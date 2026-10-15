@@ -5,12 +5,12 @@ DOI [10.1145/3382734.3405749](https://doi.org/10.1145/3382734.3405749). Formaliz
 arXiv:2006.10494v1, whose Appendix A contains the proofs.
 
 **Verdict: ✅ Correct.** The main theorem (every undoable CRDT is equivalent to a tuple of counters and modular
-counters), Propositions 1–3, Facts 1–6 and the Section 3 consequences all hold under the paper's own definitions.
-There are only typos, one point of reading that matters, and one degenerate edge case.
+counters), Propositions 1–3, Facts 1–6 and the Section 3 consequences hold under the paper's own definitions (the
+last up to one degenerate edge case). There are only typos, one point of reading that matters, and that edge case.
 
 ## Mistakes in the paper
 
-There are no false statements. Three points are worth knowing.
+Apart from the degenerate edge case below, there are no false statements. Three points are worth knowing.
 
 - **Axiom 1 must include `p = q` (a clarification, not an error).** Axiom 1 has no distinctness condition, and
   Fact 2 uses "Commutativity with a = b", so the paper is consistent. The introductory prose ("any two primitive
@@ -29,7 +29,8 @@ There are no false statements. Three points are worth knowing.
 - **Typos.**
   - In the definition of equivalence (Section 2.2), `φ⁻¹(s') · ψ'(p)` should be `ψ'(p')`.
   - In the proof of Proposition 3, `s₀ · ψ(a) · ψ(p)` should be `s₀' · ψ(a) · ψ(p)`.
-  - In Section 2.5, "by fact 5, s · a⁻¹ₛ ok" should cite Fact 4.
+  - In Section 2.5, "by fact 5, s · a⁻¹ₛ ok": Fact 4 is the direct reference. This is not an error, since Fact 5
+    (`a⁻¹ₛ a ≡ₛ ε`) also gives `s · a⁻¹ₛ ok`, as `≡ₛ` requires both sides to be defined.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

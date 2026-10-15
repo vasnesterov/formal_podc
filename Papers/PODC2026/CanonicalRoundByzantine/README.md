@@ -2,12 +2,15 @@
 
 Hagit Attiya, Itay Flam, Jennifer L. Welch. *Why Canonical-Round Algorithms Fail for Optimal Byzantine
 Resilience.* PODC 2026. DOI [10.1145/3796701.3815948](https://doi.org/10.1145/3796701.3815948). Formalized
-version: full version, arXiv [2510.04310](https://arxiv.org/abs/2510.04310).
+version: the PODC proceedings version; all theorem numbers below follow it. The full version, arXiv
+[2510.04310](https://arxiv.org/abs/2510.04310) (v2, titled *Why Canonical Rounds Fail for Optimal Byzantine
+Resilience*), numbers the results differently.
 
 **Verdict: ⚠️ Correct with fixes.** The lower bounds (Theorems 1 and 7, Corollaries 6 and 8, and their Section 3.3
 and Corollary 15 consequences) are proved, for the whole range `2f ≤ n ≤ 5f` rather than only `n = 5f`.
-Corollary 10 (broadcast) is true, but the paper's proof covers only `4f < n ≤ 5f`. Theorem 14 needs a gather
-property the paper does not state. The positive results of Section 5 are proved.
+Corollary 10 (broadcast) is true, but the paper's proof covers only `4f < n ≤ 5f`. Theorem 14 relies on the
+`i = j` case of gather agreement, which the paper uses without pointing it out. The positive results of
+Section 5 are proved.
 
 ## Mistakes in the paper
 
@@ -20,16 +23,18 @@ property the paper does not state. The positive results of Section 5 are proved.
    communication-closed algorithms, deliver the sender's messages one round late). The others then have no
    information about the sender's input, yet validity forces them to deliver it. In particular, the "sharp
    boundary at `5f`" is irrelevant for broadcast (`corollary10`, `corollary10_commClosed`).
-2. **Theorem 14 needs gather agreement also for `i = j` (unstated hypothesis).** Crusader agreement from gather
-   (Algorithm 4) requires that an output contains at most one pair per process id. If agreement is only
+2. **Theorem 14 needs gather agreement also for `i = j` (implicit in the paper).** Crusader agreement from
+   gather (Algorithm 4) requires that an output contains at most one pair per process id. If agreement is only
    required between distinct correct processes, validity (ii) fails. Instance: `n = 4`, `f = 1`, a correct
-   output with two different pairs of the faulty process. The paper's wording ("a set of distinct (process id,
-   value) pairs") is ambiguous; we require it for all correct `i, j`, including `i = j`
+   output with two different pairs of the faulty process. Read literally, the paper's agreement property ("if
+   `p_i` and `p_j` are correct") does not exclude `i = j`, so it covers this case, but the proof never says the
+   case is needed. We require agreement for all correct `i, j`, including `i = j`
    (`Gather.validity_fails_without_self_agreement`).
 3. **"`n ≤ 5f`" literally includes trivial cases (false in a degenerate case).** For `n = 1`, `f = 1` the single
    process decides its input in round 0, so Theorem 1 and Corollary 6 as literally stated fail. The paper's
    setting is `3f < n ≤ 5f`. Our proof needs only `2f ≤ n` (`literal_theorem1_fails_n1`).
-4. **Minor.** Theorem 7's proof is only a sketch ("see [8]"); it is fully formalized here. The introduction
+4. **Minor.** In the proceedings version, Theorem 7's proof is only a sketch ("see [8]"; the arXiv full
+   version gives it in full); it is fully formalized here. The introduction
    defines communication closure as discarding early *and* late messages, while Section 3.2 discards only late
    ones; we follow Section 3.2. Theorem 18 uses `|⌈a⌉ − ⌈b⌉| ≤ 1` for `|a − b| ≤ 1` without proof, and the
    paper does not show that decisions lie in `{1, …, R}` (both proved).

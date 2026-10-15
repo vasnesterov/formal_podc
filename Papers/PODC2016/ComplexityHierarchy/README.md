@@ -31,7 +31,8 @@ algorithms. But several proofs needed repair: Lemma 9.1 has a real gap, Lemma 7.
   `ℓ_v(S) = 1` it asks for an earlier scan `T` in which all laps are `0`. But every scanner has lap
   `≥ 1` on its own input from line 1, so no such `T` exists. The lemma is applied only with
   `ℓ_v(S) ≥ 2` (Lemma 8.4), where it holds. Theorem 8.8 is unaffected (invariant `SwapRead.AInv`).
-* **Lemmas 6.5 / 7.3 assume `R ≠ ∅`**, but Theorems 6.8 / 7.5 use them for `n = 2`, where `R = ∅`.
+* **The proofs of Lemmas 6.5 / 7.3 need `R ≠ ∅`** (they start from a process `p ∈ R`), but
+  Theorems 6.8 / 7.5 use them for `n = 2`, where `R = ∅`.
   The needed conclusion (at least one location) follows from a separate easy argument: with no
   locations, two processes cannot communicate (`no_locations`).
 * **Implicit steps, filled in.**

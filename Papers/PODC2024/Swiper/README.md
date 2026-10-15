@@ -14,15 +14,16 @@ prove a different, correct bound instead.
 1. **Theorem 2.4 is false (false statement).** Claimed: every weight-separation instance has a solution with
    `T ≤ (α+β)(1−α)/(β−α)·n` tickets. Counterexample: `α = 1/20`, `β = 1/10`, 8 parties of weight 14 and 13 of
    weight 1 (`n = 21`, `W = 125`). Each weight-14 party alone is heavy, all 13 unit parties together are heavy, and
-   light sets contain at most 6 unit parties. If fewer than 6 unit parties hold tickets, those (light) and all unit
-   parties (heavy) have equally many tickets, a violation. Otherwise 6 ticketed unit parties hold `≥ 6`
+   light sets contain at most 6 unit parties. If at most 6 unit parties hold tickets, those (light) and all unit
+   parties (heavy) have equally many tickets, a violation. Otherwise any 6 ticketed unit parties hold `≥ 6`
    tickets, so each weight-14 party needs `≥ 7` and the unit parties together `≥ 7`: `T ≥ 63 > 59.85`. (The
    optimum is exactly 63; for this family `OPT/n → α/β²`, here 5 versus the claimed 2.85.) This instance compares
    a set of unit parties with a superset of it, which the paper's Problem 3 allows. Under a "disjoint `S₁, S₂`"
    reading it would not be a counterexample, but item 2 refutes the proof and Swiper's guarantee under either
    reading (`ws_upper_bound_false`).
 2. **The proof in Appendix A.2 is wrong, and Swiper's weight-separation construction does not meet the bound.**
-   The proof rounds `t_i = ⌊w_i s + γ⌋` with `γ = (α+β)/2`. Case 1 (`t(S₁) ≥ γT`) is correct; case 2 is claimed
+   The proof rounds `t_i = ⌊w_i s + γ⌋` with `γ = (α+β)/2`. Case 1 (`t(S₁) ≥ γT`) is correct (up to typos: its complement bound writes `βWs` for `(1−α)Ws`, and
+   "`t(S₂) > (1−γ)T`" means `t([n]∖S₂)`); case 2 is claimed
    "analogous by substituting `1−γ` for `γ` and `1−β` for `α`". That would also require changing the rounding
    offset from `γ` to `1−γ`, which is not done, so the argument works only for `γ = 1/2`. Redone honestly, case 2
    gives `max(γ², (1−γ)²)·n` instead of `γ(1−γ)·n`. Concretely, on three parties `w = (1, 1, 15)` with the same

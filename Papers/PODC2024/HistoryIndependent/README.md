@@ -15,10 +15,11 @@ covers one fixed resolution of the `∥` interleavings**, not all of them.
 
 ## Mistakes in the paper
 
-- **The impossibility results need `n ≥ 2` (implicit scope, not an error).** Props. 6, 14, 19, Thm. 17, Cor. 18 and
+- **The impossibility results need `n ≥ 2` (implicit scope, not an error).** Props. 14, 19, Thm. 17, Cor. 18 and
   Thm. 20 all fail with a single process. That process can keep the abstract state locally and leave shared memory
   constant, which is wait-free and perfectly history independent. Example: a 3-valued register with no base objects
   at all. We assume a reader and a changer `c ≠ r` with suitable access rights. (`prop14_needs_two_processes`)
+  Prop. 6 is not affected: its proof uses a single process, and constant memory gives distance 0.
 - **Lemma 16: the case `q_k = q_{k+1}` is not handled (proof gap, morally trivial).** The construction may pick the
   same state twice in a row. Definition 13 provides `o_change(q, q')` only for `q ≠ q'`, so the changer's step is
   undefined. Fix: the changer does nothing in that round. (`thm17`)
@@ -28,8 +29,10 @@ covers one fixed resolution of the `∥` interleavings**, not all of them.
 - **Theorem 32: Theorem 28 is applied outside its hypothesis (rigor gap).** In Algorithm 5 the right side of `∥`
   (lines 6R, 18R, 25R) can jump away while the left-side `LL` is still pending. The per-object history seen by the
   R-LLSC implementation then has two pending operations of one process on one object, so it is not well-formed,
-  whereas Theorem 28 (Algorithm 6 is linearizable) is proved only for well-formed histories. The gap is easily
-  patched, since an abandoned `LL` never takes effect. Relatedly, Lemma 41 only discusses the `RL` of line 22. The
+  whereas Theorem 28 (Algorithm 6 is linearizable) is proved only for well-formed histories. The gap looks easy to
+  patch: an abandoned `LL` either never performed its successful CAS (no effect) or can be linearized at that CAS,
+  and the later `RL`/`SC` on the same object (lines 18R.2, 26, 27) clears the context bit. The paper itself notes,
+  for line 18R.2, that an abandoned `LL` may already have taken effect. Relatedly, Lemma 41 only discusses the `RL` of line 22. The
   `RL` of line 18R.2 can also run while the process is still in the context of `announce[j]` from an earlier
   iteration, and it needs the same argument.
 - **Unclear count (immaterial).** In the proof of Theorem 32, "after at most `n` mode transitions" may need `n + 1`.
@@ -38,7 +41,7 @@ covers one fixed resolution of the `∥` interleavings**, not all of them.
   `t ≥ 1` (the paper says `t ≥ 2`). The footnote-4 assumption of Lemma 15 ("no unused values") is unnecessary.
 - **Typos.**
   - Lines 6R.1 and 18R.1 read "wait until `Load(announce[i]) ∉ R`"; it must be `∈ R`.
-  - `o_change` for `o_read` in Prop. 14; `X_i` for `R_i` in Thm. 17; `α′` for `β` in Prop. 6.
+  - `o_change` for `o_read` in Prop. 14; `X_i` for `R_i` in Thm. 17; `α` for `β` in Prop. 6 ("`state(H(α)) = q₂`").
   - "`t` executions" for `t + 1` in Lemma 38. Theorem 20's proof cites Lemma 16 for Lemma 38.
   - Wrong line numbers in Theorem 12. `W` for `W₂` in Lemma 10.
 

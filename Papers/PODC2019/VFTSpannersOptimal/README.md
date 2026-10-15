@@ -7,7 +7,7 @@ Greg Bodwin, Shyamal Patel. *A Trivial Yet Optimal Solution to Vertex Fault Tole
 **Verdict: ⚠️ Correct with fixes.** Theorem 1 (the FT greedy spanner has `O(f² · b(n/f, k+1))` edges) and
 Corollary 2 (`O(f^{1−1/k} n^{1+1/k})` edges for stretch `2k−1`) hold, with explicit constants, for both
 vertex and edge faults. There are only imprecisions. The literal fault test of Algorithm 1 lets the
-fault set contain the edge's own endpoints, and Theorem 1's bound degenerates to `0` when `f = Ω(n)`.
+fault set contain the edge's own endpoints, and Theorem 1's bound degenerates to `0` when `f > n/2`.
 
 ## Mistakes in the paper
 
@@ -19,15 +19,16 @@ fault set contain the edge's own endpoints, and Theorem 1's bound degenerates to
   unambiguous, and we formalize that. The counterexample assumes that the distance to a deleted
   vertex is `∞`; if it is read as undefined, the literal test is merely ill-posed.
   (`literal_violates_corollary2`)
-* **Theorem 1 is false as stated when `f = Ω(n)`; cosmetic.** The proof dismisses this regime as
-  "trivially `O(n²)`". But once `n/f < 2`, `b(n/f, k+1) = 0`, so the stated bound is `0` even though
-  `H` has edges. With floor rounding this happens for `f > n/2`, with ceiling rounding for `f ≥ n`.
+* **Theorem 1 is false as stated for large `f` (`f > n/2`); cosmetic.** The proof dismisses the
+  regime `f = Ω(n)` as "trivially `O(n²)`". But once `n/f < 2`, `b(n/f, k+1) = 0`, so the stated
+  bound is `0` even though `H` has edges. With floor rounding this happens for `f > n/2`, with ceiling rounding for `f ≥ n`.
   We prove `|E(H)| ≤ 32 f² · max(b(⌊n/2f⌋, k+1), 1)` for all `n` and all `f, k ≥ 1`.
   (`ftGreedy_card_edges_le`)
 * **Lemma 4's `(1 + o(1))` factors hide slack.** Sampling `⌈n/2f⌉` vertices and writing the
-  probabilities as `(1+o(1))/(4f²)` and `(1+o(1))/(8f³)` assumes `f = o(n)`. With the ceiling, the
-  triple probability can even exceed `1/(8f³)`. We prove the exact, non-asymptotic counting version,
-  sampling `s` vertices with `2fs ≤ n`.
+  probabilities as `(1+o(1))/(4f²)` and `(1+o(1))/(8f³)` is only asymptotic, under the lemma's
+  hypothesis `f = o(n)`. For small `n/f` the edge probability can be well below `1/(4f²)` (e.g.
+  `1/(2f(4f−1))` for `n = 4f`); the triple probability never exceeds `1/(8f³)`. We prove the exact,
+  non-asymptotic counting version, sampling `s` vertices with `2fs ≤ n`.
 * **Small slips.**
   * The proof of Theorem 1 swaps `n` and `m` ("`n` edges and `m` nodes").
   * `f ≥ 1` is used but left implicit.

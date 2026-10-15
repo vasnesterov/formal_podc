@@ -14,7 +14,7 @@ arXiv:2105.06737v2 (numbering follows it).
 
 We found no mistakes. Two implicit assumptions are made explicit:
 - The "only if" direction of locality (Theorem 5.1) needs the empty history to be legal for every object. This
-  follows from the paper's prefix-closed, non-empty specifications.
+  follows from the paper's prefix-closed specifications, provided they are non-empty (left implicit in the paper).
 - "Total operation" (Section 3.3, Theorem 5.2) is read relative to the sequential specification: from every legal
   complete sequential history, some response makes the operation legal.
 

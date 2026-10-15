@@ -15,7 +15,8 @@ not formalized.
 No error affects the results. Minor slips and remarks:
 
 - **Lemma 2.2, "in particular" (typo).** The ball of radius `⌈log_{δ−1} n⌉` contains "a node of degree `δ` or a
-  cycle". It should read "degree `< δ`", which is what the proof gives and Algorithm 2 uses (`lemma_2_2_clog`).
+  cycle". It should read "degree `< δ`", which is what the main statement (item (i)) gives and Algorithm 2 uses
+  (`lemma_2_2_clog`). The paper gives no proof of Lemma 2.2 ("the argument is standard").
 - **Definition of `k`-sinksparse.** The definition asks for sinks at distance `≥ k`, but the proof of
   Theorem 2.1 gives `> k`; we use the stronger `> k`.
 - **Redundant hypothesis.** The hypothesis `r ≥ 1` of Lemma 2.2 is redundant: for `r = 0` the bound is 1.

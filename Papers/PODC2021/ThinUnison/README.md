@@ -42,8 +42,9 @@ paper's applications.
   on its length. (`lemma_2_22_aux`, `lemma_2_22`)
 - **Obs 2.9 / Lemma 2.20: off by one at `s = t'`.** Obs 2.9 needs `|λ_v^s| < k − d` only for `s < t'`. With
   `s = t'` included, the application in Lemma 2.20 at `d = D` fails, because `v` is at level exactly `k − D` at
-  `t'`. The paper's proof only uses `s < t'`. Lemma 2.20's conclusion for an arbitrary later `t'` also needs
-  persistence of protection, which holds only after `T₁`. (`AURun.obs29`, `lemma_2_20`)
+  `t'`. The paper's proof only uses `s < t'`. (Lemma 2.20's conclusion for an arbitrary later `t'` also needs
+  persistence of protection after `T₁`; the paper does supply this, via Lemmas 2.10 and 2.18.)
+  (`AURun.obs29`, `lemma_2_20`)
 - **Minor.**
   - Obs 2.8 omits a short extremal-point step. Pairwise distances `≤ D` imply a window of `D + 1` levels only
     because `2k > 3D`.

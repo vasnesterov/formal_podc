@@ -21,8 +21,9 @@ paper's safety proof has one gap, which we repaired with a harmless extra check.
   creation time. We add the check that a vote for view `v` may only carry a proposal and a commit certificate
   from views `< v`. Correct processes only send such votes, so liveness is unaffected. (`Protocol.ValidBallot`,
   `Protocol.ValidCC`, `Protocol.consistency`)
-- **Imprecision: commit certificates in Theorem A.4, case (3).** The proof says "a slow-path decision in view `w`
-  leaves a commit certificate for `x` in view `w` in votes′". This needs two things. First, a correct process
+- **Imprecision: commit certificates in case (3) of the Appendix A.3 safety induction (used for Theorem A.4).** The
+  proof argues that a slow-path decision for `x` in view `w` would leave a commit certificate for `x` in view `w` in
+  votes′. This needs two things. First, a correct process
   commits only for its current view; this follows from the paper's rule behind Lemma 3.1. Second, "the latest
   commit certificate" must mean the one with the highest view rather than the most recent in time. The two
   coincide once the first point holds. We make both explicit.

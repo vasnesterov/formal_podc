@@ -25,8 +25,10 @@ repaired.
   any `Λ` for arbitrary algorithms, and a computable `Λ` (in Mathlib's sense) when the algorithm's transition
   functions are computable. (`similarityCondition_of_solvable`, `similarityCondition_computable`)
 - **Implicit assumptions.**
-  - The proposal set must be nonempty. Otherwise there are no executions and Theorem 1 fails vacuously.
-  - Agreement must also cover `p = q`, i.e. a process decides at most once.
+  - The proposal set must be nonempty. Otherwise there are no executions, every algorithm vacuously solves
+    consensus, and Theorem 1 fails when also `V_O = ∅`.
+  - (Not a paper issue.) "A correct process decides at most once" is stated in the paper (§3.2); our Agreement
+    also covers `p = q` to encode it.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

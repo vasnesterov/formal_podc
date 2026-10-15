@@ -15,8 +15,9 @@ inapplicable theorem; all statements still hold for `k ≥ 2`.
    never assumes `k ≥ 2`. With one party per side, bSM is solvable with no communication on every network and
    against every adversary: each party outputs the only party on the other side. So, for example, Theorem 2's
    claim that `k = 1`, `tL = tR = 1` is unsolvable (since `1 ≥ k/3`) is false (`theorem2_only_if_false_k1`,
-   `bSM_solvable_k1`, `bSM_solvableAuth_k1`).
-2. **Lemma 13's reduction is invalid (proof error; statement true).** The proof uses Corollary 2 and Lemma 3 to
+   `bSM_solvable_k1`, `bSM_solvableAuth_k1`). (Theorems 6 and 7 are worded as "if" only, but the introduction and
+   §5.2 claim and argue necessity too; Lemma 13 and Corollary 5 fail for `k = 1` in the same way.)
+2. **Lemma 13's reduction is invalid (proof error; statement true for `k ≥ 2`).** The proof uses Corollary 2 and Lemma 3 to
    obtain an sSM protocol on 6 nodes with `tR = 3`, `tL = 1`. Lemma 3 with `d = 3` only yields
    `⌊tR/⌈k/3⌉⌋ = ⌊k/⌈k/3⌉⌋` Byzantine right parties, which is less than 3 for `k = 4, 5, 7, 8, …` (for `k = 4`:
    `4/⌈4/3⌉ = 2`). It also needs `k ≥ 3`, and Corollary 2 (unauthenticated bipartite) is irrelevant here. We run

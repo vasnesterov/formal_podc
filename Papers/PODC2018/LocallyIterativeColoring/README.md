@@ -37,10 +37,12 @@ rounds), is correct. Two other claims are false. The introduction's `2p + 1`-rou
 * **Proof gaps with true statements.**
   * Lemma 3.2 overlooks the case where the conflicting vertex already has `a = 0`. It is still true,
     since then the second coordinates differ.
-  * Corollary 3.13 needs "each neighbour blocks at most one index per round", which is never said;
-    we count blocked (round, index) pairs instead.
-  * Section 4.1's round-independent step relies on the unstated fact that a final vertex with a
-    working neighbour never recolours.
+  * Corollary 3.13's proof needs "each neighbour blocks at most one index per round", but never
+    says so. It follows from Lemma 3.11 for working neighbours and from `j = c_u` for final ones.
+    We count blocked (round, index) pairs instead.
+  * Section 4.1's round-independent step: the paper does not check that the extra recolouring rule
+    leaves the AG analysis intact. It does, because the rule's guard (all neighbours final) means a
+    final vertex with a working neighbour never recolours.
 * **Slips.**
   * Section 3.1 picks a prime `√k ≤ q ≤ 2√k` but then uses `q > 2Δ`; we use the least prime above
     `max(2Δ, ⌊√k⌋)`.

@@ -21,9 +21,10 @@ repair; the rest are minor slips.
   fact that `Z_i` does not depend on `t`. We prove this "local validity" property separately
   (`IterAlg.localValid`) and derive Theorem 1 from it. The paper's auxiliary values `m⁻ < m`,
   `M⁺ > M` turn out to be unnecessary. (`condition_of_correct`)
-* **Minor slips.**
-  * Corollary 2 (`n > 3f`) needs `n ≥ 2`: for `n = 1` the condition holds vacuously. This is the
-    paper's standing assumption (`Condition.three_mul_lt_card`).
+* **Minor slips and remarks.**
+  * Corollary 2 (`n > 3f`) needs `n ≥ 2`: for `n = 1` the condition holds vacuously. This is not a
+    slip: the paper assumes `n ≥ 2` in §2.1 and its proof starts from `2 ≤ n ≤ 3f`
+    (`Condition.three_mul_lt_card`).
   * Corollary 3: the proof takes `R = V − F − {i}` without checking `R ≠ ∅`, which Corollary 1
     requires. It follows from Corollary 2 (`|R| ≥ 2f ≥ 1`).
   * Theorem 2 (validity) does not need Corollary 3; trimming being possible suffices. Lemma 2 does

@@ -4,7 +4,7 @@ Tom-Lukas Breitkopf, Julien Dallot, Antoine El-Hayek, Stefan Schmid. *Ranking Op
 Population Protocols.* PODC 2026. DOI [10.1145/3796701.3815913](https://doi.org/10.1145/3796701.3815913).
 Formalized version: arXiv [2605.18707](https://arxiv.org/abs/2605.18707) v1.
 
-**Verdict: ❌ False claim.** Theorem 1.1 (Circles: exact majority with `k³` states) is proved, and so are
+**Verdict: ❌ False claim.** Theorem 1.1 (Circles: relative majority with `k³` states) is proved, and so are
 Theorems 4.2, 4.3, 5.1 and 5.2, under the readings explained below. **Theorem 4.1 (TieReport) is false**, and
 **the ranking protocol of Theorem 1.2 is incorrect as written**. Each has a small fix, and the fixed protocols
 are proved correct with the same state counts.
@@ -47,8 +47,8 @@ are proved correct with the same state counts.
    - Lemma 8.2 ignores tokens alive after stabilization; Lemma 8.3's proof is a sketch.
    - Lemma 8.4's "the maximum weight is in `f(G_q)`" needs an arc argument. TieBreak leaves token transfer
      between agents with equal weight and bra unspecified (we keep the token in place).
-   - "Pending agents do not interact otherwise" must also exclude Circles step (5) in the same interaction, or
-     Invariant 3.3 breaks.
+   - "Pending agents do not interact otherwise" must also exclude Circles step (5) for an agent that became
+     pending in step (4) of the same interaction, or Invariant 3.3 breaks.
    - Lemma 6.2 (backward) and 6.12 need Section 6's standing no-tie assumption; Lemma 6.12's indexing is off by
      one; the set X of Def. 6.4 is closed only as a set.
 

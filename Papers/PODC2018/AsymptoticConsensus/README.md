@@ -43,8 +43,9 @@ required to have a continuous consensus function.
   * Theorem 3, claim (8), asserts the bound "for every initial snapshot"; Lemma 13 gives only one,
     which suffices.
   * Lemma 20 needs `R(K) ≠ ∅`, which follows from the cited rootedness result [8]; we prove it.
-  * Lemma 24 swaps the endpoints of its chain relative to its own definition of `H_r`; Theorem 4
-    must be read with nonempty `N'` (for `N' = ∅` the valency is empty).
+  * Lemma 24 swaps the endpoints of its chain relative to its own definition of `H_r`. (Theorem 4
+    quantifies over network models `N' ⊆ N`, which the paper defines to be nonempty (§2); this
+    matters, since for `N' = ∅` the valency would be empty.)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

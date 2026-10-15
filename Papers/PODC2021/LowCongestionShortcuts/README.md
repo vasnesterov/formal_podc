@@ -31,8 +31,9 @@ halving round. The construction in the proof of the lower bound (Lemma 3.2) does
 - **Case (II), proof error: strictness and the edge-node count.** "At least half of the parts have degree at least
   `8δ`" yields only `≥` where the proof needs `<`. The fix is to take the exact negation of case (I): more than half
   of the parts have degree strictly greater than `8δ`. Separately, an edge-node whose `v_e` lies in no part is always
-  present, so the paper's count of edge-nodes, which assumes presence probability `1 − 1/(4D)`, is wrong. We bound
-  the number of edge-nodes by `|O|` instead. The connectivity and disjointness of the branch sets of `B_{P'}` are
+  present, so the paper's claim that each edge-node is included with probability `1 − 1/(4D)` is wrong. This is
+  harmless for the arithmetic, which only uses the bound `|O| ≤ k/c` on the number of edge-nodes, but it means the
+  strict inequality must come from the part-nodes. The connectivity and disjointness of the branch sets of `B_{P'}` are
   only asserted in the paper; we prove them.
 - **Observation 2.6 is false as stated.** Definition 2.3 lets a tree-restricted `H_i` contain tree edges far from
   `P_i`. A block of such an `H_i` need not meet `P_i`, so `G[P_i] + H_i` can be disconnected and the dilation is
@@ -40,8 +41,8 @@ halving round. The construction in the proof of the lower bound (Lemma 3.2) does
   disconnected from 0. Repair: require every block to contain a vertex of its part. We add this to Definitions
   2.4/2.5. The shortcuts built in Theorem 3.1 ("all ancestor edges of `P_i`") satisfy it.
   (`observation_2_6_counterexample`, `observation_2_6`, `blocksMeetPart_shortcut`)
-- **Observation 2.7: `log₂ n` halving rounds are not enough.** One needs `⌊log₂ n⌋ + 1` rounds; for `k = 1` part,
-  one round is needed but `log₂ 1 = 0`. The congestion becomes `c(⌊log₂ n⌋ + 1)`, which is harmless asymptotically.
+- **Observation 2.7: the proof's `log₂ k` halving rounds are not enough.** For `k` parts one needs `⌊log₂ k⌋ + 1`
+  rounds; for `k = 1` part, one round is needed but `log₂ 1 = 0`. The congestion becomes `c(⌊log₂ n⌋ + 1)`, which is harmless asymptotically.
   (`observation_2_7`)
 - **Lemma 3.2 (lower bound): the constructed graph violates the diameter bound (the proof fails; the statement is
   plausibly true).** The proof shows that every vertex is within `1.5D + 1` of the middle of the top path. That

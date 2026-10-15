@@ -33,8 +33,9 @@ corrects Section 4, and its corrected characterization (Theorem 6) is verified.
   construction. Repair: if `a, b` both lie in the triple, IIA finishes the proof. Otherwise, run the construction
   with two elements of the triple different from `a` and `b`. (`arrow_of_three`)
 - **Section 3.3 (base case via the index lemma): unstated step.** "The two remaining contributions have to be
-  `−1` each" needs each of them to lie in `{0, −1}`. This holds because a non-unanimous Condorcet cycle is oriented
-  opposite to the unanimous ones. We prove it. (`cyc_split`)
+  `−1` each" needs each of them to be `≥ −1` (a priori a cycle that is not tricoloured could contribute `±2`).
+  In fact each lies in `{0, −1}`, because a non-unanimous Condorcet cycle is oriented opposite to the unanimous
+  ones. We prove it. (`cyc_split`)
 - **Lemma 3.2 (orientability): the pairing is not a pairing when `≥ 2` coordinates are free.** We pair by flipping
   one fixed free coordinate. The boundary-edge characterization used in Figure 7 is stated without proof; we prove
   it. (`lemma_3_2`, `isBoundary_iff`)
@@ -44,7 +45,8 @@ corrects Section 4, and its corrected characterization (Theorem 6) is verified.
 - **Typos.**
   - Lemma 3.2: "`σ₃(i) = +` (resp. `+`)" should be "`−` (resp. `+`)".
   - Lemma 5.2, Step 3: `F^n(R)` should be `F^n(R')`.
-  - Section 4.2: "deleting a triangle on each cylinder" is imprecise.
+  - Full version, Section 4.2: "deleting a triangle on each of the concentric cylinders" is imprecise (two of
+    the six profiles of each are deleted).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

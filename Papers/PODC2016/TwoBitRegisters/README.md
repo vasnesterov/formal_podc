@@ -7,8 +7,9 @@ Registers in Crash-prone Systems.* PODC 2016. DOI
 
 **Verdict: ✅ Correct.** The algorithm of Figure 1 implements a linearizable SWMR register in
 `CAMP_{n,t}[t < n/2]`, and every operation of a correct process terminates. Messages carry a two-bit
-type, plus a value for two of the four types. **FIFO channels are not needed**: the parity bit and the
-`wait` at line 11 form an alternating-bit protocol. Correctness relies on the implicit (standard)
+type, plus a value for two of the four types. FIFO channels are not needed, as the paper itself
+states (§2.1 assumes non-FIFO channels): the parity bit and the `wait` at line 11 form an
+alternating-bit protocol. Correctness relies on the implicit (standard)
 convention that code between two `wait`s runs atomically. The proofs have one gap and a few slips, none
 affecting the result.
 
@@ -39,9 +40,10 @@ affecting the result.
   * Claim 3 asserts a *correct* process in the intersection of two `(n − t)`-quorums. This does not
     follow: with `n = 3`, `t = 1`, quorums `{1,2}` and `{2,3}`, `p_2` may be faulty. Correctness of
     that process is never used.
-* **Theorem 2's message complexity** (`O(n)` per read, `O(n²)` per write) holds only amortized.
-  Catch-up messages for old values (line 16) may be sent long after the write returned. We prove the
-  amortized bounds.
+* **Theorem 2's message complexity** (`O(n)` per read, `O(n²)` per write) holds when messages are
+  attributed to the operation (value) they belong to, as the paper's proof does, i.e. amortized; it
+  does not bound the messages sent *during* an operation. Catch-up messages for old values (line 16)
+  may be sent long after the write returned. We prove the amortized bounds.
 * **Index slips.**
   * Claim 3: "computed by `p_i`" should be `p_j`.
   * Claim 2: `i` and `j` are mixed in the quorum `Q_w`.

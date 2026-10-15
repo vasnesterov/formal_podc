@@ -6,7 +6,8 @@ Formalized version: arXiv:2311.08060v2 (numbering follows it). Companion of *On 
 [ValidityConsensus](../../PODC2023/ValidityConsensus)).
 
 **Verdict: ⚠️ Correct with fixes.** The main result holds: every non-trivial Byzantine agreement problem needs
-`Ω(t²)` messages, even in synchrony and even against omission faults. We prove it for every `t < n` with the
+`Ω(t²)` messages, even in synchrony (the paper proves the weak-consensus bound even against omission faults; we
+also get the omission version for every non-trivial problem). We prove it for every `t < n` with the
 explicit bound `t² ≤ 32 · #messages`, with or without signatures. The solvability characterization (Theorem 4) is
 proved too, but **Lemma 10 and the unauthenticated half of Theorem 4 are false in the degenerate case `n = 2,
 t = 1`**. We prove corrected versions.
@@ -32,7 +33,7 @@ t = 1`**. We prove corrected versions.
   proposals. That fails if the adversary may choose delays in `[0, δ]` with `δ > 0`. This is harmless: the paper's
   model is lock-step, and we prove Theorem 3 directly in the omission model for every `δ`.
 - **Minor.**
-  - Theorem 5 is stated "without loss of generality `n = 2t`"; we prove it for every `n ≤ 2t`.
+  - The proof of Theorem 5 assumes "without loss of generality `n = 2t`"; we prove it for every `n ≤ 2t`.
   - "Without loss of generality, the default is 1" before Lemma 4 is made explicit.
   - As in the 2023 paper, "Γ is computable" requires the algorithm to be computable.
 

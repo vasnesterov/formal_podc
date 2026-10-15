@@ -8,13 +8,15 @@ Yi-Jun Chang, Gopinath Mishra, Hung Thuan Nguyen, Mingyang Yang, Yu-Cheng Yeh. *
 
 **Verdict: ⚠️ Correct with fixes.** Theorem 1.1 (`Ω(log n)` for grids) and Theorem 1.3 (`Ω(√n)` for cylinders and
 tori) are proved, with explicit constants, together with Lemmas 3.3–3.6. No proof step fails, but Theorem 1.3 as
-stated omits that `√n` must be odd, and without it the claim is false.
+stated omits that `√n` must be odd (the proof chooses `√n` odd); read as a bound for all large `n`, it is false
+for even `√n`.
 
 ## Mistakes in the paper
 
-1. **Theorem 1.3 omits the parity condition (imprecise statement, false as written).** The theorem and the
-   abstract claim locality `Ω(√n)` for 3-colouring `√n × √n` toroidal and cylindrical grids, for all `n`. The proof
-   picks `√n` odd, and only a remark at the end of §2.1 mentions it. For even `√n` these graphs are bipartite, and
+1. **Theorem 1.3 omits the parity condition (imprecise statement; false if `Ω` is read "for all large `n`").** The
+   theorem and the abstract claim locality `Ω(√n)` for 3-colouring `√n × √n` toroidal and cylindrical grids, with
+   no condition on `n`. The proof picks `√n` odd; outside the proof, only §2.1 (odd-column cylinders/tori are not
+   bipartite) and the closing remark of §3.3 (the `Ω(a)` bound for `a × b` grids needs `b` odd) mention parity. For even `√n` these graphs are bipartite, and
    the `O(log n)` Online-LOCAL algorithm for bipartite graphs (the one behind Corollary 1.2) applies, so `Ω(√n)`
    cannot hold for all `n`. The correct reading is "for `√n` odd" (or "infinitely often"); we prove the general
    `a × b` form with `b ≥ 3` odd (`theorem_1_3_cylinder`, `theorem_1_3_torus`).

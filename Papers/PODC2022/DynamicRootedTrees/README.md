@@ -13,8 +13,8 @@ for all `n`. There are no errors, only small slips in FV's proofs.
 
 There are no false statements. Points worth knowing:
 
-- **BA claims one round more than FV proves (the claim is true).** BA Theorem 3.1 states `⌈(1+√2)n − 1⌉`, but FV
-  Theorem 3.6 only proves `⌈(1+√2)n⌉`. The BA bound follows from the same argument, because the pigeonhole in FV
+- **BA claims a bound one round sharper than FV proves (the claim is true).** BA Theorem 3.1 (and FV's abstract)
+  states `⌈(1+√2)n − 1⌉`, but FV Theorem 3.6 only proves `⌈(1+√2)n⌉`. The BA bound follows from the same argument, because the pigeonhole in FV
   Lemma 3.5 has slack. Take `R = n + m − 1` rounds with `m = ⌈√2 n⌉`. The edge count is at least
   `m(m+1)/2 + (n−1)m`, and this exceeds the threshold `(n−1)(n+m−1)` iff `m(m+1) > 2(n−1)²`. Optimizing `m` gives
   the slightly sharper `m + n − 1` for the least `m` with `m(m+1) > 2(n−1)²`, about `(1+√2)(n−1)`.

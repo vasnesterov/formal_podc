@@ -25,13 +25,15 @@ in the obstruction-free sense (and for `k = 1`).
    abstract are **not established for `k ≥ 2`**; whether they hold remains open
    (`exists_livelock`, `theorem_3_1_alg1_not_waitFree`).
    For `k = 1` the claim is true, but the paper's sketch does not apply. Our argument: a process other than `p`
-   can write `A[1]` only as its second write, and only if it read `⊥` there before anybody wrote it. So only
-   finitely many interfering writes on `A[1]` exist, while every two failed iterations of `p` need one
+   can write `A[2]` (the second register; `A[1]` in the 0-based Lean code) only as its second write, and only if
+   it read `⊥` there before anybody wrote it. So only finitely many interfering writes on `A[2]` exist, while
+   every two failed iterations of `p` need one
    (`theorem_3_1_k1`).
-2. **Safety argument of §3.1: wrong step, true claim.** "`k` processes are not enough to obliterate all `k + 1`
-   registers before they have to read the whole array" is false with more than `k + 1` participants: `k + 1`
-   processes poised on distinct registers can overwrite everything after a successful snapshot. Containment
-   still holds, by a counting argument over "clean" writes. A clean write by a process that has completed a
+2. **Safety argument of §3.1: gap, true claim.** The argument ("unless at least `k + 1` processes participate,
+   the set will always be a subset of at least one register … `k` processes are not enough to obliterate all
+   `k + 1` registers") covers only runs with few participants. With more than `k + 1` participants, `k + 1`
+   processes poised on distinct registers can overwrite everything after a successful snapshot, and the paper
+   does not say why containment then still holds. It does hold, by a counting argument over "clean" writes. A clean write by a process that has completed a
    collect since all registers became dirty carries a seen-set of size `≥ k + 1`, and each process makes at most
    one write without such a collect. So if all registers become clean, the union of their seen-sets is too large for a
    later output of size `≤ k` (`card_union_of_obliterate`, `alg1_solves`).
