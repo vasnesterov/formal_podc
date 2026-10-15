@@ -3,6 +3,7 @@
 Gal Sela, Maurice Herlihy, Erez Petrank. *Brief Announcement: Linearizability: A Typo.* PODC 2021, pp. 561–564.
 DOI [10.1145/3465084.3467944](https://doi.org/10.1145/3465084.3467944). Formalized version: full version
 arXiv:2105.06737v2 (numbering follows it).
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✅ Correct.** Every formalized claim holds as stated:
 - Under the original Herlihy–Wing definition (2.2), linearizability is neither local nor nonblocking.

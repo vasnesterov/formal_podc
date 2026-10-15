@@ -3,6 +3,7 @@
 Eli Gafni, Giuliano Losa, Michel Raynal, Gadi Taubenfeld. *Brief Announcement: Stranger-Free Tasks.* PODC 2025.
 DOI [10.1145/3732772.3733545](https://doi.org/10.1145/3732772.3733545). Formalized version: the brief announcement
 (no full version used).
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ❌ False claim.** Theorem 2.1 (a stranger-free task for `n` processes needs `n` registers) and the lower
 bound of Theorem 3.1 (`k`-bounded lattice agreement needs `k + 1` registers) are proved. **The upper bound of

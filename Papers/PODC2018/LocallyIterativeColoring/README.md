@@ -4,6 +4,7 @@ Leonid Barenboim, Michael Elkin, Uri Goldenberg. *Locally-Iterative Distributed 
 Szegedy–Vishwanathan Barrier, and Applications to Self-Stabilization and to Restricted-Bandwidth Models.*
 PODC 2018. DOI [10.1145/3212734.3212769](https://doi.org/10.1145/3212734.3212769). Formalized version:
 arXiv [1712.00285](https://arxiv.org/abs/1712.00285) v2 (Aug 2021).
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ❌ False claim.** The core of the paper, Section 3 (the additive-group algorithm AG, one-bit
 halving, Refine-AG, and Corollary 3.6: a locally-iterative `(Δ+1)`-colouring in `O(Δ) + log* n`

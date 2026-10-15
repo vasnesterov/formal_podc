@@ -6,6 +6,7 @@ Formalized version: the PODC version; no arXiv version exists. For the proofs th
 (Prop. 4.1, Thm. 4.2, Section 4.2) we used the full version, *A Combinatorial Topology Approach to Arrow's
 Impossibility Theorem* (MPRA 120023, 2024; Social Choice and Welfare, 2025). Numbering is the PODC one unless
 marked "full version".
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ❌ False claim.** Arrow's theorem (Thm. 2.1), its topological form (Thm. 2.2), the index lemma, the
 orientability of `N_I` and the index-lemma proof of the base case are all correct, after small repairs. **Theorem

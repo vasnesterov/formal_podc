@@ -4,6 +4,7 @@ Marc Fuchs, Fabian Kuhn. *Simpler and More General Distributed Coloring Based on
 Algorithms.* PODC 2024 (brief announcement). DOI
 [10.1145/3662158.3662808](https://doi.org/10.1145/3662158.3662808). Formalized version: full version, arXiv
 [2405.04648](https://arxiv.org/abs/2405.04648) v1.
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Correct with fixes.** The main algorithmic result (Two-Sweep, Theorem 1.1) and Theorem 1.4 are
 proved, and no stated theorem is refuted. But the construction in the proof of Lemma 4.5 has a gap, and the

@@ -3,6 +3,7 @@
 Petr Kuznetsov, Andrei Tonkikh, Yan X Zhang. *Revisiting Optimal Resilience of Fast Byzantine Consensus.* PODC 2021,
 pp. 343–353. DOI [10.1145/3465084.3467924](https://doi.org/10.1145/3465084.3467924). Formalized version: extended
 version arXiv:2102.12825v3 (numbering follows it).
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✅ Correct.** The tight bound holds: for `1 ≤ t ≤ f`, an `f`-resilient `t`-two-step consensus protocol
 exists iff `n ≥ 3f + 2t − 1` (`5f − 1` for `t = f`). We proved both directions in one formal model: the lower bound

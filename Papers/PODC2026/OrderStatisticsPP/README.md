@@ -4,6 +4,7 @@ Niccolò D'Archivio, Hind AlMahmoud, Emanuele Natale, Frederik Mallmann-Trenn. *
 Protocols via Simple Dynamics.* PODC 2026. DOI
 [10.1145/3796701.3815922](https://doi.org/10.1145/3796701.3815922). Formalized version: the proceedings
 (numbering follows it; the full version, HAL `hal-05548829`, numbers Section 4 as Section 3).
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Correct with fixes.** All laws of the consensus value are proved, also for initial configurations
 with ties: Copy-or-Max (Theorem 1, Proposition 6), Biased-Median (Theorem 2, Corollary 3), Self-Excluding Median

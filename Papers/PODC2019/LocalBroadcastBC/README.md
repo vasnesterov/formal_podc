@@ -4,6 +4,7 @@ Muhammad Samir Khan, Syed Shalan Naqvi, Nitin H. Vaidya. *Exact Byzantine Consen
 under Local Broadcast Model.* PODC 2019. DOI
 [10.1145/3293611.3331619](https://doi.org/10.1145/3293611.3331619). Formalized version: arXiv
 [1903.11677](https://arxiv.org/abs/1903.11677) v2 (full version with appendices).
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Correct with fixes.** The characterization holds for every graph with at least two nodes: under
 local broadcast, consensus tolerating `f` Byzantine faults is solvable iff the minimum degree is

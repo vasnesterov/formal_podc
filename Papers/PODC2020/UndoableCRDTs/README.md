@@ -3,6 +3,7 @@
 Stephen Dolan. *Brief Announcement: The Only Undoable CRDTs are Counters.* PODC 2020, pp. 57–58.
 DOI [10.1145/3382734.3405749](https://doi.org/10.1145/3382734.3405749). Formalized version: the full version
 arXiv:2006.10494v1, whose Appendix A contains the proofs.
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✅ Correct.** The main theorem (every undoable CRDT is equivalent to a tuple of counters and modular
 counters), Propositions 1–3, Facts 1–6 and the Section 3 consequences hold under the paper's own definitions (the

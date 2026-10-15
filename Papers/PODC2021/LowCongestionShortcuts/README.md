@@ -3,6 +3,7 @@
 Mohsen Ghaffari, Bernhard Haeupler. *Low-Congestion Shortcuts for Graphs Excluding Dense Minors.* PODC 2021,
 pp. 213–221. DOI [10.1145/3465084.3467935](https://doi.org/10.1145/3465084.3467935). Formalized version: full
 version arXiv:2008.03091v1 (numbering follows it).
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Correct with fixes.** The main result is proved: Theorem 3.1, and hence the existential Theorem 1.2.
 The block count is `8δ + 1` instead of `8δ`, and the literal `8δ` fails on the one-vertex graph. Case (II) of the

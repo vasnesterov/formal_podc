@@ -3,6 +3,7 @@
 Sean Ovens. *Determining Recoverable Consensus Numbers.* PODC 2024. DOI
 [10.1145/3662158.3662775](https://doi.org/10.1145/3662158.3662775). Formalized version: arXiv
 [2405.04775](https://arxiv.org/abs/2405.04775) v1.
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Correct with fixes.** The main result (Theorem 13: a set of deterministic types solving recoverable
 wait-free consensus among `n` processes contains an `n`-recording type) is proved, following the paper's proof.

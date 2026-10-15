@@ -3,6 +3,7 @@
 Tom-Lukas Breitkopf, Julien Dallot, Antoine El-Hayek, Stefan Schmid. *Ranking Opinions with Few States in
 Population Protocols.* PODC 2026. DOI [10.1145/3796701.3815913](https://doi.org/10.1145/3796701.3815913).
 Formalized version: arXiv [2605.18707](https://arxiv.org/abs/2605.18707) v1.
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ❌ False claim.** Theorem 1.1 (Circles: relative majority with `k³` states) is proved, and so are
 Theorems 4.2, 4.3, 5.1 and 5.2, under the readings explained below. **Theorem 4.1 (TieReport) is false**, and

@@ -5,6 +5,7 @@ Linear.* PODC 2022, pp. 54–56. DOI [10.1145/3519270.3538460](https://doi.org/1
 version: the brief announcement (BA, arXiv:2211.11352) states the result. The proofs come from the full version (FV),
 *Asymptotically Tight Bounds on the Time Complexity of Broadcast and its Variants in Dynamic Networks*, ITCS 2023,
 arXiv:2211.10151v2. The lower bound is due to Zeiner, Schwarz and Schmid (DAM 2019) and appears as FV Figure 5.
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✅ Correct.** Both bounds of BA Theorem 3.1, `⌈(3n−1)/2⌉ − 2 ≤ t*(𝒯ₙ) ≤ ⌈(1+√2)n − 1⌉`, are proved
 for all `n`. There are no errors, only small slips in FV's proofs.

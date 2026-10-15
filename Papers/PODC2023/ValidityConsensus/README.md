@@ -3,6 +3,7 @@
 Pierre Civit, Seth Gilbert, Rachid Guerraoui, Jovan Komatovic, Manuel Vidigueira. *On the Validity of Consensus.*
 PODC 2023. DOI [10.1145/3583668.3594567](https://doi.org/10.1145/3583668.3594567). Formalized version: extended
 version arXiv:2301.04920v3 (numbering follows it).
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✅ Correct.** The classification of solvable validity properties is proved: trivial ones for
 `n ≤ 3t`, and those satisfying the similarity condition `C_S` for `n > 3t`. So is the `Ω(t²)` message lower bound.

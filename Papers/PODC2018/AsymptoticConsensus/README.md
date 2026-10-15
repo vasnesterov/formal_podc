@@ -4,6 +4,7 @@ Matthias Függer, Thomas Nowak, Manfred Schwarz. *Tight Bounds for Asymptotic an
 Consensus.* PODC 2018. DOI [10.1145/3212734.3212762](https://doi.org/10.1145/3212734.3212762).
 Formalized version: arXiv [1705.02898](https://arxiv.org/abs/1705.02898) v2 (the JACM 2021 version was
 not consulted).
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ❌ False claim.** The contraction-rate lower bounds (Theorems 1, 2, 3, 5, 6) and the
 approximate-consensus bounds (Theorems 8–11) are correct. Theorems 1 and 2 are tight (Algorithm 1 and the

@@ -4,6 +4,7 @@ Achour Mostéfaoui, Michel Raynal. *Two-Bit Messages are Sufficient to Implement
 Registers in Crash-prone Systems.* PODC 2016. DOI
 [10.1145/2933057.2933095](https://doi.org/10.1145/2933057.2933095). Formalized version: arXiv
 [1602.02695](https://arxiv.org/abs/1602.02695) v1 (the only version); numbering follows it.
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✅ Correct.** The algorithm of Figure 1 implements a linearizable SWMR register in
 `CAMP_{n,t}[t < n/2]`, and every operation of a correct process terminates. Messages carry a two-bit
