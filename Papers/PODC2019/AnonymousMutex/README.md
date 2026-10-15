@@ -4,6 +4,7 @@ Zahra Aghazadeh, Damien Imbs, Michel Raynal, Gadi Taubenfeld, Philipp Woelfel. *
 Symmetric Deadlock-Free Mutual Exclusion.* PODC 2019. DOI
 [10.1145/3293611.3331594](https://doi.org/10.1145/3293611.3331594). Formalized version: arXiv
 [1810.03723](https://arxiv.org/abs/1810.03723) v1 (the only version); numbering follows it.
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ❌ False claim.** **Theorem 2 is false**: the read/write algorithm (Algorithm 1) livelocks
 for `n = 4` processes and `m = 5 ∈ M(4)` registers. So the headline tight characterization

@@ -3,6 +3,7 @@
 Michael Dinitz, Caleb Robelle. *Efficient and Simple Algorithms for Fault-Tolerant Spanners.* PODC 2020.
 DOI [10.1145/3382734.3405735](https://doi.org/10.1145/3382734.3405735). Formalized version: arXiv
 [2002.10889](https://arxiv.org/abs/2002.10889) v2.
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✅ Correct.** The sequential part (Sections 2–4) holds as stated. The modified greedy
 algorithm, which uses the length-bounded-cut approximation (Algorithm 2), outputs an `f`-VFT

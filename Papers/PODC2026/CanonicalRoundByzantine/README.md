@@ -5,6 +5,7 @@ Resilience.* PODC 2026. DOI [10.1145/3796701.3815948](https://doi.org/10.1145/37
 version: the PODC proceedings version; all theorem numbers below follow it. The full version, arXiv
 [2510.04310](https://arxiv.org/abs/2510.04310) (v2, titled *Why Canonical Rounds Fail for Optimal Byzantine
 Resilience*), numbers the results differently.
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Correct with fixes.** The lower bounds (Theorems 1 and 7, Corollaries 6 and 8, and their Section 3.3
 and Corollary 15 consequences) are proved, for the whole range `2f ≤ n ≤ 5f` rather than only `n = 5f`.

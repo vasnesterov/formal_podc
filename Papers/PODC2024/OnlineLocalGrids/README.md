@@ -5,6 +5,7 @@ Yi-Jun Chang, Gopinath Mishra, Hung Thuan Nguyen, Mingyang Yang, Yu-Cheng Yeh. *
 [10.1145/3662158.3662794](https://doi.org/10.1145/3662158.3662794). Formalized version: the conference version
 (everything formalized here is fully proved there; full version arXiv
 [2312.01384](https://arxiv.org/abs/2312.01384)).
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Correct with fixes.** Theorem 1.1 (`Ω(log n)` for grids) and Theorem 1.3 (`Ω(√n)` for cylinders and
 tori) are proved, with explicit constants, together with Lemmas 3.3–3.6. No proof step fails, but Theorem 1.3 as

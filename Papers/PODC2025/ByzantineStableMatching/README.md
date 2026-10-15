@@ -3,6 +3,7 @@
 Andrei Constantinescu, Marc Dufay, Diana Ghinea, Roger Wattenhofer. *Byzantine Stable Matching.* PODC 2025. DOI
 [10.1145/3732772.3733525](https://doi.org/10.1145/3732772.3733525). Formalized version: arXiv
 [2502.05889](https://arxiv.org/abs/2502.05889) v2 (full version with appendix; numbering follows it).
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Correct with fixes.** The solvability characterizations (Theorems 2–7) are proved for every
 `k ≥ 2`, in both directions. For `k = 1` all their "only if" directions are false. The proof of Theorem 2's

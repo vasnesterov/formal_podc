@@ -4,6 +4,7 @@ Pierre Civit, Seth Gilbert, Rachid Guerraoui, Jovan Komatovic, Anton Paramonov, 
 Agreement Problems Are Expensive.* PODC 2024. DOI [10.1145/3662158.3662780](https://doi.org/10.1145/3662158.3662780).
 Formalized version: arXiv:2311.08060v2 (numbering follows it). Companion of *On the Validity of Consensus* (PODC 2023,
 [ValidityConsensus](../../PODC2023/ValidityConsensus)).
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Correct with fixes.** The main result holds: every non-trivial Byzantine agreement problem needs
 `Ω(t²)` messages, even in synchrony (the paper proves the weak-consensus bound even against omission faults; we

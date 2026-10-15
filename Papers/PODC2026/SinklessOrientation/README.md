@@ -3,6 +3,7 @@
 Alexandre Nolin. *Brief Announcement: Sinkless Orientation Made Trivial.* PODC 2026. DOI
 [10.1145/3796701.3815953](https://doi.org/10.1145/3796701.3815953). Formalized version: the 4-page brief
 announcement (HAL `hal-05678283`); no full version was found.
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✅ Correct (deterministic part).** The paper's proofs are sketches; filled in, they hold. This covers
 the min-ID orientation (Theorem 2.1), the ball-growth Lemma 2.2, the repair procedure (Lemma 2.3) and the

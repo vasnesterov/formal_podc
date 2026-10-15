@@ -3,6 +3,7 @@
 Yuval Emek, Eyal Keren. *A Thin Self-Stabilizing Asynchronous Unison Algorithm with Applications to Fault Tolerant
 Biological Networks.* PODC 2021, pp. 93–102. DOI [10.1145/3465084.3467922](https://doi.org/10.1145/3465084.3467922).
 Formalized version: the full version, arXiv:2102.12787v2 (18 May 2021).
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ❌ False claim.** Theorem 1.1 is correct and fully proved, with explicit constants. AlgAU with
 `k = 3D + 2` (`12D + 6` states) is a self-stabilizing asynchronous unison on graphs of diameter `≤ D`, and it

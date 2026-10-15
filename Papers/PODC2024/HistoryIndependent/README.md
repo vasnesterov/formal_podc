@@ -3,6 +3,7 @@
 Hagit Attiya, Michael A. Bender, Martín Farach-Colton, Rotem Oshman, Noa Schiller. *History-Independent Concurrent
 Objects.* PODC 2024, pp. 14–24. DOI [10.1145/3662158.3662814](https://doi.org/10.1145/3662158.3662814). Formalized
 version: arXiv:2403.14445v1 (with appendices).
+Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Correct with fixes.** Every result of the paper is formalized and proved:
 - the impossibilities (Props. 6, 14, 19, Thm. 17, Cor. 18, Thm. 20);
