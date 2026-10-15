@@ -1,99 +1,95 @@
-# A Complexity-Based Hierarchy for Multiprocessor Synchronization
+# A Complexity-Based Hierarchy for Multiprocessor Synchronization — PODC 2016
 
-Faith Ellen, Rati Gelashvili, Nir Shavit, Leqi Zhu. PODC 2016, pp. 289–298.
-DOI [10.1145/2933057.2933113](https://doi.org/10.1145/2933057.2933113); full version arXiv
-[1607.06139](https://arxiv.org/abs/1607.06139) (v2, 2018; used for the formalization). Local PDF:
-`papers/2016/2933057.2933113_A_Complexity_Based_Hierarchy_for_Multiprocessor_Synchronization.pdf`.
+Faith Ellen, Rati Gelashvili, Nir Shavit, Leqi Zhu. *A Complexity-Based Hierarchy for Multiprocessor
+Synchronization.* PODC 2016. DOI [10.1145/2933057.2933113](https://doi.org/10.1145/2933057.2933113).
+Formalized version: arXiv [1607.06139](https://arxiv.org/abs/1607.06139) v2 (2018).
 
-The paper classifies instruction sets `I` by `SP(I, n)`, the number of memory locations needed
-to solve obstruction-free `n`-valued consensus among `n` processes (Table 1): upper bounds by
-algorithms, lower bounds by covering/valency arguments. Main technical results: the `ℓ`-buffer
-lower bound `⌈(n−1)/ℓ⌉` (Thm 6.8, extending Zhu's `n−1` register bound) and the multiple
-assignment lower bound `⌈(n−1)/2ℓ⌉` (Thm 7.5).
+**Verdict: ⚠️ Correct with fixes.** All formalized theorems hold as stated: the space lower bounds
+(`⌈(n−1)/ℓ⌉` ℓ-buffers, `⌈(n−1)/2ℓ⌉` locations with multiple assignment, one max-register / one
+read-write-FAI location insufficient, unboundedly many test-and-set locations) and the matching
+algorithms. But several proofs needed repair: Lemma 9.1 has a real gap, Lemma 7.1's proof is wrong
+(statement true), and Lemma 8.2 is false as stated, though never used in the false case.
 
-## Model (explicit choices)
+## Mistakes in the paper
 
-CSLib asynchronous shared-memory model `Cslib.SharedMemory`:
+* **Lemma 9.1 (test-and-set): proof gap, statement true.** The proof takes `β`, the shortest prefix of
+  `z`'s solo execution from `Cα_kξ` that ends with a test-and-set on a location `r ∉ L_k`. It then
+  reasons about `Cα_kξψβ` and `Cα_kξψψ'β`, where `ψ, ψ'` are steps of `p_1`. But in those executions
+  `z`'s preliminary steps of `β` (reads, test-and-sets on `L_k`) run *after* `ψ`, which may set
+  locations to 1. They may then return different values, so `z` need not perform `β` at all, and the
+  claims that "`β` sets `r` to 1" and that the two configurations are indistinguishable to `p_0` are
+  unjustified. Repair: run `z`'s preliminary steps first (they change no memory), so that `z` is
+  poised on `r`; its single remaining step commutes with any single step of `p_0`/`p_1`. This also
+  removes the case analysis on `ψ'`. Lemma 9.1 and Theorem 9.2 then hold as stated (`lemma_9_1`).
+* **Lemma 7.1: proof wrong, statement true.** The proof takes *any* maximal Eulerian trail
+  `r_1, …, r_t` and re-packs along it from each `r_j` to `r_t`. If the trail visits `r_t` earlier,
+  this does nothing. Example: locations `A, B, C`, processes `p1, p2, p3`, 2-packings `g = (A, B, C)`
+  and `h = (B, C, B)`. The unique maximal trail from `A` is `A→B→C→B`, and re-packing from `j = 2`
+  leaves `B` unchanged. Taking a *shortest* such sequence fixes the proof. We prove Lemma 7.2 directly
+  instead, by an augmenting-path argument (`lemma71_trail_counterexample`; `fullyPacked_of_cov`).
+* **Lemma 8.2 (swap/read algorithm): false in an unused edge case.** For a scan `S` with
+  `ℓ_v(S) = 1` it asks for an earlier scan `T` in which all laps are `0`. But every scanner has lap
+  `≥ 1` on its own input from line 1, so no such `T` exists. The lemma is applied only with
+  `ℓ_v(S) ≥ 2` (Lemma 8.4), where it holds. Theorem 8.8 is unaffected (invariant `SwapRead.AInv`).
+* **Lemmas 6.5 / 7.3 assume `R ≠ ∅`**, but Theorems 6.8 / 7.5 use them for `n = 2`, where `R = ∅`.
+  The needed conclusion (at least one location) follows from a separate easy argument: with no
+  locations, two processes cannot communicate (`no_locations`).
+* **Implicit steps, filled in.**
+  * Lemma 3.2: validity needs every scan to see a nonzero component. Otherwise the argmax of an
+    all-zero vector could be an unproposed value, since decrements lower counts.
+  * Lemma 6.6: one must truncate `α` after its first decision, so that `U'` stays undecided.
+  * Theorem 4.2 and Section 8: the step from linearizable double-collect scans to atomic-scan
+    reasoning is left implicit; we prove it (a ghost chain of
+    observed pairs for Theorem 4.2, a step-by-step simulation for Section 8).
+  * Theorem 4.2: validity needs the observation that a process seeing `m1 = (0,0)` itself wrote
+    `(0, input)`.
+  * Lemma 8.6 proves only weak validity; standard validity also holds.
+* **Typos.**
+  * The Section 7 introduction says `⌈n/2ℓ⌉` locations are necessary; Theorem 7.5 and the proof
+    give `⌈(n−1)/2ℓ⌉`.
+  * Lemma 7.3: "`Cζβ1β2`" should be "`Cξβ1β2`".
+  * Lemma 7.4: "at mostwot two".
+  * Theorem 4.2: "(r,x) ≺ (r′,x)" should be "(r,x) ≺ (r′,x′)".
+  * "Anonymous" (Section 8) is inaccurate: the swapped values carry process ids.
 
-* asynchronous, deterministic processes `P` (finite, `n = |P|`), arbitrary interleavings; no
-  explicit crashes (a process may stop taking steps); no randomization;
-* shared memory = base objects (`Impl A B P L`), each access is one atomic instruction on one
-  location; the uniformity requirement (all locations support the same instruction set) is built
-  into the base-object family (`fun _ : ι => obj`). Initial memory contents are arbitrary
-  (`Impl.memInit`, chosen by the algorithm) — the lower bounds hold for every initialization;
-* **multiple assignment** (Section 7): the whole memory of `ℓ`-buffers is one base object
-  `MB R ℓ V` (locations `R`) with `read r` and `write w` (an `ℓ-buffer-write` to every `r` with
-  `w r = some x`, atomically). Section 6's per-location model (`fun _ : ι => bufferSpec ℓ V`)
-  embeds into it (`toMB`);
-* consensus as a one-shot task (`Cslib/Computability/Distributed/SharedMemory/{Task,Consensus}.lean`): a process invokes the
-  task with its input and returns its decision; `consensus P V` = agreement + validity (decision =
-  input of a participant); lower bounds assume only `weakConsensus` (agreement + "if all
-  participants have input `v`, decide `v`"), which is implied by the paper's validity;
-* progress: obstruction-freedom. Lower bounds assume only `Impl.OneShotOF` (solo termination from
-  configurations reached by one-shot executions); upper bounds prove CSLib's full
-  `Impl.ObstructionFree`;
-* "every process has an input initially" = all processes invoked first (`Impl.Reach`).
+Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
-## Results ↔ Lean
+## The formalization
 
-Namespace `Cslib.SharedMemory.ComplexityHierarchy` unless noted.
+**Model** (CSLib asynchronous shared memory, `Cslib.SharedMemory`).
+* Deterministic processes, arbitrary interleavings, no randomization; a process may stop taking steps.
+  Every location supports the same atomic instruction set. Initial memory is arbitrary, and the lower
+  bounds hold for every initialization.
+* Multiple assignment (Section 7): the whole memory is one base object with an atomic multi-location
+  ℓ-buffer write. Section 6's per-location model embeds into it, so both lower bounds are instances
+  of one theorem (`lowerBound_core`).
+* Consensus as a one-shot task: a process participates by invoking it with its input. Lower bounds
+  assume only weak validity ("all inputs `v` ⇒ decide `v`") and only one-shot obstruction-freedom
+  (solo termination). Upper bounds prove agreement, standard validity and full obstruction-freedom.
+  Both directions are thus at least as strong as the paper's.
+* Lower bounds are proved for binary consensus and transferred to `n`-valued consensus
+  (`*_multivalued`).
 
-| Paper | Lean | File | Status |
-|---|---|---|---|
-| Lemma 3.1 (racing counters, `m`-component unbounded counter) | `lemma_3_1`, `racing_solves`, `racing_obstructionFree` | `RacingCounters.lean` | proved |
-| Lemma 3.2 (bounded counter, values in `{0..3n−1}`) | `lemma_3_2`, `racing2_solves`, `racing2_obstructionFree` | `RacingCountersBounded.lean` | proved (gap filled, see differencies) |
-| Thm 3.3 (one location: read + multiply / set-bit / add) | `theorem_3_3_multiply`, `theorem_3_3_setBit`, `theorem_3_3_add` (+ `_general`) | `RacingCounters{Multiply,SetBit,Add}.lean` | proved |
-| Thm 4.1 (one max-register is not enough) | `theorem_4_1` (any linear order of values) | `MaxRegister.lean` | proved |
-| Thm 4.2 (two max-registers suffice) | `theorem_4_2` (+ `_general`, `TwoMax.alg_safe`, `TwoMax.alg_obstructionFree`, encoding `TwoMax.encode_strictMono`) | `MaxRegisterAlg.lean` | proved |
-| Thm 5.1 (one read/write/FAI location is not enough) | `theorem_5_1` | `FetchInc.lean` | proved |
-| Lemma 6.1 (one ℓ-buffer = history object with ≤ ℓ appenders) | `lemma_6_1` (CSLib `Linearizable`), core `recon_correct` | `BufferAlg.lean` | proved |
-| Lemma 6.2 (ℓ single-writer registers from one ℓ-buffer) | not stated separately (the algorithm of Thm 6.3 appends increments directly to the group's history) | — | skipped |
-| Thm 6.3 (`⌈n/ℓ⌉` ℓ-buffers suffice for `n`-consensus) | `theorem_6_3`, `BufCons.alg_safe`, `BufCons.alg_obstructionFree` | `BufferAlgConsensus.lean` | proved (tightness / non-vacuity of Thm 6.8) |
-| Lemma 6.4 | `Impl.exists_initial_bivalent` | `Cslib/Computability/Distributed/SharedMemory/Valency.lean` | proved |
-| Lemma 6.5 / Lemma 7.3 | `key_lemma` (common generalization; needs `R ≠ ∅`) | `CoreLemma.lean` | proved |
-| Lemma 6.6 | `Impl.Reach.exists_two_deciders` | `Cslib/Computability/Distributed/SharedMemory/Valency.lean` | proved |
-| Lemma 6.7 / Lemma 7.4 | `zhu_induction` (with `k`-packings, `k = ℓ` or `2ℓ`) | `Zhu.lean` | proved |
-| Thm 6.8 (`⌈(n−1)/ℓ⌉` ℓ-buffers necessary) | `theorem_6_8`, `theorem_6_8_ceil`; Zhu's `n−1` registers: `zhu_registers` | `BufferLB.lean` | proved |
-| Lemma 7.1 | not used; replaced by augmenting paths (`exists_packing_lt_of_walk`); the proof's maximal-trail claim is refuted by `lemma71_trail_counterexample` | `Packing.lean` | statement fine, proof gap documented |
-| Lemma 7.2 | `fullyPacked_of_cov` | `Packing.lean` | proved (different proof) |
-| Thm 7.5 (`⌈(n−1)/2ℓ⌉` locations with multiple assignment) | `theorem_7_5`, `theorem_7_5_ceil` | `BufferLB.lean` | proved |
-| Lemmas 8.1–8.6 (swap/read algorithm, atomic-scan level) | `SwapRead.AInv`, `SwapRead.AInv.agree`, `SwapRead.AInv.valid` | `SwapAlgAbstract.lean` | proved (strong validity; Lemma 8.2 needs ℓ ≥ 2) |
-| Thm 8.8 (`n−1` read/swap locations suffice), Lemma 8.7 (termination part) | `theorem_8_8`, `swapAlg_solves`, `swapAlg_obstructionFree`; double collect reduced to atomic scans by `SInv.sim` | `SwapAlg.lean`, `SwapAlgOF.lean` | proved (the `3n−2` scan bound not formalized) |
-| Lemma 9.1 | `lemma_9_1` (finitely many locations, `[Fintype ι]`) | `TestAndSet.lean` | proved (proof repaired) |
-| Thm 9.2 (read + test-and-set: unbounded number of locations, `n ≥ 3`) | `theorem_9_2` (binary), `theorem_9_2_multivalued` (`n`-consensus): for every *finite* set of locations (`[Fintype ι]`) no algorithm exists | `TestAndSet.lean`, `NConsensus.lean` | proved |
-| "lower bounds for binary consensus apply to `n`-consensus" | `Impl.toBinary`, `solves_toBinary`, `oneShotOF_toBinary`; `theorem_{4_1,5_1,6_8,7_5,9_2}_multivalued` | `Cslib/Computability/Distributed/SharedMemory/BinaryReduction.lean`, `NConsensus.lean` | proved |
+**Main results in Lean.**
 
-### Not formalized
+| Paper | Lean | File |
+|---|---|---|
+| Lemmas 3.1, 3.2 (racing counters) | `lemma_3_1`, `lemma_3_2` | `RacingCounters.lean`, `RacingCountersBounded.lean` |
+| Theorem 3.3 (one location: multiply / set-bit / add) | `theorem_3_3_multiply`, `theorem_3_3_setBit`, `theorem_3_3_add` | `RacingCounters{Multiply,SetBit,Add}.lean` |
+| Theorems 4.1, 4.2 (max-registers) | `theorem_4_1`, `theorem_4_2` | `MaxRegister.lean`, `MaxRegisterAlg.lean` |
+| Theorem 5.1 (read/write/FAI) | `theorem_5_1` | `FetchInc.lean` |
+| Lemma 6.1, Theorem 6.3 (ℓ-buffer algorithms) | `lemma_6_1`, `theorem_6_3` | `BufferAlg.lean`, `BufferAlgConsensus.lean` |
+| Lemmas 6.5/7.3, 6.7/7.4 | `key_lemma`, `zhu_induction` | `CoreLemma.lean`, `Zhu.lean` |
+| Theorem 6.8 (and Zhu's `n−1` registers) | `theorem_6_8`, `theorem_6_8_ceil`, `zhu_registers` | `BufferLB.lean` |
+| Lemma 7.2, Theorem 7.5 | `fullyPacked_of_cov`, `theorem_7_5`, `theorem_7_5_ceil` | `Packing.lean`, `BufferLB.lean` |
+| Theorem 8.8 (`n−1` swap/read locations) | `theorem_8_8` | `SwapAlgOF.lean` |
+| Lemma 9.1, Theorem 9.2 | `lemma_9_1`, `theorem_9_2`, `theorem_9_2_multivalued` | `TestAndSet.lean`, `NConsensus.lean` |
 
-* Lemma 5.2 / Thm 5.3 (`O(log n)` locations with read/write/increment): needs composition of
-  consensus sub-protocols, for which there is no infrastructure (CSLib has no composition theorem).
-* Thms 9.3/9.4 and the Table 1 entries that cite other papers ([GR05], [Bow11], [FHS98], [EGZ18]).
-* The remarks after Thm 6.8 (heterogeneous capacities: sum of capacities `≥ n−1`; other
-  instruction sets simulated by ℓ-buffers) and the corresponding remark for Section 7.
+**Not formalized.** Lemma 5.2 / Theorem 5.3 (needs composition of consensus protocols), Theorems
+9.3–9.4, Table 1 entries cited from other papers, the remarks on heterogeneous capacities, and the
+`3n−2` scan bound of Lemma 8.7 (only solo termination is proved).
 
-## Infrastructure built
-
-* `Cslib/Computability/Distributed/SharedMemory/Consensus.lean` — consensus tasks (`consensus`, `weakConsensus`).
-* `Cslib/Computability/Distributed/SharedMemory/Valency.lean` — valency framework for binary consensus (`BinCons`, `Steps`,
-  `CanDecide`, `Bivalent`, `Reach`, agreement lemmas, solo decisions, initial configurations,
-  Lemmas 6.4 and 6.6).
-* `Cslib/Computability/Distributed/SharedMemory/BinaryReduction.lean` — multivalued → binary consensus reduction.
-* Paper folder: `Buffer.lean` (ℓ-buffer memory with multiple assignment, block-write
-  obliteration), `Packing.lean` (k-packings, Lemma 7.2), `CoreLemma.lean`, `Zhu.lean`.
-
-## CSLib candidates
-
-* `Cslib/Computability/Distributed/SharedMemory/{Consensus,Valency,BinaryReduction}.lean` (now in CSLib).
-* `Packing.lean` (pure combinatorics of capacitated assignments; augmenting paths).
-* From the racing-counters files: `cntF_update`, `respsOf_ret_single`; from `BufferAlg.lean`: `GoodW`/`recon_correct` (history object from an ℓ-buffer), `BufCons.AgreeV`; `swapLoc` (read/swap base object).
-* `Config.ext'` (CSLib's `Config` has no `@[ext]`).
-
-## Status
-
-Complete for the formalized results: no `sorry`/`axiom` in any file of this folder or in
-`Cslib/Computability/Distributed/SharedMemory/{Consensus,Valency,BinaryReduction}.lean`; all modules build and import
-together without name clashes; `#print axioms` / `lean_verify` of the main theorems
-(`theorem_3_3_*`, `lemma_3_1/3_2`, `theorem_4_1/4_2`, `theorem_5_1`, `lemma_6_1`, `theorem_6_3`,
-`theorem_6_8`, `theorem_7_5`, `theorem_8_8`, `lemma_9_1`, `theorem_9_2`, `*_multivalued`) shows only
-`propext`, `Classical.choice`, `Quot.sound`. Algorithms were model-checked in Python/C++ (small
-parameters) before proving. Model-checking scripts were not kept in the repo.
+**Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
+`Quot.sound`. The upper bounds (Theorems 6.3, 8.8) also show that the lower bounds are not vacuous.
+Model, consensus tasks, valency framework (Lemmas 6.4, 6.6) and the binary reduction come from CSLib
+`Cslib/Computability/Distributed/SharedMemory/`.

@@ -1,91 +1,72 @@
-# The Only Undoable CRDTs are Counters (PODC 2020)
+# The Only Undoable CRDTs are Counters — PODC 2020
 
-Stephen Dolan. *Brief Announcement: The Only Undoable CRDTs are Counters.* PODC 2020, pp. 57–58,
-DOI 10.1145/3382734.3405749.
-- Formalized version: the full version **arXiv:2006.10494v1** (18 Jun 2020), which adds Appendix A
-  with the proofs. Local copy: `papers/2020/3382734.3405749_Brief_Announcement_The_Only_Undoable_CRDTs_are_Counters.pdf`.
-- The paper has a **single author, Stephen Dolan** (OCaml Labs). W. Yu, V. Elvinger and C.-L. Ignat
-  are the authors of reference [7] (a generic undo for state-based CRDTs, OPODIS 2019), not of this
-  paper.
+Stephen Dolan. *Brief Announcement: The Only Undoable CRDTs are Counters.* PODC 2020, pp. 57–58.
+DOI [10.1145/3382734.3405749](https://doi.org/10.1145/3382734.3405749). Formalized version: the full version
+arXiv:2006.10494v1, whose Appendix A contains the proofs.
 
-## Status
+**Verdict: ✅ Correct.** The main theorem (every undoable CRDT is equivalent to a tuple of counters and modular
+counters), Propositions 1–3, Facts 1–6 and the Section 3 consequences all hold under the paper's own definitions.
+There are only typos, one point of reading that matters, and one degenerate edge case.
 
-**Complete. No `sorry`, no axioms.** `#print axioms` on every result below reports at most
-`propext`, `Classical.choice` and `Quot.sound`. Build with
-`lake build Papers.PODC2020.UndoableCRDTs.Counterexamples` (which imports everything).
+## Mistakes in the paper
 
-**The paper is correct.** The main theorem and Propositions 1–3 hold under the paper's own
-definitions. All of Facts 1–6 and the Section 3 consequences hold too. See `differencies.md`.
-- **Clarification: Axiom 1 includes `p = q`.** Axiom 1 has no distinctness condition, and Fact 2
-  explicitly applies "Commutativity with `a = b`". Only the prose "any two primitive operations"
-  is ambiguous. The case matters: with Axiom 1 for distinct operations only, the nonnegative
-  counter satisfies all hypotheses but is equivalent to no undoable CRDT (`nnCounter_not_equiv`).
-- **Minor edge case:** "all operations are always valid" (Section 3) holds for operations that
-  apply in at least one state. The definitions also allow "dead" operations that apply nowhere
-  (`deadOp`).
-- **Typos:** ψ'(p) for ψ'(p') in Section 2.2; `s₀ · ψ(a) · ψ(p)` for `s₀' · …` in the proof of
-  Proposition 3; "by fact 5" for "by fact 4" in Section 2.5.
+There are no false statements. Three points are worth knowing.
 
-## Model (explicit)
+- **Axiom 1 must include `p = q` (a clarification, not an error).** Axiom 1 has no distinctness condition, and
+  Fact 2 uses "Commutativity with a = b", so the paper is consistent. The introductory prose ("any two primitive
+  operations … commute") could be read as "two *different* operations", and under that reading the theorem is false.
+  The nonnegative counter (states ℕ, `dec` undefined at 0) commutes for distinct operations, is undoable, has
+  finitely many operations and every state is reachable. Yet it is equivalent to no undoable CRDT, so it is not a
+  tuple of counters. Under the paper's literal Axiom 1 it is simply not a CRDT: from state 0, `inc` then `dec` with
+  `p = q = dec` breaks the axiom. (`nnCounter_commutativeDistinct`, `nnCounter_not_equiv`,
+  `nnCounter_not_commutative`)
+- **"All operations are always valid" (Section 3) fails for dead operations (degenerate case).** The definitions
+  allow a primitive operation that applies in no state. A one-state CRDT with one such operation is undoable. The
+  correct statement, which we prove, is that an action applying in *some* state applies in *every* state. The same
+  caveat applies to "negative states always exist". The main theorem is unaffected, because the paper's equivalence
+  only constrains applicable operations, so dead operations can be mapped to the empty action.
+  (`deadOp_not_valid`, `all_operations_valid`, `negative_states`)
+- **Typos.**
+  - In the definition of equivalence (Section 2.2), `φ⁻¹(s') · ψ'(p)` should be `ψ'(p')`.
+  - In the proof of Proposition 3, `s₀ · ψ(a) · ψ(p)` should be `s₀' · ψ(a) · ψ(p)`.
+  - In Section 2.5, "by fact 5, s · a⁻¹ₛ ok" should cite Fact 4.
 
-The model is purely algebraic, with no replicas, network, failures or randomness. It is the
-paper's abstraction of operation-based CRDTs (Shapiro et al.'s CmRDTs). Concurrency is captured
-entirely by Axiom 1.
-- `OpSystem`: states `S`, an initial state `s0`, primitive operations `P`, and partial functions
-  `app p : S → Option S`.
-- Actions are `List P`, applied left to right: `act s [p, q] = s · p · q`. `Ok s a` means `s · a`
-  is well defined.
-- `CRDT`: `P` is finite, every state is reachable from `s0`, and Axiom 1 (`Commutative`) holds.
-- `UndoableCRDT`: a `CRDT` that also satisfies Axiom 2 (`Undoable`).
-- `CRDTEquiv C₁ C₂`: the paper's equivalence (Section 2.2), stated literally. It consists of a
-  bijection `φ` with `φ s0 = s0'` and translations `ψ : P₁ → P₂*` and `ψ' : P₂ → P₁*` that
-  simulate every *applicable* operation in each direction.
-- The group of actions `G s` is the quotient of the actions applicable in `s` by `≡ₛ`. It is
-  written additively and has an `AddCommGroup` instance.
-- Counters: `OpSystem.modCounter n` has states `ZMod n`, initial state `0`, and the operations
-  `inc` and `dec`. For `n = 0` this is the unbounded counter, since `ZMod 0 = ℤ` definitionally.
-  `UndoableCRDT.counters m` is the tuple of the counters modulo `m i`, for `i` in a finite index
-  type.
+Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
-## Main results ↔ Lean (namespace `UndoableCRDTs`)
+## The formalization
+
+**Model.** Purely algebraic, exactly as in the paper, with no replicas, network, failures or randomness.
+- An `OpSystem` has states `S`, an initial state `s0`, primitive operations `P`, and partial maps
+  `app p : S → Option S`. Actions are lists of operations applied left to right.
+- A `CRDT` additionally has finitely many operations, every state reachable from `s0`, and Axiom 1 stated literally
+  for all `p, q`. An `UndoableCRDT` also satisfies Axiom 2.
+- `CRDTEquiv` is the paper's equivalence of Section 2.2, verbatim (with the `ψ'(p')` typo fixed). It consists of a
+  bijection of states and translations of operations into actions in both directions, constrained only on
+  applicable operations.
+- Counters: `OpSystem.modCounter n` has states `ZMod n` (the unbounded counter is `n = 0`). `counters m` is
+  the tuple of counters modulo `m i`, indexed by an arbitrary finite type.
+
+**Main results in Lean** (namespace `UndoableCRDTs`).
 
 | Paper | Lean | File |
 |---|---|---|
-| Section 2: CRDT, Axiom 1, Axiom 2 | `CRDT`, `UndoableCRDT`, `OpSystem.Commutative`, `OpSystem.Undoable`, `OpSystem.Reachable` | `Defs.lean` |
-| Section 2.2: equivalent CRDTs | `CRDTEquiv` | `Defs.lean` |
-| Section 2.3: tuple construction | `OpSystem.tuple`, `CRDT.tuple`, `UndoableCRDT.tuple` (`tuple_commutative`, `tuple_undoable`, `tuple_reachable`) | `Defs.lean`, `Counters.lean` |
-| Section 1.1: (modulo-n) counter is an undoable CRDT | `UndoableCRDT.modCounter` | `Counters.lean` |
-| **Proposition 1** (commutativity of actions) | `OpSystem.prop1` | `Actions.lean` |
-| **Proposition 2** (undoability of actions) | `OpSystem.prop2` | `Actions.lean` |
+| Proposition 1 (actions commute) | `OpSystem.prop1` | `Actions.lean` |
+| Proposition 2 (actions are undoable) | `OpSystem.prop2` | `Actions.lean` |
 | Facts 1–6 | `OpSystem.fact1` … `OpSystem.fact6` | `Actions.lean` |
-| Section 2.4: `G_s` is an abelian group | `UndoableCRDT.G`, `instAddCommGroupG` | `Group.lean` |
-| Section 2.5: `G_s` is finitely generated | `instance : AddGroup.FG (C.G s)`, `groupOfActions_fg` | `Group.lean`, `Main.lean` |
-| (implicit) states ≅ `G_{s₀}` | `UndoableCRDT.stateEquiv` | `Group.lean` |
-| **Proposition 3** (isomorphic `G_{s₀}` ⇒ equivalent) | `UndoableCRDT.prop3` | `Group.lean` |
-| Section 2.6: the group of actions of a tuple of counters is `⊕ ℤ/mᵢ` | `UndoableCRDT.countersGroupEquiv` | `Counters.lean` |
-| **Theorem** (every undoable CRDT is equivalent to a tuple of counters / modulo counters) | `theorem_main` (moduli are `0` or prime powers) | `Main.lean` |
-| Section 3: "all operations are always valid" | `all_operations_valid` (for operations valid somewhere); `deadOp`, `deadOp_not_valid` | `Main.lean`, `Counterexamples.lean` |
-| Section 3: "negative states always exist" | `negative_states` | `Main.lean` |
-| Section 3: trade-off (not undoable / infinitely many states / all operations cyclic) | `tradeoff`, `finite_states_periodic` | `Main.lean` |
-| Section 3: no undoable nonnegative counter | `nnCounter_not_equiv` (equivalent to no undoable CRDT); also `nnCounter_not_commutative` (it violates Axiom 1 with `p = q`) | `Counterexamples.lean` |
-| (new) Axiom 1 with `p = q` is essential | `nnCounter_commutativeDistinct`, `nnCounter_undoable`, `nnCounter_not_equiv` | `Counterexamples.lean` |
+| §2.4–2.5: `G_s` is a finitely generated abelian group; states ≅ `G_{s₀}` | `UndoableCRDT.G`, `groupOfActions_fg`, `UndoableCRDT.stateEquiv` | `Group.lean`, `Main.lean` |
+| Proposition 3 (isomorphic `G_{s₀}` ⇒ equivalent) | `UndoableCRDT.prop3` | `Group.lean` |
+| §2.6: group of a tuple of counters is `∏ ℤ/mᵢ` | `UndoableCRDT.countersGroupEquiv` | `Counters.lean` |
+| **Theorem** (every undoable CRDT ≃ a tuple of counters) | `theorem_main` | `Main.lean` |
+| Section 3 consequences | `all_operations_valid`, `negative_states`, `tradeoff`, `finite_states_periodic` | `Main.lean` |
+| Section 3: no undoable nonnegative counter | `nnCounter_not_equiv` | `Counterexamples.lean` |
 
-The structure theorem for finitely generated abelian groups is Mathlib's
-`AddCommGroup.equiv_free_prod_directSum_zmod`.
+`theorem_main` also records that each modulus is `0` (unbounded counter) or a prime power. The structure theorem
+for finitely generated abelian groups comes from Mathlib.
 
-## Not formalized
+**Not formalized.** The informal motivation of Section 1 (OR-Set, PN-Set, T-Set, Figure 1). The OR-Set does not
+fit the paper's model, because its removes carry observed IDs, so it has infinitely many primitive operations.
+The Section 3 trade-off is proved for every CRDT, without modelling the `2ⁿ` membership states.
 
-The motivating examples of Section 1 are not formalized: the OR-Set's failure of undo (Fig. 1),
-the PN-Set and the T-Set. They are informal, and the OR-Set does not fit the paper's model with
-finitely many primitive operations, because removes carry the observed IDs. The counter and the
-modulo counter (Section 1.1) are formalized.
-
-## CSLib candidates
-
-None for now. The framework (`OpSystem`, actions, the group of actions) is small and specific to
-this paper. If more CRDT papers are formalized, `Defs.lean` + `Actions.lean` + `Group.lean` could
-become a `Podc/CRDT/` (or CSLib) module for operation-based CRDTs.
-
-## Effort
-
-About 0.2M tokens, with no subagents.
+**Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. The
+counterexamples (`nnCounter`, `deadOp`) also show that the hypotheses are satisfiable and that the literal
+Axiom 1 is needed. Self-contained: it depends only on Mathlib.

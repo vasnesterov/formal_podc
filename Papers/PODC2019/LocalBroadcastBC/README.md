@@ -1,117 +1,88 @@
-# Exact Byzantine Consensus on Undirected Graphs under Local Broadcast Model
+# Byzantine Consensus under Local Broadcast — PODC 2019
 
-Muhammad Samir Khan, Syed Shalan Naqvi, Nitin H. Vaidya. *Exact Byzantine Consensus on Undirected
-Graphs under Local Broadcast Model.* PODC 2019, pp. 327–336. DOI
-[10.1145/3293611.3331619](https://doi.org/10.1145/3293611.3331619), arXiv
-[1903.11677](https://arxiv.org/abs/1903.11677) (v2, the full version with appendices; used here).
+Muhammad Samir Khan, Syed Shalan Naqvi, Nitin H. Vaidya. *Exact Byzantine Consensus on Undirected Graphs
+under Local Broadcast Model.* PODC 2019. DOI
+[10.1145/3293611.3331619](https://doi.org/10.1145/3293611.3331619). Formalized version: arXiv
+[1903.11677](https://arxiv.org/abs/1903.11677) v2 (full version with appendices).
 
-## Status
+**Verdict: ⚠️ Correct with fixes.** The characterization holds for every graph with at least two nodes: under
+local broadcast, consensus tolerating `f` Byzantine faults is solvable iff the minimum degree is
+`≥ 2f` and the graph is `(⌊3f/2⌋+1)`-connected. Theorem 4.1 (necessity) is false only in the degenerate
+single-node case `n = 1, f = 0`. The sufficiency proof has fixable gaps: step (b) needs simple paths,
+and Observation B.1 is used in an unstated direction.
 
-**Done. No `sorry` or `axiom`.** `lean_verify` on `consensus_iff`, `theorem_4_1`, `theorem_5_1`,
-`complete_iff` and `not_theorem_4_1_single_node` shows only `propext`, `Classical.choice` and
-`Quot.sound`. `lake build Papers.PODC2019.LocalBroadcastBC.Main` succeeds without warnings
-(apart from the generic "imports Mathlib … module system" notice).
+## Mistakes in the paper
 
-The main result (Sections 4–5: minimum degree `≥ 2f` and `(⌊3f/2⌋+1)`-connectivity are necessary
-and sufficient) is formalized completely, including the algorithm (flooding with rules (i)–(iv),
-steps (b), (c)) and Menger's theorem.
+* **Theorem 4.1 / Lemma A.2 are false for the single-node graph.** The paper uses West's definition:
+  `k`-connected requires `n > k`. With `n = 1`, `f = 0` (allowed by the standing assumption `f < n`),
+  consensus is trivial, since the node decides its own input. But the graph is not 1-connected. The
+  proof of Lemma A.2 starts "not `(⌊3f/2⌋+1)`-connected ⇒ there is a vertex cut of size
+  `≤ ⌊3f/2⌋`". This misses complete graphs with `n ≤ ⌊3f/2⌋ + 1`, which have no cut. For `f ≥ 1`,
+  Lemma A.1 (degree `≥ 2f`) excludes them; for `f = 0` only the single-node graph remains. The same
+  case breaks the §4 remark that the complete graph on `2f + 1` nodes satisfies the conditions "for
+  any `f`". We prove the statement under `n ≥ 2`. The hypothesis `f < n` is also needed: for
+  `n = 1`, `f = 1` consensus is solvable but the minimum degree is `0 < 2`.
+  (`not_theorem_4_1_single_node`, `not_degree_single_node`; repaired: `theorem_4_1`)
+* **Step (b) of Algorithm 1 needs simple paths; proof gap.** The paper lets `P_uv` be an arbitrary
+  `uv`-path avoiding `F`, and its paths are walks. If `P_wv` repeats a node `x`, then `x` discards
+  the value forwarded back to it by rule (iii). So `v` receives nothing along `P_wv` and wrongly puts
+  `w` into `N_v`, even when `w` flooded `0`. The step "`v` receives 0 along `P_wv` and correctly puts
+  `w` in `Z_v`" in Lemma 5.3 then fails. With simple paths, which Lemma 5.4 provides, the proof goes
+  through.
+* **Observation B.1 is used in an unstated direction.** It states soundness: a value received along
+  a fault-free path is the origin's value. Lemma 5.3 also needs completeness: along every fault-free
+  *simple* path the value *does* arrive within the phase's `n` rounds. This depends on the default
+  message `(1, ⊥)` and on the round in which each path prefix is accepted. For a faulty originator,
+  "the value it floods" must be defined, as what its first-round transmission says about `⊥`. We
+  prove both directions.
+* **Smaller gaps.**
+  * Lemma 5.3 applies Lemma 5.5 to faulty `w`, but Lemma 5.5 is stated only for non-faulty nodes;
+    its proof works for any `w`.
+  * Lemma A.1's cover is described inconsistently: item 4 and the figure orient the `F²`–`W` edges
+    oppositely. The executions need item 4's version.
+  * Lemma A.2's cover edges are only "deduced from Figure 3"; we give them explicitly.
+  * Both covers tacitly need each Byzantine node to be simulated by a *single* cover node, so that
+    it can still broadcast.
+  * Lemma 5.4 cites Menger, but it follows from the definition of connectivity.
 
-**The main result is correct**, with one missing hypothesis. Theorem 4.1 (and Lemma A.2) is false
-in the degenerate case `n = 1`, `f = 0`, the single-node graph (Lean counterexample
-`not_theorem_4_1_single_node`). It holds for all `n ≥ 2`.
-Lemma A.2's proof only handles graphs with a small vertex cut; the case "`G` complete with
-`n ≤ ⌊3f/2⌋+1`" is covered by Lemma A.1 only for `f ≥ 1`. There are also smaller gaps: step (b)
-must use *simple* paths, and the completeness half of Observation B.1 is used but not stated. All
-details are in `differencies.md`.
+Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
-Not formalized: Theorem 5.6 / Appendix C (an `O(n)`-round algorithm for `2f`-connected graphs) and
+## The formalization
+
+**Model.**
+* Finite node set with a simple undirected graph known to all nodes. Synchronous lock-step rounds
+  (CSLib `LockStep`). Protocols are deterministic and history-based, and may use any message type.
+* Local broadcast is a restriction on both sides. Honest protocols send the same message to all
+  neighbours. The Byzantine adversary (static set, `|B| ≤ f`) also broadcasts, but is otherwise
+  arbitrary (covers adaptive, rushing adversaries).
+* Consensus (§3): termination, agreement, and validity (output = input of some non-faulty node);
+  binary values.
+* Impossibility quantifies over all broadcast protocols. Possibility uses Algorithm 1, with phases for
+  every `F` with `|F| ≤ f` in an arbitrary fixed order, `n` flooding rounds each, and rules (i)–(iv).
+  Ambiguities (ordering within a transmission, ties in step (c)) are resolved deterministically, and
+  the proof works for every choice of simple paths in step (b). Byzantine nodes may send arbitrary,
+  even contradictory, sets of pairs.
+
+**Main results in Lean.**
+
+| Paper | Lean | File |
+|---|---|---|
+| Theorems 4.1 + 5.1 (for `f < n`, `n ≥ 2`) | `consensus_iff` | `Main.lean` |
+| Lemmas A.1, A.2 | `lemmaA1`, `lemmaA2` | `Necessity.lean` |
+| Theorem 4.1 (with `n ≥ 2`) | `theorem_4_1` | `Necessity.lean` |
+| Theorem 4.1 false for `n = 1` | `not_theorem_4_1_single_node`, `not_degree_single_node` | `Counterexample.lean` |
+| Observation B.1 (both directions) | `floodInv` | `Flooding.lean` |
+| Lemmas 5.2, 5.3 | `lemma_5_2`, `lemma_5_3` | `Phase.lean` |
+| Lemmas 5.4, 5.5 | `exists_selSpec`, `pathsExist` | `Paths.lean` |
+| Theorem 5.1 (Algorithm 1 correct) | `theorem_5_1`, `alg1_solves` | `Sufficiency.lean` |
+| §2 remark: complete graph ⇔ `n ≥ 2f+1` | `complete_iff` | `Main.lean` |
+
+**Not formalized.** Theorem 5.6 / Appendix C (the `O(n)`-round algorithm for `2f`-connected graphs) and
 Section 6 / Appendix D (the hybrid model with equivocating faults).
 
-Rough token spend: about 0.6M tokens (paper agent plus one subagent for Menger's theorem).
-
-## Model (explicit choices)
-
-* **Network.** A finite node type `V` (`n = |V|`) with a Mathlib `SimpleGraph V` (undirected, no
-  loops). Every node knows `G`: the algorithm is a function of `G`.
-* **Synchrony.** CSLib's synchronous lock-step model `Cslib.Byzantine.LockStep`: deterministic,
-  history-based protocols (`Protocol.send p x h q`, `Protocol.decide p x h`), static Byzantine set,
-  reliable links, `Decides` = first decision.
-* **Local broadcast** (`Model.lean`). The model is the restriction in which *every* message is
-  received identically by all neighbours of its sender:
-  * honest protocols broadcast (`IsBroadcast alg`: `send p x h q` does not depend on `q`);
-  * the Byzantine adversary broadcasts (`IsLocalBroadcast s`: `adv r p q` does not depend on `q`).
-  The adversary is otherwise arbitrary: its messages are an arbitrary function of the round, which
-  for deterministic protocols covers adaptive, rushing adversaries.
-  `SolvesLB G alg Z spec`, `SolvableLB G Z spec` (some broadcast protocol, with any message type in
-  the universe of `V`, solves `spec` against all admissible Byzantine sets).
-* **Faults.** Threshold adversary `atMost f` (`|B| ≤ f`, as `Set.ncard`).
-* **Specification** (`Consensus`, Section 3): termination, validity ("the output of each
-  non-faulty node is the input of some non-faulty node"), agreement. Inputs and outputs are `Bool`.
-  For binary values this is CSLib's `BA` (`consensus_iff_BA`).
-* **Connectivity** (`Cslib/Foundations/Combinatorics/SimpleGraph/VertexConnectivity.lean`). West's definition, as in the paper:
-  `G.IsVertexConnected k` iff `k < n` and removing fewer than `k` vertices does not disconnect `G`
-  (`ReachableAvoiding`).
-* **Algorithm 1** (`Algorithm.lean`). Messages are sets of pairs `(b, Π)` (`Msg V`). A Byzantine
-  node may send any set, even infinite or containing both `(0, Π)` and `(1, Π)`. Phases: one for
-  every `F` with `|F| ≤ f`, in an arbitrary fixed order (`phases f`). Each phase has `n` flooding
-  rounds. Rules (i)–(iv) and the default message `(1, ⊥)` are as in the paper. Step (b) uses an
-  arbitrary path selection `sel` with `SelSpec` (simple `uv`-paths excluding `F`); the correctness
-  theorem holds for every such `sel`. Step (c) is as in the paper; "node-disjoint `A_v v`-paths"
-  may be walks, as in the paper. Remaining ambiguities are resolved deterministically (see
-  `differencies.md`). Nodes decide `γ` after all `|phases| · n` rounds.
-
-## Theorem ↔ Lean map
-
-Files: `Model.lean`, `Necessity.lean`, `Counterexample.lean`, `Algorithm.lean`, `Phase.lean`,
-`Flooding.lean`, `Paths.lean`, `Sufficiency.lean`, `Main.lean`. Namespace `LocalBroadcastBC`.
-Graph infrastructure in `Cslib/Foundations/Combinatorics/SimpleGraph/{VertexConnectivity,Menger}.lean` (namespace `SimpleGraph`).
-
-| Paper | Lean |
-|---|---|
-| Model (§3), local broadcast | `IsBroadcast`, `IsLocalBroadcast`, `SolvesLB`, `SolvableLB`, `atMost`, `Consensus` |
-| `k`-connectivity (§3) | `SimpleGraph.IsVertexConnected`, `SimpleGraph.ReachableAvoiding` |
-| Menger / fan lemma (§3, [West]) | `SimpleGraph.menger`, `SimpleGraph.fan`, `SimpleGraph.IsVertexConnected.fan` (`Cslib/Foundations/Combinatorics/SimpleGraph/Menger.lean`) |
-| Covering networks of Appendix A | `CoverSystem'.lbScenario`, `CoverSystem'.LBLift`, `CoverSystem'.decides_lbScenario_iff`, `twoCopy`, `twoCopy_lift`, `three_scenarios` |
-| Lemma A.1 | `lemmaA1` |
-| Lemma A.2 | `lemmaA2` (no vertex cut of size `≤ ⌊3f/2⌋`) |
-| **Theorem 4.1** (necessity) | `theorem_4_1` (with the extra hypothesis `2 ≤ n`) |
-| counterexample to literal Thm 4.1 / Lemma A.2 | `not_theorem_4_1_single_node` (`n = 1`, `f = 0`); `not_degree_single_node` (`f < n` is needed) |
-| Algorithm 1 | `alg1` (`readVal`, `newVal` = rules (i)–(iv), `recv`, `Zset`, `sets` = cases 1–4, `Accepts`, `update` = steps (b)–(c), `phases`) |
-| Observation B.1 (+ completeness) | `FloodOutcome`, `floodInv`, `floodOutcome`; flooded value `fv` |
-| Lemma 5.2 | `lemma_5_2` |
-| Lemma 5.3 | `lemma_5_3` (with `zset_eq`) |
-| Lemma 5.4 | `exists_selSpec` (`SelSpec`) |
-| Lemma 5.5 | `pathsExist` (`PathsExist`, `DisjointPaths`; cases `disjointPaths_fan`, `disjointPaths_degree`) |
-| **Theorem 5.1** (sufficiency) | `theorem_5_1`, `alg1_solves` |
-| Theorems 4.1 + 5.1 | **`consensus_iff`**: for `f < n`, `n ≥ 2`, `SolvableLB G (atMost f) Consensus ↔ 2f ≤ δ(G) ∧ G.IsVertexConnected (⌊3f/2⌋+1)` |
-| §2 remark: complete graph ⇔ `n ≥ 2f+1` | `complete_iff`, `top_isVertexConnected` |
-
-## Proof notes
-
-* **Necessity.** Both lemmas are FLM-style covers with two copies of every node
-  (`twoCopy c xq` on `V × Bool`; `c u i v` is the copy of the neighbour `v` that copy `(u, i)` listens
-  to). All Byzantine nodes are *single* nodes of the cover, so the simulating adversary is a local
-  broadcast adversary (`lbScenario`, `hist_lbScenario`). `three_scenarios` does the
-  `E₁/E₂/E₃` argument once; Lemmas A.1 and A.2 only define `c`, the inputs and three lifts, and
-  check the lift conditions by case analysis.
-* **Flooding.** `floodInv` is an induction over the `n` rounds of a phase. It tracks, for every
-  non-faulty node, which paths `K` have been accepted, when (round `|K| - 1`), and with which value
-  (the value `fv K.head` flooded by the first node, if all other nodes of `K` are non-faulty).
-  The default message `(1, ⊥)` in round 0 is what fixes the timing for faulty originators.
-* **Sufficiency.** `Phase.lean` proves Lemmas 5.2/5.3 for an abstract `FloodOutcome`.
-  `Sufficiency.lean` chains the phases: a validity invariant, then agreement from the phase with
-  `F = B` onwards.
-
-## Infrastructure and CSLib candidates
-
-* `Cslib/Foundations/Combinatorics/SimpleGraph/VertexConnectivity.lean` (new, now in CSLib): `ReachableAvoiding`, `Separates`,
-  `IsVertexConnected`.
-* `Cslib/Foundations/Combinatorics/SimpleGraph/Menger.lean` (new, now in CSLib, ~600 lines): Menger's theorem (vertex, set
-  version) by Göring's proof, implemented by *merging* an edge on the same vertex type; the fan lemma.
-  Mathlib has no vertex Menger theorem.
-* `Model.lean`: local broadcast predicates on top of CSLib `LockStep`, and the covering lemma with
-  single-copy Byzantine nodes (`CoverSystem'.lbScenario`, `decides_lbScenario_iff`). **CSLib
-  candidate** as an addition to `LockStep/Cover.lean`.
-* `Paths.lean`: `restrictGraph` (delete all edges at a vertex set) and walk transfer
-  (`exists_walk_restrictGraph`). Small **CSLib candidate**, together with the walk-to-list lemmas
-  `walk_support_spec`, `ne_head_of_mem_internal`, `ne_last_of_mem_internal`.
+**Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
+`Quot.sound`. The necessity proofs are FLM-style covers with two copies per node, done once in
+`three_scenarios`. Menger's theorem (vertex version) and the fan lemma were formalized for this paper,
+since Mathlib has none: `SimpleGraph.menger`, `SimpleGraph.fan` in CSLib
+`Cslib/Foundations/Combinatorics/SimpleGraph/Menger.lean`, with connectivity in
+`VertexConnectivity.lean` next to it. The round model is CSLib's `LockStep`.

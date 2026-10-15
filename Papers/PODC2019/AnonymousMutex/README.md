@@ -1,83 +1,97 @@
-# Optimal Memory-Anonymous Symmetric Deadlock-Free Mutual Exclusion
+# Memory-Anonymous Symmetric Mutual Exclusion — PODC 2019
 
-Zahra Aghazadeh, Damien Imbs, Michel Raynal, Gadi Taubenfeld, Philipp Woelfel.
-*Optimal Memory-Anonymous Symmetric Deadlock-Free Mutual Exclusion*, PODC 2019,
-DOI [10.1145/3293611.3331594](https://doi.org/10.1145/3293611.3331594); full version
-arXiv:1810.03723 (v1, the only version; local PDF
-`papers/2019/3293611.3331594_Optimal_Memory_Anonymous_Symmetric_Deadlock_Free_Mutual_Exclusion.pdf`).
-All numbering below refers to the arXiv version.
+Zahra Aghazadeh, Damien Imbs, Michel Raynal, Gadi Taubenfeld, Philipp Woelfel. *Optimal Memory-Anonymous
+Symmetric Deadlock-Free Mutual Exclusion.* PODC 2019. DOI
+[10.1145/3293611.3331594](https://doi.org/10.1145/3293611.3331594). Formalized version: arXiv
+[1810.03723](https://arxiv.org/abs/1810.03723) v1 (the only version); numbering follows it.
 
-## Model
+**Verdict: ❌ False claim.** **Theorem 2 is false**: the read/write algorithm (Algorithm 1) livelocks
+for `n = 4` processes and `m = 5 ∈ M(4)` registers. So the headline tight characterization
+`m ∈ M(n) \ {1}` for read/write anonymous memory is only half established: necessity holds, sufficiency
+does not follow from the paper. Theorems 1, 3, 4 and 5 hold, and the characterization for
+read-modify-write (compare&swap) registers is proved.
 
-Shared infrastructure (now in CSLib):
+## Mistakes in the paper
 
-* `Cslib/Computability/Distributed/SharedMemory/Mutex.lean`: lock objects on top of CSLib's asynchronous shared-memory
-  model (`Cslib.SharedMemory.Impl`): operations `lock`/`unlock`, client regions computed from the
-  history (`regionOf`: remainder → trying → CS → exiting), client well-formedness (`ClientWF`),
-  `Impl.MutualExclusion`, fairness of infinite executions (`InfExec.Fair`: a process with a pending
-  operation eventually takes a step) and `Impl.DeadlockFree` (paper §2.3: if some process has a
-  pending `lock()`/`unlock()` and nobody is in the CS, some operation completes later; fair
-  client-well-formed executions). Progress lemma `InfExec.exists_good`.
-* `Cslib/Computability/Distributed/SharedMemory/Anonymous.lean`: **memory anonymity and symmetry**. The memory is an array
-  of `m` registers (values `V`, all initially `bot`), accessed by atomic read-modify-write steps
-  `rmw x f` (any function `f`; reads, writes, compare&swap are special cases) and atomic snapshots.
-  Each process `p` has a private permutation `π p` of the register names (adversarial);
-  local name `x` means physical register `π p x`. A *symmetric algorithm* (`SymAlg`) is one
-  program for all processes; process `p` only differs by its identifier `ids p`. *Symmetry with
-  equality* is semantic: identifier renamings `Equiv.Perm Id` act on register values and local
-  states and the algorithm is equivariant (`SymAlg.Symmetric`), `bot` is not an identifier.
-  `SymAlg.impl A ids π` is the resulting CSLib implementation. `SymAlg.ReadWrite`: only reads,
-  writes and snapshots; `SymAlg.NoSnapshot`: only single-register read-modify-write accesses.
-* Asynchronous, no crashes, deterministic processes; processes may stay forever in the remainder
-  section (and, as in the paper, in the CS).
+* **Theorem 2 is false: Algorithm 1 is not deadlock-free.** With `n = 4` and `m = 5` there is a fair
+  infinite execution with a 28-step period in which all four processes stay in `lock()` forever and
+  nobody enters the CS. Each period goes as follows. All four processes snapshot the empty memory.
+  `p0` and `p1` fill it, with `p0` owning 2 registers and `p1` owning 3. `p0` (2 < 5/2) starts
+  shrinking. Then the *stale* writes of `p2` and `p3`, decided on the old empty snapshot, overwrite
+  two of `p1`'s registers. Now `p1`, `p2`, `p3` own one register each, below the averages 5/3 and
+  5/4. So everybody shrinks and the memory is empty again. The proof breaks in two places. Claim 4
+  shows only that at every time *some* competing process does not withdraw. The proof of Theorem 2
+  then concludes that some process *never* calls `shrink()`, but the non-withdrawing process may
+  change over time. Also, writes based on outdated snapshots, which can destroy the registers of
+  the process owning the most, are never considered. Claim 5's "w.l.o.g. all competing processes
+  have the same view" has the same issue. (`theorem_2_false`)
+  *Scope.* Line 6 says "write into some `x` with `view[x] = ⊥`" without fixing `x`, so Theorem 2
+  must hold for every resolution. The Lean counterexample uses "first `⊥` in the process's local
+  order". Since the permutations are adversarial, this covers every "first `⊥` w.r.t. a fixed order
+  of local names" rule. Our model checker also finds the livelock when line 6 may pick any `⊥`.
+  Rules that inspect the view's contents were not explored and might rescue the algorithm. Bounded
+  exhaustive model checking found no livelock for `n = 2` (`m ∈ {3,5,7}`) or `n = 3` (`m ∈ {5,7}`),
+  so Algorithm 1 may be correct for `n ≤ 3`; this is not proved.
+* **Theorem 4's proof is only a sketch; statement true.** "Repeating this argument, eventually one
+  of the processes will find…" ignores two things. First, Algorithm 2's views are read
+  non-atomically, so a process may count registers another process held at different times.
+  Second, a waiting process may re-enter after a non-atomic all-`⊥` scan while others still hold
+  registers. Our new proof has three steps. (1) A no-inflation lemma: a view never shows `q` owning
+  more registers than `q` owned *simultaneously* at some point of the scan. (2) Let `c*` be the
+  eventual maximum number of owned registers; a process owning `c*` registers late never withdraws.
+  (3) Once the memory is constant and full, all competitors own equally many registers, which
+  contradicts `m ∈ M(n)`. (`theorem_4`)
+* **Theorem 5's proof is confused but sound in essence.** It describes the schedule via
+  "order(pᵢ, k)", but processes do not access registers in a fixed order. The real argument is a
+  lock-step execution preserving a rotational symmetry. We use `g = gcd(ℓ, m)` processes and rotation
+  permutations; in each round they access different physical registers. (`theorem_5`)
+* **Typo.** §1.3 says `compare&swap(x, old, new)` succeeds "iff `new = v`"; it should be `old = v`.
+  The algorithm uses it correctly.
 
-Paper-specific modelling (details in `differencies.md`): registers hold `Option Id` (`none` = `⊥`);
-each loop iteration of the pseudo-code is one atomic access, the local bookkeeping between two
-accesses is folded into the continuation; Algorithm 1 uses an atomic snapshot primitive (as the
-paper assumes) and writes into the *first* `⊥` entry of its view in local order (the paper leaves
-the choice open).
+Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
-## Main results ↔ Lean
+## The formalization
 
-| Paper | Lean | File | Status |
-|---|---|---|---|
-| `M(n) = {m : ∀ ℓ, 1 < ℓ ≤ n → gcd(ℓ,m) = 1}` | `AnonymousMutex.M` | `LowerBound.lean` | def |
-| **Thm 5** (RMW lower bound: symmetric DF mutex with `m` anonymous registers ⇒ `m ∈ M(n)`) | `AnonymousMutex.theorem_5` | `LowerBound.lean` | **proved**, generalized (arbitrary RMW *and* atomic snapshots, any value/state types); also covers the RW necessity result of [15] and the model of Alg. 1 |
-| Algorithm 1 (RW + snapshot) | `Alg1.alg1`; symmetric `Alg1.alg1_symmetric`, read/write `Alg1.alg1_readWrite` | `Alg1.lean`, `Alg1Sym.lean` | def + proved |
-| **Thm 1** (Alg. 1 mutual exclusion) | `Alg1.theorem_1` (needs only `n ≤ m`), `Alg1.theorem_1_of_M` (paper's hypotheses) | `Alg1Safety.lean` | **proved** |
-| **Thm 2** (Alg. 1 deadlock-free for `m > 1`, `m ∈ M(n)`) | `AnonymousMutex.theorem_2_false`, `Alg1.Livelock.not_deadlockFree` | `Alg1Livelock.lean` | **FALSE** (`n = 4`, `m = 5`: explicit fair livelock) |
-| Algorithm 2 (compare&swap) | `Alg2.alg2`; symmetric `Alg2.alg2_symmetric` | `Alg2.lean`, `Alg2Sym.lean` | def + proved |
-| **Thm 3** (Alg. 2 mutual exclusion) | `Alg2.theorem_3` (any `m ≥ 1`) | `Alg2Safety.lean` | **proved** |
-| **Thm 4** (Alg. 2 deadlock-free for `m ∈ M(n)`) | `Alg2.theorem_4` | `Alg2DF.lean` (+ `Alg2Live`, `Alg2Inflation`, `Alg2Resign`, `Alg2Holder`, `Alg2Endgame`) | **proved** (new proof; the paper only sketches it) |
-| Tight characterization for RMW registers (§6.2, §7) | `AnonymousMutex.rmw_characterization` | `Main.lean` | **proved** |
-| RW necessity `m ∈ M(n) \ {1}` (§4.2; `m ≠ 1` cited from Burns–Lynch [3]) | `AnonymousMutex.rw_necessity'` (uses `theorem_5` and `one_register_impossible`) | `Main.lean`, `OneRegister.lean` | **proved** (the `m = 1` case is a new formal proof of the cited fact) |
-| Tight characterization for RW registers (§4.2, §7) — sufficiency | Alg. 1 fails for `n = 4`, `m = 5` (`alg1_summary`) | `Main.lean` | **not established** |
+**Model.**
+* Asynchronous shared memory (CSLib), deterministic processes, no crashes. Processes may stay in the
+  remainder (or in the CS) forever.
+* The memory is `m` registers, initially `⊥`, with atomic read-modify-write accesses and atomic
+  snapshots. Reads, writes and compare&swap are special cases.
+* **Memory anonymity:** each process has its own adversarial permutation of register names, fixed
+  for the execution.
+* **Symmetry:** one program for all processes, which differ only in their identifier. "Compare
+  identifiers only for equality" is formalized semantically: the algorithm commutes with every
+  renaming of identifiers, and `⊥` is not an identifier.
+* Deadlock-freedom follows §2.3: in every fair, client-well-formed infinite execution, if an
+  operation is pending and nobody is in the CS, some operation later completes. Fair = every process
+  with a pending operation eventually steps.
+* Granularity: each loop iteration is one atomic access; local bookkeeping is folded into the
+  preceding access. Algorithm 1 uses an atomic snapshot, as the paper assumes.
 
-The theorems are checked with `lean_verify` (axioms: `propext`, `Classical.choice`, `Quot.sound`;
-the livelock uses `decide +kernel`, which adds no axiom).
+**Main results in Lean.**
 
-## Status
+| Paper | Lean | File |
+|---|---|---|
+| Theorem 1 (Alg. 1 mutual exclusion; needs only `n ≤ m`) | `Alg1.theorem_1`, `Alg1.theorem_1_of_M` | `Alg1Safety.lean` |
+| Theorem 2 (Alg. 1 deadlock-free): **false** | `theorem_2_false` | `Alg1Livelock.lean` |
+| Theorem 3 (Alg. 2 mutual exclusion; any `m ≥ 1`) | `Alg2.theorem_3` | `Alg2Safety.lean` |
+| Theorem 4 (Alg. 2 deadlock-free for `m ∈ M(n)`) | `Alg2.theorem_4` | `Alg2DF.lean` |
+| Theorem 5 (lower bound `m ∈ M(n)`) | `theorem_5` | `LowerBound.lean` |
+| RMW characterization (§6.2, §7) | `rmw_characterization` | `Main.lean` |
+| RW necessity `m ∈ M(n) \ {1}` (§4.2) | `rw_necessity'`, `one_register_impossible` | `Main.lean`, `OneRegister.lean` |
 
-* No `sorry`, no axioms (see the table for the status of each claim).
-* **Main finding: Theorem 2 is false.** Algorithm 1 (the paper's headline read/write algorithm)
-  is not deadlock-free for 4 processes and 5 ∈ M(4) registers; the counterexample relies on
-  *stale* writes (a write into a register that was `⊥` in an old snapshot), which the proof of
-  Claims 4–5 ignores. Hence the claimed tight characterization `m ∈ M(n) \ {1}` for read/write
-  anonymous memory is not established by the paper (its necessity part holds). Exhaustive bounded
-  model checking (all register choices and shrink orders) found no livelock for `n = 2`
-  (`m ∈ {3, 5, 7}`) and `n = 3` (`m ∈ {5, 7}`); scripts in `modelcheck/` (not part of the Lean development).
-* Theorems 1, 3, 4, 5 hold. Theorem 4's proof is new (the paper's argument is a sketch that
-  ignores non-atomic views): a no-inflation lemma for non-atomic scans, an eventual-maximum
-  argument showing that some process eventually keeps its registers forever, and a final
-  counting argument using `m ∈ M(n)`.
-* Not formalized: the double-collect implementation of the snapshot (Alg. 1 uses an atomic
-  snapshot, as the paper assumes). The cited Burns–Lynch bound is only needed for `m = 1`, which
-  is proved directly (`one_register_impossible`, no symmetry needed).
+`theorem_5` is more general than the paper's. It covers arbitrary read-modify-write *and*
+snapshot accesses and any value/state types, and it needs correctness for only one identifier
+assignment. So it also yields the read/write necessity result attributed to [15]. The `m = 1` case
+of the read/write characterization, which the paper cites from Burns–Lynch, is proved directly,
+without symmetry.
 
-## CSLib candidates
+**Not formalized.** The double-collect implementation of the snapshot.
 
-* `Cslib/Computability/Distributed/SharedMemory/Mutex.lean` (lock objects, fairness, deadlock-freedom, `InfExec.exists_good`).
-* `Cslib/Computability/Distributed/SharedMemory/Anonymous.lean` (anonymous memory, symmetric algorithms, step inversion).
-* Generic helpers in paper files: `runFrom_agree`, `regionOf_filter` (`OneRegister.lean`),
-  `last_entry`, `exists_cstar`-style eventual maximum (`Alg2Holder.lean`), `finset_stab`,
-  `exists_time_all` (`Alg2Endgame.lean`), `runFrom_range` (`LowerBound.lean`).
+**Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
+`Quot.sound`. The livelock is checked by kernel computation (`decide +kernel`). Both algorithms are
+proved symmetric (`Alg1.alg1_symmetric`, `Alg2.alg2_symmetric`), and Algorithm 2 is proved
+deadlock-free, so the hypotheses are satisfiable. The bounded model checkers are in
+[`modelcheck/`](modelcheck/) and are not part of the Lean development. Lock objects, fairness and
+anonymous symmetric memory are in CSLib
+(`Cslib/Computability/Distributed/SharedMemory/{Mutex,Anonymous}.lean`).

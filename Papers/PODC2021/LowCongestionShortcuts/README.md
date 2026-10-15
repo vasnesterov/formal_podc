@@ -1,85 +1,90 @@
-# Low-Congestion Shortcuts for Graphs Excluding Dense Minors (PODC 2021)
+# Low-Congestion Shortcuts for Graphs Excluding Dense Minors — PODC 2021
 
-Mohsen Ghaffari, Bernhard Haeupler. *Low-Congestion Shortcuts for Graphs Excluding Dense Minors.*
-PODC 2021, pp. 213–221, DOI 10.1145/3465084.3467935; full version arXiv:2008.03091v1 (formalized; numbering
-follows it). Cited below as [GH21].
+Mohsen Ghaffari, Bernhard Haeupler. *Low-Congestion Shortcuts for Graphs Excluding Dense Minors.* PODC 2021,
+pp. 213–221. DOI [10.1145/3465084.3467935](https://doi.org/10.1145/3465084.3467935). Formalized version: full
+version arXiv:2008.03091v1 (numbering follows it).
 
-## Status
+**Verdict: ⚠️ Correct with fixes.** The main result is proved: Theorem 3.1, and hence the existential Theorem 1.2.
+The block count is `8δ + 1` instead of `8δ`, and the literal `8δ` fails on the one-vertex graph. Case (II) of the
+proof has three errors, all repaired. Observation 2.6 is false as stated. Observation 2.7 needs one more
+halving round. The construction in the proof of the lower bound (Lemma 3.2) does not have the claimed diameter.
 
-**Complete for the combinatorial core; no `sorry`, no axioms** (main theorems checked with `lean_verify`: only
-`propext`, `Classical.choice`, `Quot.sound`).
+## Mistakes in the paper
 
-- **Theorem 3.1** (main theorem): proved, with block number `8δ + 1` instead of `8δ` (the paper's case (I)
-  forgets the block containing the root). Congestion `8δD` as in the paper. Holds for every `δ ≥ δ(G)`. The literal
-  `8δ`-block statement is false on the one-vertex graph (`theorem_3_1_literal_false_singleton`).
-- **Observation 2.6**: proved under the extra hypothesis that every block contains a vertex of its part; **as stated
-  in the paper it is false** (Lean counterexample). The paper's own shortcuts satisfy the hypothesis.
-- **Observation 2.7**: proved with congestion `c(⌊log₂ n⌋ + 1)` instead of `c log₂ n` (one more halving round).
-- **Theorem 1.2** (existential): every connected `n`-vertex graph with diameter `≤ D` admits shortcuts with
-  congestion `8δD(⌊log₂ n⌋ + 1)` and dilation `(8δ + 1)(2D + 1)` (even tree-restricted), `δ = δ(G)`.
-- **Lemma 3.2** (lower bound): not formalized (needs planarity / Euler's formula, absent from Mathlib). We found that
-  the **construction in its proof violates the claimed diameter bound**: for `δ' = 5, D' = 12` it has diameter ≥ 15
-  (Lean proof that two vertices are at distance exactly 15). Repairable by rescaling (numerical evidence only).
-- Not formalized (distributed algorithms / cited results / other graph parameters): Lemma 1.1 [Tho01], Lemma 2.8
-  [HHW18, HIZ16a], Theorem 1.5, Corollaries 1.4, 1.6, 1.7, 3.4, Lemma 3.3 (genus/treewidth bounds; no genus or
-  treewidth theory in Mathlib), Lemma 1.3.
+- **Theorem 3.1: a part can have `8δ + 1` blocks, not `8δ` (statement off by one; false in a degenerate case).**
+  In case (I), the blocks of `P_i` are counted by their topmost vertices. The proof counts only overcongested edges
+  `(e, P_i) ∈ B`, but the topmost vertex of a block can also be the root, which has no parent edge and is never
+  overcongested. On the one-vertex graph `δ(G) = 0`, yet the part `{v}` always has one block, so `8δ = 0` blocks is
+  impossible. We prove the theorem with `8δ + 1` blocks. Whether `8δ` holds for non-degenerate graphs is left open.
+  The effect on Theorem 1.2 is dilation `(8δ + 1)(2D + 1)` instead of `8δ(2D + 1)`.
+  (`theorem_3_1_literal_false_singleton`, `theorem_3_1`)
+- **Case (II), proof error: some edges of `B` are never present in `B_{P'}`.** The lower endpoint `v_e` of an
+  overcongested edge may itself lie in a part `P_i`. Then the representative is `v_e`, so the path "from `v_e` to
+  `r` excluding `r`" is empty. Moreover, the edge-node `e` exists only if `P_i ∉ P'`, so the pair `(e, P_i)` is never
+  present, and the bound `E|E_{P'}| ≥ 3k/(16D)` is unjustified. Repair: each edge-node loses at most one such pair,
+  since parts are disjoint. We compensate with a sharper presence probability `(1 − p)^{D−1} ≥ (3D+1)/(4D)` instead
+  of `3/4`, together with `δ ≥ 1/2` for any graph with an edge. The arithmetic then closes. (`exists_blocker`,
+  `caseII_false`, `final_arith`)
+- **Case (II), proof error: representatives must be topmost.** "Some representative `r ∈ P_i` reachable from
+  `v_e` via `T \ O`" does not give the claimed independence from the event `P_i ∈ P'`. That needs the path from `v_e`
+  to `r` to avoid `P_i`, so `r` must be the first vertex of `P_i` on the way down. (`exists_rep`)
+- **Case (II), proof error: strictness and the edge-node count.** "At least half of the parts have degree at least
+  `8δ`" yields only `≥` where the proof needs `<`. The fix is to take the exact negation of case (I): more than half
+  of the parts have degree strictly greater than `8δ`. Separately, an edge-node whose `v_e` lies in no part is always
+  present, so the paper's count of edge-nodes, which assumes presence probability `1 − 1/(4D)`, is wrong. We bound
+  the number of edge-nodes by `|O|` instead. The connectivity and disjointness of the branch sets of `B_{P'}` are
+  only asserted in the paper; we prove them.
+- **Observation 2.6 is false as stated.** Definition 2.3 lets a tree-restricted `H_i` contain tree edges far from
+  `P_i`. A block of such an `H_i` need not meet `P_i`, so `G[P_i] + H_i` can be disconnected and the dilation is
+  infinite. Counterexample: the path `0 – 1 – 2` rooted at 0, part `{2}`, `H = {01}`; there are two blocks, but 2 is
+  disconnected from 0. Repair: require every block to contain a vertex of its part. We add this to Definitions
+  2.4/2.5. The shortcuts built in Theorem 3.1 ("all ancestor edges of `P_i`") satisfy it.
+  (`observation_2_6_counterexample`, `observation_2_6`, `blocksMeetPart_shortcut`)
+- **Observation 2.7: `log₂ n` halving rounds are not enough.** One needs `⌊log₂ n⌋ + 1` rounds; for `k = 1` part,
+  one round is needed but `log₂ 1 = 0`. The congestion becomes `c(⌊log₂ n⌋ + 1)`, which is harmless asymptotically.
+  (`observation_2_7`)
+- **Lemma 3.2 (lower bound): the constructed graph violates the diameter bound (the proof fails; the statement is
+  plausibly true).** The proof shows that every vertex is within `1.5D + 1` of the middle of the top path. That
+  bounds the radius, but the proof concludes "diameter ≤ 1.5D + 1 ≤ D'"; the diameter can be nearly twice as
+  large. For `δ' = 5`, `D' = 12` (so `δ = 3`, `k = 2`, `D = 6`, 174 vertices), the vertices `v_{3,3}` and `v_{10,11}`
+  are at distance exactly 15. Numerical experiments (not formal) suggest that `k = ⌊(D' − 2)/(3δ)⌋` repairs the
+  construction. Also, Figure 3.2 uses `δ' = 3`, outside the lemma's range `δ' ≥ 5`.
+  (`LowerBound.paperGraph_dist_eq`, `LowerBound.paperGraph_not_diam_le`)
 
-See `differencies.md` for all deviations.
+Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
-## Model (explicit)
+## The formalization
 
-Purely graph-theoretic; no distributed model is formalized (the paper's CONGEST algorithms come from cited work).
-- `G : SimpleGraph V`, `V` finite. "Diameter `D`": `G.Connected` and `∀ u v, G.dist u v ≤ D`.
-- Rooted spanning tree of depth `≤ D`: `G.RootedTree` (root, parent pointers, depths; `T.DepthLE D`).
-- Parts: `P : ι → Finset V`, pairwise disjoint, each inducing a connected subgraph (`G.IsParts P`).
-- Shortcut: `H : ι → Finset (Sym2 V)` (edge sets). Congestion `≤ c` (`CongestionLE`): every edge of `G` lies in at
-  most `c` of the `H i`. Dilation `≤ d` (`DilationLE`): any two vertices of `P i ∪ V(H i)` are joined by a path of
-  length `≤ d` in `G[P i] + H i`. Blocks (`numBlocks`): number of connected components of `(P i ∪ V(H i), H i)`.
-- Minor density: `G.MinorDensityLE δ` — every minor `H` (branch-set model) has `|E(H)| ≤ δ |V(H)|`;
-  `G.minorDensity` = sup (attained) of `|E(H)|/|V(H)|`.
-- Randomness: the probabilistic-method step (independent Bernoulli(`1/(4D)`) choice of parts) is a weighted sum over
-  all subsets with explicit product weights (`Bernoulli.lean`), no measure theory.
+**Model.** Purely graph-theoretic. No distributed model is formalized, because the CONGEST algorithms are cited
+from other work.
+- `G` is a finite simple graph. "Diameter `D`" means connected with all distances `≤ D`. Rooted spanning trees are
+  given by parent pointers with depths.
+- Parts are pairwise disjoint vertex sets, each inducing a connected subgraph. A shortcut is a family of edge sets
+  of `G`.
+  - Congestion bounds per-edge multiplicity.
+  - Dilation bounds the diameter of `G[P_i] + H_i`.
+  - Blocks are the components of `(P_i ∪ V(H_i), H_i)`.
+- Minors are branch-set models. `MinorDensityLE δ` means every minor has `|E| ≤ δ|V|`. `minorDensity` is the
+  (attained) supremum. Theorem 3.1 holds for every `δ ≥ δ(G)`.
+- Overcongested edges: instead of running the greedy, we take a set `O` with the greedy's fixed-point property
+  (`exists_stable`).
+- The probabilistic method (independent Bernoulli(`1/(4D)`) parts) is an explicit weighted sum over subsets, without
+  measure theory.
 
-## Theorem ↔ Lean map
+**Main results in Lean** (namespace `LowCongestionShortcuts`).
 
 | Paper | Lean | File |
 |---|---|---|
-| Def. 2.2 (shortcut, congestion, dilation) | `SimpleGraph.CongestionLE`, `SimpleGraph.DilationLE`, `partGraph` | `Cslib/Foundations/Combinatorics/SimpleGraph/Shortcut.lean` |
-| Def. 2.3 (tree-restricted, blocks) | `RootedTree.Restricts`, `numBlocks`, `BlocksMeetPart` | `Cslib/Foundations/Combinatorics/SimpleGraph/Shortcut.lean` |
-| Def. 2.4 / 2.5 (admitting (partial) shortcuts) | `AdmitsTreeShortcuts`, `AdmitsPartialTreeShortcuts` | `Cslib/Foundations/Combinatorics/SimpleGraph/Shortcut.lean` |
-| minors, `δ(G)` (Sec. 1.1) | `MinorModel`, `IsMinor`, `MinorDensityLE`, `minorDensity` | `Cslib/Foundations/Combinatorics/SimpleGraph/Minor.lean` |
-| Observation 2.6 | `LowCongestionShortcuts.observation_2_6` | `Observations.lean` |
-| Obs. 2.6 is false as stated | `observation_2_6_counterexample` | `Observations.lean` |
+| Observation 2.6 (with the block hypothesis); counterexample | `observation_2_6`, `observation_2_6_counterexample` | `Observations.lean` |
 | Observation 2.7 | `observation_2_7` | `Observations.lean` |
-| **Theorem 3.1** | `theorem_3_1` (`δ ≥ δ(G)`), `theorem_3_1_minorDensity` | `Theorems.lean` |
-| overcongested edges `O` (greedy) | `exists_stable` | `Overcongested.lean` |
-| representatives `r_(e,P_i)` | `exists_rep` (topmost) | `Overcongested.lean` |
-| case (I): shortcut, congestion, blocks | `shortcut`, `card_filter_mem_shortcut_le`, `numBlocks_shortcut_le`, `blocksMeetPart_shortcut` | `Overcongested.lean` |
-| case (II): minor `B_{P'}` is a minor | `branch_connected`, `branch_disjoint`, `present_adj`, `card_present_le` | `DenseMinor.lean` |
-| case (II): `Pr[potentially present] ≥ 3/4` | `exists_blocker` | `DenseMinor.lean` |
-| case (II): expectation / contradiction | `caseII_false`, `final_arith` | `Main.lean` |
-| Thm 3.1 literal (`8δ` blocks) false | `theorem_3_1_literal_false_singleton` | `Literal.lean` |
-| **Theorem 1.2** | `theorem_1_2` (`δ = δ(G)`), `theorem_1_2_of_minorDensityLE` | `Theorems.lean` |
-| Lemma 3.2 construction, diameter claim | `LowerBound.lbGraph`, `paperGraph_dist_eq`, `paperGraph_not_diam_le` | `LowerBoundGraph.lean` |
+| **Theorem 3.1** (`8δ + 1` blocks, congestion `8δD`) | `theorem_3_1`, `theorem_3_1_minorDensity` | `Theorems.lean` |
+| Theorem 3.1 with `8δ` blocks is false | `theorem_3_1_literal_false_singleton` | `Literal.lean` |
+| **Theorem 1.2** (congestion `8δD(⌊log₂ n⌋+1)`, dilation `(8δ+1)(2D+1)`) | `theorem_1_2`, `theorem_1_2_of_minorDensityLE` | `Theorems.lean` |
+| Lemma 3.2: construction has diameter > `D'` | `LowerBound.paperGraph_not_diam_le` | `LowerBoundGraph.lean` |
 
-## Infrastructure built (migrated to CSLib `Cslib/Foundations/Combinatorics/SimpleGraph/`)
+**Not formalized.** Lemma 3.2 itself (it needs planarity and Euler's formula); Lemmas 1.1, 1.3, 2.8, 3.3, Theorem
+1.5, Corollaries 1.4, 1.6, 1.7, 3.4 (cited results, distributed algorithms, genus/treewidth bounds).
 
-- `RootedTree.lean`: rooted spanning trees via parent pointers + depth; iterates of `parent`, tree edges
-  (`edge_injective`), `climb` (climb along a set of tree edges) with induction principle.
-- `BFSTree.lean`: BFS trees; `exists_rootedTree_depthLE` (diameter `≤ D` ⇒ spanning tree of depth `≤ D`).
-- `Minor.lean`: minor models, `IsMinor` (refl, trans, subgraphs/copies/isos), minor density
-  (`MinorDensityLE`, `minorDensity`, attained, `minorDensity_le_iff`), `half_le` (an edge ⇒ `δ ≥ 1/2`),
-  `bipartite_card_le` (bipartite minors from branch sets — the workhorse of density arguments).
-- `Shortcut.lean`, `ShortcutLemmas.lean`: shortcut definitions (congestion, dilation, blocks, (partial) admittance)
-  and the generic block ⇒ dilation lemma `RootedTree.dilationLE_of_numBlocks_le`.
-- Paper folder, reusable: `Bernoulli.lean` (independent Bernoulli subsets as finite sums: `sum_bernWeight_indicator`,
-  probabilistic method); `LowerBoundGraph.le_add_dist_of_lipschitz` (Lipschitz-potential lower bounds on `dist`).
-
-The graph infrastructure has been migrated to CSLib (`Cslib/Foundations/Combinatorics/SimpleGraph/*`; `Minor.lean` and
-`BFSTree.lean` are even Mathlib-level). **Remaining CSLib candidates:** `Bernoulli.lean`,
-`le_add_dist_of_lipschitz`.
-
-## Effort
-
-Roughly 0.6M tokens in total (main agent ≈ 0.35M, three subagents ≈ 0.25M: minor API, Observations + BFS trees,
-Lemma 3.2 counterexample). About 2200 lines of Lean.
+**Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
+The graph notions (rooted trees, BFS trees, minors and minor density, shortcuts) come from CSLib,
+`Cslib/Foundations/Combinatorics/SimpleGraph/`.

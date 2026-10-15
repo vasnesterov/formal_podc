@@ -1,79 +1,74 @@
-# Broadcasting Time in Dynamic Rooted Trees is Linear (PODC 2022)
+# Broadcasting Time in Dynamic Rooted Trees — PODC 2022
 
-Antoine El-Hayek, Monika Henzinger, Stefan Schmid. *Brief Announcement: Broadcasting Time in Dynamic Rooted
-Trees is Linear.* PODC 2022, pp. 54–56, DOI [10.1145/3519270.3538460](https://doi.org/10.1145/3519270.3538460),
-arXiv:2211.11352 (the arXiv version is also only the 5-page brief announcement).
-The proofs are in the full version: *Asymptotically Tight Bounds on the Time Complexity of Broadcast and its
-Variants in Dynamic Networks*, ITCS 2023, arXiv:2211.10151v2 (Sections 1–3, Appendix A.1–A.2). Both PDFs are in
-`src_pdf/` (don't commit them). The lower bound is due to Zeiner, Schwarz, Schmid (DAM 255, 2019), reproduced as
-Figure 5 of the full version.
+Antoine El-Hayek, Monika Henzinger, Stefan Schmid. *Brief Announcement: Broadcasting Time in Dynamic Rooted Trees is
+Linear.* PODC 2022, pp. 54–56. DOI [10.1145/3519270.3538460](https://doi.org/10.1145/3519270.3538460). Formalized
+version: the brief announcement (BA, arXiv:2211.11352) states the result. The proofs come from the full version (FV),
+*Asymptotically Tight Bounds on the Time Complexity of Broadcast and its Variants in Dynamic Networks*, ITCS 2023,
+arXiv:2211.10151v2. The lower bound is due to Zeiner, Schwarz and Schmid (DAM 2019) and appears as FV Figure 5.
 
-## Model
+**Verdict: ✅ Correct.** Both bounds of BA Theorem 3.1, `⌈(3n−1)/2⌉ − 2 ≤ t*(𝒯ₙ) ≤ ⌈(1+√2)n − 1⌉`, are proved
+for all `n`. There are no errors, only small slips in FV's proofs.
 
-- `n` processes `Fin n`; synchronous rounds `t = 1, 2, …`; in each round an **oblivious message adversary**
-  chooses a communication graph from `𝒯ₙ` = rooted (out-)trees on `Fin n` with a self-loop at every node
-  (`treesWithLoops n`, `RootedTree`). No failures, no randomness; deterministic full-information flooding
-  (each process forwards all ids it has heard of).
-- Information flow = product of the relations: `G₁ ∘ ⋯ ∘ Gₜ` (`Cslib.DynNet.prod G 1 t`, Mathlib `Relation.Comp`).
-- Broadcast after round `t`: `∃ x, ∀ y, (x, y) ∈ G₁ ∘ ⋯ ∘ Gₜ` (`Cslib.DynNet.Broadcasts`); broadcast time of a
-  sequence `t*(G₁, G₂, …)` (`broadcastTime`, a `sInf`) and of the adversary `t*(𝒯ₙ)` (`advBroadcastTime`, a `⨆`).
+## Mistakes in the paper
 
-## Main results ↔ Lean
+There are no false statements. Points worth knowing:
 
-| Paper | Lean (namespace `DynamicRootedTrees` unless noted) | File |
+- **BA claims one round more than FV proves (the claim is true).** BA Theorem 3.1 states `⌈(1+√2)n − 1⌉`, but FV
+  Theorem 3.6 only proves `⌈(1+√2)n⌉`. The BA bound follows from the same argument, because the pigeonhole in FV
+  Lemma 3.5 has slack. Take `R = n + m − 1` rounds with `m = ⌈√2 n⌉`. The edge count is at least
+  `m(m+1)/2 + (n−1)m`, and this exceeds the threshold `(n−1)(n+m−1)` iff `m(m+1) > 2(n−1)²`. Optimizing `m` gives
+  the slightly sharper `m + n − 1` for the least `m` with `m(m+1) > 2(n−1)²`, about `(1+√2)(n−1)`.
+  (`theorem_3_1`, `theorem_3_6`, `advBroadcastTime_trees_le_of_sq_lt`)
+- **Trees are not needed.** The upper-bound proof only uses a self-loop at every node and a root that reaches
+  everybody in each round. (`broadcasts_of_rooted`)
+- **Slips in FV's proofs.**
+  - Lemma 3.3 is stated for `t₁ ≤ t₂` but used in Lemma 3.5 with `t₁ = t₂ + 1` (round 1). That extra case is
+    trivial.
+  - In Lemma 3.5, the in-degree formula has `x` where `r_t` is meant.
+  - The final comparison in Lemma 3.5 is not the actual pigeonhole threshold, although the inequality used is still
+    sufficient.
+  - Lemma 3.2 (ii) carries an unnecessary hypothesis `t ≤ t'`.
+- **The lower bound is only a figure in FV (Figure 5), with no proof.** Our reading of the figure:
+  - first, the path `1 → ⋯ → n` for `⌊(n−1)/2⌋` rounds;
+  - then the tree rooted at `n` with two branches, up to round `n − 2`;
+  - then a rotated path.
+
+  With this reading the construction is correct for every `n ≥ 2`. (`lbSeq`, `lbSeq_not_broadcasts`)
+
+Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
+
+## The formalization
+
+**Model.**
+- `n` processes, synchronous rounds, no failures and no randomness. Communication is full-information flooding.
+- An oblivious message adversary picks each round's communication graph from `𝒯ₙ`: rooted out-trees on `Fin n` with
+  a self-loop at every node (`treesWithLoops`).
+- Information flow after `t` rounds is the relational product `G₁ ∘ ⋯ ∘ Gₜ`. Broadcast has happened when some
+  process reaches all others.
+- `broadcastTime` is an `sInf` and `advBroadcastTime` is a `⨆`. Their junk values (0 if never or unbounded) are
+  harmless:
+  - the upper bound is also stated per sequence (`broadcasts_trees`: every sequence of trees has broadcast by then);
+  - the lower bound is witnessed by an explicit sequence that has not yet broadcast.
+- The empty product is the identity. This only matters for `n = 1`, where `t* = 0`.
+
+**Main results in Lean** (namespace `DynamicRootedTrees`).
+
+| Paper | Lean | File |
 |---|---|---|
-| BA Thm 3.1: `⌈(3n−1)/2⌉−2 ≤ t*(𝒯ₙ) ≤ ⌈(1+√2)n−1⌉` | `theorem_3_1` | `Main.lean` |
-| FV Thm 3.6: `t*(𝒯ₙ) ≤ ⌈(1+√2)n⌉` | `theorem_3_6` | `Main.lean` |
-| FV Thm 3.7 (Zeiner et al. lower bound) | `theorem_3_7`; construction `lbSeq`, `lbSeq_mem`, `lbSeq_not_broadcasts` | `Main.lean`, `LowerBound.lean` |
-| upper bound per sequence | `broadcasts_trees` | `Main.lean` |
-| generalization: any rooted rounds with self-loops | `broadcasts_of_rooted` | `Main.lean` |
-| sharper bound `m + n − 1` if `2(n−1)² < m(m+1)` (new) | `advBroadcastTime_trees_le_of_sq_lt`, `broadcasts_of_sq_lt` | `Main.lean`, `UpperBound.lean` |
-| FV Def 1.1/1.3/1.4 (product, `t*`) | `Cslib.DynNet.prod`, `Cslib.DynNet.broadcastTime`, `Cslib.DynNet.advBroadcastTime` | `Cslib/Computability/Distributed/DynamicNetworks/Product.lean` |
-| FV Def 1.2 (`𝒯ₙ`) | `treesWithLoops`, `RootedTree.adj`, `RootedTree.isRoot` | `Defs.lean` |
-| FV Def 2.1/2.2 (`I_t^{t'}`, `O_t^{t'}`) | `Cslib.DynNet.inNbhd`, `Cslib.DynNet.outNbhd` | `Cslib/Computability/Distributed/DynamicNetworks/Product.lean` |
-| FV Lemma 2.3 | `Cslib.DynNet.mem_outNbhd_iff_mem_inNbhd` | ″ |
-| FV Lemma 2.4 (i)(ii)(iii) | `Cslib.DynNet.outNbhd_trans`, `outNbhd_trans_of_mem_inNbhd`, `outNbhd_trans_of_mem_inNbhd_of_mem_inNbhd` (+ `inNbhd_trans`) | ″ |
-| FV Lemma 2.5 (i)(ii) | `Cslib.DynNet.inNbhd_mono`, `Cslib.DynNet.outNbhd_mono` | ″ |
-| FV Def 3.1 (root of round) | hypothesis `hr : ∀ t, IsRoot (G t) (r t)` | `UpperBound.lean` |
-| FV Lemma 3.2 (i), (ii) | `Cslib.DynNet.card_inNbhd_lt_of_root_notMem`, `Cslib.DynNet.card_outNbhd_lt_of_root_mem` | `Cslib/Computability/Distributed/DynamicNetworks/Product.lean` |
-| FV Lemma 3.3 | `lemma_3_3` | `UpperBound.lean` |
-| FV Def 3.4 (rounds graph) | `roundsGraph`, `RoundsAdj`, `outdeg` (parameters `m`, `R`) | `UpperBound.lean` |
-| FV Lemma 3.5 | `lemma_3_5` (paper parameters); generic `exists_outdeg_ge` | `Main.lean`, `UpperBound.lean` |
-| FV Thm 3.6 proof (generic) | `broadcasts_of_sum_min`, `min_card_le_card_outNbhd` | `UpperBound.lean` |
-| small-n exact values `t*(𝒯ₙ) = 0,1,2,4` for `n = 1..4` (kernel-verified exhaustive search) | `advBroadcastTime_trees_one/two/three/four`; framework `FrontierSearch` (`frontier_sound`, `advBroadcastTime_le_of_frontier`, `le_advBroadcastTime_of_seq`) | `Small.lean` |
+| **BA Theorem 3.1** (both bounds) | `theorem_3_1` | `Main.lean` |
+| FV Theorem 3.6 (`⌈(1+√2)n⌉`); per-sequence form | `theorem_3_6`, `broadcasts_trees` | `Main.lean` |
+| FV Theorem 3.7 (lower bound, all `n ≥ 2`) | `theorem_3_7`, `lbSeq_not_broadcasts` | `Main.lean`, `LowerBound.lean` |
+| FV Lemmas 3.3, 3.5 | `lemma_3_3`, `lemma_3_5` | `UpperBound.lean`, `Main.lean` |
+| FV Lemmas 2.3–2.5, 3.2 (neighbourhood algebra) | `Cslib.DynNet.mem_outNbhd_iff_mem_inNbhd`, `Cslib.DynNet.outNbhd_trans`, … | CSLib `DynamicNetworks/Product.lean` |
+| (new) rooted rounds suffice; sharper `m + n − 1` | `broadcasts_of_rooted`, `advBroadcastTime_trees_le_of_sq_lt` | `Main.lean` |
+| (new) exact `t*(𝒯ₙ) = 0, 1, 2, 4` for `n = 1..4` | `advBroadcastTime_trees_one` … `advBroadcastTime_trees_four` | `Small.lean` |
 
-All listed theorems: no `sorry`; `#print axioms` = `propext, Classical.choice, Quot.sound`.
+**Small cases.** Exhaustive search gives `t*(𝒯ₙ) = 0, 1, 2, 4, 5, 7` for `n = 1..6`, which equals the lower bound
+for `n ≥ 2`. The upper bound gives `2, 4, 7, 9, 12, 14`. Only `n ≤ 4` is kernel-checked in Lean; `n = 5, 6` come from
+unverified Python/C searches.
 
-## Status
+**Not formalized.** The rest of FV (other broadcast variants and `k`-rooted networks).
 
-**Complete.** Upper bound (both the BA's `⌈(1+√2)n−1⌉` and FV's `⌈(1+√2)n⌉`), every supporting lemma of FV
-Section 2–3.1, and the lower bound `⌈(3n−1)/2⌉−2` for all `n` are formalized.
-
-Findings (details in `differencies.md`):
-- The BA claims `⌈(1+√2)n − 1⌉` but the FV proof only gives `⌈(1+√2)n⌉`; the BA's sharper claim is true (slack
-  in the pigeonhole of Lemma 3.5) and is proved here. With optimized parameters the same proof gives
-  `m + n − 1` with `m` minimal s.t. `m(m+1) > 2(n−1)²` (≈ `(1+√2)(n−1)`).
-- The proof needs only self-loops + a root per round, not trees (`broadcasts_of_rooted`).
-- Minor gaps: Lemma 3.3 used outside its stated range (`t₁ = t₂ + 1`), typos in Lemma 3.5. No real errors.
-- Exhaustive search: `t*(𝒯ₙ) = 0,1,2,4,5,7` for `n = 1..6` (n ≤ 4 kernel-verified in `Small.lean`; n = 5 Python,
-  n = 6 C search modulo relabeling, unverified) = the lower bound `⌈(3n−1)/2⌉−2` for `n ≥ 2`; the upper bound
-  (`2, 4, 7, 9, 12, 14`) is far from tight for small `n`.
-
-## CSLib candidates
-
-- `Cslib/Computability/Distributed/DynamicNetworks/Product.lean` (migrated to CSLib, namespace `Cslib.DynNet`): dynamic networks as relation sequences, products (`Relation.Comp`),
-  generalized neighbourhoods, monotonicity, rooted rounds (`IsRoot`, `exists_edge_cross`, strict growth lemmas),
-  broadcast time of sequences/adversaries (`advBroadcastTime_le`, `le_advBroadcastTime`).
-- `RootedTree`/`RootedTree.ofRank` (`Defs.lean`, `LowerBound.lean`) if a parent-function tree API is wanted.
-
-## Files
-
-- `Defs.lean` — rooted trees with loops, `𝒯ₙ`.
-- `UpperBound.lean` — Lemma 3.3, rounds graph, generic Lemma 3.5 / Theorem 3.6, sharpened bound.
-- `LowerBound.lean` — Zeiner–Schwarz–Schmid construction, `lbSeq_not_broadcasts` (all `n ≥ 2`).
-- `Main.lean` — paper-parameter Lemma 3.5, Theorems 3.6, 3.7, 3.1.
-- `Small.lean` — kernel-verified exhaustive checks for small `n`.
-
-## Token spend
-
-Roughly 0.55M tokens in total (paper agent ≈ 0.3M, lower-bound subagent ≈ 0.09M, small-n subagent ≈ 0.15M).
+**Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. The
+small-case values use kernel `decide`. The dynamic-network products and neighbourhoods come from CSLib,
+`Cslib/Computability/Distributed/DynamicNetworks/Product.lean`.

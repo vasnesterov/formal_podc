@@ -1,75 +1,75 @@
-# Swiper: a new paradigm for efficient weighted distributed protocols
+# Swiper — PODC 2024
 
-Andrei Tonkikh, Luciano Freitas. PODC 2024. DOI [10.1145/3662158.3662799](https://doi.org/10.1145/3662158.3662799),
-arXiv [2307.15561](https://arxiv.org/abs/2307.15561) (v2, which contains the appendix proofs; the local PDF is v2).
+Andrei Tonkikh, Luciano Freitas. *Swiper: a new paradigm for efficient weighted distributed protocols.* PODC 2024.
+DOI [10.1145/3662158.3662799](https://doi.org/10.1145/3662158.3662799). Formalized version: arXiv
+[2307.15561](https://arxiv.org/abs/2307.15561) v2 (contains the appendix proofs).
 
-## Scope and model
+**Verdict: ❌ False claim.** The weight restriction and weight qualification bounds (Theorem 2.1, Theorem 2.2,
+Corollary 2.3) are correct and proved, filling gaps in Appendix A.1. **Theorem 2.4 (weight separation) is false**:
+its proof in Appendix A.2 is wrong, and Swiper's own weight-separation construction violates the claimed bound. We
+prove a different, correct bound instead.
 
-The paper's mathematical content is Section 2 (three "weight reduction" problems and upper bounds),
-Section 3.1 (the Swiper family of ticket assignments and why a local minimum respects the bounds) and
-Appendix A (proofs). Sections 4–6 are protocol transformations relying on cryptographic black boxes
-(secret sharing, threshold signatures, erasure codes, VBA, SSLE); only the purely combinatorial core of
-Theorem 4.2 is formalized. Section 7 and Appendices B–C are experiments / a MIP formulation (not
-formalized).
+## Mistakes in the paper
 
-No distributed-computing model is involved: everything is static combinatorics. Parties are a
-`Fintype ι` (`n = Fintype.card ι`), weights `w : ι → ℝ` with `w i ≥ 0` and `W = ∑ w ≠ 0`, ticket
-assignments `t : ι → ℕ`.
+1. **Theorem 2.4 is false (false statement).** Claimed: every weight-separation instance has a solution with
+   `T ≤ (α+β)(1−α)/(β−α)·n` tickets. Counterexample: `α = 1/20`, `β = 1/10`, 8 parties of weight 14 and 13 of
+   weight 1 (`n = 21`, `W = 125`). Each weight-14 party alone is heavy, all 13 unit parties together are heavy, and
+   light sets contain at most 6 unit parties. If fewer than 6 unit parties hold tickets, those (light) and all unit
+   parties (heavy) have equally many tickets, a violation. Otherwise 6 ticketed unit parties hold `≥ 6`
+   tickets, so each weight-14 party needs `≥ 7` and the unit parties together `≥ 7`: `T ≥ 63 > 59.85`. (The
+   optimum is exactly 63; for this family `OPT/n → α/β²`, here 5 versus the claimed 2.85.) This instance compares
+   a set of unit parties with a superset of it, which the paper's Problem 3 allows. Under a "disjoint `S₁, S₂`"
+   reading it would not be a counterexample, but item 2 refutes the proof and Swiper's guarantee under either
+   reading (`ws_upper_bound_false`).
+2. **The proof in Appendix A.2 is wrong, and Swiper's weight-separation construction does not meet the bound.**
+   The proof rounds `t_i = ⌊w_i s + γ⌋` with `γ = (α+β)/2`. Case 1 (`t(S₁) ≥ γT`) is correct; case 2 is claimed
+   "analogous by substituting `1−γ` for `γ` and `1−β` for `α`". That would also require changing the rounding
+   offset from `γ` to `1−γ`, which is not done, so the argument works only for `γ = 1/2`. Redone honestly, case 2
+   gives `max(γ², (1−γ)²)·n` instead of `γ(1−γ)·n`. Concretely, on three parties `w = (1, 1, 15)` with the same
+   `α, β`, the paper's `s` yields `t = (0, 0, 7)`, and the two unit parties (weight 2 > `βW` = 1.7) are heavy yet
+   ticketless, so they tie with `S₁ = ∅` (disjoint sets). Every valid member of the `γ`-offset family has `T ≥ 14`,
+   while the bound is 8.55, which contradicts §3's "Robustness" claim for weight separation
+   (`swiper_ws_counterexample`, `swiper_ws_family_exceeds_bound`). The authors' public solver
+   ([DCL-TelecomParis/swiper](https://github.com/DCL-TelecomParis/swiper), commit f1d7a3d) hard-codes this bound
+   and silently returns invalid tickets when it binds: weights `(2, 14)` with `α = 1/20`, `β = 1/10` give tickets
+   `(0, 5)`, although party 1 alone is heavy (checked by running it).
+   **What we prove instead:** `T ≤ ⌈(1−d²)/(2d)·n⌉` with `d = β − α`, using rounding offset `(1−d)/2`
+   (`ws_upper_bound`). It is symmetric under `(α, β) ↦ (1−β, 1−α)`, as the problem is (the paper's bound is not).
+   It beats the paper's bound when `α+β` is near 1 and is weaker when `α+β` is small.
+3. **Gaps in Appendix A.1 (Theorem 2.1 true).** "Since we already proved that viable `s` exist": no such proof is
+   in the paper. "It is easy to see that such `s*` exists": this needs a right-continuity/discreteness argument for
+   the infimum. The border set `J` being non-empty needs `0 < αw < 1`. All three are proved
+   (`exists_viable`, `exists_locallyMinimal`, `LocallyMinimal.border_nonempty`).
+4. **Minor.** In Definition 4.1 the second conjunct has `F` unbound (we read it as `∀ F, ∃ A, A ∩ F = ∅`). The
+   §4.1 random-beacon example writes `(1−αn)T ≥ ⌈αn T⌉`, which is false in general (`αn = 1/2`, `T = 3`) but
+   harmless there because ticket counts are integers.
 
-## Main results ↔ Lean
+Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
-| Paper | Lean | Status |
+## The formalization
+
+**Model.** No distributed model is involved: Sections 2, 3.1 and Appendix A are static combinatorics. Parties form
+a finite type `ι`, with weights `w : ι → ℝ`, `w ≥ 0`, `W ≠ 0`, and tickets `t : ι → ℕ`. Problems 1–3 are the
+predicates `IsWR`, `IsWQ`, `IsWS`, which quantify over all subsets as in the paper. The removal process of A.1
+("remove tickets while the assignment stays viable") is modelled by an arbitrary stopping point, so every run is
+covered.
+
+**Main results in Lean.**
+
+| Paper | Lean | File |
 |---|---|---|
-| Problems 1–3 (WR, WQ, WS constraints) | `IsWR`, `IsWQ`, `IsWS` (`Defs.lean`) | definitions |
-| "viable" (App. A.1) | `Viable`; `viable_iff` (= `IsWR` when `W>0`, `αw>0`) | |
-| Thm 2.1 (WR upper bound) | `wr_upper_bound` (`WeightRestriction.lean`) | proved |
-| Thm 2.1 via the paper's construction (App. A.1) | `wr_upper_bound_swiper` (`Construction.lean`) | proved |
-| key computation of App. A.1 / "bootstrapping" claim of §3.1 | `isWR_of_rounds` | proved (stronger: real bound, no ceiling) |
-| existence of a locally minimal viable `s*` (gap in paper) | `exists_viable`, `exists_locallyMinimal` | proved |
-| "there must be some `j` with `s* w_j + αw ∈ ℤ`" | `LocallyMinimal.border_nonempty` | proved |
-| footnote 6 (`t' = t_{s*-ε}`) | `ts_sub_eventually_eq`, `LocallyMinimal.not_viable_removeTickets_border` | proved |
-| ticket removal ends with `t̂` viable, `t̂̂` not | `LocallyMinimal.exists_removal` | proved |
-| bound for any stopping point of the removal | `removal_bound` | proved |
-| §3.1: the family `t(s,k)` hits every total `T` | `Cslib.Apportionment.exists_rounds_sum_eq` | proved |
-| Thm 2.2 (WQ = WR with complemented parameters) | `isWQ_iff_isWR` | proved (no hypotheses needed) |
-| Cor 2.3 (WQ upper bound) | `wq_upper_bound` | proved |
-| Thm 2.4 (WS upper bound `(α+β)(1−α)/(β−α)·n`) | `ws_upper_bound_false` | **false** as stated (Lean counterexample, uses overlapping `S₁ ⊆ S₂` as the paper's definition allows); Swiper's WS construction violates it on a 3-party instance with disjoint sets (refutes the proof and the Robustness claim under either reading): `swiper_ws_counterexample`, `swiper_ws_family_exceeds_bound` |
-| Thm 2.4, corrected | `ws_upper_bound`: `T ≤ ⌈(1−(β−α)²)/(2(β−α))·n⌉` (`WeightSeparation.lean`) | proved |
-| WS symmetry (not in paper) | `isWS_iff_compl` | proved |
-| Def 4.1, Thm 4.2 (combinatorial core) | `IsBlunt`, `isBlunt_of_isWR` (`Applications.lean`) | proved |
+| Theorem 2.1 (weight restriction) | `wr_upper_bound` | `WeightRestriction.lean` |
+| Theorem 2.1 via the paper's locally-minimal construction | `wr_upper_bound_swiper` | `Construction.lean` |
+| Theorem 2.2 (WQ = WR with complemented parameters) | `isWQ_iff_isWR` | `WeightRestriction.lean` |
+| Corollary 2.3 (weight qualification) | `wq_upper_bound` | `WeightRestriction.lean` |
+| Theorem 2.4: counterexample | `ws_upper_bound_false` | `WeightSeparation.lean` |
+| Theorem 2.4: Swiper's construction fails | `swiper_ws_counterexample`, `swiper_ws_family_exceeds_bound` | `WeightSeparation.lean` |
+| Theorem 2.4, corrected bound | `ws_upper_bound` | `WeightSeparation.lean` |
+| Theorem 4.2 (combinatorial core) | `isBlunt_of_isWR` | `Applications.lean` |
 
-All theorems are sorry-free; `lean_verify` on `wr_upper_bound`, `wr_upper_bound_swiper`,
-`wq_upper_bound`, `ws_upper_bound`, `ws_upper_bound_false`, `swiper_ws_family_exceeds_bound`,
-`isBlunt_of_isWR` reports only
-`propext`, `Classical.choice`, `Quot.sound`.
+**Not formalized.** The protocol transformations of Sections 4–6 (cryptographic black boxes) beyond the
+combinatorial core of Theorem 4.2, the knapsack-based validity check of §3.1, Section 7 and Appendices B–C.
 
-## Findings (details in `differencies.md`)
-
-1. **Theorem 2.4 (WS upper bound) is false.** `ws_upper_bound_false`: `α = 1/20`, `β = 1/10`,
-   8 parties of weight 14 and 13 of weight 1 (`n = 21`): every WS solution has `T ≥ 63`, the claimed
-   bound is `59.85`. This uses overlapping `S₁ ⊆ S₂`, which the paper's definition allows (under a
-   disjoint-sets reading it would not be a counterexample). Numerically, for this family `OPT/n → α/β²` (here 5 vs the claimed 2.85).
-   The proof in A.2 fails in its second case ("analogous by substitution", but the floor offset `γ`
-   is not substituted; valid only for `γ = 1/2`). Swiper's WS mode also violates the bound on the
-   3-party instance `w = (1,1,15)`: the paper's `s` gives the invalid `t = (0,0,7)`, and every WS-valid
-   member of the `γ`-offset family has `T ≥ 14 > 8.55`. We prove the replacement bound
-   `⌈(1−d²)/(2d)·n⌉`, `d = β−α` (`ws_upper_bound`); it is better than the paper's when `α+β` is near
-   1 and is a correct (though weaker) bound otherwise.
-2. **Gaps in App. A.1 filled**: existence of viable `s` (the paper says "we already proved" — it did
-   not), existence of a locally minimal `s*` (discreteness/right-continuity argument), and `J ≠ ∅`.
-3. Theorem 2.1/2.2/Cor 2.3 are correct as stated. Edge-case note (not an error): the paper's
-   requirement `αw ∈ (0,1)` is needed (at `αw = 0` with "viable", the bound `⌈0⌉ = 0` cannot be
-   met); `n = 1` and zero weights are fine.
-
-## Infrastructure
-
-- `Cslib/Foundations/Combinatorics/Apportionment/Divisor.lean` (migrated from `Podc/` to CSLib, namespace `Cslib.Apportionment`): `Rounds` (rounding with offset, i.e.
-  stationary divisor methods with ties), `exists_rounds_sum_eq` (every house size attainable),
-  `rounds_floor`, one-sided continuity of `s ↦ ⌊a s + c⌋₊`.
-
-## Status
-
-Complete; no `sorry`. Files: `Defs.lean`, `WeightRestriction.lean`, `Construction.lean`,
-`WeightSeparation.lean`, `Applications.lean`.
-
-Rough token spend: ~0.35M (paper agent) + ~0.25M (numerics subagent) ≈ 0.6M.
+**Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. The
+rounding family ("every total `T` is attained") comes from CSLib's
+`Cslib/Foundations/Combinatorics/Apportionment/Divisor.lean`.

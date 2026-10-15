@@ -1,141 +1,89 @@
-# Optimal Dynamic Distributed MIS (PODC 2016)
+# Optimal Dynamic Distributed MIS — PODC 2016
 
-Keren Censor-Hillel, Elad Haramaty, Zohar Karnin. *Optimal Dynamic Distributed MIS.*
-PODC 2016, pp. 217–226. DOI [10.1145/2933057.2933083](https://doi.org/10.1145/2933057.2933083),
-full version arXiv:1507.04330.
+Keren Censor-Hillel, Elad Haramaty, Zohar Karnin. *Optimal Dynamic Distributed MIS.* PODC 2016.
+DOI [10.1145/2933057.2933083](https://doi.org/10.1145/2933057.2933083). Formalized version: arXiv
+[1507.04330](https://arxiv.org/abs/1507.04330) v2.
 
-## Status
+**Verdict: ⚠️ Correct with fixes.** Theorem 1 (`E_π|S| ≤ 1` for every single topology change) and
+Theorem 7 (Algorithm 2: expected `O(1)` rounds and broadcasts, `O(min(log n, deg))` for abrupt
+deletion) hold. Lemma 3 as stated ("`= 1/|P|`") is false for edge changes, but its own proof gives
+`≤`, which is all Theorem 1 needs. The recursion defining the layers `S_i` is ill-formed as written,
+and several arguments are informal; all are repaired.
 
-The main result, **Theorem 1**, is formalized and verified with no `sorry`. The axioms used are
-`propext`, `Classical.choice` and `Quot.sound`. Also formalized:
-- Lemma 2;
-- Claims 4–5;
-- Lemma 3, in its correct form `≤ 1/|P|` (`=` holds for node changes);
-- Corollary 6 in the synchronous model;
-- a weak version of history independence (Section 5), for the direct implementation only;
-- the counterexample to Lemma 3 as literally stated (with `= 1/|P|`).
+## Mistakes in the paper
 
-- **Section 4: Algorithm 2 and Theorem 7**, both for non-abrupt changes (Lemmas 8, 9, 11) and
-  for abrupt deletion (Lemmas 11, 12, 13).
+* **Lemma 3 with "`= 1/|P|`" is false for edge changes; misstatement, harmless.** Take `H` to be the
+  path `v* – z – v**` and let the change insert or delete the edge `{v*, v**}`. For any order with
+  `z < v** < v*` we get `S′ = P = {v*, z, v**}` and `π(v**) ≤ π(v*)`. So the probability that `v*` is
+  first in `P`, given this event, is `0`, not `1/3`. The paper's proof handles this case ("clearly 0")
+  and concludes only `≤ 1/|P|`. For node changes (`v** = v*`) equality does hold. As a by-product
+  we get `E|S| = 1` *exactly* for effective node insertions and deletions, which is stronger than
+  Theorem 1's `≤ 1` (`lemma3_eq_counterexample`; `theorem1_node_eq`).
+* **Recursion (1) for the layers `S_i` is inconsistent with its use; notational flaw.** The rule for
+  `M̄`-nodes is cumulative ("every `v ∈ I(u) ∩ M` is in `S_0 ∪ … ∪ S_{i−1}`"). Taken literally, a
+  node that enters some `S_i` by this rule is in every later `S_j`. Hence `i_u = max{i | u ∈ S_i}`
+  is undefined, and Algorithm 1's loop "until `S_i = ∅`" never terminates when `S` contains such a
+  node. In the paper's own example, `u2` lies in every `S_i` with `i ≥ 1`, not just `S_1` and `S_4`.
+  Theorem 1 concerns only `|S| = |⋃ S_i|`, so we use `S` as the least set closed under the two
+  rules (`mem_layer_of_inMbar`; `Influenced`).
+* **Proof gap in Lemma 12 (second part); statement true.** The claim that each entry of `v` into `C`
+  "can be associated with a different `v_i*`" is argued incompletely: the paper itself concedes that
+  the new path may pass through `v_i*`. The missing fact: the root of the entry at `t₂` stays in `C`
+  throughout `[0, 2t₂+1]`, whereas the root of the entry at `t₁` is already final by time
+  `t₂ − 1 − t₁`, so the two roots differ (`abrupt_card_entries_le`).
+* **Informal steps, made rigorous.**
+  * Lemma 2: the proof mixes states computed for `π` and for `π′`. We prove `S = S′` whenever
+    `S ≠ ∅` (the paper states `S ⊆ S′`).
+  * Claims 4–5 are stated for `π|P = σ|P`, which fixes `v*`'s position, but Lemma 3 applies them
+    to orders that agree only on `P \ {v*}`. This is harmless because `S′` does not depend on `π(v*)`.
+  * The end of Lemma 3 rests on an independence claim. It is true, and we replace it by a counting
+    argument: swapping `v*` with its successor in `P` is an injection.
+  * Algorithm 2 never says that a gracefully deleted node, which keeps participating, must not
+    enter `M`. We add this to rule 4.
+  * Correctness of the final MIS after an abrupt deletion ("straightforward to verify") is proved
+    by two invariants.
 
-We found no error that breaks a main result. We did find imprecise or wrong statements (details in
-[differencies.md](differencies.md)):
-- the recursion (1) for `S_i` makes the layers non-decreasing, so Algorithm 1's loop need not
-  terminate (a notational flaw);
-- Lemma 3's equality fails for edge changes (Lean counterexample): a genuine misstatement, but
-  harmless, since its own proof only concludes `≤`;
-- the arguments in Lemma 2, Claim 4 and the end of Lemma 3 are informal.
+Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
-All of these are repaired. As a by-product, `E|S| = 1` exactly for node insertions and deletions.
+## The formalization
 
-## Model and assumptions
+**Model.**
+* A configuration is a simple graph on a finite vertex type plus a set of present nodes. All four
+  changes (edge/node insertion/deletion) are covered, with no validity hypotheses; vacuous changes
+  give `S = ∅`.
+* `π` is a uniformly random bijection `V ≃ Fin |V|`, and expectations are finite averages. The
+  adversary is oblivious: the change is fixed before `π`. The MIS is the greedy MIS for `π`.
+* Corollary 6 and Section 4 are synchronous only. The direct implementation is a SET-LOCAL algorithm
+  in CSLib's LOCAL model. Algorithm 2 runs in synchronous broadcast rounds, with its four rules
+  encoded literally. Ranks replace the real IDs `ℓ_v`, and message sizes are not modelled.
+* "Rounds" = stabilisation time; "broadcasts" = (node, round) pairs where the visible state changes.
 
-- **Graphs.** A configuration is a `SimpleGraph` on a finite type `V` plus a set of present nodes;
-  the network is the induced graph. Node changes alter the present set; edge changes alter the
-  graph. There are four changes: edge insertion, edge deletion, node insertion, node deletion.
-- **Randomness.** The order `π` is a uniformly random bijection `V ≃ Fin |V|`. Expectations are
-  finite averages `𝔼 π, …` (no measure theory). The adversary is oblivious: the change is fixed
-  before `π` is drawn.
-- **MIS.** The MIS is the greedy MIS for `π` (the paper's "MIS invariant"): `SimpleGraph.greedyMIS`.
-- **`S` and `S′`.** `S` (`infl`) is the closure of the paper's recursion (1). It is empty when the
-  invariant still holds at `v*`. `S′` is the influenced set with `v*` moved to the front
-  (`influencedFirst`).
-- **Distributed model (Corollary 6, Section 4).** Synchronous rounds; every node knows its
-  neighbours' ranks and current states (broadcast on change). The direct implementation is a
-  SET-LOCAL algorithm in the CSLib `Cslib/Computability/Distributed/Local` model. The asynchronous model is not formalized.
-
-## Main results ↔ Lean
+**Main results in Lean.**
 
 | Paper | Lean | File |
 |---|---|---|
-| recursion (1), `S = ⋃ S_i` | `Influenced`, `layer`, `mem_layers_iff`, `mem_layer_of_inMbar` | `Basic.lean` |
-| `S(G_old, G_new, π)` | `infl` | `Basic.lean` |
-| closure = three-valued influenced set | `influenced_iff` | `Basic.lean` |
-| **Theorem 1** `E_π|S| ≤ 1` | `DynamicMIS.theorem1` (sum form `sum_ncard_infl_le`) | `Theorem1.lean` |
-| adjustments `≤ |S|`, `E ≤ 1` | `adjustments_subset_infl`, `expected_adjustments_le_one` | `Theorem1.lean` |
-| Lemma 2 | `lemma2` (also `infl_eq`) | `Lemma2.lean`, `Theorem1.lean` |
-| Claims 4–5 | `SimpleGraph.partialGreedy_eq_of_reorder`, `influencedFirst_eq_of_reorder` | `Cslib/Foundations/Combinatorics/SimpleGraph/GreedyMIS.lean`, `Cslib/Foundations/Combinatorics/SimpleGraph/RandomGreedyMIS.lean` |
-| Lemma 3 (summed form) | `Cslib.RandomOrder.sum_card_first_le`, `sum_card_first_eq`; `SimpleGraph.sum_card_influenced_le`/`_eq` | `Cslib/Probability/RandomOrder/FirstInSet.lean`, `Cslib/Foundations/Combinatorics/SimpleGraph/RandomGreedyMIS.lean` |
+| **Theorem 1** `E_π\|S\| ≤ 1`; also for actual adjustments | `theorem1`, `expected_adjustments_le_one` | `Theorem1.lean` |
+| Lemma 2 (`S = S′`) | `lemma2` | `Lemma2.lean` |
+| Lemma 3 (`≤`; `=` for node changes) | `Cslib.RandomOrder.sum_card_first_le`, `sum_card_first_eq` | CSLib `Cslib/Probability/RandomOrder/FirstInSet.lean` |
 | Lemma 3 with `=` is false | `lemma3_eq_counterexample` | `Lemma3Counterexample.lean` |
-| `E|S| = 1` for node changes (new) | `theorem1_node_eq` | `Lemma2.lean` |
-| Corollary 6 (synchronous) | `corollary6_rounds`, `directAfter_eq_of_le`, `corollary6_changing_subset`, `run_directAlg` | `Corollary6.lean` |
-| Section 5, Definition 14 (weak version, direct implementation with `|V|` rounds per change, same initial and final `Config`) | `maintained_eq_greedyMIS`, `historyIndependent`; for Algorithm 2 only the per-change `Alg2.alg2_run_eq_of_le` | `HistoryIndependence.lean`, `Theorem7.lean` |
-| Algorithm 2 (model) | `Alg2.step`, `Alg2.run`, `netOf`/`initOf`, `netAbrupt`/`initAbrupt` | `Alg2Defs.lean` |
-| Lemma 8 (≤ 3 changes per node) | `Alg2.graceful_changes_le_three` | `Alg2Graceful.lean` |
-| Lemma 9 (correctness, only `S` changes, `≤ 3|S|` broadcasts) | `graceful_run_eq`, `graceful_eq_of_notMem_infl`, `graceful_broadcasts_le` | `Alg2Graceful.lean` |
-| Lemma 11 (stable by round `3|S|+2`) | `graceful_stableFrom(_add_two)`, `abrupt_stableFrom(_add_two)`, abstract `stableFrom_three_mul` | `Alg2Graceful.lean`, `Alg2Abrupt.lean`, `Alg2Rounds.lean` |
-| Lemma 12 | `abrupt_entry_spacing` (`t₂ ≥ 3t₁+4`), `abrupt_card_entries_le` | `Alg2Abrupt.lean`, `Alg2Roots.lean` |
-| Lemma 13 | `abrupt_broadcasts_le`, `abrupt_run_eq`, `abrupt_eq_of_notMem_infl` | `Alg2Abrupt.lean` |
+| `E\|S\| = 1` for node changes (new) | `theorem1_node_eq` | `Lemma2.lean` |
+| Corollary 6 (synchronous) | `corollary6_rounds`, `corollary6_changing_subset` | `Corollary6.lean` |
+| Lemmas 8, 9 (non-abrupt) | `graceful_changes_le_three`, `graceful_run_eq`, `graceful_broadcasts_le` | `Alg2Graceful.lean` |
+| Lemmas 11–13 (abrupt deletion) | `abrupt_stableFrom`, `abrupt_entry_spacing`, `abrupt_broadcasts_le` | `Alg2Abrupt.lean` |
 | **Theorem 7** | `Alg2.theorem7_graceful`, `Alg2.theorem7_abrupt` | `Theorem7.lean` |
 
-## Proof idea of Theorem 1 (as formalized)
+The Section 4 bounds come out slightly better than the paper's: stabilisation by round `3|S|`
+(paper: `3|S|+2`), and Lemma 12's spacing `t₂ ≥ 3t₁ + 2` in paper rounds (paper: `3t + 1`).
 
-1. Let `H` be the graph without the changed edge (or with the changed node).
-2. Evaluate the greedy MIS of `H` in three-valued logic with `v*` unknown. The `none`-set is the
-   influenced set. Every state vector that obeys the greedy rule away from `v*` agrees with the
-   determined values, so the paper's closure `S` equals this set.
-3. If the invariant breaks at `v*`, then `v*` is in the greedy MIS of `H`, and `S` is the
-   influenced set of `v*` (`infl_eq`).
-4. `v*` is in the greedy MIS iff `v*` is `π`-first in `S′`, and then `S = S′`.
-5. `S′` is invariant under reorderings that keep the relative orders inside `S′ \ {v*}` and
-   outside `S′`.
-6. A swap-with-successor injection on orders gives
-   `E[|S′| · 1{v* first} · 1{v** before v*}] ≤ Pr[v** before v*]`.
-7. Sum over the two orientations of the changed edge.
+**Not formalized.**
+* The asynchronous model of Corollary 6, the deterministic lower bound, correlation clustering and
+  the `O(1)`-bit ID encoding.
+* Section 5 (history independence): only a weak, almost trivial version is proved, for the direct
+  implementation (`historyIndependent`).
 
-## Infrastructure (migrated to CSLib)
-
-- `Cslib/Foundations/Combinatorics/SimpleGraph/GreedyMIS.lean`: the greedy MIS for a rank function, the three-valued evaluation
-  `partialGreedy` and `influenced`, determinacy, congruence, move-first, reorder invariance.
-- `Cslib/Foundations/Combinatorics/SimpleGraph/RandomGreedyMIS.lean`: the expectation bounds for random greedy MIS
-  (`sum_card_influenced_le`/`_eq`).
-- `Cslib/Probability/RandomOrder/FirstInSet.lean`: "first in a random set" under uniform random orders.
-
-## Files
-
-- `Basic.lean`: configurations, changes, `v*`, the invariant, recursion (1) (`layer`, `Influenced`),
-  `infl`, `influenced_iff`.
-- `Theorem1.lean`: reduction to the base graph (`FlipData`, `infl_eq`), adjustments, Theorem 1.
-- `Lemma2.lean`: Lemma 2, `E|S| = 1` for node changes.
-- `Lemma3Counterexample.lean`: Lemma 3 with `=` is false.
-- `Corollary6.lean`: the direct synchronous implementation (`directRun`, as a CSLib `Cslib/Computability/Distributed/Local`
-  algorithm), convergence in `|S|` rounds, Corollary 6.
-- `HistoryIndependence.lean`: Section 5, a weak version for the direct implementation (see
-  differencies.md item 11).
-- `Alg2Defs.lean`: the model of Algorithm 2 (Section 4).
-- `Alg2Basic.lean`: one-round lemmas, the invariants J0–J2 and correctness at termination.
-- `Alg2Rounds.lean`: an abstract version of Lemma 11 via rank-count potentials.
-- `Alg2Roots.lean`: the roots of trigger chains, Lemma 12 spacing, counting C-entries and
-  broadcasts.
-- `Alg2Graceful.lean`, `Alg2Abrupt.lean`: the two instances.
-- `Theorem7.lean`: the expected complexities.
-
-## Section 4
-
-The model (`Alg2Defs.lean`) is a synchronous broadcast network.
-- States: `M`, `M̄`, `C` (with an age), `R`. The paper's four rules are encoded literally.
-- "`u` changes to `C`" means `u` is in `C` with age 0. "Changed to `C` at least 2 rounds ago"
-  means age `≥ 1`.
-- A gracefully deleted node keeps participating but is not *active*, so it ends in `M̄`.
-- Node unmuting = `insertNode`. The node-insertion variant of Section 4.1 (two extra announcement
-  rounds) is not modelled separately.
-
-Proved deterministically, with `S` the influenced set:
-- only nodes of `S` ever change;
-- the run is stable from round `3|S|` (paper: `3|S|+2`) at the new greedy MIS;
-- non-abrupt changes: each node changes at most 3 times and there are at most `3|S|` broadcasts;
-- abrupt deletion: C-entries of a node satisfy `t₂ ≥ 3t₁+4`, the number of entries is at most
-  `min(log₃(|S|+1)+1, deg x)`, and there are at most `3|S|·min(…)` broadcasts.
-
-With Theorem 1 this gives Theorem 7:
-- `E[adjustments] ≤ 1`;
-- `E[rounds] ≤ 3`;
-- `E[broadcasts] ≤ 3` for non-abrupt changes, and `≤ 3·min(log₃(n+1)+1, deg x)` for abrupt
-  deletion.
-
-## Token spend
-
-About 0.75M tokens in total:
-- paper agent: about 0.42M;
-- subagent "random orders" (`Cslib/Probability/RandomOrder`): about 85k;
-- subagent "Algorithm 2" (Section 4): about 0.25M.
+**Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
+`Quot.sound`. The proof of Theorem 1 goes through a three-valued greedy evaluation with `v*` unknown,
+whose undetermined set is shown equal to the paper's closure `S` (`influenced_iff`). Greedy MIS,
+Claims 4–5 and random-order lemmas are in CSLib
+(`Cslib/Foundations/Combinatorics/SimpleGraph/{GreedyMIS,RandomGreedyMIS}.lean`,
+`Cslib/Probability/RandomOrder/FirstInSet.lean`).

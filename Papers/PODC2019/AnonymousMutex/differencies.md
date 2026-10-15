@@ -28,10 +28,8 @@ Symmetric Deadlock-Free Mutual Exclusion*, PODC 2019 (arXiv:1810.03723v1).
    permutations are adversarial, any rule of the form "the first `⊥` w.r.t. a fixed order of the
    local names" is covered. Rules that inspect the contents of the view (e.g. "a `⊥` next to an own
    register") were not explored; such a rule might rescue the algorithm.
-   *Versions.* The only locally available text is arXiv:1810.03723v1 (the file
-   `papers/2019/3293611.3331594_…pdf` is that arXiv PDF, identical byte for byte; arXiv has no later
-   version). The ACM proceedings version could not be compared; all statements here refer to
-   arXiv v1.
+   *Versions.* The text used is arXiv:1810.03723v1 (arXiv has no later version). The ACM proceedings
+   version could not be compared; all statements here refer to arXiv v1.
    *Where the proof breaks*: Claim 4 only shows that at every time *some* competing process does
    not withdraw; the proof of Theorem 2 then concludes "at least one competing process never calls
    `shrink()`", which does not follow (the non-withdrawing process changes over time). The proof
