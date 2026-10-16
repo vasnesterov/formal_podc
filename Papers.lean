@@ -416,7 +416,10 @@ import Papers.PODC2019.AutomaticSpeedup.WeakColoring
 import Papers.PODC2019.AutomaticSpeedup.Theorem4
 import Papers.PODC2024.SSLeaderElectionDirected.Examples
 import Papers.PODC2024.ContentObliviousLE.Main
+import Papers.PODC2021.ScannableBinaryObjects.Main
+import Papers.PODC2021.ScannableBinaryObjects.Degenerate
 import Papers.PODC2020.UnknownParticipantsBA.Counterexample
 import Papers.PODC2020.UnknownParticipantsBA.RotorFixed
 import Papers.PODC2020.UnknownParticipantsBA.Consensus
 import Papers.PODC2020.UnknownParticipantsBA.FillRule
+import Papers.PODC2021.ScannableBinaryObjects.Impl1Tight
