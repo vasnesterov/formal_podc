@@ -12,7 +12,7 @@ Classification: **false statement**, **false only in a degenerate case**, **proo
    (or any odd `k ≥ 3`, or even `k ≥ 6`) the hypothesis `F < (f+1)⌈k/2⌉` allows `F ≥ N/3`. For example
    `n = 1, f = 0, k = 3, F = 1, C = 2, c = 576` claims a 1-resilient counter on 3 nodes, which does not
    exist. The base counter does exist (the trivial one-node counter). Lean: `theorem1_as_stated_false`,
-   using `Podc.SyncCounting.not_isCounter_of_card_eq_three` (no 1-resilient counter on 3 nodes; proved
+   using `Cslib.Byzantine.SyncCounting.not_isCounter_of_card_eq_three` (no 1-resilient counter on 3 nodes; proved
    here by a line-covering argument). The paper's own construction fails there in a concrete way: the
    Byzantine node echoes every receiver's own `a` register back to it, so each correct node sees its own
    value `N − F = 2` times and the other correct value `F = 1` time. Then all three instruction sets keep
@@ -23,7 +23,7 @@ Classification: **false statement**, **false only in a degenerate case**, **proo
 2. **Proof gap (statement true for `n ≥ 3`): the paper uses `f < n/3` without assuming it.** The proof
    of Lemma 3 says that `f < n/3` "as otherwise counting cannot be solved". That is an external
    impossibility result. We proved the needed impossibility for `3 ≤ n ≤ 3f`
-   (`Podc.SyncCounting.not_isCounter_of_three_le_card`). So Theorem 1 holds *exactly as stated* when
+   (`Cslib.Byzantine.SyncCounting.not_isCounter_of_three_le_card`). So Theorem 1 holds *exactly as stated* when
    `n ≥ 3` (`theorem1_of_three_le`). For `n = 2, f ≥ 1` the statement holds iff there is no 1-resilient
    counter on 2 nodes. We did not prove this; our line argument needs three nonempty groups. The repaired
    general theorem `boost`/`theorem1` assumes `2f < n` (all the proof needs: a strict majority of correct

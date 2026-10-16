@@ -28,7 +28,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Model.**
 * Deterministic synchronous message passing in anonymous port-numbered networks
-  (`Podc/PortNumbering/Basic.lean`). A `PNGraph` has degrees and an involution `p` on ports
+  (`Cslib/Computability/Distributed/PortNumbering/Basic.lean`). A `PNGraph` has degrees and an involution `p` on ports
   (`0 … deg v − 1`); loops and multi-edges are allowed, so the quotient graphs of the covering arguments are
   `PNGraph`s too.
 * Initially a node knows only its degree. Each round it sends one message per port and receives one per port,
@@ -59,7 +59,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | §7.3–7.8 analysis (properties (a)(b)(c) ⇒ ratio) | `card_le_of_props`, `card_le_edgeDomNum_of_props` | `Analysis5.lean` |
 | Lemma 1 (odd degree ⇒ distinguishable neighbour) | `PNGraph.dn_isSome_of_odd` | `Distinguishable.lean` |
 | Lemma 2 (`M_G(i, j)` is a matching) | `M_matching` | `Distinguishable.lean` |
-| covering maps preserve outputs (§2.3) | `Algorithm.eval_covering` | `Podc/PortNumbering/Basic.lean` |
+| covering maps preserve outputs (§2.3) | `Algorithm.eval_covering` | `Cslib/Computability/Distributed/PortNumbering/Basic.lean` |
 | each edge dominates `≤ 2Δ − 1` edges | `card_edgeFinset_add_le` | `Basic.lean` |
 
 Supporting files:
@@ -77,11 +77,10 @@ Supporting files:
 Non-vacuity (`NonVacuity.lean`): on the lower-bound graphs of Theorems 1 and 2, the algorithms of Theorems 3 and 4
 output edge dominating sets (`nonvacuous_theorem_1/2`), so the lower-bound hypothesis is satisfiable; combining
 both bounds, their outputs there have size exactly `(4 − 2/d)γ'` resp. `(4 − 6/(d+1))γ'` (`tight_theorem_1/2`).
-`d`-regular simple inputs exist for every `d ≥ 1` (`graph1`, `graph2`). The port-numbering model is new shared
-infrastructure in `Podc/PortNumbering/` (a CSLib candidate).
+`d`-regular simple inputs exist for every `d ≥ 1` (`graph1`, `graph2`). The port-numbering model (the model, covering maps,
+sequential composition, local processes) is in CSLib, `Cslib/Computability/Distributed/PortNumbering/Basic.lean`.
 
 **CSLib candidates.**
-* `Podc/PortNumbering/Basic.lean`: the model, covering maps, sequential composition, and local processes.
 * `IsEDS`, `edgeDomNum`, `card_edgeFinset_add_le` (`Basic.lean`).
 * `card_fibre_le` / `card_le_of_fibre`: covering-map counting.
 * `card_mul_le`: the star-forest count `(d+1)|D| ≤ d|V|`.

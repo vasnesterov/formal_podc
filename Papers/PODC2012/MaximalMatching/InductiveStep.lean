@@ -12,7 +12,7 @@ Lemma 15 (`lemma15`).
 
 namespace Papers.PODC2012.MaximalMatching
 
-open Podc.ColourSystem FreeCox Pointwise Template
+open Cslib.ColourSystem FreeCox Pointwise Template
 
 variable {k : ℕ} {A : Algorithm k} {r h : ℕ}
 

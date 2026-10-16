@@ -72,7 +72,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 ## The formalization
 
-**Model** (`Model.lean`, our own; a CSLib candidate).
+**Model** (our own; now in CSLib as `Cslib.CrashPartialSync`, `Cslib/Computability/Distributed/CrashPartialSync/`;
+`Model.lean` here keeps Definitions 3–5).
 - `n` deterministic crash-prone processes and point-to-point links, in the Dwork–Lynch–Stockmeyer partially
   synchronous model. Discrete time with one tick `= Δ`; GST is unknown.
 - At each tick an alive process takes one atomic step. The step receives the messages delivered now, in an
@@ -116,5 +117,5 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Trust.** There is no `sorry`. `theorem_1`, `theorem_2` and the theorems listed above use only `propext`,
 `Classical.choice` and `Quot.sound`. Non-vacuity: `theorem_1`/`theorem_2` exhibit protocols satisfying the
 hypotheses of the lower bounds whenever the bounds allow it, and `theorem_1_fails_n_one` is a degenerate
-instance. Upstreaming candidate (`-- CSLib candidate`): the crash-fault partially synchronous model
-`Model.lean` with the merge lemma `Merge.lean`.
+instance. Upstreaming candidate (`-- CSLib candidate`): the generic run facts in `ImplRun.lean` (`mem_inbox`,
+`invariant`, `st_mono`).

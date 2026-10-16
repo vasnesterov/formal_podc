@@ -23,7 +23,7 @@ matching on the `a`-side (the graph of Theorem 1); for `s = 1`, `m = 2k+1` it is
 
 namespace Podc.EdgeDominatingSets
 
-open Podc.PortNumbering Finset
+open Cslib.PortNumbering Finset
 
 namespace Gadget
 

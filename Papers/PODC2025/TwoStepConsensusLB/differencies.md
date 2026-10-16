@@ -5,7 +5,7 @@ announcement); full version arXiv:2505.03627v2 (numbering follows it).
 
 ## Model (both directions)
 
-1. **Discrete time, one tick = Δ** (`Model.lean`). At every time `τ` an alive process receives the messages
+1. **Discrete time, one tick = Δ** (CSLib `Cslib.CrashPartialSync`). At every time `τ` an alive process receives the messages
    delivered at `τ` together with an optional invocation, makes one atomic transition and sends messages (they
    arrive at `≥ τ + 1`). Round `k` of the paper is the step at time `k − 1`; "decides by time `2Δ`" is "decides
    in the state after its step at time `2`" (`DecidedBy2`, state at time `3`). The paper's continuous time with

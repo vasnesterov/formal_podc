@@ -52,7 +52,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 ## The formalization
 
-**Model** (`Podc/SyncCounting/Model.lean`, shared).
+**Model** (`Cslib/Computability/Distributed/Byzantine/SyncCounting/Model.lean`, shared).
 * Complete network of nodes `V`, synchronous lock-step rounds. A deterministic algorithm is
   `(X, g, h)`. Each round, every node broadcasts its whole state and moves to `g i m`, where `m` is the
   received state vector. Its output is `h i s ∈ Fin c`.
@@ -78,7 +78,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 1, time and space (`Achievable`) | `boost`, `theorem1_paper` (`f < n/3`, `n ≥ 2`) | `Boost.lean` |
 | Theorem 1 exactly as stated, `n ≥ 3` | `theorem1_of_three_le` | `Counterexample.lean` |
 | Theorem 1 as stated: **false** for `n = 1` | `theorem1_as_stated_false`, `construction_fails` | `Counterexample.lean` |
-| Impossibility `3 ≤ n ≤ 3f` (used by the paper, cited) | `not_isCounter_of_three_le_card`, `not_isCounter_of_card_eq_three` | `Podc/SyncCounting/Impossibility.lean` |
+| Impossibility `3 ≤ n ≤ 3f` (used by the paper, cited) | `not_isCounter_of_three_le_card`, `not_isCounter_of_card_eq_three` | `Cslib/Computability/Distributed/Byzantine/SyncCounting/Impossibility.lean` |
 | §4.1 base case, Corollary 1 | `achievable_one`, `corollary1`, `corollary1_bounds` | `Recursive.lean` |
 | Theorem 2, Corollary 2 | `theorem2`, `corollary2` | `Recursive.lean` |
 | Theorem 3, Lemmas 6–7 | `theorem3` (explicit), `theorem3_asymptotic` | `Recursive.lean` |
@@ -93,6 +93,6 @@ Corollaries 3–5), and counters for network sizes other than the special ones p
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 The hypotheses are satisfiable: Section 4 instantiates Theorem 1 repeatedly, starting from the trivial
-one-node counter. The model and the impossibility theorem are shared infrastructure in `Podc/SyncCounting/`
-(CSLib candidates). No external result is assumed: the `n ≤ 3f` impossibility, which the paper only
+one-node counter. The model and the impossibility theorem are in CSLib,
+`Cslib/Computability/Distributed/Byzantine/SyncCounting/`. No external result is assumed: the `n ≤ 3f` impossibility, which the paper only
 cites, is proved here.

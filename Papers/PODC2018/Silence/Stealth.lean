@@ -1,5 +1,5 @@
 import Papers.PODC2018.Silence.Defs
-import Podc.SyncCrash.Floodset
+import Cslib.Computability.Distributed.SyncCrash.Floodset
 
 /-!
 # The STEALTH protocol (Appendix A, Figure 1 of Goren–Moses): `D = 3`, `M = n + f − 1`
@@ -23,7 +23,7 @@ Since there are no self-messages in our model, "received `err`/`huh?`" is read a
 
 namespace Papers.PODC2018.Silence.Stealth
 
-open Podc.SyncCrash Classical
+open Cslib.SyncCrash Classical
 
 variable {n : ℕ} [NeZero n]
 
@@ -386,7 +386,7 @@ theorem solvesAC (hf : 1 ≤ f) (hfn : f < n) : SolvesAC (stealth n f) f := by
           rw [Finset.card_erase_of_mem h0f] at this
           have := hr.1
           omega)
-        exact hvi (FloodRounds.agree floodRounds ht1 ht2 hclean (Pt_of_E hEk) (Pt_of_E hEi)
+        exact hvi (FloodRounds.agree (z' := i) floodRounds ht1 ht2 hclean (Pt_of_E hEk)
           (by simpa [add_comm] using hak) (by simpa [add_comm] using hvk) |>
           fun h => by simpa [add_comm] using h)
     intro i m d i' m' d' h h'

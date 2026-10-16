@@ -11,7 +11,7 @@ view of `v`, so the output is a function of the radius-`k` view: running time `k
 
 namespace Papers.PODC2012.MaximalMatching
 
-open Podc.ColourSystem FreeCox Pointwise
+open Cslib.ColourSystem FreeCox Pointwise
 
 variable {k : ℕ}
 

@@ -17,7 +17,7 @@ carries no information (`corollary2_literal_false`). We add the hypothesis that 
 
 namespace Papers.PODC2018.Silence
 
-open Podc.SyncCrash Classical
+open Cslib.SyncCrash Classical
 
 variable {P I M O : Type*} [Fintype P] {alg : Cslib.Byzantine.LockStep.Protocol P I M O}
 

@@ -70,7 +70,7 @@ Full list of differences, including modelling choices: [differencies.md](differe
 
 ## The formalization
 
-**Model** (`Podc/SyncCrash/Model.lean`; CSLib candidate, built on CSLib's `LockStep`).
+**Model** (`Cslib/Computability/Distributed/SyncCrash/Model.lean` in CSLib, built on CSLib's `LockStep`).
 * Network and timing: a complete network, synchronous rounds; round `t + 1` runs from time `t` to time
   `t + 1`.
 * Protocols are deterministic and history based: the local state is (initial value, received inboxes).
@@ -88,13 +88,13 @@ Full list of differences, including modelling choices: [differencies.md](differe
   run. The common case is the nice run, where all values are 1 and nobody fails.
 * Appendix D (`MidRound.lean`): the same runs, with mid-round decisions. Such a decision is performed
   only if the process finished its sending phase.
-* Consensus inside the protocols: max-floodset (`Podc/SyncCrash/Floodset.lean`).
+* Consensus inside the protocols: max-floodset (`Cslib/Computability/Distributed/SyncCrash/Floodset.lean`).
 
 **Main results in Lean** (namespace `Papers.PODC2018.Silence`).
 
 | Paper | Lean | File |
 |---|---|---|
-| Theorem 1 (KoP) | `Podc.SyncCrash.kop` | `Podc/SyncCrash/Model.lean` |
+| Theorem 1 (KoP) | `Cslib.SyncCrash.kop` | `Cslib/Computability/Distributed/SyncCrash/Model.lean` |
 | Lemma 1, Lemma 2, Corollary 2 (with `i` alive) | `lemma1`, `lemma2`, `corollary2` | `SilentBroadcast.lean` |
 | Lemma 2 / Cor. 2 literal: counterexample | `corollary2_literal_false` | `SilentBroadcast.lean` |
 | Theorem 2 (Silent Choir) | `silent_choir` (stronger: `silent_choir_at`) | `SilentChoir.lean` |
@@ -118,6 +118,6 @@ formalized.
 **Trust.** There is no `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice`
 and `Quot.sound`. The lower bounds' hypotheses can be satisfied: STEALTH and D2 solve AC in `γ_f` for
 every `1 ≤ f < n`, and D1f1 does so for `f = 1`. Each protocol is verified in all admissible runs, not
-just the nice run. The model reuses CSLib `Cslib.Byzantine.LockStep` (`Protocol`, `hist`). The new
-shared code is in `Podc/SyncCrash/`; its CSLib candidates are the crash model with knowledge and
-message chains, and the floodset lemmas.
+just the nice run. The model reuses CSLib `Cslib.Byzantine.LockStep` (`Protocol`, `hist`). The crash model
+with knowledge and message chains, and the floodset lemmas, are in CSLib
+(`Cslib/Computability/Distributed/SyncCrash/`).

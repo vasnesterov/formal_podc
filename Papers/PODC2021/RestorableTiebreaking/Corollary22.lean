@@ -1,5 +1,5 @@
 import Papers.PODC2021.RestorableTiebreaking.Existence
-import Podc.Combinatorics.IsolationLemma
+import Cslib.Foundations.Combinatorics.IsolationLemma
 
 /-!
 # Corollary 22: tiebreaking weights with `O(f log n)` bits via the isolation lemma
@@ -19,7 +19,7 @@ paper).
   claimed `n^{-c}` (still `O(f log n)` bits). This final arithmetic is not stated in Lean.
 -/
 
-open Finset SimpleGraph SimpleGraph.Walk Podc.Isolation
+open Finset SimpleGraph SimpleGraph.Walk Cslib.Isolation
 
 set_option linter.unusedSectionVars false
 

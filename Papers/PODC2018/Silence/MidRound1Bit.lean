@@ -25,7 +25,7 @@ protocol of `MidRound15D.lean`, where `huh?` is a separate message sent to all, 
 
 namespace Papers.PODC2018.Silence.MidRound.OneBit
 
-open Podc.SyncCrash Classical
+open Cslib.SyncCrash Classical
 open Papers.PODC2018.Silence.MidRound.OnePointFive (ok H)
 
 variable {P : Type*}

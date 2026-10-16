@@ -1,5 +1,5 @@
 import Papers.PODC2018.Silence.MidRound
-import Podc.SyncCrash.Floodset
+import Cslib.Computability.Distributed.SyncCrash.Floodset
 
 /-!
 # The 1.5D protocol (Figure 5 of Goren–Moses, Appendix D)
@@ -13,7 +13,7 @@ with `n(n − 1) + n f = n² + n f − n` messages — matching Corollary 6.
   (mid-round); other processes send `huh?` to all.
 * A process that sent or received `huh?` takes part in a biased-to-1 consensus, starting with `1`
   iff it committed or received `all[1]`. The consensus is the max-floodset of
-  `Podc.SyncCrash.Floodset` run for `f` rounds (rounds `3 … f + 2`); an uncommitted participant
+  `Cslib.Computability.Distributed.SyncCrash.Floodset` run for `f` rounds (rounds `3 … f + 2`); an uncommitted participant
   decides at time `f + 2` (commit iff it holds `1`).
 
 Messages: `true` = `'1'` / `all[1]` / consensus `1`, `false` = `huh?` (the two kinds of round-2
@@ -23,7 +23,7 @@ the protocol).
 
 namespace Papers.PODC2018.Silence.MidRound.OnePointFive
 
-open Podc.SyncCrash Classical
+open Cslib.SyncCrash Classical
 
 variable {P : Type*} [Fintype P]
 
@@ -291,7 +291,7 @@ theorem solvesACMid (hf : 1 ≤ f) (hnb : ∀ i, i ∉ nb i) (hcard : ∀ i, (nb
             rw [Finset.card_erase_of_mem (by rw [Run.mem_faulty]; simp [Run.Faulty, hj1])] at this
             have := hr.1
             omega)
-          have := FloodRounds.agree hF h1 (by omega) hcl (Or.inl hni) (Or.inl hnu)
+          have := FloodRounds.agree (z' := u) hF h1 (by omega) hcl (Or.inl hni)
             (by simpa [add_comm] using hai) (by simpa [add_comm] using hvi)
           simpa [add_comm] using this
         · rw [if_neg hvi] at hd'; cases hd'

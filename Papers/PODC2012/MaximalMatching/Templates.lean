@@ -1,4 +1,5 @@
-import Podc.ColourSystem.Algorithm
+import Mathlib
+import Cslib.Computability.Distributed.ColourSystem.Algorithm
 
 /-!
 # Templates, realisations and extensions (§3.2–3.5 of Hirvonen–Suomela)
@@ -19,7 +20,7 @@ realisation of `T` (Corollary 11, `real_extend`), so `out A (T.extend P) x = out
 
 namespace Papers.PODC2012.MaximalMatching
 
-open Podc.ColourSystem FreeCox Pointwise
+open Cslib.ColourSystem FreeCox Pointwise
 
 variable {k : ℕ}
 

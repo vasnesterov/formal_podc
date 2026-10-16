@@ -54,11 +54,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Lemma 1 (greedy, `k-1` rounds) | `lemma1`, `lemma1_messagePassing` | `Greedy.lean`, `Main.lean` |
 | Theorem 2 (`k-1` is optimal) | `theorem2`, `theorem2_lower`, `theorem2_messagePassing` | `Greedy.lean`, `LowerBound.lean`, `Main.lean` |
 | Corollary 3 (`Ω(Δ)`) | `corollary3`, `corollary3_messagePassing` | `LowerBound.lean`, `Main.lean` |
-| Lemma 4 | `IsColourSystem.inv_smul`, `colours_inv_smul` | `Podc/ColourSystem/Basic.lean` |
+| Lemma 4 | `IsColourSystem.inv_smul`, `colours_inv_smul` | `Cslib/Computability/Distributed/ColourSystem/Basic.lean` |
 | Lemma 5 (`k ≤ 2`) | `lemma5` | `LowerBound.lean` |
 | Theorem 6 | `theorem6`, `le_runningTime`, `theorem6_messagePassing` | `LowerBound.lean`, `Main.lean` |
 | Lemma 7 | `Template.isTemplate_extend`, `Template.isRegular_real` | `Templates.lean` |
-| Lemma 8 | `ColouredGraph.view_inv_smul`, `Template.extend_symm` | `Podc/ColourSystem/Graph.lean`, `Templates.lean` |
+| Lemma 8 | `ColouredGraph.view_inv_smul`, `Template.extend_symm` | `Cslib/Computability/Distributed/ColourSystem/Graph.lean`, `Templates.lean` |
 | Corollary 10 | `Good.apply_real` | `Outputs.lean` |
 | Corollary 11 | `Template.real_extend`, `Good.out_extend` | `Templates.lean`, `InductiveStep.lean` |
 | Lemma 12 | `Good.out_ne_none` | `Outputs.lean` |
@@ -76,7 +76,6 @@ Also not formalized: the cited `O(Δ + log* k)` and `Ω(log* k)` bounds, and the
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and
 `Quot.sound`. The hypotheses of Theorem 6 are satisfiable: greedy satisfies them (`good_greedy`).
 In the message-passing model, `lemma1_messagePassing` gives an algorithm that is correct on all
-networks. The reusable infrastructure is in [`Podc/ColourSystem/`](../../../Podc/ColourSystem/):
+networks. The reusable infrastructure is in CSLib (`Cslib/Computability/Distributed/ColourSystem/`):
 the free Coxeter group, colour systems, coloured graphs and their views (universal covers), the
-view-based and message-passing models with bridges between them, and finite completions. It is a
-CSLib candidate.
+view-based and message-passing models with bridges between them, and finite completions.

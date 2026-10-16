@@ -13,7 +13,7 @@ exactly `(4 - 2/d)·γ'`, resp. `(4 - 6/(d+1))·γ'` (`tight_theorem_1/2`).
 
 namespace Podc.EdgeDominatingSets
 
-open Podc.PortNumbering
+open Cslib.PortNumbering
 
 /-- The lower-bound graph of Theorem 1 is a valid input for the algorithm of Theorem 3, which
 outputs an edge dominating set on it. -/

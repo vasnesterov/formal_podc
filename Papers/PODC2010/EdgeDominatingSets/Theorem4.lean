@@ -19,7 +19,7 @@ latter: the output is an edge cover in which every edge has a private endpoint, 
 
 namespace Podc.EdgeDominatingSets
 
-open Podc.PortNumbering Finset
+open Cslib.PortNumbering Finset
 
 /-- Local data of a node in the algorithm of Theorem 4. -/
 structure St4 where

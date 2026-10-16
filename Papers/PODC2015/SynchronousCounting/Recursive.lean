@@ -26,7 +26,7 @@ Notes on the paper's computations (all asymptotic claims survive):
 
 namespace SynchronousCounting
 
-open Podc.SyncCounting
+open Cslib.Byzantine.SyncCounting
 
 /-! ### The base case -/
 

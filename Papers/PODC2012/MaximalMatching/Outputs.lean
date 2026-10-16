@@ -10,7 +10,7 @@ outputs `out A T t` satisfy (M1)–(M3) "up to half-loops", and Lemma 12 holds.
 
 namespace Papers.PODC2012.MaximalMatching
 
-open Podc.ColourSystem FreeCox Pointwise Template
+open Cslib.ColourSystem FreeCox Pointwise Template
 
 variable {k : ℕ}
 

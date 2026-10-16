@@ -14,7 +14,7 @@ reached by a chain behave identically in both runs (`hist_choirRun`), so `r â‰ˆá
 
 namespace Papers.PODC2018.Silence
 
-open Podc.SyncCrash Classical
+open Cslib.SyncCrash Classical
 
 variable {P M O : Type*} [Fintype P] {alg : Cslib.Byzantine.LockStep.Protocol P Bool M O}
 

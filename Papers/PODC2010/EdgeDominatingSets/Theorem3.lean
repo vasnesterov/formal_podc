@@ -10,7 +10,7 @@ port `0`.
 
 namespace Podc.EdgeDominatingSets
 
-open Podc.PortNumbering Finset
+open Cslib.PortNumbering Finset
 
 /-- The local rule of the algorithm of Theorem 3: select port `i` iff `i = 0` or the neighbour's
 port at the other end is `0`. -/

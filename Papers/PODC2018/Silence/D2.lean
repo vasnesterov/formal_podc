@@ -1,5 +1,5 @@
 import Papers.PODC2018.Silence.Defs
-import Podc.SyncCrash.Floodset
+import Cslib.Computability.Distributed.SyncCrash.Floodset
 
 /-!
 # The protocol D2 (Appendix B / Figure 3 of Goren–Moses): `D = 2`, `M = f · n`
@@ -25,7 +25,7 @@ Messages are `Finset (Fin n)`; one-bit messages are `∅`.
 
 namespace Papers.PODC2018.Silence.D2
 
-open Podc.SyncCrash Classical
+open Cslib.SyncCrash Classical
 
 variable {n : ℕ}
 
@@ -387,7 +387,6 @@ lemma no_commit_abort (hf : 1 ≤ f) (hfn : f < n) (hr : r.Admissible f) {i k : 
   · cases h
   have hvi : ¬ floodVal (d2 n f) r 3 (vhatR f r) i (f + 3) := by
     intro hv; rw [if_pos hv] at hd; cases hd
-  have hpi : partR f r i := Or.inl hei
   obtain ⟨hak, ⟨rfl, hek, -⟩ | ⟨rfl, hek, hdk⟩⟩ := hc
   · -- commit at time 2
     by_cases hcom : ∃ c, ¬ r.Faulty c ∧ ¬ errR f r c
@@ -416,7 +415,7 @@ lemma no_commit_abort (hf : 1 ≤ f) (hfn : f < n) (hr : r.Admissible f) {i k : 
     · obtain ⟨t₀, h1, h2, h3⟩ := exists_clean_round r hcl
       have hak' : r.Alive k (3 + f) := by rw [add_comm]; exact hak
       have hvk' : floodVal (d2 n f) r 3 (vhatR f r) k (3 + f) := by rw [add_comm]; exact hvk
-      have := FloodRounds.agree floodRounds h1 h2 h3 hpk hpi hak' hvk'
+      have := FloodRounds.agree (z' := i) floodRounds h1 h2 h3 hpk hak' hvk'
       rw [add_comm] at this
       exact hvi this
     · push Not at hcl

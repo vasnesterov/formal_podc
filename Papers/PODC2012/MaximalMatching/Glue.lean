@@ -11,7 +11,7 @@ that the result is again a template (observation (a)) and the compatibility obse
 
 namespace Papers.PODC2012.MaximalMatching
 
-open Podc.ColourSystem FreeCox Pointwise Template
+open Cslib.ColourSystem FreeCox Pointwise Template
 
 variable {k : ℕ}
 

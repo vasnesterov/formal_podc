@@ -20,6 +20,8 @@ set_option linter.unusedSectionVars false
 
 namespace TwoStepConsensus.Impl
 
+open _root_.Cslib.CrashPartialSync
+
 open Relation
 
 variable {P V : Type*} [Fintype P] [DecidableEq P] [LinearOrder V]

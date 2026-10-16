@@ -116,6 +116,6 @@ against the synchronous one (`asends_zero_delay`).
 An exhaustive check on all connected graphs with at most 6 nodes (not part of the repository) agrees
 with every claim of Sections 2–3.
 
-**Infrastructure.** `Podc/Graphs/WalkParity.lean` (CSLib candidate) provides walks of exact length,
+**Infrastructure.** CSLib's `Cslib/Foundations/Combinatorics/SimpleGraph/WalkParity.lean` provides walks of exact length,
 parity distances, the parity facts for bipartite and non-bipartite graphs, and unique BFS parents in
 forests.

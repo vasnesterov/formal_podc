@@ -20,7 +20,7 @@ counting argument `|D| ≤ d|V|/(d+1)` for such "star forests".
 
 namespace Podc.EdgeDominatingSets
 
-open Podc.PortNumbering Finset
+open Cslib.PortNumbering Finset
 
 variable {V : Type*} [Fintype V] [DecidableEq V]
 

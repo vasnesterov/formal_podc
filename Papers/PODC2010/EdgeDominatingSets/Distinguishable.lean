@@ -21,7 +21,7 @@ uniquely labelled port (`dn v = some i`), if any.
 
 namespace Podc.EdgeDominatingSets
 
-open Podc.PortNumbering Finset
+open Cslib.PortNumbering Finset
 
 /-- Port `i` is uniquely labelled among ports `0, …, d - 1` with remote ports `rp`. -/
 def IsUniq (d : ℕ) (rp : ℕ → ℕ) (i : ℕ) : Prop :=
@@ -84,7 +84,7 @@ theorem even_of_forall_not_isUniq {d : ℕ} {rp : ℕ → ℕ} (h : ∀ i < d, �
 
 end Podc.EdgeDominatingSets
 
-namespace Podc.PortNumbering.PNGraph
+namespace Cslib.PortNumbering.PNGraph
 
 open Podc.EdgeDominatingSets
 
@@ -103,11 +103,11 @@ theorem dn_isSome_of_odd {v : V} (h : Odd (G.deg v)) : (G.dn v).isSome := by
     fun i hi hu => hn (dnOf_isSome hi hu)
   exact (Nat.not_even_iff_odd.2 h) (even_of_forall_not_isUniq this)
 
-end Podc.PortNumbering.PNGraph
+end Cslib.PortNumbering.PNGraph
 
 namespace Podc.EdgeDominatingSets
 
-open Podc.PortNumbering Finset
+open Cslib.PortNumbering Finset
 
 variable {V : Type*} [Fintype V]
 

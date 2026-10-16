@@ -1,4 +1,5 @@
-import Podc.PortNumbering.Basic
+import Mathlib
+import Cslib.Computability.Distributed.PortNumbering.Basic
 
 /-!
 # Edge dominating sets and outputs of port-numbering algorithms
@@ -20,7 +21,7 @@ Suomela, *Distributed algorithms for edge dominating sets*, PODC 2010, §1.1, §
 
 namespace Podc.EdgeDominatingSets
 
-open Podc.PortNumbering Finset
+open Cslib.PortNumbering Finset
 
 variable {V : Type*}
 

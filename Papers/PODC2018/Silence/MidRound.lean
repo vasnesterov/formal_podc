@@ -20,7 +20,7 @@ Results:
 
 namespace Papers.PODC2018.Silence.MidRound
 
-open Podc.SyncCrash Classical
+open Cslib.SyncCrash Classical
 
 variable {P M : Type*}
 

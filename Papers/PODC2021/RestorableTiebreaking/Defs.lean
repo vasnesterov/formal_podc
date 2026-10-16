@@ -1,4 +1,5 @@
-import Podc.Graphs.ShortestWalks
+import Mathlib
+import Cslib.Foundations.Combinatorics.SimpleGraph.ShortestWalks
 
 /-!
 # Restorable shortest path tiebreaking — definitions

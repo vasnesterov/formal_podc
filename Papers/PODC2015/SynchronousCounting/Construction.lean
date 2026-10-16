@@ -1,4 +1,5 @@
-import Podc.SyncCounting.Model
+import Mathlib
+import Cslib.Computability.Distributed.Byzantine.SyncCounting.Model
 import Papers.PODC2015.SynchronousCounting.Params
 import Papers.PODC2015.SynchronousCounting.Majority
 import Papers.PODC2015.SynchronousCounting.PhaseKing
@@ -24,7 +25,7 @@ are identified with nodes via `finProdFinEquiv : Fin k × Fin n ≃ Fin (k * n)`
 
 namespace SynchronousCounting
 
-open Podc.SyncCounting Finset
+open Cslib.Byzantine.SyncCounting Finset
 
 variable {X : Type*} {n c : ℕ} (k F C : ℕ)
 

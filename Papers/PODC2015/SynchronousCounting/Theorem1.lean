@@ -15,7 +15,7 @@ time `T`, then the construction `B` on `k × n` nodes is a synchronous `C`-count
 
 namespace SynchronousCounting
 
-open Podc.SyncCounting Finset
+open Cslib.Byzantine.SyncCounting Finset
 
 variable {X : Type*} {n f c T k F C : ℕ}
 

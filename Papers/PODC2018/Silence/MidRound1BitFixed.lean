@@ -14,7 +14,7 @@ process `c` that knows `all[1]` learns that an uncommitted `u` needs help (a `1`
 
 namespace Papers.PODC2018.Silence.MidRound.OneBitFixed
 
-open Podc.SyncCrash Classical
+open Cslib.SyncCrash Classical
 open Papers.PODC2018.Silence.MidRound.OnePointFive (ok H)
 open Papers.PODC2018.Silence.MidRound.OneBit (huh1 all11 val1)
 
@@ -268,7 +268,7 @@ theorem solvesACMid (hf : 1 ≤ f) (hnb : ∀ i, i ∉ nb i) (hcard : ∀ i, (nb
             rw [Finset.card_erase_of_mem (by rw [Run.mem_faulty]; simp [Run.Faulty, hj1])] at this
             have := hr.1
             omega)
-          have := FloodRounds.agree hF h1 (by omega) hcl (Or.inl hni) (Or.inl hnu)
+          have := FloodRounds.agree (z' := u) hF h1 (by omega) hcl (Or.inl hni)
             (by simpa [add_comm] using hai) (by simpa [add_comm] using hvi)
           simpa [add_comm] using this
         · rw [if_neg hvi] at hd'; cases hd'
