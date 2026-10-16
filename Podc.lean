@@ -13,3 +13,4 @@ import Podc.ColourSystem.MessagePassing
 import Podc.PortNumbering.Basic
 import Podc.SyncCrash.Model
 import Podc.SyncCrash.Floodset
+import Podc.Graphs.Arboricity
