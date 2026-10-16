@@ -3,3 +3,4 @@
 import Podc.Basic
 import Podc.IteratedModel.Basic
 import Podc.IteratedModel.Patterns
+import Podc.AtomicState.Model
