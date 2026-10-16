@@ -537,3 +537,13 @@ import Papers.PODC2016.GreedySpanner.MSTTree
 import Papers.PODC2016.GreedySpanner.Theorem5
 import Papers.PODC2016.GreedySpanner.Section4
 import Papers.PODC2016.GreedySpanner.Doubling
+import Papers.PODC2016.VertexCoverLocalRatio.LocalRatio
+import Papers.PODC2016.VertexCoverLocalRatio.Algorithm
+import Papers.PODC2016.VertexCoverLocalRatio.Invariants
+import Papers.PODC2016.VertexCoverLocalRatio.Correctness
+import Papers.PODC2016.VertexCoverLocalRatio.Rounds
+import Papers.PODC2016.VertexCoverLocalRatio.Paper
+import Papers.PODC2016.VertexCoverLocalRatio.Distributed
+import Papers.PODC2016.VertexCoverLocalRatio.Main
+import Papers.PODC2016.VertexCoverLocalRatio.Congest
+import Papers.PODC2016.VertexCoverLocalRatio.KMWDiscussion
