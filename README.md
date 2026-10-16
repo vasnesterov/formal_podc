@@ -58,6 +58,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2013 | 100 | Vaidya, Garg — *Byzantine Vector Consensus in Complete Graphs* | [ByzantineVectorConsensus](Papers/PODC2013/ByzantineVectorConsensus) | ⚠️ Exact BVC solvable iff n ≥ max(3f+1, (d+1)f+1) and the approximate-BVC impossibility proved; Tverberg's theorem proved; Thm 6 (restricted algorithms, secondary) false as literally stated — under-specified definition; async algorithm under-specified; minor gaps |
 | 2019 | 88 | Abraham, Chan, Dolev, Nayak, Pass, Ren, Shi — *Communication Complexity of Byzantine Agreement, Revisited* | [CommComplexityBA](Papers/PODC2019/CommComplexityBA) | ⚠️ Ω(f²) lower bound (Theorem 4/1) proved after repairing a probabilistic proof gap; Theorem 13 (no-setup broadcast) false for n = 2 (degenerate), proved for n ≥ C+2; upper bounds not formalized |
 | 2018 | 79 | Barenboim, Elkin, Goldenberg — *Locally-Iterative Distributed (Δ+1)-Coloring below Szegedy–Vishwanathan Barrier* | [LocallyIterativeColoring](Papers/PODC2018/LocallyIterativeColoring) | ❌ Section 3 correct; **Corollaries 7.2–7.3 false** (3AG never terminates); §1.2 round claim false |
+| 2019 | 71 | Brandt — *An Automatic Speedup Theorem for Distributed Problems* | [AutomaticSpeedup](Papers/PODC2019/AutomaticSpeedup) | ❌ Forward direction of Theorem 1, Theorem 2 and the sinkless-orientation/colouring lower bounds proved; **converse of Theorem 1 and Corollary 1 false** without edge symmetry breaking (input-free Δ-regular graphs whose port numbering is an edge colouring; K₂); repaired converse proved |
 | 2016 | 68 | Censor-Hillel, Haramaty, Karnin — *Optimal Dynamic Distributed MIS* | [DynamicMIS](Papers/PODC2016/DynamicMIS) | ⚠️ Main results proved; Lemma 3 "= 1/\|P\|" false for edge changes (≤ holds) |
 | 2021 | 49 | Kuznetsov, Tonkikh, Zhang — *Revisiting Optimal Resilience of Fast Byzantine Consensus* | [FastByzantineConsensus](Papers/PODC2021/FastByzantineConsensus) | ✅ Tight bound n ≥ 3f+2t−1 proved both ways; one proof gap repaired |
 | 2018 | 35 | Függer, Nowak, Schwarz — *Tight Bounds for Asymptotic and Approximate Consensus* | [AsymptoticConsensus](Papers/PODC2018/AsymptoticConsensus) | ❌ Lower bounds proved and tight; **Theorem 4 (⇐) false** |
@@ -128,6 +129,15 @@ in the paper's `differencies.md`.
   on a single edge with colours ⟨1,0,0⟩, ⟨1,0,1⟩ the two vertices keep equal b-values forever, for every p.
   Hence Corollaries 7.2 and 7.3 are false. The §1.2 claim that 2p+1 rounds suffice is also false (16-vertex
   tree, Δ = 4). The main Section 3 results are correct.
+- **An Automatic Speedup Theorem for Distributed Problems** (PODC 2019, 71 citations) —
+  [AutomaticSpeedup](Papers/PODC2019/AutomaticSpeedup). The converse direction of Theorem 1 ("if Π_1 is
+  solvable in t−1 rounds then Π is solvable in t rounds") and hence Corollary 1 are false in the paper's
+  port-numbering model: the proof lets both endpoints of an edge choose from the same view, and when the edge
+  looks the same from both sides they choose the same. Edge orientation on input-free Δ-regular high-girth graphs
+  whose port numbering is a proper edge colouring is unsolvable, yet its Π_1 is solvable in 0 rounds (smallest
+  case: K₂). This undermines the abstract's "reversible"/"exact complexity" claims; with edge symmetry breaking
+  (orientations or IDs, as in all of the paper's applications) the converse holds, and the paper's lower bounds,
+  which use only the forward direction, are unaffected.
 - **Tight Bounds for Asymptotic and Approximate Consensus** (PODC 2018, 35 citations) —
   [AsymptoticConsensus](Papers/PODC2018/AsymptoticConsensus). Theorem 4 (⇐), a characterization of when exact
   consensus is solvable via valencies, is false: a two-agent algorithm with a discontinuous limit function is a
