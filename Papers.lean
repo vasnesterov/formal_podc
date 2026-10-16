@@ -367,3 +367,9 @@ import Papers.PODC2025.TwoStepConsensusLB.SmallCases
 import Papers.PODC2022.DominatingSetArboricity.Main
 import Papers.PODC2025.TwoStepConsensusLB.ImplAgreement
 import Papers.PODC2025.TwoStepConsensusLB.Fig1Liveness
+import Papers.PODC2011.FaultTolerantSpanners.TwoSpanner.Defs
+import Papers.PODC2011.FaultTolerantSpanners.TwoSpanner.Rounding
+import Papers.PODC2011.FaultTolerantSpanners.TwoSpanner.Characterization
+import Papers.PODC2011.FaultTolerantSpanners.TwoSpanner.Distributed
+import Papers.PODC2011.FaultTolerantSpanners.Corollary22
+import Papers.PODC2011.FaultTolerantSpanners.TwoSpanner.Theorem33
