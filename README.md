@@ -48,6 +48,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 
 | Year | Citations | Paper | Folder | Verdict |
 |---|---|---|---|---|
+| 2021 | 330 | Keidar, Kokoris-Kogias, Naor, Spiegelman — *All You Need is DAG* | [AllYouNeedIsDAG](Papers/PODC2021/AllYouNeedIsDAG) | ⚠️ DAG-Rider BAB properties proved (abstract RBC; liveness assuming good waves); Lemma 1 false for recursively committed leaders (n=4 counterexample) — total order still holds; chain quality depends on unspecified order; several proof gaps |
 | 2012 | 221 | Vaidya, Tseng, Liang — *Iterative Approximate Byzantine Consensus in Arbitrary Directed Graphs* | [IterativeApproxBC](Papers/PODC2012/IterativeApproxBC) | ✅ Full characterization proved; a gap in the necessity proof repaired |
 | 2021 | 137 | Abraham, Nayak, Ren, Xiang — *Good-case Latency of Byzantine Broadcast: a Complete Categorization* | [GoodCaseLatencyBB](Papers/PODC2021/GoodCaseLatencyBB) | ⚠️ All lower bounds of Table 1 proved in their intended ranges; Theorem 10 false for n = 3 and Theorems 4, 8, 9 for n = 2 (degenerate); Theorem 10's executions violate unforgeability (proof gap); Theorem 19's proof one Δ weaker than stated |
 | 2011 | 108 | Dinitz, Krauthgamer — *Fault-Tolerant Spanners: Better and Simpler* | [FaultTolerantSpanners](Papers/PODC2011/FaultTolerantSpanners) | ⚠️ Thm 2.1 (explicit probability), Cor 2.2, Thm 3.3 proved; Lemma 3.8 (distributed) misstated — LP(C) misdefined, 4-vertex counterexample, Thm 3.9 unaffected; implicit assumptions (loopless, α ≥ 4, r ≤ 2n) |
