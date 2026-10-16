@@ -560,3 +560,13 @@ import Papers.PODC2016.VertexCoverLocalRatio.Congest
 import Papers.PODC2016.VertexCoverLocalRatio.KMWDiscussion
 import Papers.PODC2022.RecursivePhaseKing.VotingBarrier
 import Papers.PODC2019.CryptoConsensusNumber.Fig3Example
+import Papers.PODC2025.MinimalistLE.Basic
+import Papers.PODC2025.MinimalistLE.Flow
+import Papers.PODC2025.MinimalistLE.Convergence
+import Papers.PODC2025.MinimalistLE.Coins
+import Papers.PODC2025.MinimalistLE.Probability
+import Papers.PODC2025.MinimalistLE.Main
+import Papers.PODC2025.MinimalistLE.PairChain
+import Papers.PODC2025.MinimalistLE.Window
+import Papers.PODC2025.MinimalistLE.Theorem2
+import Papers.PODC2025.MinimalistLE.Remarks
