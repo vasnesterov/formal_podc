@@ -14,7 +14,7 @@ import Papers.PODC2018.Silence.SilentChoir
 
 namespace Papers.PODC2018.Silence
 
-open Podc.SyncCrash Classical
+open Cslib.SyncCrash Classical
 
 variable {P M : Type*} [Fintype P]
 

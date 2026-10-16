@@ -5,7 +5,7 @@ Goren, Moses, *Silence*, PODC 2018 (arXiv 1805.07954v1, the only version).
 ## Model (§2.2)
 
 1. **Runs as data.** A run is the triple (initial values, crash round of each process, set of processes
-   reached in the crash round) (`Podc.SyncCrash.Run`); the execution is computed from it with CSLib's
+   reached in the crash round) (`Cslib.SyncCrash.Run`); the execution is computed from it with CSLib's
    lock-step semantics (`Cslib.Byzantine.LockStep.hist`) on the complete graph. Every execution of the
    paper's model `γ_f` arises in this way. Two data can describe the same execution (e.g. `reach` is
    irrelevant when nothing is sent); all facts we use (values, faultiness, chains, decisions) are
@@ -96,7 +96,7 @@ in **all** admissible runs of `γ_f`):
     "all decisions via consensus") never check that at most `f − 1` crashes occur during the
     consensus. We instantiate the consensus concretely as a *max-floodset* (a participant holding `1`
     sends to all; bit = initial bit ∨ received something; decide after `f` rounds;
-    `Podc/SyncCrash/Floodset.lean`). Its validity and biased-to-1 property hold for any number of
+    `Cslib/Computability/Distributed/SyncCrash/Floodset.lean`). Its validity and biased-to-1 property hold for any number of
     crashes, and in every run where consensus inputs are mixed a crash happened before the consensus
     (process `0` in round ≤ 2 for STEALTH, a round-1 crash for D2 / 1.5D), so the `f` rounds contain a
     crash-free round (pigeonhole, `exists_clean_round`), which gives uniform agreement. *Proof gap;

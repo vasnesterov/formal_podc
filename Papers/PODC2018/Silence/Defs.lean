@@ -1,4 +1,5 @@
-import Podc.SyncCrash.Model
+import Mathlib
+import Cslib.Computability.Distributed.SyncCrash.Model
 
 /-!
 # Silence (Goren–Moses, PODC 2018): atomic commitment in `γ_f`
@@ -7,12 +8,12 @@ Definitions shared by the whole formalization: decisions, the atomic-commitment 
 specification of §2.1, nice runs, message-chain sets `S_j^r(t)`.
 
 The model `γ_f` (synchronous rounds, crash failures, deterministic history-based protocols,
-knowledge) is `Podc.SyncCrash` (`Podc/SyncCrash/Model.lean`).
+knowledge) is `Cslib.SyncCrash` (`Cslib/Computability/Distributed/SyncCrash/Model.lean`).
 -/
 
 namespace Papers.PODC2018.Silence
 
-open Podc.SyncCrash Classical
+open Cslib.SyncCrash Classical
 
 /-- The two AC actions. -/
 inductive Decision

@@ -17,6 +17,8 @@ set_option linter.unusedSectionVars false
 
 namespace TwoStepConsensus
 
+open _root_.Cslib.CrashPartialSync
+
 open Finset
 
 variable {P V M S : Type*} [Fintype P] [DecidableEq P]

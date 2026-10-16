@@ -41,6 +41,8 @@ set_option linter.unusedSectionVars false
 
 namespace TwoStepConsensus.Impl
 
+open _root_.Cslib.CrashPartialSync
+
 /-- Contents of a `1B` message besides its ballot: `(vbal, val, proposer, decided)`. -/
 structure OneB (P V : Type*) where
   /-- The last ballot in which the sender voted. -/

@@ -10,7 +10,7 @@ import Papers.PODC2012.MaximalMatching.Outputs
 
 namespace Papers.PODC2012.MaximalMatching
 
-open Podc.ColourSystem FreeCox Pointwise Template
+open Cslib.ColourSystem FreeCox Pointwise Template
 
 variable {k : ℕ}
 

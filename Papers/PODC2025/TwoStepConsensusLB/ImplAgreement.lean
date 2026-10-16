@@ -20,6 +20,8 @@ set_option linter.unusedSectionVars false
 
 namespace TwoStepConsensus.Impl
 
+open _root_.Cslib.CrashPartialSync
+
 open Relation
 
 variable {P V : Type*} [Fintype P] [DecidableEq P] [LinearOrder V]
@@ -451,6 +453,8 @@ theorem theorem_2_upper [Nonempty P] (e f : ℕ) (hef : e ≤ f) (hn1 : 2 * f + 
 end TwoStepConsensus.Impl
 
 namespace TwoStepConsensus
+
+open _root_.Cslib.CrashPartialSync
 
 universe u v
 

@@ -85,7 +85,7 @@ Full list of differences (including modelling choices and minor imprecisions):
 | Theorem 19 | `theorem19`, `theorem19_path` (core: `restore_one`) | `Theorem19.lean`, `ATWPaths.lean` |
 | Theorem 19 with literal Def. 17 is false | `theorem19_literal_false`, `not_isRestorableLiteral` | `Counterexamples.lean` |
 | Theorem 20 (random weights, probability 1) | `theorem20`, `isProbabilityMeasure_box` | `Random.lean` |
-| Theorem 21 (isolation lemma) | `Podc.Isolation.card_not_uniqueMin_le` | `Podc/Combinatorics/IsolationLemma.lean` |
+| Theorem 21 (isolation lemma) | `Cslib.Isolation.card_not_uniqueMin_le` | `Cslib/Foundations/Combinatorics/IsolationLemma.lean` |
 | Corollary 22 (counting form, corrected bound) | `corollary22`, `paper_count_false` | `Corollary22.lean` |
 | Theorem 23 (deterministic weights) | `theorem23` | `Existence.lean` |
 | Theorem 29 / Algorithm 1 (correctness) | `theorem29_correct`, `card_overlay_zero_le` | `Applications.lean` |
@@ -111,11 +111,11 @@ Non-vacuity:
 - Theorem 2 is an existence statement.
 - `theorem37` and `theorem19_literal_false` are refutations on concrete graphs (`C₄`, `K₂`).
 
-General graph infrastructure is in `Podc/Graphs/ShortestWalks.lean` (CSLib candidate). It covers:
+General graph infrastructure is in CSLib, `Cslib/Foundations/Combinatorics/SimpleGraph/ShortestWalks.lean`. It covers:
 - walks avoiding a fault set and shortest walks of `G \ A`;
 - splitting at a dart;
 - orientation of edges on shortest walks;
 - distinct shortest walks have distinct edge sets;
 - directed dart weights and the bypass weight bound.
 
-The isolation lemma is in `Podc/Combinatorics/IsolationLemma.lean` (CSLib candidate).
+The isolation lemma is in CSLib, `Cslib/Foundations/Combinatorics/IsolationLemma.lean`.

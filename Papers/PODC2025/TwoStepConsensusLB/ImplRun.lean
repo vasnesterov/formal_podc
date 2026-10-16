@@ -14,7 +14,9 @@ import Papers.PODC2025.TwoStepConsensusLB.Model
 
 set_option linter.unusedSectionVars false
 
-namespace TwoStepConsensus.Run
+-- CSLib candidate: generic facts about `Cslib.CrashPartialSync` runs (kept in that namespace so
+-- that dot notation `R.mem_inbox` works).
+namespace Cslib.CrashPartialSync.Run
 
 variable {P V M S : Type*} [Fintype P] [DecidableEq P]
 variable (A : Protocol P V M S) (R : Run P V M)
@@ -120,4 +122,4 @@ theorem st_mono (Φ : S → Prop) {p : P}
     · exact h _ _ _ _ ih
     · exact ih
 
-end TwoStepConsensus.Run
+end Cslib.CrashPartialSync.Run

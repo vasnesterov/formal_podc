@@ -1,5 +1,5 @@
 import Papers.PODC2012.MaximalMatching.Greedy
-import Podc.ColourSystem.MessagePassing
+import Cslib.Computability.Distributed.ColourSystem.MessagePassing
 
 /-!
 # Main results of Hirvonen–Suomela, *Distributed Maximal Matching: Greedy is Optimal* (PODC'12)
@@ -15,7 +15,7 @@ Two equivalent formulations of the model are covered.
 
 namespace Papers.PODC2012.MaximalMatching
 
-open Podc.ColourSystem FreeCox MPAlgorithm
+open Cslib.ColourSystem FreeCox MPAlgorithm
 
 variable {k : ℕ}
 

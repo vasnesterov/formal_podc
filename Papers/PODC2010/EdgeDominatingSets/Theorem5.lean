@@ -16,7 +16,7 @@ phases (`Phase5.lean`) and the combinatorial analysis (`Analysis5.lean`):
 
 namespace Podc.EdgeDominatingSets
 
-open Podc.PortNumbering Finset
+open Cslib.PortNumbering Finset
 
 variable {V : Type} [Fintype V] [DecidableEq V]
 

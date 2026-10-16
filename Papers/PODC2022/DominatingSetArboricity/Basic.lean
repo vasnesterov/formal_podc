@@ -1,4 +1,5 @@
-import Podc.Graphs.Arboricity
+import Mathlib
+import Cslib.Foundations.Combinatorics.SimpleGraph.Arboricity
 
 /-!
 # Weighted dominating sets, packings, weak duality

@@ -1,5 +1,5 @@
 import Papers.PODC2015.SynchronousCounting.Recursive
-import Podc.SyncCounting.Impossibility
+import Cslib.Computability.Distributed.Byzantine.SyncCounting.Impossibility
 
 /-!
 # Theorem 1 as stated is false for `n = 1`
@@ -7,7 +7,7 @@ import Podc.SyncCounting.Impossibility
 Theorem 1 of the paper assumes only `N = kn`, `3 ≤ k`, `F < (f+1)⌈k/2⌉`, `C > 1` and
 `3(F+2)(2m)^k ∣ c`, and claims (§3.4) that `F < N/3` follows. For `n = 1`, `f = 0`, `k = 3` the
 hypotheses allow `F = 1 < 2 = (f+1)⌈3/2⌉`, i.e. a `1`-resilient counter on `N = 3` nodes, which
-does not exist (`Podc.SyncCounting.not_isCounter_of_card_eq_three`). The base counter required by
+does not exist (`Cslib.Byzantine.SyncCounting.not_isCounter_of_card_eq_three`). The base counter required by
 the theorem exists: the trivial `0`-resilient counter on one node (`achievable_one`).
 
 * `not_achievable_three_one`: there is no synchronous `C`-counter (`C ≥ 2`) on 3 nodes tolerating
@@ -23,7 +23,7 @@ the theorem exists: the trivial `0`-resilient counter on one node (`achievable_o
 
 namespace SynchronousCounting
 
-open Podc.SyncCounting Finset
+open Cslib.Byzantine.SyncCounting Finset
 
 /-- No synchronous counter on 3 nodes tolerates one Byzantine fault. -/
 theorem not_achievable_three_one {C T S : ℕ} (hC : 2 ≤ C) : ¬ Achievable 3 1 C T S := by
@@ -42,7 +42,7 @@ theorem theorem1_as_stated_false :
   exact not_achievable_three_one le_rfl this
 
 /-- For `n ≥ 3`, the existence of a base counter already forces `f < n/3`
-(`Podc.SyncCounting.not_isCounter_of_three_le_card`). -/
+(`Cslib.Byzantine.SyncCounting.not_isCounter_of_three_le_card`). -/
 lemma three_mul_lt_of_achievable {n f c T S : ℕ} (h : Achievable n f c T S) (hn : 3 ≤ n)
     (hc : 2 ≤ c) : 3 * f < n := by
   obtain ⟨X, _, _, A, -, hA⟩ := h

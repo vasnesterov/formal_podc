@@ -12,6 +12,8 @@ set_option linter.unusedSectionVars false
 
 namespace TwoStepConsensus
 
+open _root_.Cslib.CrashPartialSync
+
 /-- "Decide your own input": the state is the decision. -/
 def selfDecide (V : Type*) : Protocol Unit V Unit (Option V) where
   init _ := none

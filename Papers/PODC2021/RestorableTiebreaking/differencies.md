@@ -49,7 +49,7 @@ arXiv:2102.10174v4 (numbering follows the arXiv version).
 5. **Theorem 21 (isolation lemma) needs distinct edge sets.** *Under-specified.* It is stated for "a set of
    paths `Π`". The paths must have pairwise distinct edge sets (a path and its reverse always tie). In the
    application all paths go from `s` to `t`, and distinct shortest `s ⇝ t` paths have distinct edge sets
-   (`IsShortestIn.exists_mem_edges_not_mem`). Our isolation lemma (`Podc.Isolation.card_not_uniqueMin_le`)
+   (`IsShortestIn.exists_mem_edges_not_mem`). Our isolation lemma (`Cslib.Isolation.card_not_uniqueMin_le`)
    is stated for a family of sets.
 6. **Theorem 30's proof uses the wrong `f`.** *Typo/slip.* It takes "a consistent stable restorable
    `f`-RPTS". For `f + 1` faults it needs an `(f+1)`-restorable `(f+1)`-RPTS whose `f`-fault overlays are

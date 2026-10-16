@@ -1,4 +1,5 @@
-import Podc.Graphs.WalkParity
+import Mathlib
+import Cslib.Foundations.Combinatorics.SimpleGraph.WalkParity
 
 /-!
 # Synchronous amnesiac flooding (Hussak–Trehan, PODC 2019)

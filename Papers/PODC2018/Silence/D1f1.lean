@@ -15,7 +15,7 @@ All messages are a single bit (`Unit`).
 
 namespace Papers.PODC2018.Silence.D1f1
 
-open Podc.SyncCrash Classical
+open Cslib.SyncCrash Classical
 
 variable {P : Type*} [Fintype P]
 

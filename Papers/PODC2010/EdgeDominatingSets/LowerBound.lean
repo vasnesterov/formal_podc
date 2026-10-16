@@ -11,7 +11,7 @@ Suomela, *Distributed algorithms for edge dominating sets*, PODC 2010.
 * `theorem_2`: the same for odd `d = 2k + 1` with ratio `4 - 6/(d + 1)`.
 * `corollary_1`: the bounded-degree consequence `α ≥ 4 - 1/k` for `Δ ≥ 2k`.
 
-Model: deterministic synchronous port-numbering model (`Podc.PortNumbering.Algorithm`), no
+Model: deterministic synchronous port-numbering model (`Cslib.PortNumbering.Algorithm`), no
 identifiers, no randomness, unbounded messages and running time; the output of a node is a set of
 its ports, and the computed edge set is `outEdges` (the union of the selected edges).
 
@@ -23,7 +23,7 @@ proved by the counting bound `|E| ≤ (2Δ - 1)γ'` (`card_edgeFinset_add_le`).
 
 namespace Podc.EdgeDominatingSets
 
-open Podc.PortNumbering Finset Gadget
+open Cslib.PortNumbering Finset Gadget
 
 /-- In a `d`-regular simple graph on `n` nodes, `n d + 2γ' ≤ 4 d γ'` (i.e. `|E| ≤ (2d - 1)γ'`). -/
 theorem card_mul_add_le_edgeDomNum {V : Type*} [Fintype V] [DecidableEq V] (G : PNGraph V)

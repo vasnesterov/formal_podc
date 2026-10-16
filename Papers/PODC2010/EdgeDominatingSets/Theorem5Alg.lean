@@ -20,7 +20,7 @@ The output selects the ports `r` with `inD r` (edges of `M`), `pin = some r` or 
 
 namespace Podc.EdgeDominatingSets
 
-open Podc.PortNumbering Finset
+open Cslib.PortNumbering Finset
 
 /-- Local data of a node in the algorithm of Theorem 5; `inD` stores the matching `M`. -/
 structure St5 extends St4 where

@@ -79,7 +79,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Paper | Lean | File |
 |---|---|---|
 | Lemma 2.1 (weak duality) | `sum_le_wt_of_isPacking` | `Basic.lean` |
-| Observation 3.5 | `SimpleGraph.ArboricityLE.hasOutDegLE` | `Podc/Graphs/Arboricity.lean` |
+| Observation 3.5 | `SimpleGraph.ArboricityLE.hasOutDegLE` | `Cslib/Foundations/Combinatorics/SimpleGraph/Arboricity.lean` |
 | Lemma 4.1 (and Lemma 3.2 for `w ≡ 1`) | `lemma_4_1`, `numIter_le`, `charging` | `PartialDS.lean` |
 | Theorem 1.1 (approximation) | `theorem_1_1`, `theorem_1_1_arboricity`, `numIter_detLam_le` | `Deterministic.lean` |
 | Theorem 3.1 / Claim 3.3 | `theorem_3_1` | `Deterministic.lean` |
@@ -111,10 +111,10 @@ Non-vacuity:
 - the lower-bound graph satisfies everything that is claimed of it.
 
 CSLib candidates:
-- `Podc/Graphs/Arboricity.lean`: arboricity, orientations, Observation 3.5, rank-based acyclicity;
 - the finite product-coin expectation toolkit in `Randomized.lean` (`coinProb`, `expect`, `Ec`,
   `expect_le_of_super`);
 - dominating sets, packings and weak duality (`Basic.lean`).
 
 The distributed model comes from CSLib `Cslib/Computability/Distributed/Local/LocallyIterative.lean`.
-Arboricity and orientations are in `Podc/Graphs/Arboricity.lean`, a CSLib candidate.
+Arboricity, orientations, Observation 3.5 and rank-based acyclicity are in CSLib,
+`Cslib/Foundations/Combinatorics/SimpleGraph/Arboricity.lean`.

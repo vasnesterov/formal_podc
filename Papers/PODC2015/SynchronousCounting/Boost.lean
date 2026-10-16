@@ -9,7 +9,7 @@ The state of `B` is the state of `A` plus `a ∈ [C] ∪ {∞}` and one bit `d`,
 
 namespace SynchronousCounting
 
-open Podc.SyncCounting
+open Cslib.Byzantine.SyncCounting
 
 /-- Theorem 1 (repaired: with the extra hypotheses `2f < n` and `3F < kn`). -/
 theorem boost {n f c T S k F C : ℕ} (h : Achievable n f c T S) (hk : 3 ≤ k)

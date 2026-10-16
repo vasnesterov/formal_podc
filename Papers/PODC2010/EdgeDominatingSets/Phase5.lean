@@ -23,7 +23,7 @@ import Papers.PODC2010.EdgeDominatingSets.Phases
 
 namespace Podc.EdgeDominatingSets
 
-open Podc.PortNumbering Finset
+open Cslib.PortNumbering Finset
 
 variable {V : Type*} [Fintype V] [DecidableEq V]
 

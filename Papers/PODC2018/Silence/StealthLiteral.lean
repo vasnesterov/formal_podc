@@ -17,7 +17,7 @@ Both violate Commit Validity in `γ_1` with `n = 3`.
 
 namespace Papers.PODC2018.Silence.Stealth
 
-open Podc.SyncCrash Classical
+open Cslib.SyncCrash Classical
 
 variable {n : ℕ} [NeZero n]
 

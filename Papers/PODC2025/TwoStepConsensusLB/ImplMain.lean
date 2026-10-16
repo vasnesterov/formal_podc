@@ -20,6 +20,8 @@ set_option linter.unusedSectionVars false
 
 namespace TwoStepConsensus.Impl
 
+open _root_.Cslib.CrashPartialSync
+
 variable {P V : Type*} [Fintype P] [DecidableEq P] [LinearOrder V]
 
 /-- Agreement of the task version of `fig1 c` (the `agreement` field of `SolvesTask`). -/
