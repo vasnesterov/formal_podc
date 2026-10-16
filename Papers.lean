@@ -245,3 +245,11 @@ import Papers.PODC2015.SynchronousCounting.Boost
 import Papers.PODC2015.SynchronousCounting.Recursive
 import Papers.PODC2015.SynchronousCounting.Counterexample
 import Papers.PODC2021.RestorableTiebreaking.Main
+import Papers.PODC2012.MaximalMatching.Templates
+import Papers.PODC2012.MaximalMatching.Outputs
+import Papers.PODC2012.MaximalMatching.BaseCase
+import Papers.PODC2012.MaximalMatching.Glue
+import Papers.PODC2012.MaximalMatching.InductiveStep
+import Papers.PODC2012.MaximalMatching.LowerBound
+import Papers.PODC2012.MaximalMatching.Greedy
+import Papers.PODC2012.MaximalMatching.Main

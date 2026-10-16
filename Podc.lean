@@ -5,3 +5,8 @@ import Podc.SyncCounting.Model
 import Podc.SyncCounting.Impossibility
 import Podc.Graphs.ShortestWalks
 import Podc.Combinatorics.IsolationLemma
+import Podc.ColourSystem.FreeCoxeter
+import Podc.ColourSystem.Basic
+import Podc.ColourSystem.Graph
+import Podc.ColourSystem.Algorithm
+import Podc.ColourSystem.MessagePassing
