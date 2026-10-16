@@ -84,6 +84,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2022 | 8 | Rajsbaum, Raventós-Pujol — *A Distributed Combinatorial Topology Approach to Arrow's Impossibility Theorem* | [ArrowTopology](Papers/PODC2022/ArrowTopology) | ❌ Arrow's theorem and its topological proof verified; **Theorem 4.2 false** (corrected in the full version) |
 | 2021 | 7 | Altisen, Devismes, Durand, Johnen, Petit — *On Implementing Stabilizing Leader Election with Weak Assumptions on Network Dynamics* | [StabilizingLEDynamic](Papers/PODC2021/StabilizingLEDynamic) | ⚠️ All results proved (class hierarchy, impossibilities, pseudo-stabilizing LE in 6Δ+1 rounds); identifier set must have more than n elements (implicit); Lemma 7 false as stated (harmless); proof gaps in Lemmas 12, 16 |
 | 2020 | 5 | Dolan — *The Only Undoable CRDTs are Counters* | [UndoableCRDTs](Papers/PODC2020/UndoableCRDTs) | ✅ Correct |
+| 2020 | 5 | Khanchandani, Wattenhofer — *Byzantine Agreement with Unknown Participants and Failures* | [UnknownParticipantsBA](Papers/PODC2020/UnknownParticipantsBA) | ❌ **Lemma 4 and Theorem 1 (rotor-coordinator) false** under the pseudocode's selection rule (n=7, f=2; n=4, f=1): all correct nodes can terminate with no good round; repaired rotor and consensus (3f+7 rounds) proved; full version's fill rule under-specified |
 | 2019 | 5 | Hussak, Trehan — *On Termination of a Flooding Process* | [FloodingTermination](Papers/PODC2019/FloodingTermination) | ⚠️ Termination and exact bounds proved (terminates at e iff bipartite; e < T ≤ e+d+1); Theorem 3.5 proof gap; Lemmas 3.3/3.4 need connectivity; abstract's "adversary can always prevent termination" false on forests |
 | 2017 | 5 | Dolev, Erdmann, Lutz, Schapira, Zair — *Stateless Computation* | [StatelessComputation](Papers/PODC2017/StatelessComputation) | ⚠️ Theorem 3.1 true but its proof's step after Lemma 3.4 fails (repaired); Corollary 6.3 false for odd n (degenerate); Theorem 6.2's extra hypotheses unused and violated by Corollary 6.3; Theorem 5.10 proof gaps |
 | 2025 | 4 | Constantinescu, Dufay, Ghinea, Wattenhofer — *Byzantine Stable Matching* | [ByzantineStableMatching](Papers/PODC2025/ByzantineStableMatching) | ⚠️ Characterizations proved for k ≥ 2; all "only if" directions false for k = 1; Lemma 13 reduction invalid |
@@ -171,6 +172,15 @@ in the paper's `differencies.md`.
   and a unique majority, an agent can be left outputting "tie" forever. The ranking protocol of Theorem 1.2 is
   incorrect as written: an agent holding the token of its own colour never updates its own rank. We prove fixed
   protocols correct. The core Theorem 1.1 is correct.
+- **Byzantine Agreement with Unknown Participants and Failures** (PODC 2020, 5 citations) —
+  [UnknownParticipantsBA](Papers/PODC2020/UnknownParticipantsBA). Lemma 4 and Theorem 1 (the rotor-coordinator:
+  within O(f) iterations some round is good and every correct node accepts a correct coordinator's opinion) are
+  false for the algorithm's pseudocode (coordinator `C_v[r mod |C_v|]`): Byzantine nodes can insert ids into the
+  sorted candidate lists so that indices shift back onto the previous coordinator, and every correct node
+  terminates without a good round (n = 7, f = 2) or before accepting the good round's opinion (n = 4, f = 1).
+  The proof treats the candidate list as fixed. (The prose describes a "next larger identifier" rule, under which
+  these runs are not counterexamples; the proof of Lemma 4 uses the pseudocode's rule.) A repaired rotor and the
+  consensus algorithm (3f+7 rounds) are proved.
 - **Stranger-Free Tasks** (PODC 2025, 0 citations) — [StrangerFreeTasks](Papers/PODC2025/StrangerFreeTasks). Algorithm 1 is
   not wait-free for any k ≥ 2: two processes can invalidate each other's double collects forever
   (`alg1_not_waitFree`). So the claimed wait-free upper bound with k+1 registers, and the wait-free hierarchy,
