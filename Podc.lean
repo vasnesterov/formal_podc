@@ -6,3 +6,4 @@ import Podc.IteratedModel.Patterns
 import Podc.AtomicState.Model
 import Podc.ContentOblivious.Model
 import Podc.ContentOblivious.Lockstep
+import Podc.SharedMemory.Potential
