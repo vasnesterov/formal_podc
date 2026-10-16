@@ -48,6 +48,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 
 | Year | Citations | Paper | Folder | Verdict |
 |---|---|---|---|---|
+| 2019 | 1368 | Yin, Malkhi, Reiter, Golan Gueta, Abraham — *HotStuff: BFT Consensus with Linearity and Responsiveness* | [HotStuff](Papers/PODC2019/HotStuff) | ❌ **Theorem 5 (Chained HotStuff safety) false** for Algorithm 3 as written — missing height check; conflicting commits with round-robin leaders, one Byzantine replica (n=4, f=1), synchrony; fixed protocol proved safe; Basic HotStuff safety (Thm 2) true, proof gap; liveness proved; pacemaker claim unsupported |
 | 2018 | 556 | Herlihy — *Atomic Cross-Chain Swaps* | [AtomicCrossChainSwaps](Papers/PODC2018/AtomicCrossChainSwaps) | ❌ §3 theory correct (atomic iff reachability symmetric); **Theorem 4.9 (safety) false** for the protocol as specified — no deadline guard on secret release, 2-party coalition on the §1 example; **Theorem 4.7 (liveness) off by one Δ**; repaired protocol proved safe, live, atomic |
 | 2021 | 330 | Keidar, Kokoris-Kogias, Naor, Spiegelman — *All You Need is DAG* | [AllYouNeedIsDAG](Papers/PODC2021/AllYouNeedIsDAG) | ⚠️ DAG-Rider BAB properties proved (abstract RBC; liveness assuming good waves); Lemma 1 false for recursively committed leaders (n=4 counterexample) — total order still holds; chain quality depends on unspecified order; several proof gaps |
 | 2012 | 221 | Vaidya, Tseng, Liang — *Iterative Approximate Byzantine Consensus in Arbitrary Directed Graphs* | [IterativeApproxBC](Papers/PODC2012/IterativeApproxBC) | ✅ Full characterization proved; a gap in the necessity proof repaired |
@@ -106,6 +107,13 @@ Sorted by citation count. These papers contain a stated result that is **false**
 case. In each case the counterexample is checked by Lean; details, and the corrected statements we proved, are
 in the paper's `differencies.md`.
 
+- **HotStuff: BFT Consensus with Linearity and Responsiveness** (PODC 2019, 1368 citations) —
+  [HotStuff](Papers/PODC2019/HotStuff). Theorem 5 (safety of Chained HotStuff) is false for Algorithm 3 as
+  written: replicas never check that a proposed node's height equals the current view, and the lock update is
+  unconditional. With round-robin leaders, n = 4, f = 1, a single Byzantine replica (leading views 2, 6, 10) and a
+  synchronous network, a correct replica commits two conflicting nodes. The paper's proof relies on the missing
+  check. With the height check added, safety is proved for all n > 3f. Basic HotStuff (Theorem 2) is safe;
+  its proof has a gap. Checked against arXiv 1803.05069 v4–v6, whose Algorithm 3 is identical.
 - **Atomic Cross-Chain Swaps** (PODC 2018, 556 citations) —
   [AtomicCrossChainSwaps](Papers/PODC2018/AtomicCrossChainSwaps). The hashed-timelock protocol of §4.5, as
   specified, violates its safety theorem (Theorem 4.9): on the paper's own three-party example, a coalition of

@@ -394,3 +394,7 @@ import Papers.PODC2018.AtomicCrossChainSwaps.SingleLeader
 import Papers.PODC2013.ByzantineVectorConsensus.Main
 import Papers.PODC2022.AsyncSpeedup.Consensus
 import Papers.PODC2022.AsyncSpeedup.Tightness
+import Papers.PODC2019.HotStuff.Basic.Main
+import Papers.PODC2019.HotStuff.Chained.Counterexample
+import Papers.PODC2019.HotStuff.Chained.Safety
+import Papers.PODC2019.HotStuff.Basic.Pacemaker
