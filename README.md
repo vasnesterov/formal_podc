@@ -76,6 +76,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2012 | 22 | Hirvonen, Suomela — *Distributed Maximal Matching: Greedy is Optimal* | [MaximalMatching](Papers/PODC2012/MaximalMatching) | ✅ Theorem 2 (k−1 rounds optimal) and Corollary 3 (Ω(Δ)) proved in both models; lower bounds extended to finite graphs |
 | 2016 | 20 | Mostéfaoui, Raynal — *Two-Bit Messages are Sufficient to Implement Atomic Read/Write Registers in Crash-prone Systems* | [TwoBitRegisters](Papers/PODC2016/TwoBitRegisters) | ✅ Safety and liveness proved; non-FIFO channels suffice (as the paper claims); relies on atomic code blocks (implicit convention) |
 | 2010 | 14 | Suomela — *Distributed Algorithms for Edge Dominating Sets* | [EdgeDominatingSets](Papers/PODC2010/EdgeDominatingSets) | ✅ All approximation lower bounds (stronger than stated) and matching port-numbering algorithms proved; typos only |
+| 2022 | 13 | Lenzen, Sheikholeslami — *A Recursive Early-Stopping Phase King Protocol* | [RecursivePhaseKing](Papers/PODC2022/RecursivePhaseKing) | ❌ Theorem 2.9 (early-stopping Phase King, 6(f+1) rounds) and Theorem 1.1 (cited recursive protocol as hypothesis) proved; **Lemma 4.2 (voting barrier) false** (n=4, t=1: correct nodes time out with different values), so Theorem 1.2 not established; Lemma 3.1/Cor 3.2 off by one for f=2 |
 | 2015 | 13 | Lenzen, Rybicki, Suomela — *Towards Optimal Synchronous Counting* | [SynchronousCounting](Papers/PODC2015/SynchronousCounting) | ⚠️ Theorems 1 and 3 proved; Theorem 1 false in the boundary case n = 1; Lemma 3 relies on a cited impossibility (proved here for n ≥ 3); Theorem 2's constant not established |
 | 2024 | 12 | Civit, Gilbert, Guerraoui, Komatovic, Paramonov, Vidigueira — *All Byzantine Agreement Problems Are Expensive* | [AllBAExpensive](Papers/PODC2024/AllBAExpensive) | ⚠️ Proved; Lemma 10 / Theorem 4 (unauthenticated) false in the degenerate case n = 2, t = 1 |
 | 2020 | 12 | Sakavalas, Tseng, Vaidya — *Asynchronous Byzantine Approximate Consensus in Directed Networks* | [AsyncApproxBCDirected](Papers/PODC2020/AsyncApproxBCDirected) | ⚠️ Theorem 4 (solvable iff 3-reach) proved end to end (sufficiency with FIFO links); f-cover definitions inconsistent — read literally, no node ever updates (intent evident); (max − min)/2 typo; known input range missing from Thm 4; several proof gaps |
@@ -175,6 +176,13 @@ in the paper's `differencies.md`.
   critical section (`theorem_2_false`). The proof ignores writes based on stale snapshots. Consequently the
   paper's tight characterization for read/write registers is unproven; only its necessity half holds (proved).
   The characterization for read-modify-write registers is correct.
+- **A Recursive Early-Stopping Phase King Protocol** (PODC 2022, 13 citations) —
+  [RecursivePhaseKing](Papers/PODC2022/RecursivePhaseKing). Lemma 4.2 (the voting barrier of Algorithm 7, used by
+  Corollary 4.4 for the asynchronous-start result) is false: with n = 4, t = 1, a good elector set and a correct
+  consensus, a correct node returns after counting a faulty vote without having voted, and the other correct nodes
+  stay at two votes and time out with different values. A one-line repair (keep sending pending votes for one more
+  round) is proved. Algorithm 8 has a further gap, so Theorem 1.2 is not established. Lemma 3.1 / Corollary 3.2 are
+  off by one iteration (f = 2). The headline early-stopping results (Theorems 1.1, 2.9) hold.
 - **Swiper** (PODC 2024, 10 citations) — [Swiper](Papers/PODC2024/Swiper). Theorem 2.4 (the upper bound
   (α+β)(1−α)/(β−α)·n on the number of tickets for weight separation) is false: a 21-party instance needs 63
   tickets against a bound of 59.85, and on a family of instances the optimum exceeds the bound by an unbounded
