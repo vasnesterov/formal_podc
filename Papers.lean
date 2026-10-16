@@ -351,4 +351,5 @@ import Papers.PODC2021.StabilizingLEDynamic.Main
 import Papers.PODC2022.DominatingSetArboricity.Theorem13Gap
 import Papers.PODC2022.DominatingSetArboricity.Theorem12Asymptotic
 import Papers.PODC2022.DominatingSetArboricity.Lemma46Counterexample
+import Papers.PODC2025.UniqueIDsBoundedRegisters.Main
 import Papers.PODC2022.DominatingSetArboricity.Main

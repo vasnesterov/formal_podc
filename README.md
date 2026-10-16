@@ -90,6 +90,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2026 | 0 | D'Archivio, AlMahmoud, Natale, Mallmann-Trenn — *Order Statistics in Population Protocols via Simple Dynamics* | [OrderStatisticsPP](Papers/PODC2026/OrderStatisticsPP) | ⚠️ Laws of the consensus value proved; both proofs of Proposition 6 invalid (statement true); Definition 4.2 under-specified |
 | 2026 | 0 | Nolin — *Sinkless Orientation Made Trivial* | [SinklessOrientation](Papers/PODC2026/SinklessOrientation) | ✅ Correct (deterministic part); typos only |
 | 2025 | 0 | Gafni, Losa, Raynal, Taubenfeld — *Stranger-Free Tasks* | [StrangerFreeTasks](Papers/PODC2025/StrangerFreeTasks) | ❌ Lower bound proved; **Algorithm 1 is not wait-free for k ≥ 2** |
+| 2025 | 0 | Anoprenko, Kuznetsov, Aksenov — *Optimal Construction of Unique Identifiers from Bounded Registers* | [UniqueIDsBoundedRegisters](Papers/PODC2025/UniqueIDsBoundedRegisters) | ⚠️ Algorithm 1's bound (tight) and the lower bound (Theorem 4.1) proved, pinning the optimum; "poised" definition under-specified; Claim 1 proof gap; Algorithm 2's wait-freedom holds only for bounded calls |
 
 ## Papers with critical mistakes
 
