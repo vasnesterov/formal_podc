@@ -392,3 +392,5 @@ import Papers.PODC2011.CoordinatedConsensusDynamic.Diameter68
 import Papers.PODC2018.AtomicCrossChainSwaps.Main
 import Papers.PODC2018.AtomicCrossChainSwaps.SingleLeader
 import Papers.PODC2013.ByzantineVectorConsensus.Main
+import Papers.PODC2022.AsyncSpeedup.Consensus
+import Papers.PODC2022.AsyncSpeedup.Tightness
