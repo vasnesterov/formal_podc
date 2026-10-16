@@ -66,6 +66,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2019 | 31 | Bodwin, Patel — *A Trivial Yet Optimal Solution to Vertex Fault Tolerant Spanners* | [VFTSpannersOptimal](Papers/PODC2019/VFTSpannersOptimal) | ⚠️ Theorem 1, Corollary 2 proved; Theorem 1 as stated degenerates for f > n/2; literal Algorithm 1 imprecise |
 | 2021 | 29 | Ghaffari, Haeupler — *Low-Congestion Shortcuts for Graphs Excluding Dense Minors* | [LowCongestionShortcuts](Papers/PODC2021/LowCongestionShortcuts) | ⚠️ Main theorem proved (8δ+1 blocks; 8δ fails on the one-vertex graph); several proof errors (incl. a failing Lemma 3.2 construction); Observation 2.6 false as stated |
 | 2019 | 29 | Khan, Naqvi, Vaidya — *Exact Byzantine Consensus on Undirected Graphs under Local Broadcast Model* | [LocalBroadcastBC](Papers/PODC2019/LocalBroadcastBC) | ⚠️ Characterization proved (Menger's theorem formalized); Thm 4.1 fails for a single node; sufficiency proof gaps repaired |
+| 2022 | 26 | Ghinea, Liu-Zhang, Wattenhofer — *Optimal Synchronous Approximate Agreement with Asynchronous Fallback* | [HybridApproxAgreement](Papers/PODC2022/HybridApproxAgreement) | ❌ Impossibility (Thm 5.1, 2tₛ+tₐ ≥ n) proved for n ≥ 2; **Theorem 4.1 false** (Π_rBC inconsistent in synchrony when n ≤ 3tₛ: late Byzantine proposals) and hence **Theorem 3.1(1) false** (Π_AA outputs 0 and 1 with ε = 1/2; n=3, tₛ=1); Def 2.2 under-specified |
 | 2016 | 25 | Ellen, Gelashvili, Shavit, Zhu — *A Complexity-Based Hierarchy for Multiprocessor Synchronization* | [ComplexityHierarchy](Papers/PODC2016/ComplexityHierarchy) | ⚠️ Space lower bounds and matching upper bounds proved; Lemma 9.1 proof gap; Lemma 7.1 proof wrong (statement true); Lemma 8.2 false in an edge case that is never used |
 | 2021 | 24 | Emek, Keren — *A Thin Self-Stabilizing Asynchronous Unison Algorithm* | [ThinUnison](Papers/PODC2021/ThinUnison) | ❌ Theorem 1.1 proved (gaps repaired); **Corollary 1.2 false** for arbitrary tasks |
 | 2023 | 22 | Civit, Gilbert, Guerraoui, Komatovic, Vidigueira — *On the Validity of Consensus* | [ValidityConsensus](Papers/PODC2023/ValidityConsensus) | ✅ Classification proved (with a verified vector-consensus protocol); minor gap in Lemma 3 for n < 2t |
@@ -152,6 +153,14 @@ in the paper's `differencies.md`.
   consensus is solvable via valencies, is false: a two-agent algorithm with a discontinuous limit function is a
   counterexample. The proof assumes the valency diameter vanishes, which needs continuity. We prove the theorem
   under that extra hypothesis. The lower bounds (the paper's main results) are correct and tight.
+- **Optimal Synchronous Approximate Agreement with Asynchronous Fallback** (PODC 2022, 26 citations) —
+  [HybridApproxAgreement](Papers/PODC2022/HybridApproxAgreement). Theorem 4.1 (the reliable broadcast Π_rBC is
+  consistent in a synchronous network) is false whenever n ≤ 3tₛ, i.e. in the paper's main regime tₛ ≥ n/3: a
+  Byzantine sender delivers different proposals at time 2Δ, both honest parties vote before the conflicting forwards
+  arrive, and the sender completes both quorums. Hence Theorem 3.1(1) (Π_AA is secure in synchrony) is false:
+  with n = 3, tₛ = 1, tₐ = 0, ε = 1/2 the honest parties output 0 and 1 (checked end to end on a line-by-line
+  encoding, no forged signatures). The full version (ePrint 2022/354) has the same pseudocode; the faulty step is
+  in its Lemma 6.2. The impossibility result (Theorem 5.1) is correct for n ≥ 2.
 - **A Thin Self-Stabilizing Asynchronous Unison Algorithm** (PODC 2021, 24 citations) — [ThinUnison](Papers/PODC2021/ThinUnison).
   Corollary 1.2 (a synchronizer for arbitrary tasks) is false: a task solvable synchronously on complete graphs is
   solvable by no deterministic asynchronous algorithm already on K₂. It holds for static tasks (proved). The main Theorem 1.1

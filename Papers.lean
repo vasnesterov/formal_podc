@@ -510,3 +510,12 @@ import Papers.PODC2026.PartialAuthBC.Broadcast
 import Papers.PODC2026.PartialAuthBC.LowerBound
 import Papers.PODC2026.PartialAuthBC.SimpleBA
 import Papers.PODC2026.PartialAuthBC.Exclusive
+import Papers.PODC2022.HybridApproxAgreement.Spec
+import Papers.PODC2022.HybridApproxAgreement.Impossibility
+import Papers.PODC2022.HybridApproxAgreement.Trim
+import Papers.PODC2022.HybridApproxAgreement.Iteration
+import Papers.PODC2022.HybridApproxAgreement.RBC
+import Papers.PODC2022.HybridApproxAgreement.OBC
+import Papers.PODC2022.HybridApproxAgreement.Sim
+import Papers.PODC2022.HybridApproxAgreement.Map
+import Papers.PODC2022.HybridApproxAgreement.AA
