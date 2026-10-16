@@ -100,6 +100,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2025 | 0 | Gafni, Losa, Raynal, Taubenfeld — *Stranger-Free Tasks* | [StrangerFreeTasks](Papers/PODC2025/StrangerFreeTasks) | ❌ Lower bound proved; **Algorithm 1 is not wait-free for k ≥ 2** |
 | 2025 | 0 | Anoprenko, Kuznetsov, Aksenov — *Optimal Construction of Unique Identifiers from Bounded Registers* | [UniqueIDsBoundedRegisters](Papers/PODC2025/UniqueIDsBoundedRegisters) | ⚠️ Algorithm 1's bound (tight) and the lower bound (Theorem 4.1) proved, pinning the optimum; "poised" definition under-specified; Claim 1 proof gap; Algorithm 2's wait-freedom holds only for bounded calls |
 | 2025 | 0 | Ryabinin, Gotsman, Sutra — *Brief Announcement: Revisiting Lower Bounds for Two-Step Consensus* | [TwoStepConsensusLB](Papers/PODC2025/TwoStepConsensusLB) | ⚠️ Both bounds proved as iff (task: n ≥ max{2e+f, 2f+1}; object: n ≥ max{2e+f−1, 2f+1}); the object protocol of Fig. 1 is not wait-free (1B omits initial values) — fixed protocol given; Lemma 4/5 and §B proof gaps |
+| 2024 | 0 | Altisen, Cournier, Defalque, Devismes — *On Self-stabilizing Leader Election in Directed Networks* | [SSLeaderElectionDirected](Papers/PODC2024/SSLeaderElectionDirected) | ❌ Leader election (Thms 1–4) and necessity results proved; **Theorem 5 (synchronous unison) false**: the input I_E gives distance 0 to more than the leader, so U(K) is not self-stabilizing on any network with n ≥ 2 (for some ID assignment); fixed input proved, Cor. 5 holds |
 
 ## Papers with critical mistakes
 
@@ -163,6 +164,14 @@ in the paper's `differencies.md`.
   not wait-free for any k ≥ 2: two processes can invalidate each other's double collects forever
   (`alg1_not_waitFree`). So the claimed wait-free upper bound with k+1 registers, and the wait-free hierarchy,
   are unproven for k ≥ 2. The algorithm is safe and obstruction-free (proved), and wait-free for k = 1.
+- **On Self-stabilizing Leader Election in Directed Networks** (PODC 2024, 0 citations) —
+  [SSLeaderElectionDirected](Papers/PODC2024/SSLeaderElectionDirected). Theorem 5 (the synchronous unison
+  algorithm U(K) = U-DAG ∘ PEL is self-stabilizing) is false. Its proof assumes that only the leader gets
+  distance 0, but with the paper's input I_E(p) = (¬A.M, MI.M) every process whose ancestors all have
+  identifiers ≥ the minimum gets distance 0 and runs its own clock. So U(K) is not self-stabilizing on any
+  network with n ≥ 2 for a suitable ID assignment — already on the 2-cycle and the directed path 0 → 1.
+  The definition is stated three times and matches Figure 5, so it is not a typo. With I_E(p) = (¬A.M, p.Id)
+  Theorem 5 and Corollary 5 are proved. The leader-election results are correct.
 
 As of October 2026 we found no erratum or later version that addresses the mistakes in Swiper, in
 Barenboim–Elkin–Goldenberg (including its J. ACM version), or in Függer–Nowak–Schwarz (including its J. ACM
