@@ -235,3 +235,12 @@ import Papers.PODC2026.SinklessOrientation.Lemma22
 import Papers.PODC2026.SinklessOrientation.Reorient
 import Papers.PODC2026.SinklessOrientation.Main
 import Papers.PODC2026.SinklessOrientation.LowerBound
+import Papers.PODC2015.SynchronousCounting.Params
+import Papers.PODC2015.SynchronousCounting.Majority
+import Papers.PODC2015.SynchronousCounting.PhaseKing
+import Papers.PODC2015.SynchronousCounting.Pointers
+import Papers.PODC2015.SynchronousCounting.Construction
+import Papers.PODC2015.SynchronousCounting.Theorem1
+import Papers.PODC2015.SynchronousCounting.Boost
+import Papers.PODC2015.SynchronousCounting.Recursive
+import Papers.PODC2015.SynchronousCounting.Counterexample
