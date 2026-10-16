@@ -330,6 +330,13 @@ import Papers.PODC2018.Silence.MidRound
 import Papers.PODC2018.Silence.MidRound15D
 import Papers.PODC2018.Silence.MidRound1Bit
 import Papers.PODC2018.Silence.MidRound1BitFixed
+import Papers.PODC2022.DominatingSetArboricity.Basic
+import Papers.PODC2022.DominatingSetArboricity.PartialDS
+import Papers.PODC2022.DominatingSetArboricity.Deterministic
+import Papers.PODC2022.DominatingSetArboricity.Distributed
+import Papers.PODC2022.DominatingSetArboricity.Randomized
+import Papers.PODC2022.DominatingSetArboricity.Forest
+import Papers.PODC2022.DominatingSetArboricity.LowerBound
 import Papers.PODC2021.StabilizingLEDynamic.Model
 import Papers.PODC2021.StabilizingLEDynamic.Classes
 import Papers.PODC2021.StabilizingLEDynamic.Impossibility
@@ -341,3 +348,7 @@ import Papers.PODC2021.StabilizingLEDynamic.LE.Propagation
 import Papers.PODC2021.StabilizingLEDynamic.LE.Stable
 import Papers.PODC2021.StabilizingLEDynamic.LE.Main
 import Papers.PODC2021.StabilizingLEDynamic.Main
+import Papers.PODC2022.DominatingSetArboricity.Theorem13Gap
+import Papers.PODC2022.DominatingSetArboricity.Theorem12Asymptotic
+import Papers.PODC2022.DominatingSetArboricity.Lemma46Counterexample
+import Papers.PODC2022.DominatingSetArboricity.Main
