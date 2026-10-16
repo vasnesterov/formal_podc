@@ -11,3 +11,5 @@ import Podc.ColourSystem.Graph
 import Podc.ColourSystem.Algorithm
 import Podc.ColourSystem.MessagePassing
 import Podc.PortNumbering.Basic
+import Podc.SyncCrash.Model
+import Podc.SyncCrash.Floodset
