@@ -3,3 +3,5 @@
 import Podc.Basic
 import Podc.SyncCounting.Model
 import Podc.SyncCounting.Impossibility
+import Podc.Graphs.ShortestWalks
+import Podc.Combinatorics.IsolationLemma
