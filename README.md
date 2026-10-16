@@ -57,6 +57,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2011 | 108 | Dinitz, Krauthgamer — *Fault-Tolerant Spanners: Better and Simpler* | [FaultTolerantSpanners](Papers/PODC2011/FaultTolerantSpanners) | ⚠️ Thm 2.1 (explicit probability), Cor 2.2, Thm 3.3 proved; Lemma 3.8 (distributed) misstated — LP(C) misdefined, 4-vertex counterexample, Thm 3.9 unaffected; implicit assumptions (loopless, α ≥ 4, r ≤ 2n) |
 | 2013 | 100 | Vaidya, Garg — *Byzantine Vector Consensus in Complete Graphs* | [ByzantineVectorConsensus](Papers/PODC2013/ByzantineVectorConsensus) | ⚠️ Exact BVC solvable iff n ≥ max(3f+1, (d+1)f+1) and the approximate-BVC impossibility proved; Tverberg's theorem proved; Thm 6 (restricted algorithms, secondary) false as literally stated — under-specified definition; async algorithm under-specified; minor gaps |
 | 2019 | 88 | Abraham, Chan, Dolev, Nayak, Pass, Ren, Shi — *Communication Complexity of Byzantine Agreement, Revisited* | [CommComplexityBA](Papers/PODC2019/CommComplexityBA) | ⚠️ Ω(f²) lower bound (Theorem 4/1) proved after repairing a probabilistic proof gap; Theorem 13 (no-setup broadcast) false for n = 2 (degenerate), proved for n ≥ C+2; upper bounds not formalized |
+| 2019 | 81 | Guerraoui, Kuznetsov, Monti, Pavlovič, Seredinschi — *The Consensus Number of a Cryptocurrency* | [CryptoConsensusNumber](Papers/PODC2019/CryptoConsensusNumber) | ❌ Theorem 2 (k-shared asset transfer has consensus number k) and Corollary 1 proved; **Lemma 3 and the liveness of Theorem 3 false** for the message-passing algorithm of Fig. 4 (a correct process spending money it just received blocks forever); Fig. 1 set-vs-sequence slip; Lemma 2 proof gaps |
 | 2018 | 79 | Barenboim, Elkin, Goldenberg — *Locally-Iterative Distributed (Δ+1)-Coloring below Szegedy–Vishwanathan Barrier* | [LocallyIterativeColoring](Papers/PODC2018/LocallyIterativeColoring) | ❌ Section 3 correct; **Corollaries 7.2–7.3 false** (3AG never terminates); §1.2 round claim false |
 | 2016 | 76 | Filtser, Solomon — *The Greedy Spanner is Existentially Optimal* | [GreedySpanner](Papers/PODC2016/GreedySpanner) | ✅ Lemma 3, Theorem 5 (existential optimality for size and lightness), Corollary 1 (size, via the Moore bound) and Section 4 (doubling metrics, Theorem 6) proved; cited bounds taken as hypotheses for the other corollaries; minor gaps in Lemma 6 and Observation 4 |
 | 2019 | 71 | Brandt — *An Automatic Speedup Theorem for Distributed Problems* | [AutomaticSpeedup](Papers/PODC2019/AutomaticSpeedup) | ❌ Forward direction of Theorem 1, Theorem 2 and the sinkless-orientation/colouring lower bounds proved; **converse of Theorem 1 and Corollary 1 false** without edge symmetry breaking (input-free Δ-regular graphs whose port numbering is an edge colouring; K₂); repaired converse proved |
@@ -138,6 +139,14 @@ in the paper's `differencies.md`.
   violates its liveness theorem (Theorem 4.7): nothing is triggered even when everyone conforms. Both fixes are
   small (a deadline guard on secret release; one extra Δ in the timeouts), and the repaired protocol is proved
   safe, live and atomic. The theory of §3 is correct.
+- **The Consensus Number of a Cryptocurrency** (PODC 2019, 81 citations) —
+  [CryptoConsensusNumber](Papers/PODC2019/CryptoConsensusNumber). Lemma 3 (the consensusless message-passing
+  asset transfer of Figure 4 is live) is false as written: incoming transfers are added only to the sender's history,
+  and the validity check (line 25) ignores the transfer's dependencies, so a correct process that spends money it just
+  received is blocked forever — already with two correct processes and a perfect broadcast. Hence the liveness part of
+  Theorem 3 fails for the algorithm as stated; validating against `hist[q] ∪ h` fixes it (proved). The main result,
+  Theorem 2 (k-shared asset transfer has consensus number exactly k), and Corollary 1 hold. (arXiv v1 checked; the 2022
+  journal version was not.)
 - **Locally-Iterative Distributed (Δ+1)-Coloring** (PODC 2018, 79 citations) —
   [LocallyIterativeColoring](Papers/PODC2018/LocallyIterativeColoring). Algorithm 7 (3AG) never terminates:
   on a single edge with colours ⟨1,0,0⟩, ⟨1,0,1⟩ the two vertices keep equal b-values forever, for every p.

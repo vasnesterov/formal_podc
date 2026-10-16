@@ -524,6 +524,10 @@ import Papers.PODC2022.HybridApproxAgreement.OBC
 import Papers.PODC2022.HybridApproxAgreement.Sim
 import Papers.PODC2022.HybridApproxAgreement.Map
 import Papers.PODC2022.HybridApproxAgreement.AA
+import Papers.PODC2019.CryptoConsensusNumber.Main
+import Papers.PODC2019.CryptoConsensusNumber.Fig1
+import Papers.PODC2019.CryptoConsensusNumber.Fig1Bug
+import Papers.PODC2019.CryptoConsensusNumber.Fig4
 import Papers.PODC2026.ContentObliviousCounting.AnonCountingMain
 import Papers.PODC2026.ContentObliviousCounting.AnonCountingBounds
 import Papers.PODC2026.ContentObliviousCounting.AnonCountingCompose
@@ -555,3 +559,4 @@ import Papers.PODC2016.VertexCoverLocalRatio.Main
 import Papers.PODC2016.VertexCoverLocalRatio.Congest
 import Papers.PODC2016.VertexCoverLocalRatio.KMWDiscussion
 import Papers.PODC2022.RecursivePhaseKing.VotingBarrier
+import Papers.PODC2019.CryptoConsensusNumber.Fig3Example
