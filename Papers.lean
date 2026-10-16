@@ -530,3 +530,10 @@ import Papers.PODC2026.ContentObliviousCounting.AnonCountingCompose
 import Papers.PODC2026.ContentObliviousCounting.LowerBoundNonVacuity
 import Papers.PODC2026.ContentObliviousCounting.AggregationConcrete
 import Papers.PODC2026.ContentObliviousCounting.RelayLeaderComposition
+import Papers.PODC2016.GreedySpanner.Basic
+import Papers.PODC2016.GreedySpanner.Lemma3
+import Papers.PODC2016.GreedySpanner.MST
+import Papers.PODC2016.GreedySpanner.MSTTree
+import Papers.PODC2016.GreedySpanner.Theorem5
+import Papers.PODC2016.GreedySpanner.Section4
+import Papers.PODC2016.GreedySpanner.Doubling
