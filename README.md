@@ -48,6 +48,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 
 | Year | Citations | Paper | Folder | Verdict |
 |---|---|---|---|---|
+| 2018 | 556 | Herlihy — *Atomic Cross-Chain Swaps* | [AtomicCrossChainSwaps](Papers/PODC2018/AtomicCrossChainSwaps) | ❌ §3 theory correct (atomic iff reachability symmetric); **Theorem 4.9 (safety) false** for the protocol as specified — no deadline guard on secret release, 2-party coalition on the §1 example; **Theorem 4.7 (liveness) off by one Δ**; repaired protocol proved safe, live, atomic |
 | 2021 | 330 | Keidar, Kokoris-Kogias, Naor, Spiegelman — *All You Need is DAG* | [AllYouNeedIsDAG](Papers/PODC2021/AllYouNeedIsDAG) | ⚠️ DAG-Rider BAB properties proved (abstract RBC; liveness assuming good waves); Lemma 1 false for recursively committed leaders (n=4 counterexample) — total order still holds; chain quality depends on unspecified order; several proof gaps |
 | 2012 | 221 | Vaidya, Tseng, Liang — *Iterative Approximate Byzantine Consensus in Arbitrary Directed Graphs* | [IterativeApproxBC](Papers/PODC2012/IterativeApproxBC) | ✅ Full characterization proved; a gap in the necessity proof repaired |
 | 2021 | 137 | Abraham, Nayak, Ren, Xiang — *Good-case Latency of Byzantine Broadcast: a Complete Categorization* | [GoodCaseLatencyBB](Papers/PODC2021/GoodCaseLatencyBB) | ⚠️ All lower bounds of Table 1 proved in their intended ranges; Theorem 10 false for n = 3 and Theorems 4, 8, 9 for n = 2 (degenerate); Theorem 10's executions violate unforgeability (proof gap); Theorem 19's proof one Δ weaker than stated |
@@ -103,6 +104,14 @@ Sorted by citation count. These papers contain a stated result that is **false**
 case. In each case the counterexample is checked by Lean; details, and the corrected statements we proved, are
 in the paper's `differencies.md`.
 
+- **Atomic Cross-Chain Swaps** (PODC 2018, 556 citations) —
+  [AtomicCrossChainSwaps](Papers/PODC2018/AtomicCrossChainSwaps). The hashed-timelock protocol of §4.5, as
+  specified, violates its safety theorem (Theorem 4.9): on the paper's own three-party example, a coalition of
+  two parties leaves a conforming leader Underwater, because a leader may still release its secret after its own
+  hashkey has expired (the proof of Lemma 4.8 overlooks this). With the stated timeouts the protocol also
+  violates its liveness theorem (Theorem 4.7): nothing is triggered even when everyone conforms. Both fixes are
+  small (a deadline guard on secret release; one extra Δ in the timeouts), and the repaired protocol is proved
+  safe, live and atomic. The theory of §3 is correct.
 - **Locally-Iterative Distributed (Δ+1)-Coloring** (PODC 2018, 79 citations) —
   [LocallyIterativeColoring](Papers/PODC2018/LocallyIterativeColoring). Algorithm 7 (3AG) never terminates:
   on a single edge with colours ⟨1,0,0⟩, ⟨1,0,1⟩ the two vertices keep equal b-values forever, for every p.
