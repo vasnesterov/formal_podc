@@ -294,3 +294,15 @@ import Papers.PODC2017.StatelessComputation.Basics
 import Papers.PODC2017.StatelessComputation.UpperBound
 import Papers.PODC2017.StatelessComputation.FoolingSet
 import Papers.PODC2017.StatelessComputation.Counting
+import Papers.PODC2010.EdgeDominatingSets.Basic
+import Papers.PODC2010.EdgeDominatingSets.Distinguishable
+import Papers.PODC2010.EdgeDominatingSets.Phases
+import Papers.PODC2010.EdgeDominatingSets.Phase5
+import Papers.PODC2010.EdgeDominatingSets.Gadget
+import Papers.PODC2010.EdgeDominatingSets.LowerBound
+import Papers.PODC2010.EdgeDominatingSets.Theorem3
+import Papers.PODC2010.EdgeDominatingSets.Theorem4
+import Papers.PODC2010.EdgeDominatingSets.Analysis5
+import Papers.PODC2010.EdgeDominatingSets.Theorem5Alg
+import Papers.PODC2010.EdgeDominatingSets.Theorem5
+import Papers.PODC2010.EdgeDominatingSets.NonVacuity

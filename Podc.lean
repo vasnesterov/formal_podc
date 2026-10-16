@@ -10,3 +10,4 @@ import Podc.ColourSystem.Basic
 import Podc.ColourSystem.Graph
 import Podc.ColourSystem.Algorithm
 import Podc.ColourSystem.MessagePassing
+import Podc.PortNumbering.Basic
