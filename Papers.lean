@@ -282,3 +282,7 @@ import Papers.PODC2021.GoodCaseLatencyBB.UnsyncLowerBound
 import Papers.PODC2021.GoodCaseLatencyBB.Lemma1Core
 import Papers.PODC2021.GoodCaseLatencyBB.PsyncSmall
 import Papers.PODC2021.GoodCaseLatencyBB.ThreeParties
+import Papers.PODC2019.CommComplexityBA.Theorem4
+import Papers.PODC2019.CommComplexityBA.NonVacuity
+import Papers.PODC2019.CommComplexityBA.Theorem13
+import Papers.PODC2019.CommComplexityBA.NoSetupCounterexample
