@@ -101,6 +101,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2022 | 2 | Fraigniaud, Paz, Rajsbaum — *A Speedup Theorem for Asynchronous Computation with Applications to Consensus and Approximate Agreement* | [AsyncSpeedup](Papers/PODC2022/AsyncSpeedup) | ✅ Speedup theorem, consensus fixed points and all approximate-agreement lower bounds proved for n processes (Cor. 3 shown tight); abstract overstates what Theorem 4 covers; implicit model assumptions made explicit |
 | 2026 | 1 | Breitkopf, Dallot, El-Hayek, Schmid — *Ranking Opinions with Few States in Population Protocols* | [RankingOpinions](Papers/PODC2026/RankingOpinions) | ❌ Theorem 1.1 proved; **Theorem 4.1 false**; **the ranking protocol of Theorem 1.2 is incorrect** as written (fixed versions proved) |
 | 2026 | 1 | Lenzen, Loss, Shi, Wagner — *Byzantine Consensus in the Partially Authenticated Setting* | [PartialAuthBC](Papers/PODC2026/PartialAuthBC) | ⚠️ Gradecast, broadcast (Thms 3.13, 3.14), lower bound (Thm 4.1, Cor 4.2) and Thm 5.1 proved (cited BA protocols as black boxes); Thm 4.1 omits the unregistered-sender hypothesis stated in the surrounding text; Figure 1 ambiguous (else-if reading breaks Thm 3.13); proof gaps |
+| 2026 | 1 | Chalopin, Chang, Di Luna, Zhou — *Efficient Counting and Simulation in Content-Oblivious Rings* | [ContentObliviousCounting](Papers/PODC2026/ContentObliviousCounting) | ❌ Counting (≤ 12n⌊√n⌋+14n pulses), simulation (Thms 1, 5, 14, 22) and the n log n lower bound proved; **Lemma 16 / Theorem 17 false for a relay leader** (explicitly covered by the paper; 3-node composition outputs wrong bits); §5 distance formula off by one; fixes for Thm 1 preprocessing and Algorithm 10 |
 | 2024 | 1 | Fuchs, Kuhn — *Simpler and More General Distributed Coloring Based on Simple List Defective Coloring Algorithms* | [ListDefectiveColoring](Papers/PODC2024/ListDefectiveColoring) | ⚠️ Theorems 1.1, 1.4 proved; Lemma 4.5 construction gap and Lemma A.1 proof error repaired |
 | 2022 | 1 | Ovens — *The Space Complexity of Consensus from Swap* | [ConsensusFromSwap](Papers/PODC2022/ConsensusFromSwap) | ⚠️ All results proved for deterministic obstruction-free algorithms (Theorem 10 weaker than the paper's nondeterministic version); Lemma 16 and Theorem 10 proof gaps; valency definition ambiguous |
 | 2026 | 0 | Attiya, Flam, Welch — *Why Canonical-Round Algorithms Fail for Optimal Byzantine Resilience* | [CanonicalRoundByzantine](Papers/PODC2026/CanonicalRoundByzantine) | ⚠️ Lower bounds proved (for 2f ≤ n ≤ 5f); Corollary 10's proof covers only part of the range (statement true); Theorem 14 implicitly uses the i = j case of gather agreement |
@@ -206,6 +207,13 @@ in the paper's `differencies.md`.
   438 operations) after which `isEarlier(1,0)` returns the wrong answer. Wait-freedom (≤ 2κ+107 steps per
   operation) and the Section 6 algorithm are correct; giving the helper its own link context looks like a fix
   (not proved).
+- **Efficient Counting and Simulation in Content-Oblivious Rings** (PODC 2026, 1 citations) —
+  [ContentObliviousCounting](Papers/PODC2026/ContentObliviousCounting). Lemma 16 and Theorem 17 (bit sending with a
+  composable ending) are false for a relay leader, a case the paper explicitly covers (Algorithm 8 has branches only
+  for it): on a 3-node ring with two back-to-back counter-clockwise rounds, an execution ends quiescent with a
+  process holding the wrong bits (`relay_leader_composition_wrong`). The §5 distance formula is off by one (for
+  n = 2 the non-leader computes distance 0). The counting and simulation headline results (Theorems 1, 4/13, 5, 14,
+  22) and the n log n lower bound hold.
 - **Stranger-Free Tasks** (PODC 2025, 0 citations) — [StrangerFreeTasks](Papers/PODC2025/StrangerFreeTasks). Algorithm 1 is
   not wait-free for any k ≥ 2: two processes can invalidate each other's double collects forever
   (`alg1_not_waitFree`). So the claimed wait-free upper bound with k+1 registers, and the wait-free hierarchy,
