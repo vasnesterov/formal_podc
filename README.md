@@ -93,6 +93,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2024 | 4 | Attiya, Bender, Farach-Colton, Oshman, Schiller — *History-Independent Concurrent Objects* | [HistoryIndependent](Papers/PODC2024/HistoryIndependent) | ⚠️ All results proved; impossibilities need ≥ 2 processes; Lemma 16 gap; Thm 32 for a fixed interleaving |
 | 2021 | 4 | Ovens — *The Space Complexity of Scannable Binary Objects* | [ScannableBinaryObjects](Papers/PODC2021/ScannableBinaryObjects) | ⚠️ Lemma 6, Theorem 8, Corollary 9 and the Implementation 1 upper bound proved (under weaker hypotheses); headline bound of abstract/conclusion fails for k=1, n=3; Observation 3 false in an unused case; Cor. 9(c) partly unproved in the paper |
 | 2024 | 3 | Chang, Mishra, Nguyen, Yang, Yeh — *A Tight Lower Bound for 3-Coloring Grids in the Online-LOCAL Model* | [OnlineLocalGrids](Papers/PODC2024/OnlineLocalGrids) | ⚠️ Theorems 1.1, 1.3 proved; Theorem 1.3 omits that √n must be odd |
+| 2023 | 3 | Bashari, Jamadi, Woelfel — *Efficient Bounded Timestamping from Standard Synchronization Primitives* | [BoundedTimestamping](Papers/PODC2023/BoundedTimestamping) | ❌ **The LL/SC algorithm (Figs. 1–2) is not linearizable**: helper steps share the process's LL/SC link, so Lemma 6 (hence Lemmas 8, 9, Cor. 10) is false — sequential 438-operation counterexample (n=3); Theorem 1 not established; wait-freedom (≤ 2κ+107 steps) and Section 6 algorithm proved |
 | 2022 | 3 | Dory, Ghaffari, Ilchi — *Near-Optimal Distributed Dominating Set in Bounded Arboricity Graphs* | [DominatingSetArboricity](Papers/PODC2022/DominatingSetArboricity) | ⚠️ Theorems 1.1–1.3 proved (deterministic distributed algorithm, randomized bounds) and the Theorem 1.4 reduction; Theorem 1.3's proof arithmetic fails for small Δ (statement rescued); missing justifications and degenerate slips |
 | 2024 | 2 | Ovens — *Determining Recoverable Consensus Numbers* | [RecoverableConsensus](Papers/PODC2024/RecoverableConsensus) | ⚠️ Main theorem proved; proof errors in Lemmas 15 and 16 repaired |
 | 2022 | 2 | Fraigniaud, Paz, Rajsbaum — *A Speedup Theorem for Asynchronous Computation with Applications to Consensus and Approximate Agreement* | [AsyncSpeedup](Papers/PODC2022/AsyncSpeedup) | ✅ Speedup theorem, consensus fixed points and all approximate-agreement lower bounds proved for n processes (Cor. 3 shown tight); abstract overstates what Theorem 4 covers; implicit model assumptions made explicit |
@@ -185,6 +186,15 @@ in the paper's `differencies.md`.
   The proof treats the candidate list as fixed. (The prose describes a "next larger identifier" rule, under which
   these runs are not counterexamples; the proof of Lemma 4 uses the pseudocode's rule.) A repaired rotor and the
   consensus algorithm (3f+7 rounds) are proved.
+- **Efficient Bounded Timestamping from Standard Synchronization Primitives** (PODC 2023, 3 citations) —
+  [BoundedTimestamping](Papers/PODC2023/BoundedTimestamping). The main algorithm (Figures 1–2) is not linearizable.
+  The helping routine `helpMoveTS` runs a few steps at a time across later operations of the same process, while
+  the process's own code performs `LL()` on the same objects; with the paper's LL/SC semantics (one link per process
+  and object) these renew the link behind the helper's `VL()`/`SC()`. Lemma 6 is false, and with it Lemmas 8–9 and
+  Corollary 10, so Theorem 1 is not established. Lean counterexample: a sequential execution (n = 3, κ = 4,
+  438 operations) after which `isEarlier(1,0)` returns the wrong answer. Wait-freedom (≤ 2κ+107 steps per
+  operation) and the Section 6 algorithm are correct; giving the helper its own link context looks like a fix
+  (not proved).
 - **Stranger-Free Tasks** (PODC 2025, 0 citations) — [StrangerFreeTasks](Papers/PODC2025/StrangerFreeTasks). Algorithm 1 is
   not wait-free for any k ≥ 2: two processes can invalidate each other's double collects forever
   (`alg1_not_waitFree`). So the claimed wait-free upper bound with k+1 registers, and the wait-free hierarchy,
