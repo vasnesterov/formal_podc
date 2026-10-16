@@ -92,6 +92,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2026 | 0 | Nolin — *Sinkless Orientation Made Trivial* | [SinklessOrientation](Papers/PODC2026/SinklessOrientation) | ✅ Correct (deterministic part); typos only |
 | 2025 | 0 | Gafni, Losa, Raynal, Taubenfeld — *Stranger-Free Tasks* | [StrangerFreeTasks](Papers/PODC2025/StrangerFreeTasks) | ❌ Lower bound proved; **Algorithm 1 is not wait-free for k ≥ 2** |
 | 2025 | 0 | Anoprenko, Kuznetsov, Aksenov — *Optimal Construction of Unique Identifiers from Bounded Registers* | [UniqueIDsBoundedRegisters](Papers/PODC2025/UniqueIDsBoundedRegisters) | ⚠️ Algorithm 1's bound (tight) and the lower bound (Theorem 4.1) proved, pinning the optimum; "poised" definition under-specified; Claim 1 proof gap; Algorithm 2's wait-freedom holds only for bounded calls |
+| 2025 | 0 | Ryabinin, Gotsman, Sutra — *Brief Announcement: Revisiting Lower Bounds for Two-Step Consensus* | [TwoStepConsensusLB](Papers/PODC2025/TwoStepConsensusLB) | ⚠️ Both bounds proved as iff (task: n ≥ max{2e+f, 2f+1}; object: n ≥ max{2e+f−1, 2f+1}); the object protocol of Fig. 1 is not wait-free (1B omits initial values) — fixed protocol given; Lemma 4/5 and §B proof gaps |
 
 ## Papers with critical mistakes
 

@@ -359,4 +359,11 @@ import Papers.PODC2019.FloodingTermination.Examples
 import Papers.PODC2019.FloodingTermination.Async
 import Papers.PODC2019.FloodingTermination.PaperProof
 import Papers.PODC2025.UniqueIDsBoundedRegisters.Main
+import Papers.PODC2025.TwoStepConsensusLB.Model
+import Papers.PODC2025.TwoStepConsensusLB.Merge
+import Papers.PODC2025.TwoStepConsensusLB.Basic
+import Papers.PODC2025.TwoStepConsensusLB.LowerBound
+import Papers.PODC2025.TwoStepConsensusLB.SmallCases
 import Papers.PODC2022.DominatingSetArboricity.Main
+import Papers.PODC2025.TwoStepConsensusLB.ImplAgreement
+import Papers.PODC2025.TwoStepConsensusLB.Fig1Liveness
