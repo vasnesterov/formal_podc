@@ -351,5 +351,12 @@ import Papers.PODC2021.StabilizingLEDynamic.Main
 import Papers.PODC2022.DominatingSetArboricity.Theorem13Gap
 import Papers.PODC2022.DominatingSetArboricity.Theorem12Asymptotic
 import Papers.PODC2022.DominatingSetArboricity.Lemma46Counterexample
+import Papers.PODC2019.FloodingTermination.Model
+import Papers.PODC2019.FloodingTermination.Termination
+import Papers.PODC2019.FloodingTermination.TerminationTime
+import Papers.PODC2019.FloodingTermination.Compute
+import Papers.PODC2019.FloodingTermination.Examples
+import Papers.PODC2019.FloodingTermination.Async
+import Papers.PODC2019.FloodingTermination.PaperProof
 import Papers.PODC2025.UniqueIDsBoundedRegisters.Main
 import Papers.PODC2022.DominatingSetArboricity.Main
