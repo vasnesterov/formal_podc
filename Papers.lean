@@ -253,3 +253,16 @@ import Papers.PODC2012.MaximalMatching.InductiveStep
 import Papers.PODC2012.MaximalMatching.LowerBound
 import Papers.PODC2012.MaximalMatching.Greedy
 import Papers.PODC2012.MaximalMatching.Main
+import Papers.PODC2022.ConsensusFromSwap.Model
+import Papers.PODC2022.ConsensusFromSwap.Alg1Defs
+import Papers.PODC2022.ConsensusFromSwap.Alg1Valid
+import Papers.PODC2022.ConsensusFromSwap.Alg1OF
+import Papers.PODC2022.ConsensusFromSwap.Alg1AgreeBasic
+import Papers.PODC2022.ConsensusFromSwap.Alg1AgreeLemma5
+import Papers.PODC2022.ConsensusFromSwap.Alg1Agree
+import Papers.PODC2022.ConsensusFromSwap.SetAgreementLB
+import Papers.PODC2022.ConsensusFromSwap.Valency
+import Papers.PODC2022.ConsensusFromSwap.ReadableSwap
+import Papers.PODC2022.ConsensusFromSwap.BinarySwap
+import Papers.PODC2022.ConsensusFromSwap.BoundedSwap
+import Papers.PODC2022.ConsensusFromSwap.Main
