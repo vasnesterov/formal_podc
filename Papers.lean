@@ -504,3 +504,9 @@ import Papers.PODC2020.AsyncApproxBCDirected.Operational.RefineVal
 import Papers.PODC2020.AsyncApproxBCDirected.Operational.RefineComp
 import Papers.PODC2020.AsyncApproxBCDirected.Operational.Rounds
 import Papers.PODC2020.AsyncApproxBCDirected.Operational.Theorem4
+import Papers.PODC2026.PartialAuthBC.Model
+import Papers.PODC2026.PartialAuthBC.Gradecast
+import Papers.PODC2026.PartialAuthBC.Broadcast
+import Papers.PODC2026.PartialAuthBC.LowerBound
+import Papers.PODC2026.PartialAuthBC.SimpleBA
+import Papers.PODC2026.PartialAuthBC.Exclusive
