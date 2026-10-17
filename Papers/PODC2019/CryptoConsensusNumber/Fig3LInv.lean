@@ -1,5 +1,5 @@
 import Papers.PODC2019.CryptoConsensusNumber.Fig3MStep
-import Papers.PODC2019.CryptoConsensusNumber.Fig3Gen
+import Podc.SharedMemory.LinResp
 
 /-!
 # Figure 3: the linearization invariant
@@ -108,7 +108,8 @@ variable {μ q₀ k}
 abbrev lst (L : LinL n Acct) : Acct → ℕ := linState (A := AT μ q₀) L
 
 /-- The response of an instance in a sequential history. -/
-abbrev lrs (L : LinL n Acct) (x : OpId (Fin n)) : Option (Bool ⊕ ℕ) := linResp (AT μ q₀) L x
+abbrev lrs (L : LinL n Acct) (x : OpId (Fin n)) : Option (Bool ⊕ ℕ) :=
+  (AT μ q₀).respIn (AT μ q₀).init L x
 
 variable (μ q₀)
 
@@ -182,18 +183,24 @@ lemma succ_update_union (S : Fin n → Hist n Acct) (q : Fin n) (d : Tx n Acct �
   obtain ⟨t', b'⟩ := d
   cases b' <;> simp [mem_succ, Prod.ext_iff, or_comm]
 
+/-- The response of an operation appended to a sequential history. -/
+lemma lrs_concat_self (L : LinL n Acct) (x : OpId (Fin n)) (o : ATOp (Fin n) Acct)
+    (hx : x ∉ L.map Prod.fst) :
+    lrs (μ := μ) (q₀ := q₀) (L ++ [(x, o)]) x =
+      some ((AT μ q₀).δ (lst (μ := μ) (q₀ := q₀) L) o).2 :=
+  ObjSpec.respIn_concat_self (A := AT μ q₀) (q := (AT μ q₀).init) hx o
+
 lemma lst_transfer_true (L : LinL n Acct) (x : OpId (Fin n)) {p : Fin n} {a b : Acct} {v : ℕ}
     (hp : p ∈ μ a) (hv : v ≤ lst (μ := μ) (q₀ := q₀) L a) :
     lst (μ := μ) (q₀ := q₀) (L ++ [(x, ATOp.transfer p a b v)]) = moveFunds (lst (μ := μ) (q₀ := q₀) L) a b v := by
   show linState (A := AT μ q₀) (L ++ _) = _
-  rw [linState_push]
+  rw [linState_concat]
   exact congrArg Prod.fst (atSpec_transfer_pos (q₀ := q₀) ⟨hp, hv⟩)
 
 lemma lrs_transfer_true (L : LinL n Acct) (x : OpId (Fin n)) {p : Fin n} {a b : Acct} {v : ℕ}
     (hp : p ∈ μ a) (hv : v ≤ lst (μ := μ) (q₀ := q₀) L a) (hx : x ∉ L.map Prod.fst) :
     lrs (μ := μ) (q₀ := q₀) (L ++ [(x, ATOp.transfer p a b v)]) x = some (.inl true) := by
-  show linResp (AT μ q₀) (L ++ _) x = _
-  rw [linResp_push _ _ _ hx]
+  rw [lrs_concat_self _ _ _ hx]
   exact congrArg (fun r => some r.2) (atSpec_transfer_pos (q₀ := q₀) ⟨hp, hv⟩)
 
 /-! ## Initial configuration -/

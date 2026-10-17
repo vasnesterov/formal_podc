@@ -388,8 +388,8 @@ solves recoverable consensus among `n` processes), which is cited by the paper a
 formalized here. If objects of readable types `T i` solve recoverable consensus among `n ≥ 2`
 processes, then one type `T i` (with read/write objects) already does. -/
 theorem theorem14
-    (dffr : ∀ (S : ObjSpec) (m : ℕ), Readable S → IsRecording m S → RecSolvable S m)
-    (hread : ∀ i, Readable (T i)) (hn : 2 ≤ n) (hA : RecConsensus A) :
+    (dffr : ∀ (S : ObjSpec) (m : ℕ), S.Readable → IsRecording m S → RecSolvable S m)
+    (hread : ∀ i, (T i).Readable) (hn : 2 ≤ n) (hA : RecConsensus A) :
     ∃ i, RecSolvable (T i) n := by
   obtain ⟨i, hi⟩ := theorem13 hn hA
   exact ⟨i, dffr _ _ (hread i) hi⟩

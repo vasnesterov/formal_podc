@@ -62,7 +62,7 @@ the following gaps:
 7. **"The linearization of a prefix of `E` is a prefix of `L`"** — false side claim, not needed. A
    failed transfer is linearized at the snapshot (line 8) of the process `q_o` whose proposal
    decided it. That snapshot can precede the decision, so the linearization is extended
-   retroactively. We insert such operations retroactively (`isLin_insert` in `Fig3Gen.lean`).
+   retroactively. We insert such operations retroactively (`IsLinearization.insert`, `Podc/SharedMemory/LinResp.lean`).
 8. **Successful-transfer case** — proof gap. The text mixes `L_k` and `L_s`. Its key step, that no
    outgoing transfer of `a` is linearized between `q_o`'s snapshot and the first `AS.update`
    containing `o`, is asserted without justification. We prove it from the round ordering: every
@@ -108,7 +108,7 @@ the following gaps:
   validity, and every process taking infinitely many steps decides), and objects with arbitrary
   initial values. The paper does not fix the value domain of consensus; binary consensus is the
   standard choice for consensus numbers. Lemma 1's algorithm works for any domain. Read/write
-  objects are anything `IsRW` (each operation read-only or a blind write), which includes
+  objects are anything `ObjSpec.RWLike` (each operation read-only or a blind write), which includes
   registers. Any number of objects is allowed.
 - **`k`-shared** is formalized as `∀ a, |μ(a)| ≤ k` (`KShared`) for the impossibility. Lemma 1
   uses an object with an account owned by exactly `k` processes (`Lemma1.μ₁_card`), so

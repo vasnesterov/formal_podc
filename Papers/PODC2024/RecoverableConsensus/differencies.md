@@ -36,10 +36,12 @@ non-readable fails for `n' = n − 1` if readability is understood up to encodin
    on crash-free executions.
 6. **Binary consensus**, every process has an input from the start (as in the paper).
 7. **Objects.** Arbitrary index type `ι` of objects (the paper: types `T₀, T₁, T₂, …`); registers are
-   generalized to read/write-like objects `IsRW` (every operation read-only or a blind write) in
+   generalized to read/write-like objects `ObjSpec.RWLike` (every operation read-only or a blind write) in
    `WFSolvable`/`RecSolvable`; initial values are chosen by the algorithm.
+   The test&set object in `tas_not_recSolvable` (Golab) is the library's readable test&set `rtasObj`
+   (same states and transitions as a test&set with read: `tas` sets the bit and returns the old value).
 8. **Readable** is formalized up to encoding of responses: some operation never changes the value
-   and its response determines the value (`Readable`). Only used in the statement of Theorem 14 and
+   and its response determines the value (`ObjSpec.Readable`). Only used in the statement of Theorem 14 and
    in the remark on `T_{n,n−1}` below.
 9. **Consensus numbers.** `ConsensusNumber S n` / `RecConsensusNumber S n` quantify over all
    `m > n` ("no such algorithm for `n + 1` or more processes"); the impossibility proofs are done for
@@ -89,7 +91,7 @@ non-readable fails for `n' = n − 1` if readability is understood up to encodin
     The stage index `i` is bounded (`i ≤ n − 1`) via the existence of a team-`v̄` process
     `p_j`, `j < n − i`, exactly as in the paper.
 18. **Theorem 14** is stated conditionally on DFFR'22 Theorem 8 (hypothesis `dffr`), which the paper
-    cites and which is not formalized here. Our `Readable` (some operation preserves the value and
+    cites and which is not formalized here. Our `ObjSpec.Readable` (some operation preserves the value and
     its response is an injective function of the value) is slightly broader than a literal Read
     operation returning the value itself; DFFR's result still covers it, since an algorithm can
     decode the response into the value.

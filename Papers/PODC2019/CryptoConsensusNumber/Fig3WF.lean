@@ -1,4 +1,5 @@
 import Papers.PODC2019.CryptoConsensusNumber.Fig3Pot
+import Podc.SharedMemory.Progress
 
 /-!
 # Lemma 2 of Guerraoui et al. (PODC 2019): Figure 3 is wait-free
@@ -27,58 +28,6 @@ attribute [local reducible] atSpec snapObj kConsObj
 
 variable {n : ℕ} {Acct : Type} [DecidableEq Acct] {μ : Acct → Finset (Fin n)} {q₀ : Acct → ℕ}
   {k : ℕ}
-
--- CSLib candidate
-/-- The configurations of an infinite execution are reachable. -/
-lemma InfExec.run_range {A : ObjSpec} {ι : Type} {B : ι → ObjSpec} {P L : Type} [DecidableEq P]
-    [DecidableEq ι] {I : Impl A B P L} (e : I.InfExec) (m : ℕ) :
-    I.run ((List.range m).map e.lbl) = some (e.cfg m) := by
-  induction m with
-  | zero => simp [e.cfg_zero]
-  | succ m ih =>
-    rw [List.range_succ, List.map_append, Impl.run_append_of_eq _ ih]
-    simp [e.step_eq m]
-
--- CSLib candidate (CSLib's `Impl.InfExec.exists_good` in `Mutex.lean` is stated for mutex
--- objects only; the proof is object-independent)
-/-- **Progress by a measure** (any implemented object). -/
-lemma InfExec.exists_good' {A : ObjSpec} {ι : Type} {B : ι → ObjSpec} {P L : Type}
-    [DecidableEq P] [DecidableEq ι] {I : Impl A B P L}
-    (e : I.InfExec) (p : P) (Good : ℕ → Prop) (μ : ℕ → ℕ) (t : ℕ)
-    (hstep : ∀ t' ≥ t, ¬ Good t' → ∃ t'' ≥ t', (e.lbl t'').proc = p ∧ (e.lbl t'').IsStep)
-    (hp : ∀ t' ≥ t, ¬ Good t' → (e.lbl t').proc = p → (e.lbl t').IsStep →
-      Good (t' + 1) ∨ μ (t' + 1) < μ t')
-    (ho : ∀ t' ≥ t, ¬ Good t' → ¬ ((e.lbl t').proc = p ∧ (e.lbl t').IsStep) →
-      Good (t' + 1) ∨ μ (t' + 1) ≤ μ t') :
-    ∃ t' ≥ t, Good t' := by
-  induction hn : μ t using Nat.strong_induction_on generalizing t with
-  | _ n ih =>
-    by_contra hcon
-    push Not at hcon
-    obtain ⟨t'', ht'', hpt, hst⟩ := hstep t le_rfl (hcon t le_rfl)
-    have hle : ∀ k, t + k ≤ t'' → μ (t + k) ≤ n := by
-      intro k
-      induction k with
-      | zero => intro _; simp [hn]
-      | succ k ihk =>
-        intro hk
-        have h1 := ihk (by omega)
-        by_cases hpk : (e.lbl (t + k)).proc = p ∧ (e.lbl (t + k)).IsStep
-        · rcases hp (t + k) (by omega) (hcon _ (by omega)) hpk.1 hpk.2 with h | h
-          · exact absurd h (hcon _ (by omega))
-          · rw [← Nat.add_assoc]; omega
-        · rcases ho (t + k) (by omega) (hcon _ (by omega)) hpk with h | h
-          · exact absurd h (hcon _ (by omega))
-          · rw [← Nat.add_assoc]; omega
-    have h2 := hle (t'' - t) (by omega)
-    rw [show t + (t'' - t) = t'' by omega] at h2
-    rcases hp t'' ht'' (hcon _ ht'') hpt hst with h | h
-    · exact hcon _ (by omega) h
-    · obtain ⟨t₃, ht₃, hg⟩ := ih (μ (t'' + 1)) (by omega) (t'' + 1)
-        (fun t' ht' hg => hstep t' (by omega) hg)
-        (fun t' ht' hg => hp t' (by omega) hg)
-        (fun t' ht' hg => ho t' (by omega) hg) rfl
-      exact hcon t₃ (by omega) hg
 
 /-- Decisions are permanent. -/
 lemma step_decExt (hk : KShared μ k) {C C' : Cfg μ q₀ k} {K : Set (Tx n Acct)} (hM : MInv μ C K)
@@ -149,7 +98,7 @@ theorem fig3_waitFree (hk : KShared μ k) : (impl μ q₀ k).WaitFree := by
   push Not at hcon
   -- invariants along the execution
   have hMI : ∀ m, ∃ K, MInv μ (e.cfg m) K := fun m => by
-    obtain ⟨K, -, -, hM, -⟩ := inv_of_run hk (InfExec.run_range e m); exact ⟨K, hM⟩
+    obtain ⟨K, -, -, hM, -⟩ := inv_of_run hk (e.run_lbls m); exact ⟨K, hM⟩
   have hother : ∀ m, (e.lbl m).proc ≠ p → (e.cfg (m + 1)).loc p = (e.cfg m).loc p :=
     fun m h => (Impl.step_other (e.step_eq m) h).1
   have htau : ∀ m ≥ n₀, (e.lbl m).proc = p → e.lbl m = .tau p := by
@@ -185,7 +134,7 @@ theorem fig3_waitFree (hk : KShared μ k) : (impl μ q₀ k).WaitFree := by
     rw [show m + (m' - m) = m' by omega] at this
     exact this hl
   -- `p` reaches the loop
-  obtain ⟨T, hT, hTloop⟩ := InfExec.exists_good' e p (fun m => (((e.cfg m).loc p).pc.loopC).isSome)
+  obtain ⟨T, hT, hTloop⟩ := e.exists_good_of_measure p (fun m => (((e.cfg m).loc p).pc.loopC).isSome)
     (fun m => PC.preSteps n ((e.cfg m).loc p).pc) n₀
     (fun t' ht' _ => by
       obtain ⟨m, hm, hl⟩ := hcon t'
@@ -263,7 +212,7 @@ theorem fig3_waitFree (hk : KShared μ k) : (impl μ q₀ k).WaitFree := by
   -- `round_a` of `p` grows without bound
   have hrnd : ∀ R t₀, T ≤ t₀ → ∃ m ≥ t₀, R ≤ ((e.cfg m).loc p).rnd a := by
     intro R t₀ ht₀
-    obtain ⟨m, hm, hgood⟩ := InfExec.exists_good' e p (fun m => R ≤ ((e.cfg m).loc p).rnd a)
+    obtain ⟨m, hm, hgood⟩ := e.exists_good_of_measure p (fun m => R ≤ ((e.cfg m).loc p).rnd a)
       (fun m => 3 * (R - ((e.cfg m).loc p).rnd a) + (2 - PC.phase ((e.cfg m).loc p).pc)) t₀
       (fun t' ht' _ => by
         obtain ⟨m, hm, hl⟩ := hcon t'

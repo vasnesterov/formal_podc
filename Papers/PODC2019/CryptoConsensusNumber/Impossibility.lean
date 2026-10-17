@@ -24,7 +24,7 @@ team `1`.
 
 namespace CryptoCons
 
-open Cslib.SharedMemory Cslib.SharedMemory.Recoverable TwoShotCons
+open Cslib.SharedMemory Cslib.SharedMemory.Recoverable
 
 variable {n : ℕ} {ιR ιS : Type} [DecidableEq ιR] [DecidableEq ιS] {R : ιR → ObjSpec}
   {Acct : Type} [DecidableEq Acct] {μ : ιS → Acct → Finset (Fin n)}
@@ -96,7 +96,7 @@ theorem at_pair {A : Alg n (atSys R μ)} (hA : WFConsensus A) (hH : Honest R μ 
 /-- **Theorem 2, "at most `k`" (Corollary 1 for `k = 1`).** For `n > k` (and `n ≥ 2`), there is
 no wait-free consensus algorithm for `n` processes using read/write objects and any number of
 asset-transfer objects in which every account has at most `k` owners. -/
-theorem no_consensus {k : ℕ} (hn : 2 ≤ n) (hkn : k < n) (hR : ∀ j, IsRW (R j))
+theorem no_consensus {k : ℕ} (hn : 2 ≤ n) (hkn : k < n) (hR : ∀ j, (R j).RWLike)
     (hμ : ∀ j, KShared (μ j) k) (A : Alg n (atSys R μ)) (hH : Honest R μ A) :
     ¬ WFConsensus A := by
   intro hA

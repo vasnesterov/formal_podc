@@ -569,7 +569,7 @@ theorem solvable_of_C15Cond {O : ObjSpec} {m : Fin 2 → Set O.Op} {a b : Fin 2}
   obtain ⟨s, f, f', g, g', hf, hf', hg, hg', h1, h2, h3, h4, h5⟩ := hC
   let P : Par O := ⟨a, b, s, f, f', g, g'⟩
   have hG : Good P := ⟨hab, h1, h2, h3, h4, h5⟩
-  refine ⟨Reg, Unit, inferInstance, inferInstance, inferInstance, RegT O.Resp, isRW_RegT _,
+  refine ⟨Reg, Unit, inferInstance, inferInstance, inferInstance, RegT O.Resp, rwLike_RegT _,
     alg P, ?_, ?_, ?_⟩
   · exact wfConsensus_of_inv (Inv P) (inv_init hab) (inv_step hG) (inv_out hab) rank
       (fun l i o κ r hact => rank_lt l i o κ r hact)

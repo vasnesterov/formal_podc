@@ -18,12 +18,12 @@ read/write objects and asset-transfer objects in which every account has at most
 
 namespace CryptoCons
 
-open Cslib.SharedMemory Cslib.SharedMemory.Recoverable TwoShotCons
+open Cslib.SharedMemory Cslib.SharedMemory.Recoverable
 
 /-- Lemma 1 as an `ATSolvable` statement: `k` processes can solve consensus. -/
 theorem atSolvable_self {k : ℕ} (hk : 0 < k) : ATSolvable k k :=
   ⟨Fin k, Unit, Fin 2, inferInstance, inferInstance, inferInstance, Lemma1.Reg k,
-    fun _ => isRW_register _ _, Lemma1.μ₁ k, fun _ => Lemma1.μ₁_card.2, Lemma1.alg k,
+    fun _ => register_rwLike _ _, Lemma1.μ₁ k, fun _ => Lemma1.μ₁_card.2, Lemma1.alg k,
     Lemma1.lemma_1 hk⟩
 
 /-- The "at most `k`" direction as an `ATSolvable` statement. -/
@@ -58,7 +58,7 @@ the consensus number of a `0`-shared asset-transfer object (no account has an ow
 theorem atSolvable_one (k : ℕ) : ATSolvable 1 k := by
   refine ⟨Empty, Empty, Empty, inferInstance, inferInstance, inferInstance, Empty.elim,
     fun j => j.elim, fun j => j.elim, fun j => j.elim, Trivial.alg, ?_, ?_⟩
-  · refine wfConsensus_of_inv' (fun x C => ∀ p, C.loc p = x p) (fun x p => rfl)
+  · refine wfConsensus_of_inv (fun x C => ∀ p, C.loc p = x p) (fun x p => rfl)
       (fun x C p hC => ?_) (fun x C hC => ⟨0, fun p w hp => ?_⟩) (fun _ => 0)
       (fun l i o κ r h => by cases h)
     · rw [stepP_of_out C (v := C.loc p) rfl]; exact hC

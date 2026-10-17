@@ -5,8 +5,6 @@ import Papers.PODC2025.TwoShotConsensusObjects.Model
 
 * the shared registers `Val[i]` (`Option Bool`) and `Ret[i]` (`Option ρ`, `ρ` = responses of `O`),
   all initially `⊥ = none`;
-* `wfConsensus_of_inv`: wait-free consensus from an invariant of reachable configurations
-  stating that all output values equal the input of one process, plus a ranking function;
 * `il`: the interleaving of `O`-operations described by the list of *roles* of its steps
   (role `0` = process `a` applying `f` then `f'`, role `1` = process `b` applying `g` then `g'`);
 * `Snap h P`: some prefix of the role history `h` satisfies `P` (a stable "it happened" fact).
@@ -30,9 +28,9 @@ abbrev RegT (ρ : Type) : Reg → ObjSpec
   | .val _ => register (Option Bool) none
   | .ret _ => register (Option ρ) none
 
-lemma isRW_RegT (ρ : Type) : ∀ j, IsRW (RegT ρ j)
-  | .val _ => isRW_register _ _
-  | .ret _ => isRW_register _ _
+lemma rwLike_RegT (ρ : Type) : ∀ j, (RegT ρ j).RWLike
+  | .val _ => register_rwLike _ _
+  | .ret _ => register_rwLike _ _
 
 /-- The objects of the algorithms: the registers and one copy of `O`. -/
 abbrev Obj (O : ObjSpec) : Reg ⊕ Unit → ObjSpec := withRW (ιS := Unit) (RegT O.Resp) O
@@ -96,67 +94,6 @@ variable {O : ObjSpec} (m : (i : Reg ⊕ Unit) → (Obj O i).State)
 
 end Upd
 
-section Generic
-
-variable {ι : Type} [DecidableEq ι] {T : ι → ObjSpec} {A : Alg 2 T}
-
-/-- Output states are stable along crash-free executions. -/
-lemma out_run {C : Cfg A} {p : Fin 2} {v : Bool} (h : C.Out p v) (β : List (Ev 2))
-    (hβ : CrashFree β) : (run C β).Out p v := by
-  induction β generalizing C with
-  | nil => simpa using h
-  | cons e β ih =>
-    rw [run_cons]
-    apply ih _ (fun q hq => hβ q (by simp [hq]))
-    rcases e with q | q
-    · by_cases hq : q = p
-      · subst hq; simp only [Cfg.next]; rw [stepP_of_out C h]; exact h
-      · simp only [Cfg.Out, Cfg.next] at h ⊢
-        rw [stepP_loc_other C (Ne.symm hq)]; exact h
-    · exact absurd (by simp) (hβ q)
-
-/-- **Wait-free consensus from an invariant.** If an invariant of reachable configurations
-implies that all output values are the input of a single process, and a rank strictly decreases
-at each access, the algorithm solves wait-free consensus. -/
-theorem wfConsensus_of_inv (Inv : (Fin 2 → Bool) → Cfg A → Prop)
-    (hinit : ∀ x, Inv x (initCfg A x))
-    (hstep : ∀ x C p, Inv x C → Inv x (C.stepP p))
-    (hout : ∀ x C, Inv x C → ∃ q, ∀ p w, C.Out p w → w = x q)
-    (rank : A.L → ℕ)
-    (hrank : ∀ l i o (κ : (T i).Resp → A.L) r, A.act l = .access i o κ → rank (κ r) < rank l) :
-    WFConsensus A := by
-  have reach : ∀ x (α : List (Ev 2)) (C : Cfg A), Inv x C → CrashFree α → Inv x (run C α) := by
-    intro x α
-    induction α with
-    | nil => intro C h _; simpa using h
-    | cons e α ih =>
-      intro C hC hα
-      rw [run_cons]
-      apply ih _ _ (fun q hq => hα q (by simp [hq]))
-      rcases e with q | q
-      · exact hstep x C q hC
-      · exact absurd (by simp) (hα q)
-  -- every decision in a crash-free execution persists to its end
-  have persist : ∀ x γ, CrashFree γ → ∀ v, Dec (initCfg A x) γ v →
-      ∃ p, (run (initCfg A x) γ).Out p v := by
-    intro x γ hγ v ⟨k, hk, p, hp⟩
-    refine ⟨p, ?_⟩
-    have := out_run hp (γ.drop k) (fun q hq => hγ q (List.mem_of_mem_drop hq))
-    rwa [← run_append, List.take_append_drop] at this
-  refine ⟨?_, ?_, ?_⟩
-  · intro x γ hγ v w hv hw
-    obtain ⟨p, hp⟩ := persist x γ hγ v hv
-    obtain ⟨p', hp'⟩ := persist x γ hγ w hw
-    obtain ⟨q, hq⟩ := hout x _ (reach x γ _ (hinit x) hγ)
-    rw [hq p v hp, hq p' w hp']
-  · intro x γ hγ v hv
-    obtain ⟨p, hp⟩ := persist x γ hγ v hv
-    obtain ⟨q, hq⟩ := hout x _ (reach x γ _ (hinit x) hγ)
-    exact ⟨q, (hq p v hp).symm⟩
-  · intro x e p N hadm hinf _
-    exact prog_of_rank rank hrank x e p N hadm hinf
-
-end Generic
 
 /-! ## Role histories -/
 

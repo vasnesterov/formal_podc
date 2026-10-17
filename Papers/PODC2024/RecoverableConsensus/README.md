@@ -46,7 +46,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 ## The formalization
 
-**Model** (CSLib, `Cslib/Computability/Distributed/SharedMemory/Recoverable.lean`).
+**Model** (CSLib, `Cslib/Computability/Distributed/SharedMemory/Recoverable.lean`; object families `withRW` and
+the progress tool `prog_of_rank` from the shared library `Podc/SharedMemory/Recoverable.lean`).
 - Asynchronous shared memory, `n` deterministic processes `Fin n`, arbitrarily many objects with deterministic
   sequential specifications, initial values chosen by the algorithm. Each step of a non-output process is one
   operation on one object; steps in output states are no-ops. No randomization.
@@ -55,7 +56,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
   does not use them).
 - Binary consensus. Recoverable wait-freedom (`RecConsensus`): in every infinite execution, a process that takes
   infinitely many steps and stops crashing after time `N` is in an output state at some time `≥ N`. Wait-freedom
-  (`WFConsensus`) is the same on crash-free executions. Registers are generalized to any read/write-like objects.
+  (`WFConsensus`) is the same on crash-free executions. Registers are generalized to any read/write-like objects (`ObjSpec.RWLike`).
 - Ovens' bounded-crash execution sets `E_z`, `E*_z` and valency are defined on event lists from a base
   configuration, as in the paper. Consensus numbers quantify over all `m > n` processes.
 
@@ -76,5 +77,5 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: `lemma16` contains a concrete recoverable wait-free consensus algorithm (`Sec4.alg16_recConsensus`),
-so the hypothesis of Theorem 13 is satisfiable. Readability (`Readable`, used only in Theorem 14) is formalized up
+so the hypothesis of Theorem 13 is satisfiable. Readability (`ObjSpec.Readable`, used only in Theorem 14) is formalized up
 to encoding of responses.

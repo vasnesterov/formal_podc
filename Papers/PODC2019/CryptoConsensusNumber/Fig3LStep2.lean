@@ -84,11 +84,14 @@ lemma LInv.step_prop (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
       atSpec_transfer_neg (fun h => absurd h.2 (by omega))
     have hneu1 : (AT μ q₀).δ (linState (A := AT μ q₀) S₁) ot = (linState (A := AT μ q₀) S₁, .inl false) := hneu
     have hlst : ∀ B, lst (μ := μ) (q₀ := q₀) (S₁ ++ (xt, ot) :: B) = lst (μ := μ) (q₀ := q₀) (S₁ ++ B) :=
-      fun B => linState_insert (A := AT μ q₀) S₁ B xt ot (by rw [hneu1])
+      fun B => by
+        show linState (A := AT μ q₀) _ = linState _
+        rw [linState_append, linState_append, List.map_cons, ObjSpec.runOps_cons, hneu1]
     have hlrs : ∀ x, x ≠ xt → lrs (μ := μ) (q₀ := q₀) (S₁ ++ (xt, ot) :: S₂) x =
         lrs (μ := μ) (q₀ := q₀) L x := by
       intro x hx; rw [hS]
-      exact linResp_insert (A := AT μ q₀) S₁ S₂ xt ot (by rw [hneu1]) x (Ne.symm hx)
+      exact ObjSpec.respIn_insert (A := AT μ q₀) (AT μ q₀).init S₁ S₂ (o := ot) (congrArg Prod.fst hneu1)
+        (Ne.symm hx)
     have hnc : ¬ Completed (α ++ [.tau q]) xt := not_completed_of_eq (by simp [hxt, htgid])
     have hxt_ne : ∀ q', (∀ t', (C.loc q').pc.tx? ≠ some t') → (q', (respsOf α q').length) ≠ xt := by
       intro q' hq' he
@@ -119,7 +122,7 @@ lemma LInv.step_prop (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
       lin := by
         have h0 := hL.lin.append_tau q
         rw [hS] at h0 hnotL
-        exact isLin_insert h0 (by rw [hα]; exact hL.opK t htK) hnotL hnc
+        exact h0.insert (by rw [hα]; exact hL.opK t htK) hnotL hnc
           (congrArg Prod.fst hneu1)
           (not_precedes_append (invoked_of_opOf (hL.opK t htK)) hS₂)
       bal := by rw [hlst, ← hS, hU']; exact hL.bal
@@ -152,8 +155,9 @@ lemma LInv.step_prop (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
       respF := fun t' ht' r hr => by
         rcases hDecF t' r hr with rfl | hr
         · rw [show lrs (μ := μ) (q₀ := q₀) (S₁ ++ (xt, ot) :: S₂) (t'.p, gid t') =
-            linResp (AT μ q₀) (S₁ ++ (xt, ot) :: S₂) xt from rfl]
-          rw [linResp_insert_self _ _ _ _ (fun h => hnotL (by rw [hS]; simp [h])), hneu1]
+            (AT μ q₀).respIn (AT μ q₀).init (S₁ ++ (xt, ot) :: S₂) xt from rfl]
+          rw [ObjSpec.respIn_insert_self _ _ _ _ (fun h => hnotL (by rw [hS]; simp [h]))]
+          exact congrArg (fun r => some r.2) hneu1
         · have hne : t' ≠ t := fun h => hundec r false (h ▸ hr)
           rw [hlrs _ (fun h => hne (hL.inj t' ht' t htK (congrArg Prod.fst h)
             (congrArg Prod.snd h)))]
@@ -190,7 +194,7 @@ lemma LInv.step_prop (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
           refine ⟨fun hr => by rw [hlst, ← hS]; exact h1 hr, fun hr => ?_⟩
           obtain ⟨T₁, T₂, hT, hTlt, hT₂⟩ := h2 hr
           rw [hS] at hT
-          obtain ⟨T₁', T₂', hT', hmem2, hT₁'⟩ := split_insert' hT.symm (xt, ot)
+          obtain ⟨T₁', T₂', hT', hmem2, -, hT₁'⟩ := split_insert' hT.symm (xt, ot)
           refine ⟨T₁', T₂', hT', ?_, ?_⟩
           · rcases hT₁' with rfl | ⟨B, rfl, rfl⟩
             · exact hTlt

@@ -560,22 +560,13 @@ theorem alg16_recConsensus (hn : n' < n) : RecConsensus (alg16 n n') := by
   · obtain ⟨k, -, p, hp⟩ := hv
     have hI := (inv16_run hn (γ.take k) _ (inv16_init (n := n) x)).1
     exact (letter_of_done hI (out16 hp)).2
-  · refine prog_of_rank (A := alg16 n n') rank16 (fun l hl => ?_) (fun l v hl => ?_)
-      (fun l i o k hl r => ?_) _ e p N hinf hN
-    · cases l with
-      | init x => simp [rank16] at hl
-      | apply x => simp [rank16] at hl
-      | done b => exact ⟨b, rfl⟩
-    · cases l with
-      | init x => cases hl
-      | apply x => cases hl
-      | done b => rfl
-    · cases l with
-      | init x =>
-        cases hl
-        rcases r with b | (_ | _ | ⟨v, i⟩) | _ <;> simp [readK, rank16]
-      | apply x => cases hl; simp [rank16]
-      | done b => cases hl
+  · refine prog_of_rank (A := alg16 n n') rank16 (fun l i o k r hl => ?_) _ e p N hinf hN
+    cases l with
+    | init x =>
+      cases hl
+      rcases r with b | (_ | _ | ⟨v, i⟩) | _ <;> simp [readK, rank16]
+    | apply x => cases hl; simp [rank16]
+    | done b => cases hl
 
 end Alg16
 
