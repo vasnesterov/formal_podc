@@ -118,8 +118,9 @@ Full list of differences (including modelling choices): [differencies.md](differ
 | `B ≥ φn` is tight | `FAI.exists_reach_max`, `FAI.exists_overflow` | `BoundedFAI.lean` |
 
 Generic tools (CSLib candidates):
-* `Sequential.lean`: a sequential execution with an illegal response sequence, or a response no
-  state can produce, refutes linearizability.
+* `Podc/SharedMemory/Sequential.lean` (shared library; `Sequential.lean` here re-exports it): a
+  sequential execution with an illegal response sequence, or a response no state can produce,
+  refutes linearizability.
 * `Machine.lean`: a list-based computable copy of `Impl.step`, proved equal (`step_toCfg`). It
   lets `decide +kernel` evaluate the 7268-label counterexample.
 
