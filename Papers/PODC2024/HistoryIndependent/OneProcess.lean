@@ -1,5 +1,4 @@
 import Papers.PODC2024.HistoryIndependent.Perfect
-import Podc.Computability.Distributed.SharedMemory.Model
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
 import Cslib.Computability.Distributed.SharedMemory.Model
 import Mathlib

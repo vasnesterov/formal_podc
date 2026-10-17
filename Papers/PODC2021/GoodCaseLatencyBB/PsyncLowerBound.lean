@@ -49,7 +49,7 @@ theorem exists_labels (s : P) {f : ℕ} (hf : 2 ≤ f) (h3 : 3 ≤ Fintype.card 
   obtain ⟨g, hs, hle, hc⟩ := Fintype.exists_labelling_apply_eq 6
     (fun i => if i = 0 ∨ i = 1 ∨ i = 3 then 1 else 0)
     (fun i => if i = 0 then 1 else if i = 1 ∨ i = 5 then f else f - 1)
-    (fun i _ => by split_ifs <;> omega) (by simp [sum_range_succ]; omega)
+    (fun i _ => by split_ifs <;> omega) (by simp [sum_range_succ, -sum_boole]; omega)
     (by simp [sum_range_succ]; omega) s (i₀ := 0) (by omega) (by simp)
   have hne : ∀ i, i = 1 ∨ i = 3 → ∃ x, g x = i := fun i hi => by
     obtain ⟨x, -, hx⟩ := filter_nonempty_iff.1 (card_pos.1 (by

@@ -1,5 +1,5 @@
 import Papers.PODC2021.GoodCaseLatencyBB.Basic
-import Podc.Computability.Distributed.Byzantine.PartialSync.Auth
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Auth
 import Cslib.Foundations.Combinatorics.Labelling
 
 /-!

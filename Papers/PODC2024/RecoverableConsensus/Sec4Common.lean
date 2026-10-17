@@ -10,7 +10,7 @@ Shared infrastructure for the proofs of Lemma 15 and Lemma 16 (type `T_{n,n'}`):
   the object iff `n' < idx` (`tδ_opR_of_lt`, `tδ_opR_cases`);
 * the absorption contradiction (`Team.false_of_absorb`) and the "standard argument" for
   read/write objects (`Crit.not_forall_poised_of_rwLike`) are shared
-  (`Podc/Computability/Distributed/SharedMemory/Recoverable.lean`);
+  (`Cslib/Computability/Distributed/SharedMemory/Recoverable.lean`);
 * `all_ops` — if they are all poised on a `T_{n,n'}` object, nobody is poised to apply `opR`
   (first part of the proofs of Lemmas 15 and 16);
 * `run_ops` — running distinct processes poised to apply `op₀`/`op₁`;

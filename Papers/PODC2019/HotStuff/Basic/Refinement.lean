@@ -1,5 +1,5 @@
 import Papers.PODC2019.HotStuff.Basic.Handlers
-import Podc.Computability.Distributed.Byzantine.PartialSync.Log
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Log
 
 /-!
 # Basic HotStuff implementation refines the abstract system

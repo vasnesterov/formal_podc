@@ -1,5 +1,5 @@
 import Mathlib.Combinatorics.SimpleGraph.Metric
-import Podc.Foundations.Combinatorics.SimpleGraph.Ball
+import Cslib.Foundations.Combinatorics.SimpleGraph.Ball
 
 /-!
 # The lower-bound graph of Lemma 3.2: its diameter can exceed `D'`

@@ -1,6 +1,6 @@
 import Cslib.Foundations.Combinatorics.SimplicialComplex.IndexLemma
 import Papers.PODC2022.ArrowTopology.SignModel
-import Podc.Foundations.Data.Finset.Card
+import Cslib.Foundations.Data.Finset.Card
 
 /-!
 # Lemma 3.2: the input complex `N_I` is orientable (three alternatives, any number of voters)

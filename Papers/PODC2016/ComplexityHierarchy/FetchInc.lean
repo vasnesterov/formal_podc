@@ -1,6 +1,6 @@
 import Mathlib
 import Cslib.Computability.Distributed.SharedMemory.Valency
-import Podc.Foundations.Data.Nat.Descent
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # One read/write/fetch-and-increment location is not enough (Theorem 5.1 of EGSZ'16)

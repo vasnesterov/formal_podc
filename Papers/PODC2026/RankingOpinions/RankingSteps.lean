@@ -1,5 +1,5 @@
 import Papers.PODC2026.RankingOpinions.RankingProtocol
-import Podc.Foundations.Data.Fin.Cyclic
+import Cslib.Foundations.Data.Fin.Cyclic
 
 /-!
 # The Ranking protocol: computing single transitions

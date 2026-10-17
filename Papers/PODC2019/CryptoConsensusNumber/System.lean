@@ -1,5 +1,4 @@
 import Papers.PODC2019.CryptoConsensusNumber.Defs
-import Podc.Computability.Distributed.SharedMemory.Recoverable
 import Cslib.Computability.Distributed.SharedMemory.ObjClasses
 import Cslib.Computability.Distributed.SharedMemory.Recoverable
 

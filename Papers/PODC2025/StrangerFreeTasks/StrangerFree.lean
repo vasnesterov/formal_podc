@@ -1,6 +1,4 @@
 import Cslib.Computability.Distributed.SharedMemory.FullInfo
-import Podc.Computability.Distributed.SharedMemory.Model
-import Podc.Computability.Distributed.SharedMemory.Task
 
 /-!
 # Stranger-free tasks need `n` registers (Theorem 2.1 of Gafni–Losa–Raynal–Taubenfeld, PODC 2025)

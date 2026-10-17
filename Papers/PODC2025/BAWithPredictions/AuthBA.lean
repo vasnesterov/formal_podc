@@ -1,5 +1,5 @@
 import Papers.PODC2025.BAWithPredictions.AuthBB
-import Podc.Foundations.Data.Finset.Quorum
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Authenticated Byzantine Agreement with classification (Section 8.3: Lemmas 24–27, Theorem 6)

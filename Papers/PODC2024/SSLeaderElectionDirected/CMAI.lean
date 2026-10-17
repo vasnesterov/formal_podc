@@ -1,5 +1,5 @@
 import Papers.PODC2024.SSLeaderElectionDirected.Defs
-import Podc.Foundations.Combinatorics.Digraph.Walk
+import Cslib.Foundations.Combinatorics.Digraph.Walk
 
 /-!
 # Algorithm C-MAI(D, ≺, I): minimum ancestors' input (Section 3)

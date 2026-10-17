@@ -1,5 +1,5 @@
 import Papers.PODC2024.RecoverableConsensus.Sec4Common
-import Podc.Foundations.Data.Finset.SumUpdate
+import Cslib.Foundations.Data.Finset.SumUpdate
 
 /-!
 # Lemma 16 of Ovens (PODC'24): `T_{n,n'}` has recoverable consensus number `n'`

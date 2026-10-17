@@ -1,6 +1,6 @@
 import Papers.PODC2021.StabilizingLEDynamic.Model
 import Mathlib.Data.Nat.ModEq
-import Podc.Foundations.Data.Finset.Card
+import Cslib.Foundations.Data.Finset.Card
 
 /-!
 # The hierarchy of the nine DG classes (Theorem 1)

@@ -1,7 +1,7 @@
 import Papers.PODC2018.AsymptoticConsensus.LowerBounds
 import Papers.PODC2018.AsymptoticConsensus.Psi
 import Papers.PODC2018.AsymptoticConsensus.Exact
-import Podc.Foundations.Data.Real.Logb
+import Cslib.Foundations.Data.Real.Logb
 
 /-!
 # Approximate consensus: decision-time lower bounds (FNS'18, Section 9, Theorems 8–11)

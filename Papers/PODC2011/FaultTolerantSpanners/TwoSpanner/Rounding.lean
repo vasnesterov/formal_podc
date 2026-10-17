@@ -1,5 +1,5 @@
 import Papers.PODC2011.FaultTolerantSpanners.TwoSpanner.Defs
-import Podc.Probability.Chernoff
+import Cslib.Probability.Chernoff
 
 /-!
 # Probabilistic analysis of the rounding (Theorem 3.3 of Dinitz–Krauthgamer, PODC'11)
@@ -20,7 +20,7 @@ Main results (all constants explicit):
   `2/3 - 1/n` and the cost bound is `72 ln n · LP`.
 
 The lower-tail bound `chernoff_count` is the shared multiplicative Chernoff bound
-`Cslib.Probability.measureReal_card_filter_le_le` (`Podc/Probability/Chernoff.lean`), proved via the
+`Cslib.Probability.measureReal_card_filter_le_le` (`Cslib/Probability/Chernoff.lean`), proved via the
 product formula for `E[2^{-X}]`.
 -/
 

@@ -1,7 +1,7 @@
 import Cslib.Computability.Distributed.ContentOblivious.Mirror
 import Mathlib
-import Podc.Computability.Distributed.ContentOblivious.VirtualRing
-import Podc.Foundations.Algebra.BigOperators.Translate
+import Cslib.Computability.Distributed.ContentOblivious.VirtualRing
+import Cslib.Foundations.Algebra.BigOperators.Translate
 
 /-!
 # Algorithms 7–8 (`CCWBitSending` / `CCWBitRelay`) and Theorem 17
@@ -309,7 +309,7 @@ lemma sum_ge : Q ℓ - P ℓ ≤ ∑ v, (Q v - P v) := by
 
 /-- A wave value `k ≥ 1` seen anywhere was emitted by the leader. -/
 lemma up {k : ℤ} (hk : 1 ≤ k) {w : ZMod n} (hw : k ≤ P w) : k ≤ Q ℓ := by
-  have := Ring.chain_ccw_to (fun u => k ≤ P u) ℓ (fun u hu hS => by
+  have := ZMod.chain_ccw_to (fun u => k ≤ P u) ℓ (fun u hu hS => by
     have := h.P_succ_le u
     try dsimp only at hS ⊢
     rw [h.nl_pos hu (by omega)]; omega) w hw
@@ -317,7 +317,7 @@ lemma up {k : ℤ} (hk : 1 ≤ k) {w : ZMod n} (hw : k ≤ P w) : k ≤ Q ℓ :=
   omega
 
 lemma all_of_leader {k : ℤ} (hk : 1 ≤ k) (hl : k ≤ P ℓ) (v : ZMod n) : k ≤ P v :=
-  Ring.chain_ccw_all (fun u => k ≤ P u) ℓ (fun u hu hS => by
+  ZMod.chain_ccw_all (fun u => k ≤ P u) ℓ (fun u hu hS => by
     have := h.P_succ_le u
     try dsimp only at hS ⊢
     rw [h.nl_pos hu (by omega)]; omega) hl v
@@ -326,7 +326,7 @@ lemma all_of_leader {k : ℤ} (hk : 1 ≤ k) (hl : k ≤ P ℓ) (v : ZMod n) : k
 transit. -/
 lemma quiet_of_exit (hl : P ℓ = 0) (h1 : 1 ≤ c1 (ℓ - 1)) (v : ZMod n) : c2 v = 0 := by
   classical
-  have hQ : ∀ u, 1 ≤ Q u := Ring.chain_ccw_all (fun u => 1 ≤ Q u) (ℓ - 1) (fun u hu hS => by
+  have hQ : ∀ u, 1 ≤ Q u := ZMod.chain_ccw_all (fun u => 1 ≤ Q u) (ℓ - 1) (fun u hu hS => by
       have hu' : u + 1 ≠ ℓ := fun e => hu (by rw [← e, add_sub_cancel_right])
       have := h.P_succ_le u
       try dsimp only at hS ⊢

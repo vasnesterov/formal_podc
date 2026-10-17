@@ -128,5 +128,5 @@ protocols of the remark on randomness (`DetProtocol`) are stone-age algorithms r
 synchronous schedule (`DetProtocol.toStoneAge`, `DetProtocol.run_succ`).
 
 The i.i.d. coin fields (`coinMeasure`), `Determined` events, independence of events on disjoint coin
-sets, and partition along fibres are shared code staged for CSLib in `Podc/Probability/CoinField.lean`
+sets, and partition along fibres are shared code in CSLib, `Cslib/Probability/CoinField.lean`
 (namespace `Cslib.Probability`).

@@ -1,5 +1,5 @@
 import Papers.PODC2018.AsymptoticConsensus.LowerBounds
-import Podc.Foundations.Data.Nat.CeilDiv
+import Cslib.Foundations.Data.Nat.CeilDiv
 
 /-!
 # Section 7–8 of FNS'18: α-diameter, Theorem 5, Lemma 24, Theorem 6

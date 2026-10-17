@@ -1,5 +1,5 @@
 import Papers.PODC2022.ConsensusFromSwap.BinarySwap
-import Podc.Foundations.Data.Finset.SumUpdate
+import Cslib.Foundations.Data.Finset.SumUpdate
 
 /-!
 # Readable swap objects with domain size `b`: `(n − 2)/(3b + 1)` objects are necessary

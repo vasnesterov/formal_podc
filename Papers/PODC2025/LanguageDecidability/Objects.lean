@@ -1,6 +1,6 @@
 import Cslib.Computability.Distributed.SharedMemory.HerlihyWing.DetSpec
 import Cslib.Computability.Distributed.SharedMemory.HerlihyWing.Complete
-import Podc.Computability.Distributed.SharedMemory.HerlihyWing.SeqLin
+import Cslib.Computability.Distributed.SharedMemory.HerlihyWing.SeqLin
 import Papers.PODC2025.LanguageDecidability.Characterization
 
 /-!

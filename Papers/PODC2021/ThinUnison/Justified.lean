@@ -120,7 +120,7 @@ theorem corollary_2_17 {T0 : ℕ} (hop : ∀ t, T0 ≤ t → AllOutProt G C t) {
         (fun w _ => hop T0 le_rfl w) rfl hf
       refine ⟨s + 1, by omega, ?_, fun h => absurd (hs6 ▸ h) Bool.false_ne_true⟩
       exact Nat.succ_le_of_lt (lt_of_lt_of_le hs2 (rho_iter_le_iter hA (by omega) _))
-  exact fwd_induction (P := fun r => (C r v).faulty = true → JustFaulty G C r v) hs3
+  exact Nat.Icc_induction_up (P := fun r => (C r v).faulty = true → JustFaulty G C r v) hs3
     (fun r hr _ h => hC.lemma_2_16 (hop r (by omega)) h) t (by omega) le_rfl
 
 end AURun

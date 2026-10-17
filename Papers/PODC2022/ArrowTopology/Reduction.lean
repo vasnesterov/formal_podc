@@ -1,6 +1,6 @@
 import Mathlib
 import Cslib.Foundations.SocialChoice.Aggregation
-import Podc.Foundations.Data.Finset.Card
+import Cslib.Foundations.Data.Finset.Card
 
 /-!
 # Reduction of Arrow's theorem to two voters and three alternatives

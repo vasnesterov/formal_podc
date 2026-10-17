@@ -1,6 +1,6 @@
 import Papers.PODC2022.RecursivePhaseKing.Desync
 import Papers.PODC2022.RecursivePhaseKing.Subroutines
-import Podc.Foundations.Data.Finset.Quorum
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Algorithm 7 (electors' broadcast with a voting barrier) and Lemma 4.2 of [LS22]

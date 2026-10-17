@@ -1,7 +1,6 @@
 import Papers.PODC2019.CryptoConsensusNumber.Fig1Defs
 import Cslib.Computability.Distributed.SharedMemory.History
-import Podc.Computability.Distributed.SharedMemory.History
-import Podc.Computability.Distributed.SharedMemory.Model
+import Cslib.Computability.Distributed.SharedMemory.Model
 
 /-!
 # Theorem 1: Figure 1 is a wait-free linearizable implementation of asset transfer

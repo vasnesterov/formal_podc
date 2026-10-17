@@ -1,5 +1,5 @@
 import Papers.PODC2012.IterativeApproxBC.Algorithm
-import Podc.Computability.Distributed.ApproxConsensus.Contraction
+import Cslib.Computability.Distributed.ApproxConsensus.Contraction
 
 /-!
 # Convergence of Algorithm 1 (Claims 1–3, Lemma 5, Theorem 3 of [VTL12])

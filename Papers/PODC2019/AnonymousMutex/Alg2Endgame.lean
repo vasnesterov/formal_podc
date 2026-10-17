@@ -1,5 +1,5 @@
 import Papers.PODC2019.AnonymousMutex.Alg2Resign
-import Podc.Foundations.Data.Nat.Descent
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # Algorithm 2: the endgame of the deadlock-freedom proof

@@ -1,5 +1,5 @@
 import Cslib.Computability.Distributed.PopulationProtocols.Symmetrize
-import Podc.Foundations.Data.Nat.Descent
+import Cslib.Foundations.Data.Fin.Cyclic
 import Cslib.Computability.Distributed.PopulationProtocols.Schedules
 import Cslib.Computability.Distributed.PopulationProtocols.Nondet
 import Cslib.Foundations.Data.Nat.Descent
@@ -8,7 +8,6 @@ import Mathlib.Data.Fintype.Card
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
 import Mathlib.Tactic.Ring
 import Mathlib.Data.Fin.VecNotation
-import Podc.Foundations.Data.Fin.Cyclic
 
 /-!
 # The Ordering protocol (Theorem 5.1)

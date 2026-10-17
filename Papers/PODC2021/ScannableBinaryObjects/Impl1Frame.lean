@@ -1,5 +1,5 @@
 import Papers.PODC2021.ScannableBinaryObjects.Impl1Lin
-import Podc.Computability.Distributed.SharedMemory.History
+import Cslib.Computability.Distributed.SharedMemory.History
 
 /-!
 # Implementation 1: frame lemmas for the linearizability invariant

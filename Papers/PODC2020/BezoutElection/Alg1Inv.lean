@@ -1,5 +1,5 @@
 import Papers.PODC2020.BezoutElection.Alg1Step
-import Podc.Computability.Distributed.SharedMemory.Task
+import Cslib.Computability.Distributed.SharedMemory.Task
 
 /-!
 # Algorithm 1: the safety invariant

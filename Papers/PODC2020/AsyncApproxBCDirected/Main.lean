@@ -1,7 +1,7 @@
 import Papers.PODC2020.AsyncApproxBCDirected.Round
 import Papers.PODC2020.AsyncApproxBCDirected.Necessity
-import Podc.Computability.Distributed.ApproxConsensus.Contraction
-import Podc.Computability.Distributed.Byzantine.Specs
+import Cslib.Computability.Distributed.ApproxConsensus.Contraction
+import Cslib.Computability.Distributed.Byzantine.Specs
 
 /-!
 # Main results: Theorem 4 (both directions), convergence and termination of the algorithm

@@ -61,7 +61,7 @@ CCW pulses. -/
 lemma Inv2.all_of_tight {c : Cfg n} (h : Inv2 id ℓ c)
     (ht : ∀ v, c.recvd (v, true) = c.sent (v + 1, false)) : ∀ v, c.recvd (v, true) = id ℓ + 1 := by
   obtain ⟨-, hB, hC, -⟩ := h
-  refine Ring.chain_ccw_all _ (ℓ - 1) (fun v _ hv => ?_) (by rw [ht, sub_add_cancel, hC])
+  refine ZMod.chain_ccw_all _ (ℓ - 1) (fun v _ hv => ?_) (by rw [ht, sub_add_cancel, hC])
   rw [ht]
   by_cases hv' : v + 1 = ℓ
   · rw [hv', hC]

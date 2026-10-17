@@ -1,8 +1,8 @@
 import Papers.PODC2025.ByzantineStableMatching.Problem
 import Cslib.Computability.Distributed.Byzantine.LockStep.Parallel
-import Podc.Computability.Distributed.Byzantine.LockStep.GroupSim
+import Cslib.Computability.Distributed.Byzantine.LockStep.GroupSim
+import Cslib.Foundations.Data.Nat.CeilDiv
 import Mathlib
-import Podc.Foundations.Data.Nat.CeilDiv
 
 /-!
 # Lemma 3: scaling down by group simulation
@@ -13,7 +13,7 @@ Lemma 3 (proof in Appendix A.2).
 A protocol for many parties is turned into a protocol for few parties: every party `q` of the small
 system simulates the group `grp ⁻¹' {q}` of the large system. The generic group simulation
 (`GroupSim.Bundle`, `GroupSim.simHist`, `GroupSim.hist_bigScenario`, …) is shared library code
-(`Podc/Computability/Distributed/Byzantine/LockStep/GroupSim.lean`).
+(`Cslib/Computability/Distributed/Byzantine/LockStep/GroupSim.lean`).
 
 * `GroupSim.Solvable.of_groupSim`: generic reduction (any party types, any specifications);
 * `solvable_sSM_of_groups`: the reduction for sSM with sidewise group maps;

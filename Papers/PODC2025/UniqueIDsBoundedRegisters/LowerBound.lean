@@ -76,18 +76,18 @@ lemma fresh_state {α : List (Label P uidObj)} {C : Config uidObj (fun _ : Fin k
   I.runFrom_other hrun hp
 
 lemma numInv_soloLabels (q : P) (C : Config uidObj (fun _ : Fin k => bReg m) P L) (j : ℕ) :
-    numInv (I.soloLabels q C j) = 0 := by
+    invCount (I.soloLabels q C j) = 0 := by
   induction j generalizing C with
   | zero => rfl
   | succ j ih =>
     rw [soloLabels_succ]
     split_ifs
     · rfl
-    · rw [numInv_cons, ih]
+    · rw [invCount_cons, ih]
       unfold nextLabel; split <;> rfl
 
 lemma numInv_taus (ps : List P) :
-    numInv (ps.map (fun p => (Label.tau p : Label P uidObj))) = 0 := by
+    invCount (ps.map (fun p => (Label.tau p : Label P uidObj))) = 0 := by
   induction ps with
   | nil => rfl
   | cons p ps ih => simp [ih, Label.isInv]
@@ -108,7 +108,7 @@ structure Good (α : List (Label P uidObj)) (C : Config uidObj (fun _ : Fin k =>
   cnt_le : ∀ i, cnt S i ≤ m
   restorable : ∀ i ∈ U, Restorable S i (C.mem i)
   fresh : ∀ j : Fin N, n ≤ j.val → ∀ ℓ ∈ α, ℓ.proc ≠ e j
-  inv : numInv α = n
+  inv : invCount α = n
   le : n ≤ S.length + U.card
 
 lemma good_init : Good I e [] I.initCfg [] ∅ 0 where
@@ -144,7 +144,7 @@ theorem good_step (hA : Anonymous I) (hall : ∀ p, I.allowed p ()) (hof : I.Obs
     {α : List (Label P uidObj)} {C : Config uidObj (fun _ : Fin k => bReg m) P L}
     {S : List (P × Fin k × BOp m)} {U : Finset (Fin k)} {n : ℕ}
     (hG : Good I e α C S U n) (hn : n + 1 < N) :
-    (∃ β, I.Valid β ∧ numInv β = n + 2 ∧ Dup β) ∨
+    (∃ β, I.Valid β ∧ invCount β = n + 2 ∧ Dup β) ∨
     ∃ α' C' S' U', Good I e α' C' S' U' (n + 1) ∧ S.length + U.card < S'.length + U'.card := by
   classical
   set q := e ⟨n, by omega⟩ with hq
@@ -231,8 +231,8 @@ theorem good_step (hA : Anonymous I) (hall : ∀ p, I.allowed p ()) (hof : I.Obs
     rcases List.mem_cons.1 hℓ with rfl | hℓ
     · rfl
     · exact I.soloLabels_proc q C₁ M ℓ hℓ
-  have hγinv : numInv γ = 1 := by
-    rw [hγ, numInv_cons, numInv_soloLabels]; rfl
+  have hγinv : invCount γ = 1 := by
+    rw [hγ, invCount_cons, numInv_soloLabels]; rfl
   have hrunγ : I.run (α ++ γ) = some (X M) := by rw [run_append_of_eq I hG.run, hγrun]
   have hfreshγ : ∀ j : Fin N, n + 1 ≤ j.val → ∀ ℓ ∈ α ++ γ, ℓ.proc ≠ e j := by
     intro j hj ℓ hℓ
@@ -240,7 +240,7 @@ theorem good_step (hA : Anonymous I) (hall : ∀ p, I.allowed p ()) (hof : I.Obs
     · exact hG.fresh j (by omega) ℓ hℓ
     · rw [hγproc ℓ hℓ, hq]
       intro h; have := e.injective h; rw [Fin.ext_iff] at this; simp at this; omega
-  have hinvγ : numInv (α ++ γ) = n + 1 := by rw [numInv_append, hG.inv, hγinv]
+  have hinvγ : invCount (α ++ γ) = n + 1 := by rw [invCount_append, hG.inv, hγinv]
   by_cases hret : (X M).pend q = none
   · -- `q` returned
     by_cases hU : ∀ i ∉ U, (X M).mem i = C.mem i
@@ -299,10 +299,10 @@ theorem good_step (hA : Anonymous I) (hall : ∀ p, I.allowed p ()) (hof : I.Obs
           respsOf_eq_nil_of_proc_ne (fun ℓ hℓ => by rw [hγproc ℓ hℓ]; exact hqq')]
         rfl
       refine ⟨β, ⟨D', hβrun⟩, ?_, (q, 0), (q', 0), ?_, ?_, ?_, ?_⟩
-      · have hτinv : numInv τ = 0 := by
-          rw [hτ, numInv, List.countP_eq_zero]
+      · have hτinv : invCount τ = 0 := by
+          rw [hτ, invCount, List.countP_eq_zero]
           intro ℓ hℓ; obtain ⟨x, -, rfl⟩ := List.mem_map.1 hℓ; simp [Label.isInv]
-        rw [hβ, numInv_append, numInv_append, hinvγ, hτinv, numInv_relabel, hγinv]
+        rw [hβ, invCount_append, invCount_append, hinvγ, hτinv, numInv_relabel, hγinv]
       · simp [Completed, hrq]
       · simp [Completed, hrq']
       · simp [hqq']
@@ -379,7 +379,7 @@ theorem good_step (hA : Anonymous I) (hall : ∀ p, I.allowed p ()) (hof : I.Obs
 theorem exists_dup (hA : Anonymous I) (hall : ∀ p, I.allowed p ()) (hof : I.ObstructionFree)
     (hN : k * m + k + 2 ≤ N) :
     ∀ s : ℕ, ∀ α C S U n, Good I e α C S U n → k * m + k ≤ S.length + U.card + s →
-      ∃ β, I.Valid β ∧ numInv β ≤ k * m + k + 2 ∧ Dup β := by
+      ∃ β, I.Valid β ∧ invCount β ≤ k * m + k + 2 ∧ Dup β := by
   intro s
   induction s with
   | zero =>
@@ -412,7 +412,7 @@ least `k·m + k + 2` processes, has an execution with at most `k·m + k + 2` inv
 two distinct completed `get()` operations return the same identifier. -/
 theorem lower_bound (hA : Anonymous I) (hall : ∀ p, I.allowed p ()) (hof : I.ObstructionFree)
     (e : Fin (k * m + k + 2) ↪ P) :
-    ∃ α, I.Valid α ∧ numInv α ≤ k * m + k + 2 ∧
+    ∃ α, I.Valid α ∧ invCount α ≤ k * m + k + 2 ∧
       ∃ x y : OpId P, Completed α x ∧ Completed α y ∧ x ≠ y ∧ respOf α x = respOf α y :=
   exists_dup I e hA hall hof le_rfl (k * m + k) [] I.initCfg [] ∅ 0 (good_init I e) (by simp)
 

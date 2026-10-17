@@ -1,5 +1,5 @@
 import Papers.PODC2018.AsymptoticConsensus.Alpha
-import Podc.Foundations.Data.Nat.Growth
+import Cslib.Foundations.Data.Nat.Growth
 
 /-!
 # Exact consensus and valencies (Section 7 of FNS'18)
@@ -280,7 +280,7 @@ theorem exactSolvable_of_common_root {α : Type} [Fintype α] {N : Set (Graph α
   have hgrow : ∀ t, min (t + 1) (Fintype.card α) ≤ (S t).card := by
     intro t
     have h0 := Finset.card_pos.2 ⟨r, hS0⟩
-    have := Nat.min_add_le (f := fun t => (S t).card) (n := Fintype.card α) (K := t)
+    have := Nat.min_add_le_of_grow (f := fun t => (S t).card) (n := Fintype.card α) (K := t)
       (fun i _ => Finset.card_le_card (hSmono i)) fun i _ hlt => by
         obtain ⟨y, hy⟩ : ∃ y, y ∉ S i := by
           by_contra h; push Not at h

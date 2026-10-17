@@ -1,5 +1,5 @@
 import Papers.PODC2025.BAWithPredictions.Plurality
-import Podc.Foundations.Data.Finset.Quorum
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Graded consensus and conciliation with a core set (Sections 7.1 and 7.2)

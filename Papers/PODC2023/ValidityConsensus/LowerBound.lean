@@ -1,8 +1,8 @@
 import Papers.PODC2023.ValidityConsensus.Triviality
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
 import Mathlib.Data.Fintype.Prod
-import Podc.Foundations.Data.Finset.Quorum
-import Podc.Computability.Distributed.Byzantine.PartialSync.Merge
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Merge
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # On the Validity of Consensus — §5.1: the quadratic lower bound (Theorem 4)

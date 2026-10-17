@@ -1,5 +1,5 @@
 import Papers.PODC2026.RankingOpinions.TieShareRules
-import Podc.Foundations.Data.Nat.Descent
+import Cslib.Foundations.Data.Nat.Descent
 import Papers.PODC2026.RankingOpinions.TieShareGeom
 
 /-!
@@ -597,7 +597,7 @@ theorem main2 (hE : E.WeaklyFair) (hTok : ∃ y, stA E c.T0 y = St.ws)
       (c.o y ≠ 0 → stA E (t + 1) y = St.los ∧ outA E (t + 1) y ∈ c.S))) ∧
       (∀ y, ∃ t ≥ T6, (c.o y = 0 → stA E t y ≠ St.los) ∧
       (c.o y ≠ 0 → stA E t y = St.los ∧ outA E t y ∈ c.S)) by
-    obtain ⟨T, -, hT⟩ := eventually_all (P := fun t y => (c.o y = 0 → stA E t y ≠ St.los) ∧
+    obtain ⟨T, -, hT⟩ := Nat.eventually_forall_of_imp_succ (P := fun t y => (c.o y = 0 → stA E t y ≠ St.los) ∧
       (c.o y ≠ 0 → stA E t y = St.los ∧ outA E t y ∈ c.S)) T6 hp.1 hp.2
     exact ⟨T, hT⟩
   refine ⟨?_, ?_⟩
@@ -873,7 +873,7 @@ theorem main1 (hE : E.WeaklyFair) :
       ((c.B y).1 ≠ c.μ → stA E (t + 1) y = St.los ∧ outA E (t + 1) y = c.μ))) ∧
       (∀ y, ∃ t ≥ Te, ((c.B y).1 = c.μ → stA E t y ≠ St.los) ∧
       ((c.B y).1 ≠ c.μ → stA E t y = St.los ∧ outA E t y = c.μ)) by
-    obtain ⟨T, -, hT⟩ := eventually_all (P := fun t y => ((c.B y).1 = c.μ → stA E t y ≠ St.los) ∧
+    obtain ⟨T, -, hT⟩ := Nat.eventually_forall_of_imp_succ (P := fun t y => ((c.B y).1 = c.μ → stA E t y ≠ St.los) ∧
       ((c.B y).1 ≠ c.μ → stA E t y = St.los ∧ outA E t y = c.μ)) Te hp.1 hp.2
     exact ⟨T, hT⟩
   refine ⟨?_, fun y => ?_⟩

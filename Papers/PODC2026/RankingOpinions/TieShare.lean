@@ -3,7 +3,7 @@ import Cslib.Computability.Distributed.PopulationProtocols.Schedules
 import Cslib.Computability.Distributed.PopulationProtocols.Eventually
 import Mathlib.Data.Fin.VecNotation
 import Mathlib.Tactic.Ring
-import Podc.Foundations.Data.Fin.Cyclic
+import Cslib.Foundations.Data.Fin.Cyclic
 
 /-!
 # Sharing ties (Section 4.2): `Circles_TieSharing`

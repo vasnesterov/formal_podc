@@ -73,5 +73,5 @@ SET-LOCAL round model of `theorem_2_1` is CSLib's `Cslib.LocallyIterative`.
 balls `cball G v k = G.closedBall v k` and the `edist` arithmetic (`Cslib/Foundations/Combinatorics/SimpleGraph/Ball.lean`), and LOCAL
 agreement `GAgree` (`Cslib/Computability/Distributed/Local/OnlineLocalLocality.lean`) are shared library notions. Paper-local: `deg`, `δ`-sinks,
 sinksparse orientations, `IsLocal`/`IsLocalRel` for orientation algorithms and the ball-growth bound of
-Lemma 2.2. BFS parents in disconnected graphs (`SimpleGraph.bfsParent`, `SimpleGraph.bfsAncestor`) are staged
-for CSLib in `Podc/Foundations/Combinatorics/SimpleGraph/BFSTree.lean`.
+Lemma 2.2. BFS parents in disconnected graphs (`SimpleGraph.bfsParent`, `SimpleGraph.bfsAncestor`) are in
+CSLib, `Cslib/Foundations/Combinatorics/SimpleGraph/BFSTree.lean`.

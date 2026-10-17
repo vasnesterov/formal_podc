@@ -1,6 +1,6 @@
 import Papers.PODC2015.CrashConsensusDigraph.WA
-import Podc.Computability.Distributed.ApproxConsensus.Contraction
-import Podc.Foundations.Algebra.Order.BigOperators.Average
+import Cslib.Computability.Distributed.ApproxConsensus.Contraction
+import Cslib.Foundations.Algebra.Order.BigOperators.Average
 
 /-!
 # Algorithm WA: global invariant, ε-agreement and validity

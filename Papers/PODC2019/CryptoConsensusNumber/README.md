@@ -94,7 +94,7 @@ object. A read, a failing transfer or a blind write cannot be critical. Successf
 different accounts commute. So every two processes on opposite teams withdraw from one common
 account. Every process is on some team, so all `n` processes own that account, and `n ≤ k`
 (`at_pair`, `no_consensus`; generic lemmas `Team.false_of_absorb`, `Team.false_of_commute`,
-`Crit.not_forall_poised_of_rwLike` in `Podc/Computability/Distributed/SharedMemory/Recoverable.lean`).
+`Crit.not_forall_poised_of_rwLike` in `Cslib/Computability/Distributed/SharedMemory/Recoverable.lean`).
 This needs neither the cited `k`-consensus hierarchy result nor composition of implementations,
 and it allows any number of objects with different owner maps.
 
@@ -110,7 +110,7 @@ machinery comes from CSLib (`Cslib/Computability/Distributed/SharedMemory/Recove
 shared library: `ObjSpec.RWLike` (`Cslib/Computability/Distributed/SharedMemory/ObjClasses.lean`), `wfConsensus_of_inv` and
 `inv_run_crashFree` (`Cslib/Computability/Distributed/SharedMemory/Recoverable.lean`), the retroactive-insertion toolkit
 `IsLinearization.insert`, `ObjSpec.respIn` (`Cslib/Computability/Distributed/SharedMemory/LinPoints.lean`) and
-`InfExec.exists_good`, `InfExec.run_pre` (`Cslib/Computability/Distributed/SharedMemory/Progress.lean`), the
+`InfExec.exists_good`, `InfExec.run_pre` (`Cslib/Computability/Distributed/SharedMemory/Potential.lean`), the
 current operation instance `curOp` and `opOf_append_of_eq_some`, `linState_concat`
 (`Cslib/Computability/Distributed/SharedMemory/History.lean`), and `Fintype.sum_comp_update_add`
 (`Cslib/Foundations/Data/Finset/SumUpdate.lean`).

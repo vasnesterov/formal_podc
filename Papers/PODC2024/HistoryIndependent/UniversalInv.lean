@@ -1,6 +1,5 @@
 import Papers.PODC2024.HistoryIndependent.Universal
-import Podc.Computability.Distributed.SharedMemory.Model
-import Podc.Computability.Distributed.SharedMemory.StrongLin
+import Cslib.Computability.Distributed.SharedMemory.StrongLin
 import Cslib.Computability.Distributed.SharedMemory.Linearization
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
 import Cslib.Computability.Distributed.SharedMemory.Model

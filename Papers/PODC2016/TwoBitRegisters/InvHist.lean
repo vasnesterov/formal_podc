@@ -1,6 +1,5 @@
 import Papers.PODC2016.TwoBitRegisters.InvRead
 import Cslib.Computability.Distributed.SharedMemory.History
-import Podc.Computability.Distributed.SharedMemory.History
 import Cslib.Foundations.Data.Finset.Quorum
 
 /-!

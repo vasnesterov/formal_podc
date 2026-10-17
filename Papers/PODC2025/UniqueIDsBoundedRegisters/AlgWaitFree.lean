@@ -8,7 +8,7 @@ import Cslib.Computability.Distributed.SharedMemory.Task
 
 * `alg_waitFreeUpTo`: Algorithm 2 (`1 ≤ n ≤ d`, `d ∣ m`) is wait-free in every infinite
   execution with at most `N` invocations (for every `N`). By the basic invariant at most
-  `numInv ≤ N` tickets of `R₀` are successful, so `R₀` receives fewer than `d · (N + 1)`
+  `invCount ≤ N` tickets of `R₀` are successful, so `R₀` receives fewer than `d · (N + 1)`
   FAIs in total (`lt_of_count_residue`); the potential
   `3 · (d · (N + 1) - t) + μ(loc p)` (with the ghost ticket counter `t` of the execution) then
   decreases with every step of `p` (library `Impl.waitFreeOn_of_runPotential`).

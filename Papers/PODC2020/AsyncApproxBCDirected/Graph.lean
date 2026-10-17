@@ -1,5 +1,4 @@
 import Cslib.Computability.Distributed.ApproxConsensus.DigraphConditions
-import Podc.Foundations.Combinatorics.Digraph.Walk
 
 /-!
 # Reach sets, the reach conditions and source components of reduced graphs

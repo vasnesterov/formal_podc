@@ -1,5 +1,5 @@
 import Papers.PODC2016.ComplexityHierarchy.BufferLB
-import Podc.Computability.Distributed.SharedMemory.Model
+import Cslib.Computability.Distributed.SharedMemory.Model
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
 
 /-!

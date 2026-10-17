@@ -1,8 +1,8 @@
 import Papers.PODC2013.ByzantineVectorConsensus.Spec
-import Podc.Foundations.Data.Finset.Quorum
-import Podc.Foundations.Data.Real.Logb
-import Podc.Foundations.Algebra.Order.BigOperators.Average
-import Podc.Computability.Distributed.ApproxConsensus.Contraction
+import Cslib.Computability.Distributed.ApproxConsensus.Contraction
+import Cslib.Foundations.Algebra.Order.BigOperators.Average
+import Cslib.Foundations.Data.Finset.Quorum
+import Cslib.Foundations.Data.Real.Logb
 
 /-!
 # The iterative approximate BVC algorithm (Section 3.2, Theorem 5; Section 4, Theorem 6)

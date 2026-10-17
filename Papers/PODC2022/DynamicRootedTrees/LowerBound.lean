@@ -1,5 +1,5 @@
 import Papers.PODC2022.DynamicRootedTrees.Defs
-import Podc.Computability.Distributed.DynamicNetworks.Journey
+import Cslib.Computability.Distributed.DynamicNetworks.Journey
 
 /-!
 # The lower bound `t*(𝒯ₙ) ≥ ⌈(3n-1)/2⌉ - 2`

@@ -3,7 +3,6 @@ import Cslib.Computability.Distributed.SharedMemory.Covering
 import Cslib.Computability.Distributed.SharedMemory.Mutex
 import Cslib.Computability.Distributed.SharedMemory.Task
 import Cslib.Foundations.Data.Nat.Descent
-import Podc.Computability.Distributed.SharedMemory.History
 
 /-!
 # Unique identifiers from bounded registers: definitions
@@ -20,7 +19,7 @@ Identifiers from Bounded Registers*, PODC 2025.
   `UniqueResp α` says that distinct completed operations of `α` returned distinct values. For
   this specification linearizability is equivalent to `UniqueResp` (any order of the operations
   is a legal sequential history when the outputs are distinct).
-* **Bounded number of calls.** `numInv α` is the number of invocations in `α`;
+* **Bounded number of calls.** `invCount α` is the number of invocations in `α`;
   `CorrectUpTo I B`: every execution with at most `B` invocations satisfies `UniqueResp`.
 * **Anonymity.** `Anonymous I`: all processes run the same automaton from the same initial
   state (`locInit`, `invoke`, `act` do not depend on the process).
@@ -79,7 +78,7 @@ variable {ι : Type} {B : ι → ObjSpec} {L : Type}
 /-- The implementation is a correct unique-identifier object as long as `get()` is called at
 most `N` times: every execution with at most `N` invocations has distinct outputs. -/
 def CorrectUpTo [DecidableEq P] [DecidableEq ι] (I : Impl uidObj B P L) (N : ℕ) : Prop :=
-  ∀ α, I.Valid α → numInv α ≤ N → UniqueResp α
+  ∀ α, I.Valid α → invCount α ≤ N → UniqueResp α
 
 /-- Anonymity: every process runs the same deterministic automaton from the same initial
 state. -/
@@ -89,13 +88,13 @@ structure Anonymous (I : Impl A B P L) : Prop where
   act : ∀ p q, I.act p = I.act q
 
 /-- Wait-freedom in infinite executions with at most `N` invocations (the library's
-`Impl.WaitFreeOn` for the executions with `numInv ≤ N`). -/
+`Impl.WaitFreeOn` for the executions with `invCount ≤ N`). -/
 abbrev WaitFreeUpTo [DecidableEq P] [DecidableEq ι] (I : Impl A B P L) (N : ℕ) : Prop :=
-  I.WaitFreeOn fun α => numInv α ≤ N
+  I.WaitFreeOn fun α => invCount α ≤ N
 
 /-- `WaitFreeUpTo`, unfolded. -/
 lemma waitFreeUpTo_iff [DecidableEq P] [DecidableEq ι] (I : Impl A B P L) (N : ℕ) :
-    WaitFreeUpTo I N ↔ ∀ e : I.InfExec, (∀ T, numInv ((List.range T).map e.lbl) ≤ N) →
+    WaitFreeUpTo I N ↔ ∀ e : I.InfExec, (∀ T, invCount ((List.range T).map e.lbl) ≤ N) →
       ∀ (p : P) (n : ℕ), (∀ t ≥ n, (e.cfg t).pend p ≠ none) → ∃ T, ∀ t ≥ T, e.lbl t ≠ .tau p :=
   Iff.rfl
 

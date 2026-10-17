@@ -1,5 +1,5 @@
 import Papers.PODC2011.CoordinatedConsensusDynamic.StaticPathLemma65
-import Podc.Foundations.Data.Nat.CeilDiv
+import Cslib.Foundations.Data.Nat.CeilDiv
 
 /-!
 # Lemma 6.6: rotating the path in a suffix of the execution

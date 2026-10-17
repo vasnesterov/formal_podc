@@ -112,7 +112,7 @@ core of Lemma 1.
    Kuznetsov–Tonkikh–Zhang lower bound (library module `Cslib/Computability/Distributed/Byzantine/PartialSync/TwoStepLowerBound.lean`), which are
    exactly Figure 4 with `p` = broadcaster.
 9. **Theorem 19.** The ring of groups is a time-dependent covering system with uniform delay `Δ`
-   (`DCover`, `Podc/Computability/Distributed/Byzantine/PartialSync/Cover.lean`). The broadcaster has two copies (left/right), each talking only to its neighbour group
+   (`DCover`, `Cslib/Computability/Distributed/Byzantine/PartialSync/Cover.lean`). The broadcaster has two copies (left/right), each talking only to its neighbour group
    after the proposal. Locality ("information travels one group per `Δ`") replaces the paper's informal
    distance argument.
 10. **Theorem 5 protocol.** Parties gossip all known signed tokens instead of "forwarding the `n − f` votes". A

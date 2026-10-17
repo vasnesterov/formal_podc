@@ -1,5 +1,5 @@
 import Papers.PODC2024.HistoryIndependent.UniversalWF
-import Podc.Computability.Distributed.SharedMemory.Model
+import Cslib.Computability.Distributed.SharedMemory.Model
 
 /-!
 # Theorem 32: Algorithm 5 over Algorithm 6, flattened

@@ -1,6 +1,5 @@
 import Mathlib
 import Cslib.Foundations.Combinatorics.Digraph.Walk
-import Podc.Foundations.Combinatorics.Digraph.Walk
 
 /-!
 # Source components of finite digraphs (Lemmas 6 and 7 of [BRS11])

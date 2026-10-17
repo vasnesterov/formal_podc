@@ -109,8 +109,8 @@ For Theorem 1.6 the bound is `m ≤ 4(t+1)p` for every `t`-PLS.
 **CSLib candidates** (marked `-- CSLib candidate`):
 - the PLS model (`PLS`, `Basic.lean`); views, locality and the localization trick (`loc`, `mask`)
   are in the shared `Cslib/Computability/Distributed/Local/OnlineLocalLocality.lean`;
-- the string encoding (`encList`/`decList`, `chunk`) is now shared code staged for CSLib in
-  `Podc/Foundations/Data/List/BitEncoding.lean` (namespace `Cslib.BitEncoding`);
+- the string encoding (`encList`/`decList`, `chunk`) is now shared code in CSLib,
+  `Cslib/Foundations/Data/List/BitEncoding.lean` (namespace `Cslib.BitEncoding`);
 - ball sizes in connected graphs (`card_ball_ge`, `RandomCarving.lean`); the fibre counting along
   the identifier order and the union bounds of Lemmas 5.2/5.5 use the shared
   `Cslib/Probability/Finite/Uniform.lean` (`pow_mul_card_filter_forall_le`,

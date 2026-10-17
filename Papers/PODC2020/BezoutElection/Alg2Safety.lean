@@ -1,5 +1,5 @@
 import Papers.PODC2020.BezoutElection.Alg2GlobProc
-import Podc.Computability.Distributed.SharedMemory.Task
+import Cslib.Computability.Distributed.SharedMemory.Task
 
 /-!
 # Algorithm 2: safety (Lemma 2)

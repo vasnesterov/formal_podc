@@ -1,6 +1,6 @@
 import Mathlib
 import Papers.PODC2013.ByzantineVectorConsensus.Gamma
-import Podc.Foundations.Combinatorics.Convex.Tverberg
+import Cslib.Foundations.Combinatorics.Convex.Tverberg
 
 /-!
 # Tverberg's theorem (Theorem 2 of Vaidya–Garg, PODC 2013)
@@ -14,7 +14,7 @@ import Podc.Foundations.Combinatorics.Convex.Tverberg
 
 ## Proof route
 
-The proof is shared library code (`Podc/Foundations/Combinatorics/Convex/Tverberg.lean`):
+The proof is shared library code (`Cslib/Foundations/Combinatorics/Convex/Tverberg.lean`):
 Sarkaria's lifting plus the colorful Carathéodory theorem (`exists_colorful_mem_convexHull`),
 see `Convex.tverberg_partition`.
 -/

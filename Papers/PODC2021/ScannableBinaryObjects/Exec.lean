@@ -1,10 +1,8 @@
 import Papers.PODC2021.ScannableBinaryObjects.Basic
-import Podc.Computability.Distributed.SharedMemory.Model
 import Cslib.Computability.Distributed.SharedMemory.Mutex
 import Cslib.Computability.Distributed.SharedMemory.Solo
 import Cslib.Computability.Distributed.SharedMemory.Task
 import Cslib.Foundations.Data.Nat.Descent
-import Podc.Computability.Distributed.SharedMemory.History
 
 /-!
 # Scannable binary objects: building executions

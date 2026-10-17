@@ -1,4 +1,3 @@
-import Podc.Foundations.Combinatorics.SimpleGraph.BlockingSet
 import Cslib.Foundations.Combinatorics.SimpleGraph.FaultTolerantGreedy
 import Cslib.Foundations.Combinatorics.SimpleGraph.GirthExtremal
 import Mathlib

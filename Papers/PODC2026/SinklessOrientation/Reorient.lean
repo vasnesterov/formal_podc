@@ -1,5 +1,5 @@
 import Papers.PODC2026.SinklessOrientation.Basic
-import Podc.Foundations.Combinatorics.SimpleGraph.BFSTree
+import Cslib.Foundations.Combinatorics.SimpleGraph.BFSTree
 
 /-!
 # Lemma 2.3: removing the `δ`-sinks of a sinksparse orientation (Algorithm 2)

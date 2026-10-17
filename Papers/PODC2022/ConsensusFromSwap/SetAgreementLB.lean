@@ -1,6 +1,6 @@
 import Papers.PODC2022.ConsensusFromSwap.Model
 import Cslib.Computability.Distributed.SharedMemory.ObjClasses
-import Podc.Foundations.Data.Nat.CeilDiv
+import Cslib.Foundations.Data.Nat.CeilDiv
 
 /-!
 # Lower bound for k-set agreement from swap objects (Section 4)

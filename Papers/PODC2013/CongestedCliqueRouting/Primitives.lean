@@ -1,5 +1,5 @@
 import Papers.PODC2013.CongestedCliqueRouting.Knowledge
-import Podc.Foundations.Combinatorics.Matrix.Birkhoff
+import Cslib.Foundations.Combinatorics.Matrix.Birkhoff
 import Papers.PODC2013.CongestedCliqueRouting.Assign
 
 /-!

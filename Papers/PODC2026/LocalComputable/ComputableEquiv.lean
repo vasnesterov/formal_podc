@@ -1,5 +1,5 @@
 import Papers.PODC2026.LocalComputable.Basic
-import Podc.Computability.Partrec.List
+import Cslib.Computability.Partrec.List
 
 /-!
 # Theorem 5.3: with a bound on `n`, uncomputable and computable LOCAL coincide

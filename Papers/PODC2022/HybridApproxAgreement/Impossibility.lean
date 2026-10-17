@@ -1,6 +1,6 @@
 import Papers.PODC2022.HybridApproxAgreement.Spec
 import Cslib.Foundations.Combinatorics.Labelling
-import Podc.Computability.Distributed.Byzantine.PartialSync.Merge
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Merge
 
 /-!
 # Theorem 5.1: no hybrid AA when `2 tₛ + tₐ ≥ n`

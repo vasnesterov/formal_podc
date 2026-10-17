@@ -148,5 +148,5 @@ Registers and ledgers use CSLib's Herlihy–Wing histories and `detSpec`
 CSLib candidates (not upstreamed): `rto_iff_swapClosed` (shuffle closure = adjacent
 transpositions), `wf_of_exec` (`CounterAExec.lean`), and the generic lemma `legal_seqHist_detSpec` in
 `Objects.lean` (the former `linearizable_of_isExtension` is now the shared
-`Cslib.SharedMemory.HerlihyWing.Linearizable.of_isExtension`, staged in
-`Podc/Computability/Distributed/SharedMemory/HerlihyWing/SeqLin.lean`).
+`Cslib.SharedMemory.HerlihyWing.Linearizable.of_isExtension`, in
+`Cslib/Computability/Distributed/SharedMemory/HerlihyWing/SeqLin.lean`).

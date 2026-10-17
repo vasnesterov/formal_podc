@@ -1,6 +1,6 @@
 import Papers.PODC2026.TreeAA.TreeGeom
 import Cslib.Computability.Distributed.Byzantine.LockStep.Sequential
-import Podc.Computability.Distributed.Byzantine.Specs
+import Cslib.Computability.Distributed.Byzantine.Specs
 import Mathlib
 
 /-!

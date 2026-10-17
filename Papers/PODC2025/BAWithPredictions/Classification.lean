@@ -1,5 +1,5 @@
 import Papers.PODC2025.BAWithPredictions.Defs
-import Podc.Foundations.Data.Finset.Quorum
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Byzantine Agreement with Predictions — classification (Section 6)

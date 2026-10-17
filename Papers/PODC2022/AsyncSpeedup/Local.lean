@@ -1,5 +1,5 @@
 import Papers.PODC2022.AsyncSpeedup.Speedup
-import Podc.Foundations.Data.Finset.Card
+import Cslib.Foundations.Data.Finset.Card
 
 /-!
 # Facts about one-round solutions of local tasks

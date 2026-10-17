@@ -1,6 +1,5 @@
 import Mathlib
 import Cslib.Foundations.Data.Finset.Quorum
-import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # TetraBFT: votes, reports, and the safety rules (Rules 1–4)

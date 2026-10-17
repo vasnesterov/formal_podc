@@ -1,6 +1,6 @@
 import Papers.PODC2025.ByzantineStableMatching.Problem
-import Podc.Foundations.Combinatorics.Labelling
-import Podc.Computability.Distributed.Byzantine.LockStep.Cover
+import Cslib.Computability.Distributed.Byzantine.LockStep.Cover
+import Cslib.Foundations.Combinatorics.Labelling
 
 /-!
 # Grouping parties

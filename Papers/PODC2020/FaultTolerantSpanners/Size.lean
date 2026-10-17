@@ -1,5 +1,5 @@
 import Papers.PODC2020.FaultTolerantSpanners.Greedy
-import Podc.Foundations.Combinatorics.SimpleGraph.BlockingSet
+import Cslib.Foundations.Combinatorics.SimpleGraph.BlockingSet
 import Mathlib
 
 /-!

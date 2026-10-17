@@ -1,7 +1,7 @@
 import Papers.PODC2022.HybridApproxAgreement.Trim
-import Podc.Foundations.Data.Finset.Quorum
-import Podc.Foundations.Data.Real.Logb
-import Podc.Computability.Distributed.ApproxConsensus.Contraction
+import Cslib.Computability.Distributed.ApproxConsensus.Contraction
+import Cslib.Foundations.Data.Finset.Quorum
+import Cslib.Foundations.Data.Real.Logb
 
 /-!
 # The analysis of `Π_AA` relative to the Overlap All-to-All Broadcast guarantees (Section 3.1)

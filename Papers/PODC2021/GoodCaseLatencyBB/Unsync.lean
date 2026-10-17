@@ -1,6 +1,5 @@
 import Papers.PODC2021.GoodCaseLatencyBB.Basic
-import Podc.Computability.Distributed.Byzantine.PartialSync.Auth
-import Podc.Computability.Distributed.Byzantine.PartialSync.Model
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Auth
 
 /-!
 # Unsynchronized start
@@ -21,7 +20,7 @@ Generic tools (CSLib candidates):
   at the same *local* times).
 * `Run.inbox_of_const`: inboxes on links with a constant (effective) delay.
 * (the replay lemma for a causally closed set of events is the shared `Run.tokens_replay_rel`,
-  `Podc/Computability/Distributed/Byzantine/PartialSync/Auth.lean`).
+  `Cslib/Computability/Distributed/Byzantine/PartialSync/Auth.lean`).
 -/
 
 set_option linter.unusedSectionVars false

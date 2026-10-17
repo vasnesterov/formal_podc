@@ -1,11 +1,9 @@
 import Cslib.Computability.Distributed.Byzantine.LockStep.Cover
-import Podc.Computability.Distributed.Byzantine.LockStep.Basic
-import Podc.Computability.Distributed.Byzantine.LockStep.Cover
+import Cslib.Computability.Distributed.Byzantine.Specs
 import Cslib.Computability.Distributed.Byzantine.LockStep.Agreement
 import Cslib.Foundations.Combinatorics.SimpleGraph.VertexConnectivity
 import Mathlib
 import Cslib.Computability.Distributed.Byzantine.LockStep.Parallel
-import Podc.Computability.Distributed.Byzantine.Specs
 
 /-!
 # The local broadcast model (Khan–Naqvi–Vaidya, PODC 2019), on top of CSLib's lock-step model

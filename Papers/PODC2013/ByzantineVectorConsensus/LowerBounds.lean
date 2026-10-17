@@ -1,5 +1,5 @@
 import Papers.PODC2013.ByzantineVectorConsensus.Spec
-import Podc.Foundations.Data.Nat.ModCount
+import Cslib.Foundations.Data.Nat.ModCount
 
 /-!
 # Lower bounds: Theorems 1 and 4 of Vaidya–Garg (PODC 2013)

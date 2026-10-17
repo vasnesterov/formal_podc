@@ -1,8 +1,6 @@
 import Papers.PODC2016.ConcurrentDSU.Inv
-import Podc.Computability.Distributed.SharedMemory.Model
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
 import Cslib.Computability.Distributed.SharedMemory.Model
-import Podc.Computability.Distributed.SharedMemory.History
 
 /-!
 # Linearizability (Lemma 3.2)

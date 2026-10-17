@@ -1,7 +1,7 @@
 import Papers.PODC2022.AsyncSpeedup.ApproxAgreement
 import Mathlib.Data.Fintype.EquivFin
 import Mathlib.Analysis.SpecialFunctions.Log.Base
-import Podc.Foundations.Data.Real.Logb
+import Cslib.Foundations.Data.Real.Logb
 
 /-!
 # Round lower bounds for approximate agreement (Corollary 3, Theorems 3 and 4)
