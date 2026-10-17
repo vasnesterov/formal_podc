@@ -5,7 +5,7 @@ import Cslib.Computability.Distributed.Byzantine.PartialSync.Model
 
 `Run.st` recomputes the whole history at every step, so evaluating it on a concrete run is
 exponential. `simHist` computes the list of all global states up to time `τ` once; it handles
-arbitrary delivery times `dl` (the zero-delay version is `HybridApproxAgreement.simStates`).
+arbitrary delivery times `dl` (the zero-delay version is `simStates` in `Podc/PartialSync/Sim.lean`).
 `Run.st_eq_simHist` identifies it with `Run.st`, so facts about a concrete finite run prefix can
 be checked by `decide +kernel`.
 -/

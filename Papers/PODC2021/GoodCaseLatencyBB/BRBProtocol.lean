@@ -1,4 +1,6 @@
 import Papers.PODC2021.GoodCaseLatencyBB.Basic
+import Podc.PartialSync.Gossip
+import Podc.Byzantine.Certificate
 
 /-!
 # The 2-round-BRB protocol (Figure 1, Theorem 5)
@@ -25,54 +27,29 @@ The protocol (`n ≥ 3f + 1`, asynchronous, authenticated):
 
 ## Main results
 
-* `algo_unforging`: correct processes only emit their own tokens and relay received ones.
+* `algo_gossips`: the protocol gossips its known tokens (`Algorithm.Gossips` of
+  `Podc.PartialSync.Gossip`, which provides the generic token-origin and gossip lemmas);
+  `algo_unforging`: correct processes only emit their own tokens and relay received ones.
 * `theorem_5_brb`: Byzantine reliable broadcast in all asynchronous runs (`asyncRuns f`).
 * `theorem_5_latency`: good-case latency `2Δ` in synchronous runs with delay bound `Δ`.
 
-The generic `Run.honestTokens_origin` (a token emitted by a correct process and signed by a
-correct process `q` was emitted by `q` itself, at the same time or earlier) is a CSLib candidate.
+Commit quorums are threshold certificates (`Cslib.Byzantine.Certified`,
+`Podc.Byzantine.Certificate`).
 -/
 
 set_option linter.unusedSectionVars false
 
 namespace GoodCaseLatencyBB
 
-open Cslib.Byzantine.PartialSync Finset
+open Cslib.Byzantine.PartialSync Cslib.Byzantine Finset
 
-/-! ### Token origin (generic) -/
+/-- All tokens of all received messages (messages are finite sets of tokens). -/
+def received {P K : Type*} [Fintype P] [DecidableEq K] (ib : P → List (Finset K)) : Finset K :=
+  Finset.univ.biUnion fun q => (ib q).toFinset.biUnion id
 
-section Origin
-
-variable {P M S VI VO K : Type*} [DecidableEq P]
-
--- CSLib candidate
-/-- **Token origin.** In a run respecting unforgeability of an unforging algorithm, a token
-emitted by a correct process by time `τ` is signed by a Byzantine process, or was emitted by its
-(correct) signer itself by time `τ`. -/
-theorem Run.honestTokens_origin {Au : Auth P M K} {A : Algorithm P M S VI VO}
-    (hU : A.Unforging Au) {R : Run P M VI} (hR : R.AuthValid Au A) {τ : ℕ} {x : K}
-    (hx : x ∈ R.honestTokens Au A τ) :
-    Au.signer x ∈ R.faulty ∨ ∃ τ' ≤ τ, ∃ r, ∃ m ∈ R.out A (Au.signer x) τ' r, x ∈ Au.tokens m := by
-  induction τ using Nat.strong_induction_on with
-  | _ τ ih =>
-    obtain ⟨τ₁, hτ₁, q, hq, r, m, hm, hxm⟩ := hx
-    have hm' := hm
-    rw [Run.out_of_correct A R hq] at hm'
-    rcases hU R q τ₁ r m hm' x hxm with hs | ⟨τ₂, hτ₂, q', m', hm₂, hx₂⟩
-    · exact Or.inr ⟨τ₁, hτ₁, r, m, hs ▸ hm, hxm⟩
-    · obtain ⟨σ, hσ, -, hm₃⟩ := Run.mem_inbox.mp hm₂
-      have hh : Au.signer x ∈ R.faulty ∨ x ∈ R.honestTokens Au A σ := by
-        by_cases hq' : q' ∈ R.faulty
-        · rw [Run.out_of_faulty A R hq'] at hm₃
-          exact hR q' hq' σ q hq m' hm₃ x hx₂
-        · exact Or.inr ⟨σ, le_rfl, q', hq', q, m', hm₃, hx₂⟩
-      rcases hh with h | h
-      · exact Or.inl h
-      · rcases ih σ (by omega) h with h' | ⟨τ', hτ', r', m'', hm'', hx''⟩
-        · exact Or.inl h'
-        · exact Or.inr ⟨τ', by omega, r', m'', hm'', hx''⟩
-
-end Origin
+theorem mem_received {P K : Type*} [Fintype P] [DecidableEq K] {ib : P → List (Finset K)} {k : K} :
+    k ∈ received ib ↔ ∃ r, ∃ m ∈ ib r, k ∈ m := by
+  simp [received]
 
 namespace BRB
 
@@ -107,13 +84,10 @@ noncomputable def voteAct (p : P) (K : Finset (Tok P V)) : Finset (Tok P V) :=
   if h : (∀ v, Tok.vote p v ∉ K) ∧ ∃ v, Tok.prop s v ∈ K then insert (Tok.vote p h.2.choose) K
   else K
 
-/-- All tokens of all received messages. -/
-def received (ib : P → List (Finset (Tok P V))) : Finset (Tok P V) :=
-  univ.biUnion fun q => (ib q).toFinset.biUnion id
-
-/-- `K` contains `n − f` votes for `v`. -/
+/-- `K` contains `n − f` votes for `v`: `v` is certified by the votes in `K` with threshold
+`n − f`. -/
 def Quorum (K : Finset (Tok P V)) (v : V) : Prop :=
-  Fintype.card P - f ≤ (univ.filter fun q => Tok.vote q v ∈ K).card
+  Cslib.Byzantine.Certified (fun q v => Tok.vote q v ∈ K) (Fintype.card P - f) v
 
 open Classical in
 /-- **The 2-round-BRB protocol** (Figure 1) with broadcaster `s`, for at most `f` faults. The
@@ -166,10 +140,6 @@ theorem voteAct_unique {p : P} {K : Finset (Tok P V)}
     · exact hK v w hv hw
   · exact hK v w hv hw
 
-theorem mem_received {ib : P → List (Finset (Tok P V))} {k : Tok P V} :
-    k ∈ received ib ↔ ∃ r, ∃ m ∈ ib r, k ∈ m := by
-  simp [received]
-
 variable (R : Run P (Finset (Tok P V)) V)
 
 theorem st_succ_eq (τ : ℕ) (q : P) :
@@ -180,75 +150,60 @@ theorem st_succ_eq (τ : ℕ) (q : P) :
 theorem st_zero_eq (q : P) :
     R.st (algo s f) 0 q = if q = s then {Tok.prop s (R.inp q)} else ∅ := rfl
 
-theorem known_mono {τ τ' : ℕ} (h : τ ≤ τ') (q : P) :
-    R.st (algo s f) τ q ⊆ R.st (algo s f) τ' q := by
-  induction h with
-  | refl => exact subset_rfl
-  | step _ ih =>
-    refine ih.trans ?_
-    rw [st_succ_eq]
-    exact subset_union_left.trans (subset_voteAct _ _)
-
-theorem mem_known_of_inbox {τ : ℕ} {q r : P} {m : Finset (Tok P V)}
-    (hm : m ∈ R.inbox (algo s f) q τ r) {k : Tok P V} (hk : k ∈ m) :
-    k ∈ R.st (algo s f) (τ + 1) q := by
-  rw [st_succ_eq]
-  exact subset_voteAct _ _ (mem_union_right _ (mem_received.mpr ⟨r, m, hm, hk⟩))
-
 theorem out_correct {q : P} (hq : q ∉ R.faulty) (τ : ℕ) (r : P) :
     R.out (algo s f) q τ r = [R.st (algo s f) τ q] :=
   R.out_of_correct _ hq τ r
 
-/-! ### Unforgeability and the origin of tokens -/
+/-! ### Gossip, unforgeability and the origin of tokens -/
+
+/-- The protocol gossips its known tokens. -/
+theorem algo_gossips : (algo (V := V) s f).Gossips auth (fun K => ↑K) where
+  subset_step _ _ _ := coe_subset.2 (subset_union_left.trans (subset_voteAct _ _))
+  tokens_subset _ _ _ m hm := by simp only [algo, List.mem_singleton] at hm; subst hm; rfl
+  exists_mem_send _ K _ _ hx := ⟨K, List.mem_singleton_self _, hx⟩
+  tokens_subset_step _ _ _ r m hm _ hk :=
+    subset_voteAct _ _ (mem_union_right _ (mem_received.mpr ⟨r, m, hm, hk⟩))
+
+theorem known_mono {τ τ' : ℕ} (h : τ ≤ τ') (q : P) :
+    R.st (algo s f) τ q ⊆ R.st (algo s f) τ' q :=
+  coe_subset.1 (algo_gossips.mono R h q)
+
+theorem mem_known_of_inbox {τ : ℕ} {q r : P} {m : Finset (Tok P V)}
+    (hm : m ∈ R.inbox (algo s f) q τ r) {k : Tok P V} (hk : k ∈ m) :
+    k ∈ R.st (algo s f) (τ + 1) q :=
+  algo_gossips.tokens_subset_of_mem_inbox hm hk
 
 /-- Correct processes only emit their own tokens and relay received ones. -/
 theorem algo_unforging : (algo (V := V) s f).Unforging auth := by
-  intro R p τ q m hm x hx
-  have hm' : m = R.st (algo s f) τ p := by simpa [algo] using hm
-  subst hm'
-  change x ∈ R.st (algo s f) τ p at hx
-  clear hm
-  induction τ generalizing x with
-  | zero =>
-    left
-    rw [st_zero_eq] at hx
+  refine algo_gossips.unforging (fun p v x hx => ?_) (fun p K ib x hx => ?_)
+  · simp only [algo, mem_coe] at hx
     split_ifs at hx with h
     · rw [mem_singleton] at hx; subst hx; exact h.symm
     · simp at hx
-  | succ τ ih =>
-    rw [st_succ_eq] at hx
-    rcases mem_voteAct hx with hx | ⟨u, rfl, -, -⟩
+  · rcases mem_voteAct hx with hx | ⟨u, rfl, -, -⟩
     · rcases mem_union.mp hx with hx | hx
-      · rcases ih x hx with h | ⟨τ', hτ', r', m', hm', hx'⟩
-        · exact Or.inl h
-        · exact Or.inr ⟨τ', by omega, r', m', hm', hx'⟩
-      · obtain ⟨r, m, hm, hk⟩ := mem_received.mp hx
-        exact Or.inr ⟨τ, by omega, r, m, hm, hk⟩
-    · exact Or.inl rfl
+      · exact Or.inl hx
+      · exact Or.inr (Or.inl (mem_received.mp hx))
+    · exact Or.inr (Or.inr rfl)
 
 variable {R}
 
 /-- What a correct process knows, it has emitted. -/
 theorem known_honest {q : P} (hq : q ∉ R.faulty) {τ : ℕ} {x : Tok P V}
     (hx : x ∈ R.st (algo s f) τ q) : x ∈ R.honestTokens auth (algo s f) τ :=
-  ⟨τ, le_rfl, q, hq, q, _, by rw [out_correct R hq]; exact List.mem_singleton_self _, hx⟩
+  algo_gossips.subset_honestTokens hq τ hx
 
 /-- A token emitted by correct processes and signed by a correct `q` is known to `q`. -/
 theorem honest_known (hR : R.AuthValid auth (algo s f)) {q : P} (hq : q ∉ R.faulty) {τ : ℕ}
     {x : Tok P V} (hx : x ∈ R.honestTokens auth (algo s f) τ) (hs : x.signer = q) :
-    x ∈ R.st (algo s f) τ q := by
-  rcases Run.honestTokens_origin algo_unforging hR hx with h | ⟨τ', hτ', r, m, hm, hxm⟩
-  · exact absurd (hs ▸ h) hq
-  · have hs' : auth.signer x = q := hs
-    rw [hs', out_correct R hq] at hm
-    rw [List.mem_singleton.mp hm] at hxm
-    exact known_mono R hτ' q hxm
+    x ∈ R.st (algo s f) τ q :=
+  algo_gossips.mem_of_mem_honestTokens algo_unforging hR hq hx hs
 
 /-- A token known to a correct process and signed by a correct `q` is known to `q`. -/
 theorem known_signed (hR : R.AuthValid auth (algo s f)) {c q : P} (hc : c ∉ R.faulty)
     (hq : q ∉ R.faulty) {τ : ℕ} {x : Tok P V} (hx : x ∈ R.st (algo s f) τ c)
     (hs : x.signer = q) : x ∈ R.st (algo s f) τ q :=
-  honest_known hR hq (known_honest hc hx) hs
+  algo_gossips.mem_of_mem algo_unforging hR hc hq hx hs
 
 /-- A token received by a correct process at `τ` and signed by a correct `q` is known to `q`
 at `τ`. -/
@@ -257,16 +212,7 @@ theorem recv_signed (hR : R.AuthValid auth (algo s f)) {c q : P} (hc : c ∉ R.f
     (hx : x ∈ received (R.inbox (algo s f) c τ)) (hs : x.signer = q) :
     x ∈ R.st (algo s f) τ q := by
   obtain ⟨r, m, hm, hxm⟩ := mem_received.mp hx
-  obtain ⟨σ, hσ, -, hm'⟩ := Run.mem_inbox.mp hm
-  refine known_mono R hσ q (honest_known hR hq ?_ hs)
-  by_cases hr : r ∈ R.faulty
-  · rw [Run.out_of_faulty _ _ hr] at hm'
-    rcases hR r hr σ c hc m hm' x hxm with h | h
-    · exact absurd (hs ▸ h) hq
-    · exact h
-  · rw [out_correct R hr] at hm'
-    rw [List.mem_singleton.mp hm'] at hxm
-    exact known_honest hr hxm
+  exact algo_gossips.mem_of_mem_inbox algo_unforging hR hc hq hm hxm hs
 
 /-- An own token of a correct process present before its vote action is already known to it. -/
 theorem own_of_union (hR : R.AuthValid auth (algo s f)) {c : P} (hc : c ∉ R.faulty) {τ : ℕ}
@@ -337,41 +283,6 @@ theorem vote_input (hR : R.AuthValid auth (algo s f)) (hs : s ∉ R.faulty) {c :
 
 /-! ### Quorums -/
 
-theorem Quorum.mono {K K' : Finset (Tok P V)} (h : K ⊆ K') {v : V} (hq : Quorum f K v) :
-    Quorum f K' v :=
-  hq.trans (card_le_card fun c hc => by
-    simp only [mem_filter] at hc ⊢; exact ⟨hc.1, h hc.2⟩)
-
-theorem quorum_of_correct {K : Finset (Tok P V)} {v : V} (hcard : R.faulty.card ≤ f)
-    (h : ∀ c ∉ R.faulty, Tok.vote c v ∈ K) : Quorum f K v := by
-  have hsub : R.faultyᶜ ⊆ univ.filter fun q => Tok.vote q v ∈ K := fun c hc =>
-    mem_filter.mpr ⟨mem_univ _, h c (mem_compl.mp hc)⟩
-  have := card_le_card hsub
-  rw [card_compl] at this
-  unfold Quorum; omega
-
-/-- A quorum contains the vote of a correct process (`n − f > f`). -/
-theorem Quorum.exists_correct {K : Finset (Tok P V)} {v : V} (hq : Quorum f K v)
-    (hcard : R.faulty.card ≤ f) (hn : 2 * f < Fintype.card P) :
-    ∃ c ∉ R.faulty, Tok.vote c v ∈ K := by
-  obtain ⟨c, hc, hcf⟩ := exists_mem_notMem_of_card_lt_card (t := univ.filter
-    fun q => Tok.vote q v ∈ K) (s := R.faulty) (by unfold Quorum at hq; omega)
-  exact ⟨c, hcf, (mem_filter.mp hc).2⟩
-
-/-- **Quorum intersection**: two quorums share the vote of a correct process (`n ≥ 3f + 1`). -/
-theorem Quorum.inter_correct {K K' : Finset (Tok P V)} {v w : V} (hq : Quorum f K v)
-    (hq' : Quorum f K' w) (hcard : R.faulty.card ≤ f) (hn : 3 * f + 1 ≤ Fintype.card P) :
-    ∃ c ∉ R.faulty, Tok.vote c v ∈ K ∧ Tok.vote c w ∈ K' := by
-  unfold Quorum at hq hq'
-  set Q := univ.filter fun q => Tok.vote q v ∈ K
-  set Q' := univ.filter fun q => Tok.vote q w ∈ K'
-  have h1 := card_inter_add_card_union Q Q'
-  have h2 : (Q ∪ Q').card ≤ Fintype.card P := card_le_univ _
-  obtain ⟨c, hc, hcf⟩ := exists_mem_notMem_of_card_lt_card (t := Q ∩ Q') (s := R.faulty)
-    (by omega)
-  rw [mem_inter] at hc
-  exact ⟨c, hcf, (mem_filter.mp hc.1).2, (mem_filter.mp hc.2).2⟩
-
 theorem decide_spec {p : P} {K : Finset (Tok P V)} {v : V}
     (h : (algo s f).decide p K = some v) : Quorum f K v := by
   simp only [algo] at h
@@ -389,28 +300,15 @@ theorem decide_of_quorum (p : P) {K : Finset (Tok P V)} {v : V} (h : Quorum f K 
 theorem decide_input (hR : R.AuthValid auth (algo s f)) (hs : s ∉ R.faulty)
     (hcard : R.faulty.card ≤ f) (hn : 2 * f < Fintype.card P) {p : P} (hp : p ∉ R.faulty)
     {τ : ℕ} {w : V} (h : (algo s f).decide p (R.st (algo s f) τ p) = some w) : w = R.inp s := by
-  obtain ⟨c, hc, hcv⟩ := (decide_spec h).exists_correct hcard hn
+  obtain ⟨c, hc, hcv⟩ := (decide_spec h).exists_correct_signer hcard (by omega)
   exact vote_input hR hs hc (known_signed hR hp hc hcv rfl)
 
 /-! ### Gossip -/
 
-/-- A correct process learns everything a correct process knew when the batch is delivered. -/
-theorem gossip {q r : P} (hq : q ∉ R.faulty) {τ : ℕ} (hdl : τ ≤ R.dl q τ r) :
-    R.st (algo s f) τ q ⊆ R.st (algo s f) (R.dl q τ r + 1) r := by
-  intro k hk
-  refine mem_known_of_inbox R (r := q) (m := R.st (algo s f) τ q) ?_ hk
-  exact Run.mem_inbox.mpr ⟨τ, hdl, rfl, by rw [out_correct R hq]; exact List.mem_singleton_self _⟩
-
-theorem gossip_valid {D : ℕ} (hV : R.Valid f D) {q r : P} (hq : q ∉ R.faulty)
-    (hr : r ∉ R.faulty) (τ : ℕ) :
-    R.st (algo s f) τ q ⊆ R.st (algo s f) (max τ R.gst + D + 1) r :=
-  (gossip hq (hV.dl_ge q τ r hq hr)).trans
-    (known_mono R (by have := hV.dl_le q τ r hq hr; omega) r)
-
 theorem gossip_sync {Δ : ℕ} (hV : SyncValid f Δ R) {q r : P} (hq : q ∉ R.faulty)
     (hr : r ∉ R.faulty) (τ : ℕ) : R.st (algo s f) τ q ⊆ R.st (algo s f) (τ + Δ) r :=
-  (gossip hq (hV.dl_ge q τ r hq hr)).trans
-    (known_mono R (by have := hV.dl_lt q τ r hq hr; omega) r)
+  (algo_gossips.subset_of_dl hq (hV.dl_ge q τ r hq hr)).trans
+    (algo_gossips.mono R (by have := hV.dl_lt q τ r hq hr; omega) r)
 
 /-! ### Theorem 5 -/
 
@@ -420,7 +318,8 @@ theorem agreement (hR : R.AuthValid auth (algo s f)) (hcard : R.faulty.card ≤ 
     {v w : V} (hv : R.Decides (algo s f) p v) (hw : R.Decides (algo s f) q w) : v = w := by
   obtain ⟨τ, hτ⟩ := hv
   obtain ⟨τ', hτ'⟩ := hw
-  obtain ⟨c, hc, h1, h2⟩ := (decide_spec hτ).inter_correct (decide_spec hτ') hcard hn
+  obtain ⟨c, hc, h1, h2⟩ :=
+    (decide_spec hτ).common_correct_signer (decide_spec hτ') hcard (by omega)
   exact vote_unique hR hc (max τ τ') v w
     (known_mono R (le_max_left _ _) c (known_signed hR hp hc h1 rfl))
     (known_mono R (le_max_right _ _) c (known_signed hR hq hc h2 rfl))
@@ -448,17 +347,18 @@ theorem theorem_5_brb (hn : 3 * f + 1 ≤ Fintype.card P) :
   validity := by
     rintro R ⟨D, hV⟩ hR hs p hp
     have h1 : ∀ c ∉ R.faulty, Tok.prop s (R.inp s) ∈ R.st (algo s f) (max 0 R.gst + D + 1) c :=
-      fun c hc => gossip_valid hV hs hc 0 prop_init
+      fun c hc => algo_gossips.subset_of_valid hV hs hc 0 prop_init
     have h2 := all_vote hR hs h1
     set T := max (max 0 R.gst + D + 1) R.gst + D + 1
-    obtain ⟨w, hw⟩ := decide_of_quorum (s := s) p (quorum_of_correct (K :=
-      R.st (algo s f) T p) (v := R.inp s) hV.card_faulty
-      fun c hc => gossip_valid hV hc hp _ (h2 c hc))
+    obtain ⟨w, hw⟩ := decide_of_quorum (s := s) p
+      (show Quorum f (R.st (algo s f) T p) (R.inp s) from
+      certified_of_forall_notMem hV.card_faulty
+        fun c hc => algo_gossips.subset_of_valid hV hc hp _ (h2 c hc))
     exact ⟨T, (decide_input hR hs hV.card_faulty (by omega) hp hw) ▸ hw⟩
   termination := by
     rintro R ⟨D, hV⟩ hR ⟨p, hp, v, τ, hτ⟩ r hr
     obtain ⟨w, hw⟩ := decide_of_quorum (s := s) r
-      ((decide_spec hτ).mono (gossip_valid hV hp hr τ))
+      ((decide_spec hτ).mono (fun _ hc => algo_gossips.subset_of_valid hV hp hr τ hc) le_rfl)
     exact ⟨w, _, hw⟩
 
 /-- **Theorem 5 (good-case latency).** With an honest broadcaster and synchronous delays
@@ -472,9 +372,8 @@ theorem theorem_5_latency :
   have h1 : ∀ c ∉ R.faulty, Tok.prop s (R.inp s) ∈ R.st (algo s f) (d + 1) c := fun c hc => by
     simpa using gossip_sync hV hs hc 0 prop_init
   have h2 := all_vote hR hs h1
-  obtain ⟨w, hw⟩ := decide_of_quorum (s := s) p (quorum_of_correct (K :=
-    R.st (algo s f) (2 * (d + 1)) p) (v := R.inp s) hV.card_faulty
-    fun c hc => by
+  obtain ⟨w, hw⟩ := decide_of_quorum (s := s) p (show Quorum f (R.st (algo s f) (2 * (d + 1)) p)
+    (R.inp s) from certified_of_forall_notMem hV.card_faulty fun c hc => by
       have := gossip_sync hV hc hp (d + 1) (h2 c hc)
       rwa [show d + 1 + (d + 1) = 2 * (d + 1) by omega] at this)
   exact ⟨w, 2 * (d + 1), le_rfl, hw⟩

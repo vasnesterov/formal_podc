@@ -1,4 +1,5 @@
 import Papers.PODC2021.GoodCaseLatencyBB.Tokens
+import Podc.Foundations.Labelling
 
 /-!
 # BRB good-case latency `≥ Δ + δ` for `f ≥ n/3` under synchronized start (Theorem 9)
@@ -238,38 +239,16 @@ theorem exists_partition [Fintype P] (s : P) {f : ℕ} (h3 : 3 ≤ Fintype.card 
     (hn : Fintype.card P ≤ 3 * f) :
     ∃ g : P → ℕ, (∀ p, g p ≤ 2) ∧ g s = 2 ∧ (∃ x, g x = 0) ∧ (∃ y, g y = 1) ∧
       ∀ i, (univ.filter (g · = i)).card ≤ f := by
-  set n := Fintype.card P
-  obtain ⟨C₀, hC₀, hC₀c⟩ := exists_subset_card_eq (s := univ.erase s) (n := (n + 2) / 3 - 1)
-    (by rw [card_erase_of_mem (mem_univ _), card_univ]; omega)
-  have hsC₀ : s ∉ C₀ := fun h => by simpa using hC₀ h
-  set C := insert s C₀
-  have hCc : C.card = (n + 2) / 3 := by rw [card_insert_of_notMem hsC₀]; omega
-  obtain ⟨A₀, hA₀, hA₀c⟩ := exists_subset_card_eq (s := univ \ C) (n := (n + 1) / 3)
-    (by rw [card_sdiff_of_subset (subset_univ _), card_univ]; omega)
-  have hdis : Disjoint C A₀ := disjoint_left.2 fun p hp hp' => by simpa [hp] using hA₀ hp'
-  have hBc : (univ \ (C ∪ A₀)).card = n / 3 := by
-    rw [card_sdiff_of_subset (subset_univ _), card_union_of_disjoint hdis, card_univ]; omega
-  refine ⟨fun p => if p ∈ C then 2 else if p ∈ A₀ then 0 else 1, fun p => by beta_reduce; split_ifs <;> omega,
-    by simp [C], ?_, ?_, fun i => ?_⟩
-  · obtain ⟨x, hx⟩ := card_pos.1 (show 0 < A₀.card by omega)
-    exact ⟨x, by simp [hx, disjoint_right.1 hdis hx]⟩
-  · obtain ⟨y, hy⟩ := card_pos.1 (show 0 < (univ \ (C ∪ A₀)).card by omega)
-    simp only [mem_sdiff, mem_univ, mem_union, true_and, not_or] at hy
-    exact ⟨y, by simp [hy.1, hy.2]⟩
-  · have h0 : univ.filter (fun p => (if p ∈ C then 2 else if p ∈ A₀ then 0 else 1) = 0) = A₀ := by
-      ext p; by_cases hC : p ∈ C <;> by_cases hA : p ∈ A₀ <;>
-        simp [hC, hA]
-      exact disjoint_left.1 hdis hC hA
-    have h1 : univ.filter (fun p => (if p ∈ C then 2 else if p ∈ A₀ then 0 else 1) = 1) =
-        univ \ (C ∪ A₀) := by
-      ext p; by_cases hC : p ∈ C <;> by_cases hA : p ∈ A₀ <;> simp [hC, hA]
-    have h2 : univ.filter (fun p => (if p ∈ C then 2 else if p ∈ A₀ then 0 else 1) = 2) = C := by
-      ext p; by_cases hC : p ∈ C <;> by_cases hA : p ∈ A₀ <;> simp [hC, hA]
-    rcases (by omega : i = 0 ∨ i = 1 ∨ i = 2 ∨ 3 ≤ i) with rfl | rfl | rfl | hi
-    · rw [h0]; omega
-    · rw [h1]; omega
-    · rw [h2]; omega
-    · rw [filter_false_of_mem fun p _ => by beta_reduce; split_ifs <;> omega]; simp
+  obtain ⟨g, hs, hg, hc⟩ := Fintype.exists_labelling_apply_eq 3 (fun _ => 1) (fun _ => f)
+    (fun _ _ => by omega) (by simpa using h3) (by simpa [mul_comm] using hn) s (i₀ := 2) (by omega)
+    le_rfl
+  have hne : ∀ i < 3, ∃ x, g x = i := fun i hi => by
+    obtain ⟨x, -, hx⟩ := filter_nonempty_iff.1 (card_pos.1 (hc i hi).1); exact ⟨x, hx⟩
+  refine ⟨g, fun p => by have := hg p; omega, hs, hne 0 (by omega), hne 1 (by omega),
+    fun i => ?_⟩
+  by_cases hi : i < 3
+  · exact (hc i hi).2
+  · rw [filter_false_of_mem fun p _ => by have := hg p; omega]; simp
 
 end SyncThird
 

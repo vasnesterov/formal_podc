@@ -109,7 +109,7 @@ core of Lemma 1.
    `C` (`claim2`). Delays the paper calls `∞` are replaced by a finite `L` beyond every relevant horizon.
 8. **Theorem 7.** In Execution 1 the Byzantine `E` also sends its round-0 messages to `A`. They equal those of
    an honest `E`, which `A` receives in Execution 2 too. This lets us reuse the executions `ρ₁…ρ₅` of the
-   Kuznetsov–Tonkikh–Zhang formalization (`Papers/PODC2021/FastByzantineConsensus/Executions.lean`), which are
+   Kuznetsov–Tonkikh–Zhang lower bound (library module `Podc/PartialSync/TwoStepLB.lean`), which are
    exactly Figure 4 with `p` = broadcaster.
 9. **Theorem 19.** The ring of groups is a time-dependent covering system with uniform delay `Δ`
    (`DelayCover.lean`). The broadcaster has two copies (left/right), each talking only to its neighbour group

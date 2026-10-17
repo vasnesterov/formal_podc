@@ -114,10 +114,6 @@ noncomputable def step1 (x : P) (st : St P V) (K : Finset (Tok P V)) : St P V :=
     ⟨K, st.clk + 1, newTf s st K, some h'.2.2.choose⟩
   else ⟨K, st.clk + 1, newTf s st K, st.dec⟩
 
-/-- All tokens of all received messages. -/
-def received (ib : P → List (Finset (Tok P V))) : Finset (Tok P V) :=
-  univ.biUnion fun q => (ib q).toFinset.biUnion id
-
 /-- **The protocol** with broadcaster `s` and parameter `Δ` (run through `lateStart`). -/
 noncomputable def algo : Algorithm P (Finset (Tok P V)) (St P V) V V where
   init x v := if x = s then ⟨{Tok.prop s v}, 0, some 0, some v⟩ else St.dummy
@@ -229,10 +225,6 @@ theorem equiv_step1 : Equiv s (step1 s Δ x st K).known ↔ Equiv s K := by
 theorem uniq_step1 {v : V} : Uniq s (step1 s Δ x st K).known v ↔ Uniq s K v := by
   simp only [Uniq, step1_prop]
 
-theorem mem_received {ib : P → List (Finset (Tok P V))} {k : Tok P V} :
-    k ∈ received ib ↔ ∃ r, ∃ m ∈ ib r, k ∈ m := by
-  simp [received]
-
 theorem init_eq (s : P) (Δ : ℕ) (x : P) (v : V) :
     (algo s Δ).init x v = if x = s then ⟨{Tok.prop s v}, 0, some 0, some v⟩ else St.dummy := rfl
 
@@ -243,6 +235,38 @@ theorem init_known {v : V} {k : Tok P V} (hk : k ∈ ((algo s Δ).init x v).know
   · simp [St.dummy] at hk
 
 end Step
+
+/-! ### Knowledge sharing -/
+
+section Sharing
+
+variable {s : P} {Δ : ℕ}
+
+/-- Once started, the protocol shares its known tokens. -/
+theorem algo_sharesKnowledge :
+    (algo (V := V) s Δ).SharesKnowledge auth (fun st => ↑st.known) where
+  subset_step _ _ _ := coe_subset.2 (subset_union_left.trans subset_step1)
+  tokens_subset _ st _ m hm := by simp only [algo, List.mem_singleton] at hm; subst hm; rfl
+  exists_mem_send _ st _ _ hx := ⟨st.known, List.mem_singleton_self _, hx⟩
+
+/-- Through the late-start wrapper, the protocol shares the known tokens of its inner state
+(`St.dummy`, which knows nothing, before the start). -/
+theorem lateStart_sharesKnowledge : (lateStart (algo (V := V) s Δ)).SharesKnowledge auth
+    (fun z => ↑(z.elim (fun _ => St.dummy) id).known) where
+  subset_step x z ib := by
+    rcases z with vk | st
+    · intro k hk; simp [St.dummy] at hk
+    · exact (algo_sharesKnowledge (s := s) (Δ := Δ)).subset_step x st ib
+  tokens_subset x z q m hm := by
+    rcases z with vk | st
+    · simp [lateStart] at hm
+    · exact (algo_sharesKnowledge (s := s) (Δ := Δ)).tokens_subset x st q m hm
+  exists_mem_send x z q k hk := by
+    rcases z with vk | st
+    · simp [St.dummy] at hk
+    · exact (algo_sharesKnowledge (s := s) (Δ := Δ)).exists_mem_send x st q k hk
+
+end Sharing
 
 /-! ### Runs: inner states -/
 
@@ -274,12 +298,6 @@ theorem decides_iff {x : P} {v : V} :
     R.Decides (lateStart (algo s Δ)) x v ↔ ∃ t, (ist s Δ R x t).dec = some v := by
   simp only [Run.Decides, decide_eq]
 
-theorem out_eq {q : P} {τ : ℕ} {r : P} {m : Finset (Tok P V)} (hq : q ∉ R.faulty)
-    (hm : m ∈ R.out (lateStart (algo s Δ)) q τ r) : m = (ist s Δ R q τ).known := by
-  rw [Run.out_of_correct _ _ hq] at hm
-  simp only [ist]; generalize R.st (lateStart (algo s Δ)) τ q = z at hm ⊢
-  cases z <;> simp_all [lateStart, algo]
-
 theorem mem_out {q : P} {τ : ℕ} (hq : q ∉ R.faulty) (hτ : ustart R q ≤ τ) (r : P) :
     (ist s Δ R q τ).known ∈ R.out (lateStart (algo s Δ)) q τ r := by
   rw [Run.out_of_correct _ _ hq, st_inr R hτ]; simp [lateStart, algo]
@@ -300,14 +318,8 @@ theorem ist_clk {x : P} {t : ℕ} (h : ustart R x ≤ t) :
   | succ t ht ih => rw [ist_succ R ht, step1_clk, ih]; omega
 
 theorem known_mono {x : P} {t t' : ℕ} (h : t ≤ t') :
-    (ist s Δ R x t).known ⊆ (ist s Δ R x t').known := by
-  induction t', h using Nat.le_induction with
-  | base => exact subset_rfl
-  | succ t' _ ih =>
-    refine ih.trans ?_
-    rcases lt_or_ge t' (ustart R x) with h' | h'
-    · rw [ist_before R h']; simp [St.dummy]
-    · rw [ist_succ R h']; exact subset_union_left.trans subset_step1
+    (ist s Δ R x t).known ⊆ (ist s Δ R x t').known :=
+  coe_subset.1 (lateStart_sharesKnowledge.mono R h x)
 
 theorem dec_mono {x : P} {t t' : ℕ} {v : V} (h : t ≤ t') (hv : (ist s Δ R x t).dec = some v) :
     (ist s Δ R x t').dec = some v := by
@@ -364,58 +376,44 @@ variable {s : P} {Δ : ℕ}
 
 /-- Correct processes only emit their own tokens and relay received ones. -/
 theorem unforging : (lateStart (algo (V := V) s Δ)).Unforging auth := by
-  intro R p τ q m hm k hk
-  have hm' : m = (ist s Δ R p τ).known := by
-    simp only [ist]; generalize R.st (lateStart (algo s Δ)) τ p = z at hm ⊢
-    cases z <;> simp_all [lateStart, algo]
-  subst hm'
-  change k ∈ (ist s Δ R p τ).known at hk
-  revert k
-  refine ist_ind R p (Q := fun τ => ∀ k ∈ (ist s Δ R p τ).known,
-    auth.signer k = p ∨ k ∈ R.recvTokens auth (lateStart (algo s Δ)) p τ) ?_ ?_ ?_ τ
-  · intro t ht k hk; rw [ist_before R ht] at hk; simp [St.dummy] at hk
-  · intro k hk; rw [ist_start] at hk; obtain ⟨rfl, rfl⟩ := init_known hk; exact Or.inl rfl
-  · intro t ht ih k hk
-    rw [ist_succ R ht] at hk
-    rcases mem_step1 hk with h | ⟨v, rfl, -⟩
-    · rcases mem_union.mp h with h | h
-      · rcases ih k h with h' | ⟨τ', hτ', rest⟩
-        · exact Or.inl h'
-        · exact Or.inr ⟨τ', by omega, rest⟩
-      · obtain ⟨r, m, hm, hkm⟩ := mem_received.mp h
-        exact Or.inr ⟨t, by omega, r, m, hm, hkm⟩
-    · exact Or.inl rfl
+  have hinit : ∀ x v, ∀ k ∈ (↑((algo (V := V) s Δ).init x v).known : Set (Tok P V)),
+      auth.signer k = x := fun x v k hk => by
+    obtain ⟨rfl, rfl⟩ := init_known hk; rfl
+  refine lateStart_sharesKnowledge.unforging (fun x iv k hk => ?_) (fun x z ib k hk => ?_)
+  · simp only [lateStart] at hk
+    split_ifs at hk
+    · exact hinit x _ k hk
+    · simp [St.dummy] at hk
+  · rcases z with vk | st
+    · simp only [lateStart, Sum.elim_inl] at hk
+      split_ifs at hk
+      · exact Or.inr (Or.inr (hinit x _ k hk))
+      · simp [St.dummy] at hk
+    · simp only [lateStart, Sum.elim_inr] at hk
+      rcases mem_step1 hk with h | ⟨v, rfl, -⟩
+      · rcases mem_union.mp h with h | h
+        · exact Or.inl h
+        · exact Or.inr (Or.inl (mem_received.mp h))
+      · exact Or.inr (Or.inr rfl)
 
 variable {R : Run P (Finset (Tok P V)) (V × ℕ)}
 
 theorem known_honest {x : P} (hx : x ∉ R.faulty) {τ : ℕ} {k : Tok P V}
     (hk : k ∈ (ist s Δ R x τ).known) : k ∈ R.honestTokens auth (lateStart (algo s Δ)) τ :=
-  ⟨τ, le_rfl, x, hx, x, _, mem_out R hx (ustart_le_of_mem R hk) x, hk⟩
+  lateStart_sharesKnowledge.subset_honestTokens hx τ hk
 
 /-- A token emitted by correct processes and signed by a correct `y` is known to `y`. -/
 theorem honest_known (hR : R.AuthValid auth (lateStart (algo s Δ))) {y : P} (hy : y ∉ R.faulty)
     {τ : ℕ} {k : Tok P V} (hk : k ∈ R.honestTokens auth (lateStart (algo s Δ)) τ)
-    (hs : k.signer = y) : k ∈ (ist s Δ R y τ).known := by
-  rcases Run.honestTokens_origin unforging hR hk with h | ⟨τ', hτ', r, m, hm, hkm⟩
-  · exact absurd (by rw [← hs]; exact h) hy
-  · have e : auth.signer k = y := hs
-    rw [e] at hm
-    rw [out_eq R hy hm] at hkm
-    exact known_mono R hτ' hkm
+    (hs : k.signer = y) : k ∈ (ist s Δ R y τ).known :=
+  lateStart_sharesKnowledge.mem_of_mem_honestTokens unforging hR hy hk hs
 
 /-- A token received by a correct process and signed by a correct `y` is known to `y`. -/
 theorem recv_signed (hR : R.AuthValid auth (lateStart (algo s Δ))) {x : P} (hx : x ∉ R.faulty)
     {t : ℕ} {k : Tok P V} (hk : k ∈ received (R.inbox (lateStart (algo s Δ)) x t)) {y : P}
     (hy : y ∉ R.faulty) (hs : k.signer = y) : k ∈ (ist s Δ R y t).known := by
   obtain ⟨r, m, hm, hkm⟩ := mem_received.mp hk
-  obtain ⟨σ, hσ, -, hm'⟩ := Run.mem_inbox.mp hm
-  refine known_mono R hσ (honest_known hR hy ?_ hs)
-  by_cases hr : r ∈ R.faulty
-  · rw [Run.out_of_faulty _ _ hr] at hm'
-    rcases hR r hr σ x hx m hm' k hkm with h | h
-    · exact absurd (by rw [← hs]; exact h) hy
-    · exact h
-  · exact ⟨σ, le_rfl, r, hr, x, m, hm', hkm⟩
+  exact lateStart_sharesKnowledge.mem_of_mem_inbox unforging hR hx hy hm hkm hs
 
 /-- A correct process holding its own commit token for `v` has decided `v`. -/
 theorem own_commit (hR : R.AuthValid auth (lateStart (algo s Δ))) {x : P} (hx : x ∉ R.faulty) :

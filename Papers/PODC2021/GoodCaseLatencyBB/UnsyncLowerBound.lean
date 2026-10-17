@@ -1,5 +1,6 @@
 import Papers.PODC2021.GoodCaseLatencyBB.UnsyncClaim1
 import Papers.PODC2021.GoodCaseLatencyBB.UnsyncClaim2
+import Podc.Foundations.Labelling
 
 /-!
 # Theorem 10: BRB with unsynchronized start and `f > n/3` needs `Δ + 1.5δ`
@@ -166,49 +167,17 @@ theorem exists_labels10 {f : ℕ} (h4 : 4 ≤ Fintype.card P) (hn : Fintype.card
       (univ.filter fun p => lab p = 4).card ≤ 1 ∧ (univ.filter fun p => lab p = 1).card ≤ f - 1 ∧
       (univ.filter fun p => lab p = 2).card ≤ f - 1 ∧
       (univ.filter fun p => lab p = 3).card ≤ f - 1 := by
-  set n := Fintype.card P
-  let e := Fintype.equivFin P
-  let σ : Equiv.Perm (Fin n) := Equiv.swap (e s) ⟨0, by omega⟩
-  let ι : P → ℕ := fun q => (σ (e q)).val
-  have hι : Function.Injective ι := by
-    intro x y hxy
-    exact e.injective (σ.injective (Fin.ext hxy))
-  have hιs : ι s = 0 := by simp [ι, σ]
-  have hιlt : ∀ q, ι q < n := fun q => (σ (e q)).isLt
-  have hsurj : ∀ i < n, ∃ q, ι q = i := by
-    intro i hi
-    refine ⟨e.symm (σ.symm ⟨i, hi⟩), ?_⟩
-    simp [ι]
-  obtain ⟨a1, ha1a, ha1b, ha1c⟩ : ∃ a1, a1 ≤ f - 1 ∧ a1 ≤ n - 3 ∧ (a1 = f - 1 ∨ a1 = n - 3) :=
-    ⟨min (f - 1) (n - 3), min_le_left _ _, min_le_right _ _, by omega⟩
-  let lb : ℕ → ℕ := fun i => if i = 0 then 2 else if i = 1 then 0 else if i = 2 then 4 else
-    if i < 3 + a1 then 1 else if i < 3 + a1 + (f - 2) then 2 else 3
-  have hcard : ∀ (j : ℕ) (T : Finset ℕ), (∀ i, lb i = j → i < n → i ∈ T) →
-      (univ.filter fun q => lb (ι q) = j).card ≤ T.card := by
-    intro j T hT
-    exact card_le_card_of_injOn ι (fun q hq => hT _ (mem_filter.mp hq).2 (hιlt q)) hι.injOn
-  refine ⟨fun q => lb (ι q), ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · intro q; simp only [lb]; split_ifs <;> omega
-  · simp [lb, hιs]
-  · obtain ⟨q, hq⟩ := hsurj 1 (by omega); exact ⟨q, by simp [lb, hq]⟩
-  · obtain ⟨q, hq⟩ := hsurj 2 (by omega); exact ⟨q, by simp [lb, hq]⟩
-  · obtain ⟨q, hq⟩ := hsurj 3 (by omega)
-    have ha1pos : 1 ≤ a1 := by omega
-    refine ⟨q, ?_⟩
-    show lb (ι q) = 1
-    rw [hq]; simp only [lb]
-    rw [ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_left (by omega)]
-  · refine (hcard 0 {1} fun i hi _ => ?_).trans (by simp)
-    simp only [lb] at hi; simp only [mem_singleton]; split_ifs at hi <;> omega
-  · refine (hcard 4 {2} fun i hi _ => ?_).trans (by simp)
-    simp only [lb] at hi; simp only [mem_singleton]; split_ifs at hi <;> omega
-  · refine (hcard 1 (Ico 3 (3 + a1)) fun i hi _ => ?_).trans (by simp; omega)
-    simp only [lb] at hi; simp only [mem_Ico]; split_ifs at hi <;> omega
-  · refine (hcard 2 (insert 0 (Ico (3 + a1) (3 + a1 + (f - 2)))) fun i hi _ => ?_).trans
-      ((card_insert_le _ _).trans (by simp; omega))
-    simp only [lb] at hi; simp only [mem_insert, mem_Ico]; split_ifs at hi <;> omega
-  · refine (hcard 3 (Ico (3 + a1 + (f - 2)) n) fun i hi hin => ?_).trans (by simp; omega)
-    simp only [lb] at hi; simp only [mem_Ico]; split_ifs at hi <;> omega
+  obtain ⟨lab, hs, hle, hc⟩ := Fintype.exists_labelling_apply_eq 5
+    (fun i => if i = 3 then 0 else 1) (fun i => if i = 0 ∨ i = 4 then 1 else f - 1)
+    (fun i _ => by split_ifs <;> omega) (by simp [sum_range_succ]; omega)
+    (by simp [sum_range_succ]; omega) s (i₀ := 2) (by omega) (by simp)
+  have hne : ∀ i < 5, i ≠ 3 → ∃ x, lab x = i := fun i hi h3 => by
+    obtain ⟨x, -, hx⟩ := filter_nonempty_iff.1 (card_pos.1 (by simpa [h3] using (hc i hi).1))
+    exact ⟨x, hx⟩
+  exact ⟨lab, fun p => by have := hle p; omega, hs, hne 0 (by omega) (by omega),
+    hne 4 (by omega) (by omega), hne 1 (by omega) (by omega), by simpa using (hc 0 (by omega)).2,
+    by simpa using (hc 4 (by omega)).2, by simpa using (hc 1 (by omega)).2,
+    by simpa using (hc 2 (by omega)).2, by simpa using (hc 3 (by omega)).2⟩
 
 theorem UValid.mono {f d d' σ σ' : ℕ} {R : Run P M (V × ℕ)} (h : UValid f d σ R) (hd : d ≤ d')
     (hσ : σ ≤ σ') : UValid f d' σ' R :=

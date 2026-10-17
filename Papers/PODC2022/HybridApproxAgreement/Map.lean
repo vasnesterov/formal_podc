@@ -1,5 +1,6 @@
 import Papers.PODC2022.HybridApproxAgreement.OBC
-import Papers.PODC2022.HybridApproxAgreement.Sim
+import Podc.PartialSync.Sim
+import Podc.PartialSync.Map
 
 /-!
 # `Π_rBC` and `Π_oBC` only compare values for equality

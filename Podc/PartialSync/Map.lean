@@ -27,6 +27,10 @@ inboxes, decisions, unforgeability, message counts, and solving consensus — al
   `SolvesConsensus.mapDecide`: post-processing that sends decisions admissible for an input
   configuration to decisions admissible (for another validity property) for the same input
   configuration preserves solving consensus.
+* `Run.st_map`: **equivariance**. If an algorithm `A'` is the image of `A` under maps of messages,
+  states and inputs (commuting with `init`, `step`, `send`), then in runs with the same faulty set
+  and delivery times and mapped inputs and Byzantine messages, the states are the images (e.g. a
+  run computed with Boolean values transfers to the same run with real values).
 -/
 
 namespace Cslib.Byzantine.PartialSync
@@ -220,5 +224,43 @@ theorem SolvesConsensus.mapDecide (hA : SolvesConsensus t δ A val)
   ((hA.auth (Auth.none P M)).mapDecide hf).of_none
 
 end Solves
+
+section Equivariance
+
+variable {M' S' : Type*} [DecidableEq P]
+
+/-- **Equivariance of runs** under maps of messages, states and inputs. -/
+theorem Run.st_map {A : Algorithm P M S VI VO} {A' : Algorithm P M' S' VI' VO'}
+    (fm : M → M') (fs : S → S') (fi : VI → VI')
+    (hinit : ∀ p v, A'.init p (fi v) = fs (A.init p v))
+    (hstep : ∀ p s ib, A'.step p (fs s) (fun q => (ib q).map fm) = fs (A.step p s ib))
+    (hsend : ∀ p s q, A'.send p (fs s) q = (A.send p s q).map fm)
+    {R : Run P M VI} {R' : Run P M' VI'} (hf : R'.faulty = R.faulty)
+    (hi : ∀ p, R'.inp p = fi (R.inp p)) (hb : ∀ q τ p, R'.byz q τ p = (R.byz q τ p).map fm)
+    (hdl : R'.dl = R.dl) : ∀ τ p, R'.st A' τ p = fs (R.st A τ p) := by
+  intro τ
+  induction τ using Nat.strong_induction_on with
+  | _ τ ih =>
+    intro p
+    rcases τ with _ | τ
+    · simp [hi, hinit]
+    · rw [Run.st_succ, Run.st_succ, ih τ (by omega)]
+      have hout : ∀ σ ≤ τ, ∀ q r, R'.out A' q σ r = (R.out A q σ r).map fm := by
+        intro σ hσ q r
+        by_cases hq : q ∈ R.faulty
+        · rw [Run.out_of_faulty _ _ (hf ▸ hq), Run.out_of_faulty _ _ hq, hb]
+        · rw [Run.out_of_correct _ _ (hf ▸ hq), Run.out_of_correct _ _ hq, ih σ (by omega), hsend]
+      have hin : R'.inbox A' p τ = fun q => (R.inbox A p τ q).map fm := by
+        funext q
+        rw [Run.inbox_eq_flatMap, Run.inbox_eq_flatMap, List.map_flatMap]
+        refine List.flatMap_congr fun σ hσ => ?_
+        simp only [List.mem_range] at hσ
+        simp only [Run.dlv, hdl]
+        split_ifs
+        · exact hout σ (by omega) q p
+        · rfl
+      rw [hin, hstep]
+
+end Equivariance
 
 end Cslib.Byzantine.PartialSync

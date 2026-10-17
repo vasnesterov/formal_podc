@@ -1,4 +1,5 @@
 import Cslib.Computability.Distributed.Byzantine.PartialSync.Auth
+import Podc.PartialSync.RunClasses
 import Mathlib
 
 /-!
@@ -16,11 +17,13 @@ messages, the GST and all delivery times) together with its abstract signature l
   that respects unforgeability and has inputs in `D`, every honest party outputs (termination), every
   output lies in the range of the honest inputs (`t`-validity), and any two honest outputs are
   `ε`-close (`(t, ε)`-agreement).
-* Run classes: `syncRuns t δ` (at most `t` faults, `gst = 0`: every message between honest parties is
-  delivered within `δ`; clocks are synchronised because all parties step every tick), `psyncRuns t δ`
-  (the same bound only after an arbitrary GST) and `asyncRuns t` (at most `t` faults, every message
-  between honest parties is eventually delivered, no bound). `psyncRuns t δ ⊆ asyncRuns t`, so
-  security on `asyncRuns` implies security on `psyncRuns` (`SecureAA.mono`).
+* Run classes (the library classes of `Podc.PartialSync.RunClasses`): `syncRuns t δ` =
+  `Run.SyncValid t δ` (at most `t` faults, `gst = 0`: every message between honest parties is
+  delivered within `δ`; clocks are synchronised because all parties step every tick),
+  `psyncRuns t δ` = `Run.Valid t δ` (the same bound only after an arbitrary GST) and `asyncRuns t` =
+  `Run.AsyncValid t` (at most `t` faults, every message between honest parties is eventually
+  delivered, **no bound**). `psyncRuns t δ ⊆ asyncRuns t`, so security on `asyncRuns` implies
+  security on `psyncRuns` (`SecureAA.mono`).
 -/
 
 open Cslib.Byzantine.PartialSync Finset
@@ -52,19 +55,23 @@ structure SecureAA (Au : Auth P M K) (A : Algorithm P M S ℝ ℝ) (ε : ℝ) (D
 
 /-- Synchronous network: at most `t` corruptions, every message between honest parties is
 delivered within `δ` ticks (`gst = 0`). -/
-def syncRuns (t δ : ℕ) (R : Run P M ℝ) : Prop := R.Valid t δ ∧ R.gst = 0
+abbrev syncRuns (t δ : ℕ) (R : Run P M ℝ) : Prop := R.SyncValid t δ
 
 /-- Partially synchronous network: delays bounded by `δ` after an arbitrary (unknown) GST. -/
-def psyncRuns (t δ : ℕ) (R : Run P M ℝ) : Prop := R.Valid t δ
+abbrev psyncRuns (t δ : ℕ) (R : Run P M ℝ) : Prop := R.Valid t δ
 
 /-- Asynchronous network: at most `t` corruptions, every message between honest parties is
-delivered at some (finite, arbitrary) time. -/
-def asyncRuns (t : ℕ) (R : Run P M ℝ) : Prop :=
-  R.faulty.card ≤ t ∧ ∀ q τ p, q ∉ R.faulty → p ∉ R.faulty → τ ≤ R.dl q τ p
+delivered at some (finite, arbitrary) time — **unbounded** asynchrony `Run.AsyncValid t`. -/
+abbrev asyncRuns (t : ℕ) (R : Run P M ℝ) : Prop := R.AsyncValid t
+
+/-- Bridge to the explicit form: at most `t` corruptions and delivery at or after sending. -/
+theorem asyncRuns_iff {t : ℕ} {R : Run P M ℝ} : asyncRuns t R ↔
+    R.faulty.card ≤ t ∧ ∀ q τ p, q ∉ R.faulty → p ∉ R.faulty → τ ≤ R.dl q τ p :=
+  ⟨fun h => ⟨h.card_faulty, h.dl_ge⟩, fun h => ⟨h.1, h.2⟩⟩
 
 theorem psyncRuns_le_asyncRuns {t δ : ℕ} {R : Run P M ℝ} (h : psyncRuns t δ R) :
     asyncRuns t R :=
-  ⟨h.card_faulty, h.dl_ge⟩
+  h.asyncValid
 
 /-- Security on a larger class of runs implies security on a smaller one. -/
 theorem SecureAA.mono {Au : Auth P M K} {A : Algorithm P M S ℝ ℝ} {ε : ℝ} {D : Set ℝ}

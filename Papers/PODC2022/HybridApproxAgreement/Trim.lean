@@ -1,4 +1,5 @@
 import Mathlib
+import Cslib.Computability.Distributed.ApproxConsensus.Trim
 
 /-!
 # The technical combinatorial lemma (Lemmas 3.6 and 3.7)
@@ -14,6 +15,11 @@ line 7 of `Π_AA`.
   maximum of `T ∪ T'` this is the paper's `|v - v'| ≤ length(T ∪ T') / 2` (`lemma_3_6'`).
 * `kth_ge_of_card_filter_lt`, `trim_validity`: if at most `d` of the values lie outside `[lo, hi]`,
   the trimmed values lie in `[lo, hi]` (the validity step of Lemmas 3.2 and 3.4).
+* Bridge to CSLib's MSR trimming `Cslib.ApproxConsensus.IsTrim` (ties broken arbitrarily): for the
+  values `r` on `N` and any trimming `(Low, Mid, High)` of `d` values on each side,
+  `trim_eq_of_isTrim` (`trim (r(N)) d = r(Mid)`), `kth_eq_inf'_of_isTrim`, `kth_eq_sup'_of_isTrim`
+  and `midTrim_eq_of_isTrim` (`midTrim (r(N)) d = (min r(Mid) + max r(Mid)) / 2`): the paper's new
+  value is the midpoint of the kept values of *any* MSR trimming.
 -/
 
 open Multiset
@@ -34,10 +40,9 @@ section OrderStatistics
 
 variable {V : Multiset ℝ}
 
-theorem length_sort' : (V.sort).length = card V := length_sort _
-
-theorem kth_eq {i : ℕ} (hi : i < card V) : kth V i = (V.sort)[i]'(by rw [length_sort']; exact hi) := by
-  simp [kth, List.getD_eq_getElem?_getD, List.getElem?_eq_getElem (by rw [length_sort']; exact hi)]
+theorem kth_eq {i : ℕ} (hi : i < card V) : kth V i = (V.sort)[i]'(by simpa using hi) := by
+  have hl : i < (V.sort).length := by simpa using hi
+  simp [kth, List.getD_eq_getElem?_getD, List.getElem?_eq_getElem hl]
 
 theorem kth_mono {i j : ℕ} (hij : i ≤ j) (hj : j < card V) : kth V i ≤ kth V j := by
   rw [kth_eq (by omega), kth_eq hj]
@@ -55,7 +60,7 @@ theorem card_filter_lt_kth {i : ℕ} (hi : i < card V) :
     card (V.filter (· < kth V i)) ≤ i := by
   rw [card_filter_eq_countP]
   set l := V.sort
-  have hl : l.length = card V := length_sort'
+  have hl : l.length = card V := length_sort _
   rw [← List.take_append_drop i l, List.countP_append]
   have h1 : (l.take i).countP (fun x => decide (x < kth V i)) ≤ i :=
     (List.countP_le_length).trans (by simp)
@@ -74,7 +79,7 @@ theorem card_filter_kth_lt {i : ℕ} (hi : i < card V) :
     card (V.filter (kth V i < ·)) ≤ card V - 1 - i := by
   rw [card_filter_eq_countP]
   set l := V.sort
-  have hl : l.length = card V := length_sort'
+  have hl : l.length = card V := length_sort _
   rw [← List.take_append_drop (i + 1) l, List.countP_append]
   have h1 : (l.take (i + 1)).countP (fun x => decide (kth V i < x)) = 0 := by
     rw [List.countP_eq_zero]
@@ -95,7 +100,7 @@ theorem le_kth_of_card_filter_lt {i : ℕ} (hi : i < card V) {x : ℝ}
   rw [not_le] at hlt
   rw [card_filter_eq_countP] at h
   set l := V.sort
-  have hl : l.length = card V := length_sort'
+  have hl : l.length = card V := length_sort _
   rw [← List.take_append_drop (i + 1) l, List.countP_append] at h
   have : (l.take (i + 1)).countP (fun y => decide (y < x)) = i + 1 := by
     rw [List.countP_eq_length.mpr, List.length_take]
@@ -116,7 +121,7 @@ theorem kth_le_of_card_filter_gt {i : ℕ} (hi : i < card V) {x : ℝ}
   rw [not_le] at hlt
   rw [card_filter_eq_countP] at h
   set l := V.sort
-  have hl : l.length = card V := length_sort'
+  have hl : l.length = card V := length_sort _
   rw [← List.take_append_drop i l, List.countP_append] at h
   have : (l.drop i).countP (fun y => decide (x < y)) = card V - i := by
     rw [List.countP_eq_length.mpr, List.length_drop]
@@ -137,7 +142,7 @@ variable {V : Multiset ℝ} {d : ℕ}
 
 theorem mem_trim {y : ℝ} (hd : 2 * d < card V) :
     y ∈ trim V d ↔ ∃ j, d ≤ j ∧ j ≤ card V - 1 - d ∧ kth V j = y := by
-  have hl : (V.sort).length = card V := length_sort'
+  have hl : (V.sort).length = card V := length_sort _
   simp only [trim, mem_coe, List.mem_iff_getElem, List.length_take, List.length_drop, hl,
     List.getElem_take, List.getElem_drop]
   constructor
@@ -288,5 +293,130 @@ theorem lemma_3_6' (hta : ta ≤ ts) (hn : 2 * ts + ta < n) (hV : card V = n - t
     exact ⟨(min_le_right _ _).trans this.1, this.2.trans (le_max_right _ _)⟩
 
 end Lemma36
+
+/-! ### Bridge to CSLib's MSR trimming `IsTrim` -/
+
+section Bridge
+
+open Cslib.ApproxConsensus
+
+variable {ι : Type*} [DecidableEq ι] {N Low Mid High : Finset ι} {r : ι → ℝ} {d : ℕ}
+
+omit [DecidableEq ι] in
+theorem card_filter_map_val (p : ℝ → Prop) [DecidablePred p] :
+    card ((N.val.map r).filter p) = (N.filter fun x => p (r x)).card := by
+  rw [filter_map, card_map]; rfl
+
+/-- The `d`-th smallest value of `r` on `N` is the minimum of the kept values of any trimming. -/
+theorem kth_eq_inf'_of_isTrim (h : IsTrim N d r Low Mid High) (hd : 2 * d < N.card) :
+    kth (N.val.map r) d = Mid.inf' (h.mid_nonempty hd) r := by
+  obtain ⟨m, hm, hmr⟩ := Mid.exists_mem_eq_inf' (h.mid_nonempty hd) r
+  have hmin : ∀ x ∈ Mid, r m ≤ r x := fun x hx => by rw [← hmr]; exact Finset.inf'_le r hx
+  have hcM := h.card_mid
+  have hV : card (N.val.map r) = N.card := by simp
+  rw [hmr]
+  apply le_antisymm
+  · -- values strictly above `r m` come from `Mid.erase m` and `High`
+    refine kth_le_of_card_filter_gt (by omega) ?_
+    rw [card_filter_map_val, hV]
+    calc (N.filter fun x => r m < r x).card ≤ (Mid.erase m ∪ High).card :=
+          Finset.card_le_card fun x hx => by
+            simp only [Finset.mem_filter] at hx
+            rw [Finset.mem_union, Finset.mem_erase]
+            by_cases hxH : x ∈ High
+            · exact Or.inr hxH
+            · refine Or.inl ⟨fun hxm => (lt_irrefl (r m)) (hxm ▸ hx.2), h.mem_mid.mpr
+                ⟨hx.1, fun hxL => (h.low_le_mid x hxL m hm).not_gt hx.2, hxH⟩⟩
+      _ ≤ (Mid.erase m).card + High.card := Finset.card_union_le _ _
+      _ ≤ N.card - 1 - d := by
+          rw [Finset.card_erase_of_mem hm, h.card_high]; omega
+  · -- values strictly below `r m` come from `Low`
+    refine le_kth_of_card_filter_lt (by omega) ?_
+    rw [card_filter_map_val, ← h.card_low]
+    refine Finset.card_le_card fun x hx => ?_
+    simp only [Finset.mem_filter] at hx
+    by_contra hxL
+    by_cases hxH : x ∈ High
+    · exact (h.mid_le_high m hm x hxH).not_gt hx.2
+    · exact (hmin x (h.mem_mid.mpr ⟨hx.1, hxL, hxH⟩)).not_gt hx.2
+
+/-- The `d`-th largest value of `r` on `N` is the maximum of the kept values of any trimming. -/
+theorem kth_eq_sup'_of_isTrim (h : IsTrim N d r Low Mid High) (hd : 2 * d < N.card) :
+    kth (N.val.map r) (N.card - 1 - d) = Mid.sup' (h.mid_nonempty hd) r := by
+  obtain ⟨m, hm, hmr⟩ := Mid.exists_mem_eq_sup' (h.mid_nonempty hd) r
+  have hmax : ∀ x ∈ Mid, r x ≤ r m := fun x hx => by rw [← hmr]; exact Finset.le_sup' r hx
+  have hcM := h.card_mid
+  have hV : card (N.val.map r) = N.card := by simp
+  rw [hmr]
+  apply le_antisymm
+  · -- values strictly above `r m` come from `High`
+    refine kth_le_of_card_filter_gt (by omega) ?_
+    rw [card_filter_map_val, hV]
+    calc (N.filter fun x => r m < r x).card ≤ High.card :=
+          Finset.card_le_card fun x hx => by
+            simp only [Finset.mem_filter] at hx
+            by_contra hxH
+            by_cases hxL : x ∈ Low
+            · exact (h.low_le_mid x hxL m hm).not_gt hx.2
+            · exact (hmax x (h.mem_mid.mpr ⟨hx.1, hxL, hxH⟩)).not_gt hx.2
+      _ ≤ N.card - 1 - (N.card - 1 - d) := by rw [h.card_high]; omega
+  · -- values strictly below `r m` come from `Low` and `Mid.erase m`
+    refine le_kth_of_card_filter_lt (by omega) ?_
+    rw [card_filter_map_val]
+    calc (N.filter fun x => r x < r m).card ≤ (Low ∪ Mid.erase m).card :=
+          Finset.card_le_card fun x hx => by
+            simp only [Finset.mem_filter] at hx
+            rw [Finset.mem_union, Finset.mem_erase]
+            by_cases hxL : x ∈ Low
+            · exact Or.inl hxL
+            · refine Or.inr ⟨fun hxm => (lt_irrefl (r m)) (hxm ▸ hx.2), h.mem_mid.mpr
+                ⟨hx.1, hxL, fun hxH => (h.mid_le_high m hm x hxH).not_gt hx.2⟩⟩
+      _ ≤ Low.card + (Mid.erase m).card := Finset.card_union_le _ _
+      _ ≤ N.card - 1 - d := by
+          rw [Finset.card_erase_of_mem hm, h.card_low]
+          have := Finset.card_pos.mpr (h.mid_nonempty hd); omega
+
+/-- The new value of `Π_AA` (line 7) is the midpoint of the kept values of *any* MSR trimming
+(`IsTrim`, ties broken arbitrarily) of the received values. -/
+theorem midTrim_eq_of_isTrim (h : IsTrim N d r Low Mid High) (hd : 2 * d < N.card) :
+    midTrim (N.val.map r) d =
+      (Mid.inf' (h.mid_nonempty hd) r + Mid.sup' (h.mid_nonempty hd) r) / 2 := by
+  have hV : card (N.val.map r) = N.card := by simp
+  rw [midTrim, kth_eq_inf'_of_isTrim h hd, hV, kth_eq_sup'_of_isTrim h hd]
+
+/-- `trim` keeps exactly the values of `Mid`, for any MSR trimming `(Low, Mid, High)`. -/
+theorem trim_eq_of_isTrim (h : IsTrim N d r Low Mid High) :
+    trim (N.val.map r) d = Mid.val.map r := by
+  have hLM : Disjoint Low Mid :=
+    Finset.disjoint_left.mpr fun x hx hx' => (h.mem_mid.mp hx').2.1 hx
+  have hMH : Disjoint (Low.disjUnion Mid hLM) High := by
+    rw [Finset.disjUnion_eq_union]
+    exact Finset.disjoint_union_left.mpr
+      ⟨h.disj, Finset.disjoint_left.mpr fun x hx hx' => (h.mem_mid.mp hx).2.2 hx'⟩
+  have hN : N = (Low.disjUnion Mid hLM).disjUnion High hMH := by
+    ext x
+    simp only [Finset.disjUnion_eq_union, Finset.mem_union, h.mem_mid]
+    have := @h.low_sub x; have := @h.high_sub x
+    tauto
+  -- the sorted values are the sorted `Low`, `Mid`, `High` values, concatenated
+  have hsort : (N.val.map r).sort =
+      (Low.val.map r).sort ++ ((Mid.val.map r).sort ++ (High.val.map r).sort) := by
+    refine List.Perm.eq_of_pairwise' (r := (· ≤ ·)) (pairwise_sort _ _) ?_ ?_
+    · simp only [List.pairwise_append, List.mem_append, mem_sort, mem_map, Finset.mem_val]
+      refine ⟨pairwise_sort _ _, ⟨pairwise_sort _ _, pairwise_sort _ _, ?_⟩, ?_⟩
+      · rintro _ ⟨m, hm, rfl⟩ _ ⟨k, hk, rfl⟩; exact h.mid_le_high m hm k hk
+      · rintro _ ⟨l, hl, rfl⟩ _ (⟨m, hm, rfl⟩ | ⟨k, hk, rfl⟩)
+        · exact h.low_le_mid l hl m hm
+        · exact h.low_le_high l hl k hk
+    · rw [← Multiset.coe_eq_coe, ← Multiset.coe_add, ← Multiset.coe_add, sort_eq, sort_eq,
+        sort_eq, sort_eq, ← map_add, ← map_add, hN]
+      simp only [Finset.disjUnion_val, add_assoc]
+  have hcM := h.card_mid
+  have hNc : 2 * d ≤ N.card := by
+    rw [hN, Finset.card_disjUnion, Finset.card_disjUnion, h.card_low, h.card_high]; omega
+  rw [trim, hsort, List.drop_left' (by simp [h.card_low]),
+    List.take_left' (by simp; omega), sort_eq]
+
+end Bridge
 
 end HybridApproxAgreement
