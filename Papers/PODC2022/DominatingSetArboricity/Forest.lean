@@ -61,7 +61,7 @@ theorem leafFix_isDominating [LinearOrder V] : IsDominating G (leafFix G) := by
   · exact ⟨v, by simp [leafFix, hv], self_mem_cnbr v⟩
 
 theorem cnbr_eq_singleton {v : V} (h : G.degree v = 0) : cnbr G v = {v} := by
-  rw [cnbr, ← card_neighborFinset_eq_degree, card_eq_zero] at *
+  rw [cnbr_eq_insert, ← card_neighborFinset_eq_degree, card_eq_zero] at *
   rw [h]; rfl
 
 theorem cnbr_eq_pair {v u : V} (h : G.degree v = 1) (hu : G.Adj v u) : cnbr G v = {v, u} := by
@@ -69,7 +69,7 @@ theorem cnbr_eq_pair {v u : V} (h : G.degree v = 1) (hu : G.Adj v u) : cnbr G v 
     obtain ⟨a, ha⟩ := card_eq_one.1 ((card_neighborFinset_eq_degree G v).trans h)
     have : u ∈ G.neighborFinset v := (mem_neighborFinset _ _ _).2 hu
     rw [ha] at this ⊢; rw [mem_singleton.1 this]
-  rw [cnbr, this]
+  rw [cnbr_eq_insert, this]
 
 /-- `w` lies in a component with at most two vertices (an isolated vertex or a `K₂`). -/
 def Small (G : SimpleGraph V) [DecidableRel G.Adj] (w : V) : Prop :=

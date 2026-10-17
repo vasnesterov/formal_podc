@@ -1,5 +1,6 @@
 import Papers.PODC2016.VertexCoverLocalRatio.Paper
-import Cslib.Computability.Distributed.Local.LocallyIterative
+import Podc.Local.LocallyIterative
+import Podc.Local.Locality
 
 /-!
 # Algorithm 1 in the synchronous LOCAL model (Theorem 3.1)
@@ -58,18 +59,13 @@ open scoped Classical in
 noncomputable def runIds (N : Set (NState V)) : Finset V :=
   univ.filter fun u => ∃ x ∈ N, x.id = u ∧ x.st = .active
 
-open scoped Classical in
-/-- The state of the neighbour with identifier `u` (defaults to the own state). -/
-noncomputable def pick (s : NState V) (N : Set (NState V)) (u : V) : NState V :=
-  if h : ∃ x ∈ N, x.id = u then Classical.choose h else s
-
 section
 variable (θ a : ℝ) (R : Rule V)
 
 open scoped Classical in
 /-- The requests of the running neighbours, as seen by a node. -/
 noncomputable def locReq (s : NState V) (N : Set (NState V)) (u : V) : ℝ :=
-  if u ∈ runIds N then a * (pick s N u).w0 / (pick s N u).dg else 0
+  if u ∈ runIds N then a * (pickId NState.id s N u).w0 / (pickId NState.id s N u).dg else 0
 
 /-- The answers computed in round `3i`. -/
 noncomputable def locOut (s : NState V) (N : Set (NState V)) : V → ℝ :=
@@ -81,7 +77,7 @@ noncomputable def respond (s : NState V) (N : Set (NState V)) : NState V :=
 
 /-- The new weight computed in round `3i+1`. -/
 noncomputable def locW (s : NState V) (N : Set (NState V)) : ℝ :=
-  s.w - (∑ u ∈ runIds N, (pick s N u).out s.id) - (∑ u ∈ runIds N, s.out u)
+  s.w - (∑ u ∈ runIds N, (pickId NState.id s N u).out s.id) - (∑ u ∈ runIds N, s.out u)
 
 /-- Round `3i+1`: deduct the amounts exchanged and decide whether to return `InCover`. -/
 noncomputable def deduct (s : NState V) (N : Set (NState V)) : NState V :=
@@ -114,34 +110,11 @@ def c0 (G : SimpleGraph V) [DecidableRel G.Adj] (w : V → ℝ) : V → NState V
 section nbr
 variable {G : SimpleGraph V} [DecidableRel G.Adj] {c : V → NState V}
 
-theorem exists_id_iff (hc : ∀ u, (c u).id = u) (v u : V) :
-    (∃ x ∈ nbrColors G c v, x.id = u) ↔ G.Adj v u := by
-  constructor
-  · rintro ⟨x, ⟨u', hu', rfl⟩, hx⟩
-    rw [hc] at hx; exact hx ▸ hu'
-  · intro h; exact ⟨c u, ⟨u, h, rfl⟩, hc u⟩
-
-theorem pick_eq (hc : ∀ u, (c u).id = u) (s : NState V) {v u : V} (h : G.Adj v u) :
-    pick s (nbrColors G c v) u = c u := by
-  have hex : ∃ x ∈ nbrColors G c v, x.id = u := (exists_id_iff hc v u).2 h
-  rw [pick, dif_pos hex]
-  obtain ⟨⟨u', _, hx⟩, hid⟩ := Classical.choose_spec hex
-  rw [← hx] at hid ⊢
-  rw [hc] at hid
-  rw [hid]
-
-theorem mem_nbr_id (hc : ∀ u, (c u).id = u) {v u : V} {P : NState V → Prop} :
-    (∃ x ∈ nbrColors G c v, x.id = u ∧ P x) ↔ G.Adj v u ∧ P (c u) := by
-  constructor
-  · rintro ⟨x, ⟨u', hu', rfl⟩, hx, hP⟩
-    rw [hc] at hx; subst hx; exact ⟨hu', hP⟩
-  · rintro ⟨h, hP⟩; exact ⟨c u, ⟨u, h, rfl⟩, hc u, hP⟩
-
 theorem runIds_eq (hc : ∀ u, (c u).id = u) (v : V) :
     runIds (nbrColors G c v) = (G.neighborFinset v).filter fun u => (c u).st = .active := by
   ext u
   simp only [runIds, mem_filter, mem_univ, true_and, mem_neighborFinset]
-  exact mem_nbr_id hc
+  exact exists_mem_nbrColors_id NState.id hc
 
 end nbr
 
@@ -195,7 +168,7 @@ theorem respond_sim {s : GState V} {c : V → NState V} (hs : Sim G w0 s c) (v :
   simp only [reqAt, locReq, hrun]
   by_cases hx : x ∈ actN G s v
   · have hx' := mem_actN.1 hx
-    rw [if_pos hx, if_pos hx, pick_eq hs.id _ hx'.1, hs.w0, hs.dg x hx'.2]; rfl
+    rw [if_pos hx, if_pos hx, pickId_nbrColors NState.id hs.id _ hx'.1, hs.w0, hs.dg x hx'.2]; rfl
   · rw [if_neg hx, if_neg hx]
 
 /-- Round `3i+1`. -/
@@ -205,12 +178,13 @@ theorem deduct_sim {s : GState V} {c : V → NState V} (hs : Sim G w0 s c)
     deduct θ (c v) (nbrColors G c v) =
       { c v with w := newW G a R w0 s v, cv := cov G θ a R w0 s v } := by
   have hrun := runIds_sim hs v
-  have hrecv : ∑ u ∈ runIds (nbrColors G c v), (pick (c v) (nbrColors G c v) u).out (c v).id =
+  have hrecv : ∑ u ∈ runIds (nbrColors G c v),
+      (pickId NState.id (c v) (nbrColors G c v) u).out (c v).id =
       recv G a R w0 s v := by
     rw [hrun, recv]
     refine sum_congr rfl fun u hu => ?_
     have hu' := mem_actN.1 hu
-    rw [pick_eq hs.id _ hu'.1, hout u hu'.2, hs.id]
+    rw [pickId_nbrColors NState.id hs.id _ hu'.1, hout u hu'.2, hs.id]
   have hgiven : ∑ u ∈ runIds (nbrColors G c v), (c v).out u = given G a R w0 s v := by
     rw [hrun, given, hout v hv]
   have hw : locW (c v) (nbrColors G c v) = newW G a R w0 s v := by
@@ -233,7 +207,7 @@ theorem notify_step {s : GState V} {c : V → NState V} (hid : ∀ u, (c u).id =
       (actN G s v).filter fun u => ¬ cov G θ a R w0 s u := by
     ext u
     simp only [mem_filter, mem_univ, true_and, mem_actN]
-    rw [mem_nbr_id hid (P := fun x => x.st = .active ∧ ¬ x.cv), hst]
+    rw [exists_mem_nbrColors_id NState.id hid (P := fun x => x.st = .active ∧ ¬ x.cv), hst]
     constructor
     · rintro ⟨h1, h2, h3⟩; exact ⟨⟨h1, h2⟩, fun hc => h3 ((hcv u h2).2 hc)⟩
     · rintro ⟨⟨h1, h2⟩, h3⟩; exact ⟨h1, h2, fun hc => h3 ((hcv u h2).1 hc)⟩
@@ -398,14 +372,16 @@ theorem cfg_st (t : ℕ) (v : V) :
 
 /-- A node that has returned never changes its state again. -/
 theorem dist_frozen {t : ℕ} {v : V} (hv : (cfg G θ a R w0 t v).st ≠ .active) (k : ℕ) :
-    cfg G θ a R w0 (t + k) v = cfg G θ a R w0 t v := by
-  induction k with
-  | zero => rfl
-  | succ k ih =>
-    simp only [cfg] at *
-    rw [← add_assoc, Algorithm.run_succ_apply, ih]
-    exact dist_step_of_ne hv
+    cfg G θ a R w0 (t + k) v = cfg G θ a R w0 t v :=
+  Nat.eq_of_le_of_stable (x := fun t => cfg G θ a R w0 t v) (P := fun s => s.st ≠ .active)
+    (fun _ h => dist_step_of_ne h) hv (Nat.le_add_right t k)
 
 end run
+
+/-- The distributed algorithm is a LOCAL algorithm: the state of a node after `t` rounds only
+depends on the graph and the initial states (identifiers, weights, degrees) within distance `t`. -/
+theorem dist_isLocal (θ a : ℝ) (R : Rule V) (t : ℕ) :
+    Cslib.Local.IsLocal t fun G (s₀ : V → NState V) v => (dist θ a R).run G s₀ t v :=
+  Algorithm.run_isLocal _ _
 
 end VertexCoverLocalRatio

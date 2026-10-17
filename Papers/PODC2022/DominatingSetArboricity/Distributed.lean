@@ -1,5 +1,6 @@
 import Papers.PODC2022.DominatingSetArboricity.Deterministic
-import Cslib.Computability.Distributed.Local.LocallyIterative
+import Podc.Local.LocallyIterative
+import Podc.Local.Locality
 
 /-!
 # Distributed implementation of the deterministic algorithm (Theorem 1.1, round complexity)
@@ -95,46 +96,20 @@ noncomputable def enc (G : SimpleGraph V) [DecidableRel G.Adj] (w : V → ℝ) (
     V → NState V :=
   fun v => ⟨v, w v, tau G w v, tauNode G w v, p.x v, v ∈ p.S, v ∈ dom G p.S, False⟩
 
-theorem insert_nbrColors {c : V → NState V} (v : V) :
-    insert (c v) (nbrColors G c v) = c '' (cnbr G v : Set V) := by
-  ext t
-  simp only [Set.mem_insert_iff, mem_nbrColors, Set.mem_image, mem_coe, mem_cnbr]
-  constructor
-  · rintro (rfl | ⟨u, h, rfl⟩)
-    · exact ⟨v, Or.inl rfl, rfl⟩
-    · exact ⟨u, Or.inr h, rfl⟩
-  · rintro ⟨u, (rfl | h), rfl⟩
-    · exact Or.inl rfl
-    · exact Or.inr ⟨u, h, rfl⟩
-
-theorem finsum_nbrColors {c : V → NState V} (hc : ∀ u, (c u).id = u) (v : V) :
-    ∑ᶠ t ∈ nbrColors G c v, t.x = ∑ u ∈ G.neighborFinset v, (c u).x := by
-  have hinj : Set.InjOn c (G.neighborSet v) := fun a _ b _ h => by
-    rw [← hc a, ← hc b, h]
-  rw [nbrColors, finsum_mem_image hinj, finsum_mem_eq_toFinset_sum]
-  rfl
-
-theorem exists_nbrColors {c : V → NState V} {P : NState V → Prop} (v : V) :
-    (∃ t ∈ nbrColors G c v, P t) ↔ ∃ u, G.Adj v u ∧ P (c u) := by
-  simp only [mem_nbrColors]
-  constructor
-  · rintro ⟨t, ⟨u, h, rfl⟩, hP⟩; exact ⟨u, h, hP⟩
-  · rintro ⟨u, h, hP⟩; exact ⟨c u, ⟨u, h, rfl⟩, hP⟩
-
 theorem X_eq (x : V → ℝ) (v : V) : X G x v = x v + ∑ u ∈ G.neighborFinset v, x u := by
-  rw [X, cnbr, sum_insert (by simp)]
+  rw [X, cnbr_eq_insert, sum_insert (by simp)]
 
 theorem initStep_c0 (w : V → ℝ) (v : V) :
     initStep G.maxDegree (c0 w v) (nbrColors G (c0 w) v) = enc G w (runP G 0 w 0) v := by
   have hτ : sInf (NState.w '' insert (c0 w v) (nbrColors G (c0 w) v)) = tau G w v := by
-    rw [insert_nbrColors, Set.image_image, tau, Finset.inf'_eq_csInf_image]
+    rw [insert_nbrColors, ← coe_cnbr, Set.image_image, tau, Finset.inf'_eq_csInf_image]
     rfl
   simp only [initStep, hτ, enc, runP, Function.iterate_zero, id, init]
   congr 1
   · congr 1
     funext u
     apply propext
-    rw [insert_nbrColors]
+    rw [insert_nbrColors, ← coe_cnbr]
     simp only [Set.mem_image, mem_coe]
     constructor
     · rintro ⟨_, ⟨u', hu', rfl⟩, rfl, h⟩; exact ⟨hu', h⟩
@@ -144,7 +119,7 @@ theorem initStep_c0 (w : V → ℝ) (v : V) :
 theorem stepA_enc {ε : ℝ} (w : V → ℝ) (p : PState V) (v : V) :
     stepA ε (enc G w p v) (nbrColors G (enc G w p) v) =
       { enc G w p v with inS := v ∈ (iter G ε w p).S } := by
-  simp only [stepA, enc, iter, finsum_nbrColors (c := enc G w p) (fun u => rfl), X_eq]
+  simp only [stepA, enc, iter, finsum_nbrColors (c := enc G w p) NState.id (fun u => rfl), X_eq]
   congr 1
   simp
 
@@ -155,7 +130,7 @@ theorem stepB_half {ε : ℝ} (w : V → ℝ) (p : PState V) (v : V) :
   have hd : (v ∈ (iter G ε w p).S ∨ ∃ t ∈ nbrColors G
       (fun u => { enc G w p u with inS := u ∈ (iter G ε w p).S }) v, t.inS) ↔
       v ∈ dom G (iter G ε w p).S := by
-    rw [exists_nbrColors, mem_dom]
+    rw [exists_mem_nbrColors, mem_dom]
     simp only [mem_cnbr]
     constructor
     · rintro (h | ⟨u, hu, h⟩)
@@ -206,7 +181,7 @@ theorem run_final (w : V → ℝ) (ε : ℝ) (r : ℕ) (v : V) :
       v ∈ (runP G ε w r).S ∪ completion G w (runP G ε w r).S := by
   rw [show 2 * r + 2 = (2 * r + 1) + 1 by ring, Algorithm.run_succ_apply, run_odd w ε r r le_rfl]
   simp only [alg, show 2 * r + 1 ≠ 0 by omega, ite_false, show ¬ 2 * r + 1 ≤ 2 * r by omega,
-    ite_true, stepC, enc, exists_nbrColors]
+    ite_true, stepC, enc, exists_mem_nbrColors]
   simp only [mem_union, completion, mem_image, mem_filter, mem_univ, true_and]
   apply or_congr_right
   constructor
@@ -227,6 +202,13 @@ theorem run_out_eq_detDS (w : V → ℝ) (α : ℕ) (ε : ℝ) :
   ext v
   rw [mem_filter, run_final]
   simp [detDS, partialDS]
+
+/-- The algorithm is a `(2r+2)`-round LOCAL algorithm: the output of a node only depends on the
+graph and the initial states (identifiers and weights) within distance `2r+2`. -/
+theorem alg_isLocal (Δ r : ℕ) (ε : ℝ) :
+    Cslib.Local.IsLocal (2 * r + 2) fun G (s₀ : V → NState V) v =>
+      (alg Δ r ε).run G s₀ (2 * r + 2) v :=
+  Algorithm.run_isLocal _ _
 
 open scoped Classical in
 /-- **Theorem 1.1** (distributed form). On a graph with an orientation of out-degree `≤ α`

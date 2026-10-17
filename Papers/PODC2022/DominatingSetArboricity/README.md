@@ -111,10 +111,16 @@ Non-vacuity:
 - the lower-bound graph satisfies everything that is claimed of it.
 
 CSLib candidates:
-- the finite product-coin expectation toolkit in `Randomized.lean` (`coinProb`, `expect`, `Ec`,
-  `expect_le_of_super`);
-- dominating sets, packings and weak duality (`Basic.lean`).
+- the backward expectation recursion `expect`, `runCoins` and the supermartingale bound
+  `expect_le_of_super` in `Randomized.lean`;
+- packings and weak duality (`Basic.lean`).
 
-The distributed model comes from CSLib `Cslib/Computability/Distributed/Local/LocallyIterative.lean`.
-Arboricity, orientations, Observation 3.5 and rank-based acyclicity are in CSLib,
+Shared infrastructure: independent coins `coinProb`/`coinExpect` from
+`Podc/Probability/Finite/Bernoulli.lean`; `cnbr G v` is `SimpleGraph.closedNeighborFinset` and
+`IsDominating G D ↔ G.IsDominatingSet ↑D` (`isDominating_iff_isDominatingSet`, `Podc/Graph/Ball.lean`);
+`IsVertexCover G C` is Mathlib's `G.IsVertexCover ↑C`; runs are `Nat.timeRec`
+(`Podc/Data/Nat/TimeRec.lean`); reading neighbour states by identifier and locality of the distributed
+algorithm (`alg_isLocal`) come from `Podc/Local/{LocallyIterative,Locality}.lean`. The distributed model
+is CSLib's `Cslib/Computability/Distributed/Local/LocallyIterative.lean`. Arboricity, orientations,
+Observation 3.5 and rank-based acyclicity are in CSLib,
 `Cslib/Foundations/Combinatorics/SimpleGraph/Arboricity.lean`.

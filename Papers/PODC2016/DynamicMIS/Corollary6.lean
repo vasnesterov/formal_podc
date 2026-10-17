@@ -1,5 +1,6 @@
 import Papers.PODC2016.DynamicMIS.Theorem1
-import Cslib.Computability.Distributed.Local.LocallyIterative
+import Podc.Local.LocallyIterative
+import Podc.Local.Locality
 import Mathlib
 
 /-!
@@ -54,22 +55,24 @@ noncomputable def encode (A : Set V) (r : V → ℕ) (s : Set V) : V → ℕ × 
 theorem run_directAlg (G : SimpleGraph V) (A : Set V) (r : V → ℕ) (s₀ : Set V) (t : ℕ) :
     directAlg.run G (encode A r s₀) t = encode A r (directRun G A r s₀ t) := by
   classical
-  induction t with
-  | zero => rfl
-  | succ t ih =>
-    funext v
-    rw [Cslib.LocallyIterative.Algorithm.run_succ_apply, ih, directRun_succ]
-    simp only [directAlg, Cslib.LocallyIterative.Algorithm.ofStep, encode, directStep,
-      Cslib.LocallyIterative.nbrColors, Set.mem_image, SimpleGraph.mem_neighborSet, Prod.mk.injEq,
-      true_and]
-    congr 1
-    apply propext
-    simp only [decide_eq_true_eq, Set.mem_ofPred_eq]
-    refine and_congr_right fun _ => ⟨fun h w hw hr hws => ?_, fun h y ⟨w, hw, hy⟩ hr => ?_⟩
-    · have := h _ ⟨w, hw.symm, rfl⟩ hr
-      simp [hws] at this
-    · subst hy
-      simpa using h w hw.symm hr
+  refine Cslib.LocallyIterative.Algorithm.run_semiconj G _ (F := directStep G A r)
+    (e := encode A r) (fun s => ?_) s₀ t
+  funext v
+  simp only [encode, directStep, Cslib.LocallyIterative.forall_mem_nbrColors, Prod.mk.injEq,
+    true_and]
+  congr 1
+  apply propext
+  simp only [decide_eq_true_eq, Set.mem_ofPred_eq]
+  refine and_congr_right fun _ => ⟨fun h w hw hr hws => ?_, fun h w hw hr => ?_⟩
+  · have := h w hw.symm hr
+    simp [hws] at this
+  · simpa using h w hw.symm hr
+
+/-- The direct implementation is a LOCAL algorithm: the state of a node after `t` rounds only
+depends on the graph and the initial states within distance `t`. -/
+theorem directAlg_isLocal (t : ℕ) :
+    Cslib.Local.IsLocal (V := V) t fun G s₀ v => directAlg.run G s₀ t v :=
+  Cslib.LocallyIterative.Algorithm.run_isLocal _ _
 
 /-! ### Convergence -/
 

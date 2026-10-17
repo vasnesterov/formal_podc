@@ -1,4 +1,4 @@
-import Cslib.Computability.Distributed.Local.LocallyIterative
+import Podc.Local.LocallyIterative
 import Mathlib
 
 /-!
@@ -53,12 +53,8 @@ theorem agStep_nbrColors (c : V → R × R) (v : V) :
     agStep (c v) (nbrColors G c v) =
       if Conflict G c v then ((c v).1, (c v).2 + (c v).1) else (0, (c v).2) := by
   classical
-  simp only [agStep, Conflict, mem_nbrColors]
-  congr 1
-  apply propext
-  constructor
-  · rintro ⟨_, ⟨u, hu, rfl⟩, h⟩; exact ⟨u, hu, h⟩
-  · rintro ⟨u, hu, h⟩; exact ⟨_, ⟨u, hu, rfl⟩, h⟩
+  simp only [agStep, Conflict, exists_mem_nbrColors]
+  congr
 
 open Classical in
 theorem ag_run_succ (c₀ : V → R × R) (t : ℕ) (v : V) :
@@ -174,10 +170,9 @@ theorem ag_run_succ_of_final {t : ℕ} {v : V} (h : ((ag : Algorithm (R × R)).r
   split_ifs <;> ext <;> simp [h]
 
 theorem ag_run_of_final {s t : ℕ} {v : V} (h : ((ag : Algorithm (R × R)).run G c₀ s v).1 = 0)
-    (hst : s ≤ t) : (ag : Algorithm (R × R)).run G c₀ t v = ag.run G c₀ s v := by
-  induction t, hst using Nat.le_induction with
-  | base => rfl
-  | succ t _ ih => rw [ag_run_succ_of_final c₀ (ih ▸ h), ih]
+    (hst : s ≤ t) : (ag : Algorithm (R × R)).run G c₀ t v = ag.run G c₀ s v :=
+  Nat.eq_of_le_of_stable (x := fun t => (ag : Algorithm (R × R)).run G c₀ t v)
+    (P := fun x => x.1 = 0) (fun _ => ag_run_succ_of_final c₀) h hst
 
 /-- Runs of AG satisfy `IsAGRun`. -/
 theorem isAGRun_ag : IsAGRun G ((ag : Algorithm (R × R)).run G c₀) where
