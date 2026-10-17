@@ -1,4 +1,5 @@
 import Papers.PODC2026.RankingOpinions.TieShareRules
+import Podc.Foundations.Data.Nat.Descent
 import Papers.PODC2026.RankingOpinions.TieShareGeom
 
 /-!
@@ -160,12 +161,6 @@ lemma view_stable (E : (tieShare k false).Execution A) {B : Config A (Braket k)}
 
 /-! ### Generic "eventually forever" arguments -/
 
-/-- From per-agent eventual properties to a common time. -/
-lemma exists_forall_ge {P : ℕ → A → Prop} (h : ∀ c, ∃ T, ∀ t ≥ T, P t c) :
-    ∃ T, ∀ t ≥ T, ∀ c, P t c := by
-  choose T hT using h
-  exact ⟨univ.sup T, fun t ht c => hT c t (le_trans (Finset.le_sup (mem_univ c)) ht)⟩
-
 lemma never_after {W : ℕ → Prop} {T : ℕ} (hT : ¬ W T) (h : ∀ t ≥ T, ¬ W t → ¬ W (t + 1)) :
     ∀ t ≥ T, ¬ W t := by
   intro t ht
@@ -223,7 +218,7 @@ lemma extinction (W L : ℕ → A → Prop) (R : A → Prop) (ρ : A → ℕ) (T
             exact hnl t' (by omega) (hg t' (by omega) h1 h2).1
         · exact ⟨T1, fun t ht hR hlt => hlow t ht c hR (by
             by_contra h; exact hc ⟨hR, by omega⟩)⟩
-      obtain ⟨T2, hT2⟩ := exists_forall_ge per
+      obtain ⟨T2, -, hT2⟩ := Nat.eventually_forall_of_finite per 0
       exact ⟨max T1 T2, le_trans hT1 (le_max_left _ _),
         fun t ht c hR hlt => hT2 t (le_trans (le_max_right _ _) ht) c hR hlt⟩
   obtain ⟨T, hT, h⟩ := key (univ.sup ρ + 1)
@@ -503,8 +498,8 @@ lemma ws_const (hE : E.WeaklyFair) :
         exact ⟨False, T5, fun t ht => by simp [hex t ht]⟩
     · exact ⟨False, T5, fun t ht => by simp [h5 t ht y hy]⟩
   choose b Ty hTy using per
-  obtain ⟨T6', hT6'⟩ := exists_forall_ge (P := fun t y => (stA E t y = St.ws ↔ b y))
-    (fun y => ⟨Ty y, hTy y⟩)
+  obtain ⟨T6', -, hT6'⟩ := Nat.eventually_forall_of_finite
+    (p := fun y t => (stA E t y = St.ws ↔ b y)) (fun y => ⟨Ty y, hTy y⟩) 0
   refine ⟨max T6' T5, le_trans hT5 (le_max_right _ _),
     fun t ht => h5 t (le_trans (le_max_right _ _) ht), fun t ht y => ?_⟩
   rw [hT6' t (le_trans (le_max_left _ _) ht) y, hT6' _ (le_max_left _ _) y]

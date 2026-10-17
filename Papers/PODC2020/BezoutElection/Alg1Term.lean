@@ -58,8 +58,7 @@ lemma ev_write (Q : ℕ → Prop) (T : ℕ) (hpres : ∀ t ≥ T, Q t → Q (t +
     (hw : ∀ t ≥ T, WriteAt e t → Q (t + 1)) (hIW : ∀ t, ∃ t' ≥ t, WriteAt e t') :
     ∃ T' ≥ T, ∀ t ≥ T', Q t := by
   obtain ⟨t, ht, hwt⟩ := hIW T
-  obtain ⟨T', hT', h⟩ := ev_forever Q T hpres ⟨t + 1, by omega, hw t ht hwt⟩
-  exact ⟨T', hT', h⟩
+  exact Nat.eventually_of_imp_succ hpres ⟨t + 1, by omega, hw t ht hwt⟩
 
 /-! ### The electing phase cannot last forever -/
 
@@ -70,14 +69,13 @@ theorem phase1 [Nonempty P] (hN : ∀ t, NoLead n (e.pre t) (e.cfg t)) : False :
     intro q
     obtain ⟨T, -, hT⟩ := X.pend_forever q 0 (fun t _ => (hN t).nofin q)
     exact ⟨T, fun t ht => ⟨(hT t ht).1, X.pc_cases (hT t ht).2.1 (hT t ht).2.2 ((hN t).noret q)⟩⟩
-  obtain ⟨T0, -, hT0⟩ := ev_forall_fin _ hact0 0
+  obtain ⟨T0, -, hT0⟩ := Nat.eventually_forall_of_finite hact0 0
   -- the losers stabilize
-  obtain ⟨T1, hT1, hlos⟩ := stab_finset
-    (fun t => Finset.univ.filter (fun q => ((e.cfg t).loc q).loser = true)) T0 (Fintype.card P)
+  obtain ⟨T1, hT1, hlos⟩ := Finset.eventually_const_of_subset_succ_of_finite
+    (f := fun t => Finset.univ.filter (fun q => ((e.cfg t).loc q).loser = true)) (N := T0)
     (fun t _ q hq => by
       simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hq ⊢
       exact (X.mono t q).2.1 hq)
-    (fun t => Finset.card_filter_le _ _)
   have hlos' : ∀ t ≥ T1, ∀ q, ((e.cfg t).loc q).loser = ((e.cfg T1).loc q).loser := by
     intro t ht q
     have := Finset.ext_iff.1 (hlos t ht) q
@@ -88,7 +86,8 @@ theorem phase1 [Nonempty P] (hN : ∀ t, NoLead n (e.pre t) (e.cfg t)) : False :
       ∀ t' ≥ t, ((e.cfg t').loc c).disc = ((e.cfg t).loc c).disc := by
     intro c
     by_cases hc : ((e.cfg T1).loc c).loser = false
-    · obtain ⟨T, hT, hTc⟩ := stab_finset (fun t => ((e.cfg t).loc c).disc) T1 n
+    · obtain ⟨T, hT, hTc⟩ := Finset.eventually_const_of_subset_succ
+        (f := fun t => ((e.cfg t).loc c).disc) (N := T1) (hB := fun t _ => X.card_disc_le t c)
         (fun t ht => by
           by_cases hq : (e.lbl t).proc = c
           · rcases (hT0 t (by omega) c).2 with h1 | ⟨w, h1⟩
@@ -98,10 +97,9 @@ theorem phase1 [Nonempty P] (hN : ∀ t, NoLead n (e.pre t) (e.cfg t)) : False :
               · rw [← (X.act_read hq h1).2.1, (hN (t + 1)).phase, (hN t).phase]
             · rw [(X.act_write hq h1).2.1]
           · rw [X.other hq])
-        (fun t => X.card_disc_le t c)
       exact ⟨T, fun t ht _ t' ht' => by rw [hTc t' (by omega), hTc t ht]⟩
     · exact ⟨0, fun t _ h => absurd h hc⟩
-  obtain ⟨T2, hT2, hT2'⟩ := ev_forall_fin _ hdisc T1
+  obtain ⟨T2, hT2, hT2'⟩ := Nat.eventually_forall_of_finite hdisc T1
   set D : P → Finset Id := fun c => ((e.cfg T2).loc c).disc with hDdef
   have hD : ∀ t ≥ T2, ∀ c, ((e.cfg T1).loc c).loser = false → ((e.cfg t).loc c).disc = D c :=
     fun t ht c hc => hT2' T2 le_rfl c hc t ht
@@ -196,7 +194,7 @@ theorem phase1 [Nonempty P] (hN : ∀ t, NoLead n (e.pre t) (e.cfg t)) : False :
       · rw [(X.act_write hq h1).2.1] at hw; cases hw
     · intro t ht hq hQ; rw [X.other hq]; exact hQ
     · intro hp; exact absurd hp (hT0 T3 (by omega) q).1
-  obtain ⟨T4, hT4, hQ2'⟩ := ev_forall_fin _ hQ2 T3
+  obtain ⟨T4, hT4, hQ2'⟩ := Nat.eventually_forall_of_finite hQ2 T3
   -- level 2: `⊥`-values in `REG`
   obtain ⟨T5, hT5, hR2⟩ := X.ev_write
     (fun t => (reg (e.cfg t)).id = none → μ < (reg (e.cfg t)).disc.card) T4
@@ -272,7 +270,7 @@ theorem phase1 [Nonempty P] (hN : ∀ t, NoLead n (e.pre t) (e.cfg t)) : False :
       rcases X.reg_step t with h1 | ⟨q', w', hl', hw', h1⟩
       · rw [h1]; exact ih
       · rw [h1]; exact hw3 t (by omega) q' w' hl' hw'
-  obtain ⟨t, ht, hq⟩ := InfExec.acts e X.fair (fun t ht => (hT0 t ht c₀).1) (max (t₇ + 1) T0)
+  obtain ⟨t, ht, hq⟩ := e.exists_act_of_pending X.fair (fun t ht => (hT0 t ht c₀).1) (max (t₇ + 1) T0)
     (by omega)
   rcases (hT0 t (by omega) c₀).2 with h1 | ⟨w', h1⟩
   · exact hR3 t (by omega) (hread t (by omega) hq h1).1
@@ -377,8 +375,8 @@ theorem phase2 (L : P) (t₀ : ℕ) (hL0 : Lead ids n out (e.pre t₀) (e.cfg t�
         have h1 : ((e.cfg t₀).loc q).pc ≠ .idle := by rw [hw]; simp
         have h2 : ((e.cfg t₀).loc q).pc ≠ .fin := by rw [hw]; simp
         exact absurd hp ((X.basic t₀).busy q h1 h2)
-    obtain ⟨T', hT', hQ'⟩ := ev_forall_fin _ hQ T
-    refine InfExec.descent e X.fair L T' (fun t => mu1 ((e.cfg t).loc L) (reg (e.cfg t)))
+    obtain ⟨T', hT', hQ'⟩ := Nat.eventually_forall_of_finite hQ T
+    refine e.false_of_descent X.fair L T' (fun t => mu1 ((e.cfg t).loc L) (reg (e.cfg t)))
       (fun t ht => (hTL t (by omega)).1) ?_ ?_
     · intro t ht hq
       show mu1 _ _ ≤ mu1 _ _
@@ -432,7 +430,8 @@ theorem phase2 (L : P) (t₀ : ℕ) (hL0 : Lead ids n out (e.pre t₀) (e.cfg t�
   obtain ⟨t₁, ht₁, hC1⟩ := hA1
   have hC : ∀ t ≥ t₁, ((e.cfg t).loc L).phase = .committing := fun t ht => X.phase_mono ht hC1
   have hCo : ∀ t ≥ t₁, CoPart ids n (e.cfg t) L := fun t ht => (hLd t (by omega)).co (hC t ht)
-  obtain ⟨T2a, hT2a, hDst⟩ := stab_finset (fun t => ((e.cfg t).loc L).disc) t₁ n
+  obtain ⟨T2a, hT2a, hDst⟩ := Finset.eventually_const_of_subset_succ
+    (f := fun t => ((e.cfg t).loc L).disc) (N := t₁) (hB := fun t _ => X.card_disc_le t L)
     (fun t ht => by
       by_cases hq : (e.lbl t).proc = L
       · by_cases hpc : ((e.cfg t).loc L).pc = .read
@@ -442,14 +441,11 @@ theorem phase2 (L : P) (t₀ : ℕ) (hL0 : Lead ids n out (e.pre t₀) (e.cfg t�
           · rw [← (X.act_read hq hpc).2.1, hC (t + 1) (by omega), hC t ht]
         · rw [(X.act_nonread hq hpc).1]
       · rw [X.other hq])
-    (fun t => X.card_disc_le t L)
-  obtain ⟨T2, hT2, hPst⟩ := stab_finset
-    (fun t => Finset.univ.filter (fun q => ((e.cfg t).loc q).phase = .committing)) T2a
-    (Fintype.card P)
+  obtain ⟨T2, hT2, hPst⟩ := Finset.eventually_const_of_subset_succ_of_finite
+    (f := fun t => Finset.univ.filter (fun q => ((e.cfg t).loc q).phase = .committing)) (N := T2a)
     (fun t _ q hq => by
       simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hq ⊢
       exact (X.mono t q).2.2 hq)
-    (fun t => Finset.card_filter_le _ _)
   have hDc : ∀ t ≥ T2, ((e.cfg t).loc L).disc = ((e.cfg T2).loc L).disc := fun t ht => by
     rw [hDst t (by omega), hDst T2 hT2]
   have hph : ∀ t ≥ T2, ∀ q, ((e.cfg t).loc q).phase = .committing ↔
@@ -482,7 +478,7 @@ theorem phase2 (L : P) (t₀ : ℕ) (hL0 : Lead ids n out (e.pre t₀) (e.cfg t�
         · intro a ha; exact ((hCo t (by omega)).done ⟨q, Or.inl ⟨a, ha⟩⟩).1 (hcon t ht)
         · intro ha; exact ((hCo t (by omega)).done ⟨q, Or.inr ha⟩).1 (hcon t ht)
       obtain ⟨T, hT, hTL⟩ := X.pend_forever L T2 (fun t ht => (hnr t ht L).2)
-      refine InfExec.descent e X.fair L T (fun t => mu3 ((e.cfg t).loc L))
+      refine e.false_of_descent X.fair L T (fun t => mu3 ((e.cfg t).loc L))
         (fun t ht => (hTL t ht).1) ?_ ?_
       · intro t ht hq; show mu3 _ ≤ mu3 _; rw [X.other hq]
       · intro t ht hq
@@ -528,7 +524,7 @@ theorem phase2 (L : P) (t₀ : ℕ) (hL0 : Lead ids n out (e.pre t₀) (e.cfg t�
     obtain ⟨T, hT, hTp⟩ := X.pend_forever p₀ T3 (fun t ht hfin => by
       obtain ⟨t', r, h⟩ := X.ret_of_outputs ((X.basic t).fin p₀ hfin)
       exact H t' r h)
-    refine InfExec.descent e X.fair p₀ T (fun t => mu2 ((e.cfg t).loc p₀))
+    refine e.false_of_descent X.fair p₀ T (fun t => mu2 ((e.cfg t).loc p₀))
       (fun t ht => (hTp t ht).1) ?_ ?_
     · intro t ht hq; show mu2 _ ≤ mu2 _; rw [X.other hq]
     · intro t ht hq
@@ -575,7 +571,7 @@ theorem phase2 (L : P) (t₀ : ℕ) (hL0 : Lead ids n out (e.pre t₀) (e.cfg t�
       obtain ⟨T, hT, hTq⟩ := X.pend_forever q T2 (fun t ht => (hnr t ht q).2)
       exact ⟨T, fun t ht => ⟨(hTq t ht).1,
         X.pc_cases (hTq t ht).2.1 (hTq t ht).2.2 (hnr t (by omega) q).1⟩⟩
-    obtain ⟨T3, hT3, hT3'⟩ := ev_forall_fin _ hact0 T2
+    obtain ⟨T3, hT3, hT3'⟩ := Nat.eventually_forall_of_finite hact0 T2
     obtain ⟨j₀, hj₀L, hj₀D⟩ : ∃ j, j ≠ L ∧ ids j ∉ D := by
       by_contra hcon
       push Not at hcon
@@ -610,7 +606,7 @@ theorem phase2 (L : P) (t₀ : ℕ) (hL0 : Lead ids n out (e.pre t₀) (e.cfg t�
         · exact absurd hw ((X.act_nonread hq hpc).2.2.2 w)
       · intro t ht hq hQ; rw [X.other hq]; exact hQ
       · intro hp; exact absurd hp (hT3' T3 le_rfl q).1
-    obtain ⟨T4, hT4, hQ'⟩ := ev_forall_fin _ hQ T3
+    obtain ⟨T4, hT4, hQ'⟩ := Nat.eventually_forall_of_finite hQ T3
     -- infinitely many writes
     have hIW : ∀ t, ∃ t' ≥ t, WriteAt e t' := by
       intro t
@@ -715,7 +711,7 @@ theorem phase2 (L : P) (t₀ : ℕ) (hL0 : Lead ids n out (e.pre t₀) (e.cfg t�
         rcases X.reg_step t with h1 | ⟨q', w', -, hw', h1⟩
         · rw [h1]; exact ih
         · rw [h1]; exact hw3 t (by omega) q' w' hw'
-    obtain ⟨t, ht, hq⟩ := InfExec.acts e X.fair (fun t ht => (hT3' t ht L).1)
+    obtain ⟨t, ht, hq⟩ := e.exists_act_of_pending X.fair (fun t ht => (hT3' t ht L).1)
       (max (t₇ + 1) (max T6 T3)) (by omega)
     rcases (hT3' t (by omega) L).2 with h1 | ⟨w', h1⟩
     · exact (hreadL t (by omega) hq h1).1 (hnone t (by omega))

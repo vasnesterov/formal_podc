@@ -37,19 +37,6 @@ lemma card_le_n (hn : Fintype.card P = n) (D : Finset Id) (h : ∀ a ∈ D, ∃ 
     _ ≤ Finset.univ.card := Finset.card_image_le
     _ = n := by rw [Finset.card_univ, hn]
 
-lemma stab_finset_from {α : Type} (f : ℕ → Finset α) (t₀ N : ℕ)
-    (hmono : ∀ t ≥ t₀, f t ⊆ f (t + 1)) (hbd : ∀ t ≥ t₀, (f t).card ≤ N) :
-    ∃ T ≥ t₀, ∀ t ≥ T, f t = f T := by
-  obtain ⟨T, hT, h⟩ := stab_finset (fun t => f (max t t₀)) t₀ N
-    (fun t ht => by
-      show f (max t t₀) ⊆ f (max (t + 1) t₀)
-      rw [max_eq_left ht, max_eq_left (by omega : t₀ ≤ t + 1)]
-      exact hmono t ht)
-    (fun t => hbd _ (le_max_right _ _))
-  refine ⟨T, hT, fun t ht => ?_⟩
-  have := h t ht
-  rwa [max_eq_left (by omega : t₀ ≤ t), max_eq_left hT] at this
-
 namespace LCtx
 
 variable {R : ARun n U ids} (X : LCtx R)
@@ -155,14 +142,14 @@ theorem phase1 {T₀ : ℕ} (hT₀ : X.T ≤ T₀) (hact : ∀ t ≥ T₀, ∀ q
       ((R.A (t + 1)).loc q).D = ((R.A t).loc q).D := by
     intro q
     by_cases hq : ((R.A T₀).loc q).lo = false
-    · obtain ⟨T, -, hTc⟩ := stab_finset_from (fun t => ((R.A t).loc q).D) T₀ n
-        (fun t ht => hDmono t ht q hq)
-        (fun t ht => card_le_n X.hn _ (fun a ha => by
+    · obtain ⟨T, -, hTc⟩ := Finset.eventually_const_of_subset_succ
+        (f := fun t => ((R.A t).loc q).D) (N := T₀) (h := fun t ht => hDmono t ht q hq)
+        (hB := fun t ht => card_le_n X.hn _ (fun a ha => by
           obtain ⟨i, hi, -⟩ := (R.inv t).1.discLoc q (by rw [X.lev t]; exact hact t ht q) a ha
           exact ⟨i, hi⟩))
       exact ⟨T, fun t ht _ => by rw [hTc t ht, hTc (t + 1) (by omega)]⟩
     · exact ⟨0, fun t _ h => absurd h hq⟩
-  obtain ⟨T₂, hT₂, hT₂'⟩ := ev_forall_fin _ hD T₀
+  obtain ⟨T₂, hT₂, hT₂'⟩ := Nat.eventually_forall_of_finite hD T₀
   have hDc : ∀ t ≥ T₂, ∀ q, ((R.A T₀).loc q).lo = false →
       ((R.A t).loc q).D = ((R.A T₂).loc q).D := by
     intro t ht q hq
@@ -302,7 +289,7 @@ theorem phase1 {T₀ : ℕ} (hT₀ : X.T ≤ T₀) (hact : ∀ t ≥ T₀, ∀ q
         cases ho : (procX n U (ids q) ((R.A t).loc q) v ok fin).2 <;> simp [ho, stOf] at hv'
       · rw [h]; simp only
         exact ⟨fun w hw => (by cases hw), fun v hv => (by cases hv)⟩
-  obtain ⟨T₄, hT₄, hQ2'⟩ := ev_forall_fin _ hQ2 T₃
+  obtain ⟨T₄, hT₄, hQ2'⟩ := Nat.eventually_forall_of_finite hQ2 T₃
   -- level 2: `⊥`-values in the register
   obtain ⟨T₅, hT₅, hR2⟩ := X.ev_write
     (fun t => (R.A t).reg.id = none → μ < (R.A t).reg.disc.card) T₄

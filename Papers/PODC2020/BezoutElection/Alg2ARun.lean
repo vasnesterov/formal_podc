@@ -1,5 +1,6 @@
 import Papers.PODC2020.BezoutElection.Alg2AbsLead
-import Papers.PODC2020.BezoutElection.LiveGen
+import Podc.Foundations.Data.Nat.Descent
+import Podc.Computability.Distributed.SharedMemory.Progress
 
 /-!
 # Algorithm 2: abstract runs of one register

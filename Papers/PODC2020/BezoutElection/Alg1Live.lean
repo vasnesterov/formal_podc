@@ -1,5 +1,6 @@
 import Papers.PODC2020.BezoutElection.Alg1Inv
-import Papers.PODC2020.BezoutElection.LiveGen
+import Podc.Foundations.Data.Nat.Descent
+import Podc.Computability.Distributed.SharedMemory.Progress
 
 /-!
 # Algorithm 1: termination (basic facts on infinite executions)
@@ -239,10 +240,10 @@ lemma ev_flush (q : P) (t₀ : ℕ) (Q : ℕ → Prop)
     · exact hact t ht h
     · exact hother t ht h hQ
   by_cases hp : (e.cfg t₀).pend q = none
-  · obtain ⟨T, -, hT⟩ := ev_forever Q t₀ hpres ⟨t₀, le_rfl, hidle hp⟩
+  · obtain ⟨T, -, hT⟩ := Nat.eventually_of_imp_succ hpres ⟨t₀, le_rfl, hidle hp⟩
     exact ⟨T, hT⟩
   · obtain ⟨t', ht', hq, -⟩ := e.first_act X.fair hp
-    obtain ⟨T, -, hT⟩ := ev_forever Q t₀ hpres ⟨t' + 1, by omega, hact t' ht' hq⟩
+    obtain ⟨T, -, hT⟩ := Nat.eventually_of_imp_succ hpres ⟨t' + 1, by omega, hact t' ht' hq⟩
     exact ⟨T, hT⟩
 
 /-- If nothing is written from `t₁` on, every active process eventually reads the (constant)

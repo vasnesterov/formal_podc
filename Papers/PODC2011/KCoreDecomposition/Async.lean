@@ -1,4 +1,5 @@
 import Papers.PODC2011.KCoreDecomposition.Algorithm
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # Asynchronous execution of Algorithm 1: Theorems 2 (Safety) and 3 (Liveness)
@@ -438,13 +439,6 @@ theorem est_anti (act : ℕ → Action V) (u v : V) :
 
 /-! ### Theorem 3 (Liveness) -/
 
-theorem exists_eq_of_antitone {f : ℕ → ℕ} (hf : Antitone f) : ∃ T, ∀ t ≥ T, f t = f T := by
-  classical
-  have h : ∃ n, ∃ t, f t = n := ⟨f 0, 0, rfl⟩
-  obtain ⟨T, hT⟩ := Nat.find_spec h
-  refine ⟨T, fun t ht => le_antisymm (hf ht) ?_⟩
-  rw [hT]; exact Nat.find_min' h ⟨t, rfl⟩
-
 /-- **Theorem 3 (Liveness)** of the paper, asynchronous version: in every fair execution there is a
 time after which the variable `core` of every node `u` is equal to `k(u)`. -/
 theorem theorem_3 (act : ℕ → Action V) (hfair : Fair G act) :
@@ -453,7 +447,8 @@ theorem theorem_3 (act : ℕ → Action V) (hfair : Fair G act) :
   have hinv := inv_run G act
   -- the cores are eventually constant, equal to `c`
   have hstab : ∀ u, ∃ T, ∀ t ≥ T, ((run G act t).st u).core = ((run G act T).st u).core :=
-    fun u => exists_eq_of_antitone (core_anti act u)
+    fun u => (Nat.eventually_const_of_succ_le (N := 0) fun t _ =>
+      core_anti act u t.le_succ).imp fun _ h => h.2
   choose Tu hTu using hstab
   set c : V → ℕ := fun u => ((run G act (Tu u)).st u).core with hc_def
   have hc : ∀ᶠ t in atTop, ∀ u, ((run G act t).st u).core = c u :=

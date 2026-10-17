@@ -68,12 +68,11 @@ lemma ca_mono {T₁ : ℕ} (hT₁ : ∀ t ≥ T₁, ∀ q, ((R.A t).loc q).lv = 
 lemma ca_stab : ∃ T₃, ∀ t ≥ T₃, ∀ q, ((R.A (t + 1)).loc q).ca = ((R.A t).loc q).ca := by
   obtain ⟨T₁, hT₁⟩ := X.active
   obtain ⟨T₂, hT₂, hlos⟩ := X.losers hT₁
-  obtain ⟨T₃, hT₃, hc⟩ := stab_finset
-    (fun t => Finset.univ.filter (fun q => ((R.A t).loc q).ca = true)) T₂ (Fintype.card P)
+  obtain ⟨T₃, hT₃, hc⟩ := Finset.eventually_const_of_subset_succ_of_finite
+    (f := fun t => Finset.univ.filter (fun q => ((R.A t).loc q).ca = true)) (N := T₂)
     (fun t ht q hq => by
       simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hq ⊢
       exact X.ca_mono hT₁ hT₂ hlos t ht q hq)
-    (fun t => Finset.card_filter_le _ _)
   refine ⟨T₃, fun t ht q => ?_⟩
   have h1 := Finset.ext_iff.1 (hc (t + 1) (by omega)) q
   have h2 := Finset.ext_iff.1 (hc t ht) q

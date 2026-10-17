@@ -204,7 +204,7 @@ theorem phase2a {T₀ : ℕ} (hT₀ : X.T ≤ T₀) {ℓ : P} (E₀ : Lead n ids
         cases ho : (procX n U (ids q) ((R.A t).loc q) v ok fin).2 <;> simp [ho, stOf] at hv'
       · rw [h]; simp only
         exact ⟨fun w hw => (by cases hw), fun v hv => (by cases hv)⟩
-  obtain ⟨TA, hTA, hQA'⟩ := ev_forall_fin _ hQA T₀
+  obtain ⟨TA, hTA, hQA'⟩ := Nat.eventually_forall_of_finite hQA T₀
   -- level B: `⊥`-values in the register are committing
   obtain ⟨TB, hTB, hRB⟩ := X.ev_write
     (fun t => (R.A t).reg.id = none → (R.A t).reg.phase = .committing) TA

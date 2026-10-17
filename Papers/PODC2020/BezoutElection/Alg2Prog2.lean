@@ -129,7 +129,7 @@ lemma pc_ne_ret (τ : ℕ) (q : P) (L : Finset Id) : ((e.cfg τ).loc q).pc ≠ .
   exact Q.not_all_U τ (G.ret q L (by simp [vpcOf, hpc])).1
 
 lemma pend_ex : ∃ T ≥ Q.t0, ∀ τ ≥ T, ∀ q, (e.cfg τ).pend q ≠ none := by
-  obtain ⟨T, hT, h⟩ := ev_forall_fin (fun q τ => (e.cfg τ).pend q ≠ none) (fun q => by
+  obtain ⟨T, hT, h⟩ := Nat.eventually_forall_of_finite (p := fun q τ => (e.cfg τ).pend q ≠ none) (fun q => by
     obtain ⟨tq, o, htq⟩ := Q.hall q
     refine ⟨tq + 1, fun τ hτ => ?_⟩
     induction τ, hτ using Nat.le_induction with
@@ -174,7 +174,7 @@ lemma reads (q : P) (k : Fin m) (τ : ℕ) :
     ∃ τ' ≥ τ, e.lbl τ' = .tau q ∧ ((e.cfg τ').loc q).pc = .collect k.val := by
   by_contra hne
   push Not at hne
-  refine InfExec.descent e Q.hfair q (max τ Q.T)
+  refine e.false_of_descent Q.hfair q (max τ Q.T)
     (fun τ' => rdMeas m k.val ((e.cfg τ').loc q).pc) (fun τ' h => Q.pend (by omega) q) ?_ ?_
   · intro τ' _ hq
     have := (Impl.step_other (e.step_eq _) hq).1

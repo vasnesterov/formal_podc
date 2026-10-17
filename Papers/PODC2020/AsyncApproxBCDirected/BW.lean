@@ -1,4 +1,5 @@
 import Papers.PODC2020.AsyncApproxBCDirected.RoundModel
+import Podc.Foundations.Data.Nat.Descent
 
 /-!
 # Properties of Algorithm BW (Lemmas 6–8, Theorem 9)
@@ -92,16 +93,7 @@ theorem IsSimplePath.of_snoc {b : List V} {z w : V} (h : IsSimplePath G (z :: (b
   refine ⟨q, ⟨⟨rfl, hq, hc'.1⟩, hn'.1⟩, hc'.2.2 q hq w (by simp), ?_, hq⟩
   exact hn'.2.2 q (List.getLast_mem _) w (by simp)
 
-/-! ## Choosing a common time -/
-
-theorem exists_time {ι : Type*} {s : Set ι} (hs : s.Finite) {P : ι → ℕ → Prop}
-    (hmono : ∀ i t t', t ≤ t' → P i t → P i t') (h : ∀ i ∈ s, ∃ t, P i t) :
-    ∃ T, ∀ i ∈ s, P i T := by
-  classical
-  let g : ι → ℕ := fun i => if hi : i ∈ s then Classical.choose (h i hi) else 0
-  refine ⟨hs.toFinset.sup g, fun i hi => hmono i (g i) _ ?_ ?_⟩
-  · exact Finset.le_sup (f := g) (hs.mem_toFinset.mpr hi)
-  · simp only [g, hi, dite_true]; exact Classical.choose_spec (h i hi)
+/-! ## Finitely many simple paths -/
 
 theorem finite_simplePaths (P : List V → Prop) (hP : ∀ p, P p → p.Nodup) : {p | P p}.Finite :=
   (List.finite_length_le V (Fintype.card V)).subset fun p hp => (hP p hp).length_le_card
@@ -211,8 +203,8 @@ theorem sent_actual {c : V} (hc : c ∉ E.F) : Sent G f E.M c E.F := by
   set P : Set (List V) := {p | IsRedundant G p ∧ Avoids p E.F ∧ p.getLast? = some c}
   have hPfin : P.Finite :=
     (List.finite_length_le V (2 * Fintype.card V)).subset fun p hp => hp.1.length_le
-  obtain ⟨T, hT⟩ := exists_time hPfin (P := fun p t => ∃ y, (y, p) ∈ E.M c t)
-    (fun p t t' htt' ⟨y, hy⟩ => ⟨y, E.M_mono c htt' hy⟩) (by
+  obtain ⟨T, hT⟩ := hPfin.exists_forall_of_monotone (p := fun p t => ∃ y, (y, p) ∈ E.M c t)
+    (fun p _ t t' htt' ⟨y, hy⟩ => ⟨y, E.M_mono c htt' hy⟩) (by
       rintro p ⟨⟨p₁, p₂, s, q, w, h₁, h₂, rfl⟩, hF, hl⟩
       have hw : w = c := Option.some.inj ((h₁.getLast_append h₂).symm.trans hl)
       subst hw
@@ -337,8 +329,8 @@ theorem completeness_eventually (hG : ThreeReach G f) (hn : 2 ≤ Fintype.card V
       (∀ h ∈ i.2.2, h ∉ srcComp G Fu i.1)
   let P : (Finset V × V × Finset V) → ℕ → Prop := fun i t => C i →
       ∃ m' ∈ E.M v t, m'.2.head? = some i.2.1 ∧ m'.1 = valueOf Mc i.2.1 ∧ Avoids m'.2 i.2.2
-  obtain ⟨T, hT⟩ := exists_time (s := Set.univ) Set.finite_univ (P := P)
-    (fun i t t' htt' h hC => by
+  obtain ⟨T, hT⟩ := Set.finite_univ.exists_forall_of_monotone (p := P)
+    (fun i _ t t' htt' h hC => by
       obtain ⟨m', hm', h1, h2, h3⟩ := h hC
       exact ⟨m', E.M_mono v htt' hm', h1, h2, h3⟩) (by
       rintro ⟨Fw, q, H⟩ -
@@ -390,18 +382,18 @@ theorem exists_executes (hG : ThreeReach G f) (hn : 2 ≤ Fintype.card V) {v : V
       {cp | IsSimplePath G cp.2 cp.1 v ∧ ∀ y ∈ cp.2, Reaches G E.F y v}
     have hs : s.Finite := (Set.finite_univ.prod (finite_simplePaths (fun p : List V => p.Nodup)
       fun _ h => h)).subset fun cp hcp => ⟨trivial, hcp.1.2⟩
-    obtain ⟨T, hT⟩ := exists_time hs
-      (P := fun cp t => (cp.1, cp.2, mcMsg G E.M cp.1 E.F, E.F) ∈ E.CR v t)
-      (fun _ _ _ h hm => E.CR_mono v h hm) (by
+    obtain ⟨T, hT⟩ := hs.exists_forall_of_monotone
+      (p := fun cp t => (cp.1, cp.2, mcMsg G E.M cp.1 E.F, E.F) ∈ E.CR v t)
+      (fun _ _ _ _ h hm => E.CR_mono v h (by exact hm)) (by
         rintro ⟨c, p⟩ ⟨hp, hpr⟩
         have hpF : Avoids p E.F := fun y hy => (hpr y hy).1
         exact E.CR_live v hv c p E.F (E.sent_actual (hpF c (List.mem_of_head? hp.1.1))) hp hpF)
     exact ⟨T, fun c => ⟨mcMsg G E.M c E.F, fun p hp hpr => hT (c, p) ⟨hp, hpr⟩⟩⟩
   -- Completeness for all genuine `COMPLETE` messages
-  obtain ⟨T₂, hT₂⟩ := exists_time (s := Set.univ) Set.finite_univ
-    (P := fun (cF : V × Finset V) t => cF.1 ∉ E.F → Sent G f E.M cF.1 cF.2 →
+  obtain ⟨T₂, hT₂⟩ := Set.finite_univ.exists_forall_of_monotone
+    (p := fun (cF : V × Finset V) t => cF.1 ∉ E.F → Sent G f E.M cF.1 cF.2 →
       Completeness G f v (E.M v t) (mcMsg G E.M cF.1 cF.2) cF.2)
-    (fun _ t t' htt' h a1 a2 => completeness_mono (E.M_mono v htt') (h a1 a2)) (by
+    (fun _ _ t t' htt' h a1 a2 => completeness_mono (E.M_mono v htt') (h a1 a2)) (by
       rintro ⟨c, Fu⟩ -
       by_cases h : c ∉ E.F ∧ Sent G f E.M c Fu
       · obtain ⟨t, ht⟩ := E.completeness_eventually hG hn hv h.1 h.2

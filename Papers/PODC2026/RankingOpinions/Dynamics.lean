@@ -1,8 +1,8 @@
 import Papers.PODC2026.RankingOpinions.Layers
 import Cslib.Computability.Distributed.PopulationProtocols.Basic
+import Cslib.Foundations.Data.Nat.Descent
 import Mathlib.Algebra.BigOperators.Group.Finset.Basic
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
-import Mathlib.Order.ConditionallyCompleteLattice.Basic
 import Mathlib.Order.Lattice.Nat
 
 /-!
@@ -157,20 +157,12 @@ lemma pot_mono_step (t : ℕ) : pot (E.config t) ≤ pot (E.config (t + 1)) := b
   · exact (pot_lt_interact (E.sched_ne t) h).le
   · rw [core_interact_eq_of_not (E.sched_ne t) h]
 
-lemma pot_mono {s t : ℕ} (h : s ≤ t) : pot (E.config s) ≤ pot (E.config t) := by
-  induction t, h using Nat.le_induction with
-  | base => exact le_rfl
-  | succ t _ ih => exact ih.trans (pot_mono_step E t)
-
 /-- **Theorem 3.4** (Stabilization): in every execution (fair or not), the agents exchange their
 kets only finitely many times: from some time `T` on, the configuration never changes. -/
 theorem eventually_const : ∃ T, ∀ t ≥ T, E.config t = E.config T := by
   -- the potential is bounded and monotone, hence eventually constant
-  set S := Set.range fun t => pot (E.config t)
-  have hbdd : BddAbove S := ⟨Fintype.card A * 3 ^ k, by rintro _ ⟨t, rfl⟩; exact pot_le _⟩
-  obtain ⟨T, hT⟩ : sSup S ∈ S := Nat.sSup_mem ⟨_, 0, rfl⟩ hbdd
-  have hmax : ∀ t, pot (E.config t) ≤ pot (E.config T) := fun t => by
-    rw [show pot (E.config T) = sSup S from hT]; exact le_csSup hbdd ⟨t, rfl⟩
+  obtain ⟨T, -, hT⟩ := Nat.eventually_const_of_le_succ (f := fun t => pot (E.config t)) (N := 0)
+    (fun t _ => pot_le _) (fun t _ => pot_mono_step E t)
   refine ⟨T, fun t ht => ?_⟩
   induction t, ht using Nat.le_induction with
   | base => rfl
@@ -180,7 +172,7 @@ theorem eventually_const : ∃ T, ∀ t ≥ T, E.config t = E.config T := by
       intro hp
       have := pot_lt_interact (E.sched_ne t) hp
       rw [← E.step t] at this
-      have := hmax (t + 1); have := pot_mono E ht
+      have := hT (t + 1) (by omega); have := hT t ht
       omega
     rw [core_interact_eq_of_not (E.sched_ne t) hnp, ih]
 

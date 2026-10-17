@@ -207,17 +207,6 @@ theorem tau_meas (hm : 0 < m) (hid : Function.Injective ids) (hn : Fintype.card 
   · rw [act_fin _ hpc] at hact; cases hact
 
 omit [Nonempty P] in
-/-- A strict increase of a monotone sequence happens at some single step. -/
-lemma exists_step_lt (f : ℕ → ℕ) (hmono : ∀ t, f t ≤ f (t + 1)) {N t : ℕ} (hNt : N ≤ t)
-    (h : f N < f t) : ∃ k, N ≤ k ∧ f k < f (k + 1) := by
-  induction t, hNt using Nat.le_induction with
-  | base => omega
-  | succ t hNt ih =>
-    by_cases h' : f N < f t
-    · exact ih h'
-    · exact ⟨t, hNt, by have := hmono t; omega⟩
-
-omit [Nonempty P] in
 /-- **Lemma 1 (termination) from the progress property.** If, in every fair execution in which all
 processes participate, a competition is eventually solved as long as not all of them are solved,
 then every process returns. -/
@@ -243,25 +232,8 @@ theorem alg2_terminates_of_progress (hm : 0 < m) (hid : Function.Injective ids)
     calc solved (e.cfg t) ≤ ∑ _x : Fin m, pp.U := Finset.sum_le_sum fun x _ => hlevU t x
       _ = pp.U * m := by simp [mul_comm]
   -- the number of solved competitions is eventually constant
-  obtain ⟨t0, ht0⟩ : ∃ t0, ∀ t, t0 ≤ t → solved (e.cfg t) = solved (e.cfg t0) := by
-    by_contra hne
-    push Not at hne
-    apply Nat.not_frequently_lt_of_succ_le (f := fun t => pp.U * m - solved (e.cfg t)) (N := 0)
-    · intro t _; have := hSmono t; omega
-    · intro N
-      obtain ⟨t, htN, hneq⟩ := hne N
-      have hmono' : ∀ a b, a ≤ b → solved (e.cfg a) ≤ solved (e.cfg b) := by
-        intro a b hab
-        induction b, hab using Nat.le_induction with
-        | base => exact le_rfl
-        | succ b _ ih => exact ih.trans (hSmono b)
-      have hlt : solved (e.cfg N) < solved (e.cfg t) :=
-        lt_of_le_of_ne (hmono' N t htN) (Ne.symm hneq)
-      obtain ⟨k, hk, hk'⟩ := exists_step_lt (fun t => solved (e.cfg t)) hSmono htN hlt
-      refine ⟨k, hk, ?_⟩
-      have := hSle (k + 1)
-      show pp.U * m - solved (e.cfg (k + 1)) < pp.U * m - solved (e.cfg k)
-      omega
+  obtain ⟨t0, -, ht0⟩ := Nat.eventually_const_of_le_succ (f := fun t => solved (e.cfg t)) (N := 0)
+    (fun t _ => hSle t) (fun t _ => hSmono t)
   by_cases hlt : solved (e.cfg t0) < pp.U * m
   · obtain ⟨t', ht', hgt⟩ := hprog e hos hall hfair t0 hlt
     rw [ht0 t' ht'] at hgt; exact lt_irrefl _ hgt

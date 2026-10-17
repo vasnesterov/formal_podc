@@ -1,5 +1,6 @@
 import Mathlib
 import Cslib.Computability.Distributed.SharedMemory.Valency
+import Podc.Foundations.Data.Nat.Descent
 
 /-!
 # One read/write/fetch-and-increment location is not enough (Theorem 5.1 of EGSZ'16)
@@ -53,15 +54,12 @@ abbrev faiLoc : ObjSpec where
 lemma exists_eq_of_step (g : ℕ → ℤ) (t : ℤ) :
     ∀ a, (∀ j < a, g (j + 1) = g j ∨ g (j + 1) = g j + 1) → g 0 ≤ t → t ≤ g a →
       ∃ j ≤ a, g j = t := by
-  intro a
-  induction a with
-  | zero => intro _ h0 ha; exact ⟨0, le_rfl, by omega⟩
-  | succ a ih =>
-    intro hs h0 ha
-    by_cases h : t ≤ g a
-    · obtain ⟨j, hj, e⟩ := ih (fun j hj => hs j (by omega)) h0 h
-      exact ⟨j, by omega, e⟩
-    · exact ⟨a + 1, le_rfl, by rcases hs a (by omega) with e | e <;> omega⟩
+  intro a hs h0 ha
+  rcases ha.lt_or_eq with ha | ha
+  · obtain ⟨j, -, hj, hgj, -⟩ := Int.exists_eq_and_succ_eq_of_le_add_one (Nat.zero_le a)
+      (fun s _ hs' => by rcases hs s hs' with e | e <;> omega) h0 ha
+    exact ⟨j, hj.le, hgj⟩
+  · exact ⟨a, le_rfl, ha.symm⟩
 
 lemma le_of_step (g : ℕ → ℤ) : ∀ a, (∀ j < a, g (j + 1) = g j ∨ g (j + 1) = g j + 1) →
     g 0 ≤ g a := by
