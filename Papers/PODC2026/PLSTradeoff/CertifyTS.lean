@@ -18,7 +18,9 @@ needs the two diameter checks), and then radius `3t + 2` is indeed enough.
 
 namespace PLSTradeoff
 
-open SimpleGraph SinklessOrientation
+open SimpleGraph
+open Cslib.Local (GAgree loc mask loc_le gAgree_loc edist_le_edist_loc mask_of_le
+  loc_edist_le_iff loc_adj_iff)
 
 variable {V : Type*} [Fintype V]
 
@@ -133,11 +135,11 @@ lemma recCl_loc_eq {ℓ : V → Label} {v u : V} {a : ℕ} (hu : G.edist v u ≤
   constructor
   · rintro ⟨hw, h⟩
     refine ⟨hw, ?_⟩
-    have hvw : G.edist v w ≤ certR t := (edist_le_add hu hw).trans (by exact_mod_cast ha)
+    have hvw : G.edist v w ≤ certR t := (edist_le_natCast_add hu hw).trans (by exact_mod_cast ha)
     rwa [mask_of_le hvw, mask_of_le (hu.trans (by exact_mod_cast (by omega : a ≤ certR t)))] at h
   · rintro ⟨hw, h⟩
     refine ⟨hw, ?_⟩
-    have hvw : G.edist v w ≤ certR t := (edist_le_add hu hw).trans (by exact_mod_cast ha)
+    have hvw : G.edist v w ≤ certR t := (edist_le_natCast_add hu hw).trans (by exact_mod_cast ha)
     rwa [mask_of_le hvw, mask_of_le (hu.trans (by exact_mod_cast (by omega : a ≤ certR t)))]
 
 omit [Fintype V] in
@@ -148,7 +150,7 @@ lemma marked_mask_iff {ℓ : V → Label} {v w : V} (hw : G.edist v w ≤ certR 
 omit [Fintype V] in
 lemma certVer_isLocal (t : ℕ) (ε : ℝ) :
     IsLocal (ι := Unit) (certR t) (fun G _ ℓ v => certVer (V := V) t ε G ℓ v) := by
-  intro G I ℓ G' I' ℓ' v h
+  refine isLocal_iff.2 fun G I ℓ G' I' ℓ' v h => ?_
   simp only [certVer]
   rw [viewEq_loc_eq h, (viewEq_mask_eq h).2]
 
@@ -225,12 +227,12 @@ lemma certVer_sound (ℓ : V → Label)
     constructor
     · intro hy
       have huy : G.edist u y ≤ t := hdiam u u (hself u) y hy
-      exact ⟨(edist_le_add hvu huy).trans (by exact_mod_cast (by omega)), hy.2.trans hu.2⟩
+      exact ⟨(edist_le_natCast_add hvu huy).trans (by exact_mod_cast (by omega)), hy.2.trans hu.2⟩
     · intro hy
       have hvy : G.edist v y ≤ t := hdiam v v (hself v) y hy
       refine ⟨?_, hy.2.trans hu.2.symm⟩
       rw [SimpleGraph.edist_comm] at hvu
-      exact (edist_le_add hvu hvy).trans (by exact_mod_cast (by omega))
+      exact (edist_le_natCast_add hvu hvy).trans (by exact_mod_cast (by omega))
   have hmarkv : ∀ v w, G.edist v w ≤ certR t →
       (w ∈ marked (mask G v (certR t) ℓ) ↔ w ∈ marked ℓ) := fun v w hw => marked_mask_iff hw
   refine ⟨{ cl := recCl G t ℓ
@@ -267,10 +269,11 @@ lemma certVer_sound (ℓ : V → Label)
   · -- correctness of the outputs
     obtain ⟨w, hw, hwu⟩ := hu
     have hvw : G.edist v w ≤ t := hdiam v v (hself v) w hw
-    have hvu : G.edist v u ≤ (t + 2 : ℕ) := edist_le_add hvw hwu
+    have hvu : G.edist v u ≤ (t + 2 : ℕ) := edist_le_natCast_add hvw hwu
     refine ⟨recCl_loc_eq hvu (by unfold certR; omega), fun y hy => ?_⟩
     have huy : G.edist u y ≤ t := hdiam u u (hself u) y hy
-    exact hmarkv v y ((edist_le_add hvu huy).trans (by unfold certR; exact_mod_cast (by omega)))
+    exact hmarkv v y ((edist_le_natCast_add hvu huy).trans
+      (by unfold certR; exact_mod_cast (by omega)))
 
 end Proofs
 

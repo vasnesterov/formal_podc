@@ -22,6 +22,8 @@ Deviation: the reconstructed cluster of `u` only contains nodes within distance 
 namespace PLSTradeoff
 
 open SimpleGraph Finset Classical
+open Cslib.Local (GAgree loc mask loc_le gAgree_loc edist_le_edist_loc mask_of_le
+  loc_edist_le_iff loc_adj_iff)
 
 variable {V : Type*} [Fintype V] [LinearOrder V]
 
@@ -146,11 +148,11 @@ noncomputable def genVer (SS : ShareScheme V rS cS ρS) {m : ℕ} (hm : 0 < m)
 lemma genVer_isLocal (SS : ShareScheme V rS cS ρS) {m : ℕ} (hm : 0 < m)
     (F : Fin m → V → Fin (3 * K + 3)) (hρ : ρS ≤ genR K) :
     IsLocal (ι := Unit) (genR K) (fun G _ ℓ v => genVer (t := t) SS hm F G ℓ v) := by
-  intro G I ℓ G' I' ℓ' v h
+  refine isLocal_iff.2 fun G I ℓ G' I' ℓ' v h => ?_
   have hsh : SS.ver G (shPart ℓ) v = SS.ver G' (shPart ℓ') v :=
-    SS.isLocal G (fun _ => ()) (shPart ℓ) G' (fun _ => ()) (shPart ℓ') v
-      ⟨h.1.mono_radius hρ, fun u hu => ⟨rfl, by
-        simp only [shPart, (h.2 u (hu.trans (by exact_mod_cast hρ))).2]⟩⟩
+    SS.isLocal.eq G (fun _ => ()) (shPart ℓ) G' (fun _ => ()) (shPart ℓ') v
+      (viewEq_iff.2 ⟨h.1.mono_radius hρ, fun u hu => ⟨rfl, by
+        simp only [shPart, ((viewEq_iff.1 h).2 u (hu.trans (by exact_mod_cast hρ))).2]⟩⟩)
   simp only [genVer]
   rw [hsh, viewEq_loc_eq h, (viewEq_mask_eq h).2]
 
@@ -176,13 +178,13 @@ lemma fmc_loc {ℓ : V → Label} {Rn : V → ℕ} (hRn : ∀ w, Rn w < 3 * K + 
   · rintro ⟨hT, hd⟩
     refine ⟨?_, hd⟩
     have hvw : G.edist v w ≤ genR K := by
-      have := edist_le_add hy (by rw [SimpleGraph.edist_comm]; exact hd)
+      have := edist_le_natCast_add hy (by rw [SimpleGraph.edist_comm]; exact hd)
       exact this.trans (by exact_mod_cast (by have := rad_le_rhoMax (hRn w); omega))
     simpa [inT, mask_of_le hvw] using hT
   · rintro ⟨hT, hd⟩
     refine ⟨?_, hd⟩
     have hvw : G.edist v w ≤ genR K := by
-      have := edist_le_add hy (by rw [SimpleGraph.edist_comm]; exact hd)
+      have := edist_le_natCast_add hy (by rw [SimpleGraph.edist_comm]; exact hd)
       exact this.trans (by exact_mod_cast (by have := rad_le_rhoMax (hRn w); omega))
     simpa [inT, mask_of_le hvw] using hT
 
@@ -198,7 +200,7 @@ lemma edist_of_fmc_eq {T : V → Prop} {Rn : V → ℕ} (hRn : ∀ w, Rn w < 3 *
   have h1 := ((fmcOf_eq_some_iff.1 hu).1).2
   have h2 := ((fmcOf_eq_some_iff.1 hy).1).2
   rw [SimpleGraph.edist_comm] at h1
-  have := edist_le_add h1 h2
+  have := edist_le_natCast_add h1 h2
   exact this.trans (by exact_mod_cast (by have := rad_le_rhoMax (K := K) (hRn c); omega))
 
 /-- The reconstructed cluster near `v` is the true one. -/
@@ -213,10 +215,10 @@ lemma recFmc_loc {ℓ : V → Label} {Rn : V → ℕ} (hRn : ∀ w, Rn w < 3 * K
   constructor
   · rintro ⟨h1, h2⟩
     refine ⟨h1, ?_⟩
-    rwa [fmc_loc hRn (edist_le_add hu h1) (by omega)] at h2
+    rwa [fmc_loc hRn (edist_le_natCast_add hu h1) (by omega)] at h2
   · rintro ⟨h1, h2⟩
     refine ⟨h1, ?_⟩
-    rwa [fmc_loc hRn (edist_le_add hu h1) (by omega)]
+    rwa [fmc_loc hRn (edist_le_natCast_add hu h1) (by omega)]
 
 end Scheme
 
@@ -419,13 +421,14 @@ theorem tsCertGeneral (ht : 1 ≤ t) (hK : K = t * Nat.clog 2 (Fintype.card V))
     subst ho
     intro u ⟨w, hw, hwu⟩
     have hvw : G.edist v w ≤ (2 * rhoMax K : ℕ) := hclose hw
-    have hvu : G.edist v u ≤ (2 * rhoMax K + 2 : ℕ) := edist_le_add hvw hwu
+    have hvu : G.edist v u ≤ (2 * rhoMax K + 2 : ℕ) := edist_le_natCast_add hvw hwu
     refine ⟨?_, fun y hy => ?_⟩
     · show recFmc (loc G v (genR K)) K (rhoMax K) (inT (mask G v (genR K) ℓ)) Rn u = _
       rw [recFmc_loc hRn' hvu (by unfold genR; omega), hrecG]
     · have huy : G.edist u y ≤ (2 * rhoMax K : ℕ) := by
         rw [SimpleGraph.edist_comm]; exact hclose (show fG u = fG y from hy.symm)
-      exact inXs_mask ((edist_le_add hvu huy).trans (by unfold genR; exact_mod_cast (by omega)))
+      exact inXs_mask ((edist_le_natCast_add hvu huy).trans
+        (by unfold genR; exact_mod_cast (by omega)))
   · ------------------------------------------------ cost
     show (prov G v).length ≤ _
     by_cases hc : G.Connected

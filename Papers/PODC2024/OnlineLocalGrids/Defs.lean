@@ -1,8 +1,9 @@
 import Mathlib
 import Cslib.Computability.Distributed.Local.OnlineLocal
+import Cslib.Computability.Distributed.Local.LocallyIterative
 
 /-!
-# Basic definitions: `a`-values on colours, proper colourings, grids
+# Basic definitions: `a`-values on colours, grids
 
 Chang–Mishra–Nguyen–Yang–Yeh, PODC 2024, §2.1 and Definition 3.1. Colours are `Fin 3 = {0,1,2}`;
 our colour `2` plays the role of the paper's colour `3` (and `0, 1` of the paper's `1, 2`).
@@ -36,8 +37,9 @@ lemma aval_parity (x y : Fin 3) (h : x ≠ y) : aval x y ≡ ind x + ind y + 1 [
 
 variable {V : Type*}
 
-/-- A colouring is proper for `G`. -/
-def IsProper (G : SimpleGraph V) (c : V → Fin 3) : Prop := ∀ x y, G.Adj x y → c x ≠ c y
+/- Proper colourings: `IsProper G c` is CSLib's `Cslib.LocallyIterative.IsProper` (adjacent
+vertices get different colours), used here with colours `Fin 3`. -/
+export Cslib.LocallyIterative (IsProper)
 
 /-- The `a × b` (simple) grid: rows `Fin a`, columns `Fin b`; `(i, j) ~ (i', j')` iff
 `|i - i'| + |j - j'| = 1`. -/

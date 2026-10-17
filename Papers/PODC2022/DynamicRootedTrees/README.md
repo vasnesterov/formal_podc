@@ -43,7 +43,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Model.**
 - `n` processes, synchronous rounds, no failures and no randomness. Communication is full-information flooding.
 - An oblivious message adversary picks each round's communication graph from `𝒯ₙ`: rooted out-trees on `Fin n` with
-  a self-loop at every node (`treesWithLoops`).
+  a self-loop at every node (`treesWithLoops`). A tree is a root plus parent pointers reaching it (`RootedTree`);
+  every CSLib rooted spanning tree (`SimpleGraph.RootedTree`) of a graph on `Fin n` is one
+  (`RootedTree.ofGraphRootedTree`).
 - Information flow after `t` rounds is the relational product `G₁ ∘ ⋯ ∘ Gₜ`. Broadcast has happened when some
   process reaches all others.
 - `broadcastTime` is an `sInf` and `advBroadcastTime` is a `⨆`. Their junk values (0 if never or unbounded) are

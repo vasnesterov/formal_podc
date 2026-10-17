@@ -64,8 +64,8 @@ lemma isProper_boxProd {α β : Type*} {G₁ : SimpleGraph α} {G₂ : SimpleGra
     IsProper (G₁ □ G₂) fun p => κ₁ p.1 + κ₂ p.2 := by
   rintro ⟨x₁, x₂⟩ ⟨y₁, y₂⟩ h
   rcases boxProd_adj.1 h with ⟨h, rfl⟩ | ⟨h, rfl⟩
-  · exact fun e => h₁ _ _ h (add_right_cancel e)
-  · exact fun e => h₂ _ _ h (add_left_cancel e)
+  · exact fun e => h₁ h (add_right_cancel e)
+  · exact fun e => h₂ h (add_left_cancel e)
 
 lemma isProper_pathGraph (a : ℕ) :
     IsProper (pathGraph a) fun i => (⟨i.val % 2, by omega⟩ : Fin 3) := by

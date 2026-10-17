@@ -61,3 +61,6 @@ import Podc.Stabilization.Basic
 import Podc.Stabilization.Markov
 import Podc.PopulationProtocols.Nondet
 import Podc.PopulationProtocols.RandomScheduler
+import Podc.Graph.Ball
+import Podc.Graph.Orientation
+import Podc.Local.Locality

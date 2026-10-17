@@ -54,6 +54,8 @@ namespace PLSTradeoff
 namespace Layered
 
 open SimpleGraph
+open Cslib.Local (GAgree loc mask loc_le gAgree_loc edist_le_edist_loc mask_of_le
+  loc_edist_le_iff loc_adj_iff)
 
 /-- Vertices of `G_{t,m}`: `Sum.inl k` is the single node of paper layer `2k+1`, `Sum.inr (k, i)` is
 node `i` of paper layer `2k+2`. -/
@@ -128,9 +130,6 @@ lemma exists_lay (hm : 1 ≤ m) {j : ℕ} (hj : j ≤ 2 * t + 2) : ∃ x : LV t 
   · exact ⟨Sum.inl ⟨k, by omega⟩, rfl⟩
   · exact ⟨Sum.inr (⟨k, by omega⟩, ⟨0, hm⟩), rfl⟩
 
-lemma edist_le_one_of_adj {u v : LV t m} (h : (G t m).Adj u v) : (G t m).edist u v ≤ 1 :=
-  (edist_eq_one_iff_adj.2 h).le
-
 /-- Distance upper bound between different layers. -/
 lemma edist_le_of_lay (hm : 1 ≤ m) :
     ∀ d : ℕ, ∀ u w : LV t m, lay w = lay u + d + 1 → (G t m).edist u w ≤ (d + 1 : ℕ) := by
@@ -138,12 +137,13 @@ lemma edist_le_of_lay (hm : 1 ≤ m) :
   induction d with
   | zero =>
     intro u w h
-    exact edist_le_one_of_adj (Or.inl (by omega))
+    exact (edist_eq_one_iff_adj.2 (Or.inl (by omega))).le
   | succ d ih =>
     intro u w h
     obtain ⟨x, hx⟩ := exists_lay (t := t) hm (j := lay u + d + 1) (by have := lay_le w; omega)
     calc (G t m).edist u w ≤ (G t m).edist u x + (G t m).edist x w := SimpleGraph.edist_triangle
-      _ ≤ (d + 1 : ℕ) + 1 := add_le_add (ih u x hx) (edist_le_one_of_adj (Or.inl (by omega)))
+      _ ≤ (d + 1 : ℕ) + 1 :=
+        add_le_add (ih u x hx) ((edist_eq_one_iff_adj.2 (Or.inl (by omega))).le)
       _ = ((d + 1 + 1 : ℕ) : ℕ∞) := by push_cast; ring
 
 /-- Two nodes in the same layer are at distance at most two. -/
@@ -153,7 +153,7 @@ lemma edist_le_two (hm : 1 ≤ m) {u w : LV t m} (h : lay u = lay w) : (G t m).e
   have h1 : (G t m).Adj u x := by rw [adj_iff]; split_ifs at hx <;> omega
   have h2 : (G t m).Adj x w := by rw [adj_iff]; split_ifs at hx <;> omega
   calc (G t m).edist u w ≤ (G t m).edist u x + (G t m).edist x w := SimpleGraph.edist_triangle
-    _ ≤ 1 + 1 := add_le_add (edist_le_one_of_adj h1) (edist_le_one_of_adj h2)
+    _ ≤ 1 + 1 := add_le_add ((edist_eq_one_iff_adj.2 h1).le) ((edist_eq_one_iff_adj.2 h2).le)
     _ = 2 := by norm_num
 
 /-- For `t ≥ 2`, the `t`-ball around `v` contains every node whose layer is within `t` of the
@@ -196,7 +196,7 @@ lemma verCore_congr {I I' : LV t m → Inp m} {ℓ ℓ' : LV t m → Label} {v :
       funext i
       unfold L
       split_ifs with hjt
-      · refine (h _ (edist_le_one_of_adj ?_)).2
+      · refine (h _ (edist_eq_one_iff_adj.2 ?_).le).2
         rw [adj_iff]; simp only [lay]; omega
       · rfl
     simp only [verCore, hI, hL k.val (Or.inl rfl), hL (k.val - 1) (Or.inr rfl)]
@@ -222,7 +222,7 @@ noncomputable def pls1 : PLS {G t m} (P t m) 1 where
   prov := prov1
   ver := ver1
   isLocal := by
-    intro Γ I ℓ Γ' I' ℓ' v h
+    refine isLocal_iff.2 fun Γ I ℓ Γ' I' ℓ' v h => ?_
     obtain ⟨h1, h2⟩ := viewEq_mask_eq h
     simp only [ver1, h1, h2]
   complete := by
@@ -302,19 +302,19 @@ theorem prov_injective (S : PLS {G t m} (P t m) t) :
     by_cases hv : lay v ≤ t
     · have hview : ViewEq t (G t m) (inp X Y) (S.prov (G t m) (inp X X))
           (G t m) (inp X X) (S.prov (G t m) (inp X X)) v := by
-        refine ⟨fun _ _ _ => Iff.rfl, fun u hu => ⟨?_, rfl⟩⟩
+        refine viewEq_iff.2 ⟨fun _ _ _ => Iff.rfl, fun u hu => ⟨?_, rfl⟩⟩
         have := (lay_le_of_edist hu).1
         have hu' : u ≠ vlast := by rintro rfl; rw [lay_vlast] at this; omega
         simp [inp, hu']
-      rw [S.isLocal _ _ _ _ _ _ _ hview]
+      rw [S.isLocal.eq _ _ _ _ _ _ _ hview]
       exact S.complete _ hG _ (by simp [P]) v
     · have hview : ViewEq t (G t m) (inp X Y) (S.prov (G t m) (inp X X))
           (G t m) (inp Y Y) (S.prov (G t m) (inp Y Y)) v := by
-        refine ⟨fun _ _ _ => Iff.rfl, fun u hu => ⟨?_, hXY ▸ rfl⟩⟩
+        refine viewEq_iff.2 ⟨fun _ _ _ => Iff.rfl, fun u hu => ⟨?_, hXY ▸ rfl⟩⟩
         have := (lay_le_of_edist hu).2
         have hu' : u ≠ vfirst := by rintro rfl; rw [lay_vfirst] at this; omega
         simp [inp, hu']
-      rw [S.isLocal _ _ _ _ _ _ _ hview]
+      rw [S.isLocal.eq _ _ _ _ _ _ _ hview]
       exact S.complete _ hG _ (by simp [P]) v
   simpa [P] using S.sound _ hG _ _ hacc
 

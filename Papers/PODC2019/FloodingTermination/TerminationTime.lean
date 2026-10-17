@@ -1,4 +1,5 @@
 import Papers.PODC2019.FloodingTermination.Termination
+import Podc.Graph.Ball
 
 /-!
 # Time to termination (Section 3 of Hussak–Trehan)
@@ -42,17 +43,8 @@ def IsSecondIn (v : V) (j : ℕ) : Prop := v ∈ roundSet G s j ∧ ∃ i < j, v
 variable {G s}
 
 lemma mem_distSet_iff {g : V} {j : ℕ} :
-    g ∈ distSet G s j ↔ G.Reachable s g ∧ G.dist s g = j := by
-  simp only [distSet, Set.mem_ofPred_eq]
-  constructor
-  · intro h
-    have hr : G.Reachable s g := reachable_of_edist_ne_top (by rw [h]; exact ENat.natCast_ne_top _)
-    refine ⟨hr, ?_⟩
-    have := hr.coe_dist_eq_edist
-    rw [h] at this
-    exact_mod_cast this
-  · rintro ⟨hr, rfl⟩
-    exact hr.coe_dist_eq_edist.symm
+    g ∈ distSet G s j ↔ G.Reachable s g ∧ G.dist s g = j :=
+  edist_eq_natCast_iff
 
 lemma mem_roundSet_dist {g : V} (hr : G.Reachable s g) : g ∈ roundSet G s (G.dist s g) :=
   mem_roundSet_iff.2 hr.isParityDist_dist
@@ -191,10 +183,8 @@ lemma terminatesAfter_of_bipartite (hb : G.IsBipartite) {e : ℕ} (he : G.eccent
   ext v
   simp only [Set.mem_empty_iff_false, iff_false]
   intro hv
-  obtain ⟨hr, rfl⟩ := (mem_roundSet_iff_of_colorable hb).1 hv
-  have : G.edist s v ≤ e := he ▸ edist_le_eccent
-  rw [← hr.coe_dist_eq_edist] at this
-  exact absurd (by exact_mod_cast this) (by omega : ¬ G.dist s v ≤ e)
+  obtain ⟨-, rfl⟩ := (mem_roundSet_iff_of_colorable hb).1 hv
+  exact absurd (dist_le_of_edist_le_natCast (he ▸ edist_le_eccent)) (by omega : ¬ G.dist s v ≤ e)
 
 /-- In a finite graph, `R_e ≠ ∅` where `e = ecc(s)`: the farthest nodes receive the
 message in round `e`. -/
@@ -213,8 +203,7 @@ theorem theorem_3_5 [Finite V] (hc : G.Connected) {e : ℕ} (he : G.eccent s = e
   by_contra hb
   obtain ⟨v, hv⟩ := G.exists_edist_eq_eccent_of_finite s
   have hr := hc.preconnected s v
-  have hdv : G.dist s v = e := by
-    have := hr.coe_dist_eq_edist; rw [hv, he] at this; exact_mod_cast this
+  have hdv : G.dist s v = e := (edist_eq_natCast_iff.1 (hv.trans he)).2
   obtain ⟨t, ht, hm⟩ := exists_mem_roundSet_of_not_bipartite hc hb v (e + 1)
   have hle : e ≤ t := hdv ▸ dist_le_of_mem_roundSet hm
   have hne : t ≠ e := by omega
@@ -272,9 +261,7 @@ lemma le_of_mem_roundSet_of_not_bipartite [Finite V] (hc : G.Connected) (hb : ¬
   have hdd : G.dist s g = G.dist s g' := by
     have h1 := hr.coe_dist_eq_edist; have h2 := hr'.coe_dist_eq_edist
     rw [hd, ← h2] at h1; exact_mod_cast h1
-  have hge : G.dist s g ≤ e := by
-    have : G.edist s g ≤ e := he ▸ edist_le_eccent
-    rw [← hr.coe_dist_eq_edist] at this; exact_mod_cast this
+  have hge : G.dist s g ≤ e := dist_le_of_edist_le_natCast (he ▸ edist_le_eccent)
   have := hc.nonempty
   have hfin : G.ediam ≠ ⊤ := connected_iff_ediam_ne_top.1 hc
   have hgv : G.dist g v ≤ G.diam := dist_le_diam hfin

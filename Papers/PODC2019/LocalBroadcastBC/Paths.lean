@@ -1,5 +1,6 @@
 import Papers.PODC2019.LocalBroadcastBC.Phase
 import Cslib.Foundations.Combinatorics.SimpleGraph.Menger
+import Cslib.Foundations.Combinatorics.SimpleGraph.Spanner
 
 /-!
 # Existence of the paths used by Algorithm 1: Lemmas 5.4 and 5.5 of [KNV19]
@@ -8,8 +9,9 @@ import Cslib.Foundations.Combinatorics.SimpleGraph.Menger
   `(f + 1)`-connectivity *after removing at most `f` vertices* is needed; Menger's theorem is not.
 * `pathsExist` (Lemma 5.5): for every `Z` and `w ∈ B_w` there are `f + 1` node-disjoint
   `A_w w`-paths that exclude `F`. Cases 1 and 3 use the fan lemma (`SimpleGraph.fan`, proved in
-  `Cslib/Foundations/Combinatorics/SimpleGraph/Menger.lean`) in `G` with the vertices `B'_w = (B_w ∩ F) \ {w}` removed
-  (`restrictGraph`); cases 2 and 4 use the minimum degree.
+  `Cslib/Foundations/Combinatorics/SimpleGraph/Menger.lean`) in `G` with the vertices
+  `B'_w = (B_w ∩ F) \ {w}` removed (CSLib's `SimpleGraph.deleteVerts`); cases 2 and 4 use the
+  minimum degree.
 -/
 
 open Finset
@@ -84,40 +86,6 @@ theorem exists_selSpec (hconn : G.IsVertexConnected (3 * f / 2 + 1)) :
 
 /-! ### Lemma 5.5 -/
 
-/-- `G` with all edges at vertices of `S` removed. -- CSLib candidate -/
-def restrictGraph (G : SimpleGraph V) (S : Set V) : SimpleGraph V where
-  Adj x y := G.Adj x y ∧ x ∉ S ∧ y ∉ S
-  symm := ⟨fun _ _ h => ⟨h.1.symm, h.2.2, h.2.1⟩⟩
-  loopless := ⟨fun _ h => G.loopless.irrefl _ h.1⟩
-
-omit [Fintype V] [DecidableEq V] in
-lemma restrictGraph_le (S : Set V) : restrictGraph G S ≤ G := fun _ _ h => h.1
-
-omit [Fintype V] [DecidableEq V] in
-lemma exists_walk_restrictGraph {S : Set V} {a b : V} (p : G.Walk a b)
-    (hp : ∀ x ∈ p.support, x ∉ S) :
-    ∃ q : (restrictGraph G S).Walk a b, q.support = p.support := by
-  induction p with
-  | nil => exact ⟨SimpleGraph.Walk.nil, rfl⟩
-  | cons h p ih =>
-    obtain ⟨q, hq⟩ := ih (fun x hx => hp x (by simp [hx]))
-    have hu := hp _ (SimpleGraph.Walk.start_mem_support _)
-    have hv := hp _ (List.mem_cons_of_mem _ p.start_mem_support)
-    refine ⟨SimpleGraph.Walk.cons (show (restrictGraph G S).Adj _ _ from ⟨h, hu, hv⟩) q, ?_⟩
-    simp [hq]
-
-omit [Fintype V] [DecidableEq V] in
-lemma support_restrictGraph {S : Set V} {a b : V} (q : (restrictGraph G S).Walk a b)
-    (ha : a ∉ S) : ∀ x ∈ q.support, x ∉ S := by
-  induction q with
-  | nil => simpa using ha
-  | cons h q ih =>
-    intro x hx
-    rw [SimpleGraph.Walk.support_cons, List.mem_cons] at hx
-    rcases hx with rfl | hx
-    · exact ha
-    · exact ih h.2.2 x hx
-
 /-- Cases 1 and 3 of the proof of Lemma 5.5 (via the fan lemma). -/
 lemma disjointPaths_fan (hconn : G.IsVertexConnected (3 * f / 2 + 1)) {F A B : Finset V}
     (hF : F.card ≤ f) (hAB : B = univ \ A) {w : V} (hw : w ∈ B) (hA : f < A.card)
@@ -134,7 +102,7 @@ lemma disjointPaths_fan (hconn : G.IsVertexConnected (3 * f / 2 + 1)) {F A B : F
   have hA'B' : ∀ x ∈ A', x ∉ B' := fun x hx hxB => by
     have : x ∈ B := (mem_inter.1 (mem_of_mem_erase hxB)).1
     simp [hAB, hA'A hx] at this
-  set G' := restrictGraph G (B' : Set V)
+  set G' := G.deleteVerts (B' : Set V)
   have hwA' : w ∉ A' := fun h => hwA (hA'A h)
   obtain ⟨P, hPU, hPdisj⟩ := SimpleGraph.fan G' w A' hwA' (f + 1) (by
     intro X hwX hXcard
@@ -147,11 +115,11 @@ lemma disjointPaths_fan (hconn : G.IsVertexConnected (3 * f / 2 + 1)) {F A B : F
       have := card_union_le X B'
       omega
     obtain ⟨p, hp⟩ := hconn.2 (X ∪ B') hY w u (by simp [hwX, hwB']) (by simp [hu.2, hA'B' u hu.1])
-    obtain ⟨q, hq⟩ := exists_walk_restrictGraph (S := (B' : Set V)) p
-      (fun x hx hxB => hp x hx (by simp [mem_coe.1 hxB]))
-    exact ⟨u, hu.1, q, fun x hx hxX => hp x (hq ▸ hx) (by simp [mem_coe.1 hxX])⟩)
+    have hpB : ∀ x ∈ p.support, x ∉ (B' : Set V) := fun x hx hxB => hp x hx (by simp [mem_coe.1 hxB])
+    exact ⟨u, hu.1, p.toDeleteVerts hpB, fun x hx hxX =>
+      hp x (by simpa using hx) (by simp [mem_coe.1 hxX])⟩)
   -- the lists `u_i … w`
-  let W : ∀ i : Fin (f + 1), G.Walk (P i).1 w := fun i => ((P i).2.mapLe (restrictGraph_le _)).reverse
+  let W : ∀ i : Fin (f + 1), G.Walk (P i).1 w := fun i => ((P i).2.mapLe (G.deleteVerts_le _)).reverse
   have hWsupp : ∀ i, (W i).support = (P i).2.support.reverse := fun i => by
     simp [W]
   have hWpath : ∀ i, (W i).IsPath := fun i => ((hPU i).2.mapLe _).reverse
@@ -196,7 +164,7 @@ lemma disjointPaths_fan (hconn : G.IsVertexConnected (3 * f / 2 + 1)) {F A B : F
       · exact hx2 (hPdisj i j hij x hxP (hj ▸ (P j).2.end_mem_support))
     · have hxB' : x ∈ B' := by
         simp [hB', hAB, hxA, hxF, hx2]
-      exact support_restrictGraph (P i).2 (by simpa using hwB') x hxP (by simpa using hxB')
+      exact (P i).2.not_mem_of_mem_support_deleteVerts (by simpa using hwB') x hxP (by simpa using hxB')
   · intro Q hQ Q' hQ' hne x hx hx'
     obtain ⟨i, -, rfl⟩ := mem_image.1 hQ
     obtain ⟨j, -, rfl⟩ := mem_image.1 hQ'

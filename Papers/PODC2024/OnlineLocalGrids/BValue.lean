@@ -59,7 +59,7 @@ theorem bval_four_cycle {c : V → Fin 3} (hc : IsProper G c) {u : V} (p : G.Wal
     (hp : p.length = 4) : bval c p = 0 := by
   rcases p with _ | ⟨h1, _ | ⟨h2, _ | ⟨h3, _ | ⟨h4, _ | ⟨h5, p⟩⟩⟩⟩⟩ <;> simp at hp
   simp only [bval_cons, bval_nil, add_zero, ← add_assoc]
-  exact aval_cell _ _ _ _ (hc _ _ h1) (hc _ _ h2) (hc _ _ h3) (hc _ _ h4)
+  exact aval_cell _ _ _ _ (hc h1) (hc h2) (hc h3) (hc h4)
 
 /-- **Lemma 3.5** (parity of `b`-values of paths): for a proper colouring,
 `b(P) ≡ i(u) + i(v) + ℓ (mod 2)`. Holds for all walks. -/
@@ -68,7 +68,7 @@ theorem bval_parity {c : V → Fin 3} (hc : IsProper G c) {u v : V} (p : G.Walk 
   induction p with
   | nil => simp [Int.ModEq]; omega
   | cons h p ih =>
-    have h1 := aval_parity _ _ (hc _ _ h)
+    have h1 := aval_parity _ _ (hc h)
     rw [bval_cons, Walk.length_cons, Nat.cast_add, Nat.cast_one]
     rw [Int.modEq_iff_dvd] at *
     omega
@@ -116,10 +116,10 @@ private lemma gridPot_horiz {a b : ℕ} {c : Fin a × Fin b → Fin 3} (hc : IsP
       extC_eq c (i := i + 1) (j := j + 1) hi hj] at *
     have cell := aval_cell (c (⟨i, by omega⟩, ⟨j, by omega⟩)) (c (⟨i, by omega⟩, ⟨j + 1, hj⟩))
       (c (⟨i + 1, hi⟩, ⟨j + 1, hj⟩)) (c (⟨i + 1, hi⟩, ⟨j, by omega⟩))
-      (hc _ _ (by simp [boxProd_adj, pathGraph_adj]))
-      (hc _ _ (by simp [boxProd_adj, pathGraph_adj]))
-      (hc _ _ (by simp [boxProd_adj, pathGraph_adj]))
-      (hc _ _ (by simp [boxProd_adj, pathGraph_adj]))
+      (hc (by simp [boxProd_adj, pathGraph_adj]))
+      (hc (by simp [boxProd_adj, pathGraph_adj]))
+      (hc (by simp [boxProd_adj, pathGraph_adj]))
+      (hc (by simp [boxProd_adj, pathGraph_adj]))
     have e1 := aval_antisymm (c (⟨i + 1, hi⟩, ⟨j + 1, hj⟩)) (c (⟨i + 1, hi⟩, ⟨j, by omega⟩))
     have e2 := aval_antisymm (c (⟨i, by omega⟩, ⟨j, by omega⟩)) (c (⟨i + 1, hi⟩, ⟨j, by omega⟩))
     linarith
@@ -173,9 +173,9 @@ theorem rowSum_eq_of_adj (hb : 2 ≤ b) {c : α × Fin b → Fin 3} (hc : IsProp
     {i i' : α} (h : G₁.Adj i i') : rowSum c i = rowSum c i' := by
   have cell : ∀ j : Fin b, aval (c (i, j)) (c (i, j + 1)) + aval (c (i, j + 1)) (c (i', j + 1)) +
       aval (c (i', j + 1)) (c (i', j)) + aval (c (i', j)) (c (i, j)) = 0 := fun j =>
-    aval_cell _ _ _ _ (hc _ _ (by simp [boxProd_adj, cycleGraph_adj_add_one hb]))
-      (hc _ _ (by simp [boxProd_adj, h])) (hc _ _ (by simp [boxProd_adj, (cycleGraph_adj_add_one hb j).symm]))
-      (hc _ _ (by simp [boxProd_adj, h.symm]))
+    aval_cell _ _ _ _ (hc (by simp [boxProd_adj, cycleGraph_adj_add_one hb]))
+      (hc (by simp [boxProd_adj, h])) (hc (by simp [boxProd_adj, (cycleGraph_adj_add_one hb j).symm]))
+      (hc (by simp [boxProd_adj, h.symm]))
   have hsum := Finset.sum_eq_zero (s := Finset.univ) fun j _ => cell j
   simp only [Finset.sum_add_distrib] at hsum
   have hre : ∑ j : Fin b, aval (c (i, j + 1)) (c (i', j + 1)) = ∑ j : Fin b, aval (c (i, j)) (c (i', j)) :=
@@ -206,7 +206,7 @@ theorem rowSum_odd (hb : 3 ≤ b) (hodd : Odd b) {c : α × Fin b → Fin 3}
   have hdvd : ∀ j : Fin b,
       (2 : ℤ) ∣ aval (c (i, j)) (c (i, j + 1)) - ind (c (i, j)) - ind (c (i, j + 1)) - 1 := by
     intro j
-    have := (aval_parity _ _ (hc (i, j) (i, j + 1)
+    have := (aval_parity _ _ (@hc (i, j) (i, j + 1)
       (by simp [boxProd_adj, cycleGraph_adj_add_one hb2]))).symm
     rw [Int.modEq_iff_dvd] at this
     have e : aval (c (i, j)) (c (i, j + 1)) - ind (c (i, j)) - ind (c (i, j + 1)) - 1 =

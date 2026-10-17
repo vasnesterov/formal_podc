@@ -55,9 +55,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
   yes-instances.
 - **Locality.** An `R`-PLS verifier is any function whose output at `v` depends only on the
   `R`-round LOCAL view of `v` (`ViewEq`/`IsLocal`): edges incident to nodes at distance `< R`, and
-  inputs and labels at distance `≤ R`. For `R = 1` this is the classical PLS view. The local
-  agreement relation `GAgree` is reused from `Papers/PODC2026/SinklessOrientation/`. Verifiers are
-  deterministic and need not be computable, as in the paper.
+  inputs and labels at distance `≤ R`. For `R = 1` this is the classical PLS view. `ViewEq` and
+  `IsLocal` are the shared notions of `Podc/Local/Locality.lean` (`Cslib.Local.ViewEq`,
+  `Cslib.Local.IsLocal`) applied to the labelling `u ↦ (I u, ℓ u)`; `viewEq_iff` and `isLocal_iff`
+  state them in the paper's form. Verifiers are deterministic and need not be computable, as in
+  the paper.
 - **Randomness.** Section 5's randomness is replaced by counting over all radius assignments.
 - **Connectivity.** Theorem 1.2 assumes connected graphs, as the paper does.
 - **Identifiers and `n`.** All graphs of a family live on the same node set `V`, so the identifier
@@ -105,7 +107,8 @@ For Theorem 1.6 the bound is `m ≤ 4(t+1)p` for every `t`-PLS.
 - Lemma 6.1 is not formalized as such; a direct fooling-set argument replaces it.
 
 **CSLib candidates** (marked `-- CSLib candidate`):
-- the PLS model with the localization trick (`ViewEq`, `IsLocal`, `loc`, `mask`, `Basic.lean`);
+- the PLS model (`PLS`, `Basic.lean`); views, locality and the localization trick (`loc`, `mask`)
+  are in the shared `Podc/Local/Locality.lean`;
 - the string encoding (`Encoding.lean`);
 - fibre counting along an order (`card_and_le_fiber`, `card_all_bad_le`) and ball sizes in
   connected graphs (`card_ball_ge`, `RandomCarving.lean`);

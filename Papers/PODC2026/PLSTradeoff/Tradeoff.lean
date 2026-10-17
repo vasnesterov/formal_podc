@@ -22,7 +22,9 @@ Lemma 3.5 (`sound_of_good`) is the combinatorial core of soundness.
 
 namespace PLSTradeoff
 
-open SimpleGraph SinklessOrientation
+open SimpleGraph
+open Cslib.Local (GAgree loc mask loc_le gAgree_loc edist_le_edist_loc mask_of_le
+  loc_edist_le_iff loc_adj_iff)
 
 variable {V : Type*} {ι : Type*}
 
@@ -30,28 +32,9 @@ section Helpers
 
 variable {G : SimpleGraph V}
 
-lemma eq_or_adj_of_edist_le_one {u z : V} (h : G.edist u z ≤ 1) : z = u ∨ G.Adj u z := by
-  obtain ⟨k, hk⟩ : ∃ k : ℕ, G.edist u z = k :=
-    (ENat.ne_top_iff_exists.1 (ne_top_of_le_ne_top (by decide) h)).imp fun _ h => h.symm
-  have hk1 : k ≤ 1 := by exact_mod_cast hk ▸ h
-  interval_cases k
-  · exact Or.inl (edist_eq_zero_iff.1 hk).symm
-  · exact Or.inr (edist_eq_one_iff_adj.1 hk)
-
-lemma edist_le_one_of_eq_or_adj {u z : V} (h : z = u ∨ G.Adj u z) : G.edist u z ≤ 1 := by
-  rcases h with rfl | h
-  · simp
-  · rw [edist_eq_one_iff_adj.2 h]
-
 lemma viewEq_self {α : Type*} {R : ℕ} {I : V → ι} {ℓ ℓ' : V → α} {u : V}
     (h : ∀ z, G.edist u z ≤ R → ℓ z = ℓ' z) : ViewEq R G I ℓ G I ℓ' u :=
-  ⟨fun _ _ _ => Iff.rfl, fun z hz => ⟨rfl, h z hz⟩⟩
-
-lemma edist_le_add {a b c : V} {m n : ℕ} (h1 : G.edist a b ≤ m) (h2 : G.edist b c ≤ n) :
-    G.edist a c ≤ (m + n : ℕ) := by
-  calc G.edist a c ≤ G.edist a b + G.edist b c := SimpleGraph.edist_triangle
-    _ ≤ m + n := add_le_add h1 h2
-    _ = ((m + n : ℕ) : ℕ∞) := by push_cast; rfl
+  Cslib.Local.ViewEq.of_eqOn fun z hz => by rw [h z hz]
 
 end Helpers
 
@@ -178,13 +161,14 @@ theorem sound_of_good {𝒢 : Set (SimpleGraph V)} {P : SimpleGraph V → (V →
   let ℓV : V → Label := fun u => if u ∈ ts.X then ℓX u else ext (ts.cl u) u
   refine S1.sound G hG I ℓV (fun u => ?_)
   by_cases hB : ∀ y, (y = u ∨ G.Adj u y) → y ∈ ts.X
-  · rw [S1.isLocal G I ℓV G I ℓX u (viewEq_self fun z hz => ?_)]
+  · rw [S1.isLocal.eq G I ℓV G I ℓX u (viewEq_self fun z hz => ?_)]
     · exact hgood u hB
-    · simp [ℓV, hB z (eq_or_adj_of_edist_le_one hz)]
+    · simp [ℓV, hB z (edist_le_one_iff_mem_closedNeighborSet.1 hz)]
   · obtain ⟨w, hw⟩ := ts.mem_H_of_not_subset hB
-    rw [S1.isLocal G I ℓV G I (ext (ts.cl w)) u (viewEq_self fun z hz => ?_)]
+    rw [S1.isLocal.eq G I ℓV G I (ext (ts.cl w)) u (viewEq_self fun z hz => ?_)]
     · exact (ext_spec w).2 u hw
-    · rcases ts.ball_subset_of_mem_H hw z (eq_or_adj_of_edist_le_one hz) with hz' | hz'
+    · rcases ts.ball_subset_of_mem_H hw z (edist_le_one_iff_mem_closedNeighborSet.1 hz) with
+        hz' | hz'
       · by_cases hzX : z ∈ ts.X
         · simp [ℓV, hzX, (ext_spec w).1 z hzX]
         · simp [ℓV, hzX, ts.cl_eq z w hz']
@@ -223,11 +207,11 @@ noncomputable def verT (S : TSCert 𝒢 t ε R)
 lemma verT_isLocal (S : TSCert 𝒢 t ε R)
     (ver1 : SimpleGraph V → (V → ι) → (V → Label) → V → Bool) {Rt : ℕ} (hR : R ≤ Rt) :
     IsLocal Rt (verT S ver1 Rt) := by
-  intro G I ℓ G' I' ℓ' v h
+  refine isLocal_iff.2 fun G I ℓ G' I' ℓ' v h => ?_
   have hts : S.ver G (tsPart ℓ) v = S.ver G' (tsPart ℓ') v :=
-    S.isLocal G (fun _ => ()) (tsPart ℓ) G' (fun _ => ()) (tsPart ℓ') v
-      ⟨h.1.mono_radius hR, fun u hu => ⟨rfl, by
-        simp only [tsPart, (h.2 u (hu.trans (by exact_mod_cast hR))).2]⟩⟩
+    S.isLocal.eq G (fun _ => ()) (tsPart ℓ) G' (fun _ => ()) (tsPart ℓ') v
+      (viewEq_iff.2 ⟨h.1.mono_radius hR, fun u hu => ⟨rfl, by
+        simp only [tsPart, ((viewEq_iff.1 h).2 u (hu.trans (by exact_mod_cast hR))).2]⟩⟩)
   have hloc := viewEq_loc_eq h
   obtain ⟨hI, hℓ⟩ := viewEq_mask_eq h
   unfold verT
@@ -251,7 +235,7 @@ lemma edist_near {G : SimpleGraph V} (ts : TSPartition G t ε) {v w u y : V}
     G.edist v y ≤ (2 * t + 2 : ℕ) := by
   have h1 : G.edist v w ≤ t := ts.diam v v (ts.mem_cl v) w hw
   have h2 : G.edist u y ≤ t := ts.diam u u (ts.mem_cl u) y hy
-  have := edist_le_add (edist_le_add h1 hu) h2
+  have := edist_le_natCast_add (edist_le_natCast_add h1 hu) h2
   exact this.trans (by exact_mod_cast (by omega : t + 2 + t ≤ 2 * t + 2))
 
 /-- The local decoding at `v` agrees with the global decoding near `v`'s cluster. -/
@@ -332,9 +316,9 @@ theorem tradeoff_of_tsCert {𝒢 : Set (SimpleGraph V)} {P : SimpleGraph V → (
     · -- assertion (3)
       have hv0 : G.edist v v ≤ (0 : ℕ) := by simp
       rw [ver_loc_mask S1.isLocal I _ _ hv0 (by omega) (fun _ _ => rfl)]
-      rw [S1.isLocal G I _ G I (S1.prov G I) v (viewEq_self fun z hz => ?_)]
+      rw [S1.isLocal.eq G I _ G I (S1.prov G I) v (viewEq_self fun z hz => ?_)]
       · exact S1.complete G hG I hP v
-      · have hz := eq_or_adj_of_edist_le_one hz
+      · have hz := edist_le_one_iff_mem_closedNeighborSet.1 hz
         have hnear : ∃ w ∈ ts.cl v, G.edist w z ≤ 2 :=
           ⟨v, ts.mem_cl v, hz.elim (fun h => by simp [h]) (fun h => by
             rw [edist_eq_one_iff_adj.2 h]; norm_num)⟩
@@ -355,7 +339,7 @@ theorem tradeoff_of_tsCert {𝒢 : Set (SimpleGraph V)} {P : SimpleGraph V → (
       have hvu : G.edist v u ≤ (t + 1 : ℕ) := by
         rcases hy with rfl | hy
         · exact hvy.trans (by exact_mod_cast (by omega : t ≤ t + 1))
-        · exact edist_le_add hvy (edist_le_one_of_eq_or_adj (Or.inr (loc_le G v Rt hy).symm))
+        · exact edist_le_natCast_add hvy ((edist_eq_one_iff_adj.2 (loc_le G v Rt hy).symm).le)
       rw [ver_loc_mask S1.isLocal I _ _ hvu (by omega) (fun _ _ => rfl)]
       exact S1.complete G hG I hP u
   · ---------------- soundness ----------------
@@ -382,11 +366,11 @@ theorem tradeoff_of_tsCert {𝒢 : Set (SimpleGraph V)} {P : SimpleGraph V → (
       have hv0 : G.edist v v ≤ (0 : ℕ) := by simp
       have hnear : ∀ {z}, G.edist v z ≤ 1 → ∃ w ∈ ts.cl v, G.edist w z ≤ 2 :=
         fun hz => ⟨v, ts.mem_cl v, hz.trans (by norm_num)⟩
-      have := hc3 (fun u hu => (mem_out_iff ts hoC (hnear (edist_le_one_of_eq_or_adj
+      have := hc3 (fun u hu => (mem_out_iff ts hoC (hnear (edist_le_one_iff_mem_closedNeighborSet.2
         (hu.imp id (fun h => (loc_adj_iff hv0 (by omega)).1 h))))).2
         (hB u (hu.imp id (fun h => (loc_adj_iff hv0 (by omega)).1 h))))
       rw [ver_loc_mask S1.isLocal I _ _ hv0 (by omega) (fun _ _ => rfl)] at this
-      rwa [S1.isLocal G I _ G I ℓX v (viewEq_self fun z hz => decodeX_local ts hoC hRt ℓ
+      rwa [S1.isLocal.eq G I _ G I ℓX v (viewEq_self fun z hz => decodeX_local ts hoC hRt ℓ
         (hnear hz))] at this
     · -- good extension for the cluster of `w`
       by_cases hne : ∃ y ∈ ts.cl w, y ∉ ts.X
@@ -416,19 +400,19 @@ theorem tradeoff_of_tsCert {𝒢 : Set (SimpleGraph V)} {P : SimpleGraph V → (
         have hvu : G.edist v u ≤ (t + 1 : ℕ) := by
           rcases hy with rfl | hy
           · exact hvy.trans (by exact_mod_cast (by omega : t ≤ t + 1))
-          · exact edist_le_add hvy (edist_le_one_of_eq_or_adj (Or.inr hy.symm))
+          · exact edist_le_natCast_add hvy ((edist_eq_one_iff_adj.2 hy.symm).le)
         have hacc' := hℓ'acc u ⟨y, hy.imp id (fun h =>
           ((loc_adj_iff hvy (by omega : t + 1 ≤ Rt)).2 h.symm).symm),
           hcl_o ▸ hyC, fun h => hyX ((mem_out_iff ts hoC ⟨y, hyC, by simp⟩).1 h)⟩
         rw [ver_loc_mask S1.isLocal I _ _ hvu (by omega) (fun _ _ => rfl)] at hacc'
-        rw [S1.isLocal G I _ G I ℓ' u (viewEq_self fun z hz => ?_)]
+        rw [S1.isLocal.eq G I _ G I ℓ' u (viewEq_self fun z hz => ?_)]
         · exact hacc'
-        · have hz' := eq_or_adj_of_edist_le_one hz
+        · have hz' := edist_le_one_iff_mem_closedNeighborSet.1 hz
           -- `z` is within distance 2 of `y ∈ C_v`
           have hyz : G.edist y z ≤ 2 := by
             rcases hy with rfl | hy
             · exact hz.trans (by norm_num)
-            · have := edist_le_add (edist_le_one_of_eq_or_adj (Or.inr hy.symm)) hz
+            · have := edist_le_natCast_add ((edist_eq_one_iff_adj.2 hy.symm).le) hz
               exact this.trans (by norm_num)
           have hnear : ∃ w ∈ ts.cl v, G.edist w z ≤ 2 := ⟨y, hyC, hyz⟩
           by_cases hzX : z ∈ ts.X

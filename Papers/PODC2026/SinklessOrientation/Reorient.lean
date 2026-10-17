@@ -34,6 +34,7 @@ an edge claimed in both directions keeps its old orientation.
 namespace SinklessOrientation
 
 open SimpleGraph
+open Cslib.Local (GAgree)
 
 variable {V : Type*}
 
@@ -121,19 +122,12 @@ lemma adj_anc {x : V} (hr : G.Reachable s x) {i : ℕ} (hi : i < G.dist s x) :
     rw [h, dist_self] at this; omega
   rw [anc_succ]; exact ((par_spec (reachable_anc hr i)).2 hne).1
 
-lemma reachable_of_mem_cball {x : V} {h : ℕ} (hx : G.edist s x ≤ h) : G.Reachable s x :=
-  reachable_of_edist_ne_top (edist_lt_top_of_le hx)
-
-lemma edist_le_of_dist_le {x : V} {h : ℕ} (hr : G.Reachable s x) (hx : G.dist s x ≤ h) :
-    G.edist s x ≤ h := by
-  rw [← hr.coe_dist_eq_edist]; exact_mod_cast hx
-
 lemma edist_anc_le {x : V} {h : ℕ} (hx : G.edist s x ≤ h) (i : ℕ) :
     G.edist s (anc G s x i) ≤ h := by
-  have hr := reachable_of_mem_cball hx
-  apply edist_le_of_dist_le (reachable_anc hr i)
+  have hr := reachable_of_edist_le_natCast hx
+  apply (reachable_anc hr i).edist_le_natCast
   rw [dist_anc hr]
-  have := dist_le_of_edist_le hx
+  have := dist_le_of_edist_le_natCast hx
   omega
 
 end Tree
@@ -229,7 +223,7 @@ lemma repPath_out {m : ℕ} (hm : m ≤ G.dist s t) (hm0 : m ≠ 0) :
   ⟨m - 1, by omega, by rw [Nat.sub_add_cancel (Nat.one_le_iff_ne_zero.2 hm0)], rfl⟩
 
 lemma ntSet_reachable (hp : (t, t') ∈ ntSet G h s) : G.Reachable s t ∧ G.Reachable s t' :=
-  ⟨reachable_of_mem_cball hp.1, (reachable_of_mem_cball hp.1).trans hp.2.1.reachable⟩
+  ⟨reachable_of_edist_le_natCast hp.1, (reachable_of_edist_le_natCast hp.1).trans hp.2.1.reachable⟩
 
 lemma ntSet_ne (hp : (t, t') ∈ ntSet G h s) : t ≠ s := by
   rintro rfl
@@ -295,7 +289,7 @@ lemma repair_adj_mem {a b : V} (hab : repair G δ h s a b) :
     G.Adj a b ∧ G.edist s a ≤ h ∧ G.edist s b ≤ h := by
   rcases hab with ⟨hne, hab⟩ | ⟨_, hne, hab⟩
   · have ht := (lowPick_mem hne).1
-    have hr := reachable_of_mem_cball ht
+    have hr := reachable_of_edist_le_natCast ht
     refine ⟨repPath_adj hr hab, ?_, ?_⟩
     · obtain ⟨⟨m, -, rfl⟩, -⟩ := repPath_mem hab; exact edist_anc_le ht m
     · obtain ⟨-, ⟨m, -, rfl⟩⟩ := repPath_mem hab; exact edist_anc_le ht m
@@ -306,8 +300,8 @@ lemma repair_adj_mem {a b : V} (hab : repair G δ h s a b) :
     obtain ⟨hr, hr'⟩ := ntSet_reachable hp'
     have ht : G.edist s t ≤ h := hp.1
     have ht' : G.edist s t' ≤ h := by
-      apply edist_le_of_dist_le hr'
-      exact hp.2.2.1.trans (dist_le_of_edist_le ht)
+      apply hr'.edist_le_natCast
+      exact hp.2.2.1.trans (dist_le_of_edist_le_natCast ht)
     refine ⟨repCycle_adj hp' hab, ?_⟩
     rcases hab with hab | ⟨rfl, rfl⟩ | ⟨j, -, rfl, rfl⟩
     · obtain ⟨⟨m, -, rfl⟩, ⟨m', -, rfl⟩⟩ := repPath_mem hab
@@ -318,7 +312,7 @@ lemma repair_adj_mem {a b : V} (hab : repair G δ h s a b) :
 lemma repair_not_symm {a b : V} (h1 : repair G δ h s a b) (h2 : repair G δ h s b a) : False := by
   rcases h1 with ⟨hne, h1⟩ | ⟨hlow, hne, h1⟩
   · rcases h2 with ⟨-, h2⟩ | ⟨hlow, -⟩
-    · exact repPath_not_symm (reachable_of_mem_cball (lowPick_mem hne).1) h1 h2
+    · exact repPath_not_symm (reachable_of_edist_le_natCast (lowPick_mem hne).1) h1 h2
     · exact hlow hne
   · rcases h2 with ⟨hne', -⟩ | ⟨-, -, h2⟩
     · exact hlow hne'
@@ -334,7 +328,7 @@ lemma repair_cover (hs : δ ≤ deg G s)
   by_cases hlow : (lowSet G δ h s).Nonempty
   · have ht := lowPick_mem hlow
     set t := lowPick G δ h s
-    have hr := reachable_of_mem_cball ht.1
+    have hr := reachable_of_edist_le_natCast ht.1
     have hts : t ≠ s := fun e => by have := ht.2; rw [e] at this; omega
     have hpos : G.dist s t ≠ 0 := (hr.pos_dist_of_ne hts.symm).ne'
     -- every node `anc t m` with `m ≥ 1` has an outgoing edge
@@ -514,10 +508,6 @@ section Locality
 
 variable {G G' : SimpleGraph V} {δ h : ℕ} {s : V}
 
-lemma dist_eq_of_gAgree {u x : V} {R : ℕ} (hA : GAgree G G' u R) (hx : G.edist u x ≤ R) :
-    G'.dist u x = G.dist u x := by
-  simp only [SimpleGraph.dist, hA.edist_eq hx]
-
 lemma succ_le_succ_coe {e : ℕ∞} {h : ℕ} (he : e ≤ h) : e + 1 ≤ ((h + 1 : ℕ) : ℕ∞) := by
   push_cast; exact add_le_add_left he 1
 
@@ -527,7 +517,7 @@ lemma repair_congr (hA : GAgree G G' s (h + 1)) (a b : V) :
   have hle : ∀ x : V, G.edist s x ≤ h → G.edist s x ≤ (h + 1 : ℕ) :=
     fun x hx => hx.trans (by exact_mod_cast Nat.le_succ h)
   have hD : ∀ x, G.edist s x ≤ (h + 1 : ℕ) → G'.dist s x = G.dist s x :=
-    fun x hx => dist_eq_of_gAgree hA hx
+    fun x hx => hA.dist_eq hx
   have hBall : ∀ x, G'.edist s x ≤ h ↔ G.edist s x ≤ h := fun x => hA.edist_le_iff (by omega)
   have hAdj : ∀ x, G.edist s x ≤ h → ∀ y, G.Adj x y ↔ G'.Adj x y := by
     intro x hx y
@@ -560,7 +550,7 @@ lemma repair_congr (hA : GAgree G G' s (h + 1)) (a b : V) :
     ext t
     simp only [lowSet, Set.mem_ofPred_eq, hBall]
     apply and_congr_right; intro ht
-    rw [(hA.mono (a := h) ht (by omega : h + 1 ≤ h + 1)).deg_eq (by omega)]
+    rw [deg_eq_of_gAgree (hA.mono (a := h) ht (by omega : h + 1 ≤ h + 1)) (by omega)]
   have hnt : ntSet G' h s = ntSet G h s := by
     ext ⟨t, t'⟩
     simp only [ntSet, Set.mem_ofPred_eq, hBall]
@@ -576,8 +566,8 @@ lemma repair_congr (hA : GAgree G G' s (h + 1)) (a b : V) :
     intro t t' hp a b
     have ht : G.edist s t ≤ h := hp.1
     have ht' : G.edist s t' ≤ h := by
-      apply edist_le_of_dist_le (ntSet_reachable hp).2
-      exact hp.2.2.1.trans (dist_le_of_edist_le ht)
+      apply (ntSet_reachable hp).2.edist_le_natCast
+      exact hp.2.2.1.trans (dist_le_of_edist_le_natCast ht)
     have hlca : lcaIdx G' s t t' = lcaIdx G s t t' := by
       simp only [lcaIdx, hD t (hle t ht), hD t' (hle t' ht'), hanc t ht, hanc t' ht']
     simp only [RepCycle, hpath t ht, hlca, hanc t' ht']
@@ -604,7 +594,7 @@ lemma fwd_of_gAgree {o : Orientation G} {o' : Orientation G'} {u a b : V}
   refine ⟨s, ⟨?_, ?_⟩, (repair_congr hAs a b).2 hrep⟩
   · intro y hy
     exact hsink y ((hO (lt_of_le_of_lt hus (by exact_mod_cast (by omega : h < 2 * h + 1))) y).2 hy)
-  · rw [← (hAs.mono_radius (by omega : 1 ≤ h + 1)).deg_eq (by omega)]; exact hdeg
+  · rw [← deg_eq_of_gAgree (hAs.mono_radius (by omega : 1 ≤ h + 1)) (by omega)]; exact hdeg
 
 /-- **Lemma 2.3** of [Nolin, PODC'26] (round complexity): the repaired orientation of an edge `uv`
 only depends on the graph and on the input orientation within distance `2h + 1` of `u`. Hence

@@ -18,7 +18,7 @@ import Papers.PODC2026.PLSTradeoff.Basic
 
 namespace PLSTradeoff
 
-open SimpleGraph SinklessOrientation
+open SimpleGraph
 
 variable {V : Type*}
 
