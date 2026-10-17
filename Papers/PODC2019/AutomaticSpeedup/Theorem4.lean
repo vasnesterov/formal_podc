@@ -1,6 +1,6 @@
 import Papers.PODC2019.AutomaticSpeedup.WeakColoring
 import Papers.PODC2019.AutomaticSpeedup.Lemmas123
-import Cslib.Computability.Distributed.Local.Linial
+import Podc.Foundations.Data.Nat.LogStar
 
 /-!
 # Lemma 4 and Theorem 4 of Brandt (PODC 2019, §5.1–5.2), port-numbering version
@@ -16,7 +16,7 @@ import Cslib.Computability.Distributed.Local.Linial
   `5 T + 7 ≤ log* Δ`.
 
 Tower bounds use CSLib's `Nat.tower` (`tower 0 = 1`, `tower (m+1) = 2 ^ tower m`) and
-`Nat.logStar`, and are proved by induction.
+`Nat.logStar` with the shared API of `Podc.Foundations.Data.Nat.LogStar`.
 -/
 
 namespace AutomaticSpeedup
@@ -51,34 +51,6 @@ theorem lemma_4 {k : ℕ} (hk : 2 ≤ k) {I : Type} {n Δ t : ℕ} {𝒢 : Set (
   exact ⟨_, solvesP_iff.1 h5⟩
 
 /-! ### Tower bounds -/
-
-theorem tower_le_succ (m : ℕ) : Nat.tower m ≤ Nat.tower (m + 1) :=
-  (Nat.lt_two_pow_self).le
-
-theorem tower_mono {m m' : ℕ} (h : m ≤ m') : Nat.tower m ≤ Nat.tower m' := by
-  induction h with
-  | refl => exact le_rfl
-  | step _ ih => exact ih.trans (tower_le_succ _)
-
-/-- `tower (log* n) ≤ n` for `n ≥ 1`. -/
-theorem tower_logStar_le : ∀ n : ℕ, 1 ≤ n → Nat.tower (Nat.logStar n) ≤ n := by
-  intro n
-  induction n using Nat.strong_induction_on with
-  | _ n ih =>
-    intro hn
-    rw [Nat.logStar]
-    split_ifs with h
-    · simpa [Nat.tower] using hn
-    · have hlog : 1 ≤ Nat.log 2 n := Nat.le_log_of_pow_le (by norm_num) (by omega)
-      have hlt : Nat.log 2 n < n := Nat.log_lt_self 2 (by omega)
-      calc Nat.tower (Nat.logStar (Nat.log 2 n) + 1)
-          = 2 ^ Nat.tower (Nat.logStar (Nat.log 2 n)) := rfl
-        _ ≤ 2 ^ Nat.log 2 n := Nat.pow_le_pow_right (by norm_num) (ih _ hlt hlog)
-        _ ≤ n := Nat.pow_log_le_self 2 (by omega)
-
-theorem tower_le_of_le_logStar {m n : ℕ} (hn : 1 ≤ n) (h : m ≤ Nat.logStar n) :
-    Nat.tower m ≤ n :=
-  (tower_mono h).trans (tower_logStar_le n hn)
 
 theorem succ_le_two_pow (k : ℕ) : k + 1 ≤ 2 ^ k := Nat.lt_two_pow_self
 
@@ -127,7 +99,7 @@ theorem kSeq_zero : kSeq 0 = 2 := rfl
 theorem kSeq_succ (i : ℕ) : kSeq (i + 1) = 2 ^ 2 ^ 2 ^ 2 ^ 2 ^ kSeq i := by
   simp only [kSeq, show 5 * (i + 1) + 1 = 5 * i + 1 + 1 + 1 + 1 + 1 + 1 by ring]; rfl
 
-theorem two_le_kSeq (i : ℕ) : 2 ≤ kSeq i := tower_mono (show 1 ≤ 5 * i + 1 by omega)
+theorem two_le_kSeq (i : ℕ) : 2 ≤ kSeq i := Nat.tower_mono (show 1 ≤ 5 * i + 1 by omega)
 
 /-! ### Theorem 4 -/
 
@@ -153,7 +125,7 @@ theorem theorem_4 {I : Type} {n Δ T : ℕ} {𝒢 : Set (LGraph I n)}
     rcases Nat.eq_zero_or_pos Δ with h | h
     · subst h; simp [Nat.logStar] at hT
     · exact h
-  have htow : Nat.tower (5 * T + 7) ≤ Δ := tower_le_of_le_logStar hΔ1 hT
+  have htow : Nat.tower (5 * T + 7) ≤ Δ := Nat.tower_le_of_le_logStar (by omega) hT
   -- superweak 2-colouring in `T + 1` rounds
   have h0 : SolvableIn 𝒢 (superweak (kSeq 0)) Δ (T + 1 - 0) :=
     (solvableIn_weakPtr hΔ1 hreg hw).of_labelHom (weakPtrToSuperweak Δ)
@@ -167,7 +139,7 @@ theorem theorem_4 {I : Type} {n Δ T : ℕ} {𝒢 : Set (LGraph I n)}
       have hk := two_le_kSeq j
       have hΔk : 2 ^ (4 ^ kSeq j + 1) ≤ Δ := by
         refine (two_pow_four_pow_le _).trans (le_trans ?_ htow)
-        exact tower_mono (show 5 * j + 1 + 4 ≤ 5 * T + 7 by omega)
+        exact Nat.tower_mono (show 5 * j + 1 + 4 ≤ 5 * T + 7 by omega)
       have := lemma_4 hk hΔk hreg hor (by omega) (hind _ (by omega) (by omega)) (ih (by omega))
       rw [show T + 1 - j - 1 = T + 1 - (j + 1) by omega] at this
       exact this.superweak_mono (by rw [kSeq_succ]; exact lemma4_bound hk)
@@ -175,12 +147,12 @@ theorem theorem_4 {I : Type} {n Δ T : ℕ} {𝒢 : Set (LGraph I n)}
   rw [Nat.sub_self] at hfin
   refine not_solvableIn_superweak_zero ι hlen hrich (fun b => le_trans ?_ (hcount b)) hfin
   -- `k_{T+1} + 1 ≤ (Δ - 1) / 2`
-  have h3 : 4 ≤ kSeq (T + 1) := tower_mono (show 2 ≤ 5 * (T + 1) + 1 by omega)
+  have h3 : 4 ≤ kSeq (T + 1) := Nat.tower_mono (show 2 ≤ 5 * (T + 1) + 1 by omega)
   have h4 := two_mul_add_three_le h3
   have h5 : 2 ^ kSeq (T + 1) ≤ Δ := by
     refine le_trans ?_ htow
     show Nat.tower (5 * (T + 1) + 1 + 1) ≤ _
-    exact tower_mono (by omega)
+    exact Nat.tower_mono (by omega)
   omega
 
 /-- **Theorem 4** with the paper's runtime condition `1 ≤ T ≤ (log* Δ - 8) / 5` (§5.2). -/

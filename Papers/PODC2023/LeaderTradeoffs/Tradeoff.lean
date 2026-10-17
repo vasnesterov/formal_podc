@@ -1,4 +1,5 @@
 import Papers.PODC2023.LeaderTradeoffs.Isolation
+import Podc.Foundations.Data.Real.Logb
 
 /-!
 # The time–message tradeoff lower bound (Lemma 3.9 and Theorem 3.8, corrected)
@@ -374,27 +375,6 @@ theorem tradeoff_lower_bound {k c T : ℕ} (hk : m + 1 = 2 ^ k) {f : ℝ} (hf : 
       exact ⟨hwf.mem u hu.1 j v h, by rw [hlink u hu.1 j v h]; exact hu.2⟩) hval
   exact hno _ ((Finset.filter_subset _ _).trans (hIV.trans hV)) hXc ⟨q, hq, hqv⟩
 
-theorem logb_two_pow (k : ℕ) : Real.logb 2 ((2 : ℝ) ^ k) = k := by
-  rw [Real.logb_pow, Real.logb_self_eq_one (by norm_num), mul_one]
-
-/-- `f ≤ 2 ^ ⌈log₂ f⌉` for `f > 1`. -/
-theorem le_two_pow_ceil_logb {f : ℝ} (hf : 1 < f) :
-    f ≤ 2 ^ (⌈Real.logb 2 f⌉.toNat) := by
-  have hpos : 0 < Real.logb 2 f := Real.logb_pos (by norm_num) hf
-  have hc : (0 : ℤ) ≤ ⌈Real.logb 2 f⌉ := (Int.ceil_pos.2 hpos).le
-  have h1 : f = (2 : ℝ) ^ Real.logb 2 f := (Real.rpow_logb (by norm_num) (by norm_num)
-    (by linarith)).symm
-  have h2 : Real.logb 2 f ≤ ((⌈Real.logb 2 f⌉.toNat : ℕ) : ℝ) := by
-    have := Int.le_ceil (Real.logb 2 f)
-    have h3 : ((⌈Real.logb 2 f⌉.toNat : ℕ) : ℤ) = ⌈Real.logb 2 f⌉ := Int.toNat_of_nonneg hc
-    calc Real.logb 2 f ≤ (⌈Real.logb 2 f⌉ : ℝ) := this
-      _ = (((⌈Real.logb 2 f⌉.toNat : ℕ) : ℤ) : ℝ) := by rw [h3]
-      _ = _ := by norm_cast
-  calc f = (2 : ℝ) ^ Real.logb 2 f := h1
-    _ ≤ (2 : ℝ) ^ (((⌈Real.logb 2 f⌉.toNat : ℕ)) : ℝ) :=
-        Real.rpow_le_rpow_of_exponent_le (by norm_num) h2
-    _ = _ := Real.rpow_natCast _ _
-
 /-- **Theorem 3.8 (corrected).** Let `n = m + 1` be a power of two, and let the IDs come from a
 universe `U` of at least `2 n log₂ n + n` IDs (as in the paper). If a deterministic algorithm
 elects a leader within `T` rounds and always sends at most `n · f` messages, `f > 1`, then
@@ -421,9 +401,12 @@ theorem theorem_3_8_corrected {k T : ℕ} (hk : m + 1 = 2 ^ k) {f : ℝ} (hf : 1
       calc (T + 2) * (m + 1) ≤ (2 * k + 1) * (m + 1) := Nat.mul_le_mul_right _ hT
         _ = 2 * (m + 1) * k + (m + 1) := by ring
         _ ≤ _ := hU
-    exact absurd (tradeoff_lower_bound hk hf (le_two_pow_ceil_logb hf) hU' hA hM) (not_le.2 h)
+    have hf2 : f ≤ 2 ^ ⌈Real.logb 2 f⌉.toNat := by
+      rw [Int.ceil_toNat]; exact Real.le_pow_natCeil_logb one_lt_two f
+    exact absurd (tradeoff_lower_bound hk hf hf2 hU' hA hM) (not_le.2 h)
   have hlog : Real.logb 2 ((m : ℝ) + 1) = k := by
-    rw [show ((m : ℝ) + 1) = (2 : ℝ) ^ k by exact_mod_cast hk, logb_two_pow]
+    rw [show ((m : ℝ) + 1) = (2 : ℝ) ^ k by exact_mod_cast hk,
+      Real.logb_self_pow two_pos (by norm_num)]
   rw [hlog, ← hcz]
   have hc1 : (0 : ℝ) < (c : ℝ) + 1 := by positivity
   push_cast

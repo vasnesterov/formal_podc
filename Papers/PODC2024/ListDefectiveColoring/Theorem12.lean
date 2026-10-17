@@ -1,4 +1,5 @@
 import Papers.PODC2024.ListDefectiveColoring.Basic
+import Podc.Foundations.Data.Nat.Log
 
 /-!
 # Theorem 1.2 of [FK24]: the arithmetic of the parameter choice
@@ -63,15 +64,11 @@ theorem two_mul_exp_third_lt_three : 2 * exp (1 / 3) < 3 := by
 /-- `2^{⌈log₄ C⌉} < 2 √C` for `C ≥ 2`. -/
 theorem two_pow_clog_four_lt {C : ℕ} (hC : 2 ≤ C) :
     (2 : ℝ) ^ Nat.clog 4 C < 2 * √(C : ℝ) := by
-  have hm : 0 < Nat.clog 4 C := Nat.clog_pos (by norm_num) (by omega)
-  have hlt : 4 ^ (Nat.clog 4 C).pred < C := Nat.pow_pred_clog_lt_self (by norm_num) (by omega)
-  obtain ⟨k, hk⟩ : ∃ k, Nat.clog 4 C = k + 1 := ⟨_, (Nat.succ_pred_eq_of_pos hm).symm⟩
-  rw [hk] at hlt ⊢
-  simp only [Nat.pred_succ] at hlt
-  have hlt' : ((2 : ℝ) ^ k) ^ 2 < C := by
-    rw [← pow_mul, mul_comm, pow_mul]; norm_num; exact_mod_cast hlt
-  have : (2 : ℝ) ^ k < √(C : ℝ) := (lt_sqrt (by positivity)).2 hlt'
-  rw [pow_succ]; linarith
+  have h : 4 ^ Nat.clog 4 C < 4 * C := Nat.pow_clog_lt_mul (by norm_num) (by omega)
+  have h' : ((2 : ℝ) ^ Nat.clog 4 C) ^ 2 < (2 * √(C : ℝ)) ^ 2 := by
+    rw [mul_pow, Real.sq_sqrt (Nat.cast_nonneg _), ← pow_mul, mul_comm, pow_mul]
+    norm_num; exact_mod_cast h
+  exact lt_of_pow_lt_pow_left₀ 2 (by positivity) h'
 
 /-- The arithmetic of the proof of Theorem 1.2 of [FK24] (p. 15 of arXiv:2405.04648):
 with `m = ⌈log₄ C⌉`, the slack `κ(4)^m = (2 (1 + 1/(3m)))^m` required by Lemma 3.5 applied to

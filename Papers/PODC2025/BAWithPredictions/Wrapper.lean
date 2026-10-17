@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.Foundations.Data.Nat.Log
 
 /-!
 # Byzantine Agreement with Predictions — the guess-and-double wrapper (Sections 5 and 9)
@@ -285,17 +286,8 @@ theorem theorem11_rounds (hτ : τ.Valid H PreEs PreCl) {i₀ : P} (hi₀ : i₀
   ⟨lemma30_32 hτ hi₀ hpre, rounds_le G α (ψ + 1)⟩
 
 /-- The doubling step: for every `k ≥ 1` there is a phase `ψ` with `k ≤ 2^ψ < 2k`. -/
-theorem exists_pow_two_between {k : ℕ} (hk : 1 ≤ k) : ∃ ψ, k ≤ 2 ^ ψ ∧ 2 ^ ψ < 2 * k := by
-  refine ⟨Nat.clog 2 k, Nat.le_pow_clog (by norm_num) k, ?_⟩
-  rcases Nat.lt_or_ge 1 k with h | h
-  · have h0 := Nat.pow_pred_clog_lt_self (b := 2) (by norm_num) h
-    have : 2 ^ (Nat.clog 2 k - 1) < k := by simpa [Nat.pred_eq_sub_one] using h0
-    have hc : 0 < Nat.clog 2 k := Nat.clog_pos (by norm_num) h
-    calc 2 ^ Nat.clog 2 k = 2 * 2 ^ (Nat.clog 2 k - 1) := by
-          rw [← pow_succ']; congr 1; omega
-      _ < 2 * k := by omega
-  · obtain rfl : k = 1 := by omega
-    simp
+theorem exists_pow_two_between {k : ℕ} (hk : 1 ≤ k) : ∃ ψ, k ≤ 2 ^ ψ ∧ 2 ^ ψ < 2 * k :=
+  ⟨Nat.clog 2 k, Nat.le_pow_clog one_lt_two k, Nat.pow_clog_lt_mul one_lt_two (by omega)⟩
 
 end Trace
 

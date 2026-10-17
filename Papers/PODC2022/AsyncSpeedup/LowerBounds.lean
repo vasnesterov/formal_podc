@@ -1,6 +1,7 @@
 import Papers.PODC2022.AsyncSpeedup.ApproxAgreement
 import Mathlib.Data.Fintype.EquivFin
 import Mathlib.Analysis.SpecialFunctions.Log.Base
+import Podc.Foundations.Data.Real.Logb
 
 /-!
 # Round lower bounds for approximate agreement (Corollary 3, Theorems 3 and 4)
@@ -158,12 +159,8 @@ theorem theorem4 [Fintype P] {m : ℤ} (hm : 0 ≤ m) (t : ℕ) (e : ℤ)
 /-! ### Logarithmic forms -/
 
 lemma ceil_logb_le_of_le_pow {b : ℕ} (hb : 1 < b) {u : ℝ} (hu : 0 < u) {t : ℕ}
-    (h : u ≤ (b : ℝ) ^ t) : ⌈Real.logb b u⌉ ≤ t := by
-  rw [Int.ceil_le]
-  have h3 : Real.logb b u ≤ Real.logb b ((b : ℝ) ^ t) :=
-    Real.logb_le_logb_of_le (by exact_mod_cast hb) hu h
-  have hb' : (1 : ℝ) < b := by exact_mod_cast hb
-  simpa [Real.logb_pow, Real.logb_self_eq_one hb'] using h3
+    (h : u ≤ (b : ℝ) ^ t) : ⌈Real.logb b u⌉ ≤ t :=
+  (Real.ceil_logb_le_iff_le_pow (by exact_mod_cast hb) hu).2 h
 
 lemma one_div_eps_le {m e : ℤ} (he : 0 < e) {c : ℕ} {t : ℕ} (h : m ≤ (c : ℤ) ^ t * e) :
     1 / ((e : ℝ) / m) ≤ (c : ℝ) ^ t := by

@@ -1,7 +1,8 @@
 import Mathlib.Data.Nat.Size
 import Mathlib.Data.Nat.Bitwise
 import Mathlib.Data.Nat.Log
-import Cslib.Computability.Distributed.Local.Linial
+import Podc.Foundations.Data.Nat.Log
+import Podc.Foundations.Data.Nat.LogStar
 
 /-!
 # The identifier-reduction function `f` (Section 4.1)
@@ -139,18 +140,8 @@ theorem lemma_4_3 {x y z : ℕ} (hxy : y < x) (hyz : z < y) : cvF x y ≠ cvF y 
 /-- The function `F(x) = 2⌈log₂(x + 1)⌉ + 1` of Lemma 4.1 (on natural numbers). -/
 def bigF (x : ℕ) : ℕ := 2 * Nat.clog 2 (x + 1) + 1
 
-lemma clog_two_succ_eq_size (x : ℕ) : Nat.clog 2 (x + 1) = x.size := by
-  apply le_antisymm
-  · exact Nat.clog_le_of_le_pow (Nat.lt_size_self x)
-  · exact Nat.size_le.2 (Nat.le_pow_clog (by norm_num) (x + 1))
-
 lemma bigF_eq (x : ℕ) : bigF x = 2 * x.size + 1 := by
-  rw [bigF, clog_two_succ_eq_size]
-
-lemma size_eq_log_succ {x : ℕ} (hx : x ≠ 0) : x.size = Nat.log 2 x + 1 := by
-  apply le_antisymm
-  · exact Nat.size_le.2 (Nat.lt_pow_succ_log_self (by norm_num) x)
-  · exact Nat.lt_size.2 (Nat.pow_log_le_self 2 hx)
+  rw [bigF, Nat.size_eq_clog_two]
 
 /-- `f(x, y) ≤ F(x)`. -/
 lemma cvF_le_bigF (x y : ℕ) : cvF x y ≤ bigF x := by
@@ -177,7 +168,7 @@ lemma bigF_bigF_le (x : ℕ) : bigF (bigF x) ≤ max 11 (Nat.log 2 x) := by
   rcases Nat.eq_zero_or_pos x with rfl | hx
   · have : Nat.size 1 = 1 := by decide
     simp [this]
-  rw [size_eq_log_succ hx.ne']
+  rw [Nat.size_eq_log_two_add_one hx.ne']
   set ℓ := Nat.log 2 x
   rcases Nat.lt_or_ge ℓ 12 with hℓ | hℓ
   · have : (2 * (ℓ + 1) + 1).size ≤ 5 := Nat.size_le.2 (by norm_num; omega)
@@ -185,16 +176,6 @@ lemma bigF_bigF_le (x : ℕ) : bigF (bigF x) ≤ max 11 (Nat.log 2 x) := by
   · have hm := four_mul_add_nine_lt_two_pow ((ℓ - 2) / 2) (by omega)
     have : (2 * (ℓ + 1) + 1).size ≤ (ℓ - 2) / 2 := Nat.size_le.2 (by omega)
     omega
-
-/-- `log₂^[log* x] x ≤ 1`. -/
-lemma iterate_log_logStar_le (x : ℕ) : (Nat.log 2)^[Nat.logStar x] x ≤ 1 := by
-  induction x using Nat.strong_induction_on with
-  | _ x ih =>
-    rw [Nat.logStar]
-    split_ifs with h
-    · exact h
-    · rw [Function.iterate_succ_apply]
-      exact ih _ (Nat.log_lt_self 2 (by omega))
 
 lemma iterate_bigF_two_le (k x : ℕ) : bigF^[2]^[k] x ≤ max 11 ((Nat.log 2)^[k] x) := by
   induction k with
@@ -229,7 +210,7 @@ theorem lemma_4_1 : ∃ α : ℕ, ∀ x ≥ 1, ∃ t ≤ α * Nat.logStar x, big
   refine ⟨2 * Nat.logStar x + 1, by omega, ?_⟩
   rw [Function.iterate_succ_apply', Function.iterate_mul]
   have h1 := iterate_bigF_two_le (Nat.logStar x) x
-  have h2 := iterate_log_logStar_le x
+  have h2 := Nat.iterate_log_logStar_le x
   have h3 : bigF^[2]^[Nat.logStar x] x ≤ 11 := by omega
   have h11 : bigF 11 < 10 := by
     rw [bigF_eq, show Nat.size 11 = 4 from le_antisymm (Nat.size_le.2 (by norm_num))

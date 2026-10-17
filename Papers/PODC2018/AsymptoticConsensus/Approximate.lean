@@ -1,6 +1,7 @@
 import Papers.PODC2018.AsymptoticConsensus.LowerBounds
 import Papers.PODC2018.AsymptoticConsensus.Psi
 import Papers.PODC2018.AsymptoticConsensus.Exact
+import Podc.Foundations.Data.Real.Logb
 
 /-!
 # Approximate consensus: decision-time lower bounds (FNS'18, Section 9, Theorems 8–11)
@@ -432,17 +433,12 @@ theorem theorem8 [Nontrivial V] (A : DAlg (Fin 2) σ V) {N : Set (Graph (Fin 2))
       | exact chainLE_two le_rfl m1 m0 m2 e1 (i02 k C hC)
       | exact chainLE_two le_rfl m2 m0 m1 e2 (i01 k C hC)
 
-/-- From `Δ ≤ b^T ε` to `log_b (Δ/ε) ≤ T`. -/
-theorem logb_div_le_of_le_pow_mul {b Δ ε : ℝ} (hb : 1 < b) (hΔ : 0 < Δ) (hε : 0 < ε) {T : ℕ}
-    (h : Δ ≤ b ^ T * ε) : Real.logb b (Δ / ε) ≤ T := by
-  rw [Real.logb_le_iff_le_rpow hb (div_pos hΔ hε), Real.rpow_natCast, div_le_iff₀ hε]
-  exact h
-
 /-- **Theorem 8 of FNS'18**, logarithmic form: decision time `T ≥ log₃(Δ/ε)`. -/
 theorem theorem8_logb [Nontrivial V] (A : DAlg (Fin 2) σ V) {N : Set (Graph (Fin 2))}
     (hN : ({H0, H1, H2} : Set (Graph (Fin 2))) ⊆ N) {Δ ε : ℝ} (hΔ : 0 < Δ) (hε : 0 < ε)
     {T : ℕ} (hA : A.DecidesBy N Δ ε T) : Real.logb 3 (Δ / ε) ≤ T :=
-  logb_div_le_of_le_pow_mul (by norm_num) hΔ hε (theorem8 A hN hΔ.le hA)
+  (Real.logb_div_le_iff_le_pow_mul (by norm_num) hΔ hε).2
+    (theorem8 A hN hΔ.le hA)
 
 /-! ### Theorem 9: deaf graphs -/
 
@@ -500,7 +496,8 @@ theorem theorem9_deaf [Nontrivial V] [Fintype α] (hn : 3 ≤ Fintype.card α) (
 theorem theorem9_logb [Nontrivial V] [Fintype α] (hn : 3 ≤ Fintype.card α) (A : DAlg α σ V)
     (G : Graph α) {N : Set (Graph α)} (hN : ∀ i, deafG G i ∈ N) {Δ ε : ℝ} (hΔ : 0 < Δ)
     (hε : 0 < ε) {T : ℕ} (hA : A.DecidesBy N Δ ε T) : Real.logb 2 (Δ / ε) ≤ T :=
-  logb_div_le_of_le_pow_mul (by norm_num) hΔ hε (theorem9_deaf hn A G hN hΔ.le hA)
+  (Real.logb_div_le_iff_le_pow_mul (by norm_num) hΔ hε).2
+    (theorem9_deaf hn A G hN hΔ.le hA)
 
 /-- **Theorem 9, non-split corollary**: in the model of all non-split graphs with `n ≥ 3`
 agents, `Δ ≤ 2^T ε`. -/
@@ -616,7 +613,8 @@ theorem theorem10 [Nontrivial V] {n : ℕ} (hn : 4 ≤ n) (A : DAlg (Fin n) σ V
 theorem theorem10_logb [Nontrivial V] {n : ℕ} (hn : 4 ≤ n) (A : DAlg (Fin n) σ V)
     {N : Set (Graph (Fin n))} (hN : ∀ u, Psi n u ∈ N) {Δ ε : ℝ} (hΔ : 0 < Δ) (hε : 0 < ε)
     {T : ℕ} (hA : A.DecidesBy N Δ ε T) : ((n : ℝ) - 2) * Real.logb 2 (Δ / ε) ≤ T := by
-  have h := logb_div_le_of_le_pow_mul (by norm_num) hΔ hε (theorem10 hn A hN hΔ.le hA)
+  have h := (Real.logb_div_le_iff_le_pow_mul (by norm_num) hΔ hε).2
+    (theorem10 hn A hN hΔ.le hA)
   have hcast : ((n - 2 : ℕ) : ℝ) = (n : ℝ) - 2 := by rw [Nat.cast_sub (by omega)]; norm_num
   have hdiv : ((n - 2 : ℕ) : ℝ) * ((T / (n - 2) : ℕ) : ℝ) ≤ T := by
     exact_mod_cast Nat.mul_div_le T (n - 2)
@@ -741,7 +739,7 @@ theorem theorem11_logb [Nontrivial V] {n : ℕ} (hn : 2 ≤ n) (A : DAlg (Fin n)
     have : (2 : ℝ) ≤ n := by exact_mod_cast hn
     linarith
   have hD1' : (1 : ℝ) ≤ D := by exact_mod_cast hD1
-  refine logb_div_le_of_le_pow_mul (by linarith) hΔ (mul_pos hn1 hε) ?_
+  refine (Real.logb_div_le_iff_le_pow_mul (by linarith) hΔ (mul_pos hn1 hε)).2 ?_
   have := theorem11 hn A hSI hD hΔ.le hA
   linarith
 

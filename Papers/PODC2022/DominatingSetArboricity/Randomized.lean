@@ -2,6 +2,7 @@ import Papers.PODC2022.DominatingSetArboricity.Deterministic
 import Cslib.Foundations.Data.Nat.TimeRec
 import Cslib.Probability.Finite.Bernoulli
 import Mathlib
+import Podc.Foundations.Data.Real.Logb
 
 /-!
 # The randomized extension (Lemmas 4.6–4.8, Theorems 1.2 and 1.3)
@@ -182,10 +183,8 @@ theorem maxDeg_le_pow {γ : ℝ} (hγ : 1 < γ) :
     (G.maxDegree + 1 : ℝ) ≤ γ ^ (itersPerPhase G γ - 1) := by
   have h : itersPerPhase G γ - 1 = ⌈Real.logb γ (G.maxDegree + 1)⌉₊ := by
     unfold itersPerPhase; omega
-  rw [h, ← Real.rpow_natCast]
-  calc (G.maxDegree + 1 : ℝ) = γ ^ Real.logb γ (G.maxDegree + 1) :=
-        (Real.rpow_logb (by linarith) hγ.ne' (by positivity)).symm
-    _ ≤ _ := Real.rpow_le_rpow_of_exponent_le hγ.le (Nat.le_ceil _)
+  rw [h]
+  exact Real.le_pow_natCeil_logb hγ _
 
 /-- In the last iteration of a phase every node of `Γ` is sampled. -/
 theorem sampProb_last {γ : ℝ} (hγ : 1 < γ) {k : ℕ} (hk : k % itersPerPhase G γ =
@@ -652,11 +651,7 @@ theorem run_props (cs : ℕ → V → Bool) (S : Finset V) (x : V → ℝ) (n : 
 /-- `γ^{⌈log_γ λ⁻¹⌉} λ ≥ 1`. -/
 theorem one_le_pow_numPhases_mul (hγ : 1 < γ) {lam : ℝ} (hlam : 0 < lam) :
     1 ≤ γ ^ numPhases γ lam * lam := by
-  have h : lam⁻¹ ≤ γ ^ numPhases γ lam := by
-    rw [numPhases, ← Real.rpow_natCast]
-    calc lam⁻¹ = γ ^ Real.logb γ lam⁻¹ :=
-          (Real.rpow_logb (by linarith) hγ.ne' (by positivity)).symm
-      _ ≤ _ := Real.rpow_le_rpow_of_exponent_le hγ.le (Nat.le_ceil _)
+  have h : lam⁻¹ ≤ γ ^ numPhases γ lam := Real.le_pow_natCeil_logb hγ _
   rw [inv_le_iff_one_le_mul₀ hlam] at h
   linarith
 
