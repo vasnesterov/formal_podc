@@ -38,12 +38,6 @@ theorem alg2Rounds_le {N : Net V} {c₀ : V → St} {T : ℕ} (h : StableFrom N 
 noncomputable def alg2Broadcasts (N : Net V) (c₀ : V → St) : ℕ :=
   ∑ t ∈ range (alg2Rounds N c₀), broadcastsAt N c₀ t
 
-theorem expect_le_of_sum_le {f : (V ≃ Fin (Fintype.card V)) → ℕ} {k : ℕ}
-    (h : ∑ π, f π ≤ k * (Fintype.card V).factorial) : 𝔼 π, (f π : ℚ) ≤ k := by
-  rw [Fintype.expect_eq_sum_div_card, Fintype.card_equiv (Fintype.equivFin V)]
-  rw [div_le_iff₀ (by positivity)]
-  exact_mod_cast h
-
 theorem sum_mul_ncard_infl_le (c : Change V) (cfg : Config V) (k : ℕ) :
     ∑ π : V ≃ Fin (Fintype.card V), k * (infl c cfg (orderRank π)).ncard ≤
       k * (Fintype.card V).factorial := by

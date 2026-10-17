@@ -145,17 +145,9 @@ theorem sum_range_two_dI_add_one_le {i : ℕ} (hi : 1 ≤ i) :
 size of the whole set. -/
 theorem sum_card_filter_and_eq_le {β γ : Type*} (s : Finset β) (t : Finset γ) (P : β → Prop)
     (f : β → γ) : ∑ x ∈ t, #{u ∈ s | P u ∧ f u = x} ≤ #{u ∈ s | P u} := by
-  rw [← card_biUnion]
-  · refine card_le_card fun u hu => ?_
-    simp only [mem_biUnion, mem_filter] at hu ⊢
-    obtain ⟨_, _, hu, hP, _⟩ := hu
-    exact ⟨hu, hP⟩
-  · intro x _ y _ hxy
-    simp only [Function.onFun]
-    rw [Finset.disjoint_left]
-    intro u hu hu'
-    simp only [mem_filter] at hu hu'
-    exact hxy (hu.2.2.symm.trans hu'.2.2)
+  calc ∑ x ∈ t, #{u ∈ s | P u ∧ f u = x} = ∑ x ∈ t, #{u ∈ {u ∈ s | P u} | f u = x} := by
+        simp only [filter_filter]
+    _ ≤ _ := (sum_card_fiberwise_eq_card_filter _ _ _).trans_le (card_filter_le _ _)
 
 variable {G}
 

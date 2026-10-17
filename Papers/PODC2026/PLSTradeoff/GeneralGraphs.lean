@@ -49,7 +49,7 @@ theorem tradeoff_general {𝒢 : Set (SimpleGraph V)} (h𝒢 : ∀ G ∈ 𝒢, G
   have hKc : Nat.clog 2 n ≤ K := Nat.le_mul_of_pos_left _ ht
   have hrS2 : rS ≤ 2 * Nat.clog 2 n + 1 := clog_sq_succ_le n
   obtain ⟨prov, ver, hloc, hcomp, hsound, hcost⟩ := exists_stringShare (V := V) rS
-  let SS : ShareScheme V rS (2 * cdiv rS n + 8) (4 * rS + 2) :=
+  let SS : ShareScheme V rS (2 * (rS ⌈/⌉ n) + 8) (4 * rS + 2) :=
     { prov := prov, ver := ver, isLocal := hloc, complete := hcomp, sound := hsound,
       cost := hcost }
   have hρ : 4 * rS + 2 ≤ genR K := by unfold genR rhoMax rad; omega
@@ -65,10 +65,10 @@ theorem tradeoff_general {𝒢 : Set (SimpleGraph V)} (h𝒢 : ∀ G ∈ 𝒢, G
   have hR : max (genR K) (2 * (2 * rhoMax K) + 2) = 40 * t * Nat.clog 2 n + 32 := by
     rw [max_eq_left (by unfold genR; omega)]
     simp only [genR, rhoMax, rad, hK]; ring
-  have hcd : cdiv rS n ≤ 2 := by
+  have hcd : rS ⌈/⌉ n ≤ 2 := by
     rcases Nat.eq_zero_or_pos n with hn | hn
-    · simp [cdiv, hn]
-    · apply cdiv_le_of_le_mul hn
+    · simp [hn]
+    · apply Nat.ceilDiv_le_of_le_mul hn
       have := clog_le_pred n
       omega
   have hε : (1 / t : ℝ) * (2 * p + 1) = ((2 * p + 1 : ℕ) : ℝ) / t := by push_cast; ring

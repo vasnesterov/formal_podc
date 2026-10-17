@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.Foundations.Data.Nat.ModCount
 
 -- CSLib candidate (general, not specific to this paper)
 
@@ -29,29 +30,13 @@ open Finset
 
 section Arith
 
-/-- `n ≡ q - 1 (mod q)` iff `q ∣ n + 1`. -/
-lemma mod_eq_pred_iff_dvd {q : ℕ} (hq : 0 < q) (n : ℕ) : n % q = q - 1 ↔ q ∣ n + 1 := by
-  constructor
-  · intro h
-    refine ⟨n / q + 1, ?_⟩
-    have := Nat.mod_add_div n q
-    rw [mul_add]
-    omega
-  · rintro ⟨c, hc⟩
-    cases c with
-    | zero => simp at hc
-    | succ d =>
-      have : n = (q - 1) + q * d := by rw [mul_add] at hc; omega
-      rw [this, Nat.add_mul_mod_self_left, Nat.mod_eq_of_lt (by omega)]
-
 /-- Among `0, …, n-1` exactly `n / q` numbers are `≡ q - 1 (mod q)`. -/
 lemma count_mod_eq_pred {q : ℕ} (hq : 0 < q) (n : ℕ) :
     Nat.count (fun r => r % q = q - 1) n = n / q := by
-  induction n with
-  | zero => simp
-  | succ n ih =>
-    rw [Nat.count_succ, ih, Nat.succ_div]
-    simp only [mod_eq_pred_iff_dvd hq]
+  have hq' : (q - 1) % q = q - 1 := Nat.mod_eq_of_lt (by omega)
+  have h := Nat.count_modEq_card n hq (q - 1)
+  rw [hq', if_neg (by have := Nat.mod_lt n hq; omega), add_zero] at h
+  simpa [Nat.ModEq, hq'] using h
 
 /-- Among `0, …, n-1` exactly `n / q` numbers are `≡ q - 1 (mod q)`. -/
 lemma card_range_filter_mod {q : ℕ} (hq : 0 < q) (n : ℕ) :
@@ -172,22 +157,10 @@ theorem rk_eq_add {H : Finset M} {f : M → ℕ} (hf : Monotone f) {x : M} (_hx 
 
 /-- Spreading: in `K`, at most `⌈|K| / s⌉` elements have rank `≡ y (mod s)`. -/
 theorem card_rk_mod_le (K : Finset M) {s : ℕ} (hs : 0 < s) (y : ℕ) :
-    (K.filter fun x => rk K x % s = y).card ≤ (K.card + s - 1) / s := by
-  rw [card_filter_rk K (fun r => r % s = y)]
-  calc _ ≤ (range ((K.card + s - 1) / s)).card := by
-        apply card_le_card_of_injOn (fun r => r / s)
-        · intro r hr
-          simp only [coe_filter, mem_range, Set.mem_ofPred_eq, coe_range, Set.mem_Iio] at hr ⊢
-          rw [Nat.lt_iff_add_one_le, Nat.le_div_iff_mul_le hs, add_mul, one_mul]
-          have := Nat.div_mul_le_self r s
-          omega
-        · intro r1 h1 r2 h2 he
-          simp only [coe_filter, mem_range, Set.mem_ofPred_eq] at h1 h2 he
-          have e1 := Nat.div_add_mod r1 s
-          have e2 := Nat.div_add_mod r2 s
-          rw [he] at e1
-          omega
-    _ = _ := card_range _
+    (K.filter fun x => rk K x % s = y).card ≤ K.card ⌈/⌉ s := by
+  rw [card_filter_rk K (fun r => r % s = y), ← Nat.Ico_zero_eq_range]
+  exact Nat.card_le_ceilDiv_of_subset_Ico hs (filter_subset _ _) fun a ha b hb =>
+    (mem_filter.1 ha).2.trans (mem_filter.1 hb).2.symm
 
 /-- The ranks of the elements of `H` in the fibre `f ⁻¹ {j}` of a monotone `f` form the block
 `[a, a + m)`; counting those `≡ p - 1 (mod p)`. -/

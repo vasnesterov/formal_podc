@@ -41,11 +41,11 @@ theorem phi_full_zero (x : ℕ) : (Phi d x (d + 1)).WhiteIn d 0 := by
     simpa using replicate_mem_gen_M d {M, P, O, X} {P, O, X} (by simp)
 
 theorem tval_full {x : ℕ} (hx : x ≤ d) : Tval (d + 1) x (d + 1) = 1 := by
-  have h1 : cdiv (d + 1 - x) (d + 1) = 1 := by
-    simp only [cdiv]
+  have h1 : (d + 1 - x) ⌈/⌉ (d + 1) = 1 := by
+    rw [Nat.ceilDiv_eq_add_pred_div]
     rw [Nat.div_eq_iff (by omega)]; omega
-  have h2 : cdiv (d + 1) (d + 1) = 1 := by
-    simp only [cdiv]
+  have h2 : (d + 1) ⌈/⌉ (d + 1) = 1 := by
+    rw [Nat.ceilDiv_eq_add_pred_div]
     rw [Nat.div_eq_iff (by omega)]; omega
   simp [Tval, h1, h2]
 

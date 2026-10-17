@@ -1,4 +1,5 @@
 import Papers.PODC2022.ConsensusFromSwap.BinarySwap
+import Podc.Foundations.Data.Finset.SumUpdate
 
 /-!
 # Readable swap objects with domain size `b`: `(n − 2)/(3b + 1)` objects are necessary
@@ -24,18 +25,10 @@ variable {ι : Type} [DecidableEq ι] [Fintype ι] {D : Type} [DecidableEq D] [F
 /-- The potential `∑_B (2·|f(B)| + |g(B)|)` of Lemma 20 (d). -/
 def wt (f g : ι → Finset D) : ℕ := ∑ x, (2 * (f x).card + (g x).card)
 
-lemma sum_ite_eq_add (F F' : ι → ℕ) (B : ι) (h : ∀ x, x ≠ B → F' x = F x) :
-    ∑ x, F' x + F B = ∑ x, F x + F' B := by
-  classical
-  rw [← Finset.add_sum_erase Finset.univ F (Finset.mem_univ B),
-    ← Finset.add_sum_erase Finset.univ F' (Finset.mem_univ B),
-    Finset.sum_congr rfl (fun x hx => h x (Finset.ne_of_mem_erase hx))]
-  ring
-
 lemma wt_insert_f {f g : ι → Finset D} {B : ι} {v : D} (hv : v ∉ f B) :
     wt (fun x => if x = B then insert v (f x) else f x) g = wt f g + 2 := by
-  have := sum_ite_eq_add (fun x => 2 * (f x).card + (g x).card)
-    (fun x => 2 * ((if x = B then insert v (f x) else f x)).card + (g x).card) B
+  have := Fintype.sum_add_eq_sum_add_of_eq_off (f := fun x => 2 * (f x).card + (g x).card)
+    (g := fun x => 2 * ((if x = B then insert v (f x) else f x)).card + (g x).card) B
     (fun x hx => by simp [hx])
   simp only [ite_true, Finset.card_insert_of_notMem hv] at this
   simp only [wt]
@@ -44,8 +37,8 @@ lemma wt_insert_f {f g : ι → Finset D} {B : ι} {v : D} (hv : v ∉ f B) :
 lemma wt_insert_g {f g : ι → Finset D} (B : ι) (v : D) :
     wt f g + (if v ∈ g B then 0 else 1) =
       wt f (fun x => if x = B then insert v (g x) else g x) := by
-  have := sum_ite_eq_add (fun x => 2 * (f x).card + (g x).card)
-    (fun x => 2 * (f x).card + ((if x = B then insert v (g x) else g x)).card) B
+  have := Fintype.sum_add_eq_sum_add_of_eq_off (f := fun x => 2 * (f x).card + (g x).card)
+    (g := fun x => 2 * (f x).card + ((if x = B then insert v (g x) else g x)).card) B
     (fun x hx => by simp [hx])
   simp only [ite_true] at this
   simp only [wt]

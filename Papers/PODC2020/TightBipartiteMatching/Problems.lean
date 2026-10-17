@@ -1,4 +1,5 @@
 import Papers.PODC2020.TightBipartiteMatching.RoundElim
+import Podc.Foundations.Data.Nat.CeilDiv
 
 /-!
 # The problems of §4
@@ -137,12 +138,10 @@ theorem phi'_B_counts {x y : ℕ} {m : Multiset Lab} (h : m ∈ (Phi' d x y).B) 
 
 /-! ### The bound `T_Δ(x, y)` -/
 
-/-- `⌈a / b⌉` on natural numbers. -/
-def cdiv (a b : ℕ) : ℕ := (a + b - 1) / b
-
-/-- `T_Δ(x, y)` (§1): `2⌈(Δ-x)/y⌉` if `⌈Δ/y⌉ > ⌈(Δ-x)/y⌉`, and `2⌈(Δ-x)/y⌉ - 1` otherwise. -/
+/-- `T_Δ(x, y)` (§1): `2⌈(Δ-x)/y⌉` if `⌈Δ/y⌉ > ⌈(Δ-x)/y⌉`, and `2⌈(Δ-x)/y⌉ - 1` otherwise
+(`a ⌈/⌉ b` is Mathlib's ceiling division on `ℕ`). -/
 def Tval (Δ x y : ℕ) : ℕ :=
-  if cdiv (Δ - x) y < cdiv Δ y then 2 * cdiv (Δ - x) y else 2 * cdiv (Δ - x) y - 1
+  if (Δ - x) ⌈/⌉ y < Δ ⌈/⌉ y then 2 * ((Δ - x) ⌈/⌉ y) else 2 * ((Δ - x) ⌈/⌉ y) - 1
 
 /-- Counts of a constant configuration. -/
 theorem count_mset_const (ℓ ℓ' : Lab) :

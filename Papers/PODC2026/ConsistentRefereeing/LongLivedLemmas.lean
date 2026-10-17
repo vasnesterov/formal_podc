@@ -1,5 +1,6 @@
 import Papers.PODC2026.ConsistentRefereeing.LongLivedSteps
 import Podc.Foundations.Data.Finset.Quorum
+import Podc.Foundations.Data.Finset.Card
 
 /-!
 # Valencies of closed and supervalent executions (Lemmas 20–22, 27, 28 of [ACE26])
@@ -39,30 +40,17 @@ variable {X}
 
 /-! ### Choosing competitors -/
 
-lemma exists_comp (hn : 2 ≤ Fintype.card P) : ∃ c, c ≠ X.ref := by
-  have := (Finset.card_filter_notMem_univ ({X.ref} : Finset P)).ge
-  simp only [Finset.card_singleton] at this
-  obtain ⟨c, hc⟩ := Finset.card_pos.1 (by omega : 0 < (Finset.univ.filter
-    (fun x => x ∉ ({X.ref} : Finset P))).card)
-  exact ⟨c, by simpa using hc⟩
+lemma exists_comp (hn : 2 ≤ Fintype.card P) : ∃ c, c ≠ X.ref :=
+  Fintype.exists_ne_of_one_lt_card hn X.ref
 
-lemma exists_comp_ne (hn : 3 ≤ Fintype.card P) (q : P) : ∃ c, c ≠ X.ref ∧ c ≠ q := by
-  have := (Finset.card_filter_notMem_univ ({X.ref, q} : Finset P)).ge
-  have h2 := Finset.card_le_two (a := X.ref) (b := q)
-  obtain ⟨c, hc⟩ := Finset.card_pos.1 (by omega : 0 < (Finset.univ.filter
-    (fun x => x ∉ ({X.ref, q} : Finset P))).card)
-  simp only [Finset.mem_filter, Finset.mem_univ, Finset.mem_insert, Finset.mem_singleton,
-    not_or, true_and] at hc
-  exact ⟨c, hc⟩
+lemma exists_comp_ne (hn : 3 ≤ Fintype.card P) (q : P) : ∃ c, c ≠ X.ref ∧ c ≠ q :=
+  Fintype.exists_ne_ne_of_two_lt_card hn X.ref q
 
 lemma exists_comp_ne₂ (hn : 4 ≤ Fintype.card P) (q q' : P) :
     ∃ c, c ≠ X.ref ∧ c ≠ q ∧ c ≠ q' := by
-  have := (Finset.card_filter_notMem_univ ({X.ref, q, q'} : Finset P)).ge
-  have h2 := Finset.card_le_three (a := X.ref) (b := q) (c := q')
-  obtain ⟨c, hc⟩ := Finset.card_pos.1 (by omega : 0 < (Finset.univ.filter
-    (fun x => x ∉ ({X.ref, q, q'} : Finset P))).card)
-  simp only [Finset.mem_filter, Finset.mem_univ, Finset.mem_insert, Finset.mem_singleton,
-    not_or, true_and] at hc
+  obtain ⟨c, -, hc⟩ := Finset.exists_mem_notMem_of_card_lt_card (s := {X.ref, q, q'})
+    (t := Finset.univ) (Finset.card_le_three.trans_lt (by rw [Finset.card_univ]; exact hn))
+  simp only [Finset.mem_insert, Finset.mem_singleton, not_or] at hc
   exact ⟨c, hc⟩
 
 /-- Three disjoint lists of `m` competitors avoiding `q` and `q'`. -/

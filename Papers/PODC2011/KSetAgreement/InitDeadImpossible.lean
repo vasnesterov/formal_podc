@@ -1,4 +1,5 @@
 import Papers.PODC2011.KSetAgreement.Basic
+import Podc.Foundations.Combinatorics.Labelling
 
 /-!
 # Theorem 8, "only if": impossibility with initially dead processes
@@ -25,41 +26,8 @@ variable {P M S V : Type*} [DecidableEq P] [DecidableEq M]
 theorem exists_disjoint_groups [Fintype P] (m ℓ : ℕ) (h : m * ℓ ≤ Fintype.card P) :
     ∃ G : Fin m → Finset P, (∀ i, (G i).card = ℓ) ∧
       ∀ i j, i ≠ j → Disjoint (G i) (G j) := by
-  induction m with
-  | zero => exact ⟨Fin.elim0, fun i => i.elim0, fun i => i.elim0⟩
-  | succ m ih =>
-    obtain ⟨G', hcard, hdisj⟩ := ih (le_trans (Nat.mul_le_mul_right _ (Nat.le_succ m)) h)
-    set U := Finset.univ.biUnion G'
-    have hU : U.card ≤ m * ℓ := by
-      refine le_trans Finset.card_biUnion_le ?_
-      simp [hcard]
-    have hc : ℓ ≤ Uᶜ.card := by
-      rw [Finset.card_compl]
-      have : (m + 1) * ℓ = m * ℓ + ℓ := by ring
-      omega
-    obtain ⟨t, ht, htc⟩ := Finset.exists_subset_card_eq hc
-    refine ⟨Fin.cons t G', ?_, ?_⟩
-    · intro i
-      refine Fin.cases ?_ (fun i => ?_) i
-      · simpa using htc
-      · simpa using hcard i
-    · intro i j hij
-      have key : ∀ i : Fin m, Disjoint t (G' i) := by
-        intro i
-        refine Finset.disjoint_left.2 fun p hp hpi => ?_
-        have := ht hp
-        rw [Finset.mem_compl] at this
-        exact this (Finset.mem_biUnion.2 ⟨i, Finset.mem_univ _, hpi⟩)
-      induction i using Fin.cases with
-      | zero =>
-        induction j using Fin.cases with
-        | zero => exact absurd rfl hij
-        | succ j => simpa using key j
-      | succ i =>
-        induction j using Fin.cases with
-        | zero => simpa using (key i).symm
-        | succ j =>
-          simpa using hdisj i j (fun h => hij (by rw [h]))
+  obtain ⟨G, hcard, hdisj⟩ := Fintype.exists_pairwise_disjoint_card_eq h
+  exact ⟨G, hcard, fun _ _ hij => hdisj hij⟩
 
 omit [DecidableEq P] [DecidableEq M] in
 /-- The set of decided values is finite. -/

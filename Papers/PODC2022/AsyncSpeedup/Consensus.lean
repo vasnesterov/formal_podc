@@ -92,7 +92,7 @@ theorem consensus3_closure_subset (I : Finset P) (x : P → Bool) :
     exact ⟨j, hj, hyi ▸ hyj⟩
   · by_cases hij : i = j
     · rw [hij]
-    obtain ⟨k, hk, hki, hkj⟩ := exists_third hI i j
+    obtain ⟨k, hk, hki, hkj⟩ := Finset.exists_mem_ne_ne hI i j
     obtain ⟨γ, ⟨y₁, hy₁, h₁i, h₁k⟩, ⟨y₂, hy₂, h₂j, h₂k⟩⟩ :=
       local_triangle iisTS_allowsSolo iisTS_soloDet hg hi hj hk hij
         (tsPat_mem (rk := rank3 i j k) hi rank3_zero _) (tsPat_mem (rk := rank3 j i k) hj rank3_zero _)

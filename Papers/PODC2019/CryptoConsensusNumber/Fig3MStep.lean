@@ -16,8 +16,8 @@ attribute [local reducible] atSpec snapObj kConsObj
 variable {n : ℕ} {Acct : Type} [DecidableEq Acct] {μ : Acct → Finset (Fin n)} {q₀ : Acct → ℕ}
   {k : ℕ} {C : Cfg μ q₀ k} {K : Set (Tx n Acct)} {q : Fin n}
 
-lemma invCnt_congr (C : Cfg μ q₀ k) (q : Fin n) (l' : Loc n Acct)
-    (h : ∀ a r, Invd l' a r ↔ Invd (C.loc q) a r) (a : Acct) (r : ℕ) :
+lemma invCnt_congr (C : Cfg μ q₀ k) (q : Fin n) (l' : Loc n Acct) (a : Acct) (r : ℕ)
+    (h : Invd l' a r ↔ Invd (C.loc q) a r) :
     (Finset.univ.filter (fun q'' => Invd (Function.update C.loc q l' q'') a r)).card =
       invCnt C a r := by
   unfold invCnt; congr 1; ext q''
@@ -36,7 +36,7 @@ lemma MInv.of_local (hI : MInv μ C K) (q : Fin n) (l' : Loc n Acct)
     MInv μ (⟨Function.update C.loc q l', Function.update C.pend q pd', C.mem⟩ : Cfg μ q₀ k) K :=
   hI.of_step q l' pd' C.mem hq (fun _ _ => rfl) (fun _ _ _ => rfl) (DecExt.refl _)
     le_rfl (fun t ht _ => ht) hI.kInj hI.kOwn hI.regK
-    (fun a r => (hI.cnt a r).trans (invCnt_congr C q l' hinv a r).symm)
+    (fun a r => (hI.cnt a r).trans (invCnt_congr C q l' a r (hinv a r)).symm)
     hI.kcNone hI.decK hI.decUniq
 
 /-! ## Invocations and responses -/
@@ -118,7 +118,7 @@ lemma MInv.step_inv_owner (hI : MInv μ C K) (h0 : C.pend q = none) (a b : Acct)
   have hnew : tx ∉ K := hI.newTx_not_mem h0 a b x
   refine hI.of_step q _ _ C.mem ?_ (fun _ _ => rfl) (fun _ _ _ => rfl) (DecExt.refl _)
     (Set.subset_insert _ _) ?_ ?_ ?_ (fun a i t h => ?_)
-    (fun a r => (hI.cnt a r).trans (invCnt_congr C q _ (by simp [Invd, hidle, PC.updFor]) a r).symm)
+    (fun a r => (hI.cnt a r).trans (invCnt_congr C q _ a r (by simp [Invd, hidle, PC.updFor])).symm)
     hI.kcNone (fun a r t b h => ?_) hI.decUniq
   · exact {
       idle := by simp
@@ -246,7 +246,7 @@ lemma MInv.step_write (hI : MInv μ C K) {tx : Tx n Acct} (hpc : (C.loc q).pc = 
     le_rfl (fun t ht _ => ht) hI.kInj hI.kOwn (fun a i t h => ?_)
     (fun a r => by
       rw [KC_update_Reg]
-      exact (hI.cnt a r).trans (invCnt_congr C q _ (by simp [Invd, hpc, PC.updFor]) a r).symm)
+      exact (hI.cnt a r).trans (invCnt_congr C q _ a r (by simp [Invd, hpc, PC.updFor])).symm)
     (fun a r => by rw [hDec, KC_update_Reg]; exact hI.kcNone a r)
     (fun a r t b h => by rw [hDec] at h; exact hI.decK a r t b h)
     (fun a r r' t b b' h h' => by rw [hDec] at h h'; exact hI.decUniq a r r' t b b' h h')
@@ -462,15 +462,6 @@ lemma MInv.step_snap (hI : MInv μ C K) {tx : Tx n Acct} {c : Finset (Tx n Acct)
 
 /-! ## Proposal and update -/
 
-lemma invCnt_congr' (C : Cfg μ q₀ k) (q : Fin n) (l' : Loc n Acct) (a : Acct) (r : ℕ)
-    (h : Invd l' a r ↔ Invd (C.loc q) a r) :
-    (Finset.univ.filter (fun q'' => Invd (Function.update C.loc q l' q'') a r)).card =
-      invCnt C a r := by
-  unfold invCnt; congr 1; ext q''
-  by_cases hq : q'' = q
-  · subst hq; simp [h]
-  · simp [Function.update_of_ne hq]
-
 lemma invCnt_insert (C : Cfg μ q₀ k) (q : Fin n) (l' : Loc n Acct) (a : Acct) (r : ℕ)
     (h1 : Invd l' a r) (h2 : ¬ Invd (C.loc q) a r) :
     (Finset.univ.filter (fun q'' => Invd (Function.update C.loc q l' q'') a r)).card =
@@ -625,7 +616,7 @@ lemma MInv.step_prop (hI : MInv μ C K) {tx : Tx n Acct} {c : Finset (Tx n Acct)
     split_ifs with he
     · simp only [Prod.mk.injEq] at he; obtain ⟨rfl, rfl⟩ := he
       rw [invCnt_insert C q l' _ _ ((hinvd _ _).2 (Or.inr ⟨rfl, rfl⟩)) hnotinv, hI.cnt]
-    · rw [invCnt_congr' C q l' a' r ?_, hI.cnt]
+    · rw [invCnt_congr C q l' a' r ?_, hI.cnt]
       rw [hinvd]
       constructor
       · rintro (h | ⟨rfl, rfl⟩)
@@ -738,7 +729,7 @@ lemma MInv.step_upd (hI : MInv μ C K) {tx : Tx n Acct} {c : Finset (Tx n Acct)}
     (fun q' _ a' => hRegm a' q') (fun a' r d h => by rw [hDecm]; exact h)
     le_rfl (fun t ht _ => ht) hI.kInj hI.kOwn
     (fun a' i t h => hI.regK a' i t (by rwa [hRegm] at h))
-    (fun a' r => by rw [hKCm, invCnt_congr' C q l' a' r (hinvd a' r), hI.cnt])
+    (fun a' r => by rw [hKCm, invCnt_congr C q l' a' r (hinvd a' r), hI.cnt])
     (fun a' r => by rw [hDecm, hKCm]; exact hI.kcNone a' r)
     (fun a' r t b h => hI.decK a' r t b (by rwa [hDecm] at h))
     (fun a' r r' t b b' h h' => hI.decUniq a' r r' t b b' (by rwa [hDecm] at h)

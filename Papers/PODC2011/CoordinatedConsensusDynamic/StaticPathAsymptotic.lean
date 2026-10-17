@@ -37,12 +37,12 @@ theorem three_pow_clog_le {q : ℕ} (hq : 1 ≤ q) : (3 : ℝ) ^ Nat.clog 2 q �
 `(n/X)^(1+γ) Δ = X`. -/
 theorem walk_cost_le {n β Δ : ℕ} {X : ℝ} (hX : 0 < X) (hXβ : X ≤ β) (hβn : β ≤ n) (hβ : 1 ≤ β)
     (hXΔ : ((n : ℝ) / X) ^ (1 + γ3) * Δ = X) :
-    (((n + β - 1) / β : ℕ) : ℝ) * (3 : ℝ) ^ (ellBeta n β + 1) * Δ ≤ 54 * X := by
+    ((n ⌈/⌉ β : ℕ) : ℝ) * (3 : ℝ) ^ (ellBeta n β + 1) * Δ ≤ 54 * X := by
   unfold ellBeta
-  generalize hq : (n + β - 1) / β = q
+  generalize hq : n ⌈/⌉ β = q
   have hq1 : 1 ≤ q := by
-    rw [← hq, Nat.le_div_iff_mul_le (by omega)]; omega
-  have hqβ : q * β ≤ n + β - 1 := hq ▸ Nat.div_mul_le_self _ _
+    rw [← hq, Nat.ceilDiv_eq_add_pred_div, Nat.le_div_iff_mul_le (by omega)]; omega
+  have hqβ : q * β ≤ n + β - 1 := hq ▸ Nat.ceilDiv_mul_le _ _
   have hβR : (0 : ℝ) < β := by exact_mod_cast hβ
   have hqR : (q : ℝ) ≤ 2 * n / X := by
     have h1 : (q : ℝ) * β ≤ 2 * n := by
@@ -118,7 +118,7 @@ theorem theorem_6_7_asymptotic {n Δ : ℕ} {D : Decision Bool} (hD : Consensus 
   have hcost := walk_cost_le (n := n) (β := β) (Δ := Δ) (by linarith) hβX hβn.le hβ
     (balance (by exact_mod_cast hn0) (by exact_mod_cast hΔ))
   apply theorem_6_7_clog hD hC hn3 hβ hβn k σ
-  generalize ((n + β - 1) / β) = q at hcost ⊢
+  generalize n ⌈/⌉ β = q at hcost ⊢
   have : ((t + q * 3 ^ (ellBeta n β + 1) * Δ + β + 1 : ℕ) : ℝ) ≤ n := by
     push_cast
     linarith

@@ -251,12 +251,6 @@ theorem nact_two_mul (a0 c : Bool) (k : ℕ) : nact a0 c (2 * k) = k := by
 theorem nact_two_mul_add_one (a0 : Bool) (k : ℕ) : nact a0 a0 (2 * k + 1) = k + 1 := by
   rw [nact, nact_two_mul, act_two_mul]; simp
 
-theorem le_mul_cdiv (a y : ℕ) (hy : 1 ≤ y) : a ≤ y * cdiv a y := by
-  unfold cdiv
-  have h1 := Nat.div_add_mod (a + y - 1) y
-  have h2 := Nat.mod_lt (a + y - 1) (show y > 0 by omega)
-  omega
-
 end UpperBound
 
 open UpperBound Cslib.PortNumbering in
@@ -275,9 +269,9 @@ theorem upper_bound {d x y : ℕ} (hy1 : 1 ≤ y) (hy : y ≤ d) (hx : x ≤ d +
       (∀ u, col u = false →
         mset (fun k : Fin (d + 1) => A.eval G (Tval (d + 1) x y) col (G.nbr u k) (G.rport u k)) ∈
           (Phi d x y).B) := by
-  obtain ⟨k, hk⟩ : ∃ k, k = cdiv (d + 1 - x) y := ⟨_, rfl⟩
-  have hkx : d + 1 - x ≤ y * k := hk ▸ le_mul_cdiv _ _ hy1
-  by_cases hcase : k < cdiv (d + 1) y
+  obtain ⟨k, hk⟩ : ∃ k, k = (d + 1 - x) ⌈/⌉ y := ⟨_, rfl⟩
+  have hkx : d + 1 - x ≤ y * k := hk ▸ Nat.le_mul_ceilDiv hy1
+  by_cases hcase : k < (d + 1) ⌈/⌉ y
   · -- white starts; `2k` rounds
     have hT : Tval (d + 1) x y = 2 * k := by
       rw [Tval, ← hk, ite_eq_left hcase]
@@ -291,7 +285,7 @@ theorem upper_bound {d x y : ℕ} (hy1 : 1 ≤ y) (hy : y ≤ d) (hx : x ≤ d +
     · intro h; cases h
   · -- black starts; `2k - 1` rounds, solving the `x = 0` problem
     have hΔ : d + 1 ≤ y * k :=
-      (le_mul_cdiv (d + 1) y hy1).trans (Nat.mul_le_mul_left y (not_lt.1 hcase))
+      (Nat.le_mul_ceilDiv (a := d + 1) hy1).trans (Nat.mul_le_mul_left y (not_lt.1 hcase))
     have hk1 : 1 ≤ k := Nat.pos_of_ne_zero (by rintro rfl; simp at hΔ)
     have hT : Tval (d + 1) x y = 2 * (k - 1) + 1 := by
       rw [Tval, ← hk, ite_eq_right hcase]; omega

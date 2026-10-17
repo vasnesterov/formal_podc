@@ -410,11 +410,11 @@ theorem corollary_3_13 [Fact q.Prime] (hΔ : ∀ v, G.degree v ≤ Δ) (hk : 0 <
 rounds. -/
 theorem corollary_3_13_paper [Fact q.Prime] (hΔ : ∀ v, G.degree v ≤ Δ) (hk : 0 < k)
     (hq : 2 * Δ + 3 * k ≤ q) {c₀ : V → Color q} (h₀ : IsProper G c₀) (hc₀ : ∀ v, (c₀ v).c = 0) :
-    IsProper G ((algorithm k).run G c₀ ((2 * Δ + k - 1) / k + 1)) ∧
-      (∀ v, ((algorithm k).run G c₀ ((2 * Δ + k - 1) / k + 1) v).a = 0 ∧
-        ((algorithm k).run G c₀ ((2 * Δ + k - 1) / k + 1) v).c < k) ∧
-      IsProper G (fun v => toNat ((algorithm k).run G c₀ ((2 * Δ + k - 1) / k + 1) v)) ∧
-      ∀ v, toNat ((algorithm k).run G c₀ ((2 * Δ + k - 1) / k + 1) v) < k * q :=
+    IsProper G ((algorithm k).run G c₀ ((2 * Δ) ⌈/⌉ k + 1)) ∧
+      (∀ v, ((algorithm k).run G c₀ ((2 * Δ) ⌈/⌉ k + 1) v).a = 0 ∧
+        ((algorithm k).run G c₀ ((2 * Δ) ⌈/⌉ k + 1) v).c < k) ∧
+      IsProper G (fun v => toNat ((algorithm k).run G c₀ ((2 * Δ) ⌈/⌉ k + 1) v)) ∧
+      ∀ v, toNat ((algorithm k).run G c₀ ((2 * Δ) ⌈/⌉ k + 1) v) < k * q :=
   corollary_3_13 hΔ hk (by omega) h₀ hc₀
     (Nat.succ_le_succ (Nat.div_le_div_right (by omega)))
 

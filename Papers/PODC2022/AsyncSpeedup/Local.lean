@@ -1,4 +1,5 @@
 import Papers.PODC2022.AsyncSpeedup.Speedup
+import Podc.Foundations.Data.Finset.Card
 
 /-!
 # Facts about one-round solutions of local tasks
@@ -53,10 +54,6 @@ lemma local_proj {T : Task P X Y} {I : Finset P} {x : P → X} {τ : P → Y}
   obtain ⟨y', hy', hyy'⟩ := hy2 (Nat.ne_of_gt hJ)
   exact ⟨y', hy', fun j hj => (hdec j hj).trans (hyy' j hj)⟩
 
-lemma one_lt_card_of_ne {I : Finset P} {i j : P} (hi : i ∈ I) (hj : j ∈ I) (hij : i ≠ j) :
-    1 < I.card :=
-  Finset.one_lt_card.2 ⟨i, hi, j, hj, hij⟩
-
 /-- The "γ argument": if in two rounds of all of `I` process `i` (resp. `j`) sees only itself and
 process `k` has the same view, then `τ i` and `τ j` are both "adjacent" in `Δ(σ)` to the common
 output `γ` of `k`. -/
@@ -68,7 +65,7 @@ lemma local_triangle (hsolo : M.AllowsSolo) {b₀ : P → A → B}
     (hq : q ∈ M.Pat I (fun l => g.inp 0 l (τ l))) (hpi : p.sees i = {i}) (hqj : q.sees j = {j})
     (hks : p.sees k = q.sees k) (hko : p.out k = q.out k) :
     ∃ γ : Y, (∃ y ∈ T.Δ I x, y i = τ i ∧ y k = γ) ∧ (∃ y ∈ T.Δ I x, y j = τ j ∧ y k = γ) := by
-  have hI := one_lt_card_of_ne hi hj hij
+  have hI := Finset.one_lt_card.2 ⟨i, hi, j, hj, hij⟩
   obtain ⟨y₁, hy₁, hd₁⟩ := local_proj hg le_rfl hI hp
   obtain ⟨y₂, hy₂, hd₂⟩ := local_proj hg le_rfl hI hq
   refine ⟨g.dec k (step (r := 0) τ p k), ⟨y₁, hy₁, ?_, (hd₁ k hk).symm⟩, ⟨y₂, hy₂, ?_, ?_⟩⟩
@@ -140,7 +137,7 @@ lemma iis_local_path {T : Task P X Y} {I : Finset P} {x : P → X} {τ : P → Y
     (hj : j ∈ I) (hij : i ≠ j) :
     ∃ b c : Y, (∃ y ∈ T.Δ I x, y i = τ i ∧ y j = b) ∧ (∃ y ∈ T.Δ I x, y j = b ∧ y i = c) ∧
       (∃ y ∈ T.Δ I x, y i = c ∧ y j = τ j) := by
-  have hI := one_lt_card_of_ne hi hj hij
+  have hI := Finset.one_lt_card.2 ⟨i, hi, j, hj, hij⟩
   have hsolo := iis_allowsSolo (P := P)
   have hdet := iis_soloDet (P := P)
   obtain ⟨y₁, hy₁, hd₁⟩ := local_proj hg le_rfl hI (iisPat_mem (rank2 i j) _)
@@ -191,15 +188,5 @@ def bcPat (I : Finset P) (rk : P → ℕ) (w : P) (a : P → Bool) : Pattern P B
 lemma bcPat_mem {I : Finset P} {rk : P → ℕ} {w : P} (hw : w ∈ I) (h0 : rk w = 0)
     (a : P → Bool) : bcPat I rk w a ∈ (iisBC : Model P Bool Bool).Pat I a :=
   ⟨isIS_rankSees rk, w, hw, fun l _ => by simp [bcPat, hw, h0], fun _ _ => rfl⟩
-
-/-- Three distinct elements in a set of size `≥ 3`: a third one. -/
-lemma exists_third {I : Finset P} (hI : 3 ≤ I.card) (i j : P) : ∃ k ∈ I, k ≠ i ∧ k ≠ j := by
-  have : 0 < ((I.erase i).erase j).card := by
-    have h1 := Finset.pred_card_le_card_erase (s := I) (a := i)
-    have h2 := Finset.pred_card_le_card_erase (s := I.erase i) (a := j)
-    omega
-  obtain ⟨k, hk⟩ := Finset.card_pos.1 this
-  simp only [Finset.mem_erase] at hk
-  exact ⟨k, hk.2.2, hk.2.1, hk.1⟩
 
 end AsyncSpeedup

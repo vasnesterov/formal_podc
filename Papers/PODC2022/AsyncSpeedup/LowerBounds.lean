@@ -57,7 +57,7 @@ theorem libAA_bound {A B : Type} {M : Model P A B} (hwf : M.WellFormed) (hsolo :
     (hS : 3 ≤ S.card) (hm : 0 ≤ m) :
     ∀ (t : ℕ) (e : ℤ), Solvable M (libAA S m e) t → m ≤ 2 ^ t * e := by
   obtain ⟨p, hp, q, hq, hpq⟩ := Finset.one_lt_card.1 (by omega : 1 < S.card)
-  obtain ⟨r, hr, hrp, hrq⟩ := exists_third hS p q
+  obtain ⟨r, hr, hrp, hrq⟩ := Finset.exists_mem_ne_ne hS p q
   intro t
   induction t with
   | zero =>
@@ -122,7 +122,7 @@ theorem theorem4_aux {m : ℤ} (hm : 0 ≤ m) :
     by_contra hcon
     push Not at hcon
     obtain ⟨p, hp, q, hq, hpq⟩ := Finset.one_lt_card.1 (by simp at hcon; omega : 1 < S.card)
-    obtain ⟨r, hr, hrp, hrq⟩ := exists_third (by simp at hcon; omega : 3 ≤ S.card) p q
+    obtain ⟨r, hr, hrp, hrq⟩ := Finset.exists_mem_ne_ne (by simp at hcon; omega : 3 ≤ S.card) p q
     exact claim1_lib iisBC hp hq hr hpq (Ne.symm hrp) (Ne.symm hrq) hm (by simp at hcon; omega)
       ⟨alg, halg⟩
   | succ t ih =>

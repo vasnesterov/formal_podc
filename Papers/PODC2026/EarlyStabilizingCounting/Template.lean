@@ -1,5 +1,6 @@
 import Papers.PODC2026.EarlyStabilizingCounting.Basic
 import Papers.PODC2026.EarlyStabilizingCounting.Lemma55
+import Podc.Foundations.Data.Nat.ModCount
 
 /-!
 # The recursion template at the level of traces (Lemmas 5.4, 5.6, Theorem 5.7)
@@ -184,17 +185,10 @@ theorem count_residues {n : ℕ} (hn : 0 < n) (F : Finset (Fin n)) (ℓ₀ m : �
     exact ⟨_, hJ.2, hJ.1, rfl⟩
   refine (card_le_card hsub).trans ((card_biUnion_le).trans ?_)
   refine le_trans (sum_le_card_nsmul _ _ (m / n + 1) fun u _ => ?_) (by rw [smul_eq_mul])
-  have hinj : Set.InjOn (fun J => J / n) ((range m).filter fun J => (ℓ₀ + J) % n = u) := by
-    intro J₁ h₁ J₂ h₂ h
-    simp only [coe_filter, Set.mem_ofPred_eq, mem_range] at h₁ h₂
-    simp only at h
-    have hm : J₁ % n = J₂ % n := Nat.ModEq.add_left_cancel' ℓ₀ (h₁.2.trans h₂.2.symm)
-    rw [← Nat.div_add_mod J₁ n, ← Nat.div_add_mod J₂ n, h, hm]
-  rw [← card_image_of_injOn hinj]
-  refine (card_le_card fun x hx => ?_).trans (card_range (m / n + 1)).le
-  simp only [mem_image, mem_filter, mem_range] at hx ⊢
-  obtain ⟨J, ⟨hJ, _⟩, rfl⟩ := hx
-  exact Nat.lt_succ_of_le (Nat.div_le_div_right hJ.le)
+  refine le_trans ?_ (Nat.ceilDiv_le_div_add_one m n)
+  rw [← Nat.Ico_zero_eq_range]
+  exact Nat.card_le_ceilDiv_of_subset_Ico hn (filter_subset _ _) fun J₁ h₁ J₂ h₂ =>
+    Nat.ModEq.add_left_cancel' ℓ₀ ((mem_filter.1 h₁).2.trans (mem_filter.1 h₂).2.symm)
 
 /-- If in each group `{4i, …, 4i+3}` at most one index fails `P`, then at least `3N` of the first
 `4N` indices satisfy `P`. -/

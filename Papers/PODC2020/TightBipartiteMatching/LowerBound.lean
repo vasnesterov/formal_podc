@@ -128,32 +128,20 @@ theorem phi_not_whiteIn_of_seq {x y : ℕ} (hy : 1 ≤ y) (hy' : y ≤ d) (i : �
   obtain ⟨A, hA⟩ := psiIn_seq hy hy' i 0 hPsi
   exact lemma_4_4 hy hy' hb hc A hA
 
-theorem le_cdiv_mul (n y : ℕ) (hy : 1 ≤ y) : n ≤ cdiv n y * y := by
-  have := Nat.div_add_mod (n + y - 1) y
-  have := Nat.mod_lt (n + y - 1) (show 0 < y by omega)
-  simp only [cdiv]
-  rw [Nat.mul_comm]
-  omega
-
-theorem cdiv_mul_le (n y : ℕ) : cdiv n y * y ≤ n + y - 1 := Nat.div_mul_le_self _ _
-
-theorem cdiv_mono {n m : ℕ} (y : ℕ) (h : n ≤ m) : cdiv n y ≤ cdiv m y :=
-  Nat.div_le_div_right (by omega)
-
 /-- **Theorem 4.5.** In the port-numbering model (on 2-coloured `Δ`-regular trees), for
 `0 ≤ x ≤ Δ` and `1 ≤ y ≤ Δ - 1`, the white round complexity of bipartite `x`-maximal `y`-matching
 `Φ^W_Δ(x, y)` is at least `T_Δ(x, y)`: no white algorithm with fewer rounds exists. -/
 theorem theorem_4_5 {x y : ℕ} (hy : 1 ≤ y) (hy' : y ≤ d) (hx : x ≤ d + 1) {t : ℕ}
     (ht : t < Tval (d + 1) x y) : ¬ (Phi d x y).WhiteIn d t := by
   intro h
-  set q := cdiv (d + 1 - x) y with hq
-  set Q := cdiv (d + 1) y with hQ
-  have h1 := le_cdiv_mul (d + 1 - x) y hy
-  have h2 := cdiv_mul_le (d + 1 - x) y
-  have h3 := cdiv_mul_le (d + 1) y
-  have h4 := le_cdiv_mul (d + 1) y hy
+  set q := (d + 1 - x) ⌈/⌉ y with hq
+  set Q := (d + 1) ⌈/⌉ y with hQ
+  have h1 := Nat.le_ceilDiv_mul (a := d + 1 - x) hy
+  have h2 := Nat.ceilDiv_mul_le (d + 1 - x) y
+  have h3 := Nat.ceilDiv_mul_le (d + 1) y
+  have h4 := Nat.le_ceilDiv_mul (a := d + 1) hy
   rw [← hq] at h1 h2; rw [← hQ] at h3 h4
-  have hqQ : q ≤ Q := cdiv_mono y (by omega)
+  have hqQ : q ≤ Q := Nat.ceilDiv_mono y (by omega)
   unfold Tval at ht
   rw [← hq, ← hQ] at ht
   split_ifs at ht with hlt

@@ -1,4 +1,5 @@
 import Papers.PODC2011.KCoreDecomposition.Trajectory
+import Podc.Foundations.Combinatorics.SimpleGraph.Path
 
 /-!
 # Worst-case examples for the synchronous execution time (§4.2)
@@ -274,9 +275,6 @@ theorem stab_worstGraph {N : ℕ} (hN : 5 ≤ N) : stab (worstGraph N) = N - 3 :
 section Path
 
 open SimpleGraph
-
-instance (n : ℕ) : DecidableRel (pathGraph n).Adj := fun _ _ =>
-  decidable_of_iff _ pathGraph_adj.symm
 
 theorem card_eq_one_of_val {N : ℕ} (s : Finset (Fin N)) (x : ℕ) (hx : x < N)
     (hs : ∀ v : Fin N, v ∈ s ↔ v.val = x) : #s = 1 := by

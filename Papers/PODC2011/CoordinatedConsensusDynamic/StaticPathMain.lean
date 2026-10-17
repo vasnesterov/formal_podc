@@ -87,22 +87,16 @@ theorem phase_walk {n β m k : ℕ} (σ : ℕ → Bool) (v : Bool) (hn : 3 ≤ n
     rw [add_mul]
     omega
 
-theorem le_ceil_div_mul {n β : ℕ} (hβ : 1 ≤ β) : n ≤ (n + β - 1) / β * β := by
-  have h2 := Nat.div_add_mod (n + β - 1) β
-  have h3 := Nat.mod_lt (n + β - 1) (show 0 < β by omega)
-  rw [mul_comm] at h2
-  omega
-
 /-- From the static line with any input assignment there is a walk of length
 `⌈n/β⌉ · 3^(m+1)` at time `n - 1 - β` to an execution in which all inputs are `v`. -/
 theorem walk_to_uniform {n β m k : ℕ} (σ : ℕ → Bool) (v : Bool) (hn : 3 ≤ n) (hβ : 1 ≤ β)
     (hβn : β < n) (hm : n ≤ 2 ^ m * β) :
-    ∃ G, Walk (KnownN n) (n - 1 - β) ((n + β - 1) / β * 3 ^ (m + 1)) (staticLine n k σ) G ∧
+    ∃ G, Walk (KnownN n) (n - 1 - β) (n ⌈/⌉ β * 3 ^ (m + 1)) (staticLine n k σ) G ∧
       ∀ w ∈ G.V, G.input w = v := by
-  refine ⟨_, phase_walk (k := k) σ v hn hβ hβn hm ((n + β - 1) / β), fun w hw => ?_⟩
+  refine ⟨_, phase_walk (k := k) σ v hn hβ hβn hm (n ⌈/⌉ β), fun w hw => ?_⟩
   have hw : w < n := Finset.mem_range.1 hw
   have := pos_lt (n := n) (k := k) (x := w) (by omega)
-  have := le_ceil_div_mul (n := n) hβ
+  have := Nat.le_ceilDiv_mul (a := n) hβ
   exact flipInputs_eq (by omega) _ w hw (by omega)
 
 /-- **Theorem 6.7** of [KMO11] (explicit, non-asymptotic form). In the system where `n` is known,
@@ -112,7 +106,7 @@ node has decided by any time `t` with `t + ⌈n/β⌉ · 3^(m+1) · Δ ≤ n - 1
 theorem theorem_6_7 {n β m Δ : ℕ} {D : Decision Bool} (hD : Consensus (KnownN n) D)
     (hC : Coordinated (KnownN n) Δ D) (hn : 3 ≤ n) (hβ : 1 ≤ β) (hβn : β < n)
     (hm : n ≤ 2 ^ m * β) (k : ℕ) (σ : ℕ → Bool) {t : ℕ}
-    (ht : t + (n + β - 1) / β * 3 ^ (m + 1) * Δ ≤ n - 1 - β) :
+    (ht : t + n ⌈/⌉ β * 3 ^ (m + 1) * Δ ≤ n - 1 - β) :
     ∀ u ∈ (staticLine n k σ).V, D (staticLine n k σ) u t = none := by
   obtain ⟨G₀, w₀, h₀⟩ := walk_to_uniform (k := k) σ false hn hβ hβn hm
   obtain ⟨G₁, w₁, h₁⟩ := walk_to_uniform (k := k) σ true hn hβ hβn hm
@@ -122,7 +116,7 @@ theorem theorem_6_7 {n β m Δ : ℕ} {D : Decision Bool} (hD : Consensus (Known
 theorem theorem_6_7_clog {n β Δ : ℕ} {D : Decision Bool} (hD : Consensus (KnownN n) D)
     (hC : Coordinated (KnownN n) Δ D) (hn : 3 ≤ n) (hβ : 1 ≤ β) (hβn : β < n)
     (k : ℕ) (σ : ℕ → Bool) {t : ℕ}
-    (ht : t + (n + β - 1) / β * 3 ^ (ellBeta n β + 1) * Δ ≤ n - 1 - β) :
+    (ht : t + n ⌈/⌉ β * 3 ^ (ellBeta n β + 1) * Δ ≤ n - 1 - β) :
     ∀ u ∈ (staticLine n k σ).V, D (staticLine n k σ) u t = none :=
   theorem_6_7 hD hC hn hβ hβn (le_two_pow_ellBeta hβ) k σ ht
 

@@ -1,5 +1,6 @@
 import Cslib.Foundations.Combinatorics.SimplicialComplex.IndexLemma
 import Papers.PODC2022.ArrowTopology.SignModel
+import Podc.Foundations.Data.Finset.Card
 
 /-!
 # Lemma 3.2: the input complex `N_I` is orientable (three alternatives, any number of voters)
@@ -53,11 +54,6 @@ theorem allEq_iff {g : Fin 3 → Bool} {j j' k : Fin 3} (h1 : j ≠ j') (h2 : k 
     (g 0 = g 1 ∧ g 1 = g 2) ↔ (g j = g j' ∧ g j' = g k) := by
   fin_cases j <;> fin_cases j' <;> fin_cases k <;> simp_all <;>
     constructor <;> rintro ⟨h, h'⟩ <;> simp_all
-
-theorem third_index {j j' : Fin 3} (h : j ≠ j') : ∃ k, k ≠ j ∧ k ≠ j' := by
-  fin_cases j <;> fin_cases j' <;> simp_all <;>
-    first | exact ⟨0, by decide, by decide⟩ | exact ⟨1, by decide, by decide⟩ |
-      exact ⟨2, by decide, by decide⟩
 
 omit [Fintype ι] [DecidableEq ι] in
 theorem consistent_iff {t : Fin 3 → ι → Bool} {j j' k : Fin 3} (h1 : j ≠ j') (h2 : k ≠ j)
@@ -117,7 +113,7 @@ triangles of parity `+1` and `−1` are equinumerous. -/
 theorem card_even_eq_card_odd {j j' : Fin 3} (hjj' : j ≠ j') {α β : ι → Bool} (hαβ : α ≠ β) :
     (Finset.univ.filter fun t : Tri ι => parity t.1 = 0 ∧ t.1 j = α ∧ t.1 j' = β).card =
       (Finset.univ.filter fun t : Tri ι => parity t.1 ≠ 0 ∧ t.1 j = α ∧ t.1 j' = β).card := by
-  obtain ⟨k, hkj, hkj'⟩ := third_index hjj'
+  obtain ⟨k, hkj, hkj'⟩ := Fintype.exists_ne_ne_of_two_lt_card (by simp) j j'
   obtain ⟨i₀, hi₀⟩ : ∃ i, α i ≠ β i := by
     by_contra h; push Not at h; exact hαβ (funext h)
   have hfj : ∀ t : Fin 3 → ι → Bool, flip t k i₀ j = t j := fun t => flip_apply_ne t i₀ hkj.symm
@@ -146,7 +142,7 @@ theorem card_even_eq_card_odd {j j' : Fin 3} (hjj' : j ≠ j') {α β : ι → B
 vector is forced by transitivity. -/
 theorem card_eq_one {j j' : Fin 3} (hjj' : j ≠ j') (α : ι → Bool) :
     (Finset.univ.filter fun t : Tri ι => t.1 j = α ∧ t.1 j' = α).card = 1 := by
-  obtain ⟨k, hkj, hkj'⟩ := third_index hjj'
+  obtain ⟨k, hkj, hkj'⟩ := Fintype.exists_ne_ne_of_two_lt_card (by simp) j j'
   let t₀ : Fin 3 → ι → Bool := fun m => if m = k then fun i => !α i else α
   have ht₀ : Consistent t₀ := by
     rw [consistent_iff hjj' hkj hkj']

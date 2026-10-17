@@ -374,11 +374,15 @@ theorem sum_ncard_infl_le (c : Change V) (cfg : Config V) :
   | insertNode x => exact sum_le_factorial_node _ (Or.inl rfl) cfg
   | deleteNode x => exact sum_le_factorial_node _ (Or.inr rfl) cfg
 
+theorem expect_le_of_sum_le {f : (V ≃ Fin (Fintype.card V)) → ℕ} {k : ℕ}
+    (h : ∑ π, f π ≤ k * (Fintype.card V).factorial) : 𝔼 π, (f π : ℚ) ≤ k := by
+  rw [Fintype.expect_eq_sum_div_card, Fintype.card_equiv (Fintype.equivFin V)]
+  rw [div_le_iff₀ (by positivity)]
+  exact_mod_cast h
+
 theorem expect_le_one_of_sum_le {f : (V ≃ Fin (Fintype.card V)) → ℕ}
     (h : ∑ π, f π ≤ (Fintype.card V).factorial) : 𝔼 π, (f π : ℚ) ≤ 1 := by
-  rw [Fintype.expect_eq_sum_div_card, Fintype.card_equiv (Fintype.equivFin V)]
-  rw [div_le_one (by positivity)]
-  exact_mod_cast h
+  simpa using expect_le_of_sum_le (k := 1) (by simpa using h)
 
 /-- **Theorem 1** (Censor-Hillel–Haramaty–Karnin, PODC 2016). For every configuration and every
 single topology change (edge or node insertion or deletion), the expected size of the set

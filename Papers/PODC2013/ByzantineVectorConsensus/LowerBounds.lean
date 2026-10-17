@@ -1,4 +1,5 @@
 import Papers.PODC2013.ByzantineVectorConsensus.Spec
+import Podc.Foundations.Data.Nat.ModCount
 
 /-!
 # Lower bounds: Theorems 1 and 4 of Vaidya–Garg (PODC 2013)
@@ -35,22 +36,17 @@ variable {P M S : Type*} [Fintype P] [DecidableEq P] {d : ℕ}
 
 /-- The residue classes modulo `m` of the indices of `n ≤ m t` processes have at most `t`
 elements. -/
-theorem card_mod_class_le {m t : ℕ} (_hm : 0 < m) (hn : Fintype.card P ≤ m * t) (r : ℕ) :
+theorem card_mod_class_le {m t : ℕ} (hm : 0 < m) (hn : Fintype.card P ≤ m * t) (r : ℕ) :
     (univ.filter fun p : P => ((Fintype.equivFin P p : ℕ) % m = r)).card ≤ t := by
   set e := Fintype.equivFin P
-  have h := card_le_card_of_injOn (s := univ.filter fun p : P => ((e p : ℕ) % m = r))
-    (t := range t) (fun p => (e p : ℕ) / m) (fun p _ => by
-      simp only [coe_range, Set.mem_Iio]
-      have := (e p).isLt
-      exact Nat.div_lt_of_lt_mul (by linarith [mul_comm m t]))
-    (fun p hp q hq hpq => by
-      simp only [coe_filter, mem_univ, true_and, Set.mem_ofPred_eq] at hp hq
-      have h1 := Nat.div_add_mod (e p : ℕ) m
-      have h2 := Nat.div_add_mod (e q : ℕ) m
-      simp only at hpq
-      rw [hp, hpq] at h1; rw [hq] at h2
-      exact e.injective (Fin.ext (by omega)))
-  simpa using h
+  refine le_trans ?_ (Nat.ceilDiv_le_of_le_mul hm hn)
+  rw [← card_map (e.toEmbedding.trans Fin.valEmbedding)]
+  refine Nat.card_le_ceilDiv_of_subset_Ico (a := 0) hm (fun x hx => ?_) fun x hx y hy => ?_
+  · obtain ⟨p, -, rfl⟩ := mem_map.1 hx
+    exact mem_Ico.2 ⟨Nat.zero_le _, (e p).isLt⟩
+  · obtain ⟨p, hp, rfl⟩ := mem_map.1 hx
+    obtain ⟨q, hq, rfl⟩ := mem_map.1 hy
+    exact (mem_filter.1 hp).2.trans (mem_filter.1 hq).2.symm
 
 /-- Validity constraints of the lower-bound configurations pin the decision to the own input. -/
 theorem pin_of_validity {g : P → ℕ} {a : Vec d} {c : ℝ} {p : P} (hp : g p ≤ d) {z : Vec d}

@@ -1,4 +1,5 @@
 import Papers.PODC2024.RecoverableConsensus.Sec4Common
+import Podc.Foundations.Data.Finset.SumUpdate
 
 /-!
 # Lemma 16 of Ovens (PODC'24): `T_{n,n'}` has recoverable consensus number `n'`
@@ -404,8 +405,8 @@ lemma card_applySet_change {D E : Cfg (alg16 n n')} (r : Fin n')
     (h : ∀ p, p ≠ r → E.loc p = D.loc p) :
     (applySet E).card + (if L16.isApply (D.loc r) = true then 1 else 0) =
       (applySet D).card + (if L16.isApply (E.loc r) = true then 1 else 0) :=
-  @card_filter_change (Fin n') L16 _ _ D.loc E.loc r (fun l => L16.isApply l = true)
-    (fun _ => instDecidableEqBool _ _) h
+  Fintype.card_filter_add_ite_eq_of_eq_off (p := fun l => L16.isApply (D.loc l) = true)
+    (q := fun l => L16.isApply (E.loc l) = true) r fun x hx => by rw [h x hx]
 
 lemma inv16_next (hn : n' < n) {x : Fin n' → Bool} {D : Cfg (alg16 n n')} (hI : Inv16 x D)
     (e : Ev n') : Inv16 x (D.next e) ∧
