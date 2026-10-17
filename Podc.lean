@@ -10,7 +10,6 @@ import Podc.ContentOblivious.Lockstep
 import Podc.ContentOblivious.Prog
 import Podc.ContentOblivious.Compose
 import Podc.SharedMemory.Potential
-import Podc.SharedMemory.Linearization
 import Podc.ContentOblivious.Staged
 import Podc.ContentOblivious.Hom
 import Podc.ContentOblivious.Splice
@@ -19,15 +18,10 @@ import Podc.ContentOblivious.VirtualRing
 import Podc.LockStep.Basic
 import Podc.LockStep.Restrict
 import Podc.LockStep.Sequential
-import Podc.SharedMemory.Objects
-import Podc.StrongLin.Basic
-import Podc.StrongLin.OneAccess
 import Podc.CongestLB.Protocol
 import Podc.CongestLB.Congest
 import Podc.CongestLB.Gather
 import Podc.CongestLB.Randomized
-import Podc.StrongLin.Restricted
-import Podc.SharedMemory.ObjectClasses
 import Podc.Knowledge.Basic
 import Podc.Order.NatDescent
 import Podc.SharedMemory.History
