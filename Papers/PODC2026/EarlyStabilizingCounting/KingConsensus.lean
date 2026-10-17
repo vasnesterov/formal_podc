@@ -141,7 +141,7 @@ theorem eq_of_two_majorities {n : ℕ} (F : Finset (Fin n)) (hF : 3 * F.card < n
     simp only [mem_union, mem_filter, mem_univ, true_and] at hw ⊢
     rcases hw with h | h <;> exact h.1
   have h1 := card_le_card hsub
-  rw [card_union_of_disjoint hdisj, card_correct] at h1
+  rw [card_union_of_disjoint hdisj, card_filter_notMem_univ, Fintype.card_fin] at h1
   have := card_le_res hF
   unfold res at *
   omega
@@ -194,7 +194,7 @@ theorem ga_spec {n : ℕ} (F : Finset (Fin n)) (hF : 3 * F.card < n)
         univ.filter fun w : Fin n => w ∉ F := by
       ext w; simp only [mem_filter, mem_univ, true_and]
       exact ⟨fun h => h.1, fun hw => ⟨hw, hall w hw⟩⟩
-    rw [hset, card_correct] at hge
+    rw [hset, card_filter_notMem_univ, Fintype.card_fin] at hge
     have hcond : n - res n ≤ gaCnt (r2 v) (s2 v).x := by
       rw [hx2 v hv, hc v hv]; omega
     rw [hs3 v hv]

@@ -306,7 +306,7 @@ theorem WGARun.spec {F : Finset (Fin n)} (E : WGARun F) (hF : 3 * F.card < n) :
     set A := C.filter fun u => diffCnt (E.r1 u) (E.x u) ≤ res n ∧ E.x u = a with hA
     set D := C.filter fun u => ¬ (diffCnt (E.r1 u) (E.x u) ≤ res n ∧ E.x u = a) with hD
     have hAD : A.card + D.card = n - F.card := by
-      rw [hA, hD, card_filter_add_card_filter_not, hC, card_correct]
+      rw [hA, hD, card_filter_add_card_filter_not, hC, card_filter_notMem_univ, Fintype.card_fin]
     have hDle : D.card ≤ res n := by
       refine (pcnt_ge (E.h2.agree hw) _ D fun u hu => ?_).trans hgw
       simp only [hD, hC, mem_filter, mem_univ, true_and] at hu

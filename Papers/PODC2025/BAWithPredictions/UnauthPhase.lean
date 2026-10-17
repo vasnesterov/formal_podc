@@ -1,4 +1,5 @@
 import Papers.PODC2025.BAWithPredictions.Plurality
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # Graded consensus and conciliation with a core set (Sections 7.1 and 7.2)
@@ -71,18 +72,8 @@ theorem cnt_le_cnt_add (X Y : Finset ι) (f : ι → α) (a : α) :
     cnt Y f a ≤ cnt X f a + (Y \ X).card :=
   Finset.countEq_le_countEq_add_card_sdiff Y X
 
-theorem cnt_congr {X : Finset ι} {f g : ι → α} (h : ∀ j ∈ X, f j = g j) (a : α) :
-    cnt X f a = cnt X g a := by
-  unfold cnt Finset.countEq
-  congr 1
-  exact filter_congr fun j hj => by rw [h j hj]
-
 theorem cnt_le_card (X : Finset ι) (f : ι → α) (a : α) : cnt X f a ≤ X.card :=
   Finset.countEq_le_card
-
-theorem cnt_eq_card {X : Finset ι} {f : ι → α} {a : α} (h : ∀ j ∈ X, f j = a) :
-    cnt X f a = X.card := by
-  unfold cnt Finset.countEq; rw [filter_true_of_mem h]
 
 end Threshold
 
@@ -155,7 +146,7 @@ private theorem cnt_r1 (hC : CoreSet F k L G) (h1 : GCRound1 F L v r1) {i : P} (
     cnt G (fun j => some (v j)) (some w) ≤ cnt (L i) (r1 i) (some w) ∧
       cnt (L i) (r1 i) (some w) ≤ cnt G (fun j => some (v j)) (some w) + k := by
   have he : cnt G (r1 i) (some w) = cnt G (fun j => some (v j)) (some w) :=
-    cnt_congr (fun j hj => by
+    countEq_congr (fun j hj => by
       rw [h1 i hi j (hC.G_honest j hj), ite_eq_left (hC.mem_self hj)]) _
   have h2 := cnt_mono (hC.G_sub i hi) (r1 i) (some w)
   have h3 := cnt_le_cnt_add G (L i) (r1 i) (some w)
@@ -189,7 +180,7 @@ theorem lemma8 (hC : CoreSet F k L G) (h1 : GCRound1 F L v r1) (h2 : GCRound2 F 
     {w : V} (hv : ∀ i ∉ F, v i = w) :
     ∀ i ∉ F, gcOut k (L i) (v i) (gcB k (L i) (r1 i)) (r2 i) = (w, true) := by
   have hG : cnt G (fun j => some (v j)) (some w) = G.card :=
-    cnt_eq_card fun j hj => by rw [hv j (hC.G_honest j hj)]
+    countEq_eq_card fun j hj => by rw [hv j (hC.G_honest j hj)]
   have hb : ∀ i ∉ F, gcB k (L i) (r1 i) = some w := by
     intro i hi
     have e1 := (cnt_r1 hC h1 hi w).1
@@ -201,7 +192,7 @@ theorem lemma8 (hC : CoreSet F k L G) (h1 : GCRound1 F L v r1) (h2 : GCRound2 F 
     omega
   intro i hi
   rw [hb i hi, gcOut_some]
-  have : cnt G (r2 i) (some w) = G.card := cnt_eq_card fun j hj => by
+  have : cnt G (r2 i) (some w) = G.card := countEq_eq_card fun j hj => by
     rw [h2 i hi j (hC.G_honest j hj), ite_eq_left (hC.mem_self hj), hb j (hC.G_honest j hj)]
   have := cnt_mono (hC.G_sub i hi) (r2 i) (some w)
   have := hC.card_G
@@ -227,14 +218,14 @@ theorem lemma9 (hC : CoreSet F k L G) (h1 : GCRound1 F L v r1) (h2 : GCRound2 F 
         cnt G (fun j => gcB k (L j) (r1 j)) (some w') ≤ cnt (L i') (r2 i') (some w') := by
       intro w'
       have he : cnt G (r2 i') (some w') = cnt G (fun j => gcB k (L j) (r1 j)) (some w') :=
-        cnt_congr (fun j hj => by
+        countEq_congr (fun j hj => by
           rw [h2 i' hi' j (hC.G_honest j hj), ite_eq_left (hC.mem_self hj)]) _
       have := cnt_mono (hC.G_sub i' hi') (r2 i') (some w')
       have := cnt_le_cnt_add G (L i') (r2 i') (some w')
       have := hC.card_sdiff hi'
       omega
     have hGi : cnt G (r2 i) (some w) = cnt G (fun j => gcB k (L j) (r1 j)) (some w) :=
-      cnt_congr (fun j hj => by
+      countEq_congr (fun j hj => by
         rw [h2 i hi j (hC.G_honest j hj), ite_eq_left (hC.mem_self hj)]) _
     have hw : k + 1 ≤ cnt G (fun j => gcB k (L j) (r1 j)) (some w) := by
       have := cnt_le_cnt_add G (L i) (r2 i) (some w)
@@ -386,7 +377,7 @@ private theorem conc_eq_cmin (hC : CoreSet F k L G) (hr : CRound F L v rc) {i : 
     simp only [cT, mem_filter, mem_univ, true_and]
     rw [hr i hi x (hC.G_honest x hx), ite_eq_left (hC.mem_self hx)]; rfl
   have h1 : cnt G (cmin (rc i) d) (cmin (rc i) d j) = G.card :=
-    cnt_eq_card fun x hx => lemma11 hC hr hi d hx hj
+    countEq_eq_card fun x hx => lemma11 hC hr hi d hx hj
   have h2 := cnt_mono hsub (cmin (rc i) d) (cmin (rc i) d j)
   have h3 := card_le_card (inter_subset_right (s₁ := cT (rc i)) (s₂ := L i))
   have h4 := hC.card_L i hi

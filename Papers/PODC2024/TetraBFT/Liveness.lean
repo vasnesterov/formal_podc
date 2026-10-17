@@ -32,13 +32,8 @@ variable {E : Execution P V} {f : ℕ}
 
 /-- The correct nodes form a quorum. -/
 theorem card_correct (hE : E.SafetyHyp f) :
-    Fintype.card P - f ≤ (univ.filter (· ∉ E.faulty)).card := by
-  have h1 := card_filter_add_card_filter_not (s := (univ : Finset P)) (fun q => q ∉ E.faulty)
-  have h2 : (univ.filter fun q : P => ¬ q ∉ E.faulty).card ≤ E.faulty.card :=
-    card_le_card fun q hq => by simp only [mem_filter, not_not] at hq; exact hq.2
-  have := hE.card_faulty
-  rw [card_univ] at h1
-  omega
+    Fintype.card P - f ≤ (univ.filter (· ∉ E.faulty)).card :=
+  card_sub_le_card_filter_notMem hE.card_faulty
 
 /-- The correct voters of a quorum of vote-k messages form a blocking set of correct nodes. -/
 theorem blocking_of_quorum (hn : 3 * f < Fintype.card P) (hE : E.SafetyHyp f) {Q : Finset P}

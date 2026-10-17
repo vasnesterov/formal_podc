@@ -1,4 +1,5 @@
 import Cslib.Computability.Distributed.Byzantine.PartialSync.Omission
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # All Byzantine Agreement Problems Are Expensive — §3: the lower bound for weak consensus
@@ -74,9 +75,6 @@ theorem isoExec_ok_eq_false {x : P → VI} {G H : Finset P} {k k' τ : ℕ} {q p
 
 /-! ### Lemma 2 -/
 
-theorem card_compl_eq (F : Finset P) : (univ.filter (· ∉ F)).card = Fintype.card P - F.card := by
-  rw [filter_not, card_sdiff_of_subset (by simp)]; simp
-
 /-- **Lemma 2.** Let `F` be the faulty processes of `E` (at most `t`), `Y ⊆ F` a group whose
 members only omit (non-empty) batches sent to `F`, and suppose correct processes send fewer than
 `⌈|Y|/2⌉ σ` messages. If a correct process `x` decides `b`, then more than half of `Y` decides `b`
@@ -130,7 +128,7 @@ theorem lemma2 (hS : OmSolves t A val) {E : OmExec P VI} {F Y : Finset P} {σ : 
   obtain ⟨x', hx'⟩ : ((univ.filter (· ∉ F)) \ D p).Nonempty := by
     rw [← card_pos]
     have := le_card_sdiff (D p) (univ.filter (· ∉ F))
-    rw [card_compl_eq] at this
+    rw [card_filter_notMem_univ] at this
     omega
   simp only [mem_sdiff, mem_filter, mem_univ, true_and] at hx'
   have hx'F' : x' ∉ F' := by

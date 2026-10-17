@@ -1,5 +1,6 @@
 import Papers.PODC2022.RecursivePhaseKing.Desync
 import Papers.PODC2022.RecursivePhaseKing.Subroutines
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # Algorithm 7 (electors' broadcast with a voting barrier) and Lemma 4.2 of [LS22]
@@ -564,24 +565,6 @@ theorem recv_elect (hp : p ∉ F) (hq : q ∉ F) (hK : q ∈ K) {ℓq : ℕ} (h�
   have h2 : E.σ p + (E.σ q + ℓq - E.σ p) - E.σ q = ℓq := by omega
   simp only [h1, ↓reduceIte, h2]; exact hs
 
-omit [DecidableEq P] in
-theorem card_correct_ge [DecidableEq P] (S : Finset P) :
-    S.card - F.card ≤ (S.filter (· ∉ F)).card := by
-  have h1 := card_filter_add_card_filter_not (s := S) (fun x => x ∉ F)
-  have h2 : (S.filter fun x => ¬ x ∉ F).card ≤ F.card :=
-    card_le_card fun x hx => by simp only [mem_filter, not_not] at hx; exact hx.2
-  omega
-
-theorem card_ge_of_all {S : Finset P} (h : ∀ u ∉ F, u ∈ S) : Fintype.card P - F.card ≤ S.card := by
-  rw [← card_compl]
-  exact card_le_card fun u hu => h u (mem_compl.1 hu)
-
-theorem exists_correct {S : Finset P} (h : F.card < S.card) : ∃ r ∈ S, r ∉ F := by
-  obtain ⟨r, hr⟩ : (S.filter (· ∉ F)).Nonempty := by
-    rw [← card_pos]; have := card_correct_ge (F := F) S; omega
-  rw [mem_filter] at hr
-  exact ⟨r, hr⟩
-
 end Correct
 
 /-! ### The first return and the voting barrier -/
@@ -642,7 +625,7 @@ theorem barrier (hfix : fix = true) (h3 : 3 * t < Fintype.card P) (hF : F.card �
     Fintype.card P - t ≤ ((E.st (G + 2 - E.σ q) q).vt w).card := by
   set C := ((E.st (G - E.σ r + 1) r).vt w).filter (· ∉ F) with hC
   have hCc : t + 1 ≤ C.card := by
-    have := card_correct_ge (F := F) ((E.st (G - E.σ r + 1) r).vt w)
+    have := card_sub_card_le_card_filter_notMem ((E.st (G - E.σ r + 1) r).vt w) F
     rw [← hC] at this; omega
   -- every correct voter seen by `r` voted in some local round `≥ 1`, by global round `G`
   have fact1 : ∀ s ∈ C, ∃ ℓs, 1 ≤ ℓs ∧ E.σ s + ℓs ≤ G ∧ (E.st ℓs s).fin = false ∧
@@ -685,7 +668,7 @@ theorem barrier (hfix : fix = true) (h3 : 3 * t < Fintype.card P) (hF : F.card �
     have hmem := recv_vote E hq hu hσ (send_vote_of hf (Or.inr hfix) hvm)
       (out_none_of_le E hqo (by omega))
     exact vt_mono E (by omega) hmem
-  have := card_ge_of_all fact5
+  have := card_sub_card_le_of_forall_notMem fact5
   omega
 
 end Barrier
@@ -776,7 +759,8 @@ theorem val_of_votes (h3 : 3 * t < Fintype.card P) (hF : F.card ≤ t)
     (hK : 2 * K.card / 3 < (K \ F).card) {c : Bool}
     (hc : ∀ i ∈ K, i ∉ F → ∃ τ, (inp i).2.2 = some (τ, c)) {p : P} (hp : p ∉ F) {j : ℕ}
     {w : Bool} (hv : Fintype.card P - t ≤ ((E.st j p).vt w).card) : w = c := by
-  obtain ⟨r, hr, hrF⟩ := exists_correct (F := F) (S := (E.st j p).vt w) (by omega)
+  obtain ⟨r, hr, hrF⟩ := exists_mem_notMem_of_card_lt_card (s := F) (t := (E.st j p).vt w)
+    (by omega)
   obtain ⟨ℓ', -, hvote⟩ := mem_vt E hr
   obtain ⟨-, -, hvm⟩ := rcv_vote_imp E hp hrF hvote
   by_contra hne
@@ -856,7 +840,7 @@ theorem good_ret (hfix : fix = true) (h3 : 3 * t < Fintype.card P) (hF : F.card 
         have hmem := recv_vote E hq hu hσ (send_vote_of hf (Or.inr hfix) hvm)
           (out_none_of_le E hqo (by omega))
         exact vt_mono E (by omega) hmem
-      have := card_ge_of_all hall
+      have := card_sub_card_le_of_forall_notMem hall
       omega
   have hpl := hlow p hp
   have hph := hhigh p hp

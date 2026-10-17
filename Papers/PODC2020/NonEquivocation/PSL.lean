@@ -1,5 +1,6 @@
 import Papers.PODC2020.NonEquivocation.Majority
 import Cslib.Foundations.Data.Finset.Quorum
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # Algorithm 2 and Theorem 5.1: interactive consistency under weak non-equivocation, `n > 2t`
@@ -62,8 +63,7 @@ lemma pickMaj_of_not {t : ℕ} {S : Finset P} {τ : List P → Option V} {p q : 
 omit [DecidableEq P] in
 lemma vote_congr {t : ℕ} {S : Finset P} {f g : P → V} (h : ∀ r ∈ S, f r = g r) :
     vote t S f = vote t S g := by
-  have : ∀ v, S.countEq f v = S.countEq g v := fun v => by
-    rw [Finset.countEq, Finset.countEq, Finset.filter_congr (fun r hr => by rw [h r hr])]
+  have : ∀ v, S.countEq f v = S.countEq g v := Finset.countEq_congr h
   simp only [vote, this]
 
 omit [DecidableEq P] in

@@ -1,4 +1,5 @@
 import Papers.PODC2025.BAWithPredictions.Defs
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # Byzantine Agreement with Predictions — classification (Section 6)
@@ -370,9 +371,6 @@ def VoteRcv (F : Finset P) (a : P → P → Bool) (rcv : P → Option (P → Boo
 def wrongAbout (F : Finset P) (a : P → P → Bool) (j : P) : Finset P :=
   univ.filter fun s => s ∉ F ∧ a s j ≠ correctPred F j
 
-theorem card_honest (F : Finset P) : (univ.filter fun j => j ∉ F).card = Fintype.card P - F.card := by
-  rw [filter_not, card_sdiff_of_subset (subset_univ _)]; simp
-
 /-- **Observations 1 and 2.** If some honest process misclassifies `j` after Algorithm 2, then at
 least `⌈n/2⌉ - f` honest processes received an incorrect prediction about `j`. -/
 theorem obs12 {a : P → P → Bool} {rcv : P → P → Option (P → Bool)}
@@ -412,7 +410,7 @@ theorem obs12 {a : P → P → Bool} {rcv : P → P → Option (P → Bool)}
       · exact mem_union_right _ (by simp [wrongAbout, hs, hjF, hb])
       · exact mem_union_left _ (by simp only [S, mem_filter, mem_univ, true_and]; exact ⟨a s, hrcv i hi s hs, hb⟩)
     have := (card_le_card h1).trans (card_union_le _ _)
-    rw [card_honest] at this
+    rw [card_filter_notMem_univ] at this
     omega
 
 theorem sum_card_wrongAbout (F : Finset P) (a : P → P → Bool) :

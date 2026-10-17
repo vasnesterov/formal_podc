@@ -1,4 +1,5 @@
 import Papers.PODC2022.HybridApproxAgreement.Trim
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # The analysis of `Π_AA` relative to the Overlap All-to-All Broadcast guarantees (Section 3.1)
@@ -160,9 +161,6 @@ theorem step_core {n ts ta : ℕ} (hta : ta ≤ ts) (hn : 2 * ts + ta < n) {V V'
 
 variable {ts ta : ℕ} {F : Finset P} {x : P → ℝ} {O : P → P → Option ℝ}
 
-theorem card_honest (F : Finset P) : (Finset.univ.filter (· ∉ F)).card = Fintype.card P - F.card := by
-  rw [Finset.filter_not, Finset.card_sdiff_of_subset (by simp)]; simp
-
 /-- **Lemmas 3.2 and 3.3** (one iteration, synchronous network). -/
 theorem step_sync (hta : ta ≤ ts) (hn : 2 * ts + ta < Fintype.card P) (hO : SyncOBC ts F x O)
     {lo hi : ℝ} (hx : ∀ q ∉ F, lo ≤ x q ∧ x q ≤ hi) :
@@ -179,7 +177,7 @@ theorem step_sync (hta : ta ≤ ts) (hn : 2 * ts + ta < Fintype.card P) (hO : Sy
     intro p hp
     rw [card_recvVals]
     have := Finset.card_le_card (Finset.filter_subset (· ∉ F) (dom (O p)))
-    rw [hdomeq p hp, card_honest] at this
+    rw [hdomeq p hp, Finset.card_filter_notMem_univ] at this
     omega
   have hparts : ∀ p ∉ F, ∃ H C : Multiset ℝ, recvVals (O p) = H + C ∧
       (∀ y ∈ H, lo ≤ y ∧ y ≤ hi) ∧
@@ -192,7 +190,7 @@ theorem step_sync (hta : ta ≤ ts) (hn : 2 * ts + ta < Fintype.card P) (hO : Sy
       rw [hO.overlap p hp q hq]; exact hx q hq
     · have e := congrArg card (recvVals_split (O := O p) F)
       simp only [card_add, card_map, Finset.card_val] at e
-      rw [hdomeq p hp, card_honest] at e
+      rw [hdomeq p hp, Finset.card_filter_notMem_univ] at e
       have := le_max_right ta (card (recvVals (O p)) - (Fintype.card P - ts))
       simp only [card_map, Finset.card_val]
       omega
@@ -206,7 +204,7 @@ theorem step_sync (hta : ta ≤ ts) (hn : 2 * ts + ta < Fintype.card P) (hO : Sy
     refine (step_core hta hn e e' hH hH' hC hC' (hcard p hp) card_recvVals_le (hcard p' hp')
       card_recvVals_le (card_union_le (hO.consistency p hp p' hp')) ?_).2
     refine le_trans ?_ card_common_le_inter
-    calc Fintype.card P - ts ≤ (Finset.univ.filter (· ∉ F)).card := by rw [card_honest]; omega
+    calc Fintype.card P - ts ≤ (Finset.univ.filter (· ∉ F)).card := by rw [Finset.card_filter_notMem_univ]; omega
       _ ≤ _ := Finset.card_le_card fun q hq => by
           simp at hq; simp [hO.overlap p hp q hq, hO.overlap p' hp' q hq]
 

@@ -1,5 +1,6 @@
 import Papers.PODC2026.TreeAA.Spec
 import Cslib.Foundations.Data.Finset.Quorum
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # The 3-round gradecast of Ben-Or, Dolev and Hoch  -- CSLib candidate
@@ -78,28 +79,17 @@ everybody who agrees with `c` outside `B`. -/
 lemma gcCount_transfer (hB : B.ncard ≤ t) {c c' : P → Option W}
     (hcc : ∀ q, q ∉ B → c q = c' q) {w : W} (h : Fintype.card P - t ≤ gcCount c w) :
     Fintype.card P - 2 * t ≤ gcCount c' w := by
-  unfold gcCount Finset.countEq at *
-  set S := Finset.univ.filter fun q => c q = some w
-  have h1 := Finset.card_filter_add_card_filter_not (s := S) (· ∈ B)
-  have h2 := Finset.card_filter_mem_le_ncard B S
-  have h3 : (S.filter fun q => q ∉ B).card ≤ (Finset.univ.filter fun q => c' q = some w).card := by
-    apply Finset.card_le_card
-    intro q hq
-    simp only [S, Finset.mem_filter, Finset.mem_univ, true_and] at hq ⊢
-    rw [← hcc q hq.2]; exact hq.1
+  have := Finset.countEq_sub_ncard_le_countEq (s := .univ) (fun q _ hq => hcc q hq) (some w)
+  unfold gcCount at *
   omega
 
 omit [DecidableEq P] in
 open Classical in
 lemma gcCount_of_forall (hB : B.ncard ≤ t) {c : P → Option W} {w : W}
     (h : ∀ q, q ∉ B → c q = some w) : Fintype.card P - t ≤ gcCount c w := by
-  unfold gcCount Finset.countEq
-  have h1 := Finset.card_filter_add_card_filter_not (s := (Finset.univ : Finset P)) (· ∈ B)
-  have h2 := Finset.card_filter_mem_le_ncard B Finset.univ
-  have h3 : (Finset.univ.filter fun q => q ∉ B).card ≤
-      (Finset.univ.filter fun q => c q = some w).card :=
-    Finset.card_le_card fun q hq => by simp at hq ⊢; exact h q hq
-  rw [Finset.card_univ] at h1
+  have := Finset.card_sub_ncard_le_countEq (s := .univ) (B := B) fun q _ hq => h q hq
+  rw [Finset.card_univ] at this
+  unfold gcCount
   omega
 
 omit [DecidableEq P] in

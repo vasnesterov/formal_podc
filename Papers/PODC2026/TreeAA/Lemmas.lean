@@ -1,4 +1,5 @@
 import Papers.PODC2026.TreeAA.Spec
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # The combinatorial core of `TreeAA` (Lemmas 2, 6–11)
@@ -71,26 +72,6 @@ section PathsFinder
 
 variable [Fintype P]
 
-/-- Among more than `|P| - k` parties of a set of size `≥ k`... : any set of at least `n - t`
-senders contains an honest one when `|Hᶜ| ≤ t < n - t`. -/
-lemma exists_mem_of_card {t : ℕ} (ht : 2 * t < Fintype.card P) {H : Set P} (hH : Hᶜ.ncard ≤ t)
-    (F : Finset P) (hF : Fintype.card P - t ≤ F.card) : ∃ s ∈ F, s ∈ H := by
-  by_contra hcon
-  push Not at hcon
-  have hsub : (F : Set P) ⊆ Hᶜ := fun s hs => hcon s hs
-  have := Set.ncard_le_ncard hsub (Set.toFinite _)
-  rw [Set.ncard_coe_finset] at this
-  omega
-
-lemma card_honest_ge {t : ℕ} {H : Set P} (hH : Hᶜ.ncard ≤ t) [DecidablePred (· ∈ H)] :
-    Fintype.card P - t ≤ (Finset.univ.filter (· ∈ H)).card := by
-  have h1 := Finset.card_filter_add_card_filter_not (s := Finset.univ) (fun x => x ∈ H)
-  have h2 : (Finset.univ.filter (· ∉ H)).card ≤ t := by
-    have e : ((Finset.univ.filter (· ∉ H) : Finset P) : Set P) = Hᶜ := by ext; simp
-    rw [← Set.ncard_coe_finset, e]; exact hH
-  rw [Finset.card_univ] at h1
-  omega
-
 /-- **Lemma 10** (`PathsFinder`, spec level). Every honest party `p` has received, from every
 sender `s`, a pair `d p s` (path, grade) such that honest senders' root paths arrive with grade 2
 (integrity) and a grade-2 path received by an honest party is received by every honest party
@@ -110,7 +91,10 @@ theorem pathsFinder_spec (r : V) {t : ℕ} (ht : 2 * t < Fintype.card P) {H : Se
   set k := Fintype.card P - t with hk
   have hk0 : 0 < k := by omega
   have hk2 : Fintype.card P < 2 * k := by omega
-  have hHcard := card_honest_ge (P := P) hH
+  have hHcard : k ≤ (Finset.univ.filter (· ∈ H)).card := by
+    have := Finset.card_sub_le_card_filter_notMem_of_ncard_le (B := Hᶜ) hH
+    simp only [Set.mem_compl_iff, not_not] at this
+    convert this using 2
   have hHne : H.Nonempty := by
     obtain ⟨s, hs⟩ := Finset.card_pos.1 (lt_of_lt_of_le hk0 hHcard)
     exact ⟨s, (Finset.mem_filter.1 hs).2⟩
@@ -135,7 +119,9 @@ theorem pathsFinder_spec (r : V) {t : ℕ} (ht : 2 * t < Fintype.card P) {H : Se
   · obtain ⟨hpre', hs⟩ := hP p hp
     have hne : lsp k (d p) 2 ≠ [] := by
       intro h; rw [h] at hpre'; exact rpath_ne_nil hT r m (List.prefix_nil.1 hpre')
-    obtain ⟨s, hs1, hsH⟩ := exists_mem_of_card ht hH _ hs
+    obtain ⟨s, hs1, hsH⟩ := Finset.exists_mem_notMem_of_ncard_le_of_lt hH
+      (lt_of_lt_of_le (by omega) hs)
+    rw [Set.notMem_compl_iff] at hsH
     rw [mem_supporters, hint s hsH p hp] at hs1
     refine ⟨hne, ⟨_, eq_rpath_of_prefix hT hs1.2 hne⟩, m, hpre'.subset (mem_rpath_self hT r m), hm⟩
   · obtain ⟨-, hs⟩ := hP p hp

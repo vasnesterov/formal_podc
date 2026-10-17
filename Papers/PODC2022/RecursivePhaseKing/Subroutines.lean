@@ -2,6 +2,7 @@ import Mathlib
 import Cslib.Computability.Distributed.Byzantine.KingPhase
 import Cslib.Computability.Distributed.Byzantine.Specs
 import Cslib.Foundations.Data.Finset.Quorum
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # Subroutines of the early-stopping Phase King protocol (Section 2 and Lemma 3.4)
@@ -60,8 +61,7 @@ theorem cntIn_ge_of (K F : Finset P) {m : P → Option Bool} {b : Bool}
 
 theorem cnt_ge_of (F : Finset P) {m : P → Option Bool} {b : Bool}
     (h : ∀ q ∉ F, m q = some b) : Fintype.card P - F.card ≤ cnt m b := by
-  have := cntIn_ge_of univ F (m := m) (b := b) (fun q _ hq => h q hq)
-  rwa [← compl_eq_univ_sdiff, card_compl] at this
+  simpa using card_sub_card_le_countEq (s := univ) fun q _ hq => h q hq
 
 /-- Upper bound: at most `|K ∩ F|` faulty senders plus the correct ones that sent `b`. -/
 theorem cntIn_le (K F : Finset P) (m : P → Option Bool) (b : Bool) :
@@ -74,13 +74,6 @@ theorem cnt_le (F : Finset P) (m : P → Option Bool) (b : Bool) :
     cnt m b ≤ F.card + (Fᶜ.filter fun q => m q = some b).card := by
   have := cntIn_le univ F m b
   simpa [cnt, compl_eq_univ_sdiff] using this
-
-theorem cntIn_congr {K : Finset P} {m m' : P → Option Bool} (h : ∀ q ∈ K, m q = m' q) (b : Bool) :
-    cntIn K m b = cntIn K m' b := by
-  unfold cntIn countEq; congr 1; exact filter_congr fun q hq => by rw [h q hq]
-
-theorem cnt_congr {m m' : P → Option Bool} (h : ∀ q, m q = m' q) (b : Bool) :
-    cnt m b = cnt m' b := cntIn_congr (fun q _ => h q) b
 
 /-! ### Specifications (Definitions 2.2, 2.5, 2.7) -/
 

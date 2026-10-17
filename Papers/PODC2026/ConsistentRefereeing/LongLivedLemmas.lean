@@ -1,4 +1,5 @@
 import Papers.PODC2026.ConsistentRefereeing.LongLivedSteps
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # Valencies of closed and supervalent executions (Lemmas 20–22, 27, 28 of [ACE26])
@@ -38,23 +39,15 @@ variable {X}
 
 /-! ### Choosing competitors -/
 
-lemma card_avoid (S : Finset P) :
-    Fintype.card P - S.card ≤ (Finset.univ.filter (fun x => x ∉ S)).card := by
-  have := Finset.card_filter_add_card_filter_not (s := Finset.univ) (fun x => x ∈ S)
-  have h2 : (Finset.univ.filter (fun x => x ∈ S)).card ≤ S.card := by
-    apply Finset.card_le_card; intro x; simp
-  simp only [Finset.card_univ] at this
-  omega
-
 lemma exists_comp (hn : 2 ≤ Fintype.card P) : ∃ c, c ≠ X.ref := by
-  have := card_avoid ({X.ref} : Finset P)
+  have := (Finset.card_filter_notMem_univ ({X.ref} : Finset P)).ge
   simp only [Finset.card_singleton] at this
   obtain ⟨c, hc⟩ := Finset.card_pos.1 (by omega : 0 < (Finset.univ.filter
     (fun x => x ∉ ({X.ref} : Finset P))).card)
   exact ⟨c, by simpa using hc⟩
 
 lemma exists_comp_ne (hn : 3 ≤ Fintype.card P) (q : P) : ∃ c, c ≠ X.ref ∧ c ≠ q := by
-  have := card_avoid ({X.ref, q} : Finset P)
+  have := (Finset.card_filter_notMem_univ ({X.ref, q} : Finset P)).ge
   have h2 := Finset.card_le_two (a := X.ref) (b := q)
   obtain ⟨c, hc⟩ := Finset.card_pos.1 (by omega : 0 < (Finset.univ.filter
     (fun x => x ∉ ({X.ref, q} : Finset P))).card)
@@ -64,7 +57,7 @@ lemma exists_comp_ne (hn : 3 ≤ Fintype.card P) (q : P) : ∃ c, c ≠ X.ref �
 
 lemma exists_comp_ne₂ (hn : 4 ≤ Fintype.card P) (q q' : P) :
     ∃ c, c ≠ X.ref ∧ c ≠ q ∧ c ≠ q' := by
-  have := card_avoid ({X.ref, q, q'} : Finset P)
+  have := (Finset.card_filter_notMem_univ ({X.ref, q, q'} : Finset P)).ge
   have h2 := Finset.card_le_three (a := X.ref) (b := q) (c := q')
   obtain ⟨c, hc⟩ := Finset.card_pos.1 (by omega : 0 < (Finset.univ.filter
     (fun x => x ∉ ({X.ref, q, q'} : Finset P))).card)
@@ -76,7 +69,7 @@ lemma exists_comp_ne₂ (hn : 4 ≤ Fintype.card P) (q q' : P) :
 lemma exists_lists {m : ℕ} (hn : 3 * m + 3 ≤ Fintype.card P) (q q' : P) :
     ∃ l₁ l₂ l₃ : List P, l₁.length = m ∧ l₂.length = m ∧ l₃.length = m ∧
       (l₁ ++ l₂ ++ l₃).Nodup ∧ ∀ x ∈ l₁ ++ l₂ ++ l₃, x ≠ X.ref ∧ x ≠ q ∧ x ≠ q' := by
-  have hc := card_avoid ({X.ref, q, q'} : Finset P)
+  have hc := (Finset.card_filter_notMem_univ ({X.ref, q, q'} : Finset P)).ge
   have h2 := Finset.card_le_three (a := X.ref) (b := q) (c := q')
   set S := Finset.univ.filter (fun x => x ∉ ({X.ref, q, q'} : Finset P)) with hS
   set Lst := S.toList with hL

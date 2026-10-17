@@ -476,11 +476,7 @@ local notation "A" => tetra (V := V) prm
 
 theorem card_correct_run (hF : R.faulty.card ≤ prm.f) :
     n - prm.f ≤ (univ.filter (· ∉ R.faulty)).card := by
-  have h1 := card_filter_add_card_filter_not (s := (univ : Finset (Fin n))) (fun q => q ∉ R.faulty)
-  have h2 : (univ.filter fun q : Fin n => ¬ q ∉ R.faulty).card ≤ R.faulty.card :=
-    card_le_card fun q hq => by simp only [mem_filter, not_not] at hq; exact hq.2
-  rw [card_univ, Fintype.card_fin] at h1
-  omega
+  simpa only [Fintype.card_fin] using card_sub_le_card_filter_notMem (α := Fin n) hF
 
 /-- **Catch-up.** Suppose that by time `t ≥ GST` some correct node has received `n − f`
 view-change messages for `u`, and that at time `t + δ` no correct node is above `u`. Then at

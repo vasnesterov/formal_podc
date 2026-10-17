@@ -1,4 +1,5 @@
 import Papers.PODC2013.ByzantineVectorConsensus.Spec
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # The iterative approximate BVC algorithm (Section 3.2, Theorem 5; Section 4, Theorem 6)
@@ -186,13 +187,8 @@ variable {f s E}
 
 theorem mem_correct {k : P} : k ∈ E.correct ↔ k ∉ E.faulty := by simp [correct]
 
-theorem card_correct (hV : E.Valid f s) : Fintype.card P - f ≤ E.correct.card := by
-  have h1 := card_filter_add_card_filter_not (s := (univ : Finset P)) (fun q => q ∈ E.faulty)
-  have h2 : (univ.filter fun q => q ∈ E.faulty) = E.faulty := by ext; simp
-  rw [h2, card_univ] at h1
-  have := hV.card_faulty
-  simp only [correct]
-  omega
+theorem card_correct (hV : E.Valid f s) : Fintype.card P - f ≤ E.correct.card :=
+  card_sub_le_card_filter_notMem hV.card_faulty
 
 /-- **Part I**: every point added to `Z_i` is *valid*, i.e. in the hull of the round-`r` states
 of the correct processes. -/

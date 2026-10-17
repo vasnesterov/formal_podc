@@ -1,5 +1,6 @@
 import Mathlib
 import Cslib.Foundations.Data.Finset.Quorum
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # TetraBFT: votes, reports, and the safety rules (Rules 1–4)
@@ -137,9 +138,7 @@ variable [Fintype P] [DecidableEq P]
 /-- The correct members of a quorum form a blocking set. -/
 theorem card_correct_quorum {f : ℕ} (hn : 3 * f < Fintype.card P) {F Q : Finset P}
     (hF : F.card ≤ f) (hQ : Fintype.card P - f ≤ Q.card) : f + 1 ≤ (Q.filter (· ∉ F)).card := by
-  have h1 := card_filter_add_card_filter_not (s := Q) (fun q => q ∉ F)
-  have h2 : (Q.filter fun q => ¬ q ∉ F).card ≤ F.card :=
-    card_le_card fun q hq => by simp only [mem_filter, not_not] at hq; exact hq.2
+  have := card_sub_card_le_card_filter_notMem Q F
   omega
 
 end Quorum

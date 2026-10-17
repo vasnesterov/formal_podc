@@ -1,6 +1,7 @@
 import Cslib.Computability.Distributed.Byzantine.SyncCounting.Model
 import Mathlib
 import Cslib.Foundations.Data.Finset.Quorum
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # Early-Stabilizing Counting: basic definitions
@@ -82,33 +83,15 @@ variable {n : ℕ} {α : Type*} [DecidableEq α]
 theorem cnt_le (s : Fin n → α) (a : α) : cnt s a ≤ n :=
   countEq_le_card.trans (by simp)
 
-/-- On the correct nodes, a received vector holds `a` where the true values do. -/
-theorem filter_agree (F : Finset (Fin n)) {m x : Fin n → α} (h : Agree F m x) (a : α) :
-    (univ.filter fun w => w ∉ F ∧ x w = a) = univ.filter fun w => w ∉ F ∧ m w = a :=
-  filter_congr fun w _ => and_congr_right fun hw => by rw [h w hw]
-
 /-- At least the correct nodes holding `a` are counted. -/
 theorem cnt_ge_correct (F : Finset (Fin n)) {m x : Fin n → α} (h : Agree F m x) (a : α) :
-    (univ.filter fun w => w ∉ F ∧ x w = a).card ≤ cnt m a := by
-  rw [filter_agree F h]
-  simpa [cnt, countEq, compl_eq_univ_sdiff, ← filter_notMem_eq_sdiff, filter_filter] using
-    countEq_mono (f := m) (b := a) (subset_univ Fᶜ)
+    (univ.filter fun w => w ∉ F ∧ x w = a).card ≤ cnt m a :=
+  card_filter_notMem_and_le_countEq (fun w _ hw => h w hw) a
 
 /-- At most the correct nodes holding `a` plus the faulty nodes are counted. -/
 theorem cnt_le_correct_add (F : Finset (Fin n)) {m x : Fin n → α} (h : Agree F m x) (a : α) :
-    cnt m a ≤ (univ.filter fun w => w ∉ F ∧ x w = a).card + F.card := by
-  rw [filter_agree F h]
-  simpa [cnt, countEq, compl_eq_univ_sdiff, ← filter_notMem_eq_sdiff, filter_filter] using
-    countEq_le_countEq_add_card_sdiff (f := m) (b := a) univ Fᶜ
-
-/-- The number of correct nodes is `n - |F|`. -/
-theorem card_correct (F : Finset (Fin n)) :
-    (univ.filter fun w : Fin n => w ∉ F).card = n - F.card := by
-  have := card_filter_add_card_filter_not (s := (univ : Finset (Fin n))) (fun w => w ∈ F)
-  have h2 : (univ.filter fun w : Fin n => w ∈ F) = F := by ext; simp
-  rw [h2] at this
-  simp only [card_univ, Fintype.card_fin] at this
-  omega
+    cnt m a ≤ (univ.filter fun w => w ∉ F ∧ x w = a).card + F.card :=
+  countEq_le_card_filter_notMem_and_add_card (fun w _ hw => h w hw) a
 
 /-- `3 |F| < n` gives `|F| ≤ t`. -/
 theorem card_le_res {F : Finset (Fin n)} (hF : 3 * F.card < n) : F.card ≤ res n := by
@@ -118,8 +101,8 @@ theorem card_le_res {F : Finset (Fin n)} (hF : 3 * F.card < n) : F.card ≤ res 
 theorem cnt_all {F : Finset (Fin n)} (hF : 3 * F.card < n) {m x : Fin n → α} (h : Agree F m x)
     {a : α} (ha : ∀ w, w ∉ F → x w = a) : n - res n ≤ cnt m a := by
   have h1 : n - F.card ≤ cnt m a := by
-    simpa [card_univ_sdiff] using
-      card_sdiff_le_countEq (s := univ) (f := m) fun w _ hw => (h w hw).trans (ha w hw)
+    simpa using card_sub_card_le_countEq (s := univ) (f := m) fun w _ hw =>
+      (h w hw).trans (ha w hw)
   have := card_le_res hF
   omega
 
