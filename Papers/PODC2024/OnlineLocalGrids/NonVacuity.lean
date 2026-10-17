@@ -16,45 +16,21 @@ open SimpleGraph Cslib.OnlineLocal
 
 /-! ### Balls in products, paths and cycles -/
 
--- CSLib candidate
-/-- A product of balls lies in the ball of the box product (radii add up). -/
-lemma ball_boxProd {α β : Type*} {G₁ : SimpleGraph α} {G₂ : SimpleGraph β} (x₁ : α) (x₂ : β)
-    (k₁ k₂ : ℕ) :
-    ball G₁ {x₁} k₁ ×ˢ ball G₂ {x₂} k₂ ⊆ ball (G₁ □ G₂) {(x₁, x₂)} (k₁ + k₂) := by
-  rintro ⟨y₁, y₂⟩ ⟨h₁, h₂⟩
-  obtain ⟨u₁, rfl, p₁, hp₁⟩ := mem_ball_iff_walk.1 h₁
-  obtain ⟨u₂, rfl, p₂, hp₂⟩ := mem_ball_iff_walk.1 h₂
-  refine mem_ball_iff_walk.2 ⟨_, rfl, (p₁.boxProdLeft G₂ u₂).append (p₂.boxProdRight G₁ y₁), ?_⟩
-  rw [Walk.length_append]
-  erw [Walk.length_map, Walk.length_map]
-  omega
+lemma closedBall_pathGraph (a : ℕ) (i : Fin a) : (pathGraph a).closedBall i a = Set.univ :=
+  closedBall_eq_univ_of_preconnected (pathGraph_preconnected a) i (by simp)
 
--- CSLib candidate
-/-- In a preconnected finite graph, the ball of radius `|V|` around any vertex is everything. -/
-lemma ball_eq_univ_of_preconnected {V : Type*} [Fintype V] {G : SimpleGraph V}
-    (hG : G.Preconnected) (x : V) {k : ℕ} (hk : Fintype.card V ≤ k) : ball G {x} k = Set.univ := by
-  classical
-  refine Set.eq_univ_of_forall fun y => ?_
-  obtain ⟨p⟩ := hG x y
-  refine mem_ball_iff_walk.2 ⟨x, rfl, p.bypass, ?_⟩
-  have := p.bypass_isPath.length_lt
-  omega
-
-lemma ball_pathGraph (a : ℕ) (i : Fin a) : ball (pathGraph a) {i} a = Set.univ :=
-  ball_eq_univ_of_preconnected (pathGraph_preconnected a) i (by simp)
-
-lemma ball_cycleGraph (b : ℕ) (j : Fin b) : ball (cycleGraph b) {j} b = Set.univ :=
-  ball_eq_univ_of_preconnected cycleGraph_preconnected j (by simp)
+lemma closedBall_cycleGraph (b : ℕ) (j : Fin b) : (cycleGraph b).closedBall j b = Set.univ :=
+  closedBall_eq_univ_of_preconnected cycleGraph_preconnected j (by simp)
 
 /-- Balls of radius `a + b` cover `R □ C` when `R`-balls of radius `a` and `C`-balls of radius
 `b` do. -/
 lemma ball_boxProd_eq_univ {α β : Type*} {G₁ : SimpleGraph α} {G₂ : SimpleGraph β} {a b T : ℕ}
-    (h₁ : ∀ x, ball G₁ {x} a = Set.univ) (h₂ : ∀ y, ball G₂ {y} b = Set.univ) (hT : a + b ≤ T)
-    (x : α × β) : ball (G₁ □ G₂) {x} T = Set.univ := by
+    (h₁ : ∀ x, G₁.closedBall x a = Set.univ) (h₂ : ∀ y, G₂.closedBall y b = Set.univ)
+    (hT : a + b ≤ T) (x : α × β) : ball (G₁ □ G₂) {x} T = Set.univ := by
+  rw [ball_eq_biUnion_closedBall, Set.biUnion_singleton]
   refine Set.eq_univ_of_univ_subset ?_
-  calc Set.univ = ball G₁ {x.1} a ×ˢ ball G₂ {x.2} b := by rw [h₁, h₂, Set.univ_prod_univ]
-    _ ⊆ ball (G₁ □ G₂) {(x.1, x.2)} (a + b) := ball_boxProd _ _ _ _
-    _ ⊆ ball (G₁ □ G₂) {x} T := ball_mono hT
+  rw [← closedBall_boxProd_eq_univ h₁ h₂ x]
+  exact closedBall_mono (by exact_mod_cast hT)
 
 /-! ### Proper 3-colourings -/
 
@@ -87,14 +63,16 @@ lemma exists_isProper_cycleGraph (b : ℕ) : ∃ κ : Fin b → Fin 3, IsProper 
 /-- The simple `m × m` grid is 3-coloured by `seeAll` with locality `2m` (= `2√n`). -/
 theorem grid_colors_of_le {ι : Type*} [DecidableEq ι] {m T : ℕ} (hT : 2 * m ≤ T) :
     (seeAll (ι := ι) (Fin 3)).Colors (grid m m) T :=
-  seeAll_colors (ball_boxProd_eq_univ (ball_pathGraph m) (ball_pathGraph m) (by omega))
+  seeAll_colors
+    (ball_boxProd_eq_univ (closedBall_pathGraph m) (closedBall_pathGraph m) (by omega))
     ⟨_, isProper_boxProd (isProper_pathGraph m) (isProper_pathGraph m)⟩
 
 /-- The `a × b` cylinder is 3-coloured by `seeAll` with locality `a + b`. -/
 theorem cylinder_colors_of_le {ι : Type*} [DecidableEq ι] {a b T : ℕ} (hT : a + b ≤ T) :
     (seeAll (ι := ι) (Fin 3)).Colors (cylinder a b) T := by
   obtain ⟨κ, hκ⟩ := exists_isProper_cycleGraph b
-  exact seeAll_colors (ball_boxProd_eq_univ (ball_pathGraph a) (ball_cycleGraph b) hT)
+  exact seeAll_colors
+    (ball_boxProd_eq_univ (closedBall_pathGraph a) (closedBall_cycleGraph b) hT)
     ⟨_, isProper_boxProd (isProper_pathGraph a) hκ⟩
 
 /-- The `a × b` torus is 3-coloured by `seeAll` with locality `a + b`. -/
@@ -102,7 +80,8 @@ theorem torus_colors_of_le {ι : Type*} [DecidableEq ι] {a b T : ℕ} (hT : a +
     (seeAll (ι := ι) (Fin 3)).Colors (torus a b) T := by
   obtain ⟨κ₁, hκ₁⟩ := exists_isProper_cycleGraph a
   obtain ⟨κ₂, hκ₂⟩ := exists_isProper_cycleGraph b
-  exact seeAll_colors (ball_boxProd_eq_univ (ball_cycleGraph a) (ball_cycleGraph b) hT)
+  exact seeAll_colors
+    (ball_boxProd_eq_univ (closedBall_cycleGraph a) (closedBall_cycleGraph b) hT)
     ⟨_, isProper_boxProd hκ₁ hκ₂⟩
 
 /-- Tightness of Theorem 1.3 up to constants: on the `m × m` torus (`n = m²`, `m ≥ 3` odd) the

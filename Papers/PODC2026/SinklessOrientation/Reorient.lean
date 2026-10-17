@@ -1,11 +1,13 @@
 import Papers.PODC2026.SinklessOrientation.Basic
+import Podc.Foundations.Combinatorics.SimpleGraph.BFSTree
 
 /-!
 # Lemma 2.3: removing the `δ`-sinks of a sinksparse orientation (Algorithm 2)
 
 Every `δ`-sink `s` looks at its distance-`h` neighbourhood (`h = k/2`) and its BFS tree, given by
-the canonical parent pointers `par G s` (towards `s`; the parent of a node is *some* neighbour one
-step closer to `s`, chosen by a fixed choice function, i.e. deterministically from the node names).
+the canonical parent pointers `bfsParent G s` (towards `s`; the parent of a node is *some* neighbour
+one step closer to `s`, chosen by a fixed choice function, i.e. deterministically from the node
+names).
 
 * If the ball contains a node `t` of degree `< δ` (`lowSet`), the tree path from `s` to `t` is
   oriented towards `t` (`RepPath`).
@@ -43,95 +45,6 @@ lemma OAgree.symm {G G' : SimpleGraph V} {o : Orientation G} {o' : Orientation G
   intro x hx y
   exact (hO ((hA.edist_lt_iff le_rfl).1 hx) y).symm
 
-/-! ### Parent pointers of the BFS tree rooted at `s` -/
-
-section Tree
-
-variable (G : SimpleGraph V) (s : V)
-
-/-- The parent of `x` in the BFS tree rooted at `s`: a neighbour one step closer to `s` (and `s`
-itself for `x = s`). -/
-noncomputable def par (x : V) : V :=
-  @Classical.epsilon V ⟨x⟩ fun y =>
-    (x = s → y = s) ∧ (x ≠ s → G.Adj x y ∧ G.dist s y + 1 = G.dist s x)
-
-/-- The `i`-th ancestor of `x` in the BFS tree rooted at `s`. -/
-noncomputable def anc (x : V) (i : ℕ) : V := (par G s)^[i] x
-
-variable {G s}
-
-lemma par_exists {x : V} (hr : G.Reachable s x) :
-    ∃ y, (x = s → y = s) ∧ (x ≠ s → G.Adj x y ∧ G.dist s y + 1 = G.dist s x) := by
-  by_cases hx : x = s
-  · exact ⟨s, fun _ => rfl, fun h => absurd hx h⟩
-  · obtain ⟨n, hn⟩ : ∃ n, G.dist s x = n + 1 :=
-      Nat.exists_eq_succ_of_ne_zero ((hr.pos_dist_of_ne (Ne.symm hx)).ne')
-    have he : G.edist s x = ((n + 1 : ℕ) : ℕ∞) := by rw [← hr.coe_dist_eq_edist, hn]
-    obtain ⟨y, hy, hyx⟩ := exists_adj_of_edist_eq_succ he
-    refine ⟨y, fun h => absurd h hx, fun _ => ⟨hyx.symm, ?_⟩⟩
-    have hry : G.Reachable s y := hr.trans hyx.symm.reachable
-    have := hry.coe_dist_eq_edist
-    rw [hy] at this
-    have : G.dist s y = n := by exact_mod_cast this
-    omega
-
-lemma par_spec {x : V} (hr : G.Reachable s x) :
-    (x = s → par G s x = s) ∧
-      (x ≠ s → G.Adj x (par G s x) ∧ G.dist s (par G s x) + 1 = G.dist s x) :=
-  @Classical.epsilon_spec V _ (par_exists hr)
-
-lemma par_self : par G s s = s := (par_spec (Reachable.refl s)).1 rfl
-
-lemma reachable_par {x : V} (hr : G.Reachable s x) : G.Reachable s (par G s x) := by
-  by_cases hx : x = s
-  · rw [hx, par_self]
-  · exact hr.trans ((par_spec hr).2 hx).1.reachable
-
-lemma dist_par {x : V} (hr : G.Reachable s x) : G.dist s (par G s x) = G.dist s x - 1 := by
-  by_cases hx : x = s
-  · subst hx; rw [par_self]; simp
-  · have := ((par_spec hr).2 hx).2; omega
-
-lemma anc_zero (x : V) : anc G s x 0 = x := rfl
-
-lemma anc_succ (x : V) (i : ℕ) : anc G s x (i + 1) = par G s (anc G s x i) :=
-  Function.iterate_succ_apply' _ _ _
-
-lemma reachable_anc {x : V} (hr : G.Reachable s x) (i : ℕ) : G.Reachable s (anc G s x i) := by
-  induction i with
-  | zero => exact hr
-  | succ i ih => rw [anc_succ]; exact reachable_par ih
-
-lemma dist_anc {x : V} (hr : G.Reachable s x) (i : ℕ) :
-    G.dist s (anc G s x i) = G.dist s x - i := by
-  induction i with
-  | zero => rfl
-  | succ i ih => rw [anc_succ, dist_par (reachable_anc hr i), ih]; omega
-
-lemma anc_eq_self_of_dist {x : V} (hr : G.Reachable s x) {i : ℕ} (hi : G.dist s x ≤ i) :
-    anc G s x i = s := by
-  have h := dist_anc hr i
-  rw [Nat.sub_eq_zero_of_le hi, (reachable_anc hr i).dist_eq_zero_iff] at h
-  exact h.symm
-
-lemma adj_anc {x : V} (hr : G.Reachable s x) {i : ℕ} (hi : i < G.dist s x) :
-    G.Adj (anc G s x i) (anc G s x (i + 1)) := by
-  have hne : anc G s x i ≠ s := by
-    intro h
-    have := dist_anc hr i
-    rw [h, dist_self] at this; omega
-  rw [anc_succ]; exact ((par_spec (reachable_anc hr i)).2 hne).1
-
-lemma edist_anc_le {x : V} {h : ℕ} (hx : G.edist s x ≤ h) (i : ℕ) :
-    G.edist s (anc G s x i) ≤ h := by
-  have hr := reachable_of_edist_le_natCast hx
-  apply (reachable_anc hr i).edist_le_natCast
-  rw [dist_anc hr]
-  have := dist_le_of_edist_le_natCast hx
-  omega
-
-end Tree
-
 /-! ### The repair of one sink -/
 
 section Repair
@@ -144,7 +57,7 @@ def lowSet : Set V := {t | G.edist s t ≤ h ∧ deg G t < δ}
 /-- Non-tree edges `(t, t')` of the ball: `t` is within distance `h` of `s`, `t'` is a neighbour of
 `t` not farther from `s` and different from the parent of `t`. -/
 def ntSet : Set (V × V) :=
-  {p | G.edist s p.1 ≤ h ∧ G.Adj p.1 p.2 ∧ G.dist s p.2 ≤ G.dist s p.1 ∧ p.2 ≠ par G s p.1}
+  {p | G.edist s p.1 ≤ h ∧ G.Adj p.1 p.2 ∧ G.dist s p.2 ≤ G.dist s p.1 ∧ p.2 ≠ bfsParent G s p.1}
 
 /-- The chosen node of low degree. -/
 noncomputable def lowPick : V := @Classical.epsilon V ⟨s⟩ (· ∈ lowSet G δ h s)
@@ -154,17 +67,17 @@ noncomputable def ntPick : V × V := @Classical.epsilon (V × V) ⟨(s, s)⟩ (�
 
 /-- The number of steps from `t'` up to its highest-depth common ancestor with `t`. -/
 noncomputable def lcaIdx (t t' : V) : ℕ :=
-  sInf {j | j ≤ G.dist s t' ∧ ∃ i ≤ G.dist s t, anc G s t' j = anc G s t i}
+  sInf {j | j ≤ G.dist s t' ∧ ∃ i ≤ G.dist s t, bfsAncestor G s t' j = bfsAncestor G s t i}
 
 /-- The tree path from `s` to `t`, oriented towards `t`. -/
 def RepPath (t a b : V) : Prop :=
-  ∃ i < G.dist s t, a = anc G s t (i + 1) ∧ b = anc G s t i
+  ∃ i < G.dist s t, a = bfsAncestor G s t (i + 1) ∧ b = bfsAncestor G s t i
 
 /-- The tree path from `s` to `t`, the edge `t → t'`, and the tree path from `t'` up to the
 common ancestor of `t` and `t'`. -/
 def RepCycle (t t' a b : V) : Prop :=
   RepPath G s t a b ∨ (a = t ∧ b = t') ∨
-    ∃ j < lcaIdx G s t t', a = anc G s t' j ∧ b = anc G s t' (j + 1)
+    ∃ j < lcaIdx G s t t', a = bfsAncestor G s t' j ∧ b = bfsAncestor G s t' (j + 1)
 
 /-- The edges (with their new directions) reoriented by the sink `s` (Algorithm 2). -/
 def repair (a b : V) : Prop :=
@@ -186,24 +99,25 @@ variable {t t' : V}
 
 lemma lcaIdx_mem (hr : G.Reachable s t) (hr' : G.Reachable s t') :
     lcaIdx G s t t' ≤ G.dist s t' ∧
-      ∃ i ≤ G.dist s t, anc G s t' (lcaIdx G s t t') = anc G s t i :=
-  Nat.sInf_mem (s := {j | j ≤ G.dist s t' ∧ ∃ i ≤ G.dist s t, anc G s t' j = anc G s t i})
+      ∃ i ≤ G.dist s t, bfsAncestor G s t' (lcaIdx G s t t') = bfsAncestor G s t i :=
+  Nat.sInf_mem
+    (s := {j | j ≤ G.dist s t' ∧ ∃ i ≤ G.dist s t, bfsAncestor G s t' j = bfsAncestor G s t i})
     ⟨G.dist s t', le_rfl, G.dist s t, le_rfl,
-      by rw [anc_eq_self_of_dist hr' le_rfl, anc_eq_self_of_dist hr le_rfl]⟩
+      by rw [hr'.bfsAncestor_eq_root le_rfl, hr.bfsAncestor_eq_root le_rfl]⟩
 
 lemma lcaIdx_le_of {j i : ℕ} (hj : j ≤ G.dist s t') (hi : i ≤ G.dist s t)
-    (he : anc G s t' j = anc G s t i) : lcaIdx G s t t' ≤ j :=
+    (he : bfsAncestor G s t' j = bfsAncestor G s t i) : lcaIdx G s t t' ≤ j :=
   Nat.sInf_le ⟨hj, i, hi, he⟩
 
 /-- An equality between ancestors forces equal depths. -/
 lemma dist_eq_of_anc_eq {x y : V} (hx : G.Reachable s x) (hy : G.Reachable s y) {i j : ℕ}
-    (he : anc G s x i = anc G s y j) : G.dist s x - i = G.dist s y - j := by
-  rw [← dist_anc hx, ← dist_anc hy, he]
+    (he : bfsAncestor G s x i = bfsAncestor G s y j) : G.dist s x - i = G.dist s y - j := by
+  rw [← hx.dist_bfsAncestor, ← hy.dist_bfsAncestor, he]
 
 /-- Facts about a path repair rooted at a node `t` of the ball. -/
 lemma repPath_adj (hr : G.Reachable s t) {a b : V} (hab : RepPath G s t a b) : G.Adj a b := by
   obtain ⟨i, hi, rfl, rfl⟩ := hab
-  exact (adj_anc hr hi).symm
+  exact (hr.adj_bfsAncestor hi).symm
 
 lemma repPath_not_symm (hr : G.Reachable s t) {a b : V} (h1 : RepPath G s t a b)
     (h2 : RepPath G s t b a) : False := by
@@ -214,12 +128,12 @@ lemma repPath_not_symm (hr : G.Reachable s t) {a b : V} (h1 : RepPath G s t a b)
   omega
 
 lemma repPath_mem {a b : V} (hab : RepPath G s t a b) :
-    (∃ m ≤ G.dist s t, a = anc G s t m) ∧ (∃ m ≤ G.dist s t, b = anc G s t m) := by
+    (∃ m ≤ G.dist s t, a = bfsAncestor G s t m) ∧ (∃ m ≤ G.dist s t, b = bfsAncestor G s t m) := by
   obtain ⟨i, hi, rfl, rfl⟩ := hab
   exact ⟨⟨i + 1, hi, rfl⟩, ⟨i, hi.le, rfl⟩⟩
 
 lemma repPath_out {m : ℕ} (hm : m ≤ G.dist s t) (hm0 : m ≠ 0) :
-    RepPath G s t (anc G s t m) (anc G s t (m - 1)) :=
+    RepPath G s t (bfsAncestor G s t m) (bfsAncestor G s t (m - 1)) :=
   ⟨m - 1, by omega, by rw [Nat.sub_add_cancel (Nat.one_le_iff_ne_zero.2 hm0)], rfl⟩
 
 lemma ntSet_reachable (hp : (t, t') ∈ ntSet G h s) : G.Reachable s t ∧ G.Reachable s t' :=
@@ -238,7 +152,7 @@ lemma repCycle_adj (hp : (t, t') ∈ ntSet G h s) {a b : V} (hab : RepCycle G s 
   rcases hab with hab | ⟨rfl, rfl⟩ | ⟨j, hj, rfl, rfl⟩
   · exact repPath_adj hr hab
   · exact hp.2.1
-  · exact adj_anc hr' (lt_of_lt_of_le hj (lcaIdx_mem hr hr').1)
+  · exact hr'.adj_bfsAncestor (lt_of_lt_of_le hj (lcaIdx_mem hr hr').1)
 
 lemma repCycle_not_symm (hp : (t, t') ∈ ntSet G h s) {a b : V} (h1 : RepCycle G s t t' a b)
     (h2 : RepCycle G s t t' b a) : False := by
@@ -247,9 +161,9 @@ lemma repCycle_not_symm (hp : (t, t') ∈ ntSet G h s) {a b : V} (h1 : RepCycle 
   obtain ⟨_, hadj, hdd, hpar⟩ := hp
   replace hdd : G.dist s t' ≤ G.dist s t := hdd
   replace hadj : G.Adj t t' := hadj
-  replace hpar : t' ≠ par G s t := hpar
+  replace hpar : t' ≠ bfsParent G s t := hpar
   have hL := lcaIdx_mem hr hr'
-  have hpar1 : anc G s t 1 = par G s t := rfl
+  have hpar1 : bfsAncestor G s t 1 = bfsParent G s t := rfl
   rcases h1 with h1 | ⟨rfl, rfl⟩ | ⟨j, hj, rfl, rfl⟩
   · obtain ⟨i, hi, rfl, rfl⟩ := h1
     rcases h2 with h2 | ⟨h3, h4⟩ | ⟨j, hj, h3, h4⟩
@@ -291,8 +205,8 @@ lemma repair_adj_mem {a b : V} (hab : repair G δ h s a b) :
   · have ht := (lowPick_mem hne).1
     have hr := reachable_of_edist_le_natCast ht
     refine ⟨repPath_adj hr hab, ?_, ?_⟩
-    · obtain ⟨⟨m, -, rfl⟩, -⟩ := repPath_mem hab; exact edist_anc_le ht m
-    · obtain ⟨-, ⟨m, -, rfl⟩⟩ := repPath_mem hab; exact edist_anc_le ht m
+    · obtain ⟨⟨m, -, rfl⟩, -⟩ := repPath_mem hab; exact edist_bfsAncestor_le ht m
+    · obtain ⟨-, ⟨m, -, rfl⟩⟩ := repPath_mem hab; exact edist_bfsAncestor_le ht m
   · have hp := ntPick_mem hne
     set t := (ntPick G h s).1
     set t' := (ntPick G h s).2
@@ -305,9 +219,9 @@ lemma repair_adj_mem {a b : V} (hab : repair G δ h s a b) :
     refine ⟨repCycle_adj hp' hab, ?_⟩
     rcases hab with hab | ⟨rfl, rfl⟩ | ⟨j, -, rfl, rfl⟩
     · obtain ⟨⟨m, -, rfl⟩, ⟨m', -, rfl⟩⟩ := repPath_mem hab
-      exact ⟨edist_anc_le ht m, edist_anc_le ht m'⟩
+      exact ⟨edist_bfsAncestor_le ht m, edist_bfsAncestor_le ht m'⟩
     · exact ⟨ht, ht'⟩
-    · exact ⟨edist_anc_le ht' j, edist_anc_le ht' (j + 1)⟩
+    · exact ⟨edist_bfsAncestor_le ht' j, edist_bfsAncestor_le ht' (j + 1)⟩
 
 lemma repair_not_symm {a b : V} (h1 : repair G δ h s a b) (h2 : repair G δ h s b a) : False := by
   rcases h1 with ⟨hne, h1⟩ | ⟨hlow, hne, h1⟩
@@ -332,13 +246,13 @@ lemma repair_cover (hs : δ ≤ deg G s)
     have hts : t ≠ s := fun e => by have := ht.2; rw [e] at this; omega
     have hpos : G.dist s t ≠ 0 := (hr.pos_dist_of_ne hts.symm).ne'
     -- every node `anc t m` with `m ≥ 1` has an outgoing edge
-    have hcov : ∀ m ≤ G.dist s t, m ≠ 0 → ∃ c, repair G δ h s (anc G s t m) c :=
+    have hcov : ∀ m ≤ G.dist s t, m ≠ 0 → ∃ c, repair G δ h s (bfsAncestor G s t m) c :=
       fun m hm hm0 => ⟨_, Or.inl ⟨hlow, repPath_out hm hm0⟩⟩
     refine ⟨?_, ?_⟩
     · have := hcov _ le_rfl hpos
-      rwa [anc_eq_self_of_dist hr le_rfl] at this
+      rwa [hr.bfsAncestor_eq_root le_rfl] at this
     · intro a b hab
-      have hpath : ∃ m ≤ G.dist s t, a = anc G s t m := by
+      have hpath : ∃ m ≤ G.dist s t, a = bfsAncestor G s t m := by
         rcases hab with (⟨-, hab⟩ | ⟨hl, -⟩) | (⟨-, hab⟩ | ⟨hl, -⟩)
         · exact (repPath_mem hab).1
         · exact absurd hlow hl
@@ -362,13 +276,13 @@ lemma repair_cover (hs : δ ≤ deg G s)
     have rep : ∀ a b, RepCycle G s t t' a b → repair G δ h s a b :=
       fun a b hab => Or.inr ⟨hlow, hne, hab⟩
     -- nodes on the tree path `s → t` have outgoing edges
-    have hcov : ∀ m ≤ G.dist s t, ∃ c, repair G δ h s (anc G s t m) c := by
+    have hcov : ∀ m ≤ G.dist s t, ∃ c, repair G δ h s (bfsAncestor G s t m) c := by
       intro m hm
       rcases Nat.eq_zero_or_pos m with rfl | hm0
       · exact ⟨t', rep _ _ (Or.inr (Or.inl ⟨rfl, rfl⟩))⟩
       · exact ⟨_, rep _ _ (Or.inl (repPath_out hm hm0.ne'))⟩
     -- nodes on the path from `t'` to the common ancestor have outgoing edges
-    have hcov' : ∀ j ≤ lcaIdx G s t t', ∃ c, repair G δ h s (anc G s t' j) c := by
+    have hcov' : ∀ j ≤ lcaIdx G s t t', ∃ c, repair G δ h s (bfsAncestor G s t' j) c := by
       intro j hj
       rcases hj.lt_or_eq with hj | rfl
       · exact ⟨_, rep _ _ (Or.inr (Or.inr ⟨j, hj, rfl, rfl⟩))⟩
@@ -376,7 +290,7 @@ lemma repair_cover (hs : δ ≤ deg G s)
         rw [he]; exact hcov i hi
     refine ⟨?_, ?_⟩
     · have := hcov _ le_rfl
-      rwa [anc_eq_self_of_dist hr le_rfl] at this
+      rwa [hr.bfsAncestor_eq_root le_rfl] at this
     · intro a b hab
       left
       have hab' : RepCycle G s t t' a b ∨ RepCycle G s t t' b a := by
@@ -523,14 +437,9 @@ lemma repair_congr (hA : GAgree G G' s (h + 1)) (a b : V) :
     intro x hx y
     apply hA
     exact lt_of_le_of_lt hx (by exact_mod_cast Nat.lt_succ_self h)
-  have hpar : ∀ x, G.edist s x ≤ h → par G' s x = par G s x := by
+  have hpar : ∀ x, G.edist s x ≤ h → bfsParent G' s x = bfsParent G s x := by
     intro x hx
-    unfold par
-    congr 1
-    funext y
-    apply propext
-    apply and_congr_right; intro _
-    apply imp_congr_right; intro _
+    refine bfsParent_congr fun y _ => ?_
     constructor
     · rintro ⟨hxy, hd⟩
       have hxy' := (hAdj x hx y).2 hxy
@@ -541,11 +450,11 @@ lemma repair_congr (hA : GAgree G G' s (h + 1)) (a b : V) :
       refine ⟨(hAdj x hx y).1 hxy, ?_⟩
       rw [hD y ((edist_le_add_one_of_adj hxy).trans (succ_le_succ_coe hx)), hD x (hle x hx)]
       exact hd
-  have hanc : ∀ x, G.edist s x ≤ h → ∀ i, anc G' s x i = anc G s x i := by
+  have hanc : ∀ x, G.edist s x ≤ h → ∀ i, bfsAncestor G' s x i = bfsAncestor G s x i := by
     intro x hx i
     induction i with
     | zero => rfl
-    | succ i ih => rw [anc_succ, anc_succ, ih, hpar _ (edist_anc_le hx i)]
+    | succ i ih => rw [bfsAncestor_succ, bfsAncestor_succ, ih, hpar _ (edist_bfsAncestor_le hx i)]
   have hlow : lowSet G' δ h s = lowSet G δ h s := by
     ext t
     simp only [lowSet, Set.mem_ofPred_eq, hBall]

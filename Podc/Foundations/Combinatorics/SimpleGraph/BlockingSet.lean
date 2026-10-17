@@ -1,17 +1,32 @@
+import Cslib.Foundations.Combinatorics.SimpleGraph.BlockingSet
 import Mathlib.Analysis.SpecialFunctions.Pow.Real
 
-/-!
-# Arithmetic for Theorem 8 of Dinitz–Robelle
+-- CSLib candidate: Cslib/Foundations/Combinatorics/SimpleGraph/BlockingSet.lean (append to the existing file)
 
-From the natural-number bound `m (s - 1) ≤ 2 d n (n - 1)` (valid for all `s, d` with
-`2 D s ≤ n` and `s ≤ d ^ k`, where `D = (2k - 1) f`) and the trivial bound `2 m ≤ n (n - 1)`,
-derive the explicit real bound `m ≤ 8 (2D)^{1 - 1/k} n^{1 + 1/k} ≤ 32 k f^{1 - 1/k} n^{1 + 1/k}`.
+/-!
+# Size of graphs with small blocking sets, in `n^{1 + 1/k}` form
+
+`IsBlockingSet.ncard_edgeSet_mul_le` (blocking set + Moore bound) gives, for every `s, d` with
+`2 D s ≤ n` and `s ≤ d ^ k`, the natural-number bound `|E| (s - 1) ≤ 2 d n (n - 1)`. Choosing
+`s = ⌊n / 2D⌋` and `d = ⌈s^{1/k}⌉` turns it into the bound used by Bodwin–Patel (PODC'19,
+Corollary 2) and Dinitz–Robelle (PODC'20, Theorem 8).
+
+## Main statements
+
+* `Nat.cast_le_rpow_of_forall_mul_sub_one_le`: the arithmetic step,
+  `m ≤ 8 (2D)^{1 - 1/k} n^{1 + 1/k}`.
+* `SimpleGraph.IsBlockingSet.ncard_edgeSet_le_rpow`: a graph with a `2k`-blocking set of size
+  `≤ D |E|` has `|E| ≤ 8 (2D)^{1 - 1/k} n^{1 + 1/k}` edges.
+* `Real.two_mul_rpow_le_of_le_mul`: `(2D)^{1 - 1/k} ≤ 2 c f^{1 - 1/k}` for `D ≤ c f`, `c ≥ 1`;
+  `SimpleGraph.IsBlockingSet.ncard_edgeSet_le_mul_rpow`: hence `|E| ≤ 16 c f^{1 - 1/k} n^{1 + 1/k}`.
 -/
 
-namespace FaultTolerantSpanners
+open Finset
 
-/-- Real form of the size bound, in terms of `D = (2k - 1) f`. -/
-theorem size_bound_of_nat {k D n m : ℕ} (hk : 1 ≤ k) (hD : 1 ≤ D)
+/-- Real form of the blocking-set size bound: from `2 m ≤ n (n - 1)` and the bounds
+`m (s - 1) ≤ 2 d n (n - 1)` for all `s, d` with `2 D s ≤ n` and `s ≤ d ^ k`, derive
+`m ≤ 8 (2D)^{1 - 1/k} n^{1 + 1/k}`. -/
+theorem Nat.cast_le_rpow_of_forall_mul_sub_one_le {k D n m : ℕ} (hk : 1 ≤ k) (hD : 1 ≤ D)
     (hm : 2 * m ≤ n * (n - 1))
     (h : ∀ s d : ℕ, 2 * D * s ≤ n → s ≤ d ^ k → m * (s - 1) ≤ 2 * d * (n * (n - 1))) :
     (m : ℝ) ≤ 8 * (2 * D : ℝ) ^ (1 - 1 / (k : ℝ)) * (n : ℝ) ^ (1 + 1 / (k : ℝ)) := by
@@ -41,10 +56,8 @@ theorem size_bound_of_nat {k D n m : ℕ} (hk : 1 ≤ k) (hD : 1 ≤ D)
       have : (n:ℝ) < 8 * D := by exact_mod_cast hsmall
       linarith
     rw [Real.mul_rpow (by norm_num) h2D.le] at h1
-    have h4 : (4:ℝ) ^ (1 - e) ≤ 4 := by
-      calc (4:ℝ) ^ (1 - e) ≤ (4:ℝ) ^ (1:ℝ) :=
-            Real.rpow_le_rpow_of_exponent_le (by norm_num) (by linarith)
-        _ = 4 := Real.rpow_one _
+    have h4 : (4:ℝ) ^ (1 - e) ≤ 4 :=
+      Real.rpow_le_self_of_one_le (by norm_num) (by linarith)
     have hnn : (n:ℝ) * n = (n:ℝ) ^ (1 + e) * (n:ℝ) ^ (1 - e) := by
       rw [← Real.rpow_add hnR, show (1 + e) + (1 - e) = ((2:ℕ):ℝ) by push_cast; ring,
         Real.rpow_natCast]; ring
@@ -112,28 +125,60 @@ theorem size_bound_of_nat {k D n m : ℕ} (hk : 1 ≤ k) (hD : 1 ≤ D)
           rw [hY]; ring
     exact le_of_mul_le_mul_right hm3 hDe
 
-/-- `8 (2 (2k-1) f)^{1-1/k} ≤ 32 k f^{1-1/k}`. -/
-theorem constant_le {k f : ℕ} (hk : 1 ≤ k) (hf : 1 ≤ f) :
-    8 * (2 * ((2 * k - 1) * f : ℕ) : ℝ) ^ (1 - 1 / (k : ℝ)) ≤
-      32 * k * (f : ℝ) ^ (1 - 1 / (k : ℝ)) := by
-  have hkR : (1:ℝ) ≤ k := by exact_mod_cast hk
-  have ha0 : 0 ≤ 1 - 1 / (k:ℝ) := by
+/-- The constant of the blocking-set size bound: if `0 ≤ D ≤ c f` with `c ≥ 1` and `f ≥ 0`, then
+`(2D)^{1 - 1/k} ≤ 2 c f^{1 - 1/k}`. -/
+theorem Real.two_mul_rpow_le_of_le_mul {k : ℕ} {D c f : ℝ} (hk : 1 ≤ k) (hD0 : 0 ≤ D)
+    (hf : 0 ≤ f) (hc : 1 ≤ c) (hD : D ≤ c * f) :
+    (2 * D) ^ (1 - 1 / (k : ℝ)) ≤ 2 * c * f ^ (1 - 1 / (k : ℝ)) := by
+  have hkR : (1 : ℝ) ≤ k := by exact_mod_cast hk
+  have ha0 : 0 ≤ 1 - 1 / (k : ℝ) := by
     rw [sub_nonneg, div_le_one (by linarith)]; exact hkR
-  have ha1 : 1 - 1 / (k:ℝ) ≤ 1 := by
-    have : 0 ≤ 1 / (k:ℝ) := by positivity
+  have ha1 : 1 - 1 / (k : ℝ) ≤ 1 := by
+    have : 0 ≤ 1 / (k : ℝ) := by positivity
     linarith
-  have hcast : (((2 * k - 1) * f : ℕ) : ℝ) ≤ 2 * k * f := by
-    have : (2 * k - 1) * f ≤ 2 * k * f := Nat.mul_le_mul_right _ (Nat.sub_le _ _)
-    exact_mod_cast this
-  have h1 : (2 * ((2 * k - 1) * f : ℕ) : ℝ) ^ (1 - 1 / (k : ℝ)) ≤
-      ((4 * k) * f : ℝ) ^ (1 - 1 / (k : ℝ)) :=
-    Real.rpow_le_rpow (by positivity) (by linarith) ha0
-  rw [Real.mul_rpow (x := 4 * (k:ℝ)) (by positivity) (by positivity)] at h1
-  have h2 : ((4 * k : ℝ)) ^ (1 - 1 / (k : ℝ)) ≤ 4 * k := by
-    calc ((4 * k : ℝ)) ^ (1 - 1 / (k : ℝ)) ≤ (4 * k : ℝ) ^ (1:ℝ) :=
-          Real.rpow_le_rpow_of_exponent_le (by linarith) ha1
-      _ = 4 * k := Real.rpow_one _
-  have hf0 : 0 ≤ (f : ℝ) ^ (1 - 1 / (k : ℝ)) := by positivity
-  nlinarith
+  calc (2 * D) ^ (1 - 1 / (k : ℝ)) ≤ ((2 * c) * f) ^ (1 - 1 / (k : ℝ)) :=
+        Real.rpow_le_rpow (by positivity) (by linarith) ha0
+    _ = (2 * c) ^ (1 - 1 / (k : ℝ)) * f ^ (1 - 1 / (k : ℝ)) :=
+        Real.mul_rpow (by positivity) hf
+    _ ≤ 2 * c * f ^ (1 - 1 / (k : ℝ)) :=
+        mul_le_mul_of_nonneg_right (Real.rpow_le_self_of_one_le (by linarith) ha1)
+          (by positivity)
 
-end FaultTolerantSpanners
+namespace SimpleGraph
+
+variable {V : Type*} [Fintype V]
+
+/-- **Size of a graph with a small blocking set** (Moore-bound form; Bodwin–Patel, PODC'19,
+Corollary 2; Dinitz–Robelle, PODC'20, Theorem 8): if `H` has a `2k`-blocking set of size
+`≤ D |E(H)|` with `D ≥ 1`, then `|E(H)| ≤ 8 (2D)^{1 - 1/k} n^{1 + 1/k}`. -/
+theorem IsBlockingSet.ncard_edgeSet_le_rpow {H : SimpleGraph V} {k D : ℕ}
+    {B : Finset (V × Sym2 V)} (hk : 1 ≤ k) (hD : 1 ≤ D) (hB : H.IsBlockingSet (2 * k) B)
+    (hBc : #B ≤ D * H.edgeSet.ncard) :
+    (H.edgeSet.ncard : ℝ) ≤
+      8 * (2 * D : ℝ) ^ (1 - 1 / (k : ℝ)) * (Fintype.card V : ℝ) ^ (1 + 1 / (k : ℝ)) := by
+  classical
+  refine Nat.cast_le_rpow_of_forall_mul_sub_one_le hk hD ?_
+    fun s d hs hsd => hB.ncard_edgeSet_mul_le hk hBc hD hs hsd
+  have h1 := H.card_edgeFinset_le_card_choose_two
+  rw [Nat.choose_two_right] at h1
+  rw [← coe_edgeFinset, Set.ncard_coe_finset]
+  have := Nat.mul_div_le (Fintype.card V * (Fintype.card V - 1)) 2
+  omega
+
+/-- **Size of a graph with a small blocking set**, with the constant simplified: if `H` has a
+`2k`-blocking set of size `≤ D |E(H)|` with `1 ≤ D ≤ c f` and `c ≥ 1`, then
+`|E(H)| ≤ 16 c f^{1 - 1/k} n^{1 + 1/k}`. -/
+theorem IsBlockingSet.ncard_edgeSet_le_mul_rpow {H : SimpleGraph V} {k D : ℕ} {c f : ℝ}
+    {B : Finset (V × Sym2 V)} (hk : 1 ≤ k) (hD : 1 ≤ D) (hB : H.IsBlockingSet (2 * k) B)
+    (hBc : #B ≤ D * H.edgeSet.ncard) (hf : 0 ≤ f) (hc : 1 ≤ c) (hDc : (D : ℝ) ≤ c * f) :
+    (H.edgeSet.ncard : ℝ) ≤
+      16 * c * f ^ (1 - 1 / (k : ℝ)) * (Fintype.card V : ℝ) ^ (1 + 1 / (k : ℝ)) := by
+  refine (hB.ncard_edgeSet_le_rpow hk hD hBc).trans ?_
+  have h := Real.two_mul_rpow_le_of_le_mul hk (Nat.cast_nonneg D) hf hc hDc
+  have hn : 0 ≤ (Fintype.card V : ℝ) ^ (1 + 1 / (k : ℝ)) := by positivity
+  calc 8 * (2 * D : ℝ) ^ (1 - 1 / (k : ℝ)) * (Fintype.card V : ℝ) ^ (1 + 1 / (k : ℝ))
+      ≤ 8 * (2 * c * f ^ (1 - 1 / (k : ℝ))) * (Fintype.card V : ℝ) ^ (1 + 1 / (k : ℝ)) := by
+        gcongr
+    _ = 16 * c * f ^ (1 - 1 / (k : ℝ)) * (Fintype.card V : ℝ) ^ (1 + 1 / (k : ℝ)) := by ring
+
+end SimpleGraph

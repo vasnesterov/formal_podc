@@ -1,4 +1,6 @@
 import Papers.PODC2024.OnlineLocalGrids.Defs
+import Podc.Foundations.Combinatorics.SimpleGraph.Ball
+import Podc.Foundations.Combinatorics.SimpleGraph.Cycle
 
 /-!
 # `a`-values and `b`-values of 3-colourings (§3.1 of Chang–Mishra–Nguyen–Yang–Yeh, PODC 2024)
@@ -161,12 +163,6 @@ variable {α : Type*} {G₁ : SimpleGraph α} {b : ℕ} [NeZero b]
 def rowSum (c : α × Fin b → Fin 3) (i : α) : ℤ :=
   ∑ j : Fin b, aval (c (i, j)) (c (i, j + 1))
 
-lemma cycleGraph_adj_add_one (hb : 2 ≤ b) (j : Fin b) : (cycleGraph b).Adj j (j + 1) := by
-  obtain ⟨n, rfl⟩ : ∃ n, b = n + 2 := ⟨b - 2, by omega⟩
-  rw [cycleGraph_adj]
-  right
-  simp
-
 /-- Rows connected by an edge have the same row sum (sum of Lemma 3.3 over the cells between
 them). Needs `b ≥ 2` so that `j ~ j + 1` in `C_b`. -/
 theorem rowSum_eq_of_adj (hb : 2 ≤ b) {c : α × Fin b → Fin 3} (hc : IsProper (G₁ □ cycleGraph b) c)
@@ -193,11 +189,8 @@ theorem rowSum_eq_of_adj (hb : 2 ≤ b) {c : α × Fin b → Fin 3} (hc : IsProp
 /-- Rows in the same connected component of `G₁` have the same row sum. -/
 theorem rowSum_eq_of_reachable (hb : 2 ≤ b) {c : α × Fin b → Fin 3}
     (hc : IsProper (G₁ □ cycleGraph b) c) {i i' : α} (h : G₁.Reachable i i') :
-    rowSum c i = rowSum c i' := by
-  obtain ⟨p⟩ := h
-  induction p with
-  | nil => rfl
-  | cons h _ ih => exact (rowSum_eq_of_adj hb hc h).trans ih
+    rowSum c i = rowSum c i' :=
+  h.apply_eq_of_forall_adj fun _ _ h => rowSum_eq_of_adj hb hc h
 
 /-- **Lemma 3.5** for a row cycle: an odd row has an odd row sum. -/
 theorem rowSum_odd (hb : 3 ≤ b) (hodd : Odd b) {c : α × Fin b → Fin 3}

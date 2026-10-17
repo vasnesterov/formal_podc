@@ -54,9 +54,9 @@ Lemma 2.3, Theorem 1.1) is correct as described, with the minor slips and remark
   not.
 * **Tie-breaking in Algorithm 2.** The paper breaks ties by identifiers / depth ("the node of
   smallest degree", "if needed, breaking ties by depth in the tree, and identifier"). We use a fixed
-  choice function (`Classical.epsilon`) on sets of nodes: BFS parents (`par`), the low-degree target
+  choice function (`Classical.epsilon`) on sets of nodes: BFS parents (`SimpleGraph.bfsParent`), the low-degree target
   (`lowPick`) and the non-tree edge (`ntPick`). The correctness proofs use only the specification
-  lemmas of these choices (`par_spec`, `lowPick_mem`, `ntPick_mem`), so they would go through for
+  lemmas of these choices (`SimpleGraph.Reachable.bfsParent_spec`, `lowPick_mem`, `ntPick_mem`), so they would go through for
   ID-based tie-breaking as well; locality only needs the choice to be a function of the (local) set
   of candidates.
 * **Cycle case of Algorithm 2.** The paper distinguishes "`t` has a neighbour `t'` at equal depth"

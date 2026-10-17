@@ -1,4 +1,5 @@
 import Papers.PODC2026.PLSTradeoff.Tradeoff
+import Podc.Foundations.Combinatorics.SimpleGraph.Ball
 
 /-!
 # Sharing a string with `O(1)` bits per node (Lemma 5.6)
@@ -453,15 +454,9 @@ lemma shareVer_sound {G : SimpleGraph V} (hG : G.Connected) {r : ℕ} (ℓ : V �
       edist_le_natCast_add ((edist_eq_one_iff_adj.2 hab).le) (hu0d b)
     exact (hc a).2 _ (hu0Z a) _ (hu0Z b) ((hu0d a).trans (by exact_mod_cast (by omega)))
       (h1.trans (by exact_mod_cast (by omega)))
-  have hwalk : ∀ a b (p : G.Walk a b), dec G r ℓ (u0 a) = dec G r ℓ (u0 b) := by
-    intro a b p
-    induction p with
-    | nil => rfl
-    | cons h _ ih => exact (hadj _ _ h).trans ih
   obtain ⟨v₀⟩ := hG.nonempty
   refine ⟨dec G r ℓ (u0 v₀), fun v => ?_⟩
-  obtain ⟨p⟩ := hG.preconnected v v₀
-  rw [hu0v v, hwalk v v₀ p]
+  rw [hu0v v, (hG.preconnected v v₀).apply_eq_of_forall_adj hadj]
 
 /-! #### Cost -/
 

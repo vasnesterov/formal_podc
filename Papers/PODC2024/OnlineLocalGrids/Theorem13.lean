@@ -1,4 +1,5 @@
 import Papers.PODC2024.OnlineLocalGrids.BValue
+import Cslib.Computability.Distributed.Local.OnlineLocalLocality
 
 /-!
 # Theorem 1.3: `Ω(√n)` for 3-colouring cylindrical and toroidal grids (§3.3)
@@ -29,39 +30,13 @@ abbrev torus (a b : ℕ) : SimpleGraph (Fin a × Fin b) := cycleGraph a □ cycl
 
 /-! ### Auxiliary lemmas -/
 
--- CSLib candidate
 /-- The first coordinate of a point of a ball in a box product lies in the ball of the projection. -/
 lemma fst_mem_ball_boxProd {α β : Type*} {R : SimpleGraph α} {H : SimpleGraph β}
     {U : Set (α × β)} {k : ℕ} {x : α × β} (hx : x ∈ ball (R □ H) U k) :
     x.1 ∈ ball R (Prod.fst '' U) k := by
-  induction k generalizing x with
-  | zero => exact ⟨x, hx, rfl⟩
-  | succ k ih =>
-    rcases hx with hx | ⟨z, hz, hzx⟩
-    · exact ball_subset_succ (ih hx)
-    · rcases boxProd_adj.1 hzx with ⟨h, _⟩ | ⟨_, h⟩
-      · exact mem_ball_succ_of_adj (ih hz) h
-      · rw [← h]; exact ball_subset_succ (ih hz)
-
--- CSLib candidate
-/-- Adjacency in a cycle graph, in terms of values. -/
-lemma cycleGraph_adj_val {n : ℕ} {x y : Fin n} (h : (cycleGraph n).Adj x y) :
-    y.val = x.val + 1 ∨ x.val = y.val + 1 ∨ (x.val = 0 ∧ y.val + 1 = n) ∨
-      (y.val = 0 ∧ x.val + 1 = n) := by
-  rw [cycleGraph_adj'] at h
-  have hx := x.isLt
-  have hy := y.isLt
-  rcases le_or_gt y x with hxy | hxy <;> rcases le_or_gt x y with hyx | hyx
-  · rcases h with h | h
-    · rw [Fin.coe_sub_iff_le.2 hxy] at h; omega
-    · rw [Fin.coe_sub_iff_le.2 hyx] at h; omega
-  · rcases h with h | h
-    · rw [Fin.coe_sub_iff_le.2 hxy] at h; omega
-    · rw [Fin.coe_sub_iff_lt.2 hyx] at h; omega
-  · rcases h with h | h
-    · rw [Fin.coe_sub_iff_lt.2 hxy] at h; omega
-    · rw [Fin.coe_sub_iff_le.2 hyx] at h; omega
-  · exact absurd (hxy.trans hyx) (lt_irrefl _)
+  rw [ball_eq_biUnion_closedBall, Set.mem_iUnion₂] at hx ⊢
+  obtain ⟨u, hu, hx⟩ := hx
+  exact ⟨u.1, ⟨u, hu, rfl⟩, fst_mem_closedBall_of_mem_boxProd hx⟩
 
 /-- Description of a row graph `R` on `Fin a` that is either a path or a cycle. -/
 def RowLike {a : ℕ} (R : SimpleGraph (Fin a)) : Prop :=
@@ -113,9 +88,6 @@ lemma reflect_apply (p : Fin a × Fin b) : reflect T p = reflectFun T p := rfl
 
 lemma reflect_symm_apply (p : Fin a × Fin b) : (reflect T).symm p = reflect T p := by
   rw [Equiv.symm_apply_eq, reflect_apply, reflect_apply, reflectFun_involutive]
-
-lemma cycleGraph_adj_neg [NeZero b] {u v : Fin b} : (cycleGraph b).Adj (-u) (-v) ↔ (cycleGraph b).Adj u v := by
-  rw [cycleGraph_adj', cycleGraph_adj', neg_sub_neg, neg_sub_neg, or_comm]
 
 /-- The reflection preserves the edges between rows on the same side, and between rows that are
 neither equal nor adjacent. -/

@@ -1,4 +1,5 @@
 import Papers.PODC2026.PLSTradeoff.Basic
+import Podc.Foundations.Combinatorics.SimpleGraph.Ball
 
 /-!
 # Refuting the strong tradeoff conjecture (Section 6)
@@ -107,23 +108,14 @@ def P : SimpleGraph (LV t m) → (LV t m → Inp m) → Prop := fun _ I => I vfi
 
 /-! ### Distances -/
 
-lemma lay_le_of_walk {u v : LV t m} (w : (G t m).Walk u v) :
-    lay v ≤ lay u + w.length ∧ lay u ≤ lay v + w.length := by
-  induction w with
-  | nil => simp
-  | cons h w ih =>
-    rw [adj_iff] at h
-    simp only [Walk.length_cons]
-    omega
+lemma lay_lipschitz (u v : LV t m) (h : (G t m).Adj u v) : lay v ≤ lay u + 1 := by
+  rw [adj_iff] at h; omega
 
 /-- Distance lower bound: the layer changes by at most one along each edge. -/
 lemma lay_le_of_edist {u v : LV t m} {R : ℕ} (h : (G t m).edist u v ≤ R) :
-    lay v ≤ lay u + R ∧ lay u ≤ lay v + R := by
-  have hne : (G t m).edist u v ≠ ⊤ := ne_top_of_le_ne_top (ENat.natCast_ne_top R) h
-  obtain ⟨w, hw⟩ := exists_walk_of_edist_ne_top hne
-  have hR : w.length ≤ R := by rw [← hw] at h; exact_mod_cast h
-  have := lay_le_of_walk w
-  omega
+    lay v ≤ lay u + R ∧ lay u ≤ lay v + R :=
+  ⟨le_add_of_edist_le_of_lipschitz lay_lipschitz h,
+    le_add_of_edist_le_of_lipschitz lay_lipschitz (by rwa [edist_comm])⟩
 
 lemma exists_lay (hm : 1 ≤ m) {j : ℕ} (hj : j ≤ 2 * t + 2) : ∃ x : LV t m, lay x = j := by
   rcases Nat.even_or_odd' j with ⟨k, rfl | rfl⟩

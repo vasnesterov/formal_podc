@@ -1,4 +1,4 @@
-import Papers.PODC2020.FaultTolerantSpanners.SizeArith
+import Podc.Foundations.Combinatorics.SimpleGraph.BlockingSet
 import Cslib.Foundations.Combinatorics.SimpleGraph.FaultTolerantGreedy
 import Cslib.Foundations.Combinatorics.SimpleGraph.GirthExtremal
 import Mathlib
@@ -26,7 +26,7 @@ resp. `{u, v} ∉ F`); see `differencies.md` (without this the literal test is a
   `2k - 1`, `|E(H)| ≤ 16 f^{1-1/k} n^{1+1/k}`.
 -/
 
-open Finset SimpleGraph FaultTolerantSpanners
+open Finset SimpleGraph
 open scoped ENNReal NNReal
 
 namespace VFTSpannersOptimal
@@ -265,23 +265,6 @@ theorem ftGreedyEdge_card_edges_le {w : Sym2 V → ℝ≥0} {L : List (V × V)} 
   obtain ⟨B, hB, hBc⟩ := ftGreedyEdge_exists_blockingSet (f := f) hk hsort
   exact hB.ncard_le_girthExtremal hBc hf
 
-/-- `8 (2f)^{1-1/k} ≤ 16 f^{1-1/k}`. -/
-lemma constant_le_two {k f : ℕ} (hk : 1 ≤ k) :
-    8 * (2 * f : ℝ) ^ (1 - 1 / (k : ℝ)) ≤ 16 * (f : ℝ) ^ (1 - 1 / (k : ℝ)) := by
-  have he0 : 0 ≤ 1 - 1 / (k : ℝ) := by
-    have : (1 : ℝ) ≤ k := by exact_mod_cast hk
-    rw [sub_nonneg, div_le_one (by linarith)]; exact this
-  have he1 : 1 - 1 / (k : ℝ) ≤ 1 := by
-    have : 0 ≤ 1 / (k : ℝ) := by positivity
-    linarith
-  rw [Real.mul_rpow (by norm_num) (by positivity)]
-  have h2 : (2 : ℝ) ^ (1 - 1 / (k : ℝ)) ≤ 2 := by
-    calc (2 : ℝ) ^ (1 - 1 / (k : ℝ)) ≤ 2 ^ (1 : ℝ) :=
-          Real.rpow_le_rpow_of_exponent_le (by norm_num) he1
-      _ = 2 := Real.rpow_one 2
-  have hf0 : 0 ≤ (f : ℝ) ^ (1 - 1 / (k : ℝ)) := by positivity
-  nlinarith
-
 omit [DecidableEq V] in
 /-- The size bound for any graph with a `2k`-blocking set of size `≤ f |E|`, via the Moore bound. -/
 lemma card_le_rpow_of_blockingSet {H : SimpleGraph V} {k f : ℕ} {B : Finset (V × Sym2 V)}
@@ -289,20 +272,7 @@ lemma card_le_rpow_of_blockingSet {H : SimpleGraph V} {k f : ℕ} {B : Finset (V
     (hBc : #B ≤ f * H.edgeSet.ncard) :
     (H.edgeSet.ncard : ℝ) ≤ 16 * (f : ℝ) ^ (1 - 1 / (k : ℝ)) *
       (Fintype.card V : ℝ) ^ (1 + 1 / (k : ℝ)) := by
-  classical
-  have h := size_bound_of_nat (m := H.edgeSet.ncard) (n := Fintype.card V) hk hf ?_
-    (fun s d hs hsd => hB.ncard_edgeSet_mul_le hk hBc hf hs hsd)
-  · refine h.trans ?_
-    have := constant_le_two (f := f) hk
-    have hn : 0 ≤ (Fintype.card V : ℝ) ^ (1 + 1 / (k : ℝ)) := by positivity
-    have : 8 * (2 * (f : ℕ) : ℝ) ^ (1 - 1 / (k : ℝ)) ≤ 16 * (f : ℝ) ^ (1 - 1 / (k : ℝ)) := by
-      exact_mod_cast this
-    nlinarith
-  · have h1 := H.card_edgeFinset_le_card_choose_two
-    rw [Nat.choose_two_right] at h1
-    rw [← coe_edgeFinset, Set.ncard_coe_finset]
-    have := Nat.mul_div_le (Fintype.card V * (Fintype.card V - 1)) 2
-    omega
+  simpa using hB.ncard_edgeSet_le_mul_rpow hk hf hBc (Nat.cast_nonneg f) le_rfl (by simp)
 
 /-- **Corollary 2 of Bodwin–Patel (VFT).** With stretch `2k - 1`, the VFT greedy spanner has at most
 `16 f^{1-1/k} n^{1+1/k}` edges. -/
