@@ -79,48 +79,6 @@ theorem hist_osc_swap {x₁ x₂ : Q → V} {O₁ O₂ : ℕ → Q → Q → Pro
 
 end Chain
 
-section Local
-
-variable {P I M O : Type*} (G : SimpleGraph P) (alg : Protocol P I M O)
-
--- CSLib candidate
-/-- Earlier histories are prefixes of later ones. -/
-theorem hist_eq_take (s : Scenario P I M) (p : P) {r k : ℕ} (hrk : r ≤ k) :
-    hist G alg s r p = (hist G alg s k p).take r := by
-  induction k with
-  | zero => obtain rfl : r = 0 := by omega
-            rfl
-  | succ k ih =>
-    rcases Nat.lt_or_ge r (k + 1) with h | h
-    · rw [hist_succ, List.take_append_of_le_length (by simp; omega), ih (by omega)]
-    · obtain rfl : r = k + 1 := by omega
-      rw [List.take_of_length_le (by simp)]
-
--- CSLib candidate
-/-- A party that has decided within `k` rounds of `s₁` and has the same input and the same
-history after `k` rounds in `s₂` makes the same (first) decision in `s₂`. -/
-theorem decides_iff_of_hist {s₁ s₂ : Scenario P I M} {p : P} {k : ℕ}
-    (hx : s₁.input p = s₂.input p) (hh : hist G alg s₁ k p = hist G alg s₂ k p)
-    (hdec : ∃ r ≤ k, status G alg s₁ r p ≠ none) (o : O) :
-    Decides G alg s₁ p o ↔ Decides G alg s₂ p o := by
-  have hst : ∀ r ≤ k, status G alg s₁ r p = status G alg s₂ r p := by
-    intro r hr
-    simp only [status, hx, hist_eq_take G alg s₁ p hr, hist_eq_take G alg s₂ p hr, hh]
-  obtain ⟨r₀, hr₀, hne⟩ := hdec
-  constructor
-  · rintro ⟨r, hr, hlt⟩
-    have hrr : r ≤ r₀ := by
-      by_contra h
-      exact hne (hlt r₀ (by omega))
-    exact ⟨r, (hst r (by omega)).symm ▸ hr, fun r' hr' => (hst r' (by omega)) ▸ hlt r' hr'⟩
-  · rintro ⟨r, hr, hlt⟩
-    have hrr : r ≤ r₀ := by
-      by_contra h
-      exact hne ((hst r₀ hr₀).trans (hlt r₀ (by omega)))
-    exact ⟨r, (hst r (by omega)) ▸ hr, fun r' hr' => (hst r' (by omega)).trans (hlt r' hr')⟩
-
-end Local
-
 section Chain2
 
 variable {Q V M : Type*} [Fintype Q] [DecidableEq Q] {alg : Protocol Q V M V} {t' k : ℕ}

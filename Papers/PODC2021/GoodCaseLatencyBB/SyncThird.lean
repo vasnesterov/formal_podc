@@ -1,4 +1,5 @@
-import Papers.PODC2021.GoodCaseLatencyBB.Tokens
+import Papers.PODC2021.GoodCaseLatencyBB.Basic
+import Podc.Computability.Distributed.Byzantine.PartialSync.Auth
 import Cslib.Foundations.Combinatorics.Labelling
 
 /-!
@@ -20,7 +21,7 @@ We split the processes into three groups `A = {g = 0}`, `B = {g = 1}`, `C = {g =
 
 `A` cannot distinguish Ex3 from Ex1 before `Δ + δ` (`side_st`): messages from `B` arriving
 before `Δ + δ` were sent before `δ`, when `B` has received nothing in both runs. Unforgeability of
-the replay in Ex3 follows from `tokens_replay_dl` (`side_tokens`). The mirror side is obtained by
+the replay in Ex3 follows from `Run.tokens_replay_dl` (`side_tokens`). The mirror side is obtained by
 relabelling (`mirror`), so `side_st`/`side_tokens`/`side_decides` are proved once.
 -/
 
@@ -136,7 +137,7 @@ theorem side_tokens (hU : A.Unforging Au) (h : Side I₀ s g δ Δ v A R) (hδΔ
       ∀ m ∈ (world I₀ s g δ Δ v : Run P M V).out A q σ r, ∀ x ∈ Au.tokens m,
         Au.signer x ∈ R.faulty ∨ x ∈ R.honestTokens Au A σ := by
   intro σ hσ q hq r
-  refine tokens_replay_dl hU (Ri := world I₀ s g δ Δ v) (R' := R) (T := Δ + δ - 1) ?_ σ hσ q
+  refine Run.tokens_replay_dl hU (Ri := world I₀ s g δ Δ v) (R' := R) (T := Δ + δ - 1) ?_ σ hσ q
     (by simp [world]) ((h.hF q).2 hq) r
   intro q' σ' r' hlt hle
   have := h.hg q'
@@ -146,7 +147,7 @@ theorem side_tokens (hU : A.Unforging Au) (h : Side I₀ s g δ Δ v A R) (hδΔ
     intro m hm x hx
     have hσ' : g q' = 1 → σ' ≤ δ - 1 := fun h1 => by simp [world, h1] at hlt; omega
     rw [← side_out h hδΔ (by omega) hσ' h2] at hm
-    exact Or.inr (mem_honestTokens_of_out (by rw [h.hF]; exact h2) hle hm hx)
+    exact Or.inr (Run.mem_honestTokens_of_out (by rw [h.hF]; exact h2) hle hm hx)
 
 /-- **One side of the argument**: if `world … v` enlarged by group `1` (Ex1) is admissible for
 the good case with delay `δ`, a group-`0` process `x` decides `v` in Ex3. -/

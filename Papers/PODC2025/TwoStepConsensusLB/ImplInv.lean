@@ -1,5 +1,5 @@
 import Papers.PODC2025.TwoStepConsensusLB.ImplBasic
-import Papers.PODC2025.TwoStepConsensusLB.ImplRun
+import Podc.Computability.Distributed.CrashPartialSync.Model
 
 /-!
 # System invariants of the implementation of Figure 1

@@ -57,10 +57,6 @@ theorem sent_out {τ : ℕ} {p q : P} {m : Msg P C}
     · obtain ⟨a, ha, h'⟩ := ih h; exact ⟨a, by omega, h'⟩
     · exact ⟨τ + 1, le_rfl, by rw [st_succ_eq]; exact h⟩
 
-theorem out_eq (τ : ℕ) (p q : P) (hp : p ∉ R.faulty) :
-    R.out (hotstuff f leader) p τ q = (R.st (hotstuff f leader) τ p).out q :=
-  Run.out_of_correct _ _ hp τ q
-
 theorem sent_of_out {a τ : ℕ} (h : a ≤ τ) {p q : P} {m : Msg P C}
     (hm : m ∈ (R.st (hotstuff f leader) a p).out q) :
     (q, m) ∈ (R.st (hotstuff f leader) τ p).sent :=
@@ -74,16 +70,8 @@ theorem deliver {δ : ℕ} (hR : R.Valid f δ) {p q : P} (hp : p ∉ R.faulty) (
     {a : ℕ} {m : Msg P C} (hm : m ∈ (R.st (hotstuff f leader) a p).out q) {τ : ℕ}
     (hτ : max a R.gst + δ ≤ τ) :
     (p, m) ∈ (recv (R.st (hotstuff f leader) τ q) (R.inbox (hotstuff f leader) q τ)).buf := by
-  have h1 := hR.dl_ge p a q hp hq
-  have h2 := hR.dl_le p a q hp hq
-  have hin : m ∈ R.inbox (hotstuff f leader) q (R.dl p a q) p :=
-    Run.mem_inbox.mpr ⟨a, h1, rfl, by rw [out_eq R a p q hp]; exact hm⟩
-  simp only [recv, List.mem_append, mem_received]
-  rcases Nat.lt_or_ge (R.dl p a q) τ with h | h
-  · left; exact (st_buf R τ q p m).mpr ⟨_, h, hin⟩
-  · right
-    obtain e : R.dl p a q = τ := by omega
-    rw [← e]; exact hin
+  rw [← (hstep_at R ∅ ∅ τ q).buf]
+  exact hotstuff_logs.mem_log_of_valid R hR hp hq hm (by omega)
 
 theorem buf_recv_sub {τ : ℕ} {q : P} {qm : P × Msg P C}
     (h : qm ∈ (R.st (hotstuff f leader) τ q).buf) :
@@ -99,17 +87,9 @@ theorem buf_succ {τ : ℕ} {q : P} {qm : P × Msg P C}
 theorem genuine {p q : P} (hp : p ∉ R.faulty) {τ : ℕ} {m : Msg P C}
     (h : (p, m) ∈ (recv (R.st (hotstuff f leader) τ q) (R.inbox (hotstuff f leader) q τ)).buf) :
     (q, m) ∈ (R.st (hotstuff f leader) τ p).sent := by
-  simp only [recv, List.mem_append, mem_received] at h
-  have key : ∀ ρ ≤ τ, m ∈ R.inbox (hotstuff f leader) q ρ p →
-      (q, m) ∈ (R.st (hotstuff f leader) τ p).sent := by
-    intro ρ hρ hin
-    obtain ⟨σ, hσ, -, hm⟩ := Run.mem_inbox.mp hin
-    rw [out_eq R σ p q hp] at hm
-    exact sent_of_out R (by omega) hm
-  rcases h with h | h
-  · obtain ⟨ρ, hρ, hin⟩ := (st_buf R τ q p m).mp h
-    exact key ρ (by omega) hin
-  · exact key τ le_rfl h
+  rw [← (hstep_at R ∅ ∅ τ q).buf] at h
+  obtain ⟨σ, hσ, hm⟩ := hotstuff_logs.exists_mem_send_of_mem_log R hp h
+  exact sent_of_out R (by omega) hm
 
 theorem genuine' {p q : P} (hp : p ∉ R.faulty) {τ : ℕ} {m : Msg P C}
     (h : (p, m) ∈ (R.st (hotstuff f leader) τ q).buf) :

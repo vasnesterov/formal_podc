@@ -1,6 +1,7 @@
 import Papers.PODC2025.BAWithPredictions.Defs
 import Cslib.Computability.Distributed.Byzantine.LockStep.Agreement
 import Podc.Foundations.Data.Finset.Quorum
+import Podc.Computability.Distributed.Byzantine.LockStep.Basic
 
 /-!
 # Byzantine Agreement with Predictions — round-complexity lower bound (Theorem 13)
@@ -20,8 +21,8 @@ algorithms *without* predictions, which it cites. We state that bound as an expl
 * `simProtocol X alg`: the prediction-free algorithm `S'` on the processes outside `X`, which run
   `alg` with the prediction "`X` is faulty, everyone else is honest"; the processes of `X` are
   silent Byzantine (`liftScenario`, `status_liftScenario`, `solves_simProtocol`).
-* `padScenario`: Byzantine processes that behave exactly as honest ones (used to reach exactly
-  `f` faults); `hist_padScenario`.
+* `padScenario` (shared, `Podc/Computability/Distributed/Byzantine/LockStep/Basic.lean`): Byzantine
+  processes that behave exactly as honest ones (used to reach exactly `f` faults).
 * `roundLowerBound`: Theorem 13 conditional on `EarlyDecidingLB`, with the sharper bound
   `min (f' + 2) (t - f + f' + 1)` for `f' = min f ⌊B/(n-f)⌋`;
   `roundLowerBound_paper`: the paper's four-term bound.
@@ -34,57 +35,6 @@ open Cslib.Byzantine.LockStep Finset
 /-- **Byzantine agreement with predictions**: Byzantine agreement (termination, strong unanimity,
 agreement) on the value component of the inputs; the prediction component is advice only. -/
 def BAP {P V : Type*} : Spec P (V × (P → Bool)) V := fun x H dec => BA (fun p => (x p).1) H dec
-
-/-! ### Padding: Byzantine processes that behave honestly -/
-
-section Pad
-
-variable {P I M O : Type*} (G : SimpleGraph P) (alg : Protocol P I M O)
-
-open Classical in
--- CSLib candidate
-/-- Declare the parties of `Y` Byzantine, but let them send exactly the messages they send as
-(honest or Byzantine) parties in `s`. The run is unchanged (`hist_padScenario`). -/
-noncomputable def padScenario (s : Scenario P I M) (Y : Set P) : Scenario P I M where
-  byz := s.byz ∪ Y
-  input := s.input
-  adv r p q := if p ∈ s.byz then s.adv r p q
-    else if s.drop r p q then none else alg.send p (s.input p) (hist G alg s r p) q
-  drop r p q := s.drop r p q ∧ p ∉ Y
-
--- CSLib candidate
-theorem hist_padScenario (s : Scenario P I M) (Y : Set P) :
-    ∀ r, hist G alg (padScenario G alg s Y) r = hist G alg s r := by
-  intro r
-  induction r with
-  | zero => rfl
-  | succ r ih =>
-    funext q
-    rw [hist_succ, hist_succ, ih]
-    congr 2
-    funext p
-    unfold deliver
-    by_cases hp : p ∈ s.byz <;> by_cases hY : p ∈ Y <;> simp [padScenario, hp, hY]
-    all_goals split_ifs <;> simp_all
-
--- CSLib candidate
-/-- Omissions by the padded parties disappear: they are now Byzantine sends of nothing. -/
-theorem reliable_padScenario {s : Scenario P I M} {Y : Set P}
-    (h : ∀ r p q, s.drop r p q → p ∈ Y) : (padScenario G alg s Y).Reliable :=
-  fun r p q hd => hd.2 (h r p q hd.1)
-
--- CSLib candidate
-theorem status_padScenario (s : Scenario P I M) (Y : Set P) (r : ℕ) (p : P) :
-    status G alg (padScenario G alg s Y) r p = status G alg s r p := by
-  simp only [status, hist_padScenario]
-  rfl
-
--- CSLib candidate
-theorem decides_padScenario (s : Scenario P I M) (Y : Set P) (p : P) (o : O) :
-    Decides G alg (padScenario G alg s Y) p o ↔ Decides G alg s p o := by
-  simp only [Decides, status_padScenario]
-
-end Pad
 
 /-! ### Simulating an algorithm with predictions on the processes outside `X` -/
 

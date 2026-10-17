@@ -1,4 +1,5 @@
 import Papers.PODC2026.PartialAuthBC.Model
+import Podc.Computability.Distributed.Byzantine.LockStep.Cover
 
 /-!
 # Lower bounds: Theorem 4.1 and Corollary 4.2
@@ -117,10 +118,9 @@ def lnk (a : Fin 3) (c : Bool) (b : Fin 3) : Option Bool :=
   else if a = 2 ∧ b = 0 then some true else some false
 
 /-- The covering system of the proof of Theorem 4.1 (the line `A₀ — B₀ — C₀ — A₁`). -/
-def cover (lab : P → Fin 3) (v₀ v₁ : V) : CoverSystem P V (P × Bool) where
-  φ := Prod.fst
-  nbr q p := (lnk (lab q.1) q.2 (lab p)).map fun c => (p, c)
-  xq q := if lab q.1 = 0 then (if q.2 then v₁ else v₀) else if lab q.1 = 1 then v₀ else v₁
+def cover (lab : P → Fin 3) (v₀ v₁ : V) : CoverSystem P V (P × Bool) :=
+  CoverSystem.doubleCover (fun q c p => lnk (lab q) c (lab p))
+    fun q => if lab q.1 = 0 then (if q.2 then v₁ else v₀) else if lab q.1 = 1 then v₀ else v₁
 
 lemma xq_eq (lab : P → Fin 3) (v₀ v₁ : V) (p : P) (c : Bool) :
     (cover lab v₀ v₁).xq (p, c) =
@@ -145,15 +145,13 @@ theorem not_solvablePA_of_lab {Reg : Set P} {Z : AdvStructure P} {spec : Spec P 
     ¬ SolvablePA Reg Z spec := by
   rintro ⟨M, S, Au, alg, hR, hU, hsolve⟩
   set C := cover lab v₀ v₁ with hC
-  have hφ : ∀ q p q', C.nbr q p = some q' → C.φ q' = p := by
-    intro q p q' h
-    simp only [C, cover, Option.map_eq_some_iff] at h
-    obtain ⟨c, -, rfl⟩ := h; rfl
+  have hφ : ∀ q p q', C.nbr q p = some q' → C.φ q' = p :=
+    fun _ _ _ h => CoverSystem.doubleCover_φ_of_nbr_eq_some h
   have hsim : ∀ (z : Fin 3) (σ : P → P × Bool), (∀ p, lab p ≠ z → lab p ≠ 0 → σ p = (p, false)) →
       ∀ q p q', (⊤ : SimpleGraph P).Adj p (C.φ q) → C.nbr q p = some q' →
       (∃ p', p' ∉ {p | lab p = z} ∧ q' = σ p') ∨ C.φ q' ∈ {p | lab p = z} ∨ C.φ q' ∉ Reg := by
     intro z σ hσ q p q' _ h
-    simp only [C, cover, Option.map_eq_some_iff] at h
+    simp only [C, cover, CoverSystem.doubleCover_nbr, Option.map_eq_some_iff] at h
     obtain ⟨c', hc', rfl⟩ := h
     by_cases h0 : lab p = 0
     · exact Or.inr (Or.inr (hA p h0))
@@ -175,7 +173,7 @@ theorem not_solvablePA_of_lab {Reg : Set P} {Z : AdvStructure P} {spec : Spec P 
   have hL1 : C.Lift ⊤ {p | lab p = 2} (fun p => (p, false)) := by
     refine ⟨fun _ _ => rfl, fun p q hp hq _ => ?_⟩
     have key : ∀ a b : Fin 3, a ≠ 2 → b ≠ 2 → lnk a false b = some false := by decide
-    simp only [C, cover, key _ _ hq hp, Option.map_some]
+    simp only [C, cover, CoverSystem.doubleCover_nbr, key _ _ hq hp, Option.map_some]
   have d1 : C.Decides ⊤ alg (b, false) v₀ := by
     have hs := run 2 _ hL1 (fun _ _ _ => rfl)
     have hb' : b ∉ {p | lab p = 2} := by simp [hb]
@@ -192,7 +190,7 @@ theorem not_solvablePA_of_lab {Reg : Set P} {Z : AdvStructure P} {spec : Spec P 
     refine ⟨fun _ _ => rfl, fun p q hp hq _ => ?_⟩
     have key : ∀ a b : Fin 3, a ≠ 1 → b ≠ 1 →
         lnk a (decide (a = 0)) b = some (decide (b = 0)) := by decide
-    simp only [C, cover, key _ _ hq hp, Option.map_some]
+    simp only [C, cover, CoverSystem.doubleCover_nbr, key _ _ hq hp, Option.map_some]
   have d3 : C.Decides ⊤ alg (c, false) v₁ := by
     have hs := run 1 _ hL3 (fun p _ h0 => by simp [h0])
     have hc' : c ∉ {p | lab p = 1} := by simp [hc]
@@ -210,7 +208,7 @@ theorem not_solvablePA_of_lab {Reg : Set P} {Z : AdvStructure P} {spec : Spec P 
   have hL2 : C.Lift ⊤ {p | lab p = 0} (fun p => (p, false)) := by
     refine ⟨fun _ _ => rfl, fun p q hp hq _ => ?_⟩
     have key : ∀ a b : Fin 3, a ≠ 0 → b ≠ 0 → lnk a false b = some false := by decide
-    simp only [C, cover, key _ _ hq hp, Option.map_some]
+    simp only [C, cover, CoverSystem.doubleCover_nbr, key _ _ hq hp, Option.map_some]
   have hs := run 0 _ hL2 (fun _ _ _ => rfl)
   have hb' : b ∉ {p | lab p = 0} := by simp [hb]
   have hc' : c ∉ {p | lab p = 0} := by simp [hc]

@@ -58,6 +58,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 - Shared library: lock-step helpers (`deliver_honest`, `firstSome_iff_of_ne`, `firstSome_map_iff`,
   `status_comapInput`) from `Cslib/Computability/Distributed/Byzantine/LockStep/Parallel.lean`; the `R`-parties' vote is `Finset.majority?`
   from `Cslib/Foundations/Data/Finset/Quorum.lean` (`PiBSM.majority_eq`: "a suggestion of more than half of `L`").
+- Staged shared code: the generic group simulation of Lemma 3 (`GroupSim.*`,
+  `Podc/Computability/Distributed/Byzantine/LockStep/GroupSim.lean`), double covers (`CoverSystem.doubleCover`,
+  `…/LockStep/Cover.lean`) and labellings into `Fin m` (`Fintype.exists_fin_labelling_le`,
+  `Podc/Foundations/Combinatorics/Labelling.lean`).
 - Cited protocols are **hypotheses**: Fitzi–Maurer general-adversary BB (Theorem 10), Dolev–Strong, and
   Theorems 8/9 (BA/BB with omissions). Only the sufficiency directions use them.
 

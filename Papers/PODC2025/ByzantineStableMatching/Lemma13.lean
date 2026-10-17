@@ -27,23 +27,16 @@ Copies of group `a` only exist in group 1, copies of group `c` only in group 2 (
 never listened to). `L`-nodes favour `jV`; `R`-nodes of copy `false` favour `iA`, of copy `true`
 favour `iC`. -/
 def cover (gL : Fin k → Fin 3) (iA iC jV : Fin k) :
-    CoverSystem (Party k) (Fin k) (Party k × Bool) where
-  φ := Prod.fst
-  nbr q p := match p with
-    | inl i => if gL i = 0 then (if q.2 then none else some (p, false))
-               else if gL i = 2 then (if q.2 then some (p, true) else none)
-               else some (p, q.2)
-    | inr _ => some (p, q.2)
-  xq q := match q with
-    | (inl _, _) => jV
-    | (inr _, c) => if c then iC else iA
-
-lemma nbr_fst (gL : Fin k → Fin 3) (iA iC jV : Fin k) (q : Party k × Bool) (p : Party k)
-    (q' : Party k × Bool) (h : (cover gL iA iC jV).nbr q p = some q') : q'.1 = p := by
-  rcases p with i | j
-  · simp only [cover] at h
-    split_ifs at h <;> (try simp only [Option.some.injEq] at h) <;> (try subst h) <;> rfl
-  · simp only [cover, Option.some.injEq] at h; rw [← h]
+    CoverSystem (Party k) (Fin k) (Party k × Bool) :=
+  CoverSystem.doubleCover
+    (fun _ c p => match p with
+      | inl i => if gL i = 0 then (if c then none else some false)
+                 else if gL i = 2 then (if c then some true else none)
+                 else some c
+      | inr _ => some c)
+    fun q => match q with
+      | (inl _, _) => jV
+      | (inr _, c) => if c then iC else iA
 
 /-- The general form of Lemma 13 (for sSM). -/
 theorem not_solvableAuth_of_groups (G : SimpleGraph (Party k))
@@ -74,7 +67,7 @@ theorem not_solvableAuth_of_groups (G : SimpleGraph (Party k))
       refine ⟨fun _ _ => rfl, fun p q hp _ _ => ?_⟩
       rcases p with i | j
       · have : gL i ≠ 2 := by simpa [B] using hp
-        simp only [C, cover]
+        simp only [C, cover, CoverSystem.doubleCover]
         split_ifs <;> simp_all
       · rfl
     have hV : (C.scenario G alg B (fun p => (p, false)) fun _ => jV).AuthValid G alg A := by
@@ -82,7 +75,7 @@ theorem not_solvableAuth_of_groups (G : SimpleGraph (Party k))
       exfalso
       rcases b with i | j
       · have : gL i = 2 := by simpa [B] using hb
-        simp [CoverSystem.scenario, C, cover, this] at hm
+        simp [CoverSystem.scenario, C, cover, CoverSystem.doubleCover, this] at hm
       · simp [B] at hb
     have hs := halg _ (hZL 2) (fun _ _ _ h => h) hV
     have hiA : inl iA ∉ B := by simp [B, hA]
@@ -97,7 +90,7 @@ theorem not_solvableAuth_of_groups (G : SimpleGraph (Party k))
       refine ⟨fun _ _ => rfl, fun p q hp _ _ => ?_⟩
       rcases p with i | j
       · have : gL i ≠ 0 := by simpa [B] using hp
-        simp only [C, cover]
+        simp only [C, cover, CoverSystem.doubleCover]
         split_ifs <;> simp_all
       · rfl
     have hV : (C.scenario G alg B (fun p => (p, true)) fun _ => jV).AuthValid G alg A := by
@@ -105,7 +98,7 @@ theorem not_solvableAuth_of_groups (G : SimpleGraph (Party k))
       exfalso
       rcases b with i | j
       · have : gL i = 0 := by simpa [B] using hb
-        simp [CoverSystem.scenario, C, cover, this] at hm
+        simp [CoverSystem.scenario, C, cover, CoverSystem.doubleCover, this] at hm
       · simp [B] at hb
     have hs := halg _ (hZL 0) (fun _ _ _ h => h) hV
     have hiC : inl iC ∉ B := by simp [B, hC]
@@ -125,18 +118,19 @@ theorem not_solvableAuth_of_groups (G : SimpleGraph (Party k))
       · simp [B] at hq
     · simp [B] at hp
   have hV : (C.scenario G alg B σ fun _ => jV).AuthValid G alg A := by
-    refine C.scenario_authValid hU hL (nbr_fst gL iA iC jV) (fun q p q' _ hq' => ?_) _
-    have h1 := nbr_fst gL iA iC jV q p q' hq'
+    refine C.scenario_authValid hU hL (fun _ _ _ h => CoverSystem.doubleCover_φ_of_nbr_eq_some h)
+      (fun q p q' _ hq' => ?_) _
+    have h1 : q'.1 = p := CoverSystem.doubleCover_φ_of_nbr_eq_some hq'
     rcases p with i | j
     · by_cases h0 : gL i = 0
       · left
         refine ⟨inl i, by simp [B, h0], ?_⟩
-        simp only [C, cover, h0, ite_true] at hq'
-        split_ifs at hq'; simp_all [σ]
+        simp only [C, cover, CoverSystem.doubleCover, h0, ite_true] at hq'
+        split_ifs at hq' <;> simp_all [σ]
       by_cases h2 : gL i = 2
       · left
         refine ⟨inl i, by simp [B, h2], ?_⟩
-        simp only [C, cover, h2, ite_true] at hq'
+        simp only [C, cover, CoverSystem.doubleCover, h2, ite_true] at hq'
         split_ifs at hq' <;> simp_all [σ]
       · right
         have : gL i = 1 := by omega
@@ -162,9 +156,8 @@ theorem lemma13_sSM (G : SimpleGraph (Party k)) (hG : ∀ i i', ¬ G.Adj (inl i)
     {tL tR : ℕ} (hk : 2 ≤ k) (hL : k ≤ 3 * tL) (hR : k ≤ tR) :
     ¬ SolvableAuth G (thresholds k tL tR) (sSM k) := by
   set t := (k + 2) / 3
-  obtain ⟨⟨iA, hA⟩, ⟨iC, hC⟩, hgL⟩ :=
-    split3_spec (k := k) (t := t) (x := (0 : Fin 3)) (y := 1) (z := 2) (by decide) (by decide)
-      (by decide) (by omega) (by omega) (by omega)
+  obtain ⟨gL, ⟨iA, hA⟩, ⟨iC, hC⟩, hgL⟩ :=
+    exists_split (k := k) (t := t) (0 : Fin 3) 2 (by decide) hk (by omega)
   exact Lemma13.not_solvableAuth_of_groups G hG hR _ iA iC jV' hA hC
     (fun z => (hgL z).trans (by omega))
 where jV' : Fin k := ⟨0, by omega⟩

@@ -35,27 +35,16 @@ section SyncRun
 variable {P : Type*} [Fintype P] [DecidableEq P] (t : ℕ) (king : ℕ → P)
   (tb : ℕ → P → St P → (P → Option Bool) → Bool)
 
-/-- States of the synchronous execution of `alg1` with faulty set `F`, inputs `inp`, and
-messages `byz r p q` from faulty `q` to `p` in round `r`. -/
-def syncSt (F : Finset P) (inp : P → Bool) (byz : ℕ → P → P → Option Bool) : ℕ → P → St P
-  | 0 => fun p => (alg1 t king tb).init p (inp p)
-  | r + 1 => fun p => (alg1 t king tb).trans r p (syncSt F inp byz r p)
-      (fun q => if q ∈ F then byz r p q else (alg1 t king tb).send r q (syncSt F inp byz r q) p)
-
-/-- Every adversary (faulty set, inputs, Byzantine messages) yields a synchronous execution of
-Algorithm 1: the hypotheses of Theorem 2.9 are satisfiable. -/
-def syncRun (F : Finset P) (inp : P → Bool) (byz : ℕ → P → P → Option Bool) :
-    RoundRun (alg1 t king tb) F inp where
-  s := syncSt t king tb F inp byz
-  rcv r p q := if q ∈ F then byz r p q else (alg1 t king tb).send r q (syncSt t king tb F inp byz r q) p
-  s_zero _ := rfl
-  s_succ _ _ := rfl
-  honest r p q m hq h := by simpa [hq] using h
+/-- Every adversary (faulty set `F`, inputs `inp`, messages `byz r p q` from faulty `q` to `p` in
+round `r`) yields a synchronous execution of Algorithm 1 (CSLib's `RoundRun.sync`): the hypotheses
+of Theorem 2.9 are satisfiable. -/
+abbrev syncRun (F : Finset P) (inp : P → Bool) (byz : ℕ → P → P → Option Bool) :
+    RoundRun (alg1 t king tb) F inp :=
+  RoundRun.sync (alg1 t king tb) F inp fun r _ => byz r
 
 theorem syncRun_syncFrom (F : Finset P) (inp : P → Bool) (byz : ℕ → P → P → Option Bool) :
-    (syncRun t king tb F inp byz).SyncFrom 0 := by
-  intro r _ p q _ hq
-  simp [syncRun, hq]
+    (syncRun t king tb F inp byz).SyncFrom 0 :=
+  RoundRun.sync_syncFrom _ _ _ _
 
 end SyncRun
 

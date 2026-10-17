@@ -1,26 +1,29 @@
-import Papers.PODC2025.TwoStepConsensusLB.Model
+import Cslib.Computability.Distributed.CrashPartialSync.Model
+
+-- CSLib candidate: Cslib/Computability/Distributed/CrashPartialSync/Model.lean (append to the
+-- existing file)
 
 /-!
-# Generic facts about runs (used for the upper bounds)
+# Crash-prone partially synchronous runs: inboxes and invariants
+
+Additions to `Cslib/Computability/Distributed/CrashPartialSync/Model.lean`.
 
 * `Run.mem_inbox`: the messages delivered to `x` at time `τ` are exactly those sent at some
   `τ' < τ` with delivery time `τ`.
 * `Run.mem_inbox_of_gst`: after GST, a message between correct processes sent at `τ` is delivered
   at `τ + 1`.
 * `Run.invariant`: induction principle for system invariants (a state invariant `SI` and a
-  message invariant `MI` indexed by the sending time).
+  message invariant `MI` indexed by the sending time); `Run.invariant_st`, `Run.invariant_out`,
+  `Run.invariant_inbox`.
 * `Run.st_mono`: a property preserved by every step of a process persists.
 -/
 
-set_option linter.unusedSectionVars false
-
--- CSLib candidate: generic facts about `Cslib.CrashPartialSync` runs (kept in that namespace so
--- that dot notation `R.mem_inbox` works).
 namespace Cslib.CrashPartialSync.Run
 
-variable {P V M S : Type*} [Fintype P] [DecidableEq P]
+variable {P V M S : Type*} [Fintype P]
 variable (A : Protocol P V M S) (R : Run P V M)
 
+/-- Membership in the canonically ordered list of deliveries. -/
 theorem mem_canon {x : P} {τ : ℕ} {q : P} {m : M} :
     (q, m) ∈ R.canon A x τ ↔ ∃ τ' < τ, R.dl q τ' x = τ ∧ m ∈ R.out A q τ' x := by
   rw [canon_eq_flatMap]
@@ -35,11 +38,14 @@ theorem mem_canon {x : P} {τ : ℕ} {q : P} {m : M} :
   · rintro ⟨τ', hτ', hd, hm⟩
     exact ⟨τ', hτ', q, m, by simpa [dlv, hd] using hm, rfl, rfl⟩
 
+/-- The messages delivered to `x` at time `τ` are exactly those sent at some `τ' < τ` with
+delivery time `τ`. -/
 theorem mem_inbox (hR : IsOrder R.ord) {x : P} {τ : ℕ} {q : P} {m : M} :
     (q, m) ∈ R.inbox A x τ ↔ ∃ τ' < τ, R.dl q τ' x = τ ∧ m ∈ R.out A q τ' x := by
   unfold inbox
   rw [(hR x τ _).mem_iff, mem_canon]
 
+/-- After GST, a message between correct processes sent at `τ` is delivered at `τ + 1`. -/
 theorem mem_inbox_of_gst {f : ℕ} (hR : R.Valid f) {q x : P} (hq : R.crash q = none)
     (hx : R.crash x = none) {τ : ℕ} (hτ : R.gst ≤ τ) {m : M} (hm : m ∈ R.out A q τ x) :
     (q, m) ∈ R.inbox A x (τ + 1) := by
@@ -81,6 +87,7 @@ theorem invariant (hR : IsOrder R.ord) (SI : ℕ → P → S → Prop) (MI : ℕ
         · rw [out_of_not_alive A R (by simpa using ha)] at hm
           simp at hm
 
+/-- The state invariant of `Run.invariant`. -/
 theorem invariant_st (hR : IsOrder R.ord) (SI : ℕ → P → S → Prop) (MI : ℕ → P → M → Prop)
     (h0 : ∀ p, SI 0 p (A.init p))
     (hmono : ∀ τ p s, SI τ p s → SI (τ + 1) p s)
@@ -90,6 +97,7 @@ theorem invariant_st (hR : IsOrder R.ord) (SI : ℕ → P → S → Prop) (MI : 
     (τ : ℕ) (p : P) : SI τ p (R.st A τ p) :=
   (invariant A R hR SI MI h0 hmono hstep τ).1 p
 
+/-- The message invariant of `Run.invariant`. -/
 theorem invariant_out (hR : IsOrder R.ord) (SI : ℕ → P → S → Prop) (MI : ℕ → P → M → Prop)
     (h0 : ∀ p, SI 0 p (A.init p))
     (hmono : ∀ τ p s, SI τ p s → SI (τ + 1) p s)
