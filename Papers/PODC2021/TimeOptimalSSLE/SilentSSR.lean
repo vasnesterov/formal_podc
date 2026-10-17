@@ -263,7 +263,7 @@ lemma interact_of_injective {C : Config A (Fin n)} (hC : Function.Injective C) {
 lemma silent_of_injective {C : Config A (Fin n)} (hC : Function.Injective C) :
     (NProtocol.ofProtocol (silentSSR n)).Silent C := by
   intro a b hab o ho
-  simp only [NProtocol.ofProtocol, silentSSR, Set.mem_singleton_iff] at ho
+  simp only [NProtocol.ofProtocol, Protocol.toN_δ, silentSSR, Set.mem_singleton_iff] at ho
   rw [ho, ite_eq_right (fun h => hab (hC h))]
 
 lemma bijective_of_injective (hA : Fintype.card A = n) {C : Config A (Fin n)}

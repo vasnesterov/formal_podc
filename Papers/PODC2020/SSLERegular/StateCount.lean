@@ -1,5 +1,6 @@
 import Papers.PODC2020.SSLERegular.EulerCycle
 import Mathlib.SetTheory.Cardinal.Finite
+import Mathlib.Tactic.Ring
 
 /-!
 # State complexity (Sections 3.4 and 4.4)

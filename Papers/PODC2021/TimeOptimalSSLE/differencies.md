@@ -10,7 +10,9 @@ Paper: J. Burman, H.-L. Chen, H.-P. Chen, D. Doty, T. Nowak, E. Severson, C. Xu,
    multiset. Interactions are ordered pairs of distinct agents.
 2. **Randomized transitions** `T : S × S → Dist(S × S)` are modelled by their *support*
    `δ p q ⊆ Q × Q` (`NProtocol`, `Model.lean`). All formalized statements about self-stabilization
-   only depend on the support.
+   only depend on the support. The model does not require supports to be nonempty; this only
+   enlarges the class of protocols covered by the lower bounds (Theorem 2.1), whose proofs never use
+   nonemptiness.
 3. **"With probability 1"** is formalized as `SelfStabilizes good`: from every configuration some
    *stably correct* configuration (all reachable configurations are correct) is reachable. For a
    finite state space and the uniformly random scheduler this is equivalent to the paper's notion:

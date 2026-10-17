@@ -29,3 +29,7 @@ import Podc.Knowledge.Basic
 import Podc.Probability.Finite.Uniform
 import Podc.Probability.Finite.Product
 import Podc.Probability.Finite.Bernoulli
+import Podc.Stabilization.Basic
+import Podc.Stabilization.Markov
+import Podc.PopulationProtocols.Nondet
+import Podc.PopulationProtocols.RandomScheduler
