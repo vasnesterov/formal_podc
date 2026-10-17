@@ -637,3 +637,11 @@ import Papers.PODC2026.PLSTradeoff.GeneralTS
 import Papers.PODC2026.PLSTradeoff.GeneralGraphs
 import Papers.PODC2026.PLSTradeoff.Padded
 import Papers.PODC2026.PLSTradeoff.LowerBound
+import Papers.PODC2011.KCoreDecomposition.Basic
+import Papers.PODC2011.KCoreDecomposition.Trajectory
+import Papers.PODC2011.KCoreDecomposition.Algorithm
+import Papers.PODC2011.KCoreDecomposition.Run
+import Papers.PODC2011.KCoreDecomposition.Async
+import Papers.PODC2011.KCoreDecomposition.MultiHost
+import Papers.PODC2011.KCoreDecomposition.WorstCase
+import Papers.PODC2011.KCoreDecomposition.Examples
