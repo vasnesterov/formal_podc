@@ -117,10 +117,17 @@ Full list of differences (including modelling choices): [differencies.md](differ
 | Theorem 11 (linearizable, wait-free, ≤ 2 steps) | `FAI.theorem11_linearizable`, `FAI.theorem11_linearizable_paper`, `FAI.theorem11_waitFree`, `FAI.theorem11_steps` | `BoundedFAI.lean` |
 | `B ≥ φn` is tight | `FAI.exists_reach_max`, `FAI.exists_overflow` | `BoundedFAI.lean` |
 
-Generic tools (CSLib candidates):
-* `Podc/SharedMemory/Sequential.lean` (shared library; `Sequential.lean` here re-exports it): a
-  sequential execution with an illegal response sequence, or a response no state can produce,
-  refutes linearizability.
+Shared library (`Podc/SharedMemory`):
+* `Sequential.lean`: a sequential execution with an illegal response sequence, or a response no
+  state can produce, refutes linearizability.
+* `Objects/FetchAdd.lean`: the counter `faiObj m` and the implemented object `FAI.modFAI φ` are
+  both the catalog object `modFaiObj` (readable fetch-and-increment modulo `m`).
+* `Potential.lean`: step bounds from a potential on local states
+  (`Impl.tauSteps_le_potential_invoke`, used by `lemma12` and `FAI.theorem11_steps`; steps are
+  counted with `Label.isTauOf`) and `Impl.waitFree_of_potential`; `Run.lean`:
+  `Impl.linearizable_of_run` and the forward step equations `Impl.step_*_eq_some`.
+
+Paper-specific tools:
 * `Machine.lean`: a list-based computable copy of `Impl.step`, proved equal (`step_toCfg`). It
   lets `decide +kernel` evaluate the 7268-label counterexample.
 

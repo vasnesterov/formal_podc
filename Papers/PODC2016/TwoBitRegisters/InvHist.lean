@@ -1,5 +1,6 @@
 import Papers.PODC2016.TwoBitRegisters.InvRead
 import Podc.Foundations.Quorum
+import Podc.SharedMemory.History
 
 /-!
 # The history invariant (Lemma 10 of the paper)
@@ -37,13 +38,10 @@ structure Ghost (P : Type) where
   /-- Reads-from: the index of the value returned by a completed read. -/
   rf : OpId P → ℕ
 
-/-- The current (or next) operation of `i`. -/
-def cur {A : ObjSpec} (h : List (Label P A)) (i : P) : OpId P := (i, (respsOf h i).length)
-
 /-- `m` is a lower bound that the current read of `i` must respect: write number `m` (1-based)
 or a read returning value number `m` completed before the current operation of `i` started. -/
 def Req {A : ObjSpec} (w : P) (h : List (Label P A)) (rf : OpId P → ℕ) (i : P) (m : ℕ) : Prop :=
-  ∃ y : OpId P, Precedes h y (cur h i) ∧ ((y.1 = w ∧ m = y.2 + 1) ∨ (y.1 ≠ w ∧ m = rf y))
+  ∃ y : OpId P, Precedes h y (curOp h i) ∧ ((y.1 = w ∧ m = y.2 + 1) ∨ (y.1 ≠ w ∧ m = rf y))
 
 /-- `pipe_snap` (see the module docstring). -/
 def PipeSnap (C : Cfg P V) (g : Ghost P) : Prop :=
@@ -174,20 +172,13 @@ lemma completed_append_of_not_ret {h : List (Label P A)} {ℓ : Label P A}
   | inv p o => simp [Completed]
   | tau p => simp [Completed]
 
-lemma respOf_append_of_not_ret {h : List (Label P A)} {ℓ : Label P A}
-    (hℓ : ∀ p r, ℓ ≠ .ret p r) (x : OpId P) : respOf (h ++ [ℓ]) x = respOf h x := by
-  cases ℓ with
-  | ret p r => exact absurd rfl (hℓ p r)
-  | inv p o => simp [respOf]
-  | tau p => simp [respOf]
-
 /-- A pending operation is the current one and has been invoked. -/
-lemma invoked_cur_of_pending {h : List (Label P A)} {i : P}
-    (hc : (opsOf h i).length = (respsOf h i).length + 1) : Invoked h (cur h i) := by
-  simp only [Invoked, cur]; omega
+lemma invoked_curOp_of_pending {h : List (Label P A)} {i : P}
+    (hc : (opsOf h i).length = (respsOf h i).length + 1) : Invoked h (curOp h i) := by
+  simp only [Invoked]; omega
 
 lemma req_append_iff {w : P} {h β : List (Label P A)} {rf : OpId P → ℕ} {i : P} {m : ℕ}
-    (hinv : Invoked h (cur h i)) (hcur : cur (h ++ β) i = cur h i) :
+    (hinv : Invoked h (curOp h i)) (hcur : curOp (h ++ β) i = curOp h i) :
     Req w (h ++ β) rf i m ↔ Req w h rf i m := by
   simp only [Req, hcur, precedes_append_iff_of_invoked hinv]
 
@@ -262,11 +253,11 @@ lemma of_invoke_write (hH : InvH w Q v₀ C h g) {p : P} {v : V} {l : Loc P V}
   have hresps : ∀ q, respsOf (h ++ [.inv w (.write v)]) q = respsOf h q := by intro q; simp
   have hcompl := completed_append_of_not_ret (h := h) (ℓ := .inv w (.write v))
     (fun _ _ => by simp)
-  have hresp := respOf_append_of_not_ret (h := h) (ℓ := .inv w (.write v)) (fun _ _ => by simp)
+  have hresp := respOf_append_of_not_ret (α := h) (ℓ := .inv w (.write v)) (fun _ _ => by simp)
   have hreq : ∀ i, (C.loc i).phase ≠ .idle → ∀ m,
       Req w (h ++ [.inv w (.write v)]) g.rf i m ↔ Req w h g.rf i m := by
     intro i hi m
-    exact req_append_iff (invoked_cur_of_pending (hH.pending hi)) (by simp [cur, hresps])
+    exact req_append_iff (invoked_curOp_of_pending (hH.pending hi)) (by simp [curOp, hresps])
   have hwv : writeVal v₀ (opsOf h w ++ [.write v]) (o + 1) = v :=
     writeVal_succ (by simp [hlen])
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -375,11 +366,11 @@ lemma of_invoke_read (hH : InvH w Q v₀ C h g) {p : P} {l : Loc P V}
   have hopsw : opsOf (h ++ [.inv p .read]) w = opsOf h w := by simp [hpw]
   have hresps : ∀ q, respsOf (h ++ [.inv p .read]) q = respsOf h q := by intro q; simp
   have hcompl := completed_append_of_not_ret (h := h) (ℓ := .inv p .read) (fun _ _ => by simp)
-  have hresp := respOf_append_of_not_ret (h := h) (ℓ := .inv p .read) (fun _ _ => by simp)
+  have hresp := respOf_append_of_not_ret (α := h) (ℓ := .inv p .read) (fun _ _ => by simp)
   have hreq : ∀ i, (C.loc i).phase ≠ .idle → ∀ m,
       Req w (h ++ [.inv p .read]) g.rf i m ↔ Req w h g.rf i m := by
     intro i hi m
-    exact req_append_iff (invoked_cur_of_pending (hH.pending hi)) (by simp [cur, hresps])
+    exact req_append_iff (invoked_curOp_of_pending (hH.pending hi)) (by simp [curOp, hresps])
   have hsnap : ∀ i, i ≠ p → g'.snap i = g.snap i := by
     intro i hi; simp [hg', hi]
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -445,8 +436,8 @@ lemma of_invoke_read (hH : InvH w Q v₀ C h g) {p : P} {l : Loc P V}
   · intro i rsn m hi hr
     by_cases hip : i = p
     · subst hip
-      have hcur : cur (h ++ [.inv i .read]) i = (i, (opsOf h i).length) := by
-        simp [cur, hresps, hidle']
+      have hcur : curOp (h ++ [.inv i .read]) i = (i, (opsOf h i).length) := by
+        simp [curOp, hresps, hidle']
       obtain ⟨y, hy, hm⟩ := hr
       rw [hcur, precedes_append_inv_iff] at hy
       have hs : ∀ j, g'.snap i j = W C j j := by intro j; simp [hg']
@@ -507,7 +498,7 @@ lemma of_wret (hH : InvH w Q v₀ C h g) (hW : InvW w C) {p : P} {l : Loc P V}
   have hreq : ∀ i, i ≠ w → (C.loc i).phase ≠ .idle → ∀ m,
       Req w (h ++ [.ret w (Hw w C wsn)]) g.rf i m ↔ Req w h g.rf i m := by
     intro i hip hi m
-    exact req_append_iff (invoked_cur_of_pending (hH.pending hi)) (by simp [cur, hresps i hip])
+    exact req_append_iff (invoked_curOp_of_pending (hH.pending hi)) (by simp [curOp, hresps i hip])
   -- the written value
   have hval : ∃ v, opOf h (w, wsn - 1) = some (.write v) ∧ Hw w C wsn = v := by
     have hmem : (opsOf h w)[wsn - 1]? = some ((opsOf h w)[wsn - 1]'(by omega)) :=
@@ -695,12 +686,12 @@ lemma of_rret (hH : InvH w Q v₀ C h g) (hW : InvW w C) {p : P} {l : Loc P V}
     {out : Multiset (P × Msg V)} {r : Option V}
     (hint : internal Q p .rret (C.loc p) = some (l, out, r)) :
     ∃ sn, InvH w Q v₀ (C.apply p l out C.net) (h ++ (r.map (Label.ret p)).toList)
-      ⟨g.snap, Function.update g.rf (cur h p) sn⟩ := by
+      ⟨g.snap, Function.update g.rf (curOp h p) sn⟩ := by
   obtain ⟨sn, hph, hq, rfl, rfl, rfl⟩ := internal_rret hint
   refine ⟨sn, ?_⟩
   simp only [Option.map_some, Option.toList_some]
   set C' := C.apply p _ _ C.net with hC'
-  set x0 := cur h p with hx0
+  set x0 := curOp h p with hx0
   set g' : Ghost P := ⟨g.snap, Function.update g.rf x0 sn⟩ with hg'
   obtain ⟨hpw, hsn⟩ := hH.ph_r9 p sn hph
   have hpend := hH.pending (i := p) (by rw [hph]; simp)
@@ -717,8 +708,8 @@ lemma of_rret (hH : InvH w Q v₀ C h g) (hW : InvW w C) {p : P} {l : Loc P V}
   have hresps : ∀ q, q ≠ p → respsOf (h ++ [.ret p v]) q = respsOf h q := by
     intro q hq; simp [Ne.symm hq]
   have hx0' : x0 = (p, (respsOf h p).length) := rfl
-  have hx0nc : ¬ Completed h x0 := by simp [hx0, cur, Completed]
-  have hx0inv : Invoked h x0 := invoked_cur_of_pending hpend
+  have hx0nc : ¬ Completed h x0 := by simp [hx0, curOp, Completed]
+  have hx0inv : Invoked h x0 := invoked_curOp_of_pending hpend
   have hrf : ∀ y, y ≠ x0 → g'.rf y = g.rf y := by
     intro y hy; simp [hg', Function.update_of_ne hy]
   have hrf0 : g'.rf x0 = sn := by simp [hg']
@@ -731,8 +722,8 @@ lemma of_rret (hH : InvH w Q v₀ C h g) (hW : InvW w C) {p : P} {l : Loc P V}
       Req w (h ++ [.ret p v]) g'.rf i m → Req w h g.rf i m := by
     intro i hip hi m hr
     obtain ⟨y, hy, hm⟩ := hr
-    have hcur : cur (h ++ [.ret p v]) i = cur h i := by simp [cur, hresps i hip]
-    rw [hcur, precedes_append_iff_of_invoked (invoked_cur_of_pending (hH.pending hi))] at hy
+    have hcur : curOp (h ++ [.ret p v]) i = curOp h i := by simp [curOp, hresps i hip]
+    rw [hcur, precedes_append_iff_of_invoked (invoked_curOp_of_pending (hH.pending hi))] at hy
     refine ⟨y, hy, ?_⟩
     rwa [hrf y (hne_of_compl y hy.completed)] at hm
   -- the value returned

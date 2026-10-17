@@ -19,17 +19,8 @@ variable {k : ℕ} {O : Fin k → BitObj} {P : Type} [DecidableEq P]
   {α : List (Label P (scannable O))} {C C' : Config (scannable O) (Obj O Sc) P (Loc O Sc)}
   {L : List (OpId P × ScanOp O)}
 
-lemma cur_append_tau (q p : P) : cur (α ++ [.tau q]) p = cur α p := by
-  simp [cur, respsOf_append]
-
-lemma cur_append_inv (q p : P) (o : ScanOp O) : cur (α ++ [.inv q o]) p = cur α p := by
-  simp [cur, respsOf_append]
-
-lemma not_completed_cur_tau (q p : P) : ¬ Completed (α ++ [.tau q]) (cur α p) := by
-  simp [Completed, cur, respsOf_append]
-
-lemma not_completed_cur (p : P) : ¬ Completed α (cur α p) := by
-  simp [Completed, cur]
+lemma not_completed_curOp_tau (q p : P) : ¬ Completed (α ++ [.tau q]) (curOp α p) := by
+  rw [← curOp_append_tau α q p]; exact not_completed_curOp _ _
 
 lemma loc_other {ℓ : Label P (scannable O)}
     (h : (impl1 R Sc Up h₀).step C ℓ = some C') : ∀ r : P, r ≠ ℓ.proc → C'.loc r = C.loc r :=
@@ -48,12 +39,12 @@ lemma inv_step_inv (hrun : (impl1 R Sc Up h₀).run α = some C) (hI : Inv Sc Up
     rcases (impl1 R Sc Up h₀).run_counts hrun q with ⟨-, h1⟩ | ⟨h1, -⟩
     · exact h1
     · exact absurd h0 h1
-  have hnotin : cur α q ∉ L.map Prod.fst := by
+  have hnotin : curOp α q ∉ L.map Prod.fst := by
     intro hm
     have := hI.lin.invoked_of_mem hm
-    simp [Invoked, cur] at this; omega
-  have hop : opOf (α ++ [.inv q o]) (cur (α ++ [.inv q o]) q) = some o := by
-    simp [opOf, cur, opsOf_append, respsOf_append, ← hlen]
+    simp [Invoked] at this; omega
+  have hop : opOf (α ++ [.inv q o]) (curOp (α ++ [.inv q o]) q) = some o := by
+    simp [opOf, opsOf_append, respsOf_append, ← hlen]
   refine ⟨hI.lin.append_inv q o, fun i => by rw [hmem]; exact hI.mem i, fun p => ?_⟩
   by_cases hpq : p = q
   · subst hpq
@@ -62,11 +53,11 @@ lemma inv_step_inv (hrun : (impl1 R Sc Up h₀).run α = some C) (hI : Inv Sc Up
     | scan =>
       simp only [impl1, PInvL]
       exact ⟨by rw [hpend, Function.update_self], by simpa [impl1] using hall,
-        by rw [cur_append_inv]; exact hnotin, hop⟩
+        by rw [curOp_append_inv]; exact hnotin, hop⟩
     | update i o =>
       simp only [impl1, PInvL]
       exact ⟨by rw [hpend, Function.update_self], by simpa [impl1] using hall,
-        by rw [cur_append_inv]; exact hnotin, hop⟩
+        by rw [curOp_append_inv]; exact hnotin, hop⟩
   · refine pinv_frame_same (by simpa [Label.proc] using Ne.symm hpq)
       (by rw [hloc, Function.update_of_ne hpq]) (by rw [hpend, Function.update_of_ne hpq])
       (fun hp hR => ⟨by rw [hmem] at hR; exact hR, numDanger_le (loc_other h) ?_⟩) (hI.proc p)
@@ -148,19 +139,19 @@ lemma inv_step_upd_cons (hI : Inv Sc Up α C L) {q : P} {i : Fin k} {o : (O i).O
   · rw [hloc, Function.update_self]
     simp only [PInvL] at hq ⊢
     obtain ⟨h1, h2, h3, h4⟩ := hq
-    exact ⟨by rw [hpend]; exact h1, h2, by rw [cur_append_tau]; exact h3,
-      by rw [cur_append_tau]; exact opOf_append_some h4⟩
+    exact ⟨by rw [hpend]; exact h1, h2, by rw [curOp_append_tau]; exact h3,
+      by rw [curOp_append_tau]; exact opOf_append_of_eq_some h4 _⟩
 
 /-- The linearization point of an update: its access to `B i`. -/
 lemma inv_step_upd_nil (hI : Inv Sc Up α C L) {q : P} {i : Fin k} {o : (O i).Op}
     (hl : C.loc q = .upd i o []) (h : (impl1 R Sc Up h₀).step C (.tau q) = some C') :
-    Inv Sc Up (α ++ [.tau q]) C' (L ++ [(cur α q, .update i o)]) := by
+    Inv Sc Up (α ++ [.tau q]) C' (L ++ [(curOp α q, .update i o)]) := by
   obtain ⟨hpend, hmem, hloc⟩ := step_upd_nil hl h
   have hq := hI.proc q
   rw [hl] at hq
   simp only [PInvL] at hq
   obtain ⟨h1, hqU, h3, h4⟩ := hq
-  refine ⟨(hI.lin.push h4 h3 (not_completed_cur q)).append_tau q, fun i' => ?_, fun p => ?_⟩
+  refine ⟨(hI.lin.push h4 h3 (not_completed_curOp _ q)).append_tau q, fun i' => ?_, fun p => ?_⟩
   · rw [linState_push_update, hmem, ← hI.mem i]
     by_cases hi : i' = i
     · subst hi; simp only [Function.update_self]
@@ -169,12 +160,12 @@ lemma inv_step_upd_nil (hI : Inv Sc Up α C L) {q : P} {i : Fin k} {o : (O i).Op
     · subst hpq
       rw [hloc, Function.update_self]
       simp only [PInvL]
-      refine ⟨by rw [hpend, h1]; simp, L, [], .update i o, by rw [cur_append_tau], ?_⟩
+      refine ⟨by rw [hpend, h1]; simp, L, [], .update i o, by rw [curOp_append_tau], ?_⟩
       rw [hI.mem i]
     · have hpq' : (Label.tau q : Label P (scannable O)).proc ≠ p := by
         simpa [Label.proc] using Ne.symm hpq
       refine pinv_frame_push hpq' (loc_other h p hpq) (pend_other h p hpq)
-        (fun hp => by rw [hmem]; simp) ?_ rfl rfl (not_completed_cur_tau q q) (hI.proc p)
+        (fun hp => by rw [hmem]; simp) ?_ rfl rfl (not_completed_curOp_tau q q) (hI.proc p)
       refine numDanger_lt (loc_other h) ?_ ?_ hqU
       · simp only [Label.proc]; rw [hloc, Function.update_self]; rfl
       · simp only [Label.proc]; rw [hl]; rfl
@@ -192,8 +183,8 @@ lemma inv_step_scan1_lt (hI : Inv Sc Up α C L) {q : P} {m : ℕ} {b : Fin k →
   · rw [hloc, Function.update_self]
     simp only [PInvL] at hq ⊢
     obtain ⟨h1, h2, h3, h4⟩ := hq
-    exact ⟨by rw [hpend]; exact h1, h2, by rw [cur_append_tau]; exact h3,
-      by rw [cur_append_tau]; exact opOf_append_some h4⟩
+    exact ⟨by rw [hpend]; exact h1, h2, by rw [curOp_append_tau]; exact h3,
+      by rw [curOp_append_tau]; exact opOf_append_of_eq_some h4 _⟩
 
 lemma inv_step_scan1_ge (hI : Inv Sc Up α C L) {q : P} {m : ℕ} {b : Fin k → Bool}
     (hm : ¬ m < k) (hl : C.loc q = .scan1 m b)
@@ -211,8 +202,8 @@ lemma inv_step_scan1_ge (hI : Inv Sc Up α C L) {q : P} {m : ℕ} {b : Fin k →
   · rw [hloc, Function.update_self]
     simp only [PInvL] at hq ⊢
     obtain ⟨h1, h2, h3, h4⟩ := hq
-    refine ⟨⟨by rw [hpend]; exact h1, h2, by rw [cur_append_tau]; exact h3,
-      by rw [cur_append_tau]; exact opOf_append_some h4⟩, fun hp _ => ?_⟩
+    refine ⟨⟨by rw [hpend]; exact h1, h2, by rw [curOp_append_tau]; exact h3,
+      by rw [curOp_append_tau]; exact opOf_append_of_eq_some h4 _⟩, fun hp _ => ?_⟩
     refine ⟨L, [], 0, ⟨by simp, by simp⟩, fun _ i hi => absurd hi (by omega),
       by simpa using numDanger_le_card C', Or.inr ⟨le_refl _, by simp⟩⟩
 
@@ -225,10 +216,10 @@ lemma inv_step_scan2_lt (hI : Inv Sc Up α C L) {q : P} {c m : ℕ} {b : Fin k �
   rw [hl] at hq
   simp only [PInvL] at hq
   obtain ⟨⟨h1, h2, h3, h4⟩, h5⟩ := hq
-  have hbasic : C'.pend q = some .scan ∧ q ∈ Sc ∧ cur (α ++ [.tau q]) q ∉ L.map Prod.fst ∧
-      opOf (α ++ [.tau q]) (cur (α ++ [.tau q]) q) = some (ScanOp.scan : ScanOp O) :=
-    ⟨by rw [hpend]; exact h1, h2, by rw [cur_append_tau]; exact h3,
-      by rw [cur_append_tau]; exact opOf_append_some h4⟩
+  have hbasic : C'.pend q = some .scan ∧ q ∈ Sc ∧ curOp (α ++ [.tau q]) q ∉ L.map Prod.fst ∧
+      opOf (α ++ [.tau q]) (curOp (α ++ [.tau q]) q) = some (ScanOp.scan : ScanOp O) :=
+    ⟨by rw [hpend]; exact h1, h2, by rw [curOp_append_tau]; exact h3,
+      by rw [curOp_append_tau]; exact opOf_append_of_eq_some h4 _⟩
   have hD : numDanger Up C' q ≤ numDanger Up C q := by
     refine numDanger_le (loc_other h) ?_
     simp only [Label.proc]; rw [hloc, Function.update_self]; split <;> simp [dang]
@@ -243,7 +234,7 @@ lemma inv_step_scan2_lt (hI : Inv Sc Up α C L) {q : P} {c m : ℕ} {b : Fin k �
       refine ⟨hbasic, fun hp hR => ?_⟩
       rw [hmem] at hR
       obtain ⟨S₁, S₂, d, hcut, hclean, hN, hW⟩ := h5 hp hR
-      refine ⟨S₁, S₂, d, by rw [cur_append_tau]; exact hcut.append h4, fun hall i hi => ?_,
+      refine ⟨S₁, S₂, d, by rw [curOp_append_tau]; exact hcut.append h4, fun hall i hi => ?_,
         by omega, ?_⟩
       · by_cases him : i.val < m
         · exact hclean hall i him
@@ -251,7 +242,7 @@ lemma inv_step_scan2_lt (hI : Inv Sc Up α C L) {q : P} {c m : ℕ} {b : Fin k �
           subst hi'
           rw [← linState_append_scans S₁ S₂ hall, ← hcut.1, ← hI.mem, heq]
       · rcases hW with ⟨W₁, W₂, hc, hb⟩ | hW
-        · exact Or.inl ⟨W₁, W₂, by rw [cur_append_tau]; exact hc.append h4, hb⟩
+        · exact Or.inl ⟨W₁, W₂, by rw [curOp_append_tau]; exact hc.append h4, hb⟩
         · exact Or.inr hW
     · simp only [PInvL]; exact hbasic
 
@@ -266,10 +257,10 @@ lemma inv_step_scan2_ge (hI : Inv Sc Up α C L) {q : P} {c m : ℕ} {b : Fin k �
   rw [hl] at hq
   simp only [PInvL] at hq
   obtain ⟨⟨h1, h2, h3, h4⟩, h5⟩ := hq
-  have hbasic : C'.pend q = some .scan ∧ q ∈ Sc ∧ cur (α ++ [.tau q]) q ∉ L.map Prod.fst ∧
-      opOf (α ++ [.tau q]) (cur (α ++ [.tau q]) q) = some (ScanOp.scan : ScanOp O) :=
-    ⟨by rw [hpend]; exact h1, h2, by rw [cur_append_tau]; exact h3,
-      by rw [cur_append_tau]; exact opOf_append_some h4⟩
+  have hbasic : C'.pend q = some .scan ∧ q ∈ Sc ∧ curOp (α ++ [.tau q]) q ∉ L.map Prod.fst ∧
+      opOf (α ++ [.tau q]) (curOp (α ++ [.tau q]) q) = some (ScanOp.scan : ScanOp O) :=
+    ⟨by rw [hpend]; exact h1, h2, by rw [curOp_append_tau]; exact h3,
+      by rw [curOp_append_tau]; exact opOf_append_of_eq_some h4 _⟩
   have hdq : ∀ p, dang p (C'.loc q) = false := by
     intro p; rw [hloc, Function.update_self]; split
     · rfl
@@ -295,14 +286,14 @@ lemma inv_step_scan2_ge (hI : Inv Sc Up α C L) {q : P} {c m : ℕ} {b : Fin k �
     refine ⟨hbasic, fun hp _ => ⟨L, [], d, ⟨by simp, by simp⟩, fun _ i hi => absurd hi (by omega),
       by have := hD q; omega, ?_⟩⟩
     rcases hW with ⟨W₁, W₂, hc', hb⟩ | ⟨hcd, hdirty⟩
-    · exact Or.inl ⟨W₁, W₂, by rw [cur_append_tau]; exact hc'.append h4, hb⟩
+    · exact Or.inl ⟨W₁, W₂, by rw [curOp_append_tau]; exact hc'.append h4, hb⟩
     · by_cases hall : ∀ y ∈ S₂, y.2.isScan = true
-      · exact Or.inl ⟨S₁, S₂, by rw [cur_append_tau]; exact hcut.append h4, hclean' hall⟩
+      · exact Or.inl ⟨S₁, S₂, by rw [curOp_append_tau]; exact hcut.append h4, hclean' hall⟩
       · simp only [not_forall, Bool.not_eq_true] at hall
         obtain ⟨y, hy, hys⟩ := hall
         exact Or.inr ⟨hdirty ⟨y, hy, hys⟩, by simp⟩
   · -- the scan returns: find the clean collect
-    have hwit : ∃ W₁ W₂, Cut α L (cur α q) W₁ W₂ ∧ linSt W₁ = b := by
+    have hwit : ∃ W₁ W₂, Cut α L (curOp α q) W₁ W₂ ∧ linSt W₁ = b := by
       rcases hW with hw | ⟨hcd, hdirty⟩
       · exact hw
       · by_cases hall : ∀ y ∈ S₂, y.2.isScan = true
@@ -313,21 +304,21 @@ lemma inv_step_scan2_ge (hI : Inv Sc Up α C L) {q : P} {c m : ℕ} {b : Fin k �
           have := hdirty ⟨y, hy, hys⟩
           omega
     obtain ⟨W₁, W₂, ⟨hWL, hW2⟩, hWb⟩ := hwit
-    refine ⟨W₁ ++ (cur α q, .scan) :: W₂, ⟨?_, fun i => ?_, fun p => ?_⟩⟩
+    refine ⟨W₁ ++ (curOp α q, .scan) :: W₂, ⟨?_, fun i => ?_, fun p => ?_⟩⟩
     · have hlin := hI.lin
       rw [hWL] at hlin
-      exact (hlin.insert h4 (hWL ▸ h3) (not_completed_cur q) rfl hW2).append_tau q
+      exact (hlin.insert h4 (hWL ▸ h3) (not_completed_curOp _ q) rfl hW2).append_tau q
     · rw [linState_insert_scan, ← hWL, hmem]; exact hI.mem i
     · by_cases hpq : p = q
       · subst hpq
         rw [hloc, Function.update_self]; simp only [hR, hc, ↓reduceIte]
         simp only [PInvL]
-        refine ⟨by rw [hpend, h1]; simp, W₁, W₂, .scan, by rw [cur_append_tau], ?_⟩
+        refine ⟨by rw [hpend, h1]; simp, W₁, W₂, .scan, by rw [curOp_append_tau], ?_⟩
         show ScanResp.view (linSt W₁) = _; rw [hWb]
       · have hpq' : (Label.tau q : Label P (scannable O)).proc ≠ p := by
           simpa [Label.proc] using Ne.symm hpq
         exact pinv_frame_insert hpq' (loc_other h p hpq) (pend_other h p hpq)
-          (fun hp => by rw [hmem]) (hD p) rfl (not_completed_cur_tau q q) hWL (hI.proc p)
+          (fun hp => by rw [hmem]) (hD p) rfl (not_completed_curOp_tau q q) hWL (hI.proc p)
 
 /-- Every step preserves the invariant. -/
 theorem inv_step (hrun : (impl1 R Sc Up h₀).run α = some C) (hI : Inv Sc Up α C L)
@@ -355,22 +346,10 @@ theorem inv_step (hrun : (impl1 R Sc Up h₀).run α = some C) (hI : Inv Sc Up �
 
 theorem inv_of_run {α : List (Label P (scannable O))}
     {C : Config (scannable O) (Obj O Sc) P (Loc O Sc)}
-    (h : (impl1 R Sc Up h₀).run α = some C) : ∃ L, Inv Sc Up α C L := by
-  induction α using List.reverseRecOn generalizing C with
-  | nil =>
-    simp only [Impl.run, Impl.runFrom, Impl.initCfg, Option.some.injEq] at h; subst h
-    refine ⟨[], ⟨?_, fun i => rfl, fun p => ?_⟩⟩
-    · exact ⟨by simp, by simp, fun a ha => by simp [Completed] at ha,
-        fun a b _ hb => by simp at hb, trivial⟩
-    · simp [impl1, PInvL]
-  | append_singleton α ℓ ih =>
-    rw [Impl.run, Impl.runFrom_append] at h
-    cases hα : (impl1 R Sc Up h₀).runFrom (impl1 R Sc Up h₀).initCfg α with
-    | none => simp [hα] at h
-    | some C₀ =>
-      simp only [hα, Option.bind_some, Impl.runFrom_singleton] at h
-      obtain ⟨L, hI⟩ := ih hα
-      exact inv_step hα hI h
+    (h : (impl1 R Sc Up h₀).run α = some C) : ∃ L, Inv Sc Up α C L :=
+  Impl.run_induction (Q := fun α C => ∃ L, Inv Sc Up α C L)
+    ⟨[], isLinearization_nil, fun _ => rfl, fun _ => by simp [Impl.initCfg, impl1, PInvL]⟩
+    (fun _ _ _ _ hα ⟨_, hI⟩ hs => inv_step hα hI hs) h
 
 end Impl1
 
@@ -380,16 +359,9 @@ open Impl1 in
 /-- **Theorem 2 of Ovens (PODC 2021), linearizability**: Implementation 1 is linearizable
 (for any scanners `Sc`, updaters `Up`, readable components and initial handshaking bits). -/
 theorem impl1_linearizable (R : ∀ i, (O i).Readable) (Sc Up : Finset P) (h₀ : Sc → Bool) :
-    (impl1 R Sc Up h₀).Linearizable := by
-  have : ∀ α : List (Label P (scannable O)), ∃ L, ∀ C, (impl1 R Sc Up h₀).run α = some C →
-      IsLinearization α L := by
-    intro α
-    cases hα : (impl1 R Sc Up h₀).run α with
-    | none => exact ⟨[], fun C h => by cases h⟩
-    | some C =>
-      obtain ⟨L, hL⟩ := inv_of_run hα
-      exact ⟨L, fun C' h => by cases h; exact hL.lin⟩
-  choose f hf using this
-  exact ⟨f, fun α ⟨C, hC⟩ => hf α C hC⟩
+    (impl1 R Sc Up h₀).Linearizable :=
+  Impl.linearizable_of_run fun _ _ hα =>
+    let ⟨L, hL⟩ := inv_of_run hα
+    ⟨L, hL.lin⟩
 
 end Cslib.SharedMemory.Scannable

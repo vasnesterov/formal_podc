@@ -1,5 +1,6 @@
 import Papers.PODC2021.ScannableBinaryObjects.Impl1Steps
-import Mathlib.Algebra.Order.BigOperators.Group.Finset
+import Podc.SharedMemory.Progress
+import Podc.Algebra.BigOperators.Update
 
 /-!
 # Implementation 1 is lock-free (Theorem 2 of Ovens, PODC 2021, progress part)
@@ -29,56 +30,6 @@ open List
 
 variable {k : ℕ} {O : Fin k → BitObj} {P : Type} [DecidableEq P]
   {R : ∀ i, (O i).Readable} {Sc Up : Finset P} {h₀ : Sc → Bool}
-
-/-! ### Generic facts -/
-
-/-- A non-increasing sequence of naturals is eventually constant. -/
-lemma eventually_const (f : ℕ → ℕ) (N : ℕ) (hmono : ∀ m ≥ N, f (m + 1) ≤ f m) :
-    ∃ T ≥ N, ∀ m ≥ T, f (m + 1) = f m := by
-  have anti : ∀ a b, N ≤ a → a ≤ b → f b ≤ f a := by
-    intro a b ha hab
-    induction b, hab using Nat.le_induction with
-    | base => exact le_rfl
-    | succ b hb ih => exact (hmono b (ha.trans hb)).trans ih
-  by_contra hc
-  push Not at hc
-  have key : ∀ c, ∃ t ≥ N, f t + c ≤ f N := by
-    intro c
-    induction c with
-    | zero => exact ⟨N, le_rfl, le_rfl⟩
-    | succ c ih =>
-      obtain ⟨t, ht, hc'⟩ := ih
-      obtain ⟨m, hm, hne⟩ := hc t ht
-      have h1 := hmono m (ht.trans hm)
-      have h2 := anti t m ht hm
-      exact ⟨m + 1, by omega, by omega⟩
-  obtain ⟨t, -, ht⟩ := key (f N + 1)
-  omega
-
-lemma sum_le_of_update [Fintype P] {f g : P → ℕ} (q : P) (h : ∀ r, r ≠ q → g r = f r)
-    (hq : g q ≤ f q) : ∑ r, g r ≤ ∑ r, f r :=
-  Finset.sum_le_sum fun r _ => by
-    by_cases hr : r = q
-    · subst hr; exact hq
-    · exact (h r hr).le
-
-lemma sum_lt_of_update [Fintype P] {f g : P → ℕ} (q : P) (h : ∀ r, r ≠ q → g r = f r)
-    (hq : g q < f q) : ∑ r, g r < ∑ r, f r :=
-  Finset.sum_lt_sum (fun r _ => by
-    by_cases hr : r = q
-    · subst hr; exact hq.le
-    · exact (h r hr).le) ⟨q, Finset.mem_univ _, hq⟩
-
-/-- The configurations of an infinite execution are reachable. -/
-lemma run_range {A : ObjSpec} {ι : Type} {B : ι → ObjSpec} {L : Type} [DecidableEq ι]
-    {I : Impl A B P L} (e : I.InfExec) (t : ℕ) :
-    I.run ((List.range t).map e.lbl) = some (e.cfg t) := by
-  induction t with
-  | zero => simp [e.cfg_zero]
-  | succ t ih =>
-    rw [List.range_succ, List.map_append, List.map_singleton, Impl.run_append_of_eq _ ih,
-      Impl.runFrom_singleton]
-    exact e.step_eq t
 
 /-! ### Phase 1: updates and invocations stop -/
 
@@ -116,7 +67,7 @@ lemma psi_step [Fintype P] {α : List (Label P (scannable O))}
       | update i o =>
         simp only [impl1, psi, Finset.length_toList, Finset.card_univ, Fintype.card_coe]
         omega
-    have := sum_lt_of_update q (fun r hr => congrArg (psi Sc) (hoth r hr)) hlt
+    have := Fintype.sum_lt_sum_of_eq_off q (fun r hr => congrArg (psi Sc) (hoth r hr)) hlt
     exact ⟨this.le, fun he => by omega⟩
   | tau q =>
     cases hl : C.loc q with
@@ -131,7 +82,7 @@ lemma psi_step [Fintype P] {α : List (Label P (scannable O))}
         | cons j rest =>
           obtain ⟨-, -, hloc⟩ := step_upd_cons hl h
           rw [hloc, Function.update_self, hl]; simp [psi]
-      have := sum_lt_of_update q (fun r hr => congrArg (psi Sc) (hoth r hr)) hlt
+      have := Fintype.sum_lt_sum_of_eq_off q (fun r hr => congrArg (psi Sc) (hoth r hr)) hlt
       exact ⟨this.le, fun he => by omega⟩
     | scan1 m b =>
       have hle : psi Sc (C'.loc q) ≤ psi Sc (C.loc q) := by
@@ -140,7 +91,7 @@ lemma psi_step [Fintype P] {α : List (Label P (scannable O))}
           rw [hloc, Function.update_self, hl]; simp [psi]
         · obtain ⟨_, _, _, hloc⟩ := step_scan1_ge hm hl h
           rw [hloc, Function.update_self, hl]; simp [psi]
-      exact ⟨sum_le_of_update q (fun r hr => congrArg (psi Sc) (hoth r hr)) hle,
+      exact ⟨Fintype.sum_le_sum_of_eq_off q (fun r hr => congrArg (psi Sc) (hoth r hr)) hle,
         fun _ => ⟨q, rfl, by rw [hl]; trivial⟩⟩
     | scan2 c m b =>
       have hle : psi Sc (C'.loc q) ≤ psi Sc (C.loc q) := by
@@ -151,7 +102,7 @@ lemma psi_step [Fintype P] {α : List (Label P (scannable O))}
           rw [hloc, Function.update_self, hl]; split
           · simp [psi]
           · split <;> simp [psi]
-      exact ⟨sum_le_of_update q (fun r hr => congrArg (psi Sc) (hoth r hr)) hle,
+      exact ⟨Fintype.sum_le_sum_of_eq_off q (fun r hr => congrArg (psi Sc) (hoth r hr)) hle,
         fun _ => ⟨q, rfl, by rw [hl]; trivial⟩⟩
 
 /-! ### Phase 2: scans finish -/
@@ -288,7 +239,7 @@ lemma Mu_lt [Fintype P] (u : ℕ) {C C' : Config (scannable O) (Obj O Sc) P (Loc
     (hr : ∀ p, p ≠ q → rbit C' p = rbit C p)
     (hq : mu u (bval C') (rbit C' q) (C'.loc q) < mu u (bval C) (rbit C q) (C.loc q)) :
     Mu u C' < Mu u C :=
-  sum_lt_of_update q (fun r hr' => by rw [hloc r hr', hV, hr r hr']) hq
+  Fintype.sum_lt_sum_of_eq_off q (fun r hr' => by rw [hloc r hr', hV, hr r hr']) hq
 
 lemma Mu_step [Fintype P] {C C' : Config (scannable O) (Obj O Sc) P (Loc O Sc)} {q : P} (hl : IsScanLoc (C.loc q))
     (h : (impl1 R Sc Up h₀).step C (.tau q) = some C') :
@@ -345,76 +296,24 @@ theorem impl1_lockFree [Fintype P] (R : ∀ i, (O i).Readable) (Sc Up : Finset P
   intro e _ N
   by_contra hcon
   push Not at hcon
-  have hInv : ∀ t, ∃ L, Inv Sc Up ((List.range t).map e.lbl) (e.cfg t) L :=
-    fun t => inv_of_run (run_range e t)
+  have hInv : ∀ t, ∃ L, Inv Sc Up (e.lbls t) (e.cfg t) L :=
+    fun t => inv_of_run (e.run_lbls t)
   have hψ : ∀ m ≥ N, ∑ p, psi Sc ((e.cfg (m + 1)).loc p) ≤ ∑ p, psi Sc ((e.cfg m).loc p) ∧
       (∑ p, psi Sc ((e.cfg (m + 1)).loc p) = ∑ p, psi Sc ((e.cfg m).loc p) →
         ∃ q, e.lbl m = .tau q ∧ IsScanLoc ((e.cfg m).loc q)) := fun m hm => by
     obtain ⟨L, hL⟩ := hInv m
     exact psi_step hL (e.step_eq m) (hcon m hm)
-  obtain ⟨T, hTN, hT⟩ := eventually_const (fun t => ∑ p, psi Sc ((e.cfg t).loc p)) N
-    (fun m hm => (hψ m hm).1)
+  obtain ⟨T, hTN, hT⟩ := Nat.eventually_const_of_succ_le
+    (f := fun t => ∑ p, psi Sc ((e.cfg t).loc p)) fun m hm => (hψ m hm).1
   have hM : ∀ m ≥ T, Mu Up.card (e.cfg (m + 1)) < Mu Up.card (e.cfg m) := by
     intro m hm
-    obtain ⟨q, hlq, hsc⟩ := (hψ m (by omega)).2 (hT m hm)
+    obtain ⟨q, hlq, hsc⟩ := (hψ m (by omega)).2 ((hT (m + 1) (by omega)).trans (hT m hm).symm)
     have hs := e.step_eq m
     rw [hlq] at hs
     exact Mu_step hsc hs
-  have key : ∀ n, Mu Up.card (e.cfg (T + n)) + n ≤ Mu Up.card (e.cfg T) := by
-    intro n
-    induction n with
-    | zero => simp
-    | succ n ih =>
-      have := hM (T + n) (by omega)
-      rw [show T + (n + 1) = T + n + 1 by omega]
-      omega
-  have := key (Mu Up.card (e.cfg T) + 1)
-  omega
-
-end Cslib.SharedMemory.Scannable
-
-namespace Cslib.SharedMemory.Impl
-
-variable {A : ObjSpec} {ι : Type} {B : ι → ObjSpec} {P L : Type} [DecidableEq P] [DecidableEq ι]
-  {I : Impl A B P L}
-
--- CSLib candidate
-/-- Lock-freedom implies obstruction-freedom: a process running solo forever would yield an
-infinite execution with infinitely many steps and only finitely many responses. -/
-theorem LockFree.obstructionFree (hlf : I.LockFree) : I.ObstructionFree := by
-  intro C p ⟨α, hα⟩ hp
-  by_contra hcon
-  push Not at hcon
-  let E : ℕ → List (Label P A) := fun k => α ++ I.soloLabels p C k
-  have hE : ∀ k, I.run (E k) = some ((I.soloStep p)^[k] C) := fun k => by
-    simp only [E]; rw [run_append_of_eq I hα, runFrom_soloLabels]
-  have hElen : ∀ k, (E k).length = α.length + k := fun k => by
-    simp only [E, List.length_append, I.soloLabels_length p C k (fun i _ => hcon i)]
-  obtain ⟨e, hlbl, hcfg⟩ := I.exists_infExec_of_chain E
-    (fun k => (List.prefix_append_right_inj α).2 (I.soloLabels_prefix p C k))
-    (fun k => by rw [hElen]; omega) (fun k => ⟨_, hE k⟩)
-  have hpend : ∀ m ≥ α.length, (e.cfg m).pend p ≠ none := by
-    intro m hm
-    have h := hcfg (m - α.length) m (by rw [hElen]; omega)
-    rw [List.take_of_length_le (by rw [hElen]; omega), hE] at h
-    rw [← Option.some_inj.1 h]; exact hcon _
-  have htau : ∀ m ≥ α.length, e.lbl m = .tau p := by
-    intro m hm
-    apply I.eq_tau_of_step (e.step_eq _) _ (hpend _ hm) (hpend _ (by omega))
-    rw [hlbl (m + 1) m (by rw [hElen]; omega)]
-    simp only [E]
-    rw [List.getElem_append_right (by omega)]
-    exact I.soloLabels_proc p C _ _ (List.getElem_mem _)
-  obtain ⟨m, hm, q, r, hr⟩ := hlf e (fun N => ⟨N + α.length, by omega, by
-    rw [htau _ (by omega)]; trivial⟩) α.length
-  rw [htau m hm] at hr
-  cases hr
-
-end Cslib.SharedMemory.Impl
-
-namespace Cslib.SharedMemory.Scannable
-
-variable {k : ℕ} {O : Fin k → BitObj} {P : Type} [DecidableEq P]
+  obtain ⟨T', hT', hc⟩ := Nat.eventually_not_of_succ_le (f := fun m => Mu Up.card (e.cfg m))
+    (fun m hm => (hM m hm).le) (p := fun _ => True) fun m hm _ => hM m hm
+  exact hc T' le_rfl trivial
 
 open Impl1 in
 /-- Implementation 1 is obstruction-free (finitely many processes). -/

@@ -66,7 +66,7 @@ theorem lemma6_stage [Fintype ι] {ε X A F k'} (hS : Stage I p₀ ε X A F k') 
     have := Finset.card_le_card (show A ⊆ A1 from hc); have := hR.card; omega
   have hs0 : s ≠ p₀ := fun e => hs1 (e ▸ hR.p0)
   set E := ε ++ α with hEdef
-  have hE : I.run E = some X1 := run_append_eq hS.run hR.run
+  have hE : I.run E = some X1 := (I.run_append_of_eq hS.run _).trans hR.run
   have hsuE : SUExec p₀ E := suExec_append.2 ⟨hS.su, hR.lim.su⟩
   have hk1 := hS.k'le
   set top : Fin k := ⟨k' - 1, by omega⟩ with htopdef
@@ -160,9 +160,10 @@ theorem lemma6_stage [Fintype ι] {ε X A F k'} (hS : Stage I p₀ ε X A F k') 
     ⟨hmem, fun q hq => by rw [Set.mem_singleton_iff.1 hq, (hsY t1 ht1).1, (hsY t2 ht2).1],
       fun q hq => by rw [Set.mem_singleton_iff.1 hq, (hsY t1 ht1).2, (hsY t2 ht2).2]⟩
   -- `s` completes its pending scan, then scans again
-  have hY1 : I.run (E ++ lam t1) = some (Y t1) := run_append_eq hE (hl1 t1 ht1)
-  have hY2 : I.run (E ++ lam t2) = some (Y t2) := run_append_eq hE (hl1 t2 ht2)
-  obtain ⟨τ, W1, hw1, hw2, hw3, hw4⟩ := quiesce hof [s] hY1
+  have hY1 : I.run (E ++ lam t1) = some (Y t1) := (I.run_append_of_eq hE _).trans (hl1 t1 ht1)
+  have hY2 : I.run (E ++ lam t2) = some (Y t2) := (I.run_append_of_eq hE _).trans (hl1 t2 ht2)
+  obtain ⟨τ, W1, hw3, hw2, hw1, hw4, -⟩ :=
+    I.exists_finish (hof.obstructionFreeOn fun _ => True) (fun _ _ _ _ => trivial) [s] hY1 trivial
   obtain ⟨W2, hw5, hag2⟩ := Impl.runFrom_agreeOn hag (fun ℓ hℓ => by simpa using hw3 ℓ hℓ) hw1
   have hτ0 : opsOf τ p₀ = [] := hw2 p₀
   have hsu : ∀ t ∈ T, SUExec p₀ (E ++ lam t ++ τ) := fun t ht =>
@@ -174,10 +175,10 @@ theorem lemma6_stage [Fintype ι] {ε X A F k'} (hS : Stage I p₀ ε X A F k') 
       rw [← he]; exact (by simpa using hw3 ℓ hℓ : ℓ.proc = s).symm))).2]; exact hl4 t ht
   have hcur : ∀ t ∈ T, curVal p₀ (E ++ lam t ++ τ) = wvec k' t := fun t ht => by
     rw [← hl5 t ht, curVal_append, hτ0]; rfl
-  obtain ⟨Z1, -, -, -, -, hr1⟩ := solo_scan hof hall hlin (run_append_eq hY1 hw1) (hsu t1 ht1)
-    (hp0W t1 W1 ht1 hw1) hs0 (hw4 s (by simp))
-  obtain ⟨Z2, -, -, -, -, hr2⟩ := solo_scan hof hall hlin (run_append_eq hY2 hw5) (hsu t2 ht2)
-    (hp0W t2 W2 ht2 hw5) hs0 (by rw [← hag2.pend s rfl]; exact hw4 s (by simp))
+  obtain ⟨Z1, -, -, -, -, hr1⟩ := solo_scan hof hall hlin ((I.run_append_of_eq hY1 _).trans hw1)
+    (hsu t1 ht1) (hp0W t1 W1 ht1 hw1) hs0 (hw4 s (by simp))
+  obtain ⟨Z2, -, -, -, -, hr2⟩ := solo_scan hof hall hlin ((I.run_append_of_eq hY2 _).trans hw5)
+    (hsu t2 ht2) (hp0W t2 W2 ht2 hw5) hs0 (by rw [← hag2.pend s rfl]; exact hw4 s (by simp))
   rw [Impl.soloOp_eq_of_agree (hag2.agree rfl), hr2, hcur t1 ht1, hcur t2 ht2] at hr1
   simp only [List.cons.injEq, ScanResp.view.injEq, and_true] at hr1
   exact hne (wvec_inj hk1 (Finset.mem_range.1 (Finset.mem_of_mem_erase ht1))
@@ -194,7 +195,7 @@ theorem reduce_stage {ε X A F k'} (hS : Stage I p₀ ε X A F k') (hk : 2 ≤ k
   classical
   obtain ⟨α, Xh, Ah, Bh, hR⟩ := lemma5 hnm hof hall hlin hbit hS h hh1 hh2
   set E := ε ++ α with hEdef
-  have hE : I.run E = some Xh := run_append_eq hS.run hR.run
+  have hE : I.run E = some Xh := (I.run_append_of_eq hS.run _).trans hR.run
   have hk1 := hS.k'le
   set top' : Fin k := ⟨k' - 2, by omega⟩
   have htop' : top'.val + 1 = k' - 1 := by simp [top']; omega
@@ -204,7 +205,7 @@ theorem reduce_stage {ε X A F k'} (hS : Stage I p₀ ε X A F k') (hk : 2 ≤ k
     (hR.idle _ hR.p0) (fun _ => false) (fun c hc => hR.high c (by omega))
   refine ⟨E ++ κ, X', Ah, F ∪ Bh, ?_, hR.card, ?_⟩
   · exact
-    { run := run_append_eq hE hk1'
+    { run := (I.run_append_of_eq hE _).trans hk1'
       su := suExec_append.2 ⟨suExec_append.2 ⟨hS.su, hR.lim.su⟩, hk4'.su⟩
       p0A := hR.p0
       idle := fun p hp => by

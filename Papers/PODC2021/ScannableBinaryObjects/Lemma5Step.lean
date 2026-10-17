@@ -110,7 +110,7 @@ theorem lemma5_step {ε X A F k'} (hS : Stage I p₀ ε X A F k') {j : ℕ} (hj1
     ∃ α' Xj' Aj' Bj', L5Res I p₀ ε X A F k' (j + 1) α' Xj' Aj' Bj' := by
   classical
   set E := ε ++ α with hEdef
-  have hE : I.run E = some Xj := run_append_eq hS.run hR.run
+  have hE : I.run E = some Xj := (I.run_append_of_eq hS.run _).trans hR.run
   have hsuE : SUExec p₀ E := suExec_append.2 ⟨hS.su, hR.lim.su⟩
   -- a scanner `s` (paper: `p_{n-j-1}`)
   obtain ⟨s, hsA, hs0⟩ : ∃ s ∈ Aj, s ≠ p₀ := by
@@ -134,7 +134,7 @@ theorem lemma5_step {ε X A F k'} (hS : Stage I p₀ ε X A F k') {j : ℕ} (hj1
   -- `λ`: `p₀` changes the value to `V_{j+1} = vec k' j`
   obtain ⟨lam, Y, hl1, hl2, hl3, hl4, hl5, hl6⟩ := goTo_exec hnm hof hall htop hE
     (hR.idle _ hR.p0) (vec k' j) (fun c hc => by rw [hR.high c (by omega), vec_high hc])
-  have hY : I.run (E ++ lam) = some Y := run_append_eq hE hl1
+  have hY : I.run (E ++ lam) = some Y := (I.run_append_of_eq hE _).trans hl1
   have hsY := I.runFrom_other hl1 (q := s) (fun ℓ hℓ he => hs0 (by rw [← he]; exact hl3 ℓ hℓ))
   have hlamLim : Lim p₀ Aj k' lam := hl4.mono (by simp [hR.p0]) le_rfl
   have hlamV : Absent p₀ V E lam := by
@@ -205,7 +205,7 @@ theorem lemma5_step {ε X A F k'} (hS : Stage I p₀ ε X A F k') {j : ℕ} (hj1
     have hresps : respsOf γ s = [.view (vec k' j)] := by
       rw [← respsOf_filter_proc, hfilt, hd5]
     have hcnt := resps_eq_ops_of_idle hE (hR.idle s hsA)
-    have hv : I.Valid (E ++ γ) := ⟨G, run_append_eq hE hγ⟩
+    have hv : I.Valid (E ++ γ) := ⟨G, (I.run_append_of_eq hE _).trans hγ⟩
     have hsu : SUExec p₀ (E ++ γ) := suExec_append.2 ⟨hsuE, hγL.su⟩
     have hrespOf : respOf (E ++ γ) (s, (opsOf E s).length) = some (.view (vec k' j)) := by
       simp [respOf, respsOf_append, hresps, ← hcnt]
@@ -217,11 +217,13 @@ theorem lemma5_step {ε X A F k'} (hS : Stage I p₀ ε X A F k') {j : ℕ} (hj1
   · -- (1) fails: `σ_{j+1}` and the base object `b`
     push Not at H1
     obtain ⟨σ, G, hσL, hσA, hσ, b, hbF, hbB, hb⟩ := H1
-    have hEσ : I.run (E ++ σ) = some G := run_append_eq hE hσ
+    have hEσ : I.run (E ++ σ) = some G := (I.run_append_of_eq hE _).trans hσ
     -- `τ`: the processes of `A'` complete their operations
-    obtain ⟨τ, G2, ht1, ht2, ht3, ht4⟩ := quiesce hof A'.toList hEσ
+    obtain ⟨τ, G2, ht3, ht2, ht1, ht4, -⟩ :=
+      I.exists_finish (hof.obstructionFreeOn fun _ => True) (fun _ _ _ _ => trivial) A'.toList hEσ
+        trivial
     have hτL : Lim p₀ A' k' τ := lim_of_noInv ht2 (fun ℓ hℓ => by simpa using ht3 ℓ hℓ)
-    have hEστ : I.run (E ++ σ ++ τ) = some G2 := run_append_eq hEσ ht1
+    have hEστ : I.run (E ++ σ ++ τ) = some G2 := (I.run_append_of_eq hEσ _).trans ht1
     have hστA : Absent p₀ V' E (σ ++ τ) := (absent_append_noP0 (ht2 p₀)).2 hσA
     -- `μ`: reset the top live component
     obtain ⟨μ, G3, hm1, hm2, hm3, hm4, hm5, hm6, hm7⟩ := reset_top hnm hof hall hEστ

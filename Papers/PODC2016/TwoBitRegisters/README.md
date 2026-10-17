@@ -91,4 +91,5 @@ finds no violation for the paper's algorithm and reproduces the counterexample a
 lines 1–2. The message-passing model and the SWMR reads-from linearizability criterion are in CSLib
 (`Cslib/Computability/Distributed/MessagePassing/{Async,FairExec}.lean`,
 `Cslib/Computability/Distributed/SharedMemory/SWMRRegister.lean`); quorum intersection is
-`Cslib.Quorum.inter_nonempty_of_two_mul_lt` (`Podc/Foundations/Quorum.lean`).
+`Cslib.Quorum.inter_nonempty_of_two_mul_lt` (`Podc/Foundations/Quorum.lean`); the current operation
+instance of a process is `curOp` (`Podc/SharedMemory/History.lean`).

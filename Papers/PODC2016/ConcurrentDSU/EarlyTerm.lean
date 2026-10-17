@@ -382,8 +382,8 @@ theorem elinv_of_run (hkey : Function.Injective key) {C : Config (dsu E) (Ptr E)
 structure EQOK (α : List (Label P (dsu E))) (C : Config (dsu E) (Ptr E) P (ELoc E))
     (L : List (OpId P × (dsu E).Op)) (q : P) : Prop where
   done : ∀ o r, C.pend q = some o → C.loc q = .done r →
-    ∃ L₁ L₂, L = L₁ ++ (cur α q, o) :: L₂ ∧ ((dsu E).δ (st L₁) o).2 = r
-  notin : C.pend q ≠ none → (∀ r, C.loc q ≠ .done r) → cur α q ∉ L.map Prod.fst
+    ∃ L₁ L₂, L = L₁ ++ (curOp α q, o) :: L₂ ∧ ((dsu E).δ (st L₁) o).2 = r
+  notin : C.pend q ≠ none → (∀ r, C.loc q ≠ .done r) → curOp α q ∉ L.map Prod.fst
 
 /-- The linearization invariant. -/
 structure ELinInv (α : List (Label P (dsu E))) (C : Config (dsu E) (Ptr E) P (ELoc E))
@@ -392,26 +392,12 @@ structure ELinInv (α : List (Label P (dsu E))) (C : Config (dsu E) (Ptr E) P (E
   state : st L = same C.mem
   qok : ∀ q, EQOK α C L q
 
-lemma cur_facts_gen {L' : Type} {I : Impl (dsu E) (Ptr E) P L'} {α : List (Label P (dsu E))}
-    {C : Config (dsu E) (Ptr E) P L'} (h : I.run α = some C) {p : P} {o : DSUOp E}
-    (hp : C.pend p = some o) :
-    Invoked α (cur α p) ∧ ¬ Completed α (cur α p) ∧ opOf α (cur α p) = some o := by
-  have hc := Impl.run_counts _ h p
-  have hlast := Impl.run_pend _ h hp
-  rcases hc with ⟨h1, -⟩ | ⟨-, h2⟩
-  · simp [hp] at h1
-  refine ⟨by simp [Invoked, h2], by simp [Completed], ?_⟩
-  simp only [opOf]
-  rw [List.getLast?_eq_getElem?, h2] at hlast
-  convert hlast using 2
-  simp
-
 /-- Transport of the per-process invariant of a process `q ≠ p` when `L` is unchanged or
 extended by an operation of `p`. -/
 lemma EQOK.transport {α α' : List (Label P (dsu E))} {C C' : Config (dsu E) (Ptr E) P (ELoc E)}
     {L : List (OpId P × (dsu E).Op)} {q : P} (hq : EQOK α C L q) (ext : List (OpId P × (dsu E).Op))
     (hext : ∀ y ∈ ext.map Prod.fst, y.1 ≠ q)
-    (hcur : cur α' q = cur α q) (hpend : C'.pend q = C.pend q) (hloc : C'.loc q = C.loc q) :
+    (hcur : curOp α' q = curOp α q) (hpend : C'.pend q = C.pend q) (hloc : C'.loc q = C.loc q) :
     EQOK α' C' (L ++ ext) q where
   done o r hp hl := by
     rw [hpend] at hp; rw [hloc] at hl
@@ -423,8 +409,7 @@ lemma EQOK.transport {α α' : List (Label P (dsu E))} {C C' : Config (dsu E) (P
     exact ⟨hq.notin hp hl, fun h => hext _ h rfl⟩
 
 lemma elinInv_nil : ELinInv ([] : List (Label P (dsu E))) (etImpl key k P).initCfg [] := by
-  refine ⟨⟨by simp, by simp, fun a ha => by simp [Completed] at ha, fun a b _ hb => by simp at hb,
-    trivial⟩, ?_, fun q => ⟨?_, ?_⟩⟩
+  refine ⟨isLinearization_nil, ?_, fun q => ⟨?_, ?_⟩⟩
   · funext a b
     show (a = b) = ((fun a : E => a)^[Fintype.card E] a = (fun a : E => a)^[Fintype.card E] b)
     rw [Function.iterate_fixed rfl, Function.iterate_fixed rfl]
@@ -462,10 +447,10 @@ theorem exists_elinInv (hkey : Function.Injective key) {α : List (Label P (dsu 
       cases ℓ with
       | inv p o =>
         obtain ⟨h0, -, hpend, hloc, hmem⟩ := Impl.step_inv h
-        have hcur : ∀ q, cur (α ++ [.inv p o]) q = cur α q := by
-          intro q; simp [cur, respsOf_append]
+        have hcur : ∀ q, curOp (α ++ [.inv p o]) q = curOp α q := by
+          intro q; simp [curOp, respsOf_append]
         have hlin := hL.lin.append_inv p o
-        have hnotin : cur α p ∉ L.map Prod.fst := by
+        have hnotin : curOp α p ∉ L.map Prod.fst := by
           intro hm
           have hi := hL.lin.mem_invoked hm
           rcases Impl.run_counts _ hα p with ⟨-, h2⟩ | ⟨h1, -⟩
@@ -473,7 +458,7 @@ theorem exists_elinInv (hkey : Function.Injective key) {α : List (Label P (dsu 
           · exact h1 h0
         have hlp : C.loc p = einvoke key o := by rw [hloc, Function.update_self]; rfl
         have hpp : C.pend p = some o := by rw [hpend, Function.update_self]
-        have hcf := cur_facts_gen (I := etImpl key k P) (α := α ++ [.inv p o])
+        have hcf := Impl.run_pend_curOp (I := etImpl key k P) (α := α ++ [.inv p o])
           (by rw [Impl.run, Impl.runFrom_append, hα]
               simp only [Option.bind_some, Impl.runFrom_singleton]; exact h) hpp
         have hTr : Track C₀.mem o.x o.y o.x o.y := Or.inl ⟨rfl, rfl⟩
@@ -482,7 +467,7 @@ theorem exists_elinInv (hkey : Function.Injective key) {α : List (Label P (dsu 
         rcases hen with ⟨hxy, he⟩ | ⟨-, he⟩
         · -- `x = y`: linearize at the invocation
           have hsame : same C₀.mem o.x o.y := by rw [hxy]; exact same_refl _ _
-          refine ⟨L ++ [(cur α p, o)], ?_, ?_, fun q => ?_⟩
+          refine ⟨L ++ [(curOp α p, o)], ?_, ?_, fun q => ?_⟩
           · rw [← hcur p]; exact hlin.push hcf.2.2 (by rw [hcur]; exact hnotin) hcf.2.1
           · rw [st_append, hmem]; exact state_of_same hL.state hsame
           · by_cases hq : q = p
@@ -518,8 +503,8 @@ theorem exists_elinInv (hkey : Function.Injective key) {α : List (Label P (dsu 
           have hpq : C.pend q = none := by rw [hpend, Function.update_self]
           refine ⟨fun o' r' hp _ => ?_, fun hp _ => absurd hpq hp⟩
           rw [hpq] at hp; cases hp
-        · have hcur : cur (α ++ [.ret p r]) q = cur α q := by
-            simp [cur, respsOf_append, Ne.symm hq]
+        · have hcur : curOp (α ++ [.ret p r]) q = curOp α q := by
+            simp [curOp, respsOf_append, Ne.symm hq]
           exact (hL.qok q).transport [] (by simp) hcur
             (by rw [hpend, Function.update_of_ne hq]) (by rw [hloc, Function.update_of_ne hq])
       | tau p =>
@@ -528,13 +513,13 @@ theorem exists_elinInv (hkey : Function.Injective key) {α : List (Label P (dsu 
         have hl := hI.loc p
         rw [ho] at hl
         obtain ⟨hleg, -, hcase⟩ := etRes_spec hkey hI.good hl hres
-        have hcur : ∀ q, cur (α ++ [.tau p]) q = cur α q := by
-          intro q; simp [cur, respsOf_append]
+        have hcur : ∀ q, curOp (α ++ [.tau p]) q = curOp α q := by
+          intro q; simp [curOp, respsOf_append]
         have hlin' := hL.lin.append_tau p
-        have hcf := cur_facts_gen hα ho
-        have hnc : ¬ Completed (α ++ [.tau p]) (cur α p) := by
+        have hcf := Impl.run_pend_curOp hα ho
+        have hnc : ¬ Completed (α ++ [.tau p]) (curOp α p) := by
           simp [Completed, respsOf_append]
-        have hop' : opOf (α ++ [.tau p]) (cur α p) = some o := by
+        have hop' : opOf (α ++ [.tau p]) (curOp α p) = some o := by
           rw [opOf_append_of_invoked hcf.1]; exact hcf.2.2
         have hldone : ∀ r, C₀.loc p ≠ .done r := fun r h' => by
           rw [h'] at hres; simp [etRes, eact] at hres
@@ -548,7 +533,7 @@ theorem exists_elinInv (hkey : Function.Injective key) {α : List (Label P (dsu 
         have linpt : ∀ r, C.loc p = .done r → ((dsu E).δ (st L) o).2 = r →
             ((dsu E).δ (st L) o).1 = same C.mem → ∃ L', ELinInv (α ++ [.tau p]) C L' := by
           intro r hl' hr hs
-          refine ⟨L ++ [(cur α p, o)], hlin'.push hop' hnotin hnc, by rw [st_append]; exact hs,
+          refine ⟨L ++ [(curOp α p, o)], hlin'.push hop' hnotin hnc, by rw [st_append]; exact hs,
             fun q => ?_⟩
           by_cases hq : q = p
           · subst hq
@@ -580,16 +565,10 @@ theorem exists_elinInv (hkey : Function.Injective key) {α : List (Label P (dsu 
           exact propext (hjoin a b).symm
 
 /-- **Algorithms 6 and 7 (early termination, `k + 1`-try splitting) are linearizable.** -/
-theorem et_linearizable (hkey : Function.Injective key) : (etImpl key k P).Linearizable := by
-  have : ∀ α : List (Label P (dsu E)), ∃ L, (etImpl key k P).Valid α → IsLinearization α L := by
-    intro α
-    by_cases hv : (etImpl key k P).Valid α
-    · obtain ⟨C, hC⟩ := hv
-      obtain ⟨L, hL⟩ := exists_elinInv hkey hC
-      exact ⟨L, fun _ => hL.lin⟩
-    · exact ⟨[], fun h => absurd h hv⟩
-  choose h hh using this
-  exact ⟨h, hh⟩
+theorem et_linearizable (hkey : Function.Injective key) : (etImpl key k P).Linearizable :=
+  Impl.linearizable_of_run fun _ _ hC =>
+    let ⟨L, hL⟩ := exists_elinInv hkey hC
+    ⟨L, hL.lin⟩
 
 /-! ### Wait-freedom -/
 

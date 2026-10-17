@@ -488,7 +488,6 @@ import Papers.PODC2020.AsyncApproxBCDirected.Main
 import Papers.PODC2020.AsyncApproxBCDirected.Literal
 import Papers.PODC2020.AsyncApproxBCDirected.NonVacuity
 import Papers.PODC2023.BoundedTimestamping.Defs
-import Papers.PODC2023.BoundedTimestamping.Sequential
 import Papers.PODC2023.BoundedTimestamping.Alg
 import Papers.PODC2023.BoundedTimestamping.Machine
 import Papers.PODC2023.BoundedTimestamping.Counterexample

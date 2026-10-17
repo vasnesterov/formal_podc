@@ -17,19 +17,9 @@ open List
 variable {k : ℕ} {O : Fin k → BitObj} {P : Type} [DecidableEq P] {Sc Up : Finset P}
   {α : List (Label P (scannable O))} {ℓ : Label P (scannable O)} {p : P}
 
-lemma cur_append (h : ℓ.proc ≠ p) : cur (α ++ [ℓ]) p = cur α p := by
-  simp [cur, respsOf_append, Label.retOf_eq_none_of_proc_ne h]
-
-lemma invoked_of_opOf {x : OpId P} {o : ScanOp O} (h : opOf α x = some o) : Invoked α x := by
-  simp only [opOf] at h; exact (List.getElem?_eq_some_iff.1 h).1
-
-lemma opOf_append_some {x : OpId P} {o : ScanOp O} (h : opOf α x = some o) :
-    opOf (α ++ [ℓ]) x = some o := by
-  rw [opOf_append_of_invoked (invoked_of_opOf h)]; exact h
-
 lemma not_precedes_append {x y : OpId P} {o : ScanOp O} (hx : opOf α x = some o)
     (h : ¬ Precedes α y x) : ¬ Precedes (α ++ [ℓ]) y x :=
-  fun h' => h (h'.of_append_of_invoked (invoked_of_opOf hx))
+  fun h' => h (h'.of_append_of_invoked (Invoked.of_opOf_eq_some hx))
 
 variable {L L₁ L₂ : List (OpId P × ScanOp O)} {x : OpId P} {o : ScanOp O}
 
@@ -98,33 +88,33 @@ lemma pinv_frame {C C' : Config (scannable O) (Obj O Sc) P (Loc O Sc)}
     {L L' : List (OpId P × ScanOp O)} (hpq : ℓ.proc ≠ p)
     (hloc : C'.loc p = C.loc p) (hpend : C'.pend p = C.pend p)
     (hmemL : ∀ x ∈ L'.map Prod.fst, x ∈ L.map Prod.fst ∨ x.1 = ℓ.proc)
-    (hdone : ∀ L₁ L₂ o, L = L₁ ++ (cur α p, o) :: L₂ →
-      ∃ L₁' L₂', L' = L₁' ++ (cur α p, o) :: L₂' ∧ linSt L₁' = linSt L₁)
+    (hdone : ∀ L₁ L₂ o, L = L₁ ++ (curOp α p, o) :: L₂ →
+      ∃ L₁' L₂', L' = L₁' ++ (curOp α p, o) :: L₂' ∧ linSt L₁' = linSt L₁)
     (hscan : ∀ c m b, ∀ hp : p ∈ Sc, C'.mem (.inr ⟨p, hp⟩) = false →
-      C.mem (.inr ⟨p, hp⟩) = false ∧ (opOf α (cur α p) = some .scan →
+      C.mem (.inr ⟨p, hp⟩) = false ∧ (opOf α (curOp α p) = some .scan →
         ScanInv Up α C L p c m b → ScanInv Up (α ++ [ℓ]) C' L' p c m b))
     (h : PInvL Sc Up α C L p (C.loc p)) : PInvL Sc Up (α ++ [ℓ]) C' L' p (C'.loc p) := by
-  have hcur := cur_append (α := α) hpq
-  have hnot : cur α p ∉ L.map Prod.fst → cur α p ∉ L'.map Prod.fst := by
+  have hcur := curOp_append_of_proc_ne α hpq
+  have hnot : curOp α p ∉ L.map Prod.fst → curOp α p ∉ L'.map Prod.fst := by
     intro h1 h2
     rcases hmemL _ h2 with h3 | h3
     · exact h1 h3
-    · exact hpq (by rw [← h3]; rfl)
+    · exact hpq (by rw [← h3])
   rw [hloc]
   cases hl : C.loc p with
   | idle => simp only [PInvL, hl] at h ⊢; rw [hpend]; exact h
   | upd i o' rest =>
     simp only [PInvL, hl] at h ⊢
     obtain ⟨h1, h2, h3, h4⟩ := h
-    exact ⟨hpend ▸ h1, h2, hcur ▸ hnot h3, hcur ▸ opOf_append_some h4⟩
+    exact ⟨hpend ▸ h1, h2, hcur ▸ hnot h3, hcur ▸ opOf_append_of_eq_some h4 _⟩
   | scan1 m b =>
     simp only [PInvL, hl] at h ⊢
     obtain ⟨h1, h2, h3, h4⟩ := h
-    exact ⟨hpend ▸ h1, h2, hcur ▸ hnot h3, hcur ▸ opOf_append_some h4⟩
+    exact ⟨hpend ▸ h1, h2, hcur ▸ hnot h3, hcur ▸ opOf_append_of_eq_some h4 _⟩
   | scan2 c m b =>
     simp only [PInvL, hl] at h ⊢
     obtain ⟨⟨h1, h2, h3, h4⟩, h5⟩ := h
-    refine ⟨⟨hpend ▸ h1, h2, hcur ▸ hnot h3, hcur ▸ opOf_append_some h4⟩, fun hp hR => ?_⟩
+    refine ⟨⟨hpend ▸ h1, h2, hcur ▸ hnot h3, hcur ▸ opOf_append_of_eq_some h4 _⟩, fun hp hR => ?_⟩
     obtain ⟨hR', himp⟩ := hscan c m b hp hR
     exact himp h4 (h5 hp hR')
   | done r =>
@@ -139,7 +129,7 @@ section ScanFrame
 
 variable {C C' : Config (scannable O) (Obj O Sc) P (Loc O Sc)} {c m : ℕ} {b : Fin k → Bool}
 
-lemma scanInv_same (hx : opOf α (cur α p) = some o) (hcur : cur (α ++ [ℓ]) p = cur α p)
+lemma scanInv_same (hx : opOf α (curOp α p) = some o) (hcur : curOp (α ++ [ℓ]) p = curOp α p)
     (hD : numDanger Up C' p ≤ numDanger Up C p) (h : ScanInv Up α C L p c m b) :
     ScanInv Up (α ++ [ℓ]) C' L p c m b := by
   obtain ⟨S₁, S₂, d, hcut, hclean, hN, hW⟩ := h
@@ -148,7 +138,7 @@ lemma scanInv_same (hx : opOf α (cur α p) = some o) (hcur : cur (α ++ [ℓ]) 
   · exact Or.inl ⟨W₁, W₂, hcur ▸ hc.append hx, hb⟩
   · exact Or.inr hW
 
-lemma scanInv_push (hx : opOf α (cur α p) = some o) (hcur : cur (α ++ [ℓ]) p = cur α p)
+lemma scanInv_push (hx : opOf α (curOp α p) = some o) (hcur : curOp (α ++ [ℓ]) p = curOp α p)
     {y : OpId P × ScanOp O} (hys : y.2.isScan = false) (hy : ¬ Completed (α ++ [ℓ]) y.1)
     (hD : numDanger Up C' p + 1 ≤ numDanger Up C p) (h : ScanInv Up α C L p c m b) :
     ScanInv Up (α ++ [ℓ]) C' (L ++ [y]) p c m b := by
@@ -159,7 +149,7 @@ lemma scanInv_push (hx : opOf α (cur α p) = some o) (hcur : cur (α ++ [ℓ]) 
     · exact Or.inl ⟨W₁, W₂ ++ [y], hcur ▸ hc.push hx hy, hb⟩
     · exact Or.inr ⟨by omega, fun _ => by omega⟩
 
-lemma scanInv_insert (hx : opOf α (cur α p) = some o) (hcur : cur (α ++ [ℓ]) p = cur α p)
+lemma scanInv_insert (hx : opOf α (curOp α p) = some o) (hcur : curOp (α ++ [ℓ]) p = curOp α p)
     {z : OpId P} (hz : ¬ Completed (α ++ [ℓ]) z)
     {W₁ W₂ : List (OpId P × ScanOp O)} (hWL : L = W₁ ++ W₂)
     (hD : numDanger Up C' p ≤ numDanger Up C p) (h : ScanInv Up α C L p c m b) :
@@ -188,7 +178,7 @@ lemma pinv_frame_same {C C' : Config (scannable O) (Obj O Sc) P (Loc O Sc)}
   refine pinv_frame hpq hloc hpend (fun x hx => Or.inl hx)
     (fun L₁ L₂ o hs => ⟨L₁, L₂, hs, rfl⟩)
     (fun c m b hp hR' => ⟨(hR hp hR').1, fun hx hs =>
-      scanInv_same hx (cur_append hpq) (hR hp hR').2 hs⟩) h
+      scanInv_same hx (curOp_append_of_proc_ne _ hpq) (hR hp hR').2 hs⟩) h
 
 /-- Frame lemma when an update `y` of the stepping process is linearized (appended). -/
 lemma pinv_frame_push {C C' : Config (scannable O) (Obj O Sc) P (Loc O Sc)}
@@ -202,7 +192,7 @@ lemma pinv_frame_push {C C' : Config (scannable O) (Obj O Sc) P (Loc O Sc)}
   refine pinv_frame hpq hloc hpend (fun x hx => ?_)
     (fun L₁ L₂ o hs => ⟨L₁, L₂ ++ [y], by rw [hs]; simp, rfl⟩)
     (fun c m b hp hR' => ⟨(hR hp) ▸ hR', fun hx hs =>
-      scanInv_push hx (cur_append hpq) hys hyc hD hs⟩) h
+      scanInv_push hx (curOp_append_of_proc_ne _ hpq) hys hyc hD hs⟩) h
   simp only [map_append, map_cons, map_nil, mem_append, mem_singleton] at hx
   rcases hx with hx | rfl
   · exact Or.inl hx
@@ -220,7 +210,7 @@ lemma pinv_frame_insert {C C' : Config (scannable O) (Obj O Sc) P (Loc O Sc)}
     PInvL Sc Up (α ++ [ℓ]) C' (W₁ ++ (z, .scan) :: W₂) p (C'.loc p) := by
   refine pinv_frame hpq hloc hpend (fun x hx => ?_) (fun L₁ L₂ o hs => ?_)
     (fun c m b hp hR' => ⟨(hR hp) ▸ hR', fun hx hs =>
-      scanInv_insert hx (cur_append hpq) hzc hWL hD hs⟩) h
+      scanInv_insert hx (curOp_append_of_proc_ne _ hpq) hzc hWL hD hs⟩) h
   · simp only [map_append, map_cons, mem_append, mem_cons] at hx
     rcases hx with hx | rfl | hx
     · exact Or.inl (by rw [hWL]; simp [hx])
