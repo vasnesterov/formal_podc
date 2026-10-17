@@ -111,6 +111,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2026 | 1 | Breitkopf, Dallot, El-Hayek, Schmid — *Ranking Opinions with Few States in Population Protocols* | [RankingOpinions](Papers/PODC2026/RankingOpinions) | ❌ Theorem 1.1 proved; **Theorem 4.1 false**; **the ranking protocol of Theorem 1.2 is incorrect** as written (fixed versions proved) |
 | 2026 | 1 | Lenzen, Loss, Shi, Wagner — *Byzantine Consensus in the Partially Authenticated Setting* | [PartialAuthBC](Papers/PODC2026/PartialAuthBC) | ⚠️ Gradecast, broadcast (Thms 3.13, 3.14), lower bound (Thm 4.1, Cor 4.2) and Thm 5.1 proved (cited BA protocols as black boxes); Thm 4.1 omits the unregistered-sender hypothesis stated in the surrounding text; Figure 1 ambiguous (else-if reading breaks Thm 3.13); proof gaps |
 | 2026 | 1 | Chalopin, Chang, Di Luna, Zhou — *Efficient Counting and Simulation in Content-Oblivious Rings* | [ContentObliviousCounting](Papers/PODC2026/ContentObliviousCounting) | ❌ Counting (≤ 12n⌊√n⌋+14n pulses), simulation (Thms 1, 5, 14, 22) and the n log n lower bound proved; **Lemma 16 / Theorem 17 false for a relay leader** (explicitly covered by the paper; 3-node composition outputs wrong bits); §5 distance formula off by one; fixes for Thm 1 preprocessing and Algorithm 10 |
+| 2026 | 1 | Lewis-Pye — *Reaching Univalency with Subquadratic Communication* | [ReachingUnivalency](Papers/PODC2026/ReachingUnivalency) | ❌ **Lemma 6 false** and the Fig. 3 protocol does not solve ε-BA (n=38, ε=1/5, f=5, k=37: correct processors disagree although all samples are accurate and committees act as ideal BA); Theorem 1 proved for a corrected protocol (sampler existence, recursion, message recurrence); Theorem 7 and Appendix B proved; Prop. 4 proof gap |
 | 2024 | 1 | Fuchs, Kuhn — *Simpler and More General Distributed Coloring Based on Simple List Defective Coloring Algorithms* | [ListDefectiveColoring](Papers/PODC2024/ListDefectiveColoring) | ⚠️ Theorems 1.1, 1.4 proved; Lemma 4.5 construction gap and Lemma A.1 proof error repaired |
 | 2022 | 1 | Ovens — *The Space Complexity of Consensus from Swap* | [ConsensusFromSwap](Papers/PODC2022/ConsensusFromSwap) | ⚠️ All results proved for deterministic obstruction-free algorithms (Theorem 10 weaker than the paper's nondeterministic version); Lemma 16 and Theorem 10 proof gaps; valency definition ambiguous |
 | 2026 | 0 | Attiya, Flam, Welch — *Why Canonical-Round Algorithms Fail for Optimal Byzantine Resilience* | [CanonicalRoundByzantine](Papers/PODC2026/CanonicalRoundByzantine) | ⚠️ Lower bounds proved (for 2f ≤ n ≤ 5f); Corollary 10's proof covers only part of the range (statement true); Theorem 14 implicitly uses the i = j case of gather agreement |
@@ -245,6 +246,13 @@ in the paper's `differencies.md`.
   process holding the wrong bits (`relay_leader_composition_wrong`). The §5 distance formula is off by one (for
   n = 2 the non-leader computes distance 0). The counting and simulation headline results (Theorems 1, 4/13, 5, 14,
   22) and the n log n lower bound hold.
+- **Reaching Univalency with Subquadratic Communication** (PODC 2026, 1 citations) —
+  [ReachingUnivalency](Papers/PODC2026/ReachingUnivalency). Lemma 6 is false inside its stated range, and so is the
+  claim that the committee-based protocol (Figure 3) solves ε-BA with admissible samplers: with n = 38, ε = 1/5,
+  f = 5, k = 37, every sample is accurate and the committees act as ideal Byzantine agreement, yet 14 correct
+  processors output 1 and 19 output 0. The step-1 threshold k(2/3 − ε/2) leaves no margin for sample deviation,
+  and "bad" processors do not bound the Byzantine members of a sample. With threshold k(2/3 − ε/4) and samplers that
+  are also accurate on sets containing Byzantine processors, Theorem 1 is proved.
 - **Stranger-Free Tasks** (PODC 2025, 0 citations) — [StrangerFreeTasks](Papers/PODC2025/StrangerFreeTasks). Algorithm 1 is
   not wait-free for any k ≥ 2: two processes can invalidate each other's double collects forever
   (`alg1_not_waitFree`). So the claimed wait-free upper bound with k+1 registers, and the wait-free hierarchy,
