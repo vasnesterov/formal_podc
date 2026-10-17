@@ -123,7 +123,7 @@ lemma doomed_step {α : List (Label P (laObj P))} {C C' : Cfg P 1} {ℓ : Label 
       · exact Or.inl (by rwa [hl])
       · rw [hph] at h2; cases h2
       · refine Or.inr (Or.inl ⟨by rw [hl]; rfl, (C.loc q).i + 1, by rw [hl]; exact Fin.zero_le _, ?_⟩)
-        rw [hm, Function.update_of_ne (fin2_add_one_ne _)]; exact h3
+        rw [hm, Function.update_of_ne (Fin.add_one_ne_self (by decide) _)]; exact h3
     · -- first collect, first read
       have hpot : pot q C' < pot q C := by simp [pot, dist, hl, hph, hj]
       refine ⟨⟨hnd, ?_⟩, hpot.le, fun _ => hpot⟩

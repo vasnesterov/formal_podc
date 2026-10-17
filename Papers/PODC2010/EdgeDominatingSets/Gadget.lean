@@ -78,16 +78,6 @@ theorem gp_gp (v : Node m) (t : ℕ) : gp s (gp s v t).1 (gp s v t).2 = (v, t) :
   · have h2 : y - s - ((fl t : ℕ) : ZMod m) + s + ((fl t : ℕ) : ZMod m) = y := by ring
     simp [gp, h2, hy, fl_fl]
 
-theorem natCast_inj_of_lt {a b : ℕ} (ha : a < m) (hb : b < m) (h : (a : ZMod m) = b) :
-    a = b := by
-  have := congrArg ZMod.val h; rwa [ZMod.val_cast_of_lt ha, ZMod.val_cast_of_lt hb] at this
-
-theorem one_ne_zero_of_two_le (h : 2 ≤ m) : (1 : ZMod m) ≠ 0 := by
-  intro h1
-  have := (ZMod.natCast_eq_zero_iff 1 m).1 (by simpa using h1)
-  have := Nat.le_of_dvd one_pos this
-  omega
-
 theorem card_node [NeZero m] : Fintype.card (Node m) = m + (m - 1) := by
   simp [Fintype.card_subtype_compl, ZMod.card]
 
@@ -95,7 +85,7 @@ variable {k : ℕ}
 
 /-- The gadget has no loops. -/
 theorem gp_ne (hm : 2 * k ≤ m) {t : ℕ} (ht : t < 2 * k) (v : Node m) : (gp s v t).1 ≠ v := by
-  have h1 := one_ne_zero_of_two_le (m := m) (by omega)
+  have h1 : (1 : ZMod m) ≠ 0 := ZMod.one_eq_zero_iff.not.2 (by omega)
   rcases v with x | y
   · simp only [gp]
     split_ifs with hz h
@@ -113,13 +103,15 @@ theorem gp_inj (hm : 2 * k ≤ m) {t t' : ℕ} (ht : t < 2 * k) (ht' : t' < 2 * 
     (h : (gp s v t).1 = (gp s v t').1) : t = t' := by
   rcases v with x | y
   · by_cases hz : x + s + t = 0 <;> by_cases hz' : x + s + t' = 0
-    · exact natCast_inj_of_lt (m := m) (by omega) (by omega) (by linear_combination hz - hz')
+    · exact CharP.natCast_injOn_Iio (ZMod m) m (Set.mem_Iio.2 (by omega))
+        (Set.mem_Iio.2 (by omega)) (by linear_combination hz - hz')
     · simp only [gp, hz, hz', dite_true, dite_false] at h; simp at h
     · simp only [gp, hz, hz', dite_true, dite_false] at h; simp at h
     · simp only [gp, hz, hz', dite_false, Sum.inr.injEq, Subtype.mk.injEq] at h
-      exact natCast_inj_of_lt (m := m) (by omega) (by omega) (by linear_combination h)
+      exact CharP.natCast_injOn_Iio (ZMod m) m (Set.mem_Iio.2 (by omega))
+        (Set.mem_Iio.2 (by omega)) (by linear_combination h)
   · simp only [gp, Sum.inl.injEq] at h
-    exact fl_inj (natCast_inj_of_lt (fl_lt (by omega : t < 2 * k) |>.trans_le hm)
+    exact fl_inj (CharP.natCast_injOn_Iio (ZMod m) m (fl_lt (by omega : t < 2 * k) |>.trans_le hm)
       (fl_lt (by omega : t' < 2 * k) |>.trans_le hm) (by linear_combination -h))
 
 /-- The edges `a_x a_{x-1}` with `x + s + t = 0`, `t` even (the matching `S` of the paper). -/

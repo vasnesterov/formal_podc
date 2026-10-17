@@ -39,10 +39,6 @@ lemma zmod_val_neg_two (hn : 3 ≤ n) : (-2 : ZMod n).val = n - 2 := by
   rw [ZMod.neg_val', ZMod.val_ofNat_of_lt (show 2 < n by omega)]
   exact Nat.mod_eq_of_lt (show n - 2 < n by omega)
 
-omit [NeZero n] in
-lemma zmod_one_ne_zero (hn : 3 ≤ n) : (1 : ZMod n) ≠ 0 := fun h => by
-  have := congrArg ZMod.val h; rw [zmod_val_one hn, ZMod.val_zero] at this; omega
-
 lemma zmod_one_ne_neg_one (hn : 3 ≤ n) : (1 : ZMod n) ≠ -1 := fun h => by
   have := congrArg ZMod.val h; rw [zmod_val_one hn, zmod_val_neg_one hn] at this; omega
 
@@ -102,7 +98,7 @@ lemma twoCycleInv_succ (hn : 3 ≤ n) {t : ℕ} (ht : 1 ≤ t) {a b a' b' : S}
   have nact1 : ¬ ActsAt A init (schedN n) t 1 := fun h' => by
     have := h'.1
     rw [hs] at this
-    simp [zmod_one_ne_zero hn, zmod_one_ne_neg_one hn] at this
+    simp [(ZMod.one_eq_zero_iff (n := n)).not.2 (by omega), zmod_one_ne_neg_one hn] at this
   have nact2 : ¬ ActsAt A init (schedN n) t (-2) := fun h' => by
     have := h'.1
     rw [hs] at this

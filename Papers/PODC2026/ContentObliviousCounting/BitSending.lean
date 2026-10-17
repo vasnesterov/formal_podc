@@ -1,5 +1,7 @@
 import Cslib.Computability.Distributed.ContentOblivious.Mirror
 import Mathlib
+import Podc.Computability.Distributed.ContentOblivious.VirtualRing
+import Podc.Foundations.Algebra.BigOperators.Translate
 
 /-!
 # Algorithms 7–8 (`CCWBitSending` / `CCWBitRelay`) and Theorem 17
@@ -294,7 +296,7 @@ lemma nl_pos {v : ZMod n} (hv : v ≠ ℓ) (hq : 1 ≤ Q v) : P v = Q v := by
 
 /-- The pulses in transit: `∑ (c1 + c2) = ∑ (Q - P)`. -/
 lemma sum_link : ∑ v, (c1 v + c2 v) = ∑ v, (Q v - P v) := by
-  have e : ∑ v, P (v + 1) = ∑ v, P v := Fintype.sum_equiv (Equiv.addRight 1) _ _ (fun _ => rfl)
+  have e : ∑ v, P (v + 1) = ∑ v, P v := Fintype.sum_add_right_eq_self P 1
   calc ∑ v, (c1 v + c2 v) = ∑ v, (Q v - P (v + 1)) := sum_congr rfl fun v _ => (h.link v).symm
     _ = ∑ v, (Q v - P v) := by rw [sum_sub_distrib, sum_sub_distrib, e]
 
@@ -531,62 +533,6 @@ theorem final_spec (hℓ : ∀ v, (x v).1 = true ↔ v = ℓ) {c : Config (ZMod 
 
 end ring
 
-/-! ## The next active node -/
-
-section next
-
-variable {n : ℕ} [NeZero n]
-
-open Classical in
-/-- Clockwise distance from `v` to the next active node (`n` if `v` is the only one). -/
-noncomputable def dist (act : ZMod n → Bool) (v : ZMod n) : ℕ :=
-  if h : ∃ k : ℕ, 0 < k ∧ act (v + k) = true then Nat.find h else 0
-
-/-- The next active node clockwise from `v`: `v + k` for the least `k ≥ 1` such that `v + k` is
-active (this is `v` itself if `v` is the only active node). -/
-noncomputable def next (act : ZMod n → Bool) (v : ZMod n) : ZMod n := v + (dist act v : ℕ)
-
-/-- The next active node counter-clockwise from `v`: `v - k` for the least `k ≥ 1` such that
-`v - k` is active. -/
-noncomputable def prev (act : ZMod n → Bool) (v : ZMod n) : ZMod n :=
-  -next (act ∘ Neg.neg) (-v)
-
-lemma exists_dist {act : ZMod n → Bool} (hact : ∃ u, act u = true) (v : ZMod n) :
-    ∃ k : ℕ, 0 < k ∧ act (v + k) = true := by
-  obtain ⟨u, hu⟩ := hact
-  by_cases huv : u = v
-  · refine ⟨n, Nat.pos_of_ne_zero (NeZero.ne n), ?_⟩; rw [ZMod.natCast_self, add_zero, ← huv, hu]
-  · refine ⟨(u - v).val, Nat.pos_of_ne_zero (fun h => huv ?_), ?_⟩
-    · rw [ZMod.val_eq_zero, sub_eq_zero] at h; exact h
-    · rw [ZMod.natCast_zmod_val, add_sub_cancel, hu]
-
-/-- Characterization of `dist`. -/
-theorem dist_spec {act : ZMod n → Bool} (hact : ∃ u, act u = true) (v : ZMod n) :
-    0 < dist act v ∧ act (v + (dist act v : ℕ)) = true ∧
-      ∀ k, 0 < k → k < dist act v → act (v + k) = false := by
-  have h := exists_dist hact v
-  have e : dist act v = Nat.find h := by simp [dist, h]
-  rw [e]
-  refine ⟨(Nat.find_spec h).1, (Nat.find_spec h).2, fun k hk hlt => ?_⟩
-  have := Nat.find_min h hlt
-  simpa [hk] using this
-
-lemma next_active {act : ZMod n → Bool} (hact : ∃ u, act u = true) (v : ZMod n) :
-    act (next act v) = true := (dist_spec hact v).2.1
-
-/-- Characterization of `prev`: `prev act v = v - k` for the least `k ≥ 1` with `v - k` active. -/
-theorem prev_spec {act : ZMod n → Bool} (hact : ∃ u, act u = true) (v : ZMod n) :
-    ∃ k : ℕ, 0 < k ∧ prev act v = v - k ∧ act (v - k) = true ∧
-      ∀ j : ℕ, 0 < j → j < k → act (v - j) = false := by
-  have hact' : ∃ u, (act ∘ Neg.neg) u = true := by
-    obtain ⟨u, hu⟩ := hact; exact ⟨-u, by simpa using hu⟩
-  obtain ⟨h1, h2, h3⟩ := dist_spec hact' (-v)
-  refine ⟨dist (act ∘ Neg.neg) (-v), h1, by simp [prev, next]; ring, ?_, fun j hj hjk => ?_⟩
-  · simpa [Function.comp, neg_add, sub_eq_add_neg, add_comm] using h2
-  · have := h3 j hj hjk; simpa [Function.comp, neg_add, sub_eq_add_neg, add_comm] using this
-
-end next
-
 /-! ## Theorem 17 -/
 
 section main
@@ -635,8 +581,9 @@ lemma r1_eq_chain {c : Config (ZMod n) St} (hc : proc.Reach (oriented n) x c)
 
 lemma recvd_true_le (hact : ∃ u, (x u).2.1 = true) {c : Config (ZMod n) St}
     (hc : proc.Reach (oriented n) x c) (v : ZMod n) : c.recvd (v, true) ≤ 2 := by
-  obtain ⟨h0, h1, h2⟩ := dist_spec (act := act x) hact v
-  have := r1_le_chain hc v (dist (act x) v) h2 _ h0 le_rfl
+  obtain ⟨u, hu⟩ := hact
+  obtain ⟨k, h0, -, -, h1, h2⟩ := vnext_spec (act := act x) hu v
+  have := r1_le_chain hc v k h2 _ h0 le_rfl
   rw [(rel hc _).s0_act h1] at this
   exact this.trans (κ_le _)
 
@@ -661,7 +608,7 @@ theorem totalSent_le (hℓ : ∀ v, (x v).1 = true ↔ v = ℓ) (hact : ∃ u, (
 /-- **Theorem 17** (results): every active node `v` returns the bit of the next active node
 clockwise (`v + k`, least `k ≥ 1`); relays return `none`. -/
 theorem returns (hℓ : ∀ v, (x v).1 = true ↔ v = ℓ) (hact : ∃ u, (x u).2.1 = true) :
-    proc.Returns (oriented n) x (fun v => if (x v).2.1 then (x (next (act x) v)).2.2 else none) := by
+    proc.Returns (oriented n) x (fun v => if (x v).2.1 then (x (vnext (act x) v)).2.2 else none) := by
   intro c hc hf v
   obtain ⟨hq, hdone⟩ := final_spec hℓ hc hf
   obtain ⟨res, hres⟩ := Option.isSome_iff_exists.1 (hdone v)
@@ -671,10 +618,11 @@ theorem returns (hℓ : ∀ v, (x v).1 = true ↔ v = ℓ) (hact : ∃ u, (x u).
   cases ha : (x v).2.1
   · rw [(rel hc v).result_relay ha hres]; simp [ha]
   · rw [(rel hc v).result_act ha hres]; simp only [ha, ite_true]
-    obtain ⟨h0, h1, h2⟩ := dist_spec (act := act x) hact v
-    have := r1_eq_chain hc hq v (dist (act x) v) h2 _ h0 le_rfl
+    obtain ⟨u, hu⟩ := hact
+    obtain ⟨k, h0, -, hk, h1, h2⟩ := vnext_spec (act := act x) hu v
+    have := r1_eq_chain hc hq v k h2 _ h0 le_rfl
     rw [(rel hc _).s0_act h1] at this
-    rw [this, decodeBit_κ]; rfl
+    rw [this, decodeBit_κ, hk]
 
 /-- **Theorem 17** (composable ending), when the leader is active. -/
 theorem composable (hℓ : ∀ v, (x v).1 = true ↔ v = ℓ) (hact : ∃ u, (x u).2.1 = true)
@@ -717,13 +665,13 @@ neighbour (and `proc` is composable by `composable`, with at most `6n` pulses by
 theorem lemma15 (hℓ : ∀ v, (x v).1 = true ↔ v = ℓ) (hall : ∀ v, (x v).2.1 = true) :
     proc.Returns (oriented n) x (fun v => (x (v + 1)).2.2) := by
   have hact : ∃ u, (x u).2.1 = true := ⟨ℓ, hall ℓ⟩
-  have hnext : ∀ v, next (act x) v = v + 1 := fun v => by
-    obtain ⟨h0, -, h2⟩ := dist_spec (act := act x) hact v
-    have : dist (act x) v = 1 := by
+  have hnext : ∀ v, vnext (act x) v = v + 1 := fun v => by
+    obtain ⟨k, h0, -, hk, -, h2⟩ := vnext_spec (act := act x) (hall ℓ) v
+    have : k = 1 := by
       by_contra h
       have := h2 1 one_pos (by omega)
       simp [act, hall] at this
-    simp [next, this]
+    rw [hk, this, Nat.cast_one]
   intro c hc hf v
   rw [returns hℓ hact c hc hf v]
   simp [hall, hnext]
@@ -809,11 +757,11 @@ theorem cw_composable (hℓ : ∀ v, (x v).1 = true ↔ v = ℓ) (hact : ∃ u, 
 /-- **Theorem 17 for `CWBitSending`** (results): every active node `v` returns the bit of the
 next active node counter-clockwise; relays return `none`. -/
 theorem cw_returns (hℓ : ∀ v, (x v).1 = true ↔ v = ℓ) (hact : ∃ u, (x u).2.1 = true) :
-    cwProc.Returns (oriented n) x (fun v => if (x v).2.1 then (x (prev (act x) v)).2.2 else none) := by
+    cwProc.Returns (oriented n) x (fun v => if (x v).2.1 then (x (vprev (act x) v)).2.2 else none) := by
   rw [Proc.returns_mirror_iff]
   convert returns (x := x ∘ Neg.neg) (hℓ_neg hℓ) (hact_neg hact) using 1
   funext w
-  simp only [Function.comp, prev, neg_neg]
+  simp only [Function.comp, vprev_eq_neg_vnext_neg, neg_neg]
   rfl
 
 /-- **Theorem 17 for `CWBitSending`** (message complexity): at most `6n` pulses. -/

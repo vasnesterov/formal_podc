@@ -3,6 +3,7 @@ import Cslib.Computability.Distributed.PopulationProtocols.Schedules
 import Cslib.Computability.Distributed.PopulationProtocols.Eventually
 import Mathlib.Data.Fin.VecNotation
 import Mathlib.Tactic.Ring
+import Podc.Foundations.Data.Fin.Cyclic
 
 /-!
 # Sharing ties (Section 4.2): `Circles_TieSharing`
@@ -49,11 +50,8 @@ instance : Fintype St := ⟨{St.ws, St.win, St.los}, by intro x; cases x <;> sim
 
 lemma card_St : Fintype.card St = 3 := rfl
 
-/-- Clockwise distance `(y - x) mod k` from `x` to `y`. -/
-def dst (x y : Fin k) : ℕ := if x.val ≤ y.val then y.val - x.val else y.val + k - x.val
-
 /-- `z ∈ [e.1, e.2]_k`. -/
-def inRng (e : Braket k) (z : Fin k) : Prop := dst e.1 z ≤ dst e.1 e.2
+def inRng (e : Braket k) (z : Fin k) : Prop := Fin.cdist e.1 z ≤ Fin.cdist e.1 e.2
 
 instance (e : Braket k) (z : Fin k) : Decidable (inRng e z) := by unfold inRng; infer_instance
 

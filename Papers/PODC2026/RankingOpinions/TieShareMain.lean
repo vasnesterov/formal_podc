@@ -624,7 +624,7 @@ theorem main2 (hE : E.WeaklyFair) (hTok : ∃ y, stA E c.T0 y = St.ws)
       split_ifs with hc
       · have hpT : c.Top p := by by_contra h; exact h6 (t + 1) (by omega) p h hc.1
         have : (c.B p).1 = c.σ p := by
-          have := hpT.1; unfold Ctx.o off at this; exact (dst_eq_zero this).symm
+          have := hpT.1; unfold Ctx.o off at this; exact (Fin.cdist_eq_zero.1 this).symm
         rw [this]; exact c.σ_mem p
       · exact hout
   · -- eventually
@@ -669,7 +669,7 @@ theorem main2 (hE : E.WeaklyFair) (hTok : ∃ y, stA E c.T0 y = St.ws)
       rw [h4, e2, hl.2]
       simp only [outUpd, rd, nx, Bool.false_eq_true, if_false, and_self, if_true, ite_true]
       have : (c.B z).1 = c.σ z := by
-        have := hz.1; unfold Ctx.o off at this; exact (dst_eq_zero this).symm
+        have := hz.1; unfold Ctx.o off at this; exact (Fin.cdist_eq_zero.1 this).symm
       rw [this]; exact c.σ_mem z
 
 end Ctx
@@ -750,9 +750,9 @@ lemma bra_mu_iff (y : A) : (c.B y).1 = c.μ ↔ c.σ y = c.μ ∧ c.o y = 0 := b
   · intro h
     have : c.σ y = c.μ := by unfold σ sec; rw [h]; exact secOf_of_mem c.hμ
     refine ⟨this, ?_⟩
-    unfold o off; rw [show sec c.S (c.B y) = c.μ from this, h, dst_self]
+    unfold o off; rw [show sec c.S (c.B y) = c.μ from this, h, Fin.cdist_self]
   · rintro ⟨h1, h2⟩
-    have := (dst_eq_zero h2).symm
+    have := (Fin.cdist_eq_zero.1 h2).symm
     rw [this]; exact h1
 
 /-- F1 for the unique-majority case. -/
@@ -800,7 +800,7 @@ lemma no_tokens (hE : E.WeaklyFair) : ∃ T ≥ c.T0, ∀ t ≥ T, ∀ y, stA E 
   obtain ⟨T, hT, h⟩ : ∃ T ≥ c.T0, ∀ t ≥ T, ∀ y, dg (c.B y) = false → stA E t y ≠ St.ws := by
     refine extinction (fun t y => stA E t y = St.ws) (fun t y => stA E t y = St.los)
       (fun y => dg (c.B y) = false)
-      (fun y => (dst c.μ (c.σ y) * (k + 1) + c.e y) * (k + 1) + (c.e y - c.o y)) c.T0 ?_ ?_
+      (fun y => (Fin.cdist c.μ (c.σ y) * (k + 1) + c.e y) * (k + 1) + (c.e y - c.o y)) c.T0 ?_ ?_
     · intro t ht z hz h1 h2
       rcases step_cases E t z with he | ⟨p, hm⟩
       · exact absurd (by simp only [stA, he] at h2; exact h2) h1
@@ -1304,8 +1304,8 @@ theorem tieShare_correct (input : A → Fin k) (E : (tieShare k false).Execution
       have hσ : c.σ y = μ := by
         show secOf M (B y).1 = μ; rw [hbra, hy]; exact secOf_of_mem hμ
       refine ⟨y, hσ, ?_, hw⟩
-      show dst (sec M (B y)) (B y).1 = 0
-      rw [show sec M (B y) = μ from hσ, hbra, hy, dst_self]
+      show Fin.cdist (sec M (B y)) (B y).1 = 0
+      rw [show sec M (B y) = μ from hσ, hbra, hy, Fin.cdist_self]
     obtain ⟨T', hT'⟩ := c.main2 hTop hE hTok hWit
     refine ⟨T', fun t ht a => ?_⟩
     obtain ⟨h1, h2⟩ := hT' t ht a
@@ -1314,16 +1314,16 @@ theorem tieShare_correct (input : A → Fin k) (E : (tieShare k false).Execution
       constructor
       · intro h
         have h' : secOf M (input a) = input a := by
-          have : dst (secOf M (c.B a).1) (c.B a).1 = 0 := h
-          rw [hb] at this; exact dst_eq_zero this
+          have : Fin.cdist (secOf M (c.B a).1) (c.B a).1 = 0 := h
+          rw [hb] at this; exact Fin.cdist_eq_zero.1 this
         have hm := secOf_mem hMne (input a)
         rw [h'] at hm
         have : q ≤ x (input a) := by simpa [hMdef, greedy] using hm
         exact le_antisymm (hxle _) this
       · intro h
         have hm : input a ∈ M := by simp [hMdef, greedy, h]
-        show dst (secOf M (c.B a).1) (c.B a).1 = 0
-        rw [hb, secOf_of_mem hm, dst_self]
+        show Fin.cdist (secOf M (c.B a).1) (c.B a).1 = 0
+        rw [hb, secOf_of_mem hm, Fin.cdist_self]
     refine ⟨fun h => ?_, fun h => ?_⟩
     · have hst := h1 (ho.2 h)
       exact ⟨hst, by rw [hout, if_neg hst]⟩

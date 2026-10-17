@@ -1,4 +1,5 @@
 import Papers.PODC2024.ContentObliviousLE.Alg2
+import Cslib.Computability.Distributed.ContentOblivious.Mirror
 
 /-!
 # Theorem 1: Algorithm 2 is a quiescently terminating leader election with `n(2·IDmax+1)` pulses
@@ -60,7 +61,7 @@ CCW pulses. -/
 lemma Inv2.all_of_tight {c : Cfg n} (h : Inv2 id ℓ c)
     (ht : ∀ v, c.recvd (v, true) = c.sent (v + 1, false)) : ∀ v, c.recvd (v, true) = id ℓ + 1 := by
   obtain ⟨-, hB, hC, -⟩ := h
-  refine Ring.induction_down _ (ℓ - 1) (by rw [ht, sub_add_cancel, hC]) fun v hv => ?_
+  refine Ring.chain_ccw_all _ (ℓ - 1) (fun v _ hv => ?_) (by rw [ht, sub_add_cancel, hC])
   rw [ht]
   by_cases hv' : v + 1 = ℓ
   · rw [hv', hC]
@@ -110,7 +111,7 @@ lemma Inv2.tight_of_done {c : Cfg n} (hr : Reach (oriented n) alg id c) (h : Inv
   have hle : ∀ v ∈ (univ : Finset (ZMod n)), c.recvd (v, true) ≤ c.sent (v + 1, false) :=
     fun v _ => (edges hr).2 v
   have hsum : ∑ v, c.recvd (v, true) = ∑ v, c.sent (v + 1, false) := by
-    rw [Ring.sum_shift (fun v => c.sent (v, false)) 1]
+    rw [Fintype.sum_add_right_eq_self (fun v => c.sent (v, false)) 1]
     exact sum_congr rfl fun v _ => (heq v).symm
   exact fun v => (sum_eq_sum_iff_of_le hle).1 hsum v (mem_univ v)
 

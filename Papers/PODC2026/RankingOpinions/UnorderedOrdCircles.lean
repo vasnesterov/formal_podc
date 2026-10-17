@@ -825,9 +825,8 @@ end Exec
 /-- Potential of a leader, given the (eventually constant) set `S` of labels used by stable
 leaders and a label `h ∉ S`. -/
 def phiL (S : Finset (Fin k)) (h : Fin k) (s : OCState Col k) : ℕ :=
-  if s.os = .U then 2 * dist s.bra h + 2 else if s.bra ∈ S then 2 * dist s.bra h + 1 else 2 * k + 2
-
-lemma dist_lt (d h : Fin k) : dist d h < k := (h - d).isLt
+  if s.os = .U then 2 * Fin.cdist s.bra h + 2
+  else if s.bra ∈ S then 2 * Fin.cdist s.bra h + 1 else 2 * k + 2
 
 /-- Potential of a non-leader whose leader has bra `Lb`. -/
 def psiN (Lb : Fin k) (s : OCState Col k) : ℕ :=
@@ -951,19 +950,19 @@ lemma oc_ord_stabilizes {T1 : ℕ} {lead : A → Prop} [DecidablePred lead] {inp
             rw [ite_eq_right (by rw [hc'.1]; simp), hc'.2.1, ite_eq_left hm,
               ite_eq_left hc'.2.2.1]
             omega
-          · have hdl := dist_lt (cyc (E.config t x).bra) h
+          · have hdl := Fin.cdist_lt (cyc (E.config t x).bra) h
             unfold phiL
             rw [ite_eq_left hc'.1, hc'.2.1]
             rcases hc'.2.2 with hI | hU
             · rw [ite_eq_right (by rw [hI]; simp)]
               split_ifs with hm
               · have hne : (E.config t x).bra ≠ h := fun e => hh (e ▸ hm)
-                have := dist_cyc hne
+                have := cdist_cyc hne
                 omega
               · omega
             · have hm := hmemS t ht x hx hU.1
               have hne : (E.config t x).bra ≠ h := fun e => hh (e ▸ hm)
-              have := dist_cyc hne
+              have := cdist_cyc hne
               rw [ite_eq_left hU.1]
               omega
         · push Not at hc

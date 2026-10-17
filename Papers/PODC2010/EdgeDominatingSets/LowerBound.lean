@@ -249,7 +249,7 @@ theorem graph2_isSimple : (graph2 k).IsSimple := by
         rw [graph2_nbr_lt k hj', graph2_nbr_two_mul] at h; simp at h
       · omega
     · rw [graph2_nbr_inr, graph2_nbr_inr] at h
-      exact natCast_inj_of_lt hi1 hj1 (congrArg Prod.fst (Sum.inl.inj h))
+      exact CharP.natCast_injOn_Iio (ZMod _) _ hi1 hj1 (congrArg Prod.fst (Sum.inl.inj h))
 
 /-- The base multigraph of §4.3: nodes `x_ℓ = some ℓ` (loops `(x_ℓ, 2j) ↔ (x_ℓ, 2j + 1)`) and
 `y = none`, with `(x_ℓ, 2k) ↔ (y, ℓ)`. -/

@@ -1,5 +1,6 @@
 import Papers.PODC2026.RankingOpinions.RankingInv
 import Mathlib.Data.Fintype.Fin
+import Podc.Foundations.Data.Fin.Cyclic
 
 /-!
 # The Ranking protocol: reachability, part 1 (Lemmas 6.8–6.11)
@@ -118,20 +119,6 @@ lemma phase2_step {input : A → Fin k} {C : Config A (RState k)} {σ : Fin k �
     · have : (C x).kc ≠ d := fun e => hxb (h1 x b hx hb (e.trans hbd.symm))
       rw [h2 x hx, Function.update_of_ne this]
 
-lemma iterate_add_one_val (x : Fin k) (j : ℕ) : ((· + 1)^[j] x).val = (x.val + j) % k := by
-  induction j generalizing x with
-  | zero => simp [Nat.mod_eq_of_lt x.isLt]
-  | succ j ih =>
-    rw [Function.iterate_succ_apply, ih, Fin.val_add, Fin.val_one']
-    simp [Nat.add_mod_mod, Nat.mod_add_mod]; congr 1; omega
-
-lemma exists_iterate_add_one (x y : Fin k) : ∃ j : ℕ, (· + 1)^[j] x = y := by
-  refine ⟨(y.val + k - x.val), Fin.ext ?_⟩
-  rw [iterate_add_one_val]
-  have := x.isLt; have := y.isLt
-  rw [show x.val + (y.val + k - x.val) = y.val + k by omega, Nat.add_mod_right,
-    Nat.mod_eq_of_lt y.isLt]
-
 lemma phase2_inner {input : A → Fin k} (d : Fin k) (j : ℕ) :
     ∀ (C : Config A (RState k)) (σ : Fin k → Fin k), Inv input C → OneTok C → TR σ C →
     (· + 1)^[j] (σ d) ∉ σ '' {c | c < d} →
@@ -189,7 +176,7 @@ lemma phase2_outer {input : A → Fin k} (n : ℕ) (hn : n ≤ k) :
           ext c; simp [Fin.lt_def, d]
         rw [this, Fin.card_filter_val_lt]; omega
       omega
-    obtain ⟨j, hj⟩ := exists_iterate_add_one (σ1 d) y
+    obtain ⟨j, hj⟩ := Fin.exists_iterate_add_one_eq (σ1 d) y
     rw [← hj] at hy
     obtain ⟨C', σ', r', i', o', t', hrest, hnot⟩ := phase2_inner d j C1 σ1 i1 o1 t1 hy
     refine ⟨C', σ', r1.trans r', i', o', t', ?_⟩

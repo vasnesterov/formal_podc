@@ -121,19 +121,13 @@ lemma totalRecvd_eq_sum_edgeLoad (c : Config (ZMod n) S) :
   congr 1
   exact Fintype.sum_equiv (Equiv.subRight 1) _ _ fun _ => by simp
 
-omit [NeZero n] in
-lemma natCast_injOn (ℓ : ZMod n) :
-    Set.InjOn (fun k : ℕ => ℓ + (k : ZMod n)) ↑(range n) := by
-  intro k hk k' hk' h
-  simp only [coe_range, Set.mem_Iio] at hk hk'
-  have h' : ((k : ℕ) : ZMod n) = (k' : ZMod n) := add_left_cancel h
-  have := congrArg ZMod.val h'
-  rwa [ZMod.val_natCast, ZMod.val_natCast, Nat.mod_eq_of_lt hk, Nat.mod_eq_of_lt hk'] at this
-
 /-- Edge loads of distinct edges `{ℓ+k, ℓ+k+1}`, `k < n`, add up to at most the total. -/
 lemma sum_edgeLoad_le (c : Config (ZMod n) S) (ℓ : ZMod n) {T : Finset ℕ} (hT : T ⊆ range n) :
     ∑ k ∈ T, edgeLoad c (ℓ + (k : ZMod n)) ≤ totalRecvd c := by
-  rw [totalRecvd_eq_sum_edgeLoad, ← Finset.sum_image ((natCast_injOn ℓ).mono hT)]
+  have hinj : Set.InjOn (fun k : ℕ => ℓ + (k : ZMod n)) T :=
+    ((add_right_injective ℓ).comp_injOn (CharP.natCast_injOn_Iio (ZMod n) n)).mono
+      fun _ hx => Finset.mem_range.1 (hT hx)
+  rw [totalRecvd_eq_sum_edgeLoad, ← Finset.sum_image hinj]
   exact Finset.sum_le_univ_sum_of_nonneg fun _ => Nat.zero_le _
 
 end loads

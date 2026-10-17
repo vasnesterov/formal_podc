@@ -1,4 +1,5 @@
 import Papers.PODC2024.SSLeaderElectionDirected.Necessity
+import Podc.Foundations.Data.Fin.Cyclic
 
 /-!
 # Synchronous unison (Section 5)
@@ -35,19 +36,6 @@ variable {V : Type*} [Fintype V] {G : Digraph V}
 def SPSU {Q : Type*} {k : ℕ} (clk : (V → Q) → V → Fin (k + 1)) (e : ℕ → V → Q) : Prop :=
   (∀ t p q, clk (e t) p = clk (e t) q) ∧ ∀ t p, clk (e (t + 1)) p = clk (e t) p + 1
 
-theorem Fin.add_one_ne_self {k : ℕ} (hk : 1 ≤ k) (x : Fin (k + 1)) : x + 1 ≠ x := by
-  intro h
-  have h' := congrArg Fin.val h
-  rw [Fin.val_add] at h'
-  have h1 : ((1 : Fin (k + 1)) : ℕ) = 1 := by
-    rw [Fin.val_one']; exact Nat.mod_eq_of_lt (by omega)
-  rw [h1] at h'
-  have := x.isLt
-  by_cases hx : x.val + 1 < k + 1
-  · rw [Nat.mod_eq_of_lt hx] at h'; omega
-  · have : x.val + 1 = k + 1 := by omega
-    rw [this, Nat.mod_self] at h'; omega
-
 /-- **Theorem 4** (necessary condition for synchronous unison; the paper refers to [ACDD23]).
 If a deterministic local algorithm is self-stabilizing for the synchronous unison (period `K ≥ 2`)
 under the synchronous daemon for some identifier assignment, then `G` has at most one source
@@ -83,7 +71,7 @@ theorem theorem4 {ID Q : Type*} {k : ℕ} (hk : 1 ≤ k) (next : (V → ID) → 
     have h1t : 1 + t₀ = t₀ + 1 := Nat.add_comm 1 t₀
     simp only [h1t]; exact hsp.2 t₀ p₂
   rw [hstep, hsp.1 t₀ p₂ p₁] at heq
-  exact Fin.add_one_ne_self hk _ heq.symm
+  exact Fin.add_one_ne_self (by omega) _ heq.symm
 
 /-! ### Algorithm U(K) -/
 
@@ -273,7 +261,7 @@ theorem paper_unison_not_selfStab_gen (hk : 1 ≤ k) {p₁ p₂ : V} (h₁ : Low
   have := hsp.1 0 p₂ p₁
   simp only [clk, Nat.add_zero] at this
   rw [hdiff t₀] at this
-  exact Fin.add_one_ne_self hk _ this
+  exact Fin.add_one_ne_self (by omega) _ this
 
 /-- The paper's `U(K)` fails on every network whose source component has two distinct
 processes. -/

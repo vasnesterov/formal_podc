@@ -6,6 +6,7 @@ import Mathlib.Algebra.Group.Fin.Basic
 import Mathlib.Tactic.Abel
 import Mathlib.Data.Finset.Max
 import Mathlib.Algebra.BigOperators.Ring.Finset
+import Podc.Foundations.Data.Fin.Cyclic
 
 /-!
 # Protocol 1 (`Silent-n-state-SSR`, Cai–Izumi–Wada): Lemmas 2.2, 2.3 and Theorem 2.4
@@ -348,11 +349,6 @@ theorem card_changes_le (hA : Fintype.card A = n) (E : (silentSSR n).Execution A
   rw [hA] at this
   omega
 
-lemma succ_ne {i : Fin n} (hn : 1 < n) (h : i = i + 1) : False := by
-  have h1 : ((1 : Fin n)).val = 1 := by rw [Fin.val_one', Nat.mod_eq_of_lt hn]
-  have := congrArg Fin.val (add_eq_left.mp h.symm)
-  rw [h1] at this; simp at this
-
 /-- **Theorem 2.4 (correctness), weakly fair scheduler.** Every weakly fair execution of
 `Silent-n-state-SSR` eventually becomes constant (silent) in a correctly ranked configuration. -/
 theorem weaklyFair_eventually_ranked (hA : Fintype.card A = n) (E : (silentSSR n).Execution A)
@@ -396,10 +392,10 @@ theorem weaklyFair_eventually_ranked (hA : Fintype.card A = n) (E : (silentSSR n
   · rw [interact_eq _ _ _ hne, ite_eq_left hab] at hstep
     have := congrFun hstep b
     simp only [Function.update_self] at this
-    exact succ_ne hn this
+    exact Fin.add_one_ne_self hn.ne' _ this.symm
   · rw [interact_eq _ _ _ (Ne.symm hne), ite_eq_left hab.symm] at hstep
     have := congrFun hstep a
     simp only [Function.update_self] at this
-    exact succ_ne hn this
+    exact Fin.add_one_ne_self hn.ne' _ this.symm
 
 end TimeOptimalSSLE.SilentSSR

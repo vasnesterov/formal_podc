@@ -1,6 +1,7 @@
 import Papers.PODC2024.OnlineLocalGrids.Defs
 import Podc.Foundations.Combinatorics.SimpleGraph.Ball
 import Podc.Foundations.Combinatorics.SimpleGraph.Cycle
+import Podc.Foundations.Algebra.BigOperators.Translate
 
 /-!
 # `a`-values and `b`-values of 3-colourings (§3.1 of Chang–Mishra–Nguyen–Yang–Yeh, PODC 2024)
@@ -175,7 +176,7 @@ theorem rowSum_eq_of_adj (hb : 2 ≤ b) {c : α × Fin b → Fin 3} (hc : IsProp
   have hsum := Finset.sum_eq_zero (s := Finset.univ) fun j _ => cell j
   simp only [Finset.sum_add_distrib] at hsum
   have hre : ∑ j : Fin b, aval (c (i, j + 1)) (c (i', j + 1)) = ∑ j : Fin b, aval (c (i, j)) (c (i', j)) :=
-    Equiv.sum_comp (Equiv.addRight (1 : Fin b)) (fun j => aval (c (i, j)) (c (i', j)))
+    Fintype.sum_add_right_eq_self (fun j => aval (c (i, j)) (c (i', j))) 1
   have h2 : ∑ j : Fin b, aval (c (i', j + 1)) (c (i', j)) = - rowSum c i' := by
     simp only [rowSum, ← Finset.sum_neg_distrib]
     exact Finset.sum_congr rfl fun j _ => aval_antisymm _ _
@@ -209,7 +210,7 @@ theorem rowSum_odd (hb : 3 ≤ b) (hodd : Odd b) {c : α × Fin b → Fin 3}
   simp only [Finset.sum_sub_distrib, Finset.sum_const, Finset.card_univ, Fintype.card_fin,
     nsmul_eq_mul, mul_one] at hs
   have hre : ∑ j : Fin b, ind (c (i, j + 1)) = ∑ j : Fin b, ind (c (i, j)) :=
-    Equiv.sum_comp (Equiv.addRight (1 : Fin b)) (fun j => ind (c (i, j)))
+    Fintype.sum_add_right_eq_self (fun j => ind (c (i, j))) 1
   rw [hre] at hs
   obtain ⟨k, hk⟩ := hodd
   unfold rowSum
