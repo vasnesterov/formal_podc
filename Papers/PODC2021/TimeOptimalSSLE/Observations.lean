@@ -44,7 +44,6 @@ open Classical in
 /-- The protocol of Observation 2.5 (support of the transition distributions). -/
 noncomputable def P : NProtocol (Option (Fin 5)) where
   δ x y := if active x y then Set.univ else {(x, y)}
-  nonempty x y := by split_ifs <;> simp
 
 /-- The leader state `l`. -/
 def leader (x : Option (Fin 5)) : Bool := x.isNone
@@ -79,7 +78,7 @@ theorem obs25_silent (C : Config (Fin 3) (Option (Fin 5))) :
   by_cases h : ∃ a b, a ≠ b ∧ active (C a) (C b)
   · obtain ⟨a, b, hab, hact, o, ho⟩ := exists_silent_step C h
     refine ⟨NProtocol.upd C a b o, Relation.ReflTransGen.single
-      ⟨a, b, trivial, trivial, hab, o, by simp [P, hact], rfl⟩, ?_⟩
+      ⟨a, b, hab, o, by simp [P, hact], rfl⟩, ?_⟩
     exact (silent_iff _).mpr ho
   · push Not at h
     exact ⟨C, Relation.ReflTransGen.refl, (silent_iff C).mpr fun a b hab => h a b hab⟩

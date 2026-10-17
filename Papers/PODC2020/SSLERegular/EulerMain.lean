@@ -15,7 +15,7 @@ import Papers.PODC2020.SSLERegular.ErrorReach
   `k ≥ 1`, for every ring protocol satisfying `RingSpec`, the repaired SS-EulerCycle solves SSLE:
   from every configuration a valid output-stable configuration is reachable; hence every globally
   fair execution stabilizes (`repaired_solvesSSLE`) and so does the random scheduler with
-  probability 1 (`TS.tendsto_compl_of_reach`).
+  probability 1 (`Cslib.TransitionSystem.tendsto_compl_of_reach`).
 -/
 
 set_option linter.unusedSectionVars false

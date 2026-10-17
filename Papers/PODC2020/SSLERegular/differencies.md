@@ -93,13 +93,15 @@ Classification: **[F]** false statement, **[G]** proof gap with (morally/provabl
 
 12. **[M] Randomness as nondeterminism.** Random choices (`RandState`, random bits/colours, "randomly
     do") are modelled by their support: `δ p q` is a set of outcomes. Under global fairness and, for
-    finite state spaces, for "with probability 1" this is exact (`TS.fair_iff_reach`,
-    `TS.tendsto_compl_of_reach`, `TS.prob_eq_zero_of_not_reach`).
+    finite state spaces, for "with probability 1" this is exact
+    (`Cslib.TransitionSystem.globallyFair_iff_reach`, `tendsto_compl_of_reach`,
+    `prob_eq_zero_of_not_reach` in `Podc/Stabilization/`).
 13. **[M] Global fairness.** We use the standard definition of Angluin et al. (if `C` occurs infinitely
     often and `C → C'`, then `C'` occurs infinitely often). The paper's wording ("if a configuration
     is always reachable it will be reached eventually") is a different, informal phrasing; for finite
     systems both lead to "a closed set reachable from everywhere is eventually entered". We prove that
-    globally fair executions exist (`TS.exists_globallyFair`), so the negative results are not vacuous.
+    globally fair executions exist (`Cslib.TransitionSystem.exists_globallyFair`), so the negative
+    results are not vacuous.
 14. **[M] The Ring-Protocol of [11] is a black box** (`RingProtocol`, arbitrary nondeterministic
     protocol with a leader output). For the repaired Theorem 3.3 we assume `RingSpec`: SSLE on every
     *directed* ring of size ≥ 3 (initiator = predecessor, which is how Protocol 1 calls `δ_ring`),
