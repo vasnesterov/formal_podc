@@ -1,5 +1,7 @@
 import Papers.PODC2025.ByzantineStableMatching.Lemma1
 import Papers.PODC2025.ByzantineStableMatching.Hypotheses
+import Podc.LockStep.Basic
+import Podc.Foundations.Count
 
 /-!
 # The protocol `ΠbSM` (Section 5.2, Lemmas 9, 11, 12) — before channel simulation
@@ -102,14 +104,26 @@ noncomputable def lVector (p : Party k) (π : Pref k) (ib0 : Inbox (Party k) (Ms
     (rest : History (Party k) (Msg k (LMsg D))) : Option (Party k → Pref k) :=
   ((lam D).firstDecide p (inputL π ib0) (decodeH rest)).bind allSome
 
-/-- Number of `L`-parties suggesting `i`. -/
-def count (ib : Inbox (Party k) (Msg k N)) (i : Fin k) : ℕ :=
-  (Finset.univ.filter fun l : Fin k => (ib (inl l)).bind Msg.getSuggest = some i).card
-
 /-- The suggestion of a strict majority of `L`, if any. -/
 noncomputable def majority (ib : Inbox (Party k) (Msg k N)) : Option (Fin k) :=
-  open Classical in
-  if h : ∃ i, k < 2 * count ib i then some (Classical.choose h) else none
+  Finset.univ.majority? fun l : Fin k => (ib (inl l)).bind Msg.getSuggest
+
+open Classical in
+/-- `majority` in the paper's words: some suggestion `i` made by more than half of the `k`
+parties of `L`, if one exists. -/
+theorem majority_eq (ib : Inbox (Party k) (Msg k N)) :
+    majority ib =
+      if h : ∃ i, k < 2 * (Finset.univ.filter fun l : Fin k =>
+          (ib (inl l)).bind Msg.getSuggest = some i).card
+      then some h.choose else none := by
+  split_ifs with h
+  · rw [majority, Finset.majority?_eq_some_iff, Finset.card_univ, Fintype.card_fin]
+    exact h.choose_spec
+  · rw [majority, Finset.majority?_eq_none_iff]
+    intro b
+    rw [Finset.card_univ, Fintype.card_fin]
+    push Not at h
+    exact h b
 
 /-- The protocol `Φ`. -/
 noncomputable def phi : Protocol (Party k) (Pref k) (Msg k (LMsg D)) (Option (Fin k)) where
@@ -237,11 +251,6 @@ noncomputable def sI (i : Party k) : Scenario (Party k) (Pref k) (D.M i) :=
 lemma sI_reliable (h : s.Reliable) (i : Party k) : (sI D s i).Reliable :=
   fun r p q => h (r + 1) p q
 
-lemma status_comapInput' {I' I M O : Type*} {G : SimpleGraph (Party k)} (alg : Protocol (Party k) I M O)
-    (f : I' → I) (s : Scenario (Party k) I' M) (r : ℕ) (p : Party k) :
-    status G (alg.comapInput f) s r p = status G alg (s.mapInput f) r p := by
-  simp only [status, hist_comapInput]; rfl
-
 lemma lam_decides_iff (p : Party k) (d : Party k → Option (Pref k)) :
     Decides (lClique k) (lam D) (sL D s) p d ↔
       ∀ i, Decides (lClique k) (D.alg i) (sI D s i) p (d i) := by
@@ -253,7 +262,7 @@ lemma status_lam (r : ℕ) (p : Party k) :
       allSome fun i => firstUpTo (fun j => status (lClique k) (D.alg i) (sI D s i) j p) r := by
   rw [lam, status_parallel]
   congr 1; funext i
-  exact firstUpTo_congr fun j _ => status_comapInput' _ _ _ _ _
+  exact firstUpTo_congr fun j _ => status_comapInput _ _ _ _ _ _
 
 variable {s}
 
@@ -287,15 +296,6 @@ section Decisions
 
 variable {s : Scenario (Party k) (Pref k) (Msg k (LMsg D))}
 
-lemma firstSome_fixed {O : Type*} {f : ℕ → Option O} (R0 : ℕ) (hne : ∀ r, r ≠ R0 → f r = none)
-    (o : O) : FirstSome f o ↔ f R0 = some o := by
-  constructor
-  · rintro ⟨r, hr, -⟩
-    by_cases h : r = R0
-    · rwa [h] at hr
-    · rw [hne r h] at hr; cases hr
-  · intro h; exact ⟨R0, h, fun r hr => hne r (Nat.ne_of_lt hr)⟩
-
 lemma lVector_honest (hZ : s.byz ∈ thresholds k tL k) (p : Party k) (hp : p ∉ s.byz)
     (hpL : p.isLeft) {d : Party k → Option (Pref k)}
     (hd : Decides (lClique k) (lam D) (sL D s) p d) :
@@ -313,7 +313,7 @@ lemma phi_decides_inl (hZ : s.byz ∈ thresholds k tL k) (i : Fin k) (hi : inl i
       Decides (oneSidedR k) (phi D) s (inl i) o ↔ o = (allSome d).map fun v => gsOfVector v i := by
   obtain ⟨d, hd, -⟩ := lam_first D hZ (inl i) hi
   refine ⟨d, hd, fun o => ?_⟩
-  rw [decides_iff_firstSome, firstSome_fixed (D.T + 1)]
+  rw [decides_iff_firstSome, firstSome_iff_of_ne (D.T + 1)]
   · rw [status, hist_succ_cons, phi_decide_inl, ite_eq_left (by simp), lVector_honest D hZ _ hi rfl hd]
     exact ⟨fun h => (Option.some.inj h).symm, fun h => by rw [h]⟩
   · intro r hr
@@ -327,7 +327,7 @@ lemma phi_decides_inr (j : Fin k) (o : Option (Fin k)) :
     Decides (oneSidedR k) (phi D) s (inr j) o ↔
       o = majority (fun p => deliver (oneSidedR k) (phi D) s (hist (oneSidedR k) (phi D) s (D.T + 1))
         (D.T + 1) p (inr j)) := by
-  rw [decides_iff_firstSome, firstSome_fixed (D.T + 2)]
+  rw [decides_iff_firstSome, firstSome_iff_of_ne (D.T + 2)]
   · rw [status, phi_decide_inr, ite_eq_left (by simp), hist_succ]
     simp only [List.getLastD_eq_getLast?, List.getLast?_append, List.getLast?_singleton,
       Option.some_or, Option.getD_some, Option.some.injEq]
@@ -378,22 +378,6 @@ lemma card_honestL (hZ : s.byz ∈ thresholds k tL k) :
   simp only [Finset.card_univ, Fintype.card_fin] at h2
   omega
 
-lemma majority_eq {ib : Inbox (Party k) (Msg k N)} {z : Fin k}
-    (hz : k < 2 * count ib z) : majority ib = some z := by
-  have hex : ∃ i, k < 2 * count ib i := ⟨z, hz⟩
-  rw [majority, dite_eq_left hex]
-  congr 1
-  by_contra hne
-  have hc := hex.choose_spec
-  have key : count ib z + count ib hex.choose ≤ k := by
-    unfold count
-    rw [← Finset.card_union_of_disjoint]
-    · exact (Finset.card_le_univ _).trans (by simp)
-    · rw [Finset.disjoint_filter]
-      intro l _ h1 h2
-      exact hne (Option.some.inj (h2.symm.trans h1))
-  omega
-
 open Classical in
 /-- **Lemmas 11 and 12** (for `Φ`): if `tL < k/3`, omissions only affect `L–L` messages, and there are
 no omissions as soon as some `R`-party is honest, then `Φ` achieves bSM. -/
@@ -414,11 +398,9 @@ theorem phi_bSM (h3 : 3 * tL < k) (hZ : s.byz ∈ thresholds k tL k)
     -- an honest `L`-party exists
     obtain ⟨i0, hi0⟩ : ∃ i0, inl i0 ∉ s.byz := by
       have := card_honestL D hZ
-      by_contra hcon
-      push Not at hcon
-      have : (Finset.univ.filter fun l : Fin k => inl l ∉ s.byz) = ∅ := by
-        ext l; simp [hcon l]
-      simp_all; omega
+      obtain ⟨i0, hi0⟩ :=
+        (Finset.card_pos (s := Finset.univ.filter fun l : Fin k => inl l ∉ s.byz)).1 (by omega)
+      exact ⟨i0, (Finset.mem_filter.1 hi0).2⟩
     obtain ⟨d0, hd0, -⟩ := hdL i0 hi0
     have hd0i := (lam_decides_iff D s _ _).1 hd0
     have hsome : ∀ i, ∃ w, d0 i = some w := by
@@ -463,25 +445,19 @@ theorem phi_bSM (h3 : 3 * tL < k) (hZ : s.byz ∈ thresholds k tL k)
       · obtain ⟨d, hd, hiff⟩ := hdL i hp
         rw [hiff, hall i hp d hd, hav]
         simp [eq_comm]
-      · rw [phi_decides_inr, offline_inr, majority_eq (z := (gsOfVector v).symm j)]
+      · rw [phi_decides_inr, offline_inr, majority,
+          Finset.majority?_eq_of_notMem (F := Finset.univ.filter fun l : Fin k => inl l ∈ s.byz)
+            (o := some ((gsOfVector v).symm j))]
         · exact eq_comm
-        · have hcount : (Finset.univ.filter fun l : Fin k => inl l ∉ s.byz) ⊆
-              Finset.univ.filter fun l : Fin k =>
-                (deliver (oneSidedR k) (phi D) s (hist (oneSidedR k) (phi D) s (D.T + 1)) (D.T + 1)
-                  (inl l) (inr j)).bind Msg.getSuggest = some ((gsOfVector v).symm j) := by
-            intro l hl
-            simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hl ⊢
-            obtain ⟨d, hd, -⟩ := hdL l hl
-            have hadj : (oneSidedR k).Adj (inl l) (inr j) := by simp
-            simp only [deliver, hadj, ite_true, hl, ite_false, hrel _ _ _]
-            rw [hist_succ_cons, phi_send_suggest D (by simp),
-              lVector_honest D hZ _ hl rfl hd, hall l hl d hd, hav]
-            rfl
-          have h5 := card_honestL D hZ
-          have h6 : (Finset.univ.filter fun l : Fin k => inl l ∉ s.byz).card ≤ count (fun p =>
-              deliver (oneSidedR k) (phi D) s (hist (oneSidedR k) (phi D) s (D.T + 1)) (D.T + 1) p
-                (inr j)) ((gsOfVector v).symm j) := Finset.card_le_card hcount
+        · rw [← Finset.filter_not, Finset.card_univ, Fintype.card_fin]
+          have := card_honestL D hZ
           omega
+        · intro l _ hl
+          have hl : inl l ∉ s.byz := by simpa using hl
+          obtain ⟨d, hd, -⟩ := hdL l hl
+          rw [deliver_honest _ _ _ hrel hl (by simp), hist_succ_cons, phi_send_suggest D (by simp),
+            lVector_honest D hZ _ hl rfl hd, hall l hl d hd, hav]
+          rfl
     refine bSM_congr hdec (offlineMatch s.input s.honest (fun _ d => d = v) ⟨?_, ?_, ?_⟩)
     · exact fun p _ => ⟨v, rfl⟩
     · rintro p _ d rfl q hq; exact hval q hq

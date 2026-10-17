@@ -14,6 +14,7 @@ speaks. So the paper's Theorem 13 (BB; Theorem 3 for BA is unaffected) needs an 
 set_option linter.unusedSectionVars false
 
 open MeasureTheory
+open Cslib.Byzantine.LockStep (firstSome?_eq_some_iff)
 
 namespace CommComplexityBA.NoSetup
 
@@ -35,12 +36,12 @@ section
 variable {R : Type*} (A : Adversary (Fin 2) Bool R 1) (ρ : R) (b : Bool) (ω : Fin 2 → Unit)
 
 lemma twoNode_output0 : twoNode.output (bbInput 0 b) ω A ρ 0 = some b := by
-  rw [Protocol.output, firstSome_eq_some_iff]
+  rw [Protocol.output, firstSome?_eq_some_iff]
   exact ⟨0, by simp [twoNode, bbInput], fun r hr => by omega⟩
 
 lemma twoNode_output1 : twoNode.output (bbInput 0 b) ω A ρ 1 =
     some (rcvTrue (fun p => twoNode.sent (bbInput 0 b) ω (fun _ => []) p 1 + A.inject ρ [] p 1)) := by
-  rw [Protocol.output, firstSome_eq_some_iff]
+  rw [Protocol.output, firstSome?_eq_some_iff]
   refine ⟨1, ?_, fun r hr => ?_⟩
   · simp [Protocol.run, Protocol.runI, twoNode, bbInput]
   · obtain rfl : r = 0 := by omega

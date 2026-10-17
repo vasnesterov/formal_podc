@@ -1,12 +1,14 @@
 import Papers.PODC2026.TreeAA.TreeGeom
 import Podc.LockStep.Sequential
+import Podc.LockStep.Basic
+import Podc.Agreement.Specs
 
 /-!
 # Problem specifications and local computations of the protocols
 
 Model: CSLib's synchronous lock-step Byzantine model `Cslib.Byzantine.LockStep` on the complete
 network `⊤` with parties `P` (`n = |P|`), a static adversary corrupting at most `t` parties
-(`atMost t`), deterministic protocols, optionally with ideal signatures (`Auth`).
+(`LockStep.atMost t`), deterministic protocols, optionally with ideal signatures (`Auth`).
 
 * `RealAA ε` — Definition 1 (termination, validity, `ε`-agreement), with the precondition
   `Close D` ("the honest inputs are `D`-close") under which the round bound is promised.
@@ -45,15 +47,20 @@ def GraphAA (G : SimpleGraph V) : Spec P V V := fun x H dec =>
 
 /-- **Definition 4** (gradecast with sender `snd`): termination, integrity (an honest sender's
 value is output with grade 2), consistency (grades differ by at most one; positive grades
-come with the same value). -/
-def Gradecast {W : Type*} (snd : P) : Spec P W (W × Fin 3) := fun x H dec =>
-  (∀ p ∈ H, ∃ o, dec p o) ∧
-  (snd ∈ H → ∀ p ∈ H, dec p (x snd, 2)) ∧
-  (∀ p ∈ H, ∀ q ∈ H, ∀ v w (g g' : Fin 3), dec p (v, g) → dec q (w, g') →
-    (g : ℕ) ≤ g' + 1 ∧ (0 < g → 0 < g' → v = w))
+come with the same value). The shared `Problem.Gradecast` with top grade `2`; `gradecast_iff`
+unfolds it. -/
+abbrev Gradecast {W : Type*} (snd : P) : Spec P W (W × Fin 3) :=
+  Cslib.Byzantine.Problem.Gradecast 2
+    (fun v (g : Fin 3) w g' => (g : ℕ) ≤ g' + 1 ∧ (0 < g → 0 < g' → v = w)) snd
 
-/-- The threshold adversary: at most `t` Byzantine parties. -/
-def atMost (t : ℕ) : AdvStructure P := {B | B.ncard ≤ t}
+/-- Definition 4 in its explicit form. -/
+lemma gradecast_iff {W : Type*} {snd : P} {x : P → W} {H : Set P} {dec : P → W × Fin 3 → Prop} :
+    Gradecast snd x H dec ↔
+      (∀ p ∈ H, ∃ o, dec p o) ∧
+      (snd ∈ H → ∀ p ∈ H, dec p (x snd, 2)) ∧
+      (∀ p ∈ H, ∀ q ∈ H, ∀ v w (g g' : Fin 3), dec p (v, g) → dec q (w, g') →
+        (g : ℕ) ≤ g' + 1 ∧ (0 < g → 0 < g' → v = w)) :=
+  Iff.rfl
 
 /-! ### Rounding (Remark 1) -/
 

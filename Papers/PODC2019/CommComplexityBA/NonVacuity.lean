@@ -18,6 +18,7 @@ Otherwise both other nodes are forever-honest and the relay round between them i
 -/
 
 open MeasureTheory
+open Cslib.Byzantine.LockStep (Inbox firstSome?_eq_some_iff)
 
 namespace CommComplexityBA
 
@@ -66,9 +67,9 @@ private lemma relay_output (p : Fin 3) :
           else if q = p then none else
             (if A.drop (relayProtocol.run (bbInput 0 b) () A 1).2 0 q then none
               else if (0 : Fin 3) = q then none else bbInput 0 b 0))) := by
-  rw [Protocol.output, firstSome_eq_some_iff]
+  rw [Protocol.output, firstSome?_eq_some_iff]
   refine ⟨2, ?_, fun r' hr' => ?_⟩
-  · rw [relay_hist]; rfl
+  · dsimp only; rw [relay_hist]; rfl
   · interval_cases r' <;> rfl
 
 /-- Against every omission adversary corrupting at most one node, the relay protocol achieves

@@ -54,10 +54,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Finite node set with a simple undirected graph known to all nodes. Synchronous lock-step rounds
   (CSLib `LockStep`). Protocols are deterministic and history-based, and may use any message type.
 * Local broadcast is a restriction on both sides. Honest protocols send the same message to all
-  neighbours. The Byzantine adversary (static set, `|B| ≤ f`) also broadcasts, but is otherwise
-  arbitrary (covers adaptive, rushing adversaries).
-* Consensus (§3): termination, agreement, and validity (output = input of some non-faulty node);
-  binary values.
+  neighbours. The Byzantine adversary (static set, `|B| ≤ f`: the shared threshold structure
+  `atMost f` of `Podc/LockStep/Basic.lean`) also broadcasts, but is otherwise arbitrary (covers
+  adaptive, rushing adversaries).
+* Consensus (§3): termination, agreement (the shared `Problem.Termination`, `Problem.Agreement`),
+  and validity (output = input of some non-faulty node); binary values.
 * Impossibility quantifies over all broadcast protocols. Possibility uses Algorithm 1, with phases for
   every `F` with `|F| ≤ f` in an arbitrary fixed order, `n` flooding rounds each, and rules (i)–(iv).
   Ambiguities (ordering within a transmission, ties in step (c)) are resolved deterministically, and
@@ -87,4 +88,5 @@ Section 6 / Appendix D (the hybrid model with equivocating faults).
 since Mathlib has none: `SimpleGraph.menger`, `SimpleGraph.fan` in CSLib
 `Cslib/Foundations/Combinatorics/SimpleGraph/Menger.lean`, with connectivity in
 `VertexConnectivity.lean` next to it; removing vertices without changing the vertex type is CSLib's
-`SimpleGraph.deleteVerts` (`Spanner.lean`). The round model is CSLib's `LockStep`.
+`SimpleGraph.deleteVerts` (`Spanner.lean`). The round model is CSLib's `LockStep` (delivery lemmas
+`deliver_honest`/`deliver_byz` from `Podc/LockStep/Basic.lean`).

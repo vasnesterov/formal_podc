@@ -17,14 +17,10 @@ open Cslib.Byzantine.LockStep SimpleGraph
 
 variable {P : Type} [Fintype P] [DecidableEq P]
 
-lemma byz_eq_empty_of_atMost_zero {I M : Type*} {s : Scenario P I M} (h : s.byz ∈ atMost (P := P) 0) :
-    s.byz = ∅ := by
-  have : s.byz.ncard = 0 := Nat.le_zero.1 h
-  exact (Set.ncard_eq_zero (Set.toFinite _)).1 this
-
+omit [DecidableEq P] in
 lemma mem_honest_of_atMost_zero {I M : Type*} {s : Scenario P I M} (h : s.byz ∈ atMost (P := P) 0)
     (p : P) : p ∈ s.honest := by
-  simp [Scenario.honest, byz_eq_empty_of_atMost_zero h]
+  simp [Scenario.honest, eq_empty_of_mem_atMost_zero h]
 
 /-- In a reliable failure-free run, the first inbox of `p` contains `q`'s round-0 message. -/
 lemma hist_one_of_atMost_zero {I M O : Type*} (alg : Protocol P I M O) {s : Scenario P I M}
@@ -33,7 +29,7 @@ lemma hist_one_of_atMost_zero {I M O : Type*} (alg : Protocol P I M O) {s : Scen
   rw [hist_succ, hist_zero, List.nil_append]
   congr 1
   funext q
-  have hq : q ∉ s.byz := by simp [byz_eq_empty_of_atMost_zero h]
+  have hq : q ∉ s.byz := by simp [eq_empty_of_mem_atMost_zero h]
   by_cases hqp : q = p
   · subst hqp; simp [deliver]
   · simp [deliver, top_adj, hqp, hq, hrel 0 q p]

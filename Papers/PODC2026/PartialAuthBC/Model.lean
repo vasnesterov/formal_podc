@@ -1,4 +1,5 @@
-import Cslib.Computability.Distributed.Byzantine.LockStep.Agreement
+import Podc.LockStep.Basic
+import Podc.Agreement.Specs
 import Mathlib
 
 /-!
@@ -13,11 +14,13 @@ produce such data, so it carries no authentication.
 
 * `SolvablePA Reg Z spec`: some unforging protocol whose tokens all have registered signers solves
   `spec` against every unforgeability-respecting adversary corrupting a set in `Z`.
-* `atMost t`: the threshold adversary structure.
-* `Gradecast snd`: Definition 2.3 of the paper (termination, validity, graded consistency).
+* `Gradecast snd`: Definition 2.3 of the paper (termination, validity, graded consistency), the
+  shared binary gradecast `Cslib.Byzantine.Problem.BinaryGradecast`; `gradecast_iff`.
 * `CoverSystem.scenario_authValid_pa`: the FLM covering adversary respects unforgeability as soon as
   every node listened to is an honest lift, a copy of a Byzantine party, or a copy of an
   *unregistered* party (unregistered parties never create tokens). -- CSLib candidate
+
+The threshold adversary structure `atMost t` is the shared `Cslib.Byzantine.LockStep.atMost`.
 -/
 
 namespace PartialAuthBC
@@ -37,16 +40,20 @@ def SolvablePA (Reg : Set P) (Z : AdvStructure P) (spec : Spec P I O) : Prop :=
   ∃ (M S : Type) (A : Auth P M S) (alg : Protocol P I M O),
     RegisteredSigners Reg A ∧ alg.Unforging A ∧ SolvesAuth ⊤ alg A Z spec
 
-/-- The threshold adversary: at most `t` Byzantine parties. -/
-def atMost (t : ℕ) : AdvStructure P := {B | B.ncard ≤ t}
+/-- **Gradecast** with sender `snd` (Definition 2.3): the binary-grade gradecast of the shared
+library (`gradecast_iff` spells it out). -/
+abbrev Gradecast {V : Type*} (snd : P) : Spec P V (V × Bool) :=
+  Cslib.Byzantine.Problem.BinaryGradecast snd
 
-/-- **Gradecast** with sender `snd` (Definition 2.3): termination, validity (an honest sender's
-input is output by every honest party with grade `1`), graded consistency (if an honest party
-outputs `v` with grade `1`, every honest party outputs `v`). -/
-def Gradecast {V : Type*} (snd : P) : Spec P V (V × Bool) := fun x H dec =>
-  (∀ p ∈ H, ∃ o, dec p o) ∧
-  (snd ∈ H → ∀ p ∈ H, dec p (x snd, true)) ∧
-  (∀ p ∈ H, ∀ q ∈ H, ∀ v w g, dec p (v, true) → dec q (w, g) → v = w)
+/-- Definition 2.3 as stated in the paper: termination, validity (an honest sender's input is
+output by every honest party with grade `1`), graded consistency (if an honest party outputs `v`
+with grade `1`, every honest party outputs `v`). -/
+theorem gradecast_iff {V : Type*} {snd : P} {x : P → V} {H : Set P} {dec : P → V × Bool → Prop} :
+    Gradecast snd x H dec ↔
+      (∀ p ∈ H, ∃ o, dec p o) ∧
+      (snd ∈ H → ∀ p ∈ H, dec p (x snd, true)) ∧
+      (∀ p ∈ H, ∀ q ∈ H, ∀ v w g, dec p (v, true) → dec q (w, g) → v = w) :=
+  Cslib.Byzantine.Problem.binaryGradecast_iff
 
 /-- Unauthenticated solvability gives partially authenticated solvability (no tokens at all). -/
 lemma Solvable.solvablePA {Reg : Set P} {Z : AdvStructure P} {spec : Spec P I O}

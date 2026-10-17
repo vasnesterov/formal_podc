@@ -25,6 +25,7 @@ Model for Theorem 13 of the paper (the Byzantine-broadcast form of Theorem 3).
 set_option linter.unusedSectionVars false
 
 open MeasureTheory
+open Cslib.Byzantine.LockStep (firstSome?)
 
 namespace CommComplexityBA.NoSetup
 
@@ -80,7 +81,7 @@ def Honest (A : Adversary P M R C) (ρ : R) (p : P) : Prop :=
 
 /-- First decision of `p`. -/
 noncomputable def output (A : Adversary P M R C) (ρ : R) (p : P) : Option Bool :=
-  firstSome fun r => π.decide p (inp p) (ω p) ((π.run inp ω A ρ r).1 p)
+  firstSome? fun r => π.decide p (inp p) (ω p) ((π.run inp ω A ρ r).1 p)
 
 /-- `p` sends at least one message at some point. -/
 def Speaks (A : Adversary P M R C) (ρ : R) (p : P) : Prop :=

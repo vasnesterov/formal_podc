@@ -1,4 +1,5 @@
 import Papers.PODC2026.TreeAA.Spec
+import Podc.Foundations.Count
 
 /-!
 # The 3-round gradecast of Ben-Or, Dolev and Hoch  -- CSLib candidate
@@ -32,7 +33,7 @@ variable {P : Type} [Fintype P] [DecidableEq P] {W : Type} [DecidableEq W]
 /-! ### Local computations -/
 
 /-- The number of parties `q` with `c q = some w`. -/
-def gcCount (c : P → Option W) (w : W) : ℕ := (Finset.univ.filter fun q => c q = some w).card
+def gcCount (c : P → Option W) (w : W) : ℕ := Finset.univ.countEq c (some w)
 
 /-- The inbox `ib` of `p`, completed with `p`'s own message `own`. -/
 def gcView (p : P) (own : Option W) (ib : Inbox P W) : P → Option W :=
@@ -72,34 +73,15 @@ variable {B : Set P} {t : ℕ}
 
 omit [DecidableEq P] in
 open Classical in
-lemma card_filter_mem_le (B : Set P) (S : Finset P) : (S.filter (· ∈ B)).card ≤ B.ncard := by
-  rw [← Set.ncard_coe_finset]
-  exact Set.ncard_le_ncard (fun q hq => by simp at hq; exact hq.2) (Set.toFinite _)
-
-open Classical in
-/-- Two sets of total size `> n + t` share a party outside `B` (`|B| ≤ t`). -/
-lemma exists_inter_not_mem (hB : B.ncard ≤ t) (S S' : Finset P)
-    (h : Fintype.card P + t < S.card + S'.card) : ∃ q ∈ S ∩ S', q ∉ B := by
-  have h1 := Finset.card_union_add_card_inter S S'
-  have h2 := Finset.card_le_univ (S ∪ S')
-  by_contra hc
-  push Not at hc
-  have h3 : (S ∩ S').filter (· ∈ B) = S ∩ S' := Finset.filter_true_of_mem hc
-  have h4 := card_filter_mem_le B (S ∩ S')
-  rw [h3] at h4
-  omega
-
-omit [DecidableEq P] in
-open Classical in
 /-- At least `n - t` supporters, hence at least `n - 2t` supporters outside `B`; they are seen by
 everybody who agrees with `c` outside `B`. -/
 lemma gcCount_transfer (hB : B.ncard ≤ t) {c c' : P → Option W}
     (hcc : ∀ q, q ∉ B → c q = c' q) {w : W} (h : Fintype.card P - t ≤ gcCount c w) :
     Fintype.card P - 2 * t ≤ gcCount c' w := by
-  unfold gcCount at *
+  unfold gcCount Finset.countEq at *
   set S := Finset.univ.filter fun q => c q = some w
   have h1 := Finset.card_filter_add_card_filter_not (s := S) (· ∈ B)
-  have h2 := card_filter_mem_le B S
+  have h2 := Finset.card_filter_mem_le_ncard B S
   have h3 : (S.filter fun q => q ∉ B).card ≤ (Finset.univ.filter fun q => c' q = some w).card := by
     apply Finset.card_le_card
     intro q hq
@@ -111,29 +93,20 @@ omit [DecidableEq P] in
 open Classical in
 lemma gcCount_of_forall (hB : B.ncard ≤ t) {c : P → Option W} {w : W}
     (h : ∀ q, q ∉ B → c q = some w) : Fintype.card P - t ≤ gcCount c w := by
-  unfold gcCount
+  unfold gcCount Finset.countEq
   have h1 := Finset.card_filter_add_card_filter_not (s := (Finset.univ : Finset P)) (· ∈ B)
-  have h2 := card_filter_mem_le B Finset.univ
+  have h2 := Finset.card_filter_mem_le_ncard B Finset.univ
   have h3 : (Finset.univ.filter fun q => q ∉ B).card ≤
       (Finset.univ.filter fun q => c q = some w).card :=
     Finset.card_le_card fun q hq => by simp at hq ⊢; exact h q hq
   rw [Finset.card_univ] at h1
   omega
 
-lemma gcCount_add_le (c : P → Option W) {w w' : W} (hw : w ≠ w') :
-    gcCount c w + gcCount c w' ≤ Fintype.card P := by
-  unfold gcCount
-  rw [← Finset.card_union_of_disjoint]
-  · exact Finset.card_le_univ _
-  · rw [Finset.disjoint_filter]
-    intro q _ h1 h2
-    exact hw (Option.some_injective _ (h1.symm.trans h2))
-
+omit [DecidableEq P] in
 lemma eq_of_gcCount (ht : 3 * t < Fintype.card P) {c : P → Option W} {w w' : W}
-    (h : Fintype.card P - t ≤ gcCount c w) (h' : Fintype.card P - t ≤ gcCount c w') : w = w' := by
-  by_contra hw
-  have := gcCount_add_le c hw
-  omega
+    (h : Fintype.card P - t ≤ gcCount c w) (h' : Fintype.card P - t ≤ gcCount c w') : w = w' :=
+  Option.some_injective _ <| Finset.eq_of_card_lt_countEq_add_countEq (s := .univ) (f := c) <| by
+    rw [Finset.card_univ]; unfold gcCount at h h'; omega
 
 omit [DecidableEq P] in
 lemma gcReady_spec {c : P → Option W} {w : W} (h : gcReady t c = some w) :
@@ -143,12 +116,14 @@ lemma gcReady_spec {c : P → Option W} {w : W} (h : gcReady t c = some w) :
   cases h
   exact h0.choose_spec
 
+omit [DecidableEq P] in
 lemma gcReady_eq (ht : 3 * t < Fintype.card P) {c : P → Option W} {w : W}
     (h : Fintype.card P - t ≤ gcCount c w) : gcReady t c = some w := by
   have h0 : ∃ w, Fintype.card P - t ≤ gcCount c w := ⟨w, h⟩
   unfold gcReady
   rw [dite_eq_left_of_eq_true (eq_true h0), eq_of_gcCount ht h0.choose_spec h]
 
+omit [DecidableEq P] in
 lemma gcGrade_eq (ht : 3 * t < Fintype.card P) (x : W) {c : P → Option W} {w : W}
     (h : Fintype.card P - t ≤ gcCount c w) : gcGrade t x c = (w, 2) := by
   have h0 : ∃ w, Fintype.card P - t ≤ gcCount c w := ⟨w, h⟩
@@ -259,24 +234,21 @@ theorem bdhGradecast_solves {t : ℕ} (ht : 3 * t < Fintype.card P) (snd : P) :
     rw [gc_msg_two] at h h'
     have h1 := gcReady_spec h
     have h2 := gcReady_spec h'
-    unfold gcCount at h1 h2
-    obtain ⟨u, hu, hub⟩ := exists_inter_not_mem hB _ _ (by omega : Fintype.card P + t <
-      (Finset.univ.filter fun u => gcC s t snd 1 q u = some w).card +
+    unfold gcCount Finset.countEq at h1 h2
+    obtain ⟨u, hu, hu', hub⟩ := Finset.exists_mem_inter_notMem_of_ncard_le hB (by omega :
+      Fintype.card P + t < (Finset.univ.filter fun u => gcC s t snd 1 q u = some w).card +
       (Finset.univ.filter fun u => gcC s t snd 1 q' u = some w').card)
-    simp only [Finset.mem_inter, Finset.mem_filter, Finset.mem_univ, true_and] at hu
-    rw [hagree 1 q q' hq hq' u hub, hu.2] at hu
-    exact (Option.some_injective _ hu.1).symm
+    simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hu hu'
+    rw [hagree 1 q q' hq hq' u hub, hu'] at hu
+    exact (Option.some_injective _ hu).symm
   -- `t + 1` readies of `w` include an honest one
   have hready' : ∀ p w, p ∉ s.byz → t + 1 ≤ gcCount (gcC s t snd 2 p) w →
       ∃ q, q ∉ s.byz ∧
         gcMsg t snd q (s.input q) (hist ⊤ (bdhGradecast t snd) s 2 q) = some w := by
     intro p w hp h
-    unfold gcCount at h
-    obtain ⟨u, hu, hub⟩ := exists_inter_not_mem hB _ Finset.univ
-      (by rw [Finset.card_univ]; omega : Fintype.card P + t <
-        (Finset.univ.filter fun u => gcC s t snd 2 p u = some w).card + Finset.univ.card)
-    simp only [Finset.mem_inter, Finset.mem_filter, Finset.mem_univ, true_and, and_true] at hu
-    exact ⟨u, hub, by rw [← gcC_honest hrel 2 hp hub]; exact hu⟩
+    obtain ⟨u, hu, hub⟩ := Finset.exists_mem_notMem_of_ncard_le_of_lt hB
+      (s := {u | gcC s t snd 2 p u = some w}) (by unfold gcCount Finset.countEq at h; omega)
+    exact ⟨u, hub, by rw [← gcC_honest hrel 2 hp hub]; exact (Finset.mem_filter.1 hu).2⟩
   refine ⟨⟨fun p _ => ⟨_, (gc_decides_iff s p _).2 rfl⟩, ?_, ?_⟩, ?_⟩
   · -- integrity
     intro hsnd p hp

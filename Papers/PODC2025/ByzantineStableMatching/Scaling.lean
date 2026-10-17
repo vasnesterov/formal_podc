@@ -1,4 +1,5 @@
 import Papers.PODC2025.ByzantineStableMatching.Problem
+import Podc.LockStep.Basic
 
 /-!
 # Lemma 3: scaling down by group simulation
@@ -104,28 +105,17 @@ theorem hist_bigScenario (hadj : ∀ p p', G.Adj p p' → grp p ≠ grp p' → G
     by_cases hA : G.Adj p₀ p
     · by_cases hg : grp p₀ = grp p
       · have hp₀ : grp p₀ ∉ s.byz := hg ▸ hp
-        simp only [deliver, hA, hg, ↓reduceIte,
-          show p₀ ∉ (bigScenario grp inp s).byz from hp₀, bigScenario_reliable grp inp s r p₀ p,
-          ih p₀ hp₀]
-        simp only [bigScenario, hg]
+        rw [deliver_honest _ _ _ (bigScenario_reliable grp inp s) hp₀ hA, ih p₀ hp₀]
+        simp only [hA, hg, ↓reduceIte, bigScenario]
       · have hQ := hadj p₀ p hA hg
-        simp only [deliver, hA, hg, hQ, ↓reduceIte]
+        simp only [hA, hg, ↓reduceIte]
         by_cases hb : grp p₀ ∈ s.byz
-        · simp only [show p₀ ∈ (bigScenario grp inp s).byz from hb, hb, ↓reduceIte]
+        · rw [deliver_byz _ _ (bigScenario grp inp s) hb hA, deliver_byz _ _ _ hb hQ]
           rfl
-        · simp only [show p₀ ∉ (bigScenario grp inp s).byz from hb, hb, ↓reduceIte,
-            bigScenario_reliable grp inp s r p₀ p, hrel _ _ _, ih p₀ hb]
+        · rw [deliver_honest _ _ _ (bigScenario_reliable grp inp s) hb hA,
+            deliver_honest _ _ _ hrel hb hQ, ih p₀ hb]
           simp [proto, hA, bigScenario]
     · simp [deliver, hA]
-
-lemma firstSome_map {O O' : Type*} {f : ℕ → Option O} {g : O → O'} {o' : O'} :
-    FirstSome (fun r => (f r).map g) o' ↔ ∃ o, FirstSome f o ∧ g o = o' := by
-  constructor
-  · rintro ⟨r, hr, hlt⟩
-    obtain ⟨o, ho, rfl⟩ := Option.map_eq_some_iff.mp hr
-    exact ⟨o, ⟨r, ho, fun r' h => Option.map_eq_none_iff.mp (hlt r' h)⟩, rfl⟩
-  · rintro ⟨o, ⟨r, ho, hlt⟩, rfl⟩
-    exact ⟨r, by simp [ho], fun r' h => by simp [hlt r' h]⟩
 
 /-- An honest simulator decides what its representative decides in the induced run. -/
 theorem decides_proto (hrep : ∀ q, grp (rep q) = q)
@@ -142,7 +132,7 @@ theorem decides_proto (hrep : ∀ q, grp (rep q) = q)
     simp only [status]
     rw [this]
     simp only [proto, length_hist, bigScenario, hrep]
-  rw [decides_iff_firstSome, FirstSome.congr key, firstSome_map]
+  rw [decides_iff_firstSome, FirstSome.congr key, firstSome_map_iff]
   rfl
 
 end GroupSim
