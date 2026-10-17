@@ -117,6 +117,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2023 | 3 | Bashari, Jamadi, Woelfel — *Efficient Bounded Timestamping from Standard Synchronization Primitives* | [BoundedTimestamping](Papers/PODC2023/BoundedTimestamping) | ❌ **The LL/SC algorithm (Figs. 1–2) is not linearizable**: helper steps share the process's LL/SC link, so Lemma 6 (hence Lemmas 8, 9, Cor. 10) is false — sequential 438-operation counterexample (n=3); Theorem 1 not established; wait-freedom (≤ 2κ+107 steps) and Section 6 algorithm proved |
 | 2022 | 3 | Dory, Ghaffari, Ilchi — *Near-Optimal Distributed Dominating Set in Bounded Arboricity Graphs* | [DominatingSetArboricity](Papers/PODC2022/DominatingSetArboricity) | ⚠️ Theorems 1.1–1.3 proved (deterministic distributed algorithm, randomized bounds) and the Theorem 1.4 reduction; Theorem 1.3's proof arithmetic fails for small Δ (statement rescued); missing justifications and degenerate slips |
 | 2025 | 2 | Jayanti — *On Interplanetary and Relativistic Distributed Computing* | [RelativisticComputing](Papers/PODC2025/RelativisticComputing) | ⚠️ Central Theorem 6.7 (countably many processors), Theorem 6.8 (finite executions) and Lemmas 6.2–6.6 proved over abstract spacetimes; Lemma 6.3's proof assumes order type ω (ω+1 example), repaired via Cantor; Lemmas 6.3–6.5 and Thm 6.7 fail with uncountably many processors (degenerate); several definitions under-specified |
+| 2025 | 2 | Castañeda, Rodríguez — *Asynchronous Fault-Tolerant Language Decidability for Runtime Verification of Distributed Systems* | [LanguageDecidability](Papers/PODC2025/LanguageDecidability) | ❌ Theorems 4.1, 5.1 (modified language), 5.2 and most lemmas proved; **Lemma 5.3 ('WEC is weakly decidable', Table 1) false for the paper's definition of WEC**; the monitor of Figs. 5/9 flags words in SEC (fixed and proved); Figure 4 construction wrong (Lemma 4.3 true); several proofs use words violating the definitions |
 | 2024 | 2 | Ovens — *Determining Recoverable Consensus Numbers* | [RecoverableConsensus](Papers/PODC2024/RecoverableConsensus) | ⚠️ Main theorem proved; proof errors in Lemmas 15 and 16 repaired |
 | 2022 | 2 | Fraigniaud, Paz, Rajsbaum — *A Speedup Theorem for Asynchronous Computation with Applications to Consensus and Approximate Agreement* | [AsyncSpeedup](Papers/PODC2022/AsyncSpeedup) | ✅ Speedup theorem, consensus fixed points and all approximate-agreement lower bounds proved for n processes (Cor. 3 shown tight); abstract overstates what Theorem 4 covers; implicit model assumptions made explicit |
 | 2026 | 1 | Breitkopf, Dallot, El-Hayek, Schmid — *Ranking Opinions with Few States in Population Protocols* | [RankingOpinions](Papers/PODC2026/RankingOpinions) | ❌ Theorem 1.1 proved; **Theorem 4.1 false**; **the ranking protocol of Theorem 1.2 is incorrect** as written (fixed versions proved) |
@@ -272,6 +273,13 @@ in the paper's `differencies.md`.
   438 operations) after which `isEarlier(1,0)` returns the wrong answer. Wait-freedom (≤ 2κ+107 steps per
   operation) and the Section 6 algorithm are correct; giving the helper its own link context looks like a fix
   (not proved).
+- **Asynchronous Fault-Tolerant Language Decidability for Runtime Verification of Distributed Systems** (PODC 2025,
+  2 citations) — [LanguageDecidability](Papers/PODC2025/LanguageDecidability). Lemma 5.3 (and Table 1's "WEC ∈ WD")
+  is false for the paper's definition of weak eventual counters: property (3) of Definition 2.7 is a precise
+  quiescent-convergence condition, under which no monitor weakly decides WEC (diagonal argument); under it even a
+  linearizable counter history with infinitely many increments is not in WEC. The monitor of Figures 5 and 9 is also
+  wrong — it raises its flag on words in SEC (e.g. p₀ reads 0, increments, then reads 1). With a modified language and a
+  corrected monitor the lemma and Theorem 5.1 (SD ⊊ WD) are proved.
 - **Efficient Counting and Simulation in Content-Oblivious Rings** (PODC 2026, 1 citations) —
   [ContentObliviousCounting](Papers/PODC2026/ContentObliviousCounting). Lemma 16 and Theorem 17 (bit sending with a
   composable ending) are false for a relay leader, a case the paper explicitly covers (Algorithm 8 has branches only
