@@ -1,6 +1,7 @@
 import Papers.PODC2026.ConsistentRefereeing.LongLivedValency
 import Podc.SharedMemory.Objects
 import Podc.SharedMemory.ObjClasses
+import Podc.SharedMemory.Covering
 
 /-!
 # Long-lived contest: indistinguishability of schedules (Section 5 of [ACE26])
@@ -41,11 +42,6 @@ lemma config_eq_of_agreeOn_univ {C D : Config A B P L} (h : AgreeOn Set.univ C D
   exact ⟨funext fun q => h.loc q trivial, funext fun q => h.pend q trivial, h.mem⟩
 
 -- CSLib candidate
-lemma AgreeOn.trans {Q : Set P} {C D E : Config A B P L} (h₁ : AgreeOn Q C D)
-    (h₂ : AgreeOn Q D E) : AgreeOn Q C E :=
-  ⟨h₁.mem.trans h₂.mem, fun q hq => (h₁.loc q hq).trans (h₂.loc q hq),
-    fun q hq => (h₁.pend q hq).trans (h₂.pend q hq)⟩
-
 lemma agreeOn_refl (Q : Set P) (C : Config A B P L) : AgreeOn Q C C :=
   ⟨rfl, fun _ _ => rfl, fun _ _ => rfl⟩
 
