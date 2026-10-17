@@ -1,5 +1,6 @@
 import Papers.PODC2024.HistoryIndependent.Universal
 import Podc.Computability.Distributed.SharedMemory.Model
+import Podc.Computability.Distributed.SharedMemory.StrongLin
 import Cslib.Computability.Distributed.SharedMemory.Linearization
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
 import Cslib.Computability.Distributed.SharedMemory.Model
@@ -1184,23 +1185,18 @@ noncomputable def contrib (α : List (Label (Fin n) A)) (ℓ : Label (Fin n) A) 
   | some C, .tau p => contribT (curOf α) C p
   | _, _ => []
 
-/-- Auxiliary: `hlin` on the reversed execution. -/
-noncomputable def hlinRev : List (Label (Fin n) A) → List (OpId (Fin n) × A.Op)
-  | [] => []
-  | ℓ :: β => hlinRev β ++ contrib β.reverse ℓ
-
 variable (A n) in
 /-- The linearization function `h_uc` of Algorithm 5 (Section 6.2): state-changing operations are
 linearized at the successful `SC(head, ⟨q', ⟨r, j⟩⟩)` of line 14 that applies them, read-only
 operations at their `Load(head)`. -/
 noncomputable def hlin (α : List (Label (Fin n) A)) : List (OpId (Fin n) × A.Op) :=
-  hlinRev α.reverse
+  linOfPts contrib α
 
 @[simp] lemma hlin_nil : hlin A n [] = [] := rfl
 
 lemma hlin_snoc (α : List (Label (Fin n) A)) (ℓ : Label (Fin n) A) :
-    hlin A n (α ++ [ℓ]) = hlin A n α ++ contrib α ℓ := by
-  simp [hlin, hlinRev]
+    hlin A n (α ++ [ℓ]) = hlin A n α ++ contrib α ℓ :=
+  linOfPts_concat _ α ℓ
 
 /-- The invariant of an execution `α`, with linearization `L`, reaching configuration `C`. -/
 structure InvL (α : List (Label (Fin n) A)) (L : List (OpId (Fin n) × A.Op))

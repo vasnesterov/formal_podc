@@ -4,6 +4,7 @@ import Cslib.Computability.Distributed.SharedMemory.Potential
 import Cslib.Computability.Distributed.SharedMemory.Task
 import Cslib.Foundations.Data.Finset.SumUpdate
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
+import Podc.Computability.Distributed.SharedMemory.StrongLin
 import Mathlib
 
 /-!
@@ -252,20 +253,15 @@ noncomputable def linPt (α : List (Lbl P V v₀)) : Lbl P V v₀ → List (OpId
     | none => []
   | _ => []
 
-/-- `h_llsc` on reversed executions. -/
-noncomputable def linRev : List (Lbl P V v₀) → List (OpId P × Op P V v₀)
-  | [] => []
-  | ℓ :: β => linRev β ++ linPt β.reverse ℓ
-
 /-- The linearization function `h_llsc` of the paper (Section 6.3): the operations whose
 linearization point (`IsLinStep`) occurs in `α`, ordered by their linearization points. -/
-noncomputable def lin (α : List (Lbl P V v₀)) : List (OpId P × Op P V v₀) := linRev α.reverse
+noncomputable def lin (α : List (Lbl P V v₀)) : List (OpId P × Op P V v₀) := linOfPts linPt α
 
 @[simp] lemma lin_nil : lin ([] : List (Lbl P V v₀)) = [] := rfl
 
 lemma lin_append (α : List (Lbl P V v₀)) (ℓ : Lbl P V v₀) :
-    lin (α ++ [ℓ]) = lin α ++ linPt α ℓ := by
-  simp [lin, linRev]
+    lin (α ++ [ℓ]) = lin α ++ linPt α ℓ :=
+  linOfPts_concat _ α ℓ
 
 /-! ## The invariant (Lemma 40) -/
 

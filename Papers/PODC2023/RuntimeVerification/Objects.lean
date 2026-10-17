@@ -27,10 +27,8 @@ open Podc2023.RuntimeVerification Podc2023.RuntimeVerification.Impossibility
 variable {n : ℕ} {Op Y W State : Type}
 
 theorem prefixClosed_detSpec (init : State) (δ : State → Op → State × Y) :
-    PrefixClosedSpec (P := Fin n) (fun _ => detSpec init δ) := by
-  intro M N h
-  rw [seqHist_mem_detSpec, runOK_append] at h
-  exact seqHist_mem_detSpec.2 h.1
+    PrefixClosedSpec (P := Fin n) (fun _ => detSpec init δ) :=
+  prefixClosedSpec_iff.2 (detSpec_prefixClosed init δ)
 
 /-- Sufficient conditions for `ImpData.Good` for a deterministic object: `a` takes the initial
 state to `s₁` with response `ra`, `b` takes `s₁` to `s₂` with response `rb`, every `cₖ` returns

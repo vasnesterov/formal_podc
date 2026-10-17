@@ -1,4 +1,5 @@
 import Papers.PODC2019.AnonymousMutex.Alg2Resign
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # Algorithm 2: a permanent owner
@@ -27,19 +28,9 @@ def Neutral : PC → Prop
 /-- The latest time in `[a, b)` at which `Pr` fails, if it fails at `a` and holds at `b`. -/
 lemma last_entry (Pr : ℕ → Prop) {a b : ℕ} (hab : a ≤ b) (ha : ¬ Pr a) (hb : Pr b) :
     ∃ s, a ≤ s ∧ s < b ∧ ¬ Pr s ∧ ∀ t, s < t → t ≤ b → Pr t := by
-  classical
-  have hex : ∃ k, ¬ Pr (b - k) := ⟨b - a, by rwa [show b - (b - a) = a by omega]⟩
-  set k₀ := Nat.find hex
-  have hk₀ : ¬ Pr (b - k₀) := Nat.find_spec hex
-  have hle : k₀ ≤ b - a := Nat.find_min' hex (by rwa [show b - (b - a) = a by omega])
-  have hpos : 0 < k₀ := by
-    rcases Nat.eq_zero_or_pos k₀ with h | h
-    · rw [h, Nat.sub_zero] at hk₀; exact absurd hb hk₀
-    · exact h
-  refine ⟨b - k₀, by omega, by omega, hk₀, fun t h1 h2 => ?_⟩
-  have := Nat.find_min hex (show b - t < k₀ by omega)
-  rw [show b - (b - t) = t by omega] at this
-  exact not_not.1 this
+  obtain ⟨s, h1, h2, h3, h4⟩ := Nat.exists_last_of_le (p := fun t => ¬ Pr t) hab ha
+  exact ⟨s, h1, lt_of_le_of_ne h2 (by rintro rfl; exact h3 hb), h3,
+    fun t h5 h6 => not_not.1 (h4 t h5 h6)⟩
 
 section Exec
 

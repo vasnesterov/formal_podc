@@ -1,5 +1,6 @@
 import Mathlib
 import Cslib.Computability.Distributed.SharedMemory.HerlihyWing.Equiv
+import Podc.Computability.Distributed.SharedMemory.HerlihyWing.SeqLin
 
 /-!
 # Similarity of histories and the class `GenLin` (Section 7.1)
@@ -22,7 +23,8 @@ Definition 4.2 of the paper (the paper uses the definition of [95] = Sela–Herl
 * `lemma_7_1` — Lemma 7.1: linearizability (w.r.t. a prefix-closed sequential specification)
   belongs to `GenLin`.
 
--- CSLib candidate: `similar_iff_simS`, `lemma_7_1_prefix`, `lemma_7_1_similar` (and helpers).
+-- CSLib candidate: `similar_iff_simS`, `lemma_7_1_similar` (and helpers); the prefix part of
+-- Lemma 7.1 is the staged `Cslib.SharedMemory.HerlihyWing.Linearizable.of_prefix`.
 -/
 
 namespace Podc2023.RuntimeVerification
@@ -320,27 +322,6 @@ lemma SimS.build {E F : Hist P Op R} (hS : SimS E F) (ps : List P) :
         · rw [restrictP_append, hres' q hq]
           simp [restrictP_singleton, Ne.symm hq]
 
-/-- A prefix of a linearization that contains all operations completed in `E`, each of its
-elements being completed in `E` or preceding (in the list) one that is. -/
-lemma exists_prefix_cover (E : Hist P Op R) (M : List (OpRec P Unit Op R)) :
-    ∃ N, N <+: M ∧ (∀ a ∈ idsOf M, Completed E a → a ∈ idsOf N) ∧
-      (∀ c ∈ idsOf N, Completed E c ∨ ∃ a, Completed E a ∧ [c, a].Sublist (idsOf N)) := by
-  induction M using List.reverseRecOn with
-  | nil => exact ⟨[], List.prefix_refl _, fun a ha => by simp at ha, fun c hc => by simp at hc⟩
-  | append_singleton M e ih =>
-    obtain ⟨N, hN, h1, h2⟩ := ih
-    by_cases hz : Completed E ⟨e.p, e.x, cnt M e.p e.x⟩
-    · refine ⟨M ++ [e], List.prefix_refl _, fun a ha _ => ha, fun c hc => ?_⟩
-      rw [idsOf_concat] at hc ⊢
-      rcases List.mem_append.1 hc with hc | hc
-      · exact Or.inr ⟨_, hz, pair_sublist_iff.2 ⟨idsOf M, _, rfl, hc, List.mem_singleton_self _⟩⟩
-      · rw [List.mem_singleton] at hc; subst hc; exact Or.inl hz
-    · refine ⟨N, hN.trans (List.prefix_append _ _), fun a ha hca => ?_, h2⟩
-      rw [idsOf_concat] at ha
-      rcases List.mem_append.1 ha with ha | ha
-      · exact h1 a ha hca
-      · rw [List.mem_singleton] at ha; subst ha; exact absurd hca hz
-
 end Aux
 
 /-- Definition 7.1 is equivalent to its semantic form. -/
@@ -394,50 +375,16 @@ machine, Definition 4.1). -/
 def PrefixClosedSpec (spec : SeqSpec P Unit Op R) : Prop :=
   ∀ M N : List (OpRec P Unit Op R), seqHist (M ++ N) ∈ spec () → seqHist M ∈ spec ()
 
+omit [DecidableEq P] in
+/-- `PrefixClosedSpec` is CSLib's `SeqSpec.PrefixClosed` on the single object `()`. -/
+theorem prefixClosedSpec_iff {spec : SeqSpec P Unit Op R} :
+    PrefixClosedSpec spec ↔ spec.PrefixClosed :=
+  ⟨fun h x M N hMN => h M N hMN, fun h M N hMN => h () M N hMN⟩
+
 /-- **Lemma 7.1 (1).** Every prefix of a linearizable history is linearizable. -/
 theorem lemma_7_1_prefix {spec : SeqSpec P Unit Op R} (hspec : PrefixClosedSpec spec)
-    {E F : Hist P Op R} (hF : Linearizable spec F) (h : E <+: F) : Linearizable spec E := by
-  obtain ⟨t, rfl⟩ := h
-  obtain ⟨hwfF, M, hM⟩ := linearizable_iff.1 hF
-  have hwfE : WellFormed E := hwfF.of_append
-  obtain ⟨N, ⟨T, rfl⟩, h1, h2⟩ := exists_prefix_cover E M
-  have hids : idsOf (N ++ T) = idsOf N ++ idsGo N T := idsOf_append N T
-  have hnd := nodup_idsOf (N ++ T)
-  have hsub : ∀ a ∈ idsOf N, a ∈ idsOf (N ++ T) := fun a ha => by
-    rw [hids]; exact List.mem_append_left _ ha
-  have hsub2 : ∀ a b, [a, b].Sublist (idsOf N) → [a, b].Sublist (idsOf (N ++ T)) :=
-    fun a b hab => by rw [hids]; exact hab.trans (List.sublist_append_left _ _)
-  have hinvN : ∀ c ∈ idsOf N, Invoked E c := by
-    intro c hc
-    rcases h2 c hc with hcc | ⟨a, ha, hca⟩
-    · exact hwfE.invoked_of_completed hcc
-    · by_contra hni
-      have hpre : Precedes (E ++ t) a c := ⟨E, t, rfl, ha, hni⟩
-      exact pair_sublist_asymm hnd (hM.realtime a c hpre (hsub c hc)) (hsub2 c a hca)
-  refine linearizable_iff.2 ⟨hwfE, N, IsLinA.mk' hwfE ?_ ?_ ?_ ?_⟩
-  · intro a e hae
-    have hae' : (a, e) ∈ (idsOf (N ++ T)).zip (N ++ T) := by
-      rw [hids, List.zip_append (by simp)]; exact List.mem_append_left _ hae
-    obtain ⟨ho, hr⟩ := hM.recs a e hae'
-    have hai : Invoked E a := hinvN a (List.of_mem_zip hae).1
-    refine ⟨by rw [opOf_append_of_invoked hai] at ho; exact ho, fun hc => ?_⟩
-    have := hr hc.mono
-    rw [resOf_append_of_completed hc] at this; exact this
-  · intro a ha; exact h1 a (hM.complete a ha.mono) ha
-  · have hX : ∀ S : Hist P Op R, restrictX S () = S := fun S =>
-      List.filter_eq_self.2 (fun e _ => by simp)
-    refine ⟨isSeq_seqHist N, fun x => ?_⟩
-    have hl := hM.legal.2 x
-    cases x
-    rw [hX] at hl ⊢
-    exact hspec N T hl
-  · intro a b hab hb
-    have hab' := hM.realtime a b hab.mono (hsub b hb)
-    have ha : a ∈ idsOf N := h1 a (hab'.subset List.mem_cons_self) hab.completed
-    have hne : a ≠ b := by rintro rfl; exact pair_sublist_irrefl hnd a hab'
-    rcases pair_sublist_total (nodup_idsOf N) ha hb hne with h | h
-    · exact h
-    · exact absurd hab' (pair_sublist_asymm hnd (hsub2 b a h))
+    {E F : Hist P Op R} (hF : Linearizable spec F) (h : E <+: F) : Linearizable spec E :=
+  Linearizable.of_prefix (prefixClosedSpec_iff.1 hspec) hF h
 
 /-- **Lemma 7.1 (2).** Every history similar to a linearizable history is linearizable. -/
 theorem lemma_7_1_similar {spec : SeqSpec P Unit Op R} {E F : Hist P Op R}

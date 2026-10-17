@@ -487,22 +487,17 @@ noncomputable def contribFl (α : List (Label (Fin n) A)) (ℓ : Label (Fin n) A
     else []
   | _, _ => []
 
-/-- Auxiliary: `hlinF` on the reversed execution. -/
-noncomputable def hlinFRev : List (Label (Fin n) A) → List (OpId (Fin n) × A.Op)
-  | [] => []
-  | ℓ :: β => hlinFRev β ++ contribFl β.reverse ℓ
-
 variable (A n) in
 /-- The linearization function of the flattened implementation: an operation is linearized at
 the linearization point (Algorithm 6) of the R-LLSC operation at which Algorithm 5 linearizes
 it, i.e. the successful `CAS` of `SC(head, ⟨q', ⟨r, j⟩⟩)` (line 14) for state-changing
 operations, and the `Read` of `Load(head)` (line 1) for read-only ones. -/
 noncomputable def hlinF (α : List (Label (Fin n) A)) : List (OpId (Fin n) × A.Op) :=
-  hlinFRev α.reverse
+  linOfPts contribFl α
 
 lemma hlinF_snoc (α : List (Label (Fin n) A)) (ℓ : Label (Fin n) A) :
-    hlinF A n (α ++ [ℓ]) = hlinF A n α ++ contribFl α ℓ := by
-  simp [hlinF, hlinFRev]
+    hlinF A n (α ++ [ℓ]) = hlinF A n α ++ contribFl α ℓ :=
+  linOfPts_concat _ α ℓ
 
 lemma InvL.extend_tau {α : List (Label (Fin n) A)} {L : List (OpId (Fin n) × A.Op)}
     {D : Config A (B A n) (Fin n) (Loc A n)} {p : Fin n} (hI : InvL α L D)
@@ -572,33 +567,14 @@ theorem flat_invL {α : List (Label (Fin n) A)} {C : Config A (BF A n) (Fin n) (
 
 /-! ## Linearizability and state-quiescent history independence (Theorem 32) -/
 
-lemma hlinF_append (α β : List (Label (Fin n) A)) :
-    ∃ M, hlinF A n (α ++ β) = hlinF A n α ++ M := by
-  induction β using List.reverseRecOn with
-  | nil => exact ⟨[], by simp⟩
-  | append_singleton β ℓ ih =>
-    obtain ⟨M, hM⟩ := ih
-    exact ⟨M ++ contribFl (α ++ β) ℓ, by rw [← List.append_assoc, hlinF_snoc, hM, List.append_assoc]⟩
-
 /-- **Theorem 32** (linearizability): `hlinF` is a linearization function of the flattened
 implementation. -/
-theorem flat_isLinFun : (flat A n).IsLinFun (hlinF A n) := by
-  intro α ⟨C, hC⟩
-  have hI := flat_invL hC
-  refine ⟨hI.nodup, hI.op_eq, hI.complete, ?_, ?_⟩
-  · rintro a b ⟨β, γ, rfl, ha, hb⟩ hbL
-    obtain ⟨Cβ, hCβ⟩ := (flat A n).valid_of_prefix ⟨C, hC⟩ (List.prefix_append β γ)
-    have hIβ := flat_invL hCβ
-    obtain ⟨M, hM⟩ := hlinF_append β γ
-    rw [hM] at hbL ⊢
-    have haβ := hIβ.complete a ha
-    have hbβ : b ∉ (hlinF A n β).map Prod.fst := fun hm => hb (hIβ.invoked hm)
-    simp only [map_append, mem_append] at hbL ⊢
-    rcases hbL with hbL | hbL
-    · exact absurd hbL hbβ
-    · exact (List.Sublist.append (List.singleton_sublist.2 haβ) (List.singleton_sublist.2 hbL) :
-        [a] ++ [b] <+ _)
-  · exact seqOK_of_respIn hI.nodup fun x r _ hr => hI.resp x r hr
+theorem flat_isLinFun : (flat A n).IsLinFun (hlinF A n) :=
+  (Impl.isStrongLinFun_of_prefix (fun _ _ _ h => linOfPts_prefix _ h)
+    (fun _ ⟨_, hC⟩ => (flat_invL hC).nodup) (fun _ ⟨_, hC⟩ => (flat_invL hC).op_eq)
+    (fun _ ⟨_, hC⟩ => (flat_invL hC).complete)
+    (fun _ ⟨_, hC⟩ =>
+      seqOK_of_respIn (flat_invL hC).nodup fun x r _ hr => (flat_invL hC).resp x r hr)).1
 
 /-- **Theorem 32** (state-quiescent HI): in a state-quiescent configuration every CAS object
 holds the canonical value: `head = (⟨q, ⊥⟩, ∅)`, `announce[j] = (⊥, ∅)`, where `q` is the state
