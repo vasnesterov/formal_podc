@@ -1,4 +1,5 @@
 import Mathlib.Combinatorics.SimpleGraph.Metric
+import Podc.Foundations.Combinatorics.SimpleGraph.Ball
 
 /-!
 # The lower-bound graph of Lemma 3.2: its diameter can exceed `D'`
@@ -27,7 +28,7 @@ diameter of this construction is about `3D`, and choosing e.g. `k = ⌊(D' - 2)/
 diameter `≤ D'` in all tested cases, so the proof is repairable up to constants (not formalized).
 
 The lower bound on the distance uses a 1-Lipschitz potential certificate
-(`le_add_dist_of_lipschitz`): the BFS distances from `v_{3,3}`, checked edge by edge by `decide`.
+(`SimpleGraph.Reachable.le_add_dist_of_lipschitz`): the BFS distances from `v_{3,3}`, checked edge by edge by `decide`.
 -/
 
 namespace LowCongestionShortcuts.LowerBound
@@ -69,20 +70,6 @@ abbrev paperGraph (δ' D' : ℕ) : SimpleGraph (Vtx (δ' - 2) (D' / (2 * (δ' - 
 
 instance (δ k : ℕ) : DecidableRel (lbGraph δ k).Adj := fun x y =>
   decidable_of_iff _ (SimpleGraph.fromRel_adj (baseRel δ k) x y).symm
-
-/-- A 1-Lipschitz potential gives lower bounds on distances. -- CSLib candidate -/
-theorem le_add_dist_of_lipschitz {V : Type*} {G : SimpleGraph V} (f : V → ℕ)
-    (hf : ∀ x y, G.Adj x y → f y ≤ f x + 1) {a b : V} (h : G.Reachable a b) :
-    f b ≤ f a + G.dist a b := by
-  obtain ⟨w, hw⟩ := h.exists_walk_length_eq_dist
-  rw [← hw]
-  clear hw h
-  induction w with
-  | nil => simp
-  | cons hadj p ih =>
-    have := hf _ _ hadj
-    simp only [SimpleGraph.Walk.length_cons]
-    omega
 
 /-! ### The instance `δ' = 5`, `D' = 12` -/
 
@@ -156,7 +143,7 @@ the nodes `v_{3,3}` and `v_{10,11}` are at distance exactly `15`. -/
 theorem lbGraph_dist_eq : (lbGraph 3 2).dist (vv 2 2) (vv 9 10) = 15 := by
   apply le_antisymm
   · exact shortWalk_length ▸ SimpleGraph.dist_le shortWalk
-  · have := le_add_dist_of_lipschitz pot pot_lipschitz ⟨shortWalk⟩
+  · have := SimpleGraph.Reachable.le_add_dist_of_lipschitz pot_lipschitz ⟨shortWalk⟩
     simpa [pot, gridPot] using this
 
 /-- **Counterexample to the diameter claim in the proof of Lemma 3.2** (Ghaffari–Haeupler,

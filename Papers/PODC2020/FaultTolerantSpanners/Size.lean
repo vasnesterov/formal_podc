@@ -1,5 +1,5 @@
 import Papers.PODC2020.FaultTolerantSpanners.Greedy
-import Papers.PODC2020.FaultTolerantSpanners.SizeArith
+import Podc.Foundations.Combinatorics.SimpleGraph.BlockingSet
 import Mathlib
 
 /-!
@@ -71,19 +71,8 @@ theorem modifiedGreedy_card_edges_le' {O : ShortPathOracle V} (hO : O.Spec)
     ((modifiedGreedy O k f L).edgeSet.ncard : ℝ) ≤
       8 * (2 * ((2 * k - 1) * f : ℕ) : ℝ) ^ (1 - 1 / (k : ℝ)) *
         (Fintype.card V : ℝ) ^ (1 + 1 / (k : ℝ)) := by
-  classical
-  set H := modifiedGreedy O k f L
   obtain ⟨B, hB, hBcard⟩ := modifiedGreedy_exists_blockingSet hO (L := L) (f := f) hk
-  have hD : 1 ≤ (2 * k - 1) * f := Nat.mul_pos (by omega) (by omega)
-  apply size_bound_of_nat hk hD
-  · have h1 : H.edgeSet.ncard = #H.edgeFinset := by
-      rw [← coe_edgeFinset, Set.ncard_coe_finset]
-    have h2 := card_edgeFinset_le_card_choose_two (G := H)
-    rw [Nat.choose_two_right] at h2
-    have h3 := Nat.div_mul_le_self (Fintype.card V * (Fintype.card V - 1)) 2
-    omega
-  · intro s d hs hsd
-    exact hB.ncard_edgeSet_mul_le hk hBcard hD hs hsd
+  exact hB.ncard_edgeSet_le_rpow hk (Nat.mul_pos (by omega) (by omega)) hBcard
 
 /-- **Theorem 8 of Dinitz–Robelle**: the output of Algorithm 3 has at most
 `32 k f^{1-1/k} n^{1+1/k}` edges (`= O(k f^{1-1/k} n^{1+1/k})`), for every edge order and every BFS
@@ -92,7 +81,12 @@ theorem modifiedGreedy_card_edges_le {O : ShortPathOracle V} (hO : O.Spec)
     (L : List (V × V)) {k f : ℕ} (hk : 1 ≤ k) (hf : 1 ≤ f) :
     ((modifiedGreedy O k f L).edgeSet.ncard : ℝ) ≤
       32 * k * (f : ℝ) ^ (1 - 1 / (k : ℝ)) * (Fintype.card V : ℝ) ^ (1 + 1 / (k : ℝ)) := by
-  refine (modifiedGreedy_card_edges_le' hO L hk hf).trans ?_
-  exact mul_le_mul_of_nonneg_right (constant_le hk hf) (by positivity)
+  obtain ⟨B, hB, hBcard⟩ := modifiedGreedy_exists_blockingSet hO (L := L) (f := f) hk
+  have hkR : (1 : ℝ) ≤ k := by exact_mod_cast hk
+  have hDc : (((2 * k - 1) * f : ℕ) : ℝ) ≤ (2 * k) * f := by
+    have : (2 * k - 1) * f ≤ 2 * k * f := Nat.mul_le_mul_right _ (Nat.sub_le _ _)
+    exact_mod_cast this
+  refine (hB.ncard_edgeSet_le_mul_rpow hk (Nat.mul_pos (by omega) (by omega)) hBcard
+    (Nat.cast_nonneg f) (by linarith) hDc).trans_eq (by ring)
 
 end FaultTolerantSpanners

@@ -42,7 +42,7 @@ lemma ntSet_nonempty_of_hasBackEdges {G : SimpleGraph V} {s : V} {h : ℕ}
     intro z hle
     simp only [SimpleGraph.dist]
     exact ENat.toNat_le_toNat hle (edist_ne_top_of_le_natCast hx)
-  by_cases hpy : y = par G s x
+  by_cases hpy : y = bfsParent G s x
   · exact ⟨(x, y'), hx, hxy', hdy y' hy', fun e => hne (hpy.trans e.symm)⟩
   · exact ⟨(x, y), hx, hxy, hdy y hy, hpy⟩
 

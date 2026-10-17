@@ -1,5 +1,6 @@
 import Papers.PODC2019.HardnessOptimization.MDSTheorem
 import Cslib.Computability.Distributed.Congest.Gather
+import Podc.Foundations.Combinatorics.SimpleGraph.Ball
 import Mathlib
 
 /-!
@@ -32,14 +33,8 @@ lemma layer_eq_of_adj_zero {u v : MV L}
 lemma mdsGraph_zero_not_connected [NeZero L] :
     ¬(mdsGraph (L := L) (fun _ _ => false) (fun _ _ => false)).Connected := by
   intro hc
-  obtain ⟨p⟩ := hc.preconnected (MV.gad false false (0 : Fin L) 0) (MV.gad false true 0 0)
-  have : ∀ {u v : MV L} (q : (mdsGraph (fun _ _ => false) (fun _ _ => false)).Walk u v),
-      u.layer = v.layer := by
-    intro u v q
-    induction q with
-    | nil => rfl
-    | cons h _ ih => exact (layer_eq_of_adj_zero h).trans ih
-  simpa [MV.layer] using this p
+  simpa [MV.layer] using (hc.preconnected (MV.gad false false (0 : Fin L) 0)
+    (MV.gad false true 0 0)).apply_eq_of_forall_adj fun _ _ h => layer_eq_of_adj_zero h
 
 section Conn
 

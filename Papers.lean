@@ -57,7 +57,6 @@ import Papers.PODC2024.HistoryIndependent.Alg4Thm
 import Papers.PODC2024.HistoryIndependent.Consistency
 import Papers.PODC2020.FaultTolerantSpanners.LBC
 import Papers.PODC2020.FaultTolerantSpanners.Greedy
-import Papers.PODC2020.FaultTolerantSpanners.SizeArith
 import Papers.PODC2020.FaultTolerantSpanners.Size
 import Papers.PODC2020.FaultTolerantSpanners.Weighted
 import Papers.PODC2020.FaultTolerantSpanners.Main

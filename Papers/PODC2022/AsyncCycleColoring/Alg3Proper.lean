@@ -46,60 +46,6 @@ namespace AsyncCycle
 
 namespace Alg3Proper
 
-/-! ### Lemma 4.3 (Cole–Vishkin property of `f`) -/
-
-lemma lowDiff_spec (x y : ℕ) : ∀ m, lowDiff x y m ≤ m ∧
-    (∀ k < lowDiff x y m, x.testBit k = y.testBit k) ∧
-    (lowDiff x y m < m → x.testBit (lowDiff x y m) ≠ y.testBit (lowDiff x y m)) := by
-  intro m
-  induction m with
-  | zero => simp [lowDiff]
-  | succ m ih =>
-    obtain ⟨h1, h2, h3⟩ := ih
-    simp only [lowDiff]
-    split_ifs with hl hb
-    · exact ⟨by omega, h2, fun _ => h3 hl⟩
-    · have hm : lowDiff x y m = m := by omega
-      rw [hm] at h2
-      exact ⟨by omega, h2, fun _ => hb⟩
-    · have hm : lowDiff x y m = m := by omega
-      rw [hm] at h2
-      refine ⟨le_rfl, fun k hk => ?_, fun h => absurd h (lt_irrefl _)⟩
-      rcases Nat.lt_succ_iff_lt_or_eq.1 hk with hk | rfl
-      · exact h2 k hk
-      · exact not_not.1 hb
-
-lemma toNat_inj_aux : ∀ (b c : Bool) (i j : ℕ), 2 * i + b.toNat = 2 * j + c.toNat → i = j ∧ b = c := by
-  intro b c i j h
-  cases b <;> cases c <;> simp at h ⊢ <;> omega
-
-/-- Lemma 4.3 of the paper: if `x > y > z` then `f(x, y) ≠ f(y, z)`. (Local copy.) -/
-lemma cvF_ne_aux {x y z : ℕ} (hxy : y < x) (hyz : z < y) : cvF x y ≠ cvF y z := by
-  intro h
-  have hsxy : y.size ≤ x.size := Nat.size_le_size hxy.le
-  have hszy : z.size ≤ y.size := Nat.size_le_size hyz.le
-  have ei : cvIdx x y = lowDiff x y y.size := by
-    rw [cvIdx, min_eq_right hsxy]
-  have ej : cvIdx y z = lowDiff y z z.size := by
-    rw [cvIdx, min_eq_right hszy]
-  unfold cvF at h
-  rw [ei, ej] at h
-  obtain ⟨hij, hb⟩ := toNat_inj_aux _ _ _ _ h
-  obtain ⟨hi1, -, hi3⟩ := lowDiff_spec x y y.size
-  obtain ⟨hj1, hj2, -⟩ := lowDiff_spec y z z.size
-  have hi : lowDiff x y y.size = y.size := by
-    have : ¬ lowDiff x y y.size < y.size := fun hlt => hi3 hlt (by rw [hb, hij])
-    omega
-  have hzs : z.size = y.size := by omega
-  have hyz' : y = z := by
-    apply Nat.eq_of_testBit_eq
-    intro k
-    by_cases hk : k < y.size
-    · exact hj2 k (by omega)
-    · rw [Nat.testBit_eq_false_of_lt (Nat.size_le.1 (by omega)),
-        Nat.testBit_eq_false_of_lt (Nat.size_le.1 (by omega))]
-  omega
-
 /-! ### Changing steps -/
 
 /-- A step changing the identifier from `x` to `x'` after reading `a` and `b` in the neighbours'
@@ -137,12 +83,12 @@ lemma StepChange.ne {x a b x' x'' : ℕ} (hx : StepChange x a b x')
       rcases le_total x w with hxw | hxw
       · rw [min_eq_left hxw] at k1; omega
       · rw [min_eq_right hxw] at k1 ⊢
-        exact cvF_ne_aux h1 k1
+        exact lemma_4_3 h1 k1
     · rw [min_eq_right hab] at h1 ⊢
       rw [max_eq_left hab] at h2
       rcases le_total x w with hxw | hxw
       · rw [min_eq_left hxw] at k1 ⊢
-        exact (cvF_ne_aux h2 h1).symm
+        exact (lemma_4_3 h2 h1).symm
       · rw [max_eq_left hxw] at k2; omega
   · -- `p` in the middle, `q` a local minimum
     rcases le_total a b with hab | hab
