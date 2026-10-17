@@ -1,6 +1,7 @@
 import Papers.PODC2019.CryptoConsensusNumber.Defs
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
 import Podc.SharedMemory.Potential
+import Podc.Algebra.BigOperators.Update
 
 /-!
 # Figure 1: asset transfer from an atomic snapshot (definitions)
@@ -211,23 +212,15 @@ variable {P Acct : Type} [Fintype P] [DecidableEq P] [DecidableEq Acct]
 @[simp] lemma outflow_empty (c : Acct) : outflow c (fun _ : P => ([] : List (Tr Acct))) = 0 := by
   simp [outflow]
 
--- CSLib candidate (sum of a function over an updated argument)
-lemma sum_update_eq {β : Type} (f : β → ℕ) (S : P → β) (p : P) (v : β) :
-    ∑ q, f (Function.update S p v q) + f (S p) = ∑ q, f (S q) + f v := by
-  rw [← Finset.add_sum_erase _ _ (Finset.mem_univ p), ← Finset.add_sum_erase _ _ (Finset.mem_univ p)]
-  have : ∑ x ∈ Finset.univ.erase p, f (Function.update S p v x) = ∑ x ∈ Finset.univ.erase p, f (S x) :=
-    Finset.sum_congr rfl fun q hq => by rw [Function.update_of_ne (Finset.ne_of_mem_erase hq)]
-  rw [this, Function.update_self]; ring
-
 lemma inflow_update_append (c : Acct) (S : P → List (Tr Acct)) (p : P) (t : Tr Acct) :
     inflow c (Function.update S p (S p ++ [t])) = inflow c S + if t.2.1 = c then t.2.2 else 0 := by
-  have := sum_update_eq (inAmt c) S p (S p ++ [t])
+  have := Fintype.sum_comp_update_add (inAmt c) S p (S p ++ [t])
   simp only [inAmt_append_singleton] at this
   simp only [inflow]; omega
 
 lemma outflow_update_append (c : Acct) (S : P → List (Tr Acct)) (p : P) (t : Tr Acct) :
     outflow c (Function.update S p (S p ++ [t])) = outflow c S + if t.1 = c then t.2.2 else 0 := by
-  have := sum_update_eq (outAmt c) S p (S p ++ [t])
+  have := Fintype.sum_comp_update_add (outAmt c) S p (S p ++ [t])
   simp only [outAmt_append_singleton] at this
   simp only [outflow]; omega
 

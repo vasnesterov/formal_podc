@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.Digraph.Walk
 
 /-!
 # Source components of finite digraphs (Lemmas 6 and 7 of [BRS11])
@@ -7,18 +8,22 @@ Biely, Robinson, Schmid, *Easy Impossibility Proofs for k-Set Agreement in Messa
 Systems*, PODC 2011 (arXiv 1103.3671v2), Section VI.
 
 A digraph is a relation `E : α → α → Prop` on a finite type (`E u v` = edge `u → v`). A *source
-component* is a strongly connected component with no incoming edges from outside; equivalently
-(`IsSourceComponent`) a nonempty, strongly connected set of vertices closed under in-neighbours.
+component* is a strongly connected component with no incoming edges from outside
+(`IsSourceComponent`, the library notion `Digraph.IsSourceComponent` of `Podc.Digraph.Walk` for the
+digraph `⟨E⟩`); equivalently (`isSourceComponent_iff`) a nonempty, strongly connected set of
+vertices closed under in-neighbours.
 
 * `IsRoot E v`: every ancestor of `v` is a descendant of `v`; the source components are exactly
   the ancestor sets `anc E v` of roots `v` (`isSourceComponent_anc`, `IsSourceComponent.eq_anc`).
-* `exists_isRoot`: every vertex has a root ancestor (the ancestor with the fewest ancestors).
+* `exists_isRoot`: every vertex has a root ancestor
+  (`Digraph.exists_isSourceComponent_subset`).
 * `exists_sourceComponent` (**Lemma 6**) and `exists_sourceComponent_anc` (**Lemma 7**).
 * `IsSourceComponent.eq_or_disjoint`, `card_sourceComponents_le`: distinct source components are
   disjoint, so there are at most `⌊n / (δ + 1)⌋` of size `≥ δ + 1`.
 -/
 
--- CSLib candidate: the whole file (source components of finite digraphs).
+-- CSLib candidate: `IsRoot`, `exists_isRoot` and the counting lemmas (the rest is the library
+-- theory of `Podc.Digraph.Walk`, specialized to finsets of vertices).
 
 namespace KSetAgreement.SourceComp
 
@@ -26,11 +31,11 @@ open Relation Finset
 
 variable {α : Type*} (E : α → α → Prop)
 
-/-- `C` is a *source component* of the digraph `E`: a nonempty strongly connected set of vertices
-that is closed under in-neighbours (hence a strongly connected component with no incoming edges,
-i.e. a source of the condensation DAG). -/
+/-- `C` is a *source component* of the digraph `E`: a strongly connected component with no
+incoming edges from outside, i.e. a source of the condensation DAG (`Digraph.IsSourceComponent`
+for the digraph with arcs `E`). See `isSourceComponent_iff` for the elementary characterization. -/
 def IsSourceComponent (C : Finset α) : Prop :=
-  C.Nonempty ∧ (∀ u ∈ C, ∀ v ∈ C, ReflTransGen E u v) ∧ ∀ u v, E u v → v ∈ C → u ∈ C
+  (Digraph.mk E).IsSourceComponent (C : Set α)
 
 /-- `v` is a *root*: every vertex with a path to `v` is reachable from `v`, i.e. `v` lies in a
 source component. -/
@@ -46,41 +51,45 @@ variable {E}
   classical
   simp [anc]
 
+/-- A source component is a nonempty strongly connected set of vertices closed under
+in-neighbours. -/
+theorem isSourceComponent_iff {C : Finset α} : IsSourceComponent E C ↔
+    C.Nonempty ∧ (∀ u ∈ C, ∀ v ∈ C, ReflTransGen E u v) ∧ ∀ u v, E u v → v ∈ C → u ∈ C := by
+  refine ⟨fun hC => ⟨Finset.coe_nonempty.1 hC.nonempty, fun u hu v hv => hC.reachable hu hv,
+    fun u v huv hv => hC.closed v hv u huv⟩, fun ⟨⟨r, hr⟩, hsc, hcl⟩ => ?_⟩
+  have hcl' : ∀ v ∈ (C : Set α), ∀ u, E u v → u ∈ (C : Set α) := fun v hv u huv => hcl u v huv hv
+  refine Digraph.isSourceComponent_iff.2 ⟨r, Set.ext fun u => ⟨fun hu => hsc u hu r hr,
+    fun hu => Digraph.mem_of_reachable_of_closed hcl' hu hr⟩, fun u hu => ?_⟩
+  exact hsc r hr u (Digraph.mem_of_reachable_of_closed hcl' hu hr)
+
 theorem IsSourceComponent.mem_of_rtg {C : Finset α} (hC : IsSourceComponent E C) {u v : α}
-    (hv : v ∈ C) (h : ReflTransGen E u v) : u ∈ C := by
-  induction h using ReflTransGen.head_induction_on with
-  | refl => exact hv
-  | head huw _ ih => exact hC.2.2 _ _ huw ih
+    (hv : v ∈ C) (h : ReflTransGen E u v) : u ∈ C :=
+  Digraph.mem_of_reachable_of_closed (G := ⟨E⟩) hC.closed h hv
 
 theorem IsSourceComponent.isRoot {C : Finset α} (hC : IsSourceComponent E C) {v : α}
     (hv : v ∈ C) : IsRoot E v :=
-  fun _ hu => hC.2.1 _ hv _ (hC.mem_of_rtg hv hu)
+  fun _ hu => Digraph.IsSourceComponent.reachable hC hv (hC.mem_of_rtg hv hu)
+
+theorem coe_anc [Fintype α] (v : α) : (anc E v : Set α) = {u | (Digraph.mk E).Reachable u v} :=
+  Set.ext fun _ => mem_anc
 
 /-- The ancestor set of a root is a source component. -/
 theorem isSourceComponent_anc [Fintype α] {v : α} (h : IsRoot E v) :
-    IsSourceComponent E (anc E v) := by
-  refine ⟨⟨v, mem_anc.2 ReflTransGen.refl⟩, ?_, ?_⟩
-  · intro u hu w hw
-    rw [mem_anc] at hu hw
-    exact hu.trans (h _ hw)
-  · intro u w huw hw
-    rw [mem_anc] at hw ⊢
-    exact ReflTransGen.head huw hw
+    IsSourceComponent E (anc E v) :=
+  Digraph.isSourceComponent_iff.2 ⟨v, coe_anc v, h⟩
 
 /-- A source component is the ancestor set of any of its vertices. -/
 theorem IsSourceComponent.eq_anc [Fintype α] {C : Finset α} (hC : IsSourceComponent E C) {v : α}
-    (hv : v ∈ C) : C = anc E v := by
-  ext u
-  rw [mem_anc]
-  exact ⟨fun hu => hC.2.1 _ hu _ hv, hC.mem_of_rtg hv⟩
+    (hv : v ∈ C) : C = anc E v :=
+  Finset.coe_injective ((Digraph.IsSourceComponent.eq_setOf_reachable hC hv).trans (coe_anc v).symm)
 
 /-- Two source components are equal or disjoint. -/
-theorem IsSourceComponent.eq_or_disjoint [Fintype α] {C D : Finset α} (hC : IsSourceComponent E C)
+theorem IsSourceComponent.eq_or_disjoint {C D : Finset α} (hC : IsSourceComponent E C)
     (hD : IsSourceComponent E D) : C = D ∨ Disjoint C D := by
-  by_cases h : Disjoint C D
-  · exact Or.inr h
-  · obtain ⟨v, hvC, hvD⟩ := Finset.not_disjoint_iff.1 h
-    exact Or.inl ((hC.eq_anc hvC).trans (hD.eq_anc hvD).symm)
+  by_cases h : C = D
+  · exact Or.inl h
+  · exact Or.inr (Finset.disjoint_coe.1
+      (Digraph.IsSourceComponent.disjoint hC hD (Finset.coe_injective.ne h)))
 
 /-- A source component containing a vertex `v` without self-loop contains `v` and all of its
 in-neighbours. -/
@@ -92,21 +101,16 @@ theorem IsSourceComponent.card_ge [Fintype α] [DecidableRel E] {C : Finset α}
     intro u hu
     rcases Finset.mem_insert.1 hu with rfl | hu
     · exact hv
-    · exact hC.2.2 _ _ (Finset.mem_filter.1 hu).2 hv
+    · exact hC.mem_of_rtg hv (.single (Finset.mem_filter.1 hu).2)
   have hnot : v ∉ ({u | E u v} : Finset α) := by simpa using hloop
   simpa [Finset.card_insert_of_notMem hnot] using Finset.card_le_card hsub
 
-/-- Every vertex has a root ancestor: an ancestor with the fewest ancestors is a root. -/
-theorem exists_isRoot [Fintype α] (v : α) : ∃ r, ReflTransGen E r v ∧ IsRoot E r := by
-  obtain ⟨r, hr, hmin⟩ := Finset.exists_min_image (anc E v) (fun r => (anc E r).card)
-    ⟨v, mem_anc.2 ReflTransGen.refl⟩
-  rw [mem_anc] at hr
-  refine ⟨r, hr, fun u hu => ?_⟩
-  have hsub : anc E u ⊆ anc E r := fun w hw => mem_anc.2 ((mem_anc.1 hw).trans hu)
-  have heq : anc E u = anc E r :=
-    Finset.eq_of_subset_of_card_le hsub (hmin u (mem_anc.2 (hu.trans hr)))
-  have : r ∈ anc E u := heq ▸ mem_anc.2 ReflTransGen.refl
-  exact mem_anc.1 this
+/-- Every vertex has a root ancestor (a vertex of a source component among its ancestors). -/
+theorem exists_isRoot [Finite α] (v : α) : ∃ r, ReflTransGen E r v ∧ IsRoot E r := by
+  obtain ⟨S, hS, hSv⟩ := (Digraph.mk E).exists_isSourceComponent_subset v
+  obtain ⟨r, hr⟩ := hS.nonempty
+  exact ⟨r, hSv hr, fun u hu =>
+    hS.reachable hr (Digraph.mem_of_reachable_of_closed hS.closed hu hr)⟩
 
 /-- **Lemma 6 of [BRS11].** Every finite digraph without self-loops in which every vertex has
 in-degree at least `δ` has a source component of size at least `δ + 1`.
@@ -160,13 +164,6 @@ theorem card_sourceComponents_le [Fintype α] [DecidableEq α] (𝒞 : Finset (F
 
 /-! ### Ancestor-closed sets -/
 
-/-- A set closed under in-neighbours contains all ancestors of its elements. -/
-theorem mem_of_rtg_of_inClosed {S : Set α} (hS : ∀ r ∈ S, ∀ u, E u r → u ∈ S) {u r : α}
-    (hr : r ∈ S) (h : ReflTransGen E u r) : u ∈ S := by
-  induction h using ReflTransGen.head_induction_on with
-  | refl => exact hr
-  | head huw _ ih => exact hS _ ih _ huw
-
 /-- Two digraphs with the same in-edges into an in-closed set `S` have the same ancestors of the
 elements of `S`. -/
 theorem rtg_iff_of_inClosed {E' : α → α → Prop} {S : Set α} (hE : ∀ r ∈ S, ∀ u, E' u r ↔ E u r)
@@ -178,13 +175,13 @@ theorem rtg_iff_of_inClosed {E' : α → α → Prop} {S : Set α} (hE : ∀ r �
     induction h using ReflTransGen.head_induction_on with
     | refl => exact ReflTransGen.refl
     | head huw hw ih =>
-      have hwS := mem_of_rtg_of_inClosed hS' hr hw
+      have hwS := Digraph.mem_of_reachable_of_closed (G := ⟨E'⟩) hS' hw hr
       exact ReflTransGen.head ((hE _ hwS _).1 huw) ih
   · intro h
     induction h using ReflTransGen.head_induction_on with
     | refl => exact ReflTransGen.refl
     | head huw hw ih =>
-      have hwS := mem_of_rtg_of_inClosed hS hr hw
+      have hwS := Digraph.mem_of_reachable_of_closed (G := ⟨E⟩) hS hw hr
       exact ReflTransGen.head ((hE _ hwS _).2 huw) ih
 
 /-- Ancestors of a root are roots. -/

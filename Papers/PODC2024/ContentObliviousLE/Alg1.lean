@@ -87,12 +87,10 @@ theorem algorithm_1 (hpos : ∀ v, 0 < id v) {ℓ : ZMod n} (hℓ : ∀ v, id v 
     (∀ c, Reach (oriented n) alg id c → Final (oriented n) alg c →
       Quiescent (oriented n) alg c ∧ (∀ v, c.recvd (v, false) = id ℓ ∧ c.sent (v, true) = id ℓ) ∧
       (∀ v, (c.st v).leader = true ↔ id v = id ℓ) ∧ totalSent c = n * id ℓ) := by
-  have sum_ports : ∀ (c : Config (ZMod n) S), totalSent c = ∑ v, (c.sent (v, false) + c.sent (v, true)) :=
-    fun c => by rw [totalSent, Fintype.sum_prod_type]; simp [add_comm]
   have hle : ∀ c, Reach (oriented n) alg id c → totalSent c ≤ n * id ℓ := by
     intro c hr
     have h := reach_inv hpos hℓ hr
-    rw [sum_ports]
+    rw [totalSent, sum_ports]
     calc ∑ v, (c.sent (v, false) + c.sent (v, true)) ≤ ∑ _v : ZMod n, id ℓ := by
           refine sum_le_sum fun v _ => ?_
           obtain ⟨-, -, -, h4, h5, -, h7⟩ := h v
@@ -113,7 +111,7 @@ theorem algorithm_1 (hpos : ∀ v, 0 < id v) {ℓ : ZMod n} (hℓ : ∀ v, id v 
     (fun v => (h v).2.2.2.2.2.2) (ℓ := ℓ) rfl
   refine ⟨hq, hall, fun v => ?_, ?_⟩
   · rw [(h v).2.2.1, (hall v).1, decide_eq_true_iff, eq_comm]
-  · rw [sum_ports]
+  · rw [totalSent, sum_ports]
     simp [(h _).2.2.2.2.1, (hall _).2, ZMod.card]
 
 end Podc.ContentOblivious.Alg1

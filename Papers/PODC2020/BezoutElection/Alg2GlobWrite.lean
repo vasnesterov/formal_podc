@@ -116,7 +116,7 @@ theorem ginv_write (hid : Function.Injective ids) (hn : Fintype.card P = pp.n)
   have hcnt := n11Count_change (π := π) mem mem' vpc vpc' q hN11
   rw [if_neg hnotN] at hcnt
   have hsum : ∑ x, (mem' x).level + (mem x0).level = ∑ x, (mem x).level + w.level := by
-    have := sum_update_eq (fun x => (mem x).level) x0 w.level
+    have := Fintype.sum_update_add (fun x => (mem x).level) x0 w.level
     rw [← this]; congr 1
     apply Finset.sum_congr rfl; intro x _
     by_cases hx : x = x0

@@ -68,6 +68,9 @@ structure Algo where
   /-- Output: `true` = `Leader`, `false` = `Non-Leader`. -/
   leader : State → Bool
 
+/-- The pulses sent by an action that sends exactly one pulse, on port `p`. -/
+def onePulse (p : Bool) : Bool → ℕ := fun p' => if p' = p then 1 else 0
+
 /-- Relabel the IDs of an algorithm by a function `π` (each node runs `A` with ID `π ID`). -/
 def Algo.relabel (A : Algo) (π : ℕ → ℕ) : Algo :=
   { A with init := fun i => A.init (π i) }
@@ -121,6 +124,12 @@ def totalSent {S : Type*} (c : Config V S) : ℕ := ∑ p, c.sent p
 
 /-- Total number of pulses received. -/
 def totalRecvd {S : Type*} (c : Config V S) : ℕ := ∑ p, c.recvd p
+
+omit [DecidableEq V] in
+/-- A sum over all ports is the sum over the nodes of the values at their two ports. -/
+lemma sum_ports {M : Type*} [AddCommMonoid M] (f : V × Bool → M) :
+    ∑ p, f p = ∑ v, (f (v, false) + f (v, true)) := by
+  rw [Fintype.sum_prod_type]; simp [add_comm]
 
 section basic
 

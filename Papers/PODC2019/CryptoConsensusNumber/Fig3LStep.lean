@@ -88,7 +88,7 @@ lemma LInv.tau_same (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K) (q : Fin
       refine ⟨h1, fun hr => ?_⟩
       obtain ⟨S₁, S₂, h3, h4, h5⟩ := h2 hr
       exact ⟨S₁, S₂, h3, h4, not_precedes_append
-        (invoked_of_opOf (hL.opK t (hM.prop_K h))) h5⟩
+        (Invoked.of_opOf_eq_some (hL.opK t (hM.prop_K h))) h5⟩
 
 /-! ## Invocations -/
 
@@ -146,7 +146,7 @@ lemma LInv.step_inv_read (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
       refine ⟨h1, fun hr => ?_⟩
       obtain ⟨S₁, S₂, h3, h4, h5⟩ := h2 hr
       exact ⟨S₁, S₂, h3, h4, not_precedes_append
-        (invoked_of_opOf (hL.opK t (hM.prop_K h))) h5⟩
+        (Invoked.of_opOf_eq_some (hL.opK t (hM.prop_K h))) h5⟩
 
 lemma LInv.step_inv_nonowner (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
     (hrun : (impl μ q₀ k).run α = some C) (h0 : C.pend q = none) (a b : Acct) (x : ℕ)
@@ -224,7 +224,7 @@ lemma LInv.step_inv_nonowner (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
           h4, ?_⟩
         intro y hy
         rcases List.mem_append.1 hy with hy | hy
-        · exact not_precedes_append (invoked_of_opOf (hL.opK t (hM.prop_K h))) h5 y hy
+        · exact not_precedes_append (Invoked.of_opOf_eq_some (hL.opK t (hM.prop_K h))) h5 y hy
         · simp only [List.mem_singleton] at hy; subst hy
           intro hp
           exact not_completed_of_eq (α := α ++ [.inv q (ATOp.transfer q a b x)])
@@ -316,7 +316,7 @@ lemma LInv.step_inv_owner (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
         obtain ⟨S₁, S₂, h3, h4, h5⟩ := h2 hr
         refine ⟨S₁, S₂, h3, h4, ?_⟩
         rw [hgid t htK]
-        exact not_precedes_append (invoked_of_opOf (hL.opK t htK)) h5 }
+        exact not_precedes_append (Invoked.of_opOf_eq_some (hL.opK t htK)) h5 }
 
 /-! ## Responses -/
 
@@ -366,7 +366,7 @@ lemma LInv.step_ret (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K) {r : Boo
         refine ⟨h1, fun hr => ?_⟩
         obtain ⟨S₁, S₂, h3, h4, h5⟩ := h2 hr
         exact ⟨S₁, S₂, h3, h4, not_precedes_append
-          (invoked_of_opOf (hL.opK t (hM.prop_K h))) h5⟩ }
+          (Invoked.of_opOf_eq_some (hL.opK t (hM.prop_K h))) h5⟩ }
 
 /-! ## Reads -/
 
@@ -451,7 +451,7 @@ lemma LInv.step_rscan (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
           h4, ?_⟩
         intro y hy
         rcases List.mem_append.1 hy with hy | hy
-        · exact not_precedes_append (invoked_of_opOf (hL.opK t (hM.prop_K h))) h5 y hy
+        · exact not_precedes_append (Invoked.of_opOf_eq_some (hL.opK t (hM.prop_K h))) h5 y hy
         · simp only [List.mem_singleton] at hy; subst hy
           intro hp
           exact not_completed_of_eq (α := α ++ [.tau q]) (by simp) hp.completed }

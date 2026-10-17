@@ -242,7 +242,7 @@ theorem ginv_proc (hid : Function.Injective ids) (hn : Fintype.card P = pp.n)
           exact h
         · rwa [hloc j' hjq] at h
       · have h5 := G.g5
-        have hs := sum_update_eq (fun i => g.wf i + g.wt i) q (g.wf q + g.wt q + 1)
+        have hs := Fintype.sum_update_add (fun i => g.wf i + g.wt i) q (g.wf q + g.wt q + 1)
         have : ∑ i, (g.wf i + Function.update g.wt q (g.wt q + 1) i) =
             ∑ i, Function.update (fun i => g.wf i + g.wt i) q (g.wf q + g.wt q + 1) i := by
           apply Finset.sum_congr rfl; intro i _
@@ -301,7 +301,7 @@ theorem ginv_proc (hid : Function.Injective ids) (hn : Fintype.card P = pp.n)
         have := all_eq_of_sum hn g.wf G.g3 (G.g4 ⟨j', h'⟩) q
         omega
       · have h5 := G.g5
-        have hs := sum_update_eq (fun i => g.wf i + g.wt i) q (g.wf q + g.wt q + 1)
+        have hs := Fintype.sum_update_add (fun i => g.wf i + g.wt i) q (g.wf q + g.wt q + 1)
         have : ∑ i, (Function.update g.wf q (g.wf q + 1) i + g.wt i) =
             ∑ i, Function.update (fun i => g.wf i + g.wt i) q (g.wf q + g.wt q + 1) i := by
           apply Finset.sum_congr rfl; intro i _

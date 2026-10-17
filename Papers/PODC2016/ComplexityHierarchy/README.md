@@ -98,4 +98,7 @@ Model, consensus tasks, valency framework (Lemmas 6.4, 6.6) and the binary reduc
 object `rswapObj` (Theorem 8.8's locations), poised processes and blocks (`Impl.PoisedAt`,
 `Impl.runFrom_poised_block`, behind `Impl.Poised` and `Impl.runFrom_block`), reachability of solo
 steps (`Impl.Reachable.soloStep`), the "last index" argument of valency proofs
-(`Nat.exists_lt_and_not_succ_of_not`) and `Fintype.sum_update_add`.
+(`Nat.exists_lt_and_not_succ_of_not`), `Fintype.sum_update_add`, the current operation instance
+`curOp` (`Podc/SharedMemory/History.lean`, in `BufferAlg.lean`), and the walks of the packing
+argument are CSLib's `Relation.RelatesInSteps`, cut at the first visit of their target by
+`Relation.RelatesInSteps.exists_le_first_visit` (`Podc/Digraph/Walk.lean`).

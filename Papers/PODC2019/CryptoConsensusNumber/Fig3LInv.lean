@@ -54,11 +54,6 @@ lemma idle_counts_of_run {α : List (Label P A)} {C : Config A B P L} (h : I.run
   · exact h2
   · exact absurd hq h1
 
-lemma invoked_of_opOf {α : List (Label P A)} {x : OpId P} {o : A.Op} (h : opOf α x = some o) :
-    Invoked α x := by
-  simp only [opOf] at h
-  exact (List.getElem?_eq_some_iff.1 h).1
-
 lemma not_invoked_cur_of_idle {α : List (Label P A)} {q : P}
     (h : (opsOf α q).length = (respsOf α q).length) : ¬ Invoked α (q, (respsOf α q).length) := by
   simp [Invoked, h]
@@ -80,8 +75,8 @@ lemma opOf_append_noinv {α : List (Label P A)} {ℓ : Label P A} (hℓ : ∀ q,
   simp [opOf, opsOf_append, hℓ]
 
 lemma opOf_append_of_some {α : List (Label P A)} (ℓ : Label P A) {x : OpId P} {o : A.Op}
-    (h : opOf α x = some o) : opOf (α ++ [ℓ]) x = some o := by
-  rw [opOf_append_of_invoked (invoked_of_opOf h)]; exact h
+    (h : opOf α x = some o) : opOf (α ++ [ℓ]) x = some o :=
+  opOf_append_of_eq_some h _
 
 lemma not_completed_of_eq {α : List (Label P A)} {x : OpId P} (h : x.2 = (respsOf α x.1).length) :
     ¬ Completed α x := by

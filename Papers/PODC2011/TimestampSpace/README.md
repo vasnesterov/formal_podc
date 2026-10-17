@@ -113,4 +113,6 @@ The model is CSLib's `SharedMemory` (`Model`, `Covering`, `Progress`). From the 
 `Impl.blockWrite_swap`, `Covering`); solo runs under restricted obstruction-freedom
 (`Impl.soloOp_spec_of_obstructionFreeOn`, `Impl.exists_finish`, `Solo`); potentials
 (`Impl.waitFreeOn_of_cfgPotential`, `Impl.waitFree_of_potential`, `Potential`); and the computable
-step function used to evaluate the long-lived counterexample (`Impl.crun`, `Compute`).
+step function used to evaluate the long-lived counterexample (`Impl.crun`, `Compute`); the effect of
+one appended label on operations and responses (`opOf_concat_of_ne`, `respOf_concat_of_ne`,
+`respsOf_concat_of_ne`, `Completed.of_respOf_eq_some`, `Invoked.of_opOf_eq_some`, `History`).

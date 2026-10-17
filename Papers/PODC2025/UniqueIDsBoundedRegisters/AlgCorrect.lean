@@ -1,4 +1,5 @@
 import Papers.PODC2025.UniqueIDsBoundedRegisters.AlgInv
+import Podc.SharedMemory.History
 
 /-!
 # Algorithms 1 and 2: correctness for at most `n · m` calls (Theorem 3.1)
@@ -41,13 +42,6 @@ lemma respOf_append_ret (α : List (Label P uidObj)) (p : P) (r : ℕ) (x : OpId
     · subst h2; simp
     · rw [List.getElem?_singleton, ite_eq_right (by omega), List.getElem?_eq_none (by omega)]
   · simp [hq, Ne.symm hq]
-
-lemma respOf_append_of_not_ret (α : List (Label P uidObj)) (ℓ : Label P uidObj)
-    (hℓ : ∀ q r, ℓ ≠ .ret q r) (x : OpId P) : respOf (α ++ [ℓ]) x = respOf α x := by
-  cases ℓ with
-  | ret q r => exact absurd rfl (hℓ q r)
-  | inv q o => simp [respOf, respsOf_append, respsOf_cons]
-  | tau q => simp [respOf, respsOf_append, respsOf_cons]
 
 lemma completed_iff_respOf (α : List (Label P uidObj)) (x : OpId P) :
     Completed α x ↔ ∃ v, respOf α x = some v := by
@@ -95,11 +89,11 @@ lemma rInv_of_run {n d m : ℕ} [NeZero m] {α : List (Label P uidObj)} {C : ACf
       · rw [hloc, Function.update_apply] at hq
         split_ifs at hq
         exact hR.done q v hq
-      · rw [respOf_append_of_not_ret _ _ (by simp)] at hx; exact hR.resp x v hx
+      · rw [respOf_append_of_not_ret (by simp)] at hx; exact hR.resp x v hx
     | tau p =>
       have hresp : ∀ x (v : ℕ), respOf (α ++ [.tau p]) x = some v → v < n * m := by
         intro x v hx
-        rw [respOf_append_of_not_ret _ _ (by simp)] at hx; exact hR.resp x v hx
+        rw [respOf_append_of_not_ret (by simp)] at hx; exact hR.resp x v hx
       cases hlp : C₀.loc p with
       | idle => exact (alg_step_tau_idle hs hlp).elim
       | done v => exact (alg_step_tau_done hs hlp).elim
@@ -171,7 +165,7 @@ lemma Inv2.step (hnd : n ≤ d) (hI : Inv1 n d m α C g) (hJ : Inv2 n d m α C g
     have hl : ∀ q v, C'.loc q = .done v → C.loc q = .done v := by
       intro q v h; rw [hloc, Function.update_apply] at h; split_ifs at h; exact h
     have hr : ∀ x, respOf (α ++ [.inv p o]) x = respOf α x :=
-      respOf_append_of_not_ret _ _ (by simp)
+      respOf_append_of_not_ret (by simp)
     simp only [gstep]
     refine ⟨?_, ?_, ?_, ?_, ?_⟩
     · intro x y v; rw [hr, hr]; exact hJ.uniq x y v
@@ -208,7 +202,7 @@ lemma Inv2.step (hnd : n ≤ d) (hI : Inv1 n d m α C g) (hJ : Inv2 n d m α C g
     · intro q v h; exact hJ.doneBd q v (hl q v h).2
   | tau p =>
     have hr : ∀ x, respOf (α ++ [.tau p]) x = respOf α x :=
-      respOf_append_of_not_ret _ _ (by simp)
+      respOf_append_of_not_ret (by simp)
     cases hlp : C.loc p with
     | idle => exact (alg_step_tau_idle hs hlp).elim
     | done v => exact (alg_step_tau_done hs hlp).elim

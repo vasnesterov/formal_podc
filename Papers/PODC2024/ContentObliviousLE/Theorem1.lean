@@ -17,9 +17,6 @@ open Podc.ContentOblivious Finset
 
 variable {n : ℕ} [NeZero n] {id : ZMod n → ℕ} {ℓ : ZMod n}
 
-lemma sum_ports (f : ZMod n × Bool → ℕ) : ∑ p, f p = ∑ v, (f (v, false) + f (v, true)) := by
-  rw [Fintype.sum_prod_type]; simp [add_comm]
-
 /-- Before the termination event the execution cannot stop. -/
 lemma Inv1.not_final (hid : Function.Injective id) (hpos : ∀ v, 0 < id v) (hℓ : ∀ v, id v ≤ id ℓ)
     {c : Cfg n} (hr : Reach (oriented n) alg id c) (h : Inv1 id (id ℓ) c) :

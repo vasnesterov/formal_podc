@@ -184,9 +184,6 @@ theorem final_counts (hpos : ∀ v p, 0 < vid (id v) p) (hB : Bounds flip vid id
   · have hp : p = xor true (flip v) := by cases p <;> cases h' : flip v <;> simp_all
     subst hp; exact hT v
 
-lemma sum_ports (f : ZMod n × Bool → ℕ) : ∑ p, f p = ∑ v, (f (v, false) + f (v, true)) := by
-  rw [Fintype.sum_prod_type]; simp [add_comm]
-
 /-- Message complexity of Algorithm 3: never more than `n (M true + M false)` pulses. -/
 theorem totalSent_le (hpos : ∀ v p, 0 < vid (id v) p) (hB : Bounds flip vid id M)
     {c : Config (ZMod n) S} (hr : Reach (flipped n flip) (alg vid) id c) :
