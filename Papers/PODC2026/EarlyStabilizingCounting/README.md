@@ -136,3 +136,9 @@ may send different messages to different receivers. We found no error there.
 initial state (`run`, `literal_exists_exec`), so the counting statements are not vacuous. The
 model comes from CSLib (`Cslib.Byzantine.SyncCounting`). Everything else is proved here: the
 subroutines (Algorithms 8–10) are verified, not assumed.
+
+**Shared infrastructure.** `cnt` is `Finset.countEq` (`Podc/Foundations/Count.lean`), quorum
+intersection is `Cslib.Quorum.exists_mem_inter_notMem_of_three_mul_lt` (`Podc/Foundations/Quorum.lean`).
+The conclusion of `ga_spec` is binary graded consensus (`ga_gradedConsensus`:
+`Cslib.Byzantine.Problem.GradedConsensus`, `Podc/Agreement/Specs.lean`), and the king steps of `kc_spec` and
+`KC8Run.spec` are `Cslib.Byzantine.kingPhase_agreement` (`Podc/Agreement/PhaseKing.lean`).

@@ -1,4 +1,6 @@
 import Mathlib
+import Podc.Foundations.Count
+import Podc.Agreement.PhaseKing
 
 /-!
 # The phase-king layer (§3.4, Table 2, Lemmas 4 and 5)
@@ -30,8 +32,7 @@ def incr (x : Fin C) : Fin C := ⟨(x.val + 1) % C, Nat.mod_lt _ (Nat.zero_lt_of
 def inc : Option (Fin C) → Option (Fin C) := Option.map incr
 
 /-- Number of received copies of the value `a`. -/
-def cntA (ma : V → Option (Fin C)) (a : Option (Fin C)) : ℕ :=
-  (univ.filter fun u => ma u = a).card
+abbrev cntA (ma : V → Option (Fin C)) (a : Option (Fin C)) : ℕ := univ.countEq ma a
 
 /-- `min {j ∈ [C] : z_j > F}`, `∞` (`none`) if there is no such `j`. -/
 def firstHeavy (F : ℕ) (ma : V → Option (Fin C)) : Option (Fin C) :=
@@ -48,17 +49,13 @@ variable (Fa : Finset V)
 
 lemma cntA_le (ma : V → Option (Fin C)) (a : Option (Fin C)) :
     cntA ma a ≤ (univ.filter fun u => u ∉ Fa ∧ ma u = a).card + Fa.card := by
-  unfold cntA
-  calc (univ.filter fun u => ma u = a).card
-      ≤ ((univ.filter fun u => u ∉ Fa ∧ ma u = a) ∪ Fa).card := by
-        apply card_le_card; intro u hu
-        simp only [mem_filter, mem_univ, true_and] at hu
-        by_cases h : u ∈ Fa <;> simp [h, hu]
-    _ ≤ _ := card_union_le _ _
+  simpa [cntA, countEq, compl_eq_univ_sdiff, ← filter_notMem_eq_sdiff, filter_filter] using
+    countEq_le_countEq_add_card_sdiff (f := ma) (b := a) univ Faᶜ
 
 lemma le_cntA (ma : V → Option (Fin C)) (a : Option (Fin C)) :
     (univ.filter fun u => u ∉ Fa ∧ ma u = a).card ≤ cntA ma a := by
-  unfold cntA; apply card_le_card; intro u; simp +contextual
+  simpa [cntA, countEq, compl_eq_univ_sdiff, ← filter_notMem_eq_sdiff, filter_filter] using
+    countEq_mono (f := ma) (b := a) (subset_univ Faᶜ)
 
 lemma card_correct_le : (univ.filter fun u : V => u ∉ Fa).card + Fa.card = Fintype.card V := by
   have := card_filter_add_card_filter_not (s := (univ : Finset V)) (fun u => u ∈ Fa)
@@ -69,31 +66,15 @@ lemma card_correct_le : (univ.filter fun u : V => u ∉ Fa).card + Fa.card = Fin
 /-- Values held by all correct nodes are received at least `N - |Fa|` times. -/
 lemma cntA_of_all (ma : V → Option (Fin C)) (a : Option (Fin C)) (h : ∀ u ∉ Fa, ma u = a) :
     Fintype.card V - Fa.card ≤ cntA ma a := by
-  have h1 := le_cntA Fa ma a
-  have h2 : (univ.filter fun u => u ∉ Fa ∧ ma u = a) = univ.filter fun u => u ∉ Fa := by
-    ext u; simp only [mem_filter, mem_univ, true_and]; constructor
-    · exact fun h => h.1
-    · exact fun hu => ⟨hu, h u hu⟩
-  rw [h2] at h1
-  have := card_correct_le Fa
-  omega
+  simpa [card_univ_sdiff] using card_sdiff_le_countEq (s := univ) (f := ma) fun u _ hu => h u hu
 
+omit [DecidableEq V] in
 /-- Values held by no correct node are received at most `|Fa|` times. -/
 lemma cntA_of_none (ma : V → Option (Fin C)) (a : Option (Fin C)) (h : ∀ u ∉ Fa, ma u ≠ a) :
     cntA ma a ≤ Fa.card := by
-  have h1 := cntA_le Fa ma a
-  have h2 : (univ.filter fun u => u ∉ Fa ∧ ma u = a) = ∅ := by
-    ext u; simp only [mem_filter, mem_univ, true_and, Finset.notMem_empty, iff_false, not_and]
-    exact h u
-  rw [h2, card_empty] at h1; omega
-
-/-- Two distinct values are received at most `N` times in total. -/
-lemma cntA_add_cntA_le (ma : V → Option (Fin C)) {a b : Option (Fin C)} (hab : a ≠ b) :
-    cntA ma a + cntA ma b ≤ Fintype.card V := by
-  unfold cntA
-  rw [← card_union_of_disjoint]
-  · exact card_le_univ _
-  · rw [disjoint_filter]; intro u _ h1 h2; exact hab (h1.symm.trans h2)
+  by_contra hlt
+  obtain ⟨u, -, hu, hua⟩ := exists_mem_notMem_of_card_lt_countEq (not_le.1 hlt)
+  exact h u hu hua
 
 omit [DecidableEq V] in
 lemma firstHeavy_eq_none (F : ℕ) (ma : V → Option (Fin C)) (h : ∀ j, cntA ma (some j) ≤ F) :
@@ -290,16 +271,12 @@ theorem lemma4 {F : ℕ} (hFa : Fa.card ≤ F) (hN : 3 * F < Fintype.card V) {ki
     rcases hB v hv ma hma with h | h <;> rw [h]
     · exact Or.inl rfl
     · exact Or.inr rfl
-  -- (c) the king round
-  by_cases hall : ∀ v ∉ Fa, a₂ v = none ∨ d₂ v = false
-  · refine ⟨fromKing (a₂ king), fun v hv => ?_⟩
-    obtain ⟨ma, hma, he⟩ := h₂ v hv
-    unfold pkStep at he
-    rw [ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_left (hall v hv), hma king hking] at he
-    simp only [Prod.mk.injEq] at he
-    exact he
-  · push Not at hall
-    obtain ⟨w, hw, hwa, hwd⟩ := hall
+  -- (c) coherence: a correct node that keeps its value (`a ≠ ∞`, `d = 1`) holds the value of
+  -- every correct node
+  have hcoh : ∀ w ∉ Fa, ¬ (a₂ w = none ∨ d₂ w = false) → ∀ v ∉ Fa, a₂ v = a₂ w := by
+    intro w hw hall
+    push Not at hall
+    obtain ⟨hwa, hwd⟩ := hall
     have hwa' : a₂ w = some (incr x) := (h2val w hw).resolve_left hwa
     -- `w` had `d = 1`: it saw `a₁ w` at least `N - F` times
     obtain ⟨ma, hma, he⟩ := h₁ w hw
@@ -315,7 +292,8 @@ theorem lemma4 {F : ℕ} (hFa : Fa.card ≤ F) (hN : 3 * F < Fintype.card V) {ki
         rw [h] at hdw
         have : firstHeavy F ma = none := by
           apply firstHeavy_eq_none; intro j
-          have := cntA_add_cntA_le ma (a := none) (b := some j) (by simp)
+          have : cntA ma none + cntA ma (some j) ≤ Fintype.card V :=
+            card_univ (α := V) ▸ countEq_add_countEq_le (by simp)
           omega
         rw [he.1, this] at hwa'; simp [inc] at hwa'
       · exact h
@@ -355,13 +333,27 @@ theorem lemma4 {F : ℕ} (hFa : Fa.card ≤ F) (hN : 3 * F < Fintype.card V) {ki
           · simp at hmu
           · exact hj (Option.some_injective _ hmu).symm
       rw [hev.1, hfx]; rfl
-    refine ⟨incr (incr x), fun v hv => ?_⟩
+    intro v hv
+    rw [hall2 v hv, hall2 w hw]
+  -- (d) the king round: a node that keeps its value increments it, the others adopt
+  -- `min {C, a[ℓ]} + 1 mod C` from the correct king (`Cslib.Byzantine.kingPhase_agreement`)
+  have hround : ∀ v ∉ Fa, (a₃ v, d₃ v) =
+      if a₂ v = none ∨ d₂ v = false then (some (fromKing (a₂ king)), true)
+      else (inc (a₂ v), true) := by
+    intro v hv
     obtain ⟨mc, hmc, hev⟩ := h₂ v hv
     unfold pkStep at hev
-    rw [ite_eq_right (by omega), ite_eq_right (by omega), hmc king hking, hall2 king hking, hall2 v hv] at hev
-    simp only [Prod.mk.injEq] at hev
-    refine ⟨?_, hev.2⟩
-    rw [hev.1]
+    rw [ite_eq_right (by omega), ite_eq_right (by omega), hmc king hking] at hev
+    rw [hev]
     split_ifs <;> rfl
+  refine ⟨fromKing (a₂ king), fun v hv => Prod.ext_iff.1 <|
+    Cslib.Byzantine.kingPhase_agreement (H := (↑Fa : Set V)ᶜ) (val := a₂)
+      (strong := fun v => ¬ (a₂ v = none ∨ d₂ v = false)) (out := fun v => (a₃ v, d₃ v))
+      (keep := fun a => (inc a, true)) (adopt := fun a => (some (fromKing a), true))
+      (fun w hw hs => hcoh w hw hs king hking) (fun v hv hs => (hround v hv).trans (ite_eq_right hs))
+      (fun v hv hs => (hround v hv).trans (ite_eq_left (not_not.1 hs))) (fun v _ hs => ?_) v hv⟩
+  obtain ⟨y, hy⟩ := Option.ne_none_iff_exists'.1 fun h => hs (Or.inl h)
+  simp only [hy]
+  rfl
 
 end SynchronousCounting

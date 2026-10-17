@@ -1,5 +1,6 @@
 import Cslib.Computability.Distributed.Byzantine.SyncCounting.Model
 import Mathlib
+import Podc.Foundations.Count
 
 /-!
 # Early-Stabilizing Counting: basic definitions
@@ -9,7 +10,8 @@ Lenzen, Loss, *Early-Stabilizing Counting*, PODC 2026 (arXiv 2605.18171) [LL26].
 Node set `Fin n`, faulty set `F` with `3 |F| < n` (i.e. `|F| ≤ t := ⌊(n-1)/3⌋`, `res n`).
 Time `t ∈ ℕ` is the end of round `t`; time `0` is the arbitrary initial state.
 
-* Counting received values (`cnt`, `Agree`) and quorum facts used by all subroutines.
+* Counting received values (`cnt`, an instance of `Finset.countEq`; `Agree`) and the facts about
+  correct senders used by all subroutines.
 * Specifications at the level of traces of the correct nodes:
   Definition 2.1 (`CountsFrom`, `OCountsFrom`), the crusader-agreement half of Definition 2.2
   (`Crusader`, with an explicit window), Definition 2.6 (`KCSpec`).
@@ -26,8 +28,7 @@ open Finset
 def res (n : ℕ) : ℕ := (n - 1) / 3
 
 /-- Number of indices at which `s` holds `a`. -/
-def cnt {n : ℕ} {α : Type*} [DecidableEq α] (s : Fin n → α) (a : α) : ℕ :=
-  (univ.filter fun w => s w = a).card
+abbrev cnt {n : ℕ} {α : Type*} [DecidableEq α] (s : Fin n → α) (a : α) : ℕ := univ.countEq s a
 
 /-- The received vector `m` agrees with the true values `x` on the correct nodes. -/
 def Agree {n : ℕ} {α : Type*} (F : Finset (Fin n)) (m x : Fin n → α) : Prop :=
@@ -78,30 +79,27 @@ section Counting
 
 variable {n : ℕ} {α : Type*} [DecidableEq α]
 
-theorem cnt_le (s : Fin n → α) (a : α) : cnt s a ≤ n := by
-  unfold cnt
-  exact (card_le_univ _).trans (by simp)
+theorem cnt_le (s : Fin n → α) (a : α) : cnt s a ≤ n :=
+  countEq_le_card.trans (by simp)
+
+/-- On the correct nodes, a received vector holds `a` where the true values do. -/
+theorem filter_agree (F : Finset (Fin n)) {m x : Fin n → α} (h : Agree F m x) (a : α) :
+    (univ.filter fun w => w ∉ F ∧ x w = a) = univ.filter fun w => w ∉ F ∧ m w = a :=
+  filter_congr fun w _ => and_congr_right fun hw => by rw [h w hw]
 
 /-- At least the correct nodes holding `a` are counted. -/
 theorem cnt_ge_correct (F : Finset (Fin n)) {m x : Fin n → α} (h : Agree F m x) (a : α) :
     (univ.filter fun w => w ∉ F ∧ x w = a).card ≤ cnt m a := by
-  unfold cnt
-  refine card_le_card fun w hw => ?_
-  simp only [mem_filter, mem_univ, true_and] at hw ⊢
-  rw [h w hw.1]; exact hw.2
+  rw [filter_agree F h]
+  simpa [cnt, countEq, compl_eq_univ_sdiff, ← filter_notMem_eq_sdiff, filter_filter] using
+    countEq_mono (f := m) (b := a) (subset_univ Fᶜ)
 
 /-- At most the correct nodes holding `a` plus the faulty nodes are counted. -/
 theorem cnt_le_correct_add (F : Finset (Fin n)) {m x : Fin n → α} (h : Agree F m x) (a : α) :
     cnt m a ≤ (univ.filter fun w => w ∉ F ∧ x w = a).card + F.card := by
-  unfold cnt
-  calc (univ.filter fun w => m w = a).card
-      ≤ ((univ.filter fun w => w ∉ F ∧ x w = a) ∪ F).card := by
-        refine card_le_card fun w hw => ?_
-        simp only [mem_filter, mem_univ, true_and, mem_union] at hw ⊢
-        by_cases hwF : w ∈ F
-        · exact Or.inr hwF
-        · exact Or.inl ⟨hwF, (h w hwF) ▸ hw⟩
-    _ ≤ _ := card_union_le _ _
+  rw [filter_agree F h]
+  simpa [cnt, countEq, compl_eq_univ_sdiff, ← filter_notMem_eq_sdiff, filter_filter] using
+    countEq_le_countEq_add_card_sdiff (f := m) (b := a) univ Fᶜ
 
 /-- The number of correct nodes is `n - |F|`. -/
 theorem card_correct (F : Finset (Fin n)) :
@@ -119,28 +117,10 @@ theorem card_le_res {F : Finset (Fin n)} (hF : 3 * F.card < n) : F.card ≤ res 
 /-- If all correct nodes hold `a`, then `a` is received at least `n - t` times. -/
 theorem cnt_all {F : Finset (Fin n)} (hF : 3 * F.card < n) {m x : Fin n → α} (h : Agree F m x)
     {a : α} (ha : ∀ w, w ∉ F → x w = a) : n - res n ≤ cnt m a := by
-  have h1 := cnt_ge_correct F h a
-  have h2 : (univ.filter fun w => w ∉ F ∧ x w = a) = univ.filter fun w : Fin n => w ∉ F := by
-    ext w; simp only [mem_filter, mem_univ, true_and]
-    exact ⟨fun h => h.1, fun hw => ⟨hw, ha w hw⟩⟩
-  rw [h2, card_correct] at h1
+  have h1 : n - F.card ≤ cnt m a := by
+    simpa [card_univ_sdiff] using
+      card_sdiff_le_countEq (s := univ) (f := m) fun w _ hw => (h w hw).trans (ha w hw)
   have := card_le_res hF
-  omega
-
-/-- Two sets of at least `n - t` senders share a correct sender (`n > 3t`, `|F| ≤ t`). -/
-theorem exists_correct_of_two_quorums {F : Finset (Fin n)} (hF : 3 * F.card < n)
-    {A B : Finset (Fin n)} (hA : n - res n ≤ A.card) (hB : n - res n ≤ B.card) :
-    ∃ w, w ∈ A ∧ w ∈ B ∧ w ∉ F := by
-  by_contra hcon
-  push Not at hcon
-  have hsub : A ∩ B ⊆ F := fun w hw => by
-    rw [mem_inter] at hw
-    exact hcon w hw.1 hw.2
-  have h1 := card_le_card hsub
-  have h2 := card_union_add_card_inter A B
-  have h3 : (A ∪ B).card ≤ n := (card_le_univ _).trans (by simp)
-  have := card_le_res hF
-  unfold res at *
   omega
 
 end Counting

@@ -126,4 +126,6 @@ results are non-vacuous: the hypotheses are only `n > 3f`, and `FillCex.without_
 verified consensus on a concrete instance. The abstract searches over rotor schedules are in
 `modelcheck/`: they found the `n = 7` instance and the tight bound `r ≤ f`. Paper-local
 infrastructure, CSLib candidates: the id-only model (`Model.lean`) and the candidate-set layer
-(`Rotor.lean`, `Layer.lean`, `GoodRound.lean`).
+(`Rotor.lean`, `Layer.lean`, `GoodRound.lean`). Shared infrastructure: `cnt` is `Finset.countEq`
+(`Podc/Foundations/Count.lean`); the king step of Lemma 11 (`good_phase`) is the generic phase-king
+lemma `Cslib.Byzantine.kingPhase_agreement` (`Podc/Agreement/PhaseKing.lean`).

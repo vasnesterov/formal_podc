@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.Foundations.Count
 
 /-!
 # The id-only model (Khanchandani–Wattenhofer, PODC 2020, Section 3)
@@ -66,7 +67,7 @@ lemma run_succ (A : Protocol I X M S) (E : Env I X M) (s : ℕ) (v : I) :
     run A E (s + 1) v = A.step (run A E s v) (inbox A E (run A E s) s v) := rfl
 
 /-- Number of (distinct) senders of message `m` in a received set. -/
-def cnt (B : Finset (I × M)) (m : M) : ℕ := (B.filter (fun e => e.2 = m)).card
+abbrev cnt (B : Finset (I × M)) (m : M) : ℕ := B.countEq Prod.snd m
 
 /-- The senders of a received set. -/
 def senders (B : Finset (I × M)) : Finset I := B.image Prod.fst
@@ -98,7 +99,7 @@ lemma cnt_inbox (m : M) :
     cnt (inbox A E st s v) m =
       (E.G.filter (fun q => m ∈ A.out (st q))).card +
         (E.F.filter (fun q => m ∈ E.adv s q v)).card := by
-  rw [cnt, filter_inbox, Finset.card_union_of_disjoint, Finset.card_image_of_injective,
+  rw [cnt, Finset.countEq, filter_inbox, Finset.card_union_of_disjoint, Finset.card_image_of_injective,
     Finset.card_image_of_injective]
   · intro a b h; simpa using h
   · intro a b h; simpa using h

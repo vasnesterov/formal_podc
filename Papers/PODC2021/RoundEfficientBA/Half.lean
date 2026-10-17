@@ -1,4 +1,5 @@
 import Papers.PODC2021.RoundEfficientBA.Proxcensus
+import Podc.Foundations.Quorum
 
 /-!
 # Proxcensus for `t < n/2` with threshold signatures (Section 3.3.2, Lemmas 3.4–3.6)
@@ -189,13 +190,10 @@ lemma S_mono {i : P} {k k' : ℕ} (hk : 1 ≤ k) (hkk : k ≤ k') (hi : k' < A.c
 lemma exists_of_card_or {a b : P → Prop} [DecidablePred a] [DecidablePred b]
     (h : n - t ≤ (Finset.univ.filter fun q => a q ∨ b q).card)
     (hb : (Finset.univ.filter fun q => b q).card ≤ t) (hnt : 2 * t < n) : ∃ q, a q := by
-  by_contra hne
-  push_neg at hne
-  have : (Finset.univ.filter fun q => a q ∨ b q) ⊆ Finset.univ.filter fun q => b q := by
-    intro q hq; simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hq ⊢
-    exact hq.resolve_left (hne q)
-  have := Finset.card_le_card this
-  omega
+  obtain ⟨q, hq, hqb⟩ := Finset.exists_mem_notMem_of_card_le_of_lt hb
+    (show t < (Finset.univ.filter fun q => a q ∨ b q).card by omega)
+  simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hq hqb
+  exact ⟨q, hq.resolve_right hqb⟩
 
 lemma card_cr_le_mono {r k : ℕ} (hk : k ≤ r) :
     (Finset.univ.filter fun q => A.cr q ≤ k).card ≤ (Finset.univ.filter fun q => A.cr q ≤ r).card :=

@@ -1,4 +1,7 @@
 import Mathlib
+import Podc.Foundations.Count
+import Podc.Agreement.PhaseKing
+import Podc.Agreement.Specs
 
 /-!
 # Subroutines of the early-stopping Phase King protocol (Section 2 and Lemma 3.4)
@@ -35,32 +38,25 @@ variable {P : Type*} [Fintype P] [DecidableEq P]
 /-! ### Counting received values -/
 
 /-- The number of senders in `K` from which the value `b` was received. -/
-def cntIn (K : Finset P) (m : P → Option Bool) (b : Bool) : ℕ :=
-  (K.filter fun q => m q = some b).card
+abbrev cntIn (K : Finset P) (m : P → Option Bool) (b : Bool) : ℕ := K.countEq m (some b)
 
 /-- The number of senders from which the value `b` was received. -/
-def cnt (m : P → Option Bool) (b : Bool) : ℕ := cntIn univ m b
+abbrev cnt (m : P → Option Bool) (b : Bool) : ℕ := cntIn univ m b
 
 theorem cntIn_le_card (K : Finset P) (m : P → Option Bool) (b : Bool) : cntIn K m b ≤ K.card :=
-  card_le_card (filter_subset _ _)
+  countEq_le_card
 
 theorem cntIn_add_le (K : Finset P) (m : P → Option Bool) (b : Bool) :
-    cntIn K m b + cntIn K m (!b) ≤ K.card := by
-  unfold cntIn
-  rw [← card_filter_add_card_filter_not (s := K) (fun q => m q = some b)]
-  refine Nat.add_le_add_left (card_le_card fun q hq => ?_) _
-  simp only [mem_filter] at hq ⊢
-  refine ⟨hq.1, fun h => ?_⟩
-  rw [h] at hq; cases b <;> simp at hq
+    cntIn K m b + cntIn K m (!b) ≤ K.card :=
+  countEq_add_countEq_le (by cases b <;> simp)
 
-theorem cnt_add_le (m : P → Option Bool) (b : Bool) : cnt m b + cnt m (!b) ≤ Fintype.card P := by
-  have := cntIn_add_le univ m b; simpa [cnt] using this
+theorem cnt_add_le (m : P → Option Bool) (b : Bool) : cnt m b + cnt m (!b) ≤ Fintype.card P :=
+  card_univ (α := P) ▸ cntIn_add_le univ m b
 
 /-- Lower bound: the correct senders in `K` that sent `b`. -/
 theorem cntIn_ge_of (K F : Finset P) {m : P → Option Bool} {b : Bool}
     (h : ∀ q ∈ K, q ∉ F → m q = some b) : (K \ F).card ≤ cntIn K m b :=
-  card_le_card fun q hq => by
-    rw [mem_sdiff] at hq; exact mem_filter.2 ⟨hq.1, h q hq.1 hq.2⟩
+  card_sdiff_le_countEq h
 
 theorem cnt_ge_of (F : Finset P) {m : P → Option Bool} {b : Bool}
     (h : ∀ q ∉ F, m q = some b) : Fintype.card P - F.card ≤ cnt m b := by
@@ -70,12 +66,9 @@ theorem cnt_ge_of (F : Finset P) {m : P → Option Bool} {b : Bool}
 /-- Upper bound: at most `|K ∩ F|` faulty senders plus the correct ones that sent `b`. -/
 theorem cntIn_le (K F : Finset P) (m : P → Option Bool) (b : Bool) :
     cntIn K m b ≤ (K ∩ F).card + ((K \ F).filter fun q => m q = some b).card := by
-  unfold cntIn
-  refine le_trans (card_le_card fun q hq => ?_) (card_union_le _ _)
-  simp only [mem_filter, mem_union, mem_inter, mem_sdiff] at hq ⊢
-  by_cases hF : q ∈ F
-  · exact Or.inl ⟨hq.1, hF⟩
-  · exact Or.inr ⟨⟨hq.1, hF⟩, hq.2⟩
+  have := countEq_le_countEq_add_card_sdiff (f := m) (b := some b) K (K \ F)
+  rw [sdiff_sdiff_right_self, inf_eq_inter] at this
+  exact this.trans_eq (add_comm _ _)
 
 theorem cnt_le (F : Finset P) (m : P → Option Bool) (b : Bool) :
     cnt m b ≤ F.card + (Fᶜ.filter fun q => m q = some b).card := by
@@ -84,7 +77,7 @@ theorem cnt_le (F : Finset P) (m : P → Option Bool) (b : Bool) :
 
 theorem cntIn_congr {K : Finset P} {m m' : P → Option Bool} (h : ∀ q ∈ K, m q = m' q) (b : Bool) :
     cntIn K m b = cntIn K m' b := by
-  unfold cntIn; congr 1; exact filter_congr fun q hq => by rw [h q hq]
+  unfold cntIn countEq; congr 1; exact filter_congr fun q hq => by rw [h q hq]
 
 theorem cnt_congr {m m' : P → Option Bool} (h : ∀ q, m q = m' q) (b : Bool) :
     cnt m b = cnt m' b := cntIn_congr (fun q _ => h q) b
@@ -93,10 +86,16 @@ theorem cnt_congr {m m' : P → Option Bool} (h : ∀ q, m q = m' q) (b : Bool) 
 
 /-- Definition 2.2 of [LS22] (weak validator); Definition 2.7 (termination check) is the same
 specification with `strong` renamed `term`. `b` are the inputs, `(o, s)` the outputs; only correct
-nodes (outside `F`) matter. -/
-def WeakValidatorSpec (F : Finset P) (b o s : P → Bool) : Prop :=
-  (∀ v, (∀ i ∉ F, b i = v) → ∀ i ∉ F, o i = v ∧ s i = true) ∧
-    (∀ i ∉ F, s i = true → ∀ j ∉ F, o j = o i)
+nodes (outside `F`) matter. This is binary graded consensus (`Cslib.Byzantine.Problem.GradedConsensus`)
+with grade `s`; see `weakValidatorSpec_iff` for the two clauses. -/
+abbrev WeakValidatorSpec (F : Finset P) (b o s : P → Bool) : Prop :=
+  Cslib.Byzantine.Problem.GradedConsensus b (↑F)ᶜ fun i => (o i, s i)
+
+/-- Definition 2.2 of [LS22], unfolded: validity and weak agreement of the outputs. -/
+theorem weakValidatorSpec_iff {F : Finset P} {b o s : P → Bool} :
+    WeakValidatorSpec F b o s ↔ (∀ v, (∀ i ∉ F, b i = v) → ∀ i ∉ F, o i = v ∧ s i = true) ∧
+      (∀ i ∉ F, s i = true → ∀ j ∉ F, o j = o i) :=
+  Cslib.Byzantine.Problem.gradedConsensus_iff
 
 /-- The *weak agreement* property of an input `(b, strong)` (as guaranteed by a weak validator):
 if a correct node is strong, all correct nodes hold its value. -/
@@ -196,11 +195,8 @@ theorem vote_unique (h3 : 3 * t < Fintype.card P) (hF : F.card ≤ t) {x : P →
     filter_congr fun q hq => by rw [h1 j hj q (mem_compl.1 hq)]; simp
   rw [ei] at ci; rw [ej] at cj
   have hsum : (Fᶜ.filter fun q => x q = b).card + (Fᶜ.filter fun q => x q = !b).card ≤
-      Fᶜ.card := by
-    rw [← card_filter_add_card_filter_not (s := Fᶜ) (fun q => x q = b)]
-    refine Nat.add_le_add_left (card_le_card fun q hq => ?_) _
-    simp only [mem_filter] at hq ⊢
-    refine ⟨hq.1, fun h => ?_⟩; rw [h] at hq; cases b <;> simp at hq
+      Fᶜ.card :=
+    countEq_add_countEq_le (s := Fᶜ) (f := x) (by cases b <;> simp)
   rw [card_compl] at hsum
   omega
 
@@ -303,29 +299,42 @@ theorem lemma_2_6 {F : Finset P} {k : P} {b s : P → Bool} {rk : P → Option B
     (hk : k ∉ F → ∀ i ∉ F, rk i = some (b k)) :
     ElectorsBCSpec F {k} b s (fun i => kingOut (b i) (s i) (rk i)) := by
   refine ⟨fun v hv i hi => ?_, fun hK hwa i hi j hj => ?_⟩
-  · simp [kingOut, (hv i hi).2, (hv i hi).1]
+  · exact Cslib.Byzantine.kingPhase_persistence (H := (F : Set P)ᶜ) (val := b)
+      (strong := fun i => s i = true) (out := fun i => kingOut (b i) (s i) (rk i)) (keep := id) (fun i hi => (hv i hi).symm) (fun i _ hs => by simp [kingOut, hs]) i hi
   · have hkF : k ∉ F := by
       intro hkF
       have : ({k} \ F : Finset P) = ∅ := by simp [hkF]
       rw [this] at hK; simp at hK
-    have key : ∀ i ∉ F, kingOut (b i) (s i) (rk i) = b k := by
-      intro i hi
-      unfold kingOut
-      split_ifs with hs
-      · exact (hwa i hi hs k hkF).symm
-      · rw [hk hkF i hi]; rfl
-    beta_reduce
-    rw [key i hi, key j hj]
+    -- phase king with a correct king (`Cslib.Byzantine.kingPhase_agreement`)
+    have key := Cslib.Byzantine.kingPhase_agreement (H := (F : Set P)ᶜ) (val := b)
+      (strong := fun i => s i = true) (out := fun i => kingOut (b i) (s i) (rk i))
+      (keep := id) (adopt := id) (fun i hi hs => hwa i hi hs k hkF) (fun i _ hs => by simp [kingOut, hs])
+      (fun i hi hs => by simp [kingOut, hs, hk hkF i hi]) fun _ _ _ => rfl
+    exact (key i hi).trans (key j hj).symm
 
 /-! ### Algorithm 5: electors' broadcast via consensus among the electors -/
 
 /-- The specification of the consensus routine called by the electors `K` (binary consensus,
 Definition 2.1, guaranteed only if fewer than a third of `K` is faulty): `c i` is the output of
-elector `i` on input `b i`. -/
+elector `i` on input `b i`; the honest electors are `K \ F` (`consensusOn_iff` unfolds it). -/
 def ConsensusOn (F K : Finset P) (b c : P → Bool) : Prop :=
-  2 * K.card / 3 < (K \ F).card →
-    (∀ i ∈ K, i ∉ F → ∀ j ∈ K, j ∉ F → c i = c j) ∧
-      ∀ v, (∀ i ∈ K, i ∉ F → b i = v) → ∀ i ∈ K, i ∉ F → c i = v
+  2 * K.card / 3 < (K \ F).card → Cslib.Byzantine.Problem.Consensus b ↑(K \ F) c
+
+/-- `ConsensusOn`, unfolded: agreement and validity among the correct electors. -/
+theorem consensusOn_iff {F K : Finset P} {b c : P → Bool} :
+    ConsensusOn F K b c ↔ (2 * K.card / 3 < (K \ F).card →
+      (∀ i ∈ K, i ∉ F → ∀ j ∈ K, j ∉ F → c i = c j) ∧
+        ∀ v, (∀ i ∈ K, i ∉ F → b i = v) → ∀ i ∈ K, i ∉ F → c i = v) := by
+  refine imp_congr_right fun _ => ⟨fun h => ⟨fun i hi hiF j hj hjF => ?_, fun v hv i hi hiF => ?_⟩,
+    fun h => ⟨fun i hi j hj => ?_, fun v hv i hi => ?_⟩⟩
+  · exact h.agreement i (by simp [hi, hiF]) j (by simp [hj, hjF])
+  · refine h.unanimity v (fun q hq => ?_) i (by simp [hi, hiF])
+    rw [coe_sdiff, Set.mem_sdiff, mem_coe] at hq
+    exact hv q hq.1 hq.2
+  · simp only [coe_sdiff, Set.mem_sdiff, mem_coe] at hi hj
+    exact h.1 i hi.1 hi.2 j hj.1 hj.2
+  · simp only [coe_sdiff, Set.mem_sdiff, mem_coe] at hi
+    exact h.2 v (fun q hq hqF => hv q (by simp [hq, hqF])) i hi.1 hi.2
 
 /-- Majority of the values received from `K` (`pick` on a tie). -/
 def majIn (K : Finset P) (pick : Bool) (m : P → Option Bool) : Bool :=
@@ -347,7 +356,7 @@ theorem lemma_3_4 {F K : Finset P} {b s c : P → Bool} {pick : P → Bool}
     ElectorsBCSpec F K b s (fun i => alg5Out K (pick i) (b i) (s i) (m i)) := by
   refine ⟨fun v hv i hi => ?_, fun hK hwa i hi j hj => ?_⟩
   · simp [alg5Out, (hv i hi).2, (hv i hi).1]
-  · obtain ⟨hag, hval⟩ := hc hK
+  · obtain ⟨hag, hval⟩ := consensusOn_iff.1 hc hK
     obtain ⟨e, he⟩ : (K \ F).Nonempty := by rw [← card_pos]; omega
     rw [mem_sdiff] at he
     set w := c e with hw

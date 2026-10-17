@@ -68,7 +68,7 @@ lemma mem_echoIds {B : Finset (I × Msg I A)} {p : I} :
 
 lemma echoIds_of_cnt_pos {B : Finset (I × Msg I A)} {p : I} (h : 0 < cnt B (Msg.echo p)) :
     p ∈ echoIds B := by
-  rw [cnt, Finset.card_pos] at h
+  rw [cnt, Finset.countEq, Finset.card_pos] at h
   obtain ⟨⟨q, m⟩, hm⟩ := h
   simp only [Finset.mem_filter] at hm
   obtain ⟨hm, rfl⟩ := hm
