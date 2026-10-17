@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.Agreement.Specs
 
 /-!
 # Proxcensus and the extraction step (Definition 2.2, Section 3.4, Theorem 3.7)
@@ -23,27 +24,21 @@ namespace RoundEfficientBA
 
 /-! ### Definition 2.2 -/
 
-/-- The maximal grade `G = ⌊(s-1)/2⌋` of `s`-slot Proxcensus. -/
-def maxGrade (s : ℕ) : ℕ := (s - 1) / 2
+-- The maximal grade `G = ⌊(s-1)/2⌋` of `s`-slot Proxcensus.
+export Cslib.Byzantine.Problem.Proxcensus (maxGrade)
 
 /-- The consistency conditions of Definition 2.2 for the ordered pair of outputs
 `a = (yᵢ, gᵢ)`, `b = (yⱼ, gⱼ)`: `|gᵢ - gⱼ| ≤ 1`, `min(gᵢ, gⱼ) ≥ 1 → yᵢ = yⱼ`, and, for even `s`,
 `gᵢ > 0 → yᵢ = yⱼ`. (Definition 2.2 quantifies over *any two* honest parties, so the last clause is
 required for both orders.) -/
-def ProxCons {D : Type*} (s : ℕ) (a b : D × ℕ) : Prop :=
-  a.2 ≤ b.2 + 1 ∧ b.2 ≤ a.2 + 1 ∧ (1 ≤ a.2 → 1 ≤ b.2 → a.1 = b.1) ∧
-    (s % 2 = 0 → 0 < a.2 → a.1 = b.1)
-
-instance {D : Type*} [DecidableEq D] (s : ℕ) (a b : D × ℕ) : Decidable (ProxCons s a b) := by
-  unfold ProxCons; infer_instance
+abbrev ProxCons {D : Type*} (s : ℕ) (a b : D × ℕ) : Prop := Cslib.Byzantine.Problem.Proxcensus.Consistent s a b
 
 /-- **Definition 2.2** (`s`-slot Proxcensus) as a property of one run: the honest parties `H`
-with inputs `x` output `out p = (yₚ, gₚ)` with `gₚ ∈ [0, G]`, validity and consistency hold.
-(Termination is a property of the protocol, not of the output relation.) -/
-structure IsProx {P D : Type*} (s : ℕ) (x : P → D) (H : Set P) (out : P → D × ℕ) : Prop where
-  grade_le : ∀ p ∈ H, (out p).2 ≤ maxGrade s
-  validity : ∀ v, (∀ p ∈ H, x p = v) → ∀ p ∈ H, out p = (v, maxGrade s)
-  consistency : ∀ p ∈ H, ∀ q ∈ H, ProxCons s (out p) (out q)
+with inputs `x` output `out p = (yₚ, gₚ)` with `gₚ ∈ [0, G]`, validity and consistency hold
+(fields `grade_le`, `validity`, `consistency`). (Termination is a property of the protocol, not of
+the output relation.) -/
+abbrev IsProx {P D : Type*} (s : ℕ) (x : P → D) (H : Set P) (out : P → D × ℕ) : Prop :=
+  Cslib.Byzantine.Problem.Proxcensus s x H out
 
 /-! ### Slots of binary outputs and the extraction function -/
 

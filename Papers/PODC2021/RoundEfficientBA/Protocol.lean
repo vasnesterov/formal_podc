@@ -125,7 +125,7 @@ lemma card_compl_honestF : (Finset.univ \ honestF sc).card = sc.byz.ncard := by
 lemma isProx_two (x : P → D) (H : Set P) : IsProx 2 x H (fun p => (x p, 0)) := by
   refine ⟨fun p _ => by simp [maxGrade], fun v hv p hp => ?_, fun p _ q _ => ?_⟩
   · simp [hv p hp, maxGrade]
-  · simp [ProxCons]
+  · simp [ProxCons, Cslib.Byzantine.Problem.Proxcensus.Consistent]
 
 open Classical in
 /-- Main induction: after `k` rounds the honest outputs form a `(2^k + 1)`-slot Proxcensus. -/
@@ -180,8 +180,7 @@ lemma decides_proxProtocol_iff (p : P) (o : D × ℕ) :
 
 /-- The Proxcensus specification as a lock-step `Spec`: every honest party decides, and the
 honest decisions satisfy `s`-slot Proxcensus. -/
-def ProxSpec (s : ℕ) : Spec P D (D × ℕ) := fun x H dec =>
-  (∀ p ∈ H, ∃ o, dec p o) ∧ ∀ out : P → D × ℕ, (∀ p ∈ H, dec p (out p)) → IsProx s x H out
+def ProxSpec (s : ℕ) : Spec P D (D × ℕ) := Cslib.Byzantine.Problem.ofOut (IsProx s)
 
 /-- **Corollary 3.3 (corrected threshold).** Let `n > 3t`. For every `r ≥ 0`, `proxProtocol t (t+1) r`
 achieves `(2^r + 1)`-slot Proxcensus against any (static, deterministic) adversary corrupting at

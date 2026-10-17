@@ -68,6 +68,8 @@ import Podc.SharedMemory.Recoverable
 import Podc.Graph.Ball
 import Podc.Graph.Orientation
 import Podc.Local.Locality
+import Podc.Agreement.Specs
+import Podc.Agreement.PhaseKing
 import Podc.Data.List.GreedyScan
 import Podc.Graph.Girth
 import Podc.Graph.Spanner.Weighted

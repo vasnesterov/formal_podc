@@ -107,5 +107,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 and their scenarios satisfy all hypotheses (corruption bound, validity of the adversary,
 `PrefixAgree`). The non-vacuity of `coin_parallel_static` is shown by an explicit strategy for which
 the bound `1/4` is attained (`coin_parallel_static_tight`). The `t < n/3` model is CSLib's `Cslib.Byzantine.LockStep`.
-CSLib candidates: the Proxcensus specification and extraction (`Proxcensus.lean`) and the
-echo-counting interface `hcnt`/`viewCnt` (`Expansion.lean`).
+The Proxcensus specification is shared: `IsProx`, `ProxCons`, `maxGrade` are
+`Cslib.Byzantine.Problem.Proxcensus`, `Proxcensus.Consistent`, `Proxcensus.maxGrade`, and `ProxSpec` is its
+lock-step lift `Cslib.Byzantine.Problem.ofOut` (`Podc/Agreement/Specs.lean`). CSLib candidates: the extraction
+(`Proxcensus.lean`) and the echo-counting interface `hcnt`/`viewCnt` (`Expansion.lean`).

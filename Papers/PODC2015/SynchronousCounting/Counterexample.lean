@@ -111,7 +111,7 @@ lemma isExec_badExec : IsExec (B₃ C) {byz} badExec := by
         · rw [mem_singleton] at hu; subst hu; simp [hma, badMsg, badExec, hx]
       have := card_le_card hsub
       rw [card_pair hv'] at this
-      simpa [cntA] using this
+      simpa [cntA, Finset.countEq] using this
     · -- any other value comes only from the third node
       intro j hj
       obtain ⟨o, ho⟩ : ∃ o : Fin 3 × Fin 1, ∀ u, u ≠ v → u ≠ byz → u = o := by
@@ -129,7 +129,7 @@ lemma isExec_badExec : IsExec (B₃ C) {byz} badExec := by
         · subst h2; simp [hma, badMsg, badExec] at hu; exact absurd (hu.symm.trans hx.symm) hj
         exact mem_singleton.2 (ho u h1 h2)
       have := card_le_card hsub
-      simpa [cntA] using this
+      simpa [cntA, Finset.countEq] using this
     · simp
   simp only [construction]
   rw [hmv, hpk]

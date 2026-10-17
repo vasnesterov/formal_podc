@@ -1,4 +1,5 @@
 import Papers.PODC2026.EarlyStabilizingCounting.Basic
+import Podc.Agreement.PhaseKing
 
 /-!
 # Communication-efficient King Consensus (Section 6.1: Lemmas 6.2, 6.4, Theorem 6.5)
@@ -209,9 +210,8 @@ theorem bigVal_eq {r : Fin n → Option Msg} {a : ℕ}
     rw [bigVal, List.findSome?_eq_none_iff] at h
     obtain ⟨w, hw⟩ : ∃ w, r w = some (.val a) := by
       have : 0 < cnt r (some (.val a)) := by omega
-      unfold cnt at this
-      obtain ⟨w, hw⟩ := card_pos.mp this
-      exact ⟨w, (mem_filter.mp hw).2⟩
+      obtain ⟨w, -, hw⟩ := exists_mem_of_countEq_pos this
+      exact ⟨w, hw⟩
     have := h w (List.mem_finRange w)
     simp [bigSel, hw, hy] at this
   · exact h
@@ -674,11 +674,13 @@ theorem KC8Run.spec {F : Finset (Fin n)} (E : KC8Run F) (hF : 3 * F.card < n) :
       · -- `h_ℓ = 1`: graded king agreement, then validity of weak graded agreement
         have hk : ∀ v, v ∉ F → E.k v = E.k ℓ := hG.graded_king_agreement ℓ hℓ hlead hgℓ
         exact fun v hv _ => (hW.validity _ hk v hv).1.trans (hW.validity _ hk ℓ hℓ).1.symm
-    refine ⟨by rw [hy ℓ hℓ]; simp, fun v hv => ?_⟩
-    rw [hy v hv, hy ℓ hℓ, ite_self]
-    cases hgv : E.g v
-    · rfl
-    · simp [hagree v hv hgv]
+    have hyℓ : E.y ℓ = some (E.z ℓ) := by rw [hy ℓ hℓ, ite_self]
+    refine ⟨by simp [hyℓ], fun v hv => hyℓ ▸ ?_⟩
+    -- the king step (line 8, `Cslib.Byzantine.kingPhase_agreement`)
+    exact Cslib.Byzantine.kingPhase_agreement (H := (F : Set (Fin n))ᶜ) (val := E.z)
+      (strong := fun v => E.g v = true) (out := E.y) (keep := some) (adopt := some)
+      (fun w hw hg => (hagree w hw hg).symm) (fun w hw hg => by rw [hy w hw, ite_eq_left hg])
+      (fun w hw hg => by rw [hy w hw, ite_eq_right hg]) (fun _ _ _ => rfl) v hv
 
 /-- Theorem 6.5 (communication of Algorithm 4): if all correct nodes have the same input `(x, ℓ)`
 with `ℓ = ⊥` or `ℓ` correct, then in each of the 8 rounds every message of a correct node is sent

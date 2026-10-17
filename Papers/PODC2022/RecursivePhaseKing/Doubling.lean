@@ -429,7 +429,7 @@ def badTrace : Trace ({0, 1} : Finset (Fin 7)) (K4 7) where
     · simp [show ¬ j + 1 ≤ 1 by omega, show j ≠ 0 by omega]
   hv j := by
     rcases Nat.lt_or_ge j 2 with h | h
-    · interval_cases j <;> unfold WeakValidatorSpec <;> decide
+    · interval_cases j <;> exact weakValidatorSpec_iff.2 (by decide)
     · refine ⟨fun v hv i hi => ?_, fun i _ _ k _ => ?_⟩
       · have := hv 2 (by decide)
         simp only [show ¬ j ≤ 1 by omega, ↓reduceIte] at this
@@ -445,7 +445,7 @@ def badTrace : Trace ({0, 1} : Finset (Fin 7)) (K4 7) where
       · simp [show j ≠ 0 by omega]
   ht j := by
     rcases Nat.lt_or_ge j 1 with h | h
-    · interval_cases j; unfold WeakValidatorSpec; decide
+    · interval_cases j; exact weakValidatorSpec_iff.2 (by decide)
     · refine ⟨fun v hv i hi => ?_, fun i _ _ k _ => ?_⟩
       · have := hv 2 (by decide)
         simp only [show j ≠ 0 by omega, ↓reduceIte] at this

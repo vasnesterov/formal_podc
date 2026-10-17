@@ -123,3 +123,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 - The counterexamples satisfy all hypotheses (`cx_hyps`), and `badTrace` inhabits `Trace`.
 - The models are CSLib's `RoundAlgorithm`/`RoundRun` (`Cslib/Computability/Distributed/Byzantine/PartialSync/Rounds.lean`)
   and `Desync.lean`.
+
+**Shared infrastructure.** `WeakValidatorSpec` (Definitions 2.2, 2.7) is binary graded consensus
+`Cslib.Byzantine.Problem.GradedConsensus` and `ConsensusOn` uses `Cslib.Byzantine.Problem.Consensus`
+(`Podc/Agreement/Specs.lean`; unfolded forms `weakValidatorSpec_iff`, `consensusOn_iff`). Lemma 2.6
+is the generic phase-king pair `kingPhase_agreement`/`kingPhase_persistence`
+(`Podc/Agreement/PhaseKing.lean`). Vote counts `cntIn`, `cnt` are `Finset.countEq`
+(`Podc/Foundations/Count.lean`).

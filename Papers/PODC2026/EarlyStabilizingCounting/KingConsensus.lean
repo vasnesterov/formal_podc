@@ -1,4 +1,6 @@
 import Papers.PODC2026.EarlyStabilizingCounting.Basic
+import Podc.Agreement.PhaseKing
+import Podc.Agreement.Specs
 
 /-!
 # Graded agreement and King Consensus (Lemmas 2.5 and 2.7, Algorithms 9 and 10)
@@ -17,7 +19,8 @@ round every node sends its current stage state to everybody.
 An instance is described by the receptions of the correct nodes: `r1 v w` is what `v` received
 from `w` in the first round; it agrees with the true value on correct senders (`Agree`).
 
-Main results: `ga_spec` (Lemma 2.5: validity and graded agreement), `kc_spec` (Lemma 2.7).
+Main results: `ga_spec` (Lemma 2.5: validity and graded agreement; `ga_gradedConsensus` in
+library form), `kc_spec` (Lemma 2.7).
 -/
 
 set_option linter.unusedSectionVars false
@@ -226,6 +229,17 @@ theorem ga_spec {n : ℕ} (F : Finset (Fin n)) (hF : 3 * F.card < n)
     · have := gaCnt_ge F (h2 v hv) (x w)
       omega
 
+/-- Lemma 2.5 in library form: Algorithm 9 is a binary graded consensus
+(`Cslib.Byzantine.Problem.GradedConsensus`) with value `z` and grade `g`. -/
+theorem ga_gradedConsensus {n : ℕ} (F : Finset (Fin n)) (hF : 3 * F.card < n)
+    (x : Fin n → ℕ) (l : Fin n → Option (Fin n))
+    (r1 : Fin n → Fin n → ℕ) (h1 : ∀ v, v ∉ F → Agree F (r1 v) x)
+    (s2 : Fin n → KC2 n) (hs2 : ∀ v, v ∉ F → s2 v = kc2 n (x v) (l v) (r1 v))
+    (r2 : Fin n → Fin n → KC2 n) (h2 : ∀ v, v ∉ F → Agree F (r2 v) s2)
+    (s3 : Fin n → KC3 n) (hs3 : ∀ v, v ∉ F → s3 v = kc3 (s2 v) (r2 v)) :
+    Cslib.Byzantine.Problem.GradedConsensus x (F : Set (Fin n))ᶜ fun v => ((s3 v).z, (s3 v).g) :=
+  Cslib.Byzantine.Problem.gradedConsensus_iff.2 (ga_spec F hF x l r1 h1 s2 hs2 r2 h2 s3 hs3)
+
 /-- Lemma 2.7 (King Consensus, Algorithm 10): one instance satisfies Definition 2.6. -/
 theorem kc_spec {n : ℕ} (F : Finset (Fin n)) (hF : 3 * F.card < n)
     (x : Fin n → ℕ) (l : Fin n → Option (Fin n))
@@ -253,11 +267,13 @@ theorem kc_spec {n : ℕ} (F : Finset (Fin n)) (hF : 3 * F.card < n)
   · have hyℓ : y ℓ = some (s3 ℓ).z := by
       rw [hyv ℓ hℓ, hlead ℓ hℓ]
       simp only [h3 ℓ hℓ ℓ hℓ, ite_self]
-    refine ⟨by simp [hyℓ], fun v hv => ?_⟩
-    rw [hyℓ, hyv v hv, hlead v hv]
-    simp only
-    split_ifs with hg
-    · rw [hga.2 v hv hg ℓ hℓ]
-    · rw [h3 v hv ℓ hℓ]
+    refine ⟨by simp [hyℓ], fun v hv => hyℓ ▸ ?_⟩
+    -- the king step of Algorithm 10 (`Cslib.Byzantine.kingPhase_agreement`)
+    refine Cslib.Byzantine.kingPhase_agreement (H := (F : Set (Fin n))ᶜ) (val := fun v => (s3 v).z)
+      (strong := fun v => (s3 v).g = true) (out := y) (keep := some) (adopt := some)
+      (fun w hw hg => hga.2 w hw hg ℓ hℓ) (fun w hw hg => ?_) (fun w hw hg => ?_)
+      (fun _ _ _ => rfl) v hv
+    · rw [hyv w hw, hlead w hw]; simp [hg]
+    · rw [hyv w hw, hlead w hw]; simp [hg, h3 w hw ℓ hℓ]
 
 end EarlyStabilizingCounting

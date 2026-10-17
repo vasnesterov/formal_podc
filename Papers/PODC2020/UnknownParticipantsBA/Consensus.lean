@@ -1,4 +1,5 @@
 import Papers.PODC2020.UnknownParticipantsBA.Layer
+import Podc.Agreement.PhaseKing
 
 /-!
 # Consensus in the id-only model (Section 5 of the BA, Algorithm 3 / Section VII of the full version)
@@ -473,8 +474,10 @@ correct nodes end the phase with the coordinator's opinion. -/
 lemma good_phase {k : ℕ} {p : I} (hp : p ∈ E.G)
     (hco : ∀ u ∈ E.G, (R (3 * k + 3) u).ext.coord = {p}) (u : I) (hu : u ∈ E.G) :
     (R (3 * k + 4) u).ext.x = (R (3 * k + 3) p).ext.x := by
-  have hking : pick (valsFrom (R (3 * k + 3) u).ext.coord CMsg.opVal (Bx (3 * k + 3) u))
+  -- the king's opinion, as received by a correct node
+  have hking : ∀ u ∈ E.G, pick (valsFrom (R (3 * k + 3) u).ext.coord CMsg.opVal (Bx (3 * k + 3) u))
       (R (3 * k + 3) u).ext.x = (R (3 * k + 3) p).ext.x := by
+    intro u hu
     rw [hco u hu]
     apply pick_eq
     · refine mem_valsFrom.mpr ⟨p, Finset.mem_singleton_self _, CMsg.opinion _,
@@ -489,13 +492,20 @@ lemma good_phase {k : ℕ} {p : I} (hp : p ∈ E.G)
         simp only [CMsg.opVal, Option.some.injEq] at ha; subst ha
         exact ((out_opinion_iff E k _ _).mp hm).2
       | _ => simp [CMsg.opVal] at ha
-  rw [(cons_king E k u).2]
-  split_ifs with hlt
-  · exact hking
-  · obtain ⟨t, -, hmt⟩ := cons_lemma1 E hres (s := 3 * k + 3) (t := 3 * k + 4) rfl (v := u)
-      (m := CMsg.strong (R (3 * k + 3) u).ext.x) (by omega)
+  -- the king step (`Cslib.Byzantine.kingPhase_agreement`): a node that received `n_v / 3` copies of
+  -- `strongprefer(x_v)` keeps `x_v`, the others adopt the coordinator's opinion
+  refine Cslib.Byzantine.kingPhase_agreement (H := (E.G : Set I))
+    (val := fun v => (R (3 * k + 3) v).ext.x) (out := fun v => (R (3 * k + 4) v).ext.x)
+    (strong := fun v => ¬ 3 * cnt (Bx (3 * k + 3) v) (Msg.app (CMsg.strong (R (3 * k + 3) v).ext.x)) <
+      (R (3 * k + 4) v).core.heard.card) (keep := id) (adopt := id)
+    (fun v _ hs => ?_) (fun v _ hs => ?_) (fun v hv hs => ?_) (fun _ _ _ => rfl) u hu
+  · -- coherence: a strong correct node holds the opinion of every correct node
+    obtain ⟨t, -, hmt⟩ := cons_lemma1 E hres (s := 3 * k + 3) (t := 3 * k + 4) rfl (v := v)
+      (m := CMsg.strong (R (3 * k + 3) v).ext.x) (by omega)
     obtain ⟨-, h2⟩ := out_strong_imp E hmt
-    exact (adopt E hres h2).symm
+    exact adopt E hres h2
+  · exact (cons_king E k v).2.trans (ite_f hs)
+  · exact (cons_king E k v).2.trans ((ite_t (not_not.1 hs)).trans (hking v hv))
 
 omit hres in
 /-- The origin of a decision: the first decision is taken in a king step. -/

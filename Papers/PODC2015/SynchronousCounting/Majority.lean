@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.Foundations.Count
 
 /-!
 # Majority votes
@@ -14,7 +15,7 @@ namespace SynchronousCounting
 variable {α : Type*} [DecidableEq α]
 
 /-- Number of indices holding the value `a`. -/
-def cnt {n : ℕ} (s : Fin n → α) (a : α) : ℕ := (Finset.univ.filter fun j => s j = a).card
+abbrev cnt {n : ℕ} (s : Fin n → α) (a : α) : ℕ := Finset.univ.countEq s a
 
 /-- The strict-majority value of `s`, or `d` if there is none. -/
 def maj {n : ℕ} (s : Fin n → α) (d : α) : α :=
@@ -24,25 +25,13 @@ def maj {n : ℕ} (s : Fin n → α) (d : α) : α :=
 
 /-- Two strict majorities coincide. -/
 lemma eq_of_two_maj {n : ℕ} (s : Fin n → α) {a b : α} (ha : n < 2 * cnt s a)
-    (hb : n < 2 * cnt s b) : a = b := by
-  by_contra hne
-  have hdisj : Disjoint (Finset.univ.filter fun j => s j = a)
-      (Finset.univ.filter fun j => s j = b) := by
-    rw [Finset.disjoint_filter]; intro j _ h1 h2; exact hne (h1.symm.trans h2)
-  have := Finset.card_union_of_disjoint hdisj
-  have hle := Finset.card_le_univ ((Finset.univ.filter fun j => s j = a) ∪
-    (Finset.univ.filter fun j => s j = b))
-  simp only [Fintype.card_fin] at hle
-  unfold cnt at ha hb
-  omega
+    (hb : n < 2 * cnt s b) : a = b :=
+  Finset.eq_of_card_lt_countEq_add_countEq (s := .univ) (f := s)
+    (by rw [Finset.card_univ, Fintype.card_fin]; change n < cnt s a + cnt s b; omega)
 
 /-- If `a` holds a strict majority, the majority vote returns `a`. -/
 lemma maj_eq {n : ℕ} (s : Fin n → α) (d : α) {a : α} (ha : n < 2 * cnt s a) : maj s d = a := by
-  have hpos : 0 < cnt s a := by omega
-  obtain ⟨j₀, hj₀⟩ : ∃ j, s j = a := by
-    unfold cnt at hpos
-    obtain ⟨j, hj⟩ := Finset.card_pos.1 hpos
-    exact ⟨j, (Finset.mem_filter.1 hj).2⟩
+  obtain ⟨j₀, -, hj₀⟩ := Finset.exists_mem_of_countEq_pos (show 0 < cnt s a by omega)
   unfold maj
   split
   · rename_i j hj
@@ -59,11 +48,10 @@ lemma maj_eq {n : ℕ} (s : Fin n → α) (d : α) {a : α} (ha : n < 2 * cnt s 
 `2 |B| < n` hold `a`. -/
 lemma lt_two_mul_cnt {n : ℕ} (s : Fin n → α) {a : α} (B : Finset (Fin n)) (hB : 2 * B.card < n)
     (h : ∀ j ∉ B, s j = a) : n < 2 * cnt s a := by
-  have : Bᶜ ⊆ Finset.univ.filter fun j => s j = a := by
-    intro j hj; simp only [Finset.mem_compl] at hj; simp [h j hj]
-  have h1 := Finset.card_le_card this
-  rw [Finset.card_compl, Fintype.card_fin] at h1
-  unfold cnt; omega
+  have h1 : (Finset.univ \ B).card ≤ cnt s a :=
+    Finset.card_sdiff_le_countEq fun j _ hj => h j hj
+  rw [← Finset.compl_eq_univ_sdiff, Finset.card_compl, Fintype.card_fin] at h1
+  omega
 
 /-- Majority vote with all values outside a minority `B` equal to `a`. -/
 lemma maj_eq_of_minority {n : ℕ} (s : Fin n → α) (d : α) {a : α} (B : Finset (Fin n))

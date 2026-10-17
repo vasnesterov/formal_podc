@@ -48,7 +48,7 @@ structure FS where
 /-- Strict majority over `T` of the received clock values (`⊥` if there is none). -/
 def majT {n : ℕ} (T : Finset (Fin n)) (cs : Fin n → ℕ) : Option ℕ :=
   match (List.finRange n).find?
-      (fun w => decide (w ∈ T) && decide (T.card < 2 * (T.filter fun u => cs u = cs w).card)) with
+      (fun w => decide (w ∈ T) && decide (T.card < 2 * T.countEq cs (cs w))) with
   | some w => some (cs w)
   | none => none
 
@@ -90,26 +90,6 @@ theorem filtStep_m (n K X : ℕ) (T : Finset (Fin n)) (own : FS) (cs : Fin n →
     (ms : Fin n → Option ℕ) : (filtStep n K X T own cs ms).m = majT T cs := by
   unfold filtStep; split <;> rfl
 
-theorem exists_of_cnt_pos {α : Type*} [DecidableEq α] {s : Fin n → α} {a : α}
-    (h : 0 < cnt s a) : ∃ w, s w = a := by
-  unfold cnt at h
-  obtain ⟨w, hw⟩ := Finset.card_pos.mp h
-  simp only [mem_filter, mem_univ, true_and] at hw
-  exact ⟨w, hw⟩
-
-/-- Two values each held at least `n - t` times coincide. -/
-theorem eq_of_two_cnt {α : Type*} [DecidableEq α] (hn : 0 < n) {s : Fin n → α} {a b : α}
-    (ha : n - res n ≤ cnt s a) (hb : n - res n ≤ cnt s b) : a = b := by
-  by_contra hab
-  have hdisj : Disjoint (univ.filter fun w => s w = a) (univ.filter fun w => s w = b) := by
-    rw [Finset.disjoint_filter]; intro w _ h1 h2; exact hab (h1 ▸ h2)
-  have h1 := card_union_of_disjoint hdisj
-  have h2 : ((univ.filter fun w => s w = a) ∪ (univ.filter fun w => s w = b)).card ≤ n :=
-    (card_le_univ _).trans (by simp)
-  have ha' : n - (n - 1) / 3 ≤ (univ.filter fun w => s w = a).card := ha
-  have hb' : n - (n - 1) / 3 ≤ (univ.filter fun w => s w = b).card := hb
-  omega
-
 theorem quorum_some {ms : Fin n → Option ℕ} {q : Option ℕ} (h : quorum ms = some q) :
     n - res n ≤ cnt ms q := by
   unfold quorum at h
@@ -122,13 +102,15 @@ theorem quorum_some {ms : Fin n → Option ℕ} {q : Option ℕ} (h : quorum ms 
 
 theorem quorum_of_cnt (hn : 0 < n) {ms : Fin n → Option ℕ} {q : Option ℕ}
     (h : n - res n ≤ cnt ms q) : quorum ms = some q := by
-  obtain ⟨w0, hw0⟩ := exists_of_cnt_pos (show 0 < cnt ms q by unfold res at h; omega)
+  obtain ⟨w0, -, hw0⟩ := exists_mem_of_countEq_pos (show 0 < cnt ms q by unfold res at h; omega)
   unfold quorum
   split
   · rename_i w hw
     have := List.find?_some hw
     simp only [decide_eq_true_eq] at this
-    rw [eq_of_two_cnt hn this h]
+    have hlt : (univ : Finset (Fin n)).card < cnt ms (ms w) + cnt ms q := by
+      rw [card_univ, Fintype.card_fin]; unfold res at this h; omega
+    rw [eq_of_card_lt_countEq_add_countEq hlt]
   · rename_i hnone
     rw [List.find?_eq_none] at hnone
     have := hnone w0 (List.mem_finRange w0)
@@ -140,9 +122,10 @@ theorem quorum_of_cnt (hn : 0 < n) {ms : Fin n → Option ℕ} {q : Option ℕ}
 theorem quorum_agree {F : Finset (Fin n)} (hF : 3 * F.card < n) {x ms₁ ms₂ : Fin n → Option ℕ}
     (h₁ : Agree F ms₁ x) (h₂ : Agree F ms₂ x) {q₁ q₂ : Option ℕ} (hq₁ : quorum ms₁ = some q₁)
     (hq₂ : quorum ms₂ = some q₂) : q₁ = q₂ := by
-  obtain ⟨u, hu1, hu2, huF⟩ := exists_correct_of_two_quorums hF
-    (A := univ.filter fun w => ms₁ w = q₁) (B := univ.filter fun w => ms₂ w = q₂)
-    (quorum_some hq₁) (quorum_some hq₂)
+  obtain ⟨u, hu1, hu2, huF⟩ := Cslib.Quorum.exists_mem_inter_notMem_of_three_mul_lt (f := res n)
+    (s := univ.filter fun w => ms₁ w = q₁) (t := univ.filter fun w => ms₂ w = q₂)
+    (by rw [Fintype.card_fin]; unfold res; omega) (card_le_res hF)
+    (by rw [Fintype.card_fin]; exact quorum_some hq₁) (by rw [Fintype.card_fin]; exact quorum_some hq₂)
   simp only [mem_filter, mem_univ, true_and] at hu1 hu2
   rw [← hu1, ← hu2, h₁ u huF, h₂ u huF]
 
@@ -151,20 +134,11 @@ majority value is `c`. -/
 theorem majT_eq {T F : Finset (Fin n)} (hT : 2 * (T ∩ F).card < T.card) {cs : Fin n → ℕ} {c : ℕ}
     (hc : ∀ w, w ∈ T → w ∉ F → cs w = c) : majT T cs = some c := by
   have hsd := card_sdiff_add_card_inter T F
-  have hbig : T.card < 2 * (T.filter fun u => cs u = c).card := by
-    have hsub : T \ F ⊆ T.filter fun u => cs u = c := fun w hw => by
-      rw [mem_sdiff] at hw; rw [mem_filter]; exact ⟨hw.1, hc w hw.1 hw.2⟩
-    have := card_le_card hsub
+  have hbig : T.card < 2 * T.countEq cs c := by
+    have := card_sdiff_le_countEq (f := cs) (b := c) hc
     omega
-  have uniq : ∀ d, T.card < 2 * (T.filter fun u => cs u = d).card → d = c := by
-    intro d hd
-    by_contra hne
-    have hdisj : Disjoint (T.filter fun u => cs u = d) (T.filter fun u => cs u = c) := by
-      rw [Finset.disjoint_filter]; intro w _ h1 h2; exact hne (h1 ▸ h2)
-    have h1 := card_union_of_disjoint hdisj
-    have h2 : ((T.filter fun u => cs u = d) ∪ (T.filter fun u => cs u = c)).card ≤ T.card :=
-      card_le_card (union_subset (filter_subset _ _) (filter_subset _ _))
-    omega
+  have uniq : ∀ d, T.card < 2 * T.countEq cs d → d = c := fun d hd =>
+    eq_of_card_lt_countEq_add_countEq (s := T) (f := cs) (by omega)
   unfold majT
   split
   · rename_i w hw
