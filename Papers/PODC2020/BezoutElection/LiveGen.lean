@@ -5,15 +5,16 @@ import Mathlib.Data.Fintype.Basic
 /-!
 # Generic liveness lemmas for infinite executions
 
-Small tools for proving progress properties of `Impl.InfExec` under fairness (`IsFair`):
+Small tools for proving progress properties of `Impl.InfExec` under fairness
+(`Impl.InfExec.IsFair`), on top of `Podc.SharedMemory.Progress` (`InfExec.first_act`,
+`InfExec.cfg_add_of_proc_ne`) and `Podc.Order.NatDescent`:
 
-* `InfExec.other`, `InfExec.first_act`: a process that does not act keeps its local state; under
-  fairness a pending process eventually acts, and its first action happens in its current
-  local state;
-* `ev_forever`, `ev_forall_fin`: "eventually forever" properties;
-* `stab_finset`: a monotone, bounded sequence of finite sets is eventually constant;
+* `InfExec.acts`: under fairness a process that is pending forever acts infinitely often;
 * `InfExec.descent`: a measure that never increases and strictly decreases at every action of a
-  process that is pending forever gives a contradiction.
+  process that is pending forever gives a contradiction;
+* `ev_forever`, `ev_forall_fin`: "eventually forever" properties;
+* `stab_nat`, `stab_finset`: a monotone, bounded sequence of numbers / finite sets is eventually
+  constant.
 
 CSLib candidates (generic for all shared-memory implementations).
 -/
@@ -30,74 +31,27 @@ variable {A : ObjSpec} {ι : Type} [DecidableEq ι] {B : ι → ObjSpec} {P L : 
   {I : Impl A B P L}
 
 -- CSLib candidate
-/-- A step of another process does not change the local state and pending operation of `q`. -/
-lemma InfExec.other (e : I.InfExec) {t : ℕ} {q : P} (h : (e.lbl t).proc ≠ q) :
-    (e.cfg (t + 1)).loc q = (e.cfg t).loc q ∧ (e.cfg (t + 1)).pend q = (e.cfg t).pend q :=
-  Impl.step_other (e.step_eq t) h
-
--- CSLib candidate
-lemma InfExec.other_iter (e : I.InfExec) {t k : ℕ} {q : P}
-    (h : ∀ j < k, (e.lbl (t + j)).proc ≠ q) :
-    (e.cfg (t + k)).loc q = (e.cfg t).loc q ∧ (e.cfg (t + k)).pend q = (e.cfg t).pend q := by
-  induction k with
-  | zero => exact ⟨rfl, rfl⟩
-  | succ k ih =>
-    have h1 := ih (fun j hj => h j (by omega))
-    have h2 := InfExec.other e (t := t + k) (h k (by omega))
-    rw [← Nat.add_assoc, h2.1, h2.2]
-    exact h1
-
--- CSLib candidate
-/-- Under fairness, a pending process eventually acts; its first action happens in its current
-local state. -/
-lemma InfExec.first_act (e : I.InfExec) (hfair : IsFair e) {q : P} {t : ℕ}
-    (hp : (e.cfg t).pend q ≠ none) :
-    ∃ t' ≥ t, (e.lbl t').proc = q ∧ (e.cfg t').loc q = (e.cfg t).loc q ∧
-      (e.cfg t').pend q = (e.cfg t).pend q := by
-  classical
-  obtain ⟨t₁, ht₁, hq, -⟩ := hfair q t hp
-  have hex : ∃ k, (e.lbl (t + k)).proc = q := ⟨t₁ - t, by rw [Nat.add_sub_cancel' ht₁]; exact hq⟩
-  refine ⟨t + Nat.find hex, by omega, Nat.find_spec hex, ?_⟩
-  exact InfExec.other_iter e (fun j hj => Nat.find_min hex hj)
-
--- CSLib candidate
 /-- Under fairness, a process that is pending forever acts infinitely often. -/
-lemma InfExec.acts (e : I.InfExec) (hfair : IsFair e) {q : P} {T : ℕ}
+lemma InfExec.acts (e : I.InfExec) (hfair : e.IsFair) {q : P} {T : ℕ}
     (hp : ∀ t ≥ T, (e.cfg t).pend q ≠ none) (t : ℕ) (ht : T ≤ t) :
     ∃ t' ≥ t, (e.lbl t').proc = q := by
-  obtain ⟨t', h1, h2, -⟩ := InfExec.first_act e hfair (hp t ht)
+  obtain ⟨t', h1, h2, -⟩ := e.first_act hfair (hp t ht)
   exact ⟨t', h1, h2⟩
 
 -- CSLib candidate
 /-- A measure that never increases and strictly decreases at every action of a process that is
 pending forever gives a contradiction (under fairness). -/
-lemma InfExec.descent (e : I.InfExec) (hfair : IsFair e) (q : P) (t₀ : ℕ) (μ : ℕ → ℕ)
+lemma InfExec.descent (e : I.InfExec) (hfair : e.IsFair) (q : P) (t₀ : ℕ) (μ : ℕ → ℕ)
     (hp : ∀ t ≥ t₀, (e.cfg t).pend q ≠ none)
     (hle : ∀ t ≥ t₀, (e.lbl t).proc ≠ q → μ (t + 1) ≤ μ t)
     (hlt : ∀ t ≥ t₀, (e.lbl t).proc = q → μ (t + 1) < μ t) : False := by
-  have hmono : ∀ t ≥ t₀, μ (t + 1) ≤ μ t := by
-    intro t ht
+  have hmono : ∀ t ≥ t₀, μ (t + 1) ≤ μ t := fun t ht => by
     by_cases h : (e.lbl t).proc = q
     · exact (hlt t ht h).le
     · exact hle t ht h
-  have hanti : ∀ t ≥ t₀, ∀ k, μ (t + k) ≤ μ t := by
-    intro t ht k
-    induction k with
-    | zero => exact le_rfl
-    | succ k ih => exact (hmono (t + k) (by omega)).trans ih
-  have key : ∀ k, ∃ t ≥ t₀, μ t + k ≤ μ t₀ := by
-    intro k
-    induction k with
-    | zero => exact ⟨t₀, le_rfl, by simp⟩
-    | succ k ih =>
-      obtain ⟨t, ht, hμ⟩ := ih
-      obtain ⟨t', ht', hq⟩ := InfExec.acts e hfair hp t ht
-      have h1 := hanti t ht (t' - t)
-      rw [Nat.add_sub_cancel' ht'] at h1
-      have h2 := hlt t' (by omega) hq
-      exact ⟨t' + 1, by omega, by omega⟩
-  obtain ⟨t, -, ht⟩ := key (μ t₀ + 1)
-  omega
+  obtain ⟨T, hT, hc⟩ := Nat.eventually_not_of_succ_le hmono hlt
+  obtain ⟨t', ht', hq⟩ := InfExec.acts e hfair hp T hT
+  exact hc t' ht' hq
 
 end Generic
 
@@ -126,33 +80,9 @@ lemma ev_forall_fin {P : Type} [Fintype P] (Q : P → ℕ → Prop)
 /-- A monotone bounded sequence of natural numbers is eventually constant. -/
 lemma stab_nat (g : ℕ → ℕ) (t₀ N : ℕ) (hmono : ∀ t ≥ t₀, g t ≤ g (t + 1))
     (hbd : ∀ t, g t ≤ N) : ∃ T ≥ t₀, ∀ t ≥ T, g t = g T := by
-  have hmono' : ∀ t ≥ t₀, ∀ k, g t ≤ g (t + k) := by
-    intro t ht k
-    induction k with
-    | zero => exact le_rfl
-    | succ k ih => exact ih.trans (hmono (t + k) (by omega))
-  have key : ∀ m, ∀ t₁ ≥ t₀, N - g t₁ ≤ m → ∃ T ≥ t₁, ∀ t ≥ T, g t = g T := by
-    intro m
-    induction m with
-    | zero =>
-      intro t₁ ht₁ hm
-      refine ⟨t₁, le_rfl, fun t ht => ?_⟩
-      have h1 := hmono' t₁ ht₁ (t - t₁)
-      rw [Nat.add_sub_cancel' ht] at h1
-      have := hbd t
-      omega
-    | succ m ih =>
-      intro t₁ ht₁ hm
-      by_cases hc : ∀ t ≥ t₁, g t = g t₁
-      · exact ⟨t₁, le_rfl, hc⟩
-      · push Not at hc
-        obtain ⟨t₂, ht₂, hne⟩ := hc
-        have h1 := hmono' t₁ ht₁ (t₂ - t₁)
-        rw [Nat.add_sub_cancel' ht₂] at h1
-        obtain ⟨T, hT, hT'⟩ := ih t₂ (by omega) (by have := hbd t₂; omega)
-        exact ⟨T, by omega, hT'⟩
-  obtain ⟨T, hT, hT'⟩ := key (N - g t₀) t₀ le_rfl le_rfl
-  exact ⟨T, hT, hT'⟩
+  obtain ⟨T, hT, hc⟩ := Nat.eventually_const_of_succ_le (f := fun t => N - g t) (N := t₀)
+    fun t ht => by have := hmono t ht; omega
+  exact ⟨T, hT, fun t ht => by have := hc t ht; have := hbd t; have := hbd T; omega⟩
 
 -- CSLib candidate
 /-- A monotone sequence of finite sets of bounded cardinality is eventually constant. -/

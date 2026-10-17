@@ -95,4 +95,7 @@ proved symmetric (`Alg1.alg1_symmetric`, `Alg2.alg2_symmetric`), and Algorithm 2
 deadlock-free, so the hypotheses are satisfiable. The bounded model checkers are in
 [`modelcheck/`](modelcheck/) and are not part of the Lean development. Lock objects, fairness and
 anonymous symmetric memory are in CSLib
-(`Cslib/Computability/Distributed/SharedMemory/{Mutex,Anonymous}.lean`).
+(`Cslib/Computability/Distributed/SharedMemory/{Mutex,Anonymous}.lean`). The symmetric lock-step
+rounds behind `theorem_5` are the one-group case of the shared library
+`Podc/SharedMemory/Anonymous/LockStep.lean` (`SymAlg.LSSetup`, `SymAlg.SymCfg`, `SymAlg.round_*`),
+which also serves the `k`-group argument of `Papers/PODC2020/BezoutElection`.
