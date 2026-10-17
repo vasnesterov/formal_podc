@@ -1,6 +1,8 @@
 import Papers.PODC2024.HistoryIndependent.ClassC
 import Cslib.Computability.Distributed.SharedMemory.Indist
 import Mathlib
+import Podc.SharedMemory.Solo
+import Podc.SharedMemory.Run
 
 /-!
 # Proposition 19: the reader must write
@@ -31,8 +33,7 @@ lemma Impl.NeverWrites.iterate_soloStep_mem {A : ObjSpec} {I : Impl A B P L} {r 
   | succ k ih =>
     rw [Function.iterate_succ_apply']
     set D := (I.soloStep r)^[k] C
-    have hD : I.run (α ++ I.soloLabels r C k) = some D := by
-      rw [run_append_of_eq I hα, runFrom_soloLabels]
+    have hD : I.Reachable D := Reachable.iterate_soloStep ⟨α, hα⟩ r k
     rw [← ih]
     unfold soloStep
     split_ifs with hp
@@ -40,13 +41,9 @@ lemma Impl.NeverWrites.iterate_soloStep_mem {A : ObjSpec} {I : Impl A B P L} {r 
     · unfold nextLabel
       split
       · rename_i i o kk hact
-        have hs : I.step D (.tau r) = some { D with
-            mem := Function.update D.mem i ((B i).δ (D.mem i) o).1,
-            loc := Function.update D.loc r (kk ((B i).δ (D.mem i) o).2) } := by
-          simp [step, hp, hact]
-        rw [hs]
+        rw [step_tau_eq_some hp hact]
         simp only [Option.getD_some]
-        rw [hnw D ⟨_, hD⟩ hp i o kk hact, Function.update_eq_self]
+        rw [hnw D hD hp i o kk hact, Function.update_eq_self]
       · rename_i x l hact
         cases hs : I.step D (.ret r x) with
         | none => rfl

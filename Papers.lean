@@ -69,7 +69,6 @@ import Papers.PODC2018.LocallyIterativeColoring.Counterexamples
 import Papers.PODC2018.LocallyIterativeColoring.Corollary36
 import Papers.PODC2018.LocallyIterativeColoring.Uniform
 import Papers.PODC2018.LocallyIterativeColoring.OneBit
-import Papers.PODC2024.HistoryIndependent.UniversalRLLSC
 import Papers.PODC2024.HistoryIndependent.Universal
 import Papers.PODC2024.HistoryIndependent.UniversalInv
 import Papers.PODC2024.HistoryIndependent.UniversalThm

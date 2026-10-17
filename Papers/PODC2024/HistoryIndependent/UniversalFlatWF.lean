@@ -302,7 +302,7 @@ theorem G2_tau {L : List (OpId (Fin n) × A.Op)} {cur : Fin n → OpId (Fin n)}
   have hspec : ∀ r, ((C.loc q).pc.outSC = false ∨ r ≠ q) →
       specResp (L ++ contribT cur C q) (cur r) = specResp L (cur r) := by
     intro r hr
-    apply specRespFrom_append_of_not_mem
+    apply ObjSpec.respIn_append_of_not_mem_right
     rcases hM with hM | ⟨o, hM, hpc⟩
     · simp [hM]
     · rw [hM]
@@ -1665,53 +1665,23 @@ theorem PiF_other {L : List (OpId (Fin n) × A.Op)} {cur : Fin n → OpId (Fin n
 
 /-- **Theorem 32** (wait-freedom): the flattened implementation (Algorithm 5 over
 Algorithm 6, with the strict-alternation schedule for `∥`) is wait-free. -/
-theorem flat_waitFree : (flat A n).WaitFree := by
-  intro e p n0 hpend
-  have hinv : ∀ m, InvC (hlinF A n ((List.range m).map e.lbl)) (curOf ((List.range m).map e.lbl))
-      (absC (e.cfg m)).pend (absC (e.cfg m)).mem (absC (e.cfg m)).loc :=
-    fun m => (flat_invL (e.run_eq m)).invC
-  have hcur : ∀ m q, (curOf ((List.range m).map e.lbl) q).1 = q := fun _ _ => rfl
-  have hstep : ∀ m ≥ n0, PiF p (e.cfg (m + 1)) ≤ PiF p (e.cfg m) ∧
-      (e.lbl m = .tau p → PiF p (e.cfg (m + 1)) < PiF p (e.cfg m)) := by
-    intro m hm
-    have hs := e.step_eq m
-    rcases hl : e.lbl m with ⟨q, o⟩ | ⟨q, r⟩ | q
-    · rw [hl] at hs
-      by_cases hq : q = p
-      · subst hq; exact absurd (Impl.step_inv hs).1 (hpend m hm)
-      · exact ⟨PiF_other (hcur m) (hinv m) hs hq, fun h => by cases h⟩
-    · rw [hl] at hs
-      by_cases hq : q = p
-      · subst hq
-        have := (Impl.step_ret hs).2.1
-        exact absurd (by rw [this]; simp) (hpend (m + 1) (by omega))
-      · exact ⟨PiF_other (hcur m) (hinv m) hs hq, fun h => by cases h⟩
-    · rw [hl] at hs
-      by_cases hq : q = p
-      · subst hq
-        have := PiF_self (hinv m) hs
-        exact ⟨this.le, fun _ => this⟩
-      · exact ⟨PiF_other (hcur m) (hinv m) hs hq, fun h => by cases h; exact absurd rfl hq⟩
-  have hmono : ∀ d m, n0 ≤ m → PiF p (e.cfg (m + d)) ≤ PiF p (e.cfg m) := by
-    intro d; induction d with
-    | zero => intro m _; exact le_rfl
-    | succ d ih =>
-      intro m hm
-      exact (hstep (m + d) (by omega)).1.trans (ih m hm)
-  by_contra hcon
-  push Not at hcon
-  have key : ∀ k, ∃ m ≥ n0, PiF p (e.cfg m) + k ≤ PiF p (e.cfg n0) := by
-    intro k; induction k with
-    | zero => exact ⟨n0, le_rfl, by simp⟩
-    | succ k ih =>
-      obtain ⟨m, hm, hk⟩ := ih
-      obtain ⟨m', hm', hl⟩ := hcon m
-      have h1 := (hstep m' (by omega)).2 hl
-      have h2 := hmono (m' - m) m hm
-      rw [show m + (m' - m) = m' by omega] at h2
-      exact ⟨m' + 1, by omega, by omega⟩
-  obtain ⟨m, -, hk⟩ := key (PiF p (e.cfg n0) + 1)
-  omega
+theorem flat_waitFree : (flat A n).WaitFree :=
+  Impl.waitFreeOn_true_iff.1 <| (flat A n).waitFreeOn_of_runPotential (fun p _ C => PiF p C)
+    fun p α C ℓ _ hα _ hs hp hp' => by
+      have hinv := (flat_invL hα).invC
+      have hcur : ∀ q, (curOf α q).1 = q := fun _ => rfl
+      rcases ℓ with ⟨q, o⟩ | ⟨q, r⟩ | q
+      · by_cases hq : q = p
+        · subst hq; exact absurd (Impl.step_inv hs).1 hp
+        · exact ⟨PiF_other hcur hinv hs hq, fun h => by cases h⟩
+      · by_cases hq : q = p
+        · subst hq; exact absurd (by rw [(Impl.step_ret hs).2.1]; simp) hp'
+        · exact ⟨PiF_other hcur hinv hs hq, fun h => by cases h⟩
+      · by_cases hq : q = p
+        · subst hq
+          have := PiF_self hinv hs
+          exact ⟨this.le, fun _ => this⟩
+        · exact ⟨PiF_other hcur hinv hs hq, fun h => by cases h; exact absurd rfl hq⟩
 
 end Universal
 

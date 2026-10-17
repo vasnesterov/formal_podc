@@ -131,14 +131,7 @@ lemma chain_infExec (E : ℕ → List (LLabel P)) (hmono : ∀ k, E k <+: E (k +
   have hgt : ∀ k n, X.Good ((E k).take n) := fun k n =>
     (hgood k).of_prefix (List.take_prefix _ _)
   refine ⟨e, hlbl, fun t => ?_, fun k n hn => ⟨hgt k n, ?_⟩⟩
-  · have : e.lbls t = (E t).take t := by
-      apply List.ext_getElem
-      · simp [InfExec.lbls]; have := hlen t; omega
-      · intro n h1 h2
-        simp only [InfExec.lbls, List.getElem_map, List.getElem_range, List.getElem_take]
-        simp only [InfExec.lbls, List.length_map, List.length_range] at h1
-        exact hlbl t n (by have := hlen t; omega)
-    rw [this]; exact (hgt t t).2
+  · rw [e.lbls_eq_take (hlen t) (hlbl t)]; exact (hgt t t).2
   · have h1 := (hgt k n).run
     rw [hcfg k n hn] at h1
     exact (Option.some.inj h1).symm
@@ -444,14 +437,6 @@ theorem lemma17 [Fintype P] {α α' : List (LLabel P)} (hα : X.Good α) (hα' :
   exact ⟨y, ⟨σ, hσc, hdec⟩, ⟨σ, hσc, hy⟩⟩
 
 /-! ### Lemma 19 -/
-
-lemma respsOf_prefix {α β : List (LLabel P)} (h : α <+: β) (p : P) :
-    respsOf α p <+: respsOf β p := by
-  obtain ⟨u, rfl⟩ := h; rw [respsOf_append]; exact List.prefix_append _ _
-
-lemma opsOf_prefix {α β : List (LLabel P)} (h : α <+: β) (p : P) :
-    opsOf α p <+: opsOf β p := by
-  obtain ⟨u, rfl⟩ := h; rw [opsOf_append]; exact List.prefix_append _ _
 
 /-- **Lemma 19 of [ACE26].** There is a helping supervalent execution. -/
 theorem lemma19 [Fintype P] {c : P} (hc : c ≠ X.ref) :

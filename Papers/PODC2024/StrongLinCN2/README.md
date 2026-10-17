@@ -78,7 +78,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
   Executions are label lists, and every internal step is one base-object access.
 * Crashes are modelled as processes that stop taking steps. Wait-freedom and lock-freedom are CSLib's
   `WaitFree` / `LockFree` on infinite executions.
-* **Strong linearizability** (`Podc/StrongLin/Basic.lean`) follows Golab–Higham–Woelfel: a
+* **Strong linearizability** (`Podc/SharedMemory/StrongLin/Basic.lean`) follows Golab–Higham–Woelfel: a
   linearization function on finite executions with `α ≤ β ⇒ h α ≤ h β`.
   - Deterministic objects use CSLib's `IsLinearization`.
   - Nondeterministic objects (set, relaxed queues) use `NSpec` / `IsNLinearization`, where
@@ -111,13 +111,18 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | `k`-out-of-order queues are `k`-ordering: **false**; repaired | `KOrd.ooo_not_kOrderingW`, `KOrd.ooo_kOrderingI` | `KOrdering.lean` |
 | Packing lemmas (interleaved bits) | `comp_pack`, `pack_update_int` | `Packing.lean` |
 
-Shared infrastructure (CSLib candidates):
-* `Podc/StrongLin/Basic.lean`: strong linearizability, forward simulations, `NSpec`, `linResp` toolkit;
-* `Podc/StrongLin/OneAccess.lean`: the single-access theorem;
-* `Podc/SharedMemory/Objects.lean`: fetch&add, (readable, multi-shot) test&set, readable
-  fetch&increment, max register, snapshot specs.
-
-Also marked as CSLib candidates: `MTAS.linRespFrom_const`, `MTAS.runOps_const` and `FAI.run_range`.
+Shared infrastructure (CSLib candidates, `Podc/SharedMemory/`):
+* `StrongLin/Basic.lean`: strong linearizability, forward simulations (`LinSim`);
+  `StrongLin/OneAccess.lean`: the single-access theorem; `NSpec.lean`: nondeterministic
+  specifications and `IsNLinearization`;
+* `History.lean`, `LinResp.lean`: current operation instances (`curOp`), the state and responses of
+  sequential histories (`linState_concat`, `ObjSpec.respIn`), building linearizations;
+* `Potential.lean`: wait-freedom and lock-freedom from potentials (`waitFree_of_potential`,
+  `lockFree_of_potential`), with `Podc/Algebra/BigOperators/Update.lean` for the potential sums;
+* `Compute.lean`: the computable step function (`Impl.cstep`, `Impl.valid_of_crun`) used to check
+  the counterexample's executions;
+* `Objects/`: fetch&add, (readable, multi-shot) test&set, readable fetch&increment, max register,
+  snapshot specs, and the interface-only object `ObjSpec.iface` (the set's operation types).
 
 **Not formalized.**
 * Theorems 3, 4 (simple types; the proof is a sketch) and Corollaries 7, 8 (need a composition

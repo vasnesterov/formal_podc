@@ -1,4 +1,6 @@
 import Papers.PODC2026.ConsistentRefereeing.Defs
+import Podc.SharedMemory.Objects.Queue
+import Cslib.Computability.Distributed.SharedMemory.SWSRRegister
 
 /-!
 # Proposition 11: a contest object from a strongly linearizable queue
@@ -287,33 +289,6 @@ lemma precedes_trExec {α : List (Label P (contestObj P))} (h : (contestOfQueue 
   exact ⟨_, δ, hδ.symm, (completed_trExec_iff h.of_append a).2 h1,
     fun h' => h2 ((invoked_trExec_iff β b).1 h')⟩
 
-/-- In an execution of the contest implementation, every process only invokes the operation of
-its role. -/
-lemma role_of_runFrom {C C' : Config (contestObj P) B P L} {α : List (Label P (contestObj P))}
-    (h : (contestOfQueue Q ref e).runFrom C α = some C') {p : P} {o : ContestOp P}
-    (ho : o ∈ opsOf α p) : o = roleOp ref p := by
-  induction α generalizing C with
-  | nil => simp at ho
-  | cons ℓ α ih =>
-    simp only [Impl.runFrom_cons] at h
-    cases hs : (contestOfQueue Q ref e).step C ℓ with
-    | none => simp [hs] at h
-    | some C₁ =>
-      simp only [hs, Option.bind_some] at h
-      simp only [opsOf_cons, List.mem_append] at ho
-      rcases ho with ho | ho
-      · cases ℓ with
-        | inv q o' =>
-          by_cases hq : q = p
-          · subst hq
-            simp only [Label.invOf_inv, ite_true, Option.toList_some, List.mem_singleton] at ho
-            subst ho
-            exact (Impl.step_inv hs).2.1
-          · simp [hq] at ho
-        | tau q => simp at ho
-        | ret q r => simp at ho
-      · exact ih h ho
-
 /-! ### Linearizations translate back -/
 
 /-- Translating a queue linearization back: every operation of `p` is `roleOp ref p`. -/
@@ -391,15 +366,13 @@ lemma isLinearization_back (he : Injective e) {α : List (Label P (contestObj P)
     (hv : (contestOfQueue Q ref e).Valid α) (hone : (opsOf α ref).length ≤ 1)
     {M : List (OpId P × FifoOp V)} (hM : IsLinearization (trExec Q ref e α) M) :
     IsLinearization α (back ref M) := by
-  obtain ⟨C, hC⟩ := hv
-  have hv : (contestOfQueue Q ref e).Valid α := ⟨C, hC⟩
   have hop : ∀ y ∈ M, opOf α y.1 = some (roleOp ref y.1.1) ∧ y.2 = toQOp e (roleOp ref y.1.1) := by
     intro y hy
     have h1 := hM.op_eq y hy
     rw [opOf_trExec] at h1
     obtain ⟨o, ho, ho'⟩ := Option.map_eq_some_iff.1 h1
     have hrole : o = roleOp ref y.1.1 := by
-      apply role_of_runFrom hC
+      apply (contestOfQueue Q ref e).allowed_of_mem_opsOf hv
       simp only [opOf] at ho
       exact List.mem_of_getElem? ho
     subst hrole

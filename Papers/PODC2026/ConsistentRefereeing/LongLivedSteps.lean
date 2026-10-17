@@ -1,5 +1,4 @@
 import Papers.PODC2026.ConsistentRefereeing.LongLivedValency
-import Podc.SharedMemory.Objects
 import Podc.SharedMemory.ObjClasses
 import Podc.SharedMemory.Covering
 
@@ -9,9 +8,8 @@ import Podc.SharedMemory.Covering
 Step-level facts used in the case analyses of Lemmas 20, 23, 27, 28 and Theorems 25, 30 of
 [ACE26], stated for the schedules of `LLCtx`:
 
-* `step_exact` — a step only depends on the stepping process and the object it accesses
-  (exact version of CSLib's `step_local`); `step_comm` — two steps of distinct processes that
-  do not conflict (different objects, or both leave the common object unchanged) commute;
+* the generic step lemmas `Impl.mem_of_step`, `Impl.step_exact` and `Impl.step_comm` (two steps
+  of distinct processes that do not conflict commute) come from `Podc.SharedMemory.Covering`;
 * `X.Writes C c i` (`c` is poised to apply a non-read-only primitive to `i`), `X.Quiet C c`
   (`c`'s next step does not change the memory: an invocation, a response or a read-only
   primitive), `X.Accesses C c i`;
@@ -29,155 +27,6 @@ Step-level facts used in the case analyses of Lemmas 20, 23, 27, 28 and Theorems
 set_option linter.unusedSectionVars false
 
 namespace Cslib.SharedMemory
-
-namespace Impl
-
-variable {A : ObjSpec} {ι : Type} {B : ι → ObjSpec} {P L : Type} [DecidableEq P] [DecidableEq ι]
-  {I : Impl A B P L}
-
--- CSLib candidate
-lemma config_eq_of_agreeOn_univ {C D : Config A B P L} (h : AgreeOn Set.univ C D) : C = D := by
-  cases C; cases D
-  simp only [Config.mk.injEq]
-  exact ⟨funext fun q => h.loc q trivial, funext fun q => h.pend q trivial, h.mem⟩
-
--- CSLib candidate
-lemma agreeOn_refl (Q : Set P) (C : Config A B P L) : AgreeOn Q C C :=
-  ⟨rfl, fun _ _ => rfl, fun _ _ => rfl⟩
-
-/-- **Exact locality of steps** (CSLib candidate). A step of `a` only depends on the local
-state and pending operation of `a` and on the state of the object it accesses. -/
-lemma step_exact {a : P} {C D C' : Config A B P L} {ℓ : Label P A} (hℓ : ℓ.proc = a)
-    (hloc : C.loc a = D.loc a) (hpend : C.pend a = D.pend a)
-    (hobj : ∀ i o k, ℓ = .tau a → I.act a (C.loc a) = .access i o k → C.mem i = D.mem i)
-    (h : I.step C ℓ = some C') :
-    ∃ D', I.step D ℓ = some D' ∧ D'.loc a = C'.loc a ∧ D'.pend a = C'.pend a ∧
-      (∀ q, q ≠ a → D'.loc q = D.loc q ∧ D'.pend q = D.pend q) ∧
-      ∀ j, (D'.mem j = D.mem j ∧ C'.mem j = C.mem j) ∨
-        (D'.mem j = C'.mem j ∧ ℓ = .tau a ∧ ∃ o k, I.act a (C.loc a) = .access j o k) := by
-  classical
-  cases ℓ with
-  | inv q o =>
-    simp only [Label.proc] at hℓ; subst hℓ
-    obtain ⟨h0, h1, h2, h3, h4⟩ := step_inv h
-    refine ⟨{ D with pend := Function.update D.pend q (some o),
-                     loc := Function.update D.loc q (I.invoke q (D.loc q) o) },
-      by simp [step, ← hpend, h0, h1], by simp [h3, hloc], by simp [h2],
-      fun x hx => by simp [Function.update_of_ne hx], fun j => Or.inl ⟨rfl, by rw [h4]⟩⟩
-  | tau q =>
-    simp only [Label.proc] at hℓ; subst hℓ
-    obtain ⟨h0, h1, i, o, k, hact, hm, hl⟩ := step_tau h
-    have hact' : I.act q (D.loc q) = .access i o k := by rw [← hloc, hact]
-    have hi : C.mem i = D.mem i := hobj i o k rfl hact
-    refine ⟨{ D with mem := Function.update D.mem i ((B i).δ (D.mem i) o).1,
-                     loc := Function.update D.loc q (k ((B i).δ (D.mem i) o).2) },
-      by simp [step, ← hpend, h0, hact'], by simp [hl, hi], by simp [h1, hpend],
-      fun x hx => by simp [Function.update_of_ne hx], fun j => ?_⟩
-    by_cases hj : j = i
-    · subst hj; right; exact ⟨by simp [hm, hi], rfl, o, k, hact⟩
-    · left; simp [hm, Function.update_of_ne hj]
-  | ret q r =>
-    simp only [Label.proc] at hℓ; subst hℓ
-    obtain ⟨h0, h1, h2, l, hact, hl⟩ := step_ret h
-    have hact' : I.act q (D.loc q) = .ret r l := by rw [← hloc, hact]
-    refine ⟨{ D with pend := Function.update D.pend q none, loc := Function.update D.loc q l },
-      by simp [step, ← hpend, h0, hact'], by simp [hl], by simp [h1],
-      fun x hx => by simp [Function.update_of_ne hx], fun j => Or.inl ⟨rfl, by rw [h2]⟩⟩
-
-/-- The memory after a step. -/
-lemma mem_of_step {C C' : Config A B P L} {ℓ : Label P A} (h : I.step C ℓ = some C') (j : ι) :
-    C'.mem j = C.mem j ∨ (ℓ = .tau ℓ.proc ∧ C.pend ℓ.proc ≠ none ∧
-      ∃ o k, I.act ℓ.proc (C.loc ℓ.proc) = .access j o k ∧
-        C'.mem j = ((B j).δ (C.mem j) o).1) := by
-  cases ℓ with
-  | inv q o => left; rw [(step_inv h).2.2.2.2]
-  | ret q r => left; rw [(step_ret h).2.2.1]
-  | tau q =>
-    obtain ⟨h0, -, i, o, k, hact, hm, -⟩ := step_tau h
-    by_cases hj : j = i
-    · subst hj; right; exact ⟨rfl, h0, o, k, hact, by simp [hm]⟩
-    · left; simp [hm, Function.update_of_ne hj]
-
-/-- **Commuting steps** (CSLib candidate). Steps of distinct processes commute unless both
-access the same object and one of them changes it. -/
-lemma step_comm {a b : P} (hab : a ≠ b) {C Ca Cab : Config A B P L} {ℓa ℓb : Label P A}
-    (ha : ℓa.proc = a) (hb : ℓb.proc = b) (h1 : I.step C ℓa = some Ca)
-    (h2 : I.step Ca ℓb = some Cab)
-    (hnc : ∀ i o k j o' k', ℓa = .tau a → I.act a (C.loc a) = .access i o k → ℓb = .tau b →
-      I.act b (C.loc b) = .access j o' k' →
-        i ≠ j ∨ (((B i).δ (C.mem i) o).1 = C.mem i ∧ ((B j).δ (C.mem j) o').1 = C.mem j)) :
-    ∃ Cb, I.step C ℓb = some Cb ∧ I.step Cb ℓa = some Cab := by
-  have hbC : Ca.loc b = C.loc b ∧ Ca.pend b = C.pend b :=
-    step_other h1 (by rw [ha]; exact hab)
-  -- the object accessed by `b` is unchanged by `a`'s step
-  have hobjb : ∀ j o' k', ℓb = .tau b → I.act b (Ca.loc b) = .access j o' k' →
-      Ca.mem j = C.mem j := by
-    intro j o' k' hℓb hact
-    rw [hbC.1] at hact
-    rcases mem_of_step h1 j with h | ⟨hℓa, -, o, k, hact', hv⟩
-    · exact h
-    · rw [ha] at hℓa hact'
-      rcases hnc j o k j o' k' hℓa hact' hℓb hact with h | ⟨h, -⟩
-      · exact absurd rfl h
-      · rw [hv, h]
-  obtain ⟨Cb, hCb, hl1, hp1, ho1, hm1⟩ := step_exact (I := I) hb hbC.1 hbC.2 hobjb h2
-  have haCb : Cb.loc a = C.loc a ∧ Cb.pend a = C.pend a := ho1 a hab
-  have hobja : ∀ i o k, ℓa = .tau a → I.act a (C.loc a) = .access i o k →
-      C.mem i = Cb.mem i := by
-    intro i o k hℓa hact
-    rcases mem_of_step hCb i with h | ⟨hℓb, -, o', k', hact', hv⟩
-    · exact h.symm
-    · rw [hb] at hℓb hact'
-      rcases hnc i o k i o' k' hℓa hact hℓb hact' with h | ⟨-, h⟩
-      · exact absurd rfl h
-      · rw [hv, h]
-  obtain ⟨Cba, hCba, hl2, hp2, ho2, hm2⟩ := step_exact (I := I) ha haCb.1.symm haCb.2.symm
-    hobja h1
-  refine ⟨Cb, hCb, ?_⟩
-  rw [hCba]
-  congr 1
-  have haCab : Cab.loc a = Ca.loc a ∧ Cab.pend a = Ca.pend a :=
-    step_other h2 (by rw [hb]; exact Ne.symm hab)
-  apply config_eq_of_agreeOn_univ
-  refine ⟨funext fun j => ?_, fun x _ => ?_, fun x _ => ?_⟩
-  · rcases hm1 j with ⟨e1, e2⟩ | ⟨e1, hℓb, o', k', hact'⟩ <;>
-      rcases hm2 j with ⟨e3, e4⟩ | ⟨e3, hℓa, o, k, hact⟩
-    · rw [e3, e1, e2, ← e4]
-    · rw [e3, e2]
-    · rw [e3, e1]
-    · -- both access `j`: both leave it unchanged
-      rw [hbC.1] at hact'
-      rcases hnc j o k j o' k' hℓa hact hℓb hact' with h | ⟨h, h'⟩
-      · exact absurd rfl h
-      · rw [e3, ← e1]
-        rcases mem_of_step h1 j with f1 | ⟨-, -, o₁, k₁, hact₁, f1⟩ <;>
-          rcases mem_of_step hCb j with f2 | ⟨-, -, o₂, k₂, hact₂, f2⟩
-        · rw [f1, f2]
-        · rw [hb] at hact₂; rw [hact'] at hact₂
-          simp only [Action.access.injEq] at hact₂
-          obtain ⟨-, ho, -⟩ := hact₂; rw [f1, f2, ← eq_of_heq ho, h']
-        · rw [ha] at hact₁; rw [hact] at hact₁
-          simp only [Action.access.injEq] at hact₁
-          obtain ⟨-, ho, -⟩ := hact₁; rw [f1, f2, ← eq_of_heq ho, h]
-        · rw [ha] at hact₁; rw [hact] at hact₁
-          rw [hb] at hact₂; rw [hact'] at hact₂
-          simp only [Action.access.injEq] at hact₁ hact₂
-          obtain ⟨-, ho₁, -⟩ := hact₁; obtain ⟨-, ho₂, -⟩ := hact₂
-          rw [f1, f2, ← eq_of_heq ho₁, ← eq_of_heq ho₂, h, h']
-  · by_cases hxa : x = a
-    · subst hxa; rw [hl2, ← haCab.1]
-    · by_cases hxb : x = b
-      · subst hxb; rw [(ho2 x hxa).1, hl1]
-      · rw [(ho2 x hxa).1, (ho1 x hxb).1, (step_other h2 (by rw [hb]; exact Ne.symm hxb)).1,
-          (step_other h1 (by rw [ha]; exact Ne.symm hxa)).1]
-  · by_cases hxa : x = a
-    · subst hxa; rw [hp2, ← haCab.2]
-    · by_cases hxb : x = b
-      · subst hxb; rw [(ho2 x hxa).2, hp1]
-      · rw [(ho2 x hxa).2, (ho1 x hxb).2, (step_other h2 (by rw [hb]; exact Ne.symm hxb)).2,
-          (step_other h1 (by rw [ha]; exact Ne.symm hxa)).2]
-
-end Impl
 
 namespace Referee
 
@@ -349,15 +198,15 @@ lemma Sim.mono {Q Q' : Set P} {α α' : List (LLabel P)} (h : X.Sim Q α α') (h
   ⟨h.good, h.good', h.agree.mono hQ, h.status⟩
 
 lemma Sim.refl {α : List (LLabel P)} (hα : X.Good α) (Q : Set P) : X.Sim Q α α :=
-  ⟨hα, hα, agreeOn_refl _ _, Iff.rfl⟩
+  ⟨hα, hα, AgreeOn.refl _ _, Iff.rfl⟩
 
 lemma Sim.of_eq {α α' : List (LLabel P)} (hα : X.Good α) (hα' : X.Good α')
     (h : X.cfg α = X.cfg α') (hs : opsOf α X.ref = [] ↔ opsOf α' X.ref = []) (Q : Set P) :
     X.Sim Q α α' :=
-  ⟨hα, hα', h ▸ agreeOn_refl _ _, hs⟩
+  ⟨hα, hα', h ▸ AgreeOn.refl _ _, hs⟩
 
 lemma Sim.cfg_eq {α α' : List (LLabel P)} (h : X.Sim Set.univ α α') : X.cfg α = X.cfg α' :=
-  config_eq_of_agreeOn_univ h.agree
+  h.agree.univ_eq
 
 /-- Schedules of processes of `Q` preserve `Sim Q`. -/
 lemma Sim.ext {Q : Set P} {α α' : List (LLabel P)} (h : X.Sim Q α α') {σ : List P}
@@ -501,8 +350,8 @@ lemma window_run {C D : Config (llObj P) B P L} {R : ι}
     set D₁ : Config (llObj P) B P L := { D with
         mem := Function.update D.mem R ((B R).δ (D.mem R) o).1,
         loc := Function.update D.loc a (k ((B R).δ (D.mem R) o).2) } with hD₁
-    have sC : X.I.step C (.tau a) = some C₁ := by simp [step, hp, hact, hC₁]
-    have sD : X.I.step D (.tau a) = some D₁ := by simp [step, hpD, hactD, hD₁]
+    have sC : X.I.step C (.tau a) = some C₁ := step_tau_eq_some hp hact
+    have sD : X.I.step D (.tau a) = some D₁ := step_tau_eq_some hpD hactD
     have ha_notin : a ∉ ws := (List.nodup_cons.1 hnd).1
     obtain ⟨C', D', os, r1, r2, r3, r4, r5, r6, r7, r8, r9⟩ := ih (C := C₁) (D := D₁)
       (List.nodup_cons.1 hnd).2

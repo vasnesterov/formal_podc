@@ -16,7 +16,8 @@ with key `x` (its first occurrence) when the sequential history `L` is run from 
 (`none` if `x` does not occur). Keys are arbitrary (operation instances `OpId P` for CSLib's
 linearizations; other models use e.g. `ℕ`). Main lemmas: `respIn_append_of_mem`,
 `respIn_append_of_not_mem`, `respIn_isSome_iff`, `exists_split_of_respIn_eq_some`,
-`respIn_insert`, `respIn_insert_self`; for linearizations: `SeqOK.respIn_eq`, `seqOK_of_respIn`,
+`respIn_insert`, `respIn_insert_self`, `respIn_append_const` (with `runOps_map_snd_const`); for
+linearizations: `SeqOK.respIn_eq`, `seqOK_of_respIn`,
 `IsLinearization.respIn_eq` (a completed instance gets its actual response) and
 `IsLinearization.append_ret_of_respIn` (a response is legal if the linearization assigns it).
 
@@ -168,6 +169,17 @@ lemma respIn_insert_self (q : A.State) (S₁ S₂ : List (K × A.Op)) {y : K} (o
     (hy : y ∉ S₁.map Prod.fst) :
     A.respIn q (S₁ ++ (y, o) :: S₂) y = some (A.δ (A.runOps q (S₁.map Prod.snd)) o).2 := by
   simp [respIn_append_of_not_mem hy]
+
+omit [DecidableEq K] in
+/-- Operations that keep the state `q` (all with the same response `r`) leave it unchanged when
+run in sequence. -/
+lemma runOps_map_snd_const (r : A.Resp) {l : List (K × A.Op)} (hl : ∀ y ∈ l, A.δ q y.2 = (q, r)) :
+    A.runOps q (l.map Prod.snd) = q := by
+  induction l with
+  | nil => rfl
+  | cons y l ih =>
+    simp only [List.map_cons, ObjSpec.runOps_cons, hl y (by simp)]
+    exact ih (fun z hz => hl z (by simp [hz]))
 
 /-- Entries whose operations keep the state `q` and return `r` all get the response `r`. -/
 lemma respIn_append_const (r : A.Resp) {l : List (K × A.Op)} (hl : ∀ y ∈ l, A.δ q y.2 = (q, r))

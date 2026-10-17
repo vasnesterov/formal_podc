@@ -14,8 +14,8 @@ every implemented object `A`, together with progress conditions restricted to a 
 
 ## Infinite executions
 
-* `InfExec.lbls e t` — the first `t` labels of `e` (`run_lbls`, `lbls_prefix`, `reachable_cfg`;
-  for lock objects `InfExec.pre_eq_lbls`);
+* `InfExec.lbls e t` — the first `t` labels of `e` (`run_lbls`, `lbls_prefix`, `lbls_eq_take`,
+  `reachable_cfg`; for lock objects `InfExec.pre_eq_lbls`);
 * `InfExec.IsFair` — every process with a pending operation eventually takes a step
   (`InfExec.fair_iff_isFair` for lock objects); `InfExec.first_act`;
 * `InfExec.exists_good_of_measure` — progress by a measure (generalizes CSLib's
@@ -85,6 +85,16 @@ lemma InfExec.lbls_prefix (e : I.InfExec) {t t' : ℕ} (h : t ≤ t') : e.lbls t
   induction t', h using Nat.le_induction with
   | base => exact List.prefix_refl _
   | succ t' _ ih => rw [InfExec.lbls_succ]; exact ih.trans (List.prefix_append _ _)
+
+/-- If an infinite execution starts with the labels of `β`, its prefixes of length at most
+`β.length` are prefixes of `β`. -/
+lemma InfExec.lbls_eq_take (e : I.InfExec) {β : List (Label P A)} {t : ℕ} (ht : t ≤ β.length)
+    (h : ∀ n (hn : n < β.length), e.lbl n = β[n]) : e.lbls t = β.take t := by
+  apply List.ext_getElem
+  · simp [InfExec.lbls, ht]
+  · intro n h1 h2
+    simp only [InfExec.lbls, List.getElem_map, List.getElem_range, List.getElem_take]
+    exact h n (by simp [InfExec.lbls] at h1; omega)
 
 lemma InfExec.opsOf_lbls_mono (e : I.InfExec) (p : P) {t t' : ℕ} (h : t ≤ t') :
     (opsOf (e.lbls t) p).length ≤ (opsOf (e.lbls t') p).length := by

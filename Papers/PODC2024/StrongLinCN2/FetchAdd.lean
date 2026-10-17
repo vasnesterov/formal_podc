@@ -1,5 +1,7 @@
-import Podc.StrongLin.OneAccess
-import Podc.SharedMemory.Objects
+import Podc.SharedMemory.Objects.FetchAdd
+import Podc.SharedMemory.Objects.MaxRegister
+import Podc.SharedMemory.Objects.Snapshot
+import Podc.SharedMemory.StrongLin.OneAccess
 import Papers.PODC2024.StrongLinCN2.Packing
 
 /-!
@@ -22,7 +24,7 @@ bit `j * n + i` of `R` (`Packing.lean`).
   `scan`: `fetch&add(R, 0)` and decode. The adjustment may be negative, so `R` is an integer
   `fetch&add` register.
 
-Both are single-access implementations (`Podc/StrongLin/OneAccess.lean`), hence wait-free and
+Both are single-access implementations (`Podc/SharedMemory/StrongLin/OneAccess.lean`), hence wait-free and
 strongly linearizable, with linearization point at the unique `fetch&add`.
 -/
 

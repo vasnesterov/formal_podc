@@ -1,5 +1,7 @@
 import Papers.PODC2024.HistoryIndependent.Universal
 import Cslib.Computability.Distributed.SharedMemory.Linearization
+import Podc.SharedMemory.LinResp
+import Podc.SharedMemory.Run
 import Mathlib
 
 /-!
@@ -26,78 +28,6 @@ namespace Cslib.SharedMemory
 
 open List
 
-/-! ## Spec responses of a sequential history -/
-
-section SpecResp
-
-variable {P : Type} [DecidableEq P] {A : ObjSpec}
-
-/-- The response the sequential specification gives to the instance `x` in the sequential
-history `L`, started from state `q` (`none` if `x` does not occur in `L`). -/
-def specRespFrom (q : A.State) : List (OpId P × A.Op) → OpId P → Option A.Resp
-  | [], _ => none
-  | (y, o) :: L, x => if y = x then some (A.δ q o).2 else specRespFrom (A.δ q o).1 L x
-
-lemma specRespFrom_eq_none (q : A.State) (L : List (OpId P × A.Op)) (x : OpId P) :
-    specRespFrom q L x = none ↔ x ∉ L.map Prod.fst := by
-  induction L generalizing q with
-  | nil => simp [specRespFrom]
-  | cons y L ih =>
-    obtain ⟨y, o⟩ := y
-    by_cases h : y = x
-    · subst h; simp [specRespFrom]
-    · simp [specRespFrom, h, ih, Ne.symm h]
-
-lemma specRespFrom_append_of_mem (q : A.State) (L M : List (OpId P × A.Op)) {x : OpId P}
-    (hx : x ∈ L.map Prod.fst) : specRespFrom q (L ++ M) x = specRespFrom q L x := by
-  induction L generalizing q with
-  | nil => simp at hx
-  | cons y L ih =>
-    obtain ⟨y, o⟩ := y
-    by_cases h : y = x
-    · subst h; simp [specRespFrom]
-    · simp only [map_cons, mem_cons] at hx
-      rcases hx with hx | hx
-      · exact absurd hx.symm h
-      · simp [specRespFrom, h, ih _ hx]
-
-lemma specRespFrom_append_ne (q : A.State) (L : List (OpId P × A.Op)) {x y : OpId P}
-    (o : A.Op) (hxy : x ≠ y) : specRespFrom q (L ++ [(y, o)]) x = specRespFrom q L x := by
-  by_cases hx : x ∈ L.map Prod.fst
-  · exact specRespFrom_append_of_mem q L _ hx
-  · have h1 := (specRespFrom_eq_none q L x).2 hx
-    have h2 : specRespFrom q (L ++ [(y, o)]) x = none := by
-      rw [specRespFrom_eq_none]; simp only [map_append, map_cons, map_nil, mem_append, mem_cons,
-        not_mem_nil, or_false, not_or]; exact ⟨hx, hxy⟩
-    rw [h1, h2]
-
-lemma specRespFrom_append_self (q : A.State) (L : List (OpId P × A.Op)) {y : OpId P}
-    (o : A.Op) (hy : y ∉ L.map Prod.fst) :
-    specRespFrom q (L ++ [(y, o)]) y = some (A.δ (A.runOps q (L.map Prod.snd)) o).2 := by
-  induction L generalizing q with
-  | nil => simp [specRespFrom]
-  | cons z L ih =>
-    obtain ⟨z, o'⟩ := z
-    simp only [map_cons, mem_cons, not_or] at hy
-    simp [specRespFrom, Ne.symm hy.1, ih _ hy.2]
-
-lemma seqOK_of_specResp {α : List (Label P A)} (q : A.State) (L : List (OpId P × A.Op))
-    (hnd : (L.map Prod.fst).Nodup)
-    (h : ∀ x r, x ∈ L.map Prod.fst → respOf α x = some r → specRespFrom q L x = some r) :
-    SeqOK α q L := by
-  induction L generalizing q with
-  | nil => trivial
-  | cons y L ih =>
-    obtain ⟨y, o⟩ := y
-    simp only [map_cons, nodup_cons] at hnd
-    refine ⟨fun r hr => ?_, ih _ hnd.2 fun x r hx hr => ?_⟩
-    · have := h y r (by simp) hr
-      simpa [specRespFrom] using this
-    · have := h x r (by simp [hx]) hr
-      have hne : y ≠ x := fun e => hnd.1 (e ▸ hx)
-      simpa [specRespFrom, hne] using this
-
-end SpecResp
 
 namespace Universal
 
@@ -206,10 +136,6 @@ variable (m : Mem A n) (j : Fin n)
 
 end Fold
 
-lemma linState_append_single (L : List (OpId (Fin n) × A.Op)) (x : OpId (Fin n)) (o : A.Op) :
-    linState (L ++ [(x, o)]) = (A.δ (linState L) o).1 := by
-  simp [linState, ObjSpec.runOps]
-
 /-! ## Classes of program counters -/
 
 /-- The main loop (lines 5–23). -/
@@ -236,7 +162,7 @@ def PC.inK3 : PC A n → Bool
 
 /-- The response the linearization `L` gives to `x` (`none` if `x ∉ L`). -/
 abbrev specResp (L : List (OpId (Fin n) × A.Op)) (x : OpId (Fin n)) : Option A.Resp :=
-  specRespFrom A.init L x
+  A.respIn A.init L x
 
 /-- The status of process `q` (with current instance `x` and pending operation `pd`), according
 to its program counter: what `announce[q]` holds and whether (and with which response) its
@@ -320,24 +246,16 @@ lemma ProcOK.sim {L : List (OpId (Fin n) × A.Op)} {x : OpId (Fin n)} {pd : Opti
   loc := h.loc
   h2 := by simpa [s.hv, s.hc] using h.h2
 
-lemma specRespFrom_append_of_not_mem {P : Type} [DecidableEq P] (q : A.State)
-    (L M : List (OpId P × A.Op)) {x : OpId P} (hx : x ∉ M.map Prod.fst) :
-    specRespFrom q (L ++ M) x = specRespFrom q L x := by
-  by_cases hL : x ∈ L.map Prod.fst
-  · exact specRespFrom_append_of_mem q L M hL
-  · rw [(specRespFrom_eq_none q L x).2 hL, specRespFrom_eq_none]
-    simp only [map_append, mem_append, not_or]; exact ⟨hL, hx⟩
-
 lemma PInv.append {L M : List (OpId (Fin n) × A.Op)} {x : OpId (Fin n)} {pd : Option A.Op}
     {m : Mem A n} {q : Fin n} {pc : PC A n} (hx : x ∉ M.map Prod.fst) (h : PInv L x pd m q pc) :
     PInv (L ++ M) x pd m q pc := by
-  have e : specResp (L ++ M) x = specResp L x := specRespFrom_append_of_not_mem _ _ _ hx
+  have e : specResp (L ++ M) x = specResp L x := ObjSpec.respIn_append_of_not_mem_right hx
   cases pc <;> simpa [PInv, e] using h
 
 lemma ProcOK.append {L M : List (OpId (Fin n) × A.Op)} {x : OpId (Fin n)} {pd : Option A.Op}
     {m : Mem A n} {q : Fin n} {l : Loc A n} (hx : x ∉ M.map Prod.fst) (h : ProcOK L x pd m q l) :
     ProcOK (L ++ M) x pd m q l :=
-  have e : specResp (L ++ M) x = specResp L x := specRespFrom_append_of_not_mem _ _ _ hx
+  have e : specResp (L ++ M) x = specResp L x := ObjSpec.respIn_append_of_not_mem_right hx
   { h with pinv := h.pinv.append hx, h2 := by simpa [e] using h.h2 }
 
 /-! ## Helper lemmas on `PInv` and `ProcOK` -/
@@ -525,14 +443,14 @@ theorem InvC.tau {L : List (OpId (Fin n) × A.Op)} {cur : Fin n → OpId (Fin n)
     simp only [hpc] at pinv ch ca1 ca2 k3 k4 k5 k6 loc h2
     simp only [PInv] at pinv
     obtain ⟨hpo, hro, hav, hsr⟩ := pinv
-    have hnot : cur p ∉ L.map Prod.fst := (specRespFrom_eq_none _ _ _).1 hsr
+    have hnot : cur p ∉ L.map Prod.fst := ObjSpec.respIn_eq_none_iff.1 hsr
     simp only [contribT, hpc]
-    refine ⟨by rw [linState_append_single, hro, hI.h1], fun q => ?_⟩
+    refine ⟨by rw [linState_concat, hro, hI.h1], fun q => ?_⟩
     by_cases hq : q = p
     · subst hq; simp only [Function.update_self]
       refine ⟨?_, ?_, ca1, ?_, ?_, by simp, by simp, by simp, by simp [LocInv], ?_⟩
       · refine ⟨⟨o, hpo, hro⟩, hav, ?_⟩
-        rw [specResp, specRespFrom_append_self _ _ _ hnot, ← hI.h1]
+        rw [specResp, ObjSpec.respIn_concat_self hnot, ← hI.h1]
         rfl
       · intro hh; simpa [PC.mayHC, PC.inLoop] using (ch hh).2
       · simpa [PC.inVL] using ca2
@@ -693,9 +611,9 @@ theorem InvC.tau {L : List (OpId (Fin n) × A.Op)} {cur : Fin n → OpId (Fin n)
         by_contra hc'
         obtain ⟨rsp, e⟩ := hjsr hc'
         rw [hvnone] at e; cases e
-      have hjnot : cur j ∉ L.map Prod.fst := (specRespFrom_eq_none _ _ _).1 hjn
+      have hjnot : cur j ∉ L.map Prod.fst := ObjSpec.respIn_eq_none_iff.1 hjn
       have hspec : specResp (L ++ [(cur j, o)]) (cur j) = some (A.δ (hv C.mem).1 o).2 := by
-        rw [specResp, specRespFrom_append_self _ _ _ hjnot, ← hI.h1]; rfl
+        rw [specResp, ObjSpec.respIn_concat_self hjnot, ← hI.h1]; rfl
       have key : ∀ q (lq : Loc A n), ProcOK L (cur q) (C.pend q) C.mem q lq →
           (q = j → lq.pc.inLoop = true) →
           ProcOK (L ++ [(cur j, o)]) (cur q) (C.pend q) (Function.update C.mem .head
@@ -714,7 +632,7 @@ theorem InvC.tau {L : List (OpId (Fin n) × A.Op)} {cur : Fin n → OpId (Fin n)
             refine (hQ.pinv.append hx).hv_change (by simp) ?_
             intro o' ho' hne
             exfalso
-            rw [specResp, specRespFrom_append_of_not_mem _ _ _ hx] at hne
+            rw [specResp, ObjSpec.respIn_append_of_not_mem_right hx] at hne
             obtain ⟨-, -, -, h4⟩ := hQ.pinv.inl ho'
             obtain ⟨rsp, e⟩ := h4 hne
             rw [hvnone] at e; cases e
@@ -728,7 +646,7 @@ theorem InvC.tau {L : List (OpId (Fin n) × A.Op)} {cur : Fin n → OpId (Fin n)
           simp only [Option.some.injEq, Prod.mk.injEq] at hr
           obtain ⟨rfl, rfl⟩ := hr
           exact ⟨hspec, Or.inl (hql rfl)⟩
-      refine ⟨by simp [linState_append_single, hI.h1], fun q => ?_⟩
+      refine ⟨by simp [linState_concat, hI.h1], fun q => ?_⟩
       by_cases hq : q = p
       · subst hq; simp only [Function.update_self]
         refine key q _ (hP.loopMove (by simp [hpc, PC.inLoop]) rfl rfl rfl rfl
@@ -1296,20 +1214,6 @@ structure InvL (α : List (Label (Fin n) A)) (L : List (OpId (Fin n) × A.Op))
 abbrev Inv (α : List (Label (Fin n) A)) (C : Config A (B A n) (Fin n) (Loc A n)) : Prop :=
   InvL α (hlin A n α) C
 
-omit [DecidablePred A.ReadOnly] in
-lemma opsOf_snoc_of_ne {α : List (Label (Fin n) A)} {ℓ : Label (Fin n) A}
-    (hℓ : ∀ q o, ℓ ≠ .inv q o) (q : Fin n) : opsOf (α ++ [ℓ]) q = opsOf α q := by
-  cases ℓ with
-  | inv q' o => exact absurd rfl (hℓ q' o)
-  | _ => simp [opsOf_append, opsOf_cons]
-
-omit [DecidablePred A.ReadOnly] in
-lemma respsOf_snoc_of_ne {α : List (Label (Fin n) A)} {ℓ : Label (Fin n) A}
-    (hℓ : ∀ q r, ℓ ≠ .ret q r) (q : Fin n) : respsOf (α ++ [ℓ]) q = respsOf α q := by
-  cases ℓ with
-  | ret q' r => exact absurd rfl (hℓ q' r)
-  | _ => simp [respsOf_append, respsOf_cons]
-
 lemma InvL.invoked {α : List (Label (Fin n) A)} {L : List (OpId (Fin n) × A.Op)}
     {C : Config A (B A n) (Fin n) (Loc A n)}
     (hI : InvL α L C) {x : OpId (Fin n)} (hx : x ∈ L.map Prod.fst) : Invoked α x := by
@@ -1348,8 +1252,10 @@ theorem InvL.tauStep {α : List (Label (Fin n) A)} {L : List (OpId (Fin n) × A.
     (h : (alg5 A n).step C (.tau p) = some C') :
     InvL (α ++ [.tau p]) (L ++ contribT (curOf α) C p) C' := by
   have hcur : ∀ q, (curOf α q).1 = q := fun q => rfl
-  have hops := opsOf_snoc_of_ne (α := α) (ℓ := .tau p) (by simp)
-  have hresps := respsOf_snoc_of_ne (α := α) (ℓ := .tau p) (by simp)
+  have hops : ∀ q, opsOf (α ++ [.tau p]) q = opsOf α q :=
+    fun _ => opsOf_concat_of_ne (by simp)
+  have hresps : ∀ q, respsOf (α ++ [.tau p]) q = respsOf α q :=
+    fun _ => respsOf_concat_of_ne (by simp)
   have hcurE : curOf (α ++ [.tau p]) = curOf α := by funext q; simp [curOf, hops]
   have hC := hI.invC.tau hcur h
   rcases contribT_spec (p := p) hI.invC with he | ⟨j, o, he, hpj, hsj⟩
@@ -1360,7 +1266,7 @@ theorem InvL.tauStep {α : List (Label (Fin n) A)} {L : List (OpId (Fin n) × A.
     · exact hI.complete x (by simpa [Completed, hresps] using hx)
     · exact hI.resp x r (by simpa [respOf, hresps] using hx)
   · rw [he] at hC ⊢
-    have hjn : curOf α j ∉ L.map Prod.fst := (specRespFrom_eq_none _ _ _).1 hsj
+    have hjn : curOf α j ∉ L.map Prod.fst := ObjSpec.respIn_eq_none_iff.1 hsj
     refine ⟨by rw [hcurE]; exact hC, ?_, fun y hy => ?_, fun x hx => ?_, fun x r hx => ?_⟩
     · simp only [map_append, map_cons, map_nil]
       refine List.nodup_append.2 ⟨hI.nodup, by simp, ?_⟩
@@ -1380,20 +1286,21 @@ theorem InvL.tauStep {α : List (Label (Fin n) A)} {L : List (OpId (Fin n) × A.
       have hmem := hI.complete x (by
         simp only [Completed]; simp only [respOf] at hx'
         exact (List.getElem?_eq_some_iff.1 hx').1)
-      rw [specResp, specRespFrom_append_of_mem _ _ _ hmem]; exact hI.resp x r hx'
+      rw [specResp, ObjSpec.respIn_append_of_mem hmem]; exact hI.resp x r hx'
 
 /-- Preservation of `InvL` by an invocation. -/
 theorem InvL.invStep {α : List (Label (Fin n) A)} {L : List (OpId (Fin n) × A.Op)}
     {C C' : Config A (B A n) (Fin n) (Loc A n)} {p : Fin n} {o : A.Op} (hI : InvL α L C)
     (h : (alg5 A n).step C (.inv p o) = some C') : InvL (α ++ [.inv p o]) L C' := by
-  have hresps := respsOf_snoc_of_ne (α := α) (ℓ := .inv p o) (by simp)
+  have hresps : ∀ q, respsOf (α ++ [.inv p o]) q = respsOf α q :=
+    fun _ => respsOf_concat_of_ne (by simp)
   have hops : ∀ q, opsOf (α ++ [.inv p o]) q = opsOf α q ++ (if p = q then [o] else []) := by
     intro q; by_cases hq : p = q <;> simp [opsOf_append, opsOf_cons, hq]
   have hpn : C.pend p = none := (Impl.step_inv h).1
   refine ⟨hI.invC.inv h (fun q hq => ?_) ?_, hI.nodup, fun y hy => ?_, fun x hx => ?_,
     fun x r hx => ?_⟩
   · simp [curOf, hops, Ne.symm hq]
-  · rw [specResp, specRespFrom_eq_none]
+  · rw [specResp, ObjSpec.respIn_eq_none_iff]
     intro hm
     have := hI.invoked hm
     simp [Invoked, curOf, hops] at this
@@ -1406,7 +1313,8 @@ theorem InvL.retStep {α : List (Label (Fin n) A)} {L : List (OpId (Fin n) × A.
     {C C' : Config A (B A n) (Fin n) (Loc A n)} {p : Fin n} {r : A.Resp} (hI : InvL α L C)
     (hcnt : C.pend p ≠ none → (opsOf α p).length = (respsOf α p).length + 1)
     (h : (alg5 A n).step C (.ret p r) = some C') : InvL (α ++ [.ret p r]) L C' := by
-  have hops := opsOf_snoc_of_ne (α := α) (ℓ := .ret p r) (by simp)
+  have hops : ∀ q, opsOf (α ++ [.ret p r]) q = opsOf α q :=
+    fun _ => opsOf_concat_of_ne (by simp)
   have hcurE : curOf (α ++ [.ret p r]) = curOf α := by funext q; simp [curOf, hops]
   have hresps : ∀ q, respsOf (α ++ [.ret p r]) q =
       respsOf α q ++ (if p = q then [r] else []) := by
@@ -1427,7 +1335,7 @@ theorem InvL.retStep {α : List (Label (Fin n) A)} {L : List (OpId (Fin n) × A.
       · exact hI.complete _ hx
       · subst hx; rw [← hcurp]
         by_contra hn
-        have := (specRespFrom_eq_none A.init _ _).2 hn
+        have := (ObjSpec.respIn_eq_none_iff (q := A.init)).2 hn
         simp only [specResp] at hsr
         rw [this] at hsr; cases hsr
     · simp only [hq, ↓reduceIte, append_nil] at hx; exact hI.complete _ hx
@@ -1472,13 +1380,5 @@ theorem inv_step {α : List (Label (Fin n) A)} {C C' : Config A (B A n) (Fin n) 
 
 /-- **The invariant** holds in every reachable configuration. -/
 theorem inv_run {α : List (Label (Fin n) A)} {C : Config A (B A n) (Fin n) (Loc A n)}
-    (h : (alg5 A n).run α = some C) : Inv α C := by
-  induction α using List.reverseRecOn generalizing C with
-  | nil => simp [Impl.run] at h; subst h; exact inv_init
-  | append_singleton α ℓ ih =>
-    rw [Impl.run, Impl.runFrom_append] at h
-    cases hα : (alg5 A n).runFrom (alg5 A n).initCfg α with
-    | none => simp [hα] at h
-    | some C₀ =>
-      simp only [hα, Option.bind_some, Impl.runFrom_singleton] at h
-      exact inv_step hα (ih hα) h
+    (h : (alg5 A n).run α = some C) : Inv α C :=
+  Impl.run_induction inv_init (fun _ _ _ _ hα hI hs => inv_step hα hI hs) h

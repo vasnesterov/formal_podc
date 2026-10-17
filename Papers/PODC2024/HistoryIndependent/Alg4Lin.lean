@@ -1,4 +1,5 @@
 import Papers.PODC2024.HistoryIndependent.Alg4Main
+import Podc.SharedMemory.History
 
 /-!
 # Algorithm 4: history of an execution, reads-from assignment, linearizability
@@ -64,14 +65,6 @@ structure Link (α : List (Lbl v₀)) (s : St K) : Prop where
 
 lemma St.c_le_n (s : St K) : s.c ≤ s.n := by unfold St.c; split_ifs <;> omega
 
-lemma opsOf_snoc' {α : List (Lbl v₀)} {ℓ : Lbl v₀} (p : Proc) :
-    opsOf (α ++ [ℓ]) p = opsOf α p ++ (ℓ.invOf p).toList := by
-  rw [opsOf_append]; cases h : ℓ.invOf p <;> simp [opsOf, h]
-
-lemma respsOf_snoc' {α : List (Lbl v₀)} {ℓ : Lbl v₀} (p : Proc) :
-    respsOf (α ++ [ℓ]) p = respsOf α p ++ (ℓ.retOf p).toList := by
-  rw [respsOf_append]; cases h : ℓ.retOf p <;> simp [respsOf, h]
-
 theorem link {α : List (Lbl v₀)} (h : (alg4 v₀).Valid α) : Link α (sOf v₀ α) := by
   induction α using List.reverseRecOn with
   | nil => exact ⟨rfl, rfl, rfl, rfl⟩
@@ -91,10 +84,10 @@ theorem link {α : List (Lbl v₀)} (h : (alg4 v₀).Valid α) : Link α (sOf v�
         (s.pis.map (s.vals v₀) ++ (ℓ.retOf .r).toList =
           (sstep v₀ s ℓ).pis.map ((sstep v₀ s ℓ).vals v₀)) by
       refine ⟨?_, ?_, ?_, ?_⟩
-      · rw [opsOf_snoc', hL.opsW]; exact H.1
-      · rw [respsOf_snoc', hL.respsW]; exact H.2.1
-      · rw [opsOf_snoc', hL.opsR]; exact H.2.2.1
-      · rw [respsOf_snoc', hL.respsR]; exact H.2.2.2
+      · rw [opsOf_concat, hL.opsW]; exact H.1
+      · rw [respsOf_concat, hL.respsW]; exact H.2.1
+      · rw [opsOf_concat, hL.opsR]; exact H.2.2.1
+      · rw [respsOf_concat, hL.respsR]; exact H.2.2.2
     cases ℓ with
     | inv p o =>
       cases p with

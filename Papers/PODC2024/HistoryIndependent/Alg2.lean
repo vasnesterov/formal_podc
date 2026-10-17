@@ -1,5 +1,7 @@
 import Cslib.Computability.Distributed.SharedMemory.SWSRRegister
 import Mathlib
+import Podc.SharedMemory.Progress
+import Podc.Order.NatDescent
 
 /-!
 # Algorithm 2: a lock-free state-quiescent HI SWSR `K`-valued register (Theorem 9)
@@ -857,14 +859,9 @@ lemma inv_step {v₀ : Fin K} {α : List (Lbl v₀)} {C C' : Cfg v₀} {g : Ghos
     · exact inv_step_ret_r hrun hI hs
 
 theorem inv_run {v₀ : Fin K} {α : List (Lbl v₀)} {C : Cfg v₀} (h : (alg2 v₀).run α = some C) :
-    Inv α C (ghost v₀ α) := by
-  induction α using List.reverseRecOn generalizing C with
-  | nil => simp at h; subst h; exact inv_init v₀
-  | append_singleton α ℓ ih =>
-    obtain ⟨C₁, h1, h2⟩ := (alg2 v₀).runFrom_eq_some_of_append h
-    rw [Impl.runFrom_singleton] at h2
-    rw [ghost_snoc h1 h2]
-    exact inv_step h1 (ih h1) h2
+    Inv α C (ghost v₀ α) :=
+  Impl.run_induction (Q := fun α C => Inv α C (ghost v₀ α)) (inv_init v₀)
+    (fun _ _ _ _ h1 hI h2 => by rw [ghost_snoc h1 h2]; exact inv_step h1 hI h2) h
 
 end Alg2
 
@@ -932,41 +929,6 @@ theorem stateQuiescentHI (v₀ : Fin K) : (alg2 v₀).StateQuiescentHI := by
   rw [mem_of_stateQuiescent h hq, mem_of_stateQuiescent h' hq', hs]
 
 /-! ## Lock-freedom -/
-
-/-- The configuration at step `n` of an infinite execution is reached by its first `n` labels.
--- CSLib candidate -/
-lemma _root_.Cslib.SharedMemory.Impl.InfExec.run_prefix {A : ObjSpec} {ι : Type} {B : ι → ObjSpec}
-    {P L : Type} [DecidableEq P] [DecidableEq ι] {I : Impl A B P L} (e : I.InfExec) (n : ℕ) :
-    I.run ((List.range n).map e.lbl) = some (e.cfg n) := by
-  induction n with
-  | zero => simp [e.cfg_zero]
-  | succ n ih =>
-    rw [List.range_succ, List.map_append, List.map_singleton, Impl.run_append_of_eq I ih,
-      Impl.runFrom_singleton, e.step_eq]
-
-/-- A non-increasing `ℕ`-valued function that strictly decreases at every `m` with `P m`
-admits only finitely many such `m`. -- CSLib candidate -/
-lemma eventually_not_of_decreasing (f : ℕ → ℕ) (P : ℕ → Prop) (N : ℕ)
-    (h1 : ∀ m ≥ N, f (m + 1) ≤ f m) (h2 : ∀ m ≥ N, P m → f (m + 1) < f m) :
-    ∃ N', ∀ m ≥ N', ¬ P m := by
-  obtain ⟨n, hn⟩ : ∃ n, f N = n := ⟨_, rfl⟩
-  induction n using Nat.strong_induction_on generalizing N with
-  | _ n ih =>
-    by_cases hP : ∃ m ≥ N, P m
-    · obtain ⟨m, hm, hPm⟩ := hP
-      have hmono : ∀ k, f (N + k) ≤ f N := by
-        intro k
-        induction k with
-        | zero => exact le_refl _
-        | succ k ihk => exact (h1 (N + k) (by omega)).trans ihk
-      have hlt : f (m + 1) < n := by
-        have := hmono (m - N)
-        rw [show N + (m - N) = m by omega] at this
-        have := h2 m hm hPm
-        omega
-      exact ih _ hlt (m + 1) (fun k hk => h1 k (by omega)) (fun k hk => h2 k (by omega)) rfl
-    · push Not at hP
-      exact ⟨N, hP⟩
 
 /-- The value of the last invoked write, while it is pending. -/
 lemma wv_pending {v₀ : Fin K} {α : List (Lbl v₀)} {C : Cfg v₀} {v : Fin K}
@@ -1120,10 +1082,10 @@ theorem lockFree (v₀ : Fin K) : (alg2 v₀).LockFree := by
   intro e _ N
   by_contra hcon
   push Not at hcon
-  have hreach := e.run_prefix
+  have hreach := e.run_lbls
   -- the writer takes finitely many steps after `N`
-  obtain ⟨N₁, hN₁⟩ := eventually_not_of_decreasing (fun m => wμ ((e.cfg m).loc .w))
-    (fun m => (e.lbl m).proc = .w) N
+  obtain ⟨N₁, -, hN₁⟩ := Nat.eventually_not_of_succ_le (f := fun m => wμ ((e.cfg m).loc .w))
+    (N := N) (p := fun m => (e.lbl m).proc = .w)
     (fun m hm => (writer_step (hreach m) (e.step_eq m) (hcon m hm .w)).1)
     (fun m hm => (writer_step (hreach m) (e.step_eq m) (hcon m hm .w)).2)
   -- afterwards, only the reader moves; the memory is fixed
@@ -1142,8 +1104,8 @@ theorem lockFree (v₀ : Fin K) : (alg2 v₀).LockFree := by
       rw [← ih, ← Nat.add_assoc]
       exact (reader_step (hreach _) (e.step_eq _) (hr _ (by omega)) (hcon _ (by omega) .r)).1
   -- the reader's measure decreases at every step: contradiction
-  obtain ⟨N₂, hN₂⟩ := eventually_not_of_decreasing
-    (fun m => rμ M ((e.cfg (max N N₁ + m)).loc .r)) (fun _ => True) 0
+  obtain ⟨N₂, -, hN₂⟩ := Nat.eventually_not_of_succ_le
+    (f := fun m => rμ M ((e.cfg (max N N₁ + m)).loc .r)) (N := 0) (p := fun _ => True)
     (fun m _ => by
       have := (reader_step (hreach _) (e.step_eq _) (hr (max N N₁ + m) (by omega))
         (hcon _ (by omega) .r)).2

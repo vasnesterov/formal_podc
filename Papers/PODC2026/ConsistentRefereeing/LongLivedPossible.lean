@@ -1,6 +1,9 @@
 import Papers.PODC2026.ConsistentRefereeing.LongLivedBasic
-import Podc.StrongLin.OneAccess
-import Podc.SharedMemory.Objects
+import Podc.SharedMemory.StrongLin.OneAccess
+import Podc.SharedMemory.Objects.FetchAdd
+import Podc.SharedMemory.Objects.MaxRegister
+import Podc.SharedMemory.Objects.Snapshot
+import Podc.Algebra.BigOperators.Update
 
 /-!
 # Long-lived contest from counters, max registers and snapshots (Lemma 14 of [ACE26])
@@ -265,13 +268,6 @@ lemma oneAccess_potential {A : ObjSpec} {ι D : Type} {B : ι → ObjSpec}
 
 variable [Fintype P]
 
-lemma sum_update_succ (q : P → ℕ) (p : P) :
-    ∑ c, Function.update q p (q p + 1) c = (∑ c, q c) + 1 := by
-  have h1 := Finset.sum_update_of_mem (Finset.mem_univ p) q (q p + 1)
-  have h2 := Finset.sum_update_of_mem (Finset.mem_univ p) q (q p)
-  rw [Function.update_eq_self] at h2
-  rw [h1, h2]; omega
-
 lemma sup_update_succ (q : P → ℕ) (p : P) :
     Finset.univ.sup (Function.update q p (q p + 1)) = max (Finset.univ.sup q) (q p + 1) := by
   apply le_antisymm
@@ -317,7 +313,8 @@ lemma ctrScheme_sim : (ctrScheme (P := P)).Sim (fun m _ q => m () = ∑ c, q c) 
   | compete i =>
     refine ⟨?_, rfl⟩
     simp only [ctrScheme, Function.update_self]
-    rw [sum_update_succ, hab]
+    have := Fintype.sum_update_add s i (s i + 1)
+    rw [hab]; omega
   | decide =>
     refine ⟨?_, ?_⟩
     · simp only [ctrScheme, Function.update_self]; exact hab

@@ -1,5 +1,6 @@
 import Papers.PODC2024.HistoryIndependent.Perfect
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
+import Podc.SharedMemory.Run
 import Mathlib
 
 /-!
@@ -46,59 +47,45 @@ structure Inv (α : List (Label Unit A)) (C : Config A (Empty.elim : Empty → O
   lin : IsLinearization α L
   st : (C.loc ()).st = linState L
   op : (C.loc ()).op = C.pend ()
-  notin : ∀ o, C.pend () = some o → ((), (respsOf α ()).length) ∉ L.map Prod.fst ∧
-    opOf α ((), (respsOf α ()).length) = some o ∧ ¬ Completed α ((), (respsOf α ()).length)
+  notin : C.pend () ≠ none → curOp α () ∉ L.map Prod.fst
 
 theorem inv_of_run {α : List (Label Unit A)}
     {C : Config A (Empty.elim : Empty → ObjSpec) Unit (LocalLoc A)}
     (h : (localImpl A r₀).run α = some C) : ∃ L, Inv α C L := by
-  induction α using List.reverseRecOn generalizing C with
-  | nil =>
-    simp [Impl.run, Impl.runFrom, Impl.initCfg] at h; subst h
-    exact ⟨[], ⟨by simp, by simp, fun a ha => by simp [Completed] at ha,
-      fun a b _ hb => by simp at hb, trivial⟩, rfl, rfl, fun o h => by simp at h⟩
-  | append_singleton α ℓ ih =>
-    rw [Impl.run, Impl.runFrom_append] at h
-    cases hα : (localImpl A r₀).runFrom (localImpl A r₀).initCfg α with
-    | none => simp [hα] at h
-    | some C₀ =>
-      simp only [hα, Option.bind_some, Impl.runFrom_singleton] at h
-      obtain ⟨L, hI⟩ := ih hα
-      cases ℓ with
-      | inv p o =>
-        cases p
-        obtain ⟨h0, -, hpend, hloc, -⟩ := Impl.step_inv h
-        have hlen : (opsOf α ()).length = (respsOf α ()).length := by
-          rcases (localImpl A r₀).run_counts hα () with ⟨-, h1⟩ | ⟨h1, -⟩
-          · exact h1
-          · exact absurd h0 h1
-        refine ⟨L, ⟨hI.lin.append_inv () o, ?_, ?_, ?_⟩⟩
-        · rw [hloc]; simp [localImpl, hI.st]
-        · rw [hloc, hpend]; simp [localImpl]
-        · intro o' ho'
-          rw [hpend] at ho'; simp at ho'; subst ho'
-          refine ⟨fun hm => ?_, ?_, ?_⟩
-          · have := hI.lin.mem_invoked hm
-            simp [Invoked] at this; omega
-          · simp [opOf, respsOf_append, opsOf_append, ← hlen]
-          · simp [Completed, respsOf_append]
-      | tau p =>
-        obtain ⟨-, -, i, -⟩ := Impl.step_tau h
-        exact i.elim
-      | ret p r =>
-        cases p
-        obtain ⟨h0, hpend, -, l, hact, hloc⟩ := Impl.step_ret h
-        obtain ⟨o, ho⟩ := Option.ne_none_iff_exists'.1 h0
-        have hop : (C₀.loc ()).op = some o := by rw [hI.op, ho]
-        simp only [localImpl, hop, Action.ret.injEq] at hact
-        obtain ⟨hr, rfl⟩ := hact
-        obtain ⟨hn, hopx, hnc⟩ := hI.notin o ho
-        refine ⟨L ++ [(((), (respsOf α ()).length), o)], ⟨?_, ?_, ?_, ?_⟩⟩
-        · exact (hI.lin.push hopx hn hnc).append_ret L [] o rfl
-            (by rw [← hr, hI.st]; rfl)
-        · rw [hloc]; simp [linState, ObjSpec.runOps_append, hI.st]
-        · rw [hloc, hpend]; simp
-        · intro o' ho'; rw [hpend] at ho'; simp at ho'
+  refine Impl.run_induction (Q := fun α C => ∃ L, Inv α C L)
+    ⟨[], ⟨by simp, by simp, fun a ha => by simp [Completed] at ha,
+      fun a b _ hb => by simp at hb, trivial⟩, rfl, rfl, fun h => by simp [Impl.initCfg] at h⟩
+    (fun α C₀ ℓ C hα ⟨L, hI⟩ h => ?_) h
+  cases ℓ with
+  | inv p o =>
+    cases p
+    obtain ⟨h0, -, hpend, hloc, -⟩ := Impl.step_inv h
+    have hlen : (opsOf α ()).length = (respsOf α ()).length := by
+      rcases (localImpl A r₀).run_counts hα () with ⟨-, h1⟩ | ⟨h1, -⟩
+      · exact h1
+      · exact absurd h0 h1
+    refine ⟨L, ⟨hI.lin.append_inv () o, ?_, ?_, fun _ hm => ?_⟩⟩
+    · rw [hloc]; simp [localImpl, hI.st]
+    · rw [hloc, hpend]; simp [localImpl]
+    · have := hI.lin.mem_invoked (by simpa using hm)
+      simp [Invoked] at this; omega
+  | tau p =>
+    obtain ⟨-, -, i, -⟩ := Impl.step_tau h
+    exact i.elim
+  | ret p r =>
+    cases p
+    obtain ⟨h0, hpend, -, l, hact, hloc⟩ := Impl.step_ret h
+    obtain ⟨o, ho⟩ := Option.ne_none_iff_exists'.1 h0
+    have hop : (C₀.loc ()).op = some o := by rw [hI.op, ho]
+    simp only [localImpl, hop, Action.ret.injEq] at hact
+    obtain ⟨hr, rfl⟩ := hact
+    obtain ⟨-, hnc, hopx⟩ := Impl.run_pend_curOp hα ho
+    refine ⟨L ++ [(curOp α (), o)], ⟨?_, ?_, ?_, ?_⟩⟩
+    · exact (hI.lin.push hopx (hI.notin h0) hnc).append_ret L [] o rfl
+        (by rw [← hr, hI.st]; rfl)
+    · rw [hloc]; simp [hI.st]
+    · rw [hloc, hpend]; simp
+    · intro h'; rw [hpend] at h'; simp at h'
 
 /-- The local implementation is wait-free, linearizable and perfectly HI (with a single
 process, from no base objects at all). -/
@@ -110,14 +97,7 @@ theorem waitFree_perfectHI : (localImpl A r₀).WaitFree ∧ (localImpl A r₀).
       rw [heq] at hs
       obtain ⟨-, -, i, -⟩ := Impl.step_tau hs
       exact i.elim⟩
-  · have : ∀ α : List (Label Unit A), ∃ L, ∀ C, (localImpl A r₀).run α = some C → Inv α C L := by
-      intro α
-      cases hα : (localImpl A r₀).run α with
-      | none => exact ⟨[], fun C h => by cases h⟩
-      | some C =>
-        obtain ⟨L, hL⟩ := inv_of_run hα
-        exact ⟨L, fun C' h => by cases h; exact hL⟩
-    choose h hh using this
+  · obtain ⟨h, hh⟩ := Impl.exists_linFun_of_run (fun α C hC => inv_of_run (r₀ := r₀) hC)
     exact ⟨h, fun α ⟨C, hC⟩ => (hh α C hC).lin, fun _ _ _ _ _ _ _ _ _ => funext fun e => e.elim⟩
 
 end LocalImpl

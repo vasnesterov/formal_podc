@@ -1,6 +1,7 @@
-import Papers.PODC2024.HistoryIndependent.UniversalRLLSC
+import Podc.SharedMemory.Objects.LLSC
+import Podc.SharedMemory.Potential
+import Podc.Algebra.BigOperators.Update
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
-import Mathlib.Algebra.Order.BigOperators.Group.Finset
 import Mathlib
 
 /-!
@@ -244,7 +245,7 @@ execution `α`. -/
 noncomputable def linPt (α : List (Lbl P V v₀)) : Lbl P V v₀ → List (OpId P × Op P V v₀)
   | .tau p => match (impl P V v₀).run α with
     | some C => match (C.loc p).pendOp p with
-      | some o => if IsLinStep p (C.loc p) (C.mem ()) then [((p, (respsOf α p).length), o)] else []
+      | some o => if IsLinStep p (C.loc p) (C.mem ()) then [(curOp α p, o)] else []
       | none => []
     | none => []
   | _ => []
@@ -272,10 +273,10 @@ structure ProcOK (α : List (Lbl P V v₀)) (L : List (OpId P × Op P V v₀)) (
     (pd : Option (Op P V v₀)) : Prop where
   idle : l = .idle ↔ pd = none
   active : ∀ o, l.pendOp p = some o → pd = some o ∧
-    (p, (respsOf α p).length) ∉ L.map Prod.fst ∧ opOf α (p, (respsOf α p).length) = some o
+    curOp α p ∉ L.map Prod.fst ∧ opOf α (curOp α p) = some o
   sc : ∀ v cur, l = .scCAS v cur → p ∈ cur.2
   done : ∀ r, l = .done r → pd ≠ none ∧ ∃ L₁ L₂ o,
-    L = L₁ ++ ((p, (respsOf α p).length), o) :: L₂ ∧
+    L = L₁ ++ (curOp α p, o) :: L₂ ∧
     ((rllsc P V v₀).δ ((rllsc P V v₀).runOps (rllsc P V v₀).init (L₁.map Prod.snd)) o).2 = r
 
 /-- The invariant of Lemma 40: `h_llsc(α)` is a linearization of `α`, the CAS value is its
@@ -290,12 +291,10 @@ lemma ProcOK.extend {α : List (Lbl P V v₀)} {L : List (OpId P × Op P V v₀)
     {l : Loc P V} {pd : Option (Op P V v₀)} (h : ProcOK α L q l pd) (ℓ : Lbl P V v₀)
     (hℓ : ℓ.proc ≠ q) (E : List (OpId P × Op P V v₀)) (hE : ∀ y ∈ E, y.1.1 ≠ q) :
     ProcOK (α ++ [ℓ]) (L ++ E) q l pd := by
-  have hr : respsOf (α ++ [ℓ]) q = respsOf α q := by
-    simp [respsOf_append, Label.retOf_eq_none_of_proc_ne hℓ]
+  have hr : curOp (α ++ [ℓ]) q = curOp α q := curOp_append_of_proc_ne α hℓ
   refine ⟨h.idle, fun o ho => ?_, h.sc, fun r hr' => ?_⟩
   · obtain ⟨h1, h2, h3⟩ := h.active o ho
-    have hinv : Invoked α (q, (respsOf α q).length) := by
-      simp only [opOf] at h3; exact (List.getElem?_eq_some_iff.1 h3).1
+    have hinv : Invoked α (curOp α q) := Invoked.of_opOf_eq_some h3
     refine ⟨h1, ?_, ?_⟩
     · rw [hr]; simp only [List.map_append, List.mem_append, not_or]
       exact ⟨h2, fun hm => by obtain ⟨y, hy, hy'⟩ := List.mem_map.1 hm; exact hE y hy (by rw [hy'])⟩
@@ -311,120 +310,111 @@ lemma pendOp_invokeLoc {p : P} {o : RLLSCOp P V} (h : o.proc = none ∨ o.proc =
 /-- Lemma 40 (as an invariant): every reachable configuration satisfies `Inv`. -/
 theorem inv_of_run {α : List (Lbl P V v₀)} {C : Cfg P V v₀}
     (h : (impl P V v₀).run α = some C) : Inv α C := by
-  induction α using List.reverseRecOn generalizing C with
-  | nil =>
-    simp [Impl.run, Impl.runFrom, Impl.initCfg] at h; subst h
-    refine ⟨⟨by simp, by simp, fun a ha => by simp [Completed] at ha,
-      fun a b _ hb => by simp at hb, trivial⟩, rfl, fun p => ⟨by simp [impl], ?_, ?_, ?_⟩⟩
-    · intro o ho; simp [impl, Loc.pendOp] at ho
-    · intro v cur h; simp [impl] at h
-    · intro r h; simp [impl] at h
-  | append_singleton α ℓ ih =>
-    rw [Impl.run, Impl.runFrom_append] at h
-    cases hα : (impl P V v₀).runFrom (impl P V v₀).initCfg α with
-    | none => simp [hα] at h
-    | some C₀ =>
-      simp only [hα, Option.bind_some, Impl.runFrom_singleton] at h
-      have hI := ih hα
-      have hcnt := (impl P V v₀).run_counts hα
-      cases ℓ with
-      | inv p o =>
-        obtain ⟨h0, hal, hpend, hloc, hmem⟩ := Impl.step_inv h
-        have hL : lin (α ++ [.inv p o]) = lin α := by rw [lin_append]; simp [linPt]
-        have hlen : (opsOf α p).length = (respsOf α p).length := by
-          rcases hcnt p with ⟨-, h1⟩ | ⟨h1, -⟩
-          · exact h1
-          · exact absurd h0 h1
-        refine ⟨by rw [hL]; exact hI.isLin.append_inv p o, by rw [hL, hmem]; exact hI.mem,
-          fun q => ?_⟩
-        rw [hL]
-        by_cases hq : q = p
-        · subst hq
-          rw [hloc, hpend, Function.update_self, Function.update_self]
-          have hr : respsOf (α ++ [.inv q o]) q = respsOf α q := by simp [respsOf_append]
-          refine ⟨by cases o <;> simp [impl, invokeLoc], fun o' ho' => ?_, ?_, ?_⟩
-          · have ho : o' = o := by
-              rw [show (impl P V v₀).invoke q (C₀.loc q) o = invokeLoc o from rfl,
-                pendOp_invokeLoc hal] at ho'
-              exact (Option.some.inj ho').symm
-            subst ho
-            refine ⟨rfl, fun hm => ?_, ?_⟩
-            · have := hI.isLin.mem_invoked (by rw [hr] at hm; exact hm)
-              simp [Invoked] at this; omega
-            · simp [opOf, respsOf_append, opsOf_append, ← hlen]
-          · intro v cur h; cases o <;> simp [impl, invokeLoc] at h
-          · intro r h; cases o <;> simp [impl, invokeLoc] at h
-        · rw [hloc, hpend, Function.update_of_ne hq, Function.update_of_ne hq]
-          simpa using (hI.proc q).extend (.inv p o) (Ne.symm hq) [] (by simp)
-      | tau p =>
-        obtain ⟨h0, hpend, hidle, hdone, hmem, hloc⟩ := step_tau h
-        have hP := hI.proc p
-        obtain ⟨o, ho⟩ : ∃ o, (C₀.loc p).pendOp p = some o := by
-          cases hl : C₀.loc p <;> simp_all [Loc.pendOp]
-        obtain ⟨hpo, hx, hop⟩ := hP.active o ho
-        have hr : respsOf (α ++ [.tau p]) p = respsOf α p := by simp [respsOf_append]
-        by_cases hls : IsLinStep p (C₀.loc p) (C₀.mem ())
-        · set x : OpId P := (p, (respsOf α p).length) with hxdef
-          have hL : lin (α ++ [.tau p]) = lin α ++ [(x, o)] := by
-            rw [lin_append]; simp [linPt, Impl.run, hα, ho, hls, x]
-          have hT := tauNext_of_linStep (v₀ := v₀) ho hP.sc hls
-          have hnc : ¬ Completed α x := by simp [Completed, x]
-          refine ⟨by rw [hL]; exact (hI.isLin.push hop hx hnc).append_tau p, ?_, fun q => ?_⟩
-          · rw [hL, hmem, hT, hI.mem, linState, linState, List.map_append,
-              ObjSpec.runOps_append]
-            rfl
-          rw [hL]
-          by_cases hq : q = p
-          · subst hq
-            rw [hloc, hpend, Function.update_self, hpo, hT]
-            refine ⟨by simp, fun o' ho' => by simp [Loc.pendOp] at ho', fun v cur h => by simp at h,
-              fun r' hr' => ⟨by simp, lin α, [], o, by rw [hr], ?_⟩⟩
-            simp only [Loc.done.injEq] at hr'
-            rw [← hr', hI.mem]; rfl
-          · rw [hloc, hpend, Function.update_of_ne hq]
-            exact (hI.proc q).extend (.tau p) (Ne.symm hq) _
-              (by simp only [List.mem_singleton]; rintro y rfl; exact Ne.symm hq)
-        · have hL : lin (α ++ [.tau p]) = lin α := by
-            rw [lin_append]; simp [linPt, Impl.run, hα, ho, hls]
-          obtain ⟨hm, ho', hsc'⟩ := tauNext_of_not_linStep (v₀ := v₀) ho hls
-          refine ⟨by rw [hL]; exact hI.isLin.append_tau p, by rw [hL, hmem, hm, hI.mem],
-            fun q => ?_⟩
-          rw [hL]
-          by_cases hq : q = p
-          · subst hq
-            rw [hloc, hpend, Function.update_self, hpo]
-            refine ⟨⟨fun h => by rw [h] at ho'; simp [Loc.pendOp] at ho', by simp⟩,
-              fun o' ho'' => ?_, hsc', fun r h => by rw [h] at ho'; simp [Loc.pendOp] at ho'⟩
-            rw [ho'] at ho''; cases ho''
-            refine ⟨rfl, by rw [hr]; exact hx, ?_⟩
-            have hinv : Invoked α (q, (respsOf α q).length) := by
-              simp only [opOf] at hop; exact (List.getElem?_eq_some_iff.1 hop).1
-            rw [hr, opOf_append_of_invoked hinv]; exact hop
-          · rw [hloc, hpend, Function.update_of_ne hq]
-            simpa using (hI.proc q).extend (.tau p) (Ne.symm hq) [] (by simp)
-      | ret p r =>
-        obtain ⟨h0, hpend, hmem, l, hact, hloc⟩ := Impl.step_ret h
-        have hP := hI.proc p
-        have hL : lin (α ++ [.ret p r]) = lin α := by rw [lin_append]; simp [linPt]
-        obtain ⟨hl, rfl⟩ : C₀.loc p = .done r ∧ l = .idle := by
-          cases hl : C₀.loc p with
-          | idle => exact absurd (hP.idle.1 hl) h0
-          | done r' =>
-            rw [hl] at hact
-            simp only [impl, act, Action.ret.injEq] at hact
-            exact ⟨by rw [hact.1], hact.2.symm⟩
-          | _ => rw [hl] at hact; simp [impl, act] at hact
-        obtain ⟨-, L₁, L₂, o, hs, hres⟩ := hP.done r hl
-        refine ⟨by rw [hL]; exact hI.isLin.append_ret L₁ L₂ o hs hres,
-          by rw [hL, hmem]; exact hI.mem, fun q => ?_⟩
-        rw [hL]
-        by_cases hq : q = p
-        · subst hq
-          rw [hloc, hpend, Function.update_self, Function.update_self]
-          exact ⟨by simp, fun o' ho' => by simp [Loc.pendOp] at ho', fun v cur h => by simp at h,
-            fun r h => by simp at h⟩
-        · rw [hloc, hpend, Function.update_of_ne hq, Function.update_of_ne hq]
-          simpa using (hI.proc q).extend (.ret p r) (Ne.symm hq) [] (by simp)
+  refine Impl.run_induction (Q := fun α C => Inv α C) ?_
+    (fun α C₀ ℓ C hα hI h => ?_) h
+  · refine ⟨⟨by simp, by simp, fun a ha => by simp [Completed] at ha,
+      fun a b _ hb => by simp at hb, trivial⟩, rfl, fun p => ⟨by simp [Impl.initCfg, impl], ?_, ?_, ?_⟩⟩
+    · intro o ho; simp [Impl.initCfg, impl, Loc.pendOp] at ho
+    · intro v cur h; simp [Impl.initCfg, impl] at h
+    · intro r h; simp [Impl.initCfg, impl] at h
+  have hcnt := (impl P V v₀).run_counts hα
+  cases ℓ with
+  | inv p o =>
+    obtain ⟨h0, hal, hpend, hloc, hmem⟩ := Impl.step_inv h
+    have hL : lin (α ++ [.inv p o]) = lin α := by rw [lin_append]; simp [linPt]
+    have hlen : (opsOf α p).length = (respsOf α p).length := by
+      rcases hcnt p with ⟨-, h1⟩ | ⟨h1, -⟩
+      · exact h1
+      · exact absurd h0 h1
+    refine ⟨by rw [hL]; exact hI.isLin.append_inv p o, by rw [hL, hmem]; exact hI.mem,
+      fun q => ?_⟩
+    rw [hL]
+    by_cases hq : q = p
+    · subst hq
+      rw [hloc, hpend, Function.update_self, Function.update_self]
+      have hr : curOp (α ++ [.inv q o]) q = curOp α q := curOp_append_inv α q q o
+      refine ⟨by cases o <;> simp [impl, invokeLoc], fun o' ho' => ?_, ?_, ?_⟩
+      · have ho : o' = o := by
+          rw [show (impl P V v₀).invoke q (C₀.loc q) o = invokeLoc o from rfl,
+            pendOp_invokeLoc hal] at ho'
+          exact (Option.some.inj ho').symm
+        subst ho
+        refine ⟨rfl, fun hm => ?_, ?_⟩
+        · have := hI.isLin.mem_invoked (by rw [hr] at hm; exact hm)
+          simp [Invoked] at this; omega
+        · simp [opOf, respsOf_append, opsOf_append, ← hlen]
+      · intro v cur h; cases o <;> simp [impl, invokeLoc] at h
+      · intro r h; cases o <;> simp [impl, invokeLoc] at h
+    · rw [hloc, hpend, Function.update_of_ne hq, Function.update_of_ne hq]
+      simpa using (hI.proc q).extend (.inv p o) (Ne.symm hq) [] (by simp)
+  | tau p =>
+    obtain ⟨h0, hpend, hidle, hdone, hmem, hloc⟩ := step_tau h
+    have hP := hI.proc p
+    obtain ⟨o, ho⟩ : ∃ o, (C₀.loc p).pendOp p = some o := by
+      cases hl : C₀.loc p <;> simp_all [Loc.pendOp]
+    obtain ⟨hpo, hx, hop⟩ := hP.active o ho
+    have hr : curOp (α ++ [.tau p]) p = curOp α p := curOp_append_tau α p p
+    by_cases hls : IsLinStep p (C₀.loc p) (C₀.mem ())
+    · set x : OpId P := curOp α p with hxdef
+      have hL : lin (α ++ [.tau p]) = lin α ++ [(x, o)] := by
+        rw [lin_append]; simp [linPt, hα, ho, hls, x]
+      have hT := tauNext_of_linStep (v₀ := v₀) ho hP.sc hls
+      have hnc : ¬ Completed α x := by simp [Completed, x]
+      refine ⟨by rw [hL]; exact (hI.isLin.push hop hx hnc).append_tau p, ?_, fun q => ?_⟩
+      · rw [hL, hmem, hT, hI.mem, linState, linState, List.map_append,
+          ObjSpec.runOps_append]
+        rfl
+      rw [hL]
+      by_cases hq : q = p
+      · subst hq
+        rw [hloc, hpend, Function.update_self, hpo, hT]
+        refine ⟨by simp, fun o' ho' => by simp [Loc.pendOp] at ho', fun v cur h => by simp at h,
+          fun r' hr' => ⟨by simp, lin α, [], o, by rw [hr], ?_⟩⟩
+        simp only [Loc.done.injEq] at hr'
+        rw [← hr', hI.mem]; rfl
+      · rw [hloc, hpend, Function.update_of_ne hq]
+        exact (hI.proc q).extend (.tau p) (Ne.symm hq) _
+          (by simp only [List.mem_singleton]; rintro y rfl; exact Ne.symm hq)
+    · have hL : lin (α ++ [.tau p]) = lin α := by
+        rw [lin_append]; simp [linPt, hα, ho, hls]
+      obtain ⟨hm, ho', hsc'⟩ := tauNext_of_not_linStep (v₀ := v₀) ho hls
+      refine ⟨by rw [hL]; exact hI.isLin.append_tau p, by rw [hL, hmem, hm, hI.mem],
+        fun q => ?_⟩
+      rw [hL]
+      by_cases hq : q = p
+      · subst hq
+        rw [hloc, hpend, Function.update_self, hpo]
+        refine ⟨⟨fun h => by rw [h] at ho'; simp [Loc.pendOp] at ho', by simp⟩,
+          fun o' ho'' => ?_, hsc', fun r h => by rw [h] at ho'; simp [Loc.pendOp] at ho'⟩
+        rw [ho'] at ho''; cases ho''
+        refine ⟨rfl, by rw [hr]; exact hx, ?_⟩
+        have hinv : Invoked α (curOp α q) := Invoked.of_opOf_eq_some hop
+        rw [hr, opOf_append_of_invoked hinv]; exact hop
+      · rw [hloc, hpend, Function.update_of_ne hq]
+        simpa using (hI.proc q).extend (.tau p) (Ne.symm hq) [] (by simp)
+  | ret p r =>
+    obtain ⟨h0, hpend, hmem, l, hact, hloc⟩ := Impl.step_ret h
+    have hP := hI.proc p
+    have hL : lin (α ++ [.ret p r]) = lin α := by rw [lin_append]; simp [linPt]
+    obtain ⟨hl, rfl⟩ : C₀.loc p = .done r ∧ l = .idle := by
+      cases hl : C₀.loc p with
+      | idle => exact absurd (hP.idle.1 hl) h0
+      | done r' =>
+        rw [hl] at hact
+        simp only [impl, act, Action.ret.injEq] at hact
+        exact ⟨by rw [hact.1], hact.2.symm⟩
+      | _ => rw [hl] at hact; simp [impl, act] at hact
+    obtain ⟨-, L₁, L₂, o, hs, hres⟩ := hP.done r hl
+    refine ⟨by rw [hL]; exact hI.isLin.append_ret L₁ L₂ o hs hres,
+      by rw [hL, hmem]; exact hI.mem, fun q => ?_⟩
+    rw [hL]
+    by_cases hq : q = p
+    · subst hq
+      rw [hloc, hpend, Function.update_self, Function.update_self]
+      exact ⟨by simp, fun o' ho' => by simp [Loc.pendOp] at ho', fun v cur h => by simp at h,
+        fun r h => by simp at h⟩
+    · rw [hloc, hpend, Function.update_of_ne hq, Function.update_of_ne hq]
+      simpa using (hI.proc q).extend (.ret p r) (Ne.symm hq) [] (by simp)
 
 /-! ## Theorem 28: linearizability and perfect history independence -/
 
@@ -500,24 +490,6 @@ def wCfg (K : ℕ) (C : Cfg P V v₀) (q : P) : ℕ :=
 /-- The potential `Ψ`. -/
 def pot [Fintype P] (C : Cfg P V v₀) : ℕ := ∑ q, wCfg (2 * Fintype.card P) C q
 
-lemma sum_lt_of_one [Fintype P] (f g : P → ℕ) (p : P) (h1 : ∀ q, q ≠ p → g q = f q)
-    (h2 : g p < f p) : ∑ q, g q < ∑ q, f q := by
-  apply Finset.sum_lt_sum
-  · intro q _; by_cases hq : q = p
-    · subst hq; exact h2.le
-    · rw [h1 q hq]
-  · exact ⟨p, Finset.mem_univ _, h2⟩
-
-lemma sum_lt_of_drop [Fintype P] (f g : P → ℕ) (p : P) (h1 : ∀ q, q ≠ p → g q ≤ f q + 2)
-    (h2 : g p + 2 * Fintype.card P < f p) : ∑ q, g q < ∑ q, f q := by
-  rw [← Finset.add_sum_erase _ g (Finset.mem_univ p), ← Finset.add_sum_erase _ f (Finset.mem_univ p)]
-  have h3 : ∑ q ∈ Finset.univ.erase p, g q ≤ ∑ q ∈ Finset.univ.erase p, (f q + 2) :=
-    Finset.sum_le_sum (fun q hq => h1 q (Finset.ne_of_mem_erase hq))
-  rw [Finset.sum_add_distrib, Finset.sum_const_nat (m := 2) (fun _ _ => rfl),
-    Finset.card_erase_of_mem (Finset.mem_univ p), Finset.card_univ] at h3
-  have : (Fintype.card P - 1) * 2 ≤ 2 * Fintype.card P := by omega
-  omega
-
 /-- Every step that is not a response strictly decreases the potential. -/
 lemma pot_lt [Fintype P] {C C' : Cfg P V v₀} {ℓ : Lbl P V v₀}
     (h : (impl P V v₀).step C ℓ = some C') (hℓ : ∀ p r, ℓ ≠ .ret p r) : pot C' < pot C := by
@@ -525,7 +497,7 @@ lemma pot_lt [Fintype P] {C C' : Cfg P V v₀} {ℓ : Lbl P V v₀}
   | ret p r => exact absurd rfl (hℓ p r)
   | inv p o =>
     obtain ⟨h0, -, hpend, hloc, hmem⟩ := Impl.step_inv h
-    apply sum_lt_of_one _ _ p
+    apply Fintype.sum_lt_sum_of_eq_off p
     · intro q hq
       simp [wCfg, hpend, hloc, hmem, Function.update_of_ne hq]
     · simp only [wCfg, hpend, hloc, hmem, Function.update_self, h0]
@@ -535,7 +507,7 @@ lemma pot_lt [Fintype P] {C C' : Cfg P V v₀} {ℓ : Lbl P V v₀}
     have hp : ∀ q, q ≠ p → C'.loc q = C.loc q := fun q hq => by
       rw [hloc, Function.update_of_ne hq]
     rcases tauNext_cases (v₀ := v₀) (2 * Fintype.card P) (C.mem ()) hidle hdone with ⟨r, hr⟩ | ⟨hm, hlt⟩
-    · apply sum_lt_of_drop _ _ p
+    · apply Fintype.sum_lt_sum_of_le_add (c := 2) p
       · intro q hq
         simp only [wCfg, hpend, hp q hq]
         split_ifs
@@ -545,28 +517,18 @@ lemma pot_lt [Fintype P] {C C' : Cfg P V v₀} {ℓ : Lbl P V v₀}
           rw [wCfg, hpend, hloc, Function.update_self, hr]; simp [h0, wLoc]
         have h4 : wCfg (2 * Fintype.card P) C p = wLoc (2 * Fintype.card P) (C.loc p) (C.mem ()) := by simp [wCfg, h0]
         have := wLoc_active (2 * Fintype.card P) (C.mem ()) hidle hdone
+        rw [smul_eq_mul]
         omega
     · have hm' : C'.mem = C.mem := by funext i; cases i; rw [hmem, hm]
-      apply sum_lt_of_one _ _ p
+      apply Fintype.sum_lt_sum_of_eq_off p
       · intro q hq; simp [wCfg, hpend, hp q hq, hm']
       · simp only [wCfg, hpend, h0, ite_false, hloc, Function.update_self, hm']
         exact hlt
 
 /-- **Theorem 28** (lock-freedom), for finitely many processes: in every infinite execution,
 infinitely many operations return. -/
-theorem lockFree [Fintype P] : (impl P V v₀).LockFree := by
-  intro e _ N
-  by_contra hcon
-  push Not at hcon
-  have key : ∀ k, pot (e.cfg (N + k)) + k ≤ pot (e.cfg N) := by
-    intro k
-    induction k with
-    | zero => simp
-    | succ k ih =>
-      have := pot_lt (e.step_eq (N + k)) (fun p r => hcon (N + k) (by omega) p r)
-      rw [show N + (k + 1) = N + k + 1 by omega]; omega
-  have := key (pot (e.cfg N) + 1)
-  omega
+theorem lockFree [Fintype P] : (impl P V v₀).LockFree :=
+  (impl P V v₀).lockFree_of_potential pot fun _ _ _ _ _ hs hr => pot_lt hs hr
 
 /-! ## Lemma 29 -/
 

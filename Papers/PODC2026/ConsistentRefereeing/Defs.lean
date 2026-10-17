@@ -1,5 +1,5 @@
-import Podc.StrongLin.Restricted
-import Podc.SharedMemory.ObjectClasses
+import Podc.SharedMemory.StrongLin.Restricted
+import Podc.SharedMemory.Objects.Iface
 
 /-!
 # Contest objects (Attiya, Castañeda, Enea, PODC 2026)
@@ -28,7 +28,8 @@ theorems only assume correctness and progress on such executions (`Impl.StrongLi
 `decide` may be invoked at most once, by the referee, and returns an integer `x` such that every
 competitor has executed at most `x` operations so far. This specification is nondeterministic
 (`llSpec`, an `NSpec` whose state counts the `compete` operations of every process);
-`llObj` is a dummy `ObjSpec` carrying the operation and response types. `LLAdm ref α`: roles are
+`llObj` is the interface-only `ObjSpec` (`ObjSpec.iface`) carrying the operation and response
+types. `LLAdm ref α`: roles are
 respected and the referee invokes at most once.
 -/
 
@@ -60,6 +61,13 @@ abbrev contestObj (P : Type) : ObjSpec where
   δ s
     | .compete i => (s.or (some i), .ok)
     | .decide => (s, .winner s)
+
+/-- Once a competitor has won, the state of the contest object does not change. -/
+lemma runOps_some {P : Type} (w : P) (os : List (ContestOp P)) :
+    (contestObj P).runOps (some w) os = some w := by
+  induction os with
+  | nil => rfl
+  | cons o os ih => cases o <;> simpa [ObjSpec.runOps] using ih
 
 variable {P : Type} [DecidableEq P]
 
@@ -94,14 +102,13 @@ inductive LLResp where
   | val (x : ℕ)
   deriving DecidableEq
 
-/-- Dummy deterministic specification carrying the operation and response types of the
+instance : Inhabited LLResp := ⟨.ok⟩
+
+/-- The interface-only specification carrying the operation and response types of the
 long-lived contest object (its real, nondeterministic specification is `llSpec`). -/
-abbrev llObj (P : Type) : ObjSpec where
-  State := Unit
-  Op := ContestOp P
-  Resp := LLResp
-  init := ()
-  δ _ _ := ((), .ok)
+abbrev llObj (P : Type) : ObjSpec := ObjSpec.iface (ContestOp P) LLResp
+
+example (P : Type) (o : ContestOp P) : (llObj P).δ () o = ((), .ok) := rfl
 
 /-- The long-lived contest object: the state counts the `compete` operations of every process;
 `decide` may return any `x` bounding all counts. -/
