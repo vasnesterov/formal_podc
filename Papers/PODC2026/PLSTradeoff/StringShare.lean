@@ -39,7 +39,9 @@ that whenever all nodes accept, they all output the same string.
 
 namespace PLSTradeoff
 
-open SimpleGraph SinklessOrientation
+open SimpleGraph
+open Cslib.Local (GAgree loc mask loc_le gAgree_loc edist_le_edist_loc mask_of_le
+  loc_edist_le_iff loc_adj_iff)
 
 variable {V : Type*}
 
@@ -162,7 +164,7 @@ lemma IsClusterFam.extend [Fintype V] {G : SimpleGraph V} (hG : G.Connected) {r 
   have hfar : ∀ C' ∈ 𝒞, ∀ x ∈ C, ∀ y ∈ C', ¬ G.Adj x y := by
     intro C' hC' x hx y hy hxy
     have h1 : G.edist v y ≤ (r - 1 + 1 : ℕ) :=
-      edist_le_add (hnear x hx) (edist_le_one_of_eq_or_adj (Or.inr hxy))
+      edist_le_natCast_add (hnear x hx) ((edist_eq_one_iff_adj.2 hxy).le)
     rw [show r - 1 + 1 = r by omega] at h1
     exact absurd (hv C' hC' y hy) (not_lt.2 h1)
   refine ⟨insert C 𝒞, ⟨?_, ?_, ?_⟩, ?_⟩
@@ -294,11 +296,11 @@ lemma gagree_zG {G : SimpleGraph V} {ℓ : V → Label} {v u : V} {a L R : ℕ}
     · exact ⟨L - 1, by omega⟩
   have hux : G.edist u x ≤ L' :=
     le_of_lt_natCast_succ (lt_of_le_of_lt (edist_anti (zG_le G _)) hx)
-  have hvx : G.edist v x ≤ (a + L' : ℕ) := edist_le_add hu hux
+  have hvx : G.edist v x ≤ (a + L' : ℕ) := edist_le_natCast_add hu hux
   have hxZ := mem_zeroSet_mask (ℓ := ℓ) (R := R) (hvx.trans (by exact_mod_cast (by omega)))
   have hadj : (loc G v R).Adj x y ↔ G.Adj x y := loc_adj_iff (a := a + L') hvx (by omega)
   have hyZ : G.Adj x y → (y ∈ zeroSet (mask G v R ℓ) ↔ y ∈ zeroSet ℓ) := fun hxy =>
-    mem_zeroSet_mask (R := R) ((edist_le_add hvx (edist_le_one_of_eq_or_adj (Or.inr hxy))).trans
+    mem_zeroSet_mask (R := R) ((edist_le_natCast_add hvx ((edist_eq_one_iff_adj.2 hxy).le)).trans
       (by exact_mod_cast (by omega)))
   show G.Adj x y ∧ x ∈ _ ∧ y ∈ _ ↔ (loc G v R).Adj x y ∧ x ∈ _ ∧ y ∈ _
   rw [hadj, hxZ]
@@ -326,7 +328,7 @@ lemma dec_loc {G : SimpleGraph V} {ℓ : V → Label} {v u : V} {a r R : ℕ}
   have hw'' : w ∈ zball G (zeroSet ℓ) r u := mem_sortedL.1 hw
   have hw' : (zG G (zeroSet ℓ)).edist u w ≤ r := hw''
   have : G.edist v w ≤ R :=
-    (edist_le_add hu ((edist_anti (zG_le G _)).trans hw')).trans (by exact_mod_cast h)
+    (edist_le_natCast_add hu ((edist_anti (zG_le G _)).trans hw')).trans (by exact_mod_cast h)
   rw [mask_of_le this]
 
 /-- The checks on the localized view are the checks on the whole configuration. -/
@@ -360,7 +362,7 @@ lemma shareCheck_loc_iff {G : SimpleGraph V} {r : ℕ} {ℓ : V → Label} {v : 
 
 lemma shareVer_isLocal (r : ℕ) :
     IsLocal (ι := Unit) (2 * r + 1) (fun G _ ℓ v => shareVer (V := V) r G ℓ v) := by
-  intro G I ℓ G' I' ℓ' v h
+  refine isLocal_iff.2 fun G I ℓ G' I' ℓ' v h => ?_
   simp only [shareVer]
   rw [viewEq_loc_eq h, (viewEq_mask_eq h).2]
 
@@ -448,7 +450,7 @@ lemma shareVer_sound {G : SimpleGraph V} (hG : G.Connected) {r : ℕ} (ℓ : V �
   have hadj : ∀ a b, G.Adj a b → dec G r ℓ (u0 a) = dec G r ℓ (u0 b) := by
     intro a b hab
     have h1 : G.edist a (u0 b) ≤ (1 + r : ℕ) :=
-      edist_le_add (edist_le_one_of_eq_or_adj (Or.inr hab)) (hu0d b)
+      edist_le_natCast_add ((edist_eq_one_iff_adj.2 hab).le) (hu0d b)
     exact (hc a).2 _ (hu0Z a) _ (hu0Z b) ((hu0d a).trans (by exact_mod_cast (by omega)))
       (h1.trans (by exact_mod_cast (by omega)))
   have hwalk : ∀ a b (p : G.Walk a b), dec G r ℓ (u0 a) = dec G r ℓ (u0 b) := by
@@ -513,7 +515,7 @@ theorem exists_stringShare_sharp (r : ℕ) :
         ∃ S', ∀ v, ver G ℓ v = some S') ∧
       (∀ G S v, S.length = r → (prov G S v).length ≤ 2 * cdiv r (Fintype.card V) + 6) := by
   rcases Nat.eq_zero_or_pos r with rfl | hr
-  · refine ⟨fun _ _ _ => [], fun _ _ _ => some [], fun _ _ _ _ _ _ _ _ => rfl,
+  · refine ⟨fun _ _ _ => [], fun _ _ _ => some [], fun _ _ _ _ _ _ => rfl,
       fun G _ S hS v => ?_, fun G _ ℓ _ => ⟨[], fun _ => rfl⟩, fun _ _ _ _ => by simp⟩
     rw [List.length_eq_zero_iff.1 hS]
   · exact ⟨shareProv r, shareVer r, shareVer_isLocal r,

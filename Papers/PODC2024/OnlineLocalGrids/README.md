@@ -68,6 +68,6 @@ Akbari et al. and model simulations); Theorem 1.5 / Corollary 1.6 (only sketched
 Corollaries 1.9, 1.11 (proved only in the full version).
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
-Non-vacuity: the "see everything" algorithm is correct once radius-`T` balls cover the graph (`seeAll_colors` in
+Proper colourings are CSLib's `Cslib.LocallyIterative.IsProper` (re-exported as `IsProper`). Non-vacuity: the "see everything" algorithm is correct once radius-`T` balls cover the graph (`seeAll_colors` in
 CSLib), so locality `2m` suffices on the `m × m` grid (`grid_bounds`) and `O(√n)` on square cylinders and tori,
 making Theorem 1.3 tight up to constants.

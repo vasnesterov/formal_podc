@@ -1,4 +1,5 @@
 import Cslib.Computability.Distributed.DynamicNetworks.Product
+import Cslib.Foundations.Combinatorics.SimpleGraph.RootedTree
 import Mathlib
 
 /-!
@@ -50,6 +51,12 @@ theorem isRoot : IsRoot T.adj T.root := by
     by_cases hv : v = T.root
     · subst hv; exact ReflTransGen.refl
     · exact (ih _ hk).tail (Or.inr ⟨hv, rfl⟩)
+
+/-- Every rooted spanning tree of a graph on `Fin n` in the sense of CSLib
+(`SimpleGraph.RootedTree`: parent pointers with depths) is a rooted tree in the above sense. Our
+trees carry no graph and no depth function, since the adversary may pick any rooted tree. -/
+def ofGraphRootedTree {G : SimpleGraph (Fin n)} (T : G.RootedTree) : RootedTree n :=
+  ⟨T.root, T.parent, fun v => ⟨T.depth v, T.iterate_depth v⟩⟩
 
 end RootedTree
 

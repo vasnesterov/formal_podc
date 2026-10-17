@@ -86,4 +86,5 @@ Section 6 / Appendix D (the hybrid model with equivocating faults).
 `three_scenarios`. Menger's theorem (vertex version) and the fan lemma were formalized for this paper,
 since Mathlib has none: `SimpleGraph.menger`, `SimpleGraph.fan` in CSLib
 `Cslib/Foundations/Combinatorics/SimpleGraph/Menger.lean`, with connectivity in
-`VertexConnectivity.lean` next to it. The round model is CSLib's `LockStep`.
+`VertexConnectivity.lean` next to it; removing vertices without changing the vertex type is CSLib's
+`SimpleGraph.deleteVerts` (`Spanner.lean`). The round model is CSLib's `LockStep`.

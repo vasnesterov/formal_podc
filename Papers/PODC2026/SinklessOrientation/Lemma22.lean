@@ -63,7 +63,8 @@ theorem hasBackEdges_of_containsCycle (h : ContainsCycle G (cball G s r)) :
   have hmem : ∀ w ∈ (c.rotate z hz).support, w ∈ c.support :=
     fun w hw => (c.mem_support_rotate_iff z hz).1 hw
   have hnil := hc'.not_nil
-  refine ⟨z, (c.rotate z hz).snd, (c.rotate z hz).penultimate, hcB z hz, Walk.adj_snd hnil,
+  refine ⟨z, (c.rotate z hz).snd, (c.rotate z hz).penultimate, mem_cball.1 (hcB z hz),
+    Walk.adj_snd hnil,
     (Walk.adj_penultimate hnil).symm, hc'.snd_ne_penultimate, hmax _ ?_, hmax _ ?_⟩
   · exact List.mem_toFinset.2 (hmem _ (Walk.getVert_mem_support _ _))
   · exact List.mem_toFinset.2 (hmem _ (Walk.getVert_mem_support _ _))
@@ -81,8 +82,8 @@ theorem containsCycle_of_hasBackEdges (h : HasBackEdges G s r) :
       ∃ p : G.Walk s z, p.IsPath ∧ x ∉ p.support ∧ ∀ w ∈ p.support, w ∈ cball G s r := by
     intro z hxz hz
     have hzr : G.edist s z ≤ r := hz.trans hx
-    have hdz := edist_eq_coe_dist_of_le hzr
-    have hdx := edist_eq_coe_dist_of_le hx
+    have hdz := edist_eq_natCast_dist_of_le hzr
+    have hdx := edist_eq_natCast_dist_of_le hx
     obtain ⟨q, hq⟩ := exists_walk_of_edist_eq_coe hdz
     have hzx : G.dist s z ≤ G.dist s x := by rw [hdz, hdx] at hz; exact_mod_cast hz
     refine ⟨q.bypass, q.bypass_isPath, ?_, ?_⟩
@@ -97,7 +98,7 @@ theorem containsCycle_of_hasBackEdges (h : HasBackEdges G s r) :
       have hw' := q.support_bypass_subset_support hw
       have h2 : G.edist s w ≤ (q.takeUntil w hw').length := edist_le _
       have h3 := q.length_takeUntil_le_length hw'
-      have hxr : G.dist s x ≤ r := dist_le_of_edist_le hx
+      have hxr : G.dist s x ≤ r := dist_le_of_edist_le_natCast hx
       simp only [mem_cball]
       exact h2.trans (by exact_mod_cast (by omega : (q.takeUntil w hw').length ≤ r))
   obtain ⟨p, hp, hxp, hpB⟩ := key y hxy hy
@@ -116,9 +117,9 @@ theorem containsCycle_of_hasBackEdges (h : HasBackEdges G s r) :
     | _ c d =>
       exact ⟨p.adj_of_mem_edges he, hp _ (p.fst_mem_support_of_mem_edges he),
         hp _ (p.snd_mem_support_of_mem_edges he)⟩
-  have hxB : x ∈ B := hx
-  have hyB : y ∈ B := hy.trans hx
-  have hyB' : y' ∈ B := hy'.trans hx
+  have hxB : x ∈ B := mem_cball.2 hx
+  have hyB : y ∈ B := mem_cball.2 (hy.trans hx)
+  have hyB' : y' ∈ B := mem_cball.2 (hy'.trans hx)
   let P : H.Walk s x := (p.transfer H (toH p hpB)).concat (show H.Adj y x from ⟨hxy.symm, hyB, hxB⟩)
   let P' : H.Walk s x :=
     (p'.transfer H (toH p' hpB')).concat (show H.Adj y' x from ⟨hxy'.symm, hyB', hxB⟩)

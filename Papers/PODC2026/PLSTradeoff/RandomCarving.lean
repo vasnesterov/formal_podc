@@ -201,7 +201,7 @@ theorem isDegenerate_of_allClustered (ht : 1 ≤ t) (hall : AllClustered G t K R
     have huA : u ∈ A := mem_alive_of_lt_cen (hall u) hu
     have hr2 : 2 ≤ r := by simp only [r, rad]; omega
     have hwu : G.edist w u ≤ r := by
-      have := edist_le_add hwv hvu
+      have := edist_le_natCast_add hwv hvu
       exact this.trans (by exact_mod_cast (by omega : r - 2 + 2 ≤ r))
     have := ((cen_eq_iff hwt).2 ⟨huA, hwu⟩).2
     exact absurd this hu.ne'
@@ -238,7 +238,7 @@ lemma isWeaklyBounded_of_allClustered {Mx : ℕ} (hR : ∀ w, R w ≤ Mx)
   rw [hab] at ha
   have hr : rad K (R (cen G t K R b)) ≤ rad K Mx := by simp only [rad]; have := hR (cen G t K R b); omega
   rw [SimpleGraph.edist_comm] at ha
-  have := edist_le_add ha hb
+  have := edist_le_natCast_add ha hb
   exact this.trans (by exact_mod_cast (by omega))
 
 end Partition
@@ -477,7 +477,7 @@ lemma card_ball_ge (hG : G.Connected) (u : V) (k : ℕ) :
         obtain ⟨x, hx⟩ := ih (by omega)
         have : d - i = (d - (i + 1)) + 1 := by omega
         rw [this] at hx
-        obtain ⟨y, hy, -⟩ := SinklessOrientation.exists_adj_of_edist_eq_succ hx
+        obtain ⟨y, hy, -⟩ := exists_adj_of_edist_eq_succ hx
         exact ⟨y, hy⟩
     choose f hf using fun j : Fin (k + 1) => hex (d - j) (by omega)
     have hf' : ∀ j : Fin (k + 1), G.edist u (f j) = j := by

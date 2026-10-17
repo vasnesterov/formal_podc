@@ -41,7 +41,7 @@ lemma ntSet_nonempty_of_hasBackEdges {G : SimpleGraph V} {s : V} {h : ℕ}
   have hdy : ∀ z, G.edist s z ≤ G.edist s x → G.dist s z ≤ G.dist s x := by
     intro z hle
     simp only [SimpleGraph.dist]
-    exact ENat.toNat_le_toNat hle (edist_lt_top_of_le hx)
+    exact ENat.toNat_le_toNat hle (edist_ne_top_of_le_natCast hx)
   by_cases hpy : y = par G s x
   · exact ⟨(x, y'), hx, hxy', hdy y' hy', fun e => hne (hpy.trans e.symm)⟩
   · exact ⟨(x, y), hx, hxy, hdy y hy, hpy⟩
@@ -62,10 +62,12 @@ theorem lemma_2_3 {G : SimpleGraph V} {δ k : ℕ} (o : Orientation G) (hsp : o.
     (repairOrientation δ (k / 2) o).NoDeltaSink δ ∧
       ∀ a b, ((repairOrientation δ (k / 2) o).out a b ↔ o.out a b) ∨
         ∃ s, o.IsDeltaSink δ s ∧ a ∈ cball G s (k / 2) ∧ b ∈ cball G s (k / 2) := by
-  refine lemma_2_3_core (sep_of_isSinkSparse (by omega) hsp) fun s hs => ?_
-  rcases hgood s hs with ⟨t, ht, hdeg⟩ | hc
-  · exact Or.inl ⟨t, ht, hdeg⟩
-  · exact Or.inr (ntSet_nonempty_of_hasBackEdges (hasBackEdges_of_containsCycle hc))
+  have key := lemma_2_3_core (h := k / 2) (sep_of_isSinkSparse (by omega) hsp) fun s hs => by
+    rcases hgood s hs with ⟨t, ht, hdeg⟩ | hc
+    · exact Or.inl ⟨t, mem_cball.1 ht, hdeg⟩
+    · exact Or.inr (ntSet_nonempty_of_hasBackEdges (hasBackEdges_of_containsCycle hc))
+  exact ⟨key.1, fun a b => (key.2 a b).imp_right fun ⟨s, hs, ha, hb⟩ =>
+    ⟨s, hs, mem_cball.2 ha, mem_cball.2 hb⟩⟩
 
 /-! ### Algorithm 1 -/
 
@@ -98,9 +100,10 @@ theorem sinklessAlg_noDeltaSink (hδ : 3 ≤ δ) (G : SimpleGraph V) :
   refine (lemma_2_3_core (sep_of_isSinkSparse (k := 4 * c) (by omega)
     (minIdOrientation_isSinkSparse hid)) fun s _ => ?_).1
   rcases lemma_2_2_clog G hδ s with ⟨t, ht, hdeg⟩ | hc
-  · exact Or.inl ⟨t, cball_mono (by simp only [logParam]; omega) ht, hdeg⟩
+  · exact Or.inl ⟨t, mem_cball.1 (closedBall_mono
+      (Nat.cast_le.2 (by simp only [logParam]; omega)) ht), hdeg⟩
   · exact Or.inr (ntSet_nonempty_of_hasBackEdges (hasBackEdges_of_containsCycle
-      (containsCycle_mono (cball_mono (by simp only [logParam]; omega)) hc)))
+      (containsCycle_mono (closedBall_mono (Nat.cast_le.2 (by simp only [logParam]; omega))) hc)))
 
 /-- Round complexity of Algorithm 1: `8⌈log_{δ-1} n⌉ + 2` LOCAL rounds. -/
 theorem sinklessAlg_isLocal : IsLocal (sinklessAlg id hid δ) (8 * logParam V δ + 2) := by

@@ -30,6 +30,7 @@ blocks 1 and 3 iff it points left in block 2 — contradicting antitonicity.
 namespace SinklessOrientation
 
 open SimpleGraph
+open Cslib.Local (GAgree)
 
 variable {V : Type*}
 
@@ -37,10 +38,6 @@ variable {V : Type*}
 in `l` are isolated. -/
 def pathOn (l : List V) : SimpleGraph V :=
   SimpleGraph.fromRel fun x y => ∃ i, ∃ h : i + 1 < l.length, x = l[i] ∧ y = l[i + 1]
-
-lemma Orientation.out_iff_not_out {G : SimpleGraph V} (o : Orientation G) {u v : V}
-    (h : G.Adj u v) : o.out u v ↔ ¬ o.out v u :=
-  ⟨fun h' => o.not_out_of_out h', fun h' => (o.out_or_out h).resolve_right h'⟩
 
 namespace LowerBound
 

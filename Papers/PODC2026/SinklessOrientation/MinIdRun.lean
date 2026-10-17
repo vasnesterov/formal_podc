@@ -16,7 +16,6 @@ algorithm is a broadcast algorithm.
 
 ## Main results
 
-* `cball_succ`: the ball recursion `B(v, t+1) = B(v, t) ∪ ⋃_{w ∈ N(v)} B(w, t)`.
 * `minId_succ`: `m_{t+1}(v) = min (m_t(v), min_{w ∈ N(v)} m_t(w))`.
 * `floodAlg_run`: after `t` rounds, node `v` is in state `(ID_v, m_v, d_v)` for radius `t`.
 * `floodAlg_orientation`, `theorem_2_1` (**Theorem 2.1**): after `k` rounds, the orientation
@@ -33,42 +32,11 @@ open SimpleGraph Cslib.LocallyIterative
 
 variable {V : Type*} {G : SimpleGraph V} {id : V → ℕ}
 
-/-! ### Ball and `minId` recursions -/
-
-/-- The ball recursion: `u` is within distance `t + 1` of `v` iff it is within distance `t` of
-`v` or within distance `t` of a neighbour of `v`. -/
-lemma mem_cball_succ {v u : V} {t : ℕ} :
-    u ∈ cball G v (t + 1) ↔ u ∈ cball G v t ∨ ∃ w, G.Adj v w ∧ u ∈ cball G w t := by
-  simp only [mem_cball]
-  constructor
-  · intro h
-    by_cases ht : G.edist v u ≤ t
-    · exact Or.inl ht
-    · right
-      have hne : G.edist v u ≠ ⊤ := edist_lt_top_of_le h
-      obtain ⟨j, hj⟩ := ENat.ne_top_iff_exists.1 hne
-      rw [← hj] at h ht
-      have hj' : j = t + 1 := by
-        have h1 : j ≤ t + 1 := by exact_mod_cast h
-        have h2 : ¬ j ≤ t := by exact_mod_cast ht
-        omega
-      subst hj'
-      rw [SimpleGraph.edist_comm] at hj
-      obtain ⟨w, hw, hwv⟩ := exists_adj_of_edist_eq_succ hj.symm
-      exact ⟨w, hwv.symm, by rw [SimpleGraph.edist_comm, hw]⟩
-  · rintro (h | ⟨w, hvw, hw⟩)
-    · exact h.trans (by exact_mod_cast Nat.le_succ t)
-    · rw [SimpleGraph.edist_comm]
-      calc G.edist u v ≤ G.edist u w + 1 := edist_le_add_one_of_adj hvw.symm
-        _ ≤ t + 1 := by rw [SimpleGraph.edist_comm]; gcongr
-        _ = ((t + 1 : ℕ) : ℕ∞) := by push_cast; rfl
-
-lemma cball_mono {v : V} {s t : ℕ} (h : s ≤ t) : cball G v s ⊆ cball G v t :=
-  fun _ hu => (mem_cball.1 hu).trans (by exact_mod_cast h)
+/-! ### The `minId` recursion -/
 
 lemma minId_mono {v : V} {s t : ℕ} (h : s ≤ t) : minId G id t v ≤ minId G id s v := by
   obtain ⟨u, hu, hid⟩ := minId_spec (G := G) (id := id) (k := s) v
-  exact hid ▸ minId_le (cball_mono h hu)
+  exact hid ▸ minId_le (closedBall_mono (Nat.cast_le.2 h) hu)
 
 /-- `m_{t+1}(v)` is the minimum of `m_t(v)` and of the `m_t(w)` of the neighbours `w` of `v`. -/
 lemma minId_succ (t : ℕ) (v : V) :
@@ -79,10 +47,10 @@ lemma minId_succ (t : ℕ) (v : V) :
     rintro x (rfl | ⟨w, hw, rfl⟩)
     · exact minId_mono (Nat.le_succ t)
     · obtain ⟨u, hu, hid⟩ := minId_spec (G := G) (id := id) (k := t) w
-      exact (minId_le (mem_cball_succ.2 (Or.inr ⟨w, hw, hu⟩))).trans hid.le
+      exact (minId_le (mem_closedBall_succ_iff.2 (Or.inr ⟨w, hw, hu⟩))).trans hid.le
   · obtain ⟨u, hu, hid⟩ := minId_spec (G := G) (id := id) (k := t + 1) v
     rw [← hid]
-    rcases mem_cball_succ.1 hu with hu | ⟨w, hw, hu⟩
+    rcases mem_closedBall_succ_iff.1 hu with hu | ⟨w, hw, hu⟩
     · exact (Nat.sInf_le (Set.mem_insert _ _)).trans (minId_le hu)
     · exact (Nat.sInf_le (Set.mem_insert_of_mem (minId G id t v)
         (Set.mem_image_of_mem (fun w => minId G id t w) hw))).trans (minId_le hu)
@@ -143,8 +111,8 @@ theorem floodAlg_run (hid : Function.Injective id) (t : ℕ) (v : V) :
       have hnot : leader G id (t + 1) v ∉ cball G v t := fun h =>
         absurd (minId_le (id := id) h) (by rw [hLid]; omega)
       have hd := edist_leader (G := G) (id := id) (k := t + 1) v
-      have h1 : G.edist v (leader G id (t + 1) v) ≤ (t + 1 : ℕ) := hL
-      have h2 : ¬ G.edist v (leader G id (t + 1) v) ≤ t := hnot
+      have h1 : G.edist v (leader G id (t + 1) v) ≤ (t + 1 : ℕ) := mem_cball.1 hL
+      have h2 : ¬ G.edist v (leader G id (t + 1) v) ≤ t := fun h => hnot (mem_cball.2 h)
       rw [hd] at h1 h2
       have h1' : minDist G id (t + 1) v ≤ t + 1 := by exact_mod_cast h1
       have h2' : ¬ minDist G id (t + 1) v ≤ t := by exact_mod_cast h2

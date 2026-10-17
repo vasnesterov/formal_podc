@@ -22,6 +22,7 @@ Every node `v` learns `m_v`, the smallest identifier in its inclusive distance-`
 namespace SinklessOrientation
 
 open SimpleGraph
+open Cslib.Local (GAgree)
 
 variable {V : Type*} (G : SimpleGraph V) (id : V → ℕ) (k : ℕ)
 
@@ -50,15 +51,13 @@ lemma keyLt_or_keyLt {a b : ℕ × ℕ × ℕ} (h : a.2.2 ≠ b.2.2) : keyLt a b
 
 variable {G id k}
 
-lemma mem_cball_self (v : V) : v ∈ cball G v k := by simp
-
 lemma minId_spec (v : V) : ∃ u ∈ cball G v k, id u = minId G id k v :=
-  Nat.sInf_mem (s := id '' cball G v k) ⟨id v, v, mem_cball_self v, rfl⟩
+  Nat.sInf_mem (s := id '' cball G v k) ⟨id v, v, mem_closedBall_self, rfl⟩
 
 lemma minId_le {v u : V} (hu : u ∈ cball G v k) : minId G id k v ≤ id u :=
   Nat.sInf_le ⟨u, hu, rfl⟩
 
-lemma minId_le_id (v : V) : minId G id k v ≤ id v := minId_le (mem_cball_self v)
+lemma minId_le_id (v : V) : minId G id k v ≤ id v := minId_le mem_closedBall_self
 
 lemma leader_spec (v : V) :
     leader G id k v ∈ cball G v k ∧ id (leader G id k v) = minId G id k v :=
@@ -69,7 +68,7 @@ lemma leader_eq (hid : Function.Injective id) {v u : V} (h : id u = minId G id k
   hid ((leader_spec v).2.trans h.symm)
 
 lemma edist_leader (v : V) : G.edist v (leader G id k v) = minDist G id k v :=
-  edist_eq_coe_dist_of_le (leader_spec v).1
+  edist_eq_natCast_dist_of_le (mem_cball.1 (leader_spec v).1)
 
 variable (G id k) in
 /-- The orientation of Theorem 2.1: the edge `uv` points from `u` to `v` iff
@@ -131,8 +130,8 @@ theorem minIdOrientation_isSinkSparse : (minIdOrientation G id k hid).IsSinkSpar
   intro u v hu hv huv
   by_contra hlt
   push Not at hlt
-  have h1 : minId G id k u ≤ id v := minId_le hlt
-  have h2 : minId G id k v ≤ id u := minId_le (by rw [mem_cball, edist_comm]; exact hlt)
+  have h1 : minId G id k u ≤ id v := minId_le (mem_cball.2 hlt)
+  have h2 : minId G id k v ≤ id u := minId_le (by rw [mem_cball, SimpleGraph.edist_comm]; exact hlt)
   rw [← id_eq_minId_of_isSink hid hu] at h1
   rw [← id_eq_minId_of_isSink hid hv] at h2
   exact huv (hid (le_antisymm h1 h2))
@@ -143,16 +142,13 @@ section Locality
 
 variable {G' : SimpleGraph V}
 
-lemma cball_eq_of_gAgree {v : V} (hA : GAgree G G' v k) : cball G' v k = cball G v k := by
-  ext u; simp only [mem_cball]; exact hA.edist_le_iff le_rfl
-
 lemma key_eq_of_gAgree {v : V} (hA : GAgree G G' v k) : key G' id k v = key G id k v := by
-  have hm : minId G' id k v = minId G id k v := by simp only [minId, cball_eq_of_gAgree hA]
+  have hm : minId G' id k v = minId G id k v := by simp only [minId, hA.closedBall_eq le_rfl]
   have hl : leader G' id k v = leader G id k v := by
-    simp only [leader, hm, cball_eq_of_gAgree hA]
+    simp only [leader, hm, hA.closedBall_eq le_rfl]
   have hd : minDist G' id k v = minDist G id k v := by
     have h1 := edist_leader (G := G') (id := id) (k := k) v
-    rw [hl, hA.edist_eq (leader_spec v).1, edist_leader] at h1
+    rw [hl, hA.edist_eq (mem_cball.1 (leader_spec v).1), edist_leader] at h1
     exact_mod_cast h1.symm
   simp only [key, hm, hd]
 
