@@ -77,6 +77,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2022 | 26 | Ghinea, Liu-Zhang, Wattenhofer — *Optimal Synchronous Approximate Agreement with Asynchronous Fallback* | [HybridApproxAgreement](Papers/PODC2022/HybridApproxAgreement) | ❌ Impossibility (Thm 5.1, 2tₛ+tₐ ≥ n) proved for n ≥ 2; **Theorem 4.1 false** (Π_rBC inconsistent in synchrony when n ≤ 3tₛ: late Byzantine proposals) and hence **Theorem 3.1(1) false** (Π_AA outputs 0 and 1 with ε = 1/2; n=3, tₛ=1); Def 2.2 under-specified |
 | 2016 | 25 | Ellen, Gelashvili, Shavit, Zhu — *A Complexity-Based Hierarchy for Multiprocessor Synchronization* | [ComplexityHierarchy](Papers/PODC2016/ComplexityHierarchy) | ⚠️ Space lower bounds and matching upper bounds proved; Lemma 9.1 proof gap; Lemma 7.1 proof wrong (statement true); Lemma 8.2 false in an edge case that is never used |
 | 2021 | 24 | Emek, Keren — *A Thin Self-Stabilizing Asynchronous Unison Algorithm* | [ThinUnison](Papers/PODC2021/ThinUnison) | ❌ Theorem 1.1 proved (gaps repaired); **Corollary 1.2 false** for arbitrary tasks |
+| 2021 | 23 | Fitzi, Liu-Zhang, Loss — *A New Way to Achieve Round-Efficient Byzantine Agreement* | [RoundEfficientBA](Papers/PODC2021/RoundEfficientBA) | ❌ **t < n/3 Proxcensus expansion (Lemma 3.2, Cors. 3.3, 3.8) false for n ≥ 3t+2** (threshold n−2t assumes n = 3t+1; BA errs w.p. 3/8 instead of 1/8 at n=5, t=1), repaired with threshold t+1; **Cor. 3.8 for t < n/2 fails against the paper's adaptive strongly rushing adversary** (coin visible in round 3); t < n/2 Proxcensus and extraction (Lemmas 3.4–3.6, Thm 3.7) proved |
 | 2023 | 22 | Civit, Gilbert, Guerraoui, Komatovic, Vidigueira — *On the Validity of Consensus* | [ValidityConsensus](Papers/PODC2023/ValidityConsensus) | ✅ Classification proved (with a verified vector-consensus protocol); minor gap in Lemma 3 for n < 2t |
 | 2019 | 22 | Aghazadeh, Imbs, Raynal, Taubenfeld, Woelfel — *Optimal Memory-Anonymous Symmetric Deadlock-Free Mutual Exclusion* | [AnonymousMutex](Papers/PODC2019/AnonymousMutex) | ❌ **Theorem 2 false** (Algorithm 1 livelocks); the read/write characterization is only half proved |
 | 2012 | 22 | Hirvonen, Suomela — *Distributed Maximal Matching: Greedy is Optimal* | [MaximalMatching](Papers/PODC2012/MaximalMatching) | ✅ Theorem 2 (k−1 rounds optimal) and Corollary 3 (Ω(Δ)) proved in both models; lower bounds extended to finite graphs |
@@ -198,6 +199,14 @@ in the paper's `differencies.md`.
   Corollary 1.2 (a synchronizer for arbitrary tasks) is false: a task solvable synchronously on complete graphs is
   solvable by no deterministic asynchronous algorithm already on K₂. It holds for static tasks (proved). The main Theorem 1.1
   is correct.
+- **A New Way to Achieve Round-Efficient Byzantine Agreement** (PODC 2021, 23 citations) —
+  [RoundEfficientBA](Papers/PODC2021/RoundEfficientBA). Two independent failures. (i) The t < n/3 Proxcensus
+  expansion uses the threshold n − 2t, which works only when n = 3t+1, although the paper claims all t < n/3: for
+  every t ≥ 1 and n ≥ 3t+2 one expansion step can give grades that differ by more than one (Lemma 3.2 false), and the
+  resulting BA with κ = 3 errs with probability 3/8 instead of 2^−κ = 1/8 (n = 5, t = 1). Threshold t+1 repairs it.
+  (ii) For t < n/2, Corollary 3.8 runs the coin in parallel with round 3, so the paper's own strongly rushing adaptive
+  adversary sees it and corrupts accordingly: one iteration fails with probability ≥ 1/2 instead of 1/4 (n = 5,
+  t = 2). Against coin-independent corruption the bound holds.
 - **Optimal Memory-Anonymous Symmetric Deadlock-Free Mutual Exclusion** (PODC 2019, 22 citations) —
   [AnonymousMutex](Papers/PODC2019/AnonymousMutex). Theorem 2 claims that Algorithm 1 (read/write registers plus
   atomic snapshots) is deadlock-free whenever the number of registers m lies in M(n). It is not: for n = 4,
