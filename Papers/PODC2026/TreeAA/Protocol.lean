@@ -54,16 +54,6 @@ def treeAuth (A₁ : Auth P M₁ S₁) (A₂ : Auth P M₂ S₂) :
     Auth P ((P → Option M₁) ⊕ M₂) ((Σ _ : P, S₁) ⊕ S₂) :=
   Auth.seq (Auth.parallel (M := fun _ => M₁) fun _ : P => A₁) A₂
 
-section Aux
-
-variable {I M O : Type*} (G : SimpleGraph P) (alg : Protocol P I M O)
-
-lemma status_comapInput {I' : Type*} (f : I' → I) (s : Scenario P I' M) (k : ℕ) (p : P) :
-    status G (alg.comapInput f) s k p = status G alg (s.mapInput f) k p := by
-  simp only [status, hist_comapInput]; rfl
-
-end Aux
-
 /-- Phase 1 of `treeAA`: in an admissible run, the honest parties' gradecast outputs `d p s`
 satisfy integrity and consistency, and `PathsFinder` terminates within `R_GC` rounds. -/
 lemma phase1 {t Rgc : ℕ} (A₁ : Auth P M₁ S₁) (gc : P → Protocol P (List V) M₁ (List V × Fin 3))

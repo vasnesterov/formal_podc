@@ -364,43 +364,6 @@ theorem gc_unforging : (gc Reg snd).Unforging (gAuth Reg snd) := by
 
 end Local
 
-/-! ### Generic facts about lock-step histories -- CSLib candidates -/
-
-section Generic
-
-variable {P I M O : Type*} (G : SimpleGraph P) (alg : Protocol P I M O) (s : Scenario P I M)
-
-/-- Earlier histories are prefixes of later ones. -- CSLib candidate -/
-lemma hist_take {r r' : ℕ} (h : r' ≤ r) (p : P) :
-    (hist G alg s r p).take r' = hist G alg s r' p := by
-  induction r with
-  | zero => simp_all
-  | succ r ih =>
-    rcases Nat.lt_or_ge r' (r + 1) with h' | h'
-    · rw [hist_succ, List.take_append_of_le_length (by simp; omega), ih (by omega)]
-    · rw [show r' = r + 1 by omega, List.take_of_length_le (by simp)]
-
-/-- An inbox in a history is the inbox of an earlier round. -- CSLib candidate -/
-lemma mem_hist {r : ℕ} {p : P} {ib : Inbox P M} (h : ib ∈ hist G alg s r p) :
-    ∃ r' < r, ib = fun q => deliver G alg s (hist G alg s r') r' q p := by
-  induction r with
-  | zero => simp at h
-  | succ r ih =>
-    rw [hist_succ, List.mem_append, List.mem_singleton] at h
-    rcases h with h | rfl
-    · obtain ⟨r', hr', e⟩ := ih h; exact ⟨r', by omega, e⟩
-    · exact ⟨r, by omega, rfl⟩
-
-lemma deliver_honest (hrel : s.Reliable) {r : ℕ} {q p : P} (hq : q ∉ s.byz) (hadj : G.Adj q p) :
-    deliver G alg s (hist G alg s r) r q p = alg.send q (s.input q) (hist G alg s r q) p := by
-  simp [deliver, hadj, hq, hrel r q p]
-
-lemma deliver_byz {r : ℕ} {q p : P} (hq : q ∈ s.byz) (hadj : G.Adj q p) :
-    deliver G alg s (hist G alg s r) r q p = s.adv r q p := by
-  simp [deliver, hadj, hq]
-
-end Generic
-
 /-! ### Runs of Π_GC -/
 
 section Run
@@ -437,7 +400,7 @@ lemma gS_v_mono {r r' : ℕ} (hr : r ≤ r') {p : P} (h : (gS s Reg snd r p).v =
 lemma gS_acc_persist {r r' : ℕ} (hr : r ≤ r') {p : P} {c : List P}
     (h : (gS s Reg snd r p).acc = some c) : (gS s Reg snd r' p).acc = some c := by
   have e : gH s Reg snd r' p = gH s Reg snd r p ++ (gH s Reg snd r' p).drop r := by
-    simp only [gH]; rw [← hist_take ⊤ (gc Reg snd) s hr p, List.take_append_drop]
+    simp only [gH]; rw [← take_hist ⊤ (gc Reg snd) s hr p, List.take_append_drop]
   unfold gS; rw [e]; exact gstOf_acc_persist h _
 
 /-- A chain accepted by round `r` is held from round `4 |c|` on. -/
@@ -445,7 +408,7 @@ lemma gS_acc_from {r r' : ℕ} {p : P} {c : List P} (h : (gS s Reg snd r p).acc 
     (hr' : 4 * c.length ≤ r') : (gS s Reg snd r' p).acc = some c := by
   rcases le_or_gt (4 * c.length) r with hle | hlt
   · have h1 := gstOf_acc_take p (s.input p) _ h
-    rw [hist_take ⊤ (gc Reg snd) s hle p] at h1
+    rw [take_hist ⊤ (gc Reg snd) s hle p] at h1
     exact gS_acc_persist s hr' h1
   · exact gS_acc_persist s (by omega) h
 
@@ -513,7 +476,7 @@ lemma recv_aux (r : ℕ)
     (hτ : τ ∈ (gAuth Reg snd).histTokens (gH s Reg snd r p)) (hs : τ.getLastD snd ∉ s.byz) :
     ∃ r' < r, gOrigin s Reg snd r' τ := by
   obtain ⟨ib, hib, q, m, hq, hτm⟩ := hτ
-  obtain ⟨r', hr', rfl⟩ := mem_hist _ _ _ hib
+  obtain ⟨r', hr', rfl⟩ := exists_of_mem_hist _ _ _ hib
   simp only at hq
   by_cases hqp : q = p
   · subst hqp; simp [deliver] at hq
@@ -921,18 +884,21 @@ end Props
 
 /-! ### Decisions and the main theorems -/
 
+/-- Π_GC outputs from round `4s` on the final state `(v, g)`. -/
+lemma gc_status {Reg : Set P} {snd : P} (s : Scenario P Bool (GMsg P)) (r : ℕ) (p : P) :
+    status ⊤ (gc Reg snd) s r p =
+      if 4 * Reg.ncard ≤ r then some ((gS s Reg snd (4 * Reg.ncard) p).v,
+        (gS s Reg snd (4 * Reg.ncard) p).g) else none := by
+  simp only [status, gc, length_hist]
+  split_ifs with h
+  · rw [take_hist _ _ _ h]; rfl
+  · rfl
+
 /-- Π_GC decides at round `4s` the final state `(v, g)`. -/
 lemma gc_decides {Reg : Set P} {snd : P} (s : Scenario P Bool (GMsg P)) (p : P) (o : Bool × Bool) :
     Decides ⊤ (gc Reg snd) s p o ↔
       o = ((gS s Reg snd (4 * Reg.ncard) p).v, (gS s Reg snd (4 * Reg.ncard) p).g) := by
-  have hst : ∀ r, status ⊤ (gc Reg snd) s r p =
-      if 4 * Reg.ncard ≤ r then some ((gS s Reg snd (4 * Reg.ncard) p).v,
-        (gS s Reg snd (4 * Reg.ncard) p).g) else none := by
-    intro r
-    simp only [status, gc, length_hist]
-    split_ifs with h
-    · rw [hist_take _ _ _ h]; rfl
-    · rfl
+  have hst := fun r => gc_status (Reg := Reg) (snd := snd) s r p
   constructor
   · rintro ⟨r, hr, -⟩
     rw [hst] at hr; split_ifs at hr; exact (Option.some_injective _ hr).symm
@@ -948,7 +914,7 @@ registered parties sign, `gc_unforging`, `gAuth_registered`). -/
 theorem theorem39 (hsR : snd ∈ Reg) :
     SolvesAuth ⊤ (gc Reg snd) (gAuth Reg snd) Set.univ (Gradecast snd) := by
   intro s _ hrel hV
-  refine ⟨fun p _ => ⟨_, (gc_decides s p _).2 rfl⟩, fun hsnd p hp => ?_, ?_⟩
+  refine gradecast_iff.2 ⟨fun p _ => ⟨_, (gc_decides s p _).2 rfl⟩, fun hsnd p hp => ?_, ?_⟩
   · obtain ⟨h1, h2⟩ := lemma36 s hrel hV hsR hsnd hp
     rw [gc_decides, h1, h2]
   · intro p hp q hq v w g hpv hqw

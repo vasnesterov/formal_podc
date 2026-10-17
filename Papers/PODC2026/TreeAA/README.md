@@ -69,7 +69,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
   with PKI.
 * Black boxes are hypotheses on lock-step protocols. `SolvesAuthWithin … pre spec R` means: the spec holds and
   all honest parties decide within `R` rounds, in every admissible run whose inputs satisfy `pre`.
-  * Gradecast (Def. 4): one protocol per sender, run in parallel.
+  * Gradecast (Def. 4): one protocol per sender, run in parallel. `Gradecast snd` is the shared
+    `Problem.Gradecast` (`Podc/Agreement/Specs.lean`) with grades `Fin 3`; `gradecast_iff` unfolds it.
   * RealAA (Def. 1, `ε = 1`): only required for `D`-close inputs (`pre = Close D`), matching `R_RealAA(D, ε)`.
 * Sequential composition ("wait until round `R` ends") is `Protocol.seq` in `Podc/LockStep/Sequential.lean`.
   Phase 2 starts at round `R` for everybody.
@@ -116,4 +117,6 @@ Non-vacuity:
   (`blockGraphAA_nonvacuous`, `NonVacuityBlock.lean`).
 * For `t ≥ 1` the gradecast hypothesis is discharged by the verified BDH gradecast (`treeAA_bdh_solves`).
 * The lock-step model, parallel composition and signatures come from CSLib. Sequential composition and wrapping
-  are new (`Podc/LockStep/Sequential.lean`, CSLib candidate).
+  are new (`Podc/LockStep/Sequential.lean`, CSLib candidate). The threshold adversary `atMost t` is shared
+  (`Podc/LockStep/Basic.lean`), and the gradecast vote counting uses `Finset.countEq` and the quorum lemmas of
+  `Podc/Foundations`.

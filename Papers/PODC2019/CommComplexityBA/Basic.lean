@@ -7,42 +7,11 @@ import Papers.PODC2019.CommComplexityBA.Model
 set_option linter.unusedSectionVars false
 
 open MeasureTheory
+open Cslib.Byzantine.LockStep (History FirstSome firstSome?_eq_some_iff isSome_firstSome?_iff)
 
 namespace CommComplexityBA
 
 variable {P I M Ω : Type*} [DecidableEq P] {f : ℕ}
-
-/-! ### First `some` -/
-
--- CSLib candidate
-lemma firstSome_eq_some_iff {α : Type*} (g : ℕ → Option α) (x : α) :
-    firstSome g = some x ↔ ∃ r, g r = some x ∧ ∀ r' < r, g r' = none := by
-  classical
-  unfold firstSome
-  split_ifs with h
-  · constructor
-    · intro hx
-      refine ⟨Nat.find h, hx, fun r' hr' => ?_⟩
-      have := Nat.find_min h hr'
-      simpa using this
-    · rintro ⟨r, hr, hmin⟩
-      have hle : Nat.find h ≤ r := Nat.find_min' h (by simp [hr])
-      rcases lt_or_eq_of_le hle with hlt | heq
-      · have := Nat.find_spec h
-        rw [hmin _ hlt] at this
-        simp at this
-      · rw [heq, hr]
-  · simp only [false_iff, not_exists, not_and]
-    intro r hr _
-    exact h ⟨r, by simp [hr]⟩
-
-lemma firstSome_isSome_iff {α : Type*} (g : ℕ → Option α) :
-    (firstSome g).isSome ↔ ∃ r, (g r).isSome := by
-  classical
-  unfold firstSome
-  split_ifs with h
-  · exact ⟨fun _ => h, fun _ => Nat.find_spec h⟩
-  · simpa using h
 
 namespace Protocol
 
@@ -200,7 +169,7 @@ lemma fiberMeas_silentOut (hπ : π.IsMeasurable) (p : P) (x : I) :
         (List.replicate r fun _ => none) = some b} ∩
           ⋂ r' ∈ Finset.range r, {ω | π.decide p x ω (List.replicate r' fun _ => none) = none}) := by
       ext ω
-      simp only [silentOut, Set.mem_ofPred_eq, firstSome_eq_some_iff, Set.mem_iUnion,
+      simp only [silentOut, Set.mem_ofPred_eq, firstSome?_eq_some_iff, FirstSome, Set.mem_iUnion,
         Set.mem_inter_iff, Set.mem_iInter, Finset.mem_range]
     rw [this]
     exact MeasurableSet.iUnion fun r => (hg r _).inter
@@ -210,7 +179,7 @@ lemma fiberMeas_silentOut (hπ : π.IsMeasurable) (p : P) (x : I) :
         ⋂ r, {ω | π.decide p x ω (List.replicate r fun _ => none) = none} := by
       ext ω
       simp only [Set.mem_ofPred_eq, Set.mem_iInter, silentOut]
-      rw [← Option.not_isSome_iff_eq_none, firstSome_isSome_iff]
+      rw [← Option.not_isSome_iff_eq_none, isSome_firstSome?_iff]
       simp
     rw [this]
     exact MeasurableSet.iInter fun r => hg r _

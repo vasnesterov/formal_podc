@@ -1,3 +1,4 @@
+-- CSLib candidate: Cslib/Computability/Distributed/Byzantine/LockStep/Sequential.lean
 import Cslib.Computability.Distributed.Byzantine.LockStep.Parallel
 import Mathlib
 
@@ -18,9 +19,12 @@ problems ("run `A` for `R` rounds, then run `B` on an input computed from `A`'s 
 
 Main facts: the projection lemmas `histL_hist_seq` / `histR_hist_seq` identify the two phases of a
 run of `seq` with a run of `A` in `s.seqFst R` and a run of `B` in `s.seqSnd R …`;
-`decides_seq_iff`, `seqInput_eq` and `terminatesBy_seq` transfer decisions/termination;
+`decides_seq_iff`, `seqInputs_eq_firstUpTo`, `seqInputs_eq` and `terminatesBy_seq` transfer
+decisions/termination;
 `Scenario.AuthValid.seqFst/seqSnd` and `Protocol.Unforging.seq` transfer the authenticated
-setting (tokens `S₁ ⊕ S₂`).
+setting (tokens `S₁ ⊕ S₂`). For an arbitrary signature structure `Aut` on `M₁ ⊕ M₂` (one token
+type for both phases), `Protocol.Unforging.seq_of_left_right` and `Scenario.AuthValid.seqFst_left`
+do the same with the left / right parts `Aut.left`, `Aut.right`.
 
 `SolvesAuthWithin` packages "solves `spec` within `T` rounds against `Z` in the authenticated
 setting, for runs whose inputs satisfy `pre`" (the unauthenticated setting is `Auth.none`).
@@ -227,7 +231,8 @@ lemma histL_hist_seq (s : Scenario P I (M₁ ⊕ M₂)) :
         · simp [hadj, hb, hd, Scenario.seqFst]
         · have hlen : (hist G (A.seq R f B) s r q).length < R := by simpa using hrR
           have hd' : ¬ (s.seqFst R).drop r q p := hd
-          simp only [hadj, hb, hd, hd', ite_true, ite_false, Scenario.seqFst_byz, Scenario.seqFst_input,
+          simp only [hadj, hb, hd, hd', ite_true, ite_false, Scenario.seqFst_byz,
+            Scenario.seqFst_input,
             seq_send_lt A R f B hlen, ih hrR.le q]
           cases A.send q (s.input q) (hist G A (s.seqFst R) r q) p <;> rfl
     · simp [hadj]
@@ -264,7 +269,8 @@ lemma histR_hist_seq (s : Scenario P I (M₁ ⊕ M₂)) :
         · simp [hadj, hb, hd, Scenario.seqSnd]
         · have hlen : R ≤ (hist G (A.seq R f B) s (R + r) q).length := by simp
           have hd' : ¬ (s.seqSnd R (seqInputs G A R f s)).drop r q p := hd
-          simp only [hadj, hb, hd, hd', ite_true, ite_false, Scenario.seqSnd_byz, Scenario.seqSnd_input,
+          simp only [hadj, hb, hd, hd', ite_true, ite_false, Scenario.seqSnd_byz,
+            Scenario.seqSnd_input,
             seq_send_ge A R f B hlen, ih q, seqInput_hist G A R f B s r q]
           cases B.send q (seqInputs G A R f s q)
             (hist G B (s.seqSnd R (seqInputs G A R f s)) r q) p <;> rfl
@@ -306,13 +312,20 @@ theorem decides_seq_iff (s : Scenario P I (M₁ ⊕ M₂)) (p : P) (o : O) :
       rw [status_seq_add]
       exact hmin j (by omega)
 
+/-- The input of the second phase is computed from the first decision within `R` rounds. -/
+lemma seqInputs_eq_firstUpTo (s : Scenario P I (M₁ ⊕ M₂)) (p : P) :
+    seqInputs G A R f s p =
+      f p (s.input p) (firstUpTo (fun j => status G A (s.seqFst R) j p) R) := by
+  unfold seqInputs
+  rw [Protocol.firstDecide, length_hist]
+  exact congrArg _ (firstUpTo_congr fun j hj => by rw [take_hist G _ _ hj]; rfl)
+
 /-- If `p` decides `o₁` in the first phase within `R` rounds, it starts the second phase with
 input `f p x (some o₁)`. -/
 lemma seqInputs_eq (s : Scenario P I (M₁ ⊕ M₂)) (p : P) (o₁ : O₁)
     (hd : Decides G A (s.seqFst R) p o₁) (hT : ∃ r ≤ R, ∃ o, status G A (s.seqFst R) r p = some o) :
     seqInputs G A R f s p = f p (s.input p) (some o₁) := by
-  unfold seqInputs
-  congr 1
+  rw [seqInputs_eq_firstUpTo]
   obtain ⟨r₀, hr₀, hmin⟩ := hd
   have hr₀R : r₀ ≤ R := by
     obtain ⟨r, hr, o, ho⟩ := hT
@@ -320,10 +333,7 @@ lemma seqInputs_eq (s : Scenario P I (M₁ ⊕ M₂)) (p : P) (o₁ : O₁)
     have := hmin r (by omega)
     rw [ho] at this
     exact absurd this (by simp)
-  rw [Protocol.firstDecide, length_hist]
-  rw [firstUpTo_congr (g := fun j => status G A (s.seqFst R) j p)
-    (fun j hj => by rw [take_hist G _ _ hj]; rfl)]
-  exact firstUpTo_of_firstSome hr₀ hmin hr₀R
+  rw [firstUpTo_of_firstSome hr₀ hmin hr₀R]
 
 lemma terminatesBy_seq (s : Scenario P I (M₁ ⊕ M₂)) (T : ℕ)
     (h : TerminatesBy G B (s.seqSnd R (seqInputs G A R f s)) T) :
@@ -441,6 +451,81 @@ lemma Scenario.AuthValid.seqSnd {A₁ : Auth P M₁ S₁} {A₂ : Auth P M₂ S�
         refine ⟨k, by omega, p, hp, q', hadj', m₂', ?_, hτ''⟩
         rw [seqInput_hist G A R f B s k p, histR_hist_seq G A R f B s k p] at hm₂'
         exact hm₂'
+
+/-! #### Signature structures on sum messages -/
+
+/-- The signature structure of the left messages of a structure on `M₁ ⊕ M₂`. -/
+def Auth.left (A : Auth P (M₁ ⊕ M₂) S) : Auth P M₁ S where
+  signer := A.signer
+  tokens m := A.tokens (Sum.inl m)
+
+/-- The signature structure of the right messages of a structure on `M₁ ⊕ M₂`. -/
+def Auth.right (A : Auth P (M₁ ⊕ M₂) S) : Auth P M₂ S where
+  signer := A.signer
+  tokens m := A.tokens (Sum.inr m)
+
+lemma Auth.histTokens_left (A : Auth P (M₁ ⊕ M₂) S) {h : History P (M₁ ⊕ M₂)} {τ : S}
+    (hτ : τ ∈ A.left.histTokens (histL h)) : τ ∈ A.histTokens h := by
+  obtain ⟨ib, hib, q, m, hm, hτm⟩ := hτ
+  obtain ⟨ib₀, hib₀, rfl⟩ := List.mem_map.1 hib
+  obtain ⟨m₀, hm₀, hm₀l⟩ := Option.bind_eq_some_iff.1 hm
+  cases m₀ with
+  | inl m₁ =>
+    simp only [Sum.getLeft?_inl, Option.some.injEq] at hm₀l
+    subst hm₀l
+    exact ⟨ib₀, hib₀, q, Sum.inl m₁, hm₀, hτm⟩
+  | inr m₂ => simp at hm₀l
+
+lemma Auth.histTokens_right (A : Auth P (M₁ ⊕ M₂) S) {h : History P (M₁ ⊕ M₂)} {R : ℕ} {τ : S}
+    (hτ : τ ∈ A.right.histTokens (histR (h.drop R))) : τ ∈ A.histTokens h := by
+  obtain ⟨ib, hib, q, m, hm, hτm⟩ := hτ
+  obtain ⟨ib₀, hib₀, rfl⟩ := List.mem_map.1 hib
+  obtain ⟨m₀, hm₀, hm₀r⟩ := Option.bind_eq_some_iff.1 hm
+  cases m₀ with
+  | inr m₂ =>
+    simp only [Sum.getRight?_inr, Option.some.injEq] at hm₀r
+    subst hm₀r
+    exact ⟨ib₀, List.mem_of_mem_drop hib₀, q, Sum.inr m₂, hm₀, hτm⟩
+  | inl m₁ => simp at hm₀r
+
+variable {G A R f B}
+
+/-- The sequential composition is unforging for any signature structure on `M₁ ⊕ M₂` whose left
+and right parts make the two phases unforging. -/
+lemma Protocol.Unforging.seq_of_left_right {Aut : Auth P (M₁ ⊕ M₂) S} (hA : A.Unforging Aut.left)
+    (hB : B.Unforging Aut.right) : (A.seq R f B).Unforging Aut := by
+  intro p x h q m hm τ hτ
+  simp only [Protocol.seq] at hm
+  split_ifs at hm with hlt
+  · obtain ⟨m₁, hm₁, rfl⟩ := Option.map_eq_some_iff.1 hm
+    exact (hA p x _ q m₁ hm₁ τ hτ).imp_right Aut.histTokens_left
+  · obtain ⟨m₂, hm₂, rfl⟩ := Option.map_eq_some_iff.1 hm
+    exact (hB p _ _ q m₂ hm₂ τ hτ).imp_right Aut.histTokens_right
+
+variable (G A R f B) in
+/-- The first phase of a run respecting unforgeability (for any signature structure on
+`M₁ ⊕ M₂`) respects unforgeability for the left part of the structure. -/
+lemma Scenario.AuthValid.seqFst_left {Aut : Auth P (M₁ ⊕ M₂) S} {s : Scenario P I (M₁ ⊕ M₂)}
+    (hV : s.AuthValid G (A.seq R f B) Aut) : (s.seqFst R).AuthValid G A Aut.left := by
+  intro r b q m hb hq hadj hm τ hτ
+  simp only [Scenario.seqFst] at hm
+  split_ifs at hm with hrR
+  obtain ⟨m₀, hm₀, hm₀l⟩ := Option.bind_eq_some_iff.1 hm
+  cases m₀ with
+  | inr m₂ => simp at hm₀l
+  | inl m₁ =>
+    simp only [Sum.getLeft?_inl, Option.some.injEq] at hm₀l
+    subst hm₀l
+    rcases hV r b q _ hb hq hadj hm₀ τ hτ with hs | ⟨r', hr', p, hp, q', hadj', m', hm', hτ'⟩
+    · exact Or.inl hs
+    · right
+      have hr'R : r' < R := lt_of_le_of_lt hr' hrR
+      have hlen : (hist G (A.seq R f B) s r' p).length < R := by simpa using hr'R
+      rw [seq_send_lt A R f B hlen] at hm'
+      obtain ⟨m₁, hm₁, rfl⟩ := Option.map_eq_some_iff.1 hm'
+      refine ⟨r', hr', p, hp, q', hadj', m₁, ?_, hτ'⟩
+      rw [histL_hist_seq G A R f B s r' hr'R.le p] at hm₁
+      exact hm₁
 
 end Seq
 

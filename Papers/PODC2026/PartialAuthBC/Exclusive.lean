@@ -256,18 +256,21 @@ lemma deliver_gcX (r : ℕ) (q p : P) :
     simp only [gcX, length_hist]
     rfl
 
+/-- `gcX` outputs from round `4s` on the final state `(v, g)`. -/
+lemma gcX_status (r : ℕ) (p : P) :
+    status ⊤ (gcX Reg snd) s r p =
+      if 4 * Reg.ncard ≤ r then some ((gSX s Reg snd (4 * Reg.ncard) p).v,
+        (gSX s Reg snd (4 * Reg.ncard) p).g) else none := by
+  simp only [status, gcX, length_hist]
+  split_ifs with h
+  · rw [take_hist _ _ _ h]; rfl
+  · rfl
+
 /-- `gcX` decides at round `4s` the final state `(v, g)`. -/
 lemma gcX_decides (p : P) (o : Bool × Bool) :
     Decides ⊤ (gcX Reg snd) s p o ↔
       o = ((gSX s Reg snd (4 * Reg.ncard) p).v, (gSX s Reg snd (4 * Reg.ncard) p).g) := by
-  have hst : ∀ r, status ⊤ (gcX Reg snd) s r p =
-      if 4 * Reg.ncard ≤ r then some ((gSX s Reg snd (4 * Reg.ncard) p).v,
-        (gSX s Reg snd (4 * Reg.ncard) p).g) else none := by
-    intro r
-    simp only [status, gcX, length_hist]
-    split_ifs with h
-    · rw [hist_take _ _ _ h]; rfl
-    · rfl
+  have hst := fun r => gcX_status s Reg snd r p
   constructor
   · rintro ⟨r, hr, -⟩
     rw [hst] at hr; split_ifs at hr; exact (Option.some_injective _ hr).symm
@@ -415,39 +418,42 @@ section BcDefs
 
 variable (Reg : Set P) (snd : P) {M' : Type} (ba : Protocol (Unreg Reg) Bool M' Bool)
 
-/-- The gradecast state of `p` (after the first `4s` rounds of `h`), exclusive reading. -/
-noncomputable def gcOutX {M' : Type} (p : P) (x : Bool) (h : History P (GMsg P ⊕ M')) : GSt P :=
-  gstOfX Reg snd p x ((h.take (4 * Reg.ncard)).map dec₁)
+/-- **Π_BC** (Figure 2) built on `gcX` instead of `gc` (otherwise identical to `bc`). -/
+noncomputable abbrev bcX : Protocol P Bool (GMsg P ⊕ M') Bool := bcWith Reg ba (gcX Reg snd)
+
+theorem bcX_unforging : (bcX Reg snd ba).Unforging (bcAuth Reg snd M') :=
+  bcWith_unforging Reg snd ba gcX_unforging
+
+omit snd in
+/-- `gcX` decides the state after the first `4s` rounds. -/
+lemma gcX_firstDecide {snd p : P} {x : Bool} {h : History P (GMsg P)}
+    (hl : h.length = 4 * Reg.ncard) :
+    (gcX Reg snd).firstDecide p x h =
+      some ((gstOfX Reg snd p x h).v, (gstOfX Reg snd p x h).g) := by
+  rw [Protocol.firstDecide, hl]
+  refine firstUpTo_of_firstSome (r := 4 * Reg.ncard) ?_ (fun r hr => ?_) le_rfl
+  · have ht : h.take (4 * Reg.ncard) = h := List.take_of_length_le hl.le
+    simp [gcX, hl, ht]
+  · simp only [gcX, List.length_take, hl]
+    split_ifs <;> first | rfl | omega
 
 open Classical in
-/-- **Π_BC** (Figure 2) built on `gcX` instead of `gc` (otherwise identical to `bc`). -/
-noncomputable def bcX : Protocol P Bool (GMsg P ⊕ M') Bool where
-  send p x h q :=
-    if h.length < 4 * Reg.ncard then ((gcX Reg snd).send p x (h.map dec₁) q).map Sum.inl
-    else if hp : p ∈ Regᶜ then
-      if hq : q ∈ Regᶜ then
-        (ba.send ⟨p, hp⟩ (gcOutX Reg snd p x h).v ((h.drop (4 * Reg.ncard)).map (dec₂ Reg))
-          ⟨q, hq⟩).map Sum.inr
-      else none
-    else none
-  decide p x h :=
-    if 4 * Reg.ncard ≤ h.length then
-      if hp : p ∈ Regᶜ then
-        (if (gcOutX Reg snd p x h).g then some (gcOutX Reg snd p x h).v
-         else ba.decide ⟨p, hp⟩ (gcOutX Reg snd p x h).v ((h.drop (4 * Reg.ncard)).map (dec₂ Reg)))
-      else some (gcOutX Reg snd p x h).v
-    else none
-
-theorem bcX_unforging : (bcX Reg snd ba).Unforging (bcAuth Reg snd M') := by
-  intro p x h q m hm τ hτ
-  simp only [bcX] at hm
-  split_ifs at hm
-  · obtain ⟨m', hm', rfl⟩ := Option.map_eq_some_iff.mp hm
-    rcases gcX_unforging p x _ q m' hm' τ hτ with h1 | h1
-    · exact Or.inl h1
-    · exact Or.inr (histTokens_dec₁ Reg snd h1)
-  · obtain ⟨m', -, rfl⟩ := Option.map_eq_some_iff.mp hm
-    exact absurd hτ (Set.notMem_empty τ)
+/-- `bcX` is the protocol of Figure 2 built on `gcX` (as `bc_send_decide`, with the state
+`gstOfX` of the exclusive reading). -/
+theorem bcX_send_decide (p q : P) (x : Bool) (h : History P (GMsg P ⊕ M')) :
+    let st := gstOfX Reg snd p x (histL (h.take (4 * Reg.ncard)))
+    let hba := restrictHist Regᶜ (histR (h.drop (4 * Reg.ncard)))
+    (bcX Reg snd ba).send p x h q =
+      (if h.length < 4 * Reg.ncard then ((gcX Reg snd).send p x (histL h) q).map Sum.inl
+       else if hp : p ∈ Regᶜ then
+         if hq : q ∈ Regᶜ then (ba.send ⟨p, hp⟩ st.v hba ⟨q, hq⟩).map Sum.inr else none
+       else none) ∧
+    (bcX Reg snd ba).decide p x h =
+      (if 4 * Reg.ncard ≤ h.length then
+         if hp : p ∈ Regᶜ then (if st.g then some st.v else ba.decide ⟨p, hp⟩ st.v hba)
+         else some st.v
+       else none) :=
+  bcWith_send_decide Reg ba (gstOfX Reg snd) (fun _ _ _ hl => gcX_firstDecide Reg hl) p q x h
 
 end BcDefs
 
@@ -458,126 +464,27 @@ variable {Reg : Set P} {snd : P} {M' : Type} {ba : Protocol (Unreg Reg) Bool M' 
 
 local notation "T" => 4 * Reg.ncard
 
-lemma bcX_send_lt {p q : P} {x : Bool} {h : History P (GMsg P ⊕ M')}
-    (hl : h.length < 4 * Reg.ncard) :
-    (bcX Reg snd ba).send p x h q = ((gcX Reg snd).send p x (h.map dec₁) q).map Sum.inl := by
-  simp [bcX, hl]
-
-lemma bcX_send_ge {p q : P} {x : Bool} {h : History P (GMsg P ⊕ M')}
-    (hl : 4 * Reg.ncard ≤ h.length) (hp : p ∈ Regᶜ) (hq : q ∈ Regᶜ) :
-    (bcX Reg snd ba).send p x h q = (ba.send ⟨p, hp⟩ (gcOutX Reg snd p x h).v
-      ((h.drop (4 * Reg.ncard)).map (dec₂ Reg)) ⟨q, hq⟩).map Sum.inr := by
-  simp [bcX, Nat.not_lt.mpr hl, hp, hq]
-
-open Classical in
-lemma bcX_decide_ge {p : P} {x : Bool} {h : History P (GMsg P ⊕ M')}
-    (hl : 4 * Reg.ncard ≤ h.length) :
-    (bcX Reg snd ba).decide p x h =
-      if hp : p ∈ Regᶜ then
-        (if (gcOutX Reg snd p x h).g then some (gcOutX Reg snd p x h).v
-         else ba.decide ⟨p, hp⟩ (gcOutX Reg snd p x h).v ((h.drop (4 * Reg.ncard)).map (dec₂ Reg)))
-      else some (gcOutX Reg snd p x h).v := by
-  simp [bcX, hl]
-
 /-- The agreement scenario among the unregistered parties (rounds `≥ 4s`), exclusive reading. -/
-noncomputable def sc₂X (Reg : Set P) (snd : P) (s : Scenario P Bool (GMsg P ⊕ M')) :
-    Scenario (Unreg Reg) Bool M' where
-  byz := {q | q.1 ∈ s.byz}
-  input q := (gSX (sc₁ Reg s) Reg snd (4 * Reg.ncard) q.1).v
-  adv r b q := (s.adv (4 * Reg.ncard + r) b.1 q.1).bind Sum.getRight?
-  drop r b q := s.drop (4 * Reg.ncard + r) b.1 q.1
+noncomputable abbrev sc₂X (Reg : Set P) (snd : P) (s : Scenario P Bool (GMsg P ⊕ M')) :
+    Scenario (Unreg Reg) Bool M' :=
+  sc₂With Reg s fun q => (gSX (sc₁ Reg s) Reg snd (4 * Reg.ncard) q.1).v
 
-@[simp] lemma sc₂X_byz (q : Unreg Reg) : q ∈ (sc₂X Reg snd s).byz ↔ q.1 ∈ s.byz := Iff.rfl
-@[simp] lemma sc₂X_drop (r : ℕ) (b q : Unreg Reg) :
-    (sc₂X Reg snd s).drop r b q = s.drop (4 * Reg.ncard + r) b.1 q.1 := rfl
-lemma sc₂X_adv (r : ℕ) (b q : Unreg Reg) :
-    (sc₂X Reg snd s).adv r b q = (s.adv (4 * Reg.ncard + r) b.1 q.1).bind Sum.getRight? := rfl
-lemma sc₂X_input (q : Unreg Reg) :
-    (sc₂X Reg snd s).input q = (gSX (sc₁ Reg s) Reg snd (4 * Reg.ncard) q.1).v := rfl
-
-/-- The first `4s` rounds of `bcX` are a run of `gcX`. -/
-lemma hist_dec₁X {r : ℕ} (hr : r ≤ T) (p : P) :
-    (hist ⊤ (bcX Reg snd ba) s r p).map dec₁ = hist ⊤ (gcX Reg snd) (sc₁ Reg s) r p := by
-  induction r generalizing p with
-  | zero => rfl
-  | succ r ih =>
-    rw [hist_succ, hist_succ, List.map_append, ih (by omega)]
-    simp only [List.map_cons, List.map_nil]
-    congr 2
-    funext q
-    by_cases hqp : q = p
-    · subst hqp; simp [deliver, dec₁]
-    by_cases hqb : q ∈ s.byz
-    · simp [deliver, dec₁, hqp, hqb, sc₁_adv, show r < T by omega]
-    by_cases hd : s.drop r q p
-    · simp [deliver, dec₁, hqp, hqb, hd]
-    · simp only [deliver, dec₁, SimpleGraph.top_adj, ne_eq, hqp, not_false_eq_true, ite_true,
-        hqb, ite_false, hd, sc₁_byz, sc₁_drop, sc₁_input]
-      rw [bcX_send_lt (by rw [length_hist]; omega), ih (by omega)]
-      cases (gcX Reg snd).send _ _ _ _ <;> rfl
-
-lemma gcOutX_hist {r : ℕ} (hr : T ≤ r) (p : P) :
-    gcOutX Reg snd p (s.input p) (hist ⊤ (bcX Reg snd ba) s r p) =
-      gSX (sc₁ Reg s) Reg snd T p := by
-  unfold gcOutX gSX
-  rw [hist_take _ _ _ hr, hist_dec₁X s le_rfl]; rfl
-
-/-- Rounds `≥ 4s` of `bcX` are a run of `ba` among the unregistered parties. -/
-lemma hist_dec₂X (r : ℕ) (p : Unreg Reg) :
-    ((hist ⊤ (bcX Reg snd ba) s (T + r) p.1).drop T).map (dec₂ Reg) =
-      hist ⊤ ba (sc₂X Reg snd s) r p := by
-  induction r generalizing p with
-  | zero => simp
-  | succ r ih =>
-    rw [← add_assoc, hist_succ, hist_succ, List.drop_append_of_le_length (by simp),
-      List.map_append, ih]
-    simp only [List.map_cons, List.map_nil]
-    congr 2
-    funext q
-    by_cases hqp : q = p
-    · subst hqp; simp [deliver, dec₂]
-    have hqp' : q.1 ≠ p.1 := fun h => hqp (Subtype.ext h)
-    by_cases hqb : q.1 ∈ s.byz
-    · simp [deliver, dec₂, hqp, hqp', hqb, sc₂X_adv]
-    by_cases hd : s.drop (T + r) q.1 p.1
-    · simp [deliver, dec₂, hqp, hqp', hqb, hd]
-    · simp only [deliver, dec₂, SimpleGraph.top_adj, ne_eq, hqp, hqp', not_false_eq_true,
-        ite_true, hqb, ite_false, hd, sc₂X_byz, sc₂X_drop, sc₂X_input]
-      rw [bcX_send_ge (by rw [length_hist]; omega) q.2 p.2, gcOutX_hist s (by omega), ih q]
-      cases ba.send _ _ _ _ <;> rfl
-
-lemma bcX_status_lt {r : ℕ} (hr : r < T) (p : P) : status ⊤ (bcX Reg snd ba) s r p = none := by
-  simp [status, bcX, length_hist, show ¬ T ≤ r by omega]
+lemma seqInputs_bcX (p : P) :
+    seqInputs ⊤ (gcX Reg snd) (4 * Reg.ncard) bcIn s p =
+      ((gSX (sc₁ Reg s) Reg snd T p).v, (gSX (sc₁ Reg s) Reg snd T p).g) :=
+  seqInputs_bcWith s (by rw [gcX_status]; simp) fun r hr => by rw [gcX_status]; simp; omega
 
 /-- Registered parties and parties with grade `1` decide their gradecast value. -/
 lemma bcX_decides_of_g {p : P} (hp : p ∈ Reg ∨ (gSX (sc₁ Reg s) Reg snd T p).g = true) (o : Bool) :
     Decides ⊤ (bcX Reg snd ba) s p o ↔ o = (gSX (sc₁ Reg s) Reg snd T p).v := by
-  rw [decides_iff_firstSome, firstSome_shift T (fun r hr => bcX_status_lt s hr p)]
-  have hst : ∀ r, status ⊤ (bcX Reg snd ba) s (T + r) p =
-      some (gSX (sc₁ Reg s) Reg snd T p).v := by
-    intro r
-    rw [status, bcX_decide_ge (by rw [length_hist]; omega), gcOutX_hist s (by omega)]
-    split_ifs with h1 h2
-    · rfl
-    · rcases hp with hp | hp
-      · exact absurd hp h1
-      · simp_all
-    · rfl
-  constructor
-  · rintro ⟨r, hr, -⟩; simp only [hst] at hr; exact (Option.some_injective _ hr).symm
-  · rintro rfl; exact ⟨0, hst 0, fun _ h => absurd h (Nat.not_lt_zero _)⟩
+  rw [bcWith_decides_of_g s (by rwa [seqInputs_bcX s]), seqInputs_bcX s]
 
 /-- Unregistered parties with grade `0` decide what `ba` decides. -/
 lemma bcX_decides_of_g0 (p : Unreg Reg) (hp : (gSX (sc₁ Reg s) Reg snd T p.1).g = false)
     (o : Bool) :
     Decides ⊤ (bcX Reg snd ba) s p.1 o ↔ Decides ⊤ ba (sc₂X Reg snd s) p o := by
-  rw [decides_iff_firstSome, firstSome_shift T (fun r hr => bcX_status_lt s hr p.1)]
-  apply FirstSome.congr
-  intro r
-  rw [status, bcX_decide_ge (by rw [length_hist]; omega)]
-  simp only [p.2, ↓reduceDIte]
-  rw [gcOutX_hist s (by omega), hp, hist_dec₂X s r p]
-  rfl
+  rw [bcWith_decides_of_g0 s p (by rw [seqInputs_bcX s]; exact hp)]
+  simp only [seqInputs_bcX s]
 
 end BcRuns
 
@@ -605,7 +512,7 @@ lemma andBA_decides (s : Scenario N Bool Bool) (p : N) (o : Bool) :
   have hst : ∀ r, status ⊤ (andBA N) s (r + 1) p = some (s.input p && decide (∀ q,
       deliver ⊤ (andBA N) s (hist ⊤ (andBA N) s 0) 0 q p ≠ some false)) := by
     intro r
-    have h1 := hist_take ⊤ (andBA N) s (show 1 ≤ r + 1 by omega) p
+    have h1 := take_hist ⊤ (andBA N) s (show 1 ≤ r + 1 by omega) p
     obtain ⟨ib, l, hl⟩ : ∃ ib l, hist ⊤ (andBA N) s (r + 1) p = ib :: l := by
       cases h : hist ⊤ (andBA N) s (r + 1) p with
       | nil => have := length_hist ⊤ (andBA N) s (r + 1) p; rw [h] at this; simp at this
@@ -695,7 +602,7 @@ lemma sc₁_scenB : sc₁ Reg4 scenB = scen := by
     rw [Reg4_ncard]
     simp only [scenB, scen]
     split_ifs <;> simp_all
-  simp only [sc₁, h]
+  simp only [sc₁, Scenario.seqFst, h]
   rfl
 
 lemma two_mem : (2 : Fin 4) ∈ Reg4ᶜ := by simp [Reg4]
@@ -714,7 +621,7 @@ theorem exclusive_bc_run :
         (hist ⊤ (andBA (Unreg Reg4)) (sc₂X Reg4 0 scenB) 0) 0 ⟨3, three_mem⟩ ⟨2, two_mem⟩ =
           some false := by
       rw [deliver_byz ⊤ _ _ (by simp [scenB]) (by simp)]
-      simp [sc₂X_adv, scenB, Reg4_ncard]
+      simp [sc₂With_adv, scenB, Reg4_ncard]
     rw [@decide_eq_false _ (Classical.propDecidable _) (fun H => H _ hd), Bool.and_false]
 
 /-- **Theorem 3.13 fails under the exclusive reading of Figure 1, Phase 2.** For `n = 4`,

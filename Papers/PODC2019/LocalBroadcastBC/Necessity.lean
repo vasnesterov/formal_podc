@@ -77,10 +77,6 @@ theorem three_scenarios {M : Type u} {alg : Protocol V Bool M Bool} (hb : IsBroa
   subst hrv hrv'
   exact absurd hagree (by decide)
 
-omit [Fintype V] [DecidableEq V] in
-lemma mem_atMost {f : ℕ} (F : Finset V) : (F : Set V) ∈ (atMost f : AdvStructure V) ↔ F.card ≤ f :=
-  by simp [atMost, Set.ncard_coe_finset]
-
 variable [DecidableRel G.Adj]
 
 /-- Lemma A.1 of [KNV19]: if Byzantine consensus is solvable under local broadcast on `G` with at
@@ -157,11 +153,11 @@ theorem lemmaA1 {f : ℕ} (hsol : SolvableLB G (atMost f) (Consensus : Spec V Bo
     simp only [Finset.coe_insert, Set.mem_insert_iff, Finset.mem_coe] at hb
     have : b ∉ W := by rcases hb with rfl | hb; exacts [hzW, hF₁W b hb]
     simp only [c, this, ite_false]
-  · rw [mem_atMost]
+  · rw [coe_mem_atMost]
     omega
-  · rw [mem_atMost]
+  · rw [coe_mem_atMost]
     omega
-  · rw [mem_atMost]
+  · rw [coe_mem_atMost]
     have := card_insert_le z F₁
     omega
   · intro p hp
@@ -288,13 +284,13 @@ theorem lemmaA2 {f : ℕ} (hsol : SolvableLB G (atMost f) (Consensus : Spec V Bo
       · exact hC₁X' b h
       · exact (hC₂X' b h).1
     simp only [c, this, ite_false]
-  · rw [mem_atMost]
+  · rw [coe_mem_atMost]
     have := card_union_le C₂ C₃
     omega
-  · rw [mem_atMost]
+  · rw [coe_mem_atMost]
     have := card_union_le C₁ C₃
     omega
-  · rw [mem_atMost]
+  · rw [coe_mem_atMost]
     have := card_union_le C₁ C₂
     omega
   · intro p hp

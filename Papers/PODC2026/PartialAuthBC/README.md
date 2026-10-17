@@ -85,6 +85,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 | Paper | Lean | File |
 |---|---|---|
+| Figures 2 and 3 (Π_BC, Π_SBA as composed protocols, spelled out; also Π_BC on the exclusive reading) | `bc_send_decide`, `sba_send_decide`, `Exclusive.bcX_send_decide` | `Broadcast.lean`, `SimpleBA.lean`, `Exclusive.lean` |
 | Thm 3.9 (Π_GC is gradecast, any number of faults) | `theorem39`, `gradecast_solvablePA`, `gc_unforging` | `Gradecast.lean` |
 | Lemmas 3.2–3.8, 3.10 | `validFor_length_lt`, `lemma33`, `lemma34`, `lemma35`, `lemma36`, `lemma37`, `gc_decides`, `lemma310`, `lemma310_decides` | `Gradecast.lean` |
 | Lemmas 3.11/3.12 | `bc_bb_of_honest_reg`, `bc_bb_of_ba` | `Broadcast.lean` |
@@ -112,7 +113,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
     `t = 0`; `theorem51_unreg_small` uses it with arbitrarily many Byzantine unregistered parties).
   - The lower bounds come with matching positive instances (`theorem314_solvable`, `bb_solvable_card_two`).
 - **Where the model comes from.** CSLib provides `Byzantine/LockStep` (`Basic`, `Auth`, `Cover`, `Agreement`).
-- **CSLib candidates:**
-  - `CoverSystem.scenario_authValid_pa`, the cover lemma for partial authentication (`Model.lean`);
-  - `hist_take`, `mem_hist`, `deliver_honest`, `deliver_byz` (`Gradecast.lean`);
-  - `firstSome_shift` (`Broadcast.lean`) and `hist_getElem?` (`SimpleBA.lean`).
+  The shared library `Podc/LockStep` provides the threshold structure `atMost` and the history/`FirstSome`
+  helpers (`Basic.lean`), the sequential composition `Protocol.seq` used for Π_BC and Π_SBA (`Sequential.lean`)
+  and the committee simulation `Protocol.extend` / `Scenario.restrict` used for the black boxes among `N` and `S`
+  (`Restrict.lean`). `Gradecast` is the shared `Problem.BinaryGradecast` (`Podc/Agreement/Specs.lean`);
+  `gradecast_iff` gives Definition 2.3 verbatim.
+- **CSLib candidates:** `CoverSystem.scenario_authValid_pa`, the cover lemma for partial authentication
+  (`Model.lean`).

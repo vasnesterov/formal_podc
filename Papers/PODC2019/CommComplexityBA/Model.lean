@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.LockStep.Basic
 
 /-!
 # Synchronous randomized protocols against strongly adaptive omission adversaries
@@ -11,7 +12,7 @@ of Byzantine Agreement, Revisited* (PODC 2019), Section 3 (Theorems 1 and 4).
   arbitrary way, so `Ω` covers private coins, shared coins and any trusted setup (PKI, common
   random string, random oracle). This only makes the class of protocols larger, hence the lower
   bound stronger.
-* **Protocol.** History based: in round `r`, node `p` with input `x` and history `h` (the list of
+* **Protocol.** History based (inboxes and histories are those of CSLib's lock-step model): in round `r`, node `p` with input `x` and history `h` (the list of
   its inboxes in rounds `0, …, r-1`) sends `send p x ω h q : Option M` to each `q ≠ p`
   (self-messages are local computation and are not modelled); its *output* is the first
   `decide p x ω h = some b` along its histories (`none` forever = no output).
@@ -30,14 +31,9 @@ of Byzantine Agreement, Revisited* (PODC 2019), Section 3 (Theorems 1 and 4).
 set_option linter.unusedSectionVars false
 
 open MeasureTheory
+open Cslib.Byzantine.LockStep (Inbox History firstSome?)
 
 namespace CommComplexityBA
-
-/-- Messages received in one round, indexed by sender. -/
-abbrev Inbox (P M : Type*) := P → Option M
-
-/-- Local history of a node: its inboxes so far, oldest first. -/
-abbrev History (P M : Type*) := List (Inbox P M)
 
 /-- Communication pattern of one round: `pat p q = true` iff `p` sends a message to `q`. -/
 abbrev Pattern (P : Type*) := P → P → Bool
@@ -96,21 +92,17 @@ def Honest (A : Adversary P f) (p : P) : Prop :=
 
 end Protocol
 
-/-- First `some` value of a sequence. -/
-noncomputable def firstSome {α : Type*} (g : ℕ → Option α) : Option α := by
-  classical exact if h : ∃ r, (g r).isSome then g (Nat.find h) else none
-
 namespace Protocol
 
 variable (π : Protocol P I M Ω) (inp : P → I) (ω : Ω)
 
 /-- Output of `p`: its first decision (`none` = never outputs). -/
 noncomputable def output (A : Adversary P f) (p : P) : Option Bool :=
-  firstSome fun r => π.decide p (inp p) ω ((π.run inp ω A r).1 p)
+  firstSome? fun r => π.decide p (inp p) ω ((π.run inp ω A r).1 p)
 
 /-- Output of `p` (input `x`) in a run where it never receives any message. -/
 noncomputable def silentOut (p : P) (x : I) (ω : Ω) : Option Bool :=
-  firstSome fun r => π.decide p x ω (List.replicate r fun _ => none)
+  firstSome? fun r => π.decide p x ω (List.replicate r fun _ => none)
 
 /-- Does `p` send a message to `q` in round `r`? -/
 def sentAt (A : Adversary P f) (r : ℕ) (p q : P) : Bool :=

@@ -1,5 +1,4 @@
 import Papers.PODC2026.PartialAuthBC.Broadcast
-import Cslib.Computability.Distributed.Byzantine.LockStep.Parallel
 
 /-!
 # The simple BA protocol Π_SBA (Figure 3): Theorem 5.1 and Corollary 5.2
@@ -14,17 +13,21 @@ Byzantine agreement among the `s` registered parties:
 3. unregistered parties output (at round `R + 1`) the majority of the values received from
    registered parties (tie → `false`); registered parties output (at round `R`) their `pa` decision.
 
+Π_SBA is the sequential composition (`Protocol.seq`) of `pa`, run among the registered parties by
+the committee simulation `Protocol.extend`, with the output step `sbaOut` (steps 2 and 3).
+
 * `BoundedAuthBA pa Aa Z R`: the black box (unforging, solves authenticated BA against `Z`, all
   honest parties decide within `R` rounds).
 * `sba`, `liftAuth`: Π_SBA and its signature structure (tokens of `pa`, signer lifted to `P`);
-  `liftAuth_registered`, `sba_unforging`.
+  `liftAuth_registered`, `sba_unforging`; `sba_send_decide`: the composed protocol, spelled out as
+  in Figure 3.
 * `sba_BA`: the core statement — Π_SBA solves BA whenever the Byzantine registered parties form an
   admissible set for `pa` and are a strict minority of `Reg`; unregistered parties may be corrupted
   arbitrarily.
 * `theorem51`: **Theorem 5.1** (`2t < s`); `theorem51_unreg`: the stronger form with any number of
   Byzantine unregistered parties; `theorem51_solvable`: solvability form.
 * `corollary52`: **Corollary 5.2** (`t ≤ max{⌈s/2⌉, ⌈n/3⌉} - 1`), with `paper_bound_iff`.
-* `theorem51_small`: non-vacuity (for `s ≤ 2` the black box is discharged by `orBA`).
+* `theorem51_unreg_small`: non-vacuity (for `s ≤ 2` the black box is discharged by `orBA`).
 -/
 
 namespace PartialAuthBC
@@ -55,34 +58,25 @@ section Defs
 
 variable (Reg : Set P) (pa : Protocol (↥Reg) Bool Ma Bool) (R : ℕ)
 
-/-- The `pa` part of an inbox, restricted to registered senders. -/
-def decA (ib : Inbox P (Ma ⊕ Bool)) : Inbox (↥Reg) Ma := fun q => (ib q.1).bind Sum.getLeft?
-
-/-- The first decision of `pa` of the registered party `p` within the first `R` inboxes of `h`. -/
-def authOut (p : ↥Reg) (x : Bool) (h : History P (Ma ⊕ Bool)) : Option Bool :=
-  firstUpTo (fun r => pa.decide p x ((h.take r).map (decA Reg))) R
-
 open Classical in
 /-- Majority of the values received from registered parties (tie → `false`). -/
-noncomputable def maj (ib : Inbox P (Ma ⊕ Bool)) : Bool :=
-  decide ({q | q ∈ Reg ∧ ib q = some (Sum.inr false)}.ncard <
-    {q | q ∈ Reg ∧ ib q = some (Sum.inr true)}.ncard)
+noncomputable def maj (ib : Inbox P Bool) : Bool :=
+  decide ({q | q ∈ Reg ∧ ib q = some false}.ncard < {q | q ∈ Reg ∧ ib q = some true}.ncard)
 
 open Classical in
+/-- Steps 2 and 3 of Π_SBA, on input `o` (the `pa` decision of a registered party, if any): in
+its first round every registered party sends `o` to every unregistered party; registered parties
+output `o`, unregistered parties output (after one round) the majority of the values received from
+registered parties. -/
+noncomputable def sbaOut : Protocol P (Option Bool) Bool Bool where
+  send p x h q := if p ∈ Reg ∧ q ∉ Reg ∧ h.length = 0 then x else none
+  decide p x h := if p ∈ Reg then x else (h[0]?).map (maj Reg)
+
 /-- **Π_SBA** (Figure 3) with the black-box authenticated BA protocol `pa` among the registered
-parties, which terminates within `R` rounds. -/
-noncomputable def sba : Protocol P Bool (Ma ⊕ Bool) Bool where
-  send p x h q :=
-    if hp : p ∈ Reg then
-      if h.length < R then
-        if hq : q ∈ Reg then (pa.send ⟨p, hp⟩ x (h.map (decA Reg)) ⟨q, hq⟩).map Sum.inl else none
-      else if h.length = R ∧ q ∉ Reg then (authOut Reg pa R ⟨p, hp⟩ x h).map Sum.inr
-      else none
-    else none
-  decide p x h :=
-    if hp : p ∈ Reg then
-      if R ≤ h.length then authOut Reg pa R ⟨p, hp⟩ x h else none
-    else (h[R]?).map (maj Reg)
+parties, which terminates within `R` rounds: `pa` among the registered parties for `R` rounds,
+then `sbaOut` on the first `pa` decision (sequential composition). -/
+noncomputable def sba : Protocol P Bool (Ma ⊕ Bool) Bool :=
+  (pa.extend Reg).seq R (fun _ _ o => o) (sbaOut Reg)
 
 /-- Tokens of Π_SBA: those of the `pa` messages (signer lifted to `P`); the output messages of
 step 2 carry none. -/
@@ -98,59 +92,74 @@ lemma liftAuth_registered (Aa : Auth (↥Reg) Ma Sa) : RegisteredSigners Reg (li
 
 variable {Reg pa R}
 
-lemma sba_send_lt {p q : P} {x : Bool} {h : History P (Ma ⊕ Bool)} (hl : h.length < R)
-    (hp : p ∈ Reg) (hq : q ∈ Reg) :
-    (sba Reg pa R).send p x h q = (pa.send ⟨p, hp⟩ x (h.map (decA Reg)) ⟨q, hq⟩).map Sum.inl := by
-  simp [sba, hp, hl, hq]
-
-lemma sba_send_R {p q : P} {x : Bool} {h : History P (Ma ⊕ Bool)} (hl : h.length = R)
-    (hp : p ∈ Reg) (hq : q ∉ Reg) :
-    (sba Reg pa R).send p x h q = (authOut Reg pa R ⟨p, hp⟩ x h).map Sum.inr := by
-  simp [sba, hp, hl, hq]
-
-lemma sba_send_inl {p q : P} {x : Bool} {h : History P (Ma ⊕ Bool)} {m : Ma}
-    (hm : (sba Reg pa R).send p x h q = some (Sum.inl m)) :
-    ∃ (hp : p ∈ Reg) (hq : q ∈ Reg), h.length < R ∧
-      pa.send ⟨p, hp⟩ x (h.map (decA Reg)) ⟨q, hq⟩ = some m := by
-  simp only [sba] at hm
-  split_ifs at hm with hp hl hq hl'
-  · obtain ⟨m', hm', he⟩ := Option.map_eq_some_iff.mp hm
-    cases he
-    exact ⟨hp, hq, hl, hm'⟩
-  · obtain ⟨m', -, he⟩ := Option.map_eq_some_iff.mp hm
-    cases he
-
-lemma sba_decide_reg {p : P} {x : Bool} {h : History P (Ma ⊕ Bool)} (hp : p ∈ Reg) :
-    (sba Reg pa R).decide p x h = if R ≤ h.length then authOut Reg pa R ⟨p, hp⟩ x h else none := by
-  simp [sba, hp]
-
-lemma sba_decide_unreg {p : P} {x : Bool} {h : History P (Ma ⊕ Bool)} (hp : p ∉ Reg) :
-    (sba Reg pa R).decide p x h = (h[R]?).map (maj Reg) := by
-  simp [sba, hp]
-
-lemma histTokens_decA {Aa : Auth (↥Reg) Ma Sa} {h : History P (Ma ⊕ Bool)} {τ : Sa}
-    (hτ : τ ∈ Aa.histTokens (h.map (decA Reg))) : τ ∈ (liftAuth Reg Aa).histTokens h := by
-  obtain ⟨ib, hib, q, m, hm, hτm⟩ := hτ
-  obtain ⟨ib', hib', rfl⟩ := List.mem_map.mp hib
-  simp only [decA, Option.bind_eq_some_iff, Sum.getLeft?_eq_some_iff] at hm
-  obtain ⟨_, hq, rfl⟩ := hm
-  exact ⟨ib', hib', q.1, Sum.inl m, hq, hτm⟩
-
 /-- Π_SBA is unforging (given that `pa` is). -/
 theorem sba_unforging {Aa : Auth (↥Reg) Ma Sa} (hU : pa.Unforging Aa) :
-    (sba Reg pa R).Unforging (liftAuth Reg Aa) := by
-  intro p x h q m hm τ hτ
-  cases m with
-  | inl m =>
-    obtain ⟨hp, hq, -, hm'⟩ := sba_send_inl hm
-    rcases hU _ _ _ _ _ hm' τ hτ with h1 | h1
-    · left; show (Aa.signer τ).1 = p; rw [h1]
-    · exact Or.inr (histTokens_decA h1)
-  | inr b => exact absurd hτ (Set.notMem_empty τ)
+    (sba Reg pa R).Unforging (liftAuth Reg Aa) :=
+  Protocol.Unforging.seq_of_left_right hU.extend
+    fun _ _ _ _ _ _ τ hτ => absurd hτ (Set.notMem_empty τ)
+
+/-- The first decision of `pa` (run on the histories of `h`) within `R` rounds. -/
+lemma firstDecide_extend {p : P} (hp : p ∈ Reg) (x : Bool) (h : History P (Ma ⊕ Bool))
+    (hl : R ≤ h.length) :
+    (pa.extend Reg).firstDecide p x (histL (h.take R)) =
+      firstUpTo (fun r => pa.decide ⟨p, hp⟩ x (restrictHist Reg (histL (h.take r)))) R := by
+  rw [Protocol.firstDecide, show (histL (h.take R)).length = R by simp [histL]; omega]
+  refine firstUpTo_congr fun r hr => ?_
+  rw [Protocol.extend_decide_of_mem pa hp, histL, ← List.map_take, List.take_take,
+    min_eq_left hr]
+  rfl
+
+open Classical in
+/-- **Π_SBA is the protocol of Figure 3.** A registered party runs `pa` with the registered
+parties during the first `R` rounds (on the `pa` messages from registered senders), sends in round
+`R` its first `pa` decision `out` to every unregistered party and outputs `out` from round `R`
+on; an unregistered party outputs the majority of the values received in round `R`. -/
+theorem sba_send_decide (p q : P) (x : Bool) (h : History P (Ma ⊕ Bool)) :
+    let out := fun hp : p ∈ Reg =>
+      firstUpTo (fun r => pa.decide ⟨p, hp⟩ x (restrictHist Reg (histL (h.take r)))) R
+    (sba Reg pa R).send p x h q =
+      (if hp : p ∈ Reg then
+        if h.length < R then
+          if hq : q ∈ Reg then
+            (pa.send ⟨p, hp⟩ x (restrictHist Reg (histL h)) ⟨q, hq⟩).map Sum.inl
+          else none
+        else if h.length = R ∧ q ∉ Reg then (out hp).map Sum.inr else none
+      else none) ∧
+    (sba Reg pa R).decide p x h =
+      (if hp : p ∈ Reg then (if R ≤ h.length then out hp else none)
+       else (h[R]?).map fun ib => maj Reg (inboxR ib)) := by
+  intro out
+  constructor
+  · by_cases hl : h.length < R
+    · rw [sba, seq_send_lt _ _ _ _ hl]
+      by_cases hp : p ∈ Reg
+      · by_cases hq : q ∈ Reg
+        · simp [hp, hq, hl, Protocol.extend_send_of_mem pa hp hq]
+        · simp [Protocol.extend, hp, hq, hl]
+      · simp [Protocol.extend, hp]
+    · rw [sba, seq_send_ge _ _ _ _ (not_lt.1 hl)]
+      by_cases hp : p ∈ Reg
+      · simp only [hp, ↓reduceDIte, hl, ↓reduceIte, sbaOut, true_and, List.length_drop,
+          Protocol.seqInput, firstDecide_extend hp x h (not_lt.1 hl), histR, List.length_map]
+        by_cases hR : h.length = R
+        · by_cases hq : q ∈ Reg <;> simp [hR, out, hq]
+        · simp [hR, show h.length - R ≠ 0 by omega]
+      · simp [sbaOut, hp]
+  · by_cases hp : p ∈ Reg
+    · by_cases hl : R ≤ h.length
+      · simp only [sba, Protocol.seq, not_lt.2 hl, ↓reduceIte, sbaOut, hp, ↓reduceDIte, hl,
+          Protocol.seqInput, firstDecide_extend hp x h hl, out]
+      · simp [sba, Protocol.seq, lt_of_not_ge hl, hp, hl]
+    · by_cases hl : R ≤ h.length
+      · simp only [sba, Protocol.seq, not_lt.2 hl, ↓reduceIte, sbaOut, hp, ↓reduceDIte, histR,
+          List.getElem?_map, List.getElem?_drop, Nat.add_zero, Option.map_map]
+        rfl
+      · simp [sba, Protocol.seq, lt_of_not_ge hl, hp,
+          List.getElem?_eq_none (by omega : h.length ≤ R)]
 
 end Defs
 
-/-! ### The derived run of `pa` -/
+/-! ### The derived runs -/
 
 section Run
 
@@ -158,123 +167,52 @@ variable {Reg : Set P} {pa : Protocol (↥Reg) Bool Ma Bool} {R : ℕ}
   (s : Scenario P Bool (Ma ⊕ Bool))
 
 /-- The scenario of `pa` among the registered parties induced by a run of Π_SBA. -/
-def scA (Reg : Set P) (s : Scenario P Bool (Ma ⊕ Bool)) : Scenario (↥Reg) Bool Ma where
-  byz := {q | q.1 ∈ s.byz}
-  input q := s.input q.1
-  adv r b q := (s.adv r b.1 q.1).bind Sum.getLeft?
-  drop r b q := s.drop r b.1 q.1
+abbrev scA (Reg : Set P) (R : ℕ) (s : Scenario P Bool (Ma ⊕ Bool)) : Scenario (↥Reg) Bool Ma :=
+  (s.seqFst R).restrict Reg
 
-@[simp] lemma scA_byz (q : ↥Reg) : q ∈ (scA Reg s).byz ↔ q.1 ∈ s.byz := Iff.rfl
-@[simp] lemma scA_input (q : ↥Reg) : (scA Reg s).input q = s.input q.1 := rfl
-@[simp] lemma scA_drop (r : ℕ) (b q : ↥Reg) : (scA Reg s).drop r b q = s.drop r b.1 q.1 := rfl
-lemma scA_adv (r : ℕ) (b q : ↥Reg) :
-    (scA Reg s).adv r b q = (s.adv r b.1 q.1).bind Sum.getLeft? := rfl
-
-lemma scA_reliable (hrel : s.Reliable) : (scA Reg s).Reliable := fun r b q => hrel r b.1 q.1
-
-/-- The first `R` rounds of Π_SBA, seen by a registered party, are a run of `pa`. -/
-lemma hist_decA {r : ℕ} (hr : r ≤ R) (p : ↥Reg) :
-    (hist ⊤ (sba Reg pa R) s r p.1).map (decA Reg) = hist ⊤ pa (scA Reg s) r p := by
-  induction r generalizing p with
-  | zero => rfl
-  | succ r ih =>
-    rw [hist_succ, hist_succ, List.map_append, ih (by omega)]
-    simp only [List.map_cons, List.map_nil]
-    congr 2
-    funext q
-    by_cases hqp : q = p
-    · subst hqp; simp [deliver, decA]
-    have hqp' : q.1 ≠ p.1 := fun h => hqp (Subtype.ext h)
-    by_cases hqb : q.1 ∈ s.byz
-    · simp [deliver, decA, hqp, hqp', hqb, scA_adv]
-    by_cases hd : s.drop r q.1 p.1
-    · simp [deliver, decA, hqp, hqp', hqb, hd]
-    · simp only [deliver, decA, SimpleGraph.top_adj, ne_eq, hqp, hqp', not_false_eq_true,
-        ite_true, hqb, ite_false, hd, scA_byz, scA_drop, scA_input]
-      rw [sba_send_lt (by rw [length_hist]; omega) q.2 p.2, ih (by omega) q]
-      cases pa.send _ _ _ _ <;> rfl
+lemma scA_reliable (hrel : s.Reliable) : (scA Reg R s).Reliable := fun r b q => hrel r b.1 q.1
 
 /-- Unforgeability of the adversary transfers to the derived run of `pa`. -/
 lemma scA_authValid {Aa : Auth (↥Reg) Ma Sa}
-    (hV : s.AuthValid ⊤ (sba Reg pa R) (liftAuth Reg Aa)) :
-    (scA Reg s).AuthValid ⊤ pa Aa := by
-  intro r b q m hb hq _ hm τ hτ
-  rw [scA_adv] at hm
-  obtain ⟨m', hm', hm''⟩ := Option.bind_eq_some_iff.mp hm
-  obtain ⟨m', rfl⟩ : ∃ m₀, m' = Sum.inl m₀ := by
-    cases m' with
-    | inl m₀ => exact ⟨m₀, rfl⟩
-    | inr _ => simp at hm''
-  simp only [Sum.getLeft?_inl, Option.some.injEq] at hm''
-  subst hm''
-  have hbq : b.1 ≠ q.1 := fun h => hq (show q.1 ∈ s.byz by rw [← h]; exact hb)
-  rcases hV r b.1 q.1 _ hb hq (by simpa using hbq) hm' τ hτ with h | ⟨r', hr', p', hp', q', hadj', m₁, hm₁, hτ₁⟩
-  · exact Or.inl h
-  · right
-    cases m₁ with
-    | inr _ => exact absurd hτ₁ (Set.notMem_empty τ)
-    | inl m₂ =>
-      obtain ⟨hpR, hqR, hl, hm₂⟩ := sba_send_inl hm₁
-      rw [length_hist] at hl
-      have hpq : (⟨p', hpR⟩ : ↥Reg) ≠ ⟨q', hqR⟩ := fun h =>
-        hadj'.ne (congrArg Subtype.val h)
-      refine ⟨r', hr', ⟨p', hpR⟩, hp', ⟨q', hqR⟩, by simpa using hpq, m₂, ?_, hτ₁⟩
-      rw [← hist_decA (R := R) s (by omega)]; exact hm₂
+    (hV : s.AuthValid ⊤ (sba Reg pa R) (liftAuth Reg Aa)) : (scA Reg R s).AuthValid ⊤ pa Aa :=
+  (hV.seqFst_left ⊤ (pa.extend Reg) R _ _).restrict (by simp) pa
 
-/-- The `k`-th inbox of a history is the inbox delivered in round `k`. -- CSLib candidate -/
-lemma hist_getElem? {P I M O : Type*} (G : SimpleGraph P) (alg : Protocol P I M O)
-    (s : Scenario P I M) {k r : ℕ} (hk : k < r) (p : P) :
-    (hist G alg s r p)[k]? = some (fun q => deliver G alg s (hist G alg s k) k q p) := by
-  rw [← List.getElem?_take_of_lt (l := hist G alg s r p) (j := k + 1) (by omega),
-    hist_take G alg s (show k + 1 ≤ r by omega), hist_succ, List.getElem?_append_right (by simp)]
-  simp
+/-- The inputs of the second phase: the first `pa` decisions within `R` rounds. -/
+local notation "X" => seqInputs ⊤ (pa.extend Reg) R (fun _ _ o => o) s
 
-/-- The output of a registered party, computed from its history after round `R`, is the first
-decision of `pa` within `R` rounds of the derived run. -/
-lemma authOut_hist {r : ℕ} (hr : R ≤ r) {p : P} (hp : p ∈ Reg) :
-    authOut Reg pa R ⟨p, hp⟩ (s.input p) (hist ⊤ (sba Reg pa R) s r p) =
-      firstUpTo (fun j => status ⊤ pa (scA Reg s) j ⟨p, hp⟩) R := by
-  unfold authOut
-  apply firstUpTo_congr
-  intro j hj
-  rw [hist_take _ _ _ (by omega), hist_decA s hj ⟨p, hp⟩]
-  rfl
-
-lemma sba_status_reg_lt {r : ℕ} (hr : r < R) {p : P} (hp : p ∈ Reg) :
-    status ⊤ (sba Reg pa R) s r p = none := by
-  rw [status, sba_decide_reg hp, length_hist]
-  simp [show ¬ R ≤ r by omega]
+/-- A registered party starts the second phase with its first `pa` decision within `R` rounds. -/
+lemma sba_input {p : P} (hp : p ∈ Reg) :
+    X p = firstUpTo (fun j => status ⊤ pa (scA Reg R s) j ⟨p, hp⟩) R := by
+  rw [seqInputs_eq_firstUpTo]
+  exact firstUpTo_congr fun j _ => status_extend (G' := ⊤) (by simp) pa _ j ⟨p, hp⟩
 
 /-- Registered parties decide the first decision of `pa` within `R` rounds. -/
 lemma sba_decides_reg {p : P} (hp : p ∈ Reg) (o : Bool) :
     Decides ⊤ (sba Reg pa R) s p o ↔
-      firstUpTo (fun j => status ⊤ pa (scA Reg s) j ⟨p, hp⟩) R = some o := by
-  rw [decides_iff_firstSome, firstSome_shift R (fun r hr => sba_status_reg_lt s hr hp)]
-  have hst : ∀ r, status ⊤ (sba Reg pa R) s (R + r) p =
-      firstUpTo (fun j => status ⊤ pa (scA Reg s) j ⟨p, hp⟩) R := by
-    intro r
-    rw [status, sba_decide_reg hp, length_hist, authOut_hist s (by omega) hp]
-    simp
-  simp only [hst]
-  constructor
-  · rintro ⟨r, hr, -⟩; exact hr
-  · intro h; exact ⟨0, h, fun _ h => absurd h (Nat.not_lt_zero _)⟩
+      firstUpTo (fun j => status ⊤ pa (scA Reg R s) j ⟨p, hp⟩) R = some o := by
+  rw [sba, decides_seq_iff, ← sba_input s hp]
+  have hst : ∀ r, status ⊤ (sbaOut Reg) (s.seqSnd R X) r p = X p := fun r => by
+    simp [status, sbaOut, hp]
+  rcases h : X p with _ | v
+  · simp only [reduceCtorEq, iff_false]
+    rintro ⟨r, hr, -⟩
+    rw [hst, h] at hr
+    cases hr
+  · rw [Option.some.injEq, eq_comm]
+    exact firstSome_iff_of_forall fun r => (hst r).trans h
 
-/-- Unregistered parties decide the majority of the values received in round `R`. -/
+/-- Unregistered parties decide the majority of the values received in the first round of the
+second phase. -/
 lemma sba_decides_unreg {p : P} (hp : p ∉ Reg) (o : Bool) :
-    Decides ⊤ (sba Reg pa R) s p o ↔
-      o = maj Reg (fun q => deliver ⊤ (sba Reg pa R) s (hist ⊤ (sba Reg pa R) s R) R q p) := by
-  rw [decides_iff_firstSome, firstSome_shift (R + 1) (fun r hr => by
-    rw [status, sba_decide_unreg hp]; simp [show r ≤ R by omega])]
-  have hst : ∀ r, status ⊤ (sba Reg pa R) s (R + 1 + r) p =
-      some (maj Reg (fun q => deliver ⊤ (sba Reg pa R) s (hist ⊤ (sba Reg pa R) s R) R q p)) := by
-    intro r
-    rw [status, sba_decide_unreg hp, hist_getElem? _ _ _ (by omega)]
-    rfl
-  simp only [hst]
-  constructor
-  · rintro ⟨r, hr, -⟩; exact (Option.some_injective _ hr).symm
-  · rintro rfl; exact ⟨0, rfl, fun _ h => absurd h (Nat.not_lt_zero _)⟩
+    Decides ⊤ (sba Reg pa R) s p o ↔ o = maj Reg fun q =>
+      deliver ⊤ (sbaOut Reg) (s.seqSnd R X) (hist ⊤ (sbaOut Reg) (s.seqSnd R X) 0) 0 q p := by
+  rw [sba, decides_seq_iff, decides_iff_firstSome, firstSome_shift 1 fun r hr => by
+    obtain rfl : r = 0 := by omega
+    simp [status, sbaOut, hp]]
+  refine firstSome_iff_of_forall fun r => ?_
+  simp only [status, sbaOut, hp, ↓reduceIte]
+  rw [getElem?_hist ⊤ _ _ (by omega)]
+  rfl
 
 end Run
 
@@ -286,14 +224,14 @@ variable [Finite P] {Reg : Set P} {pa : Protocol (↥Reg) Bool Ma Bool} {R : ℕ
 
 /-- If every honest registered party sends `b` and the Byzantine registered parties are a strict
 minority of `Reg`, the majority is `b` (the tie-breaking rule is never used). -/
-lemma maj_eq {ib : Inbox P (Ma ⊕ Bool)} {B : Set P} {b : Bool}
+lemma maj_eq {ib : Inbox P Bool} {B : Set P} {b : Bool}
     (hB : 2 * (B ∩ Reg).ncard < Reg.ncard)
-    (hib : ∀ q ∈ Reg, q ∉ B → ib q = some (Sum.inr b)) : maj Reg ib = b := by
+    (hib : ∀ q ∈ Reg, q ∉ B → ib q = some b) : maj Reg ib = b := by
   have hsplit := Set.ncard_inter_add_ncard_sdiff_eq_ncard Reg B
   have hBR : (Reg ∩ B).ncard = (B ∩ Reg).ncard := by rw [Set.inter_comm]
-  have hgood : (Reg \ B).ncard ≤ {q | q ∈ Reg ∧ ib q = some (Sum.inr b)}.ncard :=
+  have hgood : (Reg \ B).ncard ≤ {q | q ∈ Reg ∧ ib q = some b}.ncard :=
     Set.ncard_le_ncard (fun q ⟨hq, hqB⟩ => ⟨hq, hib q hq hqB⟩)
-  have hbad : {q | q ∈ Reg ∧ ib q = some (Sum.inr (!b))}.ncard ≤ (B ∩ Reg).ncard := by
+  have hbad : {q | q ∈ Reg ∧ ib q = some (!b)}.ncard ≤ (B ∩ Reg).ncard := by
     refine Set.ncard_le_ncard (fun q ⟨hq, hqc⟩ => ⟨?_, hq⟩)
     by_contra hqB
     rw [hib q hq hqB] at hqc
@@ -315,17 +253,17 @@ theorem sba_BA {Aa : Auth (↥Reg) Ma Sa} {Z : AdvStructure ↥Reg} (hpa : Bound
     (hmin : 2 * (s.byz ∩ Reg).ncard < Reg.ncard) (hrel : s.Reliable)
     (hV : s.AuthValid ⊤ (sba Reg pa R) (liftAuth Reg Aa)) :
     BA s.input s.honest (Decides ⊤ (sba Reg pa R) s) := by
-  have hrelA := scA_reliable (Reg := Reg) s hrel
+  have hrelA := scA_reliable (Reg := Reg) (R := R) s hrel
   have hVA := scA_authValid s hV
-  obtain ⟨-, hval, hagr⟩ := hpa.solves (scA Reg s) hZ hrelA hVA
-  have hT := hpa.terminates (scA Reg s) hZ hrelA hVA
+  obtain ⟨-, hval, hagr⟩ := hpa.solves (scA Reg R s) hZ hrelA hVA
+  have hT := hpa.terminates (scA Reg R s) hZ hrelA hVA
   -- the output of an honest registered party is its `pa` decision
   have hout : ∀ p (hp : p ∈ Reg), p ∉ s.byz → ∃ o,
-      firstUpTo (fun j => status ⊤ pa (scA Reg s) j ⟨p, hp⟩) R = some o ∧
-        Decides ⊤ pa (scA Reg s) ⟨p, hp⟩ o := by
+      firstUpTo (fun j => status ⊤ pa (scA Reg R s) j ⟨p, hp⟩) R = some o ∧
+        Decides ⊤ pa (scA Reg R s) ⟨p, hp⟩ o := by
     intro p hp hpb
     obtain ⟨r, hr, o, ho⟩ := hT ⟨p, hp⟩ hpb
-    cases hF : firstUpTo (fun j => status ⊤ pa (scA Reg s) j ⟨p, hp⟩) R with
+    cases hF : firstUpTo (fun j => status ⊤ pa (scA Reg R s) j ⟨p, hp⟩) R with
     | none => rw [firstUpTo_eq_none.1 hF r hr] at ho; cases ho
     | some o' => exact ⟨o', rfl, FirstSome.of_firstUpTo hF⟩
   -- some registered party is honest
@@ -337,7 +275,7 @@ theorem sba_BA {Aa : Auth (↥Reg) Ma Sa} {Z : AdvStructure ↥Reg} (hpa : Bound
   obtain ⟨b, -, hdb₀⟩ := hout p₀ hp₀R hp₀
   -- all honest registered parties output `b`
   have hregb : ∀ p (hp : p ∈ Reg), p ∉ s.byz →
-      firstUpTo (fun j => status ⊤ pa (scA Reg s) j ⟨p, hp⟩) R = some b := by
+      firstUpTo (fun j => status ⊤ pa (scA Reg R s) j ⟨p, hp⟩) R = some b := by
     intro p hp hpb
     obtain ⟨o, ho, hdo⟩ := hout p hp hpb
     rw [ho, hagr ⟨p, hp⟩ hpb ⟨p₀, hp₀R⟩ hp₀ o b hdo hdb₀]
@@ -348,9 +286,10 @@ theorem sba_BA {Aa : Auth (↥Reg) Ma Sa} {Z : AdvStructure ↥Reg} (hpa : Bound
     · rw [sba_decides_unreg s hp, maj_eq hmin]
       intro q hq hqB
       have hqp : q ≠ p := fun h => hp (h ▸ hq)
-      rw [deliver_honest ⊤ _ s hrel hqB (by simpa using hqp), sba_send_R (length_hist _ _ _ _ _) hq hp,
-        authOut_hist s le_rfl hq, hregb q hq hqB]
-      rfl
+      rw [deliver_honest ⊤ _ _ (hrel.seqSnd R _) hqB (by simpa using hqp)]
+      simp only [sbaOut, hq, hp, not_false_eq_true, hist_zero, List.length_nil, and_self,
+        ↓reduceIte, Scenario.seqSnd_input]
+      rw [sba_input s hq, hregb q hq hqB]
   refine ⟨fun p hp => ⟨b, (hdec p hp b).2 rfl⟩, fun v hv p hp => (hdec p hp v).2 ?_,
     fun p hp q hq v w hv hw => by rw [(hdec p hp v).1 hv, (hdec q hq w).1 hw]⟩
   exact (Decides.unique _ _ hdb₀ (hval v (fun q hq => hv q.1 hq) ⟨p₀, hp₀R⟩ hp₀)).symm

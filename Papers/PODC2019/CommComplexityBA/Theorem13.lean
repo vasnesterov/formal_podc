@@ -28,6 +28,7 @@ measure.
 set_option linter.unusedSectionVars false
 
 open MeasureTheory
+open Cslib.Byzantine.LockStep (firstSome?)
 
 namespace CommComplexityBA.NoSetup
 
@@ -114,7 +115,7 @@ lemma run_W (A : Adversary P M (P → T) C) (hA : A.inject = π.wInject S C (bbI
 
 lemma output_S_W (A : Adversary P M (P → T) C) (hA : A.inject = π.wInject S C (bbInput s (!b)))
     (ω ρ : P → T) :
-    π.output (bbInput s b) ω A ρ S = firstSome fun r =>
+    π.output (bbInput s b) ω A ρ S = firstSome? fun r =>
       π.decide S (bbInput s b S) (ω S) (π.tcRun S C (par s S b ω ρ false true) r).hS := by
   simp only [output, π.run_W s S C A hA, Function.update_self]
 

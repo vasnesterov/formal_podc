@@ -124,12 +124,12 @@ lemma stAt_succ_of_eq {r : ℕ} {v : V} (h : r % rounds (V := V) + 1 = rounds (V
   rfl
 
 lemma inboxAt_honest (hrel : s.Reliable) {r : ℕ} {p v : V} (hp : p ∉ s.byz) (hadj : G.Adj p v) :
-    inboxAt G f sel s r v p = some (outMsg (stAt G f sel s r p)) := by
-  simp [inboxAt, deliver, hadj, hp, hrel r p v, alg1, stAt]
+    inboxAt G f sel s r v p = some (outMsg (stAt G f sel s r p)) :=
+  deliver_honest G _ s hrel hp hadj
 
 lemma inboxAt_byz {r : ℕ} {p v : V} (hp : p ∈ s.byz) (hadj : G.Adj p v) :
-    inboxAt G f sel s r v p = s.adv r p v := by
-  simp [inboxAt, deliver, hadj, hp]
+    inboxAt G f sel s r v p = s.adv r p v :=
+  deliver_byz G _ s hp hadj
 
 open Classical in
 /-- The value flooded by `a` in phase `k`: its state if it is non-faulty, otherwise what its

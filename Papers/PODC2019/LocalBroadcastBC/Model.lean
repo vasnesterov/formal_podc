@@ -2,6 +2,8 @@ import Cslib.Computability.Distributed.Byzantine.LockStep.Cover
 import Cslib.Computability.Distributed.Byzantine.LockStep.Agreement
 import Cslib.Foundations.Combinatorics.SimpleGraph.VertexConnectivity
 import Mathlib
+import Podc.LockStep.Basic
+import Podc.Agreement.Specs
 
 /-!
 # The local broadcast model (Khan–Naqvi–Vaidya, PODC 2019), on top of CSLib's lock-step model
@@ -16,8 +18,8 @@ identically by all neighbours of its sender:
   on `q`); this is the whole restriction of the adversary (no equivocation).
 
 `SolvesLB G alg Z spec` / `SolvableLB G Z spec` are the corresponding solvability notions;
-`atMost f` is the threshold adversary (at most `f` Byzantine nodes) and `Consensus` is the
-specification of Section 3 of the paper (agreement, validity "the output is the input of some
+the threshold adversary is the shared `atMost f` (at most `f` Byzantine nodes) and `Consensus` is
+the specification of Section 3 of the paper (agreement, validity "the output is the input of some
 non-faulty node", termination).
 
 The impossibility proofs use FLM-style covering systems (CSLib `CoverSystem`) in which every
@@ -56,15 +58,13 @@ def SolvableLB {V : Type u} {I O : Type*} (G : SimpleGraph V) (Z : AdvStructure 
     Prop :=
   ∃ (M : Type u) (alg : Protocol V I M O), IsBroadcast alg ∧ SolvesLB G alg Z spec
 
-/-- The threshold adversary: at most `f` Byzantine nodes. -/
-def atMost (f : ℕ) : AdvStructure V := {B | B.ncard ≤ f}
-
+open Cslib.Byzantine in
 /-- Byzantine consensus as in Section 3 of [KNV19]: termination, validity (the output of each
 non-faulty node is the input of some non-faulty node) and agreement. -/
 def Consensus {W : Type*} : Spec V W W := fun x H dec =>
-  (∀ p ∈ H, ∃ v, dec p v) ∧
+  Problem.Termination H dec ∧
   (∀ p ∈ H, ∀ v, dec p v → ∃ q ∈ H, x q = v) ∧
-  (∀ p ∈ H, ∀ q ∈ H, ∀ v w, dec p v → dec q w → v = w)
+  Problem.Agreement H dec
 
 /-- For binary values the paper's consensus specification is CSLib's Byzantine agreement `BA`
 (as long as some node is non-faulty). -/
