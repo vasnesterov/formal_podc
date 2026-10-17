@@ -1,6 +1,8 @@
 import Papers.PODC2013.ByzantineVectorConsensus.Spec
 import Podc.Foundations.Data.Finset.Quorum
 import Podc.Foundations.Data.Real.Logb
+import Podc.Foundations.Algebra.Order.BigOperators.Average
+import Podc.Computability.Distributed.ApproxConsensus.Contraction
 
 /-!
 # The iterative approximate BVC algorithm (Section 3.2, Theorem 5; Section 4, Theorem 6)
@@ -34,7 +36,7 @@ Main results:
 * `RoundExec.agreement_bound`, `RoundExec.approx_agreement` and `theorem_5`.
 -/
 
-open Finset Module
+open Finset Module Cslib.ApproxConsensus
 
 namespace ByzantineVectorConsensus
 
@@ -66,55 +68,33 @@ theorem exists_heavy {F : Finset (Vec d)} {z : Vec d} (hz : z ∈ convexHull ℝ
   have hzl : (∑ y ∈ F, w y • y) l = ∑ y ∈ F, w y * y l := by
     simp [Finset.sum_apply, smul_eq_mul]
   refine ⟨u, huF, ?_, ?_⟩
-  · -- `z_l = b - ∑ w_y (b - y_l) ≤ b - w_u (b - u_l)`
-    have h1 : ∑ y ∈ F, w y * y l = b - ∑ y ∈ F, w y * (b - y l) := by
-      have : ∑ y ∈ F, w y * (b - y l) = b * ∑ y ∈ F, w y - ∑ y ∈ F, w y * y l := by
-        rw [Finset.mul_sum, ← Finset.sum_sub_distrib]
-        refine Finset.sum_congr rfl fun y _ => by ring
-      rw [this, hw1]; ring
-    have h2 : w u * (b - u l) ≤ ∑ y ∈ F, w y * (b - y l) :=
-      Finset.single_le_sum (f := fun y => w y * (b - y l))
-        (fun y hy => mul_nonneg (hw0 y hy) (by linarith [(hab y hy).2])) huF
-    have h3 : (b - u l) / n ≤ w u * (b - u l) := by
+  · have h3 : (b - u l) / n ≤ w u * (b - u l) := by
       rw [div_eq_mul_one_div, mul_comm]
       exact mul_le_mul_of_nonneg_right hun (by linarith [(hab u huF).2])
-    rw [hzl, h1]; linarith
-  · have h1 : ∑ y ∈ F, w y * y l = a + ∑ y ∈ F, w y * (y l - a) := by
-      have : ∑ y ∈ F, w y * (y l - a) = ∑ y ∈ F, w y * y l - a * ∑ y ∈ F, w y := by
-        rw [Finset.mul_sum, ← Finset.sum_sub_distrib]
-        refine Finset.sum_congr rfl fun y _ => by ring
-      rw [this, hw1]; ring
-    have h2 : w u * (u l - a) ≤ ∑ y ∈ F, w y * (y l - a) :=
-      Finset.single_le_sum (f := fun y => w y * (y l - a))
-        (fun y hy => mul_nonneg (hw0 y hy) (by linarith [(hab y hy).1])) huF
-    have h3 : (u l - a) / n ≤ w u * (u l - a) := by
+    rw [hzl]
+    linarith [Finset.sum_mul_le_sub_mul_sub hw0 hw1 (fun y hy => (hab y hy).2) huF]
+  · have h3 : (u l - a) / n ≤ w u * (u l - a) := by
       rw [div_eq_mul_one_div, mul_comm]
       exact mul_le_mul_of_nonneg_right hun (by linarith [(hab u huF).1])
-    rw [hzl, h1]; linarith
+    rw [hzl]
+    linarith [Finset.add_mul_sub_le_sum_mul hw0 hw1 (fun y hy => (hab y hy).1) huF]
 
 /-- Averaging: if all `x_i ≤ b` and `x_{i₀} ≤ b - δ₀`, the average is `≤ b - δ₀ / |S|`. -/
 theorem avg_le {ι : Type*} {S : Finset ι} {x : ι → ℝ} {b δ₀ : ℝ} {i₀ : ι} (hi₀ : i₀ ∈ S)
     (hx : ∀ i ∈ S, x i ≤ b) (h0 : x i₀ ≤ b - δ₀) :
     ((S.card : ℝ))⁻¹ * ∑ i ∈ S, x i ≤ b - δ₀ / S.card := by
-  classical
-  have hpos : (0 : ℝ) < S.card := by exact_mod_cast card_pos.2 ⟨i₀, hi₀⟩
-  rw [← Finset.add_sum_erase _ _ hi₀]
-  have hrest : ∑ i ∈ S.erase i₀, x i ≤ (S.card - 1) * b := by
-    have := Finset.sum_le_card_nsmul (S.erase i₀) x b fun i hi => hx i (mem_of_mem_erase hi)
-    rw [card_erase_of_mem hi₀, nsmul_eq_mul] at this
-    have h1 : ((S.card - 1 : ℕ) : ℝ) = S.card - 1 := by
-      rw [Nat.cast_sub (card_pos.2 ⟨i₀, hi₀⟩)]; simp
-    rwa [h1] at this
-  rw [inv_mul_le_iff₀ hpos, mul_sub, mul_div_cancel₀ _ hpos.ne']
+  rw [inv_mul_eq_div]
+  refine (Finset.sum_div_card_le_sub_div hx hi₀ le_rfl).trans ?_
+  gcongr
   linarith
 
 /-- Averaging, lower bound version. -/
 theorem le_avg {ι : Type*} {S : Finset ι} {x : ι → ℝ} {a δ₀ : ℝ} {i₀ : ι} (hi₀ : i₀ ∈ S)
     (hx : ∀ i ∈ S, a ≤ x i) (h0 : a + δ₀ ≤ x i₀) :
     a + δ₀ / S.card ≤ ((S.card : ℝ))⁻¹ * ∑ i ∈ S, x i := by
-  have := avg_le (x := fun i => -x i) (b := -a) (δ₀ := δ₀) hi₀ (fun i hi => by linarith [hx i hi])
-    (by linarith)
-  simp only [Finset.sum_neg_distrib, mul_neg] at this
+  rw [inv_mul_eq_div]
+  refine le_trans ?_ (Finset.add_div_le_sum_div_card hx hi₀ le_rfl)
+  gcongr
   linarith
 
 /-- The number of rounds after which the paper's algorithm terminates:
@@ -346,24 +326,14 @@ theorem spread (hV : E.Valid f s) (hs : (d + 1) * f < s) (hsn : s ≤ Fintype.ca
       ∀ k ∉ E.faulty, a ≤ E.state f s r k l ∧ E.state f s r k l ≤ b := by
   have hγ1 : 0 ≤ 1 - gam (Fintype.card P) s := by
     linarith [gam_le_one hsn (by omega : 0 < s)]
-  induction r with
-  | zero => exact ⟨ν, U, by simp, fun k hk => hin k hk l⟩
-  | succ r ih =>
-    obtain ⟨a, b, hab, hk⟩ := ih
-    have hne : E.correct.Nonempty := by
-      have := card_correct hV
-      have : f ≤ (d + 1) * f := Nat.le_mul_of_pos_left f (by omega)
-      exact card_pos.1 (by omega)
-    set x := fun k => E.state f s (r + 1) k l
-    obtain ⟨kmin, hkmin, hmin⟩ := E.correct.exists_min_image x hne
-    obtain ⟨kmax, hkmax, hmax⟩ := E.correct.exists_max_image x hne
-    refine ⟨x kmin, x kmax, ?_, fun k hk' => ⟨hmin k (mem_correct.2 hk'),
-      hmax k (mem_correct.2 hk')⟩⟩
-    have := contraction hV hs r l hk (mem_correct.1 hkmax) (mem_correct.1 hkmin)
-    calc x kmax - x kmin ≤ (1 - gam (Fintype.card P) s) * (b - a) := this
-      _ ≤ (1 - gam (Fintype.card P) s) * ((1 - gam (Fintype.card P) s) ^ r * (U - ν)) :=
-          mul_le_mul_of_nonneg_left hab hγ1
-      _ = _ := by ring
+  obtain ⟨a, b, hk, hab⟩ := exists_sub_le_pow_mul_of_step
+    (P := fun r a b => ∀ k ∉ E.faulty, a ≤ E.state f s r k l ∧ E.state f s r k l ≤ b) hγ1
+    (fun k hk => hin k hk l) (fun r a b hk => by
+      obtain ⟨a', b', hab', hk'⟩ := exists_Icc_of_forall_sub_le_of_finite
+        (s := {k | k ∉ E.faulty}) (Set.toFinite _) (y := fun k => E.state f s (r + 1) k l)
+        fun i hi j hj => contraction hV hs r l hk hi hj
+      exact ⟨a', b', hk', hab'⟩) r
+  exact ⟨a, b, hab, hk⟩
 
 /-- `ε`-agreement after `r` rounds, coordinate by coordinate. -/
 theorem agreement_bound (hV : E.Valid f s) (hs : (d + 1) * f < s) (hsn : s ≤ Fintype.card P)

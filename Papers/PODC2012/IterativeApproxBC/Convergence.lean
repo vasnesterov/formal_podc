@@ -1,4 +1,5 @@
 import Papers.PODC2012.IterativeApproxBC.Algorithm
+import Podc.Computability.Distributed.ApproxConsensus.Contraction
 
 /-!
 # Convergence of Algorithm 1 (Claims 1–3, Lemma 5, Theorem 3 of [VTL12])
@@ -54,14 +55,9 @@ include hx hF
 
 /-- Bounds on the fault-free states persist (validity). -/
 theorem bounds_persist {s : ℕ} {lo hi : ℝ} (hb : ∀ j ∉ S.F, lo ≤ x s j ∧ x s j ≤ hi) :
-    ∀ τ, ∀ j ∉ S.F, lo ≤ x (s + τ) j ∧ x (s + τ) j ≤ hi := by
-  intro τ
-  induction τ with
-  | zero => exact hb
-  | succ τ ih =>
-    intro j hj
-    exact ⟨(alg1_lower_step hx hF (s + τ) hj lo fun k hk => (ih k hk).1).1,
-      (alg1_upper_step hx hF (s + τ) hj hi fun k hk => (ih k hk).2).1⟩
+    ∀ τ, ∀ j ∉ S.F, lo ≤ x (s + τ) j ∧ x (s + τ) j ≤ hi := fun τ j hj => by
+  obtain ⟨⟨k, hk, h₁⟩, ⟨k', hk', h₂⟩⟩ := (alg1_validStep hx hF).hull_from s τ j hj
+  exact ⟨(hb k hk).1.trans h₁, h₂.trans (hb k' hk').2⟩
 
 include hdeg in
 /-- **Claim 1** of [VTL12]: along the propagating sequence `R_τ` of `R` (inside the fault-free set
@@ -216,20 +212,12 @@ theorem alg1_spread_le (hG : Condition G f) {α : ℝ} (hα0 : 0 ≤ α) (hα1 :
   set n := Fintype.card V
   set γ := 1 - α ^ n / 2
   have hγ : 0 ≤ γ := by have := pow_le_one₀ hα0 hα1 (n := n); simp only [γ]; linarith
-  have phase : ∀ k, ∃ lo' hi', lo' ≤ hi' ∧ (∀ j ∉ S.F, lo' ≤ x (n * k) j ∧ x (n * k) j ≤ hi') ∧
-      hi' - lo' ≤ γ ^ k * (hi - lo) := by
-    intro k
-    induction k with
-    | zero => exact ⟨lo, hi, hlohi, by simpa [hx.1] using hb, by simp⟩
-    | succ k ih =>
-      obtain ⟨lo', hi', hle, hb', hd⟩ := ih
+  have phase := exists_sub_le_pow_mul_of_step
+    (P := fun k lo' hi' => lo' ≤ hi' ∧ ∀ j ∉ S.F, lo' ≤ x (n * k) j ∧ x (n * k) j ≤ hi') hγ
+    ⟨hlohi, by simpa [hx.1] using hb⟩ fun k lo' hi' ⟨hle, hb'⟩ => by
       obtain ⟨lo'', hi'', hle', hb'', hd'⟩ := contraction hx hF hdeg hG hα0 hα1 hα hle hb'
-      refine ⟨lo'', hi'', hle', by rwa [Nat.mul_succ], ?_⟩
-      rw [pow_succ]
-      calc hi'' - lo'' ≤ γ * (hi' - lo') := hd'
-        _ ≤ γ * (γ ^ k * (hi - lo)) := mul_le_mul_of_nonneg_left hd hγ
-        _ = _ := by ring
-  obtain ⟨lo', hi', -, hb', hd⟩ := phase (t / n)
+      exact ⟨lo'', hi'', ⟨hle', by rwa [Nat.mul_succ]⟩, hd'⟩
+  obtain ⟨lo', hi', ⟨-, hb'⟩, hd⟩ := phase (t / n)
   have hb'' := bounds_persist hx hF hb' (t % n)
   rw [Nat.div_add_mod] at hb''
   intro i hi j hj

@@ -2,6 +2,7 @@
 -- The shared infrastructure formerly in `Podc/` has been upstreamed to the CSLib fork
 -- (github.com/vasnesterov/cslib, branch `podc`); `Podc.Basic` only imports all of CSLib.
 import Podc.Basic
+import Podc.Computability.Distributed.ApproxConsensus.Contraction
 import Podc.Computability.Distributed.Byzantine.PartialSync.Merge
 import Podc.Computability.Distributed.Byzantine.Specs
 import Podc.Computability.Distributed.ContentOblivious.VirtualRing
@@ -13,6 +14,7 @@ import Podc.Computability.Distributed.SharedMemory.Recoverable
 import Podc.Computability.Distributed.SharedMemory.StrongLin
 import Podc.Computability.Distributed.SharedMemory.Task
 import Podc.Foundations.Algebra.BigOperators.Translate
+import Podc.Foundations.Algebra.Order.BigOperators.Average
 import Podc.Foundations.Combinatorics.Labelling
 import Podc.Foundations.Combinatorics.SimpleGraph.BFSTree
 import Podc.Foundations.Combinatorics.SimpleGraph.Ball

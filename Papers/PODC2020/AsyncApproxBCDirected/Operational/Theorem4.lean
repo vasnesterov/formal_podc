@@ -103,44 +103,24 @@ theorem interval (hG : ThreeReach G f) (hn : 2 ≤ Fintype.card V) (hB : B.card 
     ∀ r ≤ N, ∃ lo' hi', lo ≤ lo' ∧ lo' ≤ hi' ∧ hi' ≤ hi ∧ hi' - lo' ≤ (hi - lo) / 2 ^ r ∧
       ∀ v ∉ B, lo' ≤ Xr G f N B inp ev r v ∧ Xr G f N B inp ev r v ≤ hi' := by
   classical
-  intro r
-  induction r with
-  | zero =>
-    intro _
-    exact ⟨lo, hi, le_rfl, hlh, le_rfl, by simp, fun v hv => by
-      rw [Xr_zero]; exact h0 v hv⟩
-  | succ r ih =>
-    intro hr
-    obtain ⟨lo', hi', h1, h2, h3, h4, h5⟩ := ih (by omega)
-    have hs := started_all G f N B inp ev hG hn hB hfair r (by omega)
-    set E := mkRound (r := r) (by omega) hB hfair hs
-    have hout : ∀ v ∉ B, E.Output v (Xr G f N B inp ev (r + 1) v) := by
-      intro v hv
-      obtain ⟨t, y, hy, ho⟩ := output_next G f N B inp ev hG hn (by omega) hB hfair hs hv
-      rwa [← xv_hst_eq G f N B inp ev hy]
-    have hx : ∀ w ∉ E.F, lo' ≤ E.x w ∧ E.x w ≤ hi' := h5
-    set C := univ.filter fun v => v ∉ B
-    by_cases hC : C.Nonempty
-    · have hval : ∀ v ∉ B, lo' ≤ Xr G f N B inp ev (r + 1) v ∧
-          Xr G f N B inp ev (r + 1) v ≤ hi' := fun v hv => E.output_valid hv (hout v hv) hx
-      obtain ⟨a, ha, hae⟩ := C.exists_mem_eq_inf' hC (Xr G f N B inp ev (r + 1))
-      obtain ⟨b, hb, hbe⟩ := C.exists_mem_eq_sup' hC (Xr G f N B inp ev (r + 1))
-      have haF : a ∉ B := (mem_filter.mp ha).2
-      have hbF : b ∉ B := (mem_filter.mp hb).2
-      refine ⟨C.inf' hC (Xr G f N B inp ev (r + 1)), C.sup' hC (Xr G f N B inp ev (r + 1)),
-        ?_, (C.inf'_le _ ha).trans (C.le_sup' _ ha), ?_, ?_, fun v hv => ?_⟩
-      · rw [hae]; linarith [(hval a haF).1]
-      · rw [hbe]; linarith [(hval b hbF).2]
-      · rw [hae, hbe, pow_succ]
-        have := (abs_le.mp (E.output_conv hG hn hbF haF (hout b hbF) (hout a haF) hx)).2
-        calc Xr G f N B inp ev (r + 1) b - Xr G f N B inp ev (r + 1) a ≤ (hi' - lo') / 2 := this
-          _ ≤ (hi - lo) / 2 ^ r / 2 := by linarith
-          _ = (hi - lo) / (2 ^ r * 2) := by rw [div_div]
-      · have hvC : v ∈ C := mem_filter.mpr ⟨mem_univ _, hv⟩
-        exact ⟨C.inf'_le _ hvC, C.le_sup' _ hvC⟩
-    · refine ⟨lo, lo, le_rfl, le_rfl, hlh, by
-        simp only [sub_self]; exact div_nonneg (by linarith) (by positivity), fun v hv => ?_⟩
-      exact absurd ⟨v, mem_filter.mpr ⟨mem_univ _, hv⟩⟩ hC
+  intro r hr
+  obtain ⟨a, b, h1, h2, h3, h4, h5⟩ := exists_Icc_pow_mul_of_step
+    (H := fun r => {v | r ≤ N ∧ v ∉ B}) (x := Xr G f N B inp ev) (c := 1 / 2) (by norm_num) hlh
+    (fun v hv => by rw [Xr_zero]; exact h0 v hv.2) (fun r lo' hi' _ h5 => by
+      by_cases hrN : r + 1 ≤ N
+      · have hs := started_all G f N B inp ev hG hn hB hfair r (by omega)
+        set E := mkRound (r := r) (by omega) hB hfair hs
+        have hout : ∀ v ∉ B, E.Output v (Xr G f N B inp ev (r + 1) v) := by
+          intro v hv
+          obtain ⟨t, y, hy, ho⟩ := output_next G f N B inp ev hG hn (by omega) hB hfair hs hv
+          rwa [← xv_hst_eq G f N B inp ev hy]
+        have hx : ∀ w ∉ E.F, lo' ≤ E.x w ∧ E.x w ≤ hi' := fun w hw => h5 w ⟨by omega, hw⟩
+        refine ⟨fun v hv => E.output_valid hv.2 (hout v hv.2) hx, fun v hv u hu => ?_⟩
+        rw [one_div_mul_eq_div]
+        exact (le_abs_self _).trans (E.output_conv hG hn hv.2 hu.2 (hout v hv.2) (hout u hu.2) hx)
+      · exact ⟨fun v hv => absurd hv.1 hrN, fun v hv => absurd hv.1 hrN⟩) r
+  rw [one_div_pow, one_div_mul_eq_div] at h4
+  exact ⟨a, b, h1, h2, h3, h4, fun v hv => h5 v ⟨hr, hv⟩⟩
 
 /-- Decisions are the round-`N` values. -/
 theorem dec_eq {t : ℕ} {v : V} {y : ℝ}
@@ -179,17 +159,11 @@ theorem bw_solves (hG : ThreeReach G f) (hn : 2 ≤ Fintype.card V) {K ε : ℝ}
       have h3 : (K - 0) / 2 ^ N < ε := by
         rw [sub_zero, div_lt_iff₀ h2]; linarith [Exec.lt_outRound K ε hε]
       rw [abs_lt]; constructor <;> linarith [h5 v hv, h5 u hu]
-    · set C := univ.filter fun w => w ∉ B
-      have hC : C.Nonempty := ⟨v, mem_filter.mpr ⟨mem_univ _, hv⟩⟩
-      obtain ⟨a, ha, hae⟩ := C.exists_mem_eq_inf' hC inp
-      obtain ⟨b, hb, hbe⟩ := C.exists_mem_eq_sup' hC inp
-      have h0 : ∀ w ∉ B, C.inf' hC inp ≤ inp w ∧ inp w ≤ C.sup' hC inp :=
-        fun w hw => ⟨C.inf'_le _ (mem_filter.mpr ⟨mem_univ _, hw⟩),
-          C.le_sup' _ (mem_filter.mpr ⟨mem_univ _, hw⟩)⟩
+    · refine (Cslib.Byzantine.Problem.inRange_iff_forall_mem_Icc (H := {w | w ∉ B})
+        (Set.toFinite _) ⟨v, hv⟩).2 fun lo hi h0 => ?_
       obtain ⟨lo', hi', h1, -, h3, -, h5⟩ := interval G f N B inp ev' hG hn hB hfair
-        ((C.inf'_le _ ha).trans (C.le_sup' _ ha)) h0 N le_rfl
-      exact ⟨⟨a, (mem_filter.mp ha).2, by rw [← hae]; linarith [(h5 v hv).1]⟩,
-        ⟨b, (mem_filter.mp hb).2, by rw [← hbe]; linarith [(h5 v hv).2]⟩⟩
+        ((h0 v hv).1.trans (h0 v hv).2) h0 N le_rfl
+      exact ⟨h1.trans (h5 v hv).1, (h5 v hv).2.trans h3⟩
   refine ⟨fun t v u y z hv hu hy hz => ?_, fun t v y hv hy => ?_, fun hfair v hv => ?_⟩
   · obtain ⟨ev', hfair', hrun⟩ := exists_fair_extension (alg G f N) G B inp ev t
     rw [← hrun t le_rfl] at hy hz
