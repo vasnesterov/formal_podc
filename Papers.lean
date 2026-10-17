@@ -675,3 +675,13 @@ import Papers.PODC2021.RoundEfficientBA.Counterexample
 import Papers.PODC2021.RoundEfficientBA.Half
 import Papers.PODC2021.RoundEfficientBA.HalfIter
 import Papers.PODC2021.TimeOptimalSSLE.Main
+import Papers.PODC2023.LeaderTradeoffs.Model
+import Papers.PODC2023.LeaderTradeoffs.Glue
+import Papers.PODC2023.LeaderTradeoffs.Isolation
+import Papers.PODC2023.LeaderTradeoffs.Tradeoff
+import Papers.PODC2023.LeaderTradeoffs.Counterexamples
+import Papers.PODC2023.LeaderTradeoffs.MessageLB
+import Papers.PODC2023.LeaderTradeoffs.SingleSend
+import Papers.PODC2023.LeaderTradeoffs.NLogN
+import Papers.PODC2023.LeaderTradeoffs.SmallIds
+import Papers.PODC2023.LeaderTradeoffs.Referees
