@@ -1,4 +1,6 @@
 import Papers.PODC2026.ConsistentRefereeing.LongLivedBasic
+import Mathlib.Order.Filter.Cofinite
+import Mathlib.Data.Fintype.Pigeonhole
 
 /-!
 # Competitors-valency (Section 5 of [ACE26]): Definition 15, Proposition 16, Lemmas 17, 19
@@ -68,11 +70,9 @@ lemma Helping.ext {α : List (LLabel P)} (h : X.Helping α) {σ : List P} (hσ :
 /-! ### Pigeonhole and infinite paths -/
 
 lemma exists_infinitely_often [Fintype P] (s : ℕ → P) : ∃ c, ∀ N, ∃ n ≥ N, s n = c := by
-  classical
-  by_contra hno
-  push Not at hno
-  choose Nf hNf using hno
-  exact hNf (s (Finset.univ.sup Nf)) _ (Finset.le_sup (Finset.mem_univ _)) rfl
+  obtain ⟨c, hc⟩ := Finite.exists_infinite_fiber s
+  exact ⟨c, Filter.frequently_atTop.1 <|
+    Nat.frequently_atTop_iff_infinite.2 (Set.infinite_coe_iff.1 hc)⟩
 
 /-- König-free infinite paths: if `Φ` holds for `[]` and every competitors-only schedule with
 `Φ` can be extended by a competitor keeping `Φ`, there is an infinite competitors-only schedule

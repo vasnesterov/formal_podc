@@ -1,4 +1,5 @@
 import Papers.PODC2025.LanguageDecidability.Characterization
+import Mathlib.Order.Filter.Cofinite
 import Papers.PODC2025.LanguageDecidability.Extend
 
 /-!
@@ -21,16 +22,8 @@ variable {n : ℕ} {I O : Fin n → Type}
 
 /-! ### Finite and infinite sets of times -/
 
-lemma infinite_iff_frequently {S : Set ℕ} : S.Infinite ↔ ∀ N, ∃ t, N ≤ t ∧ t ∈ S := by
-  constructor
-  · intro h N
-    by_contra hc
-    push_neg at hc
-    exact h ((Set.finite_Iio N).subset fun t ht => by
-      by_contra h'; exact hc t (by simpa using h') ht)
-  · intro h
-    exact Set.infinite_of_forall_exists_gt fun a => by
-      obtain ⟨t, ht, hS⟩ := h (a + 1); exact ⟨t, hS, by omega⟩
+lemma infinite_iff_frequently {S : Set ℕ} : S.Infinite ↔ ∀ N, ∃ t, N ≤ t ∧ t ∈ S :=
+  (Nat.frequently_atTop_iff_infinite (p := (· ∈ S))).symm.trans Filter.frequently_atTop
 
 lemma finite_iff_eventually {S : Set ℕ} : S.Finite ↔ ∃ N, ∀ t, N ≤ t → t ∉ S := by
   rw [← not_iff_not, Set.not_finite, infinite_iff_frequently]; push_neg; rfl

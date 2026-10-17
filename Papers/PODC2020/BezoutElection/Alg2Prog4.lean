@@ -23,22 +23,6 @@ lemma okOf_congr {s s' : St Id m} (k : Fin m) (hc : s.cand = s'.cand) (ht : s.to
     okOf s k = okOf s' k := by
   simp only [okOf, hc, ht]
 
-/-- A non-increasing sequence of naturals is eventually constant. -/
-lemma stab_anti (g : ℕ → ℕ) (t₀ : ℕ) (h : ∀ t ≥ t₀, g (t + 1) ≤ g t) :
-    ∃ T ≥ t₀, ∀ t ≥ T, g t = g T := by
-  have hle : ∀ t ≥ t₀, g t ≤ g t₀ := by
-    intro t ht
-    induction t, ht using Nat.le_induction with
-    | base => exact le_rfl
-    | succ t ht ih => exact (h t ht).trans ih
-  obtain ⟨T, hT, hc⟩ := stab_nat (fun t => g t₀ - g t) t₀ (g t₀)
-    (fun t ht => by have := h t ht; omega) (fun t => by omega)
-  refine ⟨T, hT, fun t ht => ?_⟩
-  have := hc t ht
-  have := hle t (by omega)
-  have := hle T hT
-  omega
-
 namespace PCtx
 
 variable {e : ((alg2 Id m pp out).impl ids π).InfExec} (Q : PCtx e)
@@ -53,8 +37,8 @@ lemma cand_eq_ca {τ : ℕ} (hτ : Q.T ≤ τ) (q : P) (k : Fin m) :
 
 /-- The candidate flags eventually stabilize. -/
 lemma cand_stab : ∃ Tc ≥ Q.T, ∀ τ ≥ Tc, ∀ q, ((e.cfg (τ + 1)).loc q).cand = ((e.cfg τ).loc q).cand := by
-  obtain ⟨I, -, hI⟩ := ev_forall_fin
-    (fun x i => ∀ q, (((Q.run x).A (i + 1)).loc q).ca = (((Q.run x).A i).loc q).ca) (fun x => by
+  obtain ⟨I, -, hI⟩ := Nat.eventually_forall_of_finite
+    (p := fun x i => ∀ q, (((Q.run x).A (i + 1)).loc q).ca = (((Q.run x).A i).loc q).ca) (fun x => by
       by_cases hx : ((e.cfg Q.t0).mem () x).level < pp.U
       · exact (Q.lctx0 x hx).ca_stab
       · refine ⟨0, fun i _ q => ?_⟩
@@ -74,23 +58,14 @@ lemma cand_stab : ∃ Tc ≥ Q.T, ∀ τ ≥ Tc, ∀ q, ((e.cfg (τ + 1)).loc q)
 lemma fin_stab : ∃ Tf, ∀ τ ≥ Tf, ∀ q,
     ((e.cfg (τ + 1)).loc q).finishing = ((e.cfg τ).loc q).finishing ∧
       ((e.cfg (τ + 1)).loc q).toWin = ((e.cfg τ).loc q).toWin := by
-  obtain ⟨Tf, -, h⟩ := ev_forall_fin (fun q τ =>
+  obtain ⟨Tf, -, h⟩ := Nat.eventually_forall_of_finite (p := fun q τ =>
     ((e.cfg (τ + 1)).loc q).finishing = ((e.cfg τ).loc q).finishing ∧
       ((e.cfg (τ + 1)).loc q).toWin = ((e.cfg τ).loc q).toWin) (fun q => by
     have hsf := fun τ => step_fin (Q.rinv τ) (e.step_eq τ) q
-    obtain ⟨T1, -, h1⟩ := stab_nat (fun τ => if ((e.cfg τ).loc q).finishing then 1 else 0) 0 1
-      (fun τ _ => by
-        have := (hsf τ).1
-        cases h : ((e.cfg τ).loc q).finishing
-        · simp only [Bool.false_eq_true, if_false]; omega
-        · rw [this h])
-      (fun τ => by split_ifs <;> omega)
-    have hf : ∀ τ ≥ T1, ((e.cfg τ).loc q).finishing = ((e.cfg T1).loc q).finishing := by
-      intro τ hτ
-      have := h1 τ hτ
-      revert this
-      cases ((e.cfg τ).loc q).finishing <;> cases ((e.cfg T1).loc q).finishing <;> simp
-    obtain ⟨T2, hT2, h2⟩ := stab_anti (fun τ => ((e.cfg τ).loc q).toWin) T1
+    obtain ⟨T1, -, hf⟩ := WellFoundedGT.eventually_const_of_le_succ
+      (f := fun τ => ((e.cfg τ).loc q).finishing) (N := 0) fun τ _ => Bool.le_iff_imp.2 (hsf τ).1
+    obtain ⟨T2, hT2, h2⟩ := Nat.eventually_const_of_succ_le
+      (f := fun τ => ((e.cfg τ).loc q).toWin) (N := T1)
       (fun τ hτ => (hsf τ).2 (by rw [hf τ hτ, hf (τ + 1) (by omega)]))
     refine ⟨T2, fun τ hτ => ⟨?_, ?_⟩⟩
     · rw [hf τ (by omega), hf (τ + 1) (by omega)]

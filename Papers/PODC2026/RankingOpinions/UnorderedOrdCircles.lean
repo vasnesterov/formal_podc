@@ -801,23 +801,9 @@ lemma oc_exists_leader (h0 : ∀ x, (E.config 0 x).ld = true) (t : ℕ) (x : A) 
 
 lemma oc_leaders_eventually_const :
     ∃ T, ∀ t ≥ T, ∀ x, (E.config t x).ld = (E.config T x).ld := by
-  obtain ⟨T, -, hT⟩ := Nat.eventually_const_of_succ_le
-    (f := fun t => (univ.filter fun x => (E.config t x).ld = true).card) (N := 0)
-    (fun t _ => Finset.card_le_card fun x => by simpa using oc_ld_succ_le E t x)
-  refine ⟨T, fun t ht => ?_⟩
-  induction t, ht using Nat.le_induction with
-  | base => exact fun _ => rfl
-  | succ t ht ih =>
-    intro x
-    have hsub : (univ.filter fun x => (E.config (t + 1) x).ld = true) ⊆
-        univ.filter fun x => (E.config t x).ld = true :=
-      fun y => by simpa using oc_ld_succ_le E t y
-    have heq := Finset.eq_of_subset_of_card_le hsub
-      (by have := hT t ht; have := hT (t + 1) (by omega); omega)
-    have := congrArg (fun s => x ∈ s) heq
-    simp only [mem_filter, mem_univ, true_and, eq_iff_iff] at this
-    rw [← ih x]
-    cases h1 : (E.config (t + 1) x).ld <;> cases h2 : (E.config t x).ld <;> simp_all
+  obtain ⟨T, -, hT⟩ := WellFoundedLT.eventually_const_of_succ_le (f := fun t x => (E.config t x).ld)
+    (N := 0) fun t _ x => Bool.le_iff_imp.2 (oc_ld_succ_le E t x)
+  exact ⟨T, fun t ht => congrFun (hT t ht)⟩
 
 lemma oc_leader_unique (hE : E.OrderedFair) {T : ℕ}
     (hT : ∀ t ≥ T, ∀ x, (E.config t x).ld = (E.config T x).ld) {a b : A}

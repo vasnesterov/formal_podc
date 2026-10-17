@@ -113,8 +113,9 @@ theorem phase2b {T₁ : ℕ} (hT₁ : X.T ≤ T₁) {ℓ : P} (E₁ : Lead n ids
       · rw [h]; simp only [procL, e]; exact Finset.Subset.refl _
       · exact (hnowin t _ _ _ _ h (hvlev t ht v hv) w e hwl).elim
     · rw [h]
-  obtain ⟨T₂, hT₂, hDst⟩ := stab_finset_from (fun t => ((R.A t).loc ℓ).D) T₁ n hDmono
-    (fun t ht => card_le_n X.hn _ (fun a ha => by
+  obtain ⟨T₂, hT₂, hDst⟩ := Finset.eventually_const_of_subset_succ
+    (f := fun t => ((R.A t).loc ℓ).D) (N := T₁) (h := hDmono)
+    (hB := fun t ht => card_le_n X.hn _ (fun a ha => by
       obtain ⟨i, hi, -⟩ := (R.inv t).1.discLoc ℓ (by rw [X.lev t]; exact hact t ht ℓ) a ha
       exact ⟨i, hi⟩))
   set D := ((R.A T₂).loc ℓ).D with hD
@@ -315,7 +316,7 @@ theorem phase2b {T₁ : ℕ} (hT₁ : X.T ≤ T₁) {ℓ : P} (E₁ : Lead n ids
           cases ho : (procX n U (ids j) ((R.A t).loc j) v ok fin).2 <;> simp [ho, stOf] at hv'
         · rw [h]; simp only
           exact ⟨fun w hw => (by cases hw), fun v hv => (by cases hv)⟩
-    obtain ⟨T₃, hT₃, hQO'⟩ := ev_forall_fin _ hQO (max Tf T₂)
+    obtain ⟨T₃, hT₃, hQO'⟩ := Nat.eventually_forall_of_finite hQO (max Tf T₂)
     have hcw : ∀ t ≥ T₃, ∀ q w, ((R.A t).loc q).st = .pend w → w.id = none → Fresh w := by
       intro t ht q w hw hwid
       by_cases hq : q = ℓ

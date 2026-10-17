@@ -438,10 +438,10 @@ theorem CR_live' (r : ℕ) (hr : r < N) (hfair : Fair (alg G f N) G B inp ev) {v
     rw [← hPc] at hce
     exact ⟨t, e, he, _, _, hce⟩
   have hfin : {j | j < L.idxOf F'}.Finite := Set.finite_lt_nat _
-  obtain ⟨T₁, hT₁⟩ := exists_time hfin
-    (P := fun j t => ∃ e ∈ hst G f N B inp ev t v, ∃ Mc'' F'',
+  obtain ⟨T₁, hT₁⟩ := hfin.exists_forall_of_monotone
+    (p := fun j t => ∃ e ∈ hst G f N B inp ev t v, ∃ Mc'' F'',
       compOf v r e = some (c, P, Mc'', F'', j))
-    (fun j t t' htt ⟨e, he, h⟩ => ⟨e, (hst_prefix G f N B inp ev htt v).subset he, h⟩)
+    (fun j _ t t' htt ⟨e, he, h⟩ => ⟨e, (hst_prefix G f N B inp ev htt v).subset he, h⟩)
     (fun j hj => hctr j (by simp at hj; omega))
   have horigF := originated (G := G) (B := B) (ev := ev) r hr ht₁
   obtain ⟨T₂, eF, heF, hceF⟩ := travel r hr hfair hc horigF P.tail v (by rw [← hPc]; exact hP)

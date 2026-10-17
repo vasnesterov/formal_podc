@@ -98,9 +98,10 @@ rounds are the shared library `Cslib/Computability/Distributed/SharedMemory/Anon
 `SymAlg.SymCfg`, `SymAlg.round_*`; also used by `Papers/PODC2019/AnonymousMutex` with one group);
 fairness, prefixes of infinite executions and pending/return lemmas come from
 `Cslib/Computability/Distributed/SharedMemory/Progress.lean` (`InfExec.Fair`, `InfExec.pre`, `InfExec.first_act`,
-`InfExec.exists_ret_between`), and the election object is the interface-only object
-`ObjSpec.iface Unit R`.
+`InfExec.exists_ret_between`; `InfExec.exists_act_of_pending`, `InfExec.false_of_descent` staged in
+`Podc/Computability/Distributed/SharedMemory/Progress.lean`), eventual-stabilization lemmas from
+`Cslib/Foundations/Data/Nat/Descent.lean` and `Podc/Foundations/Data/Nat/Descent.lean`, and the
+election object is the interface-only object `ObjSpec.iface Unit R`.
 
-**CSLib candidates.** `Exec.lean` (outputs of executions), `LiveGen.lean` (fairness/liveness
-toolkit: `InfExec.acts`, `InfExec.descent`, stabilization lemmas), the generic one-shot progress
+**CSLib candidates.** `Exec.lean` (outputs of executions), the generic one-shot progress
 definitions in `Defs.lean`, and the lock-step execution of all groups in `LockStepExec.lean`.

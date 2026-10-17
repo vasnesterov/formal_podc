@@ -1,4 +1,5 @@
 import Papers.PODC2019.AnonymousMutex.Alg2Resign
+import Podc.Foundations.Data.Nat.Descent
 
 /-!
 # Algorithm 2: the endgame of the deadlock-freedom proof
@@ -79,39 +80,6 @@ def zDist (m : ℕ) : PC → ℕ
   | _ => 0
 
 /-! ### Finite combinatorics -/
-
-lemma exists_time_all [Fintype P] (Pr : P → ℕ → Prop) (hmono : ∀ r a b, a ≤ b → Pr r a → Pr r b)
-    (h : ∀ r, ∃ T, Pr r T) : ∃ T, ∀ r, Pr r T := by
-  choose f hf using h
-  exact ⟨Finset.univ.sup f, fun r => hmono r _ _ (Finset.le_sup (Finset.mem_univ r)) (hf r)⟩
-
-lemma finset_chain {f : ℕ → Finset (Fin m)} {T : ℕ} (hmono : ∀ t ≥ T, f t ⊆ f (t + 1)) :
-    ∀ t ≥ T, f T ⊆ f t := by
-  intro t ht
-  induction t, ht using Nat.le_induction with
-  | base => exact subset_rfl
-  | succ t ht ih => exact ih.trans (hmono t ht)
-
-/-- A monotone sequence of subsets of `Fin m` stabilizes. -/
-lemma finset_stab {f : ℕ → Finset (Fin m)} {T : ℕ} (hmono : ∀ t ≥ T, f t ⊆ f (t + 1)) :
-    ∃ T' ≥ T, ∀ t ≥ T', f t = f T' := by
-  suffices key : ∀ n T, m - (f T).card = n → (∀ t ≥ T, f t ⊆ f (t + 1)) →
-      ∃ T' ≥ T, ∀ t ≥ T', f t = f T' from key _ T rfl hmono
-  intro n
-  induction n using Nat.strong_induction_on with
-  | _ n ih =>
-    intro T hn hmono
-    by_cases hall : ∀ t ≥ T, f t = f T
-    · exact ⟨T, le_rfl, hall⟩
-    · push Not at hall
-      obtain ⟨t₁, ht₁, hne⟩ := hall
-      have hsub : f T ⊆ f t₁ := finset_chain hmono t₁ ht₁
-      have hlt : (f T).card < (f t₁).card :=
-        Finset.card_lt_card (Finset.ssubset_iff_subset_ne.2 ⟨hsub, Ne.symm hne⟩)
-      have hle : (f t₁).card ≤ m := by simpa using Finset.card_le_univ (f t₁)
-      obtain ⟨T', hT', h⟩ := ih (m - (f t₁).card) (by omega) t₁ rfl
-        (fun t ht => hmono t (by omega))
-      exact ⟨T', by omega, h⟩
 
 lemma card_comp_perm (σ : Equiv.Perm (Fin m)) (g : Fin m → Option Id) (a : Option Id) :
     (Finset.univ.filter (fun x => g (σ x) = a)).card =
@@ -622,8 +590,8 @@ theorem endgame (hid : Function.Injective ids) (hm : 0 < m) (hM : m ∈ M (Finty
     have := hown t' ht' hy₀
     simpa [own] using this
   -- a time after which every process is classified
-  obtain ⟨T, hT⟩ := exists_time_all
-    (fun r T => t ≤ T ∧ ((∀ t' ≥ T, own ids (e.cfg t') r = ∅) ∨
+  obtain ⟨T, hT⟩ := Finite.exists_forall_of_monotone
+    (p := fun r T => t ≤ T ∧ ((∀ t' ≥ T, own ids (e.cfg t') r = ∅) ∨
       (∀ t' ≥ T, CasRead ((e.cfg t').loc r).pc)))
     (by
       rintro r a b hab ⟨h1, h2⟩
@@ -645,8 +613,8 @@ theorem endgame (hid : Function.Injective ids) (hm : 0 < m) (hM : m ∈ M (Finty
       rw [h t' ht'] at this; simp at this
     · rcases h t' ht' with ⟨i, hi⟩ | ⟨i, hi⟩ <;> rw [hi] at hpc <;> cases hpc
   -- the set of non-`⊥` registers grows and stabilizes
-  obtain ⟨T₆, hT₆, hstab⟩ := finset_stab
-    (f := fun t' => Finset.univ.filter (fun y => (e.cfg t').mem () y ≠ none)) (T := T) (by
+  obtain ⟨T₆, hT₆, hstab⟩ := Finset.eventually_const_of_subset_succ_of_finite
+    (f := fun t' => Finset.univ.filter (fun y => (e.cfg t').mem () y ≠ none)) (N := T) (by
       intro t' ht' y hy
       simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hy ⊢
       rw [mem_step_nonbot hid hm H (by omega) (fun p j _ => hnwr t' ht' p j) y hy]

@@ -1,5 +1,6 @@
 import Papers.PODC2021.ThinUnison.Main
 import Cslib.Computability.Distributed.SelfStabilization.Daemon
+import Podc.Foundations.Data.Nat.Descent
 
 /-!
 # Corollary 1.2 of [EK21]: a self-stabilizing synchronizer (Section 4)
@@ -143,18 +144,6 @@ end Run
 
 /-! ## Auxiliary facts -/
 
-/-- Discrete intermediate value theorem: a sequence that increases by at most one per step
-crosses every intermediate value by a `+1` step. -/
-theorem exists_step_eq {f : ℕ → ℤ} {a b : ℕ} (hf : ∀ s, a ≤ s → f (s + 1) ≤ f s + 1) {j : ℤ}
-    (ha : f a ≤ j) (hb : j < f b) (hab : a ≤ b) :
-    ∃ s, a ≤ s ∧ s < b ∧ f s = j ∧ f (s + 1) = j + 1 := by
-  induction b, hab using Nat.le_induction with
-  | base => omega
-  | succ n hn ih =>
-    by_cases h : j < f n
-    · obtain ⟨s, h1, h2, h3, h4⟩ := ih h; exact ⟨s, h1, by omega, h3, h4⟩
-    · have := hf n hn; exact ⟨n, hn, by omega, by omega, by omega⟩
-
 theorem uclk_succ_cases {k : ℕ} {C : ℕ → V → Turn k} (o : V → ℤ) {T s : ℕ} (v : V)
     (hs : T ≤ s) :
     uclk C o T (s + 1) v = uclk C o T s v ∨ uclk C o T (s + 1) v = uclk C o T s v + 1 := by
@@ -255,11 +244,11 @@ state of round `j`. -/
 theorem snd_eq_simState {t : ℕ} {w : V} {j : ℤ} (ht : T ≤ t) (hj : o w ≤ j)
     (hU : uclk (auPart C) o T t w = j + 1) : (C t w).2.1 = simState C o T j w := by
   have hT : uclk (auPart C) o T T w = o w := uclk_self o T w
-  obtain ⟨s, hs1, hs2, hs3, hs4⟩ := exists_step_eq (f := fun s => uclk (auPart C) o T s w)
-    (a := T) (b := t) (j := j)
-    (fun s hs => by
+  obtain ⟨s, hs1, hs2, hs3, hs4⟩ := Int.exists_eq_and_succ_eq_of_le_add_one
+    (f := fun s => uclk (auPart C) o T s w) (a := T) (b := t) (j := j) (hab := ht)
+    (fun s hs _ => by
       rcases uclk_succ_cases (C := auPart C) o w hs with h | h <;> simp only [h] <;> omega)
-    (by simp only [hT]; omega) (by simp only [hU]; omega) ht
+    (by simp only [hT]; omega) (by simp only [hU]; omega)
   have e1 := succ_of_uclk_succ hC hg hs1 (by rw [hs3, hs4])
   have e2 := eq_of_uclk_eq hC hg (hs1.trans (Nat.le_succ s)) hs2 (by rw [hs4, hU])
   rw [e2, e1]
@@ -375,11 +364,11 @@ theorem simState_succ {j : ℤ} (hj : ∀ w, o w ≤ j)
     simState C o T (j + 1) v = P.δ (simState C o T j v) (signal G (simState C o T j) v) := by
   have hT : uclk (auPart C) o T T v = o v := uclk_self o T v
   obtain ⟨τ, hτ1, hτ2⟩ := hunb v
-  obtain ⟨s, hs1, -, hs3, hs4⟩ := exists_step_eq (f := fun s => uclk (auPart C) o T s v)
-    (a := T) (b := τ) (j := j)
-    (fun s hs => by
+  obtain ⟨s, hs1, -, hs3, hs4⟩ := Int.exists_eq_and_succ_eq_of_le_add_one
+    (f := fun s => uclk (auPart C) o T s v) (a := T) (b := τ) (j := j) (hab := hτ1)
+    (fun s hs _ => by
       rcases uclk_succ_cases (C := auPart C) o v hs with h | h <;> simp only [h] <;> omega)
-    (by simp only [hT]; exact hj v) (by omega) hτ1
+    (by simp only [hT]; exact hj v) (by omega)
   obtain ⟨hv, haan⟩ := aa_of_uclk_succ hC hg hs1 (by rw [hs3, hs4])
   have e1 := succ_of_aa hC hv (((synchronizer_isRun_auPart hC).allGood_le hg hs1 v).2.1) haan
   rw [← hs4, ← fst_eq_simState hC hg (hs1.trans (Nat.le_succ s)), e1]

@@ -1,4 +1,5 @@
 import Cslib.Computability.Distributed.PopulationProtocols.Symmetrize
+import Podc.Foundations.Data.Nat.Descent
 import Cslib.Computability.Distributed.PopulationProtocols.Schedules
 import Cslib.Computability.Distributed.PopulationProtocols.Nondet
 import Cslib.Foundations.Data.Nat.Descent
@@ -244,27 +245,11 @@ lemma exists_leader (h0 : ∀ x, (E.config 0 x).ld = true) (t : ℕ) (x : A) :
 /-- Number of leaders. -/
 abbrev nLeaders (C : Config A (OState Col k)) : ℕ := numLeaders (fun s => s.ld) C
 
-lemma nLeaders_succ_le (t : ℕ) : nLeaders (E.config (t + 1)) ≤ nLeaders (E.config t) :=
-  Finset.card_le_card fun x => by simpa using ld_succ_le E t x
-
 /-- **Lemma 8.5 (first part)**: the leader bits eventually never change. -/
 lemma leaders_eventually_const : ∃ T, ∀ t ≥ T, ∀ x, (E.config t x).ld = (E.config T x).ld := by
-  obtain ⟨T, -, hT⟩ := Nat.eventually_const_of_succ_le (f := fun t => nLeaders (E.config t))
-    (N := 0) (fun t _ => nLeaders_succ_le E t)
-  refine ⟨T, fun t ht => ?_⟩
-  induction t, ht using Nat.le_induction with
-  | base => exact fun _ => rfl
-  | succ t ht ih =>
-    intro x
-    have hsub : (univ.filter fun x => (E.config (t + 1) x).ld = true) ⊆
-        univ.filter fun x => (E.config t x).ld = true :=
-      fun y => by simpa using ld_succ_le E t y
-    have heq := Finset.eq_of_subset_of_card_le hsub
-      (by have := hT t ht; have := hT (t + 1) (by omega); simp only [nLeaders, numLeaders] at *; omega)
-    have := congrArg (fun s => x ∈ s) heq
-    simp only [mem_filter, mem_univ, true_and, eq_iff_iff] at this
-    rw [← ih x]
-    cases h1 : (E.config (t + 1) x).ld <;> cases h2 : (E.config t x).ld <;> simp_all
+  obtain ⟨T, -, hT⟩ := WellFoundedLT.eventually_const_of_succ_le
+    (f := fun t x => (E.config t x).ld) (N := 0) fun t _ x => Bool.le_iff_imp.2 (ld_succ_le E t x)
+  exact ⟨T, fun t ht => congrFun (hT t ht)⟩
 
 /-- Leaders of the same color are unique once the leader bits are stable (Lemma 8.5). -/
 lemma leader_unique (hE : E.OrderedFair) {T : ℕ}

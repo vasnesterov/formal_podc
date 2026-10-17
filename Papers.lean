@@ -789,7 +789,6 @@ import Papers.PODC2020.BezoutElection.Bezout
 import Papers.PODC2020.BezoutElection.Corollaries
 import Papers.PODC2020.BezoutElection.Defs
 import Papers.PODC2020.BezoutElection.Exec
-import Papers.PODC2020.BezoutElection.LiveGen
 import Papers.PODC2020.BezoutElection.LockStepExec
 import Papers.PODC2020.BezoutElection.LowerBound
 import Papers.PODC2020.BezoutElection.Main

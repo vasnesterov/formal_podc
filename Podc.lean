@@ -7,3 +7,5 @@ import Podc.Foundations.Combinatorics.SimpleGraph.BFSTree
 import Podc.Foundations.Combinatorics.SimpleGraph.BlockingSet
 import Podc.Foundations.Combinatorics.SimpleGraph.Cycle
 import Podc.Foundations.Data.Finset.Quorum
+import Podc.Foundations.Data.Nat.Descent
+import Podc.Computability.Distributed.SharedMemory.Progress

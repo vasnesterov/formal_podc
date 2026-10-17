@@ -195,8 +195,8 @@ lemma lv_le (t : ℕ) (q : P) : ((R.A t).loc q).lv ≤ X.L := by
 lemma active : ∃ T₁, ∀ t ≥ T₁, ∀ q, ((R.A t).loc q).lv = X.L := by
   have h : ∀ q, ∃ T', ∀ t ≥ T', ((R.A t).loc q).lv = X.L := by
     intro q
-    obtain ⟨T', hT', hc⟩ := stab_nat (fun t => ((R.A t).loc q).lv) 0 X.L
-      (fun t _ => X.lv_mono t q) (fun t => X.lv_le t q)
+    obtain ⟨T', hT', hc⟩ := Nat.eventually_const_of_le_succ (f := fun t => ((R.A t).loc q).lv)
+      (N := 0) (fun t _ => X.lv_le t q) (fun t _ => X.lv_mono t q)
     refine ⟨T', fun t ht => ?_⟩
     rw [hc t ht]
     by_contra hne
@@ -226,7 +226,7 @@ lemma active : ∃ T₁, ∀ t ≥ T₁, ∀ q, ((R.A t).loc q).lv = X.L := by
       simp only [upd_loc_self, procL] at h4
       rw [procX_up (by rw [hc', X.lev t']; exact hlt), hc'] at h4
       omega
-  obtain ⟨T₁, -, h1⟩ := ev_forall_fin _ h 0
+  obtain ⟨T₁, -, h1⟩ := Nat.eventually_forall_of_finite h 0
   exact ⟨T₁, fun t ht q => h1 t ht q⟩
 
 /-- At the current level, losers stay losers. -/
@@ -252,12 +252,11 @@ lemma ph_mono {T₁ : ℕ} (hT₁ : ∀ t ≥ T₁, ∀ q, ((R.A t).loc q).lv = 
 /-- The losers eventually stabilize. -/
 lemma losers {T₁ : ℕ} (hT₁ : ∀ t ≥ T₁, ∀ q, ((R.A t).loc q).lv = X.L) :
     ∃ T₂ ≥ T₁, ∀ t ≥ T₂, ∀ q, ((R.A t).loc q).lo = ((R.A T₂).loc q).lo := by
-  obtain ⟨T₂, hT₂, hc⟩ := stab_finset
-    (fun t => Finset.univ.filter (fun q => ((R.A t).loc q).lo = true)) T₁ (Fintype.card P)
+  obtain ⟨T₂, hT₂, hc⟩ := Finset.eventually_const_of_subset_succ_of_finite
+    (f := fun t => Finset.univ.filter (fun q => ((R.A t).loc q).lo = true)) (N := T₁)
     (fun t ht q hq => by
       simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hq ⊢
       exact X.lo_mono hT₁ t ht q hq)
-    (fun t => Finset.card_filter_le _ _)
   refine ⟨T₂, hT₂, fun t ht q => ?_⟩
   have := Finset.ext_iff.1 (hc t ht) q
   simp only [Finset.mem_filter, Finset.mem_univ, true_and] at this
@@ -269,7 +268,7 @@ lemma ev_write (Q : ℕ → Prop) (t₀ : ℕ) (hpres : ∀ t ≥ t₀, Q t → 
     (hw : ∀ t ≥ t₀, R.tr t = .write → Q (t + 1)) (hIW : ∀ t, ∃ t' ≥ t, R.tr t' = .write) :
     ∃ T ≥ t₀, ∀ t ≥ T, Q t := by
   obtain ⟨t, ht, hwt⟩ := hIW t₀
-  exact ev_forever Q t₀ hpres ⟨t + 1, by omega, hw t ht hwt⟩
+  exact Nat.eventually_of_imp_succ hpres ⟨t + 1, by omega, hw t ht hwt⟩
 
 /-- If the register is not written from `t₁` on, it keeps its value. -/
 lemma reg_const {t₁ : ℕ} (hnw : ∀ t ≥ t₁, R.tr t ≠ .write) (t : ℕ) (ht : t₁ ≤ t) :
