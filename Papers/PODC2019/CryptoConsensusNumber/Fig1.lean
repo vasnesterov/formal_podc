@@ -1,4 +1,5 @@
 import Papers.PODC2019.CryptoConsensusNumber.Fig1Defs
+import Podc.SharedMemory.History
 
 /-!
 # Theorem 1: Figure 1 is a wait-free linearizable implementation of asset transfer
@@ -50,9 +51,6 @@ def PC.op (μ : Acct → Finset P) (q₀ : Acct → ℕ) (p : P) : PC Acct → O
   | .scanR a => some (ATOp.read a)
   | _ => none
 
-/-- The current operation instance of `p`. -/
-abbrev cur {A : ObjSpec} (α : List (Label P A)) (p : P) : OpId P := (p, (respsOf α p).length)
-
 /-- The invariant (see the module docstring). -/
 structure Inv (α : List (Label P (atSpec P Acct μ q₀))) (C : Cfg μ q₀)
     (L : List (OpId P × (atSpec P Acct μ q₀).Op)) : Prop where
@@ -62,21 +60,16 @@ structure Inv (α : List (Label P (atSpec P Acct μ q₀))) (C : Cfg μ q₀)
   ops : ∀ q, (C.loc q).ops = C.mem () q
   idle : ∀ q, (C.loc q).pc = .idle → C.pend q = none
   active : ∀ q o, PC.op μ q₀ q (C.loc q).pc = some o →
-    C.pend q = some o ∧ cur α q ∉ L.map Prod.fst ∧ opOf α (cur α q) = some o
+    C.pend q = some o ∧ curOp α q ∉ L.map Prod.fst ∧ opOf α (curOp α q) = some o
   upd : ∀ q a b x, (C.loc q).pc = .upd a b x →
     q ∈ μ a ∧ x + outflow a (C.mem ()) ≤ q₀ a + inflow a (C.mem ())
   done : ∀ q r, (C.loc q).pc = .done r → ∃ L₁ L₂ o,
-    L = L₁ ++ (cur α q, o) :: L₂ ∧ ((atSpec P Acct μ q₀).δ (linState L₁) o).2 = r
+    L = L₁ ++ (curOp α q, o) :: L₂ ∧ ((atSpec P Acct μ q₀).δ (linState L₁) o).2 = r
 
 -- CSLib candidate (generic history / linearization bookkeeping lemmas)
 section Aux
 
 variable {A : ObjSpec}
-
-lemma opOf_append_of_eq_some {α β : List (Label P A)} {x : OpId P} {o : A.Op}
-    (h : opOf α x = some o) : opOf (α ++ β) x = some o := by
-  rw [opOf_append_of_invoked]; · exact h
-  simp only [opOf] at h; exact (List.getElem?_eq_some_iff.1 h).1
 
 @[simp] lemma respsOf_append_inv (α : List (Label P A)) (p q : P) (o : A.Op) :
     respsOf (α ++ [.inv p o]) q = respsOf α q := by simp [respsOf_append]
@@ -87,24 +80,11 @@ lemma opOf_append_of_eq_some {α β : List (Label P A)} {x : OpId P} {o : A.Op}
 lemma respsOf_append_ret_ne (α : List (Label P A)) {p q : P} (r : A.Resp) (h : q ≠ p) :
     respsOf (α ++ [.ret p r]) q = respsOf α q := by simp [respsOf_append, Ne.symm h]
 
-@[simp] lemma cur_append_inv (α : List (Label P A)) (p q : P) (o : A.Op) :
-    cur (α ++ [.inv p o]) q = cur α q := by simp [cur]
-
-@[simp] lemma cur_append_tau (α : List (Label P A)) (p q : P) :
-    cur (α ++ [.tau p]) q = cur α q := by simp [cur]
-
-lemma cur_append_ret_ne (α : List (Label P A)) {p q : P} (r : A.Resp) (h : q ≠ p) :
-    cur (α ++ [.ret p r]) q = cur α q := by simp [cur, respsOf_append_ret_ne α r h]
-
 lemma not_mem_append_single {L : List (OpId P × A.Op)} {x y : OpId P} {o : A.Op}
     (hx : x ∉ L.map Prod.fst) (hxy : x.1 ≠ y.1) : x ∉ (L ++ [(y, o)]).map Prod.fst := by
   simp only [List.map_append, List.map_cons, List.map_nil, List.mem_append, List.mem_singleton,
     not_or]
   exact ⟨hx, fun h => hxy (by rw [h])⟩
-
-lemma linState_append_single (L : List (OpId P × A.Op)) (x : OpId P) (o : A.Op) :
-    linState (L ++ [(x, o)]) = (A.δ (linState L) o).1 := by
-  simp [linState, ObjSpec.runOps_append]
 
 end Aux
 
@@ -166,7 +146,7 @@ lemma Inv.step_inv {α : List (Label P (atSpec P Acct μ q₀))} {C C' : Cfg μ 
     · rw [(hother q hq).1] at hq'
       obtain ⟨h1, h2, h3⟩ := hI.active q o' hq'
       exact ⟨by rw [(hother q hq).2]; exact h1, by simpa using h2,
-        by simpa using opOf_append_of_eq_some h3⟩
+        by simpa using opOf_append_of_eq_some h3 _⟩
   · intro q a b x hq'
     by_cases hq : q = p
     · subst hq; rw [hpc] at hq'; exact absurd hq' (hpc3 a b x)
@@ -197,8 +177,8 @@ lemma Inv.step_ret {α : List (Label P (atSpec P Acct μ q₀))} {C C' : Cfg μ 
     · subst hq; simp [PC.op] at hq'
     · simp only [Function.update_of_ne hq] at hq' ⊢
       obtain ⟨h1, h2, h3⟩ := hI.active q o' hq'
-      rw [cur_append_ret_ne α r hq]
-      exact ⟨h1, h2, opOf_append_of_eq_some h3⟩
+      rw [curOp_append_ret_of_ne α r (Ne.symm hq)]
+      exact ⟨h1, h2, opOf_append_of_eq_some h3 _⟩
   · intro q a b x hq'
     by_cases hq : q = p
     · subst hq; simp at hq'
@@ -207,7 +187,7 @@ lemma Inv.step_ret {α : List (Label P (atSpec P Acct μ q₀))} {C C' : Cfg μ 
     by_cases hq : q = p
     · subst hq; simp at hq'
     · simp only [Function.update_of_ne hq] at hq'
-      rw [cur_append_ret_ne α r hq]; exact hI.done q r' hq'
+      rw [curOp_append_ret_of_ne α r (Ne.symm hq)]; exact hI.done q r' hq'
 
 omit hμ in
 /-- A linearization point: `p` executes the step that linearizes its pending operation `o` and
@@ -223,10 +203,10 @@ lemma Inv.push_done {α : List (Label P (atSpec P Acct μ q₀))} {C C' : Cfg μ
     (hops : ∀ q, q ≠ p → C'.mem () q = C.mem () q)
     (hupd : ∀ q a b x, q ≠ p → (C.loc q).pc = .upd a b x →
       x + outflow a (C'.mem ()) ≤ q₀ a + inflow a (C'.mem ())) :
-    Inv (α ++ [.tau p]) C' (L ++ [(cur α p, o)]) := by
+    Inv (α ++ [.tau p]) C' (L ++ [(curOp α p, o)]) := by
   obtain ⟨hp1, hp2, hp3⟩ := hI.active p o hact
-  have hnc : ¬ Completed α (cur α p) := by simp [Completed]
-  refine ⟨(hI.lin.push hp3 hp2 hnc).append_tau p, fun c => by rw [linState_append_single]; exact hbal c,
+  have hnc : ¬ Completed α (curOp α p) := by simp [Completed]
+  refine ⟨(hI.lin.push hp3 hp2 hnc).append_tau p, fun c => by rw [linState_concat]; exact hbal c,
     hown, ?_, ?_, ?_, ?_, ?_⟩
   · intro q
     by_cases hq : q = p
@@ -241,8 +221,8 @@ lemma Inv.push_done {α : List (Label P (atSpec P Acct μ q₀))} {C C' : Cfg μ
     · subst hq; rw [hp] at hq'; simp [PC.op] at hq'
     · rw [hother q hq] at hq'
       obtain ⟨h1, h2, h3⟩ := hI.active q o' hq'
-      rw [cur_append_tau, hpend]
-      exact ⟨h1, not_mem_append_single h2 hq, opOf_append_of_eq_some h3⟩
+      rw [curOp_append_tau, hpend]
+      exact ⟨h1, not_mem_append_single h2 hq, opOf_append_of_eq_some h3 _⟩
   · intro q a b x hq'
     by_cases hq : q = p
     · subst hq; rw [hp] at hq'; cases hq'
@@ -254,7 +234,7 @@ lemma Inv.push_done {α : List (Label P (atSpec P Acct μ q₀))} {C C' : Cfg μ
       exact ⟨L, [], o, by simp, rfl⟩
     · rw [hother q hq] at hq'
       obtain ⟨L₁, L₂, o', hs, hr⟩ := hI.done q r' hq'
-      exact ⟨L₁, L₂ ++ [(cur α p, o)], o', by simp [hs], hr⟩
+      exact ⟨L₁, L₂ ++ [(curOp α p, o)], o', by simp [hs], hr⟩
 
 /-- Internal steps preserve the invariant (the linearization grows at linearization points). -/
 lemma Inv.step_tau {α : List (Label P (atSpec P Acct μ q₀))} {C C' : Cfg μ q₀} {L}
@@ -287,12 +267,12 @@ lemma Inv.step_tau {α : List (Label P (atSpec P Acct μ q₀))} {C C' : Cfg μ 
           have : PC.op μ q₀ q (PC.upd a b x) = PC.op μ q₀ q (C.loc q).pc := by rw [hpc]; rfl
           rw [this] at hq'
           obtain ⟨h1, h2, h3⟩ := hI.active q o' hq'
-          rw [cur_append_tau]
-          exact ⟨h1, h2, opOf_append_of_eq_some h3⟩
+          rw [curOp_append_tau]
+          exact ⟨h1, h2, opOf_append_of_eq_some h3 _⟩
         · simp only [Function.update_of_ne hq] at hq' ⊢
           obtain ⟨h1, h2, h3⟩ := hI.active q o' hq'
-          rw [cur_append_tau]
-          exact ⟨h1, h2, opOf_append_of_eq_some h3⟩
+          rw [curOp_append_tau]
+          exact ⟨h1, h2, opOf_append_of_eq_some h3 _⟩
       · intro q a' b' x' hq'
         by_cases hq : q = p
         · subst hq
@@ -305,7 +285,7 @@ lemma Inv.step_tau {α : List (Label P (atSpec P Acct μ q₀))} {C C' : Cfg μ 
         by_cases hq : q = p
         · subst hq; simp at hq'
         · simp only [Function.update_of_ne hq] at hq'
-          rw [cur_append_tau]; exact hI.done q r' hq'
+          rw [curOp_append_tau]; exact hI.done q r' hq'
     · simp only [hc, ↓reduceIte]
       have hc' : ¬ (p ∈ μ a ∧ x ≤ linState L a) := by rwa [← hB a]
       refine ⟨_, hI.push_done hact rfl (fun q hq => by simp [Function.update_of_ne hq]) ?_

@@ -32,9 +32,6 @@ namespace Podc.ContentOblivious.ComputeOR
 
 open Podc.ContentOblivious Finset
 
-/-- One pulse on port `p`. -/
-def one (p : Bool) : Bool → ℕ := fun p' => if p' = p then 1 else 0
-
 /-- Local state of Algorithm 9. -/
 structure St where
   /-- input: is this node the leader -/
@@ -51,19 +48,19 @@ structure St where
 
 /-- Lines 1–6. -/
 def init (a : Bool × Bool) : St × (Bool → ℕ) :=
-  (⟨a.1, a.2, 0, false, true⟩, if a.1 then one a.2 else fun _ => 0)
+  (⟨a.1, a.2, 0, false, true⟩, if a.1 then onePulse a.2 else fun _ => 0)
 
 /-- Reception of a pulse on port `j`, and the code executed up to the next receive. -/
 def recv (s : St) (j : Bool) : St × (Bool → ℕ) :=
   match s.pc with
   | 0 => -- line 7, then lines 9–17 (leader) or 20–25 (non-leader)
     ({ s with pc := 1, q := j },
-      if s.ldr then one (!j && !s.b) else if s.b then one true else one (!j))
+      if s.ldr then onePulse (!j && !s.b) else if s.b then onePulse true else onePulse (!j))
   | 1 =>
-    if s.ldr then ({ s with pc := 2, ans := !s.q }, one true) -- lines 11–12 / 18, then line 31
-    else if s.b then ({ s with pc := 2 }, one false) -- lines 22–23
-    else ({ s with pc := 2, ans := !(j && s.q) }, one (!j)) -- lines 26–29
-  | _ => ({ s with pc := 3 }, if s.ldr then fun _ => 0 else one true) -- lines 32 / 34–35, 36
+    if s.ldr then ({ s with pc := 2, ans := !s.q }, onePulse true) -- lines 11–12 / 18, then line 31
+    else if s.b then ({ s with pc := 2 }, onePulse false) -- lines 22–23
+    else ({ s with pc := 2, ans := !(j && s.q) }, onePulse (!j)) -- lines 26–29
+  | _ => ({ s with pc := 3 }, if s.ldr then fun _ => 0 else onePulse true) -- lines 32 / 34–35, 36
 
 /-- The port(s) on which the node waits. -/
 def ready (s : St) (j : Bool) : Bool :=
@@ -398,9 +395,6 @@ theorem reach_inv (T : Typing x typ) {c : Config (ZMod n) St} (hc : proc.Reach (
     subst hj
     refine ⟨Function.update π w (π w + 1), fun v => ?_, deliver_cfgOf w h3⟩
     rw [Function.update_apply]; split_ifs <;> [omega; exact hπ v]
-
-lemma sum_ports (f : ZMod n × Bool → ℕ) : ∑ p, f p = ∑ v, (f (v, false) + f (v, true)) := by
-  rw [Fintype.sum_prod_type]; simp [add_comm]
 
 lemma totalSent_cfgOf (π : ZMod n → ℕ) :
     totalSent (cfgOf typ π) = ∑ v, ((typ v).sentR (π v) false + (typ v).sentR (π v) true) := by

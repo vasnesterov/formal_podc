@@ -1,4 +1,5 @@
 import Papers.PODC2026.ContentObliviousCounting.AnonCountingProbe
+import Podc.Algebra.BigOperators.Update
 
 /-!
 # Anonymous counting: waves of the last phase
@@ -241,8 +242,7 @@ lemma wout_sum (cw : Bool) : wout cw false + wout cw true = 1 := by cases cw <;>
 
 lemma sum_update_succ {S : Finset ℕ} {a : ℕ → ℕ} {q : ℕ} (hq : q ∈ S) :
     ∑ p ∈ S, Function.update a q (a q + 1) p = ∑ p ∈ S, a p + 1 := by
-  rw [Finset.sum_update_of_mem hq, Finset.sdiff_singleton_eq_erase, ← Finset.add_sum_erase S a hq]
-  ring
+  have := Finset.sum_update_add hq a (a q + 1); omega
 
 lemma pipe_en {n : ℕ} {κ : Kind} {a : ℕ → ℕ} {b q : ℕ} {j : Bool}
     (h : (absPipe n κ a b).En n q j) :

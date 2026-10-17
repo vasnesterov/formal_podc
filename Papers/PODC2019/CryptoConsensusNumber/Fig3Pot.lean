@@ -1,4 +1,5 @@
 import Papers.PODC2019.CryptoConsensusNumber.Fig3Lin
+import Podc.Algebra.BigOperators.Update
 
 /-!
 # Figure 3: a potential for wait-freedom
@@ -118,23 +119,11 @@ lemma Psi_eq (tx : Tx n Acct) {m m' : Mem n Acct k}
   exact le_antisymm (Psi_mono tx (fun r d hd => by rw [h] at hd; exact hd))
     (Psi_mono tx (fun r d hd => by rw [h]; exact hd))
 
-lemma sum_update_le {f : Fin n → ℕ} (s : Fin n) {v i j : ℕ} (h : v + i ≤ f s + j) :
-    ∑ q, Function.update f s v q + i ≤ ∑ q, f q + j := by
-  rw [Finset.sum_update_of_mem (Finset.mem_univ s), Finset.sdiff_singleton_eq_erase,
-    ← Finset.add_sum_erase _ _ (Finset.mem_univ s)]
-  omega
-
 lemma sum_beta_update (p : Fin n) (tx : Tx n Acct) (C : Cfg μ q₀ k) (s : Fin n)
     (l' : Loc n Acct) (i j : ℕ) (h : beta p tx l' + i ≤ beta p tx (C.loc s) + j) :
     ∑ q, beta p tx (Function.update C.loc s l' q) + i ≤ ∑ q, beta p tx (C.loc q) + j := by
-  have e : (fun q => beta p tx (Function.update C.loc s l' q)) =
-      Function.update (fun q => beta p tx (C.loc q)) s (beta p tx l') := by
-    funext q; by_cases hq : q = s
-    · subst hq; simp
-    · simp [Function.update_of_ne hq]
-  rw [show (∑ q, beta p tx (Function.update C.loc s l' q)) =
-    ∑ q, Function.update (fun q => beta p tx (C.loc q)) s (beta p tx l') q from by rw [← e]]
-  exact sum_update_le s h
+  have := Fintype.sum_comp_update_add (beta p tx) C.loc s l'
+  omega
 
 /-- Steps that do not change the decisions of `tx.a` and do not increase the stepper's
 potential. -/

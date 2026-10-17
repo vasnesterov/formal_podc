@@ -51,9 +51,6 @@ def decodeBit : ℕ → Option Bool
 
 lemma κ_le (b : Option Bool) : κ b ≤ 2 := by rcases b with _ | _ | _ <;> decide
 
-/-- One pulse on port `p`. -/
-def one (p : Bool) : Bool → ℕ := fun p' => if p' = p then 1 else 0
-
 /-- Local states of Algorithms 7 and 8. -/
 inductive St
   /-- Algorithm 7, while loop (lines 12–18), with the variables `cnt` and `in`. -/
@@ -73,15 +70,15 @@ def init : Bool × Bool × Option Bool → St × (Bool → ℕ)
 /-- Reception of a pulse on port `q`, and the code executed up to the next receive. -/
 def recv : St → Bool → St × (Bool → ℕ)
   | .loop ldr cnt inn, false => -- lines 14–15, then loop test (line 12) and line 19
-    if cnt - 1 < 0 then (.wait ldr inn, one true) else (.loop ldr (cnt - 1) inn, fun _ => 0)
-  | .loop ldr cnt inn, true => (.loop ldr cnt (inn + 1), one true) -- lines 16–18
+    if cnt - 1 < 0 then (.wait ldr inn, onePulse true) else (.loop ldr (cnt - 1) inn, fun _ => 0)
+  | .loop ldr cnt inn, true => (.loop ldr cnt (inn + 1), onePulse true) -- lines 16–18
   | .wait ldr inn, false => -- line 21 (leader), lines 28–30 (non-leader)
-    (.ret (decodeBit inn), if ldr then fun _ => 0 else one true)
-  | .wait ldr inn, true => (.wait ldr (inn + 1), one true) -- lines 25–27
+    (.ret (decodeBit inn), if ldr then fun _ => 0 else onePulse true)
+  | .wait ldr inn, true => (.wait ldr (inn + 1), onePulse true) -- lines 25–27
   | .relay ldr cnt, q => -- lines 5–11
     let cnt' := if q then cnt + 1 else cnt - 1
     (if cnt' < -1 then .ret none else .relay ldr cnt',
-      if ldr && !q && decide (cnt = -1) then fun _ => 0 else one (!q))
+      if ldr && !q && decide (cnt = -1) then fun _ => 0 else onePulse (!q))
   | .ret r, _ => (.ret r, fun _ => 0)
 
 /-- The ports on which a node waits: only port 0 for the leader at line 21; none once returned. -/
@@ -146,11 +143,11 @@ lemma rel_step (a : Bool × Bool × Option Bool) (s : St) (r snt : Bool → ℕ)
     cases j
     · by_cases hm : (r true : ℤ) - r false = -1
       · have hr : r false = r true + 1 := by omega
-        cases L' <;> simp [recv, Rel, one, h0, h1, hr]
+        cases L' <;> simp [recv, Rel, onePulse, h0, h1, hr]
       · have hm' : ¬ ((r true : ℤ) - r false - 1 < -1) := by omega
-        cases L' <;> simp [recv, Rel, one, hm, hm', h0, h1] <;> omega
+        cases L' <;> simp [recv, Rel, onePulse, hm, hm', h0, h1] <;> omega
     · have hm' : ¬ ((r true : ℤ) - r false + 1 < -1) := by omega
-      cases L' <;> simp [recv, Rel, one, hm', h0, h1] <;> omega
+      cases L' <;> simp [recv, Rel, onePulse, hm', h0, h1] <;> omega
   · simp [ready] at hrd
   · -- loop
     rename_i L' cnt inn
@@ -159,13 +156,13 @@ lemma rel_step (a : Bool × Bool × Option Bool) (s : St) (r snt : Bool → ℕ)
     · by_cases hm : cnt - 1 < 0
       · have : cnt = 0 := by omega
         subst this
-        cases L' <;> simp [recv, Rel, one, h0, h1] <;> omega
+        cases L' <;> simp [recv, Rel, onePulse, h0, h1] <;> omega
       · cases L' <;> simp [recv, Rel, hm, h0, h1] <;> omega
-    · cases L' <;> simp [recv, Rel, one, h0, h1] <;> omega
+    · cases L' <;> simp [recv, Rel, onePulse, h0, h1] <;> omega
   · -- wait
     rename_i L' inn
     obtain ⟨rfl, hr0, rfl, h0, h1⟩ := h
-    cases j <;> cases L' <;> simp [recv, Rel, one, ready, h0, h1, hr0] at hrd ⊢
+    cases j <;> cases L' <;> simp [recv, Rel, onePulse, ready, h0, h1, hr0] at hrd ⊢
     all_goals omega
   · simp [ready] at hrd
 
@@ -254,9 +251,9 @@ end facts
 
 lemma recv_false_port0 (s : St) : (recv s false).2 false = 0 := by
   rcases s with ⟨L, c, i⟩ | ⟨L, i⟩ | ⟨L, c⟩ | r
-  · simp only [recv]; split_ifs <;> simp [one]
-  · cases L <;> simp [recv, one]
-  · simp only [recv]; split_ifs <;> simp [one]
+  · simp only [recv]; split_ifs <;> simp [onePulse]
+  · cases L <;> simp [recv, onePulse]
+  · simp only [recv]; split_ifs <;> simp [onePulse]
   · simp [recv]
 
 /-! ## Propagation of the potentials around the ring
@@ -641,9 +638,6 @@ lemma recvd_true_le (hact : ∃ u, (x u).2.1 = true) {c : Config (ZMod n) St}
   have := r1_le_chain hc v (dist (act x) v) h2 _ h0 le_rfl
   rw [(rel hc _).s0_act h1] at this
   exact this.trans (κ_le _)
-
-lemma sum_ports (f : ZMod n × Bool → ℕ) : ∑ p, f p = ∑ v, (f (v, false) + f (v, true)) := by
-  rw [Fintype.sum_prod_type]; simp [add_comm]
 
 /-- **Theorem 17** (message complexity): no execution sends more than `6n` pulses. -/
 theorem totalSent_le (hℓ : ∀ v, (x v).1 = true ↔ v = ℓ) (hact : ∃ u, (x u).2.1 = true)

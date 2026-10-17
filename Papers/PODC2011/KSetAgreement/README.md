@@ -115,5 +115,8 @@ separate notion, and the synchronous-process version of Theorem 2.
 `Quot.sound`. The model and the consensus impossibility are CSLib's
 `Cslib/Computability/Distributed/FLP/`. Non-vacuity: Theorem 8's algorithm satisfies the
 specification, and the trivial algorithm `own` solves k-set agreement for `k ≥ n`.
-Reusable pieces (CSLib candidates): `AgreeOn`/`replay_mTr`/`agreeOn_mTr_outside` (`Replay.lean`),
-and the source-component lemmas (`SourceComponents.lean`).
+Source components are the shared library's `Digraph.IsSourceComponent` (`Podc/Digraph/Walk.lean`)
+on finsets of vertices; `SourceComp.isSourceComponent_iff` gives the elementary characterization
+(nonempty, strongly connected, closed under in-neighbours). Reusable pieces (CSLib candidates):
+`AgreeOn`/`replay_mTr`/`agreeOn_mTr_outside` (`Replay.lean`), and `IsRoot`, `exists_isRoot` and
+the counting lemmas of `SourceComponents.lean`.

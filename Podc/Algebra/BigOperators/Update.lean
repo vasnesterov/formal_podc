@@ -10,7 +10,9 @@ Potential-function arguments sum a quantity over all processes and change it at 
 step. This file provides the corresponding facts about `∑ x, f x` when `f` is changed at a single
 point:
 
-* `Fintype.sum_update_add` — `∑ x, update f a b x + f a = ∑ x, f x + b`;
+* `Finset.sum_update_add`, `Fintype.sum_update_add` — `∑ x, update f a b x + f a = ∑ x, f x + b`
+  (over a finset containing `a`, resp. over a finite type), and `Fintype.sum_comp_update_add` for
+  `g ∘ update f a b`;
 * `Fintype.sum_le_sum_of_eq_off`, `Fintype.sum_lt_sum_of_eq_off` — if `g` agrees with `f` outside
   `a`, then the sums compare as `g a` and `f a`;
 * `Fintype.sum_lt_sum_of_update` — decreasing one value decreases the sum;
@@ -18,6 +20,18 @@ point:
 -/
 
 open Finset
+
+namespace Finset
+
+variable {α M : Type*} [AddCommMonoid M] [DecidableEq α]
+
+/-- Changing `f` at `a ∈ s` to `b` changes the sum over `s` by replacing `f a` with `b`. -/
+theorem sum_update_add {s : Finset α} {a : α} (h : a ∈ s) (f : α → M) (b : M) :
+    ∑ x ∈ s, Function.update f a b x + f a = ∑ x ∈ s, f x + b := by
+  rw [Finset.sum_update_of_mem h, Finset.sdiff_singleton_eq_erase, ← Finset.add_sum_erase _ _ h]
+  ac_rfl
+
+end Finset
 
 namespace Fintype
 
@@ -29,10 +43,14 @@ variable [AddCommMonoid M] [DecidableEq α]
 
 /-- Changing `f` at `a` to `b` changes the sum by replacing `f a` with `b`. -/
 theorem sum_update_add (f : α → M) (a : α) (b : M) :
-    ∑ x, Function.update f a b x + f a = ∑ x, f x + b := by
-  rw [Finset.sum_update_of_mem (Finset.mem_univ a), Finset.sdiff_singleton_eq_erase,
-    ← Finset.add_sum_erase _ _ (Finset.mem_univ a)]
-  ac_rfl
+    ∑ x, Function.update f a b x + f a = ∑ x, f x + b :=
+  Finset.sum_update_add (Finset.mem_univ a) f b
+
+/-- Changing `f` at `a` to `b` changes `∑ x, g (f x)` by replacing `g (f a)` with `g b`. -/
+theorem sum_comp_update_add {β : Type*} (g : β → M) (f : α → β) (a : α) (b : β) :
+    ∑ x, g (Function.update f a b x) + g (f a) = ∑ x, g (f x) + g b := by
+  have := sum_update_add (g ∘ f) a (g b)
+  rwa [← Function.comp_update] at this
 
 end AddCommMonoid
 

@@ -64,7 +64,7 @@ lemma LInv.step_prop (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
   -- facts about the other processes' proposals
   have hPrec : ∀ q' tx' c' t' res', (C.loc q').pc = .prop tx' c' (t', res') →
       Invoked α (t'.p, gid t') :=
-    fun q' tx' c' t' res' h => invoked_of_opOf (hL.opK t' (hM.prop_K h))
+    fun q' tx' c' t' res' h => Invoked.of_opOf_eq_some (hL.opK t' (hM.prop_K h))
   by_cases hund : Dec C.mem a ρ = none ∧ res = false
   · -- the proposal `(t, false)` is decided: insert `t` at the snapshot point
     obtain ⟨hund, hres⟩ := hund
@@ -124,7 +124,7 @@ lemma LInv.step_prop (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
         rw [hS] at h0 hnotL
         exact h0.insert (by rw [hα]; exact hL.opK t htK) hnotL hnc
           (congrArg Prod.fst hneu1)
-          (not_precedes_append (invoked_of_opOf (hL.opK t htK)) hS₂)
+          (not_precedes_append (Invoked.of_opOf_eq_some (hL.opK t htK)) hS₂)
       bal := by rw [hlst, ← hS, hU']; exact hL.bal
       memL := fun y hy => by
         rw [hU']

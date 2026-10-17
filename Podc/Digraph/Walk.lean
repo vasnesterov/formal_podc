@@ -31,6 +31,8 @@ length at most `n`).
 
 * `Relation.ReflTransGen.relatesWithinSteps_card_sub_one`, `Digraph.Reachable.relatesWithinSteps`:
   in a finite type, every reachable vertex is reachable within `|V| - 1` steps.
+* `Relation.RelatesInSteps.exists_le_first_visit`: a walk can be cut at the first visit of its
+  target.
 * `Digraph.ReachableAvoiding.exists_isChainFromTo`: reachability avoiding `X` is witnessed by a
   simple path (a duplicate-free list of vertices) outside `X`.
 * `Digraph.isSourceComponent_iff`: `S` is a source component iff `S` is the set of ancestors of a
@@ -101,6 +103,24 @@ theorem ReflTransGen.relatesWithinSteps_card_sub_one [Fintype α] (h : ReflTrans
     simpa using Set.encard_le_encard (Set.subset_univ {x | ReflTransGen r a x})
   have : n < Fintype.card α := by exact_mod_cast hlt.trans_le hle
   exact ⟨n, by omega, hn⟩
+
+/-- A walk of length `n` to `b` can be cut at its first visit of `b`: there is a walk of length
+`m ≤ n` from `a` to `b` none of whose steps starts at `b`. -/
+theorem RelatesInSteps.exists_le_first_visit (h : RelatesInSteps r a b n) :
+    ∃ m ≤ n, RelatesInSteps (fun x y => r x y ∧ x ≠ b) a b m := by
+  suffices ∀ c k, RelatesInSteps r a c k → RelatesInSteps (fun x y => r x y ∧ x ≠ b) a c k ∨
+      ∃ m ≤ k, RelatesInSteps (fun x y => r x y ∧ x ≠ b) a b m by
+    rcases this b n h with h | h
+    exacts [⟨n, le_rfl, h⟩, h]
+  intro c k hc
+  induction hc with
+  | refl => exact .inl (.refl _)
+  | tail c d k _ hcd ih =>
+    rcases ih with h | ⟨m, hm, h⟩
+    · by_cases hc : c = b
+      · subst hc; exact .inr ⟨k, by omega, h⟩
+      · exact .inl (.tail _ _ _ _ h ⟨hcd, hc⟩)
+    · exact .inr ⟨m, by omega, h⟩
 
 /-- Reachability is witnessed by a duplicate-free chain. -/
 theorem ReflTransGen.exists_isChainFromTo_nodup (h : ReflTransGen r a b) :

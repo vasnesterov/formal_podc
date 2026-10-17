@@ -1,4 +1,5 @@
 import Papers.PODC2011.TimestampSpace.Alg4Inv2
+import Podc.SharedMemory.History
 
 /-!
 # Algorithms 3 and 4 are correct (Lemma 6.4)
@@ -74,11 +75,6 @@ lemma respOf_tau {α : List (Label P TS)} {q : P} (g : OpId P) :
 lemma respOf_inv {α : List (Label P TS)} {q : P} {o : TSOp (ℕ × ℕ)} (g : OpId P) :
     respOf (α ++ [.inv q o]) g = respOf α g := by
   simp [respOf, respsOf, List.filterMap_cons]
-
-lemma completed_of_respOf {α : List (Label P TS)} {g : OpId P} {r : (ℕ × ℕ) ⊕ Bool}
-    (h : respOf α g = some r) : Completed α g := by
-  simp only [respOf] at h
-  exact (List.getElem?_eq_some_iff.1 h).1
 
 lemma invoked_of_completed {α : List (Label P TS)} {C : ACfg P}
     (h : (alg4 (P := P)).run α = some C) {g : OpId P} (hc : Completed α g) : Invoked α g := by
@@ -218,7 +214,7 @@ theorem InvH.step {α : List (Label P TS)} {C C' : ACfg P} {G : Gh P} {ℓ : Lab
         respOf α g = some r ∧ opOf (α ++ [.inv q o]) g = opOf α g := by
       intro g r hr
       rw [respOf_inv] at hr
-      exact ⟨hr, opOf_inv_of_invoked (invoked_of_completed hrun (completed_of_respOf hr))⟩
+      exact ⟨hr, opOf_inv_of_invoked (invoked_of_completed hrun (Completed.of_respOf_eq_some hr))⟩
     refine ⟨?_, ?_, ?_, ?_⟩
     · intro g r hg hr
       obtain ⟨hr', ho⟩ := hop g r hr
@@ -242,7 +238,7 @@ theorem InvH.step {α : List (Label P TS)} {C C' : ACfg P} {G : Gh P} {ℓ : Lab
       obtain ⟨hr₂', ho₂⟩ := hop g₂ _ hr₂
       rw [ho₁] at hg₁; rw [ho₂] at hg₂
       exact hH.order g₁ g₂ t₁ t₂ hg₁ hr₁' hg₂ hr₂'
-        (hpr.of_append_of_invoked (invoked_of_completed hrun (completed_of_respOf hr₂')))
+        (hpr.of_append_of_invoked (invoked_of_completed hrun (Completed.of_respOf_eq_some hr₂')))
     · intro c a b r hc hr
       obtain ⟨hr', ho⟩ := hop c _ hr
       rw [ho] at hc
@@ -307,7 +303,7 @@ theorem InvH.step {α : List (Label P TS)} {C C' : ACfg P} {G : Gh P} {ℓ : Lab
         have := hH.pend g₁ k t q hg₁ h5 (by rw [ho₀, hg₂]) hpr'
         rw [hpc, ← h4] at this
         exact this
-      · obtain ⟨hpr', hne⟩ := hold g₁ _ hpr (invoked_of_completed hrun (completed_of_respOf h4))
+      · obtain ⟨hpr', hne⟩ := hold g₁ _ hpr (invoked_of_completed hrun (Completed.of_respOf_eq_some h4))
         rcases hnew g₁ _ hr₁ with ⟨h5, -⟩ | h5
         · exact absurd h5 hne
         exact hH.order g₁ g₂ t₁ t₂ hg₁ h5 hg₂ h4 hpr'
@@ -359,7 +355,7 @@ theorem InvH.step {α : List (Label P TS)} {C C' : ACfg P} {G : Gh P} {ℓ : Lab
     · intro g₁ g₂ t₁ t₂ hg₁ hr₁ hg₂ hr₂ hpr
       rw [opOf_tau] at hg₁ hg₂; rw [respOf_tau] at hr₁ hr₂
       exact hH.order g₁ g₂ t₁ t₂ hg₁ hr₁ hg₂ hr₂
-        (hprec _ _ hpr (invoked_of_completed hrun (completed_of_respOf hr₂)))
+        (hprec _ _ hpr (invoked_of_completed hrun (Completed.of_respOf_eq_some hr₂)))
     · intro c a b r hc hr
       rw [opOf_tau] at hc; rw [respOf_tau] at hr
       exact hH.cmp c a b r hc hr

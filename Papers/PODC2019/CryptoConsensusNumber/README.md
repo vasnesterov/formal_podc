@@ -109,7 +109,10 @@ machinery comes from CSLib (`Cslib/Computability/Distributed/SharedMemory/Recove
 shared library: `ObjSpec.RWLike` (`Podc/SharedMemory/ObjClasses.lean`), `wfConsensus_of_inv` and
 `inv_run_crashFree` (`Podc/SharedMemory/Recoverable.lean`), the retroactive-insertion toolkit
 `IsLinearization.insert`, `ObjSpec.respIn` (`Podc/SharedMemory/LinResp.lean`) and
-`InfExec.exists_good_of_measure`, `InfExec.run_lbls` (`Podc/SharedMemory/Progress.lean`).
+`InfExec.exists_good_of_measure`, `InfExec.run_lbls` (`Podc/SharedMemory/Progress.lean`), the
+current operation instance `curOp` and `opOf_append_of_eq_some`, `linState_concat`
+(`Podc/SharedMemory/History.lean`), and `Fintype.sum_comp_update_add`
+(`Podc/Algebra/BigOperators/Update.lean`).
 `Fig3Example.lean` instantiates Lemma 2 (2 processes, one shared account, `k = 2`). CSLib candidates:
 `snapObj`, `kConsObj`, `crit_overwrite`, `crit_commute`, `stepP_stepP_same`, and the generic
 linearization lemmas in the `Aux` section of `Fig1.lean`.

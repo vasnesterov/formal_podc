@@ -1,5 +1,6 @@
 import Papers.PODC2016.ComplexityHierarchy.BufferLB
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
+import Podc.SharedMemory.History
 
 /-!
 # A history object from a single ℓ-buffer (Lemma 6.1 of Ellen–Gelashvili–Shavit–Zhu, PODC 2016)
@@ -390,19 +391,16 @@ def histImpl (ℓ : ℕ) (S : Finset P) : Impl (historySpec X) (HB ℓ P X) P (H
     | .append _ => p ∈ S
     | .get => True
 
-/-- The current operation instance of `p` (its first not yet returned one). -/
-abbrev cur (α : List (Label P (historySpec X))) (p : P) : OpId P := (p, (respsOf α p).length)
-
 /-- The per-process part of the invariant, by program counter. -/
 def ProcOK (S : Finset P) (α : List (Label P (historySpec X))) (L : List (OpId P × HOp X))
     (W : List (Entry P X)) (p : P) : HPc P X → Option (HOp X) → Prop
   | .idle, pd => pd = none
-  | .get, pd => pd ≠ none ∧ cur α p ∉ L.map Prod.fst ∧ opOf α (cur α p) = some .get
-  | .app x, pd => pd ≠ none ∧ cur α p ∉ L.map Prod.fst ∧ opOf α (cur α p) = some (.append x) ∧
+  | .get, pd => pd ≠ none ∧ curOp α p ∉ L.map Prod.fst ∧ opOf α (curOp α p) = some .get
+  | .app x, pd => pd ≠ none ∧ curOp α p ∉ L.map Prod.fst ∧ opOf α (curOp α p) = some (.append x) ∧
       p ∈ S
-  | .wr x h, pd => pd ≠ none ∧ cur α p ∉ L.map Prod.fst ∧ opOf α (cur α p) = some (.append x) ∧
+  | .wr x h, pd => pd ≠ none ∧ curOp α p ∉ L.map Prod.fst ∧ opOf α (curOp α p) = some (.append x) ∧
       p ∈ S ∧ h <+: W.map Prod.snd ∧ ∀ j (hj : j < W.length), W[j].2.1 = p → j < h.length
-  | .done r, pd => pd ≠ none ∧ ∃ L₁ L₂ o, L = L₁ ++ (cur α p, o) :: L₂ ∧
+  | .done r, pd => pd ≠ none ∧ ∃ L₁ L₂ o, L = L₁ ++ (curOp α p, o) :: L₂ ∧
       ((historySpec X).δ ((historySpec X).runOps [] (L₁.map Prod.snd)) o).2 = r
 
 /-- The invariant of `histImpl` (`W`: all buffer writes so far, a ghost variable). -/
@@ -416,36 +414,32 @@ structure Inv (ℓ : ℕ) (S : Finset P) (α : List (Label P (historySpec X)))
   cnt : ∀ e ∈ W, e.2.2.1 < (C.loc e.2.1).cnt
   proc : ∀ p, ProcOK S α L W p (C.loc p).pc (C.pend p)
 
-lemma invoked_of_opOf {α : List (Label P (historySpec X))} {x : OpId P} {o : HOp X}
-    (h : opOf α x = some o) : Invoked α x := by
-  simp only [opOf] at h; exact (List.getElem?_eq_some_iff.1 h).1
-
 lemma ProcOK.mono {S : Finset P} {α α' : List (Label P (historySpec X))}
     {L L₀ : List (OpId P × HOp X)} {W W₀ : List (Entry P X)} {q : P} {c : HPc P X}
     {pd : Option (HOp X)}
     (hresp : respsOf α' q = respsOf α q)
     (hop : ∀ x, Invoked α x → opOf α' x = opOf α x)
-    (hL₀ : cur α q ∉ L₀.map Prod.fst)
+    (hL₀ : curOp α q ∉ L₀.map Prod.fst)
     (hW₀ : ∀ e ∈ W₀, e.2.1 ≠ q)
     (h : ProcOK S α L W q c pd) : ProcOK S α' (L ++ L₀) (W ++ W₀) q c pd := by
-  have hcur : cur α' q = cur α q := by simp [cur, hresp]
+  have hcur : curOp α' q = curOp α q := by simp [curOp, hresp]
   cases c with
   | idle => exact h
   | get =>
     obtain ⟨h1, h2, h3⟩ := h
     refine ⟨h1, ?_, ?_⟩
     · rw [hcur, List.map_append, List.mem_append, not_or]; exact ⟨h2, hL₀⟩
-    · rw [hcur, hop _ (invoked_of_opOf h3), h3]
+    · rw [hcur, hop _ (Invoked.of_opOf_eq_some h3), h3]
   | app x =>
     obtain ⟨h1, h2, h3, h4⟩ := h
     refine ⟨h1, ?_, ?_, h4⟩
     · rw [hcur, List.map_append, List.mem_append, not_or]; exact ⟨h2, hL₀⟩
-    · rw [hcur, hop _ (invoked_of_opOf h3), h3]
+    · rw [hcur, hop _ (Invoked.of_opOf_eq_some h3), h3]
   | wr x hh =>
     obtain ⟨h1, h2, h3, h4, h5, h6⟩ := h
     refine ⟨h1, ?_, ?_, h4, ?_, ?_⟩
     · rw [hcur, List.map_append, List.mem_append, not_or]; exact ⟨h2, hL₀⟩
-    · rw [hcur, hop _ (invoked_of_opOf h3), h3]
+    · rw [hcur, hop _ (Invoked.of_opOf_eq_some h3), h3]
     · rw [List.map_append]; exact h5.trans (List.prefix_append _ _)
     · intro j hj hjq
       rcases Nat.lt_or_ge j W.length with hj' | hj'
@@ -495,17 +489,17 @@ lemma inv_step_inv (hI : Inv ℓ S α C₀ L W) (hrun : (histImpl ℓ S).run α 
     · subst hq; rw [hloc, Function.update_self]; cases o <;> rfl
     · rw [hloc, Function.update_of_ne hq]
   have hresp : ∀ q, respsOf (α ++ [.inv p o]) q = respsOf α q := by intro q; simp
-  have hnL : cur α p ∉ L.map Prod.fst := by
+  have hnL : curOp α p ∉ L.map Prod.fst := by
     intro hm
     have := hI.lin.mem_invoked hm
     simp [Invoked] at this; omega
-  have hop : opOf (α ++ [.inv p o]) (cur α p) = some o := by
+  have hop : opOf (α ++ [.inv p o]) (curOp α p) = some o := by
     simp [opOf, opsOf_append, ← hlen]
   refine ⟨hI.lin.append_inv p o, hI.good, by rw [hmem]; exact hI.mem, hI.state,
     fun e he => by rw [hcnt]; exact hI.cnt e he, fun q => ?_⟩
   by_cases hq : q = p
   · subst hq
-    have hcur : cur (α ++ [.inv q o]) q = cur α q := by simp [cur, hresp]
+    have hcur : curOp (α ++ [.inv q o]) q = curOp α q := by simp [curOp, hresp]
     rw [hpend, hloc, Function.update_self, Function.update_self]
     cases o with
     | append x =>
@@ -559,8 +553,8 @@ lemma inv_step_tau (hS : S.card ≤ ℓ) (hI : Inv ℓ S α C₀ L W) {p : P}
   cases i
   have hp := hI.proc p
   have hresp : ∀ q, respsOf (α ++ [.tau p]) q = respsOf α q := by intro q; simp
-  have hcurp : cur (α ++ [.tau p]) p = cur α p := by simp [cur, hresp]
-  have hnc : ¬ Completed α (cur α p) := by simp [Completed]
+  have hcurp : curOp (α ++ [.tau p]) p = curOp α p := by simp [curOp, hresp]
+  have hnc : ¬ Completed α (curOp α p) := by simp [Completed]
   have hrec : recon ℓ (C₀.mem ()) = W.map Prod.snd := by
     rw [hI.mem]; exact recon_correct hI.good hS
   rcases hl : C₀.loc p with ⟨c, pc⟩
@@ -578,7 +572,7 @@ lemma inv_step_tau (hS : S.card ≤ ℓ) (hI : Inv ℓ S α C₀ L W) {p : P}
     have hk := (eq_of_heq h2).symm
     subst hk
     obtain ⟨hp1, hp2, hp3⟩ := hp
-    refine ⟨L ++ [(cur α p, .get)], W, (hI.lin.push hp3 hp2 hnc).append_tau p, hI.good, ?_, ?_,
+    refine ⟨L ++ [(curOp α p, .get)], W, (hI.lin.push hp3 hp2 hnc).append_tau p, hI.good, ?_, ?_,
       ?_, ?_⟩
     · rw [hmem, Function.update_self]; exact hI.mem
     · rw [← hI.state]; simp [linState, ObjSpec.runOps]
@@ -598,9 +592,9 @@ lemma inv_step_tau (hS : S.card ≤ ℓ) (hI : Inv ℓ S α C₀ L W) {p : P}
         rw [this, hrec, List.map_map]
         rfl
       · rw [(hother q hq).1, (hother q hq).2]
-        have := (hI.proc q).mono (α' := α ++ [.tau p]) (L₀ := [(cur α p, .get)]) (W₀ := [])
+        have := (hI.proc q).mono (α' := α ++ [.tau p]) (L₀ := [(curOp α p, .get)]) (W₀ := [])
           (hresp q) (fun _ hx => opOf_append_of_invoked hx)
-          (by simp [cur, hq]) (by simp)
+          (by simp [curOp, hq]) (by simp)
         rwa [List.append_nil] at this
   | app x =>
     simp only [histImpl, Action.access.injEq, true_and] at hact
@@ -624,7 +618,7 @@ lemma inv_step_tau (hS : S.card ≤ ℓ) (hI : Inv ℓ S α C₀ L W) {p : P}
         dsimp only
         rw [hrec]
         refine ⟨h0, by rw [hcurp]; exact hp2, by rw [hcurp,
-          opOf_append_of_invoked (invoked_of_opOf hp3)]; exact hp3, hp4, List.prefix_refl _, ?_⟩
+          opOf_append_of_invoked (Invoked.of_opOf_eq_some hp3)]; exact hp3, hp4, List.prefix_refl _, ?_⟩
         intro j hj _; simpa using hj
       · rw [(hother q hq).1, (hother q hq).2]
         have := (hI.proc q).mono (α' := α ++ [.tau p]) (L₀ := []) (W₀ := [])
@@ -645,7 +639,7 @@ lemma inv_step_tau (hS : S.card ≤ ℓ) (hI : Inv ℓ S α C₀ L W) {p : P}
       have := hI.cnt e' he'
       rw [hee, hl] at this
       exact lt_irrefl _ this
-    refine ⟨L ++ [(cur α p, .append x)], W ++ [e], (hI.lin.push hp3 hp2 hnc).append_tau p,
+    refine ⟨L ++ [(curOp α p, .append x)], W ++ [e], (hI.lin.push hp3 hp2 hnc).append_tau p,
       hI.good.append hp5 hp6 hp4 hnotin, ?_, ?_, ?_, ?_⟩
     · rw [hmem, Function.update_self, hI.mem]
       simp only [bufWrite, List.reverse_append, List.reverse_singleton,
@@ -675,9 +669,9 @@ lemma inv_step_tau (hS : S.card ≤ ℓ) (hI : Inv ℓ S α C₀ L W) {p : P}
         rw [hpend, hloc, Function.update_self]
         exact ⟨h0, L, [], .append x, by rw [hcurp], rfl⟩
       · rw [(hother q hq).1, (hother q hq).2]
-        exact (hI.proc q).mono (α' := α ++ [.tau p]) (L₀ := [(cur α p, .append x)]) (W₀ := [e])
+        exact (hI.proc q).mono (α' := α ++ [.tau p]) (L₀ := [(curOp α p, .append x)]) (W₀ := [e])
           (hresp q) (fun _ hx => opOf_append_of_invoked hx)
-          (by simp [cur, hq]) (by simp [e, Ne.symm hq])
+          (by simp [curOp, hq]) (by simp [e, Ne.symm hq])
 
 theorem inv_of_run (hS : S.card ≤ ℓ) {α : List (Label P (historySpec X))}
     {C : Config (historySpec X) (HB ℓ P X) P (HLoc P X)}

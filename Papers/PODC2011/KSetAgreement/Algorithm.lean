@@ -208,7 +208,7 @@ theorem Closed.inClosed {know : Fin n → Option (V × Finset (Fin n))} {p : Fin
 theorem Closed.isSome_of_rtg {know : Fin n → Option (V × Finset (Fin n))} {p : Fin n}
     (hc : Closed know p) {u : Fin n} (hu : ReflTransGen (Edge (ilOf know)) u p) :
     (know u).isSome :=
-  mem_of_rtg_of_inClosed hc.inClosed (S := {r | (know r).isSome}) hc.1 hu
+  Digraph.mem_of_reachable_of_closed (G := ⟨Edge (ilOf know)⟩) hc.inClosed hu hc.1
 
 /-- The decision rule of a closed `know` that is consistent with the actual in-lists picks a
 frozen root. -/

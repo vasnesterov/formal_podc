@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.Digraph.Walk
 
 /-!
 # `k`-packings
@@ -35,7 +36,7 @@ the *residual relation* `resid cov S π x y` ("some process packed into `x` by `
 
 namespace Cslib.SharedMemory.ComplexityHierarchy
 
-open Finset
+open Finset Relation
 
 variable {P Loc : Type*} [DecidableEq Loc]
 
@@ -51,46 +52,6 @@ def IsPacking (cov : P → Loc → Prop) (k : ℕ) (S : Finset P) (π : P → Lo
 (Section 7 of the paper). -/
 def FullyPacked (cov : P → Loc → Prop) (k : ℕ) (S : Finset P) (r : Loc) : Prop :=
   ∀ π, IsPacking cov k S π → packCount S π r = k
-
-/-! ### Length-indexed walks -/
-
-/-- Walks of length `n` from `x` to `y` along a relation `R`, built by appending edges. -/
-inductive LWalk {α : Type*} (R : α → α → Prop) : ℕ → α → α → Prop
-  | refl (x : α) : LWalk R 0 x x
-  | tail {n : ℕ} {x z y : α} : LWalk R n x z → R z y → LWalk R (n + 1) x y
-
-namespace LWalk
-
-variable {α : Type*} {R R' : α → α → Prop}
-
-theorem mono (h : ∀ a b, R a b → R' a b) {n : ℕ} {x y : α} (w : LWalk R n x y) :
-    LWalk R' n x y := by
-  induction w with
-  | refl x => exact .refl x
-  | tail _ hr ih => exact .tail ih (h _ _ hr)
-
-/-- Either a walk avoids `t` as the source of an edge, or a prefix of it reaches `t` while avoiding
-`t` as a source. -/
-theorem cut (t : α) {n : ℕ} {x y : α} (w : LWalk R n x y) :
-    LWalk (fun a b => R a b ∧ a ≠ t) n x y ∨
-      ∃ m ≤ n, LWalk (fun a b => R a b ∧ a ≠ t) m x t := by
-  induction w with
-  | refl x => exact Or.inl (.refl x)
-  | @tail n x z y _ hr ih =>
-    rcases ih with h | ⟨m, hm, h⟩
-    · by_cases hz : z = t
-      · subst hz; exact Or.inr ⟨n, by omega, h⟩
-      · exact Or.inl (.tail h ⟨hr, hz⟩)
-    · exact Or.inr ⟨m, by omega, h⟩
-
-/-- A walk to `z` can be shortened to one that never leaves `z`. -/
-theorem cut_self {n : ℕ} {x z : α} (w : LWalk R n x z) :
-    ∃ m ≤ n, LWalk (fun a b => R a b ∧ a ≠ z) m x z := by
-  rcases w.cut z with h | h
-  · exact ⟨n, le_rfl, h⟩
-  · exact h
-
-end LWalk
 
 /-! ### Residual relation and augmenting paths -/
 
@@ -119,7 +80,7 @@ theorem packCount_update [DecidableEq P] {π : P → Loc} {q : P} (hq : q ∈ S)
 packing `π`, then some packing packs fewer than `k` processes into `x`. -/
 theorem exists_packing_lt_of_walk :
     ∀ (n : ℕ) (π : P → Loc) (x y : Loc), IsPacking cov k S π →
-      LWalk (resid cov S π) n x y → packCount S π y < k →
+      RelatesInSteps (resid cov S π) x y n → packCount S π y < k →
         ∃ σ, IsPacking cov k S σ ∧ packCount S σ x < k := by
   classical
   intro n
@@ -128,7 +89,7 @@ theorem exists_packing_lt_of_walk :
   intro π x y hπ w hy
   cases w with
   | refl => exact ⟨π, hπ, hy⟩
-  | @tail m _ z _ w hzy =>
+  | tail z _ m w hzy =>
     obtain ⟨q, hqS, hqz, hqy⟩ := hzy
     have hcount := fun r => packCount_update (π := π) hqS y r
     set σ := Function.update π q y with hσdef
@@ -148,9 +109,9 @@ theorem exists_packing_lt_of_walk :
       by_cases hyz : y = z
       · subst hyz; simp only [hqz, ite_true] at h1; omega
       · simp only [hqz, hyz, ite_true, ite_false] at h1; omega
-    obtain ⟨m', hm', w'⟩ := w.cut_self
-    have w'' : LWalk (resid cov S σ) m' x z := by
-      refine w'.mono (fun a b hab => ?_)
+    obtain ⟨m', hm', w'⟩ := w.exists_le_first_visit
+    have w'' : RelatesInSteps (resid cov S σ) x z m' := by
+      refine w'.map id (fun a b hab => ?_)
       obtain ⟨⟨q', hq'S, hq'a, hq'b⟩, ha⟩ := hab
       have hq' : q' ≠ q := by
         rintro rfl
@@ -200,14 +161,14 @@ theorem fullyPacked_of_cov [Fintype Loc] {π : P → Loc} {p : P} {r : Loc}
     (hπ : IsPacking cov k S π) (hp : p ∈ S) (ha : FullyPacked cov k S (π p)) (hr : cov p r) :
     FullyPacked cov k S r := by
   classical
-  set Z := univ.filter (fun z => ∃ n, LWalk (resid cov S π) n (π p) z) with hZ
+  set Z := univ.filter (fun z => ∃ n, RelatesInSteps (resid cov S π) (π p) z n) with hZ
   by_cases hall : ∀ z ∈ Z, packCount S π z = k
   · intro σ hσ
     refine packCount_eq_of_closed (π := π) (Z := Z) ?_ hall hσ r ?_
     · intro q hq hqZ y hy
       obtain ⟨n, w⟩ := (mem_filter.1 hqZ).2
-      exact mem_filter.2 ⟨mem_univ _, n + 1, w.tail ⟨q, hq, rfl, hy⟩⟩
-    · exact mem_filter.2 ⟨mem_univ _, 1, (LWalk.refl _).tail ⟨p, hp, rfl, hr⟩⟩
+      exact mem_filter.2 ⟨mem_univ _, n + 1, .tail _ _ _ _ w ⟨q, hq, rfl, hy⟩⟩
+    · exact mem_filter.2 ⟨mem_univ _, 1, .single ⟨p, hp, rfl, hr⟩⟩
   · push Not at hall
     obtain ⟨z, hz, hne⟩ := hall
     obtain ⟨n, w⟩ := (mem_filter.1 hz).2

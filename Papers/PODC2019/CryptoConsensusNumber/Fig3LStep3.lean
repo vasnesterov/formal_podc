@@ -85,7 +85,7 @@ lemma LInv.step_upd (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K) {tx : Tx
   have hα : ∀ x, opOf (α ++ [.tau q]) x = opOf α x := opOf_append_noinv (by simp)
   have hPrec : ∀ q' tx' c' t' res', (C.loc q').pc = .prop tx' c' (t', res') →
       Invoked α (t'.p, gid t') :=
-    fun q' tx' c' t' res' h => invoked_of_opOf (hL.opK t' (hM.prop_K h))
+    fun q' tx' c' t' res' h => Invoked.of_opOf_eq_some (hL.opK t' (hM.prop_K h))
   -- the new program counter of `q`
   have hq'pc : (C'.loc q).pc = loopCheck tx (c \ ((C.loc q).com a ∪ {t}))
       (C.loc q).hist := by

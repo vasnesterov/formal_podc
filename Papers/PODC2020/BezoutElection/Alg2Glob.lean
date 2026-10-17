@@ -1,6 +1,7 @@
 import Papers.PODC2020.BezoutElection.Alg2Conc
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
 import Mathlib.Algebra.BigOperators.Group.Finset.Piecewise
+import Podc.Algebra.BigOperators.Update
 
 /-!
 # Algorithm 2: the global invariant
@@ -115,14 +116,6 @@ lemma n11Count_change (mem mem' : Fin m → Reg Id) (vpc vpc' : P → VPC Id) (q
   classical
   unfold n11Count
   convert card_filter_change q h
-
-/-- A sum over `P` changing only at `q`. -/
-lemma sum_update_eq (f : P → ℕ) (q : P) (a : ℕ) :
-    ∑ j, Function.update f q a j + f q = ∑ j, f j + a := by
-  rw [← add_sum_erase _ _ (mem_univ q), ← add_sum_erase _ f (mem_univ q)]
-  have : ∑ x ∈ univ.erase q, Function.update f q a x = ∑ x ∈ univ.erase q, f x :=
-    sum_congr rfl (fun j hj => by rw [Function.update_of_ne (ne_of_mem_erase hj)])
-  rw [this]; simp; omega
 
 end Lemmas
 
