@@ -3,6 +3,7 @@
 -- (github.com/vasnesterov/cslib, branch `podc`); `Podc.Basic` only imports all of CSLib.
 import Podc.Basic
 import Podc.Computability.Distributed.Byzantine.PartialSync.Merge
+import Podc.Computability.Distributed.Byzantine.Specs
 import Podc.Computability.Distributed.ContentOblivious.VirtualRing
 import Podc.Computability.Distributed.SharedMemory.HerlihyWing.SeqLin
 import Podc.Computability.Distributed.SharedMemory.History

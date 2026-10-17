@@ -1,5 +1,6 @@
 import Mathlib
 import Cslib.Computability.Distributed.Byzantine.CanonicalRounds.Lemmas
+import Podc.Computability.Distributed.Byzantine.Specs
 
 /-!
 # Nontrivial convergence problems (Section 2.2 of [AFW26])
@@ -21,7 +22,7 @@ execution. Termination/round complexity is treated separately (`CanonAlg.rounds`
 
 namespace Podc2026.CanonicalRound
 
-open Cslib.Byzantine.CanonicalRounds
+open Cslib.Byzantine.CanonicalRounds Cslib.Byzantine
 
 variable {n : ℕ} {V O : Type*}
 
@@ -43,8 +44,8 @@ def ncSpec (x₀ x₁ : V) (d₀ d₁ : O) : Spec n V O := fun I F d =>
 /-- Consensus: agreement and (strong) validity: a decided value is the input of a correct
 process. -/
 def consensusSpec : Spec n V V := fun I F d =>
-  (∀ p ∉ F, ∀ q ∉ F, ∀ a b, d p = some a → d q = some b → a = b) ∧
-  (∀ p ∉ F, ∀ a, d p = some a → ∃ q ∉ F, I q = a)
+  Problem.Agreement (↑F)ᶜ (fun p a => d p = some a) ∧
+  Problem.InputValidity I (↑F)ᶜ (fun p a => d p = some a)
 
 /-- Consensus is a nontrivial convergence problem (any two distinct values). -/
 theorem consensus_nc {x₀ x₁ : V} (hx : x₀ ≠ x₁) :
@@ -61,10 +62,10 @@ theorem consensus_nc {x₀ x₁ : V} (hx : x₀ ≠ x₁) :
     rw [ha, hall q hq]
 
 /-- `ε`-approximate agreement on the reals: decisions at most `ε` apart and within the range of the
-correct inputs. -/
+correct inputs (the safety clauses of the shared `Problem.ApproxAgreement ε`). -/
 def approxSpec (ε : ℝ) : Spec n ℝ ℝ := fun I F d =>
-  (∀ p ∉ F, ∀ q ∉ F, ∀ a b, d p = some a → d q = some b → |a - b| ≤ ε) ∧
-  (∀ p ∉ F, ∀ a, d p = some a → (∃ q ∉ F, I q ≤ a) ∧ ∃ q ∉ F, a ≤ I q)
+  Problem.EpsAgreement ε (↑F)ᶜ (fun p a => d p = some a) ∧
+    Problem.RangeValidity I (↑F)ᶜ (fun p a => d p = some a)
 
 /-- Approximate agreement is a nontrivial convergence problem for inputs more than `ε` apart. -/
 theorem approx_nc {ε x₀ x₁ : ℝ} (hx : ε < |x₀ - x₁|) :

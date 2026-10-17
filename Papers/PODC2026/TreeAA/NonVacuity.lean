@@ -108,7 +108,7 @@ lemma realTriv_solves (D ε : ℝ) (hε : 0 ≤ ε) :
   obtain ⟨a, -, ha⟩ := Finset.exists_mem_eq_inf' Finset.univ_nonempty s.input
   refine ⟨⟨fun p _ => ⟨_, hdec p⟩, fun p _ o ho => ?_, fun p _ q _ o o' h1 h2 => ?_⟩, ?_⟩
   · rw [Decides.unique _ _ ho (hdec p), show m = s.input a from ha]
-    exact ⟨a, hH a, a, hH a, le_rfl, le_rfl⟩
+    exact .self (hH a)
   · rw [Decides.unique _ _ h1 (hdec p), Decides.unique _ _ h2 (hdec q)]
     simpa using hε
   · intro p _

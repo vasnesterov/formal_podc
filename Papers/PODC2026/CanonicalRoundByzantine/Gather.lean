@@ -1,5 +1,6 @@
 import Mathlib
 import Cslib.Foundations.Data.Finset.Quorum
+import Podc.Computability.Distributed.Byzantine.Specs
 
 /-!
 # Algorithm 4 of [AFW26]: connected consensus from gather (and approximate agreement)
@@ -166,7 +167,7 @@ structure GatherSpec {W : Type*} (f : ℕ) (F : Finset P) (x : P → W)
 Validity: every correct output lies between two correct inputs. -/
 structure AASpec (F : Finset P) (r y : P → ℝ) : Prop where
   /-- Validity. -/
-  validity : ∀ i, i ∉ F → (∃ j, j ∉ F ∧ r j ≤ y i) ∧ (∃ j, j ∉ F ∧ y i ≤ r j)
+  validity : ∀ i, i ∉ F → Cslib.Byzantine.Problem.InRange r (↑F)ᶜ (y i)
   /-- `1`-Agreement. -/
   agreement : ∀ i j, i ∉ F → j ∉ F → |y i - y j| ≤ 1
 

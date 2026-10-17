@@ -1,5 +1,6 @@
 import Mathlib
 import Podc.Foundations.Data.Nat.Log
+import Cslib.Computability.Distributed.Byzantine.Specs
 
 /-!
 # Byzantine Agreement with Predictions — the guess-and-double wrapper (Sections 5 and 9)
@@ -47,15 +48,46 @@ open Finset
 
 variable {P V : Type*}
 
-/-- Specification of graded consensus (Section 5): Strong Unanimity and Coherence. -/
-structure GCSpec (H : Set P) (inp : P → V) (out : P → V × Bool) : Prop where
-  unanimity : ∀ v, (∀ i ∈ H, inp i = v) → ∀ i ∈ H, out i = (v, true)
-  coherence : ∀ i ∈ H, ∀ v, out i = (v, true) → ∀ j ∈ H, (out j).1 = v
+/-- Specification of graded consensus (Section 5): Strong Unanimity and Coherence. This is the
+shared binary graded consensus `Problem.GradedConsensus`; `gcSpec_iff` states it in the paper's
+form, whose two clauses are `GCSpec.unanimity` and `GCSpec.coherence`. -/
+abbrev GCSpec (H : Set P) (inp : P → V) (out : P → V × Bool) : Prop :=
+  Cslib.Byzantine.Problem.GradedConsensus inp H out
 
-/-- Agreement and Strong Unanimity of a (conditional) Byzantine agreement sub-protocol. -/
-structure BASpec (H : Set P) (inp out : P → V) : Prop where
-  agreement : ∀ i ∈ H, ∀ j ∈ H, out i = out j
-  unanimity : ∀ v, (∀ i ∈ H, inp i = v) → ∀ i ∈ H, out i = v
+/-- Agreement and Strong Unanimity of a (conditional) Byzantine agreement sub-protocol: the shared
+`Problem.Consensus` (fields `agreement`, `unanimity`; `baSpec_iff`). -/
+abbrev BASpec (H : Set P) (inp out : P → V) : Prop :=
+  Cslib.Byzantine.Problem.Consensus inp H out
+
+section Specs
+
+variable {H : Set P}
+
+/-- The specification of graded consensus in the paper's form (Strong Unanimity, Coherence). -/
+theorem gcSpec_iff {inp : P → V} {out : P → V × Bool} : GCSpec H inp out ↔
+    (∀ v, (∀ i ∈ H, inp i = v) → ∀ i ∈ H, out i = (v, true)) ∧
+      ∀ i ∈ H, ∀ v, out i = (v, true) → ∀ j ∈ H, (out j).1 = v := by
+  refine Cslib.Byzantine.Problem.gradedConsensus_iff.trans <| and_congr
+    (forall₂_congr fun _ _ => forall₂_congr fun _ _ => by rw [Prod.ext_iff])
+    ⟨fun h i hi v hv j hj => ?_, fun h i hi hg j hj => h i hi _ (Prod.ext rfl hg) j hj⟩
+  rw [h i hi (by rw [hv]) j hj, hv]
+
+/-- Strong Unanimity of graded consensus. -/
+theorem GCSpec.unanimity {inp : P → V} {out : P → V × Bool} (h : GCSpec H inp out) :
+    ∀ v, (∀ i ∈ H, inp i = v) → ∀ i ∈ H, out i = (v, true) :=
+  (gcSpec_iff.1 h).1
+
+/-- Coherence of graded consensus. -/
+theorem GCSpec.coherence {inp : P → V} {out : P → V × Bool} (h : GCSpec H inp out) :
+    ∀ i ∈ H, ∀ v, out i = (v, true) → ∀ j ∈ H, (out j).1 = v :=
+  (gcSpec_iff.1 h).2
+
+/-- The specification of the BA sub-protocols in explicit form (Agreement, Strong Unanimity). -/
+theorem baSpec_iff {inp out : P → V} : BASpec H inp out ↔
+    (∀ i ∈ H, ∀ j ∈ H, out i = out j) ∧ ∀ v, (∀ i ∈ H, inp i = v) → ∀ i ∈ H, out i = v :=
+  ⟨fun h => ⟨h.1, h.2⟩, fun h => ⟨h.1, h.2⟩⟩
+
+end Specs
 
 /-- An abstract execution of Algorithm 1: inputs and the outputs of all sub-protocol instances
 (`gc₁ φ i` = output of process `i` from GC₁ in phase `φ`, etc.). -/

@@ -1,12 +1,14 @@
 import Papers.PODC2023.ValidityConsensus.Similarity
 import Cslib.Computability.Distributed.Byzantine.PartialSync.Map
+import Cslib.Computability.Distributed.Byzantine.PartialSync.VC.Main
 
 /-!
 # On the Validity of Consensus — §5.2: `Universal` (Theorem 5) and the classification
 
-* Vector consensus (§5.2.1) is taken as a black box: `SolvesVectorConsensus`. Its existence is a
-  *hypothesis* (the paper gives implementations in its Appendix B, relying on Quad / DBFT and
-  reliable broadcast; these are not formalized).
+* Vector consensus (§5.2.1) is taken as a black box: CSLib's `SolvesVectorConsensus` (its decided
+  vectors are `IsInputConfigExact t`). Its existence is a *hypothesis* (the paper gives
+  implementations in its Appendix B, relying on Quad / DBFT and reliable broadcast; these are not
+  formalized here; `Optimal.lean` discharges it with CSLib's verified protocol `VC`).
 * `universal A Λ` (Algorithm 2): run vector consensus `A`, decide `Λ vector` (the decision
   post-processing `A.mapDecide Λ` of `Cslib.Computability.Distributed.Byzantine.PartialSync.Map`).
 * `solvesConsensus_universal` (Lemma 8 / Theorem 5): if `n > 2t` (the paper assumes `n > 3t`)
@@ -23,18 +25,10 @@ open Finset Cslib.Byzantine.PartialSync
 
 variable {P M S VI VO K : Type*} [Fintype P] [DecidableEq P] {t δ : ℕ}
 
-/-- **Vector consensus** (§5.2.1): Termination, Agreement and Vector Validity — a decided vector
-has exactly `n - t` process-proposal pairs, and the pair of each correct process is its actual
-proposal. -/
-structure SolvesVectorConsensus (t δ : ℕ) (A : Algorithm P M S VI (Config P VI)) : Prop where
-  termination : ∀ R : Run P M VI, R.Valid t δ → ∀ p ∉ R.faulty, ∃ vec, R.Decides A p vec
-  agreement : ∀ R : Run P M VI, R.Valid t δ → ∀ p ∉ R.faulty, ∀ q ∉ R.faulty, ∀ v w,
-    R.Decides A p v → R.Decides A q w → v = w
-  vectorValidity : ∀ R : Run P M VI, R.Valid t δ → ∀ p ∉ R.faulty, ∀ vec,
-    R.Decides A p vec → IsInputConfigExact t vec ∧
-      ∀ q ∉ R.faulty, vec q ≠ none → vec q = some (R.inp q)
-
-/-- Vector consensus is solvable (with message and state types in `Type`). -/
+/-- Vector consensus (§5.2.1, CSLib's `SolvesVectorConsensus`: Termination, Agreement and Vector
+Validity — a decided vector has exactly `n - t` process-proposal pairs, i.e. it is
+`IsInputConfigExact t`, and the pair of each correct process is its actual proposal) is solvable
+(with message and state types in `Type`). -/
 def VectorConsensusSolvable (P VI : Type*) [Fintype P] [DecidableEq P] (t δ : ℕ) : Prop :=
   ∃ (M S : Type) (A : Algorithm P M S VI (Config P VI)), SolvesVectorConsensus t δ A
 
@@ -60,7 +54,7 @@ theorem mem_vectorConsensusValidity_inputConf {R : Run P M VI} {vec : Config P V
   simp [Run.inputConf, hqF]
 
 /-- Vector consensus solves consensus with the validity property `vectorConsensusValidity t`. -/
-theorem SolvesVectorConsensus.solvesConsensus (hA : SolvesVectorConsensus t δ A) :
+theorem solvesConsensus_vectorConsensusValidity (hA : SolvesVectorConsensus t δ A) :
     SolvesConsensus t δ A (vectorConsensusValidity t) where
   termination := hA.termination
   agreement := hA.agreement
@@ -93,7 +87,7 @@ theorem solvesConsensus_universal {val : ValidityProperty P VI VO}
     (hn : 2 * t < Fintype.card P) (hA : SolvesVectorConsensus t δ A)
     (hΛ : ∀ c, IsInputConfigExact t c → CommonAdmissible t val c (Λ c)) :
     SolvesConsensus t δ (universal A Λ) val :=
-  hA.solvesConsensus.mapDecide fun _ hc _ hvec =>
+  (solvesConsensus_vectorConsensusValidity hA).mapDecide fun _ hc _ hvec =>
     mem_of_vectorConsensusValidity hn hΛ hc hvec
 
 /-- **Theorem 5** (solvability form): with `n > 3t`, if vector consensus is solvable then every

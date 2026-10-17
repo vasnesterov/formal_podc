@@ -65,7 +65,8 @@ theorem quiet_outputs {Au : Auth P M K} {A : Algorithm P M S ℝ ℝ} {ε : ℝ}
     Outputs A (Run.quiet F fun _ => x) p x := by
   have hav := Run.quiet_authValid (M := M) (F := F) (I := fun _ => x) (Au := Au) (A := A)
   obtain ⟨v, hv⟩ := hA.termination _ hC hav (fun _ => hx) p hp
-  have := (hA.validity _ hC hav (fun _ => hx) p hp v hv).eq_of_const (x := x) (fun _ _ => rfl)
+  have := InHonestRange.eq_of_const (hA.validity _ hC hav (fun _ => hx) p hp v hv) (x := x)
+    (fun _ _ => rfl)
   exact this ▸ hv
 
 /-- **Theorem 5.1** (strong form). Let `n ≥ 2` and `2 tₛ + tₐ ≥ n`, and let the input domain `D`
