@@ -60,7 +60,7 @@ lemma CannotGen.extend {S : Finset A} {C : Config A Q} {G : Set Q} (h : P.Cannot
       have hEa : E a = p := by
         rw [hE.eq_of_not_mem P (x := a) (by simp)]; exact hDa
       have hstep : P.StepIn (· ∈ S) E (upd E a b o) :=
-        ⟨a, b, haS, hbS, hba.symm, o, by rw [hEa, hEb]; exact ho, rfl⟩
+        ⟨a, b, ⟨haS, hbS, hba.symm⟩, o, by rw [hEa, hEb]; exact ho, rfl⟩
       have hreach := hEC.tail hstep
       rcases hoG with h1 | h2
       · exact h (upd E a b o) hreach a haS (by rw [upd_left _ hba.symm]; exact h1)
@@ -89,7 +89,7 @@ lemma not_closedSet_of_solvesSSLE [Nonempty A] {leader : Q → Bool}
     induction hE with
     | refl => exact fun _ => hq₀
     | tail _ hst ih =>
-      obtain ⟨a, b, -, -, hab, o, ho, rfl⟩ := hst
+      obtain ⟨a, b, hab, o, ho, rfl⟩ := hst
       have ho' := hH _ (ih a) _ (ih b) o ho
       intro x
       by_cases hxb : x = b
@@ -209,7 +209,7 @@ theorem not_solvesSSLE_two_sizes [Nonempty Q] {leader : Q → Bool} {n₁ n₂ :
     · simpa [hDℓ] using hℓC
   have h2 := Finset.card_le_card hsub
   rw [Finset.card_pair hei] at h2
-  have := hC D hD.reachable
+  have : LeaderCorrect leader D := hC D hD.reachable
   unfold LeaderCorrect numLeaders at this; omega
 
 end TimeOptimalSSLE.NProtocol

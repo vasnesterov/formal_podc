@@ -801,7 +801,6 @@ import Papers.PODC2020.BezoutElection.LockStepExec
 import Papers.PODC2020.BezoutElection.LowerBound
 import Papers.PODC2020.BezoutElection.Main
 import Papers.PODC2020.BezoutElection.Necessity
-import Papers.PODC2020.SSLERegular.Fairness
 import Papers.PODC2020.SSLERegular.Model
 import Papers.PODC2020.SSLERegular.SSTree
 import Papers.PODC2020.SSLERegular.EulerCycle
