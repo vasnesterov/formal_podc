@@ -2,6 +2,7 @@ import Papers.PODC2026.ContentObliviousCounting.BitSending
 import Cslib.Computability.Distributed.ContentOblivious.Splice
 import Cslib.Computability.Distributed.ContentOblivious.Staged
 import Mathlib
+import Podc.Computability.Distributed.ContentOblivious.VirtualRing
 
 /-!
 # Theorem 17 with a relay leader: composing two rounds gives wrong outputs
@@ -83,16 +84,15 @@ lemma cBad_out : (cBad.st 2).1.2 = [some false, none] ∧ (cBad.st 2).2 = none �
   decide
 
 /-- The clockwise active neighbour of process `2` is process `1`. -/
-lemma next_two : next (fun v => (xTwo v).2.1) 2 = 1 := by
-  have hact : ∃ u, (fun v => (xTwo v).2.1) u = true := ⟨1, rfl⟩
-  obtain ⟨h0, h1, h2⟩ := dist_spec hact 2
-  have hd : dist (fun v => (xTwo v).2.1) 2 = 2 := by
+lemma next_two : vnext (fun v => (xTwo v).2.1) 2 = 1 := by
+  obtain ⟨k, h0, -, hk, h1, h2⟩ := vnext_spec (act := fun v => (xTwo v).2.1) (u := 1) rfl 2
+  have : k = 2 := by
     by_contra hne
     rcases Nat.lt_or_gt_of_ne hne with hlt | hgt
-    · have : dist (fun v => (xTwo v).2.1) 2 = 1 := by omega
-      rw [this] at h1; revert h1; decide
+    · obtain rfl : k = 1 := by omega
+      revert h1; decide
     · have := h2 2 (by omega) hgt; revert this; decide
-  rw [next, hd]; decide
+  rw [hk, this]; decide
 
 /-- **Theorem 17 / Lemma 16 are false for a relay leader.** Running two CCW bit rounds back to
 back on a 3-process ring whose leader is a relay can end in a final, quiescent configuration in
@@ -101,7 +101,7 @@ which process `2` has obtained the bits `[0, ⊥]` of its clockwise active neigh
 theorem relay_leader_composition_wrong :
     ∃ c, twoRounds.Reach (oriented 3) xTwo c ∧ twoRounds.Final (oriented 3) c ∧
       twoRounds.Quiescent (oriented 3) c ∧
-      next (fun v => (xTwo v).2.1) 2 = 1 ∧
+      vnext (fun v => (xTwo v).2.1) 2 = 1 ∧
       (c.st 2).2 = none ∧
       (c.st 2).1.2 = [(xTwo 1).2.2.2, (xTwo 1).2.2.1] ∧
       (c.st 2).1.2 ≠ [(xTwo 1).2.2.1, (xTwo 1).2.2.2] :=

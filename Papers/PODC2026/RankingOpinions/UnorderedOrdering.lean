@@ -8,6 +8,7 @@ import Mathlib.Data.Fintype.Card
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
 import Mathlib.Tactic.Ring
 import Mathlib.Data.Fin.VecNotation
+import Podc.Foundations.Data.Fin.Cyclic
 
 /-!
 # The Ordering protocol (Theorem 5.1)
@@ -57,15 +58,6 @@ variable {Col : Type*} [DecidableEq Col] {k : ℕ}
 /-- Cyclic successor `d ↦ (d + 1) mod k` on `Fin k`. -/
 def cyc (d : Fin k) : Fin k := ⟨(d.val + 1) % k, Nat.mod_lt _ (by have := d.isLt; omega)⟩
 
-/-- Clockwise distance from `d` to `h`: `(h - d) mod k` (subtraction in `Fin k` is modular). -/
-def dist (d h : Fin k) : ℕ := ((h - d : Fin k) : ℕ)
-
-lemma dist_eq (d h : Fin k) : dist d h = (h.val + k - d.val) % k := by
-  rw [dist, Fin.val_sub]
-  congr 1
-  have := d.isLt
-  omega
-
 lemma cyc_ne (hk : 2 ≤ k) (d : Fin k) : cyc d ≠ d := by
   intro h
   have h' := congrArg Fin.val h
@@ -75,24 +67,14 @@ lemma cyc_ne (hk : 2 ≤ k) (d : Fin k) : cyc d ≠ d := by
   · rw [h1, Nat.mod_self] at h'; omega
   · rw [Nat.mod_eq_of_lt (by omega)] at h'; omega
 
-lemma dist_cyc {d h : Fin k} (hdh : d ≠ h) : dist (cyc d) h + 1 = dist d h := by
-  have hd := d.isLt; have hh := h.isLt
-  have hne : d.val ≠ h.val := Fin.val_ne_of_ne hdh
-  rw [dist_eq, dist_eq]
-  unfold cyc
-  simp only
-  by_cases hk : d.val + 1 = k
-  · rw [hk, Nat.mod_self]
-    rw [show h.val + k - 0 = h.val + k by omega, Nat.add_mod_right, Nat.mod_eq_of_lt hh]
-    rw [show h.val + k - d.val = h.val + 1 by omega, Nat.mod_eq_of_lt (by omega)]
-  · rw [Nat.mod_eq_of_lt (show d.val + 1 < k by omega)]
-    rcases lt_or_gt_of_ne hne with hlt | hlt
-    · rw [show h.val + k - (d.val + 1) = (h.val - d.val - 1) + k by omega,
-        show h.val + k - d.val = (h.val - d.val) + k by omega, Nat.add_mod_right,
-        Nat.add_mod_right, Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)]
-      omega
-    · rw [Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)]
-      omega
+/-- A step `cyc` towards `h ≠ d` decreases the clockwise distance to `h` by one. -/
+lemma cdist_cyc {d h : Fin k} (hdh : d ≠ h) : Fin.cdist (cyc d) h + 1 = Fin.cdist d h := by
+  have := d.isLt; have := h.isLt; have := Fin.val_ne_of_ne hdh
+  have hc : (cyc d).val = if d.val + 1 = k then 0 else d.val + 1 := by
+    simp only [cyc]; split_ifs with h1
+    · rw [h1, Nat.mod_self]
+    · exact Nat.mod_eq_of_lt (by omega)
+  rw [Fin.cdist_eq_ite, Fin.cdist_eq_ite, hc]; split_ifs <;> omega
 
 /-- States of Ordering: initial color, leader bit, label. -/
 @[ext] structure OState (Col : Type*) (k : ℕ) where
@@ -312,7 +294,7 @@ lemma usedLabels_mono {T t : ℕ} (hT : ∀ t ≥ T, ∀ x, (E.config t x).ld = 
 
 /-- Sum of the distances of the leaders' labels to the label `h`. -/
 def distSum (h : Fin k) (C : Config A (OState Col k)) : ℕ :=
-  ∑ x ∈ univ.filter (fun x => (C x).ld = true), dist (C x).d h
+  ∑ x ∈ univ.filter (fun x => (C x).ld = true), Fin.cdist (C x).d h
 
 end Labels
 
@@ -385,18 +367,19 @@ theorem ordering_correct (input : A → Col) (hk : 0 < k) (hcol : (colors input)
       (E.config (t + 1) x).d = (E.config t x).d := by
     by_cases hfull : ∃ h, h ∉ usedLabels (E.config T2)
     · obtain ⟨h, hh⟩ := hfull
-      have hsum : ∀ t ≥ T2, distSum h (E.config t) = ∑ x ∈ L, dist (E.config t x).d h :=
+      have hsum : ∀ t ≥ T2, distSum h (E.config t) = ∑ x ∈ L, Fin.cdist (E.config t x).d h :=
         fun t ht => by rw [distSum, hLt t (by omega)]
-      have hle : ∀ t ≥ T2, ∀ x ∈ L, dist (E.config (t + 1) x).d h ≤ dist (E.config t x).d h ∧
+      have hle : ∀ t ≥ T2, ∀ x ∈ L,
+          Fin.cdist (E.config (t + 1) x).d h ≤ Fin.cdist (E.config t x).d h ∧
           ((E.config (t + 1) x).d ≠ (E.config t x).d →
-            dist (E.config (t + 1) x).d h < dist (E.config t x).d h) := by
+            Fin.cdist (E.config (t + 1) x).d h < Fin.cdist (E.config t x).d h) := by
         intro t ht x hx
         have hx' : lead x := by simpa [hL] using hx
         by_cases hne : (E.config (t + 1) x).d = (E.config t x).d
         · rw [hne]; exact ⟨le_rfl, fun h' => absurd rfl h'⟩
         · obtain ⟨-, h2, h3, -⟩ := hchange t ht x hx' hne
           have hdh : (E.config t x).d ≠ h := fun e => hh (e ▸ h3)
-          have := dist_cyc hdh
+          have := cdist_cyc hdh
           rw [h2]; exact ⟨by omega, fun _ => by omega⟩
       obtain ⟨T3, hT3le, hT3⟩ := Nat.eventually_const_of_succ_le
         (f := fun t => distSum h (E.config t)) (N := T2) (fun t ht => by

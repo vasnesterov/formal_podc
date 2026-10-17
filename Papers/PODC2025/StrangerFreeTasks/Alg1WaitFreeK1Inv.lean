@@ -1,4 +1,5 @@
 import Papers.PODC2025.StrangerFreeTasks.Alg1SafetyBasic
+import Podc.Foundations.Data.Fin.Cyclic
 
 /-!
 # Algorithm 1 for `k = 1`: local steps and static invariants
@@ -26,9 +27,6 @@ variable {P : Type} [DecidableEq P]
 
 lemma fin2_cases_k1 (j : Fin (1 + 1)) : j = 0 ∨ j = 1 := by
   revert j; decide
-
-lemma fin2_add_one_ne (i : Fin (1 + 1)) : i + 1 ≠ i := by
-  revert i; decide
 
 lemma fin2_le_one (j : Fin (1 + 1)) : j ≤ 1 := by
   revert j; decide

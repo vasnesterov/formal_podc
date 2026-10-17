@@ -16,47 +16,10 @@ open Cslib.ContentOblivious Finset
 
 variable {n : ℕ} [NeZero n]
 
-/-- The two definitions of the next active node agree. -/
-lemma vnext_eq_next {act : ZMod n → Bool} {u : ZMod n} (hu : act u = true) (v : ZMod n) :
-    vnext act v = BitSending.next act v := by
-  have h := exists_next_active hu v
-  obtain ⟨d0, dact, dmin⟩ := BitSending.dist_spec ⟨u, hu⟩ v
-  rw [vnext, dite_eq_left_of_eq_true (eq_true h), BitSending.next]
-  obtain ⟨hm1, hm2⟩ := Nat.find_spec h
-  have e : Nat.find h + 1 = BitSending.dist act v := by
-    rcases lt_trichotomy (Nat.find h + 1) (BitSending.dist act v) with hlt | heq | hgt
-    · have := dmin _ (by omega) hlt; rw [hm2] at this; exact absurd this (by simp)
-    · exact heq
-    · exfalso
-      have hlt : BitSending.dist act v - 1 < Nat.find h := by omega
-      refine Nat.find_min h hlt ⟨by omega, ?_⟩
-      rw [show BitSending.dist act v - 1 + 1 = BitSending.dist act v by omega]; exact dact
-  rw [e]
-
-/-- The two definitions of the previous active node agree. -/
-lemma vprev_eq_prev {act : ZMod n → Bool} {u : ZMod n} (hu : act u = true) (v : ZMod n) :
-    vprev act v = BitSending.prev act v := by
-  have h := exists_prev_active hu v
-  obtain ⟨k, hk0, hkeq, hkact, hkmin⟩ := BitSending.prev_spec ⟨u, hu⟩ v
-  rw [vprev, dite_eq_left_of_eq_true (eq_true h), hkeq]
-  obtain ⟨hm1, hm2⟩ := Nat.find_spec h
-  have e : Nat.find h + 1 = k := by
-    rcases lt_trichotomy (Nat.find h + 1) k with hlt | heq | hgt
-    · have := hkmin _ (by omega) hlt; rw [hm2] at this; exact absurd this (by simp)
-    · exact heq
-    · exfalso
-      have hlt : k - 1 < Nat.find h := by omega
-      refine Nat.find_min h hlt ⟨by omega, ?_⟩
-      rw [show k - 1 + 1 = k by omega]; exact hkact
-  rw [e]
-
 /-- Theorems 17 and 21 give `RoundSpecAll` for the concrete round procedures. -/
 theorem roundSpecAll {lead : ZMod n → Bool} {ℓ : ZMod n} (hℓ : ∀ v, lead v = true ↔ v = ℓ) :
     RoundSpecAll ComputeOR.proc BitSending.cwProc BitSending.proc lead ℓ := by
   intro act hact
-  have e1 : vnext act = BitSending.next act := funext (vnext_eq_next hact)
-  have e2 : vprev act = BitSending.prev act := funext (vprev_eq_prev hact)
-  rw [e1, e2]
   exact Concrete.roundSpec hℓ hact
 
 /-- **Theorem 1** (efficient aggregation), for the concrete content-oblivious algorithms: see

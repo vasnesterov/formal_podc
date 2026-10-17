@@ -1,4 +1,6 @@
 import Mathlib
+import Cslib.Computability.Distributed.ContentOblivious.Mirror
+import Podc.Foundations.Algebra.BigOperators.Translate
 
 /-!
 # Counting lemmas for one instance of Algorithm 1 on a ring
@@ -20,29 +22,6 @@ namespace Podc.ContentOblivious.Ring
 open Finset
 
 variable {n : ℕ} [NeZero n]
-
-/-- Induction around the ring. -/
-lemma induction (P : ZMod n → Prop) (a : ZMod n) (h0 : P a) (hs : ∀ v, P v → P (v + 1)) :
-    ∀ v, P v := by
-  intro v
-  have key : ∀ k : ℕ, P (a + k) := by
-    intro k
-    induction k with
-    | zero => simpa using h0
-    | succ k ih => push_cast; rw [← add_assoc]; exact hs _ ih
-  have := key (v - a).val
-  rwa [ZMod.natCast_zmod_val, add_sub_cancel] at this
-
-/-- Induction around the ring, backwards. -/
-lemma induction_down (P : ZMod n → Prop) (a : ZMod n) (h0 : P a) (hs : ∀ v, P (v + 1) → P v) :
-    ∀ v, P v := by
-  intro v
-  have := induction (fun w => P (-w)) (-a) (by simpa using h0)
-    (fun w hw => hs _ (by rwa [neg_add, neg_add_cancel_right])) (-v)
-  simpa using this
-
-lemma sum_shift (f : ZMod n → ℕ) (k : ZMod n) : ∑ v, f (v + k) = ∑ v, f v :=
-  Equiv.sum_comp (Equiv.addRight k) f
 
 /-- The invariant of Lemma 5. -/
 def Profile (ρ σ I : ZMod n → ℕ) : Prop := ∀ v, σ v = ρ v + if ρ v < I v then 1 else 0
@@ -66,7 +45,7 @@ lemma Profile.good_of_tight (h : Profile ρ σ I) (ht : ∀ v, ρ (v + 1) = σ v
   have hsum : ∑ v, σ v = ∑ v, ρ v + ∑ v, (if ρ v < I v then 1 else 0) := by
     rw [← sum_add_distrib]; exact sum_congr rfl fun v _ => h v
   have h2 : ∑ v, σ v = ∑ v, ρ v := by
-    rw [← sum_shift ρ 1]; exact sum_congr rfl fun v _ => (ht v).symm
+    rw [← Fintype.sum_add_right_eq_self ρ 1]; exact sum_congr rfl fun v _ => (ht v).symm
   have h3 : ∑ v, (if ρ v < I v then 1 else 0 : ℕ) = 0 := by omega
   intro v
   have := (sum_eq_zero_iff.1 h3) v (mem_univ v)
@@ -79,11 +58,11 @@ lemma Profile.tight_of_good (h : Profile ρ σ I) (he : Edge ρ σ) (hg : ∀ v,
     (∀ v, ρ (v + 1) = σ v) ∧ (∀ v, σ v = ρ v) ∧ ∀ v w, ρ v = ρ w := by
   have hσ : ∀ v, σ v = ρ v := fun v => by rw [h v, if_neg (not_lt.2 (hg v))]; simp
   have hle : ∀ v ∈ (univ : Finset (ZMod n)), ρ (v + 1) ≤ ρ v := fun v _ => (hσ v) ▸ he v
-  have heq := (sum_eq_sum_iff_of_le hle).1 (sum_shift ρ 1)
+  have heq := (sum_eq_sum_iff_of_le hle).1 (Fintype.sum_add_right_eq_self ρ 1)
   have hstep : ∀ v, ρ (v + 1) = ρ v := fun v => heq v (mem_univ v)
   refine ⟨fun v => by rw [hσ, hstep], hσ, fun v w => ?_⟩
-  have := induction (fun x => ρ x = ρ v) v rfl (fun x hx => by rw [hstep, hx]) w
-  exact this.symm
+  exact (Cslib.ContentOblivious.Ring.chain_cw_all (fun x => ρ x = ρ v) (v - 1)
+    (fun x _ hx => by rw [hstep, hx]) (by rw [sub_add_cancel]) w).symm
 
 /-- Lemma 10 (3): once every node is past its ID, everybody has received and sent exactly
 `max I` pulses (given the bound `ρ ≤ max I` of Corollary 13). -/
@@ -143,12 +122,5 @@ lemma exists_ge_of_injective {k : ℕ} (f : Fin k → ℕ) (hf : Function.Inject
   have := card_le_card hsub
   rw [card_image_of_injective _ hf, card_univ, Fintype.card_fin, Nat.card_Ioo] at this
   omega
-
-/-- Distinct steps around the ring give distinct nodes. -/
-lemma add_natCast_injective (v : ZMod n) {i j : ℕ} (hi : i < n) (hj : j < n)
-    (h : v + (i : ZMod n) = v + j) : i = j := by
-  have := add_left_cancel h
-  rw [ZMod.natCast_eq_natCast_iff'] at this
-  rwa [Nat.mod_eq_of_lt hi, Nat.mod_eq_of_lt hj] at this
 
 end Podc.ContentOblivious.Ring

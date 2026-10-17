@@ -104,12 +104,6 @@ theorem pos_cast_of_lAdj {a b : ℤ} (ha : IsLevel k a) (hb : IsLevel k b) (h : 
   push_cast at this
   rcases h3 with h3 | h3 | h3 <;> rw [h3] <;> push_cast <;> (try rw [this]) <;> ring
 
-theorem one_ne_zero_zmod (hk : 1 ≤ k) : (1 : ZMod (2 * k)) ≠ 0 := by
-  intro h
-  have := eq_of_intCast_eq (n := 2 * k) (a := 1) (b := 0) (by simpa using h)
-    (by push_cast; omega) (by push_cast; omega)
-  omega
-
 theorem two_ne_zero_zmod (hk : 2 ≤ k) : (2 : ZMod (2 * k)) ≠ 0 := by
   intro h
   have := eq_of_intCast_eq (n := 2 * k) (a := 2) (b := 0) (by simpa using h)
@@ -241,8 +235,7 @@ theorem output_ne_of_fwd {ν μ : Turn k} (h : μ.lvl = fwd k ν.lvl) (hν : ν.
   simp only [output, hν, hμ, Bool.false_eq_true, ite_false, ne_eq, Option.some.injEq]
   unfold clock; rw [h, pos_fwd_cast ν.isLevel]
   intro h4
-  have hk : 1 ≤ k := by have := ν.isLevel; unfold IsLevel at this; omega
-  exact one_ne_zero_zmod hk (by simpa using h4)
+  exact (ZMod.one_eq_zero_iff (n := 2 * k)).not.2 (by omega) (by simpa using h4)
 
 /-- In a good graph, a node whose output does not change keeps its turn. -/
 theorem eq_of_not_chg {s : ℕ} (hg : AllGood G C s) {v : V}
@@ -298,7 +291,8 @@ theorem uclk_inv (hk : 2 ≤ k) {t : ℕ} (hg : AllGood G C t) (o : V → ℤ) (
           rw [heq] at eu
           rcases (h3 v huv).2 with h4 | h4
           · rw [h4, eu] at ev
-            exact one_ne_zero_zmod (k := k) (by omega) (by push_cast at ev; linear_combination ev)
+            exact (ZMod.one_eq_zero_iff (n := 2 * k)).not.2 (by omega)
+              (by push_cast at ev; linear_combination ev)
           · rw [h4, pos_fwd_cast (C s u).isLevel, eu] at ev
             exact two_ne_zero_zmod hk (by push_cast at ev; linear_combination ev)
       · simp only [ite_eq_right hcu]; split_ifs <;> omega

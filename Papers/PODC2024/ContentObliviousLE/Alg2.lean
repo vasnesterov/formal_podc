@@ -151,7 +151,8 @@ theorem Counters.rccw_lt (h : Counters id M rcw scw rccw sccw) (hid : Function.I
       have := ih (by omega); omega
   -- pigeonhole on the `k` distinct positive IDs
   obtain ⟨j, hj⟩ := Ring.exists_ge_of_injective (fun j : Fin k => id (v + ((j : ℕ) : ZMod n)))
-    (fun a b hab => Fin.ext (Ring.add_natCast_injective v (by omega) (by omega) (hid hab)))
+    (fun a b hab => Fin.ext (CharP.natCast_injOn_Iio (ZMod n) n (Set.mem_Iio.2 (by omega))
+      (Set.mem_Iio.2 (by omega)) (add_left_cancel (hid hab))))
     (fun j => hpos _) hk0
   have := hgood j j.2
   have := hcw j j.2

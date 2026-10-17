@@ -15,8 +15,8 @@ formalized `ComputeOR` (Algorithm 9), `CCWBitSending/CCWBitRelay` (Algorithms 7�
 mirror images `CWBitSending/CWBitRelay`.
 
 Setting: oriented ring `ZMod n` (any `n ≥ 1`), exactly one leader `ℓ`, and — for the message
-exchange and the simulation — the leader is active (as in Theorem 14). `BitSending.next act v` /
-`BitSending.prev act v` is the next active process clockwise / counter-clockwise.
+exchange and the simulation — the leader is active (as in Theorem 14). `vnext act v` /
+`vprev act v` is the next active process clockwise / counter-clockwise.
 -/
 
 namespace Podc.ContentOblivious.Concrete
@@ -28,7 +28,7 @@ variable {n : ℕ} [NeZero n] {lead act : ZMod n → Bool} {ℓ : ZMod n}
 /-- Theorems 17 and 21 give the hypotheses of the generic message exchange. -/
 theorem roundSpec (hℓ : ∀ v, lead v = true ↔ v = ℓ) (hlact : act ℓ = true) :
     RoundSpec ComputeOR.proc BitSending.cwProc BitSending.proc lead act
-      (BitSending.next act) (BitSending.prev act) where
+      (vnext act) (vprev act) where
   or_init a := by rcases a with ⟨_ | _, _ | _⟩ <;> rfl
   cw_init a := by rcases a with ⟨_ | _, _ | _, _ | _ | _⟩ <;> rfl
   ccw_init a := by rcases a with ⟨_ | _, _ | _, _ | _ | _⟩ <;> rfl
@@ -46,13 +46,6 @@ theorem roundSpec (hℓ : ∀ v, lead v = true ↔ v = ℓ) (hlact : act ℓ = t
   ccw_bound bit _ hc := BitSending.totalSent_le (x := fun v => (lead v, act v, bit v)) hℓ
     ⟨ℓ, hlact⟩ hc
 
-lemma next_act (hlact : act ℓ = true) (v : ZMod n) : act (BitSending.next act v) = true :=
-  BitSending.next_active ⟨ℓ, hlact⟩ v
-
-lemma prev_act (hlact : act ℓ = true) (v : ZMod n) : act (BitSending.prev act v) = true := by
-  obtain ⟨k, -, h1, h2, -⟩ := BitSending.prev_spec ⟨ℓ, hlact⟩ v
-  rw [h1]; exact h2
-
 /-- The message-exchange program (Algorithms 5–6) built from Algorithms 7–9. -/
 abbrev msgExchange : Proc Input St := prog ComputeOR.proc BitSending.cwProc BitSending.proc
 
@@ -66,12 +59,12 @@ theorem theorem_22 (hℓ : ∀ v, lead v = true ↔ v = ℓ) (hlact : act ℓ = 
     (∀ c, msgExchange.Reach (oriented n) (inputs lead act mcw mccw) c →
       msgExchange.Final (oriented n) c →
       msgExchange.Quiescent (oriented n) c ∧ ∀ v, (c.st v).2 = none ∧
-        (act v = true → (c.st v).1.rcw.filterMap id = mccw (BitSending.next act v) ∧
-          (c.st v).1.rccw.filterMap id = mcw (BitSending.prev act v))) ∧
+        (act v = true → (c.st v).1.rcw.filterMap id = mccw (vnext act v) ∧
+          (c.st v).1.rccw.filterMap id = mcw (vprev act v))) ∧
     (∀ c, msgExchange.Reach (oriented n) (inputs lead act mcw mccw) c →
       totalSent c ≤ 15 * n * maxLen act mcw mccw + 3 * n) ∧
     msgExchange.Composable (oriented n) (inputs lead act mcw mccw) :=
-  theorem_22_of_rounds (roundSpec hℓ hlact) (next_act hlact) (prev_act hlact)
+  theorem_22_of_rounds (roundSpec hℓ hlact) (act_vnext hlact) (act_vprev hlact)
 
 /-- **Theorem 14.** On an oriented ring with a unique, active leader, the content-oblivious
 simulation of `T` rounds of a synchronous algorithm `A` on the virtual ring of the active
@@ -86,15 +79,15 @@ theorem theorem_14 {S : Type} [Encodable S] [Inhabited S] (A : Simulation.SyncAl
         (oriented n) c →
       (Simulation.simProg ComputeOR.proc BitSending.cwProc BitSending.proc A).Quiescent
         (oriented n) c ∧ ∀ v, act v = true →
-        (c.st v).1.s = A.run (BitSending.next act) (BitSending.prev act) s0 T v) ∧
+        (c.st v).1.s = A.run (vnext act) (vprev act) s0 T v) ∧
     (∀ c, (Simulation.simProg ComputeOR.proc BitSending.cwProc BitSending.proc A).Reach
         (oriented n) (fun v => (lead v, act v, s0 v, T)) c →
       totalSent c ≤ ∑ k ∈ range T,
-        (15 * n * Simulation.lenAt A act (BitSending.next act) (BitSending.prev act) s0 k
+        (15 * n * Simulation.lenAt A act (vnext act) (vprev act) s0 k
           + 3 * n)) ∧
     (Simulation.simProg ComputeOR.proc BitSending.cwProc BitSending.proc A).Composable
       (oriented n) (fun v => (lead v, act v, s0 v, T)) :=
-  Simulation.theorem_14_of_rounds (roundSpec hℓ hlact) (next_act hlact) (prev_act hlact)
+  Simulation.theorem_14_of_rounds (roundSpec hℓ hlact) (act_vnext hlact) (act_vprev hlact)
 
 /-- ComputeOR satisfies the hypotheses of the generic minimum finding. -/
 theorem orSpec (hℓ : ∀ v, lead v = true ↔ v = ℓ) : MinFinding.ORSpec ComputeOR.proc lead where

@@ -1,4 +1,5 @@
 import Papers.PODC2025.StrangerFreeTasks.Alg1
+import Podc.Foundations.Data.Fin.Cyclic
 
 /-!
 # Algorithm 1 is obstruction-free
@@ -233,31 +234,11 @@ lemma iter_wr (p : P) (l : Loc P k) (m : Mem P k) (h : l.phase = .wr) :
     rw [hseen, sn2 x]
     simp
 
-/-- Cyclic distance from the writing position `i` forward to register `r`. -/
-def cdist (i r : Fin (k + 1)) : ℕ :=
-  if i.val ≤ r.val then r.val - i.val else r.val + (k + 1) - i.val
-
-lemma cdist_lt (i r : Fin (k + 1)) : cdist i r < k + 1 := by
-  have := r.isLt; have := i.isLt; unfold cdist; split_ifs <;> omega
-
-lemma cdist_pos {r i : Fin (k + 1)} (h : r ≠ i) : 0 < cdist i r := by
-  have h' : r.val ≠ i.val := fun e => h (Fin.ext e)
-  have := r.isLt; have := i.isLt; unfold cdist; split_ifs <;> omega
-
-lemma cdist_add_one {r i : Fin (k + 1)} (h : r ≠ i) : cdist (i + 1) r = cdist i r - 1 := by
-  have hv : (i + 1).val = if i = Fin.last k then 0 else i.val + 1 := Fin.val_add_one i
-  have h' : r.val ≠ i.val := fun e => h (Fin.ext e)
-  have := r.isLt; have := i.isLt
-  have hl : i = Fin.last k ↔ i.val = k := by simp [Fin.ext_iff]
-  unfold cdist
-  rw [hv]
-  split_ifs at * <;> simp_all <;> omega
-
 /-- Once every register holds a subset of `seen`, `seen` is stable, and every iteration writes
 `seen` into the next register; registers with a different `seen` are within distance `n` of the
 writing position. -/
 lemma term_stable (p : P) : ∀ n (l : Loc P k) (m : Mem P k), l.phase = .wr →
-    (∀ r, (m r).seen ⊆ l.seen) → (∀ r, (m r).seen ≠ l.seen → cdist l.i r < n) →
+    (∀ r, (m r).seen ⊆ l.seen) → (∀ r, (m r).seen ≠ l.seen → Fin.cdist l.i r < n) →
     Term p (l, m) := by
   intro n
   induction n with
@@ -308,8 +289,8 @@ lemma term_stable (p : P) : ∀ n (l : Loc P k) (m : Mem P k), l.phase = .wr →
         intro h; apply hr; rw [h]; simp
       rw [Function.update_of_ne hri] at hr
       have := hbad r hr
-      have := cdist_pos hri
-      rw [hi', cdist_add_one hri]
+      have := Fin.cdist_add_one_left (Ne.symm hri)
+      rw [hi']
       omega
 
 lemma term_wr (p : P) (l : Loc P k) (m : Mem P k) (hl : l.phase = .wr) : Term p (l, m) := by
@@ -318,7 +299,7 @@ lemma term_wr (p : P) (l : Loc P k) (m : Mem P k) (hl : l.phase = .wr) : Term p 
   · apply Term.of_iterate (2 * k + 3)
     rw [e]
     exact term_stable p (k + 1) l' _ hp' (fun r x hx => (hs' x).2 (Or.inr ⟨r, hx⟩))
-      (fun r _ => cdist_lt l'.i r)
+      (fun r _ => Fin.cdist_lt l'.i r)
 
 lemma term_col2 (p : P) (l : Loc P k) (m : Mem P k) (hl : l.phase = .col2) : Term p (l, m) := by
   obtain ⟨l', e, -⟩ := col2_run p m (k - l.j.val) l hl (by have := l.j.isLt; omega)

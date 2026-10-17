@@ -1,4 +1,5 @@
 import Papers.PODC2026.RankingOpinions.RankingProtocol
+import Podc.Foundations.Data.Fin.Cyclic
 
 /-!
 # The Ranking protocol: computing single transitions
@@ -131,12 +132,6 @@ lemma rδ_still {a b : RState k} (h2 : Still r2 a b) (h3 : Still r3 a b) (h4a : 
     firstChange_still h7a, firstChange_still h7b, firstChange_nil, norm_of_normal ha,
     norm_of_normal hb]
 
-lemma fin_add_one_ne {x : Fin k} (hk : 1 < k) : x + 1 ≠ x := by
-  intro e
-  have h1 : (1 : Fin k) = 0 := by simpa using e
-  have := congrArg Fin.val h1
-  simp [Nat.mod_eq_of_lt hk] at this
-
 /-- Rule (3): ranking uniqueness. -/
 lemma rδ_r3 {a b : RState k} (ha : a.tok) (hb : b.tok) (hr : a.kr = b.kr) (hc : a.kc < b.kc)
     (hna : Normal a) : rδ a b = (a, norm {b with kr := b.kr + 1}) := by
@@ -145,7 +140,7 @@ lemma rδ_r3 {a b : RState k} (ha : a.tok) (hb : b.tok) (hr : a.kr = b.kr) (hc :
   have hfire : r3 a b ≠ (a, b) := by
     unfold r3; rw [ite_eq_left ⟨ha, hb, hr, hc⟩]
     intro e
-    exact fin_add_one_ne hk (congrArg (fun p => p.2.kr) e)
+    exact Fin.add_one_ne_self hk.ne' _ (congrArg (fun p => p.2.kr) e)
   simp only [rδ, rules, firstChange_still h2, firstChange_fire hfire]
   unfold r3; rw [ite_eq_left ⟨ha, hb, hr, hc⟩]; simp [norm_of_normal hna]
 
