@@ -1,5 +1,5 @@
 import Papers.PODC2026.ContentObliviousCounting.AnonCountingProbe
-import Cslib.Foundations.Data.Finset.SumUpdate
+import Podc.Foundations.Data.Finset.SumUpdate
 
 /-!
 # Anonymous counting: waves of the last phase
@@ -240,10 +240,6 @@ lemma lead_lt {n : ℕ} (hn : 0 < n) : lead n < n := tri_phaseOf_lt hn
 
 lemma wout_sum (cw : Bool) : wout cw false + wout cw true = 1 := by cases cw <;> rfl
 
-lemma sum_update_succ {S : Finset ℕ} {a : ℕ → ℕ} {q : ℕ} (hq : q ∈ S) :
-    ∑ p ∈ S, Function.update a q (a q + 1) p = ∑ p ∈ S, a p + 1 := by
-  have := Finset.sum_update_add hq a (a q + 1); omega
-
 lemma pipe_en {n : ℕ} {κ : Kind} {a : ℕ → ℕ} {b q : ℕ} {j : Bool}
     (h : (absPipe n κ a b).En n q j) :
     j = !κ.cw n ∧ (if q = lead n then b else a q) < srcCnt (lead n) κ.K a (src n (κ.cw n) q) := by
@@ -295,7 +291,7 @@ theorem pipe_node {n : ℕ} {κ : Kind} {a : ℕ → ℕ} {b q : ℕ} {j : Bool}
   · intro p hp b'
     exact pipeTr_node hL hqn hqL hpo hpos p hp b'
   · simp only [Stage.abs, absPipe]
-    rw [sum_update_succ (by simp [hqn, hqL])]
+    rw [Finset.sum_update_self_add (by simp [hqn, hqL])]
     have := wout_sum (κ.cw n)
     omega
 

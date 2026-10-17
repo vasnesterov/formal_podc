@@ -32,14 +32,7 @@ lemma nonP_write {p x : P} (hx : x ≠ p) {n : ℕ} {s : Finset P} (hs : x ∈ s
 
 lemma two_le_card {p : P} {s : Finset P} (hp : p ∈ s) (h : ¬ s ⊆ {p}) : 2 ≤ s.card := by
   obtain ⟨q, hq, hq'⟩ := Finset.not_subset.1 h
-  have hqp : q ≠ p := fun e => hq' (by simp [e])
-  have : ({p, q} : Finset P) ⊆ s := by
-    intro z hz; simp only [Finset.mem_insert, Finset.mem_singleton] at hz
-    rcases hz with rfl | rfl
-    · exact hp
-    · exact hq
-  have := Finset.card_le_card this
-  rw [Finset.card_pair (Ne.symm hqp)] at this; exact this
+  exact Finset.one_lt_card.2 ⟨p, hp, q, hq, fun e => hq' (by simp [e])⟩
 
 /-- A step of a process other than `p` keeps non-`p` registers non-`p`. -/
 lemma nonP_step_other {α : List (Label P (laObj P))} {C C' : Cfg P 1} {ℓ : Label P (laObj P)}

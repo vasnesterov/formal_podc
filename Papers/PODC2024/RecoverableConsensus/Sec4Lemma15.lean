@@ -1,4 +1,5 @@
 import Papers.PODC2024.RecoverableConsensus.Sec4Common
+import Podc.Foundations.Data.Finset.Card
 
 /-!
 # Lemma 15 of Ovens (PODC'24): `T_{n,n'}` has consensus number `n`
@@ -21,16 +22,6 @@ namespace Cslib.SharedMemory.Recoverable.Ovens.Sec4
 open Cslib.SharedMemory Cslib.SharedMemory.Recoverable Cslib.SharedMemory.Recoverable.Ovens
 
 set_option linter.unusedSectionVars false
-
-/-- Among `m ≥ 3` processes there is a third one. -/
-lemma exists_third {m : ℕ} (hm : 3 ≤ m) (p q : Fin m) : ∃ k : Fin m, k ≠ p ∧ k ≠ q := by
-  by_contra hne
-  push Not at hne
-  have a := hne ⟨0, by omega⟩
-  have b := hne ⟨1, by omega⟩
-  have c := hne ⟨2, by omega⟩
-  simp only [ne_eq, Fin.ext_iff] at a b c
-  omega
 
 /-- The schedule `p :: (all processes except p and k)`. -/
 def schedExcept {m : ℕ} (p k : Fin m) : List (Fin m) := p :: ((List.finRange m).erase p).erase k
@@ -68,7 +59,7 @@ theorem not_wfSolvable {n n' m : ℕ} (h1 : 1 ≤ n') (h2 : n' < n) (hm : n < m)
   · exact not_rw_obj hA hAdm hC hm0 hc (i := Sum.inl jR) (hR jR) hpo
   have hops := all_ops hA hAdm hC hm0 hc hpo
   obtain ⟨⟨p, hp⟩, ⟨q, hq⟩⟩ := hc.teams hA hAdm hC hm0
-  obtain ⟨k, hkp, hkq⟩ := exists_third (by omega) p q
+  obtain ⟨k, hkp, hkq⟩ := Fintype.exists_ne_ne_of_two_lt_card (by simp; omega) p q
   set D := run (initCfg A x) α with hD
   -- the configurations after `σ_p` and `σ_q`
   have key : ∀ r, k ≠ r → (∀ i, (run D ((schedExcept r k).map Ev.step)).mem i = D.mem i ∨

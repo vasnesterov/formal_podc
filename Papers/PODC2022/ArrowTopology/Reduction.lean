@@ -1,5 +1,6 @@
 import Mathlib
 import Cslib.Foundations.SocialChoice.Aggregation
+import Podc.Foundations.Data.Finset.Card
 
 /-!
 # Reduction of Arrow's theorem to two voters and three alternatives
@@ -53,13 +54,11 @@ def rank4 (a b c d : X) : Pref X :=
 /-- In any type with three distinct elements, any two elements can be avoided. -/
 theorem exists_ne_ne (hX : ∃ x y z : X, x ≠ y ∧ y ≠ z ∧ x ≠ z) (a b : X) :
     ∃ c, c ≠ a ∧ c ≠ b := by
+  classical
   obtain ⟨x, y, z, h1, h2, h3⟩ := hX
-  by_contra h
-  push Not at h
-  have hx := h x
-  have hy := h y
-  have hz := h z
-  by_cases hxa : x = a <;> by_cases hya : y = a <;> by_cases hza : z = a <;> grind
+  obtain ⟨c, -, hc⟩ := Finset.exists_mem_ne_ne (s := {x, y, z})
+    (by rw [Finset.card_eq_three.2 ⟨x, y, z, h1, h3, h2, rfl⟩]; omega) a b
+  exact ⟨c, hc⟩
 
 end Helpers
 

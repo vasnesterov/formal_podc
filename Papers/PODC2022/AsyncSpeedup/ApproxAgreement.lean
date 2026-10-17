@@ -176,9 +176,9 @@ theorem libAA_subset_of_local {A B : Type} {M : Model P A B} (hsolo : M.AllowsSo
   by_cases hij : i = j
   · subst hij; simp; omega
   have h3 : 3 ≤ I.card := by
-    have := one_lt_card_of_ne hi hj hij
+    have := Finset.one_lt_card.2 ⟨i, hi, j, hj, hij⟩
     omega
-  obtain ⟨k, hk, hki, hkj⟩ := exists_third h3 i j
+  obtain ⟨k, hk, hki, hkj⟩ := Finset.exists_mem_ne_ne h3 i j
   obtain ⟨p, hp, q, hq, hpi, hqj, hks, hko⟩ := htri i hi j hj k hk hij hki hkj
   obtain ⟨γ, ⟨y₁, hy₁, h₁i, h₁k⟩, ⟨y₂, hy₂, h₂j, h₂k⟩⟩ :=
     local_triangle hsolo hdet hg hi hj hk hij hp hq hpi hqj hks hko

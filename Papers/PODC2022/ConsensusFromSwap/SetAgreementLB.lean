@@ -1,5 +1,6 @@
 import Papers.PODC2022.ConsensusFromSwap.Model
 import Cslib.Computability.Distributed.SharedMemory.ObjClasses
+import Podc.Foundations.Data.Nat.CeilDiv
 
 /-!
 # Lower bound for k-set agreement from swap objects (Section 4)
@@ -338,12 +339,9 @@ theorem theorem10_swap [Fintype P] {D : ι → Type} {d₀ : (i : ι) → D i}
     {A : Alg (fun i => swapObj (D i) (d₀ i)) P V} {k : ℕ} (hk : 1 ≤ k)
     {S : Set V} (hS : ((k + 1 : ℕ) : ℕ∞) ≤ S.encard) (hA : SolvesSetAgreement A k S)
     (hof : ObstructionFree A S) :
-    (Fintype.card P + k - 1) / k - 1 ≤ Fintype.card ι := by
+    Fintype.card P ⌈/⌉ k - 1 ≤ Fintype.card ι := by
   have h := theorem10 (fun i => swapObj_overwritesState (D i) (d₀ i)) hS hA hof
-  have : (Fintype.card P + k - 1) / k ≤ Fintype.card ι + 1 := by
-    rw [Nat.div_le_iff_le_mul_add_pred hk]
-    have := mul_comm k (Fintype.card ι + 1)
-    omega
+  have : Fintype.card P ⌈/⌉ k ≤ Fintype.card ι + 1 := Nat.ceilDiv_le_of_le_mul hk h
   omega
 
 /-- **Corollary of Theorem 10** for consensus (`k = 1`): every obstruction-free `n`-process

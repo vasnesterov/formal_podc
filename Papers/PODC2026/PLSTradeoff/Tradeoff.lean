@@ -89,7 +89,7 @@ noncomputable def xEnc (Pv : V → Label) (C X : Set V) : Label :=
 
 /-- `Lex(C, XLabel(C, X), v)`: the block of `XLabel(C, X)` stored at `v ∈ C`. -/
 noncomputable def ppLabel (Pv : V → Label) (C X : Set V) (v : V) : Label :=
-  chunk (xEnc Pv C X) (cdiv (xEnc Pv C X).length C.ncard) ((sortedL C).idxOf v)
+  chunk (xEnc Pv C X) ((xEnc Pv C X).length ⌈/⌉ C.ncard) ((sortedL C).idxOf v)
 
 /-- Decoding the blocks stored on a cluster gives back the encoded labels. -/
 lemma decodeX_eq {clu : V → Set V} {xs : Set V} {PP : V → Label} {C X : Set V}
@@ -99,7 +99,7 @@ lemma decodeX_eq {clu : V → Set V} {xs : Set V} {PP : V → Label} {C X : Set 
   unfold decodeX
   rw [hclu, hxs]
   have hmap : (sortedL C).map PP =
-      (sortedL C).map (fun y => chunk (xEnc Pv C X) (cdiv (xEnc Pv C X).length C.ncard)
+      (sortedL C).map (fun y => chunk (xEnc Pv C X) ((xEnc Pv C X).length ⌈/⌉ C.ncard)
         ((sortedL C).idxOf y)) :=
     List.map_congr_left (fun y hy => hPP y (mem_sortedL.1 hy))
   have hpos : 0 < C.ncard := (Set.ncard_pos (Set.toFinite _)).2 ⟨u, hu⟩
@@ -118,7 +118,8 @@ lemma decodeX_congr {clu clu' : V → Set V} {xs xs' : Set V} {PP PP' : V → La
 lemma length_ppLabel_le {Pv : V → Label} {C X : Set V} {v : V} {p m : ℕ} (hC : C.Nonempty)
     (hp : ∀ x ∈ C ∩ X, (Pv x).length ≤ p) (hm : (C ∩ X).ncard * (2 * p + 1) ≤ C.ncard * m) :
     (ppLabel Pv C X v).length ≤ m := by
-  refine (length_chunk_le _ _ _).trans (cdiv_le_of_le_mul ((Set.ncard_pos (Set.toFinite _)).2 hC) ?_)
+  refine (length_chunk_le _ _ _).trans
+    (Nat.ceilDiv_le_of_le_mul ((Set.ncard_pos (Set.toFinite _)).2 hC) ?_)
   refine le_trans ?_ hm
   rw [xEnc]
   refine (length_encList_le _ p ?_).trans ?_

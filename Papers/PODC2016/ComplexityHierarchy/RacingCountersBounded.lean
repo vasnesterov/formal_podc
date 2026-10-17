@@ -1,7 +1,7 @@
 import Papers.PODC2016.ComplexityHierarchy.RacingCounters
 import Mathlib.Algebra.BigOperators.Group.Finset.Piecewise
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
-import Cslib.Foundations.Data.Finset.SumUpdate
+import Podc.Foundations.Data.Finset.SumUpdate
 
 /-!
 # Racing bounded counters (Lemma 3.2 of [EGSZ16])
@@ -269,11 +269,6 @@ lemma cntF_lt [Fintype P] {f : Phase2 m → Bool} {loc : P → Phase2 m} {q : P}
 lemma cntF_mono [Fintype P] {f g : Phase2 m → Bool} {loc : P → Phase2 m}
     (h : ∀ x, f x = true → g x = true) : cntF f loc ≤ cntF g loc :=
   Finset.card_le_card fun q => by simpa using h _
-
-/-- Sum of a counter vector after incrementing a component. -/
-lemma sum_update_succ (c : Fin m → ℕ) (v : Fin m) :
-    ∑ u, Function.update c v (c v + 1) u = ∑ u, c u + 1 := by
-  have := Fintype.sum_update_add c v (c v + 1); omega
 
 /-- Sum of a counter vector after decrementing a positive component. -/
 lemma sum_update_pred (c : Fin m → ℕ) (v : Fin m) (hv : 0 < c v) :
@@ -553,7 +548,7 @@ lemma RInv2.tau_inc {α : List (Label P (taskObj (Fin m) (Fin m)))} {C : Cfg2 S}
     have e := sumDec_update C.loc q .scan
     rw [← hl, hph, nDec_of_ne (by simp), nDec_of_ne (by simp)] at e
     have := sumDec_le hI
-    rw [hctr, sum_update_succ]; omega
+    rw [hctr, Fintype.sum_update_self_add]; omega
   · intro r w hr
     rw [respsOf_tau] at hr
     have := hI.resp r w hr

@@ -63,10 +63,8 @@ theorem sum_card_filter_mem_le (L : Finset α) (A : Finset V) (S : V → Finset 
 /-- `∑_{x ∈ L} #{u ∈ A | f u = x} ≤ |A|` (fibres of `f` over distinct colours are disjoint). -/
 theorem sum_card_filter_eq_le (L : Finset α) (A : Finset V) (f : V → α) :
     ∑ x ∈ L, #{u ∈ A | f u = x} ≤ A.card := by
-  have := sum_card_filter_mem_le L A (fun u => {f u})
-  simp only [Finset.mem_singleton, Finset.card_singleton, Finset.sum_const, smul_eq_mul,
-    mul_one] at this
-  simpa [eq_comm] using this
+  rw [Finset.sum_card_fiberwise_eq_card_filter]
+  exact Finset.card_filter_le _ _
 
 /-- The out-degree splits into `|N_<(v)| + |N_>(v)|` if `c` is proper along out-edges. -/
 theorem card_lt_add_card_gt {out : V → Finset V} {c : V → ℕ}

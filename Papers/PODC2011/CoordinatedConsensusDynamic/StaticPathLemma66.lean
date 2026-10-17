@@ -1,4 +1,5 @@
 import Papers.PODC2011.CoordinatedConsensusDynamic.StaticPathLemma65
+import Podc.Foundations.Data.Nat.CeilDiv
 
 /-!
 # Lemma 6.6: rotating the path in a suffix of the execution
@@ -152,15 +153,11 @@ theorem lemma_6_6 {n β m t k k' : ℕ} (σ : ℕ → Bool) {g g' : ℕ → ℕ 
   rotate_walk σ hn m hβ (by omega) hm hg hg' hpre hsuf
 
 /-- The paper's `ℓ_β = ⌈log₂(n/β)⌉`. -/
-def ellBeta (n β : ℕ) : ℕ := Nat.clog 2 ((n + β - 1) / β)
+def ellBeta (n β : ℕ) : ℕ := Nat.clog 2 (n ⌈/⌉ β)
 
 theorem le_two_pow_ellBeta {n β : ℕ} (hβ : 1 ≤ β) : n ≤ 2 ^ ellBeta n β * β := by
-  have h1 : (n + β - 1) / β ≤ 2 ^ ellBeta n β := Nat.le_pow_clog (by norm_num) _
-  have h2 := Nat.div_add_mod (n + β - 1) β
-  have h3 := Nat.mod_lt (n + β - 1) (show 0 < β by omega)
-  have h4 := Nat.mul_le_mul_right β h1
-  rw [mul_comm] at h2
-  omega
+  have h1 : n ⌈/⌉ β ≤ 2 ^ ellBeta n β := Nat.le_pow_clog (by norm_num) _
+  exact (Nat.le_ceilDiv_mul hβ).trans (Nat.mul_le_mul_right β h1)
 
 /-- Lemma 6.6 with the paper's `ℓ_β = ⌈log₂(n/β)⌉`. -/
 theorem lemma_6_6_clog {n β t k k' : ℕ} (σ : ℕ → Bool) {g g' : ℕ → ℕ → ℕ → Prop} (hn : 3 ≤ n)

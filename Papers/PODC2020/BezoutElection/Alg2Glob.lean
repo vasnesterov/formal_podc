@@ -1,7 +1,7 @@
 import Papers.PODC2020.BezoutElection.Alg2Conc
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
 import Mathlib.Algebra.BigOperators.Group.Finset.Piecewise
-import Cslib.Foundations.Data.Finset.SumUpdate
+import Podc.Foundations.Data.Finset.SumUpdate
 
 /-!
 # Algorithm 2: the global invariant
@@ -97,16 +97,6 @@ lemma absAt_loc (mem : Fin m → Reg Id) (loc : P → St Id m) (vpc : P → VPC 
 @[simp] lemma absAt_reg (mem : Fin m → Reg Id) (loc : P → St Id m) (vpc : P → VPC Id)
     (x : Fin m) : (absAt π mem loc vpc x).reg = mem x := rfl
 
-/-- Counting a predicate that changes only at `q`. -/
-lemma card_filter_change {A B : P → Prop} [DecidablePred A] [DecidablePred B] (q : P)
-    (h : ∀ j, j ≠ q → (A j ↔ B j)) :
-    (univ.filter B).card + (if A q then 1 else 0) = (univ.filter A).card + (if B q then 1 else 0) := by
-  rw [card_filter, card_filter, ← add_sum_erase _ (fun j => if A j then 1 else 0) (mem_univ q),
-    ← add_sum_erase _ (fun j => if B j then 1 else 0) (mem_univ q)]
-  have : ∑ x ∈ univ.erase q, (if A x then 1 else 0) = ∑ x ∈ univ.erase q, (if B x then 1 else 0) :=
-    sum_congr rfl (fun j hj => by rw [if_congr (h j (ne_of_mem_erase hj)) rfl rfl])
-  rw [this]; omega
-
 open Classical in
 /-- `n11Count` when the N(11)-status changes only at `q`. -/
 lemma n11Count_change (mem mem' : Fin m → Reg Id) (vpc vpc' : P → VPC Id) (q : P)
@@ -115,7 +105,7 @@ lemma n11Count_change (mem mem' : Fin m → Reg Id) (vpc vpc' : P → VPC Id) (q
       n11Count π mem vpc + (if IsN11At π mem' vpc' q then 1 else 0) := by
   classical
   unfold n11Count
-  convert card_filter_change q h
+  convert Fintype.card_filter_add_ite_eq_of_eq_off q fun j hj => (h j hj).symm
 
 end Lemmas
 

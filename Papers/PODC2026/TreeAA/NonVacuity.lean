@@ -1,4 +1,5 @@
 import Papers.PODC2026.TreeAA.Protocol
+import Podc.Foundations.Combinatorics.SimpleGraph.Path
 
 /-!
 # Non-vacuity of the black-box hypotheses
@@ -120,8 +121,6 @@ lemma realTriv_solves (D ε : ℝ) (hε : 0 ≤ ε) :
     exact ⟨r, hr1, m, hr⟩
 
 /-! ### Theorem 5 on a concrete tree -/
-
-instance : DecidableRel (pathGraph 3).Adj := fun _ _ => decidable_of_iff _ pathGraph_adj.symm
 
 lemma pathGraph_three_isTree : (pathGraph 3).IsTree := by
   rw [isTree_iff_connected_and_card]

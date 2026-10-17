@@ -97,21 +97,6 @@ lemma tδ_sv_op {n n' : ℕ} (v y : Bool) (i : Fin (n - 1)) (h : i.val + 1 < n -
 lemma tδ_sv_opR {n n' : ℕ} (v : Bool) (i : Fin (n - 1)) (h : i.val + 1 ≤ n') :
     tδ n n' (.sv v i) .opR = (.sv v i, .val (.sv v i)) := by simp [tδ, h]
 
-/-- Counting the elements satisfying a predicate after changing one value. -/
-lemma card_filter_change {α β : Type} [Fintype α] [DecidableEq α] (f g : α → β) (r : α)
-    (P : β → Prop) [DecidablePred P] (h : ∀ p, p ≠ r → g p = f p) :
-    (Finset.univ.filter fun p => P (g p)).card + (if P (f r) then 1 else 0) =
-      (Finset.univ.filter fun p => P (f p)).card + (if P (g r) then 1 else 0) := by
-  have key : ∀ h' : α → β, (Finset.univ.filter fun p => P (h' p)).card =
-      (if P (h' r) then 1 else 0) + ∑ p ∈ Finset.univ.erase r, (if P (h' p) then 1 else 0) := by
-    intro h'
-    rw [Finset.card_filter, ← Finset.add_sum_erase _ _ (Finset.mem_univ r)]
-  rw [key f, key g]
-  have : ∑ p ∈ Finset.univ.erase r, (if P (g p) then 1 else 0) =
-      ∑ p ∈ Finset.univ.erase r, (if P (f p) then 1 else 0) :=
-    Finset.sum_congr rfl fun p hp => by rw [h p (Finset.ne_of_mem_erase hp)]
-  omega
-
 /-- Responses to bits (`⊥` and values are mapped to `0`). -/
 def bitOf {n : ℕ} : TResp n → Bool
   | .bit b => b

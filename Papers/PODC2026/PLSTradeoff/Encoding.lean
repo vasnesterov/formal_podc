@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.Foundations.Data.Nat.CeilDiv
 
 /-!
 # Encoding strings
@@ -94,22 +95,9 @@ lemma flatten_chunks_take (S : List Bool) (L k : ℕ) :
       chunk]
     rw [Nat.succ_mul, List.take_add]
 
-/-- Ceiling division `⌈a / k⌉`. -/
-def cdiv (a k : ℕ) : ℕ := (a + k - 1) / k
-
-lemma le_mul_cdiv {a k : ℕ} (hk : 0 < k) : a ≤ k * cdiv a k := by
-  unfold cdiv
-  have := Nat.lt_div_mul_add (a := a + k - 1) hk
-  rw [mul_comm]; omega
-
-lemma cdiv_le_of_le_mul {a k m : ℕ} (hk : 0 < k) (h : a ≤ k * m) : cdiv a k ≤ m := by
-  unfold cdiv
-  rw [Nat.div_le_iff_le_mul_add_pred hk]
-  omega
-
 lemma flatten_chunks (S : List Bool) {k : ℕ} (hk : 0 < k) :
-    ((List.range k).map (chunk S (cdiv S.length k))).flatten = S := by
-  rw [flatten_chunks_take, List.take_of_length_le (le_mul_cdiv hk)]
+    ((List.range k).map (chunk S (S.length ⌈/⌉ k))).flatten = S := by
+  rw [flatten_chunks_take, List.take_of_length_le (Nat.le_mul_ceilDiv hk)]
 
 /-- For a duplicate-free list `l`, mapping `u ↦ f (index of u in l)` over `l` is mapping `f` over
 the indices. -/

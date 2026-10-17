@@ -1,4 +1,5 @@
 import Papers.PODC2018.AsymptoticConsensus.LowerBounds
+import Podc.Foundations.Data.Nat.CeilDiv
 
 /-!
 # Section 7–8 of FNS'18: α-diameter, Theorem 5, Lemma 24, Theorem 6
@@ -238,15 +239,12 @@ theorem mixG_mem_NA {f : ℕ} {G H : Graph (Fin n)} (hG : G ∈ NA n f) (hH : H 
 
 /-- **Lemma 24 of FNS'18.** For `1 ≤ f < n`, the α-diameter of `N_A` is at most `⌈n/f⌉`. -/
 theorem alphaDiam_NA {f : ℕ} (hf : 1 ≤ f) (hfn : f < n) :
-    AlphaDiamLE AlphaRel (NA n f) ((n + f - 1) / f) := by
+    AlphaDiamLE AlphaRel (NA n f) (n ⌈/⌉ f) := by
   intro G hG H hH
-  have hq : n ≤ (n + f - 1) / f * f := by
-    have h1 := Nat.div_add_mod (n + f - 1) f
-    have h2 := Nat.mod_lt (n + f - 1) (show 0 < f by omega)
-    rw [mul_comm]; omega
-  refine ⟨(n + f - 1) / f, le_rfl, fun r => mixG f r H G, ?_, ?_, fun r hr => ⟨?_, ?_, ?_⟩⟩
+  have hq : n ≤ n ⌈/⌉ f * f := Nat.le_ceilDiv_mul hf
+  refine ⟨n ⌈/⌉ f, le_rfl, fun r => mixG f r H G, ?_, ?_, fun r hr => ⟨?_, ?_, ?_⟩⟩
   · funext j i; simp [mixG]
-  · funext j i; simp [mixG, show i.val < (n + f - 1) / f * f by omega]
+  · funext j i; simp [mixG, show i.val < n ⌈/⌉ f * f by omega]
   · exact mixG_mem_NA hG hH r
   · exact mixG_mem_NA hG hH (r + 1)
   · refine ⟨blockK f r, blockK_mem_NA r, fun i hi j => ?_⟩
@@ -284,7 +282,7 @@ asymptotic consensus algorithm in the model `N_A` of round-based algorithms wait
 messages has contraction rate at least `1/(⌈n/f⌉ + 1)`. -/
 theorem theorem6 [Nontrivial V] {f : ℕ} (hn : 2 ≤ n) (hf : 1 ≤ f) (hfn : f < n)
     {A : Alg (Fin n) σ V} (hA : A.Solves (NA n f)) :
-    (((n + f - 1) / f : ℕ) + 1 : ℝ≥0∞)⁻¹ ≤ A.rate (NA n f) :=
+    ((n ⌈/⌉ f : ℕ) + 1 : ℝ≥0∞)⁻¹ ≤ A.rate (NA n f) :=
   Alg.theorem5 hn hA (sourceIncompatible_NA hf hn) (alphaDiam_NA hf hfn)
 
 end AsymptoticConsensus

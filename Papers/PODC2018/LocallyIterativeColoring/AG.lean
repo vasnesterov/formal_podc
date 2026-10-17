@@ -1,5 +1,6 @@
 import Cslib.Computability.Distributed.Local.Identifiers
 import Mathlib
+import Podc.Foundations.Data.Nat.ModCount
 
 /-!
 # The Additive-Group (AG) algorithm (Section 3.1 of [BEG18])
@@ -199,35 +200,17 @@ variable {q : ℕ} [NeZero q]
 
 /-- Numbers in `[lo, hi)` in one residue class mod `q`: at most `⌈(hi - lo) / q⌉` of them. -/
 theorem card_filter_natCast_eq_le (x : ZMod q) (lo hi : ℕ) :
-    #{t ∈ Ico lo hi | ((t : ℕ) : ZMod q) = x} ≤ (hi - lo + q - 1) / q := by
+    #{t ∈ Ico lo hi | ((t : ℕ) : ZMod q) = x} ≤ (hi - lo) ⌈/⌉ q := by
   have hq : 0 < q := Nat.pos_of_neZero q
-  calc #{t ∈ Ico lo hi | ((t : ℕ) : ZMod q) = x}
-      ≤ #(range ((hi - lo + q - 1) / q)) := by
-        apply card_le_card_of_injOn (fun t => (t - lo) / q)
-        · intro t ht
-          simp only [coe_filter, mem_Ico, Set.mem_ofPred_eq] at ht
-          simp only [coe_range, Set.mem_Iio]
-          apply Nat.div_lt_of_lt_mul
-          have : (hi - lo + q - 1) / q * q + q > hi - lo + q - 1 := by
-            have := Nat.lt_div_mul_add (a := hi - lo + q - 1) hq; omega
-          rw [Nat.mul_comm]; omega
-        · intro t₁ h₁ t₂ h₂ he
-          simp only [coe_filter, mem_Ico, Set.mem_ofPred_eq] at h₁ h₂
-          have hmod : (t₁ - lo) % q = (t₂ - lo) % q := by
-            have : ((t₁ - lo : ℕ) : ZMod q) = ((t₂ - lo : ℕ) : ZMod q) := by
-              rw [Nat.cast_sub h₁.1.1, Nat.cast_sub h₂.1.1, h₁.2, h₂.2]
-            exact (ZMod.natCast_eq_natCast_iff' _ _ q).1 this
-          have e1 := Nat.mod_add_div (t₁ - lo) q
-          have e2 := Nat.mod_add_div (t₂ - lo) q
-          simp only at he
-          rw [hmod, he] at e1
-          omega
-    _ = _ := card_range _
+  calc #{t ∈ Ico lo hi | ((t : ℕ) : ZMod q) = x} = #{t ∈ Ico lo hi | t ≡ x.val [MOD q]} := by
+        congr 1; refine filter_congr fun t _ => ?_
+        rw [← ZMod.natCast_eq_natCast_iff, ZMod.natCast_zmod_val]
+    _ ≤ _ := Nat.card_Ico_filter_modEq_le hq _ _ _
 
 /-- Solutions of `t * k = e` (`k ≠ 0` or `e ≠ 0`) in `[lo, hi)`: at most `⌈(hi - lo) / q⌉`
 (`q` prime). This is the "`d + x c ≡ b` has exactly one solution" fact of Lemmas 3.3–3.4. -/
 theorem card_filter_mul_eq_le [Fact q.Prime] {k e : ZMod q} (hke : k ≠ 0 ∨ e ≠ 0) (lo hi : ℕ) :
-    #{t ∈ Ico lo hi | ((t : ℕ) : ZMod q) * k = e} ≤ (hi - lo + q - 1) / q := by
+    #{t ∈ Ico lo hi | ((t : ℕ) : ZMod q) * k = e} ≤ (hi - lo) ⌈/⌉ q := by
   by_cases hk : k = 0
   · have he : e ≠ 0 := hke.resolve_left (not_not.2 hk)
     simp [hk, he.symm]
@@ -239,7 +222,8 @@ theorem card_filter_mul_eq_le [Fact q.Prime] {k e : ZMod q} (hke : k ≠ 0 ∨ e
       _ ≤ _ := card_filter_natCast_eq_le _ _ _
 
 theorem ceil_add_ceil_le (q s T m : ℕ) (hq : 0 < q) (hs : s ≤ T) (hT : T = m * q) :
-    (s - 0 + q - 1) / q + (T - s + q - 1) / q ≤ m + 1 := by
+    (s - 0) ⌈/⌉ q + (T - s) ⌈/⌉ q ≤ m + 1 := by
+  simp only [Nat.ceilDiv_eq_add_pred_div]
   have h := Nat.div_add_div_le_add_div (x := s - 0 + q - 1) (y := T - s + q - 1) (z := q)
   have h1 : (s - 0 + q - 1) + (T - s + q - 1) < (m + 2) * q := by
     rw [add_mul, ← hT]; omega
@@ -307,7 +291,7 @@ theorem IsAGRun.card_conflicts_le {c : ℕ → V → ZMod q × ZMod q} (hc : IsA
           {t ∈ Ico s T | ((t : ℕ) : ZMod q) * (c 0 v).1 = (c s u).2 - (c 0 v).2}) :=
         card_le_card hsplit
     _ ≤ _ := card_union_le _ _
-    _ ≤ (s - 0 + q - 1) / q + (T - s + q - 1) / q := by
+    _ ≤ (s - 0) ⌈/⌉ q + (T - s) ⌈/⌉ q := by
         gcongr
         · apply card_filter_mul_eq_le
           by_contra hcon

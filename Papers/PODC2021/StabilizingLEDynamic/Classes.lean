@@ -1,5 +1,6 @@
 import Papers.PODC2021.StabilizingLEDynamic.Model
 import Mathlib.Data.Nat.ModEq
+import Podc.Foundations.Data.Finset.Card
 
 /-!
 # The hierarchy of the nine DG classes (Theorem 1)
@@ -208,23 +209,6 @@ theorem pow2Round_unique {a Δ t₁ t₂ : ℕ} (ha : Δ ≤ a) (h1 : a ≤ t₁
     rw [pow_succ] at this
     omega
 
-/-! ### Small combinatorial helpers -/
-
-theorem exists_mem_ne {V : Finset ι} (hV : 2 ≤ V.card) (a : ι) : ∃ p ∈ V, p ≠ a := by
-  classical
-  have := @Finset.pred_card_le_card_erase _ V a _
-  obtain ⟨p, hp⟩ : (V.erase a).Nonempty := Finset.card_pos.mp (by omega)
-  exact ⟨p, Finset.mem_of_mem_erase hp, Finset.ne_of_mem_erase hp⟩
-
-theorem exists_mem_ne_ne {V : Finset ι} (hV : 3 ≤ V.card) (a b : ι) :
-    ∃ p ∈ V, p ≠ a ∧ p ≠ b := by
-  classical
-  have h1 := @Finset.pred_card_le_card_erase _ V a _
-  have h2 := @Finset.pred_card_le_card_erase _ (V.erase a) b _
-  obtain ⟨p, hp⟩ : ((V.erase a).erase b).Nonempty := Finset.card_pos.mp (by omega)
-  have hp' := Finset.mem_of_mem_erase hp
-  exact ⟨p, Finset.mem_of_mem_erase hp', Finset.ne_of_mem_erase hp', Finset.ne_of_mem_erase hp⟩
-
 /-! ### Witness 1: the constant out-star and in-star (part (1) of the proof) -/
 
 /-- The constant out-star `G(1S) = S, S, …` centered at `c`: edges `c → q` for all `q ∈ V`,
@@ -250,7 +234,7 @@ theorem outStar_mem (hc : c ∈ V) (hΔ : 1 ≤ Δ) : outStar V c ∈ J .src .bo
 theorem outStar_no_sink (hV : 3 ≤ V.card) (τ : Timeliness) (Δ : ℕ) :
     ∀ s ∈ V, ∃ p ∈ V, ¬ Conn τ Δ (outStar V c) p s := by
   intro s _
-  obtain ⟨p, hp, hpc, hps⟩ := exists_mem_ne_ne hV c s
+  obtain ⟨p, hp, hpc, hps⟩ := Finset.exists_mem_ne_ne hV c s
   refine ⟨p, hp, fun h => ?_⟩
   obtain ⟨b, hb⟩ := (h.mono (Timeliness.le_recur τ)) 0
   exact hps (hb.eq_of_no_out fun t r hr => hpc hr.1)
@@ -266,7 +250,7 @@ theorem inStar_mem (hc : c ∈ V) (hΔ : 1 ≤ Δ) : inStar V c ∈ J .snk .boun
 theorem inStar_no_source (hV : 3 ≤ V.card) (τ : Timeliness) (Δ : ℕ) :
     ∀ s ∈ V, ∃ p ∈ V, ¬ Conn τ Δ (inStar V c) s p := by
   intro s _
-  obtain ⟨p, hp, hpc, hps⟩ := exists_mem_ne_ne hV c s
+  obtain ⟨p, hp, hpc, hps⟩ := Finset.exists_mem_ne_ne hV c s
   refine ⟨p, hp, fun h => ?_⟩
   obtain ⟨b, hb⟩ := (h.mono (Timeliness.le_recur τ)) 0
   exact hps (hb.eq_of_no_in fun t r hr => hpc hr.1).symm
@@ -301,10 +285,10 @@ theorem G2_not_mem (hV : 2 ≤ V.card) (k : Kind) : G2 V ∉ J k .bounded Δ V :
   have hne : V.Nonempty := Finset.card_pos.mp (by omega)
   by_cases hk : k = .snk
   · refine not_mem_J_of_no_sink hne (by simp [hk]) fun s _ => ?_
-    obtain ⟨p, hp, hps⟩ := exists_mem_ne hV s
+    obtain ⟨p, hp, hps⟩ := Finset.exists_mem_ne hV s
     exact ⟨p, hp, G2_not_conn hps⟩
   · refine not_mem_J_of_no_source hne hk fun s _ => ?_
-    obtain ⟨p, hp, hps⟩ := exists_mem_ne hV s
+    obtain ⟨p, hp, hps⟩ := Finset.exists_mem_ne hV s
     exact ⟨p, hp, G2_not_conn hps.symm⟩
 
 end G2
@@ -413,7 +397,7 @@ theorem G3_not_mem (hn : 3 ≤ n)
   by_cases hk : k = .snk
   · refine not_mem_J_of_no_sink hne (by simp [hk]) fun s hs => ?_
     obtain ⟨b, hb, rfl⟩ := hsurj s hs
-    obtain ⟨p, hp, hps, hpr⟩ := exists_mem_ne_ne (hcard ▸ hn) (v b) (v ((b + n - 1) % n))
+    obtain ⟨p, hp, hps, hpr⟩ := Finset.exists_mem_ne_ne (hcard ▸ hn) (v b) (v ((b + n - 1) % n))
     refine ⟨p, hp, fun h => ?_⟩
     obtain ⟨j, hj, hd⟩ := h Δ
     rcases G3_reach_window hj (tdist_le_iff.mp hd) with h | ⟨t, ht⟩
@@ -421,7 +405,7 @@ theorem G3_not_mem (hn : 3 ≤ n)
     · exact hpr (G3_in (by omega) hb hinj ht)
   · refine not_mem_J_of_no_source hne hk fun s hs => ?_
     obtain ⟨a, ha, rfl⟩ := hsurj s hs
-    obtain ⟨p, hp, hps, hpr⟩ := exists_mem_ne_ne (hcard ▸ hn) (v a) (v ((a + 1) % n))
+    obtain ⟨p, hp, hps, hpr⟩ := Finset.exists_mem_ne_ne (hcard ▸ hn) (v a) (v ((a + 1) % n))
     refine ⟨p, hp, fun h => ?_⟩
     obtain ⟨j, hj, hd⟩ := h Δ
     rcases G3_reach_window hj (tdist_le_iff.mp hd) with h | ⟨t, ht⟩
@@ -519,7 +503,7 @@ theorem J_src_eq_snk_of_card_two {V : Finset ι} (hV : V.card = 2) (τ : Timelin
     J .src τ Δ V = J .snk τ Δ V := by
   have other : ∀ s ∈ V, ∃ t ∈ V, ∀ p ∈ V, p = s ∨ p = t := by
     intro s hs
-    obtain ⟨t, ht, hts⟩ := exists_mem_ne (V := V) (by omega) s
+    obtain ⟨t, ht, hts⟩ := Finset.exists_mem_ne (s := V) (by omega) s
     refine ⟨t, ht, fun p hp => ?_⟩
     by_cases hps : p = s
     · exact .inl hps

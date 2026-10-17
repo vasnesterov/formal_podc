@@ -263,7 +263,7 @@ noncomputable def shareLabel (G : SimpleGraph V) (Z : Set V) (r : ℕ) (S : List
     Label :=
   open Classical in
   encList [[decide (v ∈ Z)],
-    if v ∈ Z then chunk S (cdiv S.length (zball G Z r v).ncard) ((sortedL (zball G Z r v)).idxOf v)
+    if v ∈ Z then chunk S (S.length ⌈/⌉ (zball G Z r v).ncard) ((sortedL (zball G Z r v)).idxOf v)
     else []]
 
 /-- The honest prover: the labels for the clusters of Lemma B.1. -/
@@ -395,7 +395,7 @@ lemma dec_shareLabel {G : SimpleGraph V} {r s : ℕ} {𝒞 : Set (Set V)} (h : I
   unfold dec
   rw [zeroSet_shareLabel, h.zball_eq hC hu]
   have hmap : (sortedL C).map (fun w => (parse (shareLabel G (⋃₀ 𝒞) r S w)).2) =
-      (sortedL C).map (fun w => chunk S (cdiv S.length C.ncard) ((sortedL C).idxOf w)) := by
+      (sortedL C).map (fun w => chunk S (S.length ⌈/⌉ C.ncard) ((sortedL C).idxOf w)) := by
     refine List.map_congr_left fun w hw => ?_
     have hwC := mem_sortedL.1 hw
     have hwZ : w ∈ ⋃₀ 𝒞 := Set.mem_sUnion_of_mem hwC hC
@@ -461,15 +461,15 @@ lemma shareVer_sound {G : SimpleGraph V} (hG : G.Connected) {r : ℕ} (ℓ : V �
 /-! #### Cost -/
 
 omit [Fintype V] [LinearOrder V] in
-lemma cdiv_min_le {r n : ℕ} (hr : 0 < r) : cdiv r (min r n) ≤ cdiv r n + 1 := by
+lemma ceilDiv_min_le {r n : ℕ} (hr : 0 < r) : r ⌈/⌉ min r n ≤ r ⌈/⌉ n + 1 := by
   rcases le_total r n with h | h
   · rw [min_eq_left h]
-    exact (cdiv_le_of_le_mul hr (le_of_eq (mul_one r).symm)).trans (by omega)
+    exact (Nat.ceilDiv_le_of_le_mul hr (le_of_eq (mul_one r).symm)).trans (by omega)
   · rw [min_eq_right h]
     omega
 
 lemma shareProv_length {G : SimpleGraph V} {r : ℕ} {S : List Bool} (v : V) (hS : S.length = r) :
-    (shareProv r G S v).length ≤ 2 * cdiv r (Fintype.card V) + 6 := by
+    (shareProv r G S v).length ≤ 2 * (r ⌈/⌉ Fintype.card V) + 6 := by
   by_cases h : G.Connected ∧ 0 < r
   · rw [shareProv_eq h.1 h.2]
     have hspec := Classical.choose_spec (exists_clusterFam h.1 h.2)
@@ -481,8 +481,8 @@ lemma shareProv_length {G : SimpleGraph V} {r : ℕ} {S : List Bool} (v : V) (hS
     split_ifs with hv
     · obtain ⟨C, hC, hvC⟩ := Set.mem_sUnion.1 hv
       rw [h𝒞.zball_eq hC hvC, h𝒞.card C hC, hS]
-      have := (length_chunk_le S (cdiv r (min r (Fintype.card V)))
-        ((sortedL C).idxOf v)).trans (cdiv_min_le h.2)
+      have := (length_chunk_le S (r ⌈/⌉ min r (Fintype.card V))
+        ((sortedL C).idxOf v)).trans (ceilDiv_min_le h.2)
       omega
     · simp
   · unfold shareProv
@@ -508,7 +508,7 @@ theorem exists_stringShare_sharp (r : ℕ) :
         ver G (prov G S) v = some S) ∧
       (∀ G : SimpleGraph V, G.Connected → ∀ ℓ : V → Label, (∀ v, (ver G ℓ v).isSome) →
         ∃ S', ∀ v, ver G ℓ v = some S') ∧
-      (∀ G S v, S.length = r → (prov G S v).length ≤ 2 * cdiv r (Fintype.card V) + 6) := by
+      (∀ G S v, S.length = r → (prov G S v).length ≤ 2 * (r ⌈/⌉ Fintype.card V) + 6) := by
   rcases Nat.eq_zero_or_pos r with rfl | hr
   · refine ⟨fun _ _ _ => [], fun _ _ _ => some [], fun _ _ _ _ _ _ => rfl,
       fun G _ S hS v => ?_, fun G _ ℓ _ => ⟨[], fun _ => rfl⟩, fun _ _ _ _ => by simp⟩
@@ -530,7 +530,7 @@ theorem exists_stringShare (r : ℕ) :
         ver G (prov G S) v = some S) ∧
       (∀ G : SimpleGraph V, G.Connected → ∀ ℓ : V → Label, (∀ v, (ver G ℓ v).isSome) →
         ∃ S', ∀ v, ver G ℓ v = some S') ∧
-      (∀ G S v, S.length = r → (prov G S v).length ≤ 2 * cdiv r (Fintype.card V) + 8) := by
+      (∀ G S v, S.length = r → (prov G S v).length ≤ 2 * (r ⌈/⌉ Fintype.card V) + 8) := by
   obtain ⟨prov, ver, hloc, hc, hs, hcost⟩ := exists_stringShare_sharp (V := V) r
   exact ⟨prov, ver, hloc.mono (by omega), hc, hs,
     fun G S v hS => (hcost G S v hS).trans (by omega)⟩

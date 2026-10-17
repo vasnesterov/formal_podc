@@ -60,21 +60,14 @@ theorem isDG_K (V : Finset ι) : IsDG V (fun _ => K V) := fun _ _ _ h => h
 theorem isDG_PK (V : Finset ι) (y : ι) : IsDG V (fun _ => PK V y) :=
   fun _ _ _ h => ⟨h.1, h.2.1, h.2.2.2⟩
 
-theorem exists_other {V : Finset ι} (hV : 2 ≤ V.card) (y : ι) : ∃ z ∈ V, z ≠ y := by
-  by_contra h
-  push Not at h
-  have : V ⊆ {y} := fun z hz => Finset.mem_singleton.mpr (h z hz)
-  have := Finset.card_le_card this
-  simp at this; omega
-
 theorem PK_mem_J1sB {V : Finset ι} {Δ : ℕ} (hΔ : 1 ≤ Δ) (hV : 2 ≤ V.card) (y : ι) :
     (fun _ => PK V y) ∈ J1sB Δ V := by
-  obtain ⟨z, hz, hzy⟩ := exists_other hV y
+  obtain ⟨z, hz, hzy⟩ := Finset.exists_mem_ne hV y
   exact mem_J1sB_of_outStar hΔ (isDG_PK V y) hz fun _ p hp hpz => ⟨hz, hp, hzy, Ne.symm hpz⟩
 
 theorem PK_mem_J1sQ {V : Finset ι} {Δ : ℕ} (hΔ : 1 ≤ Δ) (hV : 2 ≤ V.card) (y : ι) :
     (fun _ => PK V y) ∈ J1sQ Δ V := by
-  obtain ⟨z, hz, hzy⟩ := exists_other hV y
+  obtain ⟨z, hz, hzy⟩ := Finset.exists_mem_ne hV y
   exact mem_J1sQ_of_outStar hΔ (isDG_PK V y) hz
     fun i => ⟨i, le_rfl, fun p hp hpz => ⟨hz, hp, hzy, Ne.symm hpz⟩⟩
 
@@ -142,7 +135,7 @@ theorem lemma_1 [Infinite ι] {A : Algorithm ι σ} {C : DGClass ι} {n : ℕ}
       rcases hj with rfl | ⟨h1, -, h3, -⟩
       · exact hq
       · exact ⟨h1, h3⟩
-  obtain ⟨z, hz, hzp⟩ := exists_other (hV ▸ h2) p
+  obtain ⟨z, hz, hzp⟩ := Finset.exists_mem_ne (hV ▸ h2) p
   have hz' : z ∈ V.erase p := Finset.mem_erase.mpr ⟨hzp, hz⟩
   obtain ⟨i, ℓ, hℓ, hall⟩ := hA V' hcard _ (hC V' hcard v (Finset.mem_insert_self _ _)) γ
   have h1 := hall 0 z (Finset.mem_insert_of_mem hz')
@@ -171,7 +164,7 @@ theorem theorem_2 [Infinite ι] [Nonempty σ] (A : Algorithm ι σ) {Δ n : ℕ}
   have hP : PseudoStab A (J1sB Δ) n := hS.pseudoStab fun _ _ hG i => J_shift hG i
   obtain ⟨V, hV⟩ := Infinite.exists_subset_card_eq ι n
   obtain ⟨L, hconv, hcorr⟩ := selfStab_iff.1 hS V hV
-  obtain ⟨z, hz, -⟩ := exists_other (hV ▸ h2) (Classical.arbitrary ι)
+  obtain ⟨z, hz, -⟩ := Finset.exists_mem_ne (hV ▸ h2) (Classical.arbitrary ι)
   obtain ⟨i, hi⟩ := hconv _ (K_mem_J1sB hΔ hz) (fun _ => Classical.arbitrary σ)
   set γ := exec A (fun _ => K V) (fun _ => Classical.arbitrary σ) i
   obtain ⟨ℓ, hℓ, hK⟩ := hcorr _ (K_mem_J1sB hΔ hz) γ hi
@@ -257,7 +250,7 @@ theorem theorem_3 [Infinite ι] [Nonempty σ] (A : Algorithm ι σ) {Δ n : ℕ}
   intro hP
   have hC := containsPK_J1sQ (ι := ι) hΔ h2
   obtain ⟨V, hV⟩ := Infinite.exists_subset_card_eq ι n
-  obtain ⟨z, hz, -⟩ := exists_other (hV ▸ h2) (Classical.arbitrary ι)
+  obtain ⟨z, hz, -⟩ := Finset.exists_mem_ne (hV ▸ h2) (Classical.arbitrary ι)
   have hVne : V.Nonempty := ⟨z, hz⟩
   set γ : ι → σ := fun _ => Classical.arbitrary σ
   set G := advDG A V γ
@@ -311,7 +304,7 @@ theorem theorem_4 [Infinite ι] [Nonempty σ] (A : Algorithm ι σ) {Δ n : ℕ}
   rw [pseudoStab_iff]
   intro hP
   obtain ⟨V, hV⟩ := Infinite.exists_subset_card_eq ι n
-  obtain ⟨p, hp, -⟩ := exists_other (show 2 ≤ V.card by omega) (Classical.arbitrary ι)
+  obtain ⟨p, hp, -⟩ := Finset.exists_mem_ne (show 2 ≤ V.card by omega) (Classical.arbitrary ι)
   set G : DG ι := fun _ => InStar V p
   set γ : ι → σ := fun _ => Classical.arbitrary σ
   obtain ⟨i, ℓ, hℓ, hall⟩ := hP V hV G (InStar_mem_Js1B hΔ hp) γ
@@ -338,9 +331,9 @@ theorem theorem_4 [Infinite ι] [Nonempty σ] (A : Algorithm ι σ) {Δ n : ℕ}
     rcases Finset.mem_insert.mp hℓ' with h | h
     · exact hw (h ▸ hℓ)
     · exact (Finset.notMem_erase _ _) h
-  obtain ⟨q₁, hq₁, hq₁p⟩ := exists_other (show 2 ≤ V.card by omega) p
+  obtain ⟨q₁, hq₁, hq₁p⟩ := Finset.exists_mem_ne (show 2 ≤ V.card by omega) p
   obtain ⟨q₂, hq₂, hq₂ne⟩ : ∃ q₂ ∈ V.erase p, q₂ ≠ q₁ := by
-    refine exists_other ?_ q₁
+    refine Finset.exists_mem_ne ?_ q₁
     rw [Finset.card_erase_of_mem hp]; omega
   rw [Finset.mem_erase] at hq₂
   exact hq₂ne ((hleaf q₂ hq₂.2 hq₂.1).symm.trans (hleaf q₁ hq₁ hq₁p))
@@ -356,10 +349,10 @@ theorem theorem_5 [Infinite ι] [Nonempty σ] (A : Algorithm ι σ) {Δ n : ℕ}
   intro hT
   have hP := hT.pseudoStab
   obtain ⟨V, hV⟩ := Infinite.exists_subset_card_eq ι n
-  obtain ⟨z, hz, -⟩ := exists_other (hV ▸ h2) (Classical.arbitrary ι)
+  obtain ⟨z, hz, -⟩ := Finset.exists_mem_ne (hV ▸ h2) (Classical.arbitrary ι)
   set γ : ι → σ := fun _ => Classical.arbitrary σ
   obtain ⟨ℓ, hℓ, hK⟩ := pseudoStabWithin_iff.1 hT V hV _ (K_mem_J1sB hΔ hz) γ
-  obtain ⟨z', hz', hz'ℓ⟩ := exists_other (hV ▸ h2) ℓ
+  obtain ⟨z', hz', hz'ℓ⟩ := Finset.exists_mem_ne (hV ▸ h2) ℓ
   set G : DG ι := splice (fun _ => K V) T (fun _ => PK V ℓ)
   have hG : G ∈ J1sB Δ V := by
     refine mem_J1sB_of_outStar hΔ (fun t a b h => ?_) hz' (fun t p hp hpz => ?_)

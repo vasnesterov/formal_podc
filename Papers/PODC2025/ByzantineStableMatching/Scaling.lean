@@ -1,6 +1,7 @@
 import Papers.PODC2025.ByzantineStableMatching.Problem
 import Cslib.Computability.Distributed.Byzantine.LockStep.Parallel
 import Mathlib
+import Podc.Foundations.Data.Nat.CeilDiv
 
 /-!
 # Lemma 3: scaling down by group simulation
@@ -424,7 +425,7 @@ section Threshold
 variable {k d : ℕ}
 
 /-- The concrete partition used for Lemma 3: `i ↦ i mod d`. For `0 < d ≤ k` its groups are nonempty
-(`j` is in group `j`) and have size at most `⌈k/d⌉ = (k + d - 1) / d`.
+(`j` is in group `j`) and have size at most `⌈k/d⌉ = k ⌈/⌉ d`.
 (The partition `i ↦ i / ⌈k/d⌉` would not do: e.g. for `k = 4`, `d = 3` it has only 2 groups.) -/
 def modGroup (hd : 0 < d) (i : Fin k) : Fin d := ⟨i % d, Nat.mod_lt _ hd⟩
 
@@ -434,14 +435,10 @@ lemma modGroup_castLE (hd : 0 < d) (hdk : d ≤ k) (i : Fin d) :
 
 /-- Groups of `modGroup` have at most `⌈k/d⌉` elements. -/
 lemma ncard_preimage_modGroup_le (hd : 0 < d) (S : Set (Fin d)) :
-    (modGroup (k := k) hd ⁻¹' S).ncard ≤ (k + d - 1) / d * S.ncard := by
-  set c := (k + d - 1) / d with hc_def
-  have hc : ∀ i : Fin k, i.val / d < c := by
-    intro i
-    rw [Nat.div_lt_iff_lt_mul hd]
-    have h1 : k + d - 1 < c * d + d := Nat.lt_div_mul_add hd
-    have h2 := i.2
-    omega
+    (modGroup (k := k) hd ⁻¹' S).ncard ≤ k ⌈/⌉ d * S.ncard := by
+  set c := k ⌈/⌉ d with hc_def
+  have hc : ∀ i : Fin k, i.val / d < c := fun i =>
+    Nat.div_lt_of_lt_mul (i.2.trans_le (Nat.le_mul_ceilDiv hd))
   calc (modGroup hd ⁻¹' S).ncard ≤ (S ×ˢ (Set.univ : Set (Fin c))).ncard :=
         Set.ncard_le_ncard_of_injOn (fun i => (modGroup hd i, (⟨i.val / d, hc i⟩ : Fin c)))
           (fun i hi => ⟨hi, trivial⟩) (by
@@ -453,7 +450,7 @@ lemma ncard_preimage_modGroup_le (hd : 0 < d) (S : Set (Fin d)) :
         rw [Set.ncard_prod, Set.ncard_univ, Nat.card_eq_fintype_card, Fintype.card_fin, mul_comm]
 
 lemma preimage_grpMap_mem_thresholds (hd : 0 < d) {tL tR : ℕ} {B : Set (Party d)}
-    (hB : B ∈ thresholds d (tL / ((k + d - 1) / d)) (tR / ((k + d - 1) / d))) :
+    (hB : B ∈ thresholds d (tL / (k ⌈/⌉ d)) (tR / (k ⌈/⌉ d))) :
     grpMap (modGroup (k := k) hd) (modGroup hd) ⁻¹' B ∈ thresholds k tL tR := by
   obtain ⟨hBL, hBR⟩ := hB
   have eL : inl ⁻¹' (grpMap (modGroup (k := k) hd) (modGroup hd) ⁻¹' B) =
@@ -462,12 +459,12 @@ lemma preimage_grpMap_mem_thresholds (hd : 0 < d) {tL tR : ℕ} {B : Set (Party 
       modGroup hd ⁻¹' (inr ⁻¹' B) := by ext; simp [grpMap]
   refine ⟨?_, ?_⟩
   · rw [eL]
-    calc _ ≤ (k + d - 1) / d * (inl ⁻¹' B).ncard := ncard_preimage_modGroup_le hd _
-      _ ≤ (k + d - 1) / d * (tL / ((k + d - 1) / d)) := Nat.mul_le_mul_left _ hBL
+    calc _ ≤ k ⌈/⌉ d * (inl ⁻¹' B).ncard := ncard_preimage_modGroup_le hd _
+      _ ≤ k ⌈/⌉ d * (tL / (k ⌈/⌉ d)) := Nat.mul_le_mul_left _ hBL
       _ ≤ tL := Nat.mul_div_le _ _
   · rw [eR]
-    calc _ ≤ (k + d - 1) / d * (inr ⁻¹' B).ncard := ncard_preimage_modGroup_le hd _
-      _ ≤ (k + d - 1) / d * (tR / ((k + d - 1) / d)) := Nat.mul_le_mul_left _ hBR
+    calc _ ≤ k ⌈/⌉ d * (inr ⁻¹' B).ncard := ncard_preimage_modGroup_le hd _
+      _ ≤ k ⌈/⌉ d * (tR / (k ⌈/⌉ d)) := Nat.mul_le_mul_left _ hBR
       _ ≤ tR := Nat.mul_div_le _ _
 
 /-- The four networks of the paper are compatible with sidewise group maps. -/
@@ -485,7 +482,7 @@ parties, on the same kind of network (fully connected, one-sided, or bipartite).
 theorem lemma3 {G : (n : ℕ) → SimpleGraph (Party n)}
     (hG : G = fully ∨ G = oneSided ∨ G = oneSidedR ∨ G = bipartite) {k d tL tR : ℕ}
     (hd : 0 < d) (hdk : d ≤ k) (h : Solvable (G k) (thresholds k tL tR) (sSM k)) :
-    Solvable (G d) (thresholds d (tL / ((k + d - 1) / d)) (tR / ((k + d - 1) / d))) (sSM d) :=
+    Solvable (G d) (thresholds d (tL / (k ⌈/⌉ d)) (tR / (k ⌈/⌉ d))) (sSM d) :=
   solvable_sSM_of_groups (repL := Fin.castLE hdk) (repR := Fin.castLE hdk)
     (modGroup_castLE hd hdk) (modGroup_castLE hd hdk) (adj_grpMap hG _ _)
     (fun _ hB => preimage_grpMap_mem_thresholds hd hB) h
@@ -494,7 +491,7 @@ theorem lemma3 {G : (n : ℕ) → SimpleGraph (Party n)}
 theorem lemma3_auth {G : (n : ℕ) → SimpleGraph (Party n)}
     (hG : G = fully ∨ G = oneSided ∨ G = oneSidedR ∨ G = bipartite) {k d tL tR : ℕ}
     (hd : 0 < d) (hdk : d ≤ k) (h : SolvableAuth (G k) (thresholds k tL tR) (sSM k)) :
-    SolvableAuth (G d) (thresholds d (tL / ((k + d - 1) / d)) (tR / ((k + d - 1) / d))) (sSM d) :=
+    SolvableAuth (G d) (thresholds d (tL / (k ⌈/⌉ d)) (tR / (k ⌈/⌉ d))) (sSM d) :=
   solvableAuth_sSM_of_groups (repL := Fin.castLE hdk) (repR := Fin.castLE hdk)
     (modGroup_castLE hd hdk) (modGroup_castLE hd hdk) (adj_grpMap hG _ _)
     (fun _ hB => preimage_grpMap_mem_thresholds hd hB) h
@@ -502,7 +499,8 @@ theorem lemma3_auth {G : (n : ℕ) → SimpleGraph (Party n)}
 /-- Remark: Lemma 3 does not give what the paper's Lemma 13 needs. Scaling from `k = 4` to `d = 3`
 with `tR = k = 4` only yields `tR' = ⌊4 / ⌈4/3⌉⌋ = 2 < 3 = d` Byzantine parties on the right, so the
 paper's appeal to Lemma 3 in Lemma 13 is not valid for such `k`. -/
-lemma lemma3_not_enough_for_lemma13 : (4 : ℕ) / ((4 + 3 - 1) / 3) = 2 := by norm_num
+lemma lemma3_not_enough_for_lemma13 : (4 : ℕ) / (4 ⌈/⌉ 3) = 2 := by
+  norm_num [Nat.ceilDiv_eq_add_pred_div]
 
 end Threshold
 
