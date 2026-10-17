@@ -1,7 +1,5 @@
 import Papers.PODC2013.CongestedCliqueRouting.Model
 
--- CSLib candidate (general, not specific to this paper)
-
 /-!
 # Knowledge-based construction of algorithms
 

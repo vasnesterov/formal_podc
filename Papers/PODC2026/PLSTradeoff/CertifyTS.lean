@@ -18,6 +18,8 @@ needs the two diameter checks), and then radius `3t + 2` is indeed enough.
 
 namespace PLSTradeoff
 
+open Cslib.BitEncoding
+
 open SimpleGraph
 open Cslib.Local (GAgree loc mask loc_le gAgree_loc edist_le_edist_loc mask_of_le
   loc_edist_le_iff loc_adj_iff)

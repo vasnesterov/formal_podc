@@ -556,7 +556,6 @@ import Papers.PODC2019.CryptoConsensusNumber.Fig3Example
 import Papers.PODC2025.MinimalistLE.Basic
 import Papers.PODC2025.MinimalistLE.Flow
 import Papers.PODC2025.MinimalistLE.Convergence
-import Papers.PODC2025.MinimalistLE.Coins
 import Papers.PODC2025.MinimalistLE.Probability
 import Papers.PODC2025.MinimalistLE.Main
 import Papers.PODC2025.MinimalistLE.PairChain
@@ -618,7 +617,6 @@ import Papers.PODC2026.ReachingUnivalency.Theorem1
 import Papers.PODC2026.ReachingUnivalency.PaperProtocolFails
 import Papers.PODC2026.PLSTradeoff.Basic
 import Papers.PODC2026.PLSTradeoff.TSPartition
-import Papers.PODC2026.PLSTradeoff.Encoding
 import Papers.PODC2026.PLSTradeoff.Tradeoff
 import Papers.PODC2026.PLSTradeoff.CertifyTS
 import Papers.PODC2026.PLSTradeoff.BallCarving
@@ -838,7 +836,6 @@ import Papers.PODC2020.DetectableSpace.Alg2Counter
 import Papers.PODC2020.DetectableSpace.Alg2Fix
 import Papers.PODC2020.DetectableSpace.Alg3
 import Papers.PODC2020.DetectableSpace.LinBridge
-import Papers.PODC2026.LocalComputable.CompList
 import Papers.PODC2026.LocalComputable.Basic
 import Papers.PODC2026.LocalComputable.ComputableEquiv
 import Papers.PODC2026.LocalComputable.Decide

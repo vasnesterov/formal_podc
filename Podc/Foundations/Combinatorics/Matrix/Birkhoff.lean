@@ -1,32 +1,41 @@
-import Mathlib
+import Mathlib.Combinatorics.Hall.Basic
+import Mathlib.Algebra.Order.BigOperators.Group.Finset
+import Mathlib.Data.Fintype.BigOperators
+import Mathlib.Logic.Equiv.Fin.Basic
+import Mathlib.Algebra.BigOperators.Fin
 
--- CSLib candidate (general, not specific to this paper)
+-- CSLib candidate: Cslib/Foundations/Combinatorics/Matrix/Birkhoff.lean
 
 /-!
-# König's line-colouring theorem in matrix form
+# König's line-colouring theorem for `ℕ`-matrices
 
-Combinatorial lemmas about `ℕ`-valued square matrices (functions `α → α → ℕ`) used in
-Lenzen, *Optimal deterministic routing and sorting on the congested clique* (PODC 2013).
-Theorem 3.2 of the paper is König's line-colouring theorem for bipartite multigraphs: a
-bipartite multigraph of maximum degree `Δ` can be edge-coloured with `Δ` colours. We prove it in
-matrix form:
+Combinatorial lemmas about `ℕ`-valued matrices, written as functions `α → β → ℕ` (definitionally
+`Matrix α β ℕ`). They are the integral counterpart of Mathlib's Birkhoff–von Neumann theorem
+(`doublyStochastic_eq_convexHull_permMatrix`, `exists_eq_sum_perm_of_mem_doublyStochastic` in
+`Mathlib/Analysis/Convex/Birkhoff.lean`), which works over ordered fields and therefore does not
+give integer decompositions. König's line-colouring theorem for bipartite multigraphs (a
+bipartite multigraph of maximum degree `Δ` can be edge-coloured with `Δ` colours) is
+`Matrix.exists_split_parts` with `D = 1`.
 
-* `exists_le_split`: a number below a sum splits into parts below the summands;
-* `exists_transport`: the transportation problem with equal totals has an `ℕ`-solution;
-* `exists_regular_above`: a square matrix with row and column sums `≤ K` is entrywise below
+## Main statements
+
+* `Fintype.exists_le_sum_eq`: a number below a sum splits into parts below the summands;
+* `Matrix.exists_transport`: the transportation problem with equal totals has an `ℕ`-solution
+  (north-west corner rule);
+* `Matrix.exists_regular_above`: a square matrix with row and column sums `≤ K` is entrywise below
   a matrix with all row and column sums equal to `K`;
-* `exists_perm_decomposition`: a `K`-regular square `ℕ`-matrix is a sum of `K` permutation
+* `Matrix.exists_perm_decomposition`: a `K`-regular square `ℕ`-matrix is a sum of `K` permutation
   matrices (Birkhoff–König, via Hall's marriage theorem);
-* `exists_split_parts`: a square `ℕ`-matrix with row and column sums `≤ |ι| * D` splits into
+* `Matrix.exists_split_parts`: a square `ℕ`-matrix with row and column sums `≤ |ι| * D` splits into
   `|ι|` matrices with row and column sums `≤ D`.
 -/
 
 open Finset
 
-namespace CongestedCliqueRouting
+namespace Fintype
 
 /-- Splitting a number below a sum: if `a ≤ ∑ x, b x` then `a = ∑ x, a' x` with `a' ≤ b`. -/
-theorem exists_le_split {ι : Type*} [Fintype ι] (a : ℕ) (b : ι → ℕ) (h : a ≤ ∑ x, b x) :
+theorem exists_le_sum_eq {ι : Type*} [Fintype ι] (a : ℕ) (b : ι → ℕ) (h : a ≤ ∑ x, b x) :
     ∃ a' : ι → ℕ, (∀ x, a' x ≤ b x) ∧ ∑ x, a' x = a := by
   classical
   suffices H : ∀ (s : Finset ι) (a : ℕ), a ≤ ∑ x ∈ s, b x →
@@ -36,20 +45,24 @@ theorem exists_le_split {ι : Type*} [Fintype ι] (a : ℕ) (b : ι → ℕ) (h 
   | empty =>
     intro a ha
     refine ⟨0, fun _ => Nat.zero_le _, ?_⟩
-    simp only [sum_empty, nonpos_iff_eq_zero] at ha
+    simp only [Finset.sum_empty, nonpos_iff_eq_zero] at ha
     simp [ha]
   | insert x0 s hx0 ih =>
     intro a ha
-    rw [sum_insert hx0] at ha
+    rw [Finset.sum_insert hx0] at ha
     obtain ⟨a', ha'b, ha's⟩ := ih (a - min a (b x0)) (by omega)
     refine ⟨Function.update a' x0 (min a (b x0)), fun x => ?_, ?_⟩
     · rcases eq_or_ne x x0 with rfl | hx
       · simp
       · simp [hx, ha'b]
     · have hs : ∑ x ∈ s, Function.update a' x0 (min a (b x0)) x = ∑ x ∈ s, a' x :=
-        sum_congr rfl fun x hx => Function.update_of_ne (by rintro rfl; exact hx0 hx) _ _
-      rw [sum_insert hx0, Function.update_self, hs, ha's]
+        Finset.sum_congr rfl fun x hx => Function.update_of_ne (by rintro rfl; exact hx0 hx) _ _
+      rw [Finset.sum_insert hx0, Function.update_self, hs, ha's]
       omega
+
+end Fintype
+
+namespace Matrix
 
 /-- Transportation problem with equal totals (north-west corner rule): given supplies `r` and
 demands `c` with the same total, there is an `ℕ`-matrix with row sums `r` and column sums `c`. -/
@@ -71,7 +84,7 @@ theorem exists_transport {α β : Type*} [Fintype α] [Fintype β] (r : α → �
   | insert i0 s hi0 ih =>
     intro c hc
     rw [sum_insert hi0] at hc
-    obtain ⟨a, hac, hasum⟩ := exists_le_split (r i0) c (by omega)
+    obtain ⟨a, hac, hasum⟩ := Fintype.exists_le_sum_eq (r i0) c (by omega)
     obtain ⟨q, hq1, hq2⟩ := ih (fun j => c j - a j) (by
       rw [sum_tsub_distrib _ (fun j _ => hac j)]; omega)
     refine ⟨Function.update q i0 a, fun i hi => ?_, fun j => ?_⟩
@@ -159,9 +172,10 @@ theorem exists_perm_decomposition {α : Type*} [Fintype α] [DecidableEq α] (B 
   obtain ⟨σ, hσ⟩ := exists_perm_decomposition_sum K B hr hc
   exact ⟨σ, fun i j => by rw [hσ, card_filter]⟩
 
-/-- Main splitting lemma (König's line-colouring theorem, Theorem 3.2 of Lenzen, PODC 2013, in
-matrix form): a square `ℕ`-matrix whose row and column sums are at most `|ι| * D` is the sum of
-`|ι|` matrices whose row and column sums are at most `D`. -/
+/-- Main splitting lemma (König's line-colouring theorem in matrix form; Theorem 3.2 of Lenzen,
+*Optimal deterministic routing and sorting on the congested clique*, PODC 2013): a square
+`ℕ`-matrix whose row and column sums are at most `|ι| * D` is the sum of `|ι|` matrices whose row
+and column sums are at most `D`. -/
 theorem exists_split_parts {α ι : Type*} [Fintype α] [DecidableEq α] [Fintype ι]
     (A : α → α → ℕ) (D : ℕ)
     (hr : ∀ i, ∑ j, A i j ≤ Fintype.card ι * D) (hc : ∀ j, ∑ i, A i j ≤ Fintype.card ι * D) :
@@ -183,10 +197,10 @@ theorem exists_split_parts {α ι : Type*} [Fintype α] [DecidableEq α] [Fintyp
     intro x j
     simp only [Q]; rw [sum_comm]; simp [← Equiv.eq_symm_apply]
   have hsplit : ∀ i j, ∃ a' : ι → ℕ, (∀ x, a' x ≤ Q x i j) ∧ ∑ x, a' x = A i j :=
-    fun i j => exists_le_split (A i j) (fun x => Q x i j) (by rw [hQ]; exact hAB i j)
+    fun i j => Fintype.exists_le_sum_eq (A i j) (fun x => Q x i j) (by rw [hQ]; exact hAB i j)
   choose P hP1 hP2 using hsplit
   refine ⟨fun x i j => P i j x, hP2, fun x i => ?_, fun x j => ?_⟩
   · exact (sum_le_sum fun j _ => hP1 i j x).trans (hQr x i).le
   · exact (sum_le_sum fun i _ => hP1 i j x).trans (hQc x j).le
 
-end CongestedCliqueRouting
+end Matrix

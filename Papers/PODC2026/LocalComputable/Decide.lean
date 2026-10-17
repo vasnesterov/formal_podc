@@ -57,16 +57,16 @@ theorem critical_decidable
     · exact ⟨0, by simp⟩
   let mt : ℕ → ℕ := fun t => Nat.find (hex t)
   have hmt : Computable mt :=
-    computable_nat_find (Primrec.or.to_comp.comp (hq.comp fst)
+    Computable.nat_find (Primrec.or.to_comp.comp (hq.comp fst)
       (Primrec.nat_lt.decide.to_comp.comp fst (hT.comp snd))).to₂ hex
   let search : View → ℕ → Bool := fun x t => (nets (mt t)).any fun G =>
     (List.range (M.size G)).any fun v => decide (M.view G v t = x) && decide (T (M.size G) ≤ t)
   have hsearch : Computable₂ search := by
-    refine Computable₂.mk ((computable_list_any (f := fun a : View × ℕ => nets (mt a.2))
+    refine Computable₂.mk ((Computable.list_any (f := fun a : View × ℕ => nets (mt a.2))
       (p := fun a G => (List.range (M.size G)).any fun v =>
         decide (M.view G v a.2 = a.1) && decide (T (M.size G) ≤ a.2))
       (hnets.comp (hmt.comp snd)) ?_).of_eq fun a => rfl)
-    refine Computable₂.mk ((computable_list_any
+    refine Computable₂.mk ((Computable.list_any
       (f := fun b : (View × ℕ) × Net => List.range (M.size b.2))
       (p := fun b v => decide (M.view b.2 v b.1.2 = b.1.1) && decide (T (M.size b.2) ≤ b.1.2))
       (Primrec.list_range.to_comp.comp (hsize.comp snd)) ?_).of_eq fun b => rfl)

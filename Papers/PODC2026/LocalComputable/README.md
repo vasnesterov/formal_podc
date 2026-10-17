@@ -130,6 +130,7 @@ balls is not formalized.
 * a toy separation family on promised paths (`SeparationToy.lean`): uncomputable locality 0
   (`toy_uncomputable_solves`) versus computable locality `≥ n − 1` (`toy_computable_lower`).
 
-Computable list combinators (`computable_list_foldl/map/all/any/findSome?/filterMap/flatMap/filter`,
-`computable_nat_find`, in `CompList.lean`) are CSLib/Mathlib candidates. So is the abstract
-ball-growing model (`Basic.lean`).
+Computable list combinators (`Computable.list_foldl/map/all/any/findSome?/filterMap/flatMap/filter`,
+`Computable.nat_find`) and `Primrec.list_all/any`, `Primrec.nat_pow` are shared code staged for
+CSLib/Mathlib in `Podc/Computability/Partrec/List.lean` and `Podc/Computability/Primrec/List.lean`.
+The abstract ball-growing model (`Basic.lean`) is a CSLib candidate.

@@ -135,5 +135,6 @@ Full list of differences (including modelling choices and minor imprecisions): [
   which yields Corollary 2.2.
 * Non-vacuity, Section 3: every fault-tolerant spanner gives an LP-feasible solution
   (`theorem_3_3'`), so Theorem 3.3's hypotheses are satisfiable.
-* CSLib candidate: the multiplicative Chernoff lower tail for independent threshold indicators
-  `chernoff_count` (`TwoSpanner/Rounding.lean`, measure-theoretic).
+* The multiplicative Chernoff lower tail behind `chernoff_count` is shared code staged for CSLib:
+  `Cslib.Probability.measureReal_card_filter_le_le` (`Podc/Probability/Chernoff.lean`, for
+  independent events under any product of probability measures).

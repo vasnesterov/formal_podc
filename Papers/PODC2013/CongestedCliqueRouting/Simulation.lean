@@ -1,7 +1,5 @@
 import Papers.PODC2013.CongestedCliqueRouting.Knowledge
 
--- CSLib candidate (general, not specific to this paper)
-
 /-!
 # Simulating a clique of virtual nodes
 

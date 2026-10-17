@@ -1,6 +1,7 @@
 import Papers.PODC2026.LocalComputable.Concrete
 import Papers.PODC2026.LocalComputable.Collapse
 import Papers.PODC2026.LocalComputable.Decide
+import Podc.Computability.Primrec.List
 
 /-!
 # Computability of the concrete LOCAL model
@@ -37,26 +38,6 @@ section Helpers
 
 variable {α β : Type*} [Primcodable α] [Primcodable β]
 
-/-- `List.all` with a primitive recursive predicate is primitive recursive. -- CSLib candidate -/
-theorem primrec_list_all {f : α → List β} {p : α → β → Bool} (hf : Primrec f) (hp : Primrec₂ p) :
-    Primrec fun a => (f a).all (p a) :=
-  (Primrec.list_foldr hf (Primrec.const true)
-    (Primrec.and.comp (hp.comp Primrec.fst (Primrec.fst.comp Primrec.snd))
-      (Primrec.snd.comp Primrec.snd)).to₂).of_eq fun a => by
-    induction f a <;> simp [*]
-
-/-- `List.any` with a primitive recursive predicate is primitive recursive. -- CSLib candidate -/
-theorem primrec_list_any {f : α → List β} {p : α → β → Bool} (hf : Primrec f) (hp : Primrec₂ p) :
-    Primrec fun a => (f a).any (p a) :=
-  (Primrec.list_foldr hf (Primrec.const false)
-    (Primrec.or.comp (hp.comp Primrec.fst (Primrec.fst.comp Primrec.snd))
-      (Primrec.snd.comp Primrec.snd)).to₂).of_eq fun a => by
-    induction f a <;> simp [*]
-
-/-- Exponentiation of natural numbers is primitive recursive. -- CSLib candidate -/
-theorem primrec_nat_pow : Primrec₂ ((· ^ ·) : ℕ → ℕ → ℕ) :=
-  Primrec₂.unpaired'.1 Nat.Primrec.pow
-
 /-- Boolean test for `List.Nodup`. -/
 def nodupb [DecidableEq β] (l : List β) : Bool :=
   List.recOn l true fun b l' IH => !(l'.any (· == b)) && IH
@@ -76,7 +57,7 @@ theorem nodupb_iff [DecidableEq β] (l : List β) : nodupb l = true ↔ l.Nodup 
 /-- `List.Nodup` is a primitive recursive predicate. -- CSLib candidate -/
 theorem primrec_nodupb [DecidableEq β] : Primrec (nodupb (β := β)) :=
   (Primrec.list_rec Primrec.id (Primrec.const true)
-    (Primrec.and.comp (Primrec.not.comp (primrec_list_any (Primrec.fst.comp (Primrec.snd.comp
+    (Primrec.and.comp (Primrec.not.comp (Primrec.list_any (Primrec.fst.comp (Primrec.snd.comp
       Primrec.snd)) (Primrec.beq.comp Primrec.snd (Primrec.fst.comp (Primrec.snd.comp
         Primrec.fst))).to₂))
       (Primrec.snd.comp (Primrec.snd.comp Primrec.snd))).to₂).of_eq fun _ => rfl
@@ -240,21 +221,21 @@ theorem primrec_nodeOk (Δ c k : ℕ) : Primrec fun q : PNet × ℕ => nodeOk Δ
     nat_le.decide.comp (list_length.comp hNB) (const Δ)
   have h3 : Primrec fun q : PNet × ℕ =>
       (q.1.nbrOf q.2).all (fun u => decide (u < q.1.n) && (q.1.nbrOf u).any (· == q.2)) := by
-    refine primrec_list_all hNB ?_
+    refine Primrec.list_all hNB ?_
     refine Primrec.and.comp (nat_lt.decide.comp snd (hn.comp fst)) ?_
-    exact primrec_list_any (primrec_nbrOf.comp (fst.comp fst) snd)
+    exact Primrec.list_any (primrec_nbrOf.comp (fst.comp fst) snd)
       (Primrec.beq.comp snd (snd.comp (fst.comp fst))).to₂
   have h4 : Primrec fun q : PNet × ℕ => !((q.1.nbrOf q.2).any (· == q.2)) :=
-    Primrec.not.comp (primrec_list_any hNB (Primrec.beq.comp snd (snd.comp fst)).to₂)
+    Primrec.not.comp (Primrec.list_any hNB (Primrec.beq.comp snd (snd.comp fst)).to₂)
   have h5 : Primrec fun q : PNet × ℕ =>
       (List.range q.1.n).all (fun u => !(q.1.idOf u == q.1.idOf q.2) || (u == q.2)) :=
-    primrec_list_all (list_range.comp hn) (Primrec.or.comp (Primrec.not.comp
+    Primrec.list_all (list_range.comp hn) (Primrec.or.comp (Primrec.not.comp
       (Primrec.beq.comp (primrec_idOf.comp (fst.comp fst) snd) (hid.comp fst)))
       (Primrec.beq.comp snd (snd.comp fst))).to₂
   have h6 : Primrec fun q : PNet × ℕ => decide (1 ≤ q.1.idOf q.2) :=
     nat_le.decide.comp (const 1) hid
   have h7 : Primrec fun q : PNet × ℕ => decide (q.1.idOf q.2 ≤ q.1.n ^ c) :=
-    nat_le.decide.comp hid (primrec_nat_pow.comp hn (const c))
+    nat_le.decide.comp hid (Primrec.nat_pow.comp hn (const c))
   have h8 : Primrec fun q : PNet × ℕ => decide (q.1.inpOf q.2 < k) :=
     nat_lt.decide.comp hinp (const k)
   exact Primrec.and.comp (Primrec.and.comp (Primrec.and.comp (Primrec.and.comp (Primrec.and.comp
@@ -267,7 +248,7 @@ theorem primrec_wfb (Δ c k : ℕ) : Primrec (wfb Δ c k) :=
     (Primrec.beq.comp (list_length.comp primrec_nbr) primrec_n)
     (Primrec.beq.comp (list_length.comp primrec_id) primrec_n))
     (Primrec.beq.comp (list_length.comp primrec_inp) primrec_n))
-    (primrec_list_all (list_range.comp primrec_n) (primrec_nodeOk Δ c k).to₂)
+    (Primrec.list_all (list_range.comp primrec_n) (primrec_nodeOk Δ c k).to₂)
 
 /-- Well-formedness is decidable (via `wfb`). -/
 instance (Δ c k : ℕ) : DecidablePred (PNet.WF Δ c k) := fun _ => decidable_of_iff _ wfb_iff
@@ -467,7 +448,7 @@ theorem primrec_rawNets (Δ c k : ℕ) : Primrec (rawNets Δ c k) := by
       (listsOfLen (List.range (r.1 ^ c + 1)) r.1).flatMap fun id =>
         (listsOfLen (List.range k) r.1).map fun inp => PNet.mk r.1 r.2 id inp :=
     list_flatMap (primrec_listsOfLen.comp
-      (list_range.comp (succ.comp (primrec_nat_pow.comp fst (const c)))) fst) hL3.to₂
+      (list_range.comp (succ.comp (Primrec.nat_pow.comp fst (const c)))) fst) hL3.to₂
   have hL1 : Primrec fun n : ℕ =>
       (listsOfLen ((List.range (Δ + 1)).flatMap (listsOfLen (List.range n))) n).flatMap
         fun nbr => (listsOfLen (List.range (n ^ c + 1)) n).flatMap fun id =>

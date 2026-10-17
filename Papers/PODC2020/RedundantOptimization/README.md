@@ -120,7 +120,9 @@ the projection field can always be filled. The counterexamples are explicit inst
 not needed, because the paper argues in a one-shot model. Unlike `PODC2013/ByzantineVectorConsensus`
 (inputs are points, validity is a convex-hull condition), the inputs here are cost functions, so no code
 is shared. CSLib candidates:
-* `ConvexOn.add_fderiv_le` / `ConvexOn.add_inner_le` (first-order condition);
 * `mem_argmin_iff_of_hasFDerivAt`;
-* `convexOn_agg` (finite sums of convex functions);
 * the order statistic `threshold` with `threshold_spec`.
+
+The first-order condition (`ConvexOn.add_fderiv_le` / `ConvexOn.add_inner_le`) and finite sums of
+convex functions (`ConvexOn.fun_sum`, used by `convexOn_agg`) are shared code staged for CSLib in
+`Podc/Foundations/Analysis/Convex/FirstOrder.lean`.

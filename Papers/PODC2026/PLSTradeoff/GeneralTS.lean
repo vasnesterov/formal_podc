@@ -21,6 +21,8 @@ Deviation: the reconstructed cluster of `u` only contains nodes within distance 
 
 namespace PLSTradeoff
 
+open Cslib.BitEncoding
+
 open SimpleGraph Finset Classical
 open Cslib.Local (GAgree loc mask loc_le gAgree_loc edist_le_edist_loc mask_of_le
   loc_edist_le_iff loc_adj_iff)

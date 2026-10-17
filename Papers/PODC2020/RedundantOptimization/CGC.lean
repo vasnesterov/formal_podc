@@ -40,12 +40,6 @@ section Gradient
 
 variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
 
-/-- First-order condition with gradients. -- CSLib candidate -/
-lemma ConvexOn.add_inner_le {q : E → ℝ} (hq : ConvexOn ℝ Set.univ q) {g x : E}
-    (hg : HasGradientAt q g x) (y : E) : q x + ⟪g, y - x⟫ ≤ q y := by
-  have := ConvexOn.add_fderiv_le hq (hasGradientAt_iff_hasFDerivAt.1 hg) y
-  simpa [InnerProductSpace.toDual_apply_apply] using this
-
 lemma mem_argmin_of_hasGradientAt_zero {q : E → ℝ} (hq : ConvexOn ℝ Set.univ q) {x : E}
     (hg : HasGradientAt q 0 x) : x ∈ argmin q := fun y => by
   simpa using ConvexOn.add_inner_le hq hg y
@@ -62,19 +56,10 @@ lemma hasGradientAt_agg {ι : Type*} (S : Finset ι) {Q : ι → E → ℝ} {G :
   exact HasFDerivAt.fun_sum fun i hi => hasGradientAt_iff_hasFDerivAt.1 (h i hi)
 
 omit [CompleteSpace E] in
-/-- CSLib candidate (finite sums of convex functions). -/
+/-- Finite sums of convex functions are convex (the shared `ConvexOn.fun_sum`). -/
 lemma convexOn_agg {ι : Type*} {S : Finset ι} {Q : ι → E → ℝ}
-    (h : ∀ i ∈ S, ConvexOn ℝ Set.univ (Q i)) : ConvexOn ℝ Set.univ (agg S Q) := by
-  classical
-  induction S using Finset.induction_on with
-  | empty =>
-    have : agg (∅ : Finset ι) Q = fun _ => 0 := by funext w; simp [agg]
-    rw [this]; exact convexOn_const (0 : ℝ) convex_univ
-  | insert a S ha ih =>
-    have : agg (insert a S) Q = Q a + agg S Q := by
-      funext w; simp [agg, Finset.sum_insert ha]
-    rw [this]
-    exact (h a (mem_insert_self a S)).add (ih fun i hi => h i (mem_insert_of_mem hi))
+    (h : ∀ i ∈ S, ConvexOn ℝ Set.univ (Q i)) : ConvexOn ℝ Set.univ (agg S Q) :=
+  ConvexOn.fun_sum h
 
 end Gradient
 

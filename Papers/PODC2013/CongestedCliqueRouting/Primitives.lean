@@ -1,5 +1,5 @@
 import Papers.PODC2013.CongestedCliqueRouting.Knowledge
-import Papers.PODC2013.CongestedCliqueRouting.Matrix
+import Podc.Foundations.Combinatorics.Matrix.Birkhoff
 import Papers.PODC2013.CongestedCliqueRouting.Assign
 
 /-!
@@ -35,7 +35,7 @@ open Classical in
 noncomputable def splitParts (ι : Type*) [Fintype ι] (A : α → α → ℕ) (D : ℕ) :
     ι → α → α → ℕ :=
   if h : (∀ i, ∑ j, A i j ≤ Fintype.card ι * D) ∧ (∀ j, ∑ i, A i j ≤ Fintype.card ι * D) then
-    Classical.choose (exists_split_parts A D h.1 h.2)
+    Classical.choose (Matrix.exists_split_parts A D h.1 h.2)
   else 0
 
 lemma splitParts_spec {A : α → α → ℕ} {D : ℕ}
@@ -44,18 +44,18 @@ lemma splitParts_spec {A : α → α → ℕ} {D : ℕ}
       (∀ x i, ∑ j, splitParts ι A D x i j ≤ D) ∧ (∀ x j, ∑ i, splitParts ι A D x i j ≤ D) := by
   unfold splitParts
   rw [dif_pos ⟨hr, hc⟩]
-  exact Classical.choose_spec (exists_split_parts A D hr hc)
+  exact Classical.choose_spec (Matrix.exists_split_parts A D hr hc)
 
 open Classical in
 /-- A solution of the transportation problem with row sums `r` and column sums `c`. -/
 noncomputable def transportOf (r : α → ℕ) (c : β → ℕ) : α → β → ℕ :=
-  if h : ∑ i, r i = ∑ j, c j then Classical.choose (exists_transport r c h) else 0
+  if h : ∑ i, r i = ∑ j, c j then Classical.choose (Matrix.exists_transport r c h) else 0
 
 lemma transportOf_spec {r : α → ℕ} {c : β → ℕ} (h : ∑ i, r i = ∑ j, c j) :
     (∀ i, ∑ j, transportOf r c i j = r i) ∧ (∀ j, ∑ i, transportOf r c i j = c j) := by
   unfold transportOf
   rw [dif_pos h]
-  exact Classical.choose_spec (exists_transport r c h)
+  exact Classical.choose_spec (Matrix.exists_transport r c h)
 
 end Matrices
 

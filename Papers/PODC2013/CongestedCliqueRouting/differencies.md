@@ -61,7 +61,7 @@ Paper: C. Lenzen, *Optimal Deterministic Routing and Sorting on the Congested Cl
      announce the counts per destination group. Members cannot know their quota before knowing the
      others' counts.
    - The footnote's "deferred completion" of Step 2 is a transportation problem among group members
-     (`exists_transport`, `Setup.q`).
+     (`Matrix.exists_transport`, `Setup.q`).
    - Corollaries 3.3/3.4 are stated for exactly `f|W|` messages but applied to fewer (e.g. the
      `|W|²` helper messages). We prove "at most" versions.
 
