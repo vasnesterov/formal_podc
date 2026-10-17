@@ -1,6 +1,7 @@
 import Mathlib
 import Cslib.Computability.Distributed.SharedMemory.Model
 import Cslib.Computability.Distributed.SharedMemory.Objects.FetchAdd
+import Cslib.Computability.Distributed.SharedMemory.Objects.LLSC
 
 /-!
 # Mutable timestamp systems: specification and base objects
@@ -18,10 +19,9 @@ Synchronization Primitives*, PODC 2023 (full version, University of Calgary repo
   Since CSLib specifications do not see the caller, `updateTS()` of process `p` is the
   operation `upd p`, and `Impl.allowed` lets only `p` invoke it.
 * **Base objects** (Section 3): single-bit registers (CSLib `register Bool false`),
-  LL/SC objects with `LL`, `SC`, `VL` (`llscObj`; one *link* per process and object, a
+  LL/SC objects with `LL`, `SC`, `VL` (CSLib `llscObj`; one *link* per process and object, a
   successful `SC` clears all links — exactly the paper's definition), and a
-  `mod m`-fetch-and-increment object with `read` (`faiObj m`, Section 3; the library's
-  `modFaiObj m`).
+  `mod m`-fetch-and-increment object with `read` (Section 3; the library's `modFaiObj m`).
 -/
 
 set_option linter.unusedSectionVars false
@@ -63,33 +63,6 @@ abbrev mtsObj (n : ℕ) : ObjSpec where
   δ s
     | .upd p => (s.erase p ++ [p], none)
     | .ie x y => (s, some (before s x y))
-
-/-! ## Base objects -/
-
-/-- Operations of an LL/SC object; the argument `k` is the calling process (its link). -/
-inductive LLOp (V K : Type) where
-  | ll (k : K)
-  | sc (k : K) (v : V)
-  | vl (k : K)
-
-/-- An LL/SC object with values `V` and link owners `K`. The state is the value together
-with the list of owners of valid links. `LL` returns the value and creates a link; `SC(v)`
-succeeds iff the caller has a valid link, in which case it writes `v` and invalidates all
-links; `VL` reports whether the caller's link is valid. The response is the current value
-together with a success bit. -/
-abbrev llscObj (V K : Type) [DecidableEq K] (v₀ : V) : ObjSpec where
-  State := V × List K
-  Op := LLOp V K
-  Resp := V × Bool
-  init := (v₀, [])
-  δ s
-    | .ll k => ((s.1, if k ∈ s.2 then s.2 else k :: s.2), (s.1, true))
-    | .sc k v => if k ∈ s.2 then ((v, []), (s.1, true)) else (s, (s.1, false))
-    | .vl k => (s, (s.1, decide (k ∈ s.2)))
-
-/-- A `mod m`-fetch-and-increment object with `read` (Section 3): the library's `modFaiObj m`
-(`fai` sets the value `s` to `(s + 1) % m`; both operations return the old value). -/
-abbrev faiObj (m : ℕ) : ObjSpec := modFaiObj m
 
 /-! ## The algorithm's data -/
 
@@ -139,6 +112,6 @@ abbrev Base (n : ℕ) [NeZero n] : Obj n → ObjSpec
   | .A _ => register Bool false
   | .TS _ => llscObj TSVal (Fin n) tsInit
   | .LT _ => llscObj (LTVal n) (Fin n) ⟨0, 0, some true⟩
-  | .ctr => faiObj (3 * delta n)
+  | .ctr => modFaiObj (3 * delta n)
 
 end Cslib.SharedMemory.BoundedTS

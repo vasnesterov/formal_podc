@@ -186,14 +186,6 @@ lemma bInv_init : BInv (k := k) ([] : List (Label P (laObj P))) (alg1 k).initCfg
   resp q o ho := by simp at ho
 
 
-lemma opsOf_snoc (α : List (Label P (laObj P))) (ℓ : Label P (laObj P)) (x : P) :
-    opsOf (α ++ [ℓ]) x = opsOf α x ++ (ℓ.invOf x).toList := by
-  rw [opsOf_append, opsOf_cons, opsOf_nil, List.append_nil]
-
-lemma respsOf_snoc (α : List (Label P (laObj P))) (ℓ : Label P (laObj P)) (x : P) :
-    respsOf (α ++ [ℓ]) x = respsOf α x ++ (ℓ.retOf x).toList := by
-  rw [respsOf_append, respsOf_cons, respsOf_nil, List.append_nil]
-
 lemma BInv.inv {α : List (Label P (laObj P))} {C C' : Cfg P k} {p : P} {o : Unit}
     (hI : BInv α C) (h : (alg1 k).step C (.inv p o) = some C') :
     BInv (α ++ [.inv p o]) C' := by
@@ -214,7 +206,7 @@ lemma BInv.inv {α : List (Label P (laObj P))} {C C' : Cfg P k} {p : P} {o : Uni
   · intro q
     by_cases hq : q = p
     · subst hq; simp only [hph, false_iff]; exact hp
-    · rw [hlq q hq, hI.idle_iff q, opsOf_snoc]; simp [Label.invOf, Ne.symm hq]
+    · rw [hlq q hq, hI.idle_iff q, opsOf_concat]; simp [Label.invOf, Ne.symm hq]
   · intro q hq'
     by_cases hq : q = p
     · subst hq; exact absurd hq' hph
@@ -254,7 +246,7 @@ lemma BInv.inv {α : List (Label P (laObj P))} {C C' : Cfg P k} {p : P} {o : Uni
     · rw [hlq q hq] at hq' ⊢; exact hI.out_eq q hq'
   · intro q o' ho'
     have hr : respsOf (α ++ [.inv p o]) q = respsOf α q := by
-      rw [respsOf_snoc]; exact List.append_nil _
+      rw [respsOf_concat]; exact List.append_nil _
     rw [hr] at ho'
     obtain ⟨hd, he⟩ := hI.resp q o' ho'
     by_cases hq : q = p
@@ -267,7 +259,7 @@ lemma BInv.ret {α : List (Label P (laObj P))} {C C' : Cfg P k} {p : P} {o : Fin
     BInv (α ++ [.ret p o]) C' := by
   obtain ⟨h1, h2, h3, h4, h5⟩ := step_ret_alg1 h
   have hops : ∀ x, opsOf (α ++ [.ret p o]) x = opsOf α x := fun x => by
-    rw [opsOf_snoc]; exact List.append_nil _
+    rw [opsOf_concat]; exact List.append_nil _
   have hdone : (C.loc p).phase = .done ∧ o = (C.loc p).out := by
     rcases h5 with h5 | h5
     · exact h5
@@ -288,7 +280,7 @@ lemma BInv.ret {α : List (Label P (laObj P))} {C C' : Cfg P k} {p : P} {o : Fin
   · intro q; rw [h4]; exact hI.out_eq q
   · intro q o' ho'
     rw [h4]
-    rw [respsOf_snoc, List.mem_append] at ho'
+    rw [respsOf_concat, List.mem_append] at ho'
     rcases ho' with ho' | ho'
     · exact hI.resp q o' ho'
     · by_cases hqp : q = p
@@ -312,9 +304,9 @@ lemma BInv.tau_gen {α : List (Label P (laObj P))} {C C' : Cfg P k} {p : P} {l' 
     (hfmem : ∀ r, Fresh C' (C'.mem r)) :
     BInv (α ++ [.tau p]) C' := by
   have hops : ∀ x, opsOf (α ++ [.tau p]) x = opsOf α x := fun x => by
-    rw [opsOf_snoc]; exact List.append_nil _
+    rw [opsOf_concat]; exact List.append_nil _
   have hresps : ∀ x, respsOf (α ++ [.tau p]) x = respsOf α x := fun x => by
-    rw [respsOf_snoc]; exact List.append_nil _
+    rw [respsOf_concat]; exact List.append_nil _
   have hlq : ∀ q, q ≠ p → C'.loc q = C.loc q := fun q hq => by rw [hloc]; simp [hq]
   have hlp : C'.loc p = l' := by rw [hloc]; simp
   have hsq : ∀ w, (C.loc w).seq ≤ (C'.loc w).seq := by

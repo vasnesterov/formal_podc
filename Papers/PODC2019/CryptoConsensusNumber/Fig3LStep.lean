@@ -18,10 +18,10 @@ variable {n : ℕ} {Acct : Type} [DecidableEq Acct] {μ : Acct → Finset (Fin n
   {L : LinL n Acct} {q : Fin n}
 
 /-- Real-time precedence towards an already invoked operation is not created by new labels. -/
-lemma not_precedes_append {β : Hst μ q₀} {S : LinL n Acct} {x : OpId (Fin n)}
+lemma not_precedes_append_all {β : Hst μ q₀} {S : LinL n Acct} {x : OpId (Fin n)}
     (hx : Invoked α x) (h : ∀ y ∈ S, ¬ Precedes α y.1 x) :
     ∀ y ∈ S, ¬ Precedes (α ++ β) y.1 x :=
-  fun y hy hp => h y hy (hp.of_append_of_invoked hx)
+  fun y hy => not_precedes_append hx (h y hy)
 
 /-- A proposal's tuple is a created tuple. -/
 lemma MInv.prop_K (hM : MInv μ C K) {q : Fin n} {tx t : Tx n Acct} {c : Finset (Tx n Acct)}
@@ -41,7 +41,7 @@ lemma LInv.tau_same (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K) (q : Fin
         ∀ y ∈ S₂, ¬ Precedes (α ++ [.tau q]) y.1 (t.p, gid t))) :
     LInv μ q₀ (α ++ [.tau q]) ({ C with loc := Function.update C.loc q l', mem := m' } :
       Cfg μ q₀ k) K gid L where
-  opK t ht := by rw [opOf_append_noinv (by simp)]; exact hL.opK t ht
+  opK t ht := by rw [opOf_append_tau]; exact hL.opK t ht
   inj := hL.inj
   gidLe t ht := by
     simp only [respsOf_append_tau]
@@ -62,7 +62,7 @@ lemma LInv.tau_same (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K) (q : Fin
   lin := hL.lin.append_tau q
   bal := by rw [hU]; exact hL.bal
   memL y hy := by
-    rw [opOf_append_noinv (by simp), hU]; simp only [hDec]; exact hL.memL y hy
+    rw [opOf_append_tau, hU]; simp only [hDec]; exact hL.memL y hy
   respS t ht hu := hL.respS t ht (by rwa [hU] at hu)
   respF t ht r hr := hL.respF t ht r (by rwa [hDec] at hr)
   retR q' r h := by
@@ -87,7 +87,7 @@ lemma LInv.tau_same (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K) (q : Fin
       obtain ⟨h1, h2⟩ := hL.propI q' tx c t res h hd
       refine ⟨h1, fun hr => ?_⟩
       obtain ⟨S₁, S₂, h3, h4, h5⟩ := h2 hr
-      exact ⟨S₁, S₂, h3, h4, not_precedes_append
+      exact ⟨S₁, S₂, h3, h4, not_precedes_append_all
         (Invoked.of_opOf_eq_some (hL.opK t (hM.prop_K h))) h5⟩
 
 /-! ## Invocations -/
@@ -108,7 +108,7 @@ lemma LInv.step_inv_read (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
     LInv μ q₀ (α ++ [.inv q (ATOp.read a)]) ({ C with
       pend := Function.update C.pend q (some (ATOp.read a))
       loc := Function.update C.loc q { C.loc q with pc := .rscan a } } : Cfg μ q₀ k) K gid L where
-  opK t ht := opOf_append_of_some _ (hL.opK t ht)
+  opK t ht := opOf_append_of_eq_some (hL.opK t ht) _
   inj := hL.inj
   gidLe t ht := by
     simp only [respsOf_append_inv]
@@ -135,7 +135,7 @@ lemma LInv.step_inv_read (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
     by_cases hq : q' = q
     · subst hq
       intro hm
-      exact not_invoked_cur_of_idle (idle_counts_of_run hrun h0) (hL.lin.mem_invoked hm)
+      exact Impl.not_invoked_curOp_of_idle hrun h0 (hL.lin.mem_invoked hm)
     · simp only [Function.update_of_ne hq] at h; exact hL.rscan q' a' h
   decP := hL.decP
   propI q' tx c t res h hd := by
@@ -145,7 +145,7 @@ lemma LInv.step_inv_read (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
       obtain ⟨h1, h2⟩ := hL.propI q' tx c t res h hd
       refine ⟨h1, fun hr => ?_⟩
       obtain ⟨S₁, S₂, h3, h4, h5⟩ := h2 hr
-      exact ⟨S₁, S₂, h3, h4, not_precedes_append
+      exact ⟨S₁, S₂, h3, h4, not_precedes_append_all
         (Invoked.of_opOf_eq_some (hL.opK t (hM.prop_K h))) h5⟩
 
 lemma LInv.step_inv_nonowner (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
@@ -155,8 +155,8 @@ lemma LInv.step_inv_nonowner (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
       pend := Function.update C.pend q (some (ATOp.transfer q a b x))
       loc := Function.update C.loc q { C.loc q with pc := .ret (.inl false) } } : Cfg μ q₀ k) K gid
       (L ++ [((q, (respsOf α q).length), ATOp.transfer q a b x)]) := by
-  have hcnt := idle_counts_of_run hrun h0
-  have hnotinv := not_invoked_cur_of_idle hcnt
+  have hcnt := Impl.run_idle_counts hrun h0
+  have hnotinv := Impl.not_invoked_curOp_of_idle hrun h0
   have hnotL : (q, (respsOf α q).length) ∉ L.map Prod.fst :=
     fun hm => hnotinv (hL.lin.mem_invoked hm)
   have hop : opOf (α ++ [.inv q (ATOp.transfer q a b x)]) (q, (respsOf α q).length) =
@@ -172,7 +172,7 @@ lemma LInv.step_inv_nonowner (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
       lrs (μ := μ) (q₀ := q₀) (L ++ [((q, (respsOf α q).length), ATOp.transfer q a b x)]) y =
         lrs (μ := μ) (q₀ := q₀) L y := ObjSpec.respIn_append_of_mem hy _
   exact {
-    opK := fun t ht => opOf_append_of_some _ (hL.opK t ht)
+    opK := fun t ht => opOf_append_of_eq_some (hL.opK t ht) _
     inj := hL.inj
     gidLe := fun t ht => by
       simp only [respsOf_append_inv]
@@ -224,7 +224,7 @@ lemma LInv.step_inv_nonowner (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
           h4, ?_⟩
         intro y hy
         rcases List.mem_append.1 hy with hy | hy
-        · exact not_precedes_append (Invoked.of_opOf_eq_some (hL.opK t (hM.prop_K h))) h5 y hy
+        · exact not_precedes_append_all (Invoked.of_opOf_eq_some (hL.opK t (hM.prop_K h))) h5 y hy
         · simp only [List.mem_singleton] at hy; subst hy
           intro hp
           exact not_completed_of_eq (α := α ++ [.inv q (ATOp.transfer q a b x)])
@@ -240,7 +240,7 @@ lemma LInv.step_inv_owner (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
       (Function.update gid (newTx (C.loc q) q a b x) (respsOf α q).length) L := by
   set tx := newTx (C.loc q) q a b x with htx
   have hnew : tx ∉ K := hM.newTx_not_mem h0 a b x
-  have hcnt := idle_counts_of_run hrun h0
+  have hcnt := Impl.run_idle_counts hrun h0
   have hgid : ∀ t ∈ K, Function.update gid tx (respsOf α q).length t = gid t := by
     intro t ht; rw [Function.update_of_ne (by rintro rfl; exact hnew ht)]
   have hop : opOf (α ++ [.inv q (ATOp.transfer q a b x)]) (q, (respsOf α q).length) =
@@ -254,7 +254,7 @@ lemma LInv.step_inv_owner (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
     opK := fun t ht => by
       rcases Set.mem_insert_iff.1 ht with rfl | ht
       · rw [Function.update_self]; exact hop
-      · rw [hgid t ht]; exact opOf_append_of_some _ (hL.opK t ht)
+      · rw [hgid t ht]; exact opOf_append_of_eq_some (hL.opK t ht) _
     inj := fun t ht t' ht' h1 h2 => by
       rcases Set.mem_insert_iff.1 ht with rfl | ht <;>
         rcases Set.mem_insert_iff.1 ht' with rfl | ht'
@@ -316,7 +316,7 @@ lemma LInv.step_inv_owner (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
         obtain ⟨S₁, S₂, h3, h4, h5⟩ := h2 hr
         refine ⟨S₁, S₂, h3, h4, ?_⟩
         rw [hgid t htK]
-        exact not_precedes_append (Invoked.of_opOf_eq_some (hL.opK t htK)) h5 }
+        exact not_precedes_append_all (Invoked.of_opOf_eq_some (hL.opK t htK)) h5 }
 
 /-! ## Responses -/
 
@@ -330,7 +330,7 @@ lemma LInv.step_ret (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K) {r : Boo
     intro q'; by_cases h : q' = q
     · subst h; simp [respsOf_append]
     · simp [respsOf_append, h, Ne.symm h]
-  have hnoinv : ∀ x, opOf (α ++ [.ret q r]) x = opOf α x := opOf_append_noinv (by simp)
+  have hnoinv : ∀ x, opOf (α ++ [.ret q r]) x = opOf α x := opOf_append_ret _ _ _
   obtain ⟨L₁, L₂, o, hsplit, hr⟩ := ObjSpec.exists_split_of_respIn_eq_some (hL.retR q r hpc)
   exact {
     opK := fun t ht => by rw [hnoinv]; exact hL.opK t ht
@@ -365,7 +365,7 @@ lemma LInv.step_ret (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K) {r : Boo
         obtain ⟨h1, h2⟩ := hL.propI q' tx' c t res h hd
         refine ⟨h1, fun hr => ?_⟩
         obtain ⟨S₁, S₂, h3, h4, h5⟩ := h2 hr
-        exact ⟨S₁, S₂, h3, h4, not_precedes_append
+        exact ⟨S₁, S₂, h3, h4, not_precedes_append_all
           (Invoked.of_opOf_eq_some (hL.opK t (hM.prop_K h))) h5⟩ }
 
 /-! ## Reads -/
@@ -384,9 +384,9 @@ lemma LInv.step_rscan (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
         { C.loc q with pc := .ret (.inr (balance q₀ a (AS C.mem))) } } : Cfg μ q₀ k) K gid
       (L ++ [((q, (respsOf α q).length), ATOp.read a)]) := by
   have hpend := (hM.proc q).pendR a hpc
-  have hop0 := cur_op_of_run hrun hpend
+  have hop0 := (Impl.run_pend_curOp hrun hpend).2.2
   have hop : opOf (α ++ [.tau q]) (q, (respsOf α q).length) = some (ATOp.read a) :=
-    opOf_append_of_some _ hop0
+    opOf_append_of_eq_some hop0 _
   have hnotL := hL.rscan q a hpc
   have hδ : (AT μ q₀).δ (lst (μ := μ) (q₀ := q₀) L) (ATOp.read a) =
       (lst (μ := μ) (q₀ := q₀) L, .inr (lst (μ := μ) (q₀ := q₀) L a)) := rfl
@@ -397,7 +397,7 @@ lemma LInv.step_rscan (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
       lrs (μ := μ) (q₀ := q₀) (L ++ [((q, (respsOf α q).length), ATOp.read a)]) y =
         lrs (μ := μ) (q₀ := q₀) L y := ObjSpec.respIn_append_of_mem hy _
   exact {
-    opK := fun t ht => opOf_append_of_some _ (hL.opK t ht)
+    opK := fun t ht => opOf_append_of_eq_some (hL.opK t ht) _
     inj := hL.inj
     gidLe := fun t ht => by
       simp only [respsOf_append_tau]
@@ -451,7 +451,7 @@ lemma LInv.step_rscan (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
           h4, ?_⟩
         intro y hy
         rcases List.mem_append.1 hy with hy | hy
-        · exact not_precedes_append (Invoked.of_opOf_eq_some (hL.opK t (hM.prop_K h))) h5 y hy
+        · exact not_precedes_append_all (Invoked.of_opOf_eq_some (hL.opK t (hM.prop_K h))) h5 y hy
         · simp only [List.mem_singleton] at hy; subst hy
           intro hp
           exact not_completed_of_eq (α := α ++ [.tau q]) (by simp) hp.completed }

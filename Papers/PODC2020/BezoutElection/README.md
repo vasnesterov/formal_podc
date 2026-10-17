@@ -101,7 +101,9 @@ fairness, prefixes of infinite executions and pending/return lemmas come from
 `InfExec.exists_ret_between`; `InfExec.exists_act_of_pending`, `InfExec.false_of_descent` staged in
 `Podc/Computability/Distributed/SharedMemory/Progress.lean`), eventual-stabilization lemmas from
 `Cslib/Foundations/Data/Nat/Descent.lean` and `Podc/Foundations/Data/Nat/Descent.lean`, and the
-election object is the interface-only object `ObjSpec.iface Unit R`.
+election object is the interface-only object `ObjSpec.iface Unit R`. Outputs of extended executions:
+`outputs_append`, `outputs_concat`, `outputs_ne_none_of_mem` (staged in
+`Podc/Computability/Distributed/SharedMemory/Task.lean`).
 
-**CSLib candidates.** `Exec.lean` (outputs of executions), the generic one-shot progress
+**CSLib candidates.** The generic one-shot progress
 definitions in `Defs.lean`, and the lock-step execution of all groups in `LockStepExec.lean`.

@@ -1,4 +1,5 @@
 import Papers.PODC2024.HistoryIndependent.UniversalWF
+import Podc.Computability.Distributed.SharedMemory.Model
 
 /-!
 # Theorem 32: Algorithm 5 over Algorithm 6, flattened
@@ -567,10 +568,7 @@ theorem flat_invL {α : List (Label (Fin n) A)} {C : Config A (BF A n) (Fin n) (
     exact hI.invStep (flat_inv h)
   | ret p r =>
     rw [show contribFl α (.ret p r) = [] by simp [contribFl], append_nil]
-    refine hI.retStep (fun hp => ?_) (flat_ret h)
-    rcases (flat A n).run_counts hα p with ⟨h1, -⟩ | ⟨-, h2⟩
-    · exact absurd h1 hp
-    · exact h2
+    exact hI.retStep (fun hp => Impl.run_pend_counts hα hp) (flat_ret h)
 
 /-! ## Linearizability and state-quiescent history independence (Theorem 32) -/
 

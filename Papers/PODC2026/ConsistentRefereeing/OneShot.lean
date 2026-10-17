@@ -4,6 +4,8 @@ import Cslib.Computability.Distributed.SharedMemory.SWSRRegister
 import Cslib.Computability.Distributed.SharedMemory.Mutex
 import Cslib.Computability.Distributed.SharedMemory.Solo
 import Cslib.Computability.Distributed.SharedMemory.Task
+import Podc.Computability.Distributed.SharedMemory.History
+import Podc.Computability.Distributed.SharedMemory.Model
 import Cslib.Foundations.Data.Nat.Descent
 import Mathlib.Algebra.BigOperators.Group.Finset.Piecewise
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
@@ -331,17 +333,6 @@ lemma nxt_proc {α : List (Label P (contestObj P))} {C : Config (contestObj P) B
   · cases h; rfl
   · cases h; exact I.nextLabel_proc C p
 
-lemma opsOf_ne_nil_of_pend {α : List (Label P (contestObj P))} {C : Config (contestObj P) B P L}
-    (hC : I.run α = some C) {p : P} (hp : C.pend p ≠ none) : opsOf α p ≠ [] := by
-  intro h; exact hp (pend_none_of_opsOf_nil hC h)
-
-lemma respsOf_ne_nil_of_done {α : List (Label P (contestObj P))} {C : Config (contestObj P) B P L}
-    (hC : I.run α = some C) {p : P} (hp : C.pend p = none) (hops : opsOf α p ≠ []) :
-    respsOf α p ≠ [] := by
-  rcases I.run_counts hC p with ⟨-, h⟩ | ⟨h, -⟩
-  · intro hr; rw [hr] at h; exact hops (List.eq_nil_of_length_eq_zero (by simpa using h))
-  · exact absurd hp h
-
 /-- In admissible executions, every label is the next label of its process. -/
 lemma nxt_eq {α : List (Label P (contestObj P))} {C C' : Config (contestObj P) B P L}
     (hC : I.run α = some C) {ℓ : Label P (contestObj P)} (hA : Adm ref (α ++ [ℓ]))
@@ -356,11 +347,11 @@ lemma nxt_eq {α : List (Label P (contestObj P))} {C C' : Config (contestObj P) 
     simp [nxt, Label.proc, h3, h2]
   | tau p =>
     obtain ⟨h1, -, i, o, k, hact, -⟩ := step_tau hs
-    simp only [nxt, Label.proc, opsOf_ne_nil_of_pend I hC h1, h1, ite_false]
+    simp only [nxt, Label.proc, Impl.opsOf_ne_nil_of_pend hC h1, h1, ite_false]
     simp [nextLabel, hact]
   | ret p r =>
     obtain ⟨h1, -, -, l, hact, -⟩ := step_ret hs
-    simp only [nxt, Label.proc, opsOf_ne_nil_of_pend I hC h1, h1, ite_false]
+    simp only [nxt, Label.proc, Impl.opsOf_ne_nil_of_pend hC h1, h1, ite_false]
     simp [nextLabel, hact]
 
 /-- Next labels are enabled and keep executions admissible (for the referee: once some
@@ -440,9 +431,9 @@ theorem exists_common (hlf : I.LockFreeOn (Adm ref)) (hsl : I.StrongLinOn (Adm r
     fun α' q => by simp [opsOf_append, hβops q]
   have hD₂k : D₂.pend k = none := by rw [← hagD.pend k (by simp)]; exact hD₁k
   have hcomp₁ : respsOf (α₁ ++ β) k ≠ [] :=
-    respsOf_ne_nil_of_done I hr₁ hD₁k (by rw [hopsβ]; exact hk₁)
+    Impl.respsOf_ne_nil_of_idle hr₁ hD₁k (by rw [hopsβ]; exact hk₁)
   have hcomp₂ : respsOf (α₂ ++ β) k ≠ [] :=
-    respsOf_ne_nil_of_done I hr₂ hD₂k (by rw [hopsβ]; exact hk₂)
+    Impl.respsOf_ne_nil_of_idle hr₂ hD₂k (by rw [hopsβ]; exact hk₂)
   -- the referee invokes `decide`
   have hrr : roleOp ref ref = (.decide : ContestOp P) := by simp [roleOp]
   have hnx : nxt I ref (α₁ ++ β) D₁ ref = some (.inv ref .decide) := by
@@ -479,7 +470,7 @@ theorem exists_common (hlf : I.LockFreeOn (Adm ref)) (hsl : I.StrongLinOn (Adm r
   have hres₁ := hresps α₁ (respsOf_eq_nil_of_opsOf I h₁ href₁)
   have hres₂ := hresps α₂ (respsOf_eq_nil_of_opsOf I h₂ href₂)
   have hops₁ : opsOf (α₁ ++ δ) ref ≠ [] := by simp [hδ, opsOf_append]
-  have hdone := respsOf_ne_nil_of_done I hrF₁ hF₁r hops₁
+  have hdone := Impl.respsOf_ne_nil_of_idle hrF₁ hF₁r hops₁
   obtain ⟨r, hr⟩ : ∃ r, respOf (α₁ ++ δ) (ref, 0) = some r := by
     simp only [respOf]
     exact ⟨_, List.getElem?_eq_getElem (List.length_pos_of_ne_nil hdone)⟩
@@ -549,29 +540,9 @@ theorem mem_val_nil (hlf : I.LockFreeOn (Adm ref)) (hsl : I.StrongLinOn (Adm ref
 
 /-! ## Counting invocations -/
 
-/-- Number of invocations in an execution. -/
-def invCount (α : List (Label P (contestObj P))) : ℕ :=
-  (α.filter (fun ℓ => match ℓ with | .inv _ _ => true | _ => false)).length
-
-lemma invCount_eq_sum [Fintype P] (α : List (Label P (contestObj P))) :
-    invCount α = ∑ p, (opsOf α p).length := by
-  induction α with
-  | nil => simp [invCount]
-  | cons ℓ α ih =>
-    simp only [invCount] at ih ⊢
-    simp only [opsOf_cons, List.length_append, Finset.sum_add_distrib, ← ih]
-    cases ℓ with
-    | inv q o =>
-      simp only [List.filter_cons, Label.invOf_inv, ite_true, List.length_cons]
-      rw [Finset.sum_congr rfl (fun p _ => show ((if q = p then some o else none).toList).length =
-        if q = p then 1 else 0 by split_ifs <;> rfl), Finset.sum_ite_eq]
-      simp; omega
-    | ret q r => simp
-    | tau q => simp
-
-lemma Adm.invCount_le [Fintype P] {α : List (Label P (contestObj P))} (hA : Adm ref α) :
-    invCount α ≤ Fintype.card P := by
-  rw [invCount_eq_sum]
+lemma Adm.numInv_le [Fintype P] {α : List (Label P (contestObj P))} (hA : Adm ref α) :
+    numInv α ≤ Fintype.card P := by
+  rw [numInv_eq_sum]
   calc ∑ p, (opsOf α p).length ≤ ∑ _p : P, 1 := Finset.sum_le_sum fun p _ => hA.oneShot p
     _ = Fintype.card P := by simp
 
@@ -626,18 +597,17 @@ theorem exists_critical [Fintype P] (hlf : I.LockFreeOn (Adm ref)) (hsl : I.Stro
       | inv q o => exact ⟨q, o, rfl⟩
       | ret q r => exact absurd (by rw [h]; trivial) (hno m hm)
       | tau q => exact absurd (by rw [h]; trivial) (hno m hm)
-    have hgrow : ∀ K, invCount (e.pre N) + K ≤ invCount (e.pre (N + K)) := by
+    have hgrow : ∀ K, numInv (e.pre N) + K ≤ numInv (e.pre (N + K)) := by
       intro K; induction K with
       | zero => simp
       | succ K ih =>
-        show invCount (e.pre N) + (K + 1) ≤ invCount (e.pre ((N + K) + 1))
+        show numInv (e.pre N) + (K + 1) ≤ numInv (e.pre ((N + K) + 1))
         rw [InfExec.pre_succ]
         obtain ⟨q, o, hq⟩ := hinv (N + K) (by omega)
-        simp only [invCount, List.filter_append, List.length_append, hq] at ih ⊢
-        simp only [List.filter_cons, List.filter_nil, ite_true, List.length_singleton]
+        simp only [numInv_append, hq, numInv_cons, numInv_nil, Label.isInv_inv, ite_true] at ih ⊢
         omega
     have := hgrow (Fintype.card P + 1)
-    have hle := (hadm (N + (Fintype.card P + 1))).invCount_le ref
+    have hle := (hadm (N + (Fintype.card P + 1))).numInv_le ref
     omega
   obtain ⟨m, -, q, r, hr⟩ := hlf e hadm hsteps 0
   -- the response belongs to a competitor and makes the execution univalent

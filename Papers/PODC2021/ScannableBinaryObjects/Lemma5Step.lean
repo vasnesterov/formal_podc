@@ -204,13 +204,13 @@ theorem lemma5_step {ε X A F k'} (hS : Stage I p₀ ε X A F k') {j : ℕ} (hj1
       hd1
     have hresps : respsOf γ s = [.view (vec k' j)] := by
       rw [← respsOf_filter_proc, hfilt, hd5]
-    have hcnt := resps_eq_ops_of_idle hE (hR.idle s hsA)
+    have hcnt := (Impl.run_idle_counts hE (hR.idle s hsA)).symm
     have hv : I.Valid (E ++ γ) := ⟨G, (I.run_append_of_eq hE _).trans hγ⟩
     have hsu : SUExec p₀ (E ++ γ) := suExec_append.2 ⟨hsuE, hγL.su⟩
     have hrespOf : respOf (E ++ γ) (s, (opsOf E s).length) = some (.view (vec k' j)) := by
       simp [respOf, respsOf_append, hresps, ← hcnt]
     obtain ⟨i, hi1, hi2, hri⟩ := scan_resp hlin hv hsu hs0 (by simp [Invoked]) hrespOf
-    rw [resps_eq_ops_of_idle hE (hR.idle _ hR.p0)] at hi1
+    rw [(Impl.run_idle_counts hE (hR.idle _ hR.p0)).symm] at hi1
     apply hγA i hi1 hi2
     simp only [ScanResp.view.injEq] at hri
     rw [← hri]; exact vec_mem_Vset_succ k' j

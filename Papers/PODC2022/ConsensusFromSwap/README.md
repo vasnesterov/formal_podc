@@ -94,8 +94,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
   * Theorems 18 and 22 lose nothing: the paper states them for obstruction-free algorithms too, and extends them
     to other algorithms only through cited results.
 * Object types:
-  * Section 4: any objects all of whose operations are nontrivial historyless (`OnlyOverwrites`), in particular
-    swap objects (`swapObj`). This covers the paper's remark on historyless objects without trivial operations.
+  * Section 4: any objects all of whose operations are nontrivial historyless
+    (`ObjSpec.OverwritesState`, CSLib), in particular swap objects (`swapObj`). This covers the paper's remark on historyless objects without trivial operations.
   * Section 5: readable swap objects `rswapObj D` with one value set `D`, `|D| = b` (the paper's "WLOG").
   * Initial values are arbitrary.
 * Lemmas 13 and 14 are proved for arbitrary objects. A covering process must be poised on an operation that

@@ -1,4 +1,5 @@
 import Papers.PODC2024.HistoryIndependent.Perfect
+import Podc.Computability.Distributed.SharedMemory.Model
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
 import Cslib.Computability.Distributed.SharedMemory.Model
 import Mathlib
@@ -60,10 +61,7 @@ theorem inv_of_run {α : List (Label Unit A)}
   | inv p o =>
     cases p
     obtain ⟨h0, -, hpend, hloc, -⟩ := Impl.step_inv h
-    have hlen : (opsOf α ()).length = (respsOf α ()).length := by
-      rcases (localImpl A r₀).run_counts hα () with ⟨-, h1⟩ | ⟨h1, -⟩
-      · exact h1
-      · exact absurd h0 h1
+    have hlen : (opsOf α ()).length = (respsOf α ()).length := Impl.run_idle_counts hα h0
     refine ⟨L, ⟨hI.lin.append_inv () o, ?_, ?_, fun _ hm => ?_⟩⟩
     · rw [hloc]; simp [localImpl, hI.st]
     · rw [hloc, hpend]; simp [localImpl]

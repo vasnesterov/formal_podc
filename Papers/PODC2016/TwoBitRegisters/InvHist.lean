@@ -1,5 +1,6 @@
 import Papers.PODC2016.TwoBitRegisters.InvRead
 import Cslib.Computability.Distributed.SharedMemory.History
+import Podc.Computability.Distributed.SharedMemory.History
 import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
@@ -165,13 +166,6 @@ section HistoryLemmas
 
 variable {A : ObjSpec}
 
-lemma completed_append_of_not_ret {h : List (Label P A)} {ℓ : Label P A}
-    (hℓ : ∀ p r, ℓ ≠ .ret p r) (x : OpId P) : Completed (h ++ [ℓ]) x ↔ Completed h x := by
-  cases ℓ with
-  | ret p r => exact absurd rfl (hℓ p r)
-  | inv p o => simp [Completed]
-  | tau p => simp [Completed]
-
 /-- A pending operation is the current one and has been invoked. -/
 lemma invoked_curOp_of_pending {h : List (Label P A)} {i : P}
     (hc : (opsOf h i).length = (respsOf h i).length + 1) : Invoked h (curOp h i) := by
@@ -181,28 +175,6 @@ lemma req_append_iff {w : P} {h β : List (Label P A)} {rf : OpId P → ℕ} {i 
     (hinv : Invoked h (curOp h i)) (hcur : curOp (h ++ β) i = curOp h i) :
     Req w (h ++ β) rf i m ↔ Req w h rf i m := by
   simp only [Req, hcur, precedes_append_iff_of_invoked hinv]
-
-lemma completed_append_ret {h : List (Label P A)} {p : P} {r : A.Resp} (x : OpId P) :
-    Completed (h ++ [.ret p r]) x ↔ Completed h x ∨ x = (p, (respsOf h p).length) := by
-  obtain ⟨q, k⟩ := x
-  simp only [Completed, respsOf_append, respsOf_cons, Label.retOf_ret, respsOf_nil,
-    List.append_nil, List.length_append, Prod.mk.injEq]
-  by_cases hq : p = q
-  · subst hq; simp; omega
-  · simp [hq, Ne.symm hq]
-
-lemma completed_append_ret_of_ne {h : List (Label P A)} {p : P} {r : A.Resp} {x : OpId P}
-    (hx : x.1 ≠ p) : Completed (h ++ [.ret p r]) x ↔ Completed h x := by
-  rw [completed_append_ret]
-  constructor
-  · rintro (h1 | rfl)
-    · exact h1
-    · exact absurd rfl hx
-  · exact Or.inl
-
-lemma respOf_append_ret_of_ne {h : List (Label P A)} {p : P} {r : A.Resp} {x : OpId P}
-    (hx : x.1 ≠ p) : respOf (h ++ [.ret p r]) x = respOf h x := by
-  rw [respOf_append_ret, if_neg (fun he => hx (by rw [he]))]
 
 end HistoryLemmas
 
@@ -251,7 +223,7 @@ lemma of_invoke_write (hH : InvH w Q v₀ C h g) {p : P} {v : V} {l : Loc P V}
     · subst hq; simp
     · simp [hq, Ne.symm hq]
   have hresps : ∀ q, respsOf (h ++ [.inv w (.write v)]) q = respsOf h q := by intro q; simp
-  have hcompl := completed_append_of_not_ret (h := h) (ℓ := .inv w (.write v))
+  have hcompl := completed_append_of_not_ret (α := h) (ℓ := .inv w (.write v))
     (fun _ _ => by simp)
   have hresp : ∀ x, respOf (h ++ [.inv w (.write v)]) x = respOf h x := fun _ =>
     respOf_concat_of_ne (by simp)
@@ -366,7 +338,7 @@ lemma of_invoke_read (hH : InvH w Q v₀ C h g) {p : P} {l : Loc P V}
   have hHw : ∀ k, Hw w C' k = Hw w C k := by intro k; simp [hC', Hw, Ne.symm hpw]
   have hopsw : opsOf (h ++ [.inv p .read]) w = opsOf h w := by simp [hpw]
   have hresps : ∀ q, respsOf (h ++ [.inv p .read]) q = respsOf h q := by intro q; simp
-  have hcompl := completed_append_of_not_ret (h := h) (ℓ := .inv p .read) (fun _ _ => by simp)
+  have hcompl := completed_append_of_not_ret (α := h) (ℓ := .inv p .read) (fun _ _ => by simp)
   have hresp : ∀ x, respOf (h ++ [.inv p .read]) x = respOf h x := fun _ =>
     respOf_concat_of_ne (by simp)
   have hreq : ∀ i, (C.loc i).phase ≠ .idle → ∀ m,

@@ -17,7 +17,7 @@ Algorithm 1 of Ovens (PODC 2022), in the model of `Model.lean`.
 
 namespace ConsensusFromSwap.Alg1
 
-open ConsensusFromSwap
+open ConsensusFromSwap Cslib.SharedMemory
 
 /-- Lap counters. -/
 abbrev Lap (m : ℕ) := Fin m → ℕ

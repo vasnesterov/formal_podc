@@ -1,4 +1,5 @@
 import Papers.PODC2020.BezoutElection.Alg1Step
+import Podc.Computability.Distributed.SharedMemory.Task
 
 /-!
 # Algorithm 1: the safety invariant
@@ -49,29 +50,6 @@ lemma invals_of_update {C C' : Cfg Id R P} {p : P} {s' : St Id}
     by_cases hqp : q = p
     · subst hqp; simp only [Function.update_self] at hq; exact Or.inr (Or.inr hq)
     · rw [Function.update_of_ne hqp] at hq; exact Or.inr (Or.inl ⟨q, hqp, hq⟩)
-
-/-! ### Outputs -/
-
-lemma outputs_append_single (α : List (Label P (elecObj R))) (ℓ : Label P (elecObj R)) (q : P) :
-    outputs (α ++ [ℓ]) q = (outputs α q).or (ℓ.retOf q) := by
-  simp only [outputs, respsOf_append]
-  rw [List.head?_append]
-  congr 1
-  cases h : ℓ.retOf q <;> simp [respsOf, h]
-
-lemma outputs_append_ne_none {α : List (Label P (elecObj R))} (ℓ : Label P (elecObj R)) {q : P}
-    (h : outputs α q ≠ none) : outputs (α ++ [ℓ]) q ≠ none := by
-  rw [outputs_append_single]
-  obtain ⟨r, hr⟩ := Option.ne_none_iff_exists'.1 h
-  simp [hr]
-
-lemma outputs_append_tau (α : List (Label P (elecObj R))) (p q : P) :
-    outputs (α ++ [.tau p]) q = outputs α q := by
-  simp [outputs_append_single]
-
-lemma outputs_append_inv (α : List (Label P (elecObj R))) (p q : P) (o : Unit) :
-    outputs (α ++ [.inv p o]) q = outputs α q := by
-  simp [outputs_append_single]
 
 /-! ### Counting identifiers -/
 
@@ -365,7 +343,7 @@ theorem basic_step {α : List (Label P (elecObj R))} {C C' : Cfg Id R P} {ℓ : 
       · rw [hq' q hqp] at hq; exact hB.fin q hq
   · -- response
     have hret : ∀ q, q ≠ p → outputs (α ++ [.ret p r]) q = outputs α q := by
-      intro q hq; rw [outputs_append_single]; simp [Ne.symm hq]
+      intro q hq; rw [outputs_concat]; simp [Ne.symm hq]
     rcases hcase with ⟨a, hpc, -, hloc⟩ | ⟨hpc, hloc⟩
     · have hp' : C'.loc p = { C.loc p with pc := .fin } := by rw [hloc]; simp
       have hq' : ∀ q, q ≠ p → C'.loc q = C.loc q := fun q hq => by
@@ -405,7 +383,7 @@ theorem basic_step {α : List (Label P (elecObj R))} {C C' : Cfg Id R P} {ℓ : 
         · rw [Function.update_of_ne hqp]; rw [hq' q hqp] at h1 h2; exact hB.busy q h1 h2
       · intro q hq
         by_cases hqp : q = p
-        · subst hqp; rw [outputs_append_single]; simp
+        · subst hqp; rw [outputs_concat]; simp
         · rw [hret q hqp]; rw [hq' q hqp] at hq; exact hB.fin q hq
     · have hfin : (C.loc p).pc = .fin := by
         rcases hpc with h1 | h1
@@ -1051,7 +1029,7 @@ theorem lead_step [Fintype P] (hid : Function.Injective ids) (hn : Fintype.card 
         · subst hqp; exact Or.inr ⟨a, hpc⟩
         · exact Or.inl hw
       · intro q r' h'
-        rw [outputs_append_single] at h'
+        rw [outputs_concat] at h'
         by_cases hqp : q = p
         · subst hqp
           cases ho : outputs α q with
@@ -1068,7 +1046,7 @@ theorem lead_step [Fintype P] (hid : Function.Injective ids) (hn : Fintype.card 
         (fun q => by rw [hloc]) (fun q w h => by rwa [hloc] at h) (fun q a h => by rwa [hloc] at h)
         (fun q h => Or.inl (by rwa [hloc] at h)) ?_
       intro q r' h'
-      rw [outputs_append_single] at h'
+      rw [outputs_concat] at h'
       by_cases hqp : q = p
       · subst hqp
         obtain ⟨r0, hr0⟩ := Option.ne_none_iff_exists'.1 (hB.fin q hfin)

@@ -1,6 +1,8 @@
 import Papers.PODC2016.ConcurrentDSU.Inv
+import Podc.Computability.Distributed.SharedMemory.Model
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
 import Cslib.Computability.Distributed.SharedMemory.Model
+import Podc.Computability.Distributed.SharedMemory.History
 
 /-!
 # Linearizability (Lemma 3.2)
@@ -192,10 +194,6 @@ lemma joinRel_same {m : E → E} {x y : E} (h : same m x y) : joinRel (same m) x
     · exact same_trans h1 (same_trans (same_symm h) h2)
   · intro h1; exact Or.inl h1
 
-lemma not_precedes_append {α β : List (Label P (dsu E))} {a b : OpId P} (hb : Invoked α b)
-    (h : ¬ Precedes α a b) : ¬ Precedes (α ++ β) a b :=
-  fun h' => h (h'.of_append_of_invoked hb)
-
 /-- Per-process part of the linearization invariant. -/
 structure QOK (α : List (Label P (dsu E))) (C : Config (dsu E) (Ptr E) P (Loc E))
     (L : List (OpId P × (dsu E).Op)) (q : P) : Prop where
@@ -312,204 +310,191 @@ lemma linInv_nil : LinInv ([] : List (Label P (dsu E))) (dsuImpl K key P).initCf
 theorem exists_linInv (hkey : Function.Injective key) {α : List (Label P (dsu E))}
     {C : Config (dsu E) (Ptr E) P (Loc E)} (h : (dsuImpl K key P).run α = some C) :
     ∃ L, LinInv α C L := by
-  induction α using List.reverseRecOn generalizing C with
-  | nil =>
-    simp only [Impl.run, Impl.runFrom, Option.some.injEq] at h; subst h
-    exact ⟨[], linInv_nil⟩
-  | append_singleton α ℓ ih =>
-    rw [Impl.run, Impl.runFrom_append] at h
-    cases hα : (dsuImpl K key P).runFrom (dsuImpl K key P).initCfg α with
-    | none => simp [hα] at h
-    | some C₀ =>
-      simp only [hα, Option.bind_some, Impl.runFrom_singleton] at h
-      obtain ⟨L, hL⟩ := ih hα
-      have hI : LInv K key C₀ := linv_of_run hkey hα
-      have hinv : ∀ q, C₀.pend q ≠ none → Invoked α (curOp α q) := by
-        intro q hq
-        obtain ⟨o', ho'⟩ := Option.ne_none_iff_exists'.1 hq
-        exact (Impl.run_pend_curOp hα ho').1
-      have hprec : ∀ (β : List (Label P (dsu E))) q a, Invoked α (curOp α q) →
-          ¬ Precedes α a (curOp α q) → ¬ Precedes (α ++ β) a (curOp α q) :=
-        fun β q a hi hn => not_precedes_append hi hn
-      cases ℓ with
-      | inv p o =>
-        obtain ⟨h0, -, hpend, hloc, hmem⟩ := Impl.step_inv h
-        have hcur : ∀ q, curOp (α ++ [.inv p o]) q = curOp α q := by
-          intro q; simp [curOp, respsOf_append]
-        refine ⟨L, hL.lin.append_inv p o, by rw [hmem]; exact hL.state, fun q => ?_⟩
-        by_cases hq : q = p
+  refine Impl.run_induction (Q := fun α C => ∃ L, LinInv α C L) ⟨[], linInv_nil⟩ ?_ h
+  rintro α C₀ ℓ C hα ⟨L, hL⟩ h
+  have hI : LInv K key C₀ := linv_of_run hkey hα
+  have hinv : ∀ q, C₀.pend q ≠ none → Invoked α (curOp α q) := by
+    intro q hq
+    obtain ⟨o', ho'⟩ := Option.ne_none_iff_exists'.1 hq
+    exact (Impl.run_pend_curOp hα ho').1
+  have hprec : ∀ (β : List (Label P (dsu E))) q a, Invoked α (curOp α q) →
+      ¬ Precedes α a (curOp α q) → ¬ Precedes (α ++ β) a (curOp α q) :=
+    fun β q a hi hn => not_precedes_append hi hn
+  cases ℓ with
+  | inv p o =>
+    obtain ⟨h0, -, hpend, hloc, hmem⟩ := Impl.step_inv h
+    have hcur : ∀ q, curOp (α ++ [.inv p o]) q = curOp α q := by
+      intro q; simp [curOp, respsOf_append]
+    refine ⟨L, hL.lin.append_inv p o, by rw [hmem]; exact hL.state, fun q => ?_⟩
+    by_cases hq : q = p
+    · subst hq
+      have hl : C.loc q = invoke K (C₀.loc q) o := by
+        rw [hloc, Function.update_self]; rfl
+      refine ⟨fun o' r _ hl' => ?_, fun _ _ => ?_, fun x y u v _ hl' => ?_⟩
+      · rw [hl] at hl'; cases o <;> simp [invoke] at hl'
+      · rw [hcur]
+        exact fun hm => Impl.not_invoked_curOp_of_idle hα h0 (hL.lin.mem_invoked hm)
+      · rw [hl] at hl'; cases o <;> simp [invoke] at hl'
+    · exact (hL.qok q).transport (hcur q) (by rw [hpend, Function.update_of_ne hq])
+        (by rw [hloc, Function.update_of_ne hq]) (fun a ha => by rwa [hmem] at ha) (hinv q)
+        (hprec _ q) (transport_same (α' := α ++ [.inv p o])).1
+        (transport_same (α' := α ++ [.inv p o])).2 id
+  | ret p r =>
+    obtain ⟨h0, hpend, hmem, l, hact, hloc⟩ := Impl.step_ret h
+    obtain ⟨o, ho⟩ := Option.ne_none_iff_exists'.1 h0
+    have hact' : act K key (C₀.loc p) = .ret r l := hact
+    have hlp : C₀.loc p = .done r := by
+      rcases act_ret_cases hact' with h1 | h1
+      · exact h1
+      · have := hI.loc p; rw [ho, h1] at this; exact this.elim
+    obtain ⟨L₁, L₂, hsplit, hr⟩ := (hL.qok p).done o r ho hlp
+    refine ⟨L, hL.lin.append_ret L₁ L₂ o hsplit hr, by rw [hmem]; exact hL.state,
+      fun q => ?_⟩
+    by_cases hq : q = p
+    · subst hq
+      have hpq : C.pend q = none := by rw [hpend, Function.update_self]
+      refine ⟨fun o' r' hp _ => ?_, fun hp _ => absurd hpq hp, fun x y u v hp _ _ => ?_⟩
+      · rw [hpq] at hp; cases hp
+      · rw [hpq] at hp; cases hp
+    · have hcur : curOp (α ++ [.ret p r]) q = curOp α q := by
+        simp [curOp, respsOf_append, Ne.symm hq]
+      exact (hL.qok q).transport hcur (by rw [hpend, Function.update_of_ne hq])
+        (by rw [hloc, Function.update_of_ne hq]) (fun a ha => by rwa [hmem] at ha) (hinv q)
+        (hprec _ q) (transport_same (α' := α ++ [.ret p r])).1
+        (transport_same (α' := α ++ [.ret p r])).2 id
+  | tau p =>
+    obtain ⟨hp, hres, hpend, hother⟩ := step_tau_tauRes h
+    obtain ⟨o, ho⟩ := Option.ne_none_iff_exists'.1 hp
+    have hl := hI.loc p
+    rw [ho] at hl
+    have hleg := (tauRes_spec hkey hI.good hl hres).1
+    have hcur : ∀ q, curOp (α ++ [.tau p]) q = curOp α q := by
+      intro q; simp [curOp, respsOf_append]
+    have hlin' := hL.lin.append_tau p
+    have hcf := Impl.run_pend_curOp hα ho
+    have hnc : ¬ Completed (α ++ [.tau p]) (curOp α p) := by
+      simp [Completed, respsOf_append]
+    have hop' : opOf (α ++ [.tau p]) (curOp α p) = some o := by
+      rw [opOf_append_of_invoked hcf.1]; exact hcf.2.2
+    have hldone : ∀ r, C₀.loc p ≠ .done r := fun r h' => by
+      rw [h'] at hres; simp [tauRes, act] at hres
+    have hnotin := (hL.qok p).notin (by rw [ho]; simp) hldone
+    -- the processes that do not move
+    have others : ∀ (L' : List (OpId P × (dsu E).Op)),
+        (∀ q, q ≠ p → ∀ L₁ L₂ (o : (dsu E).Op), L = L₁ ++ (curOp α q, o) :: L₂ →
+          ∃ L₁' L₂', L' = L₁' ++ (curOp α q, o) :: L₂' ∧ st L₁' = st L₁) →
+        (∀ q, q ≠ p → ∀ S₁ S₂, L = S₁ ++ S₂ → ∃ S₁' S₂', L' = S₁' ++ S₂' ∧ st S₁' = st S₁ ∧
+          ∀ z ∈ S₂', z ∈ S₂ ∨ ¬ Precedes (α ++ [.tau p]) z.1 (curOp α q)) →
+        (∀ y ∈ L'.map Prod.fst, y ∈ L.map Prod.fst ∨ y = curOp α p) →
+        ∀ q, q ≠ p → QOK (α ++ [.tau p]) C L' q := by
+      intro L' hT hS hN q hq
+      refine (hL.qok q).transport (hcur q) (by rw [hpend]) (hother q hq) hleg.root (hinv q)
+        (hprec _ q) (hT q hq) (hS q hq) (fun hn hm => ?_)
+      rcases hN _ hm with h1 | h1
+      · exact hn h1
+      · exact hq (congrArg Prod.fst h1)
+    have hNsame : ∀ y ∈ L.map Prod.fst, y ∈ L.map Prod.fst ∨ y = curOp α p :=
+      fun y hy => Or.inl hy
+    have hNapp : ∀ y ∈ (L ++ [(curOp α p, o)]).map Prod.fst,
+        y ∈ L.map Prod.fst ∨ y = curOp α p := by
+      intro y hy
+      simp only [List.map_append, List.map_cons, List.map_nil, List.mem_append,
+        List.mem_singleton] at hy
+      exact hy
+    rcases tauRes_cases hkey hI.good hl hres with
+      ⟨hrun, hsame⟩ | ⟨u, r, x, y, rfl, hl', hm, hr, hux, hry, hur⟩ | ⟨hl', hm, hxy⟩ |
+      ⟨u, v, x, y, rfl, hlc, hl', hm, hu⟩ | ⟨x, y, rfl, hl', hjoin⟩
+    · -- no linearization point
+      refine ⟨L, hlin', by rw [hL.state, hsame], fun q => ?_⟩
+      by_cases hq : q = p
+      · subst hq
+        refine ⟨fun o' r' _ hl'' => ?_, fun _ _ => by rw [hcur]; exact hnotin,
+          fun x y u v _ hl'' _ => ?_⟩
+        · rw [hl''] at hrun; exact hrun.elim
+        · rw [hl''] at hrun; exact hrun.elim
+      · exact others L (fun q _ => (transport_same (α' := α ++ [.tau p])).1)
+          (fun q _ => (transport_same (α' := α ++ [.tau p])).2) hNsame q hq
+    · -- `SameSet` reaches line 8: record the cut
+      refine ⟨L, hlin', by rw [hL.state, hm], fun q => ?_⟩
+      by_cases hq : q = p
+      · subst hq
+        refine ⟨fun o' r' _ hl'' => ?_, fun _ _ => by rw [hcur]; exact hnotin,
+          fun x' y' u' v' hp' hl'' hu' => ?_⟩
+        · rw [hl''] at hl'; cases hl'
+        · rw [hpend, ho] at hp'
+          simp only [Option.some.injEq, DSUOp.sameSet.injEq] at hp'
+          obtain ⟨rfl, rfl⟩ := hp'
+          rw [hl''] at hl'
+          simp only [Loc.chk.injEq] at hl'
+          obtain ⟨rfl, rfl⟩ := hl'
+          rw [hm] at hu'
+          refine ⟨L, [], by simp, ?_, fun z hz => by simp at hz⟩
+          rw [hL.state]
+          intro hxy
+          unfold same at hxy hux hry
+          rw [rootOf_of_fixed hu'] at hux
+          rw [rootOf_of_fixed hr] at hry
+          exact hur (hux.trans (hxy.trans hry.symm))
+      · exact others L (fun q _ => (transport_same (α' := α ++ [.tau p])).1)
+          (fun q _ => (transport_same (α' := α ++ [.tau p])).2) hNsame q hq
+    · -- linearization point: `u = v` found by the last `Find(v)`
+      refine ⟨L ++ [(curOp α p, o)], hlin'.push hop' hnotin hnc, ?_, fun q => ?_⟩
+      · rw [st_append, hm]
+        cases o with
+        | sameSet x y => exact hL.state
+        | unite x y =>
+          show joinRel (st L) x y = _
+          rw [hL.state]; exact joinRel_same hxy
+      · by_cases hq : q = p
         · subst hq
-          have hl : C.loc q = invoke K (C₀.loc q) o := by
-            rw [hloc, Function.update_self]; rfl
-          refine ⟨fun o' r _ hl' => ?_, fun _ _ => ?_, fun x y u v _ hl' => ?_⟩
-          · rw [hl] at hl'; cases o <;> simp [invoke] at hl'
-          · rw [hcur]
-            intro hm
-            have hi := hL.lin.mem_invoked hm
-            rcases Impl.run_counts _ hα q with ⟨-, h2⟩ | ⟨h1, -⟩
-            · simp [Invoked, h2] at hi
-            · exact h1 h0
-          · rw [hl] at hl'; cases o <;> simp [invoke] at hl'
-        · exact (hL.qok q).transport (hcur q) (by rw [hpend, Function.update_of_ne hq])
-            (by rw [hloc, Function.update_of_ne hq]) (fun a ha => by rwa [hmem] at ha) (hinv q)
-            (hprec _ q) (transport_same (α' := α ++ [.inv p o])).1
-            (transport_same (α' := α ++ [.inv p o])).2 id
-      | ret p r =>
-        obtain ⟨h0, hpend, hmem, l, hact, hloc⟩ := Impl.step_ret h
-        obtain ⟨o, ho⟩ := Option.ne_none_iff_exists'.1 h0
-        have hact' : act K key (C₀.loc p) = .ret r l := hact
-        have hlp : C₀.loc p = .done r := by
-          rcases act_ret_cases hact' with h1 | h1
-          · exact h1
-          · have := hI.loc p; rw [ho, h1] at this; exact this.elim
-        obtain ⟨L₁, L₂, hsplit, hr⟩ := (hL.qok p).done o r ho hlp
-        refine ⟨L, hL.lin.append_ret L₁ L₂ o hsplit hr, by rw [hmem]; exact hL.state,
-          fun q => ?_⟩
-        by_cases hq : q = p
+          refine ⟨fun o' r' hp' hl'' => ?_, fun _ hd => absurd hl' (hd true),
+            fun x y u v _ hl'' _ => by rw [hl''] at hl'; cases hl'⟩
+          rw [hpend, ho] at hp'; cases hp'
+          rw [hl''] at hl'; cases hl'
+          refine ⟨L, [], by rw [hcur], ?_⟩
+          cases o with
+          | sameSet x y =>
+            show @decide (st L x y) (Classical.dec _) = true
+            exact @decide_eq_true _ (Classical.dec _) (by rw [hL.state]; exact hxy)
+          | unite x y => rfl
+        · exact others _ (fun q _ => (transport_append o hnc).1)
+            (fun q _ => (transport_append o hnc).2) hNapp q hq
+    · -- `SameSet` returns `false`: retroactive linearization point
+      obtain ⟨S₁, S₂, hsplit, hst, hpr⟩ := (hL.qok p).chk x y u v ho hlc hu
+      subst hsplit
+      refine ⟨S₁ ++ (curOp α p, .sameSet x y) :: S₂,
+        hlin'.insert hop' hnotin hnc rfl
+          (fun z hz => not_precedes_append hcf.1 (hpr z hz)), ?_, fun q => ?_⟩
+      · rw [st_insert, hL.state, hm]
+      · by_cases hq : q = p
         · subst hq
-          have hpq : C.pend q = none := by rw [hpend, Function.update_self]
-          refine ⟨fun o' r' hp _ => ?_, fun hp _ => absurd hpq hp, fun x y u v hp _ _ => ?_⟩
-          · rw [hpq] at hp; cases hp
-          · rw [hpq] at hp; cases hp
-        · have hcur : curOp (α ++ [.ret p r]) q = curOp α q := by
-            simp [curOp, respsOf_append, Ne.symm hq]
-          exact (hL.qok q).transport hcur (by rw [hpend, Function.update_of_ne hq])
-            (by rw [hloc, Function.update_of_ne hq]) (fun a ha => by rwa [hmem] at ha) (hinv q)
-            (hprec _ q) (transport_same (α' := α ++ [.ret p r])).1
-            (transport_same (α' := α ++ [.ret p r])).2 id
-      | tau p =>
-        obtain ⟨hp, hres, hpend, hother⟩ := step_tau_tauRes h
-        obtain ⟨o, ho⟩ := Option.ne_none_iff_exists'.1 hp
-        have hl := hI.loc p
-        rw [ho] at hl
-        have hleg := (tauRes_spec hkey hI.good hl hres).1
-        have hcur : ∀ q, curOp (α ++ [.tau p]) q = curOp α q := by
-          intro q; simp [curOp, respsOf_append]
-        have hlin' := hL.lin.append_tau p
-        have hcf := Impl.run_pend_curOp hα ho
-        have hnc : ¬ Completed (α ++ [.tau p]) (curOp α p) := by
-          simp [Completed, respsOf_append]
-        have hop' : opOf (α ++ [.tau p]) (curOp α p) = some o := by
-          rw [opOf_append_of_invoked hcf.1]; exact hcf.2.2
-        have hldone : ∀ r, C₀.loc p ≠ .done r := fun r h' => by
-          rw [h'] at hres; simp [tauRes, act] at hres
-        have hnotin := (hL.qok p).notin (by rw [ho]; simp) hldone
-        -- the processes that do not move
-        have others : ∀ (L' : List (OpId P × (dsu E).Op)),
-            (∀ q, q ≠ p → ∀ L₁ L₂ (o : (dsu E).Op), L = L₁ ++ (curOp α q, o) :: L₂ →
-              ∃ L₁' L₂', L' = L₁' ++ (curOp α q, o) :: L₂' ∧ st L₁' = st L₁) →
-            (∀ q, q ≠ p → ∀ S₁ S₂, L = S₁ ++ S₂ → ∃ S₁' S₂', L' = S₁' ++ S₂' ∧ st S₁' = st S₁ ∧
-              ∀ z ∈ S₂', z ∈ S₂ ∨ ¬ Precedes (α ++ [.tau p]) z.1 (curOp α q)) →
-            (∀ y ∈ L'.map Prod.fst, y ∈ L.map Prod.fst ∨ y = curOp α p) →
-            ∀ q, q ≠ p → QOK (α ++ [.tau p]) C L' q := by
-          intro L' hT hS hN q hq
-          refine (hL.qok q).transport (hcur q) (by rw [hpend]) (hother q hq) hleg.root (hinv q)
-            (hprec _ q) (hT q hq) (hS q hq) (fun hn hm => ?_)
-          rcases hN _ hm with h1 | h1
-          · exact hn h1
-          · exact hq (congrArg Prod.fst h1)
-        have hNsame : ∀ y ∈ L.map Prod.fst, y ∈ L.map Prod.fst ∨ y = curOp α p :=
-          fun y hy => Or.inl hy
-        have hNapp : ∀ y ∈ (L ++ [(curOp α p, o)]).map Prod.fst,
-            y ∈ L.map Prod.fst ∨ y = curOp α p := by
-          intro y hy
-          simp only [List.map_append, List.map_cons, List.map_nil, List.mem_append,
-            List.mem_singleton] at hy
-          exact hy
-        rcases tauRes_cases hkey hI.good hl hres with
-          ⟨hrun, hsame⟩ | ⟨u, r, x, y, rfl, hl', hm, hr, hux, hry, hur⟩ | ⟨hl', hm, hxy⟩ |
-          ⟨u, v, x, y, rfl, hlc, hl', hm, hu⟩ | ⟨x, y, rfl, hl', hjoin⟩
-        · -- no linearization point
-          refine ⟨L, hlin', by rw [hL.state, hsame], fun q => ?_⟩
-          by_cases hq : q = p
-          · subst hq
-            refine ⟨fun o' r' _ hl'' => ?_, fun _ _ => by rw [hcur]; exact hnotin,
-              fun x y u v _ hl'' _ => ?_⟩
-            · rw [hl''] at hrun; exact hrun.elim
-            · rw [hl''] at hrun; exact hrun.elim
-          · exact others L (fun q _ => (transport_same (α' := α ++ [.tau p])).1)
-              (fun q _ => (transport_same (α' := α ++ [.tau p])).2) hNsame q hq
-        · -- `SameSet` reaches line 8: record the cut
-          refine ⟨L, hlin', by rw [hL.state, hm], fun q => ?_⟩
-          by_cases hq : q = p
-          · subst hq
-            refine ⟨fun o' r' _ hl'' => ?_, fun _ _ => by rw [hcur]; exact hnotin,
-              fun x' y' u' v' hp' hl'' hu' => ?_⟩
-            · rw [hl''] at hl'; cases hl'
-            · rw [hpend, ho] at hp'
-              simp only [Option.some.injEq, DSUOp.sameSet.injEq] at hp'
-              obtain ⟨rfl, rfl⟩ := hp'
-              rw [hl''] at hl'
-              simp only [Loc.chk.injEq] at hl'
-              obtain ⟨rfl, rfl⟩ := hl'
-              rw [hm] at hu'
-              refine ⟨L, [], by simp, ?_, fun z hz => by simp at hz⟩
-              rw [hL.state]
-              intro hxy
-              unfold same at hxy hux hry
-              rw [rootOf_of_fixed hu'] at hux
-              rw [rootOf_of_fixed hr] at hry
-              exact hur (hux.trans (hxy.trans hry.symm))
-          · exact others L (fun q _ => (transport_same (α' := α ++ [.tau p])).1)
-              (fun q _ => (transport_same (α' := α ++ [.tau p])).2) hNsame q hq
-        · -- linearization point: `u = v` found by the last `Find(v)`
-          refine ⟨L ++ [(curOp α p, o)], hlin'.push hop' hnotin hnc, ?_, fun q => ?_⟩
-          · rw [st_append, hm]
-            cases o with
-            | sameSet x y => exact hL.state
-            | unite x y =>
-              show joinRel (st L) x y = _
-              rw [hL.state]; exact joinRel_same hxy
-          · by_cases hq : q = p
-            · subst hq
-              refine ⟨fun o' r' hp' hl'' => ?_, fun _ hd => absurd hl' (hd true),
-                fun x y u v _ hl'' _ => by rw [hl''] at hl'; cases hl'⟩
-              rw [hpend, ho] at hp'; cases hp'
-              rw [hl''] at hl'; cases hl'
-              refine ⟨L, [], by rw [hcur], ?_⟩
-              cases o with
-              | sameSet x y =>
-                show @decide (st L x y) (Classical.dec _) = true
-                exact @decide_eq_true _ (Classical.dec _) (by rw [hL.state]; exact hxy)
-              | unite x y => rfl
-            · exact others _ (fun q _ => (transport_append o hnc).1)
-                (fun q _ => (transport_append o hnc).2) hNapp q hq
-        · -- `SameSet` returns `false`: retroactive linearization point
-          obtain ⟨S₁, S₂, hsplit, hst, hpr⟩ := (hL.qok p).chk x y u v ho hlc hu
-          subst hsplit
-          refine ⟨S₁ ++ (curOp α p, .sameSet x y) :: S₂,
-            hlin'.insert hop' hnotin hnc rfl
-              (fun z hz => not_precedes_append hcf.1 (hpr z hz)), ?_, fun q => ?_⟩
-          · rw [st_insert, hL.state, hm]
-          · by_cases hq : q = p
-            · subst hq
-              refine ⟨fun o' r' hp' hl'' => ?_, fun _ hd => absurd hl' (hd false),
-                fun x y u v _ hl'' _ => by rw [hl''] at hl'; cases hl'⟩
-              rw [hpend, ho] at hp'; cases hp'
-              rw [hl''] at hl'; cases hl'
-              refine ⟨S₁, S₂, by rw [hcur], ?_⟩
-              show @decide (st S₁ x y) (Classical.dec _) = false
-              exact @decide_eq_false _ (Classical.dec _) hst
-            · refine others _ (fun q _ => (transport_insert x y hnc).1)
-                (fun q _ => (transport_insert x y hnc).2) (fun z hz => ?_) q hq
-              simp only [List.map_append, List.map_cons, List.mem_append, List.mem_cons] at hz ⊢
-              tauto
-        · -- `Unite` links
-          refine ⟨L ++ [(curOp α p, .unite x y)], hlin'.push hop' hnotin hnc, ?_, fun q => ?_⟩
-          · rw [st_append]
-            show joinRel (st L) x y = _
-            rw [hL.state]
-            funext a b
-            exact propext (hjoin a b).symm
-          · by_cases hq : q = p
-            · subst hq
-              refine ⟨fun o' r' hp' hl'' => ?_, fun _ hd => absurd hl' (hd true),
-                fun x y u v _ hl'' _ => by rw [hl''] at hl'; cases hl'⟩
-              rw [hpend, ho] at hp'; cases hp'
-              rw [hl''] at hl'; cases hl'
-              exact ⟨L, [], by rw [hcur], rfl⟩
-            · exact others _ (fun q _ => (transport_append _ hnc).1)
-                (fun q _ => (transport_append _ hnc).2) hNapp q hq
+          refine ⟨fun o' r' hp' hl'' => ?_, fun _ hd => absurd hl' (hd false),
+            fun x y u v _ hl'' _ => by rw [hl''] at hl'; cases hl'⟩
+          rw [hpend, ho] at hp'; cases hp'
+          rw [hl''] at hl'; cases hl'
+          refine ⟨S₁, S₂, by rw [hcur], ?_⟩
+          show @decide (st S₁ x y) (Classical.dec _) = false
+          exact @decide_eq_false _ (Classical.dec _) hst
+        · refine others _ (fun q _ => (transport_insert x y hnc).1)
+            (fun q _ => (transport_insert x y hnc).2) (fun z hz => ?_) q hq
+          simp only [List.map_append, List.map_cons, List.mem_append, List.mem_cons] at hz ⊢
+          tauto
+    · -- `Unite` links
+      refine ⟨L ++ [(curOp α p, .unite x y)], hlin'.push hop' hnotin hnc, ?_, fun q => ?_⟩
+      · rw [st_append]
+        show joinRel (st L) x y = _
+        rw [hL.state]
+        funext a b
+        exact propext (hjoin a b).symm
+      · by_cases hq : q = p
+        · subst hq
+          refine ⟨fun o' r' hp' hl'' => ?_, fun _ hd => absurd hl' (hd true),
+            fun x y u v _ hl'' _ => by rw [hl''] at hl'; cases hl'⟩
+          rw [hpend, ho] at hp'; cases hp'
+          rw [hl''] at hl'; cases hl'
+          exact ⟨L, [], by rw [hcur], rfl⟩
+        · exact others _ (fun q _ => (transport_append _ hnc).1)
+            (fun q _ => (transport_append _ hnc).2) hNapp q hq
 
 /-- **Lemma 3.2 (Linearizability).** The concurrent DSU (Algorithms 2 and 3) is linearizable
 with any of the `Find` versions, for any injective node ids. Moreover, every execution has a

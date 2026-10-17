@@ -19,8 +19,6 @@ set_option linter.unusedSectionVars false
 namespace Cslib.SharedMemory.Timestamp.MaxTS
 
 open Cslib.SharedMemory
-open SimpleTS (precedes_snoc respOf_snoc opOf_snoc precedes_snoc_of_not_ret resps_le_ops
-  opOf_pending)
 
 /-- Program counter (= local state). -/
 inductive PC where
@@ -240,7 +238,7 @@ lemma inv_tau {α : Exec n} (hI : Inv α C) (hs : (alg n).step C (.tau p) = some
     · rw [opOf_concat_of_ne (x := g) (hni g.1)] at h1
       rw [respOf_concat_of_ne (x := g) (hne g.1)] at h2
       rw [respsOf_concat_of_ne (hne q)] at h3
-      have key := hI.lb q g t hq h1 h2 (precedes_snoc_of_not_ret hne h3)
+      have key := hI.lb q g t hq h1 h2 (Precedes.of_concat_of_not_ret hne h3)
       by_cases hqp : q = p
       · subst hqp
         simp only [Function.update_self, LB]
@@ -249,7 +247,7 @@ lemma inv_tau {α : Exec n} (hI : Inv α C) (hs : (alg n).step C (.tau p) = some
       · simpa [Function.update_of_ne hqp] using key
     · rw [opOf_concat_of_ne (x := g₁) (hni g₁.1), opOf_concat_of_ne (x := g₂) (hni g₂.1)] at *
       rw [respOf_concat_of_ne (x := g₁) (hne g₁.1), respOf_concat_of_ne (x := g₂) (hne g₂.1)] at *
-      exact hI.order g₁ g₂ t₁ t₂ h1 h2 h3 h4 (precedes_snoc_of_not_ret hne h5)
+      exact hI.order g₁ g₂ t₁ t₂ h1 h2 h3 h4 (Precedes.of_concat_of_not_ret hne h5)
     · rw [opOf_concat_of_ne (x := g) (hni g.1)] at h1
       rw [respOf_concat_of_ne (x := g) (hne g.1)] at h2
       exact hI.resp g o r h1 h2
@@ -277,7 +275,7 @@ lemma inv_tau {α : Exec n} (hI : Inv α C) (hs : (alg n).step C (.tau p) = some
     · rw [opOf_concat_of_ne (x := g) (hni g.1)] at h1
       rw [respOf_concat_of_ne (x := g) (hne g.1)] at h2
       rw [respsOf_concat_of_ne (hne q)] at h3
-      have key := hI.lb q g t hq h1 h2 (precedes_snoc_of_not_ret hne h3)
+      have key := hI.lb q g t hq h1 h2 (Precedes.of_concat_of_not_ret hne h3)
       by_cases hqp : q = p
       · subst hqp
         simp only [Function.update_self, LB]
@@ -286,7 +284,7 @@ lemma inv_tau {α : Exec n} (hI : Inv α C) (hs : (alg n).step C (.tau p) = some
         exact key.trans_le (LB_mono hmem _)
     · rw [opOf_concat_of_ne (x := g₁) (hni g₁.1), opOf_concat_of_ne (x := g₂) (hni g₂.1)] at *
       rw [respOf_concat_of_ne (x := g₁) (hne g₁.1), respOf_concat_of_ne (x := g₂) (hne g₂.1)] at *
-      exact hI.order g₁ g₂ t₁ t₂ h1 h2 h3 h4 (precedes_snoc_of_not_ret hne h5)
+      exact hI.order g₁ g₂ t₁ t₂ h1 h2 h3 h4 (Precedes.of_concat_of_not_ret hne h5)
     · rw [opOf_concat_of_ne (x := g) (hni g.1)] at h1
       rw [respOf_concat_of_ne (x := g) (hne g.1)] at h2
       exact hI.resp g o r h1 h2
@@ -303,7 +301,7 @@ lemma inv_inv {α : Exec n} {o : TSOp ℕ} (hI : Inv α C) (hrun : (alg n).run �
     intro g r h
     apply opOf_append_of_invoked
     have h1 := Completed.of_respOf_eq_some h
-    have h2 := resps_le_ops hrun g.1
+    have h2 := Impl.run_resps_le_ops hrun g.1
     simp only [Invoked, Completed] at *; omega
   refine ⟨fun q => ?_, fun q i mx h hq => ?_, fun q t h => ?_, fun g t h1 h2 => ?_,
     fun q g t hq h1 h2 h3 => ?_, fun g₁ g₂ t₁ t₂ h1 h2 h3 h4 h5 => ?_, fun g o' r h1 h2 => ?_⟩
@@ -323,7 +321,7 @@ lemma inv_inv {α : Exec n} {o : TSOp ℕ} (hI : Inv α C) (hrun : (alg n).run �
     exact hI.done_le g t h1 h2
   · rw [hresp] at h2; rw [hop g _ h2] at h1
     rw [respsOf_concat_of_ne (hne q)] at h3
-    have h3 := precedes_snoc_of_not_ret hne h3
+    have h3 := Precedes.of_concat_of_not_ret hne h3
     by_cases hqp : q = p
     · subst hqp
       simp only [Function.update_self, Option.some.injEq] at hq
@@ -333,7 +331,7 @@ lemma inv_inv {α : Exec n} {o : TSOp ℕ} (hI : Inv α C) (hrun : (alg n).run �
     · simp only [Function.update_of_ne hqp] at hq ⊢
       exact hI.lb q g t hq h1 h2 h3
   · rw [hresp] at h2 h4; rw [hop _ _ h2] at h1; rw [hop _ _ h4] at h3
-    exact hI.order g₁ g₂ t₁ t₂ h1 h2 h3 h4 (precedes_snoc_of_not_ret hne h5)
+    exact hI.order g₁ g₂ t₁ t₂ h1 h2 h3 h4 (Precedes.of_concat_of_not_ret hne h5)
   · rw [hresp] at h2; rw [hop _ _ h2] at h1
     exact hI.resp g o' r h1 h2
 
@@ -342,7 +340,7 @@ lemma inv_ret {α : Exec n} {r : ℕ ⊕ Bool} (hI : Inv α C) (hrun : (alg n).r
     (hs : (alg n).step C (.ret p r) = some C') : Inv (α ++ [.ret p r]) C' := by
   obtain ⟨h0, l, hact, rfl⟩ := step_ret_eq hs
   obtain ⟨o, ho⟩ := Option.ne_none_iff_exists'.1 h0
-  have hop0 := opOf_pending hrun ho
+  have hop0 := (Impl.run_pend_curOp hrun ho).2.2
   have hni : ∀ q o, (Label.ret p r : Label (Fin n) (tsObj ℕ)) ≠ .inv q o := by simp
   have hopeq : ∀ g, opOf (α ++ [.ret p r]) g = opOf α g :=
     fun g => opOf_concat_of_ne (x := g) (hni g.1)
@@ -360,7 +358,7 @@ lemma inv_ret {α : Exec n} {r : ℕ ⊕ Bool} (hI : Inv α C) (hrun : (alg n).r
   have hnew : ∀ g r', respOf (α ++ [.ret p r]) g = some r' →
       respOf α g = some r' ∨ (g = (p, (respsOf α p).length) ∧ r' = r) := by
     intro g r' h
-    rcases respOf_snoc h with h | ⟨h1, h2⟩
+    rcases respOf_concat_cases h with h | ⟨h1, h2⟩
     · exact Or.inl h
     · simp only [Label.ret.injEq] at h1
       obtain ⟨h1, rfl⟩ := h1
@@ -396,11 +394,11 @@ lemma inv_ret {α : Exec n} {r : ℕ ⊕ Bool} (hI : Inv α C) (hrun : (alg n).r
     simp only [Function.update_of_ne hqp] at hq ⊢
     rw [hopeq] at h1
     rw [respsOf_concat_of_ne (q := q) (by simp [Ne.symm hqp])] at h3
-    rcases precedes_snoc h3 with h3 | ⟨-, h4⟩
+    rcases precedes_concat h3 with h3 | ⟨-, h4⟩
     · exact hI.lb q g t hq h1 (hcompl g _ h2 h3.completed) h3
-    · exact absurd (Invoked.of_opOf_eq_some (opOf_pending hrun hq)).mono h4
+    · exact absurd (Invoked.of_opOf_eq_some ((Impl.run_pend_curOp hrun hq).2.2)).mono h4
   · rw [hopeq] at h1 h3
-    rcases precedes_snoc h5 with h5 | ⟨-, h6⟩
+    rcases precedes_concat h5 with h5 | ⟨-, h6⟩
     · have h2' := hcompl g₁ _ h2 h5.completed
       rcases hnew g₂ _ h4 with h4 | ⟨rfl, hr⟩
       · exact hI.order g₁ g₂ t₁ t₂ h1 h2' h3 h4 h5

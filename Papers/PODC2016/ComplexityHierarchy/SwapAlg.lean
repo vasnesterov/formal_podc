@@ -1,5 +1,6 @@
 import Papers.PODC2016.ComplexityHierarchy.SwapAlgAbstract
 import Cslib.Computability.Distributed.SharedMemory.Objects.Swap
+import Podc.Computability.Distributed.SharedMemory.Task
 
 /-!
 # Swap and read (Section 8 of [EGSZ16]): Algorithm 1 with double-collect scans — safety
@@ -358,14 +359,6 @@ lemma readStep_ph_ne_done {d : DLoc k m P} (hd : d.ph = .scan) (v : SVal k P) {w
   · exact hw
   · simp [hd] at hw
 
-lemma inputs_append_of_ne_nil {α β : List (DLbl k P)} {r : P} (h : inputs α r ≠ none) :
-    inputs (α ++ β) r = inputs α r := by
-  simp only [inputs, opsOf_append] at h ⊢
-  rw [List.head?_append]
-  cases hh : (opsOf α r).head? with
-  | none => exact absurd hh h
-  | some x => rfl
-
 variable {α : List (DLbl k P)} {C C' : DCfg k m P} {q : P}
 
 lemma SInv.step_inv {x : Fin k} (hI : SInv α C)
@@ -425,7 +418,8 @@ lemma SInv.step_inv {x : Fin k} (hI : SInv α C)
       have hrq : r ≠ q := by rintro rfl; exact hph hr
       rw [hops r hrq, hpend' r hrq]; exact hI.idle r hr
     · intro r hr; rw [hl] at hr ⊢
-      rw [inputs_append_of_ne_nil (by rw [hI.inp r hr]; exact Option.some_ne_none _)]; exact hI.inp r hr
+      rw [inputs_append_of_ne_none _ (by rw [hI.inp r hr]; exact Option.some_ne_none _)]
+      exact hI.inp r hr
     · intro r w hr; rw [hresp] at hr; rw [hl]; exact hI.resp r w hr
     · intro Q hQ
       have hQ' : ∀ r ∈ Q, Ready C r := fun r hr => (ready_congr (by rw [hl]) hmem).1 (hQ r hr)

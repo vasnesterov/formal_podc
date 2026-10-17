@@ -352,19 +352,10 @@ theorem uinv_step (hkey : Function.Injective key) {C C' : Config (dsu E) (Ptr E)
 theorem uinv_of_run (hkey : Function.Injective key) {α : List (Label P (dsu E))}
     {C : Config (dsu E) (Ptr E) P (Loc E)} (h : (dsuImpl K key P).run α = some C) :
     UInv (key := key) C (uf K key α) := by
-  induction α using List.reverseRecOn generalizing C with
-  | nil =>
-    simp only [Impl.run, Impl.runFrom, Option.some.injEq] at h; subst h
-    exact uinv_init
-  | append_singleton α ℓ ih =>
-    have h' := h
-    rw [Impl.run, Impl.runFrom_append] at h
-    cases hα : (dsuImpl K key P).runFrom (dsuImpl K key P).initCfg α with
-    | none => simp [hα] at h
-    | some C₀ =>
-      simp only [hα, Option.bind_some, Impl.runFrom_singleton] at h
-      rw [uf_append hα h]
-      exact (uinv_step hkey (linv_of_run hkey hα) (ih hα) h).1
+  refine Impl.run_induction (Q := fun α C => UInv (key := key) C (uf K key α)) uinv_init ?_ h
+  intro α C₀ ℓ C hα ih h
+  rw [uf_append hα h]
+  exact (uinv_step hkey (linv_of_run hkey hα) ih h).1
 
 /-- **Lemma 3.1 (with the union forest).** After every execution `α`, the union forest
 `U = uf α` (the links done so far) has the same roots as the parent forest, ids increase along

@@ -52,7 +52,7 @@ Identifiers from Bounded Registers.* PODC 2025 (4-page brief announcement; no fu
   `UniqueResp`: distinct *completed* operations return distinct values. For this specification it
   is equivalent to linearizability, because every order of operations with distinct outputs is a
   legal sequential history. "Correct for `B` calls" (`CorrectUpTo I B`) quantifies over all
-  executions with at most `B` invocations (`invCount`).
+  executions with at most `B` invocations (`numInv`).
 * **Anonymity** (`Anonymous`) is semantic: `locInit`, `invoke` and `act` do not depend on the
   process. It is necessary for the lower bound. Without it, `p` can return `⟪p, c⟫` using no
   shared memory at all (`nonAnonymous_correct`, `NonAnonymous.lean`).

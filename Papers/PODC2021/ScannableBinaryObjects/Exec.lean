@@ -1,8 +1,10 @@
 import Papers.PODC2021.ScannableBinaryObjects.Basic
+import Podc.Computability.Distributed.SharedMemory.Model
 import Cslib.Computability.Distributed.SharedMemory.Mutex
 import Cslib.Computability.Distributed.SharedMemory.Solo
 import Cslib.Computability.Distributed.SharedMemory.Task
 import Cslib.Foundations.Data.Nat.Descent
+import Podc.Computability.Distributed.SharedMemory.History
 
 /-!
 # Scannable binary objects: building executions
@@ -169,13 +171,6 @@ section Exec
 variable {ι : Type} [DecidableEq ι] {B : ι → ObjSpec} {L : Type}
   {I : Impl (scannable O) B P L} {p₀ : P}
 
-lemma resps_eq_ops_of_idle {ε : List (Label P (scannable O))} {X : Config (scannable O) B P L}
-    (h : I.run ε = some X) {p : P} (hp : X.pend p = none) :
-    (respsOf ε p).length = (opsOf ε p).length := by
-  rcases I.run_counts h p with ⟨-, h2⟩ | ⟨h1, -⟩
-  · exact h2.symm
-  · exact absurd hp h1
-
 variable (hnm : ∀ c, (O c).NonMonotonic) (hof : I.ObstructionFree)
   (hall : ∀ p o, SingleUpdater p₀ p o → I.allowed p o)
 
@@ -240,13 +235,13 @@ theorem solo_scan {ε : List (Label P (scannable O))} {Y : Config (scannable O) 
     subst hp
     have : o ∈ opsOf γ p := mem_opsOf_of_inv_mem hm
     rw [h4] at this; simp only [List.mem_singleton] at this; subst this; exact hs
-  have hcnt := resps_eq_ops_of_idle hY hsi
+  have hcnt := (Impl.run_idle_counts hY hsi).symm
   have hrespOf : respOf (ε ++ γ) (s, (opsOf ε s).length) = some r := by
     simp [respOf, respsOf_append, hr, ← hcnt]
   obtain ⟨i, hi1, hi2, hri⟩ := scan_resp hlin hv hsu' hs (m := (opsOf ε s).length)
     (by simp [Invoked]) hrespOf
   have hγ0 : opsOf γ p₀ = [] := opsOf_eq_nil_of_proc_ne (fun ℓ hℓ he => hs (he ▸ (h3 ℓ hℓ).symm))
-  rw [resps_eq_ops_of_idle hY hp₀] at hi1
+  rw [(Impl.run_idle_counts hY hp₀).symm] at hi1
   rw [opsOf_append, hγ0, List.append_nil] at hi2
   have hi : i = (opsOf ε p₀).length := by omega
   rw [hri, hi, valAt_append_of_le le_rfl]
@@ -299,24 +294,6 @@ section Replay
 
 variable {A : ObjSpec} {ι : Type} [DecidableEq ι] {B : ι → ObjSpec} {P : Type} [DecidableEq P]
   {L : Type} {I : Impl A B P L}
-
-lemma opsOf_filter_proc (β : List (Label P A)) (p : P) :
-    opsOf (β.filter (fun ℓ => decide (ℓ.proc = p))) p = opsOf β p := by
-  induction β with
-  | nil => rfl
-  | cons ℓ β ih =>
-    by_cases h : ℓ.proc = p
-    · simp [List.filter_cons, h, ih]
-    · simp [List.filter_cons, h, ih, Label.invOf_eq_none_of_proc_ne h]
-
-lemma respsOf_filter_proc (β : List (Label P A)) (p : P) :
-    respsOf (β.filter (fun ℓ => decide (ℓ.proc = p))) p = respsOf β p := by
-  induction β with
-  | nil => rfl
-  | cons ℓ β ih =>
-    by_cases h : ℓ.proc = p
-    · simp [List.filter_cons, h, ih]
-    · simp [List.filter_cons, h, ih, Label.retOf_eq_none_of_proc_ne h]
 
 /-- **Replay with fix-ups** (the construction of `γ` in the proof of Lemma 5). Let `δ` be an
 execution of process `s` from `Y`, and let `X` be a configuration in which `s` has the same
