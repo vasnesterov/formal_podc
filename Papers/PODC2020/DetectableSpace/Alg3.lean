@@ -71,14 +71,14 @@ def act (p : Fin n) : Loc n → Act (Fin n → ℕ) (Option ℕ) (Loc n) ℕ
 /-- Initial local state of an operation (also of its recovery: re-invocation). -/
 def start : MaxOp → Loc n
   | .writeMax v => .wmRead v
-  | .read => .cmp 0 0 0
+  | .readMax => .cmp 0 0 0
 
 end Alg3
 
 open Alg3
 
 /-- **Algorithm 3** as a recoverable implementation of a max register; no auxiliary state. -/
-abbrev alg3 (n : ℕ) : RImpl maxReg (Fin n) where
+abbrev alg3 (n : ℕ) : RImpl maxRegObj (Fin n) where
   Sh := Fin n → ℕ
   Pv := Option ℕ
   L := Alg3.Loc n
@@ -116,7 +116,7 @@ lemma smax_update (s : Fin n → ℕ) (p : Fin n) (v : ℕ) (h : s p ≤ v) :
 lemma smax_zero : smax n (0 : Fin n → ℕ) = 0 :=
   Nat.eq_zero_of_le_zero (Finset.sup_le fun _ _ => le_rfl)
 
-lemma maxReg_read_ro : maxReg.ReadOnly MaxOp.read := fun _ => rfl
+lemma maxReg_read_ro : maxRegObj.ReadOnly MaxOp.readMax := fun _ => rfl
 
 /-- Two decompositions around the same identifier coincide (identifiers are distinct). -/
 lemma decomp_unique {L L₁ L₂ M₁ M₂ : List (ℕ × MaxOp)} {a : ℕ} {o o' : MaxOp}
@@ -145,7 +145,7 @@ lemma decomp_unique {L L₁ L₂ M₁ M₂ : List (ℕ × MaxOp)} {a : ℕ} {o o
 
 /-- The read entry of `a` sits at a position where the state is `r`. -/
 def Pos (L : List (ℕ × MaxOp)) (a r : ℕ) : Prop :=
-  ∃ L₁ L₂, L = L₁ ++ (a, .read) :: L₂ ∧ maxReg.runOps 0 (L₁.map Prod.snd) = r
+  ∃ L₁ L₂, L = L₁ ++ (a, .readMax) :: L₂ ∧ maxRegObj.runOps 0 (L₁.map Prod.snd) = r
 
 lemma Pos.append {L : List (ℕ × MaxOp)} {a r : ℕ} (h : Pos L a r) (δ : List (ℕ × MaxOp)) :
     Pos (L ++ δ) a r := by
@@ -153,16 +153,16 @@ lemma Pos.append {L : List (ℕ × MaxOp)} {a r : ℕ} (h : Pos L a r) (δ : Lis
   exact ⟨L₁, L₂ ++ δ, by simp, h2⟩
 
 lemma Pos.filter {L : List (ℕ × MaxOp)} {a r : ℕ} (h : Pos L a r) (f : ℕ × MaxOp → Bool)
-    (hf : ∀ y ∈ L, f y = false → y.1 ≠ a ∧ maxReg.ReadOnly y.2) : Pos (L.filter f) a r := by
+    (hf : ∀ y ∈ L, f y = false → y.1 ≠ a ∧ maxRegObj.ReadOnly y.2) : Pos (L.filter f) a r := by
   obtain ⟨L₁, L₂, rfl, h2⟩ := h
-  have hfa : f (a, .read) = true := by
-    by_contra hc; exact (hf (a, .read) (by simp) (by simpa using hc)).1 rfl
+  have hfa : f (a, .readMax) = true := by
+    by_contra hc; exact (hf (a, .readMax) (by simp) (by simpa using hc)).1 rfl
   refine ⟨L₁.filter f, L₂.filter f, by simp [List.filter_append, List.filter_cons_of_pos hfa], ?_⟩
-  rw [← h2, maxReg.runOps_map_filter 0 L₁ Prod.snd f]
+  rw [← h2, maxRegObj.runOps_map_filter 0 L₁ Prod.snd f]
   intro x hx hfx
   exact (hf x (by simp [hx]) hfx).2
 
-lemma Pos.mem {L : List (ℕ × MaxOp)} {a r : ℕ} (h : Pos L a r) : (a, .read) ∈ L := by
+lemma Pos.mem {L : List (ℕ × MaxOp)} {a r : ℕ} (h : Pos L a r) : (a, .readMax) ∈ L := by
   obtain ⟨L₁, L₂, rfl, -⟩ := h; simp
 
 /-! ### The per-process invariant -/
@@ -173,12 +173,12 @@ def PInv (p : Fin n) (sh : Fin n → ℕ) (L : List (ℕ × MaxOp)) (a : ℕ) : 
   | .writeMax v, .wmRead v' => v' = v ∧ (a ∈ L.map Prod.fst → v ≤ sh p)
   | .writeMax v, .wmWrite v' => v' = v ∧ sh p < v ∧ a ∉ L.map Prod.fst
   | .writeMax v, .wmRet => v ≤ sh p ∧ (a, .writeMax v) ∈ L
-  | .read, .cmp x y k => (∀ i, x i ≤ sh i) ∧ (k = 0 → a ∉ L.map Prod.fst) ∧
+  | .readMax, .cmp x y k => (∀ i, x i ≤ sh i) ∧ (k = 0 → a ∉ L.map Prod.fst) ∧
       (a ∈ L.map Prod.fst → Pos L a (smax n x)) ∧
       (a ∉ L.map Prod.fst → 0 < k → ∃ i, x i < sh i ∧ (i.val < k → x i < y i))
-  | .read, .asg x k => a ∉ L.map Prod.fst ∧ ∀ i : Fin n, i.val < k → x i ≤ sh i
-  | .read, .persist r => Pos L a r
-  | .read, .rret r => Pos L a r
+  | .readMax, .asg x k => a ∉ L.map Prod.fst ∧ ∀ i : Fin n, i.val < k → x i ≤ sh i
+  | .readMax, .persist r => Pos L a r
+  | .readMax, .rret r => Pos L a r
   | _, _ => False
 
 lemma PInv.push {p : Fin n} {sh : Fin n → ℕ} {L : List (ℕ × MaxOp)} {a : ℕ} {o : MaxOp}
@@ -197,7 +197,7 @@ lemma PInv.push {p : Fin n} {sh : Fin n → ℕ} {L : List (ℕ × MaxOp)} {a : 
 
 lemma PInv.filter {p : Fin n} {sh : Fin n → ℕ} {L : List (ℕ × MaxOp)} {a : ℕ} {o : MaxOp}
     {l : Loc n} (h : PInv p sh L a o l) (f : ℕ × MaxOp → Bool)
-    (hf : ∀ y ∈ L, f y = false → y.1 ≠ a ∧ maxReg.ReadOnly y.2) :
+    (hf : ∀ y ∈ L, f y = false → y.1 ≠ a ∧ maxRegObj.ReadOnly y.2) :
     PInv p sh (L.filter f) a o l := by
   have hkeep : ∀ y ∈ L, y.1 = a → y ∈ L.filter f := by
     intro y hy hya
@@ -235,8 +235,8 @@ lemma PInv.mono {p : Fin n} {sh sh' : Fin n → ℕ} {L : List (ℕ × MaxOp)} {
 /-- The invariant maintained along executions of Algorithm 3. -/
 structure Inv (C : (alg3 n).Cfg) (h : List (HEv (Fin n) MaxOp ℕ)) (L : List (ℕ × MaxOp)) :
     Prop where
-  dlin : DLin maxReg h 0 L
-  state : maxReg.runOps 0 (L.map Prod.snd) = smax n C.sh
+  dlin : DLin maxRegObj h 0 L
+  state : maxRegObj.runOps 0 (L.map Prod.snd) = smax n C.sh
   nofail : ∀ a c, HEv.res a none c ∉ h
   cnt : ∀ a q o, HEv.inv a q o ∈ h → a < C.cnt
   uniq : ∀ a q o q' o', HEv.inv a q o ∈ h → HEv.inv a q' o' ∈ h → q = q' ∧ o = o'
@@ -308,7 +308,7 @@ lemma Inv.ev_inv {C : (alg3 n).Cfg} {h L} (hI : Inv C h L) (q : Fin n) (o : MaxO
           · simp at hr
         · cases o with
           | writeMax v => exact ⟨rfl, fun hm => absurd hm hnc⟩
-          | read =>
+          | readMax =>
             exact ⟨fun i => Nat.zero_le _, fun _ => hnc, fun hm => absurd hm hnc,
               fun _ h0 => absurd h0 (lt_irrefl 0)⟩
       · simp only [Function.update_of_ne hpq] at hp
@@ -322,7 +322,7 @@ lemma Inv.ev_inv {C : (alg3 n).Cfg} {h L} (hI : Inv C h L) (q : Fin n) (o : MaxO
 open Classical in
 /-- Entries kept at a crash: writes, and operations that already returned. -/
 noncomputable def keep (h : List (HEv (Fin n) MaxOp ℕ)) (x : ℕ × MaxOp) : Bool :=
-  decide (x.2 ≠ .read ∨ ∃ r c, HEv.res x.1 r c ∈ h)
+  decide (x.2 ≠ .readMax ∨ ∃ r c, HEv.res x.1 r c ∈ h)
 
 /-- Crash events: pending reads are removed from the linearization. -/
 lemma Inv.ev_crash {C : (alg3 n).Cfg} {h L} (hI : Inv C h L) :
@@ -330,7 +330,7 @@ lemma Inv.ev_crash {C : (alg3 n).Cfg} {h L} (hI : Inv C h L) :
   have hs : (alg3 n).step1 C .crash =
       (⟨C.sh, C.pv, fun p => (alg3 n).crashPS p (C.ps p), C.cnt⟩, [.crash]) := rfl
   rw [hs]
-  have hf : ∀ x ∈ L, keep h x = false → maxReg.ReadOnly x.2 ∧ ∀ r c, HEv.res x.1 r c ∉ h ++ [.crash] := by
+  have hf : ∀ x ∈ L, keep h x = false → maxRegObj.ReadOnly x.2 ∧ ∀ r c, HEv.res x.1 r c ∉ h ++ [.crash] := by
     intro x _ hk
     simp only [keep, decide_eq_false_iff_not, not_or, not_not, not_exists] at hk
     refine ⟨hk.1 ▸ maxReg_read_ro, fun r c hr => ?_⟩
@@ -339,8 +339,8 @@ lemma Inv.ev_crash {C : (alg3 n).Cfg} {h L} (hI : Inv C h L) :
     · simp at hr
   refine ⟨L.filter (keep h), ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩⟩
   · exact (hI.dlin.append_noRes [.crash] (by simp) (by simp)).filter_ro _ hf
-  · show maxReg.runOps 0 ((L.filter (keep h)).map Prod.snd) = smax n C.sh
-    rw [maxReg.runOps_map_filter 0 L Prod.snd (keep h) (fun x hx hk => (hf x hx hk).1)]
+  · show maxRegObj.runOps 0 ((L.filter (keep h)).map Prod.snd) = smax n C.sh
+    rw [maxRegObj.runOps_map_filter 0 L Prod.snd (keep h) (fun x hx hk => (hf x hx hk).1)]
     exact hI.state
   · intro a c ha; rcases List.mem_append.1 ha with ha | ha
     · exact hI.nofail a c ha
@@ -383,7 +383,7 @@ lemma Inv.ev_crash {C : (alg3 n).Cfg} {h L} (hI : Inv C h L) :
           · exact h3.2 hm'
           · exact absurd hm' h3.2.2
           · exact h3.1
-        | read =>
+        | readMax =>
           refine ⟨fun i => Nat.zero_le _, fun _ => ?_, fun hm => ?_, fun _ h0 => absurd h0 (lt_irrefl 0)⟩
           all_goals
             first
@@ -393,7 +393,7 @@ lemma Inv.ev_crash {C : (alg3 n).Cfg} {h L} (hI : Inv C h L) :
             exfalso
             obtain ⟨y, hy, hya⟩ := List.mem_map.1 hm
             have hyL := List.mem_of_mem_filter hy
-            have hop : y.2 = .read := hI.op_eq hyL (hya ▸ h1)
+            have hop : y.2 = .readMax := hI.op_eq hyL (hya ▸ h1)
             have := (List.mem_filter.1 hy).2
             simp only [keep, decide_eq_true_eq, ne_eq] at this
             rcases this with h' | ⟨r, c, hr⟩
@@ -426,8 +426,8 @@ lemma step_ret {C : (alg3 n).Cfg} {p : Fin n} {a : ℕ} {o : MaxOp} {b : Bool} {
 /-- A memory step of `p` preserves the invariant if the new linearization and states are fine. -/
 lemma Inv.of_step {C : (alg3 n).Cfg} {h L} (hI : Inv C h L) {p : Fin n} {a : ℕ} {o : MaxOp}
     {b : Bool} {l : Loc n} (hc : C.ps p = .run a o b l) (sh' : Fin n → ℕ) (pv' : Fin n → Option ℕ)
-    (l' : Loc n) (L' : List (ℕ × MaxOp)) (hd : DLin maxReg h 0 L')
-    (hst : maxReg.runOps 0 (L'.map Prod.snd) = smax n sh') (hp' : PInv p sh' L' a o l')
+    (l' : Loc n) (L' : List (ℕ × MaxOp)) (hd : DLin maxRegObj h 0 L')
+    (hst : maxRegObj.runOps 0 (L'.map Prod.snd) = smax n sh') (hp' : PInv p sh' L' a o l')
     (hoth : ∀ q a' o' b' l'', q ≠ p → C.ps q = .run a' o' b' l'' → a' ≠ a →
       PInv q C.sh L a' o' l'' → PInv q sh' L' a' o' l'') :
     Inv (⟨sh', pv', Function.update C.ps p (.run a o b l'), C.cnt⟩ : (alg3 n).Cfg) (h ++ []) L' := by
@@ -447,7 +447,7 @@ lemma Inv.of_step {C : (alg3 n).Cfg} {h L} (hI : Inv C h L) {p : Fin n} {a : ℕ
 /-- A return step of `p` preserves the invariant if the linearization accepts the response. -/
 lemma Inv.of_ret {C : (alg3 n).Cfg} {h L} (hI : Inv C h L) {p : Fin n} {a : ℕ} {o : MaxOp}
     {b : Bool} {l : Loc n} (hc : C.ps p = .run a o b l) (r : ℕ)
-    (hd : DLin maxReg (h ++ [.res a (some r) b]) 0 L) :
+    (hd : DLin maxRegObj (h ++ [.res a (some r) b]) 0 L) :
     Inv (⟨C.sh, C.pv, Function.update C.ps p .idle, C.cnt⟩ : (alg3 n).Cfg)
       (h ++ [.res a (some r) b]) L := by
   obtain ⟨h1, h2, -⟩ := hI.run _ _ _ _ _ hc
@@ -537,7 +537,7 @@ lemma Inv.ev_step {C : (alg3 n).Cfg} {h L} (hI : Inv C h L) (p : Fin n) :
       | asg x k => simp [PInv] at hpi
       | persist r => simp [PInv] at hpi
       | rret r => simp [PInv] at hpi
-    | read =>
+    | readMax =>
       cases l with
       | wmRead v => simp [PInv] at hpi
       | wmWrite v => simp [PInv] at hpi
@@ -551,7 +551,7 @@ lemma Inv.ev_step {C : (alg3 n).Cfg} {h L} (hI : Inv C h L) (p : Fin n) :
           by_cases hpush : k = 0 ∧ C.sh = x
           · obtain ⟨rfl, hsx⟩ := hpush
             have hmem := hk0 rfl
-            refine ⟨L ++ [(a, .read)], hI.of_step hc _ _ _ _
+            refine ⟨L ++ [(a, .readMax)], hI.of_step hc _ _ _ _
               (hI.dlin.push a p _ hinv hnores hmem) ?_ ?_ ?_⟩
             · rw [List.map_append, ObjSpec.runOps_append, hI.state]; rfl
             · refine ⟨hxle, fun h0 => absurd h0 (Nat.succ_ne_zero 0), fun _ => ?_, fun hn => ?_⟩
@@ -592,14 +592,14 @@ lemma Inv.ev_step {C : (alg3 n).Cfg} {h L} (hI : Inv C h L) (p : Fin n) :
               (fun _ _ _ _ _ _ _ _ h => h)⟩
           · simp only [hyx, ite_false]
             have hf : ∀ z ∈ L, decide (z.1 ≠ a) = false →
-                maxReg.ReadOnly z.2 ∧ ∀ r c, HEv.res z.1 r c ∉ h := by
+                maxRegObj.ReadOnly z.2 ∧ ∀ r c, HEv.res z.1 r c ∉ h := by
               intro z hz hza
               simp only [decide_eq_false_iff_not, not_not] at hza
               refine ⟨by rw [hnL z hza hz]; exact maxReg_read_ro, fun r c hr => ?_⟩
               exact hnores r c (hza ▸ hr)
             refine ⟨L.filter (fun z => decide (z.1 ≠ a)), hI.of_step hc _ _ _ _
               (hI.dlin.filter_ro _ hf) ?_ ?_ ?_⟩
-            · rw [maxReg.runOps_map_filter 0 L Prod.snd _ (fun z hz hk' => (hf z hz hk').1)]
+            · rw [maxRegObj.runOps_map_filter 0 L Prod.snd _ (fun z hz hk' => (hf z hz hk').1)]
               exact hI.state
             · refine ⟨fun hm => ?_, fun i hi => absurd hi (Nat.not_lt_zero _)⟩
               obtain ⟨z, hz, hza⟩ := List.mem_map.1 hm

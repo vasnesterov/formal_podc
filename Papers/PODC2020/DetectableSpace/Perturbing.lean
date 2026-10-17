@@ -1,6 +1,7 @@
 import Mathlib.Order.Basic
 import Mathlib.Order.MinMax
-import Cslib.Computability.Distributed.SharedMemory.Spec
+import Podc.SharedMemory.Objects.MaxRegister
+import Podc.SharedMemory.Objects.Queue
 
 /-!
 # Doubly-perturbing objects (Definition 3, Lemmas 3–8)
@@ -163,22 +164,6 @@ theorem faa_doublyPerturbing (p q : P) (hpq : q ≠ p) : DoublyPerturbing faaObj
 
 /-! ### Lemma 8: FIFO queues -/
 
-/-- Operations of a FIFO queue. -/
-inductive QOp (V : Type) where
-  | enq (v : V)
-  | deq
-
-/-- A FIFO queue (initially empty; `deq` returns `none` on the empty queue, `enq` returns
-`none` as an acknowledgement). -/
-abbrev queueObj (V : Type) : ObjSpec where
-  State := List V
-  Op := QOp V
-  Resp := Option V
-  init := []
-  δ s
-    | .enq v => (s ++ [v], none)
-    | .deq => (s.tail, s.head?)
-
 /-- **Lemma 8.** A FIFO queue with at least two values is doubly-perturbing (witness: `deq` by
 `p` after `enq v₀ ∘ enq v₁`, perturbing w.r.t. `deq` by `q`; extension `enq v₀ ∘ enq v₁` by
 `q`). -/
@@ -191,22 +176,7 @@ theorem queue_doublyPerturbing {V : Type} (v₀ v₁ : V) (hv : v₀ ≠ v₁) (
 
 /-! ### Lemma 4: max registers are not doubly-perturbing -/
 
-/-- Operations of a max register. -/
-inductive MaxOp where
-  | writeMax (v : ℕ)
-  | read
-
-/-- A max register over `ℕ` (initially `0`; `writeMax` returns `0` as an acknowledgement). -/
-abbrev maxReg : ObjSpec where
-  State := ℕ
-  Op := MaxOp
-  Resp := ℕ
-  init := 0
-  δ s
-    | .writeMax v => (max s v, 0)
-    | .read => (s, s)
-
-lemma maxReg_runOps_ge (s : ℕ) (os : List MaxOp) : s ≤ maxReg.runOps s os := by
+lemma maxReg_runOps_ge (s : ℕ) (os : List MaxOp) : s ≤ maxRegObj.runOps s os := by
   induction os generalizing s with
   | nil => exact le_rfl
   | cons o os ih =>
@@ -214,28 +184,28 @@ lemma maxReg_runOps_ge (s : ℕ) (os : List MaxOp) : s ≤ maxReg.runOps s os :=
     refine le_trans ?_ (ih _)
     cases o with
     | writeMax v => exact le_max_left _ _
-    | read => exact le_rfl
+    | readMax => exact le_rfl
 
 lemma maxReg_stateAfter_read (H : List (P × MaxOp)) (p : P) :
-    stateAfter maxReg (H ++ [(p, .read)]) = stateAfter maxReg H := by
+    stateAfter maxRegObj (H ++ [(p, .readMax)]) = stateAfter maxRegObj H := by
   rw [stateAfter_append]; rfl
 
 lemma maxReg_stateAfter_wm (H : List (P × MaxOp)) (p : P) (v : ℕ)
-    (h : v ≤ stateAfter maxReg H) :
-    stateAfter maxReg (H ++ [(p, .writeMax v)]) = stateAfter maxReg H := by
+    (h : v ≤ stateAfter maxRegObj H) :
+    stateAfter maxRegObj (H ++ [(p, .writeMax v)]) = stateAfter maxRegObj H := by
   rw [stateAfter_append]; exact max_eq_left h
 
 /-- **Lemma 4.** A max register is not doubly-perturbing. -/
-theorem maxReg_not_doublyPerturbing : ¬ DoublyPerturbing maxReg P := by
+theorem maxReg_not_doublyPerturbing : ¬ DoublyPerturbing maxRegObj P := by
   rintro ⟨p, o, H₁, r, o_r, ⟨-, h1⟩, E, -, q, o_q, -, h2⟩
   cases o with
-  | read =>
+  | readMax =>
     apply h1
     simp only [respAfter]
     rw [maxReg_stateAfter_read]
   | writeMax v =>
     apply h2
-    have hge : v ≤ stateAfter maxReg (H₁ ++ [(p, .writeMax v), (r, o_r)] ++ E) := by
+    have hge : v ≤ stateAfter maxRegObj (H₁ ++ [(p, .writeMax v), (r, o_r)] ++ E) := by
       have e : H₁ ++ [(p, MaxOp.writeMax v), (r, o_r)] ++ E =
           (H₁ ++ [(p, .writeMax v)]) ++ ((r, o_r) :: E) := by simp
       rw [e, stateAfter_append]

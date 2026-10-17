@@ -16,8 +16,10 @@ Small additions to CSLib's `History.lean`, used by many invariant-based proofs:
 * `opOf_append_of_eq_some`, `respOf_append_of_eq_some` — the operation/response of an instance
   does not change when the execution is extended;
 * `opsOf_concat`, `respsOf_concat` and their `_of_ne` versions — the operations and responses
-  of a process after appending one label;
+  of a process after appending one label; `opOf_concat_inv` — the operation of an instance
+  after appending an invocation;
 * `opsOf_prefix`, `respsOf_prefix` — operations and responses grow along prefixes;
+  `WellFormed.of_append` — prefixes of well-formed histories are well formed;
 * `linState_append`, `linState_concat` — the abstract state after a concatenation of
   sequential histories.
 -/
@@ -141,6 +143,23 @@ lemma opOf_concat_of_ne {α : List (Label P A)} {ℓ : Label P A} {x : OpId P}
     (hℓ : ∀ o, ℓ ≠ .inv x.1 o) : opOf (α ++ [ℓ]) x = opOf α x := by
   simp only [opOf, opsOf_concat_of_ne hℓ]
 
+/-- The operation of an instance after appending an invocation: the new invocation is the
+operation of `(p, (opsOf α p).length)`; other instances are unchanged. -/
+lemma opOf_concat_inv (α : List (Label P A)) (p : P) (o : A.Op) (y : OpId P) :
+    opOf (α ++ [.inv p o]) y = if y = (p, (opsOf α p).length) then some o else opOf α y := by
+  obtain ⟨q, k⟩ := y
+  simp only [opOf, opsOf_append, opsOf_cons, Label.invOf_inv, opsOf_nil, List.append_nil,
+    Prod.mk.injEq]
+  by_cases hq : p = q
+  · subst hq
+    simp only [ite_true, Option.toList_some, true_and]
+    rcases lt_trichotomy k (opsOf α p).length with h | rfl | h
+    · rw [List.getElem?_append_left h, ite_eq_right (by omega)]
+    · simp
+    · rw [ite_eq_right (by omega), List.getElem?_eq_none (by simp; omega),
+        List.getElem?_eq_none (by omega)]
+  · simp [hq, Ne.symm hq]
+
 /-- Appending a label that is not a response of `x.1` does not change the response of `x`. -/
 lemma respOf_concat_of_ne {α : List (Label P A)} {ℓ : Label P A} {x : OpId P}
     (hℓ : ∀ r, ℓ ≠ .ret x.1 r) : respOf (α ++ [ℓ]) x = respOf α x := by
@@ -152,6 +171,10 @@ lemma respOf_append_of_not_ret {α : List (Label P A)} {ℓ : Label P A}
   respOf_concat_of_ne fun r => hℓ x.1 r
 
 /-! ### Prefixes -/
+
+/-- A prefix of a well-formed history is well formed. -/
+lemma WellFormed.of_append {α β : List (Label P A)} (h : WellFormed (α ++ β)) : WellFormed α :=
+  fun γ ℓ δ hγ p => h γ ℓ (δ ++ β) (by rw [hγ]; simp) p
 
 /-- The operations of a process along a prefix form a prefix. -/
 lemma opsOf_prefix {α β : List (Label P A)} (h : α <+: β) (p : P) :

@@ -841,6 +841,7 @@ import Papers.PODC2020.DetectableSpace.Alg2LinTools
 import Papers.PODC2020.DetectableSpace.Alg2Counter
 import Papers.PODC2020.DetectableSpace.Alg2Fix
 import Papers.PODC2020.DetectableSpace.Alg3
+import Papers.PODC2020.DetectableSpace.LinBridge
 import Papers.PODC2026.LocalComputable.CompList
 import Papers.PODC2026.LocalComputable.Basic
 import Papers.PODC2026.LocalComputable.ComputableEquiv

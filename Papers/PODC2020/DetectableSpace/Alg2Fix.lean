@@ -12,7 +12,7 @@ detectability (`alg2fix_durLinDet`), and it is wait-free. Together with the coun
 
 We maintain, along every execution, a linearization `L` of the history so far
 (`durLinDet_of_inv`) such that the state after `L` is the value stored in `C`, and for every
-running process `p` with current operation `a` the response `linResp L a` of `a` in `L`
+running process `p` with current operation `a` the response `(casRC V v₀).respIn v₀ L a` of `a` in `L`
 (`none` if `a ∉ L`) is described by the per-process invariant `PI` (a case analysis on the
 program counter of `p`):
 
@@ -298,7 +298,7 @@ end PIfacts
 lemma runOps_fail (v₀ old : V) :
     ∀ (M : List (ℕ × RCOp V)) (τ : V), (∀ x ∈ M, ∃ n, x.2 = .cas old n) → τ ≠ old →
       (casRC V v₀).runOps τ (M.map Prod.snd) = τ ∧
-        ∀ b ∈ M.map Prod.fst, linResp (casRC V v₀) τ M b = some (.inr false) := by
+        ∀ b ∈ M.map Prod.fst, (casRC V v₀).respIn τ M b = some (.inr false) := by
   intro M
   induction M with
   | nil => intro τ _ _; exact ⟨rfl, by simp⟩
@@ -310,17 +310,13 @@ lemma runOps_fail (v₀ old : V) :
     obtain ⟨h1, h2⟩ := ih τ (fun y hy => hM y (by simp [hy])) hτ
     refine ⟨by rw [List.map_cons, ObjSpec.runOps_cons, hδ]; exact h1, ?_⟩
     intro b hb
-    rw [linResp_cons, hδ]
+    rw [ObjSpec.respIn_cons, hδ]
     split_ifs with hxb
     · rfl
     · simp only [List.map_cons, List.mem_cons] at hb
       rcases hb with hb | hb
       · exact absurd hb.symm hxb
       · exact h2 b hb
-
-lemma linResp_push_ne {O : ObjSpec} (σ : O.State) (L : List (ℕ × O.Op)) (a b : ℕ) (o : O.Op)
-    (h : a ≠ b) : linResp O σ (L ++ [(a, o)]) b = linResp O σ L b := by
-  rw [linResp_append, linResp_singleton]; simp only [h, ite_false]; cases linResp O σ L b <;> rfl
 
 /-! ### The global invariant -/
 
@@ -334,7 +330,7 @@ structure Inv (C : (alg2fix (P := P) v₀).Cfg) (h : List (HEv P (RCOp V) (V ⊕
   lin : DLin (casRC V v₀) h v₀ L
   val : (casRC V v₀).runOps v₀ (L.map Prod.snd) = C.sh.1
   run : ∀ p a o rc l, C.ps p = .run a o rc l → HEv.inv a p o ∈ h ∧ (∀ r c, HEv.res a r c ∉ h) ∧
-    CPok (C.pv p) o ∧ PI p C.sh (C.pv p) o rc l (linResp (casRC V v₀) v₀ L a)
+    CPok (C.pv p) o ∧ PI p C.sh (C.pv p) o rc l ((casRC V v₀).respIn v₀ L a)
   invlt : ∀ a p o, HEv.inv a p o ∈ h → a < C.cnt
   invu : ∀ a p o p' o', HEv.inv a p o ∈ h → HEv.inv a p' o' ∈ h → p = p' ∧ o = o'
   resinv : ∀ a r c, HEv.res a r c ∈ h → ∃ p o, HEv.inv a p o ∈ h
@@ -369,14 +365,14 @@ lemma Inv.local {C C' : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h L)
     (hps : C'.ps q = .run a o rc l') (hps' : ∀ x, x ≠ q → C'.ps x = C.ps x)
     (hL : L' = L ∨ (L' = L ++ [(a, o)] ∧ a ∉ L.map Prod.fst ∧
       ((casRC V v₀).δ C.sh.1 o).1 = C.sh.1))
-    (hcp : CPok (C'.pv q) o) (hpi : PI q C.sh (C'.pv q) o rc l' (linResp (casRC V v₀) v₀ L' a)) :
+    (hcp : CPok (C'.pv q) o) (hpi : PI q C.sh (C'.pv q) o rc l' ((casRC V v₀).respIn v₀ L' a)) :
     Inv v₀ C' h L' := by
   obtain ⟨hinvq, hpendq, -, -⟩ := hI.run q a o rc l hq
-  have hlr : ∀ b, b ≠ a → linResp (casRC V v₀) v₀ L' b = linResp (casRC V v₀) v₀ L b := by
+  have hlr : ∀ b, b ≠ a → (casRC V v₀).respIn v₀ L' b = (casRC V v₀).respIn v₀ L b := by
     intro b hb
     rcases hL with rfl | ⟨rfl, -, -⟩
     · rfl
-    · exact linResp_push_ne _ _ _ _ _ (Ne.symm hb)
+    · exact ObjSpec.respIn_append_of_not_mem_right (by simpa using hb)
   refine ⟨?_, ?_, ?_, hcnt ▸ hI.invlt, hI.invu, hI.resinv, ?_, hI.nofail⟩
   · rcases hL with rfl | ⟨rfl, ha, -⟩
     · exact hI.lin
@@ -421,11 +417,11 @@ lemma Inv.ret {C C' : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h L) {
     (hps : C'.ps q = .idle) (hps' : ∀ x, x ≠ q → C'.ps x = C.ps x) :
     Inv v₀ C' (h ++ [.res a r rc]) L := by
   obtain ⟨hinvq, hpendq, -, hpi⟩ := hI.run q a o rc _ hq
-  have hρ : ∀ r', r = some r' → linResp (casRC V v₀) v₀ L a = some r' := by
+  have hρ : ∀ r', r = some r' → (casRC V v₀).respIn v₀ L a = some r' := by
     rintro r' rfl; exact hpi.2
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · refine hI.lin.append_res a r rc ?_ (hresp_of_linResp hI.lin.nodup hρ)
-    rw [← linResp_isSome (O := casRC V v₀) v₀]
+  · refine hI.lin.append_res a r rc ?_ (hresp_of_respIn hI.lin.nodup hρ)
+    rw [← ObjSpec.respIn_isSome_iff (A := casRC V v₀) (q := v₀)]
     cases r with
     | none => simp [hpi.2.2.2.1]
     | some r' => simp [hρ r' rfl]
@@ -499,7 +495,7 @@ lemma Inv.invoke {C C' : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h L
         · exact hnres r c hr
         · simp at hr
       · rw [hpvq]; cases o <;> simp [CPok]
-      · rw [hpvq, (linResp_eq_none _ _ _).2 hnL]
+      · rw [hpvq, ObjSpec.respIn_eq_none hnL]
         cases o <;> simp [start, PI]
     · rw [hps' p hpq] at hp
       obtain ⟨h1, h2, h3, h4⟩ := hI.run p a o' rc l hp
@@ -564,7 +560,7 @@ lemma Inv.crash {C C' : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h L)
     intro x hx hf r c hr
     simp only [f, decide_eq_false_iff_not, K, not_or] at hf
     exact hf.1 ⟨r, c, hr⟩
-  have hdrop_pres : ∀ x ∈ L, f x.1 = false → ∀ r, linResp (casRC V v₀) v₀ L x.1 = some r →
+  have hdrop_pres : ∀ x ∈ L, f x.1 = false → ∀ r, (casRC V v₀).respIn v₀ L x.1 = some r →
       ∀ τ, ((casRC V v₀).δ τ x.2).2 = r → ((casRC V v₀).δ τ x.2).1 = τ := by
     intro x hx hf r hr τ hτ
     obtain ⟨p, rc, l, hp⟩ := hI.pend x hx (hdrop_pend x hx hf)
@@ -588,12 +584,12 @@ lemma Inv.crash {C C' : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h L)
       obtain ⟨h1, h2, h3, h4⟩ := hI.run p _ _ _ _ hc
       refine ⟨List.mem_append_left _ h1, fun r c' hr => ?_, hpv ▸ h3, ?_⟩
       · rw [mem_append_crash (by simp)] at hr; exact h2 r c' hr
-      · have key : linResp (casRC V v₀) v₀ (L.filter (fun x => f x.1)) a0 =
+      · have key : (casRC V v₀).respIn v₀ (L.filter (fun x => f x.1)) a0 =
             if (C.pv p).result ≠ none ∨ ((C.pv p).CP = true ∧ C.sh.2 p = (C.pv p).RD) then
-              linResp (casRC V v₀) v₀ L a0 else none := by
+              (casRC V v₀).respIn v₀ L a0 else none := by
           split_ifs with hcd
           · exact hfp2 a0 (by simpa [f] using (hK p _ _ _ _ hc).2 hcd)
-          · rw [linResp_eq_none]
+          · rw [ObjSpec.respIn_eq_none_iff]
             intro hm
             obtain ⟨x, hx, hxa⟩ := List.mem_map.1 hm
             have := (List.mem_filter.1 hx).2
@@ -632,7 +628,7 @@ lemma Inv.casSucc {C C' : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h 
   obtain ⟨hinvq, hpendq, hcpq, hpiq⟩ := hI.run q a o rc _ hq
   obtain ⟨ho, hne, hCP, hres, hRD, -, -, h7⟩ := hpiq
   -- the processes to be linearized speculatively
-  let Q : ℕ × RCOp V → Prop := fun x => linResp (casRC V v₀) v₀ L x.1 = none ∧
+  let Q : ℕ × RCOp V → Prop := fun x => (casRC V v₀).respIn v₀ L x.1 = none ∧
     ∃ p, p ≠ q ∧ ∃ rc' l', C.ps p = .run x.1 x.2 rc' l' ∧ l'.pre = true
   obtain ⟨M, hMnd, hM⟩ := exists_list_of_bounded Q C.cnt
     (by
@@ -655,14 +651,14 @@ lemma Inv.casSucc {C C' : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h 
     exact hpq (hI.uniq hp hq).1
   have hML : ∀ x ∈ M, x.1 ∉ L.map Prod.fst := by
     intro x hx
-    exact (linResp_eq_none _ _ _).1 ((hM x).1 hx).1
+    exact ObjSpec.respIn_eq_none_iff.1 ((hM x).1 hx).1
   -- removing `q`'s own speculative entry
   let f : ℕ → Bool := fun b => decide (b ≠ a)
   have hdrop_pend : ∀ x ∈ L, f x.1 = false → ∀ r c, HEv.res x.1 r c ∉ h := by
     intro x hx hf
     simp only [f, decide_eq_false_iff_not, not_not] at hf
     rw [hf]; exact hpendq
-  have hdrop_pres : ∀ x ∈ L, f x.1 = false → ∀ r, linResp (casRC V v₀) v₀ L x.1 = some r →
+  have hdrop_pres : ∀ x ∈ L, f x.1 = false → ∀ r, (casRC V v₀).respIn v₀ L x.1 = some r →
       ∀ τ, ((casRC V v₀).δ τ x.2).2 = r → ((casRC V v₀).δ τ x.2).1 = τ := by
     intro x hx hf r hr
     simp only [f, decide_eq_false_iff_not, not_not] at hf
@@ -707,14 +703,14 @@ lemma Inv.casSucc {C C' : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h 
     rw [ho]; simp [casRC]
   obtain ⟨hMst, hMresp⟩ := runOps_fail v₀ s.1 M new hMops (Ne.symm hne)
   have hassoc : L₁ ++ [(a, o)] ++ M = L₁ ++ ((a, o) :: M) := by simp
-  have hlinq : linResp (casRC V v₀) v₀ (L₁ ++ [(a, o)] ++ M) a = some (.inr true) := by
-    rw [hassoc, linResp_append_of_not_mem _ _ _ _ haL₁, hst₁, linResp_cons]
+  have hlinq : (casRC V v₀).respIn v₀ (L₁ ++ [(a, o)] ++ M) a = some (.inr true) := by
+    rw [hassoc, ObjSpec.respIn_append_of_not_mem haL₁, hst₁, ObjSpec.respIn_cons]
     simp only [↓reduceIte]
     simp [ho]
   have hlinp : ∀ b, b ≠ a → b ∉ L₁.map Prod.fst →
-      linResp (casRC V v₀) v₀ (L₁ ++ [(a, o)] ++ M) b = linResp (casRC V v₀) new M b := by
+      (casRC V v₀).respIn v₀ (L₁ ++ [(a, o)] ++ M) b = (casRC V v₀).respIn new M b := by
     intro b hba hb
-    rw [hassoc, linResp_append_of_not_mem _ _ _ _ hb, hst₁, linResp_cons_of_ne _ _ _ _ (Ne.symm hba),
+    rw [hassoc, ObjSpec.respIn_append_of_not_mem hb, hst₁, ObjSpec.respIn_cons_of_ne _ _ _ (Ne.symm hba),
       hδq]
   refine ⟨L₁ ++ [(a, o)] ++ M, hd₃, ?_, ?_, hcnt ▸ hI.invlt, hI.invu, hI.resinv, ?_, hI.nofail⟩
   · rw [hassoc, List.map_append, ObjSpec.runOps_append, hst₁, List.map_cons, ObjSpec.runOps_cons,
@@ -738,19 +734,19 @@ lemma Inv.casSucc {C C' : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h 
       refine h4.frame (by rw [hsh, hs]; simp [Function.update_of_ne hpq]) ?_ ?_ ?_
       · intro hρ
         have hm : a' ∈ L₁.map Prod.fst := by
-          rw [← linResp_isSome (O := casRC V v₀) v₀, hfp2 a' hfa]
+          rw [← ObjSpec.respIn_isSome_iff (A := casRC V v₀) (q := v₀), hfp2 a' hfa]
           exact Option.isSome_iff_ne_none.2 hρ
-        rw [linResp_append_of_mem _ _ _ _ (by simp [hm]), linResp_append_of_mem _ _ _ _ hm,
+        rw [ObjSpec.respIn_append_of_mem (by simp [hm]), ObjSpec.respIn_append_of_mem hm,
           hfp2 a' hfa]
       · intro hρ hpre
         have hm₁ : a' ∉ L₁.map Prod.fst := by
-          rw [← linResp_eq_none (O := casRC V v₀) v₀, hfp2 a' hfa]; exact hρ
+          rw [← ObjSpec.respIn_eq_none_iff (A := casRC V v₀) (q := v₀), hfp2 a' hfa]; exact hρ
         rw [hlinp a' hne' hm₁]
         exact hMresp a' (List.mem_map.2 ⟨(a', o'), (hM _).2 ⟨hρ, p, hpq, rc', l', hp, hpre⟩, rfl⟩)
       · intro hρ hpre
         have hm₁ : a' ∉ L₁.map Prod.fst := by
-          rw [← linResp_eq_none (O := casRC V v₀) v₀, hfp2 a' hfa]; exact hρ
-        rw [hlinp a' hne' hm₁, linResp_eq_none]
+          rw [← ObjSpec.respIn_eq_none_iff (A := casRC V v₀) (q := v₀), hfp2 a' hfa]; exact hρ
+        rw [hlinp a' hne' hm₁, ObjSpec.respIn_eq_none_iff]
         intro hm
         obtain ⟨x, hx, hxa⟩ := List.mem_map.1 hm
         obtain ⟨-, p', -, rc'', l'', hp', hpre'⟩ := (hM x).1 hx
@@ -777,10 +773,10 @@ lemma Inv.casSucc {C C' : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h 
       · obtain ⟨-, p, hpq, rc', l', hp, -⟩ := (hM x).1 hx
         exact ⟨p, rc', l', by rw [hps' p hpq, hp]⟩
 
-lemma Inv.linResp_push {C : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h L) {a : ℕ}
+lemma Inv.respIn_push {C : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h L) {a : ℕ}
     {o : RCOp V} (ha : a ∉ L.map Prod.fst) :
-    linResp (casRC V v₀) v₀ (L ++ [(a, o)]) a = some ((casRC V v₀).δ C.sh.1 o).2 := by
-  rw [linResp_append_of_not_mem _ _ _ _ ha, hI.val, linResp_singleton]; simp only [↓reduceIte]
+    (casRC V v₀).respIn v₀ (L ++ [(a, o)]) a = some ((casRC V v₀).δ C.sh.1 o).2 := by
+  rw [ObjSpec.respIn_append_of_not_mem ha, hI.val, ObjSpec.respIn_singleton]; simp only [↓reduceIte]
 
 /-- The invariant is preserved by every event. -/
 theorem Inv.step {C : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h L)
@@ -809,7 +805,7 @@ theorem Inv.step {C : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h L)
       cases l with
       | c28 old new =>
         obtain ⟨rfl, hCP, hres, hρ⟩ := hpi
-        have haL : a ∉ L.map Prod.fst := (linResp_eq_none _ _ _).1 hρ
+        have haL : a ∉ L.map Prod.fst := ObjSpec.respIn_eq_none_iff.1 hρ
         by_cases h1 : C.sh.1 = old
         · by_cases h2 : old = new
           · subst h2
@@ -817,7 +813,7 @@ theorem Inv.step {C : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h L)
               and_self, ite_true, ite_false, List.append_nil]
             refine ⟨L ++ [(a, .cas old old)], hI.local hq rfl rfl (fun _ _ => rfl) (Function.update_self _ _ _)
               (fun x hx => hupd x hx _) (.inr ⟨rfl, haL, by simp [h1]⟩) hcp ?_⟩
-            rw [hI.linResp_push haL]
+            rw [hI.respIn_push haL]
             simp [PI, hres, hCP, h1, Ok]
           · simp only [RImpl.step1, hq, act, h1, ne_eq, not_true_eq_false,
               ite_false, h2, and_false, List.append_nil]
@@ -829,7 +825,7 @@ theorem Inv.step {C : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h L)
             List.append_nil]
           refine ⟨L ++ [(a, .cas old new)], hI.local hq rfl rfl (fun _ _ => rfl) (Function.update_self _ _ _)
             (fun x hx => hupd x hx _) (.inr ⟨rfl, haL, by simp [h1]⟩) hcp ?_⟩
-          rw [hI.linResp_push haL]
+          rw [hI.respIn_push haL]
           simp [PI, hres, hCP, h1, Ok]
       | c33 new s =>
         obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := hpi
@@ -853,7 +849,7 @@ theorem Inv.step {C : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h L)
           exact hI.casSucc hq hs rfl rfl rfl (by simp) (fun x hx => hupd x hx _)
         · obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := hpi
           simp only [RImpl.step1, hq, act, hs, ite_false, List.append_nil]
-          have hρ : linResp (casRC V v₀) v₀ L a = some (.inr false) := by
+          have hρ : (casRC V v₀).respIn v₀ L a = some (.inr false) := by
             rcases h8 with h8 | h8
             · exact absurd (h7 h8) hs
             · exact h8
@@ -931,17 +927,17 @@ theorem Inv.step {C : (alg2fix (P := P) v₀).Cfg} {h L} (hI : Inv v₀ C h L)
             (fun x hx => hupd x hx _) (.inl rfl) ?_ ?_⟩
           · simpa using hcp
           · simp only [Function.update_self]
-            have hnone : linResp (casRC V v₀) v₀ L a = none := by
+            have hnone : (casRC V v₀).respIn v₀ L a = none := by
               by_contra hne
               exact hbr (hb.trans (hiff.1 (Option.isSome_iff_ne_none.2 hne)))
             exact ⟨hrc, hrec.1, hr, hnone, fun _ => hb ▸ hbr⟩
       | d0 =>
         obtain ⟨rfl, hr, hρ⟩ := hpi
-        have haL : a ∉ L.map Prod.fst := (linResp_eq_none _ _ _).1 hρ
+        have haL : a ∉ L.map Prod.fst := ObjSpec.respIn_eq_none_iff.1 hρ
         simp only [RImpl.step1, hq, act, List.append_nil]
         refine ⟨L ++ [(a, .read)], hI.local hq rfl rfl (fun _ _ => rfl) (Function.update_self _ _ _)
           (fun x hx => hupd x hx _) (.inr ⟨rfl, haL, rfl⟩) hcp ?_⟩
-        rw [hI.linResp_push haL]
+        rw [hI.respIn_push haL]
         simp only [CPok] at hcp
         exact ⟨hr, rfl, fun h => absurd (h.symm.trans hcp) (by simp), fun _ => trivial⟩
       | dr =>
