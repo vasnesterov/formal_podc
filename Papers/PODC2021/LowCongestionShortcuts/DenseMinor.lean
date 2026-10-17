@@ -1,5 +1,4 @@
 import Papers.PODC2021.LowCongestionShortcuts.Overcongested
-import Papers.PODC2021.LowCongestionShortcuts.Bernoulli
 import Cslib.Foundations.Combinatorics.SimpleGraph.Minor
 import Mathlib
 
