@@ -28,50 +28,6 @@ lemma mem_bw_proc' {cs : List (P × ι)} {ℓ : Label P (tsObj T)} (h : ℓ ∈ 
     ∃ c ∈ cs, ℓ.proc = c.1 := by
   obtain ⟨q, hq, he⟩ := List.mem_map.1 (mem_bw_proc h); exact ⟨q, hq, he.symm⟩
 
-lemma runFrom_bw_other {C C' : Config (tsObj T) B P L} {cs : List (P × ι)}
-    (h : I.runFrom C (bw cs) = some C') {q : P} (hq : q ∉ cs.map Prod.fst) :
-    C'.loc q = C.loc q ∧ C'.pend q = C.pend q :=
-  I.runFrom_other h (fun _ hℓ he => hq (he ▸ mem_bw_proc hℓ))
-
--- CSLib candidate (generic in the implemented object)
-/-- The order of two block writes to the same set of objects does not matter for the processes
-and for the memory outside that set. -/
-lemma bw_swap {C : Config (tsObj T) B P L} {b b' : List (P × ι)}
-    (hnd : (b.map Prod.fst ++ b'.map Prod.fst).Nodup)
-    (hcov : ∀ c ∈ b ++ b', I.Covers C c.1 c.2)
-    (hsnd : ∀ j, j ∈ b.map Prod.snd ↔ j ∈ b'.map Prod.snd) :
-    ∃ X X', I.runFrom C (bw b ++ bw b') = some X ∧ I.runFrom C (bw b' ++ bw b) = some X' ∧
-      (∀ q, X.loc q = X'.loc q ∧ X.pend q = X'.pend q) ∧
-      (∀ j, j ∉ b.map Prod.snd → X.mem j = X'.mem j) := by
-  obtain ⟨hnd₁, hnd₂, hdis⟩ := List.nodup_append.1 hnd
-  have hcb : ∀ c ∈ b, I.Covers C c.1 c.2 := fun c hc => hcov c (List.mem_append_left _ hc)
-  have hcb' : ∀ c ∈ b', I.Covers C c.1 c.2 := fun c hc => hcov c (List.mem_append_right _ hc)
-  have hn₁ : ∀ c ∈ b, c.1 ∉ b'.map Prod.fst := fun c hc h =>
-    hdis _ (List.mem_map_of_mem hc) _ h rfl
-  have hn₂ : ∀ c ∈ b', c.1 ∉ b.map Prod.fst := fun c hc h =>
-    hdis _ h _ (List.mem_map_of_mem hc) rfl
-  obtain ⟨A, hA, hAo, hAm⟩ := blockWrite_run (I := I) hnd₁ hcb
-  obtain ⟨A', hA', hA'o, hA'm⟩ := blockWrite_run (I := I) hnd₂ hcb'
-  obtain ⟨Y, X', hY, hX', hag⟩ := blockWrite_agreeOn (I := I)
-    (Q := {q | q ∉ b'.map Prod.fst}) (cs := b) hnd₁ hn₁ (C := C) (D := A') hcb
-    (fun q hq => (hA'o q hq).1.symm) (fun q hq => (hA'o q hq).2.symm)
-    (fun j hj => (hA'm j (fun h => hj ((hsnd j).2 h))).symm)
-  rw [hA] at hY; cases hY
-  obtain ⟨Y', X, hY', hX, hag'⟩ := blockWrite_agreeOn (I := I)
-    (Q := {q | q ∉ b.map Prod.fst}) (cs := b') hnd₂ hn₂ (C := C) (D := A) hcb'
-    (fun q hq => (hAo q hq).1.symm) (fun q hq => (hAo q hq).2.symm)
-    (fun j hj => (hAm j (fun h => hj ((hsnd j).1 h))).symm)
-  rw [hA'] at hY'; cases hY'
-  refine ⟨X, X', by rw [runFrom_append_of_eq I hA, hX], by rw [runFrom_append_of_eq I hA', hX'],
-    fun q => ?_, fun j hj => ?_⟩
-  · by_cases hq : q ∈ b.map Prod.fst
-    · have hq' : q ∉ b'.map Prod.fst := fun h => hdis _ hq _ h rfl
-      have h1 := runFrom_bw_other hX hq'
-      rw [h1.1, h1.2]; exact ⟨hag.loc q hq', hag.pend q hq'⟩
-    · have h1 := runFrom_bw_other hX' hq
-      rw [h1.1, h1.2]; exact ⟨(hag'.loc q hq).symm, (hag'.pend q hq).symm⟩
-  · rw [← hag'.mem, ← hag.mem, hA'm j (fun h => hj ((hsnd j).2 h)), hAm j hj]
-
 /-- **Core of the inductive step of Lemma 3.2.** From `C₀`, the block write `b`, then a solo
 execution `β` of `p` that does not change the memory outside `R` and ends with `p` covering `r`,
 then the block writes `b'`, `b₂` (both covering exactly `R`) and `η` (without `p`), lead to a
@@ -99,8 +55,8 @@ lemma insert_cover {C₀ A D W W₀ C₁ : Config (tsObj T) B P L} {b b' b₂ : 
   have hcb'A : ∀ c ∈ b', I.Covers A c.1 c.2 := by
     intro c hc
     have hn : c.1 ∉ b.map Prod.fst := fun h => hdis₁₂ _ h _ (List.mem_map_of_mem hc) rfl
-    have h1 := runFrom_bw_other hA hn
-    exact covers_congr h1.1.symm h1.2.symm (hcov c (by simp [hc]))
+    have h1 := runFrom_blockWrite_other hA hn
+    exact (hcov c (by simp [hc])).congr h1.1.symm h1.2.symm
   have hAD : ∀ q, q ≠ p → D.loc q = A.loc q ∧ D.pend q = A.pend q := fun q hq =>
     I.runFrom_other hD (fun ℓ hℓ he => hq (he ▸ hβ ℓ hℓ))
   obtain ⟨W₁, W', hW₁, hW', hag₁⟩ := blockWrite_agreeOn (I := I) (Q := {q | q ≠ p}) (cs := b')
@@ -115,10 +71,9 @@ lemma insert_cover {C₀ A D W W₀ C₁ : Config (tsObj T) B P L} {b b' b₂ : 
       fun h => hdis₃ _ (List.mem_append_left _ h) _ (List.mem_map_of_mem hc) rfl
     have hn' : c.1 ∉ b'.map Prod.fst :=
       fun h => hdis₃ _ (List.mem_append_right _ h) _ (List.mem_map_of_mem hc) rfl
-    have h1 := runFrom_bw_other hA hn
-    have h2 := runFrom_bw_other hW hn'
-    exact covers_congr (by rw [(hW₀ c.1).1, h2.1, h1.1]) (by rw [(hW₀ c.1).2, h2.2, h1.2])
-      (hcov c (by simp [hc]))
+    have h1 := runFrom_blockWrite_other hA hn
+    have h2 := runFrom_blockWrite_other hW hn'
+    exact (hcov c (by simp [hc])).congr (by rw [(hW₀ c.1).1, h2.1, h1.1]) (by rw [(hW₀ c.1).2, h2.2, h1.2])
   obtain ⟨Z₀, Z', hZ₀, hZ', hag₂⟩ := blockWrite_agreeOn (I := I) (Q := {q | q ≠ p}) (cs := b₂)
     hnd₃ (fun c hc => hp c (by simp [hc])) (C := W₀) (D := W') hcb₂
     (fun q hq => by rw [(hW₀ q).1]; exact hag₁.loc q hq)
@@ -132,11 +87,11 @@ lemma insert_cover {C₀ A D W W₀ C₁ : Config (tsObj T) B P L} {b b' b₂ : 
     I.runFrom D (bw b' ++ bw b₂) = some Z'), hX],
     fun q hq => ⟨(hag₃.loc q hq).symm, (hag₃.pend q hq).symm⟩, ?_⟩
   have h1 := I.runFrom_other hX (fun ℓ hℓ he => hη ℓ hℓ he)
-  have h2 := runFrom_bw_other hZ' (fun h => by
+  have h2 := runFrom_blockWrite_other hZ' (fun h => by
     obtain ⟨c, hc, he⟩ := List.mem_map.1 h; exact hp c (by simp [hc]) he)
-  have h3 := runFrom_bw_other hW' (fun h => by
+  have h3 := runFrom_blockWrite_other hW' (fun h => by
     obtain ⟨c, hc, he⟩ := List.mem_map.1 h; exact hp c (by simp [hc]) he)
-  exact covers_congr (by rw [h1.1, h2.1, h3.1]) (by rw [h1.2, h2.2, h3.2]) hDc
+  exact hDc.congr (by rw [h1.1, h2.1, h3.1]) (by rw [h1.2, h2.2, h3.2])
 
 /-! ### The inductive step of Lemma 3.2 -/
 
@@ -246,7 +201,7 @@ theorem step_3_2 (hI : IsTS I false) (hB : RWLike B)
     · -- `p'` covers `r ∉ R` after `πB₁`: compare with `πB₁ πB₀ πB₂ η`
       have hcov' : ∀ c ∈ b₁ ++ b₀, I.Covers C₀ c.1 c.2 := fun c hc =>
         htr.covers c (by simp only [List.mem_append] at hc ⊢; tauto)
-      obtain ⟨X, X', hX, hX', hXX, hXXm⟩ := bw_swap (I := I) (b := b₀) (b' := b₁)
+      obtain ⟨X, X', hX, hX', hXX, hXXm⟩ := blockWrite_swap (I := I) (b := b₀) (b' := b₁)
         hnd₁₂ (fun c hc => htr.covers c (by simp only [List.mem_append] at hc ⊢; tauto))
         (fun j => (htr.mem₀ j).symm.trans (htr.mem₁ j))
       rw [hW₀] at hX; cases hX
@@ -297,8 +252,9 @@ lemma round_3_1 (hI : IsTS I false) (S : Finset P) (k : ℕ)
   obtain ⟨F, hF, -, -⟩ := blockWrite_run (I := I) (cs := b₀ ++ b₁ ++ b₂)
     (by simpa using htr.nodup) htr.covers
   have hFp : F.pend = E.pend := runFrom_pend_of_tau hF blockWrite_tau
-  obtain ⟨γ, F', hγ, hF', hfin, hoth⟩ := exists_finish hI.progress S.toList
-    (α := α ++ bw (b₀ ++ b₁ ++ b₂)) (by rw [run_append_of_eq I hα]; exact hF)
+  obtain ⟨γ, F', hγ, -, hF', hfin, hoth⟩ := I.exists_finish hI.progress
+    (fun _ _ _ _ => adm_false _) S.toList (α := α ++ bw (b₀ ++ b₁ ++ b₂))
+    (by rw [run_append_of_eq I hα]; exact hF) (adm_false _)
   have hq : F'.Quiescent := fun q => by
     by_cases hqS : q ∈ S
     · exact hfin q (by simpa using hqS)

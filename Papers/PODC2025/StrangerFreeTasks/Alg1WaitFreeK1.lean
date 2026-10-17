@@ -1,5 +1,6 @@
 import Papers.PODC2025.StrangerFreeTasks.Alg1WaitFreeK1Doomed
 import Mathlib.Data.Set.Finite.Lattice
+import Podc.SharedMemory.Progress
 
 /-!
 # Algorithm 1 is wait-free for `k = 1`
@@ -30,35 +31,6 @@ open Cslib.SharedMemory
 
 variable {P : Type} [DecidableEq P]
 
-/-- A sequence of naturals that never increases after `t0` cannot decrease infinitely often. -/
-lemma no_descent (f : ℕ → ℕ) (t0 : ℕ) (hmono : ∀ t, t0 ≤ t → f (t + 1) ≤ f t)
-    (hstrict : ∀ N, ∃ m, N ≤ m ∧ f (m + 1) < f m) : False := by
-  have anti : ∀ a b, t0 ≤ a → a ≤ b → f b ≤ f a := by
-    intro a b ha hab
-    induction b, hab using Nat.le_induction with
-    | base => exact le_rfl
-    | succ b hb ih => exact (hmono b (ha.trans hb)).trans ih
-  have key : ∀ c, ∃ t, t0 ≤ t ∧ f t + c ≤ f t0 := by
-    intro c
-    induction c with
-    | zero => exact ⟨t0, le_rfl, le_rfl⟩
-    | succ c ih =>
-      obtain ⟨t, ht, hc⟩ := ih
-      obtain ⟨m, hm, hlt⟩ := hstrict t
-      exact ⟨m + 1, by omega, by have := anti t m ht hm; omega⟩
-  obtain ⟨t, -, ht⟩ := key (f t0 + 1)
-  omega
-
-/-- The configurations of an infinite execution are reachable. -/
-lemma run_range_alg1 (e : (alg1 (P := P) 1).InfExec) (t : ℕ) :
-    (alg1 1).run ((List.range t).map e.lbl) = some (e.cfg t) := by
-  induction t with
-  | zero => simp [e.cfg_zero]
-  | succ t ih =>
-    rw [List.range_succ, List.map_append, List.map_singleton, Impl.run_append_of_eq _ ih,
-      Impl.runFrom_singleton]
-    exact e.step_eq t
-
 /-- In every infinite execution of Algorithm 1 with `k = 1`, every process takes only finitely
 many steps. -/
 theorem alg1_one_finite_steps (e : (alg1 (P := P) 1).InfExec) (p : P) :
@@ -67,9 +39,9 @@ theorem alg1_one_finite_steps (e : (alg1 (P := P) 1).InfExec) (p : P) :
   push Not at hcon
   have hinf : ∀ N, ∃ m, N ≤ m ∧ e.lbl m = .tau p := fun N => by
     obtain ⟨m, hm, h⟩ := hcon N; exact ⟨m, hm, h⟩
-  have hB : ∀ t, BInv ((List.range t).map e.lbl) (e.cfg t) :=
-    fun t => bInv_of_run (run_range_alg1 e t)
-  have hS : ∀ t, SInvK1 (e.cfg t) := fun t => sInvK1_of_run (run_range_alg1 e t)
+  have hB : ∀ t, BInv (e.lbls t) (e.cfg t) :=
+    fun t => bInv_of_run (e.run_lbls t)
+  have hS : ∀ t, SInvK1 (e.cfg t) := fun t => sInvK1_of_run (e.run_lbls t)
   have hst := e.step_eq
   -- 1. `p` never decides
   have hND : ∀ t, ((e.cfg t).loc p).phase ≠ .done := by
@@ -91,7 +63,7 @@ theorem alg1_one_finite_steps (e : (alg1 (P := P) 1).InfExec) (p : P) :
       induction t, ht using Nat.le_induction with
       | base => exact hD
       | succ t _ ih => exact (doomed_step (hB t) ih (hst t) (hND (t + 1))).1
-    apply no_descent (fun t => pot p (e.cfg t)) t0
+    refine Nat.not_frequently_lt_of_succ_le (f := fun t => pot p (e.cfg t)) (N := t0) ?_ ?_
     · intro t ht; exact (doomed_step (hB t) (hall t ht) (hst t) (hND (t + 1))).2.1
     · intro N
       obtain ⟨m, hm, hl⟩ := hinf (max N t0)
@@ -108,7 +80,7 @@ theorem alg1_one_finite_steps (e : (alg1 (P := P) 1).InfExec) (p : P) :
     intro V
     by_contra hc
     push Not at hc
-    apply no_descent (fun t => V - prog p (e.cfg t)) 0
+    refine Nat.not_frequently_lt_of_succ_le (f := fun t => V - prog p (e.cfg t)) (N := 0) ?_ ?_
     · intro t _; have := (hpr t).1; omega
     · intro N
       obtain ⟨m, hm, hl⟩ := hinf N

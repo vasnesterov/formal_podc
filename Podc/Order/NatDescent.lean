@@ -12,6 +12,9 @@ arguments ("potential functions") behind wait-freedom and lock-freedom proofs. D
 sequence that is non-decreasing from some index on is eventually constant
 (`Nat.eventually_const_of_le_succ`).
 
+`Nat.exists_lt_and_not_succ_of_not` is the discrete intermediate value property used in valency
+arguments ("the last configuration along an execution from which `v` can still be decided").
+
 Both follow from Mathlib's antitone chain condition (`WellFoundedLT.antitone_chain_condition`).
 -/
 
@@ -58,5 +61,17 @@ theorem eventually_const_of_le_succ {B : ℕ} (hB : ∀ m ≥ N, f m ≤ B)
   refine ⟨T, hT, fun m hm => ?_⟩
   have := hc m hm; have := hB m (by omega); have := hB T hT
   omega
+
+/-- **Discrete intermediate value property.** If `p 0` holds and `p K` fails, then there is a
+last index `m < K` at which `p` holds before failing at `m + 1`. -/
+theorem exists_lt_and_not_succ_of_not {p : ℕ → Prop} {K : ℕ} (h0 : p 0) (hK : ¬ p K) :
+    ∃ m < K, p m ∧ ¬ p (m + 1) := by
+  induction K with
+  | zero => exact absurd h0 hK
+  | succ K ih =>
+    by_cases hp : p K
+    · exact ⟨K, K.lt_succ_self, hp, hK⟩
+    · obtain ⟨m, hm, h⟩ := ih hp
+      exact ⟨m, by omega, h⟩
 
 end Nat

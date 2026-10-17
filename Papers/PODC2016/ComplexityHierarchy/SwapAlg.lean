@@ -1,4 +1,5 @@
 import Papers.PODC2016.ComplexityHierarchy.SwapAlgAbstract
+import Podc.SharedMemory.Objects.Swap
 
 /-!
 # Swap and read (Section 8 of [EGSZ16]): Algorithm 1 with double-collect scans — safety
@@ -7,7 +8,7 @@ import Papers.PODC2016.ComplexityHierarchy.SwapAlgAbstract
 Multiprocessor Synchronization*, PODC 2016 (arXiv 1607.06139), Section 8, Algorithm 1.
 
 The algorithm `swapAlg k m P` for processes `P`, values `Fin k` and `m` locations supporting
-`read` and `swap` (`swapLoc`). A location stores a *tagged* lap vector `(tag, laps)`, where the
+`read` and `swap` (the library's readable swap object `rswapObj`). A location stores a *tagged* lap vector `(tag, laps)`, where the
 tag `some (p, c)` identifies the `c`-th swap of process `p` (the paper's "process identifier and
 strictly increasing sequence number") and `none` the initial value. The scan of the `m` locations
 is the double collect: read `X_1, …, X_m` one by one, repeatedly, until two consecutive collects
@@ -68,23 +69,6 @@ namespace Cslib.SharedMemory.ComplexityHierarchy.SwapRead
 
 open Cslib.SharedMemory Finset
 
-/-- Primitive operations on a swap location. -/
-inductive SwapOp (V : Type) where
-  /-- Return the content. -/
-  | read
-  /-- Atomically store `v` and return the previous content. -/
-  | swap (v : V)
-
-/-- A memory location supporting `read` and `swap`. -/
-abbrev swapLoc (V : Type) (v₀ : V) : ObjSpec where
-  State := V
-  Op := SwapOp V
-  Resp := V
-  init := v₀
-  δ s o := match o with
-    | .read => (s, s)
-    | .swap v => (v, s)
-
 /-- Contents of a location: a tag (`none` = initial value, `some (p, c)` = written by the
 `c`-th swap of `p`) and a lap vector. -/
 abbrev SVal (k : ℕ) (P : Type) := Option (P × ℕ) × Laps k
@@ -143,7 +127,7 @@ variable (k m P)
 /-- Algorithm 1 of [EGSZ16]: obstruction-free consensus on `Fin k` for processes `P` from `m`
 locations supporting `read` and `swap`, all initially `(none, 0)`. -/
 def swapAlg :
-    Impl (taskObj (Fin k) (Fin k)) (fun _ : Fin m => swapLoc (SVal k P) (none, 0)) P
+    Impl (taskObj (Fin k) (Fin k)) (fun _ : Fin m => rswapObj (SVal k P) (none, 0)) P
       (DLoc k m P) where
   memInit _ := (none, 0)
   locInit _ := dInit
@@ -157,7 +141,7 @@ def swapAlg :
     | .done w => .ret w d
 
 /-- Configurations of the algorithm. -/
-abbrev DCfg := Config (taskObj (Fin k) (Fin k)) (fun _ : Fin m => swapLoc (SVal k P) (none, 0))
+abbrev DCfg := Config (taskObj (Fin k) (Fin k)) (fun _ : Fin m => rswapObj (SVal k P) (none, 0))
   P (DLoc k m P)
 
 /-- Labels of executions. -/

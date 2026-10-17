@@ -1,4 +1,5 @@
 import Cslib.Computability.Distributed.SharedMemory.Valency
+import Podc.Order.NatDescent
 
 /-!
 # Read and test-and-set: Lemma 9.1 and Theorem 9.2 of EGSZ'16
@@ -363,11 +364,7 @@ theorem exists_more_nonzero (hS : I.Solves (weakConsensus P Bool)) (hof : I.OneS
         (by rw [I.runFrom_append_of_eq hrun, I.runFrom_soloLabels]; rfl)
         ⟨b, List.mem_append_left _ (mem_respsOf_iff.1 hy)⟩ hG
       subst hyx; cases x <;> simp at this
-    have hGm : G (Nat.findGreatest G K) :=
-      Nat.findGreatest_spec (P := G) (m := 0) (Nat.zero_le _) hG0
-    set m' := Nat.findGreatest G K with hm'def
-    have hm'K : m' < K := lt_of_le_of_ne (Nat.findGreatest_le K) (fun e => hGK (e ▸ hGm))
-    have hGm1 : ¬ G (m' + 1) := Nat.findGreatest_is_greatest (Nat.lt_succ_self _) hm'K
+    obtain ⟨m', hm'K, hGm, hGm1⟩ := Nat.exists_lt_and_not_succ_of_not hG0 hGK
     have hstep : (I.soloStep b)^[m' + 1] D' = I.soloStep b ((I.soloStep b)^[m'] D') :=
       Function.iterate_succ_apply' _ _ _
     set Wm := (I.soloStep b)^[m'] D' with hWm

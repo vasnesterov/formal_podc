@@ -104,7 +104,7 @@ structure Good (α : List (Label P uidObj)) (C : Config uidObj (fun _ : Fin k =>
   nd : (S.map Prod.fst).Nodup
   wd : WD S
   nr : ∀ x ∈ S, x.2.2 ≠ .read
-  poised : ∀ x ∈ S, PoisedAt I C x
+  poised : ∀ x ∈ S, I.PoisedAt C x.1 x.2.1 x.2.2
   cnt_le : ∀ i, cnt S i ≤ m
   restorable : ∀ i ∈ U, Restorable S i (C.mem i)
   fresh : ∀ j : Fin N, n ≤ j.val → ∀ ℓ ∈ α, ℓ.proc ≠ e j
@@ -183,7 +183,7 @@ theorem good_step (hA : Anonymous I) (hall : ∀ p, I.allowed p ()) (hof : I.Obs
     intro j p hp
     have := I.iterate_soloStep_other hp C₁ j
     exact ⟨this.1.trans (hC₁other p hp).1, this.2.trans (hC₁other p hp).2⟩
-  have hXpoised : ∀ j, ∀ x ∈ S, PoisedAt I (X j) x := by
+  have hXpoised : ∀ j, ∀ x ∈ S, I.PoisedAt (X j) x.1 x.2.1 x.2.2 := by
     intro j x hx
     have hxq : x.1 ≠ q := fun h => hqS (h ▸ List.mem_map_of_mem hx)
     obtain ⟨h1, h2⟩ := hXother j x.1 hxq
@@ -256,18 +256,23 @@ theorem good_step (hA : Anonymous I) (hall : ∀ p, I.allowed p ()) (hof : I.Obs
         · rw [hesO j (by simpa using hj)]; exact hU j hj
       have hesfst : (es.map Prod.fst).Nodup :=
         List.Nodup.map_on (fun a ha b hb hab => hSinj (hesS a ha).1 (hesS b hb).1 hab) hesnd
-      obtain ⟨D, hDrun, hDmem, hDother⟩ :=
-        runFrom_taus I es hesfst (X M) (fun x hx => hXpoised M x (hesS x hx).1)
+      obtain ⟨D, hDrun, hDmem, hDpend, hDother, -⟩ :=
+        runFrom_poised_block (I := I) (es := es.map fun x => (x.1, acc x))
+          (by simpa [Function.comp_def] using hesfst) (C := X M) fun x hx => by
+            obtain ⟨y, hy, rfl⟩ := List.mem_map.1 hx; exact hXpoised M y (hesS y hy).1
+      simp only [List.map_map, Function.comp_def] at hDrun hDmem hDother
+      change D.mem = memAfter (X M).mem es at hDmem
       have hq'es : q' ∉ es.map Prod.fst := by
         intro h; obtain ⟨x, hx, hx'⟩ := List.mem_map.1 h
         exact hq'S (hx' ▸ List.mem_map_of_mem (hesS x hx).1)
-      obtain ⟨hDq'l, hDq'p⟩ := hDother q' hq'es
+      have hDq'l := hDother q' hq'es
+      have hDq'p : D.pend q' = (X M).pend q' := by rw [hDpend]
       have hmirror : Mirror q q' C D := by
         refine ⟨by rw [hDmem, hmemeq], ?_, ?_⟩
         · rw [hDq'l, (hXother M q' hqq'.symm).1, hCq'_loc, hCq_loc, hA.locInit]
         · rw [hDq'p, (hXother M q' hqq'.symm).2, hCq'_pend, hCq_pend]
       obtain ⟨D', hD'run, -⟩ := runFrom_mirror hA (fun o _ => hall q') γ hmirror hγproc hγrun
-      set τ : List (Label P uidObj) := es.map (fun x => Label.tau x.1) with hτ
+      set τ : List (Label P uidObj) := blockWrite (es.map Prod.fst) with hτ
       set β := α ++ γ ++ τ ++ γ.map (relabel q') with hβ
       have hβrun : I.run β = some D' := by
         rw [hβ, run_append_of_eq I (run_append_of_eq I hrunγ τ ▸ hDrun), hD'run]
@@ -278,11 +283,7 @@ theorem good_step (hA : Anonymous I) (hall : ∀ p, I.allowed p ()) (hof : I.Obs
       simp only [hret, true_and, ne_eq, not_true_eq_false, false_and, or_false, hops,
         List.length_singleton, zero_add] at hcnt
       obtain ⟨r, hr⟩ := List.length_eq_one_iff.1 hcnt.symm
-      have hτq : ∀ p, p ∉ es.map Prod.fst → respsOf τ p = [] := by
-        intro p hp
-        refine respsOf_eq_nil_of_proc_ne (fun ℓ hℓ => ?_)
-        obtain ⟨x, hx, rfl⟩ := List.mem_map.1 hℓ
-        exact fun h => hp (h ▸ List.mem_map_of_mem hx)
+      have hτq : ∀ p, p ∉ es.map Prod.fst → respsOf τ p = [] := fun p _ => respsOf_blockWrite _ p
       have hqes : q ∉ es.map Prod.fst := by
         intro h; obtain ⟨x, hx, hx'⟩ := List.mem_map.1 h
         exact hqS (hx' ▸ List.mem_map_of_mem (hesS x hx).1)

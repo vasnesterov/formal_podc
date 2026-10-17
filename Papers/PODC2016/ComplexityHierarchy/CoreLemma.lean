@@ -1,4 +1,5 @@
 import Papers.PODC2016.ComplexityHierarchy.Buffer
+import Podc.Order.NatDescent
 
 /-!
 # The key lemma for block (multi-)writes: Lemmas 6.5 and 7.3 of EGSZ'16
@@ -41,10 +42,6 @@ lemma steps_blockWrite {S : Set P} {ps : List P} (h : ∀ p ∈ ps, p ∈ S) :
   simp only [blockWrite, List.mem_map] at hℓ
   obtain ⟨p, hp, rfl⟩ := hℓ
   exact ⟨h p hp, trivial⟩
-
-lemma blockWrite_append (ps qs : List P) :
-    (blockWrite (ps ++ qs) : List (Label P BinCons)) = blockWrite ps ++ blockWrite qs := by
-  simp [blockWrite]
 
 /-- A block `(T1, T2)` for the locations `Lset` in `C` (see the module docstring). -/
 structure IsBlock (I : Impl BinCons (MB R ℓ V) P L) (C : Config BinCons (MB R ℓ V) P L)
@@ -158,12 +155,7 @@ theorem key_lemma (hS : I.Solves (weakConsensus P Bool)) (hof : I.OneShotOF)
             hB2 _ le_rfl])
       (hdec.mono (List.subset_append_left _ _)) h
     cases v <;> simp at this
-  set m := Nat.findGreatest f ζ.length with hmdef
-  have hfm : f m := Nat.findGreatest_spec (P := f) (m := 0) (Nat.zero_le _) hf0
-  have hmlt : m < ζ.length :=
-    lt_of_le_of_ne (Nat.findGreatest_le _) (fun e => hfend (e ▸ hfm))
-  have hfm1 : ¬ f (m + 1) :=
-    Nat.findGreatest_is_greatest (P := f) (n := ζ.length) (k := m + 1) (by omega) (by omega)
+  obtain ⟨m, hmlt, hfm, hfm1⟩ := Nat.exists_lt_and_not_succ_of_not hf0 hfend
   have hstep : I.step (Zf m) ζ[m] = some (Zf (m + 1)) := by
     have e := hZf (m + 1) hmlt
     rw [List.take_succ_eq_append_getElem hmlt, I.runFrom_append_of_eq (hZf m hmlt.le),

@@ -1,6 +1,7 @@
 import Mathlib
 import Cslib.Computability.Distributed.SharedMemory.Covering
-import Cslib.Computability.Distributed.SharedMemory.Progress
+import Podc.SharedMemory.ObjClasses
+import Podc.SharedMemory.Progress
 
 /-!
 # Timestamp objects: definitions
@@ -12,8 +13,9 @@ timestamp implementations*, PODC 2011 (full version arXiv:1103.5794v2).
   base objects `B i`, `i : ι`, deterministic processes, executions are lists of labels
   (invocation / internal step / response).
 * **Base objects.** For the lower bounds the base objects are *read/write-like*
-  (`RWLike B`): every primitive is either read-only or a blind overwrite. Registers
-  (`register V v₀`, of arbitrary — also unbounded — value types) are the main example.
+  (`RWLike B`, from the shared object-class library): every primitive is either read-only or a
+  blind overwrite. Registers (`register V v₀`, of arbitrary — also unbounded — value types) are
+  the main example (`rwLike_register`).
 * **Implemented object.** `tsObj T`: operations `getTS` and `compare t₁ t₂` over an arbitrary
   timestamp universe `T`; responses `Sum.inl t` (a timestamp) or `Sum.inr b` (a Boolean).
   The specification is not sequential: `TSCorrect α` says that whenever a `getTS` instance
@@ -24,7 +26,8 @@ timestamp implementations*, PODC 2011 (full version arXiv:1103.5794v2).
   at most once in `α` (`compare` is unrestricted).
 * **Progress.** `SoloTerm I oneShot`: from every configuration reached by an admissible
   execution, a pending process running solo returns (for deterministic processes this is the
-  paper's "non-deterministic solo-termination", i.e. obstruction-freedom).
+  paper's "non-deterministic solo-termination", i.e. obstruction-freedom). It is the library's
+  `Impl.ObstructionFreeOn (Adm oneShot)` (`soloTerm_iff`).
 -/
 
 set_option linter.unusedSectionVars false
@@ -81,23 +84,17 @@ def Adm (oneShot : Bool) (α : List (Label P (tsObj T))) : Prop :=
 
 variable {ι : Type} {B : ι → ObjSpec} {L : Type}
 
-/-- Read/write-like base objects: every primitive is read-only or a blind overwrite. -/
-def RWLike (B : ι → ObjSpec) : Prop := ∀ i (o : (B i).Op), (B i).ReadOnly o ∨ (B i).Overwrites o
-
-/-- Registers are read/write-like. -/
-lemma rwLike_register {V : ι → Type} (v₀ : ∀ i, V i) :
-    RWLike (fun i => register (V i) (v₀ i)) := by
-  intro i o
-  cases o with
-  | read => exact Or.inl (fun _ => rfl)
-  | write v => exact Or.inr (fun _ _ => rfl)
-
 variable [DecidableEq ι]
 
 /-- Solo termination (obstruction-freedom) on admissible executions. -/
-def SoloTerm (I : Impl (tsObj T) B P L) (oneShot : Bool) : Prop :=
-  ∀ α C p, I.run α = some C → Adm oneShot α → C.pend p ≠ none →
-    ∃ k, ((I.soloStep p)^[k] C).pend p = none
+abbrev SoloTerm (I : Impl (tsObj T) B P L) (oneShot : Bool) : Prop :=
+  I.ObstructionFreeOn (Adm oneShot)
+
+/-- `SoloTerm`, unfolded: from every configuration reached by an admissible execution, a pending
+process running solo returns. -/
+lemma soloTerm_iff (I : Impl (tsObj T) B P L) (oneShot : Bool) :
+    SoloTerm I oneShot ↔ ∀ α C p, I.run α = some C → Adm oneShot α → C.pend p ≠ none →
+      ∃ k, ((I.soloStep p)^[k] C).pend p = none := Iff.rfl
 
 /-- `I` is a timestamp implementation (long-lived if `oneShot = false`, one-shot otherwise)
 satisfying non-deterministic solo termination: all operations may be invoked by all processes,

@@ -49,15 +49,9 @@ lemma CovSetup.swap {α : List (Label P (tsObj T))} {C : Config (tsObj T) B P L}
   R₁ := S.R₀
   R₂ := S.R₂
 
-lemma pend_none_of_idle {α : List (Label P (tsObj T))} {C : Config (tsObj T) B P L}
-    (h : I.run α = some C) {p : P} (hp : opsOf α p = []) : C.pend p = none := by
-  rcases I.run_counts h p with ⟨h1, -⟩ | ⟨-, h2⟩
-  · exact h1
-  · rw [hp] at h2; simp at h2
-
 lemma not_idle_of_pend {α : List (Label P (tsObj T))} {C : Config (tsObj T) B P L}
     (h : I.run α = some C) {p : P} (hp : C.pend p ≠ none) : opsOf α p ≠ [] :=
-  fun h' => hp (pend_none_of_idle h h')
+  fun h' => hp (pend_none_of_opsOf_nil h h')
 
 /-- Admissibility of an extension in which only previously idle processes invoke `getTS`, each at
 most once. -/
@@ -87,7 +81,7 @@ lemma CovSetup.pend_of_mem (S : CovSetup I α C R b₀ b₁ b₂) {c : P × ι} 
 lemma CovSetup.not_idle (S : CovSetup I α C R b₀ b₁ b₂) {c : P × ι} (hc : c ∈ b₀ ++ b₁ ++ b₂)
     {p : P} (hp : opsOf α p = []) : c.1 ≠ p := by
   intro h; subst h
-  exact S.pend_of_mem hc (pend_none_of_idle S.run hp)
+  exact S.pend_of_mem hc (pend_none_of_opsOf_nil S.run hp)
 
 /-- Running the paused segments of `L₀` after the block write by `b₀`. -/
 lemma CovSetup.side (S : CovSetup I α C R b₀ b₁ b₂) {W : Config (tsObj T) B P L}
@@ -163,10 +157,10 @@ lemma two_choice (hI : IsTS I true) (S : CovSetup I α C R b₀ b₁ b₂) {W₀
     exact S.not_idle (hb c hc) hq rfl
   have hpV₀ : V₀.pend q₀ = none := by
     rw [(hV₀o q₀ hq₀L₀ (hq_b q₀ hidq₀ b₀ (fun c hc => by simp [hc]))).2]
-    exact pend_none_of_idle S.run hidq₀
+    exact pend_none_of_opsOf_nil S.run hidq₀
   have hpV₁ : V₁.pend q₁ = none := by
     rw [(hV₁o q₁ hq₁L₁ (hq_b q₁ hidq₁ b₁ (fun c hc => by simp [hc]))).2]
-    exact pend_none_of_idle S.run hidq₁
+    exact pend_none_of_opsOf_nil S.run hidq₁
   -- admissibility of the segment executions
   have hadm₀ : Adm true (α ++ bw b₀ ++ flat (segMoves I R W₀ L₀) ++ [.inv q₀ .getTS]) := by
     rw [List.append_assoc, List.append_assoc]
@@ -213,8 +207,8 @@ lemma two_choice (hI : IsTS I true) (S : CovSetup I α C R b₀ b₁ b₂) {W₀
     hW₁ (by rw [runFrom_append_of_eq I hV₁]; exact hZ₁)
     (fun i hi => by rw [seg_mem hZ₀ i hi, hV₀m i hi])
     (fun i hi => by rw [seg_mem hZ₁ i hi, hV₁m i hi])
-    q₀ q₁ (Or.inr rfl) (Or.inr rfl) (pend_none_of_idle S.run hidq₀)
-    (pend_none_of_idle S.run hidq₁) ?_ ?_ ?_ ?_ hfin₀ ?_
+    q₀ q₁ (Or.inr rfl) (Or.inr rfl) (pend_none_of_opsOf_nil S.run hidq₀)
+    (pend_none_of_opsOf_nil S.run hidq₁) ?_ ?_ ?_ ?_ hfin₀ ?_
   · intro ℓ hℓ
     rcases List.mem_append.1 hℓ with h | h
     · have := flat_procs (segMoves_procs (I := I) R W₀ L₀) ℓ h
@@ -315,8 +309,7 @@ lemma assemble (hB : RWLike B) (S : CovSetup I α C R b₀ b₁ b₂) {W₀ W₁
   have hb₁nd : (b₁.map Prod.fst).Nodup := S.nd.sublist (by simp)
   obtain ⟨Y, W₁', hY, hW₁', hagY⟩ := blockWrite_agreeOn (I := I) (Q := Q) (cs := b₁) hb₁nd
     (fun c hc => hb₁Q c hc) (C := V₀) (D := C)
-    (fun c hc => covers_congr (hV₀o c.1 (hb₁Q c hc).1 (hb₁Q c hc).2).1.symm
-      (hV₀o c.1 (hb₁Q c hc).1 (hb₁Q c hc).2).2.symm (S.cov c (by simp [hc])))
+    (fun c hc => (S.cov c (by simp [hc])).congr ((hV₀o c.1 (hb₁Q c hc).1 (hb₁Q c hc).2).1.symm) ((hV₀o c.1 (hb₁Q c hc).1 (hb₁Q c hc).2).2.symm))
     (fun q hq => (hV₀o q hq.1 hq.2).1) (fun q hq => (hV₀o q hq.1 hq.2).2)
     (fun i hi => hV₀m i (fun h => hi ((S.R₁ i).1 h)))
   rw [hW₁] at hW₁'; cases hW₁'

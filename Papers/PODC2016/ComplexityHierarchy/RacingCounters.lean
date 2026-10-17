@@ -1,5 +1,6 @@
 import Cslib.Computability.Distributed.SharedMemory.Consensus
 import Cslib.Computability.Distributed.SharedMemory.Progress
+import Podc.SharedMemory.Solo
 import Mathlib.Data.Finset.Max
 
 /-!
@@ -627,13 +628,6 @@ theorem racing_solves (hn : Fintype.card P ≤ n) :
 /-! ### Obstruction-freedom -/
 
 omit [Fintype P] in
-lemma reachable_soloStep {C : RacingCfg S} (h : (racing S n).Reachable C) (p : P) :
-    (racing S n).Reachable ((racing S n).soloStep p C) := by
-  obtain ⟨α, hα⟩ := h
-  exact ⟨α ++ (racing S n).soloLabels p C 1, by
-    rw [Impl.run_append_of_eq _ hα, Impl.runFrom_soloLabels]; rfl⟩
-
-omit [Fintype P] in
 lemma soloStep_eq {C C' : RacingCfg S} {p : P} (hp : C.pend p ≠ none)
     (h : (racing S n).step C ((racing S n).nextLabel C p) = some C') :
     (racing S n).soloStep p C = C' := by
@@ -686,7 +680,7 @@ lemma solo_lead (hn : Fintype.card P ≤ n) (p : P) (j : ℕ) :
     intro C k w hR hp hph hL hk
     obtain ⟨α, hα⟩ := hR
     obtain ⟨hp1, hph1, hc1⟩ := solo_promote (n := n) hp hph (rInv_run hn hα).sim
-    have hR1 := reachable_soloStep (n := n) ⟨α, hα⟩ p
+    have hR1 := Impl.Reachable.soloStep (I := racing S n) ⟨α, hα⟩ p
     obtain ⟨α1, hα1⟩ := hR1
     obtain ⟨hp2, hph2, -⟩ := solo_scan (n := n) hp1 hph1 (rInv_run hn hα1).sim
     have hL1 : Lead (k + 1) (ctr S ((racing S n).soloStep p C)) w := by rw [hc1]; exact hL.inc
@@ -698,14 +692,14 @@ lemma solo_lead (hn : Fintype.card P ≤ n) (p : P) (j : ℕ) :
     intro C k w hR hp hph hL hk
     obtain ⟨α, hα⟩ := hR
     obtain ⟨hp1, hph1, hc1⟩ := solo_promote (n := n) hp hph (rInv_run hn hα).sim
-    have hR1 := reachable_soloStep (n := n) ⟨α, hα⟩ p
+    have hR1 := Impl.Reachable.soloStep (I := racing S n) ⟨α, hα⟩ p
     obtain ⟨α1, hα1⟩ := hR1
     obtain ⟨hp2, hph2, hc2⟩ := solo_scan (n := n) hp1 hph1 (rInv_run hn hα1).sim
     have hL1 : Lead (k + 1) (ctr S ((racing S n).soloStep p C)) w := by rw [hc1]; exact hL.inc
     rw [hL1.argmax_eq] at hph2
     split_ifs at hph2 with hLn
     · exact ⟨3, solo_done hp2 hph2⟩
-    · obtain ⟨t, ht⟩ := ih _ (k + 1) w (reachable_soloStep ⟨α1, hα1⟩ p) hp2 hph2
+    · obtain ⟨t, ht⟩ := ih _ (k + 1) w (Impl.Reachable.soloStep (I := racing S n) ⟨α1, hα1⟩ p) hp2 hph2
         (by rw [hc2]; exact hL1) (by omega)
       exact ⟨t + 2, by rw [Function.iterate_add_apply]; exact ht⟩
 
@@ -717,7 +711,7 @@ lemma solo_from_scan (hn : Fintype.card P ≤ n) {C : RacingCfg S} {p : P} (hR :
   obtain ⟨hp1, hph1, hc1⟩ := solo_scan (n := n) hp hph (rInv_run hn hα).sim
   split_ifs at hph1 with hLn
   · exact ⟨2, solo_done hp1 hph1⟩
-  · obtain ⟨t, ht⟩ := solo_lead hn p n _ 0 _ (reachable_soloStep ⟨α, hα⟩ p) hp1 hph1
+  · obtain ⟨t, ht⟩ := solo_lead hn p n _ 0 _ (Impl.Reachable.soloStep (I := racing S n) ⟨α, hα⟩ p) hp1 hph1
       (by rw [hc1]; exact lead_zero_argmax _) (by omega)
     exact ⟨t + 1, by rw [Function.iterate_add_apply]; exact ht⟩
 
@@ -729,7 +723,7 @@ theorem racing_obstructionFree (hn : Fintype.card P ≤ n) : (racing S n).Obstru
   rcases hph : (C.loc p).ph with _ | w | _ | w
   · exact absurd (hI.idle p hph).2 hp
   · obtain ⟨hp1, hph1, -⟩ := solo_promote (n := n) hp hph hI.sim
-    obtain ⟨t, ht⟩ := solo_from_scan hn (reachable_soloStep ⟨α, hα⟩ p) hp1 hph1
+    obtain ⟨t, ht⟩ := solo_from_scan hn (Impl.Reachable.soloStep (I := racing S n) ⟨α, hα⟩ p) hp1 hph1
     exact ⟨t + 1, by rw [Function.iterate_add_apply]; exact ht⟩
   · exact solo_from_scan hn ⟨α, hα⟩ hp hph
   · exact ⟨1, solo_done hp hph⟩

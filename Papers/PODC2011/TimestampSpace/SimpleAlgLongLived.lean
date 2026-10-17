@@ -1,4 +1,5 @@
 import Papers.PODC2011.TimestampSpace.SimpleAlgCorrect
+import Podc.SharedMemory.Compute
 
 /-!
 # Algorithms 1 and 2 are not a long-lived timestamp implementation
@@ -18,67 +19,8 @@ namespace Cslib.SharedMemory.Timestamp.SimpleTS
 
 open Cslib.SharedMemory
 
-/-! ### A computable copy of the step function (for evaluating concrete executions) -/
-
-section Compute
-
-variable {n : ℕ}
-
-/-- `Impl.step` of `alg n reread` with decidable conditions. -/
-def cstep (reread : Bool) (C : Cfg n) : Label (Fin n) (tsObj ℕ) → Option (Cfg n)
-  | .inv p o =>
-    if (C.pend p).isNone then
-      some { C with pend := Function.update C.pend p (some o),
-                    loc := Function.update C.loc p (invoke (C.loc p) o) }
-    else none
-  | .tau p =>
-    if (C.pend p).isNone then none else
-    match act reread p (C.loc p) with
-    | .access i o k =>
-      some { C with mem := Function.update C.mem i ((Regs n i).δ (C.mem i) o).1,
-                    loc := Function.update C.loc p (k ((Regs n i).δ (C.mem i) o).2) }
-    | .ret _ _ => none
-  | .ret p r =>
-    if (C.pend p).isNone then none else
-    match act reread p (C.loc p) with
-    | .access _ _ _ => none
-    | .ret r' l =>
-      if r = r' then
-        some { C with pend := Function.update C.pend p none, loc := Function.update C.loc p l }
-      else none
-
-lemma step_eq_cstep (reread : Bool) (C : Cfg n) (ℓ : Label (Fin n) (tsObj ℕ)) :
-    (alg n reread).step C ℓ = cstep reread C ℓ := by
-  cases ℓ with
-  | inv p o =>
-    simp only [Impl.step, cstep, alg]; by_cases h : C.pend p = none <;> simp [h]
-  | tau p =>
-    simp only [Impl.step, cstep, alg]; by_cases h : C.pend p = none
-    · simp [h]
-    · simp only [h, Option.isNone_iff_eq_none, ite_false]
-      generalize act reread p (C.loc p) = a
-      cases a <;> rfl
-  | ret p r =>
-    simp only [Impl.step, cstep, alg]; by_cases h : C.pend p = none
-    · simp [h]
-    · simp only [h, Option.isNone_iff_eq_none, ite_false]
-      generalize act reread p (C.loc p) = a
-      cases a with
-      | access i o k => rfl
-      | ret r' l => by_cases hr : r = r' <;> simp [hr]
-
-/-- `Impl.runFrom` with `cstep`. -/
-def crun (reread : Bool) (C : Cfg n) : Exec n → Option (Cfg n)
-  | [] => some C
-  | ℓ :: α => (cstep reread C ℓ).bind (fun C' => crun reread C' α)
-
-lemma runFrom_eq_crun (reread : Bool) (C : Cfg n) (α : Exec n) :
-    (alg n reread).runFrom C α = crun reread C α := by
-  induction α generalizing C with
-  | nil => rfl
-  | cons ℓ α ih => simp only [Impl.runFrom_cons, crun, step_eq_cstep, ih]
-
-end Compute
+instance (reread : Bool) (p : Fin 2) (o : TSOp ℕ) : Decidable ((alg 2 reread).allowed p o) :=
+  inferInstanceAs (Decidable True)
 
 /-- The optional re-read step of process `p`. -/
 def rrStep (reread : Bool) (p : Fin 2) : Exec 2 := if reread then [.tau p] else []
@@ -102,7 +44,7 @@ def cex (reread : Bool) : Exec 2 := cex₁ reread ++ cex₂ reread ++ cex₃
 
 lemma cex_valid (reread : Bool) : (alg 2 reread).Valid (cex reread) := by
   refine Option.isSome_iff_exists.1 ?_
-  rw [Impl.run, runFrom_eq_crun]
+  rw [Impl.run_eq_crun]
   cases reread <;> decide +kernel
 
 /-- In the counterexample the register decreases: it holds `2` after part 1 and `1` after the
@@ -110,7 +52,7 @@ next step of process `1` (compare `mem_mono` for one-shot executions). -/
 lemma cex_decrease (reread : Bool) :
     ((alg 2 reread).run (cex₁ reread)).map (fun C => C.mem 0) = some 2 ∧
       ((alg 2 reread).run (cex₁ reread ++ [.tau 1])).map (fun C => C.mem 0) = some 1 := by
-  rw [Impl.run, Impl.run, runFrom_eq_crun, runFrom_eq_crun]
+  rw [Impl.run_eq_crun, Impl.run_eq_crun]
   cases reread <;> decide +kernel
 
 lemma cex_count (reread : Bool) (p : Fin 2) : getTSCount (cex reread) p = 2 := by

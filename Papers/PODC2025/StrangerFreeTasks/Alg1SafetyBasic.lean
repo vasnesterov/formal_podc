@@ -1,4 +1,5 @@
 import Papers.PODC2025.StrangerFreeTasks.Alg1
+import Podc.SharedMemory.Run
 
 /-!
 # Safety of Algorithm 1: step lemmas and basic invariants
@@ -60,22 +61,6 @@ lemma step_tau_alg1 {C C' : Cfg P k} {p : P}
   · exact Or.inr (Or.inl ⟨rfl, by rw [h5]; exact Function.update_eq_self _ _, h6⟩)
   · exact Or.inr (Or.inr ⟨rfl, by rw [h5]; exact Function.update_eq_self _ _, h6⟩)
 
-
-/-- Induction principle for invariants of executions of Algorithm 1. -/
-lemma run_induction {Q : List (Label P (laObj P)) → Cfg P k → Prop}
-    (h0 : Q [] (alg1 k).initCfg)
-    (hs : ∀ α C ℓ C', (alg1 k).run α = some C → Q α C → (alg1 k).step C ℓ = some C' →
-      Q (α ++ [ℓ]) C')
-    {α : List (Label P (laObj P))} {C : Cfg P k} (h : (alg1 k).run α = some C) : Q α C := by
-  induction α using List.reverseRecOn generalizing C with
-  | nil => simp only [Impl.run_nil, Option.some.injEq] at h; subst h; exact h0
-  | append_singleton α ℓ ih =>
-    rw [Impl.run, Impl.runFrom_append] at h
-    cases hα : (alg1 k).runFrom (alg1 k).initCfg α with
-    | none => simp [hα] at h
-    | some C₁ =>
-      simp only [hα, Option.bind_some, Impl.runFrom_singleton] at h
-      exact hs α C₁ ℓ C hα (ih hα) h
 
 /-! ### Fields of the local states after a step -/
 
@@ -444,7 +429,7 @@ lemma BInv.tau {α : List (Label P (laObj P))} {C C' : Cfg P k} {p : P}
 /-- The basic invariants hold along every execution of Algorithm 1. -/
 theorem bInv_of_run {α : List (Label P (laObj P))} {C : Cfg P k}
     (h : (alg1 k).run α = some C) : BInv α C := by
-  refine run_induction (Q := BInv) bInv_init ?_ h
+  refine Impl.run_induction (I := alg1 k) (Q := BInv) bInv_init ?_ h
   intro α C ℓ C' _ hI hs
   cases ℓ with
   | inv p o => exact hI.inv hs

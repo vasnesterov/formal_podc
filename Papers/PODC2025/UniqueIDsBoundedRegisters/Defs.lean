@@ -1,5 +1,6 @@
 import Mathlib
 import Cslib.Computability.Distributed.SharedMemory.Covering
+import Podc.SharedMemory.Progress
 
 /-!
 # Unique identifiers from bounded registers: definitions
@@ -21,7 +22,8 @@ Identifiers from Bounded Registers*, PODC 2025.
 * **Anonymity.** `Anonymous I`: all processes run the same automaton from the same initial
   state (`locInit`, `invoke`, `act` do not depend on the process).
 * **Progress.** `Impl.ObstructionFree`/`Impl.WaitFree` from CSLib; `WaitFreeUpTo I B`:
-  wait-freedom restricted to infinite executions with at most `B` invocations.
+  wait-freedom restricted to infinite executions with at most `B` invocations
+  (`Impl.WaitFreeOn` of the shared library, `waitFreeUpTo_iff`).
 -/
 
 set_option linter.unusedSectionVars false
@@ -100,13 +102,15 @@ structure Anonymous (I : Impl A B P L) : Prop where
   invoke : ∀ p q, I.invoke p = I.invoke q
   act : ∀ p q, I.act p = I.act q
 
-/-- Wait-freedom in infinite executions with at most `N` invocations. -/
-def WaitFreeUpTo [DecidableEq P] [DecidableEq ι] (I : Impl A B P L) (N : ℕ) : Prop :=
-  ∀ e : I.InfExec, (∀ T, invCount ((List.range T).map e.lbl) ≤ N) →
-    ∀ (p : P) (n : ℕ), (∀ t ≥ n, (e.cfg t).pend p ≠ none) → ∃ T, ∀ t ≥ T, e.lbl t ≠ .tau p
+/-- Wait-freedom in infinite executions with at most `N` invocations (the library's
+`Impl.WaitFreeOn` for the executions with `invCount ≤ N`). -/
+abbrev WaitFreeUpTo [DecidableEq P] [DecidableEq ι] (I : Impl A B P L) (N : ℕ) : Prop :=
+  I.WaitFreeOn fun α => invCount α ≤ N
 
-lemma WaitFree.waitFreeUpTo [DecidableEq P] [DecidableEq ι] {I : Impl A B P L}
-    (h : I.WaitFree) (N : ℕ) : WaitFreeUpTo I N :=
-  fun e _ p n hp => h e p n hp
+/-- `WaitFreeUpTo`, unfolded. -/
+lemma waitFreeUpTo_iff [DecidableEq P] [DecidableEq ι] (I : Impl A B P L) (N : ℕ) :
+    WaitFreeUpTo I N ↔ ∀ e : I.InfExec, (∀ T, invCount ((List.range T).map e.lbl) ≤ N) →
+      ∀ (p : P) (n : ℕ), (∀ t ≥ n, (e.cfg t).pend p ≠ none) → ∃ T, ∀ t ≥ T, e.lbl t ≠ .tau p :=
+  Iff.rfl
 
 end Cslib.SharedMemory.UniqueIDs

@@ -125,7 +125,7 @@ lemma sig_le_of_agree_except {X Y : Config (tsObj T) B P L} (p : P)
     simp only [Finset.mem_filter, Finset.mem_univ, true_and, Finset.mem_insert] at hq ⊢
     by_cases hqp : q = p
     · exact Or.inl hqp
-    · exact Or.inr (covers_congr (h q hqp).1 (h q hqp).2 hq)
+    · exact Or.inr (hq.congr ((h q hqp).1) ((h q hqp).2))
   split_ifs with hc
   · exact (Finset.card_le_card hsub).trans (Finset.card_insert_le _ _)
   · have hsub' : Finset.univ.filter (fun q => I.Covers X q r) ⊆
@@ -156,7 +156,7 @@ lemma sum_sig (C : Config (tsObj T) B P L) (S : Finset ι) [DecidablePred (fun p
     rw [Finset.disjoint_left]
     intro p hp hp'
     simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hp hp'
-    exact hrr' (covers_unique hp hp')
+    exact hrr' (Covers.unique hp hp')
 
 end Counts
 

@@ -1,6 +1,7 @@
 import Papers.PODC2016.ComplexityHierarchy.RacingCounters
 import Mathlib.Algebra.BigOperators.Group.Finset.Piecewise
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
+import Podc.Algebra.BigOperators.Update
 
 /-!
 # Racing bounded counters (Lemma 3.2 of [EGSZ16])
@@ -272,14 +273,12 @@ lemma cntF_mono [Fintype P] {f g : Phase2 m → Bool} {loc : P → Phase2 m}
 /-- Sum of a counter vector after incrementing a component. -/
 lemma sum_update_succ (c : Fin m → ℕ) (v : Fin m) :
     ∑ u, Function.update c v (c v + 1) u = ∑ u, c u + 1 := by
-  rw [Finset.sum_update_of_mem (Finset.mem_univ v), ← Finset.add_sum_erase _ _ (Finset.mem_univ v)]
-  rw [Finset.sdiff_singleton_eq_erase]; omega
+  have := Fintype.sum_update_add c v (c v + 1); omega
 
 /-- Sum of a counter vector after decrementing a positive component. -/
 lemma sum_update_pred (c : Fin m → ℕ) (v : Fin m) (hv : 0 < c v) :
     ∑ u, Function.update c v (c v - 1) u + 1 = ∑ u, c u := by
-  rw [Finset.sum_update_of_mem (Finset.mem_univ v), ← Finset.add_sum_erase _ _ (Finset.mem_univ v)]
-  rw [Finset.sdiff_singleton_eq_erase]; omega
+  have := Fintype.sum_update_add c v (c v - 1); omega
 
 /-! ### The safety invariant -/
 
@@ -905,13 +904,6 @@ theorem racing2_solves (hn : Fintype.card P ≤ n) (hn1 : 1 ≤ n) :
 /-! ### Obstruction-freedom -/
 
 omit [Fintype P] in
-lemma reachable2_soloStep {C : Cfg2 S} (h : (racing2 S n).Reachable C) (p : P) :
-    (racing2 S n).Reachable ((racing2 S n).soloStep p C) := by
-  obtain ⟨α, hα⟩ := h
-  exact ⟨α ++ (racing2 S n).soloLabels p C 1, by
-    rw [Impl.run_append_of_eq _ hα, Impl.runFrom_soloLabels]; rfl⟩
-
-omit [Fintype P] in
 lemma soloStep2_eq {C C' : Cfg2 S} {p : P} (hp : C.pend p ≠ none)
     (h : (racing2 S n).step C ((racing2 S n).nextLabel C p) = some C') :
     (racing2 S n).soloStep p C = C' := by
@@ -974,7 +966,7 @@ lemma solo2_lead (hn : Fintype.card P ≤ n) (hn1 : 1 ≤ n) (p : P) (j : ℕ) :
       have := cntF_pos (f := idleIncB w) (loc := C.loc) (q := p) (by simp [hph, idleIncB])
       omega
     obtain ⟨hp1, hph1, hc1⟩ := solo2_inc hp hph hI.inv hlt
-    obtain ⟨α1, hα1⟩ := reachable2_soloStep (n := n) ⟨α, hα⟩ p
+    obtain ⟨α1, hα1⟩ := Impl.Reachable.soloStep (I := racing2 S n) ⟨α, hα⟩ p
     obtain ⟨hp2, hph2, -⟩ := solo2_scan hp1 hph1 (rInv2_run hn hn1 hα1).inv
     have hL1 : Lead (k + 1) (ctr2 S ((racing2 S n).soloStep p C)) w := by rw [hc1]; exact hL.inc
     rcases afterScan2_cases n (ctr2 S ((racing2 S n).soloStep p C)) with
@@ -991,7 +983,7 @@ lemma solo2_lead (hn : Fintype.card P ≤ n) (hn1 : 1 ≤ n) (p : P) (j : ℕ) :
       have := cntF_pos (f := idleIncB w) (loc := C.loc) (q := p) (by simp [hph, idleIncB])
       omega
     obtain ⟨hp1, hph1, hc1⟩ := solo2_inc hp hph hI.inv hlt
-    obtain ⟨α1, hα1⟩ := reachable2_soloStep (n := n) ⟨α, hα⟩ p
+    obtain ⟨α1, hα1⟩ := Impl.Reachable.soloStep (I := racing2 S n) ⟨α, hα⟩ p
     obtain ⟨hp2, hph2, hc2⟩ := solo2_scan hp1 hph1 (rInv2_run hn hn1 hα1).inv
     set C1 := (racing2 S n).soloStep p C with hC1
     have hL1 : Lead (k + 1) (ctr2 S C1) w := by rw [hc1]; exact hL.inc
@@ -1003,7 +995,7 @@ lemma solo2_lead (hn : Fintype.card P ≤ n) (hn1 : 1 ≤ n) (p : P) (j : ℕ) :
     · rw [ham] at hne hno; exact absurd (hlow1 _ hne) (by omega)
     · rw [h, ham] at hph2
       obtain ⟨t, ht⟩ := ih ((racing2 S n).soloStep p C1) (k + 1) w
-        (reachable2_soloStep ⟨α1, hα1⟩ p) hp2 hph2 (by rw [hc2]; exact hL1)
+        (Impl.Reachable.soloStep (I := racing2 S n) ⟨α1, hα1⟩ p) hp2 hph2 (by rw [hc2]; exact hL1)
         (by rw [hc2]; exact hlow1) (by omega)
       exact ⟨t + 2, by rw [Function.iterate_add_apply]; exact ht⟩
 
@@ -1019,7 +1011,7 @@ lemma solo2_from_scan (hn : Fintype.card P ≤ n) (hn1 : 1 ≤ n) (p : P) (s : �
     obtain ⟨α, hα⟩ := hR
     have hI := rInv2_run hn hn1 hα
     obtain ⟨hp1, hph1, hc1⟩ := solo2_scan hp hph hI.inv
-    obtain ⟨α1, hα1⟩ := reachable2_soloStep (n := n) ⟨α, hα⟩ p
+    obtain ⟨α1, hα1⟩ := Impl.Reachable.soloStep (I := racing2 S n) ⟨α, hα⟩ p
     rcases afterScan2_cases n (ctr2 S C) with ⟨-, h⟩ | ⟨-, hne, hno, h⟩ | ⟨hnl, hnd, h⟩
     · rw [h] at hph1; exact ⟨2, solo2_done hp1 hph1⟩
     · rw [h] at hph1
@@ -1034,7 +1026,7 @@ lemma solo2_from_scan (hn : Fintype.card P ≤ n) (hn1 : 1 ≤ n) (p : P) (s : �
            have := Finset.single_le_sum (f := ctr2 S C) (fun _ _ => Nat.zero_le _)
              (Finset.mem_univ (argmaxOther (ctr2 S C) (argmax (ctr2 S C))))
            omega)
-        | (obtain ⟨t, ht⟩ := ih _ (reachable2_soloStep ⟨α1, hα1⟩ p) hp2 hph2 (by omega)
+        | (obtain ⟨t, ht⟩ := ih _ (Impl.Reachable.soloStep (I := racing2 S n) ⟨α1, hα1⟩ p) hp2 hph2 (by omega)
            exact ⟨t + 2, by rw [Function.iterate_add_apply]; exact ht⟩)
     · rw [h] at hph1
       have hlow : ∀ u, u ≠ argmax (ctr2 S C) → ctr2 S C u < n := by
@@ -1044,7 +1036,7 @@ lemma solo2_from_scan (hn : Fintype.card P ≤ n) (hn1 : 1 ≤ n) (p : P) (s : �
         have : ctr2 S C (argmaxOther (ctr2 S C) (argmax (ctr2 S C))) < n := by
           by_contra hc; exact hnd ⟨h1, by omega⟩
         omega
-      obtain ⟨t, ht⟩ := solo2_lead hn hn1 p n _ 0 _ (reachable2_soloStep ⟨α, hα⟩ p) hp1 hph1
+      obtain ⟨t, ht⟩ := solo2_lead hn hn1 p n _ 0 _ (Impl.Reachable.soloStep (I := racing2 S n) ⟨α, hα⟩ p) hp1 hph1
         (by rw [hc1]; exact lead_zero_argmax _) (by rw [hc1]; exact hlow) (by omega)
       exact ⟨t + 1, by rw [Function.iterate_add_apply]; exact ht⟩
 
@@ -1061,14 +1053,14 @@ theorem racing2_obstructionFree (hn : Fintype.card P ≤ n) (hn1 : 1 ≤ n) :
       have := cntF_pos (f := idleIncB v) (loc := C.loc) (q := p) (by simp [hph, idleIncB])
       omega
     obtain ⟨hp1, hph1, -⟩ := solo2_inc hp hph hI.inv hlt
-    obtain ⟨t, ht⟩ := solo2_from_scan hn hn1 p _ _ (reachable2_soloStep ⟨α, hα⟩ p) hp1 hph1 le_rfl
+    obtain ⟨t, ht⟩ := solo2_from_scan hn hn1 p _ _ (Impl.Reachable.soloStep (I := racing2 S n) ⟨α, hα⟩ p) hp1 hph1 le_rfl
     exact ⟨t + 1, by rw [Function.iterate_add_apply]; exact ht⟩
   · have hlt : 0 < ctr2 S C v := by
       have := hI.decB v
       have := cntF_pos (f := decAtB v) (loc := C.loc) (q := p) (by simp [hph, decAtB])
       omega
     obtain ⟨hp1, hph1, -⟩ := solo2_dec hp hph hI.inv hlt
-    obtain ⟨t, ht⟩ := solo2_from_scan hn hn1 p _ _ (reachable2_soloStep ⟨α, hα⟩ p) hp1 hph1 le_rfl
+    obtain ⟨t, ht⟩ := solo2_from_scan hn hn1 p _ _ (Impl.Reachable.soloStep (I := racing2 S n) ⟨α, hα⟩ p) hp1 hph1 le_rfl
     exact ⟨t + 1, by rw [Function.iterate_add_apply]; exact ht⟩
   · exact solo2_from_scan hn hn1 p _ C ⟨α, hα⟩ hp hph le_rfl
   · exact ⟨1, solo2_done hp hph⟩

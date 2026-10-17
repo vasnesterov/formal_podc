@@ -12,7 +12,7 @@ Definitions of Section 3 of the paper and generic lemmas used in the proof of Th
 * `R3 I C` — the objects covered by exactly three processes;
 * `Triple I C R b₀ b₁ b₂` — three disjoint block writes, each covering exactly `R` in `C`.
 
-Since processes are deterministic, a process covers at most one object (`covers_unique`), so
+Since processes are deterministic, a process covers at most one object (`Covers.unique`), so
 `∑ i, sig I C i` is the number of covering processes.
 -/
 
@@ -26,15 +26,6 @@ variable {P : Type} [DecidableEq P] {T : Type} {ι : Type} [DecidableEq ι] {B :
   {L : Type} {I : Impl (tsObj T) B P L}
 
 /-! ### Covering -/
-
--- CSLib candidate (generic in the implemented object)
-/-- A (deterministic) process covers at most one base object. -/
-lemma covers_unique {C : Config (tsObj T) B P L} {p : P} {i j : ι} (hi : I.Covers C p i)
-    (hj : I.Covers C p j) : i = j := by
-  obtain ⟨-, o, k, h1, -⟩ := hi
-  obtain ⟨-, o', k', h2, -⟩ := hj
-  rw [h1] at h2
-  cases h2; rfl
 
 lemma not_covers_of_idle {C : Config (tsObj T) B P L} {p : P} (hp : C.pend p = none) (i : ι) :
     ¬ I.Covers C p i := fun h => h.1 hp
@@ -90,8 +81,8 @@ lemma Is3k.insert [Fintype ι] {C X : Config (tsObj T) B P L} {k : ℕ} (hC : Is
     {r : ι} (hX : I.Covers X p r) (hr : sig I C r ≤ 2) : Is3k I X (k + 1) := by
   classical
   have hiff : ∀ q, q ≠ p → ∀ j, I.Covers X q j ↔ I.Covers C q j := fun q hq j =>
-    ⟨covers_congr (hag q hq).1 (hag q hq).2,
-      covers_congr (hag q hq).1.symm (hag q hq).2.symm⟩
+    ⟨fun h => h.congr (hag q hq).1 (hag q hq).2,
+      fun h => h.congr (hag q hq).1.symm (hag q hq).2.symm⟩
   have hsig : ∀ j, sig I X j = sig I C j + if j = r then 1 else 0 := by
     intro j
     rw [sig_eq_card, sig_eq_card]
@@ -108,7 +99,7 @@ lemma Is3k.insert [Fintype ι] {C X : Config (tsObj T) B P L} {k : ℕ} (hC : Is
       · subst hq
         simp only [Finset.mem_filter, Finset.mem_univ, true_and, not_covers_of_idle hp,
           iff_false]
-        exact fun h => hj (covers_unique h hX)
+        exact fun h => hj (Covers.unique h hX)
       · simp [hiff q hq]
   refine ⟨fun j => ?_, ?_⟩
   · rw [hsig]; split_ifs with hj
@@ -170,7 +161,7 @@ lemma exists_triple [Fintype P] [Fintype ι] (C : Config (tsObj T) B P L) :
     have h1 := (hf i ((hmemRl i).1 hi)).2 j
     have h2 := (hf i' ((hmemRl i').1 hi')).2 j'
     rw [he] at h1
-    have hii := covers_unique h1 h2
+    have hii := Covers.unique h1 h2
     subst hii
     exact ⟨rfl, (hf i ((hmemRl i).1 hi)).1 he⟩
   have hnd1 : ∀ j, (Rl.map (fun i => f i j)).Nodup := fun j =>
@@ -196,47 +187,6 @@ lemma exists_triple [Fintype P] [Fintype ι] (C : Config (tsObj T) B P L) :
     · exact hcov 1 c hc
     · exact hcov 2 c hc
   all_goals intro i; rw [hsnd, hmemRl]; rfl
-
-/-! ### Generic execution helpers -/
-
--- CSLib candidate (generic in the implemented object)
-/-- From a reachable configuration, the processes of `ps` can finish their pending operations one
-after the other (obstruction-freedom); the other processes do not move. -/
-lemma exists_finish (hst : SoloTerm I false) (ps : List P) :
-    ∀ {α : List (Label P (tsObj T))} {F : Config (tsObj T) B P L}, I.run α = some F →
-      ∃ γ F', (∀ ℓ ∈ γ, ℓ.proc ∈ ps) ∧ I.runFrom F γ = some F' ∧
-        (∀ p ∈ ps, F'.pend p = none) ∧ (∀ q, q ∉ ps → F'.loc q = F.loc q ∧ F'.pend q = F.pend q) := by
-  induction ps with
-  | nil =>
-    intro α F _
-    exact ⟨[], F, by simp, rfl, by simp, fun _ _ => ⟨rfl, rfl⟩⟩
-  | cons p ps ih =>
-    intro α F hα
-    have hfin : ∃ K, ((I.soloStep p)^[K] F).pend p = none := by
-      by_cases hp : F.pend p = none
-      · exact ⟨0, hp⟩
-      · exact hst α F p hα (adm_false _) hp
-    set γ₁ := I.soloLabels p F (I.soloTime p F)
-    set F₁ := (I.soloStep p)^[I.soloTime p F] F
-    have hr₁ : I.runFrom F γ₁ = some F₁ := I.runFrom_soloLabels p F _
-    have hF₁ : F₁.pend p = none := I.soloTime_spec p F hfin
-    obtain ⟨γ, F', hγ, hr, hfin', hoth⟩ := ih (α := α ++ γ₁) (F := F₁)
-      (by rw [run_append_of_eq I hα, hr₁])
-    refine ⟨γ₁ ++ γ, F', fun ℓ hℓ => ?_, by rw [runFrom_append_of_eq I hr₁, hr], fun q hq => ?_,
-      fun q hq => ?_⟩
-    · rcases List.mem_append.1 hℓ with h | h
-      · rw [I.soloLabels_proc p F _ ℓ h]; simp
-      · exact List.mem_cons_of_mem _ (hγ ℓ h)
-    · rcases List.mem_cons.1 hq with rfl | hq
-      · by_cases hq' : q ∈ ps
-        · exact hfin' q hq'
-        · rw [(hoth q hq').2, hF₁]
-      · exact hfin' q hq
-    · have hqp : q ≠ p := fun h => hq (by simp [h])
-      have hqs : q ∉ ps := fun h => hq (List.mem_cons_of_mem _ h)
-      rw [(hoth q hqs).1, (hoth q hqs).2, (I.iterate_soloStep_other hqp F _).1,
-        (I.iterate_soloStep_other hqp F _).2]
-      exact ⟨rfl, rfl⟩
 
 /-- **Solo `getTS` dichotomy.** Let `p` be idle in a reachable configuration `A` and run
 `getTS` solo by `p`. Then either `p` completes its `getTS` while leaving the memory outside `R`

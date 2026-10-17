@@ -84,3 +84,5 @@ import Podc.PartialSync.RoundRun
 import Podc.PartialSync.Computable
 import Podc.PartialSync.Triviality
 import Podc.PartialSync.Containment
+import Podc.SharedMemory.Solo
+import Podc.Algebra.BigOperators.Update

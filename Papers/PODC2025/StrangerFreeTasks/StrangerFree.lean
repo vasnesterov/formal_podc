@@ -1,4 +1,6 @@
 import Cslib.Computability.Distributed.SharedMemory.FullInfo
+import Podc.SharedMemory.Covering
+import Podc.SharedMemory.Run
 
 /-!
 # Stranger-free tasks need `n` registers (Theorem 2.1 of Gafni–Losa–Raynal–Taubenfeld, PODC 2025)
@@ -102,22 +104,6 @@ lemma oneShot_append_of_no_inv {α β : List (Label P A)} (h : OneShot α)
     (hβ : ∀ y, opsOf β y = []) : OneShot (α ++ β) := by
   intro y; simpa [opsOf_append, hβ y] using h y
 
-lemma opsOf_blockWrite (ps : List P) (y : P) : opsOf (blockWrite (A := A) ps) y = [] := by
-  induction ps with
-  | nil => rfl
-  | cons p ps ih => simp [ih]
-
-lemma respsOf_blockWrite (ps : List P) (y : P) : respsOf (blockWrite (A := A) ps) y = [] := by
-  induction ps with
-  | nil => rfl
-  | cons p ps ih => simp [ih]
-
-lemma pend_none_of_opsOf_nil (I : Impl A B P L) {α : List (Label P A)} {C : Config A B P L}
-    (h : I.run α = some C) {p : P} (hp : opsOf α p = []) : C.pend p = none := by
-  rcases I.run_counts h p with ⟨h1, -⟩ | ⟨-, h2⟩
-  · exact h1
-  · rw [hp] at h2; simp at h2
-
 lemma opsOf_ne_nil_of_pend (I : Impl A B P L) {α : List (Label P A)} {C : Config A B P L}
     (h : I.run α = some C) {p : P} (hp : C.pend p ≠ none) : opsOf α p ≠ [] := by
   rcases I.run_counts h p with ⟨h1, -⟩ | ⟨-, h2⟩
@@ -157,7 +143,7 @@ theorem strangers_absurd {prog : Progress} (hT : T.StrangerFree prog) (hI : I.So
         C'.pend w ≠ none ∧ opsOf α' w ≠ [] := by
     rcases hw with hw | ⟨hw, x, hx⟩
     · exact ⟨α, C, hα, h1, hp, hcp, rfl, hw, opsOf_ne_nil_of_pend _ hα hw⟩
-    · have hpend : C.pend w = none := pend_none_of_opsOf_nil _ hα hw
+    · have hpend : C.pend w = none := pend_none_of_opsOf_nil hα hw
       obtain ⟨C₁, hs⟩ := Option.isSome_iff_exists.1
         (show (I.fullInfo.step C (.inv w x)).isSome by simp [Impl.step, hpend, Impl.fullInfo, hx])
       have hrun : I.fullInfo.run (α ++ [.inv w x]) = some C₁ := by
@@ -210,7 +196,7 @@ theorem cover_step {prog : Progress} (hT : T.StrangerFree prog) (hI : I.Solves T
   classical
   set qs := cs.map Prod.fst with hqsdef
   have hof : I.fullInfo.OneShotOF := I.fullInfo_oneShotOF hprog.oneShotOF
-  have hpp : C.pend p = none := pend_none_of_opsOf_nil _ hα hpα
+  have hpp : C.pend p = none := pend_none_of_opsOf_nil hα hpα
   have hcleanp : FIClean p C := I.fiClean_of_not_invoked hα hpα
   obtain ⟨C₁, hs₁⟩ := Option.isSome_iff_exists.1
     (show (I.fullInfo.step C (.inv p x)).isSome by simp [Impl.step, hpp, Impl.fullInfo, hx])

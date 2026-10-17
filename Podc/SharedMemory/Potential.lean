@@ -12,8 +12,9 @@ Termination arguments by a natural-number potential that decreases with the step
   increases and strictly decreases at every internal step of `p`, then the number of internal
   steps of `p` is at most the drop of `Ψ`. Corollary for a potential on local states:
   `Impl.tauSteps_le_of_potential` (step complexity).
-* `Impl.waitFreeOn_of_cfgPotential` (infinite executions): the same hypothesis for the steps of
-  the executions of a set `E` gives wait-freedom on `E`. Corollaries:
+* `Impl.waitFreeOn_of_runPotential` (infinite executions): the same hypothesis for the steps of
+  the executions of a set `E` gives wait-freedom on `E` (the potential may depend on the
+  execution); `Impl.waitFreeOn_of_cfgPotential` for a potential on configurations. Corollaries:
   `Impl.waitFree_of_cfgPotential` (potential and invariant on configurations) and
   `Impl.waitFree_of_potential` (potential on local states: each operation finishes within
   `μ p l` own steps).
@@ -21,7 +22,8 @@ Termination arguments by a natural-number potential that decreases with the step
   at every non-response step gives lock-freedom.
 
 The local potential condition is turned into the configuration one by
-`Impl.potential_step_of_local`.
+`Impl.potential_step_of_local`, based on `Impl.step_tau_or_other` (a step taken while `p` stays
+pending is an internal step of `p` or does not change `p`'s local state).
 -/
 
 namespace Cslib.SharedMemory
@@ -31,14 +33,11 @@ namespace Impl
 variable {A : ObjSpec} {ι : Type} {B : ι → ObjSpec} {P L : Type} [DecidableEq P] [DecidableEq ι]
   (I : Impl A B P L)
 
-/-- A potential on local states that decreases at every base-object access of a process does
-not increase at the steps taken while the process stays pending, and decreases at its internal
-steps. -/
-lemma potential_step_of_local (μ : P → L → ℕ)
-    (hμ : ∀ p l i o k, I.act p l = .access i o k → ∀ x, μ p (k x) < μ p l)
-    {C C' : Config A B P L} {ℓ : Label P A} (h : I.step C ℓ = some C') {p : P}
-    (hp : C.pend p ≠ none) (hp' : C'.pend p ≠ none) :
-    μ p (C'.loc p) ≤ μ p (C.loc p) ∧ (ℓ = .tau p → μ p (C'.loc p) < μ p (C.loc p)) := by
+/-- A step taken while `p` is pending before and after it is an internal step of `p` or a step
+of another process (which does not change the local state of `p`). -/
+lemma step_tau_or_other {C C' : Config A B P L} {ℓ : Label P A} (h : I.step C ℓ = some C')
+    {p : P} (hp : C.pend p ≠ none) (hp' : C'.pend p ≠ none) :
+    ℓ = .tau p ∨ (ℓ.proc ≠ p ∧ C'.loc p = C.loc p) := by
   by_cases hq : ℓ.proc = p
   · cases ℓ with
     | inv q o =>
@@ -47,14 +46,24 @@ lemma potential_step_of_local (μ : P → L → ℕ)
     | ret q r =>
       simp only [Label.proc] at hq; subst hq
       exact absurd (by simp [(step_ret h).2.1]) hp'
-    | tau q =>
-      simp only [Label.proc] at hq; subst hq
-      obtain ⟨-, -, i, o, k, hact, -, hloc⟩ := step_tau h
-      have : μ q (C'.loc q) < μ q (C.loc q) := by
-        simp only [hloc, Function.update_self]
-        exact hμ _ _ i o k hact _
-      exact ⟨this.le, fun _ => this⟩
-  · rw [(step_other h hq).1]
+    | tau q => simp only [Label.proc] at hq; exact Or.inl (hq ▸ rfl)
+  · exact Or.inr ⟨hq, (step_other h hq).1⟩
+
+/-- A potential on local states that decreases at every base-object access of a process does
+not increase at the steps taken while the process stays pending, and decreases at its internal
+steps. -/
+lemma potential_step_of_local (μ : P → L → ℕ)
+    (hμ : ∀ p l i o k, I.act p l = .access i o k → ∀ x, μ p (k x) < μ p l)
+    {C C' : Config A B P L} {ℓ : Label P A} (h : I.step C ℓ = some C') {p : P}
+    (hp : C.pend p ≠ none) (hp' : C'.pend p ≠ none) :
+    μ p (C'.loc p) ≤ μ p (C.loc p) ∧ (ℓ = .tau p → μ p (C'.loc p) < μ p (C.loc p)) := by
+  rcases I.step_tau_or_other h hp hp' with rfl | ⟨hq, hloc⟩
+  · obtain ⟨-, -, i, o, k, hact, -, hloc⟩ := step_tau h
+    have : μ p (C'.loc p) < μ p (C.loc p) := by
+      simp only [hloc, Function.update_self]
+      exact hμ _ _ i o k hact _
+    exact ⟨this.le, fun _ => this⟩
+  · rw [hloc]
     exact ⟨le_rfl, fun h' => absurd (by rw [h']; rfl) hq⟩
 
 /-! ### Finite executions -/
@@ -114,6 +123,29 @@ theorem tauSteps_le_of_potential (μ : P → L → ℕ)
 
 /-! ### Infinite executions -/
 
+/-- **Wait-freedom from a potential on executions**, restricted to the executions of `E`.
+Suppose that at every step `C → C'` extending an execution `α` (with `α ++ [ℓ] ∈ E`) and taken
+while `p` stays pending, the potential `Ψ p` of the execution and its final configuration does not
+increase, and that it strictly decreases at the internal steps of `p`. Then the implementation is
+wait-free on `E`. (The potential may depend on the execution, e.g. through ghost state.) -/
+theorem waitFreeOn_of_runPotential {E : List (Label P A) → Prop}
+    (Ψ : P → List (Label P A) → Config A B P L → ℕ)
+    (hΨ : ∀ p α C ℓ C', I.run α = some C → E (α ++ [ℓ]) → I.step C ℓ = some C' →
+      C.pend p ≠ none → C'.pend p ≠ none →
+        Ψ p (α ++ [ℓ]) C' ≤ Ψ p α C ∧ (ℓ = .tau p → Ψ p (α ++ [ℓ]) C' < Ψ p α C)) :
+    I.WaitFreeOn E := by
+  intro e hE p n hpend
+  have hstep : ∀ m ≥ n, Ψ p (e.lbls (m + 1)) (e.cfg (m + 1)) ≤ Ψ p (e.lbls m) (e.cfg m) ∧
+      (e.lbl m = .tau p →
+        Ψ p (e.lbls (m + 1)) (e.cfg (m + 1)) < Ψ p (e.lbls m) (e.cfg m)) := fun m hm => by
+    rw [e.lbls_succ m]
+    exact hΨ p _ _ _ _ (e.run_lbls m) (e.lbls_succ m ▸ hE (m + 1)) (e.step_eq m) (hpend m hm)
+      (hpend (m + 1) (by omega))
+  obtain ⟨T, -, hT⟩ := Nat.eventually_not_of_succ_le (f := fun m => Ψ p (e.lbls m) (e.cfg m))
+    (fun m hm => (hstep m hm).1)
+    (p := fun m => e.lbl m = .tau p) fun m hm => (hstep m hm).2
+  exact ⟨T, hT⟩
+
 /-- **Wait-freedom from a potential on configurations**, restricted to the executions of `E`.
 Suppose that at every step `C → C'` extending an execution `α` (with `α ++ [ℓ] ∈ E`) and taken
 while `p` stays pending, the potential `Ψ p` does not increase, and that it strictly decreases at
@@ -121,16 +153,8 @@ the internal steps of `p`. Then the implementation is wait-free on `E`. -/
 theorem waitFreeOn_of_cfgPotential {E : List (Label P A) → Prop} (Ψ : P → Config A B P L → ℕ)
     (hΨ : ∀ p α C ℓ C', I.run α = some C → E (α ++ [ℓ]) → I.step C ℓ = some C' →
       C.pend p ≠ none → C'.pend p ≠ none → Ψ p C' ≤ Ψ p C ∧ (ℓ = .tau p → Ψ p C' < Ψ p C)) :
-    I.WaitFreeOn E := by
-  intro e hE p n hpend
-  have hstep : ∀ m ≥ n, Ψ p (e.cfg (m + 1)) ≤ Ψ p (e.cfg m) ∧
-      (e.lbl m = .tau p → Ψ p (e.cfg (m + 1)) < Ψ p (e.cfg m)) := fun m hm =>
-    hΨ p _ _ _ _ (e.run_lbls m) (e.lbls_succ m ▸ hE (m + 1)) (e.step_eq m) (hpend m hm)
-      (hpend (m + 1) (by omega))
-  obtain ⟨T, -, hT⟩ := Nat.eventually_not_of_succ_le (f := fun m => Ψ p (e.cfg m))
-    (fun m hm => (hstep m hm).1)
-    (p := fun m => e.lbl m = .tau p) fun m hm => (hstep m hm).2
-  exact ⟨T, hT⟩
+    I.WaitFreeOn E :=
+  I.waitFreeOn_of_runPotential (fun p _ C => Ψ p C) hΨ
 
 /-- **Wait-freedom from a potential on configurations.** If an invariant `Inv` holds initially and
 is preserved by steps, and the potential `Ψ p` never increases at steps taken while `p` is
