@@ -1,7 +1,7 @@
 import Papers.PODC2026.TreeAA.TreeGeom
-import Podc.LockStep.Sequential
-import Podc.LockStep.Basic
-import Podc.Agreement.Specs
+import Cslib.Computability.Distributed.Byzantine.LockStep.Sequential
+import Cslib.Computability.Distributed.Byzantine.Specs
+import Mathlib
 
 /-!
 # Problem specifications and local computations of the protocols

@@ -1,6 +1,6 @@
 import Papers.PODC2016.DynamicMIS.Theorem1
-import Podc.Local.LocallyIterative
-import Podc.Local.Locality
+import Cslib.Computability.Distributed.Local.Identifiers
+import Cslib.Computability.Distributed.Local.OnlineLocalLocality
 import Mathlib
 
 /-!

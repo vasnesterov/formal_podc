@@ -28,7 +28,7 @@ structure PCtx (e : ((alg2 Id m pp out).impl ids π).InfExec) where
   h1 : pp.W * pp.n ≤ pp.U * m
   h2 : pp.U * m ≤ pp.W * pp.n + pp.n
   hall : AllInvoke e
-  hfair : e.IsFair
+  hfair : e.Fair
   t0 : ℕ
   hlt : solved (e.cfg t0) < pp.U * m
   hno : ∀ t ≥ t0, solved (e.cfg t) ≤ solved (e.cfg t0)
@@ -82,9 +82,9 @@ lemma nonempty : Nonempty P := by
   rw [h0] at h2
   omega
 
-lemma rinv (τ : ℕ) : RInv π pp ids out (e.lbls τ) (e.cfg τ) := by
+lemma rinv (τ : ℕ) : RInv π pp ids out (e.pre τ) (e.cfg τ) := by
   have := Q.nonempty
-  exact rinv_run Q.hm Q.hid Q.hn (e.run_lbls τ)
+  exact rinv_run Q.hm Q.hid Q.hn (e.run_pre τ)
 
 lemma level_mono {a b : ℕ} (h : a ≤ b) (x : Fin m) :
     ((e.cfg a).mem () x).level ≤ ((e.cfg b).mem () x).level := by
@@ -117,8 +117,8 @@ lemma not_all_U (τ : ℕ) : ¬∀ x, ((e.cfg τ).mem () x).level = pp.U := by
 /-- No process ever returns. -/
 lemma no_ret (τ : ℕ) (q : P) (r : (elecObj R).Resp) : e.lbl τ ≠ .ret q r := by
   intro hl
-  have hmem : Label.ret q r ∈ e.lbls (τ + 1) := by
-    simp only [Impl.InfExec.lbls, List.mem_map, List.mem_range]
+  have hmem : Label.ret q r ∈ e.pre (τ + 1) := by
+    simp only [Impl.InfExec.pre, List.mem_map, List.mem_range]
     exact ⟨τ, by omega, hl⟩
   obtain ⟨r', hr'⟩ := Option.ne_none_iff_exists'.1 (outputs_ne_none_of_mem hmem)
   exact Q.not_all_U (τ + 1) ((Q.rinv (τ + 1)).out q r' hr').1

@@ -117,7 +117,7 @@ Full list of differences (including modelling choices): [differencies.md](differ
 | Theorem 11 (linearizable, wait-free, ≤ 2 steps) | `FAI.theorem11_linearizable`, `FAI.theorem11_linearizable_paper`, `FAI.theorem11_waitFree`, `FAI.theorem11_steps` | `BoundedFAI.lean` |
 | `B ≥ φn` is tight | `FAI.exists_reach_max`, `FAI.exists_overflow` | `BoundedFAI.lean` |
 
-Shared library (`Podc/SharedMemory`):
+Shared library (`Cslib/Computability/Distributed/SharedMemory`):
 * `Sequential.lean`: a sequential execution with an illegal response sequence, or a response no
   state can produce, refutes linearizability.
 * `Objects/FetchAdd.lean`: the counter `faiObj m` and the implemented object `FAI.modFAI φ` are

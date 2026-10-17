@@ -126,7 +126,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Shared infrastructure.** `WeakValidatorSpec` (Definitions 2.2, 2.7) is binary graded consensus
 `Cslib.Byzantine.Problem.GradedConsensus` and `ConsensusOn` uses `Cslib.Byzantine.Problem.Consensus`
-(`Podc/Agreement/Specs.lean`; unfolded forms `weakValidatorSpec_iff`, `consensusOn_iff`). Lemma 2.6
+(`Cslib/Computability/Distributed/Byzantine/Specs.lean`; unfolded forms `weakValidatorSpec_iff`, `consensusOn_iff`). Lemma 2.6
 is the generic phase-king pair `kingPhase_agreement`/`kingPhase_persistence`
-(`Podc/Agreement/PhaseKing.lean`). Vote counts `cntIn`, `cnt` are `Finset.countEq`
-(`Podc/Foundations/Count.lean`).
+(`Cslib/Computability/Distributed/Byzantine/KingPhase.lean`). Vote counts `cntIn`, `cnt` are `Finset.countEq`
+(`Cslib/Foundations/Data/Finset/Quorum.lean`).

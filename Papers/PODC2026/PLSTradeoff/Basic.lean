@@ -1,5 +1,5 @@
 import Mathlib
-import Podc.Local.Locality
+import Cslib.Computability.Distributed.Local.OnlineLocalLocality
 
 /-!
 # Proof labeling schemes: the model
@@ -16,7 +16,7 @@ Schemes* (A. Filtser, O. Fischer, PODC 2026).
   labels agree on all nodes at distance `≤ R` (`viewEq_iff`). This is exactly what `v` learns in
   `R` rounds of the LOCAL model; for `R = 1` it is the classical PLS view (own and neighbours'
   identifiers, inputs and labels). It is the shared `Cslib.Local.ViewEq`
-  (`Podc/Local/Locality.lean`) for the labelling `u ↦ (I u, ℓ u)`.
+  (`Cslib/Computability/Distributed/Local/OnlineLocalLocality.lean`) for the labelling `u ↦ (I u, ℓ u)`.
 * `IsLocal R f`: `f G I ℓ v` only depends on the `R`-view of `v` (`isLocal_iff`); again the shared
   `Cslib.Local.IsLocal` for the paired labelling.
 * `PLS 𝒢 P R`: an `R`-PLS (Definition 1), with prover, verifier, locality, completeness and

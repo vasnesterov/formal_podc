@@ -21,7 +21,7 @@ exchange and the simulation — the leader is active (as in Theorem 14). `BitSen
 
 namespace Podc.ContentOblivious.Concrete
 
-open Podc.ContentOblivious MsgExchange Finset
+open Cslib.ContentOblivious MsgExchange Finset
 
 variable {n : ℕ} [NeZero n] {lead act : ZMod n → Bool} {ℓ : ZMod n}
 

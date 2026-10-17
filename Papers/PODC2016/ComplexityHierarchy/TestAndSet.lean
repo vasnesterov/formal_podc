@@ -1,5 +1,5 @@
 import Cslib.Computability.Distributed.SharedMemory.Valency
-import Podc.Order.NatDescent
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # Read and test-and-set: Lemma 9.1 and Theorem 9.2 of EGSZ'16
@@ -188,7 +188,7 @@ lemma soloStep_comm_agree {W : Config BinCons (fun _ : ι => tasLoc) P L} {z b a
       have : (I.soloStep z W).pend b = none := by
         rw [(soloStep_other (I := I) (Ne.symm hzb) W).2]; exact hb
       exact soloStep_of_pend_none this
-    rw [e1, e2]; exact ⟨rfl, fun _ _ => rfl, fun _ _ => rfl⟩
+    rw [e1, e2]
   cases hbact : I.act b (W.loc b) with
   | access i o k' =>
     rw [soloStep_access hb hbact, soloStep_access hz hzact]

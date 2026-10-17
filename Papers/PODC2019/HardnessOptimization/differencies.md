@@ -11,7 +11,7 @@ true)** / **under-specified definition** / **typo**.
 1. **Model made explicit.** CONGEST = synchronous, deterministic (or with private random strings, see 4),
    fixed vertex set `V` whose names are the IDs, every node knows its neighbourhood (and, for directed /
    weighted problems, the directions / weights of its incident edges), exactly `B` bits per edge, direction
-   and round (`Podc/CongestLB/Congest.lean`). The algorithm may depend on `V` (it may even "know" it runs on
+   and round (`Cslib/Computability/Distributed/Congest/LowerBound.lean`). The algorithm may depend on `V` (it may even "know" it runs on
    the lower-bound family), which only strengthens the lower bounds. Decision convention: *all nodes accept
    iff the predicate holds* (the weakest usual convention).
 2. **Theorem 1.1 (deterministic) is proved, with explicit constants**: `CC(f) ≤ T · 2|E_cut| · B + 2`

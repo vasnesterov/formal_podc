@@ -1,4 +1,5 @@
-import Podc.ContentOblivious.Model
+import Cslib.Computability.Distributed.ContentOblivious.Model
+import Mathlib
 import Papers.PODC2024.ContentObliviousLE.RingCounting
 
 /-!
@@ -7,7 +8,7 @@ import Papers.PODC2024.ContentObliviousLE.RingCounting
 Frei, Gelles, Ghazy, Nolin, *Content-Oblivious Leader Election on Rings*, PODC 2024 (brief
 announcement) / arXiv 2405.03646, Algorithm 2.
 
-Ports of the oriented ring (`Podc.ContentOblivious.oriented`): `Port1` (`true`) is the clockwise
+Ports of the oriented ring (`Cslib.ContentOblivious.oriented`): `Port1` (`true`) is the clockwise
 (CW) port, `Port0` (`false`) the counterclockwise (CCW) one. So CW pulses are *sent* on `true` and
 *received* on `false`; CCW pulses are sent on `false` and received on `true`.
 
@@ -19,7 +20,7 @@ waiting. Each reception executes the remainder of the loop iteration (lines 9–
 
 namespace Podc.ContentOblivious.Alg2
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 /-- Local state of a node running Algorithm 2. -/
 structure S where

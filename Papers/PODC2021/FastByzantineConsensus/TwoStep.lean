@@ -1,4 +1,4 @@
-import Podc.PartialSync.TwoStepLB
+import Cslib.Computability.Distributed.Byzantine.PartialSync.TwoStepLowerBound
 
 /-!
 # `t`-two-step consensus protocols (Section 4.1 of Kuznetsov–Tonkikh–Zhang, PODC 2021)
@@ -8,7 +8,7 @@ per time unit, post-GST delay bound `δ`, ideal signatures via `Auth`). The pape
 `Δ` is `δ` (we assume `0 < δ`), and *round `i`* is the time interval `[(i-1)δ, iδ)`.
 
 * `weakValidity P V` (CSLib): if all processes are correct and propose `x`, only `x` may be decided.
-* `tsRun A δ I T` (`Podc.PartialSync.TwoStepLB`): the **`T`-faulty two-step execution** starting
+* `tsRun A δ I T` (`Cslib.Computability.Distributed.Byzantine.PartialSync.TwoStepLowerBound`): the **`T`-faulty two-step execution** starting
   from `I`: the processes of `T` are Byzantine, follow the protocol during the first round and are
   silent afterwards; every message sent in round `i` is delivered at the beginning of round `i + 1`
   (`nextRound`); `gst = 0`. In our model this execution is *unique* (simultaneous deliveries are
@@ -21,7 +21,7 @@ per time unit, post-GST delay bound `δ`, ideal signatures via `Auth`). The pape
 
 Generic tools (`quiet`, `nextRound`, `round1`, `templateRun` and the round-1 lemmas = Lemma 4.1)
 live in `Cslib/Computability/Distributed/Byzantine/PartialSync/RoundOne.lean`; `tsRun` and the
-executions `ρ₃`, `ρ₄` of Theorem 4.5 in `Podc/PartialSync/TwoStepLB.lean`.
+executions `ρ₃`, `ρ₄` of Theorem 4.5 in `Cslib/Computability/Distributed/Byzantine/PartialSync/TwoStepLowerBound.lean`.
 -/
 
 set_option linter.unusedSectionVars false

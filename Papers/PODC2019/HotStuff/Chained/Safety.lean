@@ -1,5 +1,5 @@
 import Papers.PODC2019.HotStuff.Chained.Model
-import Podc.Foundations.Quorum
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Chained HotStuff with the height check is safe (Theorem 5, repaired)

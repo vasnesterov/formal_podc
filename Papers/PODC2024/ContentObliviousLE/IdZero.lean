@@ -1,4 +1,5 @@
-import Podc.ContentOblivious.Lockstep
+import Cslib.Computability.Distributed.ContentOblivious.Lockstep
+import Mathlib
 import Papers.PODC2024.ContentObliviousLE.Alg2
 
 /-!
@@ -12,7 +13,7 @@ e.g. Lemma 5's base case and "k distinct IDs have maximum ≥ k" in the proof of
 
 namespace Podc.ContentOblivious.Alg2
 
-open Podc.ContentOblivious
+open Cslib.ContentOblivious
 
 lemma run_zero (j : ℕ) :
     run alg 0 (List.replicate j false) =

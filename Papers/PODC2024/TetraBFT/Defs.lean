@@ -1,5 +1,5 @@
 import Mathlib
-import Podc.Foundations.Quorum
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # TetraBFT: votes, reports, and the safety rules (Rules 1–4)
@@ -127,7 +127,7 @@ theorem IsReport.claims_of_voted {voted : Vote V → Prop} {r a b : ℕ} {rep : 
 
 /-! ### Quorum arithmetic
 
-Generic quorum facts are in `Podc.Foundations.Quorum` (`Finset.exists_mem_notMem_of_card_le_of_lt`,
+Generic quorum facts are in `Cslib.Foundations.Data.Finset.Quorum` (`Finset.exists_mem_notMem_of_card_le_of_lt`,
 `Cslib.Quorum.exists_mem_inter_notMem_of_three_mul_lt`). -/
 
 section Quorum

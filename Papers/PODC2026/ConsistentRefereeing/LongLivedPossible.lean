@@ -1,9 +1,11 @@
 import Papers.PODC2026.ConsistentRefereeing.LongLivedBasic
-import Podc.SharedMemory.StrongLin.OneAccess
-import Podc.SharedMemory.Objects.FetchAdd
-import Podc.SharedMemory.Objects.MaxRegister
-import Podc.SharedMemory.Objects.Snapshot
-import Podc.Algebra.BigOperators.Update
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Objects.FetchAdd
+import Cslib.Computability.Distributed.SharedMemory.Objects.MaxRegister
+import Cslib.Computability.Distributed.SharedMemory.Objects.Snapshot
+import Cslib.Computability.Distributed.SharedMemory.OneAccess
+import Cslib.Computability.Distributed.SharedMemory.Task
+import Cslib.Foundations.Data.Finset.SumUpdate
 
 /-!
 # Long-lived contest from counters, max registers and snapshots (Lemma 14 of [ACE26])
@@ -15,7 +17,7 @@ particular the hypotheses of Theorems 25 and 30 are not contradictory in themsel
 restriction on the base objects is essential.
 
 All three implementations are *single-access* (every operation applies one primitive), so we
-use `OneAccess` (Podc) with a deterministic refinement `ctObj P f` of the long-lived contest
+use `OneAccess` (CSLib) with a deterministic refinement `ctObj P f` of the long-lived contest
 (`decide` returns `f` of the vector of `compete` counts, `f` = sum or maximum) and transfer the
 result to the nondeterministic specification `llSpec` (`IsNLinearization.of_ctObj`) and to the
 object type `llObj P` (`implL`, a relabelling of the object type; `implL_nStronglyLinearizable`,

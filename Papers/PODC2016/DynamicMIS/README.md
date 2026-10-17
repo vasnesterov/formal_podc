@@ -56,7 +56,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
   adversary is oblivious: the change is fixed before `π`. The MIS is the greedy MIS for `π`.
 * Corollary 6 and Section 4 are synchronous only. The direct implementation is a SET-LOCAL algorithm
   in CSLib's LOCAL model (`run_directAlg`, via `Algorithm.run_semiconj` of
-  `Podc/Local/LocallyIterative.lean`; `t`-locality: `directAlg_isLocal`). Algorithm 2 runs in synchronous broadcast rounds, with its four rules
+  `Cslib/Computability/Distributed/Local/Identifiers.lean`; `t`-locality: `directAlg_isLocal`). Algorithm 2 runs in synchronous broadcast rounds, with its four rules
   encoded literally. Ranks replace the real IDs `ℓ_v`, and message sizes are not modelled.
 * "Rounds" = stabilisation time; "broadcasts" = (node, round) pairs where the visible state changes.
 

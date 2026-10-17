@@ -84,8 +84,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
   - Long-lived contest (`LLAdm`): roles are respected and the referee decides at most once.
 * The long-lived contest is a **nondeterministic** specification (`llSpec`): `decide` may return any
   bound on all competitors' counts. Strong linearizability is taken with respect to it.
-* Base objects are given by semantic classes (`Podc/SharedMemory/ObjClasses.lean`,
-  `Podc/SharedMemory/ObjClasses/Basic.lean`):
+* Base objects are given by semantic classes (`Cslib/Computability/Distributed/SharedMemory/ObjClasses.lean`,
+  `Cslib/Computability/Distributed/SharedMemory/ObjClasses/Basic.lean`):
   - Herlihy-interfering (per state);
   - window-like with window `w` (`w`-window registers are window-like with every `w′ ≥ w`);
   - stack-like (isomorphic to a stack);
@@ -126,7 +126,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * `register_rw`, `windowObj_hyp30`, `tasObj_hyp30`, `register_interfering`, `stackObj_stackLike`:
   the standard objects belong to the classes.
 
-**Shared infrastructure** (`Podc/SharedMemory/`, CSLib candidates):
+**Shared infrastructure** (`Cslib/Computability/Distributed/SharedMemory/`, upstreamed to CSLib):
 * `StrongLin/Restricted.lean`, `Progress.lean`: strong linearizability and progress (`LockFreeOn`,
   `WaitFreeOn`, `ObstructionFreeOn`) restricted to a set of executions; `Solo.lean`: finishing
   pending operations by solo runs (`Impl.exists_finish`).

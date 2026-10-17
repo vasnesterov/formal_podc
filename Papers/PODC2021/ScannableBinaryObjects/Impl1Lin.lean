@@ -1,12 +1,12 @@
 import Papers.PODC2021.ScannableBinaryObjects.Impl1
-import Podc.SharedMemory.LinResp
-import Podc.SharedMemory.Run
+import Cslib.Computability.Distributed.SharedMemory.LinPoints
+import Cslib.Computability.Distributed.SharedMemory.Model
 
 /-!
 # Implementation 1 is linearizable (Theorem 2 of Ovens, PODC 2021, safety part)
 
 The generic tools `IsLinearization.insert`, `split_insert`, `split_cons_insert` (retroactive
-linearization points) live in `Podc/SharedMemory/LinResp.lean`.
+linearization points) live in `Cslib/Computability/Distributed/SharedMemory/LinPoints.lean`.
 
 -/
 

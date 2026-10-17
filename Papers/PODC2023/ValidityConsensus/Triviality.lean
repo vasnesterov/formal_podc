@@ -1,9 +1,9 @@
-import Podc.PartialSync.Triviality
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Triviality
 
 /-!
 # On the Validity of Consensus — §3.4 and §4.1
 
-The proofs are in the shared library `Podc.PartialSync.Triviality`; this file states the paper's
+The proofs are in the shared library `Cslib.Computability.Distributed.Byzantine.PartialSync.Triviality`; this file states the paper's
 results under their paper names.
 
 * Lemma 1 (canonical similarity): `ValidityConsensus.canonical_similarity(_auth)`

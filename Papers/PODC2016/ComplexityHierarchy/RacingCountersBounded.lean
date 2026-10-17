@@ -1,7 +1,7 @@
 import Papers.PODC2016.ComplexityHierarchy.RacingCounters
 import Mathlib.Algebra.BigOperators.Group.Finset.Piecewise
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
-import Podc.Algebra.BigOperators.Update
+import Cslib.Foundations.Data.Finset.SumUpdate
 
 /-!
 # Racing bounded counters (Lemma 3.2 of [EGSZ16])

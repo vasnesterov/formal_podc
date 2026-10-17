@@ -23,7 +23,7 @@ open Cslib.Byzantine.PartialSync Cslib.Byzantine.PartialSync.TwoStepLB Finset
 variable {P M S V K : Type*} [Fintype P] [DecidableEq P]
 
 /-- **Core of Theorem 4.5** (`ρ₅ ∼_{P₃} ρ₄ ∼_{P₁} ρ₃`, executions of Figures 2–4 in
-`Podc.PartialSync.TwoStepLB`): the decision of a process of `P₁` in `ρ₃` equals the decision of a
+`Cslib.Computability.Distributed.Byzantine.PartialSync.TwoStepLowerBound`): the decision of a process of `P₁` in `ρ₃` equals the decision of a
 process of `P₃` in the two-step execution `ρ₅`. -/
 theorem decision_eq_rho4 {A : Algorithm P M S V V} {Au : Auth P M K} {f D : ℕ} {g : P → ℕ}
     {p : P} {I : P → V} {a b : V} {T5 F3 : Finset P} {J : P → V} {r3 : P → P → Option V}

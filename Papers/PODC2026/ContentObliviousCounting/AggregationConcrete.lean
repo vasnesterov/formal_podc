@@ -12,7 +12,7 @@ hypothesis is discharged with the formalized ComputeOR (Algorithm 9) and bit-sen
 
 namespace Podc.ContentOblivious.Aggregation
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 variable {n : ℕ} [NeZero n]
 

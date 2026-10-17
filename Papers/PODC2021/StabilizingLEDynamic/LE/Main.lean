@@ -1,5 +1,5 @@
 import Papers.PODC2021.StabilizingLEDynamic.LE.Stable
-import Podc.Order.NatDescent
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # Algorithm `LE`: Theorem 6, Corollary 6, Theorem 7

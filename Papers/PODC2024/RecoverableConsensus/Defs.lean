@@ -1,5 +1,6 @@
 import Mathlib
-import Podc.SharedMemory.Recoverable
+import Cslib.Computability.Distributed.SharedMemory.ObjClasses
+import Cslib.Computability.Distributed.SharedMemory.Recoverable
 
 /-!
 # Determining Recoverable Consensus Numbers — definitions

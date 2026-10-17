@@ -13,7 +13,7 @@ import Papers.PODC2026.ContentObliviousCounting.AnonCounting
 
 namespace Podc.ContentOblivious.AnonCounting
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 set_option linter.unusedSectionVars false
 

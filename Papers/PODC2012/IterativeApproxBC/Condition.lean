@@ -1,4 +1,4 @@
-import Podc.ApproxConsensus.DigraphConditions
+import Cslib.Computability.Distributed.ApproxConsensus.DigraphConditions
 import Mathlib
 
 /-!
@@ -25,7 +25,7 @@ variable {V : Type*} [Fintype V] [DecidableEq V]
 /-- The condition of Theorem 1 of [VTL12]: for every partition `F, L, C, R` of `V` with
 `|F| ≤ f` and `L, R` non-empty, `C ∪ R ⇒ L` or `L ∪ C ⇒ R` (`Arrow`, Definition 1). The
 definitions are `Cslib.ApproxConsensus.IterativeCondition` and `Cslib.ApproxConsensus.Arrow`
-(`Podc/ApproxConsensus/DigraphConditions.lean`). -/
+(`Cslib/Computability/Distributed/ApproxConsensus/DigraphConditions.lean`). -/
 abbrev Condition (G : Digraph V) (f : ℕ) : Prop := IterativeCondition G f
 
 variable {G : Digraph V} {f : ℕ}

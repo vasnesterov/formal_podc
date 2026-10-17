@@ -6,7 +6,7 @@ import Papers.PODC2026.ContentObliviousCounting.AggregationPhases
 Chalopin, Chang, Di Luna, Zhou, *Efficient Counting and Simulation in Content-Oblivious Rings*,
 PODC 2026, proof of Theorem 1.
 
-We compute the synchronous run (`syncRun`, see `Podc/ContentOblivious/Staged.lean`) of the
+We compute the synchronous run (`syncRun`, see `Cslib/Computability/Distributed/ContentOblivious/Staged.lean`) of the
 aggregation driver with the exact stage results (`oracle`): all nodes go through the same stages
 in lockstep:
 * stages `0 … λ`: λ-preprocessing (`ComputeOR(size(ID) ≥ i)`, `i = 1 … λ+1`, `λ` = maximal ID
@@ -20,7 +20,7 @@ in lockstep:
 
 namespace Podc.ContentOblivious.Aggregation
 
-open Podc.ContentOblivious Simulation Finset
+open Cslib.ContentOblivious Simulation Finset
 
 variable {n : ℕ} [NeZero n] (op2 : List Bool → List Bool → List Bool) {U : Type}
   (w0 : U → List Bool) (x : ZMod n → ℕ × Bool × U)

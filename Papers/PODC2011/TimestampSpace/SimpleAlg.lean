@@ -1,5 +1,7 @@
 import Papers.PODC2011.TimestampSpace.Defs
-import Podc.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Task
 
 /-!
 # Section 5: a simple one-shot timestamp implementation from `⌈n/2⌉` registers

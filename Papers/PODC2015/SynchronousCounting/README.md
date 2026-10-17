@@ -97,7 +97,7 @@ one-node counter. The model and the impossibility theorem are in CSLib,
 `Cslib/Computability/Distributed/Byzantine/SyncCounting/`. No external result is assumed: the `n ≤ 3f` impossibility, which the paper only
 cites, is proved here.
 
-**Shared infrastructure.** Vote counts `cnt`, `cntA` are `Finset.countEq` (`Podc/Foundations/Count.lean`);
+**Shared infrastructure.** Vote counts `cnt`, `cntA` are `Finset.countEq` (`Cslib/Foundations/Data/Finset/Quorum.lean`);
 the computable majority vote `maj` is the library selector `Finset.majority?` (`maj_eq_majority?`);
 the king round of Lemma 4 is the generic phase-king lemma `Cslib.Byzantine.kingPhase_agreement`
-(`Podc/Agreement/PhaseKing.lean`, with `keep = +1 mod C` and `adopt = min {C, ·} + 1 mod C`).
+(`Cslib/Computability/Distributed/Byzantine/KingPhase.lean`, with `keep = +1 mod C` and `adopt = min {C, ·} + 1 mod C`).

@@ -1,4 +1,4 @@
-import Podc.SharedMemory.Anonymous.LockStep
+import Cslib.Computability.Distributed.SharedMemory.Anonymous.LockStep
 import Mathlib.GroupTheory.Perm.List
 import Mathlib.Data.Nat.GCD.Basic
 import Mathlib.Data.Fintype.EquivFin
@@ -27,7 +27,7 @@ of a round perform the same kind of access), so it also gives the necessary cond
 Taubenfeld (PODC 2017) for read/write registers and for the snapshot-based model of Algorithm 1.
 
 The symmetric rounds are the one-group case (`k = 1`) of the shared lock-step library
-`Podc.SharedMemory.Anonymous.LockStep` (`SymAlg.LSSetup.single`, `SymAlg.round_rmw`, …).
+`Cslib.Computability.Distributed.SharedMemory.Anonymous.LockStep` (`SymAlg.LSSetup.single`, `SymAlg.round_rmw`, …).
 -/
 
 set_option linter.unusedSectionVars false

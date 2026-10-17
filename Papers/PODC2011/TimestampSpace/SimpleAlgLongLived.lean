@@ -1,5 +1,5 @@
 import Papers.PODC2011.TimestampSpace.SimpleAlgCorrect
-import Podc.SharedMemory.Compute
+import Cslib.Computability.Distributed.SharedMemory.Model
 
 /-!
 # Algorithms 1 and 2 are not a long-lived timestamp implementation

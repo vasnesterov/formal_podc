@@ -1,6 +1,4 @@
 import Cslib.Computability.Distributed.SharedMemory.FullInfo
-import Podc.SharedMemory.Covering
-import Podc.SharedMemory.Run
 
 /-!
 # Stranger-free tasks need `n` registers (Theorem 2.1 of Gafni–Losa–Raynal–Taubenfeld, PODC 2025)

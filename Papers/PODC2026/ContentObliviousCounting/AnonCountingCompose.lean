@@ -6,7 +6,7 @@ import Papers.PODC2026.ContentObliviousCounting.AnonCountingMain
 Chalopin, Chang, Di Luna, Zhou, *Efficient Counting and Simulation in Content-Oblivious Rings*,
 PODC 2026, Lemma 12: the last phase (and with it the whole counting procedure, including the
 broadcast of `count`) has the composable ending property. We prove the semantic condition
-`Proc.Composable` of `Podc/ContentOblivious/Compose.lean` (bounded pulses, quiescent termination,
+`Proc.Composable` of `Cslib/Computability/Distributed/ContentOblivious/Compose.lean` (bounded pulses, quiescent termination,
 and `clean`: a node still running never waits on a link whose other end has returned unless a pulse
 of the procedure is in transit on it), so the counting procedure can be followed by any other
 procedure (Theorem 9).
@@ -14,7 +14,7 @@ procedure (Theorem 9).
 
 namespace Podc.ContentOblivious.AnonCounting
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 set_option linter.unusedSectionVars false
 set_option linter.deprecated false

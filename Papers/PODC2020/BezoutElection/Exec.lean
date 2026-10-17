@@ -4,7 +4,7 @@ import Papers.PODC2020.BezoutElection.Defs
 # Generic lemmas on the outputs of executions
 
 CSLib candidates (they hold for any implementation `Impl A B P L`). The lemmas on pending
-operations along infinite executions are in `Podc.SharedMemory.Progress`
+operations along infinite executions are in `Cslib.Computability.Distributed.SharedMemory.Progress`
 (`Impl.step_pend_none`, `Impl.InfExec.exists_ret_between`).
 -/
 

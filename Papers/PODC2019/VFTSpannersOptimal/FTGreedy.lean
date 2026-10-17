@@ -1,5 +1,5 @@
 import Papers.PODC2020.FaultTolerantSpanners.SizeArith
-import Podc.Graph.Spanner.FaultTolerantGreedy
+import Cslib.Foundations.Combinatorics.SimpleGraph.FaultTolerantGreedy
 import Cslib.Foundations.Combinatorics.SimpleGraph.GirthExtremal
 import Mathlib
 
@@ -14,7 +14,7 @@ resp. `{u, v} ∉ F`); see `differencies.md` (without this the literal test is a
 
 * `ftGreedy w k f L` / `ftGreedyEdge w k f L` — Algorithm 1 for vertex / edge faults, on top of the
   generic greedy scheme `SimpleGraph.greedyGraph` (edge list `L`, weights `w`, stretch `k`), shared
-  with Dinitz–Robelle (PODC'20) in `Podc/Graph/Spanner/FaultTolerantGreedy.lean`.
+  with Dinitz–Robelle (PODC'20) in `Cslib/Foundations/Combinatorics/SimpleGraph/FaultTolerantGreedy.lean`.
 * `ftGreedy_isWeightedVFTSpanner` / `ftGreedyEdge_isWeightedEFTSpanner` — correctness (for any order).
 * **Lemma 3**: `ftGreedy_exists_blockingSet` / `ftGreedyEdge_exists_blockingSet` — a `(k+1)`-blocking set
   of size `≤ f |E(H)|` (the edge version produces a *vertex*–edge blocking set too), via the shared

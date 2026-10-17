@@ -1,6 +1,8 @@
 import Cslib.Computability.Distributed.SharedMemory.Consensus
 import Cslib.Computability.Distributed.SharedMemory.Progress
-import Podc.SharedMemory.Solo
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Solo
+import Cslib.Foundations.Data.Nat.Descent
 import Mathlib.Data.Finset.Max
 
 /-!

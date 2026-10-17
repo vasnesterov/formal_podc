@@ -1,5 +1,5 @@
 import Papers.PODC2011.TimestampSpace.Alg4Inv2
-import Podc.SharedMemory.History
+import Cslib.Computability.Distributed.SharedMemory.History
 
 /-!
 # Algorithms 3 and 4 are correct (Lemma 6.4)

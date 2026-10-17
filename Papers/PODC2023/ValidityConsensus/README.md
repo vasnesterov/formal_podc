@@ -75,7 +75,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. The
 model, the round layer and the vector-consensus protocol are in CSLib,
 `Cslib/Computability/Distributed/Byzantine/PartialSync/` (protocol in `VC/`). The model is shared with the PODC 2021
-*Fast Byzantine Consensus* formalization, which reuses Theorem 1. Shared library (`Podc/PartialSync/`): Lemmas 1–2 and
+*Fast Byzantine Consensus* formalization, which reuses Theorem 1. Shared library (`Cslib/Computability/Distributed/Byzantine/PartialSync/`): Lemmas 1–2 and
 Theorem 1 are proved in `Triviality.lean` (`SolvesConsensusAuth.mem_of_similar`, `.eq_of_compatible`, `.trivial`;
 the paper names above are thin wrappers); `Universal` is the decision post-processing `Algorithm.mapDecide`
 (`Map.lean`, with the transfer of states, messages and unforgeability); the computable `Λ` of Theorem 3 comes from

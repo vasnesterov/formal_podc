@@ -1,5 +1,5 @@
 import Papers.PODC2019.CryptoConsensusNumber.Fig3Lin
-import Podc.Algebra.BigOperators.Update
+import Cslib.Foundations.Data.Finset.SumUpdate
 
 /-!
 # Figure 3: a potential for wait-freedom

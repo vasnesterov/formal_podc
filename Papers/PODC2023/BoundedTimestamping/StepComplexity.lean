@@ -1,5 +1,7 @@
 import Papers.PODC2023.BoundedTimestamping.Alg
-import Podc.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Task
 
 /-!
 # Constant step complexity of the MTS algorithm (Lemma 12)

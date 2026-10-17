@@ -72,7 +72,7 @@ from other work.
   (`exists_stable`).
 - The probabilistic method (independent Bernoulli(`1/(4D)`) parts) is an explicit weighted sum over subsets, without
   measure theory: `bernWeight` and its lemmas come from the shared finite probability library
-  `Podc/Probability/Finite/Bernoulli.lean`.
+  `Cslib/Probability/Finite/Bernoulli.lean`.
 
 **Main results in Lean** (namespace `LowCongestionShortcuts`).
 

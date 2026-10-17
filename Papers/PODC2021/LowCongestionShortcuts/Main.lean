@@ -1,5 +1,6 @@
 import Papers.PODC2021.LowCongestionShortcuts.DenseMinor
-import Podc.Probability.Finite.Bernoulli
+import Cslib.Probability.Finite.Bernoulli
+import Mathlib
 
 /-!
 # Theorem 3.1 of [GH21]

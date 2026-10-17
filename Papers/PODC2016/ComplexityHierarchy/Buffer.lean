@@ -1,6 +1,5 @@
 import Cslib.Computability.Distributed.SharedMemory.Valency
 import Papers.PODC2016.ComplexityHierarchy.Packing
-import Podc.SharedMemory.Covering
 
 /-!
 # ℓ-buffers and multiple assignment (Sections 6–7 of Ellen–Gelashvili–Shavit–Zhu, PODC 2016)

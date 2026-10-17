@@ -1,6 +1,7 @@
 import Papers.PODC2026.ContentObliviousCounting.LowerBound
 import Papers.PODC2026.ContentObliviousCounting.AnonCountingCompose
-import Podc.ContentOblivious.Hom
+import Cslib.Computability.Distributed.ContentOblivious.Hom
+import Mathlib
 
 /-!
 # Non-vacuity of the lower bound (Theorem 3)
@@ -13,7 +14,7 @@ upper bound `O(n^{1.5})` (`AnonCounting.totalPulses_le_sqrt`) apply to the same 
 
 namespace Podc.ContentOblivious.Counting
 
-open Podc.ContentOblivious AnonCounting
+open Cslib.ContentOblivious AnonCounting
 
 /-- The anonymous counting algorithm with inputs `(ID, isLeader)`; the ID is ignored. -/
 def liftedCount : Proc (ℕ × Bool) (ℕ × ℕ) where

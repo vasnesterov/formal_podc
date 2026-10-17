@@ -1,5 +1,5 @@
 import Papers.PODC2023.BoundedTimestamping.Alg
-import Podc.SharedMemory.Sequential
+import Cslib.Computability.Distributed.SharedMemory.Sequential
 
 /-!
 # A computable copy of `alg n κ` for evaluating concrete executions

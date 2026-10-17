@@ -47,7 +47,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 ## The formalization
 
 **Model** (CSLib, `Cslib/Computability/Distributed/SharedMemory/Recoverable.lean`; object families `withRW` and
-the progress tool `prog_of_rank` from the shared library `Podc/SharedMemory/Recoverable.lean`).
+the progress tool `prog_of_rank` from the shared library `Cslib/Computability/Distributed/SharedMemory/Recoverable.lean`).
 - Asynchronous shared memory, `n` deterministic processes `Fin n`, arbitrarily many objects with deterministic
   sequential specifications, initial values chosen by the algorithm. Each step of a non-output process is one
   operation on one object; steps in output states are no-ops. No randomization.

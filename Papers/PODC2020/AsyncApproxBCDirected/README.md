@@ -106,7 +106,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 4 (iff, end to end, inputs in `[0,K]`, `0 < ε < K`) | `theorem4` | `Operational/Theorem4.lean` |
 | Theorem 4, sufficiency: BW + FA works | `BWOp.bw_solves` | `Operational/Theorem4.lean` |
 | Theorem 18 (necessity) | `threeReach_of_solvesOn`, `threeReach_of_solves` | `Necessity.lean` |
-| Definition 3 (1/2/3-reach), cliques | `OneReach`, `TwoReach`, `ThreeReach` (shared library); `threeReach_top_iff`, `twoReach_top_iff`, `oneReach_top` | `Podc/ApproxConsensus/DigraphConditions.lean`, `Graph.lean` |
+| Definition 3 (1/2/3-reach), cliques | `OneReach`, `TwoReach`, `ThreeReach` (shared library); `threeReach_top_iff`, `twoReach_top_iff`, `oneReach_top` | `Cslib/Computability/Distributed/ApproxConsensus/DigraphConditions.lean`, `Graph.lean` |
 | Theorem 5 (cover form) | `ThreeReach.theorem5` | `Graph.lean` |
 | Theorem 12 | `ThreeReach.theorem12` | `Graph.lean` |
 | Theorem 17 (a), (b), (c) | `theorem17a`, `theorem17b`, `theorem17c` | `Conditions.lean` |
@@ -137,12 +137,12 @@ Theorem 14 as stated.
   runs (`exists_fair_extension`).
 
 **Shared infrastructure.** The asynchronous model (`Algorithm`, `run`, `Fair`, `SolvesOn`) is
-`Podc/ApproxConsensus/Async/Model.lean` and the replay machinery of Theorem 18 (`proj`, `sim_phase`,
-the two-phase replay `exists_replay₂`, `roundRobin`) is `Podc/ApproxConsensus/Async/Replay.lean`;
+`Cslib/Computability/Distributed/ApproxConsensus/Async/Model.lean` and the replay machinery of Theorem 18 (`proj`, `sim_phase`,
+the two-phase replay `exists_replay₂`, `roundRobin`) is `Cslib/Computability/Distributed/ApproxConsensus/Async/Replay.lean`;
 both are also used by `Papers/PODC2015/CrashConsensusDigraph`. Reach sets (`Reaches` =
-`Digraph.ReachableAvoiding`, `Podc/Digraph/Walk.lean`), the 1/2/3-reach conditions, CCS/CCA/BCS,
+`Digraph.ReachableAvoiding`, `Cslib/Foundations/Combinatorics/Digraph/Walk.lean`), the 1/2/3-reach conditions, CCS/CCA/BCS,
 `partCond_iff` and the iterative condition of PODC'12 with its implication to BCS are
-`Podc/ApproxConsensus/DigraphConditions.lean`. The paper-specific parts (source components of
+`Cslib/Computability/Distributed/ApproxConsensus/DigraphConditions.lean`. The paper-specific parts (source components of
 reduced graphs, paths, the algorithms and their proofs) live in this folder. No CSLib model fitted
 directly: CSLib's asynchronous model is crash-only on complete graphs, and its iterative
 approximate-consensus model is synchronous.

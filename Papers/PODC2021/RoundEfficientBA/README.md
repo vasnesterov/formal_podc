@@ -109,5 +109,5 @@ and their scenarios satisfy all hypotheses (corruption bound, validity of the ad
 the bound `1/4` is attained (`coin_parallel_static_tight`). The `t < n/3` model is CSLib's `Cslib.Byzantine.LockStep`.
 The Proxcensus specification is shared: `IsProx`, `ProxCons`, `maxGrade` are
 `Cslib.Byzantine.Problem.Proxcensus`, `Proxcensus.Consistent`, `Proxcensus.maxGrade`, and `ProxSpec` is its
-lock-step lift `Cslib.Byzantine.Problem.ofOut` (`Podc/Agreement/Specs.lean`). CSLib candidates: the extraction
+lock-step lift `Cslib.Byzantine.Problem.ofOut` (`Cslib/Computability/Distributed/Byzantine/Specs.lean`). CSLib candidates: the extraction
 (`Proxcensus.lean`) and the echo-counting interface `hcnt`/`viewCnt` (`Expansion.lean`).

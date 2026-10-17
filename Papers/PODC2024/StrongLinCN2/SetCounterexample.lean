@@ -1,9 +1,8 @@
 import Mathlib.Tactic.FinCases
-import Podc.SharedMemory.Compute
-import Podc.SharedMemory.Objects.FetchAdd
-import Podc.SharedMemory.Objects.Iface
-import Podc.SharedMemory.Objects.TestAndSet
-import Podc.SharedMemory.StrongLin.Basic
+import Cslib.Computability.Distributed.SharedMemory.Objects.FetchAdd
+import Cslib.Computability.Distributed.SharedMemory.Objects.Iface
+import Cslib.Computability.Distributed.SharedMemory.Objects.TestAndSet
+import Cslib.Computability.Distributed.SharedMemory.StrongLin
 
 /-!
 # Algorithm 2 (a set from test&set) is not strongly linearizable

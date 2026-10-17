@@ -1,4 +1,5 @@
-import Podc.ContentOblivious.Hom
+import Cslib.Computability.Distributed.ContentOblivious.Hom
+import Mathlib
 
 /-!
 # Message exchange on oriented rings (Algorithms 5–6), from abstract round procedures
@@ -13,9 +14,9 @@ while ComputeOR(active ∧ I still have bits) do
   rcvdccw.append(CWBitSending(msgcw[t]));  rcvdcw.append(CCWBitSending(msgccw[t]));  t++
 ```
 (relays: `ComputeOR(false)`, `CWBitRelay`, `CCWBitRelay`). We model it as a staged program
-(`Podc.ContentOblivious.Proc.staged`) whose stage procedure is the sum of the three round
+(`Cslib.ContentOblivious.Proc.staged`) whose stage procedure is the sum of the three round
 procedures, and derive its correctness from the generic composition theorem
-(`Podc.ContentOblivious.Schedule.final`). In this file the three procedures are abstract: they are
+(`Cslib.ContentOblivious.Schedule.final`). In this file the three procedures are abstract: they are
 assumed to be composable, to return the right values and to send at most `3n`, `6n`, `6n` pulses
 (this is what Theorems 17 and 21 provide; see `MsgExchange.lean` for the instantiation).
 
@@ -25,7 +26,7 @@ messages.
 
 namespace Podc.ContentOblivious.MsgExchange
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 /-- Node input: leader flag, active flag, message to the clockwise and to the counter-clockwise
 neighbour. -/

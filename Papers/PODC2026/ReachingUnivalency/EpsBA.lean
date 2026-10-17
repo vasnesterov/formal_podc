@@ -1,5 +1,5 @@
 import Mathlib
-import Podc.Foundations.Count
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Reaching Univalency — §2.3–2.5: ε-Byzantine Agreement and the reductions

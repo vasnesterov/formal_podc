@@ -107,7 +107,7 @@ nondeterministic or randomized algorithms.
 * Theorem 1.2: Algorithm 2 is a one-shot one (`SimpleTS.lemma_5_1`).
 
 The model is CSLib's `SharedMemory` (`Model`, `Covering`, `Progress`). From the shared library
-`Podc/SharedMemory/`: `SoloTerm` is `Impl.ObstructionFreeOn (Adm oneShot)` and `WaitFreeUpTo` is
+`Cslib/Computability/Distributed/SharedMemory/`: `SoloTerm` is `Impl.ObstructionFreeOn (Adm oneShot)` and `WaitFreeUpTo` is
 `Impl.WaitFreeOn` (`Progress`, with `soloTerm_iff`, `waitFreeUpTo_iff`); `RWLike`
 (`ObjClasses`); covering and block-write lemmas (`Impl.Covers.congr`, `Impl.Covers.unique`,
 `Impl.blockWrite_swap`, `Covering`); solo runs under restricted obstruction-freedom

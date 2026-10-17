@@ -1,5 +1,5 @@
 import Mathlib
-import Podc.Agreement.Specs
+import Cslib.Computability.Distributed.Byzantine.Specs
 
 /-!
 # Proxcensus and the extraction step (Definition 2.2, Section 3.4, Theorem 3.7)

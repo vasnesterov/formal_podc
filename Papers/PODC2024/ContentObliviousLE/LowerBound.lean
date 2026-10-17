@@ -1,4 +1,5 @@
-import Podc.ContentOblivious.Lockstep
+import Cslib.Computability.Distributed.ContentOblivious.Lockstep
+import Mathlib
 import Papers.PODC2024.ContentObliviousLE.Theorem1
 
 /-!
@@ -8,7 +9,7 @@ Frei, Gelles, Ghazy, Nolin, *Content-Oblivious Leader Election on Rings*, PODC 2
 announcement), Theorem 3; full version arXiv 2405.03646, Section 5 (Definition 18, Lemmas 19–20,
 Corollary 21, Theorem 17).
 
-The lower bound holds for every deterministic algorithm in our model (`Podc.ContentOblivious.Algo`)
+The lower bound holds for every deterministic algorithm in our model (`Cslib.ContentOblivious.Algo`)
 that solves terminating leader election on oriented rings of sizes `1` and `2` (`SolvesLE`). As in
 the paper, the argument uses rings with a single node (a self-loop) and with two nodes (a double
 link).
@@ -20,7 +21,7 @@ We also show that Theorem 3 must be read as a *worst case over ID assignments*: 
 
 namespace Podc.ContentOblivious.LowerBound
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 variable {A : Algo} {Ids : Set ℕ}
 

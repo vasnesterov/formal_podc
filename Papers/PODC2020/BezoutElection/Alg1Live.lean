@@ -21,7 +21,7 @@ variable {Id : Type} [DecidableEq Id] {R : Type} [Inhabited R] {P : Type} [Decid
 structure Ctx (e : ((alg1 Id n out).impl ids π).InfExec) : Prop where
   hid : Function.Injective ids
   hn : Fintype.card P = n
-  fair : e.IsFair
+  fair : e.Fair
   allinv : AllInvoke e
 
 variable {e : ((alg1 Id n out).impl ids π).InfExec}
@@ -31,9 +31,9 @@ namespace Ctx
 variable (X : Ctx e)
 include X
 
-lemma inv (t : ℕ) : Inv ids n out (e.lbls t) (e.cfg t) := inv_run X.hid X.hn (e.run_lbls t)
+lemma inv (t : ℕ) : Inv ids n out (e.pre t) (e.cfg t) := inv_run X.hid X.hn (e.run_pre t)
 
-lemma basic (t : ℕ) : Basic ids (e.lbls t) (e.cfg t) := (X.inv t).1
+lemma basic (t : ℕ) : Basic ids (e.pre t) (e.cfg t) := (X.inv t).1
 
 lemma me (t : ℕ) (q : P) : ((e.cfg t).loc q).me = ids q := (X.basic t).me q
 
@@ -211,13 +211,13 @@ lemma act_nonread {t : ℕ} {q : P} (hq : (e.lbl t).proc = q)
     · simp [h1]
 
 /-- A response label of `p` occurs before `t` if `p` has an output at `t`. -/
-lemma ret_of_outputs {t : ℕ} {p : P} (h : outputs (e.lbls t) p ≠ none) :
+lemma ret_of_outputs {t : ℕ} {p : P} (h : outputs (e.pre t) p ≠ none) :
     ∃ t' r, e.lbl t' = .ret p r := by
   obtain ⟨r, hr⟩ := Option.ne_none_iff_exists'.1 h
-  have hmem : r ∈ respsOf (e.lbls t) p := List.mem_of_mem_head? hr
+  have hmem : r ∈ respsOf (e.pre t) p := List.mem_of_mem_head? hr
   simp only [respsOf, List.mem_filterMap] at hmem
   obtain ⟨ℓ, hℓ, hret⟩ := hmem
-  simp only [Impl.InfExec.lbls, List.mem_map, List.mem_range] at hℓ
+  simp only [Impl.InfExec.pre, List.mem_map, List.mem_range] at hℓ
   obtain ⟨t', -, rfl⟩ := hℓ
   cases hl : e.lbl t' with
   | inv q o => rw [hl] at hret; simp at hret

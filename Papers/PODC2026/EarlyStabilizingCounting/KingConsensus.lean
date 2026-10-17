@@ -1,6 +1,6 @@
 import Papers.PODC2026.EarlyStabilizingCounting.Basic
-import Podc.Agreement.PhaseKing
-import Podc.Agreement.Specs
+import Cslib.Computability.Distributed.Byzantine.KingPhase
+import Cslib.Computability.Distributed.Byzantine.Specs
 
 /-!
 # Graded agreement and King Consensus (Lemmas 2.5 and 2.7, Algorithms 9 and 10)

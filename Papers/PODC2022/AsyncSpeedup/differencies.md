@@ -29,7 +29,7 @@ Classification: **[F]** false statement, **[D]** false only in a degenerate case
    for faces `τ' ⊂ τ` (a round of a subset of processes extends to a round of all of them). This is
    explicit here as `Model.Extendable`. It also uses that every process sees itself and only
    participants (`Model.WellFormed`), besides solo executions (`Model.AllowsSolo`). All are proved for
-   IIS, iterated snapshot, IIS+test&set and IIS+binary consensus (`Podc/IteratedModel/Patterns.lean`).
+   IIS, iterated snapshot, IIS+test&set and IIS+binary consensus (`Cslib/Computability/Distributed/IteratedModel/Patterns.lean`).
 4. **[U] Black boxes (Section 4).** The "consistent box" remark is formalized by letting patterns depend
    only on the participating set and the box inputs. The proof of Theorem 2 also needs that a process
    running solo gets an answer determined by its own box input ("`b_i = B_t(a_i)` ... whenever process `i`

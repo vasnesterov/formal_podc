@@ -95,7 +95,7 @@ Classification: **[F]** false statement, **[G]** proof gap with (morally/provabl
     do") are modelled by their support: `δ p q` is a set of outcomes. Under global fairness and, for
     finite state spaces, for "with probability 1" this is exact
     (`Cslib.TransitionSystem.globallyFair_iff_reach`, `tendsto_compl_of_reach`,
-    `prob_eq_zero_of_not_reach` in `Podc/Stabilization/`).
+    `prob_eq_zero_of_not_reach` in `Cslib/Computability/Distributed/SelfStabilization/`).
 13. **[M] Global fairness.** We use the standard definition of Angluin et al. (if `C` occurs infinitely
     often and `C → C'`, then `C'` occurs infinitely often). The paper's wording ("if a configuration
     is always reachable it will be reached eventually") is a different, informal phrasing; for finite

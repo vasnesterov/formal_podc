@@ -67,7 +67,7 @@ lemma ev_write (Q : ℕ → Prop) (T : ℕ) (hpres : ∀ t ≥ T, Q t → Q (t +
 
 /-! ### The electing phase cannot last forever -/
 
-theorem phase1 [Nonempty P] (hN : ∀ t, NoLead n (e.lbls t) (e.cfg t)) : False := by
+theorem phase1 [Nonempty P] (hN : ∀ t, NoLead n (e.pre t) (e.cfg t)) : False := by
   -- all processes are active forever
   have hact0 : ∀ q, ∃ T, ∀ t ≥ T, (e.cfg t).pend q ≠ none ∧
       (((e.cfg t).loc q).pc = .read ∨ ∃ w, ((e.cfg t).loc q).pc = .write w) := by
@@ -285,14 +285,14 @@ theorem phase1 [Nonempty P] (hN : ∀ t, NoLead n (e.lbls t) (e.cfg t)) : False 
 
 /-! ### The leader phase -/
 
-lemma lead_forever {L : P} {t₀ : ℕ} (h : Lead ids n out (e.lbls t₀) (e.cfg t₀) L) :
-    ∀ t ≥ t₀, Lead ids n out (e.lbls t) (e.cfg t) L := by
+lemma lead_forever {L : P} {t₀ : ℕ} (h : Lead ids n out (e.pre t₀) (e.cfg t₀) L) :
+    ∀ t ≥ t₀, Lead ids n out (e.pre t) (e.cfg t) L := by
   intro t ht
   induction t, ht using Nat.le_induction with
   | base => exact h
   | succ t _ ih =>
     have hB' := X.basic (t + 1)
-    rw [Impl.InfExec.lbls_succ] at hB' ⊢
+    rw [Impl.InfExec.pre_succ] at hB' ⊢
     exact lead_step X.hid X.hn (X.basic t) hB' ih (e.step_eq t)
 
 end Ctx
@@ -332,7 +332,7 @@ namespace Ctx
 variable (X : Ctx e)
 include X
 
-theorem phase2 (L : P) (t₀ : ℕ) (hL0 : Lead ids n out (e.lbls t₀) (e.cfg t₀) L) (p₀ : P)
+theorem phase2 (L : P) (t₀ : ℕ) (hL0 : Lead ids n out (e.pre t₀) (e.cfg t₀) L) (p₀ : P)
     (H : ∀ t r, e.lbl t ≠ .ret p₀ r) : False := by
   have hLd := X.lead_forever hL0
   have hlos : ∀ t ≥ t₀, ∀ j, ((e.cfg t).loc j).loser = true ↔ j ≠ L :=
@@ -731,7 +731,7 @@ theorem terminates (p : P) : ∃ t r, e.lbl t = .ret p r := by
   by_contra H
   push Not at H
   have : Nonempty P := ⟨p⟩
-  by_cases hL : ∃ t L, Lead ids n out (e.lbls t) (e.cfg t) L
+  by_cases hL : ∃ t L, Lead ids n out (e.pre t) (e.cfg t) L
   · obtain ⟨t₀, L, hL⟩ := hL
     exact X.phase2 L t₀ hL p H
   · push Not at hL

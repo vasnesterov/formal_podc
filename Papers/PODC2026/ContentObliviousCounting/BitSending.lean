@@ -1,4 +1,5 @@
-import Podc.ContentOblivious.Mirror
+import Cslib.Computability.Distributed.ContentOblivious.Mirror
+import Mathlib
 
 /-!
 # Algorithms 7–8 (`CCWBitSending` / `CCWBitRelay`) and Theorem 17
@@ -9,7 +10,7 @@ PODC 2026 (arXiv 2603.28260), §6.1: Algorithm 7 `CCWBitSending(bit)`, Algorithm
 `CWBitRelay` ("symmetric, omitted" in the paper).
 
 **Model.** Oriented ring `ZMod n` (`n ≥ 1`; `Port1 = true` is the clockwise port), asynchronous
-content-oblivious pulses, adversarial scheduler (`Podc.ContentOblivious.Step`), no failures,
+content-oblivious pulses, adversarial scheduler (`Cslib.ContentOblivious.Step`), no failures,
 deterministic nodes, exactly one leader, at least one active node. The input of a node is
 `(isLeader, isActive, bit)`; active nodes run `CCWBitSending(bit)` (`bit : Option Bool`,
 `none` = ⊥), the other nodes (relays) run `CCWBitRelay()`. Both are one procedure `proc`.
@@ -32,7 +33,7 @@ received the synchronization pulse back (`P ℓ ≥ 1`), every bit pulse has bee
 
 namespace Podc.ContentOblivious.BitSending
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 /-- Number of pulses encoding a bit: `κ(⊥) = 0`, `κ(0) = 1`, `κ(1) = 2`. -/
 def κ : Option Bool → ℕ

@@ -224,14 +224,14 @@ then every process returns. -/
 theorem alg2_terminates_of_progress (hm : 0 < m) (hid : Function.Injective ids)
     (hn : Fintype.card P = pp.n)
     (hprog : ∀ e : ((alg2 Id m pp out).impl ids π).InfExec, IsOneShot e → AllInvoke e →
-      e.IsFair → ∀ t, solved (e.cfg t) < pp.U * m → ∃ t', t ≤ t' ∧ solved (e.cfg t) < solved (e.cfg t')) :
+      e.Fair → ∀ t, solved (e.cfg t) < pp.U * m → ∃ t', t ≤ t' ∧ solved (e.cfg t) < solved (e.cfg t')) :
     Terminates ((alg2 Id m pp out).impl ids π) := by
   intro e hos hall hfair p
   by_contra hnot
   push Not at hnot
   have : Nonempty P := ⟨p⟩
-  have hR : ∀ t, RInv π pp ids out (e.lbls t) (e.cfg t) :=
-    fun t => rinv_run hm hid hn (e.run_lbls t)
+  have hR : ∀ t, RInv π pp ids out (e.pre t) (e.cfg t) :=
+    fun t => rinv_run hm hid hn (e.run_pre t)
   have hlev : ∀ t x, ((e.cfg t).mem () x).level ≤ ((e.cfg (t + 1)).mem () x).level :=
     fun t x => step_level_mono (hR t) (e.step_eq t) x
   have hlevU : ∀ t x, ((e.cfg t).mem () x).level ≤ pp.U := by

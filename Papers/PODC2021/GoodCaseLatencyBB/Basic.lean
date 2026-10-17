@@ -1,5 +1,5 @@
 import Cslib.Computability.Distributed.Byzantine.PartialSync.RoundOne
-import Podc.PartialSync.RunClasses
+import Cslib.Computability.Distributed.Byzantine.PartialSync.RunClasses
 
 /-!
 # Byzantine broadcast specifications and good-case latency

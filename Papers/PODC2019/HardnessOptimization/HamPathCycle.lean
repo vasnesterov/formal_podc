@@ -11,7 +11,7 @@ import Papers.PODC2019.HardnessOptimization.HamPathTheorem
 
 namespace HardnessOptimization.HamPath
 
-open HV Finset Podc.CongestLB
+open HV Finset Cslib.Congest Cslib.CommunicationComplexity
 
 /-- A directed Hamiltonian cycle: a list of all vertices without repetitions, consecutive vertices
 joined by arcs, and an arc from the last vertex back to the first. -/

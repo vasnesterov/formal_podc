@@ -1,6 +1,8 @@
 import Papers.PODC2011.TimestampSpace.Defs
-import Podc.SharedMemory.Covering
-import Podc.SharedMemory.Solo
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Solo
+import Cslib.Computability.Distributed.SharedMemory.Task
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # Lemma 2.1 (Ellen, Fatourou, Ruppert)

@@ -77,7 +77,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Asynchrony is a schedule `σ : ℕ → Finset V`. An activated node applies `δ` to its current
   incoming labels.
 * `IsRFair r σ`: every step activates a nonempty set, and every node is activated in every
-  window of `r` consecutive steps (the shared `BoundedFair r` of `Podc/Stabilization/Daemon.lean`).
+  window of `r` consecutive steps (the shared `BoundedFair r` of `Cslib/Computability/Distributed/SelfStabilization/Daemon.lean`).
   Initial labelings and initial outputs are arbitrary
   (self-stabilization). There are no failures and no randomness.
 * `LabelStabilizing r P`, as in the paper: for every input, initial labeling and `r`-fair schedule,
@@ -120,10 +120,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * A brute-force search over random small protocols (3–4 nodes) found no counterexample to
   Theorem 3.1. Example 1 was also brute-force checked for `n = 3, 4`.
 * The model is in `Model.lean`; the stone-age model in CSLib does not fit, since its nodes have
-  states. Shared notions: `BoundedFair` (`Podc/Stabilization/Daemon.lean`),
+  states. Shared notions: `BoundedFair` (`Cslib/Computability/Distributed/SelfStabilization/Daemon.lean`),
   `Converges` is Mathlib's `Filter.EventuallyConst` (`converges_iff`), `WalkLen` is
   `Relation.RelatesInSteps` of the arcs, strong connectivity is `Digraph.StronglyConnected`
-  (`stronglyConnected_iff`, `Podc/Digraph/Walk.lean`). CSLib candidates:
+  (`stronglyConnected_iff`, `Cslib/Foundations/Combinatorics/Digraph/Walk.lean`). CSLib candidates:
   - the stateless-protocol model with `r`-fair schedules (`Model.lean`);
   - the countdown-graph encoding of `r`-fair schedules (`Impossibility.HPath.fair`);
   - BFS trees in digraphs (`UpperBound.exists_trees`).

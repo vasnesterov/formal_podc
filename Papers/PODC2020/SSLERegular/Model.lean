@@ -1,4 +1,4 @@
-import Podc.PopulationProtocols.Nondet
+import Cslib.Computability.Distributed.PopulationProtocols.Nondet
 import Mathlib.Combinatorics.SimpleGraph.Finite
 
 /-!
@@ -8,11 +8,11 @@ Hsueh-Ping Chen and Ho-Lin Chen, *Self-Stabilizing Leader Election in Regular Gr
 PODC 2020, Section 2.
 
 * A protocol (`GProtocol Q`, the shared nondeterministic model `Cslib.PopulationProtocol.NProtocol`
-  of `Podc.PopulationProtocols.Nondet`) has a **nondeterministic** transition function
+  of `Cslib.Computability.Distributed.PopulationProtocols.Nondet`) has a **nondeterministic** transition function
   `δ : Q → Q → Set (Q × Q)`: `(r, s) ∈ δ p q` iff an initiator in state `p` and a responder in state
   `q` may move to `(r, s)`. Randomized rules of the paper ("`u ← RandState`", "randomly do …") are
   modelled by their support, which is all that matters under global fairness and, for finite state
-  spaces, for "probability 1" statements (`Podc.Stabilization.Markov`).
+  spaces, for "probability 1" statements (`Cslib.Computability.Distributed.SelfStabilization.Markov`).
 * A configuration is `V → Q`; a step lets two **adjacent** nodes `u, v` of the communication graph
   `G` interact, `u` as initiator, `v` as responder (`GProtocol.Step`, i.e.
   `NProtocol.StepOn G.Adj`). Both orders are scheduled. Runs and global fairness are those of

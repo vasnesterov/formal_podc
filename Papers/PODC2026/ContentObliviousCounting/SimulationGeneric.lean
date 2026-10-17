@@ -19,7 +19,7 @@ The round procedures are abstract here (hypothesis `RoundSpec`); see `Simulation
 
 namespace Podc.ContentOblivious.Simulation
 
-open Podc.ContentOblivious MsgExchange Finset
+open Cslib.ContentOblivious MsgExchange Finset
 
 /-- A synchronous message-passing algorithm on a ring. `msg s = (to clockwise neighbour,
 to counter-clockwise neighbour)`; `step s a b` is the new state after receiving `a` from the

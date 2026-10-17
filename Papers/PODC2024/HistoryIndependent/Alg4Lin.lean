@@ -1,5 +1,5 @@
 import Papers.PODC2024.HistoryIndependent.Alg4Main
-import Podc.SharedMemory.History
+import Cslib.Computability.Distributed.SharedMemory.History
 
 /-!
 # Algorithm 4: history of an execution, reads-from assignment, linearizability

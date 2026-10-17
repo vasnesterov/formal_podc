@@ -59,7 +59,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
   `Pr[E_v] ≤ p`, `#N(v) ≤ d`, `p · 2^d < 1`, and the rank (`#` events per variable) `≤ 2` or `≤ 3`.
 * **Conditional probabilities** are exact finite sums. `condProb σ v` is the probability of `E_v` under the product
   distribution in which the fixed variables (partial assignment `σ`) are point masses (`Cslib.Probability.piExpect`
-  of the shared library `Podc/Probability/Finite/Product.lean`). There is no measure theory. The four facts used
+  of the shared library `Cslib/Probability/Finite/Product.lean`). There is no measure theory. The four facts used
   (total probability, independence, locality, value at full assignments) are proved; the first, second and fourth
   are instances of the library's `sum_mul_piExpect_update_single`, `piExpect_update_single_of_forall_update` and
   `piExpect_single`.
@@ -115,6 +115,6 @@ Non-vacuity:
   events, `d = 2`, `p = 1/8`).
 * `sharp_no_good_assignment` shows that the strict inequality is necessary.
 
-The development builds on Mathlib and the shared finite probability library `Podc/Probability/Finite/` (product
+The development builds on Mathlib and the shared finite probability library `Cslib/Probability/Finite/` (product
 distributions, averaging `exists_le_of_sum_mul_le`). CSLib candidates (`-- CSLib candidate`): the LLL instance in
 `Basic.lean`, and the tangent-plane / AM–GM lemmas in `Representable.lean`.

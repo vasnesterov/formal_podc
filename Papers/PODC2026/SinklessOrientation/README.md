@@ -38,7 +38,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
   `< R` from `u`, i.e. on what `u` learns in `R` rounds. Since `A` sees the node set `V`, a rule may depend on
   the global identifier set, slightly more than standard LOCAL. This is harmless for the explicit algorithms and
   makes the lower bound stronger. The agreement relation `GAgree` is the shared one of
-  `Podc/Local/Locality.lean`, and `isLocal_iff` identifies `IsLocal A R` with the shared
+  `Cslib/Computability/Distributed/Local/OnlineLocalLocality.lean`, and `isLocal_iff` identifies `IsLocal A R` with the shared
   `Cslib.Local.IsLocal` (the out-neighbourhoods `u ↦ {v | out u v}` are an `R`-local function).
 - Theorem 2.1 is also implemented as an explicit flooding algorithm in CSLib's synchronous SET-LOCAL model, with
   `O(log n)`-bit states. CONGEST message sizes are otherwise not modelled.
@@ -69,8 +69,8 @@ reduction results of Ghaffari–Su and Ghaffari et al.), the CONGEST implementat
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. The
 SET-LOCAL round model of `theorem_2_1` is CSLib's `Cslib.LocallyIterative`.
 
-**Infrastructure.** Orientations and sinks (`SimpleGraph.Orientation`, `Podc/Graph/Orientation.lean`), closed
-balls `cball G v k = G.closedBall v k` and the `edist` arithmetic (`Podc/Graph/Ball.lean`), and LOCAL
-agreement `GAgree` (`Podc/Local/Locality.lean`) are shared library notions. Paper-local: `deg`, `δ`-sinks,
+**Infrastructure.** Orientations and sinks (`SimpleGraph.Orientation`, `Cslib/Foundations/Combinatorics/SimpleGraph/Orientation.lean`), closed
+balls `cball G v k = G.closedBall v k` and the `edist` arithmetic (`Cslib/Foundations/Combinatorics/SimpleGraph/Ball.lean`), and LOCAL
+agreement `GAgree` (`Cslib/Computability/Distributed/Local/OnlineLocalLocality.lean`) are shared library notions. Paper-local: `deg`, `δ`-sinks,
 sinksparse orientations, `IsLocal`/`IsLocalRel` for orientation algorithms, BFS parents in disconnected graphs
 (`par`, `anc`) and the ball-growth bound of Lemma 2.2.

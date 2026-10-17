@@ -27,7 +27,7 @@ plus Lemmas 5–25 and Theorem 17. We use the full version's numbering.
    sequences of *received* pulses) do not imply equal sending behaviour: two IDs may send the same
    pulses in different batches (e.g. two pulses at start-up versus one at start-up and one after the
    first reception). The paper's synchronized scheduler ("one pulse per time step") then has to be made precise. Repair
-   (`Podc.ContentOblivious.reach_sync`): schedule by rounds of *receptions*. In round `k` every
+   (`Cslib.ContentOblivious.reach_sync`): schedule by rounds of *receptions*. In round `k` every
    node consumes one pulse at the port given by the `k`-th symbol of the common prefix. That pulse
    exists because its sender, in its own solitude run, had already sent it after the same `k − 1`
    receptions. This works for any solitude scheduler, not only the FIFO one of Definition 18, and
@@ -61,7 +61,7 @@ plus Lemmas 5–25 and Theorem 17. We use the full version's numbering.
   are indistinguishable, so FIFO is irrelevant). The configuration holds local states and ghost
   counters `sent`/`recvd` per port. Every node performs its initial action at time 0. A step is
   the delivery of one pulse to a node chosen by the adversary. Deterministic algorithms only
-  (`Podc/ContentOblivious/Model.lean`).
+  (`Cslib/Computability/Distributed/ContentOblivious/Model.lean`).
 * **Polling.** The pseudo-code polls `recvCW()`/`recvCCW()` in a busy loop and leaves unread pulses
   in the queue (Algorithm 2 reads CCW pulses only once `ρcw ≥ ID`, and reads only CCW pulses while
   waiting for the termination pulse). We model this with a predicate `ready s p`: the scheduler may

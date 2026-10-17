@@ -95,5 +95,5 @@ repaired Theorem 4; the amortized midpoint algorithm of [9] (Theorem 3's tightne
 consensus with the matching rates. The Heard-Of round model and chain/diameter lemmas are in CSLib
 (`Cslib/Computability/Distributed/DynamicNetworks/{HeardOf,Chain}.lean`). The three kinds of
 algorithms (asymptotic `Alg`, exact `EAlg`, approximate `DAlg`) are the shared full-information
-algorithm structure `Cslib.HeardOf.Algorithm` (`Podc/DynamicNetworks/FullInfo.lean`) with outputs in
+algorithm structure `Cslib.HeardOf.Algorithm` (`Cslib/Computability/Distributed/DynamicNetworks/FullInfo.lean`) with outputs in
 `V` resp. decisions in `Option V`.

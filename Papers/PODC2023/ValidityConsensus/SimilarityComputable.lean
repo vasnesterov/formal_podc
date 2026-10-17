@@ -1,5 +1,5 @@
 import Papers.PODC2023.ValidityConsensus.Similarity
-import Podc.PartialSync.Computable
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Computable
 
 /-!
 # On the Validity of Consensus — Theorems 2 and 3 with Turing-computable `Λ`
@@ -9,7 +9,7 @@ The paper's similarity condition `C_S` (Definition 2) requires the function `Λ`
 `Primcodable` encodings). Processes are `Fin n`; then `Config (Fin n) VI = Fin n → Option VI` is
 `Primcodable` (`Primcodable.finArrow`) as soon as `VI` is.
 
-* `Algorithm.IsComputable A` (shared library `Podc.PartialSync.Computable`): the algorithm is a
+* `Algorithm.IsComputable A` (shared library `Cslib.Computability.Distributed.Byzantine.PartialSync.Computable`): the algorithm is a
   computable state machine (`init`, `step`, `send`, `decide` are computable).
 * `similarityCondition_computable_auth` / `similarityCondition_computable` (**Theorem 3**, in the
   authenticated / unauthenticated model): `Λ c` is the first decision of a process of

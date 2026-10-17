@@ -1,6 +1,8 @@
 import Papers.PODC2021.ScannableBinaryObjects.Impl1Steps
-import Podc.SharedMemory.Progress
-import Podc.Algebra.BigOperators.Update
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Task
+import Cslib.Foundations.Data.Finset.SumUpdate
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # Implementation 1 is lock-free (Theorem 2 of Ovens, PODC 2021, progress part)
@@ -296,8 +298,8 @@ theorem impl1_lockFree [Fintype P] (R : ∀ i, (O i).Readable) (Sc Up : Finset P
   intro e _ N
   by_contra hcon
   push Not at hcon
-  have hInv : ∀ t, ∃ L, Inv Sc Up (e.lbls t) (e.cfg t) L :=
-    fun t => inv_of_run (e.run_lbls t)
+  have hInv : ∀ t, ∃ L, Inv Sc Up (e.pre t) (e.cfg t) L :=
+    fun t => inv_of_run (e.run_pre t)
   have hψ : ∀ m ≥ N, ∑ p, psi Sc ((e.cfg (m + 1)).loc p) ≤ ∑ p, psi Sc ((e.cfg m).loc p) ∧
       (∑ p, psi Sc ((e.cfg (m + 1)).loc p) = ∑ p, psi Sc ((e.cfg m).loc p) →
         ∃ q, e.lbl m = .tau q ∧ IsScanLoc ((e.cfg m).loc q)) := fun m hm => by

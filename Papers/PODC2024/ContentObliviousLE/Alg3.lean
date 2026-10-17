@@ -1,4 +1,5 @@
-import Podc.ContentOblivious.Model
+import Cslib.Computability.Distributed.ContentOblivious.Model
+import Mathlib
 import Papers.PODC2024.ContentObliviousLE.RingCounting
 
 /-!
@@ -18,7 +19,7 @@ The ring is `flipped n flip`: node `v`'s physical port `p` is the oriented port 
 
 namespace Podc.ContentOblivious.Alg3
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 /-- Local state: ID and the two counters `ρ_0, ρ_1` of pulses received per port. -/
 structure S where

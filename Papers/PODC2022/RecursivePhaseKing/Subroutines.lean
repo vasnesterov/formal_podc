@@ -1,7 +1,7 @@
 import Mathlib
-import Podc.Foundations.Count
-import Podc.Agreement.PhaseKing
-import Podc.Agreement.Specs
+import Cslib.Computability.Distributed.Byzantine.KingPhase
+import Cslib.Computability.Distributed.Byzantine.Specs
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Subroutines of the early-stopping Phase King protocol (Section 2 and Lemma 3.4)

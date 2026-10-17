@@ -23,7 +23,7 @@ namespace HardnessOptimization
 
 namespace MaxCut
 
-open Podc.CongestLB
+open Cslib.Congest Cslib.CommunicationComplexity
 
 variable {L : ℕ}
 

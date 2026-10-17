@@ -1,5 +1,7 @@
 import Papers.PODC2026.ConsistentRefereeing.Defs
-import Podc.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Task
 import Cslib.Computability.Distributed.SharedMemory.SWSRRegister
 
 /-!

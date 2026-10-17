@@ -1,6 +1,7 @@
 import Papers.PODC2026.ContentObliviousCounting.AggregationMIS
-import Podc.ContentOblivious.Staged
-import Podc.ContentOblivious.VirtualRing
+import Cslib.Computability.Distributed.ContentOblivious.Staged
+import Cslib.Computability.Distributed.ContentOblivious.VirtualRing
+import Mathlib
 
 /-!
 # The aggregation algorithm of Theorem 1 as a staged program
@@ -22,7 +23,7 @@ currently active nodes. The driver implements:
 (`Proc.precomp`), so that no stage returns at start-up.
 -/
 
-namespace Podc.ContentOblivious
+namespace Cslib.ContentOblivious
 
 namespace Proc
 
@@ -77,6 +78,12 @@ lemma precomp_returns {x : V → I'} {r : V → R} (h : P.Returns W (fun v => g 
   fun c hc hfin => h c ((precomp_reach (P := P) (g := g) x c).1 hc) hfin
 
 end Proc
+
+end Cslib.ContentOblivious
+
+namespace Podc.ContentOblivious
+
+open Cslib.ContentOblivious
 
 namespace Aggregation
 

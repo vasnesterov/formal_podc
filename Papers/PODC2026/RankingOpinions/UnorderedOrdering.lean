@@ -1,7 +1,7 @@
 import Cslib.Computability.Distributed.PopulationProtocols.Symmetrize
 import Cslib.Computability.Distributed.PopulationProtocols.Schedules
-import Podc.PopulationProtocols.Nondet
-import Podc.Order.NatDescent
+import Cslib.Computability.Distributed.PopulationProtocols.Nondet
+import Cslib.Foundations.Data.Nat.Descent
 import Mathlib.Tactic.DeriveFintype
 import Mathlib.Data.Fintype.Card
 import Mathlib.Algebra.Order.BigOperators.Group.Finset

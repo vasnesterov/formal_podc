@@ -1,6 +1,8 @@
 import Papers.PODC2025.StrangerFreeTasks.LowerBound
 import Mathlib
-import Podc.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Task
 
 /-!
 # The bound of Theorem 2.1 is tight for `n = 2`

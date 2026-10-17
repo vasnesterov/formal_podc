@@ -1,7 +1,9 @@
 import Papers.PODC2016.ComplexityHierarchy.MaxRegister
 import Cslib.Computability.Distributed.SharedMemory.Consensus
 import Cslib.Computability.Distributed.SharedMemory.Progress
-import Podc.SharedMemory.Solo
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Solo
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # Consensus from two max-registers (Theorem 4.2 of [EGSZ16])

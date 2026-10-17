@@ -1,5 +1,6 @@
 import Papers.PODC2019.HardnessOptimization.MDSTheorem
-import Podc.CongestLB.Randomized
+import Cslib.Computability.Distributed.Congest.Randomized
+import Mathlib
 
 /-!
 # Theorem 2.1, randomized version (conditional on `CC^R(DISJ_K) = Ω(K)`)
@@ -7,7 +8,7 @@ import Podc.CongestLB.Randomized
 
 namespace HardnessOptimization
 
-open Podc.CongestLB Protocol
+open Cslib.Congest Cslib.CommunicationComplexity Protocol
 
 variable {L : ℕ}
 

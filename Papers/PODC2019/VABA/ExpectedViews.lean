@@ -1,5 +1,6 @@
 import Papers.PODC2019.VABA.Safety
-import Podc.Probability.CoinGame
+import Cslib.Probability.CoinGame
+import Mathlib
 
 /-!
 # VABA: each view succeeds with probability `≥ (n - f) / n` (Lemmas 21–24)
@@ -17,7 +18,7 @@ the moment the coin of view `j` is revealed (all of `P` if it is never revealed)
 * `decided_of_hit`: if the leader `c j` of view `j` is in `good σ c j`, every party that leaves view
   `j` has decided (Lemma 22).
 
-Plugging this into the coin game of `Podc/Probability/CoinGame.lean` (uniform coins
+Plugging this into the coin game of `Cslib/Probability/CoinGame.lean` (uniform coins
 `x : Fin k → P` for the views `1, …, k`):
 * `card_undecided_le`: the number of coin sequences for which some party completes the first `k`
   views without deciding is at most `f ^ k` out of `n ^ k` (for `Q = n - f`), i.e. probability
@@ -339,7 +340,7 @@ theorem prob_undecided_le (hn : 3 * C.f < Fintype.card P) (hQ : C.Q = Fintype.ca
 broadcast when the coin was revealed (truncated at the horizon `K`). -/
 noncomputable def firstGoodView (C : Cfg P V) (σ : Strategy P V) (tail : ℕ → P) (K : ℕ)
     (x : Fin K → P) : ℕ :=
-  CoinGame.T (advOf C σ tail) K x
+  CoinGame.waves (advOf C σ tail) K x
 
 /-- Every party that completes view `firstGoodView` has decided (if that view is within the
 horizon). -/
@@ -352,7 +353,7 @@ theorem decided_of_firstGoodView (hQ : Fintype.card P + C.f < 2 * C.Q) (σ : Str
   let s := Nat.find hhit
   obtain ⟨hs, hhs⟩ := Nat.find_spec hhit
   have hT : firstGoodView C σ tail K x = s + 1 :=
-    CoinGame.T_eq_of_first_hit _ x hs hhs
+    CoinGame.waves_eq_of_first_hit _ x hs hhs
       (fun i h hi hh => Nat.find_min hhit hi ⟨h, hh⟩)
   rw [hT] at hp
   rw [hit_iff] at hhs

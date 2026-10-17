@@ -21,7 +21,7 @@ state is `some v`.
   (`example_not_C`).
 -/
 
-open Podc.Knowledge Podc.Knowledge.RunFact Podc.Knowledge.System Podc.Knowledge.Decisions
+open Cslib.Knowledge Cslib.Knowledge.RunFact Cslib.Knowledge.System Podc.Knowledge.Decisions
 
 namespace Podc.Knowledge.Example
 

@@ -76,7 +76,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Adversary. It corrupts up to `f` parties *adaptively*. A corrupted party's local state is frozen,
   and it signs anything.
 * Threshold signatures are ideal: a certificate exists iff `Q` shares exist (`QC` is the shared
-  `Cslib.Byzantine.Certified`, `Podc/Byzantine/Certificate.lean`). The paper's threshold
+  `Cslib.Byzantine.Certified`, `Cslib/Computability/Distributed/Byzantine/Certificate.lean`). The paper's threshold
   is `2f + 1`; theorems take `n + f < 2Q` for safety and `Q + f ≤ n` for liveness, i.e. `Q = n − f`
   for any `n > 3f`.
 * Common coin. It is ideal: a sequence of leaders, view `j`'s revealed at the first honest
@@ -89,7 +89,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
     only revealed coins. That the adversary's "good set" of view `j` depends only on the coins of
     earlier views is *proved* (`good_congr`).
   - Probabilities are counts over uniform leader sequences, in the shared coin game
-    `Podc/Probability/CoinGame.lean` (also used for DAG-Rider).
+    `Cslib/Probability/CoinGame.lean` (also used for DAG-Rider).
 * All cryptographic "except with negligible probability" qualifiers disappear with ideal
   functionalities.
 
@@ -126,5 +126,5 @@ Full list of differences (including modelling choices and minor imprecisions): [
     vacuous.
   - The counterexample run shows that the model's guards are satisfiable all the way to decisions.
 - The model is paper-local; quorum intersection and certificates come from the shared
-  `Podc/Foundations/Quorum.lean` and `Podc/Byzantine/Certificate.lean`. The safety invariants (`Inv`, `KInv`, `LInv`) are proved action by
+  `Cslib/Foundations/Data/Finset/Quorum.lean` and `Cslib/Computability/Distributed/Byzantine/Certificate.lean`. The safety invariants (`Inv`, `KInv`, `LInv`) are proved action by
   action for every reachable state.

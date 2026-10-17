@@ -1,6 +1,5 @@
 import Papers.PODC2026.ConsistentRefereeing.LongLivedValency
-import Podc.SharedMemory.ObjClasses
-import Podc.SharedMemory.Covering
+import Cslib.Computability.Distributed.SharedMemory.ObjClasses
 
 /-!
 # Long-lived contest: indistinguishability of schedules (Section 5 of [ACE26])
@@ -9,7 +8,7 @@ Step-level facts used in the case analyses of Lemmas 20, 23, 27, 28 and Theorems
 [ACE26], stated for the schedules of `LLCtx`:
 
 * the generic step lemmas `Impl.mem_of_step`, `Impl.step_exact` and `Impl.step_comm` (two steps
-  of distinct processes that do not conflict commute) come from `Podc.SharedMemory.Covering`;
+  of distinct processes that do not conflict commute) come from `Cslib.Computability.Distributed.SharedMemory.Covering`;
 * `X.Writes C c i` (`c` is poised to apply a non-read-only primitive to `i`), `X.Quiet C c`
   (`c`'s next step does not change the memory: an invocation, a response or a read-only
   primitive), `X.Accesses C c i`;
@@ -21,7 +20,7 @@ Step-level facts used in the case analyses of Lemmas 20, 23, 27, 28 and Theorems
   operations on a test&set-like object leave the same memory; `Good.tas_mem` — a set
   test&set-like object stays set;
 * test&set-like and read/write-like object classes (`ObjSpec.TASLike`, `tasObj_tasLike`,
-  `ObjSpec.windowLike_one_of_rw`) come from `Podc.SharedMemory.ObjClasses`.
+  `ObjSpec.windowLike_one_of_rw`) come from `Cslib.Computability.Distributed.SharedMemory.ObjClasses`.
 -/
 
 set_option linter.unusedSectionVars false

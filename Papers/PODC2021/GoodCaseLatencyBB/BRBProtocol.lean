@@ -1,6 +1,6 @@
 import Papers.PODC2021.GoodCaseLatencyBB.Basic
-import Podc.PartialSync.Gossip
-import Podc.Byzantine.Certificate
+import Cslib.Computability.Distributed.Byzantine.Certificate
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Gossip
 
 /-!
 # The 2-round-BRB protocol (Figure 1, Theorem 5)
@@ -28,13 +28,13 @@ The protocol (`n ≥ 3f + 1`, asynchronous, authenticated):
 ## Main results
 
 * `algo_gossips`: the protocol gossips its known tokens (`Algorithm.Gossips` of
-  `Podc.PartialSync.Gossip`, which provides the generic token-origin and gossip lemmas);
+  `Cslib.Computability.Distributed.Byzantine.PartialSync.Gossip`, which provides the generic token-origin and gossip lemmas);
   `algo_unforging`: correct processes only emit their own tokens and relay received ones.
 * `theorem_5_brb`: Byzantine reliable broadcast in all asynchronous runs (`asyncRuns f`).
 * `theorem_5_latency`: good-case latency `2Δ` in synchronous runs with delay bound `Δ`.
 
 Commit quorums are threshold certificates (`Cslib.Byzantine.Certified`,
-`Podc.Byzantine.Certificate`).
+`Cslib.Computability.Distributed.Byzantine.Certificate`).
 -/
 
 set_option linter.unusedSectionVars false
@@ -69,7 +69,7 @@ def Tok.signer : Tok P V → P
   | .vote p _ => p
 
 /-- Ideal signatures: a message is a finite set of tokens and carries exactly these tokens. -/
-def auth : Auth P (Finset (Tok P V)) (Tok P V) where
+def auth : PartialSync.Auth P (Finset (Tok P V)) (Tok P V) where
   signer := Tok.signer
   tokens m := ↑m
 

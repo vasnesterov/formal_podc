@@ -1,5 +1,5 @@
 import Mathlib
-import Podc.DynamicNetworks.FullInfo
+import Cslib.Computability.Distributed.DynamicNetworks.FullInfo
 import Cslib.Computability.Distributed.DynamicNetworks.Chain
 import Cslib.Computability.Distributed.DynamicNetworks.Product
 

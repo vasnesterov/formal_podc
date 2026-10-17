@@ -74,5 +74,5 @@ paper cites, is proved. The spanner, girth and blocking-set infrastructure is in
 generic greedy scheme (`SimpleGraph.greedyGraph`, its correctness `greedyGraph_isVFTSpanner` /
 `greedyGraph_isWeightedVFTSpanner` and EFT analogues, blocking sets from insertion histories
 `exists_blockingSet_of_insertion`, `exists_sorted_edgeList`) is in
-`Podc/Graph/Spanner/FaultTolerantGreedy.lean`, shared with
+`Cslib/Foundations/Combinatorics/SimpleGraph/FaultTolerantGreedy.lean`, shared with
 [Bodwin–Patel](../../PODC2019/VFTSpannersOptimal).

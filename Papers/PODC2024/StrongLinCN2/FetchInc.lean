@@ -1,8 +1,10 @@
-import Podc.Algebra.BigOperators.Update
-import Podc.SharedMemory.Objects.FetchAdd
-import Podc.SharedMemory.Objects.TestAndSet
-import Podc.SharedMemory.Potential
-import Podc.SharedMemory.StrongLin.Basic
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Objects.FetchAdd
+import Cslib.Computability.Distributed.SharedMemory.Objects.TestAndSet
+import Cslib.Computability.Distributed.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.StrongLin
+import Cslib.Computability.Distributed.SharedMemory.Task
+import Cslib.Foundations.Data.Finset.SumUpdate
 
 /-!
 # Readable fetch&increment from readable test&set (Theorem 9)

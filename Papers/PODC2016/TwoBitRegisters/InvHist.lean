@@ -1,6 +1,6 @@
 import Papers.PODC2016.TwoBitRegisters.InvRead
-import Podc.Foundations.Quorum
-import Podc.SharedMemory.History
+import Cslib.Computability.Distributed.SharedMemory.History
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # The history invariant (Lemma 10 of the paper)

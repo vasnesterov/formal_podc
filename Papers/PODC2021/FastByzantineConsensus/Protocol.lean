@@ -1,5 +1,5 @@
 import Mathlib
-import Podc.Byzantine.Certificate
+import Cslib.Computability.Distributed.Byzantine.Certificate
 
 /-!
 # The fast Byzantine consensus protocol of Kuznetsov–Tonkikh–Zhang (generalized version)

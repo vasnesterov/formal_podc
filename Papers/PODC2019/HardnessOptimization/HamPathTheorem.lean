@@ -18,7 +18,7 @@ line `(c, q)`, of `σ^{k/2-1} – ℓ^{k/2}`, `β^{k/2-1} – ℓ^{k/2}`, `ℓ^{
 
 namespace HardnessOptimization.HamPath
 
-open HV Finset Podc.CongestLB
+open HV Finset Cslib.Congest Cslib.CommunicationComplexity
 
 variable {L : ℕ}
 

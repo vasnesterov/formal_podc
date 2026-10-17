@@ -1,9 +1,10 @@
 import Mathlib
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
 import Cslib.Computability.Distributed.SharedMemory.Progress
-import Podc.SharedMemory.LinResp
-import Podc.SharedMemory.Objects.FetchAdd
-import Podc.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Objects.FetchAdd
+import Cslib.Computability.Distributed.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Task
 
 /-!
 # Mod-`φ` fetch-and-increment from one bounded fetch-and-add object

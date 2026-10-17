@@ -30,7 +30,7 @@ decisions (`exists_theta_of_AoN`), and show by a counterexample that some memory
 needed (`no_theta_for_forgetful_protocol`).
 -/
 
-open Podc.Knowledge Podc.Knowledge.RunFact Podc.Knowledge.System
+open Cslib.Knowledge Cslib.Knowledge.RunFact Cslib.Knowledge.System
 
 namespace Podc.Knowledge
 

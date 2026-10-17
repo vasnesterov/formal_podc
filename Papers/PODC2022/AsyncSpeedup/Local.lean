@@ -19,7 +19,7 @@ set_option linter.unusedSectionVars false
 
 namespace AsyncSpeedup
 
-open Podc.Iterated
+open Cslib.Iterated
 
 variable {P X Y A B : Type} [DecidableEq P] {M : Model P A B}
 

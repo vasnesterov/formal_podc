@@ -1,5 +1,5 @@
 import Mathlib
-import Podc.SharedMemory.NSpec
+import Cslib.Computability.Distributed.SharedMemory.History
 
 /-!
 # `k`-ordering objects (Definition 11) and the examples of Section 5

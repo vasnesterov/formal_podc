@@ -5,7 +5,7 @@ import Papers.PODC2020.AsyncApproxBCDirected.Graph
 
 The definitions (`InArrow`, Definition 14; `PartCond`; conditions CCS, CCA, BCS of [TV15],
 Definitions 16–18) and the core equivalence `partCond_iff : PartCond G F k ↔ ReachCondIn G F k`
-are in `Podc/ApproxConsensus/DigraphConditions.lean`.
+are in `Cslib/Computability/Distributed/ApproxConsensus/DigraphConditions.lean`.
 
 * **Theorem 17** (a), (b), (c) (`theorem17a/b/c`). The paper proves (a) and the direction
   "⇒" of (b) by reference to [TV15, SST19]; here all directions are proved.

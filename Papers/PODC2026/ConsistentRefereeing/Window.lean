@@ -1,6 +1,8 @@
 import Papers.PODC2026.ConsistentRefereeing.Defs
-import Podc.SharedMemory.StrongLin.OneAccess
-import Podc.SharedMemory.ObjClasses.Basic
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.ObjClasses.Basic
+import Cslib.Computability.Distributed.SharedMemory.OneAccess
+import Cslib.Computability.Distributed.SharedMemory.Task
 
 /-!
 # Theorem 4: a strongly linearizable contest object from an `(n − 1)`-window register

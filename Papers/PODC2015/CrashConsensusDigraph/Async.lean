@@ -1,12 +1,12 @@
-import Podc.ApproxConsensus.Async.Replay
-import Podc.ApproxConsensus.DigraphConditions
+import Cslib.Computability.Distributed.ApproxConsensus.Async.Replay
+import Cslib.Computability.Distributed.ApproxConsensus.DigraphConditions
 import Mathlib
 
 /-!
 # Asynchronous approximate consensus with crash faults: Theorem 6 and Lemma 1
 
 Section 4. We use the asynchronous message-passing model on digraphs of
-`Podc/ApproxConsensus/Async/Model.lean` (event-driven deterministic algorithms,
+`Cslib/Computability/Distributed/ApproxConsensus/Async/Model.lean` (event-driven deterministic algorithms,
 reliable FIFO links with adversarial finite delays, fairness = every non-empty link between
 correct nodes is eventually served, irrevocable outputs).
 

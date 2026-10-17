@@ -85,4 +85,4 @@ with exactly 2 registers. The model, full-information versions and covering lemm
 (`Cslib/Computability/Distributed/SharedMemory/`); invariants by induction on executions
 (`Impl.run_induction`), block-write and pending-operation helpers, and the potential arguments
 (`Impl.waitFree_of_potential`, `Nat.not_frequently_lt_of_succ_le`) from the shared library
-`Podc/SharedMemory/` and `Podc/Order/NatDescent.lean`.
+`Cslib/Computability/Distributed/SharedMemory/` and `Cslib/Foundations/Data/Nat/Descent.lean`.

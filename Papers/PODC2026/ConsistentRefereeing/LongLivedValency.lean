@@ -125,13 +125,13 @@ lemma extL_pre_succ (α : List (LLabel P)) (s : ℕ → P) (n : ℕ) :
 lemma chain_infExec (E : ℕ → List (LLabel P)) (hmono : ∀ k, E k <+: E (k + 1))
     (hlen : ∀ k, k ≤ (E k).length) (hgood : ∀ k, X.Good (E k)) :
     ∃ e : X.I.InfExec, (∀ k n (hn : n < (E k).length), e.lbl n = (E k)[n]) ∧
-      (∀ t, LLAdm X.ref (e.lbls t)) ∧
+      (∀ t, LLAdm X.ref (e.pre t)) ∧
       (∀ k n, n ≤ (E k).length → X.Good ((E k).take n) ∧ X.cfg ((E k).take n) = e.cfg n) := by
   obtain ⟨e, hlbl, hcfg⟩ := X.I.exists_infExec_of_chain E hmono hlen (fun k => (hgood k).1)
   have hgt : ∀ k n, X.Good ((E k).take n) := fun k n =>
     (hgood k).of_prefix (List.take_prefix _ _)
   refine ⟨e, hlbl, fun t => ?_, fun k n hn => ⟨hgt k n, ?_⟩⟩
-  · rw [e.lbls_eq_take (hlen t) (hlbl t)]; exact (hgt t t).2
+  · rw [e.pre_eq_take (hlen t) (hlbl t)]; exact (hgt t t).2
   · have h1 := (hgt k n).run
     rw [hcfg k n hn] at h1
     exact (Option.some.inj h1).symm
@@ -696,7 +696,7 @@ theorem const_valency_contra [Fintype P] (hS : X.Sing) {α : List (LLabel P)} (h
         exact hpend u hu'
       have hag : AgreeOn Set.univ (X.cfg (X.ext α (u ++ [X.ref, c])))
           (X.cfg (X.ext α (u ++ [c, X.ref]))) := by
-        rw [hcomm u hu' c hc']; exact ⟨rfl, fun _ _ => rfl, fun _ _ => rfl⟩
+        rw [hcomm u hu' c hc']
       obtain ⟨z, hz1, hz2⟩ := X.lemma17 hg1 hg2 hcl hp hc' (Set.mem_univ c)
         (Set.mem_univ _) hag
       have e1 : u ++ [X.ref, c] = (u ++ [X.ref]) ++ [c] := by simp

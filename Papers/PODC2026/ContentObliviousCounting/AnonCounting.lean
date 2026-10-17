@@ -1,4 +1,5 @@
-import Podc.ContentOblivious.Compose
+import Cslib.Computability.Distributed.ContentOblivious.Compose
+import Mathlib
 
 /-!
 # Counting in an anonymous oriented ring with a leader (Section 5, Algorithms 1–4)
@@ -8,11 +9,11 @@ PODC 2026 (arXiv 2603.28260), Section 5.
 
 ## Model
 
-Oriented ring `Podc.ContentOblivious.oriented n` on `ZMod n` (`n ≥ 1`, including the self-loop
+Oriented ring `Cslib.ContentOblivious.oriented n` on `ZMod n` (`n ≥ 1`, including the self-loop
 `n = 1` and the double link `n = 2`); `Port1 = true` is the clockwise port, linked to `Port0 = false`
 of the clockwise neighbour. Asynchronous, fully defective (content-oblivious) channels, adversarial
 scheduler, no failures, deterministic anonymous nodes. The only input is the leader flag (`true` at
-exactly one node). See `Podc/ContentOblivious/Model.lean`.
+exactly one node). See `Cslib/Computability/Distributed/ContentOblivious/Model.lean`.
 
 ## Encoding of the pseudo-code
 
@@ -36,7 +37,7 @@ Ambiguities of the pseudo-code, fixed here:
 
 namespace Podc.ContentOblivious.AnonCounting
 
-open Podc.ContentOblivious
+open Cslib.ContentOblivious
 
 /-- Program counters: one per blocking `receive` of Algorithms 1–4 (plus the two final states). -/
 inductive PC where

@@ -1,5 +1,5 @@
 import Cslib.Computability.Distributed.Byzantine.PartialSync.Auth
-import Podc.PartialSync.RunClasses
+import Cslib.Computability.Distributed.Byzantine.PartialSync.RunClasses
 import Mathlib
 
 /-!
@@ -17,7 +17,7 @@ messages, the GST and all delivery times) together with its abstract signature l
   that respects unforgeability and has inputs in `D`, every honest party outputs (termination), every
   output lies in the range of the honest inputs (`t`-validity), and any two honest outputs are
   `ε`-close (`(t, ε)`-agreement).
-* Run classes (the library classes of `Podc.PartialSync.RunClasses`): `syncRuns t δ` =
+* Run classes (the library classes of `Cslib.Computability.Distributed.Byzantine.PartialSync.RunClasses`): `syncRuns t δ` =
   `Run.SyncValid t δ` (at most `t` faults, `gst = 0`: every message between honest parties is
   delivered within `δ`; clocks are synchronised because all parties step every tick),
   `psyncRuns t δ` = `Run.Valid t δ` (the same bound only after an arbitrary GST) and `asyncRuns t` =

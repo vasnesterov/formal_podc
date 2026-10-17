@@ -1,5 +1,5 @@
 import Papers.PODC2026.ContentObliviousCounting.AnonCountingProbe
-import Podc.Algebra.BigOperators.Update
+import Cslib.Foundations.Data.Finset.SumUpdate
 
 /-!
 # Anonymous counting: waves of the last phase
@@ -10,7 +10,7 @@ Generic facts about a wave of `K` pulses sent around the ring by the last leader
 
 namespace Podc.ContentOblivious.AnonCounting
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 set_option linter.unusedSectionVars false
 set_option linter.deprecated false

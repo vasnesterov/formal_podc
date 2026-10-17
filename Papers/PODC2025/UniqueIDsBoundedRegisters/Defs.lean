@@ -1,6 +1,8 @@
 import Mathlib
 import Cslib.Computability.Distributed.SharedMemory.Covering
-import Podc.SharedMemory.Progress
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Task
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # Unique identifiers from bounded registers: definitions

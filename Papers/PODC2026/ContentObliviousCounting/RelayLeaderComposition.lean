@@ -1,6 +1,7 @@
 import Papers.PODC2026.ContentObliviousCounting.BitSending
-import Podc.ContentOblivious.Staged
-import Podc.ContentOblivious.Splice
+import Cslib.Computability.Distributed.ContentOblivious.Splice
+import Cslib.Computability.Distributed.ContentOblivious.Staged
+import Mathlib
 
 /-!
 # Theorem 17 with a relay leader: composing two rounds gives wrong outputs
@@ -23,7 +24,7 @@ Each round alone is correct (`BitSending.returns` holds for any leader position)
 
 namespace Podc.ContentOblivious.BitSending
 
-open Podc.ContentOblivious
+open Cslib.ContentOblivious
 
 /-- Input for two rounds: leader flag, active flag, bit of round 1, bit of round 2. -/
 abbrev Input2 := Bool × Bool × Option Bool × Option Bool

@@ -70,7 +70,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Swap digraph: a Mathlib `Digraph` on a finite type. Paths follow §2.1 (all vertices except
   possibly the last are distinct). `diam` = length of a longest path, cycles included (matches
   the §1 example). Reachability, strong connectivity, walks of bounded length and the follower
-  subgraph are the shared notions of `Podc/Digraph/Walk.lean` (`Digraph.Reachable`,
+  subgraph are the shared notions of `Cslib/Foundations/Combinatorics/Digraph/Walk.lean` (`Digraph.Reachable`,
   `Digraph.StronglyConnected`, `Relation.RelatesWithinSteps`, `Digraph.deleteVerts`).
 * Outcome: the set of eventually triggered arcs; the five payoff classes are taken literally. A
   protocol is abstracted as a `SwapGame`: for each deviating coalition, its possible outcomes.

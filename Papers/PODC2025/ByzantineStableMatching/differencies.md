@@ -89,7 +89,7 @@ Paper: A. Constantinescu, M. Dufay, D. Ghinea, R. Wattenhofer, *Byzantine Stable
   - This factorization is the paper's Lemma 10 + Lemmas 11/12.
   - `R`-parties decide by **strict majority** of the suggestions instead of "the most common" one; the
     result is `none` if there is no strict majority (`PiBSM.majority`, i.e. `Finset.majority?` of
-    `Podc/Foundations/Count.lean`). When some `R`-party is honest, the honest
+    `Cslib/Foundations/Data/Finset/Quorum.lean`). When some `R`-party is honest, the honest
     suggestion has `≥ k − tL > k/2` votes, so the rules coincide.
   - `R`-parties' lists are sent in round 0 and BA instances start afterwards, all in lock-step. The
     paper's `Δ`-timing (`max(ΔBA(2Δ)+Δ, ΔBB(2Δ))`) becomes the common round bound `T` of the instances.

@@ -1,6 +1,6 @@
 import Papers.PODC2016.ConcurrentDSU.Inv
-import Podc.SharedMemory.LinResp
-import Podc.SharedMemory.Run
+import Cslib.Computability.Distributed.SharedMemory.LinPoints
+import Cslib.Computability.Distributed.SharedMemory.Model
 
 /-!
 # Linearizability (Lemma 3.2)
@@ -12,7 +12,7 @@ The linearization points are those of the paper:
 * `SameSet` returning `false`: also the read in the last `Find(v)` (`u` and `v` are then two
   different roots). This point is only known to be the linearization point *afterwards*, when
   `u = u.parent` is checked: the operation is inserted retroactively into the linearization
-  (`IsLinearization.insert`, from `Podc/SharedMemory/LinResp.lean`). The
+  (`IsLinearization.insert`, from `Cslib/Computability/Distributed/SharedMemory/LinPoints.lean`). The
   invariant keeps, for every process in state `chk u v` whose `u` is still a root, a cut
   `L = S₁ ++ S₂` of the current linearization after which `x` and `y` are in different sets and
   such that no operation of `S₂` precedes the `SameSet` in real time.

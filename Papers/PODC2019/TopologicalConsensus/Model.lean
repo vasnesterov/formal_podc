@@ -1,5 +1,5 @@
 import Mathlib
-import Podc.Knowledge.Basic
+import Cslib.Computability.Distributed.Knowledge.Basic
 
 /-!
 # Generic system model (Section 3 of Nowak–Schmid–Winkler)
@@ -13,7 +13,7 @@ The paper's generic model for full-information executions:
 * a type `C` of configurations and a finite set `P` of processes;
 * for every process `p` an equivalence relation `indist p` on configurations
   (`C ∼ₚ D`: `p` has the same view in `C` and `D`), i.e. an indistinguishability system
-  (`Podc.Knowledge.IndistSystem`) on configurations;
+  (`Cslib.Knowledge.IndistSystem`) on configurations;
 * the obedient processes `Ob C ⊆ P` of a configuration;
 * weak clocks `clock p : C → ℕ`;
 * the input values `input C : P → V` (meaningful for initial configurations);
@@ -38,7 +38,7 @@ namespace TopoConsensus
 open Set Filter
 
 /-- The generic system model of Section 3. `P`: processes, `C`: configurations, `V`: values. -/
-structure Model (P C V : Type*) extends Podc.Knowledge.IndistSystem P C where
+structure Model (P C V : Type*) extends Cslib.Knowledge.IndistSystem P C where
   /-- The obedient processes of a configuration. -/
   Ob : C → Set P
   /-- Weak clocks `χₚ`. -/

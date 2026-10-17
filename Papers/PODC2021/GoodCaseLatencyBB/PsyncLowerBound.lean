@@ -1,6 +1,6 @@
 import Papers.PODC2021.GoodCaseLatencyBB.Basic
-import Podc.PartialSync.TwoStepLB
-import Podc.Foundations.Labelling
+import Cslib.Computability.Distributed.Byzantine.PartialSync.TwoStepLowerBound
+import Cslib.Foundations.Combinatorics.Labelling
 
 /-!
 # Theorem 7: partially synchronous BB with `n ≤ 5f − 2` needs 3 rounds in the good case
@@ -9,7 +9,7 @@ Abraham–Nayak–Ren–Xiang, PODC 2021, Section 4.2, Theorem 7 and Figure 4.
 
 The five executions of the paper are exactly the executions `ρ₁, …, ρ₅` of the lower bound of
 Kuznetsov–Tonkikh–Zhang (PODC 2021, Theorem 4.5), shared in the library module
-`Podc.PartialSync.TwoStepLB`, with the broadcaster in the role of the influential
+`Cslib.Computability.Distributed.Byzantine.PartialSync.TwoStepLowerBound`, with the broadcaster in the role of the influential
 process `p` and the groups `B, C, A, D, E` of Figure 4 in the roles of `P₁, …, P₅`:
 
 | paper (Fig. 4) | here (`TwoStepLB`) |

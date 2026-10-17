@@ -18,7 +18,7 @@ active (`numPhases_le_log`), holding the aggregate of all inputs (`phase_final`)
 
 namespace Podc.ContentOblivious.Aggregation
 
-open Podc.ContentOblivious Simulation Finset
+open Cslib.ContentOblivious Simulation Finset
 
 variable {n : ℕ} [NeZero n] (op2 : List Bool → List Bool → List Bool) {U : Type}
   (w0 : U → List Bool) (x : ZMod n → ℕ × Bool × U)

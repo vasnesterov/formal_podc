@@ -1,4 +1,4 @@
-import Podc.Graph.Spanner.Greedy
+import Cslib.Foundations.Combinatorics.SimpleGraph.GreedySpanner
 import Cslib.Foundations.Combinatorics.SimpleGraph.ShortestWalks
 
 /-!
@@ -8,7 +8,7 @@ A weighted graph is a `G : SimpleGraph V` together with `w : Sym2 V → ℝ≥0`
 the values on edges matter); distances are CSLib's `wdist` (in `ℝ≥0∞`, `⊤` = disconnected).
 The stretch `t` is a real number (`t : ℝ≥0`, `1 ≤ t` where needed).
 
-The model is the shared greedy-spanner library `Podc/Graph/Spanner/{Weighted,Greedy}.lean`
+The model is the shared greedy-spanner library `Cslib/Foundations/Combinatorics/SimpleGraph/{WeightedSpanner,GreedySpanner}.lean`
 (namespace `SimpleGraph`):
 
 * `IsWSpanner G H w t` — `H ≤ G` and `δ_H(u, v) ≤ t · δ_G(u, v)` for all `u, v`;

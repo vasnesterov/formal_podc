@@ -1,6 +1,5 @@
 import Papers.PODC2011.FaultTolerantSpanners.Theorem21
-import Podc.Graph.Spanner.Greedy
-import Podc.Graph.Girth
+import Cslib.Foundations.Combinatorics.SimpleGraph.GreedySpanner
 
 /-!
 # Corollary 2.2 of Dinitz–Krauthgamer (PODC'11): the greedy spanner plugged into Theorem 2.1
@@ -10,11 +9,11 @@ The paper applies Theorem 2.1 to the greedy `(2t-1)`-spanner of Althöfer et al.
 
 * `exists_greedy_spanner` — every finite weighted graph has a subgraph `H` of girth `> 2t` which
   is a `(2t - 1)`-spanner: the greedy spanner of the shared library
-  `Podc/Graph/Spanner/Greedy.lean` (`IsGreedySpanner.isWSpanner`,
+  `Cslib/Foundations/Combinatorics/SimpleGraph/GreedySpanner.lean` (`IsGreedySpanner.isWSpanner`,
   `IsGreedySpanner.noShortCycles`);
 * the Moore bound relative to a vertex set `S` containing all endpoints,
   `|E| ≤ |S|^{1+1/t} + |S|` (`SimpleGraph.NoShortCycles.ncard_edgeSet_le_card_rpow`,
-  `Podc/Graph/Girth.lean`);
+  `Cslib/Foundations/Combinatorics/SimpleGraph/Girth.lean`);
 * `greedyAlg` — hence a `SpannerAlg G w (2t-1) (fun s => s^{1+1/t} + s)`;
 * `corollary_2_2` — with probability `≥ 1 - (n+1)^{-C} - α e^{-n^{1/3}/6}` the conversion outputs
   an `r`-fault-tolerant `(2t-1)`-spanner with at most `6 (8C + 26) r^{2 - 1/t} n^{1 + 1/t} ln(n+1)`

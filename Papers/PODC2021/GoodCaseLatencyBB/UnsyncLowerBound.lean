@@ -1,6 +1,6 @@
 import Papers.PODC2021.GoodCaseLatencyBB.UnsyncClaim1
 import Papers.PODC2021.GoodCaseLatencyBB.UnsyncClaim2
-import Podc.Foundations.Labelling
+import Cslib.Foundations.Combinatorics.Labelling
 
 /-!
 # Theorem 10: BRB with unsynchronized start and `f > n/3` needs `Δ + 1.5δ`

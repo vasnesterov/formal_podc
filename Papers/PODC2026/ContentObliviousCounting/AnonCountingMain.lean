@@ -24,7 +24,7 @@ channels, no failures, deterministic anonymous nodes whose only input is the lea
 
 namespace Podc.ContentOblivious.AnonCounting
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 set_option linter.unusedSectionVars false
 set_option linter.deprecated false
@@ -369,7 +369,7 @@ theorem anonCount_terminates {n : ℕ} [NeZero n] (ℓ : ZMod n) :
     ∀ c : Cfg n, anonCount.Reach (oriented n) (leaderInput ℓ) c →
       ∃ c', Relation.ReflTransGen (anonCount.Step (oriented n)) c c' ∧
         anonCount.Final (oriented n) c' := by
-  have hB : ∀ c, Podc.ContentOblivious.Reach (oriented n) anonCount.toAlgo
+  have hB : ∀ c, Cslib.ContentOblivious.Reach (oriented n) anonCount.toAlgo
       (fun v => Encodable.encode (leaderInput ℓ v)) c → totalSent c ≤ totalPulses n :=
     fun c hc => anonCount_totalSent_le ℓ c hc
   refine ⟨?_, fun c hc => exists_final hB hc⟩

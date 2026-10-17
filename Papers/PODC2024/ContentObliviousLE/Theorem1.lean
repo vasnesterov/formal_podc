@@ -7,13 +7,13 @@ Frei, Gelles, Ghazy, Nolin, *Content-Oblivious Leader Election on Rings*, PODC 2
 announcement), Theorem 1; full version arXiv 2405.03646, Theorem 1 / Appendix A.
 
 Setting: oriented ring `ZMod n` (`n ≥ 1`, including the self-loop `n = 1` and the double link
-`n = 2`), distinct positive IDs, adversarial asynchronous scheduler (`Podc.ContentOblivious.Step`).
+`n = 2`), distinct positive IDs, adversarial asynchronous scheduler (`Cslib.ContentOblivious.Step`).
 `ℓ` is the node of maximal ID.
 -/
 
 namespace Podc.ContentOblivious.Alg2
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 variable {n : ℕ} [NeZero n] {id : ZMod n → ℕ} {ℓ : ZMod n}
 
@@ -159,13 +159,13 @@ theorem totalSent_le {c : Cfg n} (hr : Reach (oriented n) alg id c) :
 /-- **Theorem 1 (termination).** There is no infinite execution. -/
 theorem no_infinite_execution :
     ¬ ∃ f : ℕ → Cfg n, f 0 = initCfg alg id ∧ ∀ k, Step (oriented n) alg (f k) (f (k + 1)) :=
-  Podc.ContentOblivious.no_infinite_execution (B := n * (2 * id ℓ + 1))
+  Cslib.ContentOblivious.no_infinite_execution (B := n * (2 * id ℓ + 1))
     fun _ hr => totalSent_le hid hpos hℓ hr
 
 /-- Every execution can be completed (non-vacuity of `final_spec`). -/
 theorem exists_final {c : Cfg n} (hr : Reach (oriented n) alg id c) :
     ∃ c', Relation.ReflTransGen (Step (oriented n) alg) c c' ∧ Final (oriented n) alg c' :=
-  Podc.ContentOblivious.exists_final (B := n * (2 * id ℓ + 1))
+  Cslib.ContentOblivious.exists_final (B := n * (2 * id ℓ + 1))
     (fun _ hr => totalSent_le hid hpos hℓ hr) hr
 
 /-- **Quiescent termination** (Section 1.1): at any time, no pulse is in transit towards a

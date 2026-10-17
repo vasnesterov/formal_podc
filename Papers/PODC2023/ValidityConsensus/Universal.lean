@@ -1,5 +1,5 @@
 import Papers.PODC2023.ValidityConsensus.Similarity
-import Podc.PartialSync.Map
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Map
 
 /-!
 # On the Validity of Consensus — §5.2: `Universal` (Theorem 5) and the classification
@@ -8,7 +8,7 @@ import Podc.PartialSync.Map
   *hypothesis* (the paper gives implementations in its Appendix B, relying on Quad / DBFT and
   reliable broadcast; these are not formalized).
 * `universal A Λ` (Algorithm 2): run vector consensus `A`, decide `Λ vector` (the decision
-  post-processing `A.mapDecide Λ` of `Podc.PartialSync.Map`).
+  post-processing `A.mapDecide Λ` of `Cslib.Computability.Distributed.Byzantine.PartialSync.Map`).
 * `solvesConsensus_universal` (Lemma 8 / Theorem 5): if `n > 2t` (the paper assumes `n > 3t`)
   and `Λ` witnesses `C_S`, then `universal A Λ` solves consensus with `val`, and it sends exactly
   the messages of `A` in every run (`Run.msgsUpTo_mapDecide`), so it inherits `A`'s message

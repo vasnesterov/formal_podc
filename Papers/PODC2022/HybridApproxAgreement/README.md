@@ -124,8 +124,8 @@ value to everybody at `3Δ` (`RBC.rbc_honest_sender`). With a silent Byzantine p
 and both honest parties output `1/2` (`AA.aa_silent`). The impossibility hypotheses are satisfiable:
 for `n = 1` the trivial protocol meets them (`outputInput_secure`). CSLib modules used:
 `Byzantine/PartialSync/{Model,Auth,Constructions,Sync}`, `ApproxConsensus/Trim`. Shared library code
-(`Podc/PartialSync/`): the run classes `Run.SyncValid`, `Run.Valid`, `Run.AsyncValid` (`RunClasses.lean`),
+(`Cslib/Computability/Distributed/Byzantine/PartialSync/`): the run classes `Run.SyncValid`, `Run.Valid`, `Run.AsyncValid` (`RunClasses.lean`),
 quiet runs `Run.quiet` (`Runs.lean`), `Run.st_map` (states of runs commute with maps of messages, states
 and inputs, `Map.lean`), `Run.st_eq_simStates` (memoised state computation of zero-delay runs, for
 `decide`-checked concrete executions, `Sim.lean`), and the labelling lemma `Fintype.exists_labelling`
-(`Podc/Foundations/Labelling.lean`).
+(`Cslib/Foundations/Combinatorics/Labelling.lean`).

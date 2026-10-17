@@ -1,5 +1,6 @@
 import Papers.PODC2019.CryptoConsensusNumber.Valency
-import Podc.SharedMemory.Recoverable
+import Cslib.Computability.Distributed.SharedMemory.ObjClasses
+import Cslib.Computability.Distributed.SharedMemory.Recoverable
 
 /-!
 # Consensus from registers and asset-transfer objects: the system

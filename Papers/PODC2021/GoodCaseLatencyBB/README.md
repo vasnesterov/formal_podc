@@ -76,7 +76,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
   an actual bound `δ` quantifies over runs with delays `≤ δ`. Time is counted with *effective delays*: a message
   received at time `t` is in the state at time `t`, and a reply can leave at `t`. So "commits before `T`" means
   "decided in the state at `T − 1`". Delays are `≥ 1`, which only weakens the adversary. (This `SyncValid f d`
-  is the shared library class `Run.SyncValid f (d − 1)` of `Podc/PartialSync/RunClasses.lean` up to the GST,
+  is the shared library class `Run.SyncValid f (d − 1)` of `Cslib/Computability/Distributed/Byzantine/PartialSync/RunClasses.lean` up to the GST,
   bridge `syncValid_iff`.)
 - **Partial synchrony.** We use CSLib's convention: rounds of length `D`, and "within `r` rounds" means the state
   at `rD + 1`. The lower bounds use lock-step executions.
@@ -109,7 +109,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 19 for `n = 3, f = 2` | `theorem_19_three` | `DishonestMajority.lean` |
 
 The executions of Theorem 7 are those of the Kuznetsov–Tonkikh–Zhang lower bound (same PODC, same
-construction), taken from the library module `Podc/PartialSync/TwoStepLB.lean` (FastByzantineConsensus still
+construction), taken from the library module `Cslib/Computability/Distributed/Byzantine/PartialSync/TwoStepLowerBound.lean` (FastByzantineConsensus still
 has its own copy, to be switched to the library).
 
 **Not formalized.** The upper-bound protocols of Figures 3, 5, 6, 9 and 10 (Theorems 11–18) and the BA
@@ -122,11 +122,11 @@ Non-vacuity of the hypotheses:
 - the hypotheses of Theorems 7, 9, 10 and 19 (BRB/psync-BB with large `f`) are not instantiated here, since
   their protocols (PBFT, Dolev–Strong-based BB, Figures 5–10) are not formalized.
 
-Shared library code used here: run classes (`Podc/PartialSync/RunClasses.lean`), quiet runs and `DecidesBy`
+Shared library code used here: run classes (`Cslib/Computability/Distributed/Byzantine/PartialSync/RunClasses.lean`), quiet runs and `DecidesBy`
 (`Runs.lean`), gossip of known tokens and token origin (`Gossip.lean`: `Algorithm.Gossips`,
 `Run.honestTokens_origin`; the 2-round-BRB protocol and the `n = 3` protocol are instances), the two-step
-executions `ρ₁…ρ₅` (`TwoStepLB.lean`), threshold certificates for commit quorums (`Podc/Byzantine/Certificate.lean`)
-and size-bounded labellings of the processes into groups (`Podc/Foundations/Labelling.lean`).
+executions `ρ₁…ρ₅` (`TwoStepLB.lean`), threshold certificates for commit quorums (`Cslib/Computability/Distributed/Byzantine/Certificate.lean`)
+and size-bounded labellings of the processes into groups (`Cslib/Foundations/Combinatorics/Labelling.lean`).
 
 Generic tools are in this folder and marked as CSLib candidates:
 - replay lemmas `tokens_replay_dl` and `tokens_replay_rel`;

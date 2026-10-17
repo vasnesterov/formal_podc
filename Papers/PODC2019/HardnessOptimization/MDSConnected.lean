@@ -1,5 +1,6 @@
 import Papers.PODC2019.HardnessOptimization.MDSTheorem
-import Podc.CongestLB.Gather
+import Cslib.Computability.Distributed.Congest.Gather
+import Mathlib
 
 /-!
 # Connectivity of the MDS lower-bound graphs
@@ -13,7 +14,7 @@ for such algorithms, because the fooling-set argument never uses the input pair 
 
 namespace HardnessOptimization
 
-open Finset Podc.CongestLB
+open Finset Cslib.Congest Cslib.CommunicationComplexity
 
 /-- The layer of a vertex (`false` = rows `A₁, B₁` and their gadgets). -/
 def MV.layer {L : ℕ} : MV L → Bool

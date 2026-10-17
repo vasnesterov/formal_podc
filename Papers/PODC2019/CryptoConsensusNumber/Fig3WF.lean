@@ -1,5 +1,7 @@
 import Papers.PODC2019.CryptoConsensusNumber.Fig3Pot
-import Podc.SharedMemory.Progress
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Task
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # Lemma 2 of Guerraoui et al. (PODC 2019): Figure 3 is wait-free
@@ -98,7 +100,7 @@ theorem fig3_waitFree (hk : KShared μ k) : (impl μ q₀ k).WaitFree := by
   push Not at hcon
   -- invariants along the execution
   have hMI : ∀ m, ∃ K, MInv μ (e.cfg m) K := fun m => by
-    obtain ⟨K, -, -, hM, -⟩ := inv_of_run hk (e.run_lbls m); exact ⟨K, hM⟩
+    obtain ⟨K, -, -, hM, -⟩ := inv_of_run hk (e.run_pre m); exact ⟨K, hM⟩
   have hother : ∀ m, (e.lbl m).proc ≠ p → (e.cfg (m + 1)).loc p = (e.cfg m).loc p :=
     fun m h => (Impl.step_other (e.step_eq m) h).1
   have htau : ∀ m ≥ n₀, (e.lbl m).proc = p → e.lbl m = .tau p := by
@@ -134,7 +136,7 @@ theorem fig3_waitFree (hk : KShared μ k) : (impl μ q₀ k).WaitFree := by
     rw [show m + (m' - m) = m' by omega] at this
     exact this hl
   -- `p` reaches the loop
-  obtain ⟨T, hT, hTloop⟩ := e.exists_good_of_measure p (fun m => (((e.cfg m).loc p).pc.loopC).isSome)
+  obtain ⟨T, hT, hTloop⟩ := e.exists_good p (fun m => (((e.cfg m).loc p).pc.loopC).isSome)
     (fun m => PC.preSteps n ((e.cfg m).loc p).pc) n₀
     (fun t' ht' _ => by
       obtain ⟨m, hm, hl⟩ := hcon t'
@@ -212,7 +214,7 @@ theorem fig3_waitFree (hk : KShared μ k) : (impl μ q₀ k).WaitFree := by
   -- `round_a` of `p` grows without bound
   have hrnd : ∀ R t₀, T ≤ t₀ → ∃ m ≥ t₀, R ≤ ((e.cfg m).loc p).rnd a := by
     intro R t₀ ht₀
-    obtain ⟨m, hm, hgood⟩ := e.exists_good_of_measure p (fun m => R ≤ ((e.cfg m).loc p).rnd a)
+    obtain ⟨m, hm, hgood⟩ := e.exists_good p (fun m => R ≤ ((e.cfg m).loc p).rnd a)
       (fun m => 3 * (R - ((e.cfg m).loc p).rnd a) + (2 - PC.phase ((e.cfg m).loc p).pc)) t₀
       (fun t' ht' _ => by
         obtain ⟨m, hm, hl⟩ := hcon t'

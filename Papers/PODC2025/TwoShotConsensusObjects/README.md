@@ -112,5 +112,5 @@ Herlihy–Ruppert and Ruppert's classes is not, since it is discussion only.
 - The model and the critical-configuration machinery (`exists_crit`, `Crit.poised`,
   `team_contra`) come from CSLib `Cslib/Computability/Distributed/SharedMemory/Recoverable.lean`;
   the object families `withRW`, access counts `accCount` and the generic tools `prog_of_rank`,
-  `wfConsensus_of_inv` from the shared library `Podc/SharedMemory/Recoverable.lean`, and
-  `ObjSpec.RWLike` from `Podc/SharedMemory/ObjClasses.lean`.
+  `wfConsensus_of_inv` from the shared library `Cslib/Computability/Distributed/SharedMemory/Recoverable.lean`, and
+  `ObjSpec.RWLike` from `Cslib/Computability/Distributed/SharedMemory/ObjClasses.lean`.

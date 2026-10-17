@@ -1,5 +1,5 @@
 import Papers.PODC2025.StrangerFreeTasks.Alg1
-import Podc.SharedMemory.Run
+import Cslib.Computability.Distributed.SharedMemory.Model
 
 /-!
 # Safety of Algorithm 1: step lemmas and basic invariants

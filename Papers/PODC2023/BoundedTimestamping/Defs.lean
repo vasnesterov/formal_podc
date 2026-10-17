@@ -1,6 +1,6 @@
 import Mathlib
 import Cslib.Computability.Distributed.SharedMemory.Model
-import Podc.SharedMemory.Objects.FetchAdd
+import Cslib.Computability.Distributed.SharedMemory.Objects.FetchAdd
 
 /-!
 # Mutable timestamp systems: specification and base objects
