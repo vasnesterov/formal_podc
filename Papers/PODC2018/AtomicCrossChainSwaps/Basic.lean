@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.Digraph.Walk
 
 /-!
 # Atomic cross-chain swaps (Herlihy, PODC 2018): digraph vocabulary
@@ -6,6 +7,9 @@ import Mathlib
 Swap digraphs are Mathlib `Digraph`s (arcs `D.Adj u v`: a proposed transfer from `u` to `v`).
 This file fixes the paper's §2.1 notions: paths (in the paper's lax sense), reachability,
 strong connectivity, feedback vertex sets and the "diameter" (length of a longest path).
+Reachability, strong connectivity and the follower subgraph are the shared notions
+`Digraph.Reachable`, `Digraph.StronglyConnected` and `Digraph.deleteVerts` of
+`Podc.Digraph.Walk`.
 -/
 
 namespace AtomicSwap
@@ -21,18 +25,19 @@ def IsPath (D : Digraph V) (p : List V) : Prop :=
 instance [DecidableEq V] (D : Digraph V) [DecidableRel D.Adj] : DecidablePred (IsPath D) :=
   fun _ => inferInstanceAs (Decidable (_ ∧ _ ∧ _))
 
-/-- Reachability (`v` is reachable from `u`). -/
-def Reach (D : Digraph V) (u v : V) : Prop := Relation.ReflTransGen D.Adj u v
+/-- Reachability (`v` is reachable from `u` by a directed walk, possibly empty). -/
+abbrev Reach (D : Digraph V) (u v : V) : Prop := D.Reachable u v
 
 /-- `D` is strongly connected: every vertex is reachable from every vertex. -/
-def StronglyConnected (D : Digraph V) : Prop := ∀ u v, Reach D u v
+abbrev StronglyConnected (D : Digraph V) : Prop := D.StronglyConnected
 
 /-- `D` is (weakly) connected: its underlying undirected graph is connected. -/
 def WeaklyConnected (D : Digraph V) : Prop :=
   ∀ u v, Relation.ReflTransGen (fun a b => D.Adj a b ∨ D.Adj b a) u v
 
-/-- The arcs among followers (vertices outside `L`). -/
-def FollowerAdj (D : Digraph V) (L : Set V) (a b : V) : Prop := D.Adj a b ∧ a ∉ L ∧ b ∉ L
+/-- The arcs among followers (vertices outside `L`): `FollowerAdj D L a b ↔ D.Adj a b ∧ a ∉ L ∧
+b ∉ L`. -/
+abbrev FollowerAdj (D : Digraph V) (L : Set V) : V → V → Prop := (D.deleteVerts L).Adj
 
 /-- `L` is a *feedback vertex set*: deleting `L` leaves `D` acyclic, i.e. there is no closed
 walk (of positive length) among the vertices outside `L`. -/

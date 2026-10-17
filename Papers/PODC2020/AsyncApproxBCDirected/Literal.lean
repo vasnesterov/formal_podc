@@ -27,6 +27,8 @@ set_option linter.unusedSectionVars false
 
 namespace AsyncApproxBCDirected
 
+open Cslib.ApproxConsensus
+
 variable {V : Type*} [Fintype V] [DecidableEq V] {G : Digraph V} {f : ℕ}
 
 /-- Algorithm 2 exactly as written: covers `H ⊆ V \ S_{Fu,Fw}` may contain `v`. -/
@@ -53,7 +55,7 @@ theorem not_completenessLit (hG : ThreeReach G f) (hn : 2 ≤ Fintype.card V) (h
     by_cases hu : Fu = {v}
     · simp [hu]
     · simp [Fw, hu]
-  obtain ⟨q, hq⟩ := hG.srcComp_nonempty hn hFu hFw
+  obtain ⟨q, hq⟩ := ThreeReach.srcComp_nonempty hG hn hFu hFw
   obtain ⟨m, -, -, hno⟩ := h Fw hFw hne q hq
   refine hno ⟨{v}, by simpa using hf, fun h hh hhS => ?_, fun m' hm' _ _ hav => ?_⟩
   · rw [mem_singleton] at hh; subst hh

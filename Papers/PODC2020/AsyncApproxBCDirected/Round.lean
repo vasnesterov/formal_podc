@@ -20,6 +20,8 @@ set_option linter.unusedSectionVars false
 
 namespace AsyncApproxBCDirected
 
+open Cslib.ApproxConsensus
+
 variable {V : Type*} [Fintype V] [DecidableEq V] {G : Digraph V} {f : ℕ}
 
 /-- Conclusion of Theorems 10–11 for one node (see the module docstring). -/
@@ -42,7 +44,7 @@ theorem pair_le (hG : ThreeReach G f) (hn : 2 ≤ Fintype.card V) {Ft : Finset V
   obtain ⟨au, bu, rfl, -, -, ⟨Hhi, hHhi, huHhi, hhi⟩, hau, -⟩ := hz.props
   obtain ⟨W₁, -, hW₁, h₁⟩ := hwv Hlo hHlo hvHlo
   obtain ⟨W₂, -, hW₂, h₂⟩ := hwu Hhi hHhi huHhi
-  obtain ⟨q, hq⟩ := hG.theorem12 hn hFt hW₁ hW₂
+  obtain ⟨q, hq⟩ := ThreeReach.theorem12 hG hn hFt hW₁ hW₂
   obtain ⟨m₁, hm₁, hm₁v, hm₁H⟩ := h₁ q (mem_inter.mp hq).1
   obtain ⟨m₂, hm₂, hm₂v, hm₂H⟩ := h₂ q (mem_inter.mp hq).2
   have e1 := hlo m₁ hm₁ hm₁H
@@ -103,7 +105,8 @@ theorem leader_witnessed (hG : ThreeReach G f) (hn : 2 ≤ Fintype.card V) {z c 
   obtain ⟨W, hW𝒲, hW, hHS⟩ := h𝒲 H hH hzH
   refine ⟨W, hW𝒲, hW, fun q hq => ?_⟩
   have hzb : z ∉ Ft ∪ H := by simp [hsz.1, hzH]
-  obtain ⟨p, hp, hpF⟩ := (reaches_from_srcComp hG hn hsz.2.1 hW hH hq hHS hzb).exists_simplePath
+  obtain ⟨p, hp, hpF⟩ := Reaches.exists_simplePath
+    (reaches_from_srcComp hG hn hsz.2.1 hW hH hq hHS hzb)
   obtain ⟨y, hy⟩ := (hsz.full G f) p hp.isRedundant (avoids_union.mp hpF).1 hp.1.2.1
   refine ⟨(y, p), E.mcMsg_subset htz hy, ?_, (avoids_union.mp hpF).2⟩
   rw [(hsz.consistent G f).eq_valueOf hy hp.1.1]
@@ -180,12 +183,14 @@ theorem theorem10 (hG : ThreeReach G f) (hn : 2 ≤ Fintype.card V) {v u : V} (h
   obtain ⟨c, hcv, hcu⟩ := hG E.F Fu Fv u v E.card_F hsu.2.1 hsv.2.1 (by simp [hu, hsu.1])
     (by simp [hv, hsv.1])
   have hcF : c ∉ E.F := fun h => hcv.1 (mem_union_left _ h)
-  obtain ⟨pv, hpv, hpvF⟩ := hcv.exists_simplePath
-  obtain ⟨pu, hpu, hpuF⟩ := hcu.exists_simplePath
+  obtain ⟨pv, hpv, hpvF⟩ := Reaches.exists_simplePath hcv
+  obtain ⟨pu, hpu, hpuF⟩ := Reaches.exists_simplePath hcu
   have hpvR : ∀ y ∈ pv, Reaches G Fv y v := fun y hy =>
-    (hpv.1.reaches_of_mem hpvF y hy).mono subset_union_right
+    Digraph.ReachableAvoiding.anti (hpv.1.reaches_of_mem hpvF y hy)
+      (coe_subset.2 subset_union_right)
   have hpuR : ∀ y ∈ pu, Reaches G Fu y u := fun y hy =>
-    (hpu.1.reaches_of_mem hpuF y hy).mono subset_union_right
+    Digraph.ReachableAvoiding.anti (hpu.1.reaches_of_mem hpuF y hy)
+      (coe_subset.2 subset_union_right)
   obtain ⟨-, -, ⟨⟨tv', htv', hfv⟩, hverv⟩, -⟩ := ev
   obtain ⟨-, -, ⟨⟨tu', htu', hfu⟩, hveru⟩, -⟩ := eu
   obtain ⟨Mcv, hMcv⟩ := hfv c

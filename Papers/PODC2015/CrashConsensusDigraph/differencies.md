@@ -117,14 +117,14 @@ Classification used below: **false statement**, **false only in a degenerate cas
 ## Section 4 (asynchronous approximate consensus)
 
 19. **Modelling choice — asynchronous model.** We reuse the asynchronous message-passing model on
-    digraphs of the PODC 2020 formalization (`Papers/PODC2020/AsyncApproxBCDirected/AsyncModel.lean`):
+    digraphs of the PODC 2020 formalization (`Podc/ApproxConsensus/Async/Model.lean`):
     deterministic event-driven algorithms, reliable FIFO links with adversarial finite delays, fairness
     on links between correct nodes. For Theorem 6 (`CrashSolvesOn`) faulty nodes are *initially dead*
     (a special case of crashes, so the impossibility is stronger), and validity is "between two
     inputs of any nodes" (the paper's "convex hull of all the inputs").
 20. **Theorem 6** (`theorem6`, `theorem6'`): faithful; the paper's condition is
-    `AsyncApproxBCDirected.CCA G f` (partition condition with `f + 1` distinct nodes), equivalent to
-    2-reach (`theorem17b`). The informal "nodes in `L` cannot wait for any message from `O(L)`" is made
+    `Cslib.ApproxConsensus.CCA G f` (partition condition with `f + 1` distinct nodes), equivalent to
+    2-reach (`cca_iff_twoReach`). The informal "nodes in `L` cannot wait for any message from `O(L)`" is made
     precise by replaying two executions (with `O(R)`, resp. `O(L)`, initially dead) into one
     failure-free execution. Inputs `0` and `2ε` as in the paper (any two admissible inputs more than
     `ε` apart).

@@ -218,10 +218,6 @@ theorem not_condition_hypercube {d : ℕ} (hd : 1 ≤ d) (hf : 1 ≤ f) :
 
 /-! ## Decidable descriptions for concrete graphs -/
 
-theorem inNbrs_eq_filter [DecidableRel G.Adj] (v : V) :
-    inNbrs G v = univ.filter fun j => G.Adj j v ∧ j ≠ v := by
-  ext j; simp
-
 /-- The condition of Theorem 1 in terms of labelings `lab : V → Fin 4` (`0, 1, 2, 3` meaning
 `F, L, C, R`); for a concrete finite graph the hypothesis is decidable. -/
 theorem condition_of_labelings [DecidableRel G.Adj]

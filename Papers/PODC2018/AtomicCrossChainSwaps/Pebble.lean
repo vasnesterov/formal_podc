@@ -7,7 +7,7 @@ import Papers.PODC2018.AtomicCrossChainSwaps.Basic
   `k + 1` if all its in-neighbours fired by round `k`. Firing = placing pebbles (contracts) on all
   leaving arcs. Lemma 4.1: everybody fires iff `L` is a feedback vertex set; Lemma 4.3: in a
   strongly connected digraph everybody fires by round `diam D - 1`.
-* The eager game from `z` is reachability (`ReachIn`): Lemma 4.2/4.3.
+* The eager game from `z` is bounded reachability (`ReachIn`): Lemma 4.2/4.3.
 * Theorem 4.12 (core, "waits-for" argument): if followers publish on a leaving arc only after all
   their entering arcs carry contracts, no arc on a cycle of followers ever gets a contract.
 * Lemma 4.13 (single leader): with simple paths, `D(v, v̂) ≥ D(w, v̂) + 1` for every arc `(v, w)`
@@ -24,9 +24,7 @@ def Fired (D : Digraph V) (L : Set V) : ℕ → V → Prop
   | k + 1, v => Fired D L k v ∨ ∀ u, D.Adj u v → Fired D L k u
 
 /-- `ReachIn D k v w`: `w` is reachable from `v` by a walk of length at most `k`. -/
-def ReachIn (D : Digraph V) : ℕ → V → V → Prop
-  | 0, v, w => v = w
-  | k + 1, v, w => v = w ∨ ∃ x, D.Adj v x ∧ ReachIn D k x w
+abbrev ReachIn (D : Digraph V) (k : ℕ) (v w : V) : Prop := Relation.RelatesWithinSteps D.Adj v w k
 
 /-! ### Generic facts on chains and acyclic relations -/
 
@@ -186,87 +184,20 @@ theorem fired_diam [Fintype V] [Nontrivial V] (hD : StronglyConnected D) (hL : I
 
 /-! ### The eager pebble game (distances) -/
 
-lemma ReachIn.refl {k : ℕ} {v : V} : ReachIn D k v v := by
-  cases k with
-  | zero => rfl
-  | succ k => exact Or.inl rfl
-
-lemma ReachIn.succ : ∀ {k : ℕ} {v w : V}, ReachIn D k v w → ReachIn D (k + 1) v w
-  | 0, _, _, h => Or.inl h
-  | k + 1, _, _, h => by
-    rcases h with h | ⟨x, hx, h⟩
-    · exact Or.inl h
-    · exact Or.inr ⟨x, hx, h.succ⟩
-
-/-- `ReachIn` is monotone in the bound. -/
-lemma ReachIn.mono {k k' : ℕ} {v w : V} (hk : k ≤ k') (h : ReachIn D k v w) :
-    ReachIn D k' v w := by
-  induction hk with
-  | refl => exact h
-  | step _ ih => exact ih.succ
-
-lemma ReachIn.reach : ∀ {k : ℕ} {v w : V}, ReachIn D k v w → Reach D v w
-  | 0, _, _, h => h ▸ Relation.ReflTransGen.refl
-  | k + 1, _, _, h => by
-    rcases h with h | ⟨x, hx, h⟩
-    · exact h ▸ Relation.ReflTransGen.refl
-    · exact Relation.ReflTransGen.head hx h.reach
-
-lemma Reach.exists_reachIn {v w : V} (h : Reach D v w) : ∃ k, ReachIn D k v w := by
-  induction h using Relation.ReflTransGen.head_induction_on with
-  | refl => exact ⟨0, rfl⟩
-  | head hab _ ih =>
-    obtain ⟨k, hk⟩ := ih
-    exact ⟨k + 1, Or.inr ⟨_, hab, hk⟩⟩
-
-/-- A walk realising the distance is a simple path. -/
-lemma ReachIn.exists_nodup : ∀ {n : ℕ} {v w : V}, ReachIn D n v w →
-    (∀ m < n, ¬ ReachIn D m v w) →
-    ∃ p : List V, p.Nodup ∧ p.IsChain D.Adj ∧ p.head? = some v ∧ p.getLast? = some w ∧
-      p.length = n + 1 ∧ ∀ x ∈ p, ReachIn D n x w
-  | 0, v, w, h, _ => ⟨[v], by simp, .singleton _, rfl, by simp [show v = w from h], rfl,
-      by simpa using h⟩
-  | n + 1, v, w, h, hmin => by
-    rcases h with h | ⟨x, hx, h⟩
-    · exact absurd (h ▸ ReachIn.refl) (hmin 0 (Nat.succ_pos n))
-    have hmin' : ∀ m < n, ¬ ReachIn D m x w := fun m hm hm' =>
-      hmin (m + 1) (by omega) (Or.inr ⟨x, hx, hm'⟩)
-    obtain ⟨p, hnd, hch, hh, hl, hlen, hall⟩ := ReachIn.exists_nodup h hmin'
-    have hne : p ≠ [] := by rintro rfl; simp at hlen
-    refine ⟨v :: p, List.nodup_cons.2 ⟨fun hv => hmin n (by omega) (hall v hv), hnd⟩,
-      hch.cons (by simpa [hh] using hx), rfl, ?_, by simp [hlen], ?_⟩
-    · rw [List.getLast?_cons, hl]; rfl
-    · simp only [List.mem_cons, forall_eq_or_imp]
-      exact ⟨Or.inr ⟨x, hx, h⟩, fun y hy => (hall y hy).succ⟩
-
-/-- Reachability is witnessed by a simple path (as a list without repetitions). -/
-lemma Reach.exists_nodup {v w : V} (h : Reach D v w) :
-    ∃ p : List V, p.Nodup ∧ p.IsChain D.Adj ∧ p.head? = some v ∧ p.getLast? = some w := by
-  classical
-  have hex := h.exists_reachIn
-  obtain ⟨p, hnd, hch, hh, hl, -⟩ :=
-    (Nat.find_spec hex).exists_nodup fun m hm => Nat.find_min hex hm
-  exact ⟨p, hnd, hch, hh, hl⟩
-
 /-- **Lemma 4.3** (eager game) of [Herlihy, PODC 2018]: in a strongly connected digraph every
 vertex is at distance at most `diam D - 1` from every other. -/
 theorem reachIn_diam [Fintype V] (hD : StronglyConnected D) (v w : V) :
     ReachIn D (diam D - 1) v w := by
-  classical
-  have hex := (hD v w).exists_reachIn
-  have hn := Nat.find_spec hex
-  have hmin : ∀ m < Nat.find hex, ¬ ReachIn D m v w := fun m hm => Nat.find_min hex hm
-  refine hn.mono ?_
-  rcases Nat.eq_zero_or_pos (Nat.find hex) with h0 | hpos
-  · omega
-  obtain ⟨p, hnd, hch, -, hl, hlen, -⟩ := hn.exists_nodup hmin
-  have hvw : v ≠ w := by rintro rfl; exact hmin 0 hpos ReachIn.refl
+  by_cases hvw : v = w
+  · subst hvw
+    exact Relation.RelatesWithinSteps.mono (Nat.zero_le _) (Relation.RelatesWithinSteps.refl v)
+  obtain ⟨p, hp, hnd⟩ := (hD v w).exists_isChainFromTo
   obtain ⟨x, hwx, -⟩ := (Relation.ReflTransGen.cases_head (hD w v)).resolve_left (Ne.symm hvw)
-  have hP : IsPath D (p ++ [x]) :=
-    ⟨by simp, hch.append (.singleton x) (by simpa [hl] using hwx), by simpa using hnd⟩
-  have := le_diam hP
-  simp only [List.length_append, List.length_singleton] at this
-  omega
+  have hP : IsPath D (p ++ [x]) := ⟨by simp, (hp.snoc hwx).isChain, by simpa using hnd⟩
+  have hlen := le_diam hP
+  have hpos := hp.length_pos
+  simp only [List.length_append, List.length_singleton] at hlen
+  exact ⟨p.length - 1, by omega, hp.relatesInSteps (by omega)⟩
 
 /-! ### Theorem 4.12 (core): the waits-for argument -/
 

@@ -1,13 +1,15 @@
-import Cslib.Computability.Distributed.ApproxConsensus.Iterative
+import Podc.ApproxConsensus.DigraphConditions
 import Mathlib
 
 /-!
 # The graph condition of Vaidya–Tseng–Liang (PODC 2012) and its combinatorics
 
 * `Arrow G f A B` — Definition 1, `A ⇒ B`: some node of `B` has at least `f + 1` in-neighbours
-  in `A`.
+  in `A` (shared definition `Cslib.ApproxConsensus.Arrow`).
 * `Condition G f` — the necessary and sufficient condition (statement of Theorem 1): for every
-  partition `F, L, C, R` of the nodes with `|F| ≤ f`, `L, R ≠ ∅`: `C ∪ R ⇒ L` or `L ∪ C ⇒ R`.
+  partition `F, L, C, R` of the nodes with `|F| ≤ f`, `L, R ≠ ∅`: `C ∪ R ⇒ L` or `L ∪ C ⇒ R`
+  (`Cslib.ApproxConsensus.IterativeCondition`; it implies condition BCS / 3-reach,
+  `IterativeCondition.threeReach`).
 * Corollaries 1–3: `Condition.corollary1`, `Condition.three_mul_lt_card` (`n > 3f`),
   `Condition.inDegree` (`|N_i⁻| ≥ 2f + 1` when `f > 0`).
 * `inArrow` (Definition 2), `propStep` / `Propagates` (Definition 3), Lemma 1
@@ -20,29 +22,13 @@ namespace IterativeApproxBC
 
 variable {V : Type*} [Fintype V] [DecidableEq V]
 
-/-- Definition 1 of [VTL12]: `A ⇒ B` iff some node `v ∈ B` has at least `f + 1` in-neighbours
-in `A` (self-loops do not count). -/
-def Arrow (G : Digraph V) (f : ℕ) (A B : Finset V) : Prop :=
-  ∃ v ∈ B, f + 1 ≤ #(inNbrs G v ∩ A)
-
 /-- The condition of Theorem 1 of [VTL12]: for every partition `F, L, C, R` of `V` with
-`|F| ≤ f` and `L, R` non-empty, `C ∪ R ⇒ L` or `L ∪ C ⇒ R`. -/
-def Condition (G : Digraph V) (f : ℕ) : Prop :=
-  ∀ F L C R : Finset V, Disjoint F L → Disjoint F C → Disjoint F R → Disjoint L C →
-    Disjoint L R → Disjoint C R → F ∪ L ∪ C ∪ R = univ → #F ≤ f → L.Nonempty → R.Nonempty →
-    Arrow G f (C ∪ R) L ∨ Arrow G f (L ∪ C) R
+`|F| ≤ f` and `L, R` non-empty, `C ∪ R ⇒ L` or `L ∪ C ⇒ R` (`Arrow`, Definition 1). The
+definitions are `Cslib.ApproxConsensus.IterativeCondition` and `Cslib.ApproxConsensus.Arrow`
+(`Podc/ApproxConsensus/DigraphConditions.lean`). -/
+abbrev Condition (G : Digraph V) (f : ℕ) : Prop := IterativeCondition G f
 
 variable {G : Digraph V} {f : ℕ}
-
-theorem not_arrow_of_card_le {A B : Finset V} (h : #A ≤ f) : ¬ Arrow G f A B := by
-  rintro ⟨v, -, hv⟩
-  have := card_le_card (inter_subset_right (s₁ := inNbrs G v) (s₂ := A))
-  omega
-
-theorem Arrow.mono {A A' B B' : Finset V} (h : Arrow G f A B) (hA : A ⊆ A') (hB : B ⊆ B') :
-    Arrow G f A' B' := by
-  obtain ⟨v, hv, hc⟩ := h
-  exact ⟨v, hB hv, hc.trans (card_le_card (inter_subset_inter_left hA))⟩
 
 /-- The condition in "fault-free set" form: with `X = V \ F`, for disjoint non-empty `L, R ⊆ X`,
 `X \ L ⇒ L` or `X \ R ⇒ R` (here `C = X \ (L ∪ R)`). -/

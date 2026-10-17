@@ -23,6 +23,8 @@ set_option linter.unusedSectionVars false
 
 namespace AsyncApproxBCDirected
 
+open Cslib.ApproxConsensus Cslib.ApproxConsensus.Async
+
 variable {V : Type*} [Fintype V] [DecidableEq V] {G : Digraph V} {f : ℕ}
 
 /-- An execution of Algorithm BW + FA: round executions with a common Byzantine set, chained by

@@ -1,9 +1,13 @@
-import Mathlib
+-- CSLib candidate: Cslib/Computability/Distributed/ApproxConsensus/Async/Model.lean
+import Mathlib.Combinatorics.Digraph.Basic
+import Mathlib.Basic.Real.Basic
+import Mathlib.Data.Finset.Basic
 
 /-!
-# Asynchronous Byzantine message passing on a directed graph
+# Asynchronous message passing on a directed graph (Byzantine or crash faults)
 
-The system model of Section 2 of Sakavalas–Tseng–Vaidya (PODC 2020).
+The system model of Sakavalas–Tseng–Vaidya (PODC 2020, Section 2), also used for the crash-fault
+results of Tseng–Vaidya (PODC 2015, Section 4).
 
 * Nodes `V` (finite), communication digraph `G`: node `x` can send to `y` iff `G.Adj x y`
   (self-loops are ignored). Every node knows `G` (the algorithm may depend on it).
@@ -14,21 +18,19 @@ The system model of Section 2 of Sakavalas–Tseng–Vaidya (PODC 2020).
 * Links are reliable FIFO channels with arbitrary (adversarial, finite) delays: a `deliver x y`
   event delivers the oldest message in transit on `x → y`. FIFO channels only restrict the
   adversary, so impossibility results in this model also hold for non-FIFO links.
-* A static set `B` of at most `f` Byzantine nodes. They have no channels: at any time the
-  adversary may make a Byzantine `x` deliver an arbitrary message `m` to an out-neighbour `y`
-  (`byz x y m`). The event sequence is arbitrary (full-information adversary, unbounded delays).
+* A static set `B` of faulty nodes (`run A G B inp ev`). They take no steps and have no channels:
+  at any time the adversary may make a faulty `x` deliver an arbitrary message `m` to an
+  out-neighbour `y` (`byz x y m`). Without `byz` events the faulty nodes are *initially dead*
+  (crashed before the start). The event sequence is arbitrary (full-information adversary,
+  unbounded delays).
 * `Fair`: on every link between correct nodes, a non-empty channel is eventually served.
-* `Solves A G f ε` (Definition 1): for every `B` with `|B| ≤ f`, all real inputs and all event
-  sequences, decided values of correct nodes are within `ε` of each other (convergence) and in
-  the range of correct inputs (validity), and in fair executions every correct node decides
-  (termination).
+* `SolvesOn I A G f ε` (Definition 1 of [STV20]): asynchronous approximate Byzantine consensus
+  with at most `f` faults for inputs in `I`.
 -/
 
 open Finset
 
--- CSLib candidate (general directed-network / asynchronous Byzantine infrastructure)
-
-namespace AsyncApproxBCDirected
+namespace Cslib.ApproxConsensus.Async
 
 /-- A deterministic asynchronous message-passing algorithm. -/
 structure Algorithm (V M S : Type*) where
@@ -42,8 +44,11 @@ structure Algorithm (V M S : Type*) where
 
 /-- Global configuration: local states, FIFO channel contents, (irrevocable) decisions. -/
 structure Config (V M S : Type*) where
+  /-- Local states. -/
   st : V → S
+  /-- `chan x y`: the messages in transit on the link `x → y`, oldest first. -/
   chan : V → V → List M
+  /-- The (irrevocable) decisions. -/
   dec : V → Option ℝ
 
 /-- Events of an execution. -/
@@ -124,4 +129,4 @@ def SolvesOn (I : Set ℝ) (A : Algorithm V M S) (G : Digraph V) [DecidableRel G
 def Solves (A : Algorithm V M S) (G : Digraph V) [DecidableRel G.Adj] (f : ℕ) (ε : ℝ) : Prop :=
   SolvesOn Set.univ A G f ε
 
-end AsyncApproxBCDirected
+end Cslib.ApproxConsensus.Async

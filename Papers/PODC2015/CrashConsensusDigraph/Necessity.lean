@@ -22,7 +22,7 @@ set_option linter.unusedSectionVars false
 
 namespace CrashConsensusDigraph
 
-open AsyncApproxBCDirected
+open Cslib.ApproxConsensus
 
 variable {V I M S : Type*} [DecidableEq V] {G : Digraph V}
 
@@ -63,9 +63,9 @@ theorem theorem1 [Fintype V] {f : ℕ} {In : Set I} {a b : I} (ha : a ∈ In) (h
       ∀ r u w, Delivers G adv r u w → w ∈ T → u ∈ T :=
     fun T hT r u w hd hw => hT u w hd.adj (notMem_of_delivers_crashAtStart hd) hw
   have hSi : ∀ x y, G.Adj x y → x ∉ F → y ∈ Si → x ∈ Si :=
-    fun x y e hx hy => Reaches.head e hx hy
+    fun x y e hx hy => Digraph.ReachableAvoiding.head e hx hy
   have hSj : ∀ x y, G.Adj x y → x ∉ F → y ∈ Sj → x ∈ Sj :=
-    fun x y e hx hy => Reaches.head e hx hy
+    fun x y e hx hy => Digraph.ReachableAvoiding.head e hx hy
   -- the mixed execution
   set inp : V → I := fun x => if Reaches G F x i then a else b
   have hinp : ∀ u, inp u ∈ In := fun u => by simp only [inp]; split_ifs <;> assumption

@@ -76,7 +76,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
   `Z : Multiset Bool → Bool` is applied to the own value plus the received values, in the same crash
   model. Two output conventions: eventual (`SolvesEventually`) and fixed iteration `T` (`SolvesAt`).
 * *Asynchronous* (`Async.lean`). The event-driven model on digraphs of the PODC 2020 formalization
-  (`Papers/PODC2020/AsyncApproxBCDirected/AsyncModel.lean`): reliable FIFO links with adversarial
+  (`Podc/ApproxConsensus/Async/Model.lean`, shared with the PODC 2020 paper): reliable FIFO links with adversarial
   finite delays and fairness on links between correct nodes. For Theorem 6 the faulty nodes are
   initially dead, which makes the impossibility stronger. For Theorem 7 (`AsyncCrash.lean`) nodes
   crash at arbitrary times: a crashed node takes no more steps, and its messages still in transit may
@@ -116,9 +116,11 @@ is not settled.
 `Quot.sound`. `notMax_solvesAt` is checked by kernel evaluation (`decide +kernel`) over all delivery
 patterns with at most one crash. Non-vacuity: the graph of Appendix B satisfies the condition, and
 Min-Max and MVC run on it; `theorem7` exhibits an algorithm for the hypothesis of Theorem 6 (`consensus_on_pGraph`); two isolated nodes admit no consensus algorithm
-(`no_consensus_disconnected`). The reach sets, 2-reach ⇔ CCA (`theorem17b`), the asynchronous model and
-the replay lemma `sim_phase` come from `Papers/PODC2020/AsyncApproxBCDirected/`. CSLib candidates:
-`Graph.lean` (CT connectivity, bounded reachability, fault-tolerant diameter), `SyncModel.lean`
+(`no_consensus_disconnected`). The reach sets and 2-reach ⇔ CCA (`cca_iff_twoReach`) come from the shared library
+`Podc/ApproxConsensus/DigraphConditions.lean` (bounded walks: CSLib's `Relation.RelatesWithinSteps`),
+the asynchronous model and the two-phase replay lemma `exists_replay₂` from
+`Podc/ApproxConsensus/Async/`. CSLib candidates:
+`Graph.lean` (CT connectivity, fault-tolerant diameter), `SyncModel.lean`
 (synchronous crash model on digraphs), `MinMaxCore.lean` (Min/Max agreement core), `AsyncCrash.lean`
 (asynchronous crash model with crash schedules). The Python scripts
 used for the bounded searches are not part of the Lean development.

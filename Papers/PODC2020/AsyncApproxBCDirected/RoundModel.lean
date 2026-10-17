@@ -35,6 +35,8 @@ set_option linter.unusedSectionVars false
 
 namespace AsyncApproxBCDirected
 
+open Cslib.ApproxConsensus
+
 variable {V : Type*} [Fintype V] [DecidableEq V]
 
 /-! ## Message sets (Definitions 7–9) -/

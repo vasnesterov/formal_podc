@@ -16,6 +16,8 @@ set_option linter.unusedSectionVars false
 
 namespace AsyncApproxBCDirected
 
+open Cslib.ApproxConsensus Cslib.ApproxConsensus.Async
+
 namespace BWOp
 
 variable {V : Type*} [Fintype V] [DecidableEq V] (G : Digraph V) [DecidableRel G.Adj] (f N : ℕ)

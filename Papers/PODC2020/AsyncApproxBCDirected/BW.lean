@@ -20,6 +20,8 @@ set_option linter.unusedSectionVars false
 
 namespace AsyncApproxBCDirected
 
+open Cslib.ApproxConsensus
+
 variable {V : Type*} [Fintype V] [DecidableEq V] {G : Digraph V} {f : ℕ}
 
 /-! ## Lists and paths -/
@@ -283,15 +285,15 @@ theorem lemma7 (hG : ThreeReach G f) (hn : 2 ≤ Fintype.card V) {c u : V} (hc :
   have huF' : u ∉ F' := hsu.1
   obtain ⟨z, hzu, hzc⟩ := hG E.F F' F' c u E.card_F hsc.2.1 hsc.2.1
     (by simp [hc, hcF']) (by simp [hu, huF'])
-  obtain ⟨s, hsS, hsz⟩ := hG.theorem5 hn hsc.2.1 hW hsc.2.1 (b := z)
-    (by have := hzc.1; simp only [mem_union, not_or] at this ⊢; exact ⟨this.2, this.2⟩)
+  obtain ⟨s, hsS, hsz⟩ := ThreeReach.theorem5 hG hn hsc.2.1 hW hsc.2.1 (b := z)
+    (by have := hzc.1; simp only [mem_coe, mem_union, not_or] at this ⊢; exact ⟨this.2, this.2⟩)
   have hS : ∀ x ∈ F' ∪ F', x ∉ srcComp G F' W := fun x hx hxS =>
     notMem_of_mem_srcComp hn hxS (mem_union_left _ (by simpa using hx))
   have hqz : Reaches G (F' ∪ F') q z := (srcComp_reaches hq hsS hS).trans hsz
-  obtain ⟨a, ha, haF⟩ := hqz.exists_simplePath
+  obtain ⟨a, ha, haF⟩ := Reaches.exists_simplePath hqz
   have haF' : Avoids a F' := fun y hy h => haF y hy (mem_union_left _ h)
-  obtain ⟨bc, hbc, hbcF⟩ := hzc.exists_simplePath
-  obtain ⟨bu, hbu, hbuF⟩ := hzu.exists_simplePath
+  obtain ⟨bc, hbc, hbcF⟩ := Reaches.exists_simplePath hzc
+  obtain ⟨bu, hbu, hbuF⟩ := Reaches.exists_simplePath hzu
   obtain ⟨yc, hyc, hyc1, hyc2⟩ := E.full_value hc hsc ha haF' hbc
     (avoids_union.mp hbcF).1 (avoids_union.mp hbcF).2
   obtain ⟨yu, hyu, hyu1, hyu2⟩ := E.full_value hu hsu ha haF' hbu
@@ -314,7 +316,7 @@ theorem reaches_from_srcComp (hG : ThreeReach G f) (hn : 2 ≤ Fintype.card V)
     {Fu Fw H : Finset V} (hFu : Fu.card ≤ f) (hFw : Fw.card ≤ f) (hH : H.card ≤ f) {q : V}
     (hq : q ∈ srcComp G Fu Fw) (hHS : ∀ h ∈ H, h ∉ srcComp G Fu Fw) {b : V}
     (hb : b ∉ Fu ∪ H) : Reaches G (Fu ∪ H) q b := by
-  obtain ⟨s, hs, hsb⟩ := hG.theorem5 hn hFu hFw hH hb
+  obtain ⟨s, hs, hsb⟩ := ThreeReach.theorem5 hG hn hFu hFw hH hb
   refine (srcComp_reaches hq hs fun x hx hxS => ?_).trans hsb
   rcases mem_union.mp hx with h | h
   · exact notMem_of_mem_srcComp hn hxS (mem_union_left _ h)
@@ -348,10 +350,11 @@ theorem completeness_eventually (hG : ThreeReach G f) (hn : 2 ≤ Fintype.card V
         (by simp [hv, hvH])
       have hz : z ∉ Fu ∪ H := by
         have h1 := hzv.1; have h2 := hzc.1
-        simp only [mem_union, not_or] at h1 h2 ⊢; exact ⟨h2.2, h1.2⟩
-      obtain ⟨a, ha, haF⟩ := (reaches_from_srcComp hG hn hs.2.1 hFw hH hq hHS hz).exists_simplePath
-      obtain ⟨bc, hbc, hbcF⟩ := hzc.exists_simplePath
-      obtain ⟨bv, hbv, hbvF⟩ := hzv.exists_simplePath
+        simp only [mem_coe, mem_union, not_or] at h1 h2 ⊢; exact ⟨h2.2, h1.2⟩
+      obtain ⟨a, ha, haF⟩ := Reaches.exists_simplePath
+        (reaches_from_srcComp hG hn hs.2.1 hFw hH hq hHS hz)
+      obtain ⟨bc, hbc, hbcF⟩ := Reaches.exists_simplePath hzc
+      obtain ⟨bv, hbv, hbvF⟩ := Reaches.exists_simplePath hzv
       obtain ⟨y, hy, hyq, hya⟩ := E.full_value hc hs ha (avoids_union.mp haF).1 hbc
         (avoids_union.mp hbcF).1 (avoids_union.mp hbcF).2
       have hbc' : bc = z :: bc.tail := hbc.eq_cons
@@ -365,8 +368,8 @@ theorem completeness_eventually (hG : ThreeReach G f) (hn : 2 ≤ Fintype.card V
         (fun y hy => (avoids_union.mp hbvF).2 y (List.mem_of_mem_tail hy)))
   refine ⟨T, fun Fw hFw hne q hq => ?_⟩
   have hcb : c ∉ Fu ∪ Fu := by simpa using hcFu
-  obtain ⟨p, hp, hpF⟩ := (reaches_from_srcComp hG hn hs.2.1 hFw hs.2.1 hq
-    (fun h hh hhS => notMem_of_mem_srcComp hn hhS (mem_union_left _ hh)) hcb).exists_simplePath
+  obtain ⟨p, hp, hpF⟩ := Reaches.exists_simplePath (reaches_from_srcComp hG hn hs.2.1 hFw hs.2.1 hq
+    (fun h hh hhS => notMem_of_mem_srcComp hn hhS (mem_union_left _ hh)) hcb)
   have hpF' : Avoids p Fu := fun y hy h => hpF y hy (mem_union_left _ h)
   obtain ⟨y, hy⟩ := (hs.full G f) p hp.isRedundant hpF' hp.1.2.1
   have hhead : (y, p).2.head? = some q := hp.1.1

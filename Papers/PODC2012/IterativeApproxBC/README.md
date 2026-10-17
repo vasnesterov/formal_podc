@@ -77,4 +77,7 @@ the minimal edge count of core networks.
 `Quot.sound`. Non-vacuity: `alg1_complete` (on the complete graph with `n > 3f`, tie-breaking rules
 exist and Algorithm 1 is correct), plus concrete examples on `Fin 4` / `Fin 3` with `f = 1`. The
 model (`IterAlg`, validity notions, trimming `IsTrim`) lives in CSLib
-`Cslib/Computability/Distributed/ApproxConsensus/{Iterative,Trim}.lean`.
+`Cslib/Computability/Distributed/ApproxConsensus/{Iterative,Trim}.lean`; the arrow `A ⇒ B` and the
+condition (`Arrow`, `Condition` = `IterativeCondition`) are shared with the PODC 2020 directed
+asynchronous paper in `Podc/ApproxConsensus/DigraphConditions.lean`, which also proves that the
+condition implies condition BCS / 3-reach (`IterativeCondition.threeReach`).

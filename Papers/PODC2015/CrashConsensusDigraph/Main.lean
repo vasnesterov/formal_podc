@@ -29,7 +29,7 @@ no consensus algorithm (`no_consensus_disconnected`).
 
 namespace CrashConsensusDigraph
 
-open AsyncApproxBCDirected
+open Cslib.ApproxConsensus Cslib.ApproxConsensus.Async
 
 /-- Non-vacuity of Theorems 2–4: consensus is solvable on the graph of Appendix B. -/
 theorem consensus_on_pGraph (f K : ℕ) :

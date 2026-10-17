@@ -27,6 +27,8 @@ set_option linter.unusedSectionVars false
 
 namespace AsyncApproxBCDirected
 
+open Cslib.ApproxConsensus Cslib.ApproxConsensus.Async
+
 /-- Messages of the operational algorithm. -/
 inductive BMsg (V : Type*) where
   | val (r : ℕ) (x : ℝ) (p : List V)
