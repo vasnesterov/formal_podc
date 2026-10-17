@@ -168,19 +168,19 @@ lemma LInv.step_upd (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K) {tx : Tx
     have hnc : ¬ Completed (α ++ [.tau q]) xt := not_completed_of_eq (by simp [hxt, htgid])
     have hpushed (y : OpId (Fin n)) (hy : y ∈ L.map Prod.fst) :
         lrs (μ := μ) (q₀ := q₀) (L ++ [(xt, ot)]) y = lrs (μ := μ) (q₀ := q₀) L y :=
-      linResp_append_of_mem _ _ _ hy
+      ObjSpec.respIn_append_of_mem hy _
     have hS : ∀ t' ∈ K, t' ∈ U C'.mem →
         lrs (μ := μ) (q₀ := q₀) (L ++ [(xt, ot)]) (t'.p, gid t') = some (.inl true) := by
       intro t' ht' hu
       rw [hU'', Finset.mem_insert] at hu
       rcases hu with rfl | hu
       · exact lrs_transfer_true L xt htμ hx hnotL
-      · have := hL.respS t' ht' hu; rw [hpushed _ (mem_of_linResp this)]; exact this
+      · have := hL.respS t' ht' hu; rw [hpushed _ (ObjSpec.mem_of_respIn_eq_some this)]; exact this
     have hF : ∀ t' ∈ K, ∀ r, Dec C'.mem t'.a r = some (t', false) →
         lrs (μ := μ) (q₀ := q₀) (L ++ [(xt, ot)]) (t'.p, gid t') = some (.inl false) := by
       intro t' ht' r hr
       rw [hDec'] at hr
-      have := hL.respF t' ht' r hr; rw [hpushed _ (mem_of_linResp this)]; exact this
+      have := hL.respF t' ht' r hr; rw [hpushed _ (ObjSpec.mem_of_respIn_eq_some this)]; exact this
     -- the only decided successful transfer not in `AS` is the latest one
     have hlatest : ∀ r t', Dec C.mem a r = some (t', true) → t' ∉ U C.mem → t' = t := by
       intro r t' h hu
@@ -221,7 +221,7 @@ lemma LInv.step_upd (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K) {tx : Tx
             (by rw [htxp]; exact hq'hist)
           rw [htxp] at this; exact this
         · rw [hloc' _ hq'] at h
-          have := hL.retR q' r h; rw [hpushed _ (mem_of_linResp this)]; exact this
+          have := hL.retR q' r h; rw [hpushed _ (ObjSpec.mem_of_respIn_eq_some this)]; exact this
       rscan := fun q' a' h => by
         simp only [respsOf_append_tau]
         by_cases hq' : q' = q

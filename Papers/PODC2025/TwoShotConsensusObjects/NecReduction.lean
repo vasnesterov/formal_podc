@@ -19,7 +19,7 @@ variable {ιR ιS : Type} [DecidableEq ιR] [DecidableEq ιS] [Fintype ιS] {R :
   {O : ObjSpec} {m : Fin 2 → Set O.Op}
 
 /-- **The reduction of Proposition 2.** -/
-theorem reduction (hR : ∀ j, IsRW (R j)) (A : Alg 2 (withRW (ιS := ιS) R O))
+theorem reduction (hR : ∀ j, (R j).RWLike) (A : Alg 2 (withRW (ιS := ιS) R O))
     (hA : WFConsensus A) (h2 : TwoShot A) (hm : Allowed m A)
     (x₀ : Fin 2 → Bool) (β : List (Ev 2)) (hβ : CrashFree β) (k : ιS)
     (dec : Fin 2 → O.Op → Bool)
@@ -43,7 +43,7 @@ theorem reduction (hR : ∀ j, IsRW (R j)) (A : Alg 2 (withRW (ιS := ιS) R O))
       A.act ((run (run (initCfg A x₀) β) (solo 1 t)).loc 1) = .access (.inr k) c κ →
       dec 1 c = false) :
     ∃ (ιR' ιS' : Type) (_ : DecidableEq ιR') (_ : DecidableEq ιS') (_ : Fintype ιS')
-      (R' : ιR' → ObjSpec) (_ : ∀ j, IsRW (R' j)) (A' : Alg 2 (withRW (ιS := ιS') R' O)),
+      (R' : ιR' → ObjSpec) (_ : ∀ j, (R' j).RWLike) (A' : Alg 2 (withRW (ιS := ιS') R' O)),
       Fintype.card ιS' < Fintype.card ιS ∧ WFConsensus A' ∧ TwoShot A' ∧ Allowed m A' := by
   set F := run (initCfg A x₀) β with hF
   have hyp : NecRed.Hyp A F k dec :=
@@ -59,7 +59,7 @@ theorem reduction (hR : ∀ j, IsRW (R j)) (A : Alg 2 (withRW (ιS := ιS) R O))
     NecRed.twoShot' hyp ?_, NecRed.allowed' hyp m ?_⟩
   · rintro (j | j)
     · exact hR j
-    · exact isRW_register Bool false
+    · exact register_rwLike Bool false
   · exact Fintype.card_subtype_lt (p := fun k' => k' ≠ k) (x := k) (by simp)
   · intro γ hγ q k''
     have := h2 x₀ (β ++ γ) (hβ.append hγ) q k''

@@ -59,7 +59,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Consensus numbers (`System.lean`) use CSLib's asynchronous shared-memory model
   `Cslib.SharedMemory.Recoverable`, without crashes. There are `n` deterministic processes with
   binary inputs and wait-free consensus (`WFConsensus`; crash-stop = stop taking steps). The objects
-  are any read/write objects (`IsRW`: every operation is read-only or a blind write) plus any number
+  are any read/write objects (`ObjSpec.RWLike`: every operation is read-only or a blind write) plus any number
   of asset-transfer objects, each with its own owner map, with arbitrary initial values.
   `ATSolvable n k` means `n`-process consensus is solvable when every account has at most `k`
   owners.
@@ -105,7 +105,11 @@ in message passing; informal).
 `Quot.sound`. Non-vacuity: Lemma 1's algorithm satisfies all hypotheses of the consensus model
 (`atSolvable_self`). `Fig1.Example` instantiates Theorem 1 for a concrete owner map, and
 `Fig1.allowed_iff` shows the access discipline allows all reads and own transfers. The valency
-machinery comes from CSLib (`Cslib/Computability/Distributed/SharedMemory/Recoverable.lean`); `IsRW`
-comes from `Papers/PODC2025/TwoShotConsensusObjects/Model.lean`. `Fig3Example.lean` instantiates Lemma 2 (2 processes, one shared account, `k = 2`). CSLib candidates: `snapObj`,
-`kConsObj`, `crit_overwrite`, `crit_commute`, `stepP_stepP_same`, `out_run'`, `inv_run`,
-`wfConsensus_of_inv'`, the generic linearization lemmas in the `Aux` section of `Fig1.lean`, and `Fig3Gen.lean`'s retroactive-insertion toolkit (`isLin_insert`, `linResp`) plus `InfExec.exists_good'` (`Fig3WF.lean`).
+machinery comes from CSLib (`Cslib/Computability/Distributed/SharedMemory/Recoverable.lean`). From the
+shared library: `ObjSpec.RWLike` (`Podc/SharedMemory/ObjClasses.lean`), `wfConsensus_of_inv` and
+`inv_run_crashFree` (`Podc/SharedMemory/Recoverable.lean`), the retroactive-insertion toolkit
+`IsLinearization.insert`, `ObjSpec.respIn` (`Podc/SharedMemory/LinResp.lean`) and
+`InfExec.exists_good_of_measure`, `InfExec.run_lbls` (`Podc/SharedMemory/Progress.lean`).
+`Fig3Example.lean` instantiates Lemma 2 (2 processes, one shared account, `k = 2`). CSLib candidates:
+`snapObj`, `kConsObj`, `crit_overwrite`, `crit_commute`, `stepP_stepP_same`, and the generic
+linearization lemmas in the `Aux` section of `Fig1.lean`.

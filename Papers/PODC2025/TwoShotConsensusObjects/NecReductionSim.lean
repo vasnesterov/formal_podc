@@ -131,34 +131,6 @@ section Generic
 
 variable {ι : Type} [DecidableEq ι] {T : ι → ObjSpec} {n : ℕ} {B : Alg n T}
 
-lemma accCount_single (C : Cfg B) (p q : Fin n) (i : ι) :
-    accCount C [.step p] q i = if q = p ∧ objOf C p = some i then 1 else 0 := by
-  rw [accCount_cons, accCount_nil, Nat.add_zero]
-  by_cases h : q = p
-  · subst h; simp
-  · have : (Ev.step p : Ev n) ≠ .step q := by simpa [eq_comm] using h
-    simp [this, h]
-
-lemma out_run {C : Cfg B} {p : Fin n} {v : Bool} (h : C.Out p v) {α : List (Ev n)}
-    (hα : CrashFree α) : (run C α).Out p v := by
-  induction α generalizing C with
-  | nil => exact h
-  | cons e α ih =>
-    rw [run_cons]
-    apply ih _ (fun q hq => hα q (by simp [hq]))
-    rcases e with q | q
-    · by_cases hq : q = p
-      · subst hq; simp only [Cfg.next, stepP_of_out C h]; exact h
-      · unfold Cfg.Out; rw [next_loc_other C _ (by simpa [eq_comm] using hq)]; exact h
-    · exact absurd (by simp) (hα q)
-
-lemma out_of_dec {C : Cfg B} {α : List (Ev n)} {v : Bool} (h : Dec C α v) (hα : CrashFree α) :
-    ∃ p, (run C α).Out p v := by
-  obtain ⟨m, -, p, hp⟩ := h
-  refine ⟨p, ?_⟩
-  rw [← List.take_append_drop m α, run_append]
-  exact out_run hp (fun q hq => hα q (List.mem_of_mem_drop hq))
-
 lemma stepP_mem_self (C : Cfg B) {p : Fin n} {i : ι} {o : (T i).Op} {κ : (T i).Resp → B.L}
     (h : B.act (C.loc p) = .access i o κ) : (C.stepP p).mem i = ((T i).δ (C.mem i) o).1 := by
   rw [stepP_of_access C h]; exact Function.update_self _ _ _
@@ -757,11 +729,11 @@ theorem prog' (hA : WFConsensus A) (hF : Reach A CrashFree F) (hyp : Hyp A F k d
 theorem wfConsensus' (hA : WFConsensus A) (hF : Reach A CrashFree F) (hyp : Hyp A F k dec) :
     WFConsensus (A' A F k dec) where
   agree x γ hγ v w hv hw := by
-    obtain ⟨p, hp⟩ := out_of_dec hv hγ
-    obtain ⟨q, hq⟩ := out_of_dec hw hγ
+    obtain ⟨p, hp⟩ := hv.exists_out hγ
+    obtain ⟨q, hq⟩ := hw.exists_out hγ
     exact agree' hyp x hγ hp hq
   valid x γ hγ v hv := by
-    obtain ⟨p, hp⟩ := out_of_dec hv hγ
+    obtain ⟨p, hp⟩ := hv.exists_out hγ
     obtain ⟨c, κ, -, rfl⟩ := out_char hyp (inv_reach hyp x hγ).1 hp
     exact ⟨_, rfl⟩
   prog x e p N hcf hinf _ := prog' hA hF hyp x e p N hcf hinf

@@ -18,120 +18,7 @@ balance `id(w)` for its issuer `w`, who wrote `R[w]` before.
 
 namespace CryptoCons
 
-open Cslib.SharedMemory Cslib.SharedMemory.Recoverable TwoShotCons
-
-section Tools
-
-variable {ι : Type} [DecidableEq ι] {T : ι → ObjSpec} {n : ℕ} {A : Alg n T}
-
--- CSLib candidate
-/-- Output states are stable along crash-free executions. -/
-lemma out_run' {C : Cfg A} {p : Fin n} {v : Bool} (h : C.Out p v) (β : List (Ev n))
-    (hβ : CrashFree β) : (run C β).Out p v := by
-  induction β generalizing C with
-  | nil => simpa using h
-  | cons e β ih =>
-    rw [run_cons]
-    apply ih _ (fun q hq => hβ q (by simp [hq]))
-    rcases e with q | q
-    · by_cases hq : q = p
-      · subst hq; simp only [Cfg.next]; rw [stepP_of_out C h]; exact h
-      · simp only [Cfg.Out, Cfg.next] at h ⊢
-        rw [stepP_loc_other C (Ne.symm hq)]; exact h
-    · exact absurd (by simp) (hβ q)
-
--- CSLib candidate
-/-- An invariant of configurations preserved by all steps holds along crash-free runs. -/
-lemma inv_run (Inv : Cfg A → Prop) (hstep : ∀ C p, Inv C → Inv (C.stepP p)) :
-    ∀ (α : List (Ev n)) (C : Cfg A), Inv C → CrashFree α → Inv (run C α) := by
-  intro α
-  induction α with
-  | nil => intro C h _; simpa using h
-  | cons e α ih =>
-    intro C hC hα
-    rw [run_cons]
-    apply ih _ _ (fun q hq => hα q (by simp [hq]))
-    rcases e with q | q
-    · exact hstep C q hC
-    · exact absurd (by simp) (hα q)
-
--- CSLib candidate
-/-- **Wait-free consensus from an invariant** (generalizes `TwoShotCons.C1Common.wfConsensus_of_inv`
-to `n` processes). -/
-theorem wfConsensus_of_inv' (Inv : (Fin n → Bool) → Cfg A → Prop)
-    (hinit : ∀ x, Inv x (initCfg A x))
-    (hstep : ∀ x C p, Inv x C → Inv x (C.stepP p))
-    (hout : ∀ x C, Inv x C → ∃ q, ∀ p w, C.Out p w → w = x q)
-    (rank : A.L → ℕ)
-    (hrank : ∀ l i o (κ : (T i).Resp → A.L) r, A.act l = .access i o κ → rank (κ r) < rank l) :
-    WFConsensus A := by
-  have reach : ∀ x (α : List (Ev n)), CrashFree α → Inv x (run (initCfg A x) α) :=
-    fun x α hα => inv_run (Inv x) (hstep x) α _ (hinit x) hα
-  have persist : ∀ x γ, CrashFree γ → ∀ v, Dec (initCfg A x) γ v →
-      ∃ p, (run (initCfg A x) γ).Out p v := by
-    intro x γ hγ v ⟨k, hk, p, hp⟩
-    refine ⟨p, ?_⟩
-    have := out_run' hp (γ.drop k) (fun q hq => hγ q (List.mem_of_mem_drop hq))
-    rwa [← run_append, List.take_append_drop] at this
-  refine ⟨?_, ?_, ?_⟩
-  · intro x γ hγ v w hv hw
-    obtain ⟨p, hp⟩ := persist x γ hγ v hv
-    obtain ⟨p', hp'⟩ := persist x γ hγ w hw
-    obtain ⟨q, hq⟩ := hout x _ (reach x γ hγ)
-    rw [hq p v hp, hq p' w hp']
-  · intro x γ hγ v hv
-    obtain ⟨p, hp⟩ := persist x γ hγ v hv
-    obtain ⟨q, hq⟩ := hout x _ (reach x γ hγ)
-    exact ⟨q, (hq p v hp).symm⟩
-  · intro x e p N hadm hinf _
-    -- the ranking argument of `TwoShotCons.prog_of_rank`, for `n` processes
-    classical
-    have hcf' := (pre_crashFree_iff e).1 hadm
-    set Cf : ℕ → Cfg A := fun t => run (initCfg A x) (pre e t) with hCf
-    have hsucc : ∀ t, Cf (t + 1) = (Cf t).next (e t) := by
-      intro t; simp [hCf, pre_succ, run_concat]
-    by_contra hno
-    push Not at hno
-    set r : ℕ → ℕ := fun t => rank ((Cf t).loc p) with hr
-    have hle : ∀ t ≥ N, r (t + 1) ≤ r t := by
-      intro t ht
-      simp only [hr, hsucc]
-      rcases he : e t with q | q
-      · by_cases hq : q = p
-        · subst hq
-          simp only [Cfg.next]
-          rcases hact : A.act ((Cf t).loc q) with ⟨i, o, κ⟩ | v
-          · rw [stepP_of_access _ hact]; simp; exact (hrank _ i o κ _ hact).le
-          · exact absurd hact (hno t ht v)
-        · rw [next_loc_eq_of_ne _ _ (by simpa using hq)]
-      · exact absurd he (hcf' t q)
-    have hlt : ∀ t ≥ N, e t = .step p → r (t + 1) < r t := by
-      intro t ht he
-      simp only [hr, hsucc, he, Cfg.next]
-      rcases hact : A.act ((Cf t).loc p) with ⟨i, o, κ⟩ | v
-      · rw [stepP_of_access _ hact]; simp; exact hrank _ i o κ _ hact
-      · exact absurd hact (hno t ht v)
-    have hmono : ∀ t ≥ N, ∀ d, r (t + d) ≤ r t := by
-      intro t ht d
-      induction d with
-      | zero => simp
-      | succ d ih => exact (hle (t + d) (by omega)).trans ih
-    have key : ∀ j, ∃ t ≥ N, r t + j ≤ r N := by
-      intro j
-      induction j with
-      | zero => exact ⟨N, le_rfl, by simp⟩
-      | succ j ih =>
-        obtain ⟨t, ht, hj⟩ := ih
-        obtain ⟨t', ht', he⟩ := hinf t
-        refine ⟨t' + 1, by omega, ?_⟩
-        have h1 := hlt t' (by omega) he
-        obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le ht'
-        have h2 := hmono t ht d
-        omega
-    obtain ⟨t, -, ht⟩ := key (r N + 1)
-    omega
-
-end Tools
+open Cslib.SharedMemory Cslib.SharedMemory.Recoverable
 
 namespace Lemma1
 
@@ -502,10 +389,10 @@ lemma rank_lt (l : Fin n × Stage) (i : Fin n ⊕ Unit) (o : (Obj n i).Op)
 consensus using registers and one asset-transfer object (with an account owned by all `k`
 processes), and processes transfer only under their own identity. -/
 theorem lemma_1 (hn : 0 < n) : WFConsensus (alg n) ∧ Honest (Reg n) (μ₁ n) (alg n) := by
-  refine ⟨wfConsensus_of_inv' Inv inv_init (fun x C p hI => inv_step hn x C p hI)
+  refine ⟨wfConsensus_of_inv Inv inv_init (fun x C p hI => inv_step hn x C p hI)
     (fun x C hI => inv_out hn x C hI) rank rank_lt, ?_⟩
   intro x α hα p j q a b y κ h
-  have hI := inv_run (Inv x) (fun C p hI => inv_step hn x C p hI) α _ (inv_init x) hα
+  have hI := inv_run_crashFree (Inv x) (fun C p hI => inv_step hn x C p hI) α _ (inv_init x) hα
   have hid := hI.id p
   rcases hl : (run (initCfg (alg n) x) α).loc p with ⟨p', st⟩
   rw [hl] at h hid

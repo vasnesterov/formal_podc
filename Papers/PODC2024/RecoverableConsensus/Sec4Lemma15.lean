@@ -293,17 +293,10 @@ theorem alg15_wfConsensus : WFConsensus (alg15 n n') := by
   · obtain ⟨k, -, p, hp⟩ := hv
     have hI := inv15_run (x := x) _ _ (inv15_init (n' := n') x) (hγ.take k)
     exact (hI.done p v (out15 hp)).1
-  · refine prog_of_rank (A := alg15 n n') rank15 (fun l hl => ?_) (fun l v hl => ?_)
-      (fun l i o k hl r => ?_) _ e p N hinf hN
-    · cases l with
-      | start x => simp [rank15] at hl
-      | done b => exact ⟨b, rfl⟩
-    · cases l with
-      | start x => cases hl
-      | done b => rfl
-    · cases l with
-      | start x => cases hl; simp [rank15]
-      | done b => cases hl
+  · refine prog_of_rank (A := alg15 n n') rank15 (fun l i o k r hl => ?_) _ e p N hinf hN
+    cases l with
+    | start x => cases hl; simp [rank15]
+    | done b => cases hl
 
 end Alg15
 

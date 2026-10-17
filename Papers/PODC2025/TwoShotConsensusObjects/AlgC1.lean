@@ -217,7 +217,7 @@ consensus. -/
 theorem solvable_of_C1 {O : ObjSpec} {m : Fin 2 → Set O.Op} (hC : C1 O m) : Solvable O m := by
   classical
   obtain ⟨s, f, g, hf, hg, hd⟩ := hC
-  refine ⟨Reg, Unit, inferInstance, inferInstance, inferInstance, RegT O.Resp, isRW_RegT _,
+  refine ⟨Reg, Unit, inferInstance, inferInstance, inferInstance, RegT O.Resp, rwLike_RegT _,
     alg s f g, ?_, ?_, ?_⟩
   · exact wfConsensus_of_inv (Inv s f g) inv_init (fun x C p hC => inv_step hd x C p hC) inv_out
       rank (fun l i o κ r hact => rank_lt l i o κ r hact)
@@ -233,6 +233,6 @@ theorem solvable_of_C1 {O : ObjSpec} {m : Fin 2 → Set O.Op} (hC : C1 O m) : So
       cases l <;> simp only [alg, act] at hact <;> cases hact
       rename_i q
       subst hG
-      fin_cases q <;> simp [opOf, hf, hg]
+      fin_cases q <;> simp [C1Alg.opOf, hf, hg]
 
 end TwoShotCons

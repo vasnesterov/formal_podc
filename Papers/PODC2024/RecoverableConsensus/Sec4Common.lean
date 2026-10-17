@@ -15,7 +15,6 @@ Shared infrastructure for the proofs of Lemma 15 and Lemma 16 (type `T_{n,n'}`):
 * `all_ops` — if they are all poised on a `T_{n,n'}` object, nobody is poised to apply `opR`
   (first part of the proofs of Lemmas 15 and 16);
 * `run_ops` — running distinct processes poised to apply `op₀`/`op₁`;
-* `prog_of_rank` — progress (recoverable wait-freedom) from a ranking of local states;
 * `bitOf`, `T1`, `mem0` — the single-object setting of the two algorithms of Section 4.
 -/
 
@@ -199,7 +198,7 @@ lemma contra_absorb (hA : Solves A Adm) (hAdm : AdmOK Adm z) (hC : Reach A Adm C
 
 /-- At a critical execution, the processes cannot all be poised on a read/write object. -/
 lemma not_rw_obj (hA : Solves A Adm) (hAdm : AdmOK Adm z) (hC : Reach A Adm C) (hm : 0 < m)
-    {α : List (Ev m)} (hc : Crit z C α) {i : ι} (hRW : IsRW (T i))
+    {α : List (Ev m)} (hc : Crit z C α) {i : ι} (hRW : (T i).RWLike)
     (hpo : ∀ p, (run C α).Poised p i) : False := by
   obtain ⟨⟨p, hp⟩, ⟨q, hq⟩⟩ := hc.teams hA hAdm hC hm
   obtain ⟨op, kp, hop⟩ := hpo p
@@ -209,58 +208,6 @@ lemma not_rw_obj (hA : Solves A Adm) (hAdm : AdmOK Adm z) (hC : Reach A Adm C) (
   · rcases hRW oq with h2 | h2
     · exact contra_absorb hA hAdm hC hc hq hp (by simp) hoq hop (by rw [h2])
     · exact contra_absorb hA hAdm hC hc hp hq (by simp) hop hoq (h2 _ _)
-
-/-- Progress from a ranking of local states: every operation decreases the rank, output states
-have rank `0`, and rank `0` states are output states. Then a process that takes infinitely many
-steps and does not crash after time `N` outputs at some time `≥ N`. -/
-lemma prog_of_rank (rank : A.L → ℕ) (h0 : ∀ l, rank l = 0 → ∃ v, A.act l = .out v)
-    (hout : ∀ l v, A.act l = .out v → rank l = 0)
-    (hdec : ∀ l i o k, A.act l = .access i o k → ∀ r, rank (k r) < rank l)
-    (C : Cfg A) (e : ℕ → Ev m) (p : Fin m) (N : ℕ) (hinf : ∀ M, ∃ t ≥ M, e t = .step p)
-    (hN : ∀ t ≥ N, e t ≠ .crash p) : ∃ t ≥ N, ∃ v, (run C (pre e t)).Out p v := by
-  let r : ℕ → ℕ := fun t => rank ((run C (pre e t)).loc p)
-  have hsucc : ∀ t, run C (pre e (t + 1)) = (run C (pre e t)).next (e t) := by
-    intro t; rw [pre_succ, run_concat]
-  have hstepP : ∀ D : Cfg A, rank ((D.stepP p).loc p) ≤ rank (D.loc p) - 1 := by
-    intro D
-    rcases hact : A.act (D.loc p) with ⟨i, o, k⟩ | v
-    · rw [stepP_of_access D hact]
-      simp only [Function.update_self]
-      have := hdec _ _ _ _ hact ((T i).δ (D.mem i) o).2
-      omega
-    · rw [stepP_of_out D (show D.Out p v from hact), hout _ _ hact]
-  have hmono1 : ∀ t ≥ N, r (t + 1) ≤ r t := by
-    intro t ht
-    simp only [r, hsucc]
-    rcases he : e t with q | q
-    · by_cases hq : q = p
-      · subst hq; have := hstepP (run C (pre e t)); simp only [Cfg.next]; omega
-      · rw [next_loc_other _ _ (by simpa using Ne.symm hq)]
-    · have hq : q ≠ p := by rintro rfl; exact hN t ht he
-      rw [next_loc_other _ _ (by simpa using Ne.symm hq)]
-  have hmono : ∀ t ≥ N, ∀ d, r (t + d) ≤ r t := by
-    intro t ht d
-    induction d with
-    | zero => simp
-    | succ d ih => exact (hmono1 (t + d) (by omega)).trans ih
-  have hdrop : ∀ t, e t = .step p → r (t + 1) ≤ r t - 1 := by
-    intro t he
-    simp only [r, hsucc, he, Cfg.next]
-    exact hstepP _
-  have key : ∀ k, ∀ t ≥ N, r t ≤ k → ∃ t' ≥ t, r t' = 0 := by
-    intro k
-    induction k with
-    | zero => intro t _ h; exact ⟨t, le_rfl, by omega⟩
-    | succ k ih =>
-      intro t ht h
-      obtain ⟨t₁, ht₁, he₁⟩ := hinf t
-      obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le ht₁
-      have h1 := hmono t ht d
-      have h2 := hdrop _ he₁
-      obtain ⟨t', ht', h'⟩ := ih (t + d + 1) (by omega) (by omega)
-      exact ⟨t', by omega, h'⟩
-  obtain ⟨t, ht, h⟩ := key (r N) N le_rfl le_rfl
-  exact ⟨t, ht, h0 _ h⟩
 
 end Generic
 

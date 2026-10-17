@@ -43,22 +43,11 @@ lemma inv_next (hk : 1 ≤ k) (hC : C2At O m s f g (3 ^ k) c) {C : Cfg (algC2 s 
     rw [stepP_of_out C (show C.Out q (C.loc q).out from act_out (by omega))]
     exact hI
 
-lemma inv_run (hk : 1 ≤ k) (hC : C2At O m s f g (3 ^ k) c) (α : List (Ev 2)) (hα : CrashFree α)
-    (C : Cfg (algC2 s f g c k)) (h : List (Fin 2 × O.Op)) (hI : Inv s f g c k C h) :
-    ∃ h', Inv s f g c k (run C α) h' := by
-  induction α generalizing C h with
-  | nil => exact ⟨h, hI⟩
-  | cons e α ih =>
-    have hα' : CrashFree α := fun p hp => hα p (by simp [hp])
-    rcases e with q | q
-    · obtain ⟨h', hI'⟩ := inv_next hk hC hI q
-      exact ih hα' _ _ hI'
-    · exact absurd (by simp) (hα q)
-
 lemma inv_reach (hk : 1 ≤ k) (hC : C2At O m s f g (3 ^ k) c) (x : Fin 2 → Bool)
     (α : List (Ev 2)) (hα : CrashFree α) :
     ∃ h, Inv s f g c k (run (initCfg (algC2 s f g c k) x) α) h :=
-  inv_run hk hC α hα _ _ (inv_init hk x)
+  inv_run_crashFree (fun C => ∃ h, Inv s f g c k C h) (fun _ q ⟨_, hI⟩ => inv_next hk hC hI q) α _
+    ⟨_, inv_init hk x⟩ hα
 
 /-- An output state is reached only at `pc = 10`, with the output stored in the local state. -/
 lemma out_spec {C : Cfg (algC2 s f g c k)} {h : List (Fin 2 × O.Op)} (hI : Inv s f g c k C h)
@@ -77,27 +66,6 @@ lemma out_spec {C : Cfg (algC2 s f g c k)} {h : List (Fin 2 × O.Op)} (hI : Inv 
   cases hout
   exact ⟨hI.1.dec p (by omega), hI.1.out p h10⟩
 
-/-- Output states persist along crash-free executions. -/
-lemma out_run {C : Cfg (algC2 s f g c k)} {p : Fin 2} {v : Bool} (hout : C.Out p v)
-    (α : List (Ev 2)) (hα : CrashFree α) : (run C α).Out p v := by
-  induction α generalizing C with
-  | nil => exact hout
-  | cons e α ih =>
-    have hα' : CrashFree α := fun p hp => hα p (by simp [hp])
-    rcases e with q | q
-    · apply ih _ hα'
-      by_cases hq : q = p
-      · subst hq; simp only [Cfg.next]; rwa [stepP_of_out C hout]
-      · unfold Cfg.Out; simp only [Cfg.next]; rw [stepP_loc_other C (Ne.symm hq)]; exact hout
-    · exact absurd (by simp) (hα q)
-
-lemma dec_final {C : Cfg (algC2 s f g c k)} {γ : List (Ev 2)} {v : Bool} (hγ : CrashFree γ)
-    (hd : Dec C γ v) : ∃ p, (run C γ).Out p v := by
-  obtain ⟨n, hn, p, hp⟩ := hd
-  refine ⟨p, ?_⟩
-  have := out_run hp (γ.drop n) (fun q hq => hγ q (List.mem_of_mem_drop hq))
-  rwa [← run_append, List.take_append_drop] at this
-
 set_option linter.unnecessarySeqFocus false in
 /-- **Correctness of Algorithm 3** (Lemma 4 and Theorem 2 for class `C₂`). -/
 theorem algC2_wf (hk : 1 ≤ k) (hC : C2At O m s f g (3 ^ k) c) :
@@ -105,18 +73,18 @@ theorem algC2_wf (hk : 1 ≤ k) (hC : C2At O m s f g (3 ^ k) c) :
   refine ⟨?_, ?_, ?_⟩
   · intro x γ hγ v w hv hw
     obtain ⟨h, hI⟩ := inv_reach hk hC x γ hγ
-    obtain ⟨p, hp⟩ := dec_final hγ hv
-    obtain ⟨p', hp'⟩ := dec_final hγ hw
+    obtain ⟨p, hp⟩ := hv.exists_out hγ
+    obtain ⟨p', hp'⟩ := hw.exists_out hγ
     obtain ⟨h1, hv1⟩ := out_spec hI hp
     obtain ⟨h2, hw1⟩ := out_spec hI hp'
     rw [hv1, hw1, Option.some.inj (h1.symm.trans h2)]
   · intro x γ hγ v hv
     obtain ⟨h, hI⟩ := inv_reach hk hC x γ hγ
-    obtain ⟨p, hp⟩ := dec_final hγ hv
+    obtain ⟨p, hp⟩ := hv.exists_out hγ
     obtain ⟨-, hv1⟩ := out_spec hI hp
     exact ⟨_, by rw [hv1, run_inp]; rfl⟩
-  · intro x e p N hcf hinf _
-    refine prog_of_rank (fun l : LS O.Resp => 10 - l.pc + 2 * (k - l.rs.length)) ?_ x e p N hcf hinf
+  · intro x e p N _ hinf hN
+    refine prog_of_rank (fun l : LS O.Resp => 10 - l.pc + 2 * (k - l.rs.length)) ?_ _ e p N hinf hN
     intro l i o κ r hact
     obtain ⟨n, hn⟩ : ∃ n, l.pc = n := ⟨_, rfl⟩
     rcases Nat.lt_or_ge n 10 with hlt | hge
@@ -160,7 +128,7 @@ theorem solvable_of_C2Cond (h : C2Cond O m) : Solvable O m := by
   obtain ⟨s, f, g, n, c, hc⟩ := c2Cond_iff.1 h
   obtain ⟨k, hk, c', hC⟩ := hc.pad
   exact ⟨Reg, Unit, inferInstance, inferInstance, inferInstance, RegS O.Resp,
-    fun _ => isRW_register _ _, algC2 s f g c' k, algC2_wf hk hC, algC2_twoShot,
+    fun _ => register_rwLike _ _, algC2 s f g c' k, algC2_wf hk hC, algC2_twoShot,
     algC2_allowed hk hC⟩
 
 end TwoShotCons

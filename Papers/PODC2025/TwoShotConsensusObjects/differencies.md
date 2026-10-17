@@ -98,7 +98,7 @@ The list below covers every place where the formalization departs from the text.
      algorithm's infinite schedules are simulated by sub-sequences of steps of the original).
    - We also prove that nobody can decide from `fg` before accessing the removed copy again.
 9. **Registers at the critical configuration.** The paper only says "standard". We prove it
-   for every read/write-like object (`IsRW`: each operation is read-only or a blind write),
+   for every read/write-like object (`ObjSpec.RWLike`: each operation is read-only or a blind write),
    which includes registers.
 
 ## Modelling choices (not errors)
@@ -113,7 +113,7 @@ The list below covers every place where the formalization departs from the text.
 12. **Two-shot** means: in every execution, each process applies at most two operations to
     each copy of `O` (`TwoShot`, counted along the execution). The allowance map is enforced
     on all reachable configurations (`Allowed`).
-13. **Registers** are generalized to arbitrary read/write-like objects (`IsRW`) with any value
+13. **Registers** are generalized to arbitrary read/write-like objects (`ObjSpec.RWLike`) with any value
     types. Initial values of all objects are chosen by the algorithm (Jayanti's model, as in
     the paper).
 14. **Class definitions** are stated with the paper's exclusions (`C15` excludes `C1`, `C2`

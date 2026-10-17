@@ -50,13 +50,13 @@ lemma first_poised_unique {C : Cfg A} {r : Fin 2} {t t' : ℕ} {c c' : O.Op}
 
 /-- **Proposition 2** (with the minimality argument): if neither process distinguishes `fg`
 from `gf`, then `(O, m)` satisfies `C₂`, or consensus is solvable with fewer copies of `O`. -/
-theorem c2_or_smaller [Fintype ιS] (hR : ∀ j, IsRW (R j)) (hA : WFConsensus A) (h2 : TwoShot A)
+theorem c2_or_smaller [Fintype ιS] (hR : ∀ j, (R j).RWLike) (hA : WFConsensus A) (h2 : TwoShot A)
     {m : Fin 2 → Set O.Op} (hm : Allowed m A)
     (h0 : ¬ Dist O S.s 0 [(0, S.op 0), (1, S.op 1)] [(1, S.op 1), (0, S.op 0)])
     (h1 : ¬ Dist O S.s 1 [(0, S.op 0), (1, S.op 1)] [(1, S.op 1), (0, S.op 0)]) :
     C2Cond O m ∨
       ∃ (ιR' ιS' : Type) (_ : DecidableEq ιR') (_ : DecidableEq ιS') (_ : Fintype ιS')
-        (R' : ιR' → ObjSpec) (_ : ∀ j, IsRW (R' j)) (A' : Alg 2 (withRW (ιS := ιS') R' O)),
+        (R' : ιR' → ObjSpec) (_ : ∀ j, (R' j).RWLike) (A' : Alg 2 (withRW (ιS := ιS') R' O)),
         Fintype.card ιS' < Fintype.card ιS ∧ WFConsensus A' ∧ TwoShot A' ∧ Allowed m A' := by
   classical
   have h01 : (0 : Fin 2) ≠ 1 := by decide

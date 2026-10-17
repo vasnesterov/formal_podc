@@ -167,10 +167,10 @@ lemma LInv.step_inv_nonowner (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
     atSpec_transfer_neg (by simp [hq])
   have hlst : lst (μ := μ) (q₀ := q₀) (L ++ [((q, (respsOf α q).length), ATOp.transfer q a b x)]) =
       lst (μ := μ) (q₀ := q₀) L := by
-    show linState (A := AT μ q₀) _ = _; rw [linState_push, hδ]
+    show linState (A := AT μ q₀) _ = _; rw [linState_concat, hδ]
   have hpushed (y : OpId (Fin n)) (hy : y ∈ L.map Prod.fst) :
       lrs (μ := μ) (q₀ := q₀) (L ++ [((q, (respsOf α q).length), ATOp.transfer q a b x)]) y =
-        lrs (μ := μ) (q₀ := q₀) L y := linResp_append_of_mem _ _ _ hy
+        lrs (μ := μ) (q₀ := q₀) L y := ObjSpec.respIn_append_of_mem hy _
   exact {
     opK := fun t ht => opOf_append_of_some _ (hL.opK t ht)
     inj := hL.inj
@@ -193,17 +193,17 @@ lemma LInv.step_inv_nonowner (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
       · simp only [List.mem_singleton] at hy; subst hy
         exact Or.inr (Or.inl ⟨q, a, b, x, hop, hq⟩)
     respS := fun t ht hu => by
-      have := hL.respS t ht hu; rw [hpushed _ (mem_of_linResp this)]; exact this
+      have := hL.respS t ht hu; rw [hpushed _ (ObjSpec.mem_of_respIn_eq_some this)]; exact this
     respF := fun t ht r hr => by
-      have := hL.respF t ht r hr; rw [hpushed _ (mem_of_linResp this)]; exact this
+      have := hL.respF t ht r hr; rw [hpushed _ (ObjSpec.mem_of_respIn_eq_some this)]; exact this
     retR := fun q' r h => by
       simp only [respsOf_append_inv]
       by_cases hq' : q' = q
       · subst hq'; simp only [Function.update_self, PC.ret.injEq] at h; subst h
-        show linResp (AT μ q₀) _ _ = _
-        rw [linResp_push _ _ _ hnotL, hδ]
+        show lrs (μ := μ) (q₀ := q₀) _ _ = _
+        rw [lrs_concat_self _ _ _ hnotL, hδ]
       · simp only [Function.update_of_ne hq'] at h
-        have := hL.retR q' r h; rw [hpushed _ (mem_of_linResp this)]; exact this
+        have := hL.retR q' r h; rw [hpushed _ (ObjSpec.mem_of_respIn_eq_some this)]; exact this
     rscan := fun q' a' h => by
       simp only [respsOf_append_inv]
       by_cases hq' : q' = q
@@ -331,7 +331,7 @@ lemma LInv.step_ret (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K) {r : Boo
     · subst h; simp [respsOf_append]
     · simp [respsOf_append, h, Ne.symm h]
   have hnoinv : ∀ x, opOf (α ++ [.ret q r]) x = opOf α x := opOf_append_noinv (by simp)
-  obtain ⟨L₁, L₂, o, hsplit, hr⟩ := linResp_split (hL.retR q r hpc)
+  obtain ⟨L₁, L₂, o, hsplit, hr⟩ := ObjSpec.exists_split_of_respIn_eq_some (hL.retR q r hpc)
   exact {
     opK := fun t ht => by rw [hnoinv]; exact hL.opK t ht
     inj := hL.inj
@@ -392,10 +392,10 @@ lemma LInv.step_rscan (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
       (lst (μ := μ) (q₀ := q₀) L, .inr (lst (μ := μ) (q₀ := q₀) L a)) := rfl
   have hlst : lst (μ := μ) (q₀ := q₀) (L ++ [((q, (respsOf α q).length), ATOp.read a)]) =
       lst (μ := μ) (q₀ := q₀) L := by
-    show linState (A := AT μ q₀) _ = _; rw [linState_push, hδ]
+    show linState (A := AT μ q₀) _ = _; rw [linState_concat, hδ]
   have hpushed (y : OpId (Fin n)) (hy : y ∈ L.map Prod.fst) :
       lrs (μ := μ) (q₀ := q₀) (L ++ [((q, (respsOf α q).length), ATOp.read a)]) y =
-        lrs (μ := μ) (q₀ := q₀) L y := linResp_append_of_mem _ _ _ hy
+        lrs (μ := μ) (q₀ := q₀) L y := ObjSpec.respIn_append_of_mem hy _
   exact {
     opK := fun t ht => opOf_append_of_some _ (hL.opK t ht)
     inj := hL.inj
@@ -420,17 +420,17 @@ lemma LInv.step_rscan (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
       · simp only [List.mem_singleton] at hy; subst hy
         exact Or.inl ⟨a, hop⟩
     respS := fun t ht hu => by
-      have := hL.respS t ht hu; rw [hpushed _ (mem_of_linResp this)]; exact this
+      have := hL.respS t ht hu; rw [hpushed _ (ObjSpec.mem_of_respIn_eq_some this)]; exact this
     respF := fun t ht r hr => by
-      have := hL.respF t ht r hr; rw [hpushed _ (mem_of_linResp this)]; exact this
+      have := hL.respF t ht r hr; rw [hpushed _ (ObjSpec.mem_of_respIn_eq_some this)]; exact this
     retR := fun q' r h => by
       simp only [respsOf_append_tau]
       by_cases hq' : q' = q
       · subst hq'; simp only [Function.update_self, PC.ret.injEq] at h; subst h
-        show linResp (AT μ q₀) _ _ = _
-        rw [linResp_push _ _ _ hnotL, hδ, balance_eq_lst hL]
+        show lrs (μ := μ) (q₀ := q₀) _ _ = _
+        rw [lrs_concat_self _ _ _ hnotL, hδ, balance_eq_lst hL]
       · simp only [Function.update_of_ne hq'] at h
-        have := hL.retR q' r h; rw [hpushed _ (mem_of_linResp this)]; exact this
+        have := hL.retR q' r h; rw [hpushed _ (ObjSpec.mem_of_respIn_eq_some this)]; exact this
     rscan := fun q' a' h => by
       simp only [respsOf_append_tau]
       by_cases hq' : q' = q

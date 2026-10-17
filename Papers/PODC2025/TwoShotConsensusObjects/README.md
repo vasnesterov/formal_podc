@@ -65,14 +65,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Crashes are modelled by processes that stop taking steps: CSLib
   `Cslib.SharedMemory.Recoverable` without crash events, `WFConsensus`.
 * Shared objects:
-  - Read/write-like objects (`IsRW`, which includes registers of any value type).
+  - Read/write-like objects (`ObjSpec.RWLike`, which includes registers of any value type).
   - Finitely many copies of the deterministic type `O` (the paper's "minimal number of
     objects" argument presupposes this; necessity is proved for such algorithms). Each process applies at most two
     operations to each copy in every execution (`TwoShot`), and only operations allowed by
     `m` (`Allowed`).
   - Initial states are chosen by the algorithm.
 * `Solvable O m` existentially quantifies over all such algorithms (`Model.lean`). Generalizing
-  registers to `IsRW` objects only strengthens necessity. The algorithms use one copy of `O` and
+  registers to read/write-like objects only strengthens necessity. The algorithms use one copy of `O` and
   plain registers.
 * Distinguishability (`Dist`, `DistBoth`) compares the lists of a process's responses along an
   interleaving (`view`). The classes are `C1`, `C15` (incl. role swap) and `C2`, with the paper's
@@ -97,12 +97,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 Herlihy–Ruppert and Ruppert's classes is not, since it is discussion only.
 
 **CSLib candidates** (generic over CSLib's `Recoverable.Alg`):
-- `accCount`, `TwoShot`/`Allowed`, `prog_of_rank`, `twoShot_of_budget`, `allowed_of_inv`
-  (`Model.lean`);
+- `TwoShot`/`Allowed`, `twoShot_of_budget`, `allowed_of_inv` (`Model.lean`);
 - `AgreeExcept`/`AgreeAll`, `agreeOn_two_steps` (`NecBasic.lean`);
 - the object-removal `reduction` (`NecReductionSim.lean`);
-- `wfConsensus_of_inv` (`AlgC1Common.lean`) and the `view`/`resps` append lemmas
-  (`AlgC2Pad.lean`).
+- the `view`/`resps` append lemmas (`AlgC2Pad.lean`).
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and
 `Quot.sound`. Sanity checks:
@@ -112,4 +110,7 @@ Herlihy–Ruppert and Ruppert's classes is not, since it is discussion only.
 - Before formalizing, Algorithms 1–2 were checked by exhaustive scheduling on random small
   objects satisfying `C₁.₅`.
 - The model and the critical-configuration machinery (`exists_crit`, `Crit.poised`,
-  `team_contra`) come from CSLib `Cslib/Computability/Distributed/SharedMemory/Recoverable.lean`.
+  `team_contra`) come from CSLib `Cslib/Computability/Distributed/SharedMemory/Recoverable.lean`;
+  the object families `withRW`, access counts `accCount` and the generic tools `prog_of_rank`,
+  `wfConsensus_of_inv` from the shared library `Podc/SharedMemory/Recoverable.lean`, and
+  `ObjSpec.RWLike` from `Podc/SharedMemory/ObjClasses.lean`.

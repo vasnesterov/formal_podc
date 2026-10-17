@@ -1,4 +1,5 @@
 import Papers.PODC2025.TwoShotConsensusObjects.Defs
+import Podc.SharedMemory.Recoverable
 
 /-!
 # Two-shot objects solving two-process consensus — the system model
@@ -10,10 +11,10 @@ consensus in the crash-stop model):
 * two deterministic processes `0 = p₀` and `1 = p₁` (`Fin 2`), starting with binary inputs;
   a process outputs (decides) by entering an output state;
 * asynchronous scheduling; executions are lists of events (we only use crash-free ones);
-* shared objects: read/write objects `R j` (`j : ιR`, every operation read-only or a blind write,
-  `IsRW`; registers are an instance) and copies `k : ιS` (finitely many) of the deterministic
-  type `O` under study; initial states are chosen freely by the algorithm (`Alg.mem₀`), as in
-  Jayanti's model used by the paper;
+* shared objects (`withRW R O`): read/write objects `R j` (`j : ιR`, every operation read-only or
+  a blind write, `ObjSpec.RWLike`; registers are an instance) and copies `k : ιS` (finitely many)
+  of the deterministic type `O` under study; initial states are chosen freely by the algorithm
+  (`Alg.mem₀`), as in Jayanti's model used by the paper;
 * **two-shot** (`TwoShot`): in every execution each process applies at most two operations to
   each copy of `O`;
 * **process-allowance map** (`Allowed m`): process `p` only applies operations of `m p` to the
@@ -21,57 +22,13 @@ consensus in the crash-stop model):
 * wait-free consensus: agreement, validity and wait-freedom (`WFConsensus`).
 
 `Solvable O m` — the paper's "objects of type `(O, m)` solve two-shot two-process consensus".
+The object families `withRW`, access counts `accCount` and the generic correctness tools
+(`prog_of_rank`, `wfConsensus_of_inv`, …) are in `Podc.SharedMemory.Recoverable`.
 -/
 
 namespace TwoShotCons
 
 open Cslib.SharedMemory Cslib.SharedMemory.Recoverable
-
-/-- Read/write-like objects: every operation is read-only, or a blind write whose new value and
-response do not depend on the current value (registers are an instance: `isRW_register`). -/
-def IsRW (S : ObjSpec) : Prop :=
-  ∀ o : S.Op, (∀ s, (S.δ s o).1 = s) ∨ (∀ s s', S.δ s o = S.δ s' o)
-
-lemma isRW_register (V : Type) (v₀ : V) : IsRW (register V v₀) := by
-  intro o
-  cases o with
-  | read => left; intro s; rfl
-  | write v => right; intro s s'; rfl
-
-/-- The objects of an algorithm: read/write objects `R j` (`j : ιR`) and copies of `O`
-(indexed by `ιS`). -/
-abbrev withRW {ιR ιS : Type} (R : ιR → ObjSpec) (O : ObjSpec) : ιR ⊕ ιS → ObjSpec :=
-  Sum.elim R (fun _ => O)
-
-section Counting
-
-variable {ι : Type} [DecidableEq ι] {T : ι → ObjSpec} {n : ℕ} {A : Alg n T}
-
-/-- The object process `p` is poised to access in `C` (`none` if `p` is in an output state). -/
-def objOf (C : Cfg A) (p : Fin n) : Option ι :=
-  match A.act (C.loc p) with
-  | .access i _ _ => some i
-  | .out _ => none
-
-/-- Number of operations applied by process `p` to object `i` in the execution `α` from `C`. -/
-def accCount : Cfg A → List (Ev n) → Fin n → ι → ℕ
-  | _, [], _, _ => 0
-  | C, e :: α, p, i =>
-    (if e = .step p ∧ objOf C p = some i then 1 else 0) + accCount (C.next e) α p i
-
-@[simp] lemma accCount_nil (C : Cfg A) (p : Fin n) (i : ι) : accCount C [] p i = 0 := rfl
-
-lemma accCount_cons (C : Cfg A) (e : Ev n) (α : List (Ev n)) (p : Fin n) (i : ι) :
-    accCount C (e :: α) p i =
-      (if e = .step p ∧ objOf C p = some i then 1 else 0) + accCount (C.next e) α p i := rfl
-
-lemma accCount_append (C : Cfg A) (α β : List (Ev n)) (p : Fin n) (i : ι) :
-    accCount C (α ++ β) p i = accCount C α p i + accCount (run C α) β p i := by
-  induction α generalizing C with
-  | nil => simp
-  | cons e α ih => simp only [List.cons_append, accCount_cons, ih, run_cons]; omega
-
-end Counting
 
 section System
 
@@ -95,87 +52,10 @@ wait-free binary consensus algorithm for two processes using read/write objects 
 two-shot copies of `O` accessed according to `m`. -/
 def Solvable (O : ObjSpec) (m : Fin 2 → Set O.Op) : Prop :=
   ∃ (ιR ιS : Type) (_ : DecidableEq ιR) (_ : DecidableEq ιS) (_ : Fintype ιS)
-    (R : ιR → ObjSpec) (_ : ∀ j, IsRW (R j)) (A : Alg 2 (withRW (ιS := ιS) R O)),
+    (R : ιR → ObjSpec) (_ : ∀ j, (R j).RWLike) (A : Alg 2 (withRW (ιS := ιS) R O)),
     WFConsensus A ∧ TwoShot A ∧ Allowed m A
 
-/-! ## Generic tools for algorithms -/
-
-section Tools
-
-variable {ι : Type} [DecidableEq ι] {T : ι → ObjSpec} {n : ℕ} {A : Alg n T}
-
-lemma pre_crashFree_iff (e : ℕ → Ev n) : (∀ t, CrashFree (pre e t)) ↔ ∀ t, ∀ p, e t ≠ .crash p := by
-  constructor
-  · intro h t p hp
-    have := h (t + 1) p
-    apply this
-    simp only [pre, List.mem_map, List.mem_range]
-    exact ⟨t, by omega, hp⟩
-  · intro h t p hp
-    simp only [pre, List.mem_map, List.mem_range] at hp
-    obtain ⟨t', -, ht'⟩ := hp
-    exact h t' p ht'
-
-/-- Steps of other processes and crash-free steps do not change the local state of `p` except
-by `p`'s own steps. -/
-lemma next_loc_eq_of_ne (C : Cfg A) (e : Ev n) {p : Fin n} (h : e.proc ≠ p) :
-    (C.next e).loc p = C.loc p := next_loc_other C e (Ne.symm h)
-
-/-- **Wait-freedom from a ranking function**: if every step strictly decreases a rank of the
-local state, every process taking infinitely many (crash-free) steps eventually outputs. -/
-theorem prog_of_rank (rank : A.L → ℕ)
-    (hrank : ∀ l i o (κ : (T i).Resp → A.L) r, A.act l = .access i o κ → rank (κ r) < rank l)
-    (x : Fin n → Bool) (e : ℕ → Ev n) (p : Fin n) (N : ℕ) (hcf : ∀ t, CrashFree (pre e t))
-    (hinf : ∀ M, ∃ t ≥ M, e t = .step p) :
-    ∃ t ≥ N, ∃ v, (run (initCfg A x) (pre e t)).Out p v := by
-  classical
-  have hcf' := (pre_crashFree_iff e).1 hcf
-  set Cf : ℕ → Cfg A := fun t => run (initCfg A x) (pre e t) with hCf
-  have hsucc : ∀ t, Cf (t + 1) = (Cf t).next (e t) := by
-    intro t; simp [hCf, pre_succ, run_concat]
-  by_contra hno
-  push Not at hno
-  -- rank of `p` along the run
-  set r : ℕ → ℕ := fun t => rank ((Cf t).loc p) with hr
-  have hle : ∀ t ≥ N, r (t + 1) ≤ r t := by
-    intro t ht
-    simp only [hr, hsucc]
-    rcases he : e t with q | q
-    · by_cases hq : q = p
-      · subst hq
-        simp only [Cfg.next]
-        rcases hact : A.act ((Cf t).loc q) with ⟨i, o, κ⟩ | v
-        · rw [stepP_of_access _ hact]; simp; exact (hrank _ i o κ _ hact).le
-        · exact absurd hact (hno t ht v)
-      · rw [next_loc_eq_of_ne _ _ (by simpa using hq)]
-    · exact absurd he (hcf' t q)
-  have hlt : ∀ t ≥ N, e t = .step p → r (t + 1) < r t := by
-    intro t ht he
-    simp only [hr, hsucc, he, Cfg.next]
-    rcases hact : A.act ((Cf t).loc p) with ⟨i, o, κ⟩ | v
-    · rw [stepP_of_access _ hact]; simp; exact hrank _ i o κ _ hact
-    · exact absurd hact (hno t ht v)
-  have hmono : ∀ t ≥ N, ∀ d, r (t + d) ≤ r t := by
-    intro t ht d
-    induction d with
-    | zero => simp
-    | succ d ih => exact (hle (t + d) (by omega)).trans ih
-  have key : ∀ j, ∃ t ≥ N, r t + j ≤ r N := by
-    intro j
-    induction j with
-    | zero => exact ⟨N, le_rfl, by simp⟩
-    | succ j ih =>
-      obtain ⟨t, ht, hj⟩ := ih
-      obtain ⟨t', ht', he⟩ := hinf t
-      refine ⟨t' + 1, by omega, ?_⟩
-      have h1 := hlt t' (by omega) he
-      obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le ht'
-      have h2 := hmono t ht d
-      omega
-  obtain ⟨t, -, ht⟩ := key (r N + 1)
-  omega
-
-end Tools
+/-! ## Generic tools for two-shot algorithms -/
 
 section ToolsSys
 
@@ -216,7 +96,7 @@ theorem twoShot_of_budget (bud : A.L → ιS → ℕ) (hinit : ∀ p b k, bud (A
             have hobj : objOf C q = none := by simp [objOf, hact]
             simp [hobj]; omega
         · have hne : (Ev.step q : Ev 2) ≠ .step p := by simpa using hq
-          rw [next_loc_eq_of_ne C _ (by simpa using hq)] at h1
+          rw [next_loc_other C _ (by simpa using Ne.symm hq)] at h1
           simp [hne]; omega
       · exact absurd (by simp) (hcf q)
   have := gen α (initCfg A x) hα
@@ -252,7 +132,7 @@ theorem allowed_of_inv (m : Fin 2 → Set O.Op) (G : Fin 2 → A.L → Prop)
           · rw [stepP_of_access _ hact]; simp only [Function.update_self]
             exact hstep q _ i o κ _ hG hact
           · rwa [stepP_of_out C (show C.Out q v from hact)]
-        · rwa [next_loc_eq_of_ne C _ (by simpa using hq)]
+        · rwa [next_loc_other C _ (by simpa using Ne.symm hq)]
       · exact absurd (by simp) (hcf q)
   exact gen α _ hα (hinit p (x p))
 

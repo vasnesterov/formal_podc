@@ -1,5 +1,5 @@
 import Mathlib
-import Cslib.Computability.Distributed.SharedMemory.Recoverable
+import Podc.SharedMemory.Recoverable
 
 /-!
 # Determining Recoverable Consensus Numbers — definitions
@@ -12,10 +12,10 @@ Type-level conditions (Section 2 of the paper) and consensus numbers:
   of the schedule `σ` (a list of distinct processes) apply their operations `o p` in order;
 * `IsRecording n S` — `S` is `n`-recording (Delporte-Gallet–Fatourou–Fauconnier–Ruppert);
 * `IsDiscerning n S` — `S` is `n`-discerning (Ruppert);
-* `Readable S`; `IsRW S` (read/write-like objects: every operation is read-only or a blind write;
-  registers are `IsRW`, `isRW_register`);
 * `WFSolvable S n` / `RecSolvable S n` — wait-free / recoverable wait-free binary consensus for `n`
-  processes is solvable using objects of type `S` together with read/write objects;
+  processes is solvable using objects of type `S` together with read/write-like objects (every
+  operation is read-only or a blind write: `ObjSpec.RWLike`; registers are an instance,
+  `register_rwLike`); the objects of such an algorithm are `withRW R S`;
 * `ConsensusNumber S n`, `RecConsensusNumber S n`;
 * the type `Tnn n n'` of Section 4.
 -/
@@ -63,37 +63,17 @@ def IsDiscerning (n : ℕ) (S : ObjSpec) : Prop :=
       ((S.δ (apply S u o (σ.take m)) (o j)).2, apply S u o σ) ≠
         ((S.δ (apply S u o (τ.take m')) (o j)).2, apply S u o τ)
 
-/-- `S` is readable: some operation returns the current value (without changing it). -/
-def Readable (S : ObjSpec) : Prop :=
-  ∃ o : S.Op, (∀ s, (S.δ s o).1 = s) ∧ Function.Injective (fun s => (S.δ s o).2)
-
-/-- Read/write-like objects: every operation is read-only, or a blind write whose new value and
-response do not depend on the current value. -/
-def IsRW (S : ObjSpec) : Prop :=
-  ∀ o : S.Op, (∀ s, (S.δ s o).1 = s) ∨ (∀ s s', S.δ s o = S.δ s' o)
-
-lemma isRW_register (V : Type) (v₀ : V) : IsRW (register V v₀) := by
-  intro o
-  cases o with
-  | read => left; intro s; rfl
-  | write v => right; intro s s'; rfl
-
-/-- The objects of an algorithm that uses read/write objects `R j` (`j : ιR`) and objects of type
-`S` (indexed by `ιS`). -/
-abbrev withRW {ιR ιS : Type} (R : ιR → ObjSpec) (S : ObjSpec) : ιR ⊕ ιS → ObjSpec :=
-  Sum.elim R (fun _ => S)
-
 /-- Wait-free binary consensus among `n` processes can be solved using objects of type `S` and
 read/write objects. -/
 def WFSolvable (S : ObjSpec) (n : ℕ) : Prop :=
   ∃ (ιR ιS : Type) (_ : DecidableEq ιR) (_ : DecidableEq ιS) (R : ιR → ObjSpec)
-    (_ : ∀ j, IsRW (R j)) (A : Alg n (withRW (ιS := ιS) R S)), WFConsensus A
+    (_ : ∀ j, (R j).RWLike) (A : Alg n (withRW (ιS := ιS) R S)), WFConsensus A
 
 /-- Recoverable wait-free binary consensus among `n` processes (individual crashes) can be solved
 using objects of type `S` and read/write objects. -/
 def RecSolvable (S : ObjSpec) (n : ℕ) : Prop :=
   ∃ (ιR ιS : Type) (_ : DecidableEq ιR) (_ : DecidableEq ιS) (R : ιR → ObjSpec)
-    (_ : ∀ j, IsRW (R j)) (A : Alg n (withRW (ιS := ιS) R S)), RecConsensus A
+    (_ : ∀ j, (R j).RWLike) (A : Alg n (withRW (ιS := ιS) R S)), RecConsensus A
 
 /-- `S` has consensus number `n`: solvable for `n` processes, not for `m > n` processes. -/
 def ConsensusNumber (S : ObjSpec) (n : ℕ) : Prop := WFSolvable S n ∧ ∀ m > n, ¬ WFSolvable S m
