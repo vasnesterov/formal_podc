@@ -645,3 +645,4 @@ import Papers.PODC2011.KCoreDecomposition.Async
 import Papers.PODC2011.KCoreDecomposition.MultiHost
 import Papers.PODC2011.KCoreDecomposition.WorstCase
 import Papers.PODC2011.KCoreDecomposition.Examples
+import Papers.PODC2020.RedundantOptimization.Main
