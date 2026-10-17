@@ -1,4 +1,5 @@
 import Papers.PODC2021.ScannableBinaryObjects.Basic
+import Podc.SharedMemory.Solo
 
 /-!
 # Scannable binary objects: building executions
@@ -7,7 +8,8 @@ import Papers.PODC2021.ScannableBinaryObjects.Basic
   component in ascending order (non-monotonicity provides the flipping invocations);
 * `goTo_exec` — the corresponding `p₀`-only execution (paper: `λ`, `λ_j`, `κ`), with the values of
   the object along the way: the top live component `top` is changed last;
-* `quiesce` — the processes of a list complete their pending operations (paper: `τ'`, `τ''`);
+* the processes of a list complete their pending operations (paper: `τ'`, `τ''`) by the
+  library's `Impl.exists_finish`;
 * `solo_scan` — a solo scan from a `p₀`-idle configuration returns the current value.
 -/
 
@@ -171,10 +173,6 @@ lemma resps_eq_ops_of_idle {ε : List (Label P (scannable O))} {X : Config (scan
   · exact h2.symm
   · exact absurd hp h1
 
-lemma run_append_eq {ε β : List (Label P (scannable O))} {X Y : Config (scannable O) B P L}
-    (h1 : I.run ε = some X) (h2 : I.runFrom X β = some Y) : I.run (ε ++ β) = some Y := by
-  rw [I.run_append_of_eq h1, h2]
-
 variable (hnm : ∀ c, (O c).NonMonotonic) (hof : I.ObstructionFree)
   (hall : ∀ p o, SingleUpdater p₀ p o → I.allowed p o)
 
@@ -216,37 +214,6 @@ theorem goTo_exec {k' : ℕ} {top : Fin k} (htop : top.val + 1 = k')
     rw [h4] at ht
     exact goOps_top hnm htop ht
 
-include hof in
-/-- **Quiescing.** The processes of `S` complete their pending operations (no invocations). -/
-theorem quiesce (S : List P) :
-    ∀ {ε : List (Label P (scannable O))} {X : Config (scannable O) B P L}, I.run ε = some X →
-      ∃ τ Y, I.runFrom X τ = some Y ∧ NoInv τ ∧ (∀ ℓ ∈ τ, ℓ.proc ∈ S) ∧
-        ∀ p ∈ S, Y.pend p = none := by
-  induction S with
-  | nil => intro ε X _; exact ⟨[], X, rfl, fun p => rfl, by simp, by simp⟩
-  | cons p S ih =>
-    intro ε X hX
-    obtain ⟨τ₁, X₁, h1, h2, h3, h4⟩ : ∃ τ₁ X₁, I.runFrom X τ₁ = some X₁ ∧ NoInv τ₁ ∧
-        (∀ ℓ ∈ τ₁, ℓ.proc = p) ∧ X₁.pend p = none := by
-      by_cases hp : X.pend p = none
-      · exact ⟨[], X, rfl, fun _ => rfl, by simp, hp⟩
-      · have hfin := hof X p ⟨ε, hX⟩ hp
-        exact ⟨_, _, I.runFrom_soloLabels p X (I.soloTime p X),
-          fun q => I.opsOf_soloLabels p q X _, I.soloLabels_proc p X _,
-          I.soloTime_spec p X hfin⟩
-    obtain ⟨τ₂, Y, g1, g2, g3, g4⟩ := ih (run_append_eq hX h1)
-    refine ⟨τ₁ ++ τ₂, Y, by rw [I.runFrom_append_of_eq h1, g1], noInv_append h2 g2, ?_, ?_⟩
-    · intro ℓ hℓ
-      rcases List.mem_append.1 hℓ with hℓ | hℓ
-      · simp [h3 ℓ hℓ]
-      · simp [g3 ℓ hℓ]
-    · intro q hq
-      rcases List.mem_cons.1 hq with rfl | hq
-      · by_cases hqS : q ∈ S
-        · exact g4 q hqS
-        · rw [(I.runFrom_other g1 (fun ℓ hℓ he => hqS (by rw [← he]; exact g3 ℓ hℓ))).2, h4]
-      · exact g4 q hq
-
 variable (hlin : I.Linearizable)
 
 include hof hall hlin in
@@ -263,7 +230,7 @@ theorem solo_scan {ε : List (Label P (scannable O))} {Y : Config (scannable O) 
   set γ := I.soloOp s .scan Y
   obtain ⟨r, hr⟩ : ∃ r, respsOf γ s = [r] := List.length_eq_one_iff.1 h5
   rw [hr]
-  have hv : I.Valid (ε ++ γ) := ⟨Z, run_append_eq hY h1⟩
+  have hv : I.Valid (ε ++ γ) := ⟨Z, (I.run_append_of_eq hY _).trans h1⟩
   have hsu' : SUExec p₀ (ε ++ γ) := by
     rw [suExec_append]; refine ⟨hsu, fun p o hm => ?_⟩
     have hp : p = s := h3 _ hm

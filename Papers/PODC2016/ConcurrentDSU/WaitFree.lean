@@ -1,5 +1,6 @@
 import Papers.PODC2016.ConcurrentDSU.Inv
 import Papers.PODC2016.ConcurrentDSU.Lin
+import Podc.SharedMemory.Potential
 
 /-!
 # Wait-freedom (Lemma 3.3)
@@ -20,64 +21,13 @@ progress of the running `Find`. Positions are measured at the *roots* of `u` and
 failing root test (`u` is not a root) then strictly decreases the position, which pays for the
 next iteration of the loop.
 
-* `waitFree_of_cfgPotential` — generic: a configuration potential that never increases while
-  `p` is pending and decreases with every step of `p` gives wait-freedom (CSLib candidate).
+* `Impl.waitFree_of_cfgPotential` (library, `Podc/SharedMemory/Potential.lean`): a
+  configuration potential that never increases while `p` is pending and decreases with every
+  step of `p` gives wait-freedom.
 * `waitFree` — Lemma 3.3 for all versions of `Find`.
 -/
 
 set_option linter.unusedSectionVars false
-
-namespace Cslib.SharedMemory.Impl
-
-variable {A : ObjSpec} {ι : Type} {B : ι → ObjSpec} {P L : Type} [DecidableEq P] [DecidableEq ι]
-  (I : Impl A B P L)
-
--- CSLib candidate
-/-- **Wait-freedom from a configuration potential.** If an invariant `Inv` holds initially and
-is preserved by steps, and the potential `Ψ p` never increases at steps taken while `p` is
-pending and strictly decreases at the steps of `p`, then the implementation is wait-free. -/
-theorem waitFree_of_cfgPotential (Inv : Config A B P L → Prop) (hinit : Inv I.initCfg)
-    (hstep : ∀ C C' ℓ, Inv C → I.step C ℓ = some C' → Inv C')
-    (Ψ : P → Config A B P L → ℕ)
-    (hΨ : ∀ p C C' ℓ, Inv C → C.pend p ≠ none → I.step C ℓ = some C' →
-      Ψ p C' ≤ Ψ p C ∧ (ℓ = .tau p → Ψ p C' < Ψ p C)) : I.WaitFree := by
-  intro e p n hpend
-  have hinv : ∀ m, Inv (e.cfg m) := by
-    intro m
-    induction m with
-    | zero => rw [e.cfg_zero]; exact hinit
-    | succ m ih => exact hstep _ _ _ ih (e.step_eq m)
-  let f : ℕ → ℕ := fun m => Ψ p (e.cfg m)
-  have hstep' : ∀ m ≥ n, f (m + 1) ≤ f m ∧ (e.lbl m = .tau p → f (m + 1) < f m) :=
-    fun m hm => hΨ p _ _ _ (hinv m) (hpend m hm) (e.step_eq m)
-  have hmono : ∀ m ≥ n, ∀ j, f (m + j) ≤ f m := by
-    intro m hm j
-    induction j with
-    | zero => simp
-    | succ j ih => exact ((hstep' (m + j) (by omega)).1).trans ih
-  have key : ∀ k, ∀ m ≥ n, f m ≤ k → ∃ N, ∀ m' ≥ N, e.lbl m' ≠ .tau p := by
-    intro k
-    induction k with
-    | zero =>
-      intro m hm hf
-      refine ⟨m, fun m' hm' heq => ?_⟩
-      have h1 := (hstep' m' (by omega)).2 heq
-      have h2 := hmono m hm (m' - m)
-      rw [show m + (m' - m) = m' by omega] at h2
-      omega
-    | succ k ih =>
-      intro m hm hf
-      by_cases hex : ∃ m' ≥ m, e.lbl m' = .tau p
-      · obtain ⟨m', hm', heq⟩ := hex
-        have h1 := (hstep' m' (by omega)).2 heq
-        have h2 := hmono m hm (m' - m)
-        rw [show m + (m' - m) = m' by omega] at h2
-        exact ih (m' + 1) (by omega) (by omega)
-      · push Not at hex
-        exact ⟨m, hex⟩
-  exact key (f n) n le_rfl le_rfl
-
-end Cslib.SharedMemory.Impl
 
 namespace Podc.ConcurrentDSU
 

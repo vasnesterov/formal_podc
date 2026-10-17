@@ -11,7 +11,9 @@ Termination arguments by a natural-number potential that decreases with the step
   execution fragment in which `p` stays pending, if a potential `Ψ` on configurations never
   increases and strictly decreases at every internal step of `p`, then the number of internal
   steps of `p` is at most the drop of `Ψ`. Corollary for a potential on local states:
-  `Impl.tauSteps_le_of_potential` (step complexity).
+  `Impl.tauSteps_le_of_potential` (step complexity); `Impl.tauSteps_le_potential_invoke` bounds
+  the accesses of a whole operation by the potential of the local state right after its
+  invocation.
 * `Impl.waitFreeOn_of_runPotential` (infinite executions): the same hypothesis for the steps of
   the executions of a set `E` gives wait-freedom on `E` (the potential may depend on the
   execution); `Impl.waitFreeOn_of_cfgPotential` for a potential on configurations. Corollaries:
@@ -120,6 +122,29 @@ theorem tauSteps_le_of_potential (μ : P → L → ℕ)
     γ.countP (Label.isTauOf p) + μ p (C'.loc p) ≤ μ p (C.loc p) :=
   I.countP_isTauOf_add_le_of_cfgPotential p (fun C => μ p (C.loc p)) γ C C' h hp hr
     fun _ _ _ _ _ _ hs hD hD' => I.potential_step_of_local μ hμ hs hD hD'
+
+/-- **Step complexity of an operation from a potential on local states.** If a potential on local
+states strictly decreases at every base-object access, then after `p` invokes `o` (in some local
+state `l`), `p` performs at most `μ p (I.invoke p l o)` base-object accesses before it returns
+(`γ` is any continuation not containing a response of `p`). -/
+theorem tauSteps_le_potential_invoke (μ : P → L → ℕ)
+    (hμ : ∀ p l i o k, I.act p l = .access i o k → ∀ x, μ p (k x) < μ p l)
+    {α γ : List (Label P A)} {p : P} {o : A.Op} (hv : I.Valid (α ++ .inv p o :: γ))
+    (hret : ∀ r, .ret p r ∉ γ) : ∃ l, γ.countP (Label.isTauOf p) ≤ μ p (I.invoke p l o) := by
+  obtain ⟨C', h⟩ := hv
+  rw [run, runFrom_append] at h
+  cases hα : I.runFrom I.initCfg α with
+  | none => simp [hα] at h
+  | some C₀ =>
+    simp only [hα, Option.bind_some, runFrom_cons] at h
+    cases hs : I.step C₀ (.inv p o) with
+    | none => simp [hs] at h
+    | some C₁ =>
+      simp only [hs, Option.bind_some] at h
+      obtain ⟨-, -, hpend, hloc, -⟩ := step_inv hs
+      have := I.tauSteps_le_of_potential μ hμ p γ C₁ C' h (by simp [hpend]) hret
+      rw [hloc, Function.update_self] at this
+      exact ⟨C₀.loc p, by omega⟩
 
 /-! ### Infinite executions -/
 

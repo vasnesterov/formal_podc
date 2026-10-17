@@ -1,5 +1,6 @@
 import Mathlib
 import Cslib.Computability.Distributed.SharedMemory.Model
+import Podc.SharedMemory.Objects.FetchAdd
 
 /-!
 # Mutable timestamp systems: specification and base objects
@@ -19,7 +20,8 @@ Synchronization Primitives*, PODC 2023 (full version, University of Calgary repo
 * **Base objects** (Section 3): single-bit registers (CSLib `register Bool false`),
   LL/SC objects with `LL`, `SC`, `VL` (`llscObj`; one *link* per process and object, a
   successful `SC` clears all links — exactly the paper's definition), and a
-  `mod m`-fetch-and-increment object with `read` (`faiObj m`, Section 3).
+  `mod m`-fetch-and-increment object with `read` (`faiObj m`, Section 3; the library's
+  `modFaiObj m`).
 -/
 
 set_option linter.unusedSectionVars false
@@ -85,21 +87,9 @@ abbrev llscObj (V K : Type) [DecidableEq K] (v₀ : V) : ObjSpec where
     | .sc k v => if k ∈ s.2 then ((v, []), (s.1, true)) else (s, (s.1, false))
     | .vl k => (s, (s.1, decide (k ∈ s.2)))
 
-/-- Operations of a counter. -/
-inductive CtrOp where
-  | read
-  | fai
-  deriving DecidableEq
-
-/-- A `mod m`-fetch-and-increment object with `read` (Section 3). -/
-abbrev faiObj (m : ℕ) : ObjSpec where
-  State := ℕ
-  Op := CtrOp
-  Resp := ℕ
-  init := 0
-  δ s
-    | .read => (s, s)
-    | .fai => ((s + 1) % m, s)
+/-- A `mod m`-fetch-and-increment object with `read` (Section 3): the library's `modFaiObj m`
+(`fai` sets the value `s` to `(s + 1) % m`; both operations return the old value). -/
+abbrev faiObj (m : ℕ) : ObjSpec := modFaiObj m
 
 /-! ## The algorithm's data -/
 

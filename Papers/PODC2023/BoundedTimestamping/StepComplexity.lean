@@ -1,5 +1,5 @@
 import Papers.PODC2023.BoundedTimestamping.Alg
-import Papers.PODC2023.BoundedTimestamping.BoundedFAI
+import Podc.SharedMemory.Potential
 
 /-!
 # Constant step complexity of the MTS algorithm (Lemma 12)
@@ -178,25 +178,10 @@ performs at most `opCost κ o` base-object accesses before it returns (`κ + 71`
 response of `p`. -/
 theorem lemma12_opCost {α γ : List (Label (Fin n) (mtsObj n))} {p : Fin n} {o : MOp n}
     (hv : (alg n κ).Valid (α ++ .inv p o :: γ)) (hret : ∀ r, Label.ret p r ∉ γ) :
-    γ.countP (FAI.isTauOf p) ≤ opCost κ o := by
-  obtain ⟨C', h⟩ := hv
-  rw [Impl.run, Impl.runFrom_append] at h
-  cases hα : (alg n κ).runFrom (alg n κ).initCfg α with
-  | none => simp [hα] at h
-  | some C₀ =>
-    simp only [hα, Option.bind_some, Impl.runFrom_cons] at h
-    cases hs : (alg n κ).step C₀ (.inv p o) with
-    | none => simp [hs] at h
-    | some C₁ =>
-      simp only [hs, Option.bind_some] at h
-      obtain ⟨-, -, hpend, hloc, -⟩ := Impl.step_inv hs
-      have := FAI.tauSteps_le_of_potential (alg n κ) (fun _ l => pot κ l)
-        (fun p l i o k hact x => pot_lt κ p l i o k hact x) p γ C₁ C' h
-        (by simp [hpend]) hret
-      have hl : C₁.loc p = invoke n (C₀.loc p) o := by rw [hloc, Function.update_self]; rfl
-      rw [hl] at this
-      have h1 := pot_invoke κ (C₀.loc p) o
-      omega
+    γ.countP (Label.isTauOf p) ≤ opCost κ o := by
+  obtain ⟨l, h⟩ := (alg n κ).tauSteps_le_potential_invoke (fun _ l => pot κ l)
+    (fun p l i o k hact x => pot_lt κ p l i o k hact x) hv hret
+  exact h.trans (pot_invoke κ l o)
 
 /-- **Lemma 12 of [BJW23]** (constant step complexity): in every execution, after `p` invokes
 an operation `o` (`updateTS()` or `isEarlier(x, y)`), `p` performs at most
@@ -204,7 +189,7 @@ an operation `o` (`updateTS()` or `isEarlier(x, y)`), `p` performs at most
 not containing a response of `p`); the bound does not depend on `n`. -/
 theorem lemma12 {α γ : List (Label (Fin n) (mtsObj n))} {p : Fin n} {o : MOp n}
     (hv : (alg n κ).Valid (α ++ .inv p o :: γ)) (hret : ∀ r, Label.ret p r ∉ γ) :
-    γ.countP (FAI.isTauOf p) ≤ stepBound κ :=
+    γ.countP (Label.isTauOf p) ≤ stepBound κ :=
   (lemma12_opCost κ hv hret).trans (opCost_le κ o)
 
 /-- **Wait-freedom** of the MTS algorithm (a consequence of Lemma 12 of [BJW23]). -/

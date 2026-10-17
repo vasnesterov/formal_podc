@@ -1,6 +1,8 @@
 import Mathlib
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
 import Cslib.Computability.Distributed.SharedMemory.Progress
+import Podc.SharedMemory.LinResp
+import Podc.SharedMemory.Objects.FetchAdd
 import Podc.SharedMemory.Potential
 
 /-!
@@ -20,8 +22,8 @@ Primitives*, PODC 2023.
   returning the previous value. If `0 ≤ v + d < B`, `faa d` sets the value to `v + d`; otherwise
   (overflow, "arbitrary behaviour" in the paper) it sets it to `ovf v d` for an **arbitrary**
   function `ovf`, a parameter of every theorem.
-* Implemented object `modFAI φ`: state `s ∈ {0, …, φ-1}`, initially `0`; `read()` returns `s`,
-  `FAI()` returns `s` and sets `s := (s + 1) mod φ`.
+* Implemented object `modFAI φ` (the library's `modFaiObj φ`): state `s ∈ {0, …, φ-1}`,
+  initially `0`; `read()` returns `s`, `FAI()` returns `s` and sets `s := (s + 1) mod φ`.
 * Algorithm (Fig. 3, lines 75–78), program counters explicit (`Loc`):
   ```
   FAI():  tmp ← Counter.read()                                  -- pc `fai`
@@ -66,20 +68,9 @@ abbrev faaObj (B : ℕ) (ovf : ℕ → ℤ → ℕ) : ObjSpec where
     | .read => (v, v)
     | .faa d => (if 0 ≤ (v : ℤ) + d ∧ (v : ℤ) + d < B then ((v : ℤ) + d).toNat else ovf v d, v)
 
-/-- Operations of the mod-`φ` fetch-and-increment object. -/
-inductive FAIOp where
-  | read
-  | fai
-
-/-- The mod-`φ` fetch-and-increment object (state in `{0, …, φ-1}`, initially `0`). -/
-abbrev modFAI (φ : ℕ) : ObjSpec where
-  State := ℕ
-  Op := FAIOp
-  Resp := ℕ
-  init := 0
-  δ s o := match o with
-    | .read => (s, s)
-    | .fai => ((s + 1) % φ, s)
+/-- The mod-`φ` fetch-and-increment object (state in `{0, …, φ-1}`, initially `0`; operations
+`FAIOp.read`, `FAIOp.fai`): the library's `modFaiObj φ`. -/
+abbrev modFAI (φ : ℕ) : ObjSpec := modFaiObj φ
 
 /-- Program counters. `fai`: about to read `Counter` (line 75); `dec` / `inc`: poised to execute
 `FAA(1-φ)` (line 76) / `FAA(1)` (line 77); `rd`: `read()` about to read `Counter`;
@@ -167,11 +158,6 @@ lemma numAt_lt (f : Fin n → Loc) (p : Fin n) (c : Loc) (h : f p ≠ c) : numAt
 @[simp] lemma numAt_const (a c : Loc) : numAt (fun _ : Fin n => a) c = if a = c then n else 0 := by
   by_cases h : a = c <;> simp [numAt, h]
 
--- CSLib candidate
-lemma linState_append_singleton {P : Type} {A : ObjSpec} (L : List (OpId P × A.Op))
-    (y : OpId P × A.Op) : linState (L ++ [y]) = (A.δ (linState L) y.2).1 := by
-  simp [linState, ObjSpec.runOps_append]
-
 /-! ## The invariant -/
 
 /-- The value of `Counter` in a configuration. -/
@@ -257,8 +243,7 @@ theorem inv_of_run (hφ : 1 ≤ φ) (hB : φ * n ≤ B) {α : List (Label (Fin n
   induction α using List.reverseRecOn generalizing C with
   | nil =>
     simp only [Impl.run, Impl.runFrom, Impl.initCfg, Option.some.injEq] at h; subst h
-    refine ⟨[], ⟨⟨by simp, by simp, fun a ha => by simp [Completed] at ha,
-      fun a b _ hb => by simp at hb, trivial⟩, ?_, ?_, ?_, ?_⟩⟩
+    refine ⟨[], ⟨isLinearization_nil, ?_, ?_, ?_, ?_⟩⟩
     · show (0 : ℕ) % φ = 0; simp
     · simp [alg, cval]
     · simp [alg, cval]
@@ -327,7 +312,7 @@ theorem inv_of_run (hφ : 1 ≤ φ) (hB : φ * n ≤ B) {α : List (Label (Fin n
           have hnc : ¬ Completed α (p, (respsOf α p).length) := by simp [Completed]
           refine ⟨L ++ [((p, (respsOf α p).length), .read)],
             (hI.lin.push hp3 hp2 hnc).append_tau p, ?_, ?_, ?_, ?_⟩
-          · rw [hmem', linState_append_singleton]; exact hI.mem
+          · rw [hmem', linState_concat]; exact hI.mem
           · rw [hmem', e1]; exact hlow
           · rw [hmem', e2]; exact hup
           · refine procs_step (p := p) hI.proc h rfl rfl (fun y hy => by simp at hy; simp [hy]) ?_
@@ -388,7 +373,7 @@ theorem inv_of_run (hφ : 1 ≤ φ) (hB : φ * n ≤ B) {α : List (Label (Fin n
           have hnc : ¬ Completed α (p, (respsOf α p).length) := by simp [Completed]
           refine ⟨L ++ [((p, (respsOf α p).length), .fai)],
             (hI.lin.push hp3 hp2 hnc).append_tau p, ?_, ?_, ?_, ?_⟩
-          · rw [hmem', linState_append_singleton, ← hI.mem]
+          · rw [hmem', linState_concat, ← hI.mem]
             show (cval C₀ + 1 - φ) % φ = (cval C₀ % φ + 1) % φ
             rw [Nat.mod_add_mod]
             conv_rhs => rw [show cval C₀ + 1 = (cval C₀ + 1 - φ) + φ by omega]
@@ -417,7 +402,7 @@ theorem inv_of_run (hφ : 1 ≤ φ) (hB : φ * n ≤ B) {α : List (Label (Fin n
           have hnc : ¬ Completed α (p, (respsOf α p).length) := by simp [Completed]
           refine ⟨L ++ [((p, (respsOf α p).length), .fai)],
             (hI.lin.push hp3 hp2 hnc).append_tau p, ?_, ?_, ?_, ?_⟩
-          · rw [hmem', linState_append_singleton, ← hI.mem]
+          · rw [hmem', linState_concat, ← hI.mem]
             show (cval C₀ + 1) % φ = (cval C₀ % φ + 1) % φ
             rw [Nat.mod_add_mod]
           · rw [hmem', e1]; omega
@@ -499,27 +484,14 @@ theorem corollary64 (hφ : 1 ≤ φ) (hB : φ * n ≤ B) {C : Cfg n φ B ovf}
     omega
   | _ => rw [hl] at hact; simp [alg] at hact
 
-theorem exists_linFun (hφ : 1 ≤ φ) (hB : φ * n ≤ B) :
-    ∃ h : List (Label (Fin n) (modFAI φ)) → List (OpId (Fin n) × FAIOp),
-      ∀ α C, (alg n φ B ovf).run α = some C → Inv α C (h α) := by
-  have : ∀ α : List (Label (Fin n) (modFAI φ)), ∃ L,
-      ∀ C, (alg n φ B ovf).run α = some C → Inv α C L := by
-    intro α
-    cases hα : (alg n φ B ovf).run α with
-    | none => exact ⟨[], fun C h => by cases h⟩
-    | some C =>
-      obtain ⟨L, hL⟩ := inv_of_run hφ hB hα
-      exact ⟨L, fun C' h => by cases h; exact hL⟩
-  choose h hh using this
-  exact ⟨h, hh⟩
-
 /-- **Theorem 11 of [BJW23]** (linearizability; with the weaker hypothesis `B ≥ φn`): the
 algorithm of Fig. 3 is a linearizable implementation of a mod-`φ` fetch-and-increment object,
 for every overflow behaviour `ovf` of the bounded fetch-and-add object. -/
 theorem theorem11_linearizable (hφ : 1 ≤ φ) (hB : φ * n ≤ B) (ovf : ℕ → ℤ → ℕ) :
-    (alg n φ B ovf).Linearizable := by
-  obtain ⟨h, hh⟩ := exists_linFun (ovf := ovf) hφ hB
-  exact ⟨h, fun α ⟨C, hC⟩ => (hh α C hC).lin⟩
+    (alg n φ B ovf).Linearizable :=
+  Impl.linearizable_of_run fun _ _ hC =>
+    let ⟨L, hL⟩ := inv_of_run hφ hB hC
+    ⟨L, hL.lin⟩
 
 /-- Theorem 11 under the paper's exact hypothesis `B > φn`. -/
 theorem theorem11_linearizable_paper (hφ : 1 ≤ φ) (hB : φ * n < B) (ovf : ℕ → ℤ → ℕ) :
@@ -527,51 +499,6 @@ theorem theorem11_linearizable_paper (hφ : 1 ≤ φ) (hB : φ * n < B) (ovf : �
   theorem11_linearizable hφ hB.le ovf
 
 /-! ## Step complexity and wait-freedom -/
-
-/-- `ℓ` is a base-object access (internal step) of `p`. -/
-def isTauOf {P : Type} {A : ObjSpec} [DecidableEq P] (p : P) : Label P A → Bool
-  | .tau q => decide (q = p)
-  | _ => false
-
--- CSLib candidate
-/-- If a potential on local states strictly decreases at every base-object access, then along
-any execution fragment in which `p` stays pending (no response of `p`), the number of accesses
-of `p` is at most the drop of its potential. -/
-theorem tauSteps_le_of_potential {A : ObjSpec} {ι : Type} {Bs : ι → ObjSpec} {P L : Type}
-    [DecidableEq P] [DecidableEq ι] (I : Impl A Bs P L) (μ : P → L → ℕ)
-    (hμ : ∀ p l i o k, I.act p l = .access i o k → ∀ x, μ p (k x) < μ p l) (p : P) :
-    ∀ (γ : List (Label P A)) (C C' : Config A Bs P L), I.runFrom C γ = some C' →
-      C.pend p ≠ none → (∀ r, Label.ret p r ∉ γ) →
-      γ.countP (isTauOf p) + μ p (C'.loc p) ≤ μ p (C.loc p)
-  | [], C, C', h, _, _ => by simp only [Impl.runFrom_nil, Option.some.injEq] at h; subst h; simp
-  | ℓ :: γ, C, C', h, hp, hr => by
-    simp only [Impl.runFrom_cons] at h
-    cases hs : I.step C ℓ with
-    | none => simp [hs] at h
-    | some C₁ =>
-      simp only [hs, Option.bind_some] at h
-      have key : C₁.pend p ≠ none ∧
-          μ p (C₁.loc p) + (if isTauOf p ℓ then 1 else 0) ≤ μ p (C.loc p) := by
-        by_cases hq : ℓ.proc = p
-        · cases ℓ with
-          | inv q o =>
-            simp only [Label.proc] at hq; subst hq; exact absurd (Impl.step_inv hs).1 hp
-          | ret q r =>
-            simp only [Label.proc] at hq; subst hq; exact absurd List.mem_cons_self (hr r)
-          | tau q =>
-            simp only [Label.proc] at hq; subst hq
-            obtain ⟨h0, h1, i, o, k, hact, -, hloc⟩ := Impl.step_tau hs
-            refine ⟨by rw [h1]; exact h0, ?_⟩
-            have := hμ _ _ i o k hact (((Bs i).δ (C.mem i) o).2)
-            simp only [isTauOf, decide_true, ↓reduceIte, hloc, Function.update_self]; omega
-        · obtain ⟨h1, h2⟩ := Impl.step_other hs hq
-          refine ⟨by rw [h2]; exact hp, ?_⟩
-          have : isTauOf p ℓ = false := by
-            cases ℓ <;> simp_all [isTauOf, Label.proc]
-          simp [this, h1]
-      have ih := tauSteps_le_of_potential I μ hμ p γ C₁ C' h key.1
-        (fun r hr' => hr r (List.mem_cons_of_mem _ hr'))
-      rw [List.countP_cons]; omega
 
 /-- Upper bound on the remaining base-object accesses of an operation. -/
 def pot : Loc → ℕ
@@ -603,24 +530,10 @@ an operation `o`, `p` performs at most `cost o ≤ 2` base-object accesses befor
 (`γ` is any continuation not containing a response of `p`). -/
 theorem theorem11_steps {α γ : List (Label (Fin n) (modFAI φ))} {p : Fin n} {o : FAIOp}
     (hv : (alg n φ B ovf).Valid (α ++ .inv p o :: γ)) (hret : ∀ r, Label.ret p r ∉ γ) :
-    γ.countP (isTauOf p) ≤ cost o := by
-  obtain ⟨C', h⟩ := hv
-  rw [Impl.run, Impl.runFrom_append] at h
-  cases hα : (alg n φ B ovf).runFrom (alg n φ B ovf).initCfg α with
-  | none => simp [hα] at h
-  | some C₀ =>
-    simp only [hα, Option.bind_some, Impl.runFrom_cons] at h
-    cases hs : (alg n φ B ovf).step C₀ (.inv p o) with
-    | none => simp [hs] at h
-    | some C₁ =>
-      simp only [hs, Option.bind_some] at h
-      obtain ⟨-, -, hpend, hloc, -⟩ := Impl.step_inv hs
-      have := tauSteps_le_of_potential (alg n φ B ovf) (fun _ l => pot l)
-        (fun p l i o k hact x => pot_decreases p l i o k hact x) p γ C₁ C' h
-        (by simp [hpend]) hret
-      have hl : C₁.loc p = invLoc o := by rw [hloc, Function.update_self]; rfl
-      rw [hl] at this
-      cases o <;> simp only [invLoc, pot, cost] at this ⊢ <;> omega
+    γ.countP (Label.isTauOf p) ≤ cost o := by
+  obtain ⟨l, h⟩ := (alg n φ B ovf).tauSteps_le_potential_invoke (fun _ l => pot l)
+    (fun p l i o k hact x => pot_decreases p l i o k hact x) hv hret
+  cases o <;> exact h
 
 /-- **Theorem 11 of [BJW23]** (wait-freedom; no assumption on `B` needed). -/
 theorem theorem11_waitFree (ovf : ℕ → ℤ → ℕ) : (alg n φ B ovf).WaitFree :=
@@ -632,30 +545,6 @@ theorem theorem11_waitFree (ovf : ℕ → ℤ → ℕ) : (alg n φ B ovf).WaitFr
 For `φ ≥ 2` and `n ≥ 1` the counter can reach `φn − 1`: one process performs `T − 1` complete
 `FAI`s (`T = φn − n`), each reading a value `< T` and incrementing; then all `n` processes read
 `T − 1` and perform `FAA(1)`. So with `B < φn` some `FAA` overflows. -/
-
-lemma step_inv_eq {C : Cfg n φ B ovf} {p : Fin n} {o : FAIOp} (h0 : C.pend p = none) :
-    (alg n φ B ovf).step C (.inv p o) = some { C with
-      pend := Function.update C.pend p (some o), loc := Function.update C.loc p (invLoc o) } := by
-  simp [Impl.step, h0, alg]
-
-lemma step_tau_eq {C : Cfg n φ B ovf} {p : Fin n} {o : FAAOp} {k : ℕ → Loc}
-    (h0 : C.pend p ≠ none) (hact : (alg n φ B ovf).act p (C.loc p) = .access () o k) :
-    (alg n φ B ovf).step C (.tau p) = some { C with
-      mem := Function.update C.mem () ((faaObj B ovf).δ (C.mem ()) o).1,
-      loc := Function.update C.loc p (k ((faaObj B ovf).δ (C.mem ()) o).2) } := by
-  simp only [Impl.step, h0, ↓reduceIte, hact]
-
-lemma step_ret_eq {C : Cfg n φ B ovf} {p : Fin n} {r : ℕ} {l : Loc}
-    (h0 : C.pend p ≠ none) (hact : (alg n φ B ovf).act p (C.loc p) = .ret r l) :
-    (alg n φ B ovf).step C (.ret p r) = some { C with
-      pend := Function.update C.pend p none, loc := Function.update C.loc p l } := by
-  simp [Impl.step, h0, hact]
-
-lemma reachable_step {C C' : Cfg n φ B ovf} {ℓ : Label (Fin n) (modFAI φ)}
-    (hC : (alg n φ B ovf).Reachable C) (h : (alg n φ B ovf).step C ℓ = some C') :
-    (alg n φ B ovf).Reachable C' := by
-  obtain ⟨α, hα⟩ := hC
-  exact ⟨α ++ [ℓ], by rw [Impl.run_append_of_eq _ hα, Impl.runFrom_singleton, h]⟩
 
 /-- A configuration in which only `FAI`s are pending, the counter is `v` and the program counters
 are `f`. -/
@@ -673,14 +562,15 @@ lemma start_fai {C : Cfg n φ B ovf} {v : ℕ} {f : Fin n → Loc} {p : Fin n}
     ∃ C', (alg n φ B ovf).Reachable C' ∧
       Shape C' v (Function.update f p (if φ * n - n ≤ v then .dec else .inc)) := by
   have h0 : C.pend p = none := by rw [hS.pend]; simp [hp]
-  have hC1 := reachable_step hC (step_inv_eq (o := .fai) h0)
   set C1 : Cfg n φ B ovf := { C with
       pend := Function.update C.pend p (some .fai), loc := Function.update C.loc p (invLoc .fai) }
+  have hC1 : (alg n φ B ovf).Reachable C1 :=
+    hC.step (Impl.step_inv_eq_some (I := alg n φ B ovf) (o := .fai) h0 trivial)
   have h1 : C1.pend p ≠ none := by simp [C1]
   have hact : (alg n φ B ovf).act p (C1.loc p) =
       .access () .read (fun v => if φ * n - n ≤ v then .dec else .inc) := by
     simp only [C1, Function.update_self]; rfl
-  refine ⟨_, reachable_step hC1 (step_tau_eq h1 hact), ?_, ?_, ?_⟩
+  refine ⟨_, hC1.step (Impl.step_tau_eq_some h1 hact), ?_, ?_, ?_⟩
   · show Function.update C.mem () _ () = v
     rw [Function.update_self]; exact hS.mem
   · show Function.update (Function.update C.loc p _) p _ = _
@@ -701,15 +591,15 @@ lemma finish_inc {C : Cfg n φ B ovf} {v : ℕ} {f : Fin n → Loc} {p : Fin n}
   have h0 : C.pend p ≠ none := by rw [hS.pend, hp]; simp
   have hact : (alg n φ B ovf).act p (C.loc p) =
       .access () (.faa 1) (fun v => .done (v % φ)) := by rw [hS.loc, hp]; rfl
-  have hC1 := reachable_step hC (step_tau_eq h0 hact)
   set C1 : Cfg n φ B ovf := { C with
       mem := Function.update C.mem () ((faaObj B ovf).δ (C.mem ()) (.faa 1)).1,
       loc := Function.update C.loc p
         ((fun v => .done (v % φ)) ((faaObj B ovf).δ (C.mem ()) (.faa 1)).2) }
+  have hC1 : (alg n φ B ovf).Reachable C1 := hC.step (Impl.step_tau_eq_some h0 hact)
   have h1 : C1.pend p ≠ none := h0
   have hact1 : (alg n φ B ovf).act p (C1.loc p) = .ret (C.mem () % φ) .idle := by
     simp only [C1, Function.update_self]; rfl
-  refine ⟨_, reachable_step hC1 (step_ret_eq h1 hact1), ?_, ?_, ?_⟩
+  refine ⟨_, hC1.step (Impl.step_ret_eq_some h1 hact1), ?_, ?_, ?_⟩
   · have hm : C.mem () = v := hS.mem
     have e : ((faaObj B ovf).δ (C.mem ()) (.faa 1)).1 = v + 1 := by
       rw [faa_ok (v := C.mem ()) (by omega) (by rw [hm]; omega), hm]; simp

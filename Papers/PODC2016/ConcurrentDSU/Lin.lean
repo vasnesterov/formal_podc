@@ -1,5 +1,6 @@
 import Papers.PODC2016.ConcurrentDSU.Inv
-import Podc.SharedMemory.Linearization
+import Podc.SharedMemory.LinResp
+import Podc.SharedMemory.Run
 
 /-!
 # Linearizability (Lemma 3.2)
@@ -11,7 +12,7 @@ The linearization points are those of the paper:
 * `SameSet` returning `false`: also the read in the last `Find(v)` (`u` and `v` are then two
   different roots). This point is only known to be the linearization point *afterwards*, when
   `u = u.parent` is checked: the operation is inserted retroactively into the linearization
-  (`IsLinearization.insert`, from `Podc/SharedMemory/Linearization.lean`). The
+  (`IsLinearization.insert`, from `Podc/SharedMemory/LinResp.lean`). The
   invariant keeps, for every process in state `chk u v` whose `u` is still a root, a cut
   `L = S₁ ++ S₂` of the current linearization after which `x` and `y` are in different sets and
   such that no operation of `S₂` precedes the `SameSet` in real time.
@@ -163,9 +164,6 @@ theorem tauRes_cases (hkey : Function.Injective key) {m : E → E} (hg : Good ke
 
 /-! ### Bookkeeping -/
 
-/-- The current operation instance of `p` (`p`'s next or pending operation). -/
-noncomputable abbrev cur (α : List (Label P (dsu E))) (p : P) : OpId P := (p, (respsOf α p).length)
-
 /-- The abstract state after a sequential history. -/
 noncomputable abbrev st (L : List (OpId P × (dsu E).Op)) : (dsu E).State := linState L
 
@@ -194,20 +192,6 @@ lemma joinRel_same {m : E → E} {x y : E} (h : same m x y) : joinRel (same m) x
     · exact same_trans h1 (same_trans (same_symm h) h2)
   · intro h1; exact Or.inl h1
 
-lemma cur_facts {α : List (Label P (dsu E))} {C : Config (dsu E) (Ptr E) P (Loc E)}
-    (h : (dsuImpl K key P).run α = some C) {p : P} {o : DSUOp E} (hp : C.pend p = some o) :
-    Invoked α (cur α p) ∧ ¬ Completed α (cur α p) ∧ opOf α (cur α p) = some o := by
-  have hc := Impl.run_counts _ h p
-  have hlast := Impl.run_pend _ h hp
-  rcases hc with ⟨h1, -⟩ | ⟨-, h2⟩
-  · simp [hp] at h1
-  refine ⟨by simp [Invoked, h2], by simp [Completed], ?_⟩
-  simp only [opOf]
-  rw [List.getLast?_eq_getElem?] at hlast
-  rw [h2] at hlast
-  convert hlast using 2
-  simp
-
 lemma not_precedes_append {α β : List (Label P (dsu E))} {a b : OpId P} (hb : Invoked α b)
     (h : ¬ Precedes α a b) : ¬ Precedes (α ++ β) a b :=
   fun h' => h (h'.of_append_of_invoked hb)
@@ -216,10 +200,10 @@ lemma not_precedes_append {α β : List (Label P (dsu E))} {a b : OpId P} (hb : 
 structure QOK (α : List (Label P (dsu E))) (C : Config (dsu E) (Ptr E) P (Loc E))
     (L : List (OpId P × (dsu E).Op)) (q : P) : Prop where
   done : ∀ o r, C.pend q = some o → C.loc q = .done r →
-    ∃ L₁ L₂, L = L₁ ++ (cur α q, o) :: L₂ ∧ ((dsu E).δ (st L₁) o).2 = r
-  notin : C.pend q ≠ none → (∀ r, C.loc q ≠ .done r) → cur α q ∉ L.map Prod.fst
+    ∃ L₁ L₂, L = L₁ ++ (curOp α q, o) :: L₂ ∧ ((dsu E).δ (st L₁) o).2 = r
+  notin : C.pend q ≠ none → (∀ r, C.loc q ≠ .done r) → curOp α q ∉ L.map Prod.fst
   chk : ∀ x y u v, C.pend q = some (.sameSet x y) → C.loc q = .chk u v → C.mem u = u →
-    ∃ S₁ S₂, L = S₁ ++ S₂ ∧ ¬ st S₁ x y ∧ ∀ z ∈ S₂, ¬ Precedes α z.1 (cur α q)
+    ∃ S₁ S₂, L = S₁ ++ S₂ ∧ ¬ st S₁ x y ∧ ∀ z ∈ S₂, ¬ Precedes α z.1 (curOp α q)
 
 /-- The linearization invariant. -/
 structure LinInv (α : List (Label P (dsu E))) (C : Config (dsu E) (Ptr E) P (Loc E))
@@ -231,15 +215,15 @@ structure LinInv (α : List (Label P (dsu E))) (C : Config (dsu E) (Ptr E) P (Lo
 /-- Transport of the per-process invariant of a process `q` that does not move. -/
 lemma QOK.transport {α α' : List (Label P (dsu E))} {C C' : Config (dsu E) (Ptr E) P (Loc E)}
     {L L' : List (OpId P × (dsu E).Op)} {q : P} (hq : QOK α C L q)
-    (hcur : cur α' q = cur α q) (hpend : C'.pend q = C.pend q) (hloc : C'.loc q = C.loc q)
+    (hcur : curOp α' q = curOp α q) (hpend : C'.pend q = C.pend q) (hloc : C'.loc q = C.loc q)
     (hroot : ∀ a, C'.mem a = a → C.mem a = a)
-    (hinv : C.pend q ≠ none → Invoked α (cur α q))
-    (hprec : ∀ a, Invoked α (cur α q) → ¬ Precedes α a (cur α q) → ¬ Precedes α' a (cur α q))
-    (hT : ∀ L₁ L₂ (o : (dsu E).Op), L = L₁ ++ (cur α q, o) :: L₂ →
-      ∃ L₁' L₂', L' = L₁' ++ (cur α q, o) :: L₂' ∧ st L₁' = st L₁)
+    (hinv : C.pend q ≠ none → Invoked α (curOp α q))
+    (hprec : ∀ a, Invoked α (curOp α q) → ¬ Precedes α a (curOp α q) → ¬ Precedes α' a (curOp α q))
+    (hT : ∀ L₁ L₂ (o : (dsu E).Op), L = L₁ ++ (curOp α q, o) :: L₂ →
+      ∃ L₁' L₂', L' = L₁' ++ (curOp α q, o) :: L₂' ∧ st L₁' = st L₁)
     (hS : ∀ S₁ S₂, L = S₁ ++ S₂ → ∃ S₁' S₂', L' = S₁' ++ S₂' ∧ st S₁' = st S₁ ∧
-      ∀ z ∈ S₂', z ∈ S₂ ∨ ¬ Precedes α' z.1 (cur α q))
-    (hN : cur α q ∉ L.map Prod.fst → cur α q ∉ L'.map Prod.fst) : QOK α' C' L' q where
+      ∀ z ∈ S₂', z ∈ S₂ ∨ ¬ Precedes α' z.1 (curOp α q))
+    (hN : curOp α q ∉ L.map Prod.fst → curOp α q ∉ L'.map Prod.fst) : QOK α' C' L' q where
   done o r hp hl := by
     rw [hpend] at hp; rw [hloc] at hl
     obtain ⟨L₁, L₂, hsplit, hr⟩ := hq.done o r hp hl
@@ -316,8 +300,7 @@ lemma act_ret_cases {l : Loc E} {r : Bool} {l' : Loc E} (h : act K key l = .ret 
   | lnk u v => simp only [act] at h; split_ifs at h
 
 lemma linInv_nil : LinInv ([] : List (Label P (dsu E))) (dsuImpl K key P).initCfg [] := by
-  refine ⟨⟨by simp, by simp, fun a ha => by simp [Completed] at ha, fun a b _ hb => by simp at hb,
-    trivial⟩, ?_, fun q => ⟨?_, ?_, ?_⟩⟩
+  refine ⟨isLinearization_nil, ?_, fun q => ⟨?_, ?_, ?_⟩⟩
   · funext a b
     show (a = b) = ((fun a : E => a)^[Fintype.card E] a = (fun a : E => a)^[Fintype.card E] b)
     rw [Function.iterate_fixed rfl, Function.iterate_fixed rfl]
@@ -341,18 +324,18 @@ theorem exists_linInv (hkey : Function.Injective key) {α : List (Label P (dsu E
       simp only [hα, Option.bind_some, Impl.runFrom_singleton] at h
       obtain ⟨L, hL⟩ := ih hα
       have hI : LInv K key C₀ := linv_of_run hkey hα
-      have hinv : ∀ q, C₀.pend q ≠ none → Invoked α (cur α q) := by
+      have hinv : ∀ q, C₀.pend q ≠ none → Invoked α (curOp α q) := by
         intro q hq
         obtain ⟨o', ho'⟩ := Option.ne_none_iff_exists'.1 hq
-        exact (cur_facts hα ho').1
-      have hprec : ∀ (β : List (Label P (dsu E))) q a, Invoked α (cur α q) →
-          ¬ Precedes α a (cur α q) → ¬ Precedes (α ++ β) a (cur α q) :=
+        exact (Impl.run_pend_curOp hα ho').1
+      have hprec : ∀ (β : List (Label P (dsu E))) q a, Invoked α (curOp α q) →
+          ¬ Precedes α a (curOp α q) → ¬ Precedes (α ++ β) a (curOp α q) :=
         fun β q a hi hn => not_precedes_append hi hn
       cases ℓ with
       | inv p o =>
         obtain ⟨h0, -, hpend, hloc, hmem⟩ := Impl.step_inv h
-        have hcur : ∀ q, cur (α ++ [.inv p o]) q = cur α q := by
-          intro q; simp [cur, respsOf_append]
+        have hcur : ∀ q, curOp (α ++ [.inv p o]) q = curOp α q := by
+          intro q; simp [curOp, respsOf_append]
         refine ⟨L, hL.lin.append_inv p o, by rw [hmem]; exact hL.state, fun q => ?_⟩
         by_cases hq : q = p
         · subst hq
@@ -388,8 +371,8 @@ theorem exists_linInv (hkey : Function.Injective key) {α : List (Label P (dsu E
           refine ⟨fun o' r' hp _ => ?_, fun hp _ => absurd hpq hp, fun x y u v hp _ _ => ?_⟩
           · rw [hpq] at hp; cases hp
           · rw [hpq] at hp; cases hp
-        · have hcur : cur (α ++ [.ret p r]) q = cur α q := by
-            simp [cur, respsOf_append, Ne.symm hq]
+        · have hcur : curOp (α ++ [.ret p r]) q = curOp α q := by
+            simp [curOp, respsOf_append, Ne.symm hq]
           exact (hL.qok q).transport hcur (by rw [hpend, Function.update_of_ne hq])
             (by rw [hloc, Function.update_of_ne hq]) (fun a ha => by rwa [hmem] at ha) (hinv q)
             (hprec _ q) (transport_same (α' := α ++ [.ret p r])).1
@@ -400,24 +383,24 @@ theorem exists_linInv (hkey : Function.Injective key) {α : List (Label P (dsu E
         have hl := hI.loc p
         rw [ho] at hl
         have hleg := (tauRes_spec hkey hI.good hl hres).1
-        have hcur : ∀ q, cur (α ++ [.tau p]) q = cur α q := by
-          intro q; simp [cur, respsOf_append]
+        have hcur : ∀ q, curOp (α ++ [.tau p]) q = curOp α q := by
+          intro q; simp [curOp, respsOf_append]
         have hlin' := hL.lin.append_tau p
-        have hcf := cur_facts hα ho
-        have hnc : ¬ Completed (α ++ [.tau p]) (cur α p) := by
+        have hcf := Impl.run_pend_curOp hα ho
+        have hnc : ¬ Completed (α ++ [.tau p]) (curOp α p) := by
           simp [Completed, respsOf_append]
-        have hop' : opOf (α ++ [.tau p]) (cur α p) = some o := by
+        have hop' : opOf (α ++ [.tau p]) (curOp α p) = some o := by
           rw [opOf_append_of_invoked hcf.1]; exact hcf.2.2
         have hldone : ∀ r, C₀.loc p ≠ .done r := fun r h' => by
           rw [h'] at hres; simp [tauRes, act] at hres
         have hnotin := (hL.qok p).notin (by rw [ho]; simp) hldone
         -- the processes that do not move
         have others : ∀ (L' : List (OpId P × (dsu E).Op)),
-            (∀ q, q ≠ p → ∀ L₁ L₂ (o : (dsu E).Op), L = L₁ ++ (cur α q, o) :: L₂ →
-              ∃ L₁' L₂', L' = L₁' ++ (cur α q, o) :: L₂' ∧ st L₁' = st L₁) →
+            (∀ q, q ≠ p → ∀ L₁ L₂ (o : (dsu E).Op), L = L₁ ++ (curOp α q, o) :: L₂ →
+              ∃ L₁' L₂', L' = L₁' ++ (curOp α q, o) :: L₂' ∧ st L₁' = st L₁) →
             (∀ q, q ≠ p → ∀ S₁ S₂, L = S₁ ++ S₂ → ∃ S₁' S₂', L' = S₁' ++ S₂' ∧ st S₁' = st S₁ ∧
-              ∀ z ∈ S₂', z ∈ S₂ ∨ ¬ Precedes (α ++ [.tau p]) z.1 (cur α q)) →
-            (∀ y ∈ L'.map Prod.fst, y ∈ L.map Prod.fst ∨ y = cur α p) →
+              ∀ z ∈ S₂', z ∈ S₂ ∨ ¬ Precedes (α ++ [.tau p]) z.1 (curOp α q)) →
+            (∀ y ∈ L'.map Prod.fst, y ∈ L.map Prod.fst ∨ y = curOp α p) →
             ∀ q, q ≠ p → QOK (α ++ [.tau p]) C L' q := by
           intro L' hT hS hN q hq
           refine (hL.qok q).transport (hcur q) (by rw [hpend]) (hother q hq) hleg.root (hinv q)
@@ -425,9 +408,10 @@ theorem exists_linInv (hkey : Function.Injective key) {α : List (Label P (dsu E
           rcases hN _ hm with h1 | h1
           · exact hn h1
           · exact hq (congrArg Prod.fst h1)
-        have hNsame : ∀ y ∈ L.map Prod.fst, y ∈ L.map Prod.fst ∨ y = cur α p :=
+        have hNsame : ∀ y ∈ L.map Prod.fst, y ∈ L.map Prod.fst ∨ y = curOp α p :=
           fun y hy => Or.inl hy
-        have hNapp : ∀ y ∈ (L ++ [(cur α p, o)]).map Prod.fst, y ∈ L.map Prod.fst ∨ y = cur α p := by
+        have hNapp : ∀ y ∈ (L ++ [(curOp α p, o)]).map Prod.fst,
+            y ∈ L.map Prod.fst ∨ y = curOp α p := by
           intro y hy
           simp only [List.map_append, List.map_cons, List.map_nil, List.mem_append,
             List.mem_singleton] at hy
@@ -469,7 +453,7 @@ theorem exists_linInv (hkey : Function.Injective key) {α : List (Label P (dsu E
           · exact others L (fun q _ => (transport_same (α' := α ++ [.tau p])).1)
               (fun q _ => (transport_same (α' := α ++ [.tau p])).2) hNsame q hq
         · -- linearization point: `u = v` found by the last `Find(v)`
-          refine ⟨L ++ [(cur α p, o)], hlin'.push hop' hnotin hnc, ?_, fun q => ?_⟩
+          refine ⟨L ++ [(curOp α p, o)], hlin'.push hop' hnotin hnc, ?_, fun q => ?_⟩
           · rw [st_append, hm]
             cases o with
             | sameSet x y => exact hL.state
@@ -493,7 +477,7 @@ theorem exists_linInv (hkey : Function.Injective key) {α : List (Label P (dsu E
         · -- `SameSet` returns `false`: retroactive linearization point
           obtain ⟨S₁, S₂, hsplit, hst, hpr⟩ := (hL.qok p).chk x y u v ho hlc hu
           subst hsplit
-          refine ⟨S₁ ++ (cur α p, .sameSet x y) :: S₂,
+          refine ⟨S₁ ++ (curOp α p, .sameSet x y) :: S₂,
             hlin'.insert hop' hnotin hnc rfl
               (fun z hz => not_precedes_append hcf.1 (hpr z hz)), ?_, fun q => ?_⟩
           · rw [st_insert, hL.state, hm]
@@ -511,7 +495,7 @@ theorem exists_linInv (hkey : Function.Injective key) {α : List (Label P (dsu E
               simp only [List.map_append, List.map_cons, List.mem_append, List.mem_cons] at hz ⊢
               tauto
         · -- `Unite` links
-          refine ⟨L ++ [(cur α p, .unite x y)], hlin'.push hop' hnotin hnc, ?_, fun q => ?_⟩
+          refine ⟨L ++ [(curOp α p, .unite x y)], hlin'.push hop' hnotin hnc, ?_, fun q => ?_⟩
           · rw [st_append]
             show joinRel (st L) x y = _
             rw [hL.state]
@@ -538,15 +522,9 @@ theorem linearizable_with_state (hkey : Function.Injective key) {α : List (Labe
   exact ⟨L, hL.lin, hL.state⟩
 
 /-- **Lemma 3.2 (Linearizability).** -/
-theorem linearizable (hkey : Function.Injective key) : (dsuImpl K key P).Linearizable := by
-  have : ∀ α : List (Label P (dsu E)), ∃ L, (dsuImpl K key P).Valid α → IsLinearization α L := by
-    intro α
-    by_cases hv : (dsuImpl K key P).Valid α
-    · obtain ⟨C, hC⟩ := hv
-      obtain ⟨L, hL⟩ := exists_linInv hkey hC
-      exact ⟨L, fun _ => hL.lin⟩
-    · exact ⟨[], fun h => absurd h hv⟩
-  choose h hh using this
-  exact ⟨h, hh⟩
+theorem linearizable (hkey : Function.Injective key) : (dsuImpl K key P).Linearizable :=
+  Impl.linearizable_of_run fun _ _ hC =>
+    let ⟨L, hL⟩ := exists_linInv hkey hC
+    ⟨L, hL.lin⟩
 
 end Podc.ConcurrentDSU

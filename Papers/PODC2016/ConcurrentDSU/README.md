@@ -92,12 +92,12 @@ Full list of differences (including modelling choices and minor imprecisions): [
   abstract state of the linearization is the partition into trees of the current memory. Responses
   of `SameSet = false` are inserted retroactively, at a cut of the linearization recorded when
   `Find(v)` found its root; this uses `IsLinearization.insert` from
-  `Podc/SharedMemory/Linearization.lean`.
+  `Podc/SharedMemory/LinResp.lean`.
 * *Wait-freedom.* The potential is `bound · Σₐ #{ids above a.parent} + Φ`. The first term
   decreases at every successful `Cas`. `Φ` is a lexicographic local potential: positions of `u`,
   `v` (taken at their roots while a `Find` runs), then the phase, then the `Find`'s progress. It
-  decreases at every own step that leaves memory unchanged (`Impl.waitFree_of_cfgPotential`, a
-  CSLib candidate).
+  decreases at every own step that leaves memory unchanged (`Impl.waitFree_of_cfgPotential`,
+  `Podc/SharedMemory/Potential.lean`).
 
 **Not formalized.** The randomized analysis of Sections 4–5 (Lemma 4.1 relies on Goel et al.,
 SODA 2014), the `O(h+1)` step bound of Lemma 3.3, and the `MakeSet` remark.
@@ -106,7 +106,10 @@ SODA 2014), the `O(h+1)` step bound of Lemma 3.3, and the `MakeSet` remark.
 `Quot.sound`. Non-vacuity: concrete valid executions (`seqDemo_valid`: `Unite(0,1)` then
 `SameSet(1,0)` returns `true`; `seqDemo_false`: `SameSet(1,0)` alone returns `false`) and
 `cas_same_node`, all evaluated by `simp`. The model comes from CSLib
-`Cslib/Computability/Distributed/SharedMemory/{Model,History,LinPoints}.lean`.
+`Cslib/Computability/Distributed/SharedMemory/{Model,History,LinPoints}.lean`; the shared library
+`Podc/SharedMemory/{History,Run,LinResp,Potential}.lean` provides the current operation instance
+`curOp`, `Impl.run_pend_curOp`, `Impl.linearizable_of_run`, `IsLinearization.insert` and
+`Impl.waitFree_of_cfgPotential`.
 
-**CSLib candidates.** `Impl.waitFree_of_cfgPotential` (`WaitFree.lean`); the forest lemmas of
-`Forest.lean` (`rootOf`, `rootOf_update_split`, `rootOf_update_link`).
+**CSLib candidates.** The forest lemmas of `Forest.lean` (`rootOf`, `rootOf_update_split`,
+`rootOf_update_link`).

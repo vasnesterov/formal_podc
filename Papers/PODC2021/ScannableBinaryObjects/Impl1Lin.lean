@@ -1,11 +1,12 @@
 import Papers.PODC2021.ScannableBinaryObjects.Impl1
-import Podc.SharedMemory.Linearization
+import Podc.SharedMemory.LinResp
+import Podc.SharedMemory.Run
 
 /-!
 # Implementation 1 is linearizable (Theorem 2 of Ovens, PODC 2021, safety part)
 
 The generic tools `IsLinearization.insert`, `split_insert`, `split_cons_insert` (retroactive
-linearization points) live in `Podc/SharedMemory/Linearization.lean`.
+linearization points) live in `Podc/SharedMemory/LinResp.lean`.
 
 -/
 
@@ -66,9 +67,6 @@ open List
 
 variable {k : ℕ} {O : Fin k → BitObj} {P : Type} [DecidableEq P] {Sc Up : Finset P}
 
-/-- The current operation instance of `p` (the next one if `p` is idle). -/
-def cur (α : List (Label P (scannable O))) (p : P) : OpId P := (p, (respsOf α p).length)
-
 /-- Update in local state `l` has written `R p` and will not write it again before accessing
 `B i` (the *dangerous* updates for a validating scanner `p`). -/
 def dang (p : P) : Loc O Sc → Bool
@@ -94,10 +92,10 @@ state is `b`), or all `c` completed collects were dirty. -/
 def ScanInv (Up : Finset P) (α : List (Label P (scannable O)))
     (C : Config (scannable O) (Obj O Sc) P (Loc O Sc)) (L : List (OpId P × ScanOp O)) (p : P)
     (c m : ℕ) (b : Fin k → Bool) : Prop :=
-  ∃ S₁ S₂ d, Cut α L (cur α p) S₁ S₂ ∧
+  ∃ S₁ S₂ d, Cut α L (curOp α p) S₁ S₂ ∧
     ((∀ y ∈ S₂, y.2.isScan = true) → ∀ i : Fin k, i.val < m → linSt S₁ i = b i) ∧
     numDanger Up C p + d ≤ Up.card ∧
-    ((∃ W₁ W₂, Cut α L (cur α p) W₁ W₂ ∧ linSt W₁ = b) ∨
+    ((∃ W₁ W₂, Cut α L (curOp α p) W₁ W₂ ∧ linSt W₁ = b) ∨
       (c ≤ d ∧ ((∃ y ∈ S₂, y.2.isScan = false) → c + 1 ≤ d)))
 
 /-- Per-process invariant, by local state. -/
@@ -105,14 +103,14 @@ def PInvL (Sc Up : Finset P) (α : List (Label P (scannable O)))
     (C : Config (scannable O) (Obj O Sc) P (Loc O Sc)) (L : List (OpId P × ScanOp O)) (p : P) :
     Loc O Sc → Prop
   | .idle => C.pend p = none
-  | .upd i o _ => C.pend p = some (.update i o) ∧ p ∈ Up ∧ cur α p ∉ L.map Prod.fst ∧
-      opOf α (cur α p) = some (.update i o)
-  | .scan1 _ _ => C.pend p = some .scan ∧ p ∈ Sc ∧ cur α p ∉ L.map Prod.fst ∧
-      opOf α (cur α p) = some .scan
-  | .scan2 c m b => (C.pend p = some .scan ∧ p ∈ Sc ∧ cur α p ∉ L.map Prod.fst ∧
-      opOf α (cur α p) = some .scan) ∧
+  | .upd i o _ => C.pend p = some (.update i o) ∧ p ∈ Up ∧ curOp α p ∉ L.map Prod.fst ∧
+      opOf α (curOp α p) = some (.update i o)
+  | .scan1 _ _ => C.pend p = some .scan ∧ p ∈ Sc ∧ curOp α p ∉ L.map Prod.fst ∧
+      opOf α (curOp α p) = some .scan
+  | .scan2 c m b => (C.pend p = some .scan ∧ p ∈ Sc ∧ curOp α p ∉ L.map Prod.fst ∧
+      opOf α (curOp α p) = some .scan) ∧
       ∀ hp : p ∈ Sc, C.mem (.inr ⟨p, hp⟩) = false → ScanInv Up α C L p c m b
-  | .done r => C.pend p ≠ none ∧ ∃ L₁ L₂ o, L = L₁ ++ (cur α p, o) :: L₂ ∧
+  | .done r => C.pend p ≠ none ∧ ∃ L₁ L₂ o, L = L₁ ++ (curOp α p, o) :: L₂ ∧
       ((scannable O).δ (linSt L₁) o).2 = r
 
 /-- The linearizability invariant. -/
