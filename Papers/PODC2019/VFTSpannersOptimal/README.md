@@ -70,6 +70,8 @@ polynomial running time.
 edge-fault lower-bound remark.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
-`Quot.sound`. Non-vacuity: `exists_vft_spanner_ftGreedy`. The generic greedy scan is shared with
-[Dinitz–Robelle](../../PODC2020/FaultTolerantSpanners). Weighted spanners, blocking sets and `b(N, g)`
+`Quot.sound`. Non-vacuity: `exists_vft_spanner_ftGreedy`. The generic greedy scheme
+(`SimpleGraph.greedyGraph`, its correctness, and blocking sets from insertion histories
+`exists_blockingSet_of_insertion`) is shared with [Dinitz–Robelle](../../PODC2020/FaultTolerantSpanners)
+in `Podc/Graph/Spanner/FaultTolerantGreedy.lean`. Weighted spanners, blocking sets and `b(N, g)`
 are in CSLib (`Cslib/Foundations/Combinatorics/SimpleGraph/{WeightedSpanner,BlockingSet,GirthExtremal}.lean`).

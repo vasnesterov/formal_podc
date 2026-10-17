@@ -28,7 +28,7 @@ algorithm on `G \ J = G[surv]`. Output the union `ftUnion A ω` of the `α` span
 * `conversion_explicit` — both together.
 -/
 
-open Finset SimpleGraph
+open Finset SimpleGraph Cslib.Probability
 open scoped ENNReal NNReal
 
 namespace DinitzKrauthgamer
@@ -143,15 +143,11 @@ theorem uprob_good (m : ℕ) [NeZero m] (F : Finset V) {u v : V} (huv : u ≠ v)
 
 /-! ### Union bound -/
 
-lemma uprob_false {Ω : Type*} [Fintype Ω] : uprob (fun _ : Ω => False) = 0 := by
-  classical
-  rw [uprob_eq_card_filter]; simp
-
 /-- Marginals of the uniform distribution on a product. -/
 lemma uprob_coord {ι X : Type*} [Fintype ι] [DecidableEq ι] [Fintype X] [Nonempty X] (i : ι)
     (P : X → Prop) : uprob (fun ω : ι → X => P (ω i)) = uprob P := by
   classical
-  have := uprob_pi (ι := ι) (X := X) (fun j => if j = i then P else fun _ => True)
+  have := uprob_pi (ι := ι) (α := fun _ => X) (fun j => if j = i then P else fun _ => True)
   have h : (fun ω : ι → X => ∀ j, (if j = i then P else fun _ => True) (ω j)) =
       fun ω => P (ω i) := by
     ext ω

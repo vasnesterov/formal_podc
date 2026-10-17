@@ -4,7 +4,7 @@ import Papers.PODC2020.FaultTolerantSpanners.Weighted
 # Main results of Dinitz–Robelle, *Efficient and Simple Algorithms for Fault-Tolerant Spanners*
 (PODC 2020), sequential part
 
-* `exists_sorted_edgeList` — valid inputs for Algorithms 3/4 exist (non-vacuity).
+* valid inputs for Algorithms 3/4 exist (`SimpleGraph.exists_sorted_edgeList`, non-vacuity).
 * `theorem2_unweighted`, `theorem2_weighted` — Theorem 2 (without the running-time claim): for every
   correct BFS oracle, the (weighted) modified greedy algorithm outputs an `f`-VFT `(2k-1)`-spanner
   with at most `32 k f^{1-1/k} n^{1+1/k}` edges.
@@ -16,24 +16,6 @@ open scoped NNReal
 namespace FaultTolerantSpanners
 
 variable {V : Type*} [DecidableEq V] [Fintype V]
-
-omit [DecidableEq V] in
-/-- Every finite graph admits an edge list `L` as required by Algorithms 3/4: entries are edges,
-every edge occurs, and `L` is sorted by weight. -/
-theorem exists_sorted_edgeList (G : SimpleGraph V) (w : Sym2 V → ℝ≥0) :
-    ∃ L : List (V × V), (∀ p ∈ L, G.Adj p.1 p.2) ∧ (∀ u v, G.Adj u v → (u, v) ∈ L) ∧
-      L.Pairwise fun a b => w s(a.1, a.2) ≤ w s(b.1, b.2) := by
-  classical
-  let L := ((univ.filter fun p : V × V => G.Adj p.1 p.2).toList).mergeSort
-    fun a b => decide (w s(a.1, a.2) ≤ w s(b.1, b.2))
-  refine ⟨L, fun p hp => ?_, fun u v huv => ?_, ?_⟩
-  · simpa [L, List.mem_mergeSort] using hp
-  · simpa [L, List.mem_mergeSort] using huv
-  · have := List.pairwise_mergeSort (le := fun a b : V × V => decide (w s(a.1, a.2) ≤ w s(b.1, b.2)))
-      (fun a b c hab hbc => by simp only [decide_eq_true_eq] at *; exact hab.trans hbc)
-      (fun a b => by simpa using le_total _ _)
-      ((univ.filter fun p : V × V => G.Adj p.1 p.2).toList)
-    simpa using this
 
 /-- **Theorem 2 of Dinitz–Robelle (unweighted; correctness and size).** For every correct BFS oracle
 and every order of the edges, Algorithm 3 returns an `f`-VFT `(2k-1)`-spanner of `G` with at most

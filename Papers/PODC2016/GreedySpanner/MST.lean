@@ -13,7 +13,7 @@ which is the MST weight (an optimal subgraph can be chosen acyclic since weights
   from `H` is bypassed in `H` by a walk of edges of weight `≤ w(uv)`, then `G` and `H` have the same
   MST weight (and the minimum for `G` is attained inside `H`).
 * `IsGreedySpanner.mstWeight_eq` — **Observation 2**: the greedy spanner `H` contains an MST of `G`,
-  hence `w(MST(H)) = w(MST(G))`.
+  hence `w(MST(H)) = w(MST(G))` (from the shared `SimpleGraph.IsGreedySpanner.forall_walk`).
 -/
 
 open Finset SimpleGraph
@@ -189,26 +189,6 @@ theorem mstWeight_eq_of_forall_walk [Fintype V] (hHG : H ≤ G)
     exact (mstWeight_le_wt ⟨hT'H, fun a b hab => hT'.2 a b (hab.mono hHG)⟩).trans hw
   · exact mstWeight_le_wt ⟨hT.1.trans hHG, fun a b hab => hT.2 a b (reachable_of_forall_walk h hab)⟩
 
-/-- Every edge of `G` rejected by the greedy algorithm is bypassed in `H` by a walk of edges that
-were examined earlier, hence are not heavier. -/
-lemma IsGreedySpanner.forall_walk [Finite V] {t : ℝ≥0} (hH : IsGreedySpanner G w t H) :
-    H ≤ G ∧ ∀ u v, G.Adj u v → ¬ H.Adj u v → ∃ p : H.Walk u v, ∀ f ∈ p.edges, w f ≤ w s(u, v) := by
-  classical
-  obtain ⟨L, ⟨hnd, hLG, hsort⟩, rfl⟩ := hH
-  refine ⟨greedy_le hLG, fun u v huv hnH => ?_⟩
-  have huvL : s(u, v) ∈ L := (hLG _).mpr huv
-  have hi : L.idxOf s(u, v) < L.length := List.idxOf_lt_length_of_mem huvL
-  have hrej : s(u, v) ∉ greedySet w t L := fun h => hnH ((fromEdgeSet_adj _).mpr ⟨h, huv.ne⟩)
-  obtain ⟨p, -⟩ := exists_walk_of_not_mem_greedySet hi (List.getElem_idxOf hi) hrej
-  have hle : fromEdgeSet (greedySet w t (L.take (L.idxOf s(u, v)))) ≤ greedy w t L :=
-    fromEdgeSet_mono (greedySet_take_subset L _)
-  refine ⟨p.mapLe hle, fun f hf => ?_⟩
-  rw [Walk.edges_mapLe_eq_edges] at hf
-  have hf' := p.edges_subset_edgeSet hf
-  rw [edgeSet_fromEdgeSet, greedySet_take_eq hnd] at hf'
-  have hfL : f ∈ L := greedySet_subset L hf'.1.1
-  exact weight_le_of_idxOf_lt hsort hfL huvL ((List.mem_take_iff_idxOf_lt hfL).mp hf'.1.2)
-
 /-- **Observation 2.** The greedy `t`-spanner `H` of `G` contains an MST of `G`; hence
 `w(MST(H)) = w(MST(G))`. -/
 theorem IsGreedySpanner.mstWeight_eq [Fintype V] {t : ℝ≥0} (hH : IsGreedySpanner G w t H) :
@@ -221,6 +201,6 @@ theorem IsGreedySpanner.exists_mst_le [Fintype V] {t : ℝ≥0} (hH : IsGreedySp
   obtain ⟨Z, hZ, hZw⟩ := exists_wt_eq_mstWeight H w
   exact ⟨Z, hZ.1, ⟨hZ.1.trans hH.forall_walk.1,
     fun a b hab => hZ.2 a b (reachable_of_forall_walk hH.forall_walk.2 hab)⟩,
-    hZw.trans hH.mstWeight_eq⟩
+    hZw.trans (IsGreedySpanner.mstWeight_eq hH)⟩
 
 end GreedySpanner

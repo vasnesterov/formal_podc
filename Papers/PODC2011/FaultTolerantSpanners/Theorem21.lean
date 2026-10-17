@@ -1,4 +1,5 @@
 import Papers.PODC2011.FaultTolerantSpanners.Conversion
+import Cslib.Foundations.Combinatorics.SimpleGraph.Minor
 
 /-!
 # Theorem 2.1 of Dinitz–Krauthgamer (PODC'11) with explicit constants
@@ -22,7 +23,7 @@ Constants: the per-iteration success probability is `q = (1/m)²(1 - 1/m)^r ≥ 
 (`q_ge`; the paper claims `≥ 1/(4r²)` for `r ≥ 2`, which is also true, and `1/8` for `r = 1`).
 -/
 
-open Finset SimpleGraph
+open Finset SimpleGraph Cslib.Probability
 open scoped ENNReal NNReal
 
 namespace DinitzKrauthgamer
@@ -155,20 +156,6 @@ lemma numIter_le {n r C : ℕ} (hr : 1 ≤ r) (hn : 1 ≤ n) :
         nlinarith
     _ = (8 * C + 26) * (r : ℝ) ^ 3 * L := by ring
 
-omit [DecidableEq V] in
-lemma ncard_edgeSet_le_sq (H : SimpleGraph V) :
-    H.edgeSet.ncard ≤ Fintype.card V ^ 2 := by
-  classical
-  calc H.edgeSet.ncard ≤ (Set.univ : Set (Sym2 V)).ncard := Set.ncard_le_ncard (Set.subset_univ _)
-    _ = (Fintype.card V + 1) * (Fintype.card V + 1 - 1) / 2 := by
-        rw [Set.ncard_univ, Nat.card_eq_fintype_card, Sym2.card, Nat.choose_two_right]
-    _ ≤ Fintype.card V ^ 2 := by
-        rw [Nat.add_sub_cancel]
-        apply Nat.div_le_of_le_mul
-        rcases Nat.eq_zero_or_pos (Fintype.card V) with h | h
-        · simp [h]
-        · nlinarith
-
 /-- **Theorem 2.1 of Dinitz–Krauthgamer (PODC'11).** Let `A` build, on every induced subgraph
 `G[S]` of the weighted graph `(G, w)`, a `k`-spanner with at most `f(|S|)` edges (`f` monotone,
 `f 2 ≥ 1`). Run the conversion with `α = numIter n r C = ⌈8 r² (r+2+C) ln(n+1)⌉` iterations and
@@ -228,7 +215,10 @@ theorem theorem_2_1 (A : SpannerAlg G w k f) (hk : 1 ≤ k) (hf : Monotone f) (h
       (E := fun ω => IsWeightedVFTSpanner G (ftUnion A ω) w r k)
       (E' := fun ω => IsWeightedVFTSpanner G (ftUnion A ω) w r k ∧
         ((ftUnion A ω).edgeSet.ncard : ℝ) ≤ K)
-      fun ω h => ⟨h, le_trans (by exact_mod_cast ncard_edgeSet_le_sq _) hK⟩
+      fun ω h => ⟨h, le_trans (by
+        have := (ftUnion A ω).ncard_edgeSet_le_card_mul_card
+        rw [Nat.card_eq_fintype_card] at this
+        rw [sq]; exact_mod_cast this) hK⟩
     have hnot := uprob_not (Ω := Fin α → V → Fin m)
       (fun ω => IsWeightedVFTSpanner G (ftUnion A ω) w r k)
     have hbad := uprob_not_isVFT_le A hk r m α

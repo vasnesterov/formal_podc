@@ -27,39 +27,6 @@ namespace GreedySpanner
 
 variable {V : Type*} {G H K : SimpleGraph V} {w : Sym2 V → ℝ≥0} {t : ℝ≥0}
 
-/-! ### Finiteness of distances -/
-
-lemma Walk.wlength_lt_top {u v : V} (p : G.Walk u v) : p.wlength w < ⊤ := by
-  induction p with
-  | nil => simp
-  | cons h q ih => rw [Walk.wlength_cons]; exact ENNReal.add_lt_top.mpr ⟨ENNReal.coe_lt_top, ih⟩
-
-lemma wdist_lt_top_of_reachable {u v : V} (h : G.Reachable u v) : G.wdist w u v < ⊤ :=
-  (wdist_le h.some).trans_lt (Walk.wlength_lt_top _)
-
-lemma IsWSpanner.reachable (hH : IsWSpanner G H w t) {u v : V} (h : G.Reachable u v) :
-    H.Reachable u v :=
-  reachable_of_wdist_lt_top ((hH.2 u v).trans_lt
-    (ENNReal.mul_lt_top ENNReal.coe_lt_top (wdist_lt_top_of_reachable h)))
-
--- CSLib candidate
-/-- Comparing distances under two weight functions along a walk. -/
-lemma wdist_le_wlength_of_edges {K' : SimpleGraph V} {w₁ w₂ : Sym2 V → ℝ≥0} {u v : V}
-    (p : K'.Walk u v) (h : ∀ a b, s(a, b) ∈ p.edges → K.wdist w₁ a b ≤ w₂ s(a, b)) :
-    K.wdist w₁ u v ≤ p.wlength w₂ := by
-  induction p with
-  | nil => exact (wdist_le (Walk.nil : K.Walk _ _)).trans (by simp)
-  | @cons a b c hab q ih =>
-    rw [Walk.wlength_cons]
-    calc K.wdist w₁ a c ≤ K.wdist w₁ a b + K.wdist w₁ b c := wdist_triangle
-      _ ≤ w₂ s(a, b) + q.wlength w₂ :=
-        add_le_add (h a b (by simp)) (ih fun x y hxy => h x y (by simp [hxy]))
-
-lemma wdist_le_wdist_of_edges {K' : SimpleGraph V} {w₁ w₂ : Sym2 V → ℝ≥0} {u v : V}
-    (h : ∀ a b, K'.Adj a b → K.wdist w₁ a b ≤ w₂ s(a, b)) :
-    K.wdist w₁ u v ≤ K'.wdist w₂ u v :=
-  le_iInf fun p => wdist_le_wlength_of_edges p fun a b hab => h a b (p.adj_of_mem_edges hab)
-
 /-! ### The induced metric `M_H` -/
 
 /-- The weights of the metric `M_H` induced by `H`: `xy ↦ δ_H(x, y)`. -/
@@ -189,7 +156,7 @@ theorem lemma5 [Fintype V] [DecidableEq V] (hG : ∀ x y, G.Reachable x y) (ht :
   have hspan : IsWSpanner H H'' w t := by
     refine isWSpanner_of_adj ht hH''H fun x y hxy => ?_
     calc H''.wdist w x y ≤ H'.wdist (inducedW H w) x y :=
-          wdist_le_wdist_of_edges fun a b hab => by
+          wdist_le_wdist_of_forall_adj fun a b hab => by
             rw [coe_inducedW (hHc a b)]; exact wdist_le_of_spEdges_subset hHc (hsp a b hab)
       _ ≤ t * w s(x, y) := wdist_inducedW_le_of_adj hHc hH' hxy
   have heq : H'' = H := lemma3 hH hspan
@@ -206,10 +173,6 @@ theorem lemma5 [Fintype V] [DecidableEq V] (hG : ∀ x y, G.Reachable x y) (ht :
     _ = wt (inducedW H w) H' := (wt_eq_sum _ H').symm
 
 /-! ### Lemma 6 -/
-
-lemma Walk.single_le_wlength {u v : V} (p : G.Walk u v) {e : Sym2 V} (he : e ∈ p.edges) :
-    (w e : ℝ≥0∞) ≤ p.wlength w :=
-  List.single_le_sum (fun _ _ => zero_le) _ (List.mem_map_of_mem he)
 
 /-- **Lemma 6** (for any connected weighted graph `G` with positive weights, in particular a metric):
 if `1 ≤ t < 2`, `H` is the greedy `t`-spanner of `G` and `H'` is a `t`-spanner of the induced metric
@@ -234,7 +197,7 @@ theorem lemma6 [Fintype V] [DecidableEq V] (hG : ∀ x y, G.Reachable x y)
     rw [← hQw] at hd
     suffices ∃ e' ∈ Q.edges, s(x, y) ∈ spEdges H w hHc e' by
       obtain ⟨e', he'Q, he'⟩ := this
-      exact ⟨e', Q.edges_subset_edgeSet he'Q, he', (Walk.single_le_wlength Q he'Q).trans hd⟩
+      exact ⟨e', Q.edges_subset_edgeSet he'Q, he', (Q.le_wlength_of_mem_edges he'Q).trans hd⟩
     by_contra hno
     push Not at hno
     -- otherwise `H - e` is a `t`-spanner of `H`, contradicting Lemma 3
@@ -247,7 +210,7 @@ theorem lemma6 [Fintype V] [DecidableEq V] (hG : ∀ x y, G.Reachable x y)
       refine ⟨spEdges_subset hHc _ hf, fun hfe => ?_⟩
       rw [Set.mem_singleton_iff] at hfe
       exact hno _ hab (hfe ▸ hf)
-    have hKxy : K.wdist w x y ≤ t * w s(x, y) := (wdist_le_wlength_of_edges Q hK).trans hd
+    have hKxy : K.wdist w x y ≤ t * w s(x, y) := (wdist_le_wlength_of_forall_adj Q hK).trans hd
     have hspan : IsWSpanner H K w t := by
       refine isWSpanner_of_adj ht (deleteEdges_le _) fun a b hab => ?_
       by_cases habe : s(a, b) = s(x, y)

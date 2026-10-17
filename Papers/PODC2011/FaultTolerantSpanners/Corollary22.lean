@@ -1,6 +1,6 @@
 import Papers.PODC2011.FaultTolerantSpanners.Theorem21
-import Cslib.Foundations.Combinatorics.SimpleGraph.Girth
-import Cslib.Foundations.Combinatorics.SimpleGraph.Cycle
+import Podc.Graph.Spanner.Greedy
+import Podc.Graph.Girth
 
 /-!
 # Corollary 2.2 of Dinitz–Krauthgamer (PODC'11): the greedy spanner plugged into Theorem 2.1
@@ -8,161 +8,35 @@ import Cslib.Foundations.Combinatorics.SimpleGraph.Cycle
 The paper applies Theorem 2.1 to the greedy `(2t-1)`-spanner of Althöfer et al. [ADD+93], which has
 `O(n^{1 + 1/t})` edges (`k = 2t - 1`, so `1 + 2/(k+1) = 1 + 1/t`). We prove the cited fact:
 
-* `exists_greedy_spanner` — every finite weighted graph has a subgraph `H` of girth `> 2t` with
-  `d_H(x, y) ≤ (2t - 1) w(xy)` for all edges `xy` (the greedy algorithm, scanning edges by
-  nondecreasing weight, written as an induction over the sorted edge list);
-* `ncard_edgeSet_le_of_noShortCycles` — Moore bound relative to a vertex set `S` containing all
-  endpoints: `|E| ≤ |S|^{1+1/t} + |S|` (from CSLib's `NoShortCycles.ncard_edgeSet_le`);
+* `exists_greedy_spanner` — every finite weighted graph has a subgraph `H` of girth `> 2t` which
+  is a `(2t - 1)`-spanner: the greedy spanner of the shared library
+  `Podc/Graph/Spanner/Greedy.lean` (`IsGreedySpanner.isWSpanner`,
+  `IsGreedySpanner.noShortCycles`);
+* the Moore bound relative to a vertex set `S` containing all endpoints,
+  `|E| ≤ |S|^{1+1/t} + |S|` (`SimpleGraph.NoShortCycles.ncard_edgeSet_le_card_rpow`,
+  `Podc/Graph/Girth.lean`);
 * `greedyAlg` — hence a `SpannerAlg G w (2t-1) (fun s => s^{1+1/t} + s)`;
 * `corollary_2_2` — with probability `≥ 1 - (n+1)^{-C} - α e^{-n^{1/3}/6}` the conversion outputs
   an `r`-fault-tolerant `(2t-1)`-spanner with at most `6 (8C + 26) r^{2 - 1/t} n^{1 + 1/t} ln(n+1)`
   edges, i.e. `O(r^{2 - 2/(k+1)} n^{1 + 2/(k+1)} log n)` as in the paper.
 -/
 
-open Finset SimpleGraph
+open Finset SimpleGraph Cslib.Probability
 open scoped ENNReal NNReal
 
 namespace DinitzKrauthgamer
 
 variable {V : Type*} [Fintype V] [DecidableEq V]
 
-omit [Fintype V] [DecidableEq V] in
-lemma noShortCycles_bot (L : ℕ) : (⊥ : SimpleGraph V).NoShortCycles L := by
-  intro v c hc
-  cases c with
-  | nil => exact absurd hc (by simp [Walk.isCycle_def])
-  | cons h _ => exact absurd h (by simp)
-
-omit [Fintype V] in
-/-- **The greedy spanner, as an induction over an edge list sorted by nonincreasing weight**
-(head = heaviest). -/
-lemma exists_greedy_aux (w : Sym2 V → ℝ≥0) {t : ℕ} (ht : 1 ≤ t) :
-    ∀ L : List (V × V), (∀ p ∈ L, p.1 ≠ p.2) →
-      L.Pairwise (fun a b => w s(b.1, b.2) ≤ w s(a.1, a.2)) →
-      ∃ H : SimpleGraph V, (∀ e ∈ H.edgeSet, ∃ p ∈ L, s(p.1, p.2) = e) ∧
-        H.NoShortCycles (2 * t) ∧
-        ∀ p ∈ L, H.wdist w p.1 p.2 ≤ (2 * t - 1 : ℕ) * w s(p.1, p.2)
-  | [], _, _ => ⟨⊥, by simp, noShortCycles_bot _, by simp⟩
-  | (x, y) :: L, hne, hsort => by
-    obtain ⟨H, hHL, hHcyc, hHst⟩ :=
-      exists_greedy_aux w ht L (fun p hp => hne p (List.mem_cons_of_mem _ hp))
-        (List.pairwise_cons.mp hsort).2
-    have hlight : ∀ p ∈ L, w s(p.1, p.2) ≤ w s(x, y) := (List.pairwise_cons.mp hsort).1
-    have hxy : x ≠ y := hne (x, y) (by simp)
-    -- weights of the edges of `H` are at most `w(xy)`
-    have hHw : ∀ e ∈ H.edgeSet, w e ≤ w s(x, y) := by
-      intro e he
-      obtain ⟨p, hp, rfl⟩ := hHL e he
-      exact hlight p hp
-    by_cases hrej : H.wdist w x y ≤ (2 * t - 1 : ℕ) * w s(x, y)
-    · refine ⟨H, fun e he => ?_, hHcyc, ?_⟩
-      · obtain ⟨p, hp, h⟩ := hHL e he
-        exact ⟨p, List.mem_cons_of_mem _ hp, h⟩
-      · intro p hp
-        rcases List.mem_cons.mp hp with rfl | hp
-        · exact hrej
-        · exact hHst p hp
-    · push Not at hrej
-      refine ⟨H ⊔ edge x y, fun e he => ?_, ?_, ?_⟩
-      · rw [edgeSet_sup, Set.mem_union, edgeSet_edge_of_ne hxy, Set.mem_singleton_iff] at he
-        rcases he with he | rfl
-        · obtain ⟨p, hp, h⟩ := hHL e he
-          exact ⟨p, List.mem_cons_of_mem _ hp, h⟩
-        · exact ⟨(x, y), by simp, rfl⟩
-      · intro v c hc
-        by_contra hlen
-        push Not at hlen
-        by_cases hmem : s(x, y) ∈ c.edges
-        · obtain ⟨p, -, hpe, -, hpl⟩ := hc.exists_path_of_mem_edges hmem
-          have hpH : ∀ e ∈ p.edges, e ∈ H.edgeSet := by
-            intro e he
-            obtain ⟨he1, he2⟩ := hpe e he
-            have := p.edges_subset_edgeSet he
-            rw [edgeSet_sup, Set.mem_union, edgeSet_edge_of_ne hxy,
-              Set.mem_singleton_iff] at this
-            exact this.resolve_right he2
-          let q : H.Walk x y := p.transfer H hpH
-          have hq : H.wdist w x y ≤ (2 * t - 1 : ℕ) * w s(x, y) := by
-            calc H.wdist w x y ≤ q.wlength w := wdist_le q
-              _ ≤ q.length * w s(x, y) := q.wlength_le_length_mul w fun e he => by
-                  exact_mod_cast hHw e (q.edges_subset_edgeSet he)
-              _ ≤ (2 * t - 1 : ℕ) * w s(x, y) := by
-                  gcongr
-                  rw [Walk.length_transfer]
-                  exact_mod_cast (by omega : p.length ≤ 2 * t - 1)
-          exact absurd hq (not_le.mpr hrej)
-        · have hcH : ∀ e ∈ c.edges, e ∈ H.edgeSet := by
-            intro e he
-            have := c.edges_subset_edgeSet he
-            rw [edgeSet_sup, Set.mem_union, edgeSet_edge_of_ne hxy,
-              Set.mem_singleton_iff] at this
-            exact this.resolve_right (fun h => hmem (h ▸ he))
-          have := hHcyc v (c.transfer H hcH) (hc.transfer hcH)
-          rw [Walk.length_transfer] at this
-          omega
-      · intro p hp
-        rcases List.mem_cons.mp hp with rfl | hp
-        · calc (H ⊔ edge x y).wdist w x y ≤ w s(x, y) :=
-                wdist_le_of_adj (Or.inr (by simp [edge_adj, hxy]))
-            _ ≤ (2 * t - 1 : ℕ) * w s(x, y) := by
-                apply le_mul_of_one_le_left (zero_le)
-                exact_mod_cast (by omega : 1 ≤ 2 * t - 1)
-        · exact (wdist_anti le_sup_left).trans (hHst p hp)
-
--- CSLib candidate
+omit [DecidableEq V] in
 /-- **Greedy spanner** [ADD+93]: every finite weighted graph `G'` has a subgraph of girth `> 2t`
 which is a `(2t - 1)`-spanner. -/
 theorem exists_greedy_spanner (G' : SimpleGraph V) (w : Sym2 V → ℝ≥0) {t : ℕ} (ht : 1 ≤ t) :
     ∃ H ≤ G', H.NoShortCycles (2 * t) ∧
       ∀ u v, H.wdist w u v ≤ (2 * t - 1 : ℕ) * G'.wdist w u v := by
-  classical
-  let L := ((univ.filter fun p : V × V => G'.Adj p.1 p.2).toList).mergeSort
-    fun a b => decide (w s(b.1, b.2) ≤ w s(a.1, a.2))
-  have hLmem : ∀ p, p ∈ L ↔ G'.Adj p.1 p.2 := fun p => by simp [L, List.mem_mergeSort]
-  have hsort : L.Pairwise fun a b => w s(b.1, b.2) ≤ w s(a.1, a.2) := by
-    have := List.pairwise_mergeSort
-      (le := fun a b : V × V => decide (w s(b.1, b.2) ≤ w s(a.1, a.2)))
-      (fun a b c hab hbc => by simp only [decide_eq_true_eq] at *; exact hbc.trans hab)
-      (fun a b => by simpa using le_total _ _)
-      ((univ.filter fun p : V × V => G'.Adj p.1 p.2).toList)
-    simpa using this
-  obtain ⟨H, hHL, hcyc, hst⟩ := exists_greedy_aux w ht L
-    (fun p hp => ((hLmem p).mp hp).ne) hsort
-  have hle : H ≤ G' := by
-    intro a b hab
-    obtain ⟨p, hp, he⟩ := hHL s(a, b) hab
-    have := (hLmem p).mp hp
-    rw [← mem_edgeSet, ← he]
-    exact this
-  refine ⟨H, hle, hcyc, fun u v => ?_⟩
-  have h1 : 1 ≤ 2 * t - 1 := by omega
-  exact wdist_le_mul_of_adj h1 (fun a b hab => hst (a, b) ((hLmem _).mpr hab)) u v
-
--- CSLib candidate
-omit [DecidableEq V] in
-/-- **Moore bound relative to a vertex set**: if all edges of `H` have their endpoints in `S` and
-`H` has girth `> 2t`, then `|E(H)| ≤ |S|^{1+1/t} + |S|`. -/
-theorem ncard_edgeSet_le_of_noShortCycles {H : SimpleGraph V} {t : ℕ} (ht : 1 ≤ t)
-    (h : H.NoShortCycles (2 * t)) (S : Finset V) (hS : ∀ u v, H.Adj u v → u ∈ S) :
-    (H.edgeSet.ncard : ℝ) ≤ (#S : ℝ) ^ (1 + 1 / (t : ℝ)) + #S := by
-  set s := #S
-  have hx : (0 : ℝ) ≤ (s : ℝ) ^ (1 / (t : ℝ)) := by positivity
-  set d := ⌈(s : ℝ) ^ (1 / (t : ℝ))⌉₊
-  have hd : #S ≤ d ^ t := by
-    have : (s : ℝ) ≤ (d : ℝ) ^ t := by
-      calc (s : ℝ) = ((s : ℝ) ^ ((t : ℝ)⁻¹)) ^ t :=
-            (Real.rpow_inv_natCast_pow (Nat.cast_nonneg s) (by omega)).symm
-        _ ≤ (d : ℝ) ^ t := by
-            rw [← one_div]
-            exact pow_le_pow_left₀ hx (Nat.le_ceil _) t
-    exact_mod_cast this
-  have hE := h.ncard_edgeSet_le ht S hS hd
-  calc (H.edgeSet.ncard : ℝ) ≤ d * s := by exact_mod_cast hE
-    _ ≤ ((s : ℝ) ^ (1 / (t : ℝ)) + 1) * s :=
-        mul_le_mul_of_nonneg_right (Nat.ceil_lt_add_one hx).le (Nat.cast_nonneg _)
-    _ = (s : ℝ) ^ (1 + 1 / (t : ℝ)) + s := by
-        rw [Real.rpow_add' (Nat.cast_nonneg _) (by positivity), Real.rpow_one]
-        ring
+  obtain ⟨H, hH⟩ := exists_isGreedySpanner G' w ((2 * t - 1 : ℕ) : ℝ≥0)
+  have hsp := hH.isWSpanner (by exact_mod_cast (by omega : 1 ≤ 2 * t - 1))
+  exact ⟨H, hsp.1, hH.noShortCycles le_rfl, fun u v => by simpa using hsp.2 u v⟩
 
 /-- The greedy `(2t-1)`-spanner as a spanner algorithm with size bound `s^{1+1/t} + s`. -/
 noncomputable def greedyAlg (G : SimpleGraph V) (w : Sym2 V → ℝ≥0) {t : ℕ} (ht : 1 ≤ t) :
@@ -172,7 +46,7 @@ noncomputable def greedyAlg (G : SimpleGraph V) (w : Sym2 V → ℝ≥0) {t : �
   stretch S u v _ _ := (exists_greedy_spanner (G.deleteVerts (↑S : Set V)ᶜ) w ht).choose_spec.2.2 u v
   size S := by
     obtain ⟨hle, hcyc, -⟩ := (exists_greedy_spanner (G.deleteVerts (↑S : Set V)ᶜ) w ht).choose_spec
-    refine ncard_edgeSet_le_of_noShortCycles ht hcyc S fun u v huv => ?_
+    refine hcyc.ncard_edgeSet_le_card_rpow ht S fun u v huv => ?_
     have := (hle huv).2.1
     simpa using this
 

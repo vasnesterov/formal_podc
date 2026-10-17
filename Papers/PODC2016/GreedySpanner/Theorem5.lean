@@ -1,7 +1,5 @@
 import Papers.PODC2016.GreedySpanner.Lemma3
 import Papers.PODC2016.GreedySpanner.MST
-import Cslib.Foundations.Combinatorics.SimpleGraph.Girth
-import Cslib.Foundations.Combinatorics.SimpleGraph.Cycle
 
 /-!
 # Theorem 5: the greedy spanner is existentially optimal (Section 3)
@@ -70,7 +68,7 @@ theorem optLight_greedy (ht : 1 ≤ t) (hH : IsGreedySpanner G w t H) :
     optLight H w t = lightness G w H := by
   have h : lightness H w H = lightness G w H := by
     unfold lightness
-    rw [hH.mstWeight_eq]
+    rw [IsGreedySpanner.mstWeight_eq hH]
   rw [← h]
   exact le_antisymm (optLight_le (isWSpanner_refl ht))
     (le_iInf₂ fun H' hH' => by rw [lemma3 hH hH'])
@@ -124,40 +122,6 @@ theorem greedy_le_of_forall_exists (ht : 1 ≤ t) {m : ℕ} {ℓ : ℝ≥0∞}
     exact (optLight_le hH').trans hl
 
 /-! ### Corollary 1, size part: girth and the Moore bound -/
-
-omit [Fintype V] in
-/-- The greedy `t`-spanner with `t ≥ 2k - 1` has no cycle of length `≤ 2k` (the heaviest/latest
-edge of such a cycle would be bypassed by the rest of the cycle, of weight `≤ (2k - 1) w(e)`). -/
-theorem IsGreedySpanner.noShortCycles [Finite V] {k : ℕ} (ht : ((2 * k - 1 : ℕ) : ℝ≥0) ≤ t)
-    (hH : IsGreedySpanner G w t H) : H.NoShortCycles (2 * k) := by
-  classical
-  obtain ⟨L, ⟨hnd, hLG, hsort⟩, rfl⟩ := hH
-  intro v c hc
-  by_contra hlen
-  push Not at hlen
-  have hA : ∀ f ∈ c.edges, f ∈ greedySet w t L := fun f hf =>
-    mem_greedySet_of_mem_edgeSet (c.edges_subset_edgeSet hf)
-  have hinL : ∀ f ∈ c.edges, f ∈ L := fun f hf => greedySet_subset L (hA f hf)
-  have hne : c.edges.toFinset.Nonempty := by
-    cases c with
-    | nil => exact absurd hc (by simp [Walk.isCycle_def])
-    | cons h p => exact ⟨_, List.mem_toFinset.mpr (List.mem_cons_self ..)⟩
-  obtain ⟨e, heS, hemax⟩ := c.edges.toFinset.exists_max_image (L.idxOf ·) hne
-  rw [List.mem_toFinset] at heS
-  induction e using Sym2.ind with
-  | _ a b =>
-  obtain ⟨p, -, hpe, -, hpl⟩ := hc.exists_path_of_mem_edges heS
-  have hlt : ∀ f ∈ p.edges, L.idxOf f < L.idxOf s(a, b) := fun f hf =>
-    lt_of_le_of_ne (hemax f (List.mem_toFinset.mpr (hpe f hf).1))
-      (fun h => (hpe f hf).2 ((List.idxOf_inj (hinL f (hpe f hf).1)).mp h))
-  have key := lt_wlength_of_mem_greedySet hnd (hA _ heS) p fun f hf => ⟨hA f (hpe f hf).1, hlt f hf⟩
-  have hw : p.wlength w ≤ p.length * (w s(a, b) : ℝ≥0∞) := p.wlength_le_length_mul w fun f hf => by
-    exact_mod_cast weight_le_of_idxOf_lt hsort (hinL f (hpe f hf).1) (hinL _ heS) (hlt f hf)
-  have hplen : (p.length : ℝ≥0∞) ≤ t := by
-    have : p.length ≤ 2 * k - 1 := by omega
-    calc (p.length : ℝ≥0∞) ≤ ((2 * k - 1 : ℕ) : ℝ≥0∞) := by exact_mod_cast this
-      _ ≤ t := by exact_mod_cast ht
-  exact absurd (hw.trans (by gcongr)) (not_le.mpr key)
 
 /-- **Corollary 1, size part** (unconditional): for `k ≥ 1` and `t ≥ 2k - 1` (e.g. the paper's
 `t = (2k - 1)(1 + ε)`), the greedy `t`-spanner has at most `n^{1+1/k} + n` edges. -/

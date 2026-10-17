@@ -1,6 +1,5 @@
-import Papers.PODC2019.VFTSpannersOptimal.Blocking
 import Papers.PODC2020.FaultTolerantSpanners.SizeArith
-import Cslib.Foundations.Combinatorics.SimpleGraph.WeightedSpanner
+import Podc.Graph.Spanner.FaultTolerantGreedy
 import Cslib.Foundations.Combinatorics.SimpleGraph.GirthExtremal
 import Mathlib
 
@@ -14,10 +13,13 @@ resp. `{u, v} ∉ F`); see `differencies.md` (without this the literal test is a
 `f ≥ 1`, cf. `ftGreedyLiteral_eq`).
 
 * `ftGreedy w k f L` / `ftGreedyEdge w k f L` — Algorithm 1 for vertex / edge faults, on top of the
-  generic greedy scan `FaultTolerantSpanners.greedy` (edge list `L`, weights `w`, stretch `k`).
+  generic greedy scheme `SimpleGraph.greedyGraph` (edge list `L`, weights `w`, stretch `k`), shared
+  with Dinitz–Robelle (PODC'20) in `Podc/Graph/Spanner/FaultTolerantGreedy.lean`.
 * `ftGreedy_isWeightedVFTSpanner` / `ftGreedyEdge_isWeightedEFTSpanner` — correctness (for any order).
 * **Lemma 3**: `ftGreedy_exists_blockingSet` / `ftGreedyEdge_exists_blockingSet` — a `(k+1)`-blocking set
-  of size `≤ f |E(H)|` (the edge version produces a *vertex*–edge blocking set too).
+  of size `≤ f |E(H)|` (the edge version produces a *vertex*–edge blocking set too), via the shared
+  `SimpleGraph.exists_blockingSet_of_insertion` (for a short cycle, the edge inserted last is
+  bypassed by the rest of the cycle, which must meet that edge's fault set).
 * **Theorem 1**: `ftGreedy_card_edges_le` / `ftGreedyEdge_card_edges_le`:
   `|E(H)| ≤ 32 f² · max(b(⌊n / 2f⌋, k + 1), 1)`, with `b = SimpleGraph.girthExtremal`.
 * **Corollary 2**: `ftGreedy_card_edges_le_rpow` / `ftGreedyEdge_card_edges_le_rpow`: for stretch
@@ -49,11 +51,11 @@ noncomputable def eftTest (w : Sym2 V → ℝ≥0) (k f : ℕ) (H : SimpleGraph 
 
 /-- **Algorithm 1 (VFT greedy)** on the edge list `L` (to be sorted by weight). -/
 noncomputable def ftGreedy (w : Sym2 V → ℝ≥0) (k f : ℕ) (L : List (V × V)) : SimpleGraph V :=
-  greedy (vftTest w k f) L
+  greedyGraph (vftTest w k f) L
 
 /-- **Algorithm 1 (EFT greedy)** on the edge list `L` (to be sorted by weight). -/
 noncomputable def ftGreedyEdge (w : Sym2 V → ℝ≥0) (k f : ℕ) (L : List (V × V)) : SimpleGraph V :=
-  greedy (eftTest w k f) L
+  greedyGraph (eftTest w k f) L
 
 lemma vftTest_eq_true {w : Sym2 V → ℝ≥0} {k f : ℕ} {H : SimpleGraph V} {u v : V} :
     vftTest w k f H u v = true ↔ ∃ F : Finset V, #F ≤ f ∧ u ∉ F ∧ v ∉ F ∧
@@ -65,9 +67,6 @@ lemma eftTest_eq_true {w : Sym2 V → ℝ≥0} {k f : ℕ} {H : SimpleGraph V} {
       (k : ℝ≥0∞) * w s(u, v) < (H.deleteEdges F).wdist w u v := by
   simp [eftTest]
 
-lemma wdist_self_eq_zero {G : SimpleGraph V} {w : Sym2 V → ℝ≥0} {u : V} : G.wdist w u u = 0 :=
-  le_antisymm ((wdist_le (Walk.nil : G.Walk u u)).trans (by simp)) zero_le
-
 /-! ### Correctness -/
 
 /-- **Correctness of the VFT greedy algorithm** (any edge order): the output is an `f`-VFT
@@ -76,49 +75,20 @@ theorem ftGreedy_isWeightedVFTSpanner {G : SimpleGraph V} {w : Sym2 V → ℝ≥
     {L : List (V × V)} {k f : ℕ} (hk : 1 ≤ k)
     (hLG : ∀ p ∈ L, G.Adj p.1 p.2) (hL : ∀ u v, G.Adj u v → (u, v) ∈ L ∨ (v, u) ∈ L) :
     IsWeightedVFTSpanner G (ftGreedy w k f L) w f k := by
-  set H := ftGreedy w k f L
-  refine isWeightedVFTSpanner_of_adj hk (greedy_le hLG) fun F hF u v huv hu hv => ?_
-  have key : ∀ p ∈ L, p.1 ∉ F → p.2 ∉ F →
-      (H.deleteVerts F).wdist w p.1 p.2 ≤ k * w s(p.1, p.2) := by
-    intro p hp h1 h2
-    rcases greedy_mem_or_reject L hp with hmem | ⟨i, hi, -, hrej⟩
-    · have hadj : (H.deleteVerts F).Adj p.1 p.2 :=
-        ⟨edgeGraph_adj_of_mem hmem (hLG p hp).ne, h1, h2⟩
-      refine (wdist_le_of_adj hadj).trans ?_
-      exact le_mul_of_one_le_left zero_le (by exact_mod_cast hk)
-    · have hno := hrej
-      rw [← Bool.not_eq_true, vftTest_eq_true] at hno
-      push Not at hno
-      exact (wdist_anti (deleteVerts_mono (edgeGraph_take_le_greedy L i))).trans
-        (hno F hF h1 h2)
-  rcases hL u v huv with h | h
-  · exact key _ h hu hv
-  · rw [wdist_comm, Sym2.eq_swap]; exact key _ h hv hu
+  refine greedyGraph_isWeightedVFTSpanner hk (fun i _ hrej F hF h1 h2 => ?_) hLG hL
+  rw [← Bool.not_eq_true, vftTest_eq_true] at hrej
+  push Not at hrej
+  exact hrej F hF h1 h2
 
 /-- **Correctness of the EFT greedy algorithm** (any edge order). -/
 theorem ftGreedyEdge_isWeightedEFTSpanner {G : SimpleGraph V} {w : Sym2 V → ℝ≥0}
     {L : List (V × V)} {k f : ℕ} (hk : 1 ≤ k)
     (hLG : ∀ p ∈ L, G.Adj p.1 p.2) (hL : ∀ u v, G.Adj u v → (u, v) ∈ L ∨ (v, u) ∈ L) :
     IsWeightedEFTSpanner G (ftGreedyEdge w k f L) w f k := by
-  set H := ftGreedyEdge w k f L
-  refine isWeightedEFTSpanner_of_adj hk (greedy_le hLG) fun F hF u v huv huvF => ?_
-  have key : ∀ p ∈ L, s(p.1, p.2) ∉ F →
-      (H.deleteEdges F).wdist w p.1 p.2 ≤ k * w s(p.1, p.2) := by
-    intro p hp hpF
-    rcases greedy_mem_or_reject L hp with hmem | ⟨i, hi, -, hrej⟩
-    · have hadj : (H.deleteEdges F).Adj p.1 p.2 := by
-        rw [deleteEdges_adj]
-        exact ⟨edgeGraph_adj_of_mem hmem (hLG p hp).ne, by simpa using hpF⟩
-      refine (wdist_le_of_adj hadj).trans ?_
-      exact le_mul_of_one_le_left zero_le (by exact_mod_cast hk)
-    · have hno := hrej
-      rw [← Bool.not_eq_true, eftTest_eq_true] at hno
-      push Not at hno
-      exact (wdist_anti (deleteEdges_mono (edgeGraph_take_le_greedy L i))).trans
-        (hno F hF hpF)
-  rcases hL u v huv with h | h
-  · exact key _ h huvF
-  · rw [wdist_comm, Sym2.eq_swap]; exact key _ h (by rwa [Sym2.eq_swap])
+  refine greedyGraph_isWeightedEFTSpanner hk (fun i _ hrej F hF hiF => ?_) hLG hL
+  rw [← Bool.not_eq_true, eftTest_eq_true] at hrej
+  push Not at hrej
+  exact hrej F hF hiF
 
 /-! ### Lemma 3: blocking sets -/
 
@@ -148,10 +118,10 @@ theorem ftGreedy_exists_blockingSet {w : Sym2 V → ℝ≥0} {L : List (V × V)}
     (hk : 1 ≤ k) (hsort : L.Pairwise fun a b => w s(a.1, a.2) ≤ w s(b.1, b.2)) :
     ∃ B : Finset (V × Sym2 V), (ftGreedy w k f L).IsBlockingSet (k + 1) B ∧
       #B ≤ f * (ftGreedy w k f L).edgeSet.ncard := by
-  set A := greedyList (vftTest w k f) L
+  set A := greedyEdges (vftTest w k f) L
   have hA : A.Pairwise fun a b => w s(a.1, a.2) ≤ w s(b.1, b.2) :=
-    hsort.sublist (greedyList_sublist L)
-  have hgood := greedyGood_greedyList (dec := vftTest w k f) L
+    hsort.sublist (greedyEdges_sublist L)
+  have hgood := dec_greedyEdges_take (dec := vftTest w k f) L
   have hcut : ∀ i (h : i < A.length), ∃ F : Finset V, #F ≤ f ∧ A[i].1 ∉ F ∧ A[i].2 ∉ F ∧
       (k : ℝ≥0∞) * w s(A[i].1, A[i].2) <
         ((edgeGraph (A.take i)).deleteVerts F).wdist w A[i].1 A[i].2 :=
@@ -160,7 +130,7 @@ theorem ftGreedy_exists_blockingSet {w : Sym2 V → ℝ≥0} {L : List (V × V)}
   refine exists_blockingSet_of_insertion (fun i h heq => ?_) (fun i h hadj => ?_) F hFc
     (fun i h x hx => ⟨fun h' => hu i h (h' ▸ hx), fun h' => hv i h (h' ▸ hx)⟩) ?_
   · have := hlt i h
-    rw [heq, wdist_self_eq_zero] at this
+    rw [heq, wdist_self] at this
     exact absurd this (not_lt.mpr zero_le)
   · have h1 := wdist_le_of_adj (w := w) (show ((edgeGraph (A.take i)).deleteVerts (F i h)).Adj
       A[i].1 A[i].2 from ⟨hadj, hu i h, hv i h⟩)
@@ -187,10 +157,10 @@ theorem ftGreedyEdge_exists_blockingSet {w : Sym2 V → ℝ≥0} {L : List (V ×
     ∃ B : Finset (V × Sym2 V), (ftGreedyEdge w k f L).IsBlockingSet (k + 1) B ∧
       #B ≤ f * (ftGreedyEdge w k f L).edgeSet.ncard := by
   classical
-  set A := greedyList (eftTest w k f) L
+  set A := greedyEdges (eftTest w k f) L
   have hA : A.Pairwise fun a b => w s(a.1, a.2) ≤ w s(b.1, b.2) :=
-    hsort.sublist (greedyList_sublist L)
-  have hgood := greedyGood_greedyList (dec := eftTest w k f) L
+    hsort.sublist (greedyEdges_sublist L)
+  have hgood := dec_greedyEdges_take (dec := eftTest w k f) L
   have hcut : ∀ i (h : i < A.length), ∃ F : Finset (Sym2 V), #F ≤ f ∧ s(A[i].1, A[i].2) ∉ F ∧
       (k : ℝ≥0∞) * w s(A[i].1, A[i].2) <
         ((edgeGraph (A.take i)).deleteEdges F).wdist w A[i].1 A[i].2 :=
@@ -211,7 +181,7 @@ theorem ftGreedyEdge_exists_blockingSet {w : Sym2 V → ℝ≥0} {L : List (V ×
   refine exists_blockingSet_of_insertion (D := f) (fun i h heq => ?_) (fun i h hadj => ?_) X
     (fun i h => card_image_le.trans ((card_filter_le _ _).trans (hFc i h))) ?_ ?_
   · have := hlt i h
-    rw [heq, wdist_self_eq_zero] at this
+    rw [heq, wdist_self] at this
     exact absurd this (not_lt.mpr zero_le)
   · have hadj' : ((edgeGraph (A.take i)).deleteEdges (F i h)).Adj A[i].1 A[i].2 := by
       rw [deleteEdges_adj]; exact ⟨hadj, by simpa using hFe i h⟩
@@ -228,7 +198,7 @@ theorem ftGreedyEdge_exists_blockingSet {w : Sym2 V → ℝ≥0} {L : List (V ×
     have hne_uv : A[i].1 ≠ A[i].2 := by
       intro heq
       have := hlt i h
-      rw [heq, wdist_self_eq_zero] at this
+      rw [heq, wdist_self] at this
       exact absurd this (not_lt.mpr zero_le)
     have : ∃ e' ∈ p.edges, e' ∈ F i h := by
       by_contra hnone
@@ -312,6 +282,7 @@ lemma constant_le_two {k f : ℕ} (hk : 1 ≤ k) :
   have hf0 : 0 ≤ (f : ℝ) ^ (1 - 1 / (k : ℝ)) := by positivity
   nlinarith
 
+omit [DecidableEq V] in
 /-- The size bound for any graph with a `2k`-blocking set of size `≤ f |E|`, via the Moore bound. -/
 lemma card_le_rpow_of_blockingSet {H : SimpleGraph V} {k f : ℕ} {B : Finset (V × Sym2 V)}
     (hk : 1 ≤ k) (hf : 1 ≤ f) (hB : H.IsBlockingSet (2 * k) B)

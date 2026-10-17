@@ -48,7 +48,7 @@ Paper: Bodwin–Patel, *A Trivial Yet Optimal Solution to Vertex Fault Tolerant 
 5. **Tie-breaking.** Lemma 3 uses that the last edge `e` of a cycle `C` (in scan order) is at least
    as heavy as the other edges of `C`. This holds for any nondecreasing order, with ties broken
    arbitrarily. We assume `L.Pairwise (w · ≤ w ·)`, which allows ties. Since the algorithm adds
-   edges as a sublist of `L`, the insertion order inherits this (`greedyList_sublist`).
+   edges as a sublist of `L`, the insertion order inherits this (`greedyEdges_sublist`).
 
 ## Scope
 

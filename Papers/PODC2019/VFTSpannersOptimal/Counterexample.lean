@@ -14,7 +14,7 @@ not `O(n^{3/2})`. The intended test (used in `FTGreedy.lean` and in the proof of
 `G \ F`. The counterexample uses the convention that the distance to a deleted vertex is `∞`.
 -/
 
-open Finset SimpleGraph FaultTolerantSpanners
+open Finset SimpleGraph
 open scoped ENNReal NNReal
 
 namespace VFTSpannersOptimal
@@ -30,7 +30,7 @@ noncomputable def vftTestLiteral (w : Sym2 V → ℝ≥0) (k f : ℕ) (H : Simpl
 /-- Algorithm 1 read literally. -/
 noncomputable def ftGreedyLiteral (w : Sym2 V → ℝ≥0) (k f : ℕ) (L : List (V × V)) :
     SimpleGraph V :=
-  greedy (vftTestLiteral w k f) L
+  greedyGraph (vftTestLiteral w k f) L
 
 /-- Deleting `u` disconnects `u` from every other vertex. -/
 lemma wdist_deleteVerts_self_eq_top [DecidableEq V] {H : SimpleGraph V} {w : Sym2 V → ℝ≥0}
@@ -50,24 +50,13 @@ lemma vftTestLiteral_eq_true [DecidableEq V] {w : Sym2 V → ℝ≥0} {k f : ℕ
   rw [wdist_deleteVerts_self_eq_top huv]
   exact ENNReal.mul_lt_top (by simp) (by simp)
 
-lemma greedyList_eq_of_forall {dec : SimpleGraph V → V → V → Bool} :
-    ∀ (l A : List (V × V)), (∀ B, ∀ e ∈ l, dec B e.1 e.2 = true) →
-      l.foldl (greedyStep dec) A = A ++ l
-  | [], A, _ => by simp
-  | e :: l, A, h => by
-    rw [List.foldl_cons]
-    have hs : greedyStep dec A e = A ++ [e] := by simp [greedyStep, h _ e (by simp)]
-    rw [hs, greedyList_eq_of_forall l _ (fun B e' he' => h B e' (by simp [he']))]
-    simp
-
 /-- **The literal Algorithm 1 adds every edge** (for `f ≥ 1`): its output is `edgeGraph L`, i.e. `G`
 itself when `L` lists the edges of `G`. -/
 theorem ftGreedyLiteral_eq [DecidableEq V] {w : Sym2 V → ℝ≥0} {k f : ℕ} (hf : 1 ≤ f)
     {L : List (V × V)} (hL : ∀ p ∈ L, p.1 ≠ p.2) :
     ftGreedyLiteral w k f L = edgeGraph L := by
-  rw [ftGreedyLiteral, greedy, greedyList,
-    greedyList_eq_of_forall L [] (fun B e he => vftTestLiteral_eq_true hf (hL e he))]
-  rfl
+  rw [ftGreedyLiteral, greedyGraph, greedyEdges,
+    List.greedyScan_eq_self fun B e he => vftTestLiteral_eq_true hf (hL e he)]
 
 /-- The list of all ordered pairs of distinct vertices of `Fin n`. -/
 noncomputable def completeList (n : ℕ) : List (Fin n × Fin n) :=
