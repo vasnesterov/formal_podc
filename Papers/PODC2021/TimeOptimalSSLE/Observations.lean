@@ -88,7 +88,7 @@ theorem obs25_silent (C : Config (Fin 3) (Option (Fin 5))) :
 theorem obs25_solvesSSLE : P.SolvesSSLE (A := Fin 3) leader := by
   intro C
   obtain ⟨D, hD, hs⟩ := obs25_silent C
-  exact ⟨D, hD, hs.stablyCorrect _ (silent_one_leader D ((silent_iff D).mp hs))⟩
+  exact ⟨D, hD, hs.stablyIn (silent_one_leader D ((silent_iff D).mp hs))⟩
 
 /-- No proper colouring of the 5-cycle with the two ranks different from the leader's rank. -/
 lemma no_two_coloring : ∀ (v : Fin 3) (x : Fin 5 → Fin 3),
@@ -109,7 +109,7 @@ theorem obs25_not_solvesSSR (r : Option (Fin 5) → Fin 3) : ¬ P.SolvesSSR (A :
   let C : Config (Fin 3) (Option (Fin 5)) := ![none, some i, some (i + 1)]
   have hs : P.Silent C := (silent_iff C).mpr (silent_cycle i)
   obtain ⟨D, hD, hDs⟩ := hP C
-  have hDC := hs.reachable_eq P hD
+  have hDC := hs.reach_eq hD
   subst hDC
   have hb : Function.Injective fun a => r (C a) := (hDs C Relation.ReflTransGen.refl).1
   apply hi

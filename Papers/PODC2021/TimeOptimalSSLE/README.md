@@ -94,5 +94,6 @@ and `Cslib.Probability.Markov.Absorption`, and on the shared library: the suppor
 (`Cslib/Computability/Distributed/PopulationProtocols/Nondet.lean`, with sub-population embedding `exists_reach_of_embedding`), the uniform
 scheduler `uniformKernel` (`Cslib/Computability/Distributed/PopulationProtocols/RandomScheduler.lean`), `StablyCorrect`/`SelfStabilizes`
 (`StablyIn`/`SelfStabilizes` of `Cslib/Computability/Distributed/SelfStabilization/TransitionSystem.lean`) and the reachability/probability-1 bridge
-(`Cslib/Computability/Distributed/SelfStabilization/Markov.lean`). CSLib candidates (marked in the code): the pair/triple run-lifting lemmas of
-`OptimalSilentCorrect.lean`.
+(`Cslib/Computability/Distributed/SelfStabilization/Markov.lean`). The pair/triple run-lifting lemmas
+(`Protocol.PairReach.lift`, `Protocol.TripleReach.lift`), closed state sets, sub-population runs and silence are shared, staged in
+`Podc/Computability/Distributed/PopulationProtocols/{Basic,Nondet}.lean`.

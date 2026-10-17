@@ -1,4 +1,5 @@
 import Cslib.Computability.Distributed.PopulationProtocols.Nondet
+import Podc.Computability.Distributed.PopulationProtocols.Nondet
 import Mathlib.Data.Fintype.CardEmbedding
 
 /-!
@@ -24,12 +25,12 @@ Markov-chain bridge). We therefore model a protocol by its support relation `δ 
   reached with probability 1" (`RandomScheduler.lean`).
 * `SolvesSSLE` (one agent with `leader = true`), `SolvesSSR` (ranks form a bijection onto
   `Fin n`).
-* Sub-population runs: `NProtocol.reachable_embed` (a run of a sub-population embeds into the
-  whole population, the other agents being idle).
+* Sub-population runs (`StepIn`/`ReachIn`), silence (`Silent`) and the embedding of a run of a
+  sub-population (`exists_reachIn_of_embedding`) are the shared notions of
+  `Podc.Computability.Distributed.PopulationProtocols.Nondet`.
 -/
 
 open Cslib.PopulationProtocol Cslib.TransitionSystem
-open Cslib.PopulationProtocol.NProtocol (reach_stepOn_mono reach_stepOn_apply_eq)
 
 namespace TimeOptimalSSLE
 
@@ -43,26 +44,6 @@ namespace NProtocol
 export Cslib.PopulationProtocol (upd upd_left upd_right upd_other numLeaders)
 
 variable {Q A : Type*} [DecidableEq A] (P : NProtocol Q)
-
-/-- One interaction of two distinct agents, restricted to agents satisfying `S`. -/
-abbrev StepIn (S : A → Prop) : Config A Q → Config A Q → Prop :=
-  P.StepOn fun a b => S a ∧ S b ∧ a ≠ b
-
-/-- Reachability inside the sub-population `S` (the other agents are idle). -/
-abbrev ReachIn (S : A → Prop) : Config A Q → Config A Q → Prop := Reach (P.StepIn S)
-
-lemma ReachIn.reachable {S : A → Prop} {C D : Config A Q} (h : P.ReachIn S C D) :
-    P.Reachable C D :=
-  reach_stepOn_mono (fun _ _ h => h.2.2) h
-
-lemma ReachIn.mono {S S' : A → Prop} (hS : ∀ x, S x → S' x) {C D : Config A Q}
-    (h : P.ReachIn S C D) : P.ReachIn S' C D :=
-  reach_stepOn_mono (fun a b h => ⟨hS a h.1, hS b h.2.1, h.2.2⟩) h
-
-/-- Agents outside the sub-population keep their states. -/
-lemma ReachIn.eq_of_not_mem {S : A → Prop} {C D : Config A Q} (h : P.ReachIn S C D) {x : A}
-    (hx : ¬ S x) : D x = C x :=
-  reach_stepOn_apply_eq (fun _ => ⟨fun h => hx h.1, fun h => hx h.2.1⟩) h
 
 /-- A state predicate / set of configurations is *stably correct* from `C` if all configurations
 reachable from `C` satisfy it. -/
@@ -89,38 +70,6 @@ def RankCorrect {n : ℕ} (rank : Q → Fin n) (C : Config A Q) : Prop :=
 /-- Self-stabilizing ranking (SSR) on the population `A`, with output map `rank`. -/
 def SolvesSSR {n : ℕ} (rank : Q → Fin n) : Prop :=
   P.SelfStabilizes (A := A) (RankCorrect rank)
-
-/-- A configuration is silent if every enabled interaction leaves both states unchanged. -/
-def Silent (C : Config A Q) : Prop :=
-  ∀ a b, a ≠ b → ∀ o ∈ P.δ (C a) (C b), o = (C a, C b)
-
-/-- Silence of the protocol is silence of its step relation. -/
-lemma silent_iff_isSilent {C : Config A Q} : P.Silent C ↔ IsSilent P.Step C := by
-  constructor
-  · rintro hC D ⟨a, b, hab, o, ho, rfl⟩
-    rw [hC a b hab o ho, upd_self _ hab]
-  · intro hC a b hab o ho
-    have h := hC _ ⟨a, b, hab, o, ho, rfl⟩
-    rw [← congrFun h a, ← congrFun h b, upd_left _ hab, upd_right]
-
-lemma Silent.reachable_eq {C : Config A Q} {D : Config A Q} (hC : P.Silent C)
-    (h : P.Reachable C D) : D = C :=
-  ((silent_iff_isSilent P).1 hC).reach_eq h
-
-/-- A silent correct configuration is stably correct. -/
-lemma Silent.stablyCorrect {good : Config A Q → Prop} {C : Config A Q} (hC : P.Silent C)
-    (hg : good C) : P.StablyCorrect good C :=
-  ((silent_iff_isSilent P).1 hC).stablyIn hg
-
-/-! ### Sub-populations -/
-
-/-- **Embedding a run of a sub-population.** If `e : A' ↪ A` and the population `A'` can go
-from `C ∘ e` to `D'`, then the population `A` can go from `C` to a configuration that agrees
-with `D'` on the image of `e` and with `C` elsewhere. -/
-lemma reachable_embed {A' : Type*} [DecidableEq A'] (e : A' ↪ A) (C : Config A Q)
-    {D' : Config A' Q} (h : P.Reachable (fun x => C (e x)) D') :
-    ∃ D, P.ReachIn (fun x => ∃ y, e y = x) C D ∧ (fun x => D (e x)) = D' :=
-  P.exists_reach_of_embedding e (fun a b hab => ⟨⟨a, rfl⟩, ⟨b, rfl⟩, e.injective.ne hab⟩) C h
 
 /-! ### Deterministic protocols -/
 

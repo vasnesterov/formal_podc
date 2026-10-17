@@ -45,7 +45,7 @@ Paper: J. Burman, H.-L. Chen, H.-P. Chen, D. Doty, T. Nowak, E. Severson, C. Xu,
    no protocol (same `Q`, `δ` and leader output) solves SSLE on `Fin n₁` and on `Fin n₂`
    (`NProtocol.not_solvesSSLE_two_sizes`). The proof is the paper's sketch (a leaderless
    sub-population of size `n₁` of a stably correct size-`n₂` configuration creates a second leader),
-   made precise by `reachable_embed`. No gap.
+   made precise by `exists_reachIn_of_embedding`. No gap.
 
 ## Lemmas 2.2, 2.3 and Theorem 2.4 (`Silent-n-state-SSR`)
 

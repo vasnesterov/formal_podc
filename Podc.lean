@@ -6,6 +6,9 @@ import Podc.Computability.Distributed.ApproxConsensus.Contraction
 import Podc.Computability.Distributed.Byzantine.PartialSync.Merge
 import Podc.Computability.Distributed.Byzantine.Specs
 import Podc.Computability.Distributed.ContentOblivious.VirtualRing
+import Podc.Computability.Distributed.DynamicNetworks.Journey
+import Podc.Computability.Distributed.PopulationProtocols.Basic
+import Podc.Computability.Distributed.PopulationProtocols.Nondet
 import Podc.Computability.Distributed.SharedMemory.HerlihyWing.SeqLin
 import Podc.Computability.Distributed.SharedMemory.History
 import Podc.Computability.Distributed.SharedMemory.Model
@@ -15,6 +18,7 @@ import Podc.Computability.Distributed.SharedMemory.StrongLin
 import Podc.Computability.Distributed.SharedMemory.Task
 import Podc.Foundations.Algebra.BigOperators.Translate
 import Podc.Foundations.Algebra.Order.BigOperators.Average
+import Podc.Foundations.Combinatorics.Digraph.Walk
 import Podc.Foundations.Combinatorics.Labelling
 import Podc.Foundations.Combinatorics.SimpleGraph.BFSTree
 import Podc.Foundations.Combinatorics.SimpleGraph.Ball
@@ -27,6 +31,7 @@ import Podc.Foundations.Data.Finset.Quorum
 import Podc.Foundations.Data.Finset.SumUpdate
 import Podc.Foundations.Data.Nat.CeilDiv
 import Podc.Foundations.Data.Nat.Descent
+import Podc.Foundations.Data.Nat.Growth
 import Podc.Foundations.Data.Nat.Log
 import Podc.Foundations.Data.Nat.LogStar
 import Podc.Foundations.Data.Nat.ModCount

@@ -344,18 +344,9 @@ lemma noTop_δ (hn : 2 ≤ p.n) (hp : p.fixed = false) {a b : St} (ha : NoTop p 
 /-- **The printed protocol never creates rank `n`.** From a configuration with no settled agent
 of rank `n`, no reachable configuration has one. -/
 theorem asWritten_noTop_reachable (hn : 2 ≤ p.n) (hp : p.fixed = false) {C D : Config A St}
-    (hC : ∀ a, NoTop p (C a)) (h : (protocol p).Reachable C D) : ∀ a, NoTop p (D a) := by
-  induction h with
-  | refl => exact hC
-  | tail _ hst ih =>
-    obtain ⟨a, b, hab, rfl⟩ := hst
-    have := noTop_δ p hn hp (ih a) (ih b)
-    intro x
-    by_cases hxa : x = a
-    · subst hxa; rw [Protocol.interact_self_left]; exact this.1
-    · by_cases hxb : x = b
-      · subst hxb; rw [Protocol.interact_self_right _ _ hab]; exact this.2
-      · rw [Protocol.interact_other _ _ hxa hxb]; exact ih x
+    (hC : ∀ a, NoTop p (C a)) (h : (protocol p).Reachable C D) : ∀ a, NoTop p (D a) :=
+  Protocol.ClosedStates.reachable (P := protocol p) (H := {s | NoTop p s})
+    (fun _ ha _ hb => noTop_δ p hn hp ha hb) hC h
 
 /-- With `n` agents, a correctly ranked configuration contains an agent of rank `n`. -/
 lemma Ranked.exists_top [Fintype A] (hA : Fintype.card A = p.n) (hn : 1 ≤ p.n) {C : Config A St}

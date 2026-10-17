@@ -1,6 +1,7 @@
 import Mathlib
 import Cslib.Computability.Distributed.DynamicNetworks.FullInfo
 import Cslib.Computability.Distributed.Knowledge.Basic
+import Podc.Computability.Distributed.DynamicNetworks.Journey
 
 /-!
 # The dynamic-network model of Kuhn–Moses–Oshman (PODC 2011)
@@ -85,79 +86,47 @@ theorem _root_.Relation.ReflTransGen.symm_of {β : Type*} {r : β → β → Pro
   | refl => exact ReflTransGen.refl
   | tail _ hbc ih => exact ReflTransGen.head (hr _ _ hbc) ih
 
-open Classical in
-/-- `past_{(G,u,t)}(s) = {v ∈ V | (v, s) ↝ (u, t)}`. -/
-noncomputable def past (G : DGraph α) (u t s : ℕ) : Finset ℕ :=
-  G.V.filter fun v => G.Reach v s u t
+/-- `past_{(G,u,t)}(s) = {v ∈ V | (v, s) ↝ (u, t)}`: the shared causal past
+`Cslib.DynNet.past` of the dynamic network whose graph between times `k` and `k + 1` is
+`adj (k + 1)`. -/
+noncomputable abbrev past (G : DGraph α) (u t s : ℕ) : Finset ℕ :=
+  Cslib.DynNet.past (fun k => G.adj (k + 1)) G.V u t s
 
-theorem mem_past {u t s v : ℕ} : v ∈ G.past u t s ↔ v ∈ G.V ∧ G.Reach v s u t := by
-  classical
-  simp [past]
+theorem mem_past {u t s v : ℕ} : v ∈ G.past u t s ↔ v ∈ G.V ∧ G.Reach v s u t :=
+  Cslib.DynNet.mem_past
 
-theorem past_subset (u t s : ℕ) : G.past u t s ⊆ G.V := fun _ hv => (mem_past.1 hv).1
+theorem past_subset (u t s : ℕ) : G.past u t s ⊆ G.V := Cslib.DynNet.past_subset u t s
 
-theorem past_succ_subset (u t s : ℕ) : G.past u t (s + 1) ⊆ G.past u t s := by
-  intro v hv
-  rw [mem_past] at *
-  exact ⟨hv.1, hv.2.mono_left (by omega)⟩
+theorem past_succ_subset (u t s : ℕ) : G.past u t (s + 1) ⊆ G.past u t s :=
+  Cslib.DynNet.past_anti s.le_succ
 
-theorem past_mono_right {u t s s' : ℕ} (h : s ≤ s') : G.past u t s' ⊆ G.past u t s := by
-  intro v hv
-  rw [mem_past] at *
-  exact ⟨hv.1, hv.2.mono_left h⟩
+theorem past_mono_right {u t s s' : ℕ} (h : s ≤ s') : G.past u t s' ⊆ G.past u t s :=
+  Cslib.DynNet.past_anti h
 
-theorem past_mono_left {u t t' s : ℕ} (h : t ≤ t') : G.past u t s ⊆ G.past u t' s := by
-  intro v hv
-  rw [mem_past] at *
-  exact ⟨hv.1, hv.2.trans (Journey.self h)⟩
+theorem past_mono_left {u t t' s : ℕ} (h : t ≤ t') : G.past u t s ⊆ G.past u t' s :=
+  Cslib.DynNet.past_mono h
 
 /-! ### Flooding: connectivity forces the past to grow by one node per round -/
 
 /-- If `past(u,t)(s+1) ≠ V`, then `past(u,t)(s)` is strictly larger (connectivity of round
 `s + 1`). -/
 theorem past_ssubset (hG : G.Valid) {u t s : ℕ} (hu : u ∈ G.V) (hst : s < t)
-    (hne : G.past u t (s + 1) ≠ G.V) : G.past u t (s + 1) ⊂ G.past u t s := by
-  refine Finset.ssubset_iff_subset_ne.2 ⟨past_succ_subset u t s, fun heq => hne ?_⟩
-  apply Finset.Subset.antisymm (past_subset _ _ _)
-  intro y hy
-  by_contra hyp
-  have hu' : u ∈ G.past u t (s + 1) := mem_past.2 ⟨hu, Journey.self (by omega)⟩
-  obtain ⟨z, x, hzx, hz, hx⟩ := Cslib.DynNet.exists_edge_cross
-    (S := fun x => x ∈ G.past u t (s + 1)) (hG.conn (s + 1) (by omega) y hy u hu) hyp hu'
-  apply hz
-  rw [heq, mem_past]
-  exact ⟨(hG.mem _ _ _ hzx).1, Journey.cons (Or.inr hzx) (mem_past.1 hx).2⟩
+    (hne : G.past u t (s + 1) ≠ G.V) : G.past u t (s + 1) ⊂ G.past u t s :=
+  Cslib.DynNet.past_ssubset (fun x y h => (hG.mem _ x y h).1)
+    (fun y hy => hG.conn (s + 1) (by omega) y hy u hu) hu hst hne
 
 /-- **Flooding lemma**: `|past(u,t)(t-j)| ≥ min(n, j+1)`. -/
 theorem min_card_le_card_past (hG : G.Valid) {u t : ℕ} (hu : u ∈ G.V) :
-    ∀ j ≤ t, min G.V.card (j + 1) ≤ (G.past u t (t - j)).card := by
-  intro j
-  induction j with
-  | zero =>
-    intro _
-    have : u ∈ G.past u t (t - 0) := mem_past.2 ⟨hu, Journey.self (by omega)⟩
-    have := Finset.card_pos.2 ⟨u, this⟩
-    omega
-  | succ j ih =>
-    intro hj
-    have ih := ih (by omega)
-    have e : t - j = (t - (j + 1)) + 1 := by omega
-    rw [e] at ih
-    by_cases hV : G.past u t (t - (j + 1) + 1) = G.V
-    · have := Finset.card_le_card (past_succ_subset (G := G) u t (t - (j + 1)))
-      rw [hV] at this
-      omega
-    · have := Finset.card_lt_card (past_ssubset hG hu (by omega) hV)
-      omega
+    ∀ j ≤ t, min G.V.card (j + 1) ≤ (G.past u t (t - j)).card := fun _ hj =>
+  Cslib.DynNet.min_card_le_card_past (fun _ x y h => (hG.mem _ x y h).1)
+    (fun r _ y hy => hG.conn (r + 1) (by omega) y hy u hu) hu hj
 
 /-- After `n - 1` rounds every node has heard from everyone: `past(u,t)(s) = V` for
 `t ≥ s + n - 1`. -/
 theorem past_eq_V (hG : G.Valid) {u t s : ℕ} (hu : u ∈ G.V) (h : s + G.V.card ≤ t + 1) :
-    G.past u t s = G.V := by
-  have hn := Finset.card_pos.2 hG.nonempty
-  have := min_card_le_card_past hG hu (t := t) (t - s) (by omega)
-  rw [show t - (t - s) = s by omega] at this
-  exact Finset.eq_of_subset_of_card_le (past_subset _ _ _) (by omega)
+    G.past u t s = G.V :=
+  Cslib.DynNet.past_eq_of_card_le (fun _ x y h => (hG.mem _ x y h).1)
+    (fun r _ y hy => hG.conn (r + 1) (by omega) y hy u hu) hu h
 
 /-- At time `n - s - 1` every node has heard all but at most `s` inputs (used in Lemma 6.2). -/
 theorem card_sdiff_past_le (hG : G.Valid) {u t : ℕ} (hu : u ∈ G.V) :

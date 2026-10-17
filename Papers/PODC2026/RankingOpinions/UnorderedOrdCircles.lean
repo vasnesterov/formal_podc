@@ -1,5 +1,6 @@
 import Papers.PODC2026.RankingOpinions.UnorderedOrdering
 import Papers.PODC2026.RankingOpinions.Circles
+import Podc.Computability.Distributed.PopulationProtocols.Basic
 import Mathlib.Algebra.BigOperators.Group.Finset.Piecewise
 
 /-!
@@ -761,15 +762,9 @@ lemma oc_ic_eq (t : ℕ) (x : A) : (E.config t x).ic = (E.config 0 x).ic := by
   | zero => rfl
   | succ t ih => rw [oc_ic_succ, ih]
 
-lemma oc_inv (h0 : ∀ x, Inv (E.config 0 x)) (t : ℕ) (x : A) : Inv (E.config t x) := by
-  induction t generalizing x with
-  | zero => exact h0 x
-  | succ t ih =>
-    by_cases hxa : x = (E.sched t).1
-    · subst hxa; rw [oc_init]; exact (inv_ocδ (ih _) (ih _)).1
-    · by_cases hxb : x = (E.sched t).2
-      · subst hxb; rw [oc_resp]; exact (inv_ocδ (ih _) (ih _)).2
-      · rw [oc_other E hxa hxb]; exact ih x
+lemma oc_inv (h0 : ∀ x, Inv (E.config 0 x)) (t : ℕ) (x : A) : Inv (E.config t x) :=
+  Protocol.ClosedStates.execution (P := ordCircles Col k) (H := {s | Inv s})
+    (fun _ hp _ hq => inv_ocδ hp hq) E h0 t x
 
 lemma oc_ld_succ_le (t : ℕ) (x : A) :
     (E.config (t + 1) x).ld = true → (E.config t x).ld = true := by

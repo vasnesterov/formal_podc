@@ -32,19 +32,16 @@ variable {Q A : Type*} [DecidableEq A] (P : NProtocol Q)
 def CannotGen (S : Finset A) (C : Config A Q) (G : Set Q) : Prop :=
   ∀ D, P.ReachIn (· ∈ S) C D → ∀ a ∈ S, D a ∉ G
 
-/-- A set of states is closed if interactions between its states only produce its states. -/
-def ClosedSet (H : Set Q) : Prop :=
-  ∀ p ∈ H, ∀ q ∈ H, ∀ o ∈ P.δ p q, o.1 ∈ H ∧ o.2 ∈ H
-
 -- CSLib candidate
 /-- **Lemma 4 of Cai–Izumi–Wada.** If the sub-configuration `(S, C)` cannot generate `G` and the
 complement of `G` is not closed, then some sub-configuration with at most one agent less cannot
 generate `G` plus one more state. -/
 lemma CannotGen.extend {S : Finset A} {C : Config A Q} {G : Set Q} (h : P.CannotGen S C G)
-    (hG : ¬ P.ClosedSet Gᶜ) :
+    (hG : ¬ P.ClosedStates Gᶜ) :
     ∃ S' : Finset A, ∃ C' : Config A Q, ∃ q, q ∉ G ∧ S.card ≤ S'.card + 1 ∧
       P.CannotGen S' C' (insert q G) := by
-  simp only [ClosedSet, not_forall, Set.mem_compl_iff, not_and_or, not_not] at hG
+  simp only [Cslib.PopulationProtocol.NProtocol.ClosedStates, not_forall, Set.mem_compl_iff,
+    not_and_or, not_not] at hG
   obtain ⟨p, hp, q, hq, o, ho, hoG⟩ := hG
   by_cases hgen : ∃ D, P.ReachIn (· ∈ S) C D ∧ ∃ a ∈ S, D a = p
   · obtain ⟨D, hD, a, haS, hDa⟩ := hgen
@@ -52,13 +49,13 @@ lemma CannotGen.extend {S : Finset A} {C : Config A Q} {G : Set Q} (h : P.Cannot
     · rw [Finset.card_erase_of_mem haS]; omega
     intro E hE b hb hEb
     have hEC : P.ReachIn (· ∈ S) C E :=
-      hD.trans (hE.mono P fun x hx => Finset.mem_of_mem_erase hx)
+      hD.trans (hE.mono fun x hx => Finset.mem_of_mem_erase hx)
     have hba : b ≠ a := Finset.ne_of_mem_erase hb
     have hbS : b ∈ S := Finset.mem_of_mem_erase hb
     rcases hEb with hEb | hEb
     · -- `b` has the state `q`, while `a` (idle in the sub-run) still has `p`
       have hEa : E a = p := by
-        rw [hE.eq_of_not_mem P (x := a) (by simp)]; exact hDa
+        rw [hE.apply_eq (x := a) (by simp)]; exact hDa
       have hstep : P.StepIn (· ∈ S) E (upd E a b o) :=
         ⟨a, b, ⟨haS, hbS, hba.symm⟩, o, by rw [hEa, hEb]; exact ho, rfl⟩
       have hreach := hEC.tail hstep
@@ -79,24 +76,13 @@ variable [Fintype A]
 non-leader states (from a configuration using only such states no leader can ever appear). -/
 lemma not_closedSet_of_solvesSSLE [Nonempty A] {leader : Q → Bool}
     (hP : P.SolvesSSLE (A := A) leader) {H : Set Q} (hne : H.Nonempty)
-    (hL : ∀ q ∈ H, leader q = false) : ¬ P.ClosedSet H := by
+    (hL : ∀ q ∈ H, leader q = false) : ¬ P.ClosedStates H := by
   intro hH
   obtain ⟨q₀, hq₀⟩ := hne
   obtain ⟨D, hD, hDs⟩ := hP (fun _ => q₀)
   -- all reachable configurations only use states of `H`
-  have hall : ∀ E, P.Reachable (fun _ : A => q₀) E → ∀ a, E a ∈ H := by
-    intro E hE
-    induction hE with
-    | refl => exact fun _ => hq₀
-    | tail _ hst ih =>
-      obtain ⟨a, b, hab, o, ho, rfl⟩ := hst
-      have ho' := hH _ (ih a) _ (ih b) o ho
-      intro x
-      by_cases hxb : x = b
-      · subst hxb; rw [upd_right]; exact ho'.2
-      · by_cases hxa : x = a
-        · subst hxa; rw [upd_left _ hab]; exact ho'.1
-        · rw [upd_other _ hxa hxb]; exact ih x
+  have hall : ∀ E, P.Reachable (fun _ : A => q₀) E → ∀ a, E a ∈ H :=
+    fun _ hE => hH.reach (fun _ => hq₀) hE
   have h1 : numLeaders leader D = 1 := hDs D Relation.ReflTransGen.refl
   have h0 : numLeaders leader D = 0 := by
     unfold numLeaders
@@ -128,7 +114,7 @@ theorem card_le_card_states [Fintype Q] [Nonempty Q] {leader : Q → Bool}
   -- the followers of a stably correct configuration cannot generate a leader state
   have hstart : P.CannotGen (Finset.univ.erase ℓ) C L := by
     intro D hD a ha hDa
-    have hDℓ : D ℓ = C ℓ := hD.eq_of_not_mem P (by simp)
+    have hDℓ : D ℓ = C ℓ := hD.apply_eq (by simp)
     have hDc : numLeaders leader D = 1 := hC D hD.reachable
     have hsub : ({a, ℓ} : Finset A) ⊆ Finset.univ.filter fun x => leader (D x) = true := by
       intro x hx
@@ -151,7 +137,7 @@ theorem card_le_card_states [Fintype Q] [Nonempty Q] {leader : Q → Bool}
       obtain ⟨a, haS⟩ : S.Nonempty := by
         rw [← Finset.card_pos]; omega
       have haG : D a ∉ (G : Set Q) := hgen D Relation.ReflTransGen.refl a haS
-      by_cases hcl : P.ClosedSet (↑G : Set Q)ᶜ
+      by_cases hcl : P.ClosedStates (↑G : Set Q)ᶜ
       · refine P.not_closedSet_of_solvesSSLE hP ⟨D a, haG⟩ ?_ hcl
         intro q hq
         by_contra hql
@@ -196,9 +182,9 @@ theorem not_solvesSSLE_two_sizes [Nonempty Q] {leader : Q → Bool} {n₁ n₂ :
   have hiD : leader (D' i) = true := by
     have : i ∈ Finset.univ.filter fun a => leader (D' a) = true := by rw [hi]; simp
     simpa using this
-  obtain ⟨D, hD, hDe⟩ := P.reachable_embed e C hD'
+  obtain ⟨D, hD, hDe⟩ := P.exists_reachIn_of_embedding e C hD'
   have hℓnot : ¬ ∃ y, e y = ℓ := fun ⟨y, hy⟩ => (e₀ y).2 hy
-  have hDℓ : D ℓ = C ℓ := hD.eq_of_not_mem P hℓnot
+  have hDℓ : D ℓ = C ℓ := hD.apply_eq hℓnot
   have hei : e i ≠ ℓ := (e₀ i).2
   have hsub : ({e i, ℓ} : Finset (Fin n₂)) ⊆ Finset.univ.filter fun x => leader (D x) = true := by
     intro x hx

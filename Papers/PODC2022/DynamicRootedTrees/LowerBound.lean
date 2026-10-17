@@ -1,4 +1,5 @@
 import Papers.PODC2022.DynamicRootedTrees.Defs
+import Podc.Computability.Distributed.DynamicNetworks.Journey
 
 /-!
 # The lower bound `t*(𝒯ₙ) ≥ ⌈(3n-1)/2⌉ - 2`
@@ -108,20 +109,6 @@ theorem lbSeq_mem (n : ℕ) (hn : 2 ≤ n) (i : ℕ) : lbSeq n i ∈ treesWithLo
 
 /-! ### Invariants -/
 
-/-- Forward invariant: if `S 0 x` and `S` is preserved by every edge of round `t + 1`, then the
-out-neighbourhood of `x` after `t` rounds is contained in `S t`. -/
-theorem prod_of_inv {α : Type*} {G : ℕ → α → α → Prop} (S : ℕ → α → Prop) {x : α} (h0 : S 0 x)
-    (hstep : ∀ t z y, S t z → G (t + 1) z y → S (t + 1) y) :
-    ∀ t y, prod G 1 t x y → S t y := by
-  intro t
-  induction t with
-  | zero => rintro y rfl; exact h0
-  | succ t ih =>
-    intro y hy
-    obtain ⟨z, hz, hzy⟩ := prod_succ_apply.1 hy
-    rw [Nat.add_comm] at hzy
-    exact hstep t z y (ih z hz) hzy
-
 /-- Invariant for senders `x ≥ n/2`: the root `n/2 - 1` of the last phase is never reached. -/
 def lbInvHigh (n t y : ℕ) : Prop := n / 2 ≤ y ∨ (y + (n - 1) / 2 < t ∧ y + 1 < n / 2)
 
@@ -159,17 +146,17 @@ theorem lbSeq_not_broadcasts (n : ℕ) (hn : 2 ≤ n) (s : ℕ) (hs : s < 3 * n 
     ¬ Cslib.DynNet.Broadcasts (lbSeq n) s := by
   rintro ⟨x, hx⟩
   by_cases hxh : n / 2 ≤ x.val
-  · have key := prod_of_inv (G := lbSeq n) (fun t (y : Fin n) => lbInvHigh n t y.val)
-      (x := x) (by unfold lbInvHigh; omega)
+  · have key := Cslib.DynNet.prod_of_inv (E := lbSeq n) (a := 1)
+      (fun t (y : Fin n) => lbInvHigh n t y.val) (x := x) (by unfold lbInvHigh; omega)
       (fun t z y hS hE => lbInvHigh_step hn y.2 z.2 hS
-        (by rcases hE with rfl | h; exacts [Or.inl rfl, Or.inr h])) s ⟨n / 2 - 1, by omega⟩
-      (hx _)
+        (by rw [Nat.add_comm] at hE; rcases hE with rfl | h; exacts [Or.inl rfl, Or.inr h]))
+      s ⟨n / 2 - 1, by omega⟩ (hx _)
     simp only [lbInvHigh] at key
     omega
-  · have key := prod_of_inv (G := lbSeq n) (fun t (y : Fin n) => lbInvLow n x t y.val)
-      (x := x) (by unfold lbInvLow; omega)
+  · have key := Cslib.DynNet.prod_of_inv (E := lbSeq n) (a := 1)
+      (fun t (y : Fin n) => lbInvLow n x t y.val) (x := x) (by unfold lbInvLow; omega)
       (fun t z y hS hE => lbInvLow_step hn (by omega) y.2 z.2 hS
-        (by rcases hE with rfl | h; exacts [Or.inl rfl, Or.inr h])) s
+        (by rw [Nat.add_comm] at hE; rcases hE with rfl | h; exacts [Or.inl rfl, Or.inr h])) s
       ⟨if x.val = 0 then n - 1 else x.val - 1, by split_ifs <;> omega⟩ (hx _)
     simp only [lbInvLow] at key
     split_ifs at key <;> omega

@@ -298,7 +298,7 @@ theorem solvesSSR (hA : Fintype.card A = n) :
   intro C
   obtain ⟨D, hD, hDb⟩ := reachable_ranked hA C
   refine ⟨D, (NProtocol.ofProtocol_reachable_iff _ _ _).mpr hD, ?_⟩
-  exact (silent_of_injective hDb.1).stablyCorrect _ hDb
+  exact (silent_of_injective hDb.1).stablyIn hDb
 
 /-- **Theorem 2.4 (correctness), leader election.** With `leader ↔ rank = 0`,
 `Silent-n-state-SSR` solves self-stabilizing leader election. -/
@@ -307,8 +307,9 @@ theorem solvesSSLE (hA : Fintype.card A = n) :
   intro C
   obtain ⟨D, hD, hDb⟩ := reachable_ranked hA C
   refine ⟨D, (NProtocol.ofProtocol_reachable_iff _ _ _).mpr hD,
-    (silent_of_injective hDb.1).stablyCorrect _ ?_⟩
+    (silent_of_injective hDb.1).stablyIn ?_⟩
   obtain ⟨a, ha⟩ := hDb.2 0
+  show NProtocol.LeaderCorrect _ D
   unfold NProtocol.LeaderCorrect NProtocol.numLeaders
   rw [card_eq_one]
   refine ⟨a, ?_⟩

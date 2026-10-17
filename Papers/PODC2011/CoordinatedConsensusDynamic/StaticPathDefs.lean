@@ -204,11 +204,8 @@ theorem staticLine_knownN {n : ℕ} (k : ℕ) (σ : ℕ → Bool) (hn : 3 ≤ n)
 theorem reach_inv {α : Type*} {G : DGraph α} {P : ℕ → ℕ → Prop} {v s u t : ℕ}
     (h : G.Reach v s u t) (h0 : P s v)
     (hstep : ∀ τ x y, s ≤ τ → τ < t → P τ x → (x = y ∨ G.adj (τ + 1) x y) → P (τ + 1) y) :
-    P t u := by
-  induction h with
-  | refl => exact h0
-  | @step w u t hr hwu ih =>
-    exact hstep t w u hr.le (by omega) (ih fun τ x y h1 h2 => hstep τ x y h1 (by omega)) hwu
+    P t u :=
+  h.of_inv h0 hstep
 
 /-- An admissible execution is similar to itself (some node exists). -/
 theorem simStep_self {n t : ℕ} {H : DGraph Bool} (hH : KnownN n H) : SimStep (KnownN n) t H H := by
