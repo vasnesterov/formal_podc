@@ -1,4 +1,5 @@
 import Papers.PODC2025.BAWithPredictions.AuthBB
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # Authenticated Byzantine Agreement with classification (Section 8.3: Lemmas 24–27, Theorem 6)
@@ -114,7 +115,7 @@ theorem lemma24_honest (E : RoundRun (alg (P := P) (V := V) k t) F inp) (hsync :
       rw [hsync 0 le_rfl j i (hGH j hj) hi]
       rw [send_eq, ifp rfl, c_eq, ifp (hGpos i hi j hj).2]
     have h1 := card_le_card hvot
-    rw [card_honest] at h1
+    rw [card_filter_notMem_univ] at h1
     rw [cert_eq, ifp (by omega)]
     rfl
   have := card_le_card hsub

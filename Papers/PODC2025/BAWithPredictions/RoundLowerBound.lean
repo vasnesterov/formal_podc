@@ -1,5 +1,6 @@
 import Papers.PODC2025.BAWithPredictions.Defs
 import Cslib.Computability.Distributed.Byzantine.LockStep.Agreement
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # Byzantine Agreement with Predictions — round-complexity lower bound (Theorem 13)
@@ -218,11 +219,6 @@ end Sim
 
 /-! ### Wrong bits of the simulated predictions -/
 
-theorem card_filter_not_mem {P : Type*} [Fintype P] [DecidableEq P] (F : Finset P) :
-    (univ.filter (· ∉ F)).card = Fintype.card P - F.card := by
-  rw [Finset.filter_not, Finset.filter_mem_eq_inter, univ_inter, ← compl_eq_univ_sdiff,
-    card_compl]
-
 /-- If every honest process gets the prediction "exactly `X` is faulty" and the actual faulty set
 is `F ⊇ X`, each honest process has `|F \ X|` wrong bits. -/
 theorem wrongBits_correctPred_of_subset {P : Type*} [Fintype P] [DecidableEq P] {X F : Finset P}
@@ -235,7 +231,7 @@ theorem wrongBits_correctPred_of_subset {P : Type*} [Fintype P] [DecidableEq P] 
     by_cases hj : j ∈ X
     · simp [hj, hXF hj]
     · by_cases hjF : j ∈ F <;> simp [hj, hjF]
-  rw [wrongBits, h1, sum_const, smul_eq_mul, card_filter_not_mem]
+  rw [wrongBits, h1, sum_const, smul_eq_mul, card_filter_notMem_univ]
 
 /-! ### The cited lower bound and Theorem 13 -/
 

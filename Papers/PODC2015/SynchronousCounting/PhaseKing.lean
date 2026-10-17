@@ -1,6 +1,7 @@
 import Mathlib
 import Cslib.Computability.Distributed.Byzantine.KingPhase
 import Cslib.Foundations.Data.Finset.Quorum
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # The phase-king layer (§3.4, Table 2, Lemmas 4 and 5)
@@ -47,26 +48,10 @@ def kingVal : Option (Fin C) → ℕ
 
 variable (Fa : Finset V)
 
-lemma cntA_le (ma : V → Option (Fin C)) (a : Option (Fin C)) :
-    cntA ma a ≤ (univ.filter fun u => u ∉ Fa ∧ ma u = a).card + Fa.card := by
-  simpa [cntA, countEq, compl_eq_univ_sdiff, ← filter_notMem_eq_sdiff, filter_filter] using
-    countEq_le_countEq_add_card_sdiff (f := ma) (b := a) univ Faᶜ
-
-lemma le_cntA (ma : V → Option (Fin C)) (a : Option (Fin C)) :
-    (univ.filter fun u => u ∉ Fa ∧ ma u = a).card ≤ cntA ma a := by
-  simpa [cntA, countEq, compl_eq_univ_sdiff, ← filter_notMem_eq_sdiff, filter_filter] using
-    countEq_mono (f := ma) (b := a) (subset_univ Faᶜ)
-
-lemma card_correct_le : (univ.filter fun u : V => u ∉ Fa).card + Fa.card = Fintype.card V := by
-  have := card_filter_add_card_filter_not (s := (univ : Finset V)) (fun u => u ∈ Fa)
-  rw [card_univ] at this
-  simp only [filter_mem_eq_inter, univ_inter] at this
-  omega
-
 /-- Values held by all correct nodes are received at least `N - |Fa|` times. -/
 lemma cntA_of_all (ma : V → Option (Fin C)) (a : Option (Fin C)) (h : ∀ u ∉ Fa, ma u = a) :
     Fintype.card V - Fa.card ≤ cntA ma a := by
-  simpa [card_univ_sdiff] using card_sdiff_le_countEq (s := univ) (f := ma) fun u _ hu => h u hu
+  simpa using card_sub_card_le_countEq (s := univ) (f := ma) fun u _ hu => h u hu
 
 omit [DecidableEq V] in
 /-- Values held by no correct node are received at most `|Fa|` times. -/
@@ -184,7 +169,8 @@ theorem lemma4 {F : ℕ} (hFa : Fa.card ≤ F) (hN : 3 * F < Fintype.card V) {ki
     (h₀ : PKStep Fa F k₀ r a₀ d₀ a₁ d₁) (h₁ : PKStep Fa F k₁ (r + 1) a₁ d₁ a₂ d₂)
     (h₂ : PKStep Fa F king (r + 2) a₂ d₂ a₃ d₃) :
     ∃ y : Fin C, ∀ v ∉ Fa, a₃ v = some y ∧ d₃ v = true := by
-  have hcard := card_correct_le Fa
+  have hcard := card_filter_notMem_univ Fa
+  have hFaV := card_le_univ Fa
   have hr1 : (r + 1) % 3 = 1 := by omega
   have hr2 : (r + 2) % 3 = 2 := by omega
   -- (a) after `I₃ℓ` the finite values of correct nodes agree
@@ -204,15 +190,10 @@ theorem lemma4 {F : ℕ} (hFa : Fa.card ≤ F) (hN : 3 * F < Fintype.card V) {ki
         rw [he.1, ha] at hx
         simp only [inc, Option.map_some, Option.some.injEq] at hx
         refine ⟨x', hx.symm, ?_⟩
-        have h1 := cntA_le Fa ma (some x')
+        have h1 : cntA ma (some x') ≤
+            (univ.filter fun u => u ∉ Fa ∧ a₀ u = some x').card + Fa.card :=
+          countEq_le_card_filter_notMem_and_add_card (fun u _ hu => hma u hu) _
         rw [ha] at hlt
-        have h2 : (univ.filter fun u => u ∉ Fa ∧ ma u = some x') =
-            univ.filter fun u => u ∉ Fa ∧ a₀ u = some x' := by
-          apply filter_congr; intro u _
-          constructor
-          · rintro ⟨hu, h⟩; exact ⟨hu, (hma u hu) ▸ h⟩
-          · rintro ⟨hu, h⟩; exact ⟨hu, (hma u hu).symm ▸ h⟩
-        rw [h2] at h1
         omega
   have hagree : ∀ v ∉ Fa, ∀ w ∉ Fa, ∀ x y, a₁ v = some x → a₁ w = some y → x = y := by
     intro v hv w hw x y hx hy
@@ -301,14 +282,10 @@ theorem lemma4 {F : ℕ} (hFa : Fa.card ≤ F) (hN : 3 * F < Fintype.card V) {ki
     -- many correct nodes hold `x` after round `q - 1`
     have hmany : Fintype.card V - F - Fa.card ≤
         (univ.filter fun u => u ∉ Fa ∧ a₁ u = some x).card := by
-      have h1 := cntA_le Fa ma (some x)
-      have h2 : (univ.filter fun u => u ∉ Fa ∧ ma u = some x) =
-          univ.filter fun u => u ∉ Fa ∧ a₁ u = some x := by
-        apply filter_congr; intro u _
-        constructor
-        · rintro ⟨hu, h⟩; exact ⟨hu, (hma u hu) ▸ h⟩
-        · rintro ⟨hu, h⟩; exact ⟨hu, (hma u hu).symm ▸ h⟩
-      rw [h2] at h1; omega
+      have h1 : cntA ma (some x) ≤
+          (univ.filter fun u => u ∉ Fa ∧ a₁ u = some x).card + Fa.card :=
+        countEq_le_card_filter_notMem_and_add_card (fun u _ hu => hma u hu) _
+      omega
     -- hence every correct node computes `x` in `I₃ℓ₊₁`
     have hall2 : ∀ v ∉ Fa, a₂ v = some (incr x) := by
       intro v hv
@@ -318,14 +295,9 @@ theorem lemma4 {F : ℕ} (hFa : Fa.card ≤ F) (hN : 3 * F < Fintype.card V) {ki
       simp only [Prod.mk.injEq] at hev
       have hfx : firstHeavy F mb = some x := by
         apply firstHeavy_eq_some
-        · have := le_cntA Fa mb (some x)
-          have h2 : (univ.filter fun u => u ∉ Fa ∧ mb u = some x) =
-              univ.filter fun u => u ∉ Fa ∧ a₁ u = some x := by
-            apply filter_congr; intro u _
-            constructor
-            · rintro ⟨hu, h⟩; exact ⟨hu, (hmb u hu) ▸ h⟩
-            · rintro ⟨hu, h⟩; exact ⟨hu, (hmb u hu).symm ▸ h⟩
-          rw [h2] at this; omega
+        · have : (univ.filter fun u => u ∉ Fa ∧ a₁ u = some x).card ≤ cntA mb (some x) :=
+            card_filter_notMem_and_le_countEq (fun u _ hu => hmb u hu) _
+          omega
         · intro j hj
           refine (cntA_of_none Fa mb _ fun u hu hmu => ?_).trans hFa
           rw [hmb u hu] at hmu

@@ -1,4 +1,5 @@
 import Papers.PODC2019.HotStuff.Basic.LiveCore
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # Basic HotStuff: liveness (Theorem 4)
@@ -265,12 +266,6 @@ theorem lty_inj {a b : ℕ} (ha1 : 1 ≤ a) (ha3 : a ≤ 3) (hb1 : 1 ≤ b) (hb3
     (h : lty a = lty b) : a = b := by
   interval_cases a <;> interval_cases b <;> simp_all [lty]
 
-theorem card_correct_ge {F : Finset P} (hF : F.card ≤ f) :
-    Fintype.card P - f ≤ (Finset.univ.filter fun q => q ∉ F).card := by
-  have : (Finset.univ.filter fun q => q ∉ F) = Finset.univ \ F := by ext; simp
-  rw [this, Finset.card_sdiff_of_subset (Finset.subset_univ _), Finset.card_univ]
-  omega
-
 /-! ### The synchronous view -/
 
 section View
@@ -363,7 +358,8 @@ theorem propose (hR : R.Valid f δ) (hgst : R.gst ≤ t₀) (hℓ : leader v ∉
     have hint := hnv _ hℓ (t₀ + δ) (by omega) (by omega)
     have hcard : Fintype.card P - f ≤ (nvSenders f (recv (R.st (hotstuff f leader) (t₀ + δ)
         (leader v)) (R.inbox (hotstuff f leader) (leader v) (t₀ + δ)))).card := by
-      refine (card_correct_ge hR.card_faulty).trans (Finset.card_le_card fun q hq => ?_)
+      refine (Finset.card_sub_le_card_filter_notMem hR.card_faulty).trans
+        (Finset.card_le_card fun q hq => ?_)
       simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hq
       have hIq := st_LI (f := f) (leader := leader) R t₀ q
       obtain ⟨jq, hjq⟩ := hIq.nv_cur
@@ -470,7 +466,8 @@ theorem leader_step (hR : R.Valid f δ) (hA : R.AuthValid auth (hotstuff f leade
       have hs0l : s0.lphase = k := by rw [hs0]; exact le_antisymm hge hlk
       have hs0p : s0.prop = x := by rw [hs0]; exact hprop
       have hcard : Fintype.card P - f ≤ (voters s0 ⟨lty k, s0.view, s0.prop⟩).card := by
-        refine (card_correct_ge hR.card_faulty).trans (Finset.card_le_card fun q hq => ?_)
+        refine (Finset.card_sub_le_card_filter_notMem hR.card_faulty).trans
+          (Finset.card_le_card fun q hq => ?_)
         simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hq
         simp only [voters, Finset.mem_filter, Finset.mem_univ, true_and, hs0v, hs0p]
         exact ⟨q, hbuf q hq⟩

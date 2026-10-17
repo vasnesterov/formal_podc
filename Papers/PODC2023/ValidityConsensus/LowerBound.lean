@@ -1,6 +1,7 @@
 import Papers.PODC2023.ValidityConsensus.Triviality
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
 import Mathlib.Data.Fintype.Prod
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # On the Validity of Consensus — §5.1: the quadratic lower bound (Theorem 4)
@@ -29,40 +30,12 @@ theorem pigeonhole (B : Finset P) (f : ℕ → P → P → ℕ)
     (h : ∀ Q ∈ B, B.card + 1 ≤ (univ.filter fun p => p ∉ B ∧ ∃ τ, f τ p Q ≠ 0).card) :
     ∃ N, B.card * (B.card + 1) ≤
       ∑ τ ∈ range N, ∑ p ∈ univ.filter (· ∉ B), ∑ q ∈ univ.filter (· ≠ p), f τ p q := by
-  classical
-  let τ₀ : P × P → ℕ := fun pq => if hh : ∃ τ, f τ pq.1 pq.2 ≠ 0 then Classical.choose hh else 0
-  let N := (univ : Finset (P × P)).sup τ₀ + 1
-  refine ⟨N, ?_⟩
-  have key : ∀ p q, (if ∃ τ, f τ p q ≠ 0 then 1 else 0) ≤ ∑ τ ∈ range N, f τ p q := by
-    intro p q
-    split_ifs with hh
-    · have hlt : τ₀ (p, q) < N := Nat.lt_succ_of_le (le_sup (f := τ₀) (mem_univ (p, q)))
-      have hτ : τ₀ (p, q) = Classical.choose hh := by simp [τ₀, hh]
-      calc 1 ≤ f (τ₀ (p, q)) p q := by
-              rw [hτ]; exact Nat.one_le_iff_ne_zero.mpr (Classical.choose_spec hh)
-        _ ≤ ∑ τ ∈ range N, f τ p q :=
-              single_le_sum (f := fun τ => f τ p q) (fun _ _ => Nat.zero_le _) (mem_range.mpr hlt)
-    · exact Nat.zero_le _
+  obtain ⟨N, hN⟩ := exists_sum_card_filter_exists_ne_zero_le (univ.filter (· ∉ B)) B
+    (disjoint_left.2 fun _ ha hb => (mem_filter.1 ha).2 hb) f
+  refine ⟨N, le_trans ?_ hN⟩
   calc B.card * (B.card + 1) = ∑ _Q ∈ B, (B.card + 1) := by simp
-    _ ≤ ∑ Q ∈ B, (univ.filter fun p => p ∉ B ∧ ∃ τ, f τ p Q ≠ 0).card := sum_le_sum h
-    _ = ∑ Q ∈ B, ∑ p ∈ univ.filter (· ∉ B), (if ∃ τ, f τ p Q ≠ 0 then 1 else 0) := by
-        refine sum_congr rfl fun Q _ => ?_
-        rw [card_eq_sum_ones, sum_filter, sum_filter]
-        refine sum_congr rfl fun p _ => ?_
-        by_cases hp : p ∈ B <;> simp [hp]
-    _ = ∑ p ∈ univ.filter (· ∉ B), ∑ Q ∈ B, (if ∃ τ, f τ p Q ≠ 0 then 1 else 0) := sum_comm
-    _ ≤ ∑ p ∈ univ.filter (· ∉ B), ∑ Q ∈ univ.filter (· ≠ p), ∑ τ ∈ range N, f τ p Q := by
-        refine sum_le_sum fun p _ => ?_
-        calc ∑ Q ∈ B, (if ∃ τ, f τ p Q ≠ 0 then 1 else 0)
-            ≤ ∑ Q ∈ B, ∑ τ ∈ range N, f τ p Q := sum_le_sum fun Q _ => key p Q
-          _ ≤ ∑ Q ∈ univ.filter (· ≠ p), ∑ τ ∈ range N, f τ p Q := by
-              refine sum_le_sum_of_subset_of_nonneg (fun Q hQ => ?_) fun _ _ _ => Nat.zero_le _
-              have hp : p ∉ B := (mem_filter.mp ‹p ∈ univ.filter (· ∉ B)›).2
-              exact mem_filter.mpr ⟨mem_univ _, fun h => hp (h ▸ hQ)⟩
-    _ = ∑ τ ∈ range N, ∑ p ∈ univ.filter (· ∉ B), ∑ q ∈ univ.filter (· ≠ p), f τ p q := by
-        rw [Finset.sum_comm (s := range N)]
-        refine sum_congr rfl fun p _ => ?_
-        rw [Finset.sum_comm (s := range N)]
+    _ ≤ ∑ Q ∈ B, ((univ.filter (· ∉ B)).filter fun p => ∃ τ, f τ p Q ≠ 0).card :=
+        sum_le_sum fun Q hQ => (h Q hQ).trans_eq (by rw [filter_filter])
 
 /-- **Lemma 6.** For a non-trivial validity property and any process `Q` and value `vQ`, there is
 a canonical execution in which `Q` is faulty (hence silent) and a correct process decides a

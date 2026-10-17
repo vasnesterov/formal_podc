@@ -1,5 +1,6 @@
 import Papers.PODC2020.BezoutElection.Alg1Live
 import Mathlib.Data.Finset.Max
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # Algorithm 1: termination
@@ -49,13 +50,8 @@ lemma card_disc_le (t : ℕ) (c : P) : ((e.cfg t).loc c).disc.card ≤ n := by
 
 /-- All processes but `c` are in `D` ⇒ `n - 1 ≤ |D|`. -/
 lemma card_ge_of_all (D : Finset Id) (c : P) (h : ∀ j, j ≠ c → ids j ∈ D) : n - 1 ≤ D.card := by
-  have hsub : (Finset.univ.erase c).image ids ⊆ D := by
-    intro x hx
-    obtain ⟨j, hj, rfl⟩ := Finset.mem_image.1 hx
-    exact h j (Finset.ne_of_mem_erase hj)
-  have := Finset.card_le_card hsub
-  rwa [Finset.card_image_of_injective _ X.hid, Finset.card_erase_of_mem (Finset.mem_univ _),
-    Finset.card_univ, X.hn] at this
+  simpa [X.hn] using Finset.card_sub_card_le_of_injective_of_forall_notMem (F := {c}) X.hid
+    fun j hj => h j (by simpa using hj)
 
 /-- "Eventually forever" from writes. -/
 lemma ev_write (Q : ℕ → Prop) (T : ℕ) (hpres : ∀ t ≥ T, Q t → Q (t + 1))
