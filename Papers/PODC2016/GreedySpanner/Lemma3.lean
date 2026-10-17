@@ -28,22 +28,22 @@ theorem lemma3 [Finite V] (hH : IsGreedySpanner G w t H) (hH' : IsWSpanner H H' 
   obtain ⟨L, ⟨hnd, hLG, hsort⟩, rfl⟩ := hH
   refine le_antisymm hH'.1 fun u v huv => ?_
   by_contra hne
-  have he : s(u, v) ∈ greedySet w t L := ((fromEdgeSet_adj _).mp huv).1
+  have he : s(u, v) ∈ greedySpannerEdges w t L := ((fromEdgeSet_adj _).mp huv).1
   have hd : H'.wdist w u v ≤ t * w s(u, v) := hH'.wdist_le_of_adj huv
   have hreach : H'.Reachable u v := reachable_of_wdist_lt_top
     (hd.trans_lt (ENNReal.mul_lt_top ENNReal.coe_lt_top ENNReal.coe_lt_top))
   obtain ⟨P, hP, hPw⟩ := exists_isPath_wlength_eq (w := w) hreach
   rw [← hPw] at hd
-  have hPA : ∀ f ∈ P.edges, f ∈ greedySet w t L := fun f hf =>
-    mem_greedySet_of_mem_edgeSet (edgeSet_mono hH'.1 (P.edges_subset_edgeSet hf))
+  have hPA : ∀ f ∈ P.edges, f ∈ greedySpannerEdges w t L := fun f hf =>
+    mem_greedySpannerEdges_of_mem_edgeSet (edgeSet_mono hH'.1 (P.edges_subset_edgeSet hf))
   have hPe : s(u, v) ∉ P.edges := fun h => hne (P.edges_subset_edgeSet h)
   -- all edges of the cycle `P ∪ {uv}` are added edges, hence listed in `L`
-  have hA : ∀ f ∈ s(u, v) :: P.edges, f ∈ greedySet w t L := by
+  have hA : ∀ f ∈ s(u, v) :: P.edges, f ∈ greedySpannerEdges w t L := by
     intro f hf
     rcases List.mem_cons.mp hf with rfl | hf
     · exact he
     · exact hPA f hf
-  have hinL : ∀ f ∈ s(u, v) :: P.edges, f ∈ L := fun f hf => greedySet_subset L (hA f hf)
+  have hinL : ∀ f ∈ s(u, v) :: P.edges, f ∈ L := fun f hf => mem_of_mem_greedySpannerEdges (hA f hf)
   -- the edge `e'` examined last
   obtain ⟨e', he'S, he'max⟩ := (s(u, v) :: P.edges).toFinset.exists_max_image (L.idxOf ·)
     ⟨s(u, v), by simp⟩
@@ -54,7 +54,7 @@ theorem lemma3 [Finite V] (hH : IsGreedySpanner G w t H) (hH' : IsWSpanner H H' 
   by_cases hcase : e' = s(u, v)
   · -- `uv` itself is last: it would have been rejected
     subst hcase
-    have := lt_wlength_of_mem_greedySet hnd he P fun f hf =>
+    have := lt_wlength_of_mem_greedySpannerEdges hnd he P fun f hf =>
       ⟨hPA f hf, hlt f (List.mem_cons_of_mem _ hf) (fun h => hPe (h ▸ hf))⟩
     exact absurd hd (not_le.mpr this)
   · -- `e' ∈ P` is last: replace it by `uv` in the cycle
@@ -70,7 +70,7 @@ theorem lemma3 [Finite V] (hH : IsGreedySpanner G w t H) (hH' : IsWSpanner H H' 
     have hd1 : d.edge ∉ P₁.edges := fun h =>
       (List.disjoint_of_nodup_append hnodup h) (List.mem_cons_self ..)
     have hd2 : d.edge ∉ P₂.edges := (List.nodup_cons.mp (List.nodup_append.mp hnodup).2.1).1
-    let Q : (greedy w t L).Walk d.fst d.snd :=
+    let Q : (greedySpanner w t L).Walk d.fst d.snd :=
       (P₁.reverse.mapLe hH'.1).append (Walk.cons huv (P₂.reverse.mapLe hH'.1))
     have hQedges : Q.edges = P₁.edges.reverse ++ s(u, v) :: P₂.edges.reverse := by
       simp [Q, Walk.edges_append, Walk.edges_reverse]
@@ -81,9 +81,9 @@ theorem lemma3 [Finite V] (hH : IsGreedySpanner G w t H) (hH' : IsWSpanner H H' 
       · exact List.mem_append_left _ hf
       · exact List.mem_append_right _ (List.mem_cons_of_mem _ hf)
     have hde : d.edge = s(d.fst, d.snd) := rfl
-    have hd_add : s(d.fst, d.snd) ∈ greedySet w t L :=
+    have hd_add : s(d.fst, d.snd) ∈ greedySpannerEdges w t L :=
       hde ▸ hPA d.edge (hedges ▸ List.mem_append_right _ (List.mem_cons_self ..))
-    have key := lt_wlength_of_mem_greedySet hnd hd_add Q fun f hf => by
+    have key := lt_wlength_of_mem_greedySpannerEdges hnd hd_add Q fun f hf => by
       rw [hQedges, List.mem_append, List.mem_cons, List.mem_reverse, List.mem_reverse] at hf
       rcases hf with hf | rfl | hf
       · exact ⟨hPA f (hmemP f (Or.inl hf)), hde ▸ hlt f (List.mem_cons_of_mem _ (hmemP f (Or.inl hf)))
@@ -93,7 +93,7 @@ theorem lemma3 [Finite V] (hH : IsGreedySpanner G w t H) (hH' : IsWSpanner H H' 
           (fun h => hd2 (h ▸ hf))⟩
     -- weights: `w(uv) ≤ w(e')` by the order of the scan
     have hw : w s(u, v) ≤ w d.edge :=
-      weight_le_of_idxOf_lt hsort (hinL _ (List.mem_cons_self ..)) (hinL _ he'S)
+      hsort.rel_of_idxOf_lt (hinL _ (List.mem_cons_self ..)) (hinL _ he'S)
         (hlt _ (List.mem_cons_self ..) (Ne.symm hcase))
     have hQw : Q.wlength w = P₁.wlength w + w s(u, v) + P₂.wlength w := by
       simp [Q, Walk.wlength, Walk.edges_append, Walk.edges_reverse, List.sum_reverse, add_assoc]

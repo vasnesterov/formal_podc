@@ -48,9 +48,9 @@ Classification: **false statement** / **degenerate case** / **proof gap (stateme
    nonnegative lengths and odd `k ≥ 1`. We allow nonnegative weights `ℝ≥0` and all `k = 2t − 1`,
    `t ≥ 1`.
 10. **Corollary 2.2** — the cited fact [ADD+93] (greedy `(2t−1)`-spanner with `O(n^{1+1/t})` edges) is
-    proved: existence of a `(2t−1)`-spanner of girth `> 2t` by the greedy induction
-    (`exists_greedy_spanner`, an existence statement; the algorithm is not run) plus CSLib's Moore
-    bound relative to a vertex set (`|E| ≤ |S|^{1+1/t} + |S|`). Final explicit bound:
+    proved: existence of a `(2t−1)`-spanner of girth `> 2t`, namely an output of the greedy algorithm
+    (`exists_greedy_spanner`, an existence statement; the algorithm is not run inside the conversion)
+    plus the Moore bound relative to a vertex set (`|E| ≤ |S|^{1+1/t} + |S|`). Final explicit bound:
     `6(8C+26) r^{2−1/t} n^{1+1/t} ln(n+1)` (`corollary_2_2`), i.e. `O(r^{2−2/(k+1)} n^{1+2/(k+1)} log n)`.
 11. **Theorem 2.3 / Corollary 2.4 (distributed)** — not formalized (round counting around a black-box
     distributed spanner [DGPV08]).

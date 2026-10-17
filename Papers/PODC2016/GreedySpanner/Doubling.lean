@@ -173,7 +173,7 @@ theorem mstWeight_inducedW [Fintype V] (hw : IsMetricW w) (ht : 1 ≤ t)
   have hsp := hH.isWSpanner ht
   refine le_antisymm ?_ (le_iInf₂ fun T hT =>
     (mstWeight_le_wt hT).trans (wt_le_wt_of_le fun e _ => le_inducedW hw hsp e))
-  obtain ⟨Z, hZH, hZ, hZw⟩ := hH.exists_mst_le
+  obtain ⟨Z, hZH, hZ, hZw⟩ := IsGreedySpanner.exists_mst_le hH
   calc mstWeight ⊤ (inducedW H w) ≤ wt (inducedW H w) Z := mstWeight_le_wt hZ
     _ ≤ wt w Z := wt_le_wt_of_le fun e he => (inducedW_eq_of_mem hw hsp (edgeSet_mono hZH he)).le
     _ = mstWeight ⊤ w := hZw

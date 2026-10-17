@@ -46,8 +46,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
   `w : Sym2 V → ℝ≥0`. Distances are CSLib's `wdist`, in `ℝ≥0∞`, equal to `⊤` when disconnected.
   The stretch `t` is a real number `t ≥ 1`.
 * `IsWSpanner G H w t`: `H ≤ G` and `δ_H(u,v) ≤ t·δ_G(u,v)` for all `u, v`.
-* **Algorithm 1** is modelled literally (`greedy w t L`). It scans an edge list `L` and adds
-  `e = {u,v}` iff `δ_H(u,v) > t·w(e)` for the current `H`. "The greedy `t`-spanner"
+* **Algorithm 1** is modelled literally (`greedySpanner w t L`, see `greedySpanner_eq_foldl`). It scans
+  an edge list `L` and adds `e = {u,v}` iff `δ_H(u,v) > t·w(e)` for the current `H`. "The greedy `t`-spanner"
   (`IsGreedySpanner`) is the output of *any* execution: `L` lists every edge exactly once, in
   non-decreasing order of weight, with ties broken arbitrarily. Every result holds for every
   execution.
@@ -64,12 +64,12 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 | Paper | Lean | File |
 |---|---|---|
-| Algorithm 1 outputs a `t`-spanner; local criterion (§2) | `IsGreedySpanner.isWSpanner`, `isWSpanner_of_adj` | `Basic.lean` |
+| Algorithm 1 outputs a `t`-spanner; local criterion (§2) | `SimpleGraph.IsGreedySpanner.isWSpanner`, `SimpleGraph.isWSpanner_of_adj` | `Podc/Graph/Spanner/{Greedy,Weighted}.lean` |
 | Observation 2 (greedy contains an MST of `G`) | `IsGreedySpanner.exists_mst_le`, `IsGreedySpanner.mstWeight_eq` | `MST.lean` |
 | Lemma 3 (the only `t`-spanner of `H` is `H`) | `lemma3` | `Lemma3.lean` |
 | Theorem 5 (existential optimality, size and lightness) | `theorem5` | `Theorem5.lean` |
 | Existential optimality as an equality (§1.3 definition) | `existentially_optimal_sparse`, `existentially_optimal_light` | `Theorem5.lean` |
-| Corollary 1, size: `t ≥ 2k−1` ⇒ girth `> 2k`, `≤ n^{1+1/k}+n` edges | `IsGreedySpanner.noShortCycles`, `corollary1_size` | `Theorem5.lean` |
+| Corollary 1, size: `t ≥ 2k−1` ⇒ girth `> 2k`, `≤ n^{1+1/k}+n` edges | `SimpleGraph.IsGreedySpanner.noShortCycles`, `corollary1_size` | `Podc/Graph/Spanner/Greedy.lean`, `Theorem5.lean` |
 | Corollaries 1 (lightness) and 2, given the cited bounds | `greedy_le_of_forall_exists` | `Theorem5.lean` |
 | Lemma 5 (`w(H) ≤ w(H')` for `H'` a `t`-spanner of `M_H`) | `lemma5` | `Section4.lean` |
 | Lemma 6 (`|H| ≤ |H'|`, `t < 2`) | `lemma6` | `Section4.lean` |
@@ -95,9 +95,11 @@ also not formalized.
 The hypotheses of Theorem 6 are met by the uniform metric, which has doubling dimension
 `≤ log₂ n` (`isDoubling_logb_card`, and the `example` at the end of `Doubling.lean`). Distances and
 weighted walks come from CSLib (`WeightedSpanner.lean`, `ShortestWalks.lean`). The Moore bound and
-the cycle-splitting lemma also come from CSLib (`Girth.lean`, `Cycle.lean`).
+the cycle-splitting lemma also come from CSLib (`Girth.lean`, `Cycle.lean`). Weighted spanners with
+real stretch, the local criterion, two-weight distance comparison, attainment of weighted distances by
+paths and the greedy spanner with its scan properties, girth and MST bypass property are the shared
+library `Podc/Graph/Spanner/{Weighted,Greedy}.lean` (also used by
+[Dinitz–Krauthgamer](../../PODC2011/FaultTolerantSpanners) for the [ADD+93] spanner).
 
-CSLib candidates (marked `-- CSLib candidate`): weighted spanners with real stretch, the local criterion,
-attainment of weighted distances by paths (`exists_isPath_wlength_eq`), the greedy scan and Lemma 3,
-`mstWeight` with the exchange lemma `mstWeight_eq_of_forall_walk` and `mstWeight_eq_iInf_isTree`,
-two-weight distance comparison, finite metrics and doubling dimension.
+CSLib candidates (marked `-- CSLib candidate`): Lemma 3, `mstWeight` with the exchange lemma
+`mstWeight_eq_of_forall_walk` and `mstWeight_eq_iInf_isTree`, finite metrics and doubling dimension.

@@ -70,5 +70,9 @@ The sharper form is `8 (2(2k−1)f)^{1−1/k} n^{1+1/k}`. CSLib files are in
 `Quot.sound`. Non-vacuity: valid oracles (`ShortPathOracle.exists_spec`) and weight-sorted edge lists
 (`exists_sorted_edgeList`) exist, and `exists_vft_spanner` combines them. The Moore bound, which the
 paper cites, is proved. The spanner, girth and blocking-set infrastructure is in CSLib
-`Cslib/Foundations/Combinatorics/SimpleGraph/{Spanner,WeightedSpanner,Girth,BlockingSet}.lean` and is
-shared with [Bodwin–Patel](../../PODC2019/VFTSpannersOptimal).
+`Cslib/Foundations/Combinatorics/SimpleGraph/{Spanner,WeightedSpanner,Girth,BlockingSet}.lean`. The
+generic greedy scheme (`SimpleGraph.greedyGraph`, its correctness `greedyGraph_isVFTSpanner` /
+`greedyGraph_isWeightedVFTSpanner` and EFT analogues, blocking sets from insertion histories
+`exists_blockingSet_of_insertion`, `exists_sorted_edgeList`) is in
+`Podc/Graph/Spanner/FaultTolerantGreedy.lean`, shared with
+[Bodwin–Patel](../../PODC2019/VFTSpannersOptimal).

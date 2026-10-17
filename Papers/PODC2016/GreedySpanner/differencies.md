@@ -11,7 +11,7 @@ stated, **[cond]** = cited result taken as a hypothesis, **[omitted]** = not for
    with `|V| = n`. An "`n`-vertex graph family" is a set of weighted graphs on this fixed `V`, which is
    the same up to relabelling. Weights may be `0` wherever the paper's positivity is not needed (see
    items 9 and 13).
-2. **[model]** The greedy spanner (Algorithm 1) is modelled as a literal scan `greedy w t L` over an edge
+2. **[model]** The greedy spanner (Algorithm 1) is modelled as a literal scan `greedySpanner w t L` over an edge
    list `L`. `IsGreedySpanner G w t H` says that `H` is the output for *some* list `L` containing each
    edge of `G` exactly once in non-decreasing weight order. This is the paper's "`H` designates an
    arbitrary such spanner" when weights tie. All results are proved for every such execution.
