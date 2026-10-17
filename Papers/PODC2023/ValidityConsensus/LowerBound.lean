@@ -2,6 +2,7 @@ import Papers.PODC2023.ValidityConsensus.Triviality
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
 import Mathlib.Data.Fintype.Prod
 import Podc.Foundations.Data.Finset.Quorum
+import Podc.Computability.Distributed.Byzantine.PartialSync.Merge
 
 /-!
 # On the Validity of Consensus — §5.1: the quadratic lower bound (Theorem 4)
@@ -85,85 +86,27 @@ theorem exists_run_decides_ne [Nonempty VI] (hU : A.Unforging Au)
 /-- **Lemma 7 (merging with an isolated behaviour).** If `Q` (proposing `v⋆`) decides `vQ`
 when running in isolation, and `Q` is faulty and silent in a canonical execution in which a
 correct process decides `v`, then `v = vQ`: delay all messages from and to `Q` until both
-decisions have happened, and make `Q` correct. -/
+decisions have happened, and make `Q` correct. (The merged run is `Run.merge` of the execution
+and `Q`'s isolated run; the other silent faulty processes become correct too, their messages
+delayed the same way, so the merged run has no faulty process.) -/
 theorem eq_of_isoRun_decides (hA : SolvesConsensusAuth Au t δ A val) {R : Run P M VI}
     (hR : R.Valid t δ) (hcan : R.Canonical) {Q : P} (hQ : Q ∈ R.faulty) {p : P}
     (hp : p ∉ R.faulty) {v : VO} (hv : R.Decides A p v) (vstar : VI) {vQ : VO}
     (hiso : (isoRun (M := M) Q vstar).Decides A Q vQ) : v = vQ := by
   obtain ⟨τv, hτv⟩ := hv
   obtain ⟨τQ, hτQ⟩ := hiso
-  set T := max τv τQ
-  let R' : Run P M VI :=
-    { faulty := R.faulty.erase Q
-      inp := fun r => if r = Q then vstar else R.inp r
-      gst := T + 1
-      byz := R.byz
-      dl := fun q τ r => if τ ≤ T then
-          (if q = Q ∧ r = Q then τ
-           else if q ∉ R.faulty ∧ r ∉ R.faulty then min (R.dl q τ r) (T + 1) else T + 1)
-        else τ }
-  have hR'f : ∀ r, r ∈ R'.faulty ↔ r ≠ Q ∧ r ∈ R.faulty := by simp [R']
-  have hR' : R'.Valid t δ := by
-    refine ⟨?_, ?_, ?_⟩
-    · exact (card_erase_le).trans hR.card_faulty
-    · intro q τ r hq hr
-      simp only [R']
-      split_ifs with h0 h1 h2
-      · exact le_rfl
-      · exact le_min (hR.dl_ge q τ r h2.1 h2.2) (by omega)
-      · omega
-      · exact le_rfl
-    · intro q τ r _ _
-      simp only [R']
-      split_ifs <;> omega
-  have hpQ : p ≠ Q := fun h => hp (h ▸ hQ)
-  -- the correct processes of `R` cannot distinguish `R'` from `R` up to `T`
-  have h₁ : ∀ τ ≤ T, ∀ r ∈ {r | r ∉ R.faulty}, R'.st A τ r = R.st A τ r := by
-    refine R'.st_eq_of_inbox_eq A (ref := fun _ => R) ?_ ?_
-    · intro r hr
-      have : r ≠ Q := fun h => hr (h ▸ hQ)
-      simp [R', this]
-    · intro τ hτ ih r hr
-      have hr : r ∉ R.faulty := hr
-      have hrQ : r ≠ Q := fun h => hr (h ▸ hQ)
-      refine R'.inbox_eq_of_dlv_eq A fun q τ' hτ' => ?_
-      by_cases hq : q ∈ R.faulty
-      · rw [R'.dlv_eq_nil_of_ne A (by simp [R', hq, hrQ, show τ' ≤ T by omega]; omega)]
-        simp [Run.dlv, Run.out_eq_nil_of_canonical A hcan hq]
-      · have hqQ : q ≠ Q := fun h => hq (h ▸ hQ)
-        have hdl : R'.dl q τ' r = min (R.dl q τ' r) (T + 1) := by
-          simp [R', hq, hr, hqQ, show τ' ≤ T by omega]
-        have hiff : (min (R.dl q τ' r) (T + 1) = τ) ↔ R.dl q τ' r = τ := by omega
-        simp only [Run.dlv, hdl, hiff]
-        split_ifs
-        · rw [Run.out_of_correct A _ (by simp [hR'f, hq]), Run.out_of_correct A _ hq,
-            ih q hq τ' hτ']
-        · rfl
-  -- `Q` cannot distinguish `R'` from running in isolation up to `T`
-  have h₂ : ∀ τ ≤ T, ∀ r ∈ ({Q} : Set P), R'.st A τ r = (isoRun (M := M) Q vstar).st A τ r := by
-    refine R'.st_eq_of_inbox_eq A (ref := fun _ => isoRun Q vstar) ?_ ?_
-    · rintro r rfl; simp [R', isoRun]
-    · intro τ hτ ih r hr
-      simp only [Set.mem_singleton_iff] at hr
-      subst r
-      refine R'.inbox_eq_of_dlv_eq A fun q τ' hτ' => ?_
-      by_cases hqQ : q = Q
-      · rw [hqQ]
-        have hdl : R'.dl Q τ' Q = τ' := by simp [R', show τ' ≤ T by omega]
-        have hdl' : (isoRun (M := M) Q vstar).dl Q τ' Q = τ' := rfl
-        simp only [Run.dlv, hdl, hdl']
-        split_ifs
-        · rw [Run.out_of_correct A _ (by simp [hR'f]),
-            Run.out_of_correct A _ (isoRun_correct Q vstar), ih Q rfl τ' hτ']
-        · rfl
-      · rw [R'.dlv_eq_nil_of_ne A (by simp [R', hqQ, hQ, show τ' ≤ T by omega]; omega)]
-        simp [Run.dlv, Run.out_eq_nil_of_canonical A (isoRun_canonical Q vstar)
-          (show q ∈ (isoRun (M := M) Q vstar).faulty by simp [isoRun, hqQ])]
-  have hR'a : R'.AuthValid Au A := Run.authValid_of_canonical fun q hq τ r =>
-    hcan q ((hR'f q).1 hq).2 τ r
-  refine hA.agreement R' hR' hR'a p (by simp [hR'f, hp]) Q (by simp [hR'f]) v vQ ⟨τv, ?_⟩ ⟨τQ, ?_⟩
-  · rw [h₁ τv (le_max_left _ _) p hp]; exact hτv
-  · rw [h₂ τQ (le_max_right _ _) Q rfl]; exact hτQ
+  -- merge `R` with `Q` running in isolation: nobody is correct in both, so nobody is Byzantine
+  set R' := R.merge A (isoRun (M := M) Q vstar) (max τv τQ)
+  have hcov : ∀ r, r ∈ R.faulty ∨ r ∈ (isoRun (M := M) Q vstar).faulty := fun r => by
+    by_cases hr : r = Q
+    · exact Or.inl (hr ▸ hQ)
+    · exact Or.inr (by simp [isoRun, hr])
+  have hpQ := (hcov p).resolve_left hp
+  refine hA.agreement R' (Run.merge_valid_of_forall_mem hcov hR.dl_ge fun _ _ _ _ _ => le_rfl)
+    (Run.merge_authValid_of_forall_mem hcov) p (by simp [R', hpQ]) Q (by simp [R', hQ]) v vQ
+    (Run.merge_decides_left hcan hp hpQ (le_max_left _ _) hτv)
+    (Run.merge_decides_right (isoRun_canonical Q vstar) hQ (isoRun_correct Q vstar)
+      (le_max_right _ _) hτQ)
 
 /-- **Theorem 4 (generalized Dolev–Reischuk bound).** Any algorithm solving consensus with a
 non-trivial validity property has a synchronous (`gst = 0`) execution in which correct processes

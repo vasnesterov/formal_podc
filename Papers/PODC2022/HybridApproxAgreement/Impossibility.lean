@@ -1,5 +1,6 @@
 import Papers.PODC2022.HybridApproxAgreement.Spec
 import Cslib.Foundations.Combinatorics.Labelling
+import Podc.Computability.Distributed.Byzantine.PartialSync.Merge
 
 /-!
 # Theorem 5.1: no hybrid AA when `2 tₛ + tₐ ≥ n`
@@ -11,7 +12,8 @@ The paper's split-brain argument. Partition the parties into `S₋`, `S₊` (non
   validity some `p ∈ S₊` outputs `x₁`, say by time `τ₁`.
 * `R₂` (synchronous): `S₊` is Byzantine and silent, everybody else has input `x₀`. Some `q ∈ S₋`
   outputs `x₀` by time `τ₂`.
-* `R₃` (asynchronous, `gst = T + 1`, `T = max τ₁ τ₂`): `Sₐ` is Byzantine; towards `S₊` it replays its
+* `R₃` (asynchronous, `gst = T + 1`, `T = max τ₁ τ₂`; the library run `Run.merge` of `R₁` and `R₂`):
+  `Sₐ` is Byzantine; towards `S₊` it replays its
   messages of `R₁`, towards `S₋` those of `R₂` (until `T`); messages between `S₊` and `S₋` are delayed
   past `T`. Then `S₊` cannot distinguish `R₃` from `R₁` and `S₋` cannot distinguish it from `R₂` up to
   `T`, so `p` outputs `x₁` and `q` outputs `x₀` in `R₃`, contradicting `ε`-agreement as
@@ -66,147 +68,6 @@ theorem quiet_outputs {Au : Auth P M K} {A : Algorithm P M S ℝ ℝ} {ε : ℝ}
   have := (hA.validity _ hC hav (fun _ => hx) p hp v hv).eq_of_const (x := x) (fun _ _ => rfl)
   exact this ▸ hv
 
-/-- The split-brain run `R₃`. -/
-def splitRun (A : Algorithm P M S ℝ ℝ) (Sm Sp : Finset P) (x0 x1 : ℝ) (T : ℕ) : Run P M ℝ where
-  faulty := (Sm ∪ Sp)ᶜ
-  inp p := if p ∈ Sp then x1 else x0
-  gst := T + 1
-  byz b τ r := if τ ≤ T then
-      (if r ∈ Sp then (Run.quiet Sm (fun _ => x1)).out A b τ r
-        else (Run.quiet Sp (fun _ => x0)).out A b τ r)
-    else []
-  dl q τ r := if (q ∈ Sp ∧ r ∈ Sm) ∨ (q ∈ Sm ∧ r ∈ Sp) then max τ (T + 1) else τ
-
-section split
-
-variable (A : Algorithm P M S ℝ ℝ) {Sm Sp : Finset P} (hd : Disjoint Sm Sp) (x0 x1 : ℝ) (T : ℕ)
-include hd
-
-/-- The reference run of a party of `S₊ ∪ S₋` (`R₁` for `S₊`, `R₂` for `S₋`). -/
-def refRun (Sm Sp : Finset P) (x0 x1 : ℝ) (p : P) : Run P M ℝ :=
-  if p ∈ Sp then Run.quiet Sm (fun _ => x1) else Run.quiet Sp (fun _ => x0)
-
-omit hd in
-theorem not_mem_of_mem_left {p : P} (h : p ∈ Sm) (hd : Disjoint Sm Sp) : p ∉ Sp :=
-  disjoint_left.mp hd h
-
-/-- **Indistinguishability.** Up to time `T`, parties of `S₊` behave as in `R₁` and parties of `S₋`
-as in `R₂`. -/
-theorem splitRun_st :
-    ∀ τ ≤ T, ∀ p ∈ (↑(Sm ∪ Sp) : Set P),
-      (splitRun A Sm Sp x0 x1 T).st A τ p = (refRun Sm Sp x0 x1 p).st A τ p := by
-  refine (splitRun A Sm Sp x0 x1 T).st_eq_of_inbox_eq A ?_ ?_
-  · intro p hp
-    by_cases h : p ∈ Sp <;> simp [splitRun, refRun, Run.quiet, h]
-  · intro τ hτ ih p hp
-    refine Run.inbox_eq_of_dlv_eq A _ fun q τ' hτ' => ?_
-    simp only [coe_union, Set.mem_union, mem_coe] at hp
-    by_cases hpS : p ∈ Sp
-    · -- reference run `R₁ = Run.quiet Sm (fun _ => x1)`
-      have href : refRun (M := M) Sm Sp x0 x1 p = Run.quiet Sm (fun _ => x1) := by simp [refRun, hpS]
-      rw [href]
-      have hpm : p ∉ Sm := fun h => not_mem_of_mem_left h hd hpS
-      by_cases hqm : q ∈ Sm
-      · rw [Run.dlv_eq_nil_of_ne, Run.dlv]
-        · simp [Run.out_eq_nil_of_canonical A (Run.quiet_canonical (F := Sm) (I := fun _ => x1)) hqm]
-        · simp [splitRun, hqm, hpS]; omega
-      · by_cases hqp : q ∈ Sp
-        · have hq3 : q ∉ (splitRun A Sm Sp x0 x1 T).faulty := by simp [splitRun, hqp]
-          have hq1 : q ∉ (Run.quiet (M := M) Sm (fun _ => x1)).faulty := by simpa [Run.quiet] using hqm
-          have h := ih q (by simp [hqp]) τ' hτ'
-          rw [show refRun (M := M) Sm Sp x0 x1 q = Run.quiet Sm (fun _ => x1) by simp [refRun, hqp]] at h
-          simp only [Run.dlv, Run.out_of_correct A _ hq3, Run.out_of_correct A _ hq1, h]
-          simp [splitRun, hpm, hqm]
-          split_ifs <;> simp_all
-        · have hq3 : q ∈ (splitRun A Sm Sp x0 x1 T).faulty := by simp [splitRun, hqp, hqm]
-          simp only [Run.dlv, Run.out_of_faulty A _ hq3]
-          simp [splitRun, hpm, hqm, hqp, hpS, show τ' ≤ T by omega]
-          split_ifs <;> simp_all
-    · have hpm : p ∈ Sm := hp.resolve_right hpS
-      have href : refRun (M := M) Sm Sp x0 x1 p = Run.quiet Sp (fun _ => x0) := by simp [refRun, hpS]
-      rw [href]
-      by_cases hqp : q ∈ Sp
-      · rw [Run.dlv_eq_nil_of_ne, Run.dlv]
-        · simp [Run.out_eq_nil_of_canonical A (Run.quiet_canonical (F := Sp) (I := fun _ => x0)) hqp]
-        · simp [splitRun, hqp, hpm]; omega
-      · by_cases hqm : q ∈ Sm
-        · have hq3 : q ∉ (splitRun A Sm Sp x0 x1 T).faulty := by simp [splitRun, hqm]
-          have hq2 : q ∉ (Run.quiet (M := M) Sp (fun _ => x0)).faulty := by simpa [Run.quiet] using hqp
-          have h := ih q (by simp [hqm]) τ' hτ'
-          rw [show refRun (M := M) Sm Sp x0 x1 q = Run.quiet Sp (fun _ => x0) by simp [refRun, hqp]] at h
-          simp only [Run.dlv, Run.out_of_correct A _ hq3, Run.out_of_correct A _ hq2, h]
-          simp [splitRun, hpS, hqp]
-          split_ifs <;> simp_all
-        · have hq3 : q ∈ (splitRun A Sm Sp x0 x1 T).faulty := by simp [splitRun, hqp, hqm]
-          simp only [Run.dlv, Run.out_of_faulty A _ hq3]
-          simp [splitRun, hpm, hqm, hqp, hpS, show τ' ≤ T by omega]
-          split_ifs <;> simp_all
-
-theorem splitRun_st_p {p : P} (hp : p ∈ Sp) :
-    ∀ τ ≤ T, (splitRun A Sm Sp x0 x1 T).st A τ p = (Run.quiet Sm (fun _ => x1)).st A τ p := by
-  intro τ hτ
-  have := splitRun_st A hd x0 x1 T τ hτ p (by simp [hp])
-  rwa [show refRun (M := M) Sm Sp x0 x1 p = Run.quiet Sm (fun _ => x1) by simp [refRun, hp]] at this
-
-theorem splitRun_st_m {p : P} (hp : p ∈ Sm) :
-    ∀ τ ≤ T, (splitRun A Sm Sp x0 x1 T).st A τ p = (Run.quiet Sp (fun _ => x0)).st A τ p := by
-  intro τ hτ
-  have := splitRun_st A hd x0 x1 T τ hτ p (by simp [hp])
-  rwa [show refRun (M := M) Sm Sp x0 x1 p = Run.quiet Sp (fun _ => x0) by
-    simp [refRun, not_mem_of_mem_left hp hd]] at this
-
-/-- The split-brain run respects unforgeability: Byzantine parties only replay messages they sent
-as honest parties in `R₁`/`R₂`. -/
-theorem splitRun_authValid {Au : Auth P M K} (hU : A.Unforging Au) :
-    (splitRun A Sm Sp x0 x1 T).AuthValid Au A := by
-  intro b hb τ r _ m hm x hx
-  simp only [splitRun] at hm
-  split_ifs at hm with hτ hr
-  · refine Run.tokens_replay hU (Ri := Run.quiet Sm (fun _ => x1)) (T := T) (fun q σ r' hσ => ?_)
-      τ hτ b r m hm x hx
-    by_cases hqp : q ∈ Sp
-    · left
-      have hq3 : q ∉ (splitRun A Sm Sp x0 x1 T).faulty := by simp [splitRun, hqp]
-      have hq1 : q ∉ (Run.quiet (M := M) Sm (fun _ => x1)).faulty := by
-        simpa [Run.quiet] using fun h => not_mem_of_mem_left h hd hqp
-      refine ⟨hq3, ?_⟩
-      rw [Run.out_of_correct A _ hq3, Run.out_of_correct A _ hq1,
-        splitRun_st_p A hd x0 x1 T hqp σ hσ]
-    · by_cases hqm : q ∈ Sm
-      · right; right
-        intro m' hm'
-        simp [Run.out_eq_nil_of_canonical A (Run.quiet_canonical (F := Sm) (I := fun _ => x1)) hqm]
-          at hm'
-      · right; left
-        exact ⟨by simp [splitRun, hqp, hqm], by simpa [Run.quiet] using hqm⟩
-  · refine Run.tokens_replay hU (Ri := Run.quiet Sp (fun _ => x0)) (T := T) (fun q σ r' hσ => ?_)
-      τ hτ b r m hm x hx
-    by_cases hqm : q ∈ Sm
-    · left
-      have hq3 : q ∉ (splitRun A Sm Sp x0 x1 T).faulty := by simp [splitRun, hqm]
-      have hq2 : q ∉ (Run.quiet (M := M) Sp (fun _ => x0)).faulty := by
-        simpa [Run.quiet] using not_mem_of_mem_left hqm hd
-      refine ⟨hq3, ?_⟩
-      rw [Run.out_of_correct A _ hq3, Run.out_of_correct A _ hq2,
-        splitRun_st_m A hd x0 x1 T hqm σ hσ]
-    · by_cases hqp : q ∈ Sp
-      · right; right
-        intro m' hm'
-        simp [Run.out_eq_nil_of_canonical A (Run.quiet_canonical (F := Sp) (I := fun _ => x0)) hqp]
-          at hm'
-      · right; left
-        exact ⟨by simp [splitRun, hqp, hqm], by simpa [Run.quiet] using hqp⟩
-  · simp at hm
-
-omit hd in
-theorem splitRun_valid {ta : ℕ} (hca : (Sm ∪ Sp)ᶜ.card ≤ ta) (δ : ℕ) :
-    psyncRuns ta δ (splitRun A Sm Sp x0 x1 T) := by
-  refine ⟨hca, fun q τ p _ _ => ?_, fun q τ p _ _ => ?_⟩
-  · simp only [splitRun]; split_ifs <;> omega
-  · simp only [splitRun]; split_ifs <;> omega
-
-end split
-
 /-- **Theorem 5.1** (strong form). Let `n ≥ 2` and `2 tₛ + tₐ ≥ n`, and let the input domain `D`
 contain two values at distance `> ε`. Then no unforging protocol is simultaneously a secure AA
 protocol on the synchronous runs with at most `tₛ` corruptions (any delay bound `δₛ`) and on the
@@ -225,20 +86,31 @@ theorem not_secure_sync_and_psync {Au : Auth P M K} {A : Algorithm P M S ℝ ℝ
     rcases le_max_iff.mp hF with h | h
     · exact quiet_outputs hS hx (Run.quiet_syncValid h δs) hp
     · exact quiet_outputs hA hx (Run.quiet_valid h δa) hp
-  have h1 := out1 hx1 hcm pp (fun h => not_mem_of_mem_left h hd hpp)
-  have h2 := out1 (F := Sp) hx0 hcp pm (not_mem_of_mem_left hpm hd)
+  have hpp' : pp ∉ Sm := fun h => disjoint_left.mp hd h hpp
+  have hpm' : pm ∉ Sp := disjoint_left.mp hd hpm
+  have h1 := out1 hx1 hcm pp hpp'
+  have h2 := out1 (F := Sp) hx0 hcp pm hpm'
   obtain ⟨τ1, hτ1⟩ := h1.exists_time
   obtain ⟨τ2, hτ2⟩ := h2.exists_time
+  -- the split-brain run `R₃`: `Sₐ` (correct in both) is Byzantine, `S₊` sees `R₁`, `S₋` sees `R₂`
   set T := max τ1 τ2
-  set R3 := splitRun A Sm Sp x0 x1 T
+  set R3 := (Run.quiet (M := M) Sm fun _ => x1).merge A (Run.quiet Sp fun _ => x0) T
   have o1 : Outputs A R3 pp x1 :=
-    h1.of_st_eq ⟨τ1, le_max_left _ _, hτ1⟩ (splitRun_st_p A hd x0 x1 T hpp)
+    h1.of_st_eq ⟨τ1, le_max_left _ _, hτ1⟩
+      (Run.merge_st_left Run.quiet_canonical · · pp hpp' hpp)
   have o2 : Outputs A R3 pm x0 :=
-    h2.of_st_eq ⟨τ2, le_max_right _ _, hτ2⟩ (splitRun_st_m A hd x0 x1 T hpm)
+    h2.of_st_eq ⟨τ2, le_max_right _ _, hτ2⟩
+      (Run.merge_st_right Run.quiet_canonical · · pm hpm hpm')
   have hinp : ∀ p, R3.inp p ∈ D := by
-    intro p; simp only [R3, splitRun]; split_ifs <;> assumption
-  have := hA.agreement R3 (splitRun_valid A x0 x1 T hca δa) (splitRun_authValid A hd x0 x1 T hU)
-    hinp pp (by simp [R3, splitRun, hpp]) pm (by simp [R3, splitRun, hpm]) x1 x0 o1 o2
+    intro p
+    by_cases h : p ∈ (Run.quiet (M := M) Sm fun _ => x1).faulty
+    · rw [Run.merge_inp_of_mem h]; exact hx0
+    · rw [Run.merge_inp_of_notMem h]; exact hx1
+  have hR3 : psyncRuns ta δa R3 :=
+    Run.merge_valid (by simpa [Run.quiet, ← compl_union] using hca) (fun _ _ _ _ _ => le_rfl)
+      fun _ _ _ _ _ => le_rfl
+  have := hA.agreement R3 hR3 (Run.merge_authValid hU Run.quiet_canonical Run.quiet_canonical)
+    hinp pp (by simp [R3, Run.quiet, hpp]) pm (by simp [R3, Run.quiet, hpm]) x1 x0 o1 o2
   linarith
 
 /-- **Theorem 5.1.** For `n ≥ 2` parties, `ε > 0` and `2 tₛ + tₐ ≥ n`, approximate agreement that is

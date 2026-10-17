@@ -1,6 +1,7 @@
 import Papers.PODC2021.GoodCaseLatencyBB.PsyncLowerBound
 import Papers.PODC2021.GoodCaseLatencyBB.SplitBrain
 import Papers.PODC2021.GoodCaseLatencyBB.SmallCases
+import Podc.Computability.Distributed.Byzantine.PartialSync.Merge
 
 /-!
 # Partially synchronous Byzantine broadcast is impossible for `n ∈ {2, 3}`, `f ≥ 1`
@@ -18,6 +19,8 @@ faulty process suffice):
   its `R₁`-messages to `p` and its `R₂`-messages to `q` until `T`; messages between `p` and `q`
   are delayed until `T + 1 = GST`. Then `p` behaves as in `R₁` and `q` as in `R₂`.
 
+Both `R_c` and `R₃` are the library run `Run.merge` of the two silent runs.
+
 Consequently Theorems 6 and 7 hold for all `n ≥ 2` (`theorem_6_all`, `theorem_7_all`); for
 `n = 1` they are false (`theorem_7_false_one` in `SmallCases.lean`).
 -/
@@ -29,32 +32,6 @@ namespace GoodCaseLatencyBB
 open Cslib.Byzantine.PartialSync Finset
 
 variable {P M S V K : Type*} [DecidableEq P]
-
-section runs
-
-variable {A : Algorithm P M S V V}
-
-/-- Silent processes of a quiet run send nothing. -/
-theorem quiet_out_nil {F : Finset P} {I : P → V} {q : P} (hq : q ∈ F) (τ : ℕ)
-    (r : P) : (Run.quiet (M := M) F I).out A q τ r = [] :=
-  Run.out_eq_nil_of_canonical A Run.quiet_canonical hq τ r
-
-/-- Indistinguishability for a single process, batch by batch. -/
-theorem st_eq_view {R R' : Run P M V} {x : P} {T : ℕ} (hinp : R.inp x = R'.inp x)
-    (h : ∀ τ < T, (∀ σ ≤ τ, R.st A σ x = R'.st A σ x) → ∀ q, ∀ τ' ≤ τ,
-      R.dlv A q τ' x τ = R'.dlv A q τ' x τ) :
-    ∀ τ ≤ T, R.st A τ x = R'.st A τ x := fun τ hτ =>
-  R.st_eq_of_inbox_eq A (ref := fun _ => R') (X := {x}) (by rintro p rfl; exact hinp)
-    (by rintro τ hτ H p rfl; exact R.inbox_eq_of_dlv_eq A (h τ hτ (H p rfl))) τ hτ x rfl
-
-theorem dlv_self_eq {R R' : Run P M V} {x : P} {τ τ' : ℕ} (hx : x ∉ R.faulty)
-    (hx' : x ∉ R'.faulty) (hd : R.dl x τ' x = τ') (hd' : R'.dl x τ' x = τ') (hτ' : τ' ≤ τ)
-    (hst : ∀ σ ≤ τ, R.st A σ x = R'.st A σ x) :
-    R.dlv A x τ' x τ = R'.dlv A x τ' x τ := by
-  simp only [Run.dlv, hd, hd', Run.out_of_correct A R hx, Run.out_of_correct A R' hx',
-    hst τ' hτ']
-
-end runs
 
 variable [Fintype P] {A : Algorithm P M S V V} {Au : Auth P M K}
 
@@ -83,35 +60,20 @@ theorem psyncBB_impossible_two {s : P} {f D : ℕ} (hf : 1 ≤ f)
   let Rb := Run.quiet (M := M) {p} I
   obtain ⟨Tb, hTb⟩ := hA.validity Rb (Run.quiet_valid (by simpa using hf) _) Run.quiet_authValid
     rfl (by simp [Rb, Run.quiet, hps.symm]) s (by simp [Rb, Run.quiet, hps.symm])
-  let T := max Ta Tb
-  let Rc : Run P M V :=
-    { faulty := ∅, inp := I, gst := T + 1, byz := fun _ _ _ => []
-      dl := fun q τ r => if q = r then τ else max τ (T + 1) }
-  have hRc : Rc.Valid f D :=
-    ⟨by simp [Rc], fun q τ r _ _ => by simp only [Rc]; split_ifs <;> omega,
-      fun q τ r _ _ => by simp only [Rc]; split_ifs <;> omega⟩
-  have hp : ∀ τ ≤ T, Rc.st A τ p = Ra.st A τ p :=
-    st_eq_view (by simp [Rc, I, Ra, Run.quiet, hps]) fun τ hτ hst q τ' hτ' => by
-      by_cases hq : q = p
-      · subst hq
-        exact dlv_self_eq (by simp [Rc]) (by simp [Ra, Run.quiet, hps]) (by simp [Rc]) rfl hτ' hst
-      · have hqs : q = s := by by_contra h; exact hq (hall q h)
-        subst hqs
-        rw [Run.dlv_eq_nil_of_ne _ _ (by simp only [Rc, Ne.symm hps, ite_false]; omega)]
-        simp [Run.dlv, show Ra.out A q τ' p = [] from quiet_out_nil (mem_singleton_self _) _ _]
-  have hs : ∀ τ ≤ T, Rc.st A τ s = Rb.st A τ s :=
-    st_eq_view (by simp [Rc, Rb, Run.quiet]) fun τ hτ hst q τ' hτ' => by
-      by_cases hq : q = s
-      · subst hq
-        exact dlv_self_eq (by simp [Rc]) (by simp [Rb, Run.quiet, hps.symm]) (by simp [Rc]) rfl
-          hτ' hst
-      · obtain rfl := hall q hq
-        rw [Run.dlv_eq_nil_of_ne _ _ (by simp only [Rc, hps, ite_false]; omega)]
-        simp [Run.dlv, show Rb.out A q τ' s = [] from quiet_out_nil (mem_singleton_self _) _ _]
-  refine hvw (hA.agreement Rc hRc (Run.authValid_of_canonical fun _ _ _ _ => rfl) s
-    (by simp [Rc]) p (by simp [Rc]) v w ⟨Tb, ?_⟩ ⟨Ta, ?_⟩)
-  · rw [hs Tb (le_max_right _ _), hTb]; simp [Rb, Run.quiet, I]
-  · rw [hp Ta (le_max_left _ _)]; exact hTa
+  -- `R_c`: merge `Rₐ` (seen by `p`) and `R_b` (seen by `s`); nobody is correct in both
+  have hcov : ∀ x, x ∈ Ra.faulty ∨ x ∈ Rb.faulty := fun x => by
+    by_cases hx : x = s
+    · exact Or.inl (by simp [Ra, Run.quiet, hx])
+    · exact Or.inr (by simp [Rb, Run.quiet, hall x hx])
+  set Rc := Ra.merge A Rb (max Ta Tb)
+  refine hvw (hA.agreement Rc
+    (Run.merge_valid_of_forall_mem hcov (fun _ _ _ _ _ => le_rfl) fun _ _ _ _ _ => le_rfl)
+    (Run.merge_authValid_of_forall_mem hcov) s (by simp [Rc, Ra, Run.quiet]) p
+    (by simp [Rc, Rb, Run.quiet]) v w ?_ ?_)
+  · exact Run.merge_decides_right Run.quiet_canonical (by simp [Ra, Run.quiet])
+      (by simp [Run.quiet, hps.symm]) (le_max_right _ _) (by rw [hTb]; simp [Rb, Run.quiet, I])
+  · exact Run.merge_decides_left Run.quiet_canonical (by simp [Run.quiet, hps])
+      (by simp [Rb, Run.quiet]) (le_max_left _ _) hTa
 
 /-- Partially synchronous BB is impossible for `n = 3` and `f ≥ 1`. -/
 theorem psyncBB_impossible_three (hU : A.Unforging Au) {s : P} {f D : ℕ} (hf : 1 ≤ f)
@@ -126,77 +88,21 @@ theorem psyncBB_impossible_three (hU : A.Unforging Au) {s : P} {f D : ℕ} (hf :
   let R2 := Run.quiet (M := M) {p} (Function.update I0 s b)
   obtain ⟨T2, hT2⟩ := hA.validity R2 (Run.quiet_valid (by simpa using hf) _) Run.quiet_authValid
     rfl (by simp [R2, Run.quiet, hps.symm]) q (by simp [R2, Run.quiet, hpq.symm])
-  let T := max T1 T2
-  let R3 : Run P M V :=
-    { faulty := {s}, inp := I0, gst := T + 1
-      byz := fun _ τ r => if τ ≤ T then (if r = q then R2.out A s τ r else R1.out A s τ r)
-        else []
-      dl := fun x τ r => if x = s ∨ x = r then τ else max τ (T + 1) }
-  have hR3 : R3.Valid f D :=
-    ⟨by simpa [R3] using hf, fun q τ r _ _ => by simp only [R3]; split_ifs <;> omega,
-      fun q τ r _ _ => by simp only [R3]; split_ifs <;> omega⟩
-  have hs3 : s ∈ R3.faulty := mem_singleton_self _
-  have hp3 : ∀ τ ≤ T, R3.st A τ p = R1.st A τ p :=
-    st_eq_view rfl fun τ hτ hst y τ' hτ' => by
-      by_cases hyp : y = p
-      · subst hyp
-        exact dlv_self_eq (by simp [R3, hps]) (by simp [R1, Run.quiet, hpq]) (by simp [R3]) rfl
-          hτ' hst
-      by_cases hys : y = s
-      · subst hys
-        simp only [Run.dlv, Run.out_of_faulty A R3 hs3]
-        simp [R3, R1, Run.quiet, show τ' ≤ T by omega, hpq]
-      · obtain rfl := hall y hys hyp
-        rw [Run.dlv_eq_nil_of_ne _ _ (by simp only [R3, hys, hpq.symm, or_self, ite_false]; omega)]
-        simp [Run.dlv, R1, quiet_out_nil (show y ∈ ({y} : Finset P) from mem_singleton_self _)]
-  have hq3 : ∀ τ ≤ T, R3.st A τ q = R2.st A τ q :=
-    st_eq_view (by simp [R3, R2, Run.quiet, I0, hqs]) fun τ hτ hst y τ' hτ' => by
-      by_cases hyq : y = q
-      · subst hyq
-        exact dlv_self_eq (by simp [R3, hqs]) (by simp [R2, Run.quiet, hpq.symm]) (by simp [R3])
-          rfl hτ' hst
-      by_cases hys : y = s
-      · subst hys
-        simp only [Run.dlv, Run.out_of_faulty A R3 hs3]
-        simp [R3, R2, Run.quiet, show τ' ≤ T by omega]
-      · have hyp : y = p := by by_contra h; exact hyq (hall y hys h)
-        subst hyp
-        rw [Run.dlv_eq_nil_of_ne _ _ (by simp only [R3, hys, hpq, or_self, ite_false]; omega)]
-        simp [Run.dlv, R2, quiet_out_nil (show y ∈ ({y} : Finset P) from mem_singleton_self _)]
-  have hR3A : R3.AuthValid Au A := by
-    intro y hy τ r _ m hm x hx
-    obtain rfl : y = s := by simpa [R3] using hy
-    simp only [R3] at hm
-    split_ifs at hm with hτ hrq
-    · refine Run.tokens_replay hU (Ri := R2) (R' := R3) (T := T) (fun z σ r hσ => ?_) τ hτ y r m
-        hm x hx
-      by_cases hzs : z = y
-      · subst hzs; exact Or.inr (Or.inl ⟨hs3, by simp [R2, Run.quiet, hps.symm]⟩)
-      by_cases hzp : z = p
-      · subst hzp
-        refine Or.inr (Or.inr fun m hm => ?_)
-        rw [quiet_out_nil (mem_singleton_self _)] at hm; simp at hm
-      · obtain rfl := hall z hzs hzp
-        refine Or.inl ⟨by simp [R3, hzs], ?_⟩
-        rw [Run.out_of_correct A R3 (by simp [R3, hzs]),
-          Run.out_of_correct A R2 (by simp [R2, Run.quiet, hpq.symm]), hq3 σ hσ]
-    · refine Run.tokens_replay hU (Ri := R1) (R' := R3) (T := T) (fun z σ r hσ => ?_) τ hτ y r m
-        hm x hx
-      by_cases hzs : z = y
-      · subst hzs; exact Or.inr (Or.inl ⟨hs3, by simp [R1, Run.quiet, hqs.symm]⟩)
-      by_cases hzp : z = p
-      · subst hzp
-        refine Or.inl ⟨by simp [R3, hzs], ?_⟩
-        rw [Run.out_of_correct A R3 (by simp [R3, hzs]),
-          Run.out_of_correct A R1 (by simp [R1, Run.quiet, hpq]), hp3 σ hσ]
-      · obtain rfl := hall z hzs hzp
-        refine Or.inr (Or.inr fun m hm => ?_)
-        rw [quiet_out_nil (mem_singleton_self _)] at hm; simp at hm
-    · simp at hm
-  refine hab (hA.agreement R3 hR3 hR3A p (by simp [R3, hps]) q (by simp [R3, hqs]) a b
-    ⟨T1, ?_⟩ ⟨T2, ?_⟩)
-  · rw [hp3 T1 (le_max_left _ _), hT1]; rfl
-  · rw [hq3 T2 (le_max_right _ _), hT2]; simp [R2, Run.quiet]
+  -- `R₃`: merge `R₁` (seen by `p`) and `R₂` (seen by `q`); `s`, correct in both, is Byzantine
+  set R3 := R1.merge A R2 (max T1 T2)
+  have hR3f : R3.faulty ⊆ {s} := fun x hx => by
+    simp only [R3, Run.mem_merge_faulty, R1, R2, Run.quiet, mem_singleton] at hx
+    by_contra hxs
+    exact hx.1 (hall x (by simpa using hxs) hx.2)
+  refine hab (hA.agreement R3
+    (Run.merge_valid ((card_le_card hR3f).trans (by simpa using hf)) (fun _ _ _ _ _ => le_rfl)
+      fun _ _ _ _ _ => le_rfl)
+    (Run.merge_authValid hU Run.quiet_canonical Run.quiet_canonical) p
+    (by simp [R3, R2, Run.quiet]) q (by simp [R3, R1, Run.quiet]) a b ?_ ?_)
+  · exact Run.merge_decides_left Run.quiet_canonical (by simp [Run.quiet, hpq])
+      (by simp [R2, Run.quiet]) (le_max_left _ _) (by rw [hT1]; rfl)
+  · exact Run.merge_decides_right Run.quiet_canonical (by simp [R1, Run.quiet])
+      (by simp [Run.quiet, hpq.symm]) (le_max_right _ _) (by rw [hT2]; simp [R2, Run.quiet])
 
 /-- **Partially synchronous Byzantine broadcast is impossible for `n ∈ {2, 3}`** (with `f ≥ 1`,
 authenticated, any unforging algorithm, at least two values). -/

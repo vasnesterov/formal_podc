@@ -88,6 +88,9 @@ processes possibly asleep before GST, authenticated channels, arbitrary Byzantin
   matters (it bounds the extra faulty processes in `E'_base`), so the argument is unchanged and simpler.
 - **Lemma 6.** We build `c_{∌Q}` by giving every process other than `Q` a proposal (the paper removes `Q` and
   adds one process only when needed); either works.
+- **Lemma 7.** The merged execution (`Run.merge` of the canonical execution with `Q`'s isolated run) makes
+  *all* processes correct, not only `Q`: the other silent faulty processes are also cut off until both decisions
+  have happened. The argument is unchanged (the merged run just has fewer faulty processes).
 - **Theorem 5 / Lemma 8.** Vector consensus (Algorithms 1, 3, 5 of the paper, built on Quad / DBFT / reliable
   broadcast) is **not formalized**; its existence is a hypothesis (`VectorConsensusSolvable(Auth)`).
   `Universal` itself only needs `n > 2t` given vector consensus (`solvesConsensus_universal`); the paper's
