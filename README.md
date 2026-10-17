@@ -51,6 +51,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2019 | 1368 | Yin, Malkhi, Reiter, Golan Gueta, Abraham — *HotStuff: BFT Consensus with Linearity and Responsiveness* | [HotStuff](Papers/PODC2019/HotStuff) | ❌ **Theorem 5 (Chained HotStuff safety) false** for Algorithm 3 as written — missing height check; conflicting commits with round-robin leaders, one Byzantine replica (n=4, f=1), synchrony; fixed protocol proved safe; Basic HotStuff safety (Thm 2) true, proof gap; liveness proved; pacemaker claim unsupported |
 | 2018 | 556 | Herlihy — *Atomic Cross-Chain Swaps* | [AtomicCrossChainSwaps](Papers/PODC2018/AtomicCrossChainSwaps) | ❌ §3 theory correct (atomic iff reachability symmetric); **Theorem 4.9 (safety) false** for the protocol as specified — no deadline guard on secret release, 2-party coalition on the §1 example; **Theorem 4.7 (liveness) off by one Δ**; repaired protocol proved safe, live, atomic |
 | 2021 | 330 | Keidar, Kokoris-Kogias, Naor, Spiegelman — *All You Need is DAG* | [AllYouNeedIsDAG](Papers/PODC2021/AllYouNeedIsDAG) | ⚠️ DAG-Rider BAB properties proved (abstract RBC; liveness assuming good waves); Lemma 1 false for recursively committed leaders (n=4 counterexample) — total order still holds; chain quality depends on unspecified order; several proof gaps |
+| 2019 | 233 | Abraham, Malkhi, Spiegelman — *Asymptotically Optimal Validated Asynchronous Byzantine Agreement* | [VABA](Papers/PODC2019/VABA) | ❌ Agreement, external validity and the expected-constant-views bound proved for all n > 3f with n−f thresholds; **with the paper's 2f+1 thresholds, agreement (Lemma 13) and Lemma 3 are false for n > 3f+1** (n=5, f=1), although the paper allows any f < n/3; termination needs a halting rule; Algorithm 6 typo stalls view 1 |
 | 2012 | 221 | Vaidya, Tseng, Liang — *Iterative Approximate Byzantine Consensus in Arbitrary Directed Graphs* | [IterativeApproxBC](Papers/PODC2012/IterativeApproxBC) | ✅ Full characterization proved; a gap in the necessity proof repaired |
 | 2011 | 159 | Montresor, De Pellegrini, Miorandi — *Distributed k-Core Decomposition* | [KCoreDecomposition](Papers/PODC2011/KCoreDecomposition) | ⚠️ Safety and liveness (sync, async with fairness, one-host-many-nodes) and the time bounds (Theorems 4, 5, Cor. 1) proved; the Fig. 3 'worst-case' family needs N−2 rounds, not N−1; Cor. 2 message bound ignores the initial broadcast; proof gaps in Theorems 3, 5 |
 | 2021 | 137 | Abraham, Nayak, Ren, Xiang — *Good-case Latency of Byzantine Broadcast: a Complete Categorization* | [GoodCaseLatencyBB](Papers/PODC2021/GoodCaseLatencyBB) | ⚠️ All lower bounds of Table 1 proved in their intended ranges; Theorem 10 false for n = 3 and Theorems 4, 8, 9 for n = 2 (degenerate); Theorem 10's executions violate unforgeability (proof gap); Theorem 19's proof one Δ weaker than stated |
@@ -150,6 +151,13 @@ in the paper's `differencies.md`.
   violates its liveness theorem (Theorem 4.7): nothing is triggered even when everyone conforms. Both fixes are
   small (a deadline guard on secret release; one extra Δ in the timeouts), and the repaired protocol is proved
   safe, live and atomic. The theory of §3 is correct.
+- **Asymptotically Optimal Validated Asynchronous Byzantine Agreement** (PODC 2019, 233 citations) —
+  [VABA](Papers/PODC2019/VABA). The paper allows any f < n/3 (§2, Theorem 1, abstract) but uses quorum thresholds
+  of exactly 2f+1, which silently assumes n = 3f+1. For n > 3f+1 two such quorums can share only a Byzantine party,
+  so agreement (Lemma 13) and PB-provability (Lemma 3) fail: with n = 5, f = 1 a static adversary makes honest
+  parties decide `true` and `false` whenever the coin elects it (probability 1/5). The protocol is correct for
+  n = 3f+1, and with n−f thresholds agreement, validity and the expected < 3/2 views bound are proved for all
+  n > 3f. Termination is only argued vacuously (the protocol never halts).
 - **The Consensus Number of a Cryptocurrency** (PODC 2019, 81 citations) —
   [CryptoConsensusNumber](Papers/PODC2019/CryptoConsensusNumber). Lemma 3 (the consensusless message-passing
   asset transfer of Figure 4 is live) is false as written: incoming transfers are added only to the sender's history,
