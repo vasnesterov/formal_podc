@@ -21,8 +21,7 @@ of an event is the expectation of its indicator.
 
 ## Main statements
 
-* `piExpect_prod` (**independence**): `E[∏ i, f i (X_i)] = ∏ i, E[f i (X_i)]`; in particular
-  `sum_piWeight` (total mass) and `piExpect_const`.
+* `piExpect_prod` (**independence**): `E[∏ i, f i (X_i)] = ∏ i, E[f i (X_i)]`.
 * linearity and monotonicity: `piExpect_add`, `piExpect_mul_left`, `piExpect_sum`, `piExpect_mono`,
   `piExpect_nonneg`, `piExpect_congr` (only outcomes of nonzero weight matter).
 * `sum_mul_piExpect_update_single` (**law of total probability**): averaging the conditional
@@ -104,14 +103,6 @@ theorem piExpect_prod (μ : ∀ i, α i → ℝ) (f : ∀ i, α i → ℝ) :
     piExpect μ (fun x => ∏ i, f i (x i)) = ∏ i, ∑ a, μ i a * f i a := by
   simp only [piExpect, piWeight, ← prod_mul_distrib]
   exact (Fintype.prod_sum fun i a => μ i a * f i a).symm
-
-/-- The total mass of the product weight is the product of the total masses. -/
-theorem sum_piWeight (μ : ∀ i, α i → ℝ) : ∑ x, piWeight μ x = ∏ i, ∑ a, μ i a := by
-  simpa [piExpect] using piExpect_prod μ (fun _ _ => 1)
-
-/-- If every weight has total mass `1`, the expectation of a constant is the constant. -/
-theorem piExpect_const (hμ : ∀ i, ∑ a, μ i a = 1) (c : ℝ) : piExpect μ (fun _ => c) = c := by
-  rw [piExpect, ← sum_mul, sum_piWeight, prod_congr rfl fun i _ => hμ i, prod_const_one, one_mul]
 
 /-- Linearity of `piExpect`: additivity. -/
 theorem piExpect_add (μ : ∀ i, α i → ℝ) (f g : (∀ i, α i) → ℝ) :

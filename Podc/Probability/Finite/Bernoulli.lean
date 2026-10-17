@@ -16,12 +16,13 @@ needed (`coinProb_eq_measure_pi` is the bridge to `MeasureTheory.Measure.pi` of
 * `Cslib.Probability.coinProb p c = ∏ u, (if c u then p else 1 - p)`: the probability of the coin
   vector `c`; `coinExpect p g = ∑ c, coinProb p c * g c` (a special case of `piExpect`).
 * `Cslib.Probability.bernWeight p S = p ^ |S| (1 - p) ^ (|ι| - |S|)`: the probability of the
-  random subset `S` (`bernWeight_eq_coinProb`).
+  random subset `S` (`bernWeight_eq_coinProb`, `sum_bernWeight_mul_eq_coinExpect`).
 
 ## Main statements
 
 * `sum_coinProb`, `coinExpect_prod` (independence), linearity and monotonicity of `coinExpect`;
-* `coinExpect_allFalse` (`Pr[no coin of A] = (1-p)^|A|`), `coinExpect_coin` (`Pr[c u] = p`);
+* `coinExpect_forall_eq_true_and_forall_eq_false` (`Pr[all of In true, all of Out false] =
+  p^|In| (1-p)^|Out|`), `coinExpect_forall_eq_false`, `coinExpect_coin` (`Pr[c u] = p`);
 * `sum_bernWeight_indicator` (`Pr[In ⊆ S ∧ S ∩ Out = ∅] = p^|In| (1-p)^|Out|` for disjoint
   `In`, `Out`), `sum_bernWeight`, `sum_bernWeight_mul_card` (`E|S| = p |ι|`).
 -/
@@ -97,38 +98,54 @@ theorem coinExpect_congr {p : ℝ} {g h : (ι → Bool) → ℝ}
     (hgh : ∀ c, coinProb p c ≠ 0 → g c = h c) : coinExpect p g = coinExpect p h :=
   piExpect_congr (μ := fun (_ : ι) (b : Bool) => if b then p else 1 - p) hgh
 
-/-- `Pr[c u = false for all u ∈ A] = (1 - p) ^ |A|`. -/
-theorem coinExpect_allFalse (p : ℝ) (A : Finset ι) :
-    coinExpect p (fun c => if ∀ u ∈ A, c u = false then 1 else 0) = (1 - p) ^ #A := by
-  have : (fun c : ι → Bool => if ∀ u ∈ A, c u = false then (1 : ℝ) else 0) =
-      fun c => ∏ u, if u ∈ A then (if c u then 0 else 1) else 1 := by
+/-- `Pr[c u = true for all u ∈ In and c u = false for all u ∈ Out] = p ^ |In| (1 - p) ^ |Out|`
+for disjoint `In`, `Out`. -/
+theorem coinExpect_forall_eq_true_and_forall_eq_false (p : ℝ) {In Out : Finset ι}
+    (h : Disjoint In Out) :
+    coinExpect p (fun c => if (∀ u ∈ In, c u = true) ∧ ∀ u ∈ Out, c u = false then 1 else 0) =
+      p ^ #In * (1 - p) ^ #Out := by
+  set g : ι → Bool → ℝ := fun u b =>
+    if u ∈ In then (if b then 1 else 0) else if u ∈ Out then (if b then 0 else 1) else 1 with hg
+  have hind : (fun c : ι → Bool =>
+      if (∀ u ∈ In, c u = true) ∧ ∀ u ∈ Out, c u = false then (1 : ℝ) else 0) =
+      fun c => ∏ u, g u (c u) := by
     ext c
-    rw [prod_ite_mem, univ_inter]
-    by_cases h : ∀ u ∈ A, c u = false
-    · rw [ite_eq_left h, prod_eq_one fun u hu => by simp [h u hu]]
-    · push Not at h
-      obtain ⟨u, hu, hcu⟩ := h
-      rw [ite_eq_right (fun h' => hcu (h' u hu)),
-        prod_eq_zero hu (by simp [Bool.eq_false_iff.not.1 hcu |> fun h => by simpa using hcu])]
-  rw [this, coinExpect_prod p (fun u b => if u ∈ A then (if b then 0 else 1) else 1)]
-  rw [prod_congr rfl fun u _ => (show (p * (if u ∈ A then (if true then 0 else 1) else 1) +
-    (1 - p) * (if u ∈ A then (if false then 0 else 1) else 1) : ℝ) = if u ∈ A then 1 - p else 1
-      by by_cases hu : u ∈ A <;> simp [hu])]
-  rw [prod_ite_mem, univ_inter, prod_const]
+    by_cases hc : (∀ u ∈ In, c u = true) ∧ ∀ u ∈ Out, c u = false
+    · rw [ite_eq_left hc]
+      refine (prod_eq_one fun u _ => ?_).symm
+      by_cases hi : u ∈ In
+      · simp [hg, hi, hc.1 u hi]
+      · by_cases ho : u ∈ Out <;> simp [hg, hi, ho, hc.2 u]
+    · rw [ite_eq_right hc]
+      refine (prod_eq_zero_iff.2 ?_).symm
+      rw [not_and_or] at hc
+      rcases hc with hc | hc
+      · push Not at hc
+        obtain ⟨u, hu, hcu⟩ := hc
+        exact ⟨u, mem_univ _, by simp [hg, hu, hcu]⟩
+      · push Not at hc
+        obtain ⟨u, hu, hcu⟩ := hc
+        have hi : u ∉ In := fun hi => disjoint_left.1 h hi hu
+        exact ⟨u, mem_univ _, by simp [hg, hi, hu, hcu]⟩
+  rw [hind, coinExpect_prod]
+  have hfac : ∀ u, p * g u true + (1 - p) * g u false =
+      (if u ∈ In then p else 1) * (if u ∈ Out then 1 - p else 1) := by
+    intro u
+    by_cases hi : u ∈ In
+    · have ho : u ∉ Out := disjoint_left.1 h hi
+      simp [hg, hi, ho]
+    · by_cases ho : u ∈ Out <;> simp [hg, hi, ho]
+  simp_rw [hfac, prod_mul_distrib, prod_ite_mem, univ_inter, prod_const]
+
+/-- `Pr[c u = false for all u ∈ A] = (1 - p) ^ |A|`. -/
+theorem coinExpect_forall_eq_false (p : ℝ) (A : Finset ι) :
+    coinExpect p (fun c => if ∀ u ∈ A, c u = false then 1 else 0) = (1 - p) ^ #A := by
+  simpa using coinExpect_forall_eq_true_and_forall_eq_false p (disjoint_empty_left A)
 
 /-- `Pr[c u = true] = p`. -/
 theorem coinExpect_coin (p : ℝ) (u : ι) :
     coinExpect p (fun c => if c u = true then 1 else 0) = p := by
-  have : (fun c : ι → Bool => if c u = true then (1 : ℝ) else 0) =
-      fun c => ∏ v, if v = u then (if c v then 1 else 0) else 1 := by
-    ext c
-    rw [prod_ite_eq']
-    simp
-  rw [this, coinExpect_prod p (fun v b => if v = u then (if b then 1 else 0) else 1)]
-  rw [prod_congr rfl fun v _ => (show (p * (if v = u then (if true then 1 else 0) else 1) +
-    (1 - p) * (if v = u then (if false then 1 else 0) else 1) : ℝ) = if v = u then p else 1
-      by by_cases hv : v = u <;> simp [hv])]
-  simp
+  simpa using coinExpect_forall_eq_true_and_forall_eq_false p (disjoint_empty_right {u})
 
 omit [DecidableEq ι] in
 /-- Bridge to measure theory: `coinProb p c` is the probability of `{c}` under the product of
@@ -163,51 +180,36 @@ theorem bernWeight_nonneg {p : ℝ} (h0 : 0 ≤ p) (h1 : p ≤ 1) (S : Finset ι
     0 ≤ bernWeight p S :=
   mul_nonneg (pow_nonneg h0 _) (pow_nonneg (by linarith) _)
 
+/-- Expectations over the random subset are expectations over the coin vector of its
+indicator. -/
+theorem sum_bernWeight_mul_eq_coinExpect (p : ℝ) (X : Finset ι → ℝ) :
+    ∑ S ∈ univ.powerset, bernWeight p S * X S =
+      coinExpect p (fun c => X (univ.filter fun u => c u = true)) := by
+  rw [coinExpect]
+  refine sum_nbij' (fun S u => decide (u ∈ S)) (fun c => univ.filter fun u => c u = true)
+    (by simp) (by simp) (fun S _ => by ext; simp) (fun c _ => by ext; simp) (fun S _ => ?_)
+  rw [bernWeight_eq_coinProb]
+  congr 2
+  ext; simp
+
 /-- `Pr[In ⊆ S ∧ S ∩ Out = ∅] = p ^ |In| * (1 - p) ^ |Out|` for disjoint `In`, `Out`. -/
 theorem sum_bernWeight_indicator (p : ℝ) (In Out : Finset ι) (h : Disjoint In Out) :
     ∑ S ∈ univ.powerset, bernWeight p S * (if In ⊆ S ∧ Disjoint S Out then 1 else 0) =
       p ^ #In * (1 - p) ^ #Out := by
-  set f : ι → ℝ := fun i => if i ∈ Out then 0 else p
-  set g : ι → ℝ := fun i => if i ∈ In then 0 else 1 - p
-  have key := Finset.prod_add f g (univ : Finset ι)
-  have hl : ∏ i, (f i + g i) = p ^ #In * (1 - p) ^ #Out := by
-    have : ∀ i, f i + g i = (if i ∈ In then p else 1) * (if i ∈ Out then 1 - p else 1) := by
-      intro i
-      by_cases hi : i ∈ In
-      · have : i ∉ Out := Finset.disjoint_left.1 h hi
-        simp [f, g, hi, this]
-      · by_cases ho : i ∈ Out <;> simp [f, g, hi, ho]
-    simp_rw [this, Finset.prod_mul_distrib, Finset.prod_ite_mem, univ_inter, prod_const]
-  rw [hl] at key
-  rw [key]
-  refine Finset.sum_congr rfl fun t _ => ?_
-  unfold bernWeight
-  by_cases hIn : In ⊆ t
-  · by_cases hOut : Disjoint t Out
-    · rw [ite_eq_left ⟨hIn, hOut⟩, mul_one]
-      have h1 : ∏ i ∈ t, f i = p ^ #t := by
-        rw [Finset.prod_congr rfl (g := fun _ => p), prod_const]
-        intro i hi; simp [f, Finset.disjoint_left.1 hOut hi]
-      have h2 : ∏ i ∈ univ \ t, g i = (1 - p) ^ (Fintype.card ι - #t) := by
-        rw [Finset.prod_congr rfl (g := fun _ => 1 - p), prod_const, card_sdiff_of_subset
-          (subset_univ _), card_univ]
-        intro i hi
-        have : i ∉ In := fun h' => (mem_sdiff.1 hi).2 (hIn h')
-        simp [g, this]
-      rw [h1, h2]
-    · rw [ite_eq_right (fun h' => hOut h'.2), mul_zero]
-      obtain ⟨i, hit, hio⟩ := Finset.not_disjoint_iff.1 hOut
-      have : ∏ i ∈ t, f i = 0 := Finset.prod_eq_zero hit (by simp [f, hio])
-      rw [this, zero_mul]
-  · rw [ite_eq_right (fun h' => hIn h'.1), mul_zero]
-    obtain ⟨i, hii, hit⟩ := Finset.not_subset.1 hIn
-    have : ∏ i ∈ univ \ t, g i = 0 :=
-      Finset.prod_eq_zero (mem_sdiff.2 ⟨mem_univ _, hit⟩) (by simp [g, hii])
-    rw [this, mul_zero]
+  rw [sum_bernWeight_mul_eq_coinExpect, ← coinExpect_forall_eq_true_and_forall_eq_false p h]
+  congr 1
+  ext c
+  congr 1
+  simp only [subset_iff, mem_filter, mem_univ, true_and, disjoint_left]
+  refine propext (and_congr Iff.rfl ⟨fun h' u hu => ?_, fun h' u hcu hu => ?_⟩)
+  · by_contra hc
+    exact h' (by simpa using hc) hu
+  · simp [h' u hu] at hcu
 
+omit [DecidableEq ι] in
 /-- The weights of all subsets sum to `1`. -/
 theorem sum_bernWeight (p : ℝ) : ∑ S ∈ (univ : Finset ι).powerset, bernWeight p S = 1 := by
-  simpa using sum_bernWeight_indicator (ι := ι) p ∅ ∅ (disjoint_empty_left _)
+  simpa [bernWeight] using Finset.sum_pow_mul_eq_add_pow p (1 - p) (univ : Finset ι)
 
 /-- The expected size of the random subset is `p |ι|`. -/
 theorem sum_bernWeight_mul_card (p : ℝ) :
