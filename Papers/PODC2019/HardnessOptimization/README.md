@@ -119,4 +119,5 @@ Full list of differences (including modelling choices and minor imprecisions): [
     monotonicity.
   * Hamiltonian path family: `k = 2`, all inputs.
   * Lemma 2.4: `k = 2`, all inputs.
-* The framework (`Podc/CongestLB/`) is a CSLib candidate.
+* The framework (`Podc/CongestLB/`) is a CSLib candidate. `IsDominating G D` is
+  `SimpleGraph.IsDominatingSet G ↑D` (`Podc/Graph/Ball.lean`).
