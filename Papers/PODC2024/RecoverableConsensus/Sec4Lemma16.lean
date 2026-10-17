@@ -70,11 +70,6 @@ section Upper
 variable {ιR ιS : Type} [DecidableEq ιR] [DecidableEq ιS] {R : ιR → ObjSpec} {n n' m : ℕ}
   {A : Alg m (withRW (ιS := ιS) R (Tnn n n'))} {z : ℕ} {C : Cfg A}
 
-lemma reach_true (hC : Reach A (fun _ => True) C) (γ : List (Ev m)) :
-    Reach A (fun _ => True) (run C γ) := by
-  obtain ⟨x, γ₀, -, rfl⟩ := hC
-  exact ⟨x, γ₀ ++ γ, trivial, by rw [run_append]⟩
-
 /-- Extensions of `α p` by `β` followed by any events of `last` with at most `c` crashes are
 in `E*_z`. -/
 def Good (α : List (Ev m)) (last r : Fin m) (β : List (Ev m)) (c : ℕ) : Prop :=
@@ -232,7 +227,7 @@ lemma rounds (hA : RecConsensus A) (hC : Reach A (fun _ => True) C) (hn : 0 < n)
         min (idx (n := n) (D₁.mem (Sum.inr j)) + 1) n := idx_op _ y
     obtain ⟨c', rfl⟩ : ∃ c', c = c' + 1 := ⟨c - 1, by omega⟩
     obtain ⟨w, K', hK'⟩ := hA.exists_soloOut hAdm
-      (reach_true hC (α ++ [.step p] ++ (β₀ ++ [.step last, .crash last]))) last
+      (hC.run_true (α ++ [.step p] ++ (β₀ ++ [.step last, .crash last]))) last
     refine ihd (n - (idx (n := n) (D₀.mem (Sum.inr j)) + 1)) (by omega) K'
       (β₀ ++ [.step last, .crash last]) (β₁ ++ [.step last, .crash last]) c' ?_ ⟨w, hK'⟩
       hg₀.stepCrash hg₁.stepCrash ?_ ?_ ?_ ?_ ?_ <;> rw [e₀'] <;> (try rw [e₁'])
@@ -282,7 +277,7 @@ theorem not_recSolvable {n n' m : ℕ} (h1 : 1 ≤ n') (h2 : n' < n) (hm : n' < 
   obtain ⟨α, hc⟩ := exists_crit hA hAdm hC hb
   obtain ⟨i, hpo⟩ := hc.poised hA hAdm hC hm0
   rcases i with jR | j
-  · exact not_rw_obj hA hAdm hC hm0 hc (i := Sum.inl jR) (hR jR) hpo
+  · exact hc.not_forall_poised_of_rwLike hA hAdm hC hm0 (i := Sum.inl jR) (hR jR) hpo
   have hops := all_ops hA hAdm hC hm0 hc hpo
   obtain ⟨⟨p, hp⟩, ⟨q, hq⟩⟩ := hc.teams hA hAdm hC hm0
   let last : Fin m := ⟨m - 1, by omega⟩
@@ -320,7 +315,7 @@ theorem not_recSolvable {n n' m : ℕ} (h1 : 1 ≤ n') (h2 : n' < n) (hm : n' < 
       omega
   obtain ⟨hp1, hp2, hp3, hp4⟩ := key p
   obtain ⟨hq1, hq2, hq3, hq4⟩ := key q
-  obtain ⟨w, K, hK⟩ := hA.exists_soloOut hAdm (reach_true hC (α ++ [.step p] ++
+  obtain ⟨w, K, hK⟩ := hA.exists_soloOut hAdm (hC.run_true (α ++ [.step p] ++
     (((List.finRange m).erase p).map Ev.step ++ [.crash last]))) last
   refine rounds hA hC (by omega) hp hq last j _ K _ _ n rfl ⟨w, hK⟩ hp4 hq4 (by omega)
     (by rw [hp1, hq1]) (fun i hi => by rw [hp2 i hi, hq2 i hi]) (by rw [hp3, hq3]) ?_

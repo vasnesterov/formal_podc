@@ -8,10 +8,9 @@ Shared infrastructure for the proofs of Lemma 15 and Lemma 16 (type `T_{n,n'}`):
 * `idx u` — how many `op₀`/`op₁` operations the value `u` has absorbed (`s ↦ 0`,
   `s_{x,i} ↦ i`, `s⊥ ↦ n`); `op_y` maps `idx` to `min (idx + 1) n` (`idx_op`), and `opR` breaks
   the object iff `n' < idx` (`tδ_opR_of_lt`, `tδ_opR_cases`);
-* `absorb`, `contra_absorb` — at a critical execution, if the operation of `q` gives the same
-  result after the operation of `p`, then `p` and `q` cannot be on different teams;
-* `not_rw_obj` — the processes of a critical execution are not all poised on a read/write
-  object ("standard argument" of the paper);
+* the absorption contradiction (`Team.false_of_absorb`) and the "standard argument" for
+  read/write objects (`Crit.not_forall_poised_of_rwLike`) are shared
+  (`Podc/Computability/Distributed/SharedMemory/Recoverable.lean`);
 * `all_ops` — if they are all poised on a `T_{n,n'}` object, nobody is poised to apply `opR`
   (first part of the proofs of Lemmas 15 and 16);
 * `run_ops` — running distinct processes poised to apply `op₀`/`op₁`;
@@ -113,89 +112,6 @@ def mem0 {n n' : ℕ} : (i : Empty ⊕ Unit) → (T1 n n' i).State
   | .inl e => e.elim
   | .inr _ => (TVal.s : TVal n)
 
-/-! ## Generic lemmas about the model -/
-
-section Generic
-
-variable {ι : Type} [DecidableEq ι] {T : ι → ObjSpec} {m : ℕ} {A : Alg m T}
-
-/-- If `q`'s operation on `i` behaves the same after `p`'s operation on `i`, then `Dpq` and
-`Dq` are indistinguishable to `q` and have the same object values. -/
-lemma absorb (D : Cfg A) {p q : Fin m} (hpq : p ≠ q) {i : ι} {op oq : (T i).Op}
-    {kp kq : (T i).Resp → A.L}
-    (hp : A.act (D.loc p) = .access i op kp) (hq : A.act (D.loc q) = .access i oq kq)
-    (h : (T i).δ ((T i).δ (D.mem i) op).1 oq = (T i).δ (D.mem i) oq) :
-    AgreeOn {q} ((D.stepP p).stepP q) (D.stepP q) := by
-  have hq' : A.act ((D.stepP p).loc q) = .access i oq kq := by
-    rw [stepP_loc_other D (Ne.symm hpq)]; exact hq
-  rw [stepP_of_access _ hq', stepP_of_access D hp, stepP_of_access D hq]
-  refine ⟨?_, ?_⟩
-  · simp only [Function.update_self, h, Function.update_idem]
-  · intro r hr
-    simp only [Set.mem_singleton_iff] at hr
-    subst hr
-    simp [Function.update_self, h]
-
-lemma stepP_loc_self (D : Cfg A) {p : Fin m} {i : ι} {o : (T i).Op} {k : (T i).Resp → A.L}
-    (h : A.act (D.loc p) = .access i o k) : (D.stepP p).loc p = k ((T i).δ (D.mem i) o).2 := by
-  rw [stepP_of_access D h]; simp
-
-lemma stepP_mem_self (D : Cfg A) {p : Fin m} {i : ι} {o : (T i).Op} {k : (T i).Resp → A.L}
-    (h : A.act (D.loc p) = .access i o k) : (D.stepP p).mem i = ((T i).δ (D.mem i) o).1 := by
-  rw [stepP_of_access D h]; simp
-
-lemma stepP_mem_other (D : Cfg A) {p : Fin m} {i : ι} {o : (T i).Op} {k : (T i).Resp → A.L}
-    (h : A.act (D.loc p) = .access i o k) {j : ι} (hj : j ≠ i) : (D.stepP p).mem j = D.mem j := by
-  rw [stepP_of_access D h]; simp [Function.update_of_ne hj]
-
-lemma stepP_inp (D : Cfg A) (p : Fin m) : (D.stepP p).inp = D.inp := next_inp D (.step p)
-
-variable {Adm : List (Ev m) → Prop} {z : ℕ} {C : Cfg A}
-
-lemma run_two (α : List (Ev m)) (p q : Fin m) :
-    run C (α ++ [.step p] ++ [.step q]) = ((run C α).stepP p).stepP q := by
-  rw [run_append, run_append]; rfl
-
-lemma run_one (α : List (Ev m)) (p : Fin m) :
-    run C (α ++ [.step p] ++ []) = (run C α).stepP p := by
-  rw [List.append_nil, run_append]; rfl
-
-/-- Two processes on different teams at a critical execution, where the operation of the
-second one is not affected by the operation of the first one: contradiction. -/
-lemma contra_absorb (hA : Solves A Adm) (hAdm : AdmOK Adm z) (hC : Reach A Adm C)
-    {α : List (Ev m)} (hc : Crit z C α) {p q : Fin m} {v w : Bool} (hpt : Team z C α p v)
-    (hqt : Team z C α q w) (hvw : v ≠ w) {i : ι} {op oq : (T i).Op} {kp kq : (T i).Resp → A.L}
-    (hp : A.act ((run C α).loc p) = .access i op kp)
-    (hq : A.act ((run C α).loc q) = .access i oq kq)
-    (h : (T i).δ ((T i).δ ((run C α).mem i) op).1 oq = (T i).δ ((run C α).mem i) oq) : False := by
-  have hpq : p ≠ q := by
-    rintro rfl
-    exact hvw (hpt.unique hA hAdm hC hqt)
-  have hw : w = !v := by cases v <;> cases w <;> simp_all
-  subst hw
-  have hs : InEs z (α ++ [.step p] ++ [.step q]) := by
-    rw [List.append_assoc]; exact hc.1.append_crashFree (crashFree_steps [p, q])
-  have hs' : InEs z (α ++ [.step q] ++ []) := by
-    rw [List.append_nil]; exact hc.1.append_crashFree (crashFree_steps [q])
-  refine team_contra hA hAdm hC hpt hqt (r := q) hs hs' ?_
-  rw [run_two, run_one]
-  exact absorb _ hpq hp hq h
-
-/-- At a critical execution, the processes cannot all be poised on a read/write object. -/
-lemma not_rw_obj (hA : Solves A Adm) (hAdm : AdmOK Adm z) (hC : Reach A Adm C) (hm : 0 < m)
-    {α : List (Ev m)} (hc : Crit z C α) {i : ι} (hRW : (T i).RWLike)
-    (hpo : ∀ p, (run C α).Poised p i) : False := by
-  obtain ⟨⟨p, hp⟩, ⟨q, hq⟩⟩ := hc.teams hA hAdm hC hm
-  obtain ⟨op, kp, hop⟩ := hpo p
-  obtain ⟨oq, kq, hoq⟩ := hpo q
-  rcases hRW op with h1 | h1
-  · exact contra_absorb hA hAdm hC hc hp hq (by simp) hop hoq (by rw [h1])
-  · rcases hRW oq with h2 | h2
-    · exact contra_absorb hA hAdm hC hc hq hp (by simp) hoq hop (by rw [h2])
-    · exact contra_absorb hA hAdm hC hc hp hq (by simp) hop hoq (h2 _ _)
-
-end Generic
-
 /-! ## Algorithms using `T_{n,n'}` and read/write objects -/
 
 section Tnn
@@ -263,8 +179,8 @@ lemma all_ops (hA : Solves A Adm) (hAdm : AdmOK Adm z) (hC : Reach A Adm C) (hm 
     obtain ⟨q, hq⟩ : ∃ q, Team z C α q (!v) := by cases v; exacts [⟨p1, hp1⟩, ⟨p0, hp0⟩]
     obtain ⟨oq, kq, hoq⟩ := hpo q
     rcases tδ_opR_cases (n' := n') ((run C α).mem (Sum.inr j)) with h | h
-    · exact contra_absorb hA hAdm hC hc hv hq (by cases v <;> simp) ho hoq (by erw [h])
-    · refine contra_absorb hA hAdm hC hc hq hv (by cases v <;> simp) hoq ho ?_
+    · exact hv.false_of_absorb hA hAdm hC hc.1 hq (by cases v <;> simp) ho hoq (by erw [h])
+    · refine hq.false_of_absorb hA hAdm hC hc.1 hv (by cases v <;> simp) hoq ho ?_
       show tδ n n' (tδ n n' _ oq).1 .opR = tδ n n' _ .opR
       rw [tδ_opR_of_lt h, tδ_opR_of_lt (lt_idx_tδ h oq)]
 

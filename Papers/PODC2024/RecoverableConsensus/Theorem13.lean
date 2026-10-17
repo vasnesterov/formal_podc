@@ -192,7 +192,7 @@ theorem stage_step {D₀ : Cfg A} (hst : Stuck D₀) {v : Bool} {j : ℕ} (hS : 
   obtain ⟨hs, hU, hag, hout, hDiU⟩ := after_crashes (X := []) hA (le_refl 1) hn hD hc hk₁ hℓ
     (by simp) (by simpa using hmem0)
   set Di := run (run D α) ([] ++ lam n k) with hDi
-  have hDir : Reach A (fun _ => True) Di := reach_run (reach_run hD _) _
+  have hDir : Reach A (fun _ => True) Di := (hD.run_true _).run_true _
   have hLk : k ≤ (last n (by omega)).val := by simp [last]; omega
   -- `D_i` is bivalent
   have hbiv : Biv 1 Di [] := by
@@ -269,7 +269,7 @@ theorem base_special {D₀ : Cfg A} (hD₀ : Reach A (fun _ => True) D₀) (hst 
   obtain ⟨hs, hU, hag, hout, hD1U⟩ := after_crashes (X := [.step L]) (k := n - 1) hA (le_refl 1)
     hn hD₀ hc₀ hpi ⟨pi, by simp, hpik⟩ hX hmem
   set D₁ := run (run D₀ []) ([Ev.step L] ++ lam n (n - 1)) with hD₁
-  have hD₁r : Reach A (fun _ => True) D₁ := reach_run (reach_run hD₀ _) _
+  have hD₁r : Reach A (fun _ => True) D₁ := (hD₀.run_true _).run_true _
   have hLk : n - 1 ≤ L.val := by simp [hL, last]
   -- `D₁ = D₀' p_{n-1} c_{n-1}` is bivalent
   have hbiv : Biv 1 D₁ [] := by
@@ -376,7 +376,7 @@ theorem theorem13 (hn : 2 ≤ n) (hA : RecConsensus A) : ∃ i, IsRecording n (T
     intro γ hγ hE
     rw [← run_append]
     exact hst γ hγ (hβ.append hE)
-  have hD₀ : Reach A (fun _ => True) (run (initCfg A x) β) := reach_run ⟨x, [], trivial, rfl⟩ β
+  have hD₀ : Reach A (fun _ => True) (run (initCfg A x) β) := Reach.run_true ⟨x, [], trivial, rfl⟩ β
   rcases base_case hA hn hD₀ hstuck hbD₀ with hf | ⟨v, j, hS⟩
   · exact hf
   · exact final_of_stage hA hn hstuck _ j rfl hS

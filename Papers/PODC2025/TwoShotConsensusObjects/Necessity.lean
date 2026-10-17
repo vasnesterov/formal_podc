@@ -67,8 +67,9 @@ theorem c2_or_smaller [Fintype ιS] (hR : ∀ j, (R j).RWLike) (hA : WFConsensus
   have hGF : AgreeAll (.inr S.k) S.G S.F := S.agreeAll_two h0 h1 h10
   -- the edge `{c₀, c₁}`
   have he01 : S.Edge c0 c1 := by
-    refine ⟨solo 0 ta ++ solo 1 tb, (solo_crashFree 0 ta).append (solo_crashFree 1 tb),
-      fun p => ?_, ⟨κc0, ?_⟩, ⟨κc1, ?_⟩⟩
+    refine ⟨solo 0 ta ++ solo 1 tb,
+      (crashFree_replicate (n := 2) ta 0).append (crashFree_replicate tb 1), fun p => ?_,
+      ⟨κc0, ?_⟩, ⟨κc1, ?_⟩⟩
     · rw [accCount_append]
       fin_cases p
       · simp only [Fin.zero_eta]
@@ -80,7 +81,8 @@ theorem c2_or_smaller [Fintype ιS] (hR : ∀ j, (R j).RWLike) (hA : WFConsensus
   -- the edge `{f', g'}` (computed from `gf`, transferred to `fg`)
   have heFG : S.Edge f' g' := by
     set γ : List (Ev 2) := solo 1 ta' ++ solo 0 tb' with hγ
-    have hγc : CrashFree γ := (solo_crashFree 1 ta').append (solo_crashFree 0 tb')
+    have hγc : CrashFree γ :=
+      (crashFree_replicate (n := 2) ta' 1).append (crashFree_replicate tb' 0)
     have hnoG : ∀ p, accCount S.G γ p (.inr S.k) = 0 := fun p => by
       rw [hγ, accCount_append]
       fin_cases p
@@ -150,46 +152,9 @@ theorem necessity {O : ObjSpec} {m : Fin 2 → Set O.Op} (h : Solvable O m) :
   have hp : ∀ p, ∃ o κ, A.act ((run (initCfg A S.x) S.α).loc p) = .access i o κ := hpo
   rcases i with j | k
   · -- both poised on a read/write object: impossible
-    exfalso
-    obtain ⟨o0, κ0, ho0⟩ := hp 0
-    obtain ⟨o1, κ1, ho1⟩ := hp 1
-    set E := run (initCfg A S.x) S.α with hE
-    have hvq : ∀ p q : Fin 2, p ≠ q → S.val q = !S.val p := by
-      intro p q hpq
-      have := S.val_ne hpq
-      cases h1 : S.val p <;> cases h2 : S.val q <;> simp_all
-    -- `p` steps first, then `q`; compared with `q` alone, `q` cannot tell
-    have key : ∀ (p q : Fin 2) (hpq : p ≠ q) (op : (R j).Op) (κp : (R j).Resp → A.L)
-        (oq : (R j).Op) (κq : (R j).Resp → A.L),
-        A.act (E.loc p) = .access (.inl j) op κp → A.act (E.loc q) = .access (.inl j) oq κq →
-        ((∀ s, ((R j).δ s op).1 = s) ∨ (∀ s s', (R j).δ s oq = (R j).δ s' oq)) → False := by
-      intro p q hpq op κp oq κq hop hoq hcase
-      have hoq' : A.act ((E.next (.step p)).loc q) = .access (.inl j) oq κq := by
-        rw [next_loc_other E _ (by simpa using hpq.symm)]; exact hoq
-      have hs : (withRW (ιS := ιS) R O (.inl j)).δ
-          ((withRW (ιS := ιS) R O (.inl j)).δ (E.mem (.inl j)) op).1 oq =
-          (withRW (ιS := ιS) R O (.inl j)).δ (E.mem (.inl j)) oq := by
-        rcases hcase with h | h
-        · exact congrArg (fun s => (R j).δ s oq) (h _)
-        · exact h _ _
-      have hag : AgreeOn {q} (run (initCfg A S.x) (S.α ++ [.step p] ++ [.step q]))
-          (run (initCfg A S.x) (S.α ++ [.step q] ++ [])) := by
-        have e1 : run (initCfg A S.x) (S.α ++ [.step q] ++ []) = E.next (.step q) := by
-          rw [List.append_nil, run_concat]
-        have e2 : run (initCfg A S.x) (S.α ++ [.step p] ++ [.step q]) =
-            (E.next (.step p)).next (.step q) := by
-          rw [run_concat, run_concat]
-        rw [e1, e2]
-        exact agreeOn_two_steps hpq hop hoq hs
-      exact team_contra hA admOK_crashFree (Reach.initial admOK_crashFree S.x)
-        (S.team p) (by rw [← hvq p q hpq]; exact S.team q)
-        (InEs.of_crashFree ((S.hα.append (crashFree_single p)).append (crashFree_single q)) 0)
-        (InEs.of_crashFree ((S.hα.append (crashFree_single q)).append (fun _ h => by simp at h)) 0) hag
-    rcases hR j o0 with h0 | h0
-    · exact key 0 1 (by decide) o0 κ0 o1 κ1 ho0 ho1 (Or.inl h0)
-    · rcases hR j o1 with h1 | h1
-      · exact key 1 0 (by decide) o1 κ1 o0 κ0 ho1 ho0 (Or.inl h1)
-      · exact key 0 1 (by decide) o0 κ0 o1 κ1 ho0 ho1 (Or.inr h1)
+    exact (Team.false_of_rwLike hA admOK_crashFree (Reach.initial admOK_crashFree S.x)
+      (InEs.of_crashFree S.hα 0) (S.team 0) (S.team 1) S.hval (i := .inl j) (hR j)
+      (hpo 0) (hpo 1)).elim
   · obtain ⟨f, κf, hf⟩ := hp 0
     obtain ⟨g, κg, hg⟩ := hp 1
     let K : KSetup A := ⟨S, k, ![f, g], ![κf, κg], fun p => by fin_cases p <;> simpa⟩

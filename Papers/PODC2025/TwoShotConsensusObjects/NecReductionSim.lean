@@ -125,26 +125,6 @@ structure Inv (x : Fin 2 → Bool) (C' : Cfg (A' A F k dec)) (γ : List (Ev 2)) 
   fresh : ∀ q, (C'.loc q).isStart = true → Ev.step q ∉ γ
 
 
-/-! ## Generic lemmas -/
-
-section Generic
-
-variable {ι : Type} [DecidableEq ι] {T : ι → ObjSpec} {n : ℕ} {B : Alg n T}
-
-lemma stepP_mem_self (C : Cfg B) {p : Fin n} {i : ι} {o : (T i).Op} {κ : (T i).Resp → B.L}
-    (h : B.act (C.loc p) = .access i o κ) : (C.stepP p).mem i = ((T i).δ (C.mem i) o).1 := by
-  rw [stepP_of_access C h]; exact Function.update_self _ _ _
-
-lemma stepP_mem_ne (C : Cfg B) {p : Fin n} {i : ι} {o : (T i).Op} {κ : (T i).Resp → B.L}
-    (h : B.act (C.loc p) = .access i o κ) {j : ι} (hj : j ≠ i) : (C.stepP p).mem j = C.mem j := by
-  rw [stepP_of_access C h]; exact Function.update_of_ne hj _ _
-
-lemma stepP_loc_self (C : Cfg B) {p : Fin n} {i : ι} {o : (T i).Op} {κ : (T i).Resp → B.L}
-    (h : B.act (C.loc p) = .access i o κ) : (C.stepP p).loc p = κ ((T i).δ (C.mem i) o).2 := by
-  rw [stepP_of_access C h]; exact Function.update_self _ _ _
-
-end Generic
-
 /-! ## Basic facts about the new algorithm -/
 
 variable (A F k dec) in
@@ -267,10 +247,10 @@ lemma step_simR {x : Fin 2 → Bool} {C' : Cfg (A' A F k dec)} {γ : List (Ev 2)
         · subst hj
           exact (stepP_mem_self _ hact).trans
             ((congrArg Prod.fst hδ).trans (stepP_mem_self _ haD).symm)
-        · exact (stepP_mem_ne _ hact (by simpa using hj)).trans
-            ((hI.rel.memR j').trans (stepP_mem_ne _ haD (by simpa using hj)).symm)
-      · exact (stepP_mem_ne _ hact (by simp)).trans
-          ((hI.rel.memS k').trans (stepP_mem_ne _ haD (by simp)).symm)
+        · exact (stepP_mem_other _ hact (by simpa using hj)).trans
+            ((hI.rel.memR j').trans (stepP_mem_other _ haD (by simpa using hj)).symm)
+      · exact (stepP_mem_other _ hact (by simp)).trans
+          ((hI.rel.memS k').trans (stepP_mem_other _ haD (by simp)).symm)
       · by_cases hqp : q = p
         · subst hqp
           rw [stepP_loc_self _ hact, stepP_loc_self _ haD]
@@ -280,7 +260,7 @@ lemma step_simR {x : Fin 2 → Bool} {C' : Cfg (A' A F k dec)} {γ : List (Ev 2)
           by_cases hqp : q = p
           · rw [hqp, hl]; rfl
           · rwa [stepP_loc_other _ hqp] at hq
-        exact (stepP_mem_ne _ hact (by simp)).trans (hI.rel.reg q hq')
+        exact (stepP_mem_other _ hact (by simp)).trans (hI.rel.reg q hq')
     have hfresh : ∀ q, ((C'.stepP p).loc q).isStart = true → Ev.step q ∉ γ ++ [.step p] := by
       intro q hq
       by_cases hqp : q = p
@@ -312,15 +292,15 @@ lemma step_simS {x : Fin 2 → Bool} {C' : Cfg (A' A F k dec)} {γ : List (Ev 2)
   · rw [hpr, hnext]
     have hrel : Rel x (C'.stepP p) (D.stepP p) := by
       refine ⟨fun j' => ?_, fun k' => ?_, fun q => ?_, fun q hq => ?_⟩
-      · exact (stepP_mem_ne _ hact (by simp)).trans
-          ((hI.rel.memR j').trans (stepP_mem_ne _ haD (by simp)).symm)
+      · exact (stepP_mem_other _ hact (by simp)).trans
+          ((hI.rel.memR j').trans (stepP_mem_other _ haD (by simp)).symm)
       · by_cases hk : k' = k1
         · subst hk
           exact (stepP_mem_self _ hact).trans
             ((congrArg Prod.fst hδ).trans (stepP_mem_self _ haD).symm)
         · have hk' : k'.1 ≠ k0 := fun h => hk (Subtype.ext h)
-          exact (stepP_mem_ne _ hact (by simpa using hk)).trans
-            ((hI.rel.memS k').trans (stepP_mem_ne _ haD (by simpa using hk')).symm)
+          exact (stepP_mem_other _ hact (by simpa using hk)).trans
+            ((hI.rel.memS k').trans (stepP_mem_other _ haD (by simpa using hk')).symm)
       · by_cases hqp : q = p
         · subst hqp
           rw [stepP_loc_self _ hact, stepP_loc_self _ haD]
@@ -330,7 +310,7 @@ lemma step_simS {x : Fin 2 → Bool} {C' : Cfg (A' A F k dec)} {γ : List (Ev 2)
           by_cases hqp : q = p
           · rw [hqp, hl]; rfl
           · rwa [stepP_loc_other _ hqp] at hq
-        exact (stepP_mem_ne _ hact (by simp)).trans (hI.rel.reg q hq')
+        exact (stepP_mem_other _ hact (by simp)).trans (hI.rel.reg q hq')
     have hfresh : ∀ q, ((C'.stepP p).loc q).isStart = true → Ev.step q ∉ γ ++ [.step p] := by
       intro q hq
       by_cases hqp : q = p
@@ -375,7 +355,7 @@ lemma step_simK (hyp : Hyp A F k dec) {x : Fin 2 → Bool} {C' : Cfg (A' A F k d
     intro i
     by_cases hi : i = .inl (.inr q)
     · subst hi; exact stepP_mem_self _ hact
-    · exact stepP_mem_ne _ hact hi
+    · exact stepP_mem_other _ hact hi
   -- the register of `q` holds the input of `q`
   have hreg : C'.mem (.inl (.inr q)) = x q := by
     apply hI.rel.reg q
@@ -559,7 +539,7 @@ lemma proj_single (C' : Cfg (A' A F k dec)) (e : Ev 2) :
 lemma stepP_self_not_start (C' : Cfg (A' A F k dec)) (p : Fin 2) :
     ((C'.stepP p).loc p).isStart = false := by
   rcases h : act' A F k dec (C'.loc p) with ⟨i, o, κ⟩ | v
-  · rw [stepP_loc_self (B := A' A F k dec) C' h]; exact act'_cont_not_start h _
+  · rw [stepP_loc_self (A := A' A F k dec) C' h]; exact act'_cont_not_start h _
   · rw [stepP_of_out C' (show C'.Out p v from h)]
     rcases hl : C'.loc p with ⟨p', b⟩ | ⟨p', b, l⟩ | v'
     · rw [hl] at h; simp [act'] at h

@@ -1,6 +1,7 @@
 import Papers.PODC2025.TwoShotConsensusObjects.Defs
 import Cslib.Computability.Distributed.SharedMemory.ObjClasses
 import Cslib.Computability.Distributed.SharedMemory.Recoverable
+import Podc.Computability.Distributed.SharedMemory.Recoverable
 
 /-!
 # Two-shot objects solving two-process consensus — the system model

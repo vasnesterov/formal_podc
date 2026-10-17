@@ -184,7 +184,7 @@ theorem lemma12 (hA : RecConsensus A) (hz : 1 ≤ z) (hn : 2 ≤ n) {D : Cfg A}
   set D' := run (run D α) (X ++ lam n k) with hD'
   set E' := run D' α' with hE'
   set L := last n (by omega) with hL
-  have hD'r : Reach A (fun _ => True) D' := reach_run (reach_run hD _) _
+  have hD'r : Reach A (fun _ => True) D' := (hD.run_true _).run_true _
   have hLk : k ≤ L.val := by simp [hL, last]; omega
   have hlt : ∀ r : Fin n, r ≠ L → r < L := by
     intro r hr

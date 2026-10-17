@@ -9,11 +9,11 @@ import Podc.Foundations.Data.Finset.Card
   the number of decided processes, all decided values are equal to the letter of `O` and are
   inputs (so `O = s⊥` only after all `n` processes have decided).
 * Upper bound (`not_wfSolvable`): standard valency argument with `E*_0` (crash-free
-  executions). Registers and `opR` are excluded by `not_rw_obj`/`all_ops`; then `σ_p`, `σ_q`
-  (`schedExcept`) are schedules of `m - 1 ≥ n` distinct processes avoiding a third process `k`,
-  starting with `p` (team 0) resp. `q` (team 1); after them `O = s⊥` in both, so `k` cannot
-  distinguish them. Needs `m ≥ 3`, i.e. `n ≥ 2` (hypothesis `1 ≤ n'`, as in the paper);
-  informally, for `n = 1` the type `T_{1,0}` behaves like test-and-set (2-consensus with
+  executions). Registers and `opR` are excluded by `Crit.not_forall_poised_of_rwLike`/`all_ops`;
+  then `σ_p`, `σ_q` (`schedExcept`) are schedules of `m - 1 ≥ n` distinct processes avoiding a
+  third process `k`, starting with `p` (team 0) resp. `q` (team 1); after them `O = s⊥` in both,
+  so `k` cannot distinguish them. Needs `m ≥ 3`, i.e. `n ≥ 2` (hypothesis `1 ≤ n'`, as in the
+  paper); informally, for `n = 1` the type `T_{1,0}` behaves like test-and-set (2-consensus with
   registers), so the hypothesis is necessary (not formalized).
 -/
 
@@ -56,7 +56,7 @@ theorem not_wfSolvable {n n' m : ℕ} (h1 : 1 ≤ n') (h2 : n' < n) (hm : n < m)
   obtain ⟨α, hc⟩ := exists_crit hA hAdm hC hb
   obtain ⟨i, hpo⟩ := hc.poised hA hAdm hC hm0
   rcases i with jR | j
-  · exact not_rw_obj hA hAdm hC hm0 hc (i := Sum.inl jR) (hR jR) hpo
+  · exact hc.not_forall_poised_of_rwLike hA hAdm hC hm0 (i := Sum.inl jR) (hR jR) hpo
   have hops := all_ops hA hAdm hC hm0 hc hpo
   obtain ⟨⟨p, hp⟩, ⟨q, hq⟩⟩ := hc.teams hA hAdm hC hm0
   obtain ⟨k, hkp, hkq⟩ := Fintype.exists_ne_ne_of_two_lt_card (by simp; omega) p q

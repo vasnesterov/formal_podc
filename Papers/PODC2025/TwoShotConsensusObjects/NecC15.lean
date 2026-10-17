@@ -114,9 +114,9 @@ theorem c15 (hA : WFConsensus A) (h2 : TwoShot A) {m : Fin 2 → Set O.Op} (hm :
     rw [hEb1, solo_noAcc_mem (noAcc_transfer hFEb hno1), hEbk]
   have hG1k : G1.mem (.inr k) = (O.δ (O.δ s g).1 f).1 := by
     rw [hG1, solo_noAcc_mem (noAcc_transfer hFG hno1), hGk]
-  have hBF1 : S.Branch a F1 := hBFa.ext _ (solo_crashFree b t1)
-  have hBEb1 : S.Branch b Eb1 := hBEb.ext _ (solo_crashFree b t1)
-  have hBG1 : S.Branch b G1 := hBG.ext _ (solo_crashFree b t1)
+  have hBF1 : S.Branch a F1 := hBFa.ext _ (crashFree_replicate t1 b)
+  have hBEb1 : S.Branch b Eb1 := hBEb.ext _ (crashFree_replicate t1 b)
+  have hBG1 : S.Branch b G1 := hBG.ext _ (crashFree_replicate t1 b)
   have hg'm : g' ∈ m b := S.allowed_of_branch hm hBF1 hg'
   -- counts of `b`
   have hcF1 : S.Cnt b F1 1 := by
@@ -196,8 +196,8 @@ theorem c15 (hA : WFConsensus A) (h2 : TwoShot A) {m : Fin 2 → Set O.Op} (hm :
   set Ka1 := run Ka (solo a t0) with hKa1
   have hHKa1 : AgreeExcept (.inr k) a H1 Ka1 := hHKa.soloRun t0 hno0
   have hf'Ka : A.act (Ka1.loc a) = .access (.inr k) f' κf' := by rw [← hHKa1.1]; exact hf'
-  have hBH1 : S.Branch a H1 := hBH.ext _ (solo_crashFree a t0)
-  have hBKa1 : S.Branch b Ka1 := hBKa.ext _ (solo_crashFree a t0)
+  have hBH1 : S.Branch a H1 := hBH.ext _ (crashFree_replicate t0 a)
+  have hBKa1 : S.Branch b Ka1 := hBKa.ext _ (crashFree_replicate t0 a)
   have hf'm : f' ∈ m a := S.allowed_of_branch hm hBH1 hf'
   have hH1k : H1.mem (.inr k) = (O.δ (O.δ (O.δ s f).1 g).1 g').1 := by
     rw [hH1, solo_noAcc_mem hno0, hHk]
@@ -225,7 +225,7 @@ theorem c15 (hA : WFConsensus A) (h2 : TwoShot A) {m : Fin 2 → Set O.Op} (hm :
   set E4 := E4a.next (.step b) with hE4
   have hg'F4 : A.act (E4a.loc b) = .access (.inr k) g' κ' := by
     rw [hE4a, stepK_loc_other hf'F hab']; exact hg'F
-  have hBE4 : S.Branch a E4 := ((hBF1.ext _ (solo_crashFree a t0)).next a).next b
+  have hBE4 : S.Branch a E4 := ((hBF1.ext _ (crashFree_replicate t0 a)).next a).next b
   have hE4mem : ∀ j, j ≠ .inr k → E4.mem j = (Ka1.next (.step a)).mem j := fun j hj => by
     rw [hE4, stepK_mem_other hg'F4 hj, hE4a, stepK_mem_other hf'F hj, stepK_mem_other hf'Ka hj,
       ← hHKa1.2 j hj, hH1F1'.2 j hj]
