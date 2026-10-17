@@ -1,5 +1,6 @@
 import Cslib.Computability.Distributed.DynamicNetworks.HeardOf
 import Podc.DynamicNetworks.Journey
+import Podc.Stabilization.Execution
 import Mathlib.Data.Finset.Card
 
 /-!
@@ -171,47 +172,78 @@ def SPLE (A : Algorithm ι σ) (V : Finset ι) (e : ℕ → ι → σ) : Prop :=
 /-- A class of dynamic graphs, for each vertex set. -/
 abbrev DGClass (ι : Type*) := Finset ι → Set (DG ι)
 
+open Cslib.SelfStabilization
+
+/-- The executions of `A` from every configuration in every dynamic graph of the class `C` on the
+vertex set `V`. -/
+def execs (A : Algorithm ι σ) (C : DGClass ι) (V : Finset ι) : Set (ℕ → ι → σ) :=
+  {e | ∃ G ∈ C V, ∃ γ, exec A G γ = e}
+
 /-- **Definition 2** (pseudo-stabilization), for systems of `n` processes: every execution from
-every configuration in every dynamic graph of the class has a suffix satisfying `SP_LE`. -/
+every configuration in every dynamic graph of the class has a suffix satisfying `SP_LE`
+(`pseudoStab_iff`). -/
 def PseudoStab (A : Algorithm ι σ) (C : DGClass ι) (n : ℕ) : Prop :=
-  ∀ V : Finset ι, V.card = n → ∀ G ∈ C V, ∀ γ : ι → σ, ∃ i, SPLE A V (fun t => exec A G γ (i + t))
+  ∀ V : Finset ι, V.card = n → PseudoStabilizing (execs A C V) (SPLE A V)
 
 /-- **Definition 1** (self-stabilization), for systems of `n` processes: for every vertex set
 there is a set `L` of legitimate configurations that every execution reaches (convergence) and from
-which every execution satisfies `SP_LE` (correctness). -/
+which every execution satisfies `SP_LE` (correctness) (`selfStab_iff`). -/
 def SelfStab (A : Algorithm ι σ) (C : DGClass ι) (n : ℕ) : Prop :=
-  ∀ V : Finset ι, V.card = n → ∃ L : Set (ι → σ),
-    (∀ G ∈ C V, ∀ γ : ι → σ, ∃ i, exec A G γ i ∈ L) ∧
-    (∀ G ∈ C V, ∀ γ ∈ L, SPLE A V (exec A G γ))
+  ∀ V : Finset ι, V.card = n → SelfStabilizing (execs A C V) (SPLE A V)
 
 /-- The pseudo-stabilization phase of every execution in the class has length at most `T`, i.e.
-`SP_LE` holds from configuration `γ_{T+1}` (0-indexed: `exec … T`) on. -/
+`SP_LE` holds from configuration `γ_{T+1}` (0-indexed: `exec … T`) on (`pseudoStabWithin_iff`). -/
 def PseudoStabWithin (A : Algorithm ι σ) (C : DGClass ι) (n T : ℕ) : Prop :=
-  ∀ V : Finset ι, V.card = n → ∀ G ∈ C V, ∀ γ : ι → σ, SPLE A V (fun t => exec A G γ (T + t))
+  ∀ V : Finset ι, V.card = n → PseudoStabilizingWithin (execs A C V) (SPLE A V) T
 
-theorem PseudoStabWithin.pseudoStab {A : Algorithm ι σ} {C : DGClass ι} {n T : ℕ}
-    (h : PseudoStabWithin A C n T) : PseudoStab A C n :=
-  fun V hV G hG γ => ⟨T, h V hV G hG γ⟩
+variable {A : Algorithm ι σ} {C C' : DGClass ι} {n T : ℕ}
 
-theorem PseudoStab.mono {A : Algorithm ι σ} {C C' : DGClass ι} {n : ℕ}
-    (h : PseudoStab A C n) (hC : ∀ V, C' V ⊆ C V) : PseudoStab A C' n :=
-  fun V hV G hG => h V hV G (hC V hG)
+theorem forall_mem_execs {V : Finset ι} {P : (ℕ → ι → σ) → Prop} :
+    (∀ e ∈ execs A C V, P e) ↔ ∀ G ∈ C V, ∀ γ : ι → σ, P (exec A G γ) :=
+  ⟨fun h G hG γ => h _ ⟨G, hG, γ, rfl⟩, fun h _ ⟨G, hG, γ, he⟩ => he ▸ h G hG γ⟩
 
-theorem SelfStab.mono {A : Algorithm ι σ} {C C' : DGClass ι} {n : ℕ}
-    (h : SelfStab A C n) (hC : ∀ V, C' V ⊆ C V) : SelfStab A C' n := by
-  intro V hV
-  obtain ⟨L, h1, h2⟩ := h V hV
-  exact ⟨L, fun G hG => h1 G (hC V hG), fun G hG => h2 G (hC V hG)⟩
+theorem execs_mono {V : Finset ι} (hC : C' V ⊆ C V) : execs A C' V ⊆ execs A C V :=
+  fun _ ⟨G, hG, γ, he⟩ => ⟨G, hC hG, γ, he⟩
+
+/-- Definition 2, unfolded. -/
+theorem pseudoStab_iff : PseudoStab A C n ↔
+    ∀ V : Finset ι, V.card = n → ∀ G ∈ C V, ∀ γ : ι → σ,
+      ∃ i, SPLE A V (fun t => exec A G γ (i + t)) := by
+  simp only [PseudoStab, PseudoStabilizing, forall_mem_execs]
+
+/-- Definition 1, unfolded. -/
+theorem selfStab_iff : SelfStab A C n ↔
+    ∀ V : Finset ι, V.card = n → ∃ L : Set (ι → σ),
+      (∀ G ∈ C V, ∀ γ : ι → σ, ∃ i, exec A G γ i ∈ L) ∧
+      (∀ G ∈ C V, ∀ γ ∈ L, SPLE A V (exec A G γ)) := by
+  simp only [SelfStab, SelfStabilizing, IsLegitimate, forall_mem_execs]
+  rfl
+
+/-- The pseudo-stabilization time bound, unfolded. -/
+theorem pseudoStabWithin_iff : PseudoStabWithin A C n T ↔
+    ∀ V : Finset ι, V.card = n → ∀ G ∈ C V, ∀ γ : ι → σ,
+      SPLE A V (fun t => exec A G γ (T + t)) := by
+  simp only [PseudoStabWithin, PseudoStabilizingWithin, forall_mem_execs]
+
+theorem PseudoStabWithin.pseudoStab (h : PseudoStabWithin A C n T) : PseudoStab A C n :=
+  fun V hV => (h V hV).pseudoStabilizing
+
+theorem PseudoStab.mono (h : PseudoStab A C n) (hC : ∀ V, C' V ⊆ C V) : PseudoStab A C' n :=
+  fun V hV => (h V hV).mono (execs_mono (hC V))
+
+theorem SelfStab.mono (h : SelfStab A C n) (hC : ∀ V, C' V ⊆ C V) : SelfStab A C' n :=
+  fun V hV => (h V hV).mono (execs_mono (hC V))
+
+/-- On a recurring (suffix-closed) class of dynamic graphs, the executions are suffix-closed. -/
+theorem suffixClosed_execs {V : Finset ι} (hrec : ∀ G ∈ C V, ∀ i, shift i G ∈ C V) :
+    SuffixClosed (execs A C V) := by
+  rintro _ ⟨G, hG, γ, rfl⟩ i
+  exact ⟨shift i G, hrec G hG i, exec A G γ i, funext fun t => (exec_add A G γ i t).symm⟩
 
 /-- **Remark 1**: on a recurring class, self-stabilization implies pseudo-stabilization. -/
-theorem SelfStab.pseudoStab {A : Algorithm ι σ} {C : DGClass ι} {n : ℕ}
-    (hrec : ∀ V, ∀ G ∈ C V, ∀ i, shift i G ∈ C V) (h : SelfStab A C n) : PseudoStab A C n := by
-  intro V hV G hG γ
-  obtain ⟨L, hconv, hcorr⟩ := h V hV
-  obtain ⟨i, hi⟩ := hconv G hG γ
-  refine ⟨i, ?_⟩
-  have := hcorr (shift i G) (hrec V G hG i) _ hi
-  simpa only [exec_add] using this
+theorem SelfStab.pseudoStab (hrec : ∀ V, ∀ G ∈ C V, ∀ i, shift i G ∈ C V) (h : SelfStab A C n) :
+    PseudoStab A C n :=
+  fun V hV => (h V hV).pseudoStabilizing (suffixClosed_execs (hrec V))
 
 theorem SPLE.shift {A : Algorithm ι σ} {V : Finset ι} {e : ℕ → ι → σ} (h : SPLE A V e) (i : ℕ) :
     SPLE A V (fun t => e (i + t)) := by

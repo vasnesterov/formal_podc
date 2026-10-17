@@ -23,7 +23,7 @@ layers have stabilized, and every round of PEL is a round of each such layer.
 
 set_option linter.unusedSectionVars false
 
-open Podc.AtomicState
+open Cslib.SelfStabilization Relation
 
 namespace Papers.PODC2024.SSLeaderElectionDirected
 
@@ -190,7 +190,7 @@ theorem runEnabled_e_iff {t : ℕ} {p : V} :
       EnE G α fixed ι (e t) p :=
   CMAI.enabled_iff.symm
 
-theorem runMI (h : IsRun (next G α fixed ι) e S) :
+theorem runMI (h : IsUnfairRun (next G α fixed ι) e S) :
     Run G α (fun _ => ι) (fun t q => (e t q).mi.1) S where
   move t p hp := by rw [h.move t p hp, next_mi]; rfl
   stay t p hp := by rw [h.stay t p hp]
@@ -203,7 +203,7 @@ def moversA (ι : V → ID) (e : ℕ → V → PState ID α) (S : ℕ → Set V)
 def moversE (ι : V → ID) (e : ℕ → V → PState ID α) (S : ℕ → Set V) (t : ℕ) : Set V :=
   {p | p ∈ S t ∧ ¬ EnMI G α ι (e t) p ∧ ¬ EnA G α (e t) p}
 
-theorem runA (h : IsRun (next G α fixed ι) e S) :
+theorem runA (h : IsUnfairRun (next G α fixed ι) e S) :
     Run G α (fun t => IA G (e t)) (fun t q => (e t q).a.1) (moversA (G := G) ι e S) where
   move t p hp := by rw [h.move t p hp.1, next_a, ite_eq_right hp.2]; rfl
   stay t p hp := by
@@ -213,7 +213,7 @@ theorem runA (h : IsRun (next G α fixed ι) e S) :
       rw [h.move t p hS, next_a, ite_eq_left hmi]
     · rw [h.stay t p hS]
 
-theorem runE (h : IsRun (next G α fixed ι) e S) :
+theorem runE (h : IsUnfairRun (next G α fixed ι) e S) :
     Run G α (fun t => IE fixed ι (e t)) (fun t q => (e t q).e.1) (moversE (G := G) ι e S) where
   move t p hp := by
     rw [h.move t p hp.1, next_e, ite_eq_right (by rintro (h' | h') <;> [exact hp.2.1 h'; exact hp.2.2 h'])]
@@ -229,7 +229,8 @@ theorem runE (h : IsRun (next G α fixed ι) e S) :
 
 /-- **Termination part of Theorem 3** (Lemma 1 + Theorem 1 of the paper, specialised): every
 execution of PEL under the distributed unfair daemon is finite. -/
-theorem silent (h : IsRun (next G α fixed ι) e S) : ∃ t, Terminal (next G α fixed ι) (e t) := by
+theorem silent (h : IsUnfairRun (next G α fixed ι) e S) :
+    ∃ t, Terminal (next G α fixed ι) (e t) := by
   obtain ⟨T1, -, h1⟩ := (runMI h).eventually_const (T := 0) (fun _ _ => rfl)
   have hmi : ∀ t, T1 ≤ t → ∀ q, (e t q).mi = (e T1 q).mi := fun t ht q =>
     Subtype.ext (congrFun (h1 t ht) q)
@@ -249,7 +250,7 @@ theorem silent (h : IsRun (next G α fixed ι) e S) : ∃ t, Terminal (next G α
 /-- **Time part of Theorem 3** (Corollary 1 + Theorem 2 of the paper, specialised): if
 `MAD ≤ m ≤ α`, every execution of PEL under the distributed unfair daemon is terminal after at most
 `3α + 3m + 6` rounds (for any round boundaries `r`, in particular the paper's rounds). -/
-theorem terminal_within (h : IsRun (next G α fixed ι) e S) {m : ℕ} (hm : MADLe G m)
+theorem terminal_within (h : IsUnfairRun (next G α fixed ι) e S) {m : ℕ} (hm : MADLe G m)
     (hmα : m ≤ α) {r : ℕ → ℕ} (hr : RoundBounds (next G α fixed ι) e S r) :
     ∀ t, r (3 * (α + m + 2)) ≤ t → Terminal (next G α fixed ι) (e t) := by
   set X := α + m + 2

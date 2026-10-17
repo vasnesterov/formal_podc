@@ -15,7 +15,7 @@ more, and keys `≤ k` freeze as well.
 
 set_option linter.unusedSectionVars false
 
-open Podc.AtomicState
+open Cslib.SelfStabilization Relation
 
 namespace Papers.PODC2024.SSLeaderElectionDirected
 

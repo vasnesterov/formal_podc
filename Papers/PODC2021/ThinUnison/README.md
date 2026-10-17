@@ -88,4 +88,6 @@ The `|Q*|` count.
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. For
 non-vacuity, `Main.lean` instantiates Theorem 1.1 on `K₃` under the synchronous schedule. The synchronous and
 round-robin schedules are proved fair. The stone-age model and the unison specification come from CSLib,
-`Cslib/Computability/Distributed/SelfStabilization/`.
+`Cslib/Computability/Distributed/SelfStabilization/`. `SyncStabilizes` is pseudo-stabilization
+within `f` rounds of the synchronous executions (`syncStabilizes_iff`, shared notions of
+`Podc/Stabilization/`).

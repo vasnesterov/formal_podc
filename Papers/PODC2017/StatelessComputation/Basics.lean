@@ -1,4 +1,5 @@
 import Papers.PODC2017.StatelessComputation.Model
+import Podc.Digraph.Walk
 
 /-!
 # Propositions 2.1 and 2.2: round complexity vs. radius and vs. the number of labelings
@@ -82,11 +83,9 @@ end Protocol
 
 /-! ### Proposition 2.1 -/
 
--- CSLib candidate: bounded walks / BFS layers in digraphs.
-/-- Walks: `WalkLen G k j v` iff there is a directed walk of length exactly `k` from `j` to `v`. -/
-inductive WalkLen (G : Digraph V) : ℕ → V → V → Prop
-  | refl (j : V) : WalkLen G 0 j j
-  | tail {k : ℕ} {j u v : V} : WalkLen G k j u → G.Adj u v → WalkLen G (k + 1) j v
+/-- Walks: `WalkLen G k j v` iff there is a directed walk of length exactly `k` from `j` to `v`
+(`Relation.RelatesInSteps` of the arcs). -/
+abbrev WalkLen (G : Digraph V) (k : ℕ) (j v : V) : Prop := Relation.RelatesInSteps G.Adj j v k
 
 /-- `near G j t`: the nodes at distance `< t` from `j`. -/
 def near (G : Digraph V) (j : V) : ℕ → Set V
@@ -100,21 +99,21 @@ lemma mem_near_iff (j v : V) (t : ℕ) : v ∈ near G j (t + 1) ↔ ∃ k ≤ t,
     simp only [near, Set.mem_ofPred_eq, Set.mem_empty_iff_false, false_and, exists_false,
       or_false]
     constructor
-    · rintro rfl; exact ⟨0, le_rfl, WalkLen.refl _⟩
+    · rintro rfl; exact ⟨0, le_rfl, .refl _⟩
     · rintro ⟨k, hk, hw⟩
       obtain rfl : k = 0 := by omega
-      cases hw; rfl
+      exact hw.zero.symm
   | succ t ih =>
     change v = j ∨ (∃ u ∈ near G j (t + 1), G.Adj u v) ↔ _
     constructor
     · rintro (rfl | ⟨u, hu, hadj⟩)
-      · exact ⟨0, by omega, WalkLen.refl _⟩
+      · exact ⟨0, by omega, .refl _⟩
       · obtain ⟨k, hk, hw⟩ := (ih u).1 hu
-        exact ⟨k + 1, by omega, hw.tail hadj⟩
+        exact ⟨k + 1, by omega, .tail _ _ _ _ hw hadj⟩
     · rintro ⟨k, hk, hw⟩
       cases hw with
       | refl => exact Or.inl rfl
-      | tail hw hadj => exact Or.inr ⟨_, (ih _).2 ⟨_, by omega, hw⟩, hadj⟩
+      | tail _ _ _ hw hadj => exact Or.inr ⟨_, (ih _).2 ⟨_, by omega, hw⟩, hadj⟩
 
 omit [Fintype V] [DecidableEq V] in
 lemma mem_near_succ_of_adj {j u v : V} {t : ℕ} (hu : u ∈ near G j t) (h : G.Adj u v) :

@@ -63,29 +63,32 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 ## The formalization
 
-**Model** (`Podc/AtomicState/`, reusable).
+**Model** (the shared daemon library `Podc/Stabilization/{Execution,Daemon}.lean`, namespace
+`Cslib.SelfStabilization`, and digraph reachability `Podc/Digraph/Walk.lean`).
 * Atomic-state model on a finite `Digraph V`. `G.Adj q p` means `p` reads `q`, i.e. `q` is a
   predecessor of `p`.
 * Deterministic algorithms `next : (V → Q) → V → Q`. A process is enabled iff its action changes
   its state. The hierarchical collateral compositions `E ∘ A ∘ MI` and `U-DAG ∘ PEL` are written
   as one such function.
-* **Distributed unfair daemon**: `IsRun next e S`, where each step activates a nonempty set of
-  enabled processes. Executions are in the paper's `Ext∞` form: a terminal configuration repeats
+* **Distributed unfair daemon**: `IsUnfairRun next e S` (`IsUnfairExec next`), where each step
+  activates a nonempty set of enabled processes. Executions are in the paper's `Ext∞` form: a terminal configuration repeats
   forever, so "finite" means "eventually terminal".
-* **Synchronous daemon**: `e (t+1) = next (e t)`.
+* **Synchronous daemon**: `IsSyncExec next e`, i.e. `e (t+1) = next (e t)`.
 * Rounds follow the paper's neutralization definition. `RoundDone e S s s'` says that every
   process enabled at `s` executes or becomes disabled in `[s, s']`. Time bounds hold for every
   sequence `RoundBounds e S r` of such boundaries, a family that contains the paper's minimal
-  rounds (`PaperRounds`).
-* Self-stabilization (Definition 1, `SelfStab`) and silent self-stabilization (Definition 2,
-  `SilentSelfStab`) are as in the paper.
+  rounds (`IsLeastRoundBounds`).
+* Self-stabilization (Definition 1, `SelfStab`, `Defs.lean`: a *nonempty* legitimate set; equal
+  to the library's `SelfStabilizing` by `selfStab_iff`) and silent self-stabilization
+  (Definition 2, `SilentSelfStabilizing`) are as in the paper.
 * Identifiers are a separate input `ι : V → ID`, and algorithms are families indexed by `ι`. They
   are local: `IsLocal` lets a process use only the inputs and states of itself and its
   predecessors. So an algorithm must work for every assignment of unique identifiers ("insensitive
   to its inputs").
-* `α` is a fixed parameter with `MADLe G α` (`α ≥ MAD`). `|IDSET| > |V|` is an injection
-  `Option V ↪ ID`. Source components follow the paper's definition (maximal strongly connected
-  induced subgraphs without outside predecessors).
+* Ancestors are `G.Reachable q p`; `MADLe G α` (`α ≥ MAD`, `Defs.lean`) says that every ancestor
+  is within `α` arcs (`Relation.RelatesWithinSteps`). `α` is a fixed parameter with `MADLe G α`. `|IDSET| > |V|` is an injection
+  `Option V ↪ ID`. Source components (`Digraph.IsSourceComponent`) follow the paper's
+  definition (maximal strongly connected induced subgraphs without outside predecessors).
 * The impossibilities (Lemma 13, Corollaries 2 and 3) quantify over *all* deterministic local
   algorithms, with an arbitrary state type, as in the paper.
 
@@ -98,7 +101,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 1 (C-MAI silent self-stabilizing) | `CMAI.theorem1` | `Correctness.lean` |
 | Lemmas 5–9 (fake values vanish in `α + 1` rounds) | `CMAI.fake_d_moved`, `CMAI.enabled_of_bad`, `CMAI.noFake_within` | `Rounds.lean` |
 | Lemma 10, Theorem 2 (`α + MAD + 2` rounds) | `CMAI.claim_within`, `CMAI.Run.target_within`, `CMAI.theorem2` | `Rounds.lean` |
-| Lemma 12 (synchronous executions agree on a source component) | `syncExec_agree` | `Podc/AtomicState/Model.lean` |
+| Lemma 12 (synchronous executions agree on a source component) | `syncExec_agree` | `Podc/Stabilization/Daemon.lean` |
 | Lemma 13, Corollary 2 (necessity for leader election) | `lemma13`, `corollary2` | `Necessity.lean` |
 | Corollary 4, Lemmas 14, 15 | `PEL.corollary4`, `PEL.lemma14`, `PEL.lemma15` | `PELCorrect.lean` |
 | Theorem 3 (PEL silent self-stabilizing; `3α + 3MAD + 6` rounds) | `PEL.theorem3`, `PEL.silent`, `PEL.theorem3_time` | `PELCorrect.lean`, `PEL.lean` |
@@ -122,5 +125,6 @@ Full list of differences (including modelling choices and minor imprecisions): [
   there (`twoCycle_PEL`, `twoCycle_fixed_unison`).
 * `idset_card_needed` shows that Corollary 2 needs `|IDSET| > |V|`. With exactly `|V|`
   identifiers, leader election is trivially solvable on two isolated nodes.
-* The model and the digraph vocabulary (ancestors, `MAD`, source components) are in
-  `Podc/AtomicState/{Digraph,Model}.lean` (CSLib candidates).
+* The model (daemons, rounds, silent self-stabilization, locality) is the shared library
+  `Podc/Stabilization/Daemon.lean`; ancestors and source components are `Podc/Digraph/Walk.lean`
+  (CSLib candidates). Only `MAD` and Definition 1 are paper-local (`Defs.lean`).

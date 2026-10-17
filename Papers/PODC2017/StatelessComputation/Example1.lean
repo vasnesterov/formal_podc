@@ -27,9 +27,10 @@ theorem outputs_converge_of_run_converges {V : Type*} [DecidableEq V] {G : Digra
     {L X Y : Type*} (P : Protocol G L X Y) (x : V → X) {r : ℕ} {σ : ℕ → Finset V}
     (hσ : IsRFair r σ) (ℓ0 : Labeling G L) (y0 : V → Y) (h : Converges (P.run x ℓ0 σ))
     (i : V) : Converges (fun t => P.outputs x ℓ0 y0 σ t i) := by
-  obtain ⟨a, T, hT⟩ := h
+  obtain ⟨a, T, hT⟩ := converges_iff.1 h
   obtain ⟨s, hs1, -, hs3⟩ := hσ.2 T i
-  refine ⟨(P.δ i (inLab a i) (x i)).2, s + 1, fun t ht => ?_⟩
+  replace hs3 : i ∈ σ s := hs3
+  refine converges_iff.2 ⟨(P.δ i (inLab a i) (x i)).2, s + 1, fun t ht => ?_⟩
   induction t, ht using Nat.le_induction with
   | base => simp [Protocol.outputs, hs3, hT s hs1]
   | succ t ht ih =>
@@ -240,7 +241,7 @@ theorem labelStabilizing : LabelStabilizing (n - 2) (P n) := by
       | succ k ih =>
         rw [← add_assoc, Protocol.run_succ, ih, step_lab]; rfl
     obtain ⟨a, K, hK⟩ := bseq_converges b0 τ hτ
-    refine ⟨lab a, r + K, fun t ht => ?_⟩
+    refine converges_iff.2 ⟨lab a, r + K, fun t ht => ?_⟩
     obtain ⟨k, rfl⟩ : ∃ k, t = r + k := ⟨t - r, by omega⟩
     rw [hrun, hK k (by omega)]
   exact ⟨fun x ℓ0 y0 σ hσ i =>

@@ -23,7 +23,7 @@ import Papers.PODC2024.SSLeaderElectionDirected.Necessity
 
 set_option linter.unusedSectionVars false
 
-open Podc.AtomicState
+open Cslib.SelfStabilization Relation
 
 namespace Papers.PODC2024.SSLeaderElectionDirected
 
@@ -56,7 +56,7 @@ theorem theorem4 {ID Q : Type*} {k : ℕ} (hk : 1 ≤ k) (next : (V → ID) → 
     (hloc : IsLocal G next) (clk : (V → Q) → V → Fin (k + 1))
     (hclk : ∀ γ γ' p, γ p = γ' p → clk γ p = clk γ' p) (ι : V → ID)
     (hss : SelfStab (IsSyncExec (next ι)) (SPSU clk)) {S₁ S₂ : Set V}
-    (h₁ : IsSourceComponent G S₁) (h₂ : IsSourceComponent G S₂) : S₁ = S₂ := by
+    (h₁ : G.IsSourceComponent S₁) (h₂ : G.IsSourceComponent S₂) : S₁ = S₂ := by
   classical
   by_contra hne
   have hdisj := h₁.disjoint h₂ hne
@@ -182,19 +182,19 @@ theorem min_values_eq {γ : V → UState ID α k} {p : V} {c : Fin (k + 1)}
 `≥ mid`. Holds for all processes of `SC`, and for *all* processes when the globally smallest
 identifier lies in `SC`. -/
 def LowAnc (G : Digraph V) (SC : Set V) (ι : V → ID) (x : V) : Prop :=
-  ∀ q, Anc G q x → ∃ s ∈ SC, ι s ≤ ι q
+  ∀ q, G.Reachable q x → ∃ s ∈ SC, ι s ≤ ι q
 
-theorem lowAnc_of_mem {SC : Set V} (hSC : IsSourceComponent G SC) {x : V} (hx : x ∈ SC) :
+theorem lowAnc_of_mem {SC : Set V} (hSC : G.IsSourceComponent SC) {x : V} (hx : x ∈ SC) :
     LowAnc G SC ι x := fun q hq =>
-  ⟨q, mem_of_anc_of_closed hSC.closed hq hx, le_rfl⟩
+  ⟨q, Digraph.mem_of_reachable_of_closed hSC.closed hq hx, le_rfl⟩
 
 theorem lowAnc_of_min {SC : Set V} {ℓ : V} (hℓ : ℓ ∈ SC) (hmin : ∀ q, ι ℓ ≤ ι q) (x : V) :
     LowAnc G SC ι x := fun q _ => ⟨ℓ, hℓ, hmin q⟩
 
 section Counterexample
 
-variable {SC : Set V} (hSC : IsSourceComponent G SC)
-  (huniq : ∀ S, IsSourceComponent G S → S = SC) (hα : MADLe G α)
+variable {SC : Set V} (hSC : G.IsSourceComponent SC)
+  (huniq : ∀ S, G.IsSourceComponent S → S = SC) (hα : MADLe G α)
 include hSC huniq hα
 
 /-- In every terminal configuration of the paper's PEL, all processes of the source component have
@@ -220,7 +220,7 @@ theorem paper_ed_eq_zero {γ : V → PState ID α} (hγ : Terminal (PEL.next G �
 /-- Every configuration has a terminal PEL successor (PEL is silent). -/
 theorem exists_terminal_pel (fixed : Bool) (γ₀ : V → PState ID α) :
     ∃ γ, Terminal (PEL.next G α fixed ι) γ := by
-  obtain ⟨t, ht⟩ := PEL.silent (isSyncExec_iterate (next := PEL.next G α fixed ι) γ₀).isRun
+  obtain ⟨t, ht⟩ := PEL.silent (isSyncExec_iterate (next := PEL.next G α fixed ι) γ₀).isUnfairRun
   exact ⟨_, ht⟩
 
 /-- **The paper's `U(K)` is not self-stabilizing** (Theorem 5 fails) as soon as two distinct
@@ -296,8 +296,8 @@ end Counterexample
 
 section Fixed
 
-variable {SC : Set V} (hSC : IsSourceComponent G SC)
-  (huniq : ∀ S, IsSourceComponent G S → S = SC) (hα : MADLe G α) (hι : Function.Injective ι)
+variable {SC : Set V} (hSC : G.IsSourceComponent SC)
+  (huniq : ∀ S, G.IsSourceComponent S → S = SC) (hα : MADLe G α) (hι : Function.Injective ι)
   {ℓ : V} (hℓ : ℓ ∈ SC) (hℓmin : ∀ x ∈ SC, ι ℓ ≤ ι x)
 include hSC huniq hα hι hℓ hℓmin
 
@@ -379,7 +379,7 @@ theorem theorem5_time {e : ℕ → V → UState ID α k} (he : IsSyncExec (next 
   -- Lemma 18: PEL is terminal after `3α + 3·MAD + 6` steps
   set i₀ := 3 * (α + mad G + 2)
   have hT : ∀ t, i₀ ≤ t → Terminal (PEL.next G α true ι) (pelC (e t)) := fun t ht =>
-    PEL.terminal_within hpe.isRun madLe_mad (mad_le hα) hpe.roundBounds t ht
+    PEL.terminal_within hpe.isUnfairRun madLe_mad (mad_le hα) hpe.roundBounds t ht
   have hpel : ∀ t, i₀ ≤ t → ∀ p, (e (t + 1) p).pel = (e t p).pel := fun t ht p => by
     rw [he t]; exact (step_of_terminal (hT t ht) p).1
   have hed : ∀ t, i₀ ≤ t → ∀ p, ed (e (t + 1)) p = ed (e t) p := fun t ht p => by
@@ -486,11 +486,11 @@ direction is `U(K)` built on the *corrected* PEL. -/
 theorem corollary5 {ID : Type u} [LinearOrder ID] [Nonempty V] (hcard : Nonempty (V ↪ ID))
     {α k : ℕ} (hα : MADLe G α) (hk : 1 ≤ k) :
     (∃ (Q : Type u) (A : UAlg G ID Q k), ∀ ι, Function.Injective ι →
-      SelfStab (IsSyncExec (A.next ι)) (SPSU A.clk)) ↔ ∃! SC, IsSourceComponent G SC := by
+      SelfStab (IsSyncExec (A.next ι)) (SPSU A.clk)) ↔ ∃! SC, G.IsSourceComponent SC := by
   constructor
   · rintro ⟨Q, A, hA⟩
     obtain ⟨f⟩ := hcard
-    obtain ⟨SC, hSC⟩ := exists_sourceComponent (G := G)
+    obtain ⟨SC, hSC⟩ := Digraph.exists_isSourceComponent (G := G)
     exact ⟨SC, hSC, fun S hS =>
       theorem4 hk A.next A.local_next A.clk A.local_clk f (hA f f.injective) hS hSC⟩
   · rintro ⟨SC, hSC, huniq⟩

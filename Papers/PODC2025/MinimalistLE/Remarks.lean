@@ -1,4 +1,5 @@
 import Papers.PODC2025.MinimalistLE.Main
+import Cslib.Computability.Distributed.SelfStabilization.StoneAge
 
 /-!
 # Remarks of the paper: randomness is necessary; Eq. (2) is necessary
@@ -33,14 +34,34 @@ structure DetProtocol (Q : Type*) where
 
 variable {V Q : Type*} (G : SimpleGraph V) (M : DetProtocol Q)
 
-/-- Synchronous execution of a deterministic beeping protocol, all nodes starting in `q_s`. -/
-noncomputable def DetProtocol.run (M : DetProtocol Q) (G : SimpleGraph V) : ℕ → V → Q
-  | 0 => fun _ => M.start
-  | t + 1 => fun v => by
-    classical exact
-    if M.beeping (DetProtocol.run M G t v) ∨ ∃ w, G.Adj v w ∧ M.beeping (DetProtocol.run M G t w)
-    then M.δtop (DetProtocol.run M G t v)
-    else M.δbot (DetProtocol.run M G t v)
+open Classical in
+/-- A deterministic beeping protocol is a stone-age algorithm: a node only senses whether some
+node of its closed neighbourhood beeps. -/
+noncomputable def DetProtocol.toStoneAge (M : DetProtocol Q) : Cslib.StoneAge.Algorithm Q :=
+  ⟨fun q S => if ∃ q' ∈ S, M.beeping q' then M.δtop q else M.δbot q⟩
+
+/-- Synchronous execution of a deterministic beeping protocol, all nodes starting in `q_s`: the
+stone-age execution under the synchronous schedule. -/
+noncomputable def DetProtocol.run (M : DetProtocol Q) (G : SimpleGraph V) : ℕ → V → Q :=
+  Cslib.StoneAge.run G M.toStoneAge (fun _ => M.start) Cslib.StoneAge.sync
+
+theorem DetProtocol.run_zero (v : V) : M.run G 0 v = M.start := rfl
+
+open Classical in
+/-- One synchronous beeping round: a node hears a beep iff it or a neighbour beeps. -/
+theorem DetProtocol.run_succ (t : ℕ) (v : V) : M.run G (t + 1) v =
+    if M.beeping (M.run G t v) ∨ ∃ w, G.Adj v w ∧ M.beeping (M.run G t w)
+    then M.δtop (M.run G t v) else M.δbot (M.run G t v) := by
+  rw [DetProtocol.run, ((Cslib.StoneAge.isRun_run G _ _ _).succ_of_mem (Set.mem_univ v))]
+  refine if_congr ?_ rfl rfl
+  simp only [Cslib.StoneAge.mem_signal]
+  constructor
+  · rintro ⟨_, ⟨u, rfl | hu, rfl⟩, hb⟩
+    · exact Or.inl hb
+    · exact Or.inr ⟨u, hu, hb⟩
+  · rintro (hb | ⟨w, hw, hb⟩)
+    · exact ⟨_, ⟨v, Or.inl rfl, rfl⟩, hb⟩
+    · exact ⟨_, ⟨w, Or.inr hw, rfl⟩, hb⟩
 
 /-- Without isolated nodes, all nodes are always in the same state. -/
 theorem DetProtocol.run_const (hiso : ∀ v, ∃ w, G.Adj v w) (t : ℕ) (v w : V) :
@@ -57,7 +78,7 @@ theorem DetProtocol.run_const (hiso : ∀ v, ∃ w, G.Adj v w) (t : ℕ) (v w : 
         · rwa [ih v x]
         · rwa [ih v y']
       · intro h; exact Or.inl (by rwa [ih x v])
-    simp only [DetProtocol.run]
+    rw [M.run_succ G t v, M.run_succ G t w]
     split_ifs with h1 h2 h2
     · rw [ih v w]
     · exact absurd ((key w).2 ((key v).1 h1)) h2

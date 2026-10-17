@@ -66,8 +66,10 @@ lemma outputs_after (x : V → Unit) (ℓ0 : Labeling (loopG V) Bool) (y0 : V �
 theorem copyP_labelStabilizing (r : ℕ) : LabelStabilizing r (copyP V) := by
   refine ⟨fun x ℓ0 y0 σ hσ i => ?_, fun x ℓ0 σ hσ => ?_⟩
   · obtain ⟨s, -, hs, hi⟩ := hσ.2 0 i
-    exact ⟨ℓ0 ⟨(i, i), trivial⟩, s + 1, fun t ht => outputs_after x ℓ0 y0 σ i hi t (by omega)⟩
-  · refine ⟨fun e => ℓ0 ⟨(e.1.1, e.1.1), trivial⟩, r, fun t ht => funext fun e => ?_⟩
+    exact converges_iff.2
+      ⟨ℓ0 ⟨(i, i), trivial⟩, s + 1, fun t ht => outputs_after x ℓ0 y0 σ i hi t (by omega)⟩
+  · refine converges_iff.2
+      ⟨fun e => ℓ0 ⟨(e.1.1, e.1.1), trivial⟩, r, fun t ht => funext fun e => ?_⟩
     obtain ⟨s, -, hs, hi⟩ := hσ.2 0 e.1.1
     exact run_after x ℓ0 σ e hi t (by omega)
 

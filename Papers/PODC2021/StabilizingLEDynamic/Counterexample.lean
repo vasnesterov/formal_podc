@@ -24,7 +24,8 @@ theorem constAlg_selfStab (C : DGClass (Fin 2)) : SelfStab constAlg C 2 ∧
     intro V hV e
     have : V = Finset.univ := Finset.eq_univ_of_card V (by simpa using hV)
     exact ⟨0, this ▸ Finset.mem_univ _, fun _ _ _ => rfl⟩
-  exact ⟨fun V hV => ⟨Set.univ, fun _ _ _ => ⟨0, trivial⟩, fun _ _ _ _ => hspec V hV _⟩,
-    fun V hV _ _ _ => hspec V hV _⟩
+  exact ⟨selfStab_iff.2 fun V hV =>
+      ⟨Set.univ, fun _ _ _ => ⟨0, trivial⟩, fun _ _ _ _ => hspec V hV _⟩,
+    pseudoStabWithin_iff.2 fun V hV _ _ _ => hspec V hV _⟩
 
 end StabilizingLEDynamic

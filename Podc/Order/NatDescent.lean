@@ -13,7 +13,8 @@ sequence that is non-decreasing from some index on is eventually constant
 (`Nat.eventually_const_of_le_succ`).
 
 `Nat.exists_lt_and_not_succ_of_not` is the discrete intermediate value property used in valency
-arguments ("the last configuration along an execution from which `v` can still be decided").
+arguments ("the last configuration along an execution from which `v` can still be decided");
+`Nat.exists_last_of_le` gives the last index of an interval at which a property holds.
 
 Both follow from Mathlib's antitone chain condition (`WellFoundedLT.antitone_chain_condition`).
 -/
@@ -73,5 +74,14 @@ theorem exists_lt_and_not_succ_of_not {p : ℕ → Prop} {K : ℕ} (h0 : p 0) (h
     · exact ⟨K, K.lt_succ_self, hp, hK⟩
     · obtain ⟨m, hm, h⟩ := ih hp
       exact ⟨m, by omega, h⟩
+
+/-- **Last index.** If `p a` holds and `a ≤ b`, there is a last index `m ∈ [a, b]` at which `p`
+holds: `p` fails on `(m, b]`. -/
+theorem exists_last_of_le {p : ℕ → Prop} {a b : ℕ} (hab : a ≤ b) (ha : p a) :
+    ∃ m, a ≤ m ∧ m ≤ b ∧ p m ∧ ∀ k, m < k → k ≤ b → ¬ p k := by
+  classical
+  have hs := Nat.findGreatest_spec (P := fun k => a ≤ k ∧ p k) hab ⟨le_rfl, ha⟩
+  refine ⟨_, hs.1, Nat.findGreatest_le b, hs.2, fun k hk hkb hpk => ?_⟩
+  exact Nat.findGreatest_is_greatest hk hkb ⟨hs.1.trans hk.le, hpk⟩
 
 end Nat

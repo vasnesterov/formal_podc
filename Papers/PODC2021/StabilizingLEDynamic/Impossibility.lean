@@ -112,6 +112,7 @@ theorem lemma_1 [Infinite ι] {A : Algorithm ι σ} {C : DGClass ι} {n : ℕ}
     (h2 : 2 ≤ n) {p : ι} (hp : p ∈ V) (γ : ι → σ) :
     ∃ t, ∃ q ∈ V, A.lid q (exec A (fun _ => PK V p) γ t q) ≠ p := by
   classical
+  rw [pseudoStab_iff] at hA
   by_contra hcon
   push Not at hcon
   obtain ⟨v, hv⟩ := Infinite.exists_notMem_finset V
@@ -169,7 +170,7 @@ theorem theorem_2 [Infinite ι] [Nonempty σ] (A : Algorithm ι σ) {Δ n : ℕ}
   intro hS
   have hP : PseudoStab A (J1sB Δ) n := hS.pseudoStab fun _ _ hG i => J_shift hG i
   obtain ⟨V, hV⟩ := Infinite.exists_subset_card_eq ι n
-  obtain ⟨L, hconv, hcorr⟩ := hS V hV
+  obtain ⟨L, hconv, hcorr⟩ := selfStab_iff.1 hS V hV
   obtain ⟨z, hz, -⟩ := exists_other (hV ▸ h2) (Classical.arbitrary ι)
   obtain ⟨i, hi⟩ := hconv _ (K_mem_J1sB hΔ hz) (fun _ => Classical.arbitrary σ)
   set γ := exec A (fun _ => K V) (fun _ => Classical.arbitrary σ) i
@@ -294,7 +295,7 @@ theorem theorem_3 [Infinite ι] [Nonempty σ] (A : Algorithm ι σ) {Δ n : ℕ}
   have hGQ : G ∈ J1sQ Δ V := mem_J1sQ_of_outStar hΔ hdg hz fun i => by
     obtain ⟨j, hj, hGj⟩ := hinf i
     exact ⟨j, hj, fun p hp hpz => by rw [hGj]; exact ⟨hz, hp, Ne.symm hpz⟩⟩
-  obtain ⟨i, ℓ, hℓ, hall⟩ := hP V hV G hGQ γ
+  obtain ⟨i, ℓ, hℓ, hall⟩ := pseudoStab_iff.1 hP V hV G hGQ γ
   refine adv_not_eventually_unan hP hC hV h2 γ hℓ (i := i) fun t ht q hq => ?_
   have := hall (t - i) q hq
   simp only at this
@@ -307,6 +308,7 @@ pseudo-stabilizing leader election algorithm for `J^B_{*,1}(Δ)` (for any `n ≥
 theorem theorem_4 [Infinite ι] [Nonempty σ] (A : Algorithm ι σ) {Δ n : ℕ} (hΔ : 1 ≤ Δ)
     (h3 : 3 ≤ n) : ¬ PseudoStab A (Js1B Δ) n := by
   classical
+  rw [pseudoStab_iff]
   intro hP
   obtain ⟨V, hV⟩ := Infinite.exists_subset_card_eq ι n
   obtain ⟨p, hp, -⟩ := exists_other (show 2 ≤ V.card by omega) (Classical.arbitrary ι)
@@ -356,7 +358,7 @@ theorem theorem_5 [Infinite ι] [Nonempty σ] (A : Algorithm ι σ) {Δ n : ℕ}
   obtain ⟨V, hV⟩ := Infinite.exists_subset_card_eq ι n
   obtain ⟨z, hz, -⟩ := exists_other (hV ▸ h2) (Classical.arbitrary ι)
   set γ : ι → σ := fun _ => Classical.arbitrary σ
-  obtain ⟨ℓ, hℓ, hK⟩ := hT V hV _ (K_mem_J1sB hΔ hz) γ
+  obtain ⟨ℓ, hℓ, hK⟩ := pseudoStabWithin_iff.1 hT V hV _ (K_mem_J1sB hΔ hz) γ
   obtain ⟨z', hz', hz'ℓ⟩ := exists_other (hV ▸ h2) ℓ
   set G : DG ι := splice (fun _ => K V) T (fun _ => PK V ℓ)
   have hG : G ∈ J1sB Δ V := by
@@ -367,7 +369,7 @@ theorem theorem_5 [Infinite ι] [Nonempty σ] (A : Algorithm ι σ) {Δ n : ℕ}
     · simp only [G, splice]; split_ifs
       · exact ⟨hz', hp, Ne.symm hpz⟩
       · exact ⟨hz', hp, hz'ℓ, Ne.symm hpz⟩
-  obtain ⟨ℓ', -, hG'⟩ := hT V hV G hG γ
+  obtain ⟨ℓ', -, hG'⟩ := pseudoStabWithin_iff.1 hT V hV G hG γ
   have hsplice : ∀ t, exec A G γ (T + t) =
       exec A (fun _ => PK V ℓ) (exec A (fun _ => K V) γ T) t := fun t => conf_splice _ _ _ _ _
   have hℓℓ' : ℓ' = ℓ := by

@@ -17,7 +17,7 @@ disabled during the interval.
 
 set_option linter.unusedSectionVars false
 
-open Podc.AtomicState
+open Cslib.SelfStabilization Relation
 
 namespace Papers.PODC2024.SSLeaderElectionDirected
 
@@ -39,7 +39,7 @@ def RunRound (I : ℕ → V → D) (K : ℕ → V → Key D) (A : ℕ → Set V)
 
 variable (G) in
 /-- `K q` holds a fake value for `q`: its `M` is not the input of any ancestor of `q`. -/
-def Fake (I₀ : V → D) (K : V → Key D) (q : V) : Prop := ∀ q', Anc G q' q → I₀ q' ≠ (K q).M
+def Fake (I₀ : V → D) (K : V → Key D) (q : V) : Prop := ∀ q', G.Reachable q' q → I₀ q' ≠ (K q).M
 
 theorem minI_le_of_not_fake {I₀ : V → D} {K₀ : V → Key D} {q : V} (h : ¬ Fake G I₀ K₀ q) :
     minI G I₀ q ≤ (K₀ q).M := by
@@ -58,7 +58,7 @@ theorem fake_d_moved {j t : ℕ} (ht : T ≤ t) (h : ∀ q, Fake G (I T) (K t) q
   have hmem := bestKey_mem (G := G) (α := α) (I := I t) (K := K t) (p := q)
   rw [← hm, hI t ht] at hmem
   rcases mem_keySet.mp hmem with hk | ⟨q', hq', -, hk⟩
-  · exact absurd (by rw [hk]) (hf q (Anc.refl q))
+  · exact absurd (by rw [hk]) (hf q (Digraph.Reachable.refl q))
   · have hf' : Fake G (I T) (K t) q' := fun q'' h'' => by
       have := hf q'' (h''.tail hq'); rwa [hk, Key.succ_M] at this
     have := h q' hf'
@@ -82,7 +82,7 @@ theorem enabled_of_bad {j t : ℕ} (ht : T ≤ t) (h : ∀ q, Fake G (I T) (K t)
   have hmem := bestKey_mem (G := G) (α := α) (I := I t) (K := K t) (p := q)
   rw [heq, hI t ht] at hmem
   rcases mem_keySet.mp hmem with hk | ⟨q', hq', -, hk⟩
-  · exact hf q (Anc.refl q) (by rw [hk])
+  · exact hf q (Digraph.Reachable.refl q) (by rw [hk])
   · have hf' : Fake G (I T) (K t) q' := fun q'' h'' => by
       have := hf q'' (h''.tail hq'); rwa [hk, Key.succ_M] at this
     have := h q' hf'
@@ -196,7 +196,7 @@ theorem keySet_lower {i t : ℕ} (ht : T ≤ t) (hnf : ∀ q, ¬ Fake G (I T) (K
       rw [h0, hm]; simp
     · exact (Key.lt_of_M_lt (minI_lt_of_mind_pos (by omega))).le
   · have hM : minI G (I T) q ≤ (K t q).M := minI_le_of_not_fake (hnf q)
-    have hpq : minI G (I T) p ≤ minI G (I T) q := minI_mono (Anc.of_adj hq)
+    have hpq : minI G (I T) p ≤ minI G (I T) q := minI_mono (Digraph.Adj.reachable hq)
     rcases lt_or_eq_of_le (hpq.trans hM) with hlt | heq
     · exact (Key.lt_of_M_lt (by simpa using hlt)).le
     · have hqp : minI G (I T) q = minI G (I T) p := le_antisymm (heq ▸ hM) hpq
@@ -296,7 +296,7 @@ variable {V : Type*} [Fintype V] {G : Digraph V} {D : Type*} [LinearOrder D] {α
 /-- **Theorem 2** for the algorithm C-MAI(D, ≺, I) under the distributed unfair daemon: if
 `MAD ≤ m ≤ α`, the execution is terminal, with all keys correct, after at most `α + m + 2` rounds
 (for any round boundaries `r`, in particular the paper's). -/
-theorem theorem2 {e : ℕ → V → CState D α} {S : ℕ → Set V} (h : IsRun (next G α I) e S) {m : ℕ}
+theorem theorem2 {e : ℕ → V → CState D α} {S : ℕ → Set V} (h : IsUnfairRun (next G α I) e S) {m : ℕ}
     (hm : MADLe G m) (hmα : m ≤ α) {r : ℕ → ℕ} (hr : RoundBounds (next G α I) e S r) :
     ∀ t, r (α + m + 2) ≤ t → Terminal (next G α I) (e t) ∧ ∀ p, (e t p).1 = target G I p := by
   have hR := run_of_isRun h

@@ -2,6 +2,7 @@ import Papers.PODC2021.ThinUnison.Justified
 import Cslib.Computability.Distributed.SelfStabilization.Unison
 import Cslib.Foundations.Combinatorics.SimpleGraph.Spanner
 import Mathlib
+import Podc.Order.NatDescent
 
 /-!
 # AlgAU: from a justified to a good graph (Section 2.3.5, Lemmas 2.19–2.22)
@@ -326,17 +327,9 @@ theorem lemma_2_20_claim (d : ℕ) : ∀ (v : V) (t t'' : ℕ) (ℓ : ℤ), 1 �
     have hwr := hwstep r hr1 (by omega)
     have hwr1 : (C r w).lvl = ℓ + 1 + 2 * d ∧ (C (r + 1) w).lvl = ℓ + 1 + 2 * d + 1 := by omega
     -- `t_w`: the last time `≤ r` at which `w` is at level `≤ ℓ + 1`
-    set q := Nat.findGreatest (fun s => t ≤ s ∧ (C s w).lvl ≤ ℓ + 1) r with hq
-    have hPt : t ≤ t ∧ (C t w).lvl ≤ ℓ + 1 := ⟨le_rfl, by omega⟩
-    have hqge : t ≤ q := Nat.le_findGreatest hr1 hPt
-    have hqle : q ≤ r := Nat.findGreatest_le r
-    have hqP : t ≤ q ∧ (C q w).lvl ≤ ℓ + 1 :=
-      Nat.findGreatest_spec (P := fun s => t ≤ s ∧ (C s w).lvl ≤ ℓ + 1) hr1 hPt
-    have hqgt : ∀ x, q < x → x ≤ r → ℓ + 1 < (C x w).lvl := by
-      intro x hx hxr
-      have := Nat.findGreatest_is_greatest hx hxr
-      simp only [not_and, not_le] at this
-      exact this (by omega)
+    obtain ⟨q, hqge, hqle, hqP, hqgt⟩ :=
+      Nat.exists_last_of_le (p := fun s => (C s w).lvl ≤ ℓ + 1) hr1 (by omega)
+    simp only [not_le] at hqgt
     have hq1 : ℓ + 1 < (C (q + 1) w).lvl := by
       rcases Nat.eq_or_lt_of_le hqle with h | h
       · rw [h]; omega
@@ -385,17 +378,9 @@ theorem lemma_2_20 {D : ℕ} (hk : 3 * D + 2 ≤ k) (hD : G.ediam ≤ D) {v : V}
   have hstep := hC.region_step' (s := r0) (v := v) (by omega)
   have hr0' : (C r0 v).lvl = 2 * D + 1 ∧ (C (r0 + 1) v).lvl = 2 * D + 2 := by omega
   -- the last time `≤ r0` at level `≤ 1`
-  set q := Nat.findGreatest (fun x => t ≤ x ∧ (C x v).lvl ≤ 1) r0 with hq
-  have hPt : t ≤ t ∧ (C t v).lvl ≤ 1 := ⟨le_rfl, by omega⟩
-  have hqge : t ≤ q := Nat.le_findGreatest hr1 hPt
-  have hqle : q ≤ r0 := Nat.findGreatest_le r0
-  have hqP : t ≤ q ∧ (C q v).lvl ≤ 1 :=
-    Nat.findGreatest_spec (P := fun x => t ≤ x ∧ (C x v).lvl ≤ 1) hr1 hPt
-  have hqgt : ∀ x, q < x → x ≤ r0 → 1 < (C x v).lvl := by
-    intro x hx hxr
-    have := Nat.findGreatest_is_greatest hx hxr
-    simp only [not_and, not_le] at this
-    exact this (by omega)
+  obtain ⟨q, hqge, hqle, hqP, hqgt⟩ :=
+    Nat.exists_last_of_le (p := fun x => (C x v).lvl ≤ 1) hr1 (by omega)
+  simp only [not_le] at hqgt
   have hq1 : 1 < (C (q + 1) v).lvl := by
     rcases Nat.eq_or_lt_of_le hqle with h | h
     · rw [h]; omega
