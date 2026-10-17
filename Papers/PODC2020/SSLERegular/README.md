@@ -71,7 +71,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Self-stabilization follows the paper. **Global fairness** is the standard notion of Angluin et
   al. `SolvesSSLE`: from any initial configuration, every globally fair execution reaches a valid
   output-stable configuration. We prove this is equivalent to reachability (`solvesSSLE_iff`) and to
-  stabilization with probability 1 under any random scheduler supported on the steps (`Fairness.lean`).
+  stabilization with probability 1 under any random scheduler supported on the steps
+  (`Cslib.TransitionSystem.tendsto_compl_of_reach`, `prob_eq_zero_of_not_reach`).
 * The Ring-Protocol of [11] is an arbitrary nondeterministic protocol with a leader output. For the
   repaired theorem it must satisfy `RingSpec`: SSLE on every directed ring of size ≥ 3, with the
   initiator being the predecessor, as in Protocol 1. The negative results need only a leader state
@@ -99,14 +100,19 @@ SS-Tree.
 
 **Trust.** No `sorry`. All listed theorems use only `propext`, `Classical.choice` and `Quot.sound`.
 Non-vacuity:
-* globally fair executions exist (`TS.exists_globallyFair`), so the negative results are not vacuous;
+* globally fair executions exist (`Cslib.TransitionSystem.exists_globallyFair`), so the negative
+  results are not vacuous;
 * the counterexamples are explicit configurations on `K_{k+1}` / `K_{2k+1}`;
 * the hypotheses of the repaired theorem are met by every connected `2k`-regular graph, given a
   ring protocol satisfying `RingSpec`. That such a ring protocol exists is the result of [11], which
   we do not formalize.
 
+Built on the shared library: `GProtocol` is the nondeterministic population-protocol model
+`Cslib.PopulationProtocol.NProtocol` with interactions along `G.Adj`
+(`Podc/PopulationProtocols/Nondet.lean`); runs, global fairness, the existence of globally fair runs,
+the fairness/reachability equivalence and the generic Lemma 2.1 (`exists_reach_of_err`) are in
+`Podc/Stabilization/Basic.lean`, the probability-1 bridge in `Podc/Stabilization/Markov.lean`.
+
 CSLib candidates:
-* the generic fairness, existence and Markov facts in `Fairness.lean`;
-* graph-restricted nondeterministic population protocols with Lemma 2.1 (`Model.lean`);
 * Euler's theorem (`Euler.lean`);
 * greedy colouring of a conflict relation (`exists_coloring_of_card_lt`, `GoodExists.lean`).

@@ -90,6 +90,9 @@ Corollary 3.5, Lemmas 4.1–4.2, the `O(n)` time and state count of Theorem 4.3,
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: `Silent-n-state-SSR` and the protocol of Observation 2.5 satisfy the SSLE/SSR hypotheses of the
 lower bounds (`solvesSSLE`, `obs25_solvesSSLE`). Built on CSLib's `Cslib.Computability.Distributed.PopulationProtocols`
-and `Cslib.Probability.Markov.Absorption`. CSLib candidates (generic, marked in the code): the support model
-`NProtocol` with `reachable_embed`, the Markov bridge of `RandomScheduler.lean`, and the pair/triple run-lifting lemmas of
+and `Cslib.Probability.Markov.Absorption`, and on the shared library: the support model `NProtocol`
+(`Podc/PopulationProtocols/Nondet.lean`, with sub-population embedding `exists_reach_of_embedding`), the uniform
+scheduler `uniformKernel` (`Podc/PopulationProtocols/RandomScheduler.lean`), `StablyCorrect`/`SelfStabilizes`
+(`StablyIn`/`SelfStabilizes` of `Podc/Stabilization/Basic.lean`) and the reachability/probability-1 bridge
+(`Podc/Stabilization/Markov.lean`). CSLib candidates (marked in the code): the pair/triple run-lifting lemmas of
 `OptimalSilentCorrect.lean`.

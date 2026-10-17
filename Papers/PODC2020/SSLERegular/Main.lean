@@ -1,5 +1,6 @@
 import Papers.PODC2020.SSLERegular.EulerMain
 import Papers.PODC2020.SSLERegular.StateCount
+import Podc.Stabilization.Markov
 
 /-!
 # Chen–Chen, *Self-Stabilizing Leader Election in Regular Graphs* (PODC 2020): main results
@@ -46,8 +47,10 @@ theorem repaired_prob_one {RS : Type*} {k : ℕ} {V : Type u} [DecidableEq V] [F
     (hstep : ∀ C D, 0 < T C D → (ssEuler true k R).Step G C D)
     (hpos : ∀ C D, (ssEuler true k R).Step G C D → 0 < T C D) (C : V → EState k RS) :
     Tendsto (fun t => ∑ D ∈ (TS.setOf ((ssEuler true k R).ValidStable G (EState.out R)))ᶜ,
-      (T ^ t) C D) atTop (𝓝 0) :=
-  TS.tendsto_compl_of_reach GProtocol.validStable_closed hT hstep hpos
+      (T ^ t) C D) atTop (𝓝 0) := by
+  classical
+  rw [TS.setOf_eq_toFinset]
+  exact Cslib.TransitionSystem.tendsto_compl_of_reach hT hstep hpos GProtocol.validStable_closed
     (repaired_selfStab hconn hdeg hk hR hRS r0) C
 
 /-- **SS-Tree under a random scheduler**: from the bad configuration of
@@ -63,7 +66,10 @@ theorem ssTree_prob_zero {RS : Type*} {k : ℕ} {V : Type*} [DecidableEq V] [Fin
       T ∈ Matrix.rowStochastic ℝ _ → (∀ C D, 0 < T C D → (ssTree k R).Step G C D) →
       ∀ t, ∑ D ∈ TS.setOf ((ssTree k R).ValidStable G TState.isLeader), (T ^ t) C0 D = 0 := by
   obtain ⟨C0, hC0⟩ := ssTree_all_roots_forever (G := G) (R := R) hk hdeg c hinj hr0
-  refine ⟨C0, fun hT hstep t => TS.prob_eq_zero_of_not_reach hT hstep (fun D hD hv => ?_) t⟩
+  classical
+  refine ⟨C0, fun hT hstep t => ?_⟩
+  rw [TS.setOf_eq_toFinset]
+  refine Cslib.TransitionSystem.prob_eq_zero_of_not_reach hT hstep (fun D hD hv => ?_) t
   have h1 := hv.2
   unfold GProtocol.numLeaders at h1
   rw [Finset.filter_true_of_mem (fun v _ => hC0 D hD v), Finset.card_univ] at h1
