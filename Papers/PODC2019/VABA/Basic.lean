@@ -183,13 +183,9 @@ end upd
 
 variable [Fintype P]
 
-lemma signers_mono {s s' : Glob P V} (h : ∀ p x, s.tok p x → s'.tok p x) (st : Stmt P V) :
-    signers s st ⊆ signers s' st := by
-  intro p; simp only [mem_signers]; exact h p st
-
 lemma QC_mono {Q : ℕ} {s s' : Glob P V} (h : ∀ p x, s.tok p x → s'.tok p x) {st : Stmt P V}
     (hq : QC Q s st) : QC Q s' st :=
-  hq.trans (card_le_card (signers_mono h st))
+  Cslib.Byzantine.Certified.mono hq (fun p => h p st) le_rfl
 
 lemma mem_completed {Q : ℕ} {s : Glob P V} {j : ℕ} {k : P} :
     k ∈ completed Q s j ↔ ∃ v, QC Q s (.pb j k 4 v) := by
@@ -199,24 +195,5 @@ lemma completed_mono {Q : ℕ} {s s' : Glob P V} (h : ∀ p x, s.tok p x → s'.
     completed Q s j ⊆ completed Q s' j := by
   intro k; simp only [mem_completed]
   rintro ⟨v, hv⟩; exact ⟨v, QC_mono h hv⟩
-
-/-- Quorum intersection: two sets of size `≥ Q` with `n + f < 2Q` share a party outside any set
-of at most `f` corrupted parties. -/
-lemma exists_honest_inter [DecidableEq P] {Q f : ℕ} (hQ : Fintype.card P + f < 2 * Q) {A B X : Finset P}
-    (hA : Q ≤ A.card) (hB : Q ≤ B.card) (hX : X.card ≤ f) : ∃ h ∈ A, h ∈ B ∧ h ∉ X := by
-  by_contra hcon
-  push Not at hcon
-  have hsub : A ∩ B ⊆ X := by
-    intro h hh; rw [mem_inter] at hh; exact hcon h hh.1 hh.2
-  have h1 := card_union_add_card_inter A B
-  have h2 : (A ∪ B).card ≤ Fintype.card P := card_le_univ _
-  have h3 := card_le_card hsub
-  omega
-
-/-- A set of size `≥ Q` contains a party outside a set of at most `f` corrupted parties. -/
-lemma exists_honest [DecidableEq P] {Q f : ℕ} (hQ : Fintype.card P + f < 2 * Q) {A X : Finset P}
-    (hA : Q ≤ A.card) (hX : X.card ≤ f) : ∃ h ∈ A, h ∉ X := by
-  obtain ⟨h, hA', -, hX'⟩ := exists_honest_inter hQ hA hA hX
-  exact ⟨h, hA', hX'⟩
 
 end VABA

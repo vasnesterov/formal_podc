@@ -141,7 +141,7 @@ Agreement*, PODC 2019, arXiv:1811.01332v1 (the only arXiv version). Numbering fo
   - `prob_undecided_le`: probability `≤ (f/n)^k`, with `f/n < 1/3`;
   - `expected_views_lt`: the expected number of views up to the first view whose leader
     completed before the coin was revealed is `≤ n/(n−f) < 3/2`, truncated at any horizon. This
-    reuses the coin game of `Papers/PODC2021/AllYouNeedIsDAG/Coin.lean`.
+    uses the shared coin game `Podc/Probability/CoinGame.lean`.
 - **Liveness** (Lemmas 7, 17–19) is formalized in the constructive form `view_progress`. From any
   reachable state, honest steps alone (delivering honest messages) bring every honest party past
   the current view. We did not formalize the statement for all fair schedules.

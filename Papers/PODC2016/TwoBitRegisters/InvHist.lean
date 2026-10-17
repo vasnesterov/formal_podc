@@ -1,4 +1,5 @@
 import Papers.PODC2016.TwoBitRegisters.InvRead
+import Podc.Foundations.Quorum
 
 /-!
 # The history invariant (Lemma 10 of the paper)
@@ -88,17 +89,9 @@ lemma count_mono {c₁ c₂ : P → Prop} [DecidablePred c₁] [DecidablePred c�
 lemma quorum_inter {t : ℕ} (ht : 2 * t < Fintype.card P) {c₁ c₂ : P → Prop} [DecidablePred c₁]
     [DecidablePred c₂] (h₁ : Fintype.card P - t ≤ count c₁) (h₂ : Fintype.card P - t ≤ count c₂) :
     ∃ j, c₁ j ∧ c₂ j := by
-  by_contra hcon
-  push Not at hcon
-  have hdisj : Disjoint (Finset.univ.filter c₁) (Finset.univ.filter c₂) := by
-    rw [Finset.disjoint_left]
-    intro j hj1 hj2
-    simp only [Finset.mem_filter] at hj1 hj2
-    exact hcon j hj1.2 hj2.2
-  have := Finset.card_union_of_disjoint hdisj
-  have hle := Finset.card_le_univ (Finset.univ.filter c₁ ∪ Finset.univ.filter c₂)
-  simp only [count] at h₁ h₂
-  omega
+  obtain ⟨j, hj⟩ := Cslib.Quorum.inter_nonempty_of_two_mul_lt ht h₁ h₂
+  simp only [Finset.mem_inter, Finset.mem_filter, Finset.mem_univ, true_and] at hj
+  exact ⟨j, hj⟩
 
 /-! ## Frame lemmas -/
 

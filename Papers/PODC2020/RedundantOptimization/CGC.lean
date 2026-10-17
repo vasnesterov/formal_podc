@@ -311,19 +311,10 @@ lemma exists_honest_ge (hn : 2 * f < n) (r : Fin n → E) :
     ∃ σ ∈ A.H, threshold f r ≤ ‖r σ‖ := by
   classical
   obtain ⟨-, -, hU⟩ := threshold_spec (by omega : f < n) r
-  by_contra hcon
-  push Not at hcon
-  have hsub : ({j | threshold f r ≤ ‖r j‖} : Finset (Fin n)) ⊆ A.Hᶜ := by
-    intro j hj
-    simp only [mem_filter, mem_univ, true_and] at hj
-    rw [mem_compl]
-    intro hjH
-    exact absurd hj (not_le.2 (hcon j hjH))
-  have h1 := Finset.card_le_card hsub
-  have h2 := Finset.card_add_card_compl A.H
-  have := A.card_H
-  simp only [Fintype.card_fin] at h2
-  omega
+  have hHc : #A.Hᶜ ≤ f := by
+    rw [card_compl, Fintype.card_fin]; have := A.card_H; omega
+  obtain ⟨σ, hσ, hσH⟩ := exists_mem_notMem_of_card_le_of_lt hHc hU
+  exact ⟨σ, by simpa using hσH, by simpa using hσ⟩
 
 /-- The stopping rule of Step S2: if `‖g_{i_{n-f}}‖ = 0` then the current estimate is in `W*`. -/
 theorem mem_Wstar_of_threshold_eq_zero (hn : 2 * f < n) (w : E) (r : Fin n → E)

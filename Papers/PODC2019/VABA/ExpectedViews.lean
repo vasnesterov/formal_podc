@@ -1,5 +1,5 @@
 import Papers.PODC2019.VABA.Safety
-import Papers.PODC2021.AllYouNeedIsDAG.Coin
+import Podc.Probability.CoinGame
 
 /-!
 # VABA: each view succeeds with probability `≥ (n - f) / n` (Lemmas 21–24)
@@ -17,7 +17,7 @@ the moment the coin of view `j` is revealed (all of `P` if it is never revealed)
 * `decided_of_hit`: if the leader `c j` of view `j` is in `good σ c j`, every party that leaves view
   `j` has decided (Lemma 22).
 
-Plugging this into the coin game of `Papers/PODC2021/AllYouNeedIsDAG/Coin.lean` (uniform coins
+Plugging this into the coin game of `Podc/Probability/CoinGame.lean` (uniform coins
 `x : Fin k → P` for the views `1, …, k`):
 * `card_undecided_le`: the number of coin sequences for which some party completes the first `k`
   views without deciding is at most `f ^ k` out of `n ^ k` (for `Q = n - f`), i.e. probability
@@ -29,7 +29,7 @@ Plugging this into the coin game of `Papers/PODC2021/AllYouNeedIsDAG/Coin.lean` 
 
 namespace VABA
 
-open Finset
+open Finset Cslib.Probability
 
 variable {P V : Type*} [Fintype P] [DecidableEq P] {C : Cfg P V}
 
@@ -281,13 +281,13 @@ def coins {K : ℕ} (x : Fin K → P) (tail : ℕ → P) : ℕ → P :=
 /-- The adversary of the coin game induced by the strategy `σ`: the good set of wave `i` (view
 `i + 1`) as a function of the coins of the earlier views. -/
 noncomputable def advOf (C : Cfg P V) (σ : Strategy P V) (tail : ℕ → P) :
-    DagRider.Coin.Adversary P :=
+    CoinGame.Adversary P :=
   fun i h => good C σ (coins h tail) (i + 1)
 
 lemma hit_iff (σ : Strategy P V) (tail : ℕ → P) {K : ℕ} (x : Fin K → P) (i : ℕ) (hi : i < K) :
-    DagRider.Coin.Hit (advOf C σ tail) x i hi ↔
+    CoinGame.Hit (advOf C σ tail) x i hi ↔
       coins x tail (i + 1) ∈ good C σ (coins x tail) (i + 1) := by
-  unfold DagRider.Coin.Hit advOf
+  unfold CoinGame.Hit advOf
   have hx : x ⟨i, hi⟩ = coins x tail (i + 1) := by
     simp only [coins, show 1 ≤ i + 1 ∧ i + 1 ≤ K from ⟨by omega, by omega⟩]; rfl
   rw [hx, good_congr σ (by omega : 1 ≤ i + 1) (c' := coins x tail)]
@@ -306,11 +306,11 @@ theorem card_undecided_le (hQ : Fintype.card P + C.f < 2 * C.Q) (hQn : C.Q ≤ F
     (univ.filter (fun x : Fin k → P => ∃ t p, k < ((run C σ (coins x tail) t).loc p).view ∧
       ((run C σ (coins x tail) t).loc p).decs = ∅)).card ≤ (Fintype.card P - C.Q) ^ k := by
   refine le_trans (card_le_card ?_)
-    (DagRider.Coin.card_misses_le (advOf C σ tail) (fun i h => card_good hQ hQn σ _ _) k)
+    (CoinGame.card_misses_le (advOf C σ tail) (fun i h => card_good hQ hQn σ _ _) k)
   intro x hx
   simp only [mem_filter, mem_univ, true_and] at hx
   obtain ⟨t, p, hp, hdec⟩ := hx
-  simp only [DagRider.Coin.misses, DagRider.Coin.missesIn, mem_filter, mem_univ, true_and]
+  simp only [CoinGame.misses, CoinGame.missesIn, mem_filter, mem_univ, true_and]
   intro i hi _ _ hhit
   rw [hit_iff] at hhit
   have := decided_of_hit hQ σ (coins x tail) (by omega : 1 ≤ i + 1) hhit (t := t) (p := p)
@@ -339,20 +339,20 @@ theorem prob_undecided_le (hn : 3 * C.f < Fintype.card P) (hQ : C.Q = Fintype.ca
 broadcast when the coin was revealed (truncated at the horizon `K`). -/
 noncomputable def firstGoodView (C : Cfg P V) (σ : Strategy P V) (tail : ℕ → P) (K : ℕ)
     (x : Fin K → P) : ℕ :=
-  DagRider.Coin.T (advOf C σ tail) K x
+  CoinGame.T (advOf C σ tail) K x
 
 /-- Every party that completes view `firstGoodView` has decided (if that view is within the
 horizon). -/
 theorem decided_of_firstGoodView (hQ : Fintype.card P + C.f < 2 * C.Q) (σ : Strategy P V)
     (tail : ℕ → P) {K : ℕ} (x : Fin K → P)
-    (hhit : ∃ i, ∃ h : i < K, DagRider.Coin.Hit (advOf C σ tail) x i h) {t : ℕ} {p : P}
+    (hhit : ∃ i, ∃ h : i < K, CoinGame.Hit (advOf C σ tail) x i h) {t : ℕ} {p : P}
     (hp : firstGoodView C σ tail K x < ((run C σ (coins x tail) t).loc p).view) :
     ((run C σ (coins x tail) t).loc p).decs.Nonempty := by
   classical
   let s := Nat.find hhit
   obtain ⟨hs, hhs⟩ := Nat.find_spec hhit
   have hT : firstGoodView C σ tail K x = s + 1 :=
-    DagRider.Coin.T_eq_of_first_hit _ x hs hhs
+    CoinGame.T_eq_of_first_hit _ x hs hhs
       (fun i h hi hh => Nat.find_min hhit hi ⟨h, hh⟩)
   rw [hT] at hp
   rw [hit_iff] at hhs
@@ -364,7 +364,7 @@ theorem expected_views_le (hQ : Fintype.card P + C.f < 2 * C.Q) (hQn : C.Q ≤ F
     (σ : Strategy P V) (tail : ℕ → P) (K : ℕ) :
     (∑ x : Fin K → P, (firstGoodView C σ tail K x : ℚ)) / (Fintype.card P : ℚ) ^ K ≤
       (Fintype.card P : ℚ) / C.Q :=
-  DagRider.Coin.expected_waves_le (advOf C σ tail) (fun i h => card_good hQ hQn σ _ _)
+  CoinGame.expected_waves_le (advOf C σ tail) (fun i h => card_good hQ hQn σ _ _)
     (by omega) hQn K
 
 /-- With the paper's parameters (`n > 3f`, `Q = n - f`) the expected number of views is less than

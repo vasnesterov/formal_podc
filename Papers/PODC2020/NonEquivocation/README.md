@@ -125,5 +125,6 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Trust.** No `sorry`. All listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: the fault models are inhabited by fault-free and crash executions
 (`ExecSys`, `mkσ`). Algorithm 2 and the Section 3 algorithm satisfy the solvability hypotheses
-(`theorem_5_1`, `sne_solvesIC`). The model is self-contained (Mathlib only). `Model.lean` + `Exec.lean`
+(`theorem_5_1`, `sne_solvesIC`). The model is self-contained (Mathlib, plus the shared vote counting `Finset.countEq` of
+`Podc/Foundations/Count.lean`). `Model.lean` + `Exec.lean`
 (PSL message maps, imitation-world executions) are CSLib candidates.

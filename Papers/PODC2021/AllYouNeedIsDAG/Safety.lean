@@ -1,4 +1,5 @@
 import Papers.PODC2021.AllYouNeedIsDAG.Ordering
+import Podc.Foundations.Quorum
 
 /-!
 # DAG-Rider: safety (Lemma 1, Claims 4–5, Propositions 1–2)
@@ -63,14 +64,6 @@ lemma exists_sPath_down {D : Finset (Vtx P)} (hD : Closed C D) (hV : Valid f C D
     obtain ⟨x, hx, hx1, hxp⟩ := ih _ hmem k hk1 (by simp; omega)
     exact ⟨x, hx, hx1, Relation.ReflTransGen.head e hxp⟩
 
-/-- Quorum intersection: two sets of `2f + 1` sources among `n ≤ 4f + 1` intersect. -/
-lemma quorum_inter [Fintype P] (hP : Fintype.card P ≤ 4 * f + 1) {A A' : Finset P}
-    (hA : 2 * f + 1 ≤ A.card) (hA' : 2 * f + 1 ≤ A'.card) : (A ∩ A').Nonempty := by
-  rw [← Finset.card_pos]
-  have h1 := Finset.card_union_add_card_inter A A'
-  have h2 : (A ∪ A').card ≤ Fintype.card P := Finset.card_le_univ _
-  omega
-
 /-- **Lemma 1** (for direct commits). If the leader `v` of wave `d` is directly committed, then
 every vertex `u` of a round `> round(d, 4)` in any closed valid local DAG (in particular the
 leader of any later wave, in the DAG of any process) has a strong path to `v`. -/
@@ -90,7 +83,7 @@ theorem lemma1_direct [Fintype P] (hP : Fintype.card P ≤ 4 * f + 1) {v : Vtx P
     exact Prod.ext (by rw [ha.2.1, hb.2.1]) hab
   have hQ : 2 * f + 1 ≤ (F.image Prod.snd).card := by
     rw [Finset.card_image_of_injOn hinj]; exact hcnt
-  obtain ⟨s, hs⟩ := quorum_inter hP hQ (hV' x hx)
+  obtain ⟨s, hs⟩ := Cslib.Quorum.inter_nonempty_of_card_le_four_mul_add_one hP hQ (hV' x hx)
   rw [Finset.mem_inter, Finset.mem_image] at hs
   obtain ⟨⟨y, hy, rfl⟩, hsx⟩ := hs
   simp only [hF, Finset.mem_filter] at hy

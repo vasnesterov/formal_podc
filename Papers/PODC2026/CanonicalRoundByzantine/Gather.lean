@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.Foundations.Count
 
 /-!
 # Algorithm 4 of [AFW26]: connected consensus from gather (and approximate agreement)
@@ -65,45 +66,26 @@ section Counting
 variable {P W : Type*} [DecidableEq P] [DecidableEq W]
 
 /-- `#(S, w)`: the number of pairs of `S` carrying the value `w` (proof of Lemma 11). -/
-def cnt (S : Finset (P × W)) (w : W) : ℕ := (S.filter (fun p => p.2 = w)).card
-
-omit [DecidableEq P] in
--- CSLib candidate
-theorem cnt_mono {S S' : Finset (P × W)} (h : S ⊆ S') (w : W) : cnt S w ≤ cnt S' w :=
-  card_le_card (filter_subset_filter _ h)
+abbrev cnt (S : Finset (P × W)) (w : W) : ℕ := S.countEq Prod.snd w
 
 /-- Lemma 11 of [AFW26]. If `w` appears at least `|S| - f` times in `S` and `SC ⊆ S`, then `w`
 appears at least `|SC| - f` times in `SC`. (The paper states it for a gather output `Sᵢ` and its
 common core `SC`; only `SC ⊆ Sᵢ` is used.) -/
 theorem lemma11 {S SC : Finset (P × W)} {f : ℕ} {w : W} (hsub : SC ⊆ S)
     (h : S.card - f ≤ cnt S w) : SC.card - f ≤ cnt SC w := by
-  have h1 : S.filter (fun p => p.2 = w) ⊆ SC.filter (fun p => p.2 = w) ∪ (S \ SC) := by
-    intro p hp
-    simp only [mem_filter, mem_union, mem_sdiff] at hp ⊢
-    by_cases hpc : p ∈ SC
-    · exact Or.inl ⟨hpc, hp.2⟩
-    · exact Or.inr ⟨hp.1, hpc⟩
-  have h2 := (card_le_card h1).trans (card_union_le _ _)
-  rw [card_sdiff_of_subset hsub] at h2
-  have h3 := card_le_card hsub
-  unfold cnt at h ⊢
+  have h1 : cnt S w ≤ cnt SC w + #(S \ SC) := countEq_le_countEq_add_card_sdiff S SC
+  rw [card_sdiff_of_subset hsub] at h1
+  have h2 := card_le_card hsub
   omega
 
+omit [DecidableEq P] in
 /-- Prop. 12 of [AFW26], general form: if `2f < |SC|`, at most one value appears at least
 `|SC| - f` times in `SC`. -- CSLib candidate -/
 theorem heavy_unique {SC : Finset (P × W)} {f : ℕ} (hf : 2 * f < SC.card) {u w : W}
-    (hu : SC.card - f ≤ cnt SC u) (hw : SC.card - f ≤ cnt SC w) : u = w := by
-  by_contra huw
-  have hdisj : Disjoint (SC.filter (fun p => p.2 = u)) (SC.filter (fun p => p.2 = w)) := by
-    rw [disjoint_filter]
-    intro p _ hpu hpw
-    exact huw (hpu.symm.trans hpw)
-  have := card_le_card (union_subset (filter_subset (fun p : P × W => p.2 = u) SC)
-    (filter_subset (fun p : P × W => p.2 = w) SC))
-  rw [card_union_of_disjoint hdisj] at this
-  unfold cnt at hu hw
-  omega
+    (hu : SC.card - f ≤ cnt SC u) (hw : SC.card - f ≤ cnt SC w) : u = w :=
+  eq_of_card_lt_countEq_add_countEq (show #SC < cnt SC u + cnt SC w by omega)
 
+omit [DecidableEq P] in
 /-- Proposition 12 of [AFW26]. If `|SC| = n - f` and `n > 3f`, at most one value appears
 `|SC| - f` times in `SC`. -/
 theorem prop12 {n f : ℕ} (hn : 3 * f < n) {SC : Finset (P × W)} (hSC : SC.card = n - f)
@@ -128,7 +110,7 @@ theorem exists_not_mem_of_cnt {S : Finset (P × W)} {F : Finset P} {w : W}
     exact Prod.ext hpq (hp.2.trans hq.2.symm)
   have := card_le_card hsub
   rw [card_image_of_injOn hinj] at this
-  unfold cnt at h
+  rw [cnt, countEq_def] at h
   omega
 
 /-- If no process id occurs in two pairs of `S` with different values, and every pair of `S` whose
@@ -150,7 +132,7 @@ theorem cnt_ge_of_functional {S : Finset (P × W)} {F : Finset P} {w : W}
   have h1 := card_le_card hsub
   rw [card_image_of_injOn hinj] at h1
   have h2 := card_filter_add_card_filter_not (s := S) (fun p => p.2 = w)
-  unfold cnt
+  rw [cnt, countEq_def]
   omega
 
 end Counting
@@ -434,7 +416,7 @@ theorem v₂_ne_none (hn : 3 * f < Fintype.card P) (h2 : Phase2 R f F ρ)
     · rw [h] at hjy; linarith
   obtain ⟨TC, hTC, hsub⟩ := h2.gather.commonCore
   have h11 := lemma11 (hsub j hj) hu
-  have hmono := cnt_mono (hsub i hi) (some u)
+  have hmono : cnt TC (some u) ≤ cnt (ρ.T i) (some u) := countEq_mono (hsub i hi)
   have hl := h2.line5 i hi
   intro hnone
   rw [hnone] at hl

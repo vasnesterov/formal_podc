@@ -75,7 +75,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Asynchrony. The adversary schedules every enabled action in any order.
 * Adversary. It corrupts up to `f` parties *adaptively*. A corrupted party's local state is frozen,
   and it signs anything.
-* Threshold signatures are ideal: a certificate exists iff `Q` shares exist. The paper's threshold
+* Threshold signatures are ideal: a certificate exists iff `Q` shares exist (`QC` is the shared
+  `Cslib.Byzantine.Certified`, `Podc/Byzantine/Certificate.lean`). The paper's threshold
   is `2f + 1`; theorems take `n + f < 2Q` for safety and `Q + f ≤ n` for liveness, i.e. `Q = n − f`
   for any `n > 3f`.
 * Common coin. It is ideal: a sequence of leaders, view `j`'s revealed at the first honest
@@ -87,8 +88,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
   - The adversary is a deterministic strategy on the full history of global states, which contain
     only revealed coins. That the adversary's "good set" of view `j` depends only on the coins of
     earlier views is *proved* (`good_congr`).
-  - Probabilities are counts over uniform leader sequences. The coin game of
-    `Papers/PODC2021/AllYouNeedIsDAG/Coin.lean` is reused.
+  - Probabilities are counts over uniform leader sequences, in the shared coin game
+    `Podc/Probability/CoinGame.lean` (also used for DAG-Rider).
 * All cryptographic "except with negligible probability" qualifiers disappear with ideal
   functionalities.
 
@@ -124,5 +125,6 @@ Full list of differences (including modelling choices and minor imprecisions): [
   - `view_progress` shows that views always can complete, so the probability bounds are not
     vacuous.
   - The counterexample run shows that the model's guards are satisfiable all the way to decisions.
-- The model is paper-local. The safety invariants (`Inv`, `KInv`, `LInv`) are proved action by
+- The model is paper-local; quorum intersection and certificates come from the shared
+  `Podc/Foundations/Quorum.lean` and `Podc/Byzantine/Certificate.lean`. The safety invariants (`Inv`, `KInv`, `LInv`) are proved action by
   action for every reachable state.

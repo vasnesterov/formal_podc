@@ -19,6 +19,8 @@ threshold `Q` with `n + f < 2Q` (for the paper's `n = 3f + 1`, `Q = 2f + 1`):
 namespace VABA
 
 open Finset
+open Cslib.Byzantine (mem_signers Certified)
+open Cslib.Quorum (exists_mem_inter_notMem_of_quorum)
 
 variable {P V : Type*} [Fintype P] [DecidableEq P] {C : Cfg P V} {s : Glob P V}
 
@@ -29,14 +31,13 @@ include hQ I
 
 /-- A certificate has a signer that is honest now. -/
 lemma honest_signer {st : Stmt P V} (h : QC C.Q s st) : ∃ p, p ∉ s.corrupt ∧ s.tok p st := by
-  obtain ⟨p, hp, hc⟩ := exists_honest hQ h I.card_corrupt
-  exact ⟨p, hc, mem_signers.mp hp⟩
+  obtain ⟨p, hc, hp, -⟩ := Certified.common_correct_signer h h I.card_corrupt (by omega)
+  exact ⟨p, hc, hp⟩
 
 /-- Two certificates have a common signer that is honest now. -/
 lemma common_signer {st st' : Stmt P V} (h : QC C.Q s st) (h' : QC C.Q s st') :
-    ∃ p, p ∉ s.corrupt ∧ s.tok p st ∧ s.tok p st' := by
-  obtain ⟨p, hp, hp', hc⟩ := exists_honest_inter hQ h h' I.card_corrupt
-  exact ⟨p, hc, mem_signers.mp hp, mem_signers.mp hp'⟩
+    ∃ p, p ∉ s.corrupt ∧ s.tok p st ∧ s.tok p st' :=
+  Certified.common_correct_signer h h' I.card_corrupt (by omega)
 
 /-- Lemmas 4–5: a stage-`st` certificate (`st ≥ 2`) implies a stage-`(st-1)` certificate on the
 same value. -/
@@ -97,7 +98,7 @@ lemma key_safety {j0 : ℕ} {l0 : P} {v : V} (hl0 : s.rev j0 = some l0)
       have := (I.lead_spec p j0 l' hl').2; rw [hl0] at this; exact (Option.some.inj this).symm
     subst this
     obtain ⟨h, hex, hsig, hc⟩ :=
-      exists_honest_inter hQ (I.exitR_card p j0 hj0 (by omega)) h3 I.card_corrupt
+      exists_mem_inter_notMem_of_quorum hQ I.card_corrupt (I.exitR_card p j0 hj0 (by omega)) h3
     rw [mem_signers, I.tok_pb h hc] at hsig
     have hge := I.kv_spec p j l w ht j0 l' hlt hl' h hex hc v hsig
     rcases hkv with h0 | ⟨-, hlt', l'', hl'', hq⟩
@@ -113,7 +114,7 @@ lemma lock_of_commitQC {j : ℕ} {l : P} {v : V} (hl : s.rev j = some l)
     · rw [h, I.rev_zero] at hl; simp at hl
     · exact h
   obtain ⟨h, hex, hsig, hc⟩ :=
-    exists_honest_inter hQ (I.exitR_card p j hj hp) h3 I.card_corrupt
+    exists_mem_inter_notMem_of_quorum hQ I.card_corrupt (I.exitR_card p j hj hp) h3
   rw [mem_signers, I.tok_pb h hc] at hsig
   obtain ⟨-, l', hl', hv⟩ := I.rcvd_spec p j h (I.exitR_sub p j hex) hc
   have : l' = l := by
@@ -130,7 +131,7 @@ lemma key_of_lockQC {j : ℕ} {l : P} {v : V} (hl : s.rev j = some l)
     · rw [h, I.rev_zero] at hl; simp at hl
     · exact h
   obtain ⟨h, hex, hsig, hc⟩ :=
-    exists_honest_inter hQ (I.exitR_card p j hj hp) h2 I.card_corrupt
+    exists_mem_inter_notMem_of_quorum hQ I.card_corrupt (I.exitR_card p j hj hp) h2
   rw [mem_signers, I.tok_pb h hc] at hsig
   obtain ⟨-, l', hl', hv⟩ := I.rcvd_spec p j h (I.exitR_sub p j hex) hc
   have : l' = l := by
@@ -146,7 +147,8 @@ lemma decide_of_completed {j : ℕ} {l : P} {v : V} (hl : s.rev j = some l)
     rcases Nat.eq_zero_or_pos j with h | h
     · rw [h, I.rev_zero] at hl; simp at hl
     · exact h
-  obtain ⟨h, hex, hsig, hc⟩ := exists_honest_inter hQ (I.exitR_card p j hj hp) h4 I.card_corrupt
+  obtain ⟨h, hex, hsig, hc⟩ :=
+    exists_mem_inter_notMem_of_quorum hQ I.card_corrupt (I.exitR_card p j hj hp) h4
   rw [mem_signers, I.tok_pb h hc] at hsig
   obtain ⟨-, l', hl', hv⟩ := I.rcvd_spec p j h (I.exitR_sub p j hex) hc
   have : l' = l := by

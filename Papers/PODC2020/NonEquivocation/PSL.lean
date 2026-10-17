@@ -1,4 +1,5 @@
 import Papers.PODC2020.NonEquivocation.Majority
+import Podc.Foundations.Count
 
 /-!
 # Algorithm 2 and Theorem 5.1: interactive consistency under weak non-equivocation, `n > 2t`
@@ -40,7 +41,7 @@ noncomputable def pickMaj (t : ℕ) (S : Finset P) (τ : List P → Option V) (p
 /-- Lines 20–24 of Algorithm 2: a value `≠ ⟨⊥⟩` with at least `t` votes in `vec` among `S`, else
 `⟨⊥⟩`. -/
 noncomputable def vote (t : ℕ) (S : Finset P) (vec : P → V) : V :=
-  if h : ∃ v, v ≠ omitted ∧ t ≤ (S.filter (fun r => vec r = v)).card then h.choose else omitted
+  if h : ∃ v, v ≠ omitted ∧ t ≤ S.countEq vec v then h.choose else omitted
 
 /-! ### Unfolding lemmas -/
 
@@ -61,15 +62,15 @@ lemma pickMaj_of_not {t : ℕ} {S : Finset P} {τ : List P → Option V} {p q : 
 omit [DecidableEq P] in
 lemma vote_congr {t : ℕ} {S : Finset P} {f g : P → V} (h : ∀ r ∈ S, f r = g r) :
     vote t S f = vote t S g := by
-  have : ∀ v, S.filter (fun r => f r = v) = S.filter (fun r => g r = v) := fun v =>
-    Finset.filter_congr (fun r hr => by rw [h r hr])
+  have : ∀ v, S.countEq f v = S.countEq g v := fun v => by
+    rw [Finset.countEq, Finset.countEq, Finset.filter_congr (fun r hr => by rw [h r hr])]
   simp only [vote, this]
 
 omit [DecidableEq P] in
 /-- `vote` returns the unique value that qualifies, if any. -/
 lemma vote_eq {t : ℕ} {S : Finset P} {f : P → V} {v : V}
-    (huniq : ∀ u, u ≠ omitted → t ≤ (S.filter (fun r => f r = u)).card → u = v)
-    (hv : v ≠ omitted → t ≤ (S.filter (fun r => f r = v)).card) : vote t S f = v := by
+    (huniq : ∀ u, u ≠ omitted → t ≤ S.countEq f u → u = v)
+    (hv : v ≠ omitted → t ≤ S.countEq f v) : vote t S f = v := by
   unfold vote
   split_ifs with h
   · obtain ⟨h1, h2⟩ := h.choose_spec
@@ -273,16 +274,9 @@ theorem psl_correct (t : ℕ) : ∀ (S F : Finset P) (σ : MsgMap P V), 2 * t < 
       have hyS' : y ∈ S.erase q := Finset.mem_erase.2 ⟨hyq, hy⟩
       apply vote_eq
       · intro u hu hcu
-        obtain ⟨r, hr, hrF⟩ : ∃ r ∈ (S.erase q).filter
-            (fun r => psl t (S.erase q) (loc (sub σ q) y) y r = u), r ∉ F := by
-          by_contra hc
-          push Not at hc
-          have hsub : (S.erase q).filter (fun r => psl t (S.erase q) (loc (sub σ q) y) y r = u)
-              ⊆ (S.erase q) ∩ F := fun r hr =>
-            Finset.mem_inter.2 ⟨(Finset.mem_filter.1 hr).1, hc r hr⟩
-          have := Finset.card_le_card hsub
-          omega
-        obtain ⟨hrS', hru⟩ := Finset.mem_filter.1 hr
+        obtain ⟨r, hrS', hrF', hru⟩ :=
+          Finset.exists_mem_notMem_of_card_lt_countEq (F := S.erase q ∩ F) (hF'.trans_lt hcu)
+        have hrF : r ∉ F := fun h => hrF' (Finset.mem_inter.2 ⟨hrS', h⟩)
         rw [ihv y hyS' hyF r hrS' hrF] at hru
         have hrq : r ≠ q := Finset.ne_of_mem_erase hrS'
         show u = v
@@ -304,7 +298,8 @@ theorem psl_correct (t : ℕ) : ∀ (S F : Finset P) (σ : MsgMap P V), 2 * t < 
           have hrS' : r ∈ S.erase q := Finset.erase_subset_erase q hQS hr
           refine Finset.mem_filter.2 ⟨hrS', ?_⟩
           rw [iha y hyS' hyF x hxS' hxF r hrS', hvecx r hr]
-        have h1 := Finset.card_le_card hsub
+        have h1 : (Q.erase q).card ≤ (S.erase q).countEq
+            (fun r => psl t (S.erase q) (loc (sub σ q) y) y r) v := Finset.card_le_card hsub
         have h2 := Finset.pred_card_le_card_erase (s := Q) (a := q)
         have h3 := hm.1
         omega

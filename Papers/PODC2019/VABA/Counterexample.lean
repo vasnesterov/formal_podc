@@ -63,7 +63,7 @@ lemma reach_s7 : Reach C5 s7 := by
 
 lemma qc_of_subset {s : Glob (Fin 5) Bool} {st : Stmt (Fin 5) Bool} {A : Finset (Fin 5)}
     (hA : 3 ≤ A.card) (h : ∀ p ∈ A, s.tok p st) : QC C5.Q s st :=
-  hA.trans (card_le_card (fun p hp => mem_signers.mpr (h p hp)))
+  hA.trans (card_le_card (fun p hp => Cslib.Byzantine.mem_signers.mpr (h p hp)))
 
 /-- **PB-provability fails for `n = 5`, `f = 1` with threshold `2f + 1`**: a reachable state with
 two stage-1 certificates on different values in one broadcast instance. -/

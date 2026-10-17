@@ -115,7 +115,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 `Quot.sound`. Non-vacuity of Theorem 2: `example_assumptions` instantiates all hypotheses with one
 Byzantine agent (`n = 4`, `f = 1`, costs `x²/2`, `α = 1/12`, `ρ = 15/16`). `exists_proj` shows that
 the projection field can always be filled. The counterexamples are explicit instances on `ℝ` and
-`ℝ × ℝ`. The model is self-contained (Mathlib only). CSLib's Byzantine message-passing models were
+`ℝ × ℝ`. The model is self-contained (Mathlib, plus the shared quorum arithmetic
+`Podc/Foundations/Quorum.lean`). CSLib's Byzantine message-passing models were
 not needed, because the paper argues in a one-shot model. Unlike `PODC2013/ByzantineVectorConsensus`
 (inputs are points, validity is a convex-hull condition), the inputs here are cost functions, so no code
 is shared. CSLib candidates:

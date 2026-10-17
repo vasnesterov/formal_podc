@@ -125,7 +125,8 @@ lemma card_of_honest (hQf : C.Q + C.f ≤ Fintype.card P) {s : Glob P V} (hR : R
 
 lemma qc_of_honest (hQf : C.Q + C.f ≤ Fintype.card P) {s : Glob P V} (hR : Reach C s)
     {st : Stmt P V} (h : ∀ x, x ∉ s.corrupt → s.tok x st) : QC C.Q s st :=
-  card_of_honest hQf hR (fun x hx => by rw [mem_signers]; exact h x hx)
+  (Cslib.Byzantine.certified_of_forall_notMem hR.inv.card_corrupt h).mono (fun _ hp => hp)
+    (by omega)
 
 /-! ### Case A: a skip certificate exists -/
 
