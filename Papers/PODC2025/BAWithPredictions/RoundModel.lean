@@ -1,6 +1,6 @@
 import Papers.PODC2025.BAWithPredictions.Classification
 import Papers.PODC2025.BAWithPredictions.Plurality
-import Cslib.Computability.Distributed.Byzantine.PartialSync.Rounds
+import Podc.PartialSync.RoundRun
 
 /-!
 # Synchronous round executions (for the upper bounds)
@@ -15,7 +15,7 @@ the time-based synchronous model.
 
 * Synchronous executions are `E : RoundRun RA F inp` with `E.SyncFrom 0`.
 * `roundMsgs E N`: the number of messages sent by honest processes to *other* processes in rounds
-  `< N` (the paper's message complexity).
+  `< N` (the paper's message complexity; the shared `RoundRun.msgsUpTo`).
 -/
 
 namespace BAWithPredictions
@@ -25,9 +25,8 @@ open Finset Cslib.Byzantine.PartialSync
 variable {P Msg S VI VO : Type*} [Fintype P] [DecidableEq P]
 
 /-- Number of messages sent by honest processes to other processes in rounds `< N`. -/
-def roundMsgs {RA : RoundAlgorithm P Msg S VI VO} {F : Finset P} {inp : P → VI}
+abbrev roundMsgs {RA : RoundAlgorithm P Msg S VI VO} {F : Finset P} {inp : P → VI}
     (E : RoundRun RA F inp) (N : ℕ) : ℕ :=
-  ∑ r ∈ range N, ∑ p ∈ univ.filter (· ∉ F),
-    (univ.filter fun q => q ≠ p ∧ RA.send r p (E.s r p) q ≠ none).card
+  E.msgsUpTo N
 
 end BAWithPredictions

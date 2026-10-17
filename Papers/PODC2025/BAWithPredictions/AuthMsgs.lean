@@ -243,7 +243,7 @@ theorem theorem6_messages_per_process (p : P) (N : ℕ) :
 
 /-- Bundled messages (`roundMsgs`) are bounded by the paper's count. -/
 theorem roundMsgs_le (N : ℕ) : roundMsgs E N ≤ ∑ p ∈ univ.filter (· ∉ F), sentCost E p N := by
-  unfold roundMsgs sentCost
+  unfold roundMsgs RoundRun.msgsUpTo sentCost
   rw [sum_comm]
   refine sum_le_sum fun p _ => sum_le_sum fun r _ => ?_
   calc (univ.filter fun q => q ≠ p ∧ (alg k t).send r p (E.s r p) q ≠ none).card
@@ -306,37 +306,13 @@ section NonVacuity
 
 variable {Msg' S VI VO : Type*} [DecidableEq P]
 
--- CSLib candidate
-/-- The states of the execution of a round algorithm in which every process is honest and every
-message is delivered. -/
-def allHonestS (RA : RoundAlgorithm P Msg' S VI VO) (inp : P → VI) : ℕ → P → S
-  | 0, p => RA.init p (inp p)
-  | r + 1, p => RA.trans r p (allHonestS RA inp r p) fun q => RA.send r q (allHonestS RA inp r q) p
-
--- CSLib candidate
-/-- The failure-free synchronous execution of a round algorithm. -/
-def allHonest (RA : RoundAlgorithm P Msg' S VI VO) (inp : P → VI) : RoundRun RA ∅ inp where
-  s := allHonestS RA inp
-  rcv r p q := RA.send r q (allHonestS RA inp r q) p
-  s_zero _ := rfl
-  s_succ _ _ := rfl
-  honest _ _ _ _ _ h := h
-
--- CSLib candidate
-theorem allHonest_syncFrom (RA : RoundAlgorithm P Msg' S VI VO) (inp : P → VI) :
-    (allHonest RA inp).SyncFrom 0 := fun _ _ _ _ _ _ => rfl
-
--- CSLib candidate
-theorem allHonest_authValid {K : Type*} (RA : RoundAlgorithm P Msg' S VI VO) (inp : P → VI)
-    (Au : Auth P Msg' K) : (allHonest RA inp).AuthValid Au :=
-  fun r p q m _ hm _x hx => Or.inr ⟨r, le_rfl, q, Finset.notMem_empty q, p, m, hm, hx⟩
-
 /-- **Non-vacuity of Theorem 6.** For every input there is a synchronous authenticated execution
 of `alg k t` (with no faulty process); with correct classification vectors, `k = t = 0` satisfies
 all hypotheses of Theorem 6 (for `n ≥ 1`). -/
 theorem exists_run (k t : ℕ) (inp : P → V × (P → Bool)) :
     ∃ E : RoundRun (alg (P := P) (V := V) k t) ∅ inp, E.SyncFrom 0 ∧ E.AuthValid auth :=
-  ⟨allHonest _ inp, allHonest_syncFrom _ _, allHonest_authValid _ _ _⟩
+  ⟨RoundRun.sync _ ∅ inp fun _ _ _ _ => none, RoundRun.sync_syncFrom _ _ _ _,
+    RoundRun.sync_empty_authValid _ _ _ _⟩
 
 theorem hypotheses_satisfiable [Nonempty P] (inp : P → V × (P → Bool))
     (hc : ∀ i, (inp i).2 = correctPred ∅) :

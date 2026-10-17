@@ -122,7 +122,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
   (`ownInput_solves_of_narrow`).
 
 The model comes from CSLib `Cslib/Computability/Distributed/Byzantine/PartialSync/` (`Model`,
-`Consensus`, `Sync` with `Run.enlarge`, `Constructions` with `Run.extend`, `FLM`, `ICSync`).
+`Consensus`, `Sync` with `Run.enlarge`, `Constructions` with `Run.extend`, `FLM`, `ICSync`); `withGamma` is the
+decision post-processing `Algorithm.mapDecide` of the shared library `Podc/PartialSync/Map.lean`.
 CSLib candidates (marked `-- CSLib candidate`):
 - Tverberg's theorem and colorful Carathéodory (`Tverberg.lean`);
 - `GammaOn` with Lemma 1 via Helly (`Gamma.lean`).

@@ -1,4 +1,4 @@
-import Cslib.Computability.Distributed.Byzantine.PartialSync.Omission
+import Podc.PartialSync.Omission
 
 /-!
 # Reaching Univalency — Appendix B: reaching univalency requires `Ω(f)` messages
@@ -69,7 +69,7 @@ def ReachesUnivalency (A : Algorithm P M S Bool Bool) (f tstar : ℕ) : Prop :=
   ∀ (E : OmExec P Bool) (F : Finset P), CrashAdm E F → F.card ≤ f → UnivalentAt A f tstar E
 
 /-- The fault-free execution with all inputs equal to `b`. -/
-def ffExec (b : Bool) : OmExec P Bool := ⟨fun _ => b, fun _ _ _ => true⟩
+abbrev ffExec (b : Bool) : OmExec P Bool := OmExec.ff fun _ => b
 
 /-- Processes that send a message to, or receive a message from, another process at some time
 `< k` in `E` (non-empty batches; in fault-free executions every batch is delivered). -/

@@ -92,8 +92,8 @@ processes possibly asleep before GST, authenticated channels, arbitrary Byzantin
   broadcast) is **not formalized**; its existence is a hypothesis (`VectorConsensusSolvable(Auth)`).
   `Universal` itself only needs `n > 2t` given vector consensus (`solvesConsensus_universal`); the paper's
   `n > 3t` is needed for vector consensus. The `O(n²)` claim is formalized as "Universal sends exactly the
-  messages of the vector-consensus black box in every run" (`msgsUpTo_universal`,
-  `msgComplexity_universal`); the `O(n²)` bound of Algorithm 1 (Quad) is not formalized.
+  messages of the vector-consensus black box in every run" (`universal A Λ = A.mapDecide Λ`, so
+  `Run.msgsUpTo_mapDecide`, `Run.msgComplexity_mapDecide`); the `O(n²)` bound of Algorithm 1 (Quad) is not formalized.
 - **Classification.** Formalized as `solvable_iff_trivial` (`n ≤ 3t`, unconditional) and
   `solvable_iff_similarityCondition` (`n > 3t`, assuming vector consensus is solvable), and the authenticated
   analogues `solvableAuth_iff_trivial`, `solvableAuth_iff_similarityCondition`.
