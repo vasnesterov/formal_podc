@@ -28,7 +28,7 @@ locality claimed by the paper.
 * `theorem_1_1` (rank `≤ 2`) and `theorem_1_3` (rank `≤ 3`).
 -/
 
-open Finset
+open Finset Cslib.Probability
 
 set_option linter.unusedSectionVars false
 
@@ -171,17 +171,6 @@ lemma repOn_three_iff {t₁ t₂ t₃ : V} (h12 : t₁ ≠ t₂) (h13 : t₁ ≠
       · rw [e2, prod_pair h13, q21, q23]; exact h2
       · rw [e3, prod_pair h12, q31, q32]; exact h3
 
-/-- Averaging for a linear constraint: if `Σ w y * F y ≤ c` with `w` a positive probability
-distribution on `Ω`, then some `F y ≤ c`. -/
-lemma exists_le_of_avg_le {β : Type} {Ω : Finset β} {w F : β → ℝ} {c : ℝ}
-    (hw : ∀ y ∈ Ω, 0 < w y) (hsum : ∑ y ∈ Ω, w y = 1) (h : ∑ y ∈ Ω, w y * F y ≤ c) :
-    ∃ y ∈ Ω, F y ≤ c := by
-  have hne : Ω.Nonempty := by
-    by_contra h'; rw [not_nonempty_iff_eq_empty] at h'; simp [h'] at hsum
-  have : ∑ y ∈ Ω, w y * F y ≤ ∑ y ∈ Ω, w y * c := by rwa [← sum_mul, hsum, one_mul]
-  obtain ⟨y, hy, hle⟩ := exists_le_of_sum_le hne this
-  exact ⟨y, hy, le_of_mul_le_mul_left hle (hw y hy)⟩
-
 /-- **The fixing property for hyperedges of size at most 3.** Size `≤ 2` is linearity of
 expectation (the argument of Section 2). Size `3` is Lemma 3.9 together with Lemma 3.7. -/
 theorem fixingProperty_of_card_le_three (T : Finset V) (hT : T.card ≤ 3) :
@@ -197,14 +186,14 @@ theorem fixingProperty_of_card_le_three (T : Finset V) (hT : T.card ≤ 3) :
     exact ⟨y, hy, repOn_empty _⟩
   · obtain ⟨t, rfl⟩ := card_eq_one.1 hc
     rw [repOn_singleton_iff] at hrep
-    obtain ⟨y, hy, hle⟩ := exists_le_of_avg_le hw hsum ((havg t (by simp)).trans hrep)
+    obtain ⟨y, hy, hle⟩ := exists_le_of_sum_mul_le hw hsum ((havg t (by simp)).trans hrep)
     exact ⟨y, hy, (repOn_singleton_iff t _).2 hle⟩
   · obtain ⟨t, u, htu, rfl⟩ := card_eq_two.1 hc
     rw [repOn_pair_iff htu a ⟨ha0 t (by simp), ha0 u (by simp)⟩] at hrep
     have : ∑ y ∈ Ω, w y * (s y t + s y u) ≤ 2 := by
       simp only [mul_add, sum_add_distrib]
       linarith [havg t (by simp), havg u (by simp)]
-    obtain ⟨y, hy, hle⟩ := exists_le_of_avg_le hw hsum this
+    obtain ⟨y, hy, hle⟩ := exists_le_of_sum_mul_le hw hsum this
     exact ⟨y, hy, (repOn_pair_iff htu _ ⟨hs y hy t (by simp), hs y hy u (by simp)⟩).2 hle⟩
   · obtain ⟨t₁, t₂, t₃, h12, h13, h23, rfl⟩ := card_eq_three.1 hc
     rw [repOn_three_iff h12 h13 h23] at hrep
@@ -543,7 +532,7 @@ theorem exists_inc_add_inc_le_two (σ : ∀ i, Option (α i)) {j : ι} (hj : σ 
       rw [this, I.sum_condProb_fix σ hj t, div_self hP]
   have : ∑ b ∈ Ω, I.prob j b * (I.Inc σ j b u + I.Inc σ j b v) ≤ 2 := by
     simp only [mul_add, sum_add_distrib]; linarith [havg u, havg v]
-  obtain ⟨b, hb, hle⟩ := exists_le_of_avg_le hw hwsum this
+  obtain ⟨b, hb, hle⟩ := exists_le_of_sum_mul_le hw hwsum this
   exact ⟨b, hw b hb, hle⟩
 
 end Instance

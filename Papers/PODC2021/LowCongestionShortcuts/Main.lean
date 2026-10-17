@@ -1,4 +1,5 @@
 import Papers.PODC2021.LowCongestionShortcuts.DenseMinor
+import Podc.Probability.Finite.Bernoulli
 
 /-!
 # Theorem 3.1 of [GH21]
@@ -19,7 +20,7 @@ set_option linter.unusedSectionVars false
 
 namespace LowCongestionShortcuts
 
-open SimpleGraph Finset
+open SimpleGraph Finset Cslib.Probability
 
 variable {V ι : Type*} [Fintype V] [DecidableEq V] [Fintype ι] [DecidableEq ι]
   {G : SimpleGraph V} {T : G.RootedTree} {P : ι → Finset V}
@@ -187,13 +188,7 @@ theorem caseII_false {δ : ℝ} (hδ : G.MinorDensityLE δ) (hP : G.IsParts P) {
       _ ≤ _ := sum_le_sum fun S _ =>
           mul_le_mul_of_nonneg_left (hpres S) (bernWeight_nonneg hp0 hp1 S)
   have hE2 : ∑ S ∈ (univ : Finset ι).powerset, bernWeight p S * (S.card : ℝ) =
-      Fintype.card ι * p := by
-    have : ∀ S : Finset ι, (S.card : ℝ) = ∑ i, if {i} ⊆ S ∧ Disjoint S ∅ then 1 else 0 := by
-      intro S; simp
-    simp_rw [this, mul_sum]
-    rw [sum_comm]
-    simp_rw [sum_bernWeight_indicator p {_} ∅ (disjoint_empty_right _)]
-    simp
+      Fintype.card ι * p := sum_bernWeight_mul_card p
   have hE3 : ∑ S ∈ (univ : Finset ι).powerset, bernWeight p S *
       ((edgeNodes P O S).card : ℝ) ≤ O.card := by
     calc _ ≤ ∑ S ∈ (univ : Finset ι).powerset, bernWeight p S * (O.card : ℝ) :=
@@ -218,7 +213,7 @@ theorem caseII_false {δ : ℝ} (hδ : G.MinorDensityLE δ) (hP : G.IsParts P) {
     rw [hsplit, hE2]
     rw [← hp] at hfin
     nlinarith [mul_le_mul_of_nonneg_left hE3 hδ0]
-  obtain ⟨S, hS⟩ := exists_pos_of_sum_bernWeight_pos hp0 hp1 X hpos
+  obtain ⟨S, -, hS⟩ := exists_pos_of_sum_mul_pos (fun S _ => bernWeight_nonneg hp0 hp1 S) hpos
   linarith [hX S]
 
 end LowCongestionShortcuts
