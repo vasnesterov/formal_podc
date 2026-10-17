@@ -736,4 +736,5 @@ import Papers.PODC2019.TopologicalConsensus.Broadcast
 import Papers.PODC2019.TopologicalConsensus.CanonicalCex
 import Papers.PODC2019.TopologicalConsensus.ProductTopology
 import Papers.PODC2019.TopologicalConsensus.Limits
+import Papers.PODC2022.AsyncCycleColoring.Main
 import Papers.PODC2019.TopologicalConsensus.V1Cex

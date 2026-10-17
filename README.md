@@ -137,6 +137,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2025 | 0 | Nguyen, Sutra — *An Exact Characterization of the Two-shot Deterministic Objects Solving Two-process Consensus* | [TwoShotConsensusObjects](Papers/PODC2025/TwoShotConsensusObjects) | ⚠️ Characterization (C₁ ∨ C₁.₅ ∨ C₂ ⇔ solvable) proved in both directions; the AQ example (§4.2.5) is wrong (AQ ∉ C₁.₅, but AQ ∈ C₂); Algorithm 3 line-30 typo breaks agreement if read literally; several proof gaps filled |
 | 2024 | 0 | Altisen, Cournier, Defalque, Devismes — *On Self-stabilizing Leader Election in Directed Networks* | [SSLeaderElectionDirected](Papers/PODC2024/SSLeaderElectionDirected) | ❌ Leader election (Thms 1–4) and necessity results proved; **Theorem 5 (synchronous unison) false**: the input I_E gives distance 0 to more than the leader, so U(K) is not self-stabilizing on any network with n ≥ 2 (for some ID assignment); fixed input proved, Cor. 5 holds |
 | 2024 | 0 | Frei, Gelles, Ghazy, Nolin — *Content-Oblivious Leader Election on Rings* | [ContentObliviousLE](Papers/PODC2024/ContentObliviousLE) | ⚠️ Theorems 1–2 (oriented and non-oriented rings, exactly n(2·IDmax+1) pulses, quiescent termination) proved for all n ≥ 1; Theorem 3 lower bound holds as a worst case over ID assignments (per-instance reading false); Lemma 19 proof gap repaired; IDs must be positive |
+| 2022 | 0 | Fraigniaud, Lambein-Monette, Rabie — *Brief Announcement: Fault Tolerant Coloring of the Asynchronous Cycle* | [AsyncCycleColoring](Papers/PODC2022/AsyncCycleColoring) | ❌ 6-colour Algorithm 1 (Thm 3.1, sharper bound) and correctness/palette of the 5-colour algorithms proved; **the 5-colour algorithms are not wait-free** (Thm 3.11, Thm 4.4 false): after one crash, two simultaneously activated neighbours livelock with period 2 on every C_n; Lemmas 3.3 (as written) and 3.13 false |
 
 ## Papers with critical mistakes
 
@@ -314,6 +315,13 @@ in the paper's `differencies.md`.
   network with n ≥ 2 for a suitable ID assignment — already on the 2-cycle and the directed path 0 → 1.
   The definition is stated three times and matches Figure 5, so it is not a typo. With I_E(p) = (¬A.M, p.Id)
   Theorem 5 and Corollary 5 are proved. The leader-election results are correct.
+- **Fault Tolerant Coloring of the Asynchronous Cycle** (PODC 2022, 0 citations) —
+  [AsyncCycleColoring](Papers/PODC2022/AsyncCycleColoring). The 5-colouring algorithms are not wait-free, so the
+  headline claim — wait-free 5-colouring of the cycle in O(log* n) rounds (Theorem 4.4, and Theorem 3.11 for the
+  simpler algorithm) — is not established. In the paper's own model (simultaneous rounds behave as immediate
+  snapshots; crashed processes stop), on C₃ one process crashes after its first round and its two neighbours, always
+  activated together, alternate between two states forever; the same happens on every Cₙ. Outputs, when produced,
+  are proper 5-colourings, and the 6-colour algorithm is proved wait-free.
 
 As of October 2026 we found no erratum or later version that addresses the mistakes in Swiper, in
 Barenboim–Elkin–Goldenberg (including its J. ACM version), or in Függer–Nowak–Schwarz (including its J. ACM
