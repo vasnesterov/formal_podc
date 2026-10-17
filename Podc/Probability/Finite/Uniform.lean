@@ -20,17 +20,17 @@ measure theory is needed. This file collects the facts that such arguments use a
 
 * basic laws: `uprob_mono`, `uprob_le_one`, `uprob_not` (complement), `uprob_exists_le` (union
   bound; counting form `card_filter_exists_le`), `uprob_or_le`, `one_sub_sub_le_uprob_and`,
-  `uprob_comp_equiv`, `uprob_le_iff` (cross-multiplied form);
+  `uprob_le_iff` (cross-multiplied form);
 * probabilistic method: `exists_of_uprob_pos`, `exists_not_of_uprob_lt_one` (for weighted
   averages see `Cslib.Probability.exists_le_of_sum_mul_le` in `Product.lean`);
-* independence on product spaces: `card_filter_pi`, `uprob_pi`;
+* independence on product spaces: `uprob_pi`;
 * fibres (one coordinate at a time): `card_mul_card_filter_and` (exact fibre decomposition),
   `card_filter_and_le_fiber`, `uprob_and_le_fiber`;
 * adaptive sequential choices: `uprob_forall_le_pow` and its counting form
   `pow_mul_card_filter_forall_le` — if each bad event depends only on the choices made so far and
   the last choice makes it happen with probability `≤ q` whatever the past, then all of `S`
   happen with probability `≤ q ^ |S|`;
-* many independent rare events: `card_many_le`, `uprob_many_le` — at least `t` of `n` independent
+* many independent rare events: `card_many_le` — at least `t` of `n` independent
   events of probability `≤ a` happen with probability `≤ 2^n a^t`; Chernoff bound by counting
   `uprob_lt_card_filter_mem_le` — more than `c` of the uniform coordinates fall into `B` with
   probability `≤ (1 + |B|/|X|)^n / 2^c`;
@@ -114,12 +114,6 @@ theorem uprob_le_iff [Nonempty Ω] (E : Ω → Prop) [DecidablePred E] {ε : ℝ
     uprob E ≤ ε ↔ (#(univ.filter E) : ℝ) ≤ ε * Fintype.card Ω := by
   rw [uprob_eq_card_filter, div_le_iff₀ (by exact_mod_cast Fintype.card_pos)]
 
-/-- The uniform distribution is invariant under bijections. -/
-theorem uprob_comp_equiv {Ω' : Type*} [Fintype Ω'] (e : Ω' ≃ Ω) (E : Ω → Prop) :
-    uprob (fun ω' => E (e ω')) = uprob E := by
-  unfold uprob
-  rw [Fintype.card_congr e, Nat.card_congr (e.subtypeEquiv fun _ => Iff.rfl)]
-
 /-- **Union bound (counting form).** -/
 theorem card_filter_exists_le {ι : Type*} (s : Finset ι) (E : ι → Ω → Prop)
     [∀ i, DecidablePred (E i)] [DecidablePred fun ω => ∃ i ∈ s, E i ω] :
@@ -187,14 +181,6 @@ end uprob
 section Pi
 
 variable {ι : Type*} [Fintype ι] [DecidableEq ι] {α : ι → Type*} [∀ i, Fintype (α i)]
-
-/-- **Independence (counting form).** The number of `x : ∀ i, α i` with `P i (x i)` for all `i`
-is the product of the numbers of good values of each coordinate. -/
-theorem card_filter_pi (P : ∀ i, α i → Prop) [∀ i, DecidablePred (P i)] :
-    #(univ.filter fun x : ∀ i, α i => ∀ i, P i (x i)) = ∏ i, #(univ.filter (P i)) := by
-  rw [← Fintype.card_piFinset]
-  congr 1
-  ext x; simp [Fintype.mem_piFinset]
 
 /-- **Independence on product spaces.** Under the uniform distribution on `∀ i, α i`, the
 coordinates are independent: `Pr[∀ i, P i (x i)] = ∏ i, Pr[P i]`. -/
@@ -389,18 +375,6 @@ theorem card_many_le (P : ∀ i, β i → Prop) [∀ i, DecidablePred (P i)] {a 
         sum_le_sum_of_subset_of_nonneg (subset_univ _) fun _ _ _ => by positivity
     _ = 2 ^ Fintype.card ι * a ^ t * N := by
         simp [Fintype.card_finset, mul_assoc]
-
-/-- **Many independent rare events.** If each coordinate event `P i` has probability at most
-`a ≤ 1`, then at least `t` of them happen with probability at most `2^|ι| a^t`. -/
-theorem uprob_many_le (P : ∀ i, β i → Prop) [∀ i, DecidablePred (P i)] {a : ℝ} (ha0 : 0 ≤ a)
-    (ha1 : a ≤ 1) (hP : ∀ i, uprob (P i) ≤ a) (t : ℕ) :
-    uprob (fun x : ∀ i, β i => t ≤ #(univ.filter fun i => P i (x i))) ≤
-      2 ^ Fintype.card ι * a ^ t := by
-  rcases isEmpty_or_nonempty (∀ i, β i) with hΩ | hΩ
-  · simp [uprob, Fintype.card_eq_zero]; positivity
-  have hne : ∀ i, Nonempty (β i) := fun i => ⟨hΩ.some i⟩
-  rw [uprob_le_iff]
-  exact card_many_le P ha0 ha1 (fun i => (uprob_le_iff _).1 (hP i)) t
 
 /-- The moment generating function at `log 2` of the number of coordinates in `B`:
 `∑_x 2^{#{i | x i ∈ B}} = (|X| + |B|)^|ι|`. -/
