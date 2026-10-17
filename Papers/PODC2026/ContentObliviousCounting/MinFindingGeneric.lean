@@ -1,4 +1,5 @@
-import Podc.ContentOblivious.Staged
+import Cslib.Computability.Distributed.ContentOblivious.Staged
+import Mathlib
 
 /-!
 # Minimum finding by repeated ComputeOR (Algorithm 10, Theorem 5), from an abstract ComputeOR
@@ -22,7 +23,7 @@ The ComputeOR procedure is abstract here (`ORSpec`); see `MinFinding.lean` for t
 
 namespace Podc.ContentOblivious.MinFinding
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 /-- Node input: leader flag, participation flag, bit string (MSB first, `false` = 0). -/
 abbrev Input := Bool × Bool × List Bool

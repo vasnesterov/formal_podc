@@ -1,5 +1,5 @@
 import Mathlib
-import Podc.Foundations.Count
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Majority votes

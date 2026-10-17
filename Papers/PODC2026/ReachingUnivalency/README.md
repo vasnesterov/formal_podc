@@ -125,7 +125,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
   with a univalent first phase in this model (FloodSet would be one).
 - *Dependencies.* The lower bounds reuse CSLib `Cslib/Computability/Distributed/Byzantine/PartialSync/Omission.lean`
   and the shared executions `OmExec.solo` (the isolation execution `E₁` of Theorem 7) and `OmExec.ff`
-  (`Podc/PartialSync/Omission.lean`); vote counts are `Finset.countEq` (`Podc/Foundations/Count.lean`).
-  The sampler existence (§5) uses the shared finite probability library `Podc/Probability/Finite/Uniform.lean`
+  (`Cslib/Computability/Distributed/Byzantine/PartialSync/Omission.lean`); vote counts are `Finset.countEq` (`Cslib/Foundations/Data/Finset/Quorum.lean`).
+  The sampler existence (§5) uses the shared finite probability library `Cslib/Probability/Finite/Uniform.lean`
   (Chebyshev for sampling with replacement `card_freq_dev_ge_le`, many rare events `card_many_le`, union bound
   `card_filter_exists_le`).

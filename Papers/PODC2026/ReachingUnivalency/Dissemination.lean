@@ -1,4 +1,4 @@
-import Podc.PartialSync.Omission
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Omission
 
 /-!
 # Reaching Univalency — Appendix A: the dissemination lower bound (Theorem 7)

@@ -1,12 +1,12 @@
 import Papers.PODC2024.AllBAExpensive.LowerBound
-import Podc.PartialSync.Map
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Map
 
 /-!
 # All Byzantine Agreement Problems Are Expensive — §4.2: weak consensus is the weakest problem
 
 * `weakReduction A c₀ c₁ v₀`: **Algorithm 1** (propose `c₀[i]` / `c₁[i]` to `A` for proposal
   `0` / `1`; decide `0` iff `A` decides `v₀`): input pre-processing and decision post-processing
-  (`Algorithm.comapInput`, `Algorithm.mapDecide` of `Podc.PartialSync.Map`), so it has the states
+  (`Algorithm.comapInput`, `Algorithm.mapDecide` of `Cslib.Computability.Distributed.Byzantine.PartialSync.Map`), so it has the states
   and messages of `A` (`Run.st_comapInput`, `Run.msgsUpTo_comapInput`).
 * `exists_reduction_data`: Table 2 and **Lemma 17** (`v₀' ≠ v₁'`), via Lemma 7.
 * `weakReduction_solves`: **Lemma 18** — Algorithm 1 solves weak consensus.

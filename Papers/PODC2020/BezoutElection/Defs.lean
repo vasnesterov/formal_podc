@@ -1,8 +1,8 @@
 import Cslib.Computability.Distributed.SharedMemory.Anonymous
 import Cslib.Computability.Distributed.SharedMemory.Task
 import Cslib.Computability.Distributed.SharedMemory.Progress
-import Podc.SharedMemory.Progress
-import Podc.SharedMemory.Objects.Iface
+import Cslib.Computability.Distributed.SharedMemory.Objects.Iface
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # Election in anonymous memory: problem definitions
@@ -15,7 +15,7 @@ Memory Systems*, PODC 2020 (DOI 10.1145/3382734.3405727), Section 1.
   Section 2), or an identifier / a set of identifiers for the algorithms.
 * **Model** (Section 1.2): all `n` processes participate, i.e. each one invokes `elect()` exactly
   once; no process fails; the system is asynchronous. *Termination* (`Terminates`): in every
-  fair (`InfExec.IsFair`) infinite execution in which every process invokes `elect()` once, every
+  fair (`InfExec.Fair`) infinite execution in which every process invokes `elect()` once, every
   process returns.
   (Equivalently, there is no such infinite execution: all fair executions are finite.)
 * **d-election** (`DElection d`, bit outputs): in every finite execution where all processes
@@ -41,7 +41,7 @@ variable {A : ObjSpec} {ι : Type} [DecidableEq ι] {B : ι → ObjSpec} {P L : 
   {I : Impl A B P L}
 
 /-- Every process invokes at most one operation. -/
-def IsOneShot (e : I.InfExec) : Prop := ∀ t, OneShot (e.lbls t)
+def IsOneShot (e : I.InfExec) : Prop := ∀ t, OneShot (e.pre t)
 
 /-- Every process invokes an operation (all processes participate). -/
 def AllInvoke (e : I.InfExec) : Prop := ∀ p, ∃ t o, e.lbl t = .inv p o
@@ -56,7 +56,7 @@ variable {R : Type} [Inhabited R] {ι : Type} [DecidableEq ι] {B : ι → ObjSp
 /-- **Termination** (all processes participate, no failures, asynchrony): in every fair one-shot
 infinite execution in which every process invokes `elect()`, every process returns. -/
 def Terminates (I : Impl (elecObj R) B P L) : Prop :=
-  ∀ e : I.InfExec, IsOneShot e → AllInvoke e → e.IsFair → ∀ p, ∃ t r, e.lbl t = .ret p r
+  ∀ e : I.InfExec, IsOneShot e → AllInvoke e → e.Fair → ∀ p, ∃ t r, e.lbl t = .ret p r
 
 /-- All processes have returned in the finite execution `α`. -/
 def AllReturned (α : List (Label P (elecObj R))) : Prop := ∀ p, outputs α p ≠ none

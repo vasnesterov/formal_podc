@@ -127,5 +127,5 @@ verified consensus on a concrete instance. The abstract searches over rotor sche
 `modelcheck/`: they found the `n = 7` instance and the tight bound `r ≤ f`. Paper-local
 infrastructure, CSLib candidates: the id-only model (`Model.lean`) and the candidate-set layer
 (`Rotor.lean`, `Layer.lean`, `GoodRound.lean`). Shared infrastructure: `cnt` is `Finset.countEq`
-(`Podc/Foundations/Count.lean`); the king step of Lemma 11 (`good_phase`) is the generic phase-king
-lemma `Cslib.Byzantine.kingPhase_agreement` (`Podc/Agreement/PhaseKing.lean`).
+(`Cslib/Foundations/Data/Finset/Quorum.lean`); the king step of Lemma 11 (`good_phase`) is the generic phase-king
+lemma `Cslib.Byzantine.kingPhase_agreement` (`Cslib/Computability/Distributed/Byzantine/KingPhase.lean`).

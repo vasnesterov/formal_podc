@@ -1,6 +1,6 @@
 import Papers.PODC2016.VertexCoverLocalRatio.Paper
-import Podc.Local.LocallyIterative
-import Podc.Local.Locality
+import Cslib.Computability.Distributed.Local.Identifiers
+import Cslib.Computability.Distributed.Local.OnlineLocalLocality
 
 /-!
 # Algorithm 1 in the synchronous LOCAL model (Theorem 3.1)

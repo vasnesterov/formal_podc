@@ -1,5 +1,5 @@
 import Papers.PODC2025.BAWithPredictions.Defs
-import Podc.PartialSync.Omission
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Omission
 
 /-!
 # Byzantine Agreement with Predictions — the message lower bound (Theorem 14)

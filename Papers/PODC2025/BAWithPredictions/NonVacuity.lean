@@ -1,6 +1,6 @@
 import Papers.PODC2025.BAWithPredictions.MessageLowerBound
 import Papers.PODC2025.BAWithPredictions.Plurality
-import Podc.PartialSync.Containment
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Containment
 import Cslib.Computability.Distributed.Byzantine.PartialSync.ICSync
 import Cslib.Computability.Distributed.Byzantine.PartialSync.DolevStrong
 
@@ -15,7 +15,7 @@ The hypothesis of `message_lower_bound` is satisfiable: Byzantine agreement with
 
 via interactive consistency (CSLib) and the reduction "decide the plurality of the agreed
 vector" (the containment-condition reduction `ValidityProperty.ContainmentCondition.solvableSync`
-of `Podc.PartialSync.Containment`, Algorithm 2 of *All Byzantine Agreement Problems Are
+of `Cslib.Computability.Distributed.Byzantine.PartialSync.Containment`, Algorithm 2 of *All Byzantine Agreement Problems Are
 Expensive*).
 -/
 

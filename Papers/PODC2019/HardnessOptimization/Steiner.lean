@@ -15,7 +15,7 @@ disconnected.
 
 namespace HardnessOptimization
 
-open Finset Podc.CongestLB
+open Finset Cslib.Congest Cslib.CommunicationComplexity
 
 /-- A Steiner tree for the terminals `Term` with at most `M` edges: a tree `T` on a vertex set
 `W ⊇ Term`, all of whose edges are edges of `G`. -/

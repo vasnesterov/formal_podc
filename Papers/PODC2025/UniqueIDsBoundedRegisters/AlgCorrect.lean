@@ -1,5 +1,5 @@
 import Papers.PODC2025.UniqueIDsBoundedRegisters.AlgInv
-import Podc.SharedMemory.History
+import Cslib.Computability.Distributed.SharedMemory.History
 
 /-!
 # Algorithms 1 and 2: correctness for at most `n · m` calls (Theorem 3.1)

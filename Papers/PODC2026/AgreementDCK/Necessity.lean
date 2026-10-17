@@ -16,7 +16,7 @@ profile `𝛅(v) = (decide₁(v), …, decideₙ(v))` in every run in which all 
 this (`KN_CN_of_precondition`). Theorem 1.5 and both parts of Corollary 1.6 are instances.
 -/
 
-open Podc.Knowledge Podc.Knowledge.RunFact Podc.Knowledge.System
+open Cslib.Knowledge Cslib.Knowledge.RunFact Cslib.Knowledge.System
 
 namespace Podc.Knowledge
 

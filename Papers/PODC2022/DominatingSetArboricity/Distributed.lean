@@ -1,6 +1,6 @@
 import Papers.PODC2022.DominatingSetArboricity.Deterministic
-import Podc.Local.LocallyIterative
-import Podc.Local.Locality
+import Cslib.Computability.Distributed.Local.Identifiers
+import Cslib.Computability.Distributed.Local.OnlineLocalLocality
 
 /-!
 # Distributed implementation of the deterministic algorithm (Theorem 1.1, round complexity)

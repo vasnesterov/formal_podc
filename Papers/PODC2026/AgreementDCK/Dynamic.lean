@@ -1,11 +1,12 @@
-import Podc.Knowledge.Basic
+import Cslib.Computability.Distributed.Knowledge.Basic
+import Mathlib
 
 /-!
 # Dynamic knowledge and dynamic common knowledge among the nonfaulty processes
 
 Definitions 1.3 and 1.4 of Or David and Yoram Moses, *Brief Announcement: What is Agreement About
 if not Common Knowledge?*, PODC 2026, over the interpreted-system semantics of
-`Podc.Knowledge.Basic`.
+`Cslib.Computability.Distributed.Knowledge.Basic`.
 
 * `System.DK S i ψ φ` — `K_i^N@ψ (φ)`: the run fact `◇ψ ∧ □(ψ → K_i^N φ)` (Definition 1.3);
 * `System.EN S ψ φ` — `E^N@ψ (φ)`: `K_i^N@ψᵢ (φ)` for every `i ∈ N(r)` (Definition 1.4);
@@ -23,7 +24,7 @@ paper that every nonfaulty process eventually knows that a dynamic common knowle
 (`CN.eventually_KN`).
 -/
 
-namespace Podc.Knowledge
+namespace Cslib.Knowledge
 
 open RunFact
 
@@ -140,4 +141,4 @@ theorem CN.eventually_KN {ψ : ι → Fact R} {φ : Fact R} {r : R} (h : S.CN ψ
 
 end System
 
-end Podc.Knowledge
+end Cslib.Knowledge

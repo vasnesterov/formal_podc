@@ -27,7 +27,7 @@ properties hold on any virtual ring with at least two nodes (`RingAx`).
 
 namespace Podc.ContentOblivious.Aggregation
 
-open Podc.ContentOblivious Simulation Finset
+open Cslib.ContentOblivious Simulation Finset
 
 /-- Local state of the MIS/aggregation algorithm. -/
 structure MState where

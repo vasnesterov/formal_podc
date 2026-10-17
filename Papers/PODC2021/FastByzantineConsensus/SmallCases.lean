@@ -1,5 +1,5 @@
 import Papers.PODC2021.FastByzantineConsensus.TwoStep
-import Podc.PartialSync.Triviality
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Triviality
 
 /-!
 # The case `n ≤ 3f` and the degenerate case `n = 1`

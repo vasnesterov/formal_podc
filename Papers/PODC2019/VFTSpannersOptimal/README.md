@@ -73,5 +73,5 @@ edge-fault lower-bound remark.
 `Quot.sound`. Non-vacuity: `exists_vft_spanner_ftGreedy`. The generic greedy scheme
 (`SimpleGraph.greedyGraph`, its correctness, and blocking sets from insertion histories
 `exists_blockingSet_of_insertion`) is shared with [Dinitz–Robelle](../../PODC2020/FaultTolerantSpanners)
-in `Podc/Graph/Spanner/FaultTolerantGreedy.lean`. Weighted spanners, blocking sets and `b(N, g)`
+in `Cslib/Foundations/Combinatorics/SimpleGraph/FaultTolerantGreedy.lean`. Weighted spanners, blocking sets and `b(N, g)`
 are in CSLib (`Cslib/Foundations/Combinatorics/SimpleGraph/{WeightedSpanner,BlockingSet,GirthExtremal}.lean`).

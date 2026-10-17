@@ -1,4 +1,5 @@
-import Podc.ContentOblivious.Model
+import Cslib.Computability.Distributed.ContentOblivious.Model
+import Mathlib
 import Papers.PODC2024.ContentObliviousLE.RingCounting
 
 /-!
@@ -13,7 +14,7 @@ required to be positive, not distinct (Lemma 15): all nodes of maximal ID end up
 
 namespace Podc.ContentOblivious.Alg1
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 /-- Local state: ID, `ρcw`, and the output variable. -/
 structure S where

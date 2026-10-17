@@ -1,7 +1,7 @@
 import Mathlib.Order.Basic
 import Mathlib.Order.MinMax
-import Podc.SharedMemory.Objects.MaxRegister
-import Podc.SharedMemory.Objects.Queue
+import Cslib.Computability.Distributed.SharedMemory.Objects.MaxRegister
+import Cslib.Computability.Distributed.SharedMemory.Objects.Queue
 
 /-!
 # Doubly-perturbing objects (Definition 3, Lemmas 3–8)

@@ -47,7 +47,7 @@ by one. The headline results hold: Theorems 1, 4, 5, 13, 14, 22 (with an active 
   verbatim") cannot be literal — events of the removed part must be dropped and the kept interval's
   events rescheduled; we use a precise crossing-sequence merge. We prove more than stated:
   `n⌊log₂ n⌋ ≤ 14M + 4n` for *every* execution with `M` pulses in which the leader has counted.
-  (`Counting.count_lower_bound`, `Counting.theorem3`, `Podc.ContentOblivious.splice`)
+  (`Counting.count_lower_bound`, `Counting.theorem3`, `Cslib.ContentOblivious.splice`)
 * **Minor.** Lemmas 11–12 say the last phase is `⌈√n⌉`; there are about `√(2n)` phases (`n = 40`
   has 9). Lemma 10's premise has `p₀` uncounted and calls the per-phase invariant "immediate".
   Lemma 16 (relay segments behave like a link) is asserted without proof. Theorem 4 writes
@@ -59,7 +59,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Model.**
 * Content-oblivious oriented rings on `ZMod n`, every `n ≥ 1` (`n = 1` self-loop, `n = 2` double
-  link) from `Podc/ContentOblivious/Model.lean`. Pulses carry nothing; a channel is a counter
+  link) from `Cslib/Computability/Distributed/ContentOblivious/Model.lean`. Pulses carry nothing; a channel is a counter
   (equivalent to the paper's FIFO assumption). Asynchronous: at each step the adversary delivers
   any pulse in transit to a process willing to read that port (blocking receives on a given port
   or on any port). No failures; deterministic processes; all start at time 0.
@@ -72,16 +72,16 @@ Full list of differences (including modelling choices and minor imprecisions): [
   quiescent termination + `clean` (a process that has not returned and waits on a link whose other
   end has returned has a pulse of the current procedure in transit). A general theorem runs any
   sequence of such procedures chosen by the processes' local states (loops included) and adds
-  their pulse counts (`Podc/ContentOblivious/Staged.lean`); all composite algorithms of the paper
+  their pulse counts (`Cslib/Computability/Distributed/ContentOblivious/Staged.lean`); all composite algorithms of the paper
   (Algorithms 5, 6, 10, the simulator and Theorem 1's algorithm) are built this way.
 
-**Main results in Lean.** (namespace `Podc.ContentOblivious`; files in this folder unless noted)
+**Main results in Lean.** (namespace `Cslib.ContentOblivious`; files in this folder unless noted)
 
 | Paper | Lean | File |
 |---|---|---|
-| Theorem 9 (composition), generalized to staged programs | `Schedule.final`, `.totalSent_le`, `.composable` | `Podc/ContentOblivious/Staged.lean` |
+| Theorem 9 (composition), generalized to staged programs | `Schedule.final`, `.totalSent_le`, `.composable` | `Cslib/Computability/Distributed/ContentOblivious/Staged.lean` |
 | Theorem 21, Lemmas 18–20 (ComputeOR, exactly `3n` pulses) | `ComputeOR.composable`, `.returns`, `.totalSent_final`, `lemma18`–`lemma20` | `ComputeOR.lean` |
-| Theorem 17, Lemmas 15–16 (bit sending, `≤ 6n`), CW mirror | `BitSending.returns`, `.composable`, `.totalSent_le`, `cw_*` | `BitSending.lean`, `Podc/ContentOblivious/Mirror.lean` |
+| Theorem 17, Lemmas 15–16 (bit sending, `≤ 6n`), CW mirror | `BitSending.returns`, `.composable`, `.totalSent_le`, `cw_*` | `BitSending.lean`, `Cslib/Computability/Distributed/ContentOblivious/Mirror.lean` |
 | Lemma 16 / Thm 17 for a relay leader: **false** | `BitSending.relay_leader_composition_wrong`, `BitSending.not_composable_relay_leader` | `RelayLeaderComposition.lean`, `BitSending.lean` |
 | Theorem 22 (MsgExchange, `15nL + 3n`) | `Concrete.theorem_22` | `MsgExchange.lean` |
 | Theorem 14 (round-by-round simulation, `15nb + 3n` per round) | `Concrete.theorem_14` | `MsgExchange.lean` |
@@ -91,7 +91,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 1 (aggregation) | `Aggregation.theorem1_concrete` | `AggregationConcrete.lean` |
 | Corollary 2 (`O(n log² n)` counting) | `Aggregation.corollary2_concrete` | `AggregationConcrete.lean` |
 | Theorem 5, Algorithm 10 (minimum finding, `6n·|xmin|`) | `Concrete.theorem_5` | `MsgExchange.lean`, `MinFindingGeneric.lean` |
-| Observation 27, Lemma 28 (splicing) | `Counting.observation27`, `Counting.lemma28` | `LowerBoundSplice.lean`, `Podc/ContentOblivious/Splice.lean` |
+| Observation 27, Lemma 28 (splicing) | `Counting.observation27`, `Counting.lemma28` | `LowerBoundSplice.lean`, `Cslib/Computability/Distributed/ContentOblivious/Splice.lean` |
 | Theorem 3 (lower bound), per execution and in the paper's form | `Counting.count_lower_bound`, `Counting.theorem3` | `LowerBound.lean` |
 
 **Not formalized.** Theorem 6 (multiset computation), Theorem 7 and §7 (2-edge-connected
@@ -103,5 +103,5 @@ hypotheses left). Non-vacuity: the lower bound's hypothesis is met by the counti
 Theorem 4 (`Counting.countingCorrect_anonCount`, `LowerBoundNonVacuity.lean`), whose
 `O(n^1.5)` bound sits above the `Ω(n log n)` bound. A bounded model check of the paper's
 pseudo-code (`modelcheck/`) found no errors beyond those listed above. Generic infrastructure
-(CSLib candidates) is in `Podc/ContentOblivious/`: `Prog`, `Compose`, `Staged`, `Hom`, `Mirror`,
+(upstreamed to CSLib) is in `Cslib/Computability/Distributed/ContentOblivious/`: `Prog`, `Compose`, `Staged`, `Hom`, `Mirror`,
 `Splice`, `VirtualRing`.

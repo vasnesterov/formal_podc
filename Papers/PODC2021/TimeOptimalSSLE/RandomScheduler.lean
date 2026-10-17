@@ -1,6 +1,6 @@
 import Papers.PODC2021.TimeOptimalSSLE.Model
-import Podc.PopulationProtocols.RandomScheduler
-import Podc.Stabilization.Markov
+import Cslib.Computability.Distributed.PopulationProtocols.RandomScheduler
+import Cslib.Computability.Distributed.SelfStabilization.Markov
 
 /-!
 # The uniformly random scheduler: "with probability 1" versus reachability
@@ -22,7 +22,7 @@ row-stochastic kernel whose positive entries are exactly the protocol's steps:
 
 So `NProtocol.SelfStabilizes` is exactly the paper's "with probability 1" notion. Both are
 instances of the generic bridge `Cslib.TransitionSystem.SelfStabilizes.tendsto` /
-`Cslib.TransitionSystem.prob_eq_zero_of_not_reach` (`Podc.Stabilization.Markov`). The kernel of a
+`Cslib.TransitionSystem.prob_eq_zero_of_not_reach` (`Cslib.Computability.Distributed.SelfStabilization.Markov`). The kernel of a
 deterministic protocol under the uniform random scheduler is
 `Cslib.PopulationProtocol.uniformKernel` (`uniformKernel_pos_iff`).
 -/

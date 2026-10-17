@@ -1,21 +1,21 @@
 import Mathlib
-import Podc.Graph.Orientation
-import Podc.Local.Locality
+import Cslib.Computability.Distributed.Local.OnlineLocalLocality
+import Cslib.Foundations.Combinatorics.SimpleGraph.Orientation
 
 /-!
 # Sinkless orientations: basic definitions
 
 Basic notions for *Brief Announcement: Sinkless Orientation Made Trivial* (A. Nolin, PODC 2026):
 
-* `Orientation G` (`SimpleGraph.Orientation`, shared in `Podc/Graph/Orientation.lean`): an
+* `Orientation G` (`SimpleGraph.Orientation`, shared in `Cslib/Foundations/Combinatorics/SimpleGraph/Orientation.lean`): an
   orientation of the edges of a simple graph `G`; sinks `Orientation.IsSink`.
 * `Orientation.IsDeltaSink`, `Orientation.NoDeltaSink`: `δ`-sinks (sinks of degree `≥ δ`),
   orientations without `δ`-sinks.
 * `Orientation.IsSinkSparse`: `k`-sinksparse orientations (distinct sinks at distance `> k`).
 * `cball G v k`: the inclusive distance-`k` neighbourhood of `v` (`SimpleGraph.closedBall`,
-  `Podc/Graph/Ball.lean`); `ContainsCycle G S`: some cycle of `G` has all its vertices in `S`.
+  `Cslib/Foundations/Combinatorics/SimpleGraph/Ball.lean`); `ContainsCycle G S`: some cycle of `G` has all its vertices in `S`.
 * Locality (the LOCAL model): `GAgree G G' u R` (`G` and `G'` cannot be distinguished by `R` rounds
-  of communication at `u`; shared in `Podc/Local/Locality.lean`), `IsLocal A R` (an orientation
+  of communication at `u`; shared in `Cslib/Computability/Distributed/Local/OnlineLocalLocality.lean`), `IsLocal A R` (an orientation
   algorithm whose output at every node depends only on what the node sees in `R` rounds;
   `isLocal_iff` relates it to the shared `Cslib.Local.IsLocal`), `IsLocalRel` (the same, for
   algorithms that also get an orientation as local input), and the composition lemma
@@ -56,7 +56,7 @@ end SinklessOrientation
 /-! ### `δ`-sinks and sinksparse orientations
 
 Orientations themselves (`SimpleGraph.Orientation`, sinks `Orientation.IsSink`) are the shared
-notions of `Podc/Graph/Orientation.lean`; the predicates below are specific to the paper. -/
+notions of `Cslib/Foundations/Combinatorics/SimpleGraph/Orientation.lean`; the predicates below are specific to the paper. -/
 
 namespace SimpleGraph.Orientation
 
@@ -97,7 +97,7 @@ variable {V : Type*}
 
 /-! ### Locality of orientation algorithms
 
-Agreement of views (`GAgree`) is the shared notion of `Podc/Local/Locality.lean`. -/
+Agreement of views (`GAgree`) is the shared notion of `Cslib/Computability/Distributed/Local/OnlineLocalLocality.lean`. -/
 
 section Locality
 

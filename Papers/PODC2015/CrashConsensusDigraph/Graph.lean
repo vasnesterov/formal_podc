@@ -1,4 +1,4 @@
-import Podc.ApproxConsensus.DigraphConditions
+import Cslib.Computability.Distributed.ApproxConsensus.DigraphConditions
 import Mathlib
 
 /-!
@@ -7,7 +7,7 @@ import Mathlib
 Graph-theoretic notions of Tseng–Vaidya, *Fault-Tolerant (Crash-Tolerant) Consensus in Directed
 Graphs* (PODC 2015), Section 2.
 
-We use the shared reach sets of `Podc/ApproxConsensus/DigraphConditions.lean`:
+We use the shared reach sets of `Cslib/Computability/Distributed/ApproxConsensus/DigraphConditions.lean`:
 `Reaches G F a b` says that `a ∉ F` and `b` is reachable from `a` in the reduced graph `G_F`
 (Definition 1: the subgraph induced by `V − F`; `Digraph.ReachableAvoiding`).
 

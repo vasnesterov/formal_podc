@@ -1,5 +1,7 @@
 import Papers.PODC2011.TimestampSpace.Alg4Space
-import Podc.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Task
 
 /-!
 # Algorithms 3 and 4 are wait-free for boundedly many `getTS` calls (Lemma 6.14)

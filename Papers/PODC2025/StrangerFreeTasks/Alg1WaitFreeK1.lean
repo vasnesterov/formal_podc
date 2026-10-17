@@ -1,6 +1,8 @@
 import Papers.PODC2025.StrangerFreeTasks.Alg1WaitFreeK1Doomed
 import Mathlib.Data.Set.Finite.Lattice
-import Podc.SharedMemory.Progress
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Task
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # Algorithm 1 is wait-free for `k = 1`
@@ -39,9 +41,9 @@ theorem alg1_one_finite_steps (e : (alg1 (P := P) 1).InfExec) (p : P) :
   push Not at hcon
   have hinf : ∀ N, ∃ m, N ≤ m ∧ e.lbl m = .tau p := fun N => by
     obtain ⟨m, hm, h⟩ := hcon N; exact ⟨m, hm, h⟩
-  have hB : ∀ t, BInv (e.lbls t) (e.cfg t) :=
-    fun t => bInv_of_run (e.run_lbls t)
-  have hS : ∀ t, SInvK1 (e.cfg t) := fun t => sInvK1_of_run (e.run_lbls t)
+  have hB : ∀ t, BInv (e.pre t) (e.cfg t) :=
+    fun t => bInv_of_run (e.run_pre t)
+  have hS : ∀ t, SInvK1 (e.cfg t) := fun t => sInvK1_of_run (e.run_pre t)
   have hst := e.step_eq
   -- 1. `p` never decides
   have hND : ∀ t, ((e.cfg t).loc p).phase ≠ .done := by

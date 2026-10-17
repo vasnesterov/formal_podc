@@ -1,5 +1,5 @@
 import Papers.PODC2026.TreeAA.Spec
-import Podc.Foundations.Count
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # The 3-round gradecast of Ben-Or, Dolev and Hoch  -- CSLib candidate

@@ -1,5 +1,5 @@
 import Papers.PODC2022.HybridApproxAgreement.Spec
-import Podc.Foundations.Labelling
+import Cslib.Foundations.Combinatorics.Labelling
 
 /-!
 # Theorem 5.1: no hybrid AA when `2 tₛ + tₐ ≥ n`

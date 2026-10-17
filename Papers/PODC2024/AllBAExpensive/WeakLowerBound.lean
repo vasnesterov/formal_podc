@@ -1,4 +1,4 @@
-import Podc.PartialSync.Omission
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Omission
 
 /-!
 # All Byzantine Agreement Problems Are Expensive — §3: the lower bound for weak consensus

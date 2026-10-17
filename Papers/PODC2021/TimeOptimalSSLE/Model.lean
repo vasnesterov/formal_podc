@@ -1,4 +1,4 @@
-import Podc.PopulationProtocols.Nondet
+import Cslib.Computability.Distributed.PopulationProtocols.Nondet
 import Mathlib.Data.Fintype.CardEmbedding
 
 /-!
@@ -12,7 +12,7 @@ about self-stabilization "with probability 1" only depend on the **support** of 
 distributions (finite state space, uniformly random ordered pair; see `RandomScheduler.lean` for the
 Markov-chain bridge). We therefore model a protocol by its support relation `δ p q ⊆ Q × Q`
 (`NProtocol`, the shared model `Cslib.PopulationProtocol.NProtocol` of
-`Podc.PopulationProtocols.Nondet`). Deterministic CSLib protocols embed via `NProtocol.ofProtocol`.
+`Cslib.Computability.Distributed.PopulationProtocols.Nondet`). Deterministic CSLib protocols embed via `NProtocol.ofProtocol`.
 
 * `NProtocol.Step`, `NProtocol.Reachable`: one interaction of an ordered pair of distinct agents
   (the complete interaction graph).

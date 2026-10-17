@@ -64,12 +64,12 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 | Paper | Lean | File |
 |---|---|---|
-| Algorithm 1 outputs a `t`-spanner; local criterion (§2) | `SimpleGraph.IsGreedySpanner.isWSpanner`, `SimpleGraph.isWSpanner_of_adj` | `Podc/Graph/Spanner/{Greedy,Weighted}.lean` |
+| Algorithm 1 outputs a `t`-spanner; local criterion (§2) | `SimpleGraph.IsGreedySpanner.isWSpanner`, `SimpleGraph.isWSpanner_of_adj` | `Cslib/Foundations/Combinatorics/SimpleGraph/{GreedySpanner,WeightedSpanner}.lean` |
 | Observation 2 (greedy contains an MST of `G`) | `IsGreedySpanner.exists_mst_le`, `IsGreedySpanner.mstWeight_eq` | `MST.lean` |
 | Lemma 3 (the only `t`-spanner of `H` is `H`) | `lemma3` | `Lemma3.lean` |
 | Theorem 5 (existential optimality, size and lightness) | `theorem5` | `Theorem5.lean` |
 | Existential optimality as an equality (§1.3 definition) | `existentially_optimal_sparse`, `existentially_optimal_light` | `Theorem5.lean` |
-| Corollary 1, size: `t ≥ 2k−1` ⇒ girth `> 2k`, `≤ n^{1+1/k}+n` edges | `SimpleGraph.IsGreedySpanner.noShortCycles`, `corollary1_size` | `Podc/Graph/Spanner/Greedy.lean`, `Theorem5.lean` |
+| Corollary 1, size: `t ≥ 2k−1` ⇒ girth `> 2k`, `≤ n^{1+1/k}+n` edges | `SimpleGraph.IsGreedySpanner.noShortCycles`, `corollary1_size` | `Cslib/Foundations/Combinatorics/SimpleGraph/GreedySpanner.lean`, `Theorem5.lean` |
 | Corollaries 1 (lightness) and 2, given the cited bounds | `greedy_le_of_forall_exists` | `Theorem5.lean` |
 | Lemma 5 (`w(H) ≤ w(H')` for `H'` a `t`-spanner of `M_H`) | `lemma5` | `Section4.lean` |
 | Lemma 6 (`|H| ≤ |H'|`, `t < 2`) | `lemma6` | `Section4.lean` |
@@ -98,7 +98,7 @@ weighted walks come from CSLib (`WeightedSpanner.lean`, `ShortestWalks.lean`). T
 the cycle-splitting lemma also come from CSLib (`Girth.lean`, `Cycle.lean`). Weighted spanners with
 real stretch, the local criterion, two-weight distance comparison, attainment of weighted distances by
 paths and the greedy spanner with its scan properties, girth and MST bypass property are the shared
-library `Podc/Graph/Spanner/{Weighted,Greedy}.lean` (also used by
+library `Cslib/Foundations/Combinatorics/SimpleGraph/{WeightedSpanner,GreedySpanner}.lean` (also used by
 [Dinitz–Krauthgamer](../../PODC2011/FaultTolerantSpanners) for the [ADD+93] spanner).
 
 CSLib candidates (marked `-- CSLib candidate`): Lemma 3, `mstWeight` with the exchange lemma

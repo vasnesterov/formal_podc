@@ -1,5 +1,5 @@
 import Papers.PODC2026.ConsistentRefereeing.Defs
-import Podc.SharedMemory.Objects.Queue
+import Cslib.Computability.Distributed.SharedMemory.Objects.Queue
 import Cslib.Computability.Distributed.SharedMemory.SWSRRegister
 
 /-!
@@ -480,13 +480,13 @@ theorem contestOfQueue_waitFreeOn [Fintype P] (hallow : ∀ p, Q.allowed p (toQO
     exact hNf q m (le_trans (Finset.le_sup (Finset.mem_univ _)) hm) r h
   obtain ⟨m₁, -, r₁, h₁⟩ := hq 0
   obtain ⟨m₂, hm₂, r₂, h₂⟩ := hq (m₁ + 1)
-  have hlen : 2 ≤ (respsOf (ex.lbls (m₂ + 1)) q).length := by
-    obtain ⟨γ, hγ⟩ := ex.lbls_prefix hm₂
-    rw [Impl.InfExec.lbls_succ, respsOf_append, ← hγ, respsOf_append, Impl.InfExec.lbls_succ,
+  have hlen : 2 ≤ (respsOf (ex.pre (m₂ + 1)) q).length := by
+    obtain ⟨γ, hγ⟩ := ex.pre_prefix hm₂
+    rw [Impl.InfExec.pre_succ, respsOf_append, ← hγ, respsOf_append, Impl.InfExec.pre_succ,
       respsOf_append, h₁, h₂]
     simp; omega
   have h1 := (hE (m₂ + 1)).oneShot q
-  rcases (contestOfQueue Q ref e).run_counts (ex.run_lbls (m₂ + 1)) q with ⟨-, h2⟩ | ⟨-, h2⟩ <;>
+  rcases (contestOfQueue Q ref e).run_counts (ex.run_pre (m₂ + 1)) q with ⟨-, h2⟩ | ⟨-, h2⟩ <;>
     omega
 
 /-- **Proposition 11 of [ACE26].** A lock-free strongly linearizable queue implementation `Q`

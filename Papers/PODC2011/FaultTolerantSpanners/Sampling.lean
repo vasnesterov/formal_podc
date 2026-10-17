@@ -1,4 +1,4 @@
-import Podc.Probability.Finite.Uniform
+import Cslib.Probability.Finite.Uniform
 import Mathlib
 
 /-!
@@ -9,7 +9,7 @@ probability `p = 1 - 1/m` (the paper uses `m = r`, and `m = 2` when `r = 1`). We
 exactly on a *finite uniform* sample space: every vertex draws a uniform label in `Fin m` and
 survives (is not in `J`) iff its label is `0`. Repeating `α` times independently is the uniform
 distribution on `Fin α → V → Fin m`. Probabilities are then ratios of cardinalities (`uprob`, from
-the shared finite-probability library `Podc/Probability/Finite/Uniform.lean`, with the union bound
+the shared finite-probability library `Cslib/Probability/Finite/Uniform.lean`, with the union bound
 `uprob_exists_le` and independence `uprob_pi`), and no measure theory is needed.
 
 Main facts:

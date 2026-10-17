@@ -1,6 +1,7 @@
 import Papers.PODC2026.PLSTradeoff.BallCarving
 import Papers.PODC2026.PLSTradeoff.Tradeoff
-import Podc.Probability.Finite.Uniform
+import Cslib.Probability.Finite.Uniform
+import Mathlib
 
 /-!
 # Ball carving with random radii (Section 5.1)

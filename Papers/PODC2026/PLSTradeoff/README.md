@@ -56,7 +56,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 - **Locality.** An `R`-PLS verifier is any function whose output at `v` depends only on the
   `R`-round LOCAL view of `v` (`ViewEq`/`IsLocal`): edges incident to nodes at distance `< R`, and
   inputs and labels at distance `≤ R`. For `R = 1` this is the classical PLS view. `ViewEq` and
-  `IsLocal` are the shared notions of `Podc/Local/Locality.lean` (`Cslib.Local.ViewEq`,
+  `IsLocal` are the shared notions of `Cslib/Computability/Distributed/Local/OnlineLocalLocality.lean` (`Cslib.Local.ViewEq`,
   `Cslib.Local.IsLocal`) applied to the labelling `u ↦ (I u, ℓ u)`; `viewEq_iff` and `isLocal_iff`
   state them in the paper's form. Verifiers are deterministic and need not be computable, as in
   the paper.
@@ -108,11 +108,11 @@ For Theorem 1.6 the bound is `m ≤ 4(t+1)p` for every `t`-PLS.
 
 **CSLib candidates** (marked `-- CSLib candidate`):
 - the PLS model (`PLS`, `Basic.lean`); views, locality and the localization trick (`loc`, `mask`)
-  are in the shared `Podc/Local/Locality.lean`;
+  are in the shared `Cslib/Computability/Distributed/Local/OnlineLocalLocality.lean`;
 - the string encoding (`Encoding.lean`);
 - ball sizes in connected graphs (`card_ball_ge`, `RandomCarving.lean`); the fibre counting along
   the identifier order and the union bounds of Lemmas 5.2/5.5 use the shared
-  `Podc/Probability/Finite/Uniform.lean` (`pow_mul_card_filter_forall_le`,
+  `Cslib/Probability/Finite/Uniform.lean` (`pow_mul_card_filter_forall_le`,
   `card_filter_exists_le`);
 - generic carving into a cluster-degenerate partition (`exists_degenerate_of_carve`);
 - induced subgraphs on all of `V` and connected sets of any size (`zG`, `zG_edist_le_ncard`,

@@ -1,5 +1,5 @@
 import Papers.PODC2025.TwoStepConsensusLB.Fig1Basic
-import Podc.Foundations.Quorum
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Safety of the protocol of Fig. 1 (Ryabinin–Gotsman–Sutra, PODC 2025)

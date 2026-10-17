@@ -70,9 +70,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
   direction and round. Deterministic, or with private random strings per node. Every node knows its
   neighbourhood (for directed / weighted problems also its incident arcs / weights). The algorithm may
   depend on `V`, which only makes the lower bounds stronger. "Decides `P` in `T` rounds" means: all nodes
-  accept iff `P` holds (`Podc/CongestLB/Congest.lean`).
+  accept iff `P` holds (`Cslib/Computability/Distributed/Congest/LowerBound.lean`).
 * Two-party communication: deterministic protocol trees (Kushilevitz–Nisan); private-coin randomized
-  protocols are deterministic trees over inputs extended by coins (`Podc/CongestLB/Protocol.lean`,
+  protocols are deterministic trees over inputs extended by coins (`Cslib/Computability/CommunicationComplexity/Protocol.lean`,
   `Randomized.lean`).
 * Families of lower bound graphs follow Definition 1.1 (`LBFamily`). The cut is given as a finset of
   directed pairs `(a ∈ V_A, b ∈ V_B)` containing all cut edges.
@@ -84,9 +84,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 | Paper | Lean | File |
 |---|---|---|
-| `CC(DISJ_K) ≥ K` (cited in the paper) | `Protocol.disj_lowerBound`, `not_disj_lowerBound(_of_ne_zero)` | `Podc/CongestLB/Protocol.lean` |
-| Theorem 1.1 (deterministic: simulation + bound) | `LBFamily.simulation`, `LBFamily.lowerBound`, `LBFamily.not_disj_lowerBound` | `Podc/CongestLB/Congest.lean` |
-| Theorem 1.1 (randomized; `CC^R(DISJ)` as hypothesis) | `LBFamily.rand_simulation`, `LBFamily.rand_lowerBound` | `Podc/CongestLB/Randomized.lean` |
+| `CC(DISJ_K) ≥ K` (cited in the paper) | `Protocol.disj_lowerBound`, `not_disj_lowerBound(_of_ne_zero)` | `Cslib/Computability/CommunicationComplexity/Protocol.lean` |
+| Theorem 1.1 (deterministic: simulation + bound) | `LBFamily.simulation`, `LBFamily.lowerBound`, `LBFamily.not_disj_lowerBound` | `Cslib/Computability/Distributed/Congest/LowerBound.lean` |
+| Theorem 1.1 (randomized; `CC^R(DISJ)` as hypothesis) | `LBFamily.rand_simulation`, `LBFamily.rand_lowerBound` | `Cslib/Computability/Distributed/Congest/Randomized.lean` |
 | Lemma 2.1 | `lemma_2_1`, `lemma_2_1_le`, `four_mul_add_two_le_card` | `MDS.lean` |
 | Theorem 2.1 (`k² ≤ 8TB log k + 2`; `n² ≤ 256(8TB log n + 2)`) | `theorem_2_1`, `theorem_2_1_n` | `MDSTheorem.lean` |
 | Theorem 2.1 for connected-only algorithms | `theorem_2_1_connected` | `MDSConnected.lean` |
@@ -111,7 +111,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Trust.**
 * No `sorry`. All listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
-* Non-vacuity: the full-information gathering algorithm (`Podc/CongestLB/Gather.lean`) decides every graph
+* Non-vacuity: the full-information gathering algorithm (`Cslib/Computability/Distributed/Congest/Gather.lean`) decides every graph
   property on connected graphs in `n` rounds. It satisfies the hypothesis of `theorem_2_1_connected`
   (`theorem_2_1_hyp_satisfiable`).
 * Brute-force checks under resource caps, before proving:
@@ -119,5 +119,5 @@ Full list of differences (including modelling choices and minor imprecisions): [
     monotonicity.
   * Hamiltonian path family: `k = 2`, all inputs.
   * Lemma 2.4: `k = 2`, all inputs.
-* The framework (`Podc/CongestLB/`) is a CSLib candidate. `IsDominating G D` is
-  `SimpleGraph.IsDominatingSet G ↑D` (`Podc/Graph/Ball.lean`).
+* The framework (`Cslib/Computability/Distributed/Congest/`) is now in CSLib. `IsDominating G D` is
+  `SimpleGraph.IsDominatingSet G ↑D` (`Cslib/Foundations/Combinatorics/SimpleGraph/Ball.lean`).

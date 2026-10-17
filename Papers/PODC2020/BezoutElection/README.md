@@ -94,10 +94,10 @@ without required participation (§1.3, which cites [1]).
 (`theorem_1_nonvacuous`). Corollaries 1–3 are iff statements whose sufficiency direction
 exhibits Algorithm 2. The model (anonymous memory, symmetric algorithms) is CSLib's
 `Cslib/Computability/Distributed/SharedMemory/Anonymous.lean`. The symmetric `k`-group lock-step
-rounds are the shared library `Podc/SharedMemory/Anonymous/LockStep.lean` (`SymAlg.LSSetup`,
+rounds are the shared library `Cslib/Computability/Distributed/SharedMemory/Anonymous/LockStep.lean` (`SymAlg.LSSetup`,
 `SymAlg.SymCfg`, `SymAlg.round_*`; also used by `Papers/PODC2019/AnonymousMutex` with one group);
 fairness, prefixes of infinite executions and pending/return lemmas come from
-`Podc/SharedMemory/Progress.lean` (`InfExec.IsFair`, `InfExec.lbls`, `InfExec.first_act`,
+`Cslib/Computability/Distributed/SharedMemory/Progress.lean` (`InfExec.Fair`, `InfExec.pre`, `InfExec.first_act`,
 `InfExec.exists_ret_between`), and the election object is the interface-only object
 `ObjSpec.iface Unit R`.
 

@@ -1,7 +1,10 @@
 import Papers.PODC2026.ConsistentRefereeing.Defs
 import Cslib.Computability.Distributed.SharedMemory.Covering
 import Cslib.Computability.Distributed.SharedMemory.SWSRRegister
-import Podc.SharedMemory.Solo
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Solo
+import Cslib.Computability.Distributed.SharedMemory.Task
+import Cslib.Foundations.Data.Nat.Descent
 import Mathlib.Algebra.BigOperators.Group.Finset.Piecewise
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
 
@@ -609,9 +612,9 @@ theorem exists_critical [Fintype P] (hlf : I.LockFreeOn (Adm ref)) (hsl : I.Stro
   have hmono : ∀ n, E n <+: E (n + 1) := fun n => by rw [hEs]; exact List.prefix_append _ _
   have hlen : ∀ n, n ≤ (E n).length := fun n => by rw [hElen]
   obtain ⟨e, hlbl, -⟩ := I.exists_infExec_of_chain E hmono hlen (fun n => (seq n).2.1)
-  have hlbls : ∀ t, e.lbls t = E t := fun t => by
-    rw [e.lbls_eq_take (hlen t) (hlbl t), List.take_of_length_le (hElen t).le]
-  have hadm : ∀ t, Adm ref (e.lbls t) := fun t => by rw [hlbls]; exact (seq t).2.2.1
+  have hlbls : ∀ t, e.pre t = E t := fun t => by
+    rw [e.pre_eq_take (hlen t) (hlbl t), List.take_of_length_le (hElen t).le]
+  have hadm : ∀ t, Adm ref (e.pre t) := fun t => by rw [hlbls]; exact (seq t).2.2.1
   -- infinitely many steps: at most `card P` invocations
   have hsteps : ∀ N, ∃ m ≥ N, (e.lbl m).IsStep := by
     intro N
@@ -623,12 +626,12 @@ theorem exists_critical [Fintype P] (hlf : I.LockFreeOn (Adm ref)) (hsl : I.Stro
       | inv q o => exact ⟨q, o, rfl⟩
       | ret q r => exact absurd (by rw [h]; trivial) (hno m hm)
       | tau q => exact absurd (by rw [h]; trivial) (hno m hm)
-    have hgrow : ∀ K, invCount (e.lbls N) + K ≤ invCount (e.lbls (N + K)) := by
+    have hgrow : ∀ K, invCount (e.pre N) + K ≤ invCount (e.pre (N + K)) := by
       intro K; induction K with
       | zero => simp
       | succ K ih =>
-        show invCount (e.lbls N) + (K + 1) ≤ invCount (e.lbls ((N + K) + 1))
-        rw [InfExec.lbls_succ]
+        show invCount (e.pre N) + (K + 1) ≤ invCount (e.pre ((N + K) + 1))
+        rw [InfExec.pre_succ]
         obtain ⟨q, o, hq⟩ := hinv (N + K) (by omega)
         simp only [invCount, List.filter_append, List.length_append, hq] at ih ⊢
         simp only [List.filter_cons, List.filter_nil, ite_true, List.length_singleton]

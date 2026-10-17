@@ -108,7 +108,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Thm 2.1 (paper's parameters) | `theorem_2_1` | `Theorem21.lean` |
 | Thm 2.1 proof: correctness core / good-iteration probability | `isWeightedVFTSpanner_ftUnion`, `uprob_good`, `uprob_not_isVFT_le` | `Conversion.lean` |
 | Thm 2.1 proof: Chernoff bound on survivors | `uprob_card_surv_gt_two_mul` | `Sampling.lean` |
-| [ADD+93] greedy spanner (cited) + Moore bound on `S` | `exists_greedy_spanner`, `SimpleGraph.NoShortCycles.ncard_edgeSet_le_card_rpow` | `Corollary22.lean`, `Podc/Graph/Girth.lean` |
+| [ADD+93] greedy spanner (cited) + Moore bound on `S` | `exists_greedy_spanner`, `SimpleGraph.NoShortCycles.ncard_edgeSet_le_card_rpow` | `Corollary22.lean`, `Cslib/Foundations/Combinatorics/SimpleGraph/Girth.lean` |
 | Cor 2.2 (`≤ 6(8C+26) r^{2−1/t} n^{1+1/t} ln(n+1)`, `k = 2t−1`) | `corollary_2_2` | `Corollary22.lean` |
 | Lemma 3.1 | `isFTSpanner_two_iff` | `TwoSpanner/Characterization.lean` |
 | IP (3) exact, KC inequalities valid, LP ≤ OPT | `isFTSpanner_iff_exists_ip3`, `IsIP3Feasible.toLP4`, `exists_lp4_of_isFTSpanner` | `TwoSpanner/Characterization.lean` |
@@ -127,10 +127,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`.
 * Section 2 builds on CSLib's `WeightedSpanner` and `Girth` (Moore bound), and on the shared
-  `Podc` libraries: the greedy spanner (`Podc/Graph/Spanner/Greedy.lean`, also used by
+  `Podc` libraries: the greedy spanner (`Cslib/Foundations/Combinatorics/SimpleGraph/GreedySpanner.lean`, also used by
   [Filtser–Solomon](../../PODC2016/GreedySpanner)), the relative Moore bound
-  (`Podc/Graph/Girth.lean`) and finite uniform probability `uprob`
-  (`Podc/Probability/Finite/Uniform.lean`, whose counting Chernoff bound gives the survivor bound).
+  (`Cslib/Foundations/Combinatorics/SimpleGraph/Girth.lean`) and finite uniform probability `uprob`
+  (`Cslib/Probability/Finite/Uniform.lean`, whose counting Chernoff bound gives the survivor bound).
 * Non-vacuity, Section 2: the greedy spanner (`greedyAlg`) satisfies all hypotheses of Theorem 2.1,
   which yields Corollary 2.2.
 * Non-vacuity, Section 3: every fault-tolerant spanner gives an LP-feasible solution

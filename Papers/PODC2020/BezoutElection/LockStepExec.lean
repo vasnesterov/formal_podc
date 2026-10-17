@@ -1,4 +1,4 @@
-import Podc.SharedMemory.Anonymous.LockStep
+import Cslib.Computability.Distributed.SharedMemory.Anonymous.LockStep
 import Papers.PODC2020.BezoutElection.Exec
 import Mathlib.Data.Finset.Lattice.Fold
 
@@ -9,7 +9,7 @@ The set-up (`Setup`): `k` groups of `g` processes covering all processes; proces
 the group, `i < g` the position in the group) sees the registers rotated by `sh ^ i` and has
 identifier `σ ^ i (a q)` (the library's `SymAlg.LSSetup`, plus surjectivity of `e`). The
 symmetric group rounds (`SymAlg.round_rmw`, `round_snap`, `round_ret`, `round_inv`) are in
-`Podc.SharedMemory.Anonymous.LockStep`.
+`Cslib.Computability.Distributed.SharedMemory.Anonymous.LockStep`.
 
 From the symmetric set-up, the *lock-step execution* lets every group invoke `elect()`
 and then repeats rounds in which every pending group takes one group round (each member takes
@@ -305,13 +305,13 @@ theorem exists_symmetric_outcome (hg : 0 < g) (hT : Terminates (A.impl ids π)) 
     obtain ⟨ex, hlbl, hcfg⟩ := (A.impl ids π).exists_infExec_of_chain E
       (fun j => by obtain ⟨β, h1, -⟩ := hEs j; rw [h1]; exact List.prefix_append _ _)
       hlen (fun j => ⟨_, (X j).2.run⟩)
-    have hpre : ∀ j t, t ≤ (E j).length → ex.lbls t = (E j).take t := by
+    have hpre : ∀ j t, t ≤ (E j).length → ex.pre t = (E j).take t := by
       intro j t ht
       apply List.ext_getElem
-      · simp [Impl.InfExec.lbls]; omega
+      · simp [Impl.InfExec.pre]; omega
       · intro n h1 h2
-        simp only [Impl.InfExec.lbls, List.getElem_map, List.getElem_range, List.getElem_take]
-        exact hlbl j n (by simp [Impl.InfExec.lbls] at h1; omega)
+        simp only [Impl.InfExec.pre, List.getElem_map, List.getElem_range, List.getElem_take]
+        exact hlbl j n (by simp [Impl.InfExec.pre] at h1; omega)
     have hcfgE : ∀ j, ex.cfg (E j).length = (X j).1.2.1 := by
       intro j
       have h := hcfg j _ le_rfl
@@ -329,7 +329,7 @@ theorem exists_symmetric_outcome (hg : 0 < g) (hT : Terminates (A.impl ids π)) 
       intro p
       obtain ⟨n, hn, hn'⟩ := List.getElem_of_mem (hinv p)
       exact ⟨n, (), by rw [hlbl 0 n hn]; exact hn'⟩
-    have hfair : ex.IsFair := by
+    have hfair : ex.Fair := by
       intro p t hp
       set N := (E (t + 1)).length
       have htN : t < N := by have := hlen (t + 1); omega

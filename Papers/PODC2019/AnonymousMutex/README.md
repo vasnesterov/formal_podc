@@ -97,5 +97,5 @@ deadlock-free, so the hypotheses are satisfiable. The bounded model checkers are
 anonymous symmetric memory are in CSLib
 (`Cslib/Computability/Distributed/SharedMemory/{Mutex,Anonymous}.lean`). The symmetric lock-step
 rounds behind `theorem_5` are the one-group case of the shared library
-`Podc/SharedMemory/Anonymous/LockStep.lean` (`SymAlg.LSSetup`, `SymAlg.SymCfg`, `SymAlg.round_*`),
+`Cslib/Computability/Distributed/SharedMemory/Anonymous/LockStep.lean` (`SymAlg.LSSetup`, `SymAlg.SymCfg`, `SymAlg.round_*`),
 which also serves the `k`-group argument of `Papers/PODC2020/BezoutElection`.

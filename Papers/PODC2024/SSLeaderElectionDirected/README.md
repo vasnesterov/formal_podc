@@ -63,8 +63,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 ## The formalization
 
-**Model** (the shared daemon library `Podc/Stabilization/{Execution,Daemon}.lean`, namespace
-`Cslib.SelfStabilization`, and digraph reachability `Podc/Digraph/Walk.lean`).
+**Model** (the shared daemon library `Cslib/Computability/Distributed/SelfStabilization/{Defs,Daemon}.lean`, namespace
+`Cslib.SelfStabilization`, and digraph reachability `Cslib/Foundations/Combinatorics/Digraph/Walk.lean`).
 * Atomic-state model on a finite `Digraph V`. `G.Adj q p` means `p` reads `q`, i.e. `q` is a
   predecessor of `p`.
 * Deterministic algorithms `next : (V → Q) → V → Q`. A process is enabled iff its action changes
@@ -101,7 +101,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 1 (C-MAI silent self-stabilizing) | `CMAI.theorem1` | `Correctness.lean` |
 | Lemmas 5–9 (fake values vanish in `α + 1` rounds) | `CMAI.fake_d_moved`, `CMAI.enabled_of_bad`, `CMAI.noFake_within` | `Rounds.lean` |
 | Lemma 10, Theorem 2 (`α + MAD + 2` rounds) | `CMAI.claim_within`, `CMAI.Run.target_within`, `CMAI.theorem2` | `Rounds.lean` |
-| Lemma 12 (synchronous executions agree on a source component) | `syncExec_agree` | `Podc/Stabilization/Daemon.lean` |
+| Lemma 12 (synchronous executions agree on a source component) | `syncExec_agree` | `Cslib/Computability/Distributed/SelfStabilization/Daemon.lean` |
 | Lemma 13, Corollary 2 (necessity for leader election) | `lemma13`, `corollary2` | `Necessity.lean` |
 | Corollary 4, Lemmas 14, 15 | `PEL.corollary4`, `PEL.lemma14`, `PEL.lemma15` | `PELCorrect.lean` |
 | Theorem 3 (PEL silent self-stabilizing; `3α + 3MAD + 6` rounds) | `PEL.theorem3`, `PEL.silent`, `PEL.theorem3_time` | `PELCorrect.lean`, `PEL.lean` |
@@ -126,5 +126,5 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * `idset_card_needed` shows that Corollary 2 needs `|IDSET| > |V|`. With exactly `|V|`
   identifiers, leader election is trivially solvable on two isolated nodes.
 * The model (daemons, rounds, silent self-stabilization, locality) is the shared library
-  `Podc/Stabilization/Daemon.lean`; ancestors and source components are `Podc/Digraph/Walk.lean`
+  `Cslib/Computability/Distributed/SelfStabilization/Daemon.lean`; ancestors and source components are `Cslib/Foundations/Combinatorics/Digraph/Walk.lean`
   (CSLib candidates). Only `MAD` and Definition 1 are paper-local (`Defs.lean`).

@@ -27,7 +27,7 @@ contains the leader.
 
 namespace Podc.ContentOblivious.Aggregation
 
-open Podc.ContentOblivious Simulation MsgExchange Finset
+open Cslib.ContentOblivious Simulation MsgExchange Finset
 
 variable {n : ℕ} [NeZero n] {OR : Proc (Bool × Bool) Bool}
   {CW CCW : Proc (Bool × Bool × Option Bool) (Option Bool)}

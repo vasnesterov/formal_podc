@@ -1,5 +1,5 @@
 import Mathlib
-import Podc.Foundations.Count
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Algorithm 4 of [AFW26]: connected consensus from gather (and approximate agreement)

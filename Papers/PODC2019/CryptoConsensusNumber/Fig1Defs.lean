@@ -1,7 +1,9 @@
 import Papers.PODC2019.CryptoConsensusNumber.Defs
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
-import Podc.SharedMemory.Potential
-import Podc.Algebra.BigOperators.Update
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Task
+import Cslib.Foundations.Data.Finset.SumUpdate
 
 /-!
 # Figure 1: asset transfer from an atomic snapshot (definitions)

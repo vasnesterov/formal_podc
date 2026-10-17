@@ -1,5 +1,5 @@
 import Papers.PODC2017.StatelessComputation.Model
-import Podc.Digraph.Walk
+import Cslib.Foundations.Combinatorics.Digraph.Walk
 
 /-!
 # Propositions 2.1 and 2.2: round complexity vs. radius and vs. the number of labelings

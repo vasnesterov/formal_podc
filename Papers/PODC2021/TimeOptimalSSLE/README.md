@@ -91,8 +91,8 @@ Corollary 3.5, Lemmas 4.1–4.2, the `O(n)` time and state count of Theorem 4.3,
 Non-vacuity: `Silent-n-state-SSR` and the protocol of Observation 2.5 satisfy the SSLE/SSR hypotheses of the
 lower bounds (`solvesSSLE`, `obs25_solvesSSLE`). Built on CSLib's `Cslib.Computability.Distributed.PopulationProtocols`
 and `Cslib.Probability.Markov.Absorption`, and on the shared library: the support model `NProtocol`
-(`Podc/PopulationProtocols/Nondet.lean`, with sub-population embedding `exists_reach_of_embedding`), the uniform
-scheduler `uniformKernel` (`Podc/PopulationProtocols/RandomScheduler.lean`), `StablyCorrect`/`SelfStabilizes`
-(`StablyIn`/`SelfStabilizes` of `Podc/Stabilization/Basic.lean`) and the reachability/probability-1 bridge
-(`Podc/Stabilization/Markov.lean`). CSLib candidates (marked in the code): the pair/triple run-lifting lemmas of
+(`Cslib/Computability/Distributed/PopulationProtocols/Nondet.lean`, with sub-population embedding `exists_reach_of_embedding`), the uniform
+scheduler `uniformKernel` (`Cslib/Computability/Distributed/PopulationProtocols/RandomScheduler.lean`), `StablyCorrect`/`SelfStabilizes`
+(`StablyIn`/`SelfStabilizes` of `Cslib/Computability/Distributed/SelfStabilization/TransitionSystem.lean`) and the reachability/probability-1 bridge
+(`Cslib/Computability/Distributed/SelfStabilization/Markov.lean`). CSLib candidates (marked in the code): the pair/triple run-lifting lemmas of
 `OptimalSilentCorrect.lean`.

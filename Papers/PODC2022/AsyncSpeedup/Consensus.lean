@@ -16,7 +16,7 @@ import Mathlib.Data.Fintype.Card
 
 namespace AsyncSpeedup
 
-open Podc.Iterated
+open Cslib.Iterated
 
 variable {P : Type} [DecidableEq P]
 

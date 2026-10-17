@@ -1,6 +1,6 @@
 import Papers.PODC2020.SSLERegular.EulerMain
 import Papers.PODC2020.SSLERegular.StateCount
-import Podc.Stabilization.Markov
+import Cslib.Computability.Distributed.SelfStabilization.Markov
 
 /-!
 # Chen–Chen, *Self-Stabilizing Leader Election in Regular Graphs* (PODC 2020): main results

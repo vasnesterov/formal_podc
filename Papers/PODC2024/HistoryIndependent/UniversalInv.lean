@@ -1,7 +1,7 @@
 import Papers.PODC2024.HistoryIndependent.Universal
 import Cslib.Computability.Distributed.SharedMemory.Linearization
-import Podc.SharedMemory.LinResp
-import Podc.SharedMemory.Run
+import Cslib.Computability.Distributed.SharedMemory.LinPoints
+import Cslib.Computability.Distributed.SharedMemory.Model
 import Mathlib
 
 /-!

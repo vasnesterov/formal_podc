@@ -1,4 +1,4 @@
-import Podc.ApproxConsensus.Async.Replay
+import Cslib.Computability.Distributed.ApproxConsensus.Async.Replay
 import Papers.PODC2020.AsyncApproxBCDirected.Graph
 
 /-!
@@ -17,7 +17,7 @@ in-neighbour of `Rv` outside `Rv` lies in `F ∪ Fv`.
   of `e₁` restricted to deliveries into `Rv` (messages from `F` are injected by the Byzantine
   nodes, messages from `Fv` are delayed), then the first `T₂` events of `e₂` restricted to `Ru`.
   Then `v` decided `0` and `u` decided `2ε`, violating convergence.
-  The replay is the library lemma `exists_replay₂` (`Podc/ApproxConsensus/Async/Replay.lean`).
+  The replay is the library lemma `exists_replay₂` (`Cslib/Computability/Distributed/ApproxConsensus/Async/Replay.lean`).
 
 The paper uses inputs `0` and `ε`; with the non-strict reading of "within `ε`" of Definition 1
 this gives no contradiction, so we use `2ε`. More generally (`threeReach_of_solvesOn`), any two

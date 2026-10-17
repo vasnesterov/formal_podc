@@ -68,8 +68,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
   Correctness: from some time on, every agent forever outputs the required value; for Theorem 1.1 we also prove
   output stability. Circles' termination holds for every execution, without fairness, as in the paper.
 - Shared infrastructure: counterexample executions are CSLib's `Execution.ofSched`; potential arguments use
-  `Nat.eventually_const_of_succ_le`/`_of_le_succ` (`Podc/Order/NatDescent.lean`); leader counts are `numLeaders`
-  (`Podc/PopulationProtocols/Nondet.lean`).
+  `Nat.eventually_const_of_succ_le`/`_of_le_succ` (`Cslib/Foundations/Data/Nat/Descent.lean`); leader counts are `numLeaders`
+  (`Cslib/Computability/Distributed/PopulationProtocols/Nondet.lean`).
 
 **Main results in Lean.**
 

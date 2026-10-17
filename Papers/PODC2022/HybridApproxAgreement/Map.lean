@@ -1,6 +1,6 @@
 import Papers.PODC2022.HybridApproxAgreement.OBC
-import Podc.PartialSync.Sim
-import Podc.PartialSync.Map
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Map
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Sim
 
 /-!
 # `Π_rBC` and `Π_oBC` only compare values for equality

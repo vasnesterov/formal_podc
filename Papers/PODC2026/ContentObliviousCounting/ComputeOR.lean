@@ -1,4 +1,5 @@
-import Podc.ContentOblivious.Mirror
+import Cslib.Computability.Distributed.ContentOblivious.Mirror
+import Mathlib
 
 /-!
 # Algorithm 9 (`ComputeOR`) and Theorem 21
@@ -7,7 +8,7 @@ Chalopin, Chang, Di Luna, Zhou, *Efficient Counting and Simulation in Content-Ob
 PODC 2026 (arXiv 2603.28260), §6.2: Algorithm 9 `ComputeOR(bool)`, Lemmas 18–20, Theorem 21.
 
 **Model.** Oriented ring `ZMod n` (`n ≥ 1`; `Port1 = true` is the clockwise port), asynchronous
-content-oblivious pulses, adversarial scheduler (`Podc.ContentOblivious.Step`), no failures,
+content-oblivious pulses, adversarial scheduler (`Cslib.ContentOblivious.Step`), no failures,
 deterministic nodes, exactly one leader. The input of a node is `(isLeader, bool)`.
 
 **Encoding of the pseudo-code.** A node has a program counter `pc` = number of blocking receives
@@ -30,7 +31,7 @@ unique: at most one pulse is in transit).
 
 namespace Podc.ContentOblivious.ComputeOR
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 /-- Local state of Algorithm 9. -/
 structure St where

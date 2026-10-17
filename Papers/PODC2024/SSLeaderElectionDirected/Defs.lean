@@ -1,6 +1,6 @@
 import Mathlib
-import Podc.Stabilization.Daemon
-import Podc.Digraph.Walk
+import Cslib.Computability.Distributed.SelfStabilization.Daemon
+import Cslib.Foundations.Combinatorics.Digraph.Walk
 
 /-!
 # Self-stabilization (Definition 1) and the maximum ancestor distance

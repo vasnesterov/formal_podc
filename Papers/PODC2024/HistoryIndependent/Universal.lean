@@ -1,4 +1,4 @@
-import Podc.SharedMemory.Objects.LLSC
+import Cslib.Computability.Distributed.SharedMemory.Objects.LLSC
 import Cslib.Computability.Distributed.SharedMemory.Model
 import Mathlib
 

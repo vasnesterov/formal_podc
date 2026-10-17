@@ -1,10 +1,12 @@
 import Papers.PODC2024.HistoryIndependent.Alg4Inv
-import Podc.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Task
 
 /-!
 # Algorithm 4 is wait-free
 
-* `Impl.waitFree_of_potential` (general, now in `Podc/SharedMemory/Potential.lean`): if a
+* `Impl.waitFree_of_potential` (general, now in `Cslib/Computability/Distributed/SharedMemory/Potential.lean`): if a
   potential on local states strictly decreases with every base-object access of a process, the
   implementation is wait-free (each operation finishes within `μ p l` own steps).
 * Every `Write` of Algorithm 4 takes at most `3K + 6` and every `Read` at most `6K + 6` low-level

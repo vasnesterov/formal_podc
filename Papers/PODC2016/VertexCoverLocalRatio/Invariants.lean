@@ -1,5 +1,5 @@
 import Papers.PODC2016.VertexCoverLocalRatio.Algorithm
-import Podc.Data.Nat.TimeRec
+import Cslib.Foundations.Data.Nat.TimeRec
 
 /-!
 # Invariants of Algorithm 1

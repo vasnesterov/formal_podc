@@ -1,5 +1,5 @@
 import Papers.PODC2019.TopologicalConsensus.Characterization
-import Podc.DynamicNetworks.FullInfo
+import Cslib.Computability.Distributed.DynamicNetworks.FullInfo
 
 /-!
 # Dynamic networks under general message adversaries (the PODC'19 setting, Sections 8.4/8.5)

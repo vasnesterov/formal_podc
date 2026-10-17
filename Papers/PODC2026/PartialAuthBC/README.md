@@ -113,10 +113,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
     `t = 0`; `theorem51_unreg_small` uses it with arbitrarily many Byzantine unregistered parties).
   - The lower bounds come with matching positive instances (`theorem314_solvable`, `bb_solvable_card_two`).
 - **Where the model comes from.** CSLib provides `Byzantine/LockStep` (`Basic`, `Auth`, `Cover`, `Agreement`).
-  The shared library `Podc/LockStep` provides the threshold structure `atMost` and the history/`FirstSome`
+  The shared library `Cslib/Computability/Distributed/Byzantine/LockStep` provides the threshold structure `atMost` and the history/`FirstSome`
   helpers (`Basic.lean`), the sequential composition `Protocol.seq` used for Π_BC and Π_SBA (`Sequential.lean`)
   and the committee simulation `Protocol.extend` / `Scenario.restrict` used for the black boxes among `N` and `S`
-  (`Restrict.lean`). `Gradecast` is the shared `Problem.BinaryGradecast` (`Podc/Agreement/Specs.lean`);
+  (`Restrict.lean`). `Gradecast` is the shared `Problem.BinaryGradecast` (`Cslib/Computability/Distributed/Byzantine/Specs.lean`);
   `gradecast_iff` gives Definition 2.3 verbatim.
 - **CSLib candidates:** `CoverSystem.scenario_authValid_pa`, the cover lemma for partial authentication
   (`Model.lean`).

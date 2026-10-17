@@ -1,6 +1,5 @@
 import Cslib.Computability.Distributed.SharedMemory.Linearization
 import Cslib.Computability.Distributed.SharedMemory.Progress
-import Podc.SharedMemory.History
 import Mathlib.Data.Finite.Card
 import Mathlib
 

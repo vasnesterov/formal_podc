@@ -157,7 +157,7 @@ competition is eventually solved. -/
 theorem alg2_progress (hm : 0 < m) (hid : Function.Injective ids) (hn : Fintype.card P = pp.n)
     (h1 : pp.W * pp.n ≤ pp.U * m) (h2 : pp.U * m ≤ pp.W * pp.n + pp.n)
     (e : ((alg2 Id m pp out).impl ids π).InfExec) (hall : AllInvoke e)
-    (hfair : e.IsFair) (t : ℕ) (ht : solved (e.cfg t) < pp.U * m) :
+    (hfair : e.Fair) (t : ℕ) (ht : solved (e.cfg t) < pp.U * m) :
     ∃ t', t ≤ t' ∧ solved (e.cfg t) < solved (e.cfg t') := by
   by_contra hne
   push Not at hne

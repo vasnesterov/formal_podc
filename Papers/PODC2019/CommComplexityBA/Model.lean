@@ -1,5 +1,5 @@
 import Mathlib
-import Podc.LockStep.Basic
+import Cslib.Computability.Distributed.Byzantine.LockStep.Parallel
 
 /-!
 # Synchronous randomized protocols against strongly adaptive omission adversaries

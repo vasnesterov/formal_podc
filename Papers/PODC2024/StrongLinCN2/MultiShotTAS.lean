@@ -1,7 +1,9 @@
-import Podc.SharedMemory.Objects.MaxRegister
-import Podc.SharedMemory.Objects.TestAndSet
-import Podc.SharedMemory.Potential
-import Podc.SharedMemory.StrongLin.Basic
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Objects.MaxRegister
+import Cslib.Computability.Distributed.SharedMemory.Objects.TestAndSet
+import Cslib.Computability.Distributed.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.StrongLin
+import Cslib.Computability.Distributed.SharedMemory.Task
 
 /-!
 # Readable multi-shot test&set from a max register and readable test&set (Theorem 6)

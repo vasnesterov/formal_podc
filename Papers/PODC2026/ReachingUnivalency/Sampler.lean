@@ -1,5 +1,6 @@
 import Papers.PODC2026.ReachingUnivalency.RPK
-import Podc.Probability.Finite.Uniform
+import Cslib.Probability.Finite.Uniform
+import Mathlib
 
 /-!
 # Reaching Univalency — §5: existence of good deterministic samplers
@@ -16,7 +17,7 @@ simultaneously for **every** set `S`, at most `γ n` processors whose sample dev
 
 All counting is over the finite space of sampling choices `f : Fin n → Fin k → R`; the two
 probabilistic facts come from the finite probability library
-(`Podc/Probability/Finite/Uniform.lean`).
+(`Cslib/Probability/Finite/Uniform.lean`).
 
 1. *Chebyshev* (`Cslib.Probability.card_freq_dev_ge_le`): for a fixed `S`, the number of single
    samples `g : Fin k → R` with `δ ≤ |dev g R S|` is at most `|R|^k / (k δ²)` (a second-moment

@@ -1,5 +1,5 @@
 import Papers.PODC2020.UnknownParticipantsBA.Layer
-import Podc.Agreement.PhaseKing
+import Cslib.Computability.Distributed.Byzantine.KingPhase
 
 /-!
 # Consensus in the id-only model (Section 5 of the BA, Algorithm 3 / Section VII of the full version)

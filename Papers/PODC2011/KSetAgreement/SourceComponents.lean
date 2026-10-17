@@ -1,5 +1,5 @@
 import Mathlib
-import Podc.Digraph.Walk
+import Cslib.Foundations.Combinatorics.Digraph.Walk
 
 /-!
 # Source components of finite digraphs (Lemmas 6 and 7 of [BRS11])
@@ -9,7 +9,7 @@ Systems*, PODC 2011 (arXiv 1103.3671v2), Section VI.
 
 A digraph is a relation `E : α → α → Prop` on a finite type (`E u v` = edge `u → v`). A *source
 component* is a strongly connected component with no incoming edges from outside
-(`IsSourceComponent`, the library notion `Digraph.IsSourceComponent` of `Podc.Digraph.Walk` for the
+(`IsSourceComponent`, the library notion `Digraph.IsSourceComponent` of `Cslib.Foundations.Combinatorics.Digraph.Walk` for the
 digraph `⟨E⟩`); equivalently (`isSourceComponent_iff`) a nonempty, strongly connected set of
 vertices closed under in-neighbours.
 
@@ -23,7 +23,7 @@ vertices closed under in-neighbours.
 -/
 
 -- CSLib candidate: `IsRoot`, `exists_isRoot` and the counting lemmas (the rest is the library
--- theory of `Podc.Digraph.Walk`, specialized to finsets of vertices).
+-- theory of `Cslib.Foundations.Combinatorics.Digraph.Walk`, specialized to finsets of vertices).
 
 namespace KSetAgreement.SourceComp
 

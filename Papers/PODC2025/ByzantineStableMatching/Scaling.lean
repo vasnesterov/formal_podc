@@ -1,5 +1,6 @@
 import Papers.PODC2025.ByzantineStableMatching.Problem
-import Podc.LockStep.Basic
+import Cslib.Computability.Distributed.Byzantine.LockStep.Parallel
+import Mathlib
 
 /-!
 # Lemma 3: scaling down by group simulation

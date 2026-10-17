@@ -6,8 +6,8 @@ import Mathlib.Data.Fintype.Basic
 # Generic liveness lemmas for infinite executions
 
 Small tools for proving progress properties of `Impl.InfExec` under fairness
-(`Impl.InfExec.IsFair`), on top of `Podc.SharedMemory.Progress` (`InfExec.first_act`,
-`InfExec.cfg_add_of_proc_ne`) and `Podc.Order.NatDescent`:
+(`Impl.InfExec.Fair`), on top of `Cslib.Computability.Distributed.SharedMemory.Progress` (`InfExec.first_act`,
+`InfExec.cfg_add_of_proc_ne`) and `Cslib.Foundations.Data.Nat.Descent`:
 
 * `InfExec.acts`: under fairness a process that is pending forever acts infinitely often;
 * `InfExec.descent`: a measure that never increases and strictly decreases at every action of a
@@ -32,7 +32,7 @@ variable {A : ObjSpec} {ι : Type} [DecidableEq ι] {B : ι → ObjSpec} {P L : 
 
 -- CSLib candidate
 /-- Under fairness, a process that is pending forever acts infinitely often. -/
-lemma InfExec.acts (e : I.InfExec) (hfair : e.IsFair) {q : P} {T : ℕ}
+lemma InfExec.acts (e : I.InfExec) (hfair : e.Fair) {q : P} {T : ℕ}
     (hp : ∀ t ≥ T, (e.cfg t).pend q ≠ none) (t : ℕ) (ht : T ≤ t) :
     ∃ t' ≥ t, (e.lbl t').proc = q := by
   obtain ⟨t', h1, h2, -⟩ := e.first_act hfair (hp t ht)
@@ -41,7 +41,7 @@ lemma InfExec.acts (e : I.InfExec) (hfair : e.IsFair) {q : P} {T : ℕ}
 -- CSLib candidate
 /-- A measure that never increases and strictly decreases at every action of a process that is
 pending forever gives a contradiction (under fairness). -/
-lemma InfExec.descent (e : I.InfExec) (hfair : e.IsFair) (q : P) (t₀ : ℕ) (μ : ℕ → ℕ)
+lemma InfExec.descent (e : I.InfExec) (hfair : e.Fair) (q : P) (t₀ : ℕ) (μ : ℕ → ℕ)
     (hp : ∀ t ≥ t₀, (e.cfg t).pend q ≠ none)
     (hle : ∀ t ≥ t₀, (e.lbl t).proc ≠ q → μ (t + 1) ≤ μ t)
     (hlt : ∀ t ≥ t₀, (e.lbl t).proc = q → μ (t + 1) < μ t) : False := by

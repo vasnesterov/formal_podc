@@ -1,5 +1,5 @@
 import Papers.PODC2020.NonEquivocation.Majority
-import Podc.Foundations.Count
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Algorithm 2 and Theorem 5.1: interactive consistency under weak non-equivocation, `n > 2t`

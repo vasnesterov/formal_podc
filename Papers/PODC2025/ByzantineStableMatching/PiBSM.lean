@@ -1,7 +1,8 @@
 import Papers.PODC2025.ByzantineStableMatching.Lemma1
 import Papers.PODC2025.ByzantineStableMatching.Hypotheses
-import Podc.LockStep.Basic
-import Podc.Foundations.Count
+import Cslib.Computability.Distributed.Byzantine.LockStep.Parallel
+import Cslib.Foundations.Data.Finset.Quorum
+import Mathlib
 
 /-!
 # The protocol `ΠbSM` (Section 5.2, Lemmas 9, 11, 12) — before channel simulation

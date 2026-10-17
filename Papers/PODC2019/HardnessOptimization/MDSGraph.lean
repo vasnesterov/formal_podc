@@ -1,5 +1,6 @@
-import Podc.CongestLB.Congest
-import Podc.Graph.Ball
+import Cslib.Computability.Distributed.Congest.LowerBound
+import Cslib.Foundations.Combinatorics.SimpleGraph.Ball
+import Mathlib
 
 /-!
 # The lower-bound graphs for minimum dominating set (Section 2.1)

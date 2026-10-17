@@ -40,7 +40,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Synchronous LOCAL model, deterministic, no failures. We use CSLib's locally-iterative (SET-LOCAL)
   model `Cslib.LocallyIterative.Algorithm`: in each round a node maps its state and the *set* of its
   neighbours' states to a new state. States carry identifiers, so a node can address an answer to one
-  neighbour (shared identifier API `Podc/Local/LocallyIterative.lean`: `pickId`,
+  neighbour (shared identifier API `Cslib/Computability/Distributed/Local/Identifiers.lean`: `pickId`,
   `exists_mem_nbrColors_id`); the state after `t` rounds is a `t`-local function of the initial states
   (`dist_isLocal`). Local input: identifier, weight `w(v) ≥ 0`, degree. Global knowledge: only `ε` and the
   processing order (no `n`, no `Δ`). Graphs are finite simple graphs; all weights and graphs are

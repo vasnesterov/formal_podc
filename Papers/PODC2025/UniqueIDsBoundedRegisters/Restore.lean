@@ -1,5 +1,5 @@
 import Papers.PODC2025.UniqueIDsBoundedRegisters.Defs
-import Podc.SharedMemory.Covering
+import Cslib.Computability.Distributed.SharedMemory.Covering
 
 /-!
 # Poised processes and restoring register values (Claim 1)

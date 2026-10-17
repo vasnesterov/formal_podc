@@ -1,6 +1,6 @@
 import Papers.PODC2025.BAWithPredictions.Classification
 import Papers.PODC2025.BAWithPredictions.Plurality
-import Podc.PartialSync.RoundRun
+import Cslib.Computability.Distributed.Byzantine.PartialSync.RoundAuth
 
 /-!
 # Synchronous round executions (for the upper bounds)

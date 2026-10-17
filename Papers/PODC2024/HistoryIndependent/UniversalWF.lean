@@ -1,5 +1,7 @@
 import Papers.PODC2024.HistoryIndependent.UniversalThm
-import Podc.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Task
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
 
 /-!

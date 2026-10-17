@@ -1,5 +1,5 @@
 import Papers.PODC2020.DetectableSpace.Lin
-import Podc.SharedMemory.LinResp
+import Cslib.Computability.Distributed.SharedMemory.LinPoints
 
 /-!
 # More tools for building durable detectable linearizations incrementally

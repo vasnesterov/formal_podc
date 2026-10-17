@@ -109,9 +109,9 @@ Non-vacuity:
 
 Built on the shared library: `GProtocol` is the nondeterministic population-protocol model
 `Cslib.PopulationProtocol.NProtocol` with interactions along `G.Adj`
-(`Podc/PopulationProtocols/Nondet.lean`); runs, global fairness, the existence of globally fair runs,
+(`Cslib/Computability/Distributed/PopulationProtocols/Nondet.lean`); runs, global fairness, the existence of globally fair runs,
 the fairness/reachability equivalence and the generic Lemma 2.1 (`exists_reach_of_err`) are in
-`Podc/Stabilization/Basic.lean`, the probability-1 bridge in `Podc/Stabilization/Markov.lean`.
+`Cslib/Computability/Distributed/SelfStabilization/TransitionSystem.lean`, the probability-1 bridge in `Cslib/Computability/Distributed/SelfStabilization/Markov.lean`.
 
 CSLib candidates:
 * Euler's theorem (`Euler.lean`);

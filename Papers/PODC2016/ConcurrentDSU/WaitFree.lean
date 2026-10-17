@@ -1,6 +1,8 @@
 import Papers.PODC2016.ConcurrentDSU.Inv
 import Papers.PODC2016.ConcurrentDSU.Lin
-import Podc.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Task
 
 /-!
 # Wait-freedom (Lemma 3.3)
@@ -21,7 +23,7 @@ progress of the running `Find`. Positions are measured at the *roots* of `u` and
 failing root test (`u` is not a root) then strictly decreases the position, which pays for the
 next iteration of the loop.
 
-* `Impl.waitFree_of_cfgPotential` (library, `Podc/SharedMemory/Potential.lean`): a
+* `Impl.waitFree_of_cfgPotential` (library, `Cslib/Computability/Distributed/SharedMemory/Potential.lean`): a
   configuration potential that never increases while `p` is pending and decreases with every
   step of `p` gives wait-freedom.
 * `waitFree` — Lemma 3.3 for all versions of `Find`.

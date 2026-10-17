@@ -1,6 +1,6 @@
 import Papers.PODC2018.LocallyIterativeColoring.Main
 import Cslib.Computability.Distributed.Local.Linial
-import Podc.Local.Locality
+import Cslib.Computability.Distributed.Local.OnlineLocalLocality
 import Mathlib
 
 /-!

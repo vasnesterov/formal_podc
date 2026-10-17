@@ -1,5 +1,5 @@
 import Mathlib
-import Podc.Byzantine.Certificate
+import Cslib.Computability.Distributed.Byzantine.Certificate
 
 /-!
 # VABA (Abraham, Malkhi, Spiegelman, PODC 2019): the protocol as a transition system

@@ -90,4 +90,4 @@ non-vacuity, `Main.lean` instantiates Theorem 1.1 on `K₃` under the synchronou
 round-robin schedules are proved fair. The stone-age model and the unison specification come from CSLib,
 `Cslib/Computability/Distributed/SelfStabilization/`. `SyncStabilizes` is pseudo-stabilization
 within `f` rounds of the synchronous executions (`syncStabilizes_iff`, shared notions of
-`Podc/Stabilization/`).
+`Cslib/Computability/Distributed/SelfStabilization/`).

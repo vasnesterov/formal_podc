@@ -1,6 +1,5 @@
 import Papers.PODC2016.ComplexityHierarchy.BufferLB
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
-import Podc.SharedMemory.History
 
 /-!
 # A history object from a single ℓ-buffer (Lemma 6.1 of Ellen–Gelashvili–Shavit–Zhu, PODC 2016)

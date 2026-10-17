@@ -50,10 +50,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
   full-information protocols (Algorithms 1 and 2): in round `r` every participant writes its view to a
   fresh memory, optionally calls a fresh black-box object, and reads. One round is a *pattern* (who sees
   whom, box answers) admissible in the model for the participating set and box inputs
-  (`Podc/IteratedModel/Basic.lean`). Models: IIS (`iis`, the chromatic-subdivision condition of
+  (`Cslib/Computability/Distributed/IteratedModel/Basic.lean`). Models: IIS (`iis`, the chromatic-subdivision condition of
   Section 2.2), iterated snapshot (`isnap`), IIS + test&set (`iisTS`: the winner is a process of the
   first concurrency class), IIS + binary consensus (`iisBC`: the proposal of such a process wins),
-  all in `Podc/IteratedModel/Patterns.lean`.
+  all in `Cslib/Computability/Distributed/IteratedModel/Patterns.lean`.
 * Crash failures: a task is solved if, for every input simplex `σ` and every execution in which exactly
   `id(σ)` participates, the decisions form an element of `Δ(σ)`. Crashes mid-execution are faces of
   such executions (`Model.Extendable`). Deterministic processes, adversarial scheduler, no randomness.
@@ -93,5 +93,5 @@ on Theorem 4.
 `Quot.sound`. Non-vacuity: all four models satisfy the hypotheses of the speedup theorem, and concrete
 algorithms solve tasks in them (`aa_solvable_two`, `aa_solvable_many`, `twoConsensus_iisTS`). So the
 lower bounds are tight and the solvability notions are not empty. The framework
-(`Podc/IteratedModel/`, CSLib candidate) is new and independent of CSLib's `Impl`-based shared-memory
+(`Cslib/Computability/Distributed/IteratedModel/`, now in CSLib) is new and independent of CSLib's `Impl`-based shared-memory
 model.

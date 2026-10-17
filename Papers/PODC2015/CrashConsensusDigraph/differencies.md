@@ -117,7 +117,7 @@ Classification used below: **false statement**, **false only in a degenerate cas
 ## Section 4 (asynchronous approximate consensus)
 
 19. **Modelling choice — asynchronous model.** We reuse the asynchronous message-passing model on
-    digraphs of the PODC 2020 formalization (`Podc/ApproxConsensus/Async/Model.lean`):
+    digraphs of the PODC 2020 formalization (`Cslib/Computability/Distributed/ApproxConsensus/Async/Model.lean`):
     deterministic event-driven algorithms, reliable FIFO links with adversarial finite delays, fairness
     on links between correct nodes. For Theorem 6 (`CrashSolvesOn`) faulty nodes are *initially dead*
     (a special case of crashes, so the impossibility is stronger), and validity is "between two

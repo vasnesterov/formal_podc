@@ -35,7 +35,7 @@ has a repairable gap. IDs must be positive.
   schedule by rounds of receptions. In round `k`, every node consumes the pulse at the port given
   by the `k`-th symbol of the common prefix. It is available because the sender sent it after the
   same `k−1` receptions in its own solitude run. Count received pulses (`n·s`), which bound sent
-  pulses from below. (`Podc.ContentOblivious.reach_sync`, `lemma_19`, `theorem_17`)
+  pulses from below. (`Cslib.ContentOblivious.reach_sync`, `lemma_19`, `theorem_17`)
 * **IDs must be positive (under-specified definition).** The paper writes `ID_v ∈ ℕ` without saying whether `0`
   is allowed. A node with ID `0` relays every pulse, so on the 1-node ring Algorithm 2 runs forever. The proofs (Lemma 5's base
   case, the pigeonhole in Lemma 22) silently use `ID ≥ 1`. (`infinite_execution_id_zero`)
@@ -49,7 +49,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 ## The formalization
 
-**Model** (`Podc/ContentOblivious/Model.lean`).
+**Model** (`Cslib/Computability/Distributed/ContentOblivious/Model.lean`).
 * Two-port nodes on a ring `ZMod n` (any `n ≥ 1`). The oriented ring links `Port1` of `v` to
   `Port0` of `v+1`. A non-oriented ring additionally flips the ports of an arbitrary set of nodes.
 * Pulses carry no content, so each channel is a counter. Pulses are never lost or created.
@@ -86,7 +86,7 @@ The lower bound is proved for a larger class than the paper's. It covers every d
 algorithm in the model, including ones that poll only some ports. It assumes only that maximal
 executions on 1- and 2-node rings end with all nodes terminated and exactly one leader. The
 lockstep/indistinguishability lemma (`reach_sync`) and the solitude characterization (`reach_one`)
-are in `Podc/ContentOblivious/Lockstep.lean`.
+are in `Cslib/Computability/Distributed/ContentOblivious/Lockstep.lean`.
 
 **Not formalized.** Corollary 2 (simulation via the external compiler of Censor-Hillel et al.) and
 Appendix B (anonymous rings, randomized ID sampling).

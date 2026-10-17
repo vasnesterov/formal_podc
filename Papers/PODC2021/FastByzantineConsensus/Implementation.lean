@@ -1,6 +1,6 @@
 import Papers.PODC2021.FastByzantineConsensus.ProtocolSafety
 import Papers.PODC2021.FastByzantineConsensus.TwoStep
-import Podc.PartialSync.Gossip
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Gossip
 
 /-!
 # A concrete implementation of the protocol in the partially synchronous model
@@ -25,7 +25,7 @@ We implement the generalized protocol of Kuznetsov–Tonkikh–Zhang (Section 3 
   (`actCommit`). A process decides `x` as soon as its `known` contains a fast (`n − t` acks) or
   slow (`⌈(n+f+1)/2⌉` commits) quorum for `x`.
 
-Main results: `algo_gossips` (with `Podc.PartialSync.Gossip`), `algo_unforging`, `algo_agreement` (via the refinement `reachable_absState` into the
+Main results: `algo_gossips` (with `Cslib.Computability.Distributed.Byzantine.PartialSync.Gossip`), `algo_unforging`, `algo_agreement` (via the refinement `reachable_absState` into the
 transition system of `Protocol.lean` and `Protocol.consistency`), `algo_validity` (weak validity),
 `algo_twoStep` (for `δ ≥ 2`), `algo_termination`, hence `algo_fastConsensus`: the protocol is an
 `f`-resilient `t`-two-step consensus protocol for `n ≥ 3f + 2t − 1`; with `LowerBound.lean` this

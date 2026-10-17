@@ -1,5 +1,5 @@
 import Papers.PODC2020.FaultTolerantSpanners.LBC
-import Podc.Graph.Spanner.FaultTolerantGreedy
+import Cslib.Foundations.Combinatorics.SimpleGraph.FaultTolerantGreedy
 
 /-!
 # Algorithm 3: the modified greedy algorithm (Section 3.2 of Dinitz–Robelle, PODC'20)
@@ -11,7 +11,7 @@ the edge `(u, v)` to the current graph `H` iff a decision procedure `dec H u v` 
 generic greedy scheme is `SimpleGraph.greedyGraph dec L` (the list of added edges, in insertion
 order, is `greedyEdges dec L`); it and its correctness for any decision procedure that answers NO
 only when no small fault set separates `u, v` (`greedyGraph_isVFTSpanner`,
-`greedyGraph_isEFTSpanner`) are in `Podc/Graph/Spanner/FaultTolerantGreedy.lean`, shared with
+`greedyGraph_isEFTSpanner`) are in `Cslib/Foundations/Combinatorics/SimpleGraph/FaultTolerantGreedy.lean`, shared with
 Bodwin–Patel (PODC'19).
 
 * `modifiedGreedy O k f L` — **Algorithm 3**: `dec H u v := lbc O H u v (2k - 1) f` (Algorithm 2

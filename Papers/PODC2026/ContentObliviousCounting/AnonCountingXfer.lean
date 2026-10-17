@@ -9,7 +9,7 @@ configuration, or the first probe of phase `j + 1`).
 
 namespace Podc.ContentOblivious.AnonCounting
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 set_option linter.unusedSectionVars false
 set_option linter.deprecated false

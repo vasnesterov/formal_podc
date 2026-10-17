@@ -10,7 +10,7 @@ case · **[gap]** proof gap, statement true · **[under-spec]** under-specified 
 ## Model
 
 - **[model]** Content-oblivious oriented ring on `ZMod n` for every `n ≥ 1` (`n = 1`: self-loop,
-  `n = 2`: double link), from `Podc/ContentOblivious/Model.lean`. Channels are pulse counters
+  `n = 2`: double link), from `Cslib/Computability/Distributed/ContentOblivious/Model.lean`. Channels are pulse counters
   (pulses are indistinguishable, so this is the paper's "FIFO w.l.o.g."). The adversary delivers
   any pulse in transit to a node that is willing to read that port; a blocking `receive` on a
   specific port = the node reads only that port, `receive on port q` (any) = both ports. Nodes are
@@ -19,11 +19,11 @@ case · **[gap]** proof gap, statement true · **[under-spec]** under-specified 
   every execution (so every execution is finite, `exists_final`) and properties of every *final*
   configuration (no step possible): every node has returned and no pulse is in transit.
 - **[model]** Theorem 9 / Definition 8 (composable ending property) are replaced by a semantic
-  condition `Proc.Composable` (`Podc/ContentOblivious/Compose.lean`): bounded + quiescent
+  condition `Proc.Composable` (`Cslib/Computability/Distributed/ContentOblivious/Compose.lean`): bounded + quiescent
   termination + `clean` (a node that has not returned and is ready to read from a neighbour that
   has returned has a pulse of the current procedure in transit). Definition 8 implies `clean`.
   We prove a generalization of Theorem 9 for arbitrary sequences of stages chosen by the nodes'
-  local states (`Podc.ContentOblivious.Schedule.final`, `.totalSent_le`, `.composable`), which is
+  local states (`Cslib.ContentOblivious.Schedule.final`, `.totalSent_le`, `.composable`), which is
   what Algorithms 5, 6 and 10 and the simulation of Theorem 14 need (loops of procedures).
 
 ## Section 4–6 (composition, ComputeOR, bit sending, message exchange, simulation)
@@ -141,7 +141,7 @@ case · **[gap]** proof gap, statement true · **[under-spec]** under-specified 
   Constants: `n·⌊log₂ n⌋ ≤ 14·M + 4·n` (and `n·⌊log₂ n⌋ ≤ 28·M` for `n ≥ 2^10`).
 - **[gap, minor] Lemma 28's proof.** "Replay `O` verbatim" cannot be literal: `O` contains events of
   `I₂ \ I₁` (absent from `R'`), and `I₁`'s own events must be rescheduled relative to the outside.
-  Replaced by a rigorous crossing-sequence merge (`Podc.ContentOblivious.splice`).
+  Replaced by a rigorous crossing-sequence merge (`Cslib.ContentOblivious.splice`).
 - **[under-spec] Lemma 28, "same local history".** We prove equal final local states and pulse
   counters for all nodes of `R'` (also those of `I₁`). The hypothesis "leader ∉ I₂" is not needed
   for the lemma, only in Theorem 3.

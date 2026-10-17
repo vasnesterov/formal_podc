@@ -121,7 +121,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Lemma 1 (direct commits) | `lemma1_direct` | `Safety.lean` |
 | Lemma 1 as stated: false | `Lemma1Counterexample.lemma1_false` | `Lemma1Counterexample.lean` |
 | Lemma 2 | `lemma2`; robust core: `core_card`, `sPath_of_mem_core`, `core_congr`, `commit_of_mem_core` | `CommonCore.lean` |
-| Claim 6 | `Coin.dagRider_expected_waves`, `Cslib.Probability.CoinGame.prob_missesWindow_le`; link: `goodWave_of_core` | `Coin.lean`, `Podc/Probability/CoinGame.lean`, `Liveness.lean` |
+| Claim 6 | `Coin.dagRider_expected_waves`, `Cslib.Probability.CoinGame.prob_missesWindow_le`; link: `goodWave_of_core` | `Coin.lean`, `Cslib/Probability/CoinGame.lean`, `Liveness.lean` |
 | Claims 1, 2, 7 | `st_dag_closed`, `claim2`, `claim7`, `round_liveness` | `DagLayerProofs.lean` |
 | Claims 4, 5 | built into `orun_inv` (one leader per wave; increasing waves) | `Safety.lean` |
 | Chain quality (round-major) | `chain_quality` | `ChainQuality.lean` |
@@ -139,7 +139,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 - The counterexamples are checked by `decide +kernel`.
 - Non-vacuity: a lock-step run with `n = 4`, `f = 1` satisfies all hypotheses of `Run.Valid`, and
   all of its waves are good, so the Agreement and Validity hypotheses are satisfiable.
-- The coin game (`Podc/Probability/CoinGame.lean`, shared with VABA) and quorum intersection
-  (`Podc/Foundations/Quorum.lean`) are shared infrastructure.
+- The coin game (`Cslib/Probability/CoinGame.lean`, shared with VABA) and quorum intersection
+  (`Cslib/Foundations/Data/Finset/Quorum.lean`) are shared infrastructure.
 - No CSLib model was reused. The Byzantine models in CSLib are
   round/time-based state machines, whereas DAG-Rider needs an abstract RBC.

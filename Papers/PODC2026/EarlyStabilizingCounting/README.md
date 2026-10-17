@@ -137,10 +137,10 @@ initial state (`run`, `literal_exists_exec`), so the counting statements are not
 model comes from CSLib (`Cslib.Byzantine.SyncCounting`). Everything else is proved here: the
 subroutines (Algorithms 8–10) are verified, not assumed.
 
-**Shared infrastructure.** `cnt` is `Finset.countEq` (`Podc/Foundations/Count.lean`), quorum
-intersection is `Cslib.Quorum.exists_mem_inter_notMem_of_three_mul_lt` (`Podc/Foundations/Quorum.lean`).
+**Shared infrastructure.** `cnt` is `Finset.countEq` (`Cslib/Foundations/Data/Finset/Quorum.lean`), quorum
+intersection is `Cslib.Quorum.exists_mem_inter_notMem_of_three_mul_lt` (`Cslib/Foundations/Data/Finset/Quorum.lean`).
 The computable selectors of Algorithm 8 are the library ones: `majT_eq_majority?` (`Finset.majority?`),
 `quorum_eq_threshold?` (`Finset.threshold?` with threshold `n - t`).
 The conclusion of `ga_spec` is binary graded consensus (`ga_gradedConsensus`:
-`Cslib.Byzantine.Problem.GradedConsensus`, `Podc/Agreement/Specs.lean`), and the king steps of `kc_spec` and
-`KC8Run.spec` are `Cslib.Byzantine.kingPhase_agreement` (`Podc/Agreement/PhaseKing.lean`).
+`Cslib.Byzantine.Problem.GradedConsensus`, `Cslib/Computability/Distributed/Byzantine/Specs.lean`), and the king steps of `kc_spec` and
+`KC8Run.spec` are `Cslib.Byzantine.kingPhase_agreement` (`Cslib/Computability/Distributed/Byzantine/KingPhase.lean`).

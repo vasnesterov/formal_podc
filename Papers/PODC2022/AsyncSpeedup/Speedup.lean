@@ -1,4 +1,4 @@
-import Podc.IteratedModel.Patterns
+import Cslib.Computability.Distributed.IteratedModel.Patterns
 
 /-!
 # Closure of a task and the asynchronous speedup theorem (Sections 3 and 4)
@@ -22,7 +22,7 @@ set_option linter.unusedSectionVars false
 
 namespace AsyncSpeedup
 
-open Podc.Iterated
+open Cslib.Iterated
 
 variable {P X Y Z A B : Type} [DecidableEq P]
 

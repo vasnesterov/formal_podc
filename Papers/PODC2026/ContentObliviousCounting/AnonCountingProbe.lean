@@ -8,7 +8,7 @@ Every enabled delivery in a probing stage (`out`, `back`) leads to another stage
 
 namespace Podc.ContentOblivious.AnonCounting
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 set_option linter.unusedSectionVars false
 set_option linter.deprecated false

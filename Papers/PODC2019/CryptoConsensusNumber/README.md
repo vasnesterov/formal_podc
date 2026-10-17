@@ -106,13 +106,13 @@ in message passing; informal).
 (`atSolvable_self`). `Fig1.Example` instantiates Theorem 1 for a concrete owner map, and
 `Fig1.allowed_iff` shows the access discipline allows all reads and own transfers. The valency
 machinery comes from CSLib (`Cslib/Computability/Distributed/SharedMemory/Recoverable.lean`). From the
-shared library: `ObjSpec.RWLike` (`Podc/SharedMemory/ObjClasses.lean`), `wfConsensus_of_inv` and
-`inv_run_crashFree` (`Podc/SharedMemory/Recoverable.lean`), the retroactive-insertion toolkit
-`IsLinearization.insert`, `ObjSpec.respIn` (`Podc/SharedMemory/LinResp.lean`) and
-`InfExec.exists_good_of_measure`, `InfExec.run_lbls` (`Podc/SharedMemory/Progress.lean`), the
+shared library: `ObjSpec.RWLike` (`Cslib/Computability/Distributed/SharedMemory/ObjClasses.lean`), `wfConsensus_of_inv` and
+`inv_run_crashFree` (`Cslib/Computability/Distributed/SharedMemory/Recoverable.lean`), the retroactive-insertion toolkit
+`IsLinearization.insert`, `ObjSpec.respIn` (`Cslib/Computability/Distributed/SharedMemory/LinPoints.lean`) and
+`InfExec.exists_good`, `InfExec.run_pre` (`Cslib/Computability/Distributed/SharedMemory/Progress.lean`), the
 current operation instance `curOp` and `opOf_append_of_eq_some`, `linState_concat`
-(`Podc/SharedMemory/History.lean`), and `Fintype.sum_comp_update_add`
-(`Podc/Algebra/BigOperators/Update.lean`).
+(`Cslib/Computability/Distributed/SharedMemory/History.lean`), and `Fintype.sum_comp_update_add`
+(`Cslib/Foundations/Data/Finset/SumUpdate.lean`).
 `Fig3Example.lean` instantiates Lemma 2 (2 processes, one shared account, `k = 2`). CSLib candidates:
 `snapObj`, `kConsObj`, `crit_overwrite`, `crit_commute`, `stepP_stepP_same`, and the generic
 linearization lemmas in the `Aux` section of `Fig1.lean`.

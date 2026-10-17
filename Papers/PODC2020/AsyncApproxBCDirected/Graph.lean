@@ -1,4 +1,4 @@
-import Podc.ApproxConsensus.DigraphConditions
+import Cslib.Computability.Distributed.ApproxConsensus.DigraphConditions
 
 /-!
 # Reach sets, the reach conditions and source components of reduced graphs
@@ -9,7 +9,7 @@ Directed Networks* (PODC 2020), Sections 2–3.
 * Reach sets (Definition 2: `reach_v(X) = {u | Reaches G X u v}`, `Reaches` =
   `Digraph.ReachableAvoiding`), the 1-, 2-, 3-reach conditions (Definition 3) `OneReach`,
   `TwoReach`, `ThreeReach` and their common form `ReachCondIn` are defined in
-  `Podc/ApproxConsensus/DigraphConditions.lean`.
+  `Cslib/Computability/Distributed/ApproxConsensus/DigraphConditions.lean`.
 * `srcComp G F₁ F₂` — the source component `S_{F₁,F₂}` of the reduced graph (Definitions 5, 6).
 * Simple and redundant paths (Section 3) as lists of nodes.
 -/

@@ -13,7 +13,7 @@ every final configuration is quiescent with correct outputs (nodes do not termin
 
 namespace Podc.ContentOblivious.Alg3
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 variable {n : ℕ} [NeZero n] {flip : ZMod n → Bool} {id : ZMod n → ℕ} {ℓ : ZMod n}
 

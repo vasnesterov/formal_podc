@@ -85,7 +85,7 @@ CSLib modules `Cslib.Computability.Distributed.SharedMemory.{Model,Progress,Cove
 The correctness proof of the algorithm uses a ghost state (`AlgInv.lean`): global `R₀`/`Rᵢ` FAI
 counters and, for each successful `R₀` ticket, the invocation that took it. It needs no
 finiteness assumption on the set of processes.
-Shared library (`Podc/SharedMemory/`): `WaitFreeUpTo` is `Impl.WaitFreeOn` (`Progress`); the
+Shared library (`Cslib/Computability/Distributed/SharedMemory/`): `WaitFreeUpTo` is `Impl.WaitFreeOn` (`Progress`); the
 wait-freedom proofs use `Impl.waitFreeOn_of_runPotential` (a potential depending on the ghost state
 of the execution) and `Impl.waitFree_of_potential` (`Potential`); poised processes and their joint
 step are `Impl.PoisedAt` and `Impl.runFrom_poised_block` (`Covering`); `respOf_append_of_not_ret`

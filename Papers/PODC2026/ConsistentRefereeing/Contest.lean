@@ -1,5 +1,5 @@
 import Papers.PODC2026.ConsistentRefereeing.CaseStack
-import Podc.SharedMemory.Covering
+import Cslib.Computability.Distributed.SharedMemory.Covering
 
 /-!
 # Theorem 5 of [ACE26]

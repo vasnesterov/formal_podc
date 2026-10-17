@@ -94,5 +94,5 @@ case `m = 1 + ⌈1/ε⌉` of `ag_final`.
 `Quot.sound`. Both counterexamples are concrete executions checked in Lean. The round model, the
 standard colour reduction and Linial's algorithm (`linial_lt`: `< max(16Δ², 256)` colours after
 `log* n + 3` rounds) are in CSLib `Cslib/Computability/Distributed/Local/`; locality of runs and the
-"final colours stay final" lemma come from `Podc/Local/Locality.lean` and `Podc/Data/Nat/TimeRec.lean`
+"final colours stay final" lemma come from `Cslib/Computability/Distributed/Local/OnlineLocalLocality.lean` and `Cslib/Foundations/Data/Nat/TimeRec.lean`
 (`Nat.eq_of_le_of_stable`).

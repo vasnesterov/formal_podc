@@ -1,5 +1,5 @@
 import Mathlib
-import Podc.Foundations.Count
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # The id-only model (Khanchandani–Wattenhofer, PODC 2020, Section 3)

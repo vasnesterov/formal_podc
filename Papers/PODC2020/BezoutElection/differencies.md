@@ -17,7 +17,7 @@ hal-03148627, the proceedings text; there is no arXiv version).
    permutation `τ` cycling every group, and the lock-step execution preserves the invariant "local
    state of member `i` of group `q` = `τⁱ •` base state of `q`; `mem(rot y) = τ • mem(y)`". This is
    formalized in `LockStepExec.lean` (`exists_symmetric_outcome`, on top of the shared
-   `Podc/SharedMemory/Anonymous/LockStep.lean`). Choosing
+   `Cslib/Computability/Distributed/SharedMemory/Anonymous/LockStep.lean`). Choosing
    the permutation lazily is legitimate without snapshots, and the paper explains it; we fix
    the permutations in advance instead, which also covers snapshots.
    *Classification: imprecision, statement true.*

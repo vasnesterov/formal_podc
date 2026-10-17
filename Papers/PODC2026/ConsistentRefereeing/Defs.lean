@@ -1,5 +1,7 @@
-import Podc.SharedMemory.StrongLin.Restricted
-import Podc.SharedMemory.Objects.Iface
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Objects.Iface
+import Cslib.Computability.Distributed.SharedMemory.StrongLin
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # Contest objects (Attiya, Castañeda, Enea, PODC 2026)

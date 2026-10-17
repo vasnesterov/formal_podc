@@ -1,5 +1,5 @@
 import Papers.PODC2021.AllYouNeedIsDAG.Ordering
-import Podc.Foundations.Quorum
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # DAG-Rider: safety (Lemma 1, Claims 4–5, Propositions 1–2)

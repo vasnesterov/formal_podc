@@ -1,5 +1,5 @@
 import Papers.PODC2026.EarlyStabilizingCounting.Basic
-import Podc.Agreement.PhaseKing
+import Cslib.Computability.Distributed.Byzantine.KingPhase
 
 /-!
 # Communication-efficient King Consensus (Section 6.1: Lemmas 6.2, 6.4, Theorem 6.5)

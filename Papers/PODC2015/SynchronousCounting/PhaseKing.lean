@@ -1,6 +1,6 @@
 import Mathlib
-import Podc.Foundations.Count
-import Podc.Agreement.PhaseKing
+import Cslib.Computability.Distributed.Byzantine.KingPhase
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # The phase-king layer (§3.4, Table 2, Lemmas 4 and 5)

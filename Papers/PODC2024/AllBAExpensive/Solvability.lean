@@ -1,6 +1,6 @@
 import Papers.PODC2024.AllBAExpensive.Containment
-import Podc.PartialSync.Containment
-import Podc.PartialSync.Computable
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Computable
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Containment
 import Cslib.Computability.Distributed.Byzantine.PartialSync.BinaryConsensus
 
 /-!
@@ -20,7 +20,7 @@ Synchrony = runs with `gst = 0` of the partially synchronous model (`Cslib.Byzan
   `Algorithm.mapDecide`, so it sends exactly the messages of the IC algorithm,
   `Run.msgsUpTo_mapDecide`): `solvesConsensusAuthSync_reduction`,
   `solvableAuthSync_of_containmentCondition`, `solvableSync_of_containmentCondition` (shared
-  library `Podc.PartialSync.Containment`). With IC solvability as a hypothesis, Lemmas 8 and 9 give the
+  library `Cslib.Computability.Distributed.Byzantine.PartialSync.Containment`). With IC solvability as a hypothesis, Lemmas 8 and 9 give the
   CC characterisations `solvableAuthSync_iff_containmentCondition`,
   `solvableSync_iff_containmentCondition` (Theorem 4 modulo Lemma 10).
 * **Theorem 5**: `strongValidity_not_containmentCondition`, `strongValidity_not_solvableAuthSync`
@@ -441,7 +441,7 @@ computable algorithm (`Algorithm.IsComputable`), `Γ c` can be computed by simul
 canonical synchronous execution of `c` and searching for the first decision of a process of
 `π(c)`, which exists by Termination
 (`Algorithm.IsComputable.exists_computable_canonDecision`, shared library
-`Podc.PartialSync.Computable`). -/
+`Cslib.Computability.Distributed.Byzantine.PartialSync.Computable`). -/
 
 namespace AllBAExpensive
 

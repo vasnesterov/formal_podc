@@ -1,6 +1,6 @@
 import Mathlib
-import Podc.DynamicNetworks.FullInfo
-import Podc.Knowledge.Basic
+import Cslib.Computability.Distributed.DynamicNetworks.FullInfo
+import Cslib.Computability.Distributed.Knowledge.Basic
 
 /-!
 # The dynamic-network model of Kuhn–Moses–Oshman (PODC 2011)
@@ -382,13 +382,13 @@ theorem Sim.mono {S S' : DGraph α → Prop} (hS : ∀ G, S G → S' G) {t : ℕ
     | refl => exact ReflTransGen.refl
     | tail _ hs ih => exact ih.tail ⟨hS _ hs.1, hS _ hs.2.1, hs.2.2⟩
 
-/-! ### Knowledge and common knowledge as instances of `Podc.Knowledge.IndistSystem` -/
+/-! ### Knowledge and common knowledge as instances of `Cslib.Knowledge.IndistSystem` -/
 
 /-- The executions of a system `S` of valid dynamic graphs at time `t`, as an indistinguishability
 system: node `u` cannot distinguish `G` from `H` iff it has the same view in both, or it is a node
 of neither (a node outside `V` has the trivial view). -/
 def indistSystem (S : DGraph α → Prop) (hS : ∀ G, S G → G.Valid) (t : ℕ) :
-    Podc.Knowledge.IndistSystem ℕ {G // S G} where
+    Cslib.Knowledge.IndistSystem ℕ {G // S G} where
   indist u G H := (u ∉ G.1.V ∧ u ∉ H.1.V) ∨ DGraph.Indist G.1 H.1 u t
   equiv u :=
     ⟨fun G => by
@@ -429,10 +429,10 @@ theorem simStep_iff_reach {G H : {G // S G}} :
     · exact ⟨G.2, H.2, u, hi⟩
 
 /-- **Common knowledge** (Section 2.1): the paper's `CK` is common knowledge among the nodes
-present, in the sense of `Podc.Knowledge.IndistSystem.C`. -/
+present, in the sense of `Cslib.Knowledge.IndistSystem.C`. -/
 theorem CK_iff_C {G : DGraph α} (hG : S G) {φ : DGraph α → Prop} :
     CK S G t φ ↔ (indistSystem S hS t).C (nodes S) (fun H => φ H.1) ⟨G, hG⟩ := by
-  rw [Podc.Knowledge.IndistSystem.C_iff_forall_reach]
+  rw [Cslib.Knowledge.IndistSystem.C_iff_forall_reach]
   constructor
   · intro h H hr
     refine h H.1 ?_

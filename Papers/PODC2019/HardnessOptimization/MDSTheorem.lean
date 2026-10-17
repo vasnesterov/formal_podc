@@ -10,7 +10,7 @@ The graphs `G_{x,y}` form a family of lower bound graphs (Definition 1.1) for `D
 
 namespace HardnessOptimization
 
-open Finset Podc.CongestLB
+open Finset Cslib.Congest Cslib.CommunicationComplexity
 
 variable {L : ℕ}
 

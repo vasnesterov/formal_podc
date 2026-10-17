@@ -1,10 +1,10 @@
-import Podc.Foundations.Count
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Vote counting and plurality
 
 The counting function and the plurality vote of this formalization are the shared library ones
-(`Podc.Foundations.Count`), under the names used in the paper's algorithms:
+(`Cslib.Foundations.Data.Finset.Quorum`), under the names used in the paper's algorithms:
 
 * `cnt X f w = X.countEq f w`: the number of elements of `X` on which `f` takes the value `w`;
 * `plur X f d = X.plurality f d`: a value of `f` that occurs most often on `X` (`d` if `X` is

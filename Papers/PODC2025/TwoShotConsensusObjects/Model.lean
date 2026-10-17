@@ -1,5 +1,6 @@
 import Papers.PODC2025.TwoShotConsensusObjects.Defs
-import Podc.SharedMemory.Recoverable
+import Cslib.Computability.Distributed.SharedMemory.ObjClasses
+import Cslib.Computability.Distributed.SharedMemory.Recoverable
 
 /-!
 # Two-shot objects solving two-process consensus — the system model
@@ -23,7 +24,7 @@ consensus in the crash-stop model):
 
 `Solvable O m` — the paper's "objects of type `(O, m)` solve two-shot two-process consensus".
 The object families `withRW`, access counts `accCount` and the generic correctness tools
-(`prog_of_rank`, `wfConsensus_of_inv`, …) are in `Podc.SharedMemory.Recoverable`.
+(`prog_of_rank`, `wfConsensus_of_inv`, …) are in `Cslib.Computability.Distributed.SharedMemory.Recoverable`.
 -/
 
 namespace TwoShotCons

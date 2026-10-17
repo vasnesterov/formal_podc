@@ -2,7 +2,7 @@ import Papers.PODC2021.ThinUnison.Justified
 import Cslib.Computability.Distributed.SelfStabilization.Unison
 import Cslib.Foundations.Combinatorics.SimpleGraph.Spanner
 import Mathlib
-import Podc.Order.NatDescent
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # AlgAU: from a justified to a good graph (Section 2.3.5, Lemmas 2.19–2.22)

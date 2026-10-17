@@ -1,5 +1,5 @@
 import Papers.PODC2019.FloodingTermination.Termination
-import Podc.Graph.Ball
+import Cslib.Foundations.Combinatorics.SimpleGraph.Ball
 
 /-!
 # Time to termination (Section 3 of Hussak–Trehan)

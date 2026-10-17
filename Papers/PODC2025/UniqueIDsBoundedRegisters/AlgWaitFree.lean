@@ -1,5 +1,7 @@
 import Papers.PODC2025.UniqueIDsBoundedRegisters.AlgInv
-import Podc.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.Task
 
 /-!
 # Algorithms 1 and 2: wait-freedom

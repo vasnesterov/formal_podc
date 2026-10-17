@@ -1,5 +1,5 @@
-import Podc.LockStep.Basic
-import Podc.Agreement.Specs
+import Cslib.Computability.Distributed.Byzantine.LockStep.Parallel
+import Cslib.Computability.Distributed.Byzantine.Specs
 import Mathlib
 
 /-!

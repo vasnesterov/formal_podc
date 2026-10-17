@@ -77,10 +77,10 @@ linearizability invariant of Implementation 1. The `n = 1` degenerate case is on
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. The model is CSLib's (`Model`, `Linearization`, `Progress`, `Covering`, `Indist`,
-`Atomic`). Shared library (`Podc/SharedMemory`, `Podc/Order`, `Podc/Algebra`): `curOp` and
+`Atomic`). Shared library (`Cslib/Computability/Distributed/SharedMemory`, `Cslib/Foundations/Data/Nat`, `Cslib/Foundations/Data/Finset`): `curOp` and
 `Impl.linearizable_of_run`/`Impl.run_induction` for the linearizability invariant,
 `Impl.exists_finish` (completing pending operations by solo runs, paper's `τ'`, `τ''`),
-`Impl.LockFree.obstructionFree`, `InfExec.lbls`, `Nat.eventually_const_of_succ_le` and
+`Impl.LockFree.obstructionFree`, `InfExec.pre`, `Nat.eventually_const_of_succ_le` and
 `Fintype.sum_lt_sum_of_eq_off` for the two potentials of the lock-freedom proof.
 Non-vacuity: every hypothesis of the lower bounds is met by Implementation 1 with
 `k ≥ 2` and readable non-monotonic components, which uses `k + 1` objects for two processes

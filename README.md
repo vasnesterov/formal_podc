@@ -18,8 +18,7 @@ The goal is to **verify the results and the proofs** of each paper. Every formal
 General infrastructure developed along the way (Byzantine round models, asynchronous shared memory and
 linearizability, population protocols, the LOCAL model, self-stabilization, Menger's theorem, the Moore bound,
 graph minors, spanners, Markov-chain absorption, social choice, …) lives in the CSLib fork
-[`vasnesterov/cslib`](https://github.com/vasnesterov/cslib), branch `podc`, and in the shared library `Podc/`
-(see [Layout](#layout)).
+[`vasnesterov/cslib`](https://github.com/vasnesterov/cslib), branch `podc` (see [Layout](#layout)).
 
 The formalizations were produced by AI agents (Claude) under human direction. Each paper was then checked by an
 independent reviewer agent for faithfulness of definitions and statements and for over-claimed errors.
@@ -355,26 +354,26 @@ version).
 
 - `Papers/PODC<Year>/<ShortName>/` — one folder per paper (Lean library `Papers`): the Lean files, `README.md` and
   `differencies.md`.
-- `Podc/` — the shared library (Lean library `Podc`, ~19k lines in 99 files): definitions and lemmas used by several
-  papers, organised by topic. It is staged for upstreaming to CSLib: each module names its intended CSLib location in a
-  `-- CSLib candidate:` header, and most modules already use their CSLib namespace (`Cslib.Quorum`,
-  `Cslib.Byzantine.PartialSync`, `Cslib.SharedMemory`, …).
+- `Podc/` — Lean library `Podc`, now only `Podc/Basic.lean` (`import Cslib`). The shared library that used to live here
+  (~19k lines) has been upstreamed to the CSLib fork; the papers import the CSLib modules directly.
 - `lakefile.toml` — depends on CSLib (`vasnesterov/cslib`, branch `podc`), which pins Mathlib.
 
-| `Podc/` directory | Contents | Papers using it |
+Shared infrastructure developed for these papers, by CSLib directory:
+
+| CSLib directory | Contents | Papers using it |
 |---|---|---|
-| `Foundations/` | quorum intersection arithmetic, vote counting (threshold, majority, plurality), labellings into groups of bounded size | 21 |
-| `Order/`, `Data/`, `Algebra/` | eventually-constant ℕ-sequences (potential arguments), time-dependent iteration, greedy list scans, sums after a point update | 15, 9, 8 |
-| `Probability/` | finite uniform / product / Bernoulli probability by counting; common coin against an adaptive adversary | 8 |
-| `Graph/`, `Digraph/` | closed balls, dominating sets, orientations, Moore bound, greedy and fault-tolerant greedy spanners; digraph reachability avoiding faults, bounded walks, source components | 13, 8 |
-| `Local/` | locality of LOCAL algorithms, identifiers in locally-iterative algorithms | 7 |
-| `Stabilization/`, `PopulationProtocols/` | stabilization and global fairness of transition systems, probability-1 ⇔ reachability, daemons and rounds; nondeterministic population protocols, uniform random scheduler | 7, 3 |
-| `DynamicNetworks/`, `Knowledge/`, `SyncCrash/` | journeys and temporal distance, full-information indistinguishability; knowledge and common knowledge in interpreted systems; bridge to the synchronous crash model | 4, 3, — |
-| `Agreement/`, `Byzantine/` | consensus, graded consensus, gradecast and Proxcensus specifications; phase king; threshold certificates | 8, 4 |
-| `PartialSync/` | partially synchronous Byzantine model: decision/input maps, run classes, quiet and omission runs, simulators, gossip, two-step lower-bound executions, `n ≤ 3t` triviality, containment condition | 9 |
-| `LockStep/` | synchronous lock-step Byzantine model: threshold adversaries, committees, sequential composition | 5 |
-| `SharedMemory/` | asynchronous shared memory: run/history API, progress conditions and potentials, covering, linearization responses, nondeterministic specs, strong linearizability, object catalog and object classes, crash-recovery, anonymous memory | 16 |
-| `ApproxConsensus/` | reach conditions for consensus on directed networks; asynchronous model on digraphs and replay | 3 |
-| `CongestLB/` | CONGEST lower bounds from two-party communication complexity | 1 |
-| `ContentOblivious/` | content-oblivious (pulse-only) rings: model, composable procedures, staged programs, splicing, mirroring | 2 |
-| `IteratedModel/` | iterated immediate-snapshot style models, tasks and solvability | 1 |
+| `Cslib/Foundations/Data/Finset/`, `Foundations/Combinatorics/Labelling.lean` | quorum intersection arithmetic, vote counting (threshold, majority, plurality), sums after a point update; labellings into groups of bounded size | 21, 8, 2 |
+| `Cslib/Foundations/Data/{Nat,List}/` | eventually-constant ℕ-sequences (potential arguments), time-dependent iteration, greedy list scans | 15, 9 |
+| `Cslib/Probability/{Finite,CoinGame}` | finite uniform / product / Bernoulli probability by counting; common coin against an adaptive adversary | 8 |
+| `Cslib/Foundations/Combinatorics/{SimpleGraph,Digraph}/` | closed balls, dominating sets, orientations, Moore bound, greedy and fault-tolerant greedy spanners; digraph reachability avoiding faults, bounded walks, source components | 13, 8 |
+| `Cslib/Computability/Distributed/Local/` | locality of LOCAL algorithms, identifiers in locally-iterative algorithms | 7 |
+| `Cslib/Computability/Distributed/{SelfStabilization,PopulationProtocols}/` | stabilization and global fairness of transition systems, probability-1 ⇔ reachability, daemons and rounds; nondeterministic population protocols, uniform random scheduler | 7, 3 |
+| `Cslib/Computability/Distributed/{DynamicNetworks,Knowledge,SyncCrash}/` | journeys and temporal distance, full-information indistinguishability; knowledge and common knowledge in interpreted systems; the synchronous crash model as an interpreted system | 4, 3, — |
+| `Cslib/Computability/Distributed/Byzantine/` | consensus, graded consensus, gradecast and Proxcensus specifications; king phase; threshold certificates | 8, 4 |
+| `Cslib/Computability/Distributed/Byzantine/PartialSync/` | partially synchronous Byzantine model: decision/input maps, run classes, quiet and omission runs, simulators, gossip, two-step lower-bound executions, `n ≤ 3t` triviality, containment condition | 9 |
+| `Cslib/Computability/Distributed/Byzantine/LockStep/` | synchronous lock-step Byzantine model: threshold adversaries, committees, sequential composition | 5 |
+| `Cslib/Computability/Distributed/SharedMemory/` | asynchronous shared memory: run/history API, progress conditions and potentials, covering, linearization responses, nondeterministic specs, strong linearizability, object catalog and object classes, crash-recovery, anonymous memory | 16 |
+| `Cslib/Computability/Distributed/ApproxConsensus/` | reach conditions for consensus on directed networks; asynchronous model on digraphs and replay | 3 |
+| `Cslib/Computability/{CommunicationComplexity,Distributed/Congest}/` | CONGEST lower bounds from two-party communication complexity | 1 |
+| `Cslib/Computability/Distributed/ContentOblivious/` | content-oblivious (pulse-only) rings: model, composable procedures, staged programs, splicing, mirroring | 2 |
+| `Cslib/Computability/Distributed/IteratedModel/` | iterated immediate-snapshot style models, tasks and solvability | 1 |

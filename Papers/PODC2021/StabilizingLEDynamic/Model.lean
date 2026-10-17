@@ -1,6 +1,6 @@
 import Cslib.Computability.Distributed.DynamicNetworks.HeardOf
-import Podc.DynamicNetworks.Journey
-import Podc.Stabilization.Execution
+import Cslib.Computability.Distributed.DynamicNetworks.Journey
+import Cslib.Computability.Distributed.SelfStabilization.Defs
 import Mathlib.Data.Finset.Card
 
 /-!

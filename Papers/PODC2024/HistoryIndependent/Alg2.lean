@@ -1,7 +1,8 @@
 import Cslib.Computability.Distributed.SharedMemory.SWSRRegister
 import Mathlib
-import Podc.SharedMemory.Progress
-import Podc.Order.NatDescent
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Task
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # Algorithm 2: a lock-free state-quiescent HI SWSR `K`-valued register (Theorem 9)
@@ -1082,7 +1083,7 @@ theorem lockFree (v₀ : Fin K) : (alg2 v₀).LockFree := by
   intro e _ N
   by_contra hcon
   push Not at hcon
-  have hreach := e.run_lbls
+  have hreach := e.run_pre
   -- the writer takes finitely many steps after `N`
   obtain ⟨N₁, -, hN₁⟩ := Nat.eventually_not_of_succ_le (f := fun m => wμ ((e.cfg m).loc .w))
     (N := N) (p := fun m => (e.lbl m).proc = .w)

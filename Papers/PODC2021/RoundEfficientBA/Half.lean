@@ -1,5 +1,5 @@
 import Papers.PODC2021.RoundEfficientBA.Proxcensus
-import Podc.Foundations.Quorum
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Proxcensus for `t < n/2` with threshold signatures (Section 3.3.2, Lemmas 3.4–3.6)

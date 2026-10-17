@@ -1,5 +1,6 @@
 import Papers.PODC2026.ContentObliviousCounting.LowerBoundSplice
-import Podc.ContentOblivious.Prog
+import Cslib.Computability.Distributed.ContentOblivious.Prog
+import Mathlib
 
 /-!
 # The `Ω(n log n)` lower bound for counting (§10, Theorem 3)
@@ -38,7 +39,7 @@ starting within distance `n/2` after the leader.
 
 namespace Podc.ContentOblivious.Counting
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 /-- Admissible inputs `(ID, isLeader)`: distinct IDs and `ℓ` is the unique leader. -/
 def Admissible {n : ℕ} (x : ZMod n → ℕ × Bool) (ℓ : ZMod n) : Prop :=

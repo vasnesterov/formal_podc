@@ -8,10 +8,10 @@ import Papers.PODC2019.HardnessOptimization.HamPathCycle
 
 /-! Axiom check of the main results (only `propext`, `Classical.choice`, `Quot.sound`). -/
 
-#print axioms Podc.CongestLB.Protocol.disj_lowerBound
-#print axioms Podc.CongestLB.LBFamily.simulation
-#print axioms Podc.CongestLB.LBFamily.rand_lowerBound
-#print axioms Podc.CongestLB.gather_accepts
+#print axioms Cslib.CommunicationComplexity.Protocol.disj_lowerBound
+#print axioms Cslib.Congest.LBFamily.simulation
+#print axioms Cslib.Congest.LBFamily.rand_lowerBound
+#print axioms Cslib.Congest.gather_accepts
 #print axioms HardnessOptimization.lemma_2_1
 #print axioms HardnessOptimization.theorem_2_1_n
 #print axioms HardnessOptimization.theorem_2_1_connected

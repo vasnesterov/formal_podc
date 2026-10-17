@@ -147,7 +147,7 @@ counterexample shows that the Theorem 13 definitions are satisfiable. Not covere
 The hypothesis `ε ≤ 1/4` of `theorem_4` / `theorem_1` is not an issue in the paper: for `ε > 1/4`
 the paper's hypothesis is unsatisfiable. It is needed in Lean only because `ENNReal.ofReal`
 truncates negative numbers at 0. The models are paper-local; inboxes, histories and the first decision
-(`firstSome?`) are those of CSLib's lock-step model (`Podc/LockStep/Basic.lean`).
+(`firstSome?`) are those of CSLib's lock-step model (`Cslib/Computability/Distributed/Byzantine/LockStep/Parallel.lean`).
 
 **CSLib candidates.**
 * `FiberMeas` (measurability of countable-valued functions via fibres) (`Basic.lean`).

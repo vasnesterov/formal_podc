@@ -1,5 +1,5 @@
 import Papers.PODC2013.ByzantineVectorConsensus.Spec
-import Podc.PartialSync.Map
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Map
 
 /-!
 # Theorem 3: exact BVC in synchrony for `n ≥ max(3t + 1, (d + 1) t + 1)`
@@ -12,7 +12,7 @@ Step (1) is *interactive consistency* (IC), which CSLib provides for `n > 3t` in
 model (`icSolvableSync_of_three_t_lt`, Pease–Shostak–Lamport; implemented there by an exchange
 round followed by vector consensus rather than by `n` parallel Byzantine broadcasts — the
 specification is the same). `withGamma A` post-processes the decided vector `S` with `gammaPt`
-(the decision post-processing `Algorithm.mapDecide` of `Podc.PartialSync.Map`).
+(the decision post-processing `Algorithm.mapDecide` of `Cslib.Computability.Distributed.Byzantine.PartialSync.Map`).
 -/
 
 open Cslib.Byzantine.PartialSync Finset Module

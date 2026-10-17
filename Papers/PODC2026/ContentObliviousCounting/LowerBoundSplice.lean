@@ -1,4 +1,5 @@
-import Podc.ContentOblivious.Splice
+import Cslib.Computability.Distributed.ContentOblivious.Splice
+import Mathlib
 
 /-!
 # Interface traces of ring intervals and splicing (§10, Observation 27, Lemma 28)
@@ -21,7 +22,7 @@ The interval `I = (s, s+1, …, s+a-1)` has boundary edges `e_L = {s-1, s}` and
 
 namespace Podc.ContentOblivious.Counting
 
-open Podc.ContentOblivious Finset
+open Cslib.ContentOblivious Finset
 
 /-- The alphabet `Σ = {Lin, Lout, Rin, Rout}` of interface traces. -/
 inductive Letter

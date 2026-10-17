@@ -119,4 +119,4 @@ with every claim of Sections 2–3.
 **Infrastructure.** CSLib's `Cslib/Foundations/Combinatorics/SimpleGraph/WalkParity.lean` provides walks of exact length,
 parity distances, the parity facts for bipartite and non-bipartite graphs, and unique BFS parents in
 forests. The `edist`/`dist` conversions (`edist_eq_natCast_iff`, `dist_le_of_edist_le_natCast`) are in the
-shared `Podc/Graph/Ball.lean`.
+shared `Cslib/Foundations/Combinatorics/SimpleGraph/Ball.lean`.

@@ -1,4 +1,5 @@
-import Podc.Probability.Finite.Product
+import Cslib.Probability.Finite.Product
+import Mathlib
 
 /-!
 # LLL instances in the variable setting, and conditional probabilities
@@ -18,7 +19,7 @@ product distribution (`Cslib.Probability.piExpect`) in which fixed variables are
 unfixed variables keep their distribution.
 
 Main facts (instances of the general facts on product distributions in
-`Podc/Probability/Finite/Product.lean`):
+`Cslib/Probability/Finite/Product.lean`):
 * `sum_condProb_fix` (law of total probability): averaging over the value of an unfixed
   variable `j` gives back the current conditional probability.
 * `condProb_fix_of_not_mem` (independence): fixing a variable that `E_v` does not depend on does

@@ -114,7 +114,7 @@ Paper: Keidar, Kokoris-Kogias, Naor, Spiegelman, *All You Need is DAG*, PODC 202
 - **Probability.**
   - Agreement and Validity are proved under the deterministic hypothesis "infinitely many good
     waves" (`Run.GoodWave`).
-  - Claim 6 is proved in an abstract coin game (`Podc/Probability/CoinGame.lean`, specialised in
+  - Claim 6 is proved in an abstract coin game (`Cslib/Probability/CoinGame.lean`, specialised in
     `Coin.lean`): perfect uniform coin (`ε = 0`), and
     an adaptive deterministic adversary whose good set for wave `i` is a function of the earlier
     coins.

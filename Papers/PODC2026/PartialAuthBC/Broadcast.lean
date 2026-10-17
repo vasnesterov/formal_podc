@@ -1,6 +1,7 @@
 import Papers.PODC2026.PartialAuthBC.Gradecast
-import Podc.LockStep.Restrict
-import Podc.LockStep.Sequential
+import Cslib.Computability.Distributed.Byzantine.LockStep.Restrict
+import Cslib.Computability.Distributed.Byzantine.LockStep.Sequential
+import Mathlib
 
 /-!
 # The broadcast protocol Π_BC (Figure 2): Theorems 3.13 and 3.14
@@ -12,8 +13,8 @@ grade `1` output their gradecast value (at round `4s`); unregistered parties wit
 the decision of `ba`. All parties keep participating in `ba` (registered parties stay silent).
 
 Π_BC is built with the shared lock-step combinators: the sequential composition `Protocol.seq`
-(`Podc/LockStep/Sequential.lean`) of Π_GC with the agreement phase `bcPhase2`, in which `ba` runs
-among `N` through the committee simulation `Protocol.extend` (`Podc/LockStep/Restrict.lean`).
+(`Cslib/Computability/Distributed/Byzantine/LockStep/Sequential.lean`) of Π_GC with the agreement phase `bcPhase2`, in which `ba` runs
+among `N` through the committee simulation `Protocol.extend` (`Cslib/Computability/Distributed/Byzantine/LockStep/Restrict.lean`).
 `bcWith` takes the gradecast protocol as a parameter (also used for the exclusive reading in
 `Exclusive.lean`).
 

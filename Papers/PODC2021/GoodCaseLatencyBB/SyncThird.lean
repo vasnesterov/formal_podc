@@ -1,5 +1,5 @@
 import Papers.PODC2021.GoodCaseLatencyBB.Tokens
-import Podc.Foundations.Labelling
+import Cslib.Foundations.Combinatorics.Labelling
 
 /-!
 # BRB good-case latency `≥ Δ + δ` for `f ≥ n/3` under synchronized start (Theorem 9)

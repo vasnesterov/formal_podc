@@ -1,5 +1,5 @@
 import Mathlib
-import Podc.Digraph.Walk
+import Cslib.Foundations.Combinatorics.Digraph.Walk
 
 /-!
 # Atomic cross-chain swaps (Herlihy, PODC 2018): digraph vocabulary
@@ -9,7 +9,7 @@ This file fixes the paper's §2.1 notions: paths (in the paper's lax sense), rea
 strong connectivity, feedback vertex sets and the "diameter" (length of a longest path).
 Reachability, strong connectivity and the follower subgraph are the shared notions
 `Digraph.Reachable`, `Digraph.StronglyConnected` and `Digraph.deleteVerts` of
-`Podc.Digraph.Walk`.
+`Cslib.Foundations.Combinatorics.Digraph.Walk`.
 -/
 
 namespace AtomicSwap

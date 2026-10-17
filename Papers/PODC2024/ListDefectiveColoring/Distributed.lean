@@ -1,6 +1,6 @@
 import Papers.PODC2024.ListDefectiveColoring.TwoSweep
-import Podc.Local.LocallyIterative
-import Podc.Local.Locality
+import Cslib.Computability.Distributed.Local.Identifiers
+import Cslib.Computability.Distributed.Local.OnlineLocalLocality
 
 /-!
 # The Two-Sweep algorithm as a synchronous distributed algorithm (Lemma 3.3 of [FK24])

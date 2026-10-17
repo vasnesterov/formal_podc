@@ -2,7 +2,6 @@ import Papers.PODC2020.DetectableSpace.Model
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
 import Cslib.Computability.Distributed.SharedMemory.SWSRRegister
 import Cslib.Computability.Distributed.SharedMemory.HerlihyWing.Seq
-import Podc.SharedMemory.History
 
 /-!
 # `DLin` on crash-free histories is CSLib's linearizability

@@ -1,6 +1,6 @@
 import Cslib.Computability.Distributed.Byzantine.CanonicalRounds.Liveness
 import Papers.PODC2026.CanonicalRoundByzantine.Problems
-import Podc.Foundations.Count
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Non-vacuity: one-round crusader agreement for `n > 5f`

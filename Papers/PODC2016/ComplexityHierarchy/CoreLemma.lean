@@ -1,5 +1,5 @@
 import Papers.PODC2016.ComplexityHierarchy.Buffer
-import Podc.Order.NatDescent
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # The key lemma for block (multi-)writes: Lemmas 6.5 and 7.3 of EGSZ'16

@@ -1,8 +1,10 @@
 import Papers.PODC2024.HistoryIndependent.ClassC
 import Cslib.Computability.Distributed.SharedMemory.Indist
 import Mathlib
-import Podc.SharedMemory.Solo
-import Podc.SharedMemory.Run
+import Cslib.Computability.Distributed.SharedMemory.Mutex
+import Cslib.Computability.Distributed.SharedMemory.Solo
+import Cslib.Computability.Distributed.SharedMemory.Task
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # Proposition 19: the reader must write

@@ -1,5 +1,5 @@
 import Mathlib
-import Podc.Byzantine.Certificate
+import Cslib.Computability.Distributed.Byzantine.Certificate
 
 /-!
 # Basic HotStuff (Algorithm 2): the abstract asynchronous system
