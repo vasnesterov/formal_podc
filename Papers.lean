@@ -580,7 +580,6 @@ import Papers.PODC2024.TetraBFT.Defs
 import Papers.PODC2024.TetraBFT.Safety
 import Papers.PODC2024.TetraBFT.Liveness
 import Papers.PODC2024.TetraBFT.Protocol
-import Papers.PODC2024.TetraBFT.Sim
 import Papers.PODC2024.TetraBFT.Refinement
 import Papers.PODC2024.TetraBFT.Validity
 import Papers.PODC2024.TetraBFT.Counterexample

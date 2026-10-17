@@ -24,7 +24,7 @@ such executions.
 
 namespace TetraBFT
 
-open Finset
+open Finset Cslib.Quorum
 
 variable {P V : Type*} [Fintype P] [DecidableEq P]
 
@@ -62,7 +62,8 @@ variable {E f}
 theorem exists_correct_of_quorum (hn : 3 * f < Fintype.card P) (hE : E.SafetyHyp f)
     {Q : Finset P} (hQ : Fintype.card P - f ≤ Q.card) {w : Vote V}
     (h : ∀ q ∈ Q, q ∉ E.faulty → E.voted q w) : ∃ q ∉ E.faulty, E.voted q w := by
-  obtain ⟨q, hq, hqF⟩ := exists_correct hE.card_faulty (show f + 1 ≤ Q.card by omega)
+  obtain ⟨q, hq, hqF⟩ :=
+    exists_mem_notMem_of_card_le_of_lt hE.card_faulty (show f + 1 ≤ Q.card by omega)
   exact ⟨q, hqF, h q hq hqF⟩
 
 /-- A correct vote-k (`2 ≤ k ≤ 4`) is backed by a correct vote-(k−1) for the same value and
@@ -94,7 +95,7 @@ theorem lemma6 (hn : 3 * f < Fintype.card P) (hE : E.SafetyHyp f) {k r : ℕ} (h
     (hx : E.voted p ⟨k, r, x⟩) (hy : E.voted q ⟨k, r, y⟩) : x = y := by
   obtain ⟨Q₁, hQ₁, hv₁⟩ := hE.quorum_prev p hp k r x hk2 hk4 hx
   obtain ⟨Q₂, hQ₂, hv₂⟩ := hE.quorum_prev q hq k r y hk2 hk4 hy
-  obtain ⟨c, hc₁, hc₂, hcF⟩ := exists_correct_inter hn hE.card_faulty hQ₁ hQ₂
+  obtain ⟨c, hc₁, hc₂, hcF⟩ := exists_mem_inter_notMem_of_three_mul_lt hn hE.card_faulty hQ₁ hQ₂
   exact hE.one_val c hcF _ r x y (hv₁ c hc₁ hcF) (hv₂ c hc₂ hcF)
 
 /-- **Lemma 7** (on commitment). At most one value is committed in a view. -/
@@ -102,7 +103,7 @@ theorem lemma7 (hn : 3 * f < Fintype.card P) (hE : E.SafetyHyp f) {v : ℕ} {x y
     (hx : E.Committed f x v) (hy : E.Committed f y v) : x = y := by
   obtain ⟨Q₁, hQ₁, hv₁⟩ := hx
   obtain ⟨Q₂, hQ₂, hv₂⟩ := hy
-  obtain ⟨c, hc₁, hc₂, hcF⟩ := exists_correct_inter hn hE.card_faulty hQ₁ hQ₂
+  obtain ⟨c, hc₁, hc₂, hcF⟩ := exists_mem_inter_notMem_of_three_mul_lt hn hE.card_faulty hQ₁ hQ₂
   exact hE.one_val c hcF 4 v x y (hv₁ c hc₁ hcF) (hv₂ c hc₂ hcF)
 
 /-- **Lemma 8.** If `x` is committed in view `v` (in particular, if a correct node decides `x` in
@@ -122,7 +123,7 @@ theorem lemma8 (hn : 3 * f < Fintype.card P) (hE : E.SafetyHyp f) {x : V} {v : �
   rcases hrule with h0 | ⟨Q, hQS, hQ, hcase⟩
   · omega
   obtain ⟨Q4, hQ4, hv4⟩ := hc
-  obtain ⟨c, hcQ, hcQ4, hcF⟩ := exists_correct_inter hn hE.card_faulty hQ hQ4
+  obtain ⟨c, hcQ, hcQ4, hcF⟩ := exists_mem_inter_notMem_of_three_mul_lt hn hE.card_faulty hQ hQ4
   have hcrep := hrep c (hQS hcQ) hcF
   obtain ⟨u', y', htop, hvu'⟩ := hcrep.top_max v x hvv' (hv4 c hcQ4 hcF)
   obtain ⟨hu'v', hcv⟩ := hcrep.top_sound u' y' htop
@@ -140,7 +141,7 @@ theorem lemma8 (hn : 3 * f < Fintype.card P) (hE : E.SafetyHyp f) {x : V} {v : �
   -- an honest claim at a view `≥ w` (> v) of a correct node is for `x`
   have hclaim : ∀ z w₁, w ≤ w₁ → Blocking f S rep z w₁ → z = x := by
     intro z w₁ hww₁ ⟨B, hBS, hB, hBc⟩
-    obtain ⟨k, hkB, hkF⟩ := exists_correct hE.card_faulty hB
+    obtain ⟨k, hkB, hkF⟩ := exists_mem_notMem_of_card_le_of_lt hE.card_faulty hB
     have hk := hrep k (hBS hkB) hkF
     rcases hk.claims_sound (hBc k hkB) (by omega) with
       ⟨u, hwu, huv', hku⟩ | ⟨u₁, y₁, u₂, y₂, hwu₁, hu₁, hwu₂, hu₂, hy₁₂, -, hk₁, hk₂⟩

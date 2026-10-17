@@ -1,12 +1,12 @@
 import Papers.PODC2021.FastByzantineConsensus.TwoStep
-import Papers.PODC2023.ValidityConsensus.Triviality
+import Podc.PartialSync.Triviality
 
 /-!
 # The case `n ≤ 3f` and the degenerate case `n = 1`
 
 * `not_solves_of_le_three_mul`: the classic bound — no protocol solves consensus with weak
   validity tolerating `f` Byzantine processes if `2 ≤ n ≤ 3f` (also with signatures). Derived from
-  Theorem 1 of *On the Validity of Consensus* (`ValidityConsensus.trivial_of_solvesConsensus_auth`),
+  Theorem 1 of *On the Validity of Consensus* (`SolvesConsensusAuth.trivial`),
   since weak validity is a non-trivial validity property. This covers the case `t ≤ 1` of
   Theorem 4.5 of Kuznetsov–Tonkikh–Zhang.
 * `single_fastConsensus`: for `n = 1` the protocol "decide your own input immediately" is an
@@ -35,7 +35,7 @@ theorem SolvesConsensusAuth.mono {Au : Auth P M K} {A : Algorithm P M S V V} {f 
 Theorem 4.5): no consensus with weak validity for `2 ≤ n ≤ 3f`, even with signatures. -/
 theorem not_solves_of_le_three_mul {Au : Auth P M K} {A : Algorithm P M S V V} {f δ : ℕ}
     (hU : A.Unforging Au) (h2 : 2 ≤ Fintype.card P) (hn : Fintype.card P ≤ 3 * f) {a b : V}
-    (hab : a ≠ b) : ¬ SolvesConsensusAuth Au f δ A weakValidity := by
+    (hab : a ≠ b) : ¬ SolvesConsensusAuth Au f δ A (weakValidity P V) := by
   intro h
   have : Nonempty V := ⟨a⟩
   have hf' : min f (Fintype.card P - 1) ≤ f := min_le_left _ _
@@ -49,8 +49,7 @@ theorem not_solves_of_le_three_mul {Au : Auth P M K} {A : Algorithm P M S V V} {
     · rw [min_eq_right hle]; omega
   have h1 : min f (Fintype.card P - 1) < Fintype.card P :=
     (min_le_right _ _).trans_lt (by omega)
-  obtain ⟨v, hv⟩ := ValidityConsensus.trivial_of_solvesConsensus_auth hU
-    (SolvesConsensusAuth.mono h hf') h0 h1 h3
+  obtain ⟨v, hv⟩ := (SolvesConsensusAuth.mono h hf').trivial hU h0 h1 h3
   have hc : ∀ x : V, IsInputConfig (min f (Fintype.card P - 1)) (fun _ : P => some x) := by
     intro x
     unfold IsInputConfig

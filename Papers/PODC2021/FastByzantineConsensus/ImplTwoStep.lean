@@ -94,10 +94,8 @@ theorem sok_propose {x : V} (p : P) (v : ℕ) {s : LState P V} (h : SOK x s) :
   split_ifs with hh
   · refine ⟨h.1, forall_mem_insert _ _ _ |>.mpr ⟨?_, h.2.1⟩, h.2.2⟩
     have hc := Classical.choose_spec hh.2.2.2
-    obtain ⟨r, hr⟩ := card_pos.mp (Nat.lt_of_lt_of_le (Nat.succ_pos _) hc)
-    unfold certAckers at hr
-    have hr' := of_mem_filter' hr
-    have := h.2.1 _ (Finset.mem_coe.mp hr')
+    obtain ⟨r, -, hr⟩ := hc.exists_correct_signer (F := ∅) le_rfl (Nat.succ_pos _)
+    have := h.2.1 _ (Finset.mem_coe.mp hr)
     exact this
   · exact h
 
@@ -117,11 +115,9 @@ theorem sok_commit {x : V} (p : P) (v : ℕ) {s : LState P V} (h : SOK x s) :
   unfold actCommit
   split_ifs with hh
   · have hc := (Classical.choose_spec hh).1
-    obtain ⟨r, hr⟩ := card_pos.mp (Nat.lt_of_lt_of_le
-      (show 0 < pr.qc by unfold Params.qc; omega) hc)
-    unfold ackers at hr
-    have hr' := of_mem_filter' hr
-    have hy : Classical.choose hh = x := h.2.1 _ (Finset.mem_coe.mp hr')
+    obtain ⟨r, -, hr⟩ := hc.exists_correct_signer (F := ∅) le_rfl
+      (show 0 < pr.qc by unfold Params.qc; omega)
+    have hy : Classical.choose hh = x := h.2.1 _ (Finset.mem_coe.mp hr)
     refine ⟨h.1, forall_mem_insert _ _ _ |>.mpr ⟨hy, h.2.1⟩, h.2.2.1, ?_⟩
     rintro y u hyu
     simp only [Option.some.injEq, Prod.mk.injEq] at hyu
@@ -144,7 +140,7 @@ theorem sok_stepFn {x : V} (p : P) (s : LState P V) (ib : P → List (Tok P V)) 
 value counts as decided.) -/
 theorem algo_validity (hL : 0 < L) (ht : pr.t < Fintype.card P) (R : Run P (Tok P V) V)
     (hRa : R.AuthValid auth (algo pr L)) :
-    ∀ p ∉ R.faulty, ∀ v, R.Decides (algo pr L) p v → v ∈ weakValidity R.inputConf := by
+    ∀ p ∉ R.faulty, ∀ v, R.Decides (algo pr L) p v → v ∈ weakValidity P V R.inputConf := by
   rintro p - v ⟨τ, hτ⟩ x hx
   have hq : ∀ q, q ∉ R.faulty ∧ R.inp q = x := by
     intro q

@@ -425,7 +425,7 @@ theorem vc_origin_timeout (hF : R.faulty.card ≤ prm.f) : ∀ τ, ∀ p ∉ R.f
   rcases τ with _ | τ
   · simp [tetra] at h
   rcases out_vc_origin R h with hq | ⟨hv, hc, rfl⟩
-  · obtain ⟨c, hc, hcF⟩ := exists_correct hF hq
+  · obtain ⟨c, hc, hcF⟩ := exists_mem_notMem_of_card_le_of_lt hF hq
     simp only [senders, mem_filter, mem_univ, true_and] at hc
     obtain ⟨τ'', hτ'', hm⟩ := rcv_authentic R hcF hc
     obtain ⟨q, hqF, τ', hτ', h1, h2⟩ := ih τ'' hτ'' c hcF u hm
@@ -452,7 +452,7 @@ theorem reach_spacing (hn : 3 * prm.f < n) (hF : R.faulty.card ≤ prm.f) {u τ 
     (h : Reach prm R (u + 1) τ) : prm.timeout ≤ τ ∧ Reach prm R u (τ - prm.timeout) := by
   obtain ⟨p, hp, hpv⟩ := h
   obtain ⟨τe, hτe, -, hq⟩ := entered_quorum (prm := prm) R τ (le_trans (by omega) hpv)
-  obtain ⟨c, hc, hcF⟩ := exists_correct hF (show prm.f + 1 ≤
+  obtain ⟨c, hc, hcF⟩ := exists_mem_notMem_of_card_le_of_lt hF (show prm.f + 1 ≤
     (senders (R.st A (τe + 1) p).rcv (.viewChange (R.st A τ p).view)).card by omega)
   simp only [senders, mem_filter, mem_univ, true_and] at hc
   obtain ⟨τc, hτc, hm⟩ := rcv_authentic R hcF hc

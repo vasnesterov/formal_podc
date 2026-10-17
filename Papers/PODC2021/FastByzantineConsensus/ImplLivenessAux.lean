@@ -202,43 +202,14 @@ end Chain
 
 section RunLemmas
 
-variable (pr L) in
-/-- Tokens signed by a correct process `q` and known to a correct process are known to `q`
-(this is `known_signed` of `ImplSafety.lean`; here it is a hypothesis). -/
-def KnownSigned (R : Run P (Tok P V) V) : Prop :=
-  ∀ q c τ (k : Tok P V), q ∉ R.faulty → c ∉ R.faulty → k ∈ (R.st (algo pr L) τ c).known →
-    k.signer = q → k ∈ (R.st (algo pr L) τ q).known
-
 variable {R : Run P (Tok P V) V}
 
-/-- A received token signed by the (correct) receiver is already known to it. -/
-theorem inbox_signed (hRa : R.AuthValid auth (algo pr L)) (hsig : KnownSigned pr L R) {q r : P}
-    (hq : q ∉ R.faulty) {τ : ℕ} {k : Tok P V} (hk : k ∈ R.inbox (algo pr L) q τ r)
-    (hs : k.signer = q) : k ∈ (R.st (algo pr L) τ q).known := by
-  obtain ⟨σ, hσ, -, hm⟩ := Run.mem_inbox.mp hk
-  by_cases hr : r ∈ R.faulty
-  · rw [Run.out_of_faulty (algo pr L) R hr] at hm
-    rcases hRa r hr σ q hq k hm k (Set.mem_singleton k) with h | ⟨σ', hσ', q', hq', r', m, hm', hkm⟩
-    · exact absurd (hs ▸ h) hq
-    · have hkm' : k = m := Set.mem_singleton_iff.mp hkm
-      subst hkm'
-      rw [out_correct R hq'] at hm'
-      exact known_mono R (by omega) q (hsig q q' σ' k hq hq' (Finset.mem_toList.mp hm') hs)
-  · rw [out_correct R hr] at hm
-    exact known_mono R hσ q (hsig q r σ k hq hr (Finset.mem_toList.mp hm) hs)
-
 /-- **Gossip.** After GST, what a correct process knows at `τ` is known to every correct process
-at `τ + δ + 1`. -/
+at `τ + δ + 1` (`Algorithm.Gossips.subset_of_gst_le`). -/
 theorem gossip (hR : R.Valid pr.f δ) {p q : P} (hp : p ∉ R.faulty) (hq : q ∉ R.faulty) {τ : ℕ}
     (hτ : R.gst ≤ τ) :
-    (R.st (algo pr L) τ p).known ⊆ (R.st (algo pr L) (τ + δ + 1) q).known := by
-  intro k hk
-  have h1 := hR.dl_ge p τ q hp hq
-  have h2 := hR.dl_le p τ q hp hq
-  rw [max_eq_left hτ] at h2
-  have : k ∈ R.inbox (algo pr L) q (R.dl p τ q) p :=
-    Run.mem_inbox.mpr ⟨τ, h1, rfl, by rw [out_correct R hp]; exact Finset.mem_toList.mpr hk⟩
-  exact known_mono R (by omega) q (mem_known_of_inbox R this)
+    (R.st (algo pr L) τ p).known ⊆ (R.st (algo pr L) (τ + δ + 1) q).known :=
+  coe_subset.1 (algo_gossips.subset_of_gst_le hR hp hq hτ)
 
 theorem mem_E {c : P} (hc : c ∉ R.faulty) {τ : ℕ} {k : Tok P V}
     (hk : k ∈ (R.st (algo pr L) τ c).known) : k ∈ (absState pr L R τ).E :=
@@ -350,7 +321,7 @@ theorem linv_commit {p : P} {v : ℕ} (v' : ℕ) (s : LState P V) (h : LInv pr p
 variable {R : Run P (Tok P V) V}
 
 /-- The leader invariant holds at all times. -/
-theorem linv_all (hRa : R.AuthValid auth (algo pr L)) (hsig : KnownSigned pr L R) {p : P}
+theorem linv_all (hRa : R.AuthValid auth (algo pr L)) {p : P}
     (hp : p ∉ R.faulty) {v : ℕ} (hv : v ≠ 0) (hl : pr.leader v = p) :
     ∀ τ, LInv pr p v (R.st (algo pr L) τ p).known := by
   intro τ
@@ -367,7 +338,7 @@ theorem linv_all (hRa : R.AuthValid auth (algo pr L)) (hsig : KnownSigned pr L R
     have h1 : LInv pr p v s1.known := ih.of_sub hsub fun k hk hs => by
       rcases hback k hk with h | ⟨r, hr⟩
       · exact h
-      · exact inbox_signed hRa hsig hp hr hs
+      · exact algo_gossips.mem_of_mem_inbox algo_unforging hRa hp hp hr rfl hs
     rw [e]
     exact linv_commit _ _ (linv_ack _ _ (linv_propose _ _ (linv_verify hl _ _
       (linv_leaderCA _ _ (linv_vote _ _ _ h1)))))
@@ -516,13 +487,13 @@ section Main
 
 variable {R : Run P (Tok P V) V}
 
-/-- **Termination**, given the facts `known_signed` and `reachable_absState` of `ImplSafety.lean`
-(as hypotheses `hsig`, `hinv`). The first view `v` starting after GST whose leader is `ℓ`
+/-- **Termination**, given the invariant of the abstract system along the run (from
+`reachable_absState` of `ImplSafety.lean`, hypothesis `hinv`). The first view `v` starting after GST whose leader is `ℓ`
 completes within `6δ + 12` time units. -/
 theorem termination_of (hL : 6 * δ + 12 ≤ L)
     (hlead : ∀ v₀ q, ∃ v ≥ v₀, pr.leader v = q) (ht : 1 ≤ pr.t)
     (hn : 3 * pr.f + 2 * pr.t - 1 ≤ Fintype.card P)
-    (hR : R.Valid pr.f δ) (hRa : R.AuthValid auth (algo pr L)) (hsig : KnownSigned pr L R)
+    (hR : R.Valid pr.f δ) (hRa : R.AuthValid auth (algo pr L))
     (hinv : ∀ τ, Inv pr R.faulty (absState pr L R τ)) :
     ∀ p ∉ R.faulty, ∃ v, R.Decides (algo pr L) p v := by
   intro ℓ hℓ
@@ -594,7 +565,7 @@ theorem termination_of (hL : 6 * δ + 12 ≤ L)
   obtain ⟨xs, hxs⟩ := step_leaderCA (view_eq (by omega) (by omega)) hlv hv0 hsel1
   obtain ⟨S', bal', cc', hVV', hsel'⟩ :=
     (hinv (T1 + 1)).certAck_valid ℓ hℓ xs v (mem_E hℓ hxs)
-  have hLI := linv_all hRa hsig hℓ hv0 hlv
+  have hLI := linv_all hRa hℓ hv0 hlv
   -- the verifiers' `CertAck`s (steps at `T2`)
   obtain ⟨T2, hT2⟩ : ∃ T, T = T1 + 1 + δ + 1 := ⟨_, rfl⟩
   have hca : ∀ c ∉ R.faulty, Tok.certAck c xs v ∈ (R.st (algo pr L) (T2 + 1) c).known := by
@@ -605,7 +576,7 @@ theorem termination_of (hL : 6 * δ + 12 ≤ L)
     obtain ⟨y, hy1, hy2⟩ := step_verify (view_eq (by omega) (by omega)) hl
       ⟨S', bal', cc', ValidVotes.mono pr hE hVV', hsel'⟩
     rw [hlv] at hy1
-    have e : y = xs := (hLI (T2 + 1)).1 y xs (hsig ℓ c _ _ hℓ hc hy1 rfl)
+    have e : y = xs := (hLI (T2 + 1)).1 y xs (known_signed hRa hℓ hc hy1 rfl)
       (known_mono R (by omega) ℓ hxs)
     rw [e] at hy2
     exact hy2
@@ -648,11 +619,9 @@ theorem termination_of (hL : 6 * δ + 12 ≤ L)
       exact mem_ackers.mpr (Finset.mem_coe.mpr (gossip hR hc'' hc (τ := T4 + 1) (by omega)
         |>.trans (known_mono R (by omega) c) (hack c' hc'')))
     obtain ⟨y', hy'1, hy'2⟩ := step_commit (view_eq (by omega) (by omega)) hcc
-    obtain ⟨c', hc'1, hc'2⟩ := exists_not_mem_of_card_lt
-      (X := ackers (↑(R.st (algo pr L) (T5 + 1) c).known : Set (Tok P V)) y' v) (B := R.faulty)
-      (by unfold HasCC at hy'1; omega)
-    have e : y' = y :=
-      huniq _ y' c' hc'2 (mem_E hc (Finset.mem_coe.mp (mem_ackers.mp hc'1))) (by omega)
+    obtain ⟨c', hc'2, hc'1⟩ := hy'1.exists_correct_signer hR.card_faulty
+      (by unfold Params.qc; omega)
+    have e : y' = y := huniq _ y' c' hc'2 (mem_E hc (Finset.mem_coe.mp hc'1)) (by omega)
     rw [e] at hy'2
     exact hy'2
   -- the decision (at `T6`)

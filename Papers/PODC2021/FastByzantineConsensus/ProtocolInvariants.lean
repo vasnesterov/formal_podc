@@ -32,23 +32,16 @@ theorem committers_mono (h : E ⊆ E') (x : V) (v : ℕ) :
   simp only [committers, mem_filter, mem_univ, true_and] at hp ⊢
   exact h hp
 
-omit [DecidableEq P] in
-theorem certAckers_mono (h : E ⊆ E') (x : V) (v : ℕ) :
-    certAckers E x v ⊆ certAckers E' x v := by
-  intro p hp
-  simp only [certAckers, mem_filter, mem_univ, true_and] at hp ⊢
-  exact h hp
-
 variable (pr : Params P)
 
 omit [DecidableEq P] in
 theorem Certified.mono (h : E ⊆ E') {x : V} {v : ℕ} (hc : Certified pr E x v) :
     Certified pr E' x v :=
-  le_trans hc (card_le_card (certAckers_mono h x v))
+  Cslib.Byzantine.Certified.mono hc (fun _ hp => h hp) le_rfl
 
 omit [DecidableEq P] in
 theorem HasCC.mono (h : E ⊆ E') {x : V} {v : ℕ} (hc : HasCC pr E x v) : HasCC pr E' x v :=
-  le_trans hc (card_le_card (ackers_mono h x v))
+  Cslib.Byzantine.Certified.mono hc (fun _ hp => h hp) le_rfl
 
 omit [DecidableEq P] in
 theorem ValidBallot.mono (h : E ⊆ E') {v : ℕ} {b : Option (V × ℕ)}

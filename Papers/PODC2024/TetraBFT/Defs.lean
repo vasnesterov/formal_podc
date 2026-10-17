@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.Foundations.Quorum
 
 /-!
 # TetraBFT: votes, reports, and the safety rules (Rules 1–4)
@@ -124,46 +125,14 @@ theorem IsReport.claims_of_voted {voted : Vote V → Prop} {r a b : ℕ} {rep : 
   · obtain ⟨u'', y'', hprev, huu''⟩ := h.prev_max u x u' y' hur hv hhi hxy
     exact Or.inr (Or.inr ⟨u'', y'', hprev, le_trans hwu huu''⟩)
 
-/-! ### Quorum arithmetic -/
+/-! ### Quorum arithmetic
+
+Generic quorum facts are in `Podc.Foundations.Quorum` (`Finset.exists_mem_notMem_of_card_le_of_lt`,
+`Cslib.Quorum.exists_mem_inter_notMem_of_three_mul_lt`). -/
 
 section Quorum
 
 variable [Fintype P] [DecidableEq P]
-
-/-- Two quorums (`≥ n − f` members, `3f < n`) share at least `f + 1` members. -/
-theorem card_inter_quorum {f : ℕ} (hn : 3 * f < Fintype.card P) {Q₁ Q₂ : Finset P}
-    (h₁ : Fintype.card P - f ≤ Q₁.card) (h₂ : Fintype.card P - f ≤ Q₂.card) :
-    f + 1 ≤ (Q₁ ∩ Q₂).card := by
-  have hu : (Q₁ ∪ Q₂).card ≤ Fintype.card P := card_le_univ _
-  have := card_union_add_card_inter Q₁ Q₂
-  omega
-
-omit [Fintype P] in
-/-- A set with at least `f + 1` members contains a correct one. -/
-theorem exists_correct {f : ℕ} {F B : Finset P} (hF : F.card ≤ f) (hB : f + 1 ≤ B.card) :
-    ∃ q ∈ B, q ∉ F := by
-  by_contra h
-  push Not at h
-  have := card_le_card (show B ⊆ F from h)
-  omega
-
-/-- A quorum and a blocking set intersect. -/
-theorem exists_mem_quorum_blocking {f : ℕ} {Q B : Finset P}
-    (hQ : Fintype.card P - f ≤ Q.card) (hB : f + 1 ≤ B.card) : ∃ q ∈ Q, q ∈ B := by
-  by_contra h
-  push Not at h
-  have hd : Disjoint Q B := disjoint_left.2 fun q hq hqB => h q hq hqB
-  have := card_union_of_disjoint hd
-  have := card_le_univ (Q ∪ B)
-  omega
-
-/-- Two quorums share a correct member. -/
-theorem exists_correct_inter {f : ℕ} (hn : 3 * f < Fintype.card P) {F Q₁ Q₂ : Finset P}
-    (hF : F.card ≤ f) (h₁ : Fintype.card P - f ≤ Q₁.card) (h₂ : Fintype.card P - f ≤ Q₂.card) :
-    ∃ q ∈ Q₁, q ∈ Q₂ ∧ q ∉ F := by
-  obtain ⟨q, hq, hqF⟩ := exists_correct hF (card_inter_quorum hn h₁ h₂)
-  rw [mem_inter] at hq
-  exact ⟨q, hq.1, hq.2, hqF⟩
 
 /-- The correct members of a quorum form a blocking set. -/
 theorem card_correct_quorum {f : ℕ} (hn : 3 * f < Fintype.card P) {F Q : Finset P}

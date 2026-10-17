@@ -26,30 +26,6 @@ variable {P V : Type*} [Fintype P] [DecidableEq P]
 
 section Counting
 
-/-- Inclusion–exclusion bound: `|A| + |C| ≤ |A ∩ C| + n`. -/
-theorem card_add_card_le_card_inter_add (A C : Finset P) :
-    A.card + C.card ≤ (A ∩ C).card + Fintype.card P := by
-  rw [← card_union_add_card_inter]
-  have := card_le_univ (A ∪ C)
-  omega
-
-omit [Fintype P] in
-/-- A set larger than `B` has an element outside `B`. -/
-theorem exists_not_mem_of_card_lt {X B : Finset P} (h : B.card < X.card) : ∃ c ∈ X, c ∉ B := by
-  by_contra hc
-  have hXB : X ⊆ B := fun c hcX => by
-    by_contra h'
-    exact hc ⟨c, hcX, h'⟩
-  exact absurd (card_le_card hXB) (by omega)
-
-/-- Quorum intersection: two sets with `|A| + |C| ≥ n + f + 1` share a member outside `B`
-(`|B| ≤ f`). -/
-theorem exists_correct_inter {A C B : Finset P} {f : ℕ} (hB : B.card ≤ f)
-    (h : Fintype.card P + f + 1 ≤ A.card + C.card) : ∃ c ∈ A, c ∈ C ∧ c ∉ B := by
-  have := card_add_card_le_card_inter_add A C
-  obtain ⟨c, hc, hcB⟩ := exists_not_mem_of_card_lt (X := A ∩ C) (B := B) (by omega)
-  exact ⟨c, (mem_inter.1 hc).1, (mem_inter.1 hc).2, hcB⟩
-
 omit [Fintype P] in
 /-- If `X ⊆ S \ {ℓ}` with `ℓ ∈ B`, then at most `|B| - 1` members of `X` are in `B`. -/
 theorem card_add_one_le_card_sdiff_add {X S B : Finset P} {ℓ : P} (hX : X ⊆ S.erase ℓ)
@@ -123,14 +99,14 @@ theorem exists_correct_acker_of_decided {y : V} {u : ℕ} (h : DecidedIn pr E y 
   resilient_facts hR
   rcases h with h | h
   · obtain ⟨c, hc, hcC, hcB⟩ :=
-      exists_correct_inter (A := ackers E y u) (C := C) hR.hB (by omega)
+      exists_mem_inter_notMem_of_card_le (s := ackers E y u) (t := C) hR.hB (by omega)
     exact ⟨c, hcC, hcB, mem_ackers.1 hc⟩
-  · obtain ⟨c₀, hc₀, hc₀B⟩ := exists_not_mem_of_card_lt (X := committers E y u) (B := B)
+  · obtain ⟨c₀, hc₀, hc₀B⟩ := exists_mem_notMem_of_card_lt_card (t := committers E y u) (s := B)
       (by omega)
     have hcc := hI.commit_valid c₀ hc₀B y u (mem_committers.1 hc₀)
-    unfold HasCC at hcc
+    rw [hasCC_iff] at hcc
     obtain ⟨c, hc, hcC, hcB⟩ :=
-      exists_correct_inter (A := ackers E y u) (C := C) hR.hB (by omega)
+      exists_mem_inter_notMem_of_card_le (s := ackers E y u) (t := C) hR.hB (by omega)
     exact ⟨c, hcC, hcB, mem_ackers.1 hc⟩
 
 /-- The ack set of a decided value is large. -/
@@ -140,10 +116,10 @@ theorem card_ackers_of_decided {y : V} {u : ℕ} (h : DecidedIn pr E y u) :
   resilient_facts hR
   rcases h with h | h
   · constructor <;> omega
-  · obtain ⟨c₀, hc₀, hc₀B⟩ := exists_not_mem_of_card_lt (X := committers E y u) (B := B)
+  · obtain ⟨c₀, hc₀, hc₀B⟩ := exists_mem_notMem_of_card_lt_card (t := committers E y u) (s := B)
       (by have := hR.hB; omega)
     have hcc := hI.commit_valid c₀ hc₀B y u (mem_committers.1 hc₀)
-    unfold HasCC at hcc
+    rw [hasCC_iff] at hcc
     constructor <;> omega
 
 /-- **Lemma A.1 of [KTZ21].** A value with a commit certificate (or a decided value) in view `u`
@@ -152,10 +128,8 @@ first view, a progress certificate. -/
 theorem certified_of_hasCC {x : V} {u : ℕ} (h : HasCC pr E x u) :
     Tok.propose (pr.leader u) x u ∈ E ∧ (u = 0 ∨ Certified pr E x u) := by
   resilient_facts hR
-  unfold HasCC at h
-  obtain ⟨c, hc, hcB⟩ := exists_not_mem_of_card_lt (X := ackers E x u) (B := B)
-    (by have := hR.hB; omega)
-  exact hI.ack_valid c hcB x u (mem_ackers.1 hc)
+  obtain ⟨c, hcB, hc⟩ := h.exists_correct_signer hR.hB (by omega)
+  exact hI.ack_valid c hcB x u hc
 
 /-- Lemma A.1 for decided values. -/
 theorem certified_of_decided {x : V} {u : ℕ} (h : DecidedIn pr E x u) :
@@ -171,7 +145,7 @@ view `u` agree: `x = y`. -/
 theorem hasCC_decided_eq {x y : V} {u : ℕ} (hx : HasCC pr E x u) (hy : DecidedIn pr E y u) :
     x = y := by
   resilient_facts hR
-  unfold HasCC at hx
+  rw [hasCC_iff] at hx
   obtain ⟨c, hc, hcB, hcy⟩ := exists_correct_acker_of_decided hR hI hy (ackers E x u)
     (by have := hR.ht; omega) (by omega)
   exact hI.ack_uniq c hcB x y u (mem_ackers.1 hc) hcy
@@ -179,10 +153,8 @@ theorem hasCC_decided_eq {x y : V} {u : ℕ} (hx : HasCC pr E x u) (hy : Decided
 /-- Two commit certificates in the same view are for the same value. -/
 theorem hasCC_eq {x y : V} {u : ℕ} (hx : HasCC pr E x u) (hy : HasCC pr E y u) : x = y := by
   have h2 := hR.two_qc
-  unfold HasCC at hx hy
-  obtain ⟨c, hcx, hcy, hcB⟩ :=
-    exists_correct_inter (A := ackers E x u) (C := ackers E y u) hR.hB (by omega)
-  exact hI.ack_uniq c hcB x y u (mem_ackers.1 hcx) (mem_ackers.1 hcy)
+  obtain ⟨c, hcB, hcx, hcy⟩ := hx.common_correct_signer hy hR.hB (by omega)
+  exact hI.ack_uniq c hcB x y u hcx hcy
 
 /-- **Corollary A.3 of [KTZ21].** No two different values are decided in the same view. -/
 theorem decidedIn_unique {x y : V} {u : ℕ} (hx : DecidedIn pr E x u) (hy : DecidedIn pr E y u) :
@@ -302,16 +274,16 @@ theorem exists_cc_of_slow (hS : ValidVotes pr E v S bal cc) {w : ℕ} {y : V}
   resilient_facts hR
   have := hS.1
   obtain ⟨c₂, hc₂com, hc₂S, hc₂B⟩ :=
-    exists_correct_inter (A := committers E y w) (C := S) hR.hB (by omega)
+    exists_mem_inter_notMem_of_card_le (s := committers E y w) (t := S) hR.hB (by omega)
   obtain ⟨z, u'', hcc2, hwu'', hzcc⟩ := hI.vote_commit c₂ hc₂B v (bal c₂) (cc c₂) y w
     (hS.2 c₂ hc₂S).1 (mem_committers.1 hc₂com) hwv
   have hc₂S' : c₂ ∈ S.erase (pr.leader w) := mem_erase.2 ⟨fun h => hc₂B (h ▸ hlB), hc₂S⟩
   rcases lt_or_eq_of_le hwu'' with hlt | heq
   · exfalso
     have hu''v := (hS.commitCert hc₂S hcc2).1
-    unfold HasCC at hzcc
+    rw [hasCC_iff] at hzcc
     obtain ⟨c₃, hc₃ack, hc₃S, hc₃B⟩ :=
-      exists_correct_inter (A := ackers E z u'') (C := S) hR.hB (by omega)
+      exists_mem_inter_notMem_of_card_le (s := ackers E z u'') (t := S) hR.hB (by omega)
     obtain ⟨z3, u3, hb3, hu3, -⟩ := hI.vote_ack c₃ hc₃B v (bal c₃) (cc c₃) z u''
       (hS.2 c₃ hc₃S).1 (mem_ackers.1 hc₃ack) hu''v
     have := hmax c₃ hc₃S z3 u3 hb3
@@ -335,7 +307,7 @@ theorem safe_of_many_votes (hS : ValidVotes pr E v S bal cc) {w : ℕ} {x y : V}
   resilient_facts hR
   rcases hy with hfast | hslow
   · set F := (S.erase (pr.leader w)).filter fun s => bal s = some (x, w) with hF
-    have h1 := card_add_card_le_card_inter_add F (ackers E y w)
+    have h1 := card_add_card_le_card_inter_add_card_univ F (ackers E y w)
     have h2 := card_add_one_le_card_sdiff_add (X := F ∩ ackers E y w) (S := S)
       (ℓ := pr.leader w) (fun s hs => (mem_filter.1 (mem_inter.1 hs).1).1) hlB
     obtain ⟨c, hc⟩ := card_pos.1 (by omega : 0 < ((F ∩ ackers E y w) \ B).card)
@@ -359,7 +331,7 @@ theorem not_decided_of_few_votes (hS : ValidVotes pr E v S bal cc) {w : ℕ} {y 
     (hy : DecidedIn pr E y w) : False := by
   resilient_facts hR
   rcases hy with hfast | hslow
-  · have h1 := card_add_card_le_card_inter_add (ackers E y w) (S.erase (pr.leader w))
+  · have h1 := card_add_card_le_card_inter_add_card_univ (ackers E y w) (S.erase (pr.leader w))
     set X := ackers E y w ∩ S.erase (pr.leader w) with hX
     have h2 := card_add_one_le_card_sdiff_add (X := X) (S := S) (ℓ := pr.leader w)
       (fun s hs => (mem_inter.1 hs).2) hlB
@@ -411,9 +383,8 @@ theorem safe_of_certified (v : ℕ) : ∀ x, Certified pr E x v →
   | _ v IH =>
   intro x hcert u huv y hy
   resilient_facts hR
-  unfold Certified at hcert
-  obtain ⟨q, hq, hqB⟩ := exists_not_mem_of_card_lt (X := certAckers E x v) (B := B) (by omega)
-  obtain ⟨S, bal, cc, hS, hsel⟩ := hI.certAck_valid q hqB x v (mem_certAckers.1 hq)
+  obtain ⟨q, hqB, hq⟩ := hcert.exists_correct_signer hR.hB (Nat.lt_succ_self _)
+  obtain ⟨S, bal, cc, hS, hsel⟩ := hI.certAck_valid q hqB x v hq
   exact safe_of_selects hR hI hS (fun w hw => IH w hw) hsel huv hy
 
 /-- Safety of decisions in different views: if `x` is decided in view `v` and `y` in a view

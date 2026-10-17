@@ -106,7 +106,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
   - Leaders may be Byzantine, so a replica may receive *any* proposal. Safety therefore holds for
     every leader schedule and pacemaker.
   - Ideal `(n − f)`-threshold signatures: a QC is the signed tuple, and it is valid iff `n − f`
-    replicas signed it. Byzantine replicas sign anything; correct ones sign exactly their votes.
+    replicas signed it. Byzantine replicas sign anything; correct ones sign exactly their votes
+    (`signers` = `Cslib.Byzantine.signers`; quorum facts from `Podc/Byzantine/Certificate.lean` and
+    `Podc/Foundations/Quorum.lean`).
   - Nodes are branches (lists of commands), with "extends" = suffix. In the chained model, nodes
     carry parent and justify.
   - Results hold for every `n > 3f` with quorums `n − f`; the paper's case is `n = 3f + 1`.

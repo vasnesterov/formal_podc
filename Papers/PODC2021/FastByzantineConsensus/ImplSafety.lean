@@ -3,7 +3,6 @@ import Papers.PODC2021.FastByzantineConsensus.Implementation
 /-!
 # The concrete protocol: unforgeability, refinement, agreement
 
-* `algo_unforging`: the protocol only emits its own signatures and relays received ones.
 * `reachable_absState`: every time of every unforgeable run is a reachable state of the abstract
   transition system of `Protocol.lean` (refinement).
 * `algo_agreement`: agreement, from `Protocol.consistency`.
@@ -17,81 +16,6 @@ open Cslib.Byzantine.PartialSync FastByzantineConsensus.Protocol Finset
 
 variable {P V : Type*} [Fintype P] [DecidableEq P] [DecidableEq V]
 variable {pr : Params P} {L δ : ℕ}
-
-/-- A token received by a correct process at time `τ` is signed by a Byzantine process or known
-to some correct process at time `τ`. -/
-theorem recv_origin (R : Run P (Tok P V) V) (hRa : R.AuthValid auth (algo pr L)) {c r : P}
-    (hc : c ∉ R.faulty) {τ : ℕ} {k : Tok P V} (hk : k ∈ R.inbox (algo pr L) c τ r) :
-    k.signer ∈ R.faulty ∨ ∃ c' ∉ R.faulty, k ∈ (R.st (algo pr L) τ c').known := by
-  obtain ⟨σ, hσ, -, hm⟩ := Run.mem_inbox.1 hk
-  by_cases hr : r ∈ R.faulty
-  · rw [Run.out_of_faulty _ _ hr] at hm
-    rcases hRa r hr σ c hc k hm k rfl with h | ⟨τ', hτ', q', hq', r', m, hm', hx⟩
-    · exact Or.inl h
-    · have hxm : k = m := hx
-      subst hxm
-      rw [out_correct R hq'] at hm'
-      exact Or.inr ⟨q', hq', known_mono R (by omega) _ (Finset.mem_toList.1 hm')⟩
-  · rw [out_correct R hr] at hm
-    exact Or.inr ⟨r, hr, known_mono R hσ _ (Finset.mem_toList.1 hm)⟩
-
-/-- Every token known to a correct process was emitted by a correct process or is signed by a
-Byzantine one (used for the refinement). -/
-theorem known_origin (R : Run P (Tok P V) V) (hRa : R.AuthValid auth (algo pr L)) {c : P}
-    (hc : c ∉ R.faulty) {τ : ℕ} {k : Tok P V} (hk : k ∈ (R.st (algo pr L) τ c).known) :
-    k.signer ∈ R.faulty ∨ k ∈ (R.st (algo pr L) τ k.signer).known := by
-  induction τ generalizing c k with
-  | zero =>
-    right
-    have hk' : k ∈ (if pr.leader 0 = c then {Tok.propose c (R.inp c) 0} else ∅ :
-        Finset (Tok P V)) := hk
-    split_ifs at hk' with h
-    · rw [mem_singleton] at hk'
-      subst hk'
-      exact hk
-    · simp at hk'
-  | succ τ ih =>
-    rcases mem_known_succ R hk with h | ⟨r, h⟩ | h
-    · exact (ih hc h).imp id (fun h' => known_mono R (Nat.le_succ τ) _ h')
-    · rcases recv_origin R hRa hc h with h' | ⟨c', hc', h'⟩
-      · exact Or.inl h'
-      · exact (ih hc' h').imp id (fun h' => known_mono R (Nat.le_succ τ) _ h')
-    · right; rw [h]; exact hk
-
-/-- Tokens signed by a correct process `q` that some correct process knows are known to `q`
-(only `q` creates them; unforgeability of the adversary). -/
-theorem known_signed (R : Run P (Tok P V) V) (hRa : R.AuthValid auth (algo pr L)) {q c : P}
-    (hq : q ∉ R.faulty) (hc : c ∉ R.faulty) {τ : ℕ} {k : Tok P V}
-    (hk : k ∈ (R.st (algo pr L) τ c).known) (hs : k.signer = q) :
-    k ∈ (R.st (algo pr L) τ q).known := by
-  rcases known_origin R hRa hc hk with h | h
-  · exact absurd (hs ▸ h) hq
-  · exact hs ▸ h
-
-/-- The protocol only emits its own signatures and relays received ones. -/
-theorem algo_unforging : (algo (V := V) pr L).Unforging auth := by
-  intro R p τ q m hm x hx
-  have hxm : x = m := hx
-  subst hxm
-  have hk : x ∈ (R.st (algo pr L) τ p).known := Finset.mem_toList.1 hm
-  clear hm hx
-  induction τ generalizing x with
-  | zero =>
-    left
-    have hk' : x ∈ (if pr.leader 0 = p then {Tok.propose p (R.inp p) 0} else ∅ :
-        Finset (Tok P V)) := hk
-    split_ifs at hk' with h
-    · rw [mem_singleton] at hk'
-      subst hk'
-      rfl
-    · simp at hk'
-  | succ τ ih =>
-    rcases mem_known_succ R hk with h | ⟨r, h⟩ | h
-    · rcases ih x h with h' | ⟨τ', hτ', r', m', hm', hx'⟩
-      · exact Or.inl h'
-      · exact Or.inr ⟨τ', by omega, r', m', hm', hx'⟩
-    · exact Or.inr ⟨τ, by omega, r, x, h, rfl⟩
-    · exact Or.inl h
 
 /-! ### Refinement into the abstract transition system -/
 
@@ -293,7 +217,7 @@ theorem known_succ_cases (R : Run P (Tok P V) V) (hRa : R.AuthValid auth (algo p
       k.signer = c := by
   rcases mem_known_succ R hk with h | ⟨r, h⟩ | h
   · exact Or.inl ⟨c, hc, h⟩
-  · rcases recv_origin R hRa hc h with h' | h'
+  · rcases recv_origin hRa hc h with h' | h'
     · exact Or.inr (Or.inl h')
     · exact Or.inl h'
   · exact Or.inr (Or.inr h)
@@ -375,15 +299,15 @@ theorem reachable_absState_succ (R : Run P (Tok P V) V) (hRa : R.AuthValid auth 
           · exact Or.inl (Or.inl ⟨q, hq, hk⟩)
           · obtain ⟨r, -, hr⟩ := mem_biUnion.1 hk
             have hr' := List.mem_toFinset.1 hr
-            rcases recv_origin R hRa hq hr' with h' | h'
+            rcases recv_origin hRa hq hr' with h' | h'
             · exact Or.inl (Or.inr (mem_coe.2 (mem_filter.2
                 ⟨mem_biUnion.2 ⟨q, mem_filter.2 ⟨mem_univ _, hq⟩, mem_known_of_inbox R hr'⟩, h'⟩)))
             · exact Or.inl (Or.inl h')
         · rintro k ((⟨c, hc, hk⟩ | hk) | ⟨r, hrQ, hk⟩) hks
-          · exact mem_union_left _ (known_signed R hRa hq hc hk hks)
+          · exact mem_union_left _ (known_signed hRa hq hc hk hks)
           · exact absurd (hks ▸ (mem_filter.1 (mem_coe.1 hk)).2) hq
           · rcases known_succ_cases R hRa (hQC r hrQ) hk with ⟨c, hc, hk'⟩ | h' | h'
-            · exact mem_union_left _ (known_signed R hRa hq hc hk' hks)
+            · exact mem_union_left _ (known_signed hRa hq hc hk' hks)
             · exact absurd (hks ▸ h') hq
             · exact absurd (h'.symm.trans hks ▸ hrQ) hqQ
         · simp [st', hqQ, absState, hq, hold, s1]
