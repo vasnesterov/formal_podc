@@ -1,5 +1,6 @@
 import Papers.PODC2026.ConsistentRefereeing.LongLivedValency
 import Podc.SharedMemory.Objects
+import Podc.SharedMemory.ObjClasses
 
 /-!
 # Long-lived contest: indistinguishability of schedules (Section 5 of [ACE26])
@@ -20,31 +21,13 @@ Step-level facts used in the case analyses of Lemmas 20, 23, 27, 28 and Theorems
   `w` writes to a `w`-window register erases the previous contents; `Good.sim_tas` — two
   operations on a test&set-like object leave the same memory; `Good.tas_mem` — a set
   test&set-like object stays set;
-* `ObjSpec.TASLike`, `tasObj_tasLike`, `ObjSpec.windowLike_one_of_rw` (registers are window-like
-  with window `1`).
+* test&set-like and read/write-like object classes (`ObjSpec.TASLike`, `tasObj_tasLike`,
+  `ObjSpec.windowLike_one_of_rw`) come from `Podc.SharedMemory.ObjClasses`.
 -/
 
 set_option linter.unusedSectionVars false
 
 namespace Cslib.SharedMemory
-
--- CSLib candidate (next to `ObjSpec.WindowLike`)
-/-- An object whose every operation sets it to a fixed state `s₁` (test&set objects: every
-`T&S()` sets the bit). -/
-def ObjSpec.TASLike (S : ObjSpec) : Prop := ∃ s₁, ∀ s o, (S.δ s o).1 = s₁
-
-/-- The (non-readable) test&set object is test&set-like. -/
-lemma tasObj_tasLike : tasObj.TASLike := ⟨true, fun _ _ => rfl⟩
-
--- CSLib candidate (with `ObjSpec.TASLike`, next to `ObjSpec.WindowLike`)
-/-- Read/write-like objects (every primitive is read-only or a blind write) are window-like with
-window `1`. -/
-lemma ObjSpec.windowLike_one_of_rw {S : ObjSpec} (h : ∀ o, S.ReadOnly o ∨ S.Overwrites o) :
-    S.WindowLike 1 := by
-  refine ⟨fun o => (h o).imp id (fun ho s s' => by rw [ho s s']), fun os hne _ hro s s' => ?_⟩
-  obtain ⟨o, os, rfl⟩ := List.exists_cons_of_ne_nil hne
-  have ho : S.Overwrites o := (h o).resolve_left (hro o List.mem_cons_self)
-  simp only [ObjSpec.runOps_cons, ho s s']
 
 namespace Impl
 
