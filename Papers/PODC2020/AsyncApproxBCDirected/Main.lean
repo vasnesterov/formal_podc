@@ -1,5 +1,7 @@
 import Papers.PODC2020.AsyncApproxBCDirected.Round
 import Papers.PODC2020.AsyncApproxBCDirected.Necessity
+import Podc.Computability.Distributed.ApproxConsensus.Contraction
+import Podc.Computability.Distributed.Byzantine.Specs
 
 /-!
 # Main results: Theorem 4 (both directions), convergence and termination of the algorithm
@@ -62,40 +64,15 @@ theorem interval (hG : ThreeReach G f) (hn : 2 ≤ Fintype.card V) {lo hi : ℝ}
     (h0 : ∀ w ∉ E.F, lo ≤ E.x 0 w ∧ E.x 0 w ≤ hi) (r : ℕ) :
     ∃ lo' hi', lo ≤ lo' ∧ lo' ≤ hi' ∧ hi' ≤ hi ∧ hi' - lo' ≤ (hi - lo) / 2 ^ r ∧
       ∀ v ∉ E.F, lo' ≤ E.x r v ∧ E.x r v ≤ hi' := by
-  classical
-  induction r with
-  | zero => exact ⟨lo, hi, le_rfl, hlh, le_rfl, by simp, h0⟩
-  | succ r ih =>
-    obtain ⟨lo', hi', h1, h2, h3, h4, h5⟩ := ih
-    set C := univ.filter fun v => v ∉ E.F
-    by_cases hC : C.Nonempty
-    · have hval : ∀ v ∉ E.F, lo' ≤ E.x (r + 1) v ∧ E.x (r + 1) v ≤ hi' := fun v hv =>
-        (E.R r).output_valid (by rw [E.F_eq]; exact hv) (E.next r v hv)
-          fun w hw => h5 w (by rwa [E.F_eq] at hw)
-      have hconv : ∀ v ∉ E.F, ∀ u ∉ E.F, |E.x (r + 1) v - E.x (r + 1) u| ≤ (hi' - lo') / 2 :=
-        fun v hv u hu => (E.R r).output_conv hG hn (by rw [E.F_eq]; exact hv)
-          (by rw [E.F_eq]; exact hu) (E.next r v hv) (E.next r u hu)
-          fun w hw => h5 w (by rwa [E.F_eq] at hw)
-      obtain ⟨a, ha, hae⟩ := C.exists_mem_eq_inf' hC (E.x (r + 1))
-      obtain ⟨b, hb, hbe⟩ := C.exists_mem_eq_sup' hC (E.x (r + 1))
-      have haF : a ∉ E.F := (mem_filter.mp ha).2
-      have hbF : b ∉ E.F := (mem_filter.mp hb).2
-      refine ⟨C.inf' hC (E.x (r + 1)), C.sup' hC (E.x (r + 1)), ?_, ?_, ?_, ?_, ?_⟩
-      · rw [hae]; linarith [(hval a haF).1]
-      · exact (C.inf'_le _ ha).trans (C.le_sup' _ ha)
-      · rw [hbe]; linarith [(hval b hbF).2]
-      · rw [hae, hbe, pow_succ]
-        have := (abs_le.mp (hconv b hbF a haF)).2
-        have h2r : (0 : ℝ) < 2 ^ r := by positivity
-        calc E.x (r + 1) b - E.x (r + 1) a ≤ (hi' - lo') / 2 := this
-          _ ≤ (hi - lo) / 2 ^ r / 2 := by linarith
-          _ = (hi - lo) / (2 ^ r * 2) := by rw [div_div]
-      · intro v hv
-        have hvC : v ∈ C := mem_filter.mpr ⟨mem_univ _, hv⟩
-        exact ⟨C.inf'_le _ hvC, C.le_sup' _ hvC⟩
-    · refine ⟨lo, lo, le_rfl, le_rfl, hlh, by
-        simp only [sub_self]; exact div_nonneg (by linarith) (by positivity), fun v hv => ?_⟩
-      exact absurd ⟨v, mem_filter.mpr ⟨mem_univ _, hv⟩⟩ hC
+  have h := exists_Icc_pow_mul_of_step (H := fun _ => {v | v ∉ E.F}) (x := E.x) (c := 1 / 2)
+    (by norm_num) hlh h0 (fun r lo' hi' _ h5 => by
+      refine ⟨fun v hv => (E.R r).output_valid (by rw [E.F_eq]; exact hv) (E.next r v hv)
+        fun w hw => h5 w (by rwa [E.F_eq] at hw), fun v hv u hu => ?_⟩
+      rw [one_div_mul_eq_div]
+      exact (le_abs_self _).trans ((E.R r).output_conv hG hn (by rw [E.F_eq]; exact hv)
+        (by rw [E.F_eq]; exact hu) (E.next r v hv) (E.next r u hu)
+        fun w hw => h5 w (by rwa [E.F_eq] at hw))) r
+  rwa [one_div_pow, one_div_mul_eq_div] at h
 
 /-- **Lemma 15** iterated: `|x_v[r] − x_u[r]| ≤ (hi − lo) / 2^r`. -/
 theorem spread_le (hG : ThreeReach G f) (hn : 2 ≤ Fintype.card V) {lo hi : ℝ} (hlh : lo ≤ hi)
@@ -146,16 +123,8 @@ theorem termination (hG : ThreeReach G f) (hn : 2 ≤ Fintype.card V) {K ε : �
     have h3 : (K - 0) / 2 ^ outRound K ε < ε := by
       rw [sub_zero, div_lt_iff₀ h2]; linarith [lt_outRound K ε hε]
     linarith
-  · intro r v hv
-    set C := univ.filter fun w => w ∉ E.F
-    have hC : C.Nonempty := ⟨v, mem_filter.mpr ⟨mem_univ _, hv⟩⟩
-    obtain ⟨a, ha, hae⟩ := C.exists_mem_eq_inf' hC (E.x 0)
-    obtain ⟨b, hb, hbe⟩ := C.exists_mem_eq_sup' hC (E.x 0)
-    have h0 : ∀ w ∉ E.F, C.inf' hC (E.x 0) ≤ E.x 0 w ∧ E.x 0 w ≤ C.sup' hC (E.x 0) :=
-      fun w hw => ⟨C.inf'_le _ (mem_filter.mpr ⟨mem_univ _, hw⟩),
-        C.le_sup' _ (mem_filter.mpr ⟨mem_univ _, hw⟩)⟩
-    have := E.valid h0 r v hv
-    exact ⟨⟨a, (mem_filter.mp ha).2, hae ▸ this.1⟩, ⟨b, (mem_filter.mp hb).2, hbe ▸ this.2⟩⟩
+  · exact fun r v hv => (Cslib.Byzantine.Problem.inRange_iff_forall_mem_Icc
+      (H := {w | w ∉ E.F}) (Set.toFinite _) ⟨v, hv⟩).2 fun _ _ h0 => E.valid h0 r v hv
 
 end Exec
 

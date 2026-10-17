@@ -1,6 +1,7 @@
 import Papers.PODC2022.HybridApproxAgreement.Trim
 import Podc.Foundations.Data.Finset.Quorum
 import Podc.Foundations.Data.Real.Logb
+import Podc.Computability.Distributed.ApproxConsensus.Contraction
 
 /-!
 # The analysis of `Π_AA` relative to the Overlap All-to-All Broadcast guarantees (Section 3.1)
@@ -260,32 +261,13 @@ theorem iterate {F : Finset P} (hne : ∃ p, p ∉ F) (x : ℕ → P → ℝ)
     {lo hi : ℝ} (h0 : ∀ q ∉ F, lo ≤ x 0 q ∧ x 0 q ≤ hi) :
     ∀ i, (∀ p ∉ F, lo ≤ x i p ∧ x i p ≤ hi) ∧
       ∀ p ∉ F, ∀ p' ∉ F, |x i p - x i p'| ≤ (hi - lo) / 2 ^ i := by
-  -- invariant: the honest values lie in a subinterval of length `≤ (hi - lo) / 2^i`
-  have inv : ∀ i, ∃ a b, lo ≤ a ∧ b ≤ hi ∧ b - a ≤ (hi - lo) / 2 ^ i ∧
-      ∀ q ∉ F, a ≤ x i q ∧ x i q ≤ b := by
-    intro i
-    induction i with
-    | zero => exact ⟨lo, hi, le_rfl, le_rfl, by simp, h0⟩
-    | succ i ih =>
-      obtain ⟨a, b, ha, hb, hab, hq⟩ := ih
-      obtain ⟨h1, h2⟩ := hstep i a b hq
-      set Hs := Finset.univ.filter (· ∉ F)
-      have hHs : Hs.Nonempty := by obtain ⟨p, hp⟩ := hne; exact ⟨p, by simp [Hs, hp]⟩
-      obtain ⟨pm, hpm, hmin⟩ := Hs.exists_min_image (x (i + 1)) hHs
-      obtain ⟨pM, hpM, hmax⟩ := Hs.exists_max_image (x (i + 1)) hHs
-      simp only [Hs, Finset.mem_filter, Finset.mem_univ, true_and] at hpm hpM hmin hmax
-      refine ⟨x (i + 1) pm, x (i + 1) pM, ha.trans (h1 pm hpm).1, (h1 pM hpM).2.trans hb, ?_,
-        fun q hq => ⟨hmin q hq, hmax q hq⟩⟩
-      have := (abs_le.mp (h2 pM hpM pm hpm)).2
-      rw [pow_succ]
-      calc x (i + 1) pM - x (i + 1) pm ≤ (b - a) / 2 := this
-        _ ≤ (hi - lo) / 2 ^ i / 2 := by linarith
-        _ = (hi - lo) / (2 ^ i * 2) := by rw [div_div]
+  obtain ⟨p, hp⟩ := hne
   intro i
-  obtain ⟨a, b, ha, hb, hab, hq⟩ := inv i
-  refine ⟨fun p hp => ⟨ha.trans (hq p hp).1, (hq p hp).2.trans hb⟩, fun p hp p' hp' => ?_⟩
-  rw [abs_le]
-  constructor <;> linarith [hq p hp, hq p' hp']
+  have h := Cslib.ApproxConsensus.mem_Icc_and_abs_sub_le_pow_mul_of_step (H := fun _ => {p | p ∉ F})
+    (c := 1 / 2) (by norm_num) ((h0 p hp).1.trans (h0 p hp).2) h0
+    (fun t a b _ hx => ⟨(hstep t a b hx).1, fun p hp q hq => by
+      rw [one_div_mul_eq_div]; exact (le_abs_self _).trans ((hstep t a b hx).2 p hp q hq)⟩) i
+  rwa [one_div_pow, one_div_mul_eq_div] at h
 
 /-- `S = ⌈log₂(δmax / ε)⌉` iterations suffice: `δmax ≤ 2^S ε` (`0 ≤ δmax` is not needed). -/
 theorem le_two_pow_ceil_logb {δmax ε : ℝ} (_hδ : 0 ≤ δmax) (hε : 0 < ε) :

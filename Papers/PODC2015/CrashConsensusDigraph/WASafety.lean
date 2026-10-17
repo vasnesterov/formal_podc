@@ -1,4 +1,6 @@
 import Papers.PODC2015.CrashConsensusDigraph.WA
+import Podc.Computability.Distributed.ApproxConsensus.Contraction
+import Podc.Foundations.Algebra.Order.BigOperators.Average
 
 /-!
 # Algorithm WA: global invariant, ε-agreement and validity
@@ -29,36 +31,9 @@ variable {V : Type*} [DecidableEq V] [Fintype V]
 /-! ## Averaging -/
 
 theorem avg_bounds {S : Finset ℝ} {a b c : ℝ} {n : ℕ} (hS : ∀ y ∈ S, a ≤ y ∧ y ≤ b) (hc : c ∈ S)
-    (hn : S.card ≤ n) : a + (c - a) / n ≤ avg S ∧ avg S ≤ b - (b - c) / n := by
-  have hk1 : 1 ≤ S.card := card_pos.mpr ⟨c, hc⟩
-  have hk : (0 : ℝ) < S.card := by exact_mod_cast hk1
-  have hkn : (S.card : ℝ) ≤ n := by exact_mod_cast hn
-  have hsum : ∑ y ∈ S, y = c + ∑ y ∈ S.erase c, y := (Finset.add_sum_erase S (fun y => y) hc).symm
-  have hcard : ((S.erase c).card : ℝ) = S.card - 1 := by
-    rw [card_erase_of_mem hc, Nat.cast_sub hk1]; simp
-  have hlow : ((S.card : ℝ) - 1) * a ≤ ∑ y ∈ S.erase c, y := by
-    have := Finset.card_nsmul_le_sum (S.erase c) (fun y => y) a
-      (fun y hy => (hS y (mem_of_mem_erase hy)).1)
-    rw [nsmul_eq_mul, hcard] at this; exact this
-  have hup : ∑ y ∈ S.erase c, y ≤ ((S.card : ℝ) - 1) * b := by
-    have := Finset.sum_le_card_nsmul (S.erase c) (fun y => y) b
-      (fun y hy => (hS y (mem_of_mem_erase hy)).2)
-    rw [nsmul_eq_mul, hcard] at this; exact this
-  have hca : 0 ≤ c - a := by linarith [(hS c hc).1]
-  have hbc : 0 ≤ b - c := by linarith [(hS c hc).2]
-  have h1 : (c - a) / n ≤ (c - a) / S.card := div_le_div_of_nonneg_left hca hk hkn
-  have h2 : (b - c) / n ≤ (b - c) / S.card := div_le_div_of_nonneg_left hbc hk hkn
-  unfold avg
-  rw [hsum]
-  constructor
-  · have : a + (c - a) / S.card ≤ (c + ∑ y ∈ S.erase c, y) / S.card := by
-      rw [le_div_iff₀ hk, add_mul, div_mul_cancel₀ _ hk.ne']
-      nlinarith
-    linarith
-  · have : (c + ∑ y ∈ S.erase c, y) / S.card ≤ b - (b - c) / S.card := by
-      rw [div_le_iff₀ hk, sub_mul, div_mul_cancel₀ _ hk.ne']
-      nlinarith
-    linarith
+    (hn : S.card ≤ n) : a + (c - a) / n ≤ avg S ∧ avg S ≤ b - (b - c) / n :=
+  ⟨Finset.add_div_le_sum_div_card (x := fun y => y) (fun y hy => (hS y hy).1) hc hn,
+    Finset.sum_div_card_le_sub_div (x := fun y => y) (fun y hy => (hS y hy).2) hc hn⟩
 
 /-! ## Contraction -/
 
@@ -78,73 +53,51 @@ theorem contraction (hG : TwoReach G f) {g : V → WS V} {inp : V → ℝ}
     · rw [h]; simp
     · have : (1 : ℝ) ≤ n := by exact_mod_cast h
       rw [sub_nonneg, div_le_one (by linarith)]; exact this
-  intro p
-  induction p with
-  | zero =>
-    refine ⟨lo, hi, le_rfl, hlohi, le_rfl, by simp, fun i _ => ?_⟩
-    rw [(hLI i).val0]; exact ⟨hlo i, hhi i⟩
-  | succ p ih =>
-    obtain ⟨a, b, hla, hab, hbh, hw, hval⟩ := ih
-    -- the heard sets of completed phase `p + 1`
-    have hH : ∀ i, p + 1 < (g i).ph → ∃ H : Finset V, Wait G f i H ∧ (∀ j ∈ H, p < (g j).ph) ∧
-        (g i).val (p + 1) = avg (H.image fun j => (g j).val p) := by
-      intro i hi
-      obtain ⟨H, hW, hHp, hv⟩ := (hLI i).done (p + 1) (by omega) hi
-      exact ⟨H, hW, fun j hj => by simpa using hHp j hj, by simpa using hv⟩
-    have hS : ∀ H : Finset V, (∀ j ∈ H, p < (g j).ph) →
-        ∀ y ∈ H.image (fun j => (g j).val p), a ≤ y ∧ y ≤ b := by
-      intro H hHp y hy
-      obtain ⟨j, hj, rfl⟩ := mem_image.mp hy
-      exact hval j (hHp j hj)
-    have hcardS : ∀ H : Finset V, (H.image fun j => (g j).val p).card ≤ n :=
-      fun H => card_image_le.trans (card_le_univ H)
-    have hin : ∀ i, p + 1 < (g i).ph → a ≤ (g i).val (p + 1) ∧ (g i).val (p + 1) ≤ b := by
-      intro i hi
-      obtain ⟨H, hW, hHp, hv⟩ := hH i hi
-      have hc : (g i).val p ∈ H.image (fun j => (g j).val p) := mem_image_of_mem _ hW.self_mem
-      have hci := hval i (hHp i hW.self_mem)
-      obtain ⟨h1, h2⟩ := avg_bounds (hS H hHp) hc (hcardS H)
-      have : 0 ≤ ((g i).val p - a) / n := div_nonneg (by linarith) (Nat.cast_nonneg _)
-      have : 0 ≤ (b - (g i).val p) / n := div_nonneg (by linarith) (Nat.cast_nonneg _)
-      rw [hv]; constructor <;> linarith
-    have hpair : ∀ i j, p + 1 < (g i).ph → p + 1 < (g j).ph →
-        (g j).val (p + 1) - (g i).val (p + 1) ≤ (1 - 1 / (n : ℝ)) * (b - a) := by
-      intro i j hi hj
-      obtain ⟨Hi, hWi, hHi, hvi⟩ := hH i hi
-      obtain ⟨Hj, hWj, hHj, hvj⟩ := hH j hj
-      obtain ⟨Fi, hiF, hFi, hRi⟩ := hWi
-      obtain ⟨Fj, hjF, hFj, hRj⟩ := hWj
-      obtain ⟨w, hwi, hwj⟩ := hG Fj Fi j i hFj hFi hjF hiF
-      have hwHi := hRi w hwi
-      have hwHj := hRj w hwj
-      obtain ⟨li, -⟩ := avg_bounds (hS Hi hHi) (mem_image_of_mem (fun j => (g j).val p) hwHi)
-        (hcardS Hi)
-      obtain ⟨-, uj⟩ := avg_bounds (hS Hj hHj) (mem_image_of_mem (fun j => (g j).val p) hwHj)
-        (hcardS Hj)
-      rw [hvi, hvj]
-      have : (1 - 1 / (n : ℝ)) * (b - a) = (b - a) - ((b - (g w).val p) / n + ((g w).val p - a) / n) := by
-        ring
-      rw [this]
-      linarith
-    set D := univ.filter fun i => p + 1 < (g i).ph
-    by_cases hD : D.Nonempty
-    · obtain ⟨imin, himin, hmin⟩ := exists_min_image D (fun i => (g i).val (p + 1)) hD
-      obtain ⟨imax, himax, hmax⟩ := exists_max_image D (fun i => (g i).val (p + 1)) hD
-      have hmn : p + 1 < (g imin).ph := (mem_filter.mp himin).2
-      have hmx : p + 1 < (g imax).ph := (mem_filter.mp himax).2
-      refine ⟨(g imin).val (p + 1), (g imax).val (p + 1), by linarith [(hin imin hmn).1],
-        hmin imax himax, by linarith [(hin imax hmx).2], ?_, fun i hi => ?_⟩
-      · have := hpair imin imax hmn hmx
-        rw [pow_succ]
-        have : (1 - 1 / (n : ℝ)) * (b - a) ≤ (1 - 1 / (n : ℝ)) * ((1 - 1 / (n : ℝ)) ^ p * (hi - lo)) :=
-          mul_le_mul_of_nonneg_left hw hq
-        nlinarith
-      · have hiD : i ∈ D := mem_filter.mpr ⟨mem_univ _, hi⟩
-        exact ⟨hmin i hiD, hmax i hiD⟩
-    · refine ⟨a, a, hla, le_rfl, by linarith, ?_, fun i hi => ?_⟩
-      · simp only [sub_self]
-        exact mul_nonneg (pow_nonneg hq _) (by linarith)
-      · exact absurd ⟨i, mem_filter.mpr ⟨mem_univ _, hi⟩⟩ hD
+  refine exists_Icc_pow_mul_of_step (H := fun p => {i | p < (g i).ph})
+    (x := fun p i => (g i).val p) hq hlohi (fun i _ => by rw [(hLI i).val0]; exact ⟨hlo i, hhi i⟩)
+    fun p a b _ hval => ?_
+  -- the heard sets of completed phase `p + 1`
+  have hH : ∀ i, p + 1 < (g i).ph → ∃ H : Finset V, Wait G f i H ∧ (∀ j ∈ H, p < (g j).ph) ∧
+      (g i).val (p + 1) = avg (H.image fun j => (g j).val p) := by
+    intro i hi
+    obtain ⟨H, hW, hHp, hv⟩ := (hLI i).done (p + 1) (by omega) hi
+    exact ⟨H, hW, fun j hj => by simpa using hHp j hj, by simpa using hv⟩
+  have hS : ∀ H : Finset V, (∀ j ∈ H, p < (g j).ph) →
+      ∀ y ∈ H.image (fun j => (g j).val p), a ≤ y ∧ y ≤ b := by
+    intro H hHp y hy
+    obtain ⟨j, hj, rfl⟩ := mem_image.mp hy
+    exact hval j (hHp j hj)
+  have hcardS : ∀ H : Finset V, (H.image fun j => (g j).val p).card ≤ n :=
+    fun H => card_image_le.trans (card_le_univ H)
+  have hin : ∀ i, p + 1 < (g i).ph → a ≤ (g i).val (p + 1) ∧ (g i).val (p + 1) ≤ b := by
+    intro i hi
+    obtain ⟨H, hW, hHp, hv⟩ := hH i hi
+    have hc : (g i).val p ∈ H.image (fun j => (g j).val p) := mem_image_of_mem _ hW.self_mem
+    obtain ⟨hci₁, hci₂⟩ := hval i (hHp i hW.self_mem)
+    obtain ⟨h1, h2⟩ := avg_bounds (hS H hHp) hc (hcardS H)
+    have : 0 ≤ ((g i).val p - a) / n := div_nonneg (by linarith) (Nat.cast_nonneg _)
+    have : 0 ≤ (b - (g i).val p) / n := div_nonneg (by linarith) (Nat.cast_nonneg _)
+    rw [hv]; constructor <;> linarith
+  have hpair : ∀ i j, p + 1 < (g i).ph → p + 1 < (g j).ph →
+      (g j).val (p + 1) - (g i).val (p + 1) ≤ (1 - 1 / (n : ℝ)) * (b - a) := by
+    intro i j hi hj
+    obtain ⟨Hi, hWi, hHi, hvi⟩ := hH i hi
+    obtain ⟨Hj, hWj, hHj, hvj⟩ := hH j hj
+    obtain ⟨Fi, hiF, hFi, hRi⟩ := hWi
+    obtain ⟨Fj, hjF, hFj, hRj⟩ := hWj
+    obtain ⟨w, hwi, hwj⟩ := hG Fj Fi j i hFj hFi hjF hiF
+    have hwHi := hRi w hwi
+    have hwHj := hRj w hwj
+    obtain ⟨li, -⟩ := avg_bounds (hS Hi hHi) (mem_image_of_mem (fun j => (g j).val p) hwHi)
+      (hcardS Hi)
+    obtain ⟨-, uj⟩ := avg_bounds (hS Hj hHj) (mem_image_of_mem (fun j => (g j).val p) hwHj)
+      (hcardS Hj)
+    rw [hvi, hvj]
+    have : (1 - 1 / (n : ℝ)) * (b - a) = (b - a) - ((b - (g w).val p) / n + ((g w).val p - a) / n) := by
+      ring
+    rw [this]
+    linarith
+  exact ⟨hin, fun i hi j hj => hpair j i hj hi⟩
 
 /-! ## The global invariant -/
 

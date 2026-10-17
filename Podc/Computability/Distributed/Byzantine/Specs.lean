@@ -1,4 +1,5 @@
 import Cslib.Computability.Distributed.Byzantine.Specs
+import Mathlib.Data.Set.Finite.Lemmas
 
 -- CSLib candidate: append to Cslib/Computability/Distributed/Byzantine/Specs.lean
 
@@ -30,6 +31,8 @@ honest set `H : Set P`, decision relation `dec : P → O → Prop`; a paper with
 * `bb_iff`, `ic_iff`, `weakAgreement_iff`: CSLib's lock-step `BB`, `IC` and `WeakAgreement` are
   conjunctions of these clauses (by `Iff.rfl`; `ba_iff` is the case of `BA`).
 * `InRange.of_le_of_le`, `InRange.eq_of_forall_eq`, `inRange_iff_exists`: basic facts on ranges.
+* `inRange_iff_forall_mem_Icc`: for finitely many honest processes, the honest range is the
+  intersection of all intervals containing the honest inputs.
 -/
 
 namespace Cslib.Byzantine.Problem
@@ -109,6 +112,17 @@ theorem InRange.eq_of_forall_eq [PartialOrder V] (h : InRange inp H v)
   rw [hx p hp] at h₁
   rw [hx q hq] at h₂
   exact le_antisymm h₂ h₁
+
+/-- For finitely many honest processes, `v` lies in the honest range iff it lies in every interval
+containing all honest inputs (i.e. in `[min, max]` of the honest inputs). -/
+theorem inRange_iff_forall_mem_Icc [LinearOrder V] (hH : H.Finite) (hne : H.Nonempty) :
+    InRange inp H v ↔ ∀ lo hi, (∀ p ∈ H, inp p ∈ Set.Icc lo hi) → v ∈ Set.Icc lo hi := by
+  refine ⟨fun ⟨⟨p, hp, h₁⟩, q, hq, h₂⟩ lo hi h => ⟨(h p hp).1.trans h₁, h₂.trans (h q hq).2⟩,
+    fun h => ?_⟩
+  obtain ⟨p, hp, hmin⟩ := Set.exists_min_image H inp hH hne
+  obtain ⟨q, hq, hmax⟩ := Set.exists_max_image H inp hH hne
+  obtain ⟨h₁, h₂⟩ := h (inp p) (inp q) fun r hr => ⟨hmin r hr, hmax r hr⟩
+  exact ⟨⟨p, hp, h₁⟩, q, hq, h₂⟩
 
 end Range
 
