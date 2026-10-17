@@ -29,7 +29,8 @@ noncomputable def ex3 : Instance Unit (fun _ => Fin 8) (Fin 3) where
 
 lemma ex3_pr (t : Fin 3) : ex3.pr t = 1 / 8 := by
   classical
-  unfold Instance.pr Instance.condProb Instance.weight Instance.marg Instance.empty
+  unfold Instance.pr Instance.condProb Cslib.Probability.piExpect Cslib.Probability.piWeight
+    Instance.marg Instance.empty
   rw [← (Equiv.funUnique Unit (Fin 8)).symm.sum_comp]
   simp only [Fintype.prod_unique, Equiv.funUnique_symm_apply, ex3]
   fin_cases t <;> simp [Fin.sum_univ_eight]
@@ -62,7 +63,8 @@ noncomputable def sharp : Instance Unit (fun _ => Bool) Bool where
 
 lemma sharp_pr (b : Bool) : sharp.pr b = 1 / 2 := by
   classical
-  unfold Instance.pr Instance.condProb Instance.weight Instance.marg Instance.empty
+  unfold Instance.pr Instance.condProb Cslib.Probability.piExpect Cslib.Probability.piWeight
+    Instance.marg Instance.empty
   rw [← (Equiv.funUnique Unit Bool).symm.sum_comp]
   simp only [Fintype.prod_unique, Equiv.funUnique_symm_apply, sharp]
   cases b <;> simp

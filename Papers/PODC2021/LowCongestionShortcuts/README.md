@@ -71,7 +71,8 @@ from other work.
 - Overcongested edges: instead of running the greedy, we take a set `O` with the greedy's fixed-point property
   (`exists_stable`).
 - The probabilistic method (independent Bernoulli(`1/(4D)`) parts) is an explicit weighted sum over subsets, without
-  measure theory.
+  measure theory: `bernWeight` and its lemmas come from the shared finite probability library
+  `Podc/Probability/Finite/Bernoulli.lean`.
 
 **Main results in Lean** (namespace `LowCongestionShortcuts`).
 
