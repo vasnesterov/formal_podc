@@ -68,26 +68,15 @@ theorem card_filter_mk_mem (E : Finset (Sym2 V)) (y : V) :
     obtain ⟨z, rfl⟩ := Sym2.mem_iff_exists.1 hy
     exact ⟨z, he, rfl⟩
 
-theorem filter_mem_mk (p q : V) : (univ.filter (· ∈ s(p, q))) = {p, q} := by
-  ext v; simp
-
-theorem card_filter_mem_le (e : Sym2 V) : (univ.filter (· ∈ e)).card ≤ 2 := by
-  induction e using Sym2.ind with
-  | h p q => rw [filter_mem_mk]; exact card_le_two
-
-theorem card_filter_mem_eq (e : Sym2 V) (he : ¬ e.IsDiag) : (univ.filter (· ∈ e)).card = 2 := by
-  induction e using Sym2.ind with
-  | h p q =>
-    rw [filter_mem_mk]
-    exact card_pair (by simpa using he)
-
 /-- Handshake lemma for a set of non-loop edges. -/
 theorem sum_card_filter_mk_mem (E : Finset (Sym2 V)) (hE : ∀ e ∈ E, ¬ e.IsDiag) :
     ∑ y, (univ.filter fun z => s(y, z) ∈ E).card = 2 * E.card := by
   simp_rw [card_filter_mk_mem, card_filter]
   rw [sum_comm]
   simp_rw [← card_filter]
-  rw [sum_congr rfl fun e he => card_filter_mem_eq e (hE e he)]
+  rw [sum_congr rfl fun e he => (show (univ.filter (· ∈ e)).card = 2 by
+    rw [show univ.filter (· ∈ e) = e.toFinset by ext; simp]
+    exact Sym2.card_toFinset_of_not_isDiag e (hE e he))]
   simp [mul_comm]
 
 omit [Fintype V] in
@@ -156,13 +145,13 @@ theorem exists_partner (hD : IsEDS G Dstar) {y : V} (hy : y ∈ internal Dstar) 
   exact ⟨u, hD.1 _ he, mem_internal.2 ⟨_, he, Sym2.mem_mk_right _ _⟩⟩
 
 theorem card_internal_le : (internal Dstar).card ≤ 2 * Dstar.card := by
-  calc (internal Dstar).card ≤ (Dstar.biUnion fun e => univ.filter (· ∈ e)).card := by
+  calc (internal Dstar).card ≤ (Dstar.biUnion Sym2.toFinset).card := by
         apply card_le_card
         intro v hv
         obtain ⟨e, he, hve⟩ := mem_internal.1 hv
-        exact mem_biUnion.2 ⟨e, he, by simpa using hve⟩
-    _ ≤ ∑ e ∈ Dstar, (univ.filter (· ∈ e)).card := card_biUnion_le
-    _ ≤ ∑ _e ∈ Dstar, 2 := sum_le_sum fun e _ => card_filter_mem_le e
+        exact mem_biUnion.2 ⟨e, he, Sym2.mem_toFinset.2 hve⟩
+    _ ≤ ∑ e ∈ Dstar, e.toFinset.card := card_biUnion_le
+    _ ≤ ∑ _e ∈ Dstar, 2 := sum_le_sum fun e _ => by rw [Sym2.card_toFinset]; split_ifs <;> omega
     _ = 2 * Dstar.card := by simp [mul_comm]
 
 /-- Twice the cost that the edge `{y, z} ∈ D = M ∪ P` charges to `y` (§7.5). -/

@@ -1,4 +1,5 @@
 import Podc.CongestLB.Congest
+import Podc.Graph.Ball
 
 /-!
 # The lower-bound graphs for minimum dominating set (Section 2.1)
@@ -131,8 +132,9 @@ lemma adj_gad_gad {s ℓ s' ℓ' : Bool} {h h' : Fin L} {κ κ' : Fin 3} :
 
 end Adj
 
-/-- A dominating set: every vertex is in `D` or has a neighbour in `D`. -/
-def IsDominating {V : Type*} (G : SimpleGraph V) (D : Finset V) : Prop :=
-  ∀ v, v ∈ D ∨ ∃ w ∈ D, G.Adj v w
+/-- A dominating set: every vertex is in `D` or has a neighbour in `D`
+(`SimpleGraph.IsDominatingSet` for a finset). -/
+abbrev IsDominating {V : Type*} (G : SimpleGraph V) (D : Finset V) : Prop :=
+  G.IsDominatingSet ↑D
 
 end HardnessOptimization

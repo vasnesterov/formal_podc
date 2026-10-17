@@ -14,8 +14,8 @@ survives (here `x(i,p) = y(i,p) = 1`), see `lemma_2_1`.
 namespace HardnessOptimization
 
 instance {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj]
-    (D : Finset V) : Decidable (IsDominating G D) := by
-  unfold IsDominating; infer_instance
+    (D : Finset V) : Decidable (IsDominating G D) :=
+  decidable_of_iff (∀ v, v ∈ D ∨ ∃ w ∈ D, G.Adj v w) Iff.rfl
 
 /-- The column index `p = 0`. -/
 def pc : Idx 1 := fun _ => false
