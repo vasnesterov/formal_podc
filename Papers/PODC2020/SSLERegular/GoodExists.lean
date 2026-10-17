@@ -1,6 +1,7 @@
 import Papers.PODC2020.SSLERegular.EulerGood
 import Papers.PODC2020.SSLERegular.Euler
 import Mathlib.Combinatorics.SimpleGraph.DegreeSum
+import Mathlib.GroupTheory.Perm.Fin
 
 /-!
 # Existence of legitimate configurations of SS-EulerCycle (repaired Lemma 3.1)

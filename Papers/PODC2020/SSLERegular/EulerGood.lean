@@ -1,4 +1,5 @@
 import Papers.PODC2020.SSLERegular.EulerDynamics
+import Mathlib.GroupTheory.Perm.Cycle.Basic
 
 /-!
 # The ring-protocol hypothesis and the legitimate configurations of the repaired SS-EulerCycle

@@ -1,4 +1,5 @@
 import Papers.PODC2020.SSLERegular.EulerLiteral
+import Mathlib.Tactic.Ring
 
 /-!
 # Coherent configurations of SS-EulerCycle: the virtual-ring permutation

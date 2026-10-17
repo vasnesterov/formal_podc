@@ -26,3 +26,7 @@ import Podc.CongestLB.Randomized
 import Podc.StrongLin.Restricted
 import Podc.SharedMemory.ObjectClasses
 import Podc.Knowledge.Basic
+import Podc.Stabilization.Basic
+import Podc.Stabilization.Markov
+import Podc.PopulationProtocols.Nondet
+import Podc.PopulationProtocols.RandomScheduler
