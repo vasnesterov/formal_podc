@@ -1,5 +1,5 @@
 import Cslib.Computability.Distributed.DynamicNetworks.HeardOf
-import Mathlib.Data.ENat.Lattice
+import Podc.DynamicNetworks.Journey
 import Mathlib.Data.Finset.Card
 
 /-!
@@ -15,9 +15,10 @@ Assumptions on Network Dynamics* (PODC 2021; journal version HAL hal-03346225), 
 * A dynamic graph is `G : ℕ → Graph ι` (CSLib `Cslib.HeardOf.Graph`, `G t p q` = edge `p → q`).
   Rounds are **0-indexed**: `G t` is the paper's `G_{t+1}` and `exec A G γ t` is the paper's
   configuration `γ_{t+1}`. `IsDG V G`: all edges of `G` are between distinct vertices of `V`.
-* Journeys: `Reach G p a b q` holds iff `p = q` or there is a journey from `p` to `q` all of whose
-  edges are taken in rounds `t ∈ [a, b)` (at strictly increasing times).
-  The temporal distance `tdist G i p q` is the paper's `d̂_{G_{i▷}}(p, q)` (`tdist_le_iff`).
+* Journeys: `Reach G p a b q` (for `a ≤ b`) holds iff `p = q` or there is a journey from `p` to `q`
+  all of whose edges are taken in rounds `t ∈ [a, b)` (at strictly increasing times): the library
+  notion `Cslib.DynNet.Journey G a p b q`. The temporal distance `tdist G i p q` is the paper's
+  `d̂_{G_{i▷}}(p, q)` (`Cslib.DynNet.tdist`, `tdist_le_iff`).
 * Algorithms are deterministic full-information round algorithms (CSLib `Cslib.HeardOf.StepFn`):
   each process broadcasts its whole state; the receiver also learns who sent what. Each process has
   its own code (`step p`) and output `lid p : σ → ι`. This is at least as strong as the paper's
@@ -40,102 +41,23 @@ def IsDG (V : Finset ι) (G : DG ι) : Prop := ∀ t p q, G t p q → p ∈ V �
 
 /-! ### Journeys and temporal distance -/
 
--- CSLib candidate: `Reach`, `TReach`, `tdist`, `tdist_le_iff`, `Reach.shift_iff` (next to
--- `Cslib.DynNet`), and the timeliness classes below.
+-- CSLib candidate: the timeliness classes below (journeys and `tdist` are `Cslib.DynNet`'s).
 
-/-- `Reach G p a b q`: `p = q`, or there is a journey from `p` to `q` whose edges are all taken in
-rounds of `[a, b)`, at strictly increasing times. -/
-inductive Reach (G : DG ι) : ι → ℕ → ℕ → ι → Prop
-  | refl (p : ι) (a b : ℕ) : Reach G p a b p
-  | step {p r q : ι} {a b t : ℕ} : a ≤ t → t < b → G t p r → Reach G r (t + 1) b q →
-      Reach G p a b q
+open Cslib.DynNet (Journey tdist tdist_le_iff)
+
+/-- `Reach G p a b q`: there is a journey from `p` at time `a` to `q` at time `b`, i.e. `p = q`
+(and `a ≤ b`) or there is a journey from `p` to `q` whose edges are all taken in rounds of
+`[a, b)`, at strictly increasing times. -/
+abbrev Reach (G : DG ι) (p : ι) (a b : ℕ) (q : ι) : Prop := Journey G a p b q
 
 /-- `p ⇝ q` in the suffix `G_{i▷}` (`p = q` or there is a journey from `p` to `q` starting at
 round `i` or later). -/
 def TReach (G : DG ι) (i : ℕ) (p q : ι) : Prop := ∃ b, Reach G p i b q
 
-/-- The temporal distance `d̂_{G_{i▷}}(p, q)`: the least `k` such that a journey from `p` to `q`
-starting at round `i` or later arrives by round `i + k - 1` (`0` iff `p = q`; `⊤` if no journey). -/
-noncomputable def tdist (G : DG ι) (i : ℕ) (p q : ι) : ℕ∞ :=
-  sInf ((fun k : ℕ => (k : ℕ∞)) '' {k | Reach G p i (i + k) q})
-
-namespace Reach
-
-variable {G : DG ι}
-
-theorem mono_right {p q : ι} {a b b' : ℕ} (h : Reach G p a b q) (hb : b ≤ b') :
-    Reach G p a b' q := by
-  induction h with
-  | refl p a b => exact .refl p a b'
-  | step hat htb hG _ ih => exact .step hat (by omega) hG (ih hb)
-
-theorem mono_left {p q : ι} {a a' b : ℕ} (h : Reach G p a b q) (ha : a' ≤ a) :
-    Reach G p a' b q := by
-  cases h with
-  | refl => exact .refl _ _ _
-  | step hat htb hG h => exact .step (by omega) htb hG h
-
-theorem trans {p r q : ι} {a b c : ℕ} (h₁ : Reach G p a b r) (h₂ : Reach G r b c q)
-    (hab : a ≤ b) (hbc : b ≤ c) : Reach G p a c q := by
-  induction h₁ with
-  | refl p a b => exact h₂.mono_left hab
-  | step hat htb hG _ ih => exact .step hat (by omega) hG (ih h₂ (by omega) hbc)
-
-theorem single {p q : ι} {t : ℕ} (h : G t p q) : Reach G p t (t + 1) q :=
-  .step le_rfl (by omega) h (.refl _ _ _)
-
 /-- Journeys in a shifted dynamic graph. -/
-theorem shift_iff {i : ℕ} {p q : ι} {a b : ℕ} :
-    Reach (shift i G) p a b q ↔ Reach G p (i + a) (i + b) q := by
-  constructor
-  · intro h
-    induction h with
-    | refl p a b => exact .refl _ _ _
-    | step hat htb hG _ ih =>
-      exact .step (by omega) (by omega) hG (by rw [← Nat.add_assoc] at ih; exact ih)
-  · intro h
-    generalize ha : i + a = a' at h
-    generalize hb : i + b = b' at h
-    induction h generalizing a with
-    | refl p a b => exact .refl _ _ _
-    | @step p r q a'' b'' t hat htb hG _ ih =>
-      obtain ⟨t', rfl⟩ : ∃ t', t = i + t' := ⟨t - i, by omega⟩
-      exact .step (a := a) (t := t') (by omega) (by omega) hG (ih (by omega) hb)
-
-end Reach
-
-theorem tdist_le_iff {G : DG ι} {i : ℕ} {p q : ι} {Δ : ℕ} :
-    tdist G i p q ≤ Δ ↔ Reach G p i (i + Δ) q := by
-  constructor
-  · intro h
-    have hne : ((fun k : ℕ => (k : ℕ∞)) '' {k | Reach G p i (i + k) q}).Nonempty := by
-      by_contra hc
-      rw [Set.not_nonempty_iff_eq_empty] at hc
-      simp only [tdist, hc, sInf_empty, top_le_iff, ENat.coe_ne_top] at h
-    obtain ⟨k, hk, hkeq⟩ := csInf_mem hne
-    have : (k : ℕ∞) ≤ Δ := by unfold tdist at h; rw [← hkeq] at h; exact h
-    exact Reach.mono_right hk (by have := ENat.coe_le_coe.mp this; omega)
-  · intro h
-    exact sInf_le ⟨Δ, h, rfl⟩
-
-theorem tdist_eq_zero_iff {G : DG ι} {i : ℕ} {p q : ι} : tdist G i p q = 0 ↔ p = q := by
-  rw [← nonpos_iff_eq_zero, show (0 : ℕ∞) = ((0 : ℕ) : ℕ∞) from rfl, tdist_le_iff]
-  constructor
-  · intro h
-    cases h with
-    | refl => rfl
-    | step hat htb => omega
-  · rintro rfl; exact .refl _ _ _
-
-theorem tdist_lt_top_iff {G : DG ι} {i : ℕ} {p q : ι} : tdist G i p q < ⊤ ↔ TReach G i p q := by
-  constructor
-  · intro h
-    obtain ⟨k, hk⟩ := ENat.ne_top_iff_exists.mp h.ne
-    have : tdist G i p q ≤ k := hk ▸ le_rfl
-    exact ⟨_, tdist_le_iff.mp this⟩
-  · rintro ⟨b, hb⟩
-    have : tdist G i p q ≤ (b - i : ℕ) := tdist_le_iff.mpr (hb.mono_right (by omega))
-    exact lt_of_le_of_lt this (ENat.coe_lt_top _)
+theorem Reach.shift_iff {G : DG ι} {i : ℕ} {p q : ι} {a b : ℕ} :
+    Reach (shift i G) p a b q ↔ Reach G p (i + a) (i + b) q :=
+  Cslib.DynNet.journey_shift_iff
 
 /-! ### The nine classes (Table 1) -/
 
@@ -199,7 +121,7 @@ theorem J_rec_eq (k : Kind) (Δ Δ' : ℕ) (V : Finset ι) : J k .recur Δ V = J
 theorem conn_shift {τ : Timeliness} {Δ : ℕ} {G : DG ι} {p q : ι} (h : Conn τ Δ G p q) (i : ℕ) :
     Conn τ Δ (shift i G) p q := by
   have hd : ∀ j, tdist (shift i G) j p q ≤ Δ ↔ tdist G (i + j) p q ≤ Δ := by
-    intro j; rw [tdist_le_iff, tdist_le_iff, Reach.shift_iff, Nat.add_assoc]
+    intro j; rw [tdist_le_iff, tdist_le_iff, Nat.add_assoc]; exact Reach.shift_iff
   cases τ with
   | recur =>
     intro j

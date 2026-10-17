@@ -14,6 +14,7 @@ changed by adding more inputs (minimum/maximum over unbounded domains, majority,
 namespace CoordCons
 
 open DGraph Relation
+open Cslib.DynNet (Journey)
 
 variable {α : Type*} {G : DGraph α}
 
@@ -21,12 +22,12 @@ variable {α : Type*} {G : DGraph α}
 time `1`, then `u` has heard from everybody at time `1`. -/
 theorem reach_one_of_closed (hG : G.Valid) {u t : ℕ} (hu : u ∈ G.V)
     (hc : ∀ w, G.Reach w 0 u t → G.Reach w 1 u t) : ∀ w ∈ G.V, G.Reach w 1 u t := by
-  have ht : 1 ≤ t := (hc u (Reach.self (Nat.zero_le t))).le
+  have ht : 1 ≤ t := (hc u (Journey.self (Nat.zero_le t))).le
   intro y hy
   by_contra hyp
   obtain ⟨z, x, hzx, hz, hx⟩ := Cslib.DynNet.exists_edge_cross
-    (S := fun x => G.Reach x 1 u t) (hG.conn 1 le_rfl y hy u hu) hyp (Reach.self ht)
-  exact hz (hc z (Reach.cons (Or.inr hzx) hx))
+    (S := fun x => G.Reach x 1 u t) (hG.conn 1 le_rfl y hy u hu) hyp (Journey.self ht)
+  exact hz (hc z (Journey.cons (Or.inr hzx) hx))
 
 theorem past_eq_V_of_past_eq (hG : G.Valid) {u t : ℕ} (hu : u ∈ G.V)
     (h : G.past u t 0 = G.past u t 1) : G.past u t 0 = G.V := by
@@ -37,7 +38,7 @@ theorem past_eq_V_of_past_eq (hG : G.Valid) {u t : ℕ} (hu : u ∈ G.V)
     have hwV := (hw0.mem_iff hG).2 hu
     have : w ∈ G.past u t 1 := h ▸ mem_past.2 ⟨hwV, hw0⟩
     exact (mem_past.1 this).2
-  exact mem_past.2 ⟨hw, (reach_one_of_closed hG hu hc w hw).of_le (Nat.zero_le 1)⟩
+  exact mem_past.2 ⟨hw, (reach_one_of_closed hG hu hc w hw).mono_left (Nat.zero_le 1)⟩
 
 /-- **Lemma 3.1.** With no a-priori knowledge of the count, `u` knows at time `t` that it has
 heard from all nodes iff `past(u,t)(0) = past(u,t)(1)`. -/

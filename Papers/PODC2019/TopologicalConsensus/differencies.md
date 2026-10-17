@@ -211,7 +211,8 @@ The remaining sections concern v3 only.
     prefixes all extend into `MA` is in `MA`".
 15. **Section 7 in the generic model** (Definitions 7.1–7.2: HO functions, independent arbitrary
     input assignments) is not formalized. Its message-adversary instances are formalized with
-    the concrete heard-of relation `DN.Heard`.
+    the concrete heard-of relation `DN.Heard` (a journey from `(p, 0)` to `(q, t)`;
+    `heard_zero_iff`, `heard_succ_iff` give its recursive definition).
 
 ## Not formalized
 

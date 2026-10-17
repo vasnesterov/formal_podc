@@ -26,6 +26,7 @@ namespace TopoConsensus
 namespace DN
 
 open Set Cslib.HeardOf Topology
+open Cslib.DynNet (Journey journey_self_iff journey_succ_iff)
 
 set_option linter.unusedSectionVars false
 
@@ -33,53 +34,50 @@ variable {P V W : Type*}
 
 /-! ### Heard-of relation -/
 
-/-- `q` has (transitively) heard of `p` after `t` rounds of `σ`. -/
-def Heard (σ : ℕ → Graph P) : ℕ → P → P → Prop
-  | 0, q, p => q = p
-  | t + 1, q, p => Heard σ t q p ∨ ∃ r, σ t r q ∧ Heard σ t r p
+/-- `q` has (transitively) heard of `p` after `t` rounds of `σ`: there is a journey
+(`Cslib.DynNet.Journey`) from `p` at time `0` to `q` at time `t` (`heard_zero_iff`,
+`heard_succ_iff` restate the recursive definition). -/
+def Heard (σ : ℕ → Graph P) (t : ℕ) (q p : P) : Prop := Journey σ 0 p t q
 
 /-- `p` is a broadcaster of `σ`: every process eventually hears of `p` (Definition 7.3). -/
 def Broadcaster (σ : ℕ → Graph P) (p : P) : Prop := ∀ q, ∃ T, Heard σ T q p
 
+theorem heard_zero_iff {σ : ℕ → Graph P} {q p : P} : Heard σ 0 q p ↔ q = p :=
+  journey_self_iff.trans eq_comm
+
+theorem heard_succ_iff {σ : ℕ → Graph P} {t : ℕ} {q p : P} :
+    Heard σ (t + 1) q p ↔ Heard σ t q p ∨ ∃ r, σ t r q ∧ Heard σ t r p := by
+  rw [Heard, journey_succ_iff (Nat.zero_le t)]
+  constructor
+  · rintro ⟨r, h, rfl | hr⟩
+    · exact Or.inl h
+    · exact Or.inr ⟨r, hr, h⟩
+  · rintro (h | ⟨r, hr, h⟩)
+    · exact ⟨q, h, Or.inl rfl⟩
+    · exact ⟨r, h, Or.inr hr⟩
+
 theorem Heard.mono {σ : ℕ → Graph P} {t : ℕ} {q p : P} (h : Heard σ t q p) :
-    ∀ u, t ≤ u → Heard σ u q p := by
-  intro u hu
-  obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le hu
-  induction d with
-  | zero => exact h
-  | succ d ih => exact Or.inl (ih (by omega))
+    ∀ u, t ≤ u → Heard σ u q p :=
+  fun _ hu => Journey.mono_right h hu
 
 variable {x y z : P → V} {σ τ : ℕ → Graph P}
 
 /-- Heard-of property (iii): a process that cannot distinguish two executions and has heard of
 `p` sees the same input of `p`. -/
 theorem FIIndist.input_of_heard {t : ℕ} {q p : P} (h : FIIndist x y σ τ t q)
-    (hh : Heard σ t q p) : x p = y p := by
-  induction t generalizing q with
-  | zero => subst hh; exact h
-  | succ t ih =>
-    obtain ⟨h0, -, hs⟩ := h
-    rcases hh with hh | ⟨r, hr, hh⟩
-    · exact ih h0 hh
-    · exact ih (hs r hr) hh
+    (hh : Heard σ t q p) : x p = y p :=
+  (Cslib.HeardOf.FIIndist.journey h hh).2.zero
 
 /-- Indistinguishability of the communication patterns does not depend on the inputs. -/
 theorem FIIndist.pattern {V' : Type*} {t : ℕ} {q : P} (h : FIIndist x y σ τ t q) (z : P → V') :
-    FIIndist z z σ τ t q := by
-  induction t generalizing q with
-  | zero => rfl
-  | succ t ih =>
-    obtain ⟨h0, hin, hs⟩ := h
-    exact ⟨ih h0, hin, fun r hr => ih (hs r hr)⟩
+    FIIndist z z σ τ t q :=
+  Cslib.HeardOf.FIIndist.imp (fun _ _ => rfl) h
 
 /-- Changing the input of `p` is invisible to a process that has not heard of `p`. -/
 theorem FIIndist_of_not_heard {p : P} (hxy : ∀ r, r ≠ p → x r = y r) {t : ℕ} {q : P}
-    (hn : ¬ Heard σ t q p) : FIIndist x y σ σ t q := by
-  induction t generalizing q with
-  | zero => exact hxy q hn
-  | succ t ih =>
-    refine ⟨ih fun h => hn (Or.inl h), fun _ => Iff.rfl, fun r hr => ih fun h => hn ?_⟩
-    exact Or.inr ⟨r, hr, h⟩
+    (hn : ¬ Heard σ t q p) : FIIndist x y σ σ t q :=
+  Cslib.HeardOf.FIIndist.of_agree (fun _ hr => hxy _ fun e => hn (e ▸ hr))
+    (fun _ _ _ _ => Iff.rfl)
 
 /-! ### Inputs and pattern of an execution -/
 

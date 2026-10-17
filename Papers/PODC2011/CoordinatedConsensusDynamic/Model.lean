@@ -1,5 +1,6 @@
 import Mathlib
-import Cslib.Computability.Distributed.DynamicNetworks.Product
+import Podc.DynamicNetworks.FullInfo
+import Podc.Knowledge.Basic
 
 /-!
 # The dynamic-network model of Kuhn–Moses–Oshman (PODC 2011)
@@ -17,12 +18,16 @@ neighbours.
 * `adj r x y`: `{x, y} ∈ E(r)`.
 
 Causality: `G.Reach v s u t` is the paper's `(v, s) ↝_G (u, t)` (reflexive-transitive closure of
-`(u, t) → (v, t + 1)` iff `u = v` or `{u, v} ∈ E(t + 1)`), `G.past u t s` is `past_{(G,u,t)}(s)`.
+`(u, t) → (v, t + 1)` iff `u = v` or `{u, v} ∈ E(t + 1)`), i.e. a journey
+(`Cslib.DynNet.Journey`) in the dynamic network whose graph between times `k` and `k + 1` is
+`adj (k + 1)`; `G.past u t s` is `past_{(G,u,t)}(s)`.
 
 Views / indistinguishability: rather than building the view object of Definition 1, we define the
 relation "same full-information view" `Indist G H u t` (the paper's `(G, t) ∼_u (H, t)`)
 recursively: at time `0` a node sees its UID, input and `N`; at time `t + 1` it additionally sees
-the identities of its round-`t+1` neighbours and their views at time `t`.
+the identities of its round-`t+1` neighbours and their views at time `t`. This is the
+full-information indistinguishability `Cslib.HeardOf.FIIndist` with the initial views above
+(`Indist.zero_iff`, `Indist.succ_iff` restate the recursion).
 `Protocol.state_eq_of_indist` shows that the local state of *every* deterministic protocol is a
 function of this view, so lower bounds proved for view-local decision functions apply to all
 protocols.
@@ -31,6 +36,7 @@ protocols.
 namespace CoordCons
 
 open Relation
+open Cslib.DynNet (Journey)
 
 /-- A dynamic graph together with its signature (node set = UIDs, inputs, a-priori info). -/
 structure DGraph (α : Type*) where
@@ -57,74 +63,21 @@ structure Valid (G : DGraph α) : Prop where
 
 /-! ### Causal order -/
 
-/-- `G.Reach v s u t` : `(v, s) ↝_G (u, t)`. -/
-inductive Reach (G : DGraph α) (v s : ℕ) : ℕ → ℕ → Prop
-  | refl : Reach G v s v s
-  | step {w u t : ℕ} : Reach G v s w t → (w = u ∨ G.adj (t + 1) w u) → Reach G v s u (t + 1)
+/-- `G.Reach v s u t` : `(v, s) ↝_G (u, t)`: a journey from `v` at time `s` to `u` at time `t`,
+where round `r` (between times `r - 1` and `r`) uses the edges `adj r`. -/
+abbrev Reach (G : DGraph α) (v s u t : ℕ) : Prop :=
+  Cslib.DynNet.Journey (fun k => G.adj (k + 1)) s v t u
 
 variable {G H : DGraph α}
 
-namespace Reach
-
-theorem le {v s u t : ℕ} (h : G.Reach v s u t) : s ≤ t := by
-  induction h with
-  | refl => exact le_rfl
-  | step _ _ ih => omega
-
-theorem stay {v s u t : ℕ} (h : G.Reach v s u t) : G.Reach v s u (t + 1) :=
-  .step h (Or.inl rfl)
-
-theorem self {v s t : ℕ} (h : s ≤ t) : G.Reach v s v t := by
-  induction t with
-  | zero => obtain rfl : s = 0 := by omega
-            exact .refl
-  | succ t ih =>
-    rcases Nat.eq_or_lt_of_le h with rfl | h
-    · exact .refl
-    · exact (ih (by omega)).stay
-
-theorem trans {v s w r u t : ℕ} (h₁ : G.Reach v s w r) (h₂ : G.Reach w r u t) :
-    G.Reach v s u t := by
-  induction h₂ with
-  | refl => exact h₁
-  | step _ hs ih => exact .step ih hs
-
-theorem same_time {v u t : ℕ} (h : G.Reach v t u t) : v = u := by
-  cases h with
-  | refl => rfl
-  | step h _ => exact absurd h.le (by omega)
-
-/-- Prepend a step. -/
-theorem cons {v y s u t : ℕ} (hvy : v = y ∨ G.adj (s + 1) v y) (h : G.Reach y (s + 1) u t) :
-    G.Reach v s u t :=
-  trans (.step .refl hvy) h
-
-/-- Decompose the first step of a causal chain. -/
-theorem front {v s u t : ℕ} (h : G.Reach v s u t) (hst : s < t) :
-    ∃ y, (v = y ∨ G.adj (s + 1) v y) ∧ G.Reach y (s + 1) u t := by
-  induction h with
-  | refl => omega
-  | @step w u t hw hwu ih =>
-    rcases Nat.eq_or_lt_of_le hw.le with h | h
-    · subst h
-      obtain rfl := hw.same_time
-      exact ⟨u, hwu, .refl⟩
-    · obtain ⟨y, hy, hr⟩ := ih h
-      exact ⟨y, hy, .step hr hwu⟩
-
-/-- Later time-nodes of the same node are causally after earlier ones. -/
-theorem of_le {v s s' u t : ℕ} (hss' : s ≤ s') (h : G.Reach v s' u t) : G.Reach v s u t :=
-  trans (self hss') h
-
-theorem mem_iff (hG : G.Valid) {v s u t : ℕ} (h : G.Reach v s u t) : v ∈ G.V ↔ u ∈ G.V := by
+theorem Reach.mem_iff (hG : G.Valid) {v s u t : ℕ} (h : G.Reach v s u t) :
+    v ∈ G.V ↔ u ∈ G.V := by
   induction h with
   | refl => rfl
   | step _ hs ih =>
     rcases hs with rfl | hs
     · exact ih
     · exact ih.trans (iff_of_true (hG.mem _ _ _ hs).1 (hG.mem _ _ _ hs).2)
-
-end Reach
 
 theorem _root_.Relation.ReflTransGen.symm_of {β : Type*} {r : β → β → Prop}
     (hr : ∀ a b, r a b → r b a) {a b : β} (h : ReflTransGen r a b) : ReflTransGen r b a := by
@@ -146,17 +99,17 @@ theorem past_subset (u t s : ℕ) : G.past u t s ⊆ G.V := fun _ hv => (mem_pas
 theorem past_succ_subset (u t s : ℕ) : G.past u t (s + 1) ⊆ G.past u t s := by
   intro v hv
   rw [mem_past] at *
-  exact ⟨hv.1, hv.2.of_le (by omega)⟩
+  exact ⟨hv.1, hv.2.mono_left (by omega)⟩
 
 theorem past_mono_right {u t s s' : ℕ} (h : s ≤ s') : G.past u t s' ⊆ G.past u t s := by
   intro v hv
   rw [mem_past] at *
-  exact ⟨hv.1, hv.2.of_le h⟩
+  exact ⟨hv.1, hv.2.mono_left h⟩
 
 theorem past_mono_left {u t t' s : ℕ} (h : t ≤ t') : G.past u t s ⊆ G.past u t' s := by
   intro v hv
   rw [mem_past] at *
-  exact ⟨hv.1, hv.2.trans (Reach.self h)⟩
+  exact ⟨hv.1, hv.2.trans (Journey.self h)⟩
 
 /-! ### Flooding: connectivity forces the past to grow by one node per round -/
 
@@ -168,12 +121,12 @@ theorem past_ssubset (hG : G.Valid) {u t s : ℕ} (hu : u ∈ G.V) (hst : s < t)
   apply Finset.Subset.antisymm (past_subset _ _ _)
   intro y hy
   by_contra hyp
-  have hu' : u ∈ G.past u t (s + 1) := mem_past.2 ⟨hu, Reach.self (by omega)⟩
+  have hu' : u ∈ G.past u t (s + 1) := mem_past.2 ⟨hu, Journey.self (by omega)⟩
   obtain ⟨z, x, hzx, hz, hx⟩ := Cslib.DynNet.exists_edge_cross
     (S := fun x => x ∈ G.past u t (s + 1)) (hG.conn (s + 1) (by omega) y hy u hu) hyp hu'
   apply hz
   rw [heq, mem_past]
-  exact ⟨(hG.mem _ _ _ hzx).1, Reach.cons (Or.inr hzx) (mem_past.1 hx).2⟩
+  exact ⟨(hG.mem _ _ _ hzx).1, Journey.cons (Or.inr hzx) (mem_past.1 hx).2⟩
 
 /-- **Flooding lemma**: `|past(u,t)(t-j)| ≥ min(n, j+1)`. -/
 theorem min_card_le_card_past (hG : G.Valid) {u t : ℕ} (hu : u ∈ G.V) :
@@ -182,7 +135,7 @@ theorem min_card_le_card_past (hG : G.Valid) {u t : ℕ} (hu : u ∈ G.V) :
   induction j with
   | zero =>
     intro _
-    have : u ∈ G.past u t (t - 0) := mem_past.2 ⟨hu, Reach.self (by omega)⟩
+    have : u ∈ G.past u t (t - 0) := mem_past.2 ⟨hu, Journey.self (by omega)⟩
     have := Finset.card_pos.2 ⟨u, this⟩
     omega
   | succ j ih =>
@@ -216,12 +169,16 @@ theorem card_sdiff_past_le (hG : G.Valid) {u t : ℕ} (hu : u ∈ G.V) :
 
 /-! ### Indistinguishability (equal full-information views) -/
 
+/-- The time-`0` view of node `u` is the same in `G` and `H`: `u` is a node of both, with the same
+input, and the a-priori information is the same. -/
+def InitIndist (G H : DGraph α) (u : ℕ) : Prop :=
+  u ∈ G.V ∧ u ∈ H.V ∧ G.input u = H.input u ∧ G.N = H.N
+
 /-- `Indist G H u t` : node `u` has the same view at time `t` in `G` and in `H`
-(the paper's `(G, t) ∼_u (H, t)`). -/
-def Indist (G H : DGraph α) : ℕ → ℕ → Prop
-  | u, 0 => u ∈ G.V ∧ u ∈ H.V ∧ G.input u = H.input u ∧ G.N = H.N
-  | u, t + 1 => Indist G H u t ∧ (∀ w, G.adj (t + 1) w u ↔ H.adj (t + 1) w u) ∧
-      ∀ w, G.adj (t + 1) w u → Indist G H w t
+(the paper's `(G, t) ∼_u (H, t)`): full-information indistinguishability with initial views
+`InitIndist`, round `r` using the edges `adj r`. -/
+abbrev Indist (G H : DGraph α) (u t : ℕ) : Prop :=
+  Cslib.HeardOf.FIIndist (InitIndist G H) (fun k => G.adj (k + 1)) (fun k => H.adj (k + 1)) t u
 
 namespace Indist
 
@@ -232,60 +189,36 @@ theorem succ_iff {u t : ℕ} : Indist G H u (t + 1) ↔ Indist G H u t ∧
     (∀ w, G.adj (t + 1) w u ↔ H.adj (t + 1) w u) ∧ ∀ w, G.adj (t + 1) w u → Indist G H w t :=
   Iff.rfl
 
-theorem pred {u t : ℕ} (h : Indist G H u (t + 1)) : Indist G H u t := h.1
-
-theorem mono {u t t' : ℕ} (h : Indist G H u t') (htt : t ≤ t') : Indist G H u t := by
-  induction t' with
-  | zero => obtain rfl : t = 0 := by omega
-            exact h
-  | succ t' ih =>
-    rcases Nat.eq_or_lt_of_le htt with rfl | hlt
-    · exact h
-    · exact ih h.pred (by omega)
-
-theorem zero {u t : ℕ} (h : Indist G H u t) : Indist G H u 0 := h.mono (Nat.zero_le _)
+theorem mono {u t t' : ℕ} (h : Indist G H u t') (htt : t ≤ t') : Indist G H u t :=
+  Cslib.HeardOf.FIIndist.mono h htt
 
 theorem mem_left {u t : ℕ} (h : Indist G H u t) : u ∈ G.V := h.zero.1
 theorem mem_right {u t : ℕ} (h : Indist G H u t) : u ∈ H.V := h.zero.2.1
 theorem N_eq {u t : ℕ} (h : Indist G H u t) : G.N = H.N := h.zero.2.2.2
 
-theorem refl (hG : G.Valid) {u : ℕ} (hu : u ∈ G.V) (t : ℕ) : Indist G G u t := by
-  induction t generalizing u with
-  | zero => exact ⟨hu, hu, rfl, rfl⟩
-  | succ t ih => exact ⟨ih hu, fun _ => Iff.rfl, fun w hw => ih (hG.mem _ _ _ hw).1⟩
+theorem refl (hG : G.Valid) {u : ℕ} (hu : u ∈ G.V) (t : ℕ) : Indist G G u t :=
+  Cslib.HeardOf.FIIndist.refl_of (S := (G.V : Set ℕ)) (fun _ hu => ⟨hu, hu, rfl, rfl⟩)
+    (fun _ _ _ _ hw => (hG.mem _ _ _ hw).1) t u hu
 
-theorem symm {u t : ℕ} (h : Indist G H u t) : Indist H G u t := by
-  induction t generalizing u with
-  | zero => exact ⟨h.2.1, h.1, h.2.2.1.symm, h.2.2.2.symm⟩
-  | succ t ih =>
-    exact ⟨ih h.1, fun w => (h.2.1 w).symm, fun w hw => ih (h.2.2 w ((h.2.1 w).2 hw))⟩
+theorem symm {u t : ℕ} (h : Indist G H u t) : Indist H G u t :=
+  Cslib.HeardOf.FIIndist.symm (fun _ h => ⟨h.2.1, h.1, h.2.2.1.symm, h.2.2.2.symm⟩) h
 
 theorem trans {K : DGraph α} {u t : ℕ} (h₁ : Indist G H u t) (h₂ : Indist H K u t) :
-    Indist G K u t := by
-  induction t generalizing u with
-  | zero => exact ⟨h₁.1, h₂.2.1, h₁.2.2.1.trans h₂.2.2.1, h₁.2.2.2.trans h₂.2.2.2⟩
-  | succ t ih =>
-    exact ⟨ih h₁.1 h₂.1, fun w => (h₁.2.1 w).trans (h₂.2.1 w),
-      fun w hw => ih (h₁.2.2 w hw) (h₂.2.2 w ((h₁.2.1 w).1 hw))⟩
+    Indist G K u t :=
+  Cslib.HeardOf.FIIndist.trans
+    (fun _ h₁ h₂ => ⟨h₁.1, h₂.2.1, h₁.2.2.1.trans h₂.2.2.1, h₁.2.2.2.trans h₂.2.2.2⟩) h₁ h₂
 
 /-- The view determines the causal past, and the views of all time-nodes in it. -/
 theorem reach {u t v s : ℕ} (h : Indist G H u t) (hr : G.Reach v s u t) :
-    H.Reach v s u t ∧ Indist G H v s := by
-  induction hr with
-  | refl => exact ⟨.refl, h⟩
-  | @step w u t _ hwu ih =>
-    rcases hwu with rfl | hwu
-    · obtain ⟨h1, h2⟩ := ih h.pred
-      exact ⟨h1.stay, h2⟩
-    · obtain ⟨h1, h2⟩ := ih (h.2.2 w hwu)
-      exact ⟨.step h1 (Or.inr ((h.2.1 w).1 hwu)), h2⟩
+    H.Reach v s u t ∧ Indist G H v s :=
+  Cslib.HeardOf.FIIndist.journey h hr
 
 theorem reach_iff {u t v s : ℕ} (h : Indist G H u t) : G.Reach v s u t ↔ H.Reach v s u t :=
   ⟨fun hr => (h.reach hr).1, fun hr => (h.symm.reach hr).1⟩
 
 theorem input_eq {u t v : ℕ} (h : Indist G H u t) (hr : G.Reach v 0 u t) :
     G.input v = H.input v :=
-  (h.reach hr).2.2.2.1
+  (h.reach hr).2.zero.2.2.1
 
 theorem adj_iff {u t w s : ℕ} (h : Indist G H u t) (hr : G.Reach w (s + 1) u t) (x : ℕ) :
     G.adj (s + 1) x w ↔ H.adj (s + 1) x w :=
@@ -309,16 +242,9 @@ of the causal past, and `N`), then `u` cannot distinguish them. -/
 theorem indist_of_agree (hG : G.Valid) {u t : ℕ} (hu : u ∈ G.V) (hN : G.N = H.N)
     (hV : ∀ w, G.Reach w 0 u t → w ∈ H.V ∧ G.input w = H.input w)
     (hE : ∀ w s, G.Reach w (s + 1) u t → ∀ x, G.adj (s + 1) x w ↔ H.adj (s + 1) x w) :
-    Indist G H u t := by
-  induction t generalizing u with
-  | zero =>
-    obtain ⟨h1, h2⟩ := hV u .refl
-    exact ⟨hu, h1, h2, hN⟩
-  | succ t ih =>
-    refine ⟨ih hu (fun w hw => hV w hw.stay) (fun w s hw => hE w s hw.stay),
-      hE u t .refl, fun w hw => ?_⟩
-    exact ih (hG.mem _ _ _ hw).1 (fun x hx => hV x (.step hx (Or.inr hw)))
-      (fun x s hx => hE x s (.step hx (Or.inr hw)))
+    Indist G H u t :=
+  Cslib.HeardOf.FIIndist.of_agree
+    (fun w hw => ⟨(Reach.mem_iff hG hw).2 hu, (hV w hw).1, (hV w hw).2, hN⟩) hE
 
 end DGraph
 
@@ -455,6 +381,76 @@ theorem Sim.mono {S S' : DGraph α → Prop} (hS : ∀ G, S G → S' G) {t : ℕ
     induction h with
     | refl => exact ReflTransGen.refl
     | tail _ hs ih => exact ih.tail ⟨hS _ hs.1, hS _ hs.2.1, hs.2.2⟩
+
+/-! ### Knowledge and common knowledge as instances of `Podc.Knowledge.IndistSystem` -/
+
+/-- The executions of a system `S` of valid dynamic graphs at time `t`, as an indistinguishability
+system: node `u` cannot distinguish `G` from `H` iff it has the same view in both, or it is a node
+of neither (a node outside `V` has the trivial view). -/
+def indistSystem (S : DGraph α → Prop) (hS : ∀ G, S G → G.Valid) (t : ℕ) :
+    Podc.Knowledge.IndistSystem ℕ {G // S G} where
+  indist u G H := (u ∉ G.1.V ∧ u ∉ H.1.V) ∨ DGraph.Indist G.1 H.1 u t
+  equiv u :=
+    ⟨fun G => by
+      by_cases hu : u ∈ G.1.V
+      · exact Or.inr (DGraph.Indist.refl (hS _ G.2) hu t)
+      · exact Or.inl ⟨hu, hu⟩,
+    fun h => h.imp And.symm DGraph.Indist.symm,
+    fun h₁ h₂ => by
+      rcases h₁ with h₁ | h₁ <;> rcases h₂ with h₂ | h₂
+      · exact Or.inl ⟨h₁.1, h₂.2⟩
+      · exact absurd h₂.mem_left h₁.2
+      · exact absurd h₁.mem_right h₂.1
+      · exact Or.inr (h₁.trans h₂)⟩
+
+/-- The nodes present in an execution, as a nonrigid set. -/
+def nodes (S : DGraph α → Prop) (G : {G // S G}) : Set ℕ := (G.1.V : Set ℕ)
+
+variable {S : DGraph α → Prop} {hS : ∀ G, S G → G.Valid} {t : ℕ}
+
+/-- The paper's `K_u` is the knowledge modality of `indistSystem` (for nodes `u ∈ V`). -/
+theorem knows_iff_K {G : DGraph α} (hG : S G) {u : ℕ} (hu : u ∈ G.V) {φ : DGraph α → Prop} :
+    Knows S G u t φ ↔ (indistSystem S hS t).K u (fun H => φ H.1) ⟨G, hG⟩ := by
+  constructor
+  · rintro h ⟨H, hH⟩ (hi | hi)
+    · exact absurd hu hi.1
+    · exact h H hH hi
+  · exact fun h H hH hi => h ⟨H, hH⟩ (Or.inr hi)
+
+/-- An edge of the similarity graph is a step of the reachability relation of `indistSystem`
+among the nodes present. -/
+theorem simStep_iff_reach {G H : {G // S G}} :
+    SimStep S t G.1 H.1 ↔ (indistSystem S hS t).Reach (nodes S) G H := by
+  constructor
+  · rintro ⟨-, -, u, hu⟩
+    exact ⟨u, hu.mem_left, Or.inr hu⟩
+  · rintro ⟨u, hu, hi | hi⟩
+    · exact absurd hu hi.1
+    · exact ⟨G.2, H.2, u, hi⟩
+
+/-- **Common knowledge** (Section 2.1): the paper's `CK` is common knowledge among the nodes
+present, in the sense of `Podc.Knowledge.IndistSystem.C`. -/
+theorem CK_iff_C {G : DGraph α} (hG : S G) {φ : DGraph α → Prop} :
+    CK S G t φ ↔ (indistSystem S hS t).C (nodes S) (fun H => φ H.1) ⟨G, hG⟩ := by
+  rw [Podc.Knowledge.IndistSystem.C_iff_forall_reach]
+  constructor
+  · intro h H hr
+    refine h H.1 ?_
+    induction hr with
+    | single hs => exact ReflTransGen.single (simStep_iff_reach.2 hs)
+    | tail _ hs ih => exact ih.tail (simStep_iff_reach.2 hs)
+  · intro h H hsim
+    obtain ⟨u, hu⟩ := (hS G hG).nonempty
+    have key : ∀ K, Sim S t G K → ∃ hK : S K,
+        TransGen ((indistSystem S hS t).Reach (nodes S)) ⟨G, hG⟩ ⟨K, hK⟩ := by
+      intro K hK
+      induction hK with
+      | refl => exact ⟨hG, .single ⟨u, hu, Or.inr (DGraph.Indist.refl (hS G hG) hu t)⟩⟩
+      | tail _ hs ih =>
+        obtain ⟨hK, hr⟩ := ih
+        exact ⟨hs.2.1, hr.tail (simStep_iff_reach (G := ⟨_, hK⟩) (H := ⟨_, hs.2.1⟩) |>.1 hs)⟩
+    obtain ⟨hH, hr⟩ := key H hsim
+    exact h ⟨H, hH⟩ hr
 
 /-- Walks of a given length in the similarity graph. -/
 inductive Walk (S : DGraph α → Prop) (t : ℕ) : ℕ → DGraph α → DGraph α → Prop

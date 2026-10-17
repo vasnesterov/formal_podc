@@ -16,6 +16,7 @@ the system `BoundN` (any valid bound `N ≥ n`), is comparison-based, and, for e
 namespace CoordCons
 
 open DGraph Relation Function Classical
+open Cslib.DynNet (Journey)
 
 /-- The majority protocol with an upper bound `N` on the count. -/
 noncomputable def majRule : Decision Bool := fun G u t =>
@@ -144,7 +145,7 @@ theorem line_reach_zero {n N : ℕ} {b : Bool} {j : ℕ} (hj : j < n) (s : ℕ) 
   | succ j ih =>
     have := ih (by omega) (s + 1)
     rw [show s + 1 + j = s + (j + 1) by ring] at this
-    exact Reach.cons (Or.inr ⟨hj, by omega, Or.inr rfl⟩) this
+    exact Journey.cons (Or.inr ⟨hj, by omega, Or.inr rfl⟩) this
 
 /-- **Remark after Theorem 4.1.** For `3 ≤ n ≤ N ≤ 2n - 3` (i.e. a valid bound `N < 2(n-1)`),
 the comparison-based majority protocol, which solves consensus for every valid bound, lets node
@@ -165,7 +166,7 @@ theorem majority_remark :
       simp only [Finset.mem_range] at hj
       refine Finset.mem_filter.2 ⟨mem_past.2 ⟨by simp [line]; omega, ?_⟩, rfl⟩
       have := line_reach_zero (n := n) (N := N) (b := i) (j := j) (by omega) 0
-      exact this.trans (Reach.self (by omega))
+      exact this.trans (Journey.self (by omega))
     have hh : n - 1 ≤ heard (line n i N) 0 (n - 2) i := by
       have := Finset.card_le_card hsub; simpa [heard] using this
     simp only [majRule, show (line n i N).N = N from rfl]

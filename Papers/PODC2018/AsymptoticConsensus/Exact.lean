@@ -27,16 +27,14 @@ open scoped ENNReal
 
 variable {α σ : Type*} {V : Type} [NormedAddCommGroup V] [NormedSpace ℝ V]
 
-/-- An exact consensus algorithm: initial states, transition function, decision variable. -/
-structure EAlg (α σ V : Type*) where
-  init : α → V → σ
-  step : StepFn α σ
-  dec : σ → Option V
+/-- An exact consensus algorithm: initial states, transition function, decision variable
+(a `Cslib.HeardOf.Algorithm` whose output is the decision, `none` while undecided). -/
+abbrev EAlg (α σ V : Type*) := Algorithm α σ V (Option V)
 
 namespace EAlg
 
-/-- Initial configuration. -/
-def initC (B : EAlg α σ V) (x : α → V) : α → σ := fun i => B.init i (x i)
+/-- The decision variable (`none` = undecided). -/
+abbrev dec {α σ V : Type*} (B : EAlg α σ V) : σ → Option V := B.out
 
 /-- `B` solves exact consensus in `N`: in every execution every agent decides, decisions are
 irrevocable, agree, and are initial values. -/
@@ -213,7 +211,7 @@ receives, and decides it. -/
 noncomputable def flood (r : α) : EAlg α (Option V) V where
   init i v := if i = r then some v else none
   step i m := if h : ∃ j v, m j = some (some v) then some h.choose_spec.choose else none
-  dec s := s
+  out s := s
 
 theorem flood_dec_apply (r : α) (s : Option V) : (flood r).dec s = s := rfl
 
@@ -233,7 +231,7 @@ theorem flood_inv {r : α} (x : α → V) (p : ℕ → Graph α) :
       conf (flood r).step ((flood r).initC x) p t i = some (x r) := by
   intro t
   induction t with
-  | zero => intro i; by_cases h : i = r <;> simp [EAlg.initC, flood, h]
+  | zero => intro i; by_cases h : i = r <;> simp [flood, h]
   | succ t ih =>
     intro i
     rw [conf_succ]
@@ -271,7 +269,7 @@ theorem exactSolvable_of_common_root {α : Type} [Fintype α] {N : Set (Graph α
     conf (flood r).step ((flood r).initC x) p t i ≠ none
   have memS : ∀ t i, i ∈ S t ↔ conf (flood r).step ((flood r).initC x) p t i ≠ none := by
     intro t i; simp [S]
-  have hS0 : r ∈ S 0 := by rw [memS]; simp [EAlg.initC, flood]
+  have hS0 : r ∈ S 0 := by rw [memS]; simp [Algorithm.initC, flood]
   have hSmono : ∀ t, S t ⊆ S (t + 1) := fun t i hi => by
     rw [memS] at hi ⊢; exact flood_mono x p (hears_self _ i) hi
   have hrS : ∀ t, r ∈ S t := by

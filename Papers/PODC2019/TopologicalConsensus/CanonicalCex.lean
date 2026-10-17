@@ -145,7 +145,7 @@ theorem solvable : UniformSolvable (dnModel (V := Bool) MAex) := by
   refine ⟨1, fun y τ _ ⟨r, hr⟩ => ?_⟩
   obtain ⟨h0, -, hs⟩ := hr
   fin_cases r
-  · exact (hs 1 (edge10 hσ 0)).symm
+  · exact (show x 1 = y 1 from hs 1 (edge10 hσ 0)).symm
   · exact (show x 1 = y 1 from h0).symm
 
 /-! ### Broadcasters -/
@@ -153,19 +153,20 @@ theorem solvable : UniformSolvable (dnModel (V := Bool) MAex) := by
 theorem broadcaster_one {σ : ℕ → Graph (Fin 2)} (hσ : σ ∈ MAex) : Broadcaster σ 1 := by
   intro q
   fin_cases q
-  · exact ⟨1, Or.inr ⟨1, edge10 hσ 0, rfl⟩⟩
-  · exact ⟨0, rfl⟩
+  · exact ⟨1, heard_succ_iff.2 (Or.inr ⟨1, edge10 hσ 0, heard_zero_iff.2 rfl⟩)⟩
+  · exact ⟨0, heard_zero_iff.2 rfl⟩
 
 theorem broadcaster_zero_σn (n : ℕ) : Broadcaster (σn n) 0 := by
   intro q
   fin_cases q
-  · exact ⟨0, rfl⟩
-  · refine ⟨n + 1, Or.inr ⟨0, by simp [σn, both], Heard.mono (t := 0) rfl n (Nat.zero_le n)⟩⟩
+  · exact ⟨0, heard_zero_iff.2 rfl⟩
+  · refine ⟨n + 1, heard_succ_iff.2 (Or.inr ⟨0, by simp [σn, both],
+      Heard.mono (t := 0) (heard_zero_iff.2 rfl) n (Nat.zero_le n)⟩)⟩
 
 theorem not_heard_σinf : ∀ t, ¬ Heard σinf t 1 0
-  | 0 => by simp [Heard]
-  | t + 1 => by
-    rintro (h | ⟨r, hr, -⟩)
+  | 0 => fun h => absurd (heard_zero_iff.1 h) (by decide)
+  | t + 1 => fun h => by
+    rcases heard_succ_iff.1 h with h | ⟨r, hr, -⟩
     · exact not_heard_σinf t h
     · exact toL_deaf r hr
 
@@ -192,8 +193,8 @@ theorem isolated {n : ℕ} {x y : Fin 2 → Bool} {τ : ℕ → Graph (Fin 2)} (
       · simp [σn, hm, toL] at hτn
   refine ⟨funext fun q => ?_, hτeq⟩
   fin_cases q
-  · exact (hs 0 (by simp [σn, both])).input.symm
-  · exact hn1.input.symm
+  · exact (DN.FIIndist.input (hs 0 (by simp [σn, both]))).symm
+  · exact (DN.FIIndist.input hn1).symm
 
 /-- The execution `(x, σ_n)` as an element of `Σ`. -/
 def γn (x : Fin 2 → Bool) (n : ℕ) : (dnModel (V := Bool) MAex).adm :=

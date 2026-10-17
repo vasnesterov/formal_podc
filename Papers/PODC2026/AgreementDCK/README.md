@@ -47,7 +47,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
   `nf r` of nonfaulty processes; the failure model is abstract, as in the paper. Facts are
   predicates on points; run facts are time-independent facts. `K_i` quantifies over all points of
   all runs with the same local state of `i`. No synchrony, communication or failure assumptions are
-  needed, matching the paper's claim "in all models".
+  needed, matching the paper's claim "in all models". The modalities are those of the shared
+  indistinguishability system `System.toIndist` (`IndistSystem.K`, `KN`, `kop`, …), used also for
+  the knowledge notions of KMO'11 and of CSLib's synchronous crash model.
 * `K_i^N φ = i ∈ N ∧ K_i(i ∈ N → φ)`, plus Kuznets et al.'s hope `H_i`. Dynamic knowledge, dynamic
   everyone-knows and dynamic common knowledge follow Definitions 1.3–1.4 verbatim.
 * A protocol is its system plus decision facts `decideᵢ(v)`. Decisions are assumed `i`-local: this
@@ -60,7 +62,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 | Paper | Lean | File |
 |---|---|---|
-| Def. 1.1, footnote 4 (`K^N`, hope) | `System.KN`, `KN.holds`, `KN_iff_hope`, `hope_of_faulty` | `Podc/Knowledge/Basic.lean` |
+| Def. 1.1, footnote 4 (`K^N`, hope) | `System.KN`, `KN.holds`, `kn_iff_hope`, `hope_of_faulty` | `Podc/Knowledge/Basic.lean` |
 | Theorem 1.2 (KoP for nonfaulty processes) | `System.kop`, `Decisions.theorem_1_2` | `Podc/Knowledge/Basic.lean`, `Necessity.lean` |
 | Def. 1.3, 1.4 (`K_i^N@ψ`, `E^N@𝛙`, `C^N@𝛙`) | `System.DK`, `System.EN`, `System.EIter`, `System.CN` | `Dynamic.lean` |
 | Remarks after Def. 1.4 (correct processes eventually know DCK) | `CN.eventually_KN`; also `CN_iff_EN`, `CN_of_EN_valid` | `Dynamic.lean` |
@@ -83,5 +85,5 @@ the hypotheses of Theorems 1.5 and 1.7 are satisfiable (`example_sufficient`). I
 `all_decide(b)` is dynamic common knowledge. Yet classical common knowledge of the bit, even
 `E²`, holds at no point. This is the paper's motivating claim that DCK is strictly weaker than CK.
 
-CSLib candidate: `Podc/Knowledge/Basic.lean` (generic interpreted systems, `K`, `K^N`, hope, KoP,
-classical `E`/`C`).
+CSLib candidate: `Podc/Knowledge/Basic.lean` (indistinguishability systems and interpreted
+systems: `K`, `K^N`, hope, KoP, `E`/`C` with `C_iff_forall_reach`).

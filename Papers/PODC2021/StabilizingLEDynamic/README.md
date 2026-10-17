@@ -74,7 +74,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * **Dynamic graphs.** `ι` is the identifier domain (processes = identifiers), infinite. A system
   is `V : Finset ι` with `|V| = n`. A dynamic graph is a sequence of loopless digraphs on `V`
   (`G t p q`: edge `p → q` in round `t`, 0-indexed).
-* **Journeys and classes.** Journeys are the inductive `Reach`, and `tdist` is `d̂`. The nine
+* **Journeys and classes.** Journeys `Reach` are the shared `Cslib.DynNet.Journey`, and `tdist`
+  (`Cslib.DynNet.tdist`, `Podc/DynamicNetworks/Journey.lean`) is `d̂`. The nine
   classes `J k τ Δ V` transcribe Table 1 and are proved suffix-closed (`J_shift`).
 * **Communication.** Synchronous, deterministic, full-information rounds (CSLib
   `Cslib.HeardOf`). Every process broadcasts its whole state to its current out-neighbours, and
@@ -121,6 +122,5 @@ from the authors' earlier paper (ICDCN 2021) and give the green area of Figure 1
 
 The dynamic-graph model reuses CSLib's `Cslib.HeardOf` (`conf`, `conf_agree`, `conf_splice`).
 
-**CSLib candidates.** Temporal journeys / temporal distance (`Reach`, `tdist`, `tdist_le_iff`,
-`Reach.shift_iff`) and the nine timeliness classes (`Model.lean`, `Classes.lean`) would fit next to
-`Cslib.DynNet`. Finite maps with finite support (`LE.FMap`) are too ad hoc.
+**CSLib candidates.** The nine timeliness classes (`Model.lean`, `Classes.lean`) would fit next to
+`Cslib.DynNet` (journeys and temporal distance are already shared, `Podc/DynamicNetworks/`). Finite maps with finite support (`LE.FMap`) are too ad hoc.

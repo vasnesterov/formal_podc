@@ -59,8 +59,8 @@ structure Sufficient (S : System ι R L) (valid θ : V → R → Prop) (ψ : V �
 variable {valid θ : V → R → Prop} {ψ : V → ι → Fact R}
 
 lemma newDec_local (hloc : ∀ v, S.IsLocalProfile (ψ v)) : DecLocal S (newDec S θ ψ) := by
-  intro i v r t r' t' h
-  simp only [newDec, (hloc v i) r t r' t' h, (isLocal_K i _) r t r' t' h]
+  intro i v w w' h
+  exact and_congr ((hloc v i) w w' h) ((isLocal_K i _) w w' h)
 
 /-- A nonfaulty process that decides `v` in `P_A` is in a run satisfying `θ_v`. -/
 lemma theta_of_newDec {i : ι} {v : V} {r : R} {t : ℕ} (hi : i ∈ S.nf r)
@@ -138,7 +138,7 @@ theorem theorem_1_7_iff_false_without_nonfaulty :
       (ψ : Bool → Unit → Fact Unit),
       Sufficient S valid θ ψ ∧ ∃ v r, allDecide S (newDec S θ ψ) v r ∧ ¬ θ v r := by
   refine ⟨⟨fun _ _ _ => (), fun _ => ∅⟩, fun _ _ => True, fun _ _ => False, fun _ _ _ _ => True,
-    ⟨fun _ _ _ => trivial, fun _ _ _ _ h => h.elim, fun _ _ _ _ _ _ _ => Iff.rfl,
+    ⟨fun _ _ _ => trivial, fun _ _ _ _ h => h.elim, fun _ _ _ _ _ => Iff.rfl,
       fun _ _ h => h.elim, fun _ _ _ hi => by simp at hi⟩, true, (), ?_, fun h => h⟩
   intro i hi
   simp at hi
@@ -193,7 +193,7 @@ theorem no_theta_for_forgetful_protocol :
         (∀ v r, ∀ i ∈ S.nf r, ∀ t t', t < t' → ψ v i r t → ψ v i r t') := by
   intro S dec
   refine ⟨⟨?_, ?_, ?_, ?_, ?_⟩, ?_⟩
-  · intro i v r t r' t' h
+  · refine fun i v => isLocal_iff.2 fun r t r' t' h => ?_
     simp only [S, dec] at h ⊢
     split_ifs at h with h1 h2 h2 <;> simp_all
   · intro v i r t _ h j _
@@ -213,7 +213,7 @@ theorem no_theta_for_forgetful_protocol :
     -- At any time `t' ≠ 1` the local state is `none`, which is also the state at time `0` of the
     -- run `false`, where `θ_true` fails.
     have hnot : ∀ t', t' ≠ 1 → ψ true () true t' → False := fun t' ht' hψ =>
-      hfalse ((hK t' hψ).2 false 0 (by simp [S, ht']) (Set.mem_univ _))
+      hfalse ((hK t' hψ).2 (false, 0) (by simp [S, ht']) (Set.mem_univ _))
     have h1 : t = 1 := by_contra fun h => hnot t h ht
     exact hnot 2 (by decide) (hmem true true () (Set.mem_univ _) t 2 (by omega) ht)
 

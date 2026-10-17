@@ -148,7 +148,7 @@ theorem lemma20_literal_false : ¬ Lemma20LitStatement := by
   have e20 := next_alg1_zero (V := ℝ) H2 ![0, 1]
   have e21 := next_alg1_one (V := ℝ) H2 ![0, 1]
   simp only [H1, H2] at e10 e11 e20 e21
-  simp only [alg1, memoryless, Alg.initC] at s1 s2
+  simp only [alg1, memoryless] at s1 s2
   norm_num at e10 e11 e20 e21
   rw [e10, e11] at s1; rw [e20, e21] at s2
   simp only [mem_Icc] at s1 s2

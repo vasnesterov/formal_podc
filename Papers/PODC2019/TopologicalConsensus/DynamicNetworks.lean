@@ -1,5 +1,5 @@
 import Papers.PODC2019.TopologicalConsensus.Characterization
-import Cslib.Computability.Distributed.DynamicNetworks.HeardOf
+import Podc.DynamicNetworks.FullInfo
 
 /-!
 # Dynamic networks under general message adversaries (the PODC'19 setting, Sections 8.4/8.5)
@@ -11,7 +11,8 @@ an arbitrary set `MA` of communication patterns `σ : ℕ → Graph P` (no compa
 assumed). Inputs are arbitrary: `Σ = {(x, σ) | x : P → V, σ ∈ MA}`.
 
 * `FIIndist x y σ τ t p`: process `p` has the same full-information view after `t` rounds in
-  the executions `(x, σ)` and `(y, τ)` (defined by recursion on `t`, no view type needed).
+  the executions `(x, σ)` and `(y, τ)` (defined by recursion on `t`, no view type needed): the
+  library notion `Cslib.HeardOf.FIIndist` with initial views given by the inputs.
 * `dnModel MA`: the instance of the generic model; it is fault-free and satisfies
   `LockstepRecall`, so the characterization of Theorem 5.2/5.3 applies with the paper's `d_u`
   (`dn_theorem_5_2`, `dn_theorem_5_3`).
@@ -29,65 +30,40 @@ namespace DN
 
 variable {P V : Type*}
 
-/-- `p` cannot distinguish `(x, σ)` from `(y, τ)` after `t` rounds (full-information view). -/
-def FIIndist (x y : P → V) (σ τ : ℕ → Graph P) : ℕ → P → Prop
-  | 0, p => x p = y p
-  | t + 1, p => FIIndist x y σ τ t p ∧ (∀ q, σ t q p ↔ τ t q p) ∧
-      ∀ q, σ t q p → FIIndist x y σ τ t q
+/-- `p` cannot distinguish `(x, σ)` from `(y, τ)` after `t` rounds (full-information view):
+`p` has the same input in both, and for `t + 1` it has the same view after `t` rounds, the same
+in-neighbours in round `t + 1`, and these have the same views after `t` rounds
+(`FIIndist.zero_iff`, `FIIndist.succ_iff`). -/
+abbrev FIIndist (x y : P → V) (σ τ : ℕ → Graph P) : ℕ → P → Prop :=
+  Cslib.HeardOf.FIIndist (fun p => x p = y p) σ τ
 
 variable {x y z : P → V} {σ τ ρ : ℕ → Graph P}
 
-theorem FIIndist.refl (x : P → V) (σ : ℕ → Graph P) : ∀ t p, FIIndist x x σ σ t p
-  | 0, _ => rfl
-  | t + 1, p => ⟨FIIndist.refl x σ t p, fun _ => Iff.rfl, fun q _ => FIIndist.refl x σ t q⟩
+theorem FIIndist.zero_iff {p : P} : FIIndist x y σ τ 0 p ↔ x p = y p := Iff.rfl
 
-theorem FIIndist.symm {t : ℕ} {p : P} (h : FIIndist x y σ τ t p) : FIIndist y x τ σ t p := by
-  induction t generalizing p with
-  | zero => exact Eq.symm h
-  | succ t ih =>
-    obtain ⟨h, hin, hq⟩ := h
-    exact ⟨ih h, fun q => (hin q).symm, fun q hq' => ih (hq q ((hin q).2 hq'))⟩
+theorem FIIndist.succ_iff {t : ℕ} {p : P} : FIIndist x y σ τ (t + 1) p ↔
+    FIIndist x y σ τ t p ∧ (∀ q, σ t q p ↔ τ t q p) ∧ ∀ q, σ t q p → FIIndist x y σ τ t q :=
+  Iff.rfl
+
+theorem FIIndist.refl (x : P → V) (σ : ℕ → Graph P) (t : ℕ) (p : P) : FIIndist x x σ σ t p :=
+  Cslib.HeardOf.FIIndist.refl (fun _ => rfl) t p
+
+theorem FIIndist.symm {t : ℕ} {p : P} (h : FIIndist x y σ τ t p) : FIIndist y x τ σ t p :=
+  Cslib.HeardOf.FIIndist.symm (fun _ => Eq.symm) h
 
 theorem FIIndist.trans {t : ℕ} {p : P} (h₁ : FIIndist x y σ τ t p) (h₂ : FIIndist y z τ ρ t p) :
-    FIIndist x z σ ρ t p := by
-  induction t generalizing p with
-  | zero => exact Eq.trans h₁ h₂
-  | succ t ih =>
-    obtain ⟨h₁, hin₁, hq₁⟩ := h₁
-    obtain ⟨h₂, hin₂, hq₂⟩ := h₂
-    exact ⟨ih h₁ h₂, fun q => (hin₁ q).trans (hin₂ q),
-      fun q hq => ih (hq₁ q hq) (hq₂ q ((hin₁ q).1 hq))⟩
+    FIIndist x z σ ρ t p :=
+  Cslib.HeardOf.FIIndist.trans (fun _ => Eq.trans) h₁ h₂
 
-theorem FIIndist.mono {t : ℕ} {p : P} (h : FIIndist x y σ τ t p) : ∀ u ≤ t, FIIndist x y σ τ u p := by
-  induction t with
-  | zero => intro u hu; rw [Nat.le_zero.1 hu]; exact h
-  | succ t ih =>
-    intro u hu
-    rcases Nat.lt_or_eq_of_le hu with hu | rfl
-    · exact ih h.1 u (Nat.lt_succ_iff.1 hu)
-    · exact h
+theorem FIIndist.mono {t : ℕ} {p : P} (h : FIIndist x y σ τ t p) : ∀ u ≤ t, FIIndist x y σ τ u p :=
+  fun _ hu => Cslib.HeardOf.FIIndist.mono h hu
 
 theorem FIIndist.input {t : ℕ} {p : P} (h : FIIndist x y σ τ t p) : x p = y p :=
-  FIIndist.mono h 0 (Nat.zero_le _)
-
-/-- The view after `t` rounds only depends on the first `t` graphs. -/
-theorem FIIndist_congr {σ' τ' : ℕ → Graph P} :
-    ∀ {t}, (∀ k < t, σ k = σ' k) → (∀ k < t, τ k = τ' k) → ∀ p,
-      FIIndist x y σ τ t p ↔ FIIndist x y σ' τ' t p
-  | 0, _, _, _ => Iff.rfl
-  | t + 1, hσ, hτ, p => by
-    have ih := FIIndist_congr (t := t) (fun k hk => hσ k (Nat.lt_succ_of_lt hk))
-      (fun k hk => hτ k (Nat.lt_succ_of_lt hk))
-    simp only [FIIndist, ih, hσ t (Nat.lt_succ_self t), hτ t (Nat.lt_succ_self t)]
+  Cslib.HeardOf.FIIndist.zero (I := fun p => x p = y p) h
 
 /-- Executions that agree before round `t` are indistinguishable for everybody up to `t`. -/
-theorem FIIndist_of_prefix (hστ : ∀ k < t, σ k = τ k) (p : P) : FIIndist x x σ τ t p :=
-  (FIIndist_congr (fun _ _ => rfl) hστ p).1 (FIIndist.refl x σ t p)
-
-/-- A process that receives nothing (from others) in a round keeps its view. -/
-theorem FIIndist.succ_of_deaf {t : ℕ} {p : P} (h : FIIndist x y σ τ t p)
-    (hσ : ∀ q, ¬ σ t q p) (hτ : ∀ q, ¬ τ t q p) : FIIndist x y σ τ (t + 1) p :=
-  ⟨h, fun q => ⟨fun h' => (hσ q h').elim, fun h' => (hτ q h').elim⟩, fun q h' => (hσ q h').elim⟩
+theorem FIIndist_of_prefix {t : ℕ} (hστ : ∀ k < t, σ k = τ k) (p : P) : FIIndist x x σ τ t p :=
+  (fiIndist_congr (fun _ _ => rfl) hστ p).1 (FIIndist.refl x σ t p)
 
 /-- Configurations: the time, the inputs and the pattern truncated to the rounds played so far. -/
 structure Conf (P V : Type*) where
@@ -103,14 +79,14 @@ def exec (x : P → V) (σ : ℕ → Graph P) : ℕ → Conf P V := fun t => ⟨
 
 theorem FIIndist_trunc {t : ℕ} {p : P} :
     FIIndist x y (trunc σ t) (trunc τ t) t p ↔ FIIndist x y σ τ t p :=
-  FIIndist_congr (fun k hk => by simp [trunc, hk]) (fun k hk => by simp [trunc, hk]) p
+  fiIndist_congr (fun k hk => by simp [trunc, hk]) (fun k hk => by simp [trunc, hk]) p
 
 variable [Nonempty P]
 
 /-- The dynamic-network model under the message adversary `MA`. -/
 def dnModel (MA : Set (ℕ → Graph P)) : Model P (Conf P V) V where
   indist p c d := c.time = d.time ∧ FIIndist c.inp d.inp c.pat d.pat c.time p
-  indist_equiv p := ⟨fun c => ⟨rfl, FIIndist.refl _ _ _ _⟩,
+  equiv p := ⟨fun c => ⟨rfl, FIIndist.refl _ _ _ _⟩,
     fun {c d} h => ⟨h.1.symm, by rw [← h.1]; exact h.2.symm⟩,
     fun {c d e} h₁ h₂ => ⟨h₁.1.trans h₂.1, h₁.2.trans (by rw [h₁.1]; exact h₂.2)⟩⟩
   Ob _ := univ
