@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.Byzantine.Certificate
 
 /-!
 # VABA (Abraham, Malkhi, Spiegelman, PODC 2019): the protocol as a transition system
@@ -110,17 +111,9 @@ structure Cfg (P V : Type*) where
 
 variable {P V : Type*} [Fintype P] [DecidableEq P]
 
-/-- Parties that signed `st`. -/
-noncomputable def signers (s : Glob P V) (st : Stmt P V) : Finset P := by
-  classical exact univ.filter (fun p => s.tok p st)
-
-omit [DecidableEq P] in
-@[simp] lemma mem_signers {s : Glob P V} {st : Stmt P V} {p : P} :
-    p ∈ signers s st ↔ s.tok p st := by
-  classical simp [signers]
-
-/-- A (threshold-signature) certificate on `st` exists. -/
-def QC (Q : ℕ) (s : Glob P V) (st : Stmt P V) : Prop := Q ≤ (signers s st).card
+/-- A (threshold-signature) certificate on `st` exists: at least `Q` parties produced a signature
+share on `st` (`Cslib.Byzantine.Certified`). -/
+def QC (Q : ℕ) (s : Glob P V) (st : Stmt P V) : Prop := Cslib.Byzantine.Certified s.tok Q st
 
 /-- Proposers whose broadcast of view `j` has a stage-4 certificate ("completed" broadcasts, i.e.
 those for which a `done` message with a valid proof can be sent). -/

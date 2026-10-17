@@ -3,6 +3,7 @@ Copyright (c) 2026. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 import Mathlib
+import Podc.Foundations.Quorum
 
 /-!
 # Fault-tolerance in distributed optimization: the abstract one-shot model
@@ -130,10 +131,8 @@ lemma Resilient.mono {Adm : (X → ℝ) → Prop} {K K' : Set (Exec n X)}
 /-- Two honest sets of size `≥ n - f` meet in at least `n - 2f` agents. -/
 lemma card_inter_ge {f : ℕ} {T H : Finset (Fin n)} (hT : n - f ≤ T.card) (hH : n - f ≤ H.card) :
     n - 2 * f ≤ (T ∩ H).card := by
-  have h1 := Finset.card_inter_add_card_union T H
-  have h2 : (T ∪ H).card ≤ n := by
-    simpa using Finset.card_le_univ (T ∪ H)
-  omega
+  simpa using Cslib.Quorum.card_sub_two_mul_le_card_inter (α := Fin n) (f := f)
+    (by rwa [Fintype.card_fin]) (by rwa [Fintype.card_fin])
 
 /-- Key fact behind sufficiency: two 2f-redundant executions that are consistent with the same
 received vector have the same aggregate minimum points. -/

@@ -12,6 +12,8 @@ protocol live.
 namespace VABA
 
 open Finset
+open Cslib.Byzantine (mem_signers Certified)
+open Cslib.Quorum (exists_mem_inter_notMem_of_quorum)
 
 variable {P V : Type*} [Fintype P] [DecidableEq P] {C : Cfg P V} {s : Glob P V}
 
@@ -462,7 +464,7 @@ theorem proposal_valid (hQ : Fintype.card P + C.f < 2 * C.Q) (hinput : ∀ p, C.
         · rw [hph] at h; exact absurd h (by decide)
       have hi1 : 1 ≤ i := Nat.pos_of_ne_zero h0
       obtain ⟨h, hex, hsig, hc⟩ :=
-        exists_honest_inter hQ (I.exitR_card q i hi1 (by omega)) hqc I.card_corrupt
+        exists_mem_inter_notMem_of_quorum hQ I.card_corrupt (I.exitR_card q i hi1 (by omega)) hqc
       rw [mem_signers, I.tok_pb h hc] at hsig
       obtain ⟨l', hl'⟩ := Option.isSome_iff_exists.mp (I.lead_some q i hi1 (Or.inl (by omega)))
       have : l' = l := by

@@ -1,5 +1,6 @@
 import Cslib.Computability.Distributed.Byzantine.CanonicalRounds.Liveness
 import Papers.PODC2026.CanonicalRoundByzantine.Problems
+import Podc.Foundations.Count
 
 /-!
 # Non-vacuity: one-round crusader agreement for `n > 5f`
@@ -92,12 +93,11 @@ theorem caRule_isSome {f : ℕ} {l : Log n R V} (h : n - f ≤ (senders 1 l).car
 /-- Correct senders counted for `w` have input `w`. -/
 theorem card_valSenders_le {F : Finset (Fin n)} {I : Fin n → V} {l : Log n R V}
     (hl : Truthful F I l) (w : V) :
-    (valSenders w l).card ≤ (Finset.univ.filter fun q => q ∉ F ∧ I q = w).card + F.card := by
+    (valSenders w l).card ≤ Fᶜ.countEq I w + F.card := by
   refine le_trans (Finset.card_le_card_sdiff_add_card (t := F)) (Nat.add_le_add_right
     (Finset.card_le_card fun q hq => ?_) _)
   rw [Finset.mem_sdiff, mem_valSenders] at hq
-  simp only [Finset.mem_filter, Finset.mem_univ, true_and]
-  exact ⟨hq.2, (hl q hq.2 w hq.1).symm⟩
+  exact Finset.mem_filter.2 ⟨Finset.mem_compl.2 hq.2, (hl q hq.2 w hq.1).symm⟩
 
 /-- Agreement: with `n > 5f`, two truthful views cannot both have `n - 2f` senders for different
 values. -/
@@ -105,35 +105,20 @@ theorem eq_of_heavy {f : ℕ} (hn : 5 * f < n) {F : Finset (Fin n)} (hF : F.card
     {I : Fin n → V} {l l' : Log n R V} (hl : Truthful F I l) (hl' : Truthful F I l') {v w : V}
     (hv : n - 2 * f ≤ (valSenders v l).card) (hw : n - 2 * f ≤ (valSenders w l').card) :
     v = w := by
-  by_contra hvw
   have h1 := card_valSenders_le hl v
   have h2 := card_valSenders_le hl' w
-  have hdisj : Disjoint (Finset.univ.filter fun q => q ∉ F ∧ I q = v)
-      (Finset.univ.filter fun q => q ∉ F ∧ I q = w) := by
-    rw [Finset.disjoint_filter]
-    rintro q - ⟨-, rfl⟩ ⟨-, h⟩
-    exact hvw h
-  have hsub : (Finset.univ.filter fun q => q ∉ F ∧ I q = v) ∪
-      (Finset.univ.filter fun q => q ∉ F ∧ I q = w) ⊆ Fᶜ := by
-    intro q hq
-    simp only [Finset.mem_union, Finset.mem_filter] at hq
-    rw [Finset.mem_compl]; rcases hq with h | h <;> exact h.2.1
-  have h3 := Finset.card_le_card hsub
-  rw [Finset.card_union_of_disjoint hdisj, Finset.card_compl, Fintype.card_fin] at h3
-  omega
+  have h3 := Finset.card_compl F
+  rw [Fintype.card_fin] at h3
+  exact Finset.eq_of_card_lt_countEq_add_countEq (s := Fᶜ) (f := I) (by omega)
 
 /-- Validity: a value with `n - 2f > f` senders in a truthful view is the input of a correct
 process. -/
 theorem exists_correct_of_heavy {f : ℕ} (hn : 3 * f < n) {F : Finset (Fin n)} (hF : F.card ≤ f)
     {I : Fin n → V} {l : Log n R V} (hl : Truthful F I l) {w : V}
     (hw : n - 2 * f ≤ (valSenders w l).card) : ∃ q ∉ F, I q = w := by
-  by_contra hc
-  push Not at hc
-  have : valSenders w l ⊆ F := fun q hq => by
-    by_contra hqF
-    exact hc q hqF (hl q hqF w (mem_valSenders.1 hq)).symm
-  have := Finset.card_le_card this
-  omega
+  obtain ⟨q, hq, hqF⟩ := Finset.exists_mem_notMem_of_card_le_of_lt hF
+    (show f < (valSenders w l).card by omega)
+  exact ⟨q, hqF, (hl q hqF w (mem_valSenders.1 hq)).symm⟩
 
 /-- If all correct processes have input `I p`, a truthful view with `n - f` round-1 senders has
 `n - 2f` senders for `I p`. -/

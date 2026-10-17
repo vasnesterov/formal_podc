@@ -90,4 +90,5 @@ extends it to a fair 1-resilient infinite execution (`fair_exec_exists`), and ap
 finds no violation for the paper's algorithm and reproduces the counterexample above for non-atomic
 lines 1–2. The message-passing model and the SWMR reads-from linearizability criterion are in CSLib
 (`Cslib/Computability/Distributed/MessagePassing/{Async,FairExec}.lean`,
-`Cslib/Computability/Distributed/SharedMemory/SWMRRegister.lean`).
+`Cslib/Computability/Distributed/SharedMemory/SWMRRegister.lean`); quorum intersection is
+`Cslib.Quorum.inter_nonempty_of_two_mul_lt` (`Podc/Foundations/Quorum.lean`).

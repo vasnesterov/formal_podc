@@ -83,4 +83,5 @@ are black boxes given by their specifications, and termination is not modelled.
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: for `n > 5f` a deterministic, communication-closed one-round crusader agreement algorithm is verified
 safe and terminating in the same model (`exists_bounded_crusader`), so the lower bounds' hypotheses are
-satisfiable and the `5f` threshold is sharp for crusader agreement.
+satisfiable and the `5f` threshold is sharp for crusader agreement. Value counts (`Gather.cnt`) and
+quorum arithmetic are the shared `Finset.countEq` / `Podc/Foundations/{Count,Quorum}.lean`.
