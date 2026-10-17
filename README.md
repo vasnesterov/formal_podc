@@ -71,6 +71,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2016 | 42 | Bar-Yehuda, Censor-Hillel, Schwartzman — *A Distributed (2+ε)-Approximation for Vertex Cover in O(log Δ/ε log log Δ) Rounds* | [VertexCoverLocalRatio](Papers/PODC2016/VertexCoverLocalRatio) | ✅ Local-ratio template, correctness, (2+ε)-approximation and the round bound (explicit constants, per-vertex) proved in the LOCAL model; Section 4 (CONGEST) rounding mildly under-specified; Section 5 arithmetic confirmed |
 | 2020 | 35 | Brandt, Olivetti — *Truly Tight-in-Δ Bounds for Bipartite Maximal Matching and Variants* | [TightBipartiteMatching](Papers/PODC2020/TightBipartiteMatching) | ⚠️ Theorem 1.2 (exact complexity T_Δ(x,y); 2Δ−1 for bipartite maximal matching, deterministic port numbering on Δ-regular trees) proved — lower bound via forward round elimination, upper bound as a CSLib algorithm; false for y = Δ (degenerate); §5 output rule needs two fixes (simulation counterexamples); empty-label proof gap |
 | 2018 | 35 | Függer, Nowak, Schwarz — *Tight Bounds for Asymptotic and Approximate Consensus* | [AsymptoticConsensus](Papers/PODC2018/AsymptoticConsensus) | ❌ Lower bounds proved and tight; **Theorem 4 (⇐) false** |
+| 2019 | 32 | Nowak, Schmid, Winkler — *Topological Characterization of Consensus under General Message Adversaries* | [TopologicalConsensus](Papers/PODC2019/TopologicalConsensus) | ❌ Topological characterization for fault-free lock-step message adversaries (v1 Thm 5.5) and the lossy-link examples proved; **the broadcastability characterization (v1 Cor. 5.6, Thms 5.11, 6.7 'if') is false** — a 3-process adversary with every component broadcastable and univalent where consensus is impossible; Cors 6.1, 6.5, 5.15 false; several more errors only in the 2024 extension (v3) |
 | 2020 | 31 | Dinitz, Robelle — *Efficient and Simple Algorithms for Fault-Tolerant Spanners* | [FaultTolerantSpanners](Papers/PODC2020/FaultTolerantSpanners) | ✅ Correct |
 | 2019 | 31 | Bodwin, Patel — *A Trivial Yet Optimal Solution to Vertex Fault Tolerant Spanners* | [VFTSpannersOptimal](Papers/PODC2019/VFTSpannersOptimal) | ⚠️ Theorem 1, Corollary 2 proved; Theorem 1 as stated degenerates for f > n/2; literal Algorithm 1 imprecise |
 | 2021 | 29 | Ghaffari, Haeupler — *Low-Congestion Shortcuts for Graphs Excluding Dense Minors* | [LowCongestionShortcuts](Papers/PODC2021/LowCongestionShortcuts) | ⚠️ Main theorem proved (8δ+1 blocks; 8δ fails on the one-vertex graph); several proof errors (incl. a failing Lemma 3.2 construction); Observation 2.6 false as stated |
@@ -192,6 +193,13 @@ in the paper's `differencies.md`.
   consensus is solvable via valencies, is false: a two-agent algorithm with a discontinuous limit function is a
   counterexample. The proof assumes the valency diameter vanishes, which needs continuity. We prove the theorem
   under that extra hypothesis. The lower bounds (the paper's main results) are correct and tight.
+- **Topological Characterization of Consensus under General Message Adversaries** (PODC 2019, 32 citations) —
+  [TopologicalConsensus](Papers/PODC2019/TopologicalConsensus). The topological characterization itself (consensus
+  solvable iff the admissible executions split into clopen decision sets) holds, but its broadcastability form —
+  consensus is solvable if every connected component is broadcastable and contains at most one valence (arXiv v1
+  Cor. 5.6, "if" of Thms 5.11 and 6.7) — is false: a 3-process message adversary (not limit-closed) has only such
+  components, yet consensus is impossible. Cors. 6.1 and 6.5 are false as well. The 2024 journal-style version
+  (arXiv v3) repairs this by requiring finitely many components; it has further errors of its own, listed separately.
 - **Optimal Synchronous Approximate Agreement with Asynchronous Fallback** (PODC 2022, 26 citations) —
   [HybridApproxAgreement](Papers/PODC2022/HybridApproxAgreement). Theorem 4.1 (the reliable broadcast Π_rBC is
   consistent in a synchronous network) is false whenever n ≤ 3tₛ, i.e. in the paper's main regime tₛ ≥ n/3: a
