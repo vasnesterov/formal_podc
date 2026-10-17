@@ -1,4 +1,5 @@
 import Papers.PODC2026.RankingOpinions.RankingProtocol
+import Cslib.Computability.Distributed.PopulationProtocols.Schedules
 import Mathlib.Data.Fin.VecNotation
 import Mathlib.Tactic.IntervalCases
 import Mathlib.Data.List.GetD
@@ -39,11 +40,6 @@ def path : List (Fin 3 × Fin 3) :=
 /-- The schedule: follow `path`, then let agents `0` and `1` interact forever. -/
 def sched (t : ℕ) : Fin 3 × Fin 3 := path.getD t (0, 1)
 
-/-- The configurations of the execution. -/
-def config : ℕ → Config (Fin 3) (RState 2)
-  | 0 => fun a => initState (input a)
-  | t + 1 => (rankingLit 2).interact (config t) (sched t).1 (sched t).2
-
 /-- The bad silent configuration `⟨0,1|0,1⟩, ⟨1,0|1,0⟩*, ⟨1,1|0,1⟩*`. -/
 def bad : Config (Fin 3) (RState 2) := ![⟨0, 1, 0, 1, false⟩, ⟨1, 0, 1, 0, true⟩, ⟨1, 1, 0, 1, true⟩]
 
@@ -53,22 +49,19 @@ lemma sched_ne (t : ℕ) : (sched t).1 ≠ (sched t).2 := by
   · interval_cases t <;> decide
   · rw [List.getD_eq_default _ _ (by simp [path]; omega)]; decide
 
-lemma config_nine : config 9 = bad := by decide +kernel
+/-- The execution. -/
+def E : (rankingLit 2).Execution (Fin 3) :=
+  Execution.ofSched _ (fun a => initState (input a)) sched sched_ne
+
+lemma config_nine : E.config 9 = bad := by decide +kernel
 
 lemma bad_silent (a b : Fin 3) : (rankingLit 2).interact bad a b = bad := by
   revert a b; decide +kernel
 
-lemma config_bad (t : ℕ) (h : 9 ≤ t) : config t = bad := by
+lemma config_bad (t : ℕ) (h : 9 ≤ t) : E.config t = bad := by
   induction t, h using Nat.le_induction with
   | base => exact config_nine
-  | succ t _ ih => rw [config, ih, bad_silent]
-
-/-- The execution. -/
-def E : (rankingLit 2).Execution (Fin 3) where
-  config := config
-  sched := sched
-  sched_ne := sched_ne
-  step _ := rfl
+  | succ t _ ih => rw [E.step, ih, bad_silent]
 
 lemma E_globallyFair : E.GloballyFair := by
   intro C C' hst hC T
@@ -90,8 +83,7 @@ theorem literal_not_correct :
   refine ⟨E, rfl, E_globallyFair, by decide, ?_, fun t ht => ?_⟩
   · intro c d h
     revert c d h; decide
-  · show ((config t 2).br : ℕ) ≠ _
-    rw [config_bad t ht]; decide
+  · rw [config_bad t ht]; decide
 
 end Counterexample
 

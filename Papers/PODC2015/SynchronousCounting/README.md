@@ -98,5 +98,6 @@ one-node counter. The model and the impossibility theorem are in CSLib,
 cites, is proved here.
 
 **Shared infrastructure.** Vote counts `cnt`, `cntA` are `Finset.countEq` (`Podc/Foundations/Count.lean`);
+the computable majority vote `maj` is the library selector `Finset.majority?` (`maj_eq_majority?`);
 the king round of Lemma 4 is the generic phase-king lemma `Cslib.Byzantine.kingPhase_agreement`
 (`Podc/Agreement/PhaseKing.lean`, with `keep = +1 mod C` and `adopt = min {C, ·} + 1 mod C`).

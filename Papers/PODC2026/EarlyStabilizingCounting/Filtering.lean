@@ -15,7 +15,9 @@ every node `w` the pair `(C_w, m_w)`, where `C_w` is the clock input of `w` (mea
 
 Modelling notes. Values are compared modulo `K`. The paper's compiler resets out-of-range state
 variables to an in-range default; here a cooldown value above `X` is clamped to `X` before
-decrementing (`min X_v X - 1`), and outputs are reduced modulo `K`.
+decrementing (`min X_v X - 1`), and outputs are reduced modulo `K`. The selectors of lines 2–3
+(`majT`, `quorum`) are computable scans; `majT_eq_majority?` and `quorum_eq_threshold?` identify
+them with the library selectors `Finset.majority?` and `Finset.threshold?`.
 
 An execution (`IsFiltExec`) is any sequence of states in which every correct node applies
 `filtStep` to some received vectors that agree with the true values on the correct nodes; the clock
@@ -100,23 +102,21 @@ theorem quorum_some {ms : Fin n → Option ℕ} {q : Option ℕ} (h : quorum ms 
     cases h; exact this
   · cases h
 
+/-- For `n > 0`, `quorum` is the library's threshold selector `Finset.threshold?` with threshold
+`n - t` (above `n / 2`, so the quorum value is unique). -/
+theorem quorum_eq_threshold? (hn : 0 < n) (ms : Fin n → Option ℕ) :
+    quorum ms = univ.threshold? (fun w => some (ms w)) (n - res n) := by
+  rw [← find?_map_eq_threshold? (L := List.finRange n) (fun w _ => List.mem_finRange w)
+    (p := fun w => decide (n - res n ≤ cnt ms (ms w))) (fun w => by simp)
+    (by rw [card_univ, Fintype.card_fin]; unfold res; omega)]
+  unfold quorum
+  split <;> simp_all
+
 theorem quorum_of_cnt (hn : 0 < n) {ms : Fin n → Option ℕ} {q : Option ℕ}
     (h : n - res n ≤ cnt ms q) : quorum ms = some q := by
-  obtain ⟨w0, -, hw0⟩ := exists_mem_of_countEq_pos (show 0 < cnt ms q by unfold res at h; omega)
-  unfold quorum
-  split
-  · rename_i w hw
-    have := List.find?_some hw
-    simp only [decide_eq_true_eq] at this
-    have hlt : (univ : Finset (Fin n)).card < cnt ms (ms w) + cnt ms q := by
-      rw [card_univ, Fintype.card_fin]; unfold res at this h; omega
-    rw [eq_of_card_lt_countEq_add_countEq hlt]
-  · rename_i hnone
-    rw [List.find?_eq_none] at hnone
-    have := hnone w0 (List.mem_finRange w0)
-    rw [hw0] at this
-    simp only [decide_eq_true_eq] at this
-    exact absurd h this
+  rw [quorum_eq_threshold? hn]
+  exact threshold?_eq_some (by rw [card_univ, Fintype.card_fin]; unfold res; omega)
+    (by simpa using h)
 
 /-- Quorums computed by two correct nodes from vectors agreeing on the correct nodes coincide. -/
 theorem quorum_agree {F : Finset (Fin n)} (hF : 3 * F.card < n) {x ms₁ ms₂ : Fin n → Option ℕ}
@@ -129,29 +129,21 @@ theorem quorum_agree {F : Finset (Fin n)} (hF : 3 * F.card < n) {x ms₁ ms₂ :
   simp only [mem_filter, mem_univ, true_and] at hu1 hu2
   rw [← hu1, ← hu2, h₁ u huF, h₂ u huF]
 
+/-- `majT` is the library's strict-majority selector `Finset.majority?` over `T`. -/
+theorem majT_eq_majority? (T : Finset (Fin n)) (cs : Fin n → ℕ) :
+    majT T cs = T.majority? fun w => some (cs w) := by
+  rw [← find?_map_eq_majority? (L := List.finRange n) (fun w _ => List.mem_finRange w)
+    (p := fun w => decide (w ∈ T) && decide (T.card < 2 * T.countEq cs (cs w))) (fun w => by simp)]
+  unfold majT
+  split <;> simp_all
+
 /-- If the correct nodes of `T` form a strict majority of `T` and all hold `c`, the strict
 majority value is `c`. -/
 theorem majT_eq {T F : Finset (Fin n)} (hT : 2 * (T ∩ F).card < T.card) {cs : Fin n → ℕ} {c : ℕ}
     (hc : ∀ w, w ∈ T → w ∉ F → cs w = c) : majT T cs = some c := by
   have hsd := card_sdiff_add_card_inter T F
-  have hbig : T.card < 2 * T.countEq cs c := by
-    have := card_sdiff_le_countEq (f := cs) (b := c) hc
-    omega
-  have uniq : ∀ d, T.card < 2 * T.countEq cs d → d = c := fun d hd =>
-    eq_of_card_lt_countEq_add_countEq (s := T) (f := cs) (by omega)
-  unfold majT
-  split
-  · rename_i w hw
-    have := List.find?_some hw
-    simp only [Bool.and_eq_true, decide_eq_true_eq] at this
-    rw [uniq _ this.2]
-  · rename_i hnone
-    rw [List.find?_eq_none] at hnone
-    obtain ⟨w, hw⟩ : (T \ F).Nonempty := by rw [← card_pos]; omega
-    rw [mem_sdiff] at hw
-    have := hnone w (List.mem_finRange w)
-    simp only [Bool.and_eq_true, decide_eq_true_eq, hc w hw.1 hw.2] at this
-    exact absurd ⟨hw.1, hbig⟩ this
+  rw [majT_eq_majority?]
+  exact majority?_eq_of_notMem (F := F) (by omega) fun w hw hwF => by rw [hc w hw hwF]
 
 variable {F T : Finset (Fin n)} {K X : ℕ} {ci : ℕ → Fin n → ℕ} {fs : ℕ → Fin n → FS}
 

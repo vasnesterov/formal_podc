@@ -801,8 +801,8 @@ lemma oc_exists_leader (h0 : ∀ x, (E.config 0 x).ld = true) (t : ℕ) (x : A) 
 
 lemma oc_leaders_eventually_const :
     ∃ T, ∀ t ≥ T, ∀ x, (E.config t x).ld = (E.config T x).ld := by
-  obtain ⟨T, -, hT⟩ := eventually_const_of_antitone
-    (fun t => (univ.filter fun x => (E.config t x).ld = true).card) 0
+  obtain ⟨T, -, hT⟩ := Nat.eventually_const_of_succ_le
+    (f := fun t => (univ.filter fun x => (E.config t x).ld = true).card) (N := 0)
     (fun t _ => Finset.card_le_card fun x => by simpa using oc_ld_succ_le E t x)
   refine ⟨T, fun t ht => ?_⟩
   induction t, ht using Nat.le_induction with
@@ -841,7 +841,7 @@ leaders and a label `h ∉ S`. -/
 def phiL (S : Finset (Fin k)) (h : Fin k) (s : OCState Col k) : ℕ :=
   if s.os = .U then 2 * dist s.bra h + 2 else if s.bra ∈ S then 2 * dist s.bra h + 1 else 2 * k + 2
 
-lemma dist_lt (d h : Fin k) : dist d h < k := Nat.mod_lt _ (by have := d.isLt; omega)
+lemma dist_lt (d h : Fin k) : dist d h < k := (h - d).isLt
 
 /-- Potential of a non-leader whose leader has bra `Lb`. -/
 def psiN (Lb : Fin k) (s : OCState Col k) : ℕ :=
@@ -923,8 +923,9 @@ lemma oc_ord_stabilizes {T1 : ℕ} {lead : A → Prop} [DecidablePred lead] {inp
             by rw [hfb.2.2.2]; exact h'.2.2.2.1⟩
     · push Not at hc
       exact ⟨x, ⟨hx, by rw [hc.1]; exact hU⟩, hc.2⟩
-  obtain ⟨T2, hT2le, hT2⟩ := eventually_const_of_monotone (fun t => (Sset t).card) k T1
-    (fun t => (card_le_univ _).trans (by simp)) (fun t ht => card_le_card (hSmono t ht))
+  obtain ⟨T2, hT2le, hT2⟩ := Nat.eventually_const_of_le_succ
+    (f := fun t => (Sset t).card) (B := k) (N := T1) (fun t _ => (card_le_univ _).trans (by simp))
+    (fun t ht => card_le_card (hSmono t ht))
   have hS : ∀ t ≥ T2, Sset t = Sset T2 := by
     intro t ht
     induction t, ht using Nat.le_induction with
@@ -983,8 +984,8 @@ lemma oc_ord_stabilizes {T1 : ℕ} {lead : A → Prop} [DecidablePred lead] {inp
           unfold phiL
           rw [hc.1, hc.2]
           exact ⟨le_rfl, fun h' => by tauto⟩
-      obtain ⟨T3, hT3le, hT3⟩ := eventually_const_of_antitone
-        (fun t => ∑ x ∈ L, phiL (Sset T2) h (E.config t x)) T2
+      obtain ⟨T3, hT3le, hT3⟩ := Nat.eventually_const_of_succ_le
+        (f := fun t => ∑ x ∈ L, phiL (Sset T2) h (E.config t x)) (N := T2)
         (fun t ht => Finset.sum_le_sum fun x hx => (hstep t ht x hx).1)
       refine ⟨T3, hT3le, fun t ht x hx => ?_⟩
       by_contra hne
@@ -1091,8 +1092,8 @@ lemma oc_ord_stabilizes {T1 : ℕ} {lead : A → Prop} [DecidablePred lead] {inp
       unfold psiN
       rw [hc.1, hc.2]
       exact ⟨le_rfl, fun h' => by tauto⟩
-  obtain ⟨T4, hT4le, hT4⟩ := eventually_const_of_antitone
-    (fun t => ∑ x ∈ N, psiN (E.config T3 (ℓ x)).bra (E.config t x)) T3
+  obtain ⟨T4, hT4le, hT4⟩ := Nat.eventually_const_of_succ_le
+    (f := fun t => ∑ x ∈ N, psiN (E.config T3 (ℓ x)).bra (E.config t x)) (N := T3)
     (fun t ht => Finset.sum_le_sum fun x hx => (hstepN t ht x hx).1)
   refine ⟨T4, by omega, fun t ht x => ?_⟩
   by_cases hx : lead x
@@ -1546,7 +1547,7 @@ lemma cexSched2_ne (t : ℕ) : (cexSched2 t).1 ≠ (cexSched2 t).2 := by
 
 /-- The Ord-Circles counterexample execution (`k = 2`, colors `0, 0, 1`). -/
 def cexExec2 : (ordCircles (Fin 2) 2).Execution (Fin 3) :=
-  Execution.ofSchedRec _ (ocInit cexInput (by norm_num)) cexSched2 cexSched2_ne
+  Execution.ofSched _ (ocInit cexInput (by norm_num)) cexSched2 cexSched2_ne
 
 /-- The configuration reached after two steps: agent 0 is pending (it waits to meet its leader
 as the initiator), agent 1 (leader of color 0) has `⟨1|0⟩`, agent 2 (leader of color 1) has
@@ -1559,7 +1560,7 @@ lemma cexExec2_stuck (t : ℕ) : cexExec2.config (t + 2) = cexStuck2 := by
   | zero => decide
   | succ t ih =>
     rw [show t + 1 + 2 = (t + 2) + 1 by omega, cexExec2.step, ih]
-    simp only [cexExec2, Execution.ofSchedRec, cexSched2]
+    simp only [cexExec2, Execution.ofSched, cexSched2]
     generalize (⟨t % 3, _⟩ : Fin 3) = i
     revert i; decide
 

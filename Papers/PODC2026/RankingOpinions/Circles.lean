@@ -61,15 +61,6 @@ def IsMajority {A : Type*} [Fintype A] (input : A → Fin k) (μ : Fin k) : Prop
 
 variable {A : Type*} [DecidableEq A] [Fintype A]
 
-lemma Hom.reachable {Q Q' : Type*} {P : Protocol Q} {P' : Protocol Q'} (φ : P.Hom P')
-    {C C' : Config A Q} (h : P.Reachable C C') :
-    P'.Reachable (fun x => φ.f (C x)) (fun x => φ.f (C' x)) := by
-  induction h with
-  | refl => exact Relation.ReflTransGen.refl
-  | tail _ hst ih =>
-    obtain ⟨a, b, hab, rfl⟩ := hst
-    exact ih.tail ⟨a, b, hab, (φ.interact _ hab)⟩
-
 /-- In a configuration whose braket part `B` is stable and whose only diagonal brakets are
 `⟨μ|μ⟩`, an interaction does not change brakets, and every `out` either stays or becomes `μ`. -/
 lemma step_out {B : Config A (Braket k)} (hB : Stable B) {μ : Fin k}

@@ -1,4 +1,7 @@
-import Papers.PODC2026.RankingOpinions.UnorderedBasic
+import Cslib.Computability.Distributed.PopulationProtocols.Symmetrize
+import Cslib.Computability.Distributed.PopulationProtocols.Schedules
+import Podc.PopulationProtocols.Nondet
+import Podc.Order.NatDescent
 import Mathlib.Tactic.DeriveFintype
 import Mathlib.Data.Fintype.Card
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
@@ -53,8 +56,14 @@ variable {Col : Type*} [DecidableEq Col] {k : ℕ}
 /-- Cyclic successor `d ↦ (d + 1) mod k` on `Fin k`. -/
 def cyc (d : Fin k) : Fin k := ⟨(d.val + 1) % k, Nat.mod_lt _ (by have := d.isLt; omega)⟩
 
-/-- Clockwise distance from `d` to `h`: `(h - d) mod k`. -/
-def dist (d h : Fin k) : ℕ := (h.val + k - d.val) % k
+/-- Clockwise distance from `d` to `h`: `(h - d) mod k` (subtraction in `Fin k` is modular). -/
+def dist (d h : Fin k) : ℕ := ((h - d : Fin k) : ℕ)
+
+lemma dist_eq (d h : Fin k) : dist d h = (h.val + k - d.val) % k := by
+  rw [dist, Fin.val_sub]
+  congr 1
+  have := d.isLt
+  omega
 
 lemma cyc_ne (hk : 2 ≤ k) (d : Fin k) : cyc d ≠ d := by
   intro h
@@ -68,7 +77,8 @@ lemma cyc_ne (hk : 2 ≤ k) (d : Fin k) : cyc d ≠ d := by
 lemma dist_cyc {d h : Fin k} (hdh : d ≠ h) : dist (cyc d) h + 1 = dist d h := by
   have hd := d.isLt; have hh := h.isLt
   have hne : d.val ≠ h.val := Fin.val_ne_of_ne hdh
-  unfold dist cyc
+  rw [dist_eq, dist_eq]
+  unfold cyc
   simp only
   by_cases hk : d.val + 1 = k
   · rw [hk, Nat.mod_self]
@@ -232,15 +242,15 @@ lemma exists_leader (h0 : ∀ x, (E.config 0 x).ld = true) (t : ℕ) (x : A) :
     · exact ⟨y, by rw [ic_succ, ic_succ, hy1], by rw [cfg_succ_of_ne E hya]; exact hy2⟩
 
 /-- Number of leaders. -/
-def nLeaders (C : Config A (OState Col k)) : ℕ := (univ.filter fun x => (C x).ld = true).card
+abbrev nLeaders (C : Config A (OState Col k)) : ℕ := numLeaders (fun s => s.ld) C
 
 lemma nLeaders_succ_le (t : ℕ) : nLeaders (E.config (t + 1)) ≤ nLeaders (E.config t) :=
   Finset.card_le_card fun x => by simpa using ld_succ_le E t x
 
 /-- **Lemma 8.5 (first part)**: the leader bits eventually never change. -/
 lemma leaders_eventually_const : ∃ T, ∀ t ≥ T, ∀ x, (E.config t x).ld = (E.config T x).ld := by
-  obtain ⟨T, -, hT⟩ := eventually_const_of_antitone (fun t => nLeaders (E.config t)) 0
-    (fun t _ => nLeaders_succ_le E t)
+  obtain ⟨T, -, hT⟩ := Nat.eventually_const_of_succ_le (f := fun t => nLeaders (E.config t))
+    (N := 0) (fun t _ => nLeaders_succ_le E t)
   refine ⟨T, fun t ht => ?_⟩
   induction t, ht using Nat.le_induction with
   | base => exact fun _ => rfl
@@ -250,7 +260,7 @@ lemma leaders_eventually_const : ∃ T, ∀ t ≥ T, ∀ x, (E.config t x).ld = 
         univ.filter fun x => (E.config t x).ld = true :=
       fun y => by simpa using ld_succ_le E t y
     have heq := Finset.eq_of_subset_of_card_le hsub
-      (by have := hT t ht; have := hT (t + 1) (by omega); simp only [nLeaders] at *; omega)
+      (by have := hT t ht; have := hT (t + 1) (by omega); simp only [nLeaders, numLeaders] at *; omega)
     have := congrArg (fun s => x ∈ s) heq
     simp only [mem_filter, mem_univ, true_and, eq_iff_iff] at this
     rw [← ih x]
@@ -358,9 +368,10 @@ theorem ordering_correct (input : A → Col) (hk : 0 < k) (hcol : (colors input)
     · intro a ha b hb hab
       exact huniq a b (by simpa [hL] using ha) (by simpa [hL] using hb) hab
   -- Phase 2: the set of used labels grows, hence is eventually constant
-  obtain ⟨T2, hT2le, hT2⟩ := eventually_const_of_monotone
-    (fun t => (usedLabels (E.config t)).card) k T1
-    (fun t => (card_le_univ _).trans (by simp)) (fun t ht => card_le_card (usedLabels_mono E hT1 ht))
+  obtain ⟨T2, hT2le, hT2⟩ := Nat.eventually_const_of_le_succ
+    (f := fun t => (usedLabels (E.config t)).card) (B := k) (N := T1)
+    (fun t _ => (card_le_univ _).trans (by simp))
+    (fun t ht => card_le_card (usedLabels_mono E hT1 ht))
   have hS : ∀ t ≥ T2, usedLabels (E.config t) = usedLabels (E.config T2) := by
     intro t ht
     induction t, ht using Nat.le_induction with
@@ -402,8 +413,8 @@ theorem ordering_correct (input : A → Col) (hk : 0 < k) (hcol : (colors input)
           have hdh : (E.config t x).d ≠ h := fun e => hh (e ▸ h3)
           have := dist_cyc hdh
           rw [h2]; exact ⟨by omega, fun _ => by omega⟩
-      obtain ⟨T3, hT3le, hT3⟩ := eventually_const_of_antitone
-        (fun t => distSum h (E.config t)) T2 (fun t ht => by
+      obtain ⟨T3, hT3le, hT3⟩ := Nat.eventually_const_of_succ_le
+        (f := fun t => distSum h (E.config t)) (N := T2) (fun t ht => by
           rw [hsum t ht, hsum (t + 1) (by omega)]
           exact Finset.sum_le_sum fun x hx => (hle t ht x hx).1)
       refine ⟨T3, hT3le, fun t ht x hx => ?_⟩
@@ -560,7 +571,7 @@ def cexInput : Fin 3 → Fin 2 := ![0, 0, 1]
 
 /-- The counterexample execution. -/
 def cexExec : (ordering (Fin 2) 2).Execution (Fin 3) :=
-  Execution.ofSchedRec _ (ordInit cexInput (by norm_num)) cexSched cexSched_ne
+  Execution.ofSched _ (ordInit cexInput (by norm_num)) cexSched cexSched_ne
 
 /-- The configuration reached after two steps, which never changes afterwards: agent 0 is a
 non-leader with label 0, its leader (agent 1) has label 1, and agent 2 (other color) has label 0. -/
@@ -572,7 +583,7 @@ lemma cexExec_stuck (t : ℕ) : cexExec.config (t + 2) = cexStuck := by
   | zero => decide
   | succ t ih =>
     rw [show t + 1 + 2 = (t + 2) + 1 by omega, cexExec.step, ih]
-    simp only [cexExec, Execution.ofSchedRec, cexSched]
+    simp only [cexExec, Execution.ofSched, cexSched]
     generalize (⟨t % 3, _⟩ : Fin 3) = i
     revert i; decide
 

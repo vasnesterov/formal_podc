@@ -28,6 +28,8 @@ This file provides one counting function and the three selectors used by such pr
 * `Finset.majority?_eq_of_notMem`: if the members outside `F` are a strict majority of `s` and
   all report `o`, the majority value is `o`.
 * `Finset.plurality_eq_of_card_lt_two_mul_countEq`: a strict-majority value is the plurality.
+* `Finset.find?_map_eq_threshold?`, `Finset.find?_map_eq_majority?`: the computable "first
+  candidate above the threshold" scan of a protocol computes `threshold?` / `majority?`.
 -/
 
 namespace Finset
@@ -175,6 +177,40 @@ theorem majority?_eq_of_notMem [DecidableEq α] {o : Option β} (hF : #s < 2 * #
 
 theorem exists_mem_of_majority?_eq_some (h : s.majority? f = some b) : ∃ a ∈ s, f a = some b :=
   exists_mem_of_threshold?_eq_some (by omega) h
+
+/-! ### Computable selectors -/
+
+/-- Votes `some (g a)` for `some b` are the votes `g a` for `b`. -/
+@[simp] theorem countEq_some (g : α → β) (b : β) :
+    s.countEq (fun a => some (g a)) (some b) = s.countEq g b := by
+  simp [countEq]
+
+/-- **Scanning for a heavy value.** Protocols compute a threshold value by scanning a list `L`
+covering `s` for the first `a ∈ s` whose value `g a` is reported at least `k` times. When
+`#s < 2 * k` (at most one value reaches the threshold), this is `s.threshold? (some ∘ g) k`. -/
+theorem find?_map_eq_threshold? {g : α → β} {L : List α} (hL : ∀ a ∈ s, a ∈ L) {p : α → Bool}
+    (hp : ∀ a, p a = true ↔ a ∈ s ∧ k ≤ s.countEq g (g a)) (hk : #s < 2 * k) :
+    (L.find? p).map g = s.threshold? (fun a => some (g a)) k := by
+  cases h : L.find? p with
+  | some a =>
+    have := (hp a).1 (List.find?_some h)
+    exact (threshold?_eq_some hk (by rw [countEq_some]; exact this.2)).symm
+  | none =>
+    refine (threshold?_eq_none_iff.2 fun b => ?_).symm
+    rw [countEq_some]
+    by_contra hb
+    push Not at hb
+    obtain ⟨a, ha, rfl⟩ := exists_mem_of_countEq_pos (show 0 < s.countEq g b by omega)
+    exact List.find?_eq_none.1 h a (hL a ha) ((hp a).2 ⟨ha, hb⟩)
+
+/-- **Scanning for a strict majority.** The first `a ∈ s` in a list covering `s` whose value
+`g a` is reported by a strict majority of `s` gives `s.majority? (some ∘ g)`. -/
+theorem find?_map_eq_majority? {g : α → β} {L : List α} (hL : ∀ a ∈ s, a ∈ L) {p : α → Bool}
+    (hp : ∀ a, p a = true ↔ a ∈ s ∧ #s < 2 * s.countEq g (g a)) :
+    (L.find? p).map g = s.majority? (fun a => some (g a)) :=
+  find?_map_eq_threshold? hL
+    (fun a => (hp a).trans (and_congr_right fun _ => ⟨fun h => by omega, fun h => by omega⟩))
+    (by omega)
 
 end Selectors
 

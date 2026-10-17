@@ -1,5 +1,6 @@
 import Papers.PODC2026.PLSTradeoff.BallCarving
 import Papers.PODC2026.PLSTradeoff.Tradeoff
+import Podc.Probability.Finite.Uniform
 
 /-!
 # Ball carving with random radii (Section 5.1)
@@ -35,7 +36,7 @@ samples.
 
 namespace PLSTradeoff
 
-open SimpleGraph Finset Classical
+open SimpleGraph Finset Classical Cslib.Probability
 
 variable {V : Type*} [Fintype V] [LinearOrder V]
 
@@ -379,85 +380,6 @@ lemma bad_of_not_clustered {R : V → ℕ} {u : V} (hu : ¬ Clustered G t K R u)
     hw.trans (by simp only [rad]; exact_mod_cast (by omega))⟩⟩
 
 -- CSLib candidate
-/-- Fibre counting: if `A` does not depend on coordinate `w`, and for every `R` at most `c`
-values of coordinate `w` satisfy `B`, then `M |{A ∧ B}| ≤ c |{A}|`. -/
-lemma card_and_le_fiber {M : ℕ} (w : V) (A B : (V → Fin M) → Prop)
-    (hA : ∀ R x, A (Function.update R w x) ↔ A R) (c : ℕ)
-    (hB : ∀ R, (univ.filter (fun x => B (Function.update R w x))).card ≤ c) :
-    M * (univ.filter (fun R => A R ∧ B R)).card ≤ c * (univ.filter A).card := by
-  let f : (V → Fin M) → ℕ := fun R => if A R ∧ B R then 1 else 0
-  let e : (V → Fin M) × Fin M ≃ (V → Fin M) × Fin M :=
-    { toFun := fun p => (Function.update p.1 w p.2, p.1 w)
-      invFun := fun p => (Function.update p.1 w p.2, p.1 w)
-      left_inv := fun p => by simp
-      right_inv := fun p => by simp }
-  have h1 : ∑ p : (V → Fin M) × Fin M, f (Function.update p.1 w p.2) =
-      M * (univ.filter (fun R => A R ∧ B R)).card := by
-    have : ∑ p : (V → Fin M) × Fin M, f (Function.update p.1 w p.2) =
-        ∑ p : (V → Fin M) × Fin M, f p.1 := Equiv.sum_comp e (fun p => f p.1)
-    rw [this, Fintype.sum_prod_type]
-    simp only [sum_const, card_univ, Fintype.card_fin, smul_eq_mul]
-    rw [← Finset.mul_sum, Finset.card_filter]
-  have h2 : ∑ p : (V → Fin M) × Fin M, f (Function.update p.1 w p.2) ≤
-      c * (univ.filter A).card := by
-    rw [Fintype.sum_prod_type]
-    have : ∀ R : V → Fin M, ∑ x : Fin M, f (Function.update R w x) =
-        if A R then (univ.filter (fun x => B (Function.update R w x))).card else 0 := by
-      intro R
-      by_cases hR : A R
-      · simp only [f, hA, hR, true_and, ite_true, Finset.card_filter]
-      · simp [f, hA, hR]
-    simp only [this]
-    rw [Finset.card_filter, Finset.mul_sum]
-    apply Finset.sum_le_sum
-    intro R _
-    by_cases hR : A R
-    · simp only [hR, ite_true, mul_one]; exact hB R
-    · simp [hR]
-  omega
-
--- CSLib candidate
-/-- Iterated fibre counting along the identifier order: if each `bad w` depends only on the
-coordinates `≤ w` and at most a third of the values of coordinate `w` make it hold, then at most a
-`3^{-|S|}` fraction of all `R` make every `bad w`, `w ∈ S`, hold. -/
-lemma card_all_bad_le {M : ℕ} (hM : 0 < M) (bad : V → (V → Fin M) → Prop)
-    (hdep : ∀ w R R', (∀ z ≤ w, R z = R' z) → (bad w R ↔ bad w R'))
-    (hfib : ∀ w R, 3 * (univ.filter (fun x => bad w (Function.update R w x))).card ≤ M)
-    (S : Finset V) :
-    3 ^ S.card * (univ.filter (fun R : V → Fin M => ∀ w ∈ S, bad w R)).card ≤
-      M ^ Fintype.card V := by
-  induction S using Finset.induction_on_max with
-  | empty =>
-    simp only [card_empty, pow_zero, one_mul]
-    refine (card_filter_le _ _).trans (by simp)
-  | insert a s hlt ih =>
-    have has : a ∉ s := fun h => lt_irrefl a (hlt a h)
-    rw [card_insert_of_notMem has]
-    have hA : ∀ R x, (∀ w ∈ s, bad w (Function.update R a x)) ↔ (∀ w ∈ s, bad w R) := by
-      intro R x
-      refine forall₂_congr fun w hw => hdep w _ _ (fun z hz => ?_)
-      rw [Function.update_of_ne (ne_of_lt (hz.trans_lt (hlt w hw)))]
-    have hf := card_and_le_fiber a (fun R => ∀ w ∈ s, bad w R) (bad a) hA
-      (M / 3) (fun R => by have := hfib a R; omega)
-    have heq : univ.filter (fun R : V → Fin M => ∀ w ∈ insert a s, bad w R) =
-        univ.filter (fun R => (∀ w ∈ s, bad w R) ∧ bad a R) := by
-      ext R; simp [and_comm]
-    rw [heq]
-    set X := (univ.filter (fun R : V → Fin M => (∀ w ∈ s, bad w R) ∧ bad a R)).card with hX
-    set Y := (univ.filter (fun R : V → Fin M => ∀ w ∈ s, bad w R)).card with hY
-    have h3 : 3 * (M / 3) ≤ M := Nat.mul_div_le M 3
-    have h4 : 3 * X ≤ Y := by
-      apply Nat.le_of_mul_le_mul_left _ hM
-      have hf' : M * X ≤ M / 3 * Y := by rw [hX, hY]; convert hf
-      have e1 := Nat.mul_le_mul_left 3 hf'
-      have e2 := Nat.mul_le_mul_right Y h3
-      nlinarith
-    have h5 := Nat.mul_le_mul_left (3 ^ s.card) h4
-    calc 3 ^ (s.card + 1) * X = 3 ^ s.card * (3 * X) := by ring
-      _ ≤ 3 ^ s.card * Y := h5
-      _ ≤ M ^ Fintype.card V := ih
-
--- CSLib candidate
 omit [LinearOrder V] in
 /-- In a connected graph the ball of radius `k` has at least `min(n, k+1)` nodes. -/
 lemma card_ball_ge (hG : G.Connected) (u : V) (k : ℕ) :
@@ -539,7 +461,9 @@ theorem card_not_allClustered (hG : G.Connected) (ht : 1 ≤ t)
       ¬ Clustered G t K (fun v => (R v : ℕ)) u)).card ≤ N := by
     intro u
     set S := univ.filter (fun w => G.edist u w ≤ (2 * K : ℕ))
-    have hall := card_all_bad_le (by omega) bad hdep hfib S
+    have hall : 3 ^ S.card * (univ.filter (fun R : V → Fin M => ∀ w ∈ S, bad w R)).card ≤ N :=
+      (pow_mul_card_filter_forall_le (α := fun _ : V => Fin M) hdep 3
+        (fun w R => (hfib w R).trans_eq (Fintype.card_fin M).symm) S).trans_eq (by simp [N, n])
     have hsub : univ.filter (fun R : V → Fin M => ¬ Clustered G t K (fun v => (R v : ℕ)) u) ⊆
         univ.filter (fun R : V → Fin M => ∀ w ∈ S, bad w R) := by
       intro R hR
@@ -568,14 +492,11 @@ theorem card_not_allClustered (hG : G.Connected) (ht : 1 ≤ t)
           Nat.mul_le_mul_left _ (card_le_card hsub)
       _ ≤ N := hall
   -- union bound
-  have hunion : univ.filter (fun R : V → Fin M => ¬ AllClustered G t K (fun v => (R v : ℕ))) ⊆
-      univ.biUnion (fun u => univ.filter (fun R : V → Fin M =>
-        ¬ Clustered G t K (fun v => (R v : ℕ)) u)) := by
-    intro R hR
-    simp only [mem_filter, mem_univ, true_and, AllClustered, not_forall] at hR
-    obtain ⟨u, hu⟩ := hR
-    exact mem_biUnion.2 ⟨u, mem_univ _, by simpa using hu⟩
-  have hsum := (card_le_card hunion).trans card_biUnion_le
+  have hsum : (univ.filter (fun R : V → Fin M => ¬ AllClustered G t K (fun v => (R v : ℕ)))).card ≤
+      ∑ u, (univ.filter (fun R : V → Fin M => ¬ Clustered G t K (fun v => (R v : ℕ)) u)).card := by
+    rw [filter_congr fun R _ => show ¬ AllClustered G t K (fun v => (R v : ℕ)) ↔
+      ∃ u ∈ univ, ¬ Clustered G t K (fun v => (R v : ℕ)) u by simp [AllClustered]]
+    exact card_filter_exists_le _ _
   by_cases hn : n = 0
   · have : IsEmpty V := Fintype.card_eq_zero_iff.1 hn
     have : univ.filter (fun R : V → Fin M => ¬ AllClustered G t K (fun v => (R v : ℕ))) = ∅ := by
@@ -606,16 +527,22 @@ theorem exists_good_family (ht : 1 ≤ t) (hK : K = t * Nat.clog 2 (Fintype.card
   push Not at hcon
   let Bad' : SimpleGraph V → Finset (V → Fin M) := fun G =>
     univ.filter (fun R => ¬ AllClustered G t K (fun v => (R v : ℕ)))
-  have hcover : (univ : Finset (Fin m → V → Fin M)) ⊆
-      (univ.filter (fun G : SimpleGraph V => G.Connected)).biUnion
-        (fun G => Fintype.piFinset (fun _ : Fin m => Bad' G)) := by
-    intro F _
-    obtain ⟨G, hG, hbad⟩ := hcon F
-    refine mem_biUnion.2 ⟨G, by simp [hG], Fintype.mem_piFinset.2 fun i => ?_⟩
-    simp [Bad', hbad i]
-  have hcard := (card_le_card hcover).trans card_biUnion_le
+  -- union bound over the connected graphs
+  have hcard : (univ : Finset (Fin m → V → Fin M)).card ≤
+      ∑ G ∈ univ.filter (fun G : SimpleGraph V => G.Connected), (Bad' G).card ^ m := by
+    calc (univ : Finset (Fin m → V → Fin M)).card
+        = (univ.filter fun F : Fin m → V → Fin M =>
+            ∃ G ∈ univ.filter (fun G : SimpleGraph V => G.Connected), ∀ i, F i ∈ Bad' G).card := by
+          congr 1; ext F
+          obtain ⟨G, hG, hbad⟩ := hcon F
+          simpa using ⟨G, hG, fun i => by simp [Bad', hbad i]⟩
+      _ ≤ _ := by
+          convert card_filter_exists_le (univ.filter (fun G : SimpleGraph V => G.Connected))
+            (fun G (F : Fin m → V → Fin M) => ∀ i, F i ∈ Bad' G)
+      _ = _ := sum_congr rfl fun G _ => by
+          rw [← Fintype.card_piFinset_const]; congr 1; ext F; simp [Fintype.mem_piFinset]
   rw [card_univ] at hcard
-  simp only [Fintype.card_fun, Fintype.card_fin, Fintype.card_piFinset, prod_const, card_univ, Fintype.card_fin] at hcard
+  simp only [Fintype.card_fun, Fintype.card_fin] at hcard
   have hN : N = M ^ n := by simp [N, n]
   -- each term is at most `(N/2)^m`
   have hterm : ∀ G ∈ univ.filter (fun G : SimpleGraph V => G.Connected),
