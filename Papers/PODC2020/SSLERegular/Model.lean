@@ -1,5 +1,4 @@
 import Cslib.Computability.Distributed.PopulationProtocols.Nondet
-import Podc.Computability.Distributed.PopulationProtocols.Nondet
 import Mathlib.Combinatorics.SimpleGraph.Finite
 
 /-!

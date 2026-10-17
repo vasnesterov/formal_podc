@@ -5,7 +5,6 @@ import Cslib.Computability.Distributed.SharedMemory.Mutex
 import Cslib.Computability.Distributed.SharedMemory.Objects.FetchAdd
 import Cslib.Computability.Distributed.SharedMemory.Potential
 import Cslib.Computability.Distributed.SharedMemory.Task
-import Podc.Computability.Distributed.SharedMemory.Model
 
 /-!
 # Mod-`φ` fetch-and-increment from one bounded fetch-and-add object

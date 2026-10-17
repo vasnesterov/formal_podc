@@ -1,7 +1,7 @@
 import Papers.PODC2020.BezoutElection.Alg2Conc
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
 import Mathlib.Algebra.BigOperators.Group.Finset.Piecewise
-import Podc.Foundations.Data.Finset.SumUpdate
+import Cslib.Foundations.Data.Finset.SumUpdate
 
 /-!
 # Algorithm 2: the global invariant

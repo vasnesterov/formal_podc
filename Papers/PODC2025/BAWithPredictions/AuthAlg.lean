@@ -1,6 +1,6 @@
 import Papers.PODC2025.BAWithPredictions.RoundModel
 import Cslib.Computability.Distributed.Byzantine.PartialSync.RoundAuth
-import Podc.Foundations.Data.Finset.Quorum
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Authenticated Byzantine Agreement with classification (Section 8) — the algorithm

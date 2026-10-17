@@ -1,5 +1,5 @@
 import Papers.PODC2026.TreeAA.Spec
-import Podc.Foundations.Data.Finset.Quorum
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # The combinatorial core of `TreeAA` (Lemmas 2, 6–11)

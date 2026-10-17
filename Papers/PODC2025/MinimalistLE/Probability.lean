@@ -1,5 +1,5 @@
 import Papers.PODC2025.MinimalistLE.Convergence
-import Podc.Probability.CoinField
+import Cslib.Probability.CoinField
 
 /-!
 # Probabilistic part: elimination of leaders window by window

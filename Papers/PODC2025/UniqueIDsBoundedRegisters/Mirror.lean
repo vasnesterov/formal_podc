@@ -112,7 +112,7 @@ lemma relabel_proc (q' : P) (ℓ : Label P A) : (relabel q' ℓ).proc = q' := by
 
 omit [DecidableEq P] [DecidableEq ι] in
 lemma numInv_relabel (q' : P) (γ : List (Label P A)) :
-    numInv (γ.map (relabel q')) = numInv γ := by
+    invCount (γ.map (relabel q')) = invCount γ := by
   induction γ with
   | nil => rfl
   | cons ℓ γ ih => cases ℓ <;> simp [relabel, ih, Label.isInv]

@@ -117,4 +117,4 @@ The port-numbering model and its algorithms come from CSLib
 
 CSLib candidates (marked `-- CSLib candidate`): `Problem.lean` (round-elimination operators), `Abstract.lean`,
 `PNModel.lean` (full-information views, `solvableIn_iff_view`, `SolvableIn.post`), `Matching.lean` (Hall-based
-pairing lemma). The tower/log* lemmas now live in the shared `Podc/Foundations/Data/Nat/LogStar.lean`.
+pairing lemma). The tower/log* lemmas now live in the shared `Cslib/Foundations/Data/Nat/LogStar.lean`.

@@ -1,5 +1,5 @@
 import Papers.PODC2026.PLSTradeoff.Tradeoff
-import Podc.Foundations.Combinatorics.SimpleGraph.Ball
+import Cslib.Foundations.Combinatorics.SimpleGraph.Ball
 
 /-!
 # Sharing a string with `O(1)` bits per node (Lemma 5.6)

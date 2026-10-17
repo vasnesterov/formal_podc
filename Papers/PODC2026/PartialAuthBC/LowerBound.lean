@@ -1,5 +1,5 @@
 import Papers.PODC2026.PartialAuthBC.Model
-import Podc.Computability.Distributed.Byzantine.LockStep.Cover
+import Cslib.Computability.Distributed.Byzantine.LockStep.Cover
 
 /-!
 # Lower bounds: Theorem 4.1 and Corollary 4.2

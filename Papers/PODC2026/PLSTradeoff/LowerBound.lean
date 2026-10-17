@@ -1,5 +1,5 @@
 import Papers.PODC2026.PLSTradeoff.Basic
-import Podc.Foundations.Combinatorics.SimpleGraph.Ball
+import Cslib.Foundations.Combinatorics.SimpleGraph.Ball
 
 /-!
 # Refuting the strong tradeoff conjecture (Section 6)

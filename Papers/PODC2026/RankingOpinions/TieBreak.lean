@@ -454,7 +454,7 @@ theorem tieBreak_correct (h0 : E.config 0 = tbInit input) (hE : E.WeaklyFair) :
     · rcases (outs t ht _ _ hs).2 with h | ⟨h, -⟩
       · exact h
       · rw [Bool.or_comm, htz] at h; exact absurd h (by simp)
-  obtain ⟨T, -, hT⟩ := eventually_all (P := fun t y => (E.config t y).1.2 = c) T1 persist reach
+  obtain ⟨T, -, hT⟩ := Nat.eventually_forall_of_imp_succ (P := fun t y => (E.config t y).1.2 = c) T1 persist reach
   exact ⟨c, hmaj, T, hT⟩
 
 end RankingOpinions

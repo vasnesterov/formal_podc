@@ -1,5 +1,5 @@
 import Papers.PODC2011.KSetAgreement.Basic
-import Podc.Foundations.Combinatorics.Labelling
+import Cslib.Foundations.Combinatorics.Labelling
 
 /-!
 # Theorem 8, "only if": impossibility with initially dead processes

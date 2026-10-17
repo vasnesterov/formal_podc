@@ -1,5 +1,5 @@
 import Papers.PODC2024.ListDefectiveColoring.Basic
-import Podc.Foundations.Data.Nat.Log
+import Cslib.Foundations.Data.Nat.Log
 
 /-!
 # Theorem 1.2 of [FK24]: the arithmetic of the parameter choice

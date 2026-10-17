@@ -1,5 +1,5 @@
 import Papers.PODC2019.HotStuff.Basic.LiveCore
-import Podc.Foundations.Data.Finset.Quorum
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Basic HotStuff: liveness (Theorem 4)

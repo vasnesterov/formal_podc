@@ -207,7 +207,7 @@ theorem fa_core (m : ℕ) : ∀ (t : ℕ) (v : V) (ℓ : ℤ), ℓ.natAbs + m = 
       intro u hu hl
       by_contra hf
       simp only [Bool.not_eq_true] at hf
-      have hP := back_induction (P := fun s => (C s u).lvl = ℓ' ∧ (C s u).faulty = false)
+      have hP := Nat.Icc_induction_down (P := fun s => (C s u).lvl = ℓ' ∧ (C s u).faulty = false)
         (a := t) ⟨hl, hf⟩ (fun s hs hsb hP => ⟨hA' s hs (by omega) u hu hP.1,
           hB s hs (by omega) u hu hP.1 hP.2⟩)
       obtain ⟨s, hs1, hs2, hs3⟩ := exists_act hA u t
@@ -217,7 +217,7 @@ theorem fa_core (m : ℕ) : ∀ (t : ℕ) (v : V) (ℓ : ℤ), ℓ.natAbs + m = 
     -- (E) at time `τ2`, no neighbour is at level `ℓ'`
     have hE : ∀ u, G.Adj v u → (C τ2 u).lvl ≠ ℓ' := by
       intro u hu hl
-      have hlv := back_induction (P := fun s => (C s u).lvl = ℓ') (a := τ1) hl
+      have hlv := Nat.Icc_induction_down (P := fun s => (C s u).lvl = ℓ') (a := τ1) hl
         (fun s hs hsb hP => hA' s (by omega) (by omega) u hu hP)
       have hfτ1 := hD u hu (hlv τ1 le_rfl hτ1τ2)
       apply ih τ1 u ℓ' (by omega) (by omega) (hLop τ1 htτ1)
@@ -225,14 +225,14 @@ theorem fa_core (m : ℕ) : ∀ (t : ℕ) (v : V) (ℓ : ℤ), ℓ.natAbs + m = 
       refine ⟨hlv s hs1 hs2, ?_⟩
       by_contra hf
       simp only [Bool.not_eq_true] at hf
-      have hP := back_induction (P := fun r => (C r u).lvl = ℓ' ∧ (C r u).faulty = false)
+      have hP := Nat.Icc_induction_down (P := fun r => (C r u).lvl = ℓ' ∧ (C r u).faulty = false)
         (a := τ1) (b := s) ⟨hlv s hs1 hs2, hf⟩ (fun r hr hrb hP => ⟨hA' r (by omega) (by omega)
           u hu hP.1, hB r (by omega) (by omega) u hu hP.1 hP.2⟩)
       have := (hP τ1 le_rfl hs1).2
       rw [hfτ1] at this; exact Bool.false_ne_true this.symm
     -- (F) from `τ2` on, no neighbour is at level `ℓ'`
     have hF : ∀ u, G.Adj v u → ∀ s, τ2 ≤ s → s ≤ X → (C s u).lvl ≠ ℓ' := fun u hu =>
-      fwd_induction (P := fun s => (C s u).lvl ≠ ℓ') (hE u hu)
+      Nat.Icc_induction_up (P := fun s => (C s u).lvl ≠ ℓ') (hE u hu)
         (fun s hs hsX hP h' => hP (hA' s (by omega) hsX u hu h'))
     -- finally `v` performs an FA transition in `[τ2, X)`
     obtain ⟨s, hs1, hs2, hs3⟩ := exists_act hA v τ2
@@ -345,7 +345,7 @@ theorem lemma_2_13_edge {t : ℕ} {u v : V} (huv : G.Adj u v)
       · exact h3 hc.2
       · exact hnp (by
           have := h3 u huv.symm; rw [hc.1, hc.2] at this; unfold LAdj at this ⊢; tauto)
-  obtain ⟨r, hr1, hr2, hr3, hr4, -⟩ := exists_first
+  obtain ⟨r, hr1, hr2, hr3, hr4, -⟩ := Nat.exists_first_Ioc
     (Q := fun r => (C r u).lvl ≠ (C t u).lvl ∨ (C r v).lvl ≠ (C t v).lvl) (s := t)
     (by simp) ⟨s, hs1, hs2, hs3⟩
   push Not at hr3
@@ -436,14 +436,14 @@ theorem lemma_2_14 {t : ℕ} {ℓ : ℤ} (hk : ℓ.natAbs + 1 ≤ k) (hop : LOut
     exact hC.outProt_le (hC.obs24 hr3) (by omega)
   push Not at hch
   have hconst : ∀ s, t ≤ s → s ≤ X → (C s v).lvl = ℓ :=
-    back_induction (P := fun s => (C s v).lvl = ℓ) hv fun s hs hsX h => (hch s hs hsX) ▸ h
+    Nat.Icc_induction_down (P := fun s => (C s v).lvl = ℓ) hv fun s hs hsX h => (hch s hs hsX) ▸ h
   intro u hu
   rw [hv]
   obtain ⟨s', hs'1, hs'2, hs'3⟩ := hC.lemma_2_14_aux hA hop hconst hu (k - ℓ.natAbs - 1) t le_rfl
     (by have := natAbs_le_of_isLevel (C t u).isLevel; omega)
     (by rw [cost14_eq (by omega)])
   rw [cost14_eq (by omega)] at hs'2
-  refine fwd_induction (P := fun s => ¬ FarOut ℓ (C s u).lvl) hs'3 (fun s hs hsX h => ?_) X hs'2
+  refine Nat.Icc_induction_up (P := fun s => ¬ FarOut ℓ (C s u).lvl) hs'3 (fun s hs hsX h => ?_) X hs'2
     le_rfl
   have hvs := hconst s (by omega) (by omega)
   have hvs' := hconst (s + 1) (by omega) (by omega)

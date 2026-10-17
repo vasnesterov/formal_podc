@@ -128,9 +128,9 @@ variable {n d m : ℕ} [NeZero m] {α : List (Label P uidObj)} {C C' : ACfg P n 
 
 lemma Inv2.step (hnd : n ≤ d) (hI : Inv1 n d m α C g) (hJ : Inv2 n d m α C g)
     {ℓ : Label P uidObj} (hs : (alg (P := P) n d m).step C ℓ = some C')
-    (hN : numInv (α ++ [ℓ]) ≤ n * m) :
+    (hN : invCount (α ++ [ℓ]) ≤ n * m) :
     Inv2 n d m (α ++ [ℓ]) C' (gstep n d g C ℓ) := by
-  have hN' : numInv α ≤ n * m := by simp at hN; omega
+  have hN' : invCount α ≤ n * m := by simp at hN; omega
   cases ℓ with
   | inv p o =>
     obtain ⟨-, -, hloc, -⟩ := alg_step_inv hs
@@ -255,7 +255,7 @@ end Inv2Step
 
 theorem inv2_of_run {n d m : ℕ} [NeZero m] (hnd : n ≤ d) (hdm : d ∣ m)
     {α : List (Label P uidObj)} {C : ACfg P n m} (h : (alg (P := P) n d m).run α = some C)
-    (hN : numInv α ≤ n * m) : Inv2 n d m α C (ghostOf n d m α) := by
+    (hN : invCount α ≤ n * m) : Inv2 n d m α C (ghostOf n d m α) := by
   induction α using List.reverseRecOn generalizing C with
   | nil =>
     simp only [Impl.run, Impl.runFrom_nil, Option.some.injEq] at h
@@ -265,7 +265,7 @@ theorem inv2_of_run {n d m : ℕ} [NeZero m] (hnd : n ≤ d) (hdm : d ∣ m)
   | append_singleton α ℓ ih =>
     obtain ⟨C₀, h₀, hs⟩ := alg_run_append_singleton h
     rw [ghostOf_append h₀ hs]
-    have hN' : numInv α ≤ n * m := by simp at hN; omega
+    have hN' : invCount α ≤ n * m := by simp at hN; omega
     exact (ih h₀ hN').step hnd (inv1_of_run hdm h₀) hs hN
 
 /-- **Theorem 3.1** (Algorithms 1 and 2): if `n ≤ d` and `d ∣ m`, the algorithm with `n + 1`

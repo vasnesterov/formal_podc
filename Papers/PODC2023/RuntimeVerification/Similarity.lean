@@ -1,6 +1,6 @@
 import Mathlib
 import Cslib.Computability.Distributed.SharedMemory.HerlihyWing.Equiv
-import Podc.Computability.Distributed.SharedMemory.HerlihyWing.SeqLin
+import Cslib.Computability.Distributed.SharedMemory.HerlihyWing.SeqLin
 
 /-!
 # Similarity of histories and the class `GenLin` (Section 7.1)

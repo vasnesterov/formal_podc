@@ -1,5 +1,4 @@
 import Cslib.Computability.Distributed.ApproxConsensus.DigraphConditions
-import Podc.Foundations.Combinatorics.Digraph.Walk
 import Mathlib
 
 /-!

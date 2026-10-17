@@ -1,5 +1,5 @@
 import Papers.PODC2016.ConcurrentDSU.WaitFree
-import Podc.Computability.Distributed.SharedMemory.Model
+import Cslib.Computability.Distributed.SharedMemory.Model
 
 /-!
 # Section 6: `SameSet` and `Unite` with early termination (Algorithms 6 and 7)

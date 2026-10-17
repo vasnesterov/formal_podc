@@ -1,6 +1,6 @@
 import Cslib.Computability.Distributed.Byzantine.PartialSync.Auth
 import Cslib.Computability.Distributed.Byzantine.PartialSync.RunClasses
-import Podc.Computability.Distributed.Byzantine.Specs
+import Cslib.Computability.Distributed.Byzantine.Specs
 import Mathlib
 
 /-!

@@ -1,7 +1,7 @@
 import Papers.PODC2022.AsyncSpeedup.Local
 import Mathlib.Algebra.Order.Group.Int
 import Mathlib.Algebra.Order.Group.Abs
-import Podc.Computability.Distributed.Byzantine.Specs
+import Cslib.Computability.Distributed.Byzantine.Specs
 
 /-!
 # Approximate agreement (Section 5): tasks, Claim 1, and the closure inclusions

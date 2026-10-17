@@ -1,6 +1,6 @@
 import Mathlib
 import Cslib.Foundations.Data.Finset.Quorum
-import Podc.Computability.Distributed.Byzantine.Specs
+import Cslib.Computability.Distributed.Byzantine.Specs
 
 /-!
 # Algorithm 4 of [AFW26]: connected consensus from gather (and approximate agreement)

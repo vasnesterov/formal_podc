@@ -1,5 +1,4 @@
 import Cslib.Computability.Distributed.PopulationProtocols.Nondet
-import Podc.Computability.Distributed.PopulationProtocols.Nondet
 import Mathlib.Data.Fintype.CardEmbedding
 
 /-!
@@ -27,7 +26,7 @@ Markov-chain bridge). We therefore model a protocol by its support relation `δ 
   `Fin n`).
 * Sub-population runs (`StepIn`/`ReachIn`), silence (`Silent`) and the embedding of a run of a
   sub-population (`exists_reachIn_of_embedding`) are the shared notions of
-  `Podc.Computability.Distributed.PopulationProtocols.Nondet`.
+  `Cslib.Computability.Distributed.PopulationProtocols.Nondet`.
 -/
 
 open Cslib.PopulationProtocol Cslib.TransitionSystem

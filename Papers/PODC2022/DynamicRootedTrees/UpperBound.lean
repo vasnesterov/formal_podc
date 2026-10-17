@@ -1,5 +1,5 @@
 import Papers.PODC2022.DynamicRootedTrees.Defs
-import Podc.Foundations.Data.Nat.Growth
+import Cslib.Foundations.Data.Nat.Growth
 
 /-!
 # The linear upper bound (Section 3.1 of the full version)
@@ -203,7 +203,7 @@ theorem min_card_le_card_outNbhd (z : α) (S : Finset ℕ)
   have hcnt : (S.filter (· ≤ K)).card = #{t ∈ Icc 1 K | t ∈ S} := by
     congr 1; ext t; simp only [mem_filter, mem_Icc]
     exact ⟨fun h => ⟨⟨(hS t h.1).1, h.2⟩, h.1⟩, fun h => ⟨h.2, h.1.2⟩⟩
-  have := Nat.min_add_card_filter_le (f := fun K => (outNbhd G 1 K z).card)
+  have := Nat.min_add_card_filter_le_of_grow (f := fun K => (outNbhd G 1 K z).card)
     (n := Fintype.card α) (K := K) (· ∈ S)
     (fun t _ => card_le_card (outNbhd_mono hG le_rfl (Nat.le_succ t) z)) fun t _ ht hlt => by
       obtain ⟨-, hroot, hmem⟩ := hS _ ht

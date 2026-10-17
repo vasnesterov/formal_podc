@@ -319,7 +319,7 @@ theorem expected (T : Typing x typ) {π : ZMod n → ℕ} (hπ : ∀ v, π v < 4
       exfalso
       obtain ⟨hl, h1, h2⟩ := h
       change π (w - 1) = 3 at h1; change π w = 1 at h2
-      have := Ring.chain_ccw_all (fun u => θ1 (typ u) ≤ π u) (w - 1) (fun u hu hS => by
+      have := ZMod.chain_ccw_all (fun u => θ1 (typ u) ≤ π u) (w - 1) (fun u hu hS => by
         have hu' : u + 1 ≠ w := fun e => hu (by rw [← e, add_sub_cancel_right])
         have hnl : (typ (u + 1)).ldr = false := by
           by_contra hc; exact hu' (T.uniqL _ _ (by simpa using hc) hl)
@@ -331,7 +331,7 @@ theorem expected (T : Typing x typ) {π : ZMod n → ℕ} (hπ : ∀ v, π v < 4
       exfalso
       obtain ⟨hJ, h1, h2⟩ := h
       change π (w - 1) = 1 at h1; change π w = 0 at h2
-      have := Ring.chain_ccw_all (fun u => θ2 (typ u) ≤ π u) (w - 1) (fun u hu hS => by
+      have := ZMod.chain_ccw_all (fun u => θ2 (typ u) ≤ π u) (w - 1) (fun u hu hS => by
         have hu' : u + 1 ≠ w := fun e => hu (by rw [← e, add_sub_cancel_right])
         have hnJ : typ (u + 1) ≠ Role.J := fun hc => hu' (T.uniqJ _ _ hc hJ)
         exact chain2 (typ u) (typ (u + 1)) (f u) (f (u + 1)) (T.adj u) hnJ (ldr_cond T π u)
@@ -352,7 +352,7 @@ theorem expected (T : Typing x typ) {π : ZMod n → ℕ} (hπ : ∀ v, π v < 4
       obtain ⟨hL, hnl, h1, h2⟩ := h
       change π w = 0 at h1; change π (w + 1) = 2 at h2
       have hl : (typ w).ldr = true := by rw [hL]; rfl
-      have := Ring.chain_cw_all (fun u => θ3 (typ u) ≤ π u) w (fun u hu hS => by
+      have := ZMod.chain_cw_all (fun u => θ3 (typ u) ≤ π u) w (fun u hu hS => by
         have hnl' : (typ u).ldr = false := by
           by_contra hc; exact hu (T.uniqL _ _ (by simpa using hc) hl)
         exact chain3 (typ u) (typ (u + 1)) (f u) (f (u + 1)) (T.adj u) hnl' (lc hr u) hS)
@@ -438,7 +438,7 @@ theorem final_spec (T : Typing x typ) {π : ZMod n → ℕ} (hπ : ∀ v, π v <
     have := (sum_eq_zero_iff.1 hzero) ℓ (mem_univ _)
     simp only [hℓ, true_and, ite_eq_right_iff, one_ne_zero, imp_false, not_lt] at this
     have := hπ ℓ; omega
-  exact Ring.chain_ccw_all (fun u => π u = 3) ℓ (fun u hu h1 => by
+  exact ZMod.chain_ccw_all (fun u => π u = 3) ℓ (fun u hu h1 => by
     have hnl : (typ u).ldr = false := by
       by_contra hc; exact hu (T.uniqL _ _ (by simpa using hc) hℓ)
     exact chain4 (typ u) (typ (u + 1)) ⟨π u, hπ u⟩ ⟨π (u + 1), hπ (u + 1)⟩ (T.adj u) hnl

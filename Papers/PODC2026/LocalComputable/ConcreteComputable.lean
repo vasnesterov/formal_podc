@@ -1,7 +1,7 @@
 import Papers.PODC2026.LocalComputable.Concrete
 import Papers.PODC2026.LocalComputable.Collapse
 import Papers.PODC2026.LocalComputable.Decide
-import Podc.Computability.Primrec.List
+import Cslib.Computability.Primrec.List
 
 /-!
 # Computability of the concrete LOCAL model

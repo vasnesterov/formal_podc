@@ -1,6 +1,6 @@
 import Papers.PODC2016.ComplexityHierarchy.SwapAlgAbstract
 import Cslib.Computability.Distributed.SharedMemory.Objects.Swap
-import Podc.Computability.Distributed.SharedMemory.Task
+import Cslib.Computability.Distributed.SharedMemory.Task
 
 /-!
 # Swap and read (Section 8 of [EGSZ16]): Algorithm 1 with double-collect scans — safety

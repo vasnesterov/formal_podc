@@ -59,7 +59,7 @@ omit [CompleteSpace E] in
 /-- Finite sums of convex functions are convex (the shared `ConvexOn.fun_sum`). -/
 lemma convexOn_agg {ι : Type*} {S : Finset ι} {Q : ι → E → ℝ}
     (h : ∀ i ∈ S, ConvexOn ℝ Set.univ (Q i)) : ConvexOn ℝ Set.univ (agg S Q) :=
-  ConvexOn.fun_sum h
+  ConvexOn.fun_sum convex_univ h
 
 end Gradient
 

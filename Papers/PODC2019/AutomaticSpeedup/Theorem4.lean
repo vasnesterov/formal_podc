@@ -1,6 +1,6 @@
 import Papers.PODC2019.AutomaticSpeedup.WeakColoring
 import Papers.PODC2019.AutomaticSpeedup.Lemmas123
-import Podc.Foundations.Data.Nat.LogStar
+import Cslib.Computability.Distributed.Local.Linial
 
 /-!
 # Lemma 4 and Theorem 4 of Brandt (PODC 2019, §5.1–5.2), port-numbering version
@@ -16,7 +16,7 @@ import Podc.Foundations.Data.Nat.LogStar
   `5 T + 7 ≤ log* Δ`.
 
 Tower bounds use CSLib's `Nat.tower` (`tower 0 = 1`, `tower (m+1) = 2 ^ tower m`) and
-`Nat.logStar` with the shared API of `Podc.Foundations.Data.Nat.LogStar`.
+`Nat.logStar` with the shared API of `Cslib.Foundations.Data.Nat.LogStar`.
 -/
 
 namespace AutomaticSpeedup
@@ -125,7 +125,7 @@ theorem theorem_4 {I : Type} {n Δ T : ℕ} {𝒢 : Set (LGraph I n)}
     rcases Nat.eq_zero_or_pos Δ with h | h
     · subst h; simp [Nat.logStar] at hT
     · exact h
-  have htow : Nat.tower (5 * T + 7) ≤ Δ := Nat.tower_le_of_le_logStar (by omega) hT
+  have htow : Nat.tower (5 * T + 7) ≤ Δ := (Nat.le_logStar_iff (by omega)).1 hT
   -- superweak 2-colouring in `T + 1` rounds
   have h0 : SolvableIn 𝒢 (superweak (kSeq 0)) Δ (T + 1 - 0) :=
     (solvableIn_weakPtr hΔ1 hreg hw).of_labelHom (weakPtrToSuperweak Δ)

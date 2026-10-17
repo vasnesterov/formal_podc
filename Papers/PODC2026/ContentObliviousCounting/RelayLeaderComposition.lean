@@ -2,7 +2,7 @@ import Papers.PODC2026.ContentObliviousCounting.BitSending
 import Cslib.Computability.Distributed.ContentOblivious.Splice
 import Cslib.Computability.Distributed.ContentOblivious.Staged
 import Mathlib
-import Podc.Computability.Distributed.ContentOblivious.VirtualRing
+import Cslib.Computability.Distributed.ContentOblivious.VirtualRing
 
 /-!
 # Theorem 17 with a relay leader: composing two rounds gives wrong outputs

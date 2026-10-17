@@ -2,7 +2,6 @@ import Mathlib
 import Cslib.Computability.Distributed.Byzantine.KingPhase
 import Cslib.Computability.Distributed.Byzantine.Specs
 import Cslib.Foundations.Data.Finset.Quorum
-import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # Subroutines of the early-stopping Phase King protocol (Section 2 and Lemma 3.4)

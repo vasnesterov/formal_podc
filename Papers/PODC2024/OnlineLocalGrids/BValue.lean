@@ -1,7 +1,7 @@
 import Papers.PODC2024.OnlineLocalGrids.Defs
-import Podc.Foundations.Combinatorics.SimpleGraph.Ball
-import Podc.Foundations.Combinatorics.SimpleGraph.Cycle
-import Podc.Foundations.Algebra.BigOperators.Translate
+import Cslib.Foundations.Algebra.BigOperators.Translate
+import Cslib.Foundations.Combinatorics.SimpleGraph.Ball
+import Cslib.Foundations.Combinatorics.SimpleGraph.CycleGraph
 
 /-!
 # `a`-values and `b`-values of 3-colourings (§3.1 of Chang–Mishra–Nguyen–Yang–Yeh, PODC 2024)

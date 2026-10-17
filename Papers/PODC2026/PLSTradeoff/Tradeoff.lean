@@ -1,5 +1,5 @@
 import Papers.PODC2026.PLSTradeoff.TSPartition
-import Podc.Foundations.Data.List.BitEncoding
+import Cslib.Foundations.Data.List.BitEncoding
 
 /-!
 # TS partitions imply a tradeoff (Lemma 3.2)

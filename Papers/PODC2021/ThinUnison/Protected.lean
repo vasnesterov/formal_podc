@@ -157,7 +157,7 @@ theorem lemma_2_19_phaseA {t : ℕ} (hop : AllOutProt G C t) (v : V) (n : ℕ) :
     · exact ⟨s, le_rfl, le_rho_iter hA _ s, Or.inr h1⟩
     have h2 : 2 ≤ (C s v).lvl.natAbs := by have := (C s v).isLevel; lvl_omega
     have hops := hC.allOutProt_le hop hs
-    obtain ⟨r, hr1, hr2, hr3, hr4, hr5⟩ := exists_first
+    obtain ⟨r, hr1, hr2, hr3, hr4, hr5⟩ := Nat.exists_first_Ioc
       (Q := fun r => (C r v).lvl ≠ (C s v).lvl ∨ Prot G C r v) (by simp [hnp])
       (hC.lemma_2_13' hA hops h2 hnp)
     have hle : (rho A)^[2 * k - 2] s ≤ (rho A)^[(n + 1) * (2 * k - 2)] s :=
@@ -190,7 +190,7 @@ theorem lemma_2_19_phaseB (hk : 2 ≤ k) {t : ℕ} (hop : AllOutProt G C t) {v :
     · subst h; exact hnp
     · exact H s h hsX
   have hconst : ∀ s, t ≤ s → s ≤ X → (C s v).lvl = (C t v).lvl :=
-    fwd_induction (P := fun s => (C s v).lvl = (C t v).lvl) rfl fun s hs hsX h => by
+    Nat.Icc_induction_up (P := fun s => (C s v).lvl = (C t v).lvl) rfl fun s hs hsX h => by
       rw [hC.lvl_succ_of_not_prot_one (hnp' s hs hsX.le) (h ▸ h1), h]
   apply hnp' X (le_rho_iter hA _ t) le_rfl
   intro u hu
@@ -207,7 +207,7 @@ theorem lemma_2_19_phaseB (hk : 2 ≤ k) {t : ℕ} (hop : AllOutProt G C t) {v :
     · have := hp v hu.symm; unfold LAdj at this ⊢; tauto
     · rw [hconst s' h1' h2'] at *
       exact lAdj_of_natAbs_one hk h1 habs
-  refine fwd_induction (P := fun s => LAdj k (C s v).lvl (C s u).lvl) hs'3
+  refine Nat.Icc_induction_up (P := fun s => LAdj k (C s v).lvl (C s u).lvl) hs'3
     (fun s hs hsX h => ?_) X hs'2 le_rfl
   have hvs := hconst s (by omega) hsX.le
   exact hC.obs21 hu h (by rw [hvs]; omega) (by rw [hvs]; omega)
@@ -233,7 +233,7 @@ theorem lemma_2_19 (hk : 2 ≤ k) {t : ℕ} (hop : AllOutProt G C t) {v : V}
       refine ⟨s, by omega, h5.trans ?_, h6⟩
       calc (rho A)^[c] s1 ≤ (rho A)^[c] ((rho A)^[c] t) := rho_iter_mono hA _ h2
         _ = (rho A)^[2 * c] t := by rw [rho_iter_add, two_mul]
-  obtain ⟨r, hr1, hr2, hr3, hr4, -⟩ := exists_first (Q := fun s => Prot G C s v) hnp hex
+  obtain ⟨r, hr1, hr2, hr3, hr4, -⟩ := Nat.exists_first_Ioc (Q := fun s => Prot G C s v) hnp hex
   exact ⟨r + 1, by omega, hr2, hr4,
     hC.natAbs_eq_one_of_newly_prot (hC.allOutProt_le hop hr1) hr3 hr4⟩
 
@@ -288,7 +288,7 @@ theorem lemma_2_20_claim (d : ℕ) : ∀ (v : V) (t t'' : ℕ) (ℓ : ℤ), 1 �
       · have := hmid s h hs'; omega
     obtain ⟨-, haan, hprot⟩ := hC.aan_of_incr (s := t) (v := v) (by omega) (by omega) (by omega)
     have hvprot : ∀ s, t ≤ s → s ≤ t'' + 1 → Prot G C s v :=
-      fwd_induction (P := fun s => Prot G C s v) hprot fun s hs hs' h => by
+      Nat.Icc_induction_up (P := fun s => Prot G C s v) hprot fun s hs hs' h => by
         have := hvlvl s hs (by omega); exact hC.obs22 h (by omega) (by omega)
     cases p with
     | nil => exact hvprot (t'' + 1) (by omega) le_rfl
@@ -317,7 +317,7 @@ theorem lemma_2_20_claim (d : ℕ) : ∀ (v : V) (t t'' : ℕ) (ℓ : ℤ), 1 �
       · omega
       · exact ⟨h.2.2.1, h.2.2.2⟩
     -- `t'_w`: the first time `w` reaches level `ℓ + 2d + 2`
-    obtain ⟨r, hr1, hr2, hr3, hr4, hr5⟩ := exists_first
+    obtain ⟨r, hr1, hr2, hr3, hr4, hr5⟩ := Nat.exists_first_Ioc
       (Q := fun s => ℓ + 2 * (d + 1) ≤ (C s w).lvl) (s := t) (B := t'')
       (by omega) ⟨t'', by
         rcases Nat.eq_or_lt_of_le htt' with h | h
@@ -361,7 +361,7 @@ theorem lemma_2_20 {D : ℕ} (hk : 3 * D + 2 ≤ k) (hD : G.ediam ≤ D) {v : V}
     (ht : (C t v).lvl.natAbs = 1) (hts : t ≤ s) (hs : 2 * D + 2 ≤ (C s v).lvl.natAbs) :
     ∃ r, t < r ∧ r ≤ s ∧ AllProt G C r := by
   classical
-  obtain ⟨r0, hr1, hr2, hr3, hr4, hr5⟩ := exists_first
+  obtain ⟨r0, hr1, hr2, hr3, hr4, hr5⟩ := Nat.exists_first_Ioc
     (Q := fun x => 2 * D + 2 ≤ (C x v).lvl.natAbs) (s := t) (B := s) (by omega)
     ⟨s, by rcases Nat.eq_or_lt_of_le hts with h | h
            · subst h; omega
@@ -370,7 +370,7 @@ theorem lemma_2_20 {D : ℕ} (hk : 3 * D + 2 ≤ k) (hD : G.ediam ≤ D) {v : V}
   -- region invariant on `[t, r0]`
   have hreg : ∀ x, t ≤ x → x ≤ r0 → (C x v).lvl = -1 ∨ (1 ≤ (C x v).lvl ∧
       (C x v).lvl ≤ 2 * D + 1) := by
-    refine fwd_induction (P := fun x => (C x v).lvl = -1 ∨ (1 ≤ (C x v).lvl ∧
+    refine Nat.Icc_induction_up (P := fun x => (C x v).lvl = -1 ∨ (1 ≤ (C x v).lvl ∧
       (C x v).lvl ≤ 2 * D + 1)) (by omega) (fun x hx hxr h => ?_)
     have h5 := hr5 (x + 1) (by omega) (by omega)
     rcases hC.region_step' (s := x) (v := v) (by omega) with h' | h' <;> omega
@@ -417,7 +417,7 @@ theorem lemma_2_21 {D : ℕ} (hk : 3 * D + 2 ≤ k) (hD : G.ediam ≤ D) {t : �
   obtain ⟨s, hs1, hs2, hs3⟩ := hsmall
   obtain ⟨r, hr1, hr2, hr3⟩ := hC.lemma_2_20 hk hD hu hs1 (by omega)
   have : ∀ x, r ≤ x → x ≤ t' → AllProt G C x :=
-    fwd_induction (P := fun x => AllProt G C x) hr3 fun x hx _ h => hpersist x (by omega) h
+    Nat.Icc_induction_up (P := fun x => AllProt G C x) hr3 fun x hx _ h => hpersist x (by omega) h
   exact hnp (this t' (by omega) le_rfl v)
 
 /-- The inductive argument of Lemma 2.22 of [EK21]: if `v` is joined by a walk of length `j ≤ D`
@@ -436,7 +436,7 @@ theorem lemma_2_22_aux (hk2 : 2 ≤ k) {D T : ℕ} (hop : AllOutProt G C T) (j :
   have hopt := hC.allOutProt_le hop hTt
   obtain ⟨s1, hs1a, hs1b, hs1c, -⟩ := hC.lemma_2_19 hA hk2 hopt hnp
   rw [← hc] at hs1b
-  obtain ⟨r, hr1, hr2, hr3, hr4, -⟩ := exists_first
+  obtain ⟨r, hr1, hr2, hr3, hr4, -⟩ := Nat.exists_first_Ioc
     (Q := fun r => (∃ i < j, ¬ Prot G C r (p.getVert i)) ∨ Prot G C r x)
     (by push Not; exact ⟨hprot, hnp⟩) ⟨s1, hs1a, hs1b, Or.inr hs1c⟩
   push Not at hr3
@@ -488,7 +488,7 @@ theorem lemma_2_22 {D : ℕ} (hk : 3 * D + 2 ≤ k) (hD : G.ediam ≤ D) {T : �
   classical
   set X := (rho A)^[(D + 1) * (2 * ((k - 1) * (2 * k - 2)))] T
   by_cases hall : AllProt G C T
-  · exact fwd_induction (P := fun x => AllProt G C x) hall (fun x hx _ h => hpersist x hx h) X
+  · exact Nat.Icc_induction_up (P := fun x => AllProt G C x) hall (fun x hx _ h => hpersist x hx h) X
       (le_rho_iter hA _ T) le_rfl
   simp only [AllProt, not_forall] at hall
   obtain ⟨y, hy⟩ := hall

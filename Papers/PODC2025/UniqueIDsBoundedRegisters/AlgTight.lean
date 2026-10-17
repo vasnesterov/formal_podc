@@ -63,7 +63,7 @@ lemma respsOf_seqL (p : P) (k : ℕ) :
   | zero => rfl
   | succ k ih => simp [seqL, ih, getL, List.range_succ]
 
-lemma numInv_seqL (p : P) (k : ℕ) : numInv (seqL (n := n) (m := m) p k) = k := by
+lemma numInv_seqL (p : P) (k : ℕ) : invCount (seqL (n := n) (m := m) p k) = k := by
   induction k with
   | zero => rfl
   | succ k ih => simp [seqL, ih, getL, Label.isInv]

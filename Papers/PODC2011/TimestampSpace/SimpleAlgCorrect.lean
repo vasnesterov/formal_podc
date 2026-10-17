@@ -1,7 +1,6 @@
 import Papers.PODC2011.TimestampSpace.SimpleAlg
 import Cslib.Computability.Distributed.SharedMemory.History
-import Podc.Computability.Distributed.SharedMemory.History
-import Podc.Computability.Distributed.SharedMemory.Model
+import Cslib.Computability.Distributed.SharedMemory.Model
 
 /-!
 # Lemma 5.1: correctness of the simple one-shot timestamp algorithm

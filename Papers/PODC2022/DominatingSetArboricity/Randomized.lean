@@ -2,7 +2,7 @@ import Papers.PODC2022.DominatingSetArboricity.Deterministic
 import Cslib.Foundations.Data.Nat.TimeRec
 import Cslib.Probability.Finite.Bernoulli
 import Mathlib
-import Podc.Foundations.Data.Real.Logb
+import Cslib.Foundations.Data.Real.Logb
 
 /-!
 # The randomized extension (Lemmas 4.6–4.8, Theorems 1.2 and 1.3)

@@ -1,5 +1,5 @@
 import Papers.PODC2020.AsyncApproxBCDirected.RoundModel
-import Podc.Foundations.Data.Nat.Descent
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # Properties of Algorithm BW (Lemmas 6–8, Theorem 9)

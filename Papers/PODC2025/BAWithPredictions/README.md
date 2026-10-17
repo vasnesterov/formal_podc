@@ -136,6 +136,6 @@ Full list of differences (including modelling choices and minor imprecisions): [
   `OmExec.solo`/`OmExec.ff` (`Cslib/Computability/Distributed/Byzantine/PartialSync/Omission.lean`); the non-vacuity reduction uses the containment
   condition of `Cslib/Computability/Distributed/Byzantine/PartialSync/Containment.lean`; `cnt`/`plur`/`thr` are `Finset.countEq`/`plurality`/`threshold?`
   (`Cslib/Foundations/Data/Finset/Quorum.lean`).
-- Staged shared code: `padScenario`, `decides_iff_of_hist` (`Podc/Computability/Distributed/Byzantine/LockStep/Basic.lean`),
-  `Finset.pluralityMin` (smallest most frequent value, `Podc/Foundations/Data/Finset/Quorum.lean`); `hist_eq_take` is
+- Shared code (CSLib): `padScenario`, `decides_iff_of_hist` (`Cslib/Computability/Distributed/Byzantine/LockStep/Basic.lean`),
+  `Finset.pluralityMin` (smallest most frequent value, `Cslib/Foundations/Data/Finset/Quorum.lean`); `hist_eq_take` is
   CSLib's `take_hist`. CSLib candidates (marked in the files): the subtype simulation, the hybrid (equivocation) lemma.

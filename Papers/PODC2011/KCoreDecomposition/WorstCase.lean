@@ -1,5 +1,5 @@
 import Papers.PODC2011.KCoreDecomposition.Trajectory
-import Podc.Foundations.Combinatorics.SimpleGraph.Path
+import Cslib.Foundations.Combinatorics.SimpleGraph.PathGraph
 
 /-!
 # Worst-case examples for the synchronous execution time (§4.2)

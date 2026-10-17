@@ -1,6 +1,5 @@
 import Papers.PODC2021.ThinUnison.Main
 import Cslib.Computability.Distributed.SelfStabilization.Daemon
-import Podc.Foundations.Data.Nat.Descent
 
 /-!
 # Corollary 1.2 of [EK21]: a self-stabilizing synchronizer (Section 4)

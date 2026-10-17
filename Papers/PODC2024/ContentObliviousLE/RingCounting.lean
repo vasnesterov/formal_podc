@@ -1,6 +1,6 @@
 import Mathlib
 import Cslib.Computability.Distributed.ContentOblivious.Mirror
-import Podc.Foundations.Algebra.BigOperators.Translate
+import Cslib.Foundations.Algebra.BigOperators.Translate
 
 /-!
 # Counting lemmas for one instance of Algorithm 1 on a ring
@@ -61,7 +61,7 @@ lemma Profile.tight_of_good (h : Profile ρ σ I) (he : Edge ρ σ) (hg : ∀ v,
   have heq := (sum_eq_sum_iff_of_le hle).1 (Fintype.sum_add_right_eq_self ρ 1)
   have hstep : ∀ v, ρ (v + 1) = ρ v := fun v => heq v (mem_univ v)
   refine ⟨fun v => by rw [hσ, hstep], hσ, fun v w => ?_⟩
-  exact (Cslib.ContentOblivious.Ring.chain_cw_all (fun x => ρ x = ρ v) (v - 1)
+  exact (ZMod.chain_cw_all (fun x => ρ x = ρ v) (v - 1)
     (fun x _ hx => by rw [hstep, hx]) (by rw [sub_add_cancel]) w).symm
 
 /-- Lemma 10 (3): once every node is past its ID, everybody has received and sent exactly

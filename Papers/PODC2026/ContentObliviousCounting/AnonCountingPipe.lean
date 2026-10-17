@@ -1,5 +1,5 @@
 import Papers.PODC2026.ContentObliviousCounting.AnonCountingProbe
-import Podc.Foundations.Data.Finset.SumUpdate
+import Cslib.Foundations.Data.Finset.SumUpdate
 
 /-!
 # Anonymous counting: waves of the last phase

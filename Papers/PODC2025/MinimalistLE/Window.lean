@@ -1,5 +1,5 @@
 import Papers.PODC2025.MinimalistLE.PairChain
-import Podc.Probability.CoinField
+import Cslib.Probability.CoinField
 
 /-!
 # The pair chain leaves the strip `|Δ| ≤ D` within `O(D²)` steps with probability `≥ 1/2`

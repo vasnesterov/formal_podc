@@ -1,7 +1,6 @@
 import Papers.PODC2019.CryptoConsensusNumber.Fig3MStep
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
-import Podc.Computability.Distributed.SharedMemory.History
-import Podc.Computability.Distributed.SharedMemory.Model
+import Cslib.Computability.Distributed.SharedMemory.Model
 
 /-!
 # Figure 3: the linearization invariant

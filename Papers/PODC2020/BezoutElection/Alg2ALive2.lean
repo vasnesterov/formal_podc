@@ -1,6 +1,6 @@
 import Papers.PODC2020.BezoutElection.Alg2ALive1
 import Mathlib.Data.Finset.Max
-import Podc.Foundations.Data.Finset.Quorum
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Algorithm 2: liveness of a competition, the electing phase

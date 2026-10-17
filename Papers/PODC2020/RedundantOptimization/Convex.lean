@@ -3,13 +3,13 @@ Copyright (c) 2026. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 import Papers.PODC2020.RedundantOptimization.Basic
-import Podc.Foundations.Analysis.Convex.FirstOrder
+import Cslib.Foundations.Analysis.Convex.FirstOrder
 
 /-!
 # Convex differentiable cost functions
 
 * the first-order characterization of convexity `q x + q'(x)(y - x) ≤ q y` is the shared
-  `ConvexOn.add_fderiv_le` (`Podc/Foundations/Analysis/Convex/FirstOrder.lean`);
+  `ConvexOn.add_fderiv_le` (`Cslib/Foundations/Analysis/Convex/FirstOrder.lean`);
 * `mem_argmin_iff_of_hasFDerivAt` — for convex differentiable functions, minimum points are exactly
   the critical points (used throughout the paper as "`w ∈ arg min Q` iff `∇Q(w) = 0`");
 * `partI` — Part I of the proof of Theorem 1: a point that minimizes the aggregate of *every* set of

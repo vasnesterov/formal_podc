@@ -97,7 +97,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 |---|---|---|
 | Theorems 1 + 3 (characterization) | `exactBVC_sync_iff` | `Main.lean` |
 | Theorem 1 | `theorem_1` (+ `approxSync_lower_bound`: `(d+1)f+1` even for approximate BVC in synchrony) | `LowerBounds.lean` |
-| Theorem 2 (Tverberg) | `tverberg` (= shared `Convex.tverberg_partition`, via colorful Carathéodory `exists_colorful_mem_convexHull`, Sarkaria lifting) | `Tverberg.lean`, `Podc/Foundations/Combinatorics/Convex/Tverberg.lean` |
+| Theorem 2 (Tverberg) | `tverberg` (= shared `Convex.tverberg_partition`, via colorful Carathéodory `exists_colorful_mem_convexHull`, Sarkaria lifting) | `Tverberg.lean`, `Cslib/Foundations/Combinatorics/Convex/Tverberg.lean` |
 | Lemma 1 | `GammaOn_nonempty` (via Helly), `GammaOn_nonempty_of_tverberg` (paper's route); tightness `gamma_empty_of_card_eq` | `Gamma.lean`, `Tverberg.lean` |
 | Theorem 3 (IC + choice of a point of `Γ`) | `theorem_3`, `withGamma_solves` | `ExactAlgorithm.lean` |
 | Theorem 4 | `theorem_4` | `LowerBounds.lean` |
@@ -125,5 +125,5 @@ The model comes from CSLib `Cslib/Computability/Distributed/Byzantine/PartialSyn
 `Consensus`, `Sync` with `Run.enlarge`, `Constructions` with `Run.extend`, `FLM`, `ICSync`); `withGamma` is the
 decision post-processing `Algorithm.mapDecide` of the shared library `Cslib/Computability/Distributed/Byzantine/PartialSync/Map.lean`.
 CSLib candidates (marked `-- CSLib candidate`):
-- Tverberg's theorem and colorful Carathéodory — moved to `Podc/Foundations/Combinatorics/Convex/Tverberg.lean`;
+- Tverberg's theorem and colorful Carathéodory — moved to `Cslib/Foundations/Combinatorics/Convex/Tverberg.lean`;
 - `GammaOn` with Lemma 1 via Helly (`Gamma.lean`).

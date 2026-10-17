@@ -6,7 +6,7 @@ import Mathlib.Algebra.Group.Fin.Basic
 import Mathlib.Tactic.Abel
 import Mathlib.Data.Finset.Max
 import Mathlib.Algebra.BigOperators.Ring.Finset
-import Podc.Foundations.Data.Fin.Cyclic
+import Cslib.Foundations.Data.Fin.Cyclic
 
 /-!
 # Protocol 1 (`Silent-n-state-SSR`, Cai–Izumi–Wada): Lemmas 2.2, 2.3 and Theorem 2.4

@@ -1,6 +1,6 @@
 import Papers.PODC2026.RankingOpinions.UnorderedOrdering
 import Papers.PODC2026.RankingOpinions.Circles
-import Podc.Computability.Distributed.PopulationProtocols.Basic
+import Cslib.Computability.Distributed.PopulationProtocols.Basic
 import Mathlib.Algebra.BigOperators.Group.Finset.Piecewise
 
 /-!

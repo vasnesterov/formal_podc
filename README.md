@@ -364,7 +364,9 @@ Shared infrastructure developed for these papers, by CSLib directory:
 |---|---|---|
 | `Cslib/Foundations/Data/Finset/`, `Foundations/Combinatorics/Labelling.lean` | quorum intersection arithmetic, vote counting (threshold, majority, plurality), sums after a point update; labellings into groups of bounded size | 21, 8, 2 |
 | `Cslib/Foundations/Data/{Nat,List}/` | eventually-constant ℕ-sequences (potential arguments), time-dependent iteration, greedy list scans | 15, 9 |
-| `Cslib/Probability/{Finite,CoinGame}` | finite uniform / product / Bernoulli probability by counting; common coin against an adaptive adversary | 8 |
+| `Cslib/Foundations/Data/{Nat,Real,Fin,ZMod}/`, `Data/List/BitEncoding` | ceiling division and residue counts, `log`/`clog`/`logb`/`log*` bounds for round counts, growth until saturation, cyclic indices and ring induction, self-delimiting bit encodings | 23 |
+| `Cslib/Foundations/{Analysis,Algebra}/`, `Combinatorics/{Convex,Matrix}/`, `Cslib/Computability/{Partrec,Primrec}/` | first-order condition for convex functions, averages; colorful Carathéodory and Tverberg; König line colouring of ℕ-matrices; computable list combinators | 7, 1 |
+| `Cslib/Probability/{Finite,CoinGame,Chernoff,CoinField}` | finite uniform / product / Bernoulli probability by counting; common coin against an adaptive adversary; Chernoff lower tail; i.i.d. coin fields | 9 |
 | `Cslib/Foundations/Combinatorics/{SimpleGraph,Digraph}/` | closed balls, dominating sets, orientations, Moore bound, greedy and fault-tolerant greedy spanners; digraph reachability avoiding faults, bounded walks, source components | 13, 8 |
 | `Cslib/Computability/Distributed/Local/` | locality of LOCAL algorithms, identifiers in locally-iterative algorithms | 7 |
 | `Cslib/Computability/Distributed/{SelfStabilization,PopulationProtocols}/` | stabilization and global fairness of transition systems, probability-1 ⇔ reachability, daemons and rounds; nondeterministic population protocols, uniform random scheduler | 7, 3 |

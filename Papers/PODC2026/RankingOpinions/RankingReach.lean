@@ -1,6 +1,6 @@
 import Papers.PODC2026.RankingOpinions.RankingInv
 import Mathlib.Data.Fintype.Fin
-import Podc.Foundations.Data.Fin.Cyclic
+import Cslib.Foundations.Data.Fin.Cyclic
 
 /-!
 # The Ranking protocol: reachability, part 1 (Lemmas 6.8–6.11)

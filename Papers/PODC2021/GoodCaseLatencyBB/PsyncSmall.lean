@@ -1,7 +1,7 @@
 import Papers.PODC2021.GoodCaseLatencyBB.PsyncLowerBound
 import Papers.PODC2021.GoodCaseLatencyBB.SplitBrain
 import Papers.PODC2021.GoodCaseLatencyBB.SmallCases
-import Podc.Computability.Distributed.Byzantine.PartialSync.Merge
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Merge
 
 /-!
 # Partially synchronous Byzantine broadcast is impossible for `n ∈ {2, 3}`, `f ≥ 1`

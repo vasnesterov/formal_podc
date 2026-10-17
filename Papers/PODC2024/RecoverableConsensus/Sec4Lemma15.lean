@@ -1,5 +1,5 @@
 import Papers.PODC2024.RecoverableConsensus.Sec4Common
-import Podc.Foundations.Data.Finset.Card
+import Cslib.Foundations.Data.Finset.Card
 
 /-!
 # Lemma 15 of Ovens (PODC'24): `T_{n,n'}` has consensus number `n`

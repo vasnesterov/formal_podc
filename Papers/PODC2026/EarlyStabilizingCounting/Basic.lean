@@ -1,7 +1,6 @@
 import Cslib.Computability.Distributed.Byzantine.SyncCounting.Model
 import Mathlib
 import Cslib.Foundations.Data.Finset.Quorum
-import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # Early-Stabilizing Counting: basic definitions

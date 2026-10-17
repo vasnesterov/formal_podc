@@ -1,7 +1,6 @@
 import Mathlib
 import Cslib.Computability.Distributed.DynamicNetworks.FullInfo
 import Cslib.Computability.Distributed.Knowledge.Basic
-import Podc.Computability.Distributed.DynamicNetworks.Journey
 
 /-!
 # The dynamic-network model of Kuhn–Moses–Oshman (PODC 2011)

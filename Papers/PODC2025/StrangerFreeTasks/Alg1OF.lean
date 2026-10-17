@@ -1,5 +1,5 @@
 import Papers.PODC2025.StrangerFreeTasks.Alg1
-import Podc.Foundations.Data.Fin.Cyclic
+import Cslib.Foundations.Data.Fin.Cyclic
 
 /-!
 # Algorithm 1 is obstruction-free

@@ -1,5 +1,5 @@
 import Papers.PODC2015.SynchronousCounting.Boost
-import Podc.Foundations.Data.Nat.Log
+import Cslib.Foundations.Data.Nat.Log
 
 /-!
 # The recursive construction (Section 4 of Lenzen–Rybicki–Suomela, PODC 2015)

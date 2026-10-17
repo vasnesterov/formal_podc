@@ -434,14 +434,14 @@ theorem tieReport_fixed_correct (h0 : E.config 0 = trInit input) (hE : E.WeaklyF
       obtain ⟨t, ht, hs⟩ := hE x y (Ne.symm hyx) T'
       exact ⟨t, ht, by rw [tstep t (by omega) x y hs, tsStable, if_pos hy]⟩
     -- no spreaders after some time
-    obtain ⟨T1, hT1, hnS⟩ := eventually_all (P := fun t x => (E.config t x).2 ≠ TS.spreader) T0
+    obtain ⟨T1, hT1, hnS⟩ := Nat.eventually_forall_of_imp_succ (P := fun t x => (E.config t x).2 ≠ TS.spreader) T0
       (fun t ht x hx => persist (· ≠ TS.spreader) t ht x
         (fun y e h => by rw [e]; exact tsStable_ne_spreader _ _ h) hx)
       (fun x => by
         obtain ⟨t, ht, h⟩ := reachN x T0 le_rfl
         exact ⟨t + 1, by omega, by rw [h]; decide⟩)
     -- all at `no_tie` after some time
-    obtain ⟨T2, hT2, hN⟩ := eventually_all (P := fun t x => (E.config t x).2 = TS.noTie) T1
+    obtain ⟨T2, hT2, hN⟩ := Nat.eventually_forall_of_imp_succ (P := fun t x => (E.config t x).2 = TS.noTie) T1
       (fun t ht x hx => persist (· = TS.noTie) t (by omega) x
         (fun y e h => by rw [e]; exact tsStable_noTie _ h (hnS t ht y)) hx)
       (fun x => by
@@ -471,7 +471,7 @@ theorem tieReport_fixed_correct (h0 : E.config 0 = trInit input) (hE : E.WeaklyF
       | succ t ht ih =>
         exact persist (· = TS.spreader) t ht s
           (fun y e h => by rw [e, hnd, hnd, h]; exact tsStable_spreader _) ih
-    obtain ⟨T, -, hT⟩ := eventually_all (P := fun t x => (E.config t x).2 ≠ TS.noTie) T0
+    obtain ⟨T, -, hT⟩ := Nat.eventually_forall_of_imp_succ (P := fun t x => (E.config t x).2 ≠ TS.noTie) T0
       (fun t ht x hx => persist (· ≠ TS.noTie) t ht x
         (fun y e h => by rw [e, hnd, hnd]; exact tsStable_ne_noTie _ h) hx)
       (fun x => by

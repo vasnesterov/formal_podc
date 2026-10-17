@@ -1,5 +1,5 @@
 import Papers.PODC2025.StrangerFreeTasks.Alg1SafetyBasic
-import Podc.Foundations.Data.Fin.Cyclic
+import Cslib.Foundations.Data.Fin.Cyclic
 
 /-!
 # Algorithm 1 for `k = 1`: local steps and static invariants

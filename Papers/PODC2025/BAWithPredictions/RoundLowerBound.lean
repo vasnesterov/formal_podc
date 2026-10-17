@@ -1,7 +1,7 @@
 import Papers.PODC2025.BAWithPredictions.Defs
 import Cslib.Computability.Distributed.Byzantine.LockStep.Agreement
-import Podc.Foundations.Data.Finset.Quorum
-import Podc.Computability.Distributed.Byzantine.LockStep.Basic
+import Cslib.Computability.Distributed.Byzantine.LockStep.Parallel
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Byzantine Agreement with Predictions — round-complexity lower bound (Theorem 13)
@@ -21,7 +21,7 @@ algorithms *without* predictions, which it cites. We state that bound as an expl
 * `simProtocol X alg`: the prediction-free algorithm `S'` on the processes outside `X`, which run
   `alg` with the prediction "`X` is faulty, everyone else is honest"; the processes of `X` are
   silent Byzantine (`liftScenario`, `status_liftScenario`, `solves_simProtocol`).
-* `padScenario` (shared, `Podc/Computability/Distributed/Byzantine/LockStep/Basic.lean`): Byzantine
+* `padScenario` (shared, `Cslib/Computability/Distributed/Byzantine/LockStep/Basic.lean`): Byzantine
   processes that behave exactly as honest ones (used to reach exactly `f` faults).
 * `roundLowerBound`: Theorem 13 conditional on `EarlyDecidingLB`, with the sharper bound
   `min (f' + 2) (t - f + f' + 1)` for `f' = min f ⌊B/(n-f)⌋`;

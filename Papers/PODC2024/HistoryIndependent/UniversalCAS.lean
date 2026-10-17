@@ -4,7 +4,7 @@ import Cslib.Computability.Distributed.SharedMemory.Potential
 import Cslib.Computability.Distributed.SharedMemory.Task
 import Cslib.Foundations.Data.Finset.SumUpdate
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
-import Podc.Computability.Distributed.SharedMemory.StrongLin
+import Cslib.Computability.Distributed.SharedMemory.StrongLin
 import Mathlib
 
 /-!

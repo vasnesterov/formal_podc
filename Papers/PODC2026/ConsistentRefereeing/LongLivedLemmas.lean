@@ -1,6 +1,6 @@
 import Papers.PODC2026.ConsistentRefereeing.LongLivedSteps
-import Podc.Foundations.Data.Finset.Quorum
-import Podc.Foundations.Data.Finset.Card
+import Cslib.Foundations.Data.Finset.Card
+import Cslib.Foundations.Data.Finset.Quorum
 
 /-!
 # Valencies of closed and supervalent executions (Lemmas 20–22, 27, 28 of [ACE26])

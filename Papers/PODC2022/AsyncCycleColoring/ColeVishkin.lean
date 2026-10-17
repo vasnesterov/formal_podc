@@ -1,8 +1,8 @@
 import Mathlib.Data.Nat.Size
 import Mathlib.Data.Nat.Bitwise
 import Mathlib.Data.Nat.Log
-import Podc.Foundations.Data.Nat.Log
-import Podc.Foundations.Data.Nat.LogStar
+import Cslib.Computability.Distributed.Local.Linial
+import Cslib.Foundations.Data.Nat.Log
 
 /-!
 # The identifier-reduction function `f` (Section 4.1)

@@ -97,7 +97,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 | Paper | Lean | File |
 |---|---|---|
-| Theorem 3.2 (König line colouring, matrix form) | `Matrix.exists_perm_decomposition`, `Matrix.exists_split_parts` | `Podc/Foundations/Combinatorics/Matrix/Birkhoff.lean` (shared) |
+| Theorem 3.2 (König line colouring, matrix form) | `Matrix.exists_perm_decomposition`, `Matrix.exists_split_parts` | `Cslib/Foundations/Combinatorics/Matrix/Birkhoff.lean` (shared) |
 | Corollary 3.3 (two-round routing in a group, known pattern) | `mem_tagged_c33`, `C33Unique` | `Primitives.lean` |
 | Lemma 3.6, Cor. 3.5, Step 4, Cor. 3.4 (square case: 6+4+1+4 rounds) | `HB_of_inp`, `HB_col`, `HC_of_HB`, `HD_of_HC`, `HE_of_HD` | `SquarePhaseA/BCD.lean` |
 | Theorem 3.7, square case, loads ≤ `s²` (15 rounds) | `Setup.square_correct` | `SquareMain.lean` |
@@ -122,7 +122,7 @@ theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. Non-va
 specifications cannot be met without communication. The paper-gap facts are checked by
 `decide +kernel`.
 
-König/Birkhoff for ℕ-matrices (splitting into `k` parts, transportation) is shared code staged for
-CSLib in `Podc/Foundations/Combinatorics/Matrix/Birkhoff.lean`. Remaining CSLib candidates (marked in
+König/Birkhoff for ℕ-matrices (splitting into `k` parts, transportation) is shared code in
+CSLib, `Cslib/Foundations/Combinatorics/Matrix/Birkhoff.lean`. Remaining CSLib candidates (marked in
 the files): `Assign.lean`, `Buckets.lean` (ranks, samples, Lemma 4.3). `Knowledge.lean`,
 `Simulation.lean` and `Compose.lean` are specific to the congested-clique model.

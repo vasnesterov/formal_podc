@@ -1,12 +1,12 @@
 import Papers.PODC2021.GoodCaseLatencyBB.Basic
-import Podc.Computability.Distributed.Byzantine.PartialSync.Cover
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Cover
 
 /-!
 # Covering systems with uniform message delay
 
 The covering systems with time-dependent neighbourhoods and delivery offset `e` used by the
 dishonest-majority lower bounds are the shared `Cslib.Byzantine.PartialSync.DCover`
-(`Podc/Computability/Distributed/Byzantine/PartialSync/Cover.lean`: covering lemma `DCover.st_run`,
+(`Cslib/Computability/Distributed/Byzantine/PartialSync/Cover.lean`: covering lemma `DCover.st_run`,
 locality `DCover.st_eq_of_level`, unforgeability `DCover.run_authValid`). This file adds the
 bridge to this paper's synchronous runs (`SyncValid`).
 -/

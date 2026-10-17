@@ -1,6 +1,6 @@
 import Mathlib
 import Cslib.Computability.Distributed.Byzantine.CanonicalRounds.Lemmas
-import Podc.Computability.Distributed.Byzantine.Specs
+import Cslib.Computability.Distributed.Byzantine.Specs
 
 /-!
 # Nontrivial convergence problems (Section 2.2 of [AFW26])

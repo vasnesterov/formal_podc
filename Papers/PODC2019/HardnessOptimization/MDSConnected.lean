@@ -1,6 +1,6 @@
 import Papers.PODC2019.HardnessOptimization.MDSTheorem
 import Cslib.Computability.Distributed.Congest.Gather
-import Podc.Foundations.Combinatorics.SimpleGraph.Ball
+import Cslib.Foundations.Combinatorics.SimpleGraph.Ball
 import Mathlib
 
 /-!

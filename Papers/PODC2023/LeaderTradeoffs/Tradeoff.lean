@@ -1,5 +1,5 @@
 import Papers.PODC2023.LeaderTradeoffs.Isolation
-import Podc.Foundations.Data.Real.Logb
+import Cslib.Foundations.Data.Real.Logb
 
 /-!
 # The time–message tradeoff lower bound (Lemma 3.9 and Theorem 3.8, corrected)

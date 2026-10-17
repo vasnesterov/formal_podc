@@ -1,6 +1,6 @@
 import Papers.PODC2026.EarlyStabilizingCounting.Basic
 import Papers.PODC2026.EarlyStabilizingCounting.Lemma55
-import Podc.Foundations.Data.Nat.ModCount
+import Cslib.Foundations.Data.Nat.ModCount
 
 /-!
 # The recursion template at the level of traces (Lemmas 5.4, 5.6, Theorem 5.7)

@@ -131,6 +131,6 @@ balls is not formalized.
   (`toy_uncomputable_solves`) versus computable locality `≥ n − 1` (`toy_computable_lower`).
 
 Computable list combinators (`Computable.list_foldl/map/all/any/findSome?/filterMap/flatMap/filter`,
-`Computable.nat_find`) and `Primrec.list_all/any`, `Primrec.nat_pow` are shared code staged for
-CSLib/Mathlib in `Podc/Computability/Partrec/List.lean` and `Podc/Computability/Primrec/List.lean`.
+`Computable.nat_find`) and `Primrec.list_all/any`, `Primrec.nat_pow` are shared code in
+CSLib `Cslib/Computability/Partrec/List.lean` and `Cslib/Computability/Primrec/List.lean`.
 The abstract ball-growing model (`Basic.lean`) is a CSLib candidate.

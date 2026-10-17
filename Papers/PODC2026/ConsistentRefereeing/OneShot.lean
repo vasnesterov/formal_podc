@@ -4,8 +4,6 @@ import Cslib.Computability.Distributed.SharedMemory.SWSRRegister
 import Cslib.Computability.Distributed.SharedMemory.Mutex
 import Cslib.Computability.Distributed.SharedMemory.Solo
 import Cslib.Computability.Distributed.SharedMemory.Task
-import Podc.Computability.Distributed.SharedMemory.History
-import Podc.Computability.Distributed.SharedMemory.Model
 import Cslib.Foundations.Data.Nat.Descent
 import Mathlib.Algebra.BigOperators.Group.Finset.Piecewise
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
@@ -541,8 +539,8 @@ theorem mem_val_nil (hlf : I.LockFreeOn (Adm ref)) (hsl : I.StrongLinOn (Adm ref
 /-! ## Counting invocations -/
 
 lemma Adm.numInv_le [Fintype P] {α : List (Label P (contestObj P))} (hA : Adm ref α) :
-    numInv α ≤ Fintype.card P := by
-  rw [numInv_eq_sum]
+    invCount α ≤ Fintype.card P := by
+  rw [invCount_eq_sum]
   calc ∑ p, (opsOf α p).length ≤ ∑ _p : P, 1 := Finset.sum_le_sum fun p _ => hA.oneShot p
     _ = Fintype.card P := by simp
 
@@ -597,14 +595,14 @@ theorem exists_critical [Fintype P] (hlf : I.LockFreeOn (Adm ref)) (hsl : I.Stro
       | inv q o => exact ⟨q, o, rfl⟩
       | ret q r => exact absurd (by rw [h]; trivial) (hno m hm)
       | tau q => exact absurd (by rw [h]; trivial) (hno m hm)
-    have hgrow : ∀ K, numInv (e.pre N) + K ≤ numInv (e.pre (N + K)) := by
+    have hgrow : ∀ K, invCount (e.pre N) + K ≤ invCount (e.pre (N + K)) := by
       intro K; induction K with
       | zero => simp
       | succ K ih =>
-        show numInv (e.pre N) + (K + 1) ≤ numInv (e.pre ((N + K) + 1))
+        show invCount (e.pre N) + (K + 1) ≤ invCount (e.pre ((N + K) + 1))
         rw [InfExec.pre_succ]
         obtain ⟨q, o, hq⟩ := hinv (N + K) (by omega)
-        simp only [numInv_append, hq, numInv_cons, numInv_nil, Label.isInv_inv, ite_true] at ih ⊢
+        simp only [invCount_append, hq, invCount_cons, invCount_nil, Label.isInv_inv, ite_true] at ih ⊢
         omega
     have := hgrow (Fintype.card P + 1)
     have hle := (hadm (N + (Fintype.card P + 1))).numInv_le ref

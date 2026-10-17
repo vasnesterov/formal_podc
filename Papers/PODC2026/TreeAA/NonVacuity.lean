@@ -1,5 +1,5 @@
 import Papers.PODC2026.TreeAA.Protocol
-import Podc.Foundations.Combinatorics.SimpleGraph.Path
+import Cslib.Foundations.Combinatorics.SimpleGraph.PathGraph
 
 /-!
 # Non-vacuity of the black-box hypotheses

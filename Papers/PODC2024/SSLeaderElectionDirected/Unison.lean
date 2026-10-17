@@ -1,5 +1,5 @@
 import Papers.PODC2024.SSLeaderElectionDirected.Necessity
-import Podc.Foundations.Data.Fin.Cyclic
+import Cslib.Foundations.Data.Fin.Cyclic
 
 /-!
 # Synchronous unison (Section 5)

@@ -128,7 +128,7 @@ Shared library code used here: run classes (`Cslib/Computability/Distributed/Byz
 executions `ρ₁…ρ₅` (`TwoStepLB.lean`), threshold certificates for commit quorums (`Cslib/Computability/Distributed/Byzantine/Certificate.lean`)
 and size-bounded labellings of the processes into groups (`Cslib/Foundations/Combinatorics/Labelling.lean`).
 
-Staged shared code (`Podc/Computability/Distributed/Byzantine/PartialSync/`): replay lemmas
+Shared code in CSLib (`Cslib/Computability/Distributed/Byzantine/PartialSync/`): replay lemmas
 `Run.tokens_replay_dl` and `Run.tokens_replay_rel` (`Auth.lean`), delayed covering systems `DCover`
 (`Cover.lean`), constant-delay inboxes `Run.inbox_of_dl_eq_add` (`Model.lean`).
 Generic tools in this folder, marked as CSLib candidates: the `lateStart` wrapper and `Run.st_shift_eq`.

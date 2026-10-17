@@ -1,5 +1,5 @@
 import Papers.PODC2011.CoordinatedConsensusDynamic.StaticPathMain
-import Podc.Foundations.Data.Nat.Log
+import Cslib.Foundations.Data.Nat.Log
 
 /-!
 # Theorem 6.7, asymptotic form

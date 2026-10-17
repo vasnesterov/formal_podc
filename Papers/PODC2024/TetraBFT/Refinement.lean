@@ -1,6 +1,6 @@
 import Papers.PODC2024.TetraBFT.Protocol
 import Papers.PODC2024.TetraBFT.Safety
-import Podc.Computability.Distributed.Byzantine.PartialSync.Log
+import Cslib.Computability.Distributed.Byzantine.PartialSync.Log
 
 /-!
 # The protocol refines the abstract execution model
