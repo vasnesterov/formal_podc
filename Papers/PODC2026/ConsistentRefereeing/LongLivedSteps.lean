@@ -354,7 +354,7 @@ lemma Sim.refl {α : List (LLabel P)} (hα : X.Good α) (Q : Set P) : X.Sim Q α
 lemma Sim.of_eq {α α' : List (LLabel P)} (hα : X.Good α) (hα' : X.Good α')
     (h : X.cfg α = X.cfg α') (hs : opsOf α X.ref = [] ↔ opsOf α' X.ref = []) (Q : Set P) :
     X.Sim Q α α' :=
-  ⟨hα, hα', by rw [h]; exact agreeOn_refl _ _, hs⟩
+  ⟨hα, hα', h ▸ agreeOn_refl _ _, hs⟩
 
 lemma Sim.cfg_eq {α α' : List (LLabel P)} (h : X.Sim Set.univ α α') : X.cfg α = X.cfg α' :=
   config_eq_of_agreeOn_univ h.agree
