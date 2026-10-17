@@ -27,7 +27,6 @@ theorem algo_termination (hL : 6 * δ + 12 ≤ L)
     (hR : R.Valid pr.f δ) (hRa : R.AuthValid auth (algo pr L)) :
     ∀ p ∉ R.faulty, ∃ v, R.Decides (algo pr L) p v :=
   termination_of hL hlead ht hn hR hRa
-    (fun _ _ _ _ hq hc hk hs => known_signed R hRa hq hc hk hs)
     (fun τ => Inv.of_reachable (reachable_absState (by omega) R hRa τ))
 
 end FastByzantineConsensus.Impl

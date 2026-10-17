@@ -24,7 +24,7 @@ variable {P M S V K : Type*} [Fintype P] [DecidableEq P]
 variable (A : Algorithm P M S V V) {Au : Auth P M K} {f t δ : ℕ}
 
 /-- The consensus value of a two-step execution is well defined. -/
-theorem tsRun_agree (hA : SolvesConsensusAuth Au f δ A weakValidity) (hU : A.Unforging Au)
+theorem tsRun_agree (hA : SolvesConsensusAuth Au f δ A (weakValidity P V)) (hU : A.Unforging Au)
     (hδ : 0 < δ) (htf : t ≤ f) {I : P → V} {T : Finset P} (hT : T.card = t) {x y : P} {v w : V}
     (hx : x ∉ T) (hy : y ∉ T) (h1 : (tsRun (M := M) A δ I T).Decides A x v)
     (h2 : (tsRun (M := M) A δ I T).Decides A y w) : v = w :=
@@ -32,7 +32,7 @@ theorem tsRun_agree (hA : SolvesConsensusAuth Au f δ A weakValidity) (hU : A.Un
 
 /-- **Lemma 4.3.** If all processes have the same input `x`, the consensus value of every
 `T`-faulty two-step execution is `x`. -/
-theorem lemma_4_3 (hA : SolvesConsensusAuth Au f δ A weakValidity) (hU : A.Unforging Au)
+theorem lemma_4_3 (hA : SolvesConsensusAuth Au f δ A (weakValidity P V)) (hU : A.Unforging Au)
     (hTS : TwoStep A t δ) (hδ : 0 < δ) (htf : t ≤ f) (x : V) {T : Finset P} (hT : T.card = t)
     {y : P} (hy : y ∉ T) {v : V} (h : (tsRun (M := M) A δ (fun _ => x) T).Decides A y v) :
     v = x := by
@@ -113,7 +113,7 @@ def Influential (t δ : ℕ) (p : P) : Prop :=
 
 /-- **Lemma 4.4.** Every `t`-two-step consensus protocol has an influential process (for
 `n ≥ 2t + 2` and at least two values). -/
-theorem exists_influential (hA : SolvesConsensusAuth Au f δ A weakValidity)
+theorem exists_influential (hA : SolvesConsensusAuth Au f δ A (weakValidity P V))
     (hU : A.Unforging Au) (hTS : TwoStep A t δ) (hδ : 0 < δ) (htf : t ≤ f)
     (hn : 2 * t + 2 ≤ Fintype.card P) {a b : V} (hab : a ≠ b) : ∃ p, Influential A t δ p := by
   classical

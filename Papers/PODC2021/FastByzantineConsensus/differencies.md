@@ -64,7 +64,7 @@ the paper's, Section 4.1).
    itself uses the freedom of ordering only to make orders coincide across executions, which is automatic here.
 4. **Timing of "two steps".** Round `i` is `[(i−1)δ, iδ)`; messages sent in round `i` are delivered at `iδ`
    (`nextRound`). "Decides not later than `2Δ`" means: decides in its state after processing the deliveries of
-   time `2δ`, i.e. at some time `≤ 2δ + 1` (`DecidesBy … (2δ+1)`). In the PSync model a process sends at time `τ`
+   time `2δ`, i.e. at some time `≤ 2δ + 1` (`Run.DecidesBy … (2δ+1)`). In the PSync model a process sends at time `τ`
    based on its state *before* the receptions of time `τ`, so a reply to a message received at `iδ` leaves at
    `iδ + 1`; this is still in round `i + 1` iff `δ ≥ 2`. For `δ = 1` our two-step requirement is therefore
    stronger than the paper's (replies would arrive one round late); the theorem holds for every `δ ≥ 1`, and is
@@ -134,7 +134,7 @@ the paper's, Section 4.1).
    here, not formalized.
 9. **Lemma numbering.** Lemmas 3.1–3.5 are proved in their generalized form (Appendix A, `f + t` instead of `2f`):
    3.1 `not_all_nil_of_decided`, 3.2 `decided_view_le`, 3.3 `safe_of_single`, 3.4 `safe_of_many_votes`,
-   3.5 `not_decided_of_few_votes`; QI1–QI3 are instances of `exists_correct_inter`.
+   3.5 `not_decided_of_few_votes`; QI1–QI3 are instances of `Finset.exists_mem_inter_notMem_of_card_le`.
 
 ## 5. Concrete implementation (`Implementation.lean`, `Impl*.lean`) — not in the paper in this form
 

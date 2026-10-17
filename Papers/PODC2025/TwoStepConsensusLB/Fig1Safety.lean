@@ -1,4 +1,5 @@
 import Papers.PODC2025.TwoStepConsensusLB.Fig1Basic
+import Podc.Foundations.Quorum
 
 /-!
 # Safety of the protocol of Fig. 1 (Ryabinin–Gotsman–Sutra, PODC 2025)
@@ -45,11 +46,6 @@ structure Hyp (cfg : Config P V) : Prop where
 omit [DecidableEq P] [LinearOrder V] in
 theorem Hyp.f_lt {cfg : Config P V} (hH : Hyp cfg) : cfg.f < Fintype.card P := by
   have := hH.quorum; omega
-
-theorem card_inter_ge (A B : Finset P) : A.card + B.card ≤ (A ∩ B).card + Fintype.card P := by
-  have := Finset.card_union_add_card_inter A B
-  have := Finset.card_le_univ (A ∪ B)
-  omega
 
 /-! ### Chosen and potentially chosen values -/
 
@@ -146,7 +142,7 @@ theorem recover (hH : Hyp cfg) (hI : Basic cfg s) {v : V} {p : P} {P' : Finset P
     · rintro ⟨hx, hx'⟩
       exact ⟨hx, Or.inr hx'⟩
   have hAc : Fintype.card P - cfg.f - cfg.e ≤ (Q ∩ P').card := by
-    have h1 := card_inter_ge Q (insert p P')
+    have h1 := Finset.card_add_card_le_card_inter_add_card_univ Q (insert p P')
     rw [hQX] at h1
     omega
   have hAne : (Q ∩ P').Nonempty := by
@@ -261,7 +257,7 @@ theorem fast_fast (hH : Hyp cfg) (hI : Basic cfg s) {u v : V} (hu : GenuineFast 
     (hv : PotFast cfg s v) : u = v := by
   obtain ⟨p', P'', hne, hc', hP'', hdec', hvote'⟩ := hu
   obtain ⟨p, P', ⟨hc, hP', _⟩, hvote, hpr⟩ := hv
-  have h1 := card_inter_ge (insert p' P'') (insert p P')
+  have h1 := Finset.card_add_card_le_card_inter_add_card_univ (insert p' P'') (insert p P')
   have hH1 := hH.quorum
   have hH2 := hH.e_le_f
   obtain ⟨x, hx⟩ : (insert p' P'' ∩ insert p P').Nonempty := by
@@ -322,7 +318,7 @@ theorem PotSlow.vbal (hH : Hyp cfg) (hI : Basic cfg s) {b : ℕ} {v : V} (h : Po
     {c : ℕ} {Q : Finset P} {rep : P → Snap P V} (hQc : Q.card = Fintype.card P - cfg.f)
     (hQ : ∀ q ∈ Q, .oneB q c (rep q) ∈ s.msgs) (hbc : b < c) : ∃ y ∈ Q, b ≤ (rep y).vbal := by
   obtain ⟨_, Q', hQ'c, hQ'⟩ := h
-  have h1 := card_inter_ge Q Q'
+  have h1 := Finset.card_add_card_le_card_inter_add_card_univ Q Q'
   have hH1 := hH.quorum
   obtain ⟨y, hy⟩ : (Q ∩ Q').Nonempty := by
     rw [← Finset.card_pos]
@@ -575,7 +571,7 @@ theorem main_step (hH : Hyp cfg) (hI : Basic cfg s) (hM : Main cfg s) {x : P} {k
             rcases hpc with ⟨h0, -⟩ | ⟨-, -, Q', hQ'c, hQ'⟩
             · omega
             obtain ⟨-, Q2, hQ2c, hQ2⟩ := hI.twoA_quorum _ _ h2A
-            have h1 := card_inter_ge Q' Q2
+            have h1 := Finset.card_add_card_le_card_inter_add_card_univ Q' Q2
             have hH1 := hH.quorum
             obtain ⟨y, hy⟩ : (Q' ∩ Q2).Nonempty := by
               rw [← Finset.card_pos]

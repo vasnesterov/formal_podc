@@ -1,5 +1,5 @@
 import Papers.PODC2024.TetraBFT.Refinement
-import Papers.PODC2024.TetraBFT.Sim
+import Podc.PartialSync.Sim
 
 /-!
 # Termination fails: a view-synchronization deadlock (counterexample to Theorem 1, termination)

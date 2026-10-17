@@ -1,4 +1,5 @@
 import Papers.PODC2019.HotStuff.Chained.Model
+import Podc.Foundations.Quorum
 
 /-!
 # Chained HotStuff with the height check is safe (Theorem 5, repaired)
@@ -14,7 +15,7 @@ view-minimal "switching" QC `qc_s`.
 
 namespace HotStuff.Chained
 
-open Node
+open Node Cslib.Quorum
 
 namespace Node
 
@@ -82,19 +83,6 @@ theorem mem_votes_of_signer {V : Finset (P × ℕ × Node C)} {q : ℕ × Node C
   simp only [signers, Finset.mem_filter, Finset.mem_univ, true_and] at h
   exact h.resolve_left hr
 
-/-- Two quorums of size `n - f` intersect in a correct replica (`n > 3f`, `|F| ≤ f`). -/
-theorem quorum_inter (hn : 3 * f < Fintype.card P) (hF : F.card ≤ f) {A B : Finset P}
-    (hA : Fintype.card P - f ≤ A.card) (hB : Fintype.card P - f ≤ B.card) :
-    ∃ r ∈ A, r ∈ B ∧ r ∉ F := by
-  by_contra hc
-  push Not at hc
-  have hsub : A ∩ B ⊆ F := fun r hr => by
-    rw [Finset.mem_inter] at hr; exact hc r hr.1 hr.2
-  have h1 := Finset.card_union_add_card_inter A B
-  have h2 := Finset.card_le_card hsub
-  have h3 : (A ∪ B).card ≤ Fintype.card P := Finset.card_le_univ _
-  omega
-
 /-! ### The inductive invariant -/
 
 /-- Inductive invariant of the `heightCheck` variant. -/
@@ -132,7 +120,7 @@ theorem Inv.wf {s : State P C} (hI : Inv f F s) {u : ℕ} {x : Node C}
     x.height = u ∧ (u = 0 → x = gen) ∧ (1 ≤ u → StrictAnc x.jn x ∧ Valid f F s.votes x.justify) := by
   rcases h with ⟨h1, h2⟩ | h
   · simp only at h1 h2; subst h1 h2; exact ⟨rfl, fun _ => rfl, fun h => absurd h (by omega)⟩
-  · obtain ⟨r, hr, -, hrF⟩ := quorum_inter hn hF h h
+  · obtain ⟨r, hr, -, hrF⟩ := exists_mem_inter_notMem_of_three_mul_lt hn hF h h
     obtain ⟨h1, -, -, h4, h5, h6⟩ := hI.vote r hrF u x (mem_votes_of_signer hr hrF)
     exact ⟨h4, fun h => absurd h (by omega), fun _ => ⟨h5, h6⟩⟩
 
@@ -143,7 +131,7 @@ theorem Inv.unique {s : State P C} (hI : Inv f F s) {u : ℕ} {x y : Node C}
   · rw [(hI.wf hn hF hx).2.1 rfl, (hI.wf hn hF hy).2.1 rfl]
   · have hx' := hx.resolve_left (by rintro ⟨h, -⟩; simp at h; omega)
     have hy' := hy.resolve_left (by rintro ⟨h, -⟩; simp at h; omega)
-    obtain ⟨r, hr1, hr2, hrF⟩ := quorum_inter hn hF hx' hy'
+    obtain ⟨r, hr1, hr2, hrF⟩ := exists_mem_inter_notMem_of_three_mul_lt hn hF hx' hy'
     exact hI.one_vote r hrF u x y (mem_votes_of_signer hr1 hrF) (mem_votes_of_signer hr2 hrF)
 
 /-- A valid Two-Chain node `b₂` at view `v` yields valid QCs `(v - 1, b₂.jn)` and
@@ -342,7 +330,7 @@ theorem Inv.extends_of_valid {s : State P C} (hI : Inv f F s) {b₂ : Node C} (h
   · -- a correct replica `r` voted both for `x` (view `u`) and for `b₂` (view `v < u`)
     have hx' := hx.resolve_left (by rintro ⟨h, -⟩; simp at h; omega)
     have hv' := hv.resolve_left (by rintro ⟨h, -⟩; simp at h; omega)
-    obtain ⟨r, hr1, hr2, hrF⟩ := quorum_inter hn hF hx' hv'
+    obtain ⟨r, hr1, hr2, hrF⟩ := exists_mem_inter_notMem_of_three_mul_lt hn hF hx' hv'
     have hvx := mem_votes_of_signer hr1 hrF
     have hvb := mem_votes_of_signer hr2 hrF
     -- when voting for `x`, `r` was locked on a valid QC `q` of view in `[v - 2, u)`

@@ -22,7 +22,7 @@ entered view `v`, see `Refinement.lean`).
 
 namespace TetraBFT
 
-open Finset
+open Finset Cslib.Quorum
 
 variable {P V : Type*} [Fintype P] [DecidableEq P]
 
@@ -163,7 +163,7 @@ theorem lemma4 (hn : 3 * f < Fintype.card P) (hE : E.SafetyHyp f) {v : ℕ} {SL 
     have hqF := hmemC q hq
     obtain ⟨huv, hqv⟩ := (hrep q (hCS hq) hqF).top_sound u y htop
     obtain ⟨Q3, hQ3, hQ3v⟩ := hE.quorum_prev q hqF 4 u y (by omega) le_rfl hqv
-    obtain ⟨c, hc3, hcL, hcF⟩ := exists_correct_inter hn hE.card_faulty hQ3 hQL
+    obtain ⟨c, hc3, hcL, hcF⟩ := exists_mem_inter_notMem_of_three_mul_lt hn hE.card_faulty hQ3 hQL
     have hcv := hQ3v c hc3 hcF
     obtain ⟨u', y', htop', huu'⟩ := (hrepL c (hQLS hcL) hcF).top_max u y huv hcv
     exact ⟨c, hcL, hcF, u', y', htop', huu', hcv⟩
@@ -187,7 +187,7 @@ theorem lemma4 (hn : 3 * f < Fintype.card P) (hE : E.SafetyHyp f) {v : ℕ} {SL 
         obtain ⟨-, hcv'⟩ := (hrepL c (hQLS hcL) hcF).top_sound u y' htop'
         exact Or.inr ⟨rfl, hE.one_val c hcF 3 u y y' hcv hcv'⟩
   · rcases hiii with ⟨B, hBS, hB, hBc⟩ | ⟨h, -⟩
-    · obtain ⟨k, hkB, hkF⟩ := exists_correct hE.card_faulty hB
+    · obtain ⟨k, hkB, hkF⟩ := exists_mem_notMem_of_card_le_of_lt hE.card_faulty hB
       rcases lemma3 hn hE hkF (hrepL k (hBS hkB) hkF) (hBc k hkB) hwv with
         ⟨B', hB', hc⟩ | ⟨x₁, x₂, w₁, w₂, hx, hw₁, hw₁₂, hw₂, ⟨B₁, hB₁, hc₁⟩, ⟨B₂, hB₂, hc₂⟩⟩
       · exact Or.inl (blocking_of_claimsFrom hS hrep hB' hc)

@@ -1,4 +1,3 @@
-import Papers.PODC2021.FastByzantineConsensus.Executions
 import Papers.PODC2021.FastByzantineConsensus.Influential
 import Papers.PODC2021.FastByzantineConsensus.SmallCases
 
@@ -19,9 +18,21 @@ set_option linter.unusedSectionVars false
 
 namespace FastByzantineConsensus
 
-open Cslib.Byzantine.PartialSync Finset
+open Cslib.Byzantine.PartialSync Cslib.Byzantine.PartialSync.TwoStepLB Finset
 
 variable {P M S V K : Type*} [Fintype P] [DecidableEq P]
+
+/-- **Core of Theorem 4.5** (`ρ₅ ∼_{P₃} ρ₄ ∼_{P₁} ρ₃`, executions of Figures 2–4 in
+`Podc.PartialSync.TwoStepLB`): the decision of a process of `P₁` in `ρ₃` equals the decision of a
+process of `P₃` in the two-step execution `ρ₅`. -/
+theorem decision_eq_rho4 {A : Algorithm P M S V V} {Au : Auth P M K} {f D : ℕ} {g : P → ℕ}
+    {p : P} {I : P → V} {a b : V} {T5 F3 : Finset P} {J : P → V} {r3 : P → P → Option V}
+    (h : SideHyp g p I a b T5 F3 J r3) (hU : A.Unforging Au)
+    (hA : SolvesConsensusAuth Au f D A (weakValidity P V)) (hD : 0 < D) (hf : (F4 g).card ≤ f)
+    {x3 : P} (hx3 : g x3 = 3) {v : V}
+    (h5 : (tsRun A D (Function.update I p a) T5).DecidesBy A x3 v (2 * D + 1))
+    {x1 : P} (hx1 : g x1 = 1) {w : V} (h3 : (rho3 A D F3 J r3).Decides A x1 w) : v = w :=
+  decision_eq h hU hA.agreement hD hf hx3 h5 (Or.inl hx1) h3
 
 /-- The case `n ≥ 3f + 1` (hence `t ≥ 2`) of Theorem 4.5: the chain `ρ₁, …, ρ₅`. -/
 theorem no_fastConsensus_main {A : Algorithm P M S V V} {Au : Auth P M K} {f t δ : ℕ}

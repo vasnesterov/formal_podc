@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.Byzantine.Certificate
 
 /-!
 # Basic HotStuff (Algorithm 2): the abstract asynchronous system
@@ -70,12 +71,17 @@ def SafeNode {C : Type*} (lock : QC C) (x : Node C) (j : QC C) : Prop :=
 
 variable {P C : Type*} [Fintype P] [DecidableEq P]
 
+/-- `i` signed `q`: Byzantine replicas (in `F`) sign anything, correct replicas sign what they
+voted for. -/
+def Signed (F : Finset P) (V : Set (P × QC C)) (i : P) (q : QC C) : Prop := i ∈ F ∨ (i, q) ∈ V
+
 /-- Replicas that signed `q`: all Byzantine replicas and the correct replicas that voted for it. -/
 noncomputable def signers (F : Finset P) (V : Set (P × QC C)) (q : QC C) : Finset P :=
-  Finset.univ.filter fun i => i ∈ F ∨ (i, q) ∈ V
+  Cslib.Byzantine.signers (Signed F V) q
 
 /-- A QC is valid if it is the genesis QC or `n − f` replicas signed it (ideal threshold
-signatures with threshold `n − f`). -/
+signatures with threshold `n − f`; the second disjunct is `Cslib.Byzantine.Certified (Signed F V)
+(n - f) q`). -/
 def Valid (f : ℕ) (F : Finset P) (V : Set (P × QC C)) (q : QC C) : Prop :=
   q.IsGen ∨ Fintype.card P - f ≤ (signers F V q).card
 

@@ -19,7 +19,7 @@ variable {P C : Type*} [Fintype P] [DecidableEq P] {f : ℕ} {F : Finset P}
 
 theorem mem_signers {V : Set (P × QC C)} {q : QC C} {i : P} :
     i ∈ signers F V q ↔ i ∈ F ∨ (i, q) ∈ V := by
-  simp [signers]
+  simp [signers, Signed]
 
 theorem signers_mono {V V' : Set (P × QC C)} (h : V ⊆ V') (q : QC C) :
     signers F V q ⊆ signers F V' q := by
@@ -43,41 +43,26 @@ theorem card_signers_le {V : Set (P × QC C)} (q : QC C) :
         · exact Finset.mem_union_right _ (by simp [hiF, hi.resolve_left hiF])
     _ ≤ _ := Finset.card_union_le _ _
 
-/-- A quorum of size `n − f` with `2f < n` contains a correct voter. -/
+omit [DecidableEq P] in
+/-- A quorum of size `n − f` with `2f < n` contains a correct voter
+(`Cslib.Byzantine.Certified.exists_correct_signer`). -/
 theorem exists_correct_of_quorum (hF : F.card ≤ f) (h2 : 2 * f < Fintype.card P)
     {V : Set (P × QC C)} {q : QC C} (hq : Fintype.card P - f ≤ (signers F V q).card) :
-    ∃ r ∉ F, (r, q) ∈ V := by
-  by_contra hne
-  push Not at hne
-  have : (signers F V q) ⊆ F := by
-    intro i hi
-    rw [mem_signers] at hi
-    rcases hi with hi | hi
-    · exact hi
-    · by_contra hiF; exact hne i hiF hi
-  have := Finset.card_le_card this
-  omega
+    ∃ r ∉ F, (r, q) ∈ V :=
+  let ⟨r, hr, hv⟩ := Cslib.Byzantine.Certified.exists_correct_signer (signed := Signed F V) hq hF
+    (by omega)
+  ⟨r, hr, hv.resolve_left hr⟩
 
-/-- Two quorums of size `n − f` with `3f < n` intersect in a correct replica. -/
-theorem quorum_inter (hF : F.card ≤ f) (h3 : 3 * f < Fintype.card P) {S₁ S₂ : Finset P}
-    (h₁ : Fintype.card P - f ≤ S₁.card) (h₂ : Fintype.card P - f ≤ S₂.card) :
-    ∃ r ∉ F, r ∈ S₁ ∧ r ∈ S₂ := by
-  have hu := Finset.card_union_add_card_inter S₁ S₂
-  have hun : (S₁ ∪ S₂).card ≤ Fintype.card P := Finset.card_le_univ _
-  have hsd := Finset.le_card_sdiff F (S₁ ∩ S₂)
-  obtain ⟨r, hr⟩ : ((S₁ ∩ S₂) \ F).Nonempty := by
-    rw [← Finset.card_pos]; omega
-  simp only [Finset.mem_sdiff, Finset.mem_inter] at hr
-  exact ⟨r, hr.2, hr.1.1, hr.1.2⟩
-
+/-- Two quorums of size `n − f` with `3f < n` have a common correct voter
+(`Cslib.Byzantine.Certified.common_correct_signer`). -/
 theorem quorum_inter_signers (hF : F.card ≤ f) (h3 : 3 * f < Fintype.card P)
     {V : Set (P × QC C)} {q₁ q₂ : QC C}
     (h₁ : Fintype.card P - f ≤ (signers F V q₁).card)
     (h₂ : Fintype.card P - f ≤ (signers F V q₂).card) :
-    ∃ r ∉ F, (r, q₁) ∈ V ∧ (r, q₂) ∈ V := by
-  obtain ⟨r, hr, h₁', h₂'⟩ := quorum_inter hF h3 h₁ h₂
-  rw [mem_signers] at h₁' h₂'
-  exact ⟨r, hr, h₁'.resolve_left hr, h₂'.resolve_left hr⟩
+    ∃ r ∉ F, (r, q₁) ∈ V ∧ (r, q₂) ∈ V :=
+  let ⟨r, hr, h₁', h₂'⟩ := Cslib.Byzantine.Certified.common_correct_signer
+    (signed := Signed F V) (signed' := Signed F V) h₁ h₂ hF (by omega)
+  ⟨r, hr, h₁'.resolve_left hr, h₂'.resolve_left hr⟩
 
 /-! ### Local invariant of a correct replica -/
 

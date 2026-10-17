@@ -1,5 +1,6 @@
 import Papers.PODC2021.FastByzantineConsensus.ProtocolSafety
 import Papers.PODC2021.FastByzantineConsensus.TwoStep
+import Podc.PartialSync.Gossip
 
 /-!
 # A concrete implementation of the protocol in the partially synchronous model
@@ -24,7 +25,7 @@ We implement the generalized protocol of Kuznetsov–Tonkikh–Zhang (Section 3 
   (`actCommit`). A process decides `x` as soon as its `known` contains a fast (`n − t` acks) or
   slow (`⌈(n+f+1)/2⌉` commits) quorum for `x`.
 
-Main results: `algo_unforging`, `algo_agreement` (via the refinement `reachable_absState` into the
+Main results: `algo_gossips` (with `Podc.PartialSync.Gossip`), `algo_unforging`, `algo_agreement` (via the refinement `reachable_absState` into the
 transition system of `Protocol.lean` and `Protocol.consistency`), `algo_validity` (weak validity),
 `algo_twoStep` (for `δ ≥ 2`), `algo_termination`, hence `algo_fastConsensus`: the protocol is an
 `f`-resilient `t`-two-step consensus protocol for `n ≥ 3f + 2t − 1`; with `LowerBound.lean` this
@@ -259,6 +260,28 @@ theorem stepFn_spec (p : P) (s : LState P V) (ib : P → List (Tok P V)) :
       exact Or.inr (Or.inl ⟨q, List.mem_toFinset.mp hq⟩)
   · exact Or.inr (Or.inr h)
 
+/-- The protocol **gossips** its known tokens (`Algorithm.Gossips`): knowledge only grows, every
+known token is sent to everybody at every step, and received tokens are learnt. -/
+theorem algo_gossips : (algo (V := V) pr L).Gossips auth fun s => ↑s.known where
+  subset_step p s ib := coe_subset.2 (stepFn_spec p s ib).2.2.1
+  tokens_subset p s q m hm := by
+    simpa [auth] using (mem_toList.1 hm : m ∈ s.known)
+  exists_mem_send p s q k hk := ⟨k, mem_toList.2 hk, rfl⟩
+  tokens_subset_step p s ib q m hm :=
+    Set.singleton_subset_iff.2 (mem_coe.2 ((stepFn_spec p s ib).2.2.2.1 q m hm))
+
+/-- The protocol only emits its own signatures and relays received ones. -/
+theorem algo_unforging : (algo (V := V) pr L).Unforging auth := by
+  refine algo_gossips.toSharesKnowledge.unforging (fun p x k hk => ?_) fun p s ib k hk => ?_
+  · have hk' : k ∈ (if pr.leader 0 = p then {Tok.propose p x 0} else ∅ : Finset (Tok P V)) := hk
+    split_ifs at hk'
+    · rw [mem_singleton.1 hk']; rfl
+    · simp at hk'
+  · rcases (stepFn_spec p s ib).2.2.2.2 k hk with h | ⟨q, h⟩ | h
+    · exact Or.inl h
+    · exact Or.inr (Or.inl ⟨q, k, h, rfl⟩)
+    · exact Or.inr (Or.inr h)
+
 variable (R : Run P (Tok P V) V)
 
 theorem st_succ_eq (τ : ℕ) (q : P) :
@@ -276,10 +299,8 @@ theorem st_succ_eq (τ : ℕ) (q : P) :
   | succ τ ih => rw [st_succ_eq, (stepFn_spec q _ _).2.1, ih]
 
 theorem known_mono {τ τ' : ℕ} (h : τ ≤ τ') (q : P) :
-    (R.st (algo pr L) τ q).known ⊆ (R.st (algo pr L) τ' q).known := by
-  induction h with
-  | refl => exact subset_rfl
-  | step _ ih => exact ih.trans (by rw [st_succ_eq]; exact (stepFn_spec q _ _).2.2.1)
+    (R.st (algo pr L) τ q).known ⊆ (R.st (algo pr L) τ' q).known :=
+  coe_subset.1 (algo_gossips.mono R h q)
 
 /-- Received tokens are known after the step. -/
 theorem mem_known_of_inbox {τ : ℕ} {q r : P} {k : Tok P V} (hk : k ∈ R.inbox (algo pr L) q τ r) :
@@ -291,6 +312,25 @@ theorem mem_known_succ {τ : ℕ} {q : P} {k : Tok P V}
     (hk : k ∈ (R.st (algo pr L) (τ + 1) q).known) :
     k ∈ (R.st (algo pr L) τ q).known ∨ (∃ r, k ∈ R.inbox (algo pr L) q τ r) ∨ k.signer = q := by
   rw [st_succ_eq] at hk; exact (stepFn_spec q _ _).2.2.2.2 k hk
+
+variable {R} in
+/-- Tokens signed by a correct process `q` that some correct process knows are known to `q`
+(only `q` creates them; unforgeability of the adversary). -/
+theorem known_signed (hRa : R.AuthValid auth (algo pr L)) {q c : P}
+    (hq : q ∉ R.faulty) (hc : c ∉ R.faulty) {τ : ℕ} {k : Tok P V}
+    (hk : k ∈ (R.st (algo pr L) τ c).known) (hs : k.signer = q) :
+    k ∈ (R.st (algo pr L) τ q).known :=
+  algo_gossips.mem_of_mem algo_unforging hRa hc hq hk hs
+
+variable {R} in
+/-- A token received by a correct process at time `τ` is signed by a Byzantine process or known
+to some correct process (its signer) at time `τ`. -/
+theorem recv_origin (hRa : R.AuthValid auth (algo pr L)) {c r : P}
+    (hc : c ∉ R.faulty) {τ : ℕ} {k : Tok P V} (hk : k ∈ R.inbox (algo pr L) c τ r) :
+    k.signer ∈ R.faulty ∨ ∃ c' ∉ R.faulty, k ∈ (R.st (algo pr L) τ c').known := by
+  by_cases hs : k.signer ∈ R.faulty
+  · exact Or.inl hs
+  · exact Or.inr ⟨_, hs, algo_gossips.mem_of_mem_inbox algo_unforging hRa hc hs hk rfl rfl⟩
 
 /-- What a correct process sends at time `τ` is its knowledge at `τ`. -/
 theorem out_correct {q : P} (hq : q ∉ R.faulty) (τ : ℕ) (r : P) :

@@ -16,7 +16,7 @@ applies, because two valid QCs of the same view are on the same node.
 
 namespace HotStuff.Basic
 
-open Classical Cslib.Byzantine.PartialSync
+open Classical Cslib.Byzantine.PartialSync Cslib.Quorum
 
 variable {P C : Type*} [Fintype P] [DecidableEq P] {f : ℕ} {leader : ℕ → P}
 variable {R : Run P (Msg P C) (Inp C)} {δ : ℕ}
@@ -47,7 +47,7 @@ theorem safeNode_of_correct_leader (hR : R.Valid f δ)
   have hI := (abs_reach hA T).inv
   rcases hlvalid.elim (fun h => Or.inl h) (fun h => Or.inr h) with hgen | hcard
   · left; rw [hgen.2]; exact List.nil_suffix
-  obtain ⟨i, hiF, hiS, hisig⟩ := quorum_inter hF h3 hS hcard
+  obtain ⟨i, hiS, hisig, hiF⟩ := exists_mem_inter_notMem_of_three_mul_lt h3 hF hS hcard
   rw [mem_signers] at hisig
   have hvi : l ∈ (R.st (hotstuff f leader) T i).votes := (hisig.resolve_left hiF).2
   obtain ⟨j', -, hj'v, hj'buf⟩ := hS' i hiS

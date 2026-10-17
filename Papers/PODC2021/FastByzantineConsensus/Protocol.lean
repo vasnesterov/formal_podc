@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.Byzantine.Certificate
 
 /-!
 # The fast Byzantine consensus protocol of Kuznetsov–Tonkikh–Zhang (generalized version)
@@ -98,11 +99,17 @@ noncomputable def committers (x : V) (v : ℕ) : Finset P :=
 noncomputable def certAckers (x : V) (v : ℕ) : Finset P :=
   univ.filter fun s => Tok.certAck s x v ∈ E
 
-/-- A valid progress certificate for `(x, v)`: `f + 1` `CertAck(x, v)` signatures. -/
-def Certified (x : V) (v : ℕ) : Prop := pr.f + 1 ≤ (certAckers E x v).card
+/-- A valid progress certificate for `(x, v)`: `f + 1` `CertAck(x, v)` signatures (a threshold
+certificate, `Cslib.Byzantine.Certified`). -/
+def Certified (x : V) (v : ℕ) : Prop :=
+  Cslib.Byzantine.Certified (fun s (xv : V × ℕ) => Tok.certAck s xv.1 xv.2 ∈ E) (pr.f + 1) (x, v)
 
 /-- A valid commit certificate for `(x, v)`: `⌈(n+f+1)/2⌉` `ack(x, v)` signatures. -/
-def HasCC (x : V) (v : ℕ) : Prop := pr.qc ≤ (ackers E x v).card
+def HasCC (x : V) (v : ℕ) : Prop :=
+  Cslib.Byzantine.Certified (fun s (xv : V × ℕ) => Tok.ack s xv.1 xv.2 ∈ E) pr.qc (x, v)
+
+omit [DecidableEq P] in
+theorem hasCC_iff {x : V} {v : ℕ} : HasCC pr E x v ↔ pr.qc ≤ (ackers E x v).card := Iff.rfl
 
 /-- `x` is decided in view `v`: fast path (`n − t` acks) or slow path (`⌈(n+f+1)/2⌉` commits). -/
 def DecidedIn (x : V) (v : ℕ) : Prop :=

@@ -89,7 +89,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
   honest reports, quorum behind a decision. A refinement then shows that every run of `tetra prm`
   is such an execution, with no timing assumption, so safety holds in asynchronous runs too.
 * The counterexamples are concrete runs evaluated by `decide +kernel` through a memoised
-  simulator (`Sim.lean`). A quiescence lemma extends them to infinite time.
+  simulator (`simHist`, `Podc/PartialSync/Sim.lean`). A quiescence lemma extends them to infinite time.
 
 **Main results in Lean.**
 

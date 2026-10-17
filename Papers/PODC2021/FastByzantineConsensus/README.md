@@ -64,7 +64,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Paper | Lean | File |
 |---|---|---|
 | Lemma 4.3, Lemma 4.4 (influential process) | `lemma_4_3`, `exists_influential` | `Influential.lean` |
-| Executions ρ₁–ρ₅ and their indistinguishability | `rho4_st_eq_rho5_P3`, `rho4_st_eq_rho3` | `Executions.lean` |
+| Executions ρ₁–ρ₅ and their indistinguishability | `Cslib.Byzantine.PartialSync.TwoStepLB.rho4_st_eq_rho5_P3`, `TwoStepLB.rho4_st_eq_rho3`; `decision_eq_rho4` | `Podc/PartialSync/TwoStepLB.lean`, `LowerBound.lean` |
 | **Theorem 4.5** (no protocol for `n ≤ 3f + 2t − 2`) | `theorem_4_5`, `no_fastConsensus_of_le`, `theorem_4_5_tight` | `LowerBound.lean` |
 | Case `n ≤ 3f` (classic bound) | `not_solves_of_le_three_mul` | `SmallCases.lean` |
 | Lemmas 3.1–3.5, A.1–A.2, Corollary A.3 | `Protocol.safe_of_certified`, `Protocol.decidedIn_unique`, … | `ProtocolSafety.lean` |
@@ -74,7 +74,16 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Termination after GST (§3.3, A.3) | `Impl.algo_termination` | `ImplLiveness.lean` |
 | **Tightness: protocol exists iff `n ≥ 3f + 2t − 1`** | `Impl.algo_fastConsensus`, `Impl.tight_bound` | `ImplMain.lean` |
 
-The case `n ≤ 3f` reuses Theorem 1 of the PODC 2023 *Validity of Consensus* formalization.
+The case `n ≤ 3f` reuses Theorem 1 of the PODC 2023 *Validity of Consensus* formalization
+(`SolvesConsensusAuth.trivial`, `Podc/PartialSync/Triviality.lean`).
+
+**Shared infrastructure.** The two-step execution `tsRun` and the executions `ρ₃`, `ρ₄` with their
+indistinguishability and admissibility lemmas are `Podc/PartialSync/TwoStepLB.lean` (shared with
+GoodCaseLatencyBB); `Run.DecidesBy` is `Podc/PartialSync/Runs.lean`; weak validity is CSLib's
+`weakValidity P V`. The progress and commit certificates `Protocol.Certified`, `Protocol.HasCC` are threshold
+certificates `Cslib.Byzantine.Certified` (`Podc/Byzantine/Certificate.lean`), the quorum arithmetic is
+`Podc/Foundations/Quorum.lean`, and the concrete protocol is an instance of `Algorithm.Gossips`
+(`Impl.algo_gossips`, `Podc/PartialSync/Gossip.lean`), which gives gossip, unforgeability and token origin.
 
 **Not formalized.** Section 4.3 (suspect sets), Section 4.4 (disjoint proposers and acceptors, `3f + 2t + 1`),
 extended validity, and bounded certificate size. The reduction of the vanilla protocol (Theorem 3.6) to the
