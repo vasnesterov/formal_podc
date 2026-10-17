@@ -1,4 +1,4 @@
-import Podc.AtomicState.Model
+import Papers.PODC2024.SSLeaderElectionDirected.Defs
 
 /-!
 # Algorithm C-MAI(D, ≺, I): minimum ancestors' input (Section 3)
@@ -23,7 +23,7 @@ arbitrary set of processes `A t` executes `ReplaceKey` with respect to *time-dep
 
 set_option linter.unusedSectionVars false
 
-open Podc.AtomicState
+open Cslib.SelfStabilization Relation
 
 namespace Papers.PODC2024.SSLeaderElectionDirected
 
@@ -162,13 +162,13 @@ variable (G)
 
 open Classical in
 /-- The ancestors of `p`. -/
-noncomputable def ancs (p : V) : Finset V := Finset.univ.filter fun q => Anc G q p
+noncomputable def ancs (p : V) : Finset V := Finset.univ.filter fun q => G.Reachable q p
 
-theorem mem_ancs {q p : V} : q ∈ ancs G p ↔ Anc G q p := by
+theorem mem_ancs {q p : V} : q ∈ ancs G p ↔ G.Reachable q p := by
   classical
   simp [ancs]
 
-theorem self_mem_ancs (p : V) : p ∈ ancs G p := (mem_ancs G).mpr (Anc.refl p)
+theorem self_mem_ancs (p : V) : p ∈ ancs G p := (mem_ancs G).mpr (Digraph.Reachable.refl p)
 
 /-- `MinI(p)`: the smallest input among the ancestors of `p`. -/
 noncomputable def minI (I : V → D) (p : V) : D :=
@@ -176,24 +176,25 @@ noncomputable def minI (I : V → D) (p : V) : D :=
 
 variable {G}
 
-theorem minI_le {q p : V} (h : Anc G q p) : minI G I p ≤ I q :=
+theorem minI_le {q p : V} (h : G.Reachable q p) : minI G I p ≤ I q :=
   Finset.min'_le _ _ (Finset.mem_image_of_mem I ((mem_ancs G).mpr h))
 
-theorem exists_minI (p : V) : ∃ q, Anc G q p ∧ I q = minI G I p := by
+theorem exists_minI (p : V) : ∃ q, G.Reachable q p ∧ I q = minI G I p := by
   obtain ⟨q, hq, h⟩ := Finset.mem_image.mp (Finset.min'_mem ((ancs G p).image I)
     ⟨I p, Finset.mem_image_of_mem I (self_mem_ancs G p)⟩)
   exact ⟨q, (mem_ancs G).mp hq, h⟩
 
-theorem minI_le_self (p : V) : minI G I p ≤ I p := minI_le (Anc.refl p)
+theorem minI_le_self (p : V) : minI G I p ≤ I p := minI_le (Digraph.Reachable.refl p)
 
 /-- `MinI` is antitone along ancestry. -/
-theorem minI_mono {q p : V} (h : Anc G q p) : minI G I p ≤ minI G I q := by
+theorem minI_mono {q p : V} (h : G.Reachable q p) : minI G I p ≤ minI G I q := by
   obtain ⟨r, hr, hrq⟩ := exists_minI (G := G) (I := I) q
   exact hrq ▸ minI_le (hr.trans h)
 
-theorem exists_reach_minI (p : V) : ∃ n, ∃ q, I q = minI G I p ∧ ReachIn G n q p := by
+theorem exists_reach_minI (p : V) :
+    ∃ n, ∃ q, I q = minI G I p ∧ RelatesWithinSteps G.Adj q p n := by
   obtain ⟨q, hq, hIq⟩ := exists_minI (G := G) (I := I) p
-  obtain ⟨n, hn⟩ := hq.exists_reachIn
+  obtain ⟨n, hn⟩ := Digraph.reachable_iff_exists_relatesWithinSteps.1 hq
   exact ⟨n, q, hIq, hn⟩
 
 variable (G) in
@@ -205,27 +206,27 @@ variable (G) in
 /-- The legitimate key of `p`: `(MinI(p), Mind(p))`. -/
 noncomputable def target (I : V → D) (p : V) : Key D := ⟨minI G I p, mind G I p⟩
 
-theorem mind_spec (p : V) : ∃ q, I q = minI G I p ∧ ReachIn G (mind G I p) q p := by
+theorem mind_spec (p : V) : ∃ q, I q = minI G I p ∧ RelatesWithinSteps G.Adj q p (mind G I p) := by
   classical
   exact Nat.find_spec (exists_reach_minI (G := G) (I := I) p)
 
-theorem mind_le {q p : V} {n : ℕ} (hq : I q = minI G I p) (h : ReachIn G n q p) :
+theorem mind_le {q p : V} {n : ℕ} (hq : I q = minI G I p) (h : RelatesWithinSteps G.Adj q p n) :
     mind G I p ≤ n := by
   classical
   exact Nat.find_min' (exists_reach_minI (G := G) (I := I) p) ⟨q, hq, h⟩
 
 theorem mind_le_of_madLe (hα : MADLe G α) (p : V) : mind G I p ≤ α := by
   obtain ⟨q, hq, h⟩ := mind_spec (G := G) (I := I) p
-  exact mind_le hq (hα q p h.anc)
+  exact mind_le hq (hα q p h.reflTransGen)
 
 theorem mind_eq_zero_iff {p : V} : mind G I p = 0 ↔ I p = minI G I p := by
   constructor
   · intro h
     obtain ⟨q, hq, hr⟩ := mind_spec (G := G) (I := I) p
     rw [h] at hr
-    cases hr; exact hq
+    obtain rfl := RelatesWithinSteps.zero hr; exact hq
   · intro h
-    exact Nat.le_zero.mp (mind_le h (ReachIn.refl 0 p))
+    exact Nat.le_zero.mp (mind_le h (RelatesWithinSteps.refl p))
 
 theorem minI_lt_of_mind_pos {p : V} (h : 0 < mind G I p) : minI G I p < I p :=
   lt_of_le_of_ne (minI_le_self p) fun h' => by
@@ -234,7 +235,7 @@ theorem minI_lt_of_mind_pos {p : V} (h : 0 < mind G I p) : minI G I p < I p :=
 /-- Property 1: `(MinI(p), Mind(p)) ≤ (MinI(q), Mind(q) + 1)` for every predecessor `q` of `p`. -/
 theorem target_le_succ_target {q p : V} (hq : G.Adj q p) :
     target G I p ≤ (target G I q).succ := by
-  have hle := minI_mono (G := G) (I := I) (Anc.of_adj hq)
+  have hle := minI_mono (G := G) (I := I) (Digraph.Adj.reachable hq)
   rcases lt_or_eq_of_le hle with hlt | heq
   · exact Key.lt_of_M_lt hlt |>.le
   · refine Key.le_iff.mpr (Or.inr ⟨heq, ?_⟩)
@@ -251,12 +252,12 @@ theorem exists_pred_of_mind {p : V} {m : ℕ} (h : mind G I p = m + 1) :
     ∃ q, G.Adj q p ∧ minI G I q = minI G I p ∧ mind G I q = m := by
   obtain ⟨r, hr, hrp⟩ := mind_spec (G := G) (I := I) p
   rw [h] at hrp
-  have hnot : ¬ ReachIn G m r p := fun h' => by
+  have hnot : ¬ RelatesWithinSteps G.Adj r p m := fun h' => by
     have := mind_le hr h'; omega
-  obtain ⟨q, hrq, hqp⟩ := hrp.exists_pred_of_not hnot
+  obtain ⟨q, hrq, hqp⟩ := (relatesWithinSteps_succ_iff.1 hrp).resolve_left hnot
   have hmin : minI G I q = minI G I p := by
-    apply le_antisymm _ (minI_mono (Anc.of_adj hqp))
-    exact hr ▸ minI_le hrq.anc
+    apply le_antisymm _ (minI_mono (Digraph.Adj.reachable hqp))
+    exact hr ▸ minI_le hrq.reflTransGen
   refine ⟨q, hqp, hmin, le_antisymm (mind_le (hr.trans hmin.symm) hrq) ?_⟩
   have := target_le_succ_target (G := G) (I := I) hqp
   rcases Key.le_iff.mp this with h' | h'

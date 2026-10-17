@@ -85,9 +85,13 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * **No failures besides transient ones.** The initial configuration is arbitrary, and so are all
   local states, including the initial `msgs` of Algorithm `LE` (finite maps, timers in
   `{0, …, Δ}`).
-* **Stabilization.** `SelfStab` is Definition 1 (legitimate set, convergence, correctness).
-  `PseudoStab` is Definition 2 (every execution has a suffix satisfying `SP_LE`).
-  `PseudoStabWithin T` bounds the pseudo-stabilization phase by `T`.
+* **Stabilization.** For each vertex set `V` with `|V| = n`, the executions `execs A C V` (all
+  dynamic graphs of the class, all initial configurations) form a class of executions, and the
+  definitions are the shared execution-class notions of `Podc/Stabilization/Execution.lean`.
+  `SelfStab` is Definition 1 (`SelfStabilizing`: legitimate set, convergence, correctness).
+  `PseudoStab` is Definition 2 (`PseudoStabilizing`: every execution has a suffix satisfying
+  `SP_LE`). `PseudoStabWithin T` (`PseudoStabilizingWithin`) bounds the pseudo-stabilization phase
+  by `T`. The unfolded forms are `selfStab_iff`, `pseudoStab_iff`, `pseudoStabWithin_iff`.
 * **Weaker than the paper.** There is one state type for all processes, while the paper allows a
   set per process. This is equivalent up to a tagging reduction, which is not formalized; see
   differencies.md.
@@ -97,7 +101,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Paper | Lean | File |
 |---|---|---|
 | Theorem 1 (hierarchy of classes over all vertex sets; per vertex set for `n ≥ 3`) | `theorem_1_classes`, `theorem_1`; `n = 2`: `not_theorem_1_card_two` | `Classes.lean` |
-| Remark 1 (self ⇒ pseudo on recurring classes) | `SelfStab.pseudoStab`, `J_shift` | `Model.lean` |
+| Remark 1 (self ⇒ pseudo on recurring classes) | `SelfStab.pseudoStab` (from the generic `SelfStabilizing.pseudoStabilizing`), `J_shift` | `Model.lean` |
 | Lemma 1 | `lemma_1` | `Impossibility.lean` |
 | Theorem 2 (no self-stab. LE in `J^B_{1,*}(Δ)`) | `theorem_2` | `Impossibility.lean` |
 | Theorem 3 (no pseudo-stab. LE in `J^Q_{1,*}(Δ)`) | `theorem_3` | `Impossibility.lean` |

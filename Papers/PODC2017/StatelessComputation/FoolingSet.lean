@@ -54,7 +54,7 @@ point of the synchronous step at which every node outputs `f z`. -/
 lemma exists_fixed (P : Protocol G L X Y) {f : (V → X) → Y} (hstab : P.SyncLabelStabilizing)
     (hcomp : P.SyncComputes f) (z : V → X) (ℓ0 : Labeling G L) :
     ∃ m : Labeling G L, P.syncStep z m = m ∧ ∀ i, P.out z m i = f z := by
-  obtain ⟨m, T, hT⟩ := hstab z ℓ0
+  obtain ⟨m, T, hT⟩ := converges_iff.1 (hstab z ℓ0)
   refine ⟨m, ?_, fun i => ?_⟩
   · have h1 := hT (T + 1) (by omega)
     rwa [P.syncRun_succ, hT T le_rfl] at h1
@@ -284,7 +284,7 @@ protocol with a one-element label space (label complexity `0 < (n-2)/8`). -/
 theorem cor_6_3_false_odd {n : ℕ} (hn : 3 ≤ n) (ho : Odd n) :
     ∃ P : Protocol (ring n) Unit Bool Bool, P.SyncLabelStabilizing ∧
       P.SyncComputes (eqFun n) ∧ Real.logb 2 (Fintype.card Unit) < ((n : ℝ) - 2) / 8 := by
-  refine ⟨⟨fun _ _ _ => (fun _ => (), false)⟩, fun x ℓ0 => ⟨ℓ0, 0, fun _ _ =>
+  refine ⟨⟨fun _ _ _ => (fun _ => (), false)⟩, fun x ℓ0 => converges_iff.2 ⟨ℓ0, 0, fun _ _ =>
     Subsingleton.elim _ _⟩, fun z ℓ0 i => ⟨0, fun _ _ => ?_⟩, ?_⟩
   · have : ¬ Even n := Nat.not_even_iff_odd.2 ho
     simp [Protocol.out, eqFun, this]

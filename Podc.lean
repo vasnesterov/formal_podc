@@ -3,7 +3,8 @@
 import Podc.Basic
 import Podc.IteratedModel.Basic
 import Podc.IteratedModel.Patterns
-import Podc.AtomicState.Model
+import Podc.Stabilization.Execution
+import Podc.Stabilization.Daemon
 import Podc.ContentOblivious.Model
 import Podc.ContentOblivious.Lockstep
 import Podc.ContentOblivious.Prog

@@ -22,7 +22,7 @@ set_option linter.unusedSectionVars false
 
 universe u
 
-open Podc.AtomicState
+open Cslib.SelfStabilization Relation
 
 namespace Papers.PODC2024.SSLeaderElectionDirected
 
@@ -81,7 +81,7 @@ theorem lemma13 (A : LEAlg G ID Q) {ι : V → ID} (hι : Function.Injective ι)
       SelfStab (IsSyncExec (A.next ι')) (SPLE (A.next ι') (A.out ι') ι'))
     {L : Set (V → Q)} (hL : ∀ e, IsSyncExec (A.next ι) e → e 0 ∈ L → SPLE (A.next ι) (A.out ι) ι e)
     {γ : V → Q} (hγ : γ ∈ L) {ℓ : V} (hℓ : ∀ p, A.out ι γ p = ι ℓ) {SC : Set V}
-    (hSC : IsSourceComponent G SC) : ℓ ∈ SC := by
+    (hSC : G.IsSourceComponent SC) : ℓ ∈ SC := by
   classical
   by_contra hℓSC
   obtain ⟨i₀, hi₀⟩ := hfresh
@@ -130,11 +130,11 @@ theorem exists_fresh (hcard : Nonempty (Option V ↪ ID)) (ι : V → ID) :
 
 /-- **Corollary 2.** Assume `|IDSET| > |V|`. If an algorithm is self-stabilizing for leader election
 under the synchronous daemon in `G` for every assignment of unique identifiers, then `G` has at
-most one source component (exactly one if `G` is nonempty, `exists_sourceComponent`). -/
+most one source component (exactly one if `G` is nonempty, `Digraph.exists_isSourceComponent`). -/
 theorem corollary2 (hcard : Nonempty (Option V ↪ ID)) (A : LEAlg G ID Q)
     (hss : ∀ ι, Function.Injective ι →
       SelfStab (IsSyncExec (A.next ι)) (SPLE (A.next ι) (A.out ι) ι))
-    {S₁ S₂ : Set V} (h₁ : IsSourceComponent G S₁) (h₂ : IsSourceComponent G S₂) : S₁ = S₂ := by
+    {S₁ S₂ : Set V} (h₁ : G.IsSourceComponent S₁) (h₂ : G.IsSourceComponent S₂) : S₁ = S₂ := by
   obtain ⟨f⟩ := hcard
   let ι : V → ID := fun v => f (some v)
   have hι : Function.Injective ι := fun a b h => Option.some_injective _ (f.injective h)
@@ -151,9 +151,9 @@ theorem corollary2 (hcard : Nonempty (Option V ↪ ID)) (A : LEAlg G ID Q)
 /-- Silent self-stabilization for the leader election predicate implies self-stabilization for
 `SP_L` under the synchronous daemon. -/
 theorem selfStab_of_silent [Nonempty Q] {next : (V → Q) → V → Q} {out : (V → Q) → V → ID}
-    {ι : V → ID} (h : SilentSelfStab next (IsSyncExec next) (LEPredicate out ι)) :
+    {ι : V → ID} (h : SilentSelfStabilizing next (IsSyncExec next) (LEPredicate out ι)) :
     SelfStab (IsSyncExec next) (SPLE next out ι) := by
-  refine h.selfStab (fun γ => ⟨_, isSyncExec_iterate γ, rfl⟩) fun e he h0 hP => ?_
+  refine selfStab_iff.2 (h.selfStabilizing fun e he h0 hP => ?_)
   obtain ⟨ℓ, hℓ⟩ := hP
   have hconst : ∀ t, e t = e 0 := by
     intro t; induction t with
@@ -217,13 +217,13 @@ component. -/
 theorem corollary3 {ID : Type u} [LinearOrder ID] [Nonempty V] (hcard : Nonempty (Option V ↪ ID))
     {α : ℕ} (hα : MADLe G α) :
     (∃ (Q : Type u) (_ : Nonempty Q) (A : LEAlg G ID Q), ∀ ι, Function.Injective ι →
-      SilentSelfStab (A.next ι) (IsExec (A.next ι)) (LEPredicate (A.out ι) ι)) ↔
-    ∃! SC, IsSourceComponent G SC := by
+      SilentSelfStabilizing (A.next ι) (IsUnfairExec (A.next ι)) (LEPredicate (A.out ι) ι)) ↔
+    ∃! SC, G.IsSourceComponent SC := by
   constructor
   · rintro ⟨Q, hQ, A, hA⟩
-    obtain ⟨SC, hSC⟩ := exists_sourceComponent (G := G)
+    obtain ⟨SC, hSC⟩ := Digraph.exists_isSourceComponent (G := G)
     refine ⟨SC, hSC, fun S hS => corollary2 hcard A (fun ι hι => ?_) hS hSC⟩
-    exact selfStab_of_silent ((hA ι hι).mono fun e he => he.isExec)
+    exact selfStab_of_silent ((hA ι hι).mono fun _ he => IsSyncExec.isUnfairExec he)
   · rintro ⟨SC, hSC, huniq⟩
     refine ⟨PState ID α, ?_, PEL.toLEAlg G α false, fun ι _ => ?_⟩
     · obtain ⟨f⟩ := hcard
@@ -235,14 +235,14 @@ theorem corollary3 {ID : Type u} [LinearOrder ID] [Nonempty V] (hcard : Nonempty
 theorem corollary3_sync {ID : Type u} [LinearOrder ID] [Nonempty V]
     (hcard : Nonempty (Option V ↪ ID)) {α : ℕ} (hα : MADLe G α) :
     (∃ (Q : Type u) (_ : Nonempty Q) (A : LEAlg G ID Q), ∀ ι, Function.Injective ι →
-      SilentSelfStab (A.next ι) (IsSyncExec (A.next ι)) (LEPredicate (A.out ι) ι)) ↔
-    ∃! SC, IsSourceComponent G SC := by
+      SilentSelfStabilizing (A.next ι) (IsSyncExec (A.next ι)) (LEPredicate (A.out ι) ι)) ↔
+    ∃! SC, G.IsSourceComponent SC := by
   constructor
   · rintro ⟨Q, hQ, A, hA⟩
-    obtain ⟨SC, hSC⟩ := exists_sourceComponent (G := G)
+    obtain ⟨SC, hSC⟩ := Digraph.exists_isSourceComponent (G := G)
     exact ⟨SC, hSC, fun S hS => corollary2 hcard A (fun ι hι => selfStab_of_silent (hA ι hι)) hS hSC⟩
   · intro h
     obtain ⟨Q, hQ, A, hA⟩ := (corollary3 hcard hα).mpr h
-    exact ⟨Q, hQ, A, fun ι hι => (hA ι hι).mono fun e he => he.isExec⟩
+    exact ⟨Q, hQ, A, fun ι hι => (hA ι hι).mono fun _ he => IsSyncExec.isUnfairExec he⟩
 
 end Papers.PODC2024.SSLeaderElectionDirected

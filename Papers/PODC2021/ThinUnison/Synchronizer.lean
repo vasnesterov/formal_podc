@@ -1,4 +1,5 @@
 import Papers.PODC2021.ThinUnison.Main
+import Podc.Stabilization.Daemon
 
 /-!
 # Corollary 1.2 of [EK21]: a self-stabilizing synchronizer (Section 4)
@@ -485,6 +486,30 @@ def SyncStabilizes (G : SimpleGraph V) {O : Type*} (P : Algorithm Q) (ω : Q →
     (Legal : (V → O) → Prop) (f : ℕ) : Prop :=
   ∀ D0 : V → Q, ∃ out : V → O, Legal out ∧
     ∀ j, f ≤ j → ∀ v, ω (run G P D0 sync j v) = some (out v)
+
+open Cslib.SelfStabilization in
+/-- `SyncStabilizes` is pseudo-stabilization within `f` rounds, for the class of synchronous
+executions of `Π`, of the static specification "a fixed legal output vector forever". -/
+theorem syncStabilizes_iff {O : Type*} {P : Algorithm Q} {ω : Q → Option O}
+    {Legal : (V → O) → Prop} {f : ℕ} : SyncStabilizes G P ω Legal f ↔
+    PseudoStabilizingWithin (IsSyncExec fun C v => P.δ (C v) (signal G C v))
+      (fun e => ∃ out : V → O, Legal out ∧ ∀ j v, ω (e j v) = some (out v)) f := by
+  have hrun := fun D0 => Cslib.StoneAge.run_sync_mem_isSyncExec (G := G) P D0
+  constructor
+  · intro h e he
+    obtain ⟨out, hout, h⟩ := h (e 0)
+    refine ⟨out, hout, fun j v => ?_⟩
+    have he' : IsSyncExec (fun C v => P.δ (C v) (signal G C v)) e := he
+    show ω (e (f + j) v) = some (out v)
+    have h2 := (hrun (e 0)).eq_iterate (f + j)
+    rw [run_zero] at h2
+    rw [he'.eq_iterate, ← h2]
+    exact h _ (Nat.le_add_right f j) v
+  · intro h D0
+    obtain ⟨out, hout, h⟩ := h _ (hrun D0)
+    refine ⟨out, hout, fun j hj v => ?_⟩
+    obtain ⟨i, rfl⟩ := Nat.exists_eq_add_of_le hj
+    exact h i v
 
 /-- **Corollary 1.2 of [EK21]** (deterministic `Π`, static tasks, any `k ≥ 3D + 2`): if `Π`
 synchronously self-stabilizes within `f` rounds on `G` (of diameter at most `D`), then for every

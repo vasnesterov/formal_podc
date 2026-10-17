@@ -13,7 +13,7 @@ import Papers.PODC2024.SSLeaderElectionDirected.Unison
 
 set_option linter.unusedSectionVars false
 
-open Podc.AtomicState
+open Cslib.SelfStabilization Relation
 
 namespace Papers.PODC2024.SSLeaderElectionDirected
 
@@ -21,21 +21,21 @@ namespace Papers.PODC2024.SSLeaderElectionDirected
 def twoCycle : Digraph (Fin 2) where
   Adj a b := a ≠ b
 
-theorem twoCycle_anc (a b : Fin 2) : Anc twoCycle a b := by
+theorem twoCycle_anc (a b : Fin 2) : twoCycle.Reachable a b := by
   by_cases h : a = b
   · rw [h]
-  · exact Anc.of_adj h
+  · exact Digraph.Adj.reachable h
 
 theorem twoCycle_madLe : MADLe twoCycle 1 := by
   intro q p _
   by_cases h : q = p
-  · subst h; exact ReachIn.refl 1 q
-  · exact Or.inr ⟨q, rfl, h⟩
+  · subst h; exact RelatesWithinSteps.mono (Nat.zero_le 1) (RelatesWithinSteps.refl q)
+  · exact RelatesWithinSteps.single h
 
-theorem twoCycle_source : IsSourceComponent twoCycle Set.univ :=
-  isSourceComponent_iff.mpr ⟨0, by ext x; simp [twoCycle_anc], fun x _ => twoCycle_anc 0 x⟩
+theorem twoCycle_source : twoCycle.IsSourceComponent Set.univ :=
+  Digraph.isSourceComponent_iff.mpr ⟨0, by ext x; simp [twoCycle_anc], fun x _ => twoCycle_anc 0 x⟩
 
-theorem twoCycle_unique : ∀ S, IsSourceComponent twoCycle S → S = Set.univ := fun _ hS =>
+theorem twoCycle_unique : ∀ S, twoCycle.IsSourceComponent S → S = Set.univ := fun _ hS =>
   hS.eq_of_mem twoCycle_source (hS.nonempty.some_mem) (Set.mem_univ _)
 
 /-- **Counterexample to Theorem 5** (as stated in the paper): on the 2-cycle with identifiers `0, 1`
@@ -51,7 +51,7 @@ theorem twoCycle_paper_unison_fails :
 def dipath : Digraph (Fin 2) where
   Adj a b := a = 0 ∧ b = 1
 
-theorem dipath_anc_iff (a b : Fin 2) : Anc dipath a b ↔ a = b ∨ (a = 0 ∧ b = 1) := by
+theorem dipath_anc_iff (a b : Fin 2) : dipath.Reachable a b ↔ a = b ∨ (a = 0 ∧ b = 1) := by
   constructor
   · intro h
     induction h with
@@ -63,25 +63,25 @@ theorem dipath_anc_iff (a b : Fin 2) : Anc dipath a b ↔ a = b ∨ (a = 0 ∧ b
       · exact absurd (hb'.symm.trans hb) (by decide)
   · rintro (rfl | ⟨rfl, rfl⟩)
     · rfl
-    · exact Anc.of_adj ⟨rfl, rfl⟩
+    · exact Digraph.Adj.reachable ⟨rfl, rfl⟩
 
 theorem dipath_madLe : MADLe dipath 1 := by
   intro q p h
   rcases (dipath_anc_iff q p).mp h with rfl | ⟨rfl, rfl⟩
-  · exact ReachIn.refl 1 q
-  · exact Or.inr ⟨0, rfl, rfl, rfl⟩
+  · exact RelatesWithinSteps.mono (Nat.zero_le 1) (RelatesWithinSteps.refl q)
+  · exact RelatesWithinSteps.single ⟨rfl, rfl⟩
 
-theorem dipath_source : IsSourceComponent dipath {0} :=
-  isSourceComponent_iff.mpr ⟨0, by ext x; simp [dipath_anc_iff], fun x hx => by
+theorem dipath_source : dipath.IsSourceComponent {0} :=
+  Digraph.isSourceComponent_iff.mpr ⟨0, by ext x; simp [dipath_anc_iff], fun x hx => by
     rcases (dipath_anc_iff x 0).mp hx with rfl | ⟨-, h⟩
     · rfl
     · exact absurd h (by decide)⟩
 
-theorem dipath_unique : ∀ S, IsSourceComponent dipath S → S = {0} := fun S hS =>
+theorem dipath_unique : ∀ S, dipath.IsSourceComponent S → S = {0} := fun S hS =>
   hS.eq_of_mem dipath_source
     (by
       obtain ⟨r, hr⟩ := hS.nonempty
-      exact mem_of_anc_of_closed hS.closed ((dipath_anc_iff 0 r).mpr (by
+      exact Digraph.mem_of_reachable_of_closed hS.closed ((dipath_anc_iff 0 r).mpr (by
         fin_cases r <;> simp)) hr)
     rfl
 
@@ -101,8 +101,8 @@ theorem twoCycle_fixed_unison :
 
 /-- Non-vacuity: PEL on the same instance. -/
 theorem twoCycle_PEL :
-    SilentSelfStab (PEL.next twoCycle 1 false (fun i : Fin 2 => (i : ℕ)))
-      (IsExec (PEL.next twoCycle 1 false (fun i : Fin 2 => (i : ℕ))))
+    SilentSelfStabilizing (PEL.next twoCycle 1 false (fun i : Fin 2 => (i : ℕ)))
+      (IsUnfairExec (PEL.next twoCycle 1 false (fun i : Fin 2 => (i : ℕ))))
       (PEL.LEPred (fun i : Fin 2 => (i : ℕ))) :=
   PEL.theorem3 twoCycle_madLe twoCycle_source twoCycle_unique
 
@@ -115,10 +115,10 @@ identifier `0`") is silent self-stabilizing for leader election on two isolated 
 there are two source components. Hence the hypothesis `|IDSET| > |V|` of Corollary 2 cannot be
 dropped. -/
 theorem idset_card_needed :
-    (∃ S₁ S₂, IsSourceComponent twoIsolated S₁ ∧ IsSourceComponent twoIsolated S₂ ∧ S₁ ≠ S₂) ∧
+    (∃ S₁ S₂, twoIsolated.IsSourceComponent S₁ ∧ twoIsolated.IsSourceComponent S₂ ∧ S₁ ≠ S₂) ∧
     ∃ A : LEAlg twoIsolated (Fin 2) Unit, ∀ ι, Function.Injective ι →
-      SilentSelfStab (A.next ι) (IsExec (A.next ι)) (LEPredicate (A.out ι) ι) := by
-  have hanc : ∀ a b : Fin 2, Anc twoIsolated a b ↔ a = b := by
+      SilentSelfStabilizing (A.next ι) (IsUnfairExec (A.next ι)) (LEPredicate (A.out ι) ι) := by
+  have hanc : ∀ a b : Fin 2, twoIsolated.Reachable a b ↔ a = b := by
     intro a b
     constructor
     · intro h
@@ -129,9 +129,9 @@ theorem idset_card_needed :
   refine ⟨⟨{0}, {1}, ?_, ?_, by simp⟩, ⟨⟨fun _ γ => γ, fun _ _ _ => 0, fun _ _ _ _ _ h =>
     (h _ (Or.inl rfl)).2, fun _ _ _ _ _ _ _ => rfl⟩, fun ι hι => ⟨fun e _ => ⟨0, fun _ => rfl⟩,
     fun γ _ => ?_⟩⟩⟩
-  · exact isSourceComponent_iff.mpr ⟨0, by ext x; simp [hanc], fun x hx => by
+  · exact Digraph.isSourceComponent_iff.mpr ⟨0, by ext x; simp [hanc], fun x hx => by
       rw [(hanc x 0).mp hx]⟩
-  · exact isSourceComponent_iff.mpr ⟨1, by ext x; simp [hanc], fun x hx => by
+  · exact Digraph.isSourceComponent_iff.mpr ⟨1, by ext x; simp [hanc], fun x hx => by
       rw [(hanc x 1).mp hx]⟩
   · obtain ⟨ℓ, hℓ⟩ := (Finite.injective_iff_surjective.mp hι) 0
     exact ⟨ℓ, fun _ => hℓ.symm⟩

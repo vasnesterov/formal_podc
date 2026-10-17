@@ -17,7 +17,7 @@ in every digraph with a unique source component, and is terminal after `3α + 3M
 
 set_option linter.unusedSectionVars false
 
-open Podc.AtomicState
+open Cslib.SelfStabilization Relation
 
 namespace Papers.PODC2024.SSLeaderElectionDirected
 
@@ -25,21 +25,22 @@ namespace CMAI
 
 variable {V : Type*} [Fintype V] {G : Digraph V} {D : Type*} [LinearOrder D]
 
-theorem minI_eq {J : V → D} {p : V} {c : D} (h1 : ∀ q, Anc G q p → c ≤ J q)
-    (h2 : ∃ q, Anc G q p ∧ J q = c) : minI G J p = c := by
+theorem minI_eq {J : V → D} {p : V} {c : D} (h1 : ∀ q, G.Reachable q p → c ≤ J q)
+    (h2 : ∃ q, G.Reachable q p ∧ J q = c) : minI G J p = c := by
   obtain ⟨q, hq, hc⟩ := h2
   obtain ⟨q', hq', hq''⟩ := exists_minI (G := G) (I := J) p
   exact le_antisymm (hc ▸ minI_le hq) (hq'' ▸ h1 q' hq')
 
 theorem minI_bool_eq_true {J : V → Bool} {p : V} :
-    minI G J p = true ↔ ∀ q, Anc G q p → J q = true := by
+    minI G J p = true ↔ ∀ q, G.Reachable q p → J q = true := by
   constructor
   · intro h q hq
     have := minI_le (G := G) (I := J) hq
     rw [h] at this
     revert this; cases J q <;> decide
   · intro h
-    exact minI_eq (fun q hq => (h q hq).symm ▸ le_rfl) ⟨p, Anc.refl p, h p (Anc.refl p)⟩
+    exact minI_eq (fun q hq => (h q hq).symm ▸ le_rfl)
+      ⟨p, Digraph.Reachable.refl p, h p (Digraph.Reachable.refl p)⟩
 
 end CMAI
 
@@ -61,7 +62,7 @@ theorem terminal_keys (hα : MADLe G α) {γ : V → PState ID α}
     fun p => eq_target_of_terminal hα (CMAI.terminal_iff.mp h3) p⟩
 
 /-- The process with the smallest identifier in a (source) component. -/
-theorem exists_mid {SC : Set V} (hSC : IsSourceComponent G SC) :
+theorem exists_mid {SC : Set V} (hSC : G.IsSourceComponent SC) :
     ∃ ℓ ∈ SC, ∀ x ∈ SC, ι ℓ ≤ ι x := by
   classical
   obtain ⟨ℓ, hℓ, h⟩ := (SC.toFinite.toFinset).exists_min_image ι
@@ -70,18 +71,18 @@ theorem exists_mid {SC : Set V} (hSC : IsSourceComponent G SC) :
 
 section Correctness
 
-variable {SC : Set V} (hSC : IsSourceComponent G SC)
-  (huniq : ∀ S, IsSourceComponent G S → S = SC) {ℓ : V} (hℓ : ℓ ∈ SC)
+variable {SC : Set V} (hSC : G.IsSourceComponent SC)
+  (huniq : ∀ S, G.IsSourceComponent S → S = SC) {ℓ : V} (hℓ : ℓ ∈ SC)
   (hℓmin : ∀ x ∈ SC, ι ℓ ≤ ι x)
 include hSC huniq hℓ hℓmin
 
 omit hℓmin in
-theorem anc_mid (p : V) : Anc G ℓ p := subset_anc_of_unique hSC huniq p hℓ
+theorem anc_mid (p : V) : G.Reachable ℓ p := Digraph.subset_setOf_reachable_of_unique huniq p hℓ
 
 omit huniq in
 theorem minI_of_mem_SC {x : V} (hx : x ∈ SC) : minI G ι x = ι ℓ := by
-  have hSCx := hSC.eq_anc hx
-  refine minI_eq (fun q hq => hℓmin q ?_) ⟨ℓ, hSC.anc_of_mem hℓ hx, rfl⟩
+  have hSCx := hSC.eq_setOf_reachable hx
+  refine minI_eq (fun q hq => hℓmin q ?_) ⟨ℓ, hSC.reachable hℓ hx, rfl⟩
   rw [hSCx]; exact hq
 
 theorem minI_le_mid (p : V) : minI G ι p ≤ ι ℓ := minI_le (anc_mid hSC huniq hℓ p)
@@ -103,7 +104,7 @@ theorem lemma14 (p : V) : (γ p).a.1.M = true ↔ (γ p).mi.1.M = ι ℓ := by
   constructor
   · intro h
     -- all ancestors of `p` agree with `p` on `MI.M`
-    have hagree : ∀ q, Anc G q p → (γ q).mi.1.M = (γ p).mi.1.M := by
+    have hagree : ∀ q, G.Reachable q p → (γ q).mi.1.M = (γ p).mi.1.M := by
       intro q hq
       induction hq using Relation.ReflTransGen.head_induction_on with
       | refl => rfl
@@ -115,7 +116,7 @@ theorem lemma14 (p : V) : (γ p).a.1.M = true ↔ (γ p).mi.1.M = ι ℓ := by
     rw [← hagree ℓ (anc_mid hSC huniq hℓ p)]
     exact corollary4 hSC huniq hℓ hℓmin hα hγ hℓ
   · intro h
-    have hall : ∀ q, Anc G q p → (γ q).mi.1.M = ι ℓ := by
+    have hall : ∀ q, G.Reachable q p → (γ q).mi.1.M = ι ℓ := by
       intro q hq
       rw [hmi q]
       apply le_antisymm (minI_le_mid hSC huniq hℓ hℓmin q)
@@ -126,7 +127,7 @@ theorem lemma14 (p : V) : (γ p).a.1.M = true ↔ (γ p).mi.1.M = ι ℓ := by
     intro q hq
     simp only [IA, decide_eq_true_eq]
     intro x hx
-    rw [hall q hq, hall x ((Anc.of_adj hx).trans hq)]
+    rw [hall q hq, hall x ((Digraph.Adj.reachable hx).trans hq)]
 
 /-- **Lemma 15.** `p.E.M = (0, mid)` in every terminal configuration (for both choices of `I_E`). -/
 theorem lemma15 (p : V) : (γ p).e.1.M = toLex (false, ι ℓ) := by
@@ -168,9 +169,9 @@ def LEPred (ι : V → ID) (γ : V → PState ID α) : Prop := ∃ ℓ, ∀ p, l
 either `I_E`) is silent self-stabilizing for leader election under the distributed unfair daemon;
 the leader is the process of the source component with the smallest identifier (uniqueness of
 identifiers is not needed for this statement). -/
-theorem theorem3 (hα : MADLe G α) {SC : Set V} (hSC : IsSourceComponent G SC)
-    (huniq : ∀ S, IsSourceComponent G S → S = SC) :
-    SilentSelfStab (next G α fixed ι) (IsExec (next G α fixed ι)) (LEPred ι) := by
+theorem theorem3 (hα : MADLe G α) {SC : Set V} (hSC : G.IsSourceComponent SC)
+    (huniq : ∀ S, G.IsSourceComponent S → S = SC) :
+    SilentSelfStabilizing (next G α fixed ι) (IsUnfairExec (next G α fixed ι)) (LEPred ι) := by
   refine ⟨fun e ⟨S, hS⟩ => silent hS, fun γ hγ => ?_⟩
   obtain ⟨ℓ, hℓ, hℓmin⟩ := exists_mid (ι := ι) hSC
   exact ⟨ℓ, leader_eq hSC huniq hℓ hℓmin hα hγ⟩
@@ -178,7 +179,7 @@ theorem theorem3 (hα : MADLe G α) {SC : Set V} (hSC : IsSourceComponent G SC)
 /-- **Theorem 3 (stabilization time).** Every execution of PEL under the distributed unfair daemon
 is terminal — hence legitimate — after at most `3α + 3·MAD + 6` rounds. -/
 theorem theorem3_time {e : ℕ → V → PState ID α} {S : ℕ → Set V}
-    (h : IsRun (next G α fixed ι) e S) (hα : MADLe G α) {r : ℕ → ℕ}
+    (h : IsUnfairRun (next G α fixed ι) e S) (hα : MADLe G α) {r : ℕ → ℕ}
     (hr : RoundBounds (next G α fixed ι) e S r) :
     ∀ t, r (3 * α + 3 * mad G + 6) ≤ t → Terminal (next G α fixed ι) (e t) := by
   intro t ht

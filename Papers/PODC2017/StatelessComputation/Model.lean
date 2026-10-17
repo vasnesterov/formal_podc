@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.Stabilization.Daemon
 
 /-!
 # Stateless computation: the model
@@ -103,24 +104,28 @@ lemma IsStable.step_eq {ℓ : Labeling G L} (h : P.IsStable x ℓ) (T : Finset V
 
 end Protocol
 
-/-- A sequence converges (is eventually constant). -/
-def Converges {α : Type*} (f : ℕ → α) : Prop := ∃ a, ∃ T, ∀ t, T ≤ t → f t = a
+/-- A sequence converges (is eventually constant): `Filter.EventuallyConst f atTop`
+(`converges_iff`). -/
+def Converges {α : Type*} (f : ℕ → α) : Prop := Filter.EventuallyConst f Filter.atTop
 
+lemma converges_iff {α : Type*} {f : ℕ → α} : Converges f ↔ ∃ a, ∃ T, ∀ t, T ≤ t → f t = a :=
+  Filter.eventuallyConst_atTop.trans
+    ⟨fun ⟨T, h⟩ => ⟨f T, T, h⟩, fun ⟨_, T, h⟩ => ⟨T, fun t ht => (h t ht).trans (h T le_rfl).symm⟩⟩
+
+open Cslib.SelfStabilization in
 /-- An `r`-fair schedule: every step activates a nonempty set, and every node is activated at
-least once in every `r` consecutive steps. -/
+least once in every `r` consecutive steps (`r`-bounded fairness of the daemon). -/
 def IsRFair (r : ℕ) (σ : ℕ → Finset V) : Prop :=
-  (∀ t, (σ t).Nonempty) ∧ ∀ t (v : V), ∃ s, t ≤ s ∧ s < t + r ∧ v ∈ σ s
+  (∀ t, (σ t).Nonempty) ∧ BoundedFair r (fun t => (σ t : Set V))
 
 /-- An `r`-fair schedule is `r'`-fair for every `r' ≥ r`. -/
 lemma IsRFair.mono {r r' : ℕ} {σ : ℕ → Finset V} (h : IsRFair r σ) (hr : r ≤ r') :
-    IsRFair r' σ := by
-  refine ⟨h.1, fun t v => ?_⟩
-  obtain ⟨s, h1, h2, h3⟩ := h.2 t v
-  exact ⟨s, h1, by omega, h3⟩
+    IsRFair r' σ :=
+  ⟨h.1, h.2.mono hr⟩
 
 /-- The synchronous schedule is `1`-fair (if there is a node). -/
 lemma isRFair_sync [Fintype V] [Nonempty V] : IsRFair 1 (fun _ => (Finset.univ : Finset V)) :=
-  ⟨fun _ => Finset.univ_nonempty, fun t _ => ⟨t, le_rfl, by omega, Finset.mem_univ _⟩⟩
+  ⟨fun _ => Finset.univ_nonempty, fun t v => ⟨t, le_rfl, by omega, Finset.mem_univ v⟩⟩
 
 variable {G : Digraph V} [DecidableEq V]
 

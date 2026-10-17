@@ -123,7 +123,9 @@ and `Quot.sound`.
 * The probability space is Mathlib's `Measure.infinitePi` of `Ber(true, false, p)`.
 
 The model is self-contained in this folder. CSLib's stone-age model (`Cslib.StoneAge`) has
-deterministic transitions and asynchronous daemons, so we did not use it.
+deterministic transitions, so the randomized BFW protocol does not fit it; the deterministic
+protocols of the remark on randomness (`DetProtocol`) are stone-age algorithms run under the
+synchronous schedule (`DetProtocol.toStoneAge`, `DetProtocol.run_succ`).
 
 CSLib candidate: `Coins.lean`. It provides i.i.d. coin fields, `Determined` events, independence
 of events on disjoint coin sets, and partition along fibres.

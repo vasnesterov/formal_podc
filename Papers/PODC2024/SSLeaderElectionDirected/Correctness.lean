@@ -11,7 +11,7 @@ import Papers.PODC2024.SSLeaderElectionDirected.Termination
 
 set_option linter.unusedSectionVars false
 
-open Podc.AtomicState
+open Cslib.SelfStabilization Relation
 
 namespace Papers.PODC2024.SSLeaderElectionDirected
 
@@ -100,7 +100,7 @@ theorem terminal_iff {γ : V → CState D α} :
   simp [Terminal, next, Subtype.ext_iff]
 
 /-- An execution of C-MAI is a run with constant inputs. -/
-theorem run_of_isRun {e : ℕ → V → CState D α} {S : ℕ → Set V} (h : IsRun (next G α I) e S) :
+theorem run_of_isRun {e : ℕ → V → CState D α} {S : ℕ → Set V} (h : IsUnfairRun (next G α I) e S) :
     Run G α (fun _ => I) (fun t p => (e t p).1) S where
   move t p hp := by rw [h.move t p hp]; rfl
   stay t p hp := by rw [h.stay t p hp]
@@ -108,7 +108,8 @@ theorem run_of_isRun {e : ℕ → V → CState D α} {S : ℕ → Set V} (h : Is
 /-- **Theorem 1.** If `α ≥ MAD`, C-MAI(D, ≺, I) is silent self-stabilizing in `G` under the
 distributed unfair daemon for the predicate `∀ p, MinOk(p)`, i.e. `p.K = (MinI(p), Mind(p))`. -/
 theorem theorem1 (hα : MADLe G α) :
-    SilentSelfStab (next G α I) (IsExec (next G α I)) (fun γ => ∀ p, (γ p).1 = target G I p) := by
+    SilentSelfStabilizing (next G α I) (IsUnfairExec (next G α I))
+      (fun γ => ∀ p, (γ p).1 = target G I p) := by
   refine ⟨fun e ⟨S, hS⟩ => ?_, fun γ hγ p => ?_⟩
   · obtain ⟨T', -, hT'⟩ := (run_of_isRun hS).eventually_const (T := 0) (fun _ _ => rfl)
     refine ⟨T', hS.terminal_of_const fun t ht => funext fun p => Subtype.ext ?_⟩

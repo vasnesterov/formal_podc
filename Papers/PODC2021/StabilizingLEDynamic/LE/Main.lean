@@ -1,4 +1,5 @@
 import Papers.PODC2021.StabilizingLEDynamic.LE.Stable
+import Podc.Order.NatDescent
 
 /-!
 # Algorithm `LE`: Theorem 6, Corollary 6, Theorem 7
@@ -9,19 +10,6 @@ namespace StabilizingLEDynamic.LE
 open Classical Cslib.HeardOf
 
 variable {ι : Type*} [LinearOrder ι] {Δ : ℕ}
-
-/-- A sequence of naturals that is monotone from index `1` on and bounded is eventually
-constant. -/
-theorem eventually_const_of_bdd (f : ℕ → ℕ) (hmono : ∀ t u, 1 ≤ t → t ≤ u → f t ≤ f u)
-    (B : ℕ) (hB : ∀ t ≥ 1, f t ≤ B) : ∃ T ≥ 1, ∀ t ≥ T, f t = f T := by
-  set S := f '' {t | 1 ≤ t}
-  have hne : S.Nonempty := ⟨f 1, 1, show 1 ≤ 1 from le_rfl, rfl⟩
-  have hbdd : BddAbove S := ⟨B, by rintro _ ⟨t, ht, rfl⟩; exact hB t ht⟩
-  obtain ⟨T, hT, hTeq⟩ := Nat.sSup_mem hne hbdd
-  refine ⟨T, hT, fun t ht => le_antisymm ?_ (hmono T t hT ht)⟩
-  rw [hTeq]
-  have h1 : 1 ≤ t := le_trans hT ht
-  exact le_csSup hbdd ⟨t, h1, rfl⟩
 
 theorem tsource_of_J1sB {V : Finset ι} {G : DG ι} (hG : G ∈ J1sB Δ V) :
     ∃ r, TSource G V (Δ := Δ) r := by
@@ -58,8 +46,8 @@ theorem theorem_6 (hΔ : 1 ≤ Δ) {V : Finset ι} {G : DG ι} (hG : G ∈ J1sB 
     intro p hp hpC
     by_contra hcon
     push Not at hcon
-    obtain ⟨T, hT, hconst⟩ := eventually_const_of_bdd (fun t => susp G γ t p)
-      (fun t u ht htu => susp_mono hΔ ht htu p) m hcon
+    obtain ⟨T, hT, hconst⟩ := Nat.eventually_const_of_le_succ (f := fun t => susp G γ t p)
+      (N := 1) hcon fun t ht => susp_mono hΔ ht (Nat.le_succ t) p
     exact hpC (Finset.mem_filter.mpr ⟨hp, T, hT, hconst⟩)
   set g : ι → ℕ := fun p => if p ∈ C then Tc p else
     if h : ∃ t ≥ 1, m < susp G γ t p then h.choose else 0
@@ -104,7 +92,7 @@ theorem theorem_6 (hΔ : 1 ≤ Δ) {V : Finset ι} {G : DG ι} (hG : G ∈ J1sB 
 deterministic pseudo-stabilizing leader election algorithm for `J^B_{1,*}(Δ)`, for every number
 of processes. -/
 theorem corollary_6 (hΔ : 1 ≤ Δ) (n : ℕ) : PseudoStab (algLE (ι := ι) Δ) (J1sB Δ) n := by
-  intro V _ G hG γ
+  refine pseudoStab_iff.2 fun V _ G hG γ => ?_
   obtain ⟨T, -, ℓ, hℓ, -, h⟩ := theorem_6 hΔ hG γ
   exact ⟨T + 4 * Δ, ℓ, hℓ, fun t q hq => h _ (by omega) q hq⟩
 
@@ -112,7 +100,7 @@ theorem corollary_6 (hΔ : 1 ≤ Δ) (n : ℕ) : PseudoStab (algLE (ι := ι) Δ
 configuration `γ_{6Δ+1}` (0-indexed time `6Δ`) on, for systems of `n ≥ 1` processes. -/
 theorem theorem_7_sharp (hΔ : 1 ≤ Δ) {n : ℕ} (hn : 1 ≤ n) :
     PseudoStabWithin (algLE (ι := ι) Δ) (JssB Δ) n (6 * Δ) := by
-  intro V hV G hG γ
+  refine pseudoStabWithin_iff.2 fun V hV G hG γ => ?_
   obtain ⟨r, hr⟩ : V.Nonempty := Finset.card_pos.mp (by omega)
   have hdg : IsDG V G := hG.1
   have hall : ∀ p ∈ V, TSource G V (Δ := Δ) p := fun p hp => ⟨hp, fun q hq => hG.2 p hp q hq⟩
@@ -136,8 +124,8 @@ of Algorithm `LE` in `J^B_{*,*}(Δ)` is at most `6Δ + 2` rounds: `SP_LE` holds 
 configuration `γ_{6Δ+2}` (0-indexed time `6Δ + 1`) on. -/
 theorem theorem_7 (hΔ : 1 ≤ Δ) {n : ℕ} (hn : 1 ≤ n) :
     PseudoStabWithin (algLE (ι := ι) Δ) (JssB Δ) n (6 * Δ + 1) := by
-  intro V hV G hG γ
-  have := (theorem_7_sharp hΔ hn V hV G hG γ).shift 1
+  refine pseudoStabWithin_iff.2 fun V hV G hG γ => ?_
+  have := (pseudoStabWithin_iff.1 (theorem_7_sharp hΔ hn) V hV G hG γ).shift 1
   simpa only [Nat.add_assoc, Nat.add_comm 1] using this
 
 end StabilizingLEDynamic.LE

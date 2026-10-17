@@ -50,7 +50,7 @@ Networks*, PODC 2024. Formalized from the full version
    * In the compositions `E ∘ A ∘ MI` and `U-DAG ∘ PEL`, at most one action per process is enabled.
    * Lemma 12/13 in the paper are stated for deterministic algorithms.
    Trivial actions are excluded, as in the paper: a process is enabled iff `next γ p ≠ γ p`.
-7. **Executions in `Ext∞` form.** `IsRun next e S` describes infinite sequences in which a nonempty
+7. **Executions in `Ext∞` form.** `IsUnfairRun next e S` describes infinite sequences in which a nonempty
    set `S t` of enabled processes moves at every non-terminal configuration, and terminal
    configurations repeat. These are exactly the paper's infinite extensions of maximal executions
    under the distributed unfair daemon. Lemma 11 (`SP_L(e) ≡ SP_L(Ext∞(e))`) is therefore built in.
@@ -60,8 +60,8 @@ Networks*, PODC 2024. Formalized from the full version
    This is equivalent to "executes an action or is neutralized during `[s, s']`", because a
    process that becomes disabled without being activated is neutralized at that step.
    * Upper bounds hold for *every* sequence of boundaries in which each interval contains a
-     complete round (`RoundBounds`). This includes the paper's minimal rounds (`PaperRounds`, which
-     exist for eventually terminal runs, `IsRun.exists_paperRounds`).
+     complete round (`RoundBounds`). This includes the paper's minimal rounds (`IsLeastRoundBounds`, which
+     exist for eventually terminal runs, `IsUnfairRun.exists_isLeastRoundBounds`).
    * Under the synchronous daemon, `r = id`.
 9. **`MAD`.** `MADLe G α` says that every ancestor is at distance `≤ α`, i.e. `α ≥ MAD`.
    `mad G` is the least such value. Time bounds are proved for every `m` with `MAD ≤ m ≤ α`
@@ -86,7 +86,7 @@ Networks*, PODC 2024. Formalized from the full version
     * there are no predecessors outside.
     We add nonemptiness so that the empty digraph has no source component. The paper assumes
     `n ≥ 1` anyway, and the necessity results assume `V` nonempty where needed.
-    `isSourceComponent_iff` relates this to "`S = Anc(r)` with `r` upstream of all its ancestors".
+    `Digraph.isSourceComponent_iff` relates this to "`S = Anc(r)` with `r` upstream of all its ancestors".
 14. **Self-loops** are allowed in `Digraph` and do not affect any result. The counterexample
     `twoCycle` has none.
 

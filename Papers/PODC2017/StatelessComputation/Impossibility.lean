@@ -205,6 +205,7 @@ lemma HPath.fair (hn : Fintype.card V = r + 1) (hr : 1 ≤ r) {s : ℕ → State
     omega
   · by_contra hv
     push Not at hv
+    simp only [Finset.mem_coe] at hv
     have key : ∀ k, k ≤ r → (s (t + k)).2 v = (s t).2 v - k := by
       intro k hk
       induction k with
@@ -234,7 +235,7 @@ include hn hr hstab
 /-- Under `r`-stabilization, every path in `H` eventually stays at a stable labeling. -/
 lemma HPath.converges {s : ℕ → State G L} {T : ℕ → Finset V} (h : HPath P x r s T) :
     ∃ t0 m, P.IsStable x m ∧ ∀ t, t0 ≤ t → (s t).1 = m := by
-  obtain ⟨m, t0, hm⟩ := hstab _ _ (h.fair hn hr)
+  obtain ⟨m, t0, hm⟩ := converges_iff.1 (hstab _ _ (h.fair hn hr))
   have hm' : ∀ t, t0 ≤ t → (s t).1 = m := fun t ht => by rw [h.run_eq]; exact hm t ht
   refine ⟨t0, m, fun i w => ?_, hm'⟩
   obtain ⟨u, hu1, -, hu3⟩ := (h.fair hn hr).2 t0 i

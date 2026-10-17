@@ -17,14 +17,12 @@ variable {ι σ : Type*}
 theorem PseudoStab.mono_card {A : Algorithm ι σ} {C C' : DGClass ι} {n : ℕ}
     (h : PseudoStab A C n) (hC : ∀ V : Finset ι, V.card = n → C' V ⊆ C V) :
     PseudoStab A C' n :=
-  fun V hV G hG => h V hV G (hC V hV hG)
+  fun V hV => (h V hV).mono (execs_mono (hC V hV))
 
 theorem SelfStab.mono_card {A : Algorithm ι σ} {C C' : DGClass ι} {n : ℕ}
     (h : SelfStab A C n) (hC : ∀ V : Finset ι, V.card = n → C' V ⊆ C V) :
-    SelfStab A C' n := by
-  intro V hV
-  obtain ⟨L, h1, h2⟩ := h V hV
-  exact ⟨L, fun G hG => h1 G (hC V hV hG), fun G hG => h2 G (hC V hV hG)⟩
+    SelfStab A C' n :=
+  fun V hV => (h V hV).mono (execs_mono (hC V hV))
 
 /-- Class inclusions (Figure 2) for systems of `n ≥ 1` processes. -/
 theorem J_mono_card {n : ℕ} (hn : 1 ≤ n) {k k' : Kind} {τ τ' : Timeliness} {Δ : ℕ}
