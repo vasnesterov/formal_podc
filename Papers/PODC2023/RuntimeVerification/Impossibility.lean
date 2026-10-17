@@ -254,87 +254,6 @@ def tailH (i : ℕ) : Hist (Fin n) Op Y :=
 /-- History of `A` after `8 + 4 i` steps. -/
 def histAt (swap : Bool) (i : ℕ) : Hist (Fin n) Op Y := H0 hn D swap ++ tailH hn D i
 
-
-/-! ## Linearizability of sequential histories -/
-
-section Seq
-
-variable {P R : Type} [DecidableEq P]
-
-theorem wellFormed_seqHist (M : List (OpRec P Unit Op R)) : WellFormed (seqHist M) := fun p => by
-  rw [restrictP_seqHist]; exact isSeq_seqHist _
-
-/-- A legal sequential history is linearizable. -/
-theorem linearizable_seqHist {spec : SeqSpec P Unit Op R} {M : List (OpRec P Unit Op R)}
-    (h : seqHist M ∈ spec ()) : Linearizable spec (seqHist M) := by
-  have hwf := wellFormed_seqHist M
-  refine linearizable_iff.2 ⟨hwf, M, IsLinA.mk' hwf ?_ ?_ ?_ ?_⟩
-  · intro a e he
-    obtain ⟨h1, h2, -⟩ := mem_zip_idsOf_spec he
-    exact ⟨h1, fun _ => h2⟩
-  · intro a ha; exact completed_seqHist.1 ha
-  · refine ⟨isSeq_seqHist M, fun x => ?_⟩
-    cases x
-    rw [restrictX_seqHist]
-    simpa using h
-  · intro a b hab hb; exact (precedes_seqHist.1 hab).2 hb
-
-/-- A single complete operation `⟨b : rb⟩` that is illegal by itself is not linearizable. -/
-theorem not_linearizable_single {spec : SeqSpec P Unit Op R} {p : P} {b : Op} {rb : R}
-    (h : seqHist [⟨p, (), b, rb⟩] ∉ spec ()) :
-    ¬ Linearizable spec [.inv p () b, .res p () rb] := by
-  intro hl
-  obtain ⟨-, M, hM⟩ := linearizable_iff.1 hl
-  have hops : ∀ q, opsOf ([.inv p () b, .res p () rb] : Hist P Op R) q () =
-      if q = p then [b] else [] := by
-    intro q; by_cases hq : q = p
-    · subst hq; simp [opsOf, Event.invOf]
-    · simp [opsOf, Event.invOf, Ne.symm hq, hq]
-  have hress : ∀ q, ressOf ([.inv p () b, .res p () rb] : Hist P Op R) q () =
-      if q = p then [rb] else [] := by
-    intro q; by_cases hq : q = p
-    · subst hq; simp [ressOf, List.filterMap_cons, Event.resOf_res, Event.resOf_inv]
-    · simp [ressOf, Event.resOf, Ne.symm hq, hq]
-  set H : Hist P Op R := [.inv p () b, .res p () rb] with hH
-  have hinv : ∀ a : OpId P Unit, Invoked H a → a = ⟨p, (), 0⟩ := by
-    intro a ha
-    simp only [Invoked, hops] at ha
-    by_cases hq : a.p = p
-    · simp only [hq, ↓reduceIte] at ha
-      cases a; simp_all
-    · simp [hq] at ha
-  have hc : Completed H ⟨p, (), 0⟩ := by simp [Completed, hress]
-  have hmem := hM.complete _ hc
-  have hall : ∀ a ∈ idsOf M, a = ⟨p, (), 0⟩ := fun a ha => hinv a (hM.recs.invoked ha)
-  have hnd := nodup_idsOf M
-  have hids : idsOf M = [⟨p, (), 0⟩] := by
-    rcases hM' : idsOf M with _ | ⟨x, l⟩
-    · rw [hM'] at hmem; simp at hmem
-    · rw [hM'] at hall hnd
-      have hx := hall x (by simp)
-      have hl : l = [] := by
-        rcases l with _ | ⟨y, l⟩
-        · rfl
-        · have hy := hall y (by simp)
-          exact absurd (by rw [hx, hy]; simp) (List.nodup_cons.1 hnd).1
-      rw [hx, hl]
-  have hlen : M.length = 1 := by rw [← length_idsOf, hids]; rfl
-  obtain ⟨e, rfl⟩ : ∃ e, M = [e] := by
-    rcases M with _ | ⟨e, _ | ⟨f, M⟩⟩ <;> simp at hlen; exact ⟨e, rfl⟩
-  have hz : ((⟨p, (), 0⟩ : OpId P Unit), e) ∈ (idsOf [e]).zip [e] := by rw [hids]; simp
-  obtain ⟨ho, hr⟩ := hM.recs _ _ hz
-  have hp := (mem_zip_idsOf hz).1
-  have ho' : e.o = b := by simpa [opOf, hops] using ho.symm
-  have hr' : e.r = rb := by simpa [resOf, hress] using (hr hc).symm
-  have : e = ⟨p, (), b, rb⟩ := by cases e; simp_all
-  subst this
-  apply h
-  have := hM.legal.2 ()
-  rwa [restrictX_seqHist, List.filter_eq_self.2 (by simp)] at this
-
-end Seq
-
-
 /-! ## Runs -/
 
 section Run
@@ -779,7 +698,7 @@ theorem badImpl_isAbstractImpl : IsAbstractImpl (badImpl hn D) := by
 theorem linearizable_F (hD : D.Good hn spec) (V : Verifier n Op Y W) (t : ℕ) :
     Linearizable spec (runCfg V (sched hn D true) t).hist := by
   have hl : Linearizable spec (histAt hn D true t) := by
-    rw [histAt_true]; exact linearizable_seqHist (hD.legal t)
+    rw [histAt_true]; exact linearizable_seqHist ((legal_seqHist_iff_of_subsingleton ()).2 (hD.legal t))
   exact lemma_7_1_prefix hD.prefixClosed hl (hist_mem hn D true t)
 
 theorem not_linearizable_E (hD : D.Good hn spec) (V : Verifier n Op Y W) :
@@ -787,7 +706,7 @@ theorem not_linearizable_E (hD : D.Good hn spec) (V : Verifier n Op Y W) :
   intro hl
   obtain ⟨-, -, -, hh, -, -⟩ := run_six (V := V) hn D false
   rw [hh] at hl
-  apply not_linearizable_single hD.illegal
+  refine hD.illegal ((legal_seqHist_iff_of_subsingleton ()).1 (Linearizable.legal_seqHist ?_))
   exact lemma_7_1_prefix hD.prefixClosed hl ⟨[.inv (p₀ hn) () D.a, .res (p₀ hn) () D.ra], rfl⟩
 
 /-- The core of the proof of Theorem 5.1: with input `badImpl`, a verifier cannot be sound in

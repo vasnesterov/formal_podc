@@ -1,5 +1,6 @@
 import Cslib.Computability.Distributed.SharedMemory.HerlihyWing.DetSpec
 import Cslib.Computability.Distributed.SharedMemory.HerlihyWing.Complete
+import Podc.Computability.Distributed.SharedMemory.HerlihyWing.SeqLin
 import Papers.PODC2025.LanguageDecidability.Characterization
 
 /-!
@@ -142,25 +143,15 @@ lemma mem_completeAux_of_isRes {e : Event (Fin n) Unit Op Res} (he : e.isRes = t
       · exact List.mem_cons_of_mem _ this
       · exact this
 
-lemma restrictX_unit (H : History (Fin n) Unit Op Res) (x : Unit) : restrictX H x = H :=
-  List.filter_eq_self.2 fun _ _ => decide_eq_true (Subsingleton.elim _ _)
-
-lemma filter_unit (M : List (OpRec (Fin n) Unit Op Res)) (x : Unit) :
-    M.filter (fun e => decide (e.x = x)) = M :=
-  List.filter_eq_self.2 fun _ _ => decide_eq_true (Subsingleton.elim _ _)
-
 lemma legal_seqHist_detSpec {init : State} {δ : State → Op → State × Res}
     {M : List (OpRec (Fin n) Unit Op Res)} :
-    Legal (fun _ => detSpec init δ) (seqHist M) ↔ runOK δ init M := by
-  rw [legal_seqHist_iff]
-  constructor
-  · intro h; have := h (); rwa [filter_unit, seqHist_mem_detSpec] at this
-  · intro h x; rw [filter_unit, seqHist_mem_detSpec]; exact h
+    Legal (fun _ => detSpec init δ) (seqHist M) ↔ runOK δ init M :=
+  (legal_seqHist_iff_of_subsingleton ()).trans seqHist_mem_detSpec
 
 lemma legal_detSpec {init : State} {δ : State → Op → State × Res}
     {S : History (Fin n) Unit Op Res} (h : Legal (fun _ => detSpec init δ) S) :
     ∃ M, S = seqHist M ∧ runOK δ init M := by
-  have := h.2 (); rw [restrictX_unit] at this; exact this
+  have := h.2 (); rw [restrictX_of_subsingleton] at this; exact this
 
 lemma mem_seqHist_inv {M : List (OpRec (Fin n) Unit Op Res)} {e : OpRec (Fin n) Unit Op Res}
     (he : e ∈ M) : Event.inv e.p () e.o ∈ seqHist M :=
@@ -209,18 +200,6 @@ theorem explained_of_permConsistent {init : State} {δ : State → Op → State 
     rw [h1] at h3
     obtain ⟨e, he, rfl, rfl⟩ := mem_seqHist_res h3
     exact ⟨e, (List.mem_filter.1 (h2.symm.subset he)).1, rfl, rfl⟩
-
-/-- A history extending to a legal complete sequential history is linearizable. -/
-theorem linearizable_of_isExtension {init : State} {δ : State → Op → State × Res}
-    {H : History (Fin n) Unit Op Res} {M : List (OpRec (Fin n) Unit Op Res)}
-    (hH : IsExtension H (seqHist M)) (hM : runOK δ init M) :
-    Linearizable (fun _ => detSpec init δ) H := by
-  have ⟨R, hR, _, hwf⟩ := hH
-  have hc : complete (seqHist M) = seqHist M := completeAux_seqHist M []
-  refine ⟨?_, seqHist M, hH, seqHist M, legal_seqHist_detSpec.2 hM, ?_, ?_⟩
-  · rw [hR] at hwf; exact hwf.of_append
-  · rw [hc]; intro p; rfl
-  · rw [hc]; exact fun a b h => h
 
 /-! ## Sequential words -/
 
@@ -271,9 +250,6 @@ lemma histOf_pfx_seqWord (i : ℕ) :
     refine ⟨e1, ?_⟩
     rw [pfx_succ, histOf, List.map_append, ← histOf, e1, seqWord_even]
     simp
-
-lemma wellFormed_seqHist (M : List (OpRec (Fin n) Unit Op Res)) : WellFormed (seqHist M) :=
-  fun p => by rw [restrictP_seqHist]; exact isSeq_seqHist _
 
 lemma isExtension_pfx_seqWord (k : ℕ) :
     IsExtension (histOf (pfx (seqWord f) k)) (seqHist (recs f ((k + 1) / 2))) := by
@@ -333,8 +309,8 @@ lemma runOK_recs_runRec (sched : ℕ → Fin n) (init : State) (δ : State → O
 theorem runWord_mem_linLang {sched : ℕ → Fin n} (hs : ∀ p N, ∃ i, N ≤ i ∧ sched i = p)
     (init : State) (δ : State → Op → State × Res) (ops : ℕ → Op) :
     seqWord (runRec sched init δ ops) ∈ LinLang (fun _ => detSpec init δ) :=
-  ⟨wf_seqWord _ hs, fun k => linearizable_of_isExtension (isExtension_pfx_seqWord _ k)
-    (runOK_recs_runRec sched init δ ops _).1⟩
+  ⟨wf_seqWord _ hs, fun k => Linearizable.of_isExtension (isExtension_pfx_seqWord _ k)
+    (legal_seqHist_detSpec.2 (runOK_recs_runRec sched init δ ops _).1)⟩
 
 /-! ## Refuting real-time obliviousness -/
 

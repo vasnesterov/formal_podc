@@ -17,32 +17,12 @@ open List
 
 variable {A : ObjSpec} {n : ℕ} [DecidablePred A.ReadOnly]
 
-lemma hlin_append (α β : List (Label (Fin n) A)) :
-    ∃ M, hlin A n (α ++ β) = hlin A n α ++ M := by
-  induction β using List.reverseRecOn with
-  | nil => exact ⟨[], by simp⟩
-  | append_singleton β ℓ ih =>
-    obtain ⟨M, hM⟩ := ih
-    exact ⟨M ++ contrib (α ++ β) ℓ, by rw [← List.append_assoc, hlin_snoc, hM, List.append_assoc]⟩
-
 /-- **Lemma 25** (first part): `hlin` is a linearization function of Algorithm 5. -/
-theorem isLinFun : (alg5 A n).IsLinFun (hlin A n) := by
-  intro α ⟨C, hC⟩
-  have hI := inv_run hC
-  refine ⟨hI.nodup, hI.op_eq, hI.complete, ?_, ?_⟩
-  · rintro a b ⟨β, γ, rfl, ha, hb⟩ hbL
-    obtain ⟨Cβ, hCβ⟩ := (alg5 A n).valid_of_prefix ⟨C, hC⟩ (List.prefix_append β γ)
-    have hIβ := inv_run hCβ
-    obtain ⟨M, hM⟩ := hlin_append β γ
-    rw [hM] at hbL ⊢
-    have haβ := hIβ.complete a ha
-    have hbβ : b ∉ (hlin A n β).map Prod.fst := fun hm => hb (hIβ.invoked hm)
-    simp only [map_append, mem_append] at hbL ⊢
-    rcases hbL with hbL | hbL
-    · exact absurd hbL hbβ
-    · exact (List.Sublist.append (List.singleton_sublist.2 haβ) (List.singleton_sublist.2 hbL) :
-        [a] ++ [b] <+ _)
-  · exact seqOK_of_respIn hI.nodup fun x r _ hr => hI.resp x r hr
+theorem isLinFun : (alg5 A n).IsLinFun (hlin A n) :=
+  (Impl.isStrongLinFun_of_prefix (fun _ _ _ h => linOfPts_prefix _ h)
+    (fun _ ⟨_, hC⟩ => (inv_run hC).nodup) (fun _ ⟨_, hC⟩ => (inv_run hC).op_eq)
+    (fun _ ⟨_, hC⟩ => (inv_run hC).complete)
+    (fun _ ⟨_, hC⟩ => seqOK_of_respIn (inv_run hC).nodup fun x r _ hr => (inv_run hC).resp x r hr)).1
 
 /-- Algorithm 5 is linearizable. -/
 theorem linearizable : (alg5 A n).Linearizable := ⟨_, isLinFun⟩
