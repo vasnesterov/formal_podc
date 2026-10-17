@@ -738,3 +738,16 @@ import Papers.PODC2019.TopologicalConsensus.ProductTopology
 import Papers.PODC2019.TopologicalConsensus.Limits
 import Papers.PODC2022.AsyncCycleColoring.Main
 import Papers.PODC2019.TopologicalConsensus.V1Cex
+import Papers.PODC2011.KSetAgreement.Model
+import Papers.PODC2011.KSetAgreement.Replay
+import Papers.PODC2011.KSetAgreement.Basic
+import Papers.PODC2011.KSetAgreement.InitDeadImpossible
+import Papers.PODC2011.KSetAgreement.Restrict
+import Papers.PODC2011.KSetAgreement.Theorem2
+import Papers.PODC2011.KSetAgreement.Degenerate
+import Papers.PODC2011.KSetAgreement.Abstract
+import Papers.PODC2011.KSetAgreement.SourceComponents
+import Papers.PODC2011.KSetAgreement.Algorithm
+import Papers.PODC2011.KSetAgreement.AlgorithmSafety
+import Papers.PODC2011.KSetAgreement.AlgorithmLiveness
+import Papers.PODC2011.KSetAgreement.Main
