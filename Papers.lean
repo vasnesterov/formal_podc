@@ -828,3 +828,14 @@ import Papers.PODC2016.ConcurrentDSU.Examples
 import Papers.PODC2016.ConcurrentDSU.EarlyTerm
 import Papers.PODC2016.ConcurrentDSU.Lemma42
 import Papers.PODC2016.ConcurrentDSU.UnionForest
+import Papers.PODC2026.LocalComputable.CompList
+import Papers.PODC2026.LocalComputable.Basic
+import Papers.PODC2026.LocalComputable.ComputableEquiv
+import Papers.PODC2026.LocalComputable.Decide
+import Papers.PODC2026.LocalComputable.Collapse
+import Papers.PODC2026.LocalComputable.Concrete
+import Papers.PODC2026.LocalComputable.MaxSafe
+import Papers.PODC2026.LocalComputable.Padding
+import Papers.PODC2026.LocalComputable.Separation
+import Papers.PODC2026.LocalComputable.SeparationToy
+import Papers.PODC2026.LocalComputable.ConcreteComputable
