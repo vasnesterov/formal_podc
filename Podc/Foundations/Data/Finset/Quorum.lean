@@ -32,6 +32,10 @@ set `F` (a `Finset α`, or a `B : Set α` bounded through `Set.ncard`) constantl
   agree on the correct members of `s` have counts differing by at most `#F`.
 * `Finset.exists_sum_card_filter_exists_ne_zero_le`: double counting of sender–receiver pairs that
   ever exchange a message, against the number of messages sent up to some finite time.
+* `Finset.pluralityMin s f d`: the *smallest* most frequent value (a deterministic, computable
+  `Finset.plurality` for linearly ordered values), with `countEq_le_countEq_pluralityMin`,
+  `pluralityMin_eq_of_card_lt_two_mul_countEq` and `pluralityMin_congr` (it only depends on the
+  values on `s`).
 -/
 
 namespace Finset
@@ -222,5 +226,71 @@ theorem exists_sum_card_filter_exists_ne_zero_le (X Y : Finset α) (hXY : Disjoi
         rw [sum_comm (s := range N)]
 
 end Pairs
+
+/-! ### Plurality with smallest-value tie-breaking -/
+
+section PluralityMin
+
+variable {α β : Type*} [LinearOrder β] {s : Finset α} {f g : α → β}
+
+/-- The most frequent values of `f` on a nonempty `s` form a nonempty set. -/
+theorem image_filter_countEq_eq_sup_nonempty (f : α → β) (hs : s.Nonempty) :
+    ({a ∈ s | s.countEq f (f a) = s.sup fun a => s.countEq f (f a)}.image f).Nonempty := by
+  obtain ⟨a, ha, he⟩ := s.exists_mem_eq_sup hs (fun a => s.countEq f (f a))
+  exact ⟨f a, mem_image.mpr ⟨a, mem_filter.mpr ⟨ha, he.symm⟩, rfl⟩⟩
+
+/-- `s.pluralityMin f d`: the smallest value among the most frequent values of `f` on `s` (`d` if
+`s` is empty). Unlike `Finset.plurality`, ties are broken deterministically. -/
+def pluralityMin (s : Finset α) (f : α → β) (d : β) : β :=
+  if h : s.Nonempty then
+    ({a ∈ s | s.countEq f (f a) = s.sup fun a => s.countEq f (f a)}.image f).min'
+      (image_filter_countEq_eq_sup_nonempty f h)
+  else d
+
+/-- `pluralityMin` is the value of a most frequent element of `s`. -/
+theorem exists_mem_pluralityMin_eq (hs : s.Nonempty) (d : β) :
+    ∃ a ∈ s, f a = s.pluralityMin f d ∧
+      s.countEq f (f a) = s.sup fun a => s.countEq f (f a) := by
+  simp only [pluralityMin, hs, ↓reduceDIte]
+  obtain ⟨a, ha, he⟩ := mem_image.mp (min'_mem _ (image_filter_countEq_eq_sup_nonempty f hs))
+  exact ⟨a, (mem_filter.mp ha).1, he, (mem_filter.mp ha).2⟩
+
+/-- The value `pluralityMin` is reported at least as often as any other value. -/
+theorem countEq_le_countEq_pluralityMin (hs : s.Nonempty) (d b : β) :
+    s.countEq f b ≤ s.countEq f (s.pluralityMin f d) := by
+  obtain ⟨a, -, he, hmax⟩ := exists_mem_pluralityMin_eq (f := f) hs d
+  rcases Nat.eq_zero_or_pos (s.countEq f b) with h | h
+  · omega
+  obtain ⟨a', ha', rfl⟩ := exists_mem_of_countEq_pos h
+  rw [← he, hmax]
+  exact le_sup (f := fun a => s.countEq f (f a)) ha'
+
+/-- A value reported by a strict majority of `s` is `pluralityMin`. -/
+theorem pluralityMin_eq_of_card_lt_two_mul_countEq {d b : β} (h : #s < 2 * s.countEq f b) :
+    s.pluralityMin f d = b := by
+  have hs : s.Nonempty := by
+    rw [← card_pos]; have := countEq_le_card (s := s) (f := f) (b := b); omega
+  by_contra hne
+  have h₁ := countEq_le_countEq_pluralityMin (f := f) hs d b
+  have h₂ := countEq_add_countEq_le (s := s) (f := f) hne
+  omega
+
+/-- On a nonempty set, `pluralityMin` only depends on the values on that set (not on the
+default). -/
+theorem pluralityMin_congr {d d' : β} (hs : s.Nonempty) (h : ∀ a ∈ s, f a = g a) :
+    s.pluralityMin f d = s.pluralityMin g d' := by
+  have hc : ∀ a ∈ s, s.countEq f (f a) = s.countEq g (g a) := fun a ha => by
+    unfold countEq
+    exact congrArg card (filter_congr fun a' ha' => by rw [h a' ha', h a ha])
+  have hsup : (s.sup fun a => s.countEq f (f a)) = s.sup fun a => s.countEq g (g a) :=
+    sup_congr rfl hc
+  have hS : {a ∈ s | s.countEq f (f a) = s.sup fun a => s.countEq f (f a)}.image f =
+      {a ∈ s | s.countEq g (g a) = s.sup fun a => s.countEq g (g a)}.image g := by
+    rw [hsup, filter_congr fun a ha => by rw [hc a ha]]
+    exact image_congr fun a ha => h a (mem_filter.mp ha).1
+  simp only [pluralityMin, hs, ↓reduceDIte]
+  congr 1
+
+end PluralityMin
 
 end Finset

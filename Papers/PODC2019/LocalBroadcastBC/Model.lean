@@ -1,4 +1,6 @@
 import Cslib.Computability.Distributed.Byzantine.LockStep.Cover
+import Podc.Computability.Distributed.Byzantine.LockStep.Basic
+import Podc.Computability.Distributed.Byzantine.LockStep.Cover
 import Cslib.Computability.Distributed.Byzantine.LockStep.Agreement
 import Cslib.Foundations.Combinatorics.SimpleGraph.VertexConnectivity
 import Mathlib
@@ -118,30 +120,18 @@ lemma lbScenario_isLocalBroadcast (B : Set V) (σ τ : V → Q) (x₀ : V → I)
 lemma lbScenario_reliable (B : Set V) (σ τ : V → Q) (x₀ : V → I) :
     (lbScenario C G alg B σ τ x₀).Reliable := fun _ _ _ h => h
 
-open Classical in
 /-- **Simulation lemma** (local broadcast version): honest parties have the histories of their
-lifts. -/
+lifts. By local broadcast, the run is indistinguishable for honest parties from CSLib's covering
+run `CoverSystem.scenario` (`hist_honest_congr`), which is the FLM simulation lemma. -/
 theorem hist_lbScenario (hb : IsBroadcast alg) {B : Set V} {σ τ : V → Q}
     (hL : LBLift C G B σ τ) (x₀ : V → I) :
     ∀ r p, p ∉ B → hist G alg (lbScenario C G alg B σ τ x₀) r p = C.hist G alg r (σ p) := by
-  intro r
-  induction r with
-  | zero => intro p _; rfl
-  | succ r ih =>
-    intro q hq
-    rw [hist_succ, CoverSystem.hist, ih q hq]
-    congr 1
-    refine congrArg (fun f => [f]) (funext fun p => ?_)
-    simp only [deliver, hL.φ_σ q hq]
-    by_cases hadj : G.Adj p q
-    · simp only [hadj, ite_true]
-      by_cases hp : p ∈ B
-      · simp only [lbScenario, hp, ite_true, hL.nbr_τ p q hp hq hadj, Option.bind_some]
-        exact hb _ _ _ _ _
-      · simp only [lbScenario, hp, ite_false]
-        rw [hL.nbr_σ p q hp hq hadj, Option.bind_some, hL.φ_σ p hp]
-        exact congrArg (fun h => alg.send p _ h q) (ih p hp)
-    · simp [hadj]
+  intro r p hp
+  refine (hist_honest_congr G alg (s := lbScenario C G alg B σ τ x₀)
+    (s' := C.scenario G alg B σ x₀) rfl (fun _ _ => rfl) (fun _ _ _ _ _ _ => Iff.rfl)
+    (fun r b q hb' hq hbq => ?_) r p hp).trans (C.hist_scenario ⟨hL.φ_σ, hL.nbr_σ⟩ x₀ r p hp)
+  simp only [lbScenario, CoverSystem.scenario, hL.nbr_τ b q hb' hq hbq, Option.bind_some]
+  exact hb _ _ _ _ _
 
 /-- Honest parties decide exactly as their lifts do in the covering system. -/
 theorem decides_lbScenario_iff (hb : IsBroadcast alg) {B : Set V} {σ τ : V → Q}
@@ -163,10 +153,8 @@ end CoverSystem'
 
 /-- The two-copy covering system: node `(u, i)` runs the code of `u` with input `xq (u, i)` and
 listens to the copy `(v, c u i v)` of each neighbour `v`. -/
-def twoCopy (c : V → Bool → V → Bool) (xq : V × Bool → I) : CoverSystem V I (V × Bool) where
-  φ := Prod.fst
-  nbr := fun q v => some (v, c q.1 q.2 v)
-  xq := xq
+def twoCopy (c : V → Bool → V → Bool) (xq : V × Bool → I) : CoverSystem V I (V × Bool) :=
+  CoverSystem.doubleCover (fun u i v => some (c u i v)) xq
 
 /-- Lifts into a two-copy cover: honest `p` runs as `(p, ℓ p)`, Byzantine `b` is simulated by
 `(b, κ b)`. -/

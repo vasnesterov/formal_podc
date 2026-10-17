@@ -237,7 +237,6 @@ import Papers.PODC2021.GoodCaseLatencyBB.BRBProtocol
 import Papers.PODC2021.GoodCaseLatencyBB.PsyncLowerBound
 import Papers.PODC2021.GoodCaseLatencyBB.SplitBrain
 import Papers.PODC2021.GoodCaseLatencyBB.SmallCases
-import Papers.PODC2021.GoodCaseLatencyBB.Tokens
 import Papers.PODC2015.SynchronousCounting.Params
 import Papers.PODC2015.SynchronousCounting.Majority
 import Papers.PODC2015.SynchronousCounting.PhaseKing

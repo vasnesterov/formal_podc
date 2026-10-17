@@ -117,5 +117,5 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Trust.** There is no `sorry`. `theorem_1`, `theorem_2` and the theorems listed above use only `propext`,
 `Classical.choice` and `Quot.sound`. Non-vacuity: `theorem_1`/`theorem_2` exhibit protocols satisfying the
 hypotheses of the lower bounds whenever the bounds allow it, and `theorem_1_fails_n_one` is a degenerate
-instance. Upstreaming candidate (`-- CSLib candidate`): the generic run facts in `ImplRun.lean` (`mem_inbox`,
-`invariant`, `st_mono`).
+instance. The generic run facts (`Run.mem_inbox`, `Run.invariant`, `Run.st_mono`) are staged shared code
+(`Podc/Computability/Distributed/CrashPartialSync/Model.lean`).

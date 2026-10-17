@@ -29,12 +29,12 @@ def volt (a b : Fin 3) : Bool := (a = 0 && b = 2) || (a = 2 && b = 0)
 /-- The double cover of Lemma 5. Node `(p, c)` is copy `c` of party `p`. All `L`-nodes have the
 `v`-representative `jV` as favourite; `R`-nodes of copy `true` favour `iA`, of copy `false` favour
 `iC`. -/
-def cover (gL gR : Fin k → Fin 3) (iA iC jV : Fin k) : CoverSystem (Party k) (Fin k) (Party k × Bool) where
-  φ := Prod.fst
-  nbr q p := some (p, xor q.2 (volt (label gL gR q.1) (label gL gR p)))
-  xq q := match q with
-    | (inl _, _) => jV
-    | (inr _, c) => if c then iA else iC
+def cover (gL gR : Fin k → Fin 3) (iA iC jV : Fin k) :
+    CoverSystem (Party k) (Fin k) (Party k × Bool) :=
+  CoverSystem.doubleCover (fun q c p => some (xor c (volt (label gL gR q) (label gL gR p))))
+    fun q => match q with
+      | (inl _, _) => jV
+      | (inr _, c) => if c then iA else iC
 
 /-- The general form of Lemma 5. -/
 theorem not_solvable_of_groups (G : SimpleGraph (Party k)) {tL tR : ℕ}
@@ -48,11 +48,10 @@ theorem not_solvable_of_groups (G : SimpleGraph (Party k)) {tL tR : ℕ}
     label_mem_thresholds gL gR {z} (hgL z) (hgR z)
   -- Scenario (ii): groups `c`, `w` Byzantine, copy `true` honest.
   have h2 : C.Decides G alg (inl iA, true) (some jV) := by
-    have hL : C.Lift G {p | lab p = 2} (fun p => (p, true)) := by
-      refine ⟨fun _ _ => rfl, fun p q hp hq _ => ?_⟩
-      have key : ∀ a b : Fin 3, a ≠ 2 → b ≠ 2 → xor true (volt a b) = true := by decide
-      simp only [C, cover, Option.some.injEq, Prod.mk.injEq, true_and]
-      exact key _ _ hq hp
+    have hL : C.Lift G {p | lab p = 2} (fun p => (p, true)) :=
+      CoverSystem.doubleCover_lift fun p q hp hq _ => by
+        have key : ∀ a b : Fin 3, a ≠ 2 → b ≠ 2 → xor true (volt a b) = true := by decide
+        exact congrArg some (key _ _ hq hp)
     have hs := halg (C.scenario G alg {p | lab p = 2} (fun p => (p, true)) fun _ => jV) (hZ 2)
       (fun _ _ _ h => h)
     have hiA : inl iA ∉ {p | lab p = 2} := by simp [lab, hA]
@@ -62,11 +61,10 @@ theorem not_solvable_of_groups (G : SimpleGraph (Party k)) {tL tR : ℕ}
     exact (C.decides_scenario_iff hL _ hiA _).mp this
   -- Scenario (iii): groups `a`, `u` Byzantine, copy `false` honest.
   have h3 : C.Decides G alg (inl iC, false) (some jV) := by
-    have hL : C.Lift G {p | lab p = 0} (fun p => (p, false)) := by
-      refine ⟨fun _ _ => rfl, fun p q hp hq _ => ?_⟩
-      have key : ∀ a b : Fin 3, a ≠ 0 → b ≠ 0 → xor false (volt a b) = false := by decide
-      simp only [C, cover, Option.some.injEq, Prod.mk.injEq, true_and]
-      exact key _ _ hq hp
+    have hL : C.Lift G {p | lab p = 0} (fun p => (p, false)) :=
+      CoverSystem.doubleCover_lift fun p q hp hq _ => by
+        have key : ∀ a b : Fin 3, a ≠ 0 → b ≠ 0 → xor false (volt a b) = false := by decide
+        exact congrArg some (key _ _ hq hp)
     have hs := halg (C.scenario G alg {p | lab p = 0} (fun p => (p, false)) fun _ => jV) (hZ 0)
       (fun _ _ _ h => h)
     have hiC : inl iC ∉ {p | lab p = 0} := by simp [lab, hC]
@@ -75,12 +73,11 @@ theorem not_solvable_of_groups (G : SimpleGraph (Party k)) {tL tR : ℕ}
       (by rw [C.scenario_input_of_not_mem _ hjV]; rfl)).1
     exact (C.decides_scenario_iff hL _ hiC _).mp this
   -- Scenario (iv): groups `b`, `v` Byzantine; `a`, `u` honest in copy `true`, `c`, `w` in copy `false`.
-  have hL : C.Lift G {p | lab p = 1} (fun p => (p, decide (lab p = 0))) := by
-    refine ⟨fun _ _ => rfl, fun p q hp hq _ => ?_⟩
-    have key : ∀ a b : Fin 3, a ≠ 1 → b ≠ 1 →
-        xor (decide (b = 0)) (volt b a) = decide (a = 0) := by decide
-    simp only [C, cover, Option.some.injEq, Prod.mk.injEq, true_and]
-    exact key _ _ hp hq
+  have hL : C.Lift G {p | lab p = 1} (fun p => (p, decide (lab p = 0))) :=
+    CoverSystem.doubleCover_lift fun p q hp hq _ => by
+      have key : ∀ a b : Fin 3, a ≠ 1 → b ≠ 1 →
+          xor (decide (b = 0)) (volt b a) = decide (a = 0) := by decide
+      exact congrArg some (key _ _ hp hq)
   have hs := halg (C.scenario G alg {p | lab p = 1} (fun p => (p, decide (lab p = 0))) fun _ => jV)
     (hZ 1) (fun _ _ _ h => h)
   have hiA : inl iA ∉ {p | lab p = 1} := by simp [lab, hA]
@@ -98,15 +95,11 @@ no protocol achieves sSM, even in a fully-connected unauthenticated network. -/
 theorem lemma5 (G : SimpleGraph (Party k)) {tL tR : ℕ} (hk : 2 ≤ k) (hL : k ≤ 3 * tL)
     (hR : k ≤ 3 * tR) : ¬ Solvable G (thresholds k tL tR) (sSM k) := by
   set t := (k + 2) / 3
-  have ht1 : 1 ≤ t := by omega
-  have htk : t < k := by omega
   have hk3 : k ≤ 3 * t := by omega
-  obtain ⟨⟨iA, hA⟩, ⟨iC, hC⟩, hgL⟩ :=
-    split3_spec (k := k) (x := (0 : Fin 3)) (y := 1) (z := 2) (by decide) (by decide) (by decide)
-      ht1 htk hk3
-  obtain ⟨⟨jV, hV⟩, -, hgR⟩ :=
-    split3_spec (k := k) (x := (1 : Fin 3)) (y := 0) (z := 2) (by decide) (by decide) (by decide)
-      ht1 htk hk3
+  obtain ⟨gL, ⟨iA, hA⟩, ⟨iC, hC⟩, hgL⟩ :=
+    exists_split (k := k) (t := t) (0 : Fin 3) 2 (by decide) hk hk3
+  obtain ⟨gR, ⟨jV, hV⟩, -, hgR⟩ :=
+    exists_split (k := k) (t := t) (1 : Fin 3) 0 (by decide) hk hk3
   exact Lemma5.not_solvable_of_groups G _ _ iA iC jV hA hC hV
     (fun z => (hgL z).trans (by omega)) (fun z => (hgR z).trans (by omega))
 

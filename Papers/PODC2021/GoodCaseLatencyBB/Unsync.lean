@@ -1,4 +1,6 @@
-import Papers.PODC2021.GoodCaseLatencyBB.Tokens
+import Papers.PODC2021.GoodCaseLatencyBB.Basic
+import Podc.Computability.Distributed.Byzantine.PartialSync.Auth
+import Podc.Computability.Distributed.Byzantine.PartialSync.Model
 
 /-!
 # Unsynchronized start
@@ -18,8 +20,8 @@ Generic tools (CSLib candidates):
   deadline (two runs in which process `p` starts at different times, but sees the same messages
   at the same *local* times).
 * `Run.inbox_of_const`: inboxes on links with a constant (effective) delay.
-* `tokens_replay_rel`: replay lemma for unforgeability restricted to a causally closed set of
-  events.
+* (the replay lemma for a causally closed set of events is the shared `Run.tokens_replay_rel`,
+  `Podc/Computability/Distributed/Byzantine/PartialSync/Auth.lean`).
 -/
 
 set_option linter.unusedSectionVars false
@@ -143,63 +145,13 @@ theorem Run.st_shift_eq (R R' : Run P M VI) {X : Set P} (o o' T : P → ℕ)
       rw [e, Run.st_succ, Run.st_succ, ih τ' (by omega) p hp (by omega) (by omega),
         hin τ' (fun r hr σ hσ h1 h2 => ih σ (by omega) r hr h1 h2) p hp (by omega) (by omega)]
 
-theorem flatMap_range_single {α : Type*} {f : ℕ → List α} {k : ℕ} :
-    ∀ {n : ℕ}, k < n → (∀ t, t ≠ k → f t = []) → (List.range n).flatMap f = f k := by
-  intro n hk h
-  induction n with
-  | zero => omega
-  | succ n ih =>
-    rw [List.range_succ, List.flatMap_append, List.flatMap_singleton]
-    rcases Nat.lt_or_ge k n with h' | h'
-    · rw [ih h', h n (by omega), List.append_nil]
-    · obtain rfl : k = n := by omega
-      rw [List.flatMap_eq_nil_iff.mpr (fun t ht => h t (by simp at ht; omega)), List.nil_append]
-
 /-- On a link with constant effective delay `c ≥ 1`, the inbox is the batch sent `c` time units
-earlier. -/
+earlier (`Run.inbox_of_dl_eq_add` with offset `c - 1`). -/
 theorem Run.inbox_of_const (R : Run P M VI) {q p : P} {c : ℕ} (hc : 1 ≤ c)
     (hdl : ∀ t, R.dl q t p = t + c - 1) (τ : ℕ) :
     R.inbox A p τ q = if c ≤ τ + 1 then R.out A q (τ + 1 - c) p else [] := by
-  rw [Run.inbox_eq_flatMap]
-  split_ifs with h
-  · rw [flatMap_range_single (k := τ + 1 - c) (by omega)]
-    · simp only [Run.dlv, hdl]; rw [ite_eq_left (by omega)]
-    · intro t ht
-      simp only [Run.dlv, hdl]; rw [ite_eq_right (by omega)]
-  · apply List.flatMap_eq_nil_iff.mpr
-    intro t _
-    simp only [Run.dlv, hdl]
-    rw [ite_eq_right (by omega)]
-
--- CSLib candidate
-/-- **Replay lemma restricted to a causally closed set of events.** `Rel q σ` marks the
-(send) events whose messages may be replayed. If, for every such event of an `Ri`-correct process,
-every batch it has received is either sent by an `Ri`-correct, `R'`-Byzantine process at a marked
-event, or carries only tokens that are `R'`-Byzantine-signed or emitted by `R'`-correct processes
-by its delivery time, then replayed messages respect unforgeability in `R'`. -/
-theorem tokens_replay_rel {Au : Auth P M K} (hU : A.Unforging Au) {Ri R' : Run P M VI}
-    (Rel : P → ℕ → Prop)
-    (h : ∀ q σ, Rel q σ → q ∉ Ri.faulty → ∀ q' σ', σ' ≤ Ri.dl q' σ' q → Ri.dl q' σ' q < σ →
-      (q' ∈ R'.faulty ∧ q' ∉ Ri.faulty ∧ Rel q' σ') ∨
-      ∀ m ∈ Ri.out A q' σ' q, ∀ x ∈ Au.tokens m,
-        Au.signer x ∈ R'.faulty ∨ x ∈ R'.honestTokens Au A (Ri.dl q' σ' q)) :
-    ∀ σ q, Rel q σ → q ∉ Ri.faulty → q ∈ R'.faulty → ∀ r, ∀ m ∈ Ri.out A q σ r,
-      ∀ x ∈ Au.tokens m, Au.signer x ∈ R'.faulty ∨ x ∈ R'.honestTokens Au A σ := by
-  intro σ
-  induction σ using Nat.strong_induction_on with
-  | _ σ ih =>
-    intro q hR hq hq' r m hm x hx
-    rw [Run.out_of_correct A Ri hq] at hm
-    rcases hU Ri q σ r m hm x hx with hs | ⟨τ', hτ', q', m', hm', hx'⟩
-    · exact Or.inl (hs ▸ hq')
-    · obtain ⟨σ', hσ', hdl, hm''⟩ := Run.mem_inbox.mp hm'
-      rcases h q σ hR hq q' σ' (by omega) (by omega) with ⟨h1, h2, h3⟩ | h4
-      · rcases ih σ' (by omega) q' h3 h2 h1 q m' hm'' x hx' with e | e
-        · exact Or.inl e
-        · exact Or.inr (Run.honestTokens_mono (by omega) e)
-      · rcases h4 m' hm'' x hx' with e | e
-        · exact Or.inl e
-        · exact Or.inr (Run.honestTokens_mono (by omega) e)
+  rw [Run.inbox_of_dl_eq_add A (e := c - 1) fun t => by rw [hdl]; omega]
+  split_ifs <;> first | omega | rfl | congr 1; omega
 
 end generic
 

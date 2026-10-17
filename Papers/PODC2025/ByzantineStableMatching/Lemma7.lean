@@ -36,12 +36,12 @@ def isD (gR : Fin k → Fin 2) : Party k → Bool
 /-- The double cover: `a–d` edges cross. `L`-nodes favour `jC`; `R`-nodes of copy `false` favour
 `iA`, of copy `true` favour `iB`. -/
 def cover (gL gR : Fin k → Fin 2) (iA iB jC : Fin k) :
-    CoverSystem (Party k) (Fin k) (Party k × Bool) where
-  φ := Prod.fst
-  nbr q p := some (p, xor q.2 ((isA gL q.1 && isD gR p) || (isD gR q.1 && isA gL p)))
-  xq q := match q with
-    | (inl _, _) => jC
-    | (inr _, c) => if c then iB else iA
+    CoverSystem (Party k) (Fin k) (Party k × Bool) :=
+  CoverSystem.doubleCover
+    (fun q c p => some (xor c ((isA gL q && isD gR p) || (isD gR q && isA gL p))))
+    fun q => match q with
+      | (inl _, _) => jC
+      | (inr _, c) => if c then iB else iA
 
 lemma fin2_cases (x : Fin 2) : x = 0 ∨ x = 1 := by fin_cases x <;> simp
 
@@ -67,11 +67,10 @@ theorem not_solvable_of_groups (G : SimpleGraph (Party k)) (hG : ∀ i i', ¬ G.
     · have : inr ⁻¹' BC = {j | gR j = 0} := by ext j; simp [BC]
       rw [this]; exact hgR 0
   -- Lift into one copy, the group `d` being Byzantine.
-  have liftCopy : ∀ c : Bool, C.Lift G BD (fun p => (p, c)) := by
-    intro c
-    refine ⟨fun _ _ => rfl, fun p q hp hq _ => ?_⟩
-    simp only [BD, Set.mem_ofPred_eq, Bool.not_eq_true] at hp hq
-    simp [C, cover, hp, hq]
+  have liftCopy : ∀ c : Bool, C.Lift G BD (fun p => (p, c)) := fun c =>
+    CoverSystem.doubleCover_lift fun p q hp hq _ => by
+      simp only [BD, Set.mem_ofPred_eq, Bool.not_eq_true] at hp hq
+      simp [hp, hq]
   have hjC : inr jC ∉ BD := by simp [BD, isD, hC]
   -- Scenario 1: copy `false`, `a1` and `c1` are mutual favourites.
   have h1 : C.Decides G alg (inl iA, false) (some jC) := by
@@ -98,14 +97,14 @@ theorem not_solvable_of_groups (G : SimpleGraph (Party k)) (hG : ∀ i i', ¬ G.
         rcases fin2_cases (gR j') with h | h
         · exact absurd h hq
         · exact h
-      rcases fin2_cases (gL i) with h | h <;> simp [σ, C, cover, isA, isD, hj', h]
+      rcases fin2_cases (gL i) with h | h <;> simp [σ, C, cover, CoverSystem.doubleCover, isA, isD, hj', h]
     · have hj : gR j = 1 := by
         simp only [BC, Set.mem_ofPred_eq, Sum.elim_inr] at hp
         rcases fin2_cases (gR j) with h | h
         · exact absurd h hp
         · exact h
-      rcases fin2_cases (gL i') with h | h <;> simp [σ, C, cover, isA, isD, hj, h]
-    · simp [σ, C, cover, isA, isD]
+      rcases fin2_cases (gL i') with h | h <;> simp [σ, C, cover, CoverSystem.doubleCover, isA, isD, hj, h]
+    · simp [σ, C, cover, CoverSystem.doubleCover, isA, isD]
   have hs := halg (C.scenario G alg BC σ fun _ => jC) hBC (fun _ _ _ h => h)
   have hiA : inl iA ∉ BC := by simp [BC]
   have hiB : inl iB ∉ BC := by simp [BC]
@@ -125,12 +124,10 @@ whatever `tL`. -/
 theorem lemma7 (G : SimpleGraph (Party k)) (hG : ∀ i i', ¬ G.Adj (inl i) (inl i')) {tL tR : ℕ}
     (hk : 2 ≤ k) (hR : k ≤ 2 * tR) : ¬ Solvable G (thresholds k tL tR) (sSM k) := by
   set t := (k + 1) / 2
-  obtain ⟨⟨jC, hC⟩, -, hgR⟩ :=
-    split2_spec (k := k) (t := t) (x := (0 : Fin 2)) (y := 1) (by decide) (by omega) (by omega)
-      (by omega)
-  obtain ⟨⟨iA, hA⟩, ⟨iB, hB⟩, -⟩ :=
-    split2_spec (k := k) (t := k - 1) (x := (0 : Fin 2)) (y := 1) (by decide) (by omega) (by omega)
-      (by omega)
+  obtain ⟨gR, ⟨jC, hC⟩, -, hgR⟩ :=
+    exists_split (k := k) (t := t) (0 : Fin 2) 1 (by decide) hk (by omega)
+  obtain ⟨gL, ⟨iA, hA⟩, ⟨iB, hB⟩, -⟩ :=
+    exists_split (k := k) (t := k - 1) (0 : Fin 2) 1 (by decide) hk (by omega)
   exact Lemma7.not_solvable_of_groups G hG _ _ iA iB jC hA hB hC
     (fun z => (hgR z).trans (by omega))
 

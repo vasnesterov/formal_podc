@@ -103,25 +103,6 @@ lemma roundOut_zero (p : P) : roundOut t θ r sc 0 p = (sc.input p, 0) := by
 
 /-! ### Corollary 3.3 -/
 
-/-- The honest parties as a `Finset`. -/
-noncomputable def honestF : Finset P := by
-  classical exact Finset.univ.filter fun p => p ∉ sc.byz
-
-omit [DecidableEq P] in
-lemma mem_honestF {p : P} : p ∈ honestF sc ↔ p ∉ sc.byz := by
-  classical
-  unfold honestF; simp
-
-omit [DecidableEq P] in
-lemma coe_honestF : (honestF sc : Set P) = sc.honest := by
-  ext p; simp [mem_honestF, Scenario.honest]
-
-lemma card_compl_honestF : (Finset.univ \ honestF sc).card = sc.byz.ncard := by
-  classical
-  rw [← Set.ncard_coe_finset]
-  congr 1
-  ext p; simp [mem_honestF]
-
 lemma isProx_two (x : P → D) (H : Set P) : IsProx 2 x H (fun p => (x p, 0)) := by
   refine ⟨fun p _ => by simp [maxGrade], fun v hv p hp => ?_, fun p _ q _ => ?_⟩
   · simp [hv p hp, maxGrade]
@@ -139,26 +120,30 @@ theorem roundOut_isProx (ht : 3 * t < Fintype.card P) (hB : sc.byz.ncard ≤ t)
     rw [h0]
     simpa using isProx_two sc.input sc.honest
   | succ k ih =>
-    have hcard : (honestF sc).card + (Finset.univ \ honestF sc).card = Fintype.card P := by
+    have hcard : sc.honestFinset.card + (Finset.univ \ sc.honestFinset).card =
+        Fintype.card P := by
       rw [add_comm, Finset.card_sdiff_add_card_eq_card (Finset.subset_univ _), Finset.card_univ]
-    have hf : (Finset.univ \ honestF sc).card ≤ t := by rw [card_compl_honestF]; exact hB
-    rw [← coe_honestF] at ih ⊢
+    have hf : (Finset.univ \ sc.honestFinset).card ≤ t := by
+      have := sc.card_honestFinset
+      have := sc.honestFinset.card_le_univ
+      omega
+    rw [← sc.coe_honestFinset] at ih ⊢
     have hstep := expand_isProx (s := 2 ^ k + 1) (Nat.le_add_left 1 _) ht hf hcard ih
       (fun p => viewCnt fun q => if q ∈ sc.byz then sc.adv k q p
         else some (roundOut t (t + 1) r sc k q))
       (fun p _ A => (viewCnt_bounds (fun q hq => by
-          rw [mem_honestF] at hq; simp [hq]) A).1)
+          rw [Scenario.mem_honestFinset] at hq; simp [hq]) A).1)
       (fun p _ A => (viewCnt_bounds (fun q hq => by
-          rw [mem_honestF] at hq; simp [hq]) A).2)
+          rw [Scenario.mem_honestFinset] at hq; simp [hq]) A).2)
     have he : 2 * (2 ^ k + 1) - 1 = 2 ^ (k + 1) + 1 := by rw [pow_succ]; omega
     rw [he] at hstep
     refine ⟨fun p hp => ?_, fun v hv p hp => ?_, fun p hp q hq => ?_⟩
-    · rw [roundOut_succ t (t + 1) r sc hrel k p ((mem_honestF sc).1 hp)]
+    · rw [roundOut_succ t (t + 1) r sc hrel k p ((sc.mem_honestFinset).1 hp)]
       exact hstep.grade_le p hp
-    · rw [roundOut_succ t (t + 1) r sc hrel k p ((mem_honestF sc).1 hp)]
+    · rw [roundOut_succ t (t + 1) r sc hrel k p ((sc.mem_honestFinset).1 hp)]
       exact hstep.validity v hv p hp
-    · rw [roundOut_succ t (t + 1) r sc hrel k p ((mem_honestF sc).1 hp),
-        roundOut_succ t (t + 1) r sc hrel k q ((mem_honestF sc).1 hq)]
+    · rw [roundOut_succ t (t + 1) r sc hrel k p ((sc.mem_honestFinset).1 hp),
+        roundOut_succ t (t + 1) r sc hrel k q ((sc.mem_honestFinset).1 hq)]
       exact hstep.consistency p hp q hq
 
 /-- The status of `p` after `k` rounds. -/

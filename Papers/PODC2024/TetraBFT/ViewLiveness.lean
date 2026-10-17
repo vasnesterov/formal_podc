@@ -370,35 +370,12 @@ theorem work_rcv (τ : ℕ) (p : Fin n) : (work prm R τ p).rcv = (R.st A (τ + 
 theorem work_view (τ : ℕ) (p : Fin n) : (work prm R τ p).view = (R.st A (τ + 1) p).view := by
   rw [st_step, (post_voteExt prm p _).view]
 
-theorem st_rcv_prefix {τ τ' : ℕ} (h : τ ≤ τ') (p : Fin n) :
-    ∃ l, (R.st A τ' p).rcv = (R.st A τ p).rcv ++ l := by
-  induction h with
-  | refl => exact ⟨[], by simp⟩
-  | step _ ih =>
-    obtain ⟨l, hl⟩ := ih
-    rw [st_succ', step_rcv, hl, List.append_assoc]
-    exact ⟨_, rfl⟩
-
 /-- **Delivery.** A message in the outbox of a correct node at time `τc` is in the received
 messages of every correct node from time `max τc GST + δ + 1` on. -/
 theorem deliver {t δ : ℕ} (hR : R.Valid t δ) {q j : Fin n} (hq : q ∉ R.faulty)
     (hj : j ∉ R.faulty) {τc : ℕ} {m : Msg V} (hm : m ∈ (R.st A τc q).out) {τ : ℕ}
-    (hτ : max τc R.gst + δ ≤ τ) : (q, m) ∈ (R.st A (τ + 1) j).rcv := by
-  set d := R.dl q τc j with hd
-  have hd1 : τc ≤ d := hR.dl_ge q τc j hq hj
-  have hd2 : d ≤ max τc R.gst + δ := hR.dl_le q τc j hq hj
-  have hin : (q, m) ∈ (R.st A (d + 1) j).rcv := by
-    rw [st_succ', step_rcv]
-    refine List.mem_append_right _ (List.mem_flatMap.2 ⟨q, List.mem_finRange _,
-      List.mem_map.2 ⟨m, ?_, rfl⟩⟩)
-    rw [Run.inbox_eq_flatMap]
-    refine List.mem_flatMap.2 ⟨τc, List.mem_range.2 (by omega), ?_⟩
-    simp only [Run.dlv, ← hd, ite_true]
-    rw [Run.out_of_correct _ _ hq]
-    exact hm
-  obtain ⟨l, hl⟩ := st_rcv_prefix R (show d + 1 ≤ τ + 1 by omega) j
-  rw [hl]
-  exact List.mem_append_left _ hin
+    (hτ : max τc R.gst + δ ≤ τ) : (q, m) ∈ (R.st A (τ + 1) j).rcv :=
+  tetra_logs.mem_log_of_valid R hR hq hj hm (by omega)
 
 /-- A node in a view `v ≠ 0` has sent proof and suggest messages for `v` when entering it. -/
 theorem entered {v : ℕ} (hv : v ≠ 0) {j : Fin n} :

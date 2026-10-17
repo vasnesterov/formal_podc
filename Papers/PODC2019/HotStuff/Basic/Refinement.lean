@@ -1,4 +1,5 @@
 import Papers.PODC2019.HotStuff.Basic.Handlers
+import Podc.Computability.Distributed.Byzantine.PartialSync.Log
 
 /-!
 # Basic HotStuff implementation refines the abstract system
@@ -34,23 +35,16 @@ theorem hstep_at (F : Finset P) (V : Set (P × QC C)) (τ : ℕ) (p : P) :
       (R.st (hotstuff f leader) (τ + 1) p) := by
   rw [st_succ_eq]; exact hstep_stepR V p _ _
 
+/-- The replica buffers are message logs: every step appends the received messages. -/
+theorem hotstuff_logs :
+    (hotstuff f leader : Algorithm P (Msg P C) (RState P C) (Inp C) Unit).Logs RState.buf where
+  log_init _ _ := rfl
+  log_step p s ib := ⟨received ib, (hstep_stepR (F := ∅) ∅ p s ib).buf, fun _ _ => mem_received⟩
+
 theorem st_buf (τ : ℕ) (p q : P) (m : Msg P C) :
     (q, m) ∈ (R.st (hotstuff f leader) τ p).buf ↔
-      ∃ ρ < τ, m ∈ R.inbox (hotstuff f leader) p ρ q := by
-  induction τ with
-  | zero => simp [hotstuff, RState.init]
-  | succ τ ih =>
-    rw [(hstep_at R ∅ ∅ τ p).buf]
-    simp only [recv, List.mem_append, mem_received, ih]
-    constructor
-    · rintro (⟨ρ, hρ, h⟩ | h)
-      · exact ⟨ρ, by omega, h⟩
-      · exact ⟨τ, by omega, h⟩
-    · rintro ⟨ρ, hρ, h⟩
-      rcases Nat.lt_or_ge ρ τ with h' | h'
-      · exact Or.inl ⟨ρ, h', h⟩
-      · obtain rfl : ρ = τ := by omega
-        exact Or.inr h
+      ∃ ρ < τ, m ∈ R.inbox (hotstuff f leader) p ρ q :=
+  hotstuff_logs.mem_log_iff R τ p q m
 
 theorem st_clock (τ : ℕ) (p : P) : (R.st (hotstuff f leader) τ p).clock = τ := by
   induction τ with

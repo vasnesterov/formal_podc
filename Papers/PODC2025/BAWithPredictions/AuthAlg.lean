@@ -1,5 +1,6 @@
 import Papers.PODC2025.BAWithPredictions.RoundModel
 import Cslib.Computability.Distributed.Byzantine.PartialSync.RoundAuth
+import Podc.Foundations.Data.Finset.Quorum
 
 /-!
 # Authenticated Byzantine Agreement with classification (Section 8) — the algorithm
@@ -52,55 +53,6 @@ set_option linter.unusedSectionVars false
 namespace BAWithPredictions.AuthBA
 
 open Finset Cslib.Byzantine.PartialSync
-
-/-! ### Plurality with smallest-value tie-breaking -/
-
-section PlurMin
-
-variable {ι α : Type*} [DecidableEq ι] [LinearOrder α]
-
-/-- The value `f j` of a most frequent value on `X` (helper for `plurMin`). -/
-theorem exists_max_cnt {X : Finset ι} (f : ι → α) (h : X.Nonempty) :
-    ((X.filter fun j => cnt X f (f j) = X.sup fun j => cnt X f (f j)).image f).Nonempty := by
-  obtain ⟨j, hj, he⟩ := X.exists_mem_eq_sup h (fun j => cnt X f (f j))
-  exact ⟨f j, mem_image.mpr ⟨j, mem_filter.mpr ⟨hj, he.symm⟩, rfl⟩⟩
-
--- CSLib candidate
-/-- **The smallest value that occurs the largest number of times** among the values of `f` on `X`
-(`d` if `X = ∅`). -/
-def plurMin (X : Finset ι) (f : ι → α) (d : α) : α :=
-  if h : X.Nonempty then
-    ((X.filter fun j => cnt X f (f j) = X.sup fun j => cnt X f (f j)).image f).min'
-      (exists_max_cnt f h)
-  else d
-
-/-- A value occurring on a strict majority of `X` is the plurality. -/
-theorem plurMin_eq_of_majority {X : Finset ι} {f : ι → α} {d w : α}
-    (h : X.card < 2 * cnt X f w) : plurMin X f d = w := by
-  have hne : X.Nonempty := by
-    rw [← card_pos]; have := card_le_card (filter_subset (fun j => f j = w) X); unfold cnt Finset.countEq at h
-    omega
-  unfold plurMin
-  simp only [hne, ↓reduceDIte]
-  have key : ∀ a ∈ (X.filter fun j => cnt X f (f j) = X.sup fun j => cnt X f (f j)).image f,
-      a = w := by
-    intro a ha
-    obtain ⟨j, hj, rfl⟩ := mem_image.mp ha
-    obtain ⟨hjX, hjM⟩ := mem_filter.mp hj
-    by_contra hne'
-    obtain ⟨j', hj'X, hj'w⟩ : ∃ j', j' ∈ X ∧ f j' = w := by
-      have : (X.filter fun j => f j = w).Nonempty := by
-        rw [← card_pos]; unfold cnt Finset.countEq at h; omega
-      obtain ⟨j', hj'⟩ := this
-      exact ⟨j', (mem_filter.mp hj').1, (mem_filter.mp hj').2⟩
-    have h1 : cnt X f (f j') ≤ X.sup fun j => cnt X f (f j) :=
-      le_sup (f := fun j => cnt X f (f j)) hj'X
-    rw [hj'w] at h1
-    have h2 := cnt_add_cnt_le (X := X) (f := f) hne'
-    omega
-  exact key _ (min'_mem _ _)
-
-end PlurMin
 
 /-! ### Tokens, chains, messages -/
 
@@ -305,7 +257,7 @@ def bbOut (X : Finset V) : Option V :=
 /-- Line 10 of Algorithm 7: the smallest value other than `⊥` that occurs the largest number of
 times among the outputs of the broadcast instances (own input if all are `⊥`). -/
 noncomputable def plurality (st : St P V) : V :=
-  plurMin (univ.filter fun s => (bbOut (st.X s)).isSome) (fun s => (bbOut (st.X s)).getD st.x) st.x
+  Finset.pluralityMin (univ.filter fun s => (bbOut (st.X s)).isSome) (fun s => (bbOut (st.X s)).getD st.x) st.x
 
 /-- The value of a valid round-`(k+2)` message from `q` (line 12): `⟨plurality_q, cc_q⟩` with a
 committee certificate for `q`. -/
@@ -315,7 +267,7 @@ def plurVal (t : ℕ) (q : P) : Option (Msg P V) → Option V
 
 /-- Lines 12–13 of Algorithm 7 (own input if no valid message was received). -/
 noncomputable def decision (t : ℕ) (x : V) (rcv : P → Option (Msg P V)) : V :=
-  plurMin (univ.filter fun q => (plurVal t q (rcv q)).isSome) (fun q => (plurVal t q (rcv q)).getD x)
+  Finset.pluralityMin (univ.filter fun q => (plurVal t q (rcv q)).isSome) (fun q => (plurVal t q (rcv q)).getD x)
     x
 
 /-- Line 5 of Algorithm 7: the processes that sent `p` their vote. -/

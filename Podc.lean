@@ -3,9 +3,17 @@
 -- (github.com/vasnesterov/cslib, branch `podc`); `Podc.Basic` only imports all of CSLib.
 import Podc.Basic
 import Podc.Computability.Distributed.ApproxConsensus.Contraction
+import Podc.Computability.Distributed.Byzantine.LockStep.Basic
+import Podc.Computability.Distributed.Byzantine.LockStep.Cover
+import Podc.Computability.Distributed.Byzantine.LockStep.GroupSim
+import Podc.Computability.Distributed.Byzantine.PartialSync.Auth
+import Podc.Computability.Distributed.Byzantine.PartialSync.Cover
+import Podc.Computability.Distributed.Byzantine.PartialSync.Log
 import Podc.Computability.Distributed.Byzantine.PartialSync.Merge
+import Podc.Computability.Distributed.Byzantine.PartialSync.Model
 import Podc.Computability.Distributed.Byzantine.Specs
 import Podc.Computability.Distributed.ContentOblivious.VirtualRing
+import Podc.Computability.Distributed.CrashPartialSync.Model
 import Podc.Computability.Distributed.DynamicNetworks.Journey
 import Podc.Computability.Distributed.PopulationProtocols.Basic
 import Podc.Computability.Distributed.PopulationProtocols.Nondet

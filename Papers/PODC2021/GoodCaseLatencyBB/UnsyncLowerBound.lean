@@ -50,7 +50,7 @@ theorem X_authValid {Au : Auth P M K} (hU : (lateStart A).Unforging Au) {lab lab
     else []) at hm
   split_ifs at hm with hτ h1 h3
   · -- replay of `W va lab` towards `g, A`
-    refine tokens_replay_rel (lateStart A) hU (Ri := W s v0 Δ e L va lab)
+    refine Run.tokens_replay_rel hU (Ri := W s v0 Δ e L va lab)
       (R' := X A s v0 Δ e L lab lab' va vb)
       (fun q σ => lab q = 2 ∧ σ < Δ + e) ?_ τ b ⟨hb2, hτ⟩ (hWf _ _ b) hb r m hm x hx
     intro q σ ⟨hq2, hσ⟩ _ q' σ' hσ' hdl
@@ -74,13 +74,13 @@ theorem X_authValid {Au : Auth P M K} (hU : (lateStart A).Unforging Au) {lab lab
     rw [Run.out_of_correct _ _ (hWf _ _ q'),
       ← claim1 hl he hΔ hL va vb q' σ' (by omega)] at hm'
     right
-    refine mem_honestTokens_of_out (A := lateStart A) (r' := q) (σ' := σ') hq'c ?_
+    refine Run.mem_honestTokens_of_out (A := lateStart A) (r' := q) (σ' := σ') hq'c ?_
       (by rw [Run.out_of_correct (lateStart A) _ hq'c]; exact hm') hx'
     change σ' ≤ σ' + DW Δ e L (lab q') (lab q) - 1
     rw [hq2, hDW]; omega
   · -- replay of `W vb lab'` towards `C, h`
     have hl' := hl.swap
-    refine tokens_replay_rel (lateStart A) hU (Ri := W s v0 Δ e L vb lab')
+    refine Run.tokens_replay_rel hU (Ri := W s v0 Δ e L vb lab')
       (R' := X A s v0 Δ e L lab lab' va vb)
       (fun q σ => lab q = 2 ∧ σ < Δ + e) ?_ τ b ⟨hb2, hτ⟩ (hWf _ _ b) hb r m hm x hx
     intro q σ ⟨hq2, hσ⟩ _ q' σ' hσ' hdl
@@ -107,7 +107,7 @@ theorem X_authValid {Au : Auth P M K} (hU : (lateStart A).Unforging Au) {lab lab
     have h2' : lab' q' ≠ 2 := by rw [hl.mirror q']; omega
     rw [claim2 hl' he hΔ hL vb va σ' q' h2' (by simp only [off, hl.mirror q']; split_ifs <;> omega)]
       at hm'
-    refine mem_honestTokens_of_out (A := lateStart A) (r' := q)
+    refine Run.mem_honestTokens_of_out (A := lateStart A) (r' := q)
       (σ' := σ' + off lab e q' - off lab' e q') hq'c ?_
       (by rw [Run.out_of_correct (lateStart A) _ hq'c]; exact hm') hx'
     change _ ≤ σ' + DW Δ e L (lab' q') (lab' q) - 1

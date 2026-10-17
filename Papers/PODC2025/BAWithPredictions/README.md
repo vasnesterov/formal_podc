@@ -105,7 +105,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 14 (= Thm 1), agreement / broadcast / classification | `message_lower_bound`, `message_lower_bound_bb`, `message_lower_bound_classification` | `MessageLowerBound.lean` |
 | Theorem 13 (= Thm 4) | `theorem13` | `RoundLowerBoundStrong.lean` |
 | Cited [21] (Byzantine early deciding `min{f+2,t+1}`) | `earlyDecidingLB_strong`; `f+1` part: `earlyDecidingLB_weak` | `RoundLowerBoundStrong.lean`, `RoundLowerBoundChain.lean` |
-| Simulation `S'` of Theorem 13; padding | `simProtocol`, `solves_simProtocol`, `roundLowerBoundWith`, `padScenario` | `RoundLowerBound.lean` |
+| Simulation `S'` of Theorem 13; padding | `simProtocol`, `solves_simProtocol`, `roundLowerBoundWith`, `padScenario` | `RoundLowerBound.lean` (`padScenario`: `Podc/…/LockStep/Basic.lean`) |
 | Algorithm 2, Observations 1–2, Lemma 1 (`k_A(⌈n/2⌉−f) ≤ B`) | `classify`, `obs12`, `card_mis_mul_le` | `Classification.lean` |
 | Lemmas 2–6, Corollary 1, Lemmas 15+19 | `pos_mem_Icc`, `pos_gt_of_false`, `lemma4`, `lemma5`, `lemma6`, `corollary1`, `exists_clean_block` | `Classification.lean` |
 | Algorithms 3–4, Lemmas 7–14 | `Unauth.gcB/gcOut/conc`, `Unauth.lemma7` … `Unauth.lemma14` | `UnauthPhase.lean` |
@@ -136,5 +136,6 @@ Full list of differences (including modelling choices and minor imprecisions): [
   `OmExec.solo`/`OmExec.ff` (`Cslib/Computability/Distributed/Byzantine/PartialSync/Omission.lean`); the non-vacuity reduction uses the containment
   condition of `Cslib/Computability/Distributed/Byzantine/PartialSync/Containment.lean`; `cnt`/`plur`/`thr` are `Finset.countEq`/`plurality`/`threshold?`
   (`Cslib/Foundations/Data/Finset/Quorum.lean`).
-- CSLib candidates (marked in the files): `padScenario`, `hist_eq_take`, `decides_iff_of_hist`, the subtype
-  simulation, the hybrid (equivocation) lemma, `plurMin`.
+- Staged shared code: `padScenario`, `decides_iff_of_hist` (`Podc/Computability/Distributed/Byzantine/LockStep/Basic.lean`),
+  `Finset.pluralityMin` (smallest most frequent value, `Podc/Foundations/Data/Finset/Quorum.lean`); `hist_eq_take` is
+  CSLib's `take_hist`. CSLib candidates (marked in the files): the subtype simulation, the hybrid (equivocation) lemma.

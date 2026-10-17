@@ -51,7 +51,7 @@ core of Lemma 1.
      messages to `g` until about `Δ + 0.5δ`, but `C` is honest there and holds value `1`, so it never produced
      those signatures. Execution 3 has the same problem for `h`. Fix used: in Executions 1 and 4, `C → B` and
      `h → B` messages (resp. `A → B`, `g → B`) are delayed beyond the replay horizon. `X_authValid` checks the
-     repaired executions with a causal replay lemma (`tokens_replay_rel`).
+     repaired executions with a causal replay lemma (`Run.tokens_replay_rel`).
    - **Theorems 7 and 9.** Byzantine replays of other executions must be truncated in time: later messages
      carry signatures that are never produced in the new execution. This is harmless for the argument.
 6. **Lemma 1 (proof imprecision, statement correct).** The proof of part (1) says: if `h'` receives `v'` by
@@ -112,7 +112,7 @@ core of Lemma 1.
    Kuznetsov–Tonkikh–Zhang lower bound (library module `Cslib/Computability/Distributed/Byzantine/PartialSync/TwoStepLowerBound.lean`), which are
    exactly Figure 4 with `p` = broadcaster.
 9. **Theorem 19.** The ring of groups is a time-dependent covering system with uniform delay `Δ`
-   (`DelayCover.lean`). The broadcaster has two copies (left/right), each talking only to its neighbour group
+   (`DCover`, `Podc/Computability/Distributed/Byzantine/PartialSync/Cover.lean`). The broadcaster has two copies (left/right), each talking only to its neighbour group
    after the proposal. Locality ("information travels one group per `Δ`") replaces the paper's informal
    distance argument.
 10. **Theorem 5 protocol.** Parties gossip all known signed tokens instead of "forwarding the `n − f` votes". A

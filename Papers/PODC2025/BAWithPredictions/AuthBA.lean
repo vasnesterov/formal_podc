@@ -23,34 +23,6 @@ open Finset Cslib.Byzantine.PartialSync
 
 variable {P V : Type*} [Fintype P] [LinearOrder P] [LinearOrder V]
 
-section PlurCongr
-
-variable {ι α : Type*} [DecidableEq ι] [LinearOrder α]
-
-omit [Fintype P] [LinearOrder P] [LinearOrder V] in
-/-- On a nonempty set, `plurMin` depends only on the values on that set (not on the default). -/
-theorem plurMin_congr {X : Finset ι} {f g : ι → α} {d d' : α} (hX : X.Nonempty)
-    (h : ∀ j ∈ X, f j = g j) : plurMin X f d = plurMin X g d' := by
-  have hc : ∀ j ∈ X, cnt X f (f j) = cnt X g (g j) := by
-    intro j hj
-    unfold cnt Finset.countEq
-    congr 1
-    exact filter_congr fun j' hj' => by rw [h j' hj', h j hj]
-  have hsup : (X.sup fun j => cnt X f (f j)) = X.sup fun j => cnt X g (g j) := sup_congr rfl hc
-  have hS : ((X.filter fun j => cnt X f (f j) = X.sup fun j => cnt X f (f j)).image f) =
-      ((X.filter fun j => cnt X g (g j) = X.sup fun j => cnt X g (g j)).image g) := by
-    rw [hsup]
-    have : (X.filter fun j => cnt X f (f j) = X.sup fun j => cnt X g (g j)) =
-        (X.filter fun j => cnt X g (g j) = X.sup fun j => cnt X g (g j)) :=
-      filter_congr fun j hj => by rw [hc j hj]
-    rw [this]
-    exact image_congr fun j hj => h j (mem_filter.mp hj).1
-  unfold plurMin
-  simp only [hX, ↓reduceDIte]
-  congr 1
-
-end PlurCongr
-
 /-! ### Lemma 24 -/
 
 section L24
@@ -134,7 +106,7 @@ variable {k t : ℕ} {F : Finset P} {inp : P → V × (P → Bool)}
   (hk : (mis F fun i => (inp i).2).card ≤ k)
 
 theorem plurality_eq (p : P) : plurality (E.s (k + 2) p) =
-    plurMin (univ.filter fun s => (bb E p s).isSome) (fun s => (bb E p s).getD (inp p).1)
+    Finset.pluralityMin (univ.filter fun s => (bb E p s).isSome) (fun s => (bb E p s).getD (inp p).1)
       (inp p).1 := by
   unfold plurality; rw [x_eq]; rfl
 
@@ -163,7 +135,7 @@ theorem decision_eq {w : V} (hw : ∀ q ∈ CH E, plurality (E.s (k + 2) q) = w)
     (hCH : k + 1 ≤ (CH E).card) (hCF : (F.filter (· ∈ Csup k F inp)).card ≤ k) {p : P}
     (hp : p ∉ F) (x : V) : decision t x (E.rcv (k + 2) p) = w := by
   unfold decision
-  apply plurMin_eq_of_majority
+  apply Finset.pluralityMin_eq_of_card_lt_two_mul_countEq
   set X := univ.filter fun q => (plurVal t q (E.rcv (k + 2) p q)).isSome with hXdef
   have hCHv : ∀ q ∈ CH E, plurVal t q (E.rcv (k + 2) p q) = some w := by
     intro q hq
@@ -194,7 +166,7 @@ theorem decision_eq {w : V} (hw : ∀ q ∈ CH E, plurality (E.s (k + 2) q) = w)
   have := card_le_card h1
   have := card_le_card h2
   have := card_union_le (CH E) (F.filter (· ∈ Csup k F inp))
-  unfold cnt Finset.countEq
+  unfold Finset.countEq
   beta_reduce
   omega
 
@@ -211,7 +183,7 @@ theorem lemma25 {i j : P} (hi : i ∈ CH E) (hj : j ∈ CH E) :
     ⟨s, by simp [lemma21 E hsync hA hs (mem_filter.mp hi).2.1]⟩
   rw [plurality_eq, plurality_eq, hbb]
   rw [hbb] at hne
-  exact plurMin_congr hne (fun s hs => by
+  exact Finset.pluralityMin_congr hne (fun s hs => by
     obtain ⟨v, hv⟩ := Option.isSome_iff_exists.mp (mem_filter.mp hs).2
     simp [hv])
 
@@ -242,7 +214,7 @@ honest process with a certificate has plurality value `v`. -/
 theorem plurality_unanimous {v : V} (hv : ∀ p ∈ CH E, (inp p).1 = v) {j : P} (hj : j ∈ CH E) :
     plurality (E.s (k + 2) j) = v := by
   rw [plurality_eq]
-  apply plurMin_eq_of_majority
+  apply Finset.pluralityMin_eq_of_card_lt_two_mul_countEq
   have hjF := (mem_filter.mp hj).2.1
   set X := univ.filter fun s => (bb E j s).isSome with hXdef
   have h1 : CH E ⊆ X.filter fun s => (bb E j s).getD (inp j).1 = v := by
@@ -268,7 +240,7 @@ theorem plurality_unanimous {v : V} (hv : ∀ p ∈ CH E, (inp p).1 = v) {j : P}
   have := card_union_le (CH E) (F.filter (· ∈ Csup k F inp))
   have := lemma24_honest E hsync hF htn hn hk
   have := lemma24_faulty' hF hn hk
-  unfold cnt Finset.countEq
+  unfold Finset.countEq
   beta_reduce
   omega
 

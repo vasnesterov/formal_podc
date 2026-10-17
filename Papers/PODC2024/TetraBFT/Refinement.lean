@@ -1,5 +1,6 @@
 import Papers.PODC2024.TetraBFT.Protocol
 import Papers.PODC2024.TetraBFT.Safety
+import Podc.Computability.Distributed.Byzantine.PartialSync.Log
 
 /-!
 # The protocol refines the abstract execution model
@@ -637,27 +638,15 @@ theorem st_dec_mono {τ τ' : ℕ} (h : τ ≤ τ') (p : Fin n) {d : V × ℕ}
   | refl => exact hd
   | step _ ih => rw [st_succ']; exact step_dec prm p _ _ ih
 
+/-- The lists of received messages are message logs: every step appends the inbox. -/
+theorem tetra_logs : (tetra (V := V) prm).Logs St.rcv where
+  log_init _ _ := rfl
+  log_step p s ib := ⟨_, step_rcv prm p s ib, fun q m => by simp⟩
+
 /-- **Authenticity**: a message received from a correct node was in its outbox earlier. -/
 theorem rcv_authentic {τ : ℕ} {p q : Fin n} {m : Msg V} (hq : q ∉ R.faulty)
-    (h : (q, m) ∈ (R.st A τ p).rcv) : ∃ τ' < τ, m ∈ (R.st A τ' q).out := by
-  induction τ with
-  | zero => simp [Run.st_zero, tetra] at h
-  | succ τ ih =>
-    rw [st_succ', step_rcv] at h
-    rcases List.mem_append.1 h with h | h
-    · obtain ⟨τ', hτ', hm⟩ := ih h
-      exact ⟨τ', by omega, hm⟩
-    · simp only [List.mem_flatMap, List.mem_finRange, true_and, List.mem_map,
-        Prod.mk.injEq] at h
-      obtain ⟨q', m', hm', rfl, rfl⟩ := h
-      rw [Run.inbox_eq_flatMap] at hm'
-      simp only [List.mem_flatMap, List.mem_range] at hm'
-      obtain ⟨τ', hτ', hm'⟩ := hm'
-      simp only [Run.dlv] at hm'
-      split_ifs at hm'
-      · rw [Run.out_of_correct _ _ hq] at hm'
-        exact ⟨τ', hτ', hm'⟩
-      · simp at hm'
+    (h : (q, m) ∈ (R.st A τ p).rcv) : ∃ τ' < τ, m ∈ (R.st A τ' q).out :=
+  tetra_logs.exists_mem_send_of_mem_log R hq h
 
 /-- The abstract execution of a run: the votes ever cast and the decisions. -/
 def toExec : Execution (Fin n) V where
