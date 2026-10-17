@@ -71,7 +71,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
   all honest parties decide within `R` rounds, in every admissible run whose inputs satisfy `pre`.
   * Gradecast (Def. 4): one protocol per sender, run in parallel. `Gradecast snd` is the shared
     `Problem.Gradecast` (`Cslib/Computability/Distributed/Byzantine/Specs.lean`) with grades `Fin 3`; `gradecast_iff` unfolds it.
-  * RealAA (Def. 1, `ε = 1`): only required for `D`-close inputs (`pre = Close D`), matching `R_RealAA(D, ε)`.
+  * RealAA (Def. 1, `ε = 1`): the shared `Problem.ApproxAgreement` (termination, range validity, `ε`-agreement;
+    `realAA_iff` unfolds it), only required for `D`-close inputs (`pre = Close D`), matching `R_RealAA(D, ε)`.
 * Sequential composition ("wait until round `R` ends") is `Protocol.seq` in `Cslib/Computability/Distributed/Byzantine/LockStep/Sequential.lean`.
   Phase 2 starts at round `R` for everybody.
 * Graphs are Mathlib `SimpleGraph`s. The hull `⟨S⟩` is the union of all shortest paths between vertices of `S`

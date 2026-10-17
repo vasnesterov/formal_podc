@@ -44,11 +44,18 @@ structure BoundedAuthBA {N Ma Sa : Type} (pa : Protocol N Bool Ma Bool) (Aa : Au
   /-- Honest parties only emit their own and relayed signatures. -/
   unforging : pa.Unforging Aa
   /-- Termination, validity, agreement against every admissible unforgeability-respecting
-  adversary. -/
-  solves : SolvesAuth ⊤ pa Aa Z BA
-  /-- Every honest party decides within `R` rounds. -/
-  terminates : ∀ sc : Scenario N Bool Ma, sc.byz ∈ Z → sc.Reliable → sc.AuthValid ⊤ pa Aa →
-    TerminatesBy ⊤ pa sc R
+  adversary, every honest party deciding within `R` rounds (`boundedAuthBA_iff`). -/
+  solves : SolvesAuthWithin ⊤ pa Aa Z noPre BA R
+
+/-- The black box in explicit form: unforging, solves authenticated BA against `Z`, and every
+honest party decides within `R` rounds. -/
+theorem boundedAuthBA_iff {N Ma Sa : Type} {pa : Protocol N Bool Ma Bool} {Aa : Auth N Ma Sa}
+    {Z : AdvStructure N} {R : ℕ} : BoundedAuthBA pa Aa Z R ↔ pa.Unforging Aa ∧
+      SolvesAuth ⊤ pa Aa Z BA ∧ ∀ sc : Scenario N Bool Ma, sc.byz ∈ Z → sc.Reliable →
+        sc.AuthValid ⊤ pa Aa → TerminatesBy ⊤ pa sc R :=
+  ⟨fun h => ⟨h.1, fun sc hZ hrel hV => (h.2 sc hZ hrel hV trivial).1,
+      fun sc hZ hrel hV => (h.2 sc hZ hrel hV trivial).2⟩,
+    fun h => ⟨h.1, fun sc hZ hrel hV _ => ⟨h.2.1 sc hZ hrel hV, h.2.2 sc hZ hrel hV⟩⟩⟩
 
 variable {P : Type} {Ma Sa : Type}
 
@@ -255,8 +262,7 @@ theorem sba_BA {Aa : Auth (↥Reg) Ma Sa} {Z : AdvStructure ↥Reg} (hpa : Bound
     BA s.input s.honest (Decides ⊤ (sba Reg pa R) s) := by
   have hrelA := scA_reliable (Reg := Reg) (R := R) s hrel
   have hVA := scA_authValid s hV
-  obtain ⟨-, hval, hagr⟩ := hpa.solves (scA Reg R s) hZ hrelA hVA
-  have hT := hpa.terminates (scA Reg R s) hZ hrelA hVA
+  obtain ⟨⟨-, hval, hagr⟩, hT⟩ := hpa.solves (scA Reg R s) hZ hrelA hVA trivial
   -- the output of an honest registered party is its `pa` decision
   have hout : ∀ p (hp : p ∈ Reg), p ∉ s.byz → ∃ o,
       firstUpTo (fun j => status ⊤ pa (scA Reg R s) j ⟨p, hp⟩) R = some o ∧
@@ -379,8 +385,8 @@ theorem orBA_boundedAuthBA [Finite P] (Reg : Set P) (hs : Reg.ncard ≤ 2) :
     intro B hB
     rw [Nat.card_coe_set_eq] at hB
     exact (Set.ncard_eq_zero (Set.toFinite _)).mp (by omega)
-  refine ⟨(orBA _).unforging_none, fun sc hsc hrel _ => orBA_BA sc hrel (hB _ hsc),
-    fun sc _ _ _ p _ => ⟨1, le_rfl, ?_⟩⟩
+  refine ⟨(orBA _).unforging_none, fun sc hsc hrel _ _ => ⟨orBA_BA sc hrel (hB _ hsc),
+    fun p _ => ⟨1, le_rfl, ?_⟩⟩⟩
   simp [status, hist_succ, orBA]
 
 /-- Non-vacuity of Theorem 5.1 (strong form): with one or two registered parties, Π_SBA over `orBA`

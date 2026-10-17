@@ -23,16 +23,10 @@ open Cslib.Byzantine.PartialSync.VC (cnt)
 
 variable {P VI VO : Type} [Fintype P] [DecidableEq P] {t δ : ℕ}
 
-/-- The paper's vector-consensus specification is the one of `Cslib.Byzantine.PartialSync`. -/
-theorem SolvesVectorConsensus.of_podc {M S : Type} {A : Algorithm P M S VI (Config P VI)}
-    (h : Cslib.Byzantine.PartialSync.SolvesVectorConsensus t δ A) : SolvesVectorConsensus t δ A :=
-  ⟨h.termination, h.agreement, h.vectorValidity⟩
-
 /-- **Vector consensus is solvable for `n > 3t`** (verified protocol `VC`). -/
 theorem vectorConsensusSolvable (hn : 3 * t < Fintype.card P) :
     VectorConsensusSolvable P VI t δ :=
-  ⟨_, _, _, SolvesVectorConsensus.of_podc
-    (VC.solvesVectorConsensus hn (Binary.rotLeader_surj (by omega)) δ)⟩
+  ⟨_, _, _, VC.solvesVectorConsensus hn (Binary.rotLeader_surj (by omega)) δ⟩
 
 /-- Vector consensus is solvable for `n > 3t` in the authenticated model (with no tokens). -/
 theorem vectorConsensusSolvableAuth (hn : 3 * t < Fintype.card P) :
@@ -136,8 +130,7 @@ theorem universal_vc_solves (hn : 3 * t < Fintype.card P) :
       (universal ((VC.algo (VI := Bool) t (Binary.rotLeader (by omega))).compile (δ + 1)) majority)
       (Binary.strongValidity (P := P)) :=
   solvesConsensus_universal (by omega)
-    (SolvesVectorConsensus.of_podc
-      (VC.solvesVectorConsensus hn (Binary.rotLeader_surj (by omega)) δ))
+    (VC.solvesVectorConsensus hn (Binary.rotLeader_surj (by omega)) δ)
     (majority_commonAdmissible hn)
 
 /-- Theorem 4 at optimal resilience: for `n > 3t ≥ 3`, the explicit protocol has a valid

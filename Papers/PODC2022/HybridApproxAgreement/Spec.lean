@@ -1,5 +1,6 @@
 import Cslib.Computability.Distributed.Byzantine.PartialSync.Auth
 import Cslib.Computability.Distributed.Byzantine.PartialSync.RunClasses
+import Podc.Computability.Distributed.Byzantine.Specs
 import Mathlib
 
 /-!
@@ -38,20 +39,22 @@ variable {P M S K : Type*} [Fintype P] [DecidableEq P]
 def Outputs (A : Algorithm P M S ℝ ℝ) (R : Run P M ℝ) (p : P) (v : ℝ) : Prop :=
   ∃ τ, A.decide p (R.st A τ p) = some v ∧ ∀ σ < τ, A.decide p (R.st A σ p) = none
 
-/-- `v` lies in the range `[min, max]` of the inputs of the honest parties of `R`. -/
-def InHonestRange (R : Run P M ℝ) (v : ℝ) : Prop :=
-  (∃ p ∉ R.faulty, R.inp p ≤ v) ∧ ∃ p ∉ R.faulty, v ≤ R.inp p
+/-- `v` lies in the range `[min, max]` of the inputs of the honest parties of `R` (the shared
+`Problem.InRange`). -/
+abbrev InHonestRange (R : Run P M ℝ) (v : ℝ) : Prop :=
+  Cslib.Byzantine.Problem.InRange R.inp (↑R.faulty)ᶜ v
 
+open Cslib.Byzantine.Problem in
 /-- **Definition 2.1** (for a fixed `ε`): `A` is a secure approximate-agreement protocol on the
 class of runs `C`, for inputs in `D`, in the authenticated setting `Au`. -/
 structure SecureAA (Au : Auth P M K) (A : Algorithm P M S ℝ ℝ) (ε : ℝ) (D : Set ℝ)
     (C : Run P M ℝ → Prop) : Prop where
   termination : ∀ R, C R → R.AuthValid Au A → (∀ p, R.inp p ∈ D) →
-    ∀ p ∉ R.faulty, ∃ v, Outputs A R p v
+    Termination (↑R.faulty)ᶜ (Outputs A R)
   validity : ∀ R, C R → R.AuthValid Au A → (∀ p, R.inp p ∈ D) →
-    ∀ p ∉ R.faulty, ∀ v, Outputs A R p v → InHonestRange R v
+    RangeValidity R.inp (↑R.faulty)ᶜ (Outputs A R)
   agreement : ∀ R, C R → R.AuthValid Au A → (∀ p, R.inp p ∈ D) →
-    ∀ p ∉ R.faulty, ∀ q ∉ R.faulty, ∀ v w, Outputs A R p v → Outputs A R q w → |v - w| ≤ ε
+    EpsAgreement ε (↑R.faulty)ᶜ (Outputs A R)
 
 /-- Synchronous network: at most `t` corruptions, every message between honest parties is
 delivered within `δ` ticks (`gst = 0`). -/
@@ -112,9 +115,7 @@ theorem Outputs.exists_time {A : Algorithm P M S ℝ ℝ} {R : Run P M ℝ} {p :
 
 /-- If all honest parties have input `x`, the only value in the honest range is `x`. -/
 theorem InHonestRange.eq_of_const {R : Run P M ℝ} {v x : ℝ} (h : InHonestRange R v)
-    (hx : ∀ p ∉ R.faulty, R.inp p = x) : v = x := by
-  obtain ⟨⟨p, hp, h1⟩, ⟨q, hq, h2⟩⟩ := h
-  rw [hx p hp] at h1; rw [hx q hq] at h2
-  linarith
+    (hx : ∀ p ∉ R.faulty, R.inp p = x) : v = x :=
+  Cslib.Byzantine.Problem.InRange.eq_of_forall_eq h hx
 
 end HybridApproxAgreement

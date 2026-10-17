@@ -1,6 +1,7 @@
 import Papers.PODC2022.AsyncSpeedup.Local
 import Mathlib.Algebra.Order.Group.Int
 import Mathlib.Algebra.Order.Group.Abs
+import Podc.Computability.Distributed.Byzantine.Specs
 
 /-!
 # Approximate agreement (Section 5): tasks, Claim 1, and the closure inclusions
@@ -26,18 +27,17 @@ open Cslib.Iterated
 
 variable {P : Type} [DecidableEq P]
 
-/-- `min_{i ∈ I} x_i ≤ v ≤ max_{i ∈ I} x_i`. -/
-def InRange (I : Finset P) (x : P → ℤ) (v : ℤ) : Prop :=
-  (∃ i ∈ I, x i ≤ v) ∧ ∃ j ∈ I, v ≤ x j
+/-- `min_{i ∈ I} x_i ≤ v ≤ max_{i ∈ I} x_i` (the shared `Problem.InRange`). -/
+abbrev InRange (I : Finset P) (x : P → ℤ) (v : ℤ) : Prop :=
+  Cslib.Byzantine.Problem.InRange x ↑I v
 
 lemma InRange.of_between {I : Finset P} {x : P → ℤ} {a b v : ℤ} (ha : InRange I x a)
-    (hb : InRange I x b) (h1 : a ≤ v) (h2 : v ≤ b) : InRange I x v := by
-  obtain ⟨⟨i, hi, hia⟩, -⟩ := ha
-  obtain ⟨-, ⟨j, hj, hjb⟩⟩ := hb
-  exact ⟨⟨i, hi, hia.trans h1⟩, ⟨j, hj, h2.trans hjb⟩⟩
+    (hb : InRange I x b) (h1 : a ≤ v) (h2 : v ≤ b) : InRange I x v :=
+  Cslib.Byzantine.Problem.InRange.of_le_of_le ha hb h1 h2
 
 lemma inRange_singleton {i : P} {x : P → ℤ} {v : ℤ} : InRange {i} x v ↔ v = x i := by
-  simp only [InRange, Finset.mem_singleton, exists_eq_left]
+  simp only [InRange, Cslib.Byzantine.Problem.InRange, Finset.coe_singleton,
+    Set.mem_singleton_iff, exists_eq_left]
   omega
 
 /-- Input simplices of approximate agreement: nonempty participating sets inside `S`, inputs on the

@@ -1,5 +1,6 @@
 import Mathlib
 import Cslib.Computability.Distributed.Byzantine.LockStep.Parallel
+import Cslib.Computability.Distributed.Byzantine.LockStep.Agreement
 
 /-!
 # Synchronous randomized protocols against strongly adaptive omission adversaries
@@ -132,10 +133,38 @@ def BBGood (π : Protocol P (Option Bool) M Ω) (s : P) (b : Bool) (A : Adversar
     (π.Honest (bbInput s b) ω A s →
       ∀ p, π.Honest (bbInput s b) ω A p → π.output (bbInput s b) ω A p = some b)
 
+/-- `BBGood` is CSLib's lock-step Byzantine broadcast `LockStep.BB s` (termination, sender
+validity, agreement; `Cslib.Byzantine.Problem.bb_iff`) of the forever-honest nodes, with the
+sender's input `b`, a node deciding its output. -/
+theorem bbGood_iff (π : Protocol P (Option Bool) M Ω) (s : P) (b : Bool) (A : Adversary P f)
+    (ω : Ω) : BBGood π s b A ω ↔ Cslib.Byzantine.LockStep.BB s (fun _ => b)
+      {p | π.Honest (bbInput s b) ω A p} fun p v => π.output (bbInput s b) ω A p = some v := by
+  constructor
+  · rintro ⟨⟨ht, ha⟩, hv⟩
+    exact ⟨fun p hp => Option.isSome_iff_exists.1 (ht p hp), hv,
+      fun p hp q hq x y hx hy => ha p q x y hp hq hx hy⟩
+  · rintro ⟨ht, hv, ha⟩
+    exact ⟨⟨fun p hp => Option.isSome_iff_exists.2 (ht p hp),
+      fun p q x y hp hq hx hy => ha p hp q hq x y hx hy⟩, hv⟩
+
 /-- Byzantine agreement succeeds in the execution (inputs `inp`, adversary `A`). -/
 def BAGood (π : Protocol P Bool M Ω) (inp : P → Bool) (A : Adversary P f) (ω : Ω) : Prop :=
   TermCons (π.output inp ω A) (π.Honest inp ω A) ∧
     ∀ v, (∀ p, π.Honest inp ω A p → inp p = v) → ∀ p, π.Honest inp ω A p → π.output inp ω A p = some v
+
+/-- `BAGood` is CSLib's lock-step Byzantine agreement `LockStep.BA` (termination, strong
+unanimity, agreement; `Cslib.Byzantine.Problem.ba_iff`) of the forever-honest nodes, a node
+deciding its output. -/
+theorem baGood_iff (π : Protocol P Bool M Ω) (inp : P → Bool) (A : Adversary P f) (ω : Ω) :
+    BAGood π inp A ω ↔ Cslib.Byzantine.LockStep.BA inp {p | π.Honest inp ω A p}
+      fun p v => π.output inp ω A p = some v := by
+  constructor
+  · rintro ⟨⟨ht, ha⟩, hv⟩
+    exact ⟨fun p hp => Option.isSome_iff_exists.1 (ht p hp), hv,
+      fun p hp q hq x y hx hy => ha p q x y hp hq hx hy⟩
+  · rintro ⟨ht, hv, ha⟩
+    exact ⟨⟨fun p hp => Option.isSome_iff_exists.2 (ht p hp),
+      fun p q x y hp hq hx hy => ha p hp q hq x y hx hy⟩, hv⟩
 
 variable [MeasurableSpace Ω]
 

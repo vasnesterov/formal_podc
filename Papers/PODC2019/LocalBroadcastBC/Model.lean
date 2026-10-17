@@ -3,7 +3,7 @@ import Cslib.Computability.Distributed.Byzantine.LockStep.Agreement
 import Cslib.Foundations.Combinatorics.SimpleGraph.VertexConnectivity
 import Mathlib
 import Cslib.Computability.Distributed.Byzantine.LockStep.Parallel
-import Cslib.Computability.Distributed.Byzantine.Specs
+import Podc.Computability.Distributed.Byzantine.Specs
 
 /-!
 # The local broadcast model (Khan–Naqvi–Vaidya, PODC 2019), on top of CSLib's lock-step model
@@ -63,7 +63,7 @@ open Cslib.Byzantine in
 non-faulty node is the input of some non-faulty node) and agreement. -/
 def Consensus {W : Type*} : Spec V W W := fun x H dec =>
   Problem.Termination H dec ∧
-  (∀ p ∈ H, ∀ v, dec p v → ∃ q ∈ H, x q = v) ∧
+  Problem.InputValidity x H dec ∧
   Problem.Agreement H dec
 
 /-- For binary values the paper's consensus specification is CSLib's Byzantine agreement `BA`

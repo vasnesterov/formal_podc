@@ -869,7 +869,7 @@ theorem treeAA0_solves {Z : AdvStructure P} {R₁ R₂ : ℕ} (A₁ : Auth P M�
   have hval₁ : ∀ p ∈ s.honest, ∃ a ∈ s.honest, ∃ b ∈ s.honest,
       (L.idxOf (s.input a) : ℝ) ≤ j₁ p ∧ j₁ p ≤ L.idxOf (s.input b) := by
     intro p hp
-    obtain ⟨a, ha, b, hb, h1, h2⟩ := hrV₁ p hp (j₁ p) (hj₁ p hp)
+    obtain ⟨⟨a, ha, h1⟩, b, hb, h2⟩ := hrV₁ p hp (j₁ p) (hj₁ p hp)
     exact ⟨a, ha, b, hb, h1, h2⟩
   have hagr₁ : ∀ p ∈ s.honest, ∀ q ∈ s.honest, |j₁ p - j₁ q| ≤ 1 := fun p hp q hq =>
     hrA₁ p hp q hq _ _ (hj₁ p hp) (hj₁ q hq)
@@ -914,7 +914,7 @@ theorem treeAA0_solves {Z : AdvStructure P} {R₁ R₂ : ℕ} (A₁ : Auth P M�
   have hval₂ : ∀ p ∈ s.honest, ∃ a ∈ s.honest, ∃ b ∈ s.honest,
       (projIdx T (Pth a) (s.input a) : ℝ) ≤ j₂ p ∧ j₂ p ≤ projIdx T (Pth b) (s.input b) := by
     intro p hp
-    obtain ⟨a, ha, b, hb, h1, h2⟩ := hrV₂ p hp (j₂ p) (hj₂ p hp)
+    obtain ⟨⟨a, ha, h1⟩, b, hb, h2⟩ := hrV₂ p hp (j₂ p) (hj₂ p hp)
     exact ⟨a, ha, b, hb, by rw [← hin₂ a ha]; exact h1, by rw [← hin₂ b hb]; exact h2⟩
   have hagr₂ : ∀ p ∈ s.honest, ∀ q ∈ s.honest, |j₂ p - j₂ q| ≤ 1 := fun p hp q hq =>
     hrA₂ p hp q hq _ _ (hj₂ p hp) (hj₂ q hq)

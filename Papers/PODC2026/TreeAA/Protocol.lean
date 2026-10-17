@@ -185,7 +185,7 @@ theorem treeAA_solves {t Rgc Rreal : ℕ} (ht : 2 * t < Fintype.card P)
       (projIdx T (lsp k (d a) 2) (s.input a) : ℝ) ≤ j p ∧
         j p ≤ projIdx T (lsp k (d b) 2) (s.input b) := by
     intro p hp
-    obtain ⟨a, ha, b, hb, h1, h2⟩ := hrV p hp (j p) (hj p hp)
+    obtain ⟨⟨a, ha, h1⟩, b, hb, h2⟩ := hrV p hp (j p) (hj p hp)
     exact ⟨a, ha, b, hb, by rw [← hin₂ a ha]; exact h1, by rw [← hin₂ b hb]; exact h2⟩
   have hagr : ∀ p ∈ s.honest, ∀ q ∈ s.honest, |j p - j q| ≤ 1 := fun p hp q hq =>
     hrA p hp q hq _ _ (hj p hp) (hj q hq)

@@ -1,6 +1,6 @@
 import Papers.PODC2026.TreeAA.TreeGeom
 import Cslib.Computability.Distributed.Byzantine.LockStep.Sequential
-import Cslib.Computability.Distributed.Byzantine.Specs
+import Podc.Computability.Distributed.Byzantine.Specs
 import Mathlib
 
 /-!
@@ -29,11 +29,17 @@ variable {P V : Type*}
 /-! ### Specifications -/
 
 /-- **Definition 1** (AA on `ℝ`): termination, validity (outputs within the range of the honest
-inputs) and `ε`-agreement. -/
-def RealAA (ε : ℝ) : Spec P ℝ ℝ := fun x H dec =>
-  (∀ p ∈ H, ∃ o, dec p o) ∧
-  (∀ p ∈ H, ∀ o, dec p o → ∃ a ∈ H, ∃ b ∈ H, x a ≤ o ∧ o ≤ x b) ∧
-  (∀ p ∈ H, ∀ q ∈ H, ∀ o o', dec p o → dec q o' → |o - o'| ≤ ε)
+inputs) and `ε`-agreement. The shared `Problem.ApproxAgreement ε`; `realAA_iff` unfolds it. -/
+abbrev RealAA (ε : ℝ) : Spec P ℝ ℝ := Cslib.Byzantine.Problem.ApproxAgreement ε
+
+/-- Definition 1 in its explicit form. -/
+lemma realAA_iff {ε : ℝ} {x : P → ℝ} {H : Set P} {dec : P → ℝ → Prop} :
+    RealAA ε x H dec ↔
+      (∀ p ∈ H, ∃ o, dec p o) ∧
+      (∀ p ∈ H, ∀ o, dec p o → ∃ a ∈ H, ∃ b ∈ H, x a ≤ o ∧ o ≤ x b) ∧
+      (∀ p ∈ H, ∀ q ∈ H, ∀ o o', dec p o → dec q o' → |o - o'| ≤ ε) :=
+  and_congr_right' <| and_congr_left' <| forall₂_congr fun _ _ => forall₂_congr fun _ _ =>
+    Cslib.Byzantine.Problem.inRange_iff_exists
 
 /-- The honest inputs are `D`-close. -/
 def Close (D : ℝ) : (P → ℝ) → Set P → Prop := fun x H => ∀ p ∈ H, ∀ q ∈ H, |x p - x q| ≤ D
