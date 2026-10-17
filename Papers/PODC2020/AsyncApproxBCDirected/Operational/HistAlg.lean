@@ -23,6 +23,8 @@ set_option linter.unusedSectionVars false
 
 namespace AsyncApproxBCDirected
 
+open Cslib.ApproxConsensus Cslib.ApproxConsensus.Async
+
 variable {V M : Type*} [DecidableEq V]
 
 /-- A full-information algorithm. -/

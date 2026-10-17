@@ -29,7 +29,7 @@ set_option linter.unusedSectionVars false
 
 namespace CrashConsensusDigraph
 
-open AsyncApproxBCDirected PNode
+open Cslib.ApproxConsensus PNode
 
 /-- `Z(R) = ¬ max R`. -/
 def notMax (m : Multiset Bool) : Bool := !decide (true ∈ m)

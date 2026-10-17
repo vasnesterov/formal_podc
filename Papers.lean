@@ -479,7 +479,6 @@ import Papers.PODC2025.TwoShotConsensusObjects.Main
 import Papers.PODC2011.TimestampSpace.MaxAlg
 import Papers.PODC2020.AsyncApproxBCDirected.Graph
 import Papers.PODC2020.AsyncApproxBCDirected.Conditions
-import Papers.PODC2020.AsyncApproxBCDirected.AsyncModel
 import Papers.PODC2020.AsyncApproxBCDirected.Necessity
 import Papers.PODC2020.AsyncApproxBCDirected.FilterAverage
 import Papers.PODC2020.AsyncApproxBCDirected.RoundModel

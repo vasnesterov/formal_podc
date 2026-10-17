@@ -1,4 +1,5 @@
-import Papers.PODC2020.AsyncApproxBCDirected.Graph
+import Podc.ApproxConsensus.DigraphConditions
+import Mathlib
 
 /-!
 # Crash-tolerant node connectivity and the fault-tolerant diameter
@@ -6,16 +7,17 @@ import Papers.PODC2020.AsyncApproxBCDirected.Graph
 Graph-theoretic notions of Tseng–Vaidya, *Fault-Tolerant (Crash-Tolerant) Consensus in Directed
 Graphs* (PODC 2015), Section 2.
 
-We reuse the reach sets of `Papers/PODC2020/AsyncApproxBCDirected/Graph.lean`:
+We use the shared reach sets of `Podc/ApproxConsensus/DigraphConditions.lean`:
 `Reaches G F a b` says that `a ∉ F` and `b` is reachable from `a` in the reduced graph `G_F`
-(Definition 1: the subgraph induced by `V − F`).
+(Definition 1: the subgraph induced by `V − F`; `Digraph.ReachableAvoiding`).
 
 * `CTConn G k` — Definition 2 (*`k` crash-tolerant node connectivity*): every reduced graph
   `G_F` with `|F| ≤ k` has a node (a *source* / root, Definitions 3–4) reaching all its nodes.
 * `ctConn_iff_oneReach` — this is the *1-reach* condition of later work by the same authors
   (every two nodes of `G_F` have a common ancestor in `G_F`). The proof of Theorem 1 uses this
   reformulation implicitly ("there is a pair `i, j` such that no node has paths to both").
-* `ReachesWithin G F k a b` — `b` is reachable from `a` in `G_F` by a path with at most `k` edges.
+* `ReachesWithin G F k a b` — `b` is reachable from `a` in `G_F` by a path with at most `k` edges
+  (`a ∉ F` and a walk of length `≤ k` in `G.deleteVerts F`, CSLib's `Relation.RelatesWithinSteps`).
 * `FTDiamLE G f D` — `D` bounds the *fault-tolerant diameter* `d` of equation (1): every source
   `s` of every reduced graph `G_F` (`|F| ≤ f`) reaches all of `G_F` within `D` hops, i.e.
   `height(s, G_F) ≤ D`. `ftDiam G f` is the paper's `d` (the least such `D`), and
@@ -24,13 +26,11 @@ We reuse the reach sets of `Papers/PODC2020/AsyncApproxBCDirected/Graph.lean`:
 
 open Finset Relation
 
--- CSLib candidate (directed-network fault-tolerance conditions)
-
 set_option linter.unusedSectionVars false
 
 namespace CrashConsensusDigraph
 
-open AsyncApproxBCDirected
+open Cslib.ApproxConsensus
 
 variable {V : Type*} [DecidableEq V] {G : Digraph V}
 
@@ -77,77 +77,46 @@ theorem ctConn_iff_oneReach [Fintype V] {k : ℕ} : CTConn G k ↔ OneReach G k 
 
 /-- `ReachesWithin G X k a b`: there is a path from `a` to `b` with at most `k` edges in the
 subgraph induced by `V − X`. -/
-inductive ReachesWithin (G : Digraph V) (X : Finset V) : ℕ → V → V → Prop
-  | refl {a : V} (k : ℕ) : a ∉ X → ReachesWithin G X k a a
-  | tail {k : ℕ} {a b c : V} : ReachesWithin G X k a b → G.Adj b c → c ∉ X →
-      ReachesWithin G X (k + 1) a c
+abbrev ReachesWithin (G : Digraph V) (X : Finset V) (k : ℕ) (a b : V) : Prop :=
+  a ∉ X ∧ Relation.RelatesWithinSteps (G.deleteVerts ↑X).Adj a b k
 
-namespace ReachesWithin
+/-- Bounded reachability implies reachability. -/
+theorem ReachesWithin.reaches {X : Finset V} {k : ℕ} {a b : V} (h : ReachesWithin G X k a b) :
+    Reaches G X a b :=
+  ⟨h.1, h.2.reflTransGen⟩
 
-variable {X : Finset V}
+/-- The two introduction rules of bounded reachability (`k` hops, avoiding `X`): staying put. -/
+theorem ReachesWithin.refl {X : Finset V} (k : ℕ) {a : V} (h : a ∉ X) : ReachesWithin G X k a a :=
+  ⟨h, Relation.RelatesWithinSteps.mono k.zero_le (.refl a)⟩
 
-theorem notMem_right {k : ℕ} {a b : V} (h : ReachesWithin G X k a b) : b ∉ X := by
-  cases h with
-  | refl _ h => exact h
-  | tail _ _ h => exact h
+/-- The two introduction rules of bounded reachability: one more arc into `V − X`. -/
+theorem ReachesWithin.tail {X : Finset V} {k : ℕ} {a b c : V} (h : ReachesWithin G X k a b)
+    (e : G.Adj b c) (hc : c ∉ X) : ReachesWithin G X (k + 1) a c :=
+  ⟨h.1, h.2.tail ⟨e, h.reaches.notMem_right, hc⟩⟩
 
-theorem notMem_left {k : ℕ} {a b : V} (h : ReachesWithin G X k a b) : a ∉ X := by
-  induction h with
-  | refl _ h => exact h
-  | tail _ _ _ ih => exact ih
+/-- Recursive description: `ReachesWithin` is the least relation closed under `refl` and `tail`
+(bridge to the inductive definition `refl | tail`). -/
+theorem reachesWithin_succ_iff {X : Finset V} {k : ℕ} {a c : V} :
+    ReachesWithin G X (k + 1) a c ↔
+      ReachesWithin G X k a c ∨ ∃ b, ReachesWithin G X k a b ∧ G.Adj b c ∧ c ∉ X := by
+  constructor
+  · rintro ⟨ha, h⟩
+    rcases Relation.relatesWithinSteps_succ_iff.1 h with h | ⟨b, hb, e⟩
+    · exact .inl ⟨ha, h⟩
+    · exact .inr ⟨b, ⟨ha, hb⟩, e.1, e.2.2⟩
+  · rintro (h | ⟨b, hb, e, hc⟩)
+    · exact ⟨h.1, Relation.RelatesWithinSteps.mono k.le_succ h.2⟩
+    · exact hb.tail e hc
 
-theorem succ {k : ℕ} {a b : V} (h : ReachesWithin G X k a b) : ReachesWithin G X (k + 1) a b := by
-  induction h with
-  | refl k h => exact .refl _ h
-  | tail _ e hc ih => exact .tail ih e hc
-
-theorem mono {k k' : ℕ} {a b : V} (h : ReachesWithin G X k a b) (hk : k ≤ k') :
-    ReachesWithin G X k' a b := by
-  induction hk with
-  | refl => exact h
-  | step _ ih => exact ih.succ
-
-theorem head {k : ℕ} {a b c : V} (e : G.Adj a b) (ha : a ∉ X) (h : ReachesWithin G X k b c) :
-    ReachesWithin G X (k + 1) a c := by
-  induction h with
-  | refl k hb => exact (ReachesWithin.tail (.refl 0 ha) e hb).mono (by omega)
-  | tail _ e' hc ih => exact .tail (ih e) e' hc
-
-theorem zero_eq {a b : V} (h : ReachesWithin G X 0 a b) : a = b := by
-  cases h with
-  | refl => rfl
-
-theorem reaches {k : ℕ} {a b : V} (h : ReachesWithin G X k a b) : Reaches G X a b := by
-  induction h with
-  | refl _ h => exact Reaches.refl h
-  | tail _ e hc ih => exact ih.tail e hc
-
-end ReachesWithin
-
-/-- A node list forming a chain of `G` inside `V − X` gives bounded reachability. -/
-theorem reachesWithin_of_chain {X : Finset V} :
-    ∀ (p : List V) (a b : V), p.head? = some a → p.getLast? = some b → p.IsChain G.Adj →
-      (∀ y ∈ p, y ∉ X) → ReachesWithin G X (p.length - 1) a b
-  | [], _, _, h, _, _, _ => by simp at h
-  | [x], a, b, ha, hb, _, hX => by
-    simp only [List.head?_cons, Option.some.injEq, List.getLast?_singleton] at ha hb
-    subst ha hb
-    exact .refl _ (hX _ (by simp))
-  | x :: y :: q, a, b, ha, hb, hc, hX => by
-    simp only [List.head?_cons, Option.some.injEq] at ha
-    subst ha
-    rw [List.isChain_cons_cons] at hc
-    have ih := reachesWithin_of_chain (y :: q) y b rfl (by simpa using hb) hc.2
-      (fun z hz => hX z (List.mem_cons_of_mem _ hz))
-    have := ih.head hc.1 (hX x (by simp))
-    simpa using this
+/-- `ReachesWithin` in `0` hops: staying at a node outside `X`. -/
+theorem reachesWithin_zero_iff {X : Finset V} {a b : V} :
+    ReachesWithin G X 0 a b ↔ a ∉ X ∧ a = b := by
+  simp [ReachesWithin]
 
 /-- Every reachable node is reachable within `n − 1` hops. -/
 theorem reachesWithin_of_reaches [Fintype V] {X : Finset V} {a b : V} (h : Reaches G X a b) :
-    ReachesWithin G X (Fintype.card V - 1) a b := by
-  obtain ⟨p, ⟨⟨hh, hl, hc⟩, hn⟩, hX⟩ := h.exists_simplePath
-  have := reachesWithin_of_chain p a b hh hl hc hX
-  exact this.mono (by have := hn.length_le_card; omega)
+    ReachesWithin G X (Fintype.card V - 1) a b :=
+  ⟨h.1, Digraph.Reachable.relatesWithinSteps h.2⟩
 
 /-! ## The fault-tolerant diameter -/
 
@@ -158,7 +127,7 @@ def FTDiamLE (G : Digraph V) (f D : ℕ) : Prop :=
   ∀ F : Finset V, F.card ≤ f → ∀ s, IsRoot G F s → ∀ v, v ∉ F → ReachesWithin G F D s v
 
 theorem FTDiamLE.mono {f D D' : ℕ} (h : FTDiamLE G f D) (hD : D ≤ D') : FTDiamLE G f D' :=
-  fun F hF s hs v hv => (h F hF s hs v hv).mono hD
+  fun F hF s hs v hv => ⟨(h F hF s hs v hv).1, Relation.RelatesWithinSteps.mono hD (h F hF s hs v hv).2⟩
 
 /-- `d ≤ n − 1`. -/
 theorem ftDiamLE_card [Fintype V] (f : ℕ) : FTDiamLE G f (Fintype.card V - 1) :=

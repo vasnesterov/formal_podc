@@ -19,6 +19,8 @@ set_option linter.unusedSectionVars false
 
 namespace AsyncApproxBCDirected
 
+open Cslib.ApproxConsensus Cslib.ApproxConsensus.Async
+
 variable {V : Type*} [Fintype V] [DecidableEq V] {G : Digraph V} {f : ℕ}
 
 /-- Prefixes of redundant paths are redundant. -/

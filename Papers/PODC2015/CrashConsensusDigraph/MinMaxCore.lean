@@ -32,7 +32,7 @@ set_option linter.unusedSectionVars false
 
 namespace CrashConsensusDigraph
 
-open AsyncApproxBCDirected
+open Cslib.ApproxConsensus
 
 variable {V : Type*} [DecidableEq V] {G : Digraph V} {adv : Adversary V}
 
@@ -101,18 +101,16 @@ theorem spread {f D : ℕ} (hD : FTDiamLE G f D) {F : Finset V} (hF : F.card ≤
   have key : ∀ k ≤ D, ∀ v, ReachesWithin G F k s v → x (ps + k) v = a := by
     intro k
     induction k with
-    | zero => intro _ v hv; rw [← hv.zero_eq]; simpa using hx
+    | zero => intro _ v hv; rw [← hv.2.zero]; simpa using hx
     | succ k ih =>
       intro hk v hv
       have hst := hstep k (by omega)
       rw [← Nat.add_assoc]
-      cases hv with
-      | refl _ h => exact hst.sticky (ih (by omega) s (.refl k hs.1))
-      | tail hb e hc =>
-        rename_i b
-        have hxb := ih (by omega) b hb
-        refine (hst v).mpr (Or.inr ⟨b, delivers_of_alive ?_ e, hxb⟩)
-        exact (hal b hb.notMem_right).mono (by omega)
+      rcases Relation.relatesWithinSteps_succ_iff.1 hv.2 with h | ⟨b, hb, e⟩
+      · exact hst.sticky (ih (by omega) v ⟨hv.1, h⟩)
+      · have hxb := ih (by omega) b ⟨hv.1, hb⟩
+        refine (hst v).mpr (Or.inr ⟨b, delivers_of_alive ?_ e.1, hxb⟩)
+        exact (hal b e.2.1).mono (by omega)
   intro v hv
   exact key D le_rfl v (hD F hF s hs v hv)
 

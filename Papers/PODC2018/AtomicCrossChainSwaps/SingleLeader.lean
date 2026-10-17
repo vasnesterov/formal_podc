@@ -44,10 +44,11 @@ lemma exists_longest [Fintype V] {vh v : V} (h : Reach D v vh) :
     ∃ p : List V, p.Nodup ∧ p.IsChain D.Adj ∧ p.head? = some v ∧ p.getLast? = some vh ∧
       p.length = longest D vh v + 1 := by
   apply Nat.sSup_mem _ (longest_set_bdd D vh v)
-  obtain ⟨p, hnd, hch, hh, hl⟩ := h.exists_nodup
-  have : p ≠ [] := by rintro rfl; simp at hh
-  have : 0 < p.length := List.length_pos_iff.mpr this
-  exact ⟨p.length - 1, p, hnd, hch, hh, hl, by omega⟩
+  obtain ⟨p, hp, hnd⟩ := Digraph.Reachable.exists_isChainFromTo h
+  have := hp.length_pos
+  refine ⟨p.length - 1, p, hnd, hp.isChain, ?_, ?_, by omega⟩
+  · rw [List.head?_eq_some_head hp.ne_nil, hp.head_eq]
+  · rw [List.getLast?_eq_some_getLast hp.ne_nil, hp.getLast_eq]
 
 /-- **Lemma 4.13** of [Herlihy, PODC 2018]: with a single leader `vh` (i.e. `{vh}` is a feedback
 vertex set), for every arc `(v, w)` with `v ≠ vh` from which `vh` is reachable,
@@ -141,7 +142,7 @@ lemma reach_zero (v : Fin 4) : Reach G v 0 := by
   have a20 : G.Adj 2 0 := by decide
   have a30 : G.Adj 3 0 := by decide
   fin_cases v
-  · exact .refl
+  · exact .rfl
   · exact .head a12 (.single a20)
   · exact .single a20
   · exact .single a30
@@ -151,7 +152,7 @@ lemma zero_reach (v : Fin 4) : Reach G 0 v := by
   have a12 : G.Adj 1 2 := by decide
   have a13 : G.Adj 1 3 := by decide
   fin_cases v
-  · exact .refl
+  · exact .rfl
   · exact .single a01
   · exact .head a01 (.single a12)
   · exact .head a01 (.single a13)

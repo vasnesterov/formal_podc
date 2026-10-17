@@ -100,7 +100,7 @@ Classification: **[false]** false statement · **[degenerate]** false only in a 
 
 ## Modelling choices
 
-* **[model] Asynchronous model** (`AsyncModel.lean`):
+* **[model] Asynchronous model** (`Podc/ApproxConsensus/Async/Model.lean`):
   * deterministic event-driven nodes that know `G`;
   * reliable links that are **FIFO**, with adversarial finite delays;
   * a static Byzantine set `B`, `|B| ≤ f`; Byzantine nodes may deliver any message to any

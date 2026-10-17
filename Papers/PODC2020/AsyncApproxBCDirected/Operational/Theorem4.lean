@@ -21,6 +21,8 @@ set_option linter.unusedSectionVars false
 
 namespace AsyncApproxBCDirected
 
+open Cslib.ApproxConsensus Cslib.ApproxConsensus.Async
+
 variable {V : Type*} [Fintype V] [DecidableEq V]
 
 /-! ## Decisions in runs -/

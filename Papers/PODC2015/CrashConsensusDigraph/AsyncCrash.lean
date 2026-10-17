@@ -4,7 +4,7 @@ import Papers.PODC2015.CrashConsensusDigraph.Async
 # Asynchronous crash-prone message passing on a digraph (crashes at arbitrary times)
 
 The model of Section 4 with general crash faults. We reuse the asynchronous model of
-`Papers/PODC2020/AsyncApproxBCDirected/AsyncModel.lean` (deterministic event-driven algorithms,
+`Podc/ApproxConsensus/Async/Model.lean` (deterministic event-driven algorithms,
 reliable FIFO links with adversarial finite delays, irrevocable outputs) with a *time-varying*
 set of crashed nodes:
 
@@ -33,7 +33,7 @@ set_option linter.unusedSectionVars false
 
 namespace CrashConsensusDigraph
 
-open AsyncApproxBCDirected
+open Cslib.ApproxConsensus Cslib.ApproxConsensus.Async
 
 variable {V M S : Type*} [DecidableEq V] [Fintype V]
 

@@ -75,6 +75,10 @@ import Podc.Graph.Girth
 import Podc.Graph.Spanner.Weighted
 import Podc.Graph.Spanner.Greedy
 import Podc.Graph.Spanner.FaultTolerantGreedy
+import Podc.Digraph.Walk
+import Podc.ApproxConsensus.DigraphConditions
+import Podc.ApproxConsensus.Async.Model
+import Podc.ApproxConsensus.Async.Replay
 import Podc.Data.Nat.TimeRec
 import Podc.Local.LocallyIterative
 import Podc.PartialSync.Map

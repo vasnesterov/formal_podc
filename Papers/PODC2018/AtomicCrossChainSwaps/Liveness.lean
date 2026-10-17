@@ -86,11 +86,10 @@ theorem unl_of_reachIn {K : ℕ} (hK : ∀ v, Fired P.D (P.L : Set V) K v) (hB :
     {ℓ : V} (hℓ : ℓ ∈ P.L) : ∀ (d : ℕ) {u v : V}, ReachIn P.D d v ℓ → P.D.Adj u v →
     ((P.run ∅ sch (K + 2 + d)).unl u v ℓ).isSome
   | 0, u, v, hv, huv => by
-    have : v = ℓ := hv
-    subst this
+    obtain rfl : v = ℓ := hv.zero
     exact release_in_time hfix hB hℓ (fun y _ => hK y) huv
   | d + 1, u, v, hv, huv => by
-    rcases hv with hv | ⟨x, hvx, hx⟩
+    rcases Relation.relatesWithinSteps_succ_iff'.1 hv with hv | ⟨x, hvx, hx⟩
     · subst hv
       exact P.unl_isSome_mono ∅ sch (by omega)
         (release_in_time hfix hB hℓ (fun y _ => hK y) huv)

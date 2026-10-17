@@ -34,7 +34,7 @@ set_option linter.unusedSectionVars false
 
 namespace CrashConsensusDigraph
 
-open AsyncApproxBCDirected
+open Cslib.ApproxConsensus Cslib.ApproxConsensus.Async
 
 variable {V : Type*} [DecidableEq V] [Fintype V]
 

@@ -26,7 +26,7 @@ set_option linter.unusedSectionVars false
 
 namespace CrashConsensusDigraph
 
-open AsyncApproxBCDirected
+open Cslib.ApproxConsensus Cslib.ApproxConsensus.Async
 
 universe u
 
@@ -245,7 +245,7 @@ provided `(1 − 1/n)^pend · (hi − lo) ≤ ε`. -/
 theorem theorem7 (hG : CCA G f) {lo hi ε : ℝ} (hlohi : lo ≤ hi)
     (hp : (1 - 1 / (Fintype.card V : ℝ)) ^ pend * (hi - lo) ≤ ε) :
     CrashSolvesGenOn (Set.Icc lo hi) (wa G f pend) G f ε := by
-  have h2 : TwoReach G f := theorem17b.mp hG
+  have h2 : TwoReach G f := cca_iff_twoReach.mp hG
   intro ct hadm inp hinp ev hev
   refine ⟨fun t v u y z _ _ hy hz => ?_, fun t v y _ hy => ?_, fun hfair v hv => ?_⟩
   · exact (wa_agreement h2 hlohi hinp (winv_runC ct inp ev hev t) hy hz).trans hp

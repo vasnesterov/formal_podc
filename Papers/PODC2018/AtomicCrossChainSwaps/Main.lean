@@ -141,7 +141,8 @@ example : (⟨cyc3, {0}, 4, true, false⟩ : Setting (Fin 3)).game.Atomic := by
     -- every closed walk among the followers {1, 2} would need the arc 2 → 0 or 0 → 1
     have hstep : ∀ a b : Fin 3, FollowerAdj cyc3 ((({0} : Finset (Fin 3)) : Set (Fin 3))) a b →
         a.val < b.val := by
-      unfold FollowerAdj cyc3; simp only [Finset.coe_singleton, Set.mem_singleton_iff]; decide
+      unfold FollowerAdj cyc3
+      simp only [Digraph.deleteVerts_adj, Finset.coe_singleton, Set.mem_singleton_iff]; decide
     have key : ∀ a b, Relation.TransGen (FollowerAdj cyc3 ({0} : Finset (Fin 3))) a b →
         a.val < b.val := by
       intro a b h
