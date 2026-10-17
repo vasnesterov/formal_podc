@@ -1,11 +1,17 @@
-import Papers.PODC2020.BezoutElection.LockStep
+import Podc.SharedMemory.Anonymous.LockStep
 import Papers.PODC2020.BezoutElection.Exec
 import Mathlib.Data.Finset.Lattice.Fold
 
 /-!
 # The lock-step execution of all groups
 
-From the symmetric set-up (`Setup`), the *lock-step execution* lets every group invoke `elect()`
+The set-up (`Setup`): `k` groups of `g` processes covering all processes; process `e q i` (`q < k`
+the group, `i < g` the position in the group) sees the registers rotated by `sh ^ i` and has
+identifier `σ ^ i (a q)` (the library's `SymAlg.LSSetup`, plus surjectivity of `e`). The
+symmetric group rounds (`SymAlg.round_rmw`, `round_snap`, `round_ret`, `round_inv`) are in
+`Podc.SharedMemory.Anonymous.LockStep`.
+
+From the symmetric set-up, the *lock-step execution* lets every group invoke `elect()`
 and then repeats rounds in which every pending group takes one group round (each member takes
 one step). Either at some round all processes have returned — then all members of a group
 returned the same response (`exists_symmetric_outcome`) — or the lock-step execution is a fair,
@@ -24,6 +30,13 @@ variable {R : Type} [Inhabited R] {Id V S : Type} {m : ℕ} [MulAction (Equiv.Pe
   {ids : P → Id} {π : P → Equiv.Perm (Fin m)}
   {k g : ℕ} {e : ℕ → ℕ → P} {σ : Equiv.Perm Id} {sh : Equiv.Perm (Fin m)} {a : ℕ → Id}
 
+/-- The rotation set-up with `k` groups of `g` processes that cover all processes. -/
+structure Setup (k g : ℕ) (e : ℕ → ℕ → P) (σ : Equiv.Perm Id) (sh : Equiv.Perm (Fin m))
+    (a : ℕ → Id) (ids : P → Id) (π : P → Equiv.Perm (Fin m)) : Prop
+    extends SymAlg.LSSetup k g e σ sh a ids π where
+  /-- Every process is a member of a group. -/
+  esurj : ∀ p, ∃ q < k, ∃ i < g, e q i = p
+
 /-- Invariant of the lock-step execution after the invocations: execution `α` reaches the
 symmetric configuration `C`; `o q` is the response of group `q` (`none` while pending). -/
 structure Good (k g : ℕ) (e : ℕ → ℕ → P) (σ : Equiv.Perm Id) (sh : Equiv.Perm (Fin m))
@@ -31,7 +44,7 @@ structure Good (k g : ℕ) (e : ℕ → ℕ → P) (σ : Equiv.Perm Id) (sh : Eq
     (α : List (Label P (elecObj R))) (C : A.Cfg)
     (s : ℕ → S) (b : ℕ → Option Unit) (o : ℕ → Option R) : Prop where
   run : (A.impl ids π).run α = some C
-  sym : SymCfg k g e σ sh C s b
+  sym : SymAlg.SymCfg k g e σ sh C s b
   oneShot : OneShot α
   out : ∀ q < k, ∀ i < g, outputs α (e q i) = o q
   pend : ∀ q < k, b q = none ↔ o q ≠ none
@@ -70,21 +83,21 @@ lemma good_group_round (hg : 0 < g) {α : List (Label P (elecObj R))} {C : A.Cfg
     fun i hi => ⟨.tau (e q i), List.mem_map.2 ⟨i, List.mem_range.2 hi, rfl⟩, rfl, trivial⟩
   cases hact : A.act (s q) with
   | rmw x f κ =>
-    obtain ⟨D, hD, hsym, hpend⟩ := round_rmw hS hA h.sym hq hb hg hact
+    obtain ⟨D, hD, hsym, -⟩ := SymAlg.round_rmw hS.toLSSetup hA h.sym hq (by simp [hb]) hg hact
     refine ⟨_, D, _, b, o, ⟨by rw [Impl.run_append_of_eq _ h.run]; exact hD, hsym,
       fun p => by have := h.oneShot p; simpa [opsOf_map_tau hS hA] using this,
       fun q' hq' i hi => by rw [outputs_append, h.out q' hq' i hi]; simp [outputs,
         respsOf_map_tau hS hA], h.pend⟩, hsteps, hne,
       fun q' _ hqq => ⟨Function.update_of_ne hqq _ _, rfl⟩, fun _ _ h => h⟩
   | snap κ =>
-    obtain ⟨D, hD, hsym, hpend⟩ := round_snap hS hA h.sym hq hb hact
+    obtain ⟨D, hD, hsym, -⟩ := SymAlg.round_snap hS.toLSSetup hA h.sym hq (by simp [hb]) hact
     refine ⟨_, D, _, b, o, ⟨by rw [Impl.run_append_of_eq _ h.run]; exact hD, hsym,
       fun p => by have := h.oneShot p; simpa [opsOf_map_tau hS hA] using this,
       fun q' hq' i hi => by rw [outputs_append, h.out q' hq' i hi]; simp [outputs,
         respsOf_map_tau hS hA], h.pend⟩, hsteps, hne,
       fun q' _ hqq => ⟨Function.update_of_ne hqq _ _, rfl⟩, fun _ _ h => h⟩
   | ret r s'' =>
-    obtain ⟨D, hD, hsym, hpend⟩ := round_ret hS hA h.sym hq hb hact
+    obtain ⟨D, hD, hsym, -⟩ := SymAlg.round_ret hS.toLSSetup hA h.sym hq (by simp [hb]) hact
     refine ⟨_, D, _, _, Function.update o q (some r),
       ⟨by rw [Impl.run_append_of_eq _ h.run]; exact hD, hsym,
       fun p => by have := h.oneShot p; simpa [opsOf_map_ret hS hA] using this,
@@ -116,7 +129,7 @@ lemma good_group_round (hg : 0 < g) {α : List (Label P (elecObj R))} {C : A.Cfg
           apply outputs_eq_none_of_proc_ne
           intro ℓ hℓ
           obtain ⟨j, hj, rfl⟩ := List.mem_map.1 hℓ
-          exact hS.ne_of_group_ne hA hq hq' (List.mem_range.1 hj) hi (Ne.symm hqq)
+          exact hS.ne_of_group_ne hq hq' (List.mem_range.1 hj) hi (Ne.symm hqq)
         rw [this]; cases o q' <;> rfl
     · by_cases hqq : q' = q
       · subst hqq; simp
@@ -222,7 +235,7 @@ lemma good_init [Fintype P] :
   have hl : l.Nodup := Finset.nodup_toList _
   obtain ⟨D, hD, h1, h2, h3⟩ := runFrom_invs hS (A := A) l hl (A.impl ids π).initCfg
     (fun _ _ => rfl)
-  have hC0 := symCfg_init hS hA (A := A)
+  have hC0 := SymAlg.symCfg_init (A := A) hS.toLSSetup hA
   refine ⟨_, D, fun q => A.invoke (A.init (a q)) (), ⟨hD, ⟨fun q hq i hi => ?_,
     fun q hq i hi => by simp [h2, l], fun y => by rw [h1]; exact hC0.mem y⟩,
     fun p => by simp [opsOf_map_inv l hl, l], fun q hq i hi => ?_,
@@ -292,13 +305,13 @@ theorem exists_symmetric_outcome (hg : 0 < g) (hT : Terminates (A.impl ids π)) 
     obtain ⟨ex, hlbl, hcfg⟩ := (A.impl ids π).exists_infExec_of_chain E
       (fun j => by obtain ⟨β, h1, -⟩ := hEs j; rw [h1]; exact List.prefix_append _ _)
       hlen (fun j => ⟨_, (X j).2.run⟩)
-    have hpre : ∀ j t, t ≤ (E j).length → ePre ex t = (E j).take t := by
+    have hpre : ∀ j t, t ≤ (E j).length → ex.lbls t = (E j).take t := by
       intro j t ht
       apply List.ext_getElem
-      · simp [ePre]; omega
+      · simp [Impl.InfExec.lbls]; omega
       · intro n h1 h2
-        simp only [ePre, List.getElem_map, List.getElem_range, List.getElem_take]
-        exact hlbl j n (by simp [ePre] at h1; omega)
+        simp only [Impl.InfExec.lbls, List.getElem_map, List.getElem_range, List.getElem_take]
+        exact hlbl j n (by simp [Impl.InfExec.lbls] at h1; omega)
     have hcfgE : ∀ j, ex.cfg (E j).length = (X j).1.2.1 := by
       intro j
       have h := hcfg j _ le_rfl
@@ -316,12 +329,12 @@ theorem exists_symmetric_outcome (hg : 0 < g) (hT : Terminates (A.impl ids π)) 
       intro p
       obtain ⟨n, hn, hn'⟩ := List.getElem_of_mem (hinv p)
       exact ⟨n, (), by rw [hlbl 0 n hn]; exact hn'⟩
-    have hfair : IsFair ex := by
+    have hfair : ex.IsFair := by
       intro p t hp
       set N := (E (t + 1)).length
       have htN : t < N := by have := hlen (t + 1); omega
       by_cases hpN : (ex.cfg N).pend p = none
-      · obtain ⟨t', h1, -, r, hr⟩ := InfExec.exists_ret_between ex hp hpN htN.le
+      · obtain ⟨t', h1, -, r, hr⟩ := ex.exists_ret_between htN.le hp hpN
         exact ⟨t', h1, by rw [hr]; rfl, by rw [hr]; trivial⟩
       · obtain ⟨q, hq, i, hi, rfl⟩ := hS.esurj p
         rw [hcfgE, ((X (t + 1)).2.sym.pend q hq i hi)] at hpN

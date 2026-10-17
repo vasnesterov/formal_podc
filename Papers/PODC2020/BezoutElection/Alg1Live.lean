@@ -21,7 +21,7 @@ variable {Id : Type} [DecidableEq Id] {R : Type} [Inhabited R] {P : Type} [Decid
 structure Ctx (e : ((alg1 Id n out).impl ids π).InfExec) : Prop where
   hid : Function.Injective ids
   hn : Fintype.card P = n
-  fair : IsFair e
+  fair : e.IsFair
   allinv : AllInvoke e
 
 variable {e : ((alg1 Id n out).impl ids π).InfExec}
@@ -31,9 +31,9 @@ namespace Ctx
 variable (X : Ctx e)
 include X
 
-lemma inv (t : ℕ) : Inv ids n out (ePre e t) (e.cfg t) := inv_run X.hid X.hn (run_ePre e t)
+lemma inv (t : ℕ) : Inv ids n out (e.lbls t) (e.cfg t) := inv_run X.hid X.hn (e.run_lbls t)
 
-lemma basic (t : ℕ) : Basic ids (ePre e t) (e.cfg t) := (X.inv t).1
+lemma basic (t : ℕ) : Basic ids (e.lbls t) (e.cfg t) := (X.inv t).1
 
 lemma me (t : ℕ) (q : P) : ((e.cfg t).loc q).me = ids q := (X.basic t).me q
 
@@ -104,7 +104,7 @@ lemma reg_of_not_write {t : ℕ} (h : ¬ WriteAt e t) : reg (e.cfg (t + 1)) = re
   · exact absurd ⟨q, w, h1, h2⟩ h
 
 lemma other {t : ℕ} {q : P} (h : (e.lbl t).proc ≠ q) : (e.cfg (t + 1)).loc q = (e.cfg t).loc q :=
-  (InfExec.other e h).1
+  (Impl.step_other (e.step_eq _) h).1
 
 /-- Local facts preserved by every step. -/
 lemma mono (t : ℕ) (q : P) : ((e.cfg (t + 1)).loc q).me = ((e.cfg t).loc q).me ∧
@@ -211,13 +211,13 @@ lemma act_nonread {t : ℕ} {q : P} (hq : (e.lbl t).proc = q)
     · simp [h1]
 
 /-- A response label of `p` occurs before `t` if `p` has an output at `t`. -/
-lemma ret_of_outputs {t : ℕ} {p : P} (h : outputs (ePre e t) p ≠ none) :
+lemma ret_of_outputs {t : ℕ} {p : P} (h : outputs (e.lbls t) p ≠ none) :
     ∃ t' r, e.lbl t' = .ret p r := by
   obtain ⟨r, hr⟩ := Option.ne_none_iff_exists'.1 h
-  have hmem : r ∈ respsOf (ePre e t) p := List.mem_of_mem_head? hr
+  have hmem : r ∈ respsOf (e.lbls t) p := List.mem_of_mem_head? hr
   simp only [respsOf, List.mem_filterMap] at hmem
   obtain ⟨ℓ, hℓ, hret⟩ := hmem
-  simp only [ePre, List.mem_map, List.mem_range] at hℓ
+  simp only [Impl.InfExec.lbls, List.mem_map, List.mem_range] at hℓ
   obtain ⟨t', -, rfl⟩ := hℓ
   cases hl : e.lbl t' with
   | inv q o => rw [hl] at hret; simp at hret
@@ -241,7 +241,7 @@ lemma ev_flush (q : P) (t₀ : ℕ) (Q : ℕ → Prop)
   by_cases hp : (e.cfg t₀).pend q = none
   · obtain ⟨T, -, hT⟩ := ev_forever Q t₀ hpres ⟨t₀, le_rfl, hidle hp⟩
     exact ⟨T, hT⟩
-  · obtain ⟨t', ht', hq, -⟩ := InfExec.first_act e X.fair hp
+  · obtain ⟨t', ht', hq, -⟩ := e.first_act X.fair hp
     obtain ⟨T, -, hT⟩ := ev_forever Q t₀ hpres ⟨t' + 1, by omega, hact t' ht' hq⟩
     exact ⟨T, hT⟩
 
@@ -258,12 +258,12 @@ lemma read_nowrite (q : P) (t₁ : ℕ) (hpend : ∀ t ≥ t₁, (e.cfg t).pend 
     induction t, ht using Nat.le_induction with
     | base => rfl
     | succ t ht ih => rw [X.reg_of_not_write (hnw t ht), ih]
-  obtain ⟨t, ht, hq, -⟩ := InfExec.first_act e X.fair (hpend t₁ le_rfl)
+  obtain ⟨t, ht, hq, -⟩ := e.first_act X.fair (hpend t₁ le_rfl)
   rcases hpc t ht with h1 | ⟨w, h1⟩
   · obtain ⟨hl, hloc, -⟩ := X.act_read hq h1
     refine ⟨t, ht, h1, hl, hreg t ht, hloc, fun w hw => ?_⟩
     rw [← hloc] at hw
-    obtain ⟨t', ht', hq', hloc', -⟩ := InfExec.first_act e X.fair (hpend (t + 1) (by omega))
+    obtain ⟨t', ht', hq', -, hloc', -⟩ := e.first_act X.fair (hpend (t + 1) (by omega))
     rw [← hloc'] at hw
     exact hnw t' (by omega) ⟨q, w, (X.act_write hq' hw).1, hw⟩
   · exact absurd ⟨q, w, (X.act_write hq h1).1, h1⟩ (hnw t ht)

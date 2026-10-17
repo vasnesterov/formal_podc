@@ -1,5 +1,4 @@
 import Papers.PODC2020.BezoutElection.LockStepExec
-import Papers.PODC2019.AnonymousMutex.LowerBound
 import Mathlib.GroupTheory.Perm.ViaEmbedding
 import Mathlib.Logic.Equiv.Fin.Basic
 
@@ -66,7 +65,7 @@ lemma shift_mem' (q i : ℕ) : shift m (mem' m hn q i) = mem' m hn q (i + 1) := 
   ext
   have hg := gcd_pos' m hn
   obtain ⟨g', hg'⟩ : ∃ g', Nat.gcd m (Fintype.card P) = g' + 1 := ⟨_, (Nat.succ_pred_eq_of_pos hg).symm⟩
-  have := AnonymousMutex.finRotate_pow_val (m := Nat.gcd m (Fintype.card P)) 1
+  have := val_finRotate_pow_apply (m := Nat.gcd m (Fintype.card P)) 1
     ⟨i % Nat.gcd m (Fintype.card P), Nat.mod_lt _ hg⟩
   simp only [pow_one] at this
   rw [this, Nat.add_mod, Nat.mod_mod, ← Nat.add_mod]
@@ -120,26 +119,8 @@ theorem exists_setup (hid : Function.Injective ids) : ∃ (e : ℕ → ℕ → P
             Equiv.Perm.viaEmbeddingHom ι (shift m ^ Nat.gcd m (Fintype.card P)) :=
           (map_pow _ _ _).symm
         rw [this, shift_pow_gcd m hn, map_one]
-      shpow := by
-        ext x
-        rw [← pow_mul, AnonymousMutex.finRotate_pow_val, hdg, Equiv.Perm.one_apply,
-          Nat.add_mod_right, Nat.mod_eq_of_lt x.isLt]
-      shinj := by
-        intro i j y hi hj hij
-        have hm : 0 < m := Nat.lt_of_le_of_lt (Nat.zero_le _) y.isLt
-        have hd0 : 0 < m / Nat.gcd m (Fintype.card P) := by
-          rcases Nat.eq_zero_or_pos (m / Nat.gcd m (Fintype.card P)) with h0 | h0
-          · rw [h0, zero_mul] at hdg; omega
-          · exact h0
-        have := congrArg Fin.val hij
-        rw [← pow_mul, ← pow_mul, AnonymousMutex.finRotate_pow_val,
-          AnonymousMutex.finRotate_pow_val] at this
-        have hmod : Nat.ModEq m (m / Nat.gcd m (Fintype.card P) * i)
-            (m / Nat.gcd m (Fintype.card P) * j) := Nat.ModEq.add_left_cancel' (y : ℕ) this
-        have := hmod.eq_of_lt_of_lt
-          (by have := Nat.mul_lt_mul_of_pos_left hi hd0; rwa [hdg] at this)
-          (by have := Nat.mul_lt_mul_of_pos_left hj hd0; rwa [hdg] at this)
-        exact Nat.eq_of_mul_eq_mul_left hd0 this
+      shpow := finRotate_pow_pow_eq_one hdg
+      shinj := fun i j y hi hj hij => finRotate_pow_pow_apply_inj hdg hi hj hij
       einj := by
         intro q i q' j hq hi hq' hj h
         have := (grp m).symm.injective h

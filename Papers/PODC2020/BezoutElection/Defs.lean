@@ -1,6 +1,8 @@
 import Cslib.Computability.Distributed.SharedMemory.Anonymous
 import Cslib.Computability.Distributed.SharedMemory.Task
 import Cslib.Computability.Distributed.SharedMemory.Progress
+import Podc.SharedMemory.Progress
+import Podc.SharedMemory.Objects.Iface
 
 /-!
 # Election in anonymous memory: problem definitions
@@ -13,7 +15,8 @@ Memory Systems*, PODC 2020 (DOI 10.1145/3382734.3405727), Section 1.
   Section 2), or an identifier / a set of identifiers for the algorithms.
 * **Model** (Section 1.2): all `n` processes participate, i.e. each one invokes `elect()` exactly
   once; no process fails; the system is asynchronous. *Termination* (`Terminates`): in every
-  fair infinite execution in which every process invokes `elect()` once, every process returns.
+  fair (`InfExec.IsFair`) infinite execution in which every process invokes `elect()` once, every
+  process returns.
   (Equivalently, there is no such infinite execution: all fair executions are finite.)
 * **d-election** (`DElection d`, bit outputs): in every finite execution where all processes
   have returned, the number of processes that returned `true` is between `1` and `d`.
@@ -30,39 +33,18 @@ namespace BezoutElection
 
 /-- The election object: one operation `elect()`, response of type `R` (no sequential
 semantics; the problem is a task, specified on executions). -/
-abbrev elecObj (R : Type) [Inhabited R] : ObjSpec where
-  State := Unit
-  Op := Unit
-  Resp := R
-  init := ()
-  δ _ _ := ((), default)
+abbrev elecObj (R : Type) [Inhabited R] : ObjSpec := ObjSpec.iface Unit R
 
 section Generic
 
 variable {A : ObjSpec} {ι : Type} [DecidableEq ι] {B : ι → ObjSpec} {P L : Type} [DecidableEq P]
   {I : Impl A B P L}
 
-/-- The labels of the first `t` steps of an infinite execution. -/
-def ePre (e : I.InfExec) (t : ℕ) : List (Label P A) := (List.range t).map e.lbl
-
-/-- Fairness (for any object): a process with a pending operation eventually takes a step. -/
-def IsFair (e : I.InfExec) : Prop :=
-  ∀ p t, (e.cfg t).pend p ≠ none → ∃ t' ≥ t, (e.lbl t').proc = p ∧ (e.lbl t').IsStep
-
 /-- Every process invokes at most one operation. -/
-def IsOneShot (e : I.InfExec) : Prop := ∀ t, OneShot (ePre e t)
+def IsOneShot (e : I.InfExec) : Prop := ∀ t, OneShot (e.lbls t)
 
 /-- Every process invokes an operation (all processes participate). -/
 def AllInvoke (e : I.InfExec) : Prop := ∀ p, ∃ t o, e.lbl t = .inv p o
-
-lemma ePre_succ (e : I.InfExec) (t : ℕ) : ePre e (t + 1) = ePre e t ++ [e.lbl t] := by
-  simp [ePre, List.range_succ]
-
-lemma run_ePre (e : I.InfExec) (t : ℕ) : I.run (ePre e t) = some (e.cfg t) := by
-  induction t with
-  | zero => simp [ePre, e.cfg_zero]
-  | succ t ih =>
-    rw [ePre_succ, Impl.run_append_of_eq I ih, Impl.runFrom_singleton, e.step_eq]
 
 end Generic
 
@@ -74,7 +56,7 @@ variable {R : Type} [Inhabited R] {ι : Type} [DecidableEq ι] {B : ι → ObjSp
 /-- **Termination** (all processes participate, no failures, asynchrony): in every fair one-shot
 infinite execution in which every process invokes `elect()`, every process returns. -/
 def Terminates (I : Impl (elecObj R) B P L) : Prop :=
-  ∀ e : I.InfExec, IsOneShot e → AllInvoke e → IsFair e → ∀ p, ∃ t r, e.lbl t = .ret p r
+  ∀ e : I.InfExec, IsOneShot e → AllInvoke e → e.IsFair → ∀ p, ∃ t r, e.lbl t = .ret p r
 
 /-- All processes have returned in the finite execution `α`. -/
 def AllReturned (α : List (Label P (elecObj R))) : Prop := ∀ p, outputs α p ≠ none

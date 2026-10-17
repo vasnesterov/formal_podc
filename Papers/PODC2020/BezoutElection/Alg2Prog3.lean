@@ -138,7 +138,7 @@ lemma nowin_conc {τ : ℕ} (hτ : Q.T ≤ τ) {q : P} {j : ℕ} {w : Reg Id}
   rcases ((Q.rinv τ).level_lt_of_write hpc hj).2 with h | h
   · exact h
   · exfalso
-    obtain ⟨τ', hτ', hq, hloc, -⟩ := InfExec.first_act e Q.hfair (Q.pend hτ q)
+    obtain ⟨τ', hτ', hq, -, hloc, -⟩ := e.first_act Q.hfair (Q.pend hτ q)
     have hl : e.lbl τ' = .tau q := by rw [Q.lbl_tau (by omega), hq]
     have h' := e.step_eq τ'
     rw [hl] at h'

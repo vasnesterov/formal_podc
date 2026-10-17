@@ -86,3 +86,4 @@ import Podc.PartialSync.Triviality
 import Podc.PartialSync.Containment
 import Podc.SharedMemory.Solo
 import Podc.Algebra.BigOperators.Update
+import Podc.SharedMemory.Anonymous.LockStep

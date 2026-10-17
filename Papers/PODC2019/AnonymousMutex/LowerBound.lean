@@ -1,8 +1,6 @@
-import Cslib.Computability.Distributed.SharedMemory.Anonymous
+import Podc.SharedMemory.Anonymous.LockStep
 import Mathlib.GroupTheory.Perm.List
-import Mathlib.Logic.Equiv.Fin.Rotate
 import Mathlib.Data.Nat.GCD.Basic
-import Mathlib.Data.Nat.ModEq
 import Mathlib.Data.Fintype.EquivFin
 import Mathlib.Tactic.Ring
 import Mathlib.Tactic.Linarith
@@ -27,6 +25,9 @@ execution in which no `lock()` completes (deadlock-freedom fails).
 The argument covers arbitrary read-modify-write registers *and* atomic snapshots (all processes
 of a round perform the same kind of access), so it also gives the necessary condition of
 Taubenfeld (PODC 2017) for read/write registers and for the snapshot-based model of Algorithm 1.
+
+The symmetric rounds are the one-group case (`k = 1`) of the shared lock-step library
+`Podc.SharedMemory.Anonymous.LockStep` (`SymAlg.LSSetup.single`, `SymAlg.round_rmw`, …).
 -/
 
 set_option linter.unusedSectionVars false
@@ -37,28 +38,6 @@ namespace AnonymousMutex
 
 /-- `M(n) = {m : ∀ ℓ, 1 < ℓ ≤ n → gcd(ℓ, m) = 1}`. -/
 def M (n : ℕ) : Set ℕ := {m | ∀ ℓ, 1 < ℓ → ℓ ≤ n → Nat.Coprime ℓ m}
-
-/-! ### Generic lemmas -/
-
-section Generic
-
-variable {O : ObjSpec} {ι : Type} [DecidableEq ι] {B : ι → ObjSpec} {P L : Type} [DecidableEq P]
-
-/-- Run the labels `lab 0, …, lab (n-1)`, given a step invariant. -/
-lemma runFrom_range (I : Impl O B P L) (Q : ℕ → Config O B P L → Prop) (lab : ℕ → Label P O)
-    (n : ℕ) (C : Config O B P L) (h0 : Q 0 C)
-    (hstep : ∀ j < n, ∀ D, Q j D → ∃ D', I.step D (lab j) = some D' ∧ Q (j + 1) D') :
-    ∃ D, I.runFrom C ((List.range n).map lab) = some D ∧ Q n D := by
-  induction n with
-  | zero => exact ⟨C, rfl, h0⟩
-  | succ n ih =>
-    obtain ⟨D, hD, hQ⟩ := ih (fun j hj => hstep j (by omega))
-    obtain ⟨D', hD', hQ'⟩ := hstep n (by omega) D hQ
-    refine ⟨D', ?_, hQ'⟩
-    rw [List.range_succ, List.map_append, I.runFrom_append_of_eq hD, List.map_singleton,
-      I.runFrom_singleton, hD']
-
-end Generic
 
 section Regions
 
@@ -97,207 +76,7 @@ section LockStep
 variable {Id V S : Type} {m : ℕ} [MulAction (Equiv.Perm Id) V] [MulAction (Equiv.Perm Id) S]
   {A : SymAlg mutexObj Id m V S} {P : Type} [DecidableEq P] {ids : P → Id}
   {π : P → Equiv.Perm (Fin m)}
-  (g : ℕ) (e : ℕ → P) (σ : Equiv.Perm Id) (sh : Equiv.Perm (Fin m)) (a₀ : Id)
-
-/-- The hypotheses on the rotation set-up. -/
-structure Setup (ids : P → Id) (π : P → Equiv.Perm (Fin m)) : Prop where
-  σpow : σ ^ g = 1
-  shpow : sh ^ g = 1
-  shinj : ∀ i j y, i < g → j < g → (sh ^ i) y = (sh ^ j) y → i = j
-  einj : ∀ i j, i < g → j < g → e i = e j → i = j
-  hπ : ∀ i < g, π (e i) = sh ^ i
-  hid : ∀ i < g, ids (e i) = (σ ^ i) a₀
-
-/-- A symmetric configuration with base local state `s` and pending operation `b`. -/
-structure SymCfg (C : A.Cfg) (s : S) (b : Option MutexOp) : Prop where
-  loc : ∀ i < g, C.loc (e i) = (σ ^ i) • s
-  pend : ∀ i < g, C.pend (e i) = b
-  other : ∀ p, (∀ i < g, e i ≠ p) → C.pend p = none
-  mem : ∀ y, C.mem () (sh y) = σ • C.mem () y
-
-variable {g e σ sh a₀}
-
-lemma SymCfg.mem_pow {C : A.Cfg} {s : S} {b : Option MutexOp}
-    (hC : SymCfg g e σ sh C s b) (i : ℕ) (y : Fin m) :
-    C.mem () ((sh ^ i) y) = (σ ^ i) • C.mem () y := by
-  induction i with
-  | zero => simp
-  | succ i ih => rw [pow_succ', Equiv.Perm.mul_apply, hC.mem, ih, pow_succ', mul_smul]
-
-section Rounds
-
-variable (hS : Setup g e σ sh a₀ ids π) (hA : A.Symmetric)
-include hS hA
-
-/-- A round of read-modify-write steps preserves symmetry. -/
-lemma round_rmw {C : A.Cfg} {s : S} {o : MutexOp} (hC : SymCfg g e σ sh C s (some o))
-    {x : Fin m} {f : V → V} {k : V → S} (hact : A.act s = .rmw x f k) :
-    ∃ D, (A.impl ids π).runFrom C ((List.range g).map (fun j => .tau (e j))) = some D ∧
-      SymCfg g e σ sh D (k (C.mem () x)) (some o) := by
-  set v := C.mem () x
-  let Q : ℕ → A.Cfg → Prop := fun j D =>
-    (∀ i < g, D.loc (e i) = (σ ^ i) • (if i < j then k v else s)) ∧
-    (∀ p, D.pend p = C.pend p) ∧
-    (∀ i < g, D.mem () ((sh ^ i) x) = (σ ^ i) • (if i < j then f v else v)) ∧
-    (∀ y, (∀ i < g, (sh ^ i) x ≠ y) → D.mem () y = C.mem () y)
-  obtain ⟨D, hD, hQ1, hQ2, hQ3, hQ4⟩ := runFrom_range (A.impl ids π) Q _ g C
-    ⟨fun i hi => by simp [hC.loc i hi], fun _ => rfl,
-      fun i hi => by simp [hC.mem_pow, v], fun _ _ => rfl⟩
-    (by
-      rintro j hj D ⟨h1, h2, h3, h4⟩
-      have hpend : D.pend (e j) ≠ none := by rw [h2, hC.pend j hj]; simp
-      have hloc : D.loc (e j) = (σ ^ j) • s := by simp [h1 j hj]
-      have hact' : A.act (D.loc (e j)) = .rmw x (fun w => (σ ^ j) • f ((σ ^ j)⁻¹ • w))
-          (fun w => (σ ^ j) • k ((σ ^ j)⁻¹ • w)) := by
-        rw [hloc, hA.act, hact]; rfl
-      have hval : D.mem () ((sh ^ j) x) = (σ ^ j) • v := by simp [h3 j hj]
-      refine ⟨_, SymAlg.impl_step_tau_rmw ids π hpend hact', ?_⟩
-      simp only [hS.hπ j hj, hval, inv_smul_smul]
-      refine ⟨fun i hi => ?_, fun p => h2 p, fun i hi => ?_, fun y hy => ?_⟩
-      · by_cases hij : i = j
-        · subst hij; simp
-        · have hne : e i ≠ e j := fun h => hij (hS.einj i j hi hj h)
-          dsimp only; rw [Function.update_of_ne hne, h1 i hi]
-          by_cases hi' : i < j
-          · simp [hi', show i < j + 1 by omega]
-          · simp [hi', show ¬ i < j + 1 by omega]
-      · by_cases hij : i = j
-        · subst hij; simp
-        · have hne : (sh ^ i) x ≠ (sh ^ j) x := fun h => hij (hS.shinj i j x hi hj h)
-          simp only [Function.update_self]
-          rw [Function.update_of_ne hne, h3 i hi]
-          by_cases hi' : i < j
-          · simp [hi', show i < j + 1 by omega]
-          · simp [hi', show ¬ i < j + 1 by omega]
-      · simp only [Function.update_self]
-        rw [Function.update_of_ne (Ne.symm (hy j hj)), h4 y hy])
-  refine ⟨D, hD, fun i hi => by simp [hQ1 i hi, hi], fun i hi => by rw [hQ2, hC.pend i hi],
-    fun p hp => by rw [hQ2, hC.other p hp], fun y => ?_⟩
-  by_cases hy : ∃ i < g, (sh ^ i) x = y
-  · obtain ⟨i, hi, rfl⟩ := hy
-    rw [hQ3 i hi, if_pos hi]
-    by_cases hi1 : i + 1 < g
-    · have := hQ3 (i + 1) hi1
-      rw [if_pos hi1, pow_succ', Equiv.Perm.mul_apply] at this
-      rw [this, pow_succ', mul_smul]
-    · have hig : i + 1 = g := by omega
-      have : sh ((sh ^ i) x) = x := by
-        rw [← Equiv.Perm.mul_apply, ← pow_succ', hig, hS.shpow]; rfl
-      rw [this]
-      have h0 := hQ3 0 (by omega)
-      simp only [pow_zero, Equiv.Perm.one_apply, one_smul, if_pos (by omega : 0 < g)] at h0
-      rw [h0, smul_smul, ← pow_succ', hig, hS.σpow, one_smul]
-  · push Not at hy
-    have hy' : ∀ i < g, (sh ^ i) x ≠ sh y := by
-      intro i hi h
-      rcases i with _ | i
-      · apply hy (g - 1) (by omega)
-        have : (sh ^ (g - 1)) (sh y) = (sh ^ g) y := by
-          rw [← Equiv.Perm.mul_apply, ← pow_succ, show g - 1 + 1 = g by omega]
-        rw [hS.shpow] at this
-        simp only [pow_zero, Equiv.Perm.one_apply] at h
-        rw [h, this]; rfl
-      · apply hy i (by omega)
-        rw [pow_succ', Equiv.Perm.mul_apply] at h
-        exact sh.injective h
-    rw [hQ4 _ hy', hQ4 _ hy, hC.mem]
-
-/-- A round of snapshots preserves symmetry. -/
-lemma round_snap {C : A.Cfg} {s : S} {o : MutexOp} (hC : SymCfg g e σ sh C s (some o))
-    {k : (Fin m → V) → S} (hact : A.act s = .snap k) :
-    ∃ D, (A.impl ids π).runFrom C ((List.range g).map (fun j => .tau (e j))) = some D ∧
-      SymCfg g e σ sh D (k (C.mem ())) (some o) := by
-  let Q : ℕ → A.Cfg → Prop := fun j D =>
-    (∀ i < g, D.loc (e i) = (σ ^ i) • (if i < j then k (C.mem ()) else s)) ∧
-    (∀ p, D.pend p = C.pend p) ∧ D.mem () = C.mem ()
-  obtain ⟨D, hD, hQ1, hQ2, hQ3⟩ := runFrom_range (A.impl ids π) Q _ g C
-    ⟨fun i hi => by simp [hC.loc i hi], fun _ => rfl, rfl⟩
-    (by
-      rintro j hj D ⟨h1, h2, h3⟩
-      have hpend : D.pend (e j) ≠ none := by rw [h2, hC.pend j hj]; simp
-      have hloc : D.loc (e j) = (σ ^ j) • s := by simp [h1 j hj]
-      have hact' : A.act (D.loc (e j)) = .snap (fun w => (σ ^ j) • k ((σ ^ j)⁻¹ • w)) := by
-        rw [hloc, hA.act, hact]; rfl
-      have hview : (fun y => D.mem () ((sh ^ j) y)) = (σ ^ j) • C.mem () := by
-        funext y; rw [h3, hC.mem_pow]; rfl
-      refine ⟨_, SymAlg.impl_step_tau_snap ids π hpend hact', ?_⟩
-      simp only [hS.hπ j hj, hview, inv_smul_smul]
-      refine ⟨fun i hi => ?_, fun p => h2 p, ?_⟩
-      · by_cases hij : i = j
-        · subst hij; simp
-        · have hne : e i ≠ e j := fun h => hij (hS.einj i j hi hj h)
-          dsimp only; rw [Function.update_of_ne hne, h1 i hi]
-          by_cases hi' : i < j
-          · simp [hi', show i < j + 1 by omega]
-          · simp [hi', show ¬ i < j + 1 by omega]
-      · simp [h3])
-  exact ⟨D, hD, fun i hi => by simp [hQ1 i hi, hi], fun i hi => by rw [hQ2, hC.pend i hi],
-    fun p hp => by rw [hQ2, hC.other p hp], fun y => by rw [hQ3, hC.mem]⟩
-
-/-- In a symmetric configuration where the base process returns, all `g` processes return in the
-next round. -/
-lemma round_ret {C : A.Cfg} {s : S} {o : MutexOp} (hC : SymCfg g e σ sh C s (some o))
-    {s' : S} (hact : A.act s = .ret () s') :
-    ∃ D, (A.impl ids π).runFrom C ((List.range g).map (fun j => .ret (e j) ())) = some D := by
-  let Q : ℕ → A.Cfg → Prop := fun j D =>
-    ∀ i < g, j ≤ i → D.loc (e i) = (σ ^ i) • s ∧ D.pend (e i) = some o
-  obtain ⟨D, hD, -⟩ := runFrom_range (A.impl ids π) Q _ g C
-    (fun i hi _ => ⟨hC.loc i hi, hC.pend i hi⟩)
-    (by
-      rintro j hj D h1
-      obtain ⟨hloc, hpend⟩ := h1 j hj le_rfl
-      have hact' : A.act (D.loc (e j)) = .ret () ((σ ^ j) • s') := by
-        rw [hloc, hA.act, hact]; rfl
-      refine ⟨_, SymAlg.impl_step_ret ids π (by simp [hpend]) hact', fun i hi hji => ?_⟩
-      have hne : e i ≠ e j := fun h => by have := hS.einj i j hi hj h; omega
-      dsimp only
-      rw [Function.update_of_ne hne, Function.update_of_ne hne]
-      exact h1 i hi (by omega))
-  exact ⟨D, hD⟩
-
-/-- The invocation round: all `g` processes invoke `lock` from the initial configuration. -/
-lemma round_inv :
-    ∃ D, (A.impl ids π).runFrom (A.impl ids π).initCfg
-      ((List.range g).map (fun j => .inv (e j) .lock)) = some D ∧
-      SymCfg g e σ sh D (A.invoke (A.init a₀) .lock) (some .lock) := by
-  let C₀ := (A.impl ids π).initCfg
-  let Q : ℕ → A.Cfg → Prop := fun j D =>
-    (∀ i < g, D.loc (e i) = (σ ^ i) • (if i < j then A.invoke (A.init a₀) .lock else A.init a₀)) ∧
-    (∀ i < g, D.pend (e i) = if i < j then some .lock else none) ∧
-    (∀ p, (∀ i < g, e i ≠ p) → D.pend p = none) ∧ D.mem () = fun _ => A.bot
-  have hloc0 : ∀ i < g, C₀.loc (e i) = (σ ^ i) • A.init a₀ := by
-    intro i hi
-    show A.init (ids (e i)) = _
-    rw [hS.hid i hi, hA.init]
-  obtain ⟨D, hD, hQ1, hQ2, hQ3, hQ4⟩ := runFrom_range (A.impl ids π) Q
-    (fun j => Label.inv (e j) MutexOp.lock) g C₀
-    ⟨fun i hi => by simp [hloc0 i hi], fun i hi => rfl, fun _ _ => rfl, rfl⟩
-    (by
-      rintro j hj D ⟨h1, h2, h3, h4⟩
-      have hpend : D.pend (e j) = none := by simp [h2 j hj]
-      refine ⟨_, SymAlg.impl_step_inv (o := MutexOp.lock) ids π hpend, fun i hi => ?_, fun i hi => ?_,
-        fun p hp => ?_, ?_⟩
-      · by_cases hij : i = j
-        · subst hij; simp [h1 i hi, hA.invoke]
-        · have hne : e i ≠ e j := fun h => hij (hS.einj i j hi hj h)
-          dsimp only; rw [Function.update_of_ne hne, h1 i hi]
-          by_cases hi' : i < j
-          · simp [hi', show i < j + 1 by omega]
-          · simp [hi', show ¬ i < j + 1 by omega]
-      · by_cases hij : i = j
-        · subst hij; simp
-        · have hne : e i ≠ e j := fun h => hij (hS.einj i j hi hj h)
-          dsimp only; rw [Function.update_of_ne hne, h2 i hi]
-          by_cases hi' : i < j
-          · simp [hi', show i < j + 1 by omega]
-          · simp [hi', show ¬ i < j + 1 by omega]
-      · dsimp only; rw [Function.update_of_ne (Ne.symm (hp j hj)), h3 p hp]
-      · exact h4)
-  exact ⟨D, hD, fun i hi => by simp [hQ1 i hi, hi], fun i hi => by simp [hQ2 i hi, hi], hQ3,
-    fun y => by simp [hQ4, hA.bot]⟩
-
-
-end Rounds
+  {g : ℕ} {e : ℕ → P} {σ : Equiv.Perm Id} {sh : Equiv.Perm (Fin m)} {a₀ : Id}
 
 /-! ### The lock-step execution violates mutual exclusion or deadlock-freedom -/
 
@@ -376,24 +155,28 @@ lemma regionOf_lsLabel (he : ∀ i j, i < g → j < g → e i = e j → i = j) (
 
 /-- **The lock-step execution**: for the rotation set-up with `g ≥ 2` processes, the
 implementation is not both mutually exclusive and deadlock-free. -/
-theorem not_mutualExclusion_and_deadlockFree (hS : Setup g e σ sh a₀ ids π) (hA : A.Symmetric)
+theorem not_mutualExclusion_and_deadlockFree
+    (hS : SymAlg.LSSetup 1 g (fun _ => e) σ sh (fun _ => a₀) ids π) (hA : A.Symmetric)
     (hg : 2 ≤ g) :
     ¬ ((A.impl ids π).MutualExclusion ∧ (A.impl ids π).DeadlockFree) := by
   rintro ⟨hME, hDF⟩
   have hg0 : 0 < g := by omega
+  have he : ∀ i j, i < g → j < g → e i = e j → i = j :=
+    fun i j hi hj h => (hS.einj 0 i 0 j one_pos hi one_pos hj h).2
   set E : ℕ → List (Label P mutexObj) := fun k => (List.range (g * (k + 1))).map (lsLabel g e)
     with hE
-  -- the base process never returns
-  have key : ∀ k C s, (A.impl ids π).run (E k) = some C → SymCfg g e σ sh C s (some .lock) →
-      ∀ r s', A.act s ≠ .ret r s' := by
-    intro k C s hrun hC r s' hact
-    obtain ⟨D, hD⟩ := round_ret hS hA hC hact
+  -- the processes never return
+  have key : ∀ k C s b, (A.impl ids π).run (E k) = some C →
+      SymAlg.SymCfg 1 g (fun _ => e) σ sh C s b → b 0 = some .lock →
+      ∀ r s', A.act (s 0) ≠ .ret r s' := by
+    intro k C s b hrun hC hb r s' hact
+    obtain ⟨D, hD, -⟩ := SymAlg.round_ret hS hA hC one_pos (by simp [hb]) hact
     have hval : (A.impl ids π).Valid
         (E k ++ (List.range g).map (fun j => .ret (e j) ())) :=
       ⟨D, by rw [Impl.run_append_of_eq _ hrun]; exact hD⟩
-    have hreg := regionOf_append_map_range g e hS.einj (E k) (fun j => .ret (e j) ())
+    have hreg := regionOf_append_map_range g e he (E k) (fun j => .ret (e j) ())
       (fun j => rfl) g le_rfl
-    have hEk := regionOf_lsLabel (e := e) hS.einj hg0 (g * (k + 1))
+    have hEk := regionOf_lsLabel (e := e) he hg0 (g * (k + 1))
     have hcs : ∀ i < g, InCS (E k ++ (List.range g).map (fun j => .ret (e j) ())) (e i) := by
       intro i hi
       unfold InCS
@@ -408,39 +191,42 @@ theorem not_mutualExclusion_and_deadlockFree (hS : Setup g e σ sh a₀ ids π) 
         rw [hcs i hi]; simp
       · push Not at hp
         rw [hreg.2 p hp, hE, hEk.2 p hp]; simp
-    have := hS.einj 0 1 hg0 (by omega) (hME _ hval hwf _ _ (hcs 0 hg0) (hcs 1 (by omega)))
+    have := he 0 1 hg0 (by omega) (hME _ hval hwf _ _ (hcs 0 hg0) (hcs 1 (by omega)))
     omega
-  have all : ∀ k, ∃ C s, (A.impl ids π).run (E k) = some C ∧ SymCfg g e σ sh C s (some .lock) := by
+  have all : ∀ k, ∃ C s b, (A.impl ids π).run (E k) = some C ∧
+      SymAlg.SymCfg 1 g (fun _ => e) σ sh C s b ∧ b 0 = some .lock := by
     intro k
     induction k with
     | zero =>
-      obtain ⟨D, hD, hsym⟩ := round_inv (a₀ := a₀) hS hA
-      exact ⟨D, _, by simp only [hE, zero_add, mul_one, range_map_lsLabel_zero]; exact hD, hsym⟩
+      obtain ⟨D, hD, hsym, -⟩ :=
+        SymAlg.round_inv hS hA (SymAlg.symCfg_init hS hA) one_pos rfl MutexOp.lock
+      exact ⟨D, _, _, by simp only [hE, zero_add, mul_one, range_map_lsLabel_zero]; exact hD,
+        hsym, by simp⟩
     | succ k ih =>
-      obtain ⟨C, s, hC, hsym⟩ := ih
+      obtain ⟨C, s, b, hC, hsym, hb⟩ := ih
       have hEs : E (k + 1) = E k ++ (List.range g).map (fun j => .tau (e j)) :=
         range_map_lsLabel_succ k
-      cases hact : A.act s with
+      cases hact : A.act (s 0) with
       | rmw x f k' =>
-        obtain ⟨D, hD, hsym'⟩ := round_rmw hS hA hsym hact
-        exact ⟨D, _, by rw [hEs, Impl.run_append_of_eq _ hC]; exact hD, hsym'⟩
+        obtain ⟨D, hD, hsym', -⟩ := SymAlg.round_rmw hS hA hsym one_pos (by simp [hb]) hg0 hact
+        exact ⟨D, _, b, by rw [hEs, Impl.run_append_of_eq _ hC]; exact hD, hsym', hb⟩
       | snap k' =>
-        obtain ⟨D, hD, hsym'⟩ := round_snap hS hA hsym hact
-        exact ⟨D, _, by rw [hEs, Impl.run_append_of_eq _ hC]; exact hD, hsym'⟩
-      | ret r s' => exact absurd hact (key k C s hC hsym r s')
+        obtain ⟨D, hD, hsym', -⟩ := SymAlg.round_snap hS hA hsym one_pos (by simp [hb]) hact
+        exact ⟨D, _, b, by rw [hEs, Impl.run_append_of_eq _ hC]; exact hD, hsym', hb⟩
+      | ret r s' => exact absurd hact (key k C s b hC hsym hb r s')
   -- the infinite lock-step execution
   obtain ⟨ex, hlbl, -⟩ := (A.impl ids π).exists_infExec_of_chain E
     (fun k => by rw [show E (k + 1) = E k ++ _ from range_map_lsLabel_succ k];
                  exact List.prefix_append _ _)
     (fun k => by simp only [hE, List.length_map, List.length_range]; nlinarith)
-    (fun k => by obtain ⟨C, s, hC, -⟩ := all k; exact ⟨C, hC⟩)
+    (fun k => by obtain ⟨C, -, -, hC, -⟩ := all k; exact ⟨C, hC⟩)
   have hl : ∀ n, ex.lbl n = lsLabel g e n := fun n => by
     rw [hlbl n n (by simp only [hE, List.length_map, List.length_range]; nlinarith)]
     simp [hE]
   have hpre : ∀ t, ex.pre t = (List.range t).map (lsLabel g e) := fun t => by
     simp only [Impl.InfExec.pre]
     exact List.map_congr_left (fun n _ => hl n)
-  have hreg := regionOf_lsLabel (e := e) hS.einj hg0
+  have hreg := regionOf_lsLabel (e := e) he hg0
   have hwf : ∀ t, ClientWF (ex.pre t) := by
     intro t p
     rw [hpre]
@@ -465,7 +251,7 @@ theorem not_mutualExclusion_and_deadlockFree (hS : Setup g e σ sh a₀ ids π) 
         Nat.mod_eq_of_lt hi]
       exact ⟨rfl, trivial⟩
     · push Not at hpe; exact absurd (hother p hpe t) hp
-  obtain ⟨C₀, s₀, hC₀, hsym₀⟩ := all 0
+  obtain ⟨C₀, s₀, b₀, hC₀, hsym₀, hb₀⟩ := all 0
   have hcfg : ex.cfg g = C₀ := by
     have h1 := ex.run_pre g
     rw [hpre] at h1
@@ -473,7 +259,7 @@ theorem not_mutualExclusion_and_deadlockFree (hS : Setup g e σ sh a₀ ids π) 
     rw [this] at hC₀
     rw [hC₀] at h1
     exact (Option.some.inj h1).symm
-  obtain ⟨t', -, p, r, hret⟩ := hDF ex hwf hfair g ⟨e 0, by rw [hcfg, hsym₀.pend 0 hg0]; simp⟩
+  obtain ⟨t', -, p, r, hret⟩ := hDF ex hwf hfair g ⟨e 0, by rw [hcfg, hsym₀.pend 0 one_pos 0 hg0, hb₀]; simp⟩
     (fun q hq => by
       unfold InCS at hq
       rw [hpre] at hq
@@ -484,21 +270,9 @@ theorem not_mutualExclusion_and_deadlockFree (hS : Setup g e σ sh a₀ ids π) 
   unfold lsLabel at hret
   split_ifs at hret
 
-
 end LockStep
 
-
 /-! ### Theorem 5 -/
-
-lemma finRotate_pow_val {m : ℕ} (k : ℕ) (x : Fin m) :
-    (((finRotate m) ^ k) x : ℕ) = (x + k) % m := by
-  rcases m with _ | m
-  · exact x.elim0
-  induction k with
-  | zero => simp [Nat.mod_eq_of_lt x.isLt]
-  | succ k ih =>
-    rw [pow_succ', Equiv.Perm.mul_apply, finRotate_apply, Fin.val_add, ih, Fin.val_one',
-      ← Nat.add_mod, Nat.add_assoc]
 
 variable {Id V S : Type} {m : ℕ} [MulAction (Equiv.Perm Id) V] [MulAction (Equiv.Perm Id) S]
   {A : SymAlg mutexObj Id m V S} {P : Type} [DecidableEq P] [Fintype P]
@@ -542,35 +316,19 @@ theorem theorem_5 (hA : A.Symmetric) (ids : P → Id) (hid : Function.Injective 
   let σ : Equiv.Perm Id := l.formPerm
   let sh : Equiv.Perm (Fin m) := (finRotate m) ^ d
   let π : P → Equiv.Perm (Fin m) := fun p => sh ^ ((Fintype.equivFin P p : Fin n) : ℕ)
-  have hS : Setup g e σ sh (ids (e 0)) ids π :=
-    { σpow := by rw [← hlen]; exact List.formPerm_pow_length_eq_one_of_nodup l hl
-      shpow := by
-        ext x
-        rw [← pow_mul, finRotate_pow_val, hdg, Equiv.Perm.one_apply, Nat.add_mod_right,
-          Nat.mod_eq_of_lt x.isLt]
-      shinj := by
-        intro i j y hi hj hij
-        have hm : 0 < m := Nat.lt_of_le_of_lt (Nat.zero_le _) y.isLt
-        have hd0 : 0 < d := by
-          rcases Nat.eq_zero_or_pos d with h0 | h0
-          · rw [h0, zero_mul] at hdg; omega
-          · exact h0
-        have := congrArg Fin.val hij
-        rw [← pow_mul, ← pow_mul, finRotate_pow_val, finRotate_pow_val] at this
-        have hmod : Nat.ModEq m (d * i) (d * j) := Nat.ModEq.add_left_cancel' (y : ℕ) this
-        have := hmod.eq_of_lt_of_lt (by rw [← hdg]; exact Nat.mul_lt_mul_of_pos_left hi hd0)
-          (by rw [← hdg]; exact Nat.mul_lt_mul_of_pos_left hj hd0)
-        exact Nat.eq_of_mul_eq_mul_left hd0 this
-      einj := einj
-      hπ := by
-        intro i hi
-        simp only [π, e, Equiv.apply_symm_apply, Nat.mod_eq_of_lt (show i < n by omega)]
-      hid := by
-        intro i hi
+  have hS : SymAlg.LSSetup 1 g (fun _ => e) σ sh (fun _ => ids (e 0)) ids π :=
+    SymAlg.LSSetup.single
+      (by rw [← hlen]; exact List.formPerm_pow_length_eq_one_of_nodup l hl)
+      (finRotate_pow_pow_eq_one hdg)
+      (fun i j y hi hj hij => finRotate_pow_pow_apply_inj hdg hi hj hij)
+      einj
+      (fun i hi => by
+        simp only [π, e, Equiv.apply_symm_apply, Nat.mod_eq_of_lt (show i < n by omega)])
+      (fun i hi => by
         have := List.formPerm_pow_apply_getElem l hl i 0 (by omega)
         simp only [zero_add, hlen, Nat.mod_eq_of_lt hi] at this
         simp only [l, List.getElem_map, List.getElem_range] at this
-        exact this.symm }
+        exact this.symm)
   exact not_mutualExclusion_and_deadlockFree hS hA hg2 (h π)
 
 end AnonymousMutex

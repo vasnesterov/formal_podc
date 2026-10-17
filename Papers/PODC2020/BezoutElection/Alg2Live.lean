@@ -33,26 +33,6 @@ abbrev Cfg2 (Id : Type) (m : ℕ) (R : Type) [Inhabited R] (P : Type) :=
 /-- The number of solved competitions: the sum of the levels. -/
 def solved (C : Cfg2 Id m R P) : ℕ := ∑ x, (C.mem () x).level
 
--- CSLib candidate (also `Papers/PODC2025/StrangerFreeTasks/Alg1WaitFreeK1.lean`)
-/-- A sequence of naturals that never increases after `t0` cannot decrease infinitely often. -/
-lemma no_descent' (f : ℕ → ℕ) (t0 : ℕ) (hmono : ∀ t, t0 ≤ t → f (t + 1) ≤ f t)
-    (hstrict : ∀ N, ∃ k, N ≤ k ∧ f (k + 1) < f k) : False := by
-  have anti : ∀ a b, t0 ≤ a → a ≤ b → f b ≤ f a := by
-    intro a b ha hab
-    induction b, hab using Nat.le_induction with
-    | base => exact le_rfl
-    | succ b hb ih => exact (hmono b (ha.trans hb)).trans ih
-  have key : ∀ c, ∃ t, t0 ≤ t ∧ f t + c ≤ f t0 := by
-    intro c
-    induction c with
-    | zero => exact ⟨t0, le_rfl, le_rfl⟩
-    | succ c ih =>
-      obtain ⟨t, ht, hc⟩ := ih
-      obtain ⟨k, hk, hlt⟩ := hstrict t
-      exact ⟨k + 1, by omega, by have := anti t k ht hk; omega⟩
-  obtain ⟨t, -, ht⟩ := key (f t0 + 1)
-  omega
-
 /-- A pending write goes to a register of level below `U`. -/
 lemma RInv.level_lt_of_write {α : List (Label P (elecObj R))} {C : Cfg2 Id m R P}
     (hI : RInv π pp ids out α C) {q : P} {j : ℕ} {w : Reg Id} (hpc : (C.loc q).pc = .write j w)
@@ -244,14 +224,14 @@ then every process returns. -/
 theorem alg2_terminates_of_progress (hm : 0 < m) (hid : Function.Injective ids)
     (hn : Fintype.card P = pp.n)
     (hprog : ∀ e : ((alg2 Id m pp out).impl ids π).InfExec, IsOneShot e → AllInvoke e →
-      IsFair e → ∀ t, solved (e.cfg t) < pp.U * m → ∃ t', t ≤ t' ∧ solved (e.cfg t) < solved (e.cfg t')) :
+      e.IsFair → ∀ t, solved (e.cfg t) < pp.U * m → ∃ t', t ≤ t' ∧ solved (e.cfg t) < solved (e.cfg t')) :
     Terminates ((alg2 Id m pp out).impl ids π) := by
   intro e hos hall hfair p
   by_contra hnot
   push Not at hnot
   have : Nonempty P := ⟨p⟩
-  have hR : ∀ t, RInv π pp ids out (ePre e t) (e.cfg t) :=
-    fun t => rinv_run hm hid hn (run_ePre e t)
+  have hR : ∀ t, RInv π pp ids out (e.lbls t) (e.cfg t) :=
+    fun t => rinv_run hm hid hn (e.run_lbls t)
   have hlev : ∀ t x, ((e.cfg t).mem () x).level ≤ ((e.cfg (t + 1)).mem () x).level :=
     fun t x => step_level_mono (hR t) (e.step_eq t) x
   have hlevU : ∀ t x, ((e.cfg t).mem () x).level ≤ pp.U := by
@@ -266,7 +246,7 @@ theorem alg2_terminates_of_progress (hm : 0 < m) (hid : Function.Injective ids)
   obtain ⟨t0, ht0⟩ : ∃ t0, ∀ t, t0 ≤ t → solved (e.cfg t) = solved (e.cfg t0) := by
     by_contra hne
     push Not at hne
-    apply no_descent' (fun t => pp.U * m - solved (e.cfg t)) 0
+    apply Nat.not_frequently_lt_of_succ_le (f := fun t => pp.U * m - solved (e.cfg t)) (N := 0)
     · intro t _; have := hSmono t; omega
     · intro N
       obtain ⟨t, htN, hneq⟩ := hne N
@@ -309,7 +289,7 @@ theorem alg2_terminates_of_progress (hm : 0 < m) (hid : Function.Injective ids)
       rw [h1]; simp
     | succ t _ ih =>
       intro hnone
-      obtain ⟨r, hr⟩ := step_pend_none (e.step_eq t) ih hnone
+      obtain ⟨r, hr⟩ := Impl.step_pend_none (e.step_eq t) ih hnone
       exact hnot t r hr
   set T := max t0 (tp + 1) with hT
   have hstep : ∀ t, T ≤ t → (e.lbl t).proc = p → e.lbl t = .tau p := by
@@ -321,7 +301,7 @@ theorem alg2_terminates_of_progress (hm : 0 < m) (hid : Function.Injective ids)
       exact absurd (Impl.step_inv h).1 (hpend t (by omega))
     | tau q => rw [hl] at hproc; simp only [Label.proc] at hproc; subst hproc; rfl
     | ret q r => rw [hl] at hproc; simp only [Label.proc] at hproc; subst hproc; exact absurd hl (hnot t r)
-  apply no_descent' (fun t => meas pp ((e.cfg t).loc p)) T
+  apply Nat.not_frequently_lt_of_succ_le (f := fun t => meas pp ((e.cfg t).loc p)) (N := T)
   · intro t ht
     by_cases hproc : (e.lbl t).proc = p
     · have h := e.step_eq t
