@@ -21,7 +21,8 @@ has `= 3k + 1`) and a core set `G` of at least `2k + 1` honest processes contain
   (strong unanimity).
 
 Choices for under-specified points of the paper:
-* "a value which occurs at least `m` times" (`thr`): an arbitrary such value (by choice). For
+* "a value which occurs at least `m` times" (`thr`, the library selector `Finset.threshold?`):
+  an arbitrary such value (by choice). For
   `m = 2k + 1` it is unique because `|L_i| ≤ 3k + 1`; for `m = k + 1` (Algorithm 3, line 14) it need
   not be unique, and Lemma 9 holds for every choice.
 * Conciliation: the paths from `y` to `z` include the trivial path (`y = z`), and `m_i[z]` is
@@ -44,60 +45,44 @@ section Threshold
 variable {ι α : Type*} [DecidableEq ι] [DecidableEq α]
 
 /-- Some value `w` such that `some w` occurs at least `m` times among the values of `f` on `X`
-(`none` if there is none). -/
-noncomputable def thr (X : Finset ι) (f : ι → Option α) (m : ℕ) : Option α := by
-  classical
-  exact if h : ∃ w, m ≤ cnt X f (some w) then some h.choose else none
+(`none` if there is none): the library selector `Finset.threshold?`. -/
+noncomputable abbrev thr (X : Finset ι) (f : ι → Option α) (m : ℕ) : Option α :=
+  X.threshold? f m
+
+/-! The library facts about `countEq` and `threshold?`, stated with `cnt` (so that `omega` sees
+the same atoms as in the proofs below). -/
 
 theorem thr_spec {X : Finset ι} {f : ι → Option α} {m : ℕ} {w : α} (h : thr X f m = some w) :
-    m ≤ cnt X f (some w) := by
-  unfold thr at h
-  split_ifs at h with h'
-  · cases h; exact h'.choose_spec
+    m ≤ cnt X f (some w) :=
+  Finset.le_countEq_of_threshold?_eq_some h
 
 theorem thr_none {X : Finset ι} {f : ι → Option α} {m : ℕ} (h : thr X f m = none) (w : α) :
-    cnt X f (some w) < m := by
-  unfold thr at h
-  split_ifs at h with h'
-  push Not at h'
-  exact h' w
+    cnt X f (some w) < m :=
+  Finset.threshold?_eq_none_iff.mp h w
 
 theorem thr_eq {X : Finset ι} {f : ι → Option α} {m : ℕ} {w : α} (hw : m ≤ cnt X f (some w))
-    (hu : ∀ w', w' ≠ w → cnt X f (some w') < m) : thr X f m = some w := by
-  cases h : thr X f m with
-  | none => exact absurd hw (not_le.mpr (thr_none h w))
-  | some w' =>
-    by_contra hne
-    have := hu w' (fun e => hne (by rw [e]))
-    have := thr_spec h
-    omega
+    (hu : ∀ w', w' ≠ w → cnt X f (some w') < m) : thr X f m = some w :=
+  Finset.threshold?_eq_some_of_forall hw hu
 
 theorem cnt_mono {X Y : Finset ι} (h : X ⊆ Y) (f : ι → α) (a : α) : cnt X f a ≤ cnt Y f a :=
-  card_le_card (filter_subset_filter _ h)
+  Finset.countEq_mono h
 
 theorem cnt_le_cnt_add (X Y : Finset ι) (f : ι → α) (a : α) :
-    cnt Y f a ≤ cnt X f a + (Y \ X).card := by
-  unfold cnt
-  calc (Y.filter fun j => f j = a).card ≤ ((X.filter fun j => f j = a) ∪ (Y \ X)).card := by
-        refine card_le_card fun j hj => ?_
-        simp only [mem_filter, mem_union, mem_sdiff] at hj ⊢
-        by_cases hx : j ∈ X
-        · exact Or.inl ⟨hx, hj.2⟩
-        · exact Or.inr ⟨hj.1, hx⟩
-    _ ≤ _ := card_union_le _ _
+    cnt Y f a ≤ cnt X f a + (Y \ X).card :=
+  Finset.countEq_le_countEq_add_card_sdiff Y X
 
 theorem cnt_congr {X : Finset ι} {f g : ι → α} (h : ∀ j ∈ X, f j = g j) (a : α) :
     cnt X f a = cnt X g a := by
-  unfold cnt
+  unfold cnt Finset.countEq
   congr 1
   exact filter_congr fun j hj => by rw [h j hj]
 
 theorem cnt_le_card (X : Finset ι) (f : ι → α) (a : α) : cnt X f a ≤ X.card :=
-  card_le_card (filter_subset _ _)
+  Finset.countEq_le_card
 
 theorem cnt_eq_card {X : Finset ι} {f : ι → α} {a : α} (h : ∀ j ∈ X, f j = a) :
     cnt X f a = X.card := by
-  unfold cnt; rw [filter_true_of_mem h]
+  unfold cnt Finset.countEq; rw [filter_true_of_mem h]
 
 end Threshold
 
@@ -258,7 +243,7 @@ theorem lemma9 (hC : CoreSet F k L G) (h1 : GCRound1 F L v r1) (h2 : GCRound2 F 
     -- no core-set member has another value (Lemma 7)
     have hother : ∀ w', w' ≠ w → cnt G (fun j => gcB k (L j) (r1 j)) (some w') = 0 := by
       intro w' hw'
-      unfold cnt
+      unfold cnt Finset.countEq
       rw [card_eq_zero, filter_eq_empty_iff]
       intro j hj hbj
       exact hw' (lemma7 hC h1 hi (hC.G_honest j hj) hb hbj).symm
@@ -394,7 +379,8 @@ theorem lemma12 (hC : CoreSet F k L G) (hL : ∀ i ∉ F, ∀ j ∈ L i, j ∉ F
 private theorem conc_eq_cmin (hC : CoreSet F k L G) (hr : CRound F L v rc) {i : P}
     (hi : i ∉ F) (d : V) {j : P} (hj : j ∈ G) : conc (L i) d (rc i) = cmin (rc i) d j := by
   unfold conc
-  apply plur_eq_of_majority
+  apply Finset.plurality_eq_of_card_lt_two_mul_countEq
+  show _ < 2 * cnt _ _ _
   have hsub : G ⊆ cT (rc i) ∩ L i := fun x hx => by
     refine mem_inter.mpr ⟨?_, hC.G_sub i hi hx⟩
     simp only [cT, mem_filter, mem_univ, true_and]

@@ -476,7 +476,7 @@ lemma s3_maj (hgood : ∀ p, p ∉ adv.F → p ∉ B → GoodRound σ adv C ε �
     rw [hagr q (mem_sdiff.mpr hq.1) hq.2]
   have hcard : (C r).card ≤ ((C r \ adv.F) \ X).card + X.card + (C r ∩ adv.F).card := by
     have := card_le_card_sdiff_add_card (s := C r \ adv.F) (t := X)
-    have := card_sdiff_inter (C r) adv.F
+    have := card_sdiff_add_card_inter (C r) adv.F
     omega
   have hfrac : 2/3 < ((O ∩ C r).card : ℚ) / (C r).card := by
     rw [lt_div_iff₀ hC]

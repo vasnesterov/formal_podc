@@ -1,4 +1,4 @@
-import Cslib.Computability.Distributed.Byzantine.PartialSync.Omission
+import Podc.PartialSync.Omission
 
 /-!
 # Reaching Univalency — Appendix A: the dissemination lower bound (Theorem 7)
@@ -36,20 +36,6 @@ execution with at most `f` omission-faulty processors. -/
 def AlwaysReceives (A : Algorithm P M S VI VO) (f : ℕ) : Prop :=
   ∀ (E : OmExec P VI) (F : Finset P), E.Admits A F → F.card ≤ f → ∀ p ∉ F, ReceivesMsg A E p
 
-/-- The execution `E₁` of the proof: the processes of `P₁` receive no message from other
-processes (they "do not send or receive messages to or from each other, and ignore messages from
-processors in `P₂`"). -/
-def isoExec (inp : P → VI) (P₁ : Finset P) : OmExec P VI where
-  inp := inp
-  ok _ q p := !decide (p ∈ P₁ ∧ q ≠ p)
-
-omit [Fintype P] in
-lemma isoExec_admits (A : Algorithm P M S VI VO) (inp : P → VI) (P₁ : Finset P) :
-    (isoExec inp P₁).Admits A P₁ := by
-  intro τ q p h _
-  simp only [isoExec, Bool.not_eq_eq_eq_not, Bool.not_false, decide_eq_true_eq] at h
-  exact ⟨h.2, Or.inr h.1⟩
-
 /-- **Theorem 7, the `f²` part.** If every correct processor always receives a message, then some
 execution with at most `f` omission faults has at least `⌈f/2⌉²` messages sent by correct
 processors. (The paper assumes `f < n - 1`; `f ≤ n` suffices.) -/
@@ -60,8 +46,11 @@ theorem receives_lower_bound_sq (A : Algorithm P M S VI VO) {f : ℕ}
   set h := (f + 1) / 2 with hh
   obtain ⟨P₁, -, hP₁⟩ := exists_subset_card_eq (s := (univ : Finset P)) (n := h)
     (by rw [card_univ]; omega)
-  set E := isoExec inp P₁
-  have hE : E.Admits A P₁ := isoExec_admits A inp P₁
+  -- the execution `E₁` of the proof: the processes of `P₁` receive no message from other
+  -- processes ("they do not send or receive messages to or from each other, and ignore messages
+  -- from processors in `P₂`")
+  set E := OmExec.solo inp P₁
+  have hE : E.Admits A P₁ := OmExec.solo_admits
   by_cases hall : ∀ p ∈ P₁, h ≤ (E.dropSenders A P₁ p).card
   · -- every isolated processor is sent messages by `≥ ⌈f/2⌉` correct processors
     obtain ⟨N, hN⟩ := OmExec.sum_card_dropSenders_le (E := E) (A := A) (subset_refl P₁)
@@ -75,7 +64,7 @@ theorem receives_lower_bound_sq (A : Algorithm P M S VI VO) {f : ℕ}
     obtain ⟨p, hp, hlt⟩ := hall
     have hsw : E.Admits A (P₁.erase p ∪ E.dropSenders A P₁ p) := by
       refine hE.swap (fun τ r hok _ => ?_)
-      simp only [E, isoExec, Bool.not_eq_eq_eq_not, Bool.not_false, decide_eq_true_eq] at hok
+      simp only [E, OmExec.solo_ok, Bool.not_eq_eq_eq_not, Bool.not_false, decide_eq_true_eq] at hok
       exact hok.1
     have hcard : (P₁.erase p ∪ E.dropSenders A P₁ p).card ≤ f := by
       have h1 := card_union_le (P₁.erase p) (E.dropSenders A P₁ p)
@@ -86,7 +75,7 @@ theorem receives_lower_bound_sq (A : Algorithm P M S VI VO) {f : ℕ}
       exact OmExec.not_mem_dropSenders hp
     obtain ⟨τ, q, hqp, hne⟩ := hA E _ hsw hcard p hpF
     apply hne
-    simp [OmExec.inbox, E, isoExec, hp, hqp]
+    exact OmExec.solo_inbox_of_mem hp hqp τ
 
 /-- **Theorem 7, the `n` part.** In the fault-free execution correct processors send at least `n`
 messages. -/

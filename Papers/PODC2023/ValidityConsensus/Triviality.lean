@@ -1,13 +1,18 @@
-import Cslib.Computability.Distributed.Byzantine.PartialSync.Auth
+import Podc.PartialSync.Triviality
 
 /-!
 # On the Validity of Consensus — §3.4 and §4.1
 
-* Lemma 1 (canonical similarity): `ValidityConsensus.canonical_similarity(_auth)`.
-* Lemma 2 (merging compatible canonical executions): `ValidityConsensus.eq_of_compatible(_auth)`.
+The proofs are in the shared library `Podc.PartialSync.Triviality`; this file states the paper's
+results under their paper names.
+
+* Lemma 1 (canonical similarity): `ValidityConsensus.canonical_similarity(_auth)`
+  (`SolvesConsensusAuth.mem_of_similar`).
+* Lemma 2 (merging compatible canonical executions): `ValidityConsensus.eq_of_compatible(_auth)`
+  (`SolvesConsensusAuth.eq_of_compatible`).
 * Lemmas 3–4, Theorem 1 (if `n ≤ 3t`, every solvable validity property is trivial):
   `ValidityConsensus.trivial_of_solvesConsensus(_auth)`, `ValidityConsensus.trivial_of_solvable`,
-  `ValidityConsensus.trivial_of_solvableAuth` (with signatures).
+  `ValidityConsensus.trivial_of_solvableAuth` (with signatures) (`SolvesConsensusAuth.trivial`).
 -/
 
 namespace ValidityConsensus
@@ -25,229 +30,25 @@ process can only decide a value admissible for every input configuration similar
 theorem canonical_similarity_auth (hU : A.Unforging Au) (hA : SolvesConsensusAuth Au t δ A val)
     {R : Run P M VI} (hR : R.Valid t δ) (hcan : R.Canonical) {p : P} (hp : p ∉ R.faulty) {v : VO}
     (hv : R.Decides A p v) {c' : Config P VI} (hc' : IsInputConfig t c')
-    (hsim : Similar c' R.inputConf) : v ∈ val c' := by
-  obtain ⟨p', hp'⟩ := hsim.1
-  rw [mem_inter, Config.mem_procs_iff_ne_none, Run.mem_procs_inputConf] at hp'
-  have hRa : R.AuthValid Au A := Run.authValid_of_canonical hcan
-  obtain ⟨w, τ, hw⟩ := hA.termination R hR hRa p' hp'.2
-  obtain rfl : w = v := hA.agreement R hR hRa p' hp'.2 p hp w v ⟨τ, hw⟩ hv
-  have hagree : ∀ q ∉ R.faulty, c' q ≠ none → c' q = some (R.inp q) := by
-    intro q hq hq'
-    rw [hsim.2 q (by simp [Option.isSome_iff_ne_none, hq', Run.mem_procs_inputConf.mpr hq])]
-    simp [Run.inputConf, hq]
-  have hR' := Run.extend_valid (A := A) hR hc' τ
-  have hdec : (R.extend A c' τ).Decides A p' w :=
-    ⟨τ, by rw [Run.extend_st hcan hagree τ τ le_rfl p' hp'.2 hp'.1]; exact hw⟩
-  have := hA.validity _ hR' (Run.extend_authValid hU hcan hagree τ) p'
-    (by simp [Run.extend, Option.isSome_iff_ne_none, hp'.1]) w hdec
-  rwa [Run.extend_inputConf] at this
+    (hsim : Similar c' R.inputConf) : v ∈ val c' :=
+  hA.mem_of_similar hU hR hcan hp hv hc' hsim
 
 /-- **Lemma 2 (merging).** Two canonical executions with compatible input configurations
-decide the same value (the classical partitioning argument): the processes in
-`π(c₁) ∩ π(c₂)` (at most `t`) are made Byzantine and behave towards `π(c₁) \ π(c₂)` as in the
-first execution and towards `π(c₂) \ π(c₁)` as in the second, while communication between the
-two sides is delayed beyond both decisions. -/
+decide the same value. -/
 theorem eq_of_compatible_auth (hU : A.Unforging Au) (hA : SolvesConsensusAuth Au t δ A val)
     {R₁ R₂ : Run P M VI}
     (h₁ : R₁.Valid t δ) (h₂ : R₂.Valid t δ) (hc₁ : R₁.Canonical) (hc₂ : R₂.Canonical)
     (hcomp : Compatible t R₁.inputConf R₂.inputConf) {p₁ p₂ : P} {v₁ v₂ : VO}
     (hp₁ : p₁ ∉ R₁.faulty) (hd₁ : R₁.Decides A p₁ v₁)
-    (hp₂ : p₂ ∉ R₂.faulty) (hd₂ : R₂.Decides A p₂ v₂) : v₁ = v₂ := by
-  obtain ⟨a, ha⟩ := hcomp.2.1
-  obtain ⟨c, hc⟩ := hcomp.2.2
-  simp only [mem_sdiff, Run.mem_procs_inputConf, not_not] at ha hc
-  have ha₁ := Run.authValid_of_canonical (Au := Au) (A := A) hc₁
-  have ha₂ := Run.authValid_of_canonical (Au := Au) (A := A) hc₂
-  obtain ⟨w₁, T₁, hw₁⟩ := hA.termination R₁ h₁ ha₁ a ha.1
-  obtain rfl : w₁ = v₁ := hA.agreement R₁ h₁ ha₁ a ha.1 p₁ hp₁ w₁ v₁ ⟨T₁, hw₁⟩ hd₁
-  obtain ⟨w₂, T₂, hw₂⟩ := hA.termination R₂ h₂ ha₂ c hc.1
-  obtain rfl : w₂ = v₂ := hA.agreement R₂ h₂ ha₂ c hc.1 p₂ hp₂ w₂ v₂ ⟨T₂, hw₂⟩ hd₂
-  set T := max T₁ T₂
-  -- the merged execution
-  let R : Run P M VI :=
-    { faulty := R₁.faultyᶜ ∩ R₂.faultyᶜ
-      inp := fun p => if p ∉ R₁.faulty then R₁.inp p else R₂.inp p
-      gst := T + 1
-      byz := fun q τ p => if τ ≤ T then
-          (if p ∉ R₂.faulty ∧ p ∈ R₁.faulty then R₂.out A q τ p else R₁.out A q τ p) else []
-      dl := fun q τ p => if τ ≤ T then
-          (if q ∉ R₁.faulty ∧ p ∉ R₁.faulty then min (R₁.dl q τ p) (T + 1)
-           else if q ∉ R₂.faulty ∧ p ∉ R₂.faulty then min (R₂.dl q τ p) (T + 1) else T + 1)
-        else τ }
-  have hRf : ∀ p, p ∈ R.faulty ↔ p ∉ R₁.faulty ∧ p ∉ R₂.faulty := by simp [R]
-  have hR : R.Valid t δ := by
-    refine ⟨?_, ?_, ?_⟩
-    · have := hcomp.1
-      rw [Run.procs_inputConf, Run.procs_inputConf, ← filter_and] at this
-      convert this using 2
-      ext p; simp [R]
-    · intro q τ p _ _
-      simp only [R]
-      split_ifs with h0 h1 h2
-      · exact le_min (h₁.dl_ge q τ p h1.1 h1.2) (by omega)
-      · exact le_min (h₂.dl_ge q τ p h2.1 h2.2) (by omega)
-      · omega
-      · exact le_rfl
-    · intro q τ p _ _
-      simp only [R]
-      split_ifs <;> omega
-  -- `π(c₁) \ π(c₂)` cannot distinguish `R` from `R₁` up to `T`
-  have hX₁ : ∀ τ ≤ T, ∀ p ∈ {p | p ∉ R₁.faulty ∧ p ∈ R₂.faulty}, R.st A τ p = R₁.st A τ p := by
-    refine R.st_eq_of_inbox_eq A (ref := fun _ => R₁) ?_ ?_
-    · rintro p ⟨hp, -⟩; simp [R, hp]
-    · rintro τ hτ ih p ⟨hp1, hp2⟩
-      refine R.inbox_eq_of_dlv_eq A fun q τ' hτ' => ?_
-      by_cases hq : q ∈ R₁.faulty
-      · rw [R.dlv_eq_nil_of_ne A (by simp [R, hq, hp2, show τ' ≤ T by omega]; omega)]
-        simp [Run.dlv, Run.out_eq_nil_of_canonical A hc₁ hq]
-      · have hdl : R.dl q τ' p = min (R₁.dl q τ' p) (T + 1) := by
-          simp [R, hq, hp1, show τ' ≤ T by omega]
-        have hiff : (min (R₁.dl q τ' p) (T + 1) = τ) ↔ R₁.dl q τ' p = τ := by omega
-        simp only [Run.dlv, hdl, hiff]
-        split_ifs
-        · by_cases hq2 : q ∈ R₂.faulty
-          · rw [Run.out_of_correct A _ (by simp [hRf, hq2]), Run.out_of_correct A _ hq,
-              ih q ⟨hq, hq2⟩ τ' hτ']
-          · rw [Run.out_of_faulty A _ ((hRf q).2 ⟨hq, hq2⟩)]
-            simp [R, hp2, show τ' ≤ T by omega]
-        · rfl
-  -- `π(c₂) \ π(c₁)` cannot distinguish `R` from `R₂` up to `T`
-  have hX₂ : ∀ τ ≤ T, ∀ p ∈ {p | p ∉ R₂.faulty ∧ p ∈ R₁.faulty}, R.st A τ p = R₂.st A τ p := by
-    refine R.st_eq_of_inbox_eq A (ref := fun _ => R₂) ?_ ?_
-    · rintro p ⟨-, hp⟩; simp [R, hp]
-    · rintro τ hτ ih p ⟨hp2, hp1⟩
-      refine R.inbox_eq_of_dlv_eq A fun q τ' hτ' => ?_
-      by_cases hq : q ∈ R₂.faulty
-      · rw [R.dlv_eq_nil_of_ne A (by simp [R, hq, hp1, show τ' ≤ T by omega]; omega)]
-        simp [Run.dlv, Run.out_eq_nil_of_canonical A hc₂ hq]
-      · have hdl : R.dl q τ' p = min (R₂.dl q τ' p) (T + 1) := by
-          simp [R, hq, hp1, hp2, show τ' ≤ T by omega]
-        have hiff : (min (R₂.dl q τ' p) (T + 1) = τ) ↔ R₂.dl q τ' p = τ := by omega
-        simp only [Run.dlv, hdl, hiff]
-        split_ifs
-        · by_cases hq1 : q ∈ R₁.faulty
-          · rw [Run.out_of_correct A _ (by simp [hRf, hq1]), Run.out_of_correct A _ hq,
-              ih q ⟨hq, hq1⟩ τ' hτ']
-          · rw [Run.out_of_faulty A _ ((hRf q).2 ⟨hq1, hq⟩)]
-            simp [R, hp2, hp1, show τ' ≤ T by omega]
-        · rfl
-  -- the Byzantine processes only replay messages of `R₁` / `R₂` up to `T`
-  have hRa : R.AuthValid Au A := by
-    intro b hb τ r hr m hm x hx
-    simp only [R] at hm
-    split_ifs at hm with hτ hr'
-    · refine Run.tokens_replay hU (Ri := R₂) (T := T) (fun q σ r' hσ => ?_) τ hτ b r m hm x hx
-      by_cases hq : q ∈ R₂.faulty
-      · right; right; intro m' hm'
-        simp [Run.out_eq_nil_of_canonical A hc₂ hq] at hm'
-      · by_cases hq1 : q ∈ R₁.faulty
-        · left
-          have hqR : q ∉ R.faulty := by simp [hRf, hq1]
-          refine ⟨hqR, ?_⟩
-          rw [Run.out_of_correct A _ hqR, Run.out_of_correct A _ hq, hX₂ σ hσ q ⟨hq, hq1⟩]
-        · right; left; exact ⟨(hRf q).2 ⟨hq1, hq⟩, hq⟩
-    · refine Run.tokens_replay hU (Ri := R₁) (T := T) (fun q σ r' hσ => ?_) τ hτ b r m hm x hx
-      by_cases hq : q ∈ R₁.faulty
-      · right; right; intro m' hm'
-        simp [Run.out_eq_nil_of_canonical A hc₁ hq] at hm'
-      · by_cases hq2 : q ∈ R₂.faulty
-        · left
-          have hqR : q ∉ R.faulty := by simp [hRf, hq2]
-          refine ⟨hqR, ?_⟩
-          rw [Run.out_of_correct A _ hqR, Run.out_of_correct A _ hq, hX₁ σ hσ q ⟨hq, hq2⟩]
-        · right; left; exact ⟨(hRf q).2 ⟨hq, hq2⟩, hq⟩
-    · simp at hm
-  have ha' : a ∉ R.faulty := by simp [hRf, ha.2]
-  have hc' : c ∉ R.faulty := by simp [hRf, hc.2]
-  refine hA.agreement R hR hRa a ha' c hc' w₁ w₂ ⟨T₁, ?_⟩ ⟨T₂, ?_⟩
-  · rw [hX₁ T₁ (le_max_left _ _) a ha]; exact hw₁
-  · rw [hX₂ T₂ (le_max_right _ _) c hc]; exact hw₂
+    (hp₂ : p₂ ∉ R₂.faulty) (hd₂ : R₂.Decides A p₂ v₂) : v₁ = v₂ :=
+  hA.eq_of_compatible hU h₁ h₂ hc₁ hc₂ hcomp hp₁ hd₁ hp₂ hd₂
 
 /-- **Lemmas 3 and 4 / Theorem 1.** If `n ≤ 3t`, any validity property with which an algorithm
 solves consensus is trivial. -/
 theorem trivial_of_solvesConsensus_auth [Nonempty VI] (hU : A.Unforging Au)
-    (hA : SolvesConsensusAuth Au t δ A val) (ht : 0 < t) (htn : t < Fintype.card P) (hn : Fintype.card P ≤ 3 * t) : val.Trivial t := by
-  classical
-  set n := Fintype.card P with hn_def
-  let d : VI := Classical.arbitrary VI
-  obtain ⟨B₀, -, hB₀⟩ := exists_subset_card_eq (s := (univ : Finset P)) (n := n - t)
-    (by simp [n])
-  let base : Config P VI := fun p => if p ∈ B₀ then some d else none
-  have hbase_procs : base.procs = B₀ := by
-    ext p; by_cases hp : p ∈ B₀ <;> simp [base, hp]
-  let Rb : Run P M VI := canonRun base d
-  have hRb : Rb.Valid t δ :=
-    canonRun.valid base d (by unfold IsInputConfig; rw [hbase_procs, hB₀]) δ
-  obtain ⟨pb, hpb⟩ : B₀.Nonempty := card_pos.mp (by omega)
-  have hpbF : pb ∉ Rb.faulty := by simp [Rb, canonRun, hbase_procs, hpb]
-  obtain ⟨vb, hvb⟩ := hA.termination Rb hRb (canonRun_authValid _ _) pb hpbF
-  -- Lemma 3: for every full input configuration, some execution decides `vb`
-  have lemma3 : ∀ cn : Config P VI, (∀ p, cn p ≠ none) → ∃ R : Run P M VI, R.Valid t δ ∧
-      R.Canonical ∧ R.inputConf = cn ∧ ∃ p ∉ R.faulty, R.Decides A p vb := by
-    intro cn hcn
-    obtain ⟨U, hUsub, hUc⟩ := exists_subset_card_eq (s := B₀ᶜ) (n := min t (n - t))
-      (by rw [card_compl, hB₀]; omega)
-    obtain ⟨Y, hY, hYc⟩ := exists_subset_card_eq (s := B₀) (n := n - t - min t (n - t))
-      (by omega)
-    have hUY : Disjoint U Y :=
-      disjoint_of_subset_left hUsub (disjoint_of_subset_right hY disjoint_compl_left)
-    have hUB : ∀ p ∈ U, p ∉ B₀ := fun p hp => by simpa using hUsub hp
-    set X := U ∪ Y with hX
-    have hXc : X.card = n - t := by rw [card_union_of_disjoint hUY]; omega
-    let c : Config P VI := fun p => if p ∈ X then cn p else none
-    have hcprocs : c.procs = X := by
-      ext p; by_cases hp : p ∈ X <;> simp [c, hp, Option.isSome_iff_ne_none, hcn]
-    let Rc : Run P M VI := canonRun c d
-    have hc : IsInputConfig t c := by unfold IsInputConfig; rw [hcprocs, hXc]
-    have hRc : Rc.Valid t δ := canonRun.valid c d hc δ
-    have hXB : X ∩ B₀ ⊆ Y := by
-      intro p hp
-      rw [mem_inter, hX, mem_union] at hp
-      rcases hp.1 with h | h
-      · exact absurd hp.2 (hUB p h)
-      · exact h
-    have hcomp : Compatible t Rc.inputConf Rb.inputConf := by
-      rw [canonRun.inputConf, canonRun.inputConf, Compatible, hcprocs, hbase_procs]
-      refine ⟨(card_le_card hXB).trans (by omega), ?_, ?_⟩
-      · obtain ⟨u, hu⟩ : U.Nonempty := card_pos.mp (by omega)
-        exact ⟨u, mem_sdiff.mpr ⟨mem_union_left _ hu, hUB u hu⟩⟩
-      · rw [← card_pos]
-        have h1 := card_sdiff_add_card_inter B₀ X
-        have h2 := card_le_card hXB
-        rw [inter_comm] at h1
-        omega
-    obtain ⟨pc, hpc⟩ : X.Nonempty := card_pos.mp (by omega)
-    have hpcF : pc ∉ Rc.faulty := by simp [Rc, canonRun, hcprocs, hpc]
-    obtain ⟨vc, τc, hvc⟩ := hA.termination Rc hRc (canonRun_authValid _ _) pc hpcF
-    obtain rfl : vc = vb := eq_of_compatible_auth hU hA hRc hRb (canonRun.canonical c d)
-      (canonRun.canonical base d) hcomp hpcF ⟨τc, hvc⟩ hpbF hvb
-    have hcn_procs : cn.procs = univ := by
-      ext p; simp [Option.isSome_iff_ne_none, hcn]
-    have hagree : ∀ p ∉ Rc.faulty, cn p ≠ none → cn p = some (Rc.inp p) := by
-      intro p hp _
-      have hpX : p ∈ X := by simpa [Rc, canonRun, hcprocs] using hp
-      obtain ⟨v, hv⟩ := Option.ne_none_iff_exists'.mp (hcn p)
-      simp [Rc, canonRun, c, hpX, hv]
-    refine ⟨Rc.extend A cn τc,
-      Run.extend_valid hRc (by unfold IsInputConfig; rw [hcn_procs, card_univ]; omega) τc,
-      fun q hq => by simp [Run.extend, Option.isSome_iff_ne_none, hcn] at hq,
-      Run.extend_inputConf _ _ _, pc, by simp [Run.extend, Option.isSome_iff_ne_none, hcn],
-      ⟨τc, ?_⟩⟩
-    rw [Run.extend_st (canonRun.canonical c d) hagree τc τc le_rfl pc hpcF (hcn pc)]
-    exact hvc
-  -- Lemma 4: `vb` is admissible for every input configuration
-  refine ⟨vb, fun c hc => ?_⟩
-  let cn : Config P VI := fun p => if c p = none then some d else c p
-  have hcn : ∀ p, cn p ≠ none := by
-    intro p; by_cases hp : c p = none <;> simp [cn, hp]
-  obtain ⟨R, hR, hcan, hinp, p, hp, hdec⟩ := lemma3 cn hcn
-  refine canonical_similarity_auth hU hA hR hcan hp hdec hc ⟨?_, ?_⟩
-  · obtain ⟨q, hq⟩ : c.procs.Nonempty := card_pos.mp (by unfold IsInputConfig at hc; omega)
-    refine ⟨q, mem_inter.mpr ⟨hq, ?_⟩⟩
-    rw [hinp, Config.mem_procs_iff_ne_none]; exact hcn q
-  · intro q hq
-    rw [mem_inter, Config.mem_procs_iff_ne_none] at hq
-    rw [hinp]; simp [cn, hq.1]
+    (hA : SolvesConsensusAuth Au t δ A val) (ht : 0 < t) (htn : t < Fintype.card P)
+    (hn : Fintype.card P ≤ 3 * t) : val.Trivial t :=
+  hA.trivial hU ht htn hn
 
 /-- **Lemma 1 (canonical similarity)**, unauthenticated model. -/
 theorem canonical_similarity (hA : SolvesConsensus t δ A val) {R : Run P M VI}
@@ -272,13 +73,12 @@ theorem trivial_of_solvesConsensus [Nonempty VI] (hA : SolvesConsensus t δ A va
 /-- **Theorem 1**, authenticated model: if `n ≤ 3t`, every validity property solvable with
 (ideal) signatures is trivial. -/
 theorem trivial_of_solvableAuth [Nonempty VI] (h : val.SolvableAuth t δ) (ht : 0 < t)
-    (htn : t < Fintype.card P) (hn : Fintype.card P ≤ 3 * t) : val.Trivial t := by
-  obtain ⟨M, S, K, Au, A, hU, hA⟩ := h
-  exact trivial_of_solvesConsensus_auth hU hA ht htn hn
+    (htn : t < Fintype.card P) (hn : Fintype.card P ≤ 3 * t) : val.Trivial t :=
+  h.trivial ht htn hn
 
 /-- **Theorem 1.** If `n ≤ 3t`, every solvable validity property is trivial. -/
 theorem trivial_of_solvable [Nonempty VI] (h : val.Solvable t δ) (ht : 0 < t)
     (htn : t < Fintype.card P) (hn : Fintype.card P ≤ 3 * t) : val.Trivial t :=
-  trivial_of_solvableAuth h.solvableAuth ht htn hn
+  h.trivial ht htn hn
 
 end ValidityConsensus

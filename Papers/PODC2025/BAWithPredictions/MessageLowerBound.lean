@@ -1,5 +1,5 @@
 import Papers.PODC2025.BAWithPredictions.Defs
-import Cslib.Computability.Distributed.Byzantine.PartialSync.Omission
+import Podc.PartialSync.Omission
 
 /-!
 # Byzantine Agreement with Predictions — the message lower bound (Theorem 14)
@@ -54,42 +54,15 @@ namespace MsgLB
 
 variable {A : Algorithm P M S (V × Pr) V} {t : ℕ}
 
-/-- The omission execution in which every process of `B` is isolated: it receives only its own
-messages. -/
-def soloExec (x : P → V × Pr) (B : Finset P) : OmExec P (V × Pr) where
-  inp := x
-  ok _ q p := !(decide (p ∈ B ∧ q ≠ p))
-
-omit [Fintype P] in
-theorem soloExec_admits (x : P → V × Pr) (B : Finset P) : (soloExec x B).Admits A B := by
-  intro τ q p h _
-  simp only [soloExec, Bool.not_eq_false', decide_eq_true_eq] at h
-  exact ⟨h.2, Or.inr h.1⟩
-
-omit [Fintype P] in
-/-- An isolated process behaves as in any other execution in which it is isolated with the same
-input. -/
-theorem soloExec_st {x y : P → V × Pr} {B C : Finset P} {p : P} (hpB : p ∈ B) (hpC : p ∈ C)
-    (hxy : x p = y p) (τ : ℕ) : (soloExec x B).st A τ p = (soloExec y C).st A τ p := by
-  refine OmExec.st_eq_of_inbox_eq (X := fun _ => {p}) (fun _ => le_rfl)
-    (fun q hq => by rw [Set.mem_singleton_iff.mp hq]; exact hxy) (fun τ ih q hq => ?_) τ p rfl
-  rw [Set.mem_singleton_iff.mp hq]
-  funext r
-  refine OmExec.inbox_congr ?_ fun hok => ?_
-  · by_cases hr : r = p <;> simp [soloExec, hpB, hpC, hr]
-  · by_cases hr : r = p
-    · subst hr; exact ih r rfl
-    · simp [soloExec, hpB, hr] at hok
-
 /-- The decisions of `p` in isolation, with the reference input `x₀`. -/
 def IsoDec (A : Algorithm P M S (V × Pr) V) (x₀ : V × Pr) (p : P) (v : V) : Prop :=
-  (soloExec (fun _ => x₀) univ).Decides A p v
+  (OmExec.solo (fun _ => x₀) univ).Decides A p v
 
 omit [Fintype P] in
 theorem decides_solo_iff {x : P → V × Pr} {B : Finset P} {p : P} (hpB : p ∈ B) {x₀ : V × Pr}
-    (hx : x p = x₀) [Fintype P] {v : V} : (soloExec x B).Decides A p v ↔ IsoDec A x₀ p v := by
+    (hx : x p = x₀) [Fintype P] {v : V} : (OmExec.solo x B).Decides A p v ↔ IsoDec A x₀ p v := by
   unfold IsoDec OmExec.Decides
-  simp only [soloExec_st (A := A) hpB (mem_univ p) (y := fun _ => x₀) hx]
+  simp only [OmExec.solo_st (A := A) hpB (mem_univ p) (y := fun _ => x₀) hx]
 
 theorem conf_strongUnanimity {E : OmExec P (V × Pr)} {F : Finset P} {w u : V}
     (hw : ∀ p ∉ F, (E.inp p).1 = w) (hu : u ∈ strongUnanimity P V Pr (E.conf F)) : u = w := by
@@ -136,12 +109,12 @@ theorem t_sq_om {val : ValidityProperty P (V × Pr) V} (hS : OmSolves t A val) {
   obtain ⟨B, hBX, hBcard⟩ := exists_subset_card_eq hXcard
   set c : P → Pr := fun p => Classical.choose (hcor B p)
   set x : P → V × Pr := fun p => if p ∈ B then x₀ else (w, c p)
-  set E := soloExec x B
-  have hE : E.Admits A B := soloExec_admits x B
+  set E := OmExec.solo x B
+  have hE : E.Admits A B := OmExec.solo_admits
   have hBt : B.card ≤ t := by omega
   have hcorr : PredCorrect Cor E.inp B := by
     intro p hp
-    simp only [E, soloExec, x, hp, ↓reduceIte]
+    simp only [E, OmExec.solo, x, hp, ↓reduceIte]
     exact Classical.choose_spec (hcor B p)
   refine ⟨E, B, hE, hBt, hcorr, ?_⟩
   set σ := (t + 1) / 2
@@ -160,7 +133,7 @@ theorem t_sq_om {val : ValidityProperty P (V × Pr) V} (hS : OmSolves t A val) {
     have hE' : E.Admits A F' := by
       rw [hF']
       refine hE.swap fun τ r h1 _ => ?_
-      simp only [E, soloExec, Bool.not_eq_false', decide_eq_true_eq] at h1
+      simp only [E, OmExec.solo, Bool.not_eq_false', decide_eq_true_eq] at h1
       exact h1.1
     have hF'card : F'.card ≤ t := by
       rw [hF']
@@ -180,7 +153,7 @@ theorem t_sq_om {val : ValidityProperty P (V × Pr) V} (hS : OmSolves t A val) {
       simp only [hF', mem_union, mem_erase, not_or, not_and]
       exact ⟨fun _ h => hq.1 h, hq.2⟩
     have hval : ∀ r ∉ B, (E.inp r).1 = w := by
-      intro r hr; simp [E, soloExec, x, hr]
+      intro r hr; simp [E, OmExec.solo, x, hr]
     obtain ⟨u, hu⟩ := hS.termination E B hE hBt q hq.1
     have huw : u = w := hV E B w u hE hBt (hBX.trans hXQ) hval q hq.1 hu
     subst huw
@@ -193,20 +166,6 @@ theorem t_sq_om {val : ValidityProperty P (V × Pr) V} (hS : OmSolves t A val) {
     exact hu'
 
 /-! ### The `n` part -/
-
-/-- The fault-free execution with inputs `x`. -/
-def ffE (x : P → V × Pr) : OmExec P (V × Pr) where
-  inp := x
-  ok _ _ _ := true
-
-omit [Fintype P] in
-theorem ffE_admits (x : P → V × Pr) : (ffE x).Admits A ∅ := by
-  intro τ q p h; simp [ffE] at h
-
-omit [Fintype P] in
-theorem ffE_inbox (x : P → V × Pr) (τ : ℕ) (p q : P) :
-    (ffE x).inbox A τ p q = A.send q ((ffE x).st A τ q) p := by
-  simp [OmExec.inbox, ffE]
 
 /-- The non-empty batches sent to other processes before time `N`. -/
 def batches (A : Algorithm P M S (V × Pr) V) (E : OmExec P (V × Pr)) (N : ℕ) :
@@ -254,12 +213,12 @@ theorem mem_touched {E : OmExec P (V × Pr)} {N τ : ℕ} (hτ : τ < N) {z q : 
   · refine mem_union_right _ (mem_image.mpr ⟨(τ, q, z), ?_, rfl⟩)
     simp [hτ, hq, h]
 
-theorem ffE_decides_eq {val : ValidityProperty P (V × Pr) V} {x : P → V × Pr} {w : V}
+theorem ff_decides_eq {val : ValidityProperty P (V × Pr) V} {x : P → V × Pr} {w : V}
     (hS : OmSolves t A val) {Q : Finset P} (hV : ValidOn A t Q)
-    (hx : ∀ p, (x p).1 = w) (p : P) : ∃ u, (ffE x).Decides A p u ∧ u = w := by
-  obtain ⟨u, hu⟩ := hS.termination (ffE x) ∅ (ffE_admits x) (by simp) p (by simp)
-  exact ⟨u, hu, hV (ffE x) ∅ w u (ffE_admits x) (by simp) (empty_subset _) (fun r _ => hx r) p
-    (by simp) hu⟩
+    (hx : ∀ p, (x p).1 = w) (p : P) : ∃ u, (OmExec.ff x).Decides A p u ∧ u = w := by
+  obtain ⟨u, hu⟩ := hS.termination (OmExec.ff x) ∅ (OmExec.ff_admits ∅) (by simp) p (by simp)
+  exact ⟨u, hu, hV (OmExec.ff x) ∅ w u (OmExec.ff_admits ∅) (by simp) (empty_subset _)
+    (fun r _ => hx r) p (by simp) hu⟩
 
 /-- **Theorem 14, the `n` part (omission model).** Some fault-free execution in which all
 predictions are correct has at least `n / 4` messages. -/
@@ -274,44 +233,44 @@ theorem n_om {val : ValidityProperty P (V × Pr) V} (hS : OmSolves t A val) {Q :
   have hc : ∀ p, Cor ∅ p (c p) := fun p => Classical.choose_spec (hcor ∅ p)
   set x₀ : P → V × Pr := fun p => (v₀, c p)
   set x₁ : P → V × Pr := fun p => (v₁, c p)
-  set E₀ := ffE x₀
-  set E₁ := ffE x₁
+  set E₀ := OmExec.ff x₀
+  set E₁ := OmExec.ff x₁
   by_cases hiso : ∃ z, ∀ τ, ∀ q, q ≠ z →
       A.send z (E₀.st A τ z) q = [] ∧ A.send q (E₀.st A τ q) z = [] ∧
       A.send z (E₁.st A τ z) q = [] ∧ A.send q (E₁.st A τ q) z = []
   · exfalso
     obtain ⟨z, hz⟩ := hiso
     set x' : P → V × Pr := fun p => if p = z then x₀ p else x₁ p
-    set E' := ffE x'
+    set E' := OmExec.ff x'
     have key : ∀ τ, E'.st A τ z = E₀.st A τ z ∧ ∀ p, p ≠ z → E'.st A τ p = E₁.st A τ p := by
       intro τ
       induction τ with
       | zero =>
-        refine ⟨by simp [E', E₀, ffE, x'], fun p hp => by simp [E', E₁, ffE, x', hp]⟩
+        refine ⟨by simp [E', E₀, OmExec.ff, x'], fun p hp => by simp [E', E₁, OmExec.ff, x', hp]⟩
       | succ τ ih =>
         refine ⟨?_, fun p hp => ?_⟩
         · rw [OmExec.st_succ, OmExec.st_succ, ih.1]
           congr 1
           funext q
-          rw [ffE_inbox, ffE_inbox]
+          rw [OmExec.ff_inbox, OmExec.ff_inbox]
           by_cases hq : q = z
           · subst hq; rw [ih.1]
           · rw [ih.2 q hq, (hz τ q hq).2.2.2, (hz τ q hq).2.1]
         · rw [OmExec.st_succ, OmExec.st_succ, ih.2 p hp]
           congr 1
           funext q
-          rw [ffE_inbox, ffE_inbox]
+          rw [OmExec.ff_inbox, OmExec.ff_inbox]
           by_cases hq : q = z
           · subst hq; rw [ih.1, (hz τ p hp).1, (hz τ p hp).2.2.1]
           · rw [ih.2 q hq]
     obtain ⟨p, hp⟩ := Fintype.exists_ne_of_one_lt_card (by omega) z
-    obtain ⟨u₀, hu₀, rfl⟩ := ffE_decides_eq (w := v₀) hS hV (x := x₀) (fun _ => rfl) z
-    obtain ⟨u₁, hu₁, rfl⟩ := ffE_decides_eq (w := v₁) hS hV (x := x₁) (fun _ => rfl) p
+    obtain ⟨u₀, hu₀, rfl⟩ := ff_decides_eq (w := v₀) hS hV (x := x₀) (fun _ => rfl) z
+    obtain ⟨u₁, hu₁, rfl⟩ := ff_decides_eq (w := v₁) hS hV (x := x₁) (fun _ => rfl) p
     have d₀ : E'.Decides A z u₀ := by
       obtain ⟨τ, h⟩ := hu₀; exact ⟨τ, by rw [(key τ).1]; exact h⟩
     have d₁ : E'.Decides A p u₁ := by
       obtain ⟨τ, h⟩ := hu₁; exact ⟨τ, by rw [(key τ).2 p hp]; exact h⟩
-    exact hv (hS.agreement E' ∅ (ffE_admits x') (by simp) z (by simp) p (by simp) u₀ u₁ d₀ d₁)
+    exact hv (hS.agreement E' ∅ (OmExec.ff_admits ∅) (by simp) z (by simp) p (by simp) u₀ u₁ d₀ d₁)
   · push Not at hiso
     have hτ : ∀ z, ∃ τ, ∃ q, q ≠ z ∧
         ((A.send z (E₀.st A τ z) q ≠ [] ∨ A.send q (E₀.st A τ q) z ≠ []) ∨
@@ -336,8 +295,8 @@ theorem n_om {val : ValidityProperty P (V × Pr) V} (hS : OmSolves t A val) {Q :
     have h4 := card_touched_le (A := A) E₁ N
     rw [card_univ] at h1
     by_cases hm : E₁.msgsUpTo A ∅ N ≤ E₀.msgsUpTo A ∅ N
-    · exact ⟨E₀, ffE_admits x₀, fun p _ => hc p, N, by omega⟩
-    · exact ⟨E₁, ffE_admits x₁, fun p _ => hc p, N, by omega⟩
+    · exact ⟨E₀, OmExec.ff_admits ∅, fun p _ => hc p, N, by omega⟩
+    · exact ⟨E₁, OmExec.ff_admits ∅, fun p _ => hc p, N, by omega⟩
 
 end MsgLB
 

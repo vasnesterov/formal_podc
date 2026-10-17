@@ -32,7 +32,7 @@ theorem plurMin_congr {X : Finset ι} {f g : ι → α} {d d' : α} (hX : X.None
     (h : ∀ j ∈ X, f j = g j) : plurMin X f d = plurMin X g d' := by
   have hc : ∀ j ∈ X, cnt X f (f j) = cnt X g (g j) := by
     intro j hj
-    unfold cnt
+    unfold cnt Finset.countEq
     congr 1
     exact filter_congr fun j' hj' => by rw [h j' hj', h j hj]
   have hsup : (X.sup fun j => cnt X f (f j)) = X.sup fun j => cnt X g (g j) := sup_congr rfl hc
@@ -193,7 +193,7 @@ theorem decision_eq {w : V} (hw : ∀ q ∈ CH E, plurality (E.s (k + 2) q) = w)
   have := card_le_card h1
   have := card_le_card h2
   have := card_union_le (CH E) (F.filter (· ∈ Csup k F inp))
-  unfold cnt
+  unfold cnt Finset.countEq
   beta_reduce
   omega
 
@@ -267,7 +267,7 @@ theorem plurality_unanimous {v : V} (hv : ∀ p ∈ CH E, (inp p).1 = v) {j : P}
   have := card_union_le (CH E) (F.filter (· ∈ Csup k F inp))
   have := lemma24_honest E hsync hF htn hn hk
   have := lemma24_faulty' hF hn hk
-  unfold cnt
+  unfold cnt Finset.countEq
   beta_reduce
   omega
 

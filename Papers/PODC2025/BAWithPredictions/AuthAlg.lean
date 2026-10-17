@@ -78,7 +78,7 @@ def plurMin (X : Finset ι) (f : ι → α) (d : α) : α :=
 theorem plurMin_eq_of_majority {X : Finset ι} {f : ι → α} {d w : α}
     (h : X.card < 2 * cnt X f w) : plurMin X f d = w := by
   have hne : X.Nonempty := by
-    rw [← card_pos]; have := card_le_card (filter_subset (fun j => f j = w) X); unfold cnt at h
+    rw [← card_pos]; have := card_le_card (filter_subset (fun j => f j = w) X); unfold cnt Finset.countEq at h
     omega
   unfold plurMin
   simp only [hne, ↓reduceDIte]
@@ -90,7 +90,7 @@ theorem plurMin_eq_of_majority {X : Finset ι} {f : ι → α} {d w : α}
     by_contra hne'
     obtain ⟨j', hj'X, hj'w⟩ : ∃ j', j' ∈ X ∧ f j' = w := by
       have : (X.filter fun j => f j = w).Nonempty := by
-        rw [← card_pos]; unfold cnt at h; omega
+        rw [← card_pos]; unfold cnt Finset.countEq at h; omega
       obtain ⟨j', hj'⟩ := this
       exact ⟨j', (mem_filter.mp hj').1, (mem_filter.mp hj').2⟩
     have h1 : cnt X f (f j') ≤ X.sup fun j => cnt X f (f j) :=

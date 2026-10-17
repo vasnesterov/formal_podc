@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.Foundations.Count
 
 /-!
 # Reaching Univalency — §2.3–2.5: ε-Byzantine Agreement and the reductions
@@ -39,7 +40,7 @@ def EpsBAOn (C : Finset P) (ε : ℚ) (F : Finset P) (inp out : P → Bool) : Pr
 def EpsBA (ε : ℚ) (F : Finset P) (inp out : P → Bool) : Prop := EpsBAOn univ ε F inp out
 
 /-- Number of received values equal to `b`. -/
-def recvCount (recv : P → Option Bool) (b : Bool) : ℕ := (univ.filter fun q => recv q = some b).card
+abbrev recvCount (recv : P → Option Bool) (b : Bool) : ℕ := univ.countEq recv (some b)
 
 /-- Majority of the received values (ties broken by `tie`). -/
 def majority (recv : P → Option Bool) (tie : Bool) : Bool :=
@@ -78,11 +79,8 @@ theorem prop3 {ε : ℚ} (hε : 0 < ε) {F : Finset P} (hf : (F.card : ℚ) < Fi
       simp [hrecv p q hq.1, hagr q (by simp [hq.1]) hq.2]
     have hv : (recvCount (recv p) v : ℚ) > Fintype.card P / 2 :=
       lt_of_lt_of_le hG (by exact_mod_cast card_le_card hsub)
-    have hsum : recvCount (recv p) v + recvCount (recv p) (!v) ≤ Fintype.card P := by
-      unfold recvCount
-      rw [← card_union_of_disjoint]
-      · exact card_le_univ _
-      · rw [disjoint_filter]; intro q _ h1 h2; rw [h1] at h2; cases v <;> simp at h2
+    have hsum : recvCount (recv p) v + recvCount (recv p) (!v) ≤ Fintype.card P :=
+      countEq_add_countEq_le (by cases v <;> simp)
     have hlt : recvCount (recv p) (!v) < recvCount (recv p) v := by
       have : (recvCount (recv p) (!v) : ℚ) < recvCount (recv p) v := by
         have : (recvCount (recv p) v : ℚ) + recvCount (recv p) (!v) ≤ Fintype.card P := by
@@ -126,10 +124,6 @@ lemma card_filter_ne_add (s : Finset P) (vals : P → Bool) (x : Bool) :
   congr 1; ext p; simp only [mem_union, mem_filter]; tauto
 
 omit [Fintype P] in
-lemma card_sdiff_inter (C F : Finset P) : (C \ F).card + (C ∩ F).card = C.card := by
-  rw [← card_union_of_disjoint (disjoint_sdiff_inter C F), sdiff_union_inter]
-
-omit [Fintype P] in
 /-- The ideal outcome is a valid ε-BA outcome on every committee with fewer than `|C|(1/3 - ε)`
 faulty members. -/
 theorem majorityOracle_epsBA {ε : ℚ} (hε : 0 < ε) {C F : Finset P}
@@ -145,7 +139,7 @@ theorem majorityOracle_epsBA {ε : ℚ} (hε : 0 < ε) {C F : Finset P}
   refine ⟨∅, majVal C F vals, empty_subset _, by simp; positivity, fun p _ _ => rfl,
     fun x hx => ?_⟩
   have h1 := card_filter_ne_add (C \ F) vals x
-  have h2 := card_sdiff_inter C F
+  have h2 := card_sdiff_add_card_inter C F
   have h1' : ((((C \ F).filter fun p => vals p ≠ x).card : ℕ) : ℚ) +
       (((C \ F).filter fun p => vals p = x).card : ℚ) = ((C \ F).card : ℚ) := by exact_mod_cast h1
   have h2' : ((C \ F).card : ℚ) + (C ∩ F).card = C.card := by exact_mod_cast h2
@@ -286,7 +280,7 @@ theorem prop5_extract {ε : ℚ} {C F : Finset P} {f : ℕ} (hfC : (C ∩ F).car
     have hsub : C \ F ⊆ ((M.filter fun x => x.1 ∈ C).image Prod.fst) := by
       intro c hc
       exact mem_image.mpr ⟨(c, out c), mem_filter.mpr ⟨hcont c hc, (mem_sdiff.mp hc).1⟩, rfl⟩
-    have := card_sdiff_inter C F
+    have := card_sdiff_add_card_inter C F
     have := card_le_card hsub
     omega
 

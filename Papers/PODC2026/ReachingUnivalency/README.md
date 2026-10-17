@@ -123,7 +123,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
   - The counterexample's hypotheses are checked in full (accuracy on all `2^38` sets via an ℓ¹/TV bound).
 - *Not checked.* There is no non-vacuity instance for Appendix B's hypotheses, i.e. a crash-tolerant BA protocol
   with a univalent first phase in this model (FloodSet would be one).
-- *Dependencies.* The lower bounds reuse CSLib `Cslib/Computability/Distributed/Byzantine/PartialSync/Omission.lean`.
+- *Dependencies.* The lower bounds reuse CSLib `Cslib/Computability/Distributed/Byzantine/PartialSync/Omission.lean`
+  and the shared executions `OmExec.solo` (the isolation execution `E₁` of Theorem 7) and `OmExec.ff`
+  (`Podc/PartialSync/Omission.lean`); vote counts are `Finset.countEq` (`Podc/Foundations/Count.lean`).
   The sampler existence (§5) uses the shared finite probability library `Podc/Probability/Finite/Uniform.lean`
   (Chebyshev for sampling with replacement `card_freq_dev_ge_le`, many rare events `card_many_le`, union bound
   `card_filter_exists_le`).

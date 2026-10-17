@@ -85,4 +85,8 @@ protocols.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. The
 synchronous and omission models, FLM, Dolev–Strong and IC live in CSLib,
-`Cslib/Computability/Distributed/Byzantine/PartialSync/`.
+`Cslib/Computability/Distributed/Byzantine/PartialSync/`. Shared library (`Podc/PartialSync/`): Algorithms 1 and 2 are
+input/decision maps `Algorithm.comapInput`/`Algorithm.mapDecide` (`Map.lean`); Definition 3 and Lemma 9 are
+`ValidityProperty.ContainmentCondition` and `.solvableSync`/`.solvableAuthSync` (`Containment.lean`, also used by
+*BA with Predictions*); the fault-free executions `ffExec`/`ffRun` are `OmExec.ff`/`Run.quiet ∅` (`Omission.lean`,
+`Runs.lean`; `isoExec_empty` relates `ffExec` to `isoExec`); the computable `Γ` comes from `Computable.lean`.

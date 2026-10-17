@@ -1,4 +1,5 @@
 import Papers.PODC2023.ValidityConsensus.Similarity
+import Podc.PartialSync.Map
 
 /-!
 # On the Validity of Consensus — §5.2: `Universal` (Theorem 5) and the classification
@@ -6,10 +7,12 @@ import Papers.PODC2023.ValidityConsensus.Similarity
 * Vector consensus (§5.2.1) is taken as a black box: `SolvesVectorConsensus`. Its existence is a
   *hypothesis* (the paper gives implementations in its Appendix B, relying on Quad / DBFT and
   reliable broadcast; these are not formalized).
-* `universal A Λ` (Algorithm 2): run vector consensus `A`, decide `Λ vector`.
+* `universal A Λ` (Algorithm 2): run vector consensus `A`, decide `Λ vector` (the decision
+  post-processing `A.mapDecide Λ` of `Podc.PartialSync.Map`).
 * `solvesConsensus_universal` (Lemma 8 / Theorem 5): if `n > 2t` (the paper assumes `n > 3t`)
   and `Λ` witnesses `C_S`, then `universal A Λ` solves consensus with `val`, and it sends exactly
-  the messages of `A` in every run (`msgsUpTo_universal`), so it inherits `A`'s message complexity.
+  the messages of `A` in every run (`Run.msgsUpTo_mapDecide`), so it inherits `A`'s message
+  complexity.
 * `solvable_iff_similarityCondition` (`n > 3t`, assuming vector consensus is solvable) and
   `solvable_iff_trivial` (`n ≤ 3t`): the full classification of solvable validity properties.
 -/
@@ -36,66 +39,62 @@ def VectorConsensusSolvable (P VI : Type*) [Fintype P] [DecidableEq P] (t δ : �
   ∃ (M S : Type) (A : Algorithm P M S VI (Config P VI)), SolvesVectorConsensus t δ A
 
 /-- **Algorithm 2 (`Universal`)**: decide `Λ vector` once vector consensus decides `vector`. -/
-def universal (A : Algorithm P M S VI (Config P VI)) (Λ : Config P VI → VO) :
-    Algorithm P M S VI VO where
-  init := A.init
-  step := A.step
-  send := A.send
-  decide p s := (A.decide p s).map Λ
+abbrev universal (A : Algorithm P M S VI (Config P VI)) (Λ : Config P VI → VO) :
+    Algorithm P M S VI VO :=
+  A.mapDecide Λ
 
 variable {A : Algorithm P M S VI (Config P VI)} {Λ : Config P VI → VO}
 
-omit [Fintype P] in
-theorem st_universal (R : Run P M VI) : R.st (universal A Λ) = R.st A :=
-  R.st_congr _ rfl rfl rfl
+/-- The decisions of vector consensus, as a validity property: a decided vector has exactly
+`n - t` process-proposal pairs, and agrees with the input configuration where both are defined. -/
+def vectorConsensusValidity (t : ℕ) : ValidityProperty P VI (Config P VI) :=
+  fun c => {vec | IsInputConfigExact t vec ∧ ∀ q, c q ≠ none → vec q ≠ none → vec q = c q}
 
-omit [Fintype P] in
-theorem decides_universal {R : Run P M VI} {p : P} {v : VO} :
-    R.Decides (universal A Λ) p v ↔ ∃ vec, R.Decides A p vec ∧ Λ vec = v := by
-  simp only [Run.Decides, st_universal]
-  simp only [universal, Option.map_eq_some_iff]
-  constructor
-  · rintro ⟨τ, vec, h, rfl⟩; exact ⟨vec, ⟨τ, h⟩, rfl⟩
-  · rintro ⟨vec, ⟨τ, h⟩, rfl⟩; exact ⟨τ, vec, h, rfl⟩
+theorem mem_vectorConsensusValidity_inputConf {R : Run P M VI} {vec : Config P VI}
+    (hex : IsInputConfigExact t vec)
+    (hcorr : ∀ q ∉ R.faulty, vec q ≠ none → vec q = some (R.inp q)) :
+    vec ∈ vectorConsensusValidity t R.inputConf := by
+  refine ⟨hex, fun q hq hq' => ?_⟩
+  have hqF : q ∉ R.faulty := fun h => hq (by simp [Run.inputConf, h])
+  rw [hcorr q hqF hq']
+  simp [Run.inputConf, hqF]
 
-/-- `Universal` sends exactly the messages of the underlying vector consensus. -/
-theorem msgsUpTo_universal (R : Run P M VI) (N : ℕ) :
-    R.msgsUpTo (universal A Λ) N = R.msgsUpTo A N := by
-  simp only [Run.msgsUpTo, Run.msgsAt, R.out_congr (universal A Λ) (A' := A) rfl rfl rfl]
+/-- Vector consensus solves consensus with the validity property `vectorConsensusValidity t`. -/
+theorem SolvesVectorConsensus.solvesConsensus (hA : SolvesVectorConsensus t δ A) :
+    SolvesConsensus t δ A (vectorConsensusValidity t) where
+  termination := hA.termination
+  agreement := hA.agreement
+  validity R hR p hp vec hvec :=
+    mem_vectorConsensusValidity_inputConf (hA.vectorValidity R hR p hp vec hvec).1
+      (hA.vectorValidity R hR p hp vec hvec).2
 
-theorem msgComplexity_universal (R : Run P M VI) :
-    R.msgComplexity (universal A Λ) = R.msgComplexity A := by
-  simp only [Run.msgComplexity, msgsUpTo_universal]
+/-- The key step of Lemma 8: if `n > 2t`, a vector admissible for the input configuration `c`
+has `n - t` entries and is similar to `c` (`|π(c)| + |π(vec)| ≥ 2(n - t) > n`), so `Λ vec` is
+admissible for `c`. -/
+theorem mem_of_vectorConsensusValidity {val : ValidityProperty P VI VO}
+    (hn : 2 * t < Fintype.card P)
+    (hΛ : ∀ c, IsInputConfigExact t c → CommonAdmissible t val c (Λ c)) {c : Config P VI}
+    (hc : IsInputConfig t c) {vec : Config P VI} (hvec : vec ∈ vectorConsensusValidity t c) :
+    Λ vec ∈ val c := by
+  obtain ⟨hvec, hcorr⟩ := hvec
+  refine hΛ vec hvec _ hc ⟨?_, fun q hq => ?_⟩
+  · rw [← card_pos]
+    have h1 := card_union_add_card_inter c.procs vec.procs
+    have h2 := card_le_univ (c.procs ∪ vec.procs)
+    unfold IsInputConfig at hc
+    unfold IsInputConfigExact at hvec
+    omega
+  · rw [mem_inter, Config.mem_procs_iff_ne_none, Config.mem_procs_iff_ne_none] at hq
+    exact (hcorr q hq.1 hq.2).symm
 
 /-- **Lemma 8 / Theorem 5.** If `n > 2t` and `Λ` witnesses the similarity condition, `Universal`
 solves consensus with `val` on top of any vector consensus algorithm. -/
 theorem solvesConsensus_universal {val : ValidityProperty P VI VO}
     (hn : 2 * t < Fintype.card P) (hA : SolvesVectorConsensus t δ A)
     (hΛ : ∀ c, IsInputConfigExact t c → CommonAdmissible t val c (Λ c)) :
-    SolvesConsensus t δ (universal A Λ) val where
-  termination R hR p hp := by
-    obtain ⟨vec, h⟩ := hA.termination R hR p hp
-    exact ⟨Λ vec, decides_universal.mpr ⟨vec, h, rfl⟩⟩
-  agreement R hR p hp q hq v w hv hw := by
-    obtain ⟨vec, h, rfl⟩ := decides_universal.mp hv
-    obtain ⟨vec', h', rfl⟩ := decides_universal.mp hw
-    rw [hA.agreement R hR p hp q hq vec vec' h h']
-  validity R hR p hp v hv := by
-    obtain ⟨vec, h, rfl⟩ := decides_universal.mp hv
-    obtain ⟨hvec, hcorr⟩ := hA.vectorValidity R hR p hp vec h
-    refine hΛ vec hvec _ (Run.isInputConfig_inputConf hR) ⟨?_, ?_⟩
-    · -- `|π(c*)| + |π(vec)| ≥ 2(n - t) > n`
-      rw [← card_pos]
-      have h1 := card_union_add_card_inter R.inputConf.procs vec.procs
-      have h2 := card_le_univ (R.inputConf.procs ∪ vec.procs)
-      have h3 := Run.isInputConfig_inputConf hR
-      unfold IsInputConfig at h3
-      unfold IsInputConfigExact at hvec
-      omega
-    · intro q hq
-      rw [mem_inter, Run.mem_procs_inputConf, Config.mem_procs_iff_ne_none] at hq
-      rw [hcorr q hq.1 hq.2]
-      simp [Run.inputConf, hq.1]
+    SolvesConsensus t δ (universal A Λ) val :=
+  hA.solvesConsensus.mapDecide fun _ hc _ hvec =>
+    mem_of_vectorConsensusValidity hn hΛ hc hvec
 
 /-- **Theorem 5** (solvability form): with `n > 3t`, if vector consensus is solvable then every
 validity property satisfying `C_S` is solvable. -/
@@ -136,64 +135,24 @@ def VectorConsensusSolvableAuth (P VI : Type*) [Fintype P] [DecidableEq P] (t δ
   ∃ (M S K : Type) (Au : Auth P M K) (A : Algorithm P M S VI (Config P VI)),
     A.Unforging Au ∧ SolvesVectorConsensusAuth Au t δ A
 
-omit [Fintype P] in
-theorem out_universal (R : Run P M VI) : R.out (universal A Λ) = R.out A :=
-  R.out_congr _ rfl rfl rfl
-
-omit [Fintype P] in
-theorem inbox_universal (R : Run P M VI) : R.inbox (universal A Λ) = R.inbox A := by
-  funext p τ q
-  simp only [Run.inbox, Run.inboxWith, Run.outWith, st_universal]
-  rfl
-
-omit [Fintype P] in
-theorem authValid_universal {Au : Auth P M K} (R : Run P M VI) :
-    R.AuthValid Au (universal A Λ) ↔ R.AuthValid Au A := by
-  simp only [Run.AuthValid, Run.honestTokens, out_universal]
-
-omit [Fintype P] in
-theorem unforging_universal {Au : Auth P M K} (hU : A.Unforging Au) :
-    (universal A Λ).Unforging Au := by
-  intro R p τ q m hm x hx
-  rw [st_universal] at hm
-  have := hU R p τ q m hm x hx
-  simpa only [Run.recvTokens, inbox_universal] using this
+/-- Authenticated vector consensus solves consensus with the validity property
+`vectorConsensusValidity t`. -/
+theorem SolvesVectorConsensusAuth.solvesConsensusAuth {Au : Auth P M K}
+    (hA : SolvesVectorConsensusAuth Au t δ A) :
+    SolvesConsensusAuth Au t δ A (vectorConsensusValidity t) where
+  termination := hA.termination
+  agreement := hA.agreement
+  validity R hR hRa p hp vec hvec :=
+    mem_vectorConsensusValidity_inputConf (hA.vectorValidity R hR hRa p hp vec hvec).1
+      (hA.vectorValidity R hR hRa p hp vec hvec).2
 
 /-- **Lemma 8 / Theorem 5**, authenticated model. -/
 theorem solvesConsensus_universal_auth {Au : Auth P M K} {val : ValidityProperty P VI VO}
     (hn : 2 * t < Fintype.card P) (hA : SolvesVectorConsensusAuth Au t δ A)
     (hΛ : ∀ c, IsInputConfigExact t c → CommonAdmissible t val c (Λ c)) :
-    SolvesConsensusAuth Au t δ (universal A Λ) val := by
-  -- reduce to the unauthenticated proof applied to the runs that respect unforgeability
-  have key : ∀ R : Run P M VI, R.Valid t δ → R.AuthValid Au A →
-      (∀ p ∉ R.faulty, ∃ v, R.Decides (universal A Λ) p v) ∧
-      (∀ p ∉ R.faulty, ∀ q ∉ R.faulty, ∀ v w, R.Decides (universal A Λ) p v →
-        R.Decides (universal A Λ) q w → v = w) ∧
-      (∀ p ∉ R.faulty, ∀ v, R.Decides (universal A Λ) p v → v ∈ val R.inputConf) := by
-    intro R hR hRa
-    refine ⟨fun p hp => ?_, fun p hp q hq v w hv hw => ?_, fun p hp v hv => ?_⟩
-    · obtain ⟨vec, h⟩ := hA.termination R hR hRa p hp
-      exact ⟨Λ vec, decides_universal.mpr ⟨vec, h, rfl⟩⟩
-    · obtain ⟨vec, h, rfl⟩ := decides_universal.mp hv
-      obtain ⟨vec', h', rfl⟩ := decides_universal.mp hw
-      rw [hA.agreement R hR hRa p hp q hq vec vec' h h']
-    · obtain ⟨vec, h, rfl⟩ := decides_universal.mp hv
-      obtain ⟨hvec, hcorr⟩ := hA.vectorValidity R hR hRa p hp vec h
-      refine hΛ vec hvec _ (Run.isInputConfig_inputConf hR) ⟨?_, ?_⟩
-      · rw [← card_pos]
-        have h1 := card_union_add_card_inter R.inputConf.procs vec.procs
-        have h2 := card_le_univ (R.inputConf.procs ∪ vec.procs)
-        have h3 := Run.isInputConfig_inputConf hR
-        unfold IsInputConfig at h3
-        unfold IsInputConfigExact at hvec
-        omega
-      · intro q hq
-        rw [mem_inter, Run.mem_procs_inputConf, Config.mem_procs_iff_ne_none] at hq
-        rw [hcorr q hq.1 hq.2]
-        simp [Run.inputConf, hq.1]
-  exact ⟨fun R hR hRa => (key R hR ((authValid_universal R).mp hRa)).1,
-    fun R hR hRa => (key R hR ((authValid_universal R).mp hRa)).2.1,
-    fun R hR hRa => (key R hR ((authValid_universal R).mp hRa)).2.2⟩
+    SolvesConsensusAuth Au t δ (universal A Λ) val :=
+  hA.solvesConsensusAuth.mapDecide fun _ hc _ hvec =>
+    mem_of_vectorConsensusValidity hn hΛ hc hvec
 
 /-- **Theorem 5** (authenticated, solvability form). -/
 theorem solvableAuth_of_similarityCondition {val : ValidityProperty P VI VO}
@@ -201,7 +160,7 @@ theorem solvableAuth_of_similarityCondition {val : ValidityProperty P VI VO}
     (hS : SimilarityCondition t val) : val.SolvableAuth t δ := by
   obtain ⟨M, S, K, Au, A, hU, hA⟩ := hvc
   obtain ⟨Λ, hΛ⟩ := hS
-  exact ⟨M, S, K, Au, universal A Λ, unforging_universal hU,
+  exact ⟨M, S, K, Au, universal A Λ, hU.mapDecide Λ,
     solvesConsensus_universal_auth (by omega) hA hΛ⟩
 
 /-- **Classification for `n > 3t`**, authenticated model. -/

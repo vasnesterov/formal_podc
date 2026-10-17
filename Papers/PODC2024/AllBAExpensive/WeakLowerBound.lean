@@ -1,4 +1,4 @@
-import Cslib.Computability.Distributed.Byzantine.PartialSync.Omission
+import Podc.PartialSync.Omission
 
 /-!
 # All Byzantine Agreement Problems Are Expensive — §3: the lower bound for weak consensus
@@ -33,7 +33,12 @@ def isoExec (x : P → VI) (G : Finset P) (k : ℕ) (H : Finset P) (k' : ℕ) : 
   ok τ q p := !(decide (p ∈ G ∧ q ∉ G ∧ k ≤ τ)) && !(decide (p ∈ H ∧ q ∉ H ∧ k' ≤ τ))
 
 /-- The fault-free execution with inputs `x`. -/
-abbrev ffExec (x : P → VI) : OmExec P VI := isoExec x ∅ 0 ∅ 0
+abbrev ffExec (x : P → VI) : OmExec P VI := OmExec.ff x
+
+omit [Fintype P] in
+/-- With no isolated group, `isoExec` is the fault-free execution. -/
+theorem isoExec_empty (x : P → VI) (k k' : ℕ) : isoExec x ∅ k ∅ k' = ffExec x := by
+  simp [isoExec, OmExec.ff]
 
 omit [Fintype P] in
 theorem isoExec_comm (x : P → VI) (G : Finset P) (k : ℕ) (H : Finset P) (k' : ℕ) :
@@ -267,6 +272,7 @@ theorem lemma3 (hS : OmSolves t A val) {β σ : ℕ} (hp : Params P t β σ)
 
 /-! ### Lemmas 4 and 5 -/
 
+omit [Fintype P] in
 /-- Before the isolation time, an isolated execution is the fault-free one. -/
 theorem isoExec_st_eq_ff (x : P → VI) (G : Finset P) (k : ℕ) :
     ∀ τ ≤ k, ∀ p, (isoExec x G k ∅ 0).st A τ p = (ffExec x).st A τ p := by
@@ -348,9 +354,9 @@ theorem omission_lower_bound (hS : OmSolves t A val) {β σ : ℕ} (hp : Params 
   -- `a` decides `v₀` / `v₁` in the fault-free executions
   have hff : ∀ x : P → VI, ∀ p v, (ffExec x).Decides A p v → (ffExec x).Decides A a v := by
     intro x p v hpv
-    obtain ⟨w, hw⟩ := hS.termination (ffExec x) ∅ (by simpa using isoExec_admits' (A := A) x ∅ 0)
+    obtain ⟨w, hw⟩ := hS.termination (ffExec x) ∅ (OmExec.ff_admits ∅)
       (by simp) a (by simp)
-    rwa [hS.agreement (ffExec x) ∅ (by simpa using isoExec_admits' (A := A) x ∅ 0) (by simp) a
+    rwa [hS.agreement (ffExec x) ∅ (OmExec.ff_admits ∅) (by simp) a
       (by simp) p (by simp) w v hw hpv] at hw
   have hGa : a ∉ G := fun h => ha (mem_union_left _ h)
   have hHa : a ∉ H := fun h => ha (mem_union_right _ h)

@@ -61,7 +61,7 @@ omit [Fintype P] in
 /-- In a fault-free execution all processes decide the same value. -/
 theorem ff_decides (hS : OmSolves t A val) {x : P → VI} {p : P} {v : VO}
     (hv : (ffExec x).Decides A p v) (q : P) : (ffExec x).Decides A q v := by
-  have h0 : (ffExec x).Admits A ∅ := by simpa using isoExec_admits' (A := A) x ∅ 0
+  have h0 : (ffExec x).Admits A ∅ := OmExec.ff_admits ∅
   obtain ⟨w, hw⟩ := hS.termination (ffExec x) ∅ h0 (by simp) q (by simp)
   rwa [hS.agreement (ffExec x) ∅ h0 (by simp) q (by simp) p (by simp) w v hw hv] at hw
 
@@ -77,7 +77,7 @@ theorem one_message (hS : OmSolves t A val) (hn : 2 ≤ Fintype.card P)
   have hsil : ∀ x : P → VI, ∀ τ q p, p ≠ q → A.send q ((ffExec x).st A τ q) p = [] := by
     intro x τ q p hpq
     have := send_length_le_msgsUpTo (A := A) (ffExec x) (F := ∅) (by simp) hpq τ
-    have := hK (ffExec x) ∅ (by simpa using isoExec_admits' (A := A) x ∅ 0) (by simp) (τ + 1)
+    have := hK (ffExec x) ∅ (OmExec.ff_admits ∅) (by simp) (τ + 1)
     exact List.eq_nil_of_length_eq_zero (by omega)
   obtain ⟨a, b, hab⟩ := Fintype.exists_pair_of_one_lt_card (α := P) (by omega)
   set z : P → VI := fun p => if p = a then x₀ p else x₁ p
@@ -92,8 +92,7 @@ theorem one_message (hS : OmSolves t A val) (hn : 2 ≤ Fintype.card P)
     funext q
     by_cases hq : q = c
     · subst hq; rw [OmExec.inbox, OmExec.inbox, ih q rfl]; rfl
-    · have hok : ∀ y : P → VI, (ffExec y).ok τ q c = true := fun y => by simp [isoExec]
-      simp only [OmExec.inbox, hok, ↓reduceIte]
+    · simp only [OmExec.ff_inbox]
       rw [hsil z τ q c (Ne.symm hq), hsil x τ q c (Ne.symm hq)]
   have da : (ffExec z).Decides A a v₀ := by
     obtain ⟨τ, h⟩ := ff_decides hS h₀ a
@@ -101,7 +100,7 @@ theorem one_message (hS : OmSolves t A val) (hn : 2 ≤ Fintype.card P)
   have db : (ffExec z).Decides A b v₁ := by
     obtain ⟨τ, h⟩ := ff_decides hS h₁ b
     exact ⟨τ, by rw [iso x₁ b (by simp [z, Ne.symm hab]) τ]; exact h⟩
-  exact hne (hS.agreement (ffExec z) ∅ (by simpa using isoExec_admits' (A := A) z ∅ 0)
+  exact hne (hS.agreement (ffExec z) ∅ (OmExec.ff_admits ∅)
     (by simp) a (by simp) b (by simp) v₀ v₁ da db)
 
 /-- **Lemma 1, all `t`.** Under the hypotheses of `omission_lower_bound`, some execution has at
@@ -113,7 +112,7 @@ theorem omission_lower_bound_sq (hS : OmSolves t A val) (htn : t < Fintype.card 
       ∃ N, t ^ 2 ≤ 32 * E.msgsUpTo A F N := by
   rcases Nat.lt_or_ge t 2 with ht | ht
   · rcases Nat.lt_or_ge t 1 with ht1 | ht1
-    · exact ⟨ffExec x₀, ∅, by simpa using isoExec_admits' (A := A) x₀ ∅ 0, by simp, 0,
+    · exact ⟨ffExec x₀, ∅, OmExec.ff_admits ∅, by simp, 0,
         by simp [show t = 0 by omega]⟩
     · obtain ⟨E, F, h1, h2, N, hN⟩ := one_message hS (by omega) hne h₀ h₁
       exact ⟨E, F, h1, h2, N, by rw [show t = 1 by omega]; omega⟩
@@ -132,11 +131,10 @@ theorem weak_consensus_lower_bound_om {A : Algorithm P M S Bool Bool}
   obtain ⟨p⟩ := hP
   have h0 : ∀ b : Bool, (ffExec (fun _ : P => b)).Decides A p b := by
     intro b
-    have hadm : (ffExec (fun _ : P => b)).Admits A ∅ := by
-      simpa using isoExec_admits' (A := A) (fun _ : P => b) ∅ 0
+    have hadm : (ffExec (fun _ : P => b)).Admits A ∅ := OmExec.ff_admits ∅
     obtain ⟨w, hw⟩ := hS.termination _ ∅ hadm (by simp) p (by simp)
     have := hS.validity _ ∅ hadm (by simp) p (by simp) w hw
-    rwa [this b (fun q => by simp [OmExec.conf, isoExec])] at hw
+    rwa [this b (fun q => by simp [OmExec.conf])] at hw
   exact omission_lower_bound_sq hS htn Bool.false_ne_true (h0 false) (h0 true)
 
 /-- Lemma 7 for fault-free executions in the omission model: a decision of the fault-free
@@ -144,7 +142,7 @@ execution with inputs `x` is admissible for every input configuration contained 
 theorem ff_mem_val (hS : OmSolves t A val) (htn : t < Fintype.card P) {x : P → VI} {p : P}
     {v : VO} (hv : (ffExec x).Decides A p v) {c' : Config P VI} (hc' : IsInputConfig t c')
     (hcont : Contains (fun q => some (x q)) c') : v ∈ val c' := by
-  have h0 : (ffExec x).Admits A ∅ := by simpa using isoExec_admits' (A := A) x ∅ 0
+  have h0 : (ffExec x).Admits A ∅ := OmExec.ff_admits ∅
   have hF : (ffExec x).Admits A c'.procsᶜ := h0.mono (empty_subset _)
   have hFc : c'.procsᶜ.card ≤ t := by
     rw [card_compl]; unfold IsInputConfig at hc'; have := c'.procs.card_le_univ; omega
@@ -156,7 +154,7 @@ theorem ff_mem_val (hS : OmSolves t A val) (htn : t < Fintype.card P) {x : P →
   have := hS.validity _ _ hF hFc p' hp'F w hw
   convert this using 2
   funext q
-  simp only [OmExec.conf, isoExec, mem_compl, Config.mem_procs_iff_ne_none, not_not]
+  simp only [OmExec.conf, mem_compl, Config.mem_procs_iff_ne_none, not_not]
   split_ifs with hq
   · exact hq
   · exact (hcont q hq).symm
@@ -171,8 +169,7 @@ theorem message_lower_bound_om [Nonempty VI] (hS : OmSolves t A val) (hnt : ¬ v
   classical
   obtain ⟨p⟩ : Nonempty P := Fintype.card_pos_iff.mp (by omega)
   set d : VI := Classical.arbitrary VI
-  have hadm : ∀ x : P → VI, (ffExec x).Admits A ∅ := fun x => by
-    simpa using isoExec_admits' (A := A) x ∅ 0
+  have hadm : ∀ x : P → VI, (ffExec x).Admits A ∅ := fun _ => OmExec.ff_admits ∅
   obtain ⟨v₀, h₀⟩ := hS.termination (ffExec fun _ => d) ∅ (hadm _) (by simp) p (by simp)
   obtain ⟨c, hc, hv₀⟩ : ∃ c, IsInputConfig t c ∧ v₀ ∉ val c := by
     by_contra h; push Not at h; exact hnt ⟨v₀, h⟩
@@ -235,36 +232,12 @@ theorem weak_consensus_lower_bound {A : Algorithm P M S Bool Bool}
 
 /-! ### Corollary 1 (External Validity) -/
 
-/-- A fault-free run with zero delays has the states of the fault-free omission execution. -/
-theorem st_eq_ffExec {R : Run P M VI} (hf : R.faulty = ∅) (hdl : ∀ q τ p, R.dl q τ p = τ) :
-    ∀ τ p, R.st A τ p = (ffExec R.inp).st A τ p := by
-  intro τ
-  induction τ with
-  | zero => intro p; rfl
-  | succ τ ih =>
-    intro p
-    rw [Run.st_succ, OmExec.st_succ, ih p]
-    congr 1
-    funext q
-    rw [Run.inbox_of_dl_eq A hdl, Run.out_of_correct A _ (by simp [hf]), ih q]
-    simp [OmExec.inbox, isoExec]
-
 /-- The lock-step fault-free synchronous run with inputs `x`. -/
-def ffRun (M : Type*) (x : P → VI) : Run P M VI where
-  faulty := ∅
-  inp := x
-  gst := 0
-  byz _ _ _ := []
-  dl _ τ _ := τ
+abbrev ffRun (M : Type*) (x : P → VI) : Run P M VI := Run.quiet ∅ x
 
 omit [Fintype P] [DecidableEq P] in
 theorem ffRun_valid (M : Type*) (x : P → VI) : (ffRun M x).Valid t δ :=
-  ⟨by simp [ffRun], fun _ _ _ _ _ => le_rfl, fun _ τ _ _ _ => by simp [ffRun]⟩
-
-theorem ffRun_decides {x : P → VI} {p : P} {v : VO} :
-    (ffRun M x).Decides A p v ↔ (ffExec x).Decides A p v := by
-  simp only [Run.Decides, OmExec.Decides, st_eq_ffExec (R := ffRun M x) rfl (fun _ _ _ => rfl)]
-  rfl
+  Run.quiet_valid (by simp) δ
 
 /-- **Corollary 1** of [AllBAExpensive] (External Validity, or any validity property): if an
 algorithm solving Byzantine agreement in synchrony has two fault-free (lock-step) executions
@@ -276,7 +249,7 @@ theorem external_validity_lower_bound_auth (hU : A.Unforging Au)
     ∃ R : Run P M VI, R.Valid t δ ∧ R.AuthValid Au A ∧ R.gst = 0 ∧
       ∃ N, t ^ 2 ≤ 32 * R.msgsUpTo A N := by
   obtain ⟨E, F, h1, h2, N, hN⟩ := omission_lower_bound_sq (hA.omSolves hU) htn hne
-    (ffRun_decides.mp h₀) (ffRun_decides.mp h₁)
+    (Run.quiet_empty_decides_iff.mp h₀) (Run.quiet_empty_decides_iff.mp h₁)
   exact ⟨E.toRun A F, OmExec.toRun_valid h2 δ, OmExec.toRun_authValid hU h1, rfl, N,
     by rwa [OmExec.toRun_msgsUpTo h1]⟩
 

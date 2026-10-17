@@ -131,5 +131,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
     (`Unauth.theorem5_hyps_of_correct`, `AuthBA.exists_run`, `AuthBA.hypotheses_satisfiable`).
 - Models come from CSLib: `Byzantine/PartialSync` (incl. `Omission`, `Rounds`, `RoundAuth`) and
   `Byzantine/LockStep`.
+- Shared library: `roundMsgs`/`procMsgs` and `syncRun` are `RoundRun.msgsUpTo`/`procMsgs` and `RoundRun.sync`
+  (`Podc/PartialSync/RoundRun.lean`); the isolated and fault-free omission executions of Theorem 14 are
+  `OmExec.solo`/`OmExec.ff` (`Podc/PartialSync/Omission.lean`); the non-vacuity reduction uses the containment
+  condition of `Podc/PartialSync/Containment.lean`; `cnt`/`plur`/`thr` are `Finset.countEq`/`plurality`/`threshold?`
+  (`Podc/Foundations/Count.lean`).
 - CSLib candidates (marked in the files): `padScenario`, `hist_eq_take`, `decides_iff_of_hist`, the subtype
-  simulation, the hybrid (equivocation) lemma, `roundMsgs`/`procMsgs`, `syncRun`, `plur`/`plurMin`.
+  simulation, the hybrid (equivocation) lemma, `plurMin`.

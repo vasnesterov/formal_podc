@@ -1,5 +1,6 @@
 import Papers.PODC2024.AllBAExpensive.Containment
-import Papers.PODC2023.ValidityConsensus.SimilarityComputable
+import Podc.PartialSync.Containment
+import Podc.PartialSync.Computable
 import Cslib.Computability.Distributed.Byzantine.PartialSync.BinaryConsensus
 
 /-!
@@ -15,10 +16,11 @@ Synchrony = runs with `gst = 0` of the partially synchronous model (`Cslib.Byzan
   computable versions `containmentConditionComputable_of_solvesConsensusAuthSync` /
   `..._of_solvesConsensusSync` (for computable algorithms, `Γ` is computable).
 * Interactive consistency: `icValidity`, `ICSolvableSync`, `ICSolvableAuthSync`.
-* **Lemma 9** (sufficiency of CC), Algorithm 2 = `reduction A Γ`:
-  `solvesConsensusAuthSync_reduction`, `solvableAuthSync_of_containmentCondition`,
-  `solvableSync_of_containmentCondition`; `msgsUpTo_reduction` (Algorithm 2 sends exactly the
-  messages of the IC algorithm). With IC solvability as a hypothesis, Lemmas 8 and 9 give the
+* **Lemma 9** (sufficiency of CC), Algorithm 2 = `reduction A Γ` (a decision post-processing
+  `Algorithm.mapDecide`, so it sends exactly the messages of the IC algorithm,
+  `Run.msgsUpTo_mapDecide`): `solvesConsensusAuthSync_reduction`,
+  `solvableAuthSync_of_containmentCondition`, `solvableSync_of_containmentCondition` (shared
+  library `Podc.PartialSync.Containment`). With IC solvability as a hypothesis, Lemmas 8 and 9 give the
   CC characterisations `solvableAuthSync_iff_containmentCondition`,
   `solvableSync_iff_containmentCondition` (Theorem 4 modulo Lemma 10).
 * **Theorem 5**: `strongValidity_not_containmentCondition`, `strongValidity_not_solvableAuthSync`
@@ -42,9 +44,8 @@ variable {P M S VI VO K : Type*} [Fintype P] [DecidableEq P] {t δ : ℕ}
 such that for every input configuration `c`, `Γ c` is admissible for every input configuration
 `c'` contained in `c` (`c ⊒ c'`). The paper additionally requires `Γ` to be Turing-computable;
 see `ContainmentConditionComputable`. -/
-def ContainmentCondition (t : ℕ) (val : ValidityProperty P VI VO) : Prop :=
-  ∃ Γ : Config P VI → VO, ∀ c, IsInputConfig t c → ∀ c', IsInputConfig t c' →
-    Contains c c' → Γ c ∈ val c'
+abbrev ContainmentCondition (t : ℕ) (val : ValidityProperty P VI VO) : Prop :=
+  val.ContainmentCondition t
 
 /-! ### Lemma 8: necessity of CC -/
 
@@ -106,100 +107,32 @@ def ICSolvableAuthSync (P VI : Type*) [Fintype P] [DecidableEq P] (t δ : ℕ) :
 
 /-- **Algorithm 2** of [AllBAExpensive]: run the interactive consistency algorithm `A`; once it
 decides a vector `vec`, decide `Γ vec`. -/
-def reduction (A : Algorithm P M S VI (P → VI)) (Γ : Config P VI → VO) :
-    Algorithm P M S VI VO where
-  init := A.init
-  step := A.step
-  send := A.send
-  decide p s := (A.decide p s).map fun V => Γ fun q => some (V q)
-
-section Reduction
-
-variable {A : Algorithm P M S VI (P → VI)} {Γ : Config P VI → VO}
-
-omit [Fintype P] in
-theorem st_reduction (R : Run P M VI) : R.st (reduction A Γ) = R.st A :=
-  R.st_congr _ rfl rfl rfl
-
-omit [Fintype P] in
-theorem out_reduction (R : Run P M VI) : R.out (reduction A Γ) = R.out A :=
-  R.out_congr _ rfl rfl rfl
-
-omit [Fintype P] in
-theorem inbox_reduction (R : Run P M VI) : R.inbox (reduction A Γ) = R.inbox A := by
-  funext p τ q
-  simp only [Run.inbox, Run.inboxWith, Run.outWith, st_reduction]
-  rfl
-
-omit [Fintype P] in
-theorem decides_reduction {R : Run P M VI} {p : P} {v : VO} :
-    R.Decides (reduction A Γ) p v ↔ ∃ V, R.Decides A p V ∧ Γ (fun q => some (V q)) = v := by
-  simp only [Run.Decides, st_reduction]
-  simp only [reduction, Option.map_eq_some_iff]
-  constructor
-  · rintro ⟨τ, V, h, rfl⟩; exact ⟨V, ⟨τ, h⟩, rfl⟩
-  · rintro ⟨V, ⟨τ, h⟩, rfl⟩; exact ⟨τ, V, h, rfl⟩
-
-omit [Fintype P] in
-theorem authValid_reduction (R : Run P M VI) :
-    R.AuthValid Au (reduction A Γ) ↔ R.AuthValid Au A := by
-  simp only [Run.AuthValid, Run.honestTokens, out_reduction]
-
-omit [Fintype P] in
-theorem unforging_reduction (hU : A.Unforging Au) : (reduction A Γ).Unforging Au := by
-  intro R p τ q m hm x hx
-  rw [st_reduction] at hm
-  have := hU R p τ q m hm x hx
-  simpa only [Run.recvTokens, inbox_reduction] using this
-
-/-- Algorithm 2 sends exactly the messages of the underlying interactive consistency algorithm. -/
-theorem msgsUpTo_reduction (R : Run P M VI) (N : ℕ) :
-    R.msgsUpTo (reduction A Γ) N = R.msgsUpTo A N := by
-  simp only [Run.msgsUpTo, Run.msgsAt, out_reduction]
-
-theorem msgComplexity_reduction (R : Run P M VI) :
-    R.msgComplexity (reduction A Γ) = R.msgComplexity A := by
-  simp only [Run.msgComplexity, msgsUpTo_reduction]
+abbrev reduction (A : Algorithm P M S VI (P → VI)) (Γ : Config P VI → VO) :
+    Algorithm P M S VI VO :=
+  A.mapDecide fun V => Γ fun q => some (V q)
 
 /-- **Lemma 9** of [AllBAExpensive] (correctness of Algorithm 2): if `A` solves interactive
 consistency in synchrony and `Γ` witnesses CC, then Algorithm 2 solves `val`-agreement in
 synchrony (authenticated model `Au`; the unauthenticated model is `Au = Auth.none`). -/
-theorem solvesConsensusAuthSync_reduction (hA : SolvesConsensusAuthSync Au t δ A (icValidity P VI))
+theorem solvesConsensusAuthSync_reduction {A : Algorithm P M S VI (P → VI)}
+    {Γ : Config P VI → VO} (hA : SolvesConsensusAuthSync Au t δ A (icValidity P VI))
     (hΓ : ∀ c, IsInputConfig t c → ∀ c', IsInputConfig t c' → Contains c c' → Γ c ∈ val c') :
-    SolvesConsensusAuthSync Au t δ (reduction A Γ) val where
-  termination R hR hRa h0 p hp := by
-    obtain ⟨V, h⟩ := hA.termination R hR ((authValid_reduction R).mp hRa) h0 p hp
-    exact ⟨_, decides_reduction.mpr ⟨V, h, rfl⟩⟩
-  agreement R hR hRa h0 p hp q hq v w hv hw := by
-    obtain ⟨V, h, rfl⟩ := decides_reduction.mp hv
-    obtain ⟨W, h', rfl⟩ := decides_reduction.mp hw
-    rw [hA.agreement R hR ((authValid_reduction R).mp hRa) h0 p hp q hq V W h h']
-  validity R hR hRa h0 p hp v hv := by
-    obtain ⟨V, h, rfl⟩ := decides_reduction.mp hv
-    have hV := hA.validity R hR ((authValid_reduction R).mp hRa) h0 p hp V h
-    refine hΓ _ ?_ _ (Run.isInputConfig_inputConf hR) (mem_icValidity_iff.mp hV)
-    unfold IsInputConfig; simp [Config.procs]
-
-end Reduction
+    SolvesConsensusAuthSync Au t δ (reduction A Γ) val :=
+  hA.mapDecide_containment hΓ
 
 /-- **Lemma 9** of [AllBAExpensive] (sufficiency of CC), authenticated model: if `val` satisfies
 CC and interactive consistency is authenticated-solvable in synchrony, then `val` is
 authenticated-solvable in synchrony. -/
 theorem solvableAuthSync_of_containmentCondition (hC : ContainmentCondition t val)
-    (hIC : ICSolvableAuthSync P VI t δ) : val.SolvableAuthSync t δ := by
-  obtain ⟨M, S, K, Au, A, hU, hA⟩ := hIC
-  obtain ⟨Γ, hΓ⟩ := hC
-  exact ⟨M, S, K, Au, reduction A Γ, unforging_reduction hU,
-    solvesConsensusAuthSync_reduction hA hΓ⟩
+    (hIC : ICSolvableAuthSync P VI t δ) : val.SolvableAuthSync t δ :=
+  hC.solvableAuthSync hIC
 
 /-- **Lemma 9** of [AllBAExpensive] (sufficiency of CC), unauthenticated model: if `val`
 satisfies CC and interactive consistency is unauthenticated-solvable in synchrony, then `val` is
 unauthenticated-solvable in synchrony. -/
 theorem solvableSync_of_containmentCondition (hC : ContainmentCondition t val)
-    (hIC : ICSolvableSync P VI t δ) : val.SolvableSync t δ := by
-  obtain ⟨M, S, A, hA⟩ := hIC
-  obtain ⟨Γ, hΓ⟩ := hC
-  exact ⟨M, S, reduction A Γ, solvesConsensusAuthSync_reduction hA hΓ⟩
+    (hIC : ICSolvableSync P VI t δ) : val.SolvableSync t δ :=
+  hC.solvableSync hIC
 
 /-- **Theorem 4** of [AllBAExpensive] (authenticated part), relative to the solvability of
 interactive consistency (proved in [52] by Dolev–Strong, not formalized here): a problem is
@@ -503,15 +436,16 @@ end AllBAExpensive
 
 /-! ### Lemma 8 with a Turing-computable `Γ`
 
-The paper requires `Γ` in Definition 3 to be Turing-computable. As in
-`ValidityConsensus.similarityCondition_computable_auth`, for processes `Fin n` and a computable
-algorithm (`Algorithm.IsComputable`), `Γ c` can be computed by simulating the canonical
-synchronous execution of `c` (`Algorithm.lockStep`) and searching for the first decision of a
-process of `π(c)` (`Nat.rfindOpt`), which exists by Termination. -/
+The paper requires `Γ` in Definition 3 to be Turing-computable. For processes `Fin n` and a
+computable algorithm (`Algorithm.IsComputable`), `Γ c` can be computed by simulating the
+canonical synchronous execution of `c` and searching for the first decision of a process of
+`π(c)`, which exists by Termination
+(`Algorithm.IsComputable.exists_computable_canonDecision`, shared library
+`Podc.PartialSync.Computable`). -/
 
 namespace AllBAExpensive
 
-open Finset Cslib.Byzantine.PartialSync ValidityConsensus Encodable
+open Finset Cslib.Byzantine.PartialSync
 
 variable {n : ℕ} {M S VI VO : Type*} [Primcodable M] [Primcodable S] [Primcodable VI]
   [Primcodable VO] {t δ : ℕ} {A : Algorithm (Fin n) M S VI VO}
@@ -536,45 +470,12 @@ theorem containmentConditionComputable_of_solvesConsensusAuthSync {K : Type*}
     {Au : Auth (Fin n) M K} [Nonempty VI] (hU : A.Unforging Au)
     (hA : SolvesConsensusAuthSync Au t δ A val) (hc : A.IsComputable) (htn : t < n) :
     ContainmentConditionComputable t val := by
-  classical
   set d := Classical.arbitrary VI
-  let c₀ : Config (Fin n) VI := fun _ => some d
-  let norm : Config (Fin n) VI → Config (Fin n) VI := fun c =>
-    if IsInputConfig t c then c else c₀
-  have hnorm : ∀ c, IsInputConfig t (norm c) := by
-    intro c
-    by_cases h : IsInputConfig t c
-    · simp [norm, h]
-    · simp only [norm, h, ite_false]
-      unfold IsInputConfig; simp [Config.procs, c₀]
-  have hnormc : Computable norm := by
-    open Computable in
-    let F : (Fin n → Bool) → Bool := fun b => decide (n - t ≤ (univ.filter fun i => b i).card)
-    refine (cond ((Primrec.dom_finite F).to_comp.comp
-      (finArrow_of fun i => Primrec.option_isSome.to_comp.comp (fin_app.comp .id (const i))))
-      .id (const c₀)).of_eq fun c => ?_
-    simp [norm, F, IsInputConfig, Config.procs]
-  have hdom : ∀ c, IsInputConfig t c → (Nat.rfindOpt (decAt A d c)).Dom := by
-    intro c hc'
-    obtain ⟨p, hp⟩ : c.procs.Nonempty :=
-      card_pos.mp (by unfold IsInputConfig at hc'; simp at hc'; omega)
-    have hpF : p ∉ (canonRun (M := M) c d).faulty := by
-      simp only [canonRun, Finset.mem_compl, not_not]; exact hp
-    obtain ⟨v, τ, hv⟩ := hA.termination _ (canonRun.valid c d hc' δ) (canonRun_authValid c d)
-      rfl p hpF
-    rw [canonRun_st_eq_lockStep] at hv
-    refine Nat.rfindOpt_dom.mpr ⟨Nat.pair τ (encode p), v, ?_⟩
-    simp only [Config.mem_procs] at hp
-    simp [decAt, Nat.unpair_pair, encodek, hp, hv]
-  have hpart : Partrec fun c => Nat.rfindOpt (decAt A d (norm c)) :=
-    Partrec.rfindOpt ((decAt_computable hc d).comp (hnormc.comp .fst) .snd)
-  refine ⟨fun c => (Nat.rfindOpt (decAt A d (norm c))).get (hdom _ (hnorm c)),
-    hpart.of_eq_tot fun c => Part.get_mem _, fun c hc' c' hc'' hcont => ?_⟩
-  obtain ⟨k, hk⟩ := Nat.rfindOpt_spec (Part.get_mem (hdom _ (hnorm c)))
-  beta_reduce
-  generalize (Nat.rfindOpt (decAt A d (norm c))).get _ = v at hk ⊢
-  rw [show norm c = c from ite_eq_left_iff.mpr fun h => absurd hc' h] at hk
-  obtain ⟨p, hp, hdec⟩ := decAt_spec hk
+  obtain ⟨Γ, hΓc, hΓ⟩ := hc.exists_computable_canonDecision (M := M) d htn
+    fun c hc' p hp => hA.termination _ (canonRun.valid c d hc' δ) (canonRun_authValid c d) rfl p
+      (by simpa [canonRun, Option.isSome_iff_ne_none] using hp)
+  refine ⟨Γ, hΓc, fun c hc' c' hc'' hcont => ?_⟩
+  obtain ⟨p, hp, hdec⟩ := hΓ c hc'
   have hpF : p ∉ (canonRun (M := M) c d).faulty := by
     simp [canonRun, Option.isSome_iff_ne_none, hp]
   exact containment_auth hU hA (by simpa using htn) (canonRun.valid c d hc' δ)

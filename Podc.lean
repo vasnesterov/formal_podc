@@ -73,3 +73,10 @@ import Podc.Graph.Girth
 import Podc.Graph.Spanner.Weighted
 import Podc.Graph.Spanner.Greedy
 import Podc.Graph.Spanner.FaultTolerantGreedy
+import Podc.PartialSync.Map
+import Podc.PartialSync.Runs
+import Podc.PartialSync.Omission
+import Podc.PartialSync.RoundRun
+import Podc.PartialSync.Computable
+import Podc.PartialSync.Triviality
+import Podc.PartialSync.Containment

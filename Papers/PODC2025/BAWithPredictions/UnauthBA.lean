@@ -591,23 +591,6 @@ end Theorem5
 
 section Messages
 
-section Generic
-
-variable {Q Msg S VI VO : Type*} [Fintype Q] [DecidableEq Q] {RA : RoundAlgorithm Q Msg S VI VO}
-  {F : Finset Q} {inp : Q → VI}
-
--- CSLib candidate
-/-- The number of messages sent by `p` to other processes in rounds `< M`. -/
-def procMsgs (E : RoundRun RA F inp) (M : ℕ) (p : Q) : ℕ :=
-  ∑ r ∈ range M, (univ.filter fun q => q ≠ p ∧ RA.send r p (E.s r p) q ≠ none).card
-
--- CSLib candidate
-theorem roundMsgs_eq_sum (E : RoundRun RA F inp) (M : ℕ) :
-    roundMsgs E M = ∑ p ∈ univ.filter (· ∉ F), procMsgs E M p := by
-  unfold roundMsgs procMsgs; exact Finset.sum_comm
-
-end Generic
-
 variable {k t : ℕ} {F : Finset P} {inp : P → V × (P → Bool)}
   (E : RoundRun (alg5 (P := P) (V := V) k) F inp)
 
@@ -620,7 +603,7 @@ theorem send_ne_none {r : ℕ} {p q : P} {s : St P V} (h : (alg5 k).send r p s q
 `5(n-1)` messages to other processes (it broadcasts only in the 5 rounds of the phase in which it
 belongs to its own listening set). -/
 theorem theorem5_msgs_per_process (M : ℕ) (p : P) :
-    procMsgs E M p ≤ 5 * (Fintype.card P - 1) := by
+    E.procMsgs M p ≤ 5 * (Fintype.card P - 1) := by
   set φp := (pos (inp p).2 p - 1) / (3 * k + 1)
   have hterm : ∀ r ∈ range M,
       (univ.filter fun q => q ≠ p ∧ (alg5 k).send r p (E.s r p) q ≠ none).card ≤
@@ -634,7 +617,7 @@ theorem theorem5_msgs_per_process (M : ℕ) (p : P) :
       have h := (send_ne_none hq.2).2
       rw [c_eq, mem_Lset_iff] at h
       rw [mem_Ico]; omega
-  calc procMsgs E M p ≤ ∑ r ∈ range M,
+  calc E.procMsgs M p ≤ ∑ r ∈ range M,
         (if r ∈ Ico (5 * φp) (5 * φp + 5) then Fintype.card P - 1 else 0) := sum_le_sum hterm
     _ = ∑ r ∈ range M ∩ Ico (5 * φp) (5 * φp + 5), (Fintype.card P - 1) := sum_ite_mem _ _ _
     _ ≤ 5 * (Fintype.card P - 1) := by
@@ -644,7 +627,7 @@ theorem theorem5_msgs_per_process (M : ℕ) (p : P) :
 
 /-- A process that does not belong to its own listening set in any phase sends nothing. -/
 theorem procMsgs_eq_zero {M : ℕ} {p : P}
-    (hp : (2 * k + 1) * (3 * k + 1) < pos (inp p).2 p) : procMsgs E M p = 0 := by
+    (hp : (2 * k + 1) * (3 * k + 1) < pos (inp p).2 p) : E.procMsgs M p = 0 := by
   refine sum_eq_zero fun r _ => card_eq_zero.mpr (filter_eq_empty_iff.mpr fun q _ hq => ?_)
   obtain ⟨hr, hL⟩ := send_ne_none hq.2
   rw [c_eq] at hL
@@ -661,7 +644,7 @@ phase). -/
 theorem theorem5_msgs (hF : F.card ≤ t) (hk : (mis F fun i => (inp i).2).card ≤ k)
     (hn : (2 * k + 1) * (3 * k + 1) ≤ Fintype.card P - t - k) (M : ℕ) :
     roundMsgs E M ≤ 5 * Fintype.card P * ((2 * k + 1) * (3 * k + 1) + k) := by
-  rw [roundMsgs_eq_sum]
+  rw [roundMsgs, RoundRun.msgsUpTo_eq_sum_procMsgs]
   set R := (2 * k + 1) * (3 * k + 1)
   have hR : 0 < R := Nat.mul_pos (by omega) (by omega)
   rw [← sum_filter_of_ne (p := fun p => pos (inp p).2 p ≤ R) fun p _ h => by
@@ -672,7 +655,7 @@ theorem theorem5_msgs (hF : F.card ≤ t) (hk : (mis F fun i => (inp i).2).card 
     refine (card_le_card fun p hp => ?_).trans (h6.trans (by omega))
     simp only [mem_filter, mem_univ, true_and] at hp ⊢
     exact ⟨hp.1, p, hp.1, hp.2⟩
-  calc ∑ p ∈ (univ.filter (· ∉ F)).filter (fun p => pos (inp p).2 p ≤ R), procMsgs E M p
+  calc ∑ p ∈ (univ.filter (· ∉ F)).filter (fun p => pos (inp p).2 p ≤ R), E.procMsgs M p
       ≤ ∑ _p ∈ (univ.filter (· ∉ F)).filter (fun p => pos (inp p).2 p ≤ R),
           5 * (Fintype.card P - 1) := sum_le_sum fun p _ => theorem5_msgs_per_process E M p
     _ = ((univ.filter (· ∉ F)).filter fun p => pos (inp p).2 p ≤ R).card *
@@ -688,27 +671,12 @@ section NonVacuity
 
 variable {Q Msg S VI VO : Type*} [DecidableEq Q]
 
--- CSLib candidate
-/-- The states of the failure-free synchronous execution of a round algorithm. -/
-def syncStates (RA : RoundAlgorithm Q Msg S VI VO) (inp : Q → VI) : ℕ → Q → S
-  | 0 => fun p => RA.init p (inp p)
-  | r + 1 => fun p => RA.trans r p (syncStates RA inp r p)
-      (fun q => RA.send r q (syncStates RA inp r q) p)
-
--- CSLib candidate
-/-- A synchronous round execution exists for every round algorithm, faulty set and inputs: the
-one in which every process (also those in `F`) follows the algorithm. -/
-def syncRun (RA : RoundAlgorithm Q Msg S VI VO) (F : Finset Q) (inp : Q → VI) :
-    RoundRun RA F inp where
-  s := syncStates RA inp
-  rcv r p q := RA.send r q (syncStates RA inp r q) p
-  s_zero _ := rfl
-  s_succ _ _ := rfl
-  honest _ _ _ _ _ h := h
-
--- CSLib candidate
-theorem syncRun_syncFrom (RA : RoundAlgorithm Q Msg S VI VO) (F : Finset Q) (inp : Q → VI) :
-    (syncRun RA F inp).SyncFrom 0 := fun _ _ _ _ _ _ => rfl
+/-- The synchronous execution of a round algorithm in which every process (also those in `F`)
+follows the algorithm (`RoundRun.sync` with the adversary `RoundRun.honestAdv`): every adversary
+has synchronous executions. -/
+abbrev syncRun (RA : RoundAlgorithm Q Msg S VI VO) (F : Finset Q) (inp : Q → VI) :
+    RoundRun RA F inp :=
+  RoundRun.sync RA F inp (RoundRun.honestAdv RA)
 
 /-- Correct classifications misclassify nobody. -/
 theorem mis_eq_empty_of_correct {F : Finset P} {c : P → P → Bool}
@@ -727,7 +695,7 @@ theorem theorem5_hyps_of_correct {t : ℕ} (ht : t < Fintype.card P) {F : Finset
     (syncRun (alg5 (P := P) (V := V) 0) F inp).SyncFrom 0 ∧
       (mis F fun i => (inp i).2).card ≤ 0 ∧
       (2 * 0 + 1) * (3 * 0 + 1) ≤ Fintype.card P - t - 0 := by
-  refine ⟨syncRun_syncFrom _ _ _, ?_, by omega⟩
+  refine ⟨RoundRun.sync_syncFrom _ _ _ _, ?_, by omega⟩
   rw [mis_eq_empty_of_correct hc]; rfl
 
 /-- A concrete instance: `n = 4`, three faulty processes, `k = 0`; Theorem 5 applies. -/
