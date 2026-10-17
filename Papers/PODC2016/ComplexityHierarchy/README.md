@@ -94,4 +94,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. The upper bounds (Theorems 6.3, 8.8) also show that the lower bounds are not vacuous.
 Model, consensus tasks, valency framework (Lemmas 6.4, 6.6) and the binary reduction come from CSLib
-`Cslib/Computability/Distributed/SharedMemory/`.
+`Cslib/Computability/Distributed/SharedMemory/`. From the shared library `Podc/`: the readable swap
+object `rswapObj` (Theorem 8.8's locations), poised processes and blocks (`Impl.PoisedAt`,
+`Impl.runFrom_poised_block`, behind `Impl.Poised` and `Impl.runFrom_block`), reachability of solo
+steps (`Impl.Reachable.soloStep`), the "last index" argument of valency proofs
+(`Nat.exists_lt_and_not_succ_of_not`) and `Fintype.sum_update_add`.

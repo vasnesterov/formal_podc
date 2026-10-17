@@ -82,4 +82,7 @@ discussion of related work (splitters, adopt-commit, renaming).
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: `theorem_2_1_tight` exhibits a stranger-free task (1-bounded LA for two processes) solved wait-free
 with exactly 2 registers. The model, full-information versions and covering lemmas come from CSLib
-(`Cslib/Computability/Distributed/SharedMemory/`).
+(`Cslib/Computability/Distributed/SharedMemory/`); invariants by induction on executions
+(`Impl.run_induction`), block-write and pending-operation helpers, and the potential arguments
+(`Impl.waitFree_of_potential`, `Nat.not_frequently_lt_of_succ_le`) from the shared library
+`Podc/SharedMemory/` and `Podc/Order/NatDescent.lean`.

@@ -104,7 +104,7 @@ lemma exists_triple_ge (C : Config (tsObj T) B P L) (R : Finset ι)
     have h1 := (hf i ((hmemRl i).1 hi)).2 j
     have h2 := (hf i' ((hmemRl i').1 hi')).2 j'
     rw [he] at h1
-    have hii := covers_unique h1 h2
+    have hii := Covers.unique h1 h2
     subst hii
     exact ⟨rfl, (hf i ((hmemRl i).1 hi)).1 he⟩
   have hnd1 : ∀ j, (Rl.map (fun i => f i j)).Nodup := fun j =>

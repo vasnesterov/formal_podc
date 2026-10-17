@@ -181,7 +181,7 @@ theorem SInv.step {α : List (Label P (laObj P))} {C C' : Cfg P k} {ℓ : Label 
 /-- Lemma B / invariant (D) along every execution. -/
 theorem sInv_of_run {α : List (Label P (laObj P))} {C : Cfg P k}
     (h : (alg1 k).run α = some C) : SInv α C := by
-  refine run_induction (Q := fun α C => SInv α C) sInv_init ?_ h
+  refine Impl.run_induction (I := alg1 k) (Q := fun α C => SInv α C) sInv_init ?_ h
   intro α C ℓ C' hr hS hs
   exact hS.step hr (bInv_of_run hr) hs
 

@@ -1,4 +1,6 @@
 import Papers.PODC2011.TimestampSpace.Defs
+import Podc.SharedMemory.Covering
+import Podc.SharedMemory.Solo
 
 /-!
 # Lemma 2.1 (Ellen, Fatourou, Ruppert)
@@ -34,32 +36,9 @@ variable {P : Type} [DecidableEq P] {T : Type} {ι : Type} [DecidableEq ι] {B :
 /-- A block write by the processes of a list of (process, object) pairs. -/
 abbrev bw (cs : List (P × ι)) : List (Label P (tsObj T)) := blockWrite (cs.map Prod.fst)
 
-@[simp] lemma opsOf_blockWrite (ps : List P) (p : P) :
-    opsOf (blockWrite (A := tsObj T) ps) p = [] := by
-  simp [opsOf, blockWrite, List.filterMap_map, Function.comp_def]
-
-@[simp] lemma respsOf_blockWrite (ps : List P) (p : P) :
-    respsOf (blockWrite (A := tsObj T) ps) p = [] := by
-  simp [respsOf, blockWrite, List.filterMap_map, Function.comp_def]
-
 @[simp] lemma getTSCount_blockWrite (ps : List P) (p : P) :
     getTSCount (blockWrite (A := tsObj T) ps) p = 0 := by
   simp [getTSCount]
-
-lemma covers_congr {C D : Config (tsObj T) B P L} {p : P} {i : ι} (hl : C.loc p = D.loc p)
-    (hp : C.pend p = D.pend p) (h : I.Covers C p i) : I.Covers D p i := by
-  obtain ⟨h1, o, k, h2, h3⟩ := h
-  exact ⟨hp ▸ h1, o, k, hl ▸ h2, h3⟩
-
-lemma Config.ext_agreeOn {C D : Config (tsObj T) B P L}
-    (h : AgreeOn (Set.univ : Set P) C D) : C = D := by
-  obtain ⟨l, pe, m⟩ := C
-  obtain ⟨l', pe', m'⟩ := D
-  obtain ⟨hm, hl, hp⟩ := h
-  simp only at hm hl hp
-  have : l = l' := funext fun q => hl q trivial
-  have : pe = pe' := funext fun q => hp q trivial
-  subst_vars; rfl
 
 lemma runFrom_mem_cons {C C' : Config (tsObj T) B P L} {β : List (Label P (tsObj T))}
     (h : I.runFrom C β = some C') {S : Set P} (hβ : ∀ ℓ ∈ β, ℓ.proc ∈ S) {q : P} (hq : q ∉ S) :
@@ -69,53 +48,10 @@ lemma runFrom_mem_cons {C C' : Config (tsObj T) B P L} {β : List (Label P (tsOb
 lemma mem_bw_proc {cs : List (P × ι)} {ℓ : Label P (tsObj T)} (h : ℓ ∈ bw cs) :
     ℓ.proc ∈ cs.map Prod.fst := mem_blockWrite h
 
-variable (I) in
-/-- Solo execution of one operation, under solo termination on admissible executions. -/
-lemma soloOp_spec_adm (hst : SoloTerm I os) (hall : ∀ p o, I.allowed p o) (p : P) (o : TSOp T)
-    {α : List (Label P (tsObj T))} {C : Config (tsObj T) B P L} (hα : I.run α = some C)
-    (hC : C.pend p = none) (hadm : Adm os (α ++ [.inv p o])) :
-    ∃ C', I.runFrom C (I.soloOp p o C) = some C' ∧ C'.pend p = none ∧
-      (∀ ℓ ∈ I.soloOp p o C, ℓ.proc = p) ∧ opsOf (I.soloOp p o C) p = [o] ∧
-      (respsOf (I.soloOp p o C) p).length = 1 ∧
-      (∀ q, getTSCount (I.soloOp p o C) q = getTSCount [.inv p o] q) := by
-  classical
-  obtain ⟨C₁, hs⟩ : ∃ C₁, I.step C (.inv p o) = some C₁ := by
-    simp [step, hC, hall p o]
-  have hC₁p : C₁.pend p ≠ none := by
-    have := (step_inv hs).2.2.1; simp [this]
-  have hrun₁ : I.run (α ++ [.inv p o]) = some C₁ := by
-    rw [run_append_of_eq I hα, runFrom_singleton, hs]
-  have hfin := hst _ C₁ p hrun₁ hadm hC₁p
-  have hop : I.soloOp p o C = .inv p o :: I.soloLabels p C₁ (I.soloTime p C₁) := by
-    simp only [soloOp, hs]
-  have hrun : I.runFrom C (I.soloOp p o C) = some ((I.soloStep p)^[I.soloTime p C₁] C₁) := by
-    rw [hop, runFrom_cons, hs, Option.bind_some, runFrom_soloLabels]
-  have hprocs : ∀ ℓ ∈ I.soloOp p o C, ℓ.proc = p := by
-    rw [hop]; intro ℓ hℓ
-    rcases List.mem_cons.1 hℓ with rfl | hℓ
-    · rfl
-    · exact I.soloLabels_proc p C₁ _ ℓ hℓ
-  have hops : opsOf (I.soloOp p o C) p = [o] := by
-    rw [hop, opsOf_cons, opsOf_soloLabels]; simp
-  refine ⟨_, hrun, I.soloTime_spec p C₁ hfin, hprocs, hops, ?_, ?_⟩
-  · have := I.runFrom_counts hrun p 0 0 (Or.inl ⟨hC, rfl⟩)
-    have h2 := I.soloTime_spec p C₁ hfin
-    rw [hop, opsOf_cons, opsOf_soloLabels] at this
-    simp only [h2, true_and, ne_eq, not_true_eq_false, false_and, or_false] at this
-    rw [hop]; simpa using this.symm
-  · intro q
-    by_cases hq : q = p
-    · subst hq; unfold getTSCount; rw [hops]; simp [opsOf]
-    · rw [getTSCount_of_proc_ne (fun ℓ hℓ h => hq (h.symm.trans (hprocs ℓ hℓ))),
-        getTSCount_of_proc_ne (by simp [Label.proc]; exact Ne.symm hq)]
-
 lemma getTSCount_inv_compare (q p : P) (a b : T) :
     getTSCount [(.inv q (.compare a b) : Label P (tsObj T))] p = 0 := by
   simp only [getTSCount, opsOf, List.filterMap_cons, List.filterMap_nil, Label.invOf]
   split_ifs <;> simp [TSOp.isGetTS]
-
-lemma getElem?_len_append {α : Type} (l l' : List α) (x : α) :
-    (l ++ x :: l')[l.length]? = some x := by simp
 
 /-! ### Lemma 2.1 -/
 
@@ -223,18 +159,18 @@ theorem lemma_2_1 (hI : IsTS I os) {α : List (Label P (tsObj T))} {C : Config (
     (by simpa using hnd.sublist (by simp))
     (fun c hc h => hS01 c.1 h (Or.inr (List.mem_map_of_mem hc)))
     (C := D₀) (D := C)
-    (fun c hc => covers_congr (hD₀o c.1 (fun h => hS01 c.1 h (Or.inr (List.mem_map_of_mem hc)))).1.symm
-      (hD₀o c.1 (fun h => hS01 c.1 h (Or.inr (List.mem_map_of_mem hc)))).2.symm
-      (hcov c (by simp [hc])))
+    (fun c hc => (hcov c (by simp [hc])).congr
+      (hD₀o c.1 (fun h => hS01 c.1 h (Or.inr (List.mem_map_of_mem hc)))).1.symm
+      (hD₀o c.1 (fun h => hS01 c.1 h (Or.inr (List.mem_map_of_mem hc)))).2.symm)
     (fun q hq => (hD₀o q hq).1) (fun q hq => (hD₀o q hq).2) (hmem_b b₁ hR₁ D₀ hmem₀)
   rw [hX₁] at hX₁'; cases hX₁'
   obtain ⟨Y₁, X₀', hY₁, hX₀', hag₁⟩ := blockWrite_agreeOn (I := I) (Q := S₁ᶜ) (cs := b₀)
     (by simpa using hnd.sublist (by simp))
     (fun c hc h => hS01 c.1 (Or.inr (List.mem_map_of_mem hc)) h)
     (C := D₁) (D := C)
-    (fun c hc => covers_congr (hD₁o c.1 (fun h => hS01 c.1 (Or.inr (List.mem_map_of_mem hc)) h)).1.symm
-      (hD₁o c.1 (fun h => hS01 c.1 (Or.inr (List.mem_map_of_mem hc)) h)).2.symm
-      (hcov c (by simp [hc])))
+    (fun c hc => (hcov c (by simp [hc])).congr
+      (hD₁o c.1 (fun h => hS01 c.1 (Or.inr (List.mem_map_of_mem hc)) h)).1.symm
+      (hD₁o c.1 (fun h => hS01 c.1 (Or.inr (List.mem_map_of_mem hc)) h)).2.symm)
     (fun q hq => (hD₁o q hq).1) (fun q hq => (hD₁o q hq).2) (hmem_b b₀ hR₀ D₁ hmem₁)
   rw [hX₀] at hX₀'; cases hX₀'
   -- Step 2: run β₁ after Y₀ and β₀ after Y₁
@@ -269,10 +205,10 @@ theorem lemma_2_1 (hI : IsTS I os) {α : List (Label P (tsObj T))} {C : Config (
     rw [(hZ₀a c.1 h1).1, (hZ₀a c.1 h1).2, (hD₀o c.1 h0).1, (hD₀o c.1 h0).2]; exact ⟨rfl, rfl⟩
   obtain ⟨F₀, F₁, hF₀, hF₁, hagF⟩ := blockWrite_agreeOn (I := I) (Q := Set.univ) (cs := b₂)
     (by simpa using hnd.sublist (by simp)) (fun _ _ => trivial) (C := Z₀) (D := Z₁)
-    (fun c hc => covers_congr (hb2st c hc).1.symm (hb2st c hc).2.symm (hcov c (by simp [hc])))
+    (fun c hc => (hcov c (by simp [hc])).congr (hb2st c hc).1.symm (hb2st c hc).2.symm)
     (fun q _ => (hZst q).1) (fun q _ => (hZst q).2)
     (fun i hi => hZmem i (fun h => hi ((hR₂ i).1 h)))
-  have hFeq : F₀ = F₁ := Config.ext_agreeOn hagF
+  have hFeq : F₀ = F₁ := hagF.univ_eq
   subst hFeq
   -- the two executions
   set E₀' := α ++ bw b₀ ++ β₀ ++ bw b₁ ++ β₁ ++ bw b₂ with hE₀'
@@ -303,14 +239,17 @@ theorem lemma_2_1 (hI : IsTS I os) {α : List (Label P (tsObj T))} {C : Config (
   set o : TSOp T := .compare t₀ t₁ with ho
   have hadmc : Adm os (E₀' ++ [.inv q₀ o]) :=
     hadm₀.append_of_zero (fun p => getTSCount_inv_compare q₀ p t₀ t₁)
-  obtain ⟨F', hF', -, hpr, hsops, hsresp, hscnt⟩ :=
-    soloOp_spec_adm I hI.progress hI.allowed q₀ o hrE₀' hFq₀ hadmc
+  obtain ⟨F', hF', -, hpr, hsops, hsresp⟩ :=
+    I.soloOp_spec_of_obstructionFreeOn hI.progress q₀ o (hI.allowed q₀ o) hrE₀' hFq₀ hadmc
   set S := I.soloOp q₀ o F₀
   obtain ⟨r, hr⟩ : ∃ r, respsOf S q₀ = [r] := by
     match h : respsOf S q₀, hsresp with
     | [r], _ => exact ⟨r, rfl⟩
   have hscnt0 : ∀ p, getTSCount S p = 0 := by
-    intro p; rw [hscnt p]; exact getTSCount_inv_compare q₀ p t₀ t₁
+    intro p
+    by_cases hp : p = q₀
+    · rw [hp, getTSCount, hsops]; simp [ho, TSOp.isGetTS]
+    · exact getTSCount_of_proc_ne fun ℓ hℓ h => hp (h.symm.trans (hpr ℓ hℓ))
   have hv₀ : I.Valid (E₀' ++ S) := ⟨F', by rw [run_append_of_eq I hrE₀', hF']⟩
   have hv₁ : I.Valid (E₁' ++ S) := ⟨F', by rw [run_append_of_eq I hrE₁', hF']⟩
   have hc₀ := hI.correct _ hv₀ (hadm₀.append_of_zero hscnt0)

@@ -18,7 +18,7 @@ Classification: **[false]** false statement, **[degenerate]** false only in a de
    nondeterminism a process may then cover several registers at once. This breaks the signature
    counting of Section 3 ("`∑ cᵢ = k`" for `k` covering processes) and the counting of Section 4.
    With fixed choices (deterministic processes) every process covers at most one object
-   (`covers_unique`); both arguments need this.
+   (`Impl.Covers.unique`); both arguments need this.
 3. **[spec] Timestamp specification.**
    - We additionally require that every completed `getTS` returns a timestamp (`TSCorrect.getTS_ts`).
      The paper leaves this implicit. Without it a `getTS` returning a Boolean makes the
@@ -56,7 +56,7 @@ Classification: **[false]** false statement, **[degenerate]** false only in a de
    solo-termination, so it needs `D` to be reachable. We assume this (`lemma_3_1`).
 10. **[gap] Commutation of the first two block writes.** The proof of Lemma 3.2 uses
     `πBᵢπB₁₋ᵢπB₂η(C₀) = C₁` without justification. It holds because `πB₂` obliterates whichever of
-    the two first block writes came last (`bw_swap`).
+    the two first block writes came last (`blockWrite_swap`).
 11. **[gap] Three disjoint covering sets in Lemma 3.1.** Their existence relies on every process
     covering at most one register. This is true for fixed nondeterministic choices (see 2) and
     implicit in the paper (`exists_triple`).

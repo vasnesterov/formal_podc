@@ -1,4 +1,5 @@
 import Papers.PODC2025.UniqueIDsBoundedRegisters.Defs
+import Podc.SharedMemory.Covering
 
 /-!
 # Poised processes and restoring register values (Claim 1)
@@ -12,9 +13,10 @@ update primitive `o` (a `write` or a `fai`) to register `i`. For a list `S` of p
 * `claim1` (**Claim 1** of the paper, completed for the case where all poised primitives are
   `fai`): if `Restorable S i y`, some of the processes poised on `i`, each taking one step,
   set `i` to `y`, whatever its current value;
-* `restore_many`: the same simultaneously for a list of registers;
-* `runFrom_taus`: letting poised processes take one step each has exactly the expected effect
-  on the memory and does not touch other processes.
+* `restore_many`: the same simultaneously for a list of registers.
+
+That poised processes, each taking one step, have exactly the expected effect on the memory
+(`memAfter`) and do not touch other processes is the library's `Impl.runFrom_poised_block`.
 -/
 
 set_option linter.unusedSectionVars false
@@ -177,9 +179,12 @@ theorem claim1 (S : List (P × Fin k × BOp m)) (hnd : S.Nodup) (hWD : WD S)
 
 /-! ### Memory effect of poised steps -/
 
+/-- The access `(i, o)` of a poised entry. -/
+abbrev acc (e : P × Fin k × BOp m) : Σ _ : Fin k, (bReg m).Op := ⟨e.2.1, e.2.2⟩
+
 /-- Memory after the entries `es` each perform their primitive, in order. -/
 def memAfter (M : Fin k → Fin m) (es : List (P × Fin k × BOp m)) : Fin k → Fin m :=
-  es.foldl (fun M e => Function.update M e.2.1 (app (M e.2.1) e.2.2)) M
+  applyAccesses (B := fun _ => bReg m) M (es.map acc)
 
 @[simp] lemma memAfter_nil (M : Fin k → Fin m) : memAfter M ([] : List (P × Fin k × BOp m)) = M :=
   rfl
@@ -189,17 +194,12 @@ lemma memAfter_cons (M : Fin k → Fin m) (e : P × Fin k × BOp m) (es) :
 
 lemma memAfter_append (M : Fin k → Fin m) (es es' : List (P × Fin k × BOp m)) :
     memAfter M (es ++ es') = memAfter (memAfter M es) es' := by
-  simp [memAfter, List.foldl_append]
+  simp [memAfter, applyAccesses_append]
 
-lemma memAfter_of_ne (j : Fin k) : ∀ (es : List (P × Fin k × BOp m)) (M : Fin k → Fin m),
-    (∀ e ∈ es, e.2.1 ≠ j) → memAfter M es j = M j := by
-  intro es
-  induction es with
-  | nil => intro M _; rfl
-  | cons e es ih =>
-    intro M h
-    rw [memAfter_cons, ih _ (fun e' he' => h e' (by simp [he']))]
-    rw [Function.update_of_ne (h e (by simp)).symm]
+lemma memAfter_of_ne (j : Fin k) (es : List (P × Fin k × BOp m)) (M : Fin k → Fin m)
+    (h : ∀ e ∈ es, e.2.1 ≠ j) : memAfter M es j = M j :=
+  applyAccesses_of_forall_ne (B := fun _ => bReg m) M fun _ ha => by
+    obtain ⟨e, he, rfl⟩ := List.mem_map.1 ha; exact h e he
 
 lemma memAfter_single (i : Fin k) : ∀ (es : List (P × Fin k × BOp m)) (M : Fin k → Fin m),
     (∀ e ∈ es, e.2.1 = i) → memAfter M es i = appList (M i) (es.map (fun e => e.2.2)) := by
@@ -245,49 +245,5 @@ theorem restore_many (S : List (P × Fin k × BOp m)) (hnd : S.Nodup) (hWD : WD 
     · intro j hj
       rw [memAfter_append, h2o j (fun h => hj (by simp [h])), hM₁]
       exact memAfter_of_ne j es₁ M (fun e he h => hj (by rw [← h, (h1S e he).2]; simp))
-
-/-! ### Running poised processes -/
-
-variable (I : Impl uidObj (fun _ : Fin k => bReg m) P L)
-
-/-- In `D`, the process of entry `e` is pending and about to apply `e.2.2` to `e.2.1`. -/
-def PoisedAt (D : Config uidObj (fun _ : Fin k => bReg m) P L) (e : P × Fin k × BOp m) : Prop :=
-  D.pend e.1 ≠ none ∧ ∃ kk, I.act e.1 (D.loc e.1) = .access e.2.1 e.2.2 kk
-
-/-- Letting the entries `es` (distinct processes) take one step each. -/
-theorem runFrom_taus : ∀ (es : List (P × Fin k × BOp m)), (es.map Prod.fst).Nodup →
-    ∀ D : Config uidObj (fun _ : Fin k => bReg m) P L, (∀ e ∈ es, PoisedAt I D e) →
-    ∃ D', I.runFrom D (es.map (fun e => Label.tau e.1)) = some D' ∧
-      D'.mem = memAfter D.mem es ∧
-      ∀ q ∉ es.map Prod.fst, D'.loc q = D.loc q ∧ D'.pend q = D.pend q := by
-  intro es
-  induction es with
-  | nil => intro _ D _; exact ⟨D, rfl, rfl, fun _ _ => ⟨rfl, rfl⟩⟩
-  | cons e es ih =>
-    intro hnd D hP
-    obtain ⟨he, hnd'⟩ := List.nodup_cons.1 hnd
-    obtain ⟨hpend, kk, hact⟩ := hP e (by simp)
-    set D₁ : Config uidObj (fun _ : Fin k => bReg m) P L :=
-      { D with mem := Function.update D.mem e.2.1 (app (D.mem e.2.1) e.2.2),
-               loc := Function.update D.loc e.1 (kk ((bReg m).δ (D.mem e.2.1) e.2.2).2) }
-      with hD₁
-    have hs : I.step D (.tau e.1) = some D₁ := by
-      simp only [step, hpend, ↓reduceIte, hact, hD₁]; rfl
-    have hP₁ : ∀ e' ∈ es, PoisedAt I D₁ e' := by
-      intro e' he'
-      have hne : e'.1 ≠ e.1 := fun h => he (h ▸ List.mem_map_of_mem he')
-      obtain ⟨h1, kk', h2⟩ := hP e' (by simp [he'])
-      refine ⟨by simpa [hD₁] using h1, kk', ?_⟩
-      simpa [hD₁, Function.update_of_ne hne] using h2
-    obtain ⟨D', hrun, hmem, hother⟩ := ih hnd' D₁ hP₁
-    refine ⟨D', ?_, ?_, ?_⟩
-    · simp only [List.map_cons, runFrom_cons, hs, Option.bind_some]; exact hrun
-    · rw [hmem, memAfter_cons]
-    · intro q hq
-      have hq1 : q ≠ e.1 := fun h => hq (by simp [h])
-      have hq2 : q ∉ es.map Prod.fst := fun h => hq (by simp only [List.map_cons]; exact List.mem_cons_of_mem _ h)
-      obtain ⟨a, b⟩ := hother q hq2
-      refine ⟨a.trans ?_, b⟩
-      simp [hD₁, Function.update_of_ne hq1]
 
 end Cslib.SharedMemory.UniqueIDs

@@ -1,5 +1,6 @@
 import Papers.PODC2025.StrangerFreeTasks.LowerBound
-import Papers.PODC2024.HistoryIndependent.Alg4WaitFree
+import Mathlib
+import Podc.SharedMemory.Potential
 
 /-!
 # The bound of Theorem 2.1 is tight for `n = 2`
@@ -80,23 +81,6 @@ lemma forall_fin2 (p : Fin 2) {F : Fin 2 → Prop} : (∀ q, F q) ↔ F p ∧ F 
 lemma fin2_pair_card (p : Fin 2) : ({p, p + 1} : Finset (Fin 2)).card = 2 := by revert p; decide
 
 /-! ### Step lemmas -/
-
--- CSLib candidate
-/-- Induction principle for invariants of executions of an implementation. -/
-lemma Impl.run_induction' {A : ObjSpec} {ι : Type} {B : ι → ObjSpec} {P L : Type}
-    [DecidableEq P] [DecidableEq ι] (I : Impl A B P L)
-    {Q : List (Label P A) → Config A B P L → Prop} (h0 : Q [] I.initCfg)
-    (hs : ∀ α C ℓ C', I.run α = some C → Q α C → I.step C ℓ = some C' → Q (α ++ [ℓ]) C')
-    {α : List (Label P A)} {C : Config A B P L} (h : I.run α = some C) : Q α C := by
-  induction α using List.reverseRecOn generalizing C with
-  | nil => simp only [Impl.run_nil, Option.some.injEq] at h; subst h; exact h0
-  | append_singleton α ℓ ih =>
-    rw [Impl.run, Impl.runFrom_append] at h
-    cases hα : I.runFrom I.initCfg α with
-    | none => simp [hα] at h
-    | some C₁ =>
-      simp only [hα, Option.bind_some, Impl.runFrom_singleton] at h
-      exact hs α C₁ ℓ C hα (ih hα) h
 
 lemma twoAlg_step_inv {C C' : TCfg} {p : Fin 2} {o : Unit}
     (h : twoAlg.step C (.inv p o) = some C') :
@@ -210,7 +194,7 @@ lemma TInv.step {α : List (Label (Fin 2) (laObj (Fin 2)))} {C C' : TCfg}
 
 lemma tInv_of_run {α : List (Label (Fin 2) (laObj (Fin 2)))} {C : TCfg}
     (h : twoAlg.run α = some C) : TInv α C :=
-  Impl.run_induction' twoAlg (Q := TInv) tInv_init (fun _ _ _ _ _ hI hs => hI.step hs) h
+  Impl.run_induction (I := twoAlg) (Q := TInv) tInv_init (fun _ _ _ _ _ hI hs => hI.step hs) h
 
 /-! ### Main results -/
 

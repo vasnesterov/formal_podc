@@ -252,7 +252,7 @@ lemma SInvK1.step {α : List (Label P (laObj P))} {C C' : Cfg P 1} {ℓ : Label 
 
 theorem sInvK1_of_run {α : List (Label P (laObj P))} {C : Cfg P 1}
     (h : (alg1 1).run α = some C) : SInvK1 C :=
-  run_induction (Q := fun _ C => SInvK1 C) sInvK1_init
+  Impl.run_induction (I := alg1 1) (Q := fun _ C => SInvK1 C) sInvK1_init
     (fun _ _ _ _ hα hS hs => hS.step (bInv_of_run hα) hs) h
 
 /-! ### Simple step facts -/

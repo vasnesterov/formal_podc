@@ -1,6 +1,7 @@
 import Papers.PODC2016.ComplexityHierarchy.MaxRegister
 import Cslib.Computability.Distributed.SharedMemory.Consensus
 import Cslib.Computability.Distributed.SharedMemory.Progress
+import Podc.SharedMemory.Solo
 
 /-!
 # Consensus from two max-registers (Theorem 4.2 of [EGSZ16])
@@ -613,12 +614,6 @@ lemma Term.of_solo {C : Cfg n P} (h : Term p ((alg n P).soloStep p C)) : Term p 
   obtain ⟨k, hk⟩ := h
   exact ⟨k + 1, by rw [Function.iterate_succ_apply]; exact hk⟩
 
-lemma reachable_soloStep {C : Cfg n P} (h : (alg n P).Reachable C) :
-    (alg n P).Reachable ((alg n P).soloStep p C) := by
-  obtain ⟨α, hα⟩ := h
-  exact ⟨α ++ (alg n P).soloLabels p C 1, by
-    rw [Impl.run_append_of_eq _ hα, Impl.runFrom_soloLabels]; rfl⟩
-
 lemma soloStep_tau {C C' : Cfg n P} (hp : C.pend p ≠ none)
     (hn : (alg n P).nextLabel C p = .tau p) (h : (alg n P).step C (.tau p) = some C') :
     (alg n P).soloStep p C = C' := by
@@ -671,7 +666,7 @@ lemma Term.of_collect {C : Cfg n P} {prev} (hp : C.pend p ≠ none) (hph : C.loc
   obtain ⟨h1, h2, h3⟩ := solo_r1 hp hph
   obtain ⟨h4, h5, h6⟩ := solo_r2 (by rw [h1]; exact hp) h2
   exact Term.of_solo (Term.of_solo (h _ (h4.trans h1) (by rw [h5, h3]) (h6.trans h3)
-    fun hR => reachable_soloStep (reachable_soloStep hR)))
+    fun hR => (hR.soloStep p).soloStep p))
 
 lemma afterScan_dec (r : ℕ) (x : Fin n) :
     afterScan (toLex (r + 1, x)) (toLex (r, x)) = .done x := by
@@ -779,8 +774,8 @@ lemma term_r2 {C : Cfg n P} (hR : (alg n P).Reachable C) (hp : C.pend p ≠ none
   refine Term.of_solo ?_
   unfold next at e2
   split_ifs at e2
-  · exact term_after (reachable_soloStep hR) hp1 e2
-  · exact term_r1 (reachable_soloStep hR) hp1 e2
+  · exact term_after (hR.soloStep p) hp1 e2
+  · exact term_r1 (hR.soloStep p) hp1 e2
 
 /-- The algorithm is obstruction-free (CSLib's `Impl.ObstructionFree`: from every reachable
 configuration, a pending process running solo returns). -/

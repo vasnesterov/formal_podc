@@ -124,7 +124,7 @@ theorem step (hI : IsTS I true) (hB : RWLike B) (hn : 3 ≤ Fintype.card P)
     obtain ⟨r₀, hr₀, hcov⟩ := hmov
     refine ⟨_, r₀, hr₀, hnf, fun r hr => ?_, ?_⟩
     · have := hle r
-      rwa [ite_eq_right (fun h => hr (covers_unique h hcov)), Nat.add_zero] at this
+      rwa [ite_eq_right (fun h => hr (Covers.unique h hcov)), Nat.add_zero] at this
     · have := hle r₀
       split_ifs at this <;> omega
   -- the new state
@@ -201,11 +201,11 @@ theorem step (hI : IsTS I true) (hB : RWLike B) (hn : 3 ≤ Fintype.card P)
           rw [← List.map_append] at hc'
           obtain ⟨x, hx, rfl⟩ := List.mem_map.1 hc'
           refine Or.inl ⟨fun h => hqU ((hUmem _).2 h), fun ⟨r, hr, hcov⟩ => hr ?_⟩
-          rw [← covers_unique (D.ccov x hx).1 hcov]; exact (D.ccov x hx).2
+          rw [← Covers.unique (D.ccov x hx).1 hcov]; exact (D.ccov x hx).2
       · have hst := D.unmoved hm
         by_cases hcC : ∃ r ∉ R, I.Covers C q r
         · obtain ⟨r, hr, hcov⟩ := hcC
-          have hcovX : I.Covers X q r := covers_congr hst.1.symm hst.2.symm hcov
+          have hcovX : I.Covers X q r := hcov.congr hst.1.symm hst.2.symm
           by_cases hrQ : r ∈ Q
           · exact Or.inr ⟨r, hrQ, hcovX⟩
           · exact absurd ⟨r, by simp [hr, hrQ], hcovX⟩ hncov

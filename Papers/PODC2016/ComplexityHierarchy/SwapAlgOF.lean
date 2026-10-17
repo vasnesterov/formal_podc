@@ -380,7 +380,7 @@ open Cslib.SharedMemory SwapRead
 /-- **Theorem 8.8** of [EGSZ16] (Ellen–Gelashvili–Shavit–Zhu, *A Complexity-Based Hierarchy for
 Multiprocessor Synchronization*, PODC 2016): there is an obstruction-free protocol for consensus
 among `n` processes (inputs and decisions in `Fin n`) that uses only `n − 1` memory locations
-supporting `read` and `swap` (`swapLoc V v₀`, all initially `v₀`). Agreement and (strong) validity
+supporting `read` and `swap` (`rswapObj V v₀`, all initially `v₀`). Agreement and (strong) validity
 hold in every finite execution (`Impl.Solves (consensus …)`), and the protocol is obstruction-free
 from every reachable configuration (`Impl.ObstructionFree`). The protocol is Algorithm 1
 (`swapAlg`), with scans implemented by double collect; the swap arguments carry the process
@@ -389,7 +389,7 @@ that identifiers are used for nothing but these tags. Stated for `n ≥ 2` (for 
 no locations). -/
 theorem theorem_8_8 (n : ℕ) [NeZero n] (hn : 2 ≤ n) :
     ∃ (V : Type) (v₀ : V) (L : Type)
-      (I : Impl (taskObj (Fin n) (Fin n)) (fun _ : Fin (n - 1) => swapLoc V v₀) (Fin n) L),
+      (I : Impl (taskObj (Fin n) (Fin n)) (fun _ : Fin (n - 1) => rswapObj V v₀) (Fin n) L),
       (∀ i, I.memInit i = v₀) ∧ (∀ p x, I.allowed p x) ∧
         I.Solves (consensus (Fin n) (Fin n)) ∧ I.ObstructionFree := by
   have : NeZero (n - 1) := ⟨by omega⟩

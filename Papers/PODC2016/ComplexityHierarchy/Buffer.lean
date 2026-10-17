@@ -1,5 +1,6 @@
 import Cslib.Computability.Distributed.SharedMemory.Valency
 import Papers.PODC2016.ComplexityHierarchy.Packing
+import Podc.SharedMemory.Covering
 
 /-!
 # ℓ-buffers and multiple assignment (Sections 6–7 of Ellen–Gelashvili–Shavit–Zhu, PODC 2016)
@@ -29,7 +30,8 @@ one in `BufferLB.lean`.
 ## Main results
 
 * `foldl_bufWrite`, `foldl_bufWrite_eq`: `ℓ` writes obliterate an `ℓ-buffer`.
-* `Impl.runFrom_block`: effect of a block of (multi-)writes.
+* `Impl.runFrom_block`: effect of a block of (multi-)writes (from the library's
+  `Impl.runFrom_poised_block`).
 * `Impl.block_agreeOn`: indistinguishability after a block that writes `≥ ℓ` times to every
   location on which two configurations differ.
 -/
@@ -128,9 +130,10 @@ variable {R V : Type} {ℓ : ℕ} {P L : Type} [DecidableEq P]
 
 variable (I : Impl BinCons (MB R ℓ V) P L)
 
-/-- In `C`, `p` is pending and poised to perform the multiple assignment `w`. -/
-def Poised (C : Config BinCons (MB R ℓ V) P L) (p : P) (w : R → Option V) : Prop :=
-  C.pend p ≠ none ∧ ∃ k, I.act p (C.loc p) = .access () (.write w) k
+/-- In `C`, `p` is pending and poised to perform the multiple assignment `w` (the library's
+`Impl.PoisedAt` for the memory object). -/
+abbrev Poised (C : Config BinCons (MB R ℓ V) P L) (p : P) (w : R → Option V) : Prop :=
+  I.PoisedAt C p () (.write w)
 
 /-- In `C`, `p` covers location `r`: it is poised to perform a (multiple) assignment that writes
 `r`. -/
@@ -163,10 +166,6 @@ variable {I}
 lemma Poised.wOf_eq {C : Config BinCons (MB R ℓ V) P L} {p : P} {w : R → Option V}
     (h : I.Poised C p w) : I.wOf C p = w := by
   obtain ⟨-, k, hk⟩ := h; unfold wOf; rw [hk]
-
-lemma Poised.congr {C D : Config BinCons (MB R ℓ V) P L} {p : P} {w : R → Option V}
-    (h : I.Poised C p w) (hl : C.loc p = D.loc p) (hp : C.pend p = D.pend p) : I.Poised D p w :=
-  ⟨hp ▸ h.1, by rw [← hl]; exact h.2⟩
 
 lemma MCovers.congr {C D : Config BinCons (MB R ℓ V) P L} {p : P} {r : R}
     (h : I.MCovers C p r) (hl : C.loc p = D.loc p) (hp : C.pend p = D.pend p) : I.MCovers D p r := by
@@ -203,35 +202,34 @@ lemma step_tau_cases {C C' : Config BinCons (MB R ℓ V) P L} {q : P}
     right; refine ⟨w, ⟨hp, k, hact⟩, ?_⟩
     rw [hm]; simp
 
+omit [DecidableEq P] in
+/-- Multiple assignments, as accesses of the memory object, act by `applyW`. -/
+lemma applyAccesses_writes (ws : List (R → Option V)) (M : ∀ _ : Unit, R → List V) :
+    applyAccesses (B := MB R ℓ V) M (ws.map fun w => ⟨(), .write w⟩) () =
+      ws.foldl (fun m w => applyW ℓ w m) (M ()) := by
+  induction ws generalizing M with
+  | nil => rfl
+  | cons w ws ih => simpa using ih (Function.update M () (applyW ℓ w (M ())))
+
 /-- **Effect of a block** of distinct poised writers: each takes one step (a write). -/
-theorem runFrom_block : ∀ (ps : List P) (X : Config BinCons (MB R ℓ V) P L), ps.Nodup →
-    (∀ p ∈ ps, ∃ w, I.Poised X p w) →
+theorem runFrom_block (ps : List P) (X : Config BinCons (MB R ℓ V) P L) (hnd : ps.Nodup)
+    (hpo : ∀ p ∈ ps, ∃ w, I.Poised X p w) :
     ∃ X', I.runFrom X (blockWrite ps) = some X' ∧
       X'.mem () = (ps.map (I.wOf X)).foldl (fun m w => applyW ℓ w m) (X.mem ()) ∧
       X'.pend = X.pend ∧ (∀ q, q ∉ ps → X'.loc q = X.loc q) ∧
       (∀ p ∈ ps, X'.loc p = I.contOf p (X.loc p)) := by
-  intro ps
-  induction ps with
-  | nil => intro X _ _; exact ⟨X, rfl, rfl, rfl, fun _ _ => rfl, by simp⟩
-  | cons p ps ih =>
-    intro X hnd hpo
-    obtain ⟨w, hw⟩ := hpo p (by simp)
-    obtain ⟨X₁, hs, hm, hl, hpd⟩ := step_poised hw
-    have hp : p ∉ ps := (List.nodup_cons.1 hnd).1
-    have hl₁ : ∀ q, q ≠ p → X₁.loc q = X.loc q := fun q hq => by
-      rw [hl, Function.update_of_ne hq]
-    obtain ⟨X', h1, h2, h3, h4, h5⟩ := ih X₁ (List.nodup_cons.1 hnd).2 (fun q hq => by
-      obtain ⟨w', hw'⟩ := hpo q (by simp [hq])
-      have hqp : q ≠ p := fun e => hp (e ▸ hq)
-      exact ⟨w', hw'.congr (hl₁ q hqp).symm (by rw [hpd])⟩)
-    refine ⟨X', by simp only [blockWrite_cons, runFrom_cons, hs, Option.bind_some]; exact h1, ?_, by rw [h3, hpd], fun q hq => ?_, fun q hq => ?_⟩
-    · rw [h2, hm, List.map_cons, List.foldl_cons, hw.wOf_eq]
-      congr 1
-      exact List.map_congr_left (fun q hq => wOf_congr (hl₁ q (fun e => hp (e ▸ hq))))
-    · rw [h4 q (fun h => hq (by simp [h])), hl₁ q (fun h => hq (by simp [h]))]
-    · rcases List.mem_cons.1 hq with rfl | hq
-      · rw [h4 q hp, hl]; simp
-      · rw [h5 q hq, hl₁ q (fun e => hp (e ▸ hq))]
+  obtain ⟨X', h1, h2, h3, h4, h5⟩ := runFrom_poised_block (I := I)
+    (es := ps.map fun p => (p, (⟨(), .write (I.wOf X p)⟩ : Σ _ : Unit, (multiBuffer R ℓ V).Op)))
+    (by simpa [Function.comp_def] using hnd) (C := X) (by
+      simp only [List.mem_map]
+      rintro _ ⟨p, hp, rfl⟩
+      obtain ⟨w, hw⟩ := hpo p hp
+      rw [hw.wOf_eq]; exact hw)
+  simp only [List.map_map, Function.comp_def, List.map_id'] at h1 h2 h4
+  refine ⟨X', h1, by rw [h2, ← applyAccesses_writes, List.map_map]; rfl, h3, h4, fun p hp => ?_⟩
+  obtain ⟨k, s, hk, hl⟩ := h5 _ (List.mem_map_of_mem (f := fun p => (p,
+    (⟨(), .write (I.wOf X p)⟩ : Σ _ : Unit, (multiBuffer R ℓ V).Op))) hp)
+  rw [hl]; simp only [contOf] at hk ⊢; rw [hk]
 
 /-- **Indistinguishability after a block.** Let `X` and `Y` agree on the processes of `S`, and let
 the distinct processes `ps ⊆ S` be poised to write in `X`. If at every location the memories of

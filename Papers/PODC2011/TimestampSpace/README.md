@@ -45,7 +45,7 @@ invariants.
   The O(1) form of the theorem is unaffected. Minor proof gap. (`theorem_1_2`, `theorem_1_2_real`)
 * **Lemma 3.1/3.2 (long-lived).** Lemma 3.1 is stated for every quiescent `D` but needs `D`
   reachable. The proof of Lemma 3.2 uses, without justification, that the first two block writes
-  commute once `B₂` has written. Minor; statement true. (`lemma_3_1`, `bw_swap`)
+  commute once `B₂` has written. Minor; statement true. (`lemma_3_1`, `blockWrite_swap`)
 * **Typos.**
   - Proof of Lemma 3.2: "`πBᵢλπB₁₋ᵢπBⱼη`" should be `πB₂`.
   - Section 4: "`idle(Cᵢ) < idle(Cᵢ₊₁)`" should be `>`.
@@ -104,5 +104,13 @@ nondeterministic or randomized algorithms.
 `Quot.sound`. The hypotheses of both lower bounds are satisfiable for every `n`:
 * Theorem 1.1: the folklore "max + 1" algorithm (`n` registers) is a wait-free long-lived `IsTS`
   implementation from registers (`MaxTS.maxTS_isTS`, `MaxTS.maxTS_rwLike`; `MaxAlg.lean`).
-* Theorem 1.2: Algorithm 2 is a one-shot one (`SimpleTS.lemma_5_1`). The model is CSLib's `SharedMemory` (`Model`, `Covering`,
-`Progress`).
+* Theorem 1.2: Algorithm 2 is a one-shot one (`SimpleTS.lemma_5_1`).
+
+The model is CSLib's `SharedMemory` (`Model`, `Covering`, `Progress`). From the shared library
+`Podc/SharedMemory/`: `SoloTerm` is `Impl.ObstructionFreeOn (Adm oneShot)` and `WaitFreeUpTo` is
+`Impl.WaitFreeOn` (`Progress`, with `soloTerm_iff`, `waitFreeUpTo_iff`); `RWLike`
+(`ObjClasses`); covering and block-write lemmas (`Impl.Covers.congr`, `Impl.Covers.unique`,
+`Impl.blockWrite_swap`, `Covering`); solo runs under restricted obstruction-freedom
+(`Impl.soloOp_spec_of_obstructionFreeOn`, `Impl.exists_finish`, `Solo`); potentials
+(`Impl.waitFreeOn_of_cfgPotential`, `Impl.waitFree_of_potential`, `Potential`); and the computable
+step function used to evaluate the long-lived counterexample (`Impl.crun`, `Compute`).

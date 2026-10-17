@@ -1,5 +1,5 @@
 import Papers.PODC2011.TimestampSpace.Defs
-import Papers.PODC2024.HistoryIndependent.Alg4WaitFree
+import Podc.SharedMemory.Potential
 
 /-!
 # Section 5: a simple one-shot timestamp implementation from `⌈n/2⌉` registers

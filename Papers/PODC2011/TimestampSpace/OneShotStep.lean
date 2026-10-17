@@ -84,7 +84,7 @@ lemma c_pend {p : P} (hp : p ∈ c₀.map Prod.fst ++ c₁.map Prod.fst) : C.pen
 
 lemma c_not_U {p : P} (hp : p ∈ c₀.map Prod.fst ++ c₁.map Prod.fst) : p ∉ U := by
   intro hU
-  exact D.c_pend hp (pend_none_of_idle D.run ((D.Umem p).1 hU))
+  exact D.c_pend hp (pend_none_of_opsOf_nil D.run ((D.Umem p).1 hU))
 
 lemma M_U {p : P} (hp : p ∈ (M₀ ++ M₁).map Prod.fst) : p ∈ U := by
   obtain ⟨x, hx, rfl⟩ := List.mem_map.1 hp
@@ -193,7 +193,7 @@ lemma moved_U {t : ℕ} (ht : t ≤ D.ms.length) {q : P} (hq : q ∈ (D.ms.take 
   refine ⟨r, hr, ?_⟩
   rcases Nat.lt_or_ge (s + 1) t with h | h
   · have := cfgAt_frozen D.owned D.nodup_ms hX hs t (by omega) ht
-    exact covers_congr this.1.symm this.2.symm hcov
+    exact hcov.congr this.1.symm this.2.symm
   · have : t = s + 1 := by omega
     subst this; exact hcov
 
@@ -243,8 +243,8 @@ lemma c_cov_le_one (cl : List (P × ι)) (hs : (cl.map Prod.snd).Nodup)
   simp only [Finset.mem_filter, Finset.mem_univ, true_and, List.mem_map] at ha hb
   obtain ⟨⟨x, hx, rfl⟩, hxr⟩ := ha
   obtain ⟨⟨y, hy, rfl⟩, hyr⟩ := hb
-  have e1 : x.2 = r := covers_unique (hcl x hx) hxr
-  have e2 : y.2 = r := covers_unique (hcl y hy) hyr
+  have e1 : x.2 = r := Covers.unique (hcl x hx) hxr
+  have e2 : y.2 = r := Covers.unique (hcl y hy) hyr
   rw [List.inj_on_of_nodup_map hs hx hy (e1.trans e2.symm)]
 
 lemma mv_early {t : ℕ} (ht : t ≤ c₀.length + M₀.length) {q : P}
@@ -290,12 +290,12 @@ lemma R_loss {t : ℕ} (r : ι) :
     simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hp
     simp only [Finset.mem_union, Finset.mem_filter, Finset.mem_univ, true_and, A, Bt]
     by_cases hm : p ∈ (D.ms.take t).map Prod.fst
-    · have hU : p ∉ U := fun hU => hp.1 (pend_none_of_idle D.run ((D.Umem p).1 hU))
+    · have hU : p ∉ U := fun hU => hp.1 (pend_none_of_opsOf_nil D.run ((D.Umem p).1 hU))
       rcases List.mem_append.1 (D.moved_notU hm hU) with h | h
       · exact Or.inl (Or.inr ⟨h, hp⟩)
       · exact Or.inr ⟨h, hp, hm⟩
     · have := D.unmoved hm
-      exact Or.inl (Or.inl (covers_congr this.1.symm this.2.symm hp))
+      exact Or.inl (Or.inl (hp.congr this.1.symm this.2.symm))
   rw [sig_eq_card, sig_eq_card]
   have h1 := Finset.card_le_card hsub
   have h2 := Finset.card_union_le (Finset.univ.filter (fun p => I.Covers (cfgAt I C D.ms t) p r) ∪ A) Bt
@@ -332,7 +332,7 @@ lemma outCov_end :
         rw [List.take_length]
         intro hm
         rw [D.map_fst] at hm
-        have hU : p ∉ U := fun hU => hcov.1 (pend_none_of_idle D.run ((D.Umem p).1 hU))
+        have hU : p ∉ U := fun hU => hcov.1 (pend_none_of_opsOf_nil D.run ((D.Umem p).1 hU))
         have hc : p ∈ c₀.map Prod.fst ++ c₁.map Prod.fst := by
           simp only [List.mem_append] at hm ⊢
           rcases hm with ((h | h) | h) | h
@@ -342,9 +342,9 @@ lemma outCov_end :
           · exact absurd (D.M_U (by simp [h])) hU
         rw [← List.map_append] at hc
         obtain ⟨x, hx, rfl⟩ := List.mem_map.1 hc
-        exact hr (by have := covers_unique (D.ccov x hx).1 hcov; rw [← this]; exact (D.ccov x hx).2)
+        exact hr (by have := Covers.unique (D.ccov x hx).1 hcov; rw [← this]; exact (D.ccov x hx).2)
       have := D.unmoved hm
-      exact ⟨r, hr, covers_congr this.1.symm this.2.symm hcov⟩
+      exact ⟨r, hr, hcov.congr this.1.symm this.2.symm⟩
     · rw [List.mem_toFinset] at hp
       have hm : p ∈ (D.ms.take D.ms.length).map Prod.fst := by
         rw [List.take_length, D.map_fst]
@@ -358,7 +358,7 @@ lemma outCov_end :
     rw [mem_outCov] at hp
     obtain ⟨r, -, hcov⟩ := hp
     rw [List.mem_toFinset] at hp'
-    exact hcov.1 (pend_none_of_idle D.run ((D.Umem p).1 (D.M_U hp')))
+    exact hcov.1 (pend_none_of_opsOf_nil D.run ((D.Umem p).1 (D.M_U hp')))
   have h1 := Finset.card_le_card hsub
   rw [Finset.card_union_of_disjoint hdisj, List.toFinset_card_of_nodup D.Mnd] at h1
   rw [List.length_map, List.length_append] at h1; omega
