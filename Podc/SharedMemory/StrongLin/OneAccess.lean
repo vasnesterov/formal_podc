@@ -257,12 +257,6 @@ theorem waitFree (r₀ : A.Resp) : (S.impl r₀).WaitFree := by
     rw [← eq_of_heq hk]
     simp
 
-@[deprecated curOp (since := "2026-10-17")] alias cur := curOp
-@[deprecated curOp_append_inv (since := "2026-10-17")] alias cur_append_inv := curOp_append_inv
-@[deprecated curOp_append_tau (since := "2026-10-17")] alias cur_append_tau := curOp_append_tau
-@[deprecated curOp_append_of_proc_ne (since := "2026-10-17")]
-alias cur_append_of_ne := curOp_append_of_proc_ne
-
 end OneAccess
 
 end Cslib.SharedMemory

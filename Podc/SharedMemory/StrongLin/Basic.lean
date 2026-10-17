@@ -170,15 +170,6 @@ theorem nStronglyLinearizable_toNSpec_iff {I : Impl A B P L} :
   obtain ⟨M, hM⟩ := hpre α β hβ hαβ
   exact ⟨M.map fun y => (y.1, y.2.1), by simp only [← hM, List.map_append]⟩
 
-@[deprecated ObjSpec.annotate (since := "2026-10-17")] alias annotate := ObjSpec.annotate
-@[deprecated ObjSpec.annotate_append (since := "2026-10-17")]
-alias annotate_append := ObjSpec.annotate_append
-@[deprecated ObjSpec.annotate_map_fst (since := "2026-10-17")]
-alias annotate_map_fst := ObjSpec.annotate_map_fst
-@[deprecated ObjSpec.mem_annotate (since := "2026-10-17")] alias mem_annotate := ObjSpec.mem_annotate
-@[deprecated IsLinearization.isNLinearization_annotate (since := "2026-10-17")]
-alias isNLinearization_annotate := IsLinearization.isNLinearization_annotate
-
 end Impl
 
 end NLin

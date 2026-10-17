@@ -23,8 +23,7 @@ linearizations: `SeqOK.respIn_eq`, `seqOK_of_respIn`,
 
 `ObjSpec.respIn` is a reducible spelling of the recursive definition `linRespFrom A x q L`, so
 lemmas about either apply to both. `linResp L x` is the response in a linearization (from the
-initial state); the `linRespFrom_*`/`linResp_*` lemmas are deprecated spellings of the
-`respIn_*` lemmas.
+initial state); use the `respIn_*` lemmas for both.
 
 ## Building linearizations
 
@@ -278,58 +277,6 @@ lemma IsLinearization.push_list {α : List (Label P A)} {L : List (OpId P × A.O
 /-- The response that the linearization `L` assigns to the instance `x`. -/
 def linResp (L : List (OpId P × A.Op)) (x : OpId P) : Option A.Resp :=
   linRespFrom A x A.init L
-
-@[deprecated "use `ObjSpec.respIn_append_of_mem`" (since := "2026-10-17")]
-lemma linRespFrom_append_of_mem (x : OpId P) (q : A.State) (L L' : List (OpId P × A.Op))
-    (hx : x ∈ L.map Prod.fst) : linRespFrom A x q (L ++ L') = linRespFrom A x q L :=
-  ObjSpec.respIn_append_of_mem hx L'
-
-@[deprecated "use `ObjSpec.respIn_append_of_mem`" (since := "2026-10-17")]
-lemma linResp_append_of_mem {x : OpId P} {L : List (OpId P × A.Op)} (L' : List (OpId P × A.Op))
-    (hx : x ∈ L.map Prod.fst) : linResp (L ++ L') x = linResp L x :=
-  ObjSpec.respIn_append_of_mem hx L'
-
-@[deprecated "use `ObjSpec.respIn_append_of_not_mem`" (since := "2026-10-17")]
-lemma linRespFrom_append_of_not_mem (x : OpId P) (q : A.State) (L L' : List (OpId P × A.Op))
-    (hx : x ∉ L.map Prod.fst) :
-    linRespFrom A x q (L ++ L') = linRespFrom A x (A.runOps q (L.map Prod.snd)) L' :=
-  ObjSpec.respIn_append_of_not_mem hx L'
-
-@[deprecated "use `ObjSpec.respIn_append_of_not_mem`" (since := "2026-10-17")]
-lemma linResp_append_of_not_mem {x : OpId P} {L : List (OpId P × A.Op)}
-    (L' : List (OpId P × A.Op)) (hx : x ∉ L.map Prod.fst) :
-    linResp (L ++ L') x = linRespFrom A x (linState L) L' :=
-  ObjSpec.respIn_append_of_not_mem hx L'
-
-@[deprecated "use `ObjSpec.respIn_concat_self`" (since := "2026-10-17")]
-lemma linResp_append_singleton_self {x : OpId P} {L : List (OpId P × A.Op)} (o : A.Op)
-    (hx : x ∉ L.map Prod.fst) : linResp (L ++ [(x, o)]) x = some (A.δ (linState L) o).2 :=
-  ObjSpec.respIn_concat_self hx o
-
-@[deprecated "use `ObjSpec.respIn_isSome_iff`" (since := "2026-10-17")]
-lemma linRespFrom_isSome_iff (x : OpId P) (q : A.State) (L : List (OpId P × A.Op)) :
-    (linRespFrom A x q L).isSome ↔ x ∈ L.map Prod.fst :=
-  ObjSpec.respIn_isSome_iff
-
-@[deprecated "use `ObjSpec.respIn_isSome_iff`" (since := "2026-10-17")]
-lemma linResp_isSome_iff {x : OpId P} {L : List (OpId P × A.Op)} :
-    (linResp L x).isSome ↔ x ∈ L.map Prod.fst :=
-  ObjSpec.respIn_isSome_iff
-
-/-- Splitting a linearization at an instance with a known response. -/
-@[deprecated "use `ObjSpec.exists_split_of_respIn_eq_some`" (since := "2026-10-17")]
-lemma exists_split_of_linRespFrom {x : OpId P} {q : A.State} {L : List (OpId P × A.Op)}
-    {r : A.Resp} (h : linRespFrom A x q L = some r) :
-    ∃ L₁ L₂ o, L = L₁ ++ (x, o) :: L₂ ∧ (A.δ (A.runOps q (L₁.map Prod.snd)) o).2 = r :=
-  ObjSpec.exists_split_of_respIn_eq_some h
-
-/-- A response is legal if the linearization assigns it to the returning instance. -/
-@[deprecated "use `IsLinearization.append_ret_of_respIn`" (since := "2026-10-17")]
-lemma IsLinearization.append_ret_of_linResp {α : List (Label P A)} {L : List (OpId P × A.Op)}
-    (hL : IsLinearization α L) {p : P} {r : A.Resp}
-    (hr : linResp L (p, (respsOf α p).length) = some r) :
-    IsLinearization (α ++ [.ret p r]) L :=
-  hL.append_ret_of_respIn hr
 
 /-! ## Retroactive linearization points -/
 

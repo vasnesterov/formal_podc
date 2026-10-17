@@ -378,5 +378,3 @@ version).
 | `CongestLB/` | CONGEST lower bounds from two-party communication complexity | 1 |
 | `ContentOblivious/` | content-oblivious (pulse-only) rings: model, composable procedures, staged programs, splicing, mirroring | 2 |
 | `IteratedModel/` | iterated immediate-snapshot style models, tasks and solvability | 1 |
-
-`Podc/StrongLin/` and a few top-level `Podc/SharedMemory/*.lean` files are compatibility re-exports of moved modules.
