@@ -9,6 +9,7 @@ import Podc.ContentOblivious.Lockstep
 import Podc.ContentOblivious.Prog
 import Podc.ContentOblivious.Compose
 import Podc.SharedMemory.Potential
+import Podc.SharedMemory.Linearization
 import Podc.ContentOblivious.Staged
 import Podc.ContentOblivious.Hom
 import Podc.ContentOblivious.Splice

@@ -823,3 +823,8 @@ import Papers.PODC2013.CongestedCliqueRouting.Main
 import Papers.PODC2013.CongestedCliqueRouting.PaperGaps
 import Papers.PODC2013.CongestedCliqueRouting.SortMain
 import Papers.PODC2013.CongestedCliqueRouting.Sanity
+import Papers.PODC2016.ConcurrentDSU.Main
+import Papers.PODC2016.ConcurrentDSU.Examples
+import Papers.PODC2016.ConcurrentDSU.EarlyTerm
+import Papers.PODC2016.ConcurrentDSU.Lemma42
+import Papers.PODC2016.ConcurrentDSU.UnionForest
