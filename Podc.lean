@@ -15,3 +15,6 @@ import Podc.ContentOblivious.Splice
 import Podc.ContentOblivious.Mirror
 import Podc.ContentOblivious.VirtualRing
 import Podc.LockStep.Sequential
+import Podc.SharedMemory.Objects
+import Podc.StrongLin.Basic
+import Podc.StrongLin.OneAccess

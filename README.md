@@ -98,6 +98,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2021 | 7 | Altisen, Devismes, Durand, Johnen, Petit — *On Implementing Stabilizing Leader Election with Weak Assumptions on Network Dynamics* | [StabilizingLEDynamic](Papers/PODC2021/StabilizingLEDynamic) | ⚠️ All results proved (class hierarchy, impossibilities, pseudo-stabilizing LE in 6Δ+1 rounds); identifier set must have more than n elements (implicit); Lemma 7 false as stated (harmless); proof gaps in Lemmas 12, 16 |
 | 2011 | 7 | Helmi, Higham, Pacheco, Woelfel — *The Space Complexity of Long-Lived and One-Shot Timestamp Implementations* | [TimestampSpace](Papers/PODC2011/TimestampSpace) | ⚠️ Long-lived (m > n/6 − 1) and one-shot (m > √(2n) − log₂ n − 4) lower bounds and both upper-bound algorithms proved (lower bounds for deterministic implementations); genuine gaps in Theorem 1.2's final count and Lemma 6.5 repaired |
 | 2025 | 6 | Ben-David, Dzulfikar, Ellen, Gilbert — *Byzantine Agreement with Predictions* | [BAWithPredictions](Papers/PODC2025/BAWithPredictions) | ⚠️ Theorem 13 (round lower bound, unauthenticated) and Theorem 14 (n + t² ≤ 8·#msgs + 1) proved; Lemmas 1–6, Algorithms 3–7 with Theorems 5–6 proved; gaps in Theorem 14's w.l.o.g. step and Lemma 23 repaired; wrapper checked against sub-protocol specs |
+| 2024 | 5 | Attiya, Castañeda, Enea — *Strong Linearizability using Primitives with Consensus Number 2* | [StrongLinCN2](Papers/PODC2024/StrongLinCN2) | ❌ Theorems 1, 2, 5, 6, 9 (strongly linearizable max register, snapshot, readable test&set, fetch&increment) proved; **the set algorithm of Theorem 10 (Algorithm 2) is not strongly linearizable** (3 processes); §5's witness sequences for k-out-of-order queues are wrong (claim holds with repaired witnesses); Lemma 12 proof gap (stack case unproved) |
 | 2020 | 5 | Dolan — *The Only Undoable CRDTs are Counters* | [UndoableCRDTs](Papers/PODC2020/UndoableCRDTs) | ✅ Correct |
 | 2020 | 5 | Khanchandani, Wattenhofer — *Byzantine Agreement with Unknown Participants and Failures* | [UnknownParticipantsBA](Papers/PODC2020/UnknownParticipantsBA) | ❌ **Lemma 4 and Theorem 1 (rotor-coordinator) false** under the pseudocode's selection rule (n=7, f=2; n=4, f=1): all correct nodes can terminate with no good round; repaired rotor and consensus (3f+7 rounds) proved; full version's fill rule under-specified |
 | 2019 | 5 | Hussak, Trehan — *On Termination of a Flooding Process* | [FloodingTermination](Papers/PODC2019/FloodingTermination) | ⚠️ Termination and exact bounds proved (terminates at e iff bipartite; e < T ≤ e+d+1); Theorem 3.5 proof gap; Lemmas 3.3/3.4 need connectivity; abstract's "adversary can always prevent termination" false on forests |
@@ -233,6 +234,12 @@ in the paper's `differencies.md`.
   The proof treats the candidate list as fixed. (The prose describes a "next larger identifier" rule, under which
   these runs are not counterexamples; the proof of Lemma 4 uses the pseudocode's rule.) A repaired rotor and the
   consensus algorithm (3f+7 rounds) are proved.
+- **Strong Linearizability using Primitives with Consensus Number 2** (PODC 2024, 5 citations) —
+  [StrongLinCN2](Papers/PODC2024/StrongLinCN2). The set implementation of Algorithm 2, claimed strongly linearizable
+  (Theorem 10), is not: with 3 processes there is an execution prefix in which a `take` must already be linearized as
+  returning EMPTY before a completed `put`, while in one extension it returns an item. No reading of the
+  never-incremented `taken_new` helps. Theorem 10 is therefore unproved. The other constructions (Theorems 1, 2, 5,
+  6, 9) are proved strongly linearizable.
 - **Efficient Bounded Timestamping from Standard Synchronization Primitives** (PODC 2023, 3 citations) —
   [BoundedTimestamping](Papers/PODC2023/BoundedTimestamping). The main algorithm (Figures 1–2) is not linearizable.
   The helping routine `helpMoveTS` runs a few steps at a time across later operations of the same process, while
