@@ -132,10 +132,6 @@ end Bookkeeping
 
 /-! ### One iteration -/
 
-theorem union_self' (V : Multiset ℝ) : V ∪ V = V := le_antisymm (union_le le_rfl le_rfl) le_union_left
-
-theorem inter_self' (V : Multiset ℝ) : V ∩ V = V := le_antisymm inter_le_left (le_inter le_rfl le_rfl)
-
 /-- The core of Lemmas 3.2–3.5, on multisets. -/
 theorem step_core {n ts ta : ℕ} (hta : ta ≤ ts) (hn : 2 * ts + ta < n) {V V' H C H' C' : Multiset ℝ}
     {lo hi : ℝ} (hV : V = H + C) (hV' : V' = H' + C')
@@ -203,8 +199,8 @@ theorem step_sync (hta : ta ≤ ts) (hn : 2 * ts + ta < Fintype.card P) (hO : Sy
   refine ⟨fun p hp => ?_, fun p hp p' hp' => ?_⟩
   · obtain ⟨H, C, e, hH, hC⟩ := hparts p hp
     exact (step_core hta hn e e hH hH hC hC (hcard p hp) card_recvVals_le (hcard p hp)
-      card_recvVals_le (by rw [union_self']; exact card_recvVals_le)
-      (by rw [inter_self']; exact hcard p hp)).1
+      card_recvVals_le (by rw [← Multiset.sup_eq_union, sup_idem]; exact card_recvVals_le)
+      (by rw [← Multiset.inf_eq_inter, inf_idem]; exact hcard p hp)).1
   · obtain ⟨H, C, e, hH, hC⟩ := hparts p hp
     obtain ⟨H', C', e', hH', hC'⟩ := hparts p' hp'
     refine (step_core hta hn e e' hH hH' hC hC' (hcard p hp) card_recvVals_le (hcard p' hp')
@@ -245,8 +241,8 @@ theorem step_async (hta : ta ≤ ts) (hn : 2 * ts + ta < Fintype.card P)
   refine ⟨fun p hp => ?_, fun p hp p' hp' => ?_⟩
   · obtain ⟨H, C, e, hH, hC⟩ := hparts p hp
     exact (step_core hta hn e e hH hH hC hC (hcard p hp) card_recvVals_le (hcard p hp)
-      card_recvVals_le (by rw [union_self']; exact card_recvVals_le)
-      (by rw [inter_self']; exact hcard p hp)).1
+      card_recvVals_le (by rw [← Multiset.sup_eq_union, sup_idem]; exact card_recvVals_le)
+      (by rw [← Multiset.inf_eq_inter, inf_idem]; exact hcard p hp)).1
   · obtain ⟨H, C, e, hH, hC⟩ := hparts p hp
     obtain ⟨H', C', e', hH', hC'⟩ := hparts p' hp'
     exact (step_core hta hn e e' hH hH' hC hC' (hcard p hp) card_recvVals_le (hcard p' hp')

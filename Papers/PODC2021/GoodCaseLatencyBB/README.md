@@ -75,10 +75,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
 - **Synchrony.** The protocol knows `Δ` and must be correct in all runs with delays `≤ Δ`. Good-case latency for
   an actual bound `δ` quantifies over runs with delays `≤ δ`. Time is counted with *effective delays*: a message
   received at time `t` is in the state at time `t`, and a reply can leave at `t`. So "commits before `T`" means
-  "decided in the state at `T − 1`". Delays are `≥ 1`, which only weakens the adversary.
+  "decided in the state at `T − 1`". Delays are `≥ 1`, which only weakens the adversary. (This `SyncValid f d`
+  is the shared library class `Run.SyncValid f (d − 1)` of `Podc/PartialSync/RunClasses.lean` up to the GST,
+  bridge `syncValid_iff`.)
 - **Partial synchrony.** We use CSLib's convention: rounds of length `D`, and "within `r` rounds" means the state
   at `rD + 1`. The lower bounds use lock-step executions.
-- **Asynchrony.** Asynchronous executions are all runs of the model. Asynchronous rounds (Appendix A) are not
+- **Asynchrony.** Asynchronous executions are all runs of the model, i.e. runs with an unknown GST and an unknown
+  post-GST delay bound (`asyncRuns f` = library `Run.AsyncValidBounded f`, *bounded* asynchrony; not the
+  unbounded class `Run.AsyncValid`). Asynchronous rounds (Appendix A) are not
   formalized: Theorem 4 is stated for lock-step executions, and Theorem 5's latency as "two message delays".
 - **Unsynchronized start.** The wrapper `lateStart` gives each party its own start time; nothing reaches a
   correct party before it starts. This constraint also covers time-0 batches, so every correct party starts
@@ -104,8 +108,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Counterexamples (`n = 1, 2, 3`); Theorem 10 needs `n ≥ 4` | `theorem_7_false_one`, `theorem_4_false_two`, `theorem_8_false_two`, `ThreeParties.theorem_10_false_three`, `ThreeParties.theorem_10_n4_necessary`, `ThreeParties.three_latency_unsync` | `SmallCases.lean`, `ThreeParties.lean` |
 | Theorem 19 for `n = 3, f = 2` | `theorem_19_three` | `DishonestMajority.lean` |
 
-The executions of Theorem 7 are those of the Kuznetsov–Tonkikh–Zhang formalization (same PODC, same
-construction); we import them from `Papers/PODC2021/FastByzantineConsensus/Executions.lean`.
+The executions of Theorem 7 are those of the Kuznetsov–Tonkikh–Zhang lower bound (same PODC, same
+construction), taken from the library module `Podc/PartialSync/TwoStepLB.lean` (FastByzantineConsensus still
+has its own copy, to be switched to the library).
 
 **Not formalized.** The upper-bound protocols of Figures 3, 5, 6, 9 and 10 (Theorems 11–18) and the BA
 primitive they use; Lemma 1 (3); asynchronous rounds; the `O(n/(n−f))Δ` upper bound.
@@ -117,8 +122,13 @@ Non-vacuity of the hypotheses:
 - the hypotheses of Theorems 7, 9, 10 and 19 (BRB/psync-BB with large `f`) are not instantiated here, since
   their protocols (PBFT, Dolev–Strong-based BB, Figures 5–10) are not formalized.
 
+Shared library code used here: run classes (`Podc/PartialSync/RunClasses.lean`), quiet runs and `DecidesBy`
+(`Runs.lean`), gossip of known tokens and token origin (`Gossip.lean`: `Algorithm.Gossips`,
+`Run.honestTokens_origin`; the 2-round-BRB protocol and the `n = 3` protocol are instances), the two-step
+executions `ρ₁…ρ₅` (`TwoStepLB.lean`), threshold certificates for commit quorums (`Podc/Byzantine/Certificate.lean`)
+and size-bounded labellings of the processes into groups (`Podc/Foundations/Labelling.lean`).
+
 Generic tools are in this folder and marked as CSLib candidates:
 - replay lemmas `tokens_replay_dl` and `tokens_replay_rel`;
-- `Run.honestTokens_origin`;
 - the `lateStart` wrapper and `Run.st_shift_eq`;
 - delayed covering systems `DCover`.

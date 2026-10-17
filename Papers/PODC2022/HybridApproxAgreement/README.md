@@ -78,7 +78,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
   and all delivery times. Signatures are CSLib's abstract unforgeable tokens: the adversary may emit
   only its own tokens or tokens already sent by honest parties (`Run.AuthValid`).
 * *Synchronous network:* `gst = 0`, delays `≤ δ`, and at most `tₛ` faults (`syncRuns`). *Asynchronous
-  network:* at most `tₐ` faults and arbitrary finite delays (`asyncRuns`). All parties step every tick,
+  network:* at most `tₐ` faults and arbitrary finite delays, with no bound at all (`asyncRuns` = library
+  `Run.AsyncValid`, *unbounded* asynchrony; explicit form `asyncRuns_iff`). All parties step every tick,
   so their clocks are synchronized.
 * **Impossibility:** the theorem is stronger than the paper's. It needs security only on synchronous
   runs and on *partially synchronous* runs (`psyncRuns`), and inputs only from a domain containing two
@@ -104,6 +105,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 5.1 for `n = 1`: **false** | `theorem_5_1_false_n_eq_one` | `Impossibility.lean` |
 | Lemma 3.7 (ranges of `T`, `T′` intersect) | `lemma_3_7` | `Trim.lean` |
 | Lemma 3.6 | `lemma_3_6`, `lemma_3_6'` | `Trim.lean` |
+| Line 7 of `Π_AA` = midpoint of the kept values of any MSR trimming (CSLib `IsTrim`) | `trim_eq_of_isTrim`, `midTrim_eq_of_isTrim` | `Trim.lean` |
 | Lemmas 3.2–3.3 (one synchronous iteration) | `step_sync` | `Iteration.lean` |
 | Lemmas 3.4–3.5 (one asynchronous iteration) | `step_async` | `Iteration.lean` |
 | Theorem 3.1, *relative to Definition 2.2* (validity, `ε`-agreement after `S` iterations, `S = ⌈log₂(δmax/ε)⌉` suffices) | `theorem_3_1_sync`, `theorem_3_1_async`, `le_two_pow_ceil_logb` | `Iteration.lean` |
@@ -121,7 +123,9 @@ not formalized).
 value to everybody at `3Δ` (`RBC.rbc_honest_sender`). With a silent Byzantine party, `Π_AA` terminates
 and both honest parties output `1/2` (`AA.aa_silent`). The impossibility hypotheses are satisfiable:
 for `n = 1` the trivial protocol meets them (`outputInput_secure`). CSLib modules used:
-`Byzantine/PartialSync/{Model,Auth,Constructions,Sync}`.
-CSLib candidates (marked `-- CSLib candidate` in `Sim.lean`): `Run.st_map` (states of runs commute with
-maps of messages, states and inputs) and `Run.st_eq_simStates` (memoised state computation of
-zero-delay runs, for `decide`-checked concrete executions).
+`Byzantine/PartialSync/{Model,Auth,Constructions,Sync}`, `ApproxConsensus/Trim`. Shared library code
+(`Podc/PartialSync/`): the run classes `Run.SyncValid`, `Run.Valid`, `Run.AsyncValid` (`RunClasses.lean`),
+quiet runs `Run.quiet` (`Runs.lean`), `Run.st_map` (states of runs commute with maps of messages, states
+and inputs, `Map.lean`), `Run.st_eq_simStates` (memoised state computation of zero-delay runs, for
+`decide`-checked concrete executions, `Sim.lean`), and the labelling lemma `Fintype.exists_labelling`
+(`Podc/Foundations/Labelling.lean`).

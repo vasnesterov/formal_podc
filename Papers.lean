@@ -518,7 +518,6 @@ import Papers.PODC2022.HybridApproxAgreement.Trim
 import Papers.PODC2022.HybridApproxAgreement.Iteration
 import Papers.PODC2022.HybridApproxAgreement.RBC
 import Papers.PODC2022.HybridApproxAgreement.OBC
-import Papers.PODC2022.HybridApproxAgreement.Sim
 import Papers.PODC2022.HybridApproxAgreement.Map
 import Papers.PODC2022.HybridApproxAgreement.AA
 import Papers.PODC2019.CryptoConsensusNumber.Main

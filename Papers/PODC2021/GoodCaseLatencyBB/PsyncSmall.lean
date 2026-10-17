@@ -34,25 +34,10 @@ section runs
 
 variable {A : Algorithm P M S V V}
 
-/-- The run with faulty set `F` (silent), inputs `I`, `GST = 0` and immediate delivery. -/
-def quietRun (F : Finset P) (I : P → V) : Run P M V where
-  faulty := F
-  inp := I
-  gst := 0
-  byz _ _ _ := []
-  dl _ τ _ := τ
-
-theorem quietRun_valid {f D : ℕ} {F : Finset P} (hF : F.card ≤ f) (I : P → V) :
-    (quietRun (M := M) F I).Valid f D :=
-  ⟨hF, fun _ _ _ _ _ => le_rfl, fun _ τ _ _ _ => by simp [quietRun]⟩
-
-theorem quietRun_authValid {Au : Auth P M K} {F : Finset P} {I : P → V} :
-    (quietRun (M := M) F I).AuthValid Au A :=
-  Run.authValid_of_canonical fun _ _ _ _ => rfl
-
-theorem quietRun_out_faulty {F : Finset P} {I : P → V} {q : P} (hq : q ∈ F) (τ : ℕ) (r : P) :
-    (quietRun (M := M) F I).out A q τ r = [] :=
-  Run.out_of_faulty A _ hq τ r
+/-- Silent processes of a quiet run send nothing. -/
+theorem quiet_out_nil {F : Finset P} {I : P → V} {q : P} (hq : q ∈ F) (τ : ℕ)
+    (r : P) : (Run.quiet (M := M) F I).out A q τ r = [] :=
+  Run.out_eq_nil_of_canonical A Run.quiet_canonical hq τ r
 
 /-- Indistinguishability for a single process, batch by batch. -/
 theorem st_eq_view {R R' : Run P M V} {x : P} {T : ℕ} (hinp : R.inp x = R'.inp x)
@@ -88,16 +73,16 @@ theorem psyncBB_impossible_two {s : P} {f D : ℕ} (hf : 1 ≤ f)
   intro hA
   obtain ⟨p, hps⟩ := Fintype.exists_ne_of_one_lt_card (by omega) s
   have hall : ∀ x, x ≠ s → x = p := fun x hx => two_cases h2 hx hps
-  let Ra := quietRun (M := M) {s} (fun _ => a)
-  obtain ⟨w, Ta, hTa⟩ := hA.termination Ra (quietRun_valid (by simpa using hf) _)
-    quietRun_authValid p (by simp [Ra, quietRun, hps])
+  let Ra := Run.quiet (M := M) {s} (fun _ => a)
+  obtain ⟨w, Ta, hTa⟩ := hA.termination Ra (Run.quiet_valid (by simpa using hf) _)
+    Run.quiet_authValid p (by simp [Ra, Run.quiet, hps])
   obtain ⟨v, hvw⟩ : ∃ v, v ≠ w := by
     classical
     exact if h : a = w then ⟨b, fun e => hab (h.trans e.symm)⟩ else ⟨a, h⟩
   let I : P → V := Function.update (fun _ => a) s v
-  let Rb := quietRun (M := M) {p} I
-  obtain ⟨Tb, hTb⟩ := hA.validity Rb (quietRun_valid (by simpa using hf) _) quietRun_authValid
-    rfl (by simp [Rb, quietRun, hps.symm]) s (by simp [Rb, quietRun, hps.symm])
+  let Rb := Run.quiet (M := M) {p} I
+  obtain ⟨Tb, hTb⟩ := hA.validity Rb (Run.quiet_valid (by simpa using hf) _) Run.quiet_authValid
+    rfl (by simp [Rb, Run.quiet, hps.symm]) s (by simp [Rb, Run.quiet, hps.symm])
   let T := max Ta Tb
   let Rc : Run P M V :=
     { faulty := ∅, inp := I, gst := T + 1, byz := fun _ _ _ => []
@@ -106,26 +91,26 @@ theorem psyncBB_impossible_two {s : P} {f D : ℕ} (hf : 1 ≤ f)
     ⟨by simp [Rc], fun q τ r _ _ => by simp only [Rc]; split_ifs <;> omega,
       fun q τ r _ _ => by simp only [Rc]; split_ifs <;> omega⟩
   have hp : ∀ τ ≤ T, Rc.st A τ p = Ra.st A τ p :=
-    st_eq_view (by simp [Rc, I, Ra, quietRun, hps]) fun τ hτ hst q τ' hτ' => by
+    st_eq_view (by simp [Rc, I, Ra, Run.quiet, hps]) fun τ hτ hst q τ' hτ' => by
       by_cases hq : q = p
       · subst hq
-        exact dlv_self_eq (by simp [Rc]) (by simp [Ra, quietRun, hps]) (by simp [Rc]) rfl hτ' hst
+        exact dlv_self_eq (by simp [Rc]) (by simp [Ra, Run.quiet, hps]) (by simp [Rc]) rfl hτ' hst
       · have hqs : q = s := by by_contra h; exact hq (hall q h)
         subst hqs
         rw [Run.dlv_eq_nil_of_ne _ _ (by simp only [Rc, Ne.symm hps, ite_false]; omega)]
-        simp [Run.dlv, show Ra.out A q τ' p = [] from quietRun_out_faulty (mem_singleton_self _) _ _]
+        simp [Run.dlv, show Ra.out A q τ' p = [] from quiet_out_nil (mem_singleton_self _) _ _]
   have hs : ∀ τ ≤ T, Rc.st A τ s = Rb.st A τ s :=
-    st_eq_view (by simp [Rc, Rb, quietRun]) fun τ hτ hst q τ' hτ' => by
+    st_eq_view (by simp [Rc, Rb, Run.quiet]) fun τ hτ hst q τ' hτ' => by
       by_cases hq : q = s
       · subst hq
-        exact dlv_self_eq (by simp [Rc]) (by simp [Rb, quietRun, hps.symm]) (by simp [Rc]) rfl
+        exact dlv_self_eq (by simp [Rc]) (by simp [Rb, Run.quiet, hps.symm]) (by simp [Rc]) rfl
           hτ' hst
       · obtain rfl := hall q hq
         rw [Run.dlv_eq_nil_of_ne _ _ (by simp only [Rc, hps, ite_false]; omega)]
-        simp [Run.dlv, show Rb.out A q τ' s = [] from quietRun_out_faulty (mem_singleton_self _) _ _]
+        simp [Run.dlv, show Rb.out A q τ' s = [] from quiet_out_nil (mem_singleton_self _) _ _]
   refine hvw (hA.agreement Rc hRc (Run.authValid_of_canonical fun _ _ _ _ => rfl) s
     (by simp [Rc]) p (by simp [Rc]) v w ⟨Tb, ?_⟩ ⟨Ta, ?_⟩)
-  · rw [hs Tb (le_max_right _ _), hTb]; simp [Rb, quietRun, I]
+  · rw [hs Tb (le_max_right _ _), hTb]; simp [Rb, Run.quiet, I]
   · rw [hp Ta (le_max_left _ _)]; exact hTa
 
 /-- Partially synchronous BB is impossible for `n = 3` and `f ≥ 1`. -/
@@ -135,12 +120,12 @@ theorem psyncBB_impossible_three (hU : A.Unforging Au) {s : P} {f D : ℕ} (hf :
   obtain ⟨p, q, hpq, hps, hqs⟩ := exists_three s (by omega)
   have hall : ∀ x, x ≠ s → x ≠ p → x = q := fun x hxs hxp => three_cases h3 hps hqs hpq hxs hxp
   let I0 : P → V := fun _ => a
-  let R1 := quietRun (M := M) {q} I0
-  obtain ⟨T1, hT1⟩ := hA.validity R1 (quietRun_valid (by simpa using hf) _) quietRun_authValid
-    rfl (by simp [R1, quietRun, hqs.symm]) p (by simp [R1, quietRun, hpq])
-  let R2 := quietRun (M := M) {p} (Function.update I0 s b)
-  obtain ⟨T2, hT2⟩ := hA.validity R2 (quietRun_valid (by simpa using hf) _) quietRun_authValid
-    rfl (by simp [R2, quietRun, hps.symm]) q (by simp [R2, quietRun, hpq.symm])
+  let R1 := Run.quiet (M := M) {q} I0
+  obtain ⟨T1, hT1⟩ := hA.validity R1 (Run.quiet_valid (by simpa using hf) _) Run.quiet_authValid
+    rfl (by simp [R1, Run.quiet, hqs.symm]) p (by simp [R1, Run.quiet, hpq])
+  let R2 := Run.quiet (M := M) {p} (Function.update I0 s b)
+  obtain ⟨T2, hT2⟩ := hA.validity R2 (Run.quiet_valid (by simpa using hf) _) Run.quiet_authValid
+    rfl (by simp [R2, Run.quiet, hps.symm]) q (by simp [R2, Run.quiet, hpq.symm])
   let T := max T1 T2
   let R3 : Run P M V :=
     { faulty := {s}, inp := I0, gst := T + 1
@@ -155,29 +140,29 @@ theorem psyncBB_impossible_three (hU : A.Unforging Au) {s : P} {f D : ℕ} (hf :
     st_eq_view rfl fun τ hτ hst y τ' hτ' => by
       by_cases hyp : y = p
       · subst hyp
-        exact dlv_self_eq (by simp [R3, hps]) (by simp [R1, quietRun, hpq]) (by simp [R3]) rfl
+        exact dlv_self_eq (by simp [R3, hps]) (by simp [R1, Run.quiet, hpq]) (by simp [R3]) rfl
           hτ' hst
       by_cases hys : y = s
       · subst hys
         simp only [Run.dlv, Run.out_of_faulty A R3 hs3]
-        simp [R3, R1, quietRun, show τ' ≤ T by omega, hpq]
+        simp [R3, R1, Run.quiet, show τ' ≤ T by omega, hpq]
       · obtain rfl := hall y hys hyp
         rw [Run.dlv_eq_nil_of_ne _ _ (by simp only [R3, hys, hpq.symm, or_self, ite_false]; omega)]
-        simp [Run.dlv, R1, quietRun_out_faulty (show y ∈ ({y} : Finset P) from mem_singleton_self _)]
+        simp [Run.dlv, R1, quiet_out_nil (show y ∈ ({y} : Finset P) from mem_singleton_self _)]
   have hq3 : ∀ τ ≤ T, R3.st A τ q = R2.st A τ q :=
-    st_eq_view (by simp [R3, R2, quietRun, I0, hqs]) fun τ hτ hst y τ' hτ' => by
+    st_eq_view (by simp [R3, R2, Run.quiet, I0, hqs]) fun τ hτ hst y τ' hτ' => by
       by_cases hyq : y = q
       · subst hyq
-        exact dlv_self_eq (by simp [R3, hqs]) (by simp [R2, quietRun, hpq.symm]) (by simp [R3])
+        exact dlv_self_eq (by simp [R3, hqs]) (by simp [R2, Run.quiet, hpq.symm]) (by simp [R3])
           rfl hτ' hst
       by_cases hys : y = s
       · subst hys
         simp only [Run.dlv, Run.out_of_faulty A R3 hs3]
-        simp [R3, R2, quietRun, show τ' ≤ T by omega]
+        simp [R3, R2, Run.quiet, show τ' ≤ T by omega]
       · have hyp : y = p := by by_contra h; exact hyq (hall y hys h)
         subst hyp
         rw [Run.dlv_eq_nil_of_ne _ _ (by simp only [R3, hys, hpq, or_self, ite_false]; omega)]
-        simp [Run.dlv, R2, quietRun_out_faulty (show y ∈ ({y} : Finset P) from mem_singleton_self _)]
+        simp [Run.dlv, R2, quiet_out_nil (show y ∈ ({y} : Finset P) from mem_singleton_self _)]
   have hR3A : R3.AuthValid Au A := by
     intro y hy τ r _ m hm x hx
     obtain rfl : y = s := by simpa [R3] using hy
@@ -186,32 +171,32 @@ theorem psyncBB_impossible_three (hU : A.Unforging Au) {s : P} {f D : ℕ} (hf :
     · refine Run.tokens_replay hU (Ri := R2) (R' := R3) (T := T) (fun z σ r hσ => ?_) τ hτ y r m
         hm x hx
       by_cases hzs : z = y
-      · subst hzs; exact Or.inr (Or.inl ⟨hs3, by simp [R2, quietRun, hps.symm]⟩)
+      · subst hzs; exact Or.inr (Or.inl ⟨hs3, by simp [R2, Run.quiet, hps.symm]⟩)
       by_cases hzp : z = p
       · subst hzp
         refine Or.inr (Or.inr fun m hm => ?_)
-        rw [quietRun_out_faulty (mem_singleton_self _)] at hm; simp at hm
+        rw [quiet_out_nil (mem_singleton_self _)] at hm; simp at hm
       · obtain rfl := hall z hzs hzp
         refine Or.inl ⟨by simp [R3, hzs], ?_⟩
         rw [Run.out_of_correct A R3 (by simp [R3, hzs]),
-          Run.out_of_correct A R2 (by simp [R2, quietRun, hpq.symm]), hq3 σ hσ]
+          Run.out_of_correct A R2 (by simp [R2, Run.quiet, hpq.symm]), hq3 σ hσ]
     · refine Run.tokens_replay hU (Ri := R1) (R' := R3) (T := T) (fun z σ r hσ => ?_) τ hτ y r m
         hm x hx
       by_cases hzs : z = y
-      · subst hzs; exact Or.inr (Or.inl ⟨hs3, by simp [R1, quietRun, hqs.symm]⟩)
+      · subst hzs; exact Or.inr (Or.inl ⟨hs3, by simp [R1, Run.quiet, hqs.symm]⟩)
       by_cases hzp : z = p
       · subst hzp
         refine Or.inl ⟨by simp [R3, hzs], ?_⟩
         rw [Run.out_of_correct A R3 (by simp [R3, hzs]),
-          Run.out_of_correct A R1 (by simp [R1, quietRun, hpq]), hp3 σ hσ]
+          Run.out_of_correct A R1 (by simp [R1, Run.quiet, hpq]), hp3 σ hσ]
       · obtain rfl := hall z hzs hzp
         refine Or.inr (Or.inr fun m hm => ?_)
-        rw [quietRun_out_faulty (mem_singleton_self _)] at hm; simp at hm
+        rw [quiet_out_nil (mem_singleton_self _)] at hm; simp at hm
     · simp at hm
   refine hab (hA.agreement R3 hR3 hR3A p (by simp [R3, hps]) q (by simp [R3, hqs]) a b
     ⟨T1, ?_⟩ ⟨T2, ?_⟩)
   · rw [hp3 T1 (le_max_left _ _), hT1]; rfl
-  · rw [hq3 T2 (le_max_right _ _), hT2]; simp [R2, quietRun]
+  · rw [hq3 T2 (le_max_right _ _), hT2]; simp [R2, Run.quiet]
 
 /-- **Partially synchronous Byzantine broadcast is impossible for `n ∈ {2, 3}`** (with `f ≥ 1`,
 authenticated, any unforging algorithm, at least two values). -/

@@ -1,5 +1,6 @@
 import Papers.PODC2021.GoodCaseLatencyBB.Basic
-import Papers.PODC2021.FastByzantineConsensus.Executions
+import Podc.PartialSync.TwoStepLB
+import Podc.Foundations.Labelling
 
 /-!
 # Theorem 7: partially synchronous BB with `n ≤ 5f − 2` needs 3 rounds in the good case
@@ -7,11 +8,11 @@ import Papers.PODC2021.FastByzantineConsensus.Executions
 Abraham–Nayak–Ren–Xiang, PODC 2021, Section 4.2, Theorem 7 and Figure 4.
 
 The five executions of the paper are exactly the executions `ρ₁, …, ρ₅` of the lower bound of
-Kuznetsov–Tonkikh–Zhang (PODC 2021, Theorem 4.5, formalized in
-`Papers/PODC2021/FastByzantineConsensus/`), with the broadcaster in the role of the influential
+Kuznetsov–Tonkikh–Zhang (PODC 2021, Theorem 4.5), shared in the library module
+`Podc.PartialSync.TwoStepLB`, with the broadcaster in the role of the influential
 process `p` and the groups `B, C, A, D, E` of Figure 4 in the roles of `P₁, …, P₅`:
 
-| paper (Fig. 4) | here / FBC |
+| paper (Fig. 4) | here (`TwoStepLB`) |
 |---|---|
 | Execution 1 (`E` Byzantine, honest broadcaster sends `0`) | `ρ₅ = tsRun (I[s ↦ a]) E` |
 | Execution 3 (broadcaster and `A` Byzantine) | `ρ₃` |
@@ -19,9 +20,9 @@ process `p` and the groups `B, C, A, D, E` of Figure 4 in the roles of `P₁, �
 | Executions 4, 5 | mirror images (labels `i ↦ 6 - i`, values swapped) |
 
 We reuse the indistinguishability, validity and unforgeability lemmas proved there
-(`rho4_st_eq_rho5_P3`, `rho4_st_eq_rho3`, `rho4_valid`, `rho4_authValid`, `rho3_valid`,
-`rho3_authValid`); only the final step differs (here the decision of `ρ₅` is forced by the
-*validity* of broadcast instead of an influential-process argument).
+(`TwoStepLB.decision_eq`: by agreement in `ρ₄`, a decision in `ρ₃` equals a two-round decision in
+`ρ₅`); only the final step differs (here the decision of `ρ₅` is forced by the *validity* of
+broadcast instead of an influential-process argument).
 
 Two small deviations from the paper's executions (both harmless): in Execution 1 the Byzantine
 `E` also sends its round-0 messages to `A` (they are identical to those of an honest `E`, which
@@ -33,32 +34,9 @@ set_option linter.unusedSectionVars false
 
 namespace GoodCaseLatencyBB
 
-open Cslib.Byzantine.PartialSync Finset FastByzantineConsensus
+open Cslib.Byzantine.PartialSync Cslib.Byzantine.PartialSync.TwoStepLB Finset
 
 variable {P M S V K : Type*} [Fintype P] [DecidableEq P]
-
-/-- The core of Theorem 7 (one side): if a process `x3` of group `A` (label `3`) commits `v` within
-two rounds in Execution 1 (`ρ₅`), then every process of `B ∪ C ∪ E` (labels `1, 2, 5`) that
-commits in Execution 3 (`ρ₃`) commits `v`. -/
-theorem decision_eq_rho3 {A : Algorithm P M S V V} {Au : Auth P M K} {f D : ℕ} {g : P → ℕ}
-    {p : P} {I : P → V} {a b : V} {T5 F3 : Finset P} {J : P → V} {r3 : P → P → Option V}
-    (h : SideHyp g p I a b T5 F3 J r3) (hU : A.Unforging Au)
-    (hag : ∀ R : Run P M V, R.Valid f D → R.AuthValid Au A → ∀ x ∉ R.faulty, ∀ y ∉ R.faulty,
-      ∀ v w, R.Decides A x v → R.Decides A y w → v = w)
-    (hD : 0 < D) (hf : (F4 g).card ≤ f) {x3 : P} (hx3 : g x3 = 3) {v : V}
-    (h5 : ∃ τ ≤ 2 * D + 1, A.decide x3 ((tsRun A D (Function.update I p a) T5).st A τ x3) = some v)
-    {x1 : P} (hx1 : g x1 = 1 ∨ g x1 = 2 ∨ g x1 = 5) {w : V} (h3 : (rho3 A D F3 J r3).Decides A x1 w) :
-    v = w := by
-  obtain ⟨τ1, hτ1⟩ := h3
-  obtain ⟨τ5, hτ5, hd5⟩ := h5
-  have hx1F : x1 ∉ (rho4 A D g p I a b T5 (rho3 A D F3 J r3) τ1).faulty := fun hm => by
-    have := mem_F4.mp hm; omega
-  have hx3F : x3 ∉ (rho4 A D g p I a b T5 (rho3 A D F3 J r3) τ1).faulty := fun hm => by
-    have := mem_F4.mp hm; omega
-  refine hag _ (rho4_valid h hD τ1 hf) (rho4_authValid h hU hD τ1) x3 hx3F x1 hx1F v w
-    ⟨τ5, ?_⟩ ⟨τ1, ?_⟩
-  · rw [rho4_st_eq_rho5_P3 h hD τ1 hx3 τ5 hτ5]; exact hd5
-  · rw [rho4_st_eq_rho3 h hD τ1 τ1 le_rfl x1 (by simpa using hx1)]; exact hτ1
 
 /-- A labelling of the processes by groups: `0` = broadcaster, `3` = `A`, `1` = `B`, `5` = `E`,
 `2` = `C`, `4` = `D` (Figure 4), with `|A|, |C|, |D| ≤ f − 1`, `|B|, |E| ≤ f`, `A ≠ ∅ ≠ B`. -/
@@ -68,57 +46,20 @@ theorem exists_labels (s : P) {f : ℕ} (hf : 2 ≤ f) (h3 : 3 ≤ Fintype.card 
       (univ.filter fun q => g q = 3).card ≤ f - 1 ∧ (univ.filter fun q => g q = 2).card ≤ f - 1 ∧
       (univ.filter fun q => g q = 4).card ≤ f - 1 ∧ (univ.filter fun q => g q = 1).card ≤ f ∧
       (univ.filter fun q => g q = 5).card ≤ f ∧ (∃ x, g x = 3) ∧ (∃ x, g x = 1) := by
-  set n := Fintype.card P
-  let e := Fintype.equivFin P
-  let σ : Equiv.Perm (Fin n) := Equiv.swap (e s) ⟨0, by omega⟩
-  let ι : P → ℕ := fun q => (σ (e q)).val
-  have hι : Function.Injective ι := by
-    intro x y hxy
-    exact e.injective (σ.injective (Fin.ext hxy))
-  have hιs : ι s = 0 := by simp [ι, σ]
-  have hιs' : ∀ q, ι q = 0 → q = s := fun q hq => hι (by rw [hq, hιs])
-  have hιlt : ∀ q, ι q < n := fun q => (σ (e q)).isLt
-  have hsurj : ∀ i < n, ∃ q, ι q = i := by
-    intro i hi
-    refine ⟨e.symm (σ.symm ⟨i, hi⟩), ?_⟩
-    simp [ι]
-  set a1 := min (f - 1) (n - 2) with ha1
-  have ha1a : a1 ≤ f - 1 := min_le_left _ _
-  have ha1b : a1 ≤ n - 2 := min_le_right _ _
-  have ha1c : a1 = f - 1 ∨ a1 = n - 2 := by omega
-  let lab : ℕ → ℕ := fun i => if i = 0 then 0 else if i < 1 + a1 then 3 else if i < 1 + a1 + f
-    then 1 else if i < 1 + a1 + 2 * f then 5 else if i < 1 + a1 + 3 * f - 1 then 2 else 4
-  have hcard : ∀ (j l r : ℕ), (∀ i, lab i = j → i < n → l ≤ i ∧ i < r) →
-      (univ.filter fun q => lab (ι q) = j).card ≤ r - l := by
-    intro j l r hlr
-    calc (univ.filter fun q => lab (ι q) = j).card ≤ (Ico l r).card := by
-          refine card_le_card_of_injOn ι (fun q hq => ?_) hι.injOn
-          have := hlr _ (mem_filter.mp hq).2 (hιlt q)
-          simpa using this
-      _ = r - l := Nat.card_Ico l r
-  refine ⟨fun q => lab (ι q), ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · intro q
-    constructor
-    · intro h0
-      apply hιs'
-      simp only [lab] at h0
-      split_ifs at h0 <;> omega
-    · rintro rfl; simp [lab, hιs]
-  · intro q; simp only [lab]; split_ifs <;> omega
-  · refine (hcard 3 1 (1 + a1) fun i hi _ => ?_).trans (by omega)
-    simp only [lab] at hi; split_ifs at hi <;> omega
-  · refine (hcard 2 (1 + a1 + 2 * f) (1 + a1 + 3 * f - 1) fun i hi _ => ?_).trans (by omega)
-    simp only [lab] at hi; split_ifs at hi <;> omega
-  · refine (hcard 4 (1 + a1 + 3 * f - 1) n fun i hi hn' => ?_).trans (by omega)
-    simp only [lab] at hi; split_ifs at hi <;> omega
-  · refine (hcard 1 (1 + a1) (1 + a1 + f) fun i hi _ => ?_).trans (by omega)
-    simp only [lab] at hi; split_ifs at hi <;> omega
-  · refine (hcard 5 (1 + a1 + f) (1 + a1 + 2 * f) fun i hi _ => ?_).trans (by omega)
-    simp only [lab] at hi; split_ifs at hi <;> omega
-  · obtain ⟨q, hq⟩ := hsurj 1 (by omega)
-    exact ⟨q, by simp only [lab, hq]; split_ifs <;> omega⟩
-  · obtain ⟨q, hq⟩ := hsurj (1 + a1) (by omega)
-    exact ⟨q, by simp only [lab, hq]; split_ifs <;> omega⟩
+  obtain ⟨g, hs, hle, hc⟩ := Fintype.exists_labelling_apply_eq 6
+    (fun i => if i = 0 ∨ i = 1 ∨ i = 3 then 1 else 0)
+    (fun i => if i = 0 then 1 else if i = 1 ∨ i = 5 then f else f - 1)
+    (fun i _ => by split_ifs <;> omega) (by simp [sum_range_succ]; omega)
+    (by simp [sum_range_succ]; omega) s (i₀ := 0) (by omega) (by simp)
+  have hne : ∀ i, i = 1 ∨ i = 3 → ∃ x, g x = i := fun i hi => by
+    obtain ⟨x, -, hx⟩ := filter_nonempty_iff.1 (card_pos.1 (by
+      simpa [show i ≠ 0 by omega, hi] using (hc i (by omega)).1))
+    exact ⟨x, hx⟩
+  refine ⟨g, fun q => ⟨fun hq => ?_, fun h => h ▸ hs⟩, fun q => by have := hle q; omega,
+    by simpa using (hc 3 (by omega)).2, by simpa using (hc 2 (by omega)).2,
+    by simpa using (hc 4 (by omega)).2, by simpa using (hc 1 (by omega)).2,
+    by simpa using (hc 5 (by omega)).2, hne 3 (by omega), hne 1 (by omega)⟩
+  exact card_le_one.1 (by simpa using (hc 0 (by omega)).2) q (by simp [hq]) s (by simp [hs])
 
 /-- **Theorem 7 of [ANRX21].** A partially synchronous Byzantine broadcast protocol (authenticated,
 post-GST delay bound `D`) resilient to `f ≥ (n + 2) / 5` faults, i.e. `n ≤ 5f − 2`, does not have
@@ -210,8 +151,8 @@ theorem theorem_7 {A : Algorithm P M S V V} {Au : Auth P M K} (hU : A.Unforging 
   have h5 := good T5 a (hc5) (by simp [T5, hgs0]) (by simp [T5, hx3])
   have h1 := good T1 b (hc1) (by simp [T1, hgs0]) (by simp [T1, hx3])
   have hag := hA.agreement
-  have e1 : a = w := decision_eq_rho3 hside hU hag hD hF4 hx3 h5 (Or.inl hx1) hw
-  have e2 : b = w := decision_eq_rho3 hside' hU hag hD hF4' (by simp [g', hx3]) h1
+  have e1 : a = w := decision_eq hside hU hag hD hF4 hx3 h5 (Or.inl hx1) hw
+  have e2 : b = w := decision_eq hside' hU hag hD hF4' (by simp [g', hx3]) h1
     (x1 := x1) (by simp [g', hx1]) hw
   exact hab (e1.trans e2.symm)
 

@@ -215,20 +215,10 @@ theorem theorem_3_1_sync_false :
 /-! ### Sanity check: a silent Byzantine party -/
 
 /-- `P₂` Byzantine and silent, honest inputs `0` (`P₀`) and `1` (`P₁`), Boolean values. -/
-def silentB : Run (Fin 3) (OBC.Msg 3 Bool) Bool where
-  faulty := {2}
-  inp p := decide (p = 1)
-  gst := 0
-  byz _ _ _ := []
-  dl _ τ _ := τ
+def silentB : Run (Fin 3) (OBC.Msg 3 Bool) Bool := Run.quiet {2} fun p => decide (p = 1)
 
 /-- The same with real values. -/
-noncomputable def silent : Run (Fin 3) (OBC.Msg 3 ℝ) ℝ where
-  faulty := {2}
-  inp p := g (decide (p = 1))
-  gst := 0
-  byz _ _ _ := []
-  dl _ τ _ := τ
+noncomputable def silent : Run (Fin 3) (OBC.Msg 3 ℝ) ℝ := Run.quiet {2} fun p => g (decide (p = 1))
 
 theorem silentB_final : ∀ p ∈ ({0, 1} : Finset (Fin 3)),
     (silentB.st (OBC.alg 1 2) 6 p).phase = 3 ∧

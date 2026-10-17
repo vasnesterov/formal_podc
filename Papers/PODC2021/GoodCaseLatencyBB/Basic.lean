@@ -1,5 +1,5 @@
 import Cslib.Computability.Distributed.Byzantine.PartialSync.RoundOne
-import Cslib.Computability.Distributed.Byzantine.PartialSync.Sync
+import Podc.PartialSync.RunClasses
 
 /-!
 # Byzantine broadcast specifications and good-case latency
@@ -37,7 +37,7 @@ variable {P M S V K VI : Type*} [DecidableEq P]
 
 /-- `p` has committed some value by time `τ₀` (in its state at some time `≤ τ₀`). -/
 def CommitsBy (A : Algorithm P M S VI V) (R : Run P M VI) (p : P) (τ₀ : ℕ) : Prop :=
-  ∃ v, ∃ τ ≤ τ₀, A.decide p (R.st A τ p) = some v
+  ∃ v, R.DecidesBy A p v τ₀
 
 theorem CommitsBy.decides {A : Algorithm P M S VI V} {R : Run P M VI} {p : P} {τ₀ : ℕ}
     (h : CommitsBy A R p τ₀) : ∃ v, R.Decides A p v := by
@@ -45,7 +45,8 @@ theorem CommitsBy.decides {A : Algorithm P M S VI V} {R : Run P M VI} {p : P} {�
 
 /-- A **synchronous run with (effective) delay bound `d`**: at most `f` Byzantine processes, and
 every batch between correct processes sent at `τ` is processed by time `τ + d` (i.e. delivered at
-a time in `[τ, τ + d - 1]`). -/
+a time in `[τ, τ + d - 1]`). The GST is irrelevant. This is the library's `Run.SyncValid f (d - 1)`
+up to the GST (`syncValid_iff`), not the library notion itself. -/
 structure SyncValid (f d : ℕ) (R : Run P M V) : Prop where
   card_faulty : R.faulty.card ≤ f
   dl_ge : ∀ q τ p, q ∉ R.faulty → p ∉ R.faulty → τ ≤ R.dl q τ p
@@ -63,6 +64,25 @@ theorem SyncValid.valid {f d : ℕ} {R : Run P M V} (h : SyncValid f d R) : R.Va
     have := h.dl_lt q τ p hq hp
     have := le_max_left τ R.gst
     omega
+
+/-- Bridge to the library's synchronous runs (`Run.Valid` with `gst = 0`): with `gst = 0`,
+effective delay bound `δ + 1` is delay bound `δ`. -/
+theorem syncValid_iff {f δ : ℕ} {R : Run P M V} (h0 : R.gst = 0) :
+    SyncValid f (δ + 1) R ↔ R.SyncValid f δ := by
+  rw [Run.syncValid_iff_dl_le]
+  constructor
+  · intro h
+    exact ⟨h.card_faulty, fun q τ p hq hp => ⟨h.dl_ge q τ p hq hp, by
+      have := h.dl_lt q τ p hq hp; omega⟩, h0⟩
+  · rintro ⟨hc, hdl, -⟩
+    exact ⟨hc, fun q τ p hq hp => (hdl q τ p hq hp).1, fun q τ p hq hp => by
+      have := (hdl q τ p hq hp).2; omega⟩
+
+/-- A library-synchronous run with delay bound `δ` is synchronous with effective delay bound
+`δ + 1`. -/
+theorem SyncValid.of_syncValid {f δ : ℕ} {R : Run P M V} (h : R.SyncValid f δ) :
+    SyncValid f (δ + 1) R :=
+  (syncValid_iff h.gst_eq).2 h
 
 /-! ### Broadcast specifications (Definitions 2–4) -/
 
@@ -114,11 +134,13 @@ def LatencyWithin (Au : Auth P M K) (A : Algorithm P M S VI V) (s : P) (Adm : Se
 /-- Synchronous runs with at most `f` faults and (effective) delay bound `d`. -/
 def syncRuns (f d : ℕ) : Set (Run P M V) := {R | SyncValid f d R}
 
-/-- Asynchronous runs: every run of the model (any GST, any delay bound). -/
-def asyncRuns (f : ℕ) : Set (Run P M V) := {R | ∃ D, R.Valid f D}
+/-- Asynchronous runs: every run of the model (any GST, any delay bound): **bounded** asynchrony
+`Run.AsyncValidBounded f`, i.e. `∃ D, R.Valid f D` (not the unbounded `Run.AsyncValid f`). -/
+def asyncRuns (f : ℕ) : Set (Run P M V) := {R | R.AsyncValidBounded f}
 
-/-- Partially synchronous runs with `GST = 0` (the good case of Definition 7). -/
-def psyncGoodRuns (f D : ℕ) : Set (Run P M V) := {R | R.Valid f D ∧ R.gst = 0}
+/-- Partially synchronous runs with `GST = 0` (the good case of Definition 7), i.e. the library's
+synchronous runs `Run.SyncValid f D` (`R.Valid f D ∧ R.gst = 0`). -/
+def psyncGoodRuns (f D : ℕ) : Set (Run P M V) := {R | R.SyncValid f D}
 
 /-- **Good-case latency of `r` rounds under partial synchrony** (Definition 7): if the broadcaster
 is honest and `GST = 0`, every honest process commits within `r` rounds of length `D`. -/
