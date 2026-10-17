@@ -83,6 +83,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2015 | 13 | Lenzen, Rybicki, Suomela — *Towards Optimal Synchronous Counting* | [SynchronousCounting](Papers/PODC2015/SynchronousCounting) | ⚠️ Theorems 1 and 3 proved; Theorem 1 false in the boundary case n = 1; Lemma 3 relies on a cited impossibility (proved here for n ≥ 3); Theorem 2's constant not established |
 | 2024 | 12 | Civit, Gilbert, Guerraoui, Komatovic, Paramonov, Vidigueira — *All Byzantine Agreement Problems Are Expensive* | [AllBAExpensive](Papers/PODC2024/AllBAExpensive) | ⚠️ Proved; Lemma 10 / Theorem 4 (unauthenticated) false in the degenerate case n = 2, t = 1 |
 | 2020 | 12 | Sakavalas, Tseng, Vaidya — *Asynchronous Byzantine Approximate Consensus in Directed Networks* | [AsyncApproxBCDirected](Papers/PODC2020/AsyncApproxBCDirected) | ⚠️ Theorem 4 (solvable iff 3-reach) proved end to end (sufficiency with FIFO links); f-cover definitions inconsistent — read literally, no node ever updates (intent evident); (max − min)/2 typo; known input range missing from Thm 4; several proof gaps |
+| 2024 | 11 | Yu, Losa, Wang — *TetraBFT: Reducing Latency of Unauthenticated, Responsive BFT Consensus* | [TetraBFT](Papers/PODC2024/TetraBFT) | ❌ Agreement and validity proved in every run; **termination (Theorem 1) false**: the echo guard plus no retransmission allows a permanent post-GST view-change deadlock (n=7, f=2, reliable channels; n=4, f=1 with pre-GST loss); repaired echo rule proved to terminate; Lemma 7 proof claim false; proof gaps |
 | 2021 | 11 | Sela, Herlihy, Petrank — *Linearizability: A Typo* | [LinearizabilityTypo](Papers/PODC2021/LinearizabilityTypo) | ✅ Correct |
 | 2025 | 10 | Vacus, Ziccardi — *Minimalist Leader Election Under Weak Communication* | [MinimalistLE](Papers/PODC2025/MinimalistLE) | ⚠️ Theorems 2 (a.s. unique leader; O(D² log n) rounds w.h.p., new martingale proof) and 3 (p = 1/(D+1), O(D log n)) proved with explicit constants; Lemma 19 false for small D (K₂, P₃); proof gaps in Lemmas 14, 17 and the 'almost surely' claim |
 | 2024 | 10 | Tonkikh, Freitas — *Swiper: a new paradigm for efficient weighted distributed protocols* | [Swiper](Papers/PODC2024/Swiper) | ❌ Weight restriction/qualification proved; **Theorem 2.4 (weight separation) false** |
@@ -196,6 +197,13 @@ in the paper's `differencies.md`.
   stay at two votes and time out with different values. A one-line repair (keep sending pending votes for one more
   round) is proved. Algorithm 8 has a further gap, so Theorem 1.2 is not established. Lemma 3.1 / Corollary 3.2 are
   off by one iteration (f = 2). The headline early-stopping results (Theorems 1.1, 2.9) hold.
+- **TetraBFT: Reducing Latency of Unauthenticated, Responsive BFT Consensus** (PODC 2024, 11 citations) —
+  [TetraBFT](Papers/PODC2024/TetraBFT). Termination (Theorem 1) is false for the protocol as specified. A node echoes a
+  view-change only if it has not sent one "for v′ or any higher view", timers are set once per view and nothing is
+  retransmitted; so after GST the correct nodes can stay split between two views forever (n = 7, f = 2, reliable
+  channels, any timeout including 8δ+9; and n = 4, f = 1 in the paper's model with pre-GST message loss). The authors'
+  TLA+/Apalache check covered n = 4 and omits one clause of Rule 3. Agreement and validity hold in every run, and a
+  repaired echo rule is proved to terminate.
 - **Swiper** (PODC 2024, 10 citations) — [Swiper](Papers/PODC2024/Swiper). Theorem 2.4 (the upper bound
   (α+β)(1−α)/(β−α)·n on the number of tickets for weight separation) is false: a 21-party instance needs 63
   tickets against a bound of 59.85, and on a family of instances the optimum exceeds the bound by an unbounded
