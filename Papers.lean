@@ -828,6 +828,16 @@ import Papers.PODC2016.ConcurrentDSU.Examples
 import Papers.PODC2016.ConcurrentDSU.EarlyTerm
 import Papers.PODC2016.ConcurrentDSU.Lemma42
 import Papers.PODC2016.ConcurrentDSU.UnionForest
+import Papers.PODC2026.ConsistentRefereeing.Defs
+import Papers.PODC2026.ConsistentRefereeing.OneShot
+import Papers.PODC2026.ConsistentRefereeing.Critical
+import Papers.PODC2026.ConsistentRefereeing.Cases
+import Papers.PODC2026.ConsistentRefereeing.CaseStack
+import Papers.PODC2026.ConsistentRefereeing.Contest
+import Papers.PODC2026.ConsistentRefereeing.Window
+import Papers.PODC2026.ConsistentRefereeing.Queue
+import Papers.PODC2026.ConsistentRefereeing.QueueCor
+import Papers.PODC2026.ConsistentRefereeing.ReadWrite
 import Papers.PODC2026.LocalComputable.CompList
 import Papers.PODC2026.LocalComputable.Basic
 import Papers.PODC2026.LocalComputable.ComputableEquiv
@@ -839,3 +849,9 @@ import Papers.PODC2026.LocalComputable.Padding
 import Papers.PODC2026.LocalComputable.Separation
 import Papers.PODC2026.LocalComputable.SeparationToy
 import Papers.PODC2026.LocalComputable.ConcreteComputable
+import Papers.PODC2026.ConsistentRefereeing.LongLivedBasic
+import Papers.PODC2026.ConsistentRefereeing.LongLivedValency
+import Papers.PODC2026.ConsistentRefereeing.LongLivedSteps
+import Papers.PODC2026.ConsistentRefereeing.LongLivedLemmas
+import Papers.PODC2026.ConsistentRefereeing.LongLivedMain
+import Papers.PODC2026.ConsistentRefereeing.LongLivedPossible
