@@ -1,4 +1,5 @@
 import Papers.PODC2026.ConsistentRefereeing.Critical
+import Podc.SharedMemory.ObjClasses.Basic
 
 /-!
 # Theorem 5: the cases of the critical step

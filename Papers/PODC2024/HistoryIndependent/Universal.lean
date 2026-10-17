@@ -1,4 +1,6 @@
-import Papers.PODC2024.HistoryIndependent.UniversalRLLSC
+import Podc.SharedMemory.Objects.LLSC
+import Cslib.Computability.Distributed.SharedMemory.Model
+import Mathlib
 
 /-!
 # Algorithm 5: a universal implementation from R-LLSC objects

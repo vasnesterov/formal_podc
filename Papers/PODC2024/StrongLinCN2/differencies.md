@@ -90,7 +90,7 @@ repairable)** / **under-specified definition** / **typo** / **modelling choice**
   access. Local computation is folded into the transitions, and returning is a separate step. There are no
   explicit crashes: a crashed process simply takes no more steps, and strong linearizability is a property
   of finite executions.
-* **Strong linearizability** (`Podc/StrongLin/Basic.lean`) is the Golab–Higham–Woelfel definition: a
+* **Strong linearizability** (`Podc/SharedMemory/StrongLin/Basic.lean`) is the Golab–Higham–Woelfel definition: a
   linearization function on finite executions with `α ≤ β ⇒ h α ≤ h β`. A label list determines the
   execution, so `h` may depend on internal steps. For nondeterministic specifications (the set,
   `k`-out-of-order queues), linearizations carry the responses of their operations, pending ones included

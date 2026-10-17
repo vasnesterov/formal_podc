@@ -14,8 +14,10 @@ Small additions to CSLib's `History.lean`, used by many invariant-based proofs:
   (if any), otherwise of its next one; it has not completed (`not_completed_curOp`); with
   `@[simp]` lemmas for appending labels;
 * `opOf_append_of_eq_some`, `respOf_append_of_eq_some` — the operation/response of an instance
-  does not change when the execution is extended; `respOf_append_of_not_ret` — nor when a label
-  other than a response is appended;
+  does not change when the execution is extended;
+* `opsOf_concat`, `respsOf_concat` and their `_of_ne` versions — the operations and responses
+  of a process after appending one label;
+* `opsOf_prefix`, `respsOf_prefix` — operations and responses grow along prefixes;
 * `linState_append`, `linState_concat` — the abstract state after a concatenation of
   sequential histories.
 -/
@@ -104,13 +106,62 @@ lemma respOf_append_of_eq_some {α : List (Label P A)} {x : OpId P} {r : A.Resp}
     (h : respOf α x = some r) (β : List (Label P A)) : respOf (α ++ β) x = some r := by
   rw [respOf_append_of_completed (Completed.of_respOf_eq_some h), h]
 
+/-! ### Operations and responses after appending one label -/
+
+/-- The operations of `p` after appending `ℓ`: those before, plus `ℓ`'s invocation by `p`. -/
+lemma opsOf_concat (α : List (Label P A)) (ℓ : Label P A) (p : P) :
+    opsOf (α ++ [ℓ]) p = opsOf α p ++ (ℓ.invOf p).toList := by
+  rw [opsOf_append]; cases h : ℓ.invOf p <;> simp [opsOf, h]
+
+/-- The responses of `p` after appending `ℓ`: those before, plus `ℓ`'s response to `p`. -/
+lemma respsOf_concat (α : List (Label P A)) (ℓ : Label P A) (p : P) :
+    respsOf (α ++ [ℓ]) p = respsOf α p ++ (ℓ.retOf p).toList := by
+  rw [respsOf_append]; cases h : ℓ.retOf p <;> simp [respsOf, h]
+
+/-- Appending a label that is not an invocation of `q` does not change `q`'s operations. -/
+lemma opsOf_concat_of_ne {α : List (Label P A)} {ℓ : Label P A} {q : P}
+    (hℓ : ∀ o, ℓ ≠ .inv q o) : opsOf (α ++ [ℓ]) q = opsOf α q := by
+  cases ℓ with
+  | inv q' o =>
+    have : q' ≠ q := fun h => hℓ o (by rw [h])
+    simp [this]
+  | _ => simp
+
+/-- Appending a label that is not a response of `q` does not change `q`'s responses. -/
+lemma respsOf_concat_of_ne {α : List (Label P A)} {ℓ : Label P A} {q : P}
+    (hℓ : ∀ r, ℓ ≠ .ret q r) : respsOf (α ++ [ℓ]) q = respsOf α q := by
+  cases ℓ with
+  | ret q' r =>
+    have : q' ≠ q := fun h => hℓ r (by rw [h])
+    simp [this]
+  | _ => simp
+
+/-- Appending a label that is not an invocation of `x.1` does not change the operation of `x`. -/
+lemma opOf_concat_of_ne {α : List (Label P A)} {ℓ : Label P A} {x : OpId P}
+    (hℓ : ∀ o, ℓ ≠ .inv x.1 o) : opOf (α ++ [ℓ]) x = opOf α x := by
+  simp only [opOf, opsOf_concat_of_ne hℓ]
+
+/-- Appending a label that is not a response of `x.1` does not change the response of `x`. -/
+lemma respOf_concat_of_ne {α : List (Label P A)} {ℓ : Label P A} {x : OpId P}
+    (hℓ : ∀ r, ℓ ≠ .ret x.1 r) : respOf (α ++ [ℓ]) x = respOf α x := by
+  simp only [respOf, respsOf_concat_of_ne hℓ]
+
 /-- Appending a label that is not a response does not change the responses of instances. -/
 lemma respOf_append_of_not_ret {α : List (Label P A)} {ℓ : Label P A}
-    (hℓ : ∀ p r, ℓ ≠ .ret p r) (x : OpId P) : respOf (α ++ [ℓ]) x = respOf α x := by
-  cases ℓ with
-  | ret p r => exact absurd rfl (hℓ p r)
-  | inv p o => simp [respOf]
-  | tau p => simp [respOf]
+    (hℓ : ∀ p r, ℓ ≠ .ret p r) (x : OpId P) : respOf (α ++ [ℓ]) x = respOf α x :=
+  respOf_concat_of_ne fun r => hℓ x.1 r
+
+/-! ### Prefixes -/
+
+/-- The operations of a process along a prefix form a prefix. -/
+lemma opsOf_prefix {α β : List (Label P A)} (h : α <+: β) (p : P) :
+    opsOf α p <+: opsOf β p := by
+  obtain ⟨u, rfl⟩ := h; rw [opsOf_append]; exact List.prefix_append _ _
+
+/-- The responses of a process along a prefix form a prefix. -/
+lemma respsOf_prefix {α β : List (Label P A)} (h : α <+: β) (p : P) :
+    respsOf α p <+: respsOf β p := by
+  obtain ⟨u, rfl⟩ := h; rw [respsOf_append]; exact List.prefix_append _ _
 
 end Cslib.SharedMemory
 

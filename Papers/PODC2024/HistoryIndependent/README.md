@@ -87,4 +87,8 @@ interleaving of `∥`.
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: `register_tight` gives a wait-free, perfectly HI register, and the algorithms themselves are concrete
 instances of the definitions. The shared-memory model (histories, linearizability, progress, HI, the SWSR
-reads-from criterion) is in CSLib, `Cslib/Computability/Distributed/SharedMemory/`.
+reads-from criterion) is in CSLib, `Cslib/Computability/Distributed/SharedMemory/`. Shared project library
+(`Podc/SharedMemory/`): the R-LLSC object `rllsc` (`Objects/LLSC.lean`; the CAS objects are CSLib's
+`casObject`), run induction and linearization-function choice (`Run.lean`), responses in sequential histories
+`ObjSpec.respIn` (`LinResp.lean`), history lemmas (`History.lean`), potential arguments for wait-/lock-freedom
+(`Potential.lean`, `Podc/Algebra/BigOperators/Update.lean`) and solo runs (`Solo.lean`).

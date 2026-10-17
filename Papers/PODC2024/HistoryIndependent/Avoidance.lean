@@ -1,5 +1,6 @@
 import Cslib.Computability.Distributed.SharedMemory.Linearization
 import Cslib.Computability.Distributed.SharedMemory.Progress
+import Podc.SharedMemory.History
 import Mathlib.Data.Finite.Card
 import Mathlib
 
@@ -278,14 +279,6 @@ lemma Good.ret_resp {E : List (Label P A)} {i cur : Fin N} {lr : L}
   obtain ⟨a, ha, hra⟩ := havoid j hj1 hj2
   exact ⟨a, ha, hx.trans hra⟩
 
-lemma opsOf_length_le_of_prefix {α β : List (Label P A)} (h : α <+: β) (p : P) :
-    (opsOf α p).length ≤ (opsOf β p).length :=
-  (h.sublist.filterMap _).length_le
-
-lemma respsOf_length_le_of_prefix {α β : List (Label P A)} (h : α <+: β) (p : P) :
-    (respsOf α p).length ≤ (respsOf β p).length :=
-  (h.sublist.filterMap _).length_le
-
 variable (D I c r)
 
 /-- **Avoidance lower bound** (core of Theorems 17 and 20). If every base object has fewer than
@@ -403,9 +396,9 @@ theorem not_waitFree_stateQuiescentHI (hN : 2 ≤ N) (hcr : c ≠ r) (hr : I.all
       rw [prefix_iff_eq_take] at h0 ⊢
       rw [take_take, Nat.min_eq_left hm]; exact h0
     have hpre2 : (F m).take m <+: F m := take_prefix _ _
-    have h1 := opsOf_length_le_of_prefix hpre1 r
-    have h2 := opsOf_length_le_of_prefix hpre2 r
-    have h3 := respsOf_length_le_of_prefix hpre2 r
+    have h1 := (opsOf_prefix hpre1 r).length_le
+    have h2 := (opsOf_prefix hpre2 r).length_le
+    have h3 := (respsOf_prefix hpre2 r).length_le
     rw [(hFgood 0).opsr] at h1
     rw [(hFgood m).opsr] at h2
     rw [(hFgood m).respsr] at h3

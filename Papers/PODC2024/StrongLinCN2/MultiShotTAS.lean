@@ -1,6 +1,7 @@
-import Podc.StrongLin.Basic
-import Podc.SharedMemory.Objects
+import Podc.SharedMemory.Objects.MaxRegister
+import Podc.SharedMemory.Objects.TestAndSet
 import Podc.SharedMemory.Potential
+import Podc.SharedMemory.StrongLin.Basic
 
 /-!
 # Readable multi-shot test&set from a max register and readable test&set (Theorem 6)
@@ -98,38 +99,7 @@ def tsSet : MTASOp → Bool → Bool
 lemma δ_tsOp (b : Bool) (o : MTASOp) : rtasObj.δ b (tsOp o) = (tsSet o b, b) := by
   cases o <;> rfl
 
-lemma linState_append_single (Lin : List (OpId P × mtasObj.Op)) (x : OpId P) (o : MTASOp) :
-    linState (Lin ++ [(x, o)]) = (mtasObj.δ (linState Lin) o).1 := by
-  rw [linState, List.map_append, ObjSpec.runOps_append]; rfl
-
--- CSLib candidate (with `runOps_const`)
-/-- Operations that keep the state `q` and return `r` can be linearized in any number. -/
-lemma linRespFrom_const {A : ObjSpec} (x : OpId P) (q : A.State) (r : A.Resp)
-    (l L' : List (OpId P × A.Op)) (hl : ∀ y ∈ l, A.δ q y.2 = (q, r))
-    (hx : x ∈ l.map Prod.fst) : linRespFrom A x q (l ++ L') = some r := by
-  induction l with
-  | nil => simp at hx
-  | cons y l ih =>
-    obtain ⟨y, o⟩ := y
-    have hy := hl (y, o) (by simp)
-    simp only [List.cons_append, linRespFrom, hy]
-    split_ifs with h
-    · rfl
-    · simp only [List.map_cons, List.mem_cons] at hx
-      exact ih (fun z hz => hl z (by simp [hz])) (hx.resolve_left (Ne.symm h))
-
-lemma runOps_const {A : ObjSpec} (q : A.State) (r : A.Resp) (l : List (OpId P × A.Op))
-    (hl : ∀ y ∈ l, A.δ q y.2 = (q, r)) : A.runOps q (l.map Prod.snd) = q := by
-  induction l with
-  | nil => rfl
-  | cons y l ih =>
-    simp only [List.map_cons, ObjSpec.runOps_cons, hl y (by simp)]
-    exact ih (fun z hz => hl z (by simp [hz]))
-
 /-! ## The simulation invariant -/
-
-/-- The current instance of `p`. -/
-abbrev cur (α : List (Label P mtasObj)) (p : P) : OpId P := (p, (respsOf α p).length)
 
 /-- Status of a process. `V = curr`; operations that read an older value `c < V` from `curr`
 are already linearized (at `e_c`), with the response they get in state `1` (`true`). -/
@@ -137,15 +107,15 @@ def St (α : List (Label P mtasObj)) (C : Config mtasObj B P Loc)
     (Lin : List (OpId P × mtasObj.Op)) (p : P) : Prop :=
   match C.loc p with
   | .idle => C.pend p = none
-  | .start o => C.pend p = some o ∧ cur α p ∉ Lin.map Prod.fst ∧ opOf α (cur α p) = some o
-  | .acc o c => C.pend p = some o ∧ opOf α (cur α p) = some o ∧ 1 ≤ c ∧ c ≤ C.mem .curr ∧
-      (c = C.mem .curr → cur α p ∉ Lin.map Prod.fst) ∧
-      (c < C.mem .curr → linResp Lin (cur α p) = some (mtasObj.δ true o).2)
-  | .wr c => C.pend p = some .reset ∧ opOf α (cur α p) = some .reset ∧ 1 ≤ c ∧
+  | .start o => C.pend p = some o ∧ curOp α p ∉ Lin.map Prod.fst ∧ opOf α (curOp α p) = some o
+  | .acc o c => C.pend p = some o ∧ opOf α (curOp α p) = some o ∧ 1 ≤ c ∧ c ≤ C.mem .curr ∧
+      (c = C.mem .curr → curOp α p ∉ Lin.map Prod.fst) ∧
+      (c < C.mem .curr → mtasObj.respIn mtasObj.init Lin (curOp α p) = some (mtasObj.δ true o).2)
+  | .wr c => C.pend p = some .reset ∧ opOf α (curOp α p) = some .reset ∧ 1 ≤ c ∧
       c ≤ C.mem .curr ∧ C.mem (.ts c) = true ∧
-      (c = C.mem .curr → cur α p ∉ Lin.map Prod.fst) ∧
-      (c < C.mem .curr → linResp Lin (cur α p) = some false)
-  | .retv b => C.pend p ≠ none ∧ linResp Lin (cur α p) = some b
+      (c = C.mem .curr → curOp α p ∉ Lin.map Prod.fst) ∧
+      (c < C.mem .curr → mtasObj.respIn mtasObj.init Lin (curOp α p) = some false)
+  | .retv b => C.pend p ≠ none ∧ mtasObj.respIn mtasObj.init Lin (curOp α p) = some b
 
 /-- The simulation invariant: the abstract state is `TS[curr]`; the entries below `curr` are set,
 those above are unset. -/
@@ -158,25 +128,6 @@ structure Inv (α : List (Label P mtasObj)) (C : Config mtasObj B P Loc)
   above : ∀ c : ℕ, C.mem .curr < c → C.mem (.ts c) = false
   st : ∀ p, St α C Lin p
 
-lemma cur_append_inv (α : List (Label P mtasObj)) (p q : P) (o : mtasObj.Op) :
-    cur (α ++ [.inv p o]) q = cur α q := by simp [cur, respsOf_append]
-
-lemma cur_append_tau (α : List (Label P mtasObj)) (p q : P) :
-    cur (α ++ [.tau p]) q = cur α q := by simp [cur, respsOf_append]
-
-lemma cur_append_ret_of_ne (α : List (Label P mtasObj)) {p q : P} (r : Bool) (h : p ≠ q) :
-    cur (α ++ [.ret p r]) q = cur α q := by simp [cur, respsOf_append, h]
-
-lemma opOf_append_of_opOf {α : List (Label P mtasObj)} {x : OpId P} {o : mtasObj.Op}
-    (ℓ : Label P mtasObj) (h : opOf α x = some o) : opOf (α ++ [ℓ]) x = some o := by
-  have hinv : Invoked α x := by simp only [opOf] at h; exact (List.getElem?_eq_some_iff.1 h).1
-  rw [opOf_append_of_invoked hinv, h]
-
-lemma linResp_append_of_some {Lin : List (OpId P × mtasObj.Op)} {x : OpId P} {b : Bool}
-    (M : List (OpId P × mtasObj.Op)) (h : linResp Lin x = some b) :
-    linResp (Lin ++ M) x = some b := by
-  rw [linResp_append_of_mem _ (linResp_isSome_iff.1 (by rw [h]; rfl)), h]
-
 lemma not_mem_append {Lin M : List (OpId P × mtasObj.Op)} {x : OpId P}
     (h1 : x ∉ Lin.map Prod.fst) (h2 : x ∉ M.map Prod.fst) : x ∉ (Lin ++ M).map Prod.fst := by
   simp only [List.map_append, List.mem_append, not_or]; exact ⟨h1, h2⟩
@@ -186,9 +137,9 @@ when the linearization is extended without it, `curr` does not change and no `TS
 unset. -/
 lemma St.transfer {α α' : List (Label P mtasObj)} {C C' : Config mtasObj B P Loc}
     {Lin M : List (OpId P × mtasObj.Op)} {q : P} (h : St α C Lin q)
-    (hloc : C'.loc q = C.loc q) (hpend : C'.pend q = C.pend q) (hcur : cur α' q = cur α q)
-    (hop : ∀ o, opOf α (cur α q) = some o → opOf α' (cur α q) = some o)
-    (hM : cur α q ∉ M.map Prod.fst) (hV : C'.mem .curr = C.mem .curr)
+    (hloc : C'.loc q = C.loc q) (hpend : C'.pend q = C.pend q) (hcur : curOp α' q = curOp α q)
+    (hop : ∀ o, opOf α (curOp α q) = some o → opOf α' (curOp α q) = some o)
+    (hM : curOp α q ∉ M.map Prod.fst) (hV : C'.mem .curr = C.mem .curr)
     (hts : ∀ c, C.mem (.ts c) = true → C'.mem (.ts c) = true) :
     St α' C' (Lin ++ M) q := by
   unfold St at h ⊢
@@ -198,11 +149,11 @@ lemma St.transfer {α α' : List (Label P mtasObj)} {C C' : Config mtasObj B P L
   · exact ⟨h.1, not_mem_append h.2.1 hM, hop _ h.2.2⟩
   · obtain ⟨h1, h2, h3, h4, h5, h6⟩ := h
     exact ⟨h1, hop _ h2, h3, h4, fun e => not_mem_append (h5 e) hM,
-      fun e => linResp_append_of_some _ (h6 e)⟩
+      fun e => ObjSpec.respIn_append_of_eq_some (h6 e) _⟩
   · obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := h
     exact ⟨h1, hop _ h2, h3, h4, hts _ h5, fun e => not_mem_append (h6 e) hM,
-      fun e => linResp_append_of_some _ (h7 e)⟩
-  · exact ⟨h.1, linResp_append_of_some _ h.2⟩
+      fun e => ObjSpec.respIn_append_of_eq_some (h7 e) _⟩
+  · exact ⟨h.1, ObjSpec.respIn_append_of_eq_some h.2 _⟩
 
 /-! ## The operations linearized at `e_v` -/
 
@@ -252,11 +203,11 @@ lemma linSim [Fintype P] : (impl P).LinSim Inv where
         rcases hcnt p with ⟨-, h1⟩ | ⟨h1, -⟩
         · exact h1
         · exact absurd h0 h1
-      have hnot : cur α p ∉ Lin.map Prod.fst := by
+      have hnot : curOp α p ∉ Lin.map Prod.fst := by
         intro hm
         have := hI.lin.invoked_of_mem hm
         simp [Invoked] at this; omega
-      have hop : opOf (α ++ [.inv p o]) (cur α p) = some o := by
+      have hop : opOf (α ++ [.inv p o]) (curOp α p) = some o := by
         simp [opOf, opsOf_append, ← hlen]
       refine ⟨[], ?_⟩
       rw [List.append_nil]
@@ -265,11 +216,11 @@ lemma linSim [Fintype P] : (impl P).LinSim Inv where
       by_cases hq : q = p
       · subst hq
         unfold St
-        rw [hloc, Function.update_self, hpend, Function.update_self, cur_append_inv]
+        rw [hloc, Function.update_self, hpend, Function.update_self, curOp_append_inv]
         exact ⟨rfl, hnot, hop⟩
       · simpa using (hI.st q).transfer (α' := α ++ [.inv p o]) (C' := C') (M := [])
           (by rw [hloc, Function.update_of_ne hq]) (by rw [hpend, Function.update_of_ne hq])
-          (cur_append_inv _ _ _ _) (fun o' h => opOf_append_of_opOf _ h) (by simp)
+          (curOp_append_inv _ _ _ _) (fun _ h => opOf_append_of_eq_some h _) (by simp)
           (by rw [hmem]) (fun c h => by rw [hmem]; exact h)
     | tau p =>
       obtain ⟨h0, hpend, i, o, k, hact, hmem, hloc⟩ := Impl.step_tau hstep
@@ -301,11 +252,11 @@ lemma linSim [Fintype P] : (impl P).LinSim Inv where
         by_cases hq : q = p
         · subst hq
           unfold St
-          rw [hlocp, hpend, cur_append_tau, hmem']
-          exact ⟨hp1, opOf_append_of_opOf _ hp3, hI.one, le_rfl, fun _ => hp2,
+          rw [hlocp, hpend, curOp_append_tau, hmem']
+          exact ⟨hp1, opOf_append_of_eq_some hp3 _, hI.one, le_rfl, fun _ => hp2,
             fun h => absurd h (lt_irrefl _)⟩
         · simpa using (hI.st q).transfer (M := []) (hlocq q hq) (hpendq q)
-            (cur_append_tau _ _ _) (fun o' h => opOf_append_of_opOf _ h) (by simp)
+            (curOp_append_tau _ _ _) (fun _ h => opOf_append_of_eq_some h _) (by simp)
             (by rw [hmem']) (fun c h => by rw [hmem']; exact h)
       | acc o' c =>
         -- access to `TS[c]`
@@ -317,7 +268,7 @@ lemma linSim [Fintype P] : (impl P).LinSim Inv where
         subst hk'
         unfold St at hst; rw [hl] at hst
         obtain ⟨hp1, hp3, hc1, hcV, hpeq, hplt⟩ := hst
-        have hnc : ¬ Completed α (cur α p) := by simp [Completed]
+        have hnc : ¬ Completed α (curOp α p) := by simp [Completed]
         have hδ : (B (.ts c)).δ (C.mem (.ts c)) (tsOp o') =
             (tsSet o' (C.mem (.ts c)), C.mem (.ts c)) := δ_tsOp _ _
         rw [hδ] at hmem hloc
@@ -345,16 +296,16 @@ lemma linSim [Fintype P] : (impl P).LinSim Inv where
           by_cases hq : q = p
           · subst hq
             unfold St
-            rw [hlocp, hpend, cur_append_tau, hmem', hTS]
+            rw [hlocp, hpend, curOp_append_tau, hmem', hTS]
             have hr := hplt hlt
             cases o' with
             | tas => exact ⟨by rw [hp1]; simp, hr⟩
             | read => exact ⟨by rw [hp1]; simp, hr⟩
             | reset =>
-              exact ⟨hp1, opOf_append_of_opOf _ hp3, hc1, hcV, hTS,
+              exact ⟨hp1, opOf_append_of_eq_some hp3 _, hc1, hcV, hTS,
                 fun h => absurd h (Nat.ne_of_lt hlt), fun _ => hr⟩
           · simpa using (hI.st q).transfer (M := []) (hlocq q hq) (hpendq q)
-              (cur_append_tau _ _ _) (fun o' h => opOf_append_of_opOf _ h) (by simp)
+              (curOp_append_tau _ _ _) (fun _ h => opOf_append_of_eq_some h _) (by simp)
               (by rw [hmem']) (fun c h => by rw [hmem']; exact h)
         · -- the current value
           subst heq
@@ -364,34 +315,34 @@ lemma linSim [Fintype P] : (impl P).LinSim Inv where
           have hothers : ∀ (M : List (OpId P × mtasObj.Op)), (∀ y ∈ M.map Prod.fst, y.1 = p) →
               ∀ q, q ≠ p → St (α ++ [.tau p]) C' (Lin ++ M) q := by
             intro M hM q hq
-            exact (hI.st q).transfer (hlocq q hq) (hpendq q) (cur_append_tau _ _ _)
-              (fun o' h => opOf_append_of_opOf _ h) (fun h => hq (hM _ h)) hV hts
+            exact (hI.st q).transfer (hlocq q hq) (hpendq q) (curOp_append_tau _ _ _)
+              (fun _ h => opOf_append_of_eq_some h _) (fun h => hq (hM _ h)) hV hts
           cases o' with
           | tas =>
             have hTS' : C'.mem (.ts V) = true := by rw [hmem, Function.update_self]; rfl
-            refine ⟨[(cur α p, .tas)], (hI.lin.push hp3 hp2 hnc).append_tau p,
+            refine ⟨[(curOp α p, .tas)], (hI.lin.push hp3 hp2 hnc).append_tau p,
               (by rw [hV]; exact hI.one), ?_, ?_, ?_, fun q => ?_⟩
-            · rw [linState_append_single, hV, hTS']
+            · rw [linState_concat, hV, hTS']
             · intro c' h1 h2; rw [hV] at h2; rw [hmts c' (Nat.ne_of_lt h2)]; exact hI.below c' h1 h2
             · intro c' h; rw [hV] at h; rw [hmts c' (Nat.ne_of_gt h)]; exact hI.above c' h
             · by_cases hq : q = p
               · subst hq
                 unfold St
-                rw [hlocp, hpend, cur_append_tau, linResp_append_singleton_self _ hp2]
-                exact ⟨by rw [hp1]; simp, by rw [← hb]⟩
+                rw [hlocp, hpend, curOp_append_tau, ObjSpec.respIn_concat_self hp2]
+                exact ⟨by rw [hp1]; simp, congrArg some hb⟩
               · exact hothers _ (by simp) q hq
           | read =>
             have hmem' : C'.mem = C.mem := by
               rw [hmem]; exact Function.update_eq_self _ _
-            refine ⟨[(cur α p, .read)], (hI.lin.push hp3 hp2 hnc).append_tau p,
+            refine ⟨[(curOp α p, .read)], (hI.lin.push hp3 hp2 hnc).append_tau p,
               (by rw [hmem']; exact hI.one), ?_, (by rw [hmem']; exact hI.below),
               (by rw [hmem']; exact hI.above), fun q => ?_⟩
-            · rw [linState_append_single, hmem']; exact hI.abs
+            · rw [linState_concat, hmem']; exact hI.abs
             · by_cases hq : q = p
               · subst hq
                 unfold St
-                rw [hlocp, hpend, cur_append_tau, linResp_append_singleton_self _ hp2]
-                exact ⟨by rw [hp1]; simp, by rw [← hb]⟩
+                rw [hlocp, hpend, curOp_append_tau, ObjSpec.respIn_concat_self hp2]
+                exact ⟨by rw [hp1]; simp, congrArg some hb⟩
               · exact hothers _ (by simp) q hq
           | reset =>
             have hmem' : C'.mem = C.mem := by
@@ -407,20 +358,20 @@ lemma linSim [Fintype P] : (impl P).LinSim Inv where
               by_cases hq : q = p
               · subst hq
                 unfold St
-                rw [hlocp, hpend, cur_append_tau, hmem', hTS]
-                exact ⟨hp1, opOf_append_of_opOf _ hp3, hc1, le_rfl, hTS, fun _ => hp2,
+                rw [hlocp, hpend, curOp_append_tau, hmem', hTS]
+                exact ⟨hp1, opOf_append_of_eq_some hp3 _, hc1, le_rfl, hTS, fun _ => hp2,
                   fun h => absurd h (lt_irrefl _)⟩
               · simpa using hothers [] (by simp) q hq
             | false =>
               -- read `0`: a no-op reset on state `0`
-              refine ⟨[(cur α p, .reset)], (hI.lin.push hp3 hp2 hnc).append_tau p,
+              refine ⟨[(curOp α p, .reset)], (hI.lin.push hp3 hp2 hnc).append_tau p,
                 by rw [hmem']; exact hI.one, ?_, by rw [hmem']; exact hI.below,
                 by rw [hmem']; exact hI.above, fun q => ?_⟩
-              · rw [linState_append_single, hmem', hTS]
+              · rw [linState_concat, hmem', hTS]
               · by_cases hq : q = p
                 · subst hq
                   unfold St
-                  rw [hlocp, hpend, cur_append_tau, linResp_append_singleton_self _ hp2, hTS]
+                  rw [hlocp, hpend, curOp_append_tau, ObjSpec.respIn_concat_self hp2, hTS]
                   exact ⟨by rw [hp1]; simp, rfl⟩
                 · exact hothers _ (by simp) q hq
       | wr c =>
@@ -449,10 +400,10 @@ lemma linSim [Fintype P] : (impl P).LinSim Inv where
           by_cases hq : q = p
           · subst hq
             unfold St
-            rw [hlocp, hpend, cur_append_tau]
+            rw [hlocp, hpend, curOp_append_tau]
             exact ⟨by rw [hp1]; simp, hplt hlt⟩
           · simpa using (hI.st q).transfer (M := []) (hlocq q hq) (hpendq q)
-              (cur_append_tau _ _ _) (fun o' h => opOf_append_of_opOf _ h) (by simp) hV
+              (curOp_append_tau _ _ _) (fun _ h => opOf_append_of_eq_some h _) (by simp) hV
               (fun c h => by rw [hmts]; exact h)
         · -- the event `e_V`
           subst heq
@@ -462,23 +413,23 @@ lemma linSim [Fintype P] : (impl P).LinSim Inv where
           let l1 : List P := (Finset.univ.filter (fun q => g1 V (C.loc q) = true)).toList
           let l3 : List P :=
             (Finset.univ.filter (fun q => q ≠ p ∧ g3 V (C.loc q) = true)).toList
-          let M1 : List (OpId P × mtasObj.Op) := l1.map (fun q => (cur α q, lop (C.loc q)))
-          let M3 : List (OpId P × mtasObj.Op) := l3.map (fun q => (cur α q, MTASOp.reset))
-          let M : List (OpId P × mtasObj.Op) := M1 ++ (cur α p, .reset) :: M3
+          let M1 : List (OpId P × mtasObj.Op) := l1.map (fun q => (curOp α q, lop (C.loc q)))
+          let M3 : List (OpId P × mtasObj.Op) := l3.map (fun q => (curOp α q, MTASOp.reset))
+          let M : List (OpId P × mtasObj.Op) := M1 ++ (curOp α p, .reset) :: M3
           have hl1 : ∀ q, q ∈ l1 ↔ ∃ o, o ≠ .reset ∧ C.loc q = .acc o V := by
             intro q; simp [l1, g1_iff]
           have hl3 : ∀ q, q ∈ l3 ↔ q ≠ p ∧ (C.loc q = .acc .reset V ∨ C.loc q = .wr V) := by
             intro q; simp [l3, g3_iff]
-          have hcurinj : Function.Injective (cur α) := fun a b h => congrArg Prod.fst h
-          have hM1fst : M1.map Prod.fst = l1.map (cur α) := by simp [M1, Function.comp_def]
-          have hM3fst : M3.map Prod.fst = l3.map (cur α) := by simp [M3, Function.comp_def]
-          have hMfst : M.map Prod.fst = (l1 ++ p :: l3).map (cur α) := by
+          have hcurinj : Function.Injective (curOp α) := fun a b h => congrArg Prod.fst h
+          have hM1fst : M1.map Prod.fst = l1.map (curOp α) := by simp [M1, Function.comp_def]
+          have hM3fst : M3.map Prod.fst = l3.map (curOp α) := by simp [M3, Function.comp_def]
+          have hMfst : M.map Prod.fst = (l1 ++ p :: l3).map (curOp α) := by
             simp only [M, List.map_append, List.map_cons, hM1fst, hM3fst]
-          have hmemM1 : ∀ q, cur α q ∈ M1.map Prod.fst ↔ q ∈ l1 := by
+          have hmemM1 : ∀ q, curOp α q ∈ M1.map Prod.fst ↔ q ∈ l1 := by
             intro q; rw [hM1fst]; exact List.mem_map_of_injective hcurinj
-          have hmemM3 : ∀ q, cur α q ∈ M3.map Prod.fst ↔ q ∈ l3 := by
+          have hmemM3 : ∀ q, curOp α q ∈ M3.map Prod.fst ↔ q ∈ l3 := by
             intro q; rw [hM3fst]; exact List.mem_map_of_injective hcurinj
-          have hmemM : ∀ q, cur α q ∈ M.map Prod.fst ↔ q ∈ l1 ∨ q = p ∨ q ∈ l3 := by
+          have hmemM : ∀ q, curOp α q ∈ M.map Prod.fst ↔ q ∈ l1 ∨ q = p ∨ q ∈ l3 := by
             intro q
             rw [hMfst, List.mem_map_of_injective hcurinj]
             simp
@@ -491,14 +442,14 @@ lemma linSim [Fintype P] : (impl P).LinSim Inv where
             simp_all
           -- statuses of the processes in `M`
           have hstl1 : ∀ q ∈ l1, ∃ o, o ≠ .reset ∧ C.loc q = .acc o V ∧
-              opOf α (cur α q) = some o ∧ cur α q ∉ Lin.map Prod.fst := by
+              opOf α (curOp α q) = some o ∧ curOp α q ∉ Lin.map Prod.fst := by
             intro q hq
             obtain ⟨o, ho, h⟩ := (hl1 q).1 hq
             have := hI.st q
             unfold St at this; rw [h] at this
             exact ⟨o, ho, h, this.2.1, this.2.2.2.2.1 rfl⟩
-          have hstl3 : ∀ q ∈ l3, opOf α (cur α q) = some .reset ∧
-              cur α q ∉ Lin.map Prod.fst := by
+          have hstl3 : ∀ q ∈ l3, opOf α (curOp α q) = some .reset ∧
+              curOp α q ∉ Lin.map Prod.fst := by
             intro q hq
             rcases ((hl3 q).1 hq).2 with h | h
             · have := hI.st q
@@ -534,6 +485,7 @@ lemma linSim [Fintype P] : (impl P).LinSim Inv where
               · exact (hstl3 q hq).2
           -- the abstract state and the responses assigned by `Lin ++ M`
           have hLin : linState Lin = true := by rw [hI.abs]; exact hpts
+          have hLin' : mtasObj.runOps mtasObj.init (Lin.map Prod.snd) = true := hLin
           have hM1c : ∀ y ∈ M1, mtasObj.δ true y.2 = (true, true) := by
             intro y hy
             simp only [M1, List.mem_map] at hy
@@ -547,31 +499,27 @@ lemma linSim [Fintype P] : (impl P).LinSim Inv where
             obtain ⟨q, -, rfl⟩ := hy
             rfl
           have hLM : linState (Lin ++ M) = false := by
-            rw [linState, List.map_append, ObjSpec.runOps_append]
-            change mtasObj.runOps (linState Lin) _ = false
-            rw [hLin]
+            rw [linState_append, hLin]
             simp only [M, List.map_append, List.map_cons]
-            rw [ObjSpec.runOps_append, runOps_const true true M1 hM1c, ObjSpec.runOps_cons]
-            exact runOps_const false false M3 hM3c
-          have hrespM1 : ∀ q ∈ l1, linResp (Lin ++ M) (cur α q) = some true := by
+            rw [ObjSpec.runOps_append, ObjSpec.runOps_map_snd_const true hM1c, ObjSpec.runOps_cons]
+            exact ObjSpec.runOps_map_snd_const false hM3c
+          have hrespM1 : ∀ q ∈ l1, mtasObj.respIn mtasObj.init (Lin ++ M) (curOp α q) = some true := by
             intro q hq
             obtain ⟨-, -, -, -, hnl⟩ := hstl1 q hq
-            rw [linResp_append_of_not_mem _ hnl, hLin]
-            exact linRespFrom_const _ _ _ _ _ hM1c ((hmemM1 q).2 hq)
-          have hrespP : linResp (Lin ++ M) (cur α p) = some false := by
-            rw [linResp_append_of_not_mem _ hp2, hLin,
-              linRespFrom_append_of_not_mem _ _ _ _ (fun h => hpl1 ((hmemM1 p).1 h)),
-              runOps_const true true M1 hM1c]
-            simp [linRespFrom]
-          have hrespM3 : ∀ q ∈ l3, linResp (Lin ++ M) (cur α q) = some false := by
+            rw [ObjSpec.respIn_append_of_not_mem hnl, hLin']
+            exact ObjSpec.respIn_append_const _ hM1c ((hmemM1 q).2 hq) _
+          have hrespP : mtasObj.respIn mtasObj.init (Lin ++ M) (curOp α p) = some false := by
+            rw [ObjSpec.respIn_append_of_not_mem hp2, hLin',
+              ObjSpec.respIn_append_of_not_mem (fun h => hpl1 ((hmemM1 p).1 h)),
+              ObjSpec.runOps_map_snd_const true hM1c, ObjSpec.respIn_cons_self]
+          have hrespM3 : ∀ q ∈ l3, mtasObj.respIn mtasObj.init (Lin ++ M) (curOp α q) = some false := by
             intro q hq
             have hqp : q ≠ p := ((hl3 q).1 hq).1
-            rw [linResp_append_of_not_mem _ (hstl3 q hq).2, hLin,
-              linRespFrom_append_of_not_mem _ _ _ _ (fun h => hl13 q ((hmemM1 q).1 h) hq),
-              runOps_const true true M1 hM1c]
-            simp only [linRespFrom]
-            rw [ite_eq_right_of_eq_false _ _ (eq_false (fun h => hqp (congrArg Prod.fst h).symm))]
-            have := linRespFrom_const (cur α q) false false M3 [] hM3c ((hmemM3 q).2 hq)
+            rw [ObjSpec.respIn_append_of_not_mem (hstl3 q hq).2, hLin',
+              ObjSpec.respIn_append_of_not_mem (fun h => hl13 q ((hmemM1 q).1 h) hq),
+              ObjSpec.runOps_map_snd_const true hM1c,
+              ObjSpec.respIn_cons_of_ne _ _ _ (fun h => hqp (congrArg Prod.fst h).symm)]
+            have := ObjSpec.respIn_append_const (q := false) false hM3c ((hmemM3 q).2 hq) []
             rwa [List.append_nil] at this
           refine ⟨M, hlinM.append_tau p, by rw [hV]; exact Nat.le_add_left 1 V, ?_, ?_, ?_, fun q => ?_⟩
           · rw [hLM, hV, hmts]; exact (hI.above (V + 1) (Nat.lt_succ_self _)).symm
@@ -584,16 +532,16 @@ lemma linSim [Fintype P] : (impl P).LinSim Inv where
           · by_cases hq : q = p
             · subst hq
               unfold St
-              rw [hlocp, hpend, cur_append_tau]
+              rw [hlocp, hpend, curOp_append_tau]
               exact ⟨by rw [hp1]; simp, hrespP⟩
             · have hqst := hI.st q
               unfold St at hqst ⊢
-              rw [hlocq q hq, hpendq q, cur_append_tau, hV]
+              rw [hlocq q hq, hpendq q, curOp_append_tau, hV]
               cases hc : C.loc q with
               | idle => rw [hc] at hqst; exact hqst
               | start o =>
                 rw [hc] at hqst
-                refine ⟨hqst.1, not_mem_append hqst.2.1 ?_, opOf_append_of_opOf _ hqst.2.2⟩
+                refine ⟨hqst.1, not_mem_append hqst.2.1 ?_, opOf_append_of_eq_some hqst.2.2 _⟩
                 rw [hmemM]
                 rintro (h | h | h)
                 · obtain ⟨o', -, h'⟩ := (hl1 q).1 h; rw [hc] at h'; cases h'
@@ -602,10 +550,10 @@ lemma linSim [Fintype P] : (impl P).LinSim Inv where
               | acc o c' =>
                 rw [hc] at hqst
                 obtain ⟨h1, h2, h3, h4, -, h6⟩ := hqst
-                refine ⟨h1, opOf_append_of_opOf _ h2, h3, by omega, fun h => by omega,
+                refine ⟨h1, opOf_append_of_eq_some h2 _, h3, by omega, fun h => by omega,
                   fun _ => ?_⟩
                 rcases Nat.lt_or_eq_of_le h4 with h | rfl
-                · exact linResp_append_of_some _ (h6 h)
+                · exact ObjSpec.respIn_append_of_eq_some (h6 h) _
                 · cases o with
                   | tas => exact hrespM1 q ((hl1 q).2 ⟨_, by simp, hc⟩)
                   | read => exact hrespM1 q ((hl1 q).2 ⟨_, by simp, hc⟩)
@@ -613,14 +561,14 @@ lemma linSim [Fintype P] : (impl P).LinSim Inv where
               | wr c' =>
                 rw [hc] at hqst
                 obtain ⟨h1, h2, h3, h4, h5, -, h7⟩ := hqst
-                refine ⟨h1, opOf_append_of_opOf _ h2, h3, by omega, by rw [hmts]; exact h5,
+                refine ⟨h1, opOf_append_of_eq_some h2 _, h3, by omega, by rw [hmts]; exact h5,
                   fun h => by omega, fun _ => ?_⟩
                 rcases Nat.lt_or_eq_of_le h4 with h | rfl
-                · exact linResp_append_of_some _ (h7 h)
+                · exact ObjSpec.respIn_append_of_eq_some (h7 h) _
                 · exact hrespM3 q ((hl3 q).2 ⟨hq, Or.inr hc⟩)
               | retv b =>
                 rw [hc] at hqst
-                exact ⟨hqst.1, linResp_append_of_some _ hqst.2⟩
+                exact ⟨hqst.1, ObjSpec.respIn_append_of_eq_some hqst.2 _⟩
     | ret p r =>
       obtain ⟨h0, hpend, hmem, l, hact, hloc⟩ := Impl.step_ret hstep
       have hst := hI.st p
@@ -635,14 +583,14 @@ lemma linSim [Fintype P] : (impl P).LinSim Inv where
         unfold St at hst; rw [hl] at hst
         refine ⟨[], ?_⟩
         rw [List.append_nil]
-        refine ⟨hI.lin.append_ret_of_linResp hst.2, by rw [hmem]; exact hI.one,
+        refine ⟨hI.lin.append_ret_of_respIn hst.2, by rw [hmem]; exact hI.one,
           by rw [hmem]; exact hI.abs, by rw [hmem]; exact hI.below, by rw [hmem]; exact hI.above,
           fun q => ?_⟩
         by_cases hq : q = p
         · subst hq; unfold St; rw [hloc, Function.update_self, hpend, Function.update_self]
         · simpa using (hI.st q).transfer (M := []) (by rw [hloc, Function.update_of_ne hq])
-            (by rw [hpend, Function.update_of_ne hq]) (cur_append_ret_of_ne _ _ (Ne.symm hq))
-            (fun o' h => opOf_append_of_opOf _ h) (by simp) (by rw [hmem])
+            (by rw [hpend, Function.update_of_ne hq]) (curOp_append_ret_of_ne _ _ (Ne.symm hq))
+            (fun _ h => opOf_append_of_eq_some h _) (by simp) (by rw [hmem])
             (fun c h => by rw [hmem]; exact h)
 
 /-- **Theorem 6** (Attiya–Castañeda–Enea, PODC 2024): the implementation of Section 4.1 is a

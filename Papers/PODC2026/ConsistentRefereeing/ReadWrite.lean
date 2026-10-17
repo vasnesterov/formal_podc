@@ -1,5 +1,6 @@
 import Papers.PODC2026.ConsistentRefereeing.Defs
 import Podc.SharedMemory.Potential
+import Cslib.Computability.Distributed.SharedMemory.SWSRRegister
 
 /-!
 # Theorem 3: a linearizable contest object from a read/write register
@@ -108,9 +109,6 @@ namespace RW
 
 /-! ### The invariant -/
 
-/-- The current operation instance of `p`. -/
-abbrev cur (α : List (Label P (contestObj P))) (p : P) : OpId P := (p, (respsOf α p).length)
-
 /-- No `decide` has been linearized. -/
 def AllCompete (Lin : List (OpId P × ContestOp P)) : Prop := ∀ y ∈ Lin, y.2 ≠ .decide
 
@@ -120,16 +118,16 @@ def St (ref : P) (α : List (Label P (contestObj P)))
     (Lin : List (OpId P × ContestOp P)) (p : P) : Prop :=
   match C.loc p with
   | .idle => C.pend p = none
-  | .cRead i => C.pend p = some (.compete i) ∧ cur α p ∉ Lin.map Prod.fst ∧
-      opOf α (cur α p) = some (.compete i)
-  | .cWrite i => C.pend p = some (.compete i) ∧ cur α p ∉ Lin.map Prod.fst ∧
-      opOf α (cur α p) = some (.compete i) ∧
-      (AllCompete Lin → ∀ a ∈ Lin.map Prod.fst, ¬ Precedes α a (cur α p))
-  | .cDone => C.pend p ≠ none ∧ ∃ i, (cur α p, .compete i) ∈ Lin
-  | .dRead => C.pend p = some .decide ∧ cur α p ∉ Lin.map Prod.fst ∧
-      opOf α (cur α p) = some .decide ∧ AllCompete Lin ∧ p = ref
+  | .cRead i => C.pend p = some (.compete i) ∧ curOp α p ∉ Lin.map Prod.fst ∧
+      opOf α (curOp α p) = some (.compete i)
+  | .cWrite i => C.pend p = some (.compete i) ∧ curOp α p ∉ Lin.map Prod.fst ∧
+      opOf α (curOp α p) = some (.compete i) ∧
+      (AllCompete Lin → ∀ a ∈ Lin.map Prod.fst, ¬ Precedes α a (curOp α p))
+  | .cDone => C.pend p ≠ none ∧ ∃ i, (curOp α p, .compete i) ∈ Lin
+  | .dRead => C.pend p = some .decide ∧ curOp α p ∉ Lin.map Prod.fst ∧
+      opOf α (curOp α p) = some .decide ∧ AllCompete Lin ∧ p = ref
   | .dDone w => C.pend p ≠ none ∧
-      linResp (A := contestObj P) Lin (cur α p) = some (ContestResp.winner w)
+      (contestObj P).respIn (contestObj P).init Lin (curOp α p) = some (ContestResp.winner w)
 
 /-- The invariant. -/
 structure Inv (ref : P) (α : List (Label P (contestObj P)))
@@ -140,12 +138,6 @@ structure Inv (ref : P) (α : List (Label P (contestObj P)))
   st : ∀ p, St ref α C Lin p
 
 /-! ### Auxiliary lemmas -/
-
-lemma runOps_some (w : P) (os : List (ContestOp P)) :
-    (contestObj P).runOps (some w) os = some w := by
-  induction os with
-  | nil => rfl
-  | cons o os ih => cases o <;> simpa [ObjSpec.runOps] using ih
 
 lemma linState_eq_none {Lin : List (OpId P × ContestOp P)} (h : AllCompete Lin)
     (h' : linState (A := contestObj P) Lin = none) : Lin = [] := by
@@ -161,24 +153,26 @@ lemma linState_eq_none {Lin : List (OpId P × ContestOp P)} (h : AllCompete Lin)
       simp [runOps_some] at h'
 
 /-- Linearized `compete`s respond `ok`. -/
-lemma linRespFrom_compete {x : OpId P} (q : Option P) (Lin : List (OpId P × ContestOp P))
+lemma respIn_compete {x : OpId P} (q : Option P) (Lin : List (OpId P × ContestOp P))
     (hx : x ∈ Lin.map Prod.fst) (hc : ∀ y ∈ Lin, y.1 = x → ∃ i, y.2 = .compete i) :
-    linRespFrom (contestObj P) x q Lin = some ContestResp.ok := by
+    (contestObj P).respIn q Lin x = some ContestResp.ok := by
   induction Lin generalizing q with
   | nil => simp at hx
   | cons y Lin ih =>
     obtain ⟨y, o⟩ := y
-    simp only [linRespFrom]
-    split_ifs with h
-    · obtain ⟨i, hi⟩ := hc (y, o) (by simp) h
-      simp only at hi; subst hi; rfl
-    · simp only [List.map_cons, List.mem_cons] at hx
+    by_cases h : y = x
+    · subst h
+      obtain ⟨i, hi⟩ := hc (y, o) (by simp) rfl
+      simp only at hi; subst hi; simp [ObjSpec.respIn, linRespFrom]
+    · rw [ObjSpec.respIn_cons_of_ne _ _ _ h]
+      simp only [List.map_cons, List.mem_cons] at hx
       exact ih _ (hx.resolve_left (Ne.symm h)) (fun z hz => hc z (by simp [hz]))
 
-lemma linResp_compete {α : List (Label P (contestObj P))} {Lin : List (OpId P × ContestOp P)}
-    (hL : IsLinearization α Lin) {x : OpId P} {i : P} (hx : (x, .compete i) ∈ Lin) :
-    linResp (A := contestObj P) Lin x = some ContestResp.ok := by
-  apply linRespFrom_compete _ _ (List.mem_map.2 ⟨_, hx, rfl⟩)
+lemma respIn_compete_of_isLin {α : List (Label P (contestObj P))}
+    {Lin : List (OpId P × ContestOp P)} (hL : IsLinearization α Lin) {x : OpId P} {i : P}
+    (hx : (x, .compete i) ∈ Lin) :
+    (contestObj P).respIn (contestObj P).init Lin x = some ContestResp.ok := by
+  apply respIn_compete _ _ (List.mem_map.2 ⟨_, hx, rfl⟩)
   intro y hy hyx
   have h1 := hL.op_eq y hy
   have h2 := hL.op_eq _ hx
@@ -187,9 +181,9 @@ lemma linResp_compete {α : List (Label P (contestObj P))} {Lin : List (OpId P �
   exact ⟨i, Option.some.inj h2⟩
 
 /-- When no `decide` is linearized, every operation responds `ok`, from any state. -/
-lemma linRespFrom_allCompete {x : OpId P} (q q' : Option P) (Lin : List (OpId P × ContestOp P))
+lemma respIn_allCompete {x : OpId P} (q q' : Option P) (Lin : List (OpId P × ContestOp P))
     (h : AllCompete Lin) :
-    linRespFrom (contestObj P) x q Lin = linRespFrom (contestObj P) x q' Lin := by
+    (contestObj P).respIn q Lin x = (contestObj P).respIn q' Lin x := by
   induction Lin generalizing q q' with
   | nil => rfl
   | cons y Lin ih =>
@@ -197,10 +191,10 @@ lemma linRespFrom_allCompete {x : OpId P} (q q' : Option P) (Lin : List (OpId P 
     cases o with
     | decide => exact absurd rfl (h _ (List.mem_cons_self ..))
     | compete i =>
-      simp only [linRespFrom]
-      split_ifs
-      · rfl
-      · exact ih _ _ (fun z hz => h z (by simp [hz]))
+      by_cases hy : y = x
+      · subst hy; simp [ObjSpec.respIn, linRespFrom]
+      · rw [ObjSpec.respIn_cons_of_ne _ _ _ hy, ObjSpec.respIn_cons_of_ne _ _ _ hy]
+        exact ih _ _ (fun z hz => h z (by simp [hz]))
 
 lemma seqOK_allCompete {α : List (Label P (contestObj P))} (q q' : Option P)
     (Lin : List (OpId P × ContestOp P)) (h : AllCompete Lin) (hs : SeqOK α q Lin) :
@@ -238,20 +232,8 @@ lemma isLinearization_cons {α : List (Label P (contestObj P))}
     refine ⟨fun r hr => absurd (completed_iff_respOf.2 (by rw [hr]; rfl)) hxc, ?_⟩
     exact seqOK_allCompete _ _ Lin hall hL.seq
 
-lemma cur_append_of_ne (α : List (Label P (contestObj P))) (ℓ : Label P (contestObj P)) {q : P}
-    (hq : ℓ.proc ≠ q) : cur (α ++ [ℓ]) q = cur α q := by
-  simp [cur, respsOf_append, Label.retOf_eq_none_of_proc_ne hq]
-
-lemma cur_append_tau (α : List (Label P (contestObj P))) (p q : P) :
-    cur (α ++ [.tau p]) q = cur α q := by
-  simp [cur, respsOf_append]
-
-lemma invoked_of_opOf {α : List (Label P (contestObj P))} {x : OpId P} {o : ContestOp P}
-    (h : opOf α x = some o) : Invoked α x := by
-  simp only [opOf] at h; exact (List.getElem?_eq_some_iff.1 h).1
-
-lemma not_completed_cur (α : List (Label P (contestObj P))) (p : P) :
-    ¬ Completed α (cur α p) := by
+lemma not_completed_curOp (α : List (Label P (contestObj P))) (p : P) :
+    ¬ Completed α (curOp α p) := by
   simp [Completed]
 
 /-- Statuses of processes whose local state does not change are preserved, when the
@@ -260,61 +242,36 @@ lemma St.transfer {ref : P} {α : List (Label P (contestObj P))} {ℓ : Label P 
     {C C' : Config (contestObj P) (fun _ : Unit => register (Option P) none) P (RWLoc P)}
     {Lin Lin' : List (OpId P × ContestOp P)} {q : P} (h : St ref α C Lin q)
     (hloc : C'.loc q = C.loc q) (hpend : C'.pend q = C.pend q)
-    (hcur : cur (α ++ [ℓ]) q = cur α q) (h1 : ∀ y ∈ Lin, y ∈ Lin')
-    (h2 : ∀ x ∈ Lin'.map Prod.fst, x ∉ Lin.map Prod.fst → x ≠ cur α q ∧ ¬ Completed α x)
+    (hcur : curOp (α ++ [ℓ]) q = curOp α q) (h1 : ∀ y ∈ Lin, y ∈ Lin')
+    (h2 : ∀ x ∈ Lin'.map Prod.fst, x ∉ Lin.map Prod.fst → x ≠ curOp α q ∧ ¬ Completed α x)
     (h3 : AllCompete Lin' → AllCompete Lin)
     (h4 : ∀ x ∈ Lin.map Prod.fst,
-      linResp (A := contestObj P) Lin' x = linResp (A := contestObj P) Lin x)
+      (contestObj P).respIn (contestObj P).init Lin' x =
+        (contestObj P).respIn (contestObj P).init Lin x)
     (h5 : q = ref → AllCompete Lin → AllCompete Lin') :
     St ref (α ++ [ℓ]) C' Lin' q := by
-  have hnot : cur α q ∉ Lin.map Prod.fst → cur α q ∉ Lin'.map Prod.fst :=
+  have hnot : curOp α q ∉ Lin.map Prod.fst → curOp α q ∉ Lin'.map Prod.fst :=
     fun hn hm => (h2 _ hm hn).1 rfl
   unfold St at h ⊢
   rw [hloc, hpend, hcur]
   split at h
   · exact h
   · obtain ⟨a, b, c⟩ := h
-    exact ⟨a, hnot b, by rw [opOf_append_of_invoked (invoked_of_opOf c)]; exact c⟩
+    exact ⟨a, hnot b, opOf_append_of_eq_some c _⟩
   · obtain ⟨a, b, c, d⟩ := h
-    refine ⟨a, hnot b, by rw [opOf_append_of_invoked (invoked_of_opOf c)]; exact c, ?_⟩
+    refine ⟨a, hnot b, opOf_append_of_eq_some c _, ?_⟩
     intro hall x hx hpre
-    have hpre' := hpre.of_append_of_invoked (invoked_of_opOf c)
+    have hpre' := hpre.of_append_of_invoked (Invoked.of_opOf_eq_some c)
     by_cases hxL : x ∈ Lin.map Prod.fst
     · exact d (h3 hall) x hxL hpre'
     · exact (h2 x hx hxL).2 hpre'.completed
   · obtain ⟨a, i, b⟩ := h
     exact ⟨a, i, h1 _ b⟩
   · obtain ⟨a, b, c, d, e⟩ := h
-    exact ⟨a, hnot b, by rw [opOf_append_of_invoked (invoked_of_opOf c)]; exact c, h5 e d, e⟩
+    exact ⟨a, hnot b, opOf_append_of_eq_some c _, h5 e d, e⟩
   · obtain ⟨a, b⟩ := h
     refine ⟨a, ?_⟩
-    rw [h4 _ (linResp_isSome_iff.1 (by rw [b]; rfl))]; exact b
-
-/-- In an execution, every process only invokes the operation of its role. -/
-lemma role_of_runFrom {ref : P} {C C'} {α : List (Label P (contestObj P))}
-    (h : (rwContest ref).runFrom C α = some C') {p : P} {o : ContestOp P}
-    (ho : o ∈ opsOf α p) : o = roleOp ref p := by
-  induction α generalizing C with
-  | nil => simp at ho
-  | cons ℓ α ih =>
-    simp only [Impl.runFrom_cons] at h
-    cases hs : (rwContest ref).step C ℓ with
-    | none => simp [hs] at h
-    | some C₁ =>
-      simp only [hs, Option.bind_some] at h
-      simp only [opsOf_cons, List.mem_append] at ho
-      rcases ho with ho | ho
-      · cases ℓ with
-        | inv q o' =>
-          by_cases hq : q = p
-          · subst hq
-            simp only [Label.invOf_inv, ite_true, Option.toList_some, List.mem_singleton] at ho
-            subst ho
-            exact (Impl.step_inv hs).2.1
-          · simp [hq] at ho
-        | tau q => simp at ho
-        | ret q r => simp at ho
-      · exact ih h ho
+    rw [h4 _ (ObjSpec.mem_of_respIn_eq_some b)]; exact b
 
 lemma eq_ref_of_decide {ref p : P} (h : ContestOp.decide = roleOp ref p) : p = ref := by
   by_contra hp; simp [roleOp, hp] at h
@@ -335,13 +292,14 @@ lemma St.others {α : List (Label P (contestObj P))} {ℓ : Label P (contestObj 
     (h2 : ∀ x ∈ Lin'.map Prod.fst, x ∉ Lin.map Prod.fst → x.1 = p ∧ ¬ Completed α x)
     (h3 : AllCompete Lin' → AllCompete Lin)
     (h4 : ∀ x ∈ Lin.map Prod.fst,
-      linResp (A := contestObj P) Lin' x = linResp (A := contestObj P) Lin x)
+      (contestObj P).respIn (contestObj P).init Lin' x =
+        (contestObj P).respIn (contestObj P).init Lin x)
     (h5 : p ≠ ref → AllCompete Lin → AllCompete Lin') :
     ∀ q, q ≠ p → St ref (α ++ [ℓ]) C' Lin' q := by
   intro q hq
   have hpq : ℓ.proc ≠ q := hp ▸ Ne.symm hq
   obtain ⟨hl, hpd⟩ := Impl.step_other hstep hpq
-  refine (hst q).transfer hl hpd (cur_append_of_ne α ℓ hpq) h1 (fun x hx hxL => ?_) h3 h4
+  refine (hst q).transfer hl hpd (curOp_append_of_proc_ne α hpq) h1 (fun x hx hxL => ?_) h3 h4
     (fun hqr hall => h5 (hqr ▸ Ne.symm hq) hall)
   obtain ⟨a, b⟩ := h2 x hx hxL
   refine ⟨fun h => hq ?_, b⟩
@@ -358,16 +316,16 @@ lemma St.others_append {α : List (Label P (contestObj P))} {ℓ : Label P (cont
     {C C' : Cfg P} {Lin : List (OpId P × ContestOp P)} {p : P} {o : ContestOp P}
     (hst : ∀ q, St ref α C Lin q) (hstep : (rwContest ref).step C ℓ = some C')
     (hp : ℓ.proc = p) (ho : o = .decide → p = ref) :
-    ∀ q, q ≠ p → St ref (α ++ [ℓ]) C' (Lin ++ [(cur α p, o)]) q := by
+    ∀ q, q ≠ p → St ref (α ++ [ℓ]) C' (Lin ++ [(curOp α p, o)]) q := by
   refine St.others hst hstep hp (fun _ hy => List.mem_append_left _ hy) ?_ ?_ ?_ ?_
   · intro x hx hxL
     simp only [List.map_append, List.map_cons, List.map_nil, List.mem_append,
       List.mem_singleton] at hx
     rcases hx with hx | rfl
     · exact absurd hx hxL
-    · exact ⟨rfl, not_completed_cur α p⟩
+    · exact ⟨rfl, not_completed_curOp α p⟩
   · exact fun h y hy => h y (List.mem_append_left _ hy)
-  · exact fun x hx => linResp_append_of_mem _ hx
+  · exact fun x hx => ObjSpec.respIn_append_of_mem hx _
   · intro hpr hall y hy
     rcases List.mem_append.1 hy with hy | hy
     · exact hall y hy
@@ -377,29 +335,24 @@ lemma St.others_append {α : List (Label P (contestObj P))} {ℓ : Label P (cont
 lemma St.others_cons {α : List (Label P (contestObj P))} {ℓ : Label P (contestObj P)}
     {C C' : Cfg P} {Lin : List (OpId P × ContestOp P)} {p i : P}
     (hst : ∀ q, St ref α C Lin q) (hstep : (rwContest ref).step C ℓ = some C')
-    (hp : ℓ.proc = p) (hall : AllCompete Lin) (hnot : cur α p ∉ Lin.map Prod.fst) :
-    ∀ q, q ≠ p → St ref (α ++ [ℓ]) C' ((cur α p, .compete i) :: Lin) q := by
+    (hp : ℓ.proc = p) (hall : AllCompete Lin) (hnot : curOp α p ∉ Lin.map Prod.fst) :
+    ∀ q, q ≠ p → St ref (α ++ [ℓ]) C' ((curOp α p, .compete i) :: Lin) q := by
   refine St.others hst hstep hp (fun _ hy => List.mem_cons_of_mem _ hy) ?_ ?_ ?_ ?_
   · intro x hx hxL
     simp only [List.map_cons, List.mem_cons] at hx
     rcases hx with rfl | hx
-    · exact ⟨rfl, not_completed_cur α p⟩
+    · exact ⟨rfl, not_completed_curOp α p⟩
     · exact absurd hx hxL
   · exact fun h y hy => h y (List.mem_cons_of_mem _ hy)
   · intro x hx
-    have hne : cur α p ≠ x := fun h => hnot (h ▸ hx)
-    simp only [linResp, linRespFrom, hne, ↓reduceIte]
-    exact linRespFrom_allCompete _ _ Lin hall
+    have hne : curOp α p ≠ x := fun h => hnot (h ▸ hx)
+    rw [ObjSpec.respIn_cons_of_ne _ _ _ hne]
+    exact respIn_allCompete _ _ Lin hall
   · intro _ _ y hy
     rcases List.mem_cons.1 hy with rfl | hy
     · simp
     · exact hall y hy
 
-
-lemma linState_append {Lin : List (OpId P × ContestOp P)} (x : OpId P) (o : ContestOp P) :
-    linState (A := contestObj P) (Lin ++ [(x, o)]) =
-      ((contestObj P).δ (linState (A := contestObj P) Lin) o).1 := by
-  simp [linState, ObjSpec.runOps]
 
 lemma inv_step {α : List (Label P (contestObj P))} {C C' : Cfg P}
     {Lin : List (OpId P × ContestOp P)} {ℓ : Label P (contestObj P)}
@@ -417,10 +370,10 @@ lemma inv_step {α : List (Label P (contestObj P))} {C C' : Cfg P}
     have hidle : C.loc p = .idle := by
       have h := hI.st p
       cases hl : C.loc p <;> first | rfl | simp [St, hl, h0] at h
-    have hcurp : cur (α ++ [.inv p o]) p = cur α p := by simp [cur, respsOf_append]
-    have hnotin : cur α p ∉ Lin.map Prod.fst := fun hm => by
+    have hcurp : curOp (α ++ [.inv p o]) p = curOp α p := by simp [curOp, respsOf_append]
+    have hnotin : curOp α p ∉ Lin.map Prod.fst := fun hm => by
       have := hI.lin.invoked_of_mem hm; simp [Invoked] at this; omega
-    have hop : opOf (α ++ [.inv p o]) (cur α p) = some o := by
+    have hop : opOf (α ++ [.inv p o]) (curOp α p) = some o := by
       simp [opOf, opsOf_append, ← hlen]
     refine ⟨Lin, hI.lin.append_inv p o, by rw [hmem]; exact hI.phase1, fun q => ?_⟩
     by_cases hq : q = p
@@ -440,8 +393,8 @@ lemma inv_step {α : List (Label P (contestObj P))} {C C' : Cfg P}
         rw [hyd] at h1
         have hm : ContestOp.decide ∈ opsOf α y.1.1 := by
           simp only [opOf] at h1; exact List.mem_of_getElem? h1
-        have hr := eq_ref_of_decide (role_of_runFrom hrun hm)
-        have hinv := invoked_of_opOf h1
+        have hr := eq_ref_of_decide ((rwContest ref).allowed_of_mem_opsOf ⟨_, hrun⟩ hm)
+        have hinv := Invoked.of_opOf_eq_some h1
         simp only [Invoked, hr] at hinv
         subst hqr
         have : (opsOf (α ++ [.inv q .decide]) q).length = (opsOf α q).length + 1 := by
@@ -451,7 +404,7 @@ lemma inv_step {α : List (Label P (contestObj P))} {C C' : Cfg P}
   | tau p =>
     obtain ⟨h0, hpend, i, o, k, hact, hmem, hloc⟩ := Impl.step_tau hstep
     have hst := hI.st p
-    have hcurp : cur (α ++ [.tau p]) p = cur α p := cur_append_tau α p p
+    have hcurp : curOp (α ++ [.tau p]) p = curOp α p := curOp_append_tau α p p
     cases hl : C.loc p with
     | idle => simp [rwContest, hl] at hact
     | cDone => simp [rwContest, hl] at hact
@@ -464,8 +417,8 @@ lemma inv_step {α : List (Label P (contestObj P))} {C C' : Cfg P}
       simp only [St, hl] at hst
       obtain ⟨hp1, hp2, hp3⟩ := hst
       have hmem' : C'.mem = C.mem := by rw [hmem]; funext u; cases u; simp
-      have hop : opOf (α ++ [.tau p]) (cur α p) = some (ContestOp.compete j) := by
-        rw [opOf_append_of_invoked (invoked_of_opOf hp3)]; exact hp3
+      have hop : opOf (α ++ [.tau p]) (curOp α p) = some (ContestOp.compete j) :=
+        opOf_append_of_eq_some hp3 _
       cases hx : C.mem () with
       | none =>
         refine ⟨Lin, hI.lin.append_tau p, by rw [hmem']; exact hI.phase1, fun q => ?_⟩
@@ -480,11 +433,11 @@ lemma inv_step {α : List (Label P (contestObj P))} {C C' : Cfg P}
           subst this; simp at ha
         · exact St.others_same hI.st hstep rfl q hq
       | some w =>
-        refine ⟨Lin ++ [(cur α p, ContestOp.compete j)],
-          (hI.lin.push hp3 hp2 (not_completed_cur α p)).append_tau p, ?_, fun q => ?_⟩
+        refine ⟨Lin ++ [(curOp α p, ContestOp.compete j)],
+          (hI.lin.push hp3 hp2 (not_completed_curOp α p)).append_tau p, ?_, fun q => ?_⟩
         · intro hall
           have hall' : AllCompete Lin := fun y hy => hall y (List.mem_append_left _ hy)
-          rw [hmem', linState_append, hI.phase1 hall', hx]
+          rw [hmem', linState_concat, hI.phase1 hall', hx]
           rfl
         · by_cases hq : q = p
           · subst hq
@@ -502,8 +455,8 @@ lemma inv_step {α : List (Label P (contestObj P))} {C C' : Cfg P}
       obtain ⟨hp1, hp2, hp3, hp4⟩ := hst
       have hmem' : C'.mem () = some j := by rw [hmem]; simp
       by_cases hall : AllCompete Lin
-      · refine ⟨(cur α p, ContestOp.compete j) :: Lin, (isLinearization_cons hI.lin hp3 hp2
-          (not_completed_cur α p) (hp4 hall) hall).append_tau p, ?_, fun q => ?_⟩
+      · refine ⟨(curOp α p, ContestOp.compete j) :: Lin, (isLinearization_cons hI.lin hp3 hp2
+          (not_completed_curOp α p) (hp4 hall) hall).append_tau p, ?_, fun q => ?_⟩
         · intro _
           rw [hmem']
           show (contestObj P).runOps none (ContestOp.compete j :: Lin.map Prod.snd) = some j
@@ -516,8 +469,8 @@ lemma inv_step {α : List (Label P (contestObj P))} {C C' : Cfg P}
             simp only [update_self]
             exact ⟨h0, j, by simp⟩
           · exact St.others_cons hI.st hstep rfl hall hp2 q hq
-      · refine ⟨Lin ++ [(cur α p, ContestOp.compete j)],
-          (hI.lin.push hp3 hp2 (not_completed_cur α p)).append_tau p,
+      · refine ⟨Lin ++ [(curOp α p, ContestOp.compete j)],
+          (hI.lin.push hp3 hp2 (not_completed_curOp α p)).append_tau p,
           fun h => absurd (fun y hy => h y (List.mem_append_left _ hy)) hall, fun q => ?_⟩
         by_cases hq : q = p
         · subst hq
@@ -534,8 +487,8 @@ lemma inv_step {α : List (Label P (contestObj P))} {C C' : Cfg P}
       simp only [St, hl] at hst
       obtain ⟨hp1, hp2, hp3, hall, hpr⟩ := hst
       have hmem' : C'.mem = C.mem := by rw [hmem]; funext u; cases u; simp
-      refine ⟨Lin ++ [(cur α p, .decide)],
-        (hI.lin.push hp3 hp2 (not_completed_cur α p)).append_tau p,
+      refine ⟨Lin ++ [(curOp α p, .decide)],
+        (hI.lin.push hp3 hp2 (not_completed_curOp α p)).append_tau p,
         fun h => absurd (h _ (List.mem_append_right _ (List.mem_singleton_self _))) (by simp),
         fun q => ?_⟩
       by_cases hq : q = p
@@ -544,7 +497,8 @@ lemma inv_step {α : List (Label P (contestObj P))} {C C' : Cfg P}
         rw [hloc, hpend, hcurp]
         simp only [update_self]
         refine ⟨h0, ?_⟩
-        rw [linResp_append_singleton_self _ hp2, hI.phase1 hall]
+        rw [ObjSpec.respIn_concat_self hp2]
+        exact congrArg (fun s => some ((contestObj P).δ s .decide).2) (hI.phase1 hall)
       · exact St.others_append hI.st hstep rfl (fun _ => hpr) q hq
   | ret p r =>
     obtain ⟨h0, hpend, hmem, l, hact, hloc⟩ := Impl.step_ret hstep
@@ -559,7 +513,7 @@ lemma inv_step {α : List (Label P (contestObj P))} {C C' : Cfg P}
       obtain ⟨rfl, rfl⟩ := hact
       simp only [St, hl] at hst
       obtain ⟨-, i, hi⟩ := hst
-      refine ⟨Lin, hI.lin.append_ret_of_linResp (linResp_compete hI.lin hi),
+      refine ⟨Lin, hI.lin.append_ret_of_respIn (respIn_compete_of_isLin hI.lin hi),
         by rw [hmem]; exact hI.phase1, fun q => ?_⟩
       by_cases hq : q = p
       · subst hq; unfold St; rw [hloc, hpend]; simp
@@ -568,7 +522,7 @@ lemma inv_step {α : List (Label P (contestObj P))} {C C' : Cfg P}
       simp only [rwContest, hl, Action.ret.injEq] at hact
       obtain ⟨rfl, rfl⟩ := hact
       simp only [St, hl] at hst
-      refine ⟨Lin, hI.lin.append_ret_of_linResp hst.2,
+      refine ⟨Lin, hI.lin.append_ret_of_respIn hst.2,
         by rw [hmem]; exact hI.phase1, fun q => ?_⟩
       by_cases hq : q = p
       · subst hq; unfold St; rw [hloc, hpend]; simp
@@ -578,23 +532,16 @@ lemma inv_step {α : List (Label P (contestObj P))} {C C' : Cfg P}
 invariant for some linearization. -/
 theorem exists_inv (ref : P) (α : List (Label P (contestObj P))) :
     ∀ C, (rwContest ref).run α = some C → (opsOf α ref).length ≤ 1 → ∃ Lin, Inv ref α C Lin := by
-  induction α using List.reverseRecOn with
-  | nil =>
-    intro C h _
-    simp only [Impl.run_nil, Option.some.injEq] at h
-    subst h
-    exact ⟨[], isLinearization_nil, fun _ => rfl, fun p => by simp [St, rwContest, Impl.initCfg]⟩
-  | append_singleton α ℓ ih =>
-    intro C h hone
-    rw [Impl.run, Impl.runFrom_append] at h
-    cases hα : (rwContest ref).runFrom (rwContest ref).initCfg α with
-    | none => simp [hα] at h
-    | some C₀ =>
-      simp only [hα, Option.bind_some, Impl.runFrom_singleton] at h
-      have hone' : (opsOf α ref).length ≤ 1 := by
-        rw [opsOf_append, List.length_append] at hone; omega
-      obtain ⟨Lin, hI⟩ := ih C₀ hα hone'
-      exact inv_step hα hI h hone
+  intro C h
+  refine Impl.run_induction
+    (Q := fun α C => (opsOf α ref).length ≤ 1 → ∃ Lin, Inv ref α C Lin) ?_ ?_ h
+  · exact fun _ => ⟨[], isLinearization_nil, fun _ => rfl,
+      fun p => by simp [St, rwContest, Impl.initCfg]⟩
+  · intro α C₀ ℓ C hα ih hs hone
+    have hone' : (opsOf α ref).length ≤ 1 := by
+      rw [opsOf_append, List.length_append] at hone; omega
+    obtain ⟨Lin, hI⟩ := ih hone'
+    exact inv_step hα hI hs hone
 
 end RW
 

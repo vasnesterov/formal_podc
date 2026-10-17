@@ -1,4 +1,5 @@
 import Papers.PODC2026.ConsistentRefereeing.CaseStack
+import Podc.SharedMemory.Covering
 
 /-!
 # Theorem 5 of [ACE26]
@@ -93,29 +94,21 @@ lemma run_writes {R : ι} (o : P → (B R).Op) (kk : P → (B R).Resp → L) :
       D'.mem = Function.update D.mem R ((B R).runOps (D.mem R) (cs.map o)) ∧
       D'.pend = D.pend ∧ (∀ q, q ∉ cs → D'.loc q = D.loc q) ∧
       ∀ c ∈ cs, ∃ s, D'.loc c = kk c ((B R).δ s (o c)).2 := by
-  intro cs
-  induction cs with
-  | nil => intro D _ _; exact ⟨D, rfl, by simp [ObjSpec.runOps], rfl, fun _ _ => rfl,
-      fun c hc => by simp at hc⟩
-  | cons c cs ih =>
-    intro D hnd hD
-    obtain ⟨hpc, hac⟩ := hD c (by simp)
-    have hs := step_tau_eq hpc hac
-    set D₁ := { D with
-      mem := Function.update D.mem R ((B R).δ (D.mem R) (o c)).1
-      loc := Function.update D.loc c (kk c ((B R).δ (D.mem R) (o c)).2) } with hD₁
-    have hnd' := List.nodup_cons.1 hnd
-    obtain ⟨D', hD', hm, hp, hl, hl'⟩ := ih D₁ hnd'.2 (fun c' hc' => by
-      have hcc : c' ≠ c := fun h => hnd'.1 (h ▸ hc')
-      obtain ⟨h1, h2⟩ := hD c' (by simp [hc'])
-      exact ⟨h1, by simp only [hD₁, Function.update_of_ne hcc]; exact h2⟩)
-    refine ⟨D', by simp [runFrom_cons, hs, hD'], ?_, hp, fun q hq => ?_, fun c' hc' => ?_⟩
-    · rw [hm]; simp [hD₁, ObjSpec.runOps]
-    · simp only [List.mem_cons, not_or] at hq
-      rw [hl q hq.2]; simp [hD₁, Function.update_of_ne hq.1]
-    · rcases List.mem_cons.1 hc' with rfl | hc'
-      · rw [hl c' hnd'.1]; exact ⟨D.mem R, by simp [hD₁]⟩
-      · exact hl' c' hc'
+  intro cs D hnd hD
+  set es := cs.map fun c => (c, (⟨R, o c⟩ : Σ i, (B i).Op))
+  have hfst : es.map Prod.fst = cs := by simp [es, Function.comp_def]
+  have hsnd : es.map Prod.snd = (cs.map o).map (Sigma.mk R) := by simp [es, Function.comp_def]
+  obtain ⟨D', h1, h2, h3, h4, h5⟩ := I.runFrom_poised_block (es := es) (hfst ▸ hnd)
+    (fun e he => by
+      obtain ⟨c, hc, rfl⟩ := List.mem_map.1 he
+      exact ⟨(hD c hc).1, kk c, (hD c hc).2⟩)
+  rw [hfst] at h1 h4
+  refine ⟨D', h1, by rw [h2, hsnd, applyAccesses_map_mk], h3, h4, fun c hc => ?_⟩
+  obtain ⟨k, s, hk, hl⟩ := h5 (c, ⟨R, o c⟩) (by simp [es, hc])
+  rw [(hD c hc).2] at hk
+  simp only [Action.access.injEq, heq_eq_eq, true_and] at hk
+  subst hk
+  exact ⟨s, hl⟩
 
 namespace Crit
 
@@ -206,11 +199,8 @@ theorem window [Fintype P] {R : ι} (hW : (B R).WindowLike (Fintype.card P - 2))
     simp [runFrom_cons, h₁, h₁₂, hE₁]
   have hr₂ : I.runFrom K.C ([.tau j] ++ cs.map Label.tau) = some E₂ := by
     simp [runFrom_cons, h₂, hE₂]
-  have hnoinv : ∀ ℓ ∈ (cs.map Label.tau : List (Label P (contestObj P))), ∀ q, ℓ.invOf q = none :=
-    fun ℓ hℓ q => by
-    simp only [List.mem_map] at hℓ; obtain ⟨c, -, rfl⟩ := hℓ; rfl
-  have hops : ∀ q, opsOf (cs.map Label.tau : List (Label P (contestObj P))) q = [] := fun q => by
-    simp only [opsOf, List.filterMap_eq_nil_iff]; exact fun ℓ hℓ => hnoinv ℓ hℓ q
+  have hops : ∀ q, opsOf (cs.map Label.tau : List (Label P (contestObj P))) q = [] :=
+    opsOf_blockWrite cs
   refine K.contra H.lf H.sl H.allowed hi hj hk hv (β₁ := [K.lbl j] ++ cs.map Label.tau)
     (β₂ := cs.map Label.tau) ?_ ?_ ?_ ?_ ?_ (hops ref) ?_ hag
   · rw [hlbl i hi, hlbl j hj]
@@ -218,9 +208,9 @@ theorem window [Fintype P] {R : ι} (hW : (B R).WindowLike (Fintype.card P - 2))
   · rw [hlbl j hj]
     have := K.run_ext hr₂; simpa using this
   · rw [hlbl i hi, hlbl j hj, ← List.append_assoc]
-    exact hA₁₂.append_noInv ref hnoinv
-  · rw [hlbl j hj]; exact hA₂.append_noInv ref hnoinv
-  · rw [hlbl j hj]; simp [opsOf_append, hops]
+    exact hA₁₂.append_noInv ref hops
+  · rw [hlbl j hj]; exact hA₂.append_noInv ref hops
+  · rw [hlbl j hj]; simp [hops]
   · rw [hlbl i hi, hlbl j hj]; simp [opsOf_append, hops]
 
 end Crit

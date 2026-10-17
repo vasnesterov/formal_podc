@@ -1,4 +1,5 @@
 import Papers.PODC2024.HistoryIndependent.UniversalThm
+import Podc.SharedMemory.Potential
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
 
 /-!
@@ -828,64 +829,25 @@ theorem mu_tau_self {L : List (OpId (Fin n) × A.Op)} {cur : Fin n → OpId (Fin
         split <;> simp [pl3, dLoop]
     · simp [hin] at hmem hloc; split_ifs at hloc <;> local_tac
 
-omit [DecidablePred A.ReadOnly] in
-lemma _root_.Cslib.SharedMemory.Impl.InfExec.run_eq {ι P L : Type} {B' : ι → ObjSpec} [DecidableEq P]
-    [DecidableEq ι] {I : Impl A B' P L} (e : I.InfExec) (m : ℕ) :
-    I.run ((List.range m).map e.lbl) = some (e.cfg m) := by
-  induction m with
-  | zero => simp [Impl.run, e.cfg_zero]
-  | succ m ih =>
-    rw [List.range_succ, List.map_append, List.map_singleton, Impl.run_append_of_eq I ih,
-      Impl.runFrom_singleton]
-    exact e.step_eq m
-
 /-- **Wait-freedom** of Algorithm 5 with atomic R-LLSC base objects (the progress part of
-Theorem 32 for atomic base objects). -/
-theorem waitFree : (alg5 A n).WaitFree := by
-  intro e p n0 hpend
-  have hinv : ∀ m, InvC (hlin A n ((List.range m).map e.lbl)) (curOf ((List.range m).map e.lbl))
-      (e.cfg m).pend (e.cfg m).mem (e.cfg m).loc := fun m => (inv_run (e.run_eq m)).invC
-  have hstep : ∀ m ≥ n0, mu p (e.cfg (m + 1)) ≤ mu p (e.cfg m) ∧
-      (e.lbl m = .tau p → mu p (e.cfg (m + 1)) < mu p (e.cfg m)) := by
-    intro m hm
-    have hs := e.step_eq m
-    rcases hl : e.lbl m with ⟨q, o⟩ | ⟨q, r⟩ | q
-    · rw [hl] at hs
-      by_cases hq : q = p
-      · subst hq; exact absurd (Impl.step_inv hs).1 (hpend m hm)
-      · exact ⟨mu_inv_other p hq hs, fun h => by cases h⟩
-    · rw [hl] at hs
-      by_cases hq : q = p
-      · subst hq
-        have := (Impl.step_ret hs).2.1
-        exact absurd (by rw [this]; simp) (hpend (m + 1) (by omega))
-      · exact ⟨mu_ret_other p hq hs, fun h => by cases h⟩
-    · rw [hl] at hs
-      by_cases hq : q = p
-      · subst hq
-        have := mu_tau_self q (hinv m) hs
-        exact ⟨this.le, fun _ => this⟩
-      · exact ⟨mu_tau_other p (hinv m) hq hs, fun h => by cases h; exact absurd rfl hq⟩
-  have hmono : ∀ d m, n0 ≤ m → mu p (e.cfg (m + d)) ≤ mu p (e.cfg m) := by
-    intro d; induction d with
-    | zero => intro m _; exact le_rfl
-    | succ d ih =>
-      intro m hm
-      exact (hstep (m + d) (by omega)).1.trans (ih m hm)
-  by_contra hcon
-  push Not at hcon
-  have key : ∀ k, ∃ m ≥ n0, mu p (e.cfg m) + k ≤ mu p (e.cfg n0) := by
-    intro k; induction k with
-    | zero => exact ⟨n0, le_rfl, by simp⟩
-    | succ k ih =>
-      obtain ⟨m, hm, hk⟩ := ih
-      obtain ⟨m', hm', hl⟩ := hcon m
-      have h1 := (hstep m' (by omega)).2 hl
-      have h2 := hmono (m' - m) m hm
-      rw [show m + (m' - m) = m' by omega] at h2
-      exact ⟨m' + 1, by omega, by omega⟩
-  obtain ⟨m, -, hk⟩ := key (mu p (e.cfg n0) + 1)
-  omega
+Theorem 32 for atomic base objects): the potential `mu p` never increases while `p` is pending and
+decreases at each of its steps. -/
+theorem waitFree : (alg5 A n).WaitFree :=
+  Impl.waitFreeOn_true_iff.1 <| (alg5 A n).waitFreeOn_of_runPotential (fun p _ C => mu p C)
+    fun p _ C ℓ _ hα _ hs hp hp' => by
+      have hinv := (inv_run hα).invC
+      rcases ℓ with ⟨q, o⟩ | ⟨q, r⟩ | q
+      · by_cases hq : q = p
+        · subst hq; exact absurd (Impl.step_inv hs).1 hp
+        · exact ⟨mu_inv_other p hq hs, fun h => by cases h⟩
+      · by_cases hq : q = p
+        · subst hq; exact absurd (by rw [(Impl.step_ret hs).2.1]; simp) hp'
+        · exact ⟨mu_ret_other p hq hs, fun h => by cases h⟩
+      · by_cases hq : q = p
+        · subst hq
+          have := mu_tau_self q hinv hs
+          exact ⟨this.le, fun _ => this⟩
+        · exact ⟨mu_tau_other p hinv hq hs, fun h => by cases h; exact absurd rfl hq⟩
 
 /-- **Main result for atomic base objects** (Algorithm 5 with atomic R-LLSC `head` and
 `announce[1..n]`, for an arbitrary object `A`): a linearizable, wait-free, state-quiescent

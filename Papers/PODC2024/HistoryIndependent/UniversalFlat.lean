@@ -61,17 +61,10 @@ open List
 
 variable (A : ObjSpec) (n : ℕ)
 
-/-- An atomic compare-and-swap object over `V` (as `casObject`, with classical equality
-decision, so that no decidable equality on the abstract object's states is needed). -/
-@[reducible] noncomputable def casC (V : Type) (v₀ : V) : ObjSpec where
-  State := V
-  Op := CASOp V
-  Resp := V ⊕ Bool
-  init := v₀
-  δ q
-    | .read => (q, .inl q)
-    | .write v => (v, .inr true)
-    | .cas old new => @ite _ (q = old) (Classical.propDecidable _) (new, .inr true) (q, .inr false)
+/-- An atomic compare-and-swap object over `V`: CSLib's `casObject` with the classical equality
+decision, so that no decidable equality on the abstract object's states is needed. -/
+@[reducible] noncomputable def casC (V : Type) (v₀ : V) : ObjSpec :=
+  @casObject V (Classical.decEq V) v₀
 
 /-- The base objects of the flattened implementation: one CAS object per R-LLSC object, holding
 the R-LLSC state `(val, context)` (Algorithm 6's encoding). -/
@@ -514,8 +507,10 @@ lemma InvL.extend_tau {α : List (Label (Fin n) A)} {L : List (OpId (Fin n) × A
     {D : Config A (B A n) (Fin n) (Loc A n)} {p : Fin n} (hI : InvL α L D)
     {D' : Config A (B A n) (Fin n) (Loc A n)} (hC : InvC L (curOf α) D'.pend D'.mem D'.loc) :
     InvL (α ++ [.tau p]) L D' := by
-  have hops := opsOf_snoc_of_ne (α := α) (ℓ := .tau p) (by simp)
-  have hresps := respsOf_snoc_of_ne (α := α) (ℓ := .tau p) (by simp)
+  have hops : ∀ q, opsOf (α ++ [.tau p]) q = opsOf α q :=
+    fun _ => opsOf_concat_of_ne (by simp)
+  have hresps : ∀ q, respsOf (α ++ [.tau p]) q = respsOf α q :=
+    fun _ => respsOf_concat_of_ne (by simp)
   have hcurE : curOf (α ++ [.tau p]) = curOf α := by funext q; simp [curOf, hops]
   refine ⟨by rw [hcurE]; exact hC, hI.nodup, fun y hy => ?_, fun x hx => ?_, fun x r hx => ?_⟩
   · rw [opOf_append_of_invoked (hI.invoked (List.mem_map_of_mem hy))]; exact hI.op_eq y hy
@@ -535,56 +530,47 @@ open Classical in
 invariant of Algorithm 5, with the linearization `hlinF`. -/
 theorem flat_invL {α : List (Label (Fin n) A)} {C : Config A (BF A n) (Fin n) (FLoc A n)}
     (h : (flat A n).run α = some C) : InvL α (hlinF A n α) (absC C) := by
-  induction α using List.reverseRecOn generalizing C with
-  | nil =>
-    simp [Impl.run] at h; subst h
-    exact inv_init
-  | append_singleton α ℓ ih =>
-    rw [Impl.run, Impl.runFrom_append] at h
-    cases hα : (flat A n).runFrom (flat A n).initCfg α with
-    | none => simp [hα] at h
-    | some C₀ =>
-      simp only [hα, Option.bind_some, Impl.runFrom_singleton] at h
-      have hI := ih hα
-      rw [hlinF_snoc]
-      cases ℓ with
-      | tau p =>
-        have hcon : contribFl α (.tau p) = if ∃ C', (flat A n).step C₀ (.tau p) = some C' ∧
-            (alg5 A n).step (absC C₀) (.tau p) = some (absC C') then
-            contribT (curOf α) (absC C₀) p else [] := by
-          simp only [contribFl]; rw [show (flat A n).run α = some C₀ from hα]
-        rw [hcon]
-        have hloc5 : LocInv p (C₀.loc p).l5 := (hI.invC.proc p).loc
-        obtain ⟨hpend, hlr, hS | hE | hJ⟩ := flat_tau hloc5 h
-        · split_ifs with hE'
-          · obtain ⟨C'', h'', hE''⟩ := hE'
-            rw [h] at h''; cases h''
-            exact hI.tauStep (fun j o hj => flat_opOf_curOf hα hj) hE''
-          · rw [append_nil]
-            refine hI.extend_tau ?_
-            have : absC C = absC C₀ := by
-              rw [absC_eq_of (p := p) (l := (C₀.loc p).l5) hpend hlr hS.2 hS.1]
-              simp [absC]
-            rw [this]; exact hI.invC
-        · rw [if_pos ⟨C, h, hE⟩]
-          exact hI.tauStep (fun j o hj => flat_opOf_curOf hα hj) hE
-        · split_ifs with hE'
-          · obtain ⟨C'', h'', hE''⟩ := hE'
-            rw [h] at h''; cases h''
-            exact hI.tauStep (fun j o hj => flat_opOf_curOf hα hj) hE''
-          · rw [append_nil]
-            refine hI.extend_tau ?_
-            rw [absC_eq_of (p := p) (l := (C.loc p).l5) hpend hlr rfl hJ.1]
-            exact hI.invC.jump hJ.2
-      | inv p o =>
-        rw [show contribFl α (.inv p o) = [] by simp [contribFl], append_nil]
-        exact hI.invStep (flat_inv h)
-      | ret p r =>
-        rw [show contribFl α (.ret p r) = [] by simp [contribFl], append_nil]
-        refine hI.retStep (fun hp => ?_) (flat_ret h)
-        rcases (flat A n).run_counts hα p with ⟨h1, -⟩ | ⟨-, h2⟩
-        · exact absurd h1 hp
-        · exact h2
+  refine Impl.run_induction (Q := fun α C => InvL α (hlinF A n α) (absC C)) inv_init
+    (fun α C₀ ℓ C hα hI h => ?_) h
+  rw [hlinF_snoc]
+  cases ℓ with
+  | tau p =>
+    have hcon : contribFl α (.tau p) = if ∃ C', (flat A n).step C₀ (.tau p) = some C' ∧
+        (alg5 A n).step (absC C₀) (.tau p) = some (absC C') then
+        contribT (curOf α) (absC C₀) p else [] := by
+      simp only [contribFl]; rw [show (flat A n).run α = some C₀ from hα]
+    rw [hcon]
+    have hloc5 : LocInv p (C₀.loc p).l5 := (hI.invC.proc p).loc
+    obtain ⟨hpend, hlr, hS | hE | hJ⟩ := flat_tau hloc5 h
+    · split_ifs with hE'
+      · obtain ⟨C'', h'', hE''⟩ := hE'
+        rw [h] at h''; cases h''
+        exact hI.tauStep (fun j o hj => flat_opOf_curOf hα hj) hE''
+      · rw [append_nil]
+        refine hI.extend_tau ?_
+        have : absC C = absC C₀ := by
+          rw [absC_eq_of (p := p) (l := (C₀.loc p).l5) hpend hlr hS.2 hS.1]
+          simp [absC]
+        rw [this]; exact hI.invC
+    · rw [if_pos ⟨C, h, hE⟩]
+      exact hI.tauStep (fun j o hj => flat_opOf_curOf hα hj) hE
+    · split_ifs with hE'
+      · obtain ⟨C'', h'', hE''⟩ := hE'
+        rw [h] at h''; cases h''
+        exact hI.tauStep (fun j o hj => flat_opOf_curOf hα hj) hE''
+      · rw [append_nil]
+        refine hI.extend_tau ?_
+        rw [absC_eq_of (p := p) (l := (C.loc p).l5) hpend hlr rfl hJ.1]
+        exact hI.invC.jump hJ.2
+  | inv p o =>
+    rw [show contribFl α (.inv p o) = [] by simp [contribFl], append_nil]
+    exact hI.invStep (flat_inv h)
+  | ret p r =>
+    rw [show contribFl α (.ret p r) = [] by simp [contribFl], append_nil]
+    refine hI.retStep (fun hp => ?_) (flat_ret h)
+    rcases (flat A n).run_counts hα p with ⟨h1, -⟩ | ⟨-, h2⟩
+    · exact absurd h1 hp
+    · exact h2
 
 /-! ## Linearizability and state-quiescent history independence (Theorem 32) -/
 
@@ -614,7 +600,7 @@ theorem flat_isLinFun : (flat A n).IsLinFun (hlinF A n) := by
     · exact absurd hbL hbβ
     · exact (List.Sublist.append (List.singleton_sublist.2 haβ) (List.singleton_sublist.2 hbL) :
         [a] ++ [b] <+ _)
-  · exact seqOK_of_specResp _ _ hI.nodup fun x r _ hr => hI.resp x r hr
+  · exact seqOK_of_respIn hI.nodup fun x r _ hr => hI.resp x r hr
 
 /-- **Theorem 32** (state-quiescent HI): in a state-quiescent configuration every CAS object
 holds the canonical value: `head = (⟨q, ⊥⟩, ∅)`, `announce[j] = (⊥, ∅)`, where `q` is the state

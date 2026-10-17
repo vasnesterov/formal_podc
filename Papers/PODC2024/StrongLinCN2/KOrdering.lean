@@ -1,4 +1,5 @@
-import Podc.StrongLin.Basic
+import Mathlib
+import Podc.SharedMemory.NSpec
 
 /-!
 # `k`-ordering objects (Definition 11) and the examples of Section 5

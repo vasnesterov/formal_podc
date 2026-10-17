@@ -1,4 +1,5 @@
 import Papers.PODC2026.ConsistentRefereeing.Cases
+import Cslib.Computability.Distributed.SharedMemory.BinaryReduction
 
 /-!
 # Theorem 5: the stack case
@@ -63,17 +64,6 @@ lemma respOf_transfer {α₁ α₂ β : List (Label P (contestObj P))} (h : resp
     respOf (α₁ ++ β) (ref, 0) = respOf (α₂ ++ β) (ref, 0) := by
   simp [respOf, respsOf_append, h]
 
-lemma Config.ext_of {C D : Config (contestObj P) B P L} (h1 : C.loc = D.loc) (h2 : C.pend = D.pend)
-    (h3 : C.mem = D.mem) : C = D := by
-  cases C; cases D; simp_all
-
-lemma step_tau_eq {C : Config (contestObj P) B P L} {p : P} (hp : C.pend p ≠ none) {a : ι}
-    {o : (B a).Op} {k : (B a).Resp → L} (hact : I.act p (C.loc p) = .access a o k) :
-    I.step C (.tau p) = some { C with
-      mem := Function.update C.mem a ((B a).δ (C.mem a) o).1
-      loc := Function.update C.loc p (k ((B a).δ (C.mem a) o).2) } := by
-  simp [step, hp, hact]
-
 variable (I ref) in
 /-- The canonical finishing execution: competitor `k` (invoked if necessary) runs solo to
 completion, then the referee invokes `decide` and runs solo to completion. -/
@@ -96,9 +86,9 @@ theorem exists_finish_labels (H : Hyps I ref) {α : List (Label P (contestObj P)
     rw [opsOf_append, href, opsOf_eq_nil_of_proc_ne (fun ℓ hℓ => by rw [hβ₀ ℓ hℓ]; exact hk)]
     rfl
   -- `k` completes
-  obtain ⟨β₁, D₁, hD₁, hD₁k, hβ₁p, hβ₁ops⟩ := exists_finish I ref H.lf hr₀ hA₀ k
+  obtain ⟨β₁, D₁, hD₁, hD₁k, hβ₁p, hβ₁ops⟩ := solo_finish I ref H.lf hr₀ hA₀ k
   have hr₁ : I.run (α ++ β₀ ++ β₁) = some D₁ := by rw [run_append_of_eq I hr₀, hD₁]
-  have hA₁ := hA₀.append_noInv ref (noInv_of_opsOf hβ₁ops)
+  have hA₁ := hA₀.append_noInv ref hβ₁ops
   have hops₁ : ∀ q, opsOf (α ++ β₀ ++ β₁) q = opsOf (α ++ β₀) q := fun q => by
     simp [opsOf_append, hβ₁ops q]
   have hcomp : respsOf (α ++ β₀ ++ β₁) k ≠ [] :=
@@ -110,10 +100,10 @@ theorem exists_finish_labels (H : Hyps I ref) {α : List (Label P (contestObj P)
   obtain ⟨E₁, hE₁, hAE₁⟩ := nxt_step I ref H.allowed hr₁ hA₁ hnx (fun _ => ⟨k, hk, hcomp⟩)
   have hrE₁ : I.run (α ++ β₀ ++ β₁ ++ [.inv ref .decide]) = some E₁ := by
     rw [run_append_of_eq I hr₁, runFrom_singleton, hE₁]
-  obtain ⟨γ, F₁, hF₁, hF₁r, hγp, hγops⟩ := exists_finish I ref H.lf hrE₁ hAE₁ ref
+  obtain ⟨γ, F₁, hF₁, hF₁r, hγp, hγops⟩ := solo_finish I ref H.lf hrE₁ hAE₁ ref
   have hrF : I.run (α ++ β₀ ++ β₁ ++ [.inv ref .decide] ++ γ) = some F₁ := by
     rw [run_append_of_eq I hrE₁, hF₁]
-  have hAF := hAE₁.append_noInv ref (noInv_of_opsOf hγops)
+  have hAF := hAE₁.append_noInv ref hγops
   have hops : opsOf (α ++ β₀ ++ β₁ ++ [.inv ref .decide] ++ γ) ref ≠ [] := by
     simp [opsOf_append]
   have hdone := respsOf_ne_nil_of_done I hrF hF₁r hops
@@ -201,7 +191,7 @@ lemma SRel.step {T : List V} {E₁ E₂ E₁' : Config (contestObj P) B P L} (h 
     · subst haR
       cases hpo : rep.push o with
       | some v =>
-        refine ⟨v :: T, _, step_tau_eq h0' hact', ⟨fun q' hq' => ?_, by rw [h1]; exact h.pend,
+        refine ⟨v :: T, _, step_tau_eq_some h0' hact', ⟨fun q' hq' => ?_, by rw [h1]; exact h.pend,
           fun a' ha' => ?_, ?_, ?_⟩⟩
         · rw [hl]
           by_cases e : q' = q
@@ -216,7 +206,7 @@ lemma SRel.step {T : List V} {E₁ E₂ E₁' : Config (contestObj P) B P L} (h 
         | cons t T =>
           have hhead : (rep.toList (E₁.mem a)).head? = (rep.toList (E₂.mem a)).head? := by
             rw [h.st₁, h.st₂]; rfl
-          refine ⟨T, _, step_tau_eq h0' hact', ⟨fun q' hq' => ?_, by rw [h1]; exact h.pend,
+          refine ⟨T, _, step_tau_eq_some h0' hact', ⟨fun q' hq' => ?_, by rw [h1]; exact h.pend,
             fun a' ha' => ?_, ?_, ?_⟩⟩
           · rw [hl]
             by_cases e : q' = q
@@ -226,7 +216,7 @@ lemma SRel.step {T : List V} {E₁ E₂ E₁' : Config (contestObj P) B P L} (h 
           · rw [hm]; simp [rep.pop_state _ o hpo, h.st₁]
           · simp [rep.pop_state _ o hpo, h.st₂]
     · have hma := h.mem a haR
-      refine ⟨T, _, step_tau_eq h0' hact', ⟨fun q' hq' => ?_, by rw [h1]; exact h.pend,
+      refine ⟨T, _, step_tau_eq_some h0' hact', ⟨fun q' hq' => ?_, by rw [h1]; exact h.pend,
         fun a' ha' => ?_, ?_, ?_⟩⟩
       · rw [hl]
         by_cases e : q' = q
@@ -377,7 +367,7 @@ theorem stack_push {i j k : P} (hi : i ≠ ref) (hj : j ≠ ref) (hk : k ≠ ref
     obtain ⟨mF₁, lF₁, pF₁⟩ := step_tau_mem hF₁' hactq
     have hactq₂ : I.act q (F₂.loc q) = .access R o kq := by rw [← hrelF.loc q hqQ]; exact hactq
     have hpq₂ : F₂.pend q ≠ none := by rw [← hrelF.pend]; exact hpq
-    have hF₂' := step_tau_eq hpq₂ hactq₂
+    have hF₂' := step_tau_eq_some hpq₂ hactq₂
     set F₂' := { F₂ with
       mem := Function.update F₂.mem R ((B R).δ (F₂.mem R) o).1
       loc := Function.update F₂.loc q (kq ((B R).δ (F₂.mem R) o).2) } with hF₂'def
@@ -388,7 +378,7 @@ theorem stack_push {i j k : P} (hi : i ≠ ref) (hj : j ≠ ref) (hk : k ≠ ref
     have hactF₂' : I.act i (F₂'.loc i) = .access R oi ki := by
       simp only [hF₂'def, Function.update_of_ne hqi.symm]; rw [hiF₂.1]; exact hai
     have hpF₂' : F₂'.pend i ≠ none := by simp only [hF₂'def]; rw [hiF₂.2]; exact hpendi
-    have hF₂'' := step_tau_eq hpF₂' hactF₂'
+    have hF₂'' := step_tau_eq_some hpF₂' hactF₂'
     -- the stacks after the pop of `q`
     have hstF₂' : rep.toList (F₂'.mem R) = X₂ ++ S := by
       simp only [hF₂'def, Function.update_self]
@@ -403,7 +393,7 @@ theorem stack_push {i j k : P} (hi : i ≠ ref) (hj : j ≠ ref) (hk : k ≠ ref
     have heq : F₁' = { F₂' with
         mem := Function.update F₂'.mem R ((B R).δ (F₂'.mem R) oi).1
         loc := Function.update F₂'.loc i (ki ((B R).δ (F₂'.mem R) oi).2) } := by
-      apply Config.ext_of
+      apply Config.ext'
       · funext p
         by_cases hpi : p = i
         · subst hpi; simp only [Function.update_self]; rw [hiF₁, hrespi]
@@ -433,7 +423,7 @@ theorem stack_push {i j k : P} (hi : i ≠ ref) (hj : j ≠ ref) (hk : k ≠ ref
         hAβ.of_prefix ⟨β₂, by rw [hβ]; simp⟩
       have h2 := Adm.transfer (α₂ := K.α ++ [.tau j]) h1 (by simpa using hA₂)
         (fun q => by simp [opsOf_append]) (fun q h => by simpa [respsOf_append] using h)
-      exact h2.append_noInv ref (fun ℓ hℓ q => by simp at hℓ; subst hℓ; rfl)
+      exact h2.append_noInv ref (fun q => by simp)
     have hA : Adm ref (K.α ++ [.tau j] ++ (β₁ ++ [.tau q] ++ [.tau i] ++ β₂)) := by
       have h1 : Adm ref (K.α ++ [.tau i] ++ [.tau j] ++ (β₁ ++ [.tau q]) ++ β₂) := by
         rw [hβ] at hAβ; simpa using hAβ
@@ -444,7 +434,7 @@ theorem stack_push {i j k : P} (hi : i ≠ ref) (hj : j ≠ ref) (hk : k ≠ ref
       rw [hlj, run_append_of_eq I hr₂, hrun]⟩, by rw [hlj]; simpa using hA, by
       rw [hlj, ← hw, hβ]
       have := respOf_transfer (ref := ref) (β := β₂) (hresps (β₁ ++ [.tau q]) ref)
-      simp only [List.append_assoc, List.cons_append, List.nil_append, List.singleton_append]
+      simp only [List.append_assoc, List.cons_append, List.nil_append]
         at this ⊢
       exact this.symm⟩
     exact hv (hwi.symm.trans hwj)

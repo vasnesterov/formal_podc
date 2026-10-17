@@ -253,7 +253,8 @@ lemma of_invoke_write (hH : InvH w Q v₀ C h g) {p : P} {v : V} {l : Loc P V}
   have hresps : ∀ q, respsOf (h ++ [.inv w (.write v)]) q = respsOf h q := by intro q; simp
   have hcompl := completed_append_of_not_ret (h := h) (ℓ := .inv w (.write v))
     (fun _ _ => by simp)
-  have hresp := respOf_append_of_not_ret (α := h) (ℓ := .inv w (.write v)) (fun _ _ => by simp)
+  have hresp : ∀ x, respOf (h ++ [.inv w (.write v)]) x = respOf h x := fun _ =>
+    respOf_concat_of_ne (by simp)
   have hreq : ∀ i, (C.loc i).phase ≠ .idle → ∀ m,
       Req w (h ++ [.inv w (.write v)]) g.rf i m ↔ Req w h g.rf i m := by
     intro i hi m
@@ -366,7 +367,8 @@ lemma of_invoke_read (hH : InvH w Q v₀ C h g) {p : P} {l : Loc P V}
   have hopsw : opsOf (h ++ [.inv p .read]) w = opsOf h w := by simp [hpw]
   have hresps : ∀ q, respsOf (h ++ [.inv p .read]) q = respsOf h q := by intro q; simp
   have hcompl := completed_append_of_not_ret (h := h) (ℓ := .inv p .read) (fun _ _ => by simp)
-  have hresp := respOf_append_of_not_ret (α := h) (ℓ := .inv p .read) (fun _ _ => by simp)
+  have hresp : ∀ x, respOf (h ++ [.inv p .read]) x = respOf h x := fun _ =>
+    respOf_concat_of_ne (by simp)
   have hreq : ∀ i, (C.loc i).phase ≠ .idle → ∀ m,
       Req w (h ++ [.inv p .read]) g.rf i m ↔ Req w h g.rf i m := by
     intro i hi m

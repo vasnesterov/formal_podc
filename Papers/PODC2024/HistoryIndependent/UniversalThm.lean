@@ -42,7 +42,7 @@ theorem isLinFun : (alg5 A n).IsLinFun (hlin A n) := by
     · exact absurd hbL hbβ
     · exact (List.Sublist.append (List.singleton_sublist.2 haβ) (List.singleton_sublist.2 hbL) :
         [a] ++ [b] <+ _)
-  · exact seqOK_of_specResp _ _ hI.nodup fun x r _ hr => hI.resp x r hr
+  · exact seqOK_of_respIn hI.nodup fun x r _ hr => hI.resp x r hr
 
 /-- Algorithm 5 is linearizable. -/
 theorem linearizable : (alg5 A n).Linearizable := ⟨_, isLinFun⟩

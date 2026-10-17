@@ -1,5 +1,9 @@
-import Podc.StrongLin.Basic
-import Podc.SharedMemory.Objects
+import Mathlib.Tactic.FinCases
+import Podc.SharedMemory.Compute
+import Podc.SharedMemory.Objects.FetchAdd
+import Podc.SharedMemory.Objects.Iface
+import Podc.SharedMemory.Objects.TestAndSet
+import Podc.SharedMemory.StrongLin.Basic
 
 /-!
 # Algorithm 2 (a set from test&set) is not strongly linearizable
@@ -47,8 +51,9 @@ Hence no prefix-closed linearization function exists (`alg2_not_stronglyLineariz
 
 * The implemented set is the nondeterministic sequential specification `setSpec`
   (`NSpec`, states `Set ℕ`, `take` returns any element, or `empty` on the empty set).
-  The `ObjSpec` `setOps` is only used for its operation/response types: its transition function
-  is a dummy and is **never used** (`NStronglyLinearizable` only refers to `setSpec`).
+  The `ObjSpec` `setOps` is only used for its operation/response types: it is the
+  interface-only object `ObjSpec.iface SetOp SetResp`, whose transition function is a dummy and
+  is **never used** (`NStronglyLinearizable` only refers to `setSpec`).
 * Items are natural numbers; `⊥` is `none`. Processes: `Fin 3`.
 * One base-object access per step; local computation (loop bounds, the final test of an
   iteration) is folded into the transitions (`next`).
@@ -73,9 +78,11 @@ inductive SetResp where
   | item (x : ℕ)
   deriving DecidableEq
 
+instance : Inhabited SetResp := ⟨.ok⟩
+
 /-- The implemented object: only its operation and response types are used. The transition
 function is a dummy, never used: the sequential specification is `setSpec`. -/
-abbrev setOps : ObjSpec := ⟨Unit, SetOp, SetResp, (), fun _ _ => ((), .ok)⟩
+abbrev setOps : ObjSpec := ObjSpec.iface SetOp SetResp
 
 /-- Transitions of the sequential set: `put x` adds `x` and returns `ok`; `take` returns `empty`
 on the empty set, otherwise removes and returns an arbitrary element. -/
@@ -162,65 +169,9 @@ def alg2 (countTaken : Bool) : Impl setOps base (Fin 3) Loc where
 abbrev Cfg := Config setOps base (Fin 3) Loc
 abbrev Lbl := Label (Fin 3) setOps
 
-/-- A computable copy of `Impl.step` for `alg2` (`Impl.step` decides `allowed` classically). -/
-def cstep (countTaken : Bool) (C : Cfg) : Lbl → Option Cfg
-  | .inv p o =>
-    if C.pend p = none then
-      some { C with pend := Function.update C.pend p (some o),
-                    loc := Function.update C.loc p (invoke o) }
-    else none
-  | .tau p =>
-    if C.pend p = none then none else
-    match act countTaken (C.loc p) with
-    | .access i o k =>
-      some { C with mem := Function.update C.mem i ((base i).δ (C.mem i) o).1,
-                    loc := Function.update C.loc p (k ((base i).δ (C.mem i) o).2) }
-    | .ret _ _ => none
-  | .ret p r =>
-    if C.pend p = none then none else
-    match act countTaken (C.loc p) with
-    | .access _ _ _ => none
-    | .ret r' l =>
-      if r = r' then
-        some { C with pend := Function.update C.pend p none, loc := Function.update C.loc p l }
-      else none
-
-lemma step_eq_cstep (countTaken : Bool) (C : Cfg) (ℓ : Lbl) :
-    (alg2 countTaken).step C ℓ = cstep countTaken C ℓ := by
-  cases ℓ with
-  | inv p o =>
-    simp only [Impl.step, cstep, alg2, and_true]
-  | tau p =>
-    simp only [Impl.step, cstep, alg2]
-    split_ifs
-    · rfl
-    · generalize act countTaken (C.loc p) = a
-      cases a <;> rfl
-  | ret p r =>
-    simp only [Impl.step, cstep, alg2]
-    split_ifs
-    · rfl
-    · generalize act countTaken (C.loc p) = a
-      cases a
-      · rfl
-      · simp only
-
-/-- Computable run. -/
-def crunFrom (countTaken : Bool) (C : Cfg) : List Lbl → Option Cfg
-  | [] => some C
-  | ℓ :: α => (cstep countTaken C ℓ).bind (fun C' => crunFrom countTaken C' α)
-
-lemma runFrom_eq_crunFrom (countTaken : Bool) (C : Cfg) (α : List Lbl) :
-    (alg2 countTaken).runFrom C α = crunFrom countTaken C α := by
-  induction α generalizing C with
-  | nil => rfl
-  | cons ℓ α ih => simp only [Impl.runFrom_cons, crunFrom, step_eq_cstep, ih]
-
-lemma valid_of_crun (countTaken : Bool) (α : List Lbl)
-    (h : (crunFrom countTaken (alg2 countTaken).initCfg α).isSome = true) :
-    (alg2 countTaken).Valid α := by
-  rw [Impl.Valid, Impl.run, runFrom_eq_crunFrom]
-  exact Option.isSome_iff_exists.1 h
+instance (countTaken : Bool) (p : Fin 3) (o : SetOp) :
+    Decidable ((alg2 countTaken).allowed p o) :=
+  inferInstanceAs (Decidable True)
 
 /-! ## The executions -/
 
@@ -238,10 +189,10 @@ def exB : List Lbl := pre ++ [.tau 2, .ret 2 .empty]
 def exA : List Lbl := pre ++ [.tau 1, .ret 1 .ok, .tau 2, .tau 2, .ret 2 (.item 2)]
 
 theorem valid_B (countTaken : Bool) : (alg2 countTaken).Valid exB := by
-  apply valid_of_crun; cases countTaken <;> decide +kernel
+  apply Impl.valid_of_crun; cases countTaken <;> decide +kernel
 
 theorem valid_A (countTaken : Bool) : (alg2 countTaken).Valid exA := by
-  apply valid_of_crun; cases countTaken <;> decide +kernel
+  apply Impl.valid_of_crun; cases countTaken <;> decide +kernel
 
 theorem valid_pre (countTaken : Bool) : (alg2 countTaken).Valid pre :=
   (alg2 countTaken).valid_of_prefix (valid_B countTaken) (List.prefix_append _ _)
