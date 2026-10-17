@@ -12,7 +12,6 @@ import Podc.Foundations.Combinatorics.SimpleGraph.BlockingSet
 import Podc.Foundations.Combinatorics.SimpleGraph.Cycle
 import Podc.Foundations.Data.Finset.Quorum
 import Podc.Foundations.Data.Nat.Descent
-import Podc.Computability.Distributed.SharedMemory.Progress
 import Podc.Foundations.Data.Nat.Log
 import Podc.Foundations.Data.Nat.LogStar
 import Podc.Foundations.Data.Real.Logb
