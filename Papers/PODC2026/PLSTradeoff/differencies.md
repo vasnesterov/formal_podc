@@ -93,7 +93,8 @@ Labeling Schemes*, PODC 2026 (arXiv:2605.19078v1). Numbering follows the arXiv v
   characterization `cen_eq_iff`. Radius indices range over `Fin (3K+3)` (radii `2K+2, …, 8K+6`, where
   `K = t⌈log₂ n⌉`) instead of `{2K+2, …, 8K}`, so that `n = 1` is not degenerate; weak diameter
   `16K + 12`. Probability is replaced by counting over all assignments `V → Fin (3K+3)` (uniform
-  distribution), via a fibre-counting lemma along the identifier order (`card_all_bad_le`).
+  distribution), via fibre counting along the identifier order
+  (`Cslib.Probability.pow_mul_card_filter_forall_le`).
 * **Section 5.2 verifier.** The reconstructed cluster of `u` keeps only nodes within `2ρ` of `u`
   (`ρ = 8K + 6` the largest radius), which makes it computable in the local view without changing it.
   The shared index is decoded by `decIdx`; garbage strings decode to index `0`.

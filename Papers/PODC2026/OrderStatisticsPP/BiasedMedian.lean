@@ -1,4 +1,5 @@
 import Papers.PODC2026.OrderStatisticsPP.CopyOrMax
+import Mathlib.Probability.Distributions.Binomial
 
 /-!
 # Biased-Median dynamics: binomial fixation law (Theorem 2, Corollary 3)
@@ -11,7 +12,8 @@ Section 4.5: an agent `u` is drawn uniformly at random and samples two agents `v
 Here `p ∈ (0, 1/2]`. The Median dynamics is `p = 1/2`.
 
 * `biasedMedian_fixation`, `biasedMedian_fixation_injective` (**Theorem 2**): fixation on the
-  `k`-th smallest opinion has probability `C(n-1, k-1) p^(n-k) (1-p)^(k-1)`.
+  `k`-th smallest opinion has probability `C(n-1, k-1) p^(n-k) (1-p)^(k-1)`, i.e.
+  `P[X = k - 1]` for `X ~ Bin(n-1, 1-p)` (`binomLaw_eq_binomial`).
 * `twoChoices_eq_median`, `twoChoices_fixation` (**Corollary 3**): binary 2-Choices with `n₁`
   agents holding `1` (`true`) fixes on `1` with probability `P[X < n₁]`, `X ~ Bin(n-1, 1/2)`.
 -/
@@ -29,6 +31,14 @@ variable {n : ℕ} {α : Type*} [LinearOrder α] [Fintype α]
 /-- The shifted binomial law on ranks `1, …, n`: `π_k = C(n-1, k-1) p^(n-k) (1-p)^(k-1)`. -/
 noncomputable def binomLaw (n : ℕ) (p : ℝ) (k : ℕ) : ℝ :=
   (Nat.choose (n - 1) (k - 1) : ℝ) * p ^ (n - k) * (1 - p) ^ (k - 1)
+
+open ProbabilityTheory unitInterval in
+/-- `binomLaw n p k` is `P[X = k - 1]` for `X ~ Bin(n - 1, 1 - p)` (Mathlib's
+`ProbabilityTheory.binomial`): the rank of the fixation opinion is `1 + Bin(n - 1, 1 - p)`. -/
+lemma binomLaw_eq_binomial (p : I) {k : ℕ} (hk : 1 ≤ k) :
+    binomLaw n p k = (binomial (n - 1) (σ p)).real {k - 1} := by
+  rw [binomial_real_singleton, coe_symm_eq, binomLaw, show n - 1 - (k - 1) = n - k by omega]
+  ring
 
 lemma cumul_binomLaw (p : ℝ) (hn : 0 < n) : cumul (binomLaw n p) n = 1 := by
   rw [cumul_eq_sum_range]

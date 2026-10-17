@@ -65,7 +65,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
   uniform samples; 2-Choices and 3-Majority are binary.
 - The fixation probability of `x` is `lim_{t→∞} P[X_t = (x,…,x)]`. Consensus is absorbing, so this is the
   probability of eventual consensus on `x`. The limit's existence is proved, not assumed. With ties, the
-  probability of `x` is the sum of `π_k` over its ranks.
+  probability of `x` is the sum of `π_k` over its ranks. The binomial law of Theorem 2 is Mathlib's
+  `ProbabilityTheory.binomial` (`binomLaw_eq_binomial`: `π_k = P[Bin(n-1, 1-p) = k-1]`).
 - Proof route differs from the paper: harmonic functions of threshold counts plus a finite-chain absorption
   lemma, instead of rank ancestry plus Perron–Frobenius. The paper's rank-ancestry lemmas are verified
   separately.

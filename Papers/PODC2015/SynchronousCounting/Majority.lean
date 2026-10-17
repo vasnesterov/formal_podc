@@ -7,7 +7,8 @@ import Podc.Foundations.Count
 `maj s` returns a value held by a strict majority of the indices of `s : Fin n → α`, and a default
 `0`-like value if there is none (the paper: "`majority x = a` if `a` is contained in `x` more than
 half of the times, `∗` otherwise"). It is computable: it scans the indices for the first one whose
-value has a strict majority.
+value has a strict majority; `maj_eq_majority?` identifies it with the library selector
+`Finset.majority?`.
 -/
 
 namespace SynchronousCounting
@@ -29,20 +30,17 @@ lemma eq_of_two_maj {n : ℕ} (s : Fin n → α) {a b : α} (ha : n < 2 * cnt s 
   Finset.eq_of_card_lt_countEq_add_countEq (s := .univ) (f := s)
     (by rw [Finset.card_univ, Fintype.card_fin]; change n < cnt s a + cnt s b; omega)
 
+/-- `maj` is the library's strict-majority selector `Finset.majority?` (with default `d`). -/
+lemma maj_eq_majority? {n : ℕ} (s : Fin n → α) (d : α) :
+    maj s d = (Finset.univ.majority? fun j => some (s j)).getD d := by
+  unfold maj
+  rw [← Finset.find?_map_eq_majority? (L := List.finRange n) (fun j _ => List.mem_finRange j)
+    (p := fun j => decide (n < 2 * cnt s (s j))) (fun j => by simp)]
+  cases (List.finRange n).find? fun j => decide (n < 2 * cnt s (s j)) <;> rfl
+
 /-- If `a` holds a strict majority, the majority vote returns `a`. -/
 lemma maj_eq {n : ℕ} (s : Fin n → α) (d : α) {a : α} (ha : n < 2 * cnt s a) : maj s d = a := by
-  obtain ⟨j₀, -, hj₀⟩ := Finset.exists_mem_of_countEq_pos (show 0 < cnt s a by omega)
-  unfold maj
-  split
-  · rename_i j hj
-    have := List.find?_some hj
-    simp only [decide_eq_true_eq] at this
-    exact eq_of_two_maj s this ha
-  · rename_i hnone
-    rw [List.find?_eq_none] at hnone
-    have := hnone j₀ (List.mem_finRange j₀)
-    simp only [hj₀, decide_eq_true_eq] at this
-    exact absurd ha this
+  rw [maj_eq_majority?, Finset.majority?_eq_some_iff.2 (by simpa using ha), Option.getD_some]
 
 /-- A sufficient condition for a strict majority: all indices outside a set `B` with
 `2 |B| < n` hold `a`. -/
