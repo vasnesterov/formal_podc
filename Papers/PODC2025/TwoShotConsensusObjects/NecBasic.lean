@@ -120,35 +120,6 @@ lemma accCount_congr_of_agreeAll {i : ι} {C D : Cfg A} (h : AgreeAll i C D) (γ
     rw [this, ← objOf_congr (h.1 p)]
     omega
 
-/-- Two steps on the same object: if the response and new value of `q`'s operation do not depend
-on whether `p`'s operation was applied first, then `E p q` and `E q` are indistinguishable to `q`. -/
-lemma agreeOn_two_steps {E : Cfg A} {p q : Fin n} (hpq : p ≠ q) {i : ι} {op oq : (T i).Op}
-    {κp κq : (T i).Resp → A.L} (hop : A.act (E.loc p) = .access i op κp)
-    (hoq : A.act (E.loc q) = .access i oq κq)
-    (hs : (T i).δ ((T i).δ (E.mem i) op).1 oq = (T i).δ (E.mem i) oq) :
-    AgreeOn {q} ((E.next (.step p)).next (.step q)) (E.next (.step q)) := by
-  have hoq' : A.act ((E.next (.step p)).loc q) = .access i oq κq := by
-    rw [next_loc_other E _ (by simpa using hpq.symm)]; exact hoq
-  have hm : (E.next (.step p)).mem i = ((T i).δ (E.mem i) op).1 := by
-    simp [Cfg.next, stepP_of_access E hop]
-  have hmj : ∀ j, j ≠ i → (E.next (.step p)).mem j = E.mem j := fun j hj => by
-    simp [Cfg.next, stepP_of_access E hop, Function.update_of_ne hj]
-  simp only [Cfg.next] at hoq' ⊢
-  rw [stepP_of_access _ hoq', stepP_of_access E hoq]
-  refine ⟨?_, fun r hr => ?_⟩
-  · funext j
-    by_cases hj : j = i
-    · subst hj; simp only [Function.update_self]; rw [show (E.stepP p).mem j = _ from hm, hs]
-    · simp only [Function.update_of_ne hj]; exact hmj j hj
-  · simp only [Set.mem_singleton_iff] at hr
-    subst hr
-    refine ⟨?_, ?_⟩
-    swap
-    · show (E.stepP p).inp r = E.inp r
-      unfold Cfg.stepP; split <;> rfl
-    simp only [Function.update_self]
-    rw [show (E.stepP p).mem i = _ from hm, hs]
-
 end Generic
 
 /-! ## Critical executions -/

@@ -12,14 +12,14 @@ a direct valency proof instead.
 Proof. Take a critical configuration (CSLib: `biv_initial`, `exists_crit`); all processes are
 poised on the same object (`Crit.poised`), and some process `p` is on team `0`, some `q` on
 team `1`.
-* A read/write object is impossible (`crit_overwrite`: a read or failing operation followed by
-  anything, or two blind writes).
+* A read/write object is impossible (`Crit.not_forall_poised_of_rwLike`: a read or failing
+  operation followed by anything, or two blind writes).
 * On an asset-transfer object: if `p`'s operation is a read or a failing transfer it does not
-  change the state (`crit_overwrite`); likewise for `q`. So both are successful transfers, by
-  their callers (`Honest`), hence `p` and `q` own the source accounts. If the source accounts
-  differ, the two transfers commute (`crit_commute`). So **every** pair of processes on opposite
-  teams withdraws from one common account `a`, and then every process (being on some team) owns
-  `a`: `|μ(a)| ≥ n > k`.
+  change the state (`Team.false_of_absorb`); likewise for `q`. So both are successful transfers,
+  by their callers (`Honest`), hence `p` and `q` own the source accounts. If the source accounts
+  differ, the two transfers commute (`Team.false_of_commute`). So **every** pair of processes on
+  opposite teams withdraws from one common account `a`, and then every process (being on some
+  team) owns `a`: `|μ(a)| ≥ n > k`.
 -/
 
 namespace CryptoCons
@@ -50,24 +50,24 @@ theorem at_pair {A : Alg n (atSys R μ)} (hA : WFConsensus A) (hH : Honest R μ 
   -- `p`'s operation changes the state
   cases o with
   | read a =>
-    exact (crit_overwrite hA hC hc hp hq hvw hpa hqa rfl).elim
+    exact (hp.false_of_absorb hA admOK_crashFree hC hc.1 hq hwv hpa hqa rfl).elim
   | transfer p' a b y =>
     have hp' : p' = p := hH x α hcf p j p' a b y κ hpa
     subst hp'
     by_cases hok : p' ∈ μ j a ∧ y ≤ s a
     swap
-    · exact (crit_overwrite hA hC hc hp hq hvw hpa hqa
+    · exact (hp.false_of_absorb hA admOK_crashFree hC hc.1 hq hwv hpa hqa
         (by rw [show ((atSys R μ (.inr j)).δ (E.mem (.inr j)) (.transfer p' a b y)).1 =
           E.mem (.inr j) from congrArg Prod.fst (atSpec_transfer_neg (q₀ := fun _ => 0) hok)])).elim
     cases o' with
     | read a' =>
-      exact (crit_overwrite hA hC hc hq hp hwv hqa hpa rfl).elim
+      exact (hq.false_of_absorb hA admOK_crashFree hC hc.1 hp hvw hqa hpa rfl).elim
     | transfer q' a' b' y' =>
       have hq' : q' = q := hH x α hcf q j q' a' b' y' κ' hqa
       subst hq'
       by_cases hok' : q' ∈ μ j a' ∧ y' ≤ s a'
       swap
-      · exact (crit_overwrite hA hC hc hq hp hwv hqa hpa
+      · exact (hq.false_of_absorb hA admOK_crashFree hC hc.1 hp hvw hqa hpa
           (by rw [show ((atSys R μ (.inr j)).δ (E.mem (.inr j)) (.transfer q' a' b' y')).1 =
             E.mem (.inr j) from congrArg Prod.fst (atSpec_transfer_neg (q₀ := fun _ => 0) hok')])).elim
       by_cases haa : a = a'
@@ -84,7 +84,7 @@ theorem at_pair {A : Alg n (atSys R μ)} (hA : WFConsensus A) (hH : Honest R μ 
         have e4 : S.δ (moveFunds s a' b' y') (.transfer p' a b y) =
             (moveFunds (moveFunds s a' b' y') a b y, .inl true) :=
           atSpec_transfer_pos ⟨hok.1, hok.2.trans (le_moveFunds_of_ne s y' haa)⟩
-        refine crit_commute hA hC hc hp hq hvw hpa hqa ?_ ?_
+        refine hp.false_of_commute hA admOK_crashFree hC hc.1 hq hwv hpa hqa ?_ ?_
         · change (S.δ (S.δ s (.transfer p' a b y)).1 (.transfer q' a' b' y')).1 =
             (S.δ (S.δ s (.transfer q' a' b' y')).1 (.transfer p' a b y)).1
           rw [e1, e2, e3, e4]
@@ -110,16 +110,7 @@ theorem no_consensus {k : ℕ} (hn : 2 ≤ n) (hkn : k < n) (hR : ∀ j, (R j).R
   obtain ⟨⟨p, hp⟩, ⟨q, hq⟩⟩ := hc.teams hA admOK_crashFree hC hn0
   rcases i with j | j
   · -- all processes poised on a read/write object
-    obtain ⟨o, κ, ho⟩ := hi p
-    obtain ⟨o', κ', ho'⟩ := hi q
-    set s := (run (initCfg A x) α).mem (.inl j)
-    rcases hR j o with hro | hbw
-    · exact crit_overwrite hA hC hc hp hq (by simp) ho ho'
-        (congrArg (fun t => (atSys R μ (.inl j)).δ t o') (hro s))
-    · rcases hR j o' with hro' | hbw'
-      · exact crit_overwrite hA hC hc hq hp (by simp) ho' ho
-          (congrArg (fun t => (atSys R μ (.inl j)).δ t o) (hro' s))
-      · exact crit_overwrite hA hC hc hp hq (by simp) ho ho' (hbw' _ _)
+    exact hc.not_forall_poised_of_rwLike hA admOK_crashFree hC hn0 (i := .inl j) (hR j) hi
   · -- all processes poised on the asset-transfer object `j`
     choose o κ ho using hi
     obtain ⟨a, b, y, b', y', hpo, hqo, -, -⟩ := at_pair hA hH hc hp hq (by simp) (ho p) (ho q)

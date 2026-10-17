@@ -22,21 +22,16 @@ section Steps
 variable {C : Cfg A} {p : Fin 2} {k : ιS} {o : O.Op} {κ : O.Resp → A.L}
 
 lemma stepK_loc_self (h : A.act (C.loc p) = .access (.inr k) o κ) :
-    (C.next (.step p)).loc p = κ (O.δ (C.mem (.inr k)) o).2 := by
-  simp [Cfg.next, stepP_of_access C h]
+    (C.next (.step p)).loc p = κ (O.δ (C.mem (.inr k)) o).2 := stepP_loc_self C h
 
 lemma stepK_loc_other (h : A.act (C.loc p) = .access (.inr k) o κ) {q : Fin 2} (hq : q ≠ p) :
     (C.next (.step p)).loc q = C.loc q := next_loc_other C _ (by simpa using hq)
 
 lemma stepK_mem_self (h : A.act (C.loc p) = .access (.inr k) o κ) :
-    (C.next (.step p)).mem (.inr k) = (O.δ (C.mem (.inr k)) o).1 := by
-  simp only [Cfg.next, stepP_of_access C h]
-  exact Function.update_self _ _ _
+    (C.next (.step p)).mem (.inr k) = (O.δ (C.mem (.inr k)) o).1 := stepP_mem_self C h
 
 lemma stepK_mem_other (h : A.act (C.loc p) = .access (.inr k) o κ) {j : ιR ⊕ ιS}
-    (hj : j ≠ .inr k) : (C.next (.step p)).mem j = C.mem j := by
-  simp only [Cfg.next, stepP_of_access C h]
-  exact Function.update_of_ne hj _ _
+    (hj : j ≠ .inr k) : (C.next (.step p)).mem j = C.mem j := stepP_mem_other C h hj
 
 lemma stepK_objOf (h : A.act (C.loc p) = .access (.inr k) o κ) : objOf C p = some (.inr k) := by
   simp [objOf, h]
@@ -83,9 +78,6 @@ lemma solo_accCount_self {C : Cfg A} {r : Fin 2} {i : ιR ⊕ ιS} {t : ℕ}
     rw [hs, accCount_append, ih (fun t' ht' => hno t' (by omega))]
     simp [accCount_cons, hno t (by omega)]
 
-lemma solo_crashFree (r : Fin 2) (t : ℕ) : CrashFree (solo r t : List (Ev 2)) :=
-  crashFree_replicate t r
-
 lemma crashFree_single (r : Fin 2) : CrashFree [(Ev.step r : Ev 2)] := by
   simpa using crashFree_steps (n := 2) [r]
 
@@ -108,7 +100,7 @@ lemma done_noAcc (h2 : TwoShot A) (x : Fin 2 → Bool) {γ : List (Ev 2)} (hγ :
     objOf (run (run (initCfg A x) γ) (solo r t)) r ≠ some (.inr k) := by
   intro h
   have := h2 x (γ ++ solo r t ++ [.step r])
-    ((hγ.append (solo_crashFree r t)).append (crashFree_single r)) r k
+    ((hγ.append (crashFree_replicate t r)).append (crashFree_single r)) r k
   rw [accCount_append, accCount_append] at this
   have h1 : accCount (run (initCfg A x) (γ ++ solo r t)) [.step r] r (.inr k) = 1 := by
     rw [run_append]; simp [accCount_cons, h]
@@ -293,13 +285,13 @@ lemma Cnt.next_self {r : Fin 2} {X : Cfg A} {c : ℕ} (h : S.Cnt r X c) {o : O.O
 
 lemma Cnt.solo_other {r q : Fin 2} (hq : q ≠ r) {X : Cfg A} {c : ℕ} (h : S.Cnt r X c) (t : ℕ) :
     S.Cnt r (run X (solo q t)) c := by
-  have := h.ext (solo q t) (solo_crashFree q t)
+  have := h.ext (solo q t) (crashFree_replicate t q)
   rwa [solo_accCount_other (Ne.symm hq), Nat.add_zero] at this
 
 lemma Cnt.solo_self {r : Fin 2} {X : Cfg A} {c : ℕ} (h : S.Cnt r X c) {t : ℕ}
     (hno : ∀ t' < t, objOf (run X (solo r t')) r ≠ some (.inr S.k)) :
     S.Cnt r (run X (solo r t)) c := by
-  have := h.ext (solo r t) (solo_crashFree r t)
+  have := h.ext (solo r t) (crashFree_replicate t r)
   rwa [solo_accCount_self hno, Nat.add_zero] at this
 
 /-- A process that has applied two operations to copy `k` never accesses it again. -/

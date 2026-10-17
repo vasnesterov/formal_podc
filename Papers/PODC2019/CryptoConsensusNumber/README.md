@@ -93,7 +93,8 @@ directly rather than through Lemma 2. At a critical configuration all processes 
 object. A read, a failing transfer or a blind write cannot be critical. Successful transfers from
 different accounts commute. So every two processes on opposite teams withdraw from one common
 account. Every process is on some team, so all `n` processes own that account, and `n ≤ k`
-(`at_pair`, `no_consensus`; generic lemmas `crit_overwrite`, `crit_commute` in `Valency.lean`).
+(`at_pair`, `no_consensus`; generic lemmas `Team.false_of_absorb`, `Team.false_of_commute`,
+`Crit.not_forall_poised_of_rwLike` in `Podc/Computability/Distributed/SharedMemory/Recoverable.lean`).
 This needs neither the cited `k`-consensus hierarchy result nor composition of implementations,
 and it allows any number of objects with different owner maps.
 
@@ -114,5 +115,5 @@ current operation instance `curOp` and `opOf_append_of_eq_some`, `linState_conca
 (`Cslib/Computability/Distributed/SharedMemory/History.lean`), and `Fintype.sum_comp_update_add`
 (`Cslib/Foundations/Data/Finset/SumUpdate.lean`).
 `Fig3Example.lean` instantiates Lemma 2 (2 processes, one shared account, `k = 2`). CSLib candidates:
-`snapObj`, `kConsObj`, `crit_overwrite`, `crit_commute`, `stepP_stepP_same`, and
+`snapObj`, `kConsObj`, and
 `not_mem_append_single` (`Fig1.lean`).

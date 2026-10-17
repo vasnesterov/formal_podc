@@ -24,13 +24,6 @@ set_option linter.unusedSectionVars false
 
 variable {ι : Type} [DecidableEq ι] {T : ι → ObjSpec} {n : ℕ} {A : Alg n T}
 
-/-! ## Reachability with arbitrary crashes -/
-
-lemma reach_run {C : Cfg A} (hC : Reach A (fun _ => True) C) (β : List (Ev n)) :
-    Reach A (fun _ => True) (run C β) := by
-  obtain ⟨x, γ, -, rfl⟩ := hC
-  exact ⟨x, γ ++ β, trivial, by rw [run_append]⟩
-
 /-! ## Schedules of distinct processes poised on one object -/
 
 /-- Value of `O` after each process of `σ` takes one step from `E`. -/

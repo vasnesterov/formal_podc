@@ -160,7 +160,7 @@ theorem c34 (hA : WFConsensus A) (h2 : TwoShot A)
   refine ⟨ta, ca, κca, hnoA, hca, ?_⟩
   set Za1 := run Zab (solo a ta) with hZa1
   set Zba1 := run Zba (solo a ta) with hZba1
-  have hall1 : AgreeAll (.inr k) Za1 Zba1 := hall.run _ (solo_crashFree a ta) (fun p => by
+  have hall1 : AgreeAll (.inr k) Za1 Zba1 := hall.run _ (crashFree_replicate ta a) (fun p => by
     by_cases hp : p = a
     · subst hp; exact solo_accCount_self hnoA
     · exact solo_accCount_other hp ta _)
@@ -173,9 +173,9 @@ theorem c34 (hA : WFConsensus A) (h2 : TwoShot A)
   have hEa1k : Ea1.mem (.inr k) = (O.δ s fa).1 := by rw [hEa1, solo_noAcc_mem hnoEa, hEak]
   have hZba1k : Zba1.mem (.inr k) = (O.δ (O.δ s fb).1 fa).1 := by
     rw [hZba1, solo_noAcc_mem (noAcc_transfer (hall.agreeExcept a) hnoA), hZbak]
-  have hBZa1 : S.Branch a Za1 := hBZab.ext _ (solo_crashFree a ta)
-  have hBZba1 : S.Branch b Zba1 := hBZba.ext _ (solo_crashFree a ta)
-  have hBEa1 : S.Branch a Ea1 := hBEa.ext _ (solo_crashFree a ta)
+  have hBZa1 : S.Branch a Za1 := hBZab.ext _ (crashFree_replicate ta a)
+  have hBZba1 : S.Branch b Zba1 := hBZba.ext _ (crashFree_replicate ta a)
+  have hBEa1 : S.Branch a Ea1 := hBEa.ext _ (crashFree_replicate ta a)
   -- `b` runs solo next
   obtain ⟨tb, hnoB, cb, κcb, hcb⟩ := S.must_access' hA hab hBZa1 hBZba1 (hall1.agreeExcept b)
   refine ⟨tb, cb, κcb, hnoB, hcb, ?_⟩
@@ -261,13 +261,13 @@ theorem c34 (hA : WFConsensus A) (h2 : TwoShot A)
     ((((hcntE b).next_other hab).solo_other hab ta).next_other hab).next_self hPb'
   have hcbP2 : S.Cnt b (P'1.next (.step b)) 2 := (hcbP'.solo_self hnoP').next_self hcbP
   have hcaP2 : S.Cnt a (P'1.next (.step b)) 2 := ((hcaP.next_other hab').solo_other hab' tb).next_other hab'
-  have hBP2 : S.Branch a (P'1.next (.step b)) := (hBP'.ext _ (solo_crashFree b tb)).next b
+  have hBP2 : S.Branch a (P'1.next (.step b)) := (hBP'.ext _ (crashFree_replicate tb b)).next b
   -- (3), `b`'s part
   have hB3 : (O.δ (O.δ (O.δ (O.δ s fa).1 ca).1 fb).1 cb).2 ≠
       (O.δ (O.δ (O.δ (O.δ s fb).1 fa).1 ca).1 cb).2 := by
     intro heq
-    refine S.contra' hA h2 hab hBP2 ((hBQ.ext _ (solo_crashFree b tb)).next b) ⟨?_, fun j hj => ?_⟩
-      hcbP2 le_rfl
+    refine S.contra' hA h2 hab hBP2 ((hBQ.ext _ (crashFree_replicate tb b)).next b)
+      ⟨?_, fun j hj => ?_⟩ hcbP2 le_rfl
     · rw [stepK_loc_self hcbP, stepK_loc_self hcbQ, hP'1k, hQ1k, heq]
     · rw [stepK_mem_other hcbP hj, stepK_mem_other hcbQ hj, hmemPQ j hj]
   -- `f_b fₐ c_b cₐ`
@@ -277,7 +277,7 @@ theorem c34 (hA : WFConsensus A) (h2 : TwoShot A)
     rw [hR1, stepK_loc_other hcbZ hab, hZba2a]; exact hcaZba
   have hR1k : R1.mem (.inr k) = (O.δ (O.δ (O.δ s fb).1 fa).1 cb).1 := by
     rw [hR1, stepK_mem_self hcbZ, hZba2k]
-  have hBR1 : S.Branch b R1 := (hBZba1.ext _ (solo_crashFree b tb)).next b
+  have hBR1 : S.Branch b R1 := (hBZba1.ext _ (crashFree_replicate tb b)).next b
   have hA4 : (O.δ (O.δ s fa).1 ca).2 ≠ (O.δ (O.δ (O.δ (O.δ s fb).1 fa).1 cb).1 ca).2 := by
     intro heq
     refine S.contra' hA h2 hab hBP2 (hBR1.next a) ⟨?_, fun j hj => ?_⟩ hcaP2 le_rfl

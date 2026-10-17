@@ -98,7 +98,7 @@ Herlihy–Ruppert and Ruppert's classes is not, since it is discussion only.
 
 **CSLib candidates** (generic over CSLib's `Recoverable.Alg`):
 - `TwoShot`/`Allowed`, `twoShot_of_budget`, `allowed_of_inv` (`Model.lean`);
-- `AgreeExcept`/`AgreeAll`, `agreeOn_two_steps` (`NecBasic.lean`);
+- `AgreeExcept`/`AgreeAll` (`NecBasic.lean`);
 - the object-removal `reduction` (`NecReductionSim.lean`);
 - the `view`/`resps` append lemmas (`AlgC2Pad.lean`).
 
