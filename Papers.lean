@@ -38,7 +38,6 @@ import Papers.PODC2024.Swiper.Applications
 import Papers.PODC2024.AllBAExpensive.LowerBound
 import Papers.PODC2024.AllBAExpensive.Theorem4
 import Papers.PODC2021.FastByzantineConsensus.ImplMain
-import Papers.PODC2021.LowCongestionShortcuts.Bernoulli
 import Papers.PODC2021.LowCongestionShortcuts.Overcongested
 import Papers.PODC2021.LowCongestionShortcuts.DenseMinor
 import Papers.PODC2021.LowCongestionShortcuts.Main

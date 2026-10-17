@@ -20,7 +20,7 @@ not formalized here. A port-numbering version of the round-elimination lower bou
 `Papers/PODC2019/AutomaticSpeedup` (`sinklessOrientation_lower_bound`).
 -/
 
-open Finset
+open Finset Cslib.Probability
 
 set_option linter.unusedSectionVars false
 
@@ -81,7 +81,7 @@ lemma sinklessInstance_dep (v : V) : (sinklessInstance G).dep v = G.neighborFins
 /-- `Pr[v is a sink] = 2^{-deg v}`. -/
 lemma sinklessInstance_pr (v : V) : (sinklessInstance G).pr v = (1 / 2) ^ G.degree v := by
   classical
-  rw [Instance.pr_eq]
+  rw [Instance.pr, Instance.condProb]
   -- the indicator of "`v` is a sink" is a product over edges
   have hind : ∀ x : ∀ e : G.edgeSet, Ends G e,
       (if (sinklessInstance G).bad v x then (1 : ℝ) else 0) =
@@ -98,9 +98,10 @@ lemma sinklessInstance_pr (v : V) : (sinklessInstance G).pr v = (1 / 2) ^ G.degr
       obtain ⟨e, he, hne⟩ := h
       exact prod_eq_zero (mem_univ e) (by simp [he, hne])
   have hprob : ∀ e (w : Ends G e), (sinklessInstance G).prob e w = 1 / 2 := fun _ _ => rfl
-  simp_rw [hind, hprob, ← prod_mul_distrib]
-  rw [← Fintype.prod_sum (fun (e : G.edgeSet) (w : Ends G e) =>
-    1 / 2 * (if v ∈ (e : Sym2 V) then (if w.1 = v then (1 : ℝ) else 0) else 1))]
+  simp_rw [hind]
+  rw [piExpect_prod _ fun (e : G.edgeSet) (w : Ends G e) =>
+    if v ∈ (e : Sym2 V) then (if w.1 = v then (1 : ℝ) else 0) else 1]
+  simp only [Instance.marg_empty, hprob]
   have hfac : ∀ e : G.edgeSet, (∑ w : Ends G e,
       1 / 2 * (if v ∈ (e : Sym2 V) then (if w.1 = v then (1 : ℝ) else 0) else 1)) =
         if v ∈ (e : Sym2 V) then 1 / 2 else 1 := by
