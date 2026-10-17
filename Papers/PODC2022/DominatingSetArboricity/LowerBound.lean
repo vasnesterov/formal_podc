@@ -92,11 +92,8 @@ noncomputable def lbOut {K : ℕ} : LBNode V G.edgeSet K → Finset (LBNode V G.
   | tn _ => ∅
 
 theorem card_filter_mem_sym2_le_two (e : Sym2 V) : (univ.filter fun a => a ∈ e).card ≤ 2 := by
-  induction e using Sym2.ind with
-  | h a b =>
-    calc (univ.filter fun x => x ∈ s(a, b)).card ≤ ({a, b} : Finset V).card :=
-          card_le_card fun x hx => by simp at hx ⊢; exact hx
-      _ ≤ 2 := card_le_two
+  rw [show (univ.filter fun a => a ∈ e) = e.toFinset by ext; simp, Sym2.card_toFinset]
+  split <;> omega
 
 theorem mem_lbOut {K : ℕ} {a b : LBNode V G.edgeSet K} : b ∈ lbOut a ↔ lbRel G K a b := by
   cases a <;> cases b <;> (simp [lbOut, lbRel, eq_comm]; try tauto)
@@ -133,8 +130,8 @@ theorem lbGraph_arboricityLE_two (K : ℕ) : (lbGraph G K).ArboricityLE 2 :=
 /-! ### Upper bound on `OPT_MDS(H)` -/
 
 variable (G) in
-/-- A vertex cover. -/
-def IsVertexCover (C : Finset V) : Prop := ∀ ⦃u v⦄, G.Adj u v → u ∈ C ∨ v ∈ C
+/-- A vertex cover (Mathlib's `SimpleGraph.IsVertexCover` for a `Finset`). -/
+abbrev IsVertexCover (C : Finset V) : Prop := G.IsVertexCover ↑C
 
 variable (G) in
 /-- A fractional vertex cover. -/
@@ -158,7 +155,7 @@ theorem exists_dominating_lbGraph (K : ℕ) {C : Finset V} (hC : IsVertexCover G
       induction e using Sym2.ind with
       | h a b =>
         have hab : G.Adj a b := he
-        rcases hC hab with h | h
+        rcases hC hab with h | h <;> rw [Finset.mem_coe] at h
         · exact ⟨copy i a, mem_union_left _ (mem_image.2 ⟨(i, a), by simp [h], rfl⟩),
             mem_cnbr.2 (Or.inr ⟨by simp, Or.inl ⟨rfl, by simp⟩⟩)⟩
         · exact ⟨copy i b, mem_union_left _ (mem_image.2 ⟨(i, b), by simp [h], rfl⟩),
@@ -247,7 +244,7 @@ theorem fracCover_of_dominating {K : ℕ} (hK : 1 ≤ K) {S : Finset (LBNode V G
     have : (univ : Finset (Fin K)) ⊆ (univ.filter fun i => a ∈ coverOf S i) ∪
         (univ.filter fun i => b ∈ coverOf S i) := by
       intro i _
-      rcases isVertexCover_coverOf hS i hab with h | h <;> simp [h]
+      rcases isVertexCover_coverOf hS i hab with h | h <;> simp [Finset.mem_coe.1 h]
     have := (card_le_card this).trans (card_union_le _ _)
     simp only [card_univ, Fintype.card_fin] at this
     exact_mod_cast this
@@ -363,7 +360,7 @@ theorem isVertexCover_round {z : V → ℝ} (hz : IsFracVertexCover G z) :
   refine ⟨fun a b h => ?_, ?_⟩
   · have := hz.2 h
     by_contra hc
-    simp only [mem_filter, mem_univ, true_and, not_or, not_le] at hc
+    simp only [mem_coe, mem_filter, mem_univ, true_and, not_or, not_le] at hc
     linarith [hc.1, hc.2]
   · calc ((univ.filter fun u => 1 / 2 ≤ z u).card : ℝ)
         = ∑ u ∈ univ.filter (fun u => 1 / 2 ≤ z u), 2 * (1 / 2) := by simp

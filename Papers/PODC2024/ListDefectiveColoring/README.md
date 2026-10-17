@@ -51,7 +51,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
   out-edges. This is more general than the paper.
 - Section 3: synchronous, deterministic, fault-free LOCAL rounds (CSLib's `Cslib.LocallyIterative.Algorithm`: a
   node's new state depends on the round, its state and the *set* of neighbour states); states carry IDs, lists
-  and defects. Two-Sweep runs in exactly `2q` rounds. CONGEST message sizes are not modelled.
+  and defects. Two-Sweep runs in exactly `2q` rounds, and its outputs are `2q`-local functions of the
+  initial states (`twoSweep_isLocal`). Neighbours are counted through the set of neighbour states with the
+  shared identifier API `Podc/Local/LocallyIterative.lean`. CONGEST message sizes are not modelled.
 - Algorithm 1's "sort and take the first `p`" is modelled as any best `p`-subset; the sorted prefix is shown to be
   one, so every tie-breaking is covered.
 - Section 4.1 and Lemmas 4.4, 4.5, A.1 are specification-level: the arbdefective subroutine is replaced by its

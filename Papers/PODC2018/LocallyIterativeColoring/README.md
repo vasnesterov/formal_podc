@@ -63,7 +63,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * The round number is global knowledge, used only to switch phases in the composite algorithm. The
   individual steps (AG, halving, Refine-AG, the Section 4.1 step) are round-independent.
 * Corollary 3.6 starts from any proper colouring with colours `< n` (e.g. IDs). Linial's
-  `O(Δ²)`-colouring, which the paper only cites, is formalized too, so Corollary 3.6 is end to end.
+  `O(Δ²)`-colouring, which the paper only cites, is formalized too, so Corollary 3.6 is end to end;
+  the output is a `fullRounds n Δ`-local function of the initial colours (`fullColoring_isLocal`).
 * Message/bit sizes are not modelled.
 
 **Main results in Lean.**
@@ -92,4 +93,6 @@ case `m = 1 + ⌈1/ε⌉` of `ag_final`.
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Both counterexamples are concrete executions checked in Lean. The round model, the
 standard colour reduction and Linial's algorithm (`linial_lt`: `< max(16Δ², 256)` colours after
-`log* n + 3` rounds) are in CSLib `Cslib/Computability/Distributed/Local/`.
+`log* n + 3` rounds) are in CSLib `Cslib/Computability/Distributed/Local/`; locality of runs and the
+"final colours stay final" lemma come from `Podc/Local/Locality.lean` and `Podc/Data/Nat/TimeRec.lean`
+(`Nat.eq_of_le_of_stable`).

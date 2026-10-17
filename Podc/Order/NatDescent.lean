@@ -8,7 +8,9 @@ import Mathlib.Order.OrderIsoNat
 A sequence `f : ℕ → ℕ` that is non-increasing from some index `N` on is eventually constant
 (`Nat.eventually_const_of_succ_le`); consequently it can decrease only finitely often
 (`Nat.eventually_not_of_succ_le`, `Nat.not_frequently_lt_of_succ_le`). These are the termination
-arguments ("potential functions") behind wait-freedom and lock-freedom proofs.
+arguments ("potential functions") behind wait-freedom and lock-freedom proofs. Dually, a bounded
+sequence that is non-decreasing from some index on is eventually constant
+(`Nat.eventually_const_of_le_succ`).
 
 Both follow from Mathlib's antitone chain condition (`WellFoundedLT.antitone_chain_condition`).
 -/
@@ -46,5 +48,15 @@ theorem not_frequently_lt_of_succ_le (h : ∀ m ≥ N, f (m + 1) ≤ f m) :
     fun _ _ hm => hm
   obtain ⟨m, hm, hlt⟩ := hs T
   exact hc m hm hlt
+
+/-- A bounded sequence of natural numbers that is non-decreasing from `N` on is eventually
+constant. -/
+theorem eventually_const_of_le_succ {B : ℕ} (hB : ∀ m ≥ N, f m ≤ B)
+    (h : ∀ m ≥ N, f m ≤ f (m + 1)) : ∃ T ≥ N, ∀ m ≥ T, f m = f T := by
+  obtain ⟨T, hT, hc⟩ := eventually_const_of_succ_le (f := fun m => B - f m) (N := N)
+    fun m hm => by have := h m hm; have := hB m hm; have := hB (m + 1) (by omega); omega
+  refine ⟨T, hT, fun m hm => ?_⟩
+  have := hc m hm; have := hB m (by omega); have := hB T hT
+  omega
 
 end Nat

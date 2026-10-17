@@ -1,5 +1,6 @@
 import Mathlib
 import Cslib.Foundations.Combinatorics.SimpleGraph.Arboricity
+import Podc.Graph.Ball
 
 /-!
 # Weighted dominating sets, packings, weak duality
@@ -7,8 +8,9 @@ import Cslib.Foundations.Combinatorics.SimpleGraph.Arboricity
 Basic notions of Dory–Ghaffari–Ilchi, *Near-Optimal Distributed Dominating Set in Bounded Arboricity
 Graphs* (PODC 2022), Section 2.
 
-* `cnbr G v` — the closed neighbourhood `N⁺_v = {v} ∪ N_v`.
-* `IsDominating G D` — every vertex is in `D` or has a neighbour in `D`.
+* `cnbr G v` — the closed neighbourhood `N⁺_v = {v} ∪ N_v` (`SimpleGraph.closedNeighborFinset`).
+* `IsDominating G D` — every vertex is in `D` or has a neighbour in `D` (equivalently
+  `G.IsDominatingSet ↑D`, `isDominating_iff_isDominatingSet`).
 * `dom G S` — `N⁺_S`, the vertices dominated by `S`.
 * `wt w D` — the total weight `w_D`.
 * `IsPacking G w x` — `x ≥ 0` and `X_u = ∑_{v ∈ N⁺_u} x_v ≤ w_u` for every `u`.
@@ -23,23 +25,28 @@ open Finset
 
 variable {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj]
 
-/-- The closed neighbourhood `N⁺_v`. -/
-def cnbr (v : V) : Finset V := insert v (G.neighborFinset v)
+/-- The closed neighbourhood `N⁺_v` (`SimpleGraph.closedNeighborFinset`). -/
+def cnbr (v : V) : Finset V := G.closedNeighborFinset v
 
 variable {G}
 
-theorem mem_cnbr {v u : V} : u ∈ cnbr G v ↔ u = v ∨ G.Adj v u := by
-  simp [cnbr]
+theorem cnbr_eq_insert (v : V) : cnbr G v = insert v (G.neighborFinset v) := rfl
 
-theorem self_mem_cnbr (v : V) : v ∈ cnbr G v := by simp [cnbr]
+theorem mem_cnbr {v u : V} : u ∈ cnbr G v ↔ u = v ∨ G.Adj v u :=
+  SimpleGraph.mem_closedNeighborFinset
+
+theorem self_mem_cnbr (v : V) : v ∈ cnbr G v := mem_cnbr.2 (Or.inl rfl)
+
+theorem coe_cnbr (v : V) : (cnbr G v : Set V) = G.closedNeighborSet v :=
+  SimpleGraph.coe_closedNeighborFinset
 
 theorem mem_cnbr_comm {v u : V} : u ∈ cnbr G v ↔ v ∈ cnbr G u := by
-  simp only [mem_cnbr]; constructor <;> rintro (rfl | h) <;> simp_all [G.adj_comm]
+  rw [← mem_coe, ← mem_coe, coe_cnbr, coe_cnbr, SimpleGraph.mem_closedNeighborSet_comm]
 
 theorem cnbr_nonempty (v : V) : (cnbr G v).Nonempty := ⟨v, self_mem_cnbr v⟩
 
-theorem card_cnbr (v : V) : (cnbr G v).card = G.degree v + 1 := by
-  rw [cnbr, card_insert_of_notMem (by simp), SimpleGraph.card_neighborFinset_eq_degree]
+theorem card_cnbr (v : V) : (cnbr G v).card = G.degree v + 1 :=
+  SimpleGraph.card_closedNeighborFinset
 
 theorem card_cnbr_le (v : V) : (cnbr G v).card ≤ G.maxDegree + 1 := by
   rw [card_cnbr]; exact Nat.add_le_add_right (G.degree_le_maxDegree v) 1
@@ -48,6 +55,11 @@ variable (G)
 
 /-- `D` is a dominating set: every vertex is in `D` or adjacent to a vertex of `D`. -/
 def IsDominating (D : Finset V) : Prop := ∀ v, ∃ u ∈ D, u ∈ cnbr G v
+
+theorem isDominating_iff_isDominatingSet {D : Finset V} :
+    IsDominating G D ↔ G.IsDominatingSet ↑D := by
+  simp only [IsDominating, SimpleGraph.isDominatingSet_iff_forall_exists_mem, mem_coe,
+    ← coe_cnbr]
 
 /-- `N⁺_S`: the vertices dominated by `S`. -/
 def dom (S : Finset V) : Finset V := univ.filter fun v => ∃ u ∈ S, u ∈ cnbr G v

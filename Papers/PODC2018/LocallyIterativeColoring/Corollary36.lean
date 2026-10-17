@@ -1,5 +1,6 @@
 import Papers.PODC2018.LocallyIterativeColoring.Main
 import Cslib.Computability.Distributed.Local.Linial
+import Podc.Local.Locality
 import Mathlib
 
 /-!
@@ -66,6 +67,14 @@ theorem fullColoring_le (hdeg : ∀ v, G.degree v ≤ Δ) (hΔ : 1 ≤ Δ) {c₀
   rw [fullColoring, Algorithm.run_seq_add]
   exact begColoring_le hdeg (linial_lt hΔ hdeg hc₀ hlt le_rfl)
     (linial_isProper hdeg hc₀ hlt _) (by unfold fullRounds at ht; unfold linialPalette at ht; omega) v
+
+omit [G.LocallyFinite] in
+/-- `fullColoring n Δ` is a LOCAL algorithm with round complexity `fullRounds n Δ`: the output
+colour of a node only depends on the graph and the initial colours within that distance. -/
+theorem fullColoring_isLocal (n Δ : ℕ) :
+    Cslib.Local.IsLocal (V := V) (fullRounds n Δ) fun G c₀ v =>
+      (fullColoring n Δ).run G c₀ (fullRounds n Δ) v :=
+  Algorithm.run_isLocal _ _
 
 /-- Corollary 3.6 of [BEG18], packaged: proper `(Δ + 1)`-colouring after at most
 `log* n + 16 Δ + 71` rounds, every round proper. -/

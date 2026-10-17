@@ -1,4 +1,5 @@
 import Papers.PODC2016.VertexCoverLocalRatio.Algorithm
+import Podc.Data.Nat.TimeRec
 
 /-!
 # Invariants of Algorithm 1
@@ -252,14 +253,11 @@ theorem run_succ (i : ℕ) : run G θ a R w0 (i + 1) = step G θ a R w0 (run G �
 /-- A vertex that has returned stays returned, with the same status and weight. -/
 theorem run_frozen {i : ℕ} {v : V} (hv : (run G θ a R w0 i).st v ≠ .active) (k : ℕ) :
     (run G θ a R w0 (i + k)).st v = (run G θ a R w0 i).st v ∧
-      (run G θ a R w0 (i + k)).w v = (run G θ a R w0 i).w v := by
-  induction k with
-  | zero => simp
-  | succ k ih =>
-    rw [← add_assoc, run_succ]
-    have hk : (run G θ a R w0 (i + k)).st v ≠ .active := ih.1 ▸ hv
-    rw [step_st_of_ne hk, step_w_of_ne hk]
-    exact ih
+      (run G θ a R w0 (i + k)).w v = (run G θ a R w0 i).w v :=
+  Prod.ext_iff.1 <| Nat.eq_of_le_of_stable
+    (x := fun j => ((run G θ a R w0 j).st v, (run G θ a R w0 j).w v))
+    (P := fun p => p.1 ≠ .active)
+    (fun _ h => by simp only [run_succ, step_st_of_ne h, step_w_of_ne h]) hv (Nat.le_add_right i k)
 
 theorem active_of_le {i j : ℕ} (hij : i ≤ j) {v : V} (hv : (run G θ a R w0 j).st v = .active) :
     (run G θ a R w0 i).st v = .active := by

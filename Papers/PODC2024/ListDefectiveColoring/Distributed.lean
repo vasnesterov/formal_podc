@@ -1,5 +1,6 @@
 import Papers.PODC2024.ListDefectiveColoring.TwoSweep
-import Cslib.Computability.Distributed.Local.LocallyIterative
+import Podc.Local.LocallyIterative
+import Podc.Local.Locality
 
 /-!
 # The Two-Sweep algorithm as a synchronous distributed algorithm (Lemma 3.3 of [FK24])
@@ -131,27 +132,6 @@ function; no outputs yet. -/
 def initState (out : V → Finset V) (c : V → ℕ) (I : ListInstance V α) (v : V) : NodeState V α :=
   ⟨v, c v, out v, I.L v, I.d v, none, none⟩
 
-open Classical in
-/-- Counting out-neighbours through the set of neighbour states: if every state carries its own
-identifier, then the number of neighbour states with identifier in `out v` satisfying `P` is the
-number of out-neighbours `u` with `P (f u)`. -/
-theorem ncard_nbrColors_filter (G : SimpleGraph V) (f : V → NodeState V α)
-    (hf : ∀ u, (f u).id = u) (v : V) (outv : Finset V) (hout : ∀ u ∈ outv, G.Adj v u)
-    (P : NodeState V α → Prop) :
-    Set.ncard {s' ∈ nbrColors G f v | s'.id ∈ outv ∧ P s'} = #{u ∈ outv | P (f u)} := by
-  have hinj : Function.Injective f := fun a b h => by rw [← hf a, ← hf b, h]
-  have : {s' ∈ nbrColors G f v | s'.id ∈ outv ∧ P s'} = f '' ↑({u ∈ outv | P (f u)}) := by
-    ext s'
-    simp only [Set.mem_ofPred_eq, nbrColors, Set.mem_image, SimpleGraph.mem_neighborSet,
-      Finset.coe_filter]
-    constructor
-    · rintro ⟨⟨u, -, rfl⟩, hid, hP⟩
-      rw [hf] at hid
-      exact ⟨u, ⟨hid, hP⟩, rfl⟩
-    · rintro ⟨u, ⟨hu, hP⟩, rfl⟩
-      exact ⟨⟨u, hout u hu, rfl⟩, by rw [hf]; exact hu, hP⟩
-  rw [this, Set.ncard_image_of_injective _ hinj, Set.ncard_coe_finset]
-
 section Run
 
 variable (G : SimpleGraph V) (out : V → Finset V) (c : V → ℕ) (I : ListInstance V α) (p q : ℕ)
@@ -238,8 +218,9 @@ theorem kOf_eq (t : ℕ) (v : V) (hct : c v ≤ t) (x : α) :
       kCount out c (Sfin G out c I p q) v x := by
   unfold kOf kCount
   rw [(st_fields t v).2.2.1, (st_fields t v).2.1]
-  have := ncard_nbrColors_filter G (st G out c I p q t) (fun u => (st_fields t u).1) v (out v)
-    (hout v) (fun s' => s'.c < c v ∧ x ∈ s'.S.getD ∅)
+  have := ncard_nbrColors_filter (G := G) (c := st G out c I p q t) (v := v) NodeState.id
+    (fun u => (st_fields t u).1)
+    (out v) (hout v) (fun s' => s'.c < c v ∧ x ∈ s'.S.getD ∅)
   rw [this]
   congr 1
   ext u
@@ -271,8 +252,9 @@ theorem rOf_eq (v : V) (x : α) :
   unfold rOf
   set t := 2 * q - c v - 1
   rw [(st_fields t v).2.2.1, (st_fields t v).2.1]
-  have := ncard_nbrColors_filter G (st G out c I p q t) (fun u => (st_fields t u).1) v (out v)
-    (hout v) (fun s' => c v < s'.c ∧ s'.col = some x)
+  have := ncard_nbrColors_filter (G := G) (c := st G out c I p q t) (v := v) NodeState.id
+    (fun u => (st_fields t u).1)
+    (out v) (hout v) (fun s' => c v < s'.c ∧ s'.col = some x)
   rw [this]
   congr 1
   ext u
@@ -350,6 +332,15 @@ theorem colOpt_spec (hp : 1 ≤ p)
 end Run
 
 variable [DecidableEq α]
+
+omit [DecidableEq α] in
+/-- The Two-Sweep algorithm is a `2q`-round LOCAL algorithm: the state of a node after `2q`
+rounds (in particular its output colour) only depends on the graph and the initial states
+(identifiers, initial colours, out-neighbourhoods, lists and defects) within distance `2q`. -/
+theorem twoSweep_isLocal (p q : ℕ) :
+    Cslib.Local.IsLocal (2 * q) fun G (s₀ : V → NodeState V α) v =>
+      (twoSweep p q).run G s₀ (2 * q) v :=
+  Algorithm.run_isLocal _ _
 
 /-- **Lemma 3.3** of [FK24] (Algorithm 1 is correct and takes `2q` rounds), which is also
 **Theorem 1.1** for `ε = 0`. Let the out-neighbours of every node be neighbours in the

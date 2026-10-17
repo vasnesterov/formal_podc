@@ -1,4 +1,5 @@
 import Cslib.Computability.Distributed.Local.LocallyIterative
+import Podc.Data.Nat.TimeRec
 import Mathlib
 
 /-!
@@ -181,10 +182,9 @@ theorem run_succ_of_final {t : ℕ} {v : V} (h : ((algorithm k).run G c₀ t v).
   step_of_final h _
 
 theorem run_of_final_of_le {t s : ℕ} {v : V} (h : ((algorithm k).run G c₀ t v).a = 0)
-    (hts : t ≤ s) : (algorithm k).run G c₀ s v = (algorithm k).run G c₀ t v := by
-  induction s, hts using Nat.le_induction with
-  | base => rfl
-  | succ s _ ih => rw [run_succ_of_final c₀ (ih ▸ h), ih]
+    (hts : t ≤ s) : (algorithm k).run G c₀ s v = (algorithm k).run G c₀ t v :=
+  Nat.eq_of_le_of_stable (x := fun s => (algorithm k).run G c₀ s v) (P := fun x => x.a = 0)
+    (fun _ => run_succ_of_final c₀) h hts
 
 /-- A vertex still working after round `t + 1` was working after round `t`, found no free index
 in round `t`, and moved from `⟨a, b, c⟩` to `⟨a, b + k·a, 0⟩`. -/

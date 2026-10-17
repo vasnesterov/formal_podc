@@ -1,4 +1,4 @@
-import Cslib.Computability.Distributed.Local.LocallyIterative
+import Podc.Local.LocallyIterative
 import Mathlib
 
 /-!
@@ -77,10 +77,9 @@ theorem run_succ_of_final {t : ℕ} {v : V} (h : ((algorithm q).run G c₀ t v).
   simp [step, h]
 
 theorem run_of_final_of_le {t s : ℕ} {v : V} (h : ((algorithm q).run G c₀ t v).1 = false)
-    (hts : t ≤ s) : (algorithm q).run G c₀ s v = (algorithm q).run G c₀ t v := by
-  induction s, hts using Nat.le_induction with
-  | base => rfl
-  | succ s _ ih => rw [run_succ_of_final c₀ (ih ▸ h), ih]
+    (hts : t ≤ s) : (algorithm q).run G c₀ s v = (algorithm q).run G c₀ t v :=
+  Nat.eq_of_le_of_stable (x := fun s => (algorithm q).run G c₀ s v) (P := fun x => x.1 = false)
+    (fun _ => run_succ_of_final c₀) h hts
 
 /-- A vertex that is still working after round `t + 1` was working after round `t`, its second
 coordinate increased by one, and some neighbour had the final colour `⟨0, b_v⟩`. -/
@@ -228,10 +227,8 @@ theorem iterHalving_run (hΔ : ∀ v, G.degree v ≤ Δ) (s : ℕ) {k : ℕ} (hk
       ∀ v, (iterHalving Δ s k).run G c₀ ((Δ + 1) * s) v < Δ + 1 := by
   induction s generalizing k c₀ with
   | zero =>
-    have hr : ∀ t, (iterHalving Δ 0 k).run G c₀ t = c₀ := by
-      intro t; induction t with
-      | zero => rfl
-      | succ t ih => funext v; rw [Algorithm.run_succ_apply, ih]; rfl
+    have hr : ∀ t, (iterHalving Δ 0 k).run G c₀ t = c₀ := fun t =>
+      (Algorithm.run_ofStep G _ c₀ t).trans (Function.iterate_fixed rfl t)
     rw [hr]
     exact ⟨h₀, fun v => by simp at hk; exact (hc₀ v).trans_le hk⟩
   | succ s ih =>

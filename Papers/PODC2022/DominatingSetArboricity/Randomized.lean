@@ -1,4 +1,6 @@
 import Papers.PODC2022.DominatingSetArboricity.Deterministic
+import Podc.Probability.Finite.Bernoulli
+import Podc.Data.Nat.TimeRec
 
 /-!
 # The randomized extension (Lemmas 4.6–4.8, Theorems 1.2 and 1.3)
@@ -25,7 +27,7 @@ coin.
 The paper bounds the expected cost of a phase by a worst-case sequence of "degrees" `d_i`, which
 ignores that the process is adaptive. We use instead the potential (`Phi`)
 `Φ_i(s) = γ ∑_{v undominated} x_v (p_i d_v(s) + γ)`, `d_v = |N⁺_v ∩ Γ|`, and show that
-`(sampled weight) + Φ_{i+1}` does not increase `Φ_i` in expectation (`Ec_bound_mid`), using
+`(sampled weight) + Φ_{i+1}` does not increase `Φ_i` in expectation (`coinExpect_bound_mid`), using
 `w_Γ ≤ γ ∑ x_v d_v` (`wt_Gam_le`), `p_{i+1} ≤ γ p_i` and `(1 + p d)(1-p)^d ≤ (1-p²)^d ≤ 1`
 (`key_ineq`). At the start of a phase `Φ_0 ≤ γ(γ+1) w(D)` by weak duality, because the packing
 restricted to undominated vertices is feasible (`RInv`, preserved since `p = 1` in the last
@@ -35,14 +37,11 @@ argument (`expect_le_of_super`).
 
 namespace DominatingSetArboricity
 
-open Finset SimpleGraph
+open Finset SimpleGraph Cslib.Probability
 
 variable {V : Type*} [Fintype V] [DecidableEq V]
 
-/-- Probability weight of a coin vector when every node independently flips a `p`-coin. -/
--- CSLib candidate (with `expect`, `runCoins`, `Ec` and its lemmas, `expect_le_of_super`)
-noncomputable def coinProb (p : ℝ) (c : V → Bool) : ℝ := ∏ u, if c u then p else 1 - p
-
+-- CSLib candidate (with `runCoins`, `expect_le_of_super`)
 /-- Expected value of `f` of the state after `n` more random steps, starting from state `s` at
 step index `k`; `p k` is the coin probability in step `k` and `step k s c` the next state. -/
 noncomputable def expect {σ : Type*} (p : ℕ → ℝ) (step : ℕ → σ → (V → Bool) → σ)
@@ -50,102 +49,11 @@ noncomputable def expect {σ : Type*} (p : ℕ → ℝ) (step : ℕ → σ → (
   | _, 0, s => f s
   | k, n + 1, s => ∑ c : V → Bool, coinProb (p k) c * expect p step f (k + 1) n (step k s c)
 
-/-- The state after `n` steps from step index `k` for a fixed sequence of coin vectors. -/
-def runCoins {σ : Type*} (step : ℕ → σ → (V → Bool) → σ) (cs : ℕ → V → Bool) :
-    ℕ → ℕ → σ → σ
-  | _, 0, s => s
-  | k, n + 1, s => runCoins step cs (k + 1) n (step k s (cs k))
-
-/-! ### Probability toolkit: expectations over one coin vector -/
-
-/-- Expectation of `g` over one coin vector with success probability `p`. -/
-noncomputable def Ec (p : ℝ) (g : (V → Bool) → ℝ) : ℝ := ∑ c, coinProb p c * g c
-
-omit [DecidableEq V] in
-theorem coinProb_nonneg {p : ℝ} (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (c : V → Bool) :
-    0 ≤ coinProb p c :=
-  prod_nonneg fun u _ => by split_ifs <;> linarith
-
-/-- `∑_c ∏_u g_u(c_u) = ∏_u (g_u(true) + g_u(false))`. -/
-theorem sum_prod_bool (g : V → Bool → ℝ) :
-    ∑ c : V → Bool, ∏ u, g u (c u) = ∏ u, (g u true + g u false) := by
-  rw [← Fintype.prod_sum]
-  simp
-
-theorem sum_coinProb (p : ℝ) : ∑ c : V → Bool, coinProb p c = 1 := by
-  unfold coinProb
-  rw [sum_prod_bool (fun _ b => if b then p else 1 - p)]
-  simp
-
-theorem Ec_const (p a : ℝ) : Ec (V := V) p (fun _ => a) = a := by
-  rw [Ec, ← sum_mul, sum_coinProb, one_mul]
-
-theorem Ec_add (p : ℝ) (g h : (V → Bool) → ℝ) :
-    Ec p (fun c => g c + h c) = Ec p g + Ec p h := by
-  simp only [Ec, mul_add, sum_add_distrib]
-
-theorem Ec_mul_left (p a : ℝ) (g : (V → Bool) → ℝ) :
-    Ec p (fun c => a * g c) = a * Ec p g := by
-  simp only [Ec, mul_sum]
-  exact sum_congr rfl fun _ _ => by ring
-
-theorem Ec_sum {ι : Type*} (p : ℝ) (s : Finset ι) (g : ι → (V → Bool) → ℝ) :
-    Ec p (fun c => ∑ i ∈ s, g i c) = ∑ i ∈ s, Ec p (g i) := by
-  simp only [Ec, mul_sum]
-  exact sum_comm
-
-theorem Ec_mono {p : ℝ} (hp0 : 0 ≤ p) (hp1 : p ≤ 1) {g h : (V → Bool) → ℝ}
-    (hgh : ∀ c, g c ≤ h c) : Ec p g ≤ Ec p h :=
-  sum_le_sum fun c _ => mul_le_mul_of_nonneg_left (hgh c) (coinProb_nonneg hp0 hp1 c)
-
-theorem Ec_congr {p : ℝ} {g h : (V → Bool) → ℝ} (hgh : ∀ c, coinProb p c ≠ 0 → g c = h c) :
-    Ec p g = Ec p h :=
-  sum_congr rfl fun c _ => by
-    by_cases hc : coinProb p c = 0
-    · simp [hc]
-    · rw [hgh c hc]
-
-omit [DecidableEq V] in
-/-- With `p = 1`, only the all-`true` coin vector has positive weight. -/
-theorem coinProb_one_ne_zero {c : V → Bool} (hc : coinProb 1 c ≠ 0) (u : V) : c u = true := by
-  by_contra h
-  apply hc
-  exact prod_eq_zero (mem_univ u) (by simp [h])
-
-/-- `P[c_u = false for all u ∈ A] = (1-p)^{|A|}`. -/
-theorem Ec_allFalse (p : ℝ) (A : Finset V) :
-    Ec p (fun c => if ∀ u ∈ A, c u = false then 1 else 0) = (1 - p) ^ A.card := by
-  set g : V → Bool → ℝ := fun u b =>
-    if u ∈ A then (if b then 0 else 1 - p) else (if b then p else 1 - p) with hg
-  have key : ∀ c : V → Bool, coinProb p c * (if ∀ u ∈ A, c u = false then 1 else 0) =
-      ∏ u, g u (c u) := by
-    intro c
-    by_cases h : ∀ u ∈ A, c u = false
-    · rw [ite_eq_left h, mul_one, coinProb]
-      refine prod_congr rfl fun u _ => ?_
-      by_cases hu : u ∈ A
-      · simp [hg, hu, h u hu]
-      · simp [hg, hu]
-    · rw [ite_eq_right h, mul_zero]
-      push Not at h
-      obtain ⟨u, hu, hcu⟩ := h
-      exact (prod_eq_zero (mem_univ u) (by simp [hg, hu, hcu])).symm
-  rw [Ec, sum_congr rfl fun c _ => key c, sum_prod_bool g]
-  have : ∀ u, g u true + g u false = if u ∈ A then 1 - p else 1 := fun u => by
-    simp only [hg]; split_ifs <;> simp_all
-  simp only [this]
-  rw [prod_ite_mem, univ_inter, prod_const]
-
-/-- `P[c_u = true] = p`. -/
-theorem Ec_coin (p : ℝ) (u : V) : Ec p (fun c => if c u = true then 1 else 0) = p := by
-  have h1 := Ec_allFalse p {u}
-  have h2 : Ec (V := V) p (fun c => (if ∀ v ∈ ({u} : Finset V), c v = false then 1 else 0) +
-      (if c u = true then 1 else 0)) = 1 := by
-    calc _ = Ec (V := V) p (fun _ => 1) := by congr 1; ext c; cases h : c u <;> simp [h]
-      _ = 1 := Ec_const _ _
-  rw [Ec_add, h1] at h2
-  simp at h2
-  linarith
+/-- The state after `n` steps from step index `k` for a fixed sequence of coin vectors: step
+`k + j` applies `step (k + j)` with the coins `cs (k + j)`. -/
+def runCoins {σ : Type*} (step : ℕ → σ → (V → Bool) → σ) (cs : ℕ → V → Bool) (k n : ℕ)
+    (s : σ) : σ :=
+  Nat.timeRec (fun j s => step (k + j) s (cs (k + j))) s n
 
 /-! ### Expectation along the process -/
 
@@ -154,7 +62,8 @@ theorem expect_zero {σ : Type*} (p : ℕ → ℝ) (step : ℕ → σ → (V →
 
 theorem expect_succ {σ : Type*} (p : ℕ → ℝ) (step : ℕ → σ → (V → Bool) → σ) (f : σ → ℝ)
     (k n : ℕ) (s : σ) :
-    expect p step f k (n + 1) s = Ec (p k) (fun c => expect p step f (k + 1) n (step k s c)) :=
+    expect p step f k (n + 1) s =
+      coinExpect (p k) (fun c => expect p step f (k + 1) n (step k s c)) :=
   rfl
 
 /-- **Supermartingale bound.** If `Ψ` is a potential that, under an invariant `I` preserved by
@@ -163,7 +72,7 @@ expectation of `f` after the remaining steps is bounded by the current potential
 theorem expect_le_of_super {σ : Type*} {p : ℕ → ℝ} (hp0 : ∀ k, 0 ≤ p k) (hp1 : ∀ k, p k ≤ 1)
     {step : ℕ → σ → (V → Bool) → σ} {f : σ → ℝ} {N : ℕ} {I : ℕ → σ → Prop} {Ψ : ℕ → σ → ℝ}
     (hI : ∀ k s c, k < N → I k s → I (k + 1) (step k s c))
-    (hΨ : ∀ k s, k < N → I k s → Ec (p k) (fun c => Ψ (k + 1) (step k s c)) ≤ Ψ k s)
+    (hΨ : ∀ k s, k < N → I k s → coinExpect (p k) (fun c => Ψ (k + 1) (step k s c)) ≤ Ψ k s)
     (hf : ∀ s, I N s → f s ≤ Ψ N s) :
     ∀ n k s, k + n = N → I k s → expect p step f k n s ≤ Ψ k s := by
   intro n
@@ -172,18 +81,24 @@ theorem expect_le_of_super {σ : Type*} {p : ℕ → ℝ} (hp0 : ∀ k, 0 ≤ p 
   | succ n ih =>
     intro k s hk hs
     rw [expect_succ]
-    refine le_trans (Ec_mono (hp0 k) (hp1 k) fun c => ?_) (hΨ k s (by omega) hs)
+    refine le_trans (coinExpect_mono (hp0 k) (hp1 k) fun c => ?_) (hΨ k s (by omega) hs)
     exact ih (k + 1) _ (by omega) (hI k s c (by omega) hs)
+
+omit [Fintype V] [DecidableEq V] in
+theorem runCoins_zero {σ : Type*} (step : ℕ → σ → (V → Bool) → σ) (cs : ℕ → V → Bool)
+    (k : ℕ) (s : σ) : runCoins step cs k 0 s = s := rfl
 
 omit [Fintype V] [DecidableEq V] in
 theorem runCoins_succ' {σ : Type*} (step : ℕ → σ → (V → Bool) → σ) (cs : ℕ → V → Bool)
     (n k : ℕ) (s : σ) :
-    runCoins step cs k (n + 1) s = step (k + n) (runCoins step cs k n s) (cs (k + n)) := by
-  induction n generalizing k s with
-  | zero => rfl
-  | succ n ih =>
-    rw [runCoins, ih (k + 1)]
-    simp only [runCoins, Nat.add_assoc, Nat.add_comm 1 n]
+    runCoins step cs k (n + 1) s = step (k + n) (runCoins step cs k n s) (cs (k + n)) := rfl
+
+omit [Fintype V] [DecidableEq V] in
+/-- The first step, then the remaining `n` steps from step index `k + 1`. -/
+theorem runCoins_succ {σ : Type*} (step : ℕ → σ → (V → Bool) → σ) (cs : ℕ → V → Bool)
+    (n k : ℕ) (s : σ) :
+    runCoins step cs k (n + 1) s = runCoins step cs (k + 1) n (step k s (cs k)) := by
+  simp only [runCoins, Nat.timeRec_succ', Nat.add_zero, Nat.add_assoc, Nat.add_comm 1]
 
 variable (G : SimpleGraph V) [DecidableRel G.Adj]
 
@@ -449,18 +364,19 @@ theorem Phi_start (hγ : 1 < γ) {k : ℕ} (hk : k % itersPerPhase G γ = 0) {s 
         gcongr
         exact sum_undom_le hnn hfeas hD
 
-theorem Ec_sampled {k : ℕ} {s : RState V} {u : V} (hu : u ∈ Gam G w γ s) :
-    Ec (sampProb G γ k) (fun c => if u ∈ sampled G w γ k s c then 1 else 0) = sampProb G γ k := by
-  refine (Ec_congr (h := fun c => if c u = true then 1 else 0) fun c hc => ?_).trans
-    (Ec_coin _ u)
+theorem coinExpect_sampled {k : ℕ} {s : RState V} {u : V} (hu : u ∈ Gam G w γ s) :
+    coinExpect (sampProb G γ k) (fun c => if u ∈ sampled G w γ k s c then 1 else 0) =
+      sampProb G γ k := by
+  refine (coinExpect_congr (h := fun c => if c u = true then 1 else 0) fun c hc => ?_).trans
+    (coinExpect_coin _ u)
   rw [sampled_ae hc]
   simp [hu]
 
-theorem Ec_undom {k : ℕ} {s : RState V} {v : V} (hv : v ∈ undom G s) :
-    Ec (sampProb G γ k) (fun c => if v ∈ undom G (rstep G w γ k s c) then 1 else 0) =
+theorem coinExpect_undom {k : ℕ} {s : RState V} {v : V} (hv : v ∈ undom G s) :
+    coinExpect (sampProb G γ k) (fun c => if v ∈ undom G (rstep G w γ k s c) then 1 else 0) =
       (1 - sampProb G γ k) ^ dGam G w γ s v := by
-  rw [dGam, ← Ec_allFalse]
-  refine Ec_congr fun c hc => ?_
+  rw [dGam, ← coinExpect_forall_eq_false]
+  refine coinExpect_congr fun c hc => ?_
   have : v ∈ undom G (rstep G w γ k s c) ↔
       ∀ u ∈ (cnbr G v).filter (· ∈ Gam G w γ s), c u = false := by
     rw [mem_undom, rstep_T, sampled_ae hc, mem_dom]
@@ -568,10 +484,10 @@ theorem step_bound_mid (hγ : 1 < γ)
 
 /-- Expected bound for a step that is not the last of its phase:
 `E[sampled weight + Φ_{k+1}] ≤ Φ_k`. -/
-theorem Ec_bound_mid (hγ : 1 < γ) {k : ℕ}
+theorem coinExpect_bound_mid (hγ : 1 < γ) {k : ℕ}
     (hk : k % itersPerPhase G γ ≠ itersPerPhase G γ - 1) {s : RState V}
     (hnn : ∀ v, 0 ≤ s.x v) :
-    Ec (sampProb G γ k) (fun c =>
+    coinExpect (sampProb G γ k) (fun c =>
       ∑ u ∈ Gam G w γ s, w u * (if u ∈ sampled G w γ k s c then 1 else 0) +
       γ * ∑ v ∈ undom G s, s.x v * (sampProb G γ (k + 1) * dGam G w γ s v + γ) *
         (if v ∈ undom G (rstep G w γ k s c) then 1 else 0)) ≤ Phi G w γ k s := by
@@ -579,16 +495,17 @@ theorem Ec_bound_mid (hγ : 1 < γ) {k : ℕ}
   set P := sampProb G γ k
   set P' := sampProb G γ (k + 1)
   have hP0 : 0 ≤ P := sampProb_nonneg hγ0 k
-  rw [Ec_add, Ec_sum, Ec_mul_left, Ec_sum]
+  rw [coinExpect_add, coinExpect_sum, coinExpect_mul_left, coinExpect_sum]
   have e1 : ∑ u ∈ Gam G w γ s,
-      Ec P (fun c => w u * (if u ∈ sampled G w γ k s c then 1 else 0)) = wt w (Gam G w γ s) * P := by
+      coinExpect P (fun c => w u * (if u ∈ sampled G w γ k s c then 1 else 0)) =
+        wt w (Gam G w γ s) * P := by
     rw [wt, sum_mul]
     refine sum_congr rfl fun u hu => ?_
-    rw [Ec_mul_left, Ec_sampled hu]
-  have e2 : ∑ v ∈ undom G s, Ec P (fun c => s.x v * (P' * dGam G w γ s v + γ) *
+    rw [coinExpect_mul_left, coinExpect_sampled hu]
+  have e2 : ∑ v ∈ undom G s, coinExpect P (fun c => s.x v * (P' * dGam G w γ s v + γ) *
       (if v ∈ undom G (rstep G w γ k s c) then 1 else 0)) ≤ ∑ v ∈ undom G s, s.x v * γ := by
     refine sum_le_sum fun v hv => ?_
-    rw [Ec_mul_left, Ec_undom hv, mul_assoc]
+    rw [coinExpect_mul_left, coinExpect_undom hv, mul_assoc]
     exact mul_le_mul_of_nonneg_left (key_ineq _ hP0 (sampProb_le_one γ k)
       (sampProb_succ_le hγ.le hk) hγ.le) (hnn v)
   rw [e1]
@@ -657,8 +574,8 @@ theorem expect_core {w : V → ℝ} (hw : ∀ v, 0 ≤ w v) {γ : ℝ} (hγ : 1 
       have hP : sampProb G γ k = 1 := sampProb_last hγ hlast
       have hsamp : ∀ c, sampled G w γ k s c = Gam G w γ s := fun c => sampled_of_one hP.ge s c
       have hdm := succ_div_mod_of_eq hr hlast
-      refine (Ec_mono (sampProb_nonneg hγ0 k) (sampProb_le_one γ k)
-        (h := fun _ => f s + (Phi G w γ k s + R)) fun c => ?_).trans (Ec_const _ _).le
+      refine (coinExpect_mono (sampProb_nonneg hγ0 k) (sampProb_le_one γ k)
+        (h := fun _ => f s + (Phi G w γ k s + R)) fun c => ?_).trans (coinExpect_const _ _).le
       have hfs : f (rstep G w γ k s c) ≤ f s + Phi G w γ k s := by
         refine (hf k s c).trans ?_
         rw [hsamp]
@@ -681,20 +598,20 @@ theorem expect_core {w : V → ℝ} (hw : ∀ v, 0 ≤ w v) {γ : ℝ} (hγ : 1 
       have hdm := succ_div_mod_of_ne hr hlast
       have h1 : k + 1 < N := succ_lt_of_ne hr hk hlast
       simp only [ite_eq_left h1, hdm.1]
-      have hb := Ec_bound_mid (G := G) (w := w) hγ hlast hs.1
-      calc Ec (sampProb G γ k) (fun c => f (rstep G w γ k s c) +
+      have hb := coinExpect_bound_mid (G := G) (w := w) hγ hlast hs.1
+      calc coinExpect (sampProb G γ k) (fun c => f (rstep G w γ k s c) +
             (Phi G w γ (k + 1) (rstep G w γ k s c) + R))
-          ≤ Ec (sampProb G γ k) (fun c => (f s + R) +
+          ≤ coinExpect (sampProb G γ k) (fun c => (f s + R) +
             (∑ u ∈ Gam G w γ s, w u * (if u ∈ sampled G w γ k s c then 1 else 0) +
             γ * ∑ v ∈ undom G s, s.x v * (sampProb G γ (k + 1) * dGam G w γ s v + γ) *
               (if v ∈ undom G (rstep G w γ k s c) then 1 else 0))) :=
-            Ec_mono (sampProb_nonneg hγ0 k) (sampProb_le_one γ k) fun c => by
+            coinExpect_mono (sampProb_nonneg hγ0 k) (sampProb_le_one γ k) fun c => by
               linarith [step_bound_mid hγ hf hlast hs.1 c]
-        _ = (f s + R) + Ec (sampProb G γ k) (fun c =>
+        _ = (f s + R) + coinExpect (sampProb G γ k) (fun c =>
             ∑ u ∈ Gam G w γ s, w u * (if u ∈ sampled G w γ k s c then 1 else 0) +
             γ * ∑ v ∈ undom G s, s.x v * (sampProb G γ (k + 1) * dGam G w γ s v + γ) *
               (if v ∈ undom G (rstep G w γ k s c) then 1 else 0)) := by
-            rw [Ec_add, Ec_const]
+            rw [coinExpect_add, coinExpect_const]
         _ ≤ f s + (Phi G w γ k s + R) := by linarith
   · intro s _
     simp [hΨ, N]

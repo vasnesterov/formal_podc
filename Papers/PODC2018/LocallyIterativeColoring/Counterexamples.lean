@@ -63,17 +63,12 @@ def simStep (c : Fin 16 → ZMod 5 × ZMod 5) : Fin 16 → ZMod 5 × ZMod 5 := f
   if ∃ u, T.Adj v u ∧ (c u).2 = (c v).2 then ((c v).1, (c v).2 + (c v).1) else (0, (c v).2)
 
 theorem run_eq (t : ℕ) : (ag : Algorithm (ZMod 5 × ZMod 5)).run T c₀ t = simStep^[t] c₀ := by
-  induction t with
-  | zero => rfl
-  | succ t ih =>
-    rw [Function.iterate_succ_apply', ← ih]
-    funext v
-    rw [ag_run_succ]
-    unfold simStep Conflict
-    by_cases h : ∃ u, T.Adj v u ∧
-      ((ag : Algorithm (ZMod 5 × ZMod 5)).run T c₀ t u).2 = (ag.run T c₀ t v).2
-    · simp only [h, ↓reduceIte]
-    · simp only [h, ↓reduceIte]
+  rw [ag, Algorithm.run_ofStep]
+  congr 1
+  funext c v
+  rw [agStep_nbrColors]
+  unfold simStep Conflict
+  congr
 
 theorem round_11 : simStep^[11] c₀ 0 = (1, 1) := by decide +kernel
 
