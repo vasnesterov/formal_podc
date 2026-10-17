@@ -89,8 +89,8 @@ theorem hVy_mem_of_noReport {O : Set (Hist (Fin n) Op Y)} (hO : GenLin O) (hO₀
       · intro p; simp [XTHy, TH.mapRes, XTH, cids]
   have hv := valid_tauAt hw s
   have hsim : TH.SimTH E.hVy ((XTH (E.tauAt s)).mapRes Prod.fst) := by
-    refine ⟨fun q => le_of_forall_lt_imp fun j hj => ?_, fun q j hj => ?_,
-      fun p => le_of_forall_lt_imp fun k hk => ?_, fun p k hk => ?_, fun p k q j hk hj h => ?_⟩
+    refine ⟨fun q => le_of_forall_lt fun j hj => ?_, fun q j hj => ?_,
+      fun p => le_of_forall_lt fun k hk => ?_, fun p k hk => ?_, fun p k q j hk hj h => ?_⟩
     · obtain ⟨x, hx, rfl, rfl⟩ := (lt_m_iff hv).1 hj
       obtain ⟨-, -, -, -, h1, -⟩ := mem_allInv_tauAt.1 hx
       show x.2.1 < cnt 8 0 (E.len x.1)

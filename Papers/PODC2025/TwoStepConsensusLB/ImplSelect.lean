@@ -20,14 +20,8 @@ variable {P V : Type*} [Fintype P] [DecidableEq P] [LinearOrder V]
 /-- A concrete `1B` report as an abstract one. -/
 def toSnap (d : OneB P V) : Fig1.Snap P V := ⟨d.vbal, d.val, d.prop, d.dec⟩
 
-theorem le_foldr_max {l : List ℕ} {a : ℕ} (h : a ∈ l) : a ≤ l.foldr max 0 := by
-  induction l with
-  | nil => simp at h
-  | cons b l ih =>
-    simp only [List.foldr_cons]
-    rcases List.mem_cons.1 h with rfl | h
-    · exact le_max_left _ _
-    · exact (ih h).trans (le_max_right _ _)
+theorem le_foldr_max {l : List ℕ} {a : ℕ} (h : a ∈ l) : a ≤ l.foldr max 0 :=
+  List.le_max_of_le' 0 h le_rfl
 
 theorem card_toFinset_map_fst {L : List (P × OneB P V)} (hnd : (L.map Prod.fst).Nodup)
     (p : P × OneB P V → Bool) :

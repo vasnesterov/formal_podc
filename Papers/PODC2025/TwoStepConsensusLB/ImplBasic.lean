@@ -257,14 +257,8 @@ end Handlers
 /-! ### The proposal of lines 26–38 -/
 
 theorem foldr_max_mem {l : List ℕ} (h : 0 < l.foldr max 0) : l.foldr max 0 ∈ l := by
-  induction l with
-  | nil => simp at h
-  | cons a l ih =>
-    simp only [List.foldr_cons] at h ⊢
-    rcases le_total a (l.foldr max 0) with h' | h'
-    · rw [max_eq_right h'] at h ⊢
-      exact List.mem_cons_of_mem _ (ih h)
-    · rw [max_eq_left h']; exact List.mem_cons_self
+  have hne : l ≠ [] := by rintro rfl; simp at h
+  exact List.maximum_mem (List.foldr_max_of_ne_nil (α := ℕ) hne).symm
 
 /-- The proposal is not `⊥` if the fallback is not `⊥` and every reported vote in a slow
 ballot carries a value. -/

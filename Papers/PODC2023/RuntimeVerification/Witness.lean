@@ -391,13 +391,13 @@ theorem F_view (hw : E.WF) {p : Fin n} {k : ℕ} (hk : InTau E s p k) :
 
 theorem hS_m (hw : E.WF) (p : Fin n) : ((F E s).hS 6).m p = (XTH (E.tauAt s)).m p := by
   show cnt 6 0 (flen E s p) = _
-  apply Exec.eq_of_lt_iff
+  apply eq_of_forall_lt_iff
   intro k
   rw [lt_cnt (by norm_num), lt_flen hw p (by norm_num), incl_lt2_iff hw (by norm_num)]
 
 theorem hS_c (hw : E.WF) (p : Fin n) : ((F E s).hS 6).c p = (XTH (E.tauAt s)).c p := by
   show cnt 6 5 (flen E s p) = _
-  apply Exec.eq_of_lt_iff
+  apply eq_of_forall_lt_iff
   intro k
   rw [lt_cnt (by norm_num), lt_flen hw p (by norm_num), incl_ge4_iff (by norm_num)]
 
@@ -448,7 +448,7 @@ theorem hA_eq (hw : E.WF) :
   refine TH.toList_eq_of_iso (h := (E.hA 8).cut (tstar E s)) (h' := (F E s).hA 6) (hwA.cut _) hwF
     ?_ ?_ ?_ ?_ ?_
   · intro p
-    apply Exec.eq_of_lt_iff
+    apply eq_of_forall_lt_iff
     intro k
     rw [TH.cut_m_iff hwA]
     show k < cnt 8 2 (E.len p) ∧ E.T p (8 * k + 2) < tstar E s ↔ k < cnt 6 2 (flen E s p)
@@ -456,7 +456,7 @@ theorem hA_eq (hw : E.WF) :
       incl_A_iff hw (by norm_num)]
     rfl
   · intro p
-    apply Exec.eq_of_lt_iff
+    apply eq_of_forall_lt_iff
     intro k
     rw [TH.cut_c_iff hwA]
     show k < cnt 8 3 (E.len p) ∧ E.T p (8 * k + 3) < tstar E s ↔ k < cnt 6 3 (flen E s p)

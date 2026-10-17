@@ -48,12 +48,6 @@ namespace Cslib.SharedMemory.ComplexityHierarchy.SwapRead
 
 open Finset
 
-lemma ifPos {α : Type*} {c : Prop} [Decidable c] (h : c) (x y : α) : (if c then x else y) = x := by
-  simp [h]
-
-lemma ifNeg {α : Type*} {c : Prop} [Decidable c] (h : ¬c) (x y : α) : (if c then x else y) = y := by
-  simp [h]
-
 /-- Lap vectors: `l v` is the lap of value `v`. -/
 abbrev Laps (k : ℕ) := Fin k → ℕ
 
@@ -398,7 +392,7 @@ lemma Inv.invoke [NeZero k] (h : Inv a g) {p : P} {x : Fin k} (hp : (a.loc p).ph
         (g.wproc.filter fun q => ¬ g.F ≤ (a.loc q).l ∧ ¬ g.F ≤ (a.loc q).s) := by
       apply Finset.filter_congr; intro q hq
       have hqp : q ≠ p := by rintro rfl; exact hpw hq
-      rw [hl, hs, ifNeg hqp, ifNeg hqp]
+      rw [hl, hs, ite_eq_right hqp, ite_eq_right hqp]
     rw [this]; exact h.count
   · intro q
     obtain ⟨r, hr, hrw⟩ := h.wit q
@@ -409,10 +403,10 @@ lemma Inv.invoke [NeZero k] (h : Inv a g) {p : P} {x : Fin k} (hp : (a.loc p).ph
     · exact hr
   · intro q hq
     have hqp : q ≠ p := by rintro rfl; exact hpw hq
-    rw [hl, hph, ifNeg hqp, ifNeg hqp]; exact h.wscan q hq
+    rw [hl, hph, ite_eq_right hqp, ite_eq_right hqp]; exact h.wscan q hq
   · intro q hq
     have hqp : q ≠ p := by rintro rfl; exact hpw hq
-    rw [hph, ifNeg hqp]; exact h.wact q hq
+    rw [hph, ite_eq_right hqp]; exact h.wact q hq
   · intro u; exact hbnd u _ (by omega) (h.bnd u)
   · intro hw r w hr; exact h.winNone hw r w (hdone r w hr)
   · intro v F0 hw
@@ -420,12 +414,12 @@ lemma Inv.invoke [NeZero k] (h : Inv a g) {p : P} {x : Fin k} (hp : (a.loc p).ph
     exact ⟨h1, h2, fun u hu => hbnd u _ (by omega) (h3 u hu), fun r w hr => h4 r w (hdone r w hr)⟩
   · intro u hu
     have hux : x ≠ u := by
-      have := hu p (by rw [hph]; simp); rwa [hinp, ifPos rfl] at this
+      have := hu p (by rw [hph]; simp); rwa [hinp, ite_eq_left rfl] at this
     have hu' : ∀ q, (a.loc q).ph ≠ .idle → (a.loc q).inp ≠ u := by
       intro q hq
       have hqp : q ≠ p := by rintro rfl; exact hq hp
-      have := hu q (by rw [hph, ifNeg hqp]; exact hq)
-      rwa [hinp, ifNeg hqp] at this
+      have := hu q (by rw [hph, ite_eq_right hqp]; exact hq)
+      rwa [hinp, ite_eq_right hqp] at this
     obtain ⟨hB, hD⟩ := h.valid u hu'
     refine ⟨⟨fun j => hB.1 j, fun r => ⟨?_, ?_⟩⟩, fun r hr => hD r (hdone r u hr)⟩
     · rw [hl]; split_ifs
@@ -436,11 +430,11 @@ lemma Inv.invoke [NeZero k] (h : Inv a g) {p : P} {x : Fin k} (hp : (a.loc p).ph
       · exact (hB.2 r).2
   · intro r hr
     rw [hph] at hr; split_ifs at hr with hrp
-    rw [hl, hs, ifNeg hrp, ifNeg hrp]; exact h.idle0 r hr
+    rw [hl, hs, ite_eq_right hrp, ite_eq_right hrp]; exact h.idle0 r hr
   · intro r hr
     rw [hl, hinp]; split_ifs with hrp
     · exact hex
-    · rw [hph, ifNeg hrp] at hr; exact h.inpPos r hr
+    · rw [hph, ite_eq_right hrp] at hr; exact h.inpPos r hr
 
 lemma swapStep_ph_ne_idle {p r : P} {j : Fin m} (hp : (a.loc p).ph = .swap j) :
     ((a.swapStep p j).loc r).ph ≠ .idle ↔ (a.loc r).ph ≠ .idle := by
@@ -476,9 +470,9 @@ lemma Inv.swap_common (h : Inv a g) {p : P} {j : Fin m} (hp : (a.loc p).ph = .sw
     obtain ⟨hB, hD⟩ := h.valid u hu'
     exact ⟨hB.swapStep p j, fun r hr => hD r (swapStep_done hr)⟩
   · have hrp : r ≠ p := by
-      rintro rfl; rw [ACfg.swapStep_ph, ifPos rfl] at hr; cases hr
-    rw [ACfg.swapStep_ph, ifNeg hrp] at hr
-    rw [ACfg.swapStep_l, ACfg.swapStep_s, ifNeg hrp]; exact h.idle0 r hr
+      rintro rfl; rw [ACfg.swapStep_ph, ite_eq_left rfl] at hr; cases hr
+    rw [ACfg.swapStep_ph, ite_eq_right hrp] at hr
+    rw [ACfg.swapStep_l, ACfg.swapStep_s, ite_eq_right hrp]; exact h.idle0 r hr
   · rw [ACfg.swapStep_l, ACfg.swapStep_inp]; exact h.inpPos r ((swapStep_ph_ne_idle hp).1 hr)
 
 lemma Inv.swap_post (h : Inv a g) {p : P} {j : Fin m} (hp : (a.loc p).ph = .swap j)
@@ -502,7 +496,7 @@ lemma Inv.swap_post (h : Inv a g) {p : P} {j : Fin m} (hp : (a.loc p).ph = .swap
   · intro q hq hql
     rw [ACfg.swapStep_l] at hql
     have hqp : q ≠ p := by rintro rfl; exact hql hF
-    rw [ACfg.swapStep_ph, ifNeg hqp]; exact h.wscan q hq hql
+    rw [ACfg.swapStep_ph, ite_eq_right hqp]; exact h.wscan q hq hql
   · intro q hq; exact (swapStep_ph_ne_idle hp).2 (h.wact q hq)
   · exact c1
   · exact c2
@@ -519,7 +513,7 @@ lemma Inv.swap_stale (h : Inv a g) {p : P} {j : Fin m} (hp : (a.loc p).ph = .swa
   constructor
   · intro i hi
     simp only [mem_insert, not_or] at hi
-    rw [ACfg.swapStep_mem, ifNeg hi.1]; exact h.good i hi.2
+    rw [ACfg.swapStep_mem, ite_eq_right hi.1]; exact h.good i hi.2
   · simp only
     have hfilt : ((insert p g.wproc).filter fun q => ¬ g.F ≤ ((a.swapStep p j).loc q).l ∧
         ¬ g.F ≤ ((a.swapStep p j).loc q).s) ⊆
@@ -530,7 +524,7 @@ lemma Inv.swap_stale (h : Inv a g) {p : P} {j : Fin m} (hp : (a.loc p).ph = .swa
       · left; rfl
       · by_cases hqp : q = p
         · left; exact hqp
-        · right; rw [ifNeg hqp] at hq2; exact ⟨hq1, hq2⟩
+        · right; rw [ite_eq_right hqp] at hq2; exact ⟨hq1, hq2⟩
     rw [card_insert_of_notMem hpw]
     by_cases hj : j ∈ g.wloc
     · rw [insert_eq_of_mem hj]
@@ -685,13 +679,13 @@ lemma Inv.scan (hP : Fintype.card P ≤ m + 1) (h : Inv a g) {q : P}
     intro r hr
     rw [hph] at hr; split_ifs at hr with hrq
     · exact absurd hr hPHi
-    · rw [hl, ifNeg hrq, ACfg.scanStep_s]; exact h.idle0 r hr
+    · rw [hl, ite_eq_right hrq, ACfg.scanStep_s]; exact h.idle0 r hr
   have c_inpPos : ∀ r, ((a.scanStep q).loc r).ph ≠ .idle →
       1 ≤ ((a.scanStep q).loc r).l ((a.scanStep q).loc r).inp := by
     intro r hr
     rw [hl, ACfg.scanStep_inp]; split_ifs with hrq
     · subst hrq; exact hpos.trans (hLLL _)
-    · rw [hph, ifNeg hrq] at hr; exact h.inpPos r hr
+    · rw [hph, ite_eq_right hrq] at hr; exact h.inpPos r hr
   rcases after_cases' (a.loc q).l (a.loc q).s a.mem L hL with ⟨hall, hlead, hafter⟩ |
     ⟨hall, hlead, hafter⟩ | ⟨hne, hafter⟩
   · -- all-equal scan with a 2-lap leader: decide `vstar L`
@@ -709,7 +703,7 @@ lemma Inv.scan (hP : Fintype.card P ≤ m + 1) (h : Inv a g) {q : P}
       constructor
       · intro j _; rw [ACfg.scanStep_mem, hall j]
       · simp
-      · intro _; exact ⟨q, by rw [hl, ifPos rfl, hLL'], by simp⟩
+      · intro _; exact ⟨q, by rw [hl, ite_eq_left rfl, hLL'], by simp⟩
       · simp
       · simp
       · exact hbndL
@@ -753,7 +747,7 @@ lemma Inv.scan (hP : Fintype.card P ≤ m + 1) (h : Inv a g) {q : P}
     constructor
     · intro j _; rw [ACfg.scanStep_mem, hall j]
     · simp
-    · intro _; exact ⟨q, by rw [hl, ifPos rfl]; exact hLLL, by simp⟩
+    · intro _; exact ⟨q, by rw [hl, ite_eq_left rfl]; exact hLLL, by simp⟩
     · simp
     · simp
     · intro u

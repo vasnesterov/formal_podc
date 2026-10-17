@@ -67,12 +67,7 @@ lemma sum_maj (I : Fin n → ℝ) :
 
 lemma sum4 (k : ℝ) (f : Fin n → ℝ) (g : Fin n → Fin n → Fin n → ℝ) :
     ∑ u, ∑ a, ∑ b, ∑ d, k * (f u * g a b d) = k * (∑ u, f u) * (∑ a, ∑ b, ∑ d, g a b d) := by
-  calc ∑ u, ∑ a, ∑ b, ∑ d, k * (f u * g a b d) = ∑ u, k * f u * ∑ a, ∑ b, ∑ d, g a b d := by
-        refine Finset.sum_congr rfl fun u _ => ?_
-        simp only [Finset.mul_sum]
-        exact Finset.sum_congr rfl fun a _ => Finset.sum_congr rfl fun b _ =>
-          Finset.sum_congr rfl fun d _ => by ring
-    _ = _ := by rw [← Finset.sum_mul, ← Finset.mul_sum]
+  simp_rw [mul_assoc, Finset.sum_mul, Finset.mul_sum]
 
 lemma sum3_one_sub (g : Fin n → Fin n → Fin n → ℝ) :
     ∑ a, ∑ b, ∑ d, (1 - g a b d) = (n : ℝ) ^ 3 - ∑ a, ∑ b, ∑ d, g a b d := by

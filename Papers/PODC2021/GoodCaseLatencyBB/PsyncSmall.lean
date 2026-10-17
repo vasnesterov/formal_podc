@@ -35,14 +35,6 @@ variable {P M S V K : Type*} [DecidableEq P]
 
 variable [Fintype P] {A : Algorithm P M S V V} {Au : Auth P M K}
 
-theorem three_cases (h3 : Fintype.card P = 3) {s p q x : P} (hps : p ≠ s) (hqs : q ≠ s)
-    (hpq : p ≠ q) (hxs : x ≠ s) (hxp : x ≠ p) : x = q := by
-  by_contra hxq
-  have : ({x, p, q, s} : Finset P).card ≤ 3 := h3 ▸ card_le_univ _
-  rw [card_insert_of_notMem (by simp [hxp, hxq, hxs]),
-    card_insert_of_notMem (by simp [hpq, hps]), card_insert_of_notMem (by simp [hqs])] at this
-  simp at this
-
 /-- Partially synchronous BB is impossible for `n = 2` and `f ≥ 1` (for every algorithm: all
 runs used are canonical, so unforgeability is not needed). -/
 theorem psyncBB_impossible_two {s : P} {f D : ℕ} (hf : 1 ≤ f)
@@ -80,7 +72,8 @@ theorem psyncBB_impossible_three (hU : A.Unforging Au) {s : P} {f D : ℕ} (hf :
     (h3 : Fintype.card P = 3) {a b : V} (hab : a ≠ b) : ¬ IsPsyncBB Au A s f D := by
   intro hA
   obtain ⟨p, q, hpq, hps, hqs⟩ := exists_three s (by omega)
-  have hall : ∀ x, x ≠ s → x ≠ p → x = q := fun x hxs hxp => three_cases h3 hps hqs hpq hxs hxp
+  have hall : ∀ x, x ≠ s → x ≠ p → x = q := fun x hxs hxp =>
+    eq_third h3 hps.symm hqs.symm hpq hxs hxp
   let I0 : P → V := fun _ => a
   let R1 := Run.quiet (M := M) {q} I0
   obtain ⟨T1, hT1⟩ := hA.validity R1 (Run.quiet_valid (by simpa using hf) _) Run.quiet_authValid

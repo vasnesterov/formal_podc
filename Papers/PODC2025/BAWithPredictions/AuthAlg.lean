@@ -314,14 +314,6 @@ section Exec
 variable [Fintype P] [LinearOrder P] [LinearOrder V] {k t : ℕ} {F : Finset P}
   {inp : P → V × (P → Bool)} (E : RoundRun (alg (P := P) (V := V) k t) F inp)
 
-omit [Fintype P] [LinearOrder P] [LinearOrder V] in
-theorem ifn {α : Sort*} {c : Prop} [Decidable c] {a b : α} (h : ¬c) :
-    (if c then a else b) = b := by simp [h]
-
-omit [Fintype P] [LinearOrder P] [LinearOrder V] in
-theorem ifp {α : Sort*} {c : Prop} [Decidable c] {a b : α} (h : c) :
-    (if c then a else b) = a := by simp [h]
-
 theorem send_eq (r : ℕ) (p : P) (st : St P V) (q : P) : (alg k t).send r p st q =
     if r = 0 then (if pos st.c q ≤ 2 * k + 1 then some (.vote p q) else none)
     else if r ≤ k + 1 then (if st.out.Nonempty then some (.chains st.out) else none)
@@ -342,14 +334,14 @@ theorem s_one (p : P) : E.s 1 p = trans0 t p (E.s 0 p) (E.rcv 0 p) := by
 
 theorem s_succ_bb {r : ℕ} (h1 : 1 ≤ r) (h2 : r ≤ k + 1) (p : P) :
     E.s (r + 1) p = transBB t r p (E.s r p) (E.rcv r p) := by
-  rw [s_succ', ifn (by omega), ifp h2]
+  rw [s_succ', ite_eq_right (by omega), ite_eq_left h2]
 
 theorem s_succ_dec (p : P) : E.s (k + 3) p =
     { E.s (k + 2) p with dec := some (decision t (E.s (k + 2) p).x (E.rcv (k + 2) p)) } := by
-  rw [s_succ', ifn (by omega), ifn (by omega), ifp rfl]
+  rw [s_succ', ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_left rfl]
 
 theorem s_succ_late {r : ℕ} (h : k + 2 < r) (p : P) : E.s (r + 1) p = E.s r p := by
-  rw [s_succ', ifn (by omega), ifn (by omega), ifn (by omega)]
+  rw [s_succ', ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega)]
 
 theorem x_eq (r : ℕ) (p : P) : (E.s r p).x = (inp p).1 := by
   induction r with
@@ -391,7 +383,7 @@ theorem cc_eq {r : ℕ} (hr : 1 ≤ r) (p : P) : (E.s r p).cc = cert E p := by
   induction r, hr using Nat.le_induction with
   | base => rfl
   | succ r hr ih =>
-    rw [s_succ', ifn (by omega)]
+    rw [s_succ', ite_eq_right (by omega)]
     split_ifs <;> exact ih
 
 theorem X_one (p s : P) : (E.s 1 p).X s =
@@ -425,14 +417,14 @@ theorem X_late {r : ℕ} (hr : k + 2 ≤ r) (p : P) : (E.s r p).X = (E.s (k + 2)
   induction r, hr using Nat.le_induction with
   | base => rfl
   | succ r hr ih =>
-    rw [s_succ', ifn (by omega), ifn (by omega)]
+    rw [s_succ', ite_eq_right (by omega), ite_eq_right (by omega)]
     split_ifs <;> exact ih
 
 theorem out_late {r : ℕ} (hr : k + 2 ≤ r) (p : P) : (E.s r p).out = (E.s (k + 2) p).out := by
   induction r, hr using Nat.le_induction with
   | base => rfl
   | succ r hr ih =>
-    rw [s_succ', ifn (by omega), ifn (by omega)]
+    rw [s_succ', ite_eq_right (by omega), ite_eq_right (by omega)]
     split_ifs <;> exact ih
 
 theorem dec_early {r : ℕ} (hr : r ≤ k + 2) (p : P) : (E.s r p).dec = none := by

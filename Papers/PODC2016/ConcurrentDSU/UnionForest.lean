@@ -47,7 +47,7 @@ lemma Reach.link {U : E → E} {u b : E} (hu : U u = u) {x y : E} (h : Reach U x
   | succ j ih =>
     by_cases hx : x = u
     · subst hx
-      rw [iterate_fixed hu] at hj
+      rw [Function.iterate_fixed hu] at hj
       subst hj; exact Reach.refl _ _
     · rw [Function.iterate_succ_apply] at hj
       obtain ⟨i, hi⟩ := ih hj

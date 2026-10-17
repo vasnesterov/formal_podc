@@ -187,10 +187,8 @@ variable {d : ℕ} {x : Fin n → V} {inp : Fin n → Bool} {ss : ωSequence (GS
 
 omit [DecidableEq V] in
 theorem persist (Φ : GS n V → Prop) (hΦ : ∀ j, Φ (ss j) → Φ (ss (j + 1))) {i j : ℕ}
-    (hij : i ≤ j) (hi : Φ (ss i)) : Φ (ss j) := by
-  induction j, hij using Nat.le_induction with
-  | base => exact hi
-  | succ j _ ih => exact hΦ j ih
+    (hij : i ≤ j) (hi : Φ (ss i)) : Φ (ss j) :=
+  Nat.le_induction hi (fun j _ => hΦ j) j hij
 
 omit [DecidableEq V] in
 theorem first_change (Φ : GS n V → Prop) (h0 : ¬ Φ (ss 0)) {j : ℕ} (hj : Φ (ss j)) :

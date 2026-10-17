@@ -88,34 +88,12 @@ section Aux
 variable {α β : Type*}
 
 /-- Two lists strictly sorted by `f` with the same members are equal. -/
-theorem eq_of_pairwise_lt [LinearOrder β] (f : α → β) :
-    ∀ {l₁ l₂ : List α}, l₁.Pairwise (fun x y => f x < f y) →
-      l₂.Pairwise (fun x y => f x < f y) → (∀ x, x ∈ l₁ ↔ x ∈ l₂) → l₁ = l₂
-  | [], [], _, _, _ => rfl
-  | [], b :: _, _, _, hm => absurd ((hm b).2 List.mem_cons_self) List.not_mem_nil
-  | a :: _, [], _, _, hm => absurd ((hm a).1 List.mem_cons_self) List.not_mem_nil
-  | a :: l₁, b :: l₂, h₁, h₂, hm => by
-    rw [List.pairwise_cons] at h₁ h₂
-    have hab : a = b := by
-      by_contra hne
-      have hb : b ∈ l₁ := by
-        rcases List.mem_cons.1 ((hm b).2 List.mem_cons_self) with h' | h'
-        · exact absurd h'.symm hne
-        · exact h'
-      have ha : a ∈ l₂ := by
-        rcases List.mem_cons.1 ((hm a).1 List.mem_cons_self) with h' | h'
-        · exact absurd h' hne
-        · exact h'
-      exact lt_asymm (h₁.1 b hb) (h₂.1 a ha)
-    subst hab
-    congr 1
-    refine eq_of_pairwise_lt f h₁.2 h₂.2 fun x => ⟨fun hx => ?_, fun hx => ?_⟩
-    · rcases List.mem_cons.1 ((hm x).1 (List.mem_cons_of_mem _ hx)) with h' | h'
-      · subst h'; exact absurd (h₁.1 _ hx) (lt_irrefl _)
-      · exact h'
-    · rcases List.mem_cons.1 ((hm x).2 (List.mem_cons_of_mem _ hx)) with h' | h'
-      · subst h'; exact absurd (h₂.1 _ hx) (lt_irrefl _)
-      · exact h'
+theorem eq_of_pairwise_lt [LinearOrder β] (f : α → β) {l₁ l₂ : List α}
+    (h₁ : l₁.Pairwise (fun x y => f x < f y)) (h₂ : l₂.Pairwise (fun x y => f x < f y))
+    (hm : ∀ x, x ∈ l₁ ↔ x ∈ l₂) : l₁ = l₂ :=
+  haveI : Std.Irrefl (fun x y : α => f x < f y) := ⟨fun _ => lt_irrefl _⟩
+  haveI : Std.Antisymm (fun x y : α => f x < f y) := ⟨fun _ _ h h' => absurd h' h.asymm⟩
+  h₁.eq_of_mem_iff h₂ hm
 
 theorem filterMap_eq_map_filter_of (q : α → Bool) (g : α → β) (F : α → Option β)
     (hF : ∀ x, F x = if q x then some (g x) else none) (l : List α) :

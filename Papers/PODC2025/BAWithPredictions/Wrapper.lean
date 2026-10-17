@@ -293,9 +293,7 @@ sub-protocols of `T_φ = α 2^φ` rounds. -/
 def roundsUpTo (G α ψ : ℕ) : ℕ := 1 + ∑ φ ∈ range (ψ + 1), (3 * G + 2 * (α * 2 ^ φ))
 
 theorem sum_pow_two (ψ : ℕ) : ∑ φ ∈ range (ψ + 1), 2 ^ φ + 1 = 2 ^ (ψ + 1) := by
-  induction ψ with
-  | zero => simp
-  | succ ψ ih => rw [sum_range_succ, pow_succ]; omega
+  simp [Nat.geomSum_eq le_rfl, Nat.sub_add_cancel Nat.one_le_two_pow]
 
 /-- **Lemma 33 (rounds).** `roundsUpTo G α ψ = 1 + 3G(ψ+1) + 2α(2^(ψ+1) - 1)`. -/
 theorem rounds_le (G α ψ : ℕ) :

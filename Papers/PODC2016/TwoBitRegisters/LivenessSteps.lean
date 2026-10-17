@@ -275,10 +275,6 @@ lemma phase_step (hI : InvW w C) (hP : InvP C) (h : (alg w t v₀).step C s = so
   | skip =>
     obtain ⟨rfl, -⟩ := step_skip h; simp
 
-lemma count_erase_le' {α : Type} [DecidableEq α] (x a : α) (m : Multiset α) :
-    (m.erase a).count x ≤ m.count x :=
-  Multiset.count_le_of_le _ (Multiset.erase_le _ _)
-
 /-- Effect of an arbitrary step on the `READ()`/`PROCEED()` pipeline from a busy reader `p` to
 a non-crashed process `j`: `READ()`s in transit do not increase, `r_sync_p[j]` and the number of
 `PROCEED()`s sent by `j` to `p` (in transit or counted) do not decrease, and a pending `READ()`
@@ -433,7 +429,8 @@ lemma pipe_step (hI : InvW w C) (hP : InvP C) (h : (alg w t v₀).step C s = som
         · subst hx; simp [hC', R]
         · simp [hC', R, hx]
       refine ⟨?_, by rw [hR], ?_, ?_⟩
-      · simp only [hC', cR, Config.apply_net, outMsgs_zero, add_zero]; exact count_erase_le' _ _ _
+      · simp only [hC', cR, Config.apply_net, outMsgs_zero, add_zero]
+        exact Multiset.count_le_of_le _ (Multiset.erase_le _ _)
       · rw [hR]
         simp only [hC', cP, Config.apply_net, outMsgs_zero, add_zero]
         rw [Multiset.count_erase_of_ne (by simp)]
@@ -477,7 +474,8 @@ lemma pipe_step (hI : InvW w C) (hP : InvP C) (h : (alg w t v₀).step C s = som
       · intro sn hsn; left; rw [hT]; exact hsn
   | drop src dst m =>
     obtain ⟨hsrc, -, -, rfl⟩ := step_drop h
-    refine ⟨count_erase_le' _ _ _, le_refl _, ?_, fun sn hsn => Or.inl hsn⟩
+    refine ⟨Multiset.count_le_of_le _ (Multiset.erase_le _ _), le_refl _, ?_,
+      fun sn hsn => Or.inl hsn⟩
     simp only [cP, R]
     rw [Multiset.count_erase_of_ne]
     simp only [ne_eq, Prod.mk.injEq, not_and]

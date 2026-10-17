@@ -43,14 +43,10 @@ theorem sinkless_edgeAll {Δ : ℕ} {Y Z : Set Bool} :
   · rintro h y hy z hz ⟨rfl, rfl⟩; exact h ⟨hy, hz⟩
 
 theorem set_bool_eq_univ {Y : Set Bool} : Y = Set.univ ↔ false ∈ Y ∧ true ∈ Y := by
-  constructor
-  · rintro rfl; simp
-  · rintro ⟨h1, h2⟩; ext b; cases b <;> simp [h1, h2]
+  simp only [Set.eq_univ_iff_forall, Bool.forall_bool]
 
 theorem set_bool_eq_false {Y : Set Bool} : Y = {false} ↔ false ∈ Y ∧ true ∉ Y := by
-  constructor
-  · rintro rfl; simp
-  · rintro ⟨h1, h2⟩; ext b; cases b <;> simp [h1, h2]
+  simp only [Set.ext_iff, Bool.forall_bool, Set.mem_singleton_iff]; simp
 
 /-- The maximal edge configurations of `Π_{1/2}` (§4.4): only `{{0}, {0, 1}}`. -/
 theorem sinkless_edgeAllMax {Δ : ℕ} {Y Z : Set Bool} :
