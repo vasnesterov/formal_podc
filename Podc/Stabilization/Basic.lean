@@ -17,7 +17,7 @@ population protocols and other self-stabilizing systems whose executions are run
 ## Main definitions
 
 * `Reach R`: reachability, the reflexive-transitive closure of `R`.
-* `IsClosed R S`: the set `S` is closed under transitions.
+* `IsTrap R S`: the set `S` is a trap, i.e. closed under transitions.
 * `StablyIn R S x`: every configuration reachable from `x` lies in `S`.
 * `SelfStabilizes R S`: from every configuration, a configuration stably in `S` is reachable.
 * `IsSilent R x`: every transition from `x` is a self-loop.
@@ -26,7 +26,7 @@ population protocols and other self-stabilizing systems whose executions are run
 
 ## Main results
 
-* `selfStabilizes_iff_of_isClosed`: for a closed set, self-stabilization is reachability of `S`.
+* `selfStabilizes_iff_of_isTrap`: for a closed set, self-stabilization is reachability of `S`.
 * `Run.GloballyFair.eventually_mem`: with finitely many configurations, a globally fair run
   eventually enters (and stays in) a closed set reachable from all reachable configurations.
 * `exists_globallyFair`: a finite total transition system has a globally fair run from every
@@ -50,8 +50,9 @@ variable {X : Type*} (R : X → X → Prop)
 /-- Reachability: the reflexive-transitive closure of the transition relation. -/
 abbrev Reach : X → X → Prop := Relation.ReflTransGen R
 
-/-- A set of configurations is closed if every transition from it stays in it. -/
-def IsClosed (S : Set X) : Prop := ∀ ⦃x y⦄, x ∈ S → R x y → y ∈ S
+/-- A set of configurations is a *trap* (closed under transitions) if every transition from it
+stays in it. -/
+def IsTrap (S : Set X) : Prop := ∀ ⦃x y⦄, x ∈ S → R x y → y ∈ S
 
 /-- `x` is *stably in* `S`: every configuration reachable from `x` lies in `S`. -/
 def StablyIn (S : Set X) (x : X) : Prop := ∀ y, Reach R x y → y ∈ S
@@ -84,7 +85,7 @@ variable {S T : Set X} {x y : X}
 /-! ### Closed sets, stability, silence -/
 
 /-- A closed set is closed under reachability. -/
-theorem IsClosed.reach (hS : IsClosed R S) (hx : x ∈ S) (h : Reach R x y) : y ∈ S := by
+theorem IsTrap.reach (hS : IsTrap R S) (hx : x ∈ S) (h : Reach R x y) : y ∈ S := by
   induction h with
   | refl => exact hx
   | tail _ hst ih => exact hS ih hst
@@ -101,11 +102,11 @@ theorem StablyIn.mono (h : StablyIn R S x) (hST : S ⊆ T) : StablyIn R T x :=
   fun z hz => hST (h z hz)
 
 /-- The configurations stably in `S` form a closed set. -/
-theorem isClosed_stablyIn : IsClosed R {x | StablyIn R S x} :=
+theorem isTrap_stablyIn : IsTrap R {x | StablyIn R S x} :=
   fun _ _ hx hxy => StablyIn.reach hx (.single hxy)
 
 /-- For a closed set, being stably in it is being in it. -/
-theorem IsClosed.stablyIn_iff (hS : IsClosed R S) : StablyIn R S x ↔ x ∈ S :=
+theorem IsTrap.stablyIn_iff (hS : IsTrap R S) : StablyIn R S x ↔ x ∈ S :=
   ⟨StablyIn.mem, fun hx _ h => hS.reach hx h⟩
 
 /-- A silent configuration only reaches itself. -/
@@ -123,7 +124,7 @@ theorem SelfStabilizes.mono (h : SelfStabilizes R S) (hST : S ⊆ T) : SelfStabi
   fun x => (h x).imp fun _ hy => ⟨hy.1, hy.2.mono hST⟩
 
 /-- For a closed set, self-stabilization is reachability of the set from everywhere. -/
-theorem selfStabilizes_iff_of_isClosed (hS : IsClosed R S) :
+theorem selfStabilizes_iff_of_isTrap (hS : IsTrap R S) :
     SelfStabilizes R S ↔ ∀ x, ∃ y ∈ S, Reach R x y :=
   ⟨fun h x => (h x).imp fun _ hy => ⟨hy.2.mem, hy.1⟩,
     fun h x => (h x).imp fun _ hy => ⟨hy.2, hS.stablyIn_iff.2 hy.1⟩⟩
@@ -192,7 +193,7 @@ theorem exists_eq [Finite X] (hy : ∀ x, Reach R (E.st 0) x → Reach R x y) : 
 /-- Under global fairness (finitely many configurations): if from every configuration reachable
 from the start some configuration of a closed set `S` is reachable, then the run eventually
 enters `S` and stays there forever. -/
-theorem eventually_mem [Finite X] (hS : IsClosed R S)
+theorem eventually_mem [Finite X] (hS : IsTrap R S)
     (h : ∀ x, Reach R (E.st 0) x → ∃ y ∈ S, Reach R x y) : ∀ᶠ t in atTop, E.st t ∈ S := by
   obtain ⟨x, hx⟩ := exists_frequently_eq E.st
   obtain ⟨t₀, -, ht₀⟩ := frequently_atTop.1 hx 0
@@ -341,7 +342,7 @@ theorem exists_globallyFair_forall_not_mem [Finite X] (htot : ∀ x, ∃ y, R x 
 
 /-- For a closed set `S` in a finite total transition system: every globally fair run eventually
 enters `S` iff `S` is reachable from every configuration. -/
-theorem globallyFair_iff_reach [Finite X] (htot : ∀ x, ∃ y, R x y) (hS : IsClosed R S) :
+theorem globallyFair_iff_reach [Finite X] (htot : ∀ x, ∃ y, R x y) (hS : IsTrap R S) :
     (∀ E : Run R, E.GloballyFair → ∃ t, E.st t ∈ S) ↔ ∀ x, ∃ y ∈ S, Reach R x y := by
   refine ⟨fun h x => ?_, fun h E hE => (hE.eventually_mem hS fun x _ => h x).exists⟩
   obtain ⟨E, hE0, hE⟩ := exists_globallyFair htot x

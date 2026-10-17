@@ -391,7 +391,7 @@ lemma treeStep_good (hk : 1 ≤ k) (ch : TChoice k RS) {p q : TState k RS}
 lemma badInv_closed (hk : 1 ≤ k) {c g : V → Fin (k ^ 2)}
     (hinj : ∀ x u v, G.Adj x u → G.Adj x v → c u = c v → u = v)
     (hghost : ∀ u v, G.Adj u v → c u ≠ g v) :
-    TS.IsClosed ((ssTree k R).Step G) (BadInv G R c g) := by
+    TS.IsTrap ((ssTree k R).Step G) (BadInv G R c g) := by
   rintro C D ⟨hng, hbit⟩ ⟨u, v, huv, o, ⟨ch, -, rfl⟩, rfl⟩
   have hne : u ≠ v := G.ne_of_adj huv
   obtain ⟨h1, h2, h3, h4, h5⟩ := treeStep_good (R := R) hk ch (hng u) (hng v) (hghost u v huv)

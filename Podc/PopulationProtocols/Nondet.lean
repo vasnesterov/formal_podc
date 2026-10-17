@@ -188,7 +188,7 @@ theorem toN_reachable_iff {C D : Config A Q} : P.toN.Reachable C D ↔ P.Reachab
   rw [NProtocol.Reachable, toN_step]; rfl
 
 /-- CSLib's closed sets are the closed sets of the step relation. -/
-theorem closed_iff_isClosed {S : Set (Config A Q)} : P.Closed S ↔ IsClosed P.Step S := Iff.rfl
+theorem closed_iff_isTrap {S : Set (Config A Q)} : P.Closed S ↔ IsTrap P.Step S := Iff.rfl
 
 /-- CSLib's output stability is stability of the set of configurations with the same output. -/
 theorem outputStable_iff_stablyIn {O : Type*} (out : Q → O) (C : Config A Q) :
