@@ -703,3 +703,9 @@ import Papers.PODC2019.HardnessOptimization.HamPathWheel
 import Papers.PODC2019.HardnessOptimization.HamPathTheorem
 import Papers.PODC2019.HardnessOptimization.HamPathCycle
 import Papers.PODC2019.HardnessOptimization.Axioms
+import Papers.PODC2025.RelativisticComputing.Model
+import Papers.PODC2025.RelativisticComputing.Spacetime
+import Papers.PODC2025.RelativisticComputing.Central
+import Papers.PODC2025.RelativisticComputing.Counterexample
+import Papers.PODC2025.RelativisticComputing.Examples
+import Papers.PODC2025.RelativisticComputing.Linearizability
