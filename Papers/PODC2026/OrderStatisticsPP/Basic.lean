@@ -68,10 +68,8 @@ lemma cumul_sub (π : ℕ → ℝ) {a b : ℕ} (hab : a ≤ b) :
   ring
 
 lemma exists_pos_of_sum_pos' {ι : Type*} {s : Finset ι} {f : ι → ℝ} (h : 0 < ∑ i ∈ s, f i) :
-    ∃ i ∈ s, 0 < f i := by
-  by_contra hne
-  push Not at hne
-  exact (lt_irrefl _) (lt_of_lt_of_le h (Finset.sum_nonpos hne))
+    ∃ i ∈ s, 0 < f i :=
+  Finset.exists_lt_of_sum_lt (by simpa using h)
 
 /-! ### Basic facts on `cnt`, `ind` -/
 

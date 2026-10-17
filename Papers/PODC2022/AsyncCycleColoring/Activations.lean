@@ -1,5 +1,6 @@
 import Papers.PODC2022.AsyncCycleColoring.Model
 import Papers.PODC2022.AsyncCycleColoring.Changes
+import Cslib.Foundations.Data.Nat.Descent
 
 /-!
 # Generic facts about activations
@@ -67,16 +68,9 @@ lemma reg_ne_none_mono {p : ZMod n} {a b : ℕ} (hab : a ≤ b) (h : (run A init
 lemma exists_last_act {p : ZMod n} {t₀ t : ℕ} (h₀ : ActsAt A init σ t₀ p) (ht : t₀ < t) :
     ∃ t'', t₀ ≤ t'' ∧ t'' < t ∧ ActsAt A init σ t'' p ∧
       ∀ s, t'' < s → s < t → ¬ ActsAt A init σ s p := by
-  induction t, ht using Nat.le_induction with
-  | base => exact ⟨t₀, le_rfl, Nat.lt_succ_self _, h₀, fun s h1 h2 => by omega⟩
-  | succ t hle ih =>
-    by_cases ht : ActsAt A init σ t p
-    · exact ⟨t, Nat.le_of_succ_le hle, Nat.lt_succ_self _, ht, fun s h1 h2 => by omega⟩
-    · obtain ⟨t'', h1, h2, h3, h4⟩ := ih
-      refine ⟨t'', h1, Nat.lt_succ_of_lt h2, h3, fun s hs1 hs2 => ?_⟩
-      rcases Nat.lt_succ_iff_lt_or_eq.1 hs2 with hs | rfl
-      · exact h4 s hs1 hs
-      · exact ht
+  obtain ⟨m, h1, h2, h3, h4⟩ :=
+    Nat.exists_last_of_le (p := (ActsAt A init σ · p)) (show t₀ ≤ t - 1 by omega) h₀
+  exact ⟨m, h1, by omega, h3, fun s hs1 hs2 => h4 s hs1 (by omega)⟩
 
 open Classical in
 /-- Working activations are the failures plus at most one return. -/

@@ -97,7 +97,7 @@ theorem spread {r : ℕ} (h1 : 1 ≤ r) (h2 : r ≤ k + 1) {j : P} (hj : j ∉ F
     rw [hsync r (Nat.zero_le _) q j hq hj]
     change (if r = 0 then _ else if r ≤ k + 1 then
       (if (E.s r j).out.Nonempty then some (Msg.chains (E.s r j).out) else none) else _) = _
-    rw [ifn (by omega), ifp h2, ifp ⟨ch, hch⟩]
+    rw [ite_eq_right (by omega), ite_eq_left h2, ite_eq_left ⟨ch, hch⟩]
   by_cases hqs : q ∈ ch.signers
   · obtain ⟨r', hr', h1', h2', ch', hch', hs, hv⟩ :=
       link_rcv E hA hq hrcv hq (s := ch.s) (v := ch.x) ⟨ch, hch, link_mem_tokens hqs⟩

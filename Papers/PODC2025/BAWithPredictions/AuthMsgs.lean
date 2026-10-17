@@ -61,7 +61,7 @@ theorem roundCost_zero (p : P) : roundCost E 0 p ≤ 2 * k + 1 := by
   unfold roundCost
   have : ∀ q, msgCost ((alg k t).send 0 p (E.s 0 p) q) =
       if pos (inp p).2 q ≤ 2 * k + 1 then 1 else 0 := by
-    intro q; rw [send_eq, ifp rfl, c_eq]; split_ifs <;> rfl
+    intro q; rw [send_eq, ite_eq_left rfl, c_eq]; split_ifs <;> rfl
   simp only [this, sum_boole, Nat.cast_id]
   have h := card_le_card_of_injOn (pos (inp p).2) (t := Icc 1 (2 * k + 1))
     (s := univ.filter fun q => pos (inp p).2 q ≤ 2 * k + 1)
@@ -74,7 +74,7 @@ theorem roundCost_bb {r : ℕ} (h1 : 1 ≤ r) (h2 : r ≤ k + 1) (p : P) :
   unfold roundCost
   have : ∀ q, msgCost ((alg k t).send r p (E.s r p) q) = (E.s r p).out.card := by
     intro q
-    rw [send_eq, ifn (by omega), ifp h2]
+    rw [send_eq, ite_eq_right (by omega), ite_eq_left h2]
     split_ifs with h
     · rfl
     · simp [msgCost, not_nonempty_iff_eq_empty.mp h]
@@ -86,7 +86,7 @@ theorem roundCost_plur (p : P) :
   have : ∀ q, msgCost ((alg k t).send (k + 2) p (E.s (k + 2) p) q) =
       if (cert E p).isSome then 1 else 0 := by
     intro q
-    rw [send_eq, ifn (by omega), ifn (by omega), ifp rfl, cc_eq E (by omega)]
+    rw [send_eq, ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_left rfl, cc_eq E (by omega)]
     cases cert E p <;> rfl
   simp only [this]
   split_ifs <;> simp
@@ -95,7 +95,7 @@ theorem roundCost_late {r : ℕ} (h : k + 2 < r) (p : P) : roundCost E r p = 0 :
   unfold roundCost
   apply sum_eq_zero
   intro q _
-  rw [send_eq, ifn (by omega), ifn (by omega), ifn (by omega)]
+  rw [send_eq, ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega)]
   rfl
 
 /-- The chains sent in round `r + 1` correspond to values newly added to the sets `X_p[s]` at the
@@ -144,7 +144,7 @@ theorem card_out_inst_succ {r : ℕ} (hr : r ≤ k + 1) (p s : P) :
       by_cases hps : s = p
       · subst hps; simp only [Option.isSome_some, and_self, ↓reduceIte, card_singleton]
         exact (card_filter_le _ _).trans (card_singleton _).le
-      · rw [filter_singleton, ifn (Ne.symm hps)]; simp
+      · rw [filter_singleton, ite_eq_right (Ne.symm hps)]; simp
   · rw [out_succ_bb E h0 hr]
     cases hc : cert E p with
     | none => simp

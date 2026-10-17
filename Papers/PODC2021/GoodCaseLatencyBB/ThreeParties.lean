@@ -604,16 +604,6 @@ theorem fast_agree {f σ : ℕ} (hV : UValid f Δ σ R) {p q : P} (hp : p ∉ R.
     rw [Nat.sub_add_cancel (by omega)] at this
     exact hu'.2 v (known_mono R h this)
 
-/-- With three processes, a process different from two distinct processes is the third one. -/
-theorem eq_third (h3 : Fintype.card P = 3) {a b c y : P} (hab : a ≠ b) (hac : a ≠ c)
-    (hbc : b ≠ c) (hya : y ≠ a) (hyb : y ≠ b) : y = c := by
-  by_contra hyc
-  have h4 : ({y, a, b, c} : Finset P).card = 4 := by
-    rw [card_insert_of_notMem (by simp [hya, hyb, hyc]), card_insert_of_notMem (by simp [hab, hac]),
-      card_pair hbc]
-  have := card_le_univ ({y, a, b, c} : Finset P)
-  omega
-
 variable (h3 : Fintype.card P = 3) (hΔ : 1 ≤ Δ) {f σ : ℕ}
 include h3
 

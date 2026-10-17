@@ -228,12 +228,7 @@ theorem sum_card_K4_inter_le {n J : ℕ} (F : Finset (Fin n)) :
     exact Disjoint.mono inter_subset_left inter_subset_left (K4_disjoint h)
 
 theorem geom_two (J : ℕ) : ∑ j ∈ range J, 2 ^ j = 2 ^ J - 1 := by
-  induction J with
-  | zero => simp
-  | succ J ih =>
-    rw [sum_range_succ, ih, pow_succ]
-    have : 1 ≤ 2 ^ J := Nat.one_le_two_pow
-    omega
+  simpa using Nat.geomSum_eq le_rfl J
 
 /-! ### `jStar`: the corrected iteration bound -/
 

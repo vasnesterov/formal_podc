@@ -50,14 +50,10 @@ theorem mem_recvd {α : Type*} [DecidableEq α] {own b : α} {ib : V → Option 
     · exact Or.inr ⟨u, by simp [hu]⟩
 
 theorem bool_max'_eq_true {s : Finset Bool} (h : s.Nonempty) : s.max' h = true ↔ true ∈ s := by
-  constructor
-  · intro h'; rw [← h']; exact max'_mem s h
-  · intro h'; exact le_antisymm (by simp) (le_max' s true h')
+  simp [max'_eq_iff]
 
 theorem bool_min'_eq_false {s : Finset Bool} (h : s.Nonempty) : s.min' h = false ↔ false ∈ s := by
-  constructor
-  · intro h'; rw [← h']; exact min'_mem s h
-  · intro h'; exact le_antisymm (min'_le s false h') (by simp)
+  simp [min'_eq_iff]
 
 /-- The Min/Max update of a binary value `own` with absorbing value `a`. -/
 def mmUpdate (a own : Bool) (ib : V → Option Bool) : Bool :=

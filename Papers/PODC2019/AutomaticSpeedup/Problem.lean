@@ -120,19 +120,7 @@ def iter (P : Problem L) : (k : ℕ) → Problem (IterLabel L k)
 
 theorem pair_eq_pair_iff {α : Type*} {a b c d : α} :
     ({a, b} : Multiset α) = {c, d} ↔ (a = c ∧ b = d) ∨ (a = d ∧ b = c) := by
-  constructor
-  · intro h
-    have ha : a ∈ ({c, d} : Multiset α) := h ▸ by simp
-    simp only [Multiset.insert_eq_cons, Multiset.mem_cons, Multiset.mem_singleton] at ha
-    rcases ha with rfl | rfl
-    · left; refine ⟨rfl, ?_⟩
-      simpa using h
-    · right; refine ⟨rfl, ?_⟩
-      rw [Multiset.pair_comm c a] at h
-      simpa using h
-  · rintro (⟨rfl, rfl⟩ | ⟨rfl, rfl⟩)
-    · rfl
-    · exact Multiset.pair_comm _ _
+  simp [Multiset.insert_eq_cons, Multiset.cons_eq_cons]; grind
 
 theorem EdgeAll.symm {P : Problem L} {Δ : ℕ} {Y Z : Set L} (h : P.EdgeAll Δ Y Z) :
     P.EdgeAll Δ Z Y :=

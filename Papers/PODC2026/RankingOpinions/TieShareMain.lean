@@ -295,8 +295,6 @@ lemma relS_eq (x y : A) : relS (c.B x) (c.B y) = c.R x y := by
 lemma qb_sub {x y : A} (h : c.qB x y = true) : c.subB x y = true := by
   rw [qB, decide_eq_true_iff] at h; rw [subB, decide_eq_true_iff]; exact h.1
 
-lemma false_of_not {b : Bool} (h : ¬ b = true) : b = false := by simpa using h
-
 /-- One interaction in the stable phase, seen from `x`. -/
 lemma step {t : ℕ} (ht : c.T0 ≤ t) {x y : A} (hm : Meet E t x y) :
     ∃ o : Bool,
@@ -355,7 +353,7 @@ lemma kB_top {y z : A} (hy : c.Top y) (h0 : c.o z = 0) (hσ : c.σ z = nxt c.S (
     c.kB y z = true := (c.k_iff y z).2 (Or.inr ⟨hy.2, h0, hσ⟩)
 
 lemma qB_top_false {y z : A} (hy : c.Top y) : c.qB y z = false := by
-  apply false_of_not; intro h
+  apply Bool.of_not_eq_true; intro h
   obtain ⟨h1, h2, h3, h4⟩ := (c.ssub_iff y z).1 h
   have := c.e_le z; rw [← h1] at this
   have := hy.1; have := hy.2
@@ -450,7 +448,7 @@ lemma no_spurious (hE : E.WeaklyFair) :
     obtain ⟨o, h3, -⟩ := c.step1 (le_trans (le_max_right _ _) ht) hm
     show stA E (t + 1) z ≠ St.ws
     have hk : c.kB tp z = false := by
-      apply false_of_not; intro h
+      apply Bool.of_not_eq_true; intro h
       obtain ⟨-, h2⟩ := c.top_kB htp h
       rw [hσ] at h2; exact c.hS _ (c.σ_mem z) h2.symm
     have hR : c.R z tp = nx false false (c.sbB z tp) (c.kB z tp) false (c.subB z tp)
@@ -550,11 +548,12 @@ lemma all_sectors (hE : E.WeaklyFair) (hTok : ∃ y, stA E c.T0 y = St.ws)
     obtain ⟨o, h3, -⟩ := c.step1 (le_trans hT6 ht) hm
     rw [hwl' t (le_trans hT6 ht), hyw t ht] at h3
     have hσne : c.σ w ≠ c.σ y := by rw [hwσ, hy]; exact c.hS μ hμ
-    have hsb : c.sbB w y = false := false_of_not fun h => hσne ((c.sb_iff w y).1 h).1
-    have hsub1 : c.subB w y = false := false_of_not fun h => hσne ((c.sub_iff w y).1 h).1
-    have hsub2 : c.subB y w = false := false_of_not fun h => hσne ((c.sub_iff y w).1 h).1.symm
-    have hq1 : c.qB w y = false := false_of_not fun h => hσne ((c.ssub_iff w y).1 h).1
-    have hq2 : c.qB y w = false := false_of_not fun h => hσne ((c.ssub_iff y w).1 h).1.symm
+    have hsb : c.sbB w y = false := Bool.of_not_eq_true fun h => hσne ((c.sb_iff w y).1 h).1
+    have hsub1 : c.subB w y = false := Bool.of_not_eq_true fun h => hσne ((c.sub_iff w y).1 h).1
+    have hsub2 : c.subB y w = false :=
+      Bool.of_not_eq_true fun h => hσne ((c.sub_iff y w).1 h).1.symm
+    have hq1 : c.qB w y = false := Bool.of_not_eq_true fun h => hσne ((c.ssub_iff w y).1 h).1
+    have hq2 : c.qB y w = false := Bool.of_not_eq_true fun h => hσne ((c.ssub_iff y w).1 h).1.symm
     have hk : c.kB y w = true := c.kB_top hyT hw0 (by rw [hwσ, hy])
     have hR : c.R w y = nx false false false (c.kB w y) true false false false false := by
       simp only [Ctx.R, hsb, hsub1, hsub2, hq1, hq2, hk]
@@ -613,8 +612,8 @@ theorem main2 (hE : E.WeaklyFair) (hTok : ∃ y, stA E c.T0 y = St.ws)
         apply upd_keep_los
         intro hp
         have hpT : c.Top p := by by_contra h; exact h6 t ht p h hp
-        refine ⟨false_of_not fun h => h0 (c.top_kB hpT h).1,
-          false_of_not fun h => ?_, false_of_not fun h => h0 ?_⟩
+        refine ⟨Bool.of_not_eq_true fun h => h0 (c.top_kB hpT h).1,
+          Bool.of_not_eq_true fun h => ?_, Bool.of_not_eq_true fun h => h0 ?_⟩
         · obtain ⟨-, h5, -⟩ := (c.ssub_iff p y).1 h; have := hpT.1; omega
         · rw [((c.sb_iff y p).1 h).2, hpT.1]
       refine ⟨hst, ?_⟩
@@ -656,8 +655,9 @@ theorem main2 (hE : E.WeaklyFair) (hTok : ∃ y, stA E c.T0 y = St.ws)
       obtain ⟨t, ht, hm⟩ := hE y z hyz T6
       refine ⟨t + 1, by omega, fun h => absurd h h0, fun _ => ?_⟩
       obtain ⟨o, h3, h4⟩ := c.step (le_trans hT6 ht) hm
-      have hsb : c.sbB y z = false := false_of_not fun h => h0 (by rw [((c.sb_iff y z).1 h).2, hz.1])
-      have hk : c.kB z y = false := false_of_not fun h => h0 (c.top_kB hz h).1
+      have hsb : c.sbB y z = false :=
+        Bool.of_not_eq_true fun h => h0 (by rw [((c.sb_iff y z).1 h).2, hz.1])
+      have hk : c.kB z y = false := Bool.of_not_eq_true fun h => h0 (c.top_kB hz h).1
       have hR : c.R y z = nx false false false (c.kB y z) false true (c.subB z y) true false := by
         simp only [Ctx.R, hsb, hk, c.subB_into_top hz hzσ.symm, c.qB_into_top hz hzσ.symm hyT,
           c.qB_top_false hz]

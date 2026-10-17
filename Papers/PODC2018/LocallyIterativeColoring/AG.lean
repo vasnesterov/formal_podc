@@ -222,10 +222,10 @@ theorem card_filter_mul_eq_le [Fact q.Prime] {k e : ZMod q} (hke : k ≠ 0 ∨ e
       _ ≤ _ := card_filter_natCast_eq_le _ _ _
 
 theorem ceil_add_ceil_le (q s T m : ℕ) (hq : 0 < q) (hs : s ≤ T) (hT : T = m * q) :
-    (s - 0) ⌈/⌉ q + (T - s) ⌈/⌉ q ≤ m + 1 := by
+    s ⌈/⌉ q + (T - s) ⌈/⌉ q ≤ m + 1 := by
   simp only [Nat.ceilDiv_eq_add_pred_div]
-  have h := Nat.div_add_div_le_add_div (x := s - 0 + q - 1) (y := T - s + q - 1) (z := q)
-  have h1 : (s - 0 + q - 1) + (T - s + q - 1) < (m + 2) * q := by
+  have h := Nat.div_add_div_le_add_div (x := s + q - 1) (y := T - s + q - 1) (z := q)
+  have h1 : (s + q - 1) + (T - s + q - 1) < (m + 2) * q := by
     rw [add_mul, ← hT]; omega
   have h2 := (Nat.div_lt_iff_lt_mul hq).2 h1
   omega

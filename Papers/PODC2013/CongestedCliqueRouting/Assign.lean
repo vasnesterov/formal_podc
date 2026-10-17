@@ -76,16 +76,11 @@ lemma assign_le [Nonempty ι] {S : Finset α} {cls : α → κ} {cap : κ → ι
   rw [dif_pos h]
   exact Classical.choose_spec (exists_assign S cls cap h) k p
 
-omit [DecidableEq α] [DecidableEq κ] [DecidableEq ι] in
-lemma eq_of_sum_eq_of_le {f g : ι → ℕ} (hle : ∀ p, f p ≤ g p) (hsum : ∑ p, f p = ∑ p, g p)
-    (p : ι) : f p = g p :=
-  ((sum_eq_sum_iff_of_le fun p _ => hle p).1 hsum) p (mem_univ p)
-
 lemma assign_eq [Nonempty ι] {S : Finset α} {cls : α → κ} {cap : κ → ι → ℕ}
     (h : ∀ k, (S.filter (fun a => cls a = k)).card = ∑ p, cap k p) (k : κ) (p : ι) :
     (S.filter (fun a => cls a = k ∧ assign S cls cap a = p)).card = cap k p := by
   have hle := assign_le (fun k => (h k).le) k
-  refine eq_of_sum_eq_of_le hle ?_ p
+  refine (sum_eq_sum_iff_of_le fun p _ => hle p).1 ?_ p (mem_univ p)
   rw [← card_filter_eq_sum_fiber, h k]
 
 end Assign

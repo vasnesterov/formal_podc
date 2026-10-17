@@ -253,12 +253,6 @@ theorem WF.cut (hw : E.WF) (t : T) : (E.cut t).WF where
   mono p i j hij hj := hw.mono p i j hij ((lt_cut_len hw t p j).1 hj).1
   inj p q i j hi hj := hw.inj p q i j ((lt_cut_len hw t p i).1 hi).1 ((lt_cut_len hw t q j).1 hj).1
 
-theorem eq_of_lt_iff {a b : ℕ} (h : ∀ k, k < a ↔ k < b) : a = b := by
-  rcases Nat.lt_trichotomy a b with h' | h' | h'
-  · exact absurd ((h a).2 h') (lt_irrefl _)
-  · exact h'
-  · exact absurd ((h b).1 h') (lt_irrefl _)
-
 /-- Projections commute with prefixes. -/
 theorem proj_cut (hw : E.WF) (t : T) {R : Type} {i r : ℕ} (f : Fin n → ℕ → R) (hir : i < r)
     (hr : r < L) : (E.cut t).proj L i r f = (E.proj L i r f).cut t := by
@@ -267,14 +261,14 @@ theorem proj_cut (hw : E.WF) (t : T) {R : Type} {i r : ℕ} (f : Fin n → ℕ �
   simp only [proj, TH.cut]
   congr 1
   · funext p
-    apply eq_of_lt_iff
+    apply eq_of_forall_lt_iff
     intro k
     rw [lt_cnt hi, lt_cut_len hw]
     have := TH.cut_m_iff hw' t p k
     simp only [proj, TH.cut] at this
     rw [this, lt_cnt hi]
   · funext p
-    apply eq_of_lt_iff
+    apply eq_of_forall_lt_iff
     intro k
     rw [lt_cnt hr, lt_cut_len hw]
     have := TH.cut_c_iff hw' t p k

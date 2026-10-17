@@ -85,10 +85,10 @@ theorem lemma24_honest (E : RoundRun (alg (P := P) (V := V) k t) F inp) (hsync :
       have hi := (mem_filter.mp hi).2
       simp only [voters, mem_filter, mem_univ, true_and]
       rw [hsync 0 le_rfl j i (hGH j hj) hi]
-      rw [send_eq, ifp rfl, c_eq, ifp (hGpos i hi j hj).2]
+      rw [send_eq, ite_eq_left rfl, c_eq, ite_eq_left (hGpos i hi j hj).2]
     have h1 := card_le_card hvot
     rw [card_filter_notMem_univ] at h1
-    rw [cert_eq, ifp (by omega)]
+    rw [cert_eq, ite_eq_left (by omega)]
     rfl
   have := card_le_card hsub
   omega
@@ -125,7 +125,7 @@ theorem plurVal_eq_some {t : ℕ} {q : P} {mo : Option (Msg P V)} {v : V} :
 
 theorem send_plur (q p : P) : (alg k t).send (k + 2) q (E.s (k + 2) q) p =
     (cert E q).map fun cc => Msg.plur q (plurality (E.s (k + 2) q)) cc := by
-  rw [send_eq, ifn (by omega), ifn (by omega), ifp rfl, cc_eq E (by omega)]
+  rw [send_eq, ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_left rfl, cc_eq E (by omega)]
 
 include hF hsync hA in
 /-- The core of **Lemma 26**: if all honest processes with a certificate broadcast the same value
@@ -284,7 +284,7 @@ theorem theorem6 {k t : ℕ} {F : Finset P} {inp : P → V × (P → Bool)}
   ⟨fun _ hp _ hq _ _ _ _ ha hb => lemma26 E hF hsync hA htn hn hk hp hq ha hb,
     fun _ hv _ hp _ _ ha => lemma27 E hF hsync hA htn hn hk
       (fun q hq => hv q (mem_filter.mp hq).2.1) hp ha,
-    fun p => ⟨fun r hr => by rw [decide_k3, ifn (by omega)],
-      ⟨_, by rw [decide_k3, ifp le_rfl]⟩⟩⟩
+    fun p => ⟨fun r hr => by rw [decide_k3, ite_eq_right (by omega)],
+      ⟨_, by rw [decide_k3, ite_eq_left le_rfl]⟩⟩⟩
 
 end BAWithPredictions.AuthBA

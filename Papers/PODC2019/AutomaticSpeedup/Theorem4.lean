@@ -52,15 +52,13 @@ theorem lemma_4 {k : ℕ} (hk : 2 ≤ k) {I : Type} {n Δ t : ℕ} {𝒢 : Set (
 
 /-! ### Tower bounds -/
 
-theorem succ_le_two_pow (k : ℕ) : k + 1 ≤ 2 ^ k := Nat.lt_two_pow_self
-
 /-- `2^(4^k + 1) ≤ 2^2^2^2^k`: the degree condition of Lemma 4 holds once `k ≤ log⁽⁴⁾ Δ`. -/
 theorem two_pow_four_pow_le (k : ℕ) : 2 ^ (4 ^ k + 1) ≤ 2 ^ 2 ^ 2 ^ 2 ^ k := by
   apply Nat.pow_le_pow_right (by norm_num)
   have h1 : 4 ^ k + 1 ≤ 2 ^ (2 * k + 1) := by
     rw [pow_succ, pow_mul]; norm_num
   have h2 : 2 * k + 1 ≤ 2 ^ 2 ^ k := by
-    have a := succ_le_two_pow k
+    have a : k + 1 ≤ 2 ^ k := Nat.lt_two_pow_self
     have b : 2 ^ (k + 1) ≤ 2 ^ 2 ^ k := Nat.pow_le_pow_right (by norm_num) a
     rw [pow_succ] at b
     omega
@@ -80,7 +78,7 @@ theorem lemma4_bound {k : ℕ} (hk : 2 ≤ k) : 2 ^ 2 ^ 5 ^ k ≤ 2 ^ 2 ^ 2 ^ 2 
   have h2 : 3 * k ≤ 2 ^ 2 ^ k := by
     have a := add_two_le_two_pow hk
     have b : 2 ^ (k + 2) ≤ 2 ^ 2 ^ k := Nat.pow_le_pow_right (by norm_num) a
-    have c := succ_le_two_pow k
+    have c : k + 1 ≤ 2 ^ k := Nat.lt_two_pow_self
     rw [pow_add] at b
     nlinarith
   exact h1.trans (Nat.pow_le_pow_right (by norm_num) h2)

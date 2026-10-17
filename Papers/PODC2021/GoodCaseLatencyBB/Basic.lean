@@ -155,4 +155,14 @@ theorem CommitsBy.eq_of_agreement {A : Algorithm P M S VI V} {R : Run P M VI} {p
   obtain rfl := hag w ⟨τ, hd⟩ hv
   exact ⟨τ, hτ, hd⟩
 
+/-- With three processes, a process different from two distinct processes is the third one. -/
+theorem eq_third [Fintype P] (h3 : Fintype.card P = 3) {a b c y : P} (hab : a ≠ b) (hac : a ≠ c)
+    (hbc : b ≠ c) (hya : y ≠ a) (hyb : y ≠ b) : y = c := by
+  by_contra hyc
+  have h4 : ({y, a, b, c} : Finset P).card = 4 := by
+    rw [card_insert_of_notMem (by simp [hya, hyb, hyc]), card_insert_of_notMem (by simp [hab, hac]),
+      card_pair hbc]
+  have := card_le_univ ({y, a, b, c} : Finset P)
+  omega
+
 end GoodCaseLatencyBB

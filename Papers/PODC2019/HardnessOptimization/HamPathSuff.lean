@@ -64,8 +64,8 @@ lemma isChain_finRange (n : ℕ) :
     (List.finRange n).IsChain (fun i j : Fin n => j.val = i.val + 1) := by
   rw [List.isChain_iff_getElem]; intro i hi; simp
 
-lemma finRange_ne_nil {n : ℕ} (hn : 0 < n) : List.finRange n ≠ [] := by
-  intro h; have := congrArg List.length h; simp at this; omega
+lemma finRange_ne_nil {n : ℕ} (hn : 0 < n) : List.finRange n ≠ [] :=
+  List.finRange_eq_nil_iff.not.2 hn.ne'
 
 lemma head_finRange {n : ℕ} (hn : 0 < n) (h : List.finRange n ≠ []) :
     (List.finRange n).head h = ⟨0, hn⟩ := by

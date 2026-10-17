@@ -68,7 +68,7 @@ theorem pre_WF (hw : E.WF) (t : ℕ) : (E.pre t).WF where
 
 theorem pre_cut (hw : E.WF) {t t' : ℕ} (h : t' ≤ t) : (E.pre t).cut t' = E.pre t' := by
   have hl : ∀ p, ((E.pre t).cut t').len p = (E.pre t').len p := fun p =>
-    Exec.eq_of_lt_iff fun i => by
+    eq_of_forall_lt_iff fun i => by
       rw [Exec.lt_cut_len (pre_WF hw t), lt_pre_len hw, lt_pre_len hw]
       change ((i : ℕ∞) < E.len p ∧ E.T p i < t) ∧ E.T p i < t' ↔ _
       constructor

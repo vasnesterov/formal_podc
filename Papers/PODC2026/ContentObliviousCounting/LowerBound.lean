@@ -84,13 +84,10 @@ theorem no_equal_traces (hP : CountingCorrect P out) {n : ℕ} [NeZero n]
 
 lemma exists_mul_le_of_sum_le {h M : ℕ} (F : ℕ → ℕ) (hh : 0 < h)
     (hs : ∑ i ∈ range h, F i ≤ M) : ∃ i < h, h * F i ≤ M := by
-  by_contra hcon
-  push Not at hcon
-  have : ∑ i ∈ range h, M < ∑ i ∈ range h, h * F i :=
-    Finset.sum_lt_sum_of_nonempty (by simp; omega) fun i hi => hcon i (by simpa using hi)
-  rw [Finset.sum_const, card_range, smul_eq_mul, ← Finset.mul_sum] at this
-  have := Nat.mul_le_mul_left h hs
-  omega
+  obtain ⟨i, hi, hle⟩ := Finset.exists_le_of_sum_le (nonempty_range_iff.2 hh.ne')
+    (f := fun i => h * F i) (g := fun _ => M)
+    (by simpa [← Finset.mul_sum] using Nat.mul_le_mul_left h hs)
+  exact ⟨i, mem_range.1 hi, hle⟩
 
 lemma card_filter_mul_le {D M : ℕ} (F : ℕ → ℕ) (hs : ∑ i ∈ range D, F i ≤ M) :
     D ≤ 2 * ((range D).filter fun i => D * F i ≤ 2 * M).card := by

@@ -26,18 +26,12 @@ open scoped ENNReal
 /-- The model `N₃ = {H₀, H₁, H₂}`. -/
 def N3s : Set (Graph (Fin 2)) := {H0, H1, H2}
 
-theorem eq_of_reflTransGen_of_noOut {β : Type*} {R : β → β → Prop} {a b : β}
-    (hno : ∀ y, ¬ R a y) (h : Relation.ReflTransGen R a b) : b = a := by
-  induction h with
-  | refl => rfl
-  | tail _ hbc ih => subst ih; exact absurd hbc (hno _)
-
 theorem not_root_H1 : (1 : Fin 2) ∉ Roots H1 := fun h => by
-  have := eq_of_reflTransGen_of_noOut (fun y hy => by simp [H1] at hy) (h 0)
+  have := (Relation.reflTransGen_iff_eq (fun y hy => by simp [H1] at hy)).1 (h 0)
   exact absurd this (by decide)
 
 theorem not_root_H2 : (0 : Fin 2) ∉ Roots H2 := fun h => by
-  have := eq_of_reflTransGen_of_noOut (fun y hy => by simp [H2] at hy) (h 1)
+  have := (Relation.reflTransGen_iff_eq (fun y hy => by simp [H2] at hy)).1 (h 1)
   exact absurd this (by decide)
 
 theorem roots_H0 (i : Fin 2) : i ∈ Roots H0 := fun j => by
@@ -128,9 +122,6 @@ def Lemma20LitStatement : Prop :=
     (C : Fin 2 → σ), A.Solves N → G ∈ N → H ∈ N → K ∈ N → AlphaRelLit K G H → A.Reach N C →
     (A.val (Pat N) (next A.step G C) ∩ A.val (Pat N) (next A.step H C)).Nonempty
 
-theorem segment_two (C : Fin 2 → ℝ) : convexHull ℝ (range C) = Icc (min (C 0) (C 1)) (max (C 0) (C 1)) := by
-  rw [range_fin_two, convexHull_pair, segment_eq_Icc']
-
 /-- **Lemma 20 is false under the literal reading of Definition 15**: for Algorithm 1 from initial
 values `(0, 1)`, `H₁ α_{H₀} H₂` but the valencies of `H₁.C₀ ⊆ [0, 1/3]` and `H₂.C₀ ⊆ [2/3, 1]` are
 disjoint. -/
@@ -142,7 +133,7 @@ theorem lemma20_literal_false : ¬ Lemma20LitStatement := by
     (by simp [N3s]) (alphaRelLit_H0 H1 H2) (Alg.Reach.initC ⟨H0, by simp [N3s]⟩ _)
   have s1 := averaging_alg1.val_subset _ (Alg.val_mono (pat_mono hN) _ hz1)
   have s2 := averaging_alg1.val_subset _ (Alg.val_mono (pat_mono hN) _ hz2)
-  rw [segment_two] at s1 s2
+  rw [range_fin_two, convexHull_pair, segment_eq_Icc'] at s1 s2
   have e10 := next_alg1_zero (V := ℝ) H1 ![0, 1]
   have e11 := next_alg1_one (V := ℝ) H1 ![0, 1]
   have e20 := next_alg1_zero (V := ℝ) H2 ![0, 1]

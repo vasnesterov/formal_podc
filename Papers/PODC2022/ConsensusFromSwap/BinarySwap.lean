@@ -40,9 +40,6 @@ structure Inv16 (C₀ : Cfg A) (q₀ q₁ : P) (ps : List P) (i : ℕ) (C : Cfg 
     (∃ c ∈ cs, (run (run C lam) (block cs)).mem c.2 ≠ (run C lam).mem c.2) →
     ¬ Biv {q₀, q₁} (run (run C lam) (block cs))
 
-lemma bool_eq_not_of_ne {a b : Bool} (h : a ≠ b) : a = !b := by
-  cases a <;> cases b <;> simp_all
-
 section Lemma16
 
 variable {C₀ : Cfg A} (hS : Setting C₀) {q₀ q₁ : P} (hq : q₀ ≠ q₁) {ps : List P}
@@ -200,7 +197,7 @@ theorem lemma16_step {i : ℕ} (hi : i < ps.length) {C : Cfg A} {X : Finset ι}
   by_cases hd : ((rswapObj Bool false).δ v o).1 = v
   · -- Case 1: `d` does not change `B`
     have hC'B : C'.mem B = !v := by
-      apply bool_eq_not_of_ne
+      apply Bool.eq_not_of_ne
       intro h
       exact (hbc αj hαj hbj hindj [] (by simp)).2 hd ⟨[], [], rfl, by simpa using h⟩
         (by simpa using hbj)
@@ -253,7 +250,7 @@ theorem lemma16_step {i : ℕ} (hi : i < ps.length) {C : Cfg A} {X : Finset ι}
       cases o with
       | read => exact absurd rfl hd
       | swap w =>
-        have : w = !v := bool_eq_not_of_ne hd
+        have : w = !v := Bool.eq_not_of_ne hd
         exact ⟨k, by rw [hpC', this]⟩
     have hBX : B ∉ X := by
       intro hBX

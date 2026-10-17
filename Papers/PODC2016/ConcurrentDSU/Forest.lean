@@ -55,11 +55,6 @@ section Iter
 
 variable {m : E → E}
 
-lemma iterate_fixed {r : E} (hr : m r = r) (j : ℕ) : m^[j] r = r := by
-  induction j with
-  | zero => rfl
-  | succ j ih => rw [Function.iterate_succ_apply', ih, hr]
-
 lemma key_le_iterate (hg : Good key m) (a : E) (j : ℕ) : key a ≤ key (m^[j] a) := by
   induction j with
   | zero => simp
@@ -77,7 +72,7 @@ lemma key_lt_iterate (hg : Good key m) (a : E) (N : ℕ) (hN : m (m^[N] a) ≠ m
     apply hN
     have : m^[N] a = m^[N - i] (m^[i] a) := by
       rw [← Function.iterate_add_apply]; congr 1; omega
-    rw [this, iterate_fixed hfix, hfix]
+    rw [this, Function.iterate_fixed hfix, hfix]
   intro i j hij hj
   induction j with
   | zero => omega
@@ -107,7 +102,7 @@ lemma rootOf_fixed (hg : Good key m) (a : E) : m (rootOf m a) = rootOf m a := by
   have := Fintype.card_le_of_injective f hf
   simp at this
 
-lemma rootOf_of_fixed {a : E} (ha : m a = a) : rootOf m a = a := iterate_fixed ha _
+lemma rootOf_of_fixed {a : E} (ha : m a = a) : rootOf m a = a := Function.iterate_fixed ha _
 
 lemma rootOf_eq_of_iterate (hg : Good key m) {a r : E} {j : ℕ} (hj : m^[j] a = r)
     (hr : m r = r) : rootOf m a = r := by
@@ -115,12 +110,12 @@ lemma rootOf_eq_of_iterate (hg : Good key m) {a r : E} {j : ℕ} (hj : m^[j] a =
   rcases Nat.le_total j (Fintype.card E) with h | h
   · have : m^[Fintype.card E] a = m^[Fintype.card E - j] (m^[j] a) := by
       rw [← Function.iterate_add_apply]; congr 1; omega
-    rw [this, hj, iterate_fixed hr]
+    rw [this, hj, Function.iterate_fixed hr]
   · have : m^[j] a = m^[j - Fintype.card E] (m^[Fintype.card E] a) := by
       rw [← Function.iterate_add_apply]; congr 1; omega
     have hf := rootOf_fixed hg a
     unfold rootOf at hf
-    rw [this, iterate_fixed hf] at hj
+    rw [this, Function.iterate_fixed hf] at hj
     exact hj
 
 lemma rootOf_apply (hg : Good key m) (a : E) : rootOf m (m a) = rootOf m a := by

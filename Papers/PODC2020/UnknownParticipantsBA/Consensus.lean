@@ -127,14 +127,6 @@ def consExt : Ext I X (CMsg X) (CState I X) where
 /-- The consensus protocol of the id-only model. -/
 def cons : Protocol I X (Msg I (CMsg X)) (St I (CState I X)) := withRotor consExt
 
-omit [DecidableEq I] [LinearOrder I] [LinearOrder X] in
-lemma ite_t {α : Type*} {c : Prop} [Decidable c] (h : c) {a b : α} :
-    (if c then a else b) = a := by simp [h]
-
-omit [DecidableEq I] [LinearOrder I] [LinearOrder X] in
-lemma ite_f {α : Type*} {c : Prop} [Decidable c] (h : ¬ c) {a b : α} :
-    (if c then a else b) = b := by simp [h]
-
 /-! ### The four kinds of steps -/
 
 section steps
@@ -407,7 +399,7 @@ lemma lock {k : ℕ} {w : I} {y : X}
   refine ⟨h3, ?_⟩
   rw [(cons_king E k u).2, h3]
   obtain ⟨k', hk', h1, h2, -⟩ := cons_count E (s := 3 * k + 3) (t := 3 * k + 4) rfl u (CMsg.strong y)
-  rw [ite_f (by omega)]
+  rw [ite_eq_right (by omega)]
 
 /-- (C) Lemma 8 of the full version: if all correct nodes start phase `k` with opinion `y`, they
 keep it, and every correct node has decided after step `3k+4`, every new decision being `y`. -/
@@ -447,14 +439,14 @@ lemma unanimous {k : ℕ} {y : X} (h : ∀ u ∈ E.G, (R (3 * k + 1) u).ext.x = 
   simp only at hk
   rw [hx3 u hu] at hk
   refine ⟨hx3 u hu, ?_, ?_, ?_⟩
-  · rw [hk.2, ite_f (by omega)]
+  · rw [hk.2, ite_eq_right (by omega)]
   · rw [hk.1]
     split_ifs with hd
     · simp
     · intro hnone
       exact hd ⟨hnone, by omega⟩
   · intro hnone
-    rw [hk.1, ite_t ⟨hnone, by omega⟩]
+    rw [hk.1, ite_eq_left ⟨hnone, by omega⟩]
 
 /-- (C') Persistence: unanimity at the start of phase `k` persists in all later phases. -/
 lemma unanimous_forever {k : ℕ} {y : X} (h : ∀ u ∈ E.G, (R (3 * k + 1) u).ext.x = y) :
@@ -504,8 +496,8 @@ lemma good_phase {k : ℕ} {p : I} (hp : p ∈ E.G)
       (m := CMsg.strong (R (3 * k + 3) v).ext.x) (by omega)
     obtain ⟨-, h2⟩ := out_strong_imp E hmt
     exact adopt E hres h2
-  · exact (cons_king E k v).2.trans (ite_f hs)
-  · exact (cons_king E k v).2.trans ((ite_t (not_not.1 hs)).trans (hking v hv))
+  · exact (cons_king E k v).2.trans (ite_eq_right hs)
+  · exact (cons_king E k v).2.trans ((ite_eq_left (not_not.1 hs)).trans (hking v hv))
 
 omit hres in
 /-- The origin of a decision: the first decision is taken in a king step. -/

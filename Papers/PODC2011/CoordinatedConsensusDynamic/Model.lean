@@ -80,10 +80,8 @@ theorem Reach.mem_iff (hG : G.Valid) {v s u t : ℕ} (h : G.Reach v s u t) :
     · exact ih.trans (iff_of_true (hG.mem _ _ _ hs).1 (hG.mem _ _ _ hs).2)
 
 theorem _root_.Relation.ReflTransGen.symm_of {β : Type*} {r : β → β → Prop}
-    (hr : ∀ a b, r a b → r b a) {a b : β} (h : ReflTransGen r a b) : ReflTransGen r b a := by
-  induction h with
-  | refl => exact ReflTransGen.refl
-  | tail _ hbc ih => exact ReflTransGen.head (hr _ _ hbc) ih
+    (hr : ∀ a b, r a b → r b a) {a b : β} (h : ReflTransGen r a b) : ReflTransGen r b a :=
+  haveI : Std.Symm r := ⟨hr⟩; Std.Symm.symm _ _ h
 
 /-- `past_{(G,u,t)}(s) = {v ∈ V | (v, s) ↝ (u, t)}`: the shared causal past
 `Cslib.DynNet.past` of the dynamic network whose graph between times `k` and `k + 1` is

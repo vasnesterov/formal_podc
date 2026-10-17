@@ -27,9 +27,6 @@ variable {n : ℕ} {Op Y : Type} [DecidableEq Op] [DecidableEq Y] [Inhabited Op]
 theorem TH.cut_mapRes {P Op R R' T : Type} [LinearOrder T] (h : TH P Op R T) (f : R → R')
     (t : T) : (h.mapRes f).cut t = (h.cut t).mapRes f := rfl
 
-theorem le_of_forall_lt_imp {a b : ℕ} (h : ∀ k, k < a → k < b) : a ≤ b := by
-  by_contra h'; push Not at h'; exact lt_irrefl _ (h b h')
-
 namespace Exec
 
 variable {E : Exec n Op Y ℕ}
@@ -91,8 +88,8 @@ theorem sketch_mem_of_tight {O : Set (Hist (Fin n) Op Y)} (hO : GenLin O) (hw : 
       8 * k + 4 < E.len p)
     exact rec_mem_allInv hw hu h1 (by simp only [tup]; omega)
   have hsim : TH.SimTH (XTH τ) ((E.hT 8).cut ts) := by
-    refine ⟨fun q => le_of_forall_lt_imp fun j hj => ?_, fun q j hj => ?_,
-      fun p => le_of_forall_lt_imp fun k hk => ?_, fun p k hk => ?_, fun p k q j hk hj h => ?_⟩
+    refine ⟨fun q => le_of_forall_lt fun j hj => ?_, fun q j hj => ?_,
+      fun p => le_of_forall_lt fun k hk => ?_, fun p k hk => ?_, fun p k q j hk hj h => ?_⟩
     · exact (lt_m_iff hv).2 ⟨_, hvis q j hj, rfl, rfl⟩
     · exact op_eq hv (hvis q j hj)
     · obtain ⟨h1, h2⟩ := (lt_c_tauAt hw).1 hk
@@ -210,8 +207,8 @@ theorem tight_cut_mem_of_sketch {O : Set (Hist (Fin n) Op Y)} (hO : GenLin O) (h
     refine ⟨h5, lt_trans h6 hu2, ?_⟩
     rw [← h7]; exact hx
   have hsim : TH.SimTH ((E.hT 8).cut t₀) ((XTH τ).cut (lex3 (B + 1) 0 0)) := by
-    refine ⟨fun q => le_of_forall_lt_imp fun j hj => ?_, fun q j hj => ?_,
-      fun p => le_of_forall_lt_imp fun k hk => ?_, fun p k hk => ?_, fun p k q j hk hj h => ?_⟩
+    refine ⟨fun q => le_of_forall_lt fun j hj => ?_, fun q j hj => ?_,
+      fun p => le_of_forall_lt fun k hk => ?_, fun p k hk => ?_, fun p k q j hk hj h => ?_⟩
     · obtain ⟨h1, h2, -⟩ := hrec q j hj
       exact (lt_hT_cut_m hw).2 ⟨h1, h2⟩
     · exact (op_eq hv (hrec q j hj).2.2).symm
@@ -295,8 +292,8 @@ theorem sketch_mono {O : Set (Hist (Fin n) Op Y)} (hO : GenLin O) (hw : E.WF) {s
     rw [← this]
     exact ⟨mem_allInv.2 ⟨u, hu, hxu⟩, hx⟩
   have hsim : TH.SimTH (XTH τ₁) ((XTH τ₂).cut (lex3 (B + 1) 0 0)) := by
-    refine ⟨fun q => le_of_forall_lt_imp fun j hj => ?_, fun q j hj => ?_,
-      fun p => le_of_forall_lt_imp fun k hk => ?_, fun p k hk => ?_, fun p k q j hk hj h => ?_⟩
+    refine ⟨fun q => le_of_forall_lt fun j hj => ?_, fun q j hj => ?_,
+      fun p => le_of_forall_lt fun k hk => ?_, fun p k hk => ?_, fun p k q j hk hj h => ?_⟩
     · exact (lt_m_iff hv₁).2 ⟨_, (hrec q j hj).1, rfl, rfl⟩
     · show (XTH τ₁).op q j = (XTH τ₂).op q j
       rw [op_eq hv₁ (hrec q j hj).1, op_eq hv₂ (hrec q j hj).2]

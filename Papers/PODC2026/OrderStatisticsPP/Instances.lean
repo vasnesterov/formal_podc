@@ -32,9 +32,6 @@ lemma med3_choice (a b c : α) : med3 a b c = a ∨ med3 a b c = b ∨ med3 a b 
     · rcases max_choice a b with h'' | h'' <;> rw [h''] <;> simp
     · simp
 
-lemma sum_mul_sum_fin (f g : Fin n → ℝ) : ∑ u, ∑ v, f u * g v = (∑ u, f u) * (∑ v, g v) := by
-  rw [Finset.sum_mul_sum]
-
 /-- Copy-or-Max coefficients (Lemma 4.2). -/
 noncomputable def cmF (n : ℕ) (p : ℝ) (k : ℕ) : ℝ := p * ((n : ℝ) - k + 1) * ((k : ℝ) - 1) / n ^ 2
 noncomputable def cmH (n : ℕ) (k : ℕ) : ℝ := (k : ℝ) * ((n : ℝ) - k) / n ^ 2
@@ -56,14 +53,14 @@ theorem copyOrMax_orderBased (hn : 0 < n) {p : ℝ} (hp0 : 0 ≤ p) (hp1 : p ≤
   up D hD c := by
     rw [com_upMass hD]
     simp only [one_mul]
-    rw [sum_mul_sum_fin (fun u => 1 - ind D (c u)) (fun v => ind D (c v)), sum_one_sub_ind,
+    rw [← sum_mul_sum univ univ (fun u => 1 - ind D (c u)) (fun v => ind D (c v)), sum_one_sub_ind,
       ← cnt_eq_sum]
     simp only [cmF, Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul, mul_one]
     push_cast; ring
   down D hD c := by
     rw [com_downMass hD]
     simp only [one_mul]
-    rw [sum_mul_sum_fin (fun u => ind D (c u)) (fun v => 1 - ind D (c v)), sum_one_sub_ind,
+    rw [← sum_mul_sum univ univ (fun u => ind D (c u)) (fun v => 1 - ind D (c v)), sum_one_sub_ind,
       ← cnt_eq_sum]
     simp only [cmH, Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul, mul_one]
     ring

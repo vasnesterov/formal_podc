@@ -401,7 +401,7 @@ lemma SInv.step_inv {x : Fin k} (hI : SInv α C)
         obtain ⟨-, pv, hpv, -⟩ := hQ q hq; rw [hlq] at hpv; simp [startLoc] at hpv
       have hQ' : ∀ r ∈ Q, Ready C r := fun r hr =>
         (ready_congr (hlr r (by rintro rfl; exact hqQ hr)) hmem).1 (hQ r hr)
-      have := (hI.sim Q hQ').invoke (p := q) (x := x) (by rw [absCfg_loc, ifNeg hqQ]; exact hph)
+      have := (hI.sim Q hQ').invoke (p := q) (x := x) (by rw [absCfg_loc, ite_eq_right hqQ]; exact hph)
       convert this using 1
       refine acfg_ext (by simp [absCfg, hmem]) fun r => ?_
       rw [ACfg.invoke_loc, absCfg_loc, absCfg_loc]
@@ -547,7 +547,7 @@ lemma SInv.step_tau (hP : Fintype.card P ≤ m + 1) (hI : SInv α C)
         have he : absCfg Q C' = absCfg (insert q Q) C := acfg_ext (by simp [absCfg, hmem]) fun r => by
           rw [absCfg_loc, absCfg_loc]
           by_cases hrq : r = q
-          · rw [hrq, ifNeg hqQ, ifPos (mem_insert_self _ _), hlq, hrs, ← hd]
+          · rw [hrq, ite_eq_right hqQ, ite_eq_left (mem_insert_self _ _), hlq, hrs, ← hd]
             simp [scannedA, toA, hpv]
           · rw [hlr r hrq]; simp [hrq]
         rw [he]; exact hI.sim _ hQC
@@ -561,13 +561,13 @@ lemma SInv.step_tau (hP : Fintype.card P ≤ m + 1) (hI : SInv α C)
           have hQC : ∀ r ∈ Q.erase q, Ready C r := fun r hr =>
             hQo r (mem_of_mem_erase hr) (ne_of_mem_erase hr)
           have hA := (hI.sim _ hQC).scan hP (q := q)
-            (by rw [absCfg_loc, ifNeg (notMem_erase q Q)]; exact hph)
+            (by rw [absCfg_loc, ite_eq_right (notMem_erase q Q)]; exact hph)
           have hvec : vecs (Function.update d.cur d.idx v) = fun j => (C.mem j).2 := by
             funext j; rw [vecs, hm j]
           have he : absCfg Q C' = (absCfg (Q.erase q) C).scanStep q :=
             acfg_ext (by simp [absCfg, hmem, ACfg.scanStep]) fun r => by
               by_cases hrq : r = q
-              · rw [hrq, absCfg_loc, ifPos hqQ, hlq, hrs]
+              · rw [hrq, absCfg_loc, ite_eq_left hqQ, hlq, hrs]
                 simp only [ACfg.scanStep, Function.update_self, absCfg_loc, notMem_erase,
                   ↓reduceIte, scannedA, toA]
                 rw [hvec]; rfl
@@ -581,7 +581,7 @@ lemma SInv.step_tau (hP : Fintype.card P ≤ m + 1) (hI : SInv α C)
           have he : absCfg Q C' = absCfg Q C := acfg_ext (by simp [absCfg, hmem]) fun r => by
             rw [absCfg_loc, absCfg_loc]
             by_cases hrq : r = q
-            · rw [hrq, ifNeg hqQ, ifNeg hqQ, hlq, hrs, ← hd]; simp [toA]
+            · rw [hrq, ite_eq_right hqQ, ite_eq_right hqQ, hlq, hrs, ← hd]; simp [toA]
             · rw [hlr r hrq]
           rw [he]; exact hI.sim Q hQC
   · -- a swap
@@ -639,17 +639,17 @@ lemma SInv.step_tau (hP : Fintype.card P ≤ m + 1) (hI : SInv α C)
           have hok := hI.freshPrev r pv hpv j' q (C.loc q).seq (by rw [← this])
           omega
         · rwa [Function.update_of_ne hj] at this
-      have hA := (hI.sim Q hQC).swap (p := q) (j := j) (by rw [absCfg_loc, ifNeg hqQ]; exact hph)
+      have hA := (hI.sim Q hQC).swap (p := q) (j := j) (by rw [absCfg_loc, ite_eq_right hqQ]; exact hph)
       have he : absCfg Q C' = (absCfg Q C).swapStep q j := by
         refine acfg_ext ?_ fun r => ?_
         · funext j'
-          simp only [absCfg, ACfg.swapStep, hmem, ifNeg hqQ, toA]
+          simp only [absCfg, ACfg.swapStep, hmem, ite_eq_right hqQ, toA]
           by_cases hj : j' = j
           · subst hj; simp
           · simp [Function.update_of_ne hj]
         · by_cases hrq : r = q
           · subst hrq
-            simp only [absCfg, ACfg.swapStep, Function.update_self, ifNeg hqQ, toA, hlq, afterSwap]
+            simp only [absCfg, ACfg.swapStep, Function.update_self, ite_eq_right hqQ, toA, hlq, afterSwap]
           · simp only [absCfg, ACfg.swapStep, Function.update_of_ne hrq, hlr r hrq]
       rw [he]; exact hA
   · obtain ⟨-, -, i, o, k', hact, -⟩ := Impl.step_tau h
@@ -680,11 +680,11 @@ theorem swapAlg_safe (hP : Fintype.card P ≤ m + 1) (α : List (DLbl k P))
   have hI := sInv_run hP hC
   have hout : ∀ q (w : (taskObj (Fin k) (Fin k)).Resp), outputs α q = some w →
       ((absCfg ∅ C).loc q).ph = .done w := fun q w h => by
-    rw [absCfg_loc, ifNeg (notMem_empty q)]; exact hI.resp q w (List.mem_of_head? h)
+    rw [absCfg_loc, ite_eq_right (notMem_empty q)]; exact hI.resp q w (List.mem_of_head? h)
   have hA := hI.sim ∅ (by simp)
   refine ⟨fun p q x y hx hy => hA.agree (hout p x hx) (hout q y hy), fun p y hy => ?_⟩
   obtain ⟨q, hq1, hq2⟩ := hA.valid (hout p y hy)
-  rw [absCfg_loc, ifNeg (notMem_empty q)] at hq1 hq2
+  rw [absCfg_loc, ite_eq_right (notMem_empty q)] at hq1 hq2
   exact ⟨q, by rw [hI.inp q hq1]; exact congrArg some hq2⟩
 
 /-- Algorithm 1 solves consensus (agreement + validity), if `|P| ≤ m + 1`. -/

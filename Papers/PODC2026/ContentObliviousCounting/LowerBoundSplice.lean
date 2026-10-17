@@ -407,11 +407,6 @@ lemma mem_wordsUpTo {k : ℕ} {w : List Letter} : w ∈ wordsUpTo k ↔ w.length
   · rintro ⟨i, hi, v, rfl⟩; simp; omega
   · intro h; exact ⟨w.length, by omega, ⟨w, rfl⟩, rfl⟩
 
-lemma geom_four_le (k : ℕ) : ∑ i ∈ Finset.range (k + 1), 4 ^ i ≤ 4 ^ (k + 1) := by
-  induction k with
-  | zero => simp
-  | succ k ih => rw [Finset.sum_range_succ, pow_succ 4 (k + 1)]; omega
-
 lemma card_wordsUpTo (k : ℕ) : (wordsUpTo k).card = ∑ i ∈ Finset.range (k + 1), 4 ^ i := by
   rw [wordsUpTo, Finset.card_biUnion]
   · refine Finset.sum_congr rfl fun i _ => ?_
@@ -425,7 +420,7 @@ lemma card_wordsUpTo (k : ℕ) : (wordsUpTo k).card = ∑ i ∈ Finset.range (k 
     exact hij (by rw [← v.toList_length, ← w.toList_length, hw])
 
 lemma card_wordsUpTo_le (k : ℕ) : (wordsUpTo k).card ≤ 4 ^ (k + 1) :=
-  (card_wordsUpTo k).trans_le (geom_four_le k)
+  (card_wordsUpTo k).trans_le (Nat.geomSum_lt (by norm_num) fun _ => Finset.mem_range.1).le
 
 /-- **Observation 27** of [Chalopin–Chang–Di Luna–Zhou, PODC 2026]: the number of words over
 `Σ = {Lin, Lout, Rin, Rout}` of length at most `k` is `∑_{i=0}^k 4^i ≤ 4^(k+1)`. -/
@@ -435,6 +430,6 @@ theorem observation27 (k : ℕ) :
   have hset : {w : List Letter | w.length ≤ k} = ↑(wordsUpTo k) := by
     ext w; simp [mem_wordsUpTo]
   rw [hset, Set.ncard_coe_finset, card_wordsUpTo]
-  exact ⟨rfl, geom_four_le k⟩
+  exact ⟨rfl, (Nat.geomSum_lt (by norm_num) fun _ => Finset.mem_range.1).le⟩
 
 end Podc.ContentOblivious.Counting
