@@ -74,10 +74,10 @@ theorem FIIndist_of_deaf {P V : Type*} {x y : P → V} {σ τ : ℕ → Graph P}
 /-- In `π_k`, processes 0 and 2 never hear of process 1. -/
 theorem not_heard_one (k t : ℕ) : ∀ q : Fin 3, (q = 0 ∨ q = 2) → ¬ Heard (πk k) t q 1 := by
   induction t with
-  | zero => intro q hq h; simp only [Heard] at h; subst h; simp at hq
+  | zero => intro q hq h; rw [heard_zero_iff] at h; subst h; simp at hq
   | succ t ih =>
     intro q hq h
-    rcases h with h | ⟨r, hr, hh⟩
+    rcases heard_succ_iff.1 h with h | ⟨r, hr, hh⟩
     · exact ih q hq h
     · have : r = 0 ∨ r = 2 := by
         rcases hr with ⟨-, rfl, -⟩ | ⟨-, rfl, -⟩ <;> simp
@@ -90,7 +90,7 @@ theorem iso0 {k : ℕ} {x y : Fin 3 → Bool} {τ : ℕ → Graph (Fin 3)} (hτ 
   obtain ⟨h0, hin, hs⟩ := h
   have e : πk k k 2 0 := Or.inl ⟨rfl, rfl, rfl⟩
   have hτk := (hin 2).1 e
-  refine ⟨?_, h0.input.symm, (hs 2 e).input.symm⟩
+  refine ⟨?_, (DN.FIIndist.input h0).symm, (DN.FIIndist.input (hs 2 e)).symm⟩
   rcases hτ with rfl | ⟨m, rfl⟩
   · simp [σI] at hτk
   · rcases hτk with ⟨rfl, -, -⟩ | ⟨-, h2, -⟩
@@ -148,9 +148,9 @@ theorem isOpen_W (c : Bool) : IsOpen[(dnModel (V := Bool) MA).τU] (W c) := by
     have h1 := okP_upTo_iff.1 hr
     rw [← hδ hp]
     fin_cases r
-    · exact (h1.2.2 1 ⟨rfl, Or.inl rfl⟩).input.symm
+    · exact Eq.symm (h1.2.2 1 ⟨rfl, Or.inl rfl⟩)
     · exact (h1.mono 0 (by omega)).input.symm
-    · exact (h1.2.2 1 ⟨rfl, Or.inr rfl⟩).input.symm
+    · exact Eq.symm (h1.2.2 1 ⟨rfl, Or.inr rfl⟩)
   · obtain ⟨k, hk⟩ : ∃ k, patOf (δ : ℕ → Conf (Fin 3) Bool) = πk k := by
       rcases (eq_exec δ.2).2 with h | ⟨k, hk⟩
       · exact absurd h hp
@@ -209,16 +209,18 @@ theorem comp_subset_K {δ : Adm} (hσ : patOf (δ : ℕ → Conf (Fin 3) Bool) =
 theorem broadcaster_zero (k : ℕ) : Broadcaster (πk k) 0 := by
   intro q
   fin_cases q
-  · exact ⟨0, rfl⟩
-  · exact ⟨k + 2, Or.inr ⟨0, Or.inr ⟨by omega, rfl, Or.inl rfl⟩, Heard.mono (t := 0) rfl _ (by omega)⟩⟩
-  · exact ⟨k + 2, Or.inr ⟨0, Or.inr ⟨by omega, rfl, Or.inr rfl⟩, Heard.mono (t := 0) rfl _ (by omega)⟩⟩
+  · exact ⟨0, heard_zero_iff.2 rfl⟩
+  · exact ⟨k + 2, heard_succ_iff.2 (Or.inr ⟨0, Or.inr ⟨by omega, rfl, Or.inl rfl⟩,
+      Heard.mono (t := 0) (heard_zero_iff.2 rfl) _ (by omega)⟩)⟩
+  · exact ⟨k + 2, heard_succ_iff.2 (Or.inr ⟨0, Or.inr ⟨by omega, rfl, Or.inr rfl⟩,
+      Heard.mono (t := 0) (heard_zero_iff.2 rfl) _ (by omega)⟩)⟩
 
 theorem broadcaster_one_σI : Broadcaster σI 1 := by
   intro q
   fin_cases q
-  · exact ⟨1, Or.inr ⟨1, ⟨rfl, Or.inl rfl⟩, rfl⟩⟩
-  · exact ⟨0, rfl⟩
-  · exact ⟨1, Or.inr ⟨1, ⟨rfl, Or.inr rfl⟩, rfl⟩⟩
+  · exact ⟨1, heard_succ_iff.2 (Or.inr ⟨1, ⟨rfl, Or.inl rfl⟩, heard_zero_iff.2 rfl⟩)⟩
+  · exact ⟨0, heard_zero_iff.2 rfl⟩
+  · exact ⟨1, heard_succ_iff.2 (Or.inr ⟨1, ⟨rfl, Or.inr rfl⟩, heard_zero_iff.2 rfl⟩)⟩
 
 /-- Every connected component is broadcastable by some process, and no connected component
 contains valent executions of two different values. -/

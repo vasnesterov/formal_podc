@@ -201,12 +201,12 @@ theorem biv_init (hV : Valid MA3 L) (hL : LocConst MA3 L) (σ : ℕ → Graph (F
     ⟨fun _ => toR, hRc, fun k hk => absurd hk (Nat.not_lt_zero k), ?_⟩⟩
   · -- process 1 cannot distinguish `x01` from all-`1` when it never hears process 0
     have h := eq_of_forever (x := fun _ => true) (y := x01) hL hLc hLc 1
-      (FIIndist_forever (t := 0) (by simp [FIIndist, x01]) (fun k _ q => toL_deaf q)
+      (FIIndist_forever (t := 0) (DN.FIIndist.zero_iff.2 (by simp [x01])) (fun k _ q => toL_deaf q)
         (fun k _ q => toL_deaf q))
     rw [h]
     exact hV true _ _ hLc (fun _ => rfl)
   · have h := eq_of_forever (x := fun _ => false) (y := x01) hL hRc hRc 0
-      (FIIndist_forever (t := 0) (by simp [FIIndist, x01]) (fun k _ q => toR_deaf q)
+      (FIIndist_forever (t := 0) (DN.FIIndist.zero_iff.2 (by simp [x01])) (fun k _ q => toR_deaf q)
         (fun k _ q => toR_deaf q))
     rw [h]
     exact hV false _ _ hRc (fun _ => rfl)

@@ -21,6 +21,7 @@ namespace CoordCons
 namespace StaticPath
 
 open DGraph
+open Cslib.DynNet (Journey)
 
 /-- Distance (along `P_k`) from the missing edge `{u_k, u_{k+1}}` of `P_k`. -/
 def dcut (n k y : ℕ) : ℕ := min (pos n k y) (n - 1 - pos n k y)
@@ -196,15 +197,15 @@ theorem lemma_6_5_neg_false (σ : ℕ → Bool) :
   have r0 : (exec 6 σ cexN).Reach 1 1 1 1 := .refl
   have hr : (exec 6 σ cexN).Reach 1 1 u 5 := by
     interval_cases u
-    · exact (st (hp 1 0 (by simp)) le_rfl r0).trans (Reach.self (by norm_num))
-    · exact Reach.self (by norm_num)
-    · exact (st (hp 1 2 (by simp)) le_rfl r0).trans (Reach.self (by norm_num))
+    · exact (st (hp 1 0 (by simp)) le_rfl r0).trans (Journey.self (by norm_num))
+    · exact Journey.self (by norm_num)
+    · exact (st (hp 1 2 (by simp)) le_rfl r0).trans (Journey.self (by norm_num))
     · exact (st (hp 2 3 (by simp)) (by norm_num) (st (hp 1 2 (by simp)) le_rfl r0)).trans
-        (Reach.self (by norm_num))
+        (Journey.self (by norm_num))
     · exact (st (hp 3 4 (by simp)) (by norm_num) (st (hp 2 3 (by simp)) (by norm_num)
-        (st (hp 1 2 (by simp)) le_rfl r0))).trans (Reach.self (by norm_num))
+        (st (hp 1 2 (by simp)) le_rfl r0))).trans (Journey.self (by norm_num))
     · exact (st (hp 0 5 (by simp)) (by norm_num) (st (hp 1 0 (by simp)) le_rfl r0)).trans
-        (Reach.self (by norm_num))
+        (Journey.self (by norm_num))
   have := h.adj_iff (s := 0) hr 0
   change cexN 1 0 1 ↔ cexN' 1 0 1 at this
   simp only [cexN, cexN', le_refl, ite_true] at this

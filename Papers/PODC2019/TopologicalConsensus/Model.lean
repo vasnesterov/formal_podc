@@ -1,4 +1,5 @@
 import Mathlib
+import Podc.Knowledge.Basic
 
 /-!
 # Generic system model (Section 3 of Nowak–Schmid–Winkler)
@@ -11,7 +12,8 @@ The paper's generic model for full-information executions:
 
 * a type `C` of configurations and a finite set `P` of processes;
 * for every process `p` an equivalence relation `indist p` on configurations
-  (`C ∼ₚ D`: `p` has the same view in `C` and `D`);
+  (`C ∼ₚ D`: `p` has the same view in `C` and `D`), i.e. an indistinguishability system
+  (`Podc.Knowledge.IndistSystem`) on configurations;
 * the obedient processes `Ob C ⊆ P` of a configuration;
 * weak clocks `clock p : C → ℕ`;
 * the input values `input C : P → V` (meaningful for initial configurations);
@@ -36,10 +38,7 @@ namespace TopoConsensus
 open Set Filter
 
 /-- The generic system model of Section 3. `P`: processes, `C`: configurations, `V`: values. -/
-structure Model (P C V : Type*) where
-  /-- `indist p c d`: process `p` cannot distinguish the configurations `c` and `d`. -/
-  indist : P → C → C → Prop
-  indist_equiv : ∀ p, Equivalence (indist p)
+structure Model (P C V : Type*) extends Podc.Knowledge.IndistSystem P C where
   /-- The obedient processes of a configuration. -/
   Ob : C → Set P
   /-- Weak clocks `χₚ`. -/
@@ -73,14 +72,6 @@ def obe (γ : ℕ → C) : Set P := ⋂ t, M.Ob (γ t)
 
 /-- `γ` is `v`-valent: all processes start with input `v` (Definition 5.1). -/
 def Valent (γ : ℕ → C) (v : V) : Prop := ∀ p, M.input (γ 0) p = v
-
-theorem indist_refl (p : P) (c : C) : M.indist p c c := (M.indist_equiv p).refl c
-
-theorem indist_symm {p : P} {c d : C} (h : M.indist p c d) : M.indist p d c :=
-  (M.indist_equiv p).symm h
-
-theorem indist_trans {p : P} {c d e : C} (h₁ : M.indist p c d) (h₂ : M.indist p d e) :
-    M.indist p c e := (M.indist_equiv p).trans h₁ h₂
 
 theorem mem_obe {γ : ℕ → C} {p : P} : p ∈ M.obe γ ↔ ∀ t, p ∈ M.Ob (γ t) := mem_iInter
 

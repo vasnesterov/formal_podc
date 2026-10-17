@@ -120,4 +120,5 @@ and `Quot.sound`. The lower bounds' hypotheses can be satisfied: STEALTH and D2 
 every `1 ≤ f < n`, and D1f1 does so for `f = 1`. Each protocol is verified in all admissible runs, not
 just the nice run. The model reuses CSLib `Cslib.Byzantine.LockStep` (`Protocol`, `hist`). The crash model
 with knowledge and message chains, and the floodset lemmas, are in CSLib
-(`Cslib/Computability/Distributed/SyncCrash/`).
+(`Cslib/Computability/Distributed/SyncCrash/`); its message chains are journeys and its knowledge
+operator is the `K` of an interpreted system (`Podc/SyncCrash/Bridges.lean`).

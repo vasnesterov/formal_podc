@@ -96,21 +96,25 @@ theorem good_stay_iter {p q : ι} {t₀ s s' : ℕ} (ht₀ : 1 ≤ t₀) (h : Go
   | succ b hb' ih => exact good_stay hΔ hG ht₀ (ih (by omega)) (by omega)
 
 theorem good_reach {p : ι} {t₀ : ℕ} (ht₀ : 1 ≤ t₀) {r q : ι} {s b : ℕ}
-    (h : Reach G r s b q) (hr : r ∈ V) (hgood : Good G γ p t₀ r s) (hsb : s ≤ b)
+    (h : Reach G r s b q) (hr : r ∈ V) (hgood : Good G γ p t₀ r s)
     (hb : b ≤ t₀ + Δ) : Good G γ p t₀ q b := by
-  induction h with
-  | refl r s b => exact good_stay_iter hΔ hG ht₀ hgood hsb hb
-  | @step r r' q s b t hst htb hedge _ ih =>
-    have hgt : Good G γ p t₀ r t := good_stay_iter hΔ hG ht₀ hgood hst (by omega)
-    exact ih (hG t r r' hedge).2.1 (good_forward hΔ hG ht₀ hr hgt (by omega) hedge)
-      (by omega) hb
+  suffices ∀ t y, Reach G r s t y → t ≤ b → Good G γ p t₀ y t ∧ y ∈ V from (this b q h le_rfl).1
+  intro t y hj
+  induction hj with
+  | refl => exact fun _ => ⟨hgood, hr⟩
+  | @step y z t hj hyz ih =>
+    intro htb
+    obtain ⟨ih, hy⟩ := ih (by omega)
+    rcases hyz with rfl | hedge
+    · exact ⟨good_stay hΔ hG ht₀ ih (by omega), hy⟩
+    · exact ⟨good_forward hΔ hG ht₀ hy ih (by omega) hedge, (hG t y z hedge).2.1⟩
 
 /-- **Lemma 3.** If `d̂_{t₀}(p, q) ≤ d ≤ Δ` (`t₀ ≥ 1`), then `q` holds the record initiated by
 `p` at the end of round `t₀ - 1` at time `t₀ + d`, and if `q ≠ p` it received it in some round
 `j ∈ [t₀, t₀ + d)` with timer `Δ - (j - t₀)`. -/
 theorem lemma_3 {p q : ι} (hp : p ∈ V) {t₀ d : ℕ} (ht₀ : 1 ≤ t₀) (hd : d ≤ Δ)
     (h : Reach G p t₀ (t₀ + d) q) : Good G γ p t₀ q (t₀ + d) :=
-  good_reach hΔ hG ht₀ h hp (good_self hΔ hG ht₀ 0 (by omega)) (by omega) (by omega)
+  good_reach hΔ hG ht₀ h hp (good_self hΔ hG ht₀ 0 (by omega)) (by omega)
 
 /-! ### Timers -/
 

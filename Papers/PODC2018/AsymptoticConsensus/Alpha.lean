@@ -87,7 +87,7 @@ theorem lemma21 [Nontrivial V] {n : ℕ} (hn : 2 ≤ n) {A : Alg (Fin n) σ V}
       rintro h; apply hkG
       have : i = ⟨k, hk⟩ := Fin.ext h
       rw [← this]; exact hi
-    simp only [initC, xs]
+    simp only [Algorithm.initC, xs]
     congr 1
     by_cases h : i.val < k
     · simp [h, show i.val < k + 1 by omega]

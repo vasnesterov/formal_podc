@@ -1,6 +1,6 @@
 import Papers.PODC2018.AsymptoticConsensus.LowerBounds
 import Papers.PODC2018.AsymptoticConsensus.Psi
-import Papers.PODC2018.AsymptoticConsensus.Alpha
+import Papers.PODC2018.AsymptoticConsensus.Exact
 
 /-!
 # Approximate consensus: decision-time lower bounds (FNS'18, Section 9, Theorems 8–11)
@@ -92,18 +92,13 @@ theorem adm_two {Δ : ℝ} (hΔ : 0 ≤ Δ) {v w : V} (hvw : dist v w ≤ Δ) {x
 
 /-- A deterministic full-information algorithm with decisions: `init i v` is the initial state of
 agent `i` with initial value `v`, `step` the transition function, and `dec s` the decision
-recorded in state `s` (`none` if undecided). The parameters `ε`, `Δ` are fixed in the algorithm. -/
-structure DAlg (α σ V : Type*) where
-  init : α → V → σ
-  step : StepFn α σ
-  dec : σ → Option V
+recorded in state `s` (`none` if undecided); the same data as an exact consensus algorithm
+(`EAlg`). The parameters `ε`, `Δ` are fixed in the algorithm. -/
+abbrev DAlg (α σ V : Type*) := EAlg α σ V
 
 namespace DAlg
 
 variable (A : DAlg α σ V)
-
-/-- The initial configuration with initial values `x`. -/
-def initC (x : α → V) : α → σ := fun i => A.init i (x i)
 
 /-- `A` solves approximate consensus in `N` with parameters `Δ`, `ε` and has decided at time `T`:
 in every execution with pattern in `N` and initial values of diameter `≤ Δ`, at time `T` every
@@ -308,7 +303,7 @@ theorem DecidesBy.dec_of_closed {N : Set (Graph α)} {Δ ε : ℝ} {T : ℕ}
   rw [range_const, convexHull_singleton, mem_singleton_iff] at hval
   subst hval
   rw [conf_agree S (fun _ _ _ => SameIn.refl _ _) hS (C' := A.initC fun _ => u')
-    (fun a ha => by simp [initC, hxu a ha]) T i hi]
+    (fun a ha => by simp [hxu a ha]) T i hi]
   exact hu'
 
 /-- **Intersection via a closed set** (finite-horizon Lemmas 7 and 20). If `C₁`, `C₂` agree on
@@ -591,7 +586,7 @@ theorem theorem10 [Nontrivial V] {n : ℕ} (hn : 4 ≤ n) (A : DAlg (Fin n) σ V
       rw [hT] at e1 e2
       have hag : conf A.step (A.initC x) (fun _ => Psi n 0) r (ag hn 1) =
           conf A.step (A.initC fun _ => w) (fun _ => Psi n 0) r (ag hn 1) :=
-        psi0_agree_aux A.step hn (fun m hm => by simp [initC, x, hm]) r (by omega) _
+        psi0_agree_aux A.step hn (fun m hm => by simp [Algorithm.initC, x, hm]) r (by omega) _
           (Or.inl (by simp [ag]))
       have hdec := hA.dec_of_closed hΔ hP (S := univ) (fun _ _ _ _ _ => mem_univ _)
         (x := fun _ => w) (u := w) (fun _ _ => rfl) (mem_univ (ag hn 1))
@@ -702,7 +697,7 @@ theorem theorem11 [Nontrivial V] {n : ℕ} (hn : 2 ≤ n) (A : DAlg (Fin n) σ V
       rintro h; apply hkG
       have : i = ⟨k, hk⟩ := Fin.ext h
       rw [← this]; exact hi
-    simp only [initC, xs]
+    simp only [Algorithm.initC, xs]
     congr 1
     by_cases h : i.val < k
     · simp [h, show i.val < k + 1 by omega]

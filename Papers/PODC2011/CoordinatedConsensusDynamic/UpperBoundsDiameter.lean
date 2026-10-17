@@ -23,6 +23,7 @@ import Papers.PODC2011.CoordinatedConsensusDynamic.UpperBounds
 namespace CoordCons
 
 open DGraph Relation
+open Cslib.DynNet (Journey)
 
 variable {α : Type*}
 
@@ -109,7 +110,7 @@ theorem knows_inputs {n : ℕ} (hG : KnownN n G) {w s T : ℕ} (hr : ∀ b ∈ G
 
 theorem reach_all_of_diam {D T : ℕ} (hd : DiamUpTo G D T) {w s t' : ℕ} (hw : w ∈ G.V)
     (h1 : D ≤ t') (h2 : t' ≤ T) (hs : t' ≤ s) : ∀ b ∈ G.V, G.Reach b (t' - D) w s :=
-  fun b hb => (hd t' h1 h2 b hb w hw).trans (Reach.self hs)
+  fun b hb => (hd t' h1 h2 b hb w hw).trans (Journey.self hs)
 
 /-- The hypotheses of Lemma 6.3 hold for the dynamic-diameter protocol, with
 `A = v` meaning `f(x̄) = v`. -/
@@ -302,8 +303,8 @@ theorem clique4_diam (T : ℕ) : DiamUpTo clique4 1 T ∧ (2 - 1) * 1 ≤ 4 - 2 
   obtain ⟨s, rfl⟩ : ∃ s, t' = s + 1 := ⟨t' - 1, by omega⟩
   rw [Nat.add_sub_cancel]
   by_cases hab : a = b
-  · subst hab; exact Reach.step .refl (Or.inl rfl)
-  · exact Reach.step .refl (Or.inr ⟨ha, hb, hab⟩)
+  · subst hab; exact Journey.step .refl (Or.inl rfl)
+  · exact Journey.step .refl (Or.inr ⟨ha, hb, hab⟩)
 
 /-- **Counterexample** to "if `kmax ≥ ⌊n/(D+Δ)⌋`, nodes can stop as early as time
 `n - kmax·Δ - 1`": in the clique with `n = 4`, `D = Δ = 1`, `kmax = 2`, no node has decided at

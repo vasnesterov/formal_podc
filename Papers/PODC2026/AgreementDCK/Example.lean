@@ -47,8 +47,8 @@ theorem example_spec :
     DecLocal S dec ∧ (∀ v, AoN S dec v) ∧ Agreement S dec ∧ Validity S dec valid ∧
       Decision S dec ∧ Stable S dec := by
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
-  · intro i v r t r' t' h
-    simp only [dec, h]
+  · intro i v w w' h
+    simp only [Function.uncurry, dec, System.toIndist_indist.1 h]
   · intro v i r t _ h j _
     obtain ⟨rfl, -⟩ := dec_iff.1 h
     exact ⟨_, decides j r⟩
@@ -81,9 +81,9 @@ theorem example_not_E2 (v : Bool) (r : Bool × ℕ) (t : ℕ) :
   intro h
   -- `K_0 (K_1 (b = v))` at `(r, t)`; process `0` considers `((r.1, 0), 0)` possible.
   have h1 : S.K 1 (lift fun r => r.1 = v) (r.1, 0) 0 :=
-    (h 0 : S.K 0 (S.E (lift fun r => r.1 = v)) r t) (r.1, 0) 0 (by simp [S]) 1
+    E_iff.1 (K_iff.1 (E_iff.1 h 0) (r.1, 0) 0 (by simp [S])) 1
   -- At `((r.1, 0), 0)` process `1` has state `none`, as at `((!v, 0), 0)` where `b ≠ v`.
-  have := h1 (!v, 0) 0 (by simp [S])
+  have := K_iff.1 h1 (!v, 0) 0 (by simp [S])
   simp at this
 
 theorem example_not_C (v : Bool) (r : Bool × ℕ) (t : ℕ) : ¬ S.C (lift fun r => r.1 = v) r t :=

@@ -44,7 +44,7 @@ def δ : ℕ → Conf := fun t => (t, false, true, decide (1 ≤ t))
 /-- The model: views are (time, own input); process 0 is disobedient in `δ` from time 1 on. -/
 def M : Model (Fin 2) Conf Bool where
   indist p c d := c.1 = d.1 ∧ inp c p = inp d p
-  indist_equiv p := ⟨fun _ => ⟨rfl, rfl⟩, fun h => ⟨h.1.symm, h.2.symm⟩,
+  equiv p := ⟨fun _ => ⟨rfl, rfl⟩, fun h => ⟨h.1.symm, h.2.symm⟩,
     fun h₁ h₂ => ⟨h₁.1.trans h₂.1, h₁.2.trans h₂.2⟩⟩
   Ob c := if c.2.2.2 then {1} else univ
   clock _ c := c.1
@@ -188,7 +188,7 @@ def δ : ℕ → Conf := fun t => (false, true, (t + 1) / 2, (t + 1) / 2)
 /-- The model: the view of `p` is (own input, own step count); everybody is always obedient. -/
 def M : Model (Fin 2) Conf Bool where
   indist p c d := inp c p = inp d p ∧ steps c p = steps d p
-  indist_equiv p := ⟨fun _ => ⟨rfl, rfl⟩, fun h => ⟨h.1.symm, h.2.symm⟩,
+  equiv p := ⟨fun _ => ⟨rfl, rfl⟩, fun h => ⟨h.1.symm, h.2.symm⟩,
     fun h₁ h₂ => ⟨h₁.1.trans h₂.1, h₁.2.trans h₂.2⟩⟩
   Ob _ := univ
   clock p c := steps c p

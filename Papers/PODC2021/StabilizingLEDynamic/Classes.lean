@@ -27,6 +27,8 @@ our round `t` with `t + 1 = 2 ^ j` (`Pow2Round t`).
 
 namespace StabilizingLEDynamic
 
+open Cslib.DynNet (Journey tdist tdist_le_iff)
+
 variable {ι : Type*}
 
 /-! ### The orders on kinds and timeliness -/
@@ -79,9 +81,9 @@ variable {τ τ' : Timeliness} {Δ : ℕ} {G : DG ι} {p q : ι}
 
 theorem Conn.refl (τ : Timeliness) (Δ : ℕ) (G : DG ι) (p : ι) : Conn τ Δ G p p := by
   cases τ with
-  | recur => exact fun i => ⟨i, .refl _ _ _⟩
-  | quasi => exact fun i => ⟨i, le_rfl, tdist_le_iff.mpr (.refl _ _ _)⟩
-  | bounded => exact fun i => tdist_le_iff.mpr (.refl _ _ _)
+  | recur => exact fun i => ⟨i, .refl⟩
+  | quasi => exact fun i => ⟨i, le_rfl, tdist_le_iff.mpr (Journey.self (by omega))⟩
+  | bounded => exact fun i => tdist_le_iff.mpr (Journey.self (by omega))
 
 theorem Conn.mono (h : Conn τ Δ G p q) (hτ : τ ≤ τ') : Conn τ' Δ G p q := by
   rw [Timeliness.le_iff] at hτ
@@ -149,43 +151,24 @@ namespace Reach
 
 variable {G : DG ι} {p q : ι} {a b : ℕ}
 
-/-- A vertex without outgoing edges reaches only itself. -/
-theorem eq_of_no_out (hp : ∀ t r, ¬ G t p r) (h : Reach G p a b q) : p = q := by
-  cases h with
-  | refl => rfl
-  | step _ _ hG _ => exact absurd hG (hp _ _)
-
-/-- A vertex without incoming edges is reached only by itself. -/
-theorem eq_of_no_in (hq : ∀ t r, ¬ G t r q) (h : Reach G p a b q) : p = q := by
-  revert hq
-  induction h with
-  | refl => intro; rfl
-  | step _ _ hG _ ih =>
-    intro hq
-    obtain rfl := ih hq
-    exact absurd hG (hq _ _)
-
-/-- No journey uses a window `[a, b)` of rounds without edges. -/
-theorem eq_of_empty (hG : ∀ t, a ≤ t → t < b → ∀ x y, ¬ G t x y) (h : Reach G p a b q) :
-    p = q := by
-  cases h with
-  | refl => rfl
-  | step hat htb hG' _ => exact absurd hG' (hG _ hat htb _ _)
-
 /-- If all edges in the window `[a, b)` occur in the same round, then a journey in this window is
 trivial or a single edge. -/
 theorem eq_or_edge_of_sparse
     (hG : ∀ t₁ t₂ x₁ y₁ x₂ y₂, a ≤ t₁ → t₁ < b → a ≤ t₂ → t₂ < b → G t₁ x₁ y₁ → G t₂ x₂ y₂ →
       t₁ = t₂)
     (h : Reach G p a b q) : p = q ∨ ∃ t, a ≤ t ∧ t < b ∧ G t p q := by
-  cases h with
+  induction h with
   | refl => exact .inl rfl
-  | @step _ r _ _ _ t hat htb hpr hr =>
-    have hrq : r = q := hr.eq_of_empty fun t' h1 h2 x y hxy => by
-      have := hG t t' _ _ _ _ hat htb (by omega) h2 hpr hxy
-      omega
-    subst hrq
-    exact .inr ⟨t, hat, htb, hpr⟩
+  | @step y z t h hyz ih =>
+    have hat := h.le
+    rcases ih fun t₁ t₂ x₁ y₁ x₂ y₂ h1 h1' h2 h2' => hG t₁ t₂ x₁ y₁ x₂ y₂ h1 (by omega) h2
+      (by omega) with rfl | ⟨t', ht', ht't, hpy⟩
+    · rcases hyz with rfl | hyz
+      · exact .inl rfl
+      · exact .inr ⟨t, hat, by omega, hyz⟩
+    · rcases hyz with rfl | hyz
+      · exact .inr ⟨t', ht', by omega, hpy⟩
+      · exact absurd (hG _ _ _ _ _ _ ht' (by omega) hat (by omega) hpy hyz) (by omega)
 
 end Reach
 
@@ -261,7 +244,7 @@ theorem outStar_mem (hc : c ∈ V) (hΔ : 1 ≤ Δ) : outStar V c ∈ J .src .bo
   by_cases hpc : p = c
   · subst hpc; exact Conn.refl _ _ _ _
   · exact fun i => tdist_le_iff.mpr
-      ((Reach.single (G := outStar V c) (t := i) ⟨rfl, hp, hpc⟩).mono_right (by omega))
+      ((Journey.single (E := outStar V c) (t := i) ⟨rfl, hp, hpc⟩).mono_right (by omega))
 
 /-- `G(1S)` has no temporal sink (not even a recurrent one), if `|V| ≥ 3`. -/
 theorem outStar_no_sink (hV : 3 ≤ V.card) (τ : Timeliness) (Δ : ℕ) :
@@ -277,7 +260,7 @@ theorem inStar_mem (hc : c ∈ V) (hΔ : 1 ≤ Δ) : inStar V c ∈ J .snk .boun
   by_cases hpc : p = c
   · subst hpc; exact Conn.refl _ _ _ _
   · exact fun i => tdist_le_iff.mpr
-      ((Reach.single (G := inStar V c) (t := i) ⟨rfl, hp, hpc⟩).mono_right (by omega))
+      ((Journey.single (E := inStar V c) (t := i) ⟨rfl, hp, hpc⟩).mono_right (by omega))
 
 /-- `G(1T)` has no temporal source (not even a recurrent one), if `|V| ≥ 3`. -/
 theorem inStar_no_source (hV : 3 ≤ V.card) (τ : Timeliness) (Δ : ℕ) :
@@ -306,7 +289,7 @@ theorem G2_mem (hΔ : 1 ≤ Δ) : G2 V ∈ J .all .quasi Δ V := by
   · intro i
     obtain ⟨t, hit, ht⟩ := exists_pow2Round_ge i
     exact ⟨t, hit, tdist_le_iff.mpr
-      ((Reach.single (G := G2 V) ⟨ht, hp, hq, hpq⟩).mono_right (by omega))⟩
+      ((Journey.single (E := G2 V) ⟨ht, hp, hq, hpq⟩).mono_right (by omega))⟩
 
 /-- In `G(2)`, no vertex is a timely source or sink of another vertex. -/
 theorem G2_not_conn {p q : ι} (hpq : p ≠ q) : ¬ Conn .bounded Δ (G2 V) p q := by
@@ -368,7 +351,7 @@ theorem G3_isDG (hn : 2 ≤ n) (hmem : ∀ k < n, v k ∈ V)
 /-- Every vertex of the ring recurrently reaches every vertex. -/
 theorem G3_treach (hn : 1 ≤ n) (d a i : ℕ) : TReach (G3 n v) i (v (a % n)) (v ((a + d) % n)) := by
   induction d generalizing a i with
-  | zero => exact ⟨i, by simpa using Reach.refl _ _ _⟩
+  | zero => exact ⟨i, by rw [Nat.add_zero]; exact .refl⟩
   | succ d ih =>
     set j := a % n + n * i with hj
     have hji : i ≤ j := by
@@ -383,7 +366,7 @@ theorem G3_treach (hn : 1 ≤ n) (d a i : ℕ) : TReach (G3 n v) i (v (a % n)) (
       ⟨j, by omega, by rw [hjmod], by rw [hjmod.add_right 1]⟩
     refine ⟨max b (2 ^ j), ?_⟩
     rw [show a + (d + 1) = a + 1 + d by omega]
-    exact .step (t := 2 ^ j - 1) (by omega) (by omega) hedge (hb.mono_right (by omega))
+    exact (((Journey.single hedge).mono_left (by omega)).trans hb).mono_right (by omega)
 
 theorem G3_mem (hn : 2 ≤ n) (hmem : ∀ k < n, v k ∈ V)
     (hinj : ∀ a < n, ∀ b < n, v a = v b → a = b) (hsurj : ∀ p ∈ V, ∃ k < n, v k = p) :
@@ -519,12 +502,10 @@ theorem theorem_1_false_card_two {V : Finset ι} {Δ : ℕ} (hV : V.card = 2) (h
     · subst hpq; exact Conn.refl _ _ _ _
     intro i
     obtain ⟨b, hb⟩ := h i
-    cases hb with
-    | refl => exact absurd rfl hpq
-    | @step _ r _ _ _ t hat htb hpr _ =>
-      obtain ⟨-, hr, hpr'⟩ := hdg _ _ _ hpr
-      obtain rfl := card_two_eq hV hp hr hq hpr' hpq
-      exact ⟨t, hat, tdist_le_iff.mpr ((Reach.single hpr).mono_right (by omega))⟩
+    obtain ⟨t, r, hat, hpr, -⟩ := hb.exists_first_edge hpq
+    obtain ⟨-, hr, hpr'⟩ := hdg _ _ _ hpr
+    obtain rfl := card_two_eq hV hp hr hq hpr' hpq
+    exact ⟨t, hat, tdist_le_iff.mpr ((Journey.single hpr).mono_right (by omega))⟩
   rintro G ⟨hdg, hG⟩
   refine ⟨hdg, ?_⟩
   cases k with

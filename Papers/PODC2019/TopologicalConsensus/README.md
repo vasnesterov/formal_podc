@@ -82,7 +82,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
   `HeardOf.Graph` convention). It need not be limit-closed.
 * All input assignments are admissible, independently of the pattern.
 * The view of `p` is compared by `FIIndist`: recursive equality of full-information views,
-  equivalent to equal process-time-graph views.
+  equivalent to equal process-time-graph views (the shared `Cslib.HeardOf.FIIndist` of
+  `Podc/DynamicNetworks/FullInfo.lean` with initial views given by the inputs). The heard-of
+  relation `Heard` is the shared journey relation (`Cslib.DynNet.Journey`), and the generic
+  model's indistinguishability relations form a `Podc.Knowledge.IndistSystem`.
 * The minimum topology is `τU`, induced by `d_u = min_p d_p`. Decision sets are labellings `Σ → V`.
 * This is an instance of the generic model of v3, `Model.lean`.
 

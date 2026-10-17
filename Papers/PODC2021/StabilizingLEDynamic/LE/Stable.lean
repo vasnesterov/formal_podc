@@ -10,6 +10,7 @@ are sometimes slightly sharper than the paper's.
 namespace StabilizingLEDynamic.LE
 
 open Classical Cslib.HeardOf
+open Cslib.DynNet (tdist tdist_le_iff)
 
 variable {ι : Type*} [LinearOrder ι] {Δ : ℕ} {G : DG ι} {γ : ι → St ι Δ} {V : Finset ι}
 

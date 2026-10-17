@@ -61,6 +61,9 @@ import Podc.Stabilization.Basic
 import Podc.Stabilization.Markov
 import Podc.PopulationProtocols.Nondet
 import Podc.PopulationProtocols.RandomScheduler
+import Podc.DynamicNetworks.Journey
+import Podc.DynamicNetworks.FullInfo
+import Podc.SyncCrash.Bridges
 import Podc.SharedMemory.Recoverable
 import Podc.Graph.Ball
 import Podc.Graph.Orientation

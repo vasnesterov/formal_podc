@@ -84,12 +84,17 @@ Full list of differences (including modelling choices and minor imprecisions): [
   - `KnownN n`: every node is given `N = n`.
   - `UnknownN`: no information.
   - `BoundN`: a valid upper bound `N ≥ n`.
-* **Views.** `Indist G H u t` is the full-information view relation, defined recursively.
+* **Views.** `Indist G H u t` is the full-information view relation, defined recursively: the
+  shared `Cslib.HeardOf.FIIndist` (`Podc/DynamicNetworks/FullInfo.lean`) with time-0 views
+  (UID, input, `N`); the causal order `Reach` is the shared journey relation
+  `Cslib.DynNet.Journey` (`Podc/DynamicNetworks/Journey.lean`).
   `Protocol.state_eq_of_indist` shows that every protocol's state is a function of it. Lower
   bounds therefore quantify over all *local decision rules*, which covers all protocols.
   Indistinguishability is always obtained from one locality lemma, `indist_of_agree`.
 * **Knowledge.** Knowledge, the similarity graph and common knowledge are defined semantically,
-  as in §2.1 (`Knows`, `Sim`, `CK`).
+  as in §2.1 (`Knows`, `Sim`, `CK`). They are the modalities `K` and `C` (common knowledge among
+  the nodes present) of the indistinguishability system `indistSystem` of
+  `Podc/Knowledge/Basic.lean` (`knows_iff_K`, `simStep_iff_reach`, `CK_iff_C`).
 * **Problems.**
   - Consensus is binary, with irrevocable decisions.
   - `Δ`-coordination: every node has decided within `Δ` rounds of the first decision.
@@ -141,6 +146,7 @@ exact (non-approximate) `Δ`-ladder with nested `E^{@t}` operators are not forma
   `clearMajority`, `ladder`, `diamProtocol` and `majRule` are proved to solve the respective
   problems.
 - The lower bounds are tight where the paper says so (`simKnown_spec`, `simUnknown_spec`).
-- The model is paper-local (`Model.lean`) and imports only `Cslib.DynNet.exists_edge_cross` from
-  CSLib. CSLib candidates: the model with views, the locality lemma and the hiding lemma
-  (`Model.lean`, `Hiding.lean`), and the generic first-firing/ladder combinator (`UpperBounds.lean`).
+- The model (`Model.lean`) is built on the shared journeys, full-information views (with the
+  locality lemma `FIIndist.of_agree`) and knowledge of `Podc/DynamicNetworks/` and
+  `Podc/Knowledge/`. CSLib candidates: the hiding lemma (`Hiding.lean`) and the generic
+  first-firing/ladder combinator (`UpperBounds.lean`).

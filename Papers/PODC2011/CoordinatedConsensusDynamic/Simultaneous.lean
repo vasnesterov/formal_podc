@@ -184,13 +184,13 @@ theorem simUnknown_cond_iff {G : DGraph Bool} (hG : G.Valid) {u t : ℕ} (hu : u
   constructor
   · rintro ⟨hc, hn⟩
     have h1 := reach_one_of_closed hG hu hc
-    rw [hset (fun w hw => (h1 w hw).of_le (Nat.zero_le 1)), Set.ncard_coe_finset] at hn
+    rw [hset (fun w hw => (h1 w hw).mono_left (Nat.zero_le 1)), Set.ncard_coe_finset] at hn
     exact hn
   · intro ht
     have hp := past_eq_V hG hu (t := t) (s := 1) (by omega)
     have h1 : ∀ w ∈ G.V, G.Reach w 1 u t := fun w hw => (mem_past.1 (hp ▸ hw)).2
     refine ⟨fun w hw => h1 w ((hw.mem_iff hG).2 hu), ?_⟩
-    rw [hset (fun w hw => (h1 w hw).of_le (Nat.zero_le 1)), Set.ncard_coe_finset]
+    rw [hset (fun w hw => (h1 w hw).mono_left (Nat.zero_le 1)), Set.ncard_coe_finset]
     exact ht
 
 /-- The rule `simUnknown` solves simultaneous consensus without knowledge of `n`, deciding

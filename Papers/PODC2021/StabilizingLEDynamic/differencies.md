@@ -86,8 +86,8 @@ docstrings (Theorem 2.1, Lemma 3.2, Theorems 3.3–3.11, Theorem 4.1).
 * **Rounds are 0-indexed**: `G t` is the paper's `G_{t+1}` and `exec A G γ t` is `γ_{t+1}`. All
   constants are translated accordingly.
 * **Dynamic graphs** are `ℕ → ι → ι → Prop` with all edges between distinct vertices of `V`
-  (`IsDG`). Journeys are the inductive `Reach G p a b q` ("`p = q` or a journey with edges at
-  strictly increasing times in `[a, b)`"). `d̂_{G_{i▷}}(p, q)` is `tdist G i p q : ℕ∞`, with
+  (`IsDG`). Journeys are `Reach G p a b q` ("`p = q` or a journey with edges at strictly
+  increasing times in `[a, b)`", for `a ≤ b`; the shared `Cslib.DynNet.Journey`). `d̂_{G_{i▷}}(p, q)` is `tdist G i p q : ℕ∞`, with
   `tdist_le_iff : tdist ≤ Δ ↔ Reach G p i (i + Δ) q`. The nine classes are `J k τ Δ V`
   (`k ∈ {src, snk, all}`, `τ ∈ {recur, quasi, bounded}`), literally Table 1.
 * **Algorithms** are deterministic full-information round algorithms (CSLib `HeardOf.StepFn`).

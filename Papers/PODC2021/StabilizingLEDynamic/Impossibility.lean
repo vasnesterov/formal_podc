@@ -19,6 +19,7 @@ nonempty state type.
 namespace StabilizingLEDynamic
 
 open Cslib.HeardOf
+open Cslib.DynNet (Journey tdist tdist_le_iff)
 
 variable {ι σ : Type*}
 
@@ -40,8 +41,8 @@ theorem mem_J1sB_of_outStar {V : Finset ι} {G : DG ι} {Δ : ℕ} (hΔ : 1 ≤ 
     {z : ι} (hz : z ∈ V) (hout : ∀ t, ∀ p ∈ V, p ≠ z → G t z p) : G ∈ J1sB Δ V := by
   refine ⟨hG, z, hz, fun p hp i => tdist_le_iff.mpr ?_⟩
   by_cases hpz : p = z
-  · subst hpz; exact .refl _ _ _
-  · exact (Reach.single (hout i p hp hpz)).mono_right (by omega)
+  · subst hpz; exact Journey.self (by omega)
+  · exact (Journey.single (hout i p hp hpz)).mono_right (by omega)
 
 /-- A dynamic graph in which some vertex `z` infinitely often has an edge to every other vertex
 belongs to `J^Q_{1,*}(Δ)`. -/
@@ -51,8 +52,8 @@ theorem mem_J1sQ_of_outStar {V : Finset ι} {G : DG ι} {Δ : ℕ} (hΔ : 1 ≤ 
   obtain ⟨j, hji, hj⟩ := hout i
   refine ⟨j, hji, tdist_le_iff.mpr ?_⟩
   by_cases hpz : p = z
-  · subst hpz; exact .refl _ _ _
-  · exact (Reach.single (hj p hp hpz)).mono_right (by omega)
+  · subst hpz; exact Journey.self (by omega)
+  · exact (Journey.single (hj p hp hpz)).mono_right (by omega)
 
 theorem isDG_K (V : Finset ι) : IsDG V (fun _ => K V) := fun _ _ _ h => h
 
@@ -86,8 +87,8 @@ theorem InStar_mem_Js1B {V : Finset ι} {Δ : ℕ} (hΔ : 1 ≤ Δ) {y : ι} (hy
   refine ⟨fun _ p q h => ⟨h.1, h.2.1 ▸ hy, h.2.1 ▸ h.2.2⟩, y, hy, fun p hp i => ?_⟩
   refine tdist_le_iff.mpr ?_
   by_cases hpy : p = y
-  · subst hpy; exact .refl _ _ _
-  · exact (Reach.single (show InStar V y p y from ⟨hp, rfl, hpy⟩)).mono_right (by omega)
+  · subst hpy; exact Journey.self (by omega)
+  · exact (Journey.single (show InStar V y p y from ⟨hp, rfl, hpy⟩)).mono_right (by omega)
 
 /-- Swap one process of a vertex set for a fresh one: same cardinality. -/
 theorem card_swap [DecidableEq ι] {V : Finset ι} {p v : ι} (hp : p ∈ V) (hv : v ∉ V) :

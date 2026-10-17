@@ -272,7 +272,7 @@ theorem indist_stitch_left (hA : A.Valid) (hB : B.Valid) (hdisj : Disjoint A.V B
     exact ⟨Finset.mem_union_left _ hwA, by simp [DGraph.stitch, hwA]⟩
   · have hyA := (hy.mem_iff hA).2 hu
     have hyB : y ∉ B.V := fun h => Finset.disjoint_left.1 hdisj hyA h
-    have hya : y ≠ a := fun h => ha (h ▸ hy.of_le (Nat.zero_le _))
+    have hya : y ≠ a := fun h => ha (h ▸ hy.mono_left (Nat.zero_le _))
     have hyb : y ≠ b := fun h => hyB (h ▸ hb)
     have hBxy : ¬ B.adj (s + 1) x y := fun h => hyB (hB.mem _ _ _ h).2
     simp [DGraph.stitch, hya, hyb, hBxy]
@@ -286,7 +286,7 @@ theorem indist_stitch_right (hA : A.Valid) (hB : B.Valid) (hdisj : Disjoint A.V 
     exact ⟨Finset.mem_union_right _ hwB, by simp [DGraph.stitch, hwA]⟩
   · have hyB := (hy.mem_iff hB).2 hu
     have hyA : y ∉ A.V := fun h => Finset.disjoint_left.1 hdisj h hyB
-    have hyb : y ≠ b := fun h => hb (h ▸ hy.of_le (Nat.zero_le _))
+    have hyb : y ≠ b := fun h => hb (h ▸ hy.mono_left (Nat.zero_le _))
     have hya : y ≠ a := fun h => hyA (h ▸ ha)
     have hAxy : ¬ A.adj (s + 1) x y := fun h => hyA (hA.mem _ _ _ h).2
     simp [DGraph.stitch, hya, hyb, hAxy]

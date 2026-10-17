@@ -1,5 +1,5 @@
 import Mathlib
-import Cslib.Computability.Distributed.DynamicNetworks.HeardOf
+import Podc.DynamicNetworks.FullInfo
 import Cslib.Computability.Distributed.DynamicNetworks.Chain
 import Cslib.Computability.Distributed.DynamicNetworks.Product
 
@@ -9,7 +9,8 @@ import Cslib.Computability.Distributed.DynamicNetworks.Product
 Függer, Nowak, Schwarz. *Tight Bounds for Asymptotic and Approximate Consensus.* PODC 2018.
 
 * `Alg`: a deterministic full-information round-based algorithm (initial state from the
-  agent's identity and initial value, transition function, output `y`).
+  agent's identity and initial value, transition function, output `y`): a
+  `Cslib.HeardOf.Algorithm` with outputs in `V`.
 * `Alg.Solves A N`: `A` solves asymptotic consensus in the network model `N`
   (Convergence + Agreement + Validity, Section 2.1).
 * `Alg.val A Q C`: the set of limits reachable from configuration `C` under patterns in `Q`;
@@ -32,17 +33,11 @@ variable {α σ V : Type*}
 
 /-- A deterministic full-information algorithm: `init i v` is the initial state of agent `i` with
 initial value `v`, `step` the transition function, `out s` the output variable `y` of state `s`. -/
-structure Alg (α σ V : Type*) where
-  init : α → V → σ
-  step : StepFn α σ
-  out : σ → V
+abbrev Alg (α σ V : Type*) := Algorithm α σ V V
 
 namespace Alg
 
 variable [NormedAddCommGroup V] [NormedSpace ℝ V] (A : Alg α σ V)
-
-/-- The initial configuration with initial values `x`. -/
-def initC (x : α → V) : α → σ := fun i => A.init i (x i)
 
 /-- All outputs converge to `z` in the run from `C` with pattern `p`. -/
 def HasLimit (C : α → σ) (p : ℕ → Graph α) (z : V) : Prop :=
@@ -357,7 +352,7 @@ theorem Solves.exists_root [Nontrivial V] [Finite α] [Nonempty α] {N : Set (Gr
     obtain ⟨z', -, hz'⟩ := hA (fun _ => u) (fun _ => G) (const_mem_pat hG)
     have hrun := conf_agree (step := A.step) S (C := A.initC x) (C' := A.initC fun _ => u)
       (p := fun _ => G) (p' := fun _ => G) (fun _ k _ => SameIn.refl G k) (fun _ => hcl)
-      (fun k hk => by simp [initC, hxS k hk])
+      (fun k hk => by simp [hxS k hk])
     rw [hz.eq_of_agent k hz' fun t => hrun t k hk]
     exact hA.hasLimit_const u (const_mem_pat hG) hz'
   have h1 : z = v := key S1 v (fun k hk => by simp [x, hdisj k hk])

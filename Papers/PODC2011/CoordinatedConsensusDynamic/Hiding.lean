@@ -25,6 +25,7 @@ graph in which `X` only talks to `X ∪ {w}` works).
 namespace CoordCons
 
 open Relation
+open Cslib.DynNet (Journey)
 
 variable {α : Type*}
 
@@ -177,7 +178,7 @@ theorem indist_rename_swap {G : DGraph α} (hG : G.Valid) {u t a b : ℕ} (hu : 
     (ha : ¬ G.Reach a 0 u t) (hb : b ∉ G.V) : Indist G (G.rename (Equiv.swap a b)) u t := by
   have hw : ∀ w s, G.Reach w s u t → w ≠ a ∧ w ≠ b := by
     intro w s hw
-    refine ⟨fun h => ha (h ▸ hw.of_le (Nat.zero_le s)), fun h => hb (h ▸ (hw.mem_iff hG).2 hu)⟩
+    refine ⟨fun h => ha (h ▸ hw.mono_left (Nat.zero_le s)), fun h => hb (h ▸ (hw.mem_iff hG).2 hu)⟩
   have hsw : ∀ w s, G.Reach w s u t → Equiv.swap a b w = w := fun w s h =>
     Equiv.swap_apply_of_ne_of_ne (hw w s h).1 (hw w s h).2
   refine indist_of_agree hG hu rfl (fun w hr => ⟨?_, ?_⟩) ?_
@@ -186,7 +187,8 @@ theorem indist_rename_swap {G : DGraph α} (hG : G.Valid) {u t a b : ℕ} (hu : 
   · intro w s hr x
     simp only [rename, Equiv.symm_swap, hsw w _ hr]
     -- an edge from `a` or `b` into the causal past is impossible
-    have hxa : ¬ G.adj (s + 1) a w := fun h => ha ((Reach.cons (Or.inr h) hr).of_le (by omega))
+    have hxa : ¬ G.adj (s + 1) a w := fun h =>
+      ha ((Journey.cons (E := fun k => G.adj (k + 1)) (Or.inr h) hr).mono_left (by omega))
     have hxb : ¬ G.adj (s + 1) b w := fun h => hb (hG.mem _ _ _ h).1
     by_cases h1 : x = a
     · subst h1; simp [hxa, hxb]
@@ -199,7 +201,7 @@ theorem indist_addLeaf {G : DGraph α} (hG : G.Valid) {u t x w : ℕ} (hu : u �
   refine indist_of_agree hG hu rfl
     (fun y hy => ⟨Finset.mem_insert_of_mem ((hy.mem_iff hG).2 hu), rfl⟩) ?_
   intro y s hy z
-  have hyw : y ≠ w := fun h => hw (h ▸ hy.of_le (by omega))
+  have hyw : y ≠ w := fun h => hw (h ▸ hy.mono_left (by omega))
   have hyx : y ≠ x := fun h => hx (h ▸ (hy.mem_iff hG).2 hu)
   simp [addLeaf, hyw, hyx]
 
