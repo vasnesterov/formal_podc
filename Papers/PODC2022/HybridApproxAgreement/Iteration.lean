@@ -1,5 +1,6 @@
 import Papers.PODC2022.HybridApproxAgreement.Trim
 import Podc.Foundations.Data.Finset.Quorum
+import Podc.Foundations.Data.Real.Logb
 
 /-!
 # The analysis of `Π_AA` relative to the Overlap All-to-All Broadcast guarantees (Section 3.1)
@@ -286,17 +287,10 @@ theorem iterate {F : Finset P} (hne : ∃ p, p ∉ F) (x : ℕ → P → ℝ)
   rw [abs_le]
   constructor <;> linarith [hq p hp, hq p' hp']
 
-/-- `S = ⌈log₂(δmax / ε)⌉` iterations suffice: `δmax ≤ 2^S ε`. -/
-theorem le_two_pow_ceil_logb {δmax ε : ℝ} (hδ : 0 ≤ δmax) (hε : 0 < ε) :
-    δmax ≤ 2 ^ ⌈Real.logb 2 (δmax / ε)⌉₊ * ε := by
-  rw [← div_le_iff₀ hε]
-  rcases (div_nonneg hδ hε.le).lt_or_eq with h | h
-  · calc δmax / ε = (2 : ℝ) ^ Real.logb 2 (δmax / ε) := (Real.rpow_logb (by norm_num)
-          (by norm_num) h).symm
-      _ ≤ (2 : ℝ) ^ (⌈Real.logb 2 (δmax / ε)⌉₊ : ℝ) :=
-          Real.rpow_le_rpow_of_exponent_le (by norm_num) (Nat.le_ceil _)
-      _ = 2 ^ ⌈Real.logb 2 (δmax / ε)⌉₊ := Real.rpow_natCast _ _
-  · rw [← h]; positivity
+/-- `S = ⌈log₂(δmax / ε)⌉` iterations suffice: `δmax ≤ 2^S ε` (`0 ≤ δmax` is not needed). -/
+theorem le_two_pow_ceil_logb {δmax ε : ℝ} (_hδ : 0 ≤ δmax) (hε : 0 < ε) :
+    δmax ≤ 2 ^ ⌈Real.logb 2 (δmax / ε)⌉₊ * ε :=
+  Real.le_pow_natCeil_logb_div_mul one_lt_two δmax hε
 
 /-- Honest outputs after `S` iterations, from the bounds of `iterate`: validity w.r.t. the range
 `[lo, hi]` of the honest inputs and `ε`-agreement as soon as `hi - lo ≤ δmax ≤ 2^S ε`. -/

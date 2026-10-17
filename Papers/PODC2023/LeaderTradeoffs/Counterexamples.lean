@@ -173,7 +173,8 @@ theorem theorem_3_8_as_stated_false {k : ℕ} (hk : 1 ≤ k) (hm : m + 1 = 2 ^ k
   refine ⟨broadcast m, range (2 * (m + 1) * k + (m + 1)), 1, by simp, broadcast_electsBy _,
     broadcast_terminatesBy _, broadcast_msgBound _, ?_⟩
   have hlog : Real.logb 2 ((m : ℝ) + 1) = k := by
-    rw [show ((m : ℝ) + 1) = (2 : ℝ) ^ k by exact_mod_cast hm, logb_two_pow]
+    rw [show ((m : ℝ) + 1) = (2 : ℝ) ^ k by exact_mod_cast hm,
+      Real.logb_self_pow two_pos (by norm_num)]
   rw [hlog]
   have hk' : (1 : ℝ) ≤ k := by exact_mod_cast hk
   have : 0 ≤ ((k : ℝ) - 1) / (k + 1) := div_nonneg (by linarith) (by linarith)

@@ -1,4 +1,5 @@
 import Papers.PODC2011.CoordinatedConsensusDynamic.StaticPathMain
+import Podc.Foundations.Data.Nat.Log
 
 /-!
 # Theorem 6.7, asymptotic form
@@ -26,18 +27,11 @@ theorem three_pow_eq (j : ℕ) : (3 : ℝ) ^ j = ((2 : ℝ) ^ j) ^ γ3 := by
 
 /-- `3^⌈log₂ q⌉ ≤ 3 q^(log₂ 3)`. -/
 theorem three_pow_clog_le {q : ℕ} (hq : 1 ≤ q) : (3 : ℝ) ^ Nat.clog 2 q ≤ 3 * (q : ℝ) ^ γ3 := by
-  rcases Nat.lt_or_ge 1 q with h | h
-  · have h1 := Nat.pow_pred_clog_lt_self (b := 2) (by norm_num) h
-    have hm : 0 < Nat.clog 2 q := Nat.clog_pos (by norm_num) h
-    obtain ⟨j, hj⟩ : ∃ j, Nat.clog 2 q = j + 1 := ⟨_, (Nat.succ_pred_eq_of_pos hm).symm⟩
-    rw [hj] at h1 ⊢
-    simp only [Nat.pred_succ] at h1
-    rw [pow_succ, mul_comm, three_pow_eq]
-    have h2 : ((2 : ℝ) ^ j) ^ γ3 ≤ (q : ℝ) ^ γ3 :=
-      Real.rpow_le_rpow (by positivity) (by exact_mod_cast h1.le) γ3_pos.le
-    linarith
-  · obtain rfl : q = 1 := by omega
-    simp
+  have h : 2 ^ Nat.clog 2 q < 2 * q := Nat.pow_clog_lt_mul one_lt_two (by omega)
+  rw [three_pow_eq]
+  calc ((2 : ℝ) ^ Nat.clog 2 q) ^ γ3 ≤ (2 * (q : ℝ)) ^ γ3 :=
+        Real.rpow_le_rpow (by positivity) (by exact_mod_cast h.le) γ3_pos.le
+    _ = 3 * (q : ℝ) ^ γ3 := by rw [Real.mul_rpow (by norm_num) (by positivity), two_rpow_γ3]
 
 /-- The length of the walk of Theorem 6.7, times `Δ`, is at most `54 X` when `X ≤ β` and
 `(n/X)^(1+γ) Δ = X`. -/

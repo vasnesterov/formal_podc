@@ -1,5 +1,6 @@
 import Papers.PODC2013.ByzantineVectorConsensus.Spec
 import Podc.Foundations.Data.Finset.Quorum
+import Podc.Foundations.Data.Real.Logb
 
 /-!
 # The iterative approximate BVC algorithm (Section 3.2, Theorem 5; Section 4, Theorem 6)
@@ -125,17 +126,10 @@ theorem rounds_spec {q D ε : ℝ} (hq0 : 0 ≤ q) (hq1 : q < 1) (hε : 0 < ε) 
   · nlinarith [pow_nonneg hq0 R]
   rcases hq0.eq_or_lt with hq | hq
   · subst hq; simp [R, hε]
-  have hb : 1 < 1 / q := by rw [lt_div_iff₀ hq]; linarith
-  have hx : 0 < D / ε := div_pos hD hε
-  have hR : Real.logb (1 / q) (D / ε) < R := by
-    have := Nat.le_ceil (Real.logb (1 / q) (D / ε))
-    simp only [R, Nat.cast_add, Nat.cast_one]; linarith
-  have h1 : D / ε < (1 / q) ^ (R : ℝ) := (Real.logb_lt_iff_lt_rpow hb hx).1 hR
-  rw [Real.rpow_natCast, one_div_pow] at h1
-  have hqR : 0 < q ^ R := pow_pos hq R
-  rw [lt_one_div hx hqR] at h1
-  rw [div_div_eq_mul_div, lt_div_iff₀ hD] at h1
-  linarith [mul_comm (q ^ R) D]
+  have h := Real.pow_natCeil_logb_inv_div_mul_le hq hq1 D hε
+  rw [← one_div] at h
+  rw [pow_add, pow_one, mul_assoc]
+  nlinarith
 
 /-! ### Executions of the round-based algorithm -/
 

@@ -1,4 +1,5 @@
 import Papers.PODC2015.SynchronousCounting.Boost
+import Podc.Foundations.Data.Nat.Log
 
 /-!
 # The recursive construction (Section 4 of Lenzen–Rybicki–Suomela, PODC 2015)
@@ -83,11 +84,6 @@ lemma boostTime_corollary1_le {f : ℕ} (hf : 1 ≤ f) :
     _ ≤ (3 * f + 2) ^ 2 * (3 * f + 2) ^ (3 * f + 1) := Nat.mul_le_mul h2 h1
     _ = (3 * f + 2) ^ (3 * f + 3) := by rw [← pow_add]; ring_nf
 
-/-- `⌈log₂ (x^k)⌉ ≤ k ⌈log₂ x⌉`. -/
-lemma clog_pow_le (x k : ℕ) : Nat.clog 2 (x ^ k) ≤ k * Nat.clog 2 x := by
-  rw [Nat.clog_le_iff_le_pow (by norm_num), mul_comm, pow_mul]
-  exact Nat.pow_le_pow_left (Nat.le_pow_clog (by norm_num) x) k
-
 /-- Corollary 1 with explicit bounds: an `f`-resilient `C`-counter on `3f + 1` nodes stabilising in
 `(3f+2)^{3f+3} = f^{O(f)}` rounds with `(3f+3)⌈log₂(3f+2)⌉ + ⌈log₂(C+1)⌉ + 1 = O(f log f + log C)`
 state bits. -/
@@ -95,7 +91,7 @@ theorem corollary1_bounds {f C : ℕ} (hf : 1 ≤ f) (hC : 1 < C) :
     Achievable (3 * f + 1) f C ((3 * f + 2) ^ (3 * f + 3))
       ((3 * f + 3) * Nat.clog 2 (3 * f + 2) + Nat.clog 2 (C + 1) + 1) := by
   refine (corollary1 hf hC).mono (boostTime_corollary1_le hf) ?_
-  have := (Nat.clog_mono_right 2 (boostTime_corollary1_le hf)).trans (clog_pow_le _ _)
+  have := (Nat.clog_mono_right 2 (boostTime_corollary1_le hf)).trans (Nat.clog_pow_le_mul _ _ _)
   omega
 
 /-! ### Iterating Theorem 1 with an even number of blocks -/
