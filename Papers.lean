@@ -819,3 +819,7 @@ import Papers.PODC2020.SSLERegular.EulerReach
 import Papers.PODC2020.SSLERegular.EulerMain
 import Papers.PODC2020.SSLERegular.StateCount
 import Papers.PODC2020.SSLERegular.Main
+import Papers.PODC2013.CongestedCliqueRouting.Main
+import Papers.PODC2013.CongestedCliqueRouting.PaperGaps
+import Papers.PODC2013.CongestedCliqueRouting.SortMain
+import Papers.PODC2013.CongestedCliqueRouting.Sanity
