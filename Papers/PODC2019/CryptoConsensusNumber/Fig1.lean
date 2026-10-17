@@ -1,5 +1,7 @@
 import Papers.PODC2019.CryptoConsensusNumber.Fig1Defs
 import Cslib.Computability.Distributed.SharedMemory.History
+import Podc.Computability.Distributed.SharedMemory.History
+import Podc.Computability.Distributed.SharedMemory.Model
 
 /-!
 # Theorem 1: Figure 1 is a wait-free linearizable implementation of asset transfer
@@ -66,20 +68,11 @@ structure Inv (α : List (Label P (atSpec P Acct μ q₀))) (C : Cfg μ q₀)
   done : ∀ q r, (C.loc q).pc = .done r → ∃ L₁ L₂ o,
     L = L₁ ++ (curOp α q, o) :: L₂ ∧ ((atSpec P Acct μ q₀).δ (linState L₁) o).2 = r
 
--- CSLib candidate (generic history / linearization bookkeeping lemmas)
 section Aux
 
 variable {A : ObjSpec}
 
-@[simp] lemma respsOf_append_inv (α : List (Label P A)) (p q : P) (o : A.Op) :
-    respsOf (α ++ [.inv p o]) q = respsOf α q := by simp [respsOf_append]
-
-@[simp] lemma respsOf_append_tau (α : List (Label P A)) (p q : P) :
-    respsOf (α ++ [.tau p]) q = respsOf α q := by simp [respsOf_append]
-
-lemma respsOf_append_ret_ne (α : List (Label P A)) {p q : P} (r : A.Resp) (h : q ≠ p) :
-    respsOf (α ++ [.ret p r]) q = respsOf α q := by simp [respsOf_append, Ne.symm h]
-
+-- CSLib candidate
 lemma not_mem_append_single {L : List (OpId P × A.Op)} {x y : OpId P} {o : A.Op}
     (hx : x ∉ L.map Prod.fst) (hxy : x.1 ≠ y.1) : x ∉ (L ++ [(y, o)]).map Prod.fst := by
   simp only [List.map_append, List.map_cons, List.map_nil, List.mem_append, List.mem_singleton,
@@ -357,26 +350,12 @@ lemma inv_init : Inv ([] : List (Label P (atSpec P Acct μ q₀))) (impl μ q₀
 /-- Every reachable configuration satisfies the invariant for some linearization. -/
 theorem inv_of_run {α : List (Label P (atSpec P Acct μ q₀))} {C : Cfg μ q₀}
     (h : (impl μ q₀).run α = some C) : ∃ L, Inv α C L := by
-  induction α using List.reverseRecOn generalizing C with
-  | nil =>
-    simp only [Impl.run, Impl.runFrom, Option.some.injEq] at h; subst h
-    exact ⟨[], inv_init⟩
-  | append_singleton α ℓ ih =>
-    rw [Impl.run, Impl.runFrom_append] at h
-    cases hα : (impl μ q₀).runFrom (impl μ q₀).initCfg α with
-    | none => simp [hα] at h
-    | some C₀ =>
-      simp only [hα, Option.bind_some, Impl.runFrom_singleton] at h
-      obtain ⟨L, hI⟩ := ih hα
-      have hcnt : ∀ q, C₀.pend q = none → (opsOf α q).length = (respsOf α q).length := by
-        intro q hq
-        rcases (impl μ q₀).run_counts hα q with ⟨-, h1⟩ | ⟨h1, -⟩
-        · exact h1
-        · exact absurd hq h1
-      cases ℓ with
-      | inv p o => exact ⟨L, hI.step_inv hcnt h⟩
-      | tau p => exact hI.step_tau hμ h
-      | ret p r => exact ⟨L, hI.step_ret h⟩
+  refine Impl.run_induction (Q := fun α C => ∃ L, Inv α C L) ⟨[], inv_init⟩ ?_ h
+  rintro α C₀ ℓ C hα ⟨L, hI⟩ h
+  cases ℓ with
+  | inv p o => exact ⟨L, hI.step_inv (fun q hq => Impl.run_idle_counts hα hq) h⟩
+  | tau p => exact hI.step_tau hμ h
+  | ret p r => exact ⟨L, hI.step_ret h⟩
 
 omit hμ in
 /-- Every operation finishes within at most two own steps. -/
@@ -392,28 +371,12 @@ theorem waitFree_implGen (add : List (Tr Acct) → Tr Acct → List (Tr Acct)) :
     | some S => dsimp only; split_ifs <;> simp
   all_goals simp
 
-/-- The invariant along all executions, with a fixed linearization function. -/
-theorem exists_linFun : ∃ h : List (Label P (atSpec P Acct μ q₀)) →
-    List (OpId P × (atSpec P Acct μ q₀).Op),
-    ∀ α C, (impl μ q₀).run α = some C → Inv α C (h α) := by
-  have : ∀ α : List (Label P (atSpec P Acct μ q₀)),
-      ∃ L, ∀ C, (impl μ q₀).run α = some C → Inv α C L := by
-    intro α
-    cases hα : (impl μ q₀).run α with
-    | none => exact ⟨[], fun C h => by cases h⟩
-    | some C =>
-      obtain ⟨L, hL⟩ := inv_of_run hμ hα
-      exact ⟨L, fun C' h => by cases h; exact hL⟩
-  choose h hh using this
-  exact ⟨h, hh⟩
-
 /-- **Theorem 1** of [Guerraoui et al., PODC 2019] (shared-memory part): if every account has at
 most one owner, Figure 1 (with `ops_p` kept as a sequence) is a linearizable implementation of
 the asset-transfer object from one atomic snapshot object. Linearization points: a read and a
 failed transfer at their snapshot, a successful transfer at its update. -/
-theorem fig1_linearizable : (impl μ q₀).Linearizable := by
-  obtain ⟨h, hh⟩ := exists_linFun hμ (μ := μ) (q₀ := q₀)
-  exact ⟨h, fun α ⟨C, hC⟩ => (hh α C hC).lin⟩
+theorem fig1_linearizable : (impl μ q₀).Linearizable :=
+  Impl.linearizable_of_run fun _ _ h => (inv_of_run hμ h).imp fun _ hI => hI.lin
 
 /-- In every reachable configuration, the balance computed from the snapshot memory is the
 abstract balance after the linearization (so reads return `balance(a, S)` faithfully and no

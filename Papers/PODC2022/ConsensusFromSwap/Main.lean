@@ -22,6 +22,7 @@ Sean Ovens, PODC 2022 (arXiv 2305.06507).
 namespace ConsensusFromSwap
 
 open Alg1
+open Cslib.SharedMemory (swapObj)
 
 /-- **Algorithm 1** of [Ovens 2022] (Lemmas 6, 7, 8): for `k ≥ 1` and `N ≥ n − k` swap objects,
 Algorithm 1 is an obstruction-free `m`-valued `k`-set agreement algorithm; every process running

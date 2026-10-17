@@ -5,6 +5,7 @@ import Cslib.Computability.Distributed.SharedMemory.Mutex
 import Cslib.Computability.Distributed.SharedMemory.Objects.FetchAdd
 import Cslib.Computability.Distributed.SharedMemory.Potential
 import Cslib.Computability.Distributed.SharedMemory.Task
+import Podc.Computability.Distributed.SharedMemory.Model
 
 /-!
 # Mod-`φ` fetch-and-increment from one bounded fetch-and-add object
@@ -18,12 +19,12 @@ Primitives*, PODC 2023.
 * Asynchronous shared memory, CSLib model (`Cslib.SharedMemory.Impl`): processes `Fin n`
   (`0, …, n-1`), deterministic, each with at most one pending high-level operation; wait-freedom
   as in CSLib (no crash model needed: a crashed process is one that stops taking steps).
-* One base object `Counter : faaObj B ovf` (index type `Unit`): a *bounded* fetch-and-add object
+* One base object `Counter : bfaaObj B ovf` (index type `Unit`): a *bounded* fetch-and-add object
   with values in `{0, …, B-1}`, initially `0`, operations `read` and `faa d` (`d : ℤ`), both
   returning the previous value. If `0 ≤ v + d < B`, `faa d` sets the value to `v + d`; otherwise
   (overflow, "arbitrary behaviour" in the paper) it sets it to `ovf v d` for an **arbitrary**
   function `ovf`, a parameter of every theorem.
-* Implemented object `modFAI φ` (the library's `modFaiObj φ`): state `s ∈ {0, …, φ-1}`,
+* Implemented object `modFaiObj φ` (CSLib catalog): state `s ∈ {0, …, φ-1}`,
   initially `0`; `read()` returns `s`, `FAI()` returns `s` and sets `s := (s + 1) mod φ`.
 * Algorithm (Fig. 3, lines 75–78), program counters explicit (`Loc`):
   ```
@@ -60,7 +61,7 @@ inductive FAAOp where
 /-- A bounded fetch-and-add object with values in `{0, …, B-1}`, initially `0`. On overflow
 (`v + d ∉ [0, B)`) the new value is `ovf v d` (arbitrary). Every operation returns the old
 value. -/
-abbrev faaObj (B : ℕ) (ovf : ℕ → ℤ → ℕ) : ObjSpec where
+abbrev bfaaObj (B : ℕ) (ovf : ℕ → ℤ → ℕ) : ObjSpec where
   State := ℕ
   Op := FAAOp
   Resp := ℕ
@@ -68,10 +69,6 @@ abbrev faaObj (B : ℕ) (ovf : ℕ → ℤ → ℕ) : ObjSpec where
   δ v o := match o with
     | .read => (v, v)
     | .faa d => (if 0 ≤ (v : ℤ) + d ∧ (v : ℤ) + d < B then ((v : ℤ) + d).toNat else ovf v d, v)
-
-/-- The mod-`φ` fetch-and-increment object (state in `{0, …, φ-1}`, initially `0`; operations
-`FAIOp.read`, `FAIOp.fai`): the library's `modFaiObj φ`. -/
-abbrev modFAI (φ : ℕ) : ObjSpec := modFaiObj φ
 
 /-- Program counters. `fai`: about to read `Counter` (line 75); `dec` / `inc`: poised to execute
 `FAA(1-φ)` (line 76) / `FAA(1)` (line 77); `rd`: `read()` about to read `Counter`;
@@ -101,7 +98,7 @@ def invLoc : FAIOp → Loc
 
 /-- The algorithm of Fig. 3 (plus `read()`), for `n` processes. -/
 def alg (n φ B : ℕ) (ovf : ℕ → ℤ → ℕ) :
-    Impl (modFAI φ) (fun _ : Unit => faaObj B ovf) (Fin n) Loc where
+    Impl (modFaiObj φ) (fun _ : Unit => bfaaObj B ovf) (Fin n) Loc where
   memInit _ := 0
   locInit _ := .idle
   invoke _ _ o := invLoc o
@@ -115,12 +112,12 @@ def alg (n φ B : ℕ) (ovf : ℕ → ℤ → ℕ) :
 
 /-- Configurations of the algorithm. -/
 abbrev Cfg (n φ B : ℕ) (ovf : ℕ → ℤ → ℕ) :=
-  Config (modFAI φ) (fun _ : Unit => faaObj B ovf) (Fin n) Loc
+  Config (modFaiObj φ) (fun _ : Unit => bfaaObj B ovf) (Fin n) Loc
 
 variable {n φ B : ℕ} {ovf : ℕ → ℤ → ℕ}
 
 lemma faa_ok {v : ℕ} {d : ℤ} (h0 : 0 ≤ (v : ℤ) + d) (h1 : (v : ℤ) + d < B) :
-    ((faaObj B ovf).δ v (.faa d)).1 = ((v : ℤ) + d).toNat := by
+    ((bfaaObj B ovf).δ v (.faa d)).1 = ((v : ℤ) + d).toNat := by
   show (if _ then _ else _) = _
   simp only [h0, h1, and_self, ite_true]
 
@@ -165,16 +162,16 @@ lemma numAt_lt (f : Fin n → Loc) (p : Fin n) (c : Loc) (h : f p ≠ c) : numAt
 def cval (C : Cfg n φ B ovf) : ℕ := C.mem ()
 
 /-- Per-process part of the invariant. -/
-structure PInv (α : List (Label (Fin n) (modFAI φ))) (L : List (OpId (Fin n) × FAIOp))
+structure PInv (α : List (Label (Fin n) (modFaiObj φ))) (L : List (OpId (Fin n) × FAIOp))
     (l : Loc) (pd : Option FAIOp) (q : Fin n) : Prop where
   idle : l = .idle ↔ pd = none
   pending : ∀ o, l.op = some o → pd = some o ∧
     (q, (respsOf α q).length) ∉ L.map Prod.fst ∧ opOf α (q, (respsOf α q).length) = some o
   done : ∀ r, l = .done r → pd ≠ none ∧ ∃ L₁ L₂ o,
     L = L₁ ++ ((q, (respsOf α q).length), o) :: L₂ ∧
-    ((modFAI φ).δ ((modFAI φ).runOps (modFAI φ).init (L₁.map Prod.snd)) o).2 = r
+    ((modFaiObj φ).δ ((modFaiObj φ).runOps (modFaiObj φ).init (L₁.map Prod.snd)) o).2 = r
 
-lemma PInv.of_op {α : List (Label (Fin n) (modFAI φ))} {L : List (OpId (Fin n) × FAIOp)}
+lemma PInv.of_op {α : List (Label (Fin n) (modFaiObj φ))} {L : List (OpId (Fin n) × FAIOp)}
     {l l' : Loc} {pd : Option FAIOp} {q : Fin n} {o : FAIOp} (h : PInv α L l pd q)
     (hl : l.op = some o) (hl' : l'.op = some o) : PInv α L l' pd q := by
   have hp := h.pending o hl
@@ -184,7 +181,7 @@ lemma PInv.of_op {α : List (Label (Fin n) (modFAI φ))} {L : List (OpId (Fin n)
   · rw [hl'] at ho'; cases ho'; exact hp
   · subst hr; simp [Loc.op] at hl'
 
-lemma PInv.frame {α α' : List (Label (Fin n) (modFAI φ))} {L L' M : List (OpId (Fin n) × FAIOp)}
+lemma PInv.frame {α α' : List (Label (Fin n) (modFaiObj φ))} {L L' M : List (OpId (Fin n) × FAIOp)}
     {l : Loc} {pd : Option FAIOp} {q : Fin n} (h : PInv α L l pd q)
     (hops : opsOf α' q = opsOf α q) (hresps : respsOf α' q = respsOf α q) (hL : L' = L ++ M)
     (hM : ∀ y ∈ M, y.1.1 ≠ q) : PInv α' L' l pd q := by
@@ -200,7 +197,7 @@ lemma PInv.frame {α α' : List (Label (Fin n) (modFAI φ))} {L L' M : List (OpI
   · obtain ⟨h1, L₁, L₂, o, hs, hr'⟩ := h.done r hr
     exact ⟨h1, L₁, L₂ ++ M, o, by rw [hresps, hs]; simp, hr'⟩
 
-lemma procs_step {α : List (Label (Fin n) (modFAI φ))} {ℓ : Label (Fin n) (modFAI φ)}
+lemma procs_step {α : List (Label (Fin n) (modFaiObj φ))} {ℓ : Label (Fin n) (modFaiObj φ)}
     {C₀ C : Cfg n φ B ovf} {L L' M : List (OpId (Fin n) × FAIOp)} {p : Fin n}
     (hI : ∀ q, PInv α L (C₀.loc q) (C₀.pend q) q)
     (hstep : (alg n φ B ovf).step C₀ ℓ = some C) (hp : ℓ.proc = p) (hL : L' = L ++ M)
@@ -218,10 +215,10 @@ lemma procs_step {α : List (Label (Fin n) (modFAI φ))} {ℓ : Label (Fin n) (m
 
 /-- The invariant of the algorithm: `L` is a linearization, the abstract state is the counter
 value mod `φ`, Lemma 63 (in the sharpened form `v + k⁺ ≤ φn − 1`), and the per-process part. -/
-structure Inv (α : List (Label (Fin n) (modFAI φ))) (C : Cfg n φ B ovf)
+structure Inv (α : List (Label (Fin n) (modFaiObj φ))) (C : Cfg n φ B ovf)
     (L : List (OpId (Fin n) × FAIOp)) : Prop where
   lin : IsLinearization α L
-  mem : cval C % φ = linState (A := modFAI φ) L
+  mem : cval C % φ = linState (A := modFaiObj φ) L
   lower : (φ - 1) * numAt C.loc .dec ≤ cval C
   upper : cval C + numAt C.loc .inc ≤ φ * n - 1
   proc : ∀ q, PInv α L (C.loc q) (C.pend q) q
@@ -229,8 +226,8 @@ structure Inv (α : List (Label (Fin n) (modFAI φ))) (C : Cfg n φ B ovf)
 lemma step_tau_access {C C' : Cfg n φ B ovf} {p : Fin n} {o : FAAOp} {k : ℕ → Loc}
     (hact : (alg n φ B ovf).act p (C.loc p) = .access () o k)
     (h : (alg n φ B ovf).step C (.tau p) = some C') :
-    C.pend p ≠ none ∧ C'.pend = C.pend ∧ C'.mem () = ((faaObj B ovf).δ (C.mem ()) o).1 ∧
-      C'.loc = Function.update C.loc p (k ((faaObj B ovf).δ (C.mem ()) o).2) := by
+    C.pend p ≠ none ∧ C'.pend = C.pend ∧ C'.mem () = ((bfaaObj B ovf).δ (C.mem ()) o).1 ∧
+      C'.loc = Function.update C.loc p (k ((bfaaObj B ovf).δ (C.mem ()) o).2) := by
   obtain ⟨h0, hpend, i, o', k', hact', hmem, hloc⟩ := Impl.step_tau h
   rw [hact] at hact'
   cases i
@@ -239,199 +236,189 @@ lemma step_tau_access {C C' : Cfg n φ B ovf} {p : Fin n} {o : FAAOp} {k : ℕ �
   exact ⟨h0, hpend, by rw [hmem, Function.update_self], hloc⟩
 
 /-- **The invariant holds in every reachable configuration** (for `φ ≥ 1`, `B ≥ φn`). -/
-theorem inv_of_run (hφ : 1 ≤ φ) (hB : φ * n ≤ B) {α : List (Label (Fin n) (modFAI φ))}
+theorem inv_of_run (hφ : 1 ≤ φ) (hB : φ * n ≤ B) {α : List (Label (Fin n) (modFaiObj φ))}
     {C : Cfg n φ B ovf} (h : (alg n φ B ovf).run α = some C) : ∃ L, Inv α C L := by
-  induction α using List.reverseRecOn generalizing C with
-  | nil =>
-    simp only [Impl.run, Impl.runFrom, Impl.initCfg, Option.some.injEq] at h; subst h
-    refine ⟨[], ⟨isLinearization_nil, ?_, ?_, ?_, ?_⟩⟩
+  refine Impl.run_induction (Q := fun α C => ∃ L, Inv α C L) ?_ ?_ h
+  · refine ⟨[], ⟨isLinearization_nil, ?_, ?_, ?_, ?_⟩⟩
     · show (0 : ℕ) % φ = 0; simp
-    · simp [alg, cval]
-    · simp [alg, cval]
+    · simp [Impl.initCfg, alg, cval]
+    · simp [Impl.initCfg, alg, cval]
     · intro q
-      refine ⟨by simp [alg], fun o ho => by simp [alg, Loc.op] at ho, fun r hr => ?_⟩
-      simp [alg] at hr
-  | append_singleton α ℓ ih =>
-    rw [Impl.run, Impl.runFrom_append] at h
-    cases hα : (alg n φ B ovf).runFrom (alg n φ B ovf).initCfg α with
-    | none => simp [hα] at h
-    | some C₀ =>
-      simp only [hα, Option.bind_some, Impl.runFrom_singleton] at h
-      obtain ⟨L, hI⟩ := ih hα
-      have hn : ∀ q : Fin n, 1 ≤ φ * n := fun q => Nat.mul_pos hφ (Fin.pos q)
-      cases ℓ with
-      | inv p o =>
-        obtain ⟨h0, -, hpend, hloc, hmem⟩ := Impl.step_inv h
-        have hlen : (opsOf α p).length = (respsOf α p).length := by
-          rcases (alg n φ B ovf).run_counts hα p with ⟨-, h1⟩ | ⟨h1, -⟩
-          · exact h1
-          · exact absurd h0 h1
-        have hidle : C₀.loc p = .idle := (hI.proc p).idle.2 h0
-        have hloc' : C.loc = Function.update C₀.loc p (invLoc o) := hloc
-        have e1 : numAt C.loc .dec = numAt C₀.loc .dec := by
-          have := numAt_update C₀.loc p (invLoc o) .dec
-          rw [hidle, ← hloc'] at this; cases o <;> simpa [invLoc] using this
-        have e2 : numAt C.loc .inc = numAt C₀.loc .inc := by
-          have := numAt_update C₀.loc p (invLoc o) .inc
-          rw [hidle, ← hloc'] at this; cases o <;> simpa [invLoc] using this
-        have hv : cval C = cval C₀ := congrFun hmem ()
-        refine ⟨L, hI.lin.append_inv p o, by rw [hv]; exact hI.mem,
-          by rw [hv, e1]; exact hI.lower, by rw [hv, e2]; exact hI.upper, ?_⟩
-        refine procs_step (p := p) hI.proc h rfl L.append_nil.symm (by simp) ?_
-        rw [hloc', hpend, Function.update_self, Function.update_self]
-        have hr : respsOf (α ++ [.inv p o]) p = respsOf α p := by simp
-        refine ⟨?_, fun o' ho' => ?_, fun r hr' => ?_⟩
-        · cases o <;> simp [invLoc]
-        · have : o' = o := by cases o <;> cases o' <;> simp_all [invLoc, Loc.op]
-          subst this
-          refine ⟨rfl, ?_, ?_⟩
-          · rw [hr]; intro hm
-            have := hI.lin.mem_invoked hm
-            simp [Invoked] at this; omega
-          · simp [opOf, hr, ← hlen]
-        · cases o <;> simp [invLoc] at hr'
-      | tau p =>
-        have hr : respsOf (α ++ [.tau p]) p = respsOf α p := by simp
-        have hpI := hI.proc p
-        have hlow := hI.lower
-        have hup := hI.upper
-        have hn1 := hn p
-        cases hl : C₀.loc p with
-        | idle =>
-          exfalso; obtain ⟨-, -, i, o, k, hact, -⟩ := Impl.step_tau h; simp [alg, hl] at hact
-        | done r =>
-          exfalso; obtain ⟨-, -, i, o, k, hact, -⟩ := Impl.step_tau h; simp [alg, hl] at hact
-        | rd =>
-          obtain ⟨h0, hpend, hmem, hloc⟩ :=
-            step_tau_access (o := .read) (k := fun v => .done (v % φ)) (by rw [hl]; rfl) h
-          have hmem' : cval C = cval C₀ := hmem
-          have hloc' : C.loc = Function.update C₀.loc p (.done (cval C₀ % φ)) := hloc
-          obtain ⟨hp1, hp2, hp3⟩ := hpI.pending .read (by rw [hl]; rfl)
-          have e1 := numAt_update C₀.loc p (.done (cval C₀ % φ)) .dec
-          have e2 := numAt_update C₀.loc p (.done (cval C₀ % φ)) .inc
-          rw [hl, ← hloc'] at e1 e2; simp at e1 e2
-          have hnc : ¬ Completed α (p, (respsOf α p).length) := by simp [Completed]
-          refine ⟨L ++ [((p, (respsOf α p).length), .read)],
-            (hI.lin.push hp3 hp2 hnc).append_tau p, ?_, ?_, ?_, ?_⟩
-          · rw [hmem', linState_concat]; exact hI.mem
-          · rw [hmem', e1]; exact hlow
-          · rw [hmem', e2]; exact hup
-          · refine procs_step (p := p) hI.proc h rfl rfl (fun y hy => by simp at hy; simp [hy]) ?_
-            rw [hloc', hpend, Function.update_self]
-            refine ⟨by simp [h0], fun o ho => by simp [Loc.op] at ho,
-              fun r hr' => ⟨h0, L, [], .read, by rw [hr], ?_⟩⟩
-            simp only [Loc.done.injEq] at hr'; rw [← hr']; exact hI.mem.symm
-        | fai =>
-          obtain ⟨h0, hpend, hmem, hloc⟩ := step_tau_access (o := .read)
-            (k := fun v => if φ * n - n ≤ v then .dec else .inc) (by rw [hl]; rfl) h
-          have hmem' : cval C = cval C₀ := hmem
-          have hloc' : C.loc = Function.update C₀.loc p
-              (if φ * n - n ≤ cval C₀ then .dec else .inc) := hloc
-          have hnew : ∀ l', l'.op = some .fai → PInv (α ++ [.tau p]) L l' (C₀.pend p) p :=
-            fun l' hl' => (hpI.of_op (by rw [hl]; rfl) hl').frame (by simp) (by simp)
-              L.append_nil.symm (by simp)
-          have hlin := hI.lin.append_tau p
-          by_cases hv : φ * n - n ≤ cval C₀
-          · simp only [hv, ↓reduceIte] at hloc'
-            have e1 := numAt_update C₀.loc p .dec .dec
-            have e2 := numAt_update C₀.loc p .dec .inc
-            rw [hl, ← hloc'] at e1 e2; simp at e1 e2
-            have hK := numAt_lt C₀.loc p .dec (by rw [hl]; simp)
-            refine ⟨L, hlin, by rw [hmem']; exact hI.mem, ?_, by rw [hmem', e2]; exact hup, ?_⟩
-            · rw [hmem', e1]
-              calc (φ - 1) * (numAt C₀.loc .dec + 1) ≤ (φ - 1) * n := Nat.mul_le_mul_left _ hK
-                _ = φ * n - n := Nat.sub_one_mul φ n
-                _ ≤ cval C₀ := hv
-            · exact procs_step (p := p) hI.proc h rfl L.append_nil.symm (by simp)
-                (by rw [hloc', hpend, Function.update_self]; exact hnew _ rfl)
-          · simp only [hv, ↓reduceIte] at hloc'
-            have e1 := numAt_update C₀.loc p .inc .dec
-            have e2 := numAt_update C₀.loc p .inc .inc
-            rw [hl, ← hloc'] at e1 e2; simp at e1 e2
-            have hK := numAt_lt C₀.loc p .inc (by rw [hl]; simp)
-            refine ⟨L, hlin, by rw [hmem']; exact hI.mem, by rw [hmem', e1]; exact hlow, ?_, ?_⟩
-            · rw [hmem', e2]; omega
-            · exact procs_step (p := p) hI.proc h rfl L.append_nil.symm (by simp)
-                (by rw [hloc', hpend, Function.update_self]; exact hnew _ rfl)
-        | dec =>
-          obtain ⟨h0, hpend, hmem, hloc⟩ := step_tau_access (o := .faa (1 - (φ : ℤ)))
-            (k := fun v => .done (v % φ)) (by rw [hl]; rfl) h
-          have hK := numAt_pos C₀.loc p .dec hl
-          have hge : φ - 1 ≤ cval C₀ :=
-            calc φ - 1 = (φ - 1) * 1 := (mul_one _).symm
-              _ ≤ (φ - 1) * numAt C₀.loc .dec := Nat.mul_le_mul_left _ hK
-              _ ≤ cval C₀ := hlow
-          have hmem' : cval C = cval C₀ + 1 - φ := by
-            refine hmem.trans ((faa_ok (v := cval C₀) (by omega)
-              (by omega)).trans ?_)
-            rw [show ∀ z : ℤ, ∀ m : ℕ, z = m → z.toNat = m from fun z m h => by rw [h]; simp]
-            omega
-          have hloc' : C.loc = Function.update C₀.loc p (.done (cval C₀ % φ)) := hloc
-          obtain ⟨hp1, hp2, hp3⟩ := hpI.pending .fai (by rw [hl]; rfl)
-          have e1 := numAt_update C₀.loc p (.done (cval C₀ % φ)) .dec
-          have e2 := numAt_update C₀.loc p (.done (cval C₀ % φ)) .inc
-          rw [hl, ← hloc'] at e1 e2; simp at e1 e2
-          have hnc : ¬ Completed α (p, (respsOf α p).length) := by simp [Completed]
-          refine ⟨L ++ [((p, (respsOf α p).length), .fai)],
-            (hI.lin.push hp3 hp2 hnc).append_tau p, ?_, ?_, ?_, ?_⟩
-          · rw [hmem', linState_concat, ← hI.mem]
-            show (cval C₀ + 1 - φ) % φ = (cval C₀ % φ + 1) % φ
-            rw [Nat.mod_add_mod]
-            conv_rhs => rw [show cval C₀ + 1 = (cval C₀ + 1 - φ) + φ by omega]
-            rw [Nat.add_mod_right]
-          · rw [hmem']; rw [← e1, mul_add_one] at hlow; omega
-          · rw [hmem', e2]; omega
-          · refine procs_step (p := p) hI.proc h rfl rfl (fun y hy => by simp at hy; simp [hy]) ?_
-            rw [hloc', hpend, Function.update_self]
-            refine ⟨by simp [h0], fun o ho => by simp [Loc.op] at ho,
-              fun r hr' => ⟨h0, L, [], .fai, by rw [hr], ?_⟩⟩
-            simp only [Loc.done.injEq] at hr'; rw [← hr']; exact hI.mem.symm
-        | inc =>
-          obtain ⟨h0, hpend, hmem, hloc⟩ := step_tau_access (o := .faa 1)
-            (k := fun v => .done (v % φ)) (by rw [hl]; rfl) h
-          have hK := numAt_pos C₀.loc p .inc hl
-          have hmem' : cval C = cval C₀ + 1 := by
-            refine hmem.trans ((faa_ok (v := cval C₀) (by omega)
-              (by omega)).trans ?_)
-            rw [show ∀ z : ℤ, ∀ m : ℕ, z = m → z.toNat = m from fun z m h => by rw [h]; simp]
-            omega
-          have hloc' : C.loc = Function.update C₀.loc p (.done (cval C₀ % φ)) := hloc
-          obtain ⟨hp1, hp2, hp3⟩ := hpI.pending .fai (by rw [hl]; rfl)
-          have e1 := numAt_update C₀.loc p (.done (cval C₀ % φ)) .dec
-          have e2 := numAt_update C₀.loc p (.done (cval C₀ % φ)) .inc
-          rw [hl, ← hloc'] at e1 e2; simp at e1 e2
-          have hnc : ¬ Completed α (p, (respsOf α p).length) := by simp [Completed]
-          refine ⟨L ++ [((p, (respsOf α p).length), .fai)],
-            (hI.lin.push hp3 hp2 hnc).append_tau p, ?_, ?_, ?_, ?_⟩
-          · rw [hmem', linState_concat, ← hI.mem]
-            show (cval C₀ + 1) % φ = (cval C₀ % φ + 1) % φ
-            rw [Nat.mod_add_mod]
-          · rw [hmem', e1]; omega
-          · rw [hmem']; omega
-          · refine procs_step (p := p) hI.proc h rfl rfl (fun y hy => by simp at hy; simp [hy]) ?_
-            rw [hloc', hpend, Function.update_self]
-            refine ⟨by simp [h0], fun o ho => by simp [Loc.op] at ho,
-              fun r hr' => ⟨h0, L, [], .fai, by rw [hr], ?_⟩⟩
-            simp only [Loc.done.injEq] at hr'; rw [← hr']; exact hI.mem.symm
-      | ret p r =>
-        obtain ⟨h0, hpend, hmem, l, hact, hloc⟩ := Impl.step_ret h
-        cases hl : C₀.loc p with
-        | idle => exact absurd ((hI.proc p).idle.1 hl) h0
-        | done r' =>
-          simp only [alg, hl, Action.ret.injEq] at hact
-          obtain ⟨hrr, rfl⟩ := hact
-          subst hrr
-          obtain ⟨-, L₁, L₂, o, hs, hres⟩ := (hI.proc p).done _ hl
-          have e1 := numAt_update C₀.loc p .idle .dec
-          have e2 := numAt_update C₀.loc p .idle .inc
-          rw [hl, ← hloc] at e1 e2; simp at e1 e2
-          have hv : cval C = cval C₀ := congrFun hmem ()
-          refine ⟨L, hI.lin.append_ret L₁ L₂ o hs hres, by rw [hv]; exact hI.mem,
-            by rw [hv, e1]; exact hI.lower, by rw [hv, e2]; exact hI.upper, ?_⟩
-          refine procs_step (p := p) hI.proc h rfl L.append_nil.symm (by simp) ?_
-          rw [hloc, hpend, Function.update_self, Function.update_self]
-          exact ⟨by simp, fun o ho => by simp [Loc.op] at ho, fun r h => by cases h⟩
-        | _ => simp [alg, hl] at hact
+      refine ⟨by simp [Impl.initCfg, alg], fun o ho => by simp [Impl.initCfg, alg, Loc.op] at ho,
+        fun r hr => ?_⟩
+      simp [Impl.initCfg, alg] at hr
+  rintro α C₀ ℓ C hα ⟨L, hI⟩ h
+  have hn : ∀ q : Fin n, 1 ≤ φ * n := fun q => Nat.mul_pos hφ (Fin.pos q)
+  cases ℓ with
+  | inv p o =>
+    obtain ⟨h0, -, hpend, hloc, hmem⟩ := Impl.step_inv h
+    have hlen : (opsOf α p).length = (respsOf α p).length := Impl.run_idle_counts hα h0
+    have hidle : C₀.loc p = .idle := (hI.proc p).idle.2 h0
+    have hloc' : C.loc = Function.update C₀.loc p (invLoc o) := hloc
+    have e1 : numAt C.loc .dec = numAt C₀.loc .dec := by
+      have := numAt_update C₀.loc p (invLoc o) .dec
+      rw [hidle, ← hloc'] at this; cases o <;> simpa [invLoc] using this
+    have e2 : numAt C.loc .inc = numAt C₀.loc .inc := by
+      have := numAt_update C₀.loc p (invLoc o) .inc
+      rw [hidle, ← hloc'] at this; cases o <;> simpa [invLoc] using this
+    have hv : cval C = cval C₀ := congrFun hmem ()
+    refine ⟨L, hI.lin.append_inv p o, by rw [hv]; exact hI.mem,
+      by rw [hv, e1]; exact hI.lower, by rw [hv, e2]; exact hI.upper, ?_⟩
+    refine procs_step (p := p) hI.proc h rfl L.append_nil.symm (by simp) ?_
+    rw [hloc', hpend, Function.update_self, Function.update_self]
+    have hr : respsOf (α ++ [.inv p o]) p = respsOf α p := by simp
+    refine ⟨?_, fun o' ho' => ?_, fun r hr' => ?_⟩
+    · cases o <;> simp [invLoc]
+    · have : o' = o := by cases o <;> cases o' <;> simp_all [invLoc, Loc.op]
+      subst this
+      refine ⟨rfl, ?_, ?_⟩
+      · rw [hr]; intro hm
+        have := hI.lin.mem_invoked hm
+        simp [Invoked] at this; omega
+      · simp [opOf, hr, ← hlen]
+    · cases o <;> simp [invLoc] at hr'
+  | tau p =>
+    have hr : respsOf (α ++ [.tau p]) p = respsOf α p := by simp
+    have hpI := hI.proc p
+    have hlow := hI.lower
+    have hup := hI.upper
+    have hn1 := hn p
+    cases hl : C₀.loc p with
+    | idle =>
+      exfalso; obtain ⟨-, -, i, o, k, hact, -⟩ := Impl.step_tau h; simp [alg, hl] at hact
+    | done r =>
+      exfalso; obtain ⟨-, -, i, o, k, hact, -⟩ := Impl.step_tau h; simp [alg, hl] at hact
+    | rd =>
+      obtain ⟨h0, hpend, hmem, hloc⟩ :=
+        step_tau_access (o := .read) (k := fun v => .done (v % φ)) (by rw [hl]; rfl) h
+      have hmem' : cval C = cval C₀ := hmem
+      have hloc' : C.loc = Function.update C₀.loc p (.done (cval C₀ % φ)) := hloc
+      obtain ⟨hp1, hp2, hp3⟩ := hpI.pending .read (by rw [hl]; rfl)
+      have e1 := numAt_update C₀.loc p (.done (cval C₀ % φ)) .dec
+      have e2 := numAt_update C₀.loc p (.done (cval C₀ % φ)) .inc
+      rw [hl, ← hloc'] at e1 e2; simp at e1 e2
+      have hnc : ¬ Completed α (p, (respsOf α p).length) := by simp [Completed]
+      refine ⟨L ++ [((p, (respsOf α p).length), .read)],
+        (hI.lin.push hp3 hp2 hnc).append_tau p, ?_, ?_, ?_, ?_⟩
+      · rw [hmem', linState_concat]; exact hI.mem
+      · rw [hmem', e1]; exact hlow
+      · rw [hmem', e2]; exact hup
+      · refine procs_step (p := p) hI.proc h rfl rfl (fun y hy => by simp at hy; simp [hy]) ?_
+        rw [hloc', hpend, Function.update_self]
+        refine ⟨by simp [h0], fun o ho => by simp [Loc.op] at ho,
+          fun r hr' => ⟨h0, L, [], .read, by rw [hr], ?_⟩⟩
+        simp only [Loc.done.injEq] at hr'; rw [← hr']; exact hI.mem.symm
+    | fai =>
+      obtain ⟨h0, hpend, hmem, hloc⟩ := step_tau_access (o := .read)
+        (k := fun v => if φ * n - n ≤ v then .dec else .inc) (by rw [hl]; rfl) h
+      have hmem' : cval C = cval C₀ := hmem
+      have hloc' : C.loc = Function.update C₀.loc p
+          (if φ * n - n ≤ cval C₀ then .dec else .inc) := hloc
+      have hnew : ∀ l', l'.op = some .fai → PInv (α ++ [.tau p]) L l' (C₀.pend p) p :=
+        fun l' hl' => (hpI.of_op (by rw [hl]; rfl) hl').frame (by simp) (by simp)
+          L.append_nil.symm (by simp)
+      have hlin := hI.lin.append_tau p
+      by_cases hv : φ * n - n ≤ cval C₀
+      · simp only [hv, ↓reduceIte] at hloc'
+        have e1 := numAt_update C₀.loc p .dec .dec
+        have e2 := numAt_update C₀.loc p .dec .inc
+        rw [hl, ← hloc'] at e1 e2; simp at e1 e2
+        have hK := numAt_lt C₀.loc p .dec (by rw [hl]; simp)
+        refine ⟨L, hlin, by rw [hmem']; exact hI.mem, ?_, by rw [hmem', e2]; exact hup, ?_⟩
+        · rw [hmem', e1]
+          calc (φ - 1) * (numAt C₀.loc .dec + 1) ≤ (φ - 1) * n := Nat.mul_le_mul_left _ hK
+            _ = φ * n - n := Nat.sub_one_mul φ n
+            _ ≤ cval C₀ := hv
+        · exact procs_step (p := p) hI.proc h rfl L.append_nil.symm (by simp)
+            (by rw [hloc', hpend, Function.update_self]; exact hnew _ rfl)
+      · simp only [hv, ↓reduceIte] at hloc'
+        have e1 := numAt_update C₀.loc p .inc .dec
+        have e2 := numAt_update C₀.loc p .inc .inc
+        rw [hl, ← hloc'] at e1 e2; simp at e1 e2
+        have hK := numAt_lt C₀.loc p .inc (by rw [hl]; simp)
+        refine ⟨L, hlin, by rw [hmem']; exact hI.mem, by rw [hmem', e1]; exact hlow, ?_, ?_⟩
+        · rw [hmem', e2]; omega
+        · exact procs_step (p := p) hI.proc h rfl L.append_nil.symm (by simp)
+            (by rw [hloc', hpend, Function.update_self]; exact hnew _ rfl)
+    | dec =>
+      obtain ⟨h0, hpend, hmem, hloc⟩ := step_tau_access (o := .faa (1 - (φ : ℤ)))
+        (k := fun v => .done (v % φ)) (by rw [hl]; rfl) h
+      have hK := numAt_pos C₀.loc p .dec hl
+      have hge : φ - 1 ≤ cval C₀ :=
+        calc φ - 1 = (φ - 1) * 1 := (mul_one _).symm
+          _ ≤ (φ - 1) * numAt C₀.loc .dec := Nat.mul_le_mul_left _ hK
+          _ ≤ cval C₀ := hlow
+      have hmem' : cval C = cval C₀ + 1 - φ := by
+        refine hmem.trans ((faa_ok (v := cval C₀) (by omega)
+          (by omega)).trans ?_)
+        rw [show ∀ z : ℤ, ∀ m : ℕ, z = m → z.toNat = m from fun z m h => by rw [h]; simp]
+        omega
+      have hloc' : C.loc = Function.update C₀.loc p (.done (cval C₀ % φ)) := hloc
+      obtain ⟨hp1, hp2, hp3⟩ := hpI.pending .fai (by rw [hl]; rfl)
+      have e1 := numAt_update C₀.loc p (.done (cval C₀ % φ)) .dec
+      have e2 := numAt_update C₀.loc p (.done (cval C₀ % φ)) .inc
+      rw [hl, ← hloc'] at e1 e2; simp at e1 e2
+      have hnc : ¬ Completed α (p, (respsOf α p).length) := by simp [Completed]
+      refine ⟨L ++ [((p, (respsOf α p).length), .fai)],
+        (hI.lin.push hp3 hp2 hnc).append_tau p, ?_, ?_, ?_, ?_⟩
+      · rw [hmem', linState_concat, ← hI.mem]
+        show (cval C₀ + 1 - φ) % φ = (cval C₀ % φ + 1) % φ
+        rw [Nat.mod_add_mod]
+        conv_rhs => rw [show cval C₀ + 1 = (cval C₀ + 1 - φ) + φ by omega]
+        rw [Nat.add_mod_right]
+      · rw [hmem']; rw [← e1, mul_add_one] at hlow; omega
+      · rw [hmem', e2]; omega
+      · refine procs_step (p := p) hI.proc h rfl rfl (fun y hy => by simp at hy; simp [hy]) ?_
+        rw [hloc', hpend, Function.update_self]
+        refine ⟨by simp [h0], fun o ho => by simp [Loc.op] at ho,
+          fun r hr' => ⟨h0, L, [], .fai, by rw [hr], ?_⟩⟩
+        simp only [Loc.done.injEq] at hr'; rw [← hr']; exact hI.mem.symm
+    | inc =>
+      obtain ⟨h0, hpend, hmem, hloc⟩ := step_tau_access (o := .faa 1)
+        (k := fun v => .done (v % φ)) (by rw [hl]; rfl) h
+      have hK := numAt_pos C₀.loc p .inc hl
+      have hmem' : cval C = cval C₀ + 1 := by
+        refine hmem.trans ((faa_ok (v := cval C₀) (by omega)
+          (by omega)).trans ?_)
+        rw [show ∀ z : ℤ, ∀ m : ℕ, z = m → z.toNat = m from fun z m h => by rw [h]; simp]
+        omega
+      have hloc' : C.loc = Function.update C₀.loc p (.done (cval C₀ % φ)) := hloc
+      obtain ⟨hp1, hp2, hp3⟩ := hpI.pending .fai (by rw [hl]; rfl)
+      have e1 := numAt_update C₀.loc p (.done (cval C₀ % φ)) .dec
+      have e2 := numAt_update C₀.loc p (.done (cval C₀ % φ)) .inc
+      rw [hl, ← hloc'] at e1 e2; simp at e1 e2
+      have hnc : ¬ Completed α (p, (respsOf α p).length) := by simp [Completed]
+      refine ⟨L ++ [((p, (respsOf α p).length), .fai)],
+        (hI.lin.push hp3 hp2 hnc).append_tau p, ?_, ?_, ?_, ?_⟩
+      · rw [hmem', linState_concat, ← hI.mem]
+        show (cval C₀ + 1) % φ = (cval C₀ % φ + 1) % φ
+        rw [Nat.mod_add_mod]
+      · rw [hmem', e1]; omega
+      · rw [hmem']; omega
+      · refine procs_step (p := p) hI.proc h rfl rfl (fun y hy => by simp at hy; simp [hy]) ?_
+        rw [hloc', hpend, Function.update_self]
+        refine ⟨by simp [h0], fun o ho => by simp [Loc.op] at ho,
+          fun r hr' => ⟨h0, L, [], .fai, by rw [hr], ?_⟩⟩
+        simp only [Loc.done.injEq] at hr'; rw [← hr']; exact hI.mem.symm
+  | ret p r =>
+    obtain ⟨h0, hpend, hmem, l, hact, hloc⟩ := Impl.step_ret h
+    cases hl : C₀.loc p with
+    | idle => exact absurd ((hI.proc p).idle.1 hl) h0
+    | done r' =>
+      simp only [alg, hl, Action.ret.injEq] at hact
+      obtain ⟨hrr, rfl⟩ := hact
+      subst hrr
+      obtain ⟨-, L₁, L₂, o, hs, hres⟩ := (hI.proc p).done _ hl
+      have e1 := numAt_update C₀.loc p .idle .dec
+      have e2 := numAt_update C₀.loc p .idle .inc
+      rw [hl, ← hloc] at e1 e2; simp at e1 e2
+      have hv : cval C = cval C₀ := congrFun hmem ()
+      refine ⟨L, hI.lin.append_ret L₁ L₂ o hs hres, by rw [hv]; exact hI.mem,
+        by rw [hv, e1]; exact hI.lower, by rw [hv, e2]; exact hI.upper, ?_⟩
+      refine procs_step (p := p) hI.proc h rfl L.append_nil.symm (by simp) ?_
+      rw [hloc, hpend, Function.update_self, Function.update_self]
+      exact ⟨by simp, fun o ho => by simp [Loc.op] at ho, fun r h => by cases h⟩
+    | _ => simp [alg, hl] at hact
 
 /-! ## Lemma 63, Corollary 64, linearizability -/
 
@@ -529,7 +516,7 @@ lemma pot_decreases (p : Fin n) (l : Loc) (i : Unit) (o : FAAOp) (k : ℕ → Lo
 /-- **Theorem 11 of [BJW23]** (constant step complexity): in every execution, after `p` invokes
 an operation `o`, `p` performs at most `cost o ≤ 2` base-object accesses before it returns
 (`γ` is any continuation not containing a response of `p`). -/
-theorem theorem11_steps {α γ : List (Label (Fin n) (modFAI φ))} {p : Fin n} {o : FAIOp}
+theorem theorem11_steps {α γ : List (Label (Fin n) (modFaiObj φ))} {p : Fin n} {o : FAIOp}
     (hv : (alg n φ B ovf).Valid (α ++ .inv p o :: γ)) (hret : ∀ r, Label.ret p r ∉ γ) :
     γ.countP (Label.isTauOf p) ≤ cost o := by
   obtain ⟨l, h⟩ := (alg n φ B ovf).tauSteps_le_potential_invoke (fun _ l => pot l)
@@ -593,16 +580,16 @@ lemma finish_inc {C : Cfg n φ B ovf} {v : ℕ} {f : Fin n → Loc} {p : Fin n}
   have hact : (alg n φ B ovf).act p (C.loc p) =
       .access () (.faa 1) (fun v => .done (v % φ)) := by rw [hS.loc, hp]; rfl
   set C1 : Cfg n φ B ovf := { C with
-      mem := Function.update C.mem () ((faaObj B ovf).δ (C.mem ()) (.faa 1)).1,
+      mem := Function.update C.mem () ((bfaaObj B ovf).δ (C.mem ()) (.faa 1)).1,
       loc := Function.update C.loc p
-        ((fun v => .done (v % φ)) ((faaObj B ovf).δ (C.mem ()) (.faa 1)).2) }
+        ((fun v => .done (v % φ)) ((bfaaObj B ovf).δ (C.mem ()) (.faa 1)).2) }
   have hC1 : (alg n φ B ovf).Reachable C1 := hC.step (Impl.step_tau_eq_some h0 hact)
   have h1 : C1.pend p ≠ none := h0
   have hact1 : (alg n φ B ovf).act p (C1.loc p) = .ret (C.mem () % φ) .idle := by
     simp only [C1, Function.update_self]; rfl
   refine ⟨_, hC1.step (Impl.step_ret_eq_some h1 hact1), ?_, ?_, ?_⟩
   · have hm : C.mem () = v := hS.mem
-    have e : ((faaObj B ovf).δ (C.mem ()) (.faa 1)).1 = v + 1 := by
+    have e : ((bfaaObj B ovf).δ (C.mem ()) (.faa 1)).1 = v + 1 := by
       rw [faa_ok (v := C.mem ()) (by omega) (by rw [hm]; omega), hm]; simp
     simp only [cval, C1, Function.update_self]; exact e
   · show Function.update (Function.update C.loc p _) p _ = _

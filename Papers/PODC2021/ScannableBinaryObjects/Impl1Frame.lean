@@ -1,4 +1,5 @@
 import Papers.PODC2021.ScannableBinaryObjects.Impl1Lin
+import Podc.Computability.Distributed.SharedMemory.History
 
 /-!
 # Implementation 1: frame lemmas for the linearizability invariant
@@ -17,22 +18,18 @@ open List
 variable {k : ℕ} {O : Fin k → BitObj} {P : Type} [DecidableEq P] {Sc Up : Finset P}
   {α : List (Label P (scannable O))} {ℓ : Label P (scannable O)} {p : P}
 
-lemma not_precedes_append {x y : OpId P} {o : ScanOp O} (hx : opOf α x = some o)
-    (h : ¬ Precedes α y x) : ¬ Precedes (α ++ [ℓ]) y x :=
-  fun h' => h (h'.of_append_of_invoked (Invoked.of_opOf_eq_some hx))
-
 variable {L L₁ L₂ : List (OpId P × ScanOp O)} {x : OpId P} {o : ScanOp O}
 
 lemma Cut.append (hx : opOf α x = some o) (h : Cut α L x L₁ L₂) :
     Cut (α ++ [ℓ]) L x L₁ L₂ :=
-  ⟨h.1, fun y hy => not_precedes_append hx (h.2 y hy)⟩
+  ⟨h.1, fun y hy => not_precedes_append (.of_opOf_eq_some hx) (h.2 y hy)⟩
 
 lemma Cut.push (hx : opOf α x = some o) {y : OpId P × ScanOp O}
     (hy : ¬ Completed (α ++ [ℓ]) y.1) (h : Cut α L x L₁ L₂) :
     Cut (α ++ [ℓ]) (L ++ [y]) x L₁ (L₂ ++ [y]) := by
   refine ⟨by rw [h.1, append_assoc], fun y' hy' => ?_⟩
   rcases mem_append.1 hy' with hy' | hy'
-  · exact not_precedes_append hx (h.2 y' hy')
+  · exact not_precedes_append (.of_opOf_eq_some hx) (h.2 y' hy')
   · simp only [mem_singleton] at hy'; subst hy'
     exact fun hp => hy hp.completed
 
@@ -43,7 +40,7 @@ lemma Cut.insert (hx : opOf α x = some o) {z : OpId P} (hz : ¬ Completed (α +
   obtain ⟨L₁', L₂', he, h2, h3, h4⟩ := split_insert (h.1.symm.trans hW) (z, ScanOp.scan)
   refine ⟨L₁', L₂', ⟨he, fun y hy => ?_⟩, ?_, h2, h3⟩
   · rcases h2 y hy with hy | rfl
-    · exact not_precedes_append hx (h.2 y hy)
+    · exact not_precedes_append (.of_opOf_eq_some hx) (h.2 y hy)
     · exact fun hp => hz hp.completed
   · rcases h4 with rfl | ⟨A, B, rfl, rfl⟩
     · rfl

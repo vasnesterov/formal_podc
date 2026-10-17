@@ -1,4 +1,6 @@
 import Cslib.Computability.Distributed.SharedMemory.FullInfo
+import Podc.Computability.Distributed.SharedMemory.Model
+import Podc.Computability.Distributed.SharedMemory.Task
 
 /-!
 # Stranger-free tasks need `n` registers (Theorem 2.1 of Gafni–Losa–Raynal–Taubenfeld, PODC 2025)
@@ -84,39 +86,6 @@ lemma strangerFree_of_obstructionFree {T : Task P} [Inhabited T.Out]
     (h : T.StrangerFree .obstructionFree) : T.StrangerFree .waitFree :=
   fun ι V L _ v₀ I hI hall hp => h ι V L v₀ I hI hall (Progress.holds_obstructionFree hp)
 
-section Lemmas
-
-variable {A : ObjSpec} {ι : Type} [DecidableEq ι] {B : ι → ObjSpec} {L : Type}
-
-lemma oneShot_append_inv {α : List (Label P A)} (h : OneShot α) {p : P} (hp : opsOf α p = [])
-    (x : A.Op) : OneShot (α ++ [.inv p x]) := by
-  intro y
-  by_cases hy : y = p
-  · subst hy; simp [opsOf_append, hp]
-  · have := h y
-    simp only [opsOf_append, opsOf_cons, opsOf_nil, List.length_append]
-    rw [Label.invOf_eq_none_of_proc_ne (by simpa [Label.proc] using Ne.symm hy)]
-    simpa using this
-
-lemma oneShot_append_of_no_inv {α β : List (Label P A)} (h : OneShot α)
-    (hβ : ∀ y, opsOf β y = []) : OneShot (α ++ β) := by
-  intro y; simpa [opsOf_append, hβ y] using h y
-
-lemma opsOf_ne_nil_of_pend (I : Impl A B P L) {α : List (Label P A)} {C : Config A B P L}
-    (h : I.run α = some C) {p : P} (hp : C.pend p ≠ none) : opsOf α p ≠ [] := by
-  rcases I.run_counts h p with ⟨h1, -⟩ | ⟨-, h2⟩
-  · exact absurd h1 hp
-  · intro h0; rw [h0] at h2; simp at h2
-
-lemma respsOf_ne_nil_of_returned (I : Impl A B P L) {α : List (Label P A)} {C : Config A B P L}
-    (h : I.run α = some C) {p : P} (hp : C.pend p = none) (hops : opsOf α p ≠ []) :
-    respsOf α p ≠ [] := by
-  rcases I.run_counts h p with ⟨-, h2⟩ | ⟨h1, -⟩
-  · intro h0; rw [h0] at h2; exact hops (List.eq_nil_of_length_eq_zero (by simpa using h2))
-  · exact absurd hp h1
-
-end Lemmas
-
 section Covering
 
 variable {T : Task P} [Inhabited T.Out] {ι V L : Type} [DecidableEq ι] {v₀ : V}
@@ -140,13 +109,13 @@ theorem strangers_absurd {prog : Progress} (hT : T.StrangerFree prog) (hI : I.So
         OneShot α' ∧ respsOf α' p ≠ [] ∧ FIClean p C' ∧ C'.loc p = C.loc p ∧
         C'.pend w ≠ none ∧ opsOf α' w ≠ [] := by
     rcases hw with hw | ⟨hw, x, hx⟩
-    · exact ⟨α, C, hα, h1, hp, hcp, rfl, hw, opsOf_ne_nil_of_pend _ hα hw⟩
+    · exact ⟨α, C, hα, h1, hp, hcp, rfl, hw, Impl.opsOf_ne_nil_of_pend hα hw⟩
     · have hpend : C.pend w = none := pend_none_of_opsOf_nil hα hw
       obtain ⟨C₁, hs⟩ := Option.isSome_iff_exists.1
         (show (I.fullInfo.step C (.inv w x)).isSome by simp [Impl.step, hpend, Impl.fullInfo, hx])
       have hrun : I.fullInfo.run (α ++ [.inv w x]) = some C₁ := by
         rw [run_append_of_eq _ hα, runFrom_singleton, hs]
-      refine ⟨_, C₁, hrun, oneShot_append_inv h1 hw x, by simpa [respsOf_append] using hp,
+      refine ⟨_, C₁, hrun, OneShot.append_inv h1 hw x, by simpa [respsOf_append] using hp,
         I.fiClean_step hs (by simpa [Label.proc] using Ne.symm hpw) hcp,
         (step_other hs (by simpa [Label.proc] using Ne.symm hpw)).1, ?_,
         by simp [opsOf_append]⟩
@@ -160,9 +129,9 @@ theorem strangers_absurd {prog : Progress} (hT : T.StrangerFree prog) (hI : I.So
     rw [run_append_of_eq _ hα', hrun]
   have hproc := I.fullInfo.soloLabels_proc w C' K
   have h1'' : OneShot (α' ++ I.fullInfo.soloLabels w C' K) :=
-    oneShot_append_of_no_inv h1' (fun y => I.fullInfo.opsOf_soloLabels w y C' K)
+    OneShot.append_of_opsOf_nil h1' (fun y => I.fullInfo.opsOf_soloLabels w y C' K)
   have hrw : respsOf (α' ++ I.fullInfo.soloLabels w C' K) w ≠ [] :=
-    respsOf_ne_nil_of_returned _ hα'' hK (by simpa [opsOf_append, opsOf_soloLabels] using hops')
+    Impl.respsOf_ne_nil_of_idle hα'' hK (by simpa [opsOf_append, opsOf_soloLabels] using hops')
   have hrp : respsOf (α' ++ I.fullInfo.soloLabels w C' K) p ≠ [] := by
     simp only [respsOf_append, ne_eq, List.append_eq_nil_iff, not_and]
     exact fun h => absurd h hp'
@@ -200,7 +169,7 @@ theorem cover_step {prog : Progress} (hT : T.StrangerFree prog) (hI : I.Solves T
     (show (I.fullInfo.step C (.inv p x)).isSome by simp [Impl.step, hpp, Impl.fullInfo, hx])
   have hα₁ : I.fullInfo.run (α ++ [.inv p x]) = some C₁ := by
     rw [run_append_of_eq _ hα, runFrom_singleton, hs₁]
-  have h1₁ := oneShot_append_inv h1 hpα x
+  have h1₁ := OneShot.append_inv h1 hpα x
   have hp₁ : C₁.pend p ≠ none := by rw [(step_inv hs₁).2.2.1]; simp
   obtain ⟨K, hK⟩ := hof _ C₁ p hα₁ h1₁ hp₁
   set R := cs.map Prod.snd
@@ -215,7 +184,7 @@ theorem cover_step {prog : Progress} (hT : T.StrangerFree prog) (hI : I.Solves T
     rw [run_append_of_eq _ hα₁, hrun₂]
   have hprocγ := I.fullInfo.soloLabels_proc p C₁ m
   have h1₂ : OneShot ((α ++ [.inv p x]) ++ γ) :=
-    oneShot_append_of_no_inv h1₁ (fun y => I.fullInfo.opsOf_soloLabels p y C₁ m)
+    OneShot.append_of_opsOf_nil h1₁ (fun y => I.fullInfo.opsOf_soloLabels p y C₁ m)
   have hrunC : I.fullInfo.runFrom C ([.inv p x] ++ γ) = some C₂ := by
     rw [runFrom_append, runFrom_singleton, hs₁]; exact hrun₂
   have hprocCγ : ∀ ℓ ∈ ([.inv p x] ++ γ), ℓ.proc = p := by
@@ -249,7 +218,7 @@ theorem cover_step {prog : Progress} (hT : T.StrangerFree prog) (hI : I.Solves T
   · -- `p` returned without writing outside `R`: contradiction
     exfalso
     have hrp : respsOf ((α ++ [.inv p x]) ++ γ) p ≠ [] :=
-      respsOf_ne_nil_of_returned _ hα₂ hret (by simp [opsOf_append, Label.invOf])
+      Impl.respsOf_ne_nil_of_idle hα₂ hret (by simp [opsOf_append, Label.invOf])
     have hagC : ∀ q ∈ qs, C₂.loc q = C.loc q := fun q hq =>
       (hother q (fun h => hpq (h ▸ hq))).1
     have hagP : ∀ q ∈ qs, C₂.pend q = C.pend q := fun q hq =>
@@ -271,7 +240,7 @@ theorem cover_step {prog : Progress} (hT : T.StrangerFree prog) (hI : I.Solves T
         rw [e1, (hother y hy).1, ← e2]; exact hclean₃'.2 y hy
     have hα₃ : I.fullInfo.run (((α ++ [.inv p x]) ++ γ) ++ blockWrite qs) = some C₃ := by
       rw [run_append_of_eq _ hα₂, hb]
-    have h1₃ := oneShot_append_of_no_inv h1₂ (opsOf_blockWrite qs)
+    have h1₃ := OneShot.append_of_opsOf_nil h1₂ (opsOf_blockWrite qs)
     have hlocp : C₃.loc p = C₂.loc p :=
       (I.fullInfo.runFrom_other hb (fun ℓ hℓ h => hpq (by rw [← h]; exact hbproc ℓ hℓ))).1
     have hwclean₂' : FIClean w C₂ := by

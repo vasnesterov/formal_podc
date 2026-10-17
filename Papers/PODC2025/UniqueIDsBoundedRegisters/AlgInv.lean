@@ -11,7 +11,7 @@ import Papers.PODC2025.UniqueIDsBoundedRegisters.Alg
   `cur p` = global index of the current invocation of `p`, `own s` = invocation that obtained
   the successful ticket `s`, `ninv` = number of invocations.
 * The basic invariant `Inv1` (unconditional), in particular
-  `#{s < t | s % d < n} ≤ invCount α` (each invocation obtains at most one successful ticket).
+  `#{s < t | s % d < n} ≤ numInv α` (each invocation obtains at most one successful ticket).
 -/
 
 set_option linter.unusedSectionVars false
@@ -252,7 +252,7 @@ end Run
 /-- The basic invariant of `alg n d m` over (execution, configuration, ghost). -/
 structure Inv1 (n d m : ℕ) [NeZero m] (α : List (Label P uidObj)) (C : ACfg P n m)
     (g : Gh P) : Prop where
-  ninv : g.ninv = invCount α
+  ninv : g.ninv = numInv α
   m0 : (C.mem 0).val = g.t % m
   mi : ∀ i : Fin n, (C.mem i.succ).val = faiCnt d g.U i % m
   pendIdle : ∀ p, C.pend p = none ↔ C.loc p = .idle
@@ -281,7 +281,7 @@ lemma inv1_init (n d m : ℕ) [NeZero m] :
 /-- Successful tickets are obtained by distinct invocations. -/
 lemma Inv1.count_le {n d m : ℕ} [NeZero m] {α : List (Label P uidObj)} {C : ACfg P n m}
     {g : Gh P} (hI : Inv1 n d m α C g) :
-    Nat.count (fun s => s % d < n) g.t ≤ invCount α := by
+    Nat.count (fun s => s % d < n) g.t ≤ numInv α := by
   rw [Nat.count_eq_card_filter_range, ← hI.ninv]
   calc _ ≤ (Finset.range g.ninv).card := by
         apply Finset.card_le_card_of_injOn g.own
@@ -310,7 +310,7 @@ lemma Inv1.step_inv (hI : Inv1 n d m α C g) {p : P} {o : Unit}
     intro q; rw [Function.update_apply]
   simp only [gstep]
   constructor
-  · simp [hI.ninv, isInv]
+  · simp [hI.ninv, Label.isInv]
   · rw [hmem]; exact hI.m0
   · rw [hmem]; exact hI.mi
   · intro q; rw [hl, hp]; split_ifs
@@ -337,7 +337,7 @@ lemma Inv1.step_tau_start (hdm : d ∣ m) (hI : Inv1 n d m α C g) {p : P}
     Inv1 n d m (α ++ [.tau p]) C' (gstep n d g C (.tau p)) := by
   obtain ⟨hpe, hpend, hmem, hloc⟩ := alg_step_tau_start hs hlp
   have hr : (C.mem 0).val % d = g.t % d := by rw [hI.m0, Nat.mod_mod_of_dvd _ hdm]
-  have hninv : invCount (α ++ [.tau p]) = invCount α := by simp [isInv]
+  have hninv : numInv (α ++ [.tau p]) = numInv α := by simp [Label.isInv]
   have hm0 : (C'.mem 0).val = (g.t + 1) % m := by
     rw [hmem, Function.update_self, Fin.val_add, hI.m0]
     simp [Nat.add_mod]
@@ -439,7 +439,7 @@ lemma Inv1.step_tau_got (hI : Inv1 n d m α C g) {p : P} {i : Fin n}
   have hl : ∀ q, C'.loc q = if q = p then .done (i.val * m + (C.mem i.succ).val)
       else C.loc q := by
     intro q; rw [hloc, Function.update_apply]
-  have hninv : invCount (α ++ [.tau p]) = invCount α := by simp [isInv]
+  have hninv : numInv (α ++ [.tau p]) = numInv α := by simp [Label.isInv]
   simp only [gstep, hlp]
   constructor
   · rw [hninv]; exact hI.ninv
@@ -486,7 +486,7 @@ lemma Inv1.step_ret (hI : Inv1 n d m α C g) {p : P} {r : ℕ}
     intro q; rw [hloc, Function.update_apply]
   have hp : ∀ q, C'.pend q = if q = p then none else C.pend q := by
     intro q; rw [hpend, Function.update_apply]
-  have hninv : invCount (α ++ [.ret p r]) = invCount α := by simp [isInv]
+  have hninv : numInv (α ++ [.ret p r]) = numInv α := by simp [Label.isInv]
   simp only [gstep]
   constructor
   · rw [hninv]; exact hI.ninv

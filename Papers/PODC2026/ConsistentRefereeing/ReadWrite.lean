@@ -234,10 +234,6 @@ lemma isLinearization_cons {α : List (Label P (contestObj P))}
     refine ⟨fun r hr => absurd (completed_iff_respOf.2 (by rw [hr]; rfl)) hxc, ?_⟩
     exact seqOK_allCompete _ _ Lin hall hL.seq
 
-lemma not_completed_curOp (α : List (Label P (contestObj P))) (p : P) :
-    ¬ Completed α (curOp α p) := by
-  simp [Completed]
-
 /-- Statuses of processes whose local state does not change are preserved, when the
 linearization only grows by other pending operations and keeps the responses. -/
 lemma St.transfer {ref : P} {α : List (Label P (contestObj P))} {ℓ : Label P (contestObj P)}

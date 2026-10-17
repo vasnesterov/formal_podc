@@ -1,5 +1,7 @@
 import Papers.PODC2019.CryptoConsensusNumber.Fig3MStep
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
+import Podc.Computability.Distributed.SharedMemory.History
+import Podc.Computability.Distributed.SharedMemory.Model
 
 /-!
 # Figure 3: the linearization invariant
@@ -36,47 +38,6 @@ section Exec
 
 variable {A : ObjSpec} {ι : Type} {B : ι → ObjSpec} {P L : Type} [DecidableEq P] [DecidableEq ι]
   {I : Impl A B P L}
-
--- CSLib candidate
-/-- In the configuration reached by `α`, the pending operation of `q` is its current instance. -/
-lemma cur_op_of_run {α : List (Label P A)} {C : Config A B P L} (h : I.run α = some C) {q : P}
-    {o : A.Op} (hq : C.pend q = some o) : opOf α (q, (respsOf α q).length) = some o := by
-  have h1 := I.run_pend h hq
-  rcases I.run_counts h q with ⟨h2, -⟩ | ⟨-, h3⟩
-  · simp [h2] at hq
-  · rw [List.getLast?_eq_getElem?, h3] at h1
-    simpa [opOf] using h1
-
--- CSLib candidate
-lemma idle_counts_of_run {α : List (Label P A)} {C : Config A B P L} (h : I.run α = some C)
-    {q : P} (hq : C.pend q = none) : (opsOf α q).length = (respsOf α q).length := by
-  rcases I.run_counts h q with ⟨-, h2⟩ | ⟨h1, -⟩
-  · exact h2
-  · exact absurd hq h1
-
-lemma not_invoked_cur_of_idle {α : List (Label P A)} {q : P}
-    (h : (opsOf α q).length = (respsOf α q).length) : ¬ Invoked α (q, (respsOf α q).length) := by
-  simp [Invoked, h]
-
-@[simp] lemma respsOf_append_inv (α : List (Label P A)) (p q : P) (o : A.Op) :
-    respsOf (α ++ [.inv p o]) q = respsOf α q := by simp [respsOf_append]
-
-@[simp] lemma respsOf_append_tau (α : List (Label P A)) (p q : P) :
-    respsOf (α ++ [.tau p]) q = respsOf α q := by simp [respsOf_append]
-
-@[simp] lemma opsOf_append_tau (α : List (Label P A)) (p q : P) :
-    opsOf (α ++ [.tau p]) q = opsOf α q := by simp [opsOf_append]
-
-@[simp] lemma opsOf_append_ret (α : List (Label P A)) (p q : P) (r : A.Resp) :
-    opsOf (α ++ [.ret p r]) q = opsOf α q := by simp [opsOf_append]
-
-lemma opOf_append_noinv {α : List (Label P A)} {ℓ : Label P A} (hℓ : ∀ q, ℓ.invOf q = none)
-    (x : OpId P) : opOf (α ++ [ℓ]) x = opOf α x := by
-  simp [opOf, opsOf_append, hℓ]
-
-lemma opOf_append_of_some {α : List (Label P A)} (ℓ : Label P A) {x : OpId P} {o : A.Op}
-    (h : opOf α x = some o) : opOf (α ++ [ℓ]) x = some o :=
-  opOf_append_of_eq_some h _
 
 lemma not_completed_of_eq {α : List (Label P A)} {x : OpId P} (h : x.2 = (respsOf α x.1).length) :
     ¬ Completed α x := by

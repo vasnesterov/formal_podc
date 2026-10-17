@@ -120,7 +120,8 @@ Full list of differences (including modelling choices): [differencies.md](differ
 Shared library (`Cslib/Computability/Distributed/SharedMemory`):
 * `Sequential.lean`: a sequential execution with an illegal response sequence, or a response no
   state can produce, refutes linearizability.
-* `Objects/FetchAdd.lean`: the counter `faiObj m` and the implemented object `FAI.modFAI φ` are
+* `Objects/LLSC.lean`: the LL/SC base objects `llscObj`.
+* `Objects/FetchAdd.lean`: the counter of Section 3 and the implemented object of Section 6 are
   both the catalog object `modFaiObj` (readable fetch-and-increment modulo `m`).
 * `Potential.lean`: step bounds from a potential on local states
   (`Impl.tauSteps_le_potential_invoke`, used by `lemma12` and `FAI.theorem11_steps`; steps are

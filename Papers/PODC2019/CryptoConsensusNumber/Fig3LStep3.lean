@@ -82,7 +82,7 @@ lemma LInv.step_upd (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K) {tx : Tx
   have hDec' : ∀ a' r, Dec C'.mem a' r = Dec C.mem a' r := fun a' r => Dec_update_AS _ _ _
   have hloc' : ∀ q', q' ≠ q → C'.loc q' = C.loc q' := by
     intro q' hq'; simp only [hC', updCfg, Function.update_of_ne hq']
-  have hα : ∀ x, opOf (α ++ [.tau q]) x = opOf α x := opOf_append_noinv (by simp)
+  have hα : ∀ x, opOf (α ++ [.tau q]) x = opOf α x := opOf_append_tau _ _
   have hPrec : ∀ q' tx' c' t' res', (C.loc q').pc = .prop tx' c' (t', res') →
       Invoked α (t'.p, gid t') :=
     fun q' tx' c' t' res' h => Invoked.of_opOf_eq_some (hL.opK t' (hM.prop_K h))
@@ -264,7 +264,7 @@ lemma LInv.step_upd (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K) {tx : Tx
             refine ⟨S₁, S₂ ++ [(xt, ot)], by rw [h3]; simp, h4, ?_⟩
             intro y hy
             rcases List.mem_append.1 hy with hy | hy
-            · exact not_precedes_append (hPrec q' tx' c' t' res' h) h5 y hy
+            · exact not_precedes_append_all (hPrec q' tx' c' t' res' h) h5 y hy
             · simp only [List.mem_singleton] at hy; subst hy
               intro hp'; exact hnc hp'.completed }
   · -- nothing new is linearized
@@ -316,6 +316,6 @@ lemma LInv.step_upd (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K) {tx : Tx
           obtain ⟨h1, h2⟩ := hL.propI q' tx' c' t' res' h hd'
           refine ⟨h1, fun hr => ?_⟩
           obtain ⟨S₁, S₂, h3, h4, h5⟩ := h2 hr
-          exact ⟨S₁, S₂, h3, h4, not_precedes_append (hPrec q' tx' c' t' res' h) h5⟩ }
+          exact ⟨S₁, S₂, h3, h4, not_precedes_append_all (hPrec q' tx' c' t' res' h) h5⟩ }
 
 end CryptoCons.Fig3

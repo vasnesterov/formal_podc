@@ -113,33 +113,18 @@ lemma inv_step (hk : KShared μ k) {α : Hst μ q₀} {C C' : Cfg μ q₀ k} {K 
 theorem inv_of_run (hk : KShared μ k) {α : Hst μ q₀} {C : Cfg μ q₀ k}
     (h : (impl μ q₀ k).run α = some C) :
     ∃ K gid L, MInv μ C K ∧ LInv μ q₀ α C K gid L := by
-  induction α using List.reverseRecOn generalizing C with
-  | nil =>
-    simp only [Impl.run, Impl.runFrom, Option.some.injEq] at h; subst h
-    exact ⟨∅, fun _ => 0, [], MInv.init, LInv.init _⟩
-  | append_singleton α ℓ ih =>
-    rw [Impl.run, Impl.runFrom_append] at h
-    cases hα : (impl μ q₀ k).runFrom (impl μ q₀ k).initCfg α with
-    | none => simp [hα] at h
-    | some C₀ =>
-      simp only [hα, Option.bind_some, Impl.runFrom_singleton] at h
-      obtain ⟨K, gid, L, hM, hL⟩ := ih hα
-      exact inv_step hk hα hM hL ℓ h
+  refine Impl.run_induction (Q := fun α C => ∃ K gid L, MInv μ C K ∧ LInv μ q₀ α C K gid L)
+    ⟨∅, fun _ => 0, [], MInv.init, LInv.init _⟩ ?_ h
+  rintro α C₀ ℓ C hα ⟨K, gid, L, hM, hL⟩ h
+  exact inv_step hk hα hM hL ℓ h
 
 /-- **Lemma 2** (safety part) of Guerraoui et al., *The Consensus Number of a Cryptocurrency*
 (PODC 2019): if every account has at most `k` owners, the algorithm of Figure 3 is a
 linearizable implementation of the asset-transfer object from an atomic snapshot object,
 registers and `k`-consensus objects. -/
-theorem fig3_linearizable (hk : KShared μ k) : (impl μ q₀ k).Linearizable := by
-  have : ∀ α : Hst μ q₀, ∃ L : LinL n Acct, ∀ C, (impl μ q₀ k).run α = some C →
-      IsLinearization α L := by
-    intro α
-    cases hα : (impl μ q₀ k).run α with
-    | none => exact ⟨[], fun C h => by cases h⟩
-    | some C =>
-      obtain ⟨K, gid, L, -, hL⟩ := inv_of_run hk hα
-      exact ⟨L, fun C' h => hL.lin⟩
-  choose f hf using this
-  exact ⟨f, fun α ⟨C, hC⟩ => hf α C hC⟩
+theorem fig3_linearizable (hk : KShared μ k) : (impl μ q₀ k).Linearizable :=
+  Impl.linearizable_of_run fun _ _ h =>
+    let ⟨_, _, L, _, hL⟩ := inv_of_run hk h
+    ⟨L, hL.lin⟩
 
 end CryptoCons.Fig3

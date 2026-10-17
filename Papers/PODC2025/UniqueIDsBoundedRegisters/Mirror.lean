@@ -111,10 +111,10 @@ lemma relabel_proc (q' : P) (ℓ : Label P A) : (relabel q' ℓ).proc = q' := by
   cases ℓ <;> rfl
 
 omit [DecidableEq P] [DecidableEq ι] in
-lemma invCount_relabel (q' : P) (γ : List (Label P A)) :
-    invCount (γ.map (relabel q')) = invCount γ := by
+lemma numInv_relabel (q' : P) (γ : List (Label P A)) :
+    numInv (γ.map (relabel q')) = numInv γ := by
   induction γ with
   | nil => rfl
-  | cons ℓ γ ih => cases ℓ <;> simp [relabel, ih, isInv]
+  | cons ℓ γ ih => cases ℓ <;> simp [relabel, ih, Label.isInv]
 
 end Cslib.SharedMemory.UniqueIDs

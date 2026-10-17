@@ -1,4 +1,5 @@
 import Papers.PODC2016.ComplexityHierarchy.BufferLB
+import Podc.Computability.Distributed.SharedMemory.Model
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
 
 /-!
@@ -478,10 +479,7 @@ lemma inv_step_inv (hI : Inv ℓ S α C₀ L W) (hrun : (histImpl ℓ S).run α 
     {o : HOp X} (h : (histImpl ℓ S).step C₀ (.inv p o) = some C) :
     Inv ℓ S (α ++ [.inv p o]) C L W := by
   obtain ⟨h0, hall, hpend, hloc, hmem⟩ := Impl.step_inv h
-  have hlen : (opsOf α p).length = (respsOf α p).length := by
-    rcases (histImpl ℓ S).run_counts hrun p with ⟨-, h1⟩ | ⟨h1, -⟩
-    · exact h1
-    · exact absurd h0 h1
+  have hlen : (opsOf α p).length = (respsOf α p).length := Impl.run_idle_counts hrun h0
   have hcnt : ∀ q, (C.loc q).cnt = (C₀.loc q).cnt := by
     intro q
     by_cases hq : q = p

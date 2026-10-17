@@ -1,4 +1,5 @@
 import Papers.PODC2022.ConsensusFromSwap.Model
+import Cslib.Computability.Distributed.SharedMemory.ObjClasses
 
 /-!
 # Lower bound for k-set agreement from swap objects (Section 4)
@@ -8,7 +9,8 @@ Lemma 9 and Theorem 10 of Ovens (PODC 2022): every obstruction-free `n`-process 
 (`theorem10`, stated as `n ≤ k · (#objects + 1)`; `theorem10_ceil` in the paper's form).
 
 The proofs hold for any objects all of whose operations are *nontrivial historyless* operations
-(`OnlyOverwrites`: the new value does not depend on the old one), in particular swap objects.
+(CSLib `ObjSpec.OverwritesState`: the new value does not depend on the old one), in particular
+swap objects.
 -/
 
 namespace ConsensusFromSwap
@@ -88,7 +90,7 @@ steps). Suppose
 * every operation on every object is a nontrivial historyless operation (e.g. swap).
 
 Then there are at least `|Q|` objects. -/
-theorem lemma9 (hO : ∀ i, OnlyOverwrites (T i)) {R : Set P} {Q : Finset P} (hQR : ↑Q ⊆ R)
+theorem lemma9 (hO : ∀ i, (T i).OverwritesState) {R : Set P} {Q : Finset P} (hQR : ↑Q ⊆ R)
     {v : V} {W : Finset V} {C D : Cfg A} (hloc : ∀ q ∈ Q, C.loc q = D.loc q)
     (hW : ↑W ⊆ C.decBy R) (hvW : v ∉ W)
     (hagr : ∀ β : List P, (∀ r ∈ β, r ∈ Q) → ((run C β).decBy R).encard ≤ W.card)
@@ -202,7 +204,7 @@ configuration in which the processes of `R` have inputs among `e 0, …, e j` ha
 values decided by `R`, then `|R| ≤ j · (#objects + 1)`. The paper splits `R` into
 `⌈n(k−1)/k⌉` and `⌊n/k⌋` processes; we split off `#objects + 1` processes instead, which gives
 the same bound and needs no case `k = 1`. -/
-theorem theorem10_gen (hO : ∀ i, OnlyOverwrites (T i)) {S : Set V}
+theorem theorem10_gen (hO : ∀ i, (T i).OverwritesState) {S : Set V}
     (hval : ∀ x, InputsIn S x → ∀ α p v, (run (initCfg A x) α).Out p v → ∃ q, x q = v)
     (hof : ObstructionFree A S) {k : ℕ} (e : ℕ → V) (he : ∀ i ≤ k, e i ∈ S)
     (hinj : ∀ i ≤ k, ∀ i' ≤ k, e i = e i' → i = i') :
@@ -320,7 +322,7 @@ lemma exists_values {S : Set V} {k : ℕ} (hS : ((k + 1 : ℕ) : ℕ∞) ≤ S.e
 values) from objects supporting only nontrivial historyless operations (e.g. swap objects) uses
 at least `⌈n/k⌉ − 1` objects; stated as `n ≤ k · (#objects + 1)`. No assumption `n > k ≥ 1` is
 needed. -/
-theorem theorem10 [Fintype P] (hO : ∀ i, OnlyOverwrites (T i)) {k : ℕ}
+theorem theorem10 [Fintype P] (hO : ∀ i, (T i).OverwritesState) {k : ℕ}
     {S : Set V} (hS : ((k + 1 : ℕ) : ℕ∞) ≤ S.encard) (hA : SolvesSetAgreement A k S)
     (hof : ObstructionFree A S) :
     Fintype.card P ≤ k * (Fintype.card ι + 1) := by
@@ -337,7 +339,7 @@ theorem theorem10_swap [Fintype P] {D : ι → Type} {d₀ : (i : ι) → D i}
     {S : Set V} (hS : ((k + 1 : ℕ) : ℕ∞) ≤ S.encard) (hA : SolvesSetAgreement A k S)
     (hof : ObstructionFree A S) :
     (Fintype.card P + k - 1) / k - 1 ≤ Fintype.card ι := by
-  have h := theorem10 (fun i => onlyOverwrites_swapObj (D i) (d₀ i)) hS hA hof
+  have h := theorem10 (fun i => swapObj_overwritesState (D i) (d₀ i)) hS hA hof
   have : (Fintype.card P + k - 1) / k ≤ Fintype.card ι + 1 := by
     rw [Nat.div_le_iff_le_mul_add_pred hk]
     have := mul_comm k (Fintype.card ι + 1)
@@ -351,7 +353,7 @@ theorem consensus_swap_lowerBound [Fintype P] {D : ι → Type} {d₀ : (i : ι)
     {A : Alg (fun i => swapObj (D i) (d₀ i)) P V} {S : Set V} (hS : 2 ≤ S.encard)
     (hA : SolvesSetAgreement A 1 S) (hof : ObstructionFree A S) :
     Fintype.card P - 1 ≤ Fintype.card ι := by
-  have h := theorem10 (fun i => onlyOverwrites_swapObj (D i) (d₀ i)) (k := 1)
+  have h := theorem10 (fun i => swapObj_overwritesState (D i) (d₀ i)) (k := 1)
     (by exact_mod_cast hS) hA hof
   omega
 

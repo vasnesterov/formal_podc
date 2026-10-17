@@ -1,4 +1,5 @@
 import Papers.PODC2024.HistoryIndependent.Universal
+import Podc.Computability.Distributed.SharedMemory.Model
 import Cslib.Computability.Distributed.SharedMemory.Linearization
 import Cslib.Computability.Distributed.SharedMemory.LinPoints
 import Cslib.Computability.Distributed.SharedMemory.Model
@@ -1373,10 +1374,7 @@ theorem inv_step {α : List (Label (Fin n) A)} {C C' : Config A (B A n) (Fin n) 
   | ret p r =>
     have hcon : contrib α (.ret p r) = [] := by simp [contrib]
     rw [hcon, append_nil]
-    refine hI.retStep (fun hp => ?_) h
-    rcases (alg5 A n).run_counts hrun p with ⟨h1, -⟩ | ⟨-, h2⟩
-    · exact absurd h1 hp
-    · exact h2
+    exact hI.retStep (Impl.run_pend_counts hrun) h
 
 /-- **The invariant** holds in every reachable configuration. -/
 theorem inv_run {α : List (Label (Fin n) A)} {C : Config A (B A n) (Fin n) (Loc A n)}

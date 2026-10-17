@@ -1,5 +1,5 @@
 import Papers.PODC2020.BezoutElection.Alg2GlobProc
-import Papers.PODC2020.BezoutElection.Exec
+import Podc.Computability.Distributed.SharedMemory.Task
 
 /-!
 # Algorithm 2: safety (Lemma 2)
@@ -19,27 +19,6 @@ namespace BezoutElection.Alg2
 variable {Id : Type} [DecidableEq Id] {P : Type} [DecidableEq P] [Fintype P] {m : ℕ}
   {π : P → Equiv.Perm (Fin m)} {pp : Params} {ids : P → Id} {R : Type} [Inhabited R]
   {out : Id → Finset Id → R}
-
-section Outputs
-
-lemma outputs_snoc (α : List (Label P (elecObj R))) (ℓ : Label P (elecObj R)) (q : P) :
-    outputs (α ++ [ℓ]) q = (outputs α q).or (ℓ.retOf q) := by
-  simp only [outputs, respsOf_append]
-  rw [List.head?_append]
-  congr 1
-  cases h : ℓ.retOf q <;> simp [respsOf, h]
-
-lemma outputs_snoc_of_not_ret (α : List (Label P (elecObj R))) (ℓ : Label P (elecObj R)) (q : P)
-    (h : ∀ r, ℓ ≠ .ret q r) : outputs (α ++ [ℓ]) q = outputs α q := by
-  rw [outputs_snoc]
-  cases ℓ with
-  | ret p r =>
-    by_cases hp : p = q
-    · subst hp; exact absurd rfl (h r)
-    · simp [Label.retOf, hp]
-  | _ => simp [Label.retOf]
-
-end Outputs
 
 /-- The virtual program counters of a real configuration. -/
 def vpcOf (loc : P → St Id m) : P → VPC Id := fun q => .pc (loc q).pc
@@ -141,7 +120,7 @@ theorem rinv_step (hm : 0 < m) (hid : Function.Injective ids) (hn : Fintype.card
   | inv q o =>
     obtain ⟨hp, rfl⟩ := SymAlg.impl_step_inv_cases h
     have hout' : ∀ q', outputs (α ++ [.inv q o]) q' = outputs α q' :=
-      fun q' => outputs_snoc_of_not_ret _ _ _ (by intro r h; cases h)
+      fun q' => outputs_concat_of_ne (by intro r h; cases h)
     by_cases hpc : (C.loc q).pc = .idle
     · have hinv : (alg2 Id m pp out).invoke (C.loc q) o = { C.loc q with pc := .collect 0 } := by
         simp [alg2, hpc]
@@ -174,7 +153,7 @@ theorem rinv_step (hm : 0 < m) (hid : Function.Injective ids) (hn : Fintype.card
       simp only [alg2] at hact
       split at hact <;> (try split at hact) <;> simp at hact
     have hout' : ∀ q', outputs (α ++ [.tau q]) q' = outputs α q' :=
-      fun q' => outputs_snoc_of_not_ret _ _ _ (by intro r h; cases h)
+      fun q' => outputs_concat_of_ne (by intro r h; cases h)
     rcases hpc : (C.loc q).pc with _ | j | ⟨j, w⟩ | L | _
     · rw [act_idle _ hpc] at hact; cases hact
     · -- a read of the collect
@@ -285,9 +264,9 @@ theorem rinv_step (hm : 0 < m) (hid : Function.Injective ids) (hn : Fintype.card
   | ret q r =>
     obtain ⟨hp, s, hact, rfl⟩ := SymAlg.impl_step_ret_cases h
     have hout' : ∀ q', q' ≠ q → outputs (α ++ [.ret q r]) q' = outputs α q' :=
-      fun q' hq' => outputs_snoc_of_not_ret _ _ _ (by intro r' h; cases h; exact hq' rfl)
+      fun q' hq' => outputs_concat_of_ne (by intro r' h; cases h; exact hq' rfl)
     have houtq : outputs (α ++ [.ret q r]) q = (outputs α q).or (some r) := by
-      rw [outputs_snoc]; simp [Label.retOf]
+      rw [outputs_concat]; simp [Label.retOf]
     rcases hpc : (C.loc q).pc with _ | j | ⟨j, w⟩ | L | _
     · exact absurd (hidle q hpc) hp
     · have hj := (hpcok q).1 j hpc

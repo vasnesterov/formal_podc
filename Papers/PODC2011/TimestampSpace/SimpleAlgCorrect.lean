@@ -1,5 +1,7 @@
 import Papers.PODC2011.TimestampSpace.SimpleAlg
 import Cslib.Computability.Distributed.SharedMemory.History
+import Podc.Computability.Distributed.SharedMemory.History
+import Podc.Computability.Distributed.SharedMemory.Model
 
 /-!
 # Lemma 5.1: correctness of the simple one-shot timestamp algorithm
@@ -27,116 +29,6 @@ set_option linter.unusedSectionVars false
 namespace Cslib.SharedMemory.Timestamp.SimpleTS
 
 open Cslib.SharedMemory
-
-/-! ### History lemmas (one appended label) -/
-
-section History
-
-variable {A : ObjSpec} {P : Type} [DecidableEq P]
-
-lemma precedes_snoc {α : List (Label P A)} {ℓ : Label P A} {a b : OpId P}
-    (h : Precedes (α ++ [ℓ]) a b) :
-    Precedes α a b ∨ (Completed (α ++ [ℓ]) a ∧ ¬ Invoked (α ++ [ℓ]) b) := by
-  obtain ⟨β, γ, hsplit, h1, h2⟩ := h
-  induction γ using List.reverseRecOn with
-  | nil => right; simp only [List.append_nil] at hsplit; subst hsplit; exact ⟨h1, h2⟩
-  | append_singleton γ x _ =>
-    left
-    rw [← List.append_assoc] at hsplit
-    exact ⟨β, γ, (List.append_inj' hsplit rfl).1, h1, h2⟩
-
-lemma eq_ret_of_retOf {ℓ : Label P A} {p : P} {r : A.Resp} (h : ℓ.retOf p = some r) :
-    ℓ = .ret p r := by
-  cases ℓ with
-  | ret q r' => simp only [Label.retOf_ret] at h; split_ifs at h with hq; cases h; rw [hq]
-  | inv q o => simp at h
-  | tau q => simp at h
-
-lemma eq_inv_of_invOf {ℓ : Label P A} {p : P} {o : A.Op} (h : ℓ.invOf p = some o) :
-    ℓ = .inv p o := by
-  cases ℓ with
-  | inv q o' => simp only [Label.invOf_inv] at h; split_ifs at h with hq; cases h; rw [hq]
-  | ret q r => simp at h
-  | tau q => simp at h
-
-lemma respOf_snoc {α : List (Label P A)} {ℓ : Label P A} {g : OpId P} {r : A.Resp}
-    (h : respOf (α ++ [ℓ]) g = some r) :
-    respOf α g = some r ∨ (ℓ = .ret g.1 r ∧ g.2 = (respsOf α g.1).length) := by
-  simp only [respOf, respsOf_append] at h ⊢
-  rcases lt_or_ge g.2 (respsOf α g.1).length with hlt | hge
-  · left; rwa [List.getElem?_append_left hlt] at h
-  · right
-    rw [List.getElem?_append_right hge, respsOf_cons, respsOf_nil, List.append_nil] at h
-    cases hl : ℓ.retOf g.1 with
-    | none => simp [hl] at h
-    | some r' =>
-      rw [hl] at h
-      rcases List.getElem?_eq_some_iff.1 h with ⟨h1, h2⟩
-      simp only [Option.toList_some, List.length_singleton, List.getElem_singleton] at h1 h2
-      subst h2; exact ⟨eq_ret_of_retOf hl, by omega⟩
-
-lemma opOf_snoc {α : List (Label P A)} {ℓ : Label P A} {g : OpId P} {o : A.Op}
-    (h : opOf (α ++ [ℓ]) g = some o) :
-    opOf α g = some o ∨ (ℓ = .inv g.1 o ∧ g.2 = (opsOf α g.1).length) := by
-  simp only [opOf, opsOf_append] at h ⊢
-  rcases lt_or_ge g.2 (opsOf α g.1).length with hlt | hge
-  · left; rwa [List.getElem?_append_left hlt] at h
-  · right
-    rw [List.getElem?_append_right hge, opsOf_cons, opsOf_nil, List.append_nil] at h
-    cases hl : ℓ.invOf g.1 with
-    | none => simp [hl] at h
-    | some o' =>
-      rw [hl] at h
-      rcases List.getElem?_eq_some_iff.1 h with ⟨h1, h2⟩
-      simp only [Option.toList_some, List.length_singleton, List.getElem_singleton] at h1 h2
-      subst h2; exact ⟨eq_inv_of_invOf hl, by omega⟩
-
-/-- `opOf` and `respOf` of an operation completed in `α` do not change. -/
-lemma opOf_snoc_of_completed {α : List (Label P A)} {ℓ : Label P A} {g : OpId P}
-    (hwf : (respsOf α g.1).length ≤ (opsOf α g.1).length) (h : Completed α g) :
-    opOf (α ++ [ℓ]) g = opOf α g :=
-  opOf_append_of_invoked (by simp only [Invoked, Completed] at *; omega)
-
-/-- Real-time order after a label that is not a response. -/
-lemma precedes_snoc_of_not_ret {α : List (Label P A)} {ℓ : Label P A} {a b : OpId P}
-    (hℓ : ∀ q r, ℓ ≠ .ret q r) (h : Precedes (α ++ [ℓ]) a b) : Precedes α a b := by
-  rcases precedes_snoc h with h | ⟨h1, h2⟩
-  · exact h
-  · refine ⟨α, [], by simp, ?_, fun h3 => h2 h3.mono⟩
-    simpa only [Completed, respsOf_concat_of_ne (hℓ a.1)] using h1
-
-end History
-
-/-! ### Process-level facts about runs -/
-
-section Runs
-
-variable {A : ObjSpec} {ι : Type} {B : ι → ObjSpec} {P L : Type} [DecidableEq P] [DecidableEq ι]
-  {I : Impl A B P L}
-
-lemma resps_le_ops {α : List (Label P A)} {C : Config A B P L} (h : I.run α = some C) (p : P) :
-    (respsOf α p).length ≤ (opsOf α p).length := by
-  rcases I.run_counts h p with ⟨_, h2⟩ | ⟨_, h2⟩ <;> omega
-
-lemma opOf_pending {α : List (Label P A)} {C : Config A B P L} (h : I.run α = some C) {p : P}
-    {o : A.Op} (hp : C.pend p = some o) : opOf α (p, (respsOf α p).length) = some o := by
-  have h1 := I.run_pend h hp
-  have h2 : (opsOf α p).length = (respsOf α p).length + 1 := by
-    rcases I.run_counts h p with ⟨h3, _⟩ | ⟨_, h3⟩
-    · simp [hp] at h3
-    · exact h3
-  simp only [opOf]
-  rw [List.getLast?_eq_getElem?, h2] at h1
-  simpa using h1
-
-lemma not_invoked_idle {α : List (Label P A)} {C : Config A B P L} (h : I.run α = some C) {p : P}
-    (hp : C.pend p = none) : ¬ Invoked α (p, (respsOf α p).length) := by
-  simp only [Invoked]
-  rcases I.run_counts h p with ⟨_, h3⟩ | ⟨h3, _⟩
-  · omega
-  · exact absurd hp h3
-
-end Runs
 
 /-! ### Sums of register values -/
 
@@ -458,7 +350,7 @@ lemma inv_tau_frame {α : Exec n} {C : Cfg n} {p : Fin n} {l' : Loc}
   · intro q g t hq h1 h2 h3
     rw [opOf_concat_of_ne (x := g) (hni g.1), respOf_concat_of_ne (x := g) (hne g.1)] at *
     rw [respsOf_concat_of_ne (hne q)] at h3
-    have h3 := precedes_snoc_of_not_ret hne h3
+    have h3 := Precedes.of_concat_of_not_ret hne h3
     have key := hI.lb q g t hq h1 h2 h3
     by_cases hqp : q = p
     · subst hqp; simpa using key.trans_le (hlb hq)
@@ -466,7 +358,7 @@ lemma inv_tau_frame {α : Exec n} {C : Cfg n} {p : Fin n} {l' : Loc}
   · intro g₁ g₂ t₁ t₂ h1 h2 h3 h4 h5
     rw [opOf_concat_of_ne (x := g₁) (hni g₁.1), respOf_concat_of_ne (x := g₁) (hne g₁.1),
       opOf_concat_of_ne (x := g₂) (hni g₂.1), respOf_concat_of_ne (x := g₂) (hne g₂.1)] at *
-    exact hI.order g₁ g₂ t₁ t₂ h1 h2 h3 h4 (precedes_snoc_of_not_ret hne h5)
+    exact hI.order g₁ g₂ t₁ t₂ h1 h2 h3 h4 (Precedes.of_concat_of_not_ret hne h5)
   · intro g o r h1 h2
     rw [opOf_concat_of_ne (x := g) (hni g.1), respOf_concat_of_ne (x := g) (hne g.1)] at *
     exact hI.resp g o r h1 h2
@@ -601,7 +493,7 @@ lemma inv_inv {α : Exec n} {C C' : Cfg n} {p : Fin n} {o : TSOp ℕ} (hI : Inv 
     intro g r h
     apply opOf_append_of_invoked
     have h1 := Completed.of_respOf_eq_some h
-    have h2 := resps_le_ops hrun g.1
+    have h2 := Impl.run_resps_le_ops hrun g.1
     simp only [Invoked, Completed] at *; omega
   have hcount : ∀ q, getTSCount α q ≤ getTSCount (α ++ [.inv p o]) q := by intro q; simp
   have hfresh : o = .getTS → (C.loc p).wrote = false := by
@@ -652,7 +544,7 @@ lemma inv_inv {α : Exec n} {C C' : Cfg n} {p : Fin n} {o : TSOp ℕ} (hI : Inv 
   · intro q g t hq h1 h2 h3
     rw [hresp] at h2; rw [hop g _ h2] at h1
     rw [respsOf_concat_of_ne (hne q)] at h3
-    have h3 := precedes_snoc_of_not_ret hne h3
+    have h3 := Precedes.of_concat_of_not_ret hne h3
     by_cases hqp : q = p
     · subst hqp
       simp only [Function.update_self, Option.some.injEq] at hq
@@ -664,7 +556,7 @@ lemma inv_inv {α : Exec n} {C C' : Cfg n} {p : Fin n} {o : TSOp ℕ} (hI : Inv 
       exact hI.lb q g t hq h1 h2 h3
   · intro g₁ g₂ t₁ t₂ h1 h2 h3 h4 h5
     rw [hresp] at h2 h4; rw [hop _ _ h2] at h1; rw [hop _ _ h4] at h3
-    exact hI.order g₁ g₂ t₁ t₂ h1 h2 h3 h4 (precedes_snoc_of_not_ret hne h5)
+    exact hI.order g₁ g₂ t₁ t₂ h1 h2 h3 h4 (Precedes.of_concat_of_not_ret hne h5)
   · intro g o' r h1 h2
     rw [hresp] at h2; rw [hop _ _ h2] at h1
     exact hI.resp g o' r h1 h2
@@ -695,7 +587,7 @@ lemma inv_ret {α : Exec n} {C C' : Cfg n} {p : Fin n} {r : ℕ ⊕ Bool} (hI : 
     (hs : (alg n reread).step C (.ret p r) = some C') : Inv (α ++ [.ret p r]) C' := by
   obtain ⟨h0, l, hact, rfl⟩ := step_ret_eq hs
   obtain ⟨o, ho⟩ := Option.ne_none_iff_exists'.1 h0
-  have hop0 := opOf_pending hrun ho
+  have hop0 := (Impl.run_pend_curOp hrun ho).2.2
   have hni : ∀ q o, (Label.ret p r : Label (Fin n) (tsObj ℕ)) ≠ .inv q o := by simp
   have hopeq : ∀ g, opOf (α ++ [.ret p r]) g = opOf α g :=
     fun g => opOf_concat_of_ne (x := g) (hni g.1)
@@ -713,7 +605,7 @@ lemma inv_ret {α : Exec n} {C C' : Cfg n} {p : Fin n} {r : ℕ ⊕ Bool} (hI : 
   have hnew : ∀ g r', respOf (α ++ [.ret p r]) g = some r' →
       respOf α g = some r' ∨ (g = (p, (respsOf α p).length) ∧ r' = r) := by
     intro g r' h
-    rcases respOf_snoc h with h | ⟨h1, h2⟩
+    rcases respOf_concat_cases h with h | ⟨h1, h2⟩
     · exact Or.inl h
     · simp only [Label.ret.injEq] at h1
       obtain ⟨h1, rfl⟩ := h1
@@ -771,12 +663,12 @@ lemma inv_ret {α : Exec n} {C C' : Cfg n} {p : Fin n} {r : ℕ ⊕ Bool} (hI : 
     simp only [Function.update_of_ne hqp] at hq ⊢
     rw [hopeq] at h1
     rw [respsOf_concat_of_ne (q := q) (by simp [Ne.symm hqp])] at h3
-    rcases precedes_snoc h3 with h3 | ⟨-, h4⟩
+    rcases precedes_concat h3 with h3 | ⟨-, h4⟩
     · exact hI.lb q g t hq h1 (hcompl g _ h2 h3.completed) h3
-    · exact absurd (Invoked.of_opOf_eq_some (opOf_pending hrun hq)).mono h4
+    · exact absurd (Invoked.of_opOf_eq_some ((Impl.run_pend_curOp hrun hq).2.2)).mono h4
   · intro g₁ g₂ t₁ t₂ h1 h2 h3 h4 h5
     rw [hopeq] at h1 h3
-    rcases precedes_snoc h5 with h5 | ⟨-, h6⟩
+    rcases precedes_concat h5 with h5 | ⟨-, h6⟩
     · have h2' := hcompl g₁ _ h2 h5.completed
       rcases hnew g₂ _ h4 with h4 | ⟨rfl, hr⟩
       · exact hI.order g₁ g₂ t₁ t₂ h1 h2' h3 h4 h5

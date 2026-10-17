@@ -18,8 +18,8 @@ Paper: Sean Ovens, *The Space Complexity of Consensus from Swap*, PODC 2022, arX
    * Swap objects store values of an arbitrary type, not only `ℕ`; Algorithm 1 stores (lap counter, identifier)
      pairs.
    * Initial object values are arbitrary (`Alg.mem₀`).
-   * Section 4 is proved for every object type all of whose operations overwrite the value (`OnlyOverwrites`),
-     which generalizes swap.
+   * Section 4 is proved for every object type all of whose operations overwrite the value
+     (`ObjSpec.OverwritesState`, CSLib), which generalizes swap.
    * Section 5 uses readable swap objects over one finite type `D` of size `b` (the paper's "WLOG").
    * The simulations of historyless objects ([14]) are not formalized, and neither are Corollaries 19 and 23.
 5. **Correctness is relative to an input set `S`** (`SolvesSetAgreement A k S`, `ObstructionFree A S`). The

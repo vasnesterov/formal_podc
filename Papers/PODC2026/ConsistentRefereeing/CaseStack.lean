@@ -92,7 +92,7 @@ theorem exists_finish_labels (H : Hyps I ref) {α : List (Label P (contestObj P)
   have hops₁ : ∀ q, opsOf (α ++ β₀ ++ β₁) q = opsOf (α ++ β₀) q := fun q => by
     simp [opsOf_append, hβ₁ops q]
   have hcomp : respsOf (α ++ β₀ ++ β₁) k ≠ [] :=
-    respsOf_ne_nil_of_done I hr₁ hD₁k (by rw [hops₁]; exact hk₀)
+    Impl.respsOf_ne_nil_of_idle hr₁ hD₁k (by rw [hops₁]; exact hk₀)
   -- the referee runs
   have hrr : roleOp ref ref = (.decide : ContestOp P) := by simp [roleOp]
   have hnx : nxt I ref (α ++ β₀ ++ β₁) D₁ ref = some (.inv ref .decide) := by
@@ -106,7 +106,7 @@ theorem exists_finish_labels (H : Hyps I ref) {α : List (Label P (contestObj P)
   have hAF := hAE₁.append_noInv ref hγops
   have hops : opsOf (α ++ β₀ ++ β₁ ++ [.inv ref .decide] ++ γ) ref ≠ [] := by
     simp [opsOf_append]
-  have hdone := respsOf_ne_nil_of_done I hrF hF₁r hops
+  have hdone := Impl.respsOf_ne_nil_of_idle hrF hF₁r hops
   obtain ⟨r, hr⟩ : ∃ r, respOf (α ++ β₀ ++ β₁ ++ [.inv ref .decide] ++ γ) (ref, 0) = some r := by
     simp only [respOf]
     exact ⟨_, List.getElem?_eq_getElem (List.length_pos_of_ne_nil hdone)⟩

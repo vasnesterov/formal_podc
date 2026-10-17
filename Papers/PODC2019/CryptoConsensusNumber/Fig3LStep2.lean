@@ -60,7 +60,7 @@ lemma LInv.step_prop (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
     intro a' r h; cases hd : Dec C.mem a' r with
     | none => rfl
     | some d => rw [hExt a' r d hd] at h; cases h
-  have hα : ∀ x, opOf (α ++ [.tau q]) x = opOf α x := opOf_append_noinv (by simp)
+  have hα : ∀ x, opOf (α ++ [.tau q]) x = opOf α x := opOf_append_tau _ _
   -- facts about the other processes' proposals
   have hPrec : ∀ q' tx' c' t' res', (C.loc q').pc = .prop tx' c' (t', res') →
       Invoked α (t'.p, gid t') :=
@@ -124,7 +124,7 @@ lemma LInv.step_prop (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
         rw [hS] at h0 hnotL
         exact h0.insert (by rw [hα]; exact hL.opK t htK) hnotL hnc
           (congrArg Prod.fst hneu1)
-          (not_precedes_append (Invoked.of_opOf_eq_some (hL.opK t htK)) hS₂)
+          (not_precedes_append_all (Invoked.of_opOf_eq_some (hL.opK t htK)) hS₂)
       bal := by rw [hlst, ← hS, hU']; exact hL.bal
       memL := fun y hy => by
         rw [hU']
@@ -201,7 +201,7 @@ lemma LInv.step_prop (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
             · rw [hlst]; exact hTlt
           · intro y hy hpr
             rcases hmem2 y hy with hy | rfl
-            · exact not_precedes_append (hPrec q' tx' c' t' res' h) hT₂ y hy hpr
+            · exact not_precedes_append_all (hPrec q' tx' c' t' res' h) hT₂ y hy hpr
             · exact hnc hpr.completed }
   · -- the decision is not a new failure: `L` is unchanged
     have hDecT : ∀ a' r t' b, Dec C'.mem a' r = some (t', b) → Dec C.mem a' r = some (t', b) ∨
@@ -279,6 +279,6 @@ lemma LInv.step_prop (hL : LInv μ q₀ α C K gid L) (hM : MInv μ C K)
           obtain ⟨h1, h2⟩ := hL.propI q' tx' c' t' res' h hd0
           refine ⟨h1, fun hr => ?_⟩
           obtain ⟨T₁, T₂, hT, hTlt, hT₂⟩ := h2 hr
-          exact ⟨T₁, T₂, hT, hTlt, not_precedes_append (hPrec q' tx' c' t' res' h) hT₂⟩ }
+          exact ⟨T₁, T₂, hT, hTlt, not_precedes_append_all (hPrec q' tx' c' t' res' h) hT₂⟩ }
 
 end CryptoCons.Fig3

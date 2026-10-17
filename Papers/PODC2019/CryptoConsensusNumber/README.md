@@ -114,5 +114,5 @@ current operation instance `curOp` and `opOf_append_of_eq_some`, `linState_conca
 (`Cslib/Computability/Distributed/SharedMemory/History.lean`), and `Fintype.sum_comp_update_add`
 (`Cslib/Foundations/Data/Finset/SumUpdate.lean`).
 `Fig3Example.lean` instantiates Lemma 2 (2 processes, one shared account, `k = 2`). CSLib candidates:
-`snapObj`, `kConsObj`, `crit_overwrite`, `crit_commute`, `stepP_stepP_same`, and the generic
-linearization lemmas in the `Aux` section of `Fig1.lean`.
+`snapObj`, `kConsObj`, `crit_overwrite`, `crit_commute`, `stepP_stepP_same`, and
+`not_mem_append_single` (`Fig1.lean`).

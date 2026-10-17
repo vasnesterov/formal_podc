@@ -1,5 +1,6 @@
 import Cslib.Computability.Distributed.SharedMemory.Anonymous.LockStep
-import Papers.PODC2020.BezoutElection.Exec
+import Papers.PODC2020.BezoutElection.Defs
+import Podc.Computability.Distributed.SharedMemory.Task
 import Mathlib.Data.Finset.Lattice.Fold
 
 /-!

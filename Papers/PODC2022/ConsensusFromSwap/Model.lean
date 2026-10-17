@@ -1,5 +1,6 @@
 import Mathlib
 import Cslib.Computability.Distributed.SharedMemory.Spec
+import Cslib.Computability.Distributed.SharedMemory.Objects.Swap
 
 /-!
 # The Space Complexity of Consensus from Swap — the model
@@ -358,40 +359,5 @@ lemma Cfg.step_comm (C : Cfg A) {p q : P} (hpq : p ≠ q)
   congr 1
   · exact Function.update_comm hpq _ _ _
   · exact Function.update_comm hij _ _ _
-
-/-! ## Swap objects -/
-
-/-- A swap object with values `D`: `Swap(v)` sets the value to `v` and returns the old value. -/
-abbrev swapObj (D : Type) (d₀ : D) : ObjSpec where
-  State := D
-  Op := D
-  Resp := D
-  init := d₀
-  δ s v := (v, s)
-
-/-- Operations of a readable swap object. -/
-inductive RSOp (D : Type) where
-  /-- `Read`. -/
-  | read
-  /-- `Swap(v)`. -/
-  | swap (v : D)
-  deriving DecidableEq
-
-/-- A readable swap object with values `D`. -/
-abbrev rswapObj (D : Type) (d₀ : D) : ObjSpec where
-  State := D
-  Op := RSOp D
-  Resp := D
-  init := d₀
-  δ s
-    | .read => (s, s)
-    | .swap v => (v, s)
-
-/-- Every operation of `S` sets the state to a value independent of the old state: `S` is a
-historyless object all of whose operations are nontrivial (e.g. a swap object). -/
-def OnlyOverwrites (S : ObjSpec) : Prop := ∀ o s s', (S.δ s o).1 = (S.δ s' o).1
-
-lemma onlyOverwrites_swapObj (D : Type) (d₀ : D) : OnlyOverwrites (swapObj D d₀) :=
-  fun _ _ _ => rfl
 
 end ConsensusFromSwap

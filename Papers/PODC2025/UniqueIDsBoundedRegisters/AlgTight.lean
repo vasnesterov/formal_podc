@@ -63,10 +63,10 @@ lemma respsOf_seqL (p : P) (k : ℕ) :
   | zero => rfl
   | succ k ih => simp [seqL, ih, getL, List.range_succ]
 
-lemma invCount_seqL (p : P) (k : ℕ) : invCount (seqL (n := n) (m := m) p k) = k := by
+lemma numInv_seqL (p : P) (k : ℕ) : numInv (seqL (n := n) (m := m) p k) = k := by
   induction k with
   | zero => rfl
-  | succ k ih => simp [seqL, ih, getL, isInv]
+  | succ k ih => simp [seqL, ih, getL, Label.isInv]
 
 lemma memK_spec (hnm : n ∣ m) (k : ℕ) :
     (memK (n := n) (m := m) k 0).val = k % m ∧
@@ -116,7 +116,7 @@ theorem alg_not_correctUpTo_succ [Nonempty P] (n m : ℕ) [NeZero m] (hn : 1 ≤
     simp [respOf, respsOf_seqL, hj]
   have hc : ∀ j < n * m + 1, Completed (seqL (n := n) (m := m) p (n * m + 1)) (p, j) := by
     intro j hj; simp [Completed, respsOf_seqL, hj]
-  apply h (seqL (n := n) (m := m) p (n * m + 1)) ⟨_, run_seqL p _⟩ (by rw [invCount_seqL])
+  apply h (seqL (n := n) (m := m) p (n * m + 1)) ⟨_, run_seqL p _⟩ (by rw [numInv_seqL])
     (p, 0) (p, n * m) (hc 0 (by omega)) (hc _ (by omega)) (by simp; omega)
   rw [hresp 0 (by omega), hresp _ (by omega), val_memK hnm, val_memK hnm]
   have hcount : Nat.count (fun s => s % n = 0) (n * m) = m := by

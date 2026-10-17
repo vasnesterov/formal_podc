@@ -1,5 +1,6 @@
 import Papers.PODC2025.UniqueIDsBoundedRegisters.AlgInv
 import Cslib.Computability.Distributed.SharedMemory.History
+import Cslib.Computability.Distributed.SharedMemory.LinPoints
 
 /-!
 # Algorithms 1 and 2: correctness for at most `n · m` calls (Theorem 3.1)
@@ -23,35 +24,6 @@ namespace Cslib.SharedMemory.UniqueIDs
 open Cslib.SharedMemory
 
 variable {P : Type} [DecidableEq P]
-
-/-! ### Responses after one more label -/
-
-lemma respOf_append_ret (α : List (Label P uidObj)) (p : P) (r : ℕ) (x : OpId P) :
-    respOf (α ++ [.ret p r]) x =
-      if x.1 = p ∧ x.2 = (respsOf α p).length then some r else respOf α x := by
-  obtain ⟨q, k⟩ := x
-  simp only [respOf, respsOf_append, respsOf_cons, Label.retOf_ret, respsOf_nil,
-    List.append_nil]
-  by_cases hq : q = p
-  · subst hq
-    simp only [ite_true, Option.toList_some, true_and]
-    rw [List.getElem?_append]
-    split_ifs with h1 h2 h2
-    · omega
-    · rfl
-    · subst h2; simp
-    · rw [List.getElem?_singleton, ite_eq_right (by omega), List.getElem?_eq_none (by omega)]
-  · simp [hq, Ne.symm hq]
-
-lemma completed_iff_respOf (α : List (Label P uidObj)) (x : OpId P) :
-    Completed α x ↔ ∃ v, respOf α x = some v := by
-  simp only [Completed, respOf]
-  constructor
-  · intro h; exact ⟨_, List.getElem?_eq_getElem h⟩
-  · rintro ⟨v, hv⟩
-    by_contra h
-    rw [List.getElem?_eq_none (by omega)] at hv
-    cases hv
 
 /-! ### Identifiers are in `[0, n · m)` -/
 
@@ -156,9 +128,9 @@ variable {n d m : ℕ} [NeZero m] {α : List (Label P uidObj)} {C C' : ACfg P n 
 
 lemma Inv2.step (hnd : n ≤ d) (hI : Inv1 n d m α C g) (hJ : Inv2 n d m α C g)
     {ℓ : Label P uidObj} (hs : (alg (P := P) n d m).step C ℓ = some C')
-    (hN : invCount (α ++ [ℓ]) ≤ n * m) :
+    (hN : numInv (α ++ [ℓ]) ≤ n * m) :
     Inv2 n d m (α ++ [ℓ]) C' (gstep n d g C ℓ) := by
-  have hN' : invCount α ≤ n * m := by simp at hN; omega
+  have hN' : numInv α ≤ n * m := by simp at hN; omega
   cases ℓ with
   | inv p o =>
     obtain ⟨-, -, hloc, -⟩ := alg_step_inv hs
@@ -183,7 +155,7 @@ lemma Inv2.step (hnd : n ≤ d) (hI : Inv1 n d m α C g) (hJ : Inv2 n d m α C g
     · intro x y v hx hy
       rw [respOf_append_ret] at hx hy
       split_ifs at hx hy with h1 h2 h2
-      · exact Prod.ext (h1.1.trans h2.1.symm) (h1.2.trans h2.2.symm)
+      · exact h1.trans h2.symm
       · cases hx; exact absurd hy (hJ.doneResp p r y hlp)
       · cases hy; exact absurd hx (hJ.doneResp p r x hlp)
       · exact hJ.uniq x y v hx hy
@@ -283,7 +255,7 @@ end Inv2Step
 
 theorem inv2_of_run {n d m : ℕ} [NeZero m] (hnd : n ≤ d) (hdm : d ∣ m)
     {α : List (Label P uidObj)} {C : ACfg P n m} (h : (alg (P := P) n d m).run α = some C)
-    (hN : invCount α ≤ n * m) : Inv2 n d m α C (ghostOf n d m α) := by
+    (hN : numInv α ≤ n * m) : Inv2 n d m α C (ghostOf n d m α) := by
   induction α using List.reverseRecOn generalizing C with
   | nil =>
     simp only [Impl.run, Impl.runFrom_nil, Option.some.injEq] at h
@@ -293,7 +265,7 @@ theorem inv2_of_run {n d m : ℕ} [NeZero m] (hnd : n ≤ d) (hdm : d ∣ m)
   | append_singleton α ℓ ih =>
     obtain ⟨C₀, h₀, hs⟩ := alg_run_append_singleton h
     rw [ghostOf_append h₀ hs]
-    have hN' : invCount α ≤ n * m := by simp at hN; omega
+    have hN' : numInv α ≤ n * m := by simp at hN; omega
     exact (ih h₀ hN').step hnd (inv1_of_run hdm h₀) hs hN
 
 /-- **Theorem 3.1** (Algorithms 1 and 2): if `n ≤ d` and `d ∣ m`, the algorithm with `n + 1`
@@ -303,7 +275,7 @@ theorem alg_correct (n d m : ℕ) [NeZero m] (hnd : n ≤ d) (hdm : d ∣ m) :
     CorrectUpTo (alg (P := P) n d m) (n * m) := by
   intro α hα hN x y hx hy hxy he
   obtain ⟨C, hC⟩ := hα
-  obtain ⟨v, hv⟩ := (completed_iff_respOf α x).1 hx
+  obtain ⟨v, hv⟩ := Option.isSome_iff_exists.1 (completed_iff_respOf.1 hx)
   exact hxy ((inv2_of_run hnd hdm hC hN).uniq x y v hv (he ▸ hv))
 
 end Cslib.SharedMemory.UniqueIDs

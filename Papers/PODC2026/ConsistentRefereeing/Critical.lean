@@ -62,7 +62,7 @@ theorem exists_crit [Fintype P] (hlf : I.LockFreeOn (Adm ref)) (hsl : I.StrongLi
     split_ifs at hnone with h1 h2
     obtain ⟨w₁, w₂, hne, hw₁, hw₂⟩ := hM
     exact hne (val_subsingleton I ref hsl ⟨C, hC⟩ hA hc
-      (respsOf_ne_nil_of_done I hC h2 h1) hw₁ hw₂)
+      (Impl.respsOf_ne_nil_of_idle hC h2 h1) hw₁ hw₂)
   have : Nonempty (Label P (contestObj P)) := ⟨.tau c₁⟩
   have : Nonempty P := ⟨c₁⟩
   choose! lbl hlbl using hnx
