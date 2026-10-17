@@ -127,5 +127,6 @@ deterministic transitions, so the randomized BFW protocol does not fit it; the d
 protocols of the remark on randomness (`DetProtocol`) are stone-age algorithms run under the
 synchronous schedule (`DetProtocol.toStoneAge`, `DetProtocol.run_succ`).
 
-CSLib candidate: `Coins.lean`. It provides i.i.d. coin fields, `Determined` events, independence
-of events on disjoint coin sets, and partition along fibres.
+The i.i.d. coin fields (`coinMeasure`), `Determined` events, independence of events on disjoint coin
+sets, and partition along fibres are shared code staged for CSLib in `Podc/Probability/CoinField.lean`
+(namespace `Cslib.Probability`).

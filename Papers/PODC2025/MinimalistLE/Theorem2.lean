@@ -13,7 +13,7 @@ the pair chain stays in the strip, which has probability `≤ 1/2` (`Window.lean
 
 set_option linter.unusedSectionVars false
 
-open MeasureTheory ProbabilityTheory unitInterval
+open MeasureTheory ProbabilityTheory unitInterval Cslib.Probability
 
 namespace MinimalistLE
 
@@ -66,7 +66,7 @@ noncomputable def T2 (p : ℝ) (D : ℕ) : ℕ :=
 
 theorem alive_half (p : I) (hp0 : 0 < (p : ℝ)) (hp1 : (p : ℝ) < 1) {t : ℕ} {u v : V} (huv : u ≠ v)
     {D : ℕ} {y0 : PS} (hy0 : |y0.2.2| ≤ D) :
-    (coinP p).real (Alive t u v y0 D (T2 p D)) ≤ 1 / 2 := by
+    (coinMeasure p).real (Alive t u v y0 D (T2 p D)) ≤ 1 / 2 := by
   have hb := alive_bound (t := t) p hp0 hp1 huv hy0 (T2 p D)
   have hl := lyap_le hp0 hp1 D y0
   have h1 : 0 < 1 - (p : ℝ) := by linarith
@@ -75,8 +75,8 @@ theorem alive_half (p : I) (hp0 : 0 < (p : ℝ)) (hp1 : (p : ℝ) < 1) {t : ℕ}
   have hT : 2 * G ≤ (T2 p D : ℝ) := by
     refine le_trans (le_of_eq ?_) (Nat.le_ceil _)
     simp only [G]; field_simp; ring
-  have hP := measureReal_nonneg (μ := coinP p) (s := Alive t u v y0 D (T2 p D))
-  have : (T2 p D : ℝ) * (coinP p).real (Alive t u v y0 D (T2 p D)) ≤ G := hb.trans hl
+  have hP := measureReal_nonneg (μ := coinMeasure p) (s := Alive t u v y0 D (T2 p D))
+  have : (T2 p D : ℝ) * (coinMeasure p).real (Alive t u v y0 D (T2 p D)) ≤ G := hb.trans hl
   by_contra hc
   push Not at hc
   nlinarith
@@ -96,7 +96,7 @@ theorem disjoint_past_wc (t T : ℕ) (u v : V) : Disjoint (past (V := V) t) (wc 
 theorem both_step2 (hconn : G.Connected) (hW : ∀ v, (init v).phase = .W) (p : I)
     (hp0 : 0 < (p : ℝ)) (hp1 : (p : ℝ) < 1) {D : ℕ} (hD : ∀ a b, G.dist a b ≤ D) {u v : V}
     (huv : u ≠ v) (t : ℕ) :
-    (coinP p).real (Both G init (t + T2 p D) u v) ≤ 1 / 2 * (coinP p).real (Both G init t u v) := by
+    (coinMeasure p).real (Both G init (t + T2 p D) u v) ≤ 1 / 2 * (coinMeasure p).real (Both G init t u v) := by
   classical
   set A := Both G init t u v
   have hA : Determined A (past t) := determined_both t u v
@@ -118,30 +118,30 @@ theorem both_step2 (hconn : G.Connected) (hW : ∀ v, (init v).phase = .W) (p : 
     have := lemma11 (c := field ω) hconn hW u v (t + i)
     have := hD u v
     simp only [obs]; omega
-  calc (coinP p).real (Both G init (t + T2 p D) u v)
-      ≤ ∑ y ∈ Ys D, (coinP p).real ((A ∩ {ω | obs G init ω t u v = y}) ∩ Alive t u v y D (T2 p D)) :=
+  calc (coinMeasure p).real (Both G init (t + T2 p D) u v)
+      ≤ ∑ y ∈ Ys D, (coinMeasure p).real ((A ∩ {ω | obs G init ω t u v = y}) ∩ Alive t u v y D (T2 p D)) :=
         (measureReal_mono hsub (measure_ne_top _ _)).trans (measureReal_biUnion_finset_le _ _)
-    _ = ∑ y ∈ Ys D, (coinP p).real (A ∩ {ω | obs G init ω t u v = y}) *
-          (coinP p).real (Alive t u v y D (T2 p D)) := by
+    _ = ∑ y ∈ Ys D, (coinMeasure p).real (A ∩ {ω | obs G init ω t u v = y}) *
+          (coinMeasure p).real (Alive t u v y D (T2 p D)) := by
         refine Finset.sum_congr rfl fun y _ => ?_
-        rw [coinP_real_inter p ((hA.inter (determined_obs t u v y)).mono (by simp))
+        rw [coinMeasure_real_inter p ((hA.inter (determined_obs t u v y)).mono (by simp))
           (determined_alive (T2 p D)) (disjoint_past_wc t (T2 p D) u v)]
-    _ ≤ ∑ y ∈ Ys D, (coinP p).real (A ∩ {ω | obs G init ω t u v = y}) * (1 / 2) := by
+    _ ≤ ∑ y ∈ Ys D, (coinMeasure p).real (A ∩ {ω | obs G init ω t u v = y}) * (1 / 2) := by
         refine Finset.sum_le_sum fun y hy => ?_
         exact mul_le_mul_of_nonneg_left (alive_half p hp0 hp1 huv (mem_Ys.1 hy)) measureReal_nonneg
-    _ = 1 / 2 * (coinP p).real A := by
-        rw [← Finset.sum_mul, ← coinP_real_partition p hA _ (determined_obs t u v) _ hobs_mem,
+    _ = 1 / 2 * (coinMeasure p).real A := by
+        rw [← Finset.sum_mul, ← coinMeasure_real_partition p hA _ (determined_obs t u v) _ hobs_mem,
           mul_comm]
 
 theorem both_le2 (hconn : G.Connected) (hW : ∀ v, (init v).phase = .W) (p : I)
     (hp0 : 0 < (p : ℝ)) (hp1 : (p : ℝ) < 1) {D : ℕ} (hD : ∀ a b, G.dist a b ≤ D) {u v : V}
     (huv : u ≠ v) (k : ℕ) :
-    (coinP p).real (Both G init (k * T2 p D) u v) ≤ (1 / 2) ^ k := by
+    (coinMeasure p).real (Both G init (k * T2 p D) u v) ≤ (1 / 2) ^ k := by
   induction k with
   | zero => simp
   | succ k ih =>
     rw [add_mul, one_mul, pow_succ]
-    calc _ ≤ 1 / 2 * (coinP p).real (Both G init (k * T2 p D) u v) :=
+    calc _ ≤ 1 / 2 * (coinMeasure p).real (Both G init (k * T2 p D) u v) :=
           both_step2 hconn hW p hp0 hp1 hD huv _
       _ ≤ 1 / 2 * (1 / 2) ^ k := by gcongr
       _ = _ := by ring
@@ -151,7 +151,7 @@ theorem both_le2 (hconn : G.Connected) (hW : ∀ v, (init v).phase = .W) (p : I)
 `T₂(p,D) = ⌈(D+2)²(1+2p)³/(p(1−p)) + 4⌉ = O(D²)`. -/
 theorem theorem2_time (hconn : G.Connected) (hI : GoodInit init) (p : I) (hp0 : 0 < (p : ℝ))
     (hp1 : (p : ℝ) < 1) {D : ℕ} (hD : ∀ a b, G.dist a b ≤ D) (k : ℕ) :
-    (coinP p).real {ω | ¬ UniqueFrom G init (k * T2 p D) ω} ≤
+    (coinMeasure p).real {ω | ¬ UniqueFrom G init (k * T2 p D) ω} ≤
       (Fintype.card V : ℝ) ^ 2 * (1 / 2) ^ k := by
   classical
   have hsub : {ω | ¬ UniqueFrom G init (k * T2 p D) ω} ⊆
@@ -164,7 +164,7 @@ theorem theorem2_time (hconn : G.Connected) (hI : GoodInit init) (p : I) (hp0 : 
     have := hn (a, b)
     simp only [hab, ↓reduceIte] at this
     exact this ⟨ha, hb⟩
-  calc _ ≤ ∑ x : V × V, (coinP p).real
+  calc _ ≤ ∑ x : V × V, (coinMeasure p).real
         (if x.1 = x.2 then ∅ else Both G init (k * T2 p D) x.1 x.2) :=
         (measureReal_mono hsub).trans (measureReal_iUnion_fintype_le _)
     _ ≤ ∑ _x : V × V, ((1 : ℝ) / 2) ^ k := by
@@ -178,7 +178,7 @@ theorem theorem2_time (hconn : G.Connected) (hI : GoodInit init) (p : I) (hp0 : 
 leader is elected by round `⌈6 ln n⌉ · T₂(p, D)`, i.e. within `O(D² log n)` rounds. -/
 theorem theorem2_whp (hconn : G.Connected) (hI : GoodInit init) (p : I) (hp0 : 0 < (p : ℝ))
     (hp1 : (p : ℝ) < 1) {D : ℕ} (hD : ∀ a b, G.dist a b ≤ D) :
-    (coinP p).real
+    (coinMeasure p).real
         {ω | ¬ UniqueFrom G init (⌈6 * Real.log (Fintype.card V)⌉₊ * T2 p D) ω} ≤
       1 / (Fintype.card V : ℝ) ^ 2 := by
   set n : ℝ := (Fintype.card V : ℝ)

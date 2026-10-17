@@ -18,7 +18,7 @@ import Cslib.Computability.Distributed.SelfStabilization.StoneAge
 
 set_option linter.unusedSectionVars false
 
-open MeasureTheory unitInterval
+open MeasureTheory unitInterval Cslib.Probability
 
 namespace MinimalistLE
 
@@ -122,7 +122,7 @@ theorem triangle_no_leader (c : ℕ → Fin 3 → Bool) (t : ℕ) (ht : 3 ≤ t)
 
 /-- Non-vacuity of Theorem 2: the triangle with `p = 1/2` from the paper's initial configuration. -/
 theorem theorem2_ae_example :
-    ∀ᵐ ω ∂(coinP (ι := ℕ × Fin 3) ⟨1 / 2, by norm_num, by norm_num⟩),
+    ∀ᵐ ω ∂(coinMeasure (ι := ℕ × Fin 3) ⟨1 / 2, by norm_num, by norm_num⟩),
       ∃ T, UniqueFrom K3 initAll T ω :=
   theorem2_ae SimpleGraph.connected_top goodInit_initAll _ (by norm_num) (by norm_num)
 

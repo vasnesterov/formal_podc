@@ -1,4 +1,5 @@
 import Papers.PODC2011.FaultTolerantSpanners.TwoSpanner.Defs
+import Podc.Probability.Chernoff
 
 /-!
 # Probabilistic analysis of the rounding (Theorem 3.3 of Dinitz–Krauthgamer, PODC'11)
@@ -18,8 +19,9 @@ Main results (all constants explicit):
 * `rounding_success_log`: with `α = 12 ln n` (`n = |V| ≥ 2`) the success probability is at least
   `2/3 - 1/n` and the cost bound is `72 ln n · LP`.
 
-The lower-tail bound is a multiplicative Chernoff bound proved from scratch via the product formula
-for `E[2^{-X}]` (`chernoff_count`).
+The lower-tail bound `chernoff_count` is the shared multiplicative Chernoff bound
+`Cslib.Probability.measureReal_card_filter_le_le` (`Podc/Probability/Chernoff.lean`), proved via the
+product formula for `E[2^{-X}]`.
 -/
 
 open Finset MeasureTheory ProbabilityTheory
@@ -77,71 +79,16 @@ lemma ae_thresholds_mem :
 /-- **Multiplicative Chernoff lower tail** for independent threshold indicators: if `0 ≤ a_z ≤ 1`
 on `s`, the number of `z ∈ s` with `T_z ≤ a_z` (a sum of independent Bernoulli(`a_z`) variables,
 with mean `∑ a_z`) is at most `K` with probability at most `2^K · exp(-(∑_{z ∈ s} a_z) / 2)`.
-(Proof: Markov's inequality for `2^{-X}` and `E[2^{-X}] = ∏ (1 - a_z/2) ≤ exp(-∑ a_z / 2)`.) -/
--- CSLib candidate
+This is the shared `Cslib.Probability.measureReal_card_filter_le_le` for the events
+`T_z ∈ (-∞, a_z]`. -/
 lemma chernoff_count (s : Finset V) (a : V → ℝ) (ha0 : ∀ z ∈ s, 0 ≤ a z)
     (ha1 : ∀ z ∈ s, a z ≤ 1) (K : ℕ) :
     (thresholdMeasure V).real {T | #(s.filter fun z => T z ≤ a z) ≤ K} ≤
       2 ^ K * Real.exp (-(∑ z ∈ s, a z) / 2) := by
-  classical
-  set g : V → ℝ → ℝ := fun z t => if z ∈ s then (if t ≤ a z then 1 / 2 else 1) else 1 with hg
-  set F : (V → ℝ) → ℝ := fun T => ∏ z, g z (T z) with hFdef
-  have hF : ∀ T, F T = (1 / 2 : ℝ) ^ #(s.filter fun z => T z ≤ a z) := by
-    intro T
-    simp only [hFdef, hg]
-    rw [Finset.prod_ite_mem, Finset.univ_inter, Finset.prod_ite, Finset.prod_const,
-      Finset.prod_const_one, mul_one]
-  have hgm : ∀ z, Measurable (g z) := by
-    intro z
-    simp only [hg]
-    split_ifs
-    · exact Measurable.ite measurableSet_Iic measurable_const measurable_const
-    · exact measurable_const
-  have hFm : Measurable F :=
-    Finset.measurable_prod _ fun z _ => (hgm z).comp (measurable_pi_apply z)
-  have hF0 : ∀ T, 0 ≤ F T := fun T => by rw [hF]; positivity
-  have hF1 : ∀ T, F T ≤ 1 := fun T => by rw [hF]; exact pow_le_one₀ (by norm_num) (by norm_num)
-  have hFi : Integrable F (thresholdMeasure V) :=
-    Integrable.of_bound hFm.aestronglyMeasurable 1
-      (Filter.Eventually.of_forall fun T => by
-        rw [Real.norm_eq_abs, abs_of_nonneg (hF0 T)]; exact hF1 T)
-  have hgz : ∀ z ∈ s, ∫ t, g z t ∂unifI = 1 - a z / 2 := by
-    intro z hz
-    have : g z = fun t => 1 - (1 / 2 : ℝ) * (Set.Iic (a z)).indicator 1 t := by
-      funext t
-      simp only [hg, hz, ite_true, Set.indicator, Set.mem_Iic, Pi.one_apply]
-      split_ifs <;> norm_num
-    rw [this, integral_sub (integrable_const _) ((integrable_const _).indicator measurableSet_Iic
-      |>.const_mul _), integral_const, integral_const_mul, integral_indicator_one measurableSet_Iic,
-      unifI_Iic (ha0 z hz) (ha1 z hz)]
-    simp; ring
-  have hint : ∫ T, F T ∂(thresholdMeasure V) ≤ Real.exp (-(∑ z ∈ s, a z) / 2) := by
-    simp only [hFdef, thresholdMeasure]
-    rw [integral_fintype_prod_eq_prod g]
-    have : ∀ z, ∫ t, g z t ∂unifI = if z ∈ s then 1 - a z / 2 else 1 := by
-      intro z
-      split_ifs with hz
-      · exact hgz z hz
-      · simp [hg, hz]
-    simp_rw [this]
-    rw [Finset.prod_ite_mem, Finset.univ_inter, neg_div, Finset.sum_div, ← Finset.sum_neg_distrib,
-      Real.exp_sum]
-    refine Finset.prod_le_prod₀ (fun z hz => by linarith [ha1 z hz]) fun z hz => ?_
-    have := Real.add_one_le_exp (-(a z / 2))
-    linarith
-  have hsub : {T | #(s.filter fun z => T z ≤ a z) ≤ K} ⊆ {T | (1 / 2 : ℝ) ^ K ≤ F T} := by
-    intro T hT
-    simp only [Set.mem_ofPred_eq] at hT ⊢
-    rw [hF]
-    exact pow_le_pow_of_le_one (by norm_num) (by norm_num) hT
-  have hmk := mul_meas_ge_le_integral_of_nonneg (Filter.Eventually.of_forall hF0) hFi
-    ((1 / 2 : ℝ) ^ K)
-  have h2 : (0 : ℝ) < (1 / 2) ^ K := by positivity
-  calc (thresholdMeasure V).real {T | #(s.filter fun z => T z ≤ a z) ≤ K}
-      ≤ (thresholdMeasure V).real {T | (1 / 2 : ℝ) ^ K ≤ F T} := measureReal_mono hsub
-    _ = 2 ^ K * ((1 / 2 : ℝ) ^ K * (thresholdMeasure V).real {T | (1 / 2 : ℝ) ^ K ≤ F T}) := by
-        rw [← mul_assoc, ← mul_pow]; norm_num
-    _ ≤ 2 ^ K * Real.exp (-(∑ z ∈ s, a z) / 2) := by gcongr; exact hmk.trans hint
+  have h := Cslib.Probability.measureReal_card_filter_le_le (fun _ : V => unifI)
+    (A := fun z => Set.Iic (a z)) (fun _ => measurableSet_Iic) s K
+  rw [Finset.sum_congr rfl fun z hz => unifI_Iic (ha0 z hz) (ha1 z hz)] at h
+  exact h
 
 /-! ### Per-arc analysis -/
 

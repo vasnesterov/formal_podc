@@ -103,7 +103,7 @@ theorem out_computable (hview : Computable fun p : Net × ℕ × ℕ => M.view p
     {A : Alg View Out} (hA : Computable₂ A) :
     Computable fun q : Net × ℕ × ℕ => M.out A q.1 q.2.1 q.2.2 := by
   unfold out
-  refine computable_list_findSome? (Primrec.list_range.to_comp.comp (succ.comp (snd.comp snd))) ?_
+  refine Computable.list_findSome? (Primrec.list_range.to_comp.comp (succ.comp (snd.comp snd))) ?_
   exact (hA.comp (hview.comp (pair (fst.comp fst) (pair (fst.comp (snd.comp fst)) snd))) snd).to₂
 
 /-- **Lemma 4.17** (abstract form). If a *computable* algorithm `A` solves `P` with locality `T`,
@@ -135,7 +135,7 @@ theorem exists_far_of_computable {P : M.Problem Out} (F : M.SepFamily P)
     · exact Nat.lt_succ_of_le ((F.le_depth x r).trans hdr)
     · simp [hdr, hrs]
   have hgoodK : Computable₂ goodK := by
-    refine Computable₂.mk ((computable_list_any (f := fun a : Code × ℕ => List.range (a.2 + 1))
+    refine Computable₂.mk ((Computable.list_any (f := fun a : Code × ℕ => List.range (a.2 + 1))
       (p := fun a r => decide (F.depth a.1 r ≤ a.2) &&
         (A (M.view (F.inst a.1 a.2) (F.node a.1 a.2) r) r).isSome)
       (Primrec.list_range.to_comp.comp (succ.comp snd)) ?_).of_eq fun a => rfl)
@@ -150,7 +150,7 @@ theorem exists_far_of_computable {P : M.Problem Out} (F : M.SepFamily P)
       Primrec.option_isSome.to_comp.comp (hA.comp hv snd)
     exact (Primrec.and.to_comp.comp h1 h2).to₂
   let Kx : Code → ℕ := fun x => Nat.find (hex x)
-  have hKx : Computable Kx := computable_nat_find hgoodK hex
+  have hKx : Computable Kx := Computable.nat_find hgoodK hex
   -- the predictor: the bit output by `A` at the node of `G_{Kx x}(x)`
   let h : Code → Bool := fun x =>
     ((M.out A (F.inst x (Kx x)) (F.node x (Kx x)) (Kx x)).map F.bit).getD false

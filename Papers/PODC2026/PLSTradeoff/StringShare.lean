@@ -40,6 +40,8 @@ that whenever all nodes accept, they all output the same string.
 
 namespace PLSTradeoff
 
+open Cslib.BitEncoding
+
 open SimpleGraph
 open Cslib.Local (GAgree loc mask loc_le gAgree_loc edist_le_edist_loc mask_of_le
   loc_edist_le_iff loc_adj_iff)
@@ -400,7 +402,7 @@ lemma dec_shareLabel {G : SimpleGraph V} {r s : ℕ} {𝒞 : Set (Set V)} (h : I
     have hwC := mem_sortedL.1 hw
     have hwZ : w ∈ ⋃₀ 𝒞 := Set.mem_sUnion_of_mem hwC hC
     simp [shareLabel, hwZ, h.zball_eq hC hwC]
-  rw [hmap, map_idxOf_eq _ (nodup_sortedL C), length_sortedL,
+  rw [hmap, (nodup_sortedL C).map_idxOf _, length_sortedL,
     flatten_chunks _ ((Set.ncard_pos (Set.toFinite _)).2 ⟨u, hu⟩)]
 
 lemma shareProv_eq {G : SimpleGraph V} (hG : G.Connected) {r : ℕ} (hr : 0 < r) (S : List Bool) :

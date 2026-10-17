@@ -3,12 +3,13 @@ Copyright (c) 2026. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 import Papers.PODC2020.RedundantOptimization.Basic
+import Podc.Foundations.Analysis.Convex.FirstOrder
 
 /-!
 # Convex differentiable cost functions
 
-* `ConvexOn.add_fderiv_le` — the first-order characterization of convexity
-  `q x + q'(x)(y - x) ≤ q y` for a convex function differentiable at `x`;
+* the first-order characterization of convexity `q x + q'(x)(y - x) ≤ q y` is the shared
+  `ConvexOn.add_fderiv_le` (`Podc/Foundations/Analysis/Convex/FirstOrder.lean`);
 * `mem_argmin_iff_of_hasFDerivAt` — for convex differentiable functions, minimum points are exactly
   the critical points (used throughout the paper as "`w ∈ arg min Q` iff `∇Q(w) = 0`");
 * `partI` — Part I of the proof of Theorem 1: a point that minimizes the aggregate of *every* set of
@@ -20,28 +21,6 @@ open Finset
 namespace RedundantOptimization
 
 variable {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
-
-/-- First-order condition for convex functions: the tangent hyperplane lies below the graph.
--- CSLib candidate (general convex analysis; not in Mathlib in this form). -/
-theorem ConvexOn.add_fderiv_le {q : E → ℝ} (hq : ConvexOn ℝ Set.univ q) {D : E →L[ℝ] ℝ} {x : E}
-    (hD : HasFDerivAt q D x) (y : E) : q x + D (y - x) ≤ q y := by
-  set φ : ℝ → ℝ := fun t => q (x + t • (y - x)) with hφdef
-  have hφ : ConvexOn ℝ Set.univ φ := by
-    let g : ℝ →ᵃ[ℝ] E := AffineMap.lineMap x y
-    have h := hq.comp_affineMap g
-    simp only [Set.preimage_univ] at h
-    convert h using 1
-    funext t
-    simp [φ, g, AffineMap.lineMap_apply, add_comm]
-  have hline : HasDerivAt (fun t : ℝ => x + t • (y - x)) (y - x) 0 := by
-    simpa using ((hasDerivAt_id (0 : ℝ)).smul_const (y - x)).const_add x
-  have hD' : HasFDerivAt q D (x + (0 : ℝ) • (y - x)) := by simpa using hD
-  have hd : HasDerivAt φ (D (y - x)) 0 := hD'.comp_hasDerivAt (0 : ℝ) hline
-  have := hφ.le_slope_of_hasDerivAt (Set.mem_univ 0) (Set.mem_univ 1) zero_lt_one hd
-  simp only [slope, φ, sub_zero, inv_one, one_smul, zero_smul, add_zero, vsub_eq_sub] at this
-  have h1 : x + (y - x) = y := by abel
-  rw [h1] at this
-  linarith
 
 /-- A critical point of a convex function is a global minimum point. -/
 lemma mem_argmin_of_hasFDerivAt_zero {q : E → ℝ} (hq : ConvexOn ℝ Set.univ q) {x : E}

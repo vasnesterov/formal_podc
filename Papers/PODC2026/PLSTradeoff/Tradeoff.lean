@@ -1,5 +1,5 @@
 import Papers.PODC2026.PLSTradeoff.TSPartition
-import Papers.PODC2026.PLSTradeoff.Encoding
+import Podc.Foundations.Data.List.BitEncoding
 
 /-!
 # TS partitions imply a tradeoff (Lemma 3.2)
@@ -21,6 +21,8 @@ Lemma 3.5 (`sound_of_good`) is the combinatorial core of soundness.
 -/
 
 namespace PLSTradeoff
+
+open Cslib.BitEncoding
 
 open SimpleGraph
 open Cslib.Local (GAgree loc mask loc_le gAgree_loc edist_le_edist_loc mask_of_le
@@ -103,7 +105,7 @@ lemma decodeX_eq {clu : V → Set V} {xs : Set V} {PP : V → Label} {C X : Set 
         ((sortedL C).idxOf y)) :=
     List.map_congr_left (fun y hy => hPP y (mem_sortedL.1 hy))
   have hpos : 0 < C.ncard := (Set.ncard_pos (Set.toFinite _)).2 ⟨u, hu⟩
-  rw [hmap, map_idxOf_eq _ (nodup_sortedL C), length_sortedL,
+  rw [hmap, (nodup_sortedL C).map_idxOf _, length_sortedL,
     flatten_chunks _ hpos, xEnc, decList_encList]
   have hlt : (sortedL (C ∩ X)).idxOf u < (sortedL (C ∩ X)).length :=
     List.idxOf_lt_length_iff.2 (mem_sortedL.2 ⟨hu, huX⟩)

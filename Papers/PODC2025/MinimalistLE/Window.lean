@@ -1,5 +1,5 @@
 import Papers.PODC2025.MinimalistLE.PairChain
-import Papers.PODC2025.MinimalistLE.Coins
+import Podc.Probability.CoinField
 
 /-!
 # The pair chain leaves the strip `|Δ| ≤ D` within `O(D²)` steps with probability `≥ 1/2`
@@ -13,7 +13,7 @@ Berry–Esseen) of the paper.
 
 set_option linter.unusedSectionVars false
 
-open MeasureTheory unitInterval
+open MeasureTheory unitInterval Cslib.Probability
 
 namespace MinimalistLE
 
@@ -99,18 +99,18 @@ theorem disjoint_wc (j : ℕ) :
   rcases hi with ⟨a, ha, rfl⟩ | ⟨a, ha, rfl⟩ <;> rcases hi' with h | h <;>
     simp only [Prod.mk.injEq] at h <;> omega
 
-theorem coinP_stepCoins (p : I) (huv : u ≠ v) (j : ℕ) (bu bv : Bool) :
-    (coinP p).real (stepCoins t u v j bu bv) = wt p bu * wt p bv := by
-  rw [stepCoins, coinP_real_inter p (determined_coord _ _) (determined_coord _ _),
-    coinP_real_coord, coinP_real_coord]
+theorem coinMeasure_stepCoins (p : I) (huv : u ≠ v) (j : ℕ) (bu bv : Bool) :
+    (coinMeasure p).real (stepCoins t u v j bu bv) = wt p bu * wt p bv := by
+  rw [stepCoins, coinMeasure_real_inter p (determined_coord _ _) (determined_coord _ _),
+    coinMeasure_real_coord, coinMeasure_real_coord]
   · simp [wt]
   · simp [huv]
 
 theorem aliveAt_stepCoins (p : I) (huv : u ≠ v) (j : ℕ) (y : PS) (bu bv : Bool) :
-    (coinP p).real (AliveAt t u v y0 D j y ∩ stepCoins t u v j bu bv) =
-      (coinP p).real (AliveAt t u v y0 D j y) * (wt p bu * wt p bv) := by
-  rw [coinP_real_inter p (determined_aliveAt j y) (determined_stepCoins j bu bv) (disjoint_wc j),
-    coinP_stepCoins p huv]
+    (coinMeasure p).real (AliveAt t u v y0 D j y ∩ stepCoins t u v j bu bv) =
+      (coinMeasure p).real (AliveAt t u v y0 D j y) * (wt p bu * wt p bv) := by
+  rw [coinMeasure_real_inter p (determined_aliveAt j y) (determined_stepCoins j bu bv) (disjoint_wc j),
+    coinMeasure_stepCoins p huv]
 
 theorem alive_succ {ω : ℕ × V → Bool} {j : ℕ} :
     ω ∈ Alive t u v y0 D (j + 1) ↔ ω ∈ Alive t u v y0 D j ∧
@@ -128,15 +128,15 @@ theorem pchain_mem_Ys {ω : ℕ × V → Bool} {j : ℕ} (h : ω ∈ Alive t u v
 
 /-- Probability of being alive at `j` is the sum over the strip. -/
 theorem alive_eq_sum (p : I) (j : ℕ) :
-    (coinP p).real (Alive t u v y0 D j) =
-      ∑ y ∈ Ys D, (coinP p).real (AliveAt t u v y0 D j y) :=
-  coinP_real_partition p (determined_alive j) _ (determined_pchain j) _ fun _ h => pchain_mem_Ys h
+    (coinMeasure p).real (Alive t u v y0 D j) =
+      ∑ y ∈ Ys D, (coinMeasure p).real (AliveAt t u v y0 D j y) :=
+  coinMeasure_real_partition p (determined_alive j) _ (determined_pchain j) _ fun _ h => pchain_mem_Ys h
 
 /-- One step of the chain (Chapman–Kolmogorov), for a target `y'` in the strip. -/
 theorem aliveAt_succ (p : I) (huv : u ≠ v) (j : ℕ) (y' : PS) (hy' : y' ∈ Ys D) :
-    (coinP p).real (AliveAt t u v y0 D (j + 1) y') =
+    (coinMeasure p).real (AliveAt t u v y0 D (j + 1) y') =
       ∑ y ∈ Ys D, ∑ bu : Bool, ∑ bv : Bool, if pstep y bu bv = y' then
-        (coinP p).real (AliveAt t u v y0 D j y) * (wt p bu * wt p bv) else 0 := by
+        (coinMeasure p).real (AliveAt t u v y0 D j y) * (wt p bu * wt p bv) else 0 := by
   classical
   let F : (ℕ × V → Bool) → PS × Bool × Bool := fun ω =>
     (pchain t u v y0 ω j, ω (t + j, u), ω (t + j, v))
@@ -146,7 +146,7 @@ theorem aliveAt_succ (p : I) (huv : u ≠ v) (j : ℕ) (y' : PS) (hy' : y' ∈ Y
     rw [pchain_congr (fun i hi => h i (wc_mono (Nat.le_succ j) hi)) j le_rfl,
       h _ (coin_mem_wc_u (Nat.lt_succ_self j)), h _ (coin_mem_wc_v (Nat.lt_succ_self j))]
   have hA : Determined (AliveAt t u v y0 D (j + 1) y') (wc t u v (j + 1)) := determined_aliveAt _ _
-  rw [coinP_real_partition p hA F hF (Ys D ×ˢ (Finset.univ ×ˢ Finset.univ))]
+  rw [coinMeasure_real_partition p hA F hF (Ys D ×ˢ (Finset.univ ×ˢ Finset.univ))]
   · rw [Finset.sum_product]
     refine Finset.sum_congr rfl fun y _ => ?_
     rw [Finset.sum_product]
@@ -163,7 +163,7 @@ theorem aliveAt_succ (p : I) (huv : u ≠ v) (j : ℕ) (y' : PS) (hy' : y' ∈ Y
         have hstep : pchain t u v y0 ω (j + 1) = y' := by
           simp only [pchain]; rw [h2, h3, h4, hst]
         exact ⟨⟨alive_succ.2 ⟨h1, by rw [hstep]; exact mem_Ys.1 hy'⟩, hstep⟩, h2, h3, h4⟩
-    · convert measureReal_empty (μ := coinP p)
+    · convert measureReal_empty (μ := coinMeasure p)
       ext ω
       simp only [AliveAt, F, Set.mem_inter_iff, Set.mem_ofPred_eq, Prod.mk.injEq,
         Set.mem_empty_iff_false, iff_false, not_and]
@@ -176,14 +176,14 @@ theorem aliveAt_succ (p : I) (huv : u ≠ v) (j : ℕ) (y' : PS) (hy' : y' ∈ Y
 
 /-- The Lyapunov sum `S_j`. -/
 noncomputable def lsum (p : I) (j : ℕ) : ℝ :=
-  ∑ y ∈ Ys D, (coinP p).real (AliveAt t u v y0 D j y) * lyap p D y
+  ∑ y ∈ Ys D, (coinMeasure p).real (AliveAt t u v y0 D j y) * lyap p D y
 
 theorem lsum_succ (p : I) (hp0 : 0 < (p : ℝ)) (hp1 : (p : ℝ) < 1) (huv : u ≠ v) (j : ℕ) :
     lsum (t := t) (u := u) (v := v) (y0 := y0) (D := D) p (j + 1) ≤
       lsum (t := t) (u := u) (v := v) (y0 := y0) (D := D) p j -
-        (coinP p).real (Alive t u v y0 D j) := by
+        (coinMeasure p).real (Alive t u v y0 D j) := by
   classical
-  set P := fun y => (coinP p).real (AliveAt t u v y0 D j y)
+  set P := fun y => (coinMeasure p).real (AliveAt t u v y0 D j y)
   have hw : ∀ b, 0 ≤ wt p b := fun b => by cases b <;> simp [wt] <;> linarith
   calc lsum p (j + 1)
       = ∑ y' ∈ Ys D, (∑ y ∈ Ys D, ∑ bu : Bool, ∑ bv : Bool,
@@ -253,8 +253,8 @@ theorem alive_anti {i j : ℕ} (h : i ≤ j) : Alive t u v y0 D j ⊆ Alive t u 
 /-- **Exit bound.** `T·P(Alive T) ≤ g(y₀)` for a start in the strip. -/
 theorem alive_bound (p : I) (hp0 : 0 < (p : ℝ)) (hp1 : (p : ℝ) < 1) (huv : u ≠ v)
     (hy0 : |y0.2.2| ≤ D) (T : ℕ) :
-    T * (coinP p).real (Alive t u v y0 D T) ≤ lyap p D y0 := by
-  have hsum : ∀ k, ∑ j ∈ Finset.range k, (coinP p).real (Alive t u v y0 D j) ≤
+    T * (coinMeasure p).real (Alive t u v y0 D T) ≤ lyap p D y0 := by
+  have hsum : ∀ k, ∑ j ∈ Finset.range k, (coinMeasure p).real (Alive t u v y0 D j) ≤
       lyap p D y0 - lsum (t := t) (u := u) (v := v) (y0 := y0) (D := D) p k := by
     intro k
     induction k with
@@ -265,8 +265,8 @@ theorem alive_bound (p : I) (hp0 : 0 < (p : ℝ)) (hp1 : (p : ℝ) < 1) (huv : u
       linarith
   have h1 := hsum T
   have h2 := lsum_nonneg (t := t) (u := u) (v := v) (y0 := y0) (D := D) p hp0 hp1 T
-  have h3 : ∑ j ∈ Finset.range T, (coinP p).real (Alive t u v y0 D T) ≤
-      ∑ j ∈ Finset.range T, (coinP p).real (Alive t u v y0 D j) :=
+  have h3 : ∑ j ∈ Finset.range T, (coinMeasure p).real (Alive t u v y0 D T) ≤
+      ∑ j ∈ Finset.range T, (coinMeasure p).real (Alive t u v y0 D j) :=
     Finset.sum_le_sum fun j hj =>
       measureReal_mono (alive_anti (by simp at hj; omega))
   simp only [Finset.sum_const, Finset.card_range, nsmul_eq_mul] at h3

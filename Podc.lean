@@ -24,10 +24,15 @@ import Podc.Computability.Distributed.SharedMemory.Progress
 import Podc.Computability.Distributed.SharedMemory.Recoverable
 import Podc.Computability.Distributed.SharedMemory.StrongLin
 import Podc.Computability.Distributed.SharedMemory.Task
+import Podc.Computability.Partrec.List
+import Podc.Computability.Primrec.List
 import Podc.Foundations.Algebra.BigOperators.Translate
 import Podc.Foundations.Algebra.Order.BigOperators.Average
+import Podc.Foundations.Analysis.Convex.FirstOrder
+import Podc.Foundations.Combinatorics.Convex.Tverberg
 import Podc.Foundations.Combinatorics.Digraph.Walk
 import Podc.Foundations.Combinatorics.Labelling
+import Podc.Foundations.Combinatorics.Matrix.Birkhoff
 import Podc.Foundations.Combinatorics.SimpleGraph.BFSTree
 import Podc.Foundations.Combinatorics.SimpleGraph.Ball
 import Podc.Foundations.Combinatorics.SimpleGraph.BlockingSet
@@ -37,6 +42,7 @@ import Podc.Foundations.Data.Fin.Cyclic
 import Podc.Foundations.Data.Finset.Card
 import Podc.Foundations.Data.Finset.Quorum
 import Podc.Foundations.Data.Finset.SumUpdate
+import Podc.Foundations.Data.List.BitEncoding
 import Podc.Foundations.Data.Nat.CeilDiv
 import Podc.Foundations.Data.Nat.Descent
 import Podc.Foundations.Data.Nat.Growth
@@ -44,3 +50,5 @@ import Podc.Foundations.Data.Nat.Log
 import Podc.Foundations.Data.Nat.LogStar
 import Podc.Foundations.Data.Nat.ModCount
 import Podc.Foundations.Data.Real.Logb
+import Podc.Probability.Chernoff
+import Podc.Probability.CoinField

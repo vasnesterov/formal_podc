@@ -1,10 +1,10 @@
 import Papers.PODC2025.MinimalistLE.Convergence
-import Papers.PODC2025.MinimalistLE.Coins
+import Podc.Probability.CoinField
 
 /-!
 # Probabilistic part: elimination of leaders window by window
 
-Coins are i.i.d. `Bernoulli(p)` indexed by `ℕ × V` (`coinP p`), and the execution is
+Coins are i.i.d. `Bernoulli(p)` indexed by `ℕ × V` (`coinMeasure p`), and the execution is
 `exec G init (field ω)`. For two leaders `u ≠ v` and a window `[t, t+L)`, `L = 2D+3`, the "good"
 event `Good D t u v` (some `true` coin of `u` in `[t+2, t+D+2]`, all coins of `v` in `[t, t+L)`
 `false`) depends only on coins of the window and has probability `Q = (1-(1-p)^{D+1})(1-p)^L`.
@@ -15,7 +15,7 @@ By `elim_window`, `u` and `v` are not both leaders at time `t+L` if the right on
 
 set_option linter.unusedSectionVars false
 
-open MeasureTheory ProbabilityTheory unitInterval
+open MeasureTheory ProbabilityTheory unitInterval Cslib.Probability
 open scoped ENNReal
 
 namespace MinimalistLE
@@ -82,16 +82,16 @@ theorem good_eq (D t : ℕ) (u v : V) : Good D t u v =
 
 theorem determined_good (D t : ℕ) (u v : V) :
     Determined (Good D t u v) (window (t + 2) (t + D + 2) u ∪ window t (t + 2 * D + 2) v) := by
-  rw [good_eq]; exact (determined_allFalse _).compl.inter (determined_allFalse _)
+  rw [good_eq]; exact (determined_forall_eq_false _).compl.inter (determined_forall_eq_false _)
 
 /-- `Q = (1-(1-p)^{D+1})·(1-p)^{2D+3}` as an element of `ℝ≥0∞`. -/
 noncomputable def goodProb (p : I) (D : ℕ) : ℝ≥0∞ :=
   (1 - (toNNReal (σ p) : ℝ≥0∞) ^ (D + 1)) * (toNNReal (σ p) : ℝ≥0∞) ^ (2 * D + 3)
 
-theorem coinP_good (p : I) (D t : ℕ) {u v : V} (huv : u ≠ v) :
-    coinP p (Good D t u v) = goodProb p D := by
-  rw [good_eq, coinP_inter p (determined_allFalse _).compl (determined_allFalse _),
-    prob_compl_eq_one_sub (determined_allFalse _).measurableSet, coinP_allFalse, coinP_allFalse,
+theorem coinMeasure_good (p : I) (D t : ℕ) {u v : V} (huv : u ≠ v) :
+    coinMeasure p (Good D t u v) = goodProb p D := by
+  rw [good_eq, coinMeasure_inter p (determined_forall_eq_false _).compl (determined_forall_eq_false _),
+    prob_compl_eq_one_sub (determined_forall_eq_false _).measurableSet, coinMeasure_forall_eq_false, coinMeasure_forall_eq_false,
     card_window, card_window, goodProb]
   · congr 3 <;> omega
   · rw [Finset.disjoint_left]; intro i hi hi'
@@ -108,7 +108,7 @@ theorem disjoint_past_good (D t : ℕ) (u v : V) :
 `P(u, v both leaders in round t + 2D + 3) ≤ (1 - Q)·P(u, v both leaders in round t)`. -/
 theorem both_step (hconn : G.Connected) (hW : ∀ v, (init v).phase = .W) (p : I) {D : ℕ}
     (hD : ∀ a b, G.dist a b ≤ D) {u v : V} (huv : u ≠ v) (t : ℕ) :
-    coinP p (Both G init (t + (2 * D + 3)) u v) ≤ (1 - goodProb p D) * coinP p (Both G init t u v) := by
+    coinMeasure p (Both G init (t + (2 * D + 3)) u v) ≤ (1 - goodProb p D) * coinMeasure p (Both G init t u v) := by
   set A := Both G init t u v
   set X := AtLeast G init t u v
   have hsub : Both G init (t + (2 * D + 3)) u v ⊆
@@ -127,22 +127,22 @@ theorem both_step (hconn : G.Connected) (hW : ∀ v, (init v).phase = .W) (p : I
   have hAX' : Determined (A \ X) (past t) := by
     simpa [Set.sdiff_eq] using
       (determined_both (G := G) (init := init) t u v).inter (determined_atLeast t u v).compl
-  have hgc : ∀ a b : V, a ≠ b → coinP p (Good D t a b)ᶜ = 1 - goodProb p D := fun a b hab => by
-    rw [prob_compl_eq_one_sub (determined_good D t a b).measurableSet, coinP_good p D t hab]
-  calc coinP p (Both G init (t + (2 * D + 3)) u v)
-      ≤ coinP p (A ∩ X ∩ (Good D t u v)ᶜ) + coinP p ((A \ X) ∩ (Good D t v u)ᶜ) :=
+  have hgc : ∀ a b : V, a ≠ b → coinMeasure p (Good D t a b)ᶜ = 1 - goodProb p D := fun a b hab => by
+    rw [prob_compl_eq_one_sub (determined_good D t a b).measurableSet, coinMeasure_good p D t hab]
+  calc coinMeasure p (Both G init (t + (2 * D + 3)) u v)
+      ≤ coinMeasure p (A ∩ X ∩ (Good D t u v)ᶜ) + coinMeasure p ((A \ X) ∩ (Good D t v u)ᶜ) :=
         (measure_mono hsub).trans (measure_union_le _ _)
-    _ = coinP p (A ∩ X) * (1 - goodProb p D) + coinP p (A \ X) * (1 - goodProb p D) := by
-        rw [coinP_inter p hAX (determined_good D t u v).compl (disjoint_past_good D t u v),
-          coinP_inter p hAX' (determined_good D t v u).compl (disjoint_past_good D t v u),
+    _ = coinMeasure p (A ∩ X) * (1 - goodProb p D) + coinMeasure p (A \ X) * (1 - goodProb p D) := by
+        rw [coinMeasure_inter p hAX (determined_good D t u v).compl (disjoint_past_good D t u v),
+          coinMeasure_inter p hAX' (determined_good D t v u).compl (disjoint_past_good D t v u),
           hgc u v huv, hgc v u huv.symm]
-    _ = (1 - goodProb p D) * coinP p A := by
+    _ = (1 - goodProb p D) * coinMeasure p A := by
         rw [← add_mul, measure_inter_add_sdiff _ (determined_atLeast t u v).measurableSet, mul_comm]
 
 /-- After `k` windows: `P(u, v both leaders in round k(2D+3)) ≤ (1 - Q)^k`. -/
 theorem both_le (hconn : G.Connected) (hW : ∀ v, (init v).phase = .W) (p : I) {D : ℕ}
     (hD : ∀ a b, G.dist a b ≤ D) {u v : V} (huv : u ≠ v) (k : ℕ) :
-    coinP p (Both G init (k * (2 * D + 3)) u v) ≤ (1 - goodProb p D) ^ k := by
+    coinMeasure p (Both G init (k * (2 * D + 3)) u v) ≤ (1 - goodProb p D) ^ k := by
   induction k with
   | zero => simpa using prob_le_one
   | succ k ih =>
@@ -157,7 +157,7 @@ def UniqueFrom (T : ℕ) (ω : ℕ × V → Bool) : Prop :=
 /-- **Tail bound.** `P(no unique leader from round k(2D+3) on) ≤ n²·(1 - Q)^k`. -/
 theorem not_uniqueFrom_le (hconn : G.Connected) (hI : GoodInit init) (p : I) {D : ℕ}
     (hD : ∀ a b, G.dist a b ≤ D) (k : ℕ) :
-    coinP p {ω | ¬ UniqueFrom G init (k * (2 * D + 3)) ω} ≤
+    coinMeasure p {ω | ¬ UniqueFrom G init (k * (2 * D + 3)) ω} ≤
       (Fintype.card V : ℝ≥0∞) ^ 2 * (1 - goodProb p D) ^ k := by
   classical
   have hsub : {ω | ¬ UniqueFrom G init (k * (2 * D + 3)) ω} ⊆
@@ -170,7 +170,7 @@ theorem not_uniqueFrom_le (hconn : G.Connected) (hI : GoodInit init) (p : I) {D 
     have := hn (a, b)
     simp only [hab, ↓reduceIte] at this
     exact this ⟨ha, hb⟩
-  calc _ ≤ ∑ x : V × V, coinP p (if x.1 = x.2 then ∅ else Both G init (k * (2 * D + 3)) x.1 x.2) :=
+  calc _ ≤ ∑ x : V × V, coinMeasure p (if x.1 = x.2 then ∅ else Both G init (k * (2 * D + 3)) x.1 x.2) :=
         (measure_mono hsub).trans (measure_iUnion_fintype_le _ _)
     _ ≤ ∑ _x : V × V, (1 - goodProb p D) ^ k := by
         gcongr with x

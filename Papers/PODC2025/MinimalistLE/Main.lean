@@ -5,7 +5,7 @@ import Papers.PODC2025.MinimalistLE.Probability
 
 Model: connected finite graph `G`, initial configuration satisfying Eq. (2) (all nodes waiting,
 at least one leader; the paper's `W•` everywhere is `initAll`), i.i.d. `Bernoulli(p)` coins
-(`coinP p` on `ℕ × V → Bool`). `UniqueFrom G init T ω` is Definition 1 from round `T` on.
+(`coinMeasure p` on `ℕ × V → Bool`). `UniqueFrom G init T ω` is Definition 1 from round `T` on.
 
 * `theorem2_ae` — for every `p ∈ (0,1)`, BFW solves Eventual Leader Election almost surely.
 * `theorem2_tail` — explicit bound
@@ -19,7 +19,7 @@ at least one leader; the paper's `W•` everywhere is `initAll`), i.i.d. `Bernou
 
 set_option linter.unusedSectionVars false
 
-open MeasureTheory ProbabilityTheory unitInterval
+open MeasureTheory ProbabilityTheory unitInterval Cslib.Probability
 open scoped ENNReal
 
 namespace MinimalistLE
@@ -61,7 +61,7 @@ theorem goodProb_pos (p : I) (hp0 : 0 < (p : ℝ)) (hp1 : (p : ℝ) < 1) (D : �
 `P(no single leader from round k(2D+3) on) ≤ n²·(1 - (1-(1-p)^{D+1})(1-p)^{2D+3})^k`. -/
 theorem theorem2_tail (hconn : G.Connected) (hI : GoodInit init) (p : I) {D : ℕ}
     (hD : ∀ a b, G.dist a b ≤ D) (k : ℕ) :
-    (coinP p).real {ω | ¬ UniqueFrom G init (k * (2 * D + 3)) ω} ≤
+    (coinMeasure p).real {ω | ¬ UniqueFrom G init (k * (2 * D + 3)) ω} ≤
       (Fintype.card V : ℝ) ^ 2 * (1 - (1 - (1 - (p : ℝ)) ^ (D + 1)) * (1 - p) ^ (2 * D + 3)) ^ k := by
   have h := not_uniqueFrom_le hconn hI p hD k
   have hfin : (Fintype.card V : ℝ≥0∞) ^ 2 * (1 - goodProb p D) ^ k ≠ ⊤ := by
@@ -78,13 +78,13 @@ theorem theorem2_tail (hconn : G.Connected) (hI : GoodInit init) (p : I) {D : �
 Eventual Leader Election almost surely: a.s. there are a round `T` and a node `u⋆` such that `u⋆`
 is the only leader in every round `t ≥ T`. -/
 theorem theorem2_ae (hconn : G.Connected) (hI : GoodInit init) (p : I) (hp0 : 0 < (p : ℝ))
-    (hp1 : (p : ℝ) < 1) : ∀ᵐ ω ∂(coinP p), ∃ T, UniqueFrom G init T ω := by
+    (hp1 : (p : ℝ) < 1) : ∀ᵐ ω ∂(coinMeasure p), ∃ T, UniqueFrom G init T ω := by
   obtain ⟨D, hD⟩ : ∃ D, ∀ a b, G.dist a b ≤ D :=
     ⟨Finset.univ.sup fun x : V × V => G.dist x.1 x.2, fun a b =>
       Finset.le_sup (f := fun x : V × V => G.dist x.1 x.2) (Finset.mem_univ (a, b))⟩
   rw [ae_iff]
   set B := {ω | ¬ ∃ T, UniqueFrom G init T ω}
-  have hle : ∀ k : ℕ, coinP p B ≤ (Fintype.card V : ℝ≥0∞) ^ 2 * (1 - goodProb p D) ^ k :=
+  have hle : ∀ k : ℕ, coinMeasure p B ≤ (Fintype.card V : ℝ≥0∞) ^ 2 * (1 - goodProb p D) ^ k :=
     fun k => by
       refine (measure_mono ?_).trans (not_uniqueFrom_le hconn hI p hD k)
       intro ω hω h
@@ -154,7 +154,7 @@ theorem q_bound {D : ℕ} (hD1 : 1 ≤ D) :
 `P(no single leader from round k(2D+3) on) ≤ n²·(127/128)^k`. -/
 theorem theorem3 (hconn : G.Connected) (hI : GoodInit init) {D : ℕ} (hD1 : 1 ≤ D)
     (hD : ∀ a b, G.dist a b ≤ D) (k : ℕ) :
-    (coinP (pD D)).real {ω | ¬ UniqueFrom G init (k * (2 * D + 3)) ω} ≤
+    (coinMeasure (pD D)).real {ω | ¬ UniqueFrom G init (k * (2 * D + 3)) ω} ≤
       (Fintype.card V : ℝ) ^ 2 * (127 / 128) ^ k := by
   refine (theorem2_tail hconn hI (pD D) hD k).trans ?_
   have hq := q_bound hD1
@@ -168,7 +168,7 @@ theorem theorem3 (hconn : G.Connected) (hI : GoodInit init) {D : ℕ} (hD1 : 1 �
 leader is elected by round `(2D+3)·⌈512 ln n⌉`, i.e. within `O(D log n)` rounds. -/
 theorem theorem3_whp (hconn : G.Connected) (hI : GoodInit init) {D : ℕ} (hD1 : 1 ≤ D)
     (hD : ∀ a b, G.dist a b ≤ D) :
-    (coinP (pD D)).real
+    (coinMeasure (pD D)).real
         {ω | ¬ UniqueFrom G init (⌈512 * Real.log (Fintype.card V)⌉₊ * (2 * D + 3)) ω} ≤
       1 / (Fintype.card V : ℝ) ^ 2 := by
   set n : ℝ := (Fintype.card V : ℝ)

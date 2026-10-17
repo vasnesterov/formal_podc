@@ -1,17 +1,24 @@
 import Mathlib.Computability.Partrec
 import Mathlib.Computability.Primrec.List
 
+-- CSLib candidate: Cslib/Computability/Partrec/List.lean (Mathlib candidate)
+
 /-!
 # Computable list combinators
 
-Mathlib proves `Primrec` closure of `List.foldl`, `List.map`, … only for *primitive recursive*
-step functions. Here we prove the `Computable` versions (step functions that are merely
-computable), via `Computable.nat_rec` over list indices. -- CSLib candidate (Mathlib candidate)
+Mathlib proves closure of `Primrec` under `List.foldl`, `List.map`, … only for *primitive
+recursive* step functions (`Primrec.list_foldl`, `Primrec.list_map`, …). Here we prove the
+`Computable` versions, for step functions that are merely computable, via `Computable.nat_rec`
+over list indices:
+
+* `Computable.list_foldl`, `Computable.list_map`, `Computable.list_all`, `Computable.list_any`,
+  `Computable.list_findSome?`, `Computable.list_filterMap`, `Computable.list_flatMap`,
+  `Computable.list_filter`;
+* `Computable.nat_find`: unbounded search for the least witness of a computable, everywhere
+  satisfiable predicate.
 -/
 
-namespace LocalComputable
-
-open Computable
+namespace Computable
 
 variable {α β σ γ : Type*} [Primcodable α] [Primcodable β] [Primcodable σ] [Primcodable γ]
 
@@ -32,8 +39,8 @@ private theorem foldl_eq_rec (l : List β) (h : σ → β → σ) (s : σ) (i : 
     simp only [foldStep]
     cases l[i]? <;> rfl
 
-/-- `List.foldl` with a computable step function is computable. -- CSLib candidate -/
-theorem computable_list_foldl {f : α → List β} {g : α → σ} {h : α → σ × β → σ}
+/-- `List.foldl` with a computable step function is computable. -/
+theorem list_foldl {f : α → List β} {g : α → σ} {h : α → σ × β → σ}
     (hf : Computable f) (hg : Computable g) (hh : Computable₂ h) :
     Computable fun a => (f a).foldl (fun s b => h a (s, b)) (g a) := by
   have hs : Computable₂ fun (a : α) (p : ℕ × σ) =>
@@ -46,10 +53,10 @@ theorem computable_list_foldl {f : α → List β} {g : α → σ} {h : α → �
   refine (nat_rec (list_length.comp hf) hg hs).of_eq fun a => ?_
   rw [← List.take_length (l := f a), foldl_eq_rec, List.take_length]
 
-/-- `List.map` with a computable function is computable. -- CSLib candidate -/
-theorem computable_list_map {f : α → List β} {g : α → β → σ} (hf : Computable f)
+/-- `List.map` with a computable function is computable. -/
+theorem list_map {f : α → List β} {g : α → β → σ} (hf : Computable f)
     (hg : Computable₂ g) : Computable fun a => (f a).map (g a) := by
-  have h := computable_list_foldl (f := f) (g := fun _ => ([] : List σ))
+  have h := list_foldl (f := f) (g := fun _ => ([] : List σ))
     (h := fun a p => p.1 ++ [g a p.2]) hf (const _)
     ((list_concat.comp (fst.comp snd) (hg.comp fst (snd.comp snd))).to₂)
   refine h.of_eq fun a => ?_
@@ -60,10 +67,10 @@ theorem computable_list_map {f : α → List β} {g : α → β → σ} (hf : Co
   | nil => simp
   | cons b l ih => intro acc; simp [ih]
 
-/-- `List.all` with a computable predicate is computable. -- CSLib candidate -/
-theorem computable_list_all {f : α → List β} {p : α → β → Bool} (hf : Computable f)
+/-- `List.all` with a computable predicate is computable. -/
+theorem list_all {f : α → List β} {p : α → β → Bool} (hf : Computable f)
     (hp : Computable₂ p) : Computable fun a => (f a).all (p a) := by
-  have h := computable_list_foldl (f := f) (g := fun _ => true)
+  have h := list_foldl (f := f) (g := fun _ => true)
     (h := fun a q => q.1 && p a q.2) hf (const _)
     ((Primrec.and.to_comp.comp (fst.comp snd) (hp.comp fst (snd.comp snd))).to₂)
   refine h.of_eq fun a => ?_
@@ -74,10 +81,10 @@ theorem computable_list_all {f : α → List β} {p : α → β → Bool} (hf : 
   | nil => simp
   | cons b l ih => intro acc; simp [ih, Bool.and_assoc]
 
-/-- `List.any` with a computable predicate is computable. -- CSLib candidate -/
-theorem computable_list_any {f : α → List β} {p : α → β → Bool} (hf : Computable f)
+/-- `List.any` with a computable predicate is computable. -/
+theorem list_any {f : α → List β} {p : α → β → Bool} (hf : Computable f)
     (hp : Computable₂ p) : Computable fun a => (f a).any (p a) := by
-  have h := computable_list_foldl (f := f) (g := fun _ => false)
+  have h := list_foldl (f := f) (g := fun _ => false)
     (h := fun a q => q.1 || p a q.2) hf (const _)
     ((Primrec.or.to_comp.comp (fst.comp snd) (hp.comp fst (snd.comp snd))).to₂)
   refine h.of_eq fun a => ?_
@@ -88,10 +95,10 @@ theorem computable_list_any {f : α → List β} {p : α → β → Bool} (hf : 
   | nil => simp
   | cons b l ih => intro acc; simp [ih, Bool.or_assoc]
 
-/-- `List.findSome?` with a computable function is computable. -- CSLib candidate -/
-theorem computable_list_findSome? {f : α → List β} {g : α → β → Option σ} (hf : Computable f)
+/-- `List.findSome?` with a computable function is computable. -/
+theorem list_findSome? {f : α → List β} {g : α → β → Option σ} (hf : Computable f)
     (hg : Computable₂ g) : Computable fun a => (f a).findSome? (g a) := by
-  have h := computable_list_foldl (f := f) (g := fun _ => (none : Option σ))
+  have h := list_foldl (f := f) (g := fun _ => (none : Option σ))
     (h := fun a q => Option.casesOn q.1 (g a q.2) some) hf (const _)
     ((option_casesOn (fst.comp snd) (hg.comp fst (snd.comp snd))
       (option_some.comp snd).to₂).to₂)
@@ -113,10 +120,10 @@ theorem computable_list_findSome? {f : α → List β} {g : α → β → Option
       simp only [List.foldl_cons]
       rw [ih]
 
-/-- `List.filterMap` with a computable function is computable. -- CSLib candidate -/
-theorem computable_list_filterMap {f : α → List β} {g : α → β → Option σ} (hf : Computable f)
+/-- `List.filterMap` with a computable function is computable. -/
+theorem list_filterMap {f : α → List β} {g : α → β → Option σ} (hf : Computable f)
     (hg : Computable₂ g) : Computable fun a => (f a).filterMap (g a) := by
-  have h := computable_list_foldl (f := f) (g := fun _ => ([] : List σ))
+  have h := list_foldl (f := f) (g := fun _ => ([] : List σ))
     (h := fun a q => Option.casesOn (g a q.2) q.1 (fun c => q.1 ++ [c])) hf (const _)
     ((option_casesOn (hg.comp fst (snd.comp snd)) (fst.comp snd)
       (list_concat.comp (fst.comp (snd.comp fst)) snd).to₂).to₂)
@@ -133,10 +140,10 @@ theorem computable_list_filterMap {f : α → List β} {g : α → β → Option
     rw [ih]
     cases g a b <;> simp
 
-/-- `List.flatMap` with a computable function is computable. -- CSLib candidate -/
-theorem computable_list_flatMap {f : α → List β} {g : α → β → List σ} (hf : Computable f)
+/-- `List.flatMap` with a computable function is computable. -/
+theorem list_flatMap {f : α → List β} {g : α → β → List σ} (hf : Computable f)
     (hg : Computable₂ g) : Computable fun a => (f a).flatMap (g a) := by
-  have h := computable_list_foldl (f := f) (g := fun _ => ([] : List σ))
+  have h := list_foldl (f := f) (g := fun _ => ([] : List σ))
     (h := fun a q => q.1 ++ g a q.2) hf (const _)
     ((list_append.comp (fst.comp snd) (hg.comp fst (snd.comp snd))).to₂)
   refine h.of_eq fun a => ?_
@@ -147,10 +154,10 @@ theorem computable_list_flatMap {f : α → List β} {g : α → β → List σ}
   | nil => simp
   | cons b l ih => intro acc; simp [ih]
 
-/-- `List.filter` with a computable predicate is computable. -- CSLib candidate -/
-theorem computable_list_filter {f : α → List β} {p : α → β → Bool} (hf : Computable f)
+/-- `List.filter` with a computable predicate is computable. -/
+theorem list_filter {f : α → List β} {p : α → β → Bool} (hf : Computable f)
     (hp : Computable₂ p) : Computable fun a => (f a).filter (p a) := by
-  refine (computable_list_filterMap (g := fun a b => bif p a b then some b else none) hf
+  refine (list_filterMap (g := fun a b => bif p a b then some b else none) hf
     (cond hp (option_some.comp snd) (const none)).to₂).of_eq fun a => ?_
   rw [← List.filterMap_eq_filter]
   congr 1
@@ -158,8 +165,8 @@ theorem computable_list_filter {f : α → List β} {p : α → β → Bool} (hf
   rcases h : p a b <;> simp [Option.guard, h]
 
 /-- Unbounded search: the least witness of a computable, everywhere satisfiable predicate is a
-computable function of the parameter. -- CSLib candidate -/
-theorem computable_nat_find {p : α → ℕ → Bool} (hp : Computable₂ p) (h : ∀ a, ∃ n, p a n = true) :
+computable function of the parameter. -/
+theorem nat_find {p : α → ℕ → Bool} (hp : Computable₂ p) (h : ∀ a, ∃ n, p a n = true) :
     Computable fun a => Nat.find (h a) := by
   classical
   refine (Partrec.rfind (p := fun a n => (Part.some (p a n))) hp.partrec₂).of_eq fun a => ?_
@@ -169,4 +176,4 @@ theorem computable_nat_find {p : α → ℕ → Bool} (hp : Computable₂ p) (h 
     have := Nat.find_min (h a) hm
     simpa using this
 
-end LocalComputable
+end Computable

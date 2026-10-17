@@ -1,5 +1,5 @@
 import Papers.PODC2026.LocalComputable.Basic
-import Papers.PODC2026.LocalComputable.CompList
+import Podc.Computability.Partrec.List
 
 /-!
 # Theorem 5.3: with a bound on `n`, uncomputable and computable LOCAL coincide
@@ -168,24 +168,24 @@ theorem exists_computable_of_promise
   have hout : Computable fun q : Tab View Out × Net × ℕ =>
       M.out (runTab q.1) q.2.1 q.2.2 (T (M.size q.2.1)) := by
     unfold out runTab
-    refine computable_list_findSome?
+    refine Computable.list_findSome?
       (Primrec.list_range.to_comp.comp (succ.comp (hT.comp (hsize.comp (fst.comp snd))))) ?_
     refine Primrec.listLookup.to_comp.comp
       (pair (hview.comp (pair (fst.comp (snd.comp fst)) (pair (snd.comp (snd.comp fst)) snd)))
         snd) (fst.comp fst) |>.to₂
   have houts : Computable fun q : Tab View Out × Net => M.outs T (runTab q.1) q.2 := by
     unfold outs
-    exact computable_list_map (Primrec.list_range.to_comp.comp (hsize.comp snd))
+    exact Computable.list_map (Primrec.list_range.to_comp.comp (hsize.comp snd))
       (hout.comp (pair (fst.comp fst) (pair (snd.comp fst) snd))).to₂
   have hgoodNet : Computable fun q : Tab View Out × Net => M.goodNet T check (runTab q.1) q.2 := by
     unfold goodNet
-    refine Primrec.and.to_comp.comp (computable_list_all houts
+    refine Primrec.and.to_comp.comp (Computable.list_all houts
       (Primrec.option_isSome.to_comp.comp snd).to₂) ?_
     refine hcheck.comp snd ?_
-    exact (computable_list_filterMap houts (Computable.snd).to₂).of_eq fun q => by
+    exact (Computable.list_filterMap houts (Computable.snd).to₂).of_eq fun q => by
       simp [List.reduceOption]
   have hgood : Computable₂ good := by
-    refine (computable_list_all (f := fun q : ℕ × Tab View Out => cand q.1)
+    refine (Computable.list_all (f := fun q : ℕ × Tab View Out => cand q.1)
       (p := fun q G => M.goodNet T check (runTab q.2) G) (hcand.comp fst) ?_).to₂
     exact (hgoodNet.comp (pair (snd.comp fst) snd)).to₂
   have hgoodCode : Computable₂ goodCode := by
@@ -246,7 +246,7 @@ theorem sandwich_computable
       (Primrec.nat_le.decide.to_comp.comp (fst.comp fst) snd).to₂) (const true)).to₂
   refine M.exists_computable_of_promise hsize hview hT (fun N => (nets N).filter (fle N))
     ?_ ?_ check hcheck hP A hA
-  · exact computable_list_filter hnets hfle
+  · exact Computable.list_filter hnets hfle
   · intro N G
     simp only [List.mem_filter, hnetsG, Sandwich, fle, le_iff_enatToOption]
     rcases enatToOption (f (M.size G)) <;> simp

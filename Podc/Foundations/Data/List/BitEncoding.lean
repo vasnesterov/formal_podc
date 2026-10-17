@@ -1,22 +1,26 @@
-import Mathlib
+import Mathlib.Data.List.Range
+import Mathlib.Algebra.BigOperators.Group.List.Basic
+import Mathlib.Tactic.Linarith
 import Podc.Foundations.Data.Nat.CeilDiv
 
+-- CSLib candidate: Cslib/Foundations/Data/List/BitEncoding.lean
+
 /-!
-# Encoding strings
+# Self-delimiting encoding of tuples of bit strings, and splitting into blocks
 
-The "fixed delimiter scheme" and the lexicographic splitting `Lex` / `DecodeLex` of Section 2–3:
-
-* `encList : List (List Bool) → List Bool` encodes a tuple of bit strings (every bit `b` becomes
-  `true, b`, every string is terminated by `false`); `decList` decodes it (`decList_encList`), and
-  `length_encList` gives the length `Σ (2|sᵢ| + 1)`.
-* `chunk S L i` is the `i`-th block of length `L` of `S`; concatenating the blocks
-  `0, …, k-1` with `L = ⌈|S|/k⌉` gives back `S` (`flatten_chunks`). The paper pads `S` to a
-  multiple of `k` first; this is not needed (the last blocks may be shorter).
+* `Cslib.BitEncoding.encList : List (List Bool) → List Bool` encodes a tuple of bit strings (every
+  bit `b` becomes `true, b`, every string is terminated by `false`); `decList` decodes it
+  (`decList_encList`), and `length_encList` gives the length `Σ (2|sᵢ| + 1)`. This is the "fixed
+  delimiter scheme" used to pack several labels into one in proof-labelling/CONGEST label-size
+  arguments.
+* `Cslib.BitEncoding.chunk S L i` is the `i`-th block of length `L` of a list `S`; concatenating the
+  blocks `0, …, k-1` with `L = ⌈|S|/k⌉` gives back `S` (`flatten_chunks`).
+* `List.Nodup.map_idxOf`: mapping `u ↦ f (l.idxOf u)` over a duplicate-free `l` is mapping `f`
+  over the indices.
 -/
 
-namespace PLSTradeoff
+namespace Cslib.BitEncoding
 
--- CSLib candidate
 /-- Encoding of one string, terminated by `false`. -/
 def encStr (s : List Bool) : List Bool := s.flatMap (fun b => [true, b]) ++ [false]
 
@@ -33,6 +37,7 @@ def decAux : List Bool → List Bool → List (List Bool)
 /-- Decoding of `encList`. -/
 def decList (w : List Bool) : List (List Bool) := decAux [] w
 
+/-- The decoder reads one encoded string and continues with the rest. -/
 lemma decAux_encStr_append (acc s rest : List Bool) :
     decAux acc (s.flatMap (fun b => [true, b]) ++ [false] ++ rest) =
       (acc.reverse ++ s) :: decAux [] rest := by
@@ -43,6 +48,7 @@ lemma decAux_encStr_append (acc s rest : List Bool) :
     rw [decAux, ih]
     simp
 
+/-- `decList` is a left inverse of `encList`. -/
 @[simp] lemma decList_encList (L : List (List Bool)) : decList (encList L) = L := by
   induction L with
   | nil => rfl
@@ -51,6 +57,7 @@ lemma decAux_encStr_append (acc s rest : List Bool) :
     rw [decAux_encStr_append, ih]
     simp
 
+/-- A string `s` is encoded with `2 |s| + 1` bits. -/
 lemma length_encStr (s : List Bool) : (encStr s).length = 2 * s.length + 1 := by
   induction s with
   | nil => rfl
@@ -59,6 +66,7 @@ lemma length_encStr (s : List Bool) : (encStr s).length = 2 * s.length + 1 := by
       List.length_nil] at ih ⊢
     omega
 
+/-- The length of the encoding of a tuple of strings is `Σ (2|sᵢ| + 1)`. -/
 lemma length_encList (L : List (List Bool)) :
     (encList L).length = (L.map fun s => 2 * s.length + 1).sum := by
   induction L with
@@ -68,6 +76,7 @@ lemma length_encList (L : List (List Bool)) :
       List.sum_cons] at ih ⊢
     rw [length_encStr, ih]
 
+/-- A tuple of `k` strings of length `≤ p` is encoded with at most `k (2p + 1)` bits. -/
 lemma length_encList_le (L : List (List Bool)) (p : ℕ) (h : ∀ s ∈ L, s.length ≤ p) :
     (encList L).length ≤ L.length * (2 * p + 1) := by
   induction L with
@@ -79,13 +88,19 @@ lemma length_encList_le (L : List (List Bool)) (p : ℕ) (h : ∀ s ∈ L, s.len
     have h2 := ih (fun s hs => h s (by simp [hs]))
     nlinarith
 
-/-- The `i`-th block of length `L` of `S`. -/
-def chunk (S : List Bool) (L i : ℕ) : List Bool := (S.drop (i * L)).take L
+section Chunk
 
-lemma length_chunk_le (S : List Bool) (L i : ℕ) : (chunk S L i).length ≤ L := by
+variable {α : Type*}
+
+/-- The `i`-th block of length `L` of `S`. -/
+def chunk (S : List α) (L i : ℕ) : List α := (S.drop (i * L)).take L
+
+/-- Blocks have length at most `L`. -/
+lemma length_chunk_le (S : List α) (L i : ℕ) : (chunk S L i).length ≤ L := by
   simp [chunk]
 
-lemma flatten_chunks_take (S : List Bool) (L k : ℕ) :
+/-- The first `k` blocks of length `L` concatenate to the prefix of length `k L`. -/
+lemma flatten_chunks_take (S : List α) (L k : ℕ) :
     ((List.range k).map (chunk S L)).flatten = S.take (k * L) := by
   induction k with
   | zero => simp
@@ -95,13 +110,20 @@ lemma flatten_chunks_take (S : List Bool) (L k : ℕ) :
       chunk]
     rw [Nat.succ_mul, List.take_add]
 
-lemma flatten_chunks (S : List Bool) {k : ℕ} (hk : 0 < k) :
+/-- The `k` blocks of length `⌈|S|/k⌉` concatenate to `S`. -/
+lemma flatten_chunks (S : List α) {k : ℕ} (hk : 0 < k) :
     ((List.range k).map (chunk S (S.length ⌈/⌉ k))).flatten = S := by
   rw [flatten_chunks_take, List.take_of_length_le (Nat.le_mul_ceilDiv hk)]
 
+end Chunk
+
+end Cslib.BitEncoding
+
+namespace List
+
 /-- For a duplicate-free list `l`, mapping `u ↦ f (index of u in l)` over `l` is mapping `f` over
 the indices. -/
-lemma map_idxOf_eq {α β : Type*} [DecidableEq α] (l : List α) (hl : l.Nodup) (f : ℕ → β) :
+theorem Nodup.map_idxOf {α β : Type*} [DecidableEq α] {l : List α} (hl : l.Nodup) (f : ℕ → β) :
     l.map (fun u => f (l.idxOf u)) = (List.range l.length).map f := by
   apply List.ext_getElem (by simp)
   intro i h1 h2
@@ -109,4 +131,4 @@ lemma map_idxOf_eq {α β : Type*} [DecidableEq α] (l : List α) (hl : l.Nodup)
   congr 1
   exact hl.idxOf_getElem i (by simpa using h1)
 
-end PLSTradeoff
+end List

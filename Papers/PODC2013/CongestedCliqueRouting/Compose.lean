@@ -1,7 +1,5 @@
 import Papers.PODC2013.CongestedCliqueRouting.Knowledge
 
--- CSLib candidate (general, not specific to this paper)
-
 /-!
 # Composing intended runs
 

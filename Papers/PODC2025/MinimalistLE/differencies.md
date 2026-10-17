@@ -10,7 +10,7 @@ DOI 10.1145/3732772.3733559; formalized version arXiv 2502.12697v2 (numbering fo
    only if `v ∈ W•` hears nothing in round `t`). All results of Section 3 are proved **for every coin
    field**, i.e. for every rule deciding when `W•` goes to `B•`, as the paper remarks.
    For the probabilistic results the coins are i.i.d. `Bernoulli(p)` indexed by `ℕ × V`
-   (`coinP p = Measure.infinitePi …`). Faithful.
+   (`coinMeasure p = Measure.infinitePi …`). Faithful.
 2. **Initial configuration.** Section 3 and all theorems assume Eq. (2) (`GoodInit`: every node is
    waiting and some node is a leader), which is more general than the paper's "all nodes in `W•`"
    (`initAll`, `goodInit_initAll`).
