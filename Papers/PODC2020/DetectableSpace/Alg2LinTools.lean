@@ -1,12 +1,13 @@
 import Papers.PODC2020.DetectableSpace.Lin
+import Podc.SharedMemory.LinResp
 
 /-!
 # More tools for building durable detectable linearizations incrementally
 
 General lemmas (not specific to Algorithm 2; candidates for `Lin.lean`):
 
-* `linResp O σ L a`: the response of operation instance `a` in the sequential execution of `L`
-  from `σ` (`none` if `a ∉ L`), with `linResp_append`, `linResp_of_split`;
+* `hresp_of_respIn`: responding with the response `O.respIn σ L a` that the linearization `L`
+  assigns to `a` (responses in sequential histories are the library's `ObjSpec.respIn`);
 * `DLin.filter`: removing *pending* entries whose operation does not change the state (at its
   position in `L`) preserves a linearization, the final state and the responses of the other
   entries (`filter_pres`);
@@ -22,83 +23,13 @@ open Cslib.SharedMemory
 
 variable {P : Type} {O : ObjSpec}
 
-/-- The response of operation instance `a` in the sequential execution of `L` from `σ`
-(first occurrence; `none` if `a` does not occur). -/
-def linResp (O : ObjSpec) : O.State → List (ℕ × O.Op) → ℕ → Option O.Resp
-  | _, [], _ => none
-  | σ, x :: L, a => if x.1 = a then some (O.δ σ x.2).2 else linResp O (O.δ σ x.2).1 L a
-
-@[simp] lemma linResp_nil (σ : O.State) (a : ℕ) : linResp O σ [] a = none := rfl
-
-lemma linResp_cons (σ : O.State) (x : ℕ × O.Op) (L : List (ℕ × O.Op)) (a : ℕ) :
-    linResp O σ (x :: L) a =
-      if x.1 = a then some (O.δ σ x.2).2 else linResp O (O.δ σ x.2).1 L a := rfl
-
-lemma linResp_cons_of_ne (σ : O.State) (x : ℕ × O.Op) (L : List (ℕ × O.Op)) (a : ℕ)
-    (h : x.1 ≠ a) : linResp O σ (x :: L) a = linResp O (O.δ σ x.2).1 L a := by
-  simp [linResp_cons, h]
-
-lemma linResp_isSome (σ : O.State) (L : List (ℕ × O.Op)) (a : ℕ) :
-    (linResp O σ L a).isSome ↔ a ∈ L.map Prod.fst := by
-  induction L generalizing σ with
-  | nil => simp
-  | cons x L ih =>
-    rw [linResp_cons]
-    by_cases h : x.1 = a
-    · simp [h]
-    · simp only [h, ite_false, ih, List.map_cons, List.mem_cons]
-      constructor
-      · exact Or.inr
-      · rintro (h' | h')
-        · exact absurd h'.symm h
-        · exact h'
-
-lemma linResp_eq_none (σ : O.State) (L : List (ℕ × O.Op)) (a : ℕ) :
-    linResp O σ L a = none ↔ a ∉ L.map Prod.fst := by
-  rw [← linResp_isSome (O := O) σ]; simp
-
-lemma linResp_append (σ : O.State) (L M : List (ℕ × O.Op)) (a : ℕ) :
-    linResp O σ (L ++ M) a =
-      (linResp O σ L a).or (linResp O (O.runOps σ (L.map Prod.snd)) M a) := by
-  induction L generalizing σ with
-  | nil => simp
-  | cons x L ih =>
-    simp only [List.cons_append, linResp_cons, List.map_cons, ObjSpec.runOps_cons]
-    split_ifs
-    · simp
-    · exact ih _
-
-lemma linResp_append_of_mem (σ : O.State) (L M : List (ℕ × O.Op)) (a : ℕ)
-    (h : a ∈ L.map Prod.fst) : linResp O σ (L ++ M) a = linResp O σ L a := by
-  rw [linResp_append]
-  obtain ⟨r, hr⟩ := Option.isSome_iff_exists.1 ((linResp_isSome σ L a).2 h)
-  simp [hr]
-
-lemma linResp_append_of_not_mem (σ : O.State) (L M : List (ℕ × O.Op)) (a : ℕ)
-    (h : a ∉ L.map Prod.fst) :
-    linResp O σ (L ++ M) a = linResp O (O.runOps σ (L.map Prod.snd)) M a := by
-  rw [linResp_append, (linResp_eq_none σ L a).2 h]; simp
-
-lemma linResp_singleton (σ : O.State) (b : ℕ) (o : O.Op) (a : ℕ) :
-    linResp O σ [(b, o)] a = if b = a then some (O.δ σ o).2 else none := by
-  simp [linResp_cons]
-
-lemma linResp_of_split {σ : O.State} {L L₁ L₂ : List (ℕ × O.Op)} {a : ℕ} {o : O.Op}
-    (hnd : (L.map Prod.fst).Nodup) (hL : L = L₁ ++ (a, o) :: L₂) :
-    linResp O σ L a = some (O.δ (O.runOps σ (L₁.map Prod.snd)) o).2 := by
-  subst hL
-  have ha : a ∉ L₁.map Prod.fst := by
-    simp only [List.map_append, List.map_cons] at hnd
-    exact fun h => (List.nodup_append.1 hnd).2.2 _ h _ (by simp) rfl
-  rw [linResp_append_of_not_mem _ _ _ _ ha, linResp_cons]; simp
-
-/-- Responding with the response given by `linResp` (for `DLin.append_res`). -/
-lemma hresp_of_linResp {σ : O.State} {L : List (ℕ × O.Op)} {a : ℕ} {r : Option O.Resp}
-    (hnd : (L.map Prod.fst).Nodup) (hr : ∀ r', r = some r' → linResp O σ L a = some r') :
+/-- Responding with the response given by `ObjSpec.respIn` (for `DLin.append_res`). -/
+lemma hresp_of_respIn {σ : O.State} {L : List (ℕ × O.Op)} {a : ℕ} {r : Option O.Resp}
+    (hnd : (L.map Prod.fst).Nodup) (hr : ∀ r', r = some r' → O.respIn σ L a = some r') :
     ∀ r', r = some r' → ∀ L₁ o L₂, L = L₁ ++ (a, o) :: L₂ →
       r' = (O.δ (O.runOps σ (L₁.map Prod.snd)) o).2 := by
   intro r' hr' L₁ o L₂ hL
-  have := (hr r' hr').symm.trans (linResp_of_split hnd hL)
+  have := (hr r' hr').symm.trans (ObjSpec.respIn_of_split hnd hL)
   exact Option.some.inj this
 
 /-! ### Removing state-preserving pending entries -/
@@ -108,10 +39,10 @@ change the state at their position preserves the final state, the responses of t
 entries and legality. -/
 theorem filter_pres (h : List (HEv P O.Op O.Resp)) (f : ℕ → Bool) :
     ∀ (σ : O.State) (L : List (ℕ × O.Op)), (L.map Prod.fst).Nodup →
-      (∀ x ∈ L, f x.1 = false → ∀ r, linResp O σ L x.1 = some r →
+      (∀ x ∈ L, f x.1 = false → ∀ r, O.respIn σ L x.1 = some r →
         ∀ τ, (O.δ τ x.2).2 = r → (O.δ τ x.2).1 = τ) →
       O.runOps σ ((L.filter (fun x => f x.1)).map Prod.snd) = O.runOps σ (L.map Prod.snd) ∧
-      (∀ a, f a = true → linResp O σ (L.filter (fun x => f x.1)) a = linResp O σ L a) ∧
+      (∀ a, f a = true → O.respIn σ (L.filter (fun x => f x.1)) a = O.respIn σ L a) ∧
       (Legal O h σ L → Legal O h σ (L.filter (fun x => f x.1))) := by
   intro σ L
   induction L generalizing σ with
@@ -122,10 +53,10 @@ theorem filter_pres (h : List (HEv P O.Op O.Resp)) (f : ℕ → Bool) :
     have hbL : b ∉ L.map Prod.fst := (List.nodup_cons.1 (by simpa using hnd)).1
     have hnd' : (L.map Prod.fst).Nodup := (List.nodup_cons.1 (by simpa using hnd)).2
     have hne : ∀ y ∈ L, b ≠ y.1 := fun y hy hb => hbL (hb ▸ List.mem_map_of_mem hy)
-    have hpres' : ∀ y ∈ L, f y.1 = false → ∀ r, linResp O (O.δ σ o).1 L y.1 = some r →
+    have hpres' : ∀ y ∈ L, f y.1 = false → ∀ r, O.respIn (O.δ σ o).1 L y.1 = some r →
         ∀ τ, (O.δ τ y.2).2 = r → (O.δ τ y.2).1 = τ := by
       intro y hy hf r hr
-      exact hpres y (by simp [hy]) hf r (by rw [linResp_cons_of_ne _ _ _ _ (hne y hy)]; exact hr)
+      exact hpres y (by simp [hy]) hf r (by rw [ObjSpec.respIn_cons_of_ne _ _ _ (hne y hy)]; exact hr)
     by_cases hfb : f b = true
     · have e : (List.filter (fun x => f x.1) ((b, o) :: L)) =
           (b, o) :: L.filter (fun x => f x.1) := by simp [hfb]
@@ -133,7 +64,7 @@ theorem filter_pres (h : List (HEv P O.Op O.Resp)) (f : ℕ → Bool) :
       rw [e]
       refine ⟨by simpa using h1, ?_, ?_⟩
       · intro a ha
-        simp only [linResp_cons]
+        simp only [ObjSpec.respIn_cons]
         split_ifs
         · rfl
         · exact h2 a ha
@@ -143,14 +74,14 @@ theorem filter_pres (h : List (HEv P O.Op O.Resp)) (f : ℕ → Bool) :
       have e : (List.filter (fun x => f x.1) ((b, o) :: L)) = L.filter (fun x => f x.1) := by
         simp [hfb']
       have hst : (O.δ σ o).1 = σ :=
-        hpres (b, o) (by simp) hfb' _ (by simp [linResp_cons]) σ rfl
+        hpres (b, o) (by simp) hfb' _ (by simp) σ rfl
       obtain ⟨h1, h2, h3⟩ := ih (O.δ σ o).1 hnd' hpres'
       rw [hst] at h1 h2 h3
       rw [e]
       refine ⟨by simpa [hst] using h1, ?_, ?_⟩
       · intro a ha
         have hba : b ≠ a := by rintro rfl; rw [hfb'] at ha; exact absurd ha (by simp)
-        rw [linResp_cons_of_ne _ _ _ _ hba, hst]
+        rw [ObjSpec.respIn_cons_of_ne _ _ _ hba, hst]
         exact h2 a ha
       · intro hl
         have := hl.2
@@ -161,7 +92,7 @@ theorem filter_pres (h : List (HEv P O.Op O.Resp)) (f : ℕ → Bool) :
 theorem DLin.filter {h : List (HEv P O.Op O.Resp)} {σ : O.State} {L : List (ℕ × O.Op)}
     (hd : DLin O h σ L) (f : ℕ → Bool)
     (hpend : ∀ x ∈ L, f x.1 = false → ∀ r c, HEv.res x.1 r c ∉ h)
-    (hpres : ∀ x ∈ L, f x.1 = false → ∀ r, linResp O σ L x.1 = some r →
+    (hpres : ∀ x ∈ L, f x.1 = false → ∀ r, O.respIn σ L x.1 = some r →
       ∀ τ, (O.δ τ x.2).2 = r → (O.δ τ x.2).1 = τ) :
     DLin O h σ (L.filter (fun x => f x.1)) where
   nodup := ((List.filter_sublist (l := L)).map Prod.fst).nodup hd.nodup

@@ -87,10 +87,20 @@ Full list of differences (including modelling choices and minor imprecisions): [
   value (with that value), contains no operation whose recovery returned `fail`, may contain
   pending operations, and respects real-time order. `fail` is only returned by recovery
   functions.
+  Sanity check against CSLib (`LinBridge.lean`): let `h` be a history without crashes and `fail`
+  responses that records a well-formed CSLib history `α`, with identifier `ι (p, k)` for the
+  `k`-th operation of `p` and `ι` injective on the invoked instances. Then a list of invoked
+  instances is a CSLib linearization (`IsLinearization`) of `α` iff its renaming by `ι` is a
+  `DLin` of `h` from `O.init`. Hence `h` has a `DLin` from `O.init` iff `α` is linearizable
+  (`dLin_iff_isLinearization`, `exists_dLin_iff_exists_isLinearization`).
 * **Progress.** `ObstructionFree`: from every reachable configuration, a solo process completes.
   `WeakOF` (Definition 2): the same, but only when all others are idle. `BoundedSteps` is a
   syntactic wait-freedom certificate.
 * Deterministic processes; no randomness. The adversary chooses the schedule and the crashes.
+* Objects: sequential specifications `ObjSpec` with the shared catalog (`register`, `casObject`,
+  `queueObj`, `maxRegObj`); the paper-specific ones are the counters, the read/CAS object `casRC`
+  and fetch-and-add with `read` (`Perturbing.lean`). Responses assigned by a sequential order are
+  the library's `ObjSpec.respIn`.
 
 **Main results in Lean.**
 
@@ -122,4 +132,5 @@ Full list of differences (including modelling choices and minor imprecisions): [
   register needs no auxiliary state.
 
 CSLib candidates: the long-lived crash-recovery model with durable detectable linearizability
-(`Model.lean`, `Basic.lean`, `Lin.lean`, `Alg2LinTools.lean`, register tools in `Alg1Lin.lean`).
+(`Model.lean`, `Basic.lean`, `Lin.lean`, `Alg2LinTools.lean`, register tools in `Alg1Lin.lean`,
+the bridge `LinBridge.lean`).
