@@ -32,7 +32,7 @@ variable {X : Type*} [Fintype X] [DecidableEq X] {R : X → X → Prop} {T : Mat
 moves are exactly the transitions: if a closed set `S` is reachable from every configuration, the
 probability of being outside `S` after `t` steps tends to `0`. -/
 theorem tendsto_compl_of_reach [Fintype S] (hT : T ∈ rowStochastic ℝ X)
-    (hstep : ∀ x y, 0 < T x y → R x y) (hpos : ∀ x y, R x y → 0 < T x y) (hS : IsClosed R S)
+    (hstep : ∀ x y, 0 < T x y → R x y) (hpos : ∀ x y, R x y → 0 < T x y) (hS : IsTrap R S)
     (h : ∀ x, ∃ y ∈ S, Reach R x y) (x : X) :
     Tendsto (fun t => ∑ y ∈ S.toFinsetᶜ, (T ^ t) x y) atTop (𝓝 0) := by
   refine tendsto_sum_compl_of_absorbing hT (fun a ha b hb => ?_) (fun a => ?_) x
@@ -49,7 +49,7 @@ theorem SelfStabilizes.tendsto [Fintype {x | StablyIn R S x}] (hT : T ∈ rowSto
     (hstep : ∀ x y, 0 < T x y → R x y) (hpos : ∀ x y, R x y → 0 < T x y)
     (h : SelfStabilizes R S) (x : X) :
     Tendsto (fun t => ∑ y ∈ {y | StablyIn R S y}.toFinsetᶜ, (T ^ t) x y) atTop (𝓝 0) :=
-  tendsto_compl_of_reach hT hstep hpos isClosed_stablyIn
+  tendsto_compl_of_reach hT hstep hpos isTrap_stablyIn
     (fun x => (h x).imp fun _ hy => ⟨hy.2, hy.1⟩) x
 
 /-- **Unreachability implies probability `0`.** If no configuration of `S` is reachable from `x`,

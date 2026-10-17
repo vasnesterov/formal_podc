@@ -35,7 +35,7 @@ export Cslib.PopulationProtocol (upd upd_left upd_right upd_other)
 
 namespace TS
 
-export Cslib.TransitionSystem (Run IsClosed)
+export Cslib.TransitionSystem (Run IsTrap)
 
 /-- A predicate on a finite type as a finset. -/
 noncomputable def setOf {X : Type*} [Fintype X] (S : X → Prop) : Finset X := by
@@ -85,7 +85,7 @@ def SelfStab [Fintype V] (out : Q → Bool) : Prop :=
 variable {G P}
 
 lemma outputStable_closed {out : Q → Bool} :
-    IsClosed (P.Step G) (P.OutputStable G out) := by
+    IsTrap (P.Step G) (P.OutputStable G out) := by
   intro C D hC hCD E hDE v
   rw [hC E (Relation.ReflTransGen.head hCD hDE) v, hC D (Relation.ReflTransGen.single hCD) v]
 
@@ -98,7 +98,7 @@ lemma numLeaders_eq_of_outputStable [Fintype V] {out : Q → Bool} {C D : V → 
   simp [hC D h v]
 
 lemma validStable_closed [Fintype V] {out : Q → Bool} :
-    IsClosed (P.Step G) (P.ValidStable G out) := by
+    IsTrap (P.Step G) (P.ValidStable G out) := by
   intro C D hC hCD
   refine ⟨outputStable_closed hC.1 hCD, ?_⟩
   rw [numLeaders_eq_of_outputStable hC.1 (Relation.ReflTransGen.single hCD), hC.2]
@@ -107,7 +107,7 @@ lemma validStable_closed [Fintype V] {out : Q → Bool} :
 of valid output-stable configurations. -/
 lemma selfStab_iff_selfStabilizes [Fintype V] {out : Q → Bool} :
     P.SelfStab G out ↔ SelfStabilizes (P.Step G) (P.ValidStable G out) :=
-  (selfStabilizes_iff_of_isClosed validStable_closed).symm
+  (selfStabilizes_iff_of_isTrap validStable_closed).symm
 
 lemma step_total (hedge : ∃ u v, G.Adj u v) (hδ : ∀ p q, (P.δ p q).Nonempty) (C : V → Q) :
     ∃ D, P.Step G C D := by

@@ -56,5 +56,4 @@ theorem uniformKernel_pos_iff (P : Protocol Q) (C D : Config A Q) :
     exact randomMap_pos hμ (fun ω C => P.interact C ω.1.1 ω.1.2)
       (ω := (⟨(a, b), hab⟩ : Pairs A)) (by positivity) C
 
-
 end Cslib.PopulationProtocol
