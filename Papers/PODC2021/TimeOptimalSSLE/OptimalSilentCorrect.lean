@@ -172,136 +172,20 @@ variable {A : Type*} [DecidableEq A]
 
 /-- Valid configurations stay valid. -/
 theorem valid_reachable (hn : 1 ≤ p.n) {C D : Config A St} (hC : ∀ a, Valid p (C a))
-    (h : (protocol p).Reachable C D) : ∀ a, Valid p (D a) := by
-  induction h with
-  | refl => exact hC
-  | tail _ hst ih =>
-    obtain ⟨a, b, hab, rfl⟩ := hst
-    have := valid_step p hn (ih a) (ih b)
-    intro x
-    by_cases hxa : x = a
-    · subst hxa; rw [Protocol.interact_self_left]; exact this.1
-    · by_cases hxb : x = b
-      · subst hxb; rw [Protocol.interact_self_right _ _ hab]; exact this.2
-      · rw [Protocol.interact_other _ _ hxa hxb]; exact ih x
+    (h : (protocol p).Reachable C D) : ∀ a, Valid p (D a) :=
+  Protocol.ClosedStates.reachable (P := protocol p) (H := {s | Valid p s})
+    (fun _ ha _ hb => valid_step p hn ha hb) hC h
 
 
-/-! ### Reachability inside a pair or a triple of agents -/
-
-section Generic
-
-variable {Q : Type*}
-
--- CSLib candidate
-/-- Reachability of pairs of states under repeated interactions of one ordered pair of agents. -/
-def PairReach (P : Protocol Q) : Q × Q → Q × Q → Prop :=
-  Relation.ReflTransGen fun u v => v = P.δ u.1 u.2
-
--- CSLib candidate
-/-- Interactions inside a triple of agents (all six ordered pairs). -/
-inductive TripleStep (P : Protocol Q) : Q × Q × Q → Q × Q × Q → Prop
-  | xy (a b c : Q) : TripleStep P (a, b, c) ((P.δ a b).1, (P.δ a b).2, c)
-  | yx (a b c : Q) : TripleStep P (a, b, c) ((P.δ b a).2, (P.δ b a).1, c)
-  | xz (a b c : Q) : TripleStep P (a, b, c) ((P.δ a c).1, b, (P.δ a c).2)
-  | zx (a b c : Q) : TripleStep P (a, b, c) ((P.δ c a).2, b, (P.δ c a).1)
-  | yz (a b c : Q) : TripleStep P (a, b, c) (a, (P.δ b c).1, (P.δ b c).2)
-  | zy (a b c : Q) : TripleStep P (a, b, c) (a, (P.δ c b).2, (P.δ c b).1)
-
--- CSLib candidate
-/-- Reachability inside a triple of agents. -/
-def TripleReach (P : Protocol Q) : Q × Q × Q → Q × Q × Q → Prop :=
-  Relation.ReflTransGen (TripleStep P)
-
--- CSLib candidate
-lemma PairReach.map {R : Type*} {P : Protocol Q} {S : R → R → Prop} (f : Q × Q → R)
-    (hf : ∀ u, S (f u) (f (P.δ u.1 u.2))) {u v : Q × Q} (h : PairReach P u v) :
-    Relation.ReflTransGen S (f u) (f v) := by
-  induction h with
-  | refl => exact Relation.ReflTransGen.refl
-  | tail _ hst ih => subst hst; exact ih.tail (hf _)
-
-lemma PairReach.xy {P : Protocol Q} {a b a' b' : Q} (c : Q) (h : PairReach P (a, b) (a', b')) :
-    TripleReach P (a, b, c) (a', b', c) :=
-  PairReach.map (S := TripleStep P) (fun u => (u.1, u.2, c)) (fun _ => TripleStep.xy _ _ _) h
-
-lemma PairReach.yx {P : Protocol Q} {a b a' b' : Q} (c : Q) (h : PairReach P (b, a) (b', a')) :
-    TripleReach P (a, b, c) (a', b', c) :=
-  PairReach.map (S := TripleStep P) (fun u => (u.2, u.1, c)) (fun _ => TripleStep.yx _ _ _) h
-
-lemma PairReach.xz {P : Protocol Q} {a c a' c' : Q} (b : Q) (h : PairReach P (a, c) (a', c')) :
-    TripleReach P (a, b, c) (a', b, c') :=
-  PairReach.map (S := TripleStep P) (fun u => (u.1, b, u.2)) (fun _ => TripleStep.xz _ _ _) h
-
-lemma PairReach.zx {P : Protocol Q} {a c a' c' : Q} (b : Q) (h : PairReach P (c, a) (c', a')) :
-    TripleReach P (a, b, c) (a', b, c') :=
-  PairReach.map (S := TripleStep P) (fun u => (u.2, b, u.1)) (fun _ => TripleStep.zx _ _ _) h
-
-lemma PairReach.yz {P : Protocol Q} {b c b' c' : Q} (a : Q) (h : PairReach P (b, c) (b', c')) :
-    TripleReach P (a, b, c) (a, b', c') :=
-  PairReach.map (S := TripleStep P) (fun u => (a, u.1, u.2)) (fun _ => TripleStep.yz _ _ _) h
-
-lemma PairReach.zy {P : Protocol Q} {b c b' c' : Q} (a : Q) (h : PairReach P (c, b) (c', b')) :
-    TripleReach P (a, b, c) (a, b', c') :=
-  PairReach.map (S := TripleStep P) (fun u => (a, u.2, u.1)) (fun _ => TripleStep.zy _ _ _) h
-
--- CSLib candidate
-/-- A run of two agents `a ≠ b` lifts to the whole population (other agents idle). -/
-lemma PairReach.lift {P : Protocol Q} {C : Config A Q} {a b : A} (hab : a ≠ b) {u : Q × Q}
-    (h : PairReach P (C a, C b) u) :
-    ∃ D, P.Reachable C D ∧ D a = u.1 ∧ D b = u.2 ∧ ∀ z, z ≠ a → z ≠ b → D z = C z := by
-  induction h with
-  | refl => exact ⟨C, Relation.ReflTransGen.refl, rfl, rfl, fun _ _ _ => rfl⟩
-  | tail _ hst ih =>
-    obtain ⟨D, hD, hDa, hDb, hDz⟩ := ih
-    subst hst
-    refine ⟨P.interact D a b, hD.tail ⟨a, b, hab, rfl⟩, ?_, ?_, ?_⟩
-    · rw [Protocol.interact_self_left, hDa, hDb]
-    · rw [Protocol.interact_self_right _ _ hab, hDa, hDb]
-    · intro z hza hzb; rw [Protocol.interact_other _ _ hza hzb, hDz z hza hzb]
-
--- CSLib candidate
-/-- A run of three distinct agents lifts to the whole population (other agents idle). -/
-lemma TripleReach.lift {P : Protocol Q} {C : Config A Q} {x y z : A} (hxy : x ≠ y) (hxz : x ≠ z)
-    (hyz : y ≠ z) {u : Q × Q × Q} (h : TripleReach P (C x, C y, C z) u) :
-    ∃ D, P.Reachable C D ∧ D x = u.1 ∧ D y = u.2.1 ∧ D z = u.2.2 ∧
-      ∀ w, w ≠ x → w ≠ y → w ≠ z → D w = C w := by
-  induction h with
-  | refl => exact ⟨C, Relation.ReflTransGen.refl, rfl, rfl, rfl, fun _ _ _ _ => rfl⟩
-  | tail _ hst ih =>
-    obtain ⟨D, hD, hDx, hDy, hDz, hDw⟩ := ih
-    have hyx := hxy.symm
-    have hzx := hxz.symm
-    have hzy := hyz.symm
-    cases hst with
-    | xy a b c =>
-      refine ⟨P.interact D x y, hD.tail ⟨x, y, hxy, rfl⟩, ?_, ?_, ?_, ?_⟩ <;>
-        simp_all [Protocol.interact]
-    | yx a b c =>
-      refine ⟨P.interact D y x, hD.tail ⟨y, x, hyx, rfl⟩, ?_, ?_, ?_, ?_⟩ <;>
-        simp_all [Protocol.interact]
-    | xz a b c =>
-      refine ⟨P.interact D x z, hD.tail ⟨x, z, hxz, rfl⟩, ?_, ?_, ?_, ?_⟩ <;>
-        simp_all [Protocol.interact]
-    | zx a b c =>
-      refine ⟨P.interact D z x, hD.tail ⟨z, x, hzx, rfl⟩, ?_, ?_, ?_, ?_⟩ <;>
-        simp_all [Protocol.interact]
-    | yz a b c =>
-      refine ⟨P.interact D y z, hD.tail ⟨y, z, hyz, rfl⟩, ?_, ?_, ?_, ?_⟩ <;>
-        simp_all [Protocol.interact]
-    | zy a b c =>
-      refine ⟨P.interact D z y, hD.tail ⟨z, y, hzy, rfl⟩, ?_, ?_, ?_, ?_⟩ <;>
-        simp_all [Protocol.interact]
-
-end Generic
 
 
 /-! ### One-interaction computations -/
 
 /-- Pair reachability for `Optimal-Silent-SSR`. -/
-abbrev PReach : St × St → St × St → Prop := PairReach (protocol p)
+abbrev PReach : St × St → St × St → Prop := Protocol.PairReach (protocol p)
 
 /-- Triple reachability for `Optimal-Silent-SSR`. -/
-abbrev TReach : St × St × St → St × St × St → Prop := TripleReach (protocol p)
+abbrev TReach : St × St × St → St × St × St → Prop := Protocol.TripleReach (protocol p)
 
 variable {p}
 
@@ -796,7 +680,7 @@ lemma sweep (hp : p.fixed = true) (hn : 2 ≤ p.n) (hR : 2 ≤ p.Rmax) (hD : 2 �
       have h3 : TReach p (C x, C y, C t) (resetting true 0 p.Dmax, resetting true 0 p.Dmax,
           resetting false 0 p.Dmax) := by
         rw [hx, hy]; exact treach_process hp hn hR hD (hC t) htc
-      obtain ⟨D, hCD, hDx, hDy, hDt, hDo⟩ := TripleReach.lift hxy htx.symm hty.symm h3
+      obtain ⟨D, hCD, hDx, hDy, hDt, hDo⟩ := Protocol.TripleReach.lift hxy htx.symm hty.symm h3
       have hDv : ∀ z, Valid p (D z) := valid_reachable p (by omega) hC hCD
       have hlt : (Finset.univ.filter fun z => z ≠ x ∧ z ≠ y ∧ ¬ Clean (D z)).card < k := by
         rw [← hk]
@@ -907,7 +791,7 @@ lemma BFS.step (hp : p.fixed = true) (hA : Fintype.card A = p.n) {m : ℕ} (hm :
   have hδ := δ_recruit_clean (p := p) hp hz (r := r₀) (c := ch m r₀)
     (by unfold ch; split_ifs <;> omega) (by unfold ch; split_ifs <;> omega)
   rw [← hCs] at hδ
-  obtain ⟨D, hCD, hDs, hDz, hDo⟩ := PairReach.lift (P := protocol p) hsz (PReach.one hδ)
+  obtain ⟨D, hCD, hDs, hDz, hDo⟩ := Protocol.PairReach.lift (P := protocol p) hsz (PReach.one hδ)
   simp only at hDs hDz
   have h2 : 2 * r₀ + ch m r₀ = m + 1 := by unfold ch; split_ifs <;> omega
   rw [h2] at hDz
@@ -1035,7 +919,7 @@ lemma phase0 (hD : 2 ≤ p.Dmax) (hA2 : 1 < Fintype.card A) : ∀ (k : ℕ) (C :
     have hw' : (C w).isResetting = true := by simpa using hw
     obtain ⟨c, hcw⟩ := Fintype.exists_ne_of_one_lt_card hA2 w
     obtain ⟨u, hu, hG⟩ := preach_R_any (p := p) (c := C c) hD hw'
-    obtain ⟨D, hCD, hDw, hDc, hDo⟩ := PairReach.lift (P := protocol p) hcw.symm hu
+    obtain ⟨D, hCD, hDw, hDc, hDo⟩ := Protocol.PairReach.lift (P := protocol p) hcw.symm hu
     rcases hG with ⟨h1, h2⟩ | htr
     · have hlt : (Finset.univ.filter fun z => (D z).isResetting = true).card < k := by
         rw [← hk]
@@ -1118,7 +1002,7 @@ lemma reach_of_allSettled {C : Config A St} (hC : ∀ a, Valid p (C a))
     simp only [St.rankOut] at hab
     subst hab
     have h1 : PReach p (C a, C b) (trig p, trig p) := by rw [ha, hb]; exact PReach.one δ_SS
-    obtain ⟨D, hCD, hDa, hDb, -⟩ := PairReach.lift (P := protocol p) hne h1
+    obtain ⟨D, hCD, hDa, hDb, -⟩ := Protocol.PairReach.lift (P := protocol p) hne h1
     exact ⟨D, hCD, Or.inr ⟨a, b, hne, hDa, hDb⟩⟩
 
 /-- From a valid configuration without Resetting agents, a ranked configuration or a
@@ -1131,7 +1015,7 @@ lemma phase1 (hp : p.fixed = true) (hn : 2 ≤ p.n) (hA2 : 1 < Fintype.card A) {
   by_cases hU2 : ∃ u v, u ≠ v ∧ (∃ e, C u = unsettled e) ∧ ∃ e, C v = unsettled e
   · obtain ⟨u, v, huv, ⟨e, he⟩, ⟨e', he'⟩⟩ := hU2
     have h1 : PReach p (C u, C v) (trig p, trig p) := by rw [he, he']; exact preach_UU e e'
-    obtain ⟨D, hCD, hDu, hDv, -⟩ := PairReach.lift (P := protocol p) huv h1
+    obtain ⟨D, hCD, hDu, hDv, -⟩ := Protocol.PairReach.lift (P := protocol p) huv h1
     exact ⟨D, hCD, Or.inr ⟨u, v, huv, hDu, hDv⟩⟩
   push Not at hU2
   by_cases hU1 : ∃ u e, C u = unsettled e
@@ -1141,7 +1025,7 @@ lemma phase1 (hp : p.fixed = true) (hn : 2 ≤ p.n) (hA2 : 1 < Fintype.card A) {
       have hsu : s ≠ u := by rintro rfl; rw [hs] at hu; cases hu
       have h1 : PReach p (C s, C u) (trig p, trig p) := by
         rw [hs, hu]; exact preach_SU hp hg e
-      obtain ⟨D, hCD, hDs, hDu, -⟩ := PairReach.lift (P := protocol p) hsu h1
+      obtain ⟨D, hCD, hDs, hDu, -⟩ := Protocol.PairReach.lift (P := protocol p) hsu h1
       exact ⟨D, hCD, Or.inr ⟨s, u, hsu, hDs, hDu⟩⟩
     · push Not at hst
       obtain ⟨s, hsu⟩ := Fintype.exists_ne_of_one_lt_card hA2 u
@@ -1154,7 +1038,7 @@ lemma phase1 (hp : p.fixed = true) (hn : 2 ≤ p.n) (hA2 : 1 < Fintype.card A) {
       obtain ⟨hc2, hg⟩ := hst s r c hs
       have h1 : PReach p (C s, C u) (settled r (c + 1), settled (2 * r + c) 0) := by
         rw [hs, hu]; exact PReach.one (δ_recruit_clean hp trivial (hc2) (hg))
-      obtain ⟨D, hCD, hDs, hDu, hDo⟩ := PairReach.lift (P := protocol p) hsu h1
+      obtain ⟨D, hCD, hDs, hDu, hDo⟩ := Protocol.PairReach.lift (P := protocol p) hsu h1
       have hDv := valid_reachable p (by omega) hC hCD
       obtain ⟨E, hDE, hE⟩ := reach_of_allSettled hDv (fun z => by
         by_cases hzs : z = s
@@ -1182,20 +1066,20 @@ lemma reach_ranked_of_trig (hp : p.fixed = true) (hA : Fintype.card A = p.n) (hn
     have h3 : TReach p (C x, C y, C t) (resetting true 0 p.Dmax, resetting true 0 p.Dmax,
         resetting false 0 p.Dmax) := by
       rw [hx, hy]; exact treach_trig hR hD1 (hC t)
-    obtain ⟨D₁, hCD₁, hD₁x, hD₁y, -, -⟩ := TripleReach.lift hxy htx.symm hty.symm h3
+    obtain ⟨D₁, hCD₁, hD₁x, hD₁y, -, -⟩ := Protocol.TripleReach.lift hxy htx.symm hty.symm h3
     have hD₁v := valid_reachable p (by omega) hC hCD₁
     obtain ⟨D₂, hD₁D₂, hD₂x, hD₂y, hD₂o⟩ :=
       sweep hp hn hR hD hxy _ D₁ rfl hD₁v hD₁x hD₁y
     have h2 : PReach p (D₂ x, D₂ y) (settled 1 1, settled 2 0) := by
       rw [hD₂x, hD₂y]; exact preach_LL hp hn hD
-    obtain ⟨D₃, hD₂D₃, hD₃x, hD₃y, hD₃o⟩ := PairReach.lift (P := protocol p) hxy h2
+    obtain ⟨D₃, hD₂D₃, hD₃x, hD₃y, hD₃o⟩ := Protocol.PairReach.lift (P := protocol p) hxy h2
     obtain ⟨E, hD₃E, hE⟩ := reach_ranked_of_12 hp hA hn hxy hD₃x hD₃y
       (fun z hzx hzy => by rw [hD₃o z hzx hzy]; exact hD₂o z hzx hzy)
     exact ⟨E, hCD₁.trans (hD₁D₂.trans (hD₂D₃.trans hD₃E)), hE⟩
   · push Not at hd
     have h2 : PReach p (C x, C y) (settled 1 1, settled 2 0) := by
       rw [hx, hy]; exact preach_trig_trig hp hn hR hD1
-    obtain ⟨D₁, hCD₁, hD₁x, hD₁y, hD₁o⟩ := PairReach.lift (P := protocol p) hxy h2
+    obtain ⟨D₁, hCD₁, hD₁x, hD₁y, hD₁o⟩ := Protocol.PairReach.lift (P := protocol p) hxy h2
     obtain ⟨E, hD₁E, hE⟩ := reach_ranked_of_12 hp hA hn hxy hD₁x hD₁y
       (fun z hzx hzy => by rw [hD₁o z hzx hzy]; exact hd z hzx hzy)
     exact ⟨E, hCD₁.trans hD₁E, hE⟩

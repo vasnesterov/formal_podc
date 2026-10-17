@@ -165,7 +165,8 @@ in-neighbours, then `IL` and `IL'` have the same ancestors of members of `S`. -/
 theorem Ext.rtg_iff {IL IL' : InLists n} (h : Ext IL IL') {S : Set (Fin n)}
     (hS1 : ∀ r ∈ S, (IL r).isSome) (hS2 : ∀ r ∈ S, ∀ u, Edge IL u r → u ∈ S) {u r : Fin n}
     (hr : r ∈ S) : ReflTransGen (Edge IL') u r ↔ ReflTransGen (Edge IL) u r := by
-  refine rtg_iff_of_inClosed (fun r hr u => ?_) hS2 hr
+  refine Digraph.reachable_iff_of_closed (G := ⟨Edge IL⟩) (H := ⟨Edge IL'⟩) (fun r hr u => ?_)
+    hS2 hr
   obtain ⟨I, hI⟩ := Option.isSome_iff_exists.1 (hS1 r hr)
   simp [Edge, hI, h r I hI]
 
@@ -234,11 +235,11 @@ theorem frozenRoot_of_closed {x : Fin n → V} {IL : InLists n}
     simp [hext u I hI]
   · exact hext.rtg (hm.2 u ((key u).1 hu))
   · have hu' := (key u).1 hu
-    exact hmin u (mem_roots.2 ⟨hu'.trans hm.1, hm.2.of_rtg hu'⟩)
+    exact hmin u (mem_roots.2 ⟨hu'.trans hm.1, hm.2.of_reachable hu'⟩)
 
 theorem roots_nonempty (know : Fin n → Option (V × Finset (Fin n))) (p : Fin n) :
     (roots know p).Nonempty := by
-  obtain ⟨r, hr, hroot⟩ := exists_isRoot (E := Edge (ilOf know)) p
+  obtain ⟨r, hr, hroot⟩ := (Digraph.mk (Edge (ilOf know))).exists_inSourceComponent p
   exact ⟨r, mem_roots.2 ⟨hr, hroot⟩⟩
 
 theorem tryDec_isSome {p : Fin n} {st : St n V} (hc : Closed st.know p) :

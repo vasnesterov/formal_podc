@@ -1,4 +1,5 @@
 import Papers.PODC2018.AsymptoticConsensus.Alpha
+import Podc.Foundations.Data.Nat.Growth
 
 /-!
 # Exact consensus and valencies (Section 7 of FNS'18)
@@ -278,22 +279,19 @@ theorem exactSolvable_of_common_root {α : Type} [Fintype α] {N : Set (Graph α
     | succ t ih => exact hSmono t ih
   have hgrow : ∀ t, min (t + 1) (Fintype.card α) ≤ (S t).card := by
     intro t
-    induction t with
-    | zero => exact min_le_of_left_le (Finset.card_pos.2 ⟨r, hS0⟩)
-    | succ t ih =>
-      by_cases hfull : (S t).card = Fintype.card α
-      · have := Finset.card_le_card (hSmono t); have := Finset.card_le_univ (S (t + 1)); omega
-      · obtain ⟨y, hy⟩ : ∃ y, y ∉ S t := by
+    have h0 := Finset.card_pos.2 ⟨r, hS0⟩
+    have := Nat.min_add_le (f := fun t => (S t).card) (n := Fintype.card α) (K := t)
+      (fun i _ => Finset.card_le_card (hSmono i)) fun i _ hlt => by
+        obtain ⟨y, hy⟩ : ∃ y, y ∉ S i := by
           by_contra h; push Not at h
-          exact hfull (by rw [Finset.eq_univ_of_forall h, Finset.card_univ])
+          exact hlt.ne (by rw [Finset.eq_univ_of_forall h, Finset.card_univ])
         obtain ⟨z, w, hzw, hz, hw⟩ := Cslib.DynNet.exists_edge_cross
-          (S := fun i => i ∉ S t) (hr (p t) (hp t) y) (by simpa using hrS t) hy
-        have hz' : z ∈ S t := not_not.1 hz
-        have hw' : w ∈ S (t + 1) := by
+          (S := fun j => j ∉ S i) (hr (p i) (hp i) y) (by simpa using hrS i) hy
+        have hz' : z ∈ S i := not_not.1 hz
+        have hw' : w ∈ S (i + 1) := by
           rw [memS] at hz' ⊢; exact flood_mono x p (Or.inr hzw) hz'
-        have hss : S t ⊂ S (t + 1) := Finset.ssubset_iff_subset_ne.2
-          ⟨hSmono t, fun h => hw (h ▸ hw')⟩
-        have := Finset.card_lt_card hss; omega
+        exact Finset.card_lt_card (Finset.ssubset_iff_subset_ne.2 ⟨hSmono i, fun h => hw (h ▸ hw')⟩)
+    omega
   have hall : ∀ i, conf (flood r).step ((flood r).initC x) p (Fintype.card α) i = some (x r) := by
     intro i
     have h1 := hgrow (Fintype.card α)

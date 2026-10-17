@@ -1,4 +1,5 @@
 import Cslib.Computability.Distributed.ApproxConsensus.DigraphConditions
+import Podc.Foundations.Combinatorics.Digraph.Walk
 import Mathlib
 
 /-!
@@ -40,13 +41,10 @@ variable {V : Type*} [DecidableEq V] {G : Digraph V}
 def CTConn (G : Digraph V) (k : ℕ) : Prop :=
   ∀ F : Finset V, F.card ≤ k → (∃ v, v ∉ F) → ∃ s, s ∉ F ∧ ∀ v, v ∉ F → Reaches G F s v
 
-/-- `s` is a source (root) of the reduced graph `G_F` (Definition 4). -/
-def IsRoot (G : Digraph V) (F : Finset V) (s : V) : Prop := s ∉ F ∧ ∀ v, v ∉ F → Reaches G F s v
-
-/-- A node of `G_F` with an edge into a root is a root (roots form the source component). -/
-theorem IsRoot.of_adj {F : Finset V} {u w : V} (hw : IsRoot G F w) (e : G.Adj u w) (hu : u ∉ F) :
-    IsRoot G F u :=
-  ⟨hu, fun v hv => (hw.2 v hv).head e hu⟩
+/-- `s` is a source (root) of the reduced graph `G_F` (Definition 4): `s ∉ F` and `s` reaches every
+node of `G_F` (the shared `Digraph.IsRootAvoiding`; a node of `G_F` with an edge into a root is a
+root, `Digraph.IsRootAvoiding.of_adj`). -/
+abbrev IsRoot (G : Digraph V) (F : Finset V) (s : V) : Prop := G.IsRootAvoiding ↑F s
 
 /-- Crash-tolerant node connectivity is the *1-reach* condition. -/
 theorem ctConn_iff_oneReach [Fintype V] {k : ℕ} : CTConn G k ↔ OneReach G k := by
@@ -55,23 +53,9 @@ theorem ctConn_iff_oneReach [Fintype V] {k : ℕ} : CTConn G k ↔ OneReach G k 
   · intro h F u v hF hu hv
     obtain ⟨s, -, hs⟩ := h F hF ⟨u, hu⟩
     exact ⟨s, hs v hv, hs u hu⟩
-  · intro h F hF ⟨v₀, hv₀⟩
-    set D : V → Finset V := fun s => univ.filter fun x => Reaches G F s x
-    obtain ⟨s, hsF, hmax⟩ := Finset.exists_max_image (univ.filter fun x => x ∉ F)
-      (fun s => (D s).card) ⟨v₀, by simp [hv₀]⟩
-    simp only [mem_filter, mem_univ, true_and] at hsF hmax
-    refine ⟨s, hsF, fun v hv => ?_⟩
-    by_contra hsv
-    obtain ⟨w, hws, hwv⟩ := h F v s hF hv hsF
-    have hsub : D s ⊂ D w := by
-      rw [Finset.ssubset_iff_of_subset]
-      · exact ⟨v, by simp [D, hwv], by simp [D, hsv]⟩
-      · intro x hx
-        simp only [D, mem_filter, mem_univ, true_and] at hx ⊢
-        exact hws.trans hx
-    have := hmax w hws.1
-    have := Finset.card_lt_card hsub
-    omega
+  · intro h F hF hne
+    exact Digraph.exists_isRootAvoiding (X := ↑F) hne fun u v hu hv =>
+      (h F u v hF hu hv).imp fun _ hw => ⟨hw.2, hw.1⟩
 
 /-! ## Bounded reachability -/
 

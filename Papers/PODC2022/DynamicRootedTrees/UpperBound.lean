@@ -1,4 +1,5 @@
 import Papers.PODC2022.DynamicRootedTrees.Defs
+import Podc.Foundations.Data.Nat.Growth
 
 /-!
 # The linear upper bound (Section 3.1 of the full version)
@@ -199,41 +200,17 @@ theorem min_card_le_card_outNbhd (z : α) (S : Finset ℕ)
     (hS : ∀ t ∈ S, 1 ≤ t ∧ IsRoot (G t) (r t) ∧ r t ∈ outNbhd G 1 (t - 1) z) :
     ∀ K : ℕ, min (Fintype.card α) (S.filter (· ≤ K)).card ≤ (outNbhd G 1 K z).card := by
   intro K
-  induction K with
-  | zero =>
-    have : S.filter (· ≤ 0) = ∅ := by
-      ext t; simp only [mem_filter, Finset.notMem_empty, iff_false, not_and, Nat.le_zero]
-      intro ht h0; have := (hS t ht).1; omega
-    rw [this]; simp
-  | succ K ih =>
-    have hmono : (outNbhd G 1 K z).card ≤ (outNbhd G 1 (K + 1) z).card :=
-      card_le_card (outNbhd_mono hG le_rfl (Nat.le_succ K) z)
-    by_cases hK : K + 1 ∈ S
-    · have hfil : S.filter (· ≤ K + 1) = insert (K + 1) (S.filter (· ≤ K)) := by
-        ext t; simp only [mem_filter, mem_insert]
-        constructor
-        · rintro ⟨h1, h2⟩; by_cases h : t = K + 1
-          · exact Or.inl h
-          · exact Or.inr ⟨h1, by omega⟩
-        · rintro (rfl | ⟨h1, h2⟩)
-          · exact ⟨hK, le_rfl⟩
-          · exact ⟨h1, by omega⟩
-      rw [hfil, card_insert_of_notMem (by simp)]
-      obtain ⟨-, hroot, hmem⟩ := hS _ hK
+  have hcnt : (S.filter (· ≤ K)).card = #{t ∈ Icc 1 K | t ∈ S} := by
+    congr 1; ext t; simp only [mem_filter, mem_Icc]
+    exact ⟨fun h => ⟨⟨(hS t h.1).1, h.2⟩, h.1⟩, fun h => ⟨h.2, h.1.2⟩⟩
+  have := Nat.min_add_card_filter_le (f := fun K => (outNbhd G 1 K z).card)
+    (n := Fintype.card α) (K := K) (· ∈ S)
+    (fun t _ => card_le_card (outNbhd_mono hG le_rfl (Nat.le_succ t) z)) fun t _ ht hlt => by
+      obtain ⟨-, hroot, hmem⟩ := hS _ ht
       rw [Nat.add_sub_cancel] at hmem
-      by_cases hfull : (outNbhd G 1 K z).card < Fintype.card α
-      · have := card_outNbhd_lt_of_root_mem hG hroot hmem hfull
-        omega
-      · omega
-    · have hfil : S.filter (· ≤ K + 1) = S.filter (· ≤ K) := by
-        ext t; simp only [mem_filter]
-        constructor
-        · rintro ⟨h1, h2⟩; refine ⟨h1, ?_⟩
-          rcases Nat.lt_or_ge K t with h | h
-          · exact absurd (show t = K + 1 by omega ▸ h1) hK
-          · exact h
-        · rintro ⟨h1, h2⟩; exact ⟨h1, by omega⟩
-      rw [hfil]; omega
+      exact card_outNbhd_lt_of_root_mem hG hroot hmem hlt
+  rw [hcnt]
+  omega
 
 include hG hr in
 /-- **Theorem 3.6 (generic form).** If `m ≤ R` and `(n-1)(n+m-1) < ∑_{t=1}^{R} min(m,t)`, then some

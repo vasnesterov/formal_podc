@@ -1,4 +1,5 @@
 import Papers.PODC2024.SSLeaderElectionDirected.Defs
+import Podc.Foundations.Combinatorics.Digraph.Walk
 
 /-!
 # Algorithm C-MAI(D, ≺, I): minimum ancestors' input (Section 3)
@@ -160,29 +161,19 @@ theorem bestKey_congr {I' : V → D} {K' : V → Key D} (hI : I p = I' p)
 
 variable (G)
 
-open Classical in
-/-- The ancestors of `p`. -/
-noncomputable def ancs (p : V) : Finset V := Finset.univ.filter fun q => G.Reachable q p
-
-theorem mem_ancs {q p : V} : q ∈ ancs G p ↔ G.Reachable q p := by
-  classical
-  simp [ancs]
-
-theorem self_mem_ancs (p : V) : p ∈ ancs G p := (mem_ancs G).mpr (Digraph.Reachable.refl p)
-
 /-- `MinI(p)`: the smallest input among the ancestors of `p`. -/
 noncomputable def minI (I : V → D) (p : V) : D :=
-  ((ancs G p).image I).min' ⟨I p, Finset.mem_image_of_mem I (self_mem_ancs G p)⟩
+  ((G.ancestors p).image I).min' ⟨I p, Finset.mem_image_of_mem I (G.self_mem_ancestors p)⟩
 
 variable {G}
 
 theorem minI_le {q p : V} (h : G.Reachable q p) : minI G I p ≤ I q :=
-  Finset.min'_le _ _ (Finset.mem_image_of_mem I ((mem_ancs G).mpr h))
+  Finset.min'_le _ _ (Finset.mem_image_of_mem I (Digraph.mem_ancestors.mpr h))
 
 theorem exists_minI (p : V) : ∃ q, G.Reachable q p ∧ I q = minI G I p := by
-  obtain ⟨q, hq, h⟩ := Finset.mem_image.mp (Finset.min'_mem ((ancs G p).image I)
-    ⟨I p, Finset.mem_image_of_mem I (self_mem_ancs G p)⟩)
-  exact ⟨q, (mem_ancs G).mp hq, h⟩
+  obtain ⟨q, hq, h⟩ := Finset.mem_image.mp (Finset.min'_mem ((G.ancestors p).image I)
+    ⟨I p, Finset.mem_image_of_mem I (G.self_mem_ancestors p)⟩)
+  exact ⟨q, Digraph.mem_ancestors.mp hq, h⟩
 
 theorem minI_le_self (p : V) : minI G I p ≤ I p := minI_le (Digraph.Reachable.refl p)
 

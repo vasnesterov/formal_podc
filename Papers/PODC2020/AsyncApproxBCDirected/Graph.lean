@@ -1,4 +1,5 @@
 import Cslib.Computability.Distributed.ApproxConsensus.DigraphConditions
+import Podc.Foundations.Combinatorics.Digraph.Walk
 
 /-!
 # Reach sets, the reach conditions and source components of reduced graphs
@@ -109,9 +110,9 @@ removed. -/
 def RedAdj (G : Digraph V) (X : Finset V) (a b : V) : Prop := G.Adj a b ∧ a ∉ X
 
 /-- `s` belongs to the source component `S_{F₁,F₂}`: it reaches every node in the reduced graph
-`G_{F₁,F₂}`. -/
-def InSrc (G : Digraph V) (F₁ F₂ : Finset V) (s : V) : Prop :=
-  ∀ y, ReflTransGen (RedAdj G (F₁ ∪ F₂)) s y
+`G_{F₁,F₂}` (a root, `Digraph.IsRoot`, of the reduced graph). -/
+abbrev InSrc (G : Digraph V) (F₁ F₂ : Finset V) (s : V) : Prop :=
+  (Digraph.mk (RedAdj G (F₁ ∪ F₂))).IsRoot s
 
 /-- The source component `S_{F₁,F₂}` (Definition 6). -/
 noncomputable def srcComp [Fintype V] (G : Digraph V) (F₁ F₂ : Finset V) : Finset V := by
@@ -171,23 +172,11 @@ theorem ThreeReach.srcComp_nonempty {f : ℕ} (hG : ThreeReach G f) (hn : 2 ≤ 
   have h3 := hG.three_mul_lt_card hn
   have hXc : (F₁ ∪ F₂).card < Fintype.card V := by have := card_union_le F₁ F₂; omega
   set Y := F₁ ∪ F₂ with hY
-  set W : Finset V := univ \ Y
-  have hW : W.Nonempty := by
-    rw [← card_pos, card_sdiff_of_subset (subset_univ _), card_univ]; omega
-  let A : V → Finset V := fun w => univ.filter (fun a => Reaches G Y a w)
-  obtain ⟨s, hsW, hmin⟩ := exists_min_image W (fun w => (A w).card) hW
-  have hsY : s ∉ Y := (mem_sdiff.mp hsW).2
-  -- `s` reaches every node outside `X` while avoiding `X`
-  have hreach : ∀ w, w ∉ Y → Reaches G Y s w := by
-    intro w hw
-    obtain ⟨z, hz1, hz2⟩ := hG F₁ F₂ F₂ w s h₁ h₂ h₂ hw hsY
-    have hsub : A z ⊆ A s := fun a ha => by
-      simp only [A, mem_filter, mem_univ, true_and] at ha ⊢; exact ha.trans hz1
-    have hzW : z ∈ W := mem_sdiff.mpr ⟨mem_univ _, hz1.1⟩
-    have heq := eq_of_subset_of_card_le hsub (hmin z hzW)
-    have : s ∈ A z := by rw [heq]; simpa [A] using Reaches.refl hsY
-    simp only [A, mem_filter, mem_univ, true_and] at this
-    exact this.trans hz2
+  -- some `s ∉ X` reaches every node outside `X` while avoiding `X` (pairwise common ancestors)
+  obtain ⟨s, hsY, hreach⟩ : ∃ s, G.IsRootAvoiding ↑Y s := by
+    obtain ⟨v, -, hv⟩ := exists_mem_notMem_of_card_lt_card (s := Y) (t := univ) (by simpa using hXc)
+    exact Digraph.exists_isRootAvoiding ⟨v, hv⟩ fun u v hu hv =>
+      (hG F₁ F₂ F₂ u v h₁ h₂ h₂ hu hv).imp fun _ h => ⟨h.2, h.1⟩
   refine ⟨s, mem_srcComp.mpr fun y => ?_⟩
   by_cases hy : y ∈ Y
   · -- `y` has an in-neighbour outside `X`

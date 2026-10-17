@@ -1,4 +1,5 @@
 import Cslib.Computability.Distributed.PopulationProtocols.Nondet
+import Podc.Computability.Distributed.PopulationProtocols.Nondet
 import Mathlib.Combinatorics.SimpleGraph.Finite
 
 /-!
@@ -65,9 +66,10 @@ abbrev Step : (V → Q) → (V → Q) → Prop := P.StepOn G.Adj
 /-- Reachability. -/
 abbrev Reachable : (V → Q) → (V → Q) → Prop := Reach (P.Step G)
 
-/-- The output never changes again. -/
-def OutputStable (out : Q → Bool) (C : V → Q) : Prop :=
-  ∀ D, P.Reachable G C D → ∀ v, out (D v) = out (C v)
+/-- The output never changes again (the shared `NProtocol.OutputStable` along the edges of
+`G`). -/
+abbrev OutputStable (out : Q → Bool) (C : V → Q) : Prop :=
+  NProtocol.OutputStable P G.Adj out C
 
 /-- Valid output-stable configuration: output-stable with exactly one leader. -/
 def ValidStable [Fintype V] (out : Q → Bool) (C : V → Q) : Prop :=
@@ -84,24 +86,11 @@ def SelfStab [Fintype V] (out : Q → Bool) : Prop :=
 
 variable {G P}
 
-lemma outputStable_closed {out : Q → Bool} :
-    IsTrap (P.Step G) (P.OutputStable G out) := by
-  intro C D hC hCD E hDE v
-  rw [hC E (Relation.ReflTransGen.head hCD hDE) v, hC D (Relation.ReflTransGen.single hCD) v]
-
-lemma numLeaders_eq_of_outputStable [Fintype V] {out : Q → Bool} {C D : V → Q}
-    (hC : P.OutputStable G out C) (h : P.Reachable G C D) :
-    numLeaders out D = numLeaders out C := by
-  unfold numLeaders
-  congr 1
-  ext v
-  simp [hC D h v]
-
 lemma validStable_closed [Fintype V] {out : Q → Bool} :
     IsTrap (P.Step G) (P.ValidStable G out) := by
   intro C D hC hCD
-  refine ⟨outputStable_closed hC.1 hCD, ?_⟩
-  rw [numLeaders_eq_of_outputStable hC.1 (Relation.ReflTransGen.single hCD), hC.2]
+  refine ⟨NProtocol.isTrap_outputStable out hC.1 hCD, ?_⟩
+  rw [hC.1.numLeaders_eq (Relation.ReflTransGen.single hCD), hC.2]
 
 /-- `SelfStab` is self-stabilization (`Cslib.TransitionSystem.SelfStabilizes`) to the closed set
 of valid output-stable configurations. -/
@@ -109,18 +98,12 @@ lemma selfStab_iff_selfStabilizes [Fintype V] {out : Q → Bool} :
     P.SelfStab G out ↔ SelfStabilizes (P.Step G) (P.ValidStable G out) :=
   (selfStabilizes_iff_of_isTrap validStable_closed).symm
 
-lemma step_total (hedge : ∃ u v, G.Adj u v) (hδ : ∀ p q, (P.δ p q).Nonempty) (C : V → Q) :
-    ∃ D, P.Step G C D := by
-  obtain ⟨u, v, huv⟩ := hedge
-  obtain ⟨o, ho⟩ := hδ (C u) (C v)
-  exact ⟨_, u, v, huv, o, ho, rfl⟩
-
 /-- `SolvesSSLE` (global fairness) is equivalent to `SelfStab` (reachability), for finite state
 spaces, nonempty transition sets and graphs with at least one edge. -/
 theorem solvesSSLE_iff [Fintype V] [Finite Q] (hedge : ∃ u v, G.Adj u v)
     (hδ : ∀ p q, (P.δ p q).Nonempty) (out : Q → Bool) :
     P.SolvesSSLE G out ↔ P.SelfStab G out :=
-  globallyFair_iff_reach (step_total hedge hδ) validStable_closed
+  globallyFair_iff_reach (NProtocol.exists_stepOn hedge hδ) validStable_closed
 
 /-- **Lemma 2.1 (Detect-Error-and-Random-Change Lemma)**, with explicit hypotheses.
 `err` is the set of error-detected configurations. The paper's two conditions are `hcases`; the
@@ -149,7 +132,7 @@ theorem not_solvesSSLE_of [Fintype V] [Finite Q] (hedge : ∃ u v, G.Adj u v)
     (hδ : ∀ p q, (P.δ p q).Nonempty) {out : Q → Bool} (C : V → Q)
     (hC : ∀ D, P.Reachable G C D → ¬ P.ValidStable G out D) :
     ∃ E : TS.Run (P.Step G), E.st 0 = C ∧ E.GloballyFair ∧ ∀ t, ¬ P.ValidStable G out (E.st t) :=
-  exists_globallyFair_forall_not_mem (step_total hedge hδ) hC
+  exists_globallyFair_forall_not_mem (NProtocol.exists_stepOn hedge hδ) hC
 
 end GProtocol
 
