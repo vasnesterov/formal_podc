@@ -940,3 +940,12 @@ import Papers.PODC2025.ByzantineSWMRRegisters.Main
 import Papers.PODC2025.ByzantineSWMRRegisters.Observation30
 import Papers.PODC2025.ByzantineSWMRRegisters.Degenerate
 import Papers.PODC2018.LockFreeVsWaitFree.Main
+import Papers.PODC2015.ABADetection.Defs
+import Papers.PODC2015.ABADetection.Common
+import Papers.PODC2015.ABADetection.Lemma1
+import Papers.PODC2015.ABADetection.Observation
+import Papers.PODC2015.ABADetection.WeakSpec
+import Papers.PODC2015.ABADetection.CasDefs
+import Papers.PODC2015.ABADetection.Lemma2
+import Papers.PODC2015.ABADetection.Lemma3
+import Papers.PODC2015.ABADetection.Theorem1
