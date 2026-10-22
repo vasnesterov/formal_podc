@@ -958,3 +958,10 @@ import Papers.PODC2021.RegisterLinTermination.Alg2WSL
 import Papers.PODC2021.RegisterLinTermination.Theorem6
 import Papers.PODC2021.RegisterLinTermination.Theorem7Core
 import Papers.PODC2021.RegisterLinTermination.Theorem7
+import Papers.PODC2016.ShortcutsNoEmbedding.Defs
+import Papers.PODC2016.ShortcutsNoEmbedding.Lemma1
+import Papers.PODC2016.ShortcutsNoEmbedding.CoreSlow
+import Papers.PODC2016.ShortcutsNoEmbedding.Theorem1
+import Papers.PODC2016.ShortcutsNoEmbedding.Supersteps
+import Papers.PODC2016.ShortcutsNoEmbedding.Theorem2
+import Papers.PODC2016.ShortcutsNoEmbedding.Verification
