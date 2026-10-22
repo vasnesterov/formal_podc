@@ -883,3 +883,10 @@ import Papers.PODC2012.ResilientRouting.Fig3
 import Papers.PODC2012.ResilientRouting.Theorem43
 import Papers.PODC2012.ResilientRouting.Theorem31
 import Papers.PODC2012.ResilientRouting.Counterexamples
+import Papers.PODC2016.RationalConsensus.Model
+import Papers.PODC2016.RationalConsensus.Theorem1
+import Papers.PODC2016.RationalConsensus.Records
+import Papers.PODC2016.RationalConsensus.Protocol
+import Papers.PODC2016.RationalConsensus.Fairness
+import Papers.PODC2016.RationalConsensus.Theorem2
+import Papers.PODC2016.RationalConsensus.Examples
