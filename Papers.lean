@@ -988,3 +988,12 @@ import Papers.PODC2015.MinimalSynchronyBC.Consensus
 import Papers.PODC2015.MinimalSynchronyBC.Machine
 import Papers.PODC2015.MinimalSynchronyBC.Counterexample
 import Papers.PODC2015.MinimalSynchronyBC.Sanity
+import Papers.PODC2025.GeneralizedQuorums.Defs
+import Papers.PODC2025.GeneralizedQuorums.LowerBound
+import Papers.PODC2025.GeneralizedQuorums.Objects
+import Papers.PODC2025.GeneralizedQuorums.Main
+import Papers.PODC2025.GeneralizedQuorums.Examples
+import Papers.PODC2025.GeneralizedQuorums.Counterexamples
+import Papers.PODC2025.GeneralizedQuorums.ViewSync
+import Papers.PODC2025.GeneralizedQuorums.QuorumAccess
+import Papers.PODC2025.GeneralizedQuorums.QuorumAccessProof

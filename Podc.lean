@@ -17,3 +17,9 @@ import Podc.Foundations.Combinatorics.SimpleGraph.TreeCut
 import Podc.Foundations.Combinatorics.ShiftGraph
 import Podc.Computability.Distributed.Byzantine.PartialSync.Timeliness
 import Podc.Computability.Distributed.Byzantine.PartialSync.Quiescence
+import Podc.Computability.Distributed.MessagePassing.ChannelFailures.Model
+import Podc.Computability.Distributed.MessagePassing.ChannelFailures.Restrict
+import Podc.Computability.Distributed.MessagePassing.ChannelFailures.Canonical
+import Podc.Computability.Distributed.MessagePassing.ChannelFailures.Solo
+import Podc.Computability.Distributed.MessagePassing.ChannelFailures.Glue
+import Podc.Computability.Distributed.MessagePassing.ChannelFailures.PartialSync
