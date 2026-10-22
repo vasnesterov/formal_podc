@@ -14,3 +14,4 @@ import Podc.Computability.Distributed.SharedMemory.MWMRRegister
 import Podc.Computability.Distributed.SharedMemory.LinPointCheck
 import Podc.Computability.Distributed.Congest.SubtreeRouting
 import Podc.Foundations.Combinatorics.SimpleGraph.TreeCut
+import Podc.Foundations.Combinatorics.ShiftGraph

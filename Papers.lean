@@ -965,3 +965,11 @@ import Papers.PODC2016.ShortcutsNoEmbedding.Theorem1
 import Papers.PODC2016.ShortcutsNoEmbedding.Supersteps
 import Papers.PODC2016.ShortcutsNoEmbedding.Theorem2
 import Papers.PODC2016.ShortcutsNoEmbedding.Verification
+import Papers.PODC2015.RingColoringAverage.Model
+import Papers.PODC2015.RingColoringAverage.Minimal
+import Papers.PODC2015.RingColoringAverage.Lemma2
+import Papers.PODC2015.RingColoringAverage.Lemma3
+import Papers.PODC2015.RingColoringAverage.Linial
+import Papers.PODC2015.RingColoringAverage.Theorem1
+import Papers.PODC2015.RingColoringAverage.NonVacuity
+import Papers.PODC2015.RingColoringAverage.LargestId
