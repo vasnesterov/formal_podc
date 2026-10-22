@@ -915,3 +915,8 @@ import Papers.PODC2022.FullyDefective.Robbins.Invariant
 import Papers.PODC2022.FullyDefective.Robbins.Preservation
 import Papers.PODC2022.FullyDefective.Robbins.Simulation
 import Papers.PODC2022.FullyDefective.Robbins.Deadlock
+import Papers.PODC2011.SymmetryBreakingTasks.Basic
+import Papers.PODC2011.SymmetryBreakingTasks.Structure
+import Papers.PODC2011.SymmetryBreakingTasks.Examples
+import Papers.PODC2011.SymmetryBreakingTasks.Computability
+import Papers.PODC2011.SymmetryBreakingTasks.SlotRenaming
