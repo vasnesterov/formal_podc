@@ -1040,3 +1040,8 @@ import Papers.PODC2021.WeakAsyncDecisionPower.Cutoff
 import Papers.PODC2021.WeakAsyncDecisionPower.Halting
 import Papers.PODC2021.WeakAsyncDecisionPower.Majority
 import Papers.PODC2021.WeakAsyncDecisionPower.NonVacuity
+import Papers.PODC2013.SpeculativeStabilization.Model
+import Papers.PODC2013.SpeculativeStabilization.Theorem1
+import Papers.PODC2013.SpeculativeStabilization.Theorem2
+import Papers.PODC2013.SpeculativeStabilization.Lemma4
+import Papers.PODC2013.SpeculativeStabilization.LowerBound
