@@ -901,3 +901,17 @@ import Papers.PODC2022.RecoverableHarder.Theorem14
 import Papers.PODC2022.RecoverableHarder.RuppertNec
 import Papers.PODC2022.RecoverableHarder.RuppertSuff
 import Papers.PODC2022.RecoverableHarder.Corollaries
+import Papers.PODC2022.FullyDefective.Protocol
+import Papers.PODC2022.FullyDefective.TwoParty
+import Papers.PODC2022.FullyDefective.Robbins
+import Papers.PODC2022.FullyDefective.Cycle.Model
+import Papers.PODC2022.FullyDefective.Cycle.Invariant
+import Papers.PODC2022.FullyDefective.Cycle.Simulation
+import Papers.PODC2022.FullyDefective.Cycle.Progress
+import Papers.PODC2022.FullyDefective.Cycle.Liveness
+import Papers.PODC2022.FullyDefective.Robbins.Occ
+import Papers.PODC2022.FullyDefective.Robbins.Model
+import Papers.PODC2022.FullyDefective.Robbins.Invariant
+import Papers.PODC2022.FullyDefective.Robbins.Preservation
+import Papers.PODC2022.FullyDefective.Robbins.Simulation
+import Papers.PODC2022.FullyDefective.Robbins.Deadlock
