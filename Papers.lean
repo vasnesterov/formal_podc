@@ -939,3 +939,4 @@ import Papers.PODC2019.CRDTReplication.Main
 import Papers.PODC2025.ByzantineSWMRRegisters.Main
 import Papers.PODC2025.ByzantineSWMRRegisters.Observation30
 import Papers.PODC2025.ByzantineSWMRRegisters.Degenerate
+import Papers.PODC2018.LockFreeVsWaitFree.Main
