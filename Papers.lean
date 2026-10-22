@@ -1045,3 +1045,6 @@ import Papers.PODC2013.SpeculativeStabilization.Theorem1
 import Papers.PODC2013.SpeculativeStabilization.Theorem2
 import Papers.PODC2013.SpeculativeStabilization.Lemma4
 import Papers.PODC2013.SpeculativeStabilization.LowerBound
+import Papers.PODC2018.FairLeaderElection.Attacks
+import Papers.PODC2018.FairLeaderElection.Consecutive
+import Papers.PODC2018.FairLeaderElection.TreeImpossibility
