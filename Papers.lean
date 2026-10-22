@@ -1048,3 +1048,16 @@ import Papers.PODC2013.SpeculativeStabilization.LowerBound
 import Papers.PODC2018.FairLeaderElection.Attacks
 import Papers.PODC2018.FairLeaderElection.Consecutive
 import Papers.PODC2018.FairLeaderElection.TreeImpossibility
+import Papers.PODC2012.LineTreeScheduling.Basic
+import Papers.PODC2012.LineTreeScheduling.Framework
+import Papers.PODC2012.LineTreeScheduling.Lemma31
+import Papers.PODC2012.LineTreeScheduling.Lemma61
+import Papers.PODC2012.LineTreeScheduling.Algorithm
+import Papers.PODC2012.LineTreeScheduling.Approx
+import Papers.PODC2012.LineTreeScheduling.Composite
+import Papers.PODC2012.LineTreeScheduling.LineNetworks
+import Papers.PODC2012.LineTreeScheduling.TreePath
+import Papers.PODC2012.LineTreeScheduling.TreeDecomp
+import Papers.PODC2012.LineTreeScheduling.IdealTD
+import Papers.PODC2012.LineTreeScheduling.TreeNetworks
+import Papers.PODC2012.LineTreeScheduling.Sequential
