@@ -1035,3 +1035,8 @@ import Papers.PODC2019.SmallBuffersAQT.LowerBound
 import Papers.PODC2019.SmallBuffersAQT.Corollaries
 import Papers.PODC2019.SmallBuffersAQT.FormPaths
 import Papers.PODC2019.SmallBuffersAQT.Tree
+import Papers.PODC2021.WeakAsyncDecisionPower.Covering
+import Papers.PODC2021.WeakAsyncDecisionPower.Cutoff
+import Papers.PODC2021.WeakAsyncDecisionPower.Halting
+import Papers.PODC2021.WeakAsyncDecisionPower.Majority
+import Papers.PODC2021.WeakAsyncDecisionPower.NonVacuity
