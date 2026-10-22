@@ -949,3 +949,12 @@ import Papers.PODC2015.ABADetection.CasDefs
 import Papers.PODC2015.ABADetection.Lemma2
 import Papers.PODC2015.ABADetection.Lemma3
 import Papers.PODC2015.ABADetection.Theorem1
+import Papers.PODC2021.RegisterLinTermination.SWMR
+import Papers.PODC2021.RegisterLinTermination.Alg4
+import Papers.PODC2021.RegisterLinTermination.Alg2
+import Papers.PODC2021.RegisterLinTermination.Game
+import Papers.PODC2021.RegisterLinTermination.Alg4Lin
+import Papers.PODC2021.RegisterLinTermination.Alg2WSL
+import Papers.PODC2021.RegisterLinTermination.Theorem6
+import Papers.PODC2021.RegisterLinTermination.Theorem7Core
+import Papers.PODC2021.RegisterLinTermination.Theorem7

@@ -9,3 +9,6 @@ import Podc.Computability.Distributed.AbstractMAC.Basic
 import Podc.Computability.Distributed.AbstractMAC.Sync
 import Podc.Computability.Distributed.SharedMemory.Byzantine.Model
 import Podc.Computability.Distributed.SharedMemory.Byzantine.Restrict
+import Podc.Computability.Distributed.SharedMemory.WriteStrongLin
+import Podc.Computability.Distributed.SharedMemory.MWMRRegister
+import Podc.Computability.Distributed.SharedMemory.LinPointCheck
