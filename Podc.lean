@@ -23,3 +23,5 @@ import Podc.Computability.Distributed.MessagePassing.ChannelFailures.Canonical
 import Podc.Computability.Distributed.MessagePassing.ChannelFailures.Solo
 import Podc.Computability.Distributed.MessagePassing.ChannelFailures.Glue
 import Podc.Computability.Distributed.MessagePassing.ChannelFailures.PartialSync
+import Podc.Computability.Distributed.SharedMemory.MObstructionFree
+import Podc.Computability.Distributed.SharedMemory.Splice
