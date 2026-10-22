@@ -26,3 +26,6 @@ import Podc.Computability.Distributed.MessagePassing.ChannelFailures.PartialSync
 import Podc.Computability.Distributed.SharedMemory.MObstructionFree
 import Podc.Computability.Distributed.SharedMemory.Splice
 import Podc.Foundations.Combinatorics.HypergraphCover
+import Podc.Computability.Distributed.SWMR.Basic
+import Podc.Computability.Distributed.SWMR.Restrict
+import Podc.Computability.Distributed.SWMR.FLP

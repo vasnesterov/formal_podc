@@ -1016,3 +1016,12 @@ import Papers.PODC2019.CoveringPrimalDual.Theorem49
 import Papers.PODC2019.CoveringPrimalDual.ILP
 import Papers.PODC2019.CoveringPrimalDual.Compute
 import Papers.PODC2019.CoveringPrimalDual.Counterexamples
+import Papers.PODC2024.BoundedRegisterPower.NonUniversality
+import Papers.PODC2024.BoundedRegisterPower.ApproxAgreement
+import Papers.PODC2024.BoundedRegisterPower.Theorem11
+import Papers.PODC2024.BoundedRegisterPower.Alg2
+import Papers.PODC2024.BoundedRegisterPower.Alg2Sim
+import Papers.PODC2024.BoundedRegisterPower.Alg2Correct
+import Papers.PODC2024.BoundedRegisterPower.BMZ
+import Papers.PODC2024.BoundedRegisterPower.Alg1
+import Papers.PODC2024.BoundedRegisterPower.Theorem12
