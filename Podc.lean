@@ -7,3 +7,5 @@ import Podc.Computability.Distributed.SharedMemory.Recoverable.Composition
 import Podc.Computability.Distributed.IteratedModel.PostProcess
 import Podc.Computability.Distributed.AbstractMAC.Basic
 import Podc.Computability.Distributed.AbstractMAC.Sync
+import Podc.Computability.Distributed.SharedMemory.Byzantine.Model
+import Podc.Computability.Distributed.SharedMemory.Byzantine.Restrict

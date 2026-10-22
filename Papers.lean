@@ -936,3 +936,6 @@ import Papers.PODC2014.AbstractMACConsensus.Networks
 import Papers.PODC2014.AbstractMACConsensus.Anonymous
 import Papers.PODC2014.AbstractMACConsensus.TwoPhase
 import Papers.PODC2019.CRDTReplication.Main
+import Papers.PODC2025.ByzantineSWMRRegisters.Main
+import Papers.PODC2025.ByzantineSWMRRegisters.Observation30
+import Papers.PODC2025.ByzantineSWMRRegisters.Degenerate
