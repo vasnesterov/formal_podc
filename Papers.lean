@@ -980,3 +980,11 @@ import Papers.PODC2020.FastMWMRImpossibility.Lin
 import Papers.PODC2020.FastMWMRImpossibility.Theorem1
 import Papers.PODC2020.FastMWMRImpossibility.Sanity
 import Papers.PODC2020.FastMWMRImpossibility.W2R1
+import Papers.PODC2015.MinimalSynchronyBC.Basic
+import Papers.PODC2015.MinimalSynchronyBC.CB
+import Papers.PODC2015.MinimalSynchronyBC.AC
+import Papers.PODC2015.MinimalSynchronyBC.EA
+import Papers.PODC2015.MinimalSynchronyBC.Consensus
+import Papers.PODC2015.MinimalSynchronyBC.Machine
+import Papers.PODC2015.MinimalSynchronyBC.Counterexample
+import Papers.PODC2015.MinimalSynchronyBC.Sanity
