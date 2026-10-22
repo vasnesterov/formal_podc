@@ -128,6 +128,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2020 | 5 | Godard, Imbs, Raynal, Taubenfeld — *From Bezout's Identity to Space-Optimal Election in Anonymous Memory Systems* | [BezoutElection](Papers/PODC2020/BezoutElection) | ⚠️ All results proved: impossibility (Thm 1), one-register election (Thm 2), Algorithm 2 (Thm 4) and Corollaries 1–3 as iff characterizations; termination of Algorithms 1 and 2 and the safety Lemma 2 are only sketched in the paper, with genuine gaps (repaired); §4's v′ > 0 fails for m = 1 |
 | 2019 | 5 | Hussak, Trehan — *On Termination of a Flooding Process* | [FloodingTermination](Papers/PODC2019/FloodingTermination) | ⚠️ Termination and exact bounds proved (terminates at e iff bipartite; e < T ≤ e+d+1); Theorem 3.5 proof gap; Lemmas 3.3/3.4 need connectivity; abstract's "adversary can always prevent termination" false on forests |
 | 2017 | 5 | Dolev, Erdmann, Lutz, Schapira, Zair — *Stateless Computation* | [StatelessComputation](Papers/PODC2017/StatelessComputation) | ⚠️ Theorem 3.1 true but its proof's step after Lemma 3.4 fails (repaired); Corollary 6.3 false for odd n (degenerate); Theorem 6.2's extra hypotheses unused and violated by Corollary 6.3; Theorem 5.10 proof gaps |
+| 2019 | 5 | Ben-Basat, Even, Kawarabayashi, Schwartzman — *Optimal Distributed Covering Algorithms* | [CoveringPrimalDual](Papers/PODC2019/CoveringPrimalDual) | ❌ (f+ε)-approximation of MWHVC (Cor 4.3) and the O(log_α Δ + f·z·α) iteration bound (Thm 4.8, 4.9) proved; **covering-ILP claim (Claim 5.7, abstract) false** — the reduction multiplies the rank by the number of bits (`x ≥ 2`: cost 3 vs optimum 2, for every ε); Cor 4.10's ε = 1/(nW) does not give an f-approximation; Prop 5.5, Claim 5.6, Lemmas 4.7, 5.2 misstated |
 | 2025 | 4 | Constantinescu, Dufay, Ghinea, Wattenhofer — *Byzantine Stable Matching* | [ByzantineStableMatching](Papers/PODC2025/ByzantineStableMatching) | ⚠️ Characterizations proved for k ≥ 2; all "only if" directions false for k = 1; Lemma 13 reduction invalid |
 | 2024 | 4 | Attiya, Bender, Farach-Colton, Oshman, Schiller — *History-Independent Concurrent Objects* | [HistoryIndependent](Papers/PODC2024/HistoryIndependent) | ⚠️ All results proved; impossibilities need ≥ 2 processes; Lemma 16 gap; Thm 32 for a fixed interleaving |
 | 2021 | 4 | Ovens — *The Space Complexity of Scannable Binary Objects* | [ScannableBinaryObjects](Papers/PODC2021/ScannableBinaryObjects) | ⚠️ Lemma 6, Theorem 8, Corollary 9 and the Implementation 1 upper bound proved (under weaker hypotheses); headline bound of abstract/conclusion fails for k=1, n=3; Observation 3 false in an unused case; Cor. 9(c) partly unproved in the paper |
@@ -329,6 +330,17 @@ in the paper's `differencies.md`.
   different from pref repairs Figure 3. For the repair, Theorem 7 (snapshot version) is proved. The same repair of
   Figure 4 is only model-checked. The lower bound (Theorem 2) is correct; it is proved with the Borowsky–Gafni
   impossibility as a hypothesis. arXiv v2 (the latest version) and the authors' talk slides have the same rule.
+- **Optimal Distributed Covering Algorithms** (PODC 2019, 5 citations) —
+  [CoveringPrimalDual](Papers/PODC2019/CoveringPrimalDual). The abstract and Claim 5.7 promise an
+  (f+ε)-approximate integral solution for covering ILPs, where f bounds the number of variables per constraint.
+  The paper's algorithm (binary expansion of each variable, then the zero-one-to-hypergraph reduction, then
+  MWHVC) does not achieve this. The reduction multiplies the rank by the number of bits, and MWHVC only
+  guarantees that larger rank + ε. On `min x s.t. x ≥ 2` (f = 1) the algorithm outputs x = 3, cost 3 against
+  an optimum of 2, for every ε and α. This also refutes the introduction's claim that ε = 1/(nWM) gives an
+  f-approximation for ILPs. The true guarantee is f·⌈log₂ M + 1⌉ + ε. Corollary 4.10's choice ε = 1/(nW),
+  with W = max w / min w, does not give an f-approximation either (weights 9, 10: cost 19 > 18); it works for
+  ε < 1/(n·max w). The main result for hypergraph vertex cover is correct: the (f+ε)-approximation
+  (Corollary 4.3) and the iteration bounds (Theorems 4.8, 4.9) are proved.
 - **Fine-grained Analysis on Fast Implementations of Distributed Multi-writer Atomic Registers** (PODC 2020, 4 citations) —
   [FastMWMRImpossibility](Papers/PODC2020/FastMWMRImpossibility). The fast-read (W2R1) algorithm of §5.2 / Appendix A
   (Algorithms 1–2), which the paper gives as the sufficiency half of its "necessary and sufficient condition"

@@ -25,3 +25,4 @@ import Podc.Computability.Distributed.MessagePassing.ChannelFailures.Glue
 import Podc.Computability.Distributed.MessagePassing.ChannelFailures.PartialSync
 import Podc.Computability.Distributed.SharedMemory.MObstructionFree
 import Podc.Computability.Distributed.SharedMemory.Splice
+import Podc.Foundations.Combinatorics.HypergraphCover

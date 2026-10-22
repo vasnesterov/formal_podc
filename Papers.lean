@@ -1007,3 +1007,12 @@ import Papers.PODC2015.SetAgreementSpace.Repeated
 import Papers.PODC2015.SetAgreementSpace.LowerBoundLemma1
 import Papers.PODC2015.SetAgreementSpace.LowerBound
 import Papers.PODC2015.SetAgreementSpace.Main
+import Papers.PODC2019.CoveringPrimalDual.Algorithm
+import Papers.PODC2019.CoveringPrimalDual.Invariants
+import Papers.PODC2019.CoveringPrimalDual.Correctness
+import Papers.PODC2019.CoveringPrimalDual.Rounds
+import Papers.PODC2019.CoveringPrimalDual.Main
+import Papers.PODC2019.CoveringPrimalDual.Theorem49
+import Papers.PODC2019.CoveringPrimalDual.ILP
+import Papers.PODC2019.CoveringPrimalDual.Compute
+import Papers.PODC2019.CoveringPrimalDual.Counterexamples
