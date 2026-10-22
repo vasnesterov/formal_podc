@@ -920,3 +920,11 @@ import Papers.PODC2011.SymmetryBreakingTasks.Structure
 import Papers.PODC2011.SymmetryBreakingTasks.Examples
 import Papers.PODC2011.SymmetryBreakingTasks.Computability
 import Papers.PODC2011.SymmetryBreakingTasks.SlotRenaming
+import Papers.PODC2018.SparseColoringLB.Model
+import Papers.PODC2018.SparseColoringLB.Klein
+import Papers.PODC2018.SparseColoringLB.Theorem25
+import Papers.PODC2018.SparseColoringLB.Theorem26
+import Papers.PODC2018.SparseColoringLB.Theorem26Counterexample
+import Papers.PODC2018.SparseColoringLB.Torus
+import Papers.PODC2018.SparseColoringLB.Theorem15
+import Papers.PODC2018.SparseColoringLB.Theorem26General
