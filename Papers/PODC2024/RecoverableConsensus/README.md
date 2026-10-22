@@ -68,12 +68,15 @@ the progress tool `prog_of_rank` from the shared library `Cslib/Computability/Di
 | Lemma 10, Observation 11, Lemma 12 | `lemma10`, `obs11`, `lemma12` | `Lemma12.lean`, `Config.lean` |
 | **Theorem 13** | `theorem13` | `Theorem13.lean` |
 | Theorem 14 (robustness), given DFFR'22 Thm 8 | `theorem14` (hypothesis `dffr`) | `Theorem13.lean` |
+| Theorem 14 unconditionally (DFFR'22 Thm 8 proved in [RecoverableHarder](../../PODC2022/RecoverableHarder)) | `Podc.RecoverableHarder.ovens_theorem14` | `Papers/PODC2022/RecoverableHarder/Corollaries.lean` |
 | Lemma 15: consensus number of `T_{n,n'}` is `n` | `lemma15` | `Sec4Lemma15.lean` |
 | Lemma 16: recoverable consensus number of `T_{n,n'}` is `n'` | `lemma16` | `Sec4Lemma16.lean` |
 | Golab: test-and-set cannot solve recoverable 2-consensus | `tas_not_recSolvable` | `Corollaries.lean` |
 
-**Not formalized.** DFFR'22 Theorem 8 (sufficiency of `n`-recording for readable types; a hypothesis of
-`theorem14`), Ruppert's characterization of consensus numbers, and the consequence for DFFR's type `X_n`.
+**Not formalized here.** DFFR'22 Theorem 8 (sufficiency of `n`-recording for readable types; a hypothesis of
+`theorem14`) and Ruppert's characterization of consensus numbers are formalized in
+[`Papers/PODC2022/RecoverableHarder`](../../PODC2022/RecoverableHarder) (`theorem8`, `theorem3`), which also
+proves `theorem14` without the hypothesis (`ovens_theorem14`). The consequence for DFFR's type `X_n` is not formalized.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: `lemma16` contains a concrete recoverable wait-free consensus algorithm (`Sec4.alg16_recConsensus`),

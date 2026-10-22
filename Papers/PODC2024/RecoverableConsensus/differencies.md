@@ -91,7 +91,8 @@ non-readable fails for `n' = n − 1` if readability is understood up to encodin
     The stage index `i` is bounded (`i ≤ n − 1`) via the existence of a team-`v̄` process
     `p_j`, `j < n − i`, exactly as in the paper.
 18. **Theorem 14** is stated conditionally on DFFR'22 Theorem 8 (hypothesis `dffr`), which the paper
-    cites and which is not formalized here. Our `ObjSpec.Readable` (some operation preserves the value and
+    cites. DFFR'22 Theorem 8 is now formalized in `Papers/PODC2022/RecoverableHarder`, and
+    `ovens_theorem14` there is Theorem 14 without the hypothesis. Our `ObjSpec.Readable` (some operation preserves the value and
     its response is an injective function of the value) is slightly broader than a literal Read
     operation returning the value itself; DFFR's result still covers it, since an algorithm can
     decode the response into the value.
