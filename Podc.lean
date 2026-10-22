@@ -40,3 +40,4 @@ import Podc.Computability.Distributed.DistributedAutomata.Fairness
 import Podc.Computability.Distributed.SelfStabilization.ResetUnison.Basic
 import Podc.Computability.Distributed.SelfStabilization.ResetUnison.Unfair
 import Podc.Computability.Distributed.SelfStabilization.ResetUnison.Sync
+import Podc.Computability.Distributed.UniRing.Basic
