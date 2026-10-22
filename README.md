@@ -129,6 +129,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2025 | 4 | Constantinescu, Dufay, Ghinea, Wattenhofer — *Byzantine Stable Matching* | [ByzantineStableMatching](Papers/PODC2025/ByzantineStableMatching) | ⚠️ Characterizations proved for k ≥ 2; all "only if" directions false for k = 1; Lemma 13 reduction invalid |
 | 2024 | 4 | Attiya, Bender, Farach-Colton, Oshman, Schiller — *History-Independent Concurrent Objects* | [HistoryIndependent](Papers/PODC2024/HistoryIndependent) | ⚠️ All results proved; impossibilities need ≥ 2 processes; Lemma 16 gap; Thm 32 for a fixed interleaving |
 | 2021 | 4 | Ovens — *The Space Complexity of Scannable Binary Objects* | [ScannableBinaryObjects](Papers/PODC2021/ScannableBinaryObjects) | ⚠️ Lemma 6, Theorem 8, Corollary 9 and the Implementation 1 upper bound proved (under weaker hypotheses); headline bound of abstract/conclusion fails for k=1, n=3; Observation 3 false in an unused case; Cor. 9(c) partly unproved in the paper |
+| 2020 | 4 | Huang, Huang, Wei — *Fine-grained Analysis on Fast Implementations of Distributed Multi-writer Atomic Registers* | [FastMWMRImpossibility](Papers/PODC2020/FastMWMRImpossibility) | ❌ Theorem 1 (no W1R2 MWMR atomic register, t ≥ 1, W, R ≥ 2) proved for all algorithms, but its §4 "sieve" argument is not a proof (replaced by a blind-first-round construction); **the W2R1 algorithm (Algorithms 1–2) is not atomic** — a read after a completed write returns the initial value (S = 4, t = 1, R = 1, W = 2), so MWA2 / Lemma 5 and the claimed sufficiency of R < S/t − 2 fail |
 | 2024 | 3 | Chang, Mishra, Nguyen, Yang, Yeh — *A Tight Lower Bound for 3-Coloring Grids in the Online-LOCAL Model* | [OnlineLocalGrids](Papers/PODC2024/OnlineLocalGrids) | ⚠️ Theorems 1.1, 1.3 proved; Theorem 1.3 omits that √n must be odd |
 | 2023 | 3 | Bashari, Jamadi, Woelfel — *Efficient Bounded Timestamping from Standard Synchronization Primitives* | [BoundedTimestamping](Papers/PODC2023/BoundedTimestamping) | ❌ **The LL/SC algorithm (Figs. 1–2) is not linearizable**: helper steps share the process's LL/SC link, so Lemma 6 (hence Lemmas 8, 9, Cor. 10) is false — sequential 438-operation counterexample (n=3); Theorem 1 not established; wait-freedom (≤ 2κ+107 steps) and Section 6 algorithm proved |
 | 2022 | 3 | Dory, Ghaffari, Ilchi — *Near-Optimal Distributed Dominating Set in Bounded Arboricity Graphs* | [DominatingSetArboricity](Papers/PODC2022/DominatingSetArboricity) | ⚠️ Theorems 1.1–1.3 proved (deterministic distributed algorithm, randomized bounds) and the Theorem 1.4 reduction; Theorem 1.3's proof arithmetic fails for small Δ (statement rescued); missing justifications and degenerate slips |
@@ -307,6 +308,16 @@ in the paper's `differencies.md`.
   [ArrowTopology](Papers/PODC2022/ArrowTopology). Theorem 4.2 (which domains obtained by removing two profiles
   still force a dictator) is false in 12 of the 30 cases; the corrected theorem of the full version is verified.
   Arrow's theorem itself and the paper's topological proof are verified.
+- **Fine-grained Analysis on Fast Implementations of Distributed Multi-writer Atomic Registers** (PODC 2020, 4 citations) —
+  [FastMWMRImpossibility](Papers/PODC2020/FastMWMRImpossibility). The fast-read (W2R1) algorithm of §5.2 / Appendix A
+  (Algorithms 1–2), which the paper gives as the sufficiency half of its "necessary and sufficient condition"
+  R < S/t − 2, is not atomic. With S = 4, t = 1, one reader and two writers, `write(1)` completes on three servers,
+  then a concurrent larger write `(1, w₂)` overwrites one of them; a read hearing the other three servers finds the
+  completed value without the reader in its `updated` sets and returns the initial value. Lemma 5 (MWA2) wrongly
+  counts servers only and ignores the `updated` sets. This holds for the literal line 20 and for the single-writer
+  (Dutta et al.) reading of it; a third reading is refuted only by model checking. Theorem 1 (no fast-write
+  W1R2 implementation for t ≥ 1, W, R ≥ 2) is true and proved for every algorithm in the round-trip model, but
+  its §4 proof ("crucial-info model", sieving) is not valid; a simpler construction closes the gap.
 - **Ranking Opinions with Few States in Population Protocols** (PODC 2026, 1 citation) —
   [RankingOpinions](Papers/PODC2026/RankingOpinions). Theorem 4.1 (tie reporting) is false: with four agents
   and a unique majority, an agent can be left outputting "tie" forever. The ranking protocol of Theorem 1.2 is

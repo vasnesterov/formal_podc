@@ -973,3 +973,10 @@ import Papers.PODC2015.RingColoringAverage.Linial
 import Papers.PODC2015.RingColoringAverage.Theorem1
 import Papers.PODC2015.RingColoringAverage.NonVacuity
 import Papers.PODC2015.RingColoringAverage.LargestId
+import Papers.PODC2020.FastMWMRImpossibility.Model
+import Papers.PODC2020.FastMWMRImpossibility.Steps
+import Papers.PODC2020.FastMWMRImpossibility.Executions
+import Papers.PODC2020.FastMWMRImpossibility.Lin
+import Papers.PODC2020.FastMWMRImpossibility.Theorem1
+import Papers.PODC2020.FastMWMRImpossibility.Sanity
+import Papers.PODC2020.FastMWMRImpossibility.W2R1
