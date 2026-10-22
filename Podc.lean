@@ -37,3 +37,6 @@ import Podc.Computability.Distributed.AQT.Basic
 import Podc.Computability.Distributed.DistributedAutomata.Basic
 import Podc.Computability.Distributed.DistributedAutomata.Simulation
 import Podc.Computability.Distributed.DistributedAutomata.Fairness
+import Podc.Computability.Distributed.SelfStabilization.ResetUnison.Basic
+import Podc.Computability.Distributed.SelfStabilization.ResetUnison.Unfair
+import Podc.Computability.Distributed.SelfStabilization.ResetUnison.Sync
