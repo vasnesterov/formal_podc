@@ -1027,3 +1027,7 @@ import Papers.PODC2024.BoundedRegisterPower.Alg1
 import Papers.PODC2024.BoundedRegisterPower.Theorem12
 import Papers.PODC2017.PPVerification.Main
 import Papers.PODC2017.PPVerification.Remarks
+import Papers.PODC2020.UncoordinatedBeeps.Words
+import Papers.PODC2020.UncoordinatedBeeps.USICode
+import Papers.PODC2020.UncoordinatedBeeps.Transmission
+import Papers.PODC2020.UncoordinatedBeeps.Construction
