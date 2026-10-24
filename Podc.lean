@@ -47,3 +47,5 @@ import Podc.Foundations.Combinatorics.DiophantineDecomposition
 import Podc.Foundations.Order.ControlledDickson
 import Podc.Computability.Distributed.RateAllocation.MaxMinFair
 import Podc.Foundations.InformationTheory.MDSCode
+import Podc.Foundations.Combinatorics.HypergraphRamsey
+import Podc.Foundations.Combinatorics.SimpleGraph.StraightLineDrawing

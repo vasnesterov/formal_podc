@@ -1102,3 +1102,7 @@ import Papers.PODC2011.ErrorFreeMultivaluedBC.Generation
 import Papers.PODC2011.ErrorFreeMultivaluedBC.Theorem
 import Papers.PODC2011.ErrorFreeMultivaluedBC.Counterexample
 import Papers.PODC2011.ErrorFreeMultivaluedBC.Complexity
+import Papers.PODC2014.PlanarMDSLowerBound.Grid
+import Papers.PODC2014.PlanarMDSLowerBound.Blocks
+import Papers.PODC2014.PlanarMDSLowerBound.Lemma1
+import Papers.PODC2014.PlanarMDSLowerBound.Main
