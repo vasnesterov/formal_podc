@@ -51,3 +51,5 @@ import Podc.Foundations.Combinatorics.HypergraphRamsey
 import Podc.Foundations.Combinatorics.SimpleGraph.StraightLineDrawing
 import Podc.Computability.Distributed.DynamicNetworks.ActivelyDynamic
 import Podc.Foundations.Combinatorics.SimpleGraph.ParentGraph
+import Podc.Computability.Distributed.NetworkConstructors.Basic
+import Podc.Computability.Distributed.NetworkConstructors.Graph
