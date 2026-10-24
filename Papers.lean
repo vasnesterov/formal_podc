@@ -1169,3 +1169,16 @@ import Papers.PODC2025.AmnesiacFloodingFaults.Faults
 import Papers.PODC2025.AmnesiacFloodingFaults.Examples
 import Papers.PODC2025.AmnesiacFloodingFaults.DropBroadcast
 import Papers.PODC2025.AmnesiacFloodingFaults.ByzBroadcast
+import Papers.PODC2017.ZigzagCausality.Model
+import Papers.PODC2017.ZigzagCausality.Basic
+import Papers.PODC2017.ZigzagCausality.Zigzag
+import Papers.PODC2017.ZigzagCausality.Knowledge
+import Papers.PODC2017.ZigzagCausality.Coordination
+import Papers.PODC2017.ZigzagCausality.Counterexample
+import Papers.PODC2017.ZigzagCausality.CounterexampleFIP
+import Papers.PODC2017.ZigzagCausality.NonVacuity
+import Papers.PODC2017.ZigzagCausality.BoundsGraph
+import Papers.PODC2017.ZigzagCausality.RunByTiming
+import Papers.PODC2017.ZigzagCausality.Necessity
+import Papers.PODC2017.ZigzagCausality.FastRun
+import Papers.PODC2017.ZigzagCausality.VisibleNecessity
