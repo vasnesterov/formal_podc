@@ -1123,3 +1123,16 @@ import Papers.PODC2023.TreeExplorationBFDN.Breakdowns
 import Papers.PODC2023.TreeExplorationBFDN.Exists
 import Papers.PODC2023.TreeExplorationBFDN.Examples
 import Papers.PODC2023.TreeExplorationBFDN.Counterexamples
+import Papers.PODC2010.ArbdefectiveColoring.Basic
+import Papers.PODC2010.ArbdefectiveColoring.Extension
+import Papers.PODC2010.ArbdefectiveColoring.LocalTools
+import Papers.PODC2010.ArbdefectiveColoring.AlongOrientation
+import Papers.PODC2010.ArbdefectiveColoring.HPartition
+import Papers.PODC2010.ArbdefectiveColoring.PartialOrientation
+import Papers.PODC2010.ArbdefectiveColoring.Recursive
+import Papers.PODC2010.ArbdefectiveColoring.Parameters
+import Papers.PODC2010.ArbdefectiveColoring.Theorem43
+import Papers.PODC2010.ArbdefectiveColoring.NonVacuity
+import Papers.PODC2010.ArbdefectiveColoring.Lemma41
+import Papers.PODC2010.ArbdefectiveColoring.Corollary44
+import Papers.PODC2010.ArbdefectiveColoring.LinialBridge
