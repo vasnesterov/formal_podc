@@ -134,6 +134,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2011 | 7 | Helmi, Higham, Pacheco, Woelfel — *The Space Complexity of Long-Lived and One-Shot Timestamp Implementations* | [TimestampSpace](Papers/PODC2011/TimestampSpace) | ⚠️ Long-lived (m > n/6 − 1) and one-shot (m > √(2n) − log₂ n − 4) lower bounds and both upper-bound algorithms proved (lower bounds for deterministic implementations); genuine gaps in Theorem 1.2's final count and Lemma 6.5 repaired |
 | 2020 | 7 | Dufoulon, Burman, Beauquier — *Can Uncoordinated Beeps tell Stories?* | [UncoordinatedBeeps](Papers/PODC2020/UncoordinatedBeeps) | ⚠️ Section 3 proved: the two USI-code definitions are equivalent (Thm 1, l ≥ 1), USI codes decode uncoordinated transmissions (Thm 2), and Sidon-set codes of length ≤ 8h²(k+1)² exist (Thms 3, 5, 7, Lemma 6, Cor. 8); Lemma 4 is false as stated (differences mod l; D = {0,1,3}, l = 4), but only the integer version is used; Definition 4 must count d + d; degenerate side conditions; a suspected gap in Section 4 is not checked in Lean |
 | 2021 | 7 | Czerner, Esparza — *Lower Bounds on the State Complexity of Population Protocols* | [PPStateComplexity](Papers/PODC2021/PPStateComplexity) | ⚠️ Leaderless bound BB(n) ≤ 2^((2n+2)!) (Thm 5.9, arXiv v3 proof) and Thm 4.5 (ℓ leaders, η < F_{ℓ,ϑ}(n)) proved, Rackoff's bound included; Definition 1's BB_L omits a bound on the number of leaders (4 states with η leaders decide x ≥ η for every η), so the leader claims need the evidently intended fixed ℓ; gaps in Thm 4.5, Lemma 5.8 and Cor. 5.7 repaired |
+| 2017 | 7 | Dan, Manohar, Moses — *On Using Time Without Clocks via Zigzag Causality* | [ZigzagCausality](Papers/PODC2017/ZigzagCausality) | ❌ Zigzag sufficiency and necessity (Thms 1, 2) and the "if" direction of the Visible Zigzag Theorem proved; **Theorem 4 ("only if") false**: in a 4-process flooding full-information system a node knows `θ₁ --0--> θ₂` but every visible zigzag has weight ≤ −1; necessity proved when one endpoint is a basic past node (covers Protocol 2); Theorem 3 needs the FFIP hypothesis (fails for non-flooding full-information protocols); proof gaps in Lemmas 4, 12, 18 |
 | 2025 | 6 | Ben-David, Dzulfikar, Ellen, Gilbert — *Byzantine Agreement with Predictions* | [BAWithPredictions](Papers/PODC2025/BAWithPredictions) | ⚠️ Theorem 13 (round lower bound, unauthenticated) and Theorem 14 (n + t² ≤ 8·#msgs + 1) proved; Lemmas 1–6, Algorithms 3–7 with Theorems 5–6 proved; gaps in Theorem 14's w.l.o.g. step and Lemma 23 repaired; wrapper checked against sub-protocol specs |
 | 2024 | 5 | Attiya, Castañeda, Enea — *Strong Linearizability using Primitives with Consensus Number 2* | [StrongLinCN2](Papers/PODC2024/StrongLinCN2) | ❌ Theorems 1, 2, 5, 6, 9 (strongly linearizable max register, snapshot, readable test&set, fetch&increment) proved; **the set algorithm of Theorem 10 (Algorithm 2) is not strongly linearizable** (3 processes); §5's witness sequences for k-out-of-order queues are wrong (claim holds with repaired witnesses); Lemma 12 proof gap (stack case unproved) |
 | 2020 | 5 | Dolan — *The Only Undoable CRDTs are Counters* | [UndoableCRDTs](Papers/PODC2020/UndoableCRDTs) | ✅ Correct |
@@ -369,6 +370,15 @@ in the paper's `differencies.md`.
   different from pref repairs Figure 3. For the repair, Theorem 7 (snapshot version) is proved. The same repair of
   Figure 4 is only model-checked. The lower bound (Theorem 2) is correct; it is proved with the Borowsky–Gafni
   impossibility as a hypothesis. arXiv v2 (the latest version) and the authors' talk slides have the same rule.
+- **On Using Time Without Clocks via Zigzag Causality** (PODC 2017, 7 citations) —
+  [ZigzagCausality](Papers/PODC2017/ZigzagCausality). The "only if" direction of Theorem 4 (Visible Zigzag
+  Theorem) is false. With processes i, j, k, l, channels i→j, i→k, k→j, j→l, all lower bounds 1,
+  U_ij = U_jl = 2, U_ik = U_kj = 1, and a flooding full-information protocol, an i-node s that received an
+  external message knows ⟨s, ijl⟩ --0--> ⟨s, ikjl⟩: the two chains either meet at the same j-node or the direct
+  one is at least one unit earlier. But every s-visible zigzag between these nodes has weight ≤ −1, because
+  neither case is visible to s. The proof fails in Lemma 18.5, case (2). The "if" direction holds, and the
+  "only if" direction holds when one endpoint is a basic node in the past of σ, which covers both
+  coordination tasks of Protocol 2.
 - **Optimal Distributed Covering Algorithms** (PODC 2019, 5 citations) —
   [CoveringPrimalDual](Papers/PODC2019/CoveringPrimalDual). The abstract and Claim 5.7 promise an
   (f+ε)-approximate integral solution for covering ILPs, where f bounds the number of variables per constraint.
