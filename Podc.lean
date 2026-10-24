@@ -53,3 +53,5 @@ import Podc.Computability.Distributed.DynamicNetworks.ActivelyDynamic
 import Podc.Foundations.Combinatorics.SimpleGraph.ParentGraph
 import Podc.Computability.Distributed.NetworkConstructors.Basic
 import Podc.Computability.Distributed.NetworkConstructors.Graph
+import Podc.Computability.Distributed.SharedMemory.Arrival.Basic
+import Podc.Computability.Distributed.SharedMemory.Arrival.Valency
