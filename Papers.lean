@@ -1153,3 +1153,8 @@ import Papers.PODC2019.StrongLinSnapshots.SnapDefs
 import Papers.PODC2019.StrongLinSnapshots.SnapInv
 import Papers.PODC2019.StrongLinSnapshots.SnapSim
 import Papers.PODC2019.StrongLinSnapshots.SnapLockFree
+import Papers.PODC2016.UnbeatableSetConsensus.Optmin
+import Papers.PODC2016.UnbeatableSetConsensus.Unbeatable
+import Papers.PODC2016.UnbeatableSetConsensus.Counterexample
+import Papers.PODC2016.UnbeatableSetConsensus.LockStep
+import Papers.PODC2016.UnbeatableSetConsensus.UPmin
