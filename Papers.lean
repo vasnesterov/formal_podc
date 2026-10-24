@@ -1214,3 +1214,10 @@ import Papers.PODC2014.NetworkConstructors.KRCReach
 import Papers.PODC2014.NetworkConstructors.KRCMerge
 import Papers.PODC2014.NetworkConstructors.TwoRC
 import Papers.PODC2014.NetworkConstructors.Cliques
+import Papers.PODC2020.InfiniteArrivalHierarchy.Objects
+import Papers.PODC2020.InfiniteArrivalHierarchy.Alg2
+import Papers.PODC2020.InfiniteArrivalHierarchy.Alg3
+import Papers.PODC2020.InfiniteArrivalHierarchy.FiniteMemory
+import Papers.PODC2020.InfiniteArrivalHierarchy.WindowRegisters
+import Papers.PODC2020.InfiniteArrivalHierarchy.Partition
+import Papers.PODC2020.InfiniteArrivalHierarchy.Prop4
