@@ -1097,3 +1097,8 @@ import Papers.PODC2017.MaxISLocalRatio.Matching
 import Papers.PODC2017.MaxISLocalRatio.Layers
 import Papers.PODC2017.MaxISLocalRatio.LiteralLine11
 import Papers.PODC2017.MaxISLocalRatio.Main
+import Papers.PODC2011.ErrorFreeMultivaluedBC.Algorithm
+import Papers.PODC2011.ErrorFreeMultivaluedBC.Generation
+import Papers.PODC2011.ErrorFreeMultivaluedBC.Theorem
+import Papers.PODC2011.ErrorFreeMultivaluedBC.Counterexample
+import Papers.PODC2011.ErrorFreeMultivaluedBC.Complexity
