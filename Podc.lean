@@ -55,3 +55,5 @@ import Podc.Computability.Distributed.NetworkConstructors.Basic
 import Podc.Computability.Distributed.NetworkConstructors.Graph
 import Podc.Computability.Distributed.SharedMemory.Arrival.Basic
 import Podc.Computability.Distributed.SharedMemory.Arrival.Valency
+import Podc.Computability.Distributed.MessagePassing.ChannelFailures.Steps
+import Podc.Computability.Distributed.MessagePassing.ChannelFailures.Delivery
