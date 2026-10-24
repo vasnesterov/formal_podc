@@ -1088,3 +1088,12 @@ import Papers.PODC2024.DataCenterRouting.Section3
 import Papers.PODC2024.DataCenterRouting.Section4
 import Papers.PODC2024.DataCenterRouting.Section5
 import Papers.PODC2024.DataCenterRouting.DoomSwitch
+import Papers.PODC2017.MaxISLocalRatio.Basic
+import Papers.PODC2017.MaxISLocalRatio.Lemma22
+import Papers.PODC2017.MaxISLocalRatio.SeqLR
+import Papers.PODC2017.MaxISLocalRatio.Coloring
+import Papers.PODC2017.MaxISLocalRatio.Distributed
+import Papers.PODC2017.MaxISLocalRatio.Matching
+import Papers.PODC2017.MaxISLocalRatio.Layers
+import Papers.PODC2017.MaxISLocalRatio.LiteralLine11
+import Papers.PODC2017.MaxISLocalRatio.Main
