@@ -187,6 +187,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2025 | 0 | Hu, Toueg — *You can lie but not deny: SWMR registers with signature properties in systems with Byzantine processes* | [ByzantineSWMRRegisters](Papers/PODC2025/ByzantineSWMRRegisters) | ✅ Optimality result proved: no correct test-or-set (Thm 29), verifiable, authenticated or sticky register (Thm 31) from SWMR registers for 3 ≤ n ≤ 3f, Lemma 28 (sketch) in full, Observation 30; Thm 31 proved directly (paper's derivation tacitly uses composition of Byzantine linearizable implementations); multivalued domain made explicit; n > 3f algorithms not formalized |
 | 2025 | 0 | Naser-Pastoriza, Chockler, Gotsman, Ryabinin — *Tight Bounds on Channel Reliability via Generalized Quorum Systems* | [GeneralizedQuorums](Papers/PODC2025/GeneralizedQuorums) | ⚠️ Lower bounds proved for all algorithms (Lemma 2; Theorem 2 for lattice agreement, registers, snapshots, consensus; Theorem 6 under partial synchrony) by a direct gluing argument replacing the unchecked reductions; Theorem 2 false for trivial value domains (chain lattice, one-value register); Prop. 1 holds with "strongly connected" read as mutual reachability in G∖f; U_f not determined by F; Figure 3 safety proved, upper bounds not formalized |
 | 2024 | 0 | Alves Ferreira, Atre, Sherry, Sobrinho — *Impossibility Results for Data-Center Routing with Congestion Control and Unsplittable Flows* | [DataCenterRouting](Papers/PODC2024/DataCenterRouting) | ⚠️ Thms 3.4, 4.2, 4.3 (lex-max-min fair rate drops by a factor 1/n), the 2× bound of Thm 5.4 and all omitted "routine"/folklore lemmas (2.2, 3.2, 4.4, 4.6, 5.2) proved; Thm 5.4 tightness proved only for odd n (the "w.l.o.g. n odd" step is unjustified; even n gives only ε > 1/(n−2)); the Doom-Switch rates in the proof are wrong for n = 3; Lemma 4.6 Step 2 made rigorous via a leximin criterion |
+| 2025 | 0 | Austin, Gadouleau, Mertzios, Trehan — *Brief Announcement: Amnesiac Flooding: Easy to Break, Difficult to Escape* | [AmnesiacFloodingFaults](Papers/PODC2025/AmnesiacFloodingFaults) | ❌ Termination dichotomy proved (Thm 5.1: terminates iff balanced, within 2\|E\| rounds; Thm 5.5; Thm 2.1 derived) with a new closed-walk proof replacing the sketchy Appendix A; Thm 5.6 and Thm 5.8 non-termination proved; Thm 5.7's first claim false for two-initiator sets and Thm 5.8's broadcast part false (path 0–1–2, I = {0,2}), proved for a single initiator / in corrected form; Prop. C.2 window argument wrong; Lemma 5.2 typo; PODC bound 2\|E\|−3 fails on degenerate graphs; Section 4 uniqueness not formalized |
 
 ## Papers with critical mistakes
 
@@ -462,6 +463,15 @@ in the paper's `differencies.md`.
 As of October 2026 we found no erratum or later version that addresses the mistakes in Swiper, in
 Barenboim–Elkin–Goldenberg (including its J. ACM version), or in Függer–Nowak–Schwarz (including its J. ACM
 version).
+- **Brief Announcement: Amnesiac Flooding: Easy to Break, Difficult to Escape** (PODC 2025, 0 citations) —
+  [AmnesiacFloodingFaults](Papers/PODC2025/AmnesiacFloodingFaults). Theorem 5.7 claims that for every initiator set
+  I ⊊ V some single uni-directional link failure breaks broadcast or termination, and Theorem 5.8 that Byzantine
+  nodes J can block broadcast iff J contains a cut vertex set. Both fail on the path 0 – 1 – 2 with I = {0, 2}
+  (and J = {1}): node 1 is informed in round 1 whatever happens, and a tree cannot keep messages alive
+  (`theorem_5_7_multi_false`, `theorem_5_8_broadcast_false`); the PODC version's "any Byzantine set with a non-leaf
+  node can force failure, for any initial set" fails the same way. Proved instead: Theorem 5.7 for one initiator,
+  and that the adversary can block an honest node iff some honest node is unreachable from every initiator in
+  G − J. The main termination dichotomy (Theorem 5.1) is correct and fully proved.
 
 ## Layout
 
