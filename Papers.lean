@@ -1194,3 +1194,10 @@ import Papers.PODC2020.ActivelyDynamicNetworks.TreeToStar
 import Papers.PODC2020.ActivelyDynamicNetworks.LineToBinaryTree
 import Papers.PODC2020.ActivelyDynamicNetworks.CutInHalf
 import Papers.PODC2020.ActivelyDynamicNetworks.GraphToStar
+import Papers.PODC2017.RegisterEmulationSpace.Theorems
+import Papers.PODC2017.RegisterEmulationSpace.MaxRegisterLowerBound
+import Papers.PODC2017.RegisterEmulationSpace.MaxRegisterCAS
+import Papers.PODC2017.RegisterEmulationSpace.Algorithm2RegMain
+import Papers.PODC2017.RegisterEmulationSpace.Algorithm2Counterexample
+import Papers.PODC2017.RegisterEmulationSpace.Algorithm2Lemma7
+import Papers.PODC2017.RegisterEmulationSpace.Theorem8
