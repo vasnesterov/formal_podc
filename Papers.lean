@@ -1222,3 +1222,6 @@ import Papers.PODC2020.InfiniteArrivalHierarchy.WindowRegisters
 import Papers.PODC2020.InfiniteArrivalHierarchy.Partition
 import Papers.PODC2020.InfiniteArrivalHierarchy.Prop4
 import Papers.PODC2021.TrustedHardwareUnidirectional.Main
+import Papers.PODC2020.DynamicPartitioningLB.Main
+import Papers.PODC2020.DynamicPartitioningLB.PPL
+import Papers.PODC2020.DynamicPartitioningLB.Lemma31
