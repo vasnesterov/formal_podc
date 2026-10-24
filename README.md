@@ -117,6 +117,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2024 | 11 | Yu, Losa, Wang — *TetraBFT: Reducing Latency of Unauthenticated, Responsive BFT Consensus* | [TetraBFT](Papers/PODC2024/TetraBFT) | ❌ Agreement and validity proved in every run; **termination (Theorem 1) false**: the echo guard plus no retransmission allows a permanent post-GST view-change deadlock (n=7, f=2, reliable channels; n=4, f=1 with pre-GST loss); repaired echo rule proved to terminate; Lemma 7 proof claim false; proof gaps |
 | 2021 | 11 | Sela, Herlihy, Petrank — *Linearizability: A Typo* | [LinearizabilityTypo](Papers/PODC2021/LinearizabilityTypo) | ✅ Correct |
 | 2018 | 11 | Yifrach, Mansour — *Fair Leader Election for Rational Agents in Asynchronous Rings and Networks* | [FairLeaderElection](Papers/PODC2018/FairLeaderElection) | ⚠️ Attacks on A-LEADuni proved (Lemmas 3.3–3.5, 4.1 with honest origin, Thm 4.2 k ≥ √n, Cubic Attack Thm 4.3 k ≥ 2∛n, Cor 4.6) and Claim D.1 for k < n/2; **Theorem 7.2 (k-simulated trees) proved only for n = 2** — Lemma F.3/Cor F.4 and the coin-toss reduction have gaps, open for n ≥ 3; Lemma 4.1's attack deadlocks with an adversarial origin; Cor 4.6 / Thm 7.2 false at the boundary ε; Claim D.1 omits k < n/2; Thm 5.1 not formalized |
+| 2020 | 11 | Michail, Skretas, Spirakis — *Distributed Computation and Reconfiguration in Actively Dynamic Networks* | [ActivelyDynamicNetworks](Papers/PODC2020/ActivelyDynamicNetworks) | ❌ **Lemma 3.1 (GraphToStar solves Depth-1 Tree) false** for the algorithm as printed — on the 4-node line a pulling committee jumps onto a committee merging away in the same phase, ends attached to a follower, and the winner terminates without a spanning star; TreeToStar / LineToCompleteBinaryTree (Props 2.1, 2.2, exact `⌈log₂ d⌉` rounds), lower bounds Lemmas 6.1, 6.2 and CutInHalf on the line proved; `⌈log d⌉ ≤ log n` rounding slip; time analysis (Lemmas 3.2–3.7) and Thm 6.4 not formalized |
 | 2025 | 10 | Vacus, Ziccardi — *Minimalist Leader Election Under Weak Communication* | [MinimalistLE](Papers/PODC2025/MinimalistLE) | ⚠️ Theorems 2 (a.s. unique leader; O(D² log n) rounds w.h.p., new martingale proof) and 3 (p = 1/(D+1), O(D log n)) proved with explicit constants; Lemma 19 false for small D (K₂, P₃); proof gaps in Lemmas 14, 17 and the 'almost surely' claim |
 | 2024 | 10 | Tonkikh, Freitas — *Swiper: a new paradigm for efficient weighted distributed protocols* | [Swiper](Papers/PODC2024/Swiper) | ❌ Weight restriction/qualification proved; **Theorem 2.4 (weight separation) false** |
 | 2020 | 10 | Madsen, Debois — *On the Subject of Non-Equivocation: Defining Non-Equivocation in Synchronous Agreement Systems* | [NonEquivocation](Papers/PODC2020/NonEquivocation) | ⚠️ Interactive consistency under weak non-equivocation needs exactly t+1 rounds (proved, Algorithm 2 correct); Theorem 6.1 false for n ≤ 3; Lemmas 4.7/4.8 false when ⊥ counts as a value; §7.2 model imprecise |
@@ -350,6 +351,15 @@ in the paper's `differencies.md`.
   channels, any timeout including 8δ+9; and n = 4, f = 1 in the paper's model with pre-GST message loss). The authors'
   TLA+/Apalache check covered n = 4 and omits one clause of Rule 3. Agreement and validity hold in every run, and a
   repaired echo rule is proved to terminate.
+- **Distributed Computation and Reconfiguration in Actively Dynamic Networks** (PODC 2020, 11 citations) —
+  [ActivelyDynamicNetworks](Papers/PODC2020/ActivelyDynamicNetworks). Lemma 3.1 ("Algorithm GraphToStar solves
+  Depth-1 Tree") is false for the algorithm as printed. On the line 0–1–2–3 with increasing IDs, committee C(0)
+  pulls onto node 2 in the same phase in which C(2) merges into C(3); C(0) then merges into node 2, which is a
+  follower, and C(3) enters termination while node 0 is never connected to 3, so the output is not a spanning
+  star. The proof's claim that pulling trees "execute TreeToStar on committees" misses committees jumping onto
+  committees that dissolve. A natural repair (redirect to the absorbing leader, one extra round) works in
+  simulation but is not proved, so Theorem 3.8 is not established. Propositions 2.1, 2.2 and the centralized
+  lower bounds (Lemmas 6.1, 6.2) are proved.
 - **Swiper** (PODC 2024, 10 citations) — [Swiper](Papers/PODC2024/Swiper). Theorem 2.4 (the upper bound
   (α+β)(1−α)/(β−α)·n on the number of tickets for weight separation) is false: a 21-party instance needs 63
   tickets against a bound of 59.85, and on a family of instances the optimum exceeds the bound by an unbounded
