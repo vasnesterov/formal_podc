@@ -1143,3 +1143,13 @@ import Papers.PODC2014.MultiMessageBroadcastMAC.Arbitrary
 import Papers.PODC2014.MultiMessageBroadcastMAC.Correctness
 import Papers.PODC2014.MultiMessageBroadcastMAC.Restricted
 import Papers.PODC2014.MultiMessageBroadcastMAC.NonVacuity
+import Papers.PODC2019.StrongLinSnapshots.ABADefs
+import Papers.PODC2019.StrongLinSnapshots.ABAInv
+import Papers.PODC2019.StrongLinSnapshots.ABASim
+import Papers.PODC2019.StrongLinSnapshots.ABALockFree
+import Papers.PODC2019.StrongLinSnapshots.FirstRead
+import Papers.PODC2019.StrongLinSnapshots.Alg1
+import Papers.PODC2019.StrongLinSnapshots.SnapDefs
+import Papers.PODC2019.StrongLinSnapshots.SnapInv
+import Papers.PODC2019.StrongLinSnapshots.SnapSim
+import Papers.PODC2019.StrongLinSnapshots.SnapLockFree
