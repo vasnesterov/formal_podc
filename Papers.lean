@@ -1189,3 +1189,8 @@ import Papers.PODC2015.AlmostStableMatchings.Counting
 import Papers.PODC2015.AlmostStableMatchings.BadMen
 import Papers.PODC2015.AlmostStableMatchings.Main
 import Papers.PODC2015.AlmostStableMatchings.Example
+import Papers.PODC2020.ActivelyDynamicNetworks.LowerBounds
+import Papers.PODC2020.ActivelyDynamicNetworks.TreeToStar
+import Papers.PODC2020.ActivelyDynamicNetworks.LineToBinaryTree
+import Papers.PODC2020.ActivelyDynamicNetworks.CutInHalf
+import Papers.PODC2020.ActivelyDynamicNetworks.GraphToStar
