@@ -5,7 +5,7 @@ Objects.* PODC 2024, pp. 14–24. DOI [10.1145/3662158.3662814](https://doi.org/
 version: arXiv:2403.14445v1 (with appendices).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** Every result of the paper is formalized and proved:
+**Verdict: ⚠️ Minor statement issues.** Every result of the paper is formalized and proved:
 - the impossibilities (Props. 6, 14, 19, Thm. 17, Cor. 18, Thm. 20);
 - Algorithms 2 and 4 (Theorems 9, 12);
 - the universal construction (Algorithms 5, 6, Theorems 28, 32).

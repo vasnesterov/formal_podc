@@ -6,7 +6,7 @@ arXiv [1612.01514](https://arxiv.org/abs/1612.01514) v1 (the only version; a rev
 conference paper). Numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes (correctness part only; work bounds not checked).** We verified
+**Verdict: 🛠️ Proof repaired (correctness part only; work bounds not checked).** We verified
 the correctness theorem, Theorem 3.4: `SameSet`/`Unite` with CAS-based linking by node id is
 linearizable and wait-free with each of the three versions of `Find` (no compaction, one-try and
 two-try splitting), for every fixed order of the ids, and so are the early-termination variants of

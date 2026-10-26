@@ -6,7 +6,7 @@ Jukka Suomela. *Brief Announcement: Is a LOCAL Algorithm Computable?* PODC 2026.
 version, arXiv [2602.21022](https://arxiv.org/abs/2602.21022) v2; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes — for Section 5 only.** **The headline result, the separation
+**Verdict: ⚠️ Minor statement issues — for Section 5 only.** **The headline result, the separation
 Theorem 4.1 (an LCL `Π` with complexity `O(log n)` in uncomputable-LOCAL but `Ω(√n)` in
 computable-LOCAL, i.e. classes I < II of Table 1), is *not* verified.** The LCL `Π` of Section 4 is
 not formalized, only the diagonalization core of Lemma 4.17 (on abstract hypotheses) and Lemma 4.18.

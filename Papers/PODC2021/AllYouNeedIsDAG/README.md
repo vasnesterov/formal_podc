@@ -5,7 +5,7 @@ PODC 2021. DOI [10.1145/3465084.3467905](https://doi.org/10.1145/3465084.3467905
 version: arXiv [2102.08325](https://arxiv.org/abs/2102.08325) v2. Copy of the paper:
 [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** DAG-Rider satisfies Integrity, Total order, Agreement and Validity (the last two given infinitely many good waves, which occur with probability 1; robust Lemma 2 and the `≤ 3/2` expected-waves bound are proved). But Lemma 1 is false as stated (for indirectly committed leaders) and the total-order proof relies on it; chain quality holds only for round-major delivery orders; several proofs (Lemma 2 → Claim 6, Claim 2, Validity) have gaps, all closed here.
+**Verdict: ❌ False claim.** DAG-Rider satisfies Integrity, Total order, Agreement and Validity (the last two given infinitely many good waves, which occur with probability 1; robust Lemma 2 and the `≤ 3/2` expected-waves bound are proved). But Lemma 1 is false as stated (for indirectly committed leaders) and the total-order proof relies on it; chain quality holds only for round-major delivery orders; several proofs (Lemma 2 → Claim 6, Claim 2, Validity) have gaps, all closed here.
 
 ## Mistakes in the paper
 

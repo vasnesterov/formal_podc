@@ -5,7 +5,7 @@ DOI [10.1145/2933057.2933112](https://doi.org/10.1145/2933057.2933112). Formaliz
 (Distributed Computing) version, arXiv:1607.07553v3; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The deterministic core of the paper is proved: Lemma 1, Lemma 2 (pipelined
+**Verdict: ⚠️ Minor statement issues.** The deterministic core of the paper is proved: Lemma 1, Lemma 2 (pipelined
 convergecast/broadcast on subtrees in `D − 1 + c` rounds), Theorem 2 (leader election and part-wise aggregation in
 `O(b)` supersteps of `O(D + c)` rounds), Lemma 3/Corollary 6, Lemma 5 (`CoreSlow`), the combinatorial part of
 Lemma 4 (`CoreFast`), and the deterministic version of Theorem 1. Lemma 1 is false as literally stated: Definitions 4

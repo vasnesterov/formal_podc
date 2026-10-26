@@ -5,7 +5,7 @@ Redundancy.* PODC 2020. DOI [10.1145/3382734.3405748](https://doi.org/10.1145/33
 Formalized version: the proceedings version (there is no arXiv version). Copy of the paper:
 [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** Theorem 2 (linear convergence of gradient descent with the CGC
+**Verdict: ⚠️ Minor statement issues.** Theorem 2 (linear convergence of gradient descent with the CGC
 filter under 2f-redundancy) is fully proved; its part (i) `ρ ≥ 0` fails only in the degenerate case
 `W* = ℝ^d`. Theorem 1 ("2f-redundancy is necessary") is under-specified. Read literally it is
 vacuous. Read as what its proof shows (indistinguishability), it is true and tight, provided exactly

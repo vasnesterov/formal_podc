@@ -5,7 +5,7 @@ Lovász Local Lemma.* PODC 2019. DOI [10.1145/3293611.3331636](https://doi.org/1
 Formalized version: arXiv [1908.06270](https://arxiv.org/abs/1908.06270) v2; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** Both main theorems hold. Theorem 1.1 covers variables affecting `≤ 2` events
+**Verdict: ⚠️ Minor statement issues.** Both main theorems hold. Theorem 1.1 covers variables affecting `≤ 2` events
 and Theorem 1.3 variables affecting `≤ 3` events. In both, `p · 2^d < 1` and the deterministic variable-fixing
 process works for any adaptive order of the variables. Lemmas 3.2, 3.6, 3.7 and 3.9 hold, and so does Lemma 3.5
 once a parenthesis typo is fixed. Two things needed repair: the proof of Theorem 1.3 reduces "w.l.o.g." to variables

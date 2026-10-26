@@ -5,7 +5,7 @@ of Shared Memory Emulation.* PODC 2016. DOI
 [10.1145/2933057.2933118](https://doi.org/10.1145/2933057.2933118). Formalized version: arXiv
 [1605.06844](https://arxiv.org/abs/1605.06844) v2; numbering follows it.
 
-**Verdict: ❌ False claim.** With reliable FIFO channels, Theorems 4.1, 5.1, B.1 and Corollaries 4.2,
+**Verdict: 🚨 Headline claim false.** With reliable FIFO channels, Theorems 4.1, 5.1, B.1 and Corollaries 4.2,
 5.2 and B.2 are false, and this holds in the paper's I/O-automaton reading as well. The Lean
 counterexample is the *streaming relay*. Each server step either receives a message and sends
 nothing, or sends at most one message, so a server keeps its pending outputs in its state. Every

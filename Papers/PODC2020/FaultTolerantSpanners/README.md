@@ -5,10 +5,12 @@ DOI [10.1145/3382734.3405735](https://doi.org/10.1145/3382734.3405735). Formaliz
 [2002.10889](https://arxiv.org/abs/2002.10889) v2.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ✅ Correct.** The sequential part (Sections 2–4) holds as stated. The modified greedy
+**Verdict: 🛠️ Proof repaired.** The sequential part (Sections 2–4) holds as stated. The modified greedy
 algorithm, which uses the length-bounded-cut approximation (Algorithm 2), outputs an `f`-VFT
 `(2k−1)`-spanner with `O(k f^{1−1/k} n^{1+1/k})` edges, weighted and unweighted. We prove it with the
-explicit constant 32. We found only two minor slips, both in proofs.
+explicit constant 32. We found only two minor slips: a wrong step (`p = 1`) in the proof of Lemma 3, and
+Lemma 7's hypothesis `f = o(n)`, which its proof's estimate strictly needs as `kf = o(n)`; the statement
+stays true (when `kf ≥ n` the claimed subgraph exists trivially), so only the proof needs repair.
 
 ## Mistakes in the paper
 

@@ -7,7 +7,7 @@ one-shot timestamp implementations.* PODC 2011. DOI
 follows it).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** All stated results hold: Theorems 1.1 (`n/6 - 1`, long-lived),
+**Verdict: 🛠️ Proof repaired.** All stated results hold: Theorems 1.1 (`n/6 - 1`, long-lived),
 1.2 (`√(2n) - log n - O(1)`, one-shot) and 1.3 (`2⌈√n⌉` registers), with the lower bounds proved
 for deterministic (obstruction-free) implementations. The proofs of Theorem 1.2 (final counting,
 empty-prefix case) and Lemma 6.5 (last phase) have genuine gaps, which we closed with new

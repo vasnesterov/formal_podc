@@ -5,7 +5,7 @@ Data-Center Routing with Congestion Control and Unsplittable Flows.* PODC 2024. 
 [10.1145/3662158.3662777](https://doi.org/10.1145/3662158.3662777). Formalized version: the PODC
 proceedings version (no arXiv version); numbering follows it.
 
-**Verdict: ⚠️ Correct with fixes.** Theorems 3.4, 4.2 and 4.3, the upper bound of Theorem 5.4 and
+**Verdict: 🛠️ Proof repaired.** Theorems 3.4, 4.2 and 4.3, the upper bound of Theorem 5.4 and
 all lemmas are correct. The proofs that the paper omits as "routine" (Lemma 2.2, Lemma 3.2, Lemma 4.4,
 Lemma 4.6, Lemma 5.2) are also proved here. The tightness part of Theorem 5.4 is proved only for odd
 `n`. The paper reduces to odd `n` "without loss of generality", but for even `n` its construction gives

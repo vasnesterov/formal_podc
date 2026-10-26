@@ -5,7 +5,7 @@ on Trees and Block Graphs.* PODC 2026. DOI [10.1145/3796701.3815967](https://doi
 Formalized version: arXiv [2502.05591](https://arxiv.org/abs/2502.05591) v5; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The reductions are correct: AA on trees reduces to real-valued AA plus
+**Verdict: ⚠️ Minor statement issues.** The reductions are correct: AA on trees reduces to real-valued AA plus
 gradecast (Theorems 3 and 5), and AA on block graphs reduces to AA on trees (Theorem 8). We proved them in the
 synchronous lock-step model with the black boxes as hypotheses. Some proofs are wrong but the statements hold:
 Lemma 13 (validity on block graphs), Lemma 12 and Lemma 15. The authenticated RealAA protocol of Theorem 7 uses, for

@@ -7,7 +7,7 @@ Yi-Jun Chang, Gopinath Mishra, Hung Thuan Nguyen, Mingyang Yang, Yu-Cheng Yeh. *
 [2312.01384](https://arxiv.org/abs/2312.01384)).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** Theorem 1.1 (`Ω(log n)` for grids) and Theorem 1.3 (`Ω(√n)` for cylinders and
+**Verdict: ⚠️ Minor statement issues.** Theorem 1.1 (`Ω(log n)` for grids) and Theorem 1.3 (`Ω(√n)` for cylinders and
 tori) are proved, with explicit constants, together with Lemmas 3.3–3.6. No proof step fails, but Theorem 1.3 as
 stated omits that `√n` must be odd (the proof chooses `√n` odd); read as a bound for all large `n`, it is false
 for even `√n`.

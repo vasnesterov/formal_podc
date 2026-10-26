@@ -5,7 +5,7 @@ Joan Feigenbaum, Brighten Godfrey, Aurojit Panda, Michael Schapira, Scott Shenke
 [10.1145/2332432.2332478](https://doi.org/10.1145/2332432.2332478). Formalized version: arXiv
 [1207.3732](https://arxiv.org/abs/1207.3732) v2 (full version); numbering follows it.
 
-**Verdict: ⚠️ Correct with fixes.** Both theorems hold. Theorem 3.1 says every (connected) network
+**Verdict: ❌ False claim.** Both theorems hold. Theorem 3.1 says every (connected) network
 has a 1-resilient forwarding pattern. Theorem 4.3 says some network has no perfectly resilient
 one; the Figure 3 network is indeed such a network. But both lemmas behind Theorem 4.3 are false
 as stated, and its proof applies Lemma 4.1 where it does not hold. The algorithm of §3.2 is too

@@ -5,8 +5,8 @@ DOI [10.1145/3087801.3087839](https://doi.org/10.1145/3087801.3087839). Formaliz
 [1705.08627](https://arxiv.org/abs/1705.08627) v1 (extended version with the appendix); numbering
 follows it.
 
-**Verdict: ❌ False claim.** Theorem 4, the "Visible Zigzag Theorem" (knowledge of a timed
-precedence ⇔ a σ-visible zigzag of sufficient weight), is false in its "only if" direction: a
+**Verdict: 🚨 Headline claim false.** Theorem 4, the "Visible Zigzag Theorem" (knowledge of a timed
+precedence ⇔ a σ-visible zigzag of sufficient weight), which the abstract presents as a main contribution, is false in its "only if" direction: a
 4-process flooding full-information system has a node that knows `θ₁ --0--> θ₂`, but no σ-visible
 zigzag from `θ₁` to `θ₂` has weight `≥ 0`. Theorem 3 also needs a hypothesis it does not state: it
 fails for full-information protocols that do not flood. Theorems 1 and 2 (zigzag sufficiency and

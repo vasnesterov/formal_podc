@@ -6,9 +6,11 @@ Consensus Number of a Cryptocurrency.* PODC 2019. DOI
 [1906.05574](https://arxiv.org/abs/1906.05574) v1 (extended version, the only arXiv version; the journal version, Distributed Computing 2022, was not checked);
 numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** For the message-passing algorithm of Figure 4 as written, Lemma 3 and the
+**Verdict: ⚠️ Minor statement issues.** For the message-passing algorithm of Figure 4 as written, Lemma 3 and the
 liveness part of Theorem 3 are false: a correct process that spends money it has just received
-blocks forever, even with two correct processes. We prove that the fix `balance(c, hist[q] ∪ h)` makes
+blocks forever, even with two correct processes. The cause is a one-term pseudocode slip with evident intent
+(line 2 spends `balance(a, hist[p] ∪ deps)` and ships `deps` as `h`, and Lemma 3's proof assumes the receiver's
+check passes because the sender checked its balance); we prove that the fix `balance(c, hist[q] ∪ h)` makes
 that transfer complete. Theorem 2 (consensus number exactly `k`, `k ≥ 1`) and Corollary 1 hold, and
 Theorem 1 holds once a set-vs-sequence slip in Figure 1 is fixed.
 

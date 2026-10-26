@@ -5,7 +5,7 @@ Hsueh-Ping Chen, Ho-Lin Chen. *Self-Stabilizing Leader Election in Regular Graph
 proceedings version (no arXiv version exists); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** Both protocols, as printed, fail. **SS-Tree (Theorem 4.3) is false**:
+**Verdict: 🚨 Headline claim false.** Both protocols, as printed, fail. **SS-Tree (Theorem 4.3) is false**:
 there is a configuration in which every node is a root, hence a leader, forever; no detector
 ever fires. **SS-EulerCycle (Theorem 3.3) as printed is false as well**: no configuration is
 output-stable, because the coherence check rejects every interaction in which the scheduler makes

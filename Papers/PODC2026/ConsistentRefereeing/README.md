@@ -6,10 +6,11 @@ Difficulty of Consistent Refereeing.* PODC 2026. DOI
 [2506.18401](https://arxiv.org/abs/2506.18401) v3 (same text as the proceedings version); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** All theorems we formalized hold: Theorems 1, 3, 4, 5, 25, 30,
+**Verdict: ⚠️ Minor statement issues.** All theorems we formalized hold: Theorems 1, 3, 4, 5, 25, 30,
 Proposition 11, Corollary 12, and Lemma 14 for counters, max registers and snapshots. The proof of
 **Theorem 30 has a gap** in its test&set case; we closed it with a different argument. Case 4c (stack,
-push/pop) of Theorem 5 is only sketched; our stack argument does not need it.
+push/pop) of Theorem 5 is only sketched; our stack argument does not need it. The statement-level issues
+are minor: Lemma 29(2) fails in the degenerate case `w = 0`, and Lemma 17 needs `decide` to be pending.
 
 ## Mistakes in the paper
 

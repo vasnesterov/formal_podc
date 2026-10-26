@@ -7,8 +7,8 @@ version: the brief announcement (BA, arXiv:2211.11352) states the result. The pr
 arXiv:2211.10151v2. The lower bound is due to Zeiner, Schwarz and Schmid (DAM 2019) and appears as FV Figure 5.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ✅ Correct.** Both bounds of BA Theorem 3.1, `⌈(3n−1)/2⌉ − 2 ≤ t*(𝒯ₙ) ≤ ⌈(1+√2)n − 1⌉`, are proved
-for all `n`. There are no errors, only small slips in FV's proofs.
+**Verdict: 🛠️ Proof repaired.** Both bounds of BA Theorem 3.1, `⌈(3n−1)/2⌉ − 2 ≤ t*(𝒯ₙ) ≤ ⌈(1+√2)n − 1⌉`, are proved
+for all `n`. There are no false statements. The BA's upper bound is one round sharper than what FV's proof gives, and needs a recount of FV's pigeonhole; FV's proofs also have small slips.
 
 ## Mistakes in the paper
 

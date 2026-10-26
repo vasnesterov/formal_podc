@@ -6,7 +6,7 @@ Symmetric Deadlock-Free Mutual Exclusion.* PODC 2019. DOI
 [1810.03723](https://arxiv.org/abs/1810.03723) v1 (the only version); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** **Theorem 2 is false**: the read/write algorithm (Algorithm 1) livelocks
+**Verdict: 🚨 Headline claim false.** **Theorem 2 is false**: the read/write algorithm (Algorithm 1) livelocks
 for `n = 4` processes and `m = 5 ∈ M(4)` registers. So the headline tight characterization
 `m ∈ M(n) \ {1}` for read/write anonymous memory is only half established: necessity holds, sufficiency
 does not follow from the paper. Theorems 1, 3, 4 and 5 hold, and the characterization for

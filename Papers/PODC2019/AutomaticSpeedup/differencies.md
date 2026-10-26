@@ -5,7 +5,7 @@ Paper: S. Brandt, *An Automatic Speedup Theorem for Distributed Problems*, PODC 
 
 ## Errors in the paper
 
-1. **Theorem 1, (2) ⇒ (1), is false as stated (false statement of a headline claim; verdict ❌).** The proof lets the two endpoints `u, v`
+1. **Theorem 1, (2) ⇒ (1), is false as stated (false statement of a headline claim; verdict 🚨).** The proof lets the two endpoints `u, v`
    of an edge `e` pick a pair `(o, o')` from their `Π_1`-outputs with `{o, o'} ∈ g_{1/2}(Δ)` "by looking only at
    `N^t(e)`", `v` keeping `o` and `u` keeping `o'`. If `N^t(e)` looks the same from both endpoints (same port
    number of `e` at both ends, same radius-`(t-1)` views), both endpoints make the same choice. Counterexample

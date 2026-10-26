@@ -6,7 +6,7 @@ hal-01178651v1 (July 2015). Its numbering is that of the proceedings. There is n
 cited as [6] ("Tech Report 2025, IRISA, 2015"; 2025 is the report number) is not available to us, so the proofs of
 Lemmas 1 and 2 ("Proof in [6]") were reconstructed. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The EA object of Figure 3 is not live: **Lemma 2 (EA-Termination) and Theorem 3 are
+**Verdict: 🚨 Headline claim false.** The EA object of Figure 3 is not live: **Lemma 2 (EA-Termination) and Theorem 3 are
 false**. As a result, the consensus algorithm of Figure 4 does not terminate, so **Theorem 4 is false**. This holds
 even in a synchronous run in which the only faulty process crashes at the start. The proof of Lemma 3 has two
 further gaps. The paper therefore does not establish its headline claim that an eventual `⟨t+1⟩bisource` suffices for

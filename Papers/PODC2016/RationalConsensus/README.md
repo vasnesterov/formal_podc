@@ -5,7 +5,7 @@ Joseph Y. Halpern, Xavier Vilaça. *Rational Consensus.* PODC 2016. DOI
 [2005.10141](https://arxiv.org/abs/2005.10141) v1 (full version with proofs and Algorithm 1); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** Theorem 1 (no fair consensus protocol is an `f`-Nash equilibrium,
+**Verdict: ⚠️ Minor statement issues.** Theorem 1 (no fair consensus protocol is an `f`-Nash equilibrium,
 `f ≥ 1`) is correct for `n ≥ 2` and fully verified. Theorem 2 (`σ_cons` solves fair consensus whenever
 `f + 1 < n`) is verified for Algorithm 1 as written, but its proof has a gap (the first crash-free round
 need not seem clean), and the forwarding step of round `f + 1` is under-specified: under the prose reading

@@ -5,7 +5,7 @@ Siddhartha Jayanti. *On Interplanetary and Relativistic Distributed Computing.* 
 version (no arXiv version exists); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The Central Theorem (Theorem 6.7) and the Equivalence Theorem
+**Verdict: ⚠️ Minor statement issues.** The Central Theorem (Theorem 6.7) and the Equivalence Theorem
 (Theorem 6.8) hold when there are countably many processors. Theorem 6.8 holds with no assumption at
 all, once its three notions of linearizability are all read over finite executions (Def. A.3 already
 does this; see the under-specified definitions below). With uncountably many processors, Lemma 6.3

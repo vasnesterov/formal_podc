@@ -8,12 +8,13 @@ the proofs and Algorithm 3 of the full version, arXiv
 Lemmas 2, 4, 6, 7 / Theorem 2.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** **Lemma 4 and Theorem 1 (the rotor-coordinator) are false.** With
+**Verdict: 🚨 Headline claim false.** **Lemma 4 and Theorem 1 (the rotor-coordinator, one of the two algorithms
+the abstract presents) are false.** With
 `n > 3f`, every correct node can terminate without any good round, and without ever accepting the
 opinion of a correct coordinator. Smallest instances: `n = 7, f = 2` for Lemma 4 and `n = 4, f = 1`
 for Theorem 1.
 
-The headline claims survive, though. With a corrected termination rule, the rotor-coordinator
+The headline results survive in repaired form, though. With a corrected termination rule, the rotor-coordinator
 works with `n > 3f` in `O(n)` rounds, with a good round among the first `f + 1` iterations. A
 repaired version of the consensus algorithm solves consensus with `n > 3f` in `3f + 7` rounds.
 The full version's consensus algorithm (Algorithm 3) is under-specified; under the natural

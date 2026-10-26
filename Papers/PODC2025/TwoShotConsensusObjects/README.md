@@ -6,7 +6,7 @@ Solving Two-process Consensus.* PODC 2025. DOI
 proceedings version (no arXiv version found); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The main result is fully formalized. A deterministic two-shot
+**Verdict: ❌ False claim.** The main result is fully formalized. A deterministic two-shot
 type `(T, m)`, together with registers, solves wait-free two-process consensus iff it lies in
 `C₁ ∪ C₁.₅ ∪ C₂`. Both directions hold, and all three algorithms are correct, after fixing a
 typo in Algorithm 3. The necessity proof has gaps, which we filled. The illustrating example

@@ -5,7 +5,8 @@ Detectable Objects.* PODC 2020. DOI [10.1145/3382734.3405725](https://doi.org/10
 Formalized version: arXiv [2002.11378](https://arxiv.org/abs/2002.11378) v1; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** Algorithm 2 (detectable CAS, Lemma 2) is not linearizable: a crash-free run of
+**Verdict: 🚨 Headline claim false.** Algorithm 2, the detectable CAS implementation that the abstract presents
+among the main contributions (Lemma 2), is not linearizable: a crash-free run of
 two processes each executing `Cas(v₀, v₀)` breaks it. We prove a fixed version correct. Theorems 1 and 2 (the
 first assuming |V| ≥ N values), Lemmas 3–8 and Algorithm 3 are proved, and Algorithm 1's initialization is
 under-specified (it fails only with 0-based process ids; the fixed version is proved).

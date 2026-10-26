@@ -6,11 +6,11 @@ Formalized version: arXiv [1103.5320](https://arxiv.org/abs/1103.5320) v2 (full 
 follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The algorithm is correct. Estimates never increase, never drop
+**Verdict: ❌ False claim.** The algorithm is correct. Estimates never increase, never drop
 below the coreness, and converge to it, both in the one-node-per-host version (synchronous and
 asynchronous) and in the many-nodes-per-host version. The bounds of Theorem 4 (`1 + Σ(d − k)`),
 Theorem 5 (`N`) and Corollary 1 (`N − K + 1`) hold. Two quantitative claims are wrong. The "worst-case"
-family of Fig. 3 needs `N − 2` rounds, not `N − 1`. The message bound of Corollary 2 ignores the
+family of Fig. 3 needs `N − 2` rounds, not `N − 1` (a false side claim, not a typo; the theorems are unaffected). The message bound of Corollary 2 ignores the
 initial broadcast. The proofs of Theorems 3 and 5 have gaps.
 
 ## Mistakes in the paper

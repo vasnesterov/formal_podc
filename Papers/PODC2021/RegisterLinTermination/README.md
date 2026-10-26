@@ -4,7 +4,7 @@ Vassos Hadzilacos, Xing Hu, Sam Toueg. *On Register Linearizability and Terminat
 [10.1145/3465084.3467925](https://doi.org/10.1145/3465084.3467925). Formalized version: arXiv
 [2102.13242](https://arxiv.org/abs/2102.13242) v1; numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** Every theorem we formalized holds: Theorem 14 (linearizable SWMR ⇒ write
+**Verdict: 🛠️ Proof repaired.** Every theorem we formalized holds: Theorem 14 (linearizable SWMR ⇒ write
 strongly-linearizable), Theorems 10/12/13 and Corollary 11 (Algorithm 2 is write strongly-linearizable but not
 strongly linearizable; Algorithm 4 is linearizable but not write strongly-linearizable) and Theorem 6 (with merely
 linearizable registers a strong adversary keeps Algorithm 1 running forever) and Theorem 7 (if `R1` is write

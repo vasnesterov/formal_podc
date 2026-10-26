@@ -5,7 +5,7 @@ Nitin H. Vaidya, Vijay K. Garg. *Byzantine Vector Consensus in Complete Graphs.*
 [1302.2543](https://arxiv.org/abs/1302.2543) v1 (full version with appendices); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The main results (Theorems 1–5 and Lemma 1) hold. Exact BVC
+**Verdict: ❌ False claim.** The main results (Theorems 1–5 and Lemma 1) hold. Exact BVC
 in synchrony is solvable iff `n ≥ max(3f+1, (d+1)f+1)`, and approximate asynchronous BVC needs
 `n ≥ (d+2)f+1` and is achieved by the paper's algorithm, given the AAD exchange primitive. In the
 secondary Section 4 (Theorem 6, stated without proof), the synchronous necessity claim is false as

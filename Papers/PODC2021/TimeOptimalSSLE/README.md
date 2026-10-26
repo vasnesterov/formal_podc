@@ -6,7 +6,7 @@ Janna Burman, Ho-Lin Chen, Hsueh-Ping Chen, David Doty, Thomas Nowak, Eric Sever
 [1907.06068](https://arxiv.org/abs/1907.06068) v5 (29 Nov 2021); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The structural results hold: SSLE needs `≥ n` states and exact knowledge
+**Verdict: ⚠️ Minor statement issues.** The structural results hold: SSLE needs `≥ n` states and exact knowledge
 of `n` (Theorem 2.1, proved here), `Silent-n-state-SSR` solves ranking (Lemmas 2.2, 2.3, Theorem 2.4), and
 Observation 2.5 holds. **`Optimal-Silent-SSR` as printed (Protocol 3) never stabilizes**: an off-by-one in the
 recruitment guard means rank `n` can never be assigned. With the evidently intended guard `≤ n` we prove the protocol

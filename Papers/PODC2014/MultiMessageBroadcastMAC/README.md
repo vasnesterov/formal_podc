@@ -4,12 +4,13 @@ Mohsen Ghaffari, Erez Kantor, Nancy Lynch, Calvin Newport. *Multi-Message Broadc
 Unreliable Links.* PODC 2014. DOI [10.1145/2611462.2611492](https://doi.org/10.1145/2611462.2611492). Formalized
 version: arXiv [1405.1671](https://arxiv.org/abs/1405.1671) v1; numbering follows it.
 
-**Verdict: ⚠️ Correct with fixes.** The BMMB results of Section 3 hold. These are correctness (Theorem 3.4), the
+**Verdict: ⚠️ Minor statement issues.** The BMMB results of Section 3 hold. These are correctness (Theorem 3.4), the
 `O((D + k) F_ack)` bound for arbitrary `G'` (Theorem 3.1) and the `O(D F_prog + r k F_ack)` bound for an `r`-restricted
-`G'` (Theorems 3.2 and 3.16 with Lemmas 3.3–3.15). All are proved with explicit constants. The fixes are minor:
+`G'` (Theorems 3.2 and 3.16 with Lemmas 3.3–3.15). All are proved with explicit constants. The problems are local and do not affect the theorems:
 * the times `t_{d,ℓ}` used by the key lemma are never defined;
-* Lemma 3.12, part 5 is false (the proof needs only a weaker inequality);
-* Theorem 3.16 as stated ("`R_j(t₁) = K` for every node `j`") needs `G` to be connected.
+* Lemma 3.12, part 5 is off by one `F_ack` (a slip with evident intent: the proof of Lemma 3.14 cites it in the
+  correct, weaker form `ℓF_ack ≤ t_{0,ℓ} + F_ack`);
+* Theorem 3.16 as stated ("`R_j(t₁) = K` for every node `j`") needs `G` to be connected (implied by its use of the diameter `D`).
 
 The lower bounds (§3.3) and the enhanced-model algorithm (§4) are not formalized.
 

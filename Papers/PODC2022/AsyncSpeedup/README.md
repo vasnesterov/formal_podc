@@ -7,15 +7,18 @@ Applications to Consensus and Approximate Agreement.* PODC 2022. DOI
 Section 5.3); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ✅ Correct.** All the paper's results are proved, for any number of processes: the speedup
+**Verdict: ⚠️ Minor statement issues.** All the paper's results are proved, for any number of processes: the speedup
 theorem (Theorems 1 and 2), Lemma 1, Corollaries 1–3, Theorems 3 and 4, and Claims 1–6. The speedup
-theorems need two model properties that the paper uses without stating them (made explicit below). The
-abstract and conclusion overstate the binary-consensus result. We also prove that the bounds of
+theorems need two model properties that the paper uses without stating them (made explicit below), and
+the iteration in the proof of Theorem 4 skips a side condition, which we repaired. The
+abstract and conclusion overstate the binary-consensus result: read literally, the abstract's claim fails for
+`n = 2` (where consensus solves the task in one round), but the body states the qualifiers it needs. We also prove that the bounds of
 Corollary 3 are tight.
 
 ## Mistakes in the paper
 
-There are no false statements. Imprecisions, by decreasing importance:
+No numbered statement is false; the abstract's claim is false only as literally worded (see the first item).
+Imprecisions, by decreasing importance:
 
 * **Overstated scope of the binary-consensus result (abstract, Section 1.2, Conclusion).** The abstract
   says binary consensus objects "are not more powerful as far as helping solving approximate agreement

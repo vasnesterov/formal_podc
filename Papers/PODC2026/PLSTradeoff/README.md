@@ -6,7 +6,7 @@ Labeling Schemes.* PODC 2026. DOI
 [2605.19078](https://arxiv.org/abs/2605.19078) v1; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The two tradeoff theorems hold with explicit constants. For
+**Verdict: ⚠️ Minor statement issues.** The two tradeoff theorems hold with explicit constants. For
 connected graphs, a 1-PLS of cost `p` gives an `O(t log n)`-PLS of cost `O(⌈p/t⌉)` (Theorem 1.2).
 For every graph, the warm-up gives an `O(t log n)`-PLS of cost `O(⌈p/t⌉ + log n)` (Corollary 4.7).
 The lower bound of Theorem 1.6 also holds. Three auxiliary claims fail in degenerate cases: the

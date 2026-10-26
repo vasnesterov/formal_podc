@@ -5,7 +5,7 @@ Directed Networks.* PODC 2020. DOI [10.1145/3382734.3405724](https://doi.org/10.
 Formalized version: arXiv [2004.09054](https://arxiv.org/abs/2004.09054) v1 (the only version);
 numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The main result (Theorem 4) holds. Asynchronous approximate
+**Verdict: ⚠️ Minor statement issues.** The main result (Theorem 4) holds. Asynchronous approximate
 Byzantine consensus on a directed graph is solvable iff the graph satisfies 3-reach. We prove this
 end to end in one asynchronous message-passing model with **FIFO links** (the paper does not assume
 FIFO links): the paper's Algorithm BW + Filter-and-Average, implemented message by message, solves

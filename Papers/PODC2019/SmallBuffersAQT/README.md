@@ -5,8 +5,8 @@ Routing.* PODC 2019. DOI [10.1145/3293611.3331614](https://doi.org/10.1145/32936
 arXiv [1902.08069](https://arxiv.org/abs/1902.08069) v1 (the only version, with the appendix); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** **Lemma 4.8 is false for HPTS as printed**: Algorithm 3 processes the levels
-of a phase in increasing order, while the proof needs decreasing order. We prove Lemma 4.8 and Theorem 4.1 (space
+**Verdict: ⚠️ Minor statement issues.** **Lemma 4.8 is false for HPTS as printed**: Algorithm 3 processes the levels
+of a phase in increasing order, while the proof needs, and explicitly says, decreasing order; we count this as a pseudocode slip. We prove Lemma 4.8 and Theorem 4.1 (space
 `ℓ n^{1/ℓ} + σ + 1` when `ρℓ ≤ 1`) for **HPTS with the levels of each phase in decreasing order** (a one-line change
 to Algorithm 3). Theorem 4.1 claims only that *some* algorithm "HPTS" achieves the bound, so this variant proves it.
 **For Algorithm 3 as printed, the bound is unverified (open).** PTS/PPTS on paths and trees (Propositions 3.1, 3.2,

@@ -5,11 +5,12 @@ PODC 2023. DOI [10.1145/3583668.3594567](https://doi.org/10.1145/3583668.3594567
 version arXiv:2301.04920v3 (numbering follows it).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ✅ Correct.** The classification of solvable validity properties is proved: trivial ones for
+**Verdict: ⚠️ Minor statement issues.** The classification of solvable validity properties is proved: trivial ones for
 `n ≤ 3t`, and those satisfying the similarity condition `C_S` for `n > 3t`. So is the `Ω(t²)` message lower bound.
 The sufficiency direction is unconditional, because we also verified a vector-consensus protocol for every
 `n > 3t`; this replaces the paper's black box. The only proof gap is in Lemma 3 for `n < 2t`, and it is easily
-repaired.
+repaired. Two statements need implicit assumptions: Theorem 1 fails in the degenerate case of no proposals and no
+decision values, and Theorem 3's "Turing-computable `Λ`" needs computable algorithms.
 
 ## Mistakes in the paper
 

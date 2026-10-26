@@ -7,7 +7,7 @@ it. v3 has the double-exponential bound for leaderless protocols (Ω(log log η)
 claims only a triple-exponential bound and proves it differently (rejection certificates). That proof is not
 formalized.
 
-**Verdict: ⚠️ Correct with fixes.** The leaderless main result holds: Theorem 5.9 is proved, so
+**Verdict: ⚠️ Minor statement issues.** The leaderless main result holds: Theorem 5.9 is proved, so
 `η ≤ 2^((2n+2)!)` and `BB(n) ≤ 2^((2n+2)!)`. Theorem 4.5 (protocols with `ℓ` leaders, `η < F_{ℓ,ϑ}(n)`) is
 also proved, after repairing a gap in its proof. Definition 1 of `BB_L` forgets to bound the number of leaders:
 read literally, `BB_L(4)` does not exist, since 4 states and `η` leaders decide `x ≥ η` for **every** `η`. The

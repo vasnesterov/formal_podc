@@ -6,17 +6,18 @@ Power of Distributed Shared-Memory Models with Bounded-Size Registers.* PODC 202
 the proofs of the full version arXiv [2309.13977](https://arxiv.org/abs/2309.13977) v1 (Sections 4–5 there =
 Sections 3–4 of the conference paper).
 
-**Verdict: ✅ Correct.** Theorem 1.1 (bounded registers are not universal when `n/2 < t < n`) is proved, together with
+**Verdict: ⚠️ Minor statement issues.** Theorem 1.1 (bounded registers are not universal when `n/2 < t < n`) is proved, together with
 the two results it cites (Lemma 2.1, FLP for read/write memory; Lemma 2.2, wait-free ε-agreement). Algorithm 1
 (two-process ε-agreement with 1-bit registers, Proposition 5.1) is proved correct. Theorem 1.2 (3-bit registers are
 universal for two processes) is proved from the Biran–Moran–Zaks characterization, which the paper cites: its "only if"
 direction (solvable with unbounded registers ⇒ connectivity and covering) is **assumed** as the hypothesis `BMZ Δ`; the
 rest (BMZ conditions ⇒ Algorithm 2 with 3-bit coordination registers solves the task) is proved. Theorems 1.3–1.5 are
-not formalized. We found only small imprecisions.
+not formalized. We found only small imprecisions; the only ones in a statement or algorithm are index slips with
+evident intent (Algorithm 2's resolution and path indices in the full version).
 
 ## Mistakes in the paper
 
-There are no false statements. Small gaps and slips:
+There are no false statements beyond index slips with evident intent. Small gaps and slips:
 
 * **Claim 3.1: inputs of the absent processes.** The reduction to consensus uses the validity of ε-agreement,
   but that condition only applies when *all `n`* inputs are equal. Consensus fixes only the inputs of

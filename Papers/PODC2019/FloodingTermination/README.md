@@ -6,7 +6,7 @@ DOI [10.1145/3293611.3331586](https://doi.org/10.1145/3293611.3331586). Formaliz
 follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** All results hold for finite connected graphs, as the abstract
+**Verdict: ⚠️ Minor statement issues.** All results hold for finite connected graphs, as the abstract
 assumes. These are termination of synchronous amnesiac flooding (Theorem 2.2, Corollary 2.4),
 termination time exactly `e = ecc(source)` iff the graph is bipartite (Theorem 3.5), and
 `e < T ≤ e + d + 1` otherwise (Theorem 3.7). The Section 4 non-termination example also holds. The

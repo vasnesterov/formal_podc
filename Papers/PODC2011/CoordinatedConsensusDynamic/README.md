@@ -5,7 +5,7 @@ DOI [10.1145/1993806.1993808](https://doi.org/10.1145/1993806.1993808). Formaliz
 10-page proceedings version (no full version exists); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The paper's core results hold, and we proved them:
+**Verdict: ❌ False claim.** The paper's core results hold, and we proved them:
 
 - Lemma 3.1, the knowledge test for "I have heard from everybody".
 - Theorem 5.1: nothing non-trivial is common knowledge before time `n − 1` (known `n`) or `n`

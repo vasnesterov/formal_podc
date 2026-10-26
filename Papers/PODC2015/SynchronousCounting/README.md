@@ -5,7 +5,7 @@ Christoph Lenzen, Joel Rybicki, Jukka Suomela. *Towards Optimal Synchronous Coun
 [1503.06702](https://arxiv.org/abs/1503.06702) v1; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The resilience-boosting construction (Theorem 1) and the main result
+**Verdict: ⚠️ Minor statement issues.** The resilience-boosting construction (Theorem 1) and the main result
 Theorem 3 are verified: `f = n^{1−o(1)}`, `O(f)` stabilisation time, `O(log² f / log log f + log c)`
 state bits. Corollaries 1 and 2 are verified for the network sizes the constructions produce (Corollary 1
 only for `n = 3f+1`). Theorem 2 is verified with a weaker time constant than claimed. Theorem 1 *as

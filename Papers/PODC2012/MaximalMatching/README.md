@@ -5,12 +5,12 @@ Juho Hirvonen, Jukka Suomela. *Distributed Maximal Matching: Greedy is Optimal.*
 [1110.0367](https://arxiv.org/abs/1110.0367) v1 (the only version); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ✅ Correct.** On anonymous `k`-edge-coloured graphs, maximal matching needs exactly
+**Verdict: 🛠️ Proof repaired.** On anonymous `k`-edge-coloured graphs, maximal matching needs exactly
 `k - 1` deterministic rounds; the greedy algorithm is optimal (Lemma 1, Theorem 2). For `k ≥ 3` the
 lower bound holds already on `(k-1)`-regular graphs (Theorem 6), which gives `Ω(Δ)` (Corollary 3).
 All of this is proved. The template / extension / critical-pair argument of §3 goes through as
-written. We also extend the lower bound from the paper's formal model, which uses infinite trees,
-to finite simple graphs.
+written. One step is missing: the paper's formal model uses infinite trees, and passing to finite
+simple graphs needs an extra construction, which we supply.
 
 ## Mistakes in the paper
 

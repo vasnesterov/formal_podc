@@ -4,7 +4,7 @@ Leonid Barenboim, Michael Elkin. *Deterministic Distributed Vertex Coloring in P
 Time.* PODC 2010. DOI [10.1145/1835698.1835797](https://doi.org/10.1145/1835698.1835797).
 Formalized version: arXiv [1003.1608](https://arxiv.org/abs/1003.1608) v1; numbering follows it.
 
-**Verdict: ⚠️ Correct with fixes.** Sections 3 and 4 hold. This covers Lemma 3.1, Theorems 3.2
+**Verdict: 🛠️ Proof repaired.** Sections 3 and 4 hold. This covers Lemma 3.1, Theorems 3.2
 and 3.5, Corollaries 3.4 and 3.6, Lemmas 4.1 and 4.2, Theorem 4.3 and Corollary 4.4, all with
 explicit constants. Lemma 2.1 (Kuhn's defective colouring) is a black-box hypothesis, and so is the
 `(Δ+1)`-colouring of [BE09] for Lemma 4.1. The proof of Corollary 4.4 has a gap: its case split

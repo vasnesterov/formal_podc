@@ -4,11 +4,12 @@ Calvin Newport. *Consensus with an abstract MAC layer.* PODC 2014. DOI
 [10.1145/2611462.2611479](https://doi.org/10.1145/2611462.2611479). Formalized version: arXiv
 [1405.1382](https://arxiv.org/abs/1405.1382) v1; numbering follows it.
 
-**Verdict: ⚠️ Correct with fixes.** All lower bounds hold: Theorems 3.2, 3.3, 3.9 and 3.10 are proved
+**Verdict: ❌ False claim.** All lower bounds hold: Theorems 3.2, 3.3, 3.9 and 3.10 are proved
 (Theorem 3.2 needs `n ≥ 2`). Theorem 4.1 holds for the two-phase algorithm described in the prose, with the
 `2 F_ack` time bound. The pseudocode of Algorithm 1 has a one-symbol slip: line 23 looks for `decided(0)` only
-in `R2`, and read literally the algorithm violates agreement on two nodes. Claim 3.4 is false for `D = 4`, so the
-networks of Figure 1 do not prove Theorem 3.3 there; we prove it for every even `D ≥ 4` with a different gadget.
+in `R2`, and read literally the algorithm violates agreement on two nodes. The false statement is Claim 3.4, a numbered
+claim: it fails for `D = 4` (a non-degenerate case that Theorem 3.3 covers), so the networks of Figure 1 do not
+prove Theorem 3.3 there; we prove the theorem for every even `D ≥ 4` with a different gadget.
 
 ## Mistakes in the paper
 
@@ -27,7 +28,7 @@ networks of Figure 1 do not prove Theorem 3.3 there; we prove it for every even 
   proof assumes `v` "will see that `u` has a status of decided(0)". With the check over `R1 ∪ R2`, Theorem 4.1
   holds, including the bound "decide by `2 F_ack`". (`twoPhaseLit_not_solvesConsensus`; repaired:
   `theorem_4_1`, `theorem_4_1_time`)
-* **Claim 3.4 is false for `D = 4`** (the smallest case of Theorem 3.3; edge case, theorem true). For
+* **Claim 3.4 is false for `D = 4`** (the smallest case of Theorem 3.3, not a degenerate one; theorem true). For
   `d = (D−2)/2 = 1`, node `a₂⁺` of the gadget is at distance 2 from `c`, so Network A has diameter 6, not 4
   (in Lean: the 15-node network for `k = 0`, i.e. `4 ≤ n ≤ 15`). The padding nodes `a*_j` are attached to `a_{d−1} = a₀`, which does not exist.
   Theorem 3.3 is still true for `D = 4`. We prove it for all even `D ≥ 4` with another gadget, found by computer

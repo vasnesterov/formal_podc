@@ -6,7 +6,7 @@ Message Passing Systems.* PODC 2011 (brief announcement). DOI
 [1103.3671](https://arxiv.org/abs/1103.3671) v2 (full version, latest arXiv version, March 2011);
 numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The concrete results hold: k-set agreement is impossible in
+**Verdict: ⚠️ Minor statement issues.** The concrete results hold: k-set agreement is impossible in
 asynchronous message passing with `f` crashes when `k ≤ (n−1)/(n−f)` (Theorem 2 with asynchronous
 processes, Corollary 5), proved by the paper's reduction to FLP, and with up to `f < n` initially
 dead processes k-set agreement is solvable iff `kn > (k+1)f` (Theorem 8). But the generic

@@ -5,7 +5,7 @@ PODC 2026. DOI [10.1145/3796701.3815934](https://doi.org/10.1145/3796701.3815934
 the 4-page proceedings brief announcement (we found no full version on arXiv); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The paper gives no proofs. We supplied them, and all the
+**Verdict: ⚠️ Minor statement issues.** The paper gives no proofs. We supplied them, and all the
 results hold in the generic runs-and-systems model: knowledge of preconditions (Thm 1.2), necessity
 of dynamic common knowledge (Thm 1.5, Cor 1.6) and sufficiency (Thm 1.7). One clause of Theorem 1.7
 ("the nonfaulty processes decide `v` in `r` iff `r ⊨ θ_v`") is false in runs with no nonfaulty

@@ -5,14 +5,16 @@ PODC 2025. DOI [10.1145/3732772.3733518](https://doi.org/10.1145/3732772.3733518
 [2505.01793](https://arxiv.org/abs/2505.01793) v1; numbering follows it (Theorems 13/14 are the lower bounds).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** Every formal result holds. Both lower bounds are proved as stated:
+**Verdict: ⚠️ Minor statement issues.** Every formal result holds. Both lower bounds are proved as stated:
 - `Ω(n + t²)` messages even with fully correct predictions (Theorem 14);
 - `min{f+2, t+1, ⌊B/(n−f)⌋+2, ⌊B/(n−t)⌋+1}` rounds (Theorem 13), for unauthenticated algorithms.
 
 The proof of Theorem 13 cites a crash-fault bound that holds for halting times but not for decision
 times. We prove the decision-time version by switching to Byzantine faults and proving the cited bound
 there. The conditional algorithms (Theorems 5 and 6) and the classification lemmas are correct. The wrapper is verified against the specifications of the cited
-sub-protocols. Lemma 23 and Theorem 14's choice of the faulty group have fixable proof gaps.
+sub-protocols. Lemma 23 and Theorem 14's choice of the faulty group have fixable proof gaps. The statement-level slips are minor:
+Theorem 6's per-process message bound fails only for `n = 1`, Algorithm 4 has a typo, and the arXiv v1 abstract's
+`Ω(n²)` stands for `Ω(n + t²)`.
 
 ## Mistakes in the paper
 

@@ -5,7 +5,7 @@ Categorization.* PODC 2021, pp. 331–341. DOI [10.1145/3465084.3467899](https:/
 Formalized version: arXiv:2102.07240v3 (numbering follows it).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** All the lower bounds of Table 1 hold in their intended ranges, and we
+**Verdict: ⚠️ Minor statement issues.** All the lower bounds of Table 1 hold in their intended ranges, and we
 formalized every one of them: 2 rounds (asynchrony and partial synchrony), 3 rounds for `n ≤ 5f − 2`, `2δ`,
 `Δ + δ`, `Δ + 1.5δ` with unsynchronized start, and `Θ(n/(n−f))Δ`. We also verified the 2-round BRB protocol.
 Three kinds of fixes were needed:

@@ -5,10 +5,10 @@ DOI [10.1145/2933057.2933083](https://doi.org/10.1145/2933057.2933083). Formaliz
 [1507.04330](https://arxiv.org/abs/1507.04330) v2.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** Theorem 1 (`E_π|S| ≤ 1` for every single topology change) and
+**Verdict: ⚠️ Minor statement issues.** Theorem 1 (`E_π|S| ≤ 1` for every single topology change) and
 Theorem 7 (Algorithm 2: expected `O(1)` rounds and broadcasts, `O(min(log n, deg))` for abrupt
-deletion) hold. Lemma 3 as stated ("`= 1/|P|`") is false for edge changes, but its own proof gives
-`≤`, which is all Theorem 1 needs. The recursion defining the layers `S_i` is ill-formed as written,
+deletion) hold. Lemma 3 as stated ("`= 1/|P|`") is false for edge changes, but its own proof handles the
+failing case and concludes `≤`, so the intended statement is evident; `≤` is all Theorem 1 needs. The recursion defining the layers `S_i` is ill-formed as written,
 and several arguments are informal; all are repaired.
 
 ## Mistakes in the paper

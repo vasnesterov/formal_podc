@@ -5,7 +5,7 @@ DOI [10.1145/3293611.3331632](https://doi.org/10.1145/3293611.3331632). Formaliz
 [1908.10826](https://arxiv.org/abs/1908.10826) v1 (full version, 51 pp.); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** Theorem 1 holds: Algorithm 2 is a lock-free strongly linearizable
+**Verdict: ⚠️ Minor statement issues.** Theorem 1 holds: Algorithm 2 is a lock-free strongly linearizable
 ABA-detecting register from `n + 1` registers of `O(log n + log |D|)` bits. It holds for the natural
 specification, but not for the one the paper writes down, which wrongly forces every process's first `DRead`
 to report "no write". Observation 4 (Algorithm 1 is not strongly linearizable) holds. Theorem 25 (Algorithm 3,

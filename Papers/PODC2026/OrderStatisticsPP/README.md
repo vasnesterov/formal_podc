@@ -6,7 +6,7 @@ Protocols via Simple Dynamics.* PODC 2026. DOI
 (numbering follows it; the full version, HAL `hal-05548829`, numbers Section 4 as Section 3).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** All laws of the consensus value are proved, also for initial configurations
+**Verdict: ⚠️ Minor statement issues.** All laws of the consensus value are proved, also for initial configurations
 with ties: Copy-or-Max (Theorem 1, Proposition 6), Biased-Median (Theorem 2, Corollary 3), Self-Excluding Median
 (Theorem 8, Corollary 4), and Order-Based dynamics (Theorem 7). Both directions of Proposition 6 have invalid
 proofs, although the statement is true. Definition 4.2 is under-specified; Theorem 7 holds under its intended

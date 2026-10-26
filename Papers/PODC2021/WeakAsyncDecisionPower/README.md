@@ -6,11 +6,11 @@ Models of Distributed Computing.* PODC 2021. DOI
 [2102.11630](https://arxiv.org/abs/2102.11630) v2 (full version with appendix); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ✅ Correct.** All the impossibility results of Section 3 hold: Lemmas 3.1, 3.2, 3.4 and
+**Verdict: 🛠️ Proof repaired.** All the impossibility results of Section 3 hold: Lemmas 3.1, 3.2, 3.4 and
 3.5 and Corollaries 3.3 and 3.6. We prove each of them directly for all three selection constraints
 (liberal, exclusive, synchronous). The paper's proofs of 3.1, 3.2 and 3.4 do not work for exclusive
-selection as written, and fall back on the selection-independence theorem of Esparza–Reiter. The rest
-is small slips. Sections 4–6 (the expressiveness characterization) are not formalized.
+selection as written, and fall back on the selection-independence theorem of Esparza–Reiter. The explicit cutoff in the proof of Lemma 3.5 is not
+justified by the argument (the lemma only claims existence). The rest is small slips. Sections 4–6 (the expressiveness characterization) are not formalized.
 
 ## Mistakes in the paper
 

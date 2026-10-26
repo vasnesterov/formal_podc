@@ -6,7 +6,7 @@ Ittai Abraham, T-H. Hubert Chan, Danny Dolev, Kartik Nayak, Rafael Pass, Ling Re
 [1805.03391](https://arxiv.org/abs/1805.03391) v4 (15 Feb 2020); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** Both lower bounds hold. **Theorem 4 / Theorem 1** (strongly
+**Verdict: ⚠️ Minor statement issues.** Both lower bounds hold. **Theorem 4 / Theorem 1** (strongly
 adaptive adversary ⇒ Ω(f²) expected messages) is true, but its proof has a probabilistic gap. We
 prove it with a repaired argument and get a *better* constant, `εf²/2` instead of `(εf)²`.
 **Theorem 13** (no setup ⇒ no sublinear-multicast Byzantine *broadcast*) is false for `n = 2`. It

@@ -5,9 +5,10 @@ pp. 213–221. DOI [10.1145/3465084.3467935](https://doi.org/10.1145/3465084.346
 version arXiv:2008.03091v1 (numbering follows it).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The main result is proved: Theorem 3.1, and hence the existential Theorem 1.2.
+**Verdict: ⚠️ Minor statement issues.** The main result is proved: Theorem 3.1, and hence the existential Theorem 1.2.
 The block count is `8δ + 1` instead of `8δ`, and the literal `8δ` fails on the one-vertex graph. Case (II) of the
-proof has three errors, all repaired. Observation 2.6 is false as stated. Observation 2.7 needs one more
+proof has three errors, all repaired. Observation 2.6 is false as stated, but only for shortcuts with useless tree edges far from the part; the evident
+condition that every block meets its part fixes it. Observation 2.7 needs one more
 halving round. The construction in the proof of the lower bound (Lemma 3.2) does not have the claimed diameter.
 
 ## Mistakes in the paper

@@ -6,7 +6,7 @@ version: arXiv [1611.10068](https://arxiv.org/abs/1611.10068) v1 (the only versi
 follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The main impossibility result, Theorem 3.1 (two stable labelings
+**Verdict: ⚠️ Minor statement issues.** The main impossibility result, Theorem 3.1 (two stable labelings
 rule out label `(n−1)`-stabilization), is true, and its tightness example is correct. The valency
 proof has gaps that need real repairs: its description of the successors of the critical state is
 false. The theorem also needs the graph to have no self-loops, which the paper assumes only

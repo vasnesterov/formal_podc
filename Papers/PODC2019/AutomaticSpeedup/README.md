@@ -5,7 +5,7 @@ Sebastian Brandt. *An Automatic Speedup Theorem for Distributed Problems.* PODC 
 [1902.09958](https://arxiv.org/abs/1902.09958) v1 (the only version); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The converse of Theorem 1 ("`Π_1` in `t − 1` rounds ⇒ `Π` in `t`
+**Verdict: 🚨 Headline claim false.** The converse of Theorem 1 ("`Π_1` in `t − 1` rounds ⇒ `Π` in `t`
 rounds"), and with it Corollary 1 and the "reversible" / "exact complexities `T − 1, T − 2, …`" claims,
 is false. It fails for the natural class of input-free `Δ`-regular high-girth graphs with arbitrary port
 numbers. It holds once the endpoints of each edge can be told apart (edge symmetry breaking). The

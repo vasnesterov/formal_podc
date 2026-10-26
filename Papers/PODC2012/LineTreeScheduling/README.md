@@ -5,7 +5,7 @@ Line and Tree Networks.* PODC 2012. DOI [10.1145/2332432.2332503](https://doi.or
 Formalized version: arXiv [1205.1924](https://arxiv.org/abs/1205.1924) v2 (Oct 2012). This version corrects the
 conference version's ratios for arbitrary heights (20 → 80 on trees, 11 → 23 on lines); numbering follows it.
 
-**Verdict: ⚠️ Correct with fixes.** All approximation guarantees of v2 are proved. They are Lemma 3.1, Lemma 5.1 /
+**Verdict: ⚠️ Minor statement issues.** All approximation guarantees of v2 are proved. They are Lemma 3.1, Lemma 5.1 /
 Claim 5.2, Theorem 5.3 (`7/(1-ε)`), Lemma 6.1, Lemma 6.2 (`73/(1-ε)`), Theorem 6.3 (`80/(1-ε)`), Theorems 7.1 /
 7.2 (`4/(1-ε)`, `23/(1-ε)`) and Appendix A (`3`). So are the tree-decomposition Lemmas 4.1–4.3 and Observation A.1.
 The constants are right. The fixes concern depth/length bounds that fail in edge cases, degenerate cases of the

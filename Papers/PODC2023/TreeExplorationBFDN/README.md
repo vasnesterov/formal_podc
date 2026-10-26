@@ -7,14 +7,14 @@ arXiv [2301.13307](https://arxiv.org/abs/2301.13307) v1 (*Breadth-First Depth-Ne
 Exploration of Trees with Low Diameter*). We follow the numbering of the brief announcement (BA) and give
 the full-version numbering in brackets.
 
-**Verdict: ⚠️ Correct with fixes.** The headline Theorem 2.1 is true: BFDN explores any tree in
+**Verdict: ⚠️ Minor statement issues.** The headline Theorem 2.1 is true: BFDN explores any tree in
 `2n/k + D²(min{log Δ, log k} + 2)` rounds. Theorem 3.1 (the balls-in-urns game) and Proposition 4.2
 (break-downs) are true too. Corollary 3.2 is false as literally worded ("number of calls to `Reanchor`"),
 because robots at the root call `Reanchor` in every round and get the root as anchor; its evident content
 (anchor assignments at depths `d ≥ 1`) is what the analysis uses, and we prove it per depth with `+2`
 instead of `+1` (Lemma 2 of the full version). The loop condition of Algorithm 1 in the BA is a
 pseudo-code slip (the prose and the full version are right). Claim 1 inside the full-version proof of
-Theorem 1 is false (`D + 1` must be `2D`), which is harmless. The key Lemma 2 [full version], obtained by
+Theorem 1 is false (`D + 1` must be `2D`); it is a step of a proof, not a stated result, and is harmless. The key Lemma 2 [full version], obtained by
 reduction to the urn game, is only sketched, and the sketch does not match the game. We prove it by a
 different, direct argument.
 

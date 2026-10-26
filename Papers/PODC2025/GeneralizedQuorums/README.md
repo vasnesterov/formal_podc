@@ -5,7 +5,7 @@ Generalized Quorum Systems.* PODC 2025. DOI [10.1145/3732772.3733529](https://do
 Formalized version: arXiv [2505.02646](https://arxiv.org/abs/2505.02646) v1 (proceedings text plus appendices);
 numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The lower bounds hold: Lemma 2, Theorem 2 (lattice agreement, MWMR registers,
+**Verdict: ⚠️ Minor statement issues.** The lower bounds hold: Lemma 2, Theorem 2 (lattice agreement, MWMR registers,
 SWMR snapshots, and also consensus) and Theorem 6 (partial synchrony) are proved for arbitrary deterministic
 algorithms, together with Proposition 1. Two fixes are needed: the value domain must be non-trivial (otherwise
 Theorem 2 is false), and "strongly connected" must be read as mutual reachability in `G \ f` (otherwise Proposition 1

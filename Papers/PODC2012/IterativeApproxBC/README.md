@@ -5,7 +5,7 @@ Directed Graphs.* PODC 2012. DOI [10.1145/2332432.2332505](https://doi.org/10.11
 Formalized version: arXiv [1201.4183](https://arxiv.org/abs/1201.4183) v2 (technical report with all appendices).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ✅ Correct.** The tight characterization (Theorems 1–3: an iterative algorithm exists iff the
+**Verdict: 🛠️ Proof repaired.** The tight characterization (Theorems 1–3: an iterative algorithm exists iff the
 graph satisfies the partition condition, and Algorithm 1 then works) and all of Section 6 hold as stated,
 under the paper's standing assumption `n ≥ 2`. The necessity proof has one unjustified step, which we
 repair; the rest are minor slips.

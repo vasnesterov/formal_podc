@@ -5,11 +5,11 @@ Fabien Dufoulon, Janna Burman, Joffroy Beauquier. *Can Uncoordinated Beeps tell 
 version (there is no arXiv version). The extended version [7], which contains the omitted proof of Theorem 1, was
 not used. Numbering follows the proceedings.
 
-**Verdict: ⚠️ Correct with fixes.** The coding-theory core of the paper (Section 3) holds. We prove that
+**Verdict: ⚠️ Minor statement issues.** The coding-theory core of the paper (Section 3) holds. We prove that
 Definitions 2 and 3 of uncoordinated superimposed (USI) codes are equivalent (Theorem 1). A USI(h,k)-code decodes
 every uncoordinated transmission scenario with conflict at most k (Theorem 2). Sidon sets give USI(h,k)-codes of
 length at most 8h²(k+1)² (Theorems 3, 5, 7, Lemma 6, Corollary 8). Lemma 4 is false as literally stated, because
-it takes differences mod l. Its integer version is what the proofs use, and it holds. The remaining problems are
+it takes differences mod l. Its integer version is what the proof establishes and what is used, so the intent is evident, and it holds. The remaining problems are
 missing side conditions in degenerate cases. The beeping simulation of Sections 4–6 was not formalized.
 
 ## Mistakes in the paper
