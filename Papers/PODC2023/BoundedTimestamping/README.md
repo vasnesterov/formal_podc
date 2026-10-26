@@ -7,7 +7,7 @@ Synchronization Primitives.* PODC 2023. DOI
 Numbering follows the full version.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The algorithm of Figures 1–2 is **not linearizable**: Lemma 6 is
+**Verdict: 🚨 Headline claim false.** The algorithm of Figures 1–2 is **not linearizable**: Lemma 6 is
 false, and so are Lemmas 9 and 8 and Corollary 10 and Theorem 1 is not established by it. Lean checks a sequential
 execution with 3 processes in which `isEarlier(1, 0)` gives the wrong answer. The cause is
 reusable: a `helpMoveTS()` call spread over several operations shares its LL/SC links with the

@@ -7,7 +7,7 @@ version (IACR ePrint 2022/354, single version of 2022-03-18) has the same protoc
 the proof of Theorem 4.1 (Section 6.1).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The impossibility result (Theorem 5.1: no AA protocol when `2tₛ + tₐ ≥ n`) is
+**Verdict: 🚨 Headline claim false.** The impossibility result (Theorem 5.1: no AA protocol when `2tₛ + tₐ ≥ n`) is
 correct for `n ≥ 2`, even with signatures. The protocol side is broken. The Reliable Broadcast `Π_rBC` is
 not consistent in a synchronous network when `tₛ ≥ n/3` (Theorem 4.1 is false). As a result, the main
 protocol `Π_AA` is **not** a `tₛ`-secure AA protocol in the synchronous network (Theorem 3.1(1) is false).

@@ -5,7 +5,7 @@ Damien Imbs, Sergio Rajsbaum, Michel Raynal. *The universe of symmetry breaking 
 Formalized version: the full version, IRISA technical report PI 1965 (January 2011; HAL inria-00560453v1, the PDF
 in this repository). There is no arXiv version. Numbering follows the technical report.
 
-**Verdict: ⚠️ Correct with fixes.** The combinatorics of GSB tasks hold after small repairs: feasibility,
+**Verdict: ❌ False claim.** The combinatorics of GSB tasks hold after small repairs: feasibility,
 kernel sets, anchoring, the hardest task and the canonical form. So do the reductions: perfect renaming
 is universal, Theorem 10's parity reduction works, and so does the slot-to-renaming algorithm. Theorem 4
 is false as written in integer arithmetic when `ℓ = 0`. Lemma 1 misses the hypothesis `ℓ_v ≤ u_v`.

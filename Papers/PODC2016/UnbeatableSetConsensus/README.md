@@ -5,7 +5,7 @@ Combinatorial Reasoning.* PODC 2016. DOI [10.1145/2933057.2933120](https://doi.o
 Formalized version: arXiv [1605.07354](https://arxiv.org/abs/1605.07354) v1 (full version with appendices);
 numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The main results hold: `Optmin[k]` solves nonuniform `k`-set consensus
+**Verdict: ❌ False claim.** The main results hold: `Optmin[k]` solves nonuniform `k`-set consensus
 with decisions by `⌊f/k⌋ + 1` (Prop. 1), it is unbeatable (Thm. 1) and last-decider unbeatable (Thm. 2), and
 `u-Pmin[k]` solves uniform `k`-set consensus by `min(⌊t/k⌋+1, ⌊f/k⌋+2)` (Thm. 3). But **Lemma 1, the core of
 the combinatorial unbeatability proof, is false as stated.** We prove it under an extra hypothesis that holds

@@ -4,7 +4,7 @@ Rafail Ostrovsky, Will Rosenbaum. *Fast Distributed Almost Stable Matchings.* PO
 [10.1145/2767386.2767424](https://doi.org/10.1145/2767386.2767424). Formalized version: arXiv
 [1408.2782](https://arxiv.org/abs/1408.2782) v2; numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** Theorem 4.1 is true with the paper's constants: for every maximal-matching
+**Verdict: 🛠️ Proof repaired.** Theorem 4.1 is true with the paper's constants: for every maximal-matching
 subroutine, the deterministic algorithm ASM outputs a matching with at most `ε|E|` blocking pairs. Theorem 4.7
 (`O(ε⁻³ log⁵ n)` rounds given an `O(log⁴ n)`-round subroutine) is also true, as an explicit round count
 (no CONGEST message semantics). All lemmas of §§3–4 hold. The proof of

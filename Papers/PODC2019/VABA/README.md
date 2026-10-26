@@ -6,9 +6,9 @@ Formalized version: arXiv [1811.01332](https://arxiv.org/abs/1811.01332) v1, the
 Numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The paper allows any `f < n/3`, but its thresholds are hard-coded as
-`2f + 1`, which silently assumes `n = 3f + 1`. As a result, agreement (Lemma 13) and
-PB-provability (Lemma 3) are false for `n > 3f + 1`: with `n = 5`, `f = 1`, honest parties decide
+**Verdict: 🚨 Headline claim false.** The paper allows any `f < n/3`, but its thresholds are hard-coded as
+`2f + 1`, which silently assumes `n = 3f + 1`. As a result, the headline protocol violates agreement
+(Lemma 13), and PB-provability (Lemma 3) is false, for `n > 3f + 1`: with `n = 5`, `f = 1`, honest parties decide
 `true` and `false`. The protocol is correct when `n = 3f + 1`, and with thresholds `n − f` we prove
 everything (agreement, validity, view completion, expected views `< 3/2`) for all `n > 3f`. Two
 further fixes are needed: termination/efficiency need a halting rule, and Algorithm 6, line 4 has a

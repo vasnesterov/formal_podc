@@ -4,14 +4,15 @@ Gregory Chockler, Alexander Spiegelman. *Space Complexity of Fault-Tolerant Regi
 PODC 2017. DOI [10.1145/3087801.3087824](https://doi.org/10.1145/3087801.3087824). Formalized version:
 arXiv [1705.07212](https://arxiv.org/abs/1705.07212) v1; numbering follows it.
 
-**Verdict: ⚠️ Correct with fixes.** The main results hold: the lower bound of Lemma 1 and Theorem 1,
+**Verdict: ❌ False claim.** The main results hold: the lower bound of Lemma 1 and Theorem 1,
 `kf + ⌈kf/(n−(f+1))⌉(f+1)` registers, is proved, and so are Theorems 3 and 5–7. Three stated claims are false
-as written, each by a slip whose intent is evident; we prove the intended versions. (1) Algorithm 2 (Theorem 3)
+as written; we prove corrected versions. Two of them, (1) and (3), are slips whose intent is evident; (2) is a missing
+hypothesis on the value domain. (1) Algorithm 2 (Theorem 3)
 maps client `c_i`, `1 ≤ i ≤ k`, to the register set `⌊i/z⌋`, an off-by-one that overloads one set and breaks
 even WS-Safety (Lean counterexample); with `⌊(i−1)/z⌋`, the mapping the paper's own counting describes,
 Theorem 3 holds. (2) Theorem 4 (CAS max register is wait-free) is stated for "some domain of ordered values"
 but fails for dense domains such as `ℚ`; the proof silently assumes finitely many values below `v`, which
-holds for the timestamps the paper uses. (3) Theorem 8 read literally (fixed `k`) contradicts Theorem 3; its
+holds for the timestamps the paper uses but not for the stated domain. (3) Theorem 8 read literally (fixed `k`) contradicts Theorem 3; its
 intended version (bound independent of `k`) holds. Theorem 2 is proved by a different, direct argument.
 
 ## Mistakes in the paper

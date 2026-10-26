@@ -4,7 +4,7 @@ Guanfeng Liang, Nitin Vaidya. *Error-Free Multi-Valued Consensus with Byzantine 
 DOI [10.1145/1993806.1993809](https://doi.org/10.1145/1993806.1993809). Formalized version: arXiv
 [1101.3520](https://arxiv.org/abs/1101.3520) v1; numbering follows it.
 
-**Verdict: ⚠️ Correct with fixes.** Algorithm 1 achieves consensus on `L`-bit values for `3t < n`
+**Verdict: ⚠️ Minor statement issues.** Algorithm 1 achieves consensus on `L`-bit values for `3t < n`
 (Lemmas 1–5 and the correctness part of Theorem 1 hold). But the claim that the diagnosis stage runs at
 most `t(t+1)` times (and thus the complexity bound) is false for the pseudo-code as printed: an already
 isolated faulty processor can trigger the diagnosis stage in every generation. It holds once

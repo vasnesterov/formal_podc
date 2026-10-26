@@ -5,7 +5,7 @@ PODC 2020. DOI [10.1145/3382734.3405745](https://doi.org/10.1145/3382734.3405745
 [2002.08216](https://arxiv.org/abs/2002.08216) v1; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The main result holds. In the deterministic port-numbering model on
+**Verdict: ⚠️ Minor statement issues.** The main result holds. In the deterministic port-numbering model on
 2-coloured `Δ`-regular trees, bipartite `x`-maximal `y`-matching (the encoded version `Φ^W_Δ(x, y)`) has white
 round complexity exactly `T_Δ(x, y)` for `0 ≤ x ≤ Δ`, `1 ≤ y ≤ Δ − 1`; in particular it is `2Δ − 1` for maximal
 matching. We prove both bounds, and the round elimination step they use. The tightness claim of Theorem 1.2

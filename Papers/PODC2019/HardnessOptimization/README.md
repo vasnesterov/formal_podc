@@ -5,7 +5,7 @@ Distributed Optimization.* PODC 2019. DOI [10.1145/3293611.3331597](https://doi.
 Formalized version: arXiv [1905.10284](https://arxiv.org/abs/1905.10284) v1; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The near-quadratic CONGEST lower bounds of Section 2 hold. We formalize
+**Verdict: ⚠️ Minor statement issues.** The near-quadratic CONGEST lower bounds of Section 2 hold. We formalize
 them for minimum dominating set (Thm 2.1), directed Hamiltonian path and cycle (Thms 2.2, 2.3), Steiner tree (Thm 2.7)
 and weighted max-cut (Thm 2.8), with the deterministic framework (Theorem 1.1, including `CC(DISJ) ≥ K`)
 proved. Every gadget lemma is true, but several proofs have gaps or rely on statements that are false as

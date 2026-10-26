@@ -4,7 +4,7 @@ Carole Delporte-Gallet, Panagiota Fatourou, Hugues Fauconnier, Eric Ruppert. *Wh
 Harder Than Consensus?* PODC 2022. DOI [10.1145/3519270.3538418](https://doi.org/10.1145/3519270.3538418).
 Formalized version: arXiv [2205.14213](https://arxiv.org/abs/2205.14213) v1 (with appendices).
 
-**Verdict: ⚠️ Correct with fixes.** All results of Section 3 hold and are formalized with the paper's proofs:
+**Verdict: 🛠️ Proof repaired.** All results of Section 3 hold and are formalized with the paper's proofs:
 `n`-recording suffices for recoverable consensus (Theorem 8, with the algorithm of Figure 2 and the tournament
 of Proposition 30), `(n-1)`-recording is necessary (Theorem 14), Theorem 16, Propositions 18, 19, 21, Corollaries
 17, 20 and Theorem 22. Corollary 20 rests on an unproved claim (`cons(T_n) ≤ n`), which we prove; two

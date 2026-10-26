@@ -6,7 +6,7 @@ Registers in Crash-prone Systems.* PODC 2016. DOI
 [1602.02695](https://arxiv.org/abs/1602.02695) v1 (the only version); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ✅ Correct.** The algorithm of Figure 1 implements a linearizable SWMR register in
+**Verdict: 🛠️ Proof repaired.** The algorithm of Figure 1 implements a linearizable SWMR register in
 `CAMP_{n,t}[t < n/2]`, and every operation of a correct process terminates. Messages carry a two-bit
 type, plus a value for two of the four types. FIFO channels are not needed, as the paper itself
 states (§2.1 assumes non-FIFO channels): the parity bit and the `wait` at line 11 form an

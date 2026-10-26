@@ -6,13 +6,13 @@ Formalized version: arXiv [2206.05174](https://arxiv.org/abs/2206.05174) v1 (ful
 appendix); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The main results hold:
+**Verdict: ⚠️ Minor statement issues.** The main results hold:
 - the deterministic `(2α+1)(1+ε)`-approximation for weighted MDS (Theorem 1.1; Theorem 3.1 for unit weights);
 - the randomized `α + O(α/t)` approximation (Theorem 1.2);
 - the general-graph bound of Theorem 1.3;
 - the combinatorial reduction behind the lower bound (Theorem 1.4).
 
-No stated result is false. Four places in the proofs need repair:
+No stated result is false outside degenerate corners (Lemma 4.6 at `λ = 1`, Theorem 1.1 at `α = 0`). Four places in the proofs need repair:
 - Theorem 1.3's arithmetic fails for large `k`; a different algorithm covers that regime.
 - The algorithm in the proof of Observation A.1 fails on `K₂`.
 - Lemma 4.6 is under-specified at `λ = 1`.

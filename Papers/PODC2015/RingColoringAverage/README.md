@@ -5,7 +5,7 @@ Laurent Feuilloley. *Brief Announcement: Average Complexity for the LOCAL Model.
 [1505.05072](https://arxiv.org/abs/1505.05072) v1 (same text as the brief announcement); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** Theorem 1 holds: for every 3-colouring algorithm on rings, the worst-case
+**Verdict: 🛠️ Proof repaired.** Theorem 1 holds: for every 3-colouring algorithm on rings, the worst-case
 average radius is `Ω(log* n)`. We prove it with explicit constants. The proof has two real gaps. First, the
 "w.l.o.g. minimal algorithm" step needs an existence argument; we supply one with Zorn's lemma plus compactness.
 Second, Lemma 3's reduction from 3- to 4-colouring does not follow as argued; we repair it by running the whole argument for

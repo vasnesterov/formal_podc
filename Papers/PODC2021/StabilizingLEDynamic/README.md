@@ -8,7 +8,7 @@ journal version on HAL, [hal-03346225](https://hal.science/hal-03346225) (Resear
 docstrings.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** All main results are proved:
+**Verdict: ⚠️ Minor statement issues.** All main results are proved:
 * the class hierarchy (Theorem 1);
 * all impossibility results (Theorems 2–5, Corollaries 1–3);
 * the correctness of Algorithm `LE` (Corollary 6), with the speculative `6Δ + 2` bound of

@@ -6,7 +6,7 @@ Formalized version: arXiv [2505.03627](https://arxiv.org/abs/2505.03627) v2 (ful
 A–C; numbering follows it).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** Both headline theorems hold, and we prove them as "iff" statements in one
+**Verdict: ❌ False claim.** Both headline theorems hold, and we prove them as "iff" statements in one
 model. Theorem 1: an `f`-resilient `e`-two-step consensus task exists iff `n ≥ max {2e+f, 2f+1}`. Theorem 2: an
 `f`-resilient `e`-two-step consensus object exists iff `n ≥ max {2e+f−1, 2f+1}`. Both need `n ≥ 2`,
 `e ≤ f` and two values. The upper bound for objects, however, does not follow from the paper's protocol: the

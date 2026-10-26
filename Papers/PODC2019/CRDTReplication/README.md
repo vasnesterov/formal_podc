@@ -5,7 +5,7 @@ without Logs.* PODC 2019 (brief announcement). DOI [10.1145/3293611.3331568](htt
 Formalized version: the full version, arXiv [1905.08733](https://arxiv.org/abs/1905.08733) v2; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** Algorithm 2 is **not linearizable**. Theorem 3 (Consistency), Lemma 3 and Theorem 4
+**Verdict: 🚨 Headline claim false.** Algorithm 2 is **not linearizable**. Theorem 3 (Consistency), Lemma 3 and Theorem 4
 (Update Stability) are false: a five-process execution with majority quorums lets two queries learn the
 incomparable states `{u₁}` and `{u₂}`, although `u₁` completed before `u₂` was invoked. Lemmas 1, 2, 4,
 Corollary 1 and Theorems 1, 2, 5 hold, and so does the Section III-E reduction (Theorems 1–5 ⇒ linearizability).

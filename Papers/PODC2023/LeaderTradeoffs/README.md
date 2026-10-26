@@ -4,7 +4,7 @@ Shay Kutten, Peter Robinson, Ming Ming Tan, Xianbin Zhu. *Improved Tradeoffs for
 DOI [10.1145/3583668.3594576](https://doi.org/10.1145/3583668.3594576). Formalized version: arXiv 2301.08235v4.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The two deterministic lower bounds for the synchronous clique with
+**Verdict: ❌ False claim.** The two deterministic lower bounds for the synchronous clique with
 simultaneous wake-up hold after repairs. Theorem 3.8 (time–message tradeoff) is false as stated, by one round:
 a one-round algorithm violates it for every `n`. The proof gives `T > (log₂ n − 1)/(⌈log₂ f⌉ + 1)`, without
 the `+ 1`. Only the one-round case is refuted; for `T ≥ 2` the stated bound, and with it the claimed

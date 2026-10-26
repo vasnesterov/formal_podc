@@ -5,7 +5,7 @@ DOI [10.1145/2484239.2501983](https://doi.org/10.1145/2484239.2501983). Formaliz
 [1207.1852](https://arxiv.org/abs/1207.1852) v4 (10 May 2013, the PODC version); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** Both headline results hold: routing (Theorem 3.7, 16 rounds)
+**Verdict: 🛠️ Proof repaired.** Both headline results hold: routing (Theorem 3.7, 16 rounds)
 and sorting (Theorem 4.5, 37 rounds). We prove them for every `n`, with packets of a constant
 number of `O(log n)`-bit items, in 15 and 32 rounds. The square case `n = s²` follows the paper's
 algorithms. The proofs have gaps that need fixing:

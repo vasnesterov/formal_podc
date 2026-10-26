@@ -6,7 +6,8 @@ Unique Identifiers from Bounded Registers.* PODC 2025. DOI
 4-page brief announcement (no arXiv or full version found).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** All claims hold.
+**Verdict: ⚠️ Minor statement issues.** All claims hold, reading "Algorithm 2 remains wait-free" as wait-free for every
+bounded number of calls, the regime in which the paper claims correctness.
 * Algorithms 1 and 2 generate `(k−1)·2^w` distinct identifiers from `k` `w`-bit read/write/FAI
   registers.
 * No anonymous obstruction-free implementation supports more than `k·2^w + k + 1` calls.

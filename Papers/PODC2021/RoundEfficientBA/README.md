@@ -5,7 +5,7 @@ Agreement.* PODC 2021. DOI [10.1145/3465084.3467907](https://doi.org/10.1145/346
 Formalized version: the 8-page proceedings version (no arXiv version; the IACR ePrint full version 2021/814 was not accessible to us); numbering follows the proceedings.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** Both headline protocols fail as stated, though the `t < n/3` one is
+**Verdict: 🚨 Headline claim false.** Both headline protocols fail as stated, though the `t < n/3` one is
 fixed by a one-line change.
 * **`t < n/3`.** The Proxcensus expansion (Lemma 3.2, Cor. 3.3), and hence the `(κ+1)`-round BA
   (Cor. 3.8), is wrong for every `n ≥ 3t + 2` with `t ≥ 1`. With the threshold `t + 1` instead of `n - 2t` (the

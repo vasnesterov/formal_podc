@@ -7,7 +7,7 @@ proceedings version (no arXiv version; the online appendix with the full proofs 
 us). Numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The headline results hold. Under strong non-equivocation,
+**Verdict: ⚠️ Minor statement issues.** The headline results hold. Under strong non-equivocation,
 interactive consistency (IC) takes 1 round for any `n`, `t`. Under weak non-equivocation it takes
 exactly `t + 1` rounds and `n > 2t` processes. Theorem 6.1 ("impossible for `n ≤ 2t`") is false for
 `n ≤ 3`, and in that range it contradicts the paper's own Theorem 4.2. Under a reading in which `v`

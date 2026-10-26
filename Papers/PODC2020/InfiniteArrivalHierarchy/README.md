@@ -4,7 +4,7 @@ Matthieu Perrin, Achour Mostéfaoui, Grégoire Bonin. *Extending the Wait-free H
 Systems.* PODC 2020. DOI [10.1145/3382734.3405723](https://doi.org/10.1145/3382734.3405723). Formalized
 version: the 10-page proceedings version (there is no arXiv version); numbering follows it.
 
-**Verdict: ⚠️ Correct with fixes.** All formalized claims hold:
+**Verdict: 🛠️ Proof repaired.** All formalized claims hold:
 * the impossibility results for window registers in `MA₃` (Lemmas 8–9, Proposition 5);
 * the impossibility result for binary consensus + window registers in `M₂` (Proposition 4), for algorithms
   whose objects are all allocated at set-up;

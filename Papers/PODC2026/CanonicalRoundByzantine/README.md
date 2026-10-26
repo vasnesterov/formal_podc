@@ -7,7 +7,7 @@ version: the PODC proceedings version; all theorem numbers below follow it. The 
 Resilience*), numbers the results differently.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The lower bounds (Theorems 1 and 7, Corollaries 6 and 8, and their Section 3.3
+**Verdict: ⚠️ Minor statement issues.** The lower bounds (Theorems 1 and 7, Corollaries 6 and 8, and their Section 3.3
 and Corollary 15 consequences) are proved, for the whole range `2f ≤ n ≤ 5f` rather than only `n = 5f`.
 Corollary 10 (broadcast) is true, but the paper's proof covers only `4f < n ≤ 5f`. Theorem 14 relies on the
 `i = j` case of gather agreement, which the paper uses without pointing it out. The positive results of

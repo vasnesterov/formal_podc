@@ -5,7 +5,7 @@ Andrei Constantinescu, Marc Dufay, Diana Ghinea, Roger Wattenhofer. *Byzantine S
 [2502.05889](https://arxiv.org/abs/2502.05889) v2 (full version with appendix; numbering follows it).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The solvability characterizations (Theorems 2–7) are proved for every
+**Verdict: ⚠️ Minor statement issues.** The solvability characterizations (Theorems 2–7) are proved for every
 `k ≥ 2`, in both directions. For `k = 1` all their "only if" directions are false. The proof of Theorem 2's
 necessity does not cover `k = 2`, the reduction in Lemma 13 is invalid, and one case of Theorem 7 cites an
 inapplicable theorem; all statements still hold for `k ≥ 2`.

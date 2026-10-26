@@ -5,14 +5,15 @@ Michael Dinitz, Robert Krauthgamer. *Fault-Tolerant Spanners: Better and Simpler
 [1101.5753](https://arxiv.org/abs/1101.5753) v1; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The main results hold, with explicit constants:
+**Verdict: ⚠️ Minor statement issues.** The main results hold, with explicit constants:
 * the generic conversion (Theorem 2.1) and its greedy instance (Corollary 2.2);
 * Lemma 3.1, the LP relaxation with knapsack-cover inequalities (validity, LP ≤ OPT, the integrality
   gap example);
 * the `O(log n)` rounding of Theorem 3.3.
 
-Lemma 3.8, a step of the distributed algorithm (Section 3.5), is false as stated. It holds once the
-cluster LP is redefined in the way the later proof of Theorem 3.9 actually uses.
+Lemma 3.8, a step of the distributed algorithm (Section 3.5), is false as stated, but only because the
+cluster LP is misdefined; the intended definition is evident from the paper (the lemma's proof and the later
+proof of Theorem 3.9 use it), and with it the lemma holds.
 
 ## Mistakes in the paper
 

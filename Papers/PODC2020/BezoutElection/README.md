@@ -6,7 +6,7 @@ Space-Optimal Election in Anonymous Memory Systems.* PODC 2020. DOI
 proceedings text (HAL hal-03148627); there is no arXiv version.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** All results are proved: Theorems 1, 2 and 4, and
+**Verdict: ⚠️ Minor statement issues.** All results are proved: Theorems 1, 2 and 4, and
 Corollaries 1–3 as iff characterizations. The termination proofs of Algorithms 1 and 2 and the
 safety proof of Algorithm 2 (Lemma 2) are sketches with genuine gaps, repaired here. The claim in
 §4 that `v′` is positive fails for `m = 1`.

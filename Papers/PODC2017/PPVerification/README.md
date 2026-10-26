@@ -5,10 +5,10 @@ Population Protocols.* PODC 2017. DOI [10.1145/3087801.3087816](https://doi.org/
 Formalized version: arXiv [1703.04367](https://arxiv.org/abs/1703.04367) v3 (full version with appendix);
 numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The soundness of the new class is proved: WS³ ⊆ WS² ⊆ WS
+**Verdict: ⚠️ Minor statement issues.** The soundness of the new class is proved: WS³ ⊆ WS² ⊆ WS
 (Propositions 19 and 20, StrongConsensus ⇒ Consensus via traps and siphons), and so are Lemmas 21 and 22.
 The threshold protocol `P_thr` is in WS³ (Propositions 17 and 18), so it computes `∑ aᵢxᵢ < c`.
-All statements hold, but the proof of Proposition 18 relies on a false intermediate claim and misses
+All statements hold up to an indexing typo in Lemma 21, but the proof of Proposition 18 relies on a false intermediate claim and misses
 cases; we repaired it with a lexicographic ranking function. `P_thr` is also slightly under-specified
 (only the leaders' transitions are given; we complete it with silent transitions).
 

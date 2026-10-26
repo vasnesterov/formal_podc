@@ -5,7 +5,7 @@ Dynamic Balanced Graph Partitioning.* PODC 2020. DOI
 [10.1145/3382734.3405696](https://doi.org/10.1145/3382734.3405696). Formalized version: the 3-page
 brief announcement (no arXiv version). Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** Theorem 2.1 (every deterministic online algorithm for the
+**Verdict: 🛠️ Proof repaired.** Theorem 2.1 (every deterministic online algorithm for the
 learning model is `Ω(kℓ)`-competitive, `k ≥ 3`, `ℓ ≥ 2`) holds, even with a slightly better
 constant: `((k-2)(ℓ-1)-2)/2` instead of `((k-2)(ℓ-1)-4)/2`. But the adversary in the paper does not
 work as written. It assumes that the algorithm always keeps the revealed ground sets together, and

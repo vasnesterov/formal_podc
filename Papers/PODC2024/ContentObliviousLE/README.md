@@ -6,7 +6,7 @@ Formalized version: the full paper, arXiv [2405.03646](https://arxiv.org/abs/240
 version); numbering follows it (BA Theorems 1 and 3 = full Theorems 1 and 3).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The algorithms are correct exactly as claimed. Algorithm 2 is a
+**Verdict: ⚠️ Minor statement issues.** The algorithms are correct exactly as claimed. Algorithm 2 is a
 quiescently terminating leader election on oriented rings with exactly `n(2·IDmax+1)` pulses, the
 leader terminating last. Algorithm 3 elects and orients non-oriented rings quiescently with
 `n(2·IDmax+1)` pulses (Theorem 2) or `n(4·IDmax−1)` pulses (Proposition 14). The lower bound holds

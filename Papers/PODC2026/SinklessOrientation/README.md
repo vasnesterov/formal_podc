@@ -5,10 +5,11 @@ Alexandre Nolin. *Brief Announcement: Sinkless Orientation Made Trivial.* PODC 2
 announcement (HAL `hal-05678283`); no full version was found.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ✅ Correct (deterministic part).** The paper's proofs are sketches; filled in, they hold. This covers
+**Verdict: ⚠️ Minor statement issues (deterministic part).** The paper's proofs are sketches; filled in, they hold. This covers
 the min-ID orientation (Theorem 2.1), the ball-growth Lemma 2.2, the repair procedure (Lemma 2.3) and the
 deterministic `O(log_δ n)` sinkless orientation of Theorem 1.1. We also prove the "obvious" tightness remark
-after Theorem 2.1. We found only typos and imprecisions. The randomized part relies on external reductions and is
+after Theorem 2.1. We found only typos and imprecisions; one is in a statement (the "in particular" clause of Lemma 2.2
+says "degree `δ`" for "degree `< δ`"). The randomized part relies on external reductions and is
 not formalized.
 
 ## Mistakes in the paper

@@ -5,7 +5,7 @@ Greg Bodwin, Shyamal Patel. *A Trivial Yet Optimal Solution to Vertex Fault Tole
 [1812.05778](https://arxiv.org/abs/1812.05778) v2.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** Theorem 1 (the FT greedy spanner has `O(f² · b(n/f, k+1))` edges) and
+**Verdict: ⚠️ Minor statement issues.** Theorem 1 (the FT greedy spanner has `O(f² · b(n/f, k+1))` edges) and
 Corollary 2 (`O(f^{1−1/k} n^{1+1/k})` edges for stretch `2k−1`) hold, with explicit constants, for both
 vertex and edge faults. There are only imprecisions. The literal fault test of Algorithm 1 lets the
 fault set contain the edge's own endpoints, and Theorem 1's bound degenerates to `0` when `f > n/2`.

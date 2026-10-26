@@ -6,7 +6,7 @@ Lewis Tseng, Nitin H. Vaidya. *Fault-Tolerant Consensus in Directed Graphs.* POD
 authors); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The headline synchronous result holds: crash consensus with at most
+**Verdict: ⚠️ Minor statement issues.** The headline synchronous result holds: crash consensus with at most
 `f` crashes is solvable on a digraph iff every reduced graph `G_F` (`|F| ≤ f`) has a node reaching all
 of it (Theorems 1–4, binary and multi-valued). The asynchronous necessity (Theorem 6) holds.
 Its sufficiency (Theorem 7, only sketched) fails for Algorithm WA if phase-`p` messages are handled

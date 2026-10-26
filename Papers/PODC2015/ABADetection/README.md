@@ -5,7 +5,7 @@ PODC 2015. DOI [10.1145/2767386.2767403](https://doi.org/10.1145/2767386.2767403
 arXiv [1507.02722](https://arxiv.org/abs/1507.02722) v1; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** All lower bounds hold for linearizable implementations:
+**Verdict: ⚠️ Minor statement issues.** All lower bounds hold for linearizable implementations:
 Theorem 1(a) `m ≥ n − 1` for bounded registers, Theorem 1(b) `t·m ≥ n − 1`, Theorem 1(c)
 `2t·m ≥ n − 1`, and Corollary 1 for LL/SC. The paper's own weak correctness condition for
 `WeakRead()/WeakWrite()` is mis-stated: even atomic registers violate it. The proof of Lemma 2 also

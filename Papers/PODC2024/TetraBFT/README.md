@@ -6,7 +6,7 @@ Formalized version: arXiv [2405.02615](https://arxiv.org/abs/2405.02615) v2 (Apr
 numbering is the same as v1's.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** Termination (liveness after GST) in Theorem 1 is false for the
+**Verdict: 🚨 Headline claim false.** Termination (liveness after GST) in Theorem 1 is false for the
 protocol as specified. After GST the view change can deadlock forever, both with reliable channels
 (`n = 7`, `f = 2`) and in the paper's lossy pre-GST model (`n = 4`, `f = 1`). Agreement and validity
 hold in every run, and we prove that the protocol terminates once its echo rule is repaired.

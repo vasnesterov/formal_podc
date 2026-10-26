@@ -5,7 +5,7 @@ DOI [10.1145/3732772.3733559](https://doi.org/10.1145/3732772.3733559). Formaliz
 [2502.12697](https://arxiv.org/abs/2502.12697) v2; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** All main results hold:
+**Verdict: ❌ False claim.** All main results hold:
 * Theorem 2: for every fixed `p ∈ (0,1)`, BFW elects a unique leader almost surely, and w.h.p.
   within `O(D² log n)` rounds.
 * Theorem 3: `O(D log n)` rounds for `p = 1/(D+1)`.
@@ -17,7 +17,9 @@ Some proofs have gaps that we repaired:
 * Lemmas 14 and 17 of the anti-concentration argument (we replace that argument by a
   martingale/Lyapunov proof).
 
-Two lemma statements are imprecise (Lemmas 12 and 14), and Lemma 21 has an off-by-one typo.
+Lemma 19 (used for Theorem 3) is false as stated for small `D` (`K₂`, `P₃`); Theorem 3 still
+holds with a window of `2D+3` rounds. Two lemma statements are imprecise (Lemmas 12 and 14), and Lemma 21 has
+an off-by-one typo.
 
 ## Mistakes in the paper
 

@@ -6,7 +6,7 @@ Enforcement of Linearizability.* PODC 2023. DOI
 [2301.02638](https://arxiv.org/abs/2301.02638) v3 (Nov 2025, full version); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** All main results hold:
+**Verdict: ❌ False claim.** All main results hold:
 * the impossibility of runtime verification (Theorem 5.1);
 * the impossibility of predictive runtime verification (Theorem A.1), under the black-box reading
   of the model;

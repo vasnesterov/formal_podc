@@ -8,7 +8,7 @@ checked. Numbering follows it.
 ## Errors in the paper
 
 1. **Lemma 3 and the liveness part of Theorem 3 (Figure 4, message passing) are false as written** —
-   false statement (main finding, verdict ❌). The paper's proofs explicitly use the check without `h`:
+   false statement (main finding; a pseudocode slip with evident intent, verdict ⚠️). The paper's proofs explicitly use the check without `h`:
    Lemma 3's proof claims that conditions 23–25 hold. The repair is easy. Line 2 lets `p` spend `balance(a, hist[p] ∪ deps)`, which
    counts the incoming transfers `deps` it received since its last outgoing transfer. Line 4 ships
    `deps` as `h`. Validation (line 25), however, checks `balance(c, hist[q]) ≥ y` *without* `h`, and

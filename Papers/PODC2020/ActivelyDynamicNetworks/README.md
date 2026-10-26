@@ -6,10 +6,11 @@ Actively Dynamic Networks.* PODC 2020. DOI
 [2003.03355](https://arxiv.org/abs/2003.03355) v1 (full version with Appendices A–D); numbering
 follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** **Lemma 3.1 is false for GraphToStar as printed**: on the 4-node
+**Verdict: 🚨 Headline claim false.** **Lemma 3.1 is false for GraphToStar as printed**: on the 4-node
 line with increasing IDs a pulling committee jumps onto a committee that is merging away in the
 same phase. It then merges into a follower, the committees stop being stars, and the output is not
-a spanning star. So Theorem 3.8 is not established. The basic subroutines (Propositions 2.1, 2.2)
+a spanning star. So Theorem 3.8 is not established; GraphToStar is the first of the three distributed
+algorithms announced in the abstract. The basic subroutines (Propositions 2.1, 2.2)
 and the centralized lower bounds (Lemmas 6.1, 6.2) hold, up to a small slip in the bound
 `⌈log d⌉ ≤ log n`. We proved them. We also proved the matching centralized upper bound on the line
 (Theorem 6.3, line case). The distributed `Ω(n log n)` bound (Theorem 6.4) is not formalized.

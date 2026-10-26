@@ -5,7 +5,7 @@ Sean Ovens. *The Space Complexity of Scannable Binary Objects.* PODC 2021. DOI
 version (no arXiv full version exists); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The lower bounds proved in the body hold (Lemmas 5–6, Theorem 8,
+**Verdict: ⚠️ Minor statement issues.** The lower bounds proved in the body hold (Lemmas 5–6, Theorem 8,
 Corollary 9), and so does the Section 4.1 upper bound. Two statements fail in edge cases. Observation 3 is
 false when the start configuration is not `p₀`-idle. The headline bound "`n + k − 2` for `n ≤ 2^(k−1)+2`"
 in the abstract, introduction and conclusion fails for `k = 1`, `n = 3`, and some cases of it are unproved.

@@ -5,7 +5,7 @@ Setting.* PODC 2026. DOI [10.1145/3796701.3815929](https://doi.org/10.1145/37967
 the proceedings version (pp. 282–292); numbering follows it. The full version (ePrint 2026/470) was not used.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The main positive result holds: the gradecast Π_GC works against any number of
+**Verdict: ⚠️ Minor statement issues.** The main positive result holds: the gradecast Π_GC works against any number of
 corruptions and has the special grade-1 property (Theorem 3.9, Lemma 3.10). The broadcast Π_BC for a registered
 sender tolerates `t ≤ s + ⌈(n−s)/3⌉ − 1` given the black-box BA among the unregistered parties (Theorem 3.13), and
 Theorem 3.14 holds. All of this needs the right reading of an ambiguous step in Figure 1. The lower bound

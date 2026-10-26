@@ -6,12 +6,13 @@ Rendezvous in Labeled Lines.* PODC 2025. DOI
 version, arXiv [2505.04564](https://arxiv.org/abs/2505.04564) v2 (24 pp.); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The main result, Theorem 1.1, holds: rendezvous within
+**Verdict: ⚠️ Minor statement issues.** The main result, Theorem 1.1, holds: rendezvous within
 `O(D log* ℓ_min)` rounds of the first wake-up. We prove it with an explicit constant, with no
 assumption left open: Lemma 2.1, the cited MIS/colouring subroutine, is also proved. Theorem 3.1
 (CarefulWalk), Proposition 3.2 and Lemma 3.4 hold as stated. The complexity proof of Lemma 3.5
 (early-stopping coloured ruling sets) does not work as written. The lemma itself is true; we repair
-the colouring step of Algorithm 3. Lemma 4.5 is proved with `8L` instead of `7L`.
+the colouring step of Algorithm 3. Part (2) of Lemma 3.5 is imprecise as worded (it holds for the ruling set
+committed by `v`'s commitment round, not for the final one). Lemma 4.5 is proved with `8L` instead of `7L`.
 
 ## Mistakes in the paper
 

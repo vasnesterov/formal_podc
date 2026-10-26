@@ -5,7 +5,7 @@ Communication.* PODC 2021. DOI [10.1145/3465084.3467948](https://doi.org/10.1145
 Formalized version: arXiv [2105.10566](https://arxiv.org/abs/2105.10566) v1 (full version, 11 pp.);
 numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** **The Claim of §4.1 is false.** It says sequenced reliable broadcast (SRB)
+**Verdict: 🚨 Headline claim false.** **The Claim of §4.1 is false.** It says sequenced reliable broadcast (SRB)
 cannot implement unidirectional rounds when `n > 2f` and `f > 1`. In fact a simple echo protocol
 implements them over SRB for every `n > 2f`. So the paper's separation "shared memory ⊋
 unidirectionality ⊋ SRB" (Fig. 1, abstract) collapses: for `n > 2f`, unidirectionality and SRB are

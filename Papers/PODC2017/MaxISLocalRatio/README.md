@@ -6,7 +6,7 @@ of Maximum Independent Set and Maximum Matching.* PODC 2017. DOI
 [1708.00276](https://arxiv.org/abs/1708.00276) v1; numbering follows it. Scope: Section 2 (deterministic
 parts). Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The local-ratio theorem (Thm 2.1), Lemma 2.2, the `Δ`-approximation of
+**Verdict: ⚠️ Minor statement issues.** The local-ratio theorem (Thm 2.1), Lemma 2.2, the `Δ`-approximation of
 the sequential meta-algorithm (Algorithm 1) for *every* choice of independent sets, the colouring-based
 Algorithm 3 (a `Δ`-approximation in `O(Δ)` rounds after a `(Δ+1)`-colouring), the layer argument of
 Lemma A.1, and the 2-approximation for maximum-weight matching via the line graph (Thm 2.10,

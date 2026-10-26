@@ -6,7 +6,7 @@ Formalized version: arXiv [2207.11198](https://arxiv.org/abs/2207.11198) v1 (the
 version of the brief announcement). Numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The headline result is false. The paper claims a wait-free 5-colouring
+**Verdict: 🚨 Headline claim false.** The headline result is false. The paper claims a wait-free 5-colouring
 of every asynchronous cycle `C_n` in `O(log* n)` rounds (Algorithm 3, Theorem 4.4). Neither 5-colouring
 algorithm is wait-free. Algorithm 2 (Theorem 3.11) and Algorithm 3 (Theorem 4.4) have executions on
 every cycle `C_n`, `n ≥ 3`, in which two processes take rounds forever without returning. The 6-colour

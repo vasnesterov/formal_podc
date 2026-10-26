@@ -6,7 +6,7 @@ Guy Goren, Yoram Moses. *Silence.* PODC 2018. DOI
 follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The Silent Choir Theorem, the lower bounds of Theorem 3 and the
+**Verdict: ⚠️ Minor statement issues.** The Silent Choir Theorem, the lower bounds of Theorem 3 and the
 three matching AC protocols (STEALTH, D2, D1f1) hold, and so do the Appendix D bounds. The fixes:
 Lemma 2 and Corollary 2 are false when the receiver has itself crashed; Theorem 3 lacks the bound for
 `D = 1`, which "completely characterize" needs; the protocol proofs treat the consensus sub-protocol as

@@ -6,7 +6,7 @@ Formalized version: arXiv:2311.08060v2 (numbering follows it). Companion of *On 
 [ValidityConsensus](../../PODC2023/ValidityConsensus)).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Correct with fixes.** The main result holds: every non-trivial Byzantine agreement problem needs
+**Verdict: ⚠️ Minor statement issues.** The main result holds: every non-trivial Byzantine agreement problem needs
 `Ω(t²)` messages, even in synchrony (the paper proves the weak-consensus bound even against omission faults; we
 also get the omission version for every non-trivial problem). We prove it for every `t < n` with the
 explicit bound `t² ≤ 32 · #messages`, with or without signatures. The solvability characterization (Theorem 4) is

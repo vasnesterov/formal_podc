@@ -5,7 +5,7 @@ processes.* PODC 2025. DOI [10.1145/3732772.3733550](https://doi.org/10.1145/373
 arXiv [2504.09805](https://arxiv.org/abs/2504.09805) v2; numbering follows it. Copy of the paper:
 [paper.pdf](paper.pdf).
 
-**Verdict: ✅ Correct.** The optimality result of Section 10 holds. For `3 ≤ n ≤ 3f` there is no correct
+**Verdict: 🛠️ Proof repaired.** The optimality result of Section 10 holds. For `3 ≤ n ≤ 3f` there is no correct
 implementation from SWMR registers of the one-shot test-or-set object (Theorem 29). The same holds for verifiable,
 authenticated and sticky registers (Theorem 31). Observation 30 (test-or-set from each of these registers) also
 holds. Lemma 28 has only a proof sketch, and Theorem 31 is derived via an unstated composition property; both
