@@ -1612,3 +1612,8 @@ import Papers.PODC2026.FEATOrdering.LowerBound
 import Papers.PODC2026.FEATOrdering.Tree
 import Papers.PODC2026.FEATOrdering.FEAT
 import Papers.PODC2026.FEATOrdering.Counterexample
+import Papers.PODC2026.TaskCompletion.Basic
+import Papers.PODC2026.TaskCompletion.Covering
+import Papers.PODC2026.TaskCompletion.LowerBound
+import Papers.PODC2026.TaskCompletion.Algorithm
+import Papers.PODC2026.TaskCompletion.Main
