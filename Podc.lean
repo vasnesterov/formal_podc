@@ -87,3 +87,4 @@ import Podc.Computability.Distributed.SleepingCrash.Model
 import Podc.Foundations.Combinatorics.SimpleGraph.Depth1Minor
 import Podc.Foundations.Combinatorics.SelectiveFamily
 import Podc.Computability.Distributed.SharedMemory.TimestampLin
+import Podc.Foundations.Combinatorics.SimpleGraph.HubLabeling
