@@ -1483,3 +1483,14 @@ import Papers.PODC2025.AuditingWithoutLeaks.MaxRegCex
 import Papers.PODC2025.AuditingWithoutLeaks.Effective
 import Papers.PODC2025.AuditingWithoutLeaks.Theorem8
 import Papers.PODC2019.RDMAAgreement.Main
+import Papers.PODC2012.WeakModelsModalLogic.Model
+import Papers.PODC2012.WeakModelsModalLogic.Bisimulation
+import Papers.PODC2012.WeakModelsModalLogic.PortExists
+import Papers.PODC2012.WeakModelsModalLogic.SetSim
+import Papers.PODC2012.WeakModelsModalLogic.MultisetSim
+import Papers.PODC2012.WeakModelsModalLogic.Lemma15
+import Papers.PODC2012.WeakModelsModalLogic.Lemma16
+import Papers.PODC2012.WeakModelsModalLogic.Fig9a
+import Papers.PODC2012.WeakModelsModalLogic.Theorem17
+import Papers.PODC2012.WeakModelsModalLogic.Separations
+import Papers.PODC2012.WeakModelsModalLogic.Main
