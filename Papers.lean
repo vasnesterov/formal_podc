@@ -1454,3 +1454,7 @@ import Papers.PODC2021.MISTreeLowerBounds.Main
 import Papers.PODC2021.MISTreeLowerBounds.NonVacuity
 import Papers.PODC2022.ClockSyncSignatures.APA
 import Papers.PODC2022.ClockSyncSignatures.Protocol
+import Papers.PODC2024.GlobalCertificationHashing.Model
+import Papers.PODC2024.GlobalCertificationHashing.Hashing
+import Papers.PODC2024.GlobalCertificationHashing.Scheme
+import Papers.PODC2024.GlobalCertificationHashing.Main
