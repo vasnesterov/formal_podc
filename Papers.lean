@@ -1676,3 +1676,4 @@ import Papers.PODC2017.DeltaEdgeColoring.Theorem53
 import Papers.PODC2017.DeltaEdgeColoring.Section4Count
 import Papers.PODC2022.AnonymousMACConsensus.Main
 import Papers.PODC2022.AnonymousMACConsensus.Starvation
+import Papers.PODC2016.PowerLawLabeling.Main
