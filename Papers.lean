@@ -1705,3 +1705,12 @@ import Papers.PODC2019.HubLabelingHardness.Counterexample
 import Papers.PODC2020.BinaryLabelingClassification.Global
 import Papers.PODC2020.BinaryLabelingClassification.Coverage
 import Papers.PODC2020.BinaryLabelingClassification.RoundElim
+import Papers.PODC2011.RulesOfThumb.Model
+import Papers.PODC2011.RulesOfThumb.Valency
+import Papers.PODC2011.RulesOfThumb.FLP
+import Papers.PODC2011.RulesOfThumb.Bivalence
+import Papers.PODC2011.RulesOfThumb.Concat
+import Papers.PODC2011.RulesOfThumb.Theorem41
+import Papers.PODC2011.RulesOfThumb.NonStationary
+import Papers.PODC2011.RulesOfThumb.Examples
+import Papers.PODC2011.RulesOfThumb.Games
