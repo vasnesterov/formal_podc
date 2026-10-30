@@ -1631,3 +1631,6 @@ import Papers.PODC2026.DemandAwareThroughput.CycleDirection
 import Papers.PODC2026.DemandAwareThroughput.DependentRounding
 import Papers.PODC2026.DemandAwareThroughput.Lemma1
 import Papers.PODC2026.DemandAwareThroughput.Main
+import Papers.PODC2025.EnergyEfficientAgreement.Committees
+import Papers.PODC2025.EnergyEfficientAgreement.MultiValue
+import Papers.PODC2025.EnergyEfficientAgreement.Binary
