@@ -1593,3 +1593,12 @@ import Papers.PODC2026.LCLDefinitions.Counterexample
 import Papers.PODC2026.LCLDefinitions.PNView
 import Papers.PODC2026.LCLDefinitions.REFormalism
 import Papers.PODC2026.LCLDefinitions.Outcome
+import Papers.PODC2016.SpaceTimeVerification.Basic
+import Papers.PODC2016.SpaceTimeVerification.LowerBound
+import Papers.PODC2016.SpaceTimeVerification.Crossing
+import Papers.PODC2016.SpaceTimeVerification.AcyclicLabels
+import Papers.PODC2016.SpaceTimeVerification.AcyclicUpper
+import Papers.PODC2016.SpaceTimeVerification.Tightness
+import Papers.PODC2016.SpaceTimeVerification.Universal
+import Papers.PODC2016.SpaceTimeVerification.UniversalCodes
+import Papers.PODC2016.SpaceTimeVerification.Anonymous
