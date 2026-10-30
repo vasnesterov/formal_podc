@@ -1520,3 +1520,10 @@ import Papers.PODC2017.LCLGrids.EdgeColouring
 import Papers.PODC2017.LCLGrids.Orientation
 import Papers.PODC2017.LCLGrids.Orientation034
 import Papers.PODC2019.MinimalSymmetryBreaking.Main
+import Papers.PODC2018.SpannerApproximation.Spanner
+import Papers.PODC2018.SpannerApproximation.Graph
+import Papers.PODC2018.SpannerApproximation.LowerBound
+import Papers.PODC2018.SpannerApproximation.Theorems
+import Papers.PODC2018.SpannerApproximation.NonVacuity
+import Papers.PODC2018.SpannerApproximation.VertexCover
+import Papers.PODC2018.SpannerApproximation.VCReduction
