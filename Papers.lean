@@ -1649,3 +1649,11 @@ import Papers.PODC2018.LocalISApproximation.Theorem4
 import Papers.PODC2018.LocalISApproximation.Weighted
 import Papers.PODC2018.LocalISApproximation.Lemma2
 import Papers.PODC2018.LocalISApproximation.Theorem67
+import Papers.PODC2016.BoundedGenusMDS.Defs
+import Papers.PODC2016.BoundedGenusMDS.Lemma5
+import Papers.PODC2016.BoundedGenusMDS.Setup
+import Papers.PODC2016.BoundedGenusMDS.Lemma7
+import Papers.PODC2016.BoundedGenusMDS.Lemma12
+import Papers.PODC2016.BoundedGenusMDS.Counterexamples
+import Papers.PODC2016.BoundedGenusMDS.Genus
+import Papers.PODC2016.BoundedGenusMDS.Locality
