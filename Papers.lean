@@ -1714,3 +1714,6 @@ import Papers.PODC2011.RulesOfThumb.Theorem41
 import Papers.PODC2011.RulesOfThumb.NonStationary
 import Papers.PODC2011.RulesOfThumb.Examples
 import Papers.PODC2011.RulesOfThumb.Games
+import Papers.PODC2020.MISInapproxCongest.Theorem1
+import Papers.PODC2020.MISInapproxCongest.Theorem2
+import Papers.PODC2020.MISInapproxCongest.NonVacuity
