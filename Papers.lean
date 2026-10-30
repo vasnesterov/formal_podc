@@ -1657,3 +1657,11 @@ import Papers.PODC2016.BoundedGenusMDS.Lemma12
 import Papers.PODC2016.BoundedGenusMDS.Counterexamples
 import Papers.PODC2016.BoundedGenusMDS.Genus
 import Papers.PODC2016.BoundedGenusMDS.Locality
+import Papers.PODC2021.ContentionPredictions.Model
+import Papers.PODC2021.ContentionPredictions.LowerBounds
+import Papers.PODC2021.ContentionPredictions.UpperBounds
+import Papers.PODC2021.ContentionPredictions.Counterexamples
+import Papers.PODC2021.ContentionPredictions.EntropyLowerBound
+import Papers.PODC2021.ContentionPredictions.Randomized
+import Papers.PODC2021.ContentionPredictions.ThetaClaims
+import Papers.PODC2021.ContentionPredictions.Repair37
