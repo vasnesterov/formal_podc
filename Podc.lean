@@ -79,3 +79,5 @@ import Podc.Computability.CommunicationComplexity.GapDisjointness
 import Podc.Computability.Distributed.CongestedClique.Phases
 import Podc.Computability.Distributed.CongestedClique.Oblivious
 import Podc.Computability.Distributed.CongestedClique.Routing
+import Podc.Probability.Markov.Stationary
+import Podc.Probability.Markov.Mixing

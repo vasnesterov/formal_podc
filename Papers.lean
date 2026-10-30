@@ -1530,3 +1530,8 @@ import Papers.PODC2018.SpannerApproximation.VCReduction
 import Papers.PODC2015.AlgebraicCongestedClique.MatMul
 import Papers.PODC2015.AlgebraicCongestedClique.FourCycleAlg
 import Papers.PODC2015.AlgebraicCongestedClique.Girth
+import Papers.PODC2024.PPGameDynamics.Ehrenfest
+import Papers.PODC2024.PPGameDynamics.SmallK
+import Papers.PODC2024.PPGameDynamics.IGT
+import Papers.PODC2024.PPGameDynamics.Generosity
+import Papers.PODC2024.PPGameDynamics.Mixing
