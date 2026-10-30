@@ -1634,3 +1634,9 @@ import Papers.PODC2026.DemandAwareThroughput.Main
 import Papers.PODC2025.EnergyEfficientAgreement.Committees
 import Papers.PODC2025.EnergyEfficientAgreement.MultiValue
 import Papers.PODC2025.EnergyEfficientAgreement.Binary
+import Papers.PODC2025.ByzantineDownload.Model
+import Papers.PODC2025.ByzantineDownload.LowerBound
+import Papers.PODC2025.ByzantineDownload.Counting
+import Papers.PODC2025.ByzantineDownload.StaticDownload
+import Papers.PODC2025.ByzantineDownload.StaticProof
+import Papers.PODC2025.ByzantineDownload.RapidDownload
