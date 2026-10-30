@@ -1413,3 +1413,7 @@ import Papers.PODC2021.SoreLoserHedging.Examples
 import Papers.PODC2021.SoreLoserHedging.TwoParty
 import Papers.PODC2021.SoreLoserHedging.Auction
 import Papers.PODC2021.SoreLoserHedging.Bootstrap
+import Papers.PODC2026.FewToManyFaultsBA.Disperser
+import Papers.PODC2026.FewToManyFaultsBA.AsyncLowerBound
+import Papers.PODC2026.FewToManyFaultsBA.SyncBA.Main
+import Papers.PODC2026.FewToManyFaultsBA.SyncBA.NonVacuity
