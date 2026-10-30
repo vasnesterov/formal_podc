@@ -1300,3 +1300,11 @@ import Papers.PODC2026.OverwriteLeastFixedPoints.Parallel
 import Papers.PODC2026.OverwriteLeastFixedPoints.Distributed
 import Papers.PODC2026.OverwriteLeastFixedPoints.TransitiveClosure
 import Papers.PODC2026.OverwriteLeastFixedPoints.Applications
+import Papers.PODC2026.TreesNetworkSizeKnowledge.Model
+import Papers.PODC2026.TreesNetworkSizeKnowledge.Trees
+import Papers.PODC2026.TreesNetworkSizeKnowledge.Construction
+import Papers.PODC2026.TreesNetworkSizeKnowledge.Embedding
+import Papers.PODC2026.TreesNetworkSizeKnowledge.Padding
+import Papers.PODC2026.TreesNetworkSizeKnowledge.Surgery
+import Papers.PODC2026.TreesNetworkSizeKnowledge.Theorem1
+import Papers.PODC2026.TreesNetworkSizeKnowledge.NonVacuity
