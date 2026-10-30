@@ -1342,3 +1342,10 @@ import Papers.PODC2026.ForgetIT.Protocol
 import Papers.PODC2026.ForgetIT.Refinement
 import Papers.PODC2026.ForgetIT.Latency
 import Papers.PODC2026.ForgetIT.Counterexample
+import Papers.PODC2024.MemSnap.Defs
+import Papers.PODC2024.MemSnap.Augmented
+import Papers.PODC2024.MemSnap.Steps
+import Papers.PODC2024.MemSnap.Forwarding
+import Papers.PODC2024.MemSnap.Possibilities
+import Papers.PODC2024.MemSnap.Main
+import Papers.PODC2024.MemSnap.Counterexample
