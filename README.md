@@ -250,6 +250,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2024 | 0 | Bousquet, Feuilloley, Zeitoun — *Brief Announcement: Global certification via perfect hashing* | [GlobalCertificationHashing](Papers/PODC2024/GlobalCertificationHashing) | ⚠️ Theorem 4 (global certification of homomorphism to H with O(n log n' + log log M) bits, explicit constant 10) and Theorem 3 (bipartiteness, O(n + log log M)) proved, so Conjecture 1 of Feuilloley–Hirvonen is refuted (no ε n log n lower bound, even infinitely often, for M = n^c); the cited Theorem 7 (perfect hash families of size ⌈k e^k log ℓ⌉, proved by counting) is false at k = ℓ = 1 and must read "at most"; Theorems 3/4 need the implicit M(n) ≥ n |
 | 2020 | 0 | Moses, Zamir — *Probably Approximately Knowing* | [ProbablyApproxKnowing](Papers/PODC2020/ProbablyApproxKnowing) | ❌ Main theorem (Thm 6.2: expected belief at a proper action = µ(φ@α \| α) under local-state independence), Thms 4.2, 5.2, 7.1, Cor 7.2 (PAK) and Lemmas 4.3, 5.1, B.1, F.1 proved; **§7's claim that every protocol meeting µ(φ_both \| fire_A) ≥ 0.99 makes Alice believe φ_both ≥ 0.9 w.p. ≥ 0.9 is false** (mixed firing gives belief 0.495; holds for "Bob fires"); abstract omits the independence hypothesis; Lemma 4.3(b) needs protocol-generated systems with observable termination |
 | 2026 | 0 | Chechik, Lifshitz, Mukhtar — *Girth Approximations in the CONGEST Model* | [GirthApproxCongest](Papers/PODC2026/GirthApproxCongest) | ❌ Lower bounds of §6 proved (Theorem 6.1: (3−ε)-approx. of directed / weighted girth needs Ω̃(n^{3/5}) rounds unconditionally; Theorem 6.2 under Erdős–Simonovits, deterministic and randomized, diameter O(log n)), with the Das Sarma et al. moving-cut simulation checked for this network; Claim 6.2(1) false as stated (weighted girth is 2(q−1)+2q/ε, not 2q/ε·(1+ε); harmless), proof gap in Claim 6.2(2) repaired, quoted bound ex(n, C_{<2k}) = O(n^{1+1/k}) off by one |
+| 2026 | 0 | Cruciani, Das, Raevskaya, Suomela — *Brief Announcement: It Does Not Matter How You Define Locally Checkable Labelings* | [LCLDefinitions](Papers/PODC2026/LCLDefinitions) | ❌ Theorem 5.1 (colouring of gadgeted graphs, the key of the LCL → PN-checkable reduction) and Lemma 5.13 are false as stated (gadgeted K₃,₃, r = 1: consistency is only required inside r-gballs, but the conclusion compares vertices at gdistance 2r); a repaired Theorem 5.1 with global edge-consistency is proved; Section 6 (PN-checkable → RE, Lemmas 6.2–6.6) correct up to typos; headline Theorem 7.1 unestablished, not refuted |
 
 ## Papers with critical mistakes
 
@@ -667,6 +668,13 @@ the refutation is checked by Lean; details, and the corrected statements we prov
   [GirthApproxCongest](Papers/PODC2026/GirthApproxCongest). Claim 6.2(1) states that the weighted girth equals
   `2q/ε · (1 + ε)` for intersecting inputs, but the pipes have `q − 1` edges, so the girth is at most `2(q − 1) + 2q/ε`,
   strictly smaller. Harmless: the reduction only needs the upper bound, and Theorems 6.1–6.2 hold.
+- **Brief Announcement: It Does Not Matter How You Define Locally Checkable Labelings** (PODC 2026, 0 citations) —
+  [LCLDefinitions](Papers/PODC2026/LCLDefinitions). Theorem 5.1 is false as stated: its edge-consistency hypothesis
+  only compares a vertex with equally coloured vertices of its own `r`-gball, while the conclusion requires all
+  vertices of an `r`-gball (gadgeted diameter `2r`) to have distinct colours. In the gadgeted `K_{3,3}` with
+  `r = 1`, two original vertices on the same side can share a colour, yet both lie in the `1`-gball of a vertex of
+  the other side. Lemma 5.13 fails similarly. With edge-consistency required for all pairs, the theorem holds and is
+  proved. The headline Theorem 7.1 relies on it through Lemma 5.4 and is unestablished, not refuted.
 
 As of October 2026 we found no erratum or later version that addresses the mistakes in Swiper, in
 Barenboim–Elkin–Goldenberg (including its J. ACM version), or in Függer–Nowak–Schwarz (including its J. ACM

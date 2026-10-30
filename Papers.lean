@@ -1585,3 +1585,11 @@ import Papers.PODC2026.GirthApproxCongest.Asymptotic
 import Papers.PODC2026.GirthApproxCongest.PointsLines
 import Papers.PODC2026.GirthApproxCongest.Theorems
 import Papers.PODC2026.GirthApproxCongest.NonVacuity
+import Papers.PODC2026.LCLDefinitions.Local
+import Papers.PODC2026.LCLDefinitions.Gadget
+import Papers.PODC2026.LCLDefinitions.Rigidity
+import Papers.PODC2026.LCLDefinitions.Theorem51
+import Papers.PODC2026.LCLDefinitions.Counterexample
+import Papers.PODC2026.LCLDefinitions.PNView
+import Papers.PODC2026.LCLDefinitions.REFormalism
+import Papers.PODC2026.LCLDefinitions.Outcome
