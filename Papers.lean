@@ -1385,3 +1385,9 @@ import Papers.PODC2024.SleepyTOB.Counterexample
 import Papers.PODC2024.SleepyTOB.Examples
 import Papers.PODC2024.SleepyTOB.Adversary
 import Papers.PODC2024.SleepyTOB.Main
+import Papers.PODC2025.GraphAlgorithmsPredictions.Basic
+import Papers.PODC2025.GraphAlgorithmsPredictions.Line
+import Papers.PODC2025.GraphAlgorithmsPredictions.LowerBound
+import Papers.PODC2025.GraphAlgorithmsPredictions.Algorithm
+import Papers.PODC2025.GraphAlgorithmsPredictions.Greedy
+import Papers.PODC2025.GraphAlgorithmsPredictions.Main
