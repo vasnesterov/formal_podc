@@ -1577,3 +1577,11 @@ import Papers.PODC2013.AsyncRendezvousPoly.Labels
 import Papers.PODC2013.AsyncRendezvousPoly.Main
 import Papers.PODC2013.AsyncRendezvousPoly.Bridge
 import Papers.PODC2013.AsyncRendezvousPoly.Examples
+import Papers.PODC2026.GirthApproxCongest.Gadget
+import Papers.PODC2026.GirthApproxCongest.Cycles
+import Papers.PODC2026.GirthApproxCongest.Network
+import Papers.PODC2026.GirthApproxCongest.LowerBound
+import Papers.PODC2026.GirthApproxCongest.Asymptotic
+import Papers.PODC2026.GirthApproxCongest.PointsLines
+import Papers.PODC2026.GirthApproxCongest.Theorems
+import Papers.PODC2026.GirthApproxCongest.NonVacuity
