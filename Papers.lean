@@ -1505,3 +1505,6 @@ import Papers.PODC2015.MSTImpromptuRepair.FindAny
 import Papers.PODC2015.MSTImpromptuRepair.FindAnyCounterexample
 import Papers.PODC2015.MSTImpromptuRepair.FindMin
 import Papers.PODC2015.MSTImpromptuRepair.CycleBreak
+import Papers.PODC2024.LocalAdvice.Main
+import Papers.PODC2024.LocalAdvice.OrderInvariance
+import Papers.PODC2024.LocalAdvice.Lemma1
