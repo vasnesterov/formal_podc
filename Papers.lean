@@ -1607,3 +1607,8 @@ import Papers.PODC2026.MultiKrumRobustness.UpperBound
 import Papers.PODC2026.MultiKrumRobustness.Transition
 import Papers.PODC2026.MultiKrumRobustness.Config
 import Papers.PODC2026.MultiKrumRobustness.LowerBounds
+import Papers.PODC2026.FEATOrdering.Fairness
+import Papers.PODC2026.FEATOrdering.LowerBound
+import Papers.PODC2026.FEATOrdering.Tree
+import Papers.PODC2026.FEATOrdering.FEAT
+import Papers.PODC2026.FEATOrdering.Counterexample
