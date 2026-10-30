@@ -1693,3 +1693,7 @@ import Papers.PODC2023.MBroadcast.FromRegistersLiveness
 import Papers.PODC2023.MBroadcast.FromRegistersCausal
 import Papers.PODC2023.MBroadcast.FromRegistersCausalVariant
 import Papers.PODC2023.MBroadcast.FromRegistersCausalVariantLiveness
+import Papers.PODC2017.NoisyRadioBroadcast.StarCoding
+import Papers.PODC2017.NoisyRadioBroadcast.SenderTransformAux
+import Papers.PODC2017.NoisyRadioBroadcast.SenderTransform
+import Papers.PODC2017.NoisyRadioBroadcast.Theorem17
