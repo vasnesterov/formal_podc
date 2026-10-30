@@ -1527,3 +1527,6 @@ import Papers.PODC2018.SpannerApproximation.Theorems
 import Papers.PODC2018.SpannerApproximation.NonVacuity
 import Papers.PODC2018.SpannerApproximation.VertexCover
 import Papers.PODC2018.SpannerApproximation.VCReduction
+import Papers.PODC2015.AlgebraicCongestedClique.MatMul
+import Papers.PODC2015.AlgebraicCongestedClique.FourCycleAlg
+import Papers.PODC2015.AlgebraicCongestedClique.Girth
