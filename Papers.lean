@@ -1395,3 +1395,14 @@ import Papers.PODC2026.DistinctGathering.TwoPoint
 import Papers.PODC2026.DistinctGathering.Impossibility
 import Papers.PODC2026.DistinctGathering.TwoRobots
 import Papers.PODC2026.DistinctGathering.Conjectures
+import Papers.PODC2020.PowerGraphApproximation.Lemma6
+import Papers.PODC2020.PowerGraphApproximation.Algorithm1
+import Papers.PODC2020.PowerGraphApproximation.Centralized
+import Papers.PODC2020.PowerGraphApproximation.PathGadget
+import Papers.PODC2020.PowerGraphApproximation.CKP17
+import Papers.PODC2020.PowerGraphApproximation.LBGraphs
+import Papers.PODC2020.PowerGraphApproximation.WeightedLB
+import Papers.PODC2020.PowerGraphApproximation.UnweightedLB
+import Papers.PODC2020.PowerGraphApproximation.ConnectedLB
+import Papers.PODC2020.PowerGraphApproximation.Corollary17
+import Papers.PODC2020.PowerGraphApproximation.Corollary17Gap
