@@ -253,6 +253,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2026 | 0 | Chechik, Lifshitz, Mukhtar — *Girth Approximations in the CONGEST Model* | [GirthApproxCongest](Papers/PODC2026/GirthApproxCongest) | ❌ Lower bounds of §6 proved (Theorem 6.1: (3−ε)-approx. of directed / weighted girth needs Ω̃(n^{3/5}) rounds unconditionally; Theorem 6.2 under Erdős–Simonovits, deterministic and randomized, diameter O(log n)), with the Das Sarma et al. moving-cut simulation checked for this network; Claim 6.2(1) false as stated (weighted girth is 2(q−1)+2q/ε, not 2q/ε·(1+ε); harmless), proof gap in Claim 6.2(2) repaired, quoted bound ex(n, C_{<2k}) = O(n^{1+1/k}) off by one |
 | 2026 | 0 | Cruciani, Das, Raevskaya, Suomela — *Brief Announcement: It Does Not Matter How You Define Locally Checkable Labelings* | [LCLDefinitions](Papers/PODC2026/LCLDefinitions) | ❌ Theorem 5.1 (colouring of gadgeted graphs, the key of the LCL → PN-checkable reduction) and Lemma 5.13 are false as stated (gadgeted K₃,₃, r = 1: consistency is only required inside r-gballs, but the conclusion compares vertices at gdistance 2r); a repaired Theorem 5.1 with global edge-consistency is proved; Section 6 (PN-checkable → RE, Lemmas 6.2–6.6) correct up to typos; headline Theorem 7.1 unestablished, not refuted |
 | 2026 | 0 | Bareilles, Bouaziz, Fageot, El Mhamdi — *Brief Announcement: Byzantine Machine Learning, MultiKrum and an Optimal Notion of Robustness* | [MultiKrumRobustness](Papers/PODC2026/MultiKrumRobustness) | ⚠️ MultiKrum robustness upper bound (Theorems 1, 5, 6), transition asymptotics (Theorem 2) and lower bounds (Proposition 1, Theorems 3, 4, B.1) proved for every tie-breaking; Theorem 1's display prints `≥` for the intended `≤` (typo); lower bounds fail for the degenerate n = 1 under the paper's 0/0 = −∞; proof repairs: wrong bias in B.1, Theorem 2's upper bound gives 2n/C, not n/C |
+| 2026 | 0 | Dinh, Kang, Sadoghi — *FEAT: Fair and Efficient Adversarial Transaction Ordering* | [FEATOrdering](Papers/PODC2026/FEATOrdering) | 🚨 **Theorem 6.6 (FEAT achieves γ-Batch-Order-Fairness) false**, with Lemma 6.3 and Theorem 6.4: the transaction score counts only honest replicas, but Byzantine orderings enter the weights, so FEAT outputs `[z, m]` with `cmp_T(z, m) = False` (n = 7, f = 2, γ = 1); counting all replicas repairs it (proved); Theorem 4.4 and the `Ω(\|T\| log \|T\|)` lower bound (Thm 4.5, Cor 4.6, strengthened) correct; Algorithm 3 pseudocode drops the merge suffix |
 
 ## Papers with critical mistakes
 
@@ -426,6 +427,11 @@ the refutation is checked by Lean; details, and the corrected statements we prov
   snapshots; crashed processes stop), on C₃ one process crashes after its first round and its two neighbours, always
   activated together, alternate between two states forever; the same happens on every Cₙ. Outputs, when produced,
   are proper 5-colourings, and the 6-colour algorithm is proved wait-free.
+- **FEAT: Fair and Efficient Adversarial Transaction Ordering** (PODC 2026, 0 citations) —
+  [FEATOrdering](Papers/PODC2026/FEATOrdering). Theorem 6.6 (FEAT's output is γ-Batch-Order-Fair), Theorem 6.4 and
+  Lemma 6.3 are false for the protocol as defined: `score(T)` counts honest replicas only, while Byzantine replicas
+  contribute to the weights `W`, so a transaction can be finalized after one it should follow (7 replicas, 2
+  Byzantine, two transactions). With the score counting all replicas, all three hold.
 
 ### ❌ Other false claims
 
