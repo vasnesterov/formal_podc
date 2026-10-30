@@ -1700,3 +1700,5 @@ import Papers.PODC2017.NoisyRadioBroadcast.Theorem17
 import Papers.PODC2012.WirelessPacketScheduling.Counterexample
 import Papers.PODC2012.WirelessPacketScheduling.Time
 import Papers.PODC2012.WirelessPacketScheduling.Theorem20
+import Papers.PODC2019.HubLabelingHardness.Main
+import Papers.PODC2019.HubLabelingHardness.Counterexample
