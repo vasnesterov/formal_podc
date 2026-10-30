@@ -1469,3 +1469,16 @@ import Papers.PODC2026.GeneralizedCAS.Periods
 import Papers.PODC2026.GeneralizedCAS.Counting
 import Papers.PODC2026.GeneralizedCAS.Main
 import Papers.PODC2021.BFTInBlockDAG.Main
+import Papers.PODC2025.AuditingWithoutLeaks.Alg1
+import Papers.PODC2025.AuditingWithoutLeaks.Inv
+import Papers.PODC2025.AuditingWithoutLeaks.WaitFree
+import Papers.PODC2025.AuditingWithoutLeaks.LinAux
+import Papers.PODC2025.AuditingWithoutLeaks.Lin
+import Papers.PODC2025.AuditingWithoutLeaks.SimCommon
+import Papers.PODC2025.AuditingWithoutLeaks.RenameWrites
+import Papers.PODC2025.AuditingWithoutLeaks.RemoveReader
+import Papers.PODC2025.AuditingWithoutLeaks.MaxReg
+import Papers.PODC2025.AuditingWithoutLeaks.MaxRegInv
+import Papers.PODC2025.AuditingWithoutLeaks.MaxRegCex
+import Papers.PODC2025.AuditingWithoutLeaks.Effective
+import Papers.PODC2025.AuditingWithoutLeaks.Theorem8
