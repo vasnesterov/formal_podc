@@ -1264,3 +1264,13 @@ import Papers.PODC2021.ApproxByzantineOptimization.Quadratic
 import Papers.PODC2021.ApproxByzantineOptimization.PerProfile
 import Papers.PODC2021.ApproxByzantineOptimization.Tightness
 import Papers.PODC2021.ApproxByzantineOptimization.Main
+import Papers.PODC2011.UniformLocalAlgorithms.Model
+import Papers.PODC2011.UniformLocalAlgorithms.SeqNumber
+import Papers.PODC2011.UniformLocalAlgorithms.Observation41
+import Papers.PODC2011.UniformLocalAlgorithms.Theorem1
+import Papers.PODC2011.UniformLocalAlgorithms.Theorem3
+import Papers.PODC2011.UniformLocalAlgorithms.Theorem4
+import Papers.PODC2011.UniformLocalAlgorithms.Pruning
+import Papers.PODC2011.UniformLocalAlgorithms.Corollaries
+import Papers.PODC2011.UniformLocalAlgorithms.NonVacuity
+import Papers.PODC2011.UniformLocalAlgorithms.Theorem2
