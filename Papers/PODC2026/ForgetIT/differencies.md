@@ -109,7 +109,7 @@ full version [3] was not available.
     and runs `K ≥ 1` passes over candidate rule instances. The messages it broadcasts are sent at
     the next tick. Hence one message delay is `δ + 1` ticks, and the latency bound is
     `3(δ + 1)`. The proofs work for every `K ≥ 1`; rules still enabled after `K` passes fire in
-    the next tick. The counterexample uses `K = 4`. That view 2 decides nothing does not depend on
+    the next tick. The counterexample uses `K = 1` (with `K = 4` the run has the same timing but its kernel check needs too much memory). That view 2 decides nothing does not depend on
     `K`: after their timeouts processes 2 and 3 never vote in view 2 (line 37), so no correct
     process can lock there (line 39). The exact decision time GST + 14 does depend on the step
     semantics.
