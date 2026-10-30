@@ -20,6 +20,8 @@ the infinite graph (`K = 2`) version in `Cslib.Foundations.Combinatorics.Infinit
 * `Cslib.hypergraph_ramsey`: the asymmetric two-colour finite Ramsey theorem for `K`-uniform
   hypergraphs.
 * `Cslib.exists_homogeneous`: the symmetric form (a monochromatic `M`-subset).
+* `Cslib.exists_homogeneous_lt`, `Cslib.exists_homogeneous_finite`: finitely many colours (colours
+  `< k` in `ℕ`, or any `Finite` type), by induction on the number of colours.
 
 ## Proof
 
@@ -141,5 +143,52 @@ theorem exists_homogeneous (K M : ℕ) :
   rcases hN c S hS with ⟨Y, h1, h2, h3⟩ | ⟨Y, h1, h2, h3⟩
   · exact ⟨Y, h1, h2, _, h3⟩
   · exact ⟨Y, h1, h2, _, h3⟩
+
+/-- **Finite Ramsey theorem**, `k` colours (colours `< k` in `ℕ`): for every `K`, `M` and `k` there
+is `N` such that every colouring of the `K`-subsets of a set `S` with `|S| ≥ N` by colours `< k`
+admits an `M`-subset all of whose `K`-subsets have the same colour. Derived from the two-colour
+case by induction on `k`. -/
+theorem exists_homogeneous_lt (K M k : ℕ) :
+    ∃ N, ∀ {α : Type*} [DecidableEq α] (c : Finset α → ℕ) (S : Finset α), N ≤ S.card →
+      (∀ Z ⊆ S, Z.card = K → c Z < k) →
+      ∃ Y ⊆ S, Y.card = M ∧ ∃ i, ∀ Z ⊆ Y, Z.card = K → c Z = i := by
+  induction k with
+  | zero =>
+    refine ⟨M + K, fun c S hS hc => ?_⟩
+    obtain ⟨Z, hZS, hZ⟩ := Finset.exists_subset_card_eq (show K ≤ S.card by omega)
+    exact absurd (hc Z hZS hZ) (Nat.not_lt_zero _)
+  | succ k ih =>
+    obtain ⟨N₁, hN₁⟩ := ih
+    obtain ⟨N, hN⟩ := exists_homogeneous K (max N₁ M)
+    refine ⟨N, fun {α} _ c S hS hc => ?_⟩
+    obtain ⟨Y, hYS, hYc, i, hY⟩ := hN (fun Z => decide (c Z = k)) S hS
+    cases i with
+    | true =>
+      obtain ⟨Y', hY'Y, hY'c⟩ := Finset.exists_subset_card_eq (show M ≤ Y.card by omega)
+      exact ⟨Y', hY'Y.trans hYS, hY'c, k, fun Z hZ hZc => by
+        simpa using hY Z (hZ.trans hY'Y) hZc⟩
+    | false =>
+      obtain ⟨Y', hY'Y, hY'c, j, hj⟩ := hN₁ c Y (by omega) fun Z hZ hZc => by
+        have h1 := hc Z (hZ.trans hYS) hZc
+        have h2 : ¬ c Z = k := by simpa using hY Z hZ hZc
+        omega
+      exact ⟨Y', hY'Y.trans hYS, hY'c, j, hj⟩
+
+/-- **Finite Ramsey theorem**, finitely many colours: for every `K`, `M` and every finite type `β`
+of colours there is `N` such that every colouring `c : Finset α → β` of the `K`-subsets of a set `S`
+with `|S| ≥ N` admits an `M`-subset all of whose `K`-subsets have the same colour. -/
+theorem exists_homogeneous_finite (K M : ℕ) (β : Type*) [Finite β] :
+    ∃ N, ∀ {α : Type*} [DecidableEq α] (c : Finset α → β) (S : Finset α), N ≤ S.card →
+      ∃ Y ⊆ S, Y.card = M ∧ ∃ i, ∀ Z ⊆ Y, Z.card = K → c Z = i := by
+  obtain ⟨k, ⟨e⟩⟩ := Finite.exists_equiv_fin β
+  obtain ⟨N, hN⟩ := exists_homogeneous_lt K M k
+  refine ⟨N, fun {α} _ c S hS => ?_⟩
+  obtain ⟨Y, hYS, hYc, j, hj⟩ := hN (fun Z => (e (c Z) : ℕ)) S hS fun Z _ _ => (e (c Z)).isLt
+  refine ⟨Y, hYS, hYc, ?_⟩
+  by_cases h : ∃ Z ⊆ Y, Z.card = K
+  · obtain ⟨Z₀, hZ₀, hZ₀c⟩ := h
+    refine ⟨c Z₀, fun Z hZ hZc => e.injective (Fin.ext ?_)⟩
+    rw [hj Z hZ hZc, hj Z₀ hZ₀ hZ₀c]
+  · exact ⟨c ∅, fun Z hZ hZc => absurd ⟨Z, hZ, hZc⟩ h⟩
 
 end Cslib
