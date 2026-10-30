@@ -70,3 +70,4 @@ import Podc.Foundations.Combinatorics.SimpleGraph.EdgeColoring.Vizing
 import Podc.Computability.CommunicationComplexity.OneRound
 import Podc.Computability.Distributed.AsymmetricQuorum
 import Podc.Foundations.Data.Multiset.OrderStatistic
+import Podc.Foundations.Combinatorics.PerfectHash
