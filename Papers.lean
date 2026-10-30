@@ -1519,3 +1519,4 @@ import Papers.PODC2017.LCLGrids.TorusGraph
 import Papers.PODC2017.LCLGrids.EdgeColouring
 import Papers.PODC2017.LCLGrids.Orientation
 import Papers.PODC2017.LCLGrids.Orientation034
+import Papers.PODC2019.MinimalSymmetryBreaking.Main
