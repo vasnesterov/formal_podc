@@ -1391,3 +1391,7 @@ import Papers.PODC2025.GraphAlgorithmsPredictions.LowerBound
 import Papers.PODC2025.GraphAlgorithmsPredictions.Algorithm
 import Papers.PODC2025.GraphAlgorithmsPredictions.Greedy
 import Papers.PODC2025.GraphAlgorithmsPredictions.Main
+import Papers.PODC2026.DistinctGathering.TwoPoint
+import Papers.PODC2026.DistinctGathering.Impossibility
+import Papers.PODC2026.DistinctGathering.TwoRobots
+import Papers.PODC2026.DistinctGathering.Conjectures
