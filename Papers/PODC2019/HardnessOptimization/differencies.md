@@ -22,8 +22,12 @@ true)** / **under-specified definition** / **typo**.
    Harmless (complementing the output costs nothing); we use `not_disj_lowerBound`.
 4. **Randomized half of Theorem 1.1**: the simulation is proved (`LBFamily.rand_simulation`,
    `rand_lowerBound`, private coins: Alice draws the strings of `V_A`, Bob those of `V_B`); the bound
-   `CC^R(DISJ_K) = Ω(K)` is *not* formalized and enters as a hypothesis (`theorem_2_1_randomized`); the hypothesis `hCC` quantifies only over protocols with *nonempty*
-   coin spaces (with an empty coin space the error count is `0`, so `hCC` would force `c = 0`;
+   `CC^R(DISJ_K) = Ω(K)` is *not* formalized and enters as a hypothesis (`theorem_2_1_randomized`):
+   `hCC` says every such protocol sends at least `κ · K` bits for a **real** constant `κ` (a
+   natural-number constant would be inconsistent for large `K` unless it is `0`, since the randomized
+   complexity of disjointness is about `0.49 K`); the ℕ bound fed to `rand_lowerBound` is `⌈κ · K⌉`.
+   The hypothesis quantifies only over protocols with *nonempty*
+   coin spaces (with an empty coin space the error count is `0`, so `hCC` would force `κ ≤ 0`;
    `hCC_without_nonempty_degenerate`).
    Randomized versions are stated only for MDS.
 5. Only the **decision versions** are formalized. "Computing a minimum dominating set / Steiner tree / max
