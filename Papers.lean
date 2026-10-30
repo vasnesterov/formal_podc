@@ -1294,3 +1294,9 @@ import Papers.PODC2023.BilateralNetworkCreation.LayerTree
 import Papers.PODC2023.BilateralNetworkCreation.Stretched
 import Papers.PODC2023.BilateralNetworkCreation.Prop38
 import Papers.PODC2023.BilateralNetworkCreation.Prop39
+import Papers.PODC2026.OverwriteLeastFixedPoints.Basic
+import Papers.PODC2026.OverwriteLeastFixedPoints.Interleaving
+import Papers.PODC2026.OverwriteLeastFixedPoints.Parallel
+import Papers.PODC2026.OverwriteLeastFixedPoints.Distributed
+import Papers.PODC2026.OverwriteLeastFixedPoints.TransitiveClosure
+import Papers.PODC2026.OverwriteLeastFixedPoints.Applications
