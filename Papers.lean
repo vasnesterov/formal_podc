@@ -1702,3 +1702,6 @@ import Papers.PODC2012.WirelessPacketScheduling.Time
 import Papers.PODC2012.WirelessPacketScheduling.Theorem20
 import Papers.PODC2019.HubLabelingHardness.Main
 import Papers.PODC2019.HubLabelingHardness.Counterexample
+import Papers.PODC2020.BinaryLabelingClassification.Global
+import Papers.PODC2020.BinaryLabelingClassification.Coverage
+import Papers.PODC2020.BinaryLabelingClassification.RoundElim
