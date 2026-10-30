@@ -91,3 +91,5 @@ import Podc.Foundations.Combinatorics.SimpleGraph.HubLabeling
 import Podc.Computability.CommunicationComplexity.Blackboard
 import Podc.Computability.Distributed.Congest.MultiParty
 import Podc.Foundations.InformationTheory.Agreement
+import Podc.Computability.Distributed.NIS.OutputQueries
+import Podc.Computability.Distributed.NIS.ISConversion
