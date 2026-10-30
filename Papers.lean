@@ -1508,3 +1508,14 @@ import Papers.PODC2015.MSTImpromptuRepair.CycleBreak
 import Papers.PODC2024.LocalAdvice.Main
 import Papers.PODC2024.LocalAdvice.OrderInvariance
 import Papers.PODC2024.LocalAdvice.Lemma1
+import Papers.PODC2017.LCLGrids.Basic
+import Papers.PODC2017.LCLGrids.Invariant
+import Papers.PODC2017.LCLGrids.Lemma12
+import Papers.PODC2017.LCLGrids.QSum
+import Papers.PODC2017.LCLGrids.Theorem9
+import Papers.PODC2017.LCLGrids.Lemma13
+import Papers.PODC2017.LCLGrids.NonVacuity
+import Papers.PODC2017.LCLGrids.TorusGraph
+import Papers.PODC2017.LCLGrids.EdgeColouring
+import Papers.PODC2017.LCLGrids.Orientation
+import Papers.PODC2017.LCLGrids.Orientation034
