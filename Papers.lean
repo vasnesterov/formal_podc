@@ -1427,3 +1427,12 @@ import Papers.PODC2023.AmortizedByzantineBroadcast.DishonestMajorityBasic
 import Papers.PODC2023.AmortizedByzantineBroadcast.DishonestMajorityValidity
 import Papers.PODC2023.AmortizedByzantineBroadcast.DishonestMajorityConsistency
 import Papers.PODC2023.AmortizedByzantineBroadcast.DishonestMajorityLiteral
+import Papers.PODC2025.RoundEfficientColoring.Model
+import Papers.PODC2025.RoundEfficientColoring.ZeroComm
+import Papers.PODC2025.RoundEfficientColoring.Matching
+import Papers.PODC2025.RoundEfficientColoring.SetCover
+import Papers.PODC2025.RoundEfficientColoring.Encoding
+import Papers.PODC2025.RoundEfficientColoring.Plan
+import Papers.PODC2025.RoundEfficientColoring.Algorithm2
+import Papers.PODC2025.RoundEfficientColoring.Theorem2
+import Papers.PODC2025.RoundEfficientColoring.ZEC
