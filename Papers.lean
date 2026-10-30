@@ -1436,3 +1436,8 @@ import Papers.PODC2025.RoundEfficientColoring.Plan
 import Papers.PODC2025.RoundEfficientColoring.Algorithm2
 import Papers.PODC2025.RoundEfficientColoring.Theorem2
 import Papers.PODC2025.RoundEfficientColoring.ZEC
+import Papers.PODC2025.AsymmetricDAGConsensus.RoundGather
+import Papers.PODC2025.AsymmetricDAGConsensus.Counterexamples
+import Papers.PODC2025.AsymmetricDAGConsensus.Gather3
+import Papers.PODC2025.AsymmetricDAGConsensus.Gather3Liveness
+import Papers.PODC2025.AsymmetricDAGConsensus.NonVacuity
