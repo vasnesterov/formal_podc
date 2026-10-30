@@ -103,7 +103,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 2.8 (`k² ≤ 2T(4 log k + 1)B + 2`) | `theorem_2_8` | `MaxCutTheorem.lean` |
 
 **Not formalized.**
-* `CC^R(DISJ) = Ω(K)`, which is a hypothesis of the randomized statement.
+* `CC^R(DISJ) = Ω(K)`, which is a hypothesis of the randomized statement (over protocols with nonempty
+  coin spaces; without nonemptiness it would be degenerate, `hCC_without_nonempty_degenerate`).
 * The "computing" (search) versions of the problems.
 * The undirected Hamiltonian path/cycle and 2-ECSS results (Lemmas 2.2–2.3, Theorems 2.4–2.5, Claim 2.7).
 * Section 2.4.2 (approximation algorithm for max-cut), Section 3 (bounded degree), Section 4
