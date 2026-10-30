@@ -1362,3 +1362,9 @@ import Papers.PODC2022.InternetComputerConsensus.Deadlock
 import Papers.PODC2022.InternetComputerConsensus.Run
 import Papers.PODC2022.InternetComputerConsensus.Liveness
 import Papers.PODC2022.InternetComputerConsensus.NonVacuity
+import Papers.PODC2024.MinWeightCycleCongest.Defs
+import Papers.PODC2024.MinWeightCycleCongest.DirectedGadget
+import Papers.PODC2024.MinWeightCycleCongest.UndirectedGadget
+import Papers.PODC2024.MinWeightCycleCongest.Reduction
+import Papers.PODC2024.MinWeightCycleCongest.LowerBound
+import Papers.PODC2024.MinWeightCycleCongest.NonVacuity
