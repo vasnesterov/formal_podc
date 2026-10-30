@@ -1258,3 +1258,9 @@ import Papers.PODC2026.DelayOptimalOrderFairness.Defs
 import Papers.PODC2026.DelayOptimalOrderFairness.Feasible
 import Papers.PODC2026.DelayOptimalOrderFairness.Boundary
 import Papers.PODC2026.DelayOptimalOrderFairness.TimedCycle
+import Papers.PODC2021.ApproxByzantineOptimization.Basic
+import Papers.PODC2021.ApproxByzantineOptimization.Sufficiency
+import Papers.PODC2021.ApproxByzantineOptimization.Quadratic
+import Papers.PODC2021.ApproxByzantineOptimization.PerProfile
+import Papers.PODC2021.ApproxByzantineOptimization.Tightness
+import Papers.PODC2021.ApproxByzantineOptimization.Main
