@@ -57,3 +57,6 @@ import Podc.Computability.Distributed.SharedMemory.Arrival.Basic
 import Podc.Computability.Distributed.SharedMemory.Arrival.Valency
 import Podc.Computability.Distributed.MessagePassing.ChannelFailures.Steps
 import Podc.Computability.Distributed.MessagePassing.ChannelFailures.Delivery
+import Podc.Foundations.Data.Mazurkiewicz.Defs
+import Podc.Foundations.Data.Mazurkiewicz.Equiv
+import Podc.Foundations.Data.Mazurkiewicz.NTrace
