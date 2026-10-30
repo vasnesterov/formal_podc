@@ -1406,3 +1406,10 @@ import Papers.PODC2020.PowerGraphApproximation.UnweightedLB
 import Papers.PODC2020.PowerGraphApproximation.ConnectedLB
 import Papers.PODC2020.PowerGraphApproximation.Corollary17
 import Papers.PODC2020.PowerGraphApproximation.Corollary17Gap
+import Papers.PODC2021.SoreLoserHedging.Premiums
+import Papers.PODC2021.SoreLoserHedging.Model
+import Papers.PODC2021.SoreLoserHedging.Hedged
+import Papers.PODC2021.SoreLoserHedging.Examples
+import Papers.PODC2021.SoreLoserHedging.TwoParty
+import Papers.PODC2021.SoreLoserHedging.Auction
+import Papers.PODC2021.SoreLoserHedging.Bootstrap
