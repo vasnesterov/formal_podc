@@ -16,12 +16,13 @@ open Classical in
 /-- **Theorem 2.1 (randomized).** Assume the randomized communication complexity bound for
 (the complement of) set disjointness: every private-coin protocol computing "the inputs intersect"
 on `K = k²` bits with error `≤ ε` sends at least `c · K` bits (`hCC`; Kalyanasundaram–Schnitger /
-Razborov, not formalized). If a randomized CONGEST algorithm (private random strings `r v : ρ`)
+Razborov, not formalized). The coin spaces `RA`, `RB` must be nonempty: without that, `hCC` would
+force `c = 0` (`hCC_without_nonempty_degenerate`). If a randomized CONGEST algorithm (private random strings `r v : ρ`)
 decides on every `G_{x,y}`, with error probability `≤ ε`, whether there is a dominating set of size
 `≤ 4 log k + 2`, then `c · k² ≤ 8 T B log k + 2`. -/
 theorem theorem_2_1_randomized {σ ρ : Type} [Fintype ρ] [Nonempty ρ] {B : ℕ}
     (A : Algorithm (MV L) ((MV L → Bool) × ρ) σ B) (T : ℕ) (ε : ℝ) (c : ℕ)
-    (hCC : ∀ (RA RB : Type) [Fintype RA] [Fintype RB]
+    (hCC : ∀ (RA RB : Type) [Fintype RA] [Fintype RB] [Nonempty RA] [Nonempty RB]
       (P : Protocol ((Idx L × Idx L → Bool) × RA) ((Idx L × Idx L → Bool) × RB) Bool) (b : ℕ),
       P.RandComputes (fun x y => !disj x y) ε → P.CostLE b → c * 4 ^ L ≤ b)
     (hA : ∀ x y : Idx L × Idx L → Bool,
@@ -40,5 +41,16 @@ theorem theorem_2_1_randomized {σ ρ : Type} [Fintype ρ] [Nonempty ρ] {B : �
   rw [mdsFamily_Ecut, card_mdsCut] at h
   calc c * 4 ^ L ≤ T * (2 * (4 * L * B)) + 2 := h
     _ = T * (8 * L * B) + 2 := by ring
+
+/-- Why `hCC` in `theorem_2_1_randomized` requires nonempty coin spaces: with an empty coin space
+every protocol has error count `0`, so the constant protocol "computes" `¬DISJ` at cost `0`, and the
+hypothesis would force `c = 0`, making the theorem vacuous. -/
+lemma hCC_without_nonempty_degenerate {ε : ℝ} {c : ℕ}
+    (hCC : ∀ (RA RB : Type) [Fintype RA] [Fintype RB]
+      (P : Protocol ((Idx L × Idx L → Bool) × RA) ((Idx L × Idx L → Bool) × RB) Bool) (b : ℕ),
+      P.RandComputes (fun x y => !disj x y) ε → P.CostLE b → c * 4 ^ L ≤ b) :
+    c = 0 := by
+  have := hCC Empty Unit (Protocol.ret true) 0 (fun x y => by simp [errCount]) trivial
+  simpa using this
 
 end HardnessOptimization
