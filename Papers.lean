@@ -1674,3 +1674,5 @@ import Papers.PODC2017.DeltaEdgeColoring.Section5
 import Papers.PODC2017.DeltaEdgeColoring.Theorem52Arboricity
 import Papers.PODC2017.DeltaEdgeColoring.Theorem53
 import Papers.PODC2017.DeltaEdgeColoring.Section4Count
+import Papers.PODC2022.AnonymousMACConsensus.Main
+import Papers.PODC2022.AnonymousMACConsensus.Starvation
