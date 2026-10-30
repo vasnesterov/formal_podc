@@ -1468,3 +1468,4 @@ import Papers.PODC2026.GeneralizedCAS.Facts
 import Papers.PODC2026.GeneralizedCAS.Periods
 import Papers.PODC2026.GeneralizedCAS.Counting
 import Papers.PODC2026.GeneralizedCAS.Main
+import Papers.PODC2021.BFTInBlockDAG.Main
