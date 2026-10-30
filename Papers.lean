@@ -1458,3 +1458,13 @@ import Papers.PODC2024.GlobalCertificationHashing.Model
 import Papers.PODC2024.GlobalCertificationHashing.Hashing
 import Papers.PODC2024.GlobalCertificationHashing.Scheme
 import Papers.PODC2024.GlobalCertificationHashing.Main
+import Papers.PODC2026.GeneralizedCAS.Defs
+import Papers.PODC2026.GeneralizedCAS.Ghost
+import Papers.PODC2026.GeneralizedCAS.Invariant
+import Papers.PODC2026.GeneralizedCAS.Linearizable
+import Papers.PODC2026.GeneralizedCAS.Bounds
+import Papers.PODC2026.GeneralizedCAS.Trace
+import Papers.PODC2026.GeneralizedCAS.Facts
+import Papers.PODC2026.GeneralizedCAS.Periods
+import Papers.PODC2026.GeneralizedCAS.Counting
+import Papers.PODC2026.GeneralizedCAS.Main

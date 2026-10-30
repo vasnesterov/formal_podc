@@ -71,3 +71,4 @@ import Podc.Computability.CommunicationComplexity.OneRound
 import Podc.Computability.Distributed.AsymmetricQuorum
 import Podc.Foundations.Data.Multiset.OrderStatistic
 import Podc.Foundations.Combinatorics.PerfectHash
+import Podc.Computability.Distributed.SharedMemory.Objects.GCAS
