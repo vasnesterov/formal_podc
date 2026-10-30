@@ -101,7 +101,7 @@ def replayObs (p : P) (l : L) : ProcObs A B → L
     | .ret _ l' => l'
 
 /-- Replaying a list of observations. -/
-def replay (p : P) (l : L) (obs : List (ProcObs A B)) : L := obs.foldl (I.replayObs p) l
+def replayView (p : P) (l : L) (obs : List (ProcObs A B)) : L := obs.foldl (I.replayObs p) l
 
 lemma replay_obsStep {C C' : Config A B P L} {ℓ : Label P A} (h : I.step C ℓ = some C') (p : P) :
     (I.obsStep C p ℓ).toList.foldl (I.replayObs p) (C.loc p) = C'.loc p := by
@@ -126,7 +126,7 @@ lemma replay_obsStep {C C' : Config A B P L} {ℓ : Label P A} (h : I.step C ℓ
 /-- The local state of `p` at the end of an execution is determined by its initial local state
 and its observations. -/
 lemma replay_obsFrom {C D : Config A B P L} {α : List (Label P A)} (h : I.runFrom C α = some D)
-    (p : P) : I.replay p (C.loc p) (I.obsFrom p C α) = D.loc p := by
+    (p : P) : I.replayView p (C.loc p) (I.obsFrom p C α) = D.loc p := by
   induction α generalizing C with
   | nil => simp [runFrom] at h; subst h; rfl
   | cons ℓ α ih =>
@@ -135,7 +135,7 @@ lemma replay_obsFrom {C D : Config A B P L} {α : List (Label P A)} (h : I.runFr
     | none => simp [hs] at h
     | some C' =>
       rw [hs, Option.bind_some] at h
-      rw [obsFrom_cons_of_step I p hs, replay, List.foldl_append, replay_obsStep I hs p]
+      rw [obsFrom_cons_of_step I p hs, replayView, List.foldl_append, replay_obsStep I hs p]
       exact ih h
 
 /-- The invocations of `p` are read off its observations. -/
@@ -230,9 +230,9 @@ lemma IndistFam.loc_eq {I : Θ → Impl A B P L} {p : P} {θ θ' : Θ} {α β : 
     (hinv : ∀ l o, (I θ).invoke p l o = (I θ').invoke p l o) :
     C.loc p = D.loc p ∧ opsOf α p = opsOf β p ∧ respsOf α p = respsOf β p := by
   obtain ⟨h1, h2⟩ := Prod.mk.inj h
-  have hr : (I θ).replay p = (I θ').replay p := by
+  have hr : (I θ).replayView p = (I θ').replayView p := by
     funext l obs
-    unfold replay
+    unfold replayView
     congr 1
     funext l' ob
     cases ob <;> simp [replayObs, hact, hinv]
