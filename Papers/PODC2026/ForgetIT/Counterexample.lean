@@ -41,8 +41,8 @@ open Cslib.Byzantine.PartialSync
 /-- `n = 4`, `f = 1`, `leader(V) = V − 1 mod 4`, `Δ = 2` ticks. -/
 def prm : Params (Fin 4) := { f := 1, leader := fun V => ⟨(V + 3) % 4, by omega⟩, Δ := 2 }
 
-/-- The algorithm (4 rule passes per tick). -/
-abbrev A := forgetIT (Val := Bool) prm 4
+/-- The algorithm (1 rule pass per tick). -/
+abbrev A := forgetIT (Val := Bool) prm 1
 
 /-- Global stabilization time. -/
 def gst : ℕ := 21
