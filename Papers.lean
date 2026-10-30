@@ -1283,3 +1283,14 @@ import Papers.PODC2023.OptimalEBAOmission.MinCtx
 import Papers.PODC2023.OptimalEBAOmission.BasicCtx
 import Papers.PODC2023.OptimalEBAOmission.Counterexamples
 import Papers.PODC2023.OptimalEBAOmission.Main
+import Papers.PODC2023.BilateralNetworkCreation.Model
+import Papers.PODC2023.BilateralNetworkCreation.Removal
+import Papers.PODC2023.BilateralNetworkCreation.Levels
+import Papers.PODC2023.BilateralNetworkCreation.Cycle
+import Papers.PODC2023.BilateralNetworkCreation.TreeMetric
+import Papers.PODC2023.BilateralNetworkCreation.Trees
+import Papers.PODC2023.BilateralNetworkCreation.Cut
+import Papers.PODC2023.BilateralNetworkCreation.LayerTree
+import Papers.PODC2023.BilateralNetworkCreation.Stretched
+import Papers.PODC2023.BilateralNetworkCreation.Prop38
+import Papers.PODC2023.BilateralNetworkCreation.Prop39
