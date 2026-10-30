@@ -1377,3 +1377,11 @@ import Papers.PODC2022.BindingCrusaderAgreement.GBCACrash
 import Papers.PODC2022.BindingCrusaderAgreement.Framework
 import Papers.PODC2022.BindingCrusaderAgreement.Sanity
 import Papers.PODC2022.BindingCrusaderAgreement.CoinRounds
+import Papers.PODC2024.SleepyTOB.Tally
+import Papers.PODC2024.SleepyTOB.ExtendedGA
+import Papers.PODC2024.SleepyTOB.Model
+import Papers.PODC2024.SleepyTOB.Resilience
+import Papers.PODC2024.SleepyTOB.Counterexample
+import Papers.PODC2024.SleepyTOB.Examples
+import Papers.PODC2024.SleepyTOB.Adversary
+import Papers.PODC2024.SleepyTOB.Main
