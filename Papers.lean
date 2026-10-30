@@ -1697,3 +1697,6 @@ import Papers.PODC2017.NoisyRadioBroadcast.StarCoding
 import Papers.PODC2017.NoisyRadioBroadcast.SenderTransformAux
 import Papers.PODC2017.NoisyRadioBroadcast.SenderTransform
 import Papers.PODC2017.NoisyRadioBroadcast.Theorem17
+import Papers.PODC2012.WirelessPacketScheduling.Counterexample
+import Papers.PODC2012.WirelessPacketScheduling.Time
+import Papers.PODC2012.WirelessPacketScheduling.Theorem20
