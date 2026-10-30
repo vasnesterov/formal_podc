@@ -1640,3 +1640,12 @@ import Papers.PODC2025.ByzantineDownload.Counting
 import Papers.PODC2025.ByzantineDownload.StaticDownload
 import Papers.PODC2025.ByzantineDownload.StaticProof
 import Papers.PODC2025.ByzantineDownload.RapidDownload
+import Papers.PODC2018.LocalISApproximation.Basic
+import Papers.PODC2018.LocalISApproximation.Boppana
+import Papers.PODC2018.LocalISApproximation.Theorem1
+import Papers.PODC2018.LocalISApproximation.Theorem2
+import Papers.PODC2018.LocalISApproximation.Theorem3
+import Papers.PODC2018.LocalISApproximation.Theorem4
+import Papers.PODC2018.LocalISApproximation.Weighted
+import Papers.PODC2018.LocalISApproximation.Lemma2
+import Papers.PODC2018.LocalISApproximation.Theorem67
