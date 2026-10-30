@@ -1666,3 +1666,11 @@ import Papers.PODC2021.ContentionPredictions.Randomized
 import Papers.PODC2021.ContentionPredictions.ThetaClaims
 import Papers.PODC2021.ContentionPredictions.Repair37
 import Papers.PODC2020.RecoverableMutexRMR.Main
+import Papers.PODC2017.DeltaEdgeColoring.Basic
+import Papers.PODC2017.DeltaEdgeColoring.CliqueDecomposition
+import Papers.PODC2017.DeltaEdgeColoring.NonVacuity
+import Papers.PODC2017.DeltaEdgeColoring.EdgeSchedule
+import Papers.PODC2017.DeltaEdgeColoring.Section5
+import Papers.PODC2017.DeltaEdgeColoring.Theorem52Arboricity
+import Papers.PODC2017.DeltaEdgeColoring.Theorem53
+import Papers.PODC2017.DeltaEdgeColoring.Section4Count
