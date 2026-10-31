@@ -2041,3 +2041,13 @@ import Papers.PODC2014.CongestedCliquePower.CyclesCounterexample
 import Papers.PODC2014.CongestedCliquePower.Theorem19
 import Papers.PODC2016.AnalysingSI.Corollary18
 import Papers.PODC2016.AnalysingSI.Examples
+import Papers.PODC2015.LoopFreeUpdates.Model
+import Papers.PODC2015.LoopFreeUpdates.Basic
+import Papers.PODC2015.LoopFreeUpdates.LowerBound
+import Papers.PODC2015.LoopFreeUpdates.Rounds
+import Papers.PODC2015.LoopFreeUpdates.Lemma1
+import Papers.PODC2015.LoopFreeUpdates.Gadget
+import Papers.PODC2015.LoopFreeUpdates.PeacockSelect
+import Papers.PODC2015.LoopFreeUpdates.PeacockReduce
+import Papers.PODC2015.LoopFreeUpdates.PeacockCount
+import Papers.PODC2015.LoopFreeUpdates.Peacock

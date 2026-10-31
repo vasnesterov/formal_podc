@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 11, 🛠️ 42, ⚠️ 106, ❌ 70, 🚨 26 (255 papers).
+Counts: ✅ 11, 🛠️ 42, ⚠️ 106, ❌ 71, 🚨 26 (256 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -73,6 +73,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2019 | 88 | Abraham, Chan, Dolev, Nayak, Pass, Ren, Shi — *Communication Complexity of Byzantine Agreement, Revisited* | [CommComplexityBA](Papers/PODC2019/CommComplexityBA) | ⚠️ Ω(f²) lower bound (Theorem 4/1) proved after repairing a probabilistic proof gap; Theorem 13 (no-setup broadcast) false for n = 2 (degenerate), proved for n ≥ C+2; upper bounds not formalized |
 | 2019 | 81 | Guerraoui, Kuznetsov, Monti, Pavlovič, Seredinschi — *The Consensus Number of a Cryptocurrency* | [CryptoConsensusNumber](Papers/PODC2019/CryptoConsensusNumber) | ⚠️ Theorem 2 (k-shared asset transfer has consensus number k) and Corollary 1 proved; Lemma 3 and the liveness of Theorem 3 false for the message-passing algorithm of Fig. 4 as written (a correct process spending money it just received blocks forever) — a one-term pseudocode slip with evident intent (line 25 must check hist[q] ∪ h), fixed version proved; Fig. 1 set-vs-sequence slip; Lemma 2 proof gaps |
 | 2018 | 79 | Barenboim, Elkin, Goldenberg — *Locally-Iterative Distributed (Δ+1)-Coloring below Szegedy–Vishwanathan Barrier* | [LocallyIterativeColoring](Papers/PODC2018/LocallyIterativeColoring) | ❌ Section 3 correct; **Corollaries 7.2–7.3 false** (3AG never terminates); §1.2 round claim false |
+| 2015 | 78 | Ludwig, Marcinkowski, Schmid — *Scheduling Loop-free Network Updates: It's Good to Relax!* | [LoopFreeUpdates](Papers/PODC2015/LoopFreeUpdates) | ❌ **Theorem 2 (3-SAT reduction, ⇒) false** — the §3.2.3 gadgets always contain a second-round cycle (for `x` true: through the exclusive gadget, back along the false copies' implication BB edges and the assignment clause), so every instance built from them, e.g. for the satisfiable `x ∨ y ∨ z`, has no 3-round SLF schedule and NP-hardness of 3-round SLF (Theorem 1) is unestablished; 2-round characterization, Lemma 1 (as proved), Fig. 2's exactly n−1 SLF rounds and Peacock's 2·log_{3/2} n RLF rounds (Theorem 3, Lemmas 2–3) proved |
 | 2016 | 76 | Filtser, Solomon — *The Greedy Spanner is Existentially Optimal* | [GreedySpanner](Papers/PODC2016/GreedySpanner) | ✅ Lemma 3, Theorem 5 (existential optimality for size and lightness), Corollary 1 (size, via the Moore bound) and Section 4 (doubling metrics, Theorem 6) proved; cited bounds taken as hypotheses for the other corollaries; minor gaps in Lemma 6 and Observation 4 |
 | 2017 | 74 | Brandt, Hirvonen, Korhonen, Lempiäinen, Östergård, Purcell, Rybicki, Suomela, Uznański — *LCL Problems on Grids* | [LCLGrids](Papers/PODC2017/LCLGrids) | ⚠️ 3-colouring odd n × n tori needs Ω(n) rounds (Thm 9, n ≤ 8T + 8) with Thm 10 (q-sum coordination, new proof, n ≤ 8T) and Lemmas 12–14 (for every proper 3-colouring), Thm 21 (no edge 2d-colouring, n odd) and Lemma 24 (no {1,3}-orientation, n odd) proved; Theorem 22's third case ("no solution for infinitely many n") is false for {0,3,4} and {0,1,4}, which are solvable for all n ≥ 3 — the intended "global" is stated in the introduction and Theorem 25 |
 | 2013 | 74 | Dieudonné, Pelc, Villain — *How to Meet Asynchronously at Polynomial Cost* | [AsyncRendezvousPoly](Papers/PODC2013/AsyncRendezvousPoly) | 🛠️ Lemmas 2.1, 3.1–3.6 and Theorem 3.1 (polynomial-cost asynchronous rendezvous, continuous adversarial walks, UXS as hypothesis) proved; Lemma 3.3's proof misses a case; the length estimates `Y*`, `A*` defining `Π` are wrong (`|Y(1)| = 10 > 6`), so the paper's explicit `Π` is unjustified — a correct polynomial is given |
@@ -554,6 +555,14 @@ the refutation is checked by Lean; details, and the corrected statements we prov
   on a single edge with colours ⟨1,0,0⟩, ⟨1,0,1⟩ the two vertices keep equal b-values forever, for every p.
   Hence Corollaries 7.2 and 7.3 are false. The §1.2 claim that 2p+1 rounds suffice is also false (16-vertex
   tree, Δ = 4). The main Section 3 results are correct.
+- **Scheduling Loop-free Network Updates: It's Good to Relax!** (PODC 2015, 78 citations) —
+  [LoopFreeUpdates](Papers/PODC2015/LoopFreeUpdates). Theorem 2 (⇒), the key step of the 3-SAT reduction for
+  3-round strongly loop-free scheduling, is false: in the §3.2.3 gadgets of a variable, every choice of round-1
+  copies leaves a second-round cycle. For `x` true it runs forward along the true copies, through the exclusive
+  gadget to the false copy `x̄_l`, backwards along the false copies' implication `BB` edges, and through the
+  assignment clause back to `x₀`. Every instance containing these gadgets (e.g. the one built for the satisfiable
+  `x ∨ y ∨ z`) has no 3-round schedule, so the reduction fails and the NP-hardness of Theorem 1 is unestablished
+  (not refuted). The 2-round case, the Ω(n) example and the O(log n) Peacock bound for relaxed loop-freedom hold.
 - **Interactive Distributed Proofs** (PODC 2018, 53 citations) —
   [InteractiveDistributedProofs](Papers/PODC2018/InteractiveDistributedProofs). Lemma 3.11 (distinct graphs of the family give ℓ₁-far laws μ_A of the bridge response sets) is false: a correct simple protocol that masks the relevant bit with the bridge nodes' challenges makes μ_A(F₁) = μ_A(F₂). The proof of the Ω(log log n) lower bound (Theorem 1.4) relies on it. Using the joint law of the bridge challenges and 𝓜_A repairs it for challenges of bounded length, as in Definition 1. The introduction's claim that the bound holds with unbounded shared randomness remains unproved.
 - **Nesting-Safe Recoverable Linearizability: Modular Constructions for Non-Volatile Memory** (PODC 2018, 52 citations) —
