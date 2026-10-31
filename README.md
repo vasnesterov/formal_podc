@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 9, 🛠️ 39, ⚠️ 95, ❌ 56, 🚨 23 (222 papers).
+Counts: ✅ 9, 🛠️ 39, ⚠️ 95, ❌ 57, 🚨 23 (223 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -277,6 +277,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2018 | 0 | Boppana, Halldórsson, Rawitz — *Simple and Local Independent Set Approximation* | [LocalISApproximation](Papers/PODC2018/LocalISApproximation) | ❌ Headline results proved: Caro–Wei/Boppana tight (Δ+1)/2 ratio (Thm 1, Δ ≥ 1), 1-round lower bound (Thm 4, proof repaired: K_{Δ+1} vs bipartite differ in n), Turán ratio (Thm 3), weighted Max Lemmas 2–5 and Thms 6–7; **Theorem 2 false**: the constant 4(√2−1) = 1.65685… is rounded up to 1.657 (K_{24000,10000} refutes it); Lemma 5 lacks Y > 0 |
 | 2025 | 0 | Canonne, Li, Umboh — *Brief Announcement: Local Computation Algorithms for Knapsack: impossibility results, and how to avoid them* | [KnapsackLCA](Papers/PODC2025/KnapsackLCA) | 🚨 Lower bounds proved (Lemma 3.1, Thms 3.2–3.3 also for normalised instances, Thm 3.4 with n/11 after replacing the invalid Lemma 3.5); **Theorem 4.1 false: `LCA-KP` answers "no" to every query when all items have equal efficiency**, and Lemma 4.6 is false on the same instance |
 | 2025 | 0 | Modanese, Montealegre, Ríos-Wilson — *Brief Announcement: Strong and Hiding Distributed Certification of k-Coloring* | [HidingColoringCertification](Papers/PODC2025/HidingColoringCertification) | 🚨 Lemma 3.2 (hiding ⇔ V(D,n) not k-colourable), Theorem 4.1 (δ = 1 / even cycles, anonymous, constant size) and Theorems 4.3–4.4 (as existence statements) proved; **main Theorem 4.2 false**: an anonymous O(log n)-bit counter-mod-M LCP is strong and hiding on θ(5,5,5) (1-forgetful, δ = 2), also refuting the authors' corrected v3; the decoders of Theorems 4.3/4.4 are not (strongly) sound; proof gaps in Lemmas 4.1–4.2 repaired |
+| 2025 | 0 | Chang, Chen, Chen, Mishra, Yang — *Brief Announcement: The Complexity Landscape of Dynamic Distributed Subgraph Finding* | [DynamicSubgraphFinding](Papers/PODC2025/DynamicSubgraphFinding) | ❌ Theorems 1.3 (Ω(log log n), one-round MemDetect(K_s), edge insertions) and 1.6 (Ω(log log log n), Detect(K_s), node+edge insertions) proved with explicit constants (counting gaps in Lemma 4.2 and the choice of b, c repaired); Theorem 1.4 (O(Δ² log log n) MemList(K₃)) proved; **the Theorem 1.7 algorithm for List(K₃) under node+edge insertions lists a non-triangle** (max degree 2), so Theorem 1.7 is unestablished |
 
 ## Papers with critical mistakes
 
@@ -748,6 +749,12 @@ the refutation is checked by Lean; details, and the corrected statements we prov
 As of October 2026 we found no erratum or later version that addresses the mistakes in Swiper, in
 Barenboim–Elkin–Goldenberg (including its J. ACM version), or in Függer–Nowak–Schwarz (including its J. ACM
 version).
+- **Brief Announcement: The Complexity Landscape of Dynamic Distributed Subgraph Finding** (PODC 2025, 0 citations) —
+  [DynamicSubgraphFinding](Papers/PODC2025/DynamicSubgraphFinding). The one-round List(K₃) algorithm of Theorem 1.7
+  (node and edge insertions) is incorrect. Node v infers the edge {u, w} from "u got a new neighbour j rounds ago and w
+  signalled j rounds ago". But that change may have been a new node adjacent to both u and w, so v lists a
+  non-triangle in a 4-node network of maximum degree 2. Theorem 1.7 (an existence claim) and the upper half of
+  Corollary 1.8 are therefore unestablished. The lower bounds (Theorems 1.3, 1.6) and Theorem 1.4 are proved.
 
 ## Layout
 
