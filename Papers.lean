@@ -2051,3 +2051,6 @@ import Papers.PODC2015.LoopFreeUpdates.PeacockSelect
 import Papers.PODC2015.LoopFreeUpdates.PeacockReduce
 import Papers.PODC2015.LoopFreeUpdates.PeacockCount
 import Papers.PODC2015.LoopFreeUpdates.Peacock
+import Papers.PODC2016.CollaborativeListSpec.NonVacuity
+import Papers.PODC2016.CollaborativeListSpec.RGALive
+import Papers.PODC2016.CollaborativeListSpec.RGALiteral
