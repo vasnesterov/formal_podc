@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 7, 🛠️ 19, ⚠️ 69, ❌ 37, 🚨 18 (150 papers).
+Counts: ✅ 9, 🛠️ 39, ⚠️ 95, ❌ 56, 🚨 22 (221 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -275,6 +275,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2026 | 0 | Frei, Gelles, Ghazy, Nolin — *Brief Announcement: Toward Uniform Content-Oblivious Leader Election on General Graphs* | [ContentObliviousEulerian](Papers/PODC2026/ContentObliviousEulerian) | 🛠️ Lemma 2 (any port pairing of an even-degree graph induces a unique circuit decomposition), Lemma 4 (re-pairing merges circuits) and Lemma 5 at circuit level (≤ log₂ n merging phases end in one Eulerian circuit with one leader) proved, plus Theorem 1's O(\|E\|·IDmax) pulse arithmetic over black-box costs; the GHS-style merge breaks for mutually selecting circuits (a second re-pairing can split the merged circuit, K₂,₄), repaired by letting the larger one not merge; the OR protocol was repaired to use the leader's own input; Lemma 3 and the pulse-level algorithm not formalized |
 | 2026 | 0 | Bentert, Avin, Schmid — *A Separation Between Optimal Demand-Oblivious and Demand-Aware Network Throughput* | [DemandAwareThroughput](Papers/PODC2026/DemandAwareThroughput) | ⚠️ Separation theorem (throughput 5/8 − ε for large n, Theorem 5) proved unconditionally, including dependent rounding and the negative-correlation Chernoff bound, plus Props 1–4, Lemma 1, Theorem 6; typos in the Weak Direct problem definition and in Proposition 3; Theorem 5's proof applies the Chernoff bound to a non-integer number of variables (repaired) |
 | 2018 | 0 | Boppana, Halldórsson, Rawitz — *Simple and Local Independent Set Approximation* | [LocalISApproximation](Papers/PODC2018/LocalISApproximation) | ❌ Headline results proved: Caro–Wei/Boppana tight (Δ+1)/2 ratio (Thm 1, Δ ≥ 1), 1-round lower bound (Thm 4, proof repaired: K_{Δ+1} vs bipartite differ in n), Turán ratio (Thm 3), weighted Max Lemmas 2–5 and Thms 6–7; **Theorem 2 false**: the constant 4(√2−1) = 1.65685… is rounded up to 1.657 (K_{24000,10000} refutes it); Lemma 5 lacks Y > 0 |
+| 2025 | 0 | Canonne, Li, Umboh — *Brief Announcement: Local Computation Algorithms for Knapsack: impossibility results, and how to avoid them* | [KnapsackLCA](Papers/PODC2025/KnapsackLCA) | 🚨 Lower bounds proved (Lemma 3.1, Thms 3.2–3.3 also for normalised instances, Thm 3.4 with n/11 after replacing the invalid Lemma 3.5); **Theorem 4.1 false: `LCA-KP` answers "no" to every query when all items have equal efficiency**, and Lemma 4.6 is false on the same instance |
 
 ## Papers with critical mistakes
 
@@ -453,6 +454,14 @@ the refutation is checked by Lean; details, and the corrected statements we prov
   Lemma 6.3 are false for the protocol as defined: `score(T)` counts honest replicas only, while Byzantine replicas
   contribute to the weights `W`, so a transaction can be finalized after one it should follow (7 replicas, 2
   Byzantine, two transactions). With the score counting all replicas, all three hold.
+- **Brief Announcement: Local Computation Algorithms for Knapsack: impossibility results, and how to avoid them** (PODC 2025, 0 citations) —
+  [KnapsackLCA](Papers/PODC2025/KnapsackLCA). Theorem 4.1, the formal version of the main theorem, claims that Algorithm 2
+  (`LCA-KP`) gives query access to a (1/2, 6ε)-approximate solution. On N ≥ 1/ε² identical items (profit = weight = 1/N,
+  weight limit 1/2), every accurate run sets all quantiles ẽ_k = 1, CONVERT-GREEDY finds no threshold, and `LCA-KP`
+  answers "no" to every query, so it gives access to the empty set. Lemma 4.6 (the computed sequence is an EPS w.h.p.)
+  fails on the same instance: no EPS exists. The proof ignores items whose efficiency equals a quantile. The paper never
+  assumes distinct efficiencies, and reading `>` as `≥` makes the algorithm answer "yes" to everything. The
+  impossibility results (Theorems 3.2–3.4) hold.
 
 ### ❌ Other false claims
 

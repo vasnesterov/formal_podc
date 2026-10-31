@@ -1769,3 +1769,7 @@ import Papers.PODC2023.PPDoubleExpThresholds.Types
 import Papers.PODC2023.PPDoubleExpThresholds.Walk
 import Papers.PODC2023.PPDoubleExpThresholds.WellFormed
 import Papers.PODC2023.PPDoubleExpThresholds.Zero
+import Papers.PODC2025.KnapsackLCA.Defs
+import Papers.PODC2025.KnapsackLCA.Impossibility
+import Papers.PODC2025.KnapsackLCA.MaximalFeasible
+import Papers.PODC2025.KnapsackLCA.WeightedSampling
