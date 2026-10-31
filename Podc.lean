@@ -94,3 +94,4 @@ import Podc.Foundations.InformationTheory.Agreement
 import Podc.Computability.Distributed.NIS.OutputQueries
 import Podc.Computability.Distributed.NIS.ISConversion
 import Podc.Computability.QueryComplexity.QueryTree
+import Podc.Foundations.Combinatorics.SimpleGraph.OddGirth
