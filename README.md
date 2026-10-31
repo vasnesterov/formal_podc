@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 11, 🛠️ 42, ⚠️ 103, ❌ 69, 🚨 25 (250 papers).
+Counts: ✅ 11, 🛠️ 42, ⚠️ 103, ❌ 69, 🚨 26 (251 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -61,6 +61,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2019 | 233 | Abraham, Malkhi, Spiegelman — *Asymptotically Optimal Validated Asynchronous Byzantine Agreement* | [VABA](Papers/PODC2019/VABA) | 🚨 Agreement, external validity and the expected-constant-views bound proved for all n > 3f with n−f thresholds; **with the paper's 2f+1 thresholds, agreement (Lemma 13) and Lemma 3 are false for n > 3f+1** (n=5, f=1), although the paper allows any f < n/3; termination needs a halting rule; Algorithm 6 typo stalls view 1 |
 | 2012 | 221 | Vaidya, Tseng, Liang — *Iterative Approximate Byzantine Consensus in Arbitrary Directed Graphs* | [IterativeApproxBC](Papers/PODC2012/IterativeApproxBC) | 🛠️ Full characterization proved; a gap in the necessity proof repaired |
 | 2013 | 178 | Lenzen — *Optimal Deterministic Routing and Sorting on the Congested Clique* | [CongestedCliqueRouting](Papers/PODC2013/CongestedCliqueRouting) | 🛠️ Routing in 16 rounds (Thm 3.7) and sorting in 37 rounds (Thm 4.5) proved for every n; the non-square reduction in §3's proof fails (n = 3 drops a message; size/load conditions fail at n = 7, 8), proved instead via virtual nodes; missing routing information, a global-count step and bundling arguments repaired at constant cost |
+| 2014 | 160 | Mostéfaoui, Moumen, Raynal — *Signature-Free Asynchronous Byzantine Consensus with t < n/3 and O(n²) Messages* | [SignatureFreeBA](Papers/PODC2014/SignatureFreeBA) | 🚨 BV-broadcast (Theorem 1), Lemmas 1–4, validity and agreement proved; **termination (Lemma 5, Theorem 2) and the 4-expected-rounds bound (Theorem 3) false**: with n=4, t=1, inputs 0,0,1, an adversary that learns each round's coin once two correct processes have used it keeps two correct processes on the coin and the third on its negation, so no process ever decides, for every coin sequence (weakly fair execution, checked in Lean); also reported by Tholoniat–Gramoli (2019) |
 | 2011 | 159 | Montresor, De Pellegrini, Miorandi — *Distributed k-Core Decomposition* | [KCoreDecomposition](Papers/PODC2011/KCoreDecomposition) | ❌ Safety and liveness (sync, async with fairness, one-host-many-nodes) and the time bounds (Theorems 4, 5, Cor. 1) proved; **the Fig. 3 'worst-case' family needs N−2 rounds, not the claimed N−1**; Cor. 2 message bound ignores the initial broadcast; proof gaps in Theorems 3, 5 |
 | 2021 | 137 | Abraham, Nayak, Ren, Xiang — *Good-case Latency of Byzantine Broadcast: a Complete Categorization* | [GoodCaseLatencyBB](Papers/PODC2021/GoodCaseLatencyBB) | ⚠️ All lower bounds of Table 1 proved in their intended ranges; Theorem 10 false for n = 3 and Theorems 4, 8, 9 for n = 2 (degenerate); Theorem 10's executions violate unforgeability (proof gap); Theorem 19's proof one Δ weaker than stated |
 | 2011 | 125 | Kuhn, Moses, Oshman — *Coordinated Consensus in Dynamic Networks* | [CoordinatedConsensusDynamic](Papers/PODC2011/CoordinatedConsensusDynamic) | ❌ Simultaneous-consensus bounds, Thms 5.1, 6.1, 6.7, 6.8 proved; Thm 4.1 false as literally quantified (per-n version proved); **dynamic-diameter protocol running-time claim false** (6-node counterexample), final bound holds; Def 3 and Lemma 6.5 misstated |
@@ -332,6 +333,15 @@ the refutation is checked by Lean; details, and the corrected statements we prov
   parties decide `true` and `false` whenever the coin elects it (probability 1/5). The protocol is correct for
   n = 3f+1, and with n−f thresholds agreement, validity and the expected < 3/2 views bound are proved for all
   n > 3f. Termination is only argued vacuously (the protocol never halts).
+- **Signature-Free Asynchronous Byzantine Consensus with t < n/3 and O(n²) Messages** (PODC 2014, 160 citations) —
+  [SignatureFreeBA](Papers/PODC2014/SignatureFreeBA). The binary consensus algorithm of Figure 2 does not terminate
+  with probability 1, so Theorem 2 (it solves randomized consensus), Lemma 5 and Theorem 3 ("expected decision time
+  four rounds", also in the abstract) are false. The proof of Lemma 5 assumes the coin `s` equals the value `v` adopted
+  by other processes with probability 1/2, but the adversary, which controls the schedule, chooses `v` after seeing `s`
+  (it reads `s` off the next-round message of a correct process that has already called `random()`). With n = 4, t = 1
+  and inputs 0, 0, 1, it keeps two correct processes on the coin and the third on its negation in every round, so no
+  process ever decides, whatever the coins. Safety (validity, agreement) and BV-broadcast are correct. The problem was
+  also reported by Tholoniat and Gramoli (2019); the J. ACM 2015 version gives a new algorithm.
 - **An Automatic Speedup Theorem for Distributed Problems** (PODC 2019, 71 citations) —
   [AutomaticSpeedup](Papers/PODC2019/AutomaticSpeedup). The converse direction of Theorem 1, the title's speedup theorem ("if Π_1 is
   solvable in t−1 rounds then Π is solvable in t rounds") and hence Corollary 1 are false in the paper's
