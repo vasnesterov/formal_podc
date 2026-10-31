@@ -1967,3 +1967,15 @@ import Papers.PODC2015.WeakestFDEventualConsistency.ETOBtoEC
 import Papers.PODC2015.WeakestFDEventualConsistency.Theorem1
 import Papers.PODC2015.WeakestFDEventualConsistency.RunTools
 import Papers.PODC2015.WeakestFDEventualConsistency.EICImpossible
+import Papers.PODC2018.InteractiveDistributedProofs.Basic
+import Papers.PODC2018.InteractiveDistributedProofs.Hash
+import Papers.PODC2018.InteractiveDistributedProofs.Model
+import Papers.PODC2018.InteractiveDistributedProofs.TreeSum
+import Papers.PODC2018.InteractiveDistributedProofs.Protocol1
+import Papers.PODC2018.InteractiveDistributedProofs.Lemma33Counterexample
+import Papers.PODC2018.InteractiveDistributedProofs.Protocol2
+import Papers.PODC2018.InteractiveDistributedProofs.LowerBound.Setup
+import Papers.PODC2018.InteractiveDistributedProofs.LowerBound.ColourRefinement
+import Papers.PODC2018.InteractiveDistributedProofs.LowerBound.Counterexample
+import Papers.PODC2018.InteractiveDistributedProofs.LowerBound.Packing
+import Papers.PODC2018.InteractiveDistributedProofs.LowerBound.Repair
