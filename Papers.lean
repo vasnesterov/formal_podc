@@ -1847,3 +1847,16 @@ import Papers.PODC2021.UltraSparseEmulators.Main
 import Papers.PODC2021.UltraSparseEmulators.Corollary215
 import Papers.PODC2024.AnonymousCoverings.Main
 import Papers.PODC2024.AnonymousCoverings.Safety
+import Papers.PODC2022.MultipleSpending.Trust
+import Papers.PODC2022.MultipleSpending.Uniform
+import Papers.PODC2022.MultipleSpending.Examples
+import Papers.PODC2022.MultipleSpending.Transactions
+import Papers.PODC2022.MultipleSpending.Protocol
+import Papers.PODC2022.MultipleSpending.Safety
+import Papers.PODC2022.MultipleSpending.Broadcast
+import Papers.PODC2022.MultipleSpending.Optimality
+import Papers.PODC2022.MultipleSpending.WeakLocalProgress
+import Papers.PODC2022.MultipleSpending.EchoBroadcast
+import Papers.PODC2022.MultipleSpending.LowerBound
+import Papers.PODC2022.MultipleSpending.Main
+import Papers.PODC2022.MultipleSpending.Liveness
