@@ -2134,3 +2134,4 @@ import Papers.PODC2010.HindsightLinearizability.History
 import Papers.PODC2010.HindsightLinearizability.Linearizability
 import Papers.PODC2010.HindsightLinearizability.WaitFree
 import Papers.PODC2010.HindsightLinearizability.Counterexample
+import Papers.PODC2011.LocallyCheckableProofs.Summary
