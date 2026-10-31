@@ -100,3 +100,6 @@ import Podc.Computability.Distributed.AnonymousNetworks.Basic
 import Podc.Computability.Distributed.AnonymousNetworks.Lifting
 import Podc.Foundations.Combinatorics.SimpleGraph.BallCard
 import Podc.Probability.Finite.MultiplicativeChernoff
+import Podc.Computability.Distributed.SharedMemory.Persistent.StrictLin
+import Podc.Computability.Distributed.SharedMemory.Persistent.Model
+import Podc.Computability.Distributed.SharedMemory.Persistent.Solo
