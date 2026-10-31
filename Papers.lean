@@ -1799,3 +1799,11 @@ import Papers.PODC2025.DynamicSubgraphFinding.Theorem14Alg
 import Papers.PODC2025.DynamicSubgraphFinding.Theorem14Correct
 import Papers.PODC2025.DynamicSubgraphFinding.Theorem14
 import Papers.PODC2021.HTLCBrokeringHardness.Main
+import Papers.PODC2015.DeterministicLoadBalancing.Model
+import Papers.PODC2015.DeterministicLoadBalancing.RoundFairLB
+import Papers.PODC2015.DeterministicLoadBalancing.StatelessLB
+import Papers.PODC2015.DeterministicLoadBalancing.RotorRouter
+import Papers.PODC2015.DeterministicLoadBalancing.RotorRouterLB
+import Papers.PODC2015.DeterministicLoadBalancing.Potential
+import Papers.PODC2015.DeterministicLoadBalancing.SendRound
+import Papers.PODC2015.DeterministicLoadBalancing.RotorFair
