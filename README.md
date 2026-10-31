@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 9, 🛠️ 40, ⚠️ 98, ❌ 63, 🚨 23 (233 papers).
+Counts: ✅ 9, 🛠️ 40, ⚠️ 98, ❌ 63, 🚨 24 (234 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -252,6 +252,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2010 | 1 | Floréen, Kaski, Polishchuk, Suomela — *Brief Announcement: Almost Stable Matchings in Constant Time* | [TruncatedGaleShapley](Papers/PODC2010/TruncatedGaleShapley) | ⚠️ Theorems 1–3 proved with the paper's constants (truncated Gale–Shapley gives an ε-stable matching in T ≤ 4+2Δ²/ε rounds, also with ties, in the port-numbering model; (2+ε)-approx. max-weight matching in T ≤ 4+2Δ/ε; constant-query estimator of the stable-matching size with a Chernoff bound proved by counting); Lemmas 1–5 true; **Lemma 6 false for Δ = 1, i = 1** (K₂: nothing matched after round 1) — the missing i ≥ 2 is evident from Lemmas 4–5; proofs of Thms 1–2 repaired by taking i ≥ 2 |
 | 2022 | 1 | Attiya, Enea, Welch — *Blunting an Adversary Against Randomized Concurrent Programs with Linearizable Implementations* | [BluntingAdversary](Papers/PODC2022/BluntingAdversary) | ❌ **Lemmas 4.3 and 4.4 false** (conditioning on X biases the program's coins: n = 2, two coins, a strongly linearizable object, k = 2 gives Pr[B \| X] = 2/3 > 1/2 = Prob[O^a]; the proofs' simulating adversary depends on future coins); Theorem 4.2 proved as stated for r = 1, for r ≥ 2 only Prob[O^k] ≤ min(Prob[O], Prob[O^a] + 1 − q) (stated bound unestablished); Lemma 4.5 proof repaired |
 | 2022 | 1 | Liu, Golab — *Brief Announcement: Towards a Theory of Wear Leveling in Persistent Data Structures* | [WearLeveling](Papers/PODC2022/WearLeveling) | ❌ Round-robin CAS counter proved strictly linearizable (Thm 4.1, unbounded words), lock-free (Thm 4.2) and surviving k·T FAIs with k words of endurance T (Thm 4.3; exactly k·T+1 if worn words only return wrong values); **Theorem 4.4 ("any implemented object" has endurance ≤ k·T) false** — a one-word test-and-set never wears out; true for FAI (counter optimal, proved); index typo ℓ/2^k in Thm 4.1's proof |
+| 2022 | 1 | Bezerra, Kuznetsov — *Brief Announcement: How to Tame Multiple Spending in Decentralized Cryptocurrencies* | [MultipleSpending](Papers/PODC2022/MultipleSpending) | 🚨 Theorem 3.6 (uniform model, needs implicit f < q ≤ n), Theorem 4.1 and Algorithms 1–2 (Lemmas 4.3–4.7, Theorem 4.8: k_max-spending asset transfer with accountability) proved; **Theorem 5.1 (no k-CB for k < k_max) false**, hence "the optimal spending number is precisely k_max" false: the maximizing faulty set need not contain the source (n=3 singleton quorums f=1: k_max=3, 2-CB exists; 4-process example: k_max=2, 1-CB exists; the paper's own algorithm also beats k_max); correct optimum max(1, λ_s) proved; Local Progress must be per-value |
 | 2026 | 0 | Attiya, Flam, Welch — *Why Canonical-Round Algorithms Fail for Optimal Byzantine Resilience* | [CanonicalRoundByzantine](Papers/PODC2026/CanonicalRoundByzantine) | ⚠️ Lower bounds proved (for 2f ≤ n ≤ 5f); Corollary 10's proof covers only part of the range (statement true); Theorem 14 implicitly uses the i = j case of gather agreement |
 | 2026 | 0 | D'Archivio, AlMahmoud, Natale, Mallmann-Trenn — *Order Statistics in Population Protocols via Simple Dynamics* | [OrderStatisticsPP](Papers/PODC2026/OrderStatisticsPP) | ⚠️ Laws of the consensus value proved; both proofs of Proposition 6 invalid (statement true); Definition 4.2 under-specified |
 | 2026 | 0 | Nolin — *Sinkless Orientation Made Trivial* | [SinklessOrientation](Papers/PODC2026/SinklessOrientation) | ⚠️ Deterministic part proved; Lemma 2.2's 'in particular' clause says 'degree δ' for 'degree < δ' (one-symbol slip) |
@@ -454,6 +455,14 @@ the refutation is checked by Lean; details, and the corrected statements we prov
   438 operations) after which `isEarlier(1,0)` returns the wrong answer. Wait-freedom (≤ 2κ+107 steps per
   operation) and the Section 6 algorithm are correct; giving the helper its own link context looks like a fix
   (not proved).
+- **Brief Announcement: How to Tame Multiple Spending in Decentralized Cryptocurrencies** (PODC 2022, 1 citations) —
+  [MultipleSpending](Papers/PODC2022/MultipleSpending). The lower bound (Theorem 5.1: no k-Consistent Broadcast for k below
+  the inconsistency number k_max), and with it the advertised optimality of k_max as spending number, is false: the proof lets
+  the source equivocate as a member of a faulty set F maximizing the independence number, but the maximum may be attained only
+  by faulty sets without the source (typically F = ∅). With four processes, quorums {a,a'}, {b,b'}, Π, Π and faulty sets
+  ∅, {a}, {b}, k_max = 2 yet a quorum-echo algorithm is a 1-CB for every source, and the paper's own Algorithms 1–2 never
+  double-spend there. The correct optimum is max(1, λ_s), λ_s the maximum over faulty sets containing the source; both bounds
+  are proved. The upper bound (Algorithms 1–2 are k_max-spending, Theorem 4.8) holds.
 - **Fault Tolerant Coloring of the Asynchronous Cycle** (PODC 2022, 0 citations) —
   [AsyncCycleColoring](Papers/PODC2022/AsyncCycleColoring). The 5-colouring algorithms are not wait-free, so the
   headline claim — wait-free 5-colouring of the cycle in O(log* n) rounds (Theorem 4.4, and Theorem 3.11 for the
