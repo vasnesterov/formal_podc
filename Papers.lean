@@ -1987,3 +1987,15 @@ import Papers.PODC2014.SignatureFreeBA.Liveness
 import Papers.PODC2014.SignatureFreeBA.Local
 import Papers.PODC2014.SignatureFreeBA.Embed
 import Papers.PODC2014.SignatureFreeBA.Counterexample
+import Papers.PODC2015.ExactMajorityAVC.AVC
+import Papers.PODC2015.ExactMajorityAVC.AVCCorrect
+import Papers.PODC2015.ExactMajorityAVC.AVCProb
+import Papers.PODC2015.ExactMajorityAVC.AVCLiteral
+import Papers.PODC2015.ExactMajorityAVC.FourModel
+import Papers.PODC2015.ExactMajorityAVC.FourClaims
+import Papers.PODC2015.ExactMajorityAVC.FourChecker
+import Papers.PODC2015.ExactMajorityAVC.FourTreeA
+import Papers.PODC2015.ExactMajorityAVC.FourTreeB
+import Papers.PODC2015.ExactMajorityAVC.FourMain
+import Papers.PODC2015.ExactMajorityAVC.FourExample
+import Papers.PODC2015.ExactMajorityAVC.FourLowerBound
