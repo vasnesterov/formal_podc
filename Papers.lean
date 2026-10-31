@@ -2063,3 +2063,5 @@ import Papers.PODC2017.SeeingIsBelieving.ReadCommitted
 import Papers.PODC2017.SeeingIsBelieving.ParallelSI
 import Papers.PODC2017.SeeingIsBelieving.Hierarchy
 import Papers.PODC2017.SeeingIsBelieving.Examples
+import Papers.PODC2012.NonEquivocationLimits.NEPlusTA
+import Papers.PODC2012.NonEquivocationLimits.Translation
