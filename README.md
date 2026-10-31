@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 9, 🛠️ 40, ⚠️ 95, ❌ 60, 🚨 23 (227 papers).
+Counts: ✅ 9, 🛠️ 40, ⚠️ 96, ❌ 60, 🚨 23 (228 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -282,6 +282,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2025 | 0 | Canonne, Li, Umboh — *Brief Announcement: Local Computation Algorithms for Knapsack: impossibility results, and how to avoid them* | [KnapsackLCA](Papers/PODC2025/KnapsackLCA) | 🚨 Lower bounds proved (Lemma 3.1, Thms 3.2–3.3 also for normalised instances, Thm 3.4 with n/11 after replacing the invalid Lemma 3.5); **Theorem 4.1 false: `LCA-KP` answers "no" to every query when all items have equal efficiency**, and Lemma 4.6 is false on the same instance |
 | 2025 | 0 | Modanese, Montealegre, Ríos-Wilson — *Brief Announcement: Strong and Hiding Distributed Certification of k-Coloring* | [HidingColoringCertification](Papers/PODC2025/HidingColoringCertification) | 🚨 Lemma 3.2 (hiding ⇔ V(D,n) not k-colourable), Theorem 4.1 (δ = 1 / even cycles, anonymous, constant size) and Theorems 4.3–4.4 (as existence statements) proved; **main Theorem 4.2 false**: an anonymous O(log n)-bit counter-mod-M LCP is strong and hiding on θ(5,5,5) (1-forgetful, δ = 2), also refuting the authors' corrected v3; the decoders of Theorems 4.3/4.4 are not (strongly) sound; proof gaps in Lemmas 4.1–4.2 repaired |
 | 2025 | 0 | Chang, Chen, Chen, Mishra, Yang — *Brief Announcement: The Complexity Landscape of Dynamic Distributed Subgraph Finding* | [DynamicSubgraphFinding](Papers/PODC2025/DynamicSubgraphFinding) | ❌ Theorems 1.3 (Ω(log log n), one-round MemDetect(K_s), edge insertions) and 1.6 (Ω(log log log n), Detect(K_s), node+edge insertions) proved with explicit constants (counting gaps in Lemma 4.2 and the choice of b, c repaired); Theorem 1.4 (O(Δ² log log n) MemList(K₃)) proved; **the Theorem 1.7 algorithm for List(K₃) under node+edge insertions lists a non-triangle** (max degree 2), so Theorem 1.7 is unestablished |
+| 2024 | 0 | Charron-Bost, Lambein-Monette — *Brief Announcement: Know Your Audience* | [KnowYourAudience](Papers/PODC2024/KnowYourAudience) | ⚠️ Theorem 4.1 (i)⇒(ii) (frequency-based ⇒ computable; minimum-base algorithm, rank-one kernel by a maximum principle), Lifting lemma, Lemmas 3.2–3.3 and Corollaries 4.3–4.4 proved for outdegree, output port and symmetric communications; Theorem 4.1 (ii)⇒(i) and Corollary 4.2 false only on networks of ≤ 2 agents (degenerate: agents detect n = 1 from their indegree, and K₂ with symmetric links), exact corrected characterisation proved (frequency-based on lengths ≥ 2, resp. ≥ 3); §4.3 symmetric formula assumes a Hamiltonian path; dynamic networks not formalized |
 
 ## Papers with critical mistakes
 
