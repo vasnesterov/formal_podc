@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 9, 🛠️ 39, ⚠️ 95, ❌ 56, 🚨 22 (221 papers).
+Counts: ✅ 9, 🛠️ 39, ⚠️ 95, ❌ 56, 🚨 23 (222 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -276,6 +276,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2026 | 0 | Bentert, Avin, Schmid — *A Separation Between Optimal Demand-Oblivious and Demand-Aware Network Throughput* | [DemandAwareThroughput](Papers/PODC2026/DemandAwareThroughput) | ⚠️ Separation theorem (throughput 5/8 − ε for large n, Theorem 5) proved unconditionally, including dependent rounding and the negative-correlation Chernoff bound, plus Props 1–4, Lemma 1, Theorem 6; typos in the Weak Direct problem definition and in Proposition 3; Theorem 5's proof applies the Chernoff bound to a non-integer number of variables (repaired) |
 | 2018 | 0 | Boppana, Halldórsson, Rawitz — *Simple and Local Independent Set Approximation* | [LocalISApproximation](Papers/PODC2018/LocalISApproximation) | ❌ Headline results proved: Caro–Wei/Boppana tight (Δ+1)/2 ratio (Thm 1, Δ ≥ 1), 1-round lower bound (Thm 4, proof repaired: K_{Δ+1} vs bipartite differ in n), Turán ratio (Thm 3), weighted Max Lemmas 2–5 and Thms 6–7; **Theorem 2 false**: the constant 4(√2−1) = 1.65685… is rounded up to 1.657 (K_{24000,10000} refutes it); Lemma 5 lacks Y > 0 |
 | 2025 | 0 | Canonne, Li, Umboh — *Brief Announcement: Local Computation Algorithms for Knapsack: impossibility results, and how to avoid them* | [KnapsackLCA](Papers/PODC2025/KnapsackLCA) | 🚨 Lower bounds proved (Lemma 3.1, Thms 3.2–3.3 also for normalised instances, Thm 3.4 with n/11 after replacing the invalid Lemma 3.5); **Theorem 4.1 false: `LCA-KP` answers "no" to every query when all items have equal efficiency**, and Lemma 4.6 is false on the same instance |
+| 2025 | 0 | Modanese, Montealegre, Ríos-Wilson — *Brief Announcement: Strong and Hiding Distributed Certification of k-Coloring* | [HidingColoringCertification](Papers/PODC2025/HidingColoringCertification) | 🚨 Lemma 3.2 (hiding ⇔ V(D,n) not k-colourable), Theorem 4.1 (δ = 1 / even cycles, anonymous, constant size) and Theorems 4.3–4.4 (as existence statements) proved; **main Theorem 4.2 false**: an anonymous O(log n)-bit counter-mod-M LCP is strong and hiding on θ(5,5,5) (1-forgetful, δ = 2), also refuting the authors' corrected v3; the decoders of Theorems 4.3/4.4 are not (strongly) sound; proof gaps in Lemmas 4.1–4.2 repaired |
 
 ## Papers with critical mistakes
 
@@ -462,6 +463,16 @@ the refutation is checked by Lean; details, and the corrected statements we prov
   fails on the same instance: no EPS exists. The proof ignores items whose efficiency equals a quantile. The paper never
   assumes distinct efficiencies, and reading `>` as `≥` makes the algorithm answer "yes" to everything. The
   impossibility results (Theorems 3.2–3.4) hold.
+- **Brief Announcement: Strong and Hiding Distributed Certification of k-Coloring** (PODC 2025, 0 citations) —
+  [HidingColoringCertification](Papers/PODC2025/HidingColoringCertification). The main lower bound (Theorem 4.2: no strong
+  and hiding r-round LCP for 2-colouring on any class containing an r-forgetful graph that is neither an even cycle nor of
+  minimum degree 1, whatever the certificate size) is false already for r = 1. Give each node a counter and accept iff every
+  neighbour's counter is ±1 modulo an odd M > 2N. The LCP is anonymous, uses O(log n) bits, and is complete on bipartite
+  graphs. It is strongly sound on every graph, because a closed walk through accepting nodes shorter than M has even length. It is hiding on
+  θ(5,5,5) (three paths of length 5) even against identifier-aware extractors: shifting the counters by one maps the view of
+  a node onto the view of its neighbour, which forces an odd cycle of length M in the view graph. The proof's Lemma 5.3 needs
+  this odd cycle to be short and never checks it. The authors' corrected statement (arXiv v3) fails on the same example.
+  The decoders given for Theorems 4.3 and 4.4 are wrong too (accepted 5-cycles), although both theorems hold.
 
 ### ❌ Other false claims
 
