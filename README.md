@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 9, 🛠️ 39, ⚠️ 95, ❌ 59, 🚨 23 (225 papers).
+Counts: ✅ 9, 🛠️ 39, ⚠️ 95, ❌ 60, 🚨 23 (226 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -182,6 +182,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2013 | 7 | Castañeda, Gonczarowski, Moses — *Brief announcement: Pareto optimal solutions to consensus and set consensus* | [ParetoOptimalConsensus](Papers/PODC2013/ParetoOptimalConsensus) | ❌ Opt0 (Thm 2), OptMaj (Thm 3), Opt_min-k (Thm 4) and U-Opt0 (Thm 5, f+1/f+2) proved unbeatable; **Lemma 10 (core of the k-set proof) false as stated** (same counterexample as Lemma 1 of the PODC 2016 version, n = 6, k = 2, t = 1), Theorem 4 survives; Lemma 6 false when i knows of t failures (missing K_i ∃v); Corollary 1 (HMW's P0opt beatable) needs t ≥ 2; Lemma 15's inner induction repaired |
 | 2020 | 7 | Efron, Grossman, Khoury — *Beyond Alice and Bob: Improved Inapproximability for Maximum Independent Set in CONGEST* | [MISInapproxCongest](Papers/PODC2020/MISInapproxCongest) | 🛠️ Theorems 1–2 ((1/2+ε)-MaxIS needs Ω(n/log³ n), (3/4+ε)-MaxIS needs Ω(n²/log³ n) CONGEST rounds) proved conditional on the Chakrabarti–Khot–Sun bound, with the t-party reduction (Thm 5, Cor 1) and Claims 1–7, Lemmas 1–3; the proofs miscount the cut (Θ(t² log³ k) edges, not t² log² k), so as written they only give log⁴ — repaired with a constant-alphabet Gilbert–Varshamov code, which even yields Ω(n/log² n) and Ω(n²/log² n); Lemma 3's choice of t too small |
 | 2021 | 7 | Brusse, Ellen — *Reductions and Extension-Based Proofs* | [ExtensionBasedReductions](Papers/PODC2021/ExtensionBasedReductions) | 🛠️ Theorem 1 (augmented extension-based impossibility proofs transfer along reductions) proved for reductions whose post-processing task R₂ is solvable without communication (R₁ arbitrary); proof gap repaired (the paper's simulated initial configuration D₀ is arbitrary for processes still running A₁, so a partial violation of T need not yield one of S); EBP ⇒ augmented EBP and NIS ⇒ IS conversion proved; general R₂ (Section 6 composition) not formalized |
+| 2019 | 7 | Bitton, Emek, Izumi, Kutten — *Message Reduction in the LOCAL Model is a Free Lunch* | [LocalMessageReduction](Papers/PODC2019/LocalMessageReduction) | ❌ Stretch `2·3^k − 1` (Thm 4.6 deterministic core, Lemmas 4.4–4.5) and Lemma 4.3 for one node, including the adaptive trials, proved; **size bound of Theorem 1.2 / Lemma 4.7 (`Õ(n^{1+δ})`) false for `Sampler` as written**: the threshold is tested only between trials, so one trial adds up to `n^{δ+ε}` polylog edges per node (`K_n`, k = 1, h = 2: about `n^{11/6}` edges with probability ≥ 1/8); the correct size is `Õ(n^{1+δ+ε})`, so the abstract's claims and Theorem 1.3 still hold |
 | 2025 | 6 | Ben-David, Dzulfikar, Ellen, Gilbert — *Byzantine Agreement with Predictions* | [BAWithPredictions](Papers/PODC2025/BAWithPredictions) | ⚠️ Theorem 13 (round lower bound, unauthenticated) and Theorem 14 (n + t² ≤ 8·#msgs + 1) proved; Lemmas 1–6, Algorithms 3–7 with Theorems 5–6 proved; gaps in Theorem 14's w.l.o.g. step and Lemma 23 repaired; wrapper checked against sub-protocol specs |
 | 2024 | 5 | Attiya, Castañeda, Enea — *Strong Linearizability using Primitives with Consensus Number 2* | [StrongLinCN2](Papers/PODC2024/StrongLinCN2) | ❌ Theorems 1, 2, 5, 6, 9 (strongly linearizable max register, snapshot, readable test&set, fetch&increment) proved; **the set algorithm of Theorem 10 (Algorithm 2) is not strongly linearizable** (3 processes); §5's witness sequences for k-out-of-order queues are wrong (claim holds with repaired witnesses); Lemma 12 proof gap (stack case unproved) |
 | 2020 | 5 | Dolan — *The Only Undoable CRDTs are Counters* | [UndoableCRDTs](Papers/PODC2020/UndoableCRDTs) | ⚠️ Main theorem and propositions proved; §3's claims that all operations are always valid and that negative states exist fail for never-applicable operations (degenerate); typo in the equivalence definition |
@@ -624,6 +625,14 @@ the refutation is checked by Lean; details, and the corrected statements we prov
   unbeatability proof for k-set consensus, is false as stated: with n = 6, k = 2, t = 1 a 2-set consensus protocol
   satisfies all five conditions but decides a different value (the same lemma as Lemma 1 of the authors' PODC 2016
   paper). Theorem 4 survives: the lemma holds with an extra hypothesis that is true wherever the paper uses it.
+- **Message Reduction in the LOCAL Model is a Free Lunch** (PODC 2019, 7 citations) —
+  [LocalMessageReduction](Papers/PODC2019/LocalMessageReduction). Theorem 1.2 and Lemma 4.7 claim that `Sampler` outputs
+  `Õ(n^{1+δ})` spanner edges w.h.p. (`δ = 1/(2^{k+1}−1)`). In each trial of `Cluster_j`, every node samples
+  `c² n^{2^j δ + ε} log³ n` edges and keeps one per queried neighbour. The threshold `|F_v| ≥ c n^{2^j δ} log n` is tested
+  only between trials, and the proof of Lemma 4.7 drops the factor `n^ε` (`ε = 1/h`). On `K_n` with k = 1, h = 2, the first
+  trial alone puts about `n^{11/6}` edges into S with probability ≥ 1/8, far above `Õ(n^{4/3})`. The true bound is
+  `Õ(n^{1+δ+ε})`, which equals the message complexity; capping `F_v` inside a trial would restore `Õ(n^{1+δ})`. The
+  stretch analysis, the abstract's claims and Theorem 1.3 are unaffected.
 - **Optimal Distributed Covering Algorithms** (PODC 2019, 5 citations) —
   [CoveringPrimalDual](Papers/PODC2019/CoveringPrimalDual). The abstract and Claim 5.7 promise an
   (f+ε)-approximate integral solution for covering ILPs, where f bounds the number of variables per constraint.
