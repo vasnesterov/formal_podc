@@ -1890,3 +1890,7 @@ import Papers.PODC2012.ByzantineLinearCoding.Lemma1
 import Papers.PODC2012.ByzantineLinearCoding.Examples
 import Papers.PODC2012.ByzantineLinearCoding.Counterexample
 import Papers.PODC2012.ByzantineLinearCoding.Throughput
+import Papers.PODC2018.PartialReplicationCausal.Lemma4
+import Papers.PODC2018.PartialReplicationCausal.Footnote2
+import Papers.PODC2018.PartialReplicationCausal.Necessity.Theorem1
+import Papers.PODC2018.PartialReplicationCausal.Necessity.Bridge
