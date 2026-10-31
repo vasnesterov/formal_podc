@@ -2081,3 +2081,6 @@ import Papers.PODC2015.EventualConsistencyLimits.Theorem6
 import Papers.PODC2015.EventualConsistencyLimits.RevealingGap
 import Papers.PODC2015.EventualConsistencyLimits.Lemma5N1
 import Papers.PODC2015.EventualConsistencyLimits.Cor4
+import Papers.PODC2019.FastReadsRegisterSim.Section3
+import Papers.PODC2019.FastReadsRegisterSim.Theorem41
+import Papers.PODC2019.FastReadsRegisterSim.Examples
