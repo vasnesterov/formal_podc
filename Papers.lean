@@ -1894,3 +1894,7 @@ import Papers.PODC2018.PartialReplicationCausal.Lemma4
 import Papers.PODC2018.PartialReplicationCausal.Footnote2
 import Papers.PODC2018.PartialReplicationCausal.Necessity.Theorem1
 import Papers.PODC2018.PartialReplicationCausal.Necessity.Bridge
+import Papers.PODC2020.ConsecutiveBallotsPaxos.Safety
+import Papers.PODC2020.ConsecutiveBallotsPaxos.Examples
+import Papers.PODC2020.ConsecutiveBallotsPaxos.Counterexample
+import Papers.PODC2020.ConsecutiveBallotsPaxos.TLAAppendix
