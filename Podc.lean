@@ -115,3 +115,5 @@ import Podc.Computability.Distributed.SharedMemory.NRL.Erase
 import Podc.Computability.Distributed.CongestedClique.Bandwidth
 import Podc.Computability.Distributed.CongestedClique.Broadcast
 import Podc.Foundations.Order.TopologicalSort
+import Podc.Computability.Distributed.SharedMemory.Unnamed
+import Podc.Computability.Distributed.SharedMemory.UnnamedCovering
