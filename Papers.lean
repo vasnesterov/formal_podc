@@ -1884,3 +1884,9 @@ import Papers.PODC2019.ConcurrentSketches.OptParSketch
 import Papers.PODC2019.ConcurrentSketches.OptParSketchInv
 import Papers.PODC2019.ConcurrentSketches.OptParSketchStep
 import Papers.PODC2019.ConcurrentSketches.OptParSketchMain
+import Papers.PODC2012.ByzantineLinearCoding.EqualityCheck
+import Papers.PODC2012.ByzantineLinearCoding.Theorem1
+import Papers.PODC2012.ByzantineLinearCoding.Lemma1
+import Papers.PODC2012.ByzantineLinearCoding.Examples
+import Papers.PODC2012.ByzantineLinearCoding.Counterexample
+import Papers.PODC2012.ByzantineLinearCoding.Throughput
