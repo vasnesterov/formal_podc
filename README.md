@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 9, 🛠️ 40, ⚠️ 98, ❌ 62, 🚨 23 (232 papers).
+Counts: ✅ 9, 🛠️ 40, ⚠️ 98, ❌ 63, 🚨 23 (233 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -287,6 +287,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2025 | 0 | Modanese, Montealegre, Ríos-Wilson — *Brief Announcement: Strong and Hiding Distributed Certification of k-Coloring* | [HidingColoringCertification](Papers/PODC2025/HidingColoringCertification) | 🚨 Lemma 3.2 (hiding ⇔ V(D,n) not k-colourable), Theorem 4.1 (δ = 1 / even cycles, anonymous, constant size) and Theorems 4.3–4.4 (as existence statements) proved; **main Theorem 4.2 false**: an anonymous O(log n)-bit counter-mod-M LCP is strong and hiding on θ(5,5,5) (1-forgetful, δ = 2), also refuting the authors' corrected v3; the decoders of Theorems 4.3/4.4 are not (strongly) sound; proof gaps in Lemmas 4.1–4.2 repaired |
 | 2025 | 0 | Chang, Chen, Chen, Mishra, Yang — *Brief Announcement: The Complexity Landscape of Dynamic Distributed Subgraph Finding* | [DynamicSubgraphFinding](Papers/PODC2025/DynamicSubgraphFinding) | ❌ Theorems 1.3 (Ω(log log n), one-round MemDetect(K_s), edge insertions) and 1.6 (Ω(log log log n), Detect(K_s), node+edge insertions) proved with explicit constants (counting gaps in Lemma 4.2 and the choice of b, c repaired); Theorem 1.4 (O(Δ² log log n) MemList(K₃)) proved; **the Theorem 1.7 algorithm for List(K₃) under node+edge insertions lists a non-triangle** (max degree 2), so Theorem 1.7 is unestablished |
 | 2024 | 0 | Charron-Bost, Lambein-Monette — *Brief Announcement: Know Your Audience* | [KnowYourAudience](Papers/PODC2024/KnowYourAudience) | ⚠️ Theorem 4.1 (i)⇒(ii) (frequency-based ⇒ computable; minimum-base algorithm, rank-one kernel by a maximum principle), Lifting lemma, Lemmas 3.2–3.3 and Corollaries 4.3–4.4 proved for outdegree, output port and symmetric communications; Theorem 4.1 (ii)⇒(i) and Corollary 4.2 false only on networks of ≤ 2 agents (degenerate: agents detect n = 1 from their indegree, and K₂ with symmetric links), exact corrected characterisation proved (frequency-based on lengths ≥ 2, resp. ≥ 3); §4.3 symmetric formula assumes a Hamiltonian path; dynamic networks not formalized |
+| 2024 | 0 | Losa, Gafni — *Brief Announcement: Understanding Read-Write Wait-Free Coverings in the Fully-Anonymous Shared-Memory Model* | [AnonymousCoverings](Papers/PODC2024/AnonymousCoverings) | ❌ With N registers: Lemmas 4.5–4.7 and Theorem 4.8 (stable views form a DAG with a unique source) proved, and the Figure 3 snapshot algorithm proved safe (already at level N−1, footnote 4) and wait-free, with renaming via Bar-Noy–Dolev; **Lemmas 4.6–4.7 and Theorem 4.8 false with fewer registers than processors** (2 registers, 4 processors in two groups), which Section 4 never excludes (its own example uses 5 processors and 3 registers; borderline ⚠️); Theorem 4.8's proof (wrong closed set) and the safety induction (Lemma 5.2 false as printed, durability not preserved) replaced by new proofs |
 
 ## Papers with critical mistakes
 
@@ -780,6 +781,8 @@ version).
   signalled j rounds ago". But that change may have been a new node adjacent to both u and w, so v lists a
   non-triangle in a 4-node network of maximum degree 2. Theorem 1.7 (an existence claim) and the upper half of
   Corollary 1.8 are therefore unestablished. The lower bounds (Theorems 1.3, 1.6) and Theorem 1.4 are proved.
+- **Brief Announcement: Understanding Read-Write Wait-Free Coverings in the Fully-Anonymous Shared-Memory Model** (PODC 2024, 0 citations) —
+  [AnonymousCoverings](Papers/PODC2024/AnonymousCoverings). Theorem 4.8 (the stable views of the infinite write–scan loop form a DAG with a unique source) and Lemmas 4.6–4.7 are false when there are fewer registers than processors. With 2 registers and 4 processors with inputs 0, 0, 1, 1, the two groups take turns covering both registers and scanning, so each processor reads only its own group forever and there are two sources. Section 4 never bounds the number of registers, says its pathologies arise "regardless of the number of registers", and runs its example with 5 processors on 3 registers (borderline: the proof of Lemma 4.6 counts N registers). With N registers, all of Section 4 holds. The headline snapshot algorithm (N registers) is safe and wait-free, though its safety proof had to be replaced.
 
 ## Layout
 
