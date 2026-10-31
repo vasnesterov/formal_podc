@@ -1773,3 +1773,14 @@ import Papers.PODC2025.KnapsackLCA.Defs
 import Papers.PODC2025.KnapsackLCA.Impossibility
 import Papers.PODC2025.KnapsackLCA.MaximalFeasible
 import Papers.PODC2025.KnapsackLCA.WeightedSampling
+import Papers.PODC2025.HidingColoringCertification.Model
+import Papers.PODC2025.HidingColoringCertification.Graph
+import Papers.PODC2025.HidingColoringCertification.NeighborhoodGraph
+import Papers.PODC2025.HidingColoringCertification.ModCounter
+import Papers.PODC2025.HidingColoringCertification.Theta
+import Papers.PODC2025.HidingColoringCertification.Forgetful
+import Papers.PODC2025.HidingColoringCertification.Theorem42
+import Papers.PODC2025.HidingColoringCertification.MinDegreeOne
+import Papers.PODC2025.HidingColoringCertification.Theorem42Anon
+import Papers.PODC2025.HidingColoringCertification.EvenCycles
+import Papers.PODC2025.HidingColoringCertification.ShatterWatermelon
