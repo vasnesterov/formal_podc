@@ -2039,3 +2039,5 @@ import Papers.PODC2014.CongestedCliquePower.CyclesConstruction
 import Papers.PODC2014.CongestedCliquePower.CyclesLemma18
 import Papers.PODC2014.CongestedCliquePower.CyclesCounterexample
 import Papers.PODC2014.CongestedCliquePower.Theorem19
+import Papers.PODC2016.AnalysingSI.Corollary18
+import Papers.PODC2016.AnalysingSI.Examples
