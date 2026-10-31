@@ -1,0 +1,227 @@
+import Papers.PODC2010.HindsightLinearizability.Invariants
+
+/-!
+# Executions as traces
+
+For a finite execution `β` (a list of labels) of the set algorithm, `cfgAt β j` is the
+configuration after the first `j` labels and `memAt β j` its thread-shared state; the trace of
+`β` (Section 4) is `fun j => (memAt β j).hs`, of length `β.length + 1`. By Theorem 4.1 it is
+shape-legal and data-shape-legal (`shapeLegal_trace`, `dataShapeLegal_trace`), so the Hindsight
+Lemma applies to it.
+
+`effAt β n` records whether step `n` of `β` is a successful atomic section of `add`/`remove`
+(the only steps that change the abstract set `Abs`), and of which operation instance.
+-/
+
+namespace Podc.HindsightLinearizability
+
+open Cslib.SharedMemory HeapState
+
+variable {P : Type} [DecidableEq P]
+
+/-- The configuration after the first `j` labels of `β`. -/
+noncomputable def cfgAt (β : List (Label P setSpec)) (j : ℕ) :
+    Config setSpec (fun _ : Unit => heapObj) P Loc :=
+  ((impl P).run (β.take j)).getD (impl P).initCfg
+
+/-- The thread-shared state after the first `j` labels of `β`. -/
+noncomputable def memAt (β : List (Label P setSpec)) (j : ℕ) : Mem := (cfgAt β j).mem ()
+
+lemma run_take {β : List (Label P setSpec)} (hβ : (impl P).Valid β) (j : ℕ) :
+    (impl P).run (β.take j) = some (cfgAt β j) := by
+  obtain ⟨C, hC⟩ := (impl P).valid_of_prefix hβ (List.take_prefix j β)
+  simp [cfgAt, hC]
+
+lemma cfgAt_length {β : List (Label P setSpec)} {C} (h : (impl P).run β = some C) :
+    cfgAt β β.length = C := by
+  simp [cfgAt, h]
+
+lemma cfgAt_append {β : List (Label P setSpec)} (γ : List (Label P setSpec)) {j : ℕ}
+    (hj : j ≤ β.length) : cfgAt (β ++ γ) j = cfgAt β j := by
+  simp [cfgAt, List.take_append_of_le_length hj]
+
+lemma memAt_append {β : List (Label P setSpec)} (γ : List (Label P setSpec)) {j : ℕ}
+    (hj : j ≤ β.length) : memAt (β ++ γ) j = memAt β j := by
+  unfold memAt; rw [cfgAt_append γ hj]
+
+lemma step_cfgAt {β : List (Label P setSpec)} (hβ : (impl P).Valid β) {n : ℕ}
+    (hn : n < β.length) : (impl P).step (cfgAt β n) β[n] = some (cfgAt β (n + 1)) := by
+  have h1 := run_take hβ (n + 1)
+  rw [List.take_succ_eq_append_getElem hn, Impl.run_concat, run_take hβ n,
+    Option.bind_some] at h1
+  exact h1
+
+lemma inv_cfgAt {β : List (Label P setSpec)} (hβ : (impl P).Valid β) (j : ℕ) :
+    Inv (cfgAt β j) := inv_of_run (run_take hβ j)
+
+lemma memInv_memAt {β : List (Label P setSpec)} (hβ : (impl P).Valid β) (j : ℕ) :
+    MemInv (memAt β j) := (inv_cfgAt hβ j).1
+
+lemma memEffect_memAt {β : List (Label P setSpec)} (hβ : (impl P).Valid β) {n : ℕ}
+    (hn : n < β.length) : MemEffect (memAt β n) (memAt β (n + 1)) :=
+  memEffect_of_step (inv_cfgAt hβ n) (step_cfgAt hβ hn)
+
+/-- Allocated nodes stay allocated and keep their keys. -/
+lemma memAt_mono {β : List (Label P setSpec)} (hβ : (impl P).Valid β) {j j' : ℕ}
+    (hjj : j ≤ j') (hj' : j' ≤ β.length) {u : ℕ} (hu : u < (memAt β j).cnt) :
+    u < (memAt β j').cnt ∧ (memAt β j').key u = (memAt β j).key u := by
+  induction j', hjj using Nat.le_induction with
+  | base => exact ⟨hu, rfl⟩
+  | succ j' hjj ih =>
+    obtain ⟨h1, h2⟩ := ih (by omega)
+    have he := memEffect_memAt hβ (n := j') (by omega)
+    exact ⟨lt_of_lt_of_le h1 he.cnt_le, by rw [he.key_eq h1, h2]⟩
+
+/-! ### The trace is (data-)shape-legal -/
+
+/-- The trace of `β`. -/
+noncomputable def trace (β : List (Label P setSpec)) (j : ℕ) : HeapState ℕ Key :=
+  (memAt β j).hs
+
+lemma stateProps_trace {β : List (Label P setSpec)} (hβ : (impl P).Valid β) (j : ℕ) :
+    StateProps (trace β j) := (memInv_memAt hβ j).stateProps
+
+lemma stepProps_trace {β : List (Label P setSpec)} (hβ : (impl P).Valid β) {n : ℕ}
+    (hn : n < β.length) : StepProps (trace β n) (trace β (n + 1)) :=
+  (memEffect_memAt hβ hn).stepProps (memInv_memAt hβ n)
+
+/-- By Theorem 4.1, the trace of every execution is shape-legal (Definition 5.1). -/
+theorem shapeLegal_trace {β : List (Label P setSpec)} (hβ : (impl P).Valid β) :
+    ShapeLegal (trace β) (β.length + 1) := by
+  refine ⟨fun i _ => ?_, fun i hi => ?_⟩
+  · obtain ⟨h1, h2, -, h4, -, -, -, h8, h9, -, -, h12⟩ := stateProps_trace hβ i
+    exact ⟨h1, h2, h4, h8, h9, h12⟩
+  · obtain ⟨h1, h2, -, -, h5, h6, h7, h8⟩ := stepProps_trace hβ (n := i) (by omega)
+    exact ⟨h1, h2, h5, h6, h7, h8⟩
+
+/-- By Theorem 4.1, the trace of every execution is data-shape-legal (Definition 5.5). -/
+theorem dataShapeLegal_trace {β : List (Label P setSpec)} (hβ : (impl P).Valid β) :
+    DataShapeLegal (trace β) (β.length + 1) :=
+  ⟨shapeLegal_trace hβ, fun i _ => (stateProps_trace hβ i).2.2.2.2.2.2.2.2.2.1,
+    fun i hi => (stepProps_trace hβ (n := i) (by omega)).2.2.1⟩
+
+/-! ### Successful atomic sections -/
+
+/-- The operation whose atomic section the local state `l` is about to execute successfully in
+memory `m` (the validation `p.n == c && !p.m` holds). -/
+def secOk (m : Mem) : Loc → Option SetOp
+  | .sec o p c => if m.next p = some c ∧ m.mark p = false then some o else none
+  | _ => none
+
+/-- Step `n` of `β` is the successful atomic section of instance `x` with operation `o`. -/
+noncomputable def effAt (β : List (Label P setSpec)) (n : ℕ) : Option (OpId P × SetOp) :=
+  match β[n]? with
+  | some (.tau p) => (secOk (memAt β n) ((cfgAt β n).loc p)).map (fun o => (curOp (β.take n) p, o))
+  | _ => none
+
+lemma effAt_append {β : List (Label P setSpec)} (γ : List (Label P setSpec)) {n : ℕ}
+    (hn : n < β.length) : effAt (β ++ γ) n = effAt β n := by
+  simp only [effAt, List.getElem?_append_left hn, cfgAt_append γ hn.le, memAt_append γ hn.le,
+    List.take_append_of_le_length hn.le]
+
+/-- A successful atomic section moves the abstract set as the sequential specification
+prescribes, and the thread is then about to return the specified response. -/
+lemma step_secOk {C C' : Config setSpec (fun _ : Unit => heapObj) P Loc} (hC : Inv C) {p : P}
+    {o : SetOp} (hs : (impl P).step C (.tau p) = some C')
+    (ho : secOk (C.mem ()) (C.loc p) = some o) :
+    C.pend p = some o ∧ (∀ k, o ≠ .contains k) ∧
+      C'.loc p = .done (setSpec.δ (Abs (C.mem ())) o).2 ∧
+      Abs (C'.mem ()) = (setSpec.δ (Abs (C.mem ())) o).1 := by
+  obtain ⟨h1, -, op, k, hact, hmem, hloc⟩ := step_tau' hs
+  obtain ⟨o', ho'⟩ := Option.ne_none_iff_exists'.1 h1
+  have hl := (hC.2 p).2 o' ho'
+  have hm := hC.1
+  cases hlp : C.loc p with
+  | sec o'' pp c =>
+    rw [hlp] at hl ho hact
+    obtain ⟨rfl, hnc, hp, hc, hpk, hck⟩ := hl
+    simp only [secOk] at ho
+    split_ifs at ho with hv
+    cases ho
+    simp only [act, Action.access.injEq, heq_eq_eq, true_and] at hact
+    obtain ⟨rfl, rfl⟩ := hact
+    have hpb := (hm.unmarked_iff_backbone hp).1 hv.2
+    refine ⟨ho', hnc, ?_⟩
+    rw [hloc, Function.update_self, hmem]
+    cases o with
+    | contains k => exact absurd rfl (hnc k)
+    | add k =>
+      simp only [secOp, heapδ, hv, and_self, if_true]
+      split_ifs with hne
+      · obtain ⟨-, h2, h3⟩ := insertAfter_spec hm hpb hv.1 hpk (lt_of_le_of_ne hck (Ne.symm hne))
+        simp only [SetOp.key] at h2 h3
+        simp [setSpec, h2, h3]
+      · have : k ∈ Abs (C.mem ()) := (hm.mem_Abs_iff_of_link hpb hv.1 hpk hck).2 (not_not.1 hne)
+        simp [setSpec, this]
+    | remove k =>
+      simp only [secOp, heapδ, hv, and_self, if_true]
+      split_ifs with heq
+      · obtain ⟨-, h2, h3⟩ := unlink_spec hm hpb hv.1 hpk heq
+        simp only [SetOp.key] at h2 h3
+        simp [setSpec, h2, h3]
+      · have : k ∉ Abs (C.mem ()) := fun h =>
+          heq ((hm.mem_Abs_iff_of_link hpb hv.1 hpk hck).1 h)
+        simp [setSpec, this]
+  | _ => simp [hlp, secOk] at ho
+
+/-- All other steps leave the shared state unchanged. -/
+lemma step_not_secOk {C C' : Config setSpec (fun _ : Unit => heapObj) P Loc} (hC : Inv C)
+    {ℓ : Label P setSpec} (hs : (impl P).step C ℓ = some C')
+    (hno : ∀ p, ℓ = .tau p → secOk (C.mem ()) (C.loc p) = none) : C'.mem () = C.mem () := by
+  cases ℓ with
+  | inv q o => rw [(Impl.step_inv hs).2.2.2.2]
+  | ret q r => rw [(Impl.step_ret hs).2.2.1]
+  | tau p =>
+    have hn := hno p rfl
+    obtain ⟨h1, -, op, k, hact, hmem, -⟩ := step_tau' hs
+    rw [hmem]
+    cases hlp : C.loc p with
+    | sec o pp c =>
+      rw [hlp] at hn hact
+      simp only [secOk] at hn
+      split_ifs at hn with hv
+      simp only [act, Action.access.injEq, heq_eq_eq, true_and] at hact
+      obtain ⟨rfl, rfl⟩ := hact
+      cases o <;> simp [secOp, heapδ, hv]
+    | start o => rw [hlp] at hact; simp only [act, Action.access.injEq, heq_eq_eq,
+        true_and] at hact; obtain ⟨rfl, rfl⟩ := hact; rfl
+    | cross o pp => rw [hlp] at hact; simp only [act, Action.access.injEq, heq_eq_eq,
+        true_and] at hact; obtain ⟨rfl, rfl⟩ := hact; rfl
+    | test o pp c => rw [hlp] at hact; simp only [act, Action.access.injEq, heq_eq_eq,
+        true_and] at hact; obtain ⟨rfl, rfl⟩ := hact; rfl
+    | err => rw [hlp] at hact; simp only [act, Action.access.injEq, heq_eq_eq,
+        true_and] at hact; obtain ⟨rfl, rfl⟩ := hact; rfl
+    | idle => rw [hlp] at hact; simp [act] at hact
+    | done b => rw [hlp] at hact; simp [act] at hact
+
+/-- Steps without effect leave the abstract set unchanged. -/
+lemma abs_of_effAt_none {β : List (Label P setSpec)} (hβ : (impl P).Valid β) {n : ℕ}
+    (hn : n < β.length) (h : effAt β n = none) :
+    Abs (memAt β (n + 1)) = Abs (memAt β n) := by
+  have hs := step_cfgAt hβ hn
+  have : memAt β (n + 1) = memAt β n := by
+    refine step_not_secOk (inv_cfgAt hβ n) hs (fun p hp => ?_)
+    simp only [effAt, List.getElem?_eq_getElem hn, hp, Option.map_eq_none_iff] at h
+    exact h
+  rw [this]
+
+/-- A step with effect: the instance, its operation, and the abstract transition. -/
+lemma effAt_some {β : List (Label P setSpec)} (hβ : (impl P).Valid β) {n : ℕ}
+    (hn : n < β.length) {x : OpId P} {o : SetOp} (h : effAt β n = some (x, o)) :
+    ∃ p, β[n] = .tau p ∧ x = curOp (β.take n) p ∧
+      secOk (memAt β n) ((cfgAt β n).loc p) = some o ∧
+      (cfgAt β n).pend p = some o ∧ (∀ k, o ≠ .contains k) ∧
+      (cfgAt β (n + 1)).loc p = .done (setSpec.δ (Abs (memAt β n)) o).2 ∧
+      Abs (memAt β (n + 1)) = (setSpec.δ (Abs (memAt β n)) o).1 := by
+  simp only [effAt, List.getElem?_eq_getElem hn] at h
+  split at h
+  · rename_i p hp
+    simp only [Option.map_eq_some_iff, Prod.mk.injEq] at h
+    obtain ⟨o', ho', rfl, rfl⟩ := h
+    have hs := step_cfgAt hβ hn
+    rw [Option.some.inj hp] at hs
+    obtain ⟨h1, h2, h3, h4⟩ := step_secOk (inv_cfgAt hβ n) hs ho'
+    exact ⟨p, Option.some.inj hp, rfl, ho', h1, h2, h3, h4⟩
+  · cases h
+
+end Podc.HindsightLinearizability
