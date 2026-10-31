@@ -83,7 +83,7 @@ parallel SI (Theorems 29 and 31, cited) and their comparison with Corollary 18, 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. The
 hypotheses are non-vacuous: `Examples.lean` contains concrete dependency graphs, including write skew in
 `GraphSI \ GraphSER`. The model is self-contained in this folder: `Model.lean` and `Relations.lean` with Mathlib
-only. The Crooks et al. model of `Papers/PODC2017/SeeingIsBelievingDev/` (`Model.lean`, `Adya.lean`) overlaps:
+only. The Crooks et al. model of `Papers/PODC2017/SeeingIsBelieving/` (`Model.lean`, `Adya.lean`) overlaps:
 it also has transactions as operation lists and Adya's `WR`/`WW`/`RW` with SER/SI/PSI conditions, but uses unique
 values (a read returns its writer's id), no sessions, and a per-key version order in place of `WW(x)`. A bridge
 (SiB histories as `History` with `SO = ∅` and values `Option ι`, version order ↦ `WW`) would let the SI/PSI
