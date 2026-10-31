@@ -1827,3 +1827,12 @@ import Papers.PODC2010.TruncatedGaleShapley.Locality
 import Papers.PODC2010.TruncatedGaleShapley.Theorem3
 import Papers.PODC2010.TruncatedGaleShapley.Examples
 import Papers.PODC2010.TruncatedGaleShapley.PathExample
+import Papers.PODC2022.BluntingAdversary.MDP
+import Papers.PODC2022.BluntingAdversary.Model
+import Papers.PODC2022.BluntingAdversary.Moves
+import Papers.PODC2022.BluntingAdversary.Removal
+import Papers.PODC2022.BluntingAdversary.TSLSim
+import Papers.PODC2022.BluntingAdversary.Main
+import Papers.PODC2022.BluntingAdversary.Clean
+import Papers.PODC2022.BluntingAdversary.Theorem42
+import Papers.PODC2022.BluntingAdversary.Counterexample
