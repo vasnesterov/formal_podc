@@ -2054,3 +2054,12 @@ import Papers.PODC2015.LoopFreeUpdates.Peacock
 import Papers.PODC2016.CollaborativeListSpec.NonVacuity
 import Papers.PODC2016.CollaborativeListSpec.RGALive
 import Papers.PODC2016.CollaborativeListSpec.RGALiteral
+import Papers.PODC2017.SeeingIsBelieving.Model
+import Papers.PODC2017.SeeingIsBelieving.Adya
+import Papers.PODC2017.SeeingIsBelieving.Lemmas
+import Papers.PODC2017.SeeingIsBelieving.Serializability
+import Papers.PODC2017.SeeingIsBelieving.SnapshotIsolation
+import Papers.PODC2017.SeeingIsBelieving.ReadCommitted
+import Papers.PODC2017.SeeingIsBelieving.ParallelSI
+import Papers.PODC2017.SeeingIsBelieving.Hierarchy
+import Papers.PODC2017.SeeingIsBelieving.Examples
