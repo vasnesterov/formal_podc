@@ -1807,3 +1807,8 @@ import Papers.PODC2015.DeterministicLoadBalancing.RotorRouterLB
 import Papers.PODC2015.DeterministicLoadBalancing.Potential
 import Papers.PODC2015.DeterministicLoadBalancing.SendRound
 import Papers.PODC2015.DeterministicLoadBalancing.RotorFair
+import Papers.PODC2019.LocalMessageReduction.Hierarchy
+import Papers.PODC2019.LocalMessageReduction.SizeCounterexample
+import Papers.PODC2019.LocalMessageReduction.Trial
+import Papers.PODC2019.LocalMessageReduction.Lemma43
+import Papers.PODC2019.LocalMessageReduction.Parameters

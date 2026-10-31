@@ -95,3 +95,4 @@ import Podc.Computability.Distributed.NIS.OutputQueries
 import Podc.Computability.Distributed.NIS.ISConversion
 import Podc.Computability.QueryComplexity.QueryTree
 import Podc.Foundations.Combinatorics.SimpleGraph.OddGirth
+import Podc.Foundations.Combinatorics.SimpleGraph.ClusterSpanner
