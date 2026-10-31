@@ -1948,3 +1948,7 @@ import Papers.PODC2011.SimultaneousAllCaseOptimal.Flood
 import Papers.PODC2011.SimultaneousAllCaseOptimal.ThreeProcesses
 import Papers.PODC2011.SimultaneousAllCaseOptimal.LoneCC
 import Papers.PODC2011.SimultaneousAllCaseOptimal.NonVacuity
+import Papers.PODC2018.JupiterListSpec.Space
+import Papers.PODC2018.JupiterListSpec.JupiterMain
+import Papers.PODC2018.JupiterListSpec.Counterexample
+import Papers.PODC2018.JupiterListSpec.CJupiterMain
