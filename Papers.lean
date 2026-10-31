@@ -1860,3 +1860,8 @@ import Papers.PODC2022.MultipleSpending.EchoBroadcast
 import Papers.PODC2022.MultipleSpending.LowerBound
 import Papers.PODC2022.MultipleSpending.Main
 import Papers.PODC2022.MultipleSpending.Liveness
+import Papers.PODC2021.WakeUpMatching.Examples
+import Papers.PODC2021.WakeUpMatching.Algorithm4
+import Papers.PODC2021.WakeUpMatching.Algorithm4Gap
+import Papers.PODC2021.WakeUpMatching.Lemma54
+import Papers.PODC2021.WakeUpMatching.Theorem11Degenerate
