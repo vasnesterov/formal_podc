@@ -2065,3 +2065,13 @@ import Papers.PODC2017.SeeingIsBelieving.Hierarchy
 import Papers.PODC2017.SeeingIsBelieving.Examples
 import Papers.PODC2012.NonEquivocationLimits.NEPlusTA
 import Papers.PODC2012.NonEquivocationLimits.Translation
+import Papers.PODC2012.EquivocationPrice.Defs
+import Papers.PODC2012.EquivocationPrice.Equivalence
+import Papers.PODC2012.EquivocationPrice.Sufficiency
+import Papers.PODC2012.EquivocationPrice.Hardness
+import Papers.PODC2012.EquivocationPrice.Projection
+import Papers.PODC2012.EquivocationPrice.Bisection
+import Papers.PODC2012.EquivocationPrice.LowerLinear
+import Papers.PODC2012.EquivocationPrice.LowerSublinear
+import Papers.PODC2012.EquivocationPrice.UpperBound
+import Papers.PODC2012.EquivocationPrice.Expander
