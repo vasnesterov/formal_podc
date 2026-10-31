@@ -1,0 +1,113 @@
+# Simultaneous Tasks: From Worst-Case to All-Case Optimal — PODC 2011
+
+Maurice P. Herlihy, Yoram Moses, Mark R. Tuttle. *Transforming worst-case optimal solutions for
+simultaneous tasks into all-case optimal solutions.* PODC 2011. DOI
+[10.1145/1993806.1993849](https://doi.org/10.1145/1993806.1993849). Formalized version: the ACM
+proceedings version (8 pages; there is no arXiv version). Copy of the paper: [paper.pdf](paper.pdf).
+
+**Verdict: ❌ False claim.** The constructions and the optimality argument are correct when
+`t ≤ n − 2`: Lemma 1, Theorems 2 and 3, Lemma 4, and Theorems 6 and 8 hold, taking the cited
+connectivity results (Lemmas 5 and 7) and the listed properties of ConCon as hypotheses. But the
+paper explicitly allows `t = n − 1`. There, **Lemma 5 is false**, Theorem 6 contradicts the
+timing claimed by Theorems 2/3, and **Corollary 9 is false**. Four proofs need small repairs.
+
+## Mistakes in the paper
+
+* **Lemma 5 is false for `t = n − 1` (false statement).** The paper assumes `t ≤ n − 1` (§2.1,
+  and again in §4). Take `n ≥ 2`, `t = n − 1`, any complete input set, and a protocol in which
+  everybody sends a message in round 1. Let `r⋆` be the run in which all processes but `p₀` crash
+  in round 1 without sending anything. Then `W(r⋆) = t − 1`, so round 1 is premature in `r⋆`, as it
+  is in the failure-free run (`W = 0`). At time 1 only `p₀` is alive in `r⋆`, and it received
+  nothing. Every run that `p₀` cannot tell apart from `r⋆` at time 1 is of the same kind, so the
+  failure-free run is not connected to `r⋆`. Lemma 7 fails in the same way. The cited sources
+  presumably assume `n ≥ t + 2`. (`lemma5_false`, `not_lemma5Hyp`)
+* **For `t = n − 1`, Theorem 6 and the timing of Theorems 2/3 cannot both hold (false
+  statement).** Take `n = 3`, `t = 2` and binary consensus. All hypotheses of Theorem 6 hold with
+  `k̂ = 2` and `A` = FloodSet: complete inputs, `2` is a worst-case lower bound, and FloodSet
+  decides at time 2. In `r⋆` (two processes crash silently in round 1) `W = 1`, so Theorem 3 has
+  `Opt(A, 2)` decide at `min{2, 3 − 1} = 2`. But a simultaneous consensus protocol can decide at
+  time 1 in `r⋆`: the survivor sees an empty round-1 inbox, knows it is alone and decides its own
+  input; in all other runs the protocol runs FloodSet. So no protocol has both the timing of
+  Theorem 3 and the all-case optimality of Theorem 6. For every continuous-consensus protocol with
+  the properties listed in §2.3 (accuracy, consistency, (i), (ii)), `Opt(A, 2)` is not all-case
+  optimal, and such a protocol exists for `n = 3`, `t = 2`. Which claim fails for the actual ConCon
+  of Mizrahi–Moses depends on its behaviour at `t = n − 1`. Its claimed maximality (iii) and the
+  emptiness of the core before `t + 1 − W` (ii) are incompatible there: some CC protocol puts the
+  lone survivor's value into its core at time 1. If ConCon satisfies (ii), the headline Theorem 6
+  fails. Otherwise ConCon(A) decides before `t + 1 − W`, and Theorem 2's "decides at time
+  `t + 1 − W(F)`" fails. (`thm3_thm6_incompatible`, `theorem6_fails`, `theorem6_counterexample`)
+* **Corollary 9 is false for `k = 1`, `n = 3`, `t = 2` (false statement).** It claims that
+  `Opt(sa, ⌊t/k⌋ + 1) = Opt(sa, 3)` is all-case optimal and halts at `min{3, 3 − W}`, which is time
+  3 in failure-free runs. FloodSet decides at time 2 in every run, so no protocol has both
+  properties. This does not depend on ConCon. The paper quotes the `⌊t/k⌋ + 1` bound of [CHLT00]
+  without its hypothesis `n ≥ t + k + 1`, and here `3` is not a lower bound.
+  (`corollary9_false`, `not_lb_three`)
+* **Processes that crash later (proof gap, statements true).** Lemma 1, Theorem 3 and Lemma 4 all
+  assume without argument that in a simultaneous protocol, if some process decides at time `k`,
+  then every process *alive* at time `k` decides at time `k`, including processes that crash
+  later. Lemma 4's proof says "p has not failed", but `p` only survives round `k`. Theorem 3's
+  proof says the protocol "would also have caused q to decide". In Lemma 1, a faulty process of `A`
+  could a priori decide after `k̂` and break simultaneity. The fact is true: truncate the failure
+  pattern after round `k`. The process becomes correct, its first `k` rounds do not change, and
+  completeness and simultaneity apply. (`SolvesSim.decides_of_alive`,
+  `SolvesWithin.decides_of_alive`)
+* **Theorem 2, correctness (proof gap, statement true).** All processes simulate the same run of
+  `A`. This makes their outputs consistent with the *simulated* input vector, which differs from
+  the real one outside the core. The paper does not even say which inputs those processes get;
+  they must be chosen so that the input vector is allowed. Repair: for the core processes, the
+  simulated run looks the same as the run of `A` with the real inputs and the same silent crashes.
+  `A`'s correctness in that run gives an output vector for the real inputs. (`theorem2`,
+  `decides_simRun`)
+
+Full list of differences (including modelling choices and minor imprecisions):
+[differencies.md](differencies.md).
+
+## The formalization
+
+**Model.**
+* Synchronous message passing on a complete network with crash failures. At most `t` processes
+  crash. A crashing process reaches an arbitrary subset in its crash round. This is CSLib's
+  `Cslib.SyncCrash` model: a run is an input vector plus a crash pattern, so `r = A[ı, F]`.
+* Protocols are deterministic, know the round number, and have perfect recall: the local state is
+  the input and the history of received messages (CSLib's lock-step protocols). The adversary
+  chooses the input vector from the task's set and the failure pattern. There is no randomness.
+* "Decides at time `m`" is the first write to the output register, by a process alive at time `m`.
+  A task is a set of input vectors with a relation to output vectors. `SolvesSim` adds
+  simultaneity, and `SolvesWithin A T t k` means every nonfaulty process decides by time `k`.
+* A worst-case lower bound `k̂` means that no protocol solves the task within fewer rounds.
+  All-case optimality compares, in every run (inputs and failure pattern), the decision time of the
+  nonfaulty processes with that of every other `sim(T)` protocol.
+* ConCon [MM08] is not formalized. `ConCon C A` is built from any CC protocol `C` with the §2.3
+  properties used by the paper (`IsConCon`); maximality is not assumed. Lemmas 5 and 7 (cited
+  from [DM90, MR08]) are hypotheses, quantified over all protocols, as the proof of Theorem 6 needs.
+
+**Main results in Lean.** (namespace `Podc.SimultaneousAllCaseOptimal`)
+
+| Paper | Lean | File |
+|---|---|---|
+| Lemma 1 (`Delay(A, k̂)` solves `sim(P)`, decisions exactly at `k̂`) | `lemma1` | `Constructions.lean` |
+| `A else B` solves `sim(P)` (proof of Thm 3) | `else_solvesSim` | `Constructions.lean` |
+| Theorem 2 (`ConCon(A)` solves `sim(P)`, decides at `t + 1 − W`) | `theorem2` | `FastProtocols.lean` |
+| Theorem 3 (`Opt` solves `sim(P)` in `min{k̂, t + 1 − W}`) | `theorem3` | `FastProtocols.lean` |
+| Lemma 4 | `lemma4` | `Optimality.lean` |
+| Theorem 6 (given Lemma 5 and ConCon) | `theorem6` | `Optimality.lean` |
+| Theorem 8 (given Lemma 7 and ConCon) | `theorem8` | `Optimality.lean` |
+| "Beating the worst-case bound needs time `≥ t + 1 − W`" (abstract) | `beat_lower_bound` | `Optimality.lean` |
+| Lemma 5 for `t = n − 1`: **false** | `lemma5_false`, `not_lemma5Hyp` | `Lemma5False.lean` |
+| Theorem 6 vs. Theorem 3 for `n = 3`, `t = 2`: **incompatible** | `thm3_thm6_incompatible`, `theorem6_fails`, `theorem6_counterexample` | `ThreeProcesses.lean`, `LoneCC.lean` |
+| Corollary 9 for `k = 1`, `n = 3`, `t = 2`: **false** | `corollary9_false`, `not_lb_three` | `ThreeProcesses.lean` |
+| Lemma 5 for `t = 1`, `n ≥ 3`; consensus needs 2 rounds | `lemma5_t1`, `consensus_lb_two` | `Chain.lean` |
+| Theorem 6 with all hypotheses discharged (`t = 1`, `n ≥ 3`) | `theorem6_instance` | `NonVacuity.lean` |
+
+**Not formalized.** The ConCon protocol itself and its maximality. Lemmas 5 and 7 for
+`t ≤ n − 2`. Corollaries 10 and 11 (they rest on cited bounds for d-tight conditions and strong
+renaming). §6.
+
+**CSLib candidates** (marked `-- CSLib candidate`): decision tasks and first-write decisions over
+`SyncCrash`, failure-pattern truncation and `SolvesSim.decides_of_alive`, waste, and the combinators
+`Delay` and `Else` (`Model.lean`, `Constructions.lean`).
+
+**Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and
+`Quot.sound`. Non-vacuity: `floodCC` (`t = 1`) and `loneCC` (`n = 3`, `t = 2`) satisfy the ConCon
+hypotheses. `theorem6_instance` discharges every hypothesis of Theorem 6 for `t = 1`, `n ≥ 3`. The
+model is CSLib's `Cslib.Computability.Distributed.SyncCrash.Model`.
