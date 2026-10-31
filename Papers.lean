@@ -1784,3 +1784,17 @@ import Papers.PODC2025.HidingColoringCertification.MinDegreeOne
 import Papers.PODC2025.HidingColoringCertification.Theorem42Anon
 import Papers.PODC2025.HidingColoringCertification.EvenCycles
 import Papers.PODC2025.HidingColoringCertification.ShatterWatermelon
+import Papers.PODC2025.DynamicSubgraphFinding.Model
+import Papers.PODC2025.DynamicSubgraphFinding.HardInstance
+import Papers.PODC2025.DynamicSubgraphFinding.Scenarios
+import Papers.PODC2025.DynamicSubgraphFinding.Views
+import Papers.PODC2025.DynamicSubgraphFinding.Counting
+import Papers.PODC2025.DynamicSubgraphFinding.Arith
+import Papers.PODC2025.DynamicSubgraphFinding.Theorem13
+import Papers.PODC2025.DynamicSubgraphFinding.Theorem16
+import Papers.PODC2025.DynamicSubgraphFinding.NonVacuity
+import Papers.PODC2025.DynamicSubgraphFinding.FullHist
+import Papers.PODC2025.DynamicSubgraphFinding.Theorem17Counterexample
+import Papers.PODC2025.DynamicSubgraphFinding.Theorem14Alg
+import Papers.PODC2025.DynamicSubgraphFinding.Theorem14Correct
+import Papers.PODC2025.DynamicSubgraphFinding.Theorem14
