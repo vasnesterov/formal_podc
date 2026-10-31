@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 12, 🛠️ 43, ⚠️ 109, ❌ 72, 🚨 26 (262 papers).
+Counts: ✅ 12, 🛠️ 43, ⚠️ 109, ❌ 72, 🚨 27 (263 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -95,6 +95,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2021 | 49 | Kuznetsov, Tonkikh, Zhang — *Revisiting Optimal Resilience of Fast Byzantine Consensus* | [FastByzantineConsensus](Papers/PODC2021/FastByzantineConsensus) | 🛠️ Tight bound n ≥ 3f+2t−1 proved both ways; one proof gap repaired |
 | 2019 | 49 | Aguilera, Ben-David, Guerraoui, Marathe, Zablotchi — *The Impact of RDMA on Agreement* | [RDMAAgreement](Papers/PODC2019/RDMAAgreement) | ⚠️ Theorem 6.1 (no 2-deciding consensus with static permissions) proved after repairing three proof gaps, for the read-first common-case run; Lemma 4.1 (reliable broadcast from SWMR regular registers) proved, Observation 1 false as stated but harmless; Theorem D.2 (agreement of Protected Memory Paxos, Alg. 7) false as written — line 21 erases a decided leader's accepted value when it retries (Lean run, n=2, m=1) — a one-line slip with evident intent (keep the accepted pair, or stop after deciding); repaired algorithm proved safe given that p1's phase-1-skipping ballot is the smallest |
 | 2021 | 48 | Xue, Herlihy — *Hedging Against Sore Loser Attacks in Cross-Chain Transactions* | [SoreLoserHedging](Papers/PODC2021/SoreLoserHedging) | ⚠️ Multi-party swap proved hedged (Lemma 6: ≥ p per unredeemed escrowed asset, any coalition), two-party swap safe/live/hedged, auction Lemmas 7–8 (Lemma 7 needs a compliant bidder); Lemma 2 and the split form of Lemma 3 false for a leader withholding its secret (net redemption profit −p), true under the accounting of Lemma 3's proof; Eq. (1) ill-defined with ≥ 2 leaders; protocol timeouts under-specified |
+| 2012 | 48 | Faleiro, Rajamani, Rajan, Ramalingam, Vaswani — *Generalized Lattice Agreement* | [GeneralizedLatticeAgreement](Papers/PODC2012/GeneralizedLatticeAgreement) | 🚨 Safety of Algorithm 2 (validity, stability, consistency; Thms 5.1, 5.3, 5.6, Lemmas 5.4–5.5) and the round lemmas behind the O(N) bound (5.7, 5.8, 5.10, 5.11, `Propose` half of 5.9) proved; **Theorem 5.15 (every value received by a correct process is eventually learnt — the abstract's O(N) guarantee) is false**: three fair 3-process executions with one crash (singleton inputs with a lost ACK of the faulty acceptor, also without late NACKs; reliable channels with a non-singleton input), so Lemma 5.14 fails too; Algorithm 1 as written violates Consistency, failure-free (missing `nackCount = 0` in `Decide`, evident fix, proved), and so does the `Decide` half of Lemma 5.9; Lemma 5.13 needs "correct proposer" |
 | 2016 | 46 | Cerone, Gotsman — *Analysing Snapshot Isolation* | [AnalysingSI](Papers/PODC2016/AnalysingSI) | ⚠️ SI = histories of dependency graphs with (SO∪WR∪WW);RW? acyclic (Theorems 9, 10 via the least solution of Lemma 15), the dynamic and static chopping criteria (Theorem 16, Corollary 18) and the robustness criteria (Theorems 19, 22) proved; Definition 20 defines HistPSI from ExecSI instead of ExecPSI, so Theorem 21 is false as written (long fork), fixed by the evident intent; Lemma 26's proof misses the case T ≈ S (routine reordering) |
 | 2019 | 45 | Bachrach, Censor-Hillel, Dory, Efron, Leitersdorf, Paz — *Hardness of Distributed Optimization* | [HardnessOptimization](Papers/PODC2019/HardnessOptimization) | ⚠️ CONGEST lower bounds of Section 2 proved (MDS, directed Hamiltonian path/cycle, Steiner tree, max-cut) via the two-party simulation, deterministic ones unconditionally; gadget proofs repaired: Lemma 2.1 uses a false intermediate claim, Claim 2.8 fails for k = 1, max-cut proof only for k ≥ 128 (statement true for k ≥ 2), Hamiltonian-path gadget arcs only in the figure |
 | 2012 | 45 | Feigenbaum, Godfrey, Panda, Schapira, Shenker, Singla — *Brief Announcement: On the Resilience of Routing Tables* | [ResilientRouting](Papers/PODC2012/ResilientRouting) | ❌ Theorem 3.1 (1-resilient forwarding pattern; connected networks) proved with a new spanning-tree construction, §3.2.1 algorithm too under-specified to verify; Theorem 4.3 (no perfectly resilient pattern on Figure 3) proved; **Lemmas 4.1 and 4.2 false as stated** (4-node counterexamples), and the proof of Thm 4.3 relies on the false Lemma 4.1 (repaired with three extra scenarios); Thm 3.1 false for disconnected networks (degenerate) |
@@ -362,6 +363,16 @@ the refutation is checked by Lean; details, and the corrected statements we prov
   case: K₂). This undermines the abstract's "reversible"/"exact complexity" claims; with edge symmetry breaking
   (orientations or IDs, as in all of the paper's applications) the converse holds, and the paper's lower bounds,
   which use only the forward direction, are unaffected.
+- **Generalized Lattice Agreement** (PODC 2012, 48 citations) —
+  [GeneralizedLatticeAgreement](Papers/PODC2012/GeneralizedLatticeAgreement). The paper's wait-free algorithm for
+  generalized lattice agreement (Algorithm 2) does not guarantee liveness, so Theorem 5.15 and the abstract's claim
+  that every value received by a correct process is learnt in O(N) message delays are false. With three processes,
+  one of them faulty, a value received by a correct process is never learnt. If the faulty acceptor's
+  acknowledgements reach the deciding proposers but not the learners, then no learner ever counts a quorum,
+  although the correct proposers have decided and have nothing left to propose. Late rejections absorbed by passive
+  proposers break the theorem even with reliable channels (and Lemma 5.14 with it). The safety theorems (validity,
+  stability, consistency) hold. Algorithm 1 as written also violates Consistency, but a one-conjunct fix of
+  `Decide` (evident from the prose) repairs it.
 - **Optimal Synchronous Approximate Agreement with Asynchronous Fallback** (PODC 2022, 26 citations) —
   [HybridApproxAgreement](Papers/PODC2022/HybridApproxAgreement). Theorem 4.1 (the reliable broadcast Π_rBC is
   consistent in a synchronous network) is false whenever n ≤ 3tₛ, i.e. in the paper's main regime tₛ ≥ n/3: a
