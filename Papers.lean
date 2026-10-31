@@ -1836,3 +1836,10 @@ import Papers.PODC2022.BluntingAdversary.Main
 import Papers.PODC2022.BluntingAdversary.Clean
 import Papers.PODC2022.BluntingAdversary.Theorem42
 import Papers.PODC2022.BluntingAdversary.Counterexample
+import Papers.PODC2022.WearLeveling.Counter
+import Papers.PODC2022.WearLeveling.Safety
+import Papers.PODC2022.WearLeveling.LockFree
+import Papers.PODC2022.WearLeveling.Endurance
+import Papers.PODC2022.WearLeveling.Failure
+import Papers.PODC2022.WearLeveling.Tas
+import Papers.PODC2022.WearLeveling.Optimality
