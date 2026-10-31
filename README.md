@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 10, 🛠️ 42, ⚠️ 101, ❌ 65, 🚨 25 (243 papers).
+Counts: ✅ 10, 🛠️ 42, ⚠️ 101, ❌ 66, 🚨 25 (244 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -172,6 +172,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2021 | 8 | Hadzilacos, Hu, Toueg — *On Register Linearizability and Termination* | [RegisterLinTermination](Papers/PODC2021/RegisterLinTermination) | 🛠️ Theorems 6, 7, 10, 12, 13, 14 and Corollaries 8, 11 proved; the proof of Theorem 14 (Lemma 67) is wrong — dropping a trailing incomplete write breaks property (P) when a pending read follows it — new construction; Lemma 19 as stated does not yield Theorem 7 (conditional version proved: at most one coin sequence defeats a strong adversary); minor gaps in Appendices C–D |
 | 2015 | 8 | Delporte-Gallet, Fauconnier, Kuznetsov, Ruppert — *On the Space Complexity of Set Agreement* | [SetAgreementSpace](Papers/PODC2015/SetAgreementSpace) | ❌ Lower bound n+m−k (Thm 2) proved, with the wait-free set-agreement impossibility as a hypothesis; **the algorithms of Figures 3 and 4 are safe but not even obstruction-free** — a process adopts the value of another process's duplicated pair, writes a different pair, and re-adopts forever (n=2, k=m=1); Lemma 5 is false; with a one-line repair, Fig. 3 and Thm 7 (snapshot version) are proved; the repaired Fig. 4 (Thm 8) is only model-checked |
 | 2016 | 8 | Castañeda, Gonczarowski, Moses — *Unbeatable Set Consensus via Topological and Combinatorial Reasoning* | [UnbeatableSetConsensus](Papers/PODC2016/UnbeatableSetConsensus) | ❌ Prop. 1, Theorems 1–2 (Optmin[k] unbeatable, last-decider unbeatable, also against arbitrary deterministic protocols) and Theorem 3 (u-Pmin[k]) proved; **Lemma 1 false as stated** (Lean counterexample), repaired with an extra hypothesis that holds wherever the paper uses it; small gaps in Lemma 5 and Theorem 3 proofs |
+| 2014 | 8 | Miller, Pelc — *Time Versus Cost Tradeoffs for Deterministic Rendezvous in Networks* | [RendezvousTimeCost](Papers/PODC2014/RendezvousTimeCost) | ❌ Both main lower bounds proved (Thm 3.1: cost E+o(E) ⇒ time Ω(EL); Thm 3.2: time O(E log L) ⇒ cost Ω(E log L), proof repaired since Fact 3.11 is false) and Props 2.1, 2.2 (Cheap, Fast) hold; **Prop 2.3's cost bound 2·w(L)·E for FastWithRelabeling is false** (oriented 3-ring, simultaneous start: cost 6 > 4), true bound (8w+6)E, so Cor. 2.1 (cost O(E)) survives |
 | 2026 | 7 | Fuchs, Ghinea, Parsaeian, Rybicki — *Round and Resilience-Optimal Approximate Agreement on Trees and Block Graphs* | [TreeAA](Papers/PODC2026/TreeAA) | ⚠️ Tree and block-graph AA reductions (Theorems 3, 5, 8) and the 3-round gradecast proved; the authenticated RealAA protocol of Theorem 7 relies on the false Theorem 3.1 of Ghinea et al. (PODC 2022) and fails for n=3, t=1 (the existence claim survives with a fix); Theorem 2's bound fails for 1 < D/ε ≤ 2; wrong proofs of Lemmas 13, 15 |
 | 2023 | 7 | Kutten, Robinson, Tan, Zhu — *Improved Tradeoffs for Leader Election* | [LeaderTradeoffs](Papers/PODC2023/LeaderTradeoffs) | ❌ Upper bounds (Thms 3.10, 3.15) and the lower bounds of Thm 3.11 and corrected Thm 3.8 (log n ≤ (⌈log f⌉+1)·T, giving Ω(n^{1+1/k})) proved; **Thm 3.8 as stated off by one round (false for T = 1)**, so the Ω((n/2)^{1+1/(k−1)}) tradeoff is unproved; Def. 3.5 vacuous if read literally; Lemma 3.14 proof gaps |
 | 2021 | 7 | Altisen, Devismes, Durand, Johnen, Petit — *On Implementing Stabilizing Leader Election with Weak Assumptions on Network Dynamics* | [StabilizingLEDynamic](Papers/PODC2021/StabilizingLEDynamic) | ⚠️ All results proved (class hierarchy, impossibilities, pseudo-stabilizing LE in 6Δ+1 rounds); identifier set must have more than n elements (implicit); Lemma 7 false as stated (harmless); proof gaps in Lemmas 12, 16 |
@@ -647,6 +648,13 @@ the refutation is checked by Lean; details, and the corrected statements we prov
   sketch) is false: a pending operation that has written to `N` but is not yet seen by any snapshot is missing
   from the sketch, a situation the proofs of Lemmas 8.1/8.2 meet routinely. The theorems themselves (5.1, A.1, 8.1,
   8.2) hold; we re-prove Lemmas 8.1/8.2 by comparing with a prefix.
+- **Time Versus Cost Tradeoffs for Deterministic Rendezvous in Networks** (PODC 2014, 8 citations) —
+  [RendezvousTimeCost](Papers/PODC2014/RendezvousTimeCost). Proposition 2.3's cost bound 2·w(L)·E for Algorithm
+  FastWithRelabeling is false: the algorithm runs Fast, whose schedule starts with an exploration and doubles every
+  bit of the modified label, so each agent may explore in 4w+3 segments. In the oriented 3-ring with simultaneous
+  start, L = 2, w = 1, the agents explore in lock-step first and meet only at cost 6 > 4; the failure persists for
+  larger w. The correct bound is (8w+6)E, so Corollary 2.1 (cost O(E), time O(L^{1/w}E)) still holds. The main
+  lower bounds (Theorems 3.1, 3.2) are true; Theorem 3.2's proof uses a false Fact 3.11 and was repaired.
 - **Improved Tradeoffs for Leader Election** (PODC 2023, 7 citations) —
   [LeaderTradeoffs](Papers/PODC2023/LeaderTradeoffs). Theorem 3.8 (time–message tradeoff) is off by one round: the
   one-round algorithm in which everybody broadcasts its ID violates the stated bound for every `n`, because the proof
