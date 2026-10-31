@@ -108,3 +108,4 @@ import Podc.Foundations.GroupTheory.FreeGroupLeftOrder
 import Podc.Computability.Distributed.SharedMemory.HistorySpecLin
 import Podc.Probability.Finite.SchwartzZippel
 import Podc.Computability.Distributed.MessagePassing.FailureDetectors.Model
+import Podc.Foundations.Combinatorics.OutDegreeIndep
