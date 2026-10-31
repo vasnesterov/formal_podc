@@ -112,3 +112,5 @@ import Podc.Foundations.Combinatorics.OutDegreeIndep
 import Podc.Computability.Distributed.SharedMemory.NRL.Model
 import Podc.Computability.Distributed.SharedMemory.NRL.Indist
 import Podc.Computability.Distributed.SharedMemory.NRL.Erase
+import Podc.Computability.Distributed.CongestedClique.Bandwidth
+import Podc.Computability.Distributed.CongestedClique.Broadcast
