@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 10, 🛠️ 42, ⚠️ 101, ❌ 66, 🚨 25 (244 papers).
+Counts: ✅ 11, 🛠️ 42, ⚠️ 101, ❌ 66, 🚨 25 (245 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -299,6 +299,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2024 | 0 | Losa, Gafni — *Brief Announcement: Understanding Read-Write Wait-Free Coverings in the Fully-Anonymous Shared-Memory Model* | [AnonymousCoverings](Papers/PODC2024/AnonymousCoverings) | ❌ With N registers: Lemmas 4.5–4.7 and Theorem 4.8 (stable views form a DAG with a unique source) proved, and the Figure 3 snapshot algorithm proved safe (already at level N−1, footnote 4) and wait-free, with renaming via Bar-Noy–Dolev; **Lemmas 4.6–4.7 and Theorem 4.8 false with fewer registers than processors** (2 registers, 4 processors in two groups), which Section 4 never excludes (its own example uses 5 processors and 3 registers; borderline ⚠️); Theorem 4.8's proof (wrong closed set) and the safety induction (Lemma 5.2 false as printed, durability not preserved) replaced by new proofs |
 | 2020 | 0 | Goldweber, Zhang, Kapritsos — *Brief Announcement: On the Significance of Consecutive Ballots in Paxos* | [ConsecutiveBallotsPaxos](Papers/PODC2020/ConsecutiveBallotsPaxos) | ⚠️ Paxos stays safe when learning from a majority that accepted the value in consecutive ballots (Thms 3.1–3.2, Lemmas 4.1–4.3), also combined with Consecutive Proposals (Consecutive Paxos); Lemmas 4.2′/4.3′ false for the literal Definition 6 (ballot-i accept not tied to the Consecutive Quorum; 5-acceptor counterexample), true for the evident intended reading; proof of 4.3′ misses the case where i is not the largest CQ ballot; the printed TLA+ invariant of Appendix B is vacuous |
 | 2020 | 0 | Goren, Moses — *Brief Announcement: On Using Null Messages in a Byzantine Setting* | [NullMessagesByzantine](Papers/PODC2020/NullMessagesByzantine) | ✅ Theorem 1.2 (a silent validation round gives knowledge of the global milestone, Definition 1.1 via CSLib knowledge) and Theorem 2.1 (SmallCouncil + any binary BA protocol is binary BA for 2t < n; failure-free: decides MAJ at time 3 with ≤ n(t+1.5) bits; in general ≤ n(t+1.5)+2n² layer bits by correct processes, 4 rounds before the base protocol) proved; the paper gives no proofs (reconstructed); both results rely on its convention that "send to all" includes the sender (Lean counterexamples without it) |
+| 2019 | 0 | Severson, Haley, Doty — *Composable Computation in Discrete Chemical Reaction Networks* | [ComposableCRN](Papers/PODC2019/ComposableCRN) | ✅ 1D characterization (Thm 3.1, ⇒ via cited Lemma 2.7), Lemma 4.1 (`max` not obliviously-computable), quilt-affine construction (Lemma 6.1), composition and the "⇐" direction of main Theorem 5.2 (Lemma 6.2), and leaderless 1D Thm 9.2 proved; the necessity of the eventually-min condition (Thm 7.1, §7 geometry) is assumed, not checked |
 
 ## Papers with critical mistakes
 

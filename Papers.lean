@@ -1928,3 +1928,12 @@ import Papers.PODC2014.RendezvousTimeCost.RingCheap
 import Papers.PODC2014.RendezvousTimeCost.Segments
 import Papers.PODC2014.RendezvousTimeCost.Cheap
 import Papers.PODC2014.RendezvousTimeCost.Fast
+import Papers.PODC2019.ComposableCRN.Basic
+import Papers.PODC2019.ComposableCRN.Impossibility
+import Papers.PODC2019.ComposableCRN.Automaton
+import Papers.PODC2019.ComposableCRN.QuiltAffine
+import Papers.PODC2019.ComposableCRN.OneDim
+import Papers.PODC2019.ComposableCRN.Composition
+import Papers.PODC2019.ComposableCRN.Gadgets
+import Papers.PODC2019.ComposableCRN.MainTheorem
+import Papers.PODC2019.ComposableCRN.Leaderless
