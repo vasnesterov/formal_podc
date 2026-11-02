@@ -15,38 +15,29 @@ changed.
 
 ## Mistakes in the paper
 
-- **Definition 17 / Theorem 19: missing connectivity hypothesis.** *False only in a degenerate case.*
-  - Definition 17 asks for a replacement path for every nonempty fault set `F` and every pair `s, t`. It
-    does not require that `s` and `t` remain connected in `G \ F`.
-  - When `F` cuts `s` from `t`, no replacement path exists. So no scheme is restorable on any graph in
-    which some `F` with `|F| ≤ f` separates two vertices: any graph with a bridge (`f ≥ 1`), and any
-    disconnected graph with an edge. Theorem 19 fails, e.g., on the single-edge graph `K₂`, which does
-    have ATW functions.
-  - Theorem 2 states the correct hypothesis ("an `s ⇝ t` path remains"). With it added to Definition 17,
-    Theorem 19 holds. (`theorem19_literal_false`; repaired: `theorem19`)
-- **Corollary 22: union bound over `s, t, F` is miscounted.** *A false intermediate claim; the corollary
-  holds after changing a constant.*
-  - The proof bounds the number of choices of `(s, t, F)` with `|F| ≤ f` by `n^{f+2}`. There are about
-    `n² · |E|^f`, which is up to about `n^{2f+2}`. Already `K₄` with `f = 1` has `16 · 7 = 112 > 4³`
-    choices with ordered pairs (`84 > 64` excluding `s = t`).
-  - With the paper's `W = n^{f+4+c}`, the union bound therefore only gives about `n^{f−c}`, not `n^{−c}`.
-  - `W = n^{2f+4+c}` repairs the bound and keeps `O(f log n)` bits per weight.
-  - We prove the correct bound `n² · N_f · |E| / (2W+1)` with the isolation lemma. The final arithmetic
-    (choice of `W`, `O(f log n)` bits) is not stated in Lean.
-  
-  (`paper_count_false`; repaired: `corollary22`)
-- **Proof gaps with true statements.**
-  - **Theorem 23.** The uniqueness argument picks the minimum-ID edge of `π₁ \ π₂` instead of the whole
-    symmetric difference. (It also speaks of arbitrary paths, ignoring lengths; the `±2r(e)` terms of
-    oppositely traversed edges are harmless for large `C`.) (`theorem23`)
-  - **Corollary 22.** Applying the isolation lemma to signed directed weights needs that all shortest
-    `s ⇝ t` paths cross each edge in the same direction and that the weight distribution is symmetric
-    under negation; the proof does not say so. (`corollary22`, via `tau` and a sign flip)
-  - **Lemma 32.** The proof omits replacement paths that contain no clustered vertex. (`lemma32_correct`)
-  - **Theorem 30.** The proof says "restorable `f`-RPTS" where an `(f+1)`-restorable `(f+1)`-RPTS is needed.
-    (`theorem30_correct`)
-  - **Theorem 21 (isolation lemma).** It is stated for a set of paths but needs distinct edge sets.
-- **Appendix B (Theorem 27, not formalized).** Several slips, none affecting the asymptotics:
+### ⚠️ Definition 17 and Theorem 19 (missing connectivity hypothesis)
+Definition 17 asks for a replacement path even when `F` disconnects `s` from `t`, so Theorem 19 read literally
+is false on every graph where some allowed `F` separates two vertices, e.g. on `K₂` (`theorem19_literal_false`).
+
+**Impact.** Degenerate case with evident intent: Theorem 2 states the correct hypothesis ("an `s ⇝ t` path
+remains"), and with it added to Definition 17, Theorem 19 holds (`theorem19`).
+
+**Details.**
+- Definition 17 asks for a replacement path for every nonempty fault set `F` and every pair `s, t`. It
+  does not require that `s` and `t` remain connected in `G \ F`.
+- When `F` cuts `s` from `t`, no replacement path exists. So no scheme is restorable on any graph in
+  which some `F` with `|F| ≤ f` separates two vertices: any graph with a bridge (`f ≥ 1`), and any
+  disconnected graph with an edge. Theorem 19 fails, e.g., on the single-edge graph `K₂`, which does
+  have ATW functions.
+
+**Repair.** We add the connectivity hypothesis to Definition 17 (`IsRestorable`) and prove Theorem 19
+(`theorem19`).
+
+### Typos and slips
+- Theorem 21 (isolation lemma) is stated for a set of paths but needs distinct edge sets.
+- The proof of Theorem 30 says "restorable `f`-RPTS" where an `(f+1)`-restorable `(f+1)`-RPTS is needed
+  (`theorem30_correct`).
+- Appendix B (Theorem 27, not formalized) has several slips, none affecting the asymptotics:
   - the bipartite weights should be `1 + (λ−j)/n⁴`;
   - `v*` is never defined;
   - labels are undefined for the last copy at each level, so only a constant fraction of the bipartite
@@ -55,6 +46,40 @@ changed.
     RPTS.
 
   A numerical check (`scripts/thm27.py`) confirms the corrected construction for `f ≤ 3` and small `d`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Corollary 22 (union bound over `s, t, F`; signed weights)
+The proof bounds the number of choices of `(s, t, F)` with `|F| ≤ f` by `n^{f+2}`, but there are about
+`n² · |E|^f`, up to about `n^{2f+2}` (`paper_count_false`).
+
+**Impact.** Statement true after changing the constant `W` in the proof; it still gives `O(f log n)` bits per
+weight (`corollary22`).
+
+**Details.**
+- Already `K₄` with `f = 1` has `16 · 7 = 112 > 4³` choices with ordered pairs (`84 > 64` excluding
+  `s = t`).
+- With the paper's `W = n^{f+4+c}`, the union bound therefore only gives about `n^{f−c}`, not `n^{−c}`.
+- Applying the isolation lemma to signed directed weights also needs that all shortest `s ⇝ t` paths cross
+  each edge in the same direction and that the weight distribution is symmetric under negation; the proof
+  does not say so. (`corollary22`, via `tau` and a sign flip)
+
+**Repair.** `W = n^{2f+4+c}` repairs the bound and keeps `O(f log n)` bits per weight. We prove the correct
+bound `n² · N_f · |E| / (2W+1)` with the isolation lemma. The final arithmetic (choice of `W`,
+`O(f log n)` bits) is not stated in Lean. (`paper_count_false`; repaired: `corollary22`)
+
+### 🛠️ Theorem 23 (deterministic weights)
+The uniqueness argument picks the minimum-ID edge of `π₁ \ π₂` instead of the whole symmetric difference.
+
+**Impact.** Statement true; repaired (`theorem23`).
+
+**Details.** The proof also speaks of arbitrary paths, ignoring lengths; the `±2r(e)` terms of oppositely
+traversed edges are harmless for large `C`.
+
+### 🛠️ Lemma 32 (spanner correctness)
+The proof omits replacement paths that contain no clustered vertex.
+
+**Impact.** Statement true; in the missing case every edge of the path is in `H` (`lemma32_correct`).
 
 Full list of differences (including modelling choices and minor imprecisions):
 [differencies.md](differencies.md).

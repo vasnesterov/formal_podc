@@ -14,32 +14,60 @@ given strong adversary). **The proof of Theorem 14
 
 ## Mistakes in the paper
 
-* **The proof of Theorem 14 (Lemma 67) does not work.** From an arbitrary linearization function `f` the paper
-  builds `f*` by deleting the last operation of `f(H)` when it is an incomplete write, and claims (Claim 67.1)
-  that an incomplete write that is not last in `f(H)` must be read by some read of `H`. But the next operation
-  may be a *pending* read, linearized with an added response (Definition 2 allows it). Counterexample, on the
-  atomic SWMR register: in `G` the writer completes `write 1` and invokes `write 2`, and a reader invokes a read;
-  `f(G) = write 1, write 2, read`. In the extension `H` the read returns `1` and `f(H) = write 1, read`. Then
-  `f*(G) = f(G)`, `f*(H) = f(H)`, and the writes `write 1, write 2` of `f*(G)` are not a prefix of the writes
-  `write 1` of `f*(H)` (`lemma67_construction_fails`). The claim also tacitly assumes distinct written values.
-  The theorem is true: take, for each history, a linearization with the **fewest operations of the writer**;
-  restricting a linearization of an extension to the operations of the prefix shows this number is monotone, so
-  the write sequences are prefixes of each other (`swmr_writeStrongLin`, for any set of SWMR histories — shared
-  memory, message passing or hybrid).
-* **Lemma 19 is too weak for Theorem 7.** "For each round `j`, with probability ≥ 1/2 nobody enters round
-  `j + 1`" only bounds the probability of an infinite game by 1/2. The proof does give the needed conditional
-  statement (the adversary's order of the two round-`j` writes is fixed before the round-`j` coin is flipped).
-  We prove more: against a fixed (deterministic) strong adversary, the round-`j` coin that lets the game go on
-  is determined by the history before it is flipped, so **at most one coin sequence** keeps the game alive
-  (`Thm7.forever_subsingleton`), which has probability 0 (`theorem7`). Lemma 18's step "(*) implies that the
-  round of the write is ≥ j" needs an induction over rounds that the paper leaves implicit. Typos: Lemma 17 says
-  "line 37" for line 34; Claims 17.1/17.3 say "round 2" in the general case.
-* **Algorithm 3 (Theorem 10) is ambiguous on ties**: two pending writes can have equal partial timestamps (e.g.
+No mistakes in the statements.
+
+### Typos and slips
+- Lemma 17 says "line 37" for line 34; Claims 17.1/17.3 say "round 2" in the general case.
+- Algorithm 3 (Theorem 10) is ambiguous on ties: two pending writes can have equal partial timestamps (e.g.
   both `[0, ∞, ∞]`). Harmless — only "`w_i` last in `B_i`" is used; we order the rest by process id.
-* Smaller gaps, all with correct statements: Lemma 42 Case (b) uses "`r` starts after `w` completes" where only
-  "`w` writes `Val[-]` before `r` starts" is available (fix via Lemma 40); Appendix D asserts without proof that
-  the timestamps in each `Val[-]` never decrease (needs an invariant: `p_k` reads its own register), and
-  Definition 55 lists constraints on `f(H)` without showing that such a sequence exists.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 14 (Lemma 67, Appendix E)
+Claim 67.1 wrongly asserts that an incomplete write that is not last in `f(H)` must be read by some read of `H`,
+so the construction `f*` of Lemma 67 fails (`lemma67_construction_fails`).
+
+**Impact.** Theorem 14 is true; we prove it with a different construction (`swmr_writeStrongLin`).
+
+**Details.** From an arbitrary linearization function `f` the paper builds `f*` by deleting the last operation of
+`f(H)` when it is an incomplete write. But the next operation may be a *pending* read, linearized with an added
+response (Definition 2 allows it). Counterexample, on the atomic SWMR register: in `G` the writer completes
+`write 1` and invokes `write 2`, and a reader invokes a read; `f(G) = write 1, write 2, read`. In the extension
+`H` the read returns `1` and `f(H) = write 1, read`. Then `f*(G) = f(G)`, `f*(H) = f(H)`, and the writes
+`write 1, write 2` of `f*(G)` are not a prefix of the writes `write 1` of `f*(H)`
+(`lemma67_construction_fails`). The claim also tacitly assumes distinct written values.
+
+**Repair.** Take, for each history, a linearization with the **fewest operations of the writer**; restricting a
+linearization of an extension to the operations of the prefix shows this number is monotone, so the write
+sequences are prefixes of each other (`swmr_writeStrongLin`, for any set of SWMR histories — shared memory,
+message passing or hybrid).
+
+### 🛠️ Theorem 7 (Lemma 19 is too weak; Lemma 18)
+Lemma 19 ("for each round `j`, with probability ≥ 1/2 nobody enters round `j + 1`") only bounds the
+probability of an infinite game by 1/2, not by 0.
+
+**Impact.** Theorem 7 is true, in a stronger form: at most one coin sequence defeats a given strong adversary
+(`Thm7.forever_subsingleton`, `theorem7`).
+
+**Details.** The proof does give the needed conditional statement (the adversary's order of the two round-`j`
+writes is fixed before the round-`j` coin is flipped). Lemma 18's step "(*) implies that the round of the write
+is ≥ j" needs an induction over rounds that the paper leaves implicit.
+
+**Repair.** Against a fixed (deterministic) strong adversary, the round-`j` coin that lets the game go on is
+determined by the history before it is flipped, so **at most one coin sequence** keeps the game alive
+(`Thm7.forever_subsingleton`), which has probability 0 (`theorem7`).
+
+### 🛠️ Theorems 10 and 12 (Lemma 42, Appendix D)
+Lemma 42 Case (b) uses "`r` starts after `w` completes" where only "`w` writes `Val[-]` before `r` starts" is
+available.
+
+**Impact.** Statements true; small gaps, filled.
+
+**Details.**
+- Lemma 42 Case (b): fixed via Lemma 40.
+- Appendix D asserts without proof that the timestamps in each `Val[-]` never decrease (needs an invariant:
+  `p_k` reads its own register).
+- Definition 55 lists constraints on `f(H)` without showing that such a sequence exists.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
