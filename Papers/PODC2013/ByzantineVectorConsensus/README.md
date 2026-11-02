@@ -14,54 +14,83 @@ asynchronous algorithm is under-specified.
 
 ## Mistakes in the paper
 
-* **Theorem 6, synchronous necessity, is false as stated.** Section 4 defines the restricted
-  synchronous structure only as "send your vector state to everybody, then compute the new state
-  as a function of the old one and the received vectors". It claims `n ≥ (d+2)f+1` is necessary
-  for such algorithms. But the update function is unrestricted, and one vector of reals can encode
-  any finite amount of real data. So the state can carry a full-information history. For `n = 4`,
-  `d = 2`, `f = 1` (where `(d+2)f+1 = 5`), take this algorithm. In round 1, store the encoded vector
-  of received inputs. In round 2, for each `k`, take the majority of the values for `k` relayed by
-  the three other processes (OM(1)), then output the chosen point of `Γ`. It is a restricted
-  algorithm, and it solves even *exact* BVC in two rounds. The claim presumably needs an extra
-  restriction that the paper does not state, e.g. that the new state lies in the hull of the
-  received states. The claim is likely true for that intended hull-preserving iterative class,
-  but we formalized nothing under such a reading. Classification: under-specified definition;
-  false as literally stated. Our restricted class lets the update depend on the round number `t`.
-  This is harmless: in synchrony processes know `t`, and the paper's own algorithm stops after a
-  fixed round. A second counterexample does not use `t` at all: inputs lie in the box `[0,1]²`,
-  encodings lie outside it, so the own state tells the rounds apart.
-  (`theorem_6_sync_necessity_false`, round-independent: `theorem_6_sync_necessity_false'`)
-* **Theorem 6, asynchronous case: the algorithm is under-specified, and necessity is unproved.**
-  The paper says Step 2 is "analogous to Section 3.2", i.e. it averages over the subsets of `B_i`
-  of size `n − f`. In the restricted asynchronous structure `|B_i| = n − f`, so `Z_i` is a single
-  point. Two correct processes then need not share a point of `Z`, and the paper's argument (a
-  common point `z_ij`) breaks. With subsets of size `n − 3f`, or any `s` with
-  `(d+1)f < s ≤ n − 3f`, the argument goes through and gives sufficiency for `n ≥ (d+4)f+1`
-  (`theorem_6_async`). The paper gives no argument for the necessity of `(d+4)f+1`, and the
-  objection of the previous item applies to it as well. Not formalized.
-* **Theorem 4: a minor presentational gap.** In the scenario "`p_j` faulty, `p_{d+2}` correct but
-  slow", validity gives the hull of `X_i^j ∪ {x_{d+2}}`, not `H(X_i^j)`. The paper's own remark
-  that "`p_i` has no information about `x_{d+2}`" already implies the fix: choose `x_{d+2}` per
-  scenario inside `H(X_i^j)`. Only the later sentence fixing `x_{d+2} = 0` for all scenarios is
-  inconsistent with that remark: with that fixed choice and `j = d+1`, the argument gives no
-  contradiction. We pick the slow group's input per scenario (`theorem_4`).
-* **Degenerate cases and imprecise reductions (all minor).**
-  - Theorems 1 and 4 need `n ≥ 2` (the paper assumes `n > 1`) and `d ≥ 1`. With one process, BVC is
-    trivially solvable for every `f` (`ownInput_solves_of_card_one`).
-  - Theorem 4 needs inputs of width `> ε`. Theorem 5 assumes known bounds `[ν, U]^d`, and with
-    `U − ν ≤ ε` approximate BVC is trivial for every `n` (`ownInput_solves_of_narrow`). So the
-    "necessary and sufficient" pair (Theorems 4/5) is tight only when `U − ν > ε`.
-  - "`n ≤ d+1` (resp. `n ≤ d+2`) is also not sufficient — easy to see" needs a different argument
-    for `n = 2`. The simulation step "f simulated processes per process" is only sketched. We use a
-    direct partition of the processes into `d+1` (resp. `d+2`) groups of size `≤ f`, which covers all
-    cases.
-  - The `3f+1` part of Theorem 1 cites scalar consensus. The reduction (diagonal inputs) is correct.
-    The classical bound needs `n ≥ 3`, and `n = 2` follows from the `(d+1)f+1` part.
-  - The round count `1 + ⌈log_{1/(1−γ)}((U−ν)/ε)⌉` is meaningless for `U = ν` and negative for
-    `U − ν < ε`. Read it as `1 + ⌈·⌉₊`, which works (`rounds_spec`).
-* **Typos.** Section 4: "the proof of correctness … is similar to the proof of Theorem 4" should
-  say Theorem 5. Section 4 says the proof relies on `|B_i ∩ B_j| ≥ (d+1)f+1`; it needs a common
-  `C ⊆ B_i ∩ B_j` of the subset size used in Step 2.
+### ❌ Theorem 6, synchronous necessity (restricted algorithms need `n ≥ (d+2)f+1`)
+The necessity claim is false as stated: for `n = 4`, `d = 2`, `f = 1` (where `(d+2)f+1 = 5`) a restricted
+algorithm whose vector state encodes the received inputs solves even *exact* BVC in two rounds
+(`theorem_6_sync_necessity_false`, round-independent: `theorem_6_sync_necessity_false'`).
+
+**Impact.** Secondary result (Section 4, stated without proof), false because the definition is
+under-specified; the claim is likely true for the intended hull-preserving iterative class, but we formalized
+nothing under such a reading. The main results (Theorems 1–5, Lemma 1) are unaffected.
+
+**Details.** Section 4 defines the restricted synchronous structure only as "send your vector state to
+everybody, then compute the new state as a function of the old one and the received vectors". But the update
+function is unrestricted, and one vector of reals can encode any finite amount of real data. So the state can
+carry a full-information history. The algorithm: in round 1, store the encoded vector of received inputs. In
+round 2, for each `k`, take the majority of the values for `k` relayed by the three other processes (OM(1)),
+then output the chosen point of `Γ`. It is a restricted algorithm. The claim presumably needs an extra
+restriction that the paper does not state, e.g. that the new state lies in the hull of the received states.
+Classification: under-specified definition; false as literally stated.
+
+Our restricted class lets the update depend on the round number `t`. This is harmless: in synchrony processes
+know `t`, and the paper's own algorithm stops after a fixed round. A second counterexample does not use `t` at
+all: inputs lie in the box `[0,1]²`, encodings lie outside it, so the own state tells the rounds apart.
+(`theorem_6_sync_necessity_false`, round-independent: `theorem_6_sync_necessity_false'`)
+
+### ⚠️ Theorem 6, asynchronous case (algorithm under-specified, necessity unproved)
+The paper's Step 2 "analogous to Section 3.2" averages over subsets of `B_i` of size `n − f`, but here
+`|B_i| = n − f`, so `Z_i` is a single point and two correct processes need not share a point of `Z`; the
+necessity of `(d+4)f+1` is not argued at all.
+
+**Impact.** Sufficiency holds for `n ≥ (d+4)f+1` with a repaired Step 2 (`theorem_6_async`); necessity is
+unestablished (not formalized).
+
+**Details.** The paper's argument (a common point `z_ij`) breaks. The objection of the previous item applies to
+the necessity claim as well.
+
+**Repair.** With subsets of size `n − 3f`, or any `s` with `(d+1)f < s ≤ n − 3f`, the argument goes through and
+gives sufficiency for `n ≥ (d+4)f+1` (`theorem_6_async`).
+
+### ⚠️ Theorems 1, 4 and 5 (degenerate cases)
+Theorems 1 and 4 fail with one process, where BVC is trivially solvable for every `f`
+(`ownInput_solves_of_card_one`), and Theorem 4 fails for inputs of width `≤ ε` (`ownInput_solves_of_narrow`).
+
+**Impact.** Degenerate: Theorems 1 and 4 need `n ≥ 2` (the paper assumes `n > 1`) and `d ≥ 1`. The "necessary and sufficient"
+pair (Theorems 4/5) is tight only when `U − ν > ε`.
+
+**Details.** Theorem 4 needs inputs of width `> ε`. Theorem 5 assumes known bounds `[ν, U]^d`, and with
+`U − ν ≤ ε` approximate BVC is trivial for every `n` (`ownInput_solves_of_narrow`).
+
+### Typos and slips
+- Section 4: "the proof of correctness … is similar to the proof of Theorem 4" should say Theorem 5.
+- Section 4 says the proof relies on `|B_i ∩ B_j| ≥ (d+1)f+1`; it needs a common `C ⊆ B_i ∩ B_j` of the subset
+  size used in Step 2.
+- The round count `1 + ⌈log_{1/(1−γ)}((U−ν)/ε)⌉` is meaningless for `U = ν` and negative for `U − ν < ε`. Read
+  it as `1 + ⌈·⌉₊`, which works (`rounds_spec`).
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 4 (scenario with a slow correct process)
+In the scenario "`p_j` faulty, `p_{d+2}` correct but slow", validity gives the hull of `X_i^j ∪ {x_{d+2}}`, not
+`H(X_i^j)`, and with the paper's fixed choice `x_{d+2} = 0` and `j = d+1` the argument gives no contradiction.
+
+**Impact.** Minor presentational gap; statement true (`theorem_4`).
+
+**Details.** The paper's own remark that "`p_i` has no information about `x_{d+2}`" already implies the fix:
+choose `x_{d+2}` per scenario inside `H(X_i^j)`. Only the later sentence fixing `x_{d+2} = 0` for all scenarios
+is inconsistent with that remark.
+
+**Repair.** We pick the slow group's input per scenario (`theorem_4`).
+
+### 🛠️ Theorems 1 and 4 (lower-bound reductions)
+The claim that `n ≤ d+1` (resp. `n ≤ d+2`) processes do not suffice, called "easy to see", needs a different
+argument for `n = 2`, and the simulation step for `f > 1` ("f simulated processes per process") is only sketched.
+
+**Impact.** Statements true; minor.
+
+**Repair.** We use a direct partition of the processes into `d+1` (resp. `d+2`) groups of size `≤ f`, which
+covers all cases. The `3f+1` part of Theorem 1 cites scalar consensus. The reduction (diagonal inputs) is
+correct. The classical bound needs `n ≥ 3`, and `n = 2` follows from the `(d+1)f+1` part.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

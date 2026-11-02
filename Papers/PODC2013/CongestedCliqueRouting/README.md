@@ -16,59 +16,84 @@ algorithms. The proofs have gaps that need fixing:
 
 ## Mistakes in the paper
 
-* **Theorem 3.7, non-square `n`: the reduction is broken (proof gap; the statement is true).** With
-  `s = ⌊√n⌋` the proof splits the messages into three sub-instances on `V₁ = {1..s²}`,
-  `V₂ = {n-s²+1..n}` and `V₃`. Four things go wrong:
-  - The cover claim fails only for `n = 3`: there the message from node 2 to itself belongs to
-    none of the sub-instances (`coverClaim_false_three`). For `n ≠ 3` the claim holds, because
-    `2⌊√n⌋² ≥ n` (kernel-checked for `n ≤ 40` in `coverClaim_small`, elementary for larger `n`).
-  - Corollary 3.4 is applied to `W = V₁ ∩ V₃`, but it requires `|W| ≤ √n`. This fails, e.g., for
-    `n = 8`, where `|W| = 4` (the arithmetic is recorded in `cor34_size_fails_eight`).
-  - Corollary 3.4 also requires every node to hold exactly `⌊n/|W|⌋·|W|` messages. This fails,
-    e.g., for `n = 7`, where up to 21 messages must be spread over 3 nodes holding at most 6 each
-    (the set identities and arithmetic are recorded in `cor34_load_fails_seven`; this is not a
-    full execution).
-  - The square algorithm run on `V₁` (`s²` nodes) is built for `s²` messages per node, but nodes
-    can have up to `n > s²` messages inside `V₁`. The paper's "factor 2" accounts for running the
-    `V₁` and `V₂` instances in parallel. Its remark after Problem 3.1 (overloaded instances "can be
-    split up into smaller ones") partly covers this, but how to split them without coordination
-    is not worked out.
+No mistakes in the statements.
 
-  We instead simulate the square algorithm on `⌈√n⌉² ≤ 2n` virtual nodes, at most two per real
-  node (`theorem_3_7`).
-* **Corollary 3.3: the relay nodes cannot know where to forward (proof gap).** In round 1 the
-  messages go to nodes `1..m`, which need not be in `W`. Only nodes of `W` know the routing pattern.
-  This is harmless when a message's current target is its final destination, which the message
-  header contains. It is not harmless in Step 5 of Algorithm 2 and Step 3 of Algorithm 1
-  (Corollary 3.5), where the targets are intermediate. Fix: attach the target (and the target group
-  in Algorithm 2) to the message. This costs a constant factor in message size (`c33a`/`c33b`).
-* **Algorithm 4, Step 8 needs global information that is never distributed (proof gap; the round
-  count survives).** To send a key to the node responsible for its global rank, a node must know
-  the sizes of all buckets of the other groups. Corollary 3.3 (with `W = V`) also requires everyone
-  to know all sources and destinations. No step announces these counts. We add one round in which
-  every node broadcasts how many keys it holds (`P29`). This still fits easily into 37 rounds.
-* **Bundling arguments in Theorem 4.5 / Lemma 4.4 (proof gap, constant factors).**
-  - Step 6 of Algorithm 4: "receive at most `2n` keys" is true. It follows from
-    `⌈|K_{i,j}|/√n⌉ ≤ d_i + 1`, not from the stated bound `Σ|K_{i,j}| < 2n^{3/2}`.
-  - "Bundling up to two keys in each message, nodes need to … receive at most `n` messages" does
-    not follow. With per-sender bundling a node can need about `1.5 n` messages.
-  - Lemma 4.4 applies Corollary 3.4 (exactly `f|W|` messages) where only an upper bound holds.
+### Typos and slips
+- Problem 4.1 asks for the keys with indices `i(n−1)+1, …, in`; it should be `(i−1)n+1, …, in`.
+- Proof of Corollary 3.3: node `i` receives exactly **one** message (not `f`) for each destination `j`. The
+  nearby claim "each node will receive exactly one message of each color" is also wrong (node `c` receives only
+  messages of colour `c`); this is cosmetic.
+- Lemma 3.6, Steps 2–3: the group-level colouring must be distributed over the group members (a transportation
+  problem). The paper hands this to a footnote ("deferred completion"), and Step 3 should announce counts per
+  destination group.
+- Corollaries 3.3/3.4 are stated for exactly `f|W|` messages per node but used with fewer; this needs dummies or
+  an "at most" version (we prove the "at most" version).
 
-  We use packets with a few more slots and route Step 6 through the routing algorithm on a virtual
-  clique of `4n` nodes, which allows receiver loads up to `4n` (`load_tgt`, `box_spec`).
-* **Theorem 4.5, non-square `n`:** the proof is a one-sentence sketch. We prove it by the same
-  virtual-node simulation (`theorem_4_5`).
-* **Minor slips and under-specified steps.**
-  - Problem 4.1 asks for the keys with indices `i(n−1)+1, …, in`; it should be
-    `(i−1)n+1, …, in`.
-  - Proof of Corollary 3.3: node `i` receives exactly **one** message (not `f`) for each
-    destination `j`. The nearby claim "each node will receive exactly one message of each color" is
-    also wrong (node `c` receives only messages of colour `c`); this is cosmetic.
-  - Lemma 3.6, Steps 2–3: the group-level colouring must be distributed over the group members (a
-    transportation problem). The paper hands this to a footnote ("deferred completion"), and Step 3
-    should announce counts per destination group.
-  - Corollaries 3.3/3.4 are stated for exactly `f|W|` messages per node but used with fewer; this
-    needs dummies or an "at most" version (we prove the "at most" version).
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 3.7, non-square `n` (the reduction to three sub-instances)
+With `s = ⌊√n⌋` the proof splits the messages into sub-instances on `V₁ = {1..s²}`, `V₂ = {n-s²+1..n}` and
+`V₃`, but the cover claim fails for `n = 3` and Corollary 3.4 is applied outside its hypotheses
+(`coverClaim_false_three`, `cor34_size_fails_eight`, `cor34_load_fails_seven`).
+
+**Impact.** Statement true; proved by a different reduction: we simulate the square algorithm on
+`⌈√n⌉² ≤ 2n` virtual nodes, at most two per real node (`theorem_3_7`).
+
+**Details.** Four things go wrong:
+- The cover claim fails only for `n = 3`: there the message from node 2 to itself belongs to none of the
+  sub-instances (`coverClaim_false_three`). For `n ≠ 3` the claim holds, because `2⌊√n⌋² ≥ n` (kernel-checked
+  for `n ≤ 40` in `coverClaim_small`, elementary for larger `n`).
+- Corollary 3.4 is applied to `W = V₁ ∩ V₃`, but it requires `|W| ≤ √n`. This fails, e.g., for `n = 8`, where
+  `|W| = 4` (the arithmetic is recorded in `cor34_size_fails_eight`).
+- Corollary 3.4 also requires every node to hold exactly `⌊n/|W|⌋·|W|` messages. This fails, e.g., for `n = 7`,
+  where up to 21 messages must be spread over 3 nodes holding at most 6 each (the set identities and arithmetic
+  are recorded in `cor34_load_fails_seven`; this is not a full execution).
+- The square algorithm run on `V₁` (`s²` nodes) is built for `s²` messages per node, but nodes can have up to
+  `n > s²` messages inside `V₁`. The paper's "factor 2" accounts for running the `V₁` and `V₂` instances in
+  parallel. Its remark after Problem 3.1 (overloaded instances "can be split up into smaller ones") partly
+  covers this, but how to split them without coordination is not worked out.
+
+### 🛠️ Corollary 3.3 (relay nodes lack routing information)
+In round 1 the messages go to nodes `1..m`, which need not be in `W`, but only nodes of `W` know the routing
+pattern.
+
+**Impact.** Statement true; fixed by attaching the target to the message, at a constant factor in message size
+(`c33a`/`c33b`).
+
+**Details.** This is harmless when a message's current target is its final destination, which the message
+header contains. It is not harmless in Step 5 of Algorithm 2 and Step 3 of Algorithm 1 (Corollary 3.5), where
+the targets are intermediate.
+
+**Repair.** Attach the target (and the target group in Algorithm 2) to the message (`c33a`/`c33b`).
+
+### 🛠️ Theorem 4.5, Algorithm 4 Step 8 (global information never distributed)
+To send a key to the node responsible for its global rank, a node must know the sizes of all buckets of the
+other groups, but no step announces these counts.
+
+**Impact.** Statement true; the round count survives: one extra round (`P29`) still fits easily into 37 rounds.
+
+**Details.** Corollary 3.3 (with `W = V`) also requires everyone to know all sources and destinations.
+
+**Repair.** We add one round in which every node broadcasts how many keys it holds (`P29`).
+
+### 🛠️ Theorem 4.5 and Lemma 4.4 (bundling arguments)
+"Bundling up to two keys in each message, nodes need to … receive at most `n` messages" does not follow, and
+Lemma 4.4 applies Corollary 3.4 (exactly `f|W|` messages) where only an upper bound holds.
+
+**Impact.** Statements true; fixed at the cost of constant factors (`load_tgt`, `box_spec`).
+
+**Details.**
+- Step 6 of Algorithm 4: "receive at most `2n` keys" is true. It follows from `⌈|K_{i,j}|/√n⌉ ≤ d_i + 1`, not
+  from the stated bound `Σ|K_{i,j}| < 2n^{3/2}`.
+- With per-sender bundling a node can need about `1.5 n` messages.
+
+**Repair.** We use packets with a few more slots and route Step 6 through the routing algorithm on a virtual
+clique of `4n` nodes, which allows receiver loads up to `4n` (`load_tgt`, `box_spec`).
+
+### 🛠️ Theorem 4.5, non-square `n`
+The proof of the non-square case is a one-sentence sketch.
+
+**Impact.** Statement true; proved by the same virtual-node simulation (`theorem_4_5`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

@@ -14,32 +14,53 @@ this needs a real (if small) extra mechanism.
 
 ## Mistakes in the paper
 
-* **Theorems 8 and 9: proof gap (stopped neighbours); statements true.** The simulating `Multiset` algorithm `B`
-  "augments each outgoing message with the full message history" and sorts the received histories
-  lexicographically. But once a neighbour `w` of `u` has stopped in `A`, its copy in `B` has stopped too and sends
-  `m0`. Then `u` no longer receives `w`'s history and cannot place `w`'s `m0` in the sorted order. We repair it as
-  follows. `B` stores at each node the multiset `H` of the full histories received so far. In each round it sets
-  `H' = R + (H − R.map dropLast).map (· ++ [m0])`, where `R` is the multiset of histories actually received.
-  So the stopped neighbours' histories are extended by `m0`; this update is exact for multisets. The paper's
-  refinement `P₀ ⊇ P₁ ⊇ …` of compatible port numberings is replaced by a single port numbering `p*`: it copies the
-  out-ports of `p₀` and sorts the in-ports by the time-`T` histories of `B`'s own run, so it is not circular. We
-  show by induction that `A` on `p*` follows `B` on `p₀` exactly, using that truncation is monotone for the
-  lexicographic order. Time `T` is kept, as claimed. (`theorem8`, `theorem9`)
-* **Theorem 4: small gap of the same kind; statement true.** "Now all messages received by a node are distinct" is
-  false: stopped neighbours and padding all deliver `m0`. It is harmless. The non-`m0` messages are pairwise
-  distinct by Lemma 6, so the number of `m0`s is `Δ − #(distinct non-m0 messages)`, and the multiset of `A`'s
-  messages can be rebuilt from the set. Our `Set` algorithm runs `C_Δ` for `2Δ + 1` rounds and then simulates `A`.
-  Its running time is `T + 2Δ + 1 = T + O(Δ)`. (`theorem4`)
-* **Theorem 17: loose step.** "There are nodes `u, v` with `t(u) < t(v)` and `t(v)` maximal. This means
-  `S(u) = 0`." `S(u) = 0` needs a *neighbour* of larger type. Connectivity, which the paper invokes, gives an edge
-  whose endpoints have different types, and its smaller endpoint outputs `0`. (`thm17_mem`)
-* Minor imprecisions, none affecting a result:
-  - Lemma 5 is stated for rounds `t ≥ 4`; it holds for `t ≥ 3`. Lemma 6's consequence silently uses order `k = 2`
-    (the pair `u, w` itself).
-  - In Theorem 11, `Π(G)` is undefined for stars with `k ≤ 1`: they are stars, but not `k`-stars with `k > 1`. We
-    leave the output unrestricted there.
-  - In Theorem 17 the local type is defined through out-ports (`p((v, i))`), but a node can only learn the in-port
-    version (`p⁻¹((v, i))`). Under consistency the two agree, which is all the proof uses.
+No mistakes in the statements.
+
+### Typos and slips
+- Lemma 6's consequence silently uses order `k = 2` (the pair `u, w` itself).
+- In Theorem 11, `Π(G)` is undefined for stars with `k ≤ 1`: they are stars, but not `k`-stars with `k > 1`. We
+  leave the output unrestricted there.
+- In Theorem 17 the local type is defined through out-ports (`p((v, i))`), but a node can only learn the in-port
+  version (`p⁻¹((v, i))`). Under consistency the two agree, which is all the proof uses.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorems 8 and 9 (`Multiset` simulation; stopped neighbours)
+The simulating algorithm `B` sorts the full message histories received from neighbours, but a neighbour `w` that
+has stopped sends `m0`, so `u` no longer receives `w`'s history and cannot place `w`'s `m0` in the sorted order.
+
+**Impact.** Statements true; repaired with a small extra mechanism, same time `T` (`theorem8`, `theorem9`).
+
+**Details.** `B` "augments each outgoing message with the full message history" and sorts the received histories
+lexicographically. But once a neighbour `w` of `u` has stopped in `A`, its copy in `B` has stopped too and sends
+`m0`.
+
+**Repair.** `B` stores at each node the multiset `H` of the full histories received so far. In each round it sets
+`H' = R + (H − R.map dropLast).map (· ++ [m0])`, where `R` is the multiset of histories actually received.
+So the stopped neighbours' histories are extended by `m0`; this update is exact for multisets. The paper's
+refinement `P₀ ⊇ P₁ ⊇ …` of compatible port numberings is replaced by a single port numbering `p*`: it copies the
+out-ports of `p₀` and sorts the in-ports by the time-`T` histories of `B`'s own run, so it is not circular. We
+show by induction that `A` on `p*` follows `B` on `p₀` exactly, using that truncation is monotone for the
+lexicographic order. Time `T` is kept, as claimed. (`theorem8`, `theorem9`)
+
+### 🛠️ Theorem 4 (`Set` simulation; "all messages received are distinct")
+The proof's claim "now all messages received by a node are distinct" is false: stopped neighbours and padding all
+deliver `m0`.
+
+**Impact.** Statement true; harmless, repaired locally with running time `T + 2Δ + 1 = T + O(Δ)` (`theorem4`).
+
+**Repair.** The non-`m0` messages are pairwise distinct by Lemma 6, so the number of `m0`s is
+`Δ − #(distinct non-m0 messages)`, and the multiset of `A`'s messages can be rebuilt from the set. Our `Set`
+algorithm runs `C_Δ` for `2Δ + 1` rounds and then simulates `A`. (`theorem4`)
+
+### 🛠️ Theorem 17 (loose step)
+The step "there are nodes `u, v` with `t(u) < t(v)` and `t(v)` maximal; this means `S(u) = 0`" is loose:
+`S(u) = 0` needs a *neighbour* of larger type.
+
+**Impact.** Statement true; fixed with the connectivity the paper invokes (`thm17_mem`).
+
+**Repair.** Connectivity gives an edge whose endpoints have different types, and its smaller endpoint outputs `0`.
+(`thm17_mem`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -61,6 +82,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Bisimulation (`Bisimulation.lean`) is defined on the paper's relations `R(i,j)`, `R(i,*)` and `R(*,*) = E`.
   Instead of Theorem 2 (modal-logic characterisation, not formalized), we prove directly that bisimilar nodes run
   through identical states for every algorithm of the matching class; Corollary 3 follows.
+
+Lemma 5 is stated for rounds `t ≥ 4`; it holds for `t ≥ 3` (`PortNumbering.lemma5'`).
 
 **Main results in Lean.**
 
