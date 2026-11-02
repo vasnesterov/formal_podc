@@ -13,31 +13,40 @@ grows") show that a large `n` was intended. With `n` large we prove both.
 
 ## Mistakes in the paper
 
-* **Theorem 5.2 needs many nodes; false for the standard `n = 3f + 1 = 4`.** The theorem says that in the model
-  (`n` nodes, honest fraction `h`), every `θ ≤ Δ/k` and `φ < 1 − h/(k+1)` admit a synchronous profile whose AOF
-  graph has a cycle. Take `n = 4` with 3 honest nodes (`h = 3/4`), `k = 1`, `θ = Δ > 0` and `φ = 0.6 < 0.625`. All
-  hypotheses hold, including `1 − h/k ≤ h`. An edge then needs `⌈0.6·4⌉ = 3` supporters, so at least 2 honest ones,
-  more than `|H|/2`. The counting argument of Theorem 5.1 with `k = 2` (`θ = Δ > Δ/2`) applies, so *no*
-  `Δ`-synchronous profile has a cycle. The proof idea gets support "arbitrarily close to `1 − h/(k+1)`" by
-  splitting the Byzantine nodes into more and more groups, which needs `n → ∞`. For a fixed `n`, each edge of the
-  construction loses about `⌈hn/(k+1)⌉` honest supporters and one Byzantine supporter. We prove the intended
-  statement: for all sufficiently large `n` with `hn` integral (explicitly, whenever
-  `φn + hn/(k+1) + 2 ≤ n`) the rotating construction gives a cycle. (`theorem_5_2_fixed_n_false`;
-  repaired: `theorem_5_2`, `theorem_5_2_finite`)
-* **Theorem 3.1 also needs many nodes.** "For any `φ ∈ (1/2, 1)` … there is a `Δ_sync`-synchronous arrival profile"
-  with a `φ`-majority cycle. Fix `n` and take `φ > 1 − 1/n`. Then every vote edge needs all `n` nodes, and no node
-  can receive the transactions of a cycle in strictly increasing order, so no profile has such a cycle. The proof
-  idea picks `k > 1/(1 − φ)` groups, so the intended reading lets the profile choose `n ≥ 1/(1 − φ)`. Under that
-  reading the theorem holds (for any `φ < 1`, even with all nodes honest). (`theorem_3_1_fixed_n_false`;
-  `theorem_3_1`)
-* **The "boundary gap" of §5/§7 is closed by the paper's own Theorem 5.1.** §7 says the feasible and infeasible
-  regions "intentionally leave a small boundary gap" between `1 − h/k` and `1 − h/(k+1)`, and that closing it
-  "would require a sharper characterization". But if `θ ≤ Δ/k`, Theorem 5.2 applies with `k`, and if
-  `θ > Δ/(k+1)`, Theorem 5.1 applies with `k + 1` instead of `k`. So on every band `Δ/(k+1) < θ ≤ Δ/k` the
-  threshold is exactly `1 − h/(k+1)` (up to the large-`n` caveat above). This is a remark, not a theorem, so it
-  does not affect the verdict. (`threshold_tight`)
-* Minor: the hypothesis `1 − h/k ≤ h` of Theorems 5.1 and 5.2 is never used. Theorem 5.1 needs `n ≥ 1`; with
-  `n = 0` every pair is an edge.
+### ⚠️ Theorem 5.2 (cycle construction needs many nodes)
+Read with the model's fixed `n`, Theorem 5.2 is false for the standard `n = 3f + 1 = 4`: with 3 honest nodes (`h = 3/4`), `k = 1`, `θ = Δ > 0` and `φ = 0.6 < 0.625` no `Δ`-synchronous profile has a cycle (`theorem_5_2_fixed_n_false`).
+
+**Impact.** The proof idea ("as the number of Byzantine groups grows") shows that a large `n` was intended; for all sufficiently large `n` we prove it (`theorem_5_2`, `theorem_5_2_finite`).
+
+**Details.** The theorem says that in the model (`n` nodes, honest fraction `h`), every `θ ≤ Δ/k` and
+`φ < 1 − h/(k+1)` admit a synchronous profile whose AOF graph has a cycle. In the counterexample all
+hypotheses hold, including `1 − h/k ≤ h`. An edge needs `⌈0.6·4⌉ = 3` supporters, so at least 2
+honest ones, more than `|H|/2`. The counting argument of Theorem 5.1 with `k = 2` (`θ = Δ > Δ/2`)
+applies, so *no* `Δ`-synchronous profile has a cycle. The proof idea gets support "arbitrarily close
+to `1 − h/(k+1)`" by splitting the Byzantine nodes into more and more groups, which needs `n → ∞`.
+For a fixed `n`, each edge of the construction loses about `⌈hn/(k+1)⌉` honest supporters and one
+Byzantine supporter.
+
+**Repair.** For all sufficiently large `n` with `hn` integral (explicitly, whenever
+`φn + hn/(k+1) + 2 ≤ n`) the rotating construction gives a cycle. (`theorem_5_2_fixed_n_false`;
+repaired: `theorem_5_2`, `theorem_5_2_finite`)
+
+### ⚠️ Theorem 3.1 (cycle construction needs many nodes)
+"For any `φ ∈ (1/2, 1)` … there is a `Δ_sync`-synchronous arrival profile" with a `φ`-majority cycle is false for a fixed `n` and `φ > 1 − 1/n` (`theorem_3_1_fixed_n_false`).
+
+**Impact.** The proof idea picks `k > 1/(1 − φ)` groups, so the intended reading lets the profile choose `n ≥ 1/(1 − φ)`; under that reading the theorem holds (for any `φ < 1`, even with all nodes honest; `theorem_3_1`).
+
+**Details.** For `φ > 1 − 1/n` every vote edge needs all `n` nodes, and no node can receive the
+transactions of a cycle in strictly increasing order, so no profile has such a cycle.
+
+### Typos and slips
+- The "boundary gap" of §5/§7 is closed by the paper's own Theorem 5.1. §7 says the feasible and
+  infeasible regions "intentionally leave a small boundary gap" between `1 − h/k` and `1 − h/(k+1)`,
+  and that closing it "would require a sharper characterization". But if `θ ≤ Δ/k`, Theorem 5.2
+  applies with `k`, and if `θ > Δ/(k+1)`, Theorem 5.1 applies with `k + 1` instead of `k`. So on
+  every band `Δ/(k+1) < θ ≤ Δ/k` the threshold is exactly `1 − h/(k+1)` (up to the large-`n` caveat
+  above). This is a remark, not a theorem, so it does not affect the verdict. (`threshold_tight`)
+- Theorem 5.1 needs `n ≥ 1`; with `n = 0` every pair is an edge.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -70,6 +79,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Exact threshold on `Δ/(k+1) < θ ≤ Δ/k` (remark §7) | `threshold_tight` | `Boundary.lean` |
 | Theorem 3.1 (large `n`, all nodes honest) | `theorem_3_1` | `TimedCycle.lean` |
 | Theorem 3.1 for fixed `n`: false | `theorem_3_1_fixed_n_false` | `TimedCycle.lean` |
+
+The hypothesis `1 − h/k ≤ h` of Theorems 5.1 and 5.2 is never used.
 
 **Not formalized.** §4 (comparison with other fairness notions) and §6 (protocol sketch, `Order(R)`, Sync HotStuff
 carrier, the partially synchronous `n − 2f` remark).
