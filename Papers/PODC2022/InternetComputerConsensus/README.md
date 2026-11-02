@@ -13,17 +13,24 @@ wording issue, and a borderline call (see below).
 
 ## Mistakes in the paper
 
-* **Liveness lemma, conclusion too literal (wording; borderline).** The lemma promises that, once all round-`k`
-  messages are delivered, every honest party has `Q`'s block `B_Q` "in its pool as a finalized block". By Section
-  3.4 this means that a combined finalization is in the pool. But Figure 2 combines round-`k` finalization shares
-  only if `k > kmax`. After the two synchronous instants of hypothesis (iv) the network is asynchronous. The
-  adversary can deliver the round-`(k+1)` finalization shares before the round-`k` ones to every honest party.
-  Then every honest party finalizes the round-`(k+1)` block first, jumps to `kmax = k + 1`, and outputs `B_Q`
-  without ever forming a finalization of it. Nobody honest broadcasts one, so the literal conclusion fails. This
-  counterexample is argued in words, not in Lean. What does hold, and what the paper means (P3 and its
-  discussion), is that every honest party holds `n − t` finalization shares of `B_Q`, has `kmax ≥ k`, and has
-  committed `B_Q`: the chain ending at `B_Q` is a prefix of its output. (`liveness`)
-* **Typo.** Section 3.5 describes clause (c) with "at least `Δntry(t)` time units"; it should be `Δntry(r)`, as in
+### ⚠️ Liveness lemma (conclusion "as a finalized block")
+The lemma promises that every honest party has `Q`'s block `B_Q` "in its pool as a finalized block", but if the
+adversary delivers the round-`(k+1)` finalization shares before the round-`k` ones, every honest party skips
+`B_Q` via Figure 2's `kmax` and never forms a finalization of it (counterexample in words only).
+
+**Impact.** A wording issue and a borderline call: the intended reading (P3 and its discussion) holds, namely
+every honest party holds `n − t` finalization shares of `B_Q`, has `kmax ≥ k`, and has committed `B_Q`: the chain
+ending at `B_Q` is a prefix of its output (`liveness`).
+
+**Details.** By Section 3.4, "finalized" means that a combined finalization is in the pool. But Figure 2
+combines round-`k` finalization shares only if `k > kmax`. After the two synchronous instants of hypothesis (iv)
+the network is asynchronous. The adversary can deliver the round-`(k+1)` finalization shares before the round-`k`
+ones to every honest party. Then every honest party finalizes the round-`(k+1)` block first, jumps to
+`kmax = k + 1`, and outputs `B_Q` without ever forming a finalization of it. Nobody honest broadcasts one, so the
+literal conclusion fails. This counterexample is argued in words, not in Lean.
+
+### Typos and slips
+- Section 3.5 describes clause (c) with "at least `Δntry(t)` time units"; it should be `Δntry(r)`, as in
   Figure 1.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).

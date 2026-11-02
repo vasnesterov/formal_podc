@@ -17,22 +17,7 @@ some invariants that the paper uses without stating them.
 
 ## Mistakes in the paper
 
-None found. Three points are only implicit in the paper and needed real work:
-
-* **Why the token is caught (Lemma 5(1)).** The paper says the token travels "until it reaches a node `v` with a
-  non-empty `Q_v`, which must exist". Two invariants make this precise. First, a request pulse of the current
-  token phase implies a node with a non-empty queue: the initiator keeps its message until it captures the token.
-  Second, the released token has not passed such a node. Together they bound the token's hops by `n`. (`Inv2`,
-  `progress_step`)
-* **Lemma 11 [full version] is a sketch** ("we can now repeat the proof of Lemma 5"). The formal invariant
-  for Algorithm 3 needs facts the sketch does not mention. The token always lies in segment 0 of every node
-  (`RobbinsSim.Inv.rot`; the paper states this one). At most one token, data or end pulse is in transit, and the
-  ghost variable `wv` names its channel. A node still in its data phase cannot read a request pulse of the next
-  epoch at its occurrence 0 (`RobbinsSim.EndStage.read`).
-* **Implicit model conventions.** Several conventions are only implicit. A `wait until` is a blocking receive:
-  pulses from other directions stay buffered. Unary payloads must be positive. Fairness is needed for liveness.
-  Theorem 3's proof also needs a fair execution to exist; we prove that a round-robin schedule gives one
-  (`TwoParty.Protocol.rr_isFairExec`).
+No mistakes in the statements.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -86,6 +71,23 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Deadlock freedom (Algorithm 3) | `RobbinsSim.Reach.deadlock_free` | `Robbins/Deadlock.lean` |
 
 All names are in the namespace `Podc.FullyDefective`.
+
+**Proof remarks.** Three points are only implicit in the paper and needed real work:
+
+* **Why the token is caught (Lemma 5(1)).** The paper says the token travels "until it reaches a node `v` with a
+  non-empty `Q_v`, which must exist". Two invariants make this precise. First, a request pulse of the current
+  token phase implies a node with a non-empty queue: the initiator keeps its message until it captures the token.
+  Second, the released token has not passed such a node. Together they bound the token's hops by `n`. (`Inv2`,
+  `progress_step`)
+* **Lemma 11 [full version] is a sketch** ("we can now repeat the proof of Lemma 5"). The formal invariant
+  for Algorithm 3 needs facts the sketch does not mention. The token always lies in segment 0 of every node
+  (`RobbinsSim.Inv.rot`; the paper states this one). At most one token, data or end pulse is in transit, and the
+  ghost variable `wv` names its channel. A node still in its data phase cannot read a request pulse of the next
+  epoch at its occurrence 0 (`RobbinsSim.EndStage.read`).
+* **Implicit model conventions.** Several conventions are only implicit. A `wait until` is a blocking receive:
+  pulses from other directions stay buffered. Unary payloads must be positive. Fairness is needed for liveness.
+  Theorem 3's proof also needs a fair execution to exist; we prove that a round-robin schedule gives one
+  (`TwoParty.Protocol.rr_isFairExec`).
 
 **Not formalized.** These parts are not formalized:
 * liveness and no starvation of Algorithm 3 under fairness (only deadlock freedom is proved);

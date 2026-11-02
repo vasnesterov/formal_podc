@@ -12,29 +12,30 @@ for all `n`. There are no false statements. The BA's upper bound is one round sh
 
 ## Mistakes in the paper
 
-There are no false statements. Points worth knowing:
+No mistakes in the statements.
 
-- **BA claims a bound one round sharper than FV proves (the claim is true).** BA Theorem 3.1 (and FV's abstract)
-  states `⌈(1+√2)n − 1⌉`, but FV Theorem 3.6 only proves `⌈(1+√2)n⌉`. The BA bound follows from the same argument, because the pigeonhole in FV
-  Lemma 3.5 has slack. Take `R = n + m − 1` rounds with `m = ⌈√2 n⌉`. The edge count is at least
-  `m(m+1)/2 + (n−1)m`, and this exceeds the threshold `(n−1)(n+m−1)` iff `m(m+1) > 2(n−1)²`. Optimizing `m` gives
-  the slightly sharper `m + n − 1` for the least `m` with `m(m+1) > 2(n−1)²`, about `(1+√2)(n−1)`.
-  (`theorem_3_1`, `theorem_3_6`, `advBroadcastTime_trees_le_of_sq_lt`)
-- **Trees are not needed.** The upper-bound proof only uses a self-loop at every node and a root that reaches
-  everybody in each round. (`broadcasts_of_rooted`)
-- **Slips in FV's proofs.**
-  - Lemma 3.3 is stated for `t₁ ≤ t₂` but used in Lemma 3.5 with `t₁ = t₂ + 1` (round 1). That extra case is
-    trivial.
-  - In Lemma 3.5, the in-degree formula has `x` where `r_t` is meant.
-  - The final comparison in Lemma 3.5 is not the actual pigeonhole threshold, although the inequality used is still
-    sufficient.
-  - Lemma 3.2 (ii) carries an unnecessary hypothesis `t ≤ t'`.
-- **The lower bound is only a figure in FV (Figure 5), with no proof.** Our reading of the figure:
-  - first, the path `1 → ⋯ → n` for `⌊(n−1)/2⌋` rounds;
-  - then the tree rooted at `n` with two branches, up to round `n − 2`;
-  - then a rotated path.
+### Typos and slips
+- FV Lemma 3.3 is stated for `t₁ ≤ t₂` but used in Lemma 3.5 with `t₁ = t₂ + 1` (round 1). That extra case is
+  trivial.
+- In FV Lemma 3.5, the in-degree formula has `x` where `r_t` is meant.
+- The final comparison in FV Lemma 3.5 is not the actual pigeonhole threshold, although the inequality used is
+  still sufficient.
+- FV Lemma 3.2 (ii) carries an unnecessary hypothesis `t ≤ t'`.
 
-  With this reading the construction is correct for every `n ≥ 2`. (`lbSeq`, `lbSeq_not_broadcasts`)
+## Proof gaps (statements true)
+
+### 🛠️ BA Theorem 3.1 (upper bound `⌈(1+√2)n − 1⌉`)
+BA Theorem 3.1 (and FV's abstract) states `⌈(1+√2)n − 1⌉`, but FV Theorem 3.6 only proves the bound
+`⌈(1+√2)n⌉`, one round weaker.
+
+**Impact.** Statement true; the same argument proves it after a recount of the pigeonhole in FV Lemma 3.5
+(`theorem_3_1`, `theorem_3_6`).
+
+**Details.** The pigeonhole in FV Lemma 3.5 has slack. Take `R = n + m − 1` rounds with `m = ⌈√2 n⌉`. The edge
+count is at least `m(m+1)/2 + (n−1)m`, and this exceeds the threshold `(n−1)(n+m−1)` iff `m(m+1) > 2(n−1)²`.
+
+**Repair.** Optimizing `m` gives the slightly sharper `m + n − 1` for the least `m` with `m(m+1) > 2(n−1)²`,
+about `(1+√2)(n−1)` (`advBroadcastTime_trees_le_of_sq_lt`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -69,6 +70,16 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Small cases.** Exhaustive search gives `t*(𝒯ₙ) = 0, 1, 2, 4, 5, 7` for `n = 1..6`, which equals the lower bound
 for `n ≥ 2`. The upper bound gives `2, 4, 7, 9, 12, 14`. Only `n ≤ 4` is kernel-checked in Lean; `n = 5, 6` come from
 unverified Python/C searches.
+
+**Trees are not needed.** The upper-bound proof only uses a self-loop at every node and a root that reaches
+everybody in each round. (`broadcasts_of_rooted`)
+
+**The lower bound is only a figure in FV (Figure 5), with no proof.** Our reading of the figure:
+- first, the path `1 → ⋯ → n` for `⌊(n−1)/2⌋` rounds;
+- then the tree rooted at `n` with two branches, up to round `n − 2`;
+- then a rotated path.
+
+With this reading the construction is correct for every `n ≥ 2`. (`lbSeq`, `lbSeq_not_broadcasts`)
 
 **Not formalized.** The rest of FV (other broadcast variants and `k`-rooted networks).
 
