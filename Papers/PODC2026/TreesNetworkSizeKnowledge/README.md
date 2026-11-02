@@ -13,26 +13,37 @@ running the induction over a class of graphs that is closed under the surgery.
 
 ## Mistakes in the paper
 
-* **Proof of Theorem 1, property 4: the induction hypothesis is applied in a graph where it was not
-  proved.** The induction claims properties 1–4 "by running `A` on `G`", where `G` is the
-  `k`-hierarchical lower bound graph. To show property 4 for a level-`i` path, the proof removes a
-  path node `z` (with its subtree) and joins its two neighbours. This gives `Ĝ`. Then `u` and `v`
-  keep their colours, but the parity of their distance changes, "thus the produced 2-colouring cannot
-  be proper". That step needs the `u`–`v` path to be properly 2-coloured in `Ĝ`, and hence needs
-  that no node on it outputs `E`. Constraint 4 rules out `E` only if all lower-level neighbours
-  output `D` *in `Ĝ`*. The algorithm is run afresh on `Ĝ`, and `Ĝ` is not a `k`-hierarchical lower
-  bound graph (one level-`i` path is one node short), so the induction hypothesis says nothing about
-  it. Lower-level nodes next to the cut can see the change. The statement is true, and the repair is
-  routine once identified: prove the claim for every level-`j` component of the lower bound graph
-  embedded in *any* tree of a suitable class (a "host"). The class must be closed under the surgery
-  and the levels of the 2½-colouring problem must stay the designed levels in it (`claim`,
-  `hostOK_hat`, `emb_hat_child`).
-* **Small slips in the same proof** (no effect on the result):
-  * `T_i = ℓ_i/10` need not be an integer. The proof uses "distance exactly `T_i + 1`" and round
-    counts `≤ T_i`; we use `⌊ℓ_i/10⌋`.
-  * Property 2 ("`u`, `v` at distance at least `2T_i + 1`") does not guarantee a node `z` at
-    distance `> T_i` from both. The chosen `u`, `v` (at distance `T_i + 1` from the two ends) are
-    about `0.8 ℓ_i` apart, so such a `z` exists.
+No mistakes in the statements.
+
+### Typos and slips
+Small slips in the proof of Theorem 1, with no effect on the result:
+- `T_i = ℓ_i/10` need not be an integer. The proof uses "distance exactly `T_i + 1`" and round counts `≤ T_i`; we
+  use `⌊ℓ_i/10⌋`.
+- Property 2 ("`u`, `v` at distance at least `2T_i + 1`") does not guarantee a node `z` at distance `> T_i` from
+  both. The chosen `u`, `v` (at distance `T_i + 1` from the two ends) are about `0.8 ℓ_i` apart, so such a `z`
+  exists.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 1, property 4 of the induction (parity surgery)
+The parity surgery applies the induction hypothesis in the modified graph `Ĝ`, but the hypothesis was proved only
+for runs on the lower bound graph `G`.
+
+**Impact.** Statement true; the repair is routine once identified: run the induction over a class of graphs closed
+under the surgery (`claim`, `hostOK_hat`, `emb_hat_child`).
+
+**Details.** The induction claims properties 1–4 "by running `A` on `G`", where `G` is the `k`-hierarchical lower
+bound graph. To show property 4 for a level-`i` path, the proof removes a path node `z` (with its subtree) and joins
+its two neighbours. This gives `Ĝ`. Then `u` and `v` keep their colours, but the parity of their distance changes,
+"thus the produced 2-colouring cannot be proper". That step needs the `u`–`v` path to be properly 2-coloured in
+`Ĝ`, and hence needs that no node on it outputs `E`. Constraint 4 rules out `E` only if all lower-level neighbours
+output `D` *in `Ĝ`*. The algorithm is run afresh on `Ĝ`, and `Ĝ` is not a `k`-hierarchical lower bound graph (one
+level-`i` path is one node short), so the induction hypothesis says nothing about it. Lower-level nodes next to the
+cut can see the change.
+
+**Repair.** Prove the claim for every level-`j` component of the lower bound graph embedded in *any* tree of a
+suitable class (a "host"). The class must be closed under the surgery and the levels of the 2½-colouring problem
+must stay the designed levels in it (`claim`, `hostOK_hat`, `emb_hat_child`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
