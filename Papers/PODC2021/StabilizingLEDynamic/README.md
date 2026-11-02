@@ -23,52 +23,74 @@ There are four caveats.
 
 ## Mistakes in the paper
 
-* **The impossibilities need more identifiers than processes (under-specified definition).**
-  Every impossibility proof swaps a process for a fresh one, so it relies on fake identifiers.
-  The paper only says `IDSET` is "an arbitrary totally ordered domain". If `|IDSET| = n`, every
-  system is the whole of `IDSET`, and "`lid := min IDSET`" is self-stabilizing in every class.
-  Then Theorems 2–5 all fail. We assume an infinite identifier domain. (`constAlg_selfStab`)
-* **Lemma 7 is false as stated (harmless).** The lemma says that if `p` receives a record whose
-  map contains `id ≠ id(p)`, then `id ∈ Gstable(p)` for the next `Δ` configurations. This fails
-  when the record is `p`'s own relayed record, because line 12 skips records with `id = id(p)`.
-  - Setup: 0-indexed rounds, `Δ = 2`, `V = {p, a, k}`, empty initial maps.
-  - Edges: `k → p` in round 1, `p → a` in round 3, `a → p` in round 4.
-  - In round 4, `p` receives its own record `⟨p, {p, k}, 1⟩` back, and it is skipped. The entry
-    of `k` expired at configuration 4, so `k ∉ Gstable(p)` at configuration 5.
+### ⚠️ Theorems 2–5 (identifier domain `IDSET`, under-specified)
+The impossibilities fail when `|IDSET| = n`: then "`lid := min IDSET`" is self-stabilizing in every
+class (`constAlg_selfStab`).
 
-  Every use of the lemma has `id ≠ id(p)`. We add this hypothesis. (`lemma_7`)
-* **Lemma 16: proof gap, statement true.** This has the same root cause as Lemma 7.
-  - The proof takes the last round in which `q` received *any* record mentioning `id(p)`, and
-    assumes that line 17 refreshed `Gstable(q)[id(p)]` in that round.
-  - But line 12 skips `q`'s own relayed records.
+**Impact.** An implied assumption: every impossibility proof swaps a process for a fresh one, so it
+needs fake identifiers, i.e. more identifiers than processes. With an infinite identifier domain
+all impossibilities hold.
 
-  Restricting to records with `id ≠ id(q)` fixes this; Lemma 5's proof already does so.
-  (`lemma_5`, `lemma_16`)
-* **Lemma 12: proof gap, statement true.** In the third case the distance `d = d̂_i(r, q)`
-  depends on `i`, yet the proof concludes "`∀ i ≥ t_p + d + 1`". Choosing the source round as
-  (target − `Δ`) fixes it. (`lemma_12`)
-* **Theorem 1: proof slip, statement true.** The proof works inside "a set `V` of `n > 1`
-  vertices". With `n = 2` the per-`V` hierarchy collapses in two ways.
-  - "Recurrent" equals "quasi-timely": the direct edge must appear infinitely often.
-  - "Has a source" equals "has a sink": the out-star witness `G(1S)` has a sink.
+**Details.** The paper only says `IDSET` is "an arbitrary totally ordered domain". If
+`|IDSET| = n`, every system is the whole of `IDSET`, so there are no fake identifiers.
 
-  Classes range over all vertex sets, so Theorem 1 itself holds (`theorem_1_classes`). It
-  follows from the per-`V` version for `n ≥ 3` (`theorem_1`). The `n = 2` facts are
-  `theorem_1_false_card_two`, `J_src_eq_snk_of_card_two` and `not_theorem_1_card_two`.
-* Small slips:
-  * An intermediate claim of Lemma 8's proof is wrong: "no record tagged with a fake ID in any
-    `msgs` after `Δ` rounds" fails at `γ_{Δ+1}`. An initial record can still be there with timer
-    `0`, but it is never sent. Lemma 8 itself (for `i > 4Δ`) holds. (`lemma_8a_imprecise`,
-    `fake_G`)
-  * Lemma 10's proof considers rounds `i > 2Δ + 1` but concludes `t_r ≤ 2Δ + 1`. The argument
-    does work from `2Δ + 1`. (`lemma_10`)
+**Repair.** We assume an infinite identifier domain.
 
-Theorem 4 needs `n ≥ 3`, as the paper says. For `n = 2`, LE is pseudo-stabilizing in
-`J^B_{*,1}(Δ)` (`theorem_4_card_two`).
+### ⚠️ Lemma 7 (own relayed record)
+Lemma 7 says that if `p` receives a record whose map contains `id ≠ id(p)`, then
+`id ∈ Gstable(p)` for the next `Δ` configurations; this fails when the record is `p`'s own relayed
+record, because line 12 skips records with `id = id(p)`.
+
+**Impact.** Harmless: every use of the lemma has `id ≠ id(p)`. We add this hypothesis
+(`lemma_7`).
+
+**Details.**
+- Setup: 0-indexed rounds, `Δ = 2`, `V = {p, a, k}`, empty initial maps.
+- Edges: `k → p` in round 1, `p → a` in round 3, `a → p` in round 4.
+- In round 4, `p` receives its own record `⟨p, {p, k}, 1⟩` back, and it is skipped. The entry
+  of `k` expired at configuration 4, so `k ∉ Gstable(p)` at configuration 5.
+
+### Typos and slips
+- An intermediate claim of Lemma 8's proof is wrong: "no record tagged with a fake ID in any
+  `msgs` after `Δ` rounds" fails at `γ_{Δ+1}`. An initial record can still be there with timer
+  `0`, but it is never sent. Lemma 8 itself (for `i > 4Δ`) holds. (`lemma_8a_imprecise`,
+  `fake_G`)
+- Lemma 10's proof considers rounds `i > 2Δ + 1` but concludes `t_r ≤ 2Δ + 1`. The argument
+  does work from `2Δ + 1`. (`lemma_10`)
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 16 (own relayed records)
+The proof takes the last round in which `q` received *any* record mentioning `id(p)` and assumes
+that line 17 refreshed `Gstable(q)[id(p)]` in that round, but line 12 skips `q`'s own relayed
+records.
+
+**Impact.** Statement true; same root cause as Lemma 7. Restricting to records with
+`id ≠ id(q)` fixes this; Lemma 5's proof already does so. (`lemma_5`, `lemma_16`)
+
+### 🛠️ Lemma 12 (quantifiers in the third case)
+In the third case the distance `d = d̂_i(r, q)` depends on `i`, yet the proof concludes
+"`∀ i ≥ t_p + d + 1`".
+
+**Impact.** Statement true; choosing the source round as (target − `Δ`) fixes it. (`lemma_12`)
+
+### 🛠️ Theorem 1 (proof for two vertices)
+The proof works inside "a set `V` of `n > 1` vertices", but with `n = 2` the per-`V` hierarchy
+collapses (`theorem_1_false_card_two`, `J_src_eq_snk_of_card_two`, `not_theorem_1_card_two`).
+
+**Impact.** Statement true: classes range over all vertex sets, so Theorem 1 itself holds
+(`theorem_1_classes`). It follows from the per-`V` version for `n ≥ 3` (`theorem_1`).
+
+**Details.** With `n = 2` the per-`V` hierarchy collapses in two ways.
+- "Recurrent" equals "quasi-timely": the direct edge must appear infinitely often.
+- "Has a source" equals "has a sink": the out-star witness `G(1S)` has a sink.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
 ## The formalization
+
+Theorem 4 needs `n ≥ 3`, as the paper says. For `n = 2`, LE is pseudo-stabilizing in
+`J^B_{*,1}(Δ)` (`theorem_4_card_two`).
 
 **Model.**
 * **Dynamic graphs.** `ι` is the identifier domain (processes = identifiers), infinite. A system

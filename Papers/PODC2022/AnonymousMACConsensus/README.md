@@ -14,39 +14,54 @@ properties.
 
 ## Mistakes in the paper
 
-* **MAC-SC is not wait-free under assumption (iii) as stated.** The abstract says all algorithms are
-  wait-free. Section 2 says the handler processes queued messages one by one and "has a priority over the
-  execution of the main thread". So line 1 or line 4 of an operation can run only when the handler's queue is
-  empty. Take two nodes. Node `1` runs `Store₁` operations forever. In every round, its new message reaches
-  node `0` before node `0`'s handler has processed the previous one. Node `0`'s queue then always holds one or
-  two messages and is never empty. In this infinite execution nobody crashes, every broadcast is delivered and
-  acknowledged, and node `1` completes one operation per round. Node `0`'s handler processes every message it
-  receives, within two rounds. Yet node `0`'s `Collect₀` never executes line 4 and never returns. The property
-  is false as written, but the intended fix is local and can be read off the proof of Theorem 1. The proof only
-  needs the messages delivered *before an operation's invocation* to be processed before its line 1/4. Under
-  that weaker rule the main thread cannot starve. We classify it as a missing implied assumption (R3/R4). It is
-  borderline: a reader who takes the paper's asynchrony literally gets a non-wait-free algorithm.
-  (`Starvation.mac_sc_not_wait_free`)
-* **Assumption (iii) is necessary for Theorem 1 (not an error; the paper does assume it).** Suppose the main
-  thread may read `view_i` while delivered messages are still queued. Node `0` completes `Store₀(7)`, and its
-  message waits in node `1`'s queue. Node `1` then invokes `Collect₁` and returns `∅`. This violates Property
-  I(i). The proof sketch of Property I ("node `i` has not received any message from `j`'s mac-broadcast") and
-  of Property II both use (iii) silently. (`theorem_1_needs_priority`)
-* **Minor imprecisions** (the statements are unaffected):
-  - The merge `A ∪ B` keeps "the newer value from each node". The paper calls this well defined because values
-    are unique and operations sequential. But a node cannot compute it from unique values alone, because a stale
-    view can arrive after a newer one. It needs the sequence numbers that the paper mentions as the way to
-    make values unique. We tag every stored value with the index of its store operation and merge by that
-    index.
-  - The proof sketch of Property II says that when a mac-broadcast completes "all the fault-free nodes have
-    received the broadcast message". What is needed, and what the MAC layer gives, is "every node not crashed
-    yet". The node of the later collect may crash after that collect returns, so it need not be fault-free.
-  - Property I(ii)'s "we can prove by contradiction" is left to the reader. The argument needs the merge to
-    never replace an entry by an older one, which again relies on sequence numbers.
+### ⚠️ Abstract: "all of the algorithms are wait-free" (MAC-SC under assumption (iii))
+Under assumption (iii) as stated (the handler has priority over the main thread), the adversary can keep a node's
+message queue non-empty forever, so with two nodes a `Collect₀` never returns (`Starvation.mac_sc_not_wait_free`).
+
+**Impact.** A missing implied assumption (R3/R4), borderline: the intended fix is local and can be read off the
+proof of Theorem 1, and under it the main thread cannot starve. But a reader who takes the paper's asynchrony
+literally gets a non-wait-free algorithm.
+
+**Details.** Section 2 says the handler processes queued messages one by one and "has a priority over the execution
+of the main thread". So line 1 or line 4 of an operation can run only when the handler's queue is empty. Take two
+nodes. Node `1` runs `Store₁` operations forever. In every round, its new message reaches node `0` before node
+`0`'s handler has processed the previous one. Node `0`'s queue then always holds one or two messages and is never
+empty. In this infinite execution nobody crashes, every broadcast is delivered and acknowledged, and node `1`
+completes one operation per round. Node `0`'s handler processes every message it receives, within two rounds. Yet
+node `0`'s `Collect₀` never executes line 4 and never returns.
+
+**Repair.** The proof only needs the messages delivered *before an operation's invocation* to be processed before
+its line 1/4. Under that weaker rule the main thread cannot starve.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 1 (proof sketch: merge and delivery)
+The proof sketch relies on a merge that keeps "the newer value from each node", which a node cannot compute from
+unique values alone, and on delivery to "all the fault-free nodes" where "every node not crashed yet" is needed.
+
+**Impact.** Minor imprecisions; Theorem 1 is unaffected.
+
+**Details.**
+- The merge `A ∪ B` keeps "the newer value from each node". The paper calls this well defined because values
+  are unique and operations sequential. But a node cannot compute it from unique values alone, because a stale
+  view can arrive after a newer one. It needs the sequence numbers that the paper mentions as the way to
+  make values unique. We tag every stored value with the index of its store operation and merge by that
+  index.
+- The proof sketch of Property II says that when a mac-broadcast completes "all the fault-free nodes have
+  received the broadcast message". What is needed, and what the MAC layer gives, is "every node not crashed
+  yet". The node of the later collect may crash after that collect returns, so it need not be fault-free.
+- Property I(ii)'s "we can prove by contradiction" is left to the reader. The argument needs the merge to
+  never replace an entry by an older one, which again relies on sequence numbers.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
 ## The formalization
+
+**Assumption (iii) is necessary for Theorem 1** (not an error; the paper does assume it). Suppose the main
+thread may read `view_i` while delivered messages are still queued. Node `0` completes `Store₀(7)`, and its
+message waits in node `1`'s queue. Node `1` then invokes `Collect₁` and returns `∅`. This violates Property
+I(i). The proof sketch of Property I ("node `i` has not received any message from `j`'s mac-broadcast") and
+of Property II both use (iii) silently. (`theorem_1_needs_priority`)
 
 **Model** (`Model.lean`).
 * Asynchronous, single-hop abstract MAC layer, deterministic nodes, any number of crash failures. Nodes form an

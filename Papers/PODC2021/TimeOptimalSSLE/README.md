@@ -16,32 +16,44 @@ correct: from every valid configuration a silent, correctly ranked configuration
 
 ## Mistakes in the paper
 
-* **Protocol 3 (`Optimal-Silent-SSR`) is incorrect as printed; Theorem 4.3 fails for it.** Line 9 lets a settled
-  agent recruit only if `2 · i.rank + i.children < n`. New ranks are created only by `Reset` (rank 1) and by
-  recruitment (rank `2·rank + children`), so **no agent can ever obtain rank `n`** unless it already had it. Hence
-  from the all-`Unsettled` configuration — or from any configuration after a complete reset — no correctly ranked
-  configuration is ever reached, for every `n ≥ 2` and all `Rmax, Dmax, Emax`; the protocol stabilizes with
-  probability 0. Figure 1 (rank 12 assigned for `n = 12`) shows that `≤ n` is meant. This is a typo-level fix, but
-  the printed protocol is false. (`OptimalSilent.asWritten_never_ranked`, `asWritten_not_selfStabilizes`; fixed
-  version: `OptimalSilent.fixed_selfStabilizes`)
-* **Observation 2.6's explicit bound is false for `n = 2` (degenerate); the proof has a wrong estimate.** The
-  claim "for any `α > 0`, probability `≥ ½ n^{-3α}` to require `≥ α n ln n` convergence time" fails for `n = 2`:
-  `Silent-n-state-SSR` with two agents is correctly ranked after the first interaction from every configuration,
-  under every schedule, so its convergence time is at most `1/2 < 2 ln 2`. In the proof,
-  `(1 − 3/n²)^{α n² ln n} ≥ ½ e^{−3α ln n}` is false for large `α` (e.g. `n = 10`, `α = 7`), and
-  `1/C(n,2) < 3/n²` needs `n ≥ 4`. For `n = 3` the claim also fails for large `α` (e.g. `α = 10`; checked
-  numerically, not in Lean). The claim holds for `n ≥ 4` with the exact success probability
-  `2/(n(n−1))`, and the `Ω(n)` expected-time statement is fine. (`obs26_n2_counterexample`; the deterministic core
-  and the geometric tail are `obs26_null_of_ne`, `obs26_two_leaders`, `obs26_stay_prob`)
-* **Under-specified pseudocode of Protocols 2–4.** The field list of Protocol 3 omits `resetcount = 0`;
+### ⚠️ Protocol 3 (`Optimal-Silent-SSR`, recruitment guard) and Theorem 4.3
+As printed, Protocol 3 never stabilizes: line 9's guard `2 · i.rank + i.children < n` means no agent can ever
+obtain rank `n`, so from the all-`Unsettled` configuration no correctly ranked configuration is reached, for every
+`n ≥ 2` (`OptimalSilent.asWritten_never_ranked`, `asWritten_not_selfStabilizes`).
+
+**Impact.** A typo with evident intent: Figure 1 (rank 12 assigned for `n = 12`) shows that `≤ n` is meant, and
+with `≤ n` we prove Theorem 4.3's correctness for `Rmax, Dmax ≥ 2` (`OptimalSilent.fixed_selfStabilizes`). But the
+printed protocol is false.
+
+**Details.** New ranks are created only by `Reset` (rank 1) and by recruitment (rank `2·rank + children`), so
+**no agent can ever obtain rank `n`** unless it already had it. Hence from the all-`Unsettled` configuration — or
+from any configuration after a complete reset — no correctly ranked configuration is ever reached, for every
+`n ≥ 2` and all `Rmax, Dmax, Emax`; the protocol stabilizes with probability 0.
+
+### ⚠️ Observation 2.6 for `n = 2` and `n = 3` (explicit tail bound)
+The claim "for any `α > 0`, probability `≥ ½ n^{-3α}` to require `≥ α n ln n` convergence time" fails for `n = 2`,
+where `Silent-n-state-SSR` is correctly ranked after the first interaction (`obs26_n2_counterexample`).
+
+**Impact.** Degenerate: the claim holds for `n ≥ 4` with the exact success probability `2/(n(n−1))`, and the
+`Ω(n)` expected-time statement is fine. For `n = 3` the claim also fails for large `α`.
+
+**Details.** With two agents, `Silent-n-state-SSR` is correctly ranked after the first interaction from every
+configuration, under every schedule, so its convergence time is at most `1/2 < 2 ln 2`. The proof has a wrong
+estimate: `(1 − 3/n²)^{α n² ln n} ≥ ½ e^{−3α ln n}` is false for large `α` (e.g. `n = 10`, `α = 7`), and
+`1/C(n,2) < 3/n²` needs `n ≥ 4`. For `n = 3` the claim fails e.g. for `α = 10` (checked numerically, not in
+Lean). The deterministic core and the geometric tail are `obs26_null_of_ne`, `obs26_two_leaders`,
+`obs26_stay_prob`.
+
+### Typos and slips
+- Under-specified pseudocode of Protocols 2–4. The field list of Protocol 3 omits `resetcount = 0`;
   `Propagate-Reset(a, b)` is written for a Resetting `a` but called also when only `b` is Resetting; the `leader`
   bit of agents brought into `Resetting` is not set (the text says `L`); "just became 0" and line 10's
   `b.role ≠ Resetting` (for `i = b`) are ambiguous. We fixed one reading (`differencies.md`, item 21); the
   off-by-one does not depend on it, and the model checker finds the fixed protocol correct under the alternative
   reading of line 10 too.
-* **Typos.** Proof of Lemma 2.2: `∑_{j=1}^{n−1} m_j = n` (should start at `j = 0`) and `S_k − S_{k−r+1}` (should be
-  `S_{k−r−1}`, `S_{−1} = 0`). Proof of Theorem 2.4: the slow initial configuration is "`m_1(C_0) = 2`" but should be
-  `m_0(C_0) = 2`.
+- Proof of Lemma 2.2: `∑_{j=1}^{n−1} m_j = n` (should start at `j = 0`) and `S_k − S_{k−r+1}` (should be
+  `S_{k−r−1}`, `S_{−1} = 0`).
+- Proof of Theorem 2.4: the slow initial configuration is "`m_1(C_0) = 2`" but should be `m_0(C_0) = 2`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
