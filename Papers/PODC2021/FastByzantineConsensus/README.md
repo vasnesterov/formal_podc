@@ -12,28 +12,28 @@ paper's safety proof has one gap, which we repaired with a harmless extra check.
 
 ## Mistakes in the paper
 
-- **Proof gap in protocol safety: votes from "future" views (Sections 3.2–3.3, Appendix A).** A vote
-  `(x, u, σ, τ)` sent to the leader of view `v` is valid if its certificates check out. Nothing requires `u < v`.
-  During asynchrony, other processes may already be in higher views, so a Byzantine voter can attach a correctly
-  certified proposal from some view `u ≥ v`. The highest view `w` among the valid votes can then be `≥ v`. The
-  proof's induction on views ("every certified value of an earlier view is safe") cannot be applied to `w`. The
-  commit certificate carried in a vote has the same problem. This is a gap in the proof, not a known protocol bug:
-  safety of the unmodified protocol is plausibly provable by a different induction, for example on certificate
-  creation time. We add the check that a vote for view `v` may only carry a proposal and a commit certificate
-  from views `< v`. Correct processes only send such votes, so liveness is unaffected. (`Protocol.ValidBallot`,
-  `Protocol.ValidCC`, `Protocol.consistency`)
-- **Imprecision: commit certificates in case (3) of the Appendix A.3 safety induction (used for Theorem A.4).** The
-  proof argues that a slow-path decision for `x` in view `w` would leave a commit certificate for `x` in view `w` in
-  votes′. This needs two things. First, a correct process
-  commits only for its current view; this follows from the paper's rule behind Lemma 3.1. Second, "the latest
-  commit certificate" must mean the one with the highest view rather than the most recent in time. The two
-  coincide once the first point holds. We make both explicit.
-- **Theorem 4.5 is false in the degenerate case `f = 1, t = 0`.** Then `3f + 2t − 2 = 1`, and with a single process
-  "decide your own input at once" is an `f`-resilient `t`-two-step protocol. This is outside the paper's intended
-  scope, since §4.1 assumes `n ≥ 3f + 1` and the protocol assumes `t ≥ 1`. We prove the lower bound for every
-  `2 ≤ n ≤ 3f + 2t − 2`, not just `n = 3f + 2t − 2`. (`theorem_4_5_fails_f1_t0`, `no_fastConsensus_of_le`)
-- **Unstated hypotheses (not errors).** Lemma 4.4 uses `n ≥ 2t + 2`, which follows from `n ≥ 3f + 1`, and at
-  least two input values.
+No mistakes in the statements.
+
+## Proof gaps (statements true)
+
+### 🛠️ Protocol safety (Sections 3.2–3.3, Appendix A: votes from "future" views)
+The safety proof's induction on views breaks because nothing requires a valid vote sent to the leader of
+view `v` to carry a proposal (or commit certificate) from a view `u < v`, so the highest view `w` among the
+valid votes can be `≥ v`.
+
+**Impact.** A gap in the proof, not a known protocol bug; repaired with a harmless extra check
+(`Protocol.ValidBallot`, `Protocol.ValidCC`, `Protocol.consistency`).
+
+**Details.** A vote `(x, u, σ, τ)` sent to the leader of view `v` is valid if its certificates check out.
+During asynchrony, other processes may already be in higher views, so a Byzantine voter can attach a
+correctly certified proposal from some view `u ≥ v`. The proof's induction on views ("every certified value of
+an earlier view is safe") cannot then be applied to `w`. The commit certificate carried in a vote has the same
+problem. Safety of the unmodified protocol is plausibly provable by a different induction, for example on
+certificate creation time.
+
+**Repair.** We add the check that a vote for view `v` may only carry a proposal and a commit certificate from
+views `< v`. Correct processes only send such votes, so liveness is unaffected. (`Protocol.ValidBallot`,
+`Protocol.ValidCC`, `Protocol.consistency`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -76,6 +76,20 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 The case `n ≤ 3f` reuses Theorem 1 of the PODC 2023 *Validity of Consensus* formalization
 (`SolvesConsensusAuth.trivial`, `Cslib/Computability/Distributed/Byzantine/PartialSync/Triviality.lean`).
+
+**Proof remarks.**
+- *Commit certificates in case (3) of the Appendix A.3 safety induction (used for Theorem A.4): an
+  imprecision.* The proof argues that a slow-path decision for `x` in view `w` would leave a commit
+  certificate for `x` in view `w` in votes′. This needs two things. First, a correct process commits only for
+  its current view; this follows from the paper's rule behind Lemma 3.1. Second, "the latest commit
+  certificate" must mean the one with the highest view rather than the most recent in time. The two coincide
+  once the first point holds. We make both explicit.
+- *Theorem 4.5 in the degenerate case `f = 1, t = 0`.* Then `3f + 2t − 2 = 1`, and with a single process
+  "decide your own input at once" is an `f`-resilient `t`-two-step protocol (`theorem_4_5_fails_f1_t0`). This
+  is outside the paper's intended scope, since §4.1 assumes `n ≥ 3f + 1` and the protocol assumes `t ≥ 1`. We
+  prove the lower bound for every `2 ≤ n ≤ 3f + 2t − 2`, not just `n = 3f + 2t − 2` (`no_fastConsensus_of_le`).
+- *Unstated hypotheses (not errors).* Lemma 4.4 uses `n ≥ 2t + 2`, which follows from `n ≥ 3f + 1`, and at
+  least two input values.
 
 **Shared infrastructure.** The two-step execution `tsRun` and the executions `ρ₃`, `ρ₄` with their
 indistinguishability and admissibility lemmas are `Cslib/Computability/Distributed/Byzantine/PartialSync/TwoStepLowerBound.lean` (shared with

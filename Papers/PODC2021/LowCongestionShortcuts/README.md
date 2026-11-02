@@ -13,46 +13,84 @@ halving round. The construction in the proof of the lower bound (Lemma 3.2) does
 
 ## Mistakes in the paper
 
-- **Theorem 3.1: a part can have `8δ + 1` blocks, not `8δ` (statement off by one; false in a degenerate case).**
-  In case (I), the blocks of `P_i` are counted by their topmost vertices. The proof counts only overcongested edges
-  `(e, P_i) ∈ B`, but the topmost vertex of a block can also be the root, which has no parent edge and is never
-  overcongested. On the one-vertex graph `δ(G) = 0`, yet the part `{v}` always has one block, so `8δ = 0` blocks is
-  impossible. We prove the theorem with `8δ + 1` blocks. Whether `8δ` holds for non-degenerate graphs is left open.
-  The effect on Theorem 1.2 is dilation `(8δ + 1)(2D + 1)` instead of `8δ(2D + 1)`.
-  (`theorem_3_1_literal_false_singleton`, `theorem_3_1`)
-- **Case (II), proof error: some edges of `B` are never present in `B_{P'}`.** The lower endpoint `v_e` of an
-  overcongested edge may itself lie in a part `P_i`. Then the representative is `v_e`, so the path "from `v_e` to
-  `r` excluding `r`" is empty. Moreover, the edge-node `e` exists only if `P_i ∉ P'`, so the pair `(e, P_i)` is never
-  present, and the bound `E|E_{P'}| ≥ 3k/(16D)` is unjustified. Repair: each edge-node loses at most one such pair,
-  since parts are disjoint. We compensate with a sharper presence probability `(1 − p)^{D−1} ≥ (3D+1)/(4D)` instead
-  of `3/4`, together with `δ ≥ 1/2` for any graph with an edge. The arithmetic then closes. (`exists_blocker`,
-  `caseII_false`, `final_arith`)
-- **Case (II), proof error: representatives must be topmost.** "Some representative `r ∈ P_i` reachable from
-  `v_e` via `T \ O`" does not give the claimed independence from the event `P_i ∈ P'`. That needs the path from `v_e`
-  to `r` to avoid `P_i`, so `r` must be the first vertex of `P_i` on the way down. (`exists_rep`)
-- **Case (II), proof error: strictness and the edge-node count.** "At least half of the parts have degree at least
-  `8δ`" yields only `≥` where the proof needs `<`. The fix is to take the exact negation of case (I): more than half
-  of the parts have degree strictly greater than `8δ`. Separately, an edge-node whose `v_e` lies in no part is always
-  present, so the paper's claim that each edge-node is included with probability `1 − 1/(4D)` is wrong. This is
-  harmless for the arithmetic, which only uses the bound `|O| ≤ k/c` on the number of edge-nodes, but it means the
-  strict inequality must come from the part-nodes. The connectivity and disjointness of the branch sets of `B_{P'}` are
-  only asserted in the paper; we prove them.
-- **Observation 2.6 is false as stated.** Definition 2.3 lets a tree-restricted `H_i` contain tree edges far from
-  `P_i`. A block of such an `H_i` need not meet `P_i`, so `G[P_i] + H_i` can be disconnected and the dilation is
-  infinite. Counterexample: the path `0 – 1 – 2` rooted at 0, part `{2}`, `H = {01}`; there are two blocks, but 2 is
-  disconnected from 0. Repair: require every block to contain a vertex of its part. We add this to Definitions
-  2.4/2.5. The shortcuts built in Theorem 3.1 ("all ancestor edges of `P_i`") satisfy it.
-  (`observation_2_6_counterexample`, `observation_2_6`, `blocksMeetPart_shortcut`)
-- **Observation 2.7: the proof's `log₂ k` halving rounds are not enough.** For `k` parts one needs `⌊log₂ k⌋ + 1`
-  rounds; for `k = 1` part, one round is needed but `log₂ 1 = 0`. The congestion becomes `c(⌊log₂ n⌋ + 1)`, which is harmless asymptotically.
-  (`observation_2_7`)
-- **Lemma 3.2 (lower bound): the constructed graph violates the diameter bound (the proof fails; the statement is
-  plausibly true).** The proof shows that every vertex is within `1.5D + 1` of the middle of the top path. That
-  bounds the radius, but the proof concludes "diameter ≤ 1.5D + 1 ≤ D'"; the diameter can be nearly twice as
-  large. For `δ' = 5`, `D' = 12` (so `δ = 3`, `k = 2`, `D = 6`, 174 vertices), the vertices `v_{3,3}` and `v_{10,11}`
-  are at distance exactly 15. Numerical experiments (not formal) suggest that `k = ⌊(D' − 2)/(3δ)⌋` repairs the
-  construction. Also, Figure 3.2 uses `δ' = 3`, outside the lemma's range `δ' ≥ 5`.
-  (`LowerBound.paperGraph_dist_eq`, `LowerBound.paperGraph_not_diam_le`)
+### ⚠️ Theorem 3.1 (block count `8δ`)
+The proof of Theorem 3.1 only bounds the block count by `8δ + 1`, and the literal `8δ` is false on the
+one-vertex graph, where `δ(G) = 0` but the part `{v}` always has one block
+(`theorem_3_1_literal_false_singleton`).
+
+**Impact.** An off-by-one: we prove the theorem with `8δ + 1` blocks (`theorem_3_1`), so Theorem 1.2 gets
+dilation `(8δ + 1)(2D + 1)` instead of `8δ(2D + 1)`. Whether `8δ` holds for non-degenerate graphs is left open.
+
+**Details.** In case (I), the blocks of `P_i` are counted by their topmost vertices. The proof counts only
+overcongested edges `(e, P_i) ∈ B`, but the topmost vertex of a block can also be the root, which has no
+parent edge and is never overcongested. On the one-vertex graph this makes `8δ = 0` blocks impossible.
+
+### ⚠️ Observation 2.6 (blocks far from the part)
+Observation 2.6 is false as stated: on the path `0 – 1 – 2` rooted at 0, with part `{2}` and `H = {01}`, there
+are two blocks, but 2 is disconnected from 0, so the dilation is infinite (`observation_2_6_counterexample`).
+
+**Impact.** Fixed by the evident condition that every block meets its part, which the shortcuts built in
+Theorem 3.1 satisfy (`observation_2_6`, `blocksMeetPart_shortcut`).
+
+**Details.** Definition 2.3 lets a tree-restricted `H_i` contain tree edges far from `P_i`. A block of such
+an `H_i` need not meet `P_i`, so `G[P_i] + H_i` can be disconnected.
+
+**Repair.** Require every block to contain a vertex of its part. We add this to Definitions 2.4/2.5. The
+shortcuts built in Theorem 3.1 ("all ancestor edges of `P_i`") satisfy it. (`observation_2_6`,
+`blocksMeetPart_shortcut`)
+
+### ⚠️ Lemma 3.2 (lower bound: diameter of the construction)
+The graph constructed in the proof of Lemma 3.2 violates the diameter bound: for `δ' = 5`, `D' = 12` (so
+`δ = 3`, `k = 2`, `D = 6`, 174 vertices), the vertices `v_{3,3}` and `v_{10,11}` are at distance exactly 15
+(`LowerBound.paperGraph_dist_eq`, `LowerBound.paperGraph_not_diam_le`).
+
+**Impact.** The proof fails, so Lemma 3.2 is unestablished; the statement is plausibly true with different
+constants. The upper bounds are unaffected.
+
+**Details.** The proof shows that every vertex is within `1.5D + 1` of the middle of the top path. That bounds
+the radius, but the proof concludes "diameter ≤ 1.5D + 1 ≤ D'"; the diameter can be nearly twice as large.
+Numerical experiments (not formal) suggest that `k = ⌊(D' − 2)/(3δ)⌋` repairs the construction. Also,
+Figure 3.2 uses `δ' = 3`, outside the lemma's range `δ' ≥ 5`.
+
+### ⚠️ Observation 2.7 (number of halving rounds)
+The proof's `log₂ k` halving rounds are not enough to cover `k` parts, which need `⌊log₂ k⌋ + 1` rounds (for
+`k = 1` part one round is needed but `log₂ 1 = 0`), so the stated congestion `c log₂ n` is not established.
+
+**Impact.** Harmless asymptotically: we prove congestion `c(⌊log₂ n⌋ + 1)` (`observation_2_7`).
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 3.1, case (II) (edges of `B` never present in `B_{P'}`)
+When the lower endpoint `v_e` of an overcongested edge lies in a part `P_i`, the pair `(e, P_i)` is never
+present in `B_{P'}`, so the bound `E|E_{P'}| ≥ 3k/(16D)` is unjustified.
+
+**Impact.** Repaired with a sharper presence probability (`exists_blocker`, `caseII_false`, `final_arith`).
+
+**Details.** The representative is then `v_e`, so the path "from `v_e` to `r` excluding `r`" is empty.
+Moreover, the edge-node `e` exists only if `P_i ∉ P'`, so the pair `(e, P_i)` is never present.
+
+**Repair.** Each edge-node loses at most one such pair, since parts are disjoint. We compensate with a sharper
+presence probability `(1 − p)^{D−1} ≥ (3D+1)/(4D)` instead of `3/4`, together with `δ ≥ 1/2` for any graph
+with an edge. The arithmetic then closes. (`exists_blocker`, `caseII_false`, `final_arith`)
+
+### 🛠️ Theorem 3.1, case (II) (representatives must be topmost)
+"Some representative `r ∈ P_i` reachable from `v_e` via `T \ O`" does not give the claimed independence from
+the event `P_i ∈ P'`, which needs the path from `v_e` to `r` to avoid `P_i`.
+
+**Impact.** Repaired by choosing `r` as the first vertex of `P_i` on the way down (`exists_rep`).
+
+### 🛠️ Theorem 3.1, case (II) (strictness and the edge-node count)
+"At least half of the parts have degree at least `8δ`" yields only `≥` where the proof needs `<`, and the
+claim that each edge-node is included with probability `1 − 1/(4D)` is wrong.
+
+**Impact.** Repaired; the arithmetic only needs the bound `|O| ≤ k/c` on the number of edge-nodes.
+
+**Details.** An edge-node whose `v_e` lies in no part is always present. This is harmless for the arithmetic,
+which only uses the bound `|O| ≤ k/c`, but it means the strict inequality must come from the part-nodes. The
+connectivity and disjointness of the branch sets of `B_{P'}` are only asserted in the paper; we prove them.
+
+**Repair.** Take the exact negation of case (I): more than half of the parts have degree strictly greater than
+`8δ`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

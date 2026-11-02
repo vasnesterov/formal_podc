@@ -15,34 +15,55 @@ extension-based) and the cited fact "NIS-solvable ⇒ IS-solvable" are proved.
 
 ## Mistakes in the paper
 
-* **Theorem 1, "Why the prover wins", first case: proof gap; the statement holds in the case we check.**
-  The paper argues: "if the values output in `D₀γ'` did satisfy the specifications of `S`, then the values
-  output in `C` would satisfy `R₂ ∘ S ∘ R₁`". Here `D₀` is any initial configuration of `A` compatible with
-  `C₀γ₁`, so its inputs are only fixed for processes that finished `A₁`. The prover may also reach `C`
-  before every process has finished `A₁`. Then `D₀` gives the other processes arbitrary inputs, and its
-  input vector need not be an output vector of `R₁` (it need not even be an input vector of `S`). A valid
-  `S`-output for that input vector then tells nothing about `T`. The step is correct only for final
-  configurations, but the paper's prover also wins by reaching partial configurations that already violate
-  `T`. Our repair: `𝒫` keeps the `A`-part with **canonical** inputs: the outputs of a fixed completion of
-  the `A₁`-part (`toA`, `ucan`). After every simulated step of `A₁`, not only the last one, `𝒫` re-reaches
-  this configuration by a chain of queries from the start of its phase. We also handle the
-  infinitely-many-phases case by a potential argument, since "`𝒫_T` can only end a finite number of phases
-  with `A₁`/`A₂`-only steps" needs one. (`theorem1_local`, `step_queryA1`, `ucan_mem`)
-* **General Theorem 1 (non-local `R₂`): two gaps we did not try to resolve.**
-  * The assignment-query step enumerates "the initial configurations `C₂` of `A₂` such that there is a
-    `P'`-only schedule from `C₂` that results in a configuration satisfying `f`". This ignores the steps of
-    `A₂` that other processes, possibly outside `P`, already took during `γ`. Such a step can be necessary
-    for `f`, so the filter can drop the right `g`, and the prover then answers `None` although a schedule
-    exists. The later exhaustive search over `μ₂` makes the filter unnecessary: enumerating all `g` repairs
-    this.
-  * More seriously, the claim that the `A₂`-schedules simulable from `C μ₁ μ'` "do not depend on the
-    particular schedule `μ'`" is asserted without proof. It is needed for the `None` answers to be correct.
-    With estimate vectors, the composite configuration after `μ'` records more than the outputs of `A`:
-    composite rounds and copied estimates. So the claim needs a real argument, which the paper defers
-    together with the correctness of the composition. We neither prove nor refute it.
-* **Typos.** "Suppose `R₂ ∘ S ∘ R₂` is a reduction" (§1) and "`R₁ ∘ S ∘ R₂`" / "`R₂ ∘ S ∘ R₂`" (§7, "Why the
-  prover wins") should read `R₂ ∘ S ∘ R₁`. In §3, "if `δ(s'ᵢ) ≠ ⊥` then `pᵢ` outputs `δ(sᵢ)`. If `δ(sᵢ) = ⊥` …" should read
-  `δ(s'ᵢ)` in both places.
+No mistakes in the statements.
+
+### Typos and slips
+- "Suppose `R₂ ∘ S ∘ R₂` is a reduction" (§1) and "`R₁ ∘ S ∘ R₂`" / "`R₂ ∘ S ∘ R₂`" (§7, "Why the prover wins")
+  should read `R₂ ∘ S ∘ R₁`.
+- In §3, "if `δ(s'ᵢ) ≠ ⊥` then `pᵢ` outputs `δ(sᵢ)`. If `δ(sᵢ) = ⊥` …" should read `δ(s'ᵢ)` in both places.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 1 ("Why the prover wins", first case)
+The step "if the values output in `D₀γ'` did satisfy the specifications of `S`, then the values output in
+`C` would satisfy `R₂ ∘ S ∘ R₁`" fails when the prover reaches `C` before every process has finished `A₁`,
+because `D₀` then gives those processes arbitrary inputs.
+
+**Impact.** Statement true in the case we check (`R₂` local); repaired by choosing `D₀` canonically
+(`theorem1_local`, `step_queryA1`, `ucan_mem`).
+
+**Details.** `D₀` is any initial configuration of `A` compatible with `C₀γ₁`, so its inputs are only fixed
+for processes that finished `A₁`. If the prover reaches `C` before every process has finished `A₁`, `D₀`'s
+input vector need not be an output vector of `R₁` (it need not even be an input vector of `S`). A valid
+`S`-output for that input vector then tells nothing about `T`. The step is correct only for final
+configurations, but the paper's prover also wins by reaching partial configurations that already violate
+`T`.
+
+**Repair.** `𝒫` keeps the `A`-part with **canonical** inputs: the outputs of a fixed completion of the
+`A₁`-part (`toA`, `ucan`). After every simulated step of `A₁`, not only the last one, `𝒫` re-reaches this
+configuration by a chain of queries from the start of its phase. We also handle the
+infinitely-many-phases case by a potential argument, since "`𝒫_T` can only end a finite number of phases
+with `A₁`/`A₂`-only steps" needs one. (`theorem1_local`, `step_queryA1`, `ucan_mem`)
+
+### 🛠️ General Theorem 1 (non-local `R₂`, assignment queries)
+In the general case the assignment-query step filters candidates in a way that can drop the right `g`, and
+it relies on the unproved claim that the `A₂`-schedules simulable from `C μ₁ μ'` "do not depend on the
+particular schedule `μ'`".
+
+**Impact.** Outside the checked scope: the general case is not formalized, and we did not try to resolve
+these two gaps; the first is easily repaired, the second is neither proved nor refuted. The verdict concerns
+only the local case.
+
+**Details.**
+- The assignment-query step enumerates "the initial configurations `C₂` of `A₂` such that there is a
+  `P'`-only schedule from `C₂` that results in a configuration satisfying `f`". This ignores the steps of
+  `A₂` that other processes, possibly outside `P`, already took during `γ`. Such a step can be necessary for
+  `f`, so the filter can drop the right `g`, and the prover then answers `None` although a schedule exists.
+  The later exhaustive search over `μ₂` makes the filter unnecessary: enumerating all `g` repairs this.
+- More seriously, the independence claim is asserted without proof. It is needed for the `None` answers to
+  be correct. With estimate vectors, the composite configuration after `μ'` records more than the outputs
+  of `A`: composite rounds and copied estimates. So the claim needs a real argument, which the paper defers
+  together with the correctness of the composition. We neither prove nor refute it.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

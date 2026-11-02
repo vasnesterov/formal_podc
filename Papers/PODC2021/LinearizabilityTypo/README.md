@@ -13,14 +13,7 @@ Copy of the paper: [paper.pdf](paper.pdf).
 
 ## Mistakes in the paper
 
-We found no mistakes. Two implicit assumptions are made explicit:
-- The "only if" direction of locality (Theorem 5.1) needs the empty history to be legal for every object. This
-  follows from the paper's prefix-closed specifications, provided they are non-empty (left implicit in the paper).
-- "Total operation" (Section 3.3, Theorem 5.2) is read relative to the sequential specification: from every legal
-  complete sequential history, some response makes the operation legal.
-
-We did not formalize the paper's own proof of Theorem 5.1 (the Herlihy–Wing minimal-cycle argument). The theorem is
-proved by a different route; see below.
+No mistakes in the statements.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -37,7 +30,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
   linearization points are gaps between events, which is equivalent to distinct real-valued points.
 - The Section 3 counterexamples use concrete instances: 0/1 register values and queue values 1, 2.
 
-**Proof of Theorem 5.1 (locality).** Instead of the paper's minimal-cycle argument:
+**Implicit assumptions made explicit.**
+- The "only if" direction of locality (Theorem 5.1) needs the empty history to be legal for every object. This
+  follows from the paper's prefix-closed specifications, provided they are non-empty (left implicit in the paper).
+- "Total operation" (Section 3.3, Theorem 5.2) is read relative to the sequential specification: from every legal
+  complete sequential history, some response makes the operation legal.
+
+**Proof remarks.** We did not formalize the paper's own proof of Theorem 5.1 (the Herlihy–Wing minimal-cycle
+argument). Theorem 5.1 (locality) is proved by a different route:
 - Give each object's operations the running-maximum linearization points from Claim 1.
 - Points of different objects never coincide.
 - Merge all objects' operations by point. The result respects the real-time order of `H`.
