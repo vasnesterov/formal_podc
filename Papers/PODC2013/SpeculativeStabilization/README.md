@@ -17,59 +17,83 @@ Theorem 2 rest on ill-defined notions; we replaced them with a new proof.
 
 ## Mistakes in the paper
 
-* **Theorem 4 is false as stated.** Specification 1 lets `privileged_v` be "a predicate over variables
-  of `v` and possibly of its neighbours". The proof of Theorem 4 only makes the `t`-balls around `u` and
-  `v` agree with earlier configurations. A predicate that reads the neighbours needs the `(t+1)`-balls.
-  Concretely: on the complete graph `K_n` (`n ≥ 2`, `diam = 1`), take registers in `ℤ_n`. Process `v`
-  is privileged iff the sum of all registers is `v`, and a privileged process increments its register.
-  Exactly one process is privileged in *every* configuration, and the privilege goes round-robin. So
-  mutual exclusion holds from time 0 under the synchronous daemon, and even under the unfair one, while
-  the theorem claims `≥ ⌈1/2⌉ = 1` steps (`theorem_4_false`). On every star `K_{1,n-1}` (`n ≥ 3`,
-  `diam = 2`), a pointer held by the centre does the same under the synchronous daemon
-  (`theorem_4_false_star`). The general construction: pick a centre `z` of eccentricity `R` and a BFS
-  tree rooted at `z`. Process `z` increments a clock modulo `n`, every other process sets
-  `c_v := c_parent(v) + 1`, and `privileged_v ≡ (c_parent(v) = id_v)`. After `R - 1` synchronous steps
-  every clock within distance `R - 1` of `z` equals `c_z`, so mutual exclusion holds from time `R - 1`
-  on (`theorem_4_false_centre`). Whenever the radius is `⌈diam/2⌉` (all trees, complete graphs, stars,
-  odd square grids, …), this beats the claimed bound by one (`theorem_4_false_of_radius`). So the
-  abstract's claim that `⌈diam/2⌉` is optimal "even if asynchronous stabilization is not required" is
-  false in the paper's own model. What is true: if `privileged_v` reads the ball of radius `r` around
-  `v`, the bound is `⌈diam/2⌉ - r` (`theorem_4_radius`). For `r = 0` this is the paper's bound
-  (`theorem_4`). For `r = 1` it is tight on all graphs of radius `⌈diam/2⌉`. Optimality of SSME among
-  protocols whose `privileged` reads only the own state is not affected, since SSME's `privileged` reads
-  only `r_v` (`conv_time_ssme`). Lemma 5 also needs protocols given by local deterministic rules. Under
-  the paper's formal definition (an arbitrary set of global actions) it is false. We state it for local
-  rules (`lemma_5`).
-* **Lemma 4 is false (off by one).** It claims that if `γ₀ ∉ Γ₁`, every register at time `D = diam`
-  lies in `init ∪ {K-D, …, K-1} ∪ {0, …, 2D-1}`. Counterexample: `C₅` (`n = 5`, `D = 2`, `K = 29`) with
-  registers `(10, 10, 10, 12, 11)`. The incorrect edge `2–3` resets at step 0 and its neighbours reset at
-  step 1. Process 0 is at distance exactly `D` from the incorrect edge, keeps incrementing, and holds
-  `12` at time `D = 2` (`lemma_4_false`). The proof assumes that the reset wave reaches a process at
-  distance `i ≤ D` from the RA-enabled set by time `i`; it only acts there one step later. The proof
-  also claims that some process is RA-enabled whenever `γ₀ ∉ Γ₁`, which fails when all registers are
-  negative. Correct version: from time `D + 1` on, every register is `≤ t` or `≥ K - D - 1`
-  (`lemma_4_corrected`). This still gives Case 2 of Theorem 2, because the only privileged value
-  `≥ K - D - 1` is that of the process with identity `n - 1`.
-* **Islands (Definition 5) and Lemmas 2–3 are ill-defined; the statements we need hold.** An island is
-  "a maximal set `I ⊊ V` all of whose internal edges are correct". This requires neither connectivity
-  nor registers in `stab`, and it excludes `I = V`, which leaves a process uncovered when all registers
-  are in `stab` but a chord is incorrect. With the intended reading (components of the correct-edge
-  graph), the proof of Lemma 2 still uses "same island and `dist(u, v) ≤ D` ⇒ `d_K(r_u, r_v) ≤ D`". This
-  is false, because the path realising `dist(u, v)` may leave the island. Case 1 of Theorem 2 also
-  mixes up island depth (a maximum over the island) with the depth of `u`. We prove Case 1 differently,
-  with a *light cone* (`cone`): if `u` is privileged at time `i ≤ D`, every process within distance
-  `i-1-j` of `u` is `allCorrect` at time `j`, and the registers in the cone differ from `r_u` by at most
-  the distance, as integers. The equality case `i = D` needs one extra observation that the paper does
-  not make: a process that moves at step 0 is a local minimum (`no_two_priv_early`).
-* **Black boxes replaced by proofs.** The paper uses the convergence of the Boulinier–Petit–Villain
-  unison (PODC 2004, with conditions on `hole(g)` and `cyclo(g)`) and its synchronous bound
-  `α + lcp(g) + D` (Algorithmica 2008). For `α = n` and `K > n` we prove both from scratch. Convergence
-  under the unfair daemon uses chains of resets: with `α ≥ n`, a chain has fewer than `n` links. The
-  synchronous bound becomes `Γ₁` from time `n + α = 2n` on (`legit_sync`).
-* **Minor.** Lemma 1 also holds for `i = D` (we use this). Theorem 3 (`O(diam·n³)` steps under the unfair
-  daemon) only quotes Devismes–Petit [7] and is not formalized. The claim that SSME is
-  "sd-speculatively stabilizing" (Definition 4) depends on the asymptotic ratio of two convergence
-  times and is not formalized.
+### ❌ Theorem 4 (lower bound `⌈diam/2⌉` for every protocol)
+Theorem 4 is false when `privileged_v` reads the neighbours of `v`, as Specification 1 allows: on the
+complete graph `K_n` (`n ≥ 2`, `diam = 1`) a token-passing protocol has mutual exclusion from time 0,
+while the theorem claims at least `⌈1/2⌉ = 1` step (`theorem_4_false`).
+
+**Impact.** The abstract's claim that `⌈diam/2⌉` is optimal "even if asynchronous stabilization is not
+required" is false in the paper's own model: on every graph whose radius is `⌈diam/2⌉` (every tree,
+complete graph, star, odd square grid, …) some protocol needs only `⌈diam/2⌉ - 1` steps. The bound holds
+when `privileged_v` reads only `v`'s own state, as in SSME, so SSME is still optimal among such protocols
+(`theorem_4`, `conv_time_ssme`).
+
+**Details.** Specification 1 lets `privileged_v` be "a predicate over variables of `v` and possibly of
+its neighbours". The proof of Theorem 4 only makes the `t`-balls around `u` and `v` agree with earlier
+configurations. A predicate that reads the neighbours needs the `(t+1)`-balls.
+- Complete graph `K_n`: take registers in `ℤ_n`. Process `v` is privileged iff the sum of all registers
+  is `v`, and a privileged process increments its register. Exactly one process is privileged in
+  *every* configuration, and the privilege goes round-robin. So mutual exclusion holds from time 0
+  under the synchronous daemon, and even under the unfair one (`theorem_4_false`).
+- Star `K_{1,n-1}` (`n ≥ 3`, `diam = 2`): a pointer held by the centre does the same under the
+  synchronous daemon (`theorem_4_false_star`).
+- General construction: pick a centre `z` of eccentricity `R` and a BFS tree rooted at `z`. Process `z`
+  increments a clock modulo `n`, every other process sets `c_v := c_parent(v) + 1`, and
+  `privileged_v ≡ (c_parent(v) = id_v)`. After `R - 1` synchronous steps every clock within distance
+  `R - 1` of `z` equals `c_z`, so mutual exclusion holds from time `R - 1` on
+  (`theorem_4_false_centre`). Whenever the radius is `⌈diam/2⌉`, this beats the claimed bound by one
+  (`theorem_4_false_of_radius`).
+
+**Repair.** If `privileged_v` reads the ball of radius `r` around `v`, the bound is `⌈diam/2⌉ - r`
+(`theorem_4_radius`). For `r = 0` this is the paper's bound (`theorem_4`). For `r = 1` it is tight on all
+graphs of radius `⌈diam/2⌉`. Optimality of SSME among protocols whose `privileged` reads only the own
+state is not affected, since SSME's `privileged` reads only `r_v` (`conv_time_ssme`).
+
+### ❌ Lemma 4 (registers at time `D` after a non-legitimate start)
+Lemma 4 is off by one step: on `C₅` (`n = 5`, `D = 2`, `K = 29`) with registers `(10, 10, 10, 12, 11)`,
+process 0 holds `12` at time `D`, outside the claimed set `init ∪ {K-D, …, K-1} ∪ {0, …, 2D-1}`
+(`lemma_4_false`).
+
+**Impact.** Only the lemma is false; its corrected version still gives Case 2 of Theorem 2, which holds
+(`lemma_4_corrected`, `theorem_2`).
+
+**Details.** The lemma claims that if `γ₀ ∉ Γ₁`, every register at time `D = diam` lies in the set
+above. In the counterexample, the incorrect edge `2–3` resets at step 0 and its neighbours reset at
+step 1. Process 0 is at distance exactly `D` from the incorrect edge, keeps incrementing, and holds `12`
+at time `D = 2`. The proof assumes that the reset wave reaches a process at distance `i ≤ D` from the
+RA-enabled set by time `i`; it only acts there one step later. The proof also claims that some process
+is RA-enabled whenever `γ₀ ∉ Γ₁`, which fails when all registers are negative.
+
+**Repair.** From time `D + 1` on, every register is `≤ t` or `≥ K - D - 1` (`lemma_4_corrected`). This
+still gives Case 2 of Theorem 2, because the only privileged value `≥ K - D - 1` is that of the process
+with identity `n - 1`.
+
+### ⚠️ Definition 5 and Lemmas 2–3 (islands)
+Islands (Definition 5) are ill-defined, and the proof of Lemma 2 uses the false step "same island and
+`dist(u, v) ≤ D` ⇒ `d_K(r_u, r_v) ≤ D`", so Lemmas 2–3 are not established as stated.
+
+**Impact.** The statements we need hold: Case 1 of Theorem 2 is proved with a new argument that needs no
+islands (`cone`, `no_two_priv_early`), and Theorem 2 stands (`theorem_2`).
+
+**Details.** An island is "a maximal set `I ⊊ V` all of whose internal edges are correct". This requires
+neither connectivity nor registers in `stab`, and it excludes `I = V`, which leaves a process uncovered
+when all registers are in `stab` but a chord is incorrect. With the intended reading (components of the
+correct-edge graph), the proof of Lemma 2 still uses the step above. It is false, because the path
+realising `dist(u, v)` may leave the island. Case 1 of Theorem 2 also mixes up island depth (a maximum
+over the island) with the depth of `u`.
+
+**Repair.** We prove Case 1 with a *light cone* (`cone`): if `u` is privileged at time `i ≤ D`, every
+process within distance `i-1-j` of `u` is `allCorrect` at time `j`, and the registers in the cone differ
+from `r_u` by at most the distance, as integers. The equality case `i = D` needs one extra observation
+that the paper does not make: a process that moves at step 0 is a local minimum (`no_two_priv_early`).
+
+### ⚠️ Lemma 5 (protocols as arbitrary sets of global actions)
+Lemma 5 is false under the paper's formal definition of a protocol (an arbitrary set of global actions,
+so the next state may depend on far-away processes); it holds for protocols given by local
+deterministic rules (`lemma_5`).
+
+**Impact.** Implied assumption: the paper uses guarded local rules everywhere else, so we state the lemma
+for local rules.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -109,8 +133,17 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | `conv_time(SSME, sd) = ⌈diam/2⌉` | `conv_time_ssme` | `LowerBound.lean` |
 | `d_K`, `≤_l`, `φ` as in the paper | `correct_iff`, `locLe_iff`, `succK_eq_emod` | `Model.lean` |
 
-**Not formalized.** Theorem 3 (it cites [7]); Definition 4 and the asymptotic "speculation" claims of
-Section 3, including the examples (Dijkstra's ring, min+1 BFS, matching).
+**Black boxes replaced by proofs.** The paper uses the convergence of the Boulinier–Petit–Villain
+unison (PODC 2004, with conditions on `hole(g)` and `cyclo(g)`) and its synchronous bound
+`α + lcp(g) + D` (Algorithmica 2008). For `α = n` and `K > n` we prove both from scratch. Convergence
+under the unfair daemon uses chains of resets: with `α ≥ n`, a chain has fewer than `n` links. The
+synchronous bound becomes `Γ₁` from time `n + α = 2n` on (`legit_sync`). Lemma 1 also holds for
+`i = D` (we use this).
+
+**Not formalized.** Theorem 3 (`O(diam·n³)` steps under the unfair daemon; it only quotes
+Devismes–Petit [7]); Definition 4 and the asymptotic "speculation" claims of Section 3, including the
+claim that SSME is "sd-speculatively stabilizing" (it depends on the asymptotic ratio of two
+convergence times) and the examples (Dijkstra's ring, min+1 BFS, matching).
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: Theorems 1 and 2 are instantiated on `C₅` (example in `Lemma4.lean`). The

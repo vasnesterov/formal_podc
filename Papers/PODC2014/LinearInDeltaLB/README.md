@@ -13,28 +13,43 @@ stated and needs a separate nested induction. The randomized extension (Appendix
 
 ## Mistakes in the paper
 
-No statement is wrong. One proof step needs a repair, and some steps needed details the text leaves
-implicit:
+No mistakes in the statements.
 
-* **Equation (3) (Section 4.3): the cited induction hypothesis does not give it.** The paper reduces
-  (3) to the "critical case" `g* = g` and says `τ_i(GG, ĝ) ≅ τ_i(GH, h)` holds "by our induction
-  assumption". The induction assumption is `τ_i(G, g) ≅ τ_i(H, h)`. `GG` is a lift of `G`, but `GH`
-  is not a lift of `H`: in `GH` the colour-`c` edge at `h` leads into the copy of `G − e`, and walks
-  can cross that edge several times by going around loops. So `τ_i(GH, h) ≅ τ_i(H, h)` needs its own
-  argument. The formal proof inducts on the radius `r ≤ i + 1`, simultaneously for all nodes of the
-  `G`-half (`GG` vs `GH`) and of the `H`-half (`HH` vs `GH`). The paper's idea is right, but the step
-  as written is a gap a careful referee would flag. (`Inv.step_core`)
-* **Base case of Section 4 is terse.** (P1) needs a loop colour `c_0` present in both `G_0` and
-  `H_0 = G_0 − e`, so `c_0` cannot be the colour of `e` (Figure 5 shows the intended choice). Such a
-  `c_0` exists because `H_0` is loopy (`Δ ≥ 2`), hence saturated, and `y(e) ≠ 0`.
-  (`exists_inv_zero`)
-* **Radius `2t + 1` in the proof of Lemma 7 is too small only for `t = 0`.** The radius occurs only
-  inside the proof, not in the statement of Lemma 7. For `t ≥ 1` the neighbours of the nodes of
-  `B_{t+1}(v)` lie in `B_{2t+1}(v)` and the argument works. For `t = 0` they do not, and the
-  saturation indicator `A*` needs radius `≥ 1` to see its own edges. But for `t = 0` the hypothesis
-  of the lemma (a 0-round algorithm finding a maximal FM) cannot hold: such an algorithm already
-  fails on a 3-node path (`not_hasRunTime_zero`). We use radius `2t + 2` throughout.
-* **Typo** in the proof of Lemma 6: "`τ_t(U_G, ≺, v) ≅ τ_t(U_G, ≺, v)`" should end with `u`.
+### Typos and slips
+- In the proof of Lemma 6, "`τ_t(U_G, ≺, v) ≅ τ_t(U_G, ≺, v)`" should end with `u`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Equation (3) (Section 4.3, unfold-and-mix step)
+The paper justifies `τ_i(GG, ĝ) ≅ τ_i(GH, h)` "by our induction assumption" `τ_i(G, g) ≅ τ_i(H, h)`,
+which does not apply because `GH` is not a lift of `H`.
+
+**Impact.** Statement true; repaired by a nested induction (`Inv.step_core`). The paper's idea is right,
+but the step as written is a gap a careful referee would flag.
+
+**Details.** The paper reduces (3) to the "critical case" `g* = g`. `GG` is a lift of `G`, but in `GH`
+the colour-`c` edge at `h` leads into the copy of `G − e`, and walks can cross that edge several times by
+going around loops. So `τ_i(GH, h) ≅ τ_i(H, h)` needs its own argument.
+
+**Repair.** The formal proof inducts on the radius `r ≤ i + 1`, simultaneously for all nodes of the
+`G`-half (`GG` vs `GH`) and of the `H`-half (`HH` vs `GH`). (`Inv.step_core`)
+
+### 🛠️ Section 4 base case and proof of Lemma 7 (implicit details)
+The base case of Section 4 leaves the choice of the loop colour `c_0` implicit, and the radius `2t + 1`
+in the proof of Lemma 7 is too small for `t = 0`.
+
+**Impact.** Statements true; routine details (`exists_inv_zero`, `not_hasRunTime_zero`).
+
+**Details.**
+* *Base case.* (P1) needs a loop colour `c_0` present in both `G_0` and `H_0 = G_0 − e`, so `c_0`
+  cannot be the colour of `e` (Figure 5 shows the intended choice). Such a `c_0` exists because `H_0`
+  is loopy (`Δ ≥ 2`), hence saturated, and `y(e) ≠ 0`. (`exists_inv_zero`)
+* *Radius in Lemma 7.* The radius occurs only inside the proof, not in the statement of Lemma 7. For
+  `t ≥ 1` the neighbours of the nodes of `B_{t+1}(v)` lie in `B_{2t+1}(v)` and the argument works. For
+  `t = 0` they do not, and the saturation indicator `A*` needs radius `≥ 1` to see its own edges. But
+  for `t = 0` the hypothesis of the lemma (a 0-round algorithm finding a maximal FM) cannot hold: such
+  an algorithm already fails on a 3-node path (`not_hasRunTime_zero`). We use radius `2t + 2`
+  throughout.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

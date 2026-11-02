@@ -13,50 +13,90 @@ prove Theorem 3.3 there; we prove the theorem for every even `D ≥ 4` with a di
 
 ## Mistakes in the paper
 
-* **Algorithm 1, line 23: a pseudocode slip that breaks agreement (Theorem 4.1 false if read literally).**
-  Line 23 looks for `⟨phase 2, *, decided(0)⟩` in `R2` only. But a phase-2 message received during the
-  receiver's own phase 1 goes into `R1` (line 6), and the loop of line 20 then does not wait for it again.
-  Counterexample with two nodes, crash-free and timely (bound `F_ack = 8`):
-  * `u` (input 0) gets its phase-1 ack before hearing `x` (input 1), so `u` is `decided(0)`;
-  * `x`, still in phase 1, has heard `u`'s input 0 (so it will be bivalent) and receives `u`'s
-    `⟨phase 2, u, decided(0)⟩` into `R1`;
-  * `u` decides 0. `x` finishes phase 2 with `R2 = {⟨phase 2, x, bivalent⟩}`; both witnesses are covered by
-    `R1 ∪ R2`, so it leaves the loop and decides 1.
+### ❌ Claim 3.4 for `D = 4` (the networks of Figure 1)
+For `D = 4` (`d = (D−2)/2 = 1`) the paper's Network A has diameter 6, not 4, because node `a₂⁺` of the
+gadget is at distance 2 from `c` (`claim_3_4_false_D4`).
 
-  The intended rule is evident: line 8 already looks for phase-2 messages in `R1`, line 20 checks `R1 ∪ R2`,
-  the prose says "if the set contains any message of the form decided `v_w`, then it decides `v_w`", and the
-  proof assumes `v` "will see that `u` has a status of decided(0)". With the check over `R1 ∪ R2`, Theorem 4.1
-  holds, including the bound "decide by `2 F_ack`". (`twoPhaseLit_not_solvesConsensus`; repaired:
-  `theorem_4_1`, `theorem_4_1_time`)
-* **Claim 3.4 is false for `D = 4`** (the smallest case of Theorem 3.3, not a degenerate one; theorem true). For
-  `d = (D−2)/2 = 1`, node `a₂⁺` of the gadget is at distance 2 from `c`, so Network A has diameter 6, not 4
-  (in Lean: the 15-node network for `k = 0`, i.e. `4 ≤ n ≤ 15`). The padding nodes `a*_j` are attached to `a_{d−1} = a₀`, which does not exist.
-  Theorem 3.3 is still true for `D = 4`. We prove it for all even `D ≥ 4` with another gadget, found by computer
-  search: a core `c, t, s, r, u, p`, padding twins of `p`, and a path of length `d − 1` below `t`. B is a 3-fold
-  voltage cover of it. For `D ≥ 6` the paper's networks are fine (checked numerically, not formalized).
-  (`claim_3_4_false_D4`; repaired: `theorem_3_3`, `exists_nets`)
-* **Theorem 3.2 needs `n ≥ 2`.** With one node, deciding one's own input solves consensus with any number of
-  crashes. Degenerate case. (`theorem_3_2_card_one`; `theorem_3_2` assumes `2 ≤ n`)
-* **Lemma 3.1: proof gaps, statement true.**
-  * Valency is defined over extensions by valid steps. Then a fragment with no deciding extension is vacuously
-    both 0- and 1-valent, and it is unclear whether extensions may contain crashes.
-  * Case 1 applies the valency of `β₁` to an execution in which `w` crashes. Such an execution is not an extension
-    by valid steps of the paper's kind.
-  * Our repair:
-    * valency counts crash-free valid extensions; every reachable configuration has a possible decision;
-    * the decision obtained by crashing `w` is transferred to the crash-free extension in which `w` is merely
-      silent; both runs perform the same events and agree off `w`;
-    * both cases of the proof become one: the two orders of the steps agree except at one node.
+**Impact.** `D = 4` is the smallest case of Theorem 3.3, not a degenerate one, so Figure 1 does not prove
+Theorem 3.3 there. The theorem is still true: we prove it for all even `D ≥ 4` with another gadget
+(`theorem_3_3`, `exists_nets`).
 
-  (`lemma_3_1`, `exists_decision_off`, `stepV_comm`)
-* **Lemma 3.8 is over-general.** It claims one `t` for lines of every length `d`. The hypothesis only concerns
-  networks of diameter `D`, so only `d = D` follows, and only `d = D` is used. (`lemma_3_8`)
-* **Under-specified schedulers and a w.l.o.g. step.**
-  * The synchronous scheduler does not fix the order in which a node receives the messages of one round. Lemma 3.6
-    needs corresponding nodes to use the same order; we sort messages by a fixed order.
-  * "W.l.o.g. nodes always broadcast" is not justified. Our model allows idle nodes, so the bounds cover all
-    algorithms.
-* Typos: Lemma 3.8 "all nodes begin with initial value 0" should be `b`.
+**Details.** In Lean the counterexample is the 15-node network for `k = 0`, i.e. `4 ≤ n ≤ 15`. The
+padding nodes `a*_j` are attached to `a_{d−1} = a₀`, which does not exist. For `D ≥ 6` the paper's
+networks are fine (checked numerically, not formalized).
+
+**Repair.** Our gadget, found by computer search: a core `c, t, s, r, u, p`, padding twins of `p`, and a
+path of length `d − 1` below `t`. B is a 3-fold voltage cover of it. (`theorem_3_3`, `exists_nets`)
+
+### ⚠️ Algorithm 1, line 23 (Theorem 4.1 read literally)
+Read literally, Algorithm 1 violates agreement on two nodes, because line 23 looks for
+`⟨phase 2, *, decided(0)⟩` in `R2` only, while a phase-2 message received during the receiver's phase 1
+goes into `R1` (`twoPhaseLit_not_solvesConsensus`).
+
+**Impact.** A one-symbol pseudocode slip with evident intent: with the check over `R1 ∪ R2`, Theorem 4.1
+holds, including the bound "decide by `2 F_ack`" (`theorem_4_1`, `theorem_4_1_time`).
+
+**Details.** A phase-2 message received during the receiver's own phase 1 goes into `R1` (line 6), and
+the loop of line 20 then does not wait for it again. Counterexample with two nodes, crash-free and
+timely (bound `F_ack = 8`):
+* `u` (input 0) gets its phase-1 ack before hearing `x` (input 1), so `u` is `decided(0)`;
+* `x`, still in phase 1, has heard `u`'s input 0 (so it will be bivalent) and receives `u`'s
+  `⟨phase 2, u, decided(0)⟩` into `R1`;
+* `u` decides 0. `x` finishes phase 2 with `R2 = {⟨phase 2, x, bivalent⟩}`; both witnesses are covered by
+  `R1 ∪ R2`, so it leaves the loop and decides 1.
+
+The intended rule is evident: line 8 already looks for phase-2 messages in `R1`, line 20 checks
+`R1 ∪ R2`, the prose says "if the set contains any message of the form decided `v_w`, then it decides
+`v_w`", and the proof assumes `v` "will see that `u` has a status of decided(0)".
+
+**Repair.** Check `R1 ∪ R2` in line 23 (`theorem_4_1`, `theorem_4_1_time`).
+
+### ⚠️ Theorem 3.2 for `n = 1`
+Theorem 3.2 needs `n ≥ 2`: with one node, deciding one's own input solves consensus with any number of
+crashes (`theorem_3_2_card_one`).
+
+**Impact.** Degenerate case; `theorem_3_2` assumes `2 ≤ n`.
+
+### ⚠️ Lemma 3.8 (lines of every length `d`)
+Lemma 3.8 claims one `t` for lines of every length `d`, but its hypothesis only concerns networks of
+diameter `D`, so only `d = D` follows.
+
+**Impact.** Over-general but harmless: only `d = D` is used, and we prove that case (`lemma_3_8`).
+
+### Typos and slips
+- Lemma 3.8: "all nodes begin with initial value 0" should be `b`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 3.1 (valency and crashes)
+The proof's valency notion is ill-posed and Case 1 applies the valency of `β₁` to an execution in which
+`w` crashes, which is not an extension by valid steps.
+
+**Impact.** Statement true; repaired (`lemma_3_1`, `exists_decision_off`, `stepV_comm`).
+
+**Details.**
+* Valency is defined over extensions by valid steps. Then a fragment with no deciding extension is
+  vacuously both 0- and 1-valent, and it is unclear whether extensions may contain crashes.
+* Case 1 applies the valency of `β₁` to an execution in which `w` crashes. Such an execution is not an
+  extension by valid steps of the paper's kind.
+
+**Repair.**
+* valency counts crash-free valid extensions; every reachable configuration has a possible decision;
+* the decision obtained by crashing `w` is transferred to the crash-free extension in which `w` is
+  merely silent; both runs perform the same events and agree off `w`;
+* both cases of the proof become one: the two orders of the steps agree except at one node.
+
+(`lemma_3_1`, `exists_decision_off`, `stepV_comm`)
+
+### 🛠️ Lemma 3.6 and Sections 3.1, 3.3 (under-specified scheduler, w.l.o.g. step)
+The synchronous scheduler does not fix the order in which a node receives the messages of one round,
+and "w.l.o.g. nodes always broadcast" is not justified.
+
+**Impact.** Statements true; routine fixes in the model.
+
+**Details.**
+* Lemma 3.6 needs corresponding nodes to use the same order; we sort messages by a fixed order.
+* Our model allows idle nodes, so the bounds cover all algorithms without the w.l.o.g. step.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

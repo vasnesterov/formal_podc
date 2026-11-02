@@ -17,57 +17,61 @@ validity and agreement. So do the two deterministic steps of the termination pro
 
 ## Mistakes in the paper
 
-* **Lemma 5, BC-Termination of Theorem 2, and Theorem 3 are false.** The proof of Lemma 5 has a
-  "Claim": with probability 1 all correct processes eventually have the same estimate. Its third
-  case (some correct processes adopt the value `v` of a singleton `values` at line 09, others
-  adopt the coin `s` at line 10) says that "`s` is equal to `v` with probability 1/2", because the
-  coin is independent of the scheduler. But `v` is not fixed before the coin is drawn. The
-  adversary can wait until the coin of the round is known and *then* decide which value the
-  remaining processes see. The paper's model gives it this power: Byzantine processes control
-  the message schedule, and the coin is only required not to be computable *in advance*
-  (Section 4.1 and footnote 2).
-  Our counterexample: `n = 4`, `t = 1`, processes `p0, p1, p2` correct with estimates `a, a, ¬a`
-  (initially `0, 0, 1`), `p3` Byzantine. In every round:
-  1. `p3` sends `B_VAL(¬a)` to everybody. So `¬a` gets `t + 1` copies, everybody echoes it, and
-     both values enter every `bin_values`. The adversary picks the order: `p0` sees `a` first and
-     broadcasts `AUX(a)`, `p1` sees `¬a` first and broadcasts `AUX(¬a)`.
-  2. `p0` and `p1` receive `AUX(a)`, `AUX(¬a)`, `AUX(a)` (the last from `p3`). So `values = {0,1}`,
-     both call `random()` and adopt the coin `s`.
-  3. Now the adversary knows `s`. It makes `p2` see `¬s` first in `bin_values`, so `p2` broadcasts
-     `AUX(¬s)`. Then `p2` receives `AUX(¬s)` from itself, from `p3` and from whichever of `p0`, `p1`
-     sent `¬s`. Its `values = {¬s}` differs from the coin, so `p2` does not decide and adopts `¬s`.
-  The next round starts again with two processes at one value and one at the other. Nobody ever
-  decides, for **every** coin sequence. The execution is weakly fair: every message between
-  correct processes is delivered and every enabled step is taken. It is also an execution of
-  the deterministic code: processes react to each message at once, and every `bin_values` and
-  `values` they use is the only possible one. So the probability of termination is 0, not 1,
-  and the expected number of rounds is infinite, not 4.
-  Theorem 2 claims Figure 2 solves randomized consensus, and the abstract claims it decides in 4
-  expected rounds. The paper's own algorithm is wrong, so this is a false headline claim
-  (rule R5). (`Attack.counterexample`, `Attack.prob_termination_eq_zero`, `Attack.coin_used_late`,
-  `Local.eager`, `Local.forced`)
-  *Scope.* The adversary needs the coin of a round only after `p0` and `p1` (and `p3`) have called
-  `random()`. So the attack also works against a threshold coin that is revealed by `n − t`
-  shares. It even works against an ideal coin that tells `b_r` only to the caller: the adversary
-  reads `s` off `p0`'s next broadcast `B_VAL[r+1](s)`, which the Byzantine `p3` receives (this is
-  exactly what `Attack.strat` looks at). The argument of the Claim would go through only if the
-  adversary could not see the coin before *all* correct processes have fixed their `values`, e.g.
-  with a scheduler that does not see message contents (the "oblivious scheduler" of the paper's
-  footnote 2). The paper's model explicitly gives the Byzantine processes control of the
-  schedule, and no common-coin implementation in an asynchronous Byzantine system can wait for
-  all correct processes.
-  The same liveness problem was reported by P. Tholoniat and V. Gramoli, *Formal Verification of
-  Blockchain Byzantine Fault Tolerance* (arXiv:1909.07453, 2019), with another `n = 4`, `t = 1`
-  scenario; according to them the authors confirmed it, and the journal version (J. ACM 2015)
-  remarks that a fair scheduler and a perfect common coin are needed for this algorithm and gives a
-  new algorithm. We did not check the journal version.
-* **The rest of Lemma 5's proof is correct.** No correct process blocks at line 03 or 05
-  (`Exec.no_blocking`). Once all correct processes start a round with the same estimate `v`,
-  they all decide in the first later round whose coin is `v` (`Exec.decide_of_unanimous`). In
-  particular, with unanimous inputs the algorithm terminates as soon as the coin shows the input
-  (`Exec.decide_of_unanimous_inputs`).
-* **Typo** in the proof of Lemma 2: "`p_x` sent `AUX[r](v)` to `p_i` and `AUX[r](w)` to `p_i`"
-  should end with "to `p_j`".
+### 🚨 Theorem 2 (BC-Termination), Lemma 5 and Theorem 3 (termination, four expected rounds)
+The algorithm of Figure 2 does not terminate: for `n = 4`, `t = 1` and inputs `0, 0, 1`, an adversary
+that controls the schedule and the Byzantine process, and sees each coin only after two correct
+processes have called `random()`, prevents every decision forever, for every coin sequence
+(`Attack.counterexample`, `Attack.prob_termination_eq_zero`).
+
+**Impact.** The probability of termination is 0, not 1, and the expected number of rounds is infinite,
+not 4. Theorem 2 claims Figure 2 solves randomized consensus, and the abstract claims it decides in 4
+expected rounds; the paper's own algorithm is wrong, so this is a false headline claim (rule R5). Safety
+(Theorem 1, Lemmas 1–4, validity, agreement) is unaffected.
+
+**Details.** The proof of Lemma 5 has a "Claim": with probability 1 all correct processes eventually
+have the same estimate. Its third case (some correct processes adopt the value `v` of a singleton
+`values` at line 09, others adopt the coin `s` at line 10) says that "`s` is equal to `v` with
+probability 1/2", because the coin is independent of the scheduler. But `v` is not fixed before the coin
+is drawn. The adversary can wait until the coin of the round is known and *then* decide which value the
+remaining processes see. The paper's model gives it this power: Byzantine processes control the message
+schedule, and the coin is only required not to be computable *in advance* (Section 4.1 and footnote 2).
+
+Our counterexample: `n = 4`, `t = 1`, processes `p0, p1, p2` correct with estimates `a, a, ¬a`
+(initially `0, 0, 1`), `p3` Byzantine. In every round:
+1. `p3` sends `B_VAL(¬a)` to everybody. So `¬a` gets `t + 1` copies, everybody echoes it, and both
+   values enter every `bin_values`. The adversary picks the order: `p0` sees `a` first and broadcasts
+   `AUX(a)`, `p1` sees `¬a` first and broadcasts `AUX(¬a)`.
+2. `p0` and `p1` receive `AUX(a)`, `AUX(¬a)`, `AUX(a)` (the last from `p3`). So `values = {0,1}`, both
+   call `random()` and adopt the coin `s`.
+3. Now the adversary knows `s`. It makes `p2` see `¬s` first in `bin_values`, so `p2` broadcasts
+   `AUX(¬s)`. Then `p2` receives `AUX(¬s)` from itself, from `p3` and from whichever of `p0`, `p1` sent
+   `¬s`. Its `values = {¬s}` differs from the coin, so `p2` does not decide and adopts `¬s`.
+
+The next round starts again with two processes at one value and one at the other. Nobody ever decides,
+for **every** coin sequence. The execution is weakly fair: every message between correct processes is
+delivered and every enabled step is taken. It is also an execution of the deterministic code: processes
+react to each message at once, and every `bin_values` and `values` they use is the only possible one.
+(`Attack.coin_used_late`, `Local.eager`, `Local.forced`)
+
+*Scope.* The adversary needs the coin of a round only after `p0` and `p1` (and `p3`) have called
+`random()`. So the attack also works against a threshold coin that is revealed by `n − t` shares. It
+even works against an ideal coin that tells `b_r` only to the caller: the adversary reads `s` off `p0`'s
+next broadcast `B_VAL[r+1](s)`, which the Byzantine `p3` receives (this is exactly what `Attack.strat`
+looks at). The argument of the Claim would go through only if the adversary could not see the coin
+before *all* correct processes have fixed their `values`, e.g. with a scheduler that does not see message
+contents (the "oblivious scheduler" of the paper's footnote 2). The paper's model explicitly gives the
+Byzantine processes control of the schedule, and no common-coin implementation in an asynchronous
+Byzantine system can wait for all correct processes.
+
+The same liveness problem was reported by P. Tholoniat and V. Gramoli, *Formal Verification of
+Blockchain Byzantine Fault Tolerance* (arXiv:1909.07453, 2019), with another `n = 4`, `t = 1` scenario;
+according to them the authors confirmed it, and the journal version (J. ACM 2015) remarks that a fair
+scheduler and a perfect common coin are needed for this algorithm and gives a new algorithm. We did not
+check the journal version.
+
+### Typos and slips
+- In the proof of Lemma 2, "`p_x` sent `AUX[r](v)` to `p_i` and `AUX[r](w)` to `p_i`" should end with
+  "to `p_j`".
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -110,6 +114,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Lemma 5, decision after unanimity | `Exec.decide_of_unanimous`, `Exec.decide_of_unanimous_inputs` | `Liveness.lean` |
 | **Lemma 5 / Theorem 2 (termination) / Theorem 3 — false** | `Attack.counterexample`, `Attack.prob_termination_eq_zero` | `Counterexample.lean` |
 | The counterexample is a legal, eager, forced schedule; coin used late | `Local.valid_script`, `Local.eager`, `Local.forced`, `Local.quiet_final`, `Attack.coin_used_late` | `Local.lean`, `Counterexample.lean` |
+
+The rest of Lemma 5's proof is correct. No correct process blocks at line 03 or 05 (`Exec.no_blocking`).
+Once all correct processes start a round with the same estimate `v`, they all decide in the first later
+round whose coin is `v` (`Exec.decide_of_unanimous`). In particular, with unanimous inputs the algorithm
+terminates as soon as the coin shows the input (`Exec.decide_of_unanimous_inputs`).
 
 **Not formalized.** Message, bit and step complexities (the "Cost" paragraphs, `O(n²)` messages per
 round). Probability spaces: the positive termination results are deterministic statements about

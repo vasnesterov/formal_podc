@@ -13,24 +13,13 @@ and the theorem takes `m` large anyway.
 
 ## Mistakes in the paper
 
-* **Lemma 1, last step, degenerate case.** "The common output cannot be 0; otherwise there would be nodes that
-  are not dominated" needs an internal node whose whole closed neighbourhood is internal, i.e. `m' = m − 2T ≥ 3`.
-  For `m' ∈ {1, 2}` (and `T ≥ 1`) this inference fails *in `G` alone*: the boundary rows can dominate the internal
-  nodes. Whether Lemma 1 itself still holds there depends on the reading of "radius-`T` neighbourhood". (a) If the view
-  is the edges at distance `< T` plus the identifiers at distance `≤ T` (our model) or the induced radius-`T` ball, the lemma
-  still holds: an internal node of `G` then has the same view as a deep interior node of a taller planar grid `H` on `n`
-  nodes, so `c` is also the colouring of `H`. Every monochromatic set of size `(2T + 3)²` therefore has colour 1, and
-  the Ramsey step with that size goes through. (b) If nodes also see the degrees of the nodes at distance `T`, the
-  lemma fails for `m' = 1`: "output 0 iff your view is exactly that of the middle node of a `(2T+1)`-high strip"
-  dominates every planar graph, and it puts no internal node of `G` into the output. In either case the paper has already fixed
-  `m ≫ T` ("Pick sufficiently large `m ≫ T`"), so this is a minor gap in a degenerate case. The theorem is unaffected.
-  We prove Lemma 1 under `2T + 3 ≤ m` (`lemma_1`). Our `lemma_1` assumes correctness only on relabellings of
-  `G`. Under that weaker hypothesis Lemma 1 fails for `m' ∈ {1, 2}` already in model (a), via "join iff a horizontal border is
-  visible at distance `< T`". Neither argument is formalized.
-* Smaller points, all harmless: the graph `G` and the set `D*` are given only by Figure 1. The paper says `D*`
-  contains 1/7 of the *internal* nodes, but it must also dominate the border of the whole grid; the bound
-  `|D*| ≤ (1/7 + ε′)n` is right once these `O(rm)` extra nodes are added. Also, `ℓ = o(r)` can be taken as a
-  constant `N(K, m²)` that does not depend on `r`.
+No mistakes in the statements.
+
+### Typos and slips
+- The graph `G` and the set `D*` are given only by Figure 1. The paper says `D*` contains 1/7 of the
+  *internal* nodes, but it must also dominate the border of the whole grid; the bound
+  `|D*| ≤ (1/7 + ε′)n` is right once these `O(rm)` extra nodes are added.
+- `ℓ = o(r)` can be taken as a constant `N(K, m²)` that does not depend on `r`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -75,6 +64,26 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 In the explicit form we take `m = ⌈7(4T + 72)/ε⌉ + 2T + 3`, `ℓ = N((2T+1)², m²) + 1` and `r = (m + 1)ℓ`. Then
 `|A(G)| ≥ ℓm(m − 2T)²` and `7|D*| ≤ rm² + 35rm`, which gives `(7 − ε)|D*| < |A(G)|`.
+
+**Proof remarks.** *Lemma 1, last step, degenerate case.* "The common output cannot be 0; otherwise there
+would be nodes that are not dominated" needs an internal node whose whole closed neighbourhood is internal,
+i.e. `m' = m − 2T ≥ 3`. For `m' ∈ {1, 2}` (and `T ≥ 1`) this inference fails *in `G` alone*: the boundary
+rows can dominate the internal nodes. Whether Lemma 1 itself still holds there depends on the reading of
+"radius-`T` neighbourhood".
+* (a) If the view is the edges at distance `< T` plus the identifiers at distance `≤ T` (our model) or the
+  induced radius-`T` ball, the lemma still holds: an internal node of `G` then has the same view as a deep
+  interior node of a taller planar grid `H` on `n` nodes, so `c` is also the colouring of `H`. Every
+  monochromatic set of size `(2T + 3)²` therefore has colour 1, and the Ramsey step with that size goes
+  through.
+* (b) If nodes also see the degrees of the nodes at distance `T`, the lemma fails for `m' = 1`: "output 0
+  iff your view is exactly that of the middle node of a `(2T+1)`-high strip" dominates every planar graph,
+  and it puts no internal node of `G` into the output.
+
+In either case the paper has already fixed `m ≫ T` ("Pick sufficiently large `m ≫ T`"), so this is a minor
+gap in a degenerate case. The theorem is unaffected. We prove Lemma 1 under `2T + 3 ≤ m` (`lemma_1`). Our
+`lemma_1` assumes correctness only on relabellings of `G`. Under that weaker hypothesis Lemma 1 fails for
+`m' ∈ {1, 2}` already in model (a), via "join iff a horizontal border is visible at distance `< T`".
+Neither argument is formalized.
 
 **Not formalized.** Fáry's theorem itself (equivalence of straight-line and topological planarity), and the
 prose arguments about Lemma 1 for `m − 2T ≤ 2`.
