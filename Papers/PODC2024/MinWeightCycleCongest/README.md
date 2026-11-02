@@ -16,33 +16,50 @@ constant diameter. The proofs need two repairs. The cited constructions are disc
 
 ## Mistakes in the paper
 
-* **"Even on graphs with constant diameter" (Thm 1.2.A, 1.4.A) is not proved.** The graphs of
-  Lemmas 13 and 14 in the cited proofs can be disconnected: for `S_a = S_b = ∅` they are perfect
-  matchings. The companion paper adds a sink vertex with an arc from every vertex to get diameter 2,
-  but only for its replacement-path bound, not for MWC. For directed MWC the same sink works, since
-  a sink lies on no cycle. For undirected weighted MWC it must be done with care. A hub joined to all
-  vertices by unit-weight edges creates triangles `hub–ℓ_i–r_i` of weight 3, below the gap `2w + 2`,
-  and the reduction fails. We add a hub whose edges weigh `2w`. Then every cycle through the hub
-  weighs at least `4w`, and the bound holds on diameter-2 networks. We also add pendant padding
-  vertices so that every `n` is covered, not only `n = 4k`. The statements are true; this is a
-  proof gap. (`dComap_ediam`, `uComap_ediam`, `theorem_1_2_A`, `theorem_1_4_A`)
-* **Lemma 14's argument does not cover the heavy weight `w` needed for `(2 − ε)`.** For
-  `(2 − ε)`-approximation, the paper changes the heavy weight 2 to a large `w` and says one must then
-  tell cycles of weight `2w + 2` from cycles of weight `4w`. Its proof bounds cycles with at least 6
-  edges as follows: the graph is bipartite and the light edges form a matching, so a cycle has at
-  most as many light edges as heavy edges. With `w = 2` this gives weight at least 9. With weight `w`
-  it only gives `3w + 3` for a 6-cycle, which is below `4w` once `w > 3`. The claim is still true:
-  light edges are the only edges between Alice's side `L ∪ L′` and Bob's side `R ∪ R′`, so every
-  cycle has an even number of light edges. A 6-cycle therefore has at most 2 light edges and weighs
-  at least `4w + 2`. The lemma is true; the proof needed this parity step. (`uGraph.weight_ge`)
-* **Slips** (all in the companion paper's proofs, none affects a result):
-  - The directed proof decides "by checking if the minimum cycle has length at least 4". Every
-    cycle has length at least 4; the test should be "at least 8" (or "greater than 4").
-  - The undirected proof likewise says "weight at least 6" where it should be "> 6" (or "≥ 8").
-  - Both proofs say "the cut has `4k` edges". The graphs as constructed have `2k` cut edges (our
-    graphs with a hub have `4k`). This is harmless.
-  - In Lemma 14 the case list of 4-cycles leaves out the all-heavy cycles `r_i r′_j r_p r′_q` on
-    Bob's side. They weigh `4w`, like the listed `ℓ_i ℓ′_j ℓ_p ℓ′_q`.
+No mistakes in the statements.
+
+### Typos and slips
+All in the companion paper's proofs; none affects a result.
+- The directed proof decides "by checking if the minimum cycle has length at least 4". Every cycle has length at
+  least 4; the test should be "at least 8" (or "greater than 4").
+- The undirected proof likewise says "weight at least 6" where it should be "> 6" (or "≥ 8").
+- Both proofs say "the cut has `4k` edges". The graphs as constructed have `2k` cut edges (our graphs with a hub
+  have `4k`). This is harmless.
+- In Lemma 14 the case list of 4-cycles leaves out the all-heavy cycles `r_i r′_j r_p r′_q` on Bob's side. They
+  weigh `4w`, like the listed `ℓ_i ℓ′_j ℓ_p ℓ′_q`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Thm 1.2.A, 1.4.A ("even on graphs with constant diameter")
+The constant-diameter part is not proved: the graphs of Lemmas 13 and 14 in the cited proofs can be disconnected
+(for `S_a = S_b = ∅` they are perfect matchings).
+
+**Impact.** Statements true; repaired with a hub vertex, on diameter-2 networks and for every `n` (`dComap_ediam`,
+`uComap_ediam`, `theorem_1_2_A`, `theorem_1_4_A`).
+
+**Details.** The companion paper adds a sink vertex with an arc from every vertex to get diameter 2, but only for
+its replacement-path bound, not for MWC. For directed MWC the same sink works, since a sink lies on no cycle. For
+undirected weighted MWC it must be done with care. A hub joined to all vertices by unit-weight edges creates
+triangles `hub–ℓ_i–r_i` of weight 3, below the gap `2w + 2`, and the reduction fails.
+
+**Repair.** We add a hub whose edges weigh `2w`. Then every cycle through the hub weighs at least `4w`, and the
+bound holds on diameter-2 networks. We also add pendant padding vertices so that every `n` is covered, not only
+`n = 4k`.
+
+### 🛠️ Lemma 14 (the heavy weight `w` needed for `(2 − ε)`)
+The proof bounds cycles with at least 6 edges by "at most as many light edges as heavy edges", which for heavy
+weight `w` gives only `3w + 3` for a 6-cycle, below the needed `4w` once `w > 3`.
+
+**Impact.** The lemma is true; the proof needed a parity step (`uGraph.weight_ge`).
+
+**Details.** For `(2 − ε)`-approximation, the paper changes the heavy weight 2 to a large `w` and says one must then
+tell cycles of weight `2w + 2` from cycles of weight `4w`. Its argument: the graph is bipartite and the light edges
+form a matching, so a cycle has at most as many light edges as heavy edges. With `w = 2` this gives weight at least
+9.
+
+**Repair.** Light edges are the only edges between Alice's side `L ∪ L′` and Bob's side `R ∪ R′`, so every cycle
+has an even number of light edges. A 6-cycle therefore has at most 2 light edges and weighs at least `4w + 2`.
+(`uGraph.weight_ge`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

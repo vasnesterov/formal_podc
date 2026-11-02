@@ -19,41 +19,66 @@ its proof idea survive.
 
 ## Mistakes in the paper
 
-* **Theorem 4.1, (ii) ⇒ (i), is false (all three models; also Corollary 4.2).** The paper's model (§2.1–2.2) puts a
-  self-loop at every agent, and the transition function receives the *multiset* of received messages. So after
-  round 1 an agent knows its indegree. In a strongly connected network the indegree is 1 iff the agent is alone.
-  Hence `isSingleton(v) = [|v| = 1]` is computable in every model, even simple broadcast, from every initial
-  configuration, but it is not frequency-based: `isSingleton(a) = 1 ≠ 0 = isSingleton(a, a)`
-  (`theorem_4_1_ii_imp_i_false`, `theorem_4_1_false`). Taken alone this is the degenerate case `n = 1`.
-* **With symmetric communications `K₂` is recognisable too.** In a connected bidirectional
-  network, an agent with a single neighbour whose neighbour also has a single neighbour lives in `K₂`. Agents learn
-  their degree in round 1 and their neighbours' degrees in round 2. So `isPair(v) = [|v| = 2]` is computable with
-  symmetric communications, and it is not frequency-based even on vectors of length ≥ 2:
-  `isPair(a, b) = 1 ≠ 0 = isPair(a, b, a, b)` (`theorem_4_1_false_symmetric_K2`). Theorem 4.1 and Corollary 4.2 are
-  therefore false for symmetric communications on 2-agent networks. We grade this as degenerate: with symmetric links
-  `K₂` is the only 2-agent network and its agents know it after two rounds, so function computation on 2 agents is
-  trivial there (in the directed models, where `K₂` is not recognisable, the theorem holds at `n = 2`). This is a
-  borderline call; see [differencies.md](differencies.md), item 2.
-* **Where the proof breaks.** The proof of (ii) ⇒ (i) (§4.1) lifts both input vectors along the rings
-  `R_n → R_p ← R_m`, where `p` is the lcm of the denominators of the frequencies. A bidirectional ring of size ≤ 2
-  is a multigraph (`R_2` has a double edge and `R_1` three loops), not a network of the class (§2.1 networks are simple
-  digraphs `([n], E_t)` with self-loops). So for `p ≤ 2` (or `n, m ≤ 2`) Lemma 3.2 does not apply: the proof
-  silently needs sizes ≥ 3.
-  For outdegree and output port awareness this matters only for `n = 1`. We use directed cycles instead and lift along
-  `C_{n'n} → C_n` and `C_{nn'} → C_{n'}` (`n, n' ≥ 2`), together with Lemma 3.3 at length `nn'`
-  (`frequencyBasedFrom_two_of_computable`). For symmetric communications we use bidirectional rings, which needs
-  `n, n' ≥ 3` (`frequencyBasedFrom_three_of_computable_symmetric`). These bounds are optimal, by the two functions
-  above. The positive algorithm then has to treat `n = 1` (and `n = 2` for symmetric communications) separately
-  (`theorem_4_1_corrected`, `theorem_4_1_corrected_symmetric`, `corollary_4_2_corrected*`).
-* **Lemma 3.3 is imprecise.** "If `f` is computed in an anonymous network class then `f` is multiset-based" holds only
-  on the vector lengths of the networks in the class: computability in `C_k` says nothing about other lengths. Every
-  use in the paper involves classes with networks of all sizes, so the uses are fine (`Computes.perm_eq`).
-* **§4.3, symmetric variant (not formalized).** "Up to some permutation of the vertices in `B`, we may assume that
-  none of the degrees `d_{1,2}, …, d_{m−1,m}` is zero, since `B` is strongly connected" assumes a Hamiltonian path in
-  the minimum base. This fails, e.g., for a star with four distinct input values, which is its own minimum base.
-  Propagating eq. (4) along a spanning tree repairs the formula. Our symmetric algorithm does not use this variant.
-* **Side remark (cited result).** Table 1 and §6 state, citing [20], that only set-based functions are computable with
-  simple broadcast. In this paper's model that also fails at `n = 1` (`isSingleton_computable .broadcast`).
+### ⚠️ Theorem 4.1, (ii) ⇒ (i), and Corollary 4.2 (one agent, all three models)
+`isSingleton(v) = [|v| = 1]` is computable in every model, even simple broadcast, but it is not frequency-based:
+`isSingleton(a) = 1 ≠ 0 = isSingleton(a, a)` (`theorem_4_1_ii_imp_i_false`, `theorem_4_1_false`).
+
+**Impact.** Taken alone this is the degenerate case `n = 1`; the direction "frequency-based ⇒ computable",
+Corollaries 4.3 and 4.4, the paper's examples and its proof idea survive, and we prove the exact corrected
+characterisation.
+
+**Details.** The paper's model (§2.1–2.2) puts a self-loop at every agent, and the transition function receives
+the *multiset* of received messages. So after round 1 an agent knows its indegree. In a strongly connected network
+the indegree is 1 iff the agent is alone, from every initial configuration.
+
+Where the proof breaks: the proof of (ii) ⇒ (i) (§4.1) lifts both input vectors along the rings
+`R_n → R_p ← R_m`, where `p` is the lcm of the denominators of the frequencies. A bidirectional ring of size ≤ 2
+is a multigraph (`R_2` has a double edge and `R_1` three loops), not a network of the class (§2.1 networks are
+simple digraphs `([n], E_t)` with self-loops). So for `p ≤ 2` (or `n, m ≤ 2`) Lemma 3.2 does not apply: the proof
+silently needs sizes ≥ 3.
+
+**Repair.** For outdegree and output port awareness the failure matters only for `n = 1`. We use directed cycles
+instead and lift along `C_{n'n} → C_n` and `C_{nn'} → C_{n'}` (`n, n' ≥ 2`), together with Lemma 3.3 at length
+`nn'` (`frequencyBasedFrom_two_of_computable`). For symmetric communications we use bidirectional rings, which
+needs `n, n' ≥ 3` (`frequencyBasedFrom_three_of_computable_symmetric`). These bounds are optimal, by `isSingleton`
+and `isPair`. The positive algorithm then has to treat `n = 1` (and `n = 2` for symmetric communications)
+separately (`theorem_4_1_corrected`, `theorem_4_1_corrected_symmetric`, `corollary_4_2_corrected*`).
+
+### ⚠️ Theorem 4.1 and Corollary 4.2 for symmetric communications (`K₂`)
+With symmetric communications `isPair(v) = [|v| = 2]` is computable, because agents recognise that they live in
+`K₂`, but it is not frequency-based even on vectors of length ≥ 2: `isPair(a, b) = 1 ≠ 0 = isPair(a, b, a, b)`
+(`theorem_4_1_false_symmetric_K2`).
+
+**Impact.** We grade this as degenerate: with symmetric links `K₂` is the only 2-agent network and its agents know
+it after two rounds, so function computation on 2 agents is trivial there (in the directed models, where `K₂` is
+not recognisable, the theorem holds at `n = 2`). This is a borderline call; see
+[differencies.md](differencies.md), item 2.
+
+**Details.** In a connected bidirectional network, an agent with a single neighbour whose neighbour also has a
+single neighbour lives in `K₂`. Agents learn their degree in round 1 and their neighbours' degrees in round 2.
+
+### ⚠️ Lemma 3.3 (multiset-based only on the class's vector lengths)
+"If `f` is computed in an anonymous network class then `f` is multiset-based" holds only on the vector lengths of
+the networks in the class: computability in `C_k` says nothing about other lengths.
+
+**Impact.** Imprecise only: every use in the paper involves classes with networks of all sizes, so the uses are
+fine (`Computes.perm_eq`).
+
+### ⚠️ Table 1 and §6 (simple broadcast, cited from [20])
+The claim, citing [20], that only set-based functions are computable with simple broadcast also fails at `n = 1`
+in this paper's model (`isSingleton_computable .broadcast`).
+
+**Impact.** A side remark about a cited result, false only in the degenerate case `n = 1`.
+
+## Proof gaps (statements true)
+
+### 🛠️ §4.3, symmetric variant of the algorithm (not formalized)
+"Up to some permutation of the vertices in `B`, we may assume that none of the degrees `d_{1,2}, …, d_{m−1,m}` is
+zero, since `B` is strongly connected" assumes a Hamiltonian path in the minimum base, which fails, e.g., for a star
+with four distinct input values, which is its own minimum base.
+
+**Impact.** Propagating eq. (4) along a spanning tree repairs the formula. Our symmetric algorithm does not use
+this variant.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
