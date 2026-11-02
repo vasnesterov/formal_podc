@@ -16,41 +16,41 @@ Section 4 need small repairs, and Theorems 4.1, 5.1 and 5.3 have no proofs in th
 
 ## Mistakes in the paper
 
-No theorem or lemma is false. One pseudocode slip, proof repairs and remarks:
+### ⚠️ Algorithm 5, line 9 (output "`⊥` grade 2")
+Read literally, line 9 ("if all of the messages contain the same value `v` then decide `v, 2`") also fires when all `n − t` echo2's are `⊥`, e.g. for `n = 3`, `t = 1`, inputs `0, 1, 0`, no crash, so Algorithm 5 can output "`⊥` grade 2", which is not a GBCA output.
 
-* **Algorithm 5, line 9, can output "`⊥` grade 2".** The line says "if all of the messages contain the same
-  value `v` then decide `v, 2`". Line 10 counts `⊥` as "a value other than `v`", so line 9 also fires when
-  all `n − t` echo2's are `⊥`. Example: `n = 3`, `t = 1`, inputs `0, 1, 0`, no crash, and a schedule in
-  which every party first receives one `⟨val, 0⟩` and one `⟨val, 1⟩`. Then everybody sends `⟨echo, ⊥⟩` and then `⟨echo2, ⊥⟩`. Line 9 then outputs `⊥` with
-  grade 2. That is not one of the five buckets of Definition 3.2, so Theorem 5.1 fails for the literal
-  code. Line 11 becomes dead code, and Algorithm 2, line 7 ("if grade = 2 then commit val") would commit
-  `⊥`. The prose above the algorithm says that a party with all `⊥` decides `⊥`. We prove Theorem 5.1 for
-  this intended version (all `⊥` gives `⊥` grade 0). A typo with evident intent (rule R3). (`Alg5.decideG`,
-  `Alg5.theorem_5_1`)
-* **Lemma 4.5 (validity) cites the wrong guard.** The proof says that to decide `1 − v` a non-faulty party
-  "must have `1 − v` in its approvedVals set (line 15)". Line 15 only asks for `n − t` messages
-  `⟨echo3, 1 − v⟩`. The step is repaired by one more link of the chain. An uncorrupted sender of
-  `⟨echo3, 1 − v⟩` saw `n − t` messages `⟨echo2, 1 − v⟩`. One of their senders is uncorrupted and has `1 − v`
-  approved, which needs an uncorrupted party with input `1 − v`. (`Alg4.validity`)
-* **Lemma 4.9 (binding) leaves the adaptive quantifier order implicit.** The proof argues with "the `t + 1`
-  echo3 messages from non-faulty parties". Under adaptive corruption, who is non-faulty depends on the
-  extension, while `b` must be fixed at the first decision. We fix `b` from the prefix. If some party has
-  broadcast `⟨echo3, u⟩` with `u ≠ ⊥`, then `b = u`, by Lemma 4.8 applied inside the extension. Otherwise
-  the decider's quorum contains at least `n − t − |bad(τ)|` genuine `⊥`'s. A later `⟨echo3, w⟩` quorum
-  would then need `n − t` parties among at most `2t` candidates. The same repair works for Algorithm 6
-  through its first `⟨echo4, ⊥⟩`. (`Alg4.binding`, `Alg6.graded_binding`)
-* **Theorems 4.1, 5.1, 5.3 (Algorithms 3, 5, 6)** are stated with proofs deferred to the full version. We
-  prove them. For Algorithm 6, binding must be argued at the `echo4` level. A grade-≥1 decision on `v` needs
-  a genuine `⟨echo4, v⟩`, which is why line 25 checks `t + 1` echo4's. (`Alg3.theorem_4_1`,
-  `Alg5.theorem_5_1`, `Alg6.theorem_5_3`)
-* **"Communication rounds" = broadcasts, not asynchronous time.** "Terminates within 4 communication
-  rounds" (Lemma 4.7) is proved by counting messages, and that is what we verify (≤ 4 broadcasts per
-  party). In the normalized-delay measure, Algorithm 4 can take almost 5 time units. With `n = 7`, `t = 2`,
-  the Byzantine parties make one correct party approve the minority value first. Then nobody gets `n − t`
-  equal `echo2`'s, and everybody waits until both values are approved at time `≈ 4`. We checked this by an
-  event simulation, not in Lean ([`scripts/latency.py`](scripts/latency.py)). The round comparisons with
-  other papers in Tables 1–2 are fair only if those papers count the same way.
-* **Typo.** Algorithm 6, line 11 reads "if 1 then"; it means "if (1) then", as in Algorithm 4, line 11.
+**Impact.** A typo with evident intent (rule R3): the prose above the algorithm says that a party with all
+`⊥` decides `⊥`. We prove Theorem 5.1 for this intended version (all `⊥` gives `⊥` grade 0) (`Alg5.decideG`,
+`Alg5.theorem_5_1`). No theorem or lemma is false.
+
+**Details.** Line 10 counts `⊥` as "a value other than `v`", so "value" includes `⊥`. In the example, every
+party first receives one `⟨val, 0⟩` and one `⟨val, 1⟩`. Then everybody sends `⟨echo, ⊥⟩` and then
+`⟨echo2, ⊥⟩`, and line 9 outputs `⊥` with grade 2. That is not one of the five buckets of Definition 3.2, so
+Theorem 5.1 fails for the literal code. Line 11 becomes dead code, and Algorithm 2, line 7 ("if grade = 2
+then commit val") would commit `⊥`.
+
+### Typos and slips
+- Algorithm 6, line 11 reads "if 1 then"; it means "if (1) then", as in Algorithm 4, line 11.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 4.5 (validity of Algorithm 4)
+The proof says that to decide `1 − v` a non-faulty party "must have `1 − v` in its approvedVals set (line 15)", but line 15 only asks for `n − t` messages `⟨echo3, 1 − v⟩`.
+
+**Impact.** Statement true; repaired by one more link of the chain (`Alg4.validity`).
+
+**Repair.** An uncorrupted sender of `⟨echo3, 1 − v⟩` saw `n − t` messages `⟨echo2, 1 − v⟩`. One of their
+senders is uncorrupted and has `1 − v` approved, which needs an uncorrupted party with input `1 − v`.
+
+### 🛠️ Lemma 4.9 (binding of Algorithm 4, adaptive adversary)
+The proof argues with "the `t + 1` echo3 messages from non-faulty parties", but under adaptive corruption who is non-faulty depends on the extension, while `b` must be fixed at the first decision.
+
+**Impact.** Statement true; repaired by fixing `b` from the prefix (`Alg4.binding`, `Alg6.graded_binding`).
+
+**Repair.** If some party has broadcast `⟨echo3, u⟩` with `u ≠ ⊥`, then `b = u`, by Lemma 4.8 applied inside
+the extension. Otherwise the decider's quorum contains at least `n − t − |bad(τ)|` genuine `⊥`'s. A later
+`⟨echo3, w⟩` quorum would then need `n − t` parties among at most `2t` candidates. The same repair works for
+Algorithm 6 through its first `⟨echo4, ⊥⟩`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -75,6 +75,19 @@ Full list of differences (including modelling choices and minor imprecisions): [
   earlier coins only.
 * Safety statements are stronger than the paper's. Agreement, validity and binding cover *all* recorded
   decisions, also of parties corrupted after deciding, in every reachable state and every extension.
+
+**Proofs we supplied.** Theorems 4.1, 5.1, 5.3 (Algorithms 3, 5, 6) are stated with proofs deferred to the
+full version. We prove them. For Algorithm 6, binding must be argued at the `echo4` level. A grade-≥1
+decision on `v` needs a genuine `⟨echo4, v⟩`, which is why line 25 checks `t + 1` echo4's.
+(`Alg3.theorem_4_1`, `Alg5.theorem_5_1`, `Alg6.theorem_5_3`)
+
+**"Communication rounds" = broadcasts, not asynchronous time.** "Terminates within 4 communication rounds"
+(Lemma 4.7) is proved by counting messages, and that is what we verify (≤ 4 broadcasts per party). In the
+normalized-delay measure, Algorithm 4 can take almost 5 time units. With `n = 7`, `t = 2`, the Byzantine
+parties make one correct party approve the minority value first. Then nobody gets `n − t` equal `echo2`'s,
+and everybody waits until both values are approved at time `≈ 4`. We checked this by an event simulation,
+not in Lean ([`scripts/latency.py`](scripts/latency.py)). The round comparisons with other papers in
+Tables 1–2 are fair only if those papers count the same way.
 
 **Main results in Lean.**
 
