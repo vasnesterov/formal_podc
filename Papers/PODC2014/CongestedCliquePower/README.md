@@ -83,7 +83,7 @@ through three vertices of `V_A`, which violates condition II. Whether the lemma 
 `ℓ` is odd" the construction is correct for all `N`; we prove this (including condition II for
 every cycle, which the paper does not argue) and derive Theorem 19 from it. (`lemma_18`)
 
-### ⚠️ Typos and slips
+### Typos and slips
 - Lemma 14's construction connects `u_1, …, u_{ℓ−1}` to everything; it should be `u_{ℓ−4}`.
 - Lemma 18's index ranges for the path nodes `u_{i,j}` give `⌊ℓ/2⌋` (resp. `⌈ℓ/2⌉`) internal
   nodes; it should be `⌊ℓ/2⌋ − 2` (resp. `⌈ℓ/2⌉ − 2`), consistent with the stated path lengths and

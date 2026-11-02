@@ -14,7 +14,7 @@ repair; the rest are minor slips.
 
 No mistakes in the statements.
 
-### ⚠️ Typos and slips
+### Typos and slips
 - At the end of the proof of Claim 4 (Appendix A), `v_i[s + τ]` should be `v_i[s + τ + 1]`.
 
 ## Proof gaps (statements true)
