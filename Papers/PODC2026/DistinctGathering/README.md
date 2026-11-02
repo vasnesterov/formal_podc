@@ -14,27 +14,34 @@ rigid movement and a common chirality too. The only statement-level slip is that
 
 ## Mistakes in the paper
 
-* **Conjecture 3 is misquoted, so it cannot be "disproved" as printed.** §3 states Conjecture 3 (after Défago et
-  al., Conj. 1) as "every algorithm that solves *Gathering* under RoundRobin is a rapid-gathering algorithm". §1
-  and §4.1 then say Theorem 5 disproves it. But by the paper's own Theorem 1, no algorithm solves Gathering under
-  Round-Robin for any `n ≥ 3`. So the conjecture as printed is vacuously true for every `n ≥ 3` and cannot be
-  disproved. The intended reading is clear: the sentence before it speaks of "any algorithm solving this
-  problem", meaning Distinct Gathering, and Definition 5 starts from distinct positions. This is a typo with
-  evident intent. For `n = 3` the intended version holds vacuously by Theorem 4, which agrees with the paper's
-  remark "confirming Conjectures 2 and 3 in this case". We did not check the disproof for `n ≥ 4`; it rests on
-  Theorem 5 together with Défago et al., Thm. 16. (`conjecture_3_as_stated`, `conjecture_3_distinct_three`)
-* **Theorem 4 has only a sketch, but a short complete proof exists, and it works under rigid movement.** The paper
-  defers the rigorous proof to the full version. Its sketch mentions the last 3→2-point transition and "the fact
-  that the algorithm does not revert to a three-point configuration multiple times". Our proof is short and does
-  not need non-rigid movement.
-  (1) The step that first gathers is a lone robot jumping onto the point of the other two. The adversary can
-  rotate and scale every two-point view to the same view `{0, w}`, so *every* robot seeing a two-point
-  configuration jumps onto the other point.
-  (2) Robots starting at distinct positions must eventually collide. So in some distinct configuration `C`, some
-  robot `x` jumps exactly onto some robot `y`.
-  (3) Start from `C` with the Round-Robin order `x, y, z`. After `x` joins `y`, the activated robot is always
-  accompanied, and the robots swap between the two points forever.
-  The theorem is true as stated; this is not an error, only a missing proof. (`theorem_4`)
+### ⚠️ Conjecture 3 (§3, misquoted as "Gathering")
+Conjecture 3 is printed as "every algorithm that solves *Gathering* under RoundRobin is a rapid-gathering algorithm", which by the paper's own Theorem 1 is vacuously true for every `n ≥ 3`, so the claim in §1 and §4.1 that Theorem 5 disproves it fails as printed (`conjecture_3_as_stated`).
+
+**Impact.** A typo with evident intent: Distinct Gathering is meant. For `n = 3` the intended version holds vacuously by Theorem 4 (`conjecture_3_distinct_three`); the disproof for `n ≥ 4` was not checked.
+
+**Details.** §3 states Conjecture 3 after Défago et al., Conj. 1. The intended reading is clear: the
+sentence before it speaks of "any algorithm solving this problem", meaning Distinct Gathering, and
+Definition 5 starts from distinct positions. For `n = 3` the vacuous truth agrees with the paper's
+remark "confirming Conjectures 2 and 3 in this case". The disproof for `n ≥ 4` rests on Theorem 5
+together with Défago et al., Thm. 16. (`conjecture_3_as_stated`, `conjecture_3_distinct_three`)
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 4 (only a sketch)
+The paper defers the rigorous proof to the full version, and its sketch only mentions the last 3→2-point transition and "the fact that the algorithm does not revert to a three-point configuration multiple times".
+
+**Impact.** The theorem is true as stated; this is not an error, only a missing proof. A short complete proof exists, and it works under rigid movement (`theorem_4`).
+
+**Repair.** Our proof does not need non-rigid movement.
+1. The step that first gathers is a lone robot jumping onto the point of the other two. The
+   adversary can rotate and scale every two-point view to the same view `{0, w}`, so *every* robot
+   seeing a two-point configuration jumps onto the other point.
+2. Robots starting at distinct positions must eventually collide. So in some distinct configuration
+   `C`, some robot `x` jumps exactly onto some robot `y`.
+3. Start from `C` with the Round-Robin order `x, y, z`. After `x` joins `y`, the activated robot is
+   always accompanied, and the robots swap between the two points forever.
+
+(`theorem_4`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

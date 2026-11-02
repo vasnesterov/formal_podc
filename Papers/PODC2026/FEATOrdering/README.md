@@ -14,52 +14,64 @@ verdict is borderline: if "honest" is read as a slip, the verdict would be ⚠�
 
 ## Mistakes in the paper
 
-* **Lemma 6.3 is false, and with it Theorems 6.4 and 6.6.** §5.1 defines `score(T)` as the number of *honest*
-  replicas whose committed local orderings include `T`. Case 2 of the proof of Lemma 6.3 reasons as follows: `z` is
-  solid and `m` is blank, so `W(z, m) > τ_dec = τ_shaded > W(m, z)`. The second inequality needs
-  `W(m, z) ≤ score(m)`. But `W(m, z)` counts *all* committed orderings, including the Byzantine ones. Here is a
-  counterexample with `n = 7`, `f = 2`, `γ = 1` (so `n > (2γ+1)f/(2γ−1) = 6`), `τ_dec = 5/2` and `τ_solid = 5`:
-  * Honest replicas 0 and 1 receive `m, z`, and honest replicas 2, 3 and 4 receive `z, m`.
-  * In round 1, replicas 0 and 1 and both Byzantine replicas commit `[m, z]`, and replicas 2, 3, 4 commit `[z]`.
-    So `z` is solid (honest score 5) and `m` is blank (honest score 2). Also `W₁(m, z) = 4 > W₁(z, m) = 3 ≥ τ_dec`,
-    so the pair is decided in round 1: `cmp_T(z, m) = False`. FEAT finalizes `FO₁ = [z]`.
-  * In round 2, replicas 2, 3 and 4 commit `m`. Now `m` is newly solid, so `RO₂ = [m]` and FEAT outputs
-    `FO₂ = [z, m]`.
+### 🚨 Lemma 6.3, Theorems 6.4 and 6.6 (score counts only honest replicas)
+With `score(T)` counting only *honest* replicas (§5.1), a 7-replica run with `f = 2` makes FEAT output `[z, m]` although `cmp_T(z, m) = False`, so Lemma 6.3 and Theorems 6.4 and 6.6 (FEAT achieves comparator-based γ-Batch-Order-Fairness) are false (`lemma_6_3_false`, `theorem_6_4_false`, `theorem_6_6_false`).
 
-  FEAT never compares this pair. The output violates ACC and the linear-batch-partition clause of Definition 4.1:
-  the batches are `{z}` and `{m}`, `z` comes first, but `cmp_T(z, m) = False`. All system-model assumptions hold.
-  Rounds after 2 commit nothing new (empty fragments), so `FO₂` is the final ordering. The γ-precedence clause is not
-  violated in this run. What fails is the claim that FO is consistent with FEAT's own comparator, and that claim
-  is exactly what Theorems 6.4 and 6.6 state. If the score counts all replicas, the proof goes through:
-  `W(m, z) ≤ score(m) < τ_shaded`. On the same run, FEAT then inserts both transactions in round 1 and outputs
-  `[m, z]`. (`lemma_6_3_false`, `theorem_6_4_false`, `theorem_6_6_false`; repaired: `Setup.lemma_6_3`,
-  `Setup.theorem_6_4`, `Setup.theorem_6_6`, contrast run `cex_scoreAll_FO1`)
-* **The repair needs the "loose" reading of `W`.** In the proof of Lemma 6.3, `W(z, m)` counts orderings that
-  contain `z` but not yet `m` ("committed `z` but not `m`"). We use this reading. Under the stricter reading (both
-  transactions present, `z` first), Case 2 fails even with the all-replica score. An example: two honest replicas
-  that have committed nothing yet later commit `[m, z]`. This is a sketch and is not formalized.
-* **Lemma 6.3, Case 1 has a gap (the statement is true).** It says that the head of `TailList_{r−1}` immediately
-  followed `z` in `Merged_{r−1}`. This fails when round `r−1` finalized nothing (`ℓ = 0`): then `z` was finalized
-  earlier. An invariant over rounds closes the gap: `FO ++ TailList` satisfies ACC and the last finalized
-  transaction is solid. (`Setup.inv_step`)
-* **Algorithm 3 drops a suffix.** After the loop `while i ≤ |TailList| and j ≤ |RO_r|`, the tests
-  `if i = |TailList|` and `else if j = |RO_r|` are both false (the exhausted index is one past the end). So the
-  remaining suffix is never appended. The prose (steps (1) and (2)) is correct, and we model the prose
-  (`List.merge`).
-* **The Theorem 4.5 proof needs the positional comparison model.** "Fix `cmp★`, then `A` sorts the random
-  permutation" works only if the algorithm sees the transactions through their input positions. The theorem
-  itself holds more generally. If the algorithm also sees the transaction identities, averaging over the `|T|!`
-  linear comparators gives the same bound. (`theorem_4_5_of_linear`, `theorem_4_5_identityAware`)
-* **Corollary 4.6 holds more broadly than stated.** For a linear comparator, Definition 4.1 already forces the
-  sorted order. So the `Ω(|T| log |T|)` bound holds for every algorithm guaranteeing comparator-based γ-BOF, not
-  only those "relying on ACC". (`corollary_4_6`)
-* Minor slips:
-  * Algorithm 1 inserts the transactions that are "newly solid" or "newly shaded". Read literally, a transaction
-    that turns from shaded to solid would be inserted twice. The prose says "newly non-blank".
-  * Rule (4) of `pcmp` says "both weights exceed the threshold". It should be `≥`, as in rules (2) and (3).
-  * Replicas cannot know which replicas are honest, so an honest-replica score cannot be computed by the protocol.
-  * The bound `W(T_j, T_i) ≤ (1−γ)(n−f) + f` in Lemma 6.5 implicitly takes exactly `n − f` honest replicas. It
-    remains true with more honest replicas: `n − γ|H| ≤ n − γ(n − f)`.
+**Impact.** The headline fails for the protocol as defined, but the fix is one word: if the score counts *all* replicas, Lemma 6.3 and Theorems 6.4 and 6.6 hold (`Setup.lemma_6_3`, `Setup.theorem_6_4`, `Setup.theorem_6_6`). The verdict is borderline (see the Verdict).
+
+**Details.** §5.1 defines `score(T)` as the number of *honest* replicas whose committed local orderings
+include `T`. Case 2 of the proof of Lemma 6.3 reasons as follows: `z` is solid and `m` is blank, so
+`W(z, m) > τ_dec = τ_shaded > W(m, z)`. The second inequality needs `W(m, z) ≤ score(m)`. But
+`W(m, z)` counts *all* committed orderings, including the Byzantine ones. Here is a counterexample
+with `n = 7`, `f = 2`, `γ = 1` (so `n > (2γ+1)f/(2γ−1) = 6`), `τ_dec = 5/2` and `τ_solid = 5`:
+* Honest replicas 0 and 1 receive `m, z`, and honest replicas 2, 3 and 4 receive `z, m`.
+* In round 1, replicas 0 and 1 and both Byzantine replicas commit `[m, z]`, and replicas 2, 3, 4 commit `[z]`.
+  So `z` is solid (honest score 5) and `m` is blank (honest score 2). Also `W₁(m, z) = 4 > W₁(z, m) = 3 ≥ τ_dec`,
+  so the pair is decided in round 1: `cmp_T(z, m) = False`. FEAT finalizes `FO₁ = [z]`.
+* In round 2, replicas 2, 3 and 4 commit `m`. Now `m` is newly solid, so `RO₂ = [m]` and FEAT outputs
+  `FO₂ = [z, m]`.
+
+FEAT never compares this pair. The output violates ACC and the linear-batch-partition clause of
+Definition 4.1: the batches are `{z}` and `{m}`, `z` comes first, but `cmp_T(z, m) = False`. All
+system-model assumptions hold. Rounds after 2 commit nothing new (empty fragments), so `FO₂` is the
+final ordering. The γ-precedence clause is not violated in this run. What fails is the claim that FO
+is consistent with FEAT's own comparator, and that claim is exactly what Theorems 6.4 and 6.6 state.
+
+**Repair.** If the score counts all replicas, the proof goes through: `W(m, z) ≤ score(m) < τ_shaded`.
+On the same run, FEAT then inserts both transactions in round 1 and outputs `[m, z]`.
+(`lemma_6_3_false`, `theorem_6_4_false`, `theorem_6_6_false`; repaired: `Setup.lemma_6_3`,
+`Setup.theorem_6_4`, `Setup.theorem_6_6`, contrast run `cex_scoreAll_FO1`)
+
+The repair needs the "loose" reading of `W`. In the proof of Lemma 6.3, `W(z, m)` counts orderings
+that contain `z` but not yet `m` ("committed `z` but not `m`"). We use this reading. Under the
+stricter reading (both transactions present, `z` first), Case 2 fails even with the all-replica
+score. An example: two honest replicas that have committed nothing yet later commit `[m, z]`. This
+is a sketch and is not formalized.
+
+### ⚠️ Algorithm 3 (merge drops a suffix)
+After the loop `while i ≤ |TailList| and j ≤ |RO_r|`, the tests `if i = |TailList|` and `else if j = |RO_r|` are both false (the exhausted index is one past the end), so the remaining suffix is never appended.
+
+**Impact.** The prose (steps (1) and (2)) is correct, and we model the prose (`List.merge`).
+
+### Typos and slips
+- Algorithm 1 inserts the transactions that are "newly solid" or "newly shaded". Read literally, a transaction
+  that turns from shaded to solid would be inserted twice. The prose says "newly non-blank".
+- Rule (4) of `pcmp` says "both weights exceed the threshold". It should be `≥`, as in rules (2) and (3).
+- Replicas cannot know which replicas are honest, so an honest-replica score cannot be computed by the protocol.
+- The bound `W(T_j, T_i) ≤ (1−γ)(n−f) + f` in Lemma 6.5 implicitly takes exactly `n − f` honest replicas. It
+  remains true with more honest replicas: `n − γ|H| ≤ n − γ(n − f)`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 6.3, Case 1
+Case 1 says that the head of `TailList_{r−1}` immediately followed `z` in `Merged_{r−1}`, which fails when round `r−1` finalized nothing (`ℓ = 0`): then `z` was finalized earlier.
+
+**Impact.** The (repaired) statement is true; an invariant over rounds closes the gap: `FO ++ TailList` satisfies ACC and the last finalized transaction is solid (`Setup.inv_step`).
+
+### 🛠️ Theorem 4.5 (positional comparison model)
+"Fix `cmp★`, then `A` sorts the random permutation" works only if the algorithm sees the transactions through their input positions.
+
+**Impact.** The theorem itself holds more generally: if the algorithm also sees the transaction identities, averaging over the `|T|!` linear comparators gives the same bound (`theorem_4_5_of_linear`, `theorem_4_5_identityAware`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -101,6 +113,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 6.4: **false** as stated / repaired | `theorem_6_4_false` / `Setup.theorem_6_4` | `Counterexample.lean` / `FEAT.lean` |
 | Lemma 6.5 | `Setup.lemma_6_5` | `FEAT.lean` |
 | Theorem 6.6: **false** as stated / repaired | `theorem_6_6_false` / `Setup.theorem_6_6` | `Counterexample.lean` / `FEAT.lean` |
+
+Corollary 4.6 holds more broadly than stated. For a linear comparator, Definition 4.1 already forces the sorted
+order. So the `Ω(|T| log |T|)` bound holds for every algorithm guaranteeing comparator-based γ-BOF, not only those
+"relying on ACC". (`corollary_4_6`)
 
 **Not formalized.** Theorem 6.7 and Corollary 6.8 (the per-round `O(|T| log |T|)` upper bound: AVL heights and
 retry counts), Theorem 6.9 (safety: replicas agree), and the query count in Figure 4.

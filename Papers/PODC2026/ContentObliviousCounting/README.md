@@ -14,44 +14,56 @@ by one. The headline results hold: Theorems 1, 4, 5, 13, 14, 22 (with an active 
 
 ## Mistakes in the paper
 
-* **The distance formula of the counting algorithm is off by one (false statement, §5 p. 9).**
-  For every process probed in a completed phase (`myPhase < i`, including the last leader) the
-  formula `myPhase(myPhase+1)/2 − k − 1` gives its clockwise distance minus one; it is undefined for
-  the original leader (whose `myPhase` is never set). Already for `n = 2` the non-leader computes
-  0, the leader's own distance. The correct value is `myPhase(myPhase+1)/2 − k` (and 0 for the
-  leader); with it the algorithm computes `n` and all distances (Theorem 4).
-  (`AnonCounting.paperResult_off_by_one`, `paperResult_wrong`, `paperResult_two`,
-  `anonCount_final`)
-* **Lemma 16 / Theorem 17: bit sending with a relay leader is not composable (false statement).**
-  Lemma 16 explicitly covers a relay leader (Algorithm 8's lines 2–3 and 6 exist only for it) and
-  Theorem 17 claims the composable ending property for it. But after forwarding the termination
-  wave, the relay leader still reads *any* port, so it can consume a pulse that its
-  already-returned clockwise neighbour sends in the next procedure. On 3 processes (relay leader
-  `0`, active `1`, `2`) running two CCW rounds back to back — `1` sends `⊥` then `0`, `2` sends `⊥`
-  twice — an execution of 16 deliveries ends in a final, quiescent configuration in which `2` has
-  obtained `[0, ⊥]` instead of `[⊥, 0]`: the round-2 bit is attributed to round 1. Each single
-  round is correct. Theorems 14 and 22 hold with an active leader (Theorem 14 assumes it;
-  Theorem 22 as stated does not, and its proof does not cover a relay leader; neither does §9.2's
-  use of relays, which may contain the leader). (`BitSending.relay_leader_composition_wrong`,
-  `BitSending.not_composable_relay_leader`)
-* **Theorem 1's λ-preprocessing does not work as written (pseudo-code error, easy fix).** With the
-  input "ID length ≤ i" and "stop at the first false", the loop stops at `i = 1` (unless some ID has
-  one bit) and "the largest index with outcome true" does not exist; the input must be
-  "ID length ≥ i". Fixed in the formalization. Also, "self-decomposable for *disjoint* multisets"
-  literally excludes counting (`{1} ⊎ {1}`); disjoint sets of processes are meant.
-* **Algorithm 10 loops over the process's own input length (pseudo-code error, easy fix).**
-  `while phase < len(bits)` lets processes with longer inputs call ComputeOR more often than the
-  others, so the calls no longer match; the loop bound must be the common minimum length `B`
-  (as the text suggests). Fixed in the formalization (Theorem 5).
-* **Theorem 3's proof (minor proof gap, statement true).** The splicing in Lemma 28 ("replay O
-  verbatim") cannot be literal — events of the removed part must be dropped and the kept interval's
-  events rescheduled; we use a precise crossing-sequence merge. We prove more than stated:
-  `n⌊log₂ n⌋ ≤ 14M + 4n` for *every* execution with `M` pulses in which the leader has counted.
-  (`Counting.count_lower_bound`, `Counting.theorem3`, `Cslib.ContentOblivious.splice`)
-* **Minor.** Lemmas 11–12 say the last phase is `⌈√n⌉`; there are about `√(2n)` phases (`n = 40`
-  has 9). Lemma 10's premise has `p₀` uncounted and calls the per-phase invariant "immediate".
-  Lemma 16 (relay segments behave like a link) is asserted without proof. Theorem 4 writes
-  `d ∈ [0, n]`. Algorithm 5's comments say `phase > len` for `≥`.
+### ❌ Lemma 16 / Theorem 17 (bit sending with a relay leader)
+Bit sending with a relay leader is not composable: on 3 processes (relay leader `0`, active `1`, `2`), two CCW rounds run back to back can end in a final, quiescent configuration in which `2` has obtained `[0, ⊥]` instead of `[⊥, 0]` (`BitSending.relay_leader_composition_wrong`, `BitSending.not_composable_relay_leader`).
+
+**Impact.** Each single round is correct, and Theorems 14 and 22 hold with an active leader. Theorem 14 assumes it; Theorem 22 as stated does not, and its proof does not cover a relay leader; neither does §9.2's use of relays, which may contain the leader.
+
+**Details.** Lemma 16 explicitly covers a relay leader (Algorithm 8's lines 2–3 and 6 exist only for
+it) and Theorem 17 claims the composable ending property for it. But after forwarding the
+termination wave, the relay leader still reads *any* port, so it can consume a pulse that its
+already-returned clockwise neighbour sends in the next procedure. In the counterexample `1` sends
+`⊥` then `0`, `2` sends `⊥` twice; an execution of 16 deliveries ends with the round-2 bit
+attributed to round 1.
+
+### ❌ Section 5, p. 9 (distance formula of the counting algorithm)
+For every process probed in a completed phase (`myPhase < i`, including the last leader) the formula `myPhase(myPhase+1)/2 − k − 1` gives its clockwise distance minus one, e.g. for `n = 2` the non-leader computes 0, the leader's own distance (`AnonCounting.paperResult_off_by_one`, `paperResult_wrong`, `paperResult_two`).
+
+**Impact.** The algorithm is correct with the corrected formula: it computes `n` and all distances (Theorem 4, `anonCount_final`).
+
+**Details.** The formula is also undefined for the original leader, whose `myPhase` is never set.
+
+**Repair.** The correct value is `myPhase(myPhase+1)/2 − k` (and 0 for the leader). (`anonCount_final`)
+
+### ⚠️ Theorem 1 (λ-preprocessing pseudo-code)
+With the input "ID length ≤ i" and "stop at the first false", the loop stops at `i = 1` (unless some ID has one bit) and "the largest index with outcome true" does not exist; the input must be "ID length ≥ i".
+
+**Impact.** Pseudo-code error with an easy fix; fixed in the formalization.
+
+### ⚠️ Algorithm 10 (loop bound)
+`while phase < len(bits)` loops over the process's own input length, so processes with longer inputs call ComputeOR more often than the others and the calls no longer match.
+
+**Impact.** Pseudo-code error with an easy fix: the loop bound must be the common minimum length `B` (as the text suggests). Fixed in the formalization (Theorem 5).
+
+### Typos and slips
+- "Self-decomposable for *disjoint* multisets" (Theorem 1) literally excludes counting (`{1} ⊎ {1}`);
+  disjoint sets of processes are meant.
+- Lemmas 11–12 say the last phase is `⌈√n⌉`; there are about `√(2n)` phases (`n = 40` has 9).
+- Lemma 10's premise has `p₀` uncounted and calls the per-phase invariant "immediate".
+- Lemma 16 (relay segments behave like a link) is asserted without proof.
+- Theorem 4 writes `d ∈ [0, n]`.
+- Algorithm 5's comments say `phase > len` for `≥`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 3 (splicing in Lemma 28)
+The splicing in Lemma 28 ("replay O verbatim") cannot be literal: events of the removed part must be dropped and the kept interval's events rescheduled.
+
+**Impact.** Minor; statement true. We use a precise crossing-sequence merge (`Cslib.ContentOblivious.splice`).
+
+**Repair.** We prove more than stated: `n⌊log₂ n⌋ ≤ 14M + 4n` for *every* execution with `M` pulses
+in which the leader has counted. (`Counting.count_lower_bound`, `Counting.theorem3`,
+`Cslib.ContentOblivious.splice`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

@@ -17,47 +17,61 @@ max-ID protocol, the synchronisation of merges) are not formalized.
 
 ## Mistakes in the paper
 
-* **Lemma 5, merging phases: mutually selecting circuits (proof gap, statement true).** The sketch
-  lets *every* circuit `C` merge into the adjacent circuit `C'` with the largest leader ID. A
-  designated node of `C` re-pairs one pair of `C` with one pair of `C'`. Two circuits often select
-  each other; for example, if only two circuits remain, each one's only neighbour is the other. Then
-  two merges are performed on the same pair of circuits. The second re-pairing acts on two pairs
-  that by then lie on *one* circuit, and that can split it again. Take `K_{2,4}` (`x, y` adjacent
-  to `2, 3, 4, 5`) with circuits `C₁ = x2y3x` and `C₂ = x4y5x`. Merging at `x` (the node
-  designated by `C₂`) gives one Eulerian circuit. Merging at `y` as well (the node designated by
-  `C₁`, re-pairing as in Lemma 4) gives two circuits again, `x2y5x` and `x3y4x`. Whether this
-  happens depends on how the pairs are labelled, which the sketch leaves open ("w.l.o.g."). So the
-  sketch does not show that the number of circuits halves, or even decreases. Our repair: the
-  circuit with the larger ID in a mutually selecting pair does not merge. Then the merge links
-  form a forest, every link joins two different circuits, and each merged tree contains at least
-  two old circuits and is led by its root, the largest ID in it. We prove that the number of
-  circuits at least halves per phase, so there are at most `log₂ n` phases. (The protocol must
-  then also tell `C` whether `C'` selected `C`; we do not formalize that.)
-  (`DoubleMerge.double_merge_splits`; repaired: `phaseStep_spec`, `lemma5`)
-* **Lemma 5, OR protocol: the leader's own input (under-specified).** The leader `ℓ_C` starts
-  a clockwise pulse that "the first node with input 1 reflects"; if the pulse completes the cycle,
-  the leader forwards it once more and every node outputs 0. The sketch does not say how the
-  leader's own input enters. If "the first node with input 1" excludes the initiating leader, the
-  protocol outputs 0 when only the leader borders another circuit, and the algorithm would stop
-  with several circuits: for every ring size, all executions of this reading give output 0 when
-  only the leader has input 1. The evident fix, which we adopt: if its pulse completes the cycle
-  and its own input is 1, the leader acts as the reflector. We verify the fixed protocol in
-  the asynchronous content-oblivious ring model for every schedule: it terminates quiescently, every
-  node outputs the OR, and at most `2|C|` pulses are sent. Also, nodes with input 1 that come after
-  the first reflector receive a counter-clockwise pulse first and must behave like nodes with
-  input 0, which the paper's sentence "receive a counterclockwise pulse without a clockwise one"
-  covers. (`OrProtocol.literal_wrong`; fixed: `OrProtocol.orProc_final`, `orProc_totalSent_le`)
-* **Minor.**
-  - The intro says the "maximum-ID node on the merged circuit becomes its new leader". It is the
-    maximum among the merged *leaders* (the root of the merge tree; `id_le_id_top_of_top_eq`).
-    This need not be the maximum-ID node of the circuit: in Lemma 3 a node may only relay
-    passively on a circuit and then does not take part in its election.
-  - The max-ID step of Lemma 5 (bitwise ORs over "prefix-free" encodings) needs an
-    *order-preserving* prefix-free code. Otherwise it returns the lexicographically largest code,
-    not the largest ID. Not formalized.
-  - Lemma 3's sketch relies on properties of the ring election black box that are not stated:
-    passive relays must recognise when an election has finished, and pulses must be bounded per
-    edge (`O(IDmax)` on every edge) so that relays do not multiply the cost. Not formalized.
+No mistakes in the statements.
+
+### Typos and slips
+- The intro says the "maximum-ID node on the merged circuit becomes its new leader". It is the
+  maximum among the merged *leaders* (the root of the merge tree; `id_le_id_top_of_top_eq`).
+  This need not be the maximum-ID node of the circuit: in Lemma 3 a node may only relay
+  passively on a circuit and then does not take part in its election.
+- The max-ID step of Lemma 5 (bitwise ORs over "prefix-free" encodings) needs an
+  *order-preserving* prefix-free code. Otherwise it returns the lexicographically largest code,
+  not the largest ID. Not formalized.
+- Lemma 3's sketch relies on properties of the ring election black box that are not stated:
+  passive relays must recognise when an election has finished, and pulses must be bounded per
+  edge (`O(IDmax)` on every edge) so that relays do not multiply the cost. Not formalized.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 5, merging phases (mutually selecting circuits)
+The sketch lets *every* circuit merge into its adjacent circuit with the largest leader ID, so two circuits that select each other are merged twice, and the second re-pairing can split the merged circuit again (`DoubleMerge.double_merge_splits`).
+
+**Impact.** Statement true; repaired by letting the larger circuit of a mutually selecting pair not merge (`phaseStep_spec`, `lemma5`).
+
+**Details.** In the sketch a designated node of `C` re-pairs one pair of `C` with one pair of the
+selected circuit `C'`. Two circuits often select each other; for example, if only two circuits
+remain, each one's only neighbour is the other. The second re-pairing then acts on two pairs that
+by then lie on *one* circuit. Take `K_{2,4}` (`x, y` adjacent to `2, 3, 4, 5`) with circuits
+`C₁ = x2y3x` and `C₂ = x4y5x`. Merging at `x` (the node designated by `C₂`) gives one Eulerian
+circuit. Merging at `y` as well (the node designated by `C₁`, re-pairing as in Lemma 4) gives two
+circuits again, `x2y5x` and `x3y4x`. Whether this happens depends on how the pairs are labelled,
+which the sketch leaves open ("w.l.o.g."). So the sketch does not show that the number of circuits
+halves, or even decreases.
+
+**Repair.** The circuit with the larger ID in a mutually selecting pair does not merge. Then the
+merge links form a forest, every link joins two different circuits, and each merged tree contains
+at least two old circuits and is led by its root, the largest ID in it. We prove that the number of
+circuits at least halves per phase, so there are at most `log₂ n` phases. (The protocol must then
+also tell `C` whether `C'` selected `C`; we do not formalize that.)
+(`DoubleMerge.double_merge_splits`; repaired: `phaseStep_spec`, `lemma5`)
+
+### 🛠️ Lemma 5, OR protocol (the leader's own input)
+The sketch does not say how the leader's own input enters the OR protocol, and if "the first node with input 1" excludes the initiating leader, the protocol outputs 0 when only the leader borders another circuit (`OrProtocol.literal_wrong`).
+
+**Impact.** Under-specified; the evident fix (the leader reflects if its own input is 1) is verified on every schedule (`OrProtocol.orProc_final`, `orProc_totalSent_le`).
+
+**Details.** The leader `ℓ_C` starts a clockwise pulse that "the first node with input 1 reflects";
+if the pulse completes the cycle, the leader forwards it once more and every node outputs 0. Under
+the literal reading, for every ring size, all executions give output 0 when only the leader has
+input 1, and the algorithm would stop with several circuits.
+
+**Repair.** If its pulse completes the cycle and its own input is 1, the leader acts as the
+reflector. We verify the fixed protocol in the asynchronous content-oblivious ring model for every
+schedule: it terminates quiescently, every node outputs the OR, and at most `2|C|` pulses are sent.
+Also, nodes with input 1 that come after the first reflector receive a counter-clockwise pulse
+first and must behave like nodes with input 0, which the paper's sentence "receive a
+counterclockwise pulse without a clockwise one" covers. (`OrProtocol.literal_wrong`; fixed:
+`OrProtocol.orProc_final`, `orProc_totalSent_le`)
 
 Full list of differences (including modelling choices and minor imprecisions):
 [differencies.md](differencies.md).

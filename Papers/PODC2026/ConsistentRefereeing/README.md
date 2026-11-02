@@ -14,43 +14,61 @@ are minor: Lemma 29(2) fails in the degenerate case `w = 0`, and Lemma 17 needs 
 
 ## Mistakes in the paper
 
-* **Theorem 30, case "all processes apply T&S to the same test&set object R": proof gap, statement
-  true.** The proof compares `αβγpγ′₁q′ᵏγ′₂` with `αβγ′₁q′ᵏγpγ′₂` and claims they end with the same shared
-  memory and look the same to every other competitor `q″`. If `R` is still unset after `αβ`, then `q` wins
-  the test&set in the first execution and `q′` wins it in the second.
-  - `q′` then takes `k` more steps in different local states, and so do the processes of `γ′₂`. These
-    steps may write different values to other objects, and `q″` can read them.
-  - So neither the memory equality nor the indistinguishability follows.
+### ⚠️ Lemma 29(2) for `w = 0` (window objects)
+Lemma 29(2) fails in the degenerate case `w = 0`: the sequences it needs (`|γ| = w`, `γ = qλ`) do not exist.
 
-  Our fix does not use Lemma 29(2). Once some competitor has set `R`, every later referee step on `R`
-  changes nothing and commutes with every competitor step. By Lemma 17 the singleton valency `W(αβq·u·p)`
-  is then the same for every competitors-only extension `u`. Taking `u` in which some competitor completes
-  more operations than that value contradicts the specification. (`const_valency_contra`, `theorem30`)
-* **Theorem 5, stack case 4c: sketched only (imprecise proof, statement true).** Case 4c (one push, one
-  pop) refers to case 4b, "conceiving the step of `p_i` as a push of `u_i`". The two orders leave
-  different stack shapes than in 4b (`u_j·T` vs `s₀·T`, where `s₀·T` is the stack in `C`), so the transfer is
-  not immediate. The "w.l.o.g. pushed values are distinct" step (footnote 3, stamping) is standard and
-  sound, but our proof does not need it. Our replacement argument covers 4b and 4c:
-  - Run the canonical extension (a third competitor solo, then the referee) from `α·i·j` and from `α·j`
-    in lock-step. The stacks are `X₁ ++ S` and `X₂ ++ S` and differ only below a common top.
-  - If no step pops into `X₁`/`X₂`, the referee returns the same value from a descendant of `α·i` and of
-    `α·j`.
-  - Otherwise, at the first such pop by `q`, the configurations `α·i·j·β·q` and `α·j·β·q·i` are
-    identical.
+**Impact.** Degenerate; we use window `max(w, 1)` (a 0-window object is also 1-window-like), and our proof of Theorem 30 does not need Lemma 29(2) at all.
 
-  (`Crit.stack_push`, `lockstep`)
-* **Under-specified steps in Section 5.**
-  - Lemma 17 needs `decide` to be pending.
-  - In Lemma 17's proof, the operations of `q` must be counted inside `β′`.
-  - The case analyses of Lemmas 20, 23, 27, 28 and Theorems 25, 30 omit the referee's invocation and
-    response steps.
-  - Lemma 29(2) fails in the degenerate case `w = 0`: the sequences it needs do not exist, so we use
-    window `max(w, 1)`.
-* **Typos.**
-  - The last paragraph of Theorem 25 ("We have that αβp is closed. Otherwise…") is garbled; we
-    formalized the intended argument.
-  - Lemma 28's test&set case calls `αβq′` closed, but it is supervalent there.
-  - Lemma 29's proof cites Lemma 21 instead of Lemma 27.
+### ⚠️ Lemma 17 (missing hypothesis)
+Lemma 17 needs `decide` to be pending.
+
+**Impact.** An implied assumption that holds where the lemma is used; the lemma is proved with it.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 30, case "all processes apply T&S to the same test&set object R"
+The proof claims that `αβγpγ′₁q′ᵏγ′₂` and `αβγ′₁q′ᵏγpγ′₂` end with the same shared memory and look the same to every other competitor `q″`, but if `R` is still unset after `αβ`, `q` wins the test&set in the first execution and `q′` in the second.
+
+**Impact.** Statement true; closed with a different argument (`const_valency_contra`, `theorem30`).
+
+**Details.**
+- `q′` then takes `k` more steps in different local states, and so do the processes of `γ′₂`. These
+  steps may write different values to other objects, and `q″` can read them.
+- So neither the memory equality nor the indistinguishability follows.
+
+**Repair.** Our fix does not use Lemma 29(2). Once some competitor has set `R`, every later referee step on `R`
+changes nothing and commutes with every competitor step. By Lemma 17 the singleton valency `W(αβq·u·p)`
+is then the same for every competitors-only extension `u`. Taking `u` in which some competitor completes
+more operations than that value contradicts the specification. (`const_valency_contra`, `theorem30`)
+
+### 🛠️ Theorem 5, stack case 4c (one push, one pop)
+Case 4c is only sketched: it refers to case 4b, "conceiving the step of `p_i` as a push of `u_i`", but the two orders leave different stack shapes than in 4b (`u_j·T` vs `s₀·T`, where `s₀·T` is the stack in `C`), so the transfer is not immediate.
+
+**Impact.** Statement true; our replacement argument covers 4b and 4c (`Crit.stack_push`, `lockstep`).
+
+**Details.** The "w.l.o.g. pushed values are distinct" step (footnote 3, stamping) is standard and
+sound, but our proof does not need it.
+
+**Repair.**
+- Run the canonical extension (a third competitor solo, then the referee) from `α·i·j` and from `α·j`
+  in lock-step. The stacks are `X₁ ++ S` and `X₂ ++ S` and differ only below a common top.
+- If no step pops into `X₁`/`X₂`, the referee returns the same value from a descendant of `α·i` and of
+  `α·j`.
+- Otherwise, at the first such pop by `q`, the configurations `α·i·j·β·q` and `α·j·β·q·i` are
+  identical.
+
+(`Crit.stack_push`, `lockstep`)
+
+### 🛠️ Section 5 (under-specified proof steps)
+In Lemma 17's proof the operations of `q` must be counted inside `β′`, and the case analyses of Lemmas 20, 23, 27, 28 and Theorems 25, 30 omit the referee's invocation and response steps.
+
+**Impact.** Statements true; routine completions in the formalization.
+
+### Typos and slips
+- The last paragraph of Theorem 25 ("We have that αβp is closed. Otherwise…") is garbled; we
+  formalized the intended argument.
+- Lemma 28's test&set case calls `αβq′` closed, but it is supervalent there.
+- Lemma 29's proof cites Lemma 21 instead of Lemma 27.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

@@ -15,35 +15,50 @@ Proposition 3 names the wrong matrix. Several proofs need small repairs.
 
 ## Mistakes in the paper
 
-* **Theorem 5's proof feeds a non-integer number of variables into Theorem 4 (proof repair).** For
-  each row it applies Theorem 4 "with `t = n + Y_i`" variables: the `n` rounding variables plus
-  `Y_i = ∑_j (1 − b'_ij)` constant ones of weight `1`. But `Y_i` is not an integer in general. The
-  fix is local: add `n` constant variables of weight `1 − b'_ij ∈ [0, 1]` instead. The mean, `δ` and
-  the bound `e^{-2nε²/3}` stay the same. (`line_bad_prob_le`)
-* **Theorem 5's proof only checks the conditions on `n_κ` at `n_κ` itself (routine gap).** `n_κ` is
-  "the smallest positive integer such that `n_κ ≥ 6/(16ε) + 1` and `e^{-2ε²n_κ/3} < 1/(2n_κ)`", but
-  the proof then uses both conditions for every `n ≥ n_κ`. The second condition is not monotone in
-  general. It does hold for all `n ≥ n_κ`, because `2n·e^{-cn}` is decreasing beyond its maximum and
-  is `> 1` up to it. We take `n_κ` from "eventually" statements instead. (`eventually_large`)
-* **Proposition 1's proof has an arithmetic slip and a gap (statement true).** In the displayed
-  computation, `5/6 − 5ε/12 − ε²/2` is set equal to `5/6 − 5ε/6 + ε − ε − ε²/2`, which is false. The
-  final inequality `< κ(1 − ε)` still holds. Separately, the graphs with `≤ 1` self-loop are
-  dismissed with "cannot host `(5/6)M_κ` since `1 − ε > 2/3`", which is not an argument. We replace
-  the graph-by-graph reasoning with two cut inequalities that hold for every flow on two nodes:
-  `D_ab ≤ A_ab` and `D_ab + D_aa + D_bb ≤ A_ab + A_aa + A_bb`. Proposition 1, Proposition 4 (first
-  part) and the `M₂` example follow by arithmetic. (`two_node_bounds_rel`, `proposition_1`)
-* **Typos and small slips.**
-  - Proof of Theorem 5: "Let `ε = κ − 5/8 > 0`" should be `ε = 5/8 − κ` (since `κ < 5/8`).
-    "Hence `b_ij < (2n−1)κ a_ij`" fails when `a_ij = 0` (then they are equal; this is harmless).
-    "`b_ij < min(a_ij, d_ij)`" should read `b_ij < d_ij`.
-  - The problem box for Demand-Aware Weak Direct Throughput asks whether "the direct throughput
-    of `G` … is at least `κ`"; it should say "weak direct throughput" (defined in §1.1). Read
-    literally, the problem coincides with Demand-Aware Direct Throughput, and Theorem 6 would then
-    contradict Proposition 3 for `n ≥ 2`. The intent is clear from the name, §1.1, Observation 4
-    and the proof of Theorem 6. Together with the next item, this is behind the ⚠️ (R3).
-  - Proposition 3 constructs `M_κ` but says "`(M, κ)` is a no-instance"; it should be `(M_κ, κ)`.
-  - Numerical remark after Theorem 5: by the proof's own two conditions, `κ = 0.6` needs
-    `n ≥ 26068`, not 26000. The other three numbers (≈ 700, 2250, ≈ 27 million) check out.
+### ⚠️ Problem box of Demand-Aware Weak Direct Throughput
+The problem box asks whether "the direct throughput of `G` … is at least `κ`"; it should say "weak direct throughput" (defined in §1.1).
+
+**Impact.** A typo with evident intent (R3): read literally, the problem coincides with Demand-Aware Direct Throughput, and Theorem 6 would then contradict Proposition 3 for `n ≥ 2`. The intent is clear from the name, §1.1, Observation 4 and the proof of Theorem 6.
+
+### ⚠️ Proposition 3 (wrong matrix named)
+Proposition 3 constructs `M_κ` but says "`(M, κ)` is a no-instance"; it should be `(M_κ, κ)`.
+
+**Impact.** A typo with evident intent (R3); together with the previous item, this is behind the ⚠️.
+
+### Typos and slips
+- Proof of Theorem 5: "Let `ε = κ − 5/8 > 0`" should be `ε = 5/8 − κ` (since `κ < 5/8`).
+  "Hence `b_ij < (2n−1)κ a_ij`" fails when `a_ij = 0` (then they are equal; this is harmless).
+  "`b_ij < min(a_ij, d_ij)`" should read `b_ij < d_ij`.
+- Numerical remark after Theorem 5: by the proof's own two conditions, `κ = 0.6` needs
+  `n ≥ 26068`, not 26000. The other three numbers (≈ 700, 2250, ≈ 27 million) check out.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 5 (non-integer number of variables in Theorem 4)
+For each row the proof applies Theorem 4 "with `t = n + Y_i`" variables (the `n` rounding variables plus `Y_i = ∑_j (1 − b'_ij)` constant ones of weight `1`), but `Y_i` is not an integer in general.
+
+**Impact.** Statement true; local fix (`line_bad_prob_le`).
+
+**Repair.** Add `n` constant variables of weight `1 − b'_ij ∈ [0, 1]` instead. The mean, `δ` and the
+bound `e^{-2nε²/3}` stay the same. (`line_bad_prob_le`)
+
+### 🛠️ Theorem 5 (conditions on `n_κ`)
+`n_κ` is "the smallest positive integer such that `n_κ ≥ 6/(16ε) + 1` and `e^{-2ε²n_κ/3} < 1/(2n_κ)`", but the proof then uses both conditions for every `n ≥ n_κ`, and the second is not monotone in general.
+
+**Impact.** Routine gap; statement true. We take `n_κ` from "eventually" statements instead (`eventually_large`).
+
+**Details.** The second condition does hold for all `n ≥ n_κ`, because `2n·e^{-cn}` is decreasing
+beyond its maximum and is `> 1` up to it.
+
+### 🛠️ Proposition 1 (arithmetic slip and a gap)
+In the displayed computation `5/6 − 5ε/12 − ε²/2` is set equal to `5/6 − 5ε/6 + ε − ε − ε²/2`, which is false, and the graphs with `≤ 1` self-loop are dismissed with "cannot host `(5/6)M_κ` since `1 − ε > 2/3`", which is not an argument.
+
+**Impact.** Statement true; the final inequality `< κ(1 − ε)` still holds, and we repair the case analysis (`two_node_bounds_rel`, `proposition_1`).
+
+**Repair.** We replace the graph-by-graph reasoning with two cut inequalities that hold for every
+flow on two nodes: `D_ab ≤ A_ab` and `D_ab + D_aa + D_bb ≤ A_ab + A_aa + A_bb`. Proposition 1,
+Proposition 4 (first part) and the `M₂` example follow by arithmetic. (`two_node_bounds_rel`,
+`proposition_1`)
 
 Full list of differences (including modelling choices and minor imprecisions):
 [differencies.md](differencies.md).
