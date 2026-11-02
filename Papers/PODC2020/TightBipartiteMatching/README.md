@@ -14,41 +14,62 @@ ill-defined problem in Lemma 4.3, and two errors in the output rule of the algor
 
 ## Mistakes in the paper
 
-* **Theorem 1.2 / end of §6: tightness fails for `y = Δ` (false only in a degenerate case).** The paper claims
-  tightness "for any combination of integers `x ≥ 0, y ≥ 1, Δ ≥ 2`". For `y = Δ` and `x < Δ` the formula gives
-  `T_Δ(x, Δ) = 1`. But matching every edge is a valid solution, so 0 rounds suffice. The paper itself notes
-  the trivial algorithm after Theorem 4.5. (`theorem_1_2_false_y_eq_Δ`)
-* **Lemma 4.1–4.3 proofs ignore the empty set (proof gap, statements true).** `R_B(Π)` uses labels from
-  `2^Σ`, which includes `∅`. A configuration such as `(∅, MZPOX, …, MZPOX)` is vacuously universal and
-  maximal. For `a ≤ Δ − 2` it extends to none of the three configurations listed in the proof of Lemma 4.1. The
-  lemmas survive because `∅` never appears in a correct solution. We use nonempty sets throughout.
-  (`emptyConf_counterexample`)
-* **Lemma 4.3 produces `Ψ^W_Δ(y, x, 0)`, which is undefined for `x > Δ − y` (under-specified).** The family
-  requires `a + b ≤ Δ`. We prove the lemma with `Ψ^W_Δ(y, min{x, Δ − y}, 0)`. Theorem 4.5 is unaffected,
-  since it only uses the lemma when `x < Δ − y`. (`lemma_4_3`)
-* **§5, the algorithm's output rule is wrong as literally written (proof error, bound true).** The text hints
-  at both fixes, but the stated rule fails on small cycles.
-  * White nodes must accept proposals received in the last round. Without this, an unmatched black node
-    that proposed in the last round may see more than `x` labels `X`. Example: `Δ = 2`, `x = y = 1`
-    (2 rounds) on an 8-cycle, where a black node gets `X` from both neighbours.
-  * In the `2⌈(Δ−x)/y⌉ − 1`-round variant, unmatched whites must output `P` on all ports, not only where
-    they proposed. Whites are active only `k − 1` times there. Example: BMM with `Δ = 2` (3 rounds) on a
-    6-cycle, where an unmatched white node outputs `P X`, which violates `x = 0`.
+### ⚠️ Theorem 1.2 and end of §6 (tightness for `y = Δ`)
+The tightness claim fails for `y = Δ` and `x < Δ`: the formula gives `T_Δ(x, Δ) = 1`, but matching every edge
+is a valid 0-round solution (`theorem_1_2_false_y_eq_Δ`).
 
-  With these fixes the bound holds on all `Δ`-regular properly 2-coloured port-numbered graphs. (`upper_bound`)
-* **Theorem 4.5 has small gaps.**
-  * Its parameter formulas break down when `⌈(Δ−x)/y⌉ = 1`. That case needs `Φ^W` and `Φ'` to be not
-    0-round solvable, which is asserted without proof.
-  * The caps `min{c + a, Δ − a}` of Lemma 4.1 are ignored. They are inactive.
+**Impact.** Degenerate case; the paper itself notes the trivial algorithm after Theorem 4.5. The paper claims
+tightness "for any combination of integers `x ≥ 0, y ≥ 1, Δ ≥ 2`"; we prove Theorem 1.2 for `0 ≤ x ≤ Δ`,
+`1 ≤ y ≤ Δ − 1` (`theorem_1_2`).
 
-  We prove both points. (`phi_not_zero`, `phi'_not_zero`, `seqBC_le`)
-* **Typos.**
-  * Theorem 2.1 says "complexity `min{0, T − 1}`"; it should be `max`.
-  * The proof of Lemma 4.1 says the universal quantifier is applied to the *white* constraint; it should be
-    the black one.
-  * "Δ-regular balanced trees" is imprecise: finite trees have leaves, while the problems are defined for
-    `Δ`-regular graphs (§2 uses regular graphs of girth `≥ 4Δ + 2`). We use the infinite 2-coloured
-    `Δ`-regular tree.
+### ⚠️ Lemma 4.3 (undefined problem `Ψ^W_Δ(y, x, 0)` for `x > Δ − y`)
+Lemma 4.3 produces `Ψ^W_Δ(y, x, 0)`, which is undefined for `x > Δ − y`, since the family requires `a + b ≤ Δ`.
+
+**Impact.** Under-specified, not false: we prove the lemma with `Ψ^W_Δ(y, min{x, Δ − y}, 0)` (`lemma_4_3`).
+Theorem 4.5 is unaffected, since it only uses the lemma when `x < Δ − y`.
+
+### Typos and slips
+- Theorem 2.1 says "complexity `min{0, T − 1}`"; it should be `max`.
+- The proof of Lemma 4.1 says the universal quantifier is applied to the *white* constraint; it should be the
+  black one.
+- "Δ-regular balanced trees" is imprecise: finite trees have leaves, while the problems are defined for
+  `Δ`-regular graphs (§2 uses regular graphs of girth `≥ 4Δ + 2`). We use the infinite 2-coloured `Δ`-regular
+  tree.
+
+## Proof gaps (statements true)
+
+### 🛠️ §5 (output rule of the upper-bound algorithm)
+The algorithm's output rule, as literally written, fails on small cycles in two places.
+
+**Impact.** Bound true: the text hints at both fixes, and with them the bound holds on all `Δ`-regular properly
+2-coloured port-numbered graphs (`upper_bound`).
+
+**Details.**
+* White nodes must accept proposals received in the last round. Without this, an unmatched black node that
+  proposed in the last round may see more than `x` labels `X`. Example: `Δ = 2`, `x = y = 1` (2 rounds) on an
+  8-cycle, where a black node gets `X` from both neighbours.
+* In the `2⌈(Δ−x)/y⌉ − 1`-round variant, unmatched whites must output `P` on all ports, not only where they
+  proposed. Whites are active only `k − 1` times there. Example: BMM with `Δ = 2` (3 rounds) on a 6-cycle,
+  where an unmatched white node outputs `P X`, which violates `x = 0`.
+
+### 🛠️ Lemmas 4.1–4.3 (the empty set in `R_B`)
+The proofs ignore the empty set: `R_B(Π)` uses labels from `2^Σ`, and a configuration such as
+`(∅, MZPOX, …, MZPOX)` is vacuously universal and maximal but extends to none of the configurations listed in
+the proof of Lemma 4.1 (`emptyConf_counterexample`).
+
+**Impact.** Statements true: `∅` never appears in a correct solution. We use nonempty sets throughout.
+
+**Details.** For `a ≤ Δ − 2` the configuration above extends to none of the three configurations listed in the
+proof of Lemma 4.1.
+
+### 🛠️ Theorem 4.5 (small gaps)
+Theorem 4.5's parameter formulas break down when `⌈(Δ−x)/y⌉ = 1`, and the proof ignores the caps of Lemma 4.1.
+
+**Impact.** Statement true; we prove both points (`phi_not_zero`, `phi'_not_zero`, `seqBC_le`).
+
+**Details.**
+* The case `⌈(Δ−x)/y⌉ = 1` needs `Φ^W` and `Φ'` to be not 0-round solvable, which is asserted without proof.
+* The caps `min{c + a, Δ − a}` of Lemma 4.1 are ignored. They are inactive.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

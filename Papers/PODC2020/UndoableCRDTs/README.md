@@ -11,27 +11,22 @@ last up to one degenerate edge case). There are only typos, one point of reading
 
 ## Mistakes in the paper
 
-Apart from the degenerate edge case below, there are no false statements. Three points are worth knowing.
+### ⚠️ Section 3 ("all operations are always valid")
+"All operations are always valid" fails for dead operations: a one-state CRDT with one primitive operation that
+applies in no state is undoable (`deadOp_not_valid`).
 
-- **Axiom 1 must include `p = q` (a clarification, not an error).** Axiom 1 has no distinctness condition, and
-  Fact 2 uses "Commutativity with a = b", so the paper is consistent. The introductory prose ("any two primitive
-  operations … commute") could be read as "two *different* operations", and under that reading the theorem is false.
-  The nonnegative counter (states ℕ, `dec` undefined at 0) commutes for distinct operations, is undoable, has
-  finitely many operations and every state is reachable. Yet it is equivalent to no undoable CRDT, so it is not a
-  tuple of counters. Under the paper's literal Axiom 1 it is simply not a CRDT: from state 0, `inc` then `dec` with
-  `p = q = dec` breaks the axiom. (`nnCounter_commutativeDistinct`, `nnCounter_not_equiv`,
-  `nnCounter_not_commutative`)
-- **"All operations are always valid" (Section 3) fails for dead operations (degenerate case).** The definitions
-  allow a primitive operation that applies in no state. A one-state CRDT with one such operation is undoable. The
-  correct statement, which we prove, is that an action applying in *some* state applies in *every* state. The same
-  caveat applies to "negative states always exist". The main theorem is unaffected, because the paper's equivalence
-  only constrains applicable operations, so dead operations can be mapped to the empty action.
-  (`deadOp_not_valid`, `all_operations_valid`, `negative_states`)
-- **Typos.**
-  - In the definition of equivalence (Section 2.2), `φ⁻¹(s') · ψ'(p)` should be `ψ'(p')`.
-  - In the proof of Proposition 3, `s₀ · ψ(a) · ψ(p)` should be `s₀' · ψ(a) · ψ(p)`.
-  - In Section 2.5, "by fact 5, s · a⁻¹ₛ ok": Fact 4 is the direct reference. This is not an error, since Fact 5
-    (`a⁻¹ₛ a ≡ₛ ε`) also gives `s · a⁻¹ₛ ok`, as `≡ₛ` requires both sides to be defined.
+**Impact.** Degenerate case; the main theorem is unaffected, because the paper's equivalence only constrains
+applicable operations, so dead operations can be mapped to the empty action. The same caveat applies to
+"negative states always exist".
+
+**Repair.** An action applying in *some* state applies in *every* state (`all_operations_valid`); likewise for
+negative states (`negative_states`).
+
+### Typos and slips
+- In the definition of equivalence (Section 2.2), `φ⁻¹(s') · ψ'(p)` should be `ψ'(p')`.
+- In the proof of Proposition 3, `s₀ · ψ(a) · ψ(p)` should be `s₀' · ψ(a) · ψ(p)`.
+- In Section 2.5, "by fact 5, s · a⁻¹ₛ ok": Fact 4 is the direct reference. This is not an error, since Fact 5
+  (`a⁻¹ₛ a ≡ₛ ε`) also gives `s · a⁻¹ₛ ok`, as `≡ₛ` requires both sides to be defined.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -47,6 +42,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
   applicable operations.
 - Counters: `OpSystem.modCounter n` has states `ZMod n` (the unbounded counter is `n = 0`). `counters m` is
   the tuple of counters modulo `m i`, indexed by an arbitrary finite type.
+
+**Axiom 1 must include `p = q`** (a clarification, not an error). Axiom 1 has no distinctness condition, and Fact 2
+uses "Commutativity with a = b", so the paper is consistent. The introductory prose ("any two primitive operations …
+commute") could be read as "two *different* operations", and under that reading the theorem is false. The nonnegative
+counter (states ℕ, `dec` undefined at 0) commutes for distinct operations, is undoable, has finitely many operations
+and every state is reachable. Yet it is equivalent to no undoable CRDT, so it is not a tuple of counters. Under the
+paper's literal Axiom 1 it is simply not a CRDT: from state 0, `inc` then `dec` with `p = q = dec` breaks the axiom.
+(`nnCounter_commutativeDistinct`, `nnCounter_not_equiv`, `nnCounter_not_commutative`)
 
 **Main results in Lean** (namespace `UndoableCRDTs`).
 
