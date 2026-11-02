@@ -15,58 +15,78 @@ Lemma 5, §B.2) have gaps, all of which we repaired.
 
 ## Mistakes in the paper
 
-* **The object protocol (Fig. 1 with the red lines, §C.3) is not wait-free, so Theorem 2 "if" is not
-  established by the paper.** The 1B messages do not carry `initial_val`, and a leader at line 37 can only
-  propose its *own* `initial_val`. A value known only to a non-leader is therefore never proposed. Two concrete
-  executions show this.
-  - *Ω scenario, any admissible parameters.* No process crashes, and Ω permanently outputs a correct `l` that
-    never calls `propose`. Every process moves to ballot 1 before anybody invokes (the ballot timer runs from
-    startup: "Initially it is set to 2Δ", §C.1). Later a correct `r ≠ l`
-    invokes `propose(v)`. Its `Propose` is ignored (`bal ≠ 0`), so `l` computes `val = ⊥` in every ballot and
-    never sends a 2A, and `r` never returns. (`Fig1.object_not_wait_free_omega`)
-  - *Crash scenario, any leader election, whenever `n − f − e ≥ 2`* (e.g. `n = 7, f = 3, e = 2`, which meets
-    the paper's bound). `p` proposes `v`, only `r` accepts it, and `p` crashes. Everyone else moves to a slow
-    ballot. `r` invokes `propose(w)` later; line 3 is skipped because `r` has already voted. Each 1B quorum
-    shows at most one vote for `v`, which is below `n − f − e`, and no leader has an `initial_val`, so nobody
-    ever decides. (`Fig1.object_not_wait_free`)
+### ❌ Fig. 1 object version (§C.3, upper bound of Theorem 2; wait-freedom)
+The object protocol (Fig. 1 with the red lines) is not wait-free: 1B messages do not carry
+`initial_val` and a leader at line 37 can only propose its *own* `initial_val`, so a value known only
+to a non-leader is never proposed (`Fig1.object_not_wait_free_omega`, `Fig1.object_not_wait_free`).
 
-  Severity: the upper-bound proof is broken, but Theorem 2 itself is true. We fix lines 37–38 in the object
-  version ("else, if `initial_val = ⊥`, propose the leader's own `val`"). We also replace Ω by clock-driven
-  rotating ballots, so every correct invoker eventually leads a ballot after GST. The fix alone does not save
-  the Ω version: the first scenario still applies. We prove the fixed protocol correct and two-step for
-  `n ≥ max {2e+f−1, 2f+1}`. (`Impl.theorem_2_upper`, `theorem_2`)
-* **Lemma 5 (object fast-path recovery): proof gap; the statement is true.** The proof considers the line-33
-  case only when `v` itself has `> n−e−f` votes in `Q`. With `n = 2e+f−1` it can also happen that `v` has
-  exactly `n−e−f = e−1` votes and another `w` has `e` votes; counting does not exclude this. The case is ruled
-  out by the line-35 argument: all `f` processes outside `Q` voted for `v`, so `w`'s proposer did as well, and
-  in the object version it then never proposed `w`. In the task version (Lemma 1) the same case is excluded by
-  counting, and the paper skips it silently. (`Fig1.lemma5`, `Fig1.lemma1`)
-* **Lemma 4 (slow-path safety): the proof does not work; the statement is true.** The induction on `b′`
-  analyses line 30 by claiming that a process with `vbal_q′ = b` received its `Decide` from the leader of
-  ballot `b`. That is false: `Decide` may come from a decision at a higher ballot, received before answering
-  `1A(b′)`, and `decided_q′` need not be the value of `2A(vbal_q′)`. Agreement between two fast-path decisions
-  is never argued either. We prove agreement through a "potentially chosen" invariant over all fast and slow
-  decisions. (`Fig1.lemma4`, `Fig1.task_agreement`, `Fig1.object_agreement`)
-* **Lower-bound proofs (§B): gaps; statements true.**
-  - The proofs assume `n = 2e+f−1` (Thm 1) and `n = 2e+f−2` (Thm 2) without reducing smaller `n` to these
-    cases.
-  - Lemma 2 is stated without proof.
-  - "All correct processes propose 0, thus 0 is decided" needs Lemma 2 first, because the crashed processes
-    propose 1.
-  - In §B.2 the correct processes never call `propose`, so wait-freedom forces no decision in the
-    continuation. Moreover, the "w.l.o.g. 1 is decided" ignores a third proposed value.
+**Impact.** The paper does not establish the "if" direction of Theorem 2, but Theorem 2 itself is true:
+we prove it with a repaired protocol (`Impl.theorem_2_upper`, `theorem_2`).
 
-  We prove both bounds for every `n ≥ 2`, using one generic merge lemma for all the indistinguishability
-  arguments. (`theorem_1_lower`, `theorem_2_lower`, `merge_task`, `merge_object`)
-* **Degenerate cases (outside the paper's assumption `n ≥ 3`; not an error).** The lower bounds fail for `n = 1`: deciding one's own input is `1`-resilient and
-  `0`-two-step (`theorem_1_fails_n_one`). The paper assumes `n ≥ 3`. The fast path of Fig. 1 is vacuous when
-  `n − e ≤ 1`; this only matters for `n ≤ 2`, where `f = 0`.
-* **Typos and slips.**
-  - §B.1, base case: `E₀′` should be `E₀`.
-  - §B.2: `decide(p, 1)` in `σ′` should be `decide(p, 0)`, and "`F ∪ {p,q} = f`" should be a cardinality.
-  - Brief announcement, lines 33 and 35: `Q_f` should be `S`.
-  - Introduction: "EPaxos uses `2f+1 = 2e+f−1` processes, Lamport requires `2f+3`" holds only for even `f`.
-    For odd `f`, EPaxos's `2f+1` equals `2e+f`.
+**Details.** Two concrete executions show this.
+- *Ω scenario, any admissible parameters.* No process crashes, and Ω permanently outputs a correct `l`
+  that never calls `propose`. Every process moves to ballot 1 before anybody invokes (the ballot timer
+  runs from startup: "Initially it is set to 2Δ", §C.1). Later a correct `r ≠ l` invokes `propose(v)`.
+  Its `Propose` is ignored (`bal ≠ 0`), so `l` computes `val = ⊥` in every ballot and never sends a 2A,
+  and `r` never returns. (`Fig1.object_not_wait_free_omega`)
+- *Crash scenario, any leader election, whenever `n − f − e ≥ 2`* (e.g. `n = 7, f = 3, e = 2`, which
+  meets the paper's bound). `p` proposes `v`, only `r` accepts it, and `p` crashes. Everyone else moves
+  to a slow ballot. `r` invokes `propose(w)` later; line 3 is skipped because `r` has already voted.
+  Each 1B quorum shows at most one vote for `v`, which is below `n − f − e`, and no leader has an
+  `initial_val`, so nobody ever decides. (`Fig1.object_not_wait_free`)
+
+**Repair.** We fix lines 37–38 in the object version ("else, if `initial_val = ⊥`, propose the leader's
+own `val`"). We also replace Ω by clock-driven rotating ballots, so every correct invoker eventually
+leads a ballot after GST. The fix alone does not save the Ω version: the first scenario still applies.
+We prove the fixed protocol correct and two-step for `n ≥ max {2e+f−1, 2f+1}`.
+(`Impl.theorem_2_upper`, `theorem_2`)
+
+### Typos and slips
+- §B.1, base case: `E₀′` should be `E₀`.
+- §B.2: `decide(p, 1)` in `σ′` should be `decide(p, 0)`, and "`F ∪ {p,q} = f`" should be a cardinality.
+- Brief announcement, lines 33 and 35: `Q_f` should be `S`.
+- Introduction: "EPaxos uses `2f+1 = 2e+f−1` processes, Lamport requires `2f+3`" holds only for even
+  `f`. For odd `f`, EPaxos's `2f+1` equals `2e+f`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 5 (object fast-path recovery)
+The proof considers the line-33 case only when `v` itself has `> n−e−f` votes in `Q`, but with
+`n = 2e+f−1` `v` can also have exactly `n−e−f = e−1` votes while another `w` has `e` votes.
+
+**Impact.** Statement true; repaired (`Fig1.lemma5`, `Fig1.lemma1`).
+
+**Details.** Counting does not exclude this case. It is ruled out by the line-35 argument: all `f`
+processes outside `Q` voted for `v`, so `w`'s proposer did as well, and in the object version it then
+never proposed `w`. In the task version (Lemma 1) the same case is excluded by counting, and the paper
+skips it silently.
+
+### 🛠️ Lemma 4 (slow-path safety)
+The induction on `b′` claims that a process with `vbal_q′ = b` received its `Decide` from the leader of
+ballot `b`, which is false: `Decide` may come from a decision at a higher ballot.
+
+**Impact.** Statement true; we prove agreement through a "potentially chosen" invariant over all fast and
+slow decisions (`Fig1.lemma4`, `Fig1.task_agreement`, `Fig1.object_agreement`).
+
+**Details.** The `Decide` may be received before answering `1A(b′)`, and `decided_q′` need not be the
+value of `2A(vbal_q′)`. Agreement between two fast-path decisions is never argued either.
+
+### 🛠️ Lower-bound proofs (§B, Theorems 1 and 2 "only if")
+The proofs treat only `n = 2e+f−1` (Thm 1) and `n = 2e+f−2` (Thm 2), omit the proof of Lemma 2, and
+skip steps in the indistinguishability arguments.
+
+**Impact.** Statements true; we prove both bounds for every `n ≥ 2`, using one generic merge lemma for
+all the indistinguishability arguments (`theorem_1_lower`, `theorem_2_lower`, `merge_task`,
+`merge_object`).
+
+**Details.**
+- The proofs assume `n = 2e+f−1` (Thm 1) and `n = 2e+f−2` (Thm 2) without reducing smaller `n` to
+  these cases.
+- Lemma 2 is stated without proof.
+- "All correct processes propose 0, thus 0 is decided" needs Lemma 2 first, because the crashed
+  processes propose 1.
+- In §B.2 the correct processes never call `propose`, so wait-freedom forces no decision in the
+  continuation. Moreover, the "w.l.o.g. 1 is decided" ignores a third proposed value.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -87,6 +107,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
   before", wait-freedom.
 - Clocks and the restricted step granularity only strengthen the lower bounds. The upper bound holds in this
   model; with rotating clock-driven ballots instead of Ω, no synchronizer argument is needed.
+
+**Degenerate cases** (outside the paper's assumption `n ≥ 3`; not an error). The lower bounds fail for
+`n = 1`: deciding one's own input is `1`-resilient and `0`-two-step (`theorem_1_fails_n_one`). The fast
+path of Fig. 1 is vacuous when `n − e ≤ 1`; this only matters for `n ≤ 2`, where `f = 0`.
 
 **Main results in Lean** (namespace `TwoStepConsensus`).
 

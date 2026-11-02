@@ -14,46 +14,71 @@ typo in Algorithm 3. The necessity proof has gaps, which we filled. The illustra
 
 ## Mistakes in the paper
 
-* **The AQ example (§4.2.5) is false (illustration only).** The paper claims the asymmetric
-  queue, where only `p₀` may dequeue, is in `C₁.₅`, with witness queue `[0]`, `f = dequeue`,
-  `f' = read`, `g = enqueue(1)`, `g' = read`.
-  - That witness already violates property (1): `dequeue` returns `0` whether or not
-    `enqueue(1)` went first. Properties (3), (4) and (5) fail too; only (2) holds.
-  - No witness exists, in any state and in either role orientation. Property (1) forces
-    `g = enqueue(y)`. Properties (1) and (3) then force `g' = read`, `f = dequeue` and an empty
-    queue. But then `p₁` reads `[y]` both in `gg'ff'` and in `fgg'f'`, so property (4) fails.
-  - AQ is in `C₂` (with the WQ witness), so it still solves consensus. The characterization
-    itself is unaffected. (`paper_AQ_witness_fails`, `aq_not_C15`, `aq_C2`)
-* **Necessity proof (§6): implicit assumption that `f` and `g` are first accesses (proof gap,
-  statement true).** At the critical configuration the paper treats `f` and `g` as each process's
-  first call to `O`, and Lemma 5 / Proposition 1 use "the second call `f'`".
-  - If `f` is `p₀`'s second call, `p₀` can never touch `O` again, so it must distinguish `fg`
-    from `gf`.
-  - The object is then in `C₁`, or in `C₁.₅` with alternative (5a) and an arbitrary `f'`.
-  - Likewise, `p₀` may decide without calling `O` again after `fgσg'`; then (5a) holds.
-  (`KSetup.dist_of_last`, `KSetup.c15`)
-* **Proposition 2: the graph `G` must be bipartite (proof gap, statement true).**
-  - With *operations* as nodes, an operation allowed to both processes merges a `p₀`-node with
-    a `p₁`-node. A path can then switch sides there, and "`cᵢ ∈ m(p₀)` for even `i`" fails.
-  - Using `(process, operation)` nodes repairs this; the reduction to fewer objects works
-    unchanged.
-  - The paper also writes "`n ≥ 2` even" where `n` must be odd.
-  - The "minimal number of objects" argument becomes an induction on the number of copies, which
-    needs finitely many copies. We prove the reduced algorithm correct and wait-free.
-  (`KSetup.Adj`, `KSetup.c2_or_smaller`, `reduction`, `necessity`)
-* **Lemma 4 (Algorithm 3) omits some histories (proof gap, statement true).** Its case
-  analysis ignores histories where the other process applies its operations on `O` after the
-  decider's reads. The Lean proof enumerates all interleavings. `k ≥ 1` is genuinely needed:
-  with `N = 1`, line 23 would fire wrongly in the run `g c_N f c_{N−1}`.
-  (`decide0_ok`, `decide1_ok`)
-* **Typos.**
-  - Algorithm 3, line 30: `v[1][1]` must be `v[0][1]`. Only `p₀` executes the line, and its
-    `v[1][1]` is `⊥`. Taken literally, agreement fails in the run where `p₁` runs solo first.
-    A brute-force search (Python, not in Lean) found a 4-state object in `C₂` exhibiting this.
-  - Corollary 1's "`op ∈ [0, k]`" should be `[0, 3^k]`.
-  - The proof of Lemma 2 is imprecise (its case `a = 0` gives `n = 3^{k-1}`, which for `n = 1`
-    violates `k > 0`; it cites the "third" property of `C₂` for the pairs of property (2)); the
-    padding argument is formalized.
+### ❌ §4.2.5 (the asymmetric queue AQ is in `C₁.₅`)
+The asymmetric queue, where only `p₀` may dequeue, is not in `C₁.₅`: the paper's witness violates
+property (1), and no witness exists (`paper_AQ_witness_fails`, `aq_not_C15`).
+
+**Impact.** Illustration only: AQ is in `C₂` (with the WQ witness), so it still solves consensus
+(`aq_C2`). The characterization itself is unaffected.
+
+**Details.** The paper's witness is queue `[0]`, `f = dequeue`, `f' = read`, `g = enqueue(1)`,
+`g' = read`.
+- That witness already violates property (1): `dequeue` returns `0` whether or not `enqueue(1)` went
+  first. Properties (3), (4) and (5) fail too; only (2) holds.
+- No witness exists, in any state and in either role orientation. Property (1) forces
+  `g = enqueue(y)`. Properties (1) and (3) then force `g' = read`, `f = dequeue` and an empty queue.
+  But then `p₁` reads `[y]` both in `gg'ff'` and in `fgg'f'`, so property (4) fails.
+
+### ⚠️ Algorithm 3, line 30 (typo `v[1][1]` for `v[0][1]`)
+Line 30 tests `v[1][1]` where `v[0][1]` is meant; only `p₀` executes the line, and its `v[1][1]` is
+`⊥`, so taken literally agreement fails in the run where `p₁` runs solo first.
+
+**Impact.** A typo with evident intent: with `v[0][1]` Algorithm 3 is correct (proved in Lean), and the
+characterization stands.
+
+**Details.** A brute-force search (Python, not in Lean) found a 4-state object in `C₂` exhibiting the
+failure.
+
+### Typos and slips
+- Corollary 1's "`op ∈ [0, k]`" should be `[0, 3^k]`.
+- The proof of Lemma 2 is imprecise (its case `a = 0` gives `n = 3^{k-1}`, which for `n = 1` violates
+  `k > 0`; it cites the "third" property of `C₂` for the pairs of property (2)); the padding argument is
+  formalized.
+- The proof of Proposition 2 writes "`n ≥ 2` even" where `n` must be odd.
+
+## Proof gaps (statements true)
+
+### 🛠️ Necessity proof, §6 (`f` and `g` assumed to be first accesses)
+At the critical configuration the paper treats `f` and `g` as each process's first call to `O`, and
+Lemma 5 / Proposition 1 use "the second call `f'`", which need not exist.
+
+**Impact.** Statement true; the missing cases are covered (`KSetup.dist_of_last`, `KSetup.c15`).
+
+**Details.**
+- If `f` is `p₀`'s second call, `p₀` can never touch `O` again, so it must distinguish `fg` from `gf`.
+- The object is then in `C₁`, or in `C₁.₅` with alternative (5a) and an arbitrary `f'`.
+- Likewise, `p₀` may decide without calling `O` again after `fgσg'`; then (5a) holds.
+
+### 🛠️ Proposition 2 (the graph `G` must be bipartite)
+With *operations* as nodes, an operation allowed to both processes merges a `p₀`-node with a `p₁`-node,
+so a path can switch sides there and "`cᵢ ∈ m(p₀)` for even `i`" fails.
+
+**Impact.** Statement true; repaired with `(process, operation)` nodes (`KSetup.Adj`,
+`KSetup.c2_or_smaller`, `reduction`, `necessity`).
+
+**Repair.**
+- Using `(process, operation)` nodes repairs this; the reduction to fewer objects works unchanged.
+- The "minimal number of objects" argument becomes an induction on the number of copies, which needs
+  finitely many copies. We prove the reduced algorithm correct and wait-free.
+
+### 🛠️ Lemma 4 (Algorithm 3, omitted histories)
+Its case analysis ignores histories where the other process applies its operations on `O` after the
+decider's reads.
+
+**Impact.** Statement true; the Lean proof enumerates all interleavings (`decide0_ok`, `decide1_ok`).
+
+**Details.** `k ≥ 1` is genuinely needed: with `N = 1`, line 23 would fire wrongly in the run
+`g c_N f c_{N−1}`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

@@ -16,37 +16,63 @@ give correct proofs.
 
 ## Mistakes in the paper
 
-* **Lemma A.3 (Commitment of Algorithm 2): the proof has a false step.** The proof follows a chain
-  `i ↦ f(i)` of processes whose candidate was missing. It claims `f(i)` again wrote the least output `β`
-  into `B` ("`B_{f(i)} = β`, therefore `f(i) ∈ P_β`"). This fails with three processes, inputs `a`, `ε`, `c`
-  over independent letters:
-  - `p₁` reads `A = {a, ε}`, writes `(a, True)` and sees only its own entry. It adopts `a`, because the
-    input `ε ≤ a` of `p₂` has no `B` entry yet.
-  - `p₂` reads `A = {a, ε, c}` later and writes `ac ≠ a`.
+No mistakes in the statements.
 
-  The lemma is still true. We replace the chain by a maximality argument. Among the processes whose input is
-  `≤ β₀` (the least candidate) and whose `B`-view contains `β₀`, one with a maximal `B`-view must commit
-  (`GCA.commitment_of_reach`).
-* **Lemma A.2 (Adoption of Algorithm 2): the proof has a false step.** The case `w_i = True` asserts that no
-  flag in `B_i` is `False`. Let `p₁` (input `a`) write `A` and snapshot `{a}` first. A process `p₂` whose later snapshot holds
-  `a, b, c` with `b ≍ c` (and `a` independent of both) writes `(a, False)`. Then `p₁` has `w₁ = True` and sees that `False` flag. Adoption still holds,
-  because all entries seen by `p₁` equal its input. Our proof is a direct case analysis on the comparability of
-  the `A`- and `B`-views (`GCA.adoption_of_reach`).
-* **Coherence of the trace order is used but never stated.** Algorithm 2 needs it in two places: in
-  "`A_i^co` contains only compatible traces", and in Lemma A.4, to go from incompatible least upper bounds to
-  incompatible elements. Both need the fact that a pairwise compatible finite set of traces has an upper
-  bound. The paper cites Aalbersberg–Rozenberg only for the existence of GLBs and of LUBs of compatible
-  sets. We prove coherence for traces of duplicate-free schedules (`NTrace.compat_of_pairwise`).
-* **Theorem 4.4: invariant (I) is claimed for every round `r > r₀`, which the argument does not give.** The
-  argument "`u_i` contains only commands from pending operations" fails for operations that complete between
-  `τ` and `τ'`. These commit at rounds above `r₀`. The proof only needs (I) at round `r* + 1`, where every
-  operation is pending forever, and there it holds: completed operations committed at rounds `≤ r*`, so by
-  Lemma A.1 their commands lie in the common prefix (`Alg1.Setup.compat_round`).
-* **Proposition 3.4 (not part of the checked results; not formalized): the proof that lock-freedom implies
-  weak conflict-freedom is incomplete.** The proof argues that "a suffix where Φ runs pending and alone
-  contradicts lock-freedom". It does not, because an idle process is correct and vacuously completes all its
-  operations. The fix is to let idle processes invoke and crash. Relatedly, Definition 3.2 (2) as worded is
-  satisfied by any process that stays idle. Our Lean definitions are the paper's, verbatim.
+## Proof gaps (statements true)
+
+### 🛠️ Lemma A.3 (Commitment of Algorithm 2)
+The proof follows a chain `i ↦ f(i)` of processes whose candidate was missing and claims that `f(i)`
+again wrote the least output `β` into `B` ("`B_{f(i)} = β`, therefore `f(i) ∈ P_β`"), which fails with
+three processes.
+
+**Impact.** Statement true; we replace the chain by a maximality argument (`GCA.commitment_of_reach`).
+
+**Details.** Inputs `a`, `ε`, `c` over independent letters:
+- `p₁` reads `A = {a, ε}`, writes `(a, True)` and sees only its own entry. It adopts `a`, because the
+  input `ε ≤ a` of `p₂` has no `B` entry yet.
+- `p₂` reads `A = {a, ε, c}` later and writes `ac ≠ a`.
+
+**Repair.** Among the processes whose input is `≤ β₀` (the least candidate) and whose `B`-view contains
+`β₀`, one with a maximal `B`-view must commit (`GCA.commitment_of_reach`).
+
+### 🛠️ Lemma A.2 (Adoption of Algorithm 2)
+The case `w_i = True` asserts that no flag in `B_i` is `False`, which is false.
+
+**Impact.** Statement true; our proof is a direct case analysis on the comparability of the `A`- and
+`B`-views (`GCA.adoption_of_reach`).
+
+**Details.** Let `p₁` (input `a`) write `A` and snapshot `{a}` first. A process `p₂` whose later snapshot
+holds `a, b, c` with `b ≍ c` (and `a` independent of both) writes `(a, False)`. Then `p₁` has
+`w₁ = True` and sees that `False` flag. Adoption still holds, because all entries seen by `p₁` equal its
+input.
+
+### 🛠️ Algorithm 2 (coherence of the trace order used but never stated)
+Algorithm 2's proofs need that a pairwise compatible finite set of traces has an upper bound, which the
+paper never states.
+
+**Impact.** Statement true; we prove coherence for traces of duplicate-free schedules
+(`NTrace.compat_of_pairwise`).
+
+**Details.** It is needed in two places: in "`A_i^co` contains only compatible traces", and in Lemma A.4,
+to go from incompatible least upper bounds to incompatible elements. The paper cites
+Aalbersberg–Rozenberg only for the existence of GLBs and of LUBs of compatible sets.
+
+### 🛠️ Theorem 4.4 (invariant (I))
+Invariant (I) is claimed for every round `r > r₀`, which the argument does not give: "`u_i` contains only
+commands from pending operations" fails for operations that complete between `τ` and `τ'`.
+
+**Impact.** Statement true; the proof only needs (I) at round `r* + 1`, where it holds
+(`Alg1.Setup.compat_round`).
+
+**Details.** Operations that complete between `τ` and `τ'` commit at rounds above `r₀`. At round `r* + 1`
+every operation is pending forever, and there (I) holds: completed operations committed at rounds
+`≤ r*`, so by Lemma A.1 their commands lie in the common prefix (`Alg1.Setup.compat_round`).
+
+### 🛠️ Proposition 3.4 (lock-freedom implies weak conflict-freedom; not formalized)
+The proof argues that "a suffix where Φ runs pending and alone contradicts lock-freedom", which it does
+not, because an idle process is correct and vacuously completes all its operations.
+
+**Impact.** Not part of the checked results; the fix is to let idle processes invoke and crash.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -69,6 +95,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 - **Domain of the GCA objects.** Mazurkiewicz traces of duplicate-free command schedules (`NTrace`), which
   is all the algorithms ever handle. Algorithm 2 is proved for any `GCADomain`: a meet-semilattice with
   least upper bounds of compatible finite sets that is coherent.
+
+**Remark.** Definition 3.2 (2) as worded is satisfied by any process that stays idle. Our Lean definitions
+are the paper's, verbatim.
 
 **Main results in Lean.**
 

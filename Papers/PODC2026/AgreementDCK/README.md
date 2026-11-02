@@ -14,28 +14,33 @@ decisions.
 
 ## Mistakes in the paper
 
-* **Theorem 1.7, the "iff" clause: false only in a degenerate case.** `all_decide(v)` holds
-  vacuously in a run with `N(r) = ∅`, but `θ_v` need not hold there. Exclusivity even forbids `θ_v`
-  for two different values, while `all_decide(v)` holds for all of them. Counterexample: one run,
-  every process faulty, all `θ_v` false. All hypotheses of Theorem 1.7 hold trivially. Fix: assume
-  `N(r) ≠ ∅`, which most models do (`f < n`). The other claims of Theorem 1.7 hold unchanged.
-  (`theorem_1_7_iff_false_without_nonfaulty`, repaired: `allDecide_newDec_iff`)
-* **The converse remark needs memory of decisions (imprecise informal claim).** The paper says
-  "underlying the design of every AoN protocol is a set of facts Θ as described in Theorem 1.7".
-  We read Θ as facts that describe the protocol's decisions. With that reading the remark holds when
-  nonfaulty processes remember their decisions: take `θ_v` = "some nonfaulty process decides `v`"
-  and the profile `𝛅(v)` (`exists_theta_of_AoN`). Without such recall it fails. Example: one
-  failure-free process learns a bit `b` at time 1, decides `b` then, and forgets `b` afterwards. This
-  protocol is AoN and satisfies Agreement, Validity and Decision. Yet no local, remembered profile
-  makes `θ_v ↔ all_decide(v)` even dynamically *everyone*-known, let alone dynamic common knowledge.
-  (`no_theta_for_forgetful_protocol`)
-* **Minor points (no error).**
-  - Theorem 1.7's hypothesis `⊨ θ_v → C^N@𝛙(v)(θ_v)` is equivalent to the weaker-looking
-    `⊨ θ_v → E^N@𝛙(v)(θ_v)`, by the induction rule (`sufficient_of_EN`).
-  - The assumption that `P` solves `A` is never used.
-  - The memory hypothesis is used only to make the new decisions stable ("conscious").
-  - Corollary 1.6 needs `AoN(v)` only for the decided value `v`, and it holds for every
-    precondition of deciding `v`, as the text says (`KN_CN_of_precondition`).
+### ⚠️ Theorem 1.7 (the "iff" clause, runs with no nonfaulty process)
+"The nonfaulty processes decide `v` in `r` iff `r ⊨ θ_v`" fails in a run with `N(r) = ∅`, where
+`all_decide(v)` holds vacuously but `θ_v` need not (`theorem_1_7_iff_false_without_nonfaulty`).
+
+**Impact.** Degenerate: assuming `N(r) ≠ ∅`, which most models do (`f < n`), repairs it
+(`allDecide_newDec_iff`). The other claims of Theorem 1.7 hold unchanged.
+
+**Details.** Exclusivity even forbids `θ_v` for two different values, while `all_decide(v)` holds for
+all of them. Counterexample: one run, every process faulty, all `θ_v` false. All hypotheses of
+Theorem 1.7 hold trivially.
+
+### ⚠️ Converse remark after Theorem 1.7 (needs memory of decisions)
+The remark "underlying the design of every AoN protocol is a set of facts Θ as described in
+Theorem 1.7" fails for a protocol whose nonfaulty processes forget their decisions
+(`no_theta_for_forgetful_protocol`).
+
+**Impact.** An imprecise informal claim: it holds when nonfaulty processes remember their decisions
+(`exists_theta_of_AoN`).
+
+**Details.** We read Θ as facts that describe the protocol's decisions. Example without recall: one
+failure-free process learns a bit `b` at time 1, decides `b` then, and forgets `b` afterwards. This
+protocol is AoN and satisfies Agreement, Validity and Decision. Yet no local, remembered profile makes
+`θ_v ↔ all_decide(v)` even dynamically *everyone*-known, let alone dynamic common knowledge.
+(`no_theta_for_forgetful_protocol`)
+
+**Repair.** With memory of decisions, take `θ_v` = "some nonfaulty process decides `v`" and the profile
+`𝛅(v)` (`exists_theta_of_AoN`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -57,6 +62,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Theorem 1.7 has no proof in the paper. We build `P_A` on the same runs: it adds the local decision
   rule `ψᵢ(v) ∧ K_i(i ∈ N → θ_v)`. The new decisions are outputs only and do not change local
   states or messages.
+
+**Remarks (no error).**
+- Theorem 1.7's hypothesis `⊨ θ_v → C^N@𝛙(v)(θ_v)` is equivalent to the weaker-looking
+  `⊨ θ_v → E^N@𝛙(v)(θ_v)`, by the induction rule (`sufficient_of_EN`).
+- The assumption that `P` solves `A` is never used.
+- The memory hypothesis is used only to make the new decisions stable ("conscious").
+- Corollary 1.6 needs `AoN(v)` only for the decided value `v`, and it holds for every
+  precondition of deciding `v`, as the text says (`KN_CN_of_precondition`).
 
 **Main results in Lean.**
 

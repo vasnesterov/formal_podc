@@ -15,30 +15,45 @@ Section 5 are proved.
 
 ## Mistakes in the paper
 
-1. **Corollary 10: the proof covers only part of the claimed range (statement true).** Corollary 10 claims that
-   reliable/consistent broadcast has unbounded round complexity for canonical-round algorithms with `n ≤ 5f`. The
-   proof goes through Algorithm 3 (crusader agreement from `n` consistent broadcasts), which is correct only for
-   `n > 4f` (Theorem 9 needs two sets of `n − 2f` senders to intersect). So the proof says nothing about
-   `3f < n ≤ 4f`. The statement holds for every `n > f ≥ 1` by a direct argument, which the introduction hints
-   at: in the first `K` rounds, let every process hear `n − f` processes other than the correct sender (for
-   communication-closed algorithms, deliver the sender's messages one round late). The others then have no
-   information about the sender's input, yet validity forces them to deliver it. In particular, the "sharp
-   boundary at `5f`" is irrelevant for broadcast (`corollary10`, `corollary10_commClosed`).
-2. **Theorem 14 needs gather agreement also for `i = j` (implicit in the paper).** Crusader agreement from
-   gather (Algorithm 4) requires that an output contains at most one pair per process id. If agreement is only
-   required between distinct correct processes, validity (ii) fails. Instance: `n = 4`, `f = 1`, a correct
-   output with two different pairs of the faulty process. Read literally, the paper's agreement property ("if
-   `p_i` and `p_j` are correct") does not exclude `i = j`, so it covers this case, but the proof never says the
-   case is needed. We require agreement for all correct `i, j`, including `i = j`
-   (`Gather.validity_fails_without_self_agreement`).
-3. **"`n ≤ 5f`" literally includes trivial cases (false in a degenerate case).** For `n = 1`, `f = 1` the single
-   process decides its input in round 0, so Theorem 1 and Corollary 6 as literally stated fail. The paper's
-   setting is `3f < n ≤ 5f`. Our proof needs only `2f ≤ n` (`literal_theorem1_fails_n1`).
-4. **Minor.** In the proceedings version, Theorem 7's proof is only a sketch ("see [8]"; the arXiv full
-   version gives it in full); it is fully formalized here. The introduction
-   defines communication closure as discarding early *and* late messages, while Section 3.2 discards only late
-   ones; we follow Section 3.2. Theorem 18 uses `|⌈a⌉ − ⌈b⌉| ≤ 1` for `|a − b| ≤ 1` without proof, and the
-   paper does not show that decisions lie in `{1, …, R}` (both proved).
+### ⚠️ Theorem 1 and Corollary 6 for `n = 1` ("`n ≤ 5f`" includes trivial cases)
+Read literally, "`n ≤ 5f`" includes `n = 1`, `f = 1`, where the single process decides its input in
+round 0, so Theorem 1 and Corollary 6 fail (`literal_theorem1_fails_n1`).
+
+**Impact.** Degenerate: the paper's setting is `3f < n ≤ 5f`, and our proof needs only `2f ≤ n`.
+
+### Typos and slips
+- The introduction defines communication closure as discarding early *and* late messages, while
+  Section 3.2 discards only late ones; we follow Section 3.2.
+
+## Proof gaps (statements true)
+
+### 🛠️ Corollary 10 (broadcast; the proof covers only `4f < n ≤ 5f`)
+The proof goes through Algorithm 3 (crusader agreement from `n` consistent broadcasts), which is correct
+only for `n > 4f`, so it says nothing about `3f < n ≤ 4f`.
+
+**Impact.** Statement true for every `n > f ≥ 1` by a direct argument (`corollary10`,
+`corollary10_commClosed`). In particular, the "sharp boundary at `5f`" is irrelevant for broadcast.
+
+**Details.** Corollary 10 claims that reliable/consistent broadcast has unbounded round complexity for
+canonical-round algorithms with `n ≤ 5f`. Algorithm 3 needs `n > 4f` because Theorem 9 needs two sets of
+`n − 2f` senders to intersect.
+
+**Repair.** The direct argument, which the introduction hints at: in the first `K` rounds, let every
+process hear `n − f` processes other than the correct sender (for communication-closed algorithms,
+deliver the sender's messages one round late). The others then have no information about the sender's
+input, yet validity forces them to deliver it. (`corollary10`, `corollary10_commClosed`)
+
+### 🛠️ Theorem 14 (needs gather agreement also for `i = j`)
+Crusader agreement from gather (Algorithm 4) requires that an output contains at most one pair per
+process id, i.e. gather agreement for `i = j`, which the proof uses without saying so.
+
+**Impact.** Statement true: read literally, the paper's agreement property ("if `p_i` and `p_j` are
+correct") does not exclude `i = j`, so it covers this case. We require agreement for all correct `i, j`,
+including `i = j`.
+
+**Details.** If agreement is only required between distinct correct processes, validity (ii) fails.
+Instance: `n = 4`, `f = 1`, a correct output with two different pairs of the faulty process
+(`Gather.validity_fails_without_self_agreement`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -62,6 +77,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 - Communication-closed (`CommClosed`): messages and decisions factor through a view that drops late messages.
 - The adversary of Theorems 1 and 7 works tape by tape: it forces round complexity `> K` (resp. non-termination)
   for every tape, not just in expectation.
+
+**Proof remarks.** In the proceedings version, Theorem 7's proof is only a sketch ("see [8]"; the arXiv full
+version gives it in full); it is fully formalized here. Theorem 18 uses `|⌈a⌉ − ⌈b⌉| ≤ 1` for `|a − b| ≤ 1`
+without proof, and the paper does not show that decisions lie in `{1, …, R}` (both proved).
 
 **Main results in Lean** (namespace `Podc2026.CanonicalRound`; paper-facing statements assume `3f < n ≤ 5f`, cores
 `thm1_core`/`thm7_core` hold for `2f ≤ n ≤ 5f`).

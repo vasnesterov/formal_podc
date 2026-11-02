@@ -13,39 +13,65 @@ in the obstruction-free sense (and for `k = 1`).
 
 ## Mistakes in the paper
 
-1. **Algorithm 1 is not wait-free for `k ≥ 2` (false claim).** §3.1 argues that "processes that keep
-   interfering have seen sets that converge to the same value or eventually grow in cardinality past `k`".
-   Counterexample with two processes `a`, `b` and `k = 2`, so `|seen| = 2 ≤ k` never triggers the early exit at
-   line 23. Once both have `seen = {a, b}`, repeat forever: `a` does its first collect; `b` writes; `a`'s second
-   collect fails because `b`'s triple changed; `b` does its first collect; `a` writes; `b`'s second collect
-   fails. Both processes take infinitely many steps in a one-shot execution and never output. Converging `seen`
-   sets do not help: without helping, the double collects keep invalidating each other, as in the double-collect
-   scan of Afek et al., which is only obstruction-free. The livelock does not depend on how line 21 is read.
-   Replacing `> k` by `≥ k` in line 23 would only repair `k = 2`. Consequently the wait-free upper bound of
-   Theorem 3.1 (`k + 1` registers, unboundedly many processes) and the wait-free "infinite hierarchy" of the
-   abstract are **not established for `k ≥ 2`**; whether they hold remains open
-   (`exists_livelock`, `theorem_3_1_alg1_not_waitFree`).
-   For `k = 1` the claim is true, but the paper's sketch does not apply. Our argument: a process other than `p`
-   can write `A[2]` (the second register; `A[1]` in the 0-based Lean code) only as its second write, and only if
-   it read `⊥` there before anybody wrote it. So only finitely many interfering writes on `A[2]` exist, while
-   every two failed iterations of `p` need one
-   (`theorem_3_1_k1`).
-2. **Safety argument of §3.1: gap, true claim.** The argument ("unless at least `k + 1` processes participate,
-   the set will always be a subset of at least one register … `k` processes are not enough to obliterate all
-   `k + 1` registers") covers only runs with few participants. With more than `k + 1` participants, `k + 1`
-   processes poised on distinct registers can overwrite everything after a successful snapshot, and the paper
-   does not say why containment then still holds. It does hold, by a counting argument over "clean" writes. A clean write by a process that has completed a
-   collect since all registers became dirty carries a seen-set of size `≥ k + 1`, and each process makes at most
-   one write without such a collect. So if all registers become clean, the union of their seen-sets is too large for a
-   later output of size `≤ k` (`card_union_of_obliterate`, `alg1_solves`).
-3. **§3.2, step omitted as routine.** The claim that `k`-bounded lattice agreement for `k + 1` processes is
-   stranger-free needs "`j` in `i`'s output ⇒ `j` appears in `i`'s view". This takes a causal-erasure argument:
-   erase `j`'s causal future to obtain an execution without `j` in which `i` outputs the same set. The claim
-   holds (`boundedLA_strangerFree`).
-4. **Unstated hypothesis.** The obstruction-free variant of Theorem 2.1 (remark after its proof) needs
-   stranger-freedom with respect to *obstruction-free* algorithms, a stronger hypothesis. It holds for
-   `k`-bounded lattice agreement. Line 21 of Algorithm 1 (`seen ∪ collect[j][3]`) is a no-op as written,
-   probably a typo for `A[j][3]`.
+### ❌ Theorem 3.1, upper bound (Algorithm 1, wait-freedom for `k ≥ 2`)
+Algorithm 1 is not wait-free for any `k ≥ 2`: with two processes whose double collects keep invalidating
+each other, both take infinitely many steps in a one-shot execution and never output (`exists_livelock`,
+`theorem_3_1_alg1_not_waitFree`).
+
+**Impact.** The wait-free upper bound of Theorem 3.1 (`k + 1` registers, unboundedly many processes) and
+the wait-free "infinite hierarchy" of the abstract are **not established for `k ≥ 2`**; whether they hold
+remains open. Algorithm 1 is safe and obstruction-free for every `k`, and wait-free for `k = 1`.
+
+**Details.** §3.1 argues that "processes that keep interfering have seen sets that converge to the same
+value or eventually grow in cardinality past `k`". Counterexample with two processes `a`, `b` and
+`k = 2`, so `|seen| = 2 ≤ k` never triggers the early exit at line 23. Once both have `seen = {a, b}`,
+repeat forever: `a` does its first collect; `b` writes; `a`'s second collect fails because `b`'s triple
+changed; `b` does its first collect; `a` writes; `b`'s second collect fails. Converging `seen` sets do not
+help: without helping, the double collects keep invalidating each other, as in the double-collect scan of
+Afek et al., which is only obstruction-free. The livelock does not depend on how line 21 is read.
+Replacing `> k` by `≥ k` in line 23 would only repair `k = 2`.
+
+**Repair.** For `k = 1` the claim is true, but the paper's sketch does not apply. Our argument: a process
+other than `p` can write `A[2]` (the second register; `A[1]` in the 0-based Lean code) only as its second
+write, and only if it read `⊥` there before anybody wrote it. So only finitely many interfering writes on
+`A[2]` exist, while every two failed iterations of `p` need one (`theorem_3_1_k1`).
+
+### ⚠️ Theorem 2.1, obstruction-free variant (remark after its proof; unstated hypothesis)
+The obstruction-free variant of Theorem 2.1 needs stranger-freedom with respect to *obstruction-free*
+algorithms, a stronger hypothesis that the paper does not state.
+
+**Impact.** The stronger hypothesis holds for `k`-bounded lattice agreement, the paper's application.
+
+### Typos and slips
+- Line 21 of Algorithm 1 (`seen ∪ collect[j][3]`) is a no-op as written, probably a typo for `A[j][3]`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Safety argument of §3.1 (more than `k + 1` participants)
+The argument ("unless at least `k + 1` processes participate, the set will always be a subset of at least
+one register … `k` processes are not enough to obliterate all `k + 1` registers") covers only runs with
+few participants.
+
+**Impact.** Statement true; repaired by a counting argument (`card_union_of_obliterate`, `alg1_solves`).
+
+**Details.** With more than `k + 1` participants, `k + 1` processes poised on distinct registers can
+overwrite everything after a successful snapshot, and the paper does not say why containment then still
+holds.
+
+**Repair.** It does hold, by a counting argument over "clean" writes. A clean write by a process that has
+completed a collect since all registers became dirty carries a seen-set of size `≥ k + 1`, and each
+process makes at most one write without such a collect. So if all registers become clean, the union of
+their seen-sets is too large for a later output of size `≤ k` (`card_union_of_obliterate`,
+`alg1_solves`).
+
+### 🛠️ §3.2 (`k`-bounded lattice agreement is stranger-free; step omitted as routine)
+The claim that `k`-bounded lattice agreement for `k + 1` processes is stranger-free needs "`j` in `i`'s
+output ⇒ `j` appears in `i`'s view", which the paper omits.
+
+**Impact.** Statement true (`boundedLA_strangerFree`).
+
+**Details.** This takes a causal-erasure argument: erase `j`'s causal future to obtain an execution
+without `j` in which `i` outputs the same set.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
