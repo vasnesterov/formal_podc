@@ -13,50 +13,77 @@ vacuous. Read as what its proof shows (indistinguishability), it is true and tig
 
 ## Mistakes in the paper
 
-* **Theorem 1 is under-specified.** Definition 2 does not say on which inputs the algorithm must be
-  correct. There are three readings.
-  - *(a) Literal: vacuous.* The proof turns the faulty agents' functions into honest functions of a
-    second execution, so it asks for correctness on all executions. In that model no deterministic
-    algorithm is f-resilient once `f ≥ 1`, so "f-resilient ⇒ 2f-redundant" holds trivially. Even a
-    2f-redundant execution is confused there. Example: `n = 3`, `f = 1`, received `x², x², (x−2)²`;
-    honest agents {0, 1} (minimum 0) vs. {1, 2} (minimum 1). The partner `x², (x−2)²` has no common
-    minimum point. (`theorem1`, `no_resilient_allExecs`, `redundant_execution_confusable`)
-  - *(b) Sharp: false, but not claimed by the paper.* "An algorithm that is f-resilient on all
-    2f-redundant inputs cannot also be f-resilient on a non-redundant input." Counterexample in the
-    paper's sensing setting: `n = 3`, `f = 1`, honest costs `x²` and `y²` on `ℝ²`. More generally,
-    any execution whose honest costs share a minimum point can be added to the 2f-redundant class.
-    The paper never states this reading, so it is not an error of the paper. It does show that
-    2f-redundancy is not a maximal solvable class. (`sharp_necessity_false`,
-    `exists_resilient_redundant_insert`)
-  - *(c) Indistinguishability: true and proved.* This is what Part II actually shows. Let `f ≥ 1`,
-    `2f < n`, exactly `f` agents faulty, and suppose the honest costs share a minimum point. Then the
-    execution is not 2f-redundant iff the faulty agents can send convex differentiable functions such
-    that another execution yields the same received vector, has honest costs with a common minimum
-    point, and has a solution set disjoint from the true one. Then no deterministic algorithm is
-    correct on both. The (⇒) direction is the paper's construction with `C_B = ‖x − ŵ‖²`. For (⇐),
-    the two honest sets share `≥ n − 2f` agents, and the partner's common minimum point solves that
-    subset, hence by 2f-redundancy the true execution. (`theorem1_indistinguishable`)
-* **Part II assumes exactly `f` faulty agents** ("Then `|H| = n − f`"). With fewer faults reading
-  (c) is false. Take `n = 3`, `f = 1`, no faulty agent, costs `x², y², x² + y²` on `ℝ²`. The
-  execution is not 2f-redundant, yet every execution producing the same received vector has the
-  origin as a solution. Classification: false statement under reading (c); the repair is "exactly
-  `f` faulty agents". (`theorem1_indistinguishable_false_fewer_faults`)
-* **Theorem 1 needs `n > 2f`**, which is used in the proof but not stated. For `n = f = 1` the
-  statement is false. Definition 1 then includes the empty subset, so a single honest agent with cost
-  `x²` violates 2f-redundancy, while "output a minimum point of the received function" is
-  f-resilient. False only in a degenerate case. (`theorem1_false_n_eq_one`)
-* **Theorem 2 (i), `ρ ∈ [0, 1)`, fails when `W* = ℝ^d`** (e.g. all honest costs constant). Appendix B
-  derives `λ ≤ μ` from a point outside `W*`. Without one, `λ` is unconstrained: `n = 3`, `f = 1`,
-  `μ = 1`, `λ = 30`, `η = 29/3 < η̄ = 58/3` give `ρ = −840`. Part (ii) is trivially true there. False
-  only in a degenerate case. (`theorem2_rho_nonneg_false`; (i) under `W* ≠ ℝ^d`:
-  `theorem2_rho_nonneg`)
-* **Smaller gaps.**
-  - Existence of minimum points is assumed tacitly. Definition 2 and the projection in Assumption 4
-    need `W* ≠ ∅`.
-  - The step (29) ⇒ (30) ("every honest gradient vanishes on `W*`") needs `f ≥ 1`. For `f = 0` it
-    fails, but Theorem 2 still holds via the Lipschitz bound on the aggregate gradient.
-  - "2f-redundancy implies `n > 2f`" (Appendix B) does not follow from Definition 1.
-  - The hypothesis `α > 0` of Theorem 2 is implied by `0 < η < η̄`.
+### ⚠️ Theorem 1 ("2f-redundancy is necessary"; under-specified)
+Definition 2 does not say on which inputs the algorithm must be correct, so Theorem 1 is vacuous when read
+literally and true only when read as what its proof shows, indistinguishability (`theorem1`,
+`theorem1_indistinguishable`).
+
+**Impact.** The indistinguishability reading is true and tight, provided exactly `f` agents are faulty and
+`n > 2f` (see the next two items); we prove this repaired form in both directions.
+
+**Details.** There are three readings.
+- *(a) Literal: vacuous.* The proof turns the faulty agents' functions into honest functions of a
+  second execution, so it asks for correctness on all executions. In that model no deterministic
+  algorithm is f-resilient once `f ≥ 1`, so "f-resilient ⇒ 2f-redundant" holds trivially. Even a
+  2f-redundant execution is confused there. Example: `n = 3`, `f = 1`, received `x², x², (x−2)²`;
+  honest agents {0, 1} (minimum 0) vs. {1, 2} (minimum 1). The partner `x², (x−2)²` has no common
+  minimum point. (`theorem1`, `no_resilient_allExecs`, `redundant_execution_confusable`)
+- *(b) Sharp: false, but not claimed by the paper.* "An algorithm that is f-resilient on all
+  2f-redundant inputs cannot also be f-resilient on a non-redundant input." Counterexample in the
+  paper's sensing setting: `n = 3`, `f = 1`, honest costs `x²` and `y²` on `ℝ²`. More generally,
+  any execution whose honest costs share a minimum point can be added to the 2f-redundant class.
+  The paper never states this reading, so it is not an error of the paper. It does show that
+  2f-redundancy is not a maximal solvable class. (`sharp_necessity_false`,
+  `exists_resilient_redundant_insert`)
+- *(c) Indistinguishability: true and proved.* This is what Part II actually shows. Let `f ≥ 1`,
+  `2f < n`, exactly `f` agents faulty, and suppose the honest costs share a minimum point. Then the
+  execution is not 2f-redundant iff the faulty agents can send convex differentiable functions such
+  that another execution yields the same received vector, has honest costs with a common minimum
+  point, and has a solution set disjoint from the true one. Then no deterministic algorithm is
+  correct on both. The (⇒) direction is the paper's construction with `C_B = ‖x − ŵ‖²`. For (⇐),
+  the two honest sets share `≥ n − 2f` agents, and the partner's common minimum point solves that
+  subset, hence by 2f-redundancy the true execution. (`theorem1_indistinguishable`)
+
+### ⚠️ Theorem 1, Part II of the proof (exactly `f` faulty agents)
+Part II assumes exactly `f` faulty agents ("Then `|H| = n − f`"), and with fewer faults reading (c) is
+false: `n = 3`, `f = 1`, no faulty agent, costs `x², y², x² + y²` on `ℝ²`
+(`theorem1_indistinguishable_false_fewer_faults`).
+
+**Impact.** A false statement under reading (c); the repair is "exactly `f` faulty agents".
+
+**Details.** In the counterexample the execution is not 2f-redundant, yet every execution producing
+the same received vector has the origin as a solution.
+
+### ⚠️ Theorem 1 for `n ≤ 2f`
+Theorem 1 needs `n > 2f`, which the proof uses but the statement omits, and it is false for `n = f = 1`
+(`theorem1_false_n_eq_one`).
+
+**Impact.** False only in a degenerate case.
+
+**Details.** Definition 1 then includes the empty subset, so a single honest agent with cost `x²`
+violates 2f-redundancy, while "output a minimum point of the received function" is f-resilient.
+
+### ⚠️ Theorem 2 (i) when `W* = ℝ^d` (`ρ ∈ [0, 1)`)
+Theorem 2 (i) fails when `W* = ℝ^d` (e.g. all honest costs constant): with `n = 3`, `f = 1`, `μ = 1`,
+`λ = 30`, `η = 29/3 < η̄ = 58/3` we get `ρ = −840` (`theorem2_rho_nonneg_false`).
+
+**Impact.** False only in a degenerate case; part (ii) is trivially true there, and (i) holds under
+`W* ≠ ℝ^d` (`theorem2_rho_nonneg`).
+
+**Details.** Appendix B derives `λ ≤ μ` from a point outside `W*`. Without one, `λ` is unconstrained.
+
+### Typos and slips
+- Existence of minimum points is assumed tacitly. Definition 2 and the projection in Assumption 4
+  need `W* ≠ ∅`.
+- "2f-redundancy implies `n > 2f`" (Appendix B) does not follow from Definition 1.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 2, step (29) ⇒ (30) (case `f = 0`)
+The step (29) ⇒ (30) ("every honest gradient vanishes on `W*`") needs `f ≥ 1` and fails for `f = 0`.
+
+**Impact.** Statement true: Theorem 2 still holds for `f = 0` via the Lipschitz bound on the aggregate
+gradient (`Assumptions.key_estimates`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -104,6 +131,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Stopping rule of Step S2 is correct | `Assumptions.mem_Wstar_of_threshold_eq_zero` | `CGC.lean` |
 | Appendix B, `λ ≤ μ` | `Assumptions.lam_le_μ` | `CGC.lean` |
 | Appendix C, (42) and (56) | `Assumptions.key_estimates`, `Assumptions.step` | `CGC.lean` |
+
+The hypothesis `α > 0` of Theorem 2 is implied by `0 < η < η̄`, so `theorem2` omits it.
 
 **Not formalized.**
 * The peer-to-peer reduction via Byzantine broadcast (an informal remark).

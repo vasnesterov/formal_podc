@@ -14,41 +14,58 @@ the Chakrabarti–Khot–Sun communication lower bound is a hypothesis.
 
 ## Mistakes in the paper
 
-* **The cut is miscounted, so the claimed round bounds are not established by the proof.** In the proofs
-  of Theorems 1 and 2 the paper uses `|cut(G_x̄)| = t² log² k`. In the construction of Section 4, however,
-  `C^i_h` and `C^j_h` are joined by a complete bipartite graph minus a perfect matching. That is
-  `(ℓ+α)(ℓ+α−1)` edges for each of the `ℓ+α` positions `h` and each pair `i<j`. So the cut has exactly
-  `(t choose 2)·q²(q−1)` edges, `q = ℓ+α ≈ log k`, which is `Θ(t² log³ k)`. Corollary 1 then gives only
-  `Ω(k/(log³ k · log n)) = Ω(n/log⁴ n)` (resp. `Ω(n²/log⁴ n)`). Changing `ℓ, α` does not help: with
-  Reed–Solomon codes the alphabet has size at least the code length, and the cut is at least
-  `(log k/log log k)³`.
-  **Repair.** The construction never needs the alphabet to be as large as the code length. Take a code
-  over an alphabet of constant size `Q = 4^D` (`D ≈ 2t/ε`), with length `M = log₂ k` and pairwise
-  agreement `≤ M/D`; such a code exists by Gilbert–Varshamov. Give heavy nodes weight `M`. All claims go
-  through with the same proofs, and the cut has `t(t−1)/2 · M · Q(Q−1) = O(log n)` edges. Corollary 1
-  then gives `T·B·log n = Ω(n)` (resp. `Ω(n²)`), so `T = Ω(n/log² n)` (resp. `Ω(n²/log² n)`) for
-  `B = O(log n)`. This implies the paper's claims. (`paper_cut_edges`; `theorem1`, `theorem2`)
-* **The choice of `t` in the proof of Lemma 3 is too small; statement true.** The proof picks
-  `t = 3/(4ε) − 1`. But the gap between Claims 6 and 7 has leading terms `3(t+1)ℓ` versus `4tℓ`, with
-  ratio `3/4 + 3/(4t)`. For `t = 3/(4ε) − 1` this ratio exceeds `3/4 + ε`; for `ε = 1/8` and `t = 5` it is
-  `0.9 > 0.875`. With the paper's own simplified bounds `3(t+2)` vs `4(t−1)` it is even `21/16 > 1` at
-  `ε = 1/8`.
-  Any `t ≥ 3/(2ε) + 3` works. (`lemma3`, `lemma3_paper`)
-* **Corollary 1 needs a strict gap (proof gap).** With Definition 6 a γ-approximation may output weight
-  exactly `γβ` in both cases, so it does not decide the gap predicate. We require `hi < γ·lo`. This is
-  harmless: Lemmas 2 and 3 hold for every `ε`, so one uses `ε/2`. (`corollary1`)
-* **Theorem 4 is stated for arbitrary alphabets.** Reed–Solomon codes need a field, and the paper takes
-  `Σ = [ℓ+α]` of arbitrary size. We prove Theorem 4 for prime `q`. That is enough, since `ℓ+α` can be
-  chosen prime. We neither prove nor refute the statement for other `q`. (`theorem4`)
-* Typos and small slips:
-  * Definition 5 reads `w(I) ≥ OPT/γ`; it should be `w(I) ≥ γ·OPT`. As written, no `(1/2+ε)`-approximation
-    could exist.
-  * In the proof of Claim 6 the weight is written `t(4ℓ+α)` instead of `4tℓ + 2tα`.
-  * The proof of Lemma 3 has a sign slip (`4t log k − 2t log k/log log k`) and drops the constants of
-    Claim 7 (`t²` for `3t³`).
-  * The base cases of Claims 2 and 5 need `ℓ ≥ 1`, and the inductive step of Claim 5 needs `α ≥ 1`. Both
-    are implicit in `ℓ ≫ α ≥ 1`.
-  * Step (4) of Claim 4 sums `2ψ` over `i ≠ j ∈ [t]`, but step (6) counts unordered pairs.
+No mistakes in the statements.
+
+### Typos and slips
+- Definition 5 reads `w(I) ≥ OPT/γ`; it should be `w(I) ≥ γ·OPT`. As written, no `(1/2+ε)`-approximation
+  could exist.
+- In the proof of Claim 6 the weight is written `t(4ℓ+α)` instead of `4tℓ + 2tα`.
+- The proof of Lemma 3 has a sign slip (`4t log k − 2t log k/log log k`) and drops the constants of
+  Claim 7 (`t²` for `3t³`).
+- The base cases of Claims 2 and 5 need `ℓ ≥ 1`, and the inductive step of Claim 5 needs `α ≥ 1`. Both
+  are implicit in `ℓ ≫ α ≥ 1`.
+- Step (4) of Claim 4 sums `2ψ` over `i ≠ j ∈ [t]`, but step (6) counts unordered pairs.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorems 1 and 2 (the cut is miscounted)
+The proofs use `|cut(G_x̄)| = t² log² k`, but the construction of Section 4 has `Θ(t² log³ k)` cut
+edges, so the argument as written only gives `Ω(n/log⁴ n)` and `Ω(n²/log⁴ n)` rounds
+(`paper_cut_edges`).
+
+**Impact.** Both theorems are true: the same construction with a constant-size alphabet proves them,
+and even improves the bounds to `Ω(n/log² n)` and `Ω(n²/log² n)` (`theorem1`, `theorem2`).
+
+**Details.** `C^i_h` and `C^j_h` are joined by a complete bipartite graph minus a perfect matching.
+That is `(ℓ+α)(ℓ+α−1)` edges for each of the `ℓ+α` positions `h` and each pair `i<j`. So the cut has
+exactly `(t choose 2)·q²(q−1)` edges, `q = ℓ+α ≈ log k`, which is `Θ(t² log³ k)`. Corollary 1 then
+gives only `Ω(k/(log³ k · log n)) = Ω(n/log⁴ n)` (resp. `Ω(n²/log⁴ n)`). Changing `ℓ, α` does not
+help: with Reed–Solomon codes the alphabet has size at least the code length, and the cut is at least
+`(log k/log log k)³`.
+
+**Repair.** The construction never needs the alphabet to be as large as the code length. Take a code
+over an alphabet of constant size `Q = 4^D` (`D ≈ 2t/ε`), with length `M = log₂ k` and pairwise
+agreement `≤ M/D`; such a code exists by Gilbert–Varshamov. Give heavy nodes weight `M`. All claims go
+through with the same proofs, and the cut has `t(t−1)/2 · M · Q(Q−1) = O(log n)` edges. Corollary 1
+then gives `T·B·log n = Ω(n)` (resp. `Ω(n²)`), so `T = Ω(n/log² n)` (resp. `Ω(n²/log² n)`) for
+`B = O(log n)`. This implies the paper's claims. (`theorem1`, `theorem2`)
+
+### 🛠️ Lemma 3 (the choice of `t`)
+The proof of Lemma 3 picks `t = 3/(4ε) − 1`, which is too small: for `ε = 1/8` and `t = 5` the gap
+ratio between Claims 6 and 7 is `0.9 > 0.875` (`= 3/4 + ε`).
+
+**Impact.** Statement true; any `t ≥ 3/(2ε) + 3` works (`lemma3`, `lemma3_paper`).
+
+**Details.** The gap between Claims 6 and 7 has leading terms `3(t+1)ℓ` versus `4tℓ`, with ratio
+`3/4 + 3/(4t)`. For `t = 3/(4ε) − 1` this ratio exceeds `3/4 + ε`. With the paper's own simplified
+bounds `3(t+2)` vs `4(t−1)` it is even `21/16 > 1` at `ε = 1/8`.
+
+### 🛠️ Corollary 1 (needs a strict gap)
+With Definition 6 a γ-approximation may output weight exactly `γβ` in both cases, so it does not
+decide the gap predicate.
+
+**Impact.** Harmless: we require `hi < γ·lo`, and since Lemmas 2 and 3 hold for every `ε`, one uses
+`ε/2` (`corollary1`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -98,6 +115,10 @@ size `n` such that every randomized algorithm satisfying `ApproxMIS A (1/2+ε) T
 `C·n ≤ T·B·log n`. `theorem2` is the same with `3/4+ε` and `C·n² ≤ T·B·log n`. The generic claims
 (`claim5_generic`, `claim7_generic`, `card_code_le`) hold for any code with pairwise agreement `≤ a`. They
 serve both the paper's Reed–Solomon parameters and the repaired constant-alphabet instance.
+
+Theorem 4 (cited) is stated for arbitrary alphabets, but Reed–Solomon codes need a field, and the paper
+takes `Σ = [ℓ+α]` of arbitrary size. We prove Theorem 4 for prime `q` (`theorem4`). That is enough, since
+`ℓ+α` can be chosen prime. We neither prove nor refute the statement for other `q`.
 
 **Not formalized.** The CKS lower bound itself; Remark 1 (unweighted graphs); constant diameter of the hard
 instances; Theorem 4 for non-prime alphabet sizes; the paper's real-valued parameter choice

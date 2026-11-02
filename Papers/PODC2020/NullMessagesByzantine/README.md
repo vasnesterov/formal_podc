@@ -18,29 +18,7 @@ convention that a process receives its own broadcasts ("send to all" includes th
 
 ## Mistakes in the paper
 
-There are no false statements. One implicit convention matters and is easy to get wrong:
-
-* **Self-delivery is essential and never stated.** Figure 1 (line 10) has a process without a
-  unanimous recommendation "send `err` to all", and line 11 has a process that "did not receive any
-  `err`" decide at time 3. If the sender does not count its own `err`, the protocol is wrong for
-  every base protocol. Take `n = 7`, `t = 2`, Council `{0,1,2}`. Process `1` is Byzantine and
-  silent, process `6` has input 0 and everyone else input 1. The correct council members recommend
-  `MAJ = 1`. The null message of `1` tells `6` "recommendation 0", so `6` sees no unanimous
-  recommendation, sets `est = 0` and sends `err`. Nobody else sends `err`, so `6` decides 0 at time
-  3. The others got `6`'s `err` and run the base protocol with input 1. Declaring `6` Byzantine as
-  well gives the same run with 2 faults, so the base protocol's validity makes them decide 1.
-  Theorem 1.2 has the same issue: if `j` does not receive its own messages, silence in round `m+1`
-  says nothing about `φ_j`. With the paper's wording ("sends messages to everyone", "send to all"),
-  which includes the sender, both results hold. This is the paper's convention, not an extra
-  assumption: Figure 1 quantifies over all of `P` including the sender (lines 01–03 for a council
-  member `i`, lines 06–07 for `i = j`), and line 08 ("unanimous recommendation from `{0,…,t}`")
-  only makes sense for a council member if it receives its own recommendation. We prove the
-  results under this convention, or with "`φ_j` held" as an explicit hypothesis in Theorem 1.2. (`not_solves_without_selfDelivery`,
-  `theorem_1_2_literal_false`; correct versions `theorem_2_1_consensus`, `theorem_1_2`)
-* **Minor imprecisions.** Theorem 2.1 only needs `2t < n` for the layer itself (`k ≥ 3` matters only
-  for the base protocol). "Majority value" (2.1 (3)) is ambiguous for ties when `n` is even; any
-  fixed tie-break works (ours: 0). The bit bound in (2) counts the four layer rounds only, not the
-  base protocol's messages.
+No mistakes in the statements.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -78,6 +56,30 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 2.1 (2): ≤ `n(t+1.5)+2n²` bits by correct processes in the layer; base starts at time 4 | `layer_bits_le`, `status_base`, `decides_iff_base` | `Complexity.lean`, `Compose.lean` |
 | Theorem 2.1 (3): failure-free runs decide `MAJ(inputs)` | `ff_decides_maj` | `Complexity.lean` |
 | Self-delivery is necessary for Figure 1 | `not_solves_without_selfDelivery` | `SelfDelivery.lean` |
+
+**Self-delivery convention.** One implicit convention matters and is easy to get wrong: a process
+receives its own broadcasts. Figure 1 (line 10) has a process without a unanimous recommendation
+"send `err` to all", and line 11 has a process that "did not receive any `err`" decide at time 3.
+If the sender does not count its own `err`, the protocol is wrong for every base protocol. Take
+`n = 7`, `t = 2`, Council `{0,1,2}`. Process `1` is Byzantine and silent, process `6` has input 0
+and everyone else input 1. The correct council members recommend `MAJ = 1`. The null message of `1`
+tells `6` "recommendation 0", so `6` sees no unanimous recommendation, sets `est = 0` and sends
+`err`. Nobody else sends `err`, so `6` decides 0 at time 3. The others got `6`'s `err` and run the
+base protocol with input 1. Declaring `6` Byzantine as well gives the same run with 2 faults, so the
+base protocol's validity makes them decide 1. Theorem 1.2 has the same issue: if `j` does not receive
+its own messages, silence in round `m+1` says nothing about `φ_j`. With the paper's wording ("sends
+messages to everyone", "send to all"), which includes the sender, both results hold. This is the
+paper's convention, not an extra assumption: Figure 1 quantifies over all of `P` including the
+sender (lines 01–03 for a council member `i`, lines 06–07 for `i = j`), and line 08 ("unanimous
+recommendation from `{0,…,t}`") only makes sense for a council member if it receives its own
+recommendation. We prove the results under this convention, or with "`φ_j` held" as an explicit
+hypothesis in Theorem 1.2. (`not_solves_without_selfDelivery`, `theorem_1_2_literal_false`; correct
+versions `theorem_2_1_consensus`, `theorem_1_2`)
+
+**Minor imprecisions.** Theorem 2.1 only needs `2t < n` for the layer itself (`k ≥ 3` matters only
+for the base protocol). "Majority value" (2.1 (3)) is ambiguous for ties when `n` is even; any fixed
+tie-break works (ours: 0). The bit bound in (2) counts the four layer rounds only, not the base
+protocol's messages.
 
 **Not formalized.** Comparisons with the literature (24-fold improvement over Phase King,
 the `nt/4` lower bound), the "fewer than `3n²` bits" remark, and the plurality/multi-valued remark.

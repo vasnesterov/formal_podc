@@ -16,46 +16,75 @@ There are also several typos in proofs.
 
 ## Mistakes in the paper
 
-* **Locality (Appendix A), gap in the proof; the statement is true.** To build a global linearization,
-  the proof takes the union of the per-object linearization orders and the real-time order. It then
-  asserts this is "a well defined partial order" because the per-object orders respect real time and
-  are disjoint. That union is not transitive. The real work, as in Herlihy–Wing's locality proof, is
-  showing that its transitive closure is acyclic, since cycles may alternate between objects and
-  real-time edges. Our proof uses CSLib's merge of per-object linearizations by explicit linearization
-  points, which proves exactly this step. Typo: "`H₂` of `H 2`" should be "of `H?`".
-  (`HW.ivl_locality`)
-* **Example 2, the witness that PCM is not linearizable, is not a well-formed execution; the claim is
-  true.** The paper claims (abstract, introduction, and the sentence before Example 2) that PCM is not
-  linearizable, and Example 2 with its proof by contradiction is the demonstration. Process `p`
-  invokes `U = update(a)`, which stalls. Then "process `p`" invokes `Q₁ = query(a)` and
-  `Q₂ = query(b)` while `U` is still pending. Well-formedness (Section 2.1) forbids this. With a second
-  process issuing the two queries, the example works as claimed. We also reach the paper's initial
-  matrix `[[1,4],[2,3]]` from the all-zero matrix of Algorithm 1 with the updates `a, b, e, e, e`. The responses force
-  `U` before `Q₁` and `Q₂` before `U`, while `Q₁` precedes `Q₂` in real time. The text also says
-  "P DC" where PCM is meant. (`Example2.pcm_not_linearizable`, `example2_not_lin`)
-* **The proof of Lemma 2 does not define `H₁` and `H₂` precisely.** Reads are placed "after all
-  preceding operations and before concurrent ones", and ties are broken arbitrarily. This is
-  contradictory for two concurrent reads. The intended orders work: reads at their invocation and
-  updates at their response, and the converse. The rest of the proof goes through as written.
-  (`Alg2.alg2_sandwich`)
-* **Lemma 1's proof is imprecise.** "`c_{σ₁}(Q)[i]` (the value when the query starts)": the count in
-  `H₁` only lower-bounds the counter at the query's start, because pending updates may already have
-  incremented it. The bound still holds. (`pcm_sandwich`)
-* **Lemma 4's proof applies the sequential Lemma 3 to a linearization without justification.** This
-  needs each process's operations to appear in program order in the linearization. It is true (each
-  process's operations are ordered by real time) but not mentioned. (`alg3_linearizable`)
-* Typos and slips:
-  - Proof of Theorem 1 (p. 9): the first display should read
-    `ret(Q, τ_{A(c)}(H₁)) ≤ ret(Q, H(A′, σ, c)) ≤ ret(Q, τ_{A(c)}(H₂))`, not `A` and `H₁`;
-    "`ret(Q, τ_{A(c)}(H₂)) ≤ v_max`" should be `τ_I(H₂)`; the last line should have `≤ v_max + ε`, not
-    `≥`.
-  - Definition of `v_min`/`v_max`: `min{τ_I(L)}` should be `min{ret(Q, τ_I(L))}`.
-  - Proof of Invariant 1, case `v = 0`: "`v′ᵢ = 1`" should be `v′ᵢ = 0`. Invariant 1 and Lemma 3 use
-    `H′` before it is defined (in Lemma 4's proof). The summation index `i` clashes with the process
-    index `i`.
-  - Lemma 3: "the last update invocation" should be "the last `updateᵢ` invocation". The literal
-    reading is also true but weaker.
-  - Lemma 1's proof starts "We next prove that i is IVL".
+No mistakes in the statements.
+
+### Typos and slips
+- Proof of Theorem 1 (p. 9): the first display should read
+  `ret(Q, τ_{A(c)}(H₁)) ≤ ret(Q, H(A′, σ, c)) ≤ ret(Q, τ_{A(c)}(H₂))`, not `A` and `H₁`;
+  "`ret(Q, τ_{A(c)}(H₂)) ≤ v_max`" should be `τ_I(H₂)`; the last line should have `≤ v_max + ε`, not
+  `≥`.
+- Definition of `v_min`/`v_max`: `min{τ_I(L)}` should be `min{ret(Q, τ_I(L))}`.
+- Proof of Invariant 1, case `v = 0`: "`v′ᵢ = 1`" should be `v′ᵢ = 0`. Invariant 1 and Lemma 3 use
+  `H′` before it is defined (in Lemma 4's proof). The summation index `i` clashes with the process
+  index `i`.
+- Lemma 3: "the last update invocation" should be "the last `updateᵢ` invocation". The literal
+  reading is also true but weaker.
+- Lemma 1's proof starts "We next prove that i is IVL".
+- Appendix A: "`H₂` of `H 2`" should be "of `H?`".
+- Example 2: the text says "P DC" where PCM is meant.
+
+## Proof gaps (statements true)
+
+### 🛠️ Locality of IVL (§3.2, Appendix A)
+The proof asserts that the union of the per-object linearization orders and the real-time order is
+"a well defined partial order", but that union is not transitive and the acyclicity of its
+transitive closure is never argued.
+
+**Impact.** Statement true; repaired with CSLib's merge of per-object linearizations
+(`HW.ivl_locality`).
+
+**Details.** The paper justifies the claim by the per-object orders respecting real time and being
+disjoint. The real work, as in Herlihy–Wing's locality proof, is showing that the transitive closure
+is acyclic, since cycles may alternate between objects and real-time edges.
+
+**Repair.** Our proof uses CSLib's merge of per-object linearizations by explicit linearization
+points, which proves exactly this step.
+
+### 🛠️ Example 2 (the witness that PCM is not linearizable)
+Example 2's execution is not well formed: process `p` invokes `Q₁ = query(a)` and `Q₂ = query(b)`
+while its own `U = update(a)` is still pending.
+
+**Impact.** The claim that PCM is not linearizable (abstract, introduction, and the sentence before
+Example 2) is true; with a second process issuing the two queries the example works as claimed
+(`Example2.pcm_not_linearizable`, `example2_not_lin`).
+
+**Details.** Well-formedness (Section 2.1) forbids a process to have two operations pending at once.
+We also reach the paper's initial matrix `[[1,4],[2,3]]` from the all-zero matrix of Algorithm 1
+with the updates `a, b, e, e, e`. The responses force `U` before `Q₁` and `Q₂` before `U`, while
+`Q₁` precedes `Q₂` in real time.
+
+### 🛠️ Lemma 2 (the linearizations `H₁`, `H₂`)
+The proof of Lemma 2 places reads "after all preceding operations and before concurrent ones" with
+ties broken arbitrarily, which is contradictory for two concurrent reads.
+
+**Impact.** Statement true; the intended orders work and the rest of the proof goes through as
+written (`Alg2.alg2_sandwich`).
+
+**Repair.** Reads at their invocation and updates at their response, and the converse.
+
+### 🛠️ Lemmas 1 and 4 (imprecise steps)
+Lemma 1's proof misdescribes the count in `H₁`, and Lemma 4's proof applies the sequential Lemma 3
+to a linearization without justification.
+
+**Impact.** Statements true; routine fixes (`pcm_sandwich`, `alg3_linearizable`).
+
+**Details.**
+- Lemma 1: "`c_{σ₁}(Q)[i]` (the value when the query starts)": the count in `H₁` only lower-bounds
+  the counter at the query's start, because pending updates may already have incremented it. The
+  bound still holds. (`pcm_sandwich`)
+- Lemma 4: applying Lemma 3 needs each process's operations to appear in program order in the
+  linearization. It is true (each process's operations are ordered by real time) but not mentioned.
+  (`alg3_linearizable`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

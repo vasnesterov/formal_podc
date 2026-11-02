@@ -14,32 +14,48 @@ there. The proof of Lemma 6 claims a strict inequality that is false.
 
 ## Mistakes in the paper
 
-* **Corollary 17's proof misapplies Theorem 12; the corollary is true.** The proof runs Phase I of Algorithm 1 with
-  `ε = 1/2` and then says the leader "locally uses Theorem 12 to compute a 5/3-approximation for the remaining
-  graph" `G²[U]`. Theorem 12 only covers squares `G²`. `G²[U]` is just an induced subgraph of a square, and every
-  graph is one. The proof of Theorem 12 also breaks there: Lemma 13 (3) needs the `G`-midpoint of every blue edge
-  to lie in `V1`, but now the midpoint can lie in `S`. Concrete run: take vertices `a₀..a₃`, `b₀..b₃` and midpoints
-  `wᵢⱼ ~ aᵢ, bⱼ`. Phase I picks `a₀, …, a₃` and ends with `U = {aᵢ, bⱼ}` and `G²[U] = K₄,₄`. That graph is
-  triangle-free and 4-regular, so Algorithm 2 goes straight to part 3. Part 3 may output all 8 vertices (both ends
-  of a perfect matching), while 4 vertices suffice (`corollary_17_proof_gap`). The overall 5/3 bound still holds,
-  with a different accounting. A midpoint in `S` has at most two neighbours in the triangle-free remainder, so it
-  pays for at most one blue edge, just like a triangle vertex. Lemma 5 charges `S` at ratio `3/2`, the same as part 1
-  charges triangles. So Lemma 14 (4) becomes `s₁ + |S| ≥ (3/2)|V_{R'}|` and the 5/3 computation goes through
-  (`induced_bound`, `corollary_17`).
-* **Lemma 6's proof claims `|I| < n/α`; only `|I| ≤ n/α` holds.** Take the path `0–1–2–3` with `r = 2`. Then
-  `I = {0, 3}` is independent in `G²` and `|I| = 2 = n/α`. The non-strict bound follows from the paper's own
-  argument and is all the lemma needs, so the statement holds (`lemma_6_strict_false`, `card_mul_le_of_indep`,
-  `lemma_6`). Its second sentence (the `(1 + 1/⌊r/2⌋)`-approximation) needs `r ≥ 2`; for `r = 1` it divides by 0.
-* **Small slips in proofs** (all statements true):
-  - Theorem 12, degree-3 case: the three disjoint edges are `{y₁,z₁}, {y₂,z₂}, {x,y₃}`, not `{x,y₂}`.
-  - In the degree-2 case, the edges `{z,y₁}` and `{x,y₂}` are disjoint only because `z ≠ y₂`. This holds because
-    the graph is triangle-free, which the paper does not say.
-  - Lemma 5 writes `Sᵢ = N(vᵢ) ∩ R` for `N(cᵢ) ∩ R`.
-  - The distributed description of Phase I calls vertices with "at least `1/ε`" neighbours in `R` candidates;
-    the pseudocode, Lemma 2 and Lemma 5 need "more than `1/ε`".
-  - Theorem 1, case `ε > 1`: "a `G²`-MIS has at most `n/2` vertices" fails for `n = 1`.
-  - Theorems 20 and 22: `V_B = V(G) \ V_B` should be `\ V_A`.
-  - The order of the 4-cycle in the [CKP17] bit gadgets is not specified. We use `t_A – f_A – t_B – f_B`.
+No mistakes in the statements.
+
+### Typos and slips
+- Theorem 12, degree-3 case: the three disjoint edges are `{y₁,z₁}, {y₂,z₂}, {x,y₃}`, not `{x,y₂}`.
+- In the degree-2 case, the edges `{z,y₁}` and `{x,y₂}` are disjoint only because `z ≠ y₂`. This holds because
+  the graph is triangle-free, which the paper does not say.
+- Lemma 5 writes `Sᵢ = N(vᵢ) ∩ R` for `N(cᵢ) ∩ R`.
+- The distributed description of Phase I calls vertices with "at least `1/ε`" neighbours in `R` candidates;
+  the pseudocode, Lemma 2 and Lemma 5 need "more than `1/ε`".
+- Theorem 1, case `ε > 1`: "a `G²`-MIS has at most `n/2` vertices" fails for `n = 1`.
+- Theorems 20 and 22: `V_B = V(G) \ V_B` should be `\ V_A`.
+- The order of the 4-cycle in the [CKP17] bit gadgets is not specified. We use `t_A – f_A – t_B – f_B`.
+- Lemma 6's second sentence (the `(1 + 1/⌊r/2⌋)`-approximation) needs `r ≥ 2`; for `r = 1` it divides by 0.
+
+## Proof gaps (statements true)
+
+### 🛠️ Corollary 17 (the proof misapplies Theorem 12)
+The proof runs Phase I of Algorithm 1 with `ε = 1/2` and then applies Theorem 12 to the remaining graph `G²[U]`,
+which is not a square, and Algorithm 2 really is only a 2-approximation there (`corollary_17_proof_gap`).
+
+**Impact.** The corollary is true: the overall 5/3 bound holds with a different accounting (`induced_bound`,
+`corollary_17`).
+
+**Details.** The proof says the leader "locally uses Theorem 12 to compute a 5/3-approximation for the remaining
+graph" `G²[U]`. Theorem 12 only covers squares `G²`. `G²[U]` is just an induced subgraph of a square, and every
+graph is one. The proof of Theorem 12 also breaks there: Lemma 13 (3) needs the `G`-midpoint of every blue edge
+to lie in `V1`, but now the midpoint can lie in `S`. Concrete run: take vertices `a₀..a₃`, `b₀..b₃` and midpoints
+`wᵢⱼ ~ aᵢ, bⱼ`. Phase I picks `a₀, …, a₃` and ends with `U = {aᵢ, bⱼ}` and `G²[U] = K₄,₄`. That graph is
+triangle-free and 4-regular, so Algorithm 2 goes straight to part 3. Part 3 may output all 8 vertices (both ends
+of a perfect matching), while 4 vertices suffice (`corollary_17_proof_gap`).
+
+**Repair.** A midpoint in `S` has at most two neighbours in the triangle-free remainder, so it pays for at most
+one blue edge, just like a triangle vertex. Lemma 5 charges `S` at ratio `3/2`, the same as part 1 charges
+triangles. So Lemma 14 (4) becomes `s₁ + |S| ≥ (3/2)|V_{R'}|` and the 5/3 computation goes through
+(`induced_bound`, `corollary_17`).
+
+### 🛠️ Lemma 6 (the strict bound `|I| < n/α`)
+The proof claims `|I| < n/α`, which fails for the path `0–1–2–3` with `r = 2`, where `I = {0, 3}` is independent
+in `G²` and `|I| = 2 = n/α` (`lemma_6_strict_false`).
+
+**Impact.** Statement true: the non-strict bound `|I| ≤ n/α` follows from the paper's own argument and is all the
+lemma needs (`card_mul_le_of_indep`, `lemma_6`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
