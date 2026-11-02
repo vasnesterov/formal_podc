@@ -17,50 +17,66 @@ is not formalized.
 
 ## Mistakes in the paper
 
-* **Theorem 2.1, proof gap: the algorithm is assumed to keep every ground set in one cluster.** The
-  proof says "Any competitive algorithm under the learning model maintains a perfect partition of
-  ground sets" and builds its adversary on that. A deterministic algorithm may split a revealed
-  ground set, for example by moving a node of `B` away for a while, and nothing in the proof covers
-  this. The statement is still true. We add *repair requests*: whenever the algorithm's current
-  configuration splits a ground set, the adversary requests a split pair, which costs the algorithm
-  at least `1` (it pays for the request or migrates). The adversary moves on to the next pivot step
-  only when all ground sets are back together. Between two such moments the algorithm migrates at
-  least two nodes (`LB.two_le_dist`; this also covers an algorithm that moves `B` instead of the
-  pivot). If the algorithm never puts the ground sets back together, the repair requests alone
-  make its cost large enough. (`theorem_2_1`)
-* **Theorem 2.1, proof gap: the pivot step is undefined when the pivot is `z`.** Let `z` be the
-  node of `B`'s home cluster that is not in `B`. The paper does not control `z`: during the
-  requests inside `B` the algorithm may move `z` away, so `x₀ ≠ z`, and later choose `z` as a new
-  pivot. Then the only other ground set with `z`'s origin is `B` itself, and `B` is in the same
-  cluster as `z`. So the required "ground set of the same origin residing in a different cluster"
-  does not exist. Following the text literally, the adversary would request `(z, b)` with
-  `b ∈ B`. That request is internal, and `B ∪ {z}` then fills the cluster, so no pivot is left and
-  the construction stops after `O(1)` swaps. Fix: make `z` part of the first pair `{x₀, y₀}`. In
-  our adversary `B` is never requested before the first pivot step, so `x₀ = z`, and `y₀` comes
-  from another cluster. Every later pivot then has an origin other than `B`'s home cluster. With
-  `k ≥ 3` it always has a partner of the same origin (`LB.grow_shape`).
-* **Theorem 2.1: the competitive-ratio notion is left implicit.** In the learning model every
-  sensible algorithm has bounded total cost (PPL pays at most `2(n-1)α·n`). So no lower bound is
-  possible if the additive constant `β` may depend on `α`. The bound holds for strict
-  competitiveness, or for `β` independent of `α` (letting `α → ∞`). We prove
-  `c ≥ ((k-2)(ℓ-1)-2)/2 - β/(4α)` for every `(c, β)`-competitive algorithm with `c ≥ 0`.
-  (`theorem_2_1_competitive`, `theorem_2_1_omega`)
-* **Theorem 2.2 is stated without proof; it is true.** PPL never pays for a request. While
-  `D = dist(init, P*)` for a perfect partition `P*`, every configuration PPL visits is within `D`
-  of `init`. Each repartition merges two components, so there are at most `n - 1` of them, and each
-  costs at most `2αD`. Any offline algorithm with finite cost ends in a perfect partition and pays
-  at least `αD`. This uses "pairs communicate forever": on a *finite* sequence OPT may simply pay
-  for the requests (one request: OPT = 1, PPL ≥ 2α). Section 2 makes "communicate forever" part
-  of the model, so this does not contradict Theorem 2.2. (`theorem_2_2`, `theorem_2_2_kl`)
-* **Lemma 3.1 is stated without proof; it is true.** For clusters of size `3`, if a balanced
-  configuration respecting the merged components exists, one exists at distance at most `4` (two
-  swaps). The hard case is when `a` and `b` are singletons sitting next to pairs. A counting
-  argument then finds a cluster made of three singletons (`K3.exists_triple`).
-  (`K3.lemma_3_1`, `K3.lemma_3_1_closest`)
-* **Slips.** In the final count of the proof of Theorem 2.1, `B` contributes `|B| - 1 = k - 2` to
-  `Σ(|C*| - 1)`, but the proof subtracts `k - 1`. It also stops at `< ℓ + 3` isolated nodes, while
-  `< ℓ + 2` suffices, because `B`'s home cluster has no isolated node. Both slips only weaken the
-  bound. The pigeonhole step needs only `ℓ` isolated nodes, not `ℓ + 1`.
+No mistakes in the statements.
+
+### Typos and slips
+- In the final count of the proof of Theorem 2.1, `B` contributes `|B| - 1 = k - 2` to `Σ(|C*| - 1)`, but the
+  proof subtracts `k - 1`. It also stops at `< ℓ + 3` isolated nodes, while `< ℓ + 2` suffices, because `B`'s home
+  cluster has no isolated node. Both slips only weaken the bound.
+- The pigeonhole step needs only `ℓ` isolated nodes, not `ℓ + 1`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 2.1 (the algorithm is assumed to keep every ground set in one cluster)
+The proof says "Any competitive algorithm under the learning model maintains a perfect partition of ground sets",
+but a deterministic algorithm may split a revealed ground set, for example by moving a node of `B` away for a while,
+and nothing in the proof covers this.
+
+**Impact.** Statement true; repaired with *repair requests* (`theorem_2_1`).
+
+**Repair.** Whenever the algorithm's current configuration splits a ground set, the adversary requests a split
+pair, which costs the algorithm at least `1` (it pays for the request or migrates). The adversary moves on to the
+next pivot step only when all ground sets are back together. Between two such moments the algorithm migrates at
+least two nodes (`LB.two_le_dist`; this also covers an algorithm that moves `B` instead of the pivot). If the
+algorithm never puts the ground sets back together, the repair requests alone make its cost large enough.
+(`theorem_2_1`)
+
+### 🛠️ Theorem 2.1 (the pivot step is undefined when the pivot is `z`)
+If the pivot is `z`, the node of `B`'s home cluster that is not in `B`, the required "ground set of the same origin
+residing in a different cluster" does not exist, and following the text the construction stops after `O(1)` swaps.
+
+**Impact.** Statement true; repaired by making `z` part of the first pair (`LB.grow_shape`).
+
+**Details.** The paper does not control `z`: during the requests inside `B` the algorithm may move `z` away, so
+`x₀ ≠ z`, and later choose `z` as a new pivot. Then the only other ground set with `z`'s origin is `B` itself, and
+`B` is in the same cluster as `z`. Following the text literally, the adversary would request `(z, b)` with
+`b ∈ B`. That request is internal, and `B ∪ {z}` then fills the cluster, so no pivot is left.
+
+**Repair.** Make `z` part of the first pair `{x₀, y₀}`. In our adversary `B` is never requested before the first
+pivot step, so `x₀ = z`, and `y₀` comes from another cluster. Every later pivot then has an origin other than `B`'s
+home cluster. With `k ≥ 3` it always has a partner of the same origin (`LB.grow_shape`).
+
+### 🛠️ Theorem 2.2 (PPL is `O(kℓ)`-competitive; no proof in the paper)
+The theorem is stated without proof.
+
+**Impact.** Statement true; we prove it with ratio `2(kℓ-1)` in the static learning model (`theorem_2_2`,
+`theorem_2_2_kl`).
+
+**Details.** PPL never pays for a request. While `D = dist(init, P*)` for a perfect partition `P*`, every
+configuration PPL visits is within `D` of `init`. Each repartition merges two components, so there are at most
+`n - 1` of them, and each costs at most `2αD`. Any offline algorithm with finite cost ends in a perfect partition
+and pays at least `αD`. This uses "pairs communicate forever": on a *finite* sequence OPT may simply pay for the
+requests (one request: OPT = 1, PPL ≥ 2α). Section 2 makes "communicate forever" part of the model, so this does
+not contradict Theorem 2.2. (`theorem_2_2`, `theorem_2_2_kl`)
+
+### 🛠️ Lemma 3.1 (`k = 3`: at most two swaps; no proof in the paper)
+The lemma is stated without proof.
+
+**Impact.** Statement true; proved (`K3.lemma_3_1`, `K3.lemma_3_1_closest`).
+
+**Details.** For clusters of size `3`, if a balanced configuration respecting the merged components exists, one
+exists at distance at most `4` (two swaps). The hard case is when `a` and `b` are singletons sitting next to pairs.
+A counting argument then finds a cluster made of three singletons (`K3.exists_triple`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -82,6 +98,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
   both forms. Theorem 2.2 needs the static form (see above).
 * Lower-bound instance: nodes `Fin ℓ × Fin k` (cluster of origin, index), initial partition
   `Prod.fst`. A lower bound for one instance is a lower bound for the problem.
+* Competitive ratio: the paper leaves the notion implicit. In the learning model every sensible
+  algorithm has bounded total cost (PPL pays at most `2(n-1)α·n`), so no lower bound is possible if
+  the additive constant `β` may depend on `α`. Theorem 2.1 holds for strict competitiveness, or for
+  `β` independent of `α` (letting `α → ∞`). We prove `c ≥ ((k-2)(ℓ-1)-2)/2 - β/(4α)` for every
+  `(c, β)`-competitive algorithm with `c ≥ 0` (`theorem_2_1_competitive`, `theorem_2_1_omega`).
 
 **Main results in Lean.**
 

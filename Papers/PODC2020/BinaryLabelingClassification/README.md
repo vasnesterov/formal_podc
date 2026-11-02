@@ -17,31 +17,50 @@ proof of Theorem 8.2 an intermediate claim is false for general trees, though it
 
 ## Mistakes in the paper
 
-- **Proof of Theorem 8.3: the orientation goes the wrong way (proof slip, statement true).** The hardest VI.b problem
-  is `W = 010⁺`, `B = 0⁺10`. With the paper's convention (an `X`-edge points from black to white), every relevant node
-  must have exactly one incoming edge. The paper roots the tree at a leaf and orients all edges *towards* it. Then a
-  non-root node of degree `k` has `k − 1` incoming edges, which violates the constraints for `k ≥ 3`. Orienting
-  *away* from the leaf works: every non-root node has one incoming edge, and the leaf root is irrelevant. The same
-  slip appears in the sentence "it is always possible to orient a tree towards a root" about the Theorem 8.2
-  problem. (`viHard_exists`, `theorem_8_3`)
-- **Proof of Theorem 8.2: "at most a single vertex has all edges outgoing" is false for general trees (proof
-  imprecision, statement true).** Only relevant nodes (white degree `d`, black degree `δ`) must have at most one
-  incoming edge. Nodes of other degrees can absorb several incoming edges, so in a general tree many nodes can be
-  sources. The paper then calls the problem equivalent to the "oriented tree problem"; that equivalence also fails
-  in general. The claim does hold on the instances the reduction actually uses: a path whose nodes are all relevant,
-  with leaves attached. Our proof runs the paper's mirroring argument directly on those caterpillars and never uses
-  the general claim. (`dirR_mono`, `Caterpillar.viEasy_lower`)
-- **Minor slips.**
-  - Theorem 8.1, upper bound: the proof only treats subdivided `d`-regular trees ("it is sufficient that V.a is
-    solvable on any `d`-regular tree"). On a general bipartite tree, black nodes of degree `≠ 2` are not edges of an
-    underlying tree. A solution still always exists: root the tree at a node of degree `≤ 1` and use the parity of
-    `⌊dist(r, u)/2⌋` at white nodes `u` (`va_exists`).
-  - Proof of Lemma 10.4, case `1010`: the case `B = 0⁺` (type II.b) is not mentioned; the lemma's hypothesis excludes it.
-  - Proof of Lemma 10.8 (2): "configurations consisting of `δ` labels" (and `Z₁ … Z_δ`) should read `d`.
-  - Proof of Lemma 10.9, items (1)–(2): "black" and "white" (and `d`, `δ`) are swapped in the description of the
-    output problem; the proof itself uses the right constraints.
-  - The `Ω(n)` arguments of §8 build a caterpillar with `n ≡ 1 (mod d)` nodes, and do not say how to obtain other
-    values of `n`. We pad with extra leaves at one end, so the bounds hold for every `n`.
+No mistakes in the statements.
+
+### Typos and slips
+- Proof of Lemma 10.4, case `1010`: the case `B = 0⁺` (type II.b) is not mentioned; the lemma's hypothesis excludes it.
+- Proof of Lemma 10.8 (2): "configurations consisting of `δ` labels" (and `Z₁ … Z_δ`) should read `d`.
+- Proof of Lemma 10.9, items (1)–(2): "black" and "white" (and `d`, `δ`) are swapped in the description of the
+  output problem; the proof itself uses the right constraints.
+- The `Ω(n)` arguments of §8 build a caterpillar with `n ≡ 1 (mod d)` nodes, and do not say how to obtain other
+  values of `n`. We pad with extra leaves at one end, so the bounds hold for every `n`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 8.3 (the orientation goes the wrong way)
+The proof roots the tree at a leaf and orients all edges *towards* it, which gives a non-root node of degree `k`
+`k − 1` incoming edges and violates the constraints of the hardest VI.b problem for `k ≥ 3`.
+
+**Impact.** Statement true; orienting *away* from the leaf works (`viHard_exists`, `theorem_8_3`).
+
+**Details.** The hardest VI.b problem is `W = 010⁺`, `B = 0⁺10`. With the paper's convention (an `X`-edge points
+from black to white), every relevant node must have exactly one incoming edge. Orienting *away* from the leaf, every
+non-root node has one incoming edge, and the leaf root is irrelevant. The same slip appears in the sentence "it is
+always possible to orient a tree towards a root" about the Theorem 8.2 problem.
+
+### 🛠️ Theorem 8.2 ("at most a single vertex has all edges outgoing")
+This intermediate claim of the proof is false for general trees, and so is the claimed equivalence with the
+"oriented tree problem", though both hold on the instances the reduction actually uses.
+
+**Impact.** Statement true; repaired by running the mirroring argument directly on caterpillars
+(`dirR_mono`, `Caterpillar.viEasy_lower`).
+
+**Details.** Only relevant nodes (white degree `d`, black degree `δ`) must have at most one incoming edge. Nodes of
+other degrees can absorb several incoming edges, so in a general tree many nodes can be sources. The claim does hold
+on the instances the reduction uses: a path whose nodes are all relevant, with leaves attached.
+
+**Repair.** Our proof runs the paper's mirroring argument directly on those caterpillars and never uses the general
+claim.
+
+### 🛠️ Theorem 8.1 (upper bound, only subdivided regular trees)
+The proof only treats subdivided `d`-regular trees ("it is sufficient that V.a is solvable on any `d`-regular
+tree"), but on a general bipartite tree black nodes of degree `≠ 2` are not edges of an underlying tree.
+
+**Impact.** Statement true; a solution always exists (`va_exists`).
+
+**Repair.** Root the tree at a node of degree `≤ 1` and use the parity of `⌊dist(r, u)/2⌋` at white nodes `u`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
