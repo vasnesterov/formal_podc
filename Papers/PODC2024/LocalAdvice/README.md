@@ -15,29 +15,42 @@ decoder's description has a typo.
 
 ## Mistakes in the paper
 
-* **Theorem 5: the proof ignores the knowledge of `n` (proof gap; the statement is true).**
-  The paper's LOCAL model (Section 3.1) gives every node `n`. The proof of Theorem 5 treats `A` as one
-  map from labelled radius-`T` views to outputs, colours `s`-subsets of identifiers by that map, and
-  takes an infinite monochromatic set `I`. Then it runs `A` on a graph `H` made of many copies of `G`,
-  with `N ≫ n` nodes and `N` chosen *after* `I`. If `A` reads `n`, the behaviour on `H` is that of
-  `A_N`, a different map, and `I` was built for the wrong one. The repair: for each `M`, apply finite
-  Ramsey on `{1, …, N_M}` with `N_M = (R(M) + M)!` to `A_{N_M}`. That gives a homogeneous `M`-set whose
-  behaviour is one of finitely many types. By pigeonhole one type `F*` occurs for infinitely many `M`.
-  For a graph with `n` nodes take such an `M ≥ n + s`; then `n | N_M`, so `H` can be exactly
-  `N_M / n` copies of `G`. The resulting `A'` does not even depend on `n`. (`theorem_5`)
-* **Lemma 1 as stated is false for `d = 0` (degenerate case).** The paper states the symmetric local
-  lemma with the condition `e·p·d ≤ 1`. One event of probability 1 depends on no other event and
-  satisfies `e·1·0 ≤ 1`, yet it always occurs. The standard condition is `e·p·(d+1) ≤ 1`. The only use
-  (Lemma 32, `d ≤ 48Δ⁸`, `p ≤ 1/(144Δ⁸)`) satisfies it as well. This is a cited textbook result.
-  (`lemma_1_as_stated_false`; used instead: `Cslib.Probability.exists_forall_not_of_symmetric`)
-* **Typos and small slips.**
-  * The decoder (page 42) takes `x` as the smallest identifier "among all nodes in the
-    `(30Δ³)`-hop neighborhood of `w` in `C(u)` that receive *color* 1". No node of `C(u)` has
-    colour 1. It must be "receive *bit* 1", as the overview of Appendix D and the proof of Theorem 34
-    show. The proof of Theorem 34 drops the qualifier altogether ("the smallest-ID node among all
-    nodes in the neighborhood").
-  * The existence of a greedy 3-colouring of a 3-colourable graph is used but not shown. It is easy:
-    take a proper colouring with minimal colour sum (`exists_isGreedy`).
+### ⚠️ Lemma 1 (symmetric local lemma, cited) for `d = 0`
+With the condition `e·p·d ≤ 1`, one event of probability 1 depends on no other event and satisfies `e·1·0 ≤ 1`,
+yet it always occurs (`lemma_1_as_stated_false`).
+
+**Impact.** A degenerate corner of a cited textbook result: the standard condition is `e·p·(d+1) ≤ 1`, and the
+only use (Lemma 32, `d ≤ 48Δ⁸`, `p ≤ 1/(144Δ⁸)`) satisfies it as well (used instead:
+`Cslib.Probability.exists_forall_not_of_symmetric`).
+
+### ⚠️ Decoder of Theorem 34 (page 42, "receive *color* 1")
+The decoder takes `x` as the smallest identifier "among all nodes in the `(30Δ³)`-hop neighborhood of `w` in `C(u)`
+that receive *color* 1", but no node of `C(u)` has colour 1; it must be "receive *bit* 1".
+
+**Impact.** A typo with evident intent, as the overview of Appendix D and the proof of Theorem 34 show; the proof
+of Theorem 34 drops the qualifier altogether ("the smallest-ID node among all nodes in the neighborhood").
+
+### Typos and slips
+- The existence of a greedy 3-colouring of a 3-colourable graph is used but not shown. It is easy: take a proper
+  colouring with minimal colour sum (`exists_isGreedy`).
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 5 (order-invariance: the proof ignores the knowledge of `n`)
+The paper's LOCAL model (Section 3.1) gives every node `n`, but the proof treats `A` as one map from labelled
+radius-`T` views to outputs and then runs it on a padded graph `H` with `N ≫ n` nodes, where it behaves as the
+different map `A_N`.
+
+**Impact.** Statement true; repaired, and the resulting `A'` does not even depend on `n` (`theorem_5`).
+
+**Details.** The proof colours `s`-subsets of identifiers by that map and takes an infinite monochromatic set `I`.
+Then it runs `A` on a graph `H` made of many copies of `G`, with `N ≫ n` nodes and `N` chosen *after* `I`. If `A`
+reads `n`, the behaviour on `H` is that of `A_N`, and `I` was built for the wrong map.
+
+**Repair.** For each `M`, apply finite Ramsey on `{1, …, N_M}` with `N_M = (R(M) + M)!` to `A_{N_M}`. That gives a
+homogeneous `M`-set whose behaviour is one of finitely many types. By pigeonhole one type `F*` occurs for
+infinitely many `M`. For a graph with `n` nodes take such an `M ≥ n + s`; then `n | N_M`, so `H` can be exactly
+`N_M / n` copies of `G`. (`theorem_5`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
