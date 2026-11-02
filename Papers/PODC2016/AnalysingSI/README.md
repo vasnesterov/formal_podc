@@ -12,20 +12,35 @@ Theorem 21 false as written.
 
 ## Mistakes in the paper
 
-- **Definition 20 typo makes Theorem 21 false as written.** `HistPSI` is defined as
-  `{H | ∃VIS, CO. (H, VIS, CO) ∈ ExecSI}`, with `ExecSI` rather than the `ExecPSI` defined on the line above. The
-  JACM version has the same typo. Read literally, `HistPSI = HistSI`, and Theorem 21 would then say that SI
-  histories are exactly the histories of graphs in `GraphPSI`. That is false: the long-fork history of
-  Figure 2(c) has a graph in `GraphPSI` but is not in `HistSI`. The intended definition is evident, and with
-  `ExecPSI` Theorem 21 holds (we prove it although the paper cites it).
-  (`Examples.theorem21_literal_false`; `theorem21`)
-- **Lemma 26, transitivity of `WW_splice(G)`: a missing case.** The proof first shows `T' —WW→ S''` and only then
-  `T ≉ S`. In the first part it rules out `S'' —WW→ T'` with a cycle of `DCG(G)` (Figure 10(f)). That cycle is in
-  `DCG(G)` only if `S'' ≉ T'`, and the case `T ≈ S` is not treated there. Proving the second part first (it does
-  not depend on the first) closes the gap. Routine; the statement is true. (`Chopped.Hyp.splice_ww_trans`)
-- **Small slips.** Some derived anti-dependencies `S' —RW→ V'` in the proofs of Lemmas 26 and 27 need
-  `S' ≠ V'`; the excluded case is a short cycle forbidden by `G ∈ GraphSI`. §6.1 refers to "the long fork
-  anomaly in Figure 4" (it is Figure 2(c)). The proof of Theorem 10(i) says "Figure 3" for Figure 4.
+### ⚠️ Definition 20 and Theorem 21 (`HistPSI` defined from `ExecSI`)
+Definition 20 defines `HistPSI = {H | ∃VIS, CO. (H, VIS, CO) ∈ ExecSI}` with `ExecSI` instead of `ExecPSI`, which
+makes Theorem 21 false as written: the long-fork history of Figure 2(c) has a graph in `GraphPSI` but is not in
+`HistSI` (`Examples.theorem21_literal_false`).
+
+**Impact.** A typo with evident intent (the `ExecPSI` defined on the line above); with `ExecPSI`, Theorem 21 holds
+(`theorem21`), and no other result is affected.
+
+**Details.** Read literally, `HistPSI = HistSI`, and Theorem 21 would then say that SI histories are exactly the
+histories of graphs in `GraphPSI`. The JACM version has the same typo. We prove Theorem 21 for the intended
+definition although the paper cites it.
+
+### Typos and slips
+- §6.1 refers to "the long fork anomaly in Figure 4"; it is Figure 2(c).
+- The proof of Theorem 10(i) says "Figure 3" for Figure 4.
+- Some derived anti-dependencies `S' —RW→ V'` in the proofs of Lemmas 26 and 27 need `S' ≠ V'`; the excluded case
+  is a short cycle forbidden by `G ∈ GraphSI`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 26 (transitivity of `WW_splice(G)`)
+The first part of the proof rules out `S'' —WW→ T'` with a cycle of `DCG(G)` (Figure 10(f)) that is in `DCG(G)`
+only if `S'' ≉ T'`, and the case `T ≈ S` is not treated.
+
+**Impact.** Statement true; a routine fix (`Chopped.Hyp.splice_ww_trans`).
+
+**Details.** The proof first shows `T' —WW→ S''` and only then `T ≉ S`.
+
+**Repair.** Prove the second part first (it does not depend on the first); then the cycle is in `DCG(G)`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
