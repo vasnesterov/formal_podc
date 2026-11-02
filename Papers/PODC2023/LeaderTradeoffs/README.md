@@ -14,51 +14,91 @@ must be read existentially; read literally, Lemma 3.6 and Corollary 3.7 are fals
 
 ## Mistakes in the paper
 
-- **Theorem 3.8 is off by one round (false statement).** The paper claims: at most `n·f(n)` messages imply
-  `T(n) > (log₂ n − 1)/(log₂ f(n) + 1) + 1`. Take `f(n) = n` and the algorithm in which every node sends its ID to
-  everybody in round 1 and the maximum ID wins. It runs in `T = 1` round and sends `n(n − 1) ≤ n·f(n)` messages,
-  for every ID universe. The claimed bound is `(log₂ n − 1)/(log₂ n + 1) + 1 > 1` for every power of two `n ≥ 2`.
-  The cause is an index slip. The communication graph `G_r` only contains messages of rounds `< r`, but the proof
-  applies Lemma 3.9 with `r = T`, so the messages of the last round are never accounted for. The induction step of
-  Lemma 3.9 also builds `G_{r+1}` from the messages "sent during round `r+1`". Running the induction one round
-  further gives the corrected bound `T > (log₂ n − 1)/(⌈log₂ f⌉ + 1)`, in fact `log₂ n ≤ (⌈log₂ f⌉ + 1)·T`.
-  The "consequently" clause (`k`-round algorithms need `Ω((n/2)^{1+1/(k−1)})` messages) rests on the false
-  bound. The corrected bound gives `Ω(n^{1+1/k})` (e.g. `Ω(n^{3/2})` instead of `Ω(n²)` for 2 rounds). That
-  still improves polynomially on Afek–Gafni, but no longer matches the `O(n^{3/2})` 3-round algorithm of
-  Theorem 3.10. Whether the stronger exponent holds is open. (`theorem_3_8_as_stated_false`,
-  `theorem_3_8_corrected`, `rounds_messages_tradeoff`)
-- **Ceiling (proof gap).** Theorem 3.8 is stated with `log₂ f(n)`, but the proof uses blocks of size
-  `2^{(⌈log₂ f⌉+1)(r−1)}`. Its last inequality, `2^{σ_T} ≤ 2^{(log₂ f + 1)(T − 1)}`, goes the wrong way when `f`
-  is not a power of two. We prove the version with `⌈log₂ f⌉`. (`theorem_3_8_corrected`)
-- **Definition 3.5 is vacuous as written (defective definition).** "`X` forms terminating components if, for
-  some `r`, in **every** restricted prefix `E ∈ Exec_r(X)` all nodes of `X` have terminated." This holds trivially
-  when `Exec_r(X)` is empty, i.e. when some node of `X` must send on more than `|X| − 1` ports. For the broadcast
-  algorithm every set of fewer than `n` IDs is then "terminating". Lemma 3.6 (at most `n/2^ℓ` disjoint
-  terminating `2^ℓ`-sets) fails already for `n = 2` with three singletons, and so does Corollary 3.7. The proof of
-  Lemma 3.6 actually uses the existential reading: *some* isolated execution of `X` exists. With that reading both
-  results hold and suffice for Theorems 3.8 and 3.11. (`lemma_3_6_literal_false`, `not_disjoint_isolable`,
-  `exists_universe_no_isolable_pow`)
-- **Theorem 3.11: missing IDs (proof gap, minor).** Lemma 3.14 needs `n T'^{log₂ n − 1} + n log₂ n` IDs for the
-  single-send algorithm, whose time is `T' = nT` (Lemma 3.12). Theorems 3.11 and 3.13 drop the `n log₂ n`. We prove
-  Theorem 3.11 with `n log₂ n + n^{log₂ n} T^{log₂ n − 1}` IDs. (`theorem_3_11`)
-- **Lemma 3.14 (proof gaps, statement true).**
-  - Merging step: the ports opened by `C` are wired into `C'` by an arbitrary one-to-one map `g`, and those opened
-    by `C'` into `C` by an independent `h`. A node can then receive two new links, which leaves capacity
-    `2^i − 2`, not the claimed `|D|/2 − 1`. Wiring along one perfect matching `C ↔ C'` fixes this.
-  - Counting: "`U_i` contains many pairwise disjoint sets" is not preserved by `|U_i'| ≥ |U_i|/T`. The
-    pigeonhole must be applied to a disjoint subfamily.
-  - Quantifiers: "every execution prefix in `Exec_{r_i}(I)`" is stronger than what the construction provides.
-    One adversarial execution per set suffices.
-  - Absorbing phase: how the first `|C|/2 − 1` new ports are kept inside `C` is left implicit. We track capacity
-    per node. (`merge`, `level_step`, `absorb`)
-- **Imprecisions in the algorithms (Theorems 3.10, 3.15; the results hold).**
-  - Theorem 3.10: "there remains only a single survivor at the end of the `(k−1)`-th iteration" is not what the
-    analysis shows. Up to `n^{1/(k−1)}` survivors can remain, and the final all-to-all round selects the maximum;
-    its cost is within the claimed bound. The referee counts `⌈n^{i/(k−1)}⌉` can exceed `n − 1` for small `n`,
-    so the algorithm caps them.
-  - Algorithm 1 (Theorem 3.15) must stop nodes after they select a leader; otherwise later ID blocks keep
-    broadcasting and the message bound fails. For `n = 1` the rule "select when receiving messages" never fires.
-    The assumption `d ≤ n` is not needed.
+### ❌ Theorem 3.8 (time–message tradeoff, the `+ 1`)
+Theorem 3.8 is off by one round: with `f(n) = n`, the one-round algorithm in which every node sends its ID to
+everybody and the maximum ID wins sends `n(n − 1) ≤ n·f(n)` messages, but the claimed bound
+`T(n) > (log₂ n − 1)/(log₂ f(n) + 1) + 1` exceeds 1 for every power of two `n ≥ 2` (`theorem_3_8_as_stated_false`).
+
+**Impact.** The proof gives the bound without the `+ 1` (`theorem_3_8_corrected`). Only the one-round case is
+refuted; for `T ≥ 2` the stated bound is unproved.
+
+**Details.** The paper claims: at most `n·f(n)` messages imply `T(n) > (log₂ n − 1)/(log₂ f(n) + 1) + 1`. The
+broadcast algorithm runs in `T = 1` round, for every ID universe, while with `f(n) = n` the claimed bound is
+`(log₂ n − 1)/(log₂ n + 1) + 1 > 1`. The cause is an index slip. The communication graph
+`G_r` only contains messages of rounds `< r`, but the proof applies Lemma 3.9 with `r = T`, so the messages of the
+last round are never accounted for. The induction step of Lemma 3.9 also builds `G_{r+1}` from the messages "sent
+during round `r+1`".
+
+A second problem: Theorem 3.8 is stated with `log₂ f(n)`, but the proof uses blocks of size
+`2^{(⌈log₂ f⌉+1)(r−1)}`. Its last inequality, `2^{σ_T} ≤ 2^{(log₂ f + 1)(T − 1)}`, goes the wrong way when `f` is
+not a power of two.
+
+**Repair.** Running the induction one round further gives the corrected bound `T > (log₂ n − 1)/(⌈log₂ f⌉ + 1)`,
+in fact `log₂ n ≤ (⌈log₂ f⌉ + 1)·T`. We prove the version with `⌈log₂ f⌉`. (`theorem_3_8_corrected`)
+
+### ⚠️ Theorem 3.8, "consequently" clause (`k`-round algorithms)
+The claim that `k`-round algorithms need `Ω((n/2)^{1+1/(k−1)})` messages rests on the false bound, and the
+corrected bound only gives `Ω(n^{1+1/k})` (`rounds_messages_tradeoff`).
+
+**Impact.** Unestablished, not refuted: whether the stronger exponent holds is open. The corrected bound (e.g.
+`Ω(n^{3/2})` instead of `Ω(n²)` for 2 rounds) still improves polynomially on Afek–Gafni, but no longer matches the
+`O(n^{3/2})` 3-round algorithm of Theorem 3.10.
+
+### ⚠️ Definition 3.5, Lemma 3.6, Corollary 3.7 (terminating components)
+Definition 3.5 ("in **every** restricted prefix `E ∈ Exec_r(X)` all nodes of `X` have terminated") holds vacuously
+when `Exec_r(X)` is empty, so Lemma 3.6 fails already for `n = 2` with three singletons, and so does Corollary 3.7
+(`lemma_3_6_literal_false`).
+
+**Impact.** A defective definition with evident intent: the proof of Lemma 3.6 uses the existential reading, under
+which both results hold and suffice for Theorems 3.8 and 3.11 (`not_disjoint_isolable`,
+`exists_universe_no_isolable_pow`).
+
+**Details.** The full definition reads "`X` forms terminating components if, for some `r`, in every restricted
+prefix `E ∈ Exec_r(X)` all nodes of `X` have terminated". `Exec_r(X)` is empty when some node of `X` must send on
+more than `|X| − 1` ports. For the broadcast algorithm every set of fewer than `n` IDs is then "terminating". Lemma
+3.6 claims at most `n/2^ℓ` disjoint terminating `2^ℓ`-sets. The proof of Lemma 3.6 actually uses the existential
+reading: *some* isolated execution of `X` exists.
+
+### ⚠️ Algorithm 1 (Theorem 3.15, nodes must stop)
+Algorithm 1 must stop nodes after they select a leader; otherwise later ID blocks keep broadcasting and the
+message bound fails.
+
+**Impact.** A missing case in the pseudocode; with it the result holds, with explicit constants
+(`SmallIds.electsBy`, `SmallIds.msgBound`).
+
+**Details.** For `n = 1` the rule "select when receiving messages" never fires. The assumption `d ≤ n` is not
+needed.
+
+### Typos and slips
+- Theorem 3.10: "there remains only a single survivor at the end of the `(k−1)`-th iteration" is not what the
+  analysis shows. Up to `n^{1/(k−1)}` survivors can remain, and the final all-to-all round selects the maximum; its
+  cost is within the claimed bound. The referee counts `⌈n^{i/(k−1)}⌉` can exceed `n − 1` for small `n`, so the
+  algorithm caps them.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 3.11 (missing IDs)
+Lemma 3.14 needs `n T'^{log₂ n − 1} + n log₂ n` IDs for the single-send algorithm, whose time is `T' = nT`
+(Lemma 3.12), but Theorems 3.11 and 3.13 drop the `n log₂ n`.
+
+**Impact.** Minor; we prove Theorem 3.11 with `n log₂ n + n^{log₂ n} T^{log₂ n − 1}` IDs (`theorem_3_11`).
+
+### 🛠️ Lemma 3.14 (merging, counting, quantifiers, absorbing)
+The merging step wires the two clusters by independent maps `g`, `h`, so a node can receive two new links and keep
+capacity `2^i − 2`, not the claimed `|D|/2 − 1`; three further steps are imprecise.
+
+**Impact.** Statement true; repaired (`merge`, `level_step`, `absorb`).
+
+**Details.**
+- Merging step: the ports opened by `C` are wired into `C'` by an arbitrary one-to-one map `g`, and those opened
+  by `C'` into `C` by an independent `h`. A node can then receive two new links, which leaves capacity `2^i − 2`,
+  not the claimed `|D|/2 − 1`. Wiring along one perfect matching `C ↔ C'` fixes this.
+- Counting: "`U_i` contains many pairwise disjoint sets" is not preserved by `|U_i'| ≥ |U_i|/T`. The pigeonhole
+  must be applied to a disjoint subfamily.
+- Quantifiers: "every execution prefix in `Exec_{r_i}(I)`" is stronger than what the construction provides. One
+  adversarial execution per set suffices.
+- Absorbing phase: how the first `|C|/2 − 1` new ports are kept inside `C` is left implicit. We track capacity per
+  node. (`merge`, `level_step`, `absorb`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

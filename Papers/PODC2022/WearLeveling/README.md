@@ -13,54 +13,42 @@ from one word of endurance 1 never wears out. It is true for fetch-and-increment
 
 ## Mistakes in the paper
 
-* **Theorem 4.4 is false for general objects.** The proof says that, under sequential access, "each
-  update operation on the implemented object must update at least one base object". This fails for objects
-  whose updates stop changing the state. Counterexample: test-and-set (an update operation) from one word
-  `A[0]`: `CAS(A[0], false, true)`, `Flush(A[0])`, return "lost" iff the CAS failed. In the model of the
-  proof of Theorem 4.3 (wear = write-backs to persistent memory), `A[0]` is written back at most once in any
-  execution, so the refutation holds whatever a worn-out word does (wrong values or no response). With `k = 1` and `T = 1`, the object is strictly linearizable and lock-free in all
-  executions, with any number of TAS operations; Theorem 4.4 promises a failure after `k·T + 1 = 2`
-  updates. This is a false theorem, not a degenerate case: TAS is a standard object and the theorem says
-  "any implemented object". The model cannot be changed to rescue both theorems. If every operation
-  applied to a base object counted towards its endurance (Definition 2.1 applied to the base CAS objects),
-  Theorem 4.3 would fail instead: every FAI of Figure 1 starts with a CAS on `A[0]` (lines 3–5), so `A[0]`
-  receives `T + 1` CASes within `T + 1` sequential FAIs. What we proved instead is the FAI case: every
-  strictly linearizable, obstruction-free FAI implementation from `k` words has a sequential crash-free
-  execution with `k·T + 1` FAIs that writes some word back `T + 1` times. So the counter's `k·T` is optimal,
-  which is the claim of the introduction. (`theorem_4_4_false`, `tas_guarantees`; repaired:
-  `theorem_4_4_fai`)
-* **The wear model changes between the definition and the proof.** Definition 2.1 counts updates
-  *invoked* on an object. For the base objects, the proof of Theorem 4.3 instead counts write-backs to
-  persistent memory, under assumptions (1)–(3) and "a failed CAS does not dirty the line". The
-  formalization uses the proof's model. Under it, Theorems 4.1–4.3 hold and Theorem 4.4 fails (first item).
-* **Typos and slips.**
-  - Proof of Theorem 4.1, crucial claim: `iter = ⌊ℓ/2^k⌋` and `index = ℓ mod 2^k` should be `⌊ℓ/k⌋` and
-    `ℓ mod k` (with `ℓ` counted from 0). The rest of the proof uses the correct values.
-  - Proof of Theorem 4.2: the value of `A[k−1]` is read at line 12, not line 13. The CAS on `A[k−1]` comes
-    `k − 1` (not `k`) iterations later.
-  - Proof of Theorem 4.3: when FAI `k·T + 1` takes effect, `A[0]` is *written back* for the `(T+1)`-st
-    time. `A[0]` is *accessed* (CAS at line 5) by every FAI.
-  - Theorem 4.2 implicitly assumes finitely many threads. Its proof needs a suffix without successful
-    CAS, and with infinitely many threads each could perform one successful CAS and then stop.
-* **Remark, not counted as a mistake: the exact endurance in Theorem 4.3 depends on the failure mode of a worn-out
-  word.** The paper never says how a worn-out word fails; Definition 2.1 only says it loses "safety and liveness".
-  If a worn-out word may stop responding (e.g. the `Flush` that performs its `(T+1)`-st write-back never
-  completes, a non-responsive failure in the sense of Jayanti–Chandra–Toueg [4]), FAI `k·T + 1` never returns and
-  the counter's endurance is exactly `k·T`, as stated. The same reading gives "a hardware FAI followed by a Flush
-  provides endurance `T`". In the safety-only wear model formalized here (a worn-out write-back stores an arbitrary
-  value, the word keeps responding), the exact value is `k·T + 1`. Definition 2.1 says endurance `T` means
-  "correct in all executions with at most `T` updates, *but not in some execution with `T + 1`*". With `k`
-  words of endurance `T`, the `(T+1)`-st write-back of `A[0]` happens only when all `k·T + 1` FAIs have
-  already performed their successful CAS. After that, no thread reads or CASes the memory again: the
-  pending operations only flush and return values already computed. A lost or corrupted write therefore
-  becomes visible only through a crash *and* another FAI. So the counter is correct in **all** executions
-  with `k·T + 1` FAIs, whatever a worn-out word stores. It fails with `k·T + 2`: `k·T + 1` sequential FAIs,
-  a crash, one more FAI. If worn-out words keep their old value, the last FAI returns `k·T` a second time.
-  So in this wear model the exact endurance is `k·T + 1`, because the counter has no read operation. The
-  paper's argument ("`k·T` FAIs can be invoked before any element is updated more than `T` times") is right
-  in every wear model. In this wear model the counter itself also exceeds the bound `k·T` of Theorem 4.4 by one.
-  (`theorem_4_3`, `guarantees_kT_succ`, `not_safeUpTo_kT_add_two`, `hasEndurance_counter`,
-  `not_hasEndurance_kT`)
+### ❌ Theorem 4.4 (endurance at most `k·T` for any implemented object)
+Theorem 4.4 is false for test-and-set: a TAS from one word `A[0]` of endurance 1 (`CAS(A[0], false, true)`,
+`Flush(A[0])`, return "lost" iff the CAS failed) is strictly linearizable and lock-free in all executions, with any
+number of operations (`theorem_4_4_false`, `tas_guarantees`).
+
+**Impact.** Not a headline result, and true for fetch-and-increment: the counter's `k·T` is optimal, which is the
+claim of the introduction (`theorem_4_4_fai`).
+
+**Details.** The proof says that, under sequential access, "each update operation on the implemented object must
+update at least one base object". This fails for objects whose updates stop changing the state. In the TAS, `A[0]`
+is written back at most once in any execution, so with `k = 1` and `T = 1` Theorem 4.4 promises a failure after
+`k·T + 1 = 2` updates that never comes. The refutation holds in the model of the proof of Theorem 4.3 (wear =
+write-backs to persistent memory), whatever a worn-out word does (wrong values or no response). This is a false
+theorem, not a degenerate case: TAS is a standard object and the theorem says "any implemented object".
+
+The wear model changes between the definition and the proof. Definition 2.1 counts updates *invoked* on an
+object. For the base objects, the proof of Theorem 4.3 instead counts write-backs to persistent memory, under
+assumptions (1)–(3) and "a failed CAS does not dirty the line". The formalization uses the proof's model; under it,
+Theorems 4.1–4.3 hold and Theorem 4.4 fails. The model cannot be changed to rescue both theorems. If every
+operation applied to a base object counted towards its endurance (Definition 2.1 applied to the base CAS objects),
+Theorem 4.3 would fail instead: every FAI of Figure 1 starts with a CAS on `A[0]` (lines 3–5), so `A[0]` receives
+`T + 1` CASes within `T + 1` sequential FAIs.
+
+**Repair.** We prove the FAI case: every strictly linearizable, obstruction-free FAI implementation from `k` words
+has a sequential crash-free execution with `k·T + 1` FAIs that writes some word back `T + 1` times
+(`theorem_4_4_fai`).
+
+### Typos and slips
+- Proof of Theorem 4.1, crucial claim: `iter = ⌊ℓ/2^k⌋` and `index = ℓ mod 2^k` should be `⌊ℓ/k⌋` and
+  `ℓ mod k` (with `ℓ` counted from 0). The rest of the proof uses the correct values.
+- Proof of Theorem 4.2: the value of `A[k−1]` is read at line 12, not line 13. The CAS on `A[k−1]` comes
+  `k − 1` (not `k`) iterations later.
+- Proof of Theorem 4.3: when FAI `k·T + 1` takes effect, `A[0]` is *written back* for the `(T+1)`-st
+  time. `A[0]` is *accessed* (CAS at line 5) by every FAI.
+- Theorem 4.2 implicitly assumes finitely many threads. Its proof needs a suffix without successful
+  CAS, and with infinitely many threads each could perform one successful CAS and then stop.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -97,6 +85,24 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 4.4 as stated: **false** (test-and-set) | `theorem_4_4_false`, `tas_guarantees` | `Tas.lean` |
 | Theorem 4.4 as stated: also violated (by one) by the counter itself, in the safety-only wear model | `theorem_4_4_false_counter` | `Optimality.lean` |
 | Theorem 4.4 for FAI (optimality of `k·T`) | `theorem_4_4_fai`, `counter_exceeds` | `Optimality.lean` |
+
+**Remark (not a mistake): the exact endurance in Theorem 4.3 depends on the failure mode of a worn-out word.** The
+paper never says how a worn-out word fails; Definition 2.1 only says it loses "safety and liveness". If a worn-out
+word may stop responding (e.g. the `Flush` that performs its `(T+1)`-st write-back never completes, a non-responsive
+failure in the sense of Jayanti–Chandra–Toueg [4]), FAI `k·T + 1` never returns and the counter's endurance is
+exactly `k·T`, as stated. The same reading gives "a hardware FAI followed by a Flush provides endurance `T`". In the
+safety-only wear model formalized here (a worn-out write-back stores an arbitrary value, the word keeps responding),
+the exact value is `k·T + 1`. Definition 2.1 says endurance `T` means "correct in all executions with at most `T`
+updates, *but not in some execution with `T + 1`*". With `k` words of endurance `T`, the `(T+1)`-st write-back of
+`A[0]` happens only when all `k·T + 1` FAIs have already performed their successful CAS. After that, no thread reads
+or CASes the memory again: the pending operations only flush and return values already computed. A lost or
+corrupted write therefore becomes visible only through a crash *and* another FAI. So the counter is correct in
+**all** executions with `k·T + 1` FAIs, whatever a worn-out word stores. It fails with `k·T + 2`: `k·T + 1`
+sequential FAIs, a crash, one more FAI. If worn-out words keep their old value, the last FAI returns `k·T` a second
+time. So in this wear model the exact endurance is `k·T + 1`, because the counter has no read operation. The
+paper's argument ("`k·T` FAIs can be invoked before any element is updated more than `T` times") is right in every
+wear model. In this wear model the counter itself also exceeds the bound `k·T` of Theorem 4.4 by one.
+(`theorem_4_3`, `guarantees_kT_succ`, `not_safeUpTo_kT_add_two`, `hasEndurance_counter`, `not_hasEndurance_kT`)
 
 **Not formalized.** The `b`-bit version of Theorem 4.1 (truncation of `iter + 1` and of the return value to `b` bits
 under the paper's "no overflow during one FAI" assumption). We use unbounded words. The return value modulo

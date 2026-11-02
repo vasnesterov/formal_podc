@@ -14,67 +14,76 @@ Read literally, both lemmas fail.
 
 ## Mistakes in the paper
 
-* **Lemma 3 is false and Algorithm 4 violates Validity.** In step (8) (Query-1), a node `u` without a
-  commit-proof sends `query₁` to the smallest node `v` that "has not accused `L_i`". An honest `v` that
-  also lacks the commit-proof accuses `L_i` *in the same round*, so `u` cannot know this. `v` has
-  nothing to send in Respond-1, and in Query-2 `u` accuses the honest `v`. Together with the Byzantine
-  nodes' accusations this produces a corrupt-proof `thsig(accuse, v)` of an honest node. From then on,
-  every honest node skips every epoch led by `v`, in every slot. The proof of Lemma 3 fails exactly at
-  this point: "if `L_i` does not have a commit-proof … then `L_i` must have also accused the epoch's
-  leader, and `u` would not have sent `query₁` to `L_i`".
+### 🚨 Algorithm 4 (Validity) and Lemma 3 (an honest leader's epoch succeeds)
+In step (8) (Query-1) a node may query an honest helper `v` that accuses the leader in the same round, then accuse
+`v` in Query-2, so an honest node gets a corrupt-proof and all its epochs are skipped: with `n = 6`, `f = 2` the
+honest sender's value is never committed (`not_validity`) and an honest leader's epoch fails (`not_lemma3`).
 
-  Concrete run: `n = 6`, `f = 2`, `ε = 1/6`, `G_ε = K₆` (a valid `(n, 2ε, 1−2ε)`-expander). Nodes 5 and 6
-  are Byzantine; node 5 sends slot 1 and node 1 sends slot 2 (paper numbering). In epoch 0 of slot 1 the
-  Byzantine leader runs the protocol correctly but sends the commit-proof only to node 4. Nodes 1, 2, 3
-  accuse the leader; three accusations are too few for a corrupt-proof. Nodes 2 and 3 query node 1, and
-  node 1 queries node 2; none of them has the commit-proof. In Query-2, nodes 2, 3, 5, 6 accuse node 1,
-  which gives the `n − f = 4` accusations of a corrupt-proof. Node 4 then answers the `query₂`s and slot 1
-  completes. In slot 2 the honest sender node 1 broadcasts `true`, and every honest node has committed
-  slot 1, so sequentiality allows the invocation. Epochs 0 and 1 of slot 2 are led by node 1 and are
-  skipped by every honest node. The honest leader of epoch 2 (node 2) proposes its arbitrary value
-  `false`, which everybody commits. By consistency, no honest node ever commits `true` in slot 2, so
-  **Validity fails** (`not_validity`). In the same run, slot 2's epoch 1 has an honest leader and nobody
-  commits in it, so **Lemma 3 fails** (`not_lemma3`).
+**Impact.** Sinks the honest-majority protocol, which the abstract presents as achieving amortized linear
+communication: it is not a correct multi-shot Byzantine broadcast, and fixing it needs a protocol change, not a
+local edit. Consistency (Lemmas 1, 2, Theorem 1) is correct and proved.
 
-  The skip condition ("runs the following steps if it has neither committed in slot `k`, nor received
-  `thsig(accuse, L_i)`") does not say when it is evaluated, so we checked three readings. Validity fails
-  when "committed" is checked at the start of the epoch (with the corrupt-proof checked at the start of
-  the epoch or at every step). Read literally, both conditions are checked at every step, so a node that
-  holds a commit-proof has already committed and never answers queries. Rounds 8–11 then cannot
-  disseminate anything, and Lemma 3 fails in the same run, already in slot 1. Fixing the bug needs a
-  protocol change, not a local edit. A second, independent mismatch: Respond-1 condition 2 ("`u` is the
-  smallest node `v` has not accused") ignores the Query-1 filter "has not accused `L_i`". A helper chosen
-  past a smaller node that had accused `L_i` therefore refuses to answer and gets accused (not formalized).
-  The complexity analysis (§4.2) and Termination are claims about this broken protocol. We did not
-  formalize them.
+**Details.** In step (8), a node `u` without a commit-proof sends `query₁` to the smallest node `v` that "has not
+accused `L_i`". An honest `v` that also lacks the commit-proof accuses `L_i` *in the same round*, so `u` cannot know
+this. `v` has nothing to send in Respond-1, and in Query-2 `u` accuses the honest `v`. Together with the Byzantine
+nodes' accusations this produces a corrupt-proof `thsig(accuse, v)` of an honest node. From then on, every honest
+node skips every epoch led by `v`, in every slot. The proof of Lemma 3 fails exactly at this point: "if `L_i` does
+not have a commit-proof … then `L_i` must have also accused the epoch's leader, and `u` would not have sent
+`query₁` to `L_i`".
 
-* **Lemmas 4 and 5 (Algorithm 5.2) need a reading the pseudocode does not give.** Algorithm 5.2 invokes
-  `TrustCast(G_u, n, k)`, whose rules run in rounds `1..n` of the slot and only consider proposals of
-  slot `k`. The trust graph, however, is shared across slots. Read literally, equivocation evidence that
-  one honest node receives in round `n` reaches the others when it is no longer processed, and the honest
-  trust graphs diverge forever. Concrete run: `n = 3`, `f = 1`, Byzantine sender in slots 1 and 2,
-  honest sender in slot 3. In slot 1 one honest node commits `⊥` and the other commits a value, so
-  Lemma 5 fails (`literal_consistency_fails`). In slot 2 an honest node accuses an honest node, so
-  TrustCast's integrity fails (`literal_integrity_fails`). In slot 3 an honest node commits `⊥` although
-  the sender is honest, so Lemma 4 fails (`literal_validity_fails`). Running graph maintenance in every
-  round is not enough: equivocation evidence must also persist across slots
-  (`slotLocal_validity_fails`). The proof of Lemma 5 uses transferability in the Dolev–Strong rounds,
-  i.e. graph maintenance after round `n`. With maintenance in every round and evidence of every slot,
-  both lemmas hold for every slot of the multi-shot execution (`validity`, `consistency`). We count this
-  as a statement issue whose intent is recoverable from the proof (⚠️).
+Concrete run: `n = 6`, `f = 2`, `ε = 1/6`, `G_ε = K₆` (a valid `(n, 2ε, 1−2ε)`-expander). Nodes 5 and 6 are
+Byzantine; node 5 sends slot 1 and node 1 sends slot 2 (paper numbering). In epoch 0 of slot 1 the Byzantine leader
+runs the protocol correctly but sends the commit-proof only to node 4. Nodes 1, 2, 3 accuse the leader; three
+accusations are too few for a corrupt-proof. Nodes 2 and 3 query node 1, and node 1 queries node 2; none of them
+has the commit-proof. In Query-2, nodes 2, 3, 5, 6 accuse node 1, which gives the `n − f = 4` accusations of a
+corrupt-proof. Node 4 then answers the `query₂`s and slot 1 completes. In slot 2 the honest sender node 1
+broadcasts `true`, and every honest node has committed slot 1, so sequentiality allows the invocation. Epochs 0 and
+1 of slot 2 are led by node 1 and are skipped by every honest node. The honest leader of epoch 2 (node 2) proposes
+its arbitrary value `false`, which everybody commits. By consistency, no honest node ever commits `true` in slot 2,
+so **Validity fails** (`not_validity`). In the same run, slot 2's epoch 1 has an honest leader and nobody commits in
+it, so **Lemma 3 fails** (`not_lemma3`).
 
-* **Imprecisions.**
-  * The definition of equivocation requires the two proposals to carry the same certificate `C`. Taken
-    literally, a leader escapes detection by attaching different certificates. We use "two proposals
-    with different values".
-  * The proof of Lemma 2 refers to a "Leader setup" round; this is Collect.
-  * The TrustCast properties are stated only for a complete initial graph, but they are used for the
-    shared multi-slot graph. We prove them there.
-  * The expander definition ("for any set `S` of `αn` vertices, the number of neighbours of `S` is more
-    than `βn`") does not say whether `S` counts among its neighbours. It must: no graph has more than
-    `n − |S| = (1 − 2ε)n` neighbours outside a set of `2εn` vertices, so the exclusive reading admits no
-    `(n, 2ε, 1 − 2ε)`-expander at all. We assume only the weaker form `|S ∪ N(S)| > βn`. `K₆` in the
-    counterexample satisfies even the stronger form `|⋃_{v∈S} N(v)| > βn`.
+The skip condition ("runs the following steps if it has neither committed in slot `k`, nor received
+`thsig(accuse, L_i)`") does not say when it is evaluated, so we checked three readings. Validity fails when
+"committed" is checked at the start of the epoch (with the corrupt-proof checked at the start of the epoch or at
+every step). Read literally, both conditions are checked at every step, so a node that holds a commit-proof has
+already committed and never answers queries. Rounds 8–11 then cannot disseminate anything, and Lemma 3 fails in the
+same run, already in slot 1.
+
+A second, independent mismatch: Respond-1 condition 2 ("`u` is the smallest node `v` has not accused") ignores the
+Query-1 filter "has not accused `L_i`". A helper chosen past a smaller node that had accused `L_i` therefore refuses
+to answer and gets accused (not formalized). The complexity analysis (§4.2) and Termination are claims about this
+broken protocol. We did not formalize them.
+
+### ⚠️ Lemmas 4 and 5 (Algorithm 5.2, how TrustCast is invoked)
+Read literally, `TrustCast(G_u, n, k)` maintains the shared trust graph only in rounds `1..n` of slot `k`, and then
+with `n = 3`, `f = 1` Lemma 5 fails in slot 1 and Lemma 4 in slot 3 (`literal_consistency_fails`,
+`literal_validity_fails`).
+
+**Impact.** Both lemmas hold for every slot of the multi-shot execution with maintenance in every round and
+evidence of every slot (`validity`, `consistency`). The intent is recoverable from the proof of Lemma 5, so we count
+this as a statement issue with evident intent (⚠️).
+
+**Details.** Algorithm 5.2 invokes `TrustCast(G_u, n, k)`, whose rules run in rounds `1..n` of the slot and only
+consider proposals of slot `k`. The trust graph, however, is shared across slots. Read literally, equivocation
+evidence that one honest node receives in round `n` reaches the others when it is no longer processed, and the
+honest trust graphs diverge forever. Concrete run: `n = 3`, `f = 1`, Byzantine sender in slots 1 and 2, honest
+sender in slot 3. In slot 1 one honest node commits `⊥` and the other commits a value, so Lemma 5 fails
+(`literal_consistency_fails`). In slot 2 an honest node accuses an honest node, so TrustCast's integrity fails
+(`literal_integrity_fails`). In slot 3 an honest node commits `⊥` although the sender is honest, so Lemma 4 fails
+(`literal_validity_fails`). Running graph maintenance in every round is not enough: equivocation evidence must also
+persist across slots (`slotLocal_validity_fails`). The proof of Lemma 5 uses transferability in the Dolev–Strong
+rounds, i.e. graph maintenance after round `n`.
+
+### Typos and slips
+- The definition of equivocation requires the two proposals to carry the same certificate `C`. Taken literally, a
+  leader escapes detection by attaching different certificates. We use "two proposals with different values".
+- The proof of Lemma 2 refers to a "Leader setup" round; this is Collect.
+- The expander definition ("for any set `S` of `αn` vertices, the number of neighbours of `S` is more than `βn`")
+  does not say whether `S` counts among its neighbours. It must: no graph has more than `n − |S| = (1 − 2ε)n`
+  neighbours outside a set of `2εn` vertices, so the exclusive reading admits no `(n, 2ε, 1 − 2ε)`-expander at
+  all. We assume only the weaker form `|S ∪ N(S)| > βn`. `K₆` in the counterexample satisfies even the stronger
+  form `|⋃_{v∈S} N(v)| > βn`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -120,6 +129,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | TrustCast transferability / termination | `Setup.transferability`, `Setup.termination` | `DishonestMajorityConsistency.lean` |
 | Lemma 5 (consistency of Alg. 5.2) | `DishonestMajority.Setup.consistency` | `DishonestMajorityConsistency.lean` |
 | Lemmas 4/5 fail under the literal reading | `literal_validity_fails`, `literal_consistency_fails`, `literal_integrity_fails`, `slotLocal_validity_fails` | `DishonestMajorityLiteral.lean` |
+
+The TrustCast properties are stated in the paper only for a complete initial graph, but they are used for the
+shared multi-slot graph. We prove them there.
 
 **Not formalized.** The communication-complexity analyses (§4.2, §5.4; amortized `O(κn)` and `O(κn²)`).
 Termination of Algorithm 4. Appendix A (HotStuff).
