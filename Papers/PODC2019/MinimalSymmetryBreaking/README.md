@@ -13,58 +13,71 @@ Claim 16, the Ω(log\* n) lower bound for weak 2-colouring (Theorems 6/13), and 
 
 ## Mistakes in the paper
 
-1. **The algorithm in the proof of Lemma 3 (Section 8.1) does not produce a valid P\* labelling.** Lemma 3 is the
-   upper bound behind Theorem 4 and the homogeneous LCLs. The paper's case analysis for a node v on a cycle C with
-   irr(v) = C only checks that pointers do not backtrack. It never checks d(v) = d(p(v)) when p(v) chose a
-   *low-degree* irregularity.
-   - Counterexample (Δ = 4, r = 2): a 4-cycle a, b, c, d of degree-4 nodes with IDs a < b < c < d, a leaf x hanging
-     on b, and deep degree-4 trees elsewhere.
-     - Node a sees C and x at the same distance 2.
-     - b's closest irregularity is x, at distance 1, so d(b) = deg x = 1.
-     - If a's tie-break picks C, then a outputs d(a) = 0 and points to b (the orientation goes from the smallest ID
-       a toward its smaller neighbour b). Condition (3) fails at a.
-     - If the tie-break picks x, then node d points to a with d(d) = 0 ≠ d(a) = 1.
-   - The alternative reading "cycles take precedence whenever one is within r" fails as well. A degree-Δ node whose
-     shortest path to the cycle starts at a degree-< Δ neighbour w points to w with d = 0, while w must output
-     (⊥, deg w).
-   - The claim "each node v on C will have a cycle as their closest irregularity" is false.
-   - The statement of Lemma 3 is nevertheless true. We prove it (and Lemma 17) with a repaired algorithm:
-     - A node is in *low mode* if its distance to a degree-< Δ node is at most its distance to the set Z of nodes on
-       short degree-Δ cycles. Low-mode nodes point towards the nearest low-degree node and copy its degree.
-     - Otherwise the node is in *cycle mode*: d = 0, pointers lead towards Z, and inside Z each node follows the
-       least (in a fixed global order) short cycle through it.
-     - Both modes are closed under following pointers. Non-backtracking inside Z follows because both endpoints of
-       an edge compare the same candidate cycles.
+No mistakes in the statements.
 
-   (`lemma3_repaired`, `lemma17`, `theorem4`; analysis scripts in the work notes.)
+### Typos and slips
+- In Claim 11 the recurrence for p̂ is written with ĉ_t; it should be ĉ_{t−1}.
+- In the proof of Lemma 2, "u must be *the* closest node of different colour to w" is imprecise under ties. Only the
+  distance matters.
+- Lemma 3's tie-break "cycle with the smallest maximum identifier" is ambiguous, because two cycles may share their
+  maximum-ID node.
+- Section 3.2 defines the distance to a cycle C using ℓ(C) ≈ |C|/2. Section 8.1 uses "the length of the cycle"
+  instead.
 
-2. **Claim 10 (proof of Lemma 9): failure events at distance 2t+1 are not independent.** The proof picks nodes at
-   pairwise distance ≥ 2t+1 and treats their failure events as independent. The failure of a node depends on the
-   outputs of its neighbours, so on its (t+1)-ball. Two such balls intersect when the distance is 2t+1 or 2t+2.
-   - We use disjoint (t+1)-balls (distance ≥ 2t+3), which changes the counting. The exact bound n^{1/(3(2t+1))} of
-     Claim 10/Lemma 9 is not re-derived. Lemma 9 and Claim 10 are not refuted, and Theorem 13 is unaffected.
-   - The step Pr[X | Y] ≤ Pr[X' | Y'] also mixes conditionings on different events. We bypass it: we choose
-     identifiers that are injective on the central ball by averaging, and extend them to a bijection.
+## Proof gaps (statements true)
 
-   (`succProb_le`, `theorem_6`.)
+### 🛠️ Lemma 3 (Section 8.1, the P\* algorithm)
+The algorithm in the proof of Lemma 3 does not produce a valid P\* labelling: on a 4-cycle of degree-4 nodes with a
+leaf hanging on one of them, either tie-break breaks the labelling (condition (3) fails at a, or d(d) ≠ d(a)).
 
-3. **Circular choice of the threshold in Lemmas 7/8/14/15.** The proofs set f = p'/(5c), where p' is the failure
-   probability of the algorithm built *with threshold f*. We set f from the target bound instead and argue by
-   contradiction. This needs p > 0, which holds on the infinite tree because of the 0-round bound
-   (`lemma_14`, `lemma_15`, `NodeAlg.failProb_pos`). The lower-bound form used by Claim 11 needs no fixed point
-   (`nodeLB_succ_of_edgeLB`, `edgeLB_of_nodeLB`).
+**Impact.** Lemma 3, the upper bound behind Theorem 4 and the homogeneous LCLs, is nevertheless true; we prove it
+(and Lemma 17) with a repaired algorithm (`lemma3_repaired`, `lemma17`, `theorem4`).
 
-4. Minor:
-   - Claims 12 and 16 and the prose of Section 6 ("at least ½ log\* n − 4 rounds") give explicit constants. Their
-     proofs say "for large enough n", and we did not check these exact constants. We prove the Ω(log\* n) bound with
-     t ≤ (log\* n − 2k − 15)/2.
-   - In Claim 11 the recurrence for p̂ is written with ĉ_t; it should be ĉ_{t−1}.
-   - In the proof of Lemma 2, "u must be *the* closest node of different colour to w" is imprecise under ties. Only
-     the distance matters.
-   - Lemma 3's tie-break "cycle with the smallest maximum identifier" is ambiguous, because two cycles may share
-     their maximum-ID node.
-   - Section 3.2 defines the distance to a cycle C using ℓ(C) ≈ |C|/2. Section 8.1 uses "the length of the cycle"
-     instead.
+**Details.** The paper's case analysis for a node v on a cycle C with irr(v) = C only checks that pointers do not
+backtrack. It never checks d(v) = d(p(v)) when p(v) chose a *low-degree* irregularity.
+- Counterexample (Δ = 4, r = 2): a 4-cycle a, b, c, d of degree-4 nodes with IDs a < b < c < d, a leaf x hanging on
+  b, and deep degree-4 trees elsewhere.
+  - Node a sees C and x at the same distance 2.
+  - b's closest irregularity is x, at distance 1, so d(b) = deg x = 1.
+  - If a's tie-break picks C, then a outputs d(a) = 0 and points to b (the orientation goes from the smallest ID a
+    toward its smaller neighbour b). Condition (3) fails at a.
+  - If the tie-break picks x, then node d points to a with d(d) = 0 ≠ d(a) = 1.
+- The alternative reading "cycles take precedence whenever one is within r" fails as well. A degree-Δ node whose
+  shortest path to the cycle starts at a degree-< Δ neighbour w points to w with d = 0, while w must output
+  (⊥, deg w).
+- The claim "each node v on C will have a cycle as their closest irregularity" is false.
+
+**Repair.** The repaired algorithm:
+- A node is in *low mode* if its distance to a degree-< Δ node is at most its distance to the set Z of nodes on short
+  degree-Δ cycles. Low-mode nodes point towards the nearest low-degree node and copy its degree.
+- Otherwise the node is in *cycle mode*: d = 0, pointers lead towards Z, and inside Z each node follows the least (in
+  a fixed global order) short cycle through it.
+- Both modes are closed under following pointers. Non-backtracking inside Z follows because both endpoints of an edge
+  compare the same candidate cycles.
+
+(`lemma3_repaired`, `lemma17`, `theorem4`; analysis scripts in the work notes.)
+
+### 🛠️ Claim 10 (proof of Lemma 9, independence)
+The proof treats failure events of nodes at pairwise distance ≥ 2t+1 as independent, but a node's failure depends on
+its (t+1)-ball, and two such balls intersect when the distance is 2t+1 or 2t+2.
+
+**Impact.** Lemma 9 and Claim 10 are not refuted, and Theorem 13 is unaffected; the exact bound n^{1/(3(2t+1))} of
+Claim 10/Lemma 9 is not re-derived (`succProb_le`, `theorem_6`).
+
+**Details.** The step Pr[X | Y] ≤ Pr[X' | Y'] also mixes conditionings on different events.
+
+**Repair.** We use disjoint (t+1)-balls (distance ≥ 2t+3), which changes the counting. We bypass the conditioning
+step: we choose identifiers that are injective on the central ball by averaging, and extend them to a bijection.
+(`succProb_le`, `theorem_6`.)
+
+### 🛠️ Lemmas 7/8/14/15 (circular choice of the threshold)
+The proofs set f = p'/(5c), where p' is the failure probability of the algorithm built *with threshold f*.
+
+**Impact.** Statements true; repaired (`lemma_14`, `lemma_15`).
+
+**Repair.** We set f from the target bound instead and argue by contradiction. This needs p > 0, which holds on the
+infinite tree because of the 0-round bound (`lemma_14`, `lemma_15`, `NodeAlg.failProb_pos`). The lower-bound form
+used by Claim 11 needs no fixed point (`nodeLB_succ_of_edgeLB`, `edgeLB_of_nodeLB`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -121,6 +134,10 @@ Infrastructure:
 - Theorem 5 and Table 1 (the classification of homogeneous LCLs). They rest on external gap theorems (Appendix A.1).
 - The minimality argument of Section 8.3.
 - The exact constants of Claim 12, Lemma 9 and the "½ log\* n − 4" claim.
+
+Claims 12 and 16 and the prose of Section 6 ("at least ½ log\* n − 4 rounds") give explicit constants. Their proofs
+say "for large enough n", and we did not check these exact constants. We prove the Ω(log\* n) bound with
+t ≤ (log\* n − 2k − 15)/2.
 
 **Trust.** No `sorry`. All listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 - Non-vacuity: the instances of Theorem 6 exist for every n (`theorem_6_instances`), the speedup bounds are

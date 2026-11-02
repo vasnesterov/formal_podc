@@ -15,34 +15,64 @@ claim about decision trees that is false. We repair the proof of Theorem 4.1 wit
 
 ## Mistakes in the paper
 
-* **Proof of Lemma 4.2 (same root of `T₁` and `T₂`): the key step is false.** The proof picks "a value `z` whose
-  root-to-leaf path in `T₂` does not include `r₁`. Such a value must exist since `r₁` is not the root of `T₂`."
-  This does not follow. In a complete decision tree of depth 2 whose root reads register 1 and whose two children
-  both read register 0, every root-to-leaf path reads register 0, which is not the root (`lemma_4_2_gap`). The
-  argument after this step is correct; it shows only "if some path of `T₂` avoids the root `ρ` of `T₁`,
-  contradiction" (`lemma_4_2_core`). Lemma 4.2 itself is not false: like every step of a proof by
-  contradiction, it is stated under the assumption that the simulation `A` exists, which Theorem 4.1 refutes,
-  so once Theorem 4.1 is proved it holds trivially (`lemma_4_2`). This is not a defect of the reductio; the
-  point is that the paper gives no valid derivation of it, and we found none from the facts available at that
-  point. The gap example is about the inference inside the proof (abstract decision trees with the properties of
-  Lemmas 3.3–3.4), not a counterexample to a stated lemma; it cannot be realized by a simulation satisfying the
-  hypotheses, since none exists. **Repair.** The main argument of Theorem 4.1 (writes `W₀(a) W₁(z) W₂(b)`) does not
-  need "same root". It only needs that `b`'s path in `T₂` reads `ρ` (with value 0, while `R₂` sees `ρ = 1`). So we
-  split: if some path of `T₂` avoids `ρ`, the Lemma 4.2 argument gives a contradiction (`Sec4.caseA`); otherwise
-  every path of `T₂` reads `ρ`, and the main argument goes through with `ρ` read at any depth instead of at the
-  root (`Sec4.caseB`). (`theorem_4_1`, `setting_false`)
-* **Proof of Theorem 4.1, main part: two steps need care (statement unaffected).** (a) "The first write of 1 to `x`
-  between the beginning of `W₁` and the end of `W₂`" may lie inside `W₁`. Then `R₁` returns `b` while only `a` and
-  `z` have been written, which already violates regularity. We treat this as a separate case. (b) In Case 2,
-  "`R₁` cannot return `b`, since `R₁` read 0 in `x`" presumes that `R₁` reads `x`. The correct argument: `R₁` must
-  return `b` by regularity, so it follows `b`'s path, which reads `x` and needs `x = 1`; but `x = 0` at that
-  time. The cases "first write of 1 to `x` before / after the first write of 0 to `r`" are exhaustive because one
-  step writes one register.
-* **Small gaps in Section 3 (statements unaffected).** (a) Lemma 3.3 bounds the depth of *every* path of `T_i` by
-  the step bound. But the bound only constrains paths that occur in executions, and the code may do anything on
-  other branches. The correct argument counts the `k` paths realized by the executions `σ_v`: they form a
-  prefix-free family of binary strings of length `≤ log₂ k`, hence are exactly all strings of length `log₂ k`.
-  (b) Theorem 3.2 counts only *reads* of the simulated read, so the read may also write. The last step ("`WP`
+No mistakes in the statements.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 4.2 (same root of `T₁` and `T₂`), used by Theorem 4.1
+The proof's key step "a value `z` whose root-to-leaf path in `T₂` does not include `r₁` must exist since `r₁` is
+not the root of `T₂`" is false for decision trees (`lemma_4_2_gap`).
+
+**Impact.** Lemma 4.2 and Theorem 4.1 are true; we repair the proof of Theorem 4.1 with a case split
+(`theorem_4_1`, `setting_false`).
+
+**Details.** The proof picks "a value `z` whose root-to-leaf path in `T₂` does not include `r₁`. Such a value must
+exist since `r₁` is not the root of `T₂`." This does not follow. In a complete decision tree of depth 2 whose root
+reads register 1 and whose two children both read register 0, every root-to-leaf path reads register 0, which is
+not the root (`lemma_4_2_gap`). The argument after this step is correct; it shows only "if some path of `T₂`
+avoids the root `ρ` of `T₁`, contradiction" (`lemma_4_2_core`).
+
+Lemma 4.2 itself is not false: like every step of a proof by contradiction, it is stated under the assumption that
+the simulation `A` exists, which Theorem 4.1 refutes, so once Theorem 4.1 is proved it holds trivially
+(`lemma_4_2`). This is not a defect of the reductio; the point is that the paper gives no valid derivation of it,
+and we found none from the facts available at that point. The gap example is about the inference inside the proof
+(abstract decision trees with the properties of Lemmas 3.3–3.4), not a counterexample to a stated lemma; it cannot
+be realized by a simulation satisfying the hypotheses, since none exists.
+
+**Repair.** The main argument of Theorem 4.1 (writes `W₀(a) W₁(z) W₂(b)`) does not need "same root". It only needs
+that `b`'s path in `T₂` reads `ρ` (with value 0, while `R₂` sees `ρ = 1`). So we split: if some path of `T₂` avoids
+`ρ`, the Lemma 4.2 argument gives a contradiction (`Sec4.caseA`); otherwise every path of `T₂` reads `ρ`, and the
+main argument goes through with `ρ` read at any depth instead of at the root (`Sec4.caseB`). (`theorem_4_1`,
+`setting_false`)
+
+### 🛠️ Theorem 4.1 (main part of the proof)
+Two steps of the main argument need care: the first write of 1 to `x` may lie inside `W₁`, and Case 2 presumes
+that `R₁` reads `x`.
+
+**Impact.** Statement unaffected; both steps are fixed in the formal proof.
+
+**Details.**
+- (a) "The first write of 1 to `x` between the beginning of `W₁` and the end of `W₂`" may lie inside `W₁`. Then
+  `R₁` returns `b` while only `a` and `z` have been written, which already violates regularity. We treat this as
+  a separate case.
+- (b) In Case 2, "`R₁` cannot return `b`, since `R₁` read 0 in `x`" presumes that `R₁` reads `x`. The correct
+  argument: `R₁` must return `b` by regularity, so it follows `b`'s path, which reads `x` and needs `x = 1`; but
+  `x = 0` at that time.
+- The cases "first write of 1 to `x` before / after the first write of 0 to `r`" are exhaustive because one step
+  writes one register.
+
+### 🛠️ Lemma 3.3 and Theorem 3.2 (small gaps in Section 3)
+Lemma 3.3 bounds the depth of every path of `T_i`, although the step bound only constrains paths that occur in
+executions, and the last step of Theorem 3.2 forgets that the reader might write a register itself.
+
+**Impact.** Statements unaffected; routine fixes, with a stronger form of Lemma 3.4.
+
+**Details.**
+- (a) Lemma 3.3 bounds the depth of *every* path of `T_i` by the step bound. But the bound only constrains paths
+  that occur in executions, and the code may do anything on other branches. The correct argument counts the `k`
+  paths realized by the executions `σ_v`: they form a prefix-free family of binary strings of length `≤ log₂ k`,
+  hence are exactly all strings of length `log₂ k`.
+- (b) Theorem 3.2 counts only *reads* of the simulated read, so the read may also write. The last step ("`WP`
   writes 1 to each of the `log₂ k` registers read") forgets that the reader might have written such a register
   itself. It cannot: the argument of Lemma 3.4 shows that every read accesses a register for the first time, so
   it returns the value left by the write. We prove this stronger form of Lemma 3.4.

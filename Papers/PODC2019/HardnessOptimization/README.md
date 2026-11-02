@@ -15,51 +15,83 @@ Figure 2), and the max-cut proof only works for `k ≥ 128`.
 
 ## Mistakes in the paper
 
-* **Lemma 2.1 (MDS): a false intermediate claim, statement true.** In the case "two row vertices in `D`",
-  the proof claims that `D` contains exactly one of every pair `f^h_S, t^h_S`, arguing "if `f_A ∈ D` then
-  `f_B ∈ D` to dominate `u_A`" and overlooking `u_A ∈ D`. Counterexample for `k = 2`: with
-  `x = y =` "column `p` all ones", `D = {a^p_2, b^p_2, u⁰_{A₁}, u⁰_{B₁}, t⁰_{A₂}, t⁰_{B₂}}` dominates
-  `G_{x,y}`, has size `4 log k + 2`, and its first-layer cycle is covered by `{u_A, u_B}`. The lemma itself is
-  true. We reprove it: every 6-cycle holds exactly two vertices of `D`, `D` has exactly one row per side,
-  and the nine possible two-vertex patterns of a cycle are analysed by `decide`.
-  (`paper_intermediate_claim_false`, `lemma_2_1`)
-* **Lemma 2.1: a counting step does not follow (proof gap).** In the case "`4 log k + 1` gadget vertices,
-  one row vertex in `A₁`", the conclusion that `B₁` or `B₂` gets exactly `log k` gadget vertices of `D` is
-  not implied by the counts. It needs the extra fact that the rows of `A₁` outside `D` force `log k` gadget
-  vertices on `A₁`.
-* **Claim 2.8 (Steiner tree), `⇐` direction (proof gap; false only for `k = 1`).** The proof joins the two
-  copy-cliques through a crossing edge, assuming that an *arbitrary* minimum dominating set contains
-  `f⁰_{A₁}, f⁰_{B₁}` or `t⁰_{A₁}, t⁰_{B₁}`. The counterexample above refutes this. Using the canonical
-  dominating set of the intersecting index repairs the proof. For `k = 1` there is no crossing edge and the
-  claim is false. (`claim_2_8`, for `k ≥ 2`)
-* **Hamiltonian path construction (Section 2.2.1): edges used by the proof are missing from the text
-  (under-specified definition).** The proof of Claim 2.1 goes "from `r_s` into `ℓ^{s,k−1}_{q'}`", and Figure 2
-  draws these arcs, but the textual construction defines no arcs out of `r_c`. Taken literally, `r_0` and
-  `end` both have out-degree 0, so no input has a Hamiltonian path. With the arcs `r_c → ℓ^{c,k−1}_q` added,
-  Claims 2.1 and 2.2 hold. Our proof of Claim 2.2 replaces Claims 2.3–2.5, which have gaps: Claim 2.4
-  assumes `g_c` is visited before `r_c`, and Claim 2.5 uses an unproved "rows before `s¹₁` are entered from
-  launch vertices". The partition `V_A/V_B` and `E_cut` are not given; we choose one with
-  `|E_cut| ≤ 24 log k + 1`. (`paperArc_not_hamPath`, `hamPath_iff`)
-* **Claim 2.7 omits "spanning" (false as stated, typo-level).** `K₄` plus two pendant vertices has a
-  2-edge-connected subgraph with `n = 6` edges but no Hamiltonian cycle. The proof assumes a spanning
-  subgraph. (Not formalized.)
-* **Claim 2.9 (max-cut): the proof needs `k ≥ 128` (proof gap).** It bounds the total weight of the light
-  edges, exactly `16k³ log k − 4k³ + 2k² + |x| + |y|`, by `k⁴`. This bound fails for `k ≤ 64`. Claim 2.9 and
-  Lemma 2.4 still hold for every `k ≥ 2`. We prove them with a direct counting inequality valid for every
-  cut instead of the exchange arguments of Claims 2.9–2.12. (`claim_2_9`, `lemma_2_4`)
-* **The MDS family contains a disconnected graph (under-specified model, harmless).** `G_{0,0}` is
-  disconnected, while CONGEST networks are normally connected. All other `G_{x,y}` are connected, and the
-  fooling-set argument never uses `(0,0)`. So the lower bound holds even for algorithms that only work on
-  connected graphs. (`mdsGraph_zero_not_connected`, `theorem_2_1_connected`)
-* **Minor slips.**
-  * Definition 1.1 requires "`P` iff `DISJ = TRUE`"; all constructions give "`P` iff `DISJ = FALSE`".
-  * In the max-cut construction `|E_cut| = 4 log k + 1`, not only the T/F edges: `C̄_A – C_B` also crosses.
-  * "Three crossing edges" should be two (Claim 2.8).
-  * `i ∈ [n]` should be `[k]` (bin); `t^j_S` in `bin̄`.
-  * `b^{j_i}_z` should be `b^{j_z}_z`, plus other index typos in Section 2.4.1.
-  * In Lemma 2.3, `E'` should only contain pairs `(u, w) ∈ E`.
-  * The step "`T(n) = O(n²)` hence `2T(3n) = O(T(n))`" in Lemmas 2.2–2.3 is not a valid inference. The
-    lower bound transfers directly anyway. (Not formalized.)
+### ⚠️ Section 2.2.1 (Hamiltonian path construction: missing arcs)
+The textual construction defines no arcs out of `r_c`, so taken literally `r_0` and `end` both have out-degree 0
+and no input has a Hamiltonian path (`paperArc_not_hamPath`).
+
+**Impact.** An under-specified definition with evident intent: the proof of Claim 2.1 goes "from `r_s` into
+`ℓ^{s,k−1}_{q'}`", and Figure 2 draws these arcs. With the arcs `r_c → ℓ^{c,k−1}_q` added, Claims 2.1 and 2.2 hold
+(`hamPath_iff`).
+
+**Details.** The partition `V_A/V_B` and `E_cut` are not given; we choose one with `|E_cut| ≤ 24 log k + 1`.
+
+### ⚠️ Claim 2.7 (2-edge-connected subgraph with `n` edges)
+Claim 2.7 omits "spanning": `K₄` plus two pendant vertices has a 2-edge-connected subgraph with `n = 6` edges but no
+Hamiltonian cycle.
+
+**Impact.** Typo-level: the proof assumes a spanning subgraph, and the claim is true for spanning subgraphs.
+(Not formalized.)
+
+### ⚠️ Claim 2.8 for `k = 1` (Steiner tree)
+For `k = 1` there is no crossing edge, so the Steiner-tree graph is disconnected and Claim 2.8 is false.
+
+**Impact.** Degenerate case; we prove Claim 2.8 for `k ≥ 2` (`claim_2_8`).
+
+### Typos and slips
+- Definition 1.1 requires "`P` iff `DISJ = TRUE`"; all constructions give "`P` iff `DISJ = FALSE`".
+- In the max-cut construction `|E_cut| = 4 log k + 1`, not only the T/F edges: `C̄_A – C_B` also crosses.
+- "Three crossing edges" should be two (Claim 2.8).
+- `i ∈ [n]` should be `[k]` (bin); `t^j_S` in `bin̄`.
+- `b^{j_i}_z` should be `b^{j_z}_z`, plus other index typos in Section 2.4.1.
+- In Lemma 2.3, `E'` should only contain pairs `(u, w) ∈ E`.
+- The step "`T(n) = O(n²)` hence `2T(3n) = O(T(n))`" in Lemmas 2.2–2.3 is not a valid inference. The lower bound
+  transfers directly anyway. (Not formalized.)
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 2.1 (MDS), case "two row vertices in `D`"
+The proof claims that `D` contains exactly one of every pair `f^h_S, t^h_S`, which is false
+(`paper_intermediate_claim_false`).
+
+**Impact.** Statement true; reproved by a different case analysis (`lemma_2_1`).
+
+**Details.** The proof argues "if `f_A ∈ D` then `f_B ∈ D` to dominate `u_A`", overlooking `u_A ∈ D`.
+Counterexample for `k = 2`: with `x = y =` "column `p` all ones",
+`D = {a^p_2, b^p_2, u⁰_{A₁}, u⁰_{B₁}, t⁰_{A₂}, t⁰_{B₂}}` dominates `G_{x,y}`, has size `4 log k + 2`, and its
+first-layer cycle is covered by `{u_A, u_B}`.
+
+**Repair.** Every 6-cycle holds exactly two vertices of `D`, `D` has exactly one row per side, and the nine possible
+two-vertex patterns of a cycle are analysed by `decide`. (`paper_intermediate_claim_false`, `lemma_2_1`)
+
+### 🛠️ Lemma 2.1 (MDS), case "`4 log k + 1` gadget vertices, one row vertex in `A₁`"
+The conclusion that `B₁` or `B₂` gets exactly `log k` gadget vertices of `D` is not implied by the counts.
+
+**Impact.** Statement true; the step needs one extra fact.
+
+**Repair.** The rows of `A₁` outside `D` force `log k` gadget vertices on `A₁`.
+
+### 🛠️ Claim 2.8 (Steiner tree), `⇐` direction
+The proof joins the two copy-cliques through a crossing edge, assuming that an *arbitrary* minimum dominating set
+contains `f⁰_{A₁}, f⁰_{B₁}` or `t⁰_{A₁}, t⁰_{B₁}`, which the Lemma 2.1 counterexample refutes.
+
+**Impact.** Statement true for `k ≥ 2`; repaired (`claim_2_8`).
+
+**Repair.** Use the canonical dominating set of the intersecting index.
+
+### 🛠️ Claims 2.3–2.5 (Hamiltonian path, Claim 2.2)
+Claim 2.4 assumes `g_c` is visited before `r_c`, and Claim 2.5 uses an unproved "rows before `s¹₁` are entered from
+launch vertices".
+
+**Impact.** Claim 2.2 is true; our proof replaces Claims 2.3–2.5 (`hamPath_iff`).
+
+### 🛠️ Claim 2.9 (max-cut)
+The proof bounds the total weight of the light edges, exactly `16k³ log k − 4k³ + 2k² + |x| + |y|`, by `k⁴`, which
+fails for `k ≤ 64`, so the proof only works for `k ≥ 128`.
+
+**Impact.** Claim 2.9 and Lemma 2.4 still hold for every `k ≥ 2` (`claim_2_9`, `lemma_2_4`).
+
+**Repair.** We prove them with a direct counting inequality valid for every cut instead of the exchange arguments
+of Claims 2.9–2.12.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -79,6 +111,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * `k = 2^L`; row indices are `L`-bit strings; inputs `x, y : [k] × [k] → {0,1}`.
 * Only the decision versions of the problems are covered ("is there a dominating set of size
   `≤ 4 log k + 2`", …).
+* The MDS family contains a disconnected graph (under-specified model, harmless): `G_{0,0}` is disconnected,
+  while CONGEST networks are normally connected. All other `G_{x,y}` are connected, and the fooling-set argument
+  never uses `(0,0)`. So the lower bound holds even for algorithms that only work on connected graphs.
+  (`mdsGraph_zero_not_connected`, `theorem_2_1_connected`)
 
 **Main results in Lean.**
 

@@ -15,66 +15,106 @@ Copy of the paper: [paper.pdf](paper.pdf).
 
 ## Mistakes in the paper
 
-* **Algorithm 7 violates agreement (Theorem D.2 false as written).**
-  - *The bug.* Line 21 writes `(propNr, ⊥, ⊥)` into the leader's own slot, which erases the value it accepted there
-    earlier. The loop is `repeat forever`, so a process that has decided starts new attempts.
-  - *The run.* One memory, two processes, no crashes, unique ballots:
-    1. p2 runs both phases and decides `true`.
-    2. p2 starts a new attempt; its line-21 write erases `(2, 2, true)`.
-    3. Before p2's phase-2 write, p1 takes the permission and reads: no slot holds a value, and no minProp is
-       larger than its ballot.
-    4. p1 writes its own input `false` and decides it. p2's next write fails.
+### ⚠️ Theorem D.2 (agreement of Protected Memory Paxos, Algorithm 7 line 21)
+Algorithm 7 violates agreement: line 21 writes `(propNr, ⊥, ⊥)` into the leader's own slot, erasing its accepted
+value, so a decided p2 that starts a new attempt lets p1 decide a different value (`theorem_D2_false`).
 
-    The run works under every reading of the ambiguous lines 24–26.
-  - *Where the proof fails.* The proof of D.2 assumes that a decided leader's slot still holds its value when a
-    later leader reads it ("q must have seen p's value"). This is exactly what line 21 destroys.
-  - *The fix.* Keep the own accepted pair in the line-21 write, as in Disk Paxos. The prose ("write a new proposal
-    number in its slot") and Algorithm 10's `{propNr, -, -}` suggest this. With this fix (and the reading of lines
-    24–26 fixed by Algorithm 12), we prove D.1 and D.2 for any number of processes and memories, including zombie
-    operations of aborted attempts. (`theorem_D2_false`; repaired: `theorem_D1`, `theorem_D2`)
-  - *Caveat.* The run needs the decided process p2 to start another attempt. The pseudocode allows this: `decide`
-    sits inside `repeat forever`. But elsewhere the paper treats deciding as the end of the instance ("irrevocable
-    decision", "p1 terminates, deciding", "the leader terminates one instance"). If `decide` ends the loop, this run
-    is impossible, so a missing `return` after line 39 is an equally local fix. Either way the D.2 proof reasons
-    with the intended behaviour (a decided value stays in the decider's slot), not with the erasing one.
-* **Protected Memory Paxos also needs p1's first ballot to be the smallest.** The paper only says `propNr = a higher
-  value than any proposal number seen before`. p1's first attempt skips phase 1 and has seen nothing, so it may pick,
-  say, 100.
-  - *The run* (even with the line-21 fix; two processes, three memories):
-    1. q decides `c` at ballot 5 on memories 2 and 3.
-    2. p1's first attempt then writes `(100, 100, a)` on memory 1, where it still holds the initial permission, and
-       aborts.
-    3. q's next ballot 200 reads memories 1 and 2, adopts `a`, and decides it.
-  - *Where the proof fails.* Case 2 of the D.2 proof assumes that the minimal "bad" ballot performed phase 1, which
-    this attempt did not.
-  - *Halting reading.* The Lean run again lets the decided q start a new attempt. If deciding ends the loop, a
-    third process r can run ballot 200 instead of q, so the problem remains for n ≥ 3 (argued, not formalized).
-  - *Status.* Excluded by the standard convention that only the lowest ballot may skip phase 1; we assume it.
-    Ballot uniqueness is also only implicit. (`first_ballot_not_minimal_false`)
-* **Theorem 6.1: true, but the proof has three gaps, and the notion of 2-deciding is ambiguous.**
-  - *Gap 1.* The proof takes an *arbitrary* run E in which p decides in two delays and claims p cannot distinguish
-    it from a run where everybody else starts later. That is false if p's reads in E returned values written
-    concurrently by others. We take E to be the synchronous run in which simultaneous operations take effect reads
-    first. There, p's reads return the initial memory, and write responses are fixed by the static permissions.
-  - *Gap 2.* The proof needs "p′ running alone must decide", which the model does not give when n ≥ 3 and only one
-    crash is tolerated. We let *all* processes except p run; to them p looks crashed.
-  - *Gap 3.* Why p′ decides a value other than p's is not explained. We give the others input v′ and use validity.
-  - *Ambiguity.* If "2-deciding" only requires *some* common-case run, and simultaneous operations may take effect
-    write-first, the theorem fails. With n = 2, p2 writes its input while p1 reads it; p1 decides what it read, and
-    both then run any consensus algorithm with that value. This sketch is in `differencies.md` (not formalized).
-    (`theorem_6_1`)
-* **Lemma 4.1: true; Algorithm 2 needs charitable reading, and Observation 1 is false as stated.**
-  - *Observation 1.* It says no slot of a correct process is written twice. But `Value[p,k,p]` is written at line 12
-    and again at line 40 (p echoes its own message), and `L2Proof[p,k,q]` is written at line 64 and again at
-    line 18. The overwrites are harmless: weaker invariants suffice and are proved.
-  - *Pseudocode slips:*
-    - `try_deliver` starts at key `last[q] = 0` although keys start at 1, so taken literally nothing is ever
-      delivered;
-    - lines 38 and 47 check the reader's own signature (`sValid(p, ·)`) instead of the sender's;
-    - `state` must be per sender, and line 30 uses an out-of-scope `proof`;
-    - proof validity must require distinct signers, which is left unspecified.
-  - *Proof of Property 2.* "r wrote before r′, so r′ later saw both" needs "write completed before the read was
-    invoked" for regular registers. (`lemma_4_1`)
+**Impact.** A local fix whose intent is recoverable from the paper (keep the accepted pair, or `return` after
+deciding) makes the algorithm safe (`theorem_D1`, `theorem_D2`), so Theorem 5.1 survives.
+
+**Details.**
+- *The bug.* Line 21 writes `(propNr, ⊥, ⊥)` into the leader's own slot, which erases the value it accepted there
+  earlier. The loop is `repeat forever`, so a process that has decided starts new attempts.
+- *The run.* One memory, two processes, no crashes, unique ballots:
+  1. p2 runs both phases and decides `true`.
+  2. p2 starts a new attempt; its line-21 write erases `(2, 2, true)`.
+  3. Before p2's phase-2 write, p1 takes the permission and reads: no slot holds a value, and no minProp is larger
+     than its ballot.
+  4. p1 writes its own input `false` and decides it. p2's next write fails.
+
+  The run works under every reading of the ambiguous lines 24–26.
+- *Where the proof fails.* The proof of D.2 assumes that a decided leader's slot still holds its value when a later
+  leader reads it ("q must have seen p's value"). This is exactly what line 21 destroys.
+- *Caveat.* The run needs the decided process p2 to start another attempt. The pseudocode allows this: `decide` sits
+  inside `repeat forever`. But elsewhere the paper treats deciding as the end of the instance ("irrevocable
+  decision", "p1 terminates, deciding", "the leader terminates one instance"). If `decide` ends the loop, this run
+  is impossible, so a missing `return` after line 39 is an equally local fix. Either way the D.2 proof reasons with
+  the intended behaviour (a decided value stays in the decider's slot), not with the erasing one.
+
+**Repair.** Keep the own accepted pair in the line-21 write, as in Disk Paxos. The prose ("write a new proposal
+number in its slot") and Algorithm 10's `{propNr, -, -}` suggest this. With this fix (and the reading of lines 24–26
+fixed by Algorithm 12), we prove D.1 and D.2 for any number of processes and memories, including zombie operations
+of aborted attempts. (`theorem_D2_false`; repaired: `theorem_D1`, `theorem_D2`)
+
+### ⚠️ Theorem D.2 (Algorithm 7, p1's first ballot)
+Protected Memory Paxos also needs p1's first ballot to be the smallest: the paper only says `propNr = a higher value
+than any proposal number seen before`, and a first ballot of 100 lets two values be decided even with the line-21
+fix (`first_ballot_not_minimal_false`).
+
+**Impact.** Excluded by the standard convention that only the lowest ballot may skip phase 1; we assume it.
+
+**Details.** p1's first attempt skips phase 1 and has seen nothing, so it may pick, say, 100.
+- *The run* (even with the line-21 fix; two processes, three memories):
+  1. q decides `c` at ballot 5 on memories 2 and 3.
+  2. p1's first attempt then writes `(100, 100, a)` on memory 1, where it still holds the initial permission, and
+     aborts.
+  3. q's next ballot 200 reads memories 1 and 2, adopts `a`, and decides it.
+- *Where the proof fails.* Case 2 of the D.2 proof assumes that the minimal "bad" ballot performed phase 1, which this
+  attempt did not.
+- *Halting reading.* The Lean run again lets the decided q start a new attempt. If deciding ends the loop, a third
+  process r can run ballot 200 instead of q, so the problem remains for n ≥ 3 (argued, not formalized).
+- Ballot uniqueness is also only implicit. (`first_ballot_not_minimal_false`)
+
+### ⚠️ Theorem 6.1 (the notion of 2-deciding is ambiguous)
+If "2-deciding" only requires *some* common-case run, and simultaneous operations may take effect write-first,
+Theorem 6.1 fails for n = 2 (sketch in `differencies.md`, not formalized).
+
+**Impact.** The paper never fixes how simultaneous operations are ordered; for the read-first notion of
+"common-case execution" the theorem holds (`theorem_6_1`).
+
+**Details.** p2 writes its input while p1 reads it; p1 decides what it read, and both then run any consensus
+algorithm with that value. (`theorem_6_1`)
+
+### ⚠️ Lemma 4.1, Observation 1 (no slot written twice)
+Observation 1 says no slot of a correct process is written twice, but `Value[p,k,p]` is written at line 12 and again
+at line 40 (p echoes its own message), and `L2Proof[p,k,q]` at line 64 and again at line 18.
+
+**Impact.** The overwrites are harmless: weaker invariants suffice and are proved; Lemma 4.1 holds (`lemma_4_1`).
+
+### ⚠️ Lemma 4.1, Algorithm 2 (pseudocode slips)
+Taken literally, Algorithm 2 never delivers anything: `try_deliver` starts at key `last[q] = 0` although keys start
+at 1.
+
+**Impact.** Algorithm 2 needs a charitable reading; with the evident fixes Lemma 4.1 holds (`lemma_4_1`).
+
+**Details.**
+- `try_deliver` starts at key `last[q] = 0` although keys start at 1, so taken literally nothing is ever delivered;
+- lines 38 and 47 check the reader's own signature (`sValid(p, ·)`) instead of the sender's;
+- `state` must be per sender, and line 30 uses an out-of-scope `proof`;
+- proof validity must require distinct signers, which is left unspecified.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 6.1 (three gaps)
+The proof takes an *arbitrary* 2-deciding run E, needs "p′ running alone must decide", and does not explain why p′
+decides a value other than p's.
+
+**Impact.** Statement true (for the read-first notion); repaired (`theorem_6_1`).
+
+**Details.**
+- *Gap 1.* The proof takes an *arbitrary* run E in which p decides in two delays and claims p cannot distinguish it
+  from a run where everybody else starts later. That is false if p's reads in E returned values written
+  concurrently by others. We take E to be the synchronous run in which simultaneous operations take effect reads
+  first. There, p's reads return the initial memory, and write responses are fixed by the static permissions.
+- *Gap 2.* The proof needs "p′ running alone must decide", which the model does not give when n ≥ 3 and only one
+  crash is tolerated. We let *all* processes except p run; to them p looks crashed.
+- *Gap 3.* Why p′ decides a value other than p's is not explained. We give the others input v′ and use validity.
+
+### 🛠️ Lemma 4.1, Property 2
+"r wrote before r′, so r′ later saw both" needs "write completed before the read was invoked" for regular
+registers.
+
+**Impact.** Statement true; repaired (`lemma_4_1`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

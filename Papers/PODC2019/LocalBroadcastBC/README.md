@@ -14,37 +14,56 @@ and Observation B.1 is used in an unstated direction.
 
 ## Mistakes in the paper
 
-* **Theorem 4.1 / Lemma A.2 are false for the single-node graph.** The paper uses West's definition:
-  `k`-connected requires `n > k`. With `n = 1`, `f = 0` (allowed by the standing assumption `f < n`),
-  consensus is trivial, since the node decides its own input. But the graph is not 1-connected. The
-  proof of Lemma A.2 starts "not `(⌊3f/2⌋+1)`-connected ⇒ there is a vertex cut of size
-  `≤ ⌊3f/2⌋`". This misses complete graphs with `n ≤ ⌊3f/2⌋ + 1`, which have no cut. For `f ≥ 1`,
-  Lemma A.1 (degree `≥ 2f`) excludes them; for `f = 0` only the single-node graph remains. The same
-  case breaks the §4 remark that the complete graph on `2f + 1` nodes satisfies the conditions "for
-  any `f`". We prove the statement under `n ≥ 2`. The hypothesis `f < n` is also needed: for
-  `n = 1`, `f = 1` consensus is solvable but the minimum degree is `0 < 2`.
-  (`not_theorem_4_1_single_node`, `not_degree_single_node`; repaired: `theorem_4_1`)
-* **Step (b) of Algorithm 1 needs simple paths; proof gap.** The paper lets `P_uv` be an arbitrary
-  `uv`-path avoiding `F`, and its paths are walks. If `P_wv` repeats a node `x`, then `x` discards
-  the value forwarded back to it by rule (iii). So `v` receives nothing along `P_wv` and wrongly puts
-  `w` into `N_v`, even when `w` flooded `0`. The step "`v` receives 0 along `P_wv` and correctly puts
-  `w` in `Z_v`" in Lemma 5.3 then fails. With simple paths, which Lemma 5.4 provides, the proof goes
-  through.
-* **Observation B.1 is used in an unstated direction.** It states soundness: a value received along
-  a fault-free path is the origin's value. Lemma 5.3 also needs completeness: along every fault-free
-  *simple* path the value *does* arrive within the phase's `n` rounds. This depends on the default
-  message `(1, ⊥)` and on the round in which each path prefix is accepted. For a faulty originator,
-  "the value it floods" must be defined, as what its first-round transmission says about `⊥`. We
-  prove both directions.
-* **Smaller gaps.**
-  * Lemma 5.3 applies Lemma 5.5 to faulty `w`, but Lemma 5.5 is stated only for non-faulty nodes;
-    its proof works for any `w`.
-  * Lemma A.1's cover is described inconsistently: item 4 and the figure orient the `F²`–`W` edges
-    oppositely. The executions need item 4's version.
-  * Lemma A.2's cover edges are only "deduced from Figure 3"; we give them explicitly.
-  * Both covers tacitly need each Byzantine node to be simulated by a *single* cover node, so that
-    it can still broadcast.
-  * Lemma 5.4 cites Menger, but it follows from the definition of connectivity.
+### ⚠️ Theorem 4.1 and Lemma A.2 (single-node graph)
+Theorem 4.1 (necessity) is false for `n = 1`, `f = 0`: consensus is trivial, but under West's definition
+(`k`-connected requires `n > k`) the graph is not 1-connected (`not_theorem_4_1_single_node`).
+
+**Impact.** Degenerate case only; we prove the statement under `n ≥ 2` (`theorem_4_1`).
+
+**Details.** The case `n = 1`, `f = 0` is allowed by the standing assumption `f < n`, and the node decides its own
+input. The proof of Lemma A.2 starts "not `(⌊3f/2⌋+1)`-connected ⇒ there is a vertex cut of size `≤ ⌊3f/2⌋`". This
+misses complete graphs with `n ≤ ⌊3f/2⌋ + 1`, which have no cut. For `f ≥ 1`, Lemma A.1 (degree `≥ 2f`) excludes
+them; for `f = 0` only the single-node graph remains. The same case breaks the §4 remark that the complete graph on
+`2f + 1` nodes satisfies the conditions "for any `f`". The hypothesis `f < n` is also needed: for `n = 1`, `f = 1`
+consensus is solvable but the minimum degree is `0 < 2` (`not_degree_single_node`).
+
+## Proof gaps (statements true)
+
+### 🛠️ Algorithm 1, step (b), in the proof of Lemma 5.3 (simple paths)
+The paper lets `P_uv` be an arbitrary `uv`-path avoiding `F`, and its paths are walks, so along a path `P_wv` that
+repeats a node `v` may receive nothing and wrongly put `w` into `N_v`.
+
+**Impact.** Fixable: with simple paths, which Lemma 5.4 provides, the proof goes through.
+
+**Details.** If `P_wv` repeats a node `x`, then `x` discards the value forwarded back to it by rule (iii). So `v`
+receives nothing along `P_wv` and wrongly puts `w` into `N_v`, even when `w` flooded `0`. The step "`v` receives 0
+along `P_wv` and correctly puts `w` in `Z_v`" in Lemma 5.3 then fails.
+
+### 🛠️ Observation B.1 (used in an unstated direction)
+Observation B.1 states soundness (a value received along a fault-free path is the origin's value), but Lemma 5.3
+also needs completeness: along every fault-free *simple* path the value *does* arrive within the phase's `n` rounds.
+
+**Impact.** Statement true; we prove both directions.
+
+**Details.** Completeness depends on the default message `(1, ⊥)` and on the round in which each path prefix is
+accepted. For a faulty originator, "the value it floods" must be defined, as what its first-round transmission says
+about `⊥`.
+
+### 🛠️ Lemmas 5.3, 5.4, A.1, A.2 (smaller gaps)
+Lemma 5.3 applies Lemma 5.5 to faulty nodes, the covers of Lemmas A.1 and A.2 are described inconsistently or only
+by a figure, and both covers tacitly simulate each Byzantine node by a single cover node.
+
+**Impact.** Statements true; routine fixes.
+
+**Details.**
+- Lemma 5.3 applies Lemma 5.5 to faulty `w`, but Lemma 5.5 is stated only for non-faulty nodes; its proof works for
+  any `w`.
+- Lemma A.1's cover is described inconsistently: item 4 and the figure orient the `F²`–`W` edges oppositely. The
+  executions need item 4's version.
+- Lemma A.2's cover edges are only "deduced from Figure 3"; we give them explicitly.
+- Both covers tacitly need each Byzantine node to be simulated by a *single* cover node, so that it can still
+  broadcast.
+- Lemma 5.4 cites Menger, but it follows from the definition of connectivity.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
