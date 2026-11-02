@@ -14,39 +14,62 @@ required to have a continuous consensus function.
 
 ## Mistakes in the paper
 
-* **Theorem 4 (⇐) is false.** Two agents, model `N = {H₀, H₁, H₂}`: `H₀` lets both hear each other,
-  and in `H₁`/`H₂` one of them is deaf. Consider the "first deviation" algorithm. Before any non-`H₀`
-  round the output is `x₀`. At the first non-`H₀` round `t`, the deaf agent decides its own value if
-  `t` is odd and the other's value if `t` is even. The other agent copies that decision, or applies
-  the same parity rule if it is itself deaf in round `t+1`. This solves asymptotic consensus, and
-  every limit is an initial value, so every valency `Y*_{N'}(C)` is finite: a singleton or
-  disconnected. Yet exact consensus is unsolvable in `N`: by Theorem 1 an exact algorithm would have
-  contraction rate 0. The proof fails at "`δ_{N'}(C_t) → 0` in any execution, by Convergence and
-  Agreement". That holds only if the consensus function (pattern ↦ limit) is continuous, and the
-  paper itself notes in §2.1 that it need not be. Here, along the all-`H₀` execution, both `x₀` and
-  `x₁` stay reachable forever. The refutation also covers binary inputs. Adding continuity (valency
-  diameters vanish along every execution of every submodel) makes (⇐) true. The full equivalence
-  then follows, conditional on the cited characterization of Coulouma et al. [12]. (⇒) holds as
-  stated. (`theorem4_false`, `fd_not_vanishing`; repaired: `theorem4_mpr_repaired`,
-  `theorem4_repaired`)
-* **Definition 15 (α-relation) is stated imprecisely; typo-level.** It writes `In_S(G)` as a union of
-  node sets, whereas [12, Def. 4.7] and every later use (the remark `D = 2` for `{H₀,H₁,H₂}`, Lemmas
-  20 and 24) need the per-agent version `In_i(G) = In_i(H)` for all `i ∈ R(K)`. Under the literal
-  reading the α-diameter of `{H₀,H₁,H₂}` would be 1. Lemma 20 would fail for Algorithm 1 from
-  `(0, 1)`, since the valencies after `H₁` and `H₂` lie in `[0, 1/3]` and `[2/3, 1]`. Theorem 5 would
-  claim rate `≥ 1/2` for Algorithm 1, whose rate is `1/3`. Under the intended reading both hold
-  (`lemma20_literal_false`, `theorem5_literal_false`).
-* **Proof of Theorem 11 is broken; statement true.** It builds `Ã` by restarting `A` with the
-  decision values, but with a fixed `ε` this need not converge, so `Ã` is not an asymptotic
-  consensus algorithm. It also writes `log₃` for `log_{D+1}` and `δ_N(C₀) ≤ Δ/n` for `≥ Δ/n`. We
-  prove Theorems 8–11 directly on finite-horizon decision sets (`theorem11`).
-* **Minor gaps and slips.**
-  * Theorem 3, claim (8), asserts the bound "for every initial snapshot"; Lemma 13 gives only one,
-    which suffices.
-  * Lemma 20 needs `R(K) ≠ ∅`, which follows from the cited rootedness result [8]; we prove it.
-  * Lemma 24 swaps the endpoints of its chain relative to its own definition of `H_r`. (Theorem 4
-    quantifies over network models `N' ⊆ N`, which the paper defines to be nonempty (§2); this
-    matters, since for `N' = ∅` the valency would be empty.)
+### ❌ Theorem 4 (⇐: valencies singleton or disconnected ⇒ exact consensus solvable)
+For two agents in `N = {H₀, H₁, H₂}` the "first deviation" algorithm solves asymptotic consensus with
+every valency finite (a singleton or disconnected), yet exact consensus is unsolvable in `N`
+(`theorem4_false`, `fd_not_vanishing`).
+
+**Impact.** Only the converse direction fails: (⇒) holds as stated. Adding continuity of the
+consensus function (valency diameters vanish along every execution of every submodel) makes (⇐)
+true (`theorem4_mpr_repaired`).
+
+**Details.** `H₀` lets both agents hear each other, and in `H₁`/`H₂` one of them is deaf. The
+"first deviation" algorithm: before any non-`H₀` round the output is `x₀`. At the first non-`H₀`
+round `t`, the deaf agent decides its own value if `t` is odd and the other's value if `t` is
+even. The other agent copies that decision, or applies the same parity rule if it is itself deaf
+in round `t+1`. This solves asymptotic consensus, and every limit is an initial value, so every
+valency `Y*_{N'}(C)` is finite. Yet by Theorem 1 an exact algorithm would have contraction rate 0.
+
+The proof fails at "`δ_{N'}(C_t) → 0` in any execution, by Convergence and Agreement". That holds
+only if the consensus function (pattern ↦ limit) is continuous, and the paper itself notes in §2.1
+that it need not be. Here, along the all-`H₀` execution, both `x₀` and `x₁` stay reachable
+forever. The refutation also covers binary inputs.
+
+Theorem 4 quantifies over network models `N' ⊆ N`, which the paper defines to be nonempty (§2);
+this matters, since for `N' = ∅` the valency would be empty.
+
+**Repair.** With continuity, the full equivalence follows, conditional on the cited
+characterization of Coulouma et al. [12] (`theorem4_repaired`).
+
+### ⚠️ Definition 15 (α-relation)
+Definition 15 writes `In_S(G)` as a union of node sets, but [12, Def. 4.7] and every later use need
+the per-agent version `In_i(G) = In_i(H)` for all `i ∈ R(K)`; under the literal reading Lemma 20
+and Theorem 5 fail (`lemma20_literal_false`, `theorem5_literal_false`).
+
+**Impact.** A typo with evident intent: the remark `D = 2` for `{H₀,H₁,H₂}` and the proofs of
+Lemmas 20 and 24 use the per-agent version, under which Lemma 20 and Theorem 5 hold.
+
+**Details.** Under the literal reading the α-diameter of `{H₀,H₁,H₂}` would be 1. Lemma 20 would
+fail for Algorithm 1 from `(0, 1)`, since the valencies after `H₁` and `H₂` lie in `[0, 1/3]` and
+`[2/3, 1]`. Theorem 5 would claim rate `≥ 1/2` for Algorithm 1, whose rate is `1/3`.
+
+### Typos and slips
+- The proof of Theorem 11 writes `log₃` for `log_{D+1}` and `δ_N(C₀) ≤ Δ/n` for `≥ Δ/n`.
+- Lemma 24 swaps the endpoints of its chain relative to its own definition of `H_r`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 11 (restarting `A`)
+The proof builds `Ã` by restarting `A` with the decision values, but with a fixed `ε` this need not
+converge, so `Ã` is not an asymptotic consensus algorithm.
+
+**Impact.** Statement true; we prove Theorems 8–11 directly on finite-horizon decision sets
+(`theorem11`).
+
+### 🛠️ Theorem 3 (claim (8))
+Claim (8) asserts the bound "for every initial snapshot", but Lemma 13 gives only one.
+
+**Impact.** One snapshot suffices for the theorem (`theorem3`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -84,7 +107,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorems 8–11 (approximate consensus) | `theorem8`, `theorem9`, `theorem10`, `theorem11` | `Approximate.lean` |
 
 Lemma 21 is proved with constant `1/(n−1)` instead of `1/n`, and Theorem 6 under weaker hypotheses
-(`n ≥ 2`, `1 ≤ f < n`).
+(`n ≥ 2`, `1 ≤ f < n`). Lemma 20 needs `R(K) ≠ ∅`, which follows from the cited rootedness
+result [8]; we prove it.
 
 **Not formalized.** Theorem 7 (MinRelay, asynchronous crashes); the characterization of exact
 consensus from [12] (Theorem 19, β-classes), which appears only as the hypothesis `CouloumaHyp` of the

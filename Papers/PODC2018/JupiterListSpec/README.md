@@ -16,45 +16,65 @@ different argument.
 
 ## Mistakes in the paper
 
-* **Figure A.1 does not satisfy CP1 for the paper's operations, so Theorems 11 and 18 fail as
-  stated.** Section 2.3 defines `Ins(a, p)`/`Del(p)` for `p` beyond the list size as an
-  insertion/deletion at the end. The clients send `o` unchanged (Algorithms B.5, C.5), and the OTs
-  of Figure A.1 compare raw positions. On `[x]`: `o₁ = Del(5)` deletes `x`, and `o₂ = Ins(b, 1)`
-  appends `b`. Then `OT(o₁, o₂) = Del(6)` and `OT(o₂, o₁) = Ins(b, 1)`. Applying `o₂; Del(6)`
-  gives `[x]`, while `o₁; Ins(b, 1)` gives `[b]` (`cp1_fails`). As a run of Jupiter with two
-  clients: `c₀` inserts `x`; then `c₀` deletes at 5 while `c₁` inserts at 1. Both final `Read`s see
-  all three updates, yet `c₀` reads `[b]` and `c₁` reads `[x]`. This violates `A_cp` and hence
-  `A_weak` (`jupiter_raw_counterexample`, `cjupiter_raw_counterexample`). The violation of
-  `A_weak` does not depend on the choice of the abstract execution: `c₁`'s final `Read` must see
-  `c₁`'s own `Ins(b, 1)`, nobody deletes `b`, yet it returns `[x]`. So no well-formed abstract
-  execution complying with the run is in `A_weak` (`cjupiter_raw_not_weak_any`,
-  `jupiter_raw_not_weak_any`). The paper's own text supplies
-  the fix: it requires that a transformed operation "inserts (resp. deletes) the element `a`",
-  which only makes sense for in-range positions, and the OT literature it cites [8, 9] assumes
-  them. With in-range positions, Figure A.1 satisfies CP1 (`square`). We therefore normalise the
-  position when the operation is generated (`genOp`). The user-visible result does not change;
-  only the operation sent to the server does. *Severity:* a statement-level error with a local fix
-  (one line of pseudocode). We grade it ⚠️, at the border with ❌, because the out-of-range
-  convention is stated explicitly in the paper.
-* **Section 5's proofs (Lemmas 22–25) are sketches; the statements are true.** Lemma 24, Case 2.2
-  ("step ladder") and the inductive step of Lemma 23 are not real arguments. The one-step claim in
-  Lemma 25 assumes the operation "does not correspond to any element of the list in `v`". That
-  excludes deleting a common element, which the induction needs. The remark after Definition 19,
-  that `lo` is transitive on each list "by definition", is only true *given* pairwise
-  compatibility. We give a different proof. The vertices of the global state space are the
-  causally closed operation sets made of a `≺s`-prefix plus operations of one client. These sets
-  are closed under intersection, so the LCA of Lemma 23 is `V₁ ∩ V₂`. Along any path, the operations
-  keep the relative order of existing elements. Two common elements of `V₁` and `V₂` were therefore
-  inserted in `V₁ ∩ V₂` and keep their order on both paths (`Sched.compatible`).
-* **Propositions 9, 14, 16 and Lemma 5 are argued by "mathematical induction" sketches.** Prop. 9's
-  Case 2 (an operation inserted in the middle of a client's sequence) is the hard case, and it is
-  only illustrated. We prove these facts as invariants instead. For CJupiter: every replica's state
-  space is sound and complete (`CPI`). For Jupiter: every 2D-state-space edge is an edge of the
-  global space (`JPI`). Both statements are true.
-* **Minor slips.** Footnote 8's LCA definition (an antichain of common ancestors) does not say
-  "lowest". Appendix A says that the *smaller* replica id has the *higher* priority, while Figure
-  A.1 shifts the insertion with the *larger* `pr`. With ids used as priorities (Figure A.1's
-  caption), Figure 1 ends in `ab`, not `ba`. Either convention works.
+### ⚠️ Figure A.1 with out-of-range positions (Theorems 11 and 18)
+With positions beyond the list size, which Section 2.3 allows and the clients send unchanged, the OT
+functions of Figure A.1 violate CP1 (`cp1_fails`), and both Jupiter and CJupiter diverge, violating
+Theorems 11 and 18 (`jupiter_raw_counterexample`, `cjupiter_raw_counterexample`).
+
+**Impact.** A local fix (one line of pseudocode) that the paper's own text supplies: normalise the
+position when the operation is generated (`genOp`); with in-range positions Figure A.1 satisfies
+CP1 (`square`) and all main results hold. We grade it ⚠️, at the border with ❌, because the
+out-of-range convention is stated explicitly in the paper.
+
+**Details.** Section 2.3 defines `Ins(a, p)`/`Del(p)` for `p` beyond the list size as an
+insertion/deletion at the end. The clients send `o` unchanged (Algorithms B.5, C.5), and the OTs of
+Figure A.1 compare raw positions. On `[x]`: `o₁ = Del(5)` deletes `x`, and `o₂ = Ins(b, 1)`
+appends `b`. Then `OT(o₁, o₂) = Del(6)` and `OT(o₂, o₁) = Ins(b, 1)`. Applying `o₂; Del(6)` gives
+`[x]`, while `o₁; Ins(b, 1)` gives `[b]`. As a run of Jupiter with two clients: `c₀` inserts `x`;
+then `c₀` deletes at 5 while `c₁` inserts at 1. Both final `Read`s see all three updates, yet `c₀`
+reads `[b]` and `c₁` reads `[x]`. This violates `A_cp` and hence `A_weak`. The violation of
+`A_weak` does not depend on the choice of the abstract execution: `c₁`'s final `Read` must see
+`c₁`'s own `Ins(b, 1)`, nobody deletes `b`, yet it returns `[x]`. So no well-formed abstract
+execution complying with the run is in `A_weak` (`cjupiter_raw_not_weak_any`,
+`jupiter_raw_not_weak_any`).
+
+The paper requires that a transformed operation "inserts (resp. deletes) the element `a`", which
+only makes sense for in-range positions, and the OT literature it cites [8, 9] assumes them.
+
+**Repair.** We normalise the position in `genOp`. The user-visible result does not change; only the
+operation sent to the server does.
+
+### Typos and slips
+- Footnote 8's LCA definition (an antichain of common ancestors) does not say "lowest".
+- Appendix A says that the *smaller* replica id has the *higher* priority, while Figure A.1 shifts
+  the insertion with the *larger* `pr`. With ids used as priorities (Figure A.1's caption),
+  Figure 1 ends in `ab`, not `ba`. Either convention works.
+
+## Proof gaps (statements true)
+
+### 🛠️ Section 5 (Lemmas 22–25)
+Lemma 24, Case 2.2 ("step ladder") and the inductive step of Lemma 23 are not real arguments, and
+the one-step claim in Lemma 25 excludes deleting a common element, which the induction needs.
+
+**Impact.** Statements true; we give a different proof (`Sched.compatible`).
+
+**Details.** The one-step claim in Lemma 25 assumes the operation "does not correspond to any
+element of the list in `v`". The remark after Definition 19, that `lo` is transitive on each list
+"by definition", is only true *given* pairwise compatibility.
+
+**Repair.** The vertices of the global state space are the causally closed operation sets made of
+a `≺s`-prefix plus operations of one client. These sets are closed under intersection, so the LCA
+of Lemma 23 is `V₁ ∩ V₂`. Along any path, the operations keep the relative order of existing
+elements. Two common elements of `V₁` and `V₂` were therefore inserted in `V₁ ∩ V₂` and keep their
+order on both paths.
+
+### 🛠️ Propositions 9, 14, 16 and Lemma 5 (induction sketches)
+These are argued by "mathematical induction" sketches, and Prop. 9's hard Case 2 (an operation
+inserted in the middle of a client's sequence) is only illustrated.
+
+**Impact.** Statements true; we prove these facts as invariants instead. For CJupiter: every
+replica's state space is sound and complete (`CPI`). For Jupiter: every 2D-state-space edge is an
+edge of the global space (`JPI`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

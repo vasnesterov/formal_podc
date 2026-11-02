@@ -16,51 +16,86 @@ symmetric.
 
 ## Mistakes in the paper
 
-* **Theorem 4.9 is false: a conforming leader can end Underwater.** Lemma 4.8's proof says: "if
-  `v` appears in `p`, then `v` has already received (and signed) a hashkey that triggers `h` on
-  `(u, v)`." For a leader's own hashlock this fails. A leader releases its secret whenever its
-  last entering contract appears, even if its own key has already expired. Its failed `unlock`
-  call is public, since the pseudocode's `unlock` does not revert. Colluders then extend the
-  signed secret along a longer path, whose key expires later. On the §1 example, Bob and Carol rob
-  Alice this way. Carol publishes `C → A` at the last moment, Alice's call fails, and Bob presents
-  `(B, C, A)` on `A → B`. The counterexample uses timeouts already enlarged as in the next item,
-  and no front-running. (`literal_unsafe_late`)
-  **Repair:** the standard HTLC guard. A leader releases only if its own hashkey still meets its
-  deadline. With it, no conforming party is ever Underwater, for any digraph, any leaders, any
-  timeouts and any coalition. (`Setting.safety`)
-  *Ambiguity, not an error.* A leader publishes its leaving contracts first and may see a foreign
-  hashlock unlocked while still in Phase One. Suppose it then forwards that key once, to the
-  entering contracts present at that moment. Then a single deviator can rob it on Figure 7's
-  digraph (`literal_unsafe_refwd`). The proof of Theorem 4.9 says that a leader issues hashkeys
-  only in Phase Two, after all its entering contracts exist; under that reading the attack
-  disappears. Our repaired protocol implements this intended behaviour: it keeps forwarding to
-  entering contracts that appear later.
-* **Theorem 4.7 / Lemma 4.6 are false as stated: the hashkey timeouts are one `Δ` short.** A
-  hashkey expires at `(diam(D) + |p|)Δ`. A leader's own key has `|p| = 0`, but the leader may
-  present it only after Phase One, which itself may take `diam(D)·Δ`. On the three-party example
-  of §1, with the timing of Figures 1–2, nothing is triggered when everybody conforms. This holds
-  whether `diam = 3`, as the example's own timeouts imply, or `diam = 2`, the longest path between
-  distinct vertices. So the protocol is not even uniform. Timeouts `(diam + 1 + |p|)Δ` fix it, as
-  in the single-leader formula of §4.6. Then every arc is triggered by `2·diam(D)·Δ`, as claimed.
-  (`literal_not_live`; repaired: `Setting.theorem_4_7`)
-* **Lemma 4.13 needs simple paths.** The paper's paths may repeat their last vertex anywhere
-  ("lassos"). Then the longest path from `w` to the leader may pass through `v`, and
-  `D(v, v̂) ≥ D(w, v̂) + 1` fails. Five arcs on four vertices suffice. With simple paths the lemma
-  holds. (`Lasso.not_lemma_4_13_lax`; `lemma_4_13`) Conversely, the contracts *need* the paper's
-  lax paths. If `isPath` accepted only simple paths and cycles, a deviating leader could present a
-  cycle key that conforming parties cannot extend. Our model checker found this; it is not in Lean.
-* **Theorem 3.5 needs `D` connected**, which §3 assumes "without loss of generality". On two
-  disjoint 2-cycles there is a uniform atomic protocol. The exact characterization, valid for all
-  digraphs, is: atomic iff reachability is symmetric. (`theorem_3_5_needs_connected`,
-  `SwapGame.atomic_iff`)
-* **Proof gaps, statements true.** Lemma 3.4 silently assumes that coalitions can withhold their
-  assets; we make this an explicit hypothesis and prove it for the protocol. Lemma 4.8 needs an
-  unforgeability argument: a party's first observed key does not contain the party itself.
-  (`Setting.game_canAbstain`, `Setting.not_mem_first`)
-* **Small slips.** In Lemma 3.4 the coalition gets Discount, not FreeRide (it has no entering arcs).
-  `refund()` should test "not unlocked and timed out". Lemma 4.14's proof cites itself. The
-  abstract (space `O(|A|²)`) and §1 (communication `O(|A|·|L|)`) disagree. `diam` is the
-  longest-path length, so "time `O(diam(D))`" can mean `Θ(|V|)`.
+### 🚨 Theorem 4.9 (safety: no conforming party ends Underwater)
+On the §1 three-party example, Bob and Carol rob a conforming leader Alice: she releases her secret
+after her own key has expired, and they extend the signed secret along a longer path whose key
+expires later (`literal_unsafe_late`).
+
+**Impact.** The protocol as specified is unsafe. The standard HTLC guard (a leader releases only
+if its own hashkey still meets its deadline) repairs it: then no conforming party is ever
+Underwater, for any digraph, any leaders, any timeouts and any coalition (`Setting.safety`).
+
+**Details.** Lemma 4.8's proof says: "if `v` appears in `p`, then `v` has already received (and
+signed) a hashkey that triggers `h` on `(u, v)`." For a leader's own hashlock this fails. A leader
+releases its secret whenever its last entering contract appears, even if its own key has already
+expired. Its failed `unlock` call is public, since the pseudocode's `unlock` does not revert.
+Colluders then extend the signed secret along a longer path, whose key expires later. On the §1
+example, Carol publishes `C → A` at the last moment, Alice's call fails, and Bob presents
+`(B, C, A)` on `A → B`. The counterexample uses timeouts already enlarged as in the next item, and
+no front-running.
+
+*Ambiguity, not an error.* A leader publishes its leaving contracts first and may see a foreign
+hashlock unlocked while still in Phase One. Suppose it then forwards that key once, to the entering
+contracts present at that moment. Then a single deviator can rob it on Figure 7's digraph
+(`literal_unsafe_refwd`). The proof of Theorem 4.9 says that a leader issues hashkeys only in
+Phase Two, after all its entering contracts exist; under that reading the attack disappears. Our
+repaired protocol implements this intended behaviour: it keeps forwarding to entering contracts
+that appear later.
+
+### 🚨 Theorem 4.7 and Lemma 4.6 (liveness: hashkey timeouts one `Δ` short)
+On the §1 three-party example with the timing of Figures 1–2, nothing is triggered even when
+everybody conforms, because a leader's own key (`|p| = 0`) expires before the leader may present it
+(`literal_not_live`).
+
+**Impact.** The protocol is not even uniform as specified. Timeouts `(diam + 1 + |p|)Δ`, as in the
+single-leader formula of §4.6, fix it, and then every arc is triggered by `2·diam(D)·Δ`, as
+claimed (`Setting.theorem_4_7`).
+
+**Details.** A hashkey expires at `(diam(D) + |p|)Δ`. A leader's own key has `|p| = 0`, but the
+leader may present it only after Phase One, which itself may take `diam(D)·Δ`. This holds whether
+`diam = 3`, as the example's own timeouts imply, or `diam = 2`, the longest path between distinct
+vertices.
+
+### ❌ Lemma 4.13 (needs simple paths)
+Under the paper's own path definition, which lets a path repeat its last vertex anywhere ("lassos"),
+the longest path from `w` to the leader may pass through `v`, and `D(v, v̂) ≥ D(w, v̂) + 1` fails
+on five arcs on four vertices (`Lasso.not_lemma_4_13_lax`).
+
+**Impact.** With simple paths the lemma holds (`lemma_4_13`). It only concerns the timeout
+arithmetic of the single-leader protocol of §4.6.
+
+**Details.** Conversely, the contracts *need* the paper's lax paths. If `isPath` accepted only
+simple paths and cycles, a deviating leader could present a cycle key that conforming parties
+cannot extend. Our model checker found this; it is not in Lean.
+
+### ⚠️ Theorem 3.5 (needs `D` connected)
+On two disjoint 2-cycles there is a uniform atomic protocol, although `D` is not strongly connected
+(`theorem_3_5_needs_connected`).
+
+**Impact.** §3 assumes connectivity "without loss of generality", so this is a degenerate case.
+The exact characterization, valid for all digraphs, is: atomic iff reachability is symmetric
+(`SwapGame.atomic_iff`).
+
+### Typos and slips
+- In Lemma 3.4 the coalition gets Discount, not FreeRide (it has no entering arcs).
+- `refund()` should test "not unlocked and timed out".
+- Lemma 4.14's proof cites itself.
+- The abstract (space `O(|A|²)`) and §1 (communication `O(|A|·|L|)`) disagree.
+- `diam` is the longest-path length, so "time `O(diam(D))`" can mean `Θ(|V|)`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 3.4 (coalitions withholding assets)
+The proof silently assumes that coalitions can withhold their assets.
+
+**Impact.** We make this an explicit hypothesis and prove it for the protocol
+(`Setting.game_canAbstain`).
+
+### 🛠️ Lemma 4.8 (unforgeability)
+The proof needs an unforgeability argument: a party's first observed key does not contain the
+party itself.
+
+**Impact.** True for the repaired protocol; proved (`Setting.not_mem_first`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
