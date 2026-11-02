@@ -14,30 +14,54 @@ formalize the protocol and its safety (see the table).
 
 ## Mistakes in the paper
 
-* **Theorem 2 needs a non-trivial object (false in a degenerate case).** The proof picks two incomparable elements
-  `x₁, x₂` of the semi-lattice, but the theorem is stated for lattice agreement over any semi-lattice. Over a chain
-  (e.g. `ℕ`), returning one's own proposal immediately is a safe, wait-free lattice agreement algorithm that never
-  communicates. Under the fail-prone system "one of two processes may crash" (`τ(f)` = the correct process), no
-  generalized quorum system exists. The same algorithm shows that registers, snapshots and consensus need at least two
-  values. We add these hypotheses; with them, everything holds. (`theorem_2_false_of_chain`)
-* **Ambiguous phrase "strongly connected in `G \ f`" (Proposition 1; not an error under the natural reading).** If it
-  meant that the induced subgraph is strongly connected, Proposition 1 would be false. Take processes `0, 1, 2`, with only the channels `0 ↔ 1` failing, and
-  write quorums `{0}`, `{1}` reachable from the read quorum `{0, 1}`. Then `U = {0, 1}`, but `0` and `1` reach each
-  other only through `2`. The proof of Proposition 1 and the definition of `U_f` as a strongly connected component use
-  mutual reachability in `G \ f`; with that reading everything is correct, and this is the reading we formalize.
-  (`proposition_1_false_induced`, `proposition_1`)
-* **`U_f` is not determined by `F`.** The remark after Theorem 2 calls `U_f` "the largest set of processes for which
-  termination can be guaranteed". But `U_f` depends on the quorum system. With two processes and only the channel
-  `0 → 1` reliable, both `({0},{0})` and `({0,1},{1})` are generalized quorum systems, with `U_f = {0}` and
-  `U_f = {1}`. Termination can be guaranteed at `{0}` or at `{1}`, but not at both (Lemma 2). The theorems themselves
-  are unaffected. (`Uf_not_unique`)
-* **Proof gaps, statements true.** Theorem 2 for registers and snapshots is derived from the constructions of [2, 11],
-  and Theorem 6 from "consensus implements an MWMR register". Neither reduction is checked in this failure model with
-  obstruction-freedom at `τ(f)` only, and a single-shot consensus object needs infinitely many instances. For
-  Theorem 6 the paper only argues that `σ` is finite; one also needs the executions `α₁, β₁` to be partially
-  synchronous. We avoid the reductions: one gluing argument proves the bound for every object with two conflicting
-  operations, and it uses liveness only through one canonical continuation, which is both fair and partially
-  synchronous. (`theorem_2_register`, `theorem_2_snapshot`, `theorem_6`)
+### ⚠️ Theorem 2 (needs a non-trivial object)
+Theorem 2 is false over a chain (e.g. `ℕ`): returning one's own proposal immediately is a safe, wait-free lattice
+agreement algorithm, yet under "one of two processes may crash" (`τ(f)` = the correct process) no generalized quorum
+system exists (`theorem_2_false_of_chain`).
+
+**Impact.** Degenerate case: the proof picks two incomparable elements `x₁, x₂`, but the theorem is stated for any
+semi-lattice. With two incomparable elements (lattice agreement) or two distinct values (registers, snapshots,
+consensus) as hypotheses, everything holds.
+
+**Details.** The same algorithm shows that registers, snapshots and consensus need at least two values.
+
+### ⚠️ Proposition 1 (ambiguous "strongly connected in `G \ f`")
+If "strongly connected in `G \ f`" meant that the induced subgraph is strongly connected, Proposition 1 would be
+false (`proposition_1_false_induced`).
+
+**Impact.** Not an error under the natural reading: the proof of Proposition 1 and the definition of `U_f` as a
+strongly connected component use mutual reachability in `G \ f`; with that reading everything is correct, and this
+is the reading we formalize (`proposition_1`).
+
+**Details.** Take processes `0, 1, 2`, with only the channels `0 ↔ 1` failing, and write quorums `{0}`, `{1}`
+reachable from the read quorum `{0, 1}`. Then `U = {0, 1}`, but `0` and `1` reach each other only through `2`.
+
+### ⚠️ Remark after Theorem 2 (`U_f` is not determined by `F`)
+The remark calls `U_f` "the largest set of processes for which termination can be guaranteed", but `U_f` depends on
+the quorum system, not only on `F` (`Uf_not_unique`).
+
+**Impact.** The theorems themselves are unaffected; the remark has to be read for the quorum system built in the
+proof.
+
+**Details.** With two processes and only the channel `0 → 1` reliable, both `({0},{0})` and `({0,1},{1})` are
+generalized quorum systems, with `U_f = {0}` and `U_f = {1}`. Termination can be guaranteed at `{0}` or at `{1}`, but
+not at both (Lemma 2).
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 2 (registers, snapshots) and Theorem 6 (unchecked reductions)
+Theorem 2 for registers and snapshots is derived from the constructions of [2, 11], and Theorem 6 from "consensus
+implements an MWMR register", but neither reduction is checked in this failure model.
+
+**Impact.** Statements true; proved directly without the reductions (`theorem_2_register`, `theorem_2_snapshot`,
+`theorem_6`).
+
+**Details.** The reductions would have to work with obstruction-freedom at `τ(f)` only, and a single-shot consensus
+object needs infinitely many instances. For Theorem 6 the paper only argues that `σ` is finite; one also needs the
+executions `α₁, β₁` to be partially synchronous.
+
+**Repair.** One gluing argument proves the bound for every object with two conflicting operations, and it uses
+liveness only through one canonical continuation, which is both fair and partially synchronous.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

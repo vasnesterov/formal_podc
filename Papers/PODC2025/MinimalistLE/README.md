@@ -23,43 +23,71 @@ an off-by-one typo.
 
 ## Mistakes in the paper
 
-* **Lemma 19 (used for Theorem 3) has gaps; Lemma 12 is stated too weakly.** Lemma 19 needs
-  Lemma 12's beep of `v` to happen *after* round `t`. Lemma 12 as stated only gives
-  `s ≤ t + dis(u,v)`; its proof does give `s > t`, and we prove that version. The proof of
-  Lemma 19 has two further gaps:
-  * `P(v does not beep by itself in [t, t+2D+2]) = (1−p)^{2(D+1)}` is wrong if `v` is in `B•` in
-    round `t` (the probability is then 0).
-  * In the case `N_t(u) = N_t(v)`, the "self-beep of `u` between `t` and `t+D+1`" may be the beep
-    in round `t` itself. That beep is already counted, so `u` does not get ahead of `v`.
+### ❌ Lemma 19 (elimination within `2D+1` rounds, used for Theorem 3)
+Lemma 19, read per configuration in round `t` as its proof does, is false for small `D`: on `K₂` (`D = 1`) with both
+nodes in `B•` in round `t = 1`, neither node loses leadership before round `t + 4 > t + 2D + 1`, whatever the coins
+(`lemma19_fails_K2`, `lemma19_fails_P3`).
 
-  We shift the coin windows (coins of `u` in rounds `t+2..t+D+2`, all coins of `v` in rounds
-  `t..t+2D+2`) and use windows of length `2D+3`. Theorem 3 then holds with explicit constants:
-  `P(no single leader from round k(2D+3) on) ≤ n²(127/128)^k`. Theorem 3 is true. Lemma 19 itself,
-  read per configuration in round `t` as its proof does, is false for small `D`: on `K₂` (`D = 1`)
-  with both nodes in `B•` in round `t = 1`, neither node loses leadership before round `t + 4 > t + 2D + 1`,
-  whatever the coins. On the path `u–w–v` (`D = 2`) the earliest elimination is in round `t + 2D + 1`,
-  not before it. Both counterexamples hold for every coin field and are proved in Lean.
-  (`lemma12`, `elim_window`, `theorem3`, `theorem3_whp`, `lemma19_fails_K2`, `lemma19_fails_P3`)
-* **"Almost surely" in Theorem 2 is not proved.** The proof only bounds the probability of two
-  leaders in round `AD² log n` by `n^{−2}`, and that does not give probability 1. We prove a.s.
-  convergence by a separate argument. Each window of `2D+3` rounds has a good event of positive
-  probability `(1−(1−p)^{D+1})(1−p)^{2D+3}`, and that event eliminates one of any two given
-  leaders. Proof gap; the statement is true. (`theorem2_ae`, `theorem2_tail`)
-* **The anti-concentration chain (Lemmas 14, 15, 17) is imprecise.** We prove the `O(D² log n)`
-  bound by a different route (see "The formalization"). The issues:
-  * Lemma 14 is stated for the chain started in `W`, but its proof needs the stationary start.
-  * The proof of Lemma 14 claims `P(Z ≥ EZ + k(2p+1)) ≥ 1/2` for a binomial `Z`. This is false:
-    a binomial's median is within 1 of its mean, so the probability is `< 1/2` (for `p = 1/2`,
-    `k = 1`, `t = 100` it is 0.333). Any smaller constant works instead.
-  * Lemma 17 applies Lemma 15, which bounds `P(|Δ| < d)`, where it needs a shifted interval
-    `|Δ + δ| ≤ D`. It conditions only on `E_{k−1}` instead of the whole past. And it uses
-    Lemma 15's "`d` large enough" although `D` may be 1.
+**Impact.** Theorem 3 is true: with windows of `2D+3` rounds it holds with explicit constants
+(`elim_window`, `theorem3`, `theorem3_whp`).
 
-  All of these are fixable proof gaps; the statements are true. (`theorem2_time`, `theorem2_whp`)
-* **Typos.** The Discussion (§5) cites "Theorem 1", which does not exist; Theorem 2 is meant.
-  Lemma 21 should read `P(Σ_{i≤n} W_i ≥ k) = P(Bin(k−1,p) ≤ n−1)`, not
-  `P(Bin(k,p) ≤ n)`. For `n = 1`, `k = 2`, `p = 1/2` the two sides are `1/2` and `3/4`. The form
-  used in Lemma 14 is correct.
+**Details.** On the path `u–w–v` (`D = 2`) the earliest elimination is in round `t + 2D + 1`, not before it. Both
+counterexamples hold for every coin field and are proved in Lean. The proof of Lemma 19 has two further gaps:
+* `P(v does not beep by itself in [t, t+2D+2]) = (1−p)^{2(D+1)}` is wrong if `v` is in `B•` in
+  round `t` (the probability is then 0).
+* In the case `N_t(u) = N_t(v)`, the "self-beep of `u` between `t` and `t+D+1`" may be the beep
+  in round `t` itself. That beep is already counted, so `u` does not get ahead of `v`.
+
+**Repair.** We shift the coin windows (coins of `u` in rounds `t+2..t+D+2`, all coins of `v` in rounds `t..t+2D+2`)
+and use windows of length `2D+3`. Theorem 3 then holds with explicit constants:
+`P(no single leader from round k(2D+3) on) ≤ n²(127/128)^k` (`elim_window`, `theorem3`, `theorem3_whp`).
+
+### ⚠️ Lemma 12 (stated too weakly for Lemma 19)
+Lemma 12 as stated only gives a beep of `v` in some round `s ≤ t + dis(u,v)`, but Lemma 19 needs it to happen *after*
+round `t`.
+
+**Impact.** Imprecise statement with evident intent: its proof does give `s > t`, and we prove that version
+(`lemma12`).
+
+### ⚠️ Lemma 14 (stated for the wrong chain)
+Lemma 14 is stated for the chain started in `W`, but its proof needs the stationary start.
+
+**Impact.** Imprecise statement: the lemma is applied (in Lemma 15) only to the stationary copy. Not formalized; our
+proof of Theorem 2 does not use it.
+
+### ⚠️ Lemma 21 (off by one)
+Lemma 21 should read `P(Σ_{i≤n} W_i ≥ k) = P(Bin(k−1,p) ≤ n−1)`, not `P(Bin(k,p) ≤ n)`: for `n = 1`, `k = 2`,
+`p = 1/2` the two sides are `1/2` and `3/4`.
+
+**Impact.** Typo: the form used in Lemma 14 is correct. Not formalized.
+
+### Typos and slips
+- The Discussion (§5) cites "Theorem 1", which does not exist; Theorem 2 is meant.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 2 ("almost surely")
+The proof only bounds the probability of two leaders in round `AD² log n` by `n^{−2}`, and that does not give
+probability 1.
+
+**Impact.** Statement true; proved by a separate argument (`theorem2_ae`, `theorem2_tail`).
+
+**Repair.** Each window of `2D+3` rounds has a good event of positive probability `(1−(1−p)^{D+1})(1−p)^{2D+3}`, and
+that event eliminates one of any two given leaders. (`theorem2_ae`, `theorem2_tail`)
+
+### 🛠️ Theorem 2, `O(D² log n)` bound (anti-concentration chain, Lemmas 14, 15, 17)
+The proof of Lemma 14 claims `P(Z ≥ EZ + k(2p+1)) ≥ 1/2` for a binomial `Z`, which is false, and Lemma 17 applies
+Lemma 15 to the wrong interval.
+
+**Impact.** All of these are fixable proof gaps; the statements are true. We prove the `O(D² log n)` bound by a
+different route (see "The formalization") (`theorem2_time`, `theorem2_whp`).
+
+**Details.**
+* A binomial's median is within 1 of its mean, so the probability in Lemma 14's proof is `< 1/2` (for `p = 1/2`,
+  `k = 1`, `t = 100` it is 0.333). Any smaller constant works instead.
+* Lemma 17 applies Lemma 15, which bounds `P(|Δ| < d)`, where it needs a shifted interval `|Δ + δ| ≤ D`. It
+  conditions only on `E_{k−1}` instead of the whole past. And it uses Lemma 15's "`d` large enough" although `D`
+  may be 1.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

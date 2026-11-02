@@ -15,57 +15,79 @@ proof of 3.4 is not justified.
 
 ## Mistakes in the paper
 
-* **Theorem 4.1 is false (headline), and so is Lemma 4.6.** Take `N` identical items with
-  normalised profit and weight `1/N`. In integer form: weights `1`, weight limit `N/2`. Take
-  `ε = 1/m` with `m ≥ 30` and `N ≥ m²`. All items are small with efficiency `1`, so the
-  efficiency distribution that `rQuantile` samples is a point mass at `1`.
-  - *Lemma 4.6.* Every set `A_k(I)` of Definition 4.3 is either empty or contains every item. So no
-    equally partitioning sequence of length `t ≥ 1` exists, and the probability in Lemma 4.6 is
-    `0`, not `≥ 1 − 13ε/36`. The proof of Lemma 4.6 turns `Pr[p/w > ẽ_k] ≤ kq + τ` into
-    `Pr[p/w ≥ ẽ_k] ≤ kq + τ`, which ignores the mass of items with efficiency exactly `ẽ_k`.
-    Nothing in the paper assumes distinct efficiencies.
-  - *Theorem 4.1.* Suppose all quantiles are accurate, which by Theorem 4.5 happens with
-    probability `≥ 1 − tβ ≥ 1 − ε/36`. Then every `1 − kq` lies in `(τ, 1 − τ)`, and every
-    `ẽ_k = 1`. So every item of `Ĩ` is a copy of `(ε², ε²)` with efficiency `1`. CONVERT-GREEDY
-    finds no index `k` with `ẽ_k > p_j/w_j = 1`, sets `e_small = −1`, and `LCA-KP` answers "no"
-    to every query. This holds for any sample and any tie-breaking in the sort. The empty set is
-    not a `(1/2, 6ε)`-approximation, since `OPT ≈ 1/2`. Even in the weakest, per-query reading of
-    correctness, no seed-dependent `(1/2, 6ε)`-approximate solution agrees with each answer with
-    probability `≥ 1 − ε`. Reading `>` as `≥` in Line 3 of Algorithm 3 does not help: `LCA-KP`
-    then answers "yes" to every item, which is infeasible. The paper never assumes distinct
-    efficiencies, and ties are built into the design: the synthetic items of `Ĩ` have efficiency
-    exactly `ẽ_{k+1}`. (`Sec4.theorem_4_1_false`, `Sec4.answerKP_uniform`, `Sec4.no_eps_uniform`)
-* **Theorems 3.2 and 3.3: the reduction leaves the paper's model; statements true.**
-  Definition 2.2 normalises the total profit of an instance to `1`. The instance `I(x)` used in
-  the reductions from `OR_{n−1}` has total profit `|x| + β`. Normalising it requires knowing
-  `|x|`, so the reduction only applies to LCAs that are correct on unnormalised instances. We
-  formalize the paper's reductions in that setting (`theorem_3_2`, `theorem_3_3`, bound `n/3` on
-  `n + 1` items). We also prove the theorems for LCAs required to be correct only on normalised
-  instances, with a different hard family and a direct argument. The first item of a block of
-  `b = ⌊1/α²⌋ + 1` items takes the profit of the whole block. This gives the bound
-  `⌊n/b⌋/3`, still `Ω(n)` for fixed `α`. (`theorem_3_2_normalized`, `theorem_3_3_normalized`)
-* **Theorem 3.4: Lemma 3.5 is not justified, but the theorem is true with the paper's constant.**
-  Lemma 3.5 claims that for each query `k` the default answer must be "yes". The argument is
-  that answering "no" costs error `1/3 − 1/10 > 1/5`. But that error is conditional on the query
-  being `k`, while the `1/5` bound is an average over all `k`. An algorithm may answer "no" on a
-  constant fraction of the `k` and still meet the average bound. The lemma's hypotheses are in
-  fact unsatisfiable (they contradict Theorem 3.4), so the lemma is vacuously true, but its proof
-  does not show this. We replace it with a joint count. Let `y` be the fraction of default "yes"
-  answers. The algorithm fails on a `½(1 − y) + ½(y² + (1 − y)²) − O(q/n) ≥ 7/16 − O(q/n)`
-  fraction of the hard distribution. This gives `t(n) ≥ n/11` for every `n ≥ 2` with success
-  probability `4/5`, the paper's constant, and `t(n) ≥ n/40 − 1/5` under the per-query reading.
-  (`theorem_3_4`, `theorem_3_4_perQuery`, `LCA.count_le`)
-* **Small slips.**
-  - Theorem 3.4 says "`(t(n), 4/5)`-LCA", which is failure probability `4/5` by Definition 2.2.
-    The proof uses success probability `4/5`, and we formalize that version. The literal version
-    cannot follow from the paper's distribution: a 1-query algorithm that answers "yes" on a
-    weight-`3/4` item with a random hash bit succeeds with probability `1/2 > 1/5` on it.
-  - The proof of Theorem 3.4 draws `(i, j)` uniformly from `[n]²`, so `i = j` is possible, and
-    then the weights are ill-defined. We use distinct pairs. Its weights `3/4, 1/4` are not
-    integers, as Definition 2.2 requires. We scale them to `3, 1` with weight limit `4`.
-  - Theorem 2.7 states the sample complexity with `Ω̃`; it should be `Õ`.
-  - The approximation guarantee is stated inconsistently: `(1/2 + ε)` in Theorem 1.4, `(2 + ε)` in
-    the technical overview, `(1/2, 6ε)` in Theorem 4.1.
+### 🚨 Theorem 4.1 (Algorithm 2 `LCA-KP` is a `(1/2, 6ε)`-approximation LCA)
+On `N` identical items (weights `1`, weight limit `N/2`, `ε = 1/m` with `m ≥ 30`, `N ≥ m²`), `LCA-KP` answers "no" to
+every query with probability `≥ 1 − ε/36`, which is not a `(1/2, 6ε)`-approximation (`Sec4.theorem_4_1_false`).
+
+**Impact.** The main positive result falls, even in the weakest, per-query reading of correctness; there is no local
+fix, and the existential claim of Theorem 1.4 is at best unestablished. The impossibility results are unaffected.
+
+**Details.** In normalised form every item has profit and weight `1/N`. All items are small with efficiency `1`, so
+the efficiency distribution that `rQuantile` samples is a point mass at `1`. Suppose all quantiles are accurate,
+which by Theorem 4.5 happens with probability `≥ 1 − tβ ≥ 1 − ε/36`. Then every `1 − kq` lies in `(τ, 1 − τ)`, and
+every `ẽ_k = 1`. So every item of `Ĩ` is a copy of `(ε², ε²)` with efficiency `1`. CONVERT-GREEDY finds no index
+`k` with `ẽ_k > p_j/w_j = 1`, sets `e_small = −1`, and `LCA-KP` answers "no" to every query
+(`Sec4.answerKP_uniform`). This holds for any sample and any tie-breaking in the sort. The empty set is not a
+`(1/2, 6ε)`-approximation, since `OPT ≈ 1/2`. Even in the weakest, per-query reading of correctness, no
+seed-dependent `(1/2, 6ε)`-approximate solution agrees with each answer with probability `≥ 1 − ε`.
+
+Reading `>` as `≥` in Line 3 of Algorithm 3 does not help: `LCA-KP` then answers "yes" to every item, which is
+infeasible. The paper never assumes distinct efficiencies, and ties are built into the design: the synthetic items
+of `Ĩ` have efficiency exactly `ẽ_{k+1}`.
+
+### ❌ Lemma 4.6 (an equally partitioning sequence exists with probability `≥ 1 − 13ε/36`)
+On the same instance every set `A_k(I)` of Definition 4.3 is either empty or contains every item, so no equally
+partitioning sequence of length `t ≥ 1` exists and the probability in Lemma 4.6 is `0` (`Sec4.no_eps_uniform`).
+
+**Impact.** Theorem 4.1 rests on this lemma; nothing in the paper assumes distinct efficiencies.
+
+**Details.** The proof of Lemma 4.6 turns `Pr[p/w > ẽ_k] ≤ kq + τ` into `Pr[p/w ≥ ẽ_k] ≤ kq + τ`, which ignores the
+mass of items with efficiency exactly `ẽ_k`.
+
+### Typos and slips
+- Theorem 3.4 says "`(t(n), 4/5)`-LCA", which is failure probability `4/5` by Definition 2.2. The proof uses
+  success probability `4/5`, and we formalize that version. The literal version cannot follow from the paper's
+  distribution: a 1-query algorithm that answers "yes" on a weight-`3/4` item with a random hash bit succeeds with
+  probability `1/2 > 1/5` on it.
+- The proof of Theorem 3.4 draws `(i, j)` uniformly from `[n]²`, so `i = j` is possible, and then the weights are
+  ill-defined. We use distinct pairs. Its weights `3/4, 1/4` are not integers, as Definition 2.2 requires. We scale
+  them to `3, 1` with weight limit `4`.
+- Theorem 2.7 states the sample complexity with `Ω̃`; it should be `Õ`.
+- The approximation guarantee is stated inconsistently: `(1/2 + ε)` in Theorem 1.4, `(2 + ε)` in the technical
+  overview, `(1/2, 6ε)` in Theorem 4.1.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorems 3.2 and 3.3 (the reduction leaves the paper's model)
+The reduction instance `I(x)` from `OR_{n−1}` has total profit `|x| + β`, so it violates the normalisation of
+Definition 2.2, and normalising it requires knowing `|x|`.
+
+**Impact.** Statements true; proved both for LCAs correct on unnormalised instances (the paper's reduction,
+`theorem_3_2`, `theorem_3_3`) and for LCAs correct only on normalised instances (`theorem_3_2_normalized`,
+`theorem_3_3_normalized`).
+
+**Details.** The paper's reduction only applies to LCAs that are correct on unnormalised instances. We formalize it
+in that setting (`theorem_3_2`, `theorem_3_3`, bound `n/3` on `n + 1` items).
+
+**Repair.** For LCAs required to be correct only on normalised instances we use a different hard family and a direct
+argument. The first item of a block of `b = ⌊1/α²⌋ + 1` items takes the profit of the whole block. This gives the
+bound `⌊n/b⌋/3`, still `Ω(n)` for fixed `α`. (`theorem_3_2_normalized`, `theorem_3_3_normalized`)
+
+### 🛠️ Theorem 3.4 (Lemma 3.5 is not justified)
+Lemma 3.5's argument that the default answer to each query `k` must be "yes" confuses an error conditional on the
+query being `k` with the `1/5` bound, which is an average over all `k`.
+
+**Impact.** Theorem 3.4 is true with the paper's constant; repaired by a joint count (`theorem_3_4`,
+`theorem_3_4_perQuery`, `LCA.count_le`).
+
+**Details.** The argument is that answering "no" costs error `1/3 − 1/10 > 1/5`. An algorithm may answer "no" on a
+constant fraction of the `k` and still meet the average bound. The lemma's hypotheses are in fact unsatisfiable
+(they contradict Theorem 3.4), so the lemma is vacuously true, but its proof does not show this.
+
+**Repair.** Let `y` be the fraction of default "yes" answers. The algorithm fails on a
+`½(1 − y) + ½(y² + (1 − y)²) − O(q/n) ≥ 7/16 − O(q/n)` fraction of the hard distribution. This gives `t(n) ≥ n/11`
+for every `n ≥ 2` with success probability `4/5`, the paper's constant, and `t(n) ≥ n/40 − 1/5` under the per-query
+reading. (`theorem_3_4`, `theorem_3_4_perQuery`, `LCA.count_le`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

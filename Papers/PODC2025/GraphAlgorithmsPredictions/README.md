@@ -13,18 +13,7 @@ every error component" all hold. The same Ramsey argument applied directly to MI
 
 ## Mistakes in the paper
 
-No mistakes in the checked statements. Small remarks:
-
-* **Theorem 4.1 is not tight in its constant.** Applying Ramsey directly to the MIS outputs gives three
-  consecutive middle nodes with the same output: all three in the MIS contradicts independence, none in the MIS
-  contradicts maximality. This needs a window of `2T + 5` nodes and gives `T ≥ (n − 4)/2`. The paper's detour
-  through 3-colouring (Lemma 5 of the full version) loses one round. (`mis_lowerBound_sharp`)
-* **Lemma 4 of the full version holds for any finite number of colours**, not only 3: the Ramsey argument never
-  uses the number of colours. (`lemma_4`)
-* **Round counting of the pruning algorithm.** The paper's third round only tells the remaining active nodes that
-  the neighbours of `I` have terminated. With the usual "send, receive, compute" round convention (CSLib's
-  locally-iterative model) this message is part of the next round, and 2 rounds suffice. This is a counting
-  convention, not an error: we prove the paper's 3 (round 3 is idle in our model).
+No mistakes in the statements.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -69,6 +58,18 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | §4: Distributed Greedy MIS terminates within `n` rounds (within the component size), output is an MIS | `greedy_round_complexity`, `greedy_decided`, `greedy_isMIS` | `Main.lean`, `Greedy.lean` |
 | §5: pruning + greedy terminates within `η + 3` rounds with an MIS (`η`-degrading) | `predAlg_terminates`, `predAlg_correct` | `Main.lean` |
 | the algorithm is a LOCAL algorithm | `predAlg_isLocal` | `Main.lean` |
+
+**Remarks.**
+* **Theorem 4.1 is not tight in its constant** (a remark, not a mistake: the paper's bound is true). Applying Ramsey directly to the MIS outputs gives three
+  consecutive middle nodes with the same output: all three in the MIS contradicts independence, none in the MIS
+  contradicts maximality. This needs a window of `2T + 5` nodes and gives `T ≥ (n − 4)/2`. The paper's detour
+  through 3-colouring (Lemma 5 of the full version) loses one round. (`mis_lowerBound_sharp`)
+* **Lemma 4 of the full version holds for any finite number of colours**, not only 3: the Ramsey argument never
+  uses the number of colours. (`lemma_4`)
+* **Round counting of the pruning algorithm** (proof remark). The paper's third round only tells the remaining active nodes that
+  the neighbours of `I` have terminated. With the usual "send, receive, compute" round convention (CSLib's
+  locally-iterative model) this message is part of the next round, and 2 rounds suffice. This is a counting
+  convention, not an error: we prove the paper's 3 (round 3 is idle in our model).
 
 **Not formalized.** The framework definitions (consistent/robust/smooth as asymptotic notions), the generic
 compositions of Section 5 with black-box algorithms (`2f(η)`-degrading composition with a clean-up algorithm,
