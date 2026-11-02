@@ -16,24 +16,25 @@ only the stated reason is wrong.
 
 ## Mistakes in the paper
 
-* **Theorem 22, third case: solutions do exist.** Theorem 22 classifies `X`-orientations: if
-  `2 ∉ X`, `{1,3,4} ⊄ X` and `{0,1,3} ⊄ X`, it claims that "no solution exists for infinitely many
-  `n`". The set `X = {0,3,4}` falls in this case, yet every `n × n` torus with `n ≥ 3` has a
-  `{0,3,4}`-orientation. The same holds for `{0,1,4}`, by reversing all edges. The construction
-  is invariant under the diagonal shift `(x, y) ↦ (x+1, y+1)`. Diagonal `k` gets a value `t_k`:
-  how many of the two edges between diagonals `k` and `k+1` point to `k+1`. A node then has
-  in-degree `2 − t_k + t_{k−1}`. The cyclic sequence `t = 0,2,0,2,…,0,2` (even `n`) or
-  `0,2,…,0,2,1` (odd `n`) only produces in-degrees 0, 3 and 4. The classification itself is
-  right: the paper proves separately that `{0,3,4}` is global (Theorem 25, via `q`-sum
-  coordination), and the introduction says "otherwise it is global". This is an imprecise
-  statement with evident intent, not a wrong complexity
-  (`exists_orientation034`, `theorem22_third_bullet_false`).
-* **Slips that do not affect any statement.** In the proof of Theorem 10,
-  `d = A(F₁X₂F₂) − A(F₁X₂F₂)` should be `A(F₁X₂F₂) − A(F₁X₁F₂)`. "The conditions in Section 10"
-  means those of Theorem 10. The proof of Lemma 14 swaps the coordinate names. The greedy
-  post-processing before the reduction is unnecessary, because Lemmas 12–14 hold for every proper
-  3-colouring. Lemma 13's bound `T < n/4` ignores the `O(1)` extra radius needed to read `ℓ`, as
-  the paper's conventions allow; we prove it with `4(T+2) ≤ n`.
+### ⚠️ Theorem 22, third case (`X`-orientations with no solution)
+The third case claims "no solution exists for infinitely many `n`", but `X = {0,3,4}` falls in it and every
+`n × n` torus with `n ≥ 3` has a `{0,3,4}`-orientation (`exists_orientation034`,
+`theorem22_third_bullet_false`).
+
+**Impact.** Only the stated reason is wrong, not the complexity: `{0,3,4}` is still global, as the paper proves
+separately (Theorem 25, via `q`-sum coordination), and the introduction says "otherwise it is global". An imprecise
+statement with evident intent.
+
+**Details.** Theorem 22 classifies `X`-orientations: the third case is `2 ∉ X`, `{1,3,4} ⊄ X` and `{0,1,3} ⊄ X`.
+The same counterexample works for `{0,1,4}`, by reversing all edges. The construction is invariant under the
+diagonal shift `(x, y) ↦ (x+1, y+1)`. Diagonal `k` gets a value `t_k`: how many of the two edges between diagonals
+`k` and `k+1` point to `k+1`. A node then has in-degree `2 − t_k + t_{k−1}`. The cyclic sequence
+`t = 0,2,0,2,…,0,2` (even `n`) or `0,2,…,0,2,1` (odd `n`) only produces in-degrees 0, 3 and 4.
+
+### Typos and slips
+- In the proof of Theorem 10, `d = A(F₁X₂F₂) − A(F₁X₂F₂)` should be `A(F₁X₂F₂) − A(F₁X₁F₂)`.
+- "The conditions in Section 10" means those of Theorem 10.
+- The proof of Lemma 14 swaps the coordinate names.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -54,6 +55,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
   `8T < n`, any constant output sum `Q` on `n`-cycles must be a multiple of `n` (`sum_eq_mul`).
   Lemmas 12–14 are proved for every proper colouring by finite `3 × 3` block checks (`decide`) and
   flux counting, instead of a cycle decomposition of `H`.
+* **Remarks on the paper (not mistakes).** The greedy post-processing before the reduction is unnecessary, because
+  Lemmas 12–14 hold for every proper 3-colouring. Lemma 13's bound `T < n/4` ignores the `O(1)` extra radius
+  needed to read `ℓ`, as the paper's conventions allow; we prove it with `4(T+2) ≤ n`.
 
 **Main results in Lean.**
 

@@ -14,41 +14,64 @@ cases; we repaired it with a lexicographic ranking function. `P_thr` is also sli
 
 ## Mistakes in the paper
 
-* **Proof of Proposition 18 (`P_thr[T₁]` is silent): a false monotonicity claim.** The proof says
-  that, "as observed in [1]", `aᵢ` (the total absolute value of the non-leaders) never increases:
-  `a₀ ≥ a₁ ≥ ⋯`. This is false. When two leaders meet, the responder becomes a non-leader and keeps
-  the overflow `g(n, n')`. For example, with `c = 1` and `v = vmax = 2` (the case `c > 0` treated in the
-  appendix), the `T₁`-step `(1,2,0),(1,2,0) ↦ (1,2,0),(0,2,0)` raises `a` from 0 to 2
-  (`nonleaderAbs_not_antitone`). This is a proof gap; the statement is true. Leader–leader steps lower
-  the number of leaders, which the proof also uses, so the repair is to order the measures
-  lexicographically, with the number of leaders first.
-* **Proof of Proposition 18: missing cases.** The proof then says that, once leaders, `a` and the
-  inconsistent leaders are stable, every non-silent `T₁`-transition is `(1,x,1),(0,0,0) ↦ (1,x,1),(0,0,1)`.
-  This misses the *saturated* interactions: `(1,v,0),(0,n,1) ↦ (1,v,0),(0,n,0)` for `n > 0`, and the
-  mirror case `(1,−v,1),(0,n,0) ↦ (1,−v,1),(0,n,1)` for `n < 0` (`saturated_flip`). These flip opinions in one direction only,
-  so the conclusion survives once a fourth potential is added. Our proof uses the lexicographic ranking
-  (leaders, `a`, inconsistent leaders, flippable non-leaders) and checks that it strictly decreases on every
-  non-silent `T₁`-transition (`t1_silent`). The paper's case split on the sign of `c` is unnecessary:
-  the partition `T₁ = {t : pre(t) ∉ L₀ × N₁}`, `T₂ = T \ T₁` works for every `c` (`proposition_18_with`).
-* **`P_thr` is under-specified.** The definition says that `T` *contains* the transitions of pairs whose
-  first state is a leader, and is silent about the other pairs, while the model requires a transition for
-  every pair of states. We add identity transitions for the remaining pairs, as in Example 1 for the
-  majority protocol. Silent transitions only add self-loops, so this changes neither reachability,
-  potential reachability, terminal configurations, nor (up to stuttering) the fair executions.
-* **Proof of Proposition 17: trap argument incomplete in a trivial case.** "The set of leaders forms a
-  U-trap … which implies that `C'` contains a leader" only follows when some transition in `U = ⟦x⟧` moves
-  an agent *into* the leaders. Every listed transition of `P_thr` does, so in the paper's protocol the only
-  missing case is `x = 0` (then `C' = C`); with the added silent non-leader transitions, `U` may consist of
-  these only, and the flow equations show that the number of leaders is unchanged
-  (`exists_leader_of_potReachVia`). A minor gap.
-* **Proposition 19(a), "⇒ follows immediately from the definitions".** This direction needs fair
-  executions to exist. With the paper's edge-based fairness, that takes a construction (a globally fair run of the "edge
-  system"; `exists_edgeFair`). An omitted routine step.
-* **Typos.** Lemma 21 writes "`x(q) ≥ 0` for every `q ∈ Q`, and `x(q) > 0` for some `q ∈ Q`" where `x`
-  is indexed by transitions (`x(t)`, `t ∈ U`). In the proof of Proposition 18, "every execution of `P_thr[T₁]`
-  is fair" should read "silent", and "set the opinion of non leaders to 0" should read "to 1".
-  Observation 11 writes `C(S) = 0` for `C(P) = 0`. Lemma 22 is stated for `S = T \ U` inside one
-  protocol but used (Prop. 7) for `P[Tᵢ]` with `U = T₁ ∪ ⋯ ∪ Tᵢ₋₁`; we state it for arbitrary `S`, `U`.
+### ⚠️ Lemma 21 (indexing of `x`)
+Lemma 21 writes "`x(q) ≥ 0` for every `q ∈ Q`, and `x(q) > 0` for some `q ∈ Q`", but `x` is indexed by transitions
+(`x(t)`, `t ∈ U`).
+
+**Impact.** A typo with evident intent; with `x` indexed by transitions the lemma holds (`lemma_21`,
+`lemma_21_set`).
+
+### ⚠️ Definition of `P_thr` (transitions not total)
+The definition says that `T` *contains* the transitions of pairs whose first state is a leader and is silent about
+the other pairs, while the model requires a transition for every pair of states.
+
+**Impact.** Harmless completion: we add identity transitions for the remaining pairs, as in Example 1 for the
+majority protocol. Silent transitions only add self-loops, so this changes neither reachability, potential
+reachability, terminal configurations, nor (up to stuttering) the fair executions.
+
+### Typos and slips
+- In the proof of Proposition 18, "every execution of `P_thr[T₁]` is fair" should read "silent", and "set the
+  opinion of non leaders to 0" should read "to 1".
+- Observation 11 writes `C(S) = 0` for `C(P) = 0`.
+- Lemma 22 is stated for `S = T \ U` inside one protocol but used (Prop. 7) for `P[Tᵢ]` with
+  `U = T₁ ∪ ⋯ ∪ Tᵢ₋₁`; we state it for arbitrary `S`, `U`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Proposition 18 (`P_thr[T₁]` is silent: false monotonicity claim)
+The proof says that, "as observed in [1]", `aᵢ` (the total absolute value of the non-leaders) never increases, but a
+leader–leader step can raise it from 0 to 2 (`nonleaderAbs_not_antitone`).
+
+**Impact.** Statement true; repaired by ordering the measures lexicographically, with the number of leaders first
+(`t1_silent`).
+
+**Details.** The claim is `a₀ ≥ a₁ ≥ ⋯`. When two leaders meet, the responder becomes a non-leader and keeps the
+overflow `g(n, n')`. For example, with `c = 1` and `v = vmax = 2` (the case `c > 0` treated in the appendix), the
+`T₁`-step `(1,2,0),(1,2,0) ↦ (1,2,0),(0,2,0)` raises `a` from 0 to 2 (`nonleaderAbs_not_antitone`). Leader–leader
+steps lower the number of leaders, which the proof also uses.
+
+### 🛠️ Proposition 18 (missing saturated cases)
+The proof claims that, once leaders, `a` and the inconsistent leaders are stable, every non-silent `T₁`-transition
+is `(1,x,1),(0,0,0) ↦ (1,x,1),(0,0,1)`, which misses the *saturated* interactions (`saturated_flip`).
+
+**Impact.** Statement true; the conclusion survives once a fourth potential is added (`t1_silent`,
+`proposition_18_with`).
+
+**Details.** The missed transitions are `(1,v,0),(0,n,1) ↦ (1,v,0),(0,n,0)` for `n > 0`, and the mirror case
+`(1,−v,1),(0,n,0) ↦ (1,−v,1),(0,n,1)` for `n < 0` (`saturated_flip`). These flip opinions in one direction only.
+
+**Repair.** Our proof uses the lexicographic ranking (leaders, `a`, inconsistent leaders, flippable non-leaders) and
+checks that it strictly decreases on every non-silent `T₁`-transition (`t1_silent`). The paper's case split on the
+sign of `c` is unnecessary: the partition `T₁ = {t : pre(t) ∉ L₀ × N₁}`, `T₂ = T \ T₁` works for every `c`
+(`proposition_18_with`).
+
+### 🛠️ Proposition 17 (trap argument, trivial case)
+"The set of leaders forms a U-trap … which implies that `C'` contains a leader" only follows when some transition in
+`U = ⟦x⟧` moves an agent *into* the leaders.
+
+**Impact.** A minor gap: every listed transition of `P_thr` does, so in the paper's protocol the only missing case
+is `x = 0` (then `C' = C`). With the added silent non-leader transitions, `U` may consist of these only, and the
+flow equations show that the number of leaders is unchanged (`exists_leader_of_potReachVia`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -69,6 +92,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
   These are terminal and have no executions, so nothing changes.
 * `P_thr` is formalized for any value bound `v ≥ |c| + 1` with `|aᵢ| ≤ v` (`Threshold.protocol`). The paper's
   `vmax = max(|aᵢ|, |c| + 1)` is the instance `Threshold.Pthr`.
+
+**Proof remarks.** Proposition 19(a), "⇒ follows immediately from the definitions", needs fair executions to exist.
+With the paper's edge-based fairness, that takes a construction (a globally fair run of the "edge system";
+`exists_edgeFair`). An omitted routine step.
 
 **Main results in Lean.** (namespace `Podc.PPVerification`)
 

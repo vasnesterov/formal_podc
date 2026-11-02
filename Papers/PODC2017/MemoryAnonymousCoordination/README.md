@@ -14,46 +14,77 @@ claims and had to be repaired.
 
 ## Mistakes in the paper
 
-* **The algorithm proofs reason as if collects were atomic (Theorems 4.1, 5.2; proofs repaired).**
-  For Figure 2 the paper argues that once the first decider `i` has seen all registers equal to
-  `(i, v)`, every other process will find `v` in at least `n` entries at line 4. A process whose
-  collect started earlier sees a partly stale view, may keep another value and write it once more.
-  For Figure 3 there is a second problem: processes that already left round `r` keep writing records
-  of later rounds, so the number of `(v, r)` records does drop below `n`, and the catch-up of lines
-  8–12 is ignored. Both theorems are true. We prove them with a counting invariant: "registers not
-  carrying `v` plus processes that may still write one stale value ≤ `n − 1`", per round for Figure 3
-  (records of later rounds force catch-up and carry `(v, r)` in their history). A ghost invariant on
-  collects shows the invariant holds when the deciding collect starts.
-  (`Consensus.consensus_solves`, `Renaming.renaming_solves`)
-* **Theorem 3.3's proof states a false claim (proof repaired).** "Exactly one of the two processes
-  must find that less than `⌈m/2⌉` registers are set to its identifier, will give up, …, enabling
-  the other … to enter its critical section." With `m = 3`, both processes can give up with no CS
-  entry in between, and the first loser is not blocked. The schedule: `q` scans while `p` is exiting
-  and writes nothing; it then collects three `0`s and gives up. Meanwhile `p` calls `lock` again,
-  `q` leaves its wait loop on the empty memory, `q` writes two registers, `p` writes one, and `p`
-  gives up too. Deadlock-freedom still holds for every odd `m`. Our proof shows that at most
-  two give-ups occur while no operation completes. Without give-ups the memory stabilizes, and
-  oddness of `m` forces a decision. (`Mutex.theorem_3_3`; schedule in
-  `modelcheck/mutex_scenario.py`)
-* **Theorem 5.1's proof (proof repaired).** Item (4) claims that a process continuing alone into the
-  next round wins it. But records of that round written earlier by others may hold another value at
-  least `n` times; the solo process adopts it and loses that round too. Also, the proof never shows
-  that `myround` stays below `n`. Termination is proved by induction on `n − myround`, using the
-  invariant `myround + 1 ≤ |P|`. (`Renaming.renaming_obstructionFree`)
-* **Theorem 5.3's proof (proof repaired).** "The algorithm will terminate after `k` rounds" does not
-  bound the names. The repaired argument: a process acquiring name `a` sees a history naming `a − 1`
-  other distinct participants. Two processes cannot both get the name `n` by a counting argument.
-* **Pseudocode issues (⚠️).** Figure 2 line 6 and Figure 3 line 15 ("an arbitrary index `k` such that
-  `myview[k] ≠` own record; clearly, such an entry exists") have no such index in the deciding
-  iteration, because the until-test comes after the write. We let the write go anywhere (harmless).
-  Figure 2 ignores the value `0` at line 4 but does not exclude `0` as an input. With an input `0`
-  agreement fails (`n = 2`): process 1 with input `0` fills the registers and decides `0`, then
-  process 2 with input `1` decides `1`. We type inputs apart from the empty value.
-* **Minor.** The Section 6 proofs are correct. They leave implicit why the adversary may steer each
-  process's first write: until then it reads only initial values, so its run does not depend on its
-  numbering. For mutual exclusion, the covering processes must run round-robin, not solo, for
-  deadlock-freedom to apply. Theorem 3.2 holds for every `m ≥ 2`. Typos: Theorem 6.5's proof says
-  "in y" for "in x"; Theorem 5.1's item (3) says "increments mypref" for `myround`.
+### ⚠️ Figure 2, line 4 (an input equal to the initial value `0`)
+Figure 2 ignores the value `0` at line 4 but does not exclude `0` as an input, and with an input `0` agreement fails
+for `n = 2`.
+
+**Impact.** Implied assumption: `0` is plainly the "empty" value. We type inputs apart from the empty value, and
+consensus then holds (`Consensus.consensus_solves`).
+
+**Details.** Process 1 with input `0` fills the registers and decides `0`; then process 2 with input `1` ignores
+the `0` entries and decides `1`.
+
+### ⚠️ Figure 2, line 6 and Figure 3, line 15 (the "arbitrary index")
+The lines write to "an arbitrary index `k` such that `myview[k] ≠` own record; clearly, such an entry exists", but
+in the deciding iteration no such index exists, because the until-test comes after the write.
+
+**Impact.** Harmless: we let the write go anywhere, and the theorems hold for every admissible choice.
+
+### Typos and slips
+- Theorem 6.5's proof says "in y" for "in x".
+- Theorem 5.1's item (3) says "increments mypref" for `myround`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorems 4.1 and 5.2 (proofs treat collects as atomic)
+The proofs for Figures 2 and 3 argue as if collects were atomic: after the first decider `i` has seen all registers
+equal to `(i, v)`, every other process is claimed to find `v` in at least `n` entries at line 4.
+
+**Impact.** Both theorems are true; repaired with a counting invariant
+(`Consensus.consensus_solves`, `Renaming.renaming_solves`).
+
+**Details.** A process whose collect started earlier sees a partly stale view, may keep another value and write it
+once more. For Figure 3 there is a second problem: processes that already left round `r` keep writing records of
+later rounds, so the number of `(v, r)` records does drop below `n`, and the catch-up of lines 8–12 is ignored.
+
+**Repair.** The invariant is "registers not carrying `v` plus processes that may still write one stale value
+≤ `n − 1`", per round for Figure 3 (records of later rounds force catch-up and carry `(v, r)` in their history). A
+ghost invariant on collects shows the invariant holds when the deciding collect starts.
+(`Consensus.consensus_solves`, `Renaming.renaming_solves`)
+
+### 🛠️ Theorem 3.3 (Figure 1, deadlock-freedom)
+The proof claims "exactly one of the two processes must find that less than `⌈m/2⌉` registers are set to its
+identifier, will give up, …, enabling the other … to enter its critical section", but with `m = 3` both processes
+can give up with no CS entry in between.
+
+**Impact.** Statement true for every odd `m`; repaired (`Mutex.theorem_3_3`).
+
+**Details.** The first loser is not blocked. The schedule: `q` scans while `p` is exiting and writes nothing; it
+then collects three `0`s and gives up. Meanwhile `p` calls `lock` again, `q` leaves its wait loop on the empty
+memory, `q` writes two registers, `p` writes one, and `p` gives up too. (schedule in
+`modelcheck/mutex_scenario.py`)
+
+**Repair.** At most two give-ups occur while no operation completes. Without give-ups the memory stabilizes, and
+oddness of `m` forces a decision. (`Mutex.theorem_3_3`)
+
+### 🛠️ Theorem 5.1 (Figure 3, termination)
+Item (4) of the proof claims that a process continuing alone into the next round wins it, but earlier records of that
+round may hold another value at least `n` times, so the solo process adopts it and loses that round too.
+
+**Impact.** Statement true; repaired (`Renaming.renaming_obstructionFree`).
+
+**Details.** Also, the proof never shows that `myround` stays below `n`.
+
+**Repair.** Termination is proved by induction on `n − myround`, using the invariant `myround + 1 ≤ |P|`.
+(`Renaming.renaming_obstructionFree`)
+
+### 🛠️ Theorem 5.3 (Figure 3, adaptivity)
+The proof's "the algorithm will terminate after `k` rounds" does not bound the names.
+
+**Impact.** Statement true; repaired (`Renaming.renaming_solves`).
+
+**Repair.** A process acquiring name `a` sees a history naming `a − 1` other distinct participants. Two processes
+cannot both get the name `n` by a counting argument.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -100,6 +131,11 @@ The covering construction shared by Theorems 6.2, 6.3 and 6.5 is `Impl.covering_
 (`Podc/Computability/Distributed/SharedMemory/UnnamedCovering.lean`): since a process running alone
 from the initial memory reads only the common initial value until its first write, the adversary
 can choose its numbering so that this write goes to any prescribed register.
+
+**Proof remarks.** The Section 6 proofs are correct. They leave implicit why the adversary may steer each process's
+first write: until then it reads only initial values, so its run does not depend on its numbering. For mutual
+exclusion, the covering processes must run round-robin, not solo, for deadlock-freedom to apply. Theorem 3.2 holds
+for every `m ≥ 2`.
 
 **Not formalized.** Theorem 6.1 and Corollary 6.4 (they rely on results of [17] and the unpublished
 [25]); the k-set consensus remark; the election note. Theorems 3.1/3.4 (necessity of `m` odd,

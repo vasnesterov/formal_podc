@@ -13,26 +13,14 @@ go through; the missing steps are routine.
 
 ## Mistakes in the paper
 
-No mathematical errors were found in the checked statements. Imprecisions an expert should be aware of:
+No mistakes in the statements.
 
-- **What "≡ ¬G1 ∧ ¬G2" quantifies over.** The left-hand sides of Theorems 1–4 and 10 only see the transactions and
-  the values they read; Adya's phenomena are properties of a *history*, which also fixes a version order (and, for
-  SI, start/commit timestamps). The theorems are true when the history's version order and timestamps are
-  existentially quantified — exactly what the ⇒ halves of the proof sketches construct from `e` — and false if they
-  refer to a given history: two transactions that blindly write `x` and `y` are serializable, but with the version
-  order `x₀ ≪ x₁`, `y₁ ≪ y₀` the history exhibits G0 (so also G1); for that history Theorem 4 would even claim ¬G0
-  (`fixed_versionOrder_counterexample`). The paper's remark that its definitions "do not rely on timestamps" and
-  Theorem 4 (both sides then trivially true) confirm the existential reading, which we formalize.
-- **Proof sketches.** Theorem 1 (⇐) argues only with anti-dependency edges that a version read by `T` is not
-  overwritten before `T`; a writer whose version precedes the one read must be excluded via write-dependency edges, and
-  aborted reads via ¬G1a. Theorem 2 (⇒) needs NO-CONF (not just completeness) to give write-dependency edges a
-  start-dependency; its start points coincide for transactions sharing a snapshot (the paper's time oracle assigns
-  distinct timestamps — we perturb them); and for a transaction without operations every state is "complete", including
-  states after its parent state, so the chosen snapshot must be capped at the parent state. All routine.
-- **Small slips.** Section 3 says states hold values "produced by writes from aborted or committed transactions", but
-  executions apply only the transactions of `𝒯`, which must be the committed ones (otherwise Theorem 1 ⇒ fails on
-  aborted reads). Phenomenon G1b (intermediate reads) is vacuous under the paper's assumption that a transaction
-  writes a key at most once.
+### Typos and slips
+- Section 3 says states hold values "produced by writes from aborted or committed transactions", but executions
+  apply only the transactions of `𝒯`, which must be the committed ones (otherwise Theorem 1 ⇒ fails on aborted
+  reads).
+- Phenomenon G1b (intermediate reads) is vacuous under the paper's assumption that a transaction writes a key at most
+  once.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -55,6 +43,22 @@ Full list of differences (including modelling choices and minor imprecisions): [
 - Theorems assume `TxnSet.WellFormed`: a value of another transaction that is read was written by it, and a transaction
   reads its own value only after writing it (Adya's well-formedness; without the latter the equivalences fail
   trivially).
+
+**What "≡ ¬G1 ∧ ¬G2" quantifies over.** The left-hand sides of Theorems 1–4 and 10 only see the transactions and the
+values they read; Adya's phenomena are properties of a *history*, which also fixes a version order (and, for SI,
+start/commit timestamps). The theorems are true when the history's version order and timestamps are existentially
+quantified — exactly what the ⇒ halves of the proof sketches construct from `e` — and false if they refer to a given
+history: two transactions that blindly write `x` and `y` are serializable, but with the version order `x₀ ≪ x₁`,
+`y₁ ≪ y₀` the history exhibits G0 (so also G1); for that history Theorem 4 would even claim ¬G0
+(`fixed_versionOrder_counterexample`). The paper's remark that its definitions "do not rely on timestamps" and
+Theorem 4 (both sides then trivially true) confirm the existential reading, which we formalize.
+
+**Proof remarks.** Theorem 1 (⇐) argues only with anti-dependency edges that a version read by `T` is not overwritten
+before `T`; a writer whose version precedes the one read must be excluded via write-dependency edges, and aborted
+reads via ¬G1a. Theorem 2 (⇒) needs NO-CONF (not just completeness) to give write-dependency edges a
+start-dependency; its start points coincide for transactions sharing a snapshot (the paper's time oracle assigns
+distinct timestamps — we perturb them); and for a transaction without operations every state is "complete",
+including states after its parent state, so the chosen snapshot must be capped at the parent state. All routine.
 
 **Main results in Lean** (namespace `Podc.SeeingIsBelieving`).
 
