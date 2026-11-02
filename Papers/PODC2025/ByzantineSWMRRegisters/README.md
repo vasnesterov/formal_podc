@@ -14,28 +14,37 @@ formalized.
 
 ## Mistakes in the paper
 
-No false statements; the impossibility proof (histories H1–H3 of Figure 1) is sound. The gaps below are minor.
+No mistakes in the statements.
 
-* **Theorem 31 is derived from Theorem 29 and Observation 30 via an unproved composition step.** The derivation
-  needs this: composing a correct implementation of test-or-set *from a verifiable register* with a correct
-  implementation of the verifiable register *from SWMR registers* gives a correct implementation of test-or-set
-  *from SWMR registers*. The paper does not state this. Its Section 3.2 motivates Byzantine linearizability by
-  exactly this use ("as if it were an atomic object"), so the step is a standard tacit assumption. For
-  deterministic implementations it is plausible, but it is not trivial: Byzantine processes may deviate at both
-  levels. We avoid it. The proof of Theorem 29 only
-  uses three properties of a positive test: validity, unforgeability and relay (Lemma 28). We prove these for
-  every "signature-like" object directly from Byzantine linearizability. The impossibility then applies to all
-  four objects at once. (`SigTest.no_byzCorrect`, `theorem31_verifiable`, `theorem31_authenticated`,
-  `theorem31_sticky`)
-* **Degenerate value domains (implicit convention).** Theorem 31 for authenticated registers is false if the value
-  domain is `{v₀}`: then `Read` always returns `v₀` and `Verify(v₀)` always returns true, so every operation can
-  return immediately. The sticky register is likewise trivial for an empty domain. The paper speaks of
-  *multivalued* registers throughout, which excludes these cases, so this is an implicit convention rather than an
-  error. We make it explicit with the hypotheses `v ≠ v₀` and `Nonempty V`.
-  (`authenticated_unit_swmr`, `theorem31_authenticated`)
-* **Lemma 28 has only a proof sketch.** The sketch is correct, and we prove the lemma in full. (`SigTest.validity`,
-  `SigTest.unforgeability`, `SigTest.relay`)
-* Typo: Section 6 introduces the authenticated register as "a multivalued SWMR *verifiable* register".
+### Typos and slips
+- Section 6 introduces the authenticated register as "a multivalued SWMR *verifiable* register".
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 31 (derivation from Theorem 29 and Observation 30)
+Theorem 31 is derived from Theorem 29 and Observation 30 via an unstated composition property: a
+correct implementation of test-or-set *from a verifiable register*, composed with a correct
+implementation of the verifiable register *from SWMR registers*, gives a correct implementation of
+test-or-set *from SWMR registers*.
+
+**Impact.** Statement true; we avoid the composition and prove Theorem 31 directly for all four
+objects at once (`SigTest.no_byzCorrect`, `theorem31_verifiable`, `theorem31_authenticated`,
+`theorem31_sticky`).
+
+**Details.** The paper does not state the composition property. Its Section 3.2 motivates Byzantine
+linearizability by exactly this use ("as if it were an atomic object"), so the step is a standard
+tacit assumption. For deterministic implementations it is plausible, but it is not trivial:
+Byzantine processes may deviate at both levels.
+
+**Repair.** The proof of Theorem 29 only uses three properties of a positive test: validity,
+unforgeability and relay (Lemma 28). We prove these for every "signature-like" object directly from
+Byzantine linearizability. The impossibility then applies to all four objects at once.
+
+### 🛠️ Lemma 28 (proof sketch only)
+Lemma 28 has only a proof sketch.
+
+**Impact.** The sketch is correct, and we prove the lemma in full (`SigTest.validity`,
+`SigTest.unforgeability`, `SigTest.relay`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -71,6 +80,15 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Observation 30 | `observation30`, `observation30_verifiable`, `observation30_authenticated`, `observation30_sticky` | `Observation30.lean` |
 | Theorem 31 | `theorem31_verifiable`, `theorem31_authenticated`, `theorem31_sticky` | `Main.lean` |
 | (degenerate case) | `authenticated_unit_byzCorrect`, `authenticated_unit_swmr` | `Degenerate.lean` |
+
+The impossibility proof (histories H1–H3 of Figure 1) is sound.
+
+**Degenerate value domains (implicit convention).** Theorem 31 for authenticated registers is false if the value
+domain is `{v₀}`: then `Read` always returns `v₀` and `Verify(v₀)` always returns true, so every operation can
+return immediately. The sticky register is likewise trivial for an empty domain. The paper speaks of
+*multivalued* registers throughout, which excludes these cases, so this is an implicit convention rather than an
+error. We make it explicit with the hypotheses `v ≠ v₀` and `Nonempty V`.
+(`authenticated_unit_swmr`, `theorem31_authenticated`)
 
 **CSLib candidates.** `Podc/Computability/Distributed/SharedMemory/Byzantine/Model.lean` and `Restrict.lean`
 (Byzantine shared-memory model, Byzantine linearizability, replay, single-writer objects, termination ⇒ completion,

@@ -18,60 +18,99 @@ Theorem 6's per-process message bound fails only for `n = 1`, Algorithm 4 has a 
 
 ## Mistakes in the paper
 
-- **Theorem 13: the cited bound only covers halting times (imprecision; the statement is true).**
-  - **The step.** The proof turns the predicted algorithm into an algorithm `S'` without predictions on fewer
-    processes "that may fail by crashing". It then cites Dolev–Reischuk–Strong [21]: some execution with `f'`
-    faults takes `min{f'+2, t'+1}` rounds.
-  - **Fine for halting.** For crash faults, `min{f+2, t+1}` bounds the round in which all correct processes
-    *stop* (DRS). It also bounds the decision round of *uniform* consensus. The paper says that `A`
-    "terminates within `T(f)` rounds" and counts rounds "performed". Read literally as halting time, the
-    proof is correct.
-  - **Not enough for decisions.** We prove the stronger statement about the round in which the last honest
-    process *decides*. `S'` inherits only non-uniform agreement, and non-uniform crash consensus can decide
-    in `f+1` rounds. Example: `n = 3`, `t = 1`. Everyone relays all known inputs for `t+1` rounds. A process
-    that heard all `n` inputs in round 1 decides their minimum at once; the others decide the minimum they
-    know at round `t+1`. Failure-free runs decide at round `1 < min{f+2, t+1} = 2`. This does not contradict
-    the classical `t+1` bound, which concerns runs with `f = t`.
-  - **Repair.** The same simulation works with Byzantine `S'`. We prove the Byzantine early-deciding bound
-    `min{f'+2, t'+1}` ourselves. The usual chain argument gives `f'+1`; the extra round comes from one more
-    process that equivocates in the last round, which `f' < t'` allows.
-  - **Result.** Theorem 13 holds as stated, for decision times, for at least two values and `t < n − 1`
-    (`theorem13`, `earlyDecidingLB_strong`), for *unauthenticated* algorithms (see the model section).
-    Reaching *exactly* `f` faults needs padding with Byzantine processes that behave honestly (`padScenario`).
-- **Theorem 14: the choice of the faulty group has a gap (statement true).**
-  - **The gap.** The proof picks `B ⊆ S₀`, where `S₀` are the processes that "decide 0 for some prediction
-    when they receive no messages", and assumes w.l.o.g. `|S₀| ≥ ⌈(n−1)/2⌉`. A process receiving nothing need
-    not decide at all, because such a run need not be admissible. So `S₀ ∪ S₁` need not cover the processes.
-  - **Fix.** Split the processes by whether their isolated run ever decides `v₁`, and give the honest
-    processes the other value. Both cases contradict Agreement in `E_bad` (`t_sq_om`).
-  - **Also.** The paper proves Theorem 14 for broadcast and says it "implies the same bounds" for agreement.
-    The reduction only transfers the `t²` term. We prove both problems directly, with
-    `n + t² ≤ 8·#messages + 1` (`message_lower_bound`, `message_lower_bound_bb`).
-- **The abstract and introduction of arXiv v1 claim `Ω(n²)` messages (loose shorthand).** The theorem gives
-  `Ω(n + t²)`, which is `Ω(n²)` only when `t = Θ(n)` (the usual convention for Dolev–Reischuk). Read
-  literally, `Ω(n²)` is false for small `t`: for `t = 0`, "everyone sends to `p₁`, `p₁` broadcasts the
-  minimum" uses `2(n−1)` messages. The PODC abstract states `Ω(n + t²)`.
-- **Lemma 23 (committee agreement) has a proof gap (statement true).** "If `p_i` received a chain for `x` in
-  the first `k` rounds, it broadcast one" ignores that `p_i` relays only values it *adds*, at most two. The
-  fix is to argue from the round in which `x` entered `X_i` (`lemma23`).
-- **A remark in the introduction of Section 7 is false (never used).** It says that when `k` is too small,
-  "if any honest process decides, then they all decide". Counterexample: `k = 0` and two honest processes
-  whose first-ranked process is a different faulty one; one leader sends `v` everywhere, the other stays
-  silent. The first process decides `v` at line 12, the second never decides. Algorithm 1 only needs
-  termination, so nothing depends on this (not formalized).
-- **Minor.**
-  - The paper's hypotheses are stronger than needed: Lemma 5 needs only `1 ≤ ℓ ≤ r ≤ n − f`, and Lemma 6's
-    hypothesis is unnecessary.
-  - Lemma 6 is stated ambiguously; we prove the union version used by Lemma 24.
-  - The per-process message bound of Theorem 6 fails for `n = 1`.
-  - Asymptotic statements omit `+1`s: `O(min{B/n, f})` should be `O(min{B/n, f} + 1)`, and `log(·)` should be
-    `log(· + 2)`.
-  - Under-specified tie-breaking and defaults (Algorithm 3 line 14, empty `T_i ∩ L_i`, all-`⊥` outputs).
-  - Typos:
-    - the position formula for `c[i] = 0`;
-    - Algorithm 4 line 4 has `y ∈ L_y` for `y ∈ T_i`;
-    - Theorem 6 says "Algorithm 5" for Algorithm 7;
-    - Algorithm 7 line 8 has `v_i` for `x_i`.
+### ⚠️ Abstract and introduction of arXiv v1 (`Ω(n²)` messages)
+They claim an `Ω(n²)` message lower bound, but the theorem gives `Ω(n + t²)`, and read literally
+`Ω(n²)` is false for small `t`: for `t = 0`, "everyone sends to `p₁`, `p₁` broadcasts the
+minimum" uses `2(n−1)` messages.
+
+**Impact.** Loose shorthand: `Ω(n + t²)` is `Ω(n²)` when `t = Θ(n)` (the usual convention for
+Dolev–Reischuk), and the PODC abstract states `Ω(n + t²)`. Theorem 14 itself holds.
+
+### ⚠️ Theorem 6 (per-process message bound, `n = 1`)
+The per-process message bound of Theorem 6 fails for `n = 1`.
+
+**Impact.** Degenerate case; the round bound and the `O(nk²)` total hold.
+
+### ⚠️ Algorithm 4, line 4 (typo)
+Line 4 has `y ∈ L_y` where it should be `y ∈ T_i`.
+
+**Impact.** Typo with evident intent; Algorithms 3–4 and Theorem 5 hold with the intended reading.
+
+### ⚠️ Introduction of Section 7 (remark on too-small `k`)
+The remark that, when `k` is too small, "if any honest process decides, then they all decide" is
+false: with `k = 0`, two honest processes whose first-ranked process is a different faulty one can
+disagree on whether to decide (not formalized).
+
+**Impact.** Never used: Algorithm 1 only needs termination, so nothing depends on this.
+
+**Details.** Take `k = 0` and two honest processes whose first-ranked process is a different faulty
+one; one leader sends `v` everywhere, the other stays silent. The first process decides `v` at line
+12, the second never decides.
+
+### Typos and slips
+- Lemma 6 is stated ambiguously; we prove the union version used by Lemma 24.
+- Asymptotic statements omit `+1`s: `O(min{B/n, f})` should be `O(min{B/n, f} + 1)`, and `log(·)`
+  should be `log(· + 2)`.
+- Under-specified tie-breaking and defaults (Algorithm 3 line 14, empty `T_i ∩ L_i`, all-`⊥`
+  outputs).
+- The position formula for `c[i] = 0` has a typo.
+- Theorem 6 says "Algorithm 5" for Algorithm 7.
+- Algorithm 7 line 8 has `v_i` for `x_i`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 13 (the cited crash-fault bound covers halting, not decision times)
+The proof cites Dolev–Reischuk–Strong [21] for crash faults, whose bound `min{f'+2, t'+1}` holds
+for halting times (and uniform consensus) but not for the round in which the last honest process
+decides.
+
+**Impact.** Statement true (an imprecision); proved as stated, for decision times, for at least
+two values and `t < n − 1` (`theorem13`, `earlyDecidingLB_strong`), for *unauthenticated*
+algorithms (see the model section).
+
+**Details.**
+- **The step.** The proof turns the predicted algorithm into an algorithm `S'` without predictions
+  on fewer processes "that may fail by crashing". It then cites Dolev–Reischuk–Strong [21]: some
+  execution with `f'` faults takes `min{f'+2, t'+1}` rounds.
+- **Fine for halting.** For crash faults, `min{f+2, t+1}` bounds the round in which all correct
+  processes *stop* (DRS). It also bounds the decision round of *uniform* consensus. The paper says
+  that `A` "terminates within `T(f)` rounds" and counts rounds "performed". Read literally as
+  halting time, the proof is correct.
+- **Not enough for decisions.** We prove the stronger statement about the round in which the last
+  honest process *decides*. `S'` inherits only non-uniform agreement, and non-uniform crash
+  consensus can decide in `f+1` rounds. Example: `n = 3`, `t = 1`. Everyone relays all known
+  inputs for `t+1` rounds. A process that heard all `n` inputs in round 1 decides their minimum at
+  once; the others decide the minimum they know at round `t+1`. Failure-free runs decide at round
+  `1 < min{f+2, t+1} = 2`. This does not contradict the classical `t+1` bound, which concerns runs
+  with `f = t`.
+
+**Repair.** The same simulation works with Byzantine `S'`. We prove the Byzantine early-deciding
+bound `min{f'+2, t'+1}` ourselves. The usual chain argument gives `f'+1`; the extra round comes
+from one more process that equivocates in the last round, which `f' < t'` allows. Reaching
+*exactly* `f` faults needs padding with Byzantine processes that behave honestly (`padScenario`).
+
+### 🛠️ Theorem 14 (choice of the faulty group)
+The proof assumes w.l.o.g. `|S₀| ≥ ⌈(n−1)/2⌉` for the processes `S₀` that "decide 0 for some
+prediction when they receive no messages", but a process receiving nothing need not decide at all,
+so `S₀ ∪ S₁` need not cover the processes.
+
+**Impact.** Statement true; repaired (`t_sq_om`), and proved directly for both agreement and
+broadcast (`message_lower_bound`, `message_lower_bound_bb`).
+
+**Details.** The proof picks the faulty group `B ⊆ S₀`. A process receiving nothing need not decide because such a run need not be
+admissible. Also, the paper proves Theorem 14 for broadcast and says it "implies the same bounds"
+for agreement; the reduction only transfers the `t²` term.
+
+**Repair.** Split the processes by whether their isolated run ever decides `v₁`, and give the
+honest processes the other value. Both cases contradict Agreement in `E_bad` (`t_sq_om`). We prove
+both problems directly, with `n + t² ≤ 8·#messages + 1`.
+
+### 🛠️ Lemma 23 (committee agreement)
+The step "if `p_i` received a chain for `x` in the first `k` rounds, it broadcast one" ignores that
+`p_i` relays only values it *adds*, at most two.
+
+**Impact.** Statement true; repaired by arguing from the round in which `x` entered `X_i`
+(`lemma23`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -115,6 +154,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Algorithm 6, Lemmas 21–23, Observation 3 | `AuthBA.lemma21`, `lemma22_honest/faulty`, `lemma23`, `observation3` | `AuthBB.lean`, `AuthMsgs.lean` |
 | Algorithm 7, Lemmas 24–27, Theorem 6 (`k+3` rounds, `O(nk²)` messages) | `AuthBA.alg`, `lemma24_*`, `lemma26`, `lemma27`, `theorem6`, `theorem6_messages` | `AuthAlg.lean`, `AuthBA.lean`, `AuthMsgs.lean` |
 | Lemmas 28–32 (wrapper), Lemma 33 (rounds), round part of Theorems 11/12 | `Wrapper.Trace.lemma28`, `lemma29`, `lemma30_32`, `lemma31`, `agreement`, `rounds_le`, `theorem11_rounds` | `Wrapper.lean` |
+
+The paper's hypotheses are stronger than needed: Lemma 5 needs only `1 ≤ ℓ ≤ r ≤ n − f`, and Lemma 6's
+hypothesis is unnecessary.
 
 **Not formalized.**
 - The cited graded-consensus and early-stopping protocols, and the formal composition of the sub-protocols
