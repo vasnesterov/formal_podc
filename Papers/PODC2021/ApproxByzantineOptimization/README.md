@@ -15,55 +15,69 @@ does not cover that reading. Lemma 1 is true, except in the degenerate case `f �
 
 ## Mistakes in the paper
 
-* **Theorem 1 is under-specified.** Definition 2 is a property of an algorithm in the executions
-  with given cost functions. The theorem talks about "the agents' cost functions". We formalize three
-  readings.
-  - *(a) Per profile (literal): false.* Take `n = 3`, `f = 1`, `d = 1` and costs `(x − a)²`, `(x + a)²`,
-    `2a|x|` with `a > 0`. They are convex and every aggregate has a unique minimum point, as in the
-    proof's own scenario. Every pair of agents has `arg min = {0}`, so the algorithm "always output
-    0" is `(1, 0)`-resilient, i.e. exactly fault-tolerant. But `arg min Q₀ = {a}` is at distance `a`
-    from `arg min (Q₀ + Q₁) = {0}`, so the costs are not `(2, ε)`-redundant for any `ε < a`. Since `a`
-    is arbitrary, no constant factor helps either. For a fixed profile, an `(f, ε)`-resilient
-    algorithm exists iff some point is within `ε` of every `(n − f)`-`arg min`. Redundancy plays no
-    role there. (`theorem_1_false_per_profile`, `exists_isResilient_iff`)
-  - *(b) All inputs: vacuous.* The proof turns the faulty agents' fabricated functions into the true
-    costs of a second execution. So it needs the algorithm to be correct on all profiles. On that
-    class no deterministic algorithm is `(f, ε)`-resilient once `1 ≤ f < n`, whatever the
-    redundancy, even with quadratic costs `‖x − cᵢ‖²`. The theorem then holds only because its
-    hypothesis is never met. (`theorem_1_uniform`, `no_uniform_resilience`)
-  - *(c) Redundant inputs: true, proof repaired.* The meaningful version is: if `ε < ε'`, no
-    deterministic algorithm is `(f, ε)`-resilient on all profiles satisfying Assumption 1 and
-    `(2f, ε')`-redundancy. Equivalently, resilience `ε` on that class forces `ε' ≤ ε`. With Theorem 2,
-    the best resilience on the class lies in `[ε', 2ε']`. The paper's proof does not establish this:
-    its second profile (the reflected faulty functions) is not shown to be `(2f, ε')`-redundant. We
-    prove it for all `n > 2f ≥ 2` and every `ℝ^d`, `d ≥ 1`, with one profile supported on the three
-    points `−v, 0, v`, `‖v‖ = ε'`. The `f` agents of group 2 pull towards `v`, the `f` agents of group
-    3 towards `−v`, and the rest prefer `0`. A set has `v` (resp. `−v`) as a minimum point only if it
-    contains group 2 and not group 3 (resp. the converse). So nested sets always have their `arg min`s
-    together in `{0, v}` or in `{0, −v}`, and the redundancy is `ε'`. The `n − f` agents outside group
-    3 have `arg min {v}`, those outside group 2 have `{−v}`, at distance `2ε' > 2ε`. These costs are
-    discontinuous, which Section 3 allows. (`theorem_1_corrected`, `theorem_1_class`,
-    `resilience_window`)
-* **The Theorem 2 algorithm misses a case.** Step 2 picks `x_T ∈ arg min ∑_{i∈T} Qᵢ` for *every*
-  set `T` of `n − f` received functions. It also takes distances to `arg min ∑_{i∈T̂} Qᵢ`. If `T`
-  contains faulty agents, these sets may be empty, and then Step 2
-  is undefined. For example, a faulty agent can send minus the other agents' aggregate plus a
-  non-zero linear function, so that the aggregate is linear and has no minimum. Repair: pick an
-  arbitrary point, and let the distance to `∅` be `+∞`. The proof then goes through unchanged, since it uses `x_T ∈ arg min` only for a fully non-faulty `T`. This is a
-  proof-level gap; the statement is true. (`algorithm`, `theorem_2`)
-* **Lemma 1 fails for `f ≥ n`.** For `f = n` the only set of `n − f` non-faulty agents is `∅`, whose
-  `arg min` is all of `ℝ^d`. So every algorithm is `(n, 0)`-resilient. For `f > n` the condition is
-  empty. False only in a degenerate case. For `n/2 ≤ f < n` the lemma holds in the reading of its
-  proof (no algorithm works for all profiles). Read per profile, it is false (e.g. all costs equal),
-  just like Theorem 1. In the uniform reading, `f ≥ 1` already suffices. (`lemma_1`,
-  `lemma_1_false_of_le`, `no_uniform_resilience`)
-* **Smaller points.**
-  - Theorem 2 needs neither the closedness in Assumption 1 nor redundancy outside the current
-    non-faulty set. An `inf`/triangle-inequality argument replaces the nearest points `z` and `x*`.
-    Only `arg min ≠ ∅` and the redundancy inequality for sets of non-faulty agents are used
-    (`theorem_2_strong`). It also holds for `f = 0`, which the proof excludes.
-  - Theorem 1's proof writes `n − 2f ≤ |Ŝ| < n − f`, while Definition 3 has `|Ŝ| = n − 2f`. This is
-    harmless.
+### ⚠️ Theorem 1 (`(f, ε)`-resilience ⇒ `(2f, ε)`-redundancy)
+Theorem 1 does not say on which inputs the algorithm must work: read for the given cost functions it is false
+(`n = 3`, `f = 1`, `d = 1`, `theorem_1_false_per_profile`), read for all inputs it is vacuous
+(`theorem_1_uniform`), and read for `(2f, ε')`-redundant inputs it is true but not covered by the paper's proof
+(`theorem_1_corrected`).
+
+**Impact.** Under the meaningful class reading the statement holds for all `n > 2f ≥ 2` and every `ℝ^d`,
+`d ≥ 1`. With Theorem 2, the best resilience on that class lies in `[ε', 2ε']` (`resilience_window`).
+
+**Details.** Definition 2 is a property of an algorithm in the executions with given cost functions. The
+theorem talks about "the agents' cost functions". We formalize three readings.
+- *(a) Per profile (literal): false.* Take `n = 3`, `f = 1`, `d = 1` and costs `(x − a)²`, `(x + a)²`, `2a|x|`
+  with `a > 0`. They are convex and every aggregate has a unique minimum point, as in the proof's own scenario.
+  Every pair of agents has `arg min = {0}`, so the algorithm "always output 0" is `(1, 0)`-resilient, i.e.
+  exactly fault-tolerant. But `arg min Q₀ = {a}` is at distance `a` from `arg min (Q₀ + Q₁) = {0}`, so the
+  costs are not `(2, ε)`-redundant for any `ε < a`. Since `a` is arbitrary, no constant factor helps either.
+  For a fixed profile, an `(f, ε)`-resilient algorithm exists iff some point is within `ε` of every
+  `(n − f)`-`arg min`. Redundancy plays no role there. (`theorem_1_false_per_profile`,
+  `exists_isResilient_iff`)
+- *(b) All inputs: vacuous.* The proof turns the faulty agents' fabricated functions into the true costs of a
+  second execution. So it needs the algorithm to be correct on all profiles. On that class no deterministic
+  algorithm is `(f, ε)`-resilient once `1 ≤ f < n`, whatever the redundancy, even with quadratic costs
+  `‖x − cᵢ‖²`. The theorem then holds only because its hypothesis is never met. (`theorem_1_uniform`,
+  `no_uniform_resilience`)
+- *(c) Redundant inputs: true, proof repaired.* The meaningful version is: if `ε < ε'`, no deterministic
+  algorithm is `(f, ε)`-resilient on all profiles satisfying Assumption 1 and `(2f, ε')`-redundancy.
+  Equivalently, resilience `ε` on that class forces `ε' ≤ ε`. The paper's proof does not establish this: its
+  second profile (the reflected faulty functions) is not shown to be `(2f, ε')`-redundant.
+
+**Repair.** We prove (c) for all `n > 2f ≥ 2` and every `ℝ^d`, `d ≥ 1`, with one profile supported on the
+three points `−v, 0, v`, `‖v‖ = ε'`. The `f` agents of group 2 pull towards `v`, the `f` agents of group 3
+towards `−v`, and the rest prefer `0`. A set has `v` (resp. `−v`) as a minimum point only if it contains group 2
+and not group 3 (resp. the converse). So nested sets always have their `arg min`s together in `{0, v}` or in
+`{0, −v}`, and the redundancy is `ε'`. The `n − f` agents outside group 3 have `arg min {v}`, those outside
+group 2 have `{−v}`, at distance `2ε' > 2ε`. These costs are discontinuous, which Section 3 allows.
+(`theorem_1_corrected`, `theorem_1_class`, `resilience_window`)
+
+### ⚠️ Lemma 1 for `f ≥ n`
+Lemma 1 fails for `f ≥ n`: for `f = n` the only set of `n − f` non-faulty agents is `∅`, whose `arg min` is all
+of `ℝ^d`, so every algorithm is `(n, 0)`-resilient (`lemma_1_false_of_le`).
+
+**Impact.** Degenerate case. For `n/2 ≤ f < n` the lemma holds in the reading of its proof (no algorithm works
+for all profiles) (`lemma_1`); in the uniform reading, `f ≥ 1` already suffices (`no_uniform_resilience`).
+
+**Details.** For `f > n` the condition is empty. Read per profile, Lemma 1 is false (e.g. all costs equal),
+just like Theorem 1.
+
+### Typos and slips
+- Theorem 1's proof writes `n − 2f ≤ |Ŝ| < n − f`, while Definition 3 has `|Ŝ| = n − 2f`. This is harmless.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 2 (the algorithm misses a case)
+Step 2 of the algorithm picks `x_T ∈ arg min ∑_{i∈T} Qᵢ` for *every* set `T` of `n − f` received functions, but
+if `T` contains faulty agents this `arg min` may be empty, and then Step 2 is undefined.
+
+**Impact.** Statement true; repaired (`algorithm`, `theorem_2`).
+
+**Details.** Step 2 also takes distances to `arg min ∑_{i∈T̂} Qᵢ`. For example, a faulty agent can send minus
+the other agents' aggregate plus a non-zero linear function, so that the aggregate is linear and has no minimum.
+
+**Repair.** Pick an arbitrary point, and let the distance to `∅` be `+∞`. The proof then goes through
+unchanged, since it uses `x_T ∈ arg min` only for a fully non-faulty `T`. (`algorithm`, `theorem_2`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -101,6 +115,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 2 | `theorem_2` | `Sufficiency.lean` |
 | — honest-only hypotheses, no closedness | `theorem_2_strong` | `Sufficiency.lean` |
 | Theorems 1 + 2: window `[ε', 2ε']` | `resilience_window` | `Main.lean` |
+
+Theorem 2 needs neither the closedness in Assumption 1 nor redundancy outside the current non-faulty set. An
+`inf`/triangle-inequality argument replaces the nearest points `z` and `x*`. Only `arg min ≠ ∅` and the
+redundancy inequality for sets of non-faulty agents are used (`theorem_2_strong`). It also holds for `f = 0`,
+which the proof excludes.
 
 **Not formalized.** Appendix B ((f, 0)-resilience ⇔ exact fault tolerance). The remark "2f-redundancy
 ⇔ (2f, 0)-redundancy". Sections 4–5 (DGD with CGE/CWTM gradient filters, Theorems 3–6) and the

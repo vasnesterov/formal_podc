@@ -22,57 +22,72 @@ reading of its "fill rule" it violates agreement.
 
 ## Mistakes in the paper
 
-* **Lemma 4 is false: a correct node can terminate without witnessing a good round.** Take `n = 7`
-  with correct nodes `2,…,6` and Byzantine nodes `0, 1`. Both Byzantine nodes make themselves
-  known to everybody in round 1, so the thresholds are 3 and 5 copies. They then play their
-  `init`/`echo` messages so that:
-  - in iteration 0, only node `2` gets 5 copies of `echo(1)`; so node `2` selects `1` and the
-    others select `2`;
-  - in iteration 1, the others add `1` and node `2` adds `0`. Node `2` now has
-    `C_2 = {0,…,6}` and selects `C_2[1] = 1` again; the others have `C = {1,…,6}` and select
-    `C[1] = 2` again.
+### 🚨 Theorem 1 (BA) / Theorem 2 (full version): rotor-coordinator
+There need not be a round in which every correct node accepts the opinion of a common correct coordinator: in
+the `n = 7, f = 2` run of Lemma 4 below no correct node ever accepts any opinion, and an independent gap
+already appears for `n = 4, f = 1` (`Cex.theorem1_false`, `Cex4.theorem1_false`).
 
-  Everybody "reselects" and breaks in iteration 1, and no iteration was ever good. The proof's last
-  step treats `C_v` as fixed ("a reselected node is in `{C_v[r mod |C_v|] : r < r_c}`"). But `C_v`
-  is kept sorted, and inserting a smaller identifier shifts the index back onto the previous
-  coordinator. (`Cex.lemma4_false`, `Cex.no_good`)
-* **Theorem 1 is false: there need not be a round in which every correct node accepts the opinion
-  of a common correct coordinator.** In the run above no correct node ever accepts any opinion. A
-  second, independent gap shows up already for `n = 4, f = 1`. Iteration 1 there *is* a good round,
-  but two correct nodes reselect in that very iteration and break. The coordinator's opinion would
-  only be accepted in the next iteration, so they never accept it. The termination half of
-  Theorem 1 does hold: everybody breaks within `n` iterations. (`Cex.theorem1_false`,
-  `Cex4.theorem1_false`, `paper_terminates`)
-  *Repair:* break once `2r > n_v` instead of on reselection. Since `n_v ≥ g > 2f`, nobody stops
-  before iteration `f + 1`. We prove that some iteration `r ≤ f` is good, and that in iteration
-  `r + 1` every correct node accepts exactly the coordinator's opinion. Every node stops by
-  iteration `⌊n/2⌋ + 1`. The bound `r ≤ f` is tight in a bounded search. (`rotor_fixed`)
-* **Full version, Algorithm 3: the fill rule is under-specified, and its natural reading breaks
-  agreement.** The rule says that a node `v`
-  that sends nothing is assumed to have sent what the receiver itself sent in the previous round.
-  It is meant for terminated nodes. But correct nodes are also silent when they miss a threshold,
-  and their silence then counts as support for the receiver's value. With `n = 4, f = 1` and inputs
-  `0, 0, 1`:
-  - node `1` alone sends `prefer(0)`;
-  - it counts the two silent correct nodes as `prefer(0)` and then as `strongprefer(0)`, and
-    decides `0`;
-  - the others adopt the Byzantine coordinator's `1`, and in the next phase one of them decides
-    `1` by the same mechanism.
+**Impact.** One of the two algorithms the abstract presents fails as written. The termination half of
+Theorem 1 does hold (everybody breaks within `n` iterations, `paper_terminates`), and a one-line change of the
+termination rule repairs the rotor-coordinator with the claimed `O(n)` rounds (`rotor_fixed`).
 
-  The Lean witness adds the fill rule to our (otherwise verified) phase layout, so this is an
-  under-specified algorithm rather than a refutation of Algorithm 3 verbatim.
-  (`FillCex.fill_rule_breaks_agreement`; the same adversary is harmless without the rule:
-  `FillCex.without_fill`)
-* **Full version, Theorem 3: proof gaps; statement true.** The proof relies on the false
-  Theorem 2. The coordinator's opinion is taken from the previous phase, but Lemma 11 needs the
-  current one. A rotor `break` inside the consensus is not specified. We verify a repaired
-  Algorithm 3: the coordinator broadcasts its current opinion in the same phase, there is no fill
-  rule, and decided nodes keep participating. It satisfies agreement, validity, and termination
-  within `3f + 7` rounds, which confirms both the BA's `O(n)` and the full version's `O(f)`.
-  (`consensus_correct`, `consensus_validity_bool`)
-* **Small slips.**
-  - The inequality chain in the proof of Lemma 1 is garbled. What is needed is `g > 2f_v'`.
-  - Lemma 3 (relay) silently assumes that no correct node has terminated yet.
+**Details.** For `n = 4, f = 1`, iteration 1 *is* a good round, but two correct nodes reselect in that very
+iteration and break. The coordinator's opinion would only be accepted in the next iteration, so they never
+accept it.
+
+**Repair.** Break once `2r > n_v` instead of on reselection. Since `n_v ≥ g > 2f`, nobody stops before
+iteration `f + 1`. We prove that some iteration `r ≤ f` is good, and that in iteration `r + 1` every correct
+node accepts exactly the coordinator's opinion. Every node stops by iteration `⌊n/2⌋ + 1`. The bound `r ≤ f`
+is tight in a bounded search. (`rotor_fixed`)
+
+### ❌ Lemma 4 (BA) / Lemma 7 (full version): good round
+A correct node can terminate without witnessing a good round: with `n = 7`, `f = 2`, every correct node
+"reselects" and breaks in iteration 1, and no iteration was ever good (`Cex.lemma4_false`, `Cex.no_good`).
+
+**Impact.** The good-round lemma behind Theorem 1 is false; the repaired rule above restores a good round
+among the first `f + 1` iterations (`rotor_fixed`).
+
+**Details.** Take `n = 7` with correct nodes `2,…,6` and Byzantine nodes `0, 1`. Both Byzantine nodes make
+themselves known to everybody in round 1, so the thresholds are 3 and 5 copies. They then play their
+`init`/`echo` messages so that:
+- in iteration 0, only node `2` gets 5 copies of `echo(1)`; so node `2` selects `1` and the others select `2`;
+- in iteration 1, the others add `1` and node `2` adds `0`. Node `2` now has `C_2 = {0,…,6}` and selects
+  `C_2[1] = 1` again; the others have `C = {1,…,6}` and select `C[1] = 2` again.
+
+The proof's last step treats `C_v` as fixed ("a reselected node is in `{C_v[r mod |C_v|] : r < r_c}`"). But
+`C_v` is kept sorted, and inserting a smaller identifier shifts the index back onto the previous coordinator.
+
+### ⚠️ Full version, Algorithm 3 (the fill rule)
+Algorithm 3's fill rule is under-specified, and under its natural reading silent correct nodes count as support
+for the receiver's value, which breaks agreement for `n = 4, f = 1` (`FillCex.fill_rule_breaks_agreement`).
+
+**Impact.** An under-specified algorithm rather than a refutation of Algorithm 3 verbatim: the Lean witness adds
+the fill rule to our (otherwise verified) phase layout. The same adversary is harmless without the rule
+(`FillCex.without_fill`).
+
+**Details.** The rule says that a node `v` that sends nothing is assumed to have sent what the receiver itself
+sent in the previous round. It is meant for terminated nodes. But correct nodes are also silent when they miss a
+threshold. With `n = 4, f = 1` and inputs `0, 0, 1`:
+- node `1` alone sends `prefer(0)`;
+- it counts the two silent correct nodes as `prefer(0)` and then as `strongprefer(0)`, and decides `0`;
+- the others adopt the Byzantine coordinator's `1`, and in the next phase one of them decides `1` by the same
+  mechanism.
+
+### Typos and slips
+- The inequality chain in the proof of Lemma 1 is garbled. What is needed is `g > 2f_v'`.
+- Lemma 3 (relay) silently assumes that no correct node has terminated yet.
+
+## Proof gaps (statements true)
+
+### 🛠️ Full version, Theorem 3 (consensus)
+The proof relies on the false Theorem 2, takes the coordinator's opinion from the previous phase although
+Lemma 11 needs the current one, and does not specify a rotor `break` inside the consensus.
+
+**Impact.** Statement true: we verify a repaired Algorithm 3, which confirms both the BA's `O(n)` and the full
+version's `O(f)` (`consensus_correct`, `consensus_validity_bool`).
+
+**Repair.** The coordinator broadcasts its current opinion in the same phase, there is no fill rule, and decided
+nodes keep participating. This satisfies agreement, validity, and termination within `3f + 7` rounds.
 
 Full list of differences (including modelling choices and minor imprecisions):
 [differencies.md](differencies.md).

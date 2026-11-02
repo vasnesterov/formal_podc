@@ -9,78 +9,94 @@ version: arXiv [2102.08325](https://arxiv.org/abs/2102.08325) v2. Copy of the pa
 
 ## Mistakes in the paper
 
-* **Lemma 1 is false for indirectly committed leaders, so the proof of Proposition 2 (total order)
-  has a gap.**
-  - Section 6.1 says a process *commits* a leader when it pops it from the stack. Leaders reached
-    in lines 39–43 count too. Lemma 1 says every later leader in anyone's DAG has a strong path to
-    every committed leader.
-  - The proof assumes the commit rule of line 36 was met, which is true only for *direct* commits.
-  - Section 5 introduces Lemma 1 right after the commit rule, so it can be read as speaking of
-    direct commits only. Under that reading Lemma 1 is true (`lemma1_direct`), and the gap moves to
-    Proposition 2, whose proof applies it to every committed leader.
-  - Counterexample with `n = 4`, `f = 1`, observed by correct process `3`, whose DAG at
-    `wave_ready(w)` holds all vertices of rounds `1..4w` except its own `(4w, 3)` (a realizable view):
-    - Waves 1 and 2 fail the commit rule (only one round-4/round-8 vertex reaches the leader).
-    - The wave-2 leader `v₂ = (5,0)` points only to round-4 vertices that avoid `v₁ = (1,0)`.
-    - Wave 3 commits `v₃ = (9,0)` directly. `v₃` reaches `v₁` (via `(5,1) → (4,0)`) but not `v₂`.
-    - So the process commits `v₁` and then `v₃`, while the later leader `v₂` sits in its DAG with
-      no strong path to `v₁`.
-  - Total order still holds. Lemma 1 for *direct* commits is enough: the output of a process is
-    always the delivery of the full greedy chain of its last directly committed leader, and that
-    chain depends only on the global DAG. (`Lemma1Counterexample.lemma1_false`; repaired:
-    `lemma1_direct`, `orun_inv`, `delivered_prefix`, `total_order`)
-* **Chain quality (Section 3, stated without proof) depends on the unspecified delivery order.**
-  - `order_vertices` delivers a causal history "in some deterministic order". If that order lists
-    vertices by source first, the claim is false. In a lock-step run with `n = 4` and Byzantine
-    process `0` that behaves correctly:
-    - wave 1 delivers the leader `(1,1)`;
-    - wave 2 then delivers `(1,0), (2,0), …`.
-    - The prefix of size `2f + 1 = 3` therefore has only one correct block.
-  - For any round-major order (rounds non-decreasing, any order within a round, even Byzantine
-    first) the claim is true. Every prefix of the output has `≥ 2f + 1` vertices in each round below
-    its top round, and at most `f` Byzantine vertices per round.
+### ❌ Lemma 1 (strong paths to committed leaders)
+Lemma 1 is false for indirectly committed leaders: with `n = 4`, `f = 1`, a process commits `v₁` and then `v₃`,
+while the later wave-2 leader `v₂` sits in its DAG with no strong path to `v₁`
+(`Lemma1Counterexample.lemma1_false`).
 
-  Classification: under-specified definition. (`ChainQualityCounterexample.chain_quality_false`;
-  `chain_quality`)
-* **The probability argument (Lemma 2 → Claim 6) needs a stronger Lemma 2; the statement is true.**
-  - Lemma 2 gives each process a set `V` from its *own* DAG at the time it completes the wave.
-  - The coin is revealed as soon as `f + 1` processes have called it, so the adversary may know
-    the leader before slower correct processes complete the wave.
-  - We prove the needed *robust* version. Take any `2f + 1` round-3 vertices that exist; this
-    already holds when the first correct process completes the wave, i.e. before the reveal.
-    Let the core be the round-1 sources reached by `≥ f + 1` of them. Then:
-    - the core has `≥ 2f + 1` members (double counting; this replaces the informal appeal to the
-      common-core protocol);
-    - every round-4 vertex ever created, Byzantine or not, strongly reaches the whole core;
-    - the core is determined by the past of those vertices.
-  - With a perfect coin the expected number of waves until a commit is `≤ (3f+1)/(2f+1) ≤ 3/2`.
-    The paper's "`≤ 3/2 + ε`" is slightly off for `ε > 0`: `1/(2/3 − ε) > 3/2 + ε`.
-  (`core_card`, `sPath_of_mem_core`, `core_congr`, `lemma2`, `goodWave_of_core`,
-  `Coin.dagRider_expected_waves`)
-* **Claim 2's "induction on rounds" is unsound as written; the statement is true.**
-  - Line 25 checks only the strong edges, so a Byzantine vertex may have weak edges to vertices
-    of the same or a higher round.
-  - The proof also assumes every correct process eventually reaches the vertex's round. That
-    progress claim is never proved and itself needs Claim 2.
+**Impact.** The proof of Proposition 2 (total order) applies Lemma 1 to every committed leader, so it has a gap.
+Total order still holds: Lemma 1 for *direct* commits is enough (`lemma1_direct`, `total_order`).
 
-  We prove progress and Claim 2 jointly: induction on rounds, with an inner induction on the time
-  at which the vertex was added. (`round_liveness`, `claim2`, `claim7`)
-* **Proposition 4 (Validity) skips a step; the statement is true.**
-  - Weak edges only guarantee that vertices created *later by correct processes* reach `v`. The
-    committed leader may be Byzantine.
-  - Missing step: a vertex of a late enough round has `2f + 1` strong edges, so at least one of
-    them goes to a correct vertex, which reaches `v`.
+**Details.**
+- Section 6.1 says a process *commits* a leader when it pops it from the stack. Leaders reached in lines 39–43
+  count too. Lemma 1 says every later leader in anyone's DAG has a strong path to every committed leader.
+- The proof assumes the commit rule of line 36 was met, which is true only for *direct* commits.
+- Section 5 introduces Lemma 1 right after the commit rule, so it can be read as speaking of direct commits
+  only. Under that reading Lemma 1 is true (`lemma1_direct`), and the gap moves to Proposition 2.
+- The counterexample is observed by correct process `3`, whose DAG at `wave_ready(w)` holds all vertices of
+  rounds `1..4w` except its own `(4w, 3)` (a realizable view):
+  - Waves 1 and 2 fail the commit rule (only one round-4/round-8 vertex reaches the leader).
+  - The wave-2 leader `v₂ = (5,0)` points only to round-4 vertices that avoid `v₁ = (1,0)`.
+  - Wave 3 commits `v₃ = (9,0)` directly. `v₃` reaches `v₁` (via `(5,1) → (4,0)`) but not `v₂`.
 
-  The proof also needs RBC *authenticity*: a correct sender's message is delivered only if it was
-  sent. This is standard, but absent from the paper's RBC specification. (`run_validity`)
-* **Typos and slips.**
-  - Line 7 requires predecessors in `⋃_{k≥1} DAG[k]`, which excludes the genesis round, so
-    literally no round-1 vertex is ever added.
-  - Algorithm 2 calls `wave_ready(0)` with `round(0,1) = −3` (harmless).
-  - Line 25 does not check that strong edges point to round `r − 1`. The prose requires it, and
-    without it a Byzantine leader could skip a committed leader and break total order (described
-    in words only).
-  - Claim 7's proof ignores the buffer conditions.
+**Repair.** The output of a process is always the delivery of the full greedy chain of its last directly
+committed leader, and that chain depends only on the global DAG. (`lemma1_direct`, `orun_inv`,
+`delivered_prefix`, `total_order`)
+
+### ⚠️ Section 3 (chain quality)
+Chain quality, stated without proof, fails if the unspecified "deterministic order" of `order_vertices` lists
+vertices by source first: with `n = 4` the prefix of size `2f + 1 = 3` has only one correct block
+(`ChainQualityCounterexample.chain_quality_false`).
+
+**Impact.** An under-specified definition: for any round-major delivery order the claim is true
+(`chain_quality`).
+
+**Details.** The counterexample is a lock-step run with `n = 4` and a Byzantine process `0` that behaves
+correctly: wave 1 delivers the leader `(1,1)`; wave 2 then delivers `(1,0), (2,0), …`. For a round-major order
+(rounds non-decreasing, any order within a round, even Byzantine first), every prefix of the output has
+`≥ 2f + 1` vertices in each round below its top round, and at most `f` Byzantine vertices per round.
+
+### Typos and slips
+- Line 7 requires predecessors in `⋃_{k≥1} DAG[k]`, which excludes the genesis round, so literally no round-1
+  vertex is ever added.
+- Algorithm 2 calls `wave_ready(0)` with `round(0,1) = −3` (harmless).
+- Line 25 does not check that strong edges point to round `r − 1`. The prose requires it, and without it a
+  Byzantine leader could skip a committed leader and break total order (described in words only).
+- Claim 7's proof ignores the buffer conditions.
+- Claim 6's "`≤ 3/2 + ε`" is slightly off for `ε > 0`: `1/(2/3 − ε) > 3/2 + ε`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 2 → Claim 6 (probability of a commit)
+The probability argument needs a stronger Lemma 2: Lemma 2 gives each process a set `V` from its *own* DAG when
+it completes the wave, but the coin is revealed as soon as `f + 1` processes have called it, so the adversary
+may know the leader before slower correct processes complete the wave.
+
+**Impact.** Statement true; we prove the needed *robust* version, and with a perfect coin the expected number
+of waves until a commit is `≤ (3f+1)/(2f+1) ≤ 3/2` (`lemma2`, `Coin.dagRider_expected_waves`).
+
+**Repair.** Take any `2f + 1` round-3 vertices that exist; this already holds when the first correct process
+completes the wave, i.e. before the reveal. Let the core be the round-1 sources reached by `≥ f + 1` of them.
+Then:
+- the core has `≥ 2f + 1` members (double counting; this replaces the informal appeal to the common-core
+  protocol);
+- every round-4 vertex ever created, Byzantine or not, strongly reaches the whole core;
+- the core is determined by the past of those vertices.
+
+(`core_card`, `sPath_of_mem_core`, `core_congr`, `lemma2`, `goodWave_of_core`,
+`Coin.dagRider_expected_waves`)
+
+### 🛠️ Claim 2 (induction on rounds)
+Claim 2's "induction on rounds" is unsound as written: line 25 checks only the strong edges, so a Byzantine
+vertex may have weak edges to vertices of the same or a higher round.
+
+**Impact.** Statement true; repaired (`claim2`).
+
+**Details.** The proof also assumes every correct process eventually reaches the vertex's round. That progress
+claim is never proved and itself needs Claim 2.
+
+**Repair.** We prove progress and Claim 2 jointly: induction on rounds, with an inner induction on the time at
+which the vertex was added. (`round_liveness`, `claim2`, `claim7`)
+
+### 🛠️ Proposition 4 (Validity)
+The proof skips a step: weak edges only guarantee that vertices created *later by correct processes* reach `v`,
+but the committed leader may be Byzantine.
+
+**Impact.** Statement true; repaired (`run_validity`).
+
+**Details.** Missing step: a vertex of a late enough round has `2f + 1` strong edges, so at least one of them
+goes to a correct vertex, which reaches `v`. The proof also needs RBC *authenticity*: a correct sender's message
+is delivered only if it was sent. This is standard, but absent from the paper's RBC specification.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
