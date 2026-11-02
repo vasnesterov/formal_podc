@@ -13,44 +13,68 @@ instances are ordinary Knapsack instances, and the paper gives no way to handle 
 
 ## Mistakes in the paper
 
-* **Lemma 4.2 fails on all instances with a weight-1 item (so does the forward direction of Lemma 4.4).** The
-  `y`-parties are the broker's only bitcoin source besides the supplier: each `yᵢ`, `2 ≤ i ≤ m`, pays
-  `(min_w(X) − 1)` B. With `min_w(X) = 1` they pay nothing, so the flower graph is adequate only if all items fit
-  into the knapsack, whatever `m` is. Take the items `(v, w) = (1, 1), (1, 1), (1, 2)` with `V = 2` and `W = 2`.
-  The instance is satisfiable (the first two items) and meets all the paper's assumptions; even every single item
-  fits. But `Σ_w(X) = 4 > 2 = W`, so the flower graph has no adequate leader set for any number of levels
-  (`lemma_4_2_false_minW_one`, `paper_minW_one`). The intended formula for `m` (below) divides by zero here. The
-  amount `min_w(X) − 1` cannot simply be raised: Lemma 4.3's proof needs it to be below every weight. Weight-1
-  items are not a degenerate case of Knapsack, and the paper reduces from Knapsack in general. The repair is a
-  new step of the reduction: double all weights and the capacity first (`theorem_4_1_repaired`). Theorem 4.1
-  (NP-hardness) is therefore true, but Lemma 4.2, a numbered lemma, is false without an excuse.
-* **Lemma 4.2 is also false with the printed `m` when all weights are ≥ 2.** The broker `b` starts with nothing.
-  It must pay every item contract `(b, xᵢ) = wᵢ B`, so it must receive `Σ_w(X)` bitcoins in total. Its only bitcoin
-  income is `W` from the supplier `s` and `min_w(X) − 1` from each of `y₂, …, y_m`. So
-  `Σ_w(X) ≤ W + (m − 1)(min_w(X) − 1)` is necessary for **any** leader set to be adequate, whatever the schedule
-  (`budget_of_adequate`). The paper sets `m = ⌈Σ_w(X)/min_w(X) − 1⌉ + 1 = ⌈Σ_w(X)/min_w(X)⌉`, which is too small.
-  Take the items `(v, w) = (1, 2), (1, 2), (1, 4)` with `V = 2` and `W = 4`. The instance is satisfiable (the first
-  two items), and it meets all the paper's assumptions. Here `m = 4`, so the broker can collect at most
-  `4 + 3·1 = 7 < 8` bitcoins: the flower graph has no adequate leader set at all (`lemma_4_2_false`). The proof's
-  arithmetic goes wrong in the same place. It says that after "repeating this process `m` times", `b` "is left with
-  at least `Σ_w(X)` B by the definition of `m`". Only `m − 1` parties send bitcoins, and with the printed `m` the
-  total is short.
-  *Evident intent:* `m = ⌈Σ_w(X)/(min_w(X) − 1)⌉ + 1`. Writing `⌈x − 1⌉ + 1` instead of `⌈x⌉` makes no sense
-  otherwise, and the proof's "left with at least `Σ_w(X)` B" holds exactly for this reading. With it the reduction
-  is correct whenever all weights are ≥ 2 (`theorem_4_1_fixed`). More generally it is correct for every `m ≥ 1`
-  that satisfies the budget (`lemma_4_4_of_budget`, `theorem_4_1_of_budget`). On its own, this part would be a
-  typo with evident intent.
-* **"Otherwise the Knapsack problem is trivial" is not quite right (proof gap; the lemmas are true under the
-  stated assumption).** Lemma 4.3's proof assumes that no single item has value `≥ V`. An item with `vᵢ ≥ V` but
-  `wᵢ > W` does not make the instance trivial. Without the assumption, Lemma 4.3 and the backward half of
-  Lemma 4.4 fail even for the paper's own `m`. Take the items `(2, 20), (0, 10)` with `V = 2` and `W = 12`. The
-  instance is unsatisfiable, yet `{b, x₁}` is adequate: `x₁`'s `2 E` start the whole chain, which then releases
-  the supplier's bitcoins. This example was checked by hand, not in Lean. The reduction therefore first has to
-  discard items with `wᵢ > W`, and then answer "yes" directly if some remaining item has `vᵢ ≥ V`.
-* **Small slips.** Lemma 4.3 also needs `V ≥ 2`. With `V = 1`, the assumption forces all values to be 0; then
-  `(b, y₁) = 0 E` and `{b, z₁}` is adequate although the instance is unsatisfiable. This case is degenerate. In
-  Lemma 4.3's proof, `{b, y₁}` and `{b, y_{m+1}}` give `b` no bitcoins, not `min_w(X) − 1`; this is harmless. The
-  leader set `{b}` alone is not discussed; it is covered by the same argument.
+### ❌ Lemma 4.2 (and the forward half of Lemma 4.4) for instances with a weight-1 item
+When some item has weight 1, the "bitcoin pump" contracts `(yᵢ, b)` carry `min_w(X) − 1 = 0` B, so for the
+satisfiable instance `(v, w) = (1, 1), (1, 1), (1, 2)`, `V = 2`, `W = 2` the flower graph has no adequate leader
+set for any number of levels `m` (`lemma_4_2_false_minW_one`, `paper_minW_one`).
+
+**Impact.** Theorem 4.1 (NP-hardness) is true: a new first step, doubling all weights and the capacity,
+repairs the reduction (`theorem_4_1_repaired`). But Lemma 4.2, a numbered lemma, is false without an excuse:
+weight-1 items are not a degenerate case of Knapsack, and the paper reduces from Knapsack in general.
+
+**Details.** The `y`-parties are the broker's only bitcoin source besides the supplier: each `yᵢ`,
+`2 ≤ i ≤ m`, pays `(min_w(X) − 1)` B. With `min_w(X) = 1` they pay nothing, so the flower graph is adequate
+only if all items fit into the knapsack, whatever `m` is. The instance above is satisfiable (the first two
+items) and meets all the paper's assumptions; even every single item fits. But `Σ_w(X) = 4 > 2 = W`. The
+intended formula for `m` (next item) divides by zero here. The amount `min_w(X) − 1` cannot simply be raised:
+Lemma 4.3's proof needs it to be below every weight.
+
+**Repair.** Double all weights and the capacity first (`theorem_4_1_repaired`).
+
+### ⚠️ Lemma 4.2 with the printed `m` (all weights ≥ 2)
+With the printed `m = ⌈Σ_w(X)/min_w(X) − 1⌉ + 1` the broker cannot collect enough bitcoins: for the
+satisfiable instance `(v, w) = (1, 2), (1, 2), (1, 4)`, `V = 2`, `W = 4` it gets at most `4 + 3·1 = 7 < 8`, so
+the flower graph has no adequate leader set at all (`lemma_4_2_false`).
+
+**Impact.** On its own, a typo with evident intent: with `m = ⌈Σ_w(X)/(min_w(X) − 1)⌉ + 1` the reduction is
+correct whenever all weights are ≥ 2 (`theorem_4_1_fixed`).
+
+**Details.** The broker `b` starts with nothing. It must pay every item contract `(b, xᵢ) = wᵢ B`, so it must
+receive `Σ_w(X)` bitcoins in total. Its only bitcoin income is `W` from the supplier `s` and `min_w(X) − 1`
+from each of `y₂, …, y_m`. So `Σ_w(X) ≤ W + (m − 1)(min_w(X) − 1)` is necessary for **any** leader set to be
+adequate, whatever the schedule (`budget_of_adequate`). The printed `m` equals `⌈Σ_w(X)/min_w(X)⌉`, which is
+too small. In the example, which meets all the paper's assumptions, `m = 4`. The proof's arithmetic goes wrong
+in the same place. It says that after "repeating this process `m` times", `b` "is left with at least `Σ_w(X)`
+B by the definition of `m`". Only `m − 1` parties send bitcoins, and with the printed `m` the total is short.
+The intent is evident: writing `⌈x − 1⌉ + 1` instead of `⌈x⌉` makes no sense otherwise, and the proof's "left
+with at least `Σ_w(X)` B" holds exactly for the corrected reading.
+
+**Repair.** The reduction is correct for every `m ≥ 1` that satisfies the budget (`lemma_4_4_of_budget`,
+`theorem_4_1_of_budget`), in particular for the intended `m` (`theorem_4_1_fixed`).
+
+### Typos and slips
+- Lemma 4.3 also needs `V ≥ 2`. With `V = 1`, the assumption `vᵢ < V` forces all values to be 0; then
+  `(b, y₁) = 0 E` and `{b, z₁}` is adequate although the instance is unsatisfiable. This case is degenerate.
+- In Lemma 4.3's proof, `{b, y₁}` and `{b, y_{m+1}}` give `b` no bitcoins, not `min_w(X) − 1`; this is
+  harmless.
+- The leader set `{b}` alone is not discussed in Lemma 4.3's proof; it is covered by the same argument.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 4.3 ("otherwise the Knapsack problem is trivial")
+Lemma 4.3's proof assumes that no single item has value `≥ V`, justified by "otherwise the Knapsack problem is
+trivial", but an item with `vᵢ ≥ V` and `wᵢ > W` does not make the instance trivial.
+
+**Impact.** The lemmas are true under the stated assumption (`lemma_4_3`, `satisfiable_of_adequate`); the
+reduction needs a preprocessing step.
+
+**Details.** Without the assumption, Lemma 4.3 and the backward half of Lemma 4.4 fail even for the paper's
+own `m`. Take the items `(2, 20), (0, 10)` with `V = 2` and `W = 12`. The instance is unsatisfiable, yet
+`{b, x₁}` is adequate: `x₁`'s `2 E` start the whole chain, which then releases the supplier's bitcoins. This
+example was checked by hand, not in Lean.
+
+**Repair.** The reduction first has to discard items with `wᵢ > W`, and then answer "yes" directly if some
+remaining item has `vᵢ ≥ V`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

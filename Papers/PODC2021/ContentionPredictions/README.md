@@ -13,42 +13,85 @@ every algorithm needs at least one round.
 
 ## Mistakes in the paper
 
-* **Theorems 3.3 and 3.5 fail for variable-length advice.** The definitions say the advice has "no more than
-  `b(n)` bits". With strings of length `≤ 1` (`ε, 0, 1`) three players can be told who transmits, although
-  `1 < log₂ 3` (Theorem 3.3). With collision detection, the same three advice values select one of three groups of
-  three players, and each group is resolved in two rounds (players 1, 2 of the group transmit; after silence player
-  3, after a collision player 1). So `n = 9`, `b = 1`, `t = 2 < log₂ 9 − 1` (Theorem 3.5). Section 3.1 defines
-  advice as `f_A : P(A) → {0,1}^b`, and with fixed-length advice both theorems are true. We read "at most `b` bits" as
-  "a `b`-bit string" (an implied assumption from the model section). This call is borderline: the proof of 3.5 itself
-  feeds variable-length histories into 3.3. (`theorem_3_3_false_variable_length`,
-  `theorem_3_5_false_variable_length`; true versions `theorem_3_3`, `theorem_3_5`)
-* **The proof of Theorem 3.3 is wrong; the theorem is true.** The first-round transmitter sets `V(s)` are not an
-  `(n, n)`-strongly selective family. Correctness only says that *some* participant of each `P` is isolated, not
-  every one. For `n = 2`, `V(0) = {0}`, `V(1) = {0,1}` solve the problem, but nothing isolates `1` in `{0,1}`. So
-  Theorem 3.2 [5] does not apply. A parity argument over `GF(2)` repairs it: a family meeting every nonempty set in
-  exactly one point has at least `n` members. (`not_stronglySelective_example`;
-  `Cslib.card_le_of_forall_exists_card_inter_eq_one`)
-* **The `Θ` upper bounds of Theorems 3.6 and 3.7 are false for long advice.** Any algorithm needs at least one
-  round. But for `b(n) = ⌊log₂ n⌋ − 1 < log n`, `log n / 2^{b(n)} → 0` (3.6). For
-  `b(n) = ⌈log₂ log₂ n⌉ − 1 < log log n` along `n = 2^{2^j+1}`, `log log n − b(n) → 0` (3.7). The correct forms are
-  `Θ(1 + log n / 2^b)` and `Θ(1 + log log n − b)`; the paper itself treats the `O(1)` regime only for
-  `b ≥ log log n`. Table 2's `Θ(log n − b)` has the same issue. (`theorem_3_6_upper_false`, `theorem_3_7_upper_false`)
-* **Proof of Theorem 3.7 (lower bound): wrong direction of Jensen.** Simulating a collision-detection algorithm
-  without collision detection costs `2^T` rounds when the algorithm takes `T` rounds, so its expected cost is
-  `E[2^T] ≥ 2^{E[T]}`, not `≤`. The step "if `t < log t'`, we get a no-CD algorithm faster than `t'`" therefore does
-  not follow. What the argument gives is `E[2^T] ≥ c log n / 2^b` (`theorem_3_7_lower_exp`). We repair the bound with Markov's inequality and independent restarts of the first `2t` rounds. This gives
-  `c log₂ n ≤ 2^b · 2^{2t+1}`, i.e. `t ≥ (log₂(c log₂ n) − b − 3)/2`: the claimed `Ω(log log n − b)` holds, with
-  half the paper's leading constant. (`theorem_3_7_lower`, `theorem_3_7_lower_bits`)
-* **Lemma 2.5: the code is not uniquely decodable.** The code `x ↦ (r, d)` writes `r` in `log r` bits without a
-  delimiter, so the Source Coding Theorem does not apply. The lemma is still true: a positive integer of mean `μ` has
-  entropy at most `log(μ + 1) + log e`. We prove this with a Gibbs inequality against a geometric distribution
-  (`sum_negMulLog_le_of_card_fiber_le`).
-* **Lemma 2.7, case 1: mean is not median.** "Success within the first `μ_i` rounds with probability `< 1/2`
-  contradicts expected time `μ_i`" is false (`T = 1` w.p. 0.49, `T = 2` w.p. 0.51). We use instead: if all rounds
-  before `R` succeed with probability `< ε` and `Rε ≤ 1/2`, then `E[T] ≥ (R+1)/2` (`UniformAlg.expTime_ge`).
-* Typos and slips: RF-construction appends `2^j` where the range index `j` is meant; the tightness text after 3.4
-  writes `n/q` for `n/2^q`; the last display of 3.7 writes `O(log log n) − b(n)` for a lower bound; Lemma 2.6's
-  constants are loose (it holds as used).
+### ⚠️ Theorems 3.3 and 3.5 (advice of "at most `b` bits")
+Read literally, with advice of variable length `≤ b`, Theorems 3.3 and 3.5 are false: for `b = 1` the
+advice strings `ε, 0, 1` tell three players who transmits, and `n = 9` players are resolved in `t = 2` rounds
+with collision detection (`theorem_3_3_false_variable_length`, `theorem_3_5_false_variable_length`).
+
+**Impact.** Both theorems are true for the fixed-length advice `f_A : P(A) → {0,1}^b` of Section 3.1
+(`theorem_3_3`, `theorem_3_5`), which we treat as an implied assumption of the model section. The call is
+borderline: the proof of 3.5 itself feeds variable-length histories into 3.3.
+
+**Details.** The definitions say the advice has "no more than `b(n)` bits". With strings of length `≤ 1`
+(`ε, 0, 1`) three players can be told who transmits, although `1 < log₂ 3` (Theorem 3.3). With collision
+detection, the same three advice values select one of three groups of three players, and each group is
+resolved in two rounds (players 1, 2 of the group transmit; after silence player 3, after a collision
+player 1). So `n = 9`, `b = 1`, `t = 2 < log₂ 9 − 1` (Theorem 3.5). We read "at most `b` bits" as "a `b`-bit
+string".
+
+### ⚠️ Theorems 3.6 and 3.7 (upper halves of the `Θ` bounds)
+The `Θ` upper bounds of Theorems 3.6 and 3.7 are false for long advice, since every algorithm needs at
+least one round while the claimed bounds tend to `0` (`theorem_3_6_upper_false`, `theorem_3_7_upper_false`).
+
+**Impact.** A missing `1 +`: the correct forms are `Θ(1 + log n / 2^b)` and `Θ(1 + log log n − b)`, and the
+paper itself treats the `O(1)` regime only for `b ≥ log log n`. The lower halves are unaffected.
+
+**Details.** For `b(n) = ⌊log₂ n⌋ − 1 < log n`, `log n / 2^{b(n)} → 0` (3.6). For
+`b(n) = ⌈log₂ log₂ n⌉ − 1 < log log n` along `n = 2^{2^j+1}`, `log log n − b(n) → 0` (3.7). Table 2's
+`Θ(log n − b)` has the same issue.
+
+### Typos and slips
+- RF-construction appends `2^j` where the range index `j` is meant.
+- The tightness text after 3.4 writes `n/q` for `n/2^q`.
+- The last display of 3.7 writes `O(log log n) − b(n)` for a lower bound.
+- Lemma 2.6's constants are loose (it holds as used).
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 3.3 (the "strongly selective" claim)
+The proof claims that the first-round transmitter sets `V(s)` form an `(n, n)`-strongly selective family,
+which is false: for `n = 2`, `V(0) = {0}`, `V(1) = {0,1}` solve the problem but nothing isolates `1` in
+`{0,1}` (`not_stronglySelective_example`).
+
+**Impact.** Statement true; repaired (`theorem_3_3`, via `Cslib.card_le_of_forall_exists_card_inter_eq_one`).
+
+**Details.** Correctness only says that *some* participant of each `P` is isolated, not every one. So
+Theorem 3.2 [5] does not apply.
+
+**Repair.** A parity argument over `GF(2)`: a family meeting every nonempty set in exactly one point has at
+least `n` members (`Cslib.card_le_of_forall_exists_card_inter_eq_one`).
+
+### 🛠️ Theorem 3.7, lower bound (wrong direction of Jensen)
+The proof bounds the cost `E[2^T]` of simulating a collision-detection algorithm without collision detection
+by `2^{E[T]}`, but Jensen gives `E[2^T] ≥ 2^{E[T]}`, so the step "if `t < log t'`, we get a no-CD algorithm
+faster than `t'`" does not follow.
+
+**Impact.** Statement true up to the constant: the claimed `Ω(log log n − b)` holds, with half the paper's
+leading constant (`theorem_3_7_lower`, `theorem_3_7_lower_bits`).
+
+**Details.** Simulating a collision-detection algorithm that takes `T` rounds costs `2^T` rounds without
+collision detection. What the paper's argument gives is `E[2^T] ≥ c log n / 2^b` (`theorem_3_7_lower_exp`).
+
+**Repair.** Markov's inequality and independent restarts of the first `2t` rounds give
+`c log₂ n ≤ 2^b · 2^{2t+1}`, i.e. `t ≥ (log₂(c log₂ n) − b − 3)/2` (`theorem_3_7_lower`,
+`theorem_3_7_lower_bits`).
+
+### 🛠️ Lemma 2.5 (code not uniquely decodable)
+The proof applies the Source Coding Theorem to the code `x ↦ (r, d)`, which writes `r` in `log r` bits without
+a delimiter and so is not uniquely decodable.
+
+**Impact.** Statement true: a positive integer of mean `μ` has entropy at most `log(μ + 1) + log e`.
+
+**Repair.** A Gibbs inequality against a geometric distribution (`sum_negMulLog_le_of_card_fiber_le`).
+
+### 🛠️ Lemma 2.7, case 1 (mean is not median)
+The step "success within the first `μ_i` rounds with probability `< 1/2` contradicts expected time `μ_i`" is
+false (`T = 1` w.p. 0.49, `T = 2` w.p. 0.51).
+
+**Impact.** Repaired with a direct bound (`UniformAlg.expTime_ge`), used in Theorem 2.4.
+
+**Repair.** If all rounds before `R` succeed with probability `< ε` and `Rε ≤ 1/2`, then `E[T] ≥ (R+1)/2`
+(`UniformAlg.expTime_ge`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
