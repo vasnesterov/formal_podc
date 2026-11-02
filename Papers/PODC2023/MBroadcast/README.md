@@ -17,31 +17,24 @@ below.
 
 ## Mistakes in the paper
 
-* **Mutual ordering: the meaning of "before" (imprecise wording, results true).** The main text says "it is not
+No mistakes in the statements.
+
+### Typos and slips
+- Mutual ordering, the meaning of "before" (imprecise wording, results true). The main text says "it is not
   possible that p mdelivers m before m′ and p′ mdelivers m′ before m". The abstract paraphrases it as "it is not
   possible for p to deliver first m and then m′ while p′ delivers first m′ and then m". The pattern MP1 of the full
   version is also drawn with both processes delivering both messages. The results need the stronger reading: "when
   p mdelivers its m, it has not (yet, or ever) mdelivered m′". This is the reading of the paper's own FIFO and
   causal properties ("no process mdelivers m′ before m"), of Property 1 ("p′ cannot return … before it has
-  mdelivered m") and of the introduction ("p′ does not ignore p").
+  mdelivered m") and of the introduction ("p′ does not ignore p"). We formalize the strong reading (`DelivBefore`).
+
   Under the literal reading both claims fail. Take two processes. p₀ writes 1 with Algorithm 3: it mbroadcasts
   `synch` and `write(1, ⟨1, p₀⟩)`, mdelivers both itself, returns, and crashes. Then p₁ reads: its `synch` and its
   write-back of `(0, ⊥)` are mdelivered only by p₁ itself, and the read returns 0. No process mdelivers both
   messages of a pair, so the literal mutual ordering holds vacuously. Validity and no-duplication hold too, and
   Global CS-termination is respected since p₀ is faulty. Yet Property 1 fails, and the history "write(1) completes,
   then read() returns 0" is not linearizable (`property1_false_weak`, `alg3_weak_not_linearizable`). Under the
-  strong reading the same trace violates mutual ordering (`weakTrace_not_mutualOrdering`). We formalize the strong
-  reading (`DelivBefore`).
-* **No other mistakes.** The proofs of the full version for Theorem 2 (timestamps plus cycle-freeness) and for the
-  register-based construction (write-then-read) go through as written. The brief announcement gives no proof of
-  Theorem 1; ours follows the quorum-intersection argument the paper suggests.
-  * Small observations, none of them errors:
-    * Algorithm 3 needs only validity and mutual ordering of the layer, not no-duplication
-      (`alg3_linearizable_of_validity_mutualOrdering`).
-    * The liveness part of Theorem 1 needs only "at most t crashes", not t < n/2.
-    * The register-based Algorithm 2 of the full version is FIFO but **not causal**
-      (`FromRegisters.not_causalOrdering`; the paper does not claim it is). The paper's remark that the causal
-      variant has the same power is still true: we give a variant of our own that is causal (see the table).
+  strong reading the same trace violates mutual ordering (`weakTrace_not_mutualOrdering`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -92,6 +85,17 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Variants "do not change its computing power" (causal-MBroadcast from registers; our algorithm) | `FromRegisters.Causal.safe`, `FromRegisters.Causal.causalOrdering`, `FromRegisters.Causal.fifoOrdering`, `FromRegisters.Causal.globalCFTermination` | `FromRegistersCausalVariant.lean`, `FromRegistersCausalVariantLiveness.lean` |
 | Full-version Alg. 2 is not causal (not claimed) | `FromRegisters.not_causalOrdering` | `FromRegistersCausal.lean` |
 | "Neither construction needs t < n/2" | no crash bound in the hypotheses of the four theorems above | — |
+
+**Proof remarks.** The proofs of the full version for Theorem 2 (timestamps plus cycle-freeness) and for the
+register-based construction (write-then-read) go through as written. The brief announcement gives no proof of
+Theorem 1; ours follows the quorum-intersection argument the paper suggests. Small observations, none of them
+errors:
+* Algorithm 3 needs only validity and mutual ordering of the layer, not no-duplication
+  (`alg3_linearizable_of_validity_mutualOrdering`).
+* The liveness part of Theorem 1 needs only "at most t crashes", not t < n/2.
+* The register-based Algorithm 2 of the full version is FIFO but **not causal** (`FromRegisters.not_causalOrdering`;
+  the paper does not claim it is). The paper's remark that the causal variant has the same power is still true: we
+  give a variant of our own that is causal (see the table).
 
 **Not formalized.**
 * The message-complexity remark ("O(n) implementation messages").

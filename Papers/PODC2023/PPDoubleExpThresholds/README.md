@@ -14,45 +14,69 @@ needed repairs.
 
 ## Mistakes in the paper
 
-* **Lemma 11(c) is false (for `j = i`).** The lemma claims `IncrPair(x, y)` is `j`-robust for all
-  `j ≤ i`. That means: called on a `j`-high configuration, every return is `j`-high again. Take one
-  level (`n = i = 1`, `N₁ = 1`) and `x₁ = 0, x̄₁ = 1, y₁ = 1, ȳ₁ = 0`. This configuration is
-  `1`-high: it is not `1`-proper, and both pair sums are `1`. `IncrPair(x̄₁, ȳ₁)` increments the
-  two-digit counter `ctr = x̄₁·2 + ȳ₁` from `2` to `3`. It returns `x̄₁ = ȳ₁ = 1`, `x₁ = y₁ = 0`,
-  which is `1`-proper, so not `1`-high. The same happens at every level, starting one counter step
-  before the proper value. The proof of 11(c) overlooks that lines 3 and 5–7 change the level-`i`
-  registers. Only `j < i` holds, and we prove that. Lemma 12(c) ("`Large` is robust") needs exactly
-  the false case: `Large` at level `i` calls `IncrPair` at level `i − 1` on `(i−1)`-high
-  configurations. Lemma 12(c) is still true, for a different reason. The walk of `Large` never
-  changes the pair sums of level `i − 1`. Once line 9 has passed, one of these sums exceeds
-  `N_{i−1}`, so the configuration cannot become `(i−1)`-proper. We prove termination with the
-  paper's own symmetry idea: one loop iteration can be undone by another. In Lean this is the
-  explicit relation `Iter` and `iter_symm`. (`lemma_11c_false`; `large_robust_mid`)
-* **Proof of Theorem 3: the bound `k ≥ 2^(2^n)` is wrong.** The proof says
-  "`N_{i+1} = (N_i+1)²` and `N₁ = 1`, implying `k ≥ 2^(2^n)`" for `k = 2 ∑ᵢ₌₁ⁿ Nᵢ`. This fails
-  already for `n = 1, 2, 3` (`k = 2, 10, 60`). The bound in the theorem's own statement,
-  `k ≥ 2^(2^(n−1))`, is correct, and so is Theorem 1 (apply Theorem 3 with `n + 1` levels).
-  (`S_lt_claim`, `S_ge`)
-* **Proposition 16: the initial value of `OF` must be `false`.** The construction lets the leader
-  election give `OF` an arbitrary initial value `v_OF`. With fewer than `|F|` agents the election
-  can create an `OF` agent but never an `IP` agent. With `v_OF = true`, that agent would broadcast
-  `true` on inputs `x < i`, where `φ′(x)` is false. Fixing `v_OF = false` repairs the construction.
-* **Proof of Lemma 15 / Proposition 16 is incomplete.** The proof says the agents are in their
-  initial states `X^v_none` "at the moment this happens". Making this precise needs three new
-  invariants of the election (prefix counts, empty levels, fresh agents). The fairness argument
-  also needs the elected configuration to be reachable from every *reachable* configuration, not
-  only from the initial one. (`Machine.lemma_15`)
-* **Smaller gaps in the constructions of Appendix B.** In Proposition 14, the `restart` helper must
-  skip moves between equal registers, and `V_y := V_□` needs a clamped map `f`. In Proposition 16,
-  the paper assumes `Y ≠ IP` "w.l.o.g.", so transitions for `Y = IP` must be added. Map states also
-  have to count as agents of their pointer in `⟨elect⟩`.
-* **Typos and slips.** In `IncrPair`, the "Effect" line says the counter "decreases by 1", but the
-  procedure increments it (prose and Lemma 11(a) say so). Line 12 of `Large` calls
-  `CheckProper(i − 2)`, which should be `AssertProper(i − 2)`. In the proof of Theorem 3,
-  "registers sum to `i`" should be "`m`", and the bound "`m − |C| ≤ 2N_j`" is too weak for the
-  argument: the strict `< 2N_j` is needed (with equality the configuration would be `j`-proper, not
-  `j`-low), and it does hold by the choice of `j`. On p. 27, the last `⟨move⟩` rule
-  should read `v ∈ 𝓕_{V_y}`.
+### ❌ Lemma 11(c) (`IncrPair` is `j`-robust for all `j ≤ i`)
+Lemma 11(c) is false for `j = i`: with one level (`n = i = 1`, `N₁ = 1`), `IncrPair(x̄₁, ȳ₁)` on the `1`-high
+configuration `x₁ = 0, x̄₁ = 1, y₁ = 1, ȳ₁ = 0` returns a `1`-proper configuration (`lemma_11c_false`).
+
+**Impact.** A false numbered lemma whose false case the proof of Lemma 12(c) uses; Lemma 12(c) is still true, for
+a different reason (`large_robust_mid`), and the headline results (Theorems 1, 2, 3, 5) are unaffected.
+
+**Details.** The lemma claims `IncrPair(x, y)` is `j`-robust for all `j ≤ i`, that is: called on a `j`-high configuration, every return is `j`-high again. The example is
+`1`-high: it is not `1`-proper, and both pair sums are `1`. `IncrPair(x̄₁, ȳ₁)` increments the two-digit counter
+`ctr = x̄₁·2 + ȳ₁` from `2` to `3`. It returns `x̄₁ = ȳ₁ = 1`, `x₁ = y₁ = 0`, which is `1`-proper, so not `1`-high.
+The same happens at every level, starting one counter step before the proper value. The proof of 11(c) overlooks
+that lines 3 and 5–7 change the level-`i` registers. Lemma 12(c) ("`Large` is robust") needs exactly the false
+case: `Large` at level `i` calls `IncrPair` at level `i − 1` on `(i−1)`-high configurations.
+
+**Repair.** Only `j < i` holds, and we prove that. Lemma 12(c) holds because the walk of `Large` never changes the
+pair sums of level `i − 1`. Once line 9 has passed, one of these sums exceeds `N_{i−1}`, so the configuration
+cannot become `(i−1)`-proper. We prove termination with the paper's own symmetry idea: one loop iteration can be
+undone by another. In Lean this is the explicit relation `Iter` and `iter_symm`. (`large_robust_mid`)
+
+### Typos and slips
+- In `IncrPair`, the "Effect" line says the counter "decreases by 1", but the procedure increments it (prose and
+  Lemma 11(a) say so).
+- Line 12 of `Large` calls `CheckProper(i − 2)`, which should be `AssertProper(i − 2)`.
+- In the proof of Theorem 3, "registers sum to `i`" should be "`m`", and the bound "`m − |C| ≤ 2N_j`" is too weak
+  for the argument: the strict `< 2N_j` is needed (with equality the configuration would be `j`-proper, not
+  `j`-low), and it does hold by the choice of `j`.
+- On p. 27, the last `⟨move⟩` rule should read `v ∈ 𝓕_{V_y}`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 3 (the bound `k ≥ 2^(2^n)` in the proof)
+The proof says "`N_{i+1} = (N_i+1)²` and `N₁ = 1`, implying `k ≥ 2^(2^n)`" for `k = 2 ∑ᵢ₌₁ⁿ Nᵢ`, which fails
+already for `n = 1, 2, 3` (`k = 2, 10, 60`; `S_lt_claim`).
+
+**Impact.** Statement true: the bound in the theorem's own statement, `k ≥ 2^(2^(n−1))`, is correct (`S_ge`), and
+so is Theorem 1 (apply Theorem 3 with `n + 1` levels).
+
+### 🛠️ Proposition 16 (the initial value of `OF` must be `false`)
+The construction lets the leader election give `OF` an arbitrary initial value `v_OF`, and with `v_OF = true` the
+protocol can output `true` on inputs `x < i`, where `φ′(x)` is false.
+
+**Impact.** Statement true; fixing `v_OF = false` repairs the construction (`proposition_16`).
+
+**Details.** With fewer than `|F|` agents the election can create an `OF` agent but never an `IP` agent. With
+`v_OF = true`, that agent would broadcast `true`.
+
+### 🛠️ Lemma 15 / Proposition 16 (the elected agents' initial states)
+The proof says the agents are in their initial states `X^v_none` "at the moment this happens", which needs three
+new invariants of the election (prefix counts, empty levels, fresh agents).
+
+**Impact.** Statement true; repaired (`Machine.lemma_15`).
+
+**Details.** The fairness argument also needs the elected configuration to be reachable from every *reachable*
+configuration, not only from the initial one.
+
+### 🛠️ Propositions 14 and 16 (smaller gaps in the constructions of Appendix B)
+In Proposition 14, the `restart` helper must skip moves between equal registers, and `V_y := V_□` needs a clamped
+map `f`.
+
+**Impact.** Statements true; local fixes (`proposition_14`, `proposition_16`).
+
+**Details.** In Proposition 16, the paper assumes `Y ≠ IP` "w.l.o.g.", so transitions for `Y = IP` must be added.
+Map states also have to count as agents of their pointer in `⟨elect⟩`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

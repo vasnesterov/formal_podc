@@ -15,40 +15,53 @@ inference. For Proposition 3.8 we give our own, shorter proof instead of Lemmas 
 
 ## Mistakes in the paper
 
-* **Lemma 2.4: the `α`-range in the proof is wrong for odd `n`; the lemma is true.** The proof says
-  `C_n` is in BSE for `(n+1)(n-1)/4 - (n-1) < α < (n+1)(n-1)/4` when `n` is odd, citing [14] for
-  Remove Equilibrium on this range. But an agent on `C_n` who drops one of its two edges saves `α`
-  and loses only `n(n-1)/2 - (n²-1)/4 = (n-1)²/4` in distance. So for
-  `(n-1)²/4 < α < (n²-1)/4` the cycle is not even in RE. Example: `C_5` with `α = 5`, inside the
-  claimed range `(2, 6)`. The right end must be `(n-1)²/4`. With it, the range is still nonempty and
-  of order `n²` (for even `n` the paper's range is correct), so Lemma 2.4 as stated, "for some range
-  of `α ∈ Θ(n²)`", holds. The same proof also misstates `dist_{C_n}(u)` for odd `n` as
-  `(n-1)(n-2)/4` instead of `(n²-1)/4`. Its path case assumes that "one of the end nodes must be part
-  of the coalition", which is unjustified: the edge may have been dropped by the other endpoint. Our
-  proof avoids this by counting distance levels: every coalition member of degree `≤ 1` in a path,
-  and every member of degree 2, is not better off. (`C5_not_BSE`, `cycle_odd_not_BSE`,
-  `cycle_not_RE`; corrected statement `cycle_BSE`, `lemma_2_4`)
-* **Lemma 3.5: invalid case in the proof; statement true.** The proof starts with "if `α ≥ n/2`,
-  the claim holds by definition of the 1-median `r`". But `|T_u| ≤ n/2 ≤ α` does not give
-  `|T_u| ≤ α/(ℓ(u)-1)` once `ℓ(u) ≥ 3`. The case split is unnecessary: the swap argument of the
-  main case (`u` swaps its parent edge for an edge to `r`) works for every `α`. (`lemma_3_5`)
-* **Lemma 3.4: a step rests on an unproved characterization.** The proof uses "for all `w ∈ T_u`
-  with `ℓ(w) ≥ ℓ(v)+1`, `|T_w| ≤ |T_u|/2`" for the `T_u`-1-median `v`. This follows from the
-  "equivalent" component-size definition of 1-medians stated in Section 3.2, which the paper does
-  not prove. We prove the step directly from minimality: otherwise moving from `v` towards `w`
-  (to a child of `v`, or to its parent if `w ∉ T_v`) decreases the distance cost within `T_u`.
-  Minor gap. (`two_mul_card_sub_le_of_subMedian`)
-* **Typos and small slips.**
-  * Proposition 3.9 says "for sufficiently large `η`". The paper's proof (with `k = ⌈α/η⌉`)
-    needs a threshold that depends on `γ`; `η^γ ≥ 512` suffices (`prop_3_9`). The statement
-    also holds with the `γ`-independent threshold `η ≥ 512` (`prop_3_9_uniform`): if
-    `η^γ < 512`, the claimed bound is below `1 ≤ ρ`, and a complete binary tree of the right size
-    is in BGE.
-  * The definition of the Bilateral `k`-Strong Equilibrium must require a nonempty coalition;
-    otherwise the empty coalition "improves" vacuously and no graph is in BSE.
-  * With `M` only required to exceed `α n³`, disconnecting is not always worse when `α` is tiny
-    (e.g. `n = 3`, `α = 0.01`, `M = 1`: an agent of the triangle drops both edges). This never
-    matters under the paper's standing assumption `α ≥ 1`.
+No mistakes in the statements.
+
+### Typos and slips
+- The proof of Lemma 2.4 misstates `dist_{C_n}(u)` for odd `n` as `(n-1)(n-2)/4` instead of `(n²-1)/4`.
+- Proposition 3.9 says "for sufficiently large `η`". The paper's proof (with `k = ⌈α/η⌉`) needs a threshold that
+  depends on `γ`; `η^γ ≥ 512` suffices (`prop_3_9`). The statement also holds with the `γ`-independent threshold
+  `η ≥ 512` (`prop_3_9_uniform`): if `η^γ < 512`, the claimed bound is below `1 ≤ ρ`, and a complete binary tree
+  of the right size is in BGE.
+- The definition of the Bilateral `k`-Strong Equilibrium must require a nonempty coalition; otherwise the empty
+  coalition "improves" vacuously and no graph is in BSE.
+- With `M` only required to exceed `α n³`, disconnecting is not always worse when `α` is tiny (e.g. `n = 3`,
+  `α = 0.01`, `M = 1`: an agent of the triangle drops both edges). This never matters under the paper's standing
+  assumption `α ≥ 1`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 2.4 (the explicit `α`-range for odd `n`)
+The proof claims `C_n` is in BSE for `(n+1)(n-1)/4 - (n-1) < α < (n+1)(n-1)/4` when `n` is odd, but for
+`(n-1)²/4 < α < (n²-1)/4` the cycle is not even in RE (as for `C_5` with `α = 5`; `C5_not_BSE`,
+`cycle_odd_not_BSE`, `cycle_not_RE`).
+
+**Impact.** Statement true: with the right end `(n-1)²/4` the range is still nonempty and of order `n²`, so
+Lemma 2.4 as stated, "for some range of `α ∈ Θ(n²)`", holds (`cycle_BSE`, `lemma_2_4`). For even `n` the paper's
+range is correct.
+
+**Details.** The proof cites [14] for Remove Equilibrium on this range. But an agent on `C_n` who drops one of its
+two edges saves `α` and loses only `n(n-1)/2 - (n²-1)/4 = (n-1)²/4` in distance. `C_5` with `α = 5` lies inside
+the claimed range `(2, 6)`. The proof's path case also assumes that "one of the end nodes must be part of the
+coalition", which is unjustified: the edge may have been dropped by the other endpoint.
+
+**Repair.** Our proof avoids the case analysis by counting distance levels: every coalition member of degree `≤ 1`
+in a path, and every member of degree 2, is not better off (`cycle_BSE`, `lemma_2_4`).
+
+### 🛠️ Lemma 3.5 (case `α ≥ n/2`)
+The proof starts with "if `α ≥ n/2`, the claim holds by definition of the 1-median `r`", but `|T_u| ≤ n/2 ≤ α`
+does not give `|T_u| ≤ α/(ℓ(u)-1)` once `ℓ(u) ≥ 3`.
+
+**Impact.** Statement true; the case split is unnecessary: the swap argument of the main case (`u` swaps its parent
+edge for an edge to `r`) works for every `α` (`lemma_3_5`).
+
+### 🛠️ Lemma 3.4 (a step rests on an unproved characterization)
+The proof uses "for all `w ∈ T_u` with `ℓ(w) ≥ ℓ(v)+1`, `|T_w| ≤ |T_u|/2`" for the `T_u`-1-median `v`, which
+follows from the "equivalent" component-size definition of 1-medians stated in Section 3.2 without proof.
+
+**Impact.** Minor gap; statement true. We prove the step directly from minimality: otherwise moving from `v`
+towards `w` (to a child of `v`, or to its parent if `w ∉ T_v`) decreases the distance cost within `T_u`
+(`two_mul_card_sub_le_of_subMedian`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
