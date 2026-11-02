@@ -16,50 +16,93 @@ remains unproved.
 
 ## Mistakes in the paper
 
-* **Lemma 3.11 is false; the lower-bound proof (Theorem 1.4) breaks.** The lemma says that for distinct
-  `F₁, F₂ ∈ 𝓕` the laws `μ_A(F₁)`, `μ_A(F₂)` of the random sets `𝓜_A(F, r)` are at ℓ₁-distance `≥ 2/3`.
-  The proof's separating "event", namely "`𝓜_A(·, r)` meets `𝓜_B(F₁, r)`", depends on the challenge `r`
-  itself, so it is not an event about `𝓜_A(F, r)` alone. A correct protocol can hide `F` from the
-  *marginal* law by masking with the bridge nodes' coins. Take two asymmetric 6-vertex graphs `F₁` and
-  `F₂ = F₁ + {01}`, and let `ι(F)` be whether `01` is an edge, a bit that `v_A` sees locally. Each node
-  draws one random bit, and the bridge nodes both receive `(ι(F_A) ⊕ r_{x_A}, ι(F_B) ⊕ r_{x_B})`. `v_A`
-  and `v_B` check their halves, and `x_A`, `x_B` check that the two halves unmask to the same bit. This is
-  a simple protocol in the sense of Definition 6, and it decides `Sym` on the dumbbell class with
-  probability 1 / 0. But `𝓜_A(F, r)` is a uniformly random singleton for both `F₁` and `F₂`, so
-  `μ_A(F₁) = μ_A(F₂)`. (`lemma_3_11_false`)
-  *Repair.* `𝓜_A(F, r)` depends only on the A-side challenges and the two bridge challenges `r_{x_A}`,
-  `r_{x_B}`, and symmetrically for `𝓜_B`. So the two sets are independent once the bridge challenges
-  are fixed. Replacing `μ_A(F)` by the joint law of `((r_{x_A}, r_{x_B}), 𝓜_A(F, r))` makes the
-  lemma true (`lemma_3_11_repaired`, distance `> 2/3`). Lemma 3.12 then bounds the family:
-  `|𝓕| < 5^{|R|²·2^{|M|}}` (`card_family_lt`). With `L`-bit challenges and responses this gives
-  `log |𝓕| < 3 · 2^{2^{L+1}}`, so `|𝓕| ≥ 2^{c n²}` forces `L ≥ log log n − O(1)` (`theorem_1_4_repaired`).
-  The factor `|R|²` is why the repaired argument needs bounded challenges.
-* **Protocol 1 counts the root as a child; Lemma 3.3 is false and Theorem 3.4 fails on complete graphs
-  (as written).** The prover gives *every* node a parent `t_v`, and `C(v) = {u ∈ N(v) | t_u = v}` with
-  `v ∈ N(v)`. If the root's own pointer lies in `N(r)`, the root becomes a child of `t_r`. Summing all
-  the tree checks then gives `h_i(∑_v [v, N(v)]) = 0` instead of pinning down `a_r`. Lemma 3.3 fails
-  on `K₂` with `t_0 = t_1 = 0` and index `i = -1`: all nodes accept, but `a_r = 1 ≠ 0 = h_i(A)`
-  (`lemma_3_3_false`). Completeness fails on `K_n` for `n ≥ 2`: `t_r ∈ N(r) = V` is unavoidable there,
-  so every prover is accepted only with probability `≤ (n² − 1)/p` (`theorem_3_4_literal_false`).
-  Soundness is unaffected. The evident fix, used in the proof of Lemma 3.3, is to build the tree from
-  `t_v` for `v ≠ r` only, i.e. exclude the root from `C(v)`. With it, Lemma 3.3 and Theorem 3.4 hold
-  (`lemma_3_3`, `theorem_3_4`). Protocol 2 has the same line, and we formalize it repaired.
-* **Theorem 3.5 (dAM protocol): gap in the soundness proof; statement true.** The proof fixes a root
-  `r₀` and union-bounds over the `n^n` maps `σ`. But in a dAM protocol the prover names the root, and the
-  index `i = i_r` it must echo, after seeing the challenges, so it can pick any node with a bad index.
-  The repair also union-bounds over the root and uses that `ρ` is broadcast as a permutation: `n · n!`
-  pairs, and `2 n · n! (n² − 1)/p < 1/3` for the paper's `p ≥ 10 n^{n+2}` since `n! ≤ n^{n−1}`.
-  (`Protocol2.soundness`, `theorem_3_5`)
-* **Lemma 3.12: proof repaired; statement true.** The ℓ₁ balls are cut down to `[0,1]^d`, so their
-  volumes depend on the centre, and the volume formula `(4r)^d/(d+1)!` is wrong. Full balls in `ℝ^d`
-  and Haar-measure scaling give `|U| ≤ 5^d − 3^d`. (`lemma_3_12`)
-* **Theorem 3.2 is stated on `{0,1}^m`, but it is applied to sums with entries in `{0,…,n}`**
-  (`∑_v [ρ(v), ρ(N(v))]` for non-injective `ρ`). The linearity clause already adds vectors mod `p`. We prove
-  it on `(ZMod p)^m` for the polynomial family (`theorem_3_2`).
-* Typos and slips: in Protocol 1, line 3, `N_ρ(v)` is defined through `C(v)` instead of `N(v)`. The
-  protocol uses `d_v ∈ [n]` but needs `d_r = 0`. The proof of Theorem 3.4 cites "Theorem 3.1" for
-  Lemma 3.1. Theorem 3.6 says "does not have an LCP … of length `Ω(n²)`" instead of "requires `Ω(n²)`".
-  The ball in Lemma 3.12 is written with `‖µ − η‖`. The dumbbell needs corresponding `v_A`, `v_B`.
+### ❌ Lemma 3.11 (the laws `μ_A(F)` are far apart)
+Lemma 3.11 is false: a simple protocol that masks the bit "is `01` an edge?" with the bridge nodes'
+coins decides `Sym` on the dumbbell class, yet `μ_A(F₁) = μ_A(F₂)` for the two 6-vertex graphs
+`F₁` and `F₂ = F₁ + {01}` (`lemma_3_11_false`).
+
+**Impact.** The paper's proof of the `Ω(log log n)` lower bound (Theorem 1.4) breaks; see the next
+item for its repair. The upper bounds are unaffected.
+
+**Details.** The lemma says that for distinct `F₁, F₂ ∈ 𝓕` the laws `μ_A(F₁)`, `μ_A(F₂)` of the
+random sets `𝓜_A(F, r)` are at ℓ₁-distance `≥ 2/3`. The proof's separating "event", namely
+"`𝓜_A(·, r)` meets `𝓜_B(F₁, r)`", depends on the challenge `r` itself, so it is not an event about
+`𝓜_A(F, r)` alone. A correct protocol can hide `F` from the *marginal* law by masking with the
+bridge nodes' coins. Take two asymmetric 6-vertex graphs `F₁` and `F₂ = F₁ + {01}`, and let `ι(F)`
+be whether `01` is an edge, a bit that `v_A` sees locally. Each node draws one random bit, and the
+bridge nodes both receive `(ι(F_A) ⊕ r_{x_A}, ι(F_B) ⊕ r_{x_B})`. `v_A` and `v_B` check their
+halves, and `x_A`, `x_B` check that the two halves unmask to the same bit. This is a simple
+protocol in the sense of Definition 6, and it decides `Sym` on the dumbbell class with probability
+1 / 0. But `𝓜_A(F, r)` is a uniformly random singleton for both `F₁` and `F₂`.
+
+**Repair.** `𝓜_A(F, r)` depends only on the A-side challenges and the two bridge challenges
+`r_{x_A}`, `r_{x_B}`, and symmetrically for `𝓜_B`. So the two sets are independent once the bridge
+challenges are fixed. Replacing `μ_A(F)` by the joint law of `((r_{x_A}, r_{x_B}), 𝓜_A(F, r))`
+makes the lemma true (`lemma_3_11_repaired`, distance `> 2/3`).
+
+### ❌ Theorem 1.4 (`Ω(log log n)` lower bound)
+Theorem 1.4 is unestablished as proved, since its proof uses the false Lemma 3.11, and the
+introduction's stronger claim that the bound holds with unbounded shared randomness remains
+unproved.
+
+**Impact.** Repaired for challenges of `O(L)` bits, as in Definition 1, assuming the paper's family
+`𝓕` and its claim that `G(F_A, F_B)` is symmetric iff `F_A = F_B` (`theorem_1_4_repaired`).
+
+**Repair.** With the repaired Lemma 3.11, Lemma 3.12 bounds the family:
+`|𝓕| < 5^{|R|²·2^{|M|}}` (`card_family_lt`). With `L`-bit challenges and responses this gives
+`log |𝓕| < 3 · 2^{2^{L+1}}`, so `|𝓕| ≥ 2^{c n²}` forces `L ≥ log log n − O(1)`. The factor `|R|²`
+is why the repaired argument needs bounded challenges.
+
+### ⚠️ Protocol 1 (counts the root as a child): Lemma 3.3 and Theorem 3.4
+As written, Protocol 1 lets the root be a child of `t_r`, so Lemma 3.3 is false on `K₂`
+(`lemma_3_3_false`) and completeness (Theorem 3.4) fails on `K_n` for `n ≥ 2`
+(`theorem_3_4_literal_false`).
+
+**Impact.** A missing case in the pseudocode with evident intent: the proof of Lemma 3.3 builds the
+tree from `t_v` for `v ≠ r` only. With that fix Lemma 3.3 and Theorem 3.4 hold (`lemma_3_3`,
+`theorem_3_4`); soundness is unaffected. Protocol 2 has the same line, and we formalize it repaired.
+
+**Details.** The prover gives *every* node a parent `t_v`, and `C(v) = {u ∈ N(v) | t_u = v}` with
+`v ∈ N(v)`. If the root's own pointer lies in `N(r)`, the root becomes a child of `t_r`. Summing all
+the tree checks then gives `h_i(∑_v [v, N(v)]) = 0` instead of pinning down `a_r`. Lemma 3.3 fails
+on `K₂` with `t_0 = t_1 = 0` and index `i = -1`: all nodes accept, but `a_r = 1 ≠ 0 = h_i(A)`. On
+`K_n`, `t_r ∈ N(r) = V` is unavoidable, so every prover is accepted only with probability
+`≤ (n² − 1)/p`.
+
+### ⚠️ Theorem 3.2 (domain `{0,1}^m`)
+Theorem 3.2 is stated on `{0,1}^m`, but it is applied to sums `∑_v [ρ(v), ρ(N(v))]` with entries in
+`{0,…,n}` for non-injective `ρ`.
+
+**Impact.** The intended domain is evident: the linearity clause already adds vectors mod `p`. We
+prove it on `(ZMod p)^m` for the polynomial family (`theorem_3_2`).
+
+### Typos and slips
+- In Protocol 1, line 3, `N_ρ(v)` is defined through `C(v)` instead of `N(v)`.
+- The protocol uses `d_v ∈ [n]` but needs `d_r = 0`.
+- The proof of Theorem 3.4 cites "Theorem 3.1" for Lemma 3.1.
+- Theorem 3.6 says "does not have an LCP … of length `Ω(n²)`" instead of "requires `Ω(n²)`".
+- The ball in Lemma 3.12 is written with `‖µ − η‖`.
+- The dumbbell needs corresponding `v_A`, `v_B`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 3.5 (dAM protocol, soundness)
+The proof fixes a root `r₀` and union-bounds over the `n^n` maps `σ`, but in a dAM protocol the
+prover names the root, and the index `i = i_r` it must echo, after seeing the challenges, so it can
+pick any node with a bad index.
+
+**Impact.** Statement true with the paper's parameters (`Protocol2.soundness`, `theorem_3_5`).
+
+**Repair.** Also union-bound over the root and use that `ρ` is broadcast as a permutation:
+`n · n!` pairs, and `2 n · n! (n² − 1)/p < 1/3` for the paper's `p ≥ 10 n^{n+2}` since
+`n! ≤ n^{n−1}`.
+
+### 🛠️ Lemma 3.12 (packing bound)
+The ℓ₁ balls are cut down to `[0,1]^d`, so their volumes depend on the centre, and the volume
+formula `(4r)^d/(d+1)!` is wrong.
+
+**Impact.** Statement true (`lemma_3_12`): full balls in `ℝ^d` and Haar-measure scaling give
+`|U| ≤ 5^d − 3^d`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

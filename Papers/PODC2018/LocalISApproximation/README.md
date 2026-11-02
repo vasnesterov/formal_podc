@@ -14,35 +14,59 @@ and Theorem 6 has `min_{x ≤ 1}`.
 
 ## Mistakes in the paper
 
-* **Theorem 2 is false (wrong rounding of the constant).** It claims `α(G) ≤ (d̄+2)/1.657 · CaroWei(G)`
-  for every graph. The proof ends with `(d̄+2)/(4(√2−1)) ≤ (d̄+2)/1.657`, but `4(√2−1) = 1.65685… < 1.657`,
-  so the inequality goes the wrong way. Because the bound is asymptotically tight on bipartite graphs with
-  regular sides and `τ ≈ 1/√2`, the rounded constant really fails. Example: `K_{24000,10000}` has
-  `α = 24000` but `(d̄+2)/1.657·CaroWei ≈ 23999.2`. The smallest complete bipartite counterexample is
-  `K_{13721,5683}`. We prove the statement with `4(√2−1)` in place of `1.657` (`theorem2_false`,
-  `theorem2_corrected`). This is a borderline call between ❌ and ⚠️; see differencies.md.
-* **Theorem 4's proof compares graphs that nodes can tell apart.** The proof says no 1-round algorithm
-  can distinguish `K_{Δ+1}` from a `Δ`-regular bipartite graph. In the paper's model, however, nodes know
-  `n`, and the two graphs have different sizes. The view also contains the port number at the neighbour's
-  end, which the proof ignores. The theorem is true. Our repair uses `2k` copies of `K_{Δ+1}` versus `k`
-  copies of `K_{Δ+1,Δ+1}` minus a perfect matching, on the same nodes, with matching port numbers at both
-  ends of every edge. For each node `v`, a permutation fixing `v` maps its view in one graph to its view in
-  the other, so averaging over labelings gives every node the same join probability in both graphs
-  (`theorem4`, `theorem4_ratio`).
-* **Lemma 5 lacks `Y > 0`.** As stated (`a > b > 0`, `Z − Y ≥ X > 0`) it is false: `a=2, b=1, X=1,
-  Y=−100, Z=−50` gives a smaller value at `t = 0` than at `t = 1`. In its only use `Y = w(opt) > 0`, and
-  with that hypothesis we prove it (`lemma5_false`, `lemma5`).
-* **Theorem 1 at `Δ = 0`.** A ratio `(0+1)/2 < 1` is impossible on edgeless graphs. The theorem holds for
-  every `Δ ≥ 1` (`theorem1_false_zero`, `theorem1`).
-* **Typos and slips.**
-  - Theorem 6: the minimum should be over `0 ≤ x ≤ 1`. Over `x ≤ 1` the expression takes negative
-    values (`theorem6_min_unbounded`).
-  - "For `Δ = 2`, … `ρ ∼ 1.657`" should be `≈ 1.686 = 1/0.593` (`rho_two_gt`).
-  - The arXiv abstract says Boppana's algorithm is "only a `Δ`-approximation" on weighted graphs. The
-    correct ratio is `Δ+1`, as §3 and the PODC abstract state; it exceeds `Δ` on `K_{Δ,Δ}` with weights
-    `1, Q > Δ` (`boppana_weighted_not_Delta`).
-  - §3 writes `E[w(B)] = Σ_{v∈B} …`, which should be `Σ_{v∈V}`.
-  - Lemma 5 is applied with `t = W/X`, which is undefined when `V′ = ∅`.
+### ❌ Theorem 2 (ratio `(d̄+2)/1.657`)
+Theorem 2 is false: `K_{24000,10000}` has `α = 24000` but `(d̄+2)/1.657·CaroWei ≈ 23999.2`, because
+the proof rounds its constant `4(√2−1) = 1.65685…` the wrong way (`theorem2_false`).
+
+**Impact.** A secondary result with a wrong constant: the statement with `4(√2−1)` in place of
+`1.657` holds (`theorem2_corrected`). This is a borderline call between ❌ and ⚠️; see
+differencies.md.
+
+**Details.** The theorem claims `α(G) ≤ (d̄+2)/1.657 · CaroWei(G)` for every graph. The proof ends
+with `(d̄+2)/(4(√2−1)) ≤ (d̄+2)/1.657`, but `4(√2−1) < 1.657`, so the inequality goes the wrong
+way. Because the bound is asymptotically tight on bipartite graphs with regular sides and
+`τ ≈ 1/√2` (the paper's own extremal family), the rounded constant really fails. The smallest
+complete bipartite counterexample is `K_{13721,5683}`.
+
+### ⚠️ Lemma 5 (lacks `Y > 0`)
+As stated (`a > b > 0`, `Z − Y ≥ X > 0`) Lemma 5 is false: `a=2, b=1, X=1, Y=−100, Z=−50` gives a
+smaller value at `t = 0` than at `t = 1` (`lemma5_false`).
+
+**Impact.** A missing hypothesis that holds at the only use, `Y = w(opt) > 0`; with it we prove the
+lemma (`lemma5`).
+
+### ⚠️ Theorem 1 at `Δ = 0`
+A ratio `(0+1)/2 < 1` is impossible on edgeless graphs (`theorem1_false_zero`).
+
+**Impact.** Degenerate: the theorem holds for every `Δ ≥ 1` (`theorem1`).
+
+### ⚠️ Theorem 6 (minimum over `x ≤ 1`)
+Theorem 6 takes the minimum over `x ≤ 1`, where the expression takes negative values
+(`theorem6_min_unbounded`).
+
+**Impact.** A typo with evident intent: the minimum should be over `0 ≤ x ≤ 1`, which we formalize.
+
+### Typos and slips
+- "For `Δ = 2`, … `ρ ∼ 1.657`" should be `≈ 1.686 = 1/0.593` (`rho_two_gt`).
+- The arXiv abstract says Boppana's algorithm is "only a `Δ`-approximation" on weighted graphs. The
+  correct ratio is `Δ+1`, as §3 and the PODC abstract state; it exceeds `Δ` on `K_{Δ,Δ}` with
+  weights `1, Q > Δ` (`boppana_weighted_not_Delta`).
+- §3 writes `E[w(B)] = Σ_{v∈B} …`, which should be `Σ_{v∈V}`.
+- Lemma 5 is applied with `t = W/X`, which is undefined when `V′ = ∅`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 4 (1-round lower bound)
+The proof says no 1-round algorithm can distinguish `K_{Δ+1}` from a `Δ`-regular bipartite graph,
+but in the paper's model nodes know `n`, the two graphs have different sizes, and the view also
+contains the port number at the neighbour's end.
+
+**Impact.** The theorem is true; repaired (`theorem4`, `theorem4_ratio`).
+
+**Repair.** We use `2k` copies of `K_{Δ+1}` versus `k` copies of `K_{Δ+1,Δ+1}` minus a perfect
+matching, on the same nodes, with matching port numbers at both ends of every edge. For each node
+`v`, a permutation fixing `v` maps its view in one graph to its view in the other, so averaging
+over labelings gives every node the same join probability in both graphs.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

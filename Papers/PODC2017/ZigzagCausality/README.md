@@ -17,61 +17,94 @@ characterization of optimal coordination (Protocol 2) survives.
 
 ## Mistakes in the paper
 
-* **Theorem 4 ("only if") is false.** Take processes `i, j, k, l` with channels `i→j`, `i→k`, `k→j`,
-  `j→l`. All lower bounds are 1; `U_ij = U_jl = 2` and `U_ik = U_kj = 1`. Processes run a flooding
-  full-information protocol (FFIP). Let `s` be an `i`-node that just received an external message,
-  and set `θ₁ = ⟨s, ijl⟩`, `θ₂ = ⟨s, ikjl⟩`.
-  - *`s` knows `θ₁ --0--> θ₂`.* The chain `i→k→j` reaches `j` exactly 2 units after `s`. The direct
-    message `i→j` arrives after 1 or 2 units. If both arrive at `t+2` they arrive at the *same*
-    `j`-node, so the two chains coincide from then on and `θ₁ = θ₂`. Otherwise `θ₁ ≤ t+3 ≤ θ₂`.
-  - *No `s`-visible zigzag has weight `≥ 0`.* The past of `s` contains only `i`-nodes, since `i`
-    has no incoming channel. The potential `timer(ρ) + τ(q)` on nodes `⟨ρ, q⟩`, with
-    `τ(ij) = 2, τ(ik) = 1, τ(ikj) = 2, τ(ijl) = 4, τ(ikjl) = 3`, is compatible with all bounds. It
-    bounds every fork and every junction of such a zigzag, so its weight is at most
-    `τ(ikjl) − τ(ijl) = −1`.
+### 🚨 Theorem 4 ("only if" direction, Visible Zigzag Theorem)
+In a 4-process flooding full-information system a node `s` knows `θ₁ --0--> θ₂`, yet every
+`s`-visible zigzag from `θ₁` to `θ₂` has weight `≤ −1` (`Counterexample.theorem_4_false`,
+`Counterexample.theorem_4_counterexample`).
 
-  The knowledge comes from a case split over runs (merge at `j` or a gap of at least 1), and neither
-  case is visible to `s`. Where the proof breaks: Lemma 18.5, case (2). In the "fast run" the chain
-  of `θ₂` can merge with the chain of `θ₀ = θ₁`. The resulting time difference is the weight of a
-  fork whose head is a node on `θ₁`'s chain. That node differs from `θ₂` in the actual run `r`, so
-  no zigzag *in `r`* ending at `θ₂` results. The "if" direction is correct. This is a false
-  statement about the paper's main structural result.
+**Impact.** A false statement about the paper's main structural result. The "if" direction is
+correct, and necessity holds when one endpoint is a basic node of `σ`'s past, which covers both
+coordination tasks of Protocol 2.
 
-  *What we proved instead.* Necessity holds when `θ₁` or `θ₂` is a basic node in the past of `σ`
-  with positive time; the other endpoint can be any σ-recognized node. That is exactly the shape
-  used in Protocol 2. Our proof builds a fast run as in Definition 24 and replaces the
-  longest-path lemmas 10–16 by a maximum over visible zigzags, bounded with Theorem 1.
-  (`Counterexample.theorem_4_false`, `Counterexample.theorem_4_counterexample`; repaired:
-  `Sys.visible_zigzag_necessity_basic`, `Sys.visible_zigzag_necessity_early`,
-  `Sys.visible_zigzag_necessity_late`)
-* **Theorem 3 needs flooding.** As stated it assumes nothing about the protocol. The proof uses
-  Lemma 3 (needs full information), and the proof of Lemma 4 uses that a node outside the past still
-  sends to every neighbour (flooding). For a full-information protocol that does not flood, Theorem 3
-  is false: `D` sends to `C` and `B`; `C` replies to `B` unless it has just received `μ_go`, in which
-  case it sends "go" to `A`. The delays are exact, so the reply would reach `B` together with `D`'s
-  message. `B` performs `b` when it gets `D`'s message without a reply. This implements
-  `Late⟨a --0--> b⟩`, but `B` learns of `μ_go` from the *absence* of a message, without a message
-  chain from the go-node `σ_C`. A run in which `C` receives an extra external message together with
-  `μ_go` looks the same to `B` but does not contain `σ_C`, so `K_σ(σ_C·A --0--> σ)` fails.
-  We prove Theorem 3 for FFIPs, which is the setting announced in Section 2.2. Severity: a missing
-  hypothesis (the paper's standing FFIP assumption covers it), not a false claim about FFIPs; the ❌
-  verdict rests on Theorem 4 alone.
-  (`CounterexampleFIP.theorem_3_false_for_FIP`; repaired: `Sys.thm3_late`, `Sys.thm3_early`)
-* **Gaps in proofs with true statements.**
-  - *Lemma 4.* The induction step treats the r-node of the sender at time `t_µ` as if it sent the
-    message in `r`. That fails when the sender is still initial at `t_µ` in `r`. We fixed it with an
-    extra invariant: a process activated in the constructed run was already activated in `r`.
-  - *Lemma 18.* The proof assumes that the chain of `θ₀` leaves `past(r, σ)` with its first
-    message, and its case analysis misses deliveries inside the past. In our repaired proof the
-    zigzag starts with a fork rooted at the last past node of the chain, and from there the chain is
-    delayed to its upper bounds.
-  - *Lemma 12 is false as stated.* A σ-recognized node with a longer path may itself lie in the
-    past, before the boundary node. The lemma is only used for nodes outside the past, where it
-    holds.
-  - *Theorem 4 ("if").* The proof says "`wt(Z)` depends only on the pattern". It does not:
-    joinedness depends on the run. We show it is preserved for σ-visible zigzags.
-* **Imprecisions.** Definition 3 says `⟨σ, p⟩` appears if `σ` appears and `p` is a path. That
-  presupposes flooding and a non-initial `σ`, since initial nodes never send.
+**Details.** Take processes `i, j, k, l` with channels `i→j`, `i→k`, `k→j`, `j→l`. All lower
+bounds are 1; `U_ij = U_jl = 2` and `U_ik = U_kj = 1`. Processes run a flooding full-information
+protocol (FFIP). Let `s` be an `i`-node that just received an external message, and set
+`θ₁ = ⟨s, ijl⟩`, `θ₂ = ⟨s, ikjl⟩`.
+- *`s` knows `θ₁ --0--> θ₂`.* The chain `i→k→j` reaches `j` exactly 2 units after `s`. The direct
+  message `i→j` arrives after 1 or 2 units. If both arrive at `t+2` they arrive at the *same*
+  `j`-node, so the two chains coincide from then on and `θ₁ = θ₂`. Otherwise `θ₁ ≤ t+3 ≤ θ₂`.
+- *No `s`-visible zigzag has weight `≥ 0`.* The past of `s` contains only `i`-nodes, since `i`
+  has no incoming channel. The potential `timer(ρ) + τ(q)` on nodes `⟨ρ, q⟩`, with
+  `τ(ij) = 2, τ(ik) = 1, τ(ikj) = 2, τ(ijl) = 4, τ(ikjl) = 3`, is compatible with all bounds. It
+  bounds every fork and every junction of such a zigzag, so its weight is at most
+  `τ(ikjl) − τ(ijl) = −1`.
+
+The knowledge comes from a case split over runs (merge at `j` or a gap of at least 1), and neither
+case is visible to `s`. Where the proof breaks: Lemma 18.5, case (2). In the "fast run" the chain
+of `θ₂` can merge with the chain of `θ₀ = θ₁`. The resulting time difference is the weight of a
+fork whose head is a node on `θ₁`'s chain. That node differs from `θ₂` in the actual run `r`, so
+no zigzag *in `r`* ending at `θ₂` results.
+
+**Repair.** Necessity holds when `θ₁` or `θ₂` is a basic node in the past of `σ` with positive
+time; the other endpoint can be any σ-recognized node. That is exactly the shape used in
+Protocol 2. Our proof builds a fast run as in Definition 24 and replaces the longest-path lemmas
+10–16 by a maximum over visible zigzags, bounded with Theorem 1.
+(`Sys.visible_zigzag_necessity_basic`, `Sys.visible_zigzag_necessity_early`,
+`Sys.visible_zigzag_necessity_late`)
+
+### ⚠️ Theorem 3 (needs flooding)
+Theorem 3 assumes nothing about the protocol, but it is false for a full-information protocol that
+does not flood: there `B` learns of `μ_go` from the *absence* of a message, without a message chain
+from the go-node `σ_C` (`CounterexampleFIP.theorem_3_false_for_FIP`).
+
+**Impact.** A missing hypothesis covered by the paper's standing FFIP assumption (Section 2.2),
+not a false claim about FFIPs; we prove Theorem 3 for FFIPs (`Sys.thm3_late`, `Sys.thm3_early`).
+The verdict rests on Theorem 4 alone.
+
+**Details.** The proof uses Lemma 3 (needs full information), and the proof of Lemma 4 uses that a
+node outside the past still sends to every neighbour (flooding). The counterexample: `D` sends to
+`C` and `B`; `C` replies to `B` unless it has just received `μ_go`, in which case it sends "go" to
+`A`. The delays are exact, so the reply would reach `B` together with `D`'s message. `B` performs
+`b` when it gets `D`'s message without a reply. This implements `Late⟨a --0--> b⟩`. A run in which
+`C` receives an extra external message together with `μ_go` looks the same to `B` but does not
+contain `σ_C`, so `K_σ(σ_C·A --0--> σ)` fails.
+
+### ⚠️ Lemma 12 (nodes inside the past)
+Lemma 12 is false as stated: a σ-recognized node with a longer path may itself lie in the past,
+before the boundary node.
+
+**Impact.** The lemma is only used for nodes outside the past, where it holds. (Not formalized: our
+proof replaces Lemmas 10–16.)
+
+### Typos and slips
+- Definition 3 says `⟨σ, p⟩` appears if `σ` appears and `p` is a path. That presupposes flooding
+  and a non-initial `σ`, since initial nodes never send.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 4 (sender still initial)
+The induction step treats the r-node of the sender at time `t_µ` as if it sent the message in `r`,
+which fails when the sender is still initial at `t_µ` in `r`.
+
+**Impact.** Statement true for FFIPs; repaired (`Sys.lemma4`).
+
+**Repair.** An extra invariant: a process activated in the constructed run was already activated
+in `r`.
+
+### 🛠️ Lemma 18 (chain leaving the past)
+The proof assumes that the chain of `θ₀` leaves `past(r, σ)` with its first message, and its case
+analysis misses deliveries inside the past.
+
+**Impact.** Repaired in the proof of the corrected Theorem 4 ("only if").
+
+**Repair.** The zigzag starts with a fork rooted at the last past node of the chain, and from
+there the chain is delayed to its upper bounds.
+
+### 🛠️ Theorem 4 ("if" direction)
+The proof says "`wt(Z)` depends only on the pattern", but joinedness depends on the run.
+
+**Impact.** Statement true (`Sys.visible_zigzag_sufficiency`): we show joinedness is preserved for
+σ-visible zigzags.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

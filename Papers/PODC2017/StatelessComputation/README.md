@@ -15,54 +15,82 @@ Corollary 6.4 hold; some proofs have gaps that we fixed. Corollary 6.3 is false 
 
 ## Mistakes in the paper
 
-* **Theorem 3.1: the valency proof has gaps (proof gap, statement true).** The proof works in
-  the state space `H` of (labeling, countdown) pairs whose sorted countdown vector dominates
-  `(1, 2, …, r−1, r, r)`. Two steps fail as written; Lemmas 3.3 and 3.4 themselves are fine.
-  1. In the final step of the proof of Theorem 3.1 (the paragraph after Lemma 3.4), the paper
-     says the `H`-successors of the critical state are *all* activation sets with `|T| ≥ 2`
-     (containing the node with countdown 1). This description is false. Take `n = 5`, `r = 4`
-     and countdowns `(2,2,4,4,4)`. Activating two of the nodes with countdown 4 gives
-     `(1,1,4,4,3)`, which is not in `H`. So the step that finds `S` and `S ∪ {i}` in different
-     attractor regions is not justified as written.
-  2. The paper never says whether "attractor regions" are defined by paths in `H` or in the full
-     state graph. Lemma 3.4 and the final step need `H`. But Lemma 3.2's proof activates a single
-     node, and that step leaves `H`.
+### ⚠️ Theorem 3.1 (self-loops must be excluded)
+Theorem 3.1 fails on graphs with self-loops: on the complete digraph with loops on 2 nodes, the
+protocol in which each node copies its loop label to all its outgoing arcs has 4 stable labelings
+but is label `r`-stabilizing for every `r` (`SelfLoops.thm_3_1_false_with_loops`).
 
-  Repair: Lemma 3.2 follows from Lemma 3.3 along a chain of hybrid labelings. For the final step it
-  is enough that the admissible activation sets are *upward closed*, so that any two of them are
-  connected through "activate everybody" by single-node insertions. We checked the counting step
-  of Lemma 3.3 (activating `j` and the minimum-countdown node `j'` stays in `H`) in Lean.
-  (`not_labelStabilizing`, `exists_nonconvergent_run`)
-* **Self-loops must be excluded (under-specified model).** The paper implicitly excludes
-  self-loops: a node communicates with "another node", and processors "cannot store
-  information". The paper never states this, and Theorem 3.1 fails without it. A node with a
-  self-loop can store its state on that loop. Take the complete digraph with loops on 2 nodes, and
-  let each node copy its loop label to all its outgoing arcs. This protocol has 4 stable
-  labelings, but it is label `r`-stabilizing for every `r`. We therefore assume loop-free graphs.
-  (`SelfLoops.thm_3_1_false_with_loops`)
-* **Corollary 6.3 is false for odd `n` (false only in a degenerate case).** The paper defines
-  `EQ_n = 1` only for even `n`, so for odd `n` `EQ_n ≡ 0`, which a
-  protocol with a single label computes. Its label complexity is `0 < (n−2)/8`. For even `n` it
-  holds, and in the stronger form `L_n ≥ n/8`. (`FoolingSet.cor_6_3_false_odd`,
-  `FoolingSet.cor_6_3`)
-* **Theorem 6.2 has two unused hypotheses (statement true).** The proof never uses the bullet
-  conditions `xᵢ = x'ᵢ` (arcs of `C`) and `yᵢ = y'ᵢ` (arcs of `D`), and we prove the theorem
-  without them. This matters for Corollary 6.3: its fooling set `{(x,x) : x₁ = 1}` violates these
-  conditions, for example at the arc `(m, m+1)`. (`FoolingSet.card_le_of_isFoolingSet`)
-* **Theorem 5.10: proof gaps (statement true).**
-  1. The protocols are counted for one fixed `Σ`, but the statement needs one function that is
-     hard for *all* small `Σ` simultaneously.
-  2. One algebra step, `log n + log(2|Σ|^k) + log log(2|Σ|^k) ≥ n ⇒ log n + 2k log|Σ| ≥ n`, fails
-     for `k log|Σ| < 3`.
-  3. "A protocol computes at most one function" needs `Σ ≠ ∅`.
+**Impact.** An implied assumption of the model: the paper implicitly excludes self-loops (a node
+communicates with "another node", and processors "cannot store information") but never states
+it. With loop-free graphs the theorem holds; we assume them.
 
-  We prove the theorem for `n ≥ 6`. (`exists_hard_function`)
-* **Example 1 (tightness of Theorem 3.1): incomplete argument, claim true.** The argument ignores
-  initial labelings in which a node's outgoing arcs carry different bits. (`Example1.or_tight`)
-* **Minor.**
-  - Proposition 2.1's proof is informal, and neither the round-complexity off-by-one nor the
-    radius of a digraph is defined.
-  - In the proofs of Corollaries 6.3/6.4 the names `C` and `D` are swapped.
+**Details.** A node with a self-loop can store its state on that loop, which the stateless model
+is meant to rule out.
+
+### ⚠️ Corollary 6.3 for odd `n`
+For odd `n` the paper's `EQ_n` is constantly 0, so a protocol with a single label computes it,
+with label complexity `0 < (n−2)/8` (`FoolingSet.cor_6_3_false_odd`).
+
+**Impact.** Degenerate: the paper defines `EQ_n = 1` only for even `n`. For even `n` the corollary
+holds, and in the stronger form `L_n ≥ n/8` (`FoolingSet.cor_6_3`).
+
+### Typos and slips
+- In the proofs of Corollaries 6.3/6.4 the names `C` and `D` are swapped.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 3.1 (valency proof)
+The final step of the proof (the paragraph after Lemma 3.4) claims that the `H`-successors of the
+critical state are *all* activation sets with `|T| ≥ 2`, which is false, and the paper never says
+whether attractor regions are defined by paths in `H` or in the full state graph.
+
+**Impact.** Statement true; repaired (`not_labelStabilizing`, `exists_nonconvergent_run`).
+Lemmas 3.3 and 3.4 themselves are fine.
+
+**Details.** The proof works in the state space `H` of (labeling, countdown) pairs whose sorted
+countdown vector dominates `(1, 2, …, r−1, r, r)`. Two steps fail as written.
+1. The description of the `H`-successors (all `T` with `|T| ≥ 2`, containing the node with
+   countdown 1) is false. Take `n = 5`, `r = 4` and countdowns `(2,2,4,4,4)`. Activating two of
+   the nodes with countdown 4 gives `(1,1,4,4,3)`, which is not in `H`. So the step that finds `S`
+   and `S ∪ {i}` in different attractor regions is not justified as written.
+2. Lemma 3.4 and the final step need attractor regions defined by paths in `H`. But Lemma 3.2's
+   proof activates a single node, and that step leaves `H`.
+
+**Repair.** Lemma 3.2 follows from Lemma 3.3 along a chain of hybrid labelings. For the final step
+it is enough that the admissible activation sets are *upward closed*, so that any two of them are
+connected through "activate everybody" by single-node insertions. We checked the counting step of
+Lemma 3.3 (activating `j` and the minimum-countdown node `j'` stays in `H`) in Lean.
+
+### 🛠️ Theorem 5.10 (counting lower bound)
+The proof counts protocols for one fixed `Σ`, but the statement needs one function that is hard
+for *all* small `Σ` simultaneously; it also has a wrong algebra step and a missing `Σ ≠ ∅`.
+
+**Impact.** Statement true; we prove it for `n ≥ 6` (`exists_hard_function`).
+
+**Details.**
+1. One function must be hard for all small `Σ` at once; the proof fixes `Σ`.
+2. The algebra step `log n + log(2|Σ|^k) + log log(2|Σ|^k) ≥ n ⇒ log n + 2k log|Σ| ≥ n` fails
+   for `k log|Σ| < 3`.
+3. "A protocol computes at most one function" needs `Σ ≠ ∅`.
+
+### 🛠️ Corollary 6.3 (fooling set violates Theorem 6.2's conditions)
+The fooling set `{(x,x) : x₁ = 1}` of the proof violates the bullet conditions of Theorem 6.2,
+for example at the arc `(m, m+1)`.
+
+**Impact.** Statement true (for even `n`): the proof of Theorem 6.2 never uses the bullet
+conditions `xᵢ = x'ᵢ` (arcs of `C`) and `yᵢ = y'ᵢ` (arcs of `D`), and we prove the theorem without
+them (`FoolingSet.card_le_of_isFoolingSet`).
+
+### 🛠️ Example 1 (tightness of Theorem 3.1)
+The argument ignores initial labelings in which a node's outgoing arcs carry different bits.
+
+**Impact.** Claim true (`Example1.or_tight`).
+
+### 🛠️ Proposition 2.1
+The proof is informal, and neither the round-complexity off-by-one nor the radius of a digraph is
+defined.
+
+**Impact.** Statement true under a precise reading (`exists_center`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
