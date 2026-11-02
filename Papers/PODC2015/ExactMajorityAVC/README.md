@@ -17,41 +17,64 @@ symmetric four-state protocol preserves `#S0 − #S1`, so the probability of con
 
 ## Mistakes in the paper
 
-* **Figure 1, line 12, as printed, breaks AVC when `B` is the majority (typo).** Line 12 reads
-  "`weight(x)·weight(y) = 0` and `value(x) + value(y) > 0`". So a weak node meeting a node of
-  *negative* value skips lines 12–14. It falls through to line 19, which changes nothing: `+0` never
-  becomes `−0`. Counterexample with `m = d = 1`, the four-state protocol, and inputs `A, B, B`
-  (states `1₁, −1₁, −1₁`). The first two agents interact by line 17 into `−0, +0`. The configuration
-  `−0, +0, −1₁` is silent, and agent 2 outputs `A` forever. This happens after one step with
-  positive probability, so the probability of converging to `B` does not tend to 1. A model checker
-  finds the same failure for `m = 3` (inputs `A, B, B` give `+3, −3, −3`) and every other small
-  parameter set we tried, from many initial configurations. The intended condition,
-  `weight(x) + weight(y) > 0` ("zero meets non-zero"), is clear from the prose under Figure 1. The
-  proof of Lemma A.1 assumes "without loss of generality `S > 0`", and for `S > 0` the literal rule
-  happens to work; it is the sign symmetry behind this WLOG that the typo destroys. With the fix,
-  the protocol is sign-symmetric (`update_neg`) and correct. (`literal_fails`, `not_tendsto_literal`;
-  repaired: `lemma_A_1`, `theorem_4_1_correct`)
-* **Theorem B.1 is proved only for unordered interactions (proof gap, statement not refuted).**
-  Section 2 defines `δ : Q × Q → Q × Q` with ordered (initiator, responder) pairs, and AVC itself
-  assigns different states to initiator and responder. Theorem B.1 is stated for "any majority
-  algorithm using four states". The proof in Appendix B treats `[S0, X]` and `[X, S0]` as the same
-  interaction with a single outcome, so it misses protocols in which the two orientations of a
-  pair give different outcomes. The statement very likely holds for ordered protocols too:
-  Claims B.2–B.5 do not need symmetry (we prove them for both orientations), and an exhaustive
-  search over ordered protocols with populations of at most 5 agents refutes every protocol that
-  does not preserve `#S0 − #S1`. Since refuting certificates on small populations are valid for
-  every `n`, this search would close the gap, but it is a script, not Lean. We formalize Theorem
-  B.1 under the convention of the paper's proof (hypothesis `Symmetric P`: both orientations of a
-  pair give the same multiset of states, though possibly to different agents).
-* **Claim B.8 (inside the proof of Theorem B.1): wrong constant in its proof.** The unique minority
-  agent meets one of the `ϵn + 1` majority agents with probability `2(ϵn+1)/(n(n−1))`, not
-  `(ϵn+1)/n²`. The paper's value is too small, the wrong direction for a lower bound, but only by a
-  factor of about 2, so `Ω(1/ϵ)` is unaffected. (`hitProb_le`)
-* **Small slips in the case analysis of Appendix B** (we checked the stated interaction sequences by
-  script). "two nodes in S9" (Case 1) should be `S0`. "three nodes starting in C0" (Case 2.3)
-  should be `S0`. In Case 2.4.1 the configuration "two `X`, three `S1`" needs two applications of
-  `[X, Y] → [S1, X]`, not one. At the end of Case 2.4.1 ("`[X, Y]` into `[S0, Y]`") the
-  contradiction is with the second property, not the third.
+### ⚠️ Figure 1, line 12 (AVC pseudocode: `value` for `weight`)
+As printed, a weak node never adopts a negative sign, so AVC fails when `B` is the majority, already
+for `m = d = 1` and inputs `A, B, B` (`literal_fails`, `not_tendsto_literal`).
+
+**Impact.** A one-symbol typo with evident intent: the prose under Figure 1 describes the intended
+condition `weight(x) + weight(y) > 0` ("zero meets non-zero"). With the fix, AVC solves exact
+majority with probability 1 (`lemma_A_1`, `theorem_4_1_correct`).
+
+**Details.** Line 12 reads "`weight(x)·weight(y) = 0` and `value(x) + value(y) > 0`". So a weak node
+meeting a node of *negative* value skips lines 12–14. It falls through to line 19, which changes
+nothing: `+0` never becomes `−0`. Counterexample with `m = d = 1`, the four-state protocol, and
+inputs `A, B, B` (states `1₁, −1₁, −1₁`). The first two agents interact by line 17 into `−0, +0`.
+The configuration `−0, +0, −1₁` is silent, and agent 2 outputs `A` forever. This happens after one
+step with positive probability, so the probability of converging to `B` does not tend to 1. A model
+checker finds the same failure for `m = 3` (inputs `A, B, B` give `+3, −3, −3`) and every other
+small parameter set we tried, from many initial configurations. The proof of Lemma A.1 assumes
+"without loss of generality `S > 0`", and for `S > 0` the literal rule happens to work; it is the
+sign symmetry behind this WLOG that the typo destroys.
+
+**Repair.** With the condition `weight(x) + weight(y) > 0`, the protocol is sign-symmetric
+(`update_neg`) and correct. (`lemma_A_1`, `theorem_4_1_correct`)
+
+### ⚠️ Theorem B.1 for ordered interactions (unestablished)
+Theorem B.1 is stated for "any majority algorithm using four states" with ordered
+(initiator, responder) interactions, but its proof treats `[S0, X]` and `[X, S0]` as one interaction
+with a single outcome, so it does not cover protocols whose two orientations differ.
+
+**Impact.** Not refuted, and very likely true: we prove Theorem B.1 for unordered interactions, the
+convention of the paper's proof (`theorem_B_1`, hypothesis `Symmetric P`); for ordered protocols the
+gap is closed only by a script, not in Lean. It does not affect the verdict.
+
+**Details.** Section 2 defines `δ : Q × Q → Q × Q` with ordered (initiator, responder) pairs, and
+AVC itself assigns different states to initiator and responder. Claims B.2–B.5 do not need symmetry
+(we prove them for both orientations), and an exhaustive search over ordered protocols with
+populations of at most 5 agents refutes every protocol that does not preserve `#S0 − #S1`. Since
+refuting certificates on small populations are valid for every `n`, this search would close the
+gap, but it is a script, not Lean. `Symmetric P` means that both orientations of a pair give the
+same multiset of states, though possibly to different agents. The classification is recorded in
+[differencies.md](differencies.md) (item 7).
+
+### Typos and slips
+- Small slips in the case analysis of Appendix B (we checked the stated interaction sequences by
+  script):
+  - "two nodes in S9" (Case 1) should be `S0`.
+  - "three nodes starting in C0" (Case 2.3) should be `S0`.
+  - In Case 2.4.1 the configuration "two `X`, three `S1`" needs two applications of
+    `[X, Y] → [S1, X]`, not one.
+  - At the end of Case 2.4.1 ("`[X, Y]` into `[S0, Y]`") the contradiction is with the second
+    property, not the third.
+
+## Proof gaps (statements true)
+
+### 🛠️ Claim B.8 (inside the proof of Theorem B.1: meeting probability)
+The unique minority agent meets one of the `ϵn + 1` majority agents with probability
+`2(ϵn+1)/(n(n−1))`, not `(ϵn+1)/n²`.
+
+**Impact.** The paper's value is too small, the wrong direction for a lower bound, but only by a
+factor of about 2, so `Ω(1/ϵ)` is unaffected (`hitProb_le`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
