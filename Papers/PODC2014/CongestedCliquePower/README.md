@@ -15,61 +15,103 @@ statements that are false hold only in degenerate cases: Theorem 22 for `ℓ = 1
 
 ## Mistakes in the paper
 
-* **Lemma 21 (lower-bound graphs for `K_{ℓ,m}`): the construction fails for `ℓ ≠ m`.** The proof claims that each
-  side of a copy of `K_{ℓ,m}` contains at least two nodes of `V_A ∪ V_B`, "as `|W^L| = ℓ − 2` and `|W^R| = m − 2`
-  (and no mixing between `W^L, W^R` is possible)". But in a non-induced copy, nodes of `W^R` can sit on the
-  `ℓ`-side. Smallest case `ℓ = 2`, `m = 3`, so `W^L = ∅` and `W^R = {w}`. Take `F` = the path `i – k – i'` with
-  `i, i' ∈ L` and `k ∈ R` (bipartite, `C₄`-free, 2 edges, at least `ex(3, C₄)/2`). Then `{w, u_k} × {u_i, u_{i'}, v_k}`
-  is a `K_{2,3}`: `w` is adjacent to `φA(L) ∪ φB(R)`, `u_k` to its `F_A`-neighbours and to `v_k`. Its four nodes in
-  `V_A ∪ V_B` are not of the form `φA(e) ∪ φB(e)`, so condition II of Definition 10 fails. The copy uses only Alice's
-  edges and fixed edges, so with Bob's input empty the reduction graph contains `K_{2,3}`: Observation 11, and with it
-  the reduction, breaks. The same happens for every `m = ℓ ± 1` as soon as `F` has a vertex of degree 2 on the
-  relevant side, which every `F` with `≥ ex(N, C₄)/2 = Θ(N^{3/2})` edges does for large `N` (counting argument, not formalized). For `|ℓ − m| ≥ 2` there is even a copy
-  of `K_{ℓ,m}` avoiding all of `F_A` and `F_B`, so every input looks "intersecting". Lemma 21 only claims that *some*
-  lower-bound graph exists. We do not know whether one exists for `ℓ ≠ m` in general. For the 2-edge `F` above, a
-  brute-force search finds valid `(K_{2,3}, F)`-lower bound graphs on `2N + ℓ + m − 4 = 7` vertices, so that
-  instance of the lemma is true. Lemma 21 and Theorem 22 are therefore unestablished for `ℓ ≠ m`, not refuted.
-  Brute force found no problem with the paper's construction for `ℓ = m`.
-  (`lemma_21_counterexample`, `lemma21_fails_succ`, `lemma21_fails_succ'`, `lemma21_fails_free`)
-* **Theorem 22 is false for `ℓ = 1` (and, symmetrically, `m = 1`).** It is stated "for any `ℓ, m ≥ 1`". But
-  `K_{1,m}` is a star, and `G` contains it iff some node has degree `≥ m`. So one round with one-bit messages
-  suffices, not `Ω(√n/b)`. Lemma 21 assumes `ℓ, m ≥ 2`, so this is evidently a typo, and the problem is trivial for
-  stars. (`theorem_22_false_of_l_eq_one`, `starAlg`)
-* **Lemma 18 (lower-bound graphs for cycles) is false for `ℓ = 5`, `N = 4`.** It claims that for every even `N`
-there is an *extremal* `C_ℓ`-free `F` on `N` vertices with a `(C_ℓ, F)`-lower bound graph, and for odd `ℓ` the
-proof takes `F = K_{N/2,N/2}` "since `ex(N, C_ℓ) = N²/4`". That holds only for large `N`. For `ℓ = 5`, `N = 4` the
-unique extremal `C₅`-free graph is `K₄`, and no `(C₅, K₄)`-lower bound graph exists on any number of vertices.
-The witness cycle for an edge `{u, v}` has a single vertex outside `V_A ∪ V_B`, so it contains a direct edge
-`A_x B_y` with `x, y ∈ {u, v}`. Two such edges for the disjoint edges `{0,1}` and `{2,3}` of `K₄` close a 5-cycle
-through three vertices of `V_A`, which violates condition II. This is a degenerate corner: for `N < ℓ` every graph
-on `N` vertices is `C_ℓ`-free, and Theorem 19 (asymptotic in `n`, `ℓ` fixed) never uses it. Whether the lemma also
-fails for some `N ≥ ℓ` (where `ex(N, C_ℓ) > N²/4` can still hold for odd `ℓ`) is not checked. With "extremal" replaced by "`C_ℓ`-free, with all edges between the two halves when
-`ℓ` is odd" the construction is correct for all `N`; we prove this (including condition II for every cycle,
-which the paper does not argue) and derive Theorem 19 from it.
-(`lemma_18_false`, `not_lemma18Statement`, `no_lowerBoundGraph_C5_K4`, `lemma_18`)
-* **Theorem 2's proof miscounts by a factor 2; the theorem holds.** The proof calls `G` heavy if
-  `w(G) = |in G| + |out G| ≥ ns` (`N = n² s` wires) and claims that "the number of heavy gates cannot exceed `n`". It
-  also claims that the greedy assignment of light gates never gets stuck with load `2ns`. Both rest on "total weight
-  `≤ n² s`", but the total weight is `2N`. With `n = 2`, `s = 1`, a path of 5 gates has `4 = n² s` wires and 3 heavy
-  gates (`heavy_count_counterexample`). The fix uses heavy iff `w ≥ n(2s + 1)` (counting input gates with weight `+1`)
-  and light load `≤ 2n(2s + 1)`. With these thresholds the simulation runs with bandwidth `b + 4s + 3` in `2D + 4`
-  rounds. We use oblivious routing (König splitting) instead of Lenzen's algorithm; all communication patterns are
-  fixed in advance. (`theorem_2`)
-* **Claim 6's proof needs `H` connected.** It uses that `ex(n, H)` is non-decreasing in `n` and that
-  `ex(2n, H) ≥ 2 ex(n, H)` (two disjoint copies of an extremal graph). Both fail for disconnected `H`, e.g.
-  `H = K₂ ∪ K₁` has `ex(2, H) = 1 > ex(3, H) = 0` (`extremalNumber_edge_plus_point`). We prove Claim 6 and Theorem 7
-  for connected `H` with at least one edge. That covers the cycles, cliques and complete bipartite graphs, but not the
-  forests to which the paper also applies Theorem 7. For forests the doubling step fails too: `ex(3, 2K₂) = 3` (a
-  triangle) but `ex(6, 2K₂) = 5` (a star). For disconnected `H` the claim is unestablished: our brute force found no
-  counterexample, and we have no proof. (`claim_6`, `theorem_7`)
-* **Typos and slips.** Lemma 14's construction connects `u_1, …, u_{ℓ−1}` to everything; it should be `u_{ℓ−4}`.
-  Lemma 18's index ranges for the path nodes `u_{i,j}` give `⌊ℓ/2⌋` (resp. `⌈ℓ/2⌉`) internal nodes; it should be
-  `⌊ℓ/2⌋ − 2` (resp. `⌈ℓ/2⌉ − 2`), consistent with the stated path lengths and the `(ℓ−4)N/2` extra nodes. Lemma 18
-  also claims "`ex(N, C_ℓ) = Ω(N^{3/2})`" for every even `ℓ`; for `ℓ ≥ 6` this contradicts Bondy–Simonovits
-  (`ex(N, C_{2k}) = O(N^{1+1/k})`), but it is never used. Lemma 21's proof says "assume `n = 4N + ℓ + m − 4`"; it
-  should be `2N`. Theorem 4 says "depth `c·R`" with `c > 1`; the simulation gives depth `R / c`. After Theorem 7 the
-  paper says that for a fixed tree or forest `ex(n, H) = O(1)`. It is `O(n)`, which is what the stated running time
-  `O(log(n)/b)` needs.
+### ⚠️ Lemma 21 and Theorem 22 for `ℓ ≠ m` (the `K_{ℓ,m}` lower-bound gadget)
+The construction in the proof of Lemma 21 contains unintended copies of `K_{ℓ,m}` for every
+`ℓ ≠ m`, so Lemma 21 and Theorem 22 are unestablished there (`lemma_21_counterexample`).
+
+**Impact.** A broken proof, not a refuted statement: Lemma 21 only claims that *some* lower-bound
+graph exists, and in the smallest case other gadgets exist. The case `ℓ = m` and all other lower
+bounds (cliques, cycles) are unaffected.
+
+**Details.** The proof claims that each side of a copy of `K_{ℓ,m}` contains at least two nodes of
+`V_A ∪ V_B`, "as `|W^L| = ℓ − 2` and `|W^R| = m − 2` (and no mixing between `W^L, W^R` is
+possible)". But in a non-induced copy, nodes of `W^R` can sit on the `ℓ`-side. Smallest case
+`ℓ = 2`, `m = 3`, so `W^L = ∅` and `W^R = {w}`. Take `F` = the path `i – k – i'` with `i, i' ∈ L`
+and `k ∈ R` (bipartite, `C₄`-free, 2 edges, at least `ex(3, C₄)/2`). Then
+`{w, u_k} × {u_i, u_{i'}, v_k}` is a `K_{2,3}`: `w` is adjacent to `φA(L) ∪ φB(R)`, `u_k` to its
+`F_A`-neighbours and to `v_k`. Its four nodes in `V_A ∪ V_B` are not of the form `φA(e) ∪ φB(e)`,
+so condition II of Definition 10 fails. The copy uses only Alice's edges and fixed edges, so with
+Bob's input empty the reduction graph contains `K_{2,3}`: Observation 11, and with it the
+reduction, breaks.
+
+The same happens for every `m = ℓ ± 1` as soon as `F` has a vertex of degree 2 on the relevant
+side, which every `F` with `≥ ex(N, C₄)/2 = Θ(N^{3/2})` edges does for large `N` (counting argument,
+not formalized). For `|ℓ − m| ≥ 2` there is even a copy of `K_{ℓ,m}` avoiding all of `F_A` and
+`F_B`, so every input looks "intersecting". We do not know whether a lower-bound graph exists for
+`ℓ ≠ m` in general. For the 2-edge `F` above, a brute-force search finds valid
+`(K_{2,3}, F)`-lower bound graphs on `2N + ℓ + m − 4 = 7` vertices, so that instance of the lemma is
+true. Brute force found no problem with the paper's construction for `ℓ = m`.
+(`lemma_21_counterexample`, `lemma21_fails_succ`, `lemma21_fails_succ'`, `lemma21_fails_free`)
+
+### ⚠️ Claim 6 and Theorem 7 for disconnected `H`
+The proof of Claim 6 needs `H` connected, but the paper also applies Theorem 7 to forests.
+
+**Impact.** Proved for connected `H` with at least one edge, which covers cycles, cliques and
+complete bipartite graphs (`claim_6`, `theorem_7`). For disconnected `H` (including forests) the
+claim is unestablished: our brute force found no counterexample, and we have no proof.
+
+**Details.** The proof uses that `ex(n, H)` is non-decreasing in `n` and that
+`ex(2n, H) ≥ 2 ex(n, H)` (two disjoint copies of an extremal graph). Both fail for disconnected
+`H`, e.g. `H = K₂ ∪ K₁` has `ex(2, H) = 1 > ex(3, H) = 0` (`extremalNumber_edge_plus_point`). For
+forests the doubling step fails too: `ex(3, 2K₂) = 3` (a triangle) but `ex(6, 2K₂) = 5` (a star).
+
+### ⚠️ Theorem 22 for `ℓ = 1` (stars)
+Theorem 22 is stated "for any `ℓ, m ≥ 1`", but for `ℓ = 1` (and, symmetrically, `m = 1`) one round
+with one-bit messages suffices, not `Ω(√n/b)` (`theorem_22_false_of_l_eq_one`, `starAlg`).
+
+**Impact.** Degenerate: `K_{1,m}` is a star, and `G` contains it iff some node has degree `≥ m`.
+Lemma 21 assumes `ℓ, m ≥ 2`, so this is evidently a typo.
+
+### ⚠️ Lemma 18 for `ℓ = 5`, `N = 4` (lower-bound graphs for cycles)
+Lemma 18 claims an *extremal* `C_ℓ`-free `F` with a `(C_ℓ, F)`-lower bound graph for every even
+`N`; for `ℓ = 5`, `N = 4` none exists (`lemma_18_false`, `no_lowerBoundGraph_C5_K4`).
+
+**Impact.** Degenerate corner: for `N < ℓ` every graph on `N` vertices is `C_ℓ`-free, and
+Theorem 19 (asymptotic in `n`, `ℓ` fixed) never uses it. Theorem 19 is proved from a corrected
+Lemma 18.
+
+**Details.** For odd `ℓ` the proof takes `F = K_{N/2,N/2}` "since `ex(N, C_ℓ) = N²/4`". That holds
+only for large `N`. For `ℓ = 5`, `N = 4` the unique extremal `C₅`-free graph is `K₄`, and no
+`(C₅, K₄)`-lower bound graph exists on any number of vertices. The witness cycle for an edge
+`{u, v}` has a single vertex outside `V_A ∪ V_B`, so it contains a direct edge `A_x B_y` with
+`x, y ∈ {u, v}`. Two such edges for the disjoint edges `{0,1}` and `{2,3}` of `K₄` close a 5-cycle
+through three vertices of `V_A`, which violates condition II. Whether the lemma also fails for some
+`N ≥ ℓ` (where `ex(N, C_ℓ) > N²/4` can still hold for odd `ℓ`) is not checked.
+(`not_lemma18Statement`)
+
+**Repair.** With "extremal" replaced by "`C_ℓ`-free, with all edges between the two halves when
+`ℓ` is odd" the construction is correct for all `N`; we prove this (including condition II for
+every cycle, which the paper does not argue) and derive Theorem 19 from it. (`lemma_18`)
+
+### ⚠️ Typos and slips
+- Lemma 14's construction connects `u_1, …, u_{ℓ−1}` to everything; it should be `u_{ℓ−4}`.
+- Lemma 18's index ranges for the path nodes `u_{i,j}` give `⌊ℓ/2⌋` (resp. `⌈ℓ/2⌉`) internal
+  nodes; it should be `⌊ℓ/2⌋ − 2` (resp. `⌈ℓ/2⌉ − 2`), consistent with the stated path lengths and
+  the `(ℓ−4)N/2` extra nodes.
+- Lemma 18 also claims "`ex(N, C_ℓ) = Ω(N^{3/2})`" for every even `ℓ`; for `ℓ ≥ 6` this contradicts
+  Bondy–Simonovits (`ex(N, C_{2k}) = O(N^{1+1/k})`), but it is never used.
+- Lemma 21's proof says "assume `n = 4N + ℓ + m − 4`"; it should be `2N`.
+- Theorem 4 says "depth `c·R`" with `c > 1`; the simulation gives depth `R / c`.
+- After Theorem 7 the paper says that for a fixed tree or forest `ex(n, H) = O(1)`. It is `O(n)`,
+  which is what the stated running time `O(log(n)/b)` needs.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 2 (circuit simulation)
+The proof's count of heavy gates is off by a factor 2: the total weight is `2N`, not `≤ n² s`.
+
+**Impact.** Statement true; repaired with adjusted thresholds (`theorem_2`).
+
+**Details.** The proof calls `G` heavy if `w(G) = |in G| + |out G| ≥ ns` (`N = n² s` wires) and
+claims that "the number of heavy gates cannot exceed `n`". It also claims that the greedy
+assignment of light gates never gets stuck with load `2ns`. Both rest on "total weight `≤ n² s`",
+but the total weight is `2N`. With `n = 2`, `s = 1`, a path of 5 gates has `4 = n² s` wires and 3
+heavy gates (`heavy_count_counterexample`).
+
+**Repair.** Heavy iff `w ≥ n(2s + 1)` (counting input gates with weight `+1`) and light load
+`≤ 2n(2s + 1)`. With these thresholds the simulation runs with bandwidth `b + 4s + 3` in `2D + 4`
+rounds. We use oblivious routing (König splitting) instead of Lenzen's algorithm; all communication
+patterns are fixed in advance. (`theorem_2`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
