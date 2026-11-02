@@ -20,75 +20,71 @@ repaired or new arguments.
 
 ## Mistakes in the paper
 
-* **Lemmas 4.6–4.7 and Theorem 4.8 need at least `N` registers.** Take two registers and four
-  processors with inputs `0, 0, 1, 1`. The two groups take turns: both members of a group write,
-  one register each, and then both scan. Each processor only ever reads its own group's value, so
-  the stable views `{0}` and `{1}` are incomparable and the stable-view graph has two sources.
-  * With one register, two processors that alternate *write; scan* behave the same way. This
-    execution also refutes Lemma 4.6 with `A = {0}`: `Ā = {1}` is live and covers at most one
-    register, yet never reads from `A`.
-  * Exhaustive search finds no such execution with 3 processors and 2 registers. In general, the
-    two groups with minimal views must together have more members than there are registers.
-  * Section 2 allows any number `M > 0` of registers, and Theorem 4.8 states no bound.
-  * Section 4 stresses that its pathology arises "regardless of the number of registers". Its
-    running example (§4.1, reused in §5.1) has 5 processors and 3 registers.
-  * The proof of Lemma 4.6 does count `N` registers ("`|R_t^Ā| + |Ā| < N` registers"). Section 5
-    uses `N` registers.
+### ❌ Lemmas 4.6–4.7 and Theorem 4.8 (fewer registers than processors)
+Theorem 4.8 (stable views form a DAG with a unique source) and Lemmas 4.6–4.7 are false with fewer registers than processors: with two registers and four processors with inputs `0, 0, 1, 1`, the stable views `{0}` and `{1}` are incomparable and the stable-view graph has two sources (`theorem_4_8_needs_registers'`).
 
-  So the missing hypothesis `M ≥ N` is borderline between an implied assumption (⚠️) and a false
-  claim (❌). We count it as ❌ because the paper itself works with fewer registers than processors
-  in Section 4. Section 4 is a warm-up for the snapshot algorithm, which uses `N` registers, so the
-  headline results are unaffected. We prove Lemmas 4.5–4.7 and Theorem 4.8 with
-  `N ≤ |R|`. (`theorem_4_8_needs_registers'`, `theorem_4_8_needs_registers`,
-  `lemma_4_6_needs_registers`; `Exec.lemma_4_5`,
-  `Exec.lemma_4_6`, `Exec.lemma_4_7`, `theorem_4_8`)
-* **Theorem 4.8: the proof is wrong; the statement holds with `N ≤ |R|`.**
-  * The proof claims, by Lemma 4.4, that live processors with a stable view in `X` read only from
-    `P_X`. Here `X` is the set of views reachable from a source `S`. Lemma 4.4 gives the opposite
-    inclusion: processors with a view in `X̄` read only from `P_X̄`. A processor with a view in `X`
-    may read from a smaller view in `X̄`.
-  * Applying Lemma 4.7 to the closed set `P_X̄` yields no contradiction.
-  * The GST of Definition 4.1 does not ensure that registers hold the writers' *stable* views,
-    which Lemma 4.4 needs.
+**Impact.** Section 4 is a warm-up for the snapshot algorithm, which uses `N` registers, so the headline results are unaffected; we prove Lemmas 4.5–4.7 and Theorem 4.8 with `N ≤ |R|`. The missing hypothesis `M ≥ N` is borderline between an implied assumption (⚠️) and a false claim (❌); we count it as ❌ because the paper itself works with fewer registers than processors in Section 4.
 
-  Our proof:
-  * Take two distinct minimal stable views. After a strengthened GST, the processors holding each
-    of them read only from each other.
-  * By Lemma 4.5, each group leaves at most its own size of registers to the others. With at least
-    `N` registers, this pins the partition exactly.
-  * The next round-robin write of a group member into the other group's registers then breaks the
-    count.
+**Details.** In the counterexample the two groups take turns: both members of a group write, one register each, and then both scan. Each processor only ever reads its own group's value.
+* With one register, two processors that alternate *write; scan* behave the same way (`theorem_4_8_needs_registers`). This execution also refutes Lemma 4.6 with `A = {0}`: `Ā = {1}` is live and covers at most one register, yet never reads from `A` (`lemma_4_6_needs_registers`).
+* Exhaustive search finds no such execution with 3 processors and 2 registers. In general, the two groups with minimal views must together have more members than there are registers.
+* Section 2 allows any number `M > 0` of registers, and Theorem 4.8 states no bound.
+* Section 4 stresses that its pathology arises "regardless of the number of registers". Its running example (§4.1, reused in §5.1) has 5 processors and 3 registers.
+* The proof of Lemma 4.6 does count `N` registers ("`|R_t^Ā| + |Ā| < N` registers"). Section 5 uses `N` registers.
 
-  (`theorem_4_8`, `theorem_4_8_unique_source`, `Exec.false_of_two_closed`, `Exec.exists_gst`)
-* **Snapshot safety (§5.3.2): the statement is true; the proof does not go through.**
-  * Lemma 5.2 is false as printed. Take `N = 2`: `q` runs solo to level 2 with view `{1}`. Then
-    `p` writes `{1,2}` into both registers, so `W = {1,2}` is durable. Afterwards `q` executes its
-    output step, "takes a step and terminates", with `W ⊄ view[q]`. The intended statement covers
-    scans that *start* after `t`. Without the printed version, the derivation of safety from
-    Lemmas 5.2 and 5.3 misses two final scans that overlap in time. This counterexample is not in
-    Lean: our model merges the output step into the last read.
-  * Lemma 5.8 assumes that "durably stored" is preserved over time. It is not: a write of a value
-    containing `W` can turn several harmless scanners into threats.
+**Repair.** Lemmas 4.5–4.7 and Theorem 4.8 with `N ≤ |R|`. (`Exec.lemma_4_5`, `Exec.lemma_4_6`, `Exec.lemma_4_7`, `theorem_4_8`)
 
-  We give a new proof (details in [differencies.md](differencies.md), item 8). Call `W` *durable*
-  when the registers containing `W` plus the processors containing `W` number more than `N`.
-  * Persistence: every scan that starts after a durable time ends with a view containing `W`.
-  * Chain: below a terminated view `W` there is a chain of nested scans with view `W`. Each scan
-    in the chain is performed by a new processor with view `W`, so the chain must reach a scan at
-    whose start `W` is durable.
-  * For two incomparable outputs, the two durable starts would each have to precede the other.
+### ❌ Lemma 5.2 (durably stored values)
+Lemma 5.2 is false as printed: with `N = 2`, `q` runs solo to level 2 with view `{1}`, then `p` writes `{1,2}` into both registers, so `W = {1,2}` is durable, and afterwards `q` executes its output step, "takes a step and terminates", with `W ⊄ view[q]`.
 
-  This proof needs only level `N − 1`, so it also proves footnote 4, which the paper states
-  without proof. (`snapshot_safety_paper`, `snapshot_safety`, `Exec.durable_scan`, `Exec.chain`)
-* **Smaller points.**
-  * The wait-freedom proof only needs a minimal stable view, not Theorem 4.8. It also tacitly uses
-    fresh register contents after stabilization.
-  * Lemma 4.6's proof ignores registers that still hold their initial value. Its case "|R_t^Ā| <
-    |A|" needs a scan that starts after every register has been written.
-  * Figure 1 has a typo: `written ∪ {r} = P` should be `= R`. Figure 3 has the same typo.
-  * The "saving grace" argument of Section 6 is correct, but a simpler argument suffices. Two
-    groups with equal-size snapshots appear together in some output sample, so their snapshots
-    are equal and their ranks differ.
+**Impact.** Snapshot safety itself is true (see Proof gaps); the intended statement covers scans that *start* after `t`. This counterexample is not in Lean: our model merges the output step into the last read.
+
+**Details.** Without the printed version, the derivation of safety from Lemmas 5.2 and 5.3 misses two final scans that overlap in time.
+
+### Typos and slips
+- Figure 1 has a typo: `written ∪ {r} = P` should be `= R`. Figure 3 has the same typo.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 4.8 (unique source)
+The proof claims, by Lemma 4.4, that live processors with a stable view in `X` (the views reachable from a source `S`) read only from `P_X`, but Lemma 4.4 gives the opposite inclusion.
+
+**Impact.** The statement holds with `N ≤ |R|`; new proof (`theorem_4_8`, `theorem_4_8_unique_source`, `Exec.false_of_two_closed`, `Exec.exists_gst`).
+
+**Details.**
+* Lemma 4.4 says that processors with a view in `X̄` read only from `P_X̄`. A processor with a view in `X` may read from a smaller view in `X̄`.
+* Applying Lemma 4.7 to the closed set `P_X̄` yields no contradiction.
+* The GST of Definition 4.1 does not ensure that registers hold the writers' *stable* views, which Lemma 4.4 needs.
+
+**Repair.**
+* Take two distinct minimal stable views. After a strengthened GST, the processors holding each of them read only from each other.
+* By Lemma 4.5, each group leaves at most its own size of registers to the others. With at least `N` registers, this pins the partition exactly.
+* The next round-robin write of a group member into the other group's registers then breaks the count.
+
+(`theorem_4_8`, `theorem_4_8_unique_source`, `Exec.false_of_two_closed`, `Exec.exists_gst`)
+
+### 🛠️ Snapshot safety (§5.3.2)
+The derivation of safety from Lemmas 5.2 and 5.3 misses two final scans that overlap in time, and Lemma 5.8 assumes that "durably stored" is preserved over time, which it is not.
+
+**Impact.** Statement true; new proof (`snapshot_safety_paper`, `snapshot_safety`).
+
+**Details.** In Lemma 5.8, a write of a value containing `W` can turn several harmless scanners into threats. Details in [differencies.md](differencies.md), item 8.
+
+**Repair.** Call `W` *durable* when the registers containing `W` plus the processors containing `W` number more than `N`.
+* Persistence: every scan that starts after a durable time ends with a view containing `W`.
+* Chain: below a terminated view `W` there is a chain of nested scans with view `W`. Each scan in the chain is performed by a new processor with view `W`, so the chain must reach a scan at whose start `W` is durable.
+* For two incomparable outputs, the two durable starts would each have to precede the other.
+
+This proof needs only level `N − 1`, so it also proves footnote 4, which the paper states without proof. (`snapshot_safety_paper`, `snapshot_safety`, `Exec.durable_scan`, `Exec.chain`)
+
+### 🛠️ Lemma 4.6 and wait-freedom (smaller points)
+Lemma 4.6's proof ignores registers that still hold their initial value, and the wait-freedom proof tacitly uses fresh register contents after stabilization.
+
+**Impact.** Statements true; routine fixes.
+
+**Details.**
+* Lemma 4.6's case "|R_t^Ā| < |A|" needs a scan that starts after every register has been written.
+* The wait-freedom proof only needs a minimal stable view, not Theorem 4.8.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -110,6 +106,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Atomicity follows the PlusCal code. The end-of-scan computation and the output step are merged
   into the last read of the scan.
 * Sections 3 and 6 are formalized on outcomes: participants, groups (= inputs), and outputs.
+
+**Remark.** The "saving grace" argument of Section 6 is correct, but a simpler argument suffices. Two
+groups with equal-size snapshots appear together in some output sample, so their snapshots are equal and
+their ranks differ.
 
 **Main results in Lean.**
 

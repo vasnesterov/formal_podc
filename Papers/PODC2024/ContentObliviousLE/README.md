@@ -16,34 +16,34 @@ has a repairable gap. IDs must be positive.
 
 ## Mistakes in the paper
 
-* **Theorem 3 holds only as a worst case over ID assignments (imprecise statement).** "Any …
-  algorithm sends at least `n⌊log₂(IDmax/n)⌋` messages" is false if read for each ring and ID
-  assignment. Run Algorithm 2 on IDs relabelled by the swap `1 ↔ 16`. This is still a correct
-  quiescently terminating leader election. On the single-node ring with ID 16 it sends at most 3
-  pulses in every execution, while `1·⌊log₂ 16⌋ = 4`. What Theorem 17 proves, and what we prove, is
-  the worst case: for `n ≤ M`, some assignment of distinct IDs from `{1,…,M}` has an execution with
-  at least `n⌊log₂(M/n)⌋ ≥ n⌊log₂(IDmax/n)⌋` pulses. The full version's Theorem 17 states this
-  quantifier explicitly ("for some assignment of IDs") and derives Theorem 3 from it, so the
-  intended reading is clear from the full paper; only the standalone statement is imprecise.
-  (`theorem_3_per_instance_false`, `theorem_3`)
-* **Lemma 19 / Theorem 17: proof gap, statement true.** The lockstep argument says that nodes with
-  equal solitude patterns "send their first pulse in the same direction … receive and send exactly
-  the pattern", and that one pulse is sent per time step. Patterns record *received* pulses, so two
-  IDs with equal patterns may still send in different batches (two pulses at start versus one at
-  start and one after the first reception). Then "one pulse per time step" and "send exactly the
-  pattern" are not literally true, and the synchronized scheduler needs to be made precise. Fix:
-  schedule by rounds of receptions. In round `k`, every node consumes the pulse at the port given
-  by the `k`-th symbol of the common prefix. It is available because the sender sent it after the
-  same `k−1` receptions in its own solitude run. Count received pulses (`n·s`), which bound sent
-  pulses from below. (`Cslib.ContentOblivious.reach_sync`, `lemma_19`, `theorem_17`)
-* **IDs must be positive (under-specified definition).** The paper writes `ID_v ∈ ℕ` without saying whether `0`
-  is allowed. A node with ID `0` relays every pulse, so on the 1-node ring Algorithm 2 runs forever. The proofs (Lemma 5's base
-  case, the pigeonhole in Lemma 22) silently use `ID ≥ 1`. (`infinite_execution_id_zero`)
-* **Minor.** The lower bound needs correctness on rings with 1 node (a self-loop) and 2 nodes (a
-  double link). The paper uses these explicitly, but its definition of a ring ("connected graph with
-  all degrees 2") does not literally include them. Several cross-references are wrong: "Lemma 1–5"
-  in Lemmas 6–8 and Appendix A mean the items of Lemma 5 and Lemma 24, "Algorithms 2–2" means line
-  ranges, and Lemma 11's proof has `ID_v` for `ID_b`.
+### ⚠️ Theorem 3 (lower bound, per instance vs. worst case)
+Theorem 3 ("any … algorithm sends at least `n⌊log₂(IDmax/n)⌋` messages") is false if read for each ring and ID assignment: Algorithm 2 with IDs relabelled by the swap `1 ↔ 16` sends at most 3 pulses on the single-node ring with ID 16, while `1·⌊log₂ 16⌋ = 4` (`theorem_3_per_instance_false`).
+
+**Impact.** An imprecise statement: the full version's Theorem 17 states the quantifier explicitly ("for some assignment of IDs") and derives Theorem 3 from it, so the intended reading is clear from the full paper. The worst-case bound holds (`theorem_3`).
+
+**Details.** The relabelled algorithm is still a correct quiescently terminating leader election, and it sends at most 3 pulses in every execution on that ring.
+
+**Repair.** What Theorem 17 proves, and what we prove, is the worst case: for `n ≤ M`, some assignment of distinct IDs from `{1,…,M}` has an execution with at least `n⌊log₂(M/n)⌋ ≥ n⌊log₂(IDmax/n)⌋` pulses. (`theorem_3`)
+
+### ⚠️ IDs must be positive (under-specified definition)
+The paper writes `ID_v ∈ ℕ` without excluding `0`, but a node with ID `0` relays every pulse, so on the 1-node ring Algorithm 2 runs forever (`infinite_execution_id_zero`).
+
+**Impact.** An implied assumption: the proofs (Lemma 5's base case, the pigeonhole in Lemma 22) silently use `ID ≥ 1`, and with it all results hold.
+
+### Typos and slips
+- The lower bound needs correctness on rings with 1 node (a self-loop) and 2 nodes (a double link). The paper uses these explicitly, but its definition of a ring ("connected graph with all degrees 2") does not literally include them.
+- Several cross-references are wrong: "Lemma 1–5" in Lemmas 6–8 and Appendix A mean the items of Lemma 5 and Lemma 24, "Algorithms 2–2" means line ranges, and Lemma 11's proof has `ID_v` for `ID_b`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 19 / Theorem 17 (lockstep argument)
+The lockstep argument says that nodes with equal solitude patterns "send their first pulse in the same direction … receive and send exactly the pattern", one pulse per time step, but patterns record *received* pulses, so two IDs with equal patterns may still send in different batches.
+
+**Impact.** Statement true; repaired (`Cslib.ContentOblivious.reach_sync`, `lemma_19`, `theorem_17`).
+
+**Details.** Example: two pulses at start versus one at start and one after the first reception. Then "one pulse per time step" and "send exactly the pattern" are not literally true, and the synchronized scheduler needs to be made precise.
+
+**Repair.** Schedule by rounds of receptions. In round `k`, every node consumes the pulse at the port given by the `k`-th symbol of the common prefix. It is available because the sender sent it after the same `k−1` receptions in its own solitude run. Count received pulses (`n·s`), which bound sent pulses from below. (`Cslib.ContentOblivious.reach_sync`, `lemma_19`, `theorem_17`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

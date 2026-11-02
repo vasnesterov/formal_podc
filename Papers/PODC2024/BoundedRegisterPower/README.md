@@ -17,28 +17,39 @@ evident intent (Algorithm 2's resolution and path indices in the full version).
 
 ## Mistakes in the paper
 
-There are no false statements beyond index slips with evident intent. Small gaps and slips:
+### ⚠️ Algorithm 2 (full version), resolution and path indices
+Algorithm 2's indices do not match: the text calls `A_{L/2}` with ε = 1/(L+1) and then indexes the node `Y_{dL}`, and "for every `j ∈ {1,…,L}`, `Y_j ∈ Δ(X)`" should read `j ∈ {0,…,L−1}`.
 
-* **Claim 3.1: inputs of the absent processes.** The reduction to consensus uses the validity of ε-agreement,
-  but that condition only applies when *all `n`* inputs are equal. Consensus fixes only the inputs of
-  `p₁…p_{n−t+1}`. The proof works because `p_{n−t+2}…p_n` never take a step, so their inputs do not matter and can be
-  set to the common value. The paper does not say this. (`solves_binConsensus_of_not_claim`)
-* **Theorem 1.1, the final indistinguishability.** It needs `E_{2i}` and `E_{2j}` to agree on everything that
-  `p_{n−t+2}…p_n` can observe. That includes those processes' own inputs, which the paper calls "arbitrary", so they
-  must be fixed the same way in all executions `E_ℓ`. The word `w_ℓ` should be the register contents at the *end* of
-  `E_ℓ`, not "after each process has decided", since a process may crash. (`not_solves_epsAgreement`)
-* **Algorithm 2 (full version).**
-  - The text calls `A_{L/2}` with ε = 1/(L+1) and then indexes the node `Y_{dL}`. These do not match. We use resolution
-    `1/L` with odd `L = 2k+1`.
-  - "For every `j ∈ {1,…,L}`, `Y_j ∈ Δ(X)`" should read `j ∈ {0,…,L−1}`.
-  - Lemma 5.8 assumes that both processes decide. Solo decisions are legal too (covering condition); we prove that case.
-* **Lemma 5.5, case "`I_j` read as ⊥".** The proof says the other process decides at line 17 with `r_j = 2`. For
-  `k = 1` it completes the loop and decides at line 14 instead. The value is the same, so the statement holds.
-* **Typos.** In the proofs of Lemmas 5.1 and 5.4 the registers `R1`/`R2` are swapped. `|W| = …` should be `|W| ≤ …`.
-  The caption of Figure 1 says "1-bit registers are universal (Theorem 1.2)"; Theorem 1.2 says 3 bits (which is what
-  is proved: Algorithm 1's ternary input register plus its 1-bit register).
-  Claim 3.1's "`D ⊆ O_ℓ'` for some `ℓ' ≠ ℓ`" fails for `D = {0}`, `ℓ = 0`. This is harmless, since singletons are
-  handled separately.
+**Impact.** Index slips with evident intent; the only issues in a statement or algorithm. We use resolution `1/L` with odd `L = 2k+1`, and Theorem 1.2 holds.
+
+### Typos and slips
+- In the proofs of Lemmas 5.1 and 5.4 the registers `R1`/`R2` are swapped.
+- `|W| = …` should be `|W| ≤ …`.
+- The caption of Figure 1 says "1-bit registers are universal (Theorem 1.2)"; Theorem 1.2 says 3 bits (which is what is proved: Algorithm 1's ternary input register plus its 1-bit register).
+- Claim 3.1's "`D ⊆ O_ℓ'` for some `ℓ' ≠ ℓ`" fails for `D = {0}`, `ℓ = 0`. This is harmless, since singletons are handled separately.
+
+## Proof gaps (statements true)
+
+### 🛠️ Claim 3.1 (inputs of the absent processes)
+The reduction to consensus uses the validity of ε-agreement, which only applies when *all `n`* inputs are equal, but consensus fixes only the inputs of `p₁…p_{n−t+1}`.
+
+**Impact.** The proof works because `p_{n−t+2}…p_n` never take a step, so their inputs do not matter and can be set to the common value; the paper does not say this. (`solves_binConsensus_of_not_claim`)
+
+### 🛠️ Theorem 1.1 (the final indistinguishability)
+The final step needs `E_{2i}` and `E_{2j}` to agree on everything that `p_{n−t+2}…p_n` can observe, including those processes' own inputs, which the paper calls "arbitrary".
+
+**Impact.** Statement true; repaired (`not_solves_epsAgreement`).
+
+**Details.** The inputs of `p_{n−t+2}…p_n` must be fixed the same way in all executions `E_ℓ`. The word `w_ℓ` should be the register contents at the *end* of `E_ℓ`, not "after each process has decided", since a process may crash. (`not_solves_epsAgreement`)
+
+### 🛠️ Lemmas 5.5 and 5.8 (Algorithm 2, missing cases)
+Lemma 5.8 assumes that both processes decide, and Lemma 5.5's case "`I_j` read as ⊥" says the other process decides at line 17 with `r_j = 2`, which is wrong for `k = 1`.
+
+**Impact.** Statements true; routine fixes.
+
+**Details.**
+- Lemma 5.8: solo decisions are legal too (covering condition); we prove that case.
+- Lemma 5.5: for `k = 1` the other process completes the loop and decides at line 14 instead. The value is the same, so the statement holds.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

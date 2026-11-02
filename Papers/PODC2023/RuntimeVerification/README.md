@@ -19,29 +19,35 @@ comparison is made with a prefix, and we prove them that way.
 
 ## Mistakes in the paper
 
-* **Lemma 7.4 is false as stated.** It claims that every tight execution `E` is equivalent to its
-  sketch `X(λ_E)`. This fails when a pending operation has written to `N` but no view has seen it
-  yet, i.e. its `N.Write` comes after every `N.Snapshot`. Such an operation is missing from
-  `X(λ_E)`. Example: a process completes one operation, then invokes a second one and writes it to
-  `N`.
-  This is an edge case for the lemma itself, but the proofs of Lemmas 8.1 and 8.2 meet it
-  routinely. They apply Lemma 7.4 to executions in which such operations are normal: the execution
-  `F` of Lemma 8.1, obtained by removing snapshot steps, and `T(E'|A*)` in Lemma 8.2. The proof of
-  Lemma 8.1 also claims `≺_{F'} = ≺_{T(E')}`, where only `⊆` holds.
-  The statements of Lemmas 8.1/8.2 are true. The fix is to compare with a prefix: truncate at the
-  last relevant snapshot and use prefix closure. (`lemma_7_4_false`; `Exec.sketch_mem_of_tight`,
-  `Exec.cut_mem_of_sketch`, `sketch_isAStarHist`)
-* Smaller slips:
-  * Claim 7.2 is stated for all implementations. It fails for abstract ones (sets of histories)
-    but holds for `A*`.
-  * Theorem 8.2 (2) needs `O ≠ ∅`.
-  * Typos in the proofs of Lemma 7.3 ("`E` and `T(E)` are equivalent") and Lemma 8.2 (`H` should
-    be a prefix of `X(τ'')`).
-  * Theorem 8.2 (3) states the direction of similarity backwards.
-  * Section 3 says the black-box requirement is "modeled as conceptually `V_O` taking `A` as its
-    input". The intended reading is that one verifier works for every `A` (`∃V ∀A`), which is what
-    we formalize. If `V_O` could depend on `A`, Definition 6.1 would be trivially solvable
-    (`Impossibility.trivialVerifier_predictive`, a remark).
+### ❌ Lemma 7.4 (tight execution vs. its sketch)
+Lemma 7.4 claims that every tight execution `E` is equivalent to its sketch `X(λ_E)`, but this fails when a pending operation has written to `N` and no view has seen it yet, i.e. its `N.Write` comes after every `N.Snapshot` (`lemma_7_4_false`).
+
+**Impact.** An edge case for the lemma itself, but the proofs of Lemmas 8.1 and 8.2 meet it routinely. The statements of Lemmas 8.1/8.2, and all main results, are true; we prove them with a prefix comparison.
+
+**Details.** Such an operation is missing from `X(λ_E)`. Example: a process completes one operation, then invokes a second one and writes it to `N`. The proofs of Lemmas 8.1 and 8.2 apply Lemma 7.4 to executions in which such operations are normal: the execution `F` of Lemma 8.1, obtained by removing snapshot steps, and `T(E'|A*)` in Lemma 8.2.
+
+**Repair.** Compare with a prefix: truncate at the last relevant snapshot and use prefix closure. (`Exec.sketch_mem_of_tight`, `Exec.cut_mem_of_sketch`, `sketch_isAStarHist`)
+
+### ⚠️ Claim 7.2 (for all implementations)
+Claim 7.2 is stated for all implementations, but it fails for abstract ones (sets of histories).
+
+**Impact.** It holds for `A*`, the only implementation it is used for.
+
+### ⚠️ Theorem 8.2 (2) (empty `O`)
+Theorem 8.2 (2) needs `O ≠ ∅`.
+
+**Impact.** Degenerate case.
+
+### Typos and slips
+- Typos in the proofs of Lemma 7.3 ("`E` and `T(E)` are equivalent") and Lemma 8.2 (`H` should be a prefix of `X(τ'')`).
+- Theorem 8.2 (3) states the direction of similarity backwards.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 8.1 (order equality)
+The proof of Lemma 8.1 claims `≺_{F'} = ≺_{T(E')}`, where only `⊆` holds.
+
+**Impact.** Statement true; only `⊆` is needed for similarity (`Exec.sketch_mem_of_tight`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -77,6 +83,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
   assumptions are hypotheses:
   * a process that took its `N.Snapshot` also writes `M`;
   * tests occur at arbitrarily late times.
+
+**Reading of Section 3.** Section 3 says the black-box requirement is "modeled as conceptually
+`V_O` taking `A` as its input". The intended reading is that one verifier works for every `A`
+(`∃V ∀A`), which is what we formalize. If `V_O` could depend on `A`, Definition 6.1 would be
+trivially solvable (`Impossibility.trivialVerifier_predictive`, a remark).
 
 **Main results in Lean.**
 
