@@ -17,63 +17,82 @@ intended version (bound independent of `k`) holds. Theorem 2 is proved by a diff
 
 ## Mistakes in the paper
 
-* **Algorithm 2 as written is not WS-Safe (Appendix D, Theorem 3).** Client `c_i`, `1 ≤ i ≤ k`, writes
-  to the register set `R_⌊i/z⌋`. With 1-based `i`, `R_0` gets `z − 1` writers, a later set gets one
-  writer more than it is sized for, and when `z | k`, client `c_k` maps to a set `R_m` that does not
-  exist. Smallest case: `n = 4`, `f = 1`, `k = 3`, so `z = 2`. Clients `c_2` and `c_3` share the overflow
-  set `R_1`, which has `2f + 1 = 3` registers `a, b, c` on servers 0–2. A failure-free sequential run
-  goes as follows. `c_2` writes 1 to `a` and `b`, and its write to `c` stays pending. `c_3` writes 2
-  to `c` and `a`, and its write to `b` stays pending. Then `c_2`'s old write lands on `c`. A read that
-  hears from servers 1–3 sees at most timestamp 1 and returns 1. So the counting of Lemmas 6/7
-  ("`⌊(|R_j|−(f+1))/f⌋` writers per set") fails for the paper's own mapping. This is an indexing slip with evident intent
-  (the paper says each set serves `(|R_j|−(f+1))/f` clients), but with real consequences. With `j = ⌊(i−1)/z⌋` the algorithm is wait-free and WS-Regular with
-  exactly `kf + ⌈k/z⌉(f+1)` registers, so Theorem 3 holds. (counterexample on our formalization of
-  Algorithm 2: `Alg2.Counterexample.not_seqSafe_paperMapping`, `not_wsRegular_paperMapping`;
-  repaired: `Alg2.theorem3_wsRegular`, `Alg2.theorem3`)
-* **Theorem 4 is false for dense value domains (under-specified domain).** Algorithm 1 (max register from one CAS) is
-  stated for "some domain of ordered values V". Over `ℚ`, a `write-max(1)` can loop forever while
-  another process completes `write-max(1 − 1/(j+2))`, `j = 0, 1, …`, each between the first process's
-  read and its CAS. The proof's "assume w.l.o.g. there are `k` values between `v′` and `v`" is an
-  unstated hypothesis. The exact condition for wait-freedom is that no interval `[v₀, c)` contains an
-  infinite increasing sequence. Lemma 5 (linearizability) and lock-freedom hold over every linear
-  order. Theorem 4 holds over `ℕ`, which suffices for the paper's use with timestamps.
-  (`MaxRegisterCAS.ratImpl_not_waitFree`, `MaxRegisterCAS.waitFree_iff`; `theorem4_nat`)
-* **Theorem 8 is false as literally stated (quantifier slip).** Here `k` is fixed and the function `M` may depend on the
-  algorithm. Algorithm 2 (Theorem 3) uses finitely many registers, so it is adaptive with a constant
-  `M`. The proof only shows that consumption grows by `f` over each of the `k` writes. True version:
-  no `M` independent of `k` works. For every `M` there is a `k` such that every `k`-register emulation
-  has a sequential run with more than `M` registers in use. (`theorem8_false_as_stated`; repaired:
-  `Alg.theorem8`)
-* **Proof gaps in Lemma 1; all statements hold.**
-  - *Lemma 3:* the crash run "crashes `Q_i ∪ M_i` immediately after `r`". But in the adversary run,
-    reads on these servers keep responding (Definition 3.3(a)), so the two runs differ for `c_i`.
-    The servers must crash at the stabilization time. In our version the adversary freezes reads
-    too, and its run is then itself fair (`Alg.round_main`).
-  - *Lemma 1(b):* the final extension "by Definition 3.3(a)" until `F` is uncovered does not exist
-    if `c_i` keeps writing to `F` after it returns. One has to stop scheduling `c_i` and let only its
-    pending writes respond (`Alg.lemma1_step`).
-  - *Theorem 1:* the last step applies Lemma 1 to `G`, the servers with many registers. But `|G|` may
-    exceed `f + 1`, and Lemma 1 needs `|F| = f + 1`. Applying it to `f + 1` servers of `G` repairs
-    this (`load_bound`).
-  - We simplified the adversary to `G_i = F \ F_i`, which removes `M_i`. We also replaced the paper's
-    Lemma 4 by a stronger core statement (`Alg.fresh_resp`): after a complete write of a new value,
-    the newly written, previously uncovered registers span more than `f` servers.
-* **Lemma 7's first claim is false; the lemma holds.** "Every low-level write triggered after time `t`
-  is associated with a bigger timestamp" fails: after `W` returns, an idle writer whose old write
-  responds re-triggers (lines 30–32) with its own older timestamp. The conclusion survives, because
-  such a re-trigger only re-covers a register that this writer already covered.
-  (`Alg2.Lemma7.retrigger_old_timestamp`)
-* **Theorem 2's proof is not formalized; the statement is proved directly.** The paper reduces
-  Theorem 2 to Theorem 1 by running `2f + 1` copies of the max-register implementation plus
-  multi-writer ABD; we did not formalize that composition. We prove Theorem 2 by a covering
-  argument instead, with weaker hypotheses: obstruction freedom suffices, and linearizability is
-  needed only on `k`-writer executions. It needs a reader distinct from the writers.
-  (`MaxRegLB.theorem2`)
-* **Superfluous hypotheses and typos.** Theorem 7 does not need `|S| > 2f + 1`. Theorem 1 needs only
-  `|S| ≥ f + 1`. Lemma 1 needs only two values, not `k` distinct values. Lemma 1 says "`k`
-  failure-free runs `r_i`, `0 ≤ i ≤ k`". Lemma 2.11 writes `δ⁻¹` for `δ`. Algorithm 2's initial state
-  `⟨⟨⟨0,1⟩, v₀⟩, …⟩` is ill-typed. The max-register specification "highest written value or `v₀`"
-  needs `v₀ = min V`.
+### ❌ Theorem 4 (CAS max register, Algorithm 1, wait-freedom)
+Theorem 4 is stated for "some domain of ordered values V" but is false over `ℚ`: a `write-max(1)` can loop forever
+while another process completes ever larger writes below 1 (`MaxRegisterCAS.ratImpl_not_waitFree`).
+
+**Impact.** The paper explicitly claims an arbitrary ordered domain, but its use with timestamps (over `ℕ`) is
+unaffected: Theorem 4 holds over `ℕ` (`theorem4_nat`), and Lemma 5 (linearizability) and lock-freedom hold over every
+linear order.
+
+**Details.** Over `ℚ`, the other process completes `write-max(1 − 1/(j+2))`, `j = 0, 1, …`, each between the first
+process's read and its CAS. The proof's "assume w.l.o.g. there are `k` values between `v′` and `v`" is an unstated
+hypothesis. The exact condition for wait-freedom is that no interval `[v₀, c)` contains an infinite increasing
+sequence (`MaxRegisterCAS.waitFree_iff`).
+
+### ⚠️ Theorem 3 (Algorithm 2, Appendix D: writer-to-set mapping)
+Client `c_i`, `1 ≤ i ≤ k`, writes to the register set `R_⌊i/z⌋`, an off-by-one that overloads a set, and then
+Algorithm 2 is not even WS-Safe (`Alg2.Counterexample.not_seqSafe_paperMapping`, `not_wsRegular_paperMapping`).
+
+**Impact.** An indexing slip with evident intent (the paper says each set serves `(|R_j|−(f+1))/f` clients), but with
+real consequences. With `j = ⌊(i−1)/z⌋` the algorithm is wait-free and WS-Regular with exactly `kf + ⌈k/z⌉(f+1)`
+registers, so Theorem 3 holds (`Alg2.theorem3_wsRegular`, `Alg2.theorem3`).
+
+**Details.** With 1-based `i`, `R_0` gets `z − 1` writers, a later set gets one writer more than it is sized for, and
+when `z | k`, client `c_k` maps to a set `R_m` that does not exist. Smallest case: `n = 4`, `f = 1`, `k = 3`, so
+`z = 2`. Clients `c_2` and `c_3` share the overflow set `R_1`, which has `2f + 1 = 3` registers `a, b, c` on servers
+0–2. A failure-free sequential run goes as follows. `c_2` writes 1 to `a` and `b`, and its write to `c` stays
+pending. `c_3` writes 2 to `c` and `a`, and its write to `b` stays pending. Then `c_2`'s old write lands on `c`. A
+read that hears from servers 1–3 sees at most timestamp 1 and returns 1. So the counting of Lemmas 6/7
+("`⌊(|R_j|−(f+1))/f⌋` writers per set") fails for the paper's own mapping. (counterexample on our formalization of
+Algorithm 2: `Alg2.Counterexample.not_seqSafe_paperMapping`, `not_wsRegular_paperMapping`)
+
+### ⚠️ Theorem 8 (no emulation adaptive to point contention)
+Read literally (`k` fixed, `M` may depend on the algorithm), Theorem 8 is false: Algorithm 2 (Theorem 3) uses
+finitely many registers, so it is adaptive with a constant `M` (`theorem8_false_as_stated`).
+
+**Impact.** A quantifier slip; the intended version (bound independent of `k`) holds (`Alg.theorem8`).
+
+**Details.** The proof only shows that consumption grows by `f` over each of the `k` writes.
+
+**Repair.** True version: no `M` independent of `k` works. For every `M` there is a `k` such that every
+`k`-register emulation has a sequential run with more than `M` registers in use. (`Alg.theorem8`)
+
+### Typos and slips
+- Lemma 1 says "`k` failure-free runs `r_i`, `0 ≤ i ≤ k`".
+- Lemma 2.11 writes `δ⁻¹` for `δ`.
+- Algorithm 2's initial state `⟨⟨⟨0,1⟩, v₀⟩, …⟩` is ill-typed.
+- The max-register specification "highest written value or `v₀`" needs `v₀ = min V`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 1, Lemma 3 and Theorem 1 (the lower-bound proof)
+Three steps of the lower-bound proof fail as written: Lemma 3's crash run, Lemma 1(b)'s final extension, and
+Theorem 1's application of Lemma 1 to a set `G` that may have more than `f + 1` servers.
+
+**Impact.** All statements hold; repaired (`Alg.round_main`, `Alg.lemma1_step`, `load_bound`).
+
+**Details.**
+- *Lemma 3:* the crash run "crashes `Q_i ∪ M_i` immediately after `r`". But in the adversary run, reads on these
+  servers keep responding (Definition 3.3(a)), so the two runs differ for `c_i`. The servers must crash at the
+  stabilization time. In our version the adversary freezes reads too, and its run is then itself fair
+  (`Alg.round_main`).
+- *Lemma 1(b):* the final extension "by Definition 3.3(a)" until `F` is uncovered does not exist if `c_i` keeps
+  writing to `F` after it returns. One has to stop scheduling `c_i` and let only its pending writes respond
+  (`Alg.lemma1_step`).
+- *Theorem 1:* the last step applies Lemma 1 to `G`, the servers with many registers. But `|G|` may exceed `f + 1`,
+  and Lemma 1 needs `|F| = f + 1`. Applying it to `f + 1` servers of `G` repairs this (`load_bound`).
+
+**Repair.** We simplified the adversary to `G_i = F \ F_i`, which removes `M_i`. We also replaced the paper's
+Lemma 4 by a stronger core statement (`Alg.fresh_resp`): after a complete write of a new value, the newly written,
+previously uncovered registers span more than `f` servers.
+
+### 🛠️ Lemma 7 (first claim of the proof)
+"Every low-level write triggered after time `t` is associated with a bigger timestamp" is false: after `W` returns,
+an idle writer whose old write responds re-triggers (lines 30–32) with its own older timestamp
+(`Alg2.Lemma7.retrigger_old_timestamp`).
+
+**Impact.** The lemma holds: such a re-trigger only re-covers a register that this writer already covered.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -100,6 +119,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
   `|Q_i| < |F_i|`, which simplifies the paper's `M_i`. The frozen set is eventually constant and has
   at most `f` elements. Hence the infinite strategy run is fair with these servers crashed, and
   obstruction freedom applies to it directly (Lemma 3).
+
+**Remarks on the paper (not mistakes).**
+* Theorem 2: the paper reduces it to Theorem 1 by running `2f + 1` copies of the max-register implementation plus
+  multi-writer ABD; we did not formalize that composition. We prove Theorem 2 by a covering argument instead, with
+  weaker hypotheses: obstruction freedom suffices, and linearizability is needed only on `k`-writer executions. It
+  needs a reader distinct from the writers. (`MaxRegLB.theorem2`)
+* Superfluous hypotheses: Theorem 7 does not need `|S| > 2f + 1`. Theorem 1 needs only `|S| ≥ f + 1`. Lemma 1 needs
+  only two values, not `k` distinct values.
 
 **Main results in Lean.** Namespace `Podc.RegisterEmulationSpace`.
 

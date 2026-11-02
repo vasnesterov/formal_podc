@@ -15,33 +15,42 @@ reduction.
 
 ## Mistakes in the paper
 
-* **Theorem 3.2's colour bound: the inductive step is wrong for `𝒜_2`; the statement is true.** The proof
-  builds `𝒜_{i+1}` from `𝒜_i` with `t = ⌊S^{1/(i+1)}⌋`. It uses only the induction hypothesis
-  "`𝒜_i` uses `D^{i+1} S'` colours". Then it claims `(D(t−1)+1)·D^{i+1}⌈S/t⌉ ≤ D^{i+2} S` "for `S` larger
-  than some constant, since `(D−1)(S/t) > Dt` because `t = ⌊S^{1/(i+1)}⌋` and `i ≥ 2`". But `𝒜_2` is the
-  case `i = 1`. There `t = ⌊√S⌋`, and the inequality fails for arbitrarily large `S`. For example,
-  `D = 2`, `S = 31`, `t = 5` gives `9·4·7 = 252 > 248 = 8·31` (`paper_inductive_step_fails`).
-  In the running-time part the proof uses a different parameter, `t = ⌊S^{1/(i+2)}⌋`. With that choice
-  the step works for `S` above a constant (constant `S` is covered by §3's direct `D(S−1)+1`-colouring), so
-  the gap is repairable from the paper itself, but the proof as written does not establish `𝒜_2`. The
-  bound itself is true for the actual algorithm. For `D ≥ 2`, the invariant `pal_j · (D·S_j − 1) ≤ D^j (D S − 1)` holds whenever every level
-  uses some `t` with `t² ≤ S_cur`. Here `pal_j` is the number of subgraphs after `j` levels and `S_j`
-  the current clique bound. So `𝒜_x` uses fewer than `D^{x+1}S` colours, for all `S ≥ 1`, with either
-  choice of `t` and with no colour-reduction rounds (`theorem_3_2`, `theorem_3_2_algA`).
-* **Theorem 3.2, base case `𝒜_1`: correct, but not tight, and only for `D ≥ 2`.** The chain of inequalities
-  is valid (the `+(D−1)²` term is absorbed by the `−1` in `2⌊√S⌋ − 1`, since `t + k ≥ 2⌊√S⌋` and
-  `D(D−1) ≥ (D−1)²`). The 2 colour-reduction rounds are unnecessary: the count is already
-  `≤ D(DS − 1) < D²S` (the case `x = 1` of `theorem_3_2`). The proof assumes `D ≥ 2`, the statement does
-  not. For `D = 1`, `𝒜_1` produces up to `⌊√S⌋⌈S/⌊√S⌋⌉` colours, e.g. 6 > 5 for `S = 5`, so the `S` colours
-  of the statement need more colour reduction. This case is degenerate (the graph is a disjoint union of
-  cliques).
-* **Minor imprecisions.**
-  - The (p,q)-clique-decomposition is defined with clique size "is `q`"; "at most `q`" is meant.
-  - The proof of Lemma 2.3 (i) speaks of "a clique `Q` of `G'`" where a clique of `G_i` is meant.
-  - Theorem 2.4's `S/t^x + 2` can be sharpened to `⌈S/t^x⌉ ≤ S/t^x + 1`.
-  - Algorithm 1 passes `⌈S/t⌉` as the next `S`, and the nested ceilings equal `⌈S/t^x⌉`.
-  - §4: `(2t−1)(2k−1) ≤ 4Δ` already holds for `t = ⌊√Δ⌋`, so the extra reduction round is unnecessary
-    (`theorem_4_1_count_one`).
+No mistakes in the statements.
+
+### Typos and slips
+- The (p,q)-clique-decomposition is defined with clique size "is `q`"; "at most `q`" is meant.
+- The proof of Lemma 2.3 (i) speaks of "a clique `Q` of `G'`" where a clique of `G_i` is meant.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 3.2, colour bound (appendix proof, inductive step for `𝒜_2`)
+The inductive step's inequality `(D(t−1)+1)·D^{i+1}⌈S/t⌉ ≤ D^{i+2} S` is justified only for `i ≥ 2`, and for `𝒜_2`
+(`i = 1`, `t = ⌊√S⌋`) it fails for arbitrarily large `S` (`paper_inductive_step_fails`).
+
+**Impact.** Statement true; repaired with a stronger invariant, which gives the bound for every `S ≥ 1` without
+colour reduction (`theorem_3_2`, `theorem_3_2_algA`).
+
+**Details.** The proof builds `𝒜_{i+1}` from `𝒜_i` with `t = ⌊S^{1/(i+1)}⌋`. It uses only the induction hypothesis
+"`𝒜_i` uses `D^{i+1} S'` colours". Then it claims `(D(t−1)+1)·D^{i+1}⌈S/t⌉ ≤ D^{i+2} S` "for `S` larger than some
+constant, since `(D−1)(S/t) > Dt` because `t = ⌊S^{1/(i+1)}⌋` and `i ≥ 2`". But `𝒜_2` is the case `i = 1`. There
+`t = ⌊√S⌋`, and the inequality fails for arbitrarily large `S`. For example, `D = 2`, `S = 31`, `t = 5` gives
+`9·4·7 = 252 > 248 = 8·31` (`paper_inductive_step_fails`). In the running-time part the proof uses a different
+parameter, `t = ⌊S^{1/(i+2)}⌋`. With that choice the step works for `S` above a constant (constant `S` is covered by
+§3's direct `D(S−1)+1`-colouring), so the gap is repairable from the paper itself, but the proof as written does not
+establish `𝒜_2`.
+
+**Repair.** The bound is true for the actual algorithm. For `D ≥ 2`, the invariant
+`pal_j · (D·S_j − 1) ≤ D^j (D S − 1)` holds whenever every level uses some `t` with `t² ≤ S_cur`. Here `pal_j` is the
+number of subgraphs after `j` levels and `S_j` the current clique bound. So `𝒜_x` uses fewer than `D^{x+1}S`
+colours, for all `S ≥ 1`, with either choice of `t` and with no colour-reduction rounds (`theorem_3_2`,
+`theorem_3_2_algA`).
+
+### 🛠️ Theorem 3.2 for `D = 1` (base case `𝒜_1`)
+The proof assumes `D ≥ 2`, which the statement does not; for `D = 1`, `𝒜_1` produces up to
+`⌊√S⌋⌈S/⌊√S⌋⌉` colours, e.g. 6 > 5 for `S = 5`.
+
+**Impact.** Degenerate case (the graph is a disjoint union of cliques); the `S` colours of the statement are reached
+by the colour reduction the paper allows. Our `theorem_3_2` assumes `D ≥ 2`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -80,6 +89,15 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Orientation connector (§5): the acyclic orientation is a rank `r`. Incoming/outgoing edges are grouped by
   ID into groups of `sIn`/`sOut`, with virtual vertices `V × Fin (m+1)`. The paper's `k = ⌈√Δ⌉` groups of
   size `⌈Δ/k⌉` become groups of size `⌊√Δ⌋+1`, and similarly for `√d`. Asymptotically this is the same.
+
+**Remarks on the paper (not mistakes).**
+* Theorem 3.2, base case `𝒜_1`: the chain of inequalities is valid (the `+(D−1)²` term is absorbed by the `−1` in
+  `2⌊√S⌋ − 1`, since `t + k ≥ 2⌊√S⌋` and `D(D−1) ≥ (D−1)²`). It is not tight: the 2 colour-reduction rounds are
+  unnecessary, the count is already `≤ D(DS − 1) < D²S` (the case `x = 1` of `theorem_3_2`).
+* Theorem 2.4's `S/t^x + 2` can be sharpened to `⌈S/t^x⌉ ≤ S/t^x + 1`.
+* Algorithm 1 passes `⌈S/t⌉` as the next `S`, and the nested ceilings equal `⌈S/t^x⌉`.
+* §4: `(2t−1)(2k−1) ≤ 4Δ` already holds for `t = ⌊√Δ⌋`, so the extra reduction round is unnecessary
+  (`theorem_4_1_count_one`).
 
 **Main results in Lean.** All in namespace `Podc.DeltaEdgeColoring`.
 
