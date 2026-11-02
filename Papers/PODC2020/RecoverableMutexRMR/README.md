@@ -14,30 +14,36 @@ crash also starts a passage. Lemma 2.1 (19) (and Lemmas 2.4–2.6) omit the fair
 
 ## Mistakes in the paper
 
-* **The RMR bound needs crashes to start passages (Theorems 1–2, definitional slip).** The paper
-  says a passage "begins when [the process] calls `Enter()` and ends when the process crashes or
-  when it finishes its following `Exit()` call". Read literally, the steps of `Recover()` belong
-  to no passage. Take one process: it calls `Enter()` once and reaches the critical section. It
-  then crashes in the critical section over and over, and each time `Recover()` line 20 sends it
-  straight back in. Every round executes `D.FAI()` (line 15). This is an RMR in the CC model
-  (a non-read operation), and in the DSM model for every process whose segment does not hold `D`
-  (with `n ≥ 2`, pick such a process and keep the others idle). So one passage begins but there
-  are unboundedly many RMRs
-  (`Literal.rmr_literal_unbounded`). The fix is the usual RME convention: a crash ends a passage
-  and the recovery starts a new one. With it the claim holds. We prove at most
-  `25·#Enter() + 76·#crashes` RMRs in the DSM model, counting only crashes outside the remainder
-  section (`rmr_bound`).
-* **Lemma 2.1 (19) and Lemmas 2.4–2.6 need fairness.** Lemma 2.1 is stated for "any run", and
-  (19) assumes only finitely many crashes. Without fairness it fails. Take two processes and no
-  crash. Process `false` gets ticket 1 and grants it to itself (`W = (1,true)`), then stops taking
-  steps. Process `true` gets ticket 2 and busy-waits forever. `Token` stays 0
-  (`Lemma2_1_19.lemma2_1_19_false`). These lemmas are only used in the starvation-freedom proof,
-  where fairness holds. There the paper's argument goes through.
-* **Omitted proofs.** Lemma 2.1 (19 items), Lemmas 2.2, 2.4, 2.6, 2.7, 2.10 and all RMR claims come
-  without proof. We prove all items we need, using a single inductive invariant (see below).
-  Lemma 2.3's proof argues backwards in time. We made it inductive, and the argument is sound.
-  Section 3.1 claims that skipped tickets are at most twice the number of crashes. This is true
-  (`skipped_le_two_mul_crashes`) and gives Lemma 2.10.
+### ⚠️ Theorems 1–2 (RMR bound "`O(m)` when `m` passages begin")
+Under the paper's literal definition of a passage, a single process that calls `Enter()` once and then
+crashes in the critical section over and over begins one passage but incurs unboundedly many RMRs
+(`Literal.rmr_literal_unbounded`).
+
+**Impact.** A definitional slip with evident intent: with the usual RME convention that a crash ends a
+passage and the recovery starts a new one, the bound holds (`rmr_bound`).
+
+**Details.** The paper says a passage "begins when [the process] calls `Enter()` and ends when the
+process crashes or when it finishes its following `Exit()` call". Read literally, the steps of
+`Recover()` belong to no passage. Take one process: it calls `Enter()` once and reaches the critical
+section. It then crashes in the critical section over and over, and each time `Recover()` line 20 sends
+it straight back in. Every round executes `D.FAI()` (line 15). This is an RMR in the CC model (a
+non-read operation), and in the DSM model for every process whose segment does not hold `D` (with
+`n ≥ 2`, pick such a process and keep the others idle).
+
+**Repair.** We prove at most `25·#Enter() + 76·#crashes` RMRs in the DSM model, counting only crashes
+outside the remainder section (`rmr_bound`).
+
+### ⚠️ Lemma 2.1 (19) and Lemmas 2.4–2.6 (missing fairness hypothesis)
+Lemma 2.1 is stated for "any run" and (19) assumes only finitely many crashes, but without fairness it
+fails: a process that granted itself ticket 1 stops taking steps, and the other busy-waits forever with
+`Token` stuck at 0 (`Lemma2_1_19.lemma2_1_19_false`).
+
+**Impact.** A missing implied assumption: these lemmas are only used in the starvation-freedom proof,
+where fairness holds, and there the paper's argument goes through.
+
+**Details.** Take two processes and no crash. Process `false` gets ticket 1 and grants it to itself
+(`W = (1,true)`), then stops taking steps. Process `true` gets ticket 2 and busy-waits forever. `Token`
+stays 0.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -79,6 +85,12 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorems 1–2, RMRs `O(m)` (DSM; crashes start passages) | `rmr_bound` | `RMR.lean` |
 | Theorems 1–2 under the literal passage definition: **false** | `Literal.rmr_literal_unbounded` | `RMRLiteral.lean` |
 | Theorem 2 (summary) | `theorem2` | `Main.lean` |
+
+**Omitted proofs.** Lemma 2.1 (19 items), Lemmas 2.2, 2.4, 2.6, 2.7, 2.10 and all RMR claims come
+without proof. We prove all items we need, using a single inductive invariant (`Inv`). Lemma 2.3's
+proof argues backwards in time. We made it inductive, and the argument is sound. Section 3.1 claims
+that skipped tickets are at most twice the number of crashes. This is true
+(`skipped_le_two_mul_crashes`) and gives Lemma 2.10.
 
 **Not formalized.** The CC-model RMR bound, the worst-case `O(1+f)` RMRs per passage, FCFS without
 crashes (all proved only in the full version), and the wait-free `Exit()` variant of Section 3.4.
