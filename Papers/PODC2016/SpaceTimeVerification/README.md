@@ -13,42 +13,60 @@ two-round verifiers can detect short cycles. It is true without identifiers.
 
 ## Mistakes in the paper
 
-* **Proposition 4 and Theorem 5 fail for `t ≥ 2` in the identifier model.** The paper claims (Sections 1.1
-  and 4) that its lower-bound tool holds when nodes have unique identifiers, with outputs independent of
-  them. Take `r` disjoint triangles, `e_i` an edge of triangle `i`, `t = 2`, `q = 3`, and the predicate
-  "every node lies on a triangle". All hypotheses hold, and the crossing of two triangles is a 6-cycle
-  violating the predicate. But a 2-round verifier with *empty* labels decides the predicate: a node checks
-  whether two of its neighbours are adjacent. So the label size is 0, not `Ω(log r)`, and Proposition 4's
-  conclusion fails for every pair. The broken step is "every node of `N_t(e_i) ∪ N_t(e_j)` has the same
-  `t`-neighbourhood in `G` and in `C(e_i, e_j, G)`", which fails when `e_i` lies on a cycle of length
-  `≤ 2t+1`. In anonymous networks, where a node only learns its view tree, a triangle and a 6-cycle look
-  alike and Proposition 4 is true; we prove it there. The paper's application, Theorem 7, uses a path and
-  is unaffected; we prove it directly in the identifier model. Counterexamples: (`theorem_5_false`,
-  `proposition_4_false`); anonymous-model version: (`proposition_4_view`, `theorem_5_anon`).
-* **Proposition 16 is false as printed: off-by-one in condition 4 of correct block labels.** Condition 4
-  asks for a head at the start of an oriented path `w_0, …, w_{k-1} = v` with `k < t` vertices. A tail is
-  `t` vertices below its head, so it can never satisfy this. For `t = 2` no graph with an edge has a
-  correct labelling, e.g. the acyclic path on two nodes. With `k ≤ t`, as the proof of Lemma 17 and Fig. 1
-  intend, Proposition 16 holds for all `t ≥ 2`. Typo with evident intent. (`not_correctLiteral_path`,
-  `prop16`)
-* **Proposition 16 fails for `t = 1`.** Every node would have to be both head and tail, so no nonempty
-  graph has a correct labelling. This is a degenerate case; Theorem 8 is then the classical 1-round scheme.
-  (`correct_one_isEmpty`)
-* **Theorem 1 says "`t ∈ Ω(D)`", but its scheme needs `t ∈ O(D)`.** The shares are spread over BFS
-  distances `0, …, t/4` from one node, so that node needs eccentricity about `t/4`. The introduction
-  indeed says `t ∈ O(diam)`, so `Ω` is most likely a typo. The statement itself survives for large `t`:
-  when the diameter is below `t`, every node sees the whole configuration in `t` rounds and empty labels
-  suffice (not formalized; we formalize the paper's scheme for `t ≤ 2·diam + 2`). The scheme also tacitly needs `P` to be invariant under isomorphism and connected
-  configurations. Its soundness proof skips why a representation consistent with all local views is the
-  actual configuration; we fill this gap. (`theorem1`)
-* **Smaller slips.**
-  * Proposition 4's counting "`|ℓ| < log r / q` ⇒ fewer than `r` concatenations" is wrong for
-    variable-length labels. Counting label tuples gives `log₂ r < q(|ℓ|+1)`. Same asymptotics.
-  * Algorithm 1 (not formalized): `HEAD_CHECK` starts `false` and only ancestors can set it, so a root
-    always rejects at line 35. The relay loop runs `t-1` times while the text uses the message of the
-    `t`-th round.
-  * Typos: "`d(v) = mid` otherwise" should be `b(v) = mid` (proof of Proposition 16), and
-    "`d(w) = b(v) + 1`" should be `d(w) = d(v) + 1` (before Definition 10).
+### ❌ Proposition 4 and Theorem 5 (crossing lower-bound tool, identifier model, `t ≥ 2`)
+The lower-bound tool fails in the identifier model, where the paper (Sections 1.1 and 4) says it holds: for `r` disjoint triangles, `t = 2`, `q = 3` and the predicate "every node lies on a triangle", all hypotheses hold, yet a 2-round verifier with *empty* labels decides the predicate (`theorem_5_false`, `proposition_4_false`).
+
+**Impact.** The paper's application, Theorem 7 (a path), is unaffected; we prove it directly in the identifier
+model. Without identifiers the tool is true (`proposition_4_view`, `theorem_5_anon`).
+
+**Details.** Take `e_i` an edge of triangle `i`. The crossing of two triangles is a 6-cycle violating the
+predicate. But a node can check in 2 rounds whether two of its neighbours are adjacent. So the label size is 0,
+not `Ω(log r)`, and Proposition 4's conclusion fails for every pair. The broken step is "every node of
+`N_t(e_i) ∪ N_t(e_j)` has the same `t`-neighbourhood in `G` and in `C(e_i, e_j, G)`", which fails when `e_i`
+lies on a cycle of length `≤ 2t+1`.
+
+**Repair.** In anonymous networks, where a node only learns its view tree, a triangle and a 6-cycle look alike
+and Proposition 4 is true; we prove it there (`proposition_4_view`, `theorem_5_anon`).
+
+### ⚠️ Proposition 16 (condition 4 of correct block labels, off by one)
+Condition 4 asks for a head at the start of an oriented path `w_0, …, w_{k-1} = v` with `k < t` vertices, which a tail (`t` vertices below its head) can never satisfy, so for `t = 2` no graph with an edge, e.g. the acyclic path on two nodes, has a correct labelling (`not_correctLiteral_path`).
+
+**Impact.** Typo with evident intent: with `k ≤ t`, as the proof of Lemma 17 and Fig. 1 intend, Proposition 16
+holds for all `t ≥ 2` (`prop16`).
+
+### ⚠️ Proposition 16 for `t = 1`
+For `t = 1` every node would have to be both head and tail, so no nonempty graph has a correct labelling (`correct_one_isEmpty`).
+
+**Impact.** Degenerate; Theorem 8 is then the classical 1-round scheme.
+
+### ⚠️ Theorem 1 (universal `t`-PLS: "`t ∈ Ω(D)`" and tacit assumptions)
+Theorem 1 says "`t ∈ Ω(D)`", but its scheme needs `t ∈ O(D)`, and it tacitly needs `P` to be invariant under isomorphism and configurations to be connected.
+
+**Impact.** The introduction says `t ∈ O(diam)`, so `Ω` is most likely a typo. The statement itself survives for
+large `t` (not formalized); we formalize the paper's scheme for `t ≤ 2·diam + 2` (`theorem1`).
+
+**Details.** The shares are spread over BFS distances `0, …, t/4` from one node, so that node needs eccentricity
+about `t/4`. When the diameter is below `t`, every node sees the whole configuration in `t` rounds and empty
+labels suffice.
+
+### Typos and slips
+- Algorithm 1 (not formalized): `HEAD_CHECK` starts `false` and only ancestors can set it, so a root always
+  rejects at line 35. The relay loop runs `t-1` times while the text uses the message of the `t`-th round.
+- "`d(v) = mid` otherwise" should be `b(v) = mid` (proof of Proposition 16).
+- "`d(w) = b(v) + 1`" should be `d(w) = d(v) + 1` (before Definition 10).
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 1 (soundness of the universal scheme)
+The soundness proof skips why a representation consistent with all local views is the actual configuration.
+
+**Impact.** Statement true (in the range above); we fill this gap (`theorem1`).
+
+### 🛠️ Proposition 4 (counting labels)
+The counting "`|ℓ| < log r / q` ⇒ fewer than `r` concatenations" is wrong for variable-length labels.
+
+**Impact.** A repair of the anonymous-model version (where Proposition 4 holds) and of Theorem 7: counting label
+tuples gives `log₂ r < q(|ℓ|+1)`, with the same asymptotics.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

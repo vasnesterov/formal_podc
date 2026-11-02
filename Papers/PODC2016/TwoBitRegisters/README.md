@@ -16,39 +16,36 @@ affecting the result.
 
 ## Mistakes in the paper
 
-* **Implicit convention, necessary for correctness.** The paper never says how an operation's code
-  interleaves with the message handlers. We use the standard convention for this pseudo-code: each
-  block between two `wait`s is atomic. Without it the algorithm is wrong. Suppose a `WRITE` handler
-  runs between lines 1 and 2 of `write()`. Then the writer can send the same `WRITE(b, v_x)` twice
-  to one process: once at line 16, while it handles a late echo of `v_{x−1}`, and again at line 2.
-  The stale copy later passes the parity test as message `x + 2`, and the receiver appends a wrong
-  value to its history. Our model checker found a 14-step execution with `n = 3`, `t = 1`, no crashes,
-  no reads and three writes, in which `p2` accepts the stale `WRITE(0, v2)` as its 4th value.
-  Recorded as a convention, not an error.
-* **Gap in the proof of Lemma 5; statement true.** The case analysis for a pair `(i, j)` considers
-  `p_i` invoking `write` and `p_i` receiving a `WRITE` from `p_j`. It omits `p_i` receiving a `WRITE`
-  from a third process `p_k`. That reception may raise `w_sync_i[i]` (line 14) and send a `WRITE` to
-  `p_j` (line 15), changing the premises of R1/R2. The induction also needs the hypothesis "at most
-  two unprocessed `WRITE`s per channel, with different parities". This is what makes the parity test
-  of line 11 pick the right message. We prove an exact invariant covering both points (`lemma5`,
-  `lemma5_sent`).
-* **Unargued step in Lemma 9.** Channels are not FIFO and `READ()`/`PROCEED()` carry no sequence
-  number, so "`r_sync_i[j] = rsn` means `p_j` answered the *current* request" needs proof; the paper
-  only asserts it. It holds: each `READ()` is at all times in exactly one place (in transit, a pending
-  handler, a `PROCEED()` in transit, or already counted).
-* **Lemma 10, two harmless imprecisions.**
-  * Claim 2 says `w_sync_k[k] = x` when the read starts; only `≥ x` is true, and only `≥ x` is used.
-  * Claim 3 asserts a *correct* process in the intersection of two `(n − t)`-quorums. This does not
-    follow: with `n = 3`, `t = 1`, quorums `{1,2}` and `{2,3}`, `p_2` may be faulty. Correctness of
-    that process is never used.
-* **Theorem 2's message complexity** (`O(n)` per read, `O(n²)` per write) holds when messages are
-  attributed to the operation (value) they belong to, as the paper's proof does, i.e. amortized; it
-  does not bound the messages sent *during* an operation. Catch-up messages for old values (line 16)
-  may be sent long after the write returned. We prove the amortized bounds.
-* **Index slips.**
-  * Claim 3: "computed by `p_i`" should be `p_j`.
-  * Claim 2: `i` and `j` are mixed in the quorum `Q_w`.
-  * Lemma 8: `w_sync_i[i] ≥ w_sync_w[i]` should be `w_sync_w[i] ≥ wsn`.
+No mistakes in the statements.
+
+### Typos and slips
+- Claim 3: "computed by `p_i`" should be `p_j`.
+- Claim 2: `i` and `j` are mixed in the quorum `Q_w`.
+- Lemma 8: `w_sync_i[i] ≥ w_sync_w[i]` should be `w_sync_w[i] ≥ wsn`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 5 (alternating-bit invariant)
+The case analysis for a pair `(i, j)` omits `p_i` receiving a `WRITE` from a third process `p_k`, and the induction lacks the hypothesis "at most two unprocessed `WRITE`s per channel, with different parities".
+
+**Impact.** Statement true; we prove an exact invariant covering both points (`lemma5`, `lemma5_sent`).
+
+**Details.** The paper considers `p_i` invoking `write` and `p_i` receiving a `WRITE` from `p_j`. A reception
+from `p_k` may raise `w_sync_i[i]` (line 14) and send a `WRITE` to `p_j` (line 15), changing the premises of
+R1/R2. The missing hypothesis is what makes the parity test of line 11 pick the right message.
+
+### 🛠️ Lemma 9 (`r_sync_i[j] = rsn` means the current request was answered)
+Channels are not FIFO and `READ()`/`PROCEED()` carry no sequence number, so "`r_sync_i[j] = rsn` means `p_j` answered the *current* request" needs proof, which the paper only asserts.
+
+**Impact.** Statement true: each `READ()` is at all times in exactly one place (in transit, a pending handler, a
+`PROCEED()` in transit, or already counted) (`read_terminates`).
+
+### 🛠️ Lemma 10 (Claims 2 and 3)
+Claim 2 says `w_sync_k[k] = x` when the read starts, but only `≥ x` is true, and Claim 3 asserts a *correct* process in the intersection of two `(n − t)`-quorums, which does not follow.
+
+**Impact.** Harmless: only `≥ x` is used, and correctness of that process is never used (`lemma10`).
+
+**Details.** For Claim 3: with `n = 3`, `t = 1`, quorums `{1,2}` and `{2,3}`, `p_2` may be faulty.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -66,6 +63,20 @@ Full list of differences (including modelling choices and minor imprecisions): [
   of line 11 stays in the channel.
 * Atomicity is CSLib's linearizability (amended Herlihy–Wing) for a register. Pending operations may
   or may not be linearized. No randomness, no timing.
+
+**Implicit convention: code between two `wait`s is atomic.** The paper never says how an operation's code
+interleaves with the message handlers. We use the standard convention for this pseudo-code (last Model bullet);
+it is a convention, not an error, but it is necessary: without it the algorithm is wrong. Suppose a `WRITE`
+handler runs between lines 1 and 2 of `write()`. Then the writer can send the same `WRITE(b, v_x)` twice to one
+process: once at line 16, while it handles a late echo of `v_{x−1}`, and again at line 2. The stale copy later
+passes the parity test as message `x + 2`, and the receiver appends a wrong value to its history. Our model
+checker found a 14-step execution with `n = 3`, `t = 1`, no crashes, no reads and three writes, in which `p2`
+accepts the stale `WRITE(0, v2)` as its 4th value.
+
+**Theorem 2's message complexity** (`O(n)` per read, `O(n²)` per write) holds when messages are attributed to the
+operation (value) they belong to, as the paper's proof does, i.e. amortized; it does not bound the messages sent
+*during* an operation. Catch-up messages for old values (line 16) may be sent long after the write returned. We
+prove the amortized bounds.
 
 **Main results in Lean.**
 
