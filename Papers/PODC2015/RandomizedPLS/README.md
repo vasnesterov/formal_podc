@@ -13,51 +13,62 @@ false when `G` is illegal and all its crossings are legal.
 
 ## Mistakes in the paper
 
-* **The crossing tool fails for an illegal `G` (Proposition 4.3, Theorems 4.4 and 4.7).**
-  Theorems 4.4 and 4.7 only ask that every crossing flips the predicate: `P(G_s) ≠ P(σ^{ij}₁(G)_s)`.
-  The proof of Proposition 4.3 covers the case "`G_s` is rejected" with a single labelling of `G`
-  (the pigeonholed prover labels). Rejection of the crossing, though, is about *every* labelling,
-  and a legal crossing comes with its own prover labels.
+### ❌ Proposition 4.3, Theorems 4.4 and 4.7 (the crossing tool for an illegal `G`)
+The crossing lower bounds are stated for any `G` with `P(G) ≠ P(σ(G))`, but they are false when `G` is
+illegal and all its crossings are legal: on a windmill graph a PLS with `3 + log₂ log₂ r` bits exists, while
+Theorem 4.4 promises `Ω(log r)` bits (`thm_4_4_false`, `thm_4_7_false`, `prop_4_3_false`).
 
-  *Counterexample.* Take the windmill: a hub joined to `L_k` and `R_k` (`k < r`), plus the edges
-  `L_k R_k`. These `r` edges are independent port-preserving copies of one edge (`s = 1`). States are
-  identities, `F` is `G` together with its crossings, and `P` says "some `(k,·)` has a neighbour
-  `(k',·)` with `k' ≠ k`". So `P(G)` is false and every crossing is legal, and all configurations
-  are connected. A PLS with `3 + log₂ log₂ r` bits exists:
-  * a crossed `L_k` raises a flag, and the hub checks that some flag is up;
-  * each `R_m` publishes a bit position `t` and the bit `m_t`, and checks them;
-  * a flagged `L_k` checks that its port-0 neighbour's bit differs from `k_t`.
+**Impact.** Secondary results, over-general as stated; all applications in Section 5 use a legal `G`, and in
+that case we prove the tools (`prop_4_3`, `thm_4_4`, `thm_4_7_correct`, `prop_4_8`). The paper's main message
+(Theorem 3.1, Corollary 3.5) is unaffected.
 
-  In `G`, the flagged `L_k` faces `R_k`, so `G` is rejected under every labelling.
-  * Theorem 4.4 promises `Ω(log r / s) = Ω(log r)` bits (`thm_4_4_false`).
-  * Compiling this PLS with Theorem 3.1 gives an edge-independent two-sided RPLS with
-    `O(log log log r)` bits. Theorem 4.7 promises `Ω(log log r)` bits (`thm_4_7_false`).
-  * For `r = 2^32` and 8-bit labels, Proposition 4.3 fails for every pair: `G` is rejected and the
-    crossing is accepted (`prop_4_3_false`).
+**Details.** Theorems 4.4 and 4.7 only ask that every crossing flips the predicate:
+`P(G_s) ≠ P(σ^{ij}₁(G)_s)`. The proof of Proposition 4.3 covers the case "`G_s` is rejected" with a single
+labelling of `G` (the pigeonholed prover labels). Rejection of the crossing, though, is about *every*
+labelling, and a legal crossing comes with its own prover labels.
 
-  All applications in Section 5 use a legal `G`. In that case we prove the tools
-  (`prop_4_3`, `thm_4_4`, `thm_4_7_correct`, `prop_4_8`).
-* **Proposition 4.6: a wrong step in the proof (statement true).** The proof rounds the *joint*
-  distribution of the certificates of a copy. Eq. (6) then uses that one arc's *marginal* is
-  `ε`-close, but equal joint roundings only give closeness `ε·2^((2s−1)κ)`. The chosen `ε` happens to
-  absorb this factor (the total error is exactly `1/3`), so Eqs. (6)–(8) need fixing, but the
-  conclusion survives. We round each arc separately and get `log₂ log₂ r ≤ 2κ + 5 + 2 log₂ s`
-  (`prop_4_6`, `thm_4_7_loglog`).
-* **Theorem 5.1 applies Theorem 4.7 outside its hypotheses (proof gap).** The crossed path is not in
-  `F`; the proof uses its cycle component instead. This is sound because verification is local. We
-  state the tools for crossings whose union of components is an illegal member of `F` (`Refuted`).
-* **Smaller slips.**
-  * Propositions 4.3, 4.6 and 4.8 count as if every label or certificate had exactly `κ` bits. With
-    "at most `κ` bits" there are `2^(κ+1) − 1` strings, so our thresholds read
-    `r ≤ (2^(κ+1)−1)^(2s)` (Prop. 4.3) and `r ≤ 2^((2^(κ+1)−1)·2s)` (Prop. 4.8). The asymptotics
-    are the same.
-  * Lemma 3.4 (cited) silently needs connected configurations, distinct identities and an
-    isomorphism-invariant `P`; all three hold in the paper's model.
-  * In the proof of Theorem 5.4 the first copy is printed as `H_1 = G_e{v₀, v₁}`. `v₀` is adjacent
-    to every other node, so this copy is not independent of the others
-    (`printed_H1_not_independent`); `{v₁, v₂}` as in Theorem 5.2 is clearly meant.
-  * Theorem 5.6's graph ("`n/c` cycles, except one of at most `c` nodes") is vague when the leftover
-    has 1–2 nodes; we take `n = m·c`.
+*Counterexample.* Take the windmill: a hub joined to `L_k` and `R_k` (`k < r`), plus the edges `L_k R_k`.
+These `r` edges are independent port-preserving copies of one edge (`s = 1`). States are identities, `F` is
+`G` together with its crossings, and `P` says "some `(k,·)` has a neighbour `(k',·)` with `k' ≠ k`". So
+`P(G)` is false and every crossing is legal, and all configurations are connected. A PLS with
+`3 + log₂ log₂ r` bits exists:
+* a crossed `L_k` raises a flag, and the hub checks that some flag is up;
+* each `R_m` publishes a bit position `t` and the bit `m_t`, and checks them;
+* a flagged `L_k` checks that its port-0 neighbour's bit differs from `k_t`.
+
+In `G`, the flagged `L_k` faces `R_k`, so `G` is rejected under every labelling.
+* Theorem 4.4 promises `Ω(log r / s) = Ω(log r)` bits (`thm_4_4_false`).
+* Compiling this PLS with Theorem 3.1 gives an edge-independent two-sided RPLS with `O(log log log r)` bits.
+  Theorem 4.7 promises `Ω(log log r)` bits (`thm_4_7_false`).
+* For `r = 2^32` and 8-bit labels, Proposition 4.3 fails for every pair: `G` is rejected and the crossing is
+  accepted (`prop_4_3_false`).
+
+### Typos and slips
+- Propositions 4.3, 4.6 and 4.8 count as if every label or certificate had exactly `κ` bits. With "at most
+  `κ` bits" there are `2^(κ+1) − 1` strings, so our thresholds read `r ≤ (2^(κ+1)−1)^(2s)` (Prop. 4.3) and
+  `r ≤ 2^((2^(κ+1)−1)·2s)` (Prop. 4.8). The asymptotics are the same.
+- In the proof of Theorem 5.4 the first copy is printed as `H_1 = G_e{v₀, v₁}`. `v₀` is adjacent to every
+  other node, so this copy is not independent of the others (`printed_H1_not_independent`); `{v₁, v₂}` as in
+  Theorem 5.2 is clearly meant.
+- Theorem 5.6's graph ("`n/c` cycles, except one of at most `c` nodes") is vague when the leftover has 1–2
+  nodes; we take `n = m·c`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Proposition 4.6 (rounding the certificate distributions)
+The proof rounds the *joint* distribution of the certificates of a copy, but Eq. (6) uses that one arc's
+*marginal* is `ε`-close, while equal joint roundings only give closeness `ε·2^((2s−1)κ)`.
+
+**Impact.** Statement true; repaired (`prop_4_6`, `thm_4_7_loglog`). The chosen `ε` happens to absorb this
+factor (the total error is exactly `1/3`), so Eqs. (6)–(8) need fixing, but the conclusion survives.
+
+**Repair.** We round each arc separately and get `log₂ log₂ r ≤ 2κ + 5 + 2 log₂ s`.
+
+### 🛠️ Theorem 5.1 (Theorem 4.7 applied outside its hypotheses)
+The crossed path is not in `F`; the proof uses its cycle component instead.
+
+**Impact.** Statement true. This is sound because verification is local. We state the tools for crossings
+whose union of components is an illegal member of `F` (`Refuted`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -80,6 +91,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
   configurations. It may depend on the configuration, e.g. on `n`.
 - **Crossings.** Crossings are built from `r` pairwise independent port-preserving copies of a
   pattern graph (`Copies.cross`). They keep ports, states and degrees.
+- **Lemma 3.4** (cited) silently needs connected configurations, distinct identities and an
+  isomorphism-invariant `P`; all three hold in the paper's model.
 
 **Main results in Lean.**
 

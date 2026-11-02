@@ -14,36 +14,55 @@ proof proves the intended version.
 
 ## Mistakes in the paper
 
-* **Theorem 2 is false, and the reduction of §3.2 maps satisfiable formulas to no-instances.** Theorem 2
-  claims that if the copies set to true by a satisfying assignment of `C′` are updated in round 1 (and all
-  `BB` nodes in round 2), the second round is cycle-free. Take any variable `x`, say with one positive and
-  no negative occurrence (every variable of `x ∨ y ∨ z`), and set `x` true. Then the second round contains the ring
-  `x₀ ⇢ x₁^IN → x₁ ⇢ x_l^IN → x_l ⇢ v₃ → v₄ ⇢ x̄_l^H → x̄_l^IN → x̄_l → x̄_l^BB ⇢ x̄₀^H → x̄₀ → v₁ᴬ ⇢ v₂ᴬ → x₀^H → x₀`.
-  (⇢ = new rule, → = old rule.) The true copies jump forward along their implication edges. `x_l`'s dashed
-  edge enters the exclusive gadget, and `v₄`'s `BB` edge leads to the false copy `x̄_l`. The implication `BB`
-  edges then lead backwards through all false copies to `x̄₀`. Finally the assignment clause's path and
-  its `BB` edge lead back to `x₀`. Every edge is one the paper draws, with the colours it prescribes. The
-  proof's claim that from `x_l` "there is no way back" overlooks the exclusive gadget. Every other choice
-  of round-1 copies violates a clause of `C′` and closes one of the paper's own gadget cycles. So no choice
-  of round-1 nodes makes the second round cycle-free (`gadget_cycle`, `theorem_2_false`; formalized for a
-  variable with `pₓ = 1`, `nₓ = 0`; the same argument works for any `pₓ, nₓ`, so the network of every
-  formula is a no-instance). Lifted to instances: every network containing these gadgets with the required node
-  types has no 3-round schedule (`not_hasSLF_three_of_realizes`, non-vacuous by `realizes_example`). This
-  covers every completion of the under-specified connection step §3.2.4 that keeps the gadget edges and
-  node types, as the paper says its completion does (it only adds nodes above the vertical paths and in `R`). The ring seems inherent
-  to the gadget design, since an implication gadget must lead from the consequent back to the antecedent.
-  NP-hardness of the 3-round problem (Theorem 1, a headline result) therefore has no valid proof in the paper.
-* **Lemma 1 is misstated for `FF` nodes (statement imprecise; intended version true).** Read literally,
-  "the same holds true for nodes of type FF" says that all `FF` nodes of a 3-round schedule can be moved to
-  round 1. This is false: in the 7-node instance with new route `0, 5, 4, 1, 3, 2, 6` a 3-round schedule
-  exists, but with both `FF` nodes `0, 1` in round 1 the `BB` node `4` closes the loop `1 ⇢ 3 → 4 ⇢ 1` in
-  round 2 (`lemma_1_FF_literal_false`). It would also make the 3-round problem trivial, and the paper's own Fig. 4
-  shows why it fails. The proof moves nodes only from round 2 to round 1, and that version is true, also in
-  the backward direction (`lemma_1`, `lemma_1_backward`).
-* **Small slips.** Lemma 2 ("reduces the number of nodes on the path by `n_t/3`") is true only when the
-  updated start nodes are merged into their new successors, as §4 does, but not if they are counted as path nodes
-  (old route `0,1,2,3`, new route `0,2,1,3`). Algorithm 1, line 7, ranges over all of `X` instead of the
-  forward edges sorted in line 6.
+### ❌ Theorem 2 (§3.2 reduction for 3-round schedules)
+Theorem 2 is false: for a variable `x` set true by a satisfying assignment, round 2 of the claimed schedule
+contains a forwarding ring through the exclusive gadget, and every other choice of round-1 copies closes one
+of the paper's own gadget cycles, so the reduction maps satisfiable formulas such as `x ∨ y ∨ z` to
+no-instances (`gadget_cycle`, `theorem_2_false`).
+
+**Impact.** NP-hardness of the 3-round problem (Theorem 1, a headline result) has no valid proof in the
+paper; we neither prove nor refute it. The ring seems inherent to the gadget design, since an implication
+gadget must lead from the consequent back to the antecedent.
+
+**Details.** Theorem 2 claims that if the copies set to true by a satisfying assignment of `C′` are updated
+in round 1 (and all `BB` nodes in round 2), the second round is cycle-free. Take any variable `x`, say with
+one positive and no negative occurrence (every variable of `x ∨ y ∨ z`), and set `x` true. Then the second
+round contains the ring
+`x₀ ⇢ x₁^IN → x₁ ⇢ x_l^IN → x_l ⇢ v₃ → v₄ ⇢ x̄_l^H → x̄_l^IN → x̄_l → x̄_l^BB ⇢ x̄₀^H → x̄₀ → v₁ᴬ ⇢ v₂ᴬ → x₀^H → x₀`.
+(⇢ = new rule, → = old rule.)
+- The true copies jump forward along their implication edges.
+- `x_l`'s dashed edge enters the exclusive gadget, and `v₄`'s `BB` edge leads to the false copy `x̄_l`.
+- The implication `BB` edges then lead backwards through all false copies to `x̄₀`.
+- Finally the assignment clause's path and its `BB` edge lead back to `x₀`.
+
+Every edge is one the paper draws, with the colours it prescribes. The proof's claim that from `x_l` "there
+is no way back" overlooks the exclusive gadget. Every other choice of round-1 copies violates a clause of
+`C′` and closes one of the paper's own gadget cycles. So no choice of round-1 nodes makes the second round
+cycle-free (formalized for a variable with `pₓ = 1`, `nₓ = 0`; the same argument works for any `pₓ, nₓ`, so
+the network of every formula is a no-instance).
+
+Lifted to instances: every network containing these gadgets with the required node types has no 3-round
+schedule (`not_hasSLF_three_of_realizes`, non-vacuous by `realizes_example`). This covers every completion
+of the under-specified connection step §3.2.4 that keeps the gadget edges and node types, as the paper says
+its completion does (it only adds nodes above the vertical paths and in `R`).
+
+### ⚠️ Lemma 1 (moving `FF` nodes to round 1)
+Read literally, Lemma 1 says that all `FF` nodes of a 3-round schedule can be moved to round 1, which is
+false for the 7-node instance with new route `0, 5, 4, 1, 3, 2, 6` (`lemma_1_FF_literal_false`).
+
+**Impact.** Statement imprecise; the intended version is true. The proof moves nodes only from round 2 to
+round 1, and that version holds, also in the backward direction (`lemma_1`, `lemma_1_backward`).
+
+**Details.** The lemma says "the same holds true for nodes of type FF". In the instance above a 3-round
+schedule exists, but with both `FF` nodes `0, 1` in round 1 the `BB` node `4` closes the loop
+`1 ⇢ 3 → 4 ⇢ 1` in round 2. The literal reading would also make the 3-round problem trivial, and the
+paper's own Fig. 4 shows why it fails.
+
+### Typos and slips
+- Lemma 2 ("reduces the number of nodes on the path by `n_t/3`") is true only when the updated start nodes
+  are merged into their new successors, as §4 does, but not if they are counted as path nodes (old route
+  `0,1,2,3`, new route `0,2,1,3`).
+- Algorithm 1, line 7, ranges over all of `X` instead of the forward edges sorted in line 6.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

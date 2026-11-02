@@ -14,40 +14,53 @@ registers), is correct. We prove it from the wait-free set-agreement impossibili
 
 ## Mistakes in the paper
 
-* **Figures 3 and 4 livelock: Lemma 5 is false.** The adoption rule (lines 11–13) makes a process adopt
-  the *value* `w` of a duplicated pair `(w, q)` written by another process `q`. The process then writes
-  `(w, id)`. This is a *different pair*, so it does not destroy the duplicate. Smallest case: `n = 2`,
-  `k = m = 1`, `r = 3` components. `p₁` runs solo and decides, leaving `A = [(v,p₁),(v,p₁),(v,p₁)]`.
-  Then `p₀` runs solo forever. It writes `(v₀,p₀)` into `A[0]` and sees two different pairs (more than
-  `m = 1`), so it does not decide. Line 11 holds: there is no `⊥`, no copy of its own pair, and a
-  duplicated pair. It adopts `v`, writes `(v,p₀)` into `A[0]`, and is in the same situation again,
-  without ever changing `i`. Both processes are correct, and `p₀` never terminates.
-  For general `m` we use crashed processes `1,…,m` that leave `m` different pairs and a duplicate in
+### ❌ Lemma 5, Theorems 7 and 8 (Figures 3 and 4 livelock)
+The algorithms of Figures 3 and 4 are not `m`-obstruction-free, not even obstruction-free: already for
+`n = 2`, `k = m = 1`, `r = 3`, a process running solo keeps re-adopting the same value forever, so Lemma 5
+and the termination part of Theorems 7 and 8 (as proved through these algorithms) are false
+(`fig3_not_mObstructionFree`, `fig3_not_obstructionFree`, `fig4_not_mObstructionFree`; summary
+`theorem7_figure3_false`, `theorem8_figure4_false`).
+
+**Impact.** The paper's proofs of the upper bounds of Theorems 7 and 8, and of the "exactly `n` registers for
+obstruction-free repeated consensus" corollary, are invalid. A one-line change repairs Figure 3, and the
+repaired one-shot algorithm satisfies Theorem 7 in its snapshot version; the repeated upper bound
+(Theorem 8) remains unverified. Safety and the lower bound (Theorem 2) are unaffected.
+
+**Details.** The adoption rule (lines 11–13) makes a process adopt the *value* `w` of a duplicated pair
+`(w, q)` written by another process `q`. The process then writes `(w, id)`. This is a *different pair*, so
+it does not destroy the duplicate.
+- Smallest case: `n = 2`, `k = m = 1`, `r = 3` components. `p₁` runs solo and decides, leaving
+  `A = [(v,p₁),(v,p₁),(v,p₁)]`. Then `p₀` runs solo forever. It writes `(v₀,p₀)` into `A[0]` and sees two
+  different pairs (more than `m = 1`), so it does not decide. Line 11 holds: there is no `⊥`, no copy of
+  its own pair, and a duplicated pair. It adopts `v`, writes `(v,p₀)` into `A[0]`, and is in the same
+  situation again, without ever changing `i`. Both processes are correct, and `p₀` never terminates.
+- For general `m` we use crashed processes `1,…,m` that leave `m` different pairs and a duplicate in
   `A[1..r−1]`. With them the livelock exists for every `1 ≤ m ≤ k < n` with `r = n + 2m − k`, even when
   all inputs are equal.
-  The proof of Lemma 5 breaks in Case 2: "as `p` changes its preferred value … it must have found
-  another pair that appears twice". In the example, `p` re-adopts the same value forever. Figure 4
-  inherits the bug verbatim: run everything above inside the first instance. So the paper's proofs of
-  the upper bounds of Theorems 7 and 8, and of the "exactly `n` registers for obstruction-free
-  repeated consensus" corollary, are invalid. (`fig3_not_mObstructionFree`, `fig3_not_obstructionFree`,
-  `fig4_not_mObstructionFree`; summary `theorem7_figure3_false`, `theorem8_figure4_false`)
-  arXiv v2 is the latest version and has the same Figure 3. The authors' PODC'15 talk slides give the
-  same rule: "if … some other pair `(v, id′)` appears twice then `pref ← v`".
-  *Repair.* At line 11, also require that the value of the first duplicated pair differs from `pref`;
-  otherwise advance `i` (line 14). The repaired Figure 3 is `m`-obstruction-free. The new Case 2 of
-  Lemma 5: after some time all duplicates lie in the frozen components, so the first duplicated value
-  `w*` is constant. A process that adopted `w*` must then advance. Safety (Lemmas 3–4, `k`-agreement)
-  is unaffected. (`theorem7_corrected`)
-  The same repair of Figure 4 passes bounded exhaustive model checking (`n = 2`, `k = m = 1`, two
-  instances per process; see `differencies.md`). It is **not** proved in Lean, so the repeated upper
-  bound `min(n + 2m − k, n)` (Theorem 8) remains unverified.
-* **Lemma 1 is used outside its statement (statement true).** Lemma 1 talks about executions from the
-  initial configuration. Theorem 2 applies it from a reachable configuration `D_j`, to the fresh
-  `(s+1)`-th instance. The reduction to the wait-free impossibility works there too: restart the
-  algorithm from `D_j`. We prove that generalized form. (`lemma1`)
-* **Lemma 3 holds only for one-shot executions (not a mistake).** If a decided process were invoked
-  again, its old and new pairs could coexist. The algorithm is one-shot, so the paper's statement and
-  proof are fine. Our Lean proof uses a stronger inductive invariant. (`lemma3`)
+
+The proof of Lemma 5 breaks in Case 2: "as `p` changes its preferred value … it must have found another
+pair that appears twice". In the example, `p` re-adopts the same value forever. Figure 4 inherits the bug
+verbatim: run everything above inside the first instance. arXiv v2 is the latest version and has the same
+Figure 3. The authors' PODC'15 talk slides give the same rule: "if … some other pair `(v, id′)` appears
+twice then `pref ← v`".
+
+**Repair.** At line 11, also require that the value of the first duplicated pair differs from `pref`;
+otherwise advance `i` (line 14). The repaired Figure 3 is `m`-obstruction-free. The new Case 2 of Lemma 5:
+after some time all duplicates lie in the frozen components, so the first duplicated value `w*` is
+constant. A process that adopted `w*` must then advance. Safety (Lemmas 3–4, `k`-agreement) is unaffected.
+(`theorem7_corrected`)
+The same repair of Figure 4 passes bounded exhaustive model checking (`n = 2`, `k = m = 1`, two instances
+per process; see `differencies.md`). It is **not** proved in Lean, so the repeated upper bound
+`min(n + 2m − k, n)` (Theorem 8) remains unverified.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 2 (Lemma 1 used outside its statement)
+Lemma 1 talks about executions from the initial configuration, but Theorem 2 applies it from a reachable
+configuration `D_j`, to the fresh `(s+1)`-th instance.
+
+**Impact.** Statement true. The reduction to the wait-free impossibility works there too: restart the
+algorithm from `D_j`. We prove that generalized form (`lemma1`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -69,6 +82,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Upper bounds: the algorithms use one atomic snapshot object with `r = n + 2m − k` components
   (`snapObjOpt`). Implementing the snapshot from registers ([5], [1,13] in the paper) is not
   formalized.
+* Lemma 3 holds only for one-shot executions (not a mistake): if a decided process were invoked again,
+  its old and new pairs could coexist. The algorithm is one-shot, so the paper's statement and proof are
+  fine. Our Lean proof uses a stronger inductive invariant (`lemma3`).
 * Lower bound: an arbitrary algorithm over a finite family of read/write registers (`RegFamily ι W w₀`)
   with arbitrary local states and values. It assumes all invocations are allowed and that the inputs
   include `|P|` distinct values, as in the paper's proof, where processes propose their ids.

@@ -15,51 +15,73 @@ Lemma 5 false for some pairwise independent hash families.
 
 ## Mistakes in the paper
 
-* **`HP-TestOut` as written always answers "no leaving edge" (Section 2.2).** The polynomial
-  `𝒫(D)(z) = ∏_{e∈D} (z − edge_number(e))` is applied to the sets `E↑(T)`, `E↓(T)` of *ordered* pairs,
-  but the edge number is defined for the *undirected* edge (IDs concatenated, smallest first). Then
-  `(u, v)` and `(v, u)` get the same number, already `Local↑(y) = Local↓(y)` at every node, and the two
-  fingerprints are equal for every `α`, whatever `T` is. The fix is to number the dart `(u, v)` by the
-  ordered concatenation `ID(u)·ID(v)` and to pick `p` above the largest dart number. Observation 1
-  makes the intent clear. With this fix we prove inequality (2): error `≤ (D−1)/p < ε` with
-  `D = ∑_{y∈T} deg y` (`hpTestOut_symm_never`, `hpTestOut_edgeNumber_never`; fixed:
-  `hpTestOut_dartNumber_error_lt`).
-* **`FindMin` misses the heaviest weight (Section 3.1, Lemma 2).** Step 3 sets `k ← maxWt(T_x)`. The
-  `w` subranges of step 5 cover `[j, j + w⌈(k−j)/w⌉ − 1]`, which is `[j, k−1]` when `w | k − j`
-  (empty when `k = j`). Step 7(a) narrows to `(j_min, k_min + 1)`, so the range is meant to be
-  half-open. If the lightest leaving edge is also the heaviest edge at `T_x` and `w | maxWt − 1`,
-  `TestOut` (which never answers 1 wrongly) never answers 1, and `FindMin` returns `∅` even though an
-  edge leaves `T_x`. Example: path `0 − 1 − 2` with weights `1, 3` and `T = {0}`, a singleton
-  fragment in `Build MST`'s first phase. Then `maxWt(T) = 1` and every subrange is empty. With
-  `k ← maxWt + 1` the search is correct (`run_none_of_max`, `p3_counterexample`; fixed:
-  `findMinFixed_correct`).
-* **Lemma 5 needs a larger hash range than `FindAny` uses (Section 4.1).** Lemma 4 assumes
-  `|W| < 2^(ℓ−1) = r/2` for the set `W` of leaving edges, and its witness `j` can be `0`. Step 3a only
-  asks `r > ∑ deg`, and step 3b only uses the indices `1, …, lg r`. The proof of Lemma 5 never checks
-  Lemma 4's hypothesis, and the statement fails. Take the star `K_{1,3}` with `T = {center}`: then
-  `∑ deg = 3`, so `r = 4` and the indices are `{1, 2}`, and the edge numbers are `10, 11, 12`. We
-  build a pairwise independent family on all keys `[0, 12]`: the high bits of the three hash values
-  are `s₁, s₂, ¬(s₁ ⊕ s₂)`, and everything else is independent and uniform. With it, the number of
-  leaving edges hashing into `[2]` is always 0 or 2. So `min = 2`, `w(T) = 10 ⊕ 11 ⊕ 12 = 13` is not
-  the number of any edge, and every round fails. `FindAny-C` succeeds with probability `0` (not
-  `≥ 1/16`), and `FindAny` never finds an edge. The family is artificial: the linear family over
-  `GF(2)` succeeds here. The fix is `r ≥ 4 ∑ deg`, or `r > 2 ∑ deg` plus index `0`; with it,
-  Lemma 5 holds (`FindAnyCex.lemma5_findAnyC_false`, `FindAnyCex.findAny_eq_none`; fixed:
-  `lemma5_findAnyC`, `lemma5_findAny_whp`).
-* **Proof slips with true statements.**
-  * Lemma 4's chain of inequalities ends with "`= 1/16`" but in fact gives `> 1/8`. The exact
-    bound is `≥ 3/16` (`lemma4_strong`).
-  * The proof of Lemma 5 only derives `1/16 − 1/(2n^c)` for `FindAny-C`, but the stated `1/16`
-    holds by the `3/16` bound.
-  * Inequality (2) needs `B` = the *sum of the degrees* in `T`, as in step 0, not "the number of
-    edges incident to `T`". The fingerprints agree at the number of every dart inside `T`
-    (`card_inter_le_card_hpTestOut_fail`).
-* **Not formalized, noted in [differencies.md](differencies.md).**
-  * Lemma 2's Markov step gives `≈ 0.47`, not `< 1/3`, for `c = 1`.
-  * Lemma 3's phase count adds up to `24c/C + 16c/C²`, not `40c/C`.
-  * `Insert` misses the case where `u` and `v` are in different trees.
-  * `FindMin`'s step 6 is undefined when no subrange answers 1.
-  * Typos: `|X|`, `TestHigh`, `{u′, v}`, and "TestOut" in `FindAny`'s step 5.
+### ⚠️ `HP-TestOut` (Section 2.2, edge numbers)
+`HP-TestOut` as written always answers "no leaving edge", because the edge number of the *undirected* edge
+is used for the *ordered* pairs in `E↑(T)`, `E↓(T)`, so both fingerprints are equal for every `α`
+(`hpTestOut_symm_never`, `hpTestOut_edgeNumber_never`).
+
+**Impact.** Local fix with evident intent (Observation 1 makes it clear): number the dart `(u, v)` by the
+ordered concatenation `ID(u)·ID(v)` and pick `p` above the largest dart number. With this fix we prove
+inequality (2): error `≤ (D−1)/p < ε` with `D = ∑_{y∈T} deg y` (`hpTestOut_dartNumber_error_lt`).
+
+**Details.** The polynomial `𝒫(D)(z) = ∏_{e∈D} (z − edge_number(e))` is applied to the sets of ordered
+pairs, but the edge number concatenates the IDs smallest first. Then `(u, v)` and `(v, u)` get the same
+number, already `Local↑(y) = Local↓(y)` at every node, and the two fingerprints are equal whatever `T` is.
+
+### ⚠️ `FindMin` (Section 3.1, Lemma 2: the heaviest weight is missed)
+`FindMin` returns `∅` although an edge leaves `T_x` when the lightest leaving edge is also the heaviest edge
+at `T_x` and `w | maxWt − 1`, e.g. on the path `0 − 1 − 2` with weights `1, 3` and `T = {0}`
+(`run_none_of_max`, `p3_counterexample`).
+
+**Impact.** Off-by-one with evident intent (step 7(a) treats the range as half-open): with
+`k ← maxWt + 1` the search is correct (`findMinFixed_correct`).
+
+**Details.** Step 3 sets `k ← maxWt(T_x)`. The `w` subranges of step 5 cover
+`[j, j + w⌈(k−j)/w⌉ − 1]`, which is `[j, k−1]` when `w | k − j` (empty when `k = j`). Step 7(a) narrows to
+`(j_min, k_min + 1)`, so the range is meant to be half-open. In the failing case `TestOut` (which never
+answers 1 wrongly) never answers 1. In the example, a singleton fragment in `Build MST`'s first phase,
+`maxWt(T) = 1` and every subrange is empty.
+
+### ⚠️ Lemma 5 (Section 4.1, `FindAny`'s hash range)
+Lemma 5 is false for some pairwise independent hash families: on the star `K_{1,3}` with `T = {center}`,
+`FindAny`'s range `r > ∑ deg` gives `r = 4`, too small for Lemma 4, and `FindAny-C` succeeds with probability
+`0` instead of `≥ 1/16` (`FindAnyCex.lemma5_findAnyC_false`, `FindAnyCex.findAny_eq_none`).
+
+**Impact.** Local parameter fix: with `r ≥ 4 ∑ deg`, or `r > 2 ∑ deg` plus index `0`, Lemma 5 holds
+(`lemma5_findAnyC`, `lemma5_findAny_whp`). The failing family is artificial: the linear family over
+`GF(2)` succeeds here.
+
+**Details.** Lemma 4 assumes `|W| < 2^(ℓ−1) = r/2` for the set `W` of leaving edges, and its witness `j` can
+be `0`. Step 3a only asks `r > ∑ deg`, and step 3b only uses the indices `1, …, lg r`. The proof of
+Lemma 5 never checks Lemma 4's hypothesis. In the star example `∑ deg = 3`, so `r = 4` and the indices are
+`{1, 2}`, and the edge numbers are `10, 11, 12`. We build a pairwise independent family on all keys
+`[0, 12]`: the high bits of the three hash values are `s₁, s₂, ¬(s₁ ⊕ s₂)`, and everything else is
+independent and uniform. With it, the number of leaving edges hashing into `[2]` is always 0 or 2. So
+`min = 2`, `w(T) = 10 ⊕ 11 ⊕ 12 = 13` is not the number of any edge, and every round fails. `FindAny`
+never finds an edge.
+
+### Typos and slips
+- Inequality (2) needs `B` = the *sum of the degrees* in `T`, as in step 0, not "the number of edges
+  incident to `T`". The fingerprints agree at the number of every dart inside `T`
+  (`card_inter_le_card_hpTestOut_fail`).
+- `Insert` misses the case where `u` and `v` are in different trees (not formalized).
+- `FindMin`'s step 6 is undefined when no subrange answers 1.
+- Typos: `|X|`, `TestHigh`, `{u′, v}`, and "TestOut" in `FindAny`'s step 5.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemmas 4 and 5 (the `1/16` bound)
+The proof of Lemma 5 only derives `1/16 − 1/(2n^c)` for `FindAny-C`, not the stated `1/16`, and Lemma 4's
+chain of inequalities ends with "`= 1/16`" but in fact gives `> 1/8`.
+
+**Impact.** Statements true: the exact bound in Lemma 4 is `≥ 3/16` (`lemma4_strong`), and the stated
+`1/16` for `FindAny-C` follows from it (`lemma5_findAnyC`).
+
+### 🛠️ Lemmas 2 and 3 (constants; not formalized, noted in [differencies.md](differencies.md))
+Lemma 2's Markov step gives `≈ 0.47`, not `< 1/3`, for `c = 1`, and Lemma 3's phase count adds up to
+`24c/C + 16c/C²`, not `40c/C`.
+
+**Impact.** Not formalized. Only constants change.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

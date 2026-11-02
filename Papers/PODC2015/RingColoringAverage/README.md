@@ -15,37 +15,56 @@ directly rather than through the paper's unproved recurrence.
 
 ## Mistakes in the paper
 
-* **"Without loss of generality we prove the theorem only for minimal algorithms" — proof gap, true statement.**
-  Minimal means that no valid algorithm uses at most the same radius everywhere and a strictly smaller one
-  somewhere. The paper never shows that a minimal algorithm exists below a given one. Algorithms have infinitely
-  many neighbourhoods, so improvements can go on forever. The limit of a chain of improvements has well-defined
-  radii (pointwise minima), but its outputs need not converge. So it is not clear that the limit is a valid
-  algorithm. We prove existence with Zorn's lemma on radius functions. For a chain, the limit algorithm stops at
-  the pointwise minimum radius. Its colour table exists by Tychonoff compactness: being proper on the finitely
-  many nodes where a given chain member attains the minimum is a closed condition, and these conditions are
-  directed. (`Alg.exists_isMinimal_le`)
-* **Lemma 3's reduction from 3- to 4-colouring does not follow — proof gap; Theorem 1 unaffected after repair.**
-  Lemma 2 is stated and proved for algorithms that are minimal *for 4-colouring*. Its modified algorithm `A'`
-  uses all four colours. Lemma 3 assumes `A` is minimal *for 3-colouring* and says it "is sufficient to prove
-  the result for 4-colouring, as it implies the result for 3-colouring". But a 3-colouring algorithm that no
-  3-colouring algorithm improves can still be improved by a 4-colouring algorithm. Then Lemma 2 says nothing
-  about it. We do not know whether Lemma 3 holds as stated. The repair is to prove Theorem 1 for every
-  4-colouring algorithm: take a minimal 4-colouring algorithm below it, and use Lemma 3 for minimal 4-colouring
-  algorithms together with Linial's bound for 4 colours. A 3-colouring algorithm is a 4-colouring algorithm with
-  the same radii. (`lemma_3`, `theorem_1_four`, `theorem_1`)
-* **Minor imprecisions** (details in `differencies.md`):
-  * Lemma 2's proof ignores rings so small that the threshold views wrap around. We assume `n ≥ 2T + 1`, the only
-    case used.
-  * Lemma 3 is applied in Theorem 1 with `r = ½ log*(n/2)` while the centre's radius is only `≥ r`. We state it
-    for `r ≤ r(v)`.
-  * The black-box corollary of Linial's bound uses the exact constant `½ log*(n/2)`, and the citation does not
-    justify dropping the `−O(1)` term. We prove our own version, for 4 colours: `|S| > tower (2t+2)` implies a node
-    of radius `> t`.
-  * "Ω(r)" and "Ω(log* n)" are made explicit: average `≥ r/4`, and `n (log* n − 3) ≤ 32 ∑ r(v)`.
-  * §2 asserts without proof that the recurrence `a(p) = max_k {k + a(k−1) + a(p−k)}` is the worst-case total
-    radius on a segment, and cites OEIS A000788 for `a(p) = Θ(p ln p)`. We prove the conclusion (total radius
-    `≤ n (⌊log₂ n⌋ + 1)`) by a different argument. We only check the first 16 values of the recurrence against
-    A000788.
+No mistakes in the statements.
+
+### Typos and slips
+- Lemma 2's proof ignores rings so small that the threshold views wrap around. We assume `n ≥ 2T + 1`, the
+  only case used.
+- Lemma 3 is applied in Theorem 1 with `r = ½ log*(n/2)` while the centre's radius is only `≥ r`. We state
+  it for `r ≤ r(v)`.
+- The black-box corollary of Linial's bound uses the exact constant `½ log*(n/2)`, and the citation does not
+  justify dropping the `−O(1)` term. We prove our own version, for 4 colours: `|S| > tower (2t+2)` implies a
+  node of radius `> t`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 1 ("without loss of generality … minimal algorithms")
+The paper never shows that a minimal algorithm exists below a given one, and a chain of improvements need
+not have a valid limit.
+
+**Impact.** Statement true; we prove existence with Zorn's lemma plus compactness (`Alg.exists_isMinimal_le`).
+
+**Details.** Minimal means that no valid algorithm uses at most the same radius everywhere and a strictly
+smaller one somewhere. Algorithms have infinitely many neighbourhoods, so improvements can go on forever. The
+limit of a chain of improvements has well-defined radii (pointwise minima), but its outputs need not
+converge. So it is not clear that the limit is a valid algorithm.
+
+**Repair.** Zorn's lemma on radius functions. For a chain, the limit algorithm stops at the pointwise minimum
+radius. Its colour table exists by Tychonoff compactness: being proper on the finitely many nodes where a
+given chain member attains the minimum is a closed condition, and these conditions are directed.
+
+### 🛠️ Lemma 3 (reduction from 3- to 4-colouring)
+Lemma 3 assumes `A` is minimal *for 3-colouring*, but Lemma 2, which it uses, is stated and proved only for
+algorithms minimal *for 4-colouring*, and a 3-colouring algorithm that no 3-colouring algorithm improves can
+still be improved by a 4-colouring algorithm.
+
+**Impact.** Theorem 1 unaffected after repair (`lemma_3`, `theorem_1_four`, `theorem_1`). We do not know
+whether Lemma 3 holds as stated.
+
+**Details.** Lemma 2's modified algorithm `A'` uses all four colours. Lemma 3 says it "is sufficient to prove
+the result for 4-colouring, as it implies the result for 3-colouring". For a 3-colouring algorithm improved
+only by a 4-colouring algorithm, Lemma 2 says nothing.
+
+**Repair.** Prove Theorem 1 for every 4-colouring algorithm: take a minimal 4-colouring algorithm below it,
+and use Lemma 3 for minimal 4-colouring algorithms together with Linial's bound for 4 colours. A 3-colouring
+algorithm is a 4-colouring algorithm with the same radii.
+
+### 🛠️ Section 2 (largest ID: the recurrence)
+§2 asserts without proof that the recurrence `a(p) = max_k {k + a(k−1) + a(p−k)}` is the worst-case total
+radius on a segment, and cites OEIS A000788 for `a(p) = Θ(p ln p)`.
+
+**Impact.** Conclusion true: we prove the total radius is `≤ n (⌊log₂ n⌋ + 1)` by a different argument. We
+only check the first 16 values of the recurrence against A000788.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -61,6 +80,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
   assignments, as the paper's construction implicitly needs.
 * Complexity: the worst case over identifier assignments of the *average* radius `∑_v r(v) / n`. Theorem 1's
   ring uses the identifiers `{0, …, n−1}`.
+* "Ω(r)" and "Ω(log* n)" are made explicit: average `≥ r/4`, and `n (log* n − 3) ≤ 32 ∑ r(v)`.
 
 **Main results in Lean** (namespace `Podc.RingColoringAverage`).
 
