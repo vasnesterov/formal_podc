@@ -80,7 +80,7 @@ then on the two replicas share every view for exactly `α` time units, forever. 
 `n = 4` (one silent Byzantine), no later view decides. The Lean theorem covers the timer
 arithmetic only.
 
-### ⚠️ Typos and slips
+### Typos and slips
 - Algorithm 2 Line 32 ("wait for message m from leader") duplicates Line 33.
 - Theorem 5 leaves `n > 3f`, `|F| ≤ f` implicit.
 

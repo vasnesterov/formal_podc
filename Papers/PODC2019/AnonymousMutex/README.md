@@ -42,7 +42,7 @@ inspect the view's contents were not explored and might rescue the algorithm. Bo
 model checking found no livelock for `n = 2` (`m ∈ {3,5,7}`) or `n = 3` (`m ∈ {5,7}`), so
 Algorithm 1 may be correct for `n ≤ 3`; this is not proved.
 
-### ⚠️ Typos and slips
+### Typos and slips
 - §1.3 says `compare&swap(x, old, new)` succeeds "iff `new = v`"; it should be `old = v`. The
   algorithm uses it correctly.
 
