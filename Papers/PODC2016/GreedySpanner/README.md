@@ -13,28 +13,44 @@ the proof of Lemma 6 and some loose definitions. None affects any statement.
 
 ## Mistakes in the paper
 
-There are no false statements. Minor points:
+No mistakes in the statements.
 
-* **Lemma 6: unstated step (proof gap, statement true).** The injection `f : H → H'` sets `f(e) = e`
-  for `e ∈ H ∩ H'` because "an edge `e' ∈ H ∩ H'` covers itself". So the fixed shortest path
-  `P_{e'}` in `H` between the endpoints of `e'` must be the edge `e'` itself. This fact is used in the
-  injectivity step ("it must hold that `e₁` and `e₂` are in `H \ H'`"), but the paper never proves it.
-  It is true for the greedy spanner: a different path of weight `≤ w(e')` would make `H − e'` a
-  `t`-spanner of `H`, contradicting Lemma 3. Our proof avoids the special case. For *every*
-  `e ∈ H`, `f(e)` is an edge of a shortest `H'`-path `Q_e` whose `P_{f(e)}` contains `e` (`lemma6`).
-* **Observation 4: proof treats only pairs outside `G`.** The proof replaces an MST edge `e ∈ M_G \ G`
-  by a shortest path with at least two edges. An edge of `G` heavier than the distance between its
-  endpoints needs the same treatment, and the argument works for it verbatim. Theorem 6 does not need
-  Observation 4: all edges of a greedy spanner of a metric are shortest paths. We prove the equality
-  `w(MST(M_H)) = w(MST(M))` directly (`mstWeight_inducedW`).
-* **Loose definitions (harmless).** `OPT_t(𝒢)` is defined as a *maximum* over `𝒢`. For lightness
-  over an infinite family of weighted graphs the maximum need not be attained; we use the supremum.
-  Section 2 assumes all graphs connected, but a family closed under edge removal contains
+### ⚠️ Typos and slips
+- In the proof of Observation 7, the covering balls in `M` should have radius `r/4`, not `4r`.
+- `OPT_t(𝒢)` is defined as a *maximum* over `𝒢`. For lightness over an infinite family of weighted
+  graphs the maximum need not be attained; we use the supremum.
+- Section 2 assumes all graphs connected, but a family closed under edge removal contains
   disconnected graphs. We define the MST weight as the weight of a minimum spanning *forest*. For
   connected graphs it is the minimum weight of a spanning tree (`mstWeight_eq_iInf_isTree`).
-* **Unneeded hypotheses.** Lemma 3 and Observation 2 hold for every stretch `t` (the paper assumes
-  `t ≥ 1`) and for non-negative weights (the paper assumes positive weights).
-* **Typo.** In the proof of Observation 7, the covering balls in `M` should have radius `r/4`, not `4r`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 6 (`|H| ≤ |H'|`)
+The injection `f : H → H'` relies on the unproved fact that the fixed shortest path `P_{e'}` in `H`
+between the endpoints of an edge `e' ∈ H ∩ H'` is the edge `e'` itself.
+
+**Impact.** Statement true; small unstated step, avoided in our proof (`lemma6`).
+
+**Details.** The proof sets `f(e) = e` for `e ∈ H ∩ H'` because "an edge `e' ∈ H ∩ H'` covers
+itself". This is used in the injectivity step ("it must hold that `e₁` and `e₂` are in `H \ H'`").
+It is true for the greedy spanner: a different path of weight `≤ w(e')` would make `H − e'` a
+`t`-spanner of `H`, contradicting Lemma 3.
+
+**Repair.** Our proof avoids the special case. For *every* `e ∈ H`, `f(e)` is an edge of a shortest
+`H'`-path `Q_e` whose `P_{f(e)}` contains `e` (`lemma6`).
+
+### 🛠️ Observation 4 (MST of `M_G`)
+The proof treats only MST edges outside `G`.
+
+**Impact.** Statement true; the missing case works verbatim, and Theorem 6 does not need
+Observation 4.
+
+**Details.** The proof replaces an MST edge `e ∈ M_G \ G` by a shortest path with at least two
+edges. An edge of `G` heavier than the distance between its endpoints needs the same treatment, and
+the argument works for it verbatim.
+
+**Repair.** All edges of a greedy spanner of a metric are shortest paths, so for Theorem 6 we prove
+the equality `w(MST(M_H)) = w(MST(M))` directly (`mstWeight_inducedW`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -80,7 +96,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | (sanity) `mstWeight` = minimum spanning tree weight | `mstWeight_eq_iInf_isTree` | `MSTTree.lean` |
 
 Lemmas 5 and 6 are proved for an arbitrary connected weighted graph `G`, not only for metrics. Lemma 6
-additionally needs positive edge weights and `1 ≤ t < 2`.
+additionally needs positive edge weights and `1 ≤ t < 2`. Lemma 3 and Observation 2 hold for every stretch `t`
+(the paper assumes `t ≥ 1`) and for non-negative weights (the paper assumes positive weights).
 
 **Not formalized.** The cited Theorems 1–4 and Lemma 1 are used only as hypotheses, in
 Corollaries 1–3. For Corollaries 1 and 2 the hypothesis is stated for all weighted graphs on `V`,

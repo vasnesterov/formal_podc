@@ -12,27 +12,42 @@ repair; the rest are minor slips.
 
 ## Mistakes in the paper
 
-* **Gap in the necessity proof (Theorem 1); statement true.** For a node `i ∈ L`, the paper argues that
-  if all values `i` receives from fault-free nodes equal `m`, then validity (1) forces `v_i[1] = m`. But
-  (1) bounds `v_i[1]` by `μ[0]` and `U[0]`, the extremes over *all* fault-free nodes, including nodes
-  of `C ∪ R` that `i` cannot hear and that start at `M`. So (1) gives only `v_i[1] ≤ M`. This
-  already fails in the simplest case `F = N'(i) = ∅` with `R ≠ ∅`. The argument needs a *different*
-  execution in which the nodes outside `i`'s in-neighbourhood start in `[m, m]`; since `Z_i` sees only
-  in-neighbours, `i` cannot tell the two apart. The induction to `t > 1` uses the same step, plus the
-  fact that `Z_i` does not depend on `t`. We prove this "local validity" property separately
-  (`IterAlg.localValid`) and derive Theorem 1 from it. The paper's auxiliary values `m⁻ < m`,
-  `M⁺ > M` turn out to be unnecessary. (`condition_of_correct`)
-* **Minor slips and remarks.**
-  * Corollary 2 (`n > 3f`) needs `n ≥ 2`: for `n = 1` the condition holds vacuously. This is not a
-    slip: the paper assumes `n ≥ 2` in §2.1 and its proof starts from `2 ≤ n ≤ 3f`
-    (`Condition.three_mul_lt_card`).
-  * Corollary 3: the proof takes `R = V − F − {i}` without checking `R ≠ ∅`, which Corollary 1
-    requires. It follows from Corollary 2 (`|R| ≥ 2f ≥ 1`).
-  * Theorem 2 (validity) does not need Corollary 3; trimming being possible suffices. Lemma 2 does
-    not need `A`, `B` non-empty.
-  * Theorem 3 iterates Lemma 5 with phase lengths `l(s) ≤ n − f − 1` and leaves the uniform bound
-    implicit; we use phase length `n` throughout.
-  * Typo at the end of the proof of Claim 4 (Appendix A): `v_i[s + τ]` should be `v_i[s + τ + 1]`.
+No mistakes in the statements.
+
+### ⚠️ Typos and slips
+- At the end of the proof of Claim 4 (Appendix A), `v_i[s + τ]` should be `v_i[s + τ + 1]`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 1 (necessity of the condition)
+The proof uses validity (1) to force `v_i[1] = m` for a node `i ∈ L` that receives only `m` from
+fault-free nodes, but (1) only gives `v_i[1] ≤ M`.
+
+**Impact.** Statement true; repaired by a separate "local validity" argument
+(`condition_of_correct`).
+
+**Details.** (1) bounds `v_i[1]` by `μ[0]` and `U[0]`, the extremes over *all* fault-free nodes,
+including nodes of `C ∪ R` that `i` cannot hear and that start at `M`. This already fails in the
+simplest case `F = N'(i) = ∅` with `R ≠ ∅`. The argument needs a *different* execution in which the
+nodes outside `i`'s in-neighbourhood start in `[m, m]`; since `Z_i` sees only in-neighbours, `i`
+cannot tell the two apart. The induction to `t > 1` uses the same step, plus the fact that `Z_i`
+does not depend on `t`.
+
+**Repair.** We prove this "local validity" property separately (`IterAlg.localValid`) and derive
+Theorem 1 from it. The paper's auxiliary values `m⁻ < m`, `M⁺ > M` turn out to be unnecessary.
+(`condition_of_correct`)
+
+### 🛠️ Corollary 3 and Theorem 3 (unchecked steps)
+Corollary 3's proof does not check `R ≠ ∅`, and Theorem 3 leaves the uniform phase-length bound
+implicit.
+
+**Impact.** Statements true; routine fixes.
+
+**Details.**
+- Corollary 3: the proof takes `R = V − F − {i}` without checking `R ≠ ∅`, which Corollary 1
+  requires. It follows from Corollary 2 (`|R| ≥ 2f ≥ 1`).
+- Theorem 3 iterates Lemma 5 with phase lengths `l(s) ≤ n − f − 1` and leaves the uniform bound
+  implicit; we use phase length `n` throughout.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -69,6 +84,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 The explicit rate is `(1 − αⁿ/2)^⌊t/n⌋ (hi − lo)`. The chord case `n = 5, f = 1`, which the paper
 states without proof, is checked by kernel computation.
+
+Corollary 2 (`n > 3f`) needs `n ≥ 2`: for `n = 1` the condition holds vacuously. This is not a slip:
+the paper assumes `n ≥ 2` in §2.1 and its proof starts from `2 ≤ n ≤ 3f`
+(`Condition.three_mul_lt_card`). Theorem 2 (validity) does not need Corollary 3; trimming being
+possible suffices. Lemma 2 does not need `A`, `B` non-empty.
 
 **Not formalized.** Section 7 (asynchronous variants: announced without proofs) and the conjecture on
 the minimal edge count of core networks.
