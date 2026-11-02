@@ -12,39 +12,61 @@ stated. Two proofs have genuine gaps, in Lemma 6.2 and Lemma 7.3. Lemma 7.3 is p
 
 ## Mistakes in the paper
 
-* **Proof gap in Lemma 7.3 (Pottier step).** The linear system (1) has one variable `β(a)` per *displacement* `a ∈ A`
-  of a simple cycle. The proof then reads `β(e)` for *edges* `e` ("`Σ_H β(e) = #Θ(e)`") and builds `Θ'` with
-  "`#Θ' = β'`". That is a type error: different cycles with the same displacement are merged, so the system no longer
-  knows which edges a solution uses. The claim "`#Θ'(e) > 0` if `#Θ(e) ≥ k`" is therefore not established. The
-  length is also off: `|Θ'|` counts edges, but `‖β'‖₁` counts cycles. Each cycle has up to `|S|` edges, so the
-  proof gives `|Θ'| ≤ |S|·(|E|+d)(1+2|S|‖T‖)^(d(d+1))`, not the stated bound without the factor `|S|`.
-  We prove Lemma 7.3 with variables indexed by the cycles themselves. This works with the weak Pottier bound
-  (`Cslib.exists_small_decomposition`), whose constant does not depend on the number of variables. The constant
-  becomes `K = (2|S|M)^(2^d−1)`, with `k > ‖Δ(Θ)|_Q‖₁·|S|·M·K` and `|Θ'| ≤ (|E|+d)·|S|·K`. Section 8 goes through
-  with this constant (`ℓ = h^(2^d+2d+4)`, `k = d·h^(2^d+1)`, threshold `h^(2d+5)·ℓ`). The final exponent still fits
-  under `|P|^((|P|+2)²)`, so Theorem 4.3 is unaffected. We do not know whether Lemma 7.3 holds with the paper's
-  constant. (`lemma_7_3`)
-* **Proof gap in Lemma 6.2 (statement true).** In the case where every `β` reachable from `ρ_n` has
-  `β(p) < λ_{n+1}` on `R_n`, the proof asserts that the `T|_{Q'}`-reachability set of `ρ_n|_{Q'}` has at most
-  `sλ_{n+1}^{d−n}` elements. The case hypothesis is about the full net `T`. In the restricted net `T|_{Q'}` the places
-  `p_1, …, p_n` are unconstrained, so it does not apply directly. Repair: suppose an `R_n`-place reaches `λ_{n+1}` in
-  `T|_{Q'}`. A shortest such path stays in a set of at most `sλ_{n+1}^{d−n}` configurations, so it is that short. It
-  then lifts to `T` by Lemma 5.2, since `ρ_n(p_j) ≥ λ_n ≥ sλ_{n+1}^{d−n}‖T‖`. That contradicts the case hypothesis.
-  (`lemma_6_2_step`)
-* **Slips in the proof of Theorem 4.3 (Section 8), all harmless.**
-  * The decomposition of a path into a multicycle `Θ` and an elementary path `π` gives `#Θ(e) ≥ ℓ − 1` (or
-    `≥ ℓ − |S|` for a short path), not `#Θ(e) ≥ ℓ`. There is ample slack.
-  * Theorem 6.1 is applied to `P' = P \ {i}`, so it gives `(d−1)‖α‖∞ ≤ b`, not `d‖α‖∞ ≤ b`. The weaker bound
-    suffices, because the sum is over `R' ⊆ P'`.
-  * "`Δ(Θ)(p) = μ(p) − η'(p) − Δ(π)(p)`" should read `α'(p)` instead of `η'(p)`. The following estimate only works
-    with `α'`.
-  * "`α'(i) = ρ_L(i) + (n−1) − Δ(σ)(i)`" has the wrong sign; the bound `≥ n − h` holds anyway.
-  * Lemma 7.3 is used with its hypothesis `‖T‖∞ > 0` without checking it. We avoid the issue with `M = 1 + ‖T‖∞`.
-  * The final estimate claims `r ≤ d^(d²+d+3)`. The factors `2(d−1)^(d−1) ≤ d^d`, `1+(2+(d−1)^(d−1))^d ≤ d^(d²)` and
-    `5d²+2d+4 ≤ d^5` only give `d^(d²+d+5)`. That is still `≤ d^((d+2)²)`, so the theorem is unaffected.
-* Typos: Section 8 writes "`d = |Q|`" (meaning `|P|`), "the `(n > i)` predicate" (meaning `(i ≥ n)`) and "a cycle
-  `θ` on `x|_Q`" (meaning `α|_Q`). The proof of Lemma 7.3 writes `Δ(Δ)` for `Δ(Θ)` and swaps `α'`/`β'` in one
-  sentence. Pottier's decomposition is a multiset, not a "set `H`".
+No mistakes in the statements.
+
+### Typos and slips
+Slips in the proof of Theorem 4.3 (Section 8), all harmless:
+- The decomposition of a path into a multicycle `Θ` and an elementary path `π` gives `#Θ(e) ≥ ℓ − 1` (or
+  `≥ ℓ − |S|` for a short path), not `#Θ(e) ≥ ℓ`. There is ample slack.
+- Theorem 6.1 is applied to `P' = P \ {i}`, so it gives `(d−1)‖α‖∞ ≤ b`, not `d‖α‖∞ ≤ b`. The weaker bound
+  suffices, because the sum is over `R' ⊆ P'`.
+- "`Δ(Θ)(p) = μ(p) − η'(p) − Δ(π)(p)`" should read `α'(p)` instead of `η'(p)`. The following estimate only works
+  with `α'`.
+- "`α'(i) = ρ_L(i) + (n−1) − Δ(σ)(i)`" has the wrong sign; the bound `≥ n − h` holds anyway.
+- Lemma 7.3 is used with its hypothesis `‖T‖∞ > 0` without checking it. We avoid the issue with `M = 1 + ‖T‖∞`.
+- The final estimate claims `r ≤ d^(d²+d+3)`. The factors `2(d−1)^(d−1) ≤ d^d`, `1+(2+(d−1)^(d−1))^d ≤ d^(d²)` and
+  `5d²+2d+4 ≤ d^5` only give `d^(d²+d+5)`. That is still `≤ d^((d+2)²)`, so the theorem is unaffected.
+
+Typos:
+- Section 8 writes "`d = |Q|`" (meaning `|P|`), "the `(n > i)` predicate" (meaning `(i ≥ n)`) and "a cycle `θ` on
+  `x|_Q`" (meaning `α|_Q`).
+- The proof of Lemma 7.3 writes `Δ(Δ)` for `Δ(Θ)` and swaps `α'`/`β'` in one sentence.
+- Pottier's decomposition is a multiset, not a "set `H`".
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 7.3 (Pottier step)
+The proof reads the variables `β(a)` of system (1), one per *displacement* `a ∈ A` of a simple cycle, as counts
+`β(e)` of *edges* `e`, so the claim "`#Θ'(e) > 0` if `#Θ(e) ≥ k`" is not established, and the length bound misses a
+factor `|S|`.
+
+**Impact.** Proved with a weaker constant (the weak Pottier bound), which is still enough for Theorem 4.3's bound
+(`lemma_7_3`). We do not know whether Lemma 7.3 holds with the paper's constant.
+
+**Details.** The proof reads `β(e)` for edges ("`Σ_H β(e) = #Θ(e)`") and builds `Θ'` with "`#Θ' = β'`". That is a
+type error: different cycles with the same displacement are merged, so the system no longer knows which edges a
+solution uses. The length is also off: `|Θ'|` counts edges, but `‖β'‖₁` counts cycles. Each cycle has up to `|S|`
+edges, so the proof gives `|Θ'| ≤ |S|·(|E|+d)(1+2|S|‖T‖)^(d(d+1))`, not the stated bound without the factor `|S|`.
+
+**Repair.** We prove Lemma 7.3 with variables indexed by the cycles themselves. This works with the weak Pottier
+bound (`Cslib.exists_small_decomposition`), whose constant does not depend on the number of variables. The
+constant becomes `K = (2|S|M)^(2^d−1)`, with `k > ‖Δ(Θ)|_Q‖₁·|S|·M·K` and `|Θ'| ≤ (|E|+d)·|S|·K`. Section 8 goes
+through with this constant (`ℓ = h^(2^d+2d+4)`, `k = d·h^(2^d+1)`, threshold `h^(2d+5)·ℓ`). The final exponent
+still fits under `|P|^((|P|+2)²)`, so Theorem 4.3 is unaffected. (`lemma_7_3`)
+
+### 🛠️ Lemma 6.2 (bound on the restricted reachability set)
+In the case where every `β` reachable from `ρ_n` has `β(p) < λ_{n+1}` on `R_n`, the proof asserts that the
+`T|_{Q'}`-reachability set of `ρ_n|_{Q'}` has at most `sλ_{n+1}^{d−n}` elements, but the case hypothesis is about
+the full net `T`.
+
+**Impact.** Statement true; repaired (`lemma_6_2_step`).
+
+**Details.** In the restricted net `T|_{Q'}` the places `p_1, …, p_n` are unconstrained, so the case hypothesis
+does not apply directly.
+
+**Repair.** Suppose an `R_n`-place reaches `λ_{n+1}` in `T|_{Q'}`. A shortest such path stays in a set of at
+most `sλ_{n+1}^{d−n}` configurations, so it is that short. It then lifts to `T` by Lemma 5.2, since
+`ρ_n(p_j) ≥ λ_n ≥ sλ_{n+1}^{d−n}‖T‖`. That contradicts the case hypothesis. (`lemma_6_2_step`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
