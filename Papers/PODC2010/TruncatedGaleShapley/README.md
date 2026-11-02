@@ -14,26 +14,35 @@ degenerate case `Δ = 1`, `i = 1`; it needs `i ≥ 2`, as in Lemmas 4 and 5, whi
 
 ## Mistakes in the paper
 
-* **Lemma 6 is false for `Δ = 1` (degenerate case; statement repaired).** Lemma 6 claims
-  `f_i(R) ≤ γ w_i(B)` for all `γ > 0` and `i ≥ 1 + (Δ-1)/γ`. For `Δ = 1` this allows `i = 1`. But
-  after round 1 nothing is matched (`w_1(B) = 0`), while every red node has a pending proposal
-  (`f_1(R) > 0`). The smallest counterexample is a single edge `K₂`, which has maximum degree 1
-  and no isolated nodes. The proof combines Lemmas 4 and 5, which are stated only for
-  `i ≥ 2`. With the extra hypothesis `i ≥ 2` the lemma holds. The proofs of Theorems 1 and 2
-  inherit the slip: for `Δ = 1` they allow `i = 1`, and `M_1 = ∅` is neither `ε`-stable nor an
-  approximation. Both theorems are still true: choosing `i = max(2, ⌈…⌉)` keeps `T = 2i` within
-  the claimed bounds. (`lemma_6_false_at_one`; repaired: `Bicoloured.lemma_6`, `theorem_1`,
-  `theorem_2`)
-* **Small slips in proofs** (statements true):
-  - Proof of Lemma 5: "`w({r,b}) < w_j(b)`" should be `≤`. The weights respect the preferences only
-    weakly, and with `w ≡ 1` equality holds. Only `≤` is needed.
-  - Proof of Theorem 1 with ties: "analogous" hides nothing. The ports refine the weak
-    preferences, and every edge unstable for the weak preferences is unstable for the refinement.
-    (`theorem_1_ties`)
-  - §6.3 treats `Y` (the matched nodes among the first `N` red samples) as a binomial variable
-    without saying that the analysis conditions on the sample containing `N` red nodes. The bound
-    is correct. We prove it with a martingale (exponential-moment) argument over the sequential
-    sampling. (`card_firstHits_abs_sub_ge_le` in `Podc/Probability/Finite/MultiplicativeChernoff.lean`)
+### ⚠️ Lemma 6 for `Δ = 1`
+Lemma 6 claims `f_i(R) ≤ γ w_i(B)` for all `γ > 0` and `i ≥ 1 + (Δ-1)/γ`, which for `Δ = 1`
+allows `i = 1`, where the bound fails already on a single edge `K₂` (`lemma_6_false_at_one`).
+
+**Impact.** Degenerate case with evident intent: the proof combines Lemmas 4 and 5, which are
+stated only for `i ≥ 2`, and with the extra hypothesis `i ≥ 2` the lemma holds
+(`Bicoloured.lemma_6`). No constant of Theorems 1–3 changes.
+
+**Details.** After round 1 nothing is matched (`w_1(B) = 0`), while every red node has a pending
+proposal (`f_1(R) > 0`). `K₂` has maximum degree 1 and no isolated nodes. For `Δ ≥ 2` the
+hypothesis forces `i ≥ 2`.
+
+### Typos and slips
+- Proof of Lemma 5: "`w({r,b}) < w_j(b)`" should be `≤`. The weights respect the preferences only
+  weakly, and with `w ≡ 1` equality holds. Only `≤` is needed.
+- §6.3 treats `Y` (the matched nodes among the first `N` red samples) as a binomial variable
+  without saying that the analysis conditions on the sample containing `N` red nodes. The bound is
+  correct. We prove it with a martingale (exponential-moment) argument over the sequential
+  sampling. (`card_firstHits_abs_sub_ge_le` in
+  `Podc/Probability/Finite/MultiplicativeChernoff.lean`)
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorems 1 and 2 (choice of `i` for `Δ = 1`)
+The proofs of Theorems 1 and 2 inherit the slip of Lemma 6: for `Δ = 1` they allow `i = 1`, and
+`M_1 = ∅` is neither `ε`-stable nor an approximation.
+
+**Impact.** Statements true; choosing `i = max(2, ⌈…⌉)` keeps `T = 2i` within the claimed bounds
+(`theorem_1`, `theorem_2`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -47,7 +56,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
   whose input colouring is proper; isolated nodes are allowed. One GS round is two communication
   rounds (blue turn, red turn), so `T = 2i`. Messages are full local states (`Algorithm.ofLocal`),
   but each node only uses the information the 'propose', 'accept', 'reject' and 'break' messages
-  of §4 carry. The output is the port of the partner.
+  of §4 carry. The output is the port of the partner. For Theorem 1 with ties the paper's
+  "analogous" hides nothing: the ports refine the weak preferences, and every edge unstable for
+  the weak preferences is unstable for the refinement (`theorem_1_ties`).
 * **Centralised analysis:** `Bicoloured V` is a finite bicoloured graph with strict
   preferences, given as ranks that are injective on the neighbours. `run I i` is the state at the
   end of round `i`, a global synchronous transition. `dec_localRun` proves that after `2i`

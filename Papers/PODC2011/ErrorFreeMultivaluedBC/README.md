@@ -12,33 +12,51 @@ announcements of isolated processors are ignored, as the paper's prose intends.
 
 ## Mistakes in the paper
 
-* **An isolated processor can force the diagnosis stage forever (Theorem 1's `t(t+1)` bound, Lemma 4).**
-  In Algorithm 1, every `P_j ∉ P_match` broadcasts `Detected_j`, and the diagnosis stage starts as soon
-  as one of these bits is `true`. A faulty processor whose vertex is already isolated is never in
-  `P_match`: the fault-free members do not trust it. So it can announce `Detected = true` in every
-  generation. Take `n = 4`, `t = 1`, `P₃` faulty, all inputs equal. `P₃` behaves correctly except that
-  it broadcasts `M₃ = false…false` and `Detected₃ = true`. In generation 1, step 3(f) isolates vertex 3.
-  From then on the diagnosis stage runs in every generation and removes nothing, since vertex 3 has no
-  edge left. Case 2 of the proof of Lemma 4 assumes that step 3(f) removes some edge at `j`, and misses
-  the case where none is left. So Lemma 4 is false ("at least one edge … will be removed") and so is the
-  `t(t+1)` bound; with 3 generations there are already `3 > 2` diagnosis stages. This is a false
-  statement about the printed algorithm. The intended algorithm is clear from the prose: §3.3 says
-  of an isolated processor that "the fault-free processors will not communicate with it anymore", and
-  the proof of Theorem 1 argues that once all faulty processors are identified "the diagnosis stage
-  will not be performed any more". So: ignore the `Detected` bits of isolated processors. For this repaired algorithm we prove Lemma 4 and the `t(t+1)` bound. Correctness holds
-  for both versions. (`Counterexample.literal_not_theorem_1`, `Counterexample.literal_lemma_4_false`;
-  repaired: `Run.theorem_1_numDiag`)
-* **`⊥` in the checking stage is under-specified.** Untrusted senders give `R_i[j] = ⊥`, and
-  "`R_j/P_match ∈ C₂ₜ`" is defined by equality with a codeword. Read literally, a fault-free processor
-  outside `P_match` that distrusts a faulty member of `P_match` always reports a detection. Step 3(f)
-  can then isolate this *fault-free* processor (a 2-generation scenario with `n = 4` is in
-  `differencies.md`). The prose of §3.2 ("checks whether the symbols received from the trusted
-  processors in `P_match` are consistent") and the proof of Lemma 4 (case 2(a)) state the intended
-  reading: `⊥` entries are ignored, and the check and decoding use the trusted members of `P_match`. We formalize this reading.
-  The literal reading's failure is described in `differencies.md` but not proved in Lean.
-* **Minor.** Lemma 3 should assume that no processor *announces* a detection, not that none *detects*
-  one. "`v_i(g)`, represented by `n − t` symbols" in §3.1 should be `n − 2t`. "`Detected_i`" in §3.2
-  should be `Detected_j`.
+### ⚠️ Lemma 4 and Theorem 1's `t(t+1)` bound (Algorithm 1 as printed)
+An already isolated faulty processor can announce `Detected = true` in every generation, so the
+diagnosis stage runs forever without removing an edge: with `n = 4`, `t = 1` there are already
+`3 > t(t+1)` diagnosis stages in 3 generations (`Counterexample.literal_not_theorem_1`,
+`Counterexample.literal_lemma_4_false`).
+
+**Impact.** Only the complexity bound is affected, and only for the printed pseudo-code: ignoring
+the `Detected` bits of isolated processors, as the prose intends, restores Lemma 4 and the
+`t(t+1)` bound (`Run.theorem_1_numDiag`). Correctness holds for both versions.
+
+**Details.** In Algorithm 1, every `P_j ∉ P_match` broadcasts `Detected_j`, and the diagnosis
+stage starts as soon as one of these bits is `true`. A faulty processor whose vertex is already
+isolated is never in `P_match`: the fault-free members do not trust it. Take `n = 4`, `t = 1`, `P₃`
+faulty, all inputs equal. `P₃` behaves correctly except that it broadcasts `M₃ = false…false` and
+`Detected₃ = true`. In generation 1, step 3(f) isolates vertex 3. From then on the diagnosis stage
+runs in every generation and removes nothing, since vertex 3 has no edge left. Case 2 of the proof
+of Lemma 4 assumes that step 3(f) removes some edge at `j`, and misses the case where none is left.
+So Lemma 4 is false ("at least one edge … will be removed") and so is the `t(t+1)` bound; with 3
+generations there are already `3 > 2` diagnosis stages. This is
+a false statement about the printed algorithm. The intended algorithm is clear from the prose: §3.3
+says of an isolated processor that "the fault-free processors will not communicate with it
+anymore", and the proof of Theorem 1 argues that once all faulty processors are identified "the
+diagnosis stage will not be performed any more".
+
+**Repair.** Ignore the `Detected` bits of isolated processors. For this repaired algorithm we
+prove Lemma 4 and the `t(t+1)` bound. (`Run.theorem_1_numDiag`)
+
+### ⚠️ `⊥` in the checking stage (steps 2(a), 2(c))
+Read literally, a received vector with a `⊥` entry is never in `C₂ₜ`, so a fault-free processor
+that distrusts a faulty member of `P_match` always reports a detection, and step 3(f) can then
+isolate this *fault-free* processor.
+
+**Impact.** Under-specified pseudo-code with an evident intended reading, which we formalize: `⊥`
+entries are ignored, and the check and decoding use the trusted members of `P_match`. The literal
+reading's failure is described in `differencies.md` but not proved in Lean.
+
+**Details.** Untrusted senders give `R_i[j] = ⊥`, and "`R_j/P_match ∈ C₂ₜ`" is defined by equality
+with a codeword. A 2-generation scenario with `n = 4` is in `differencies.md`. The prose of §3.2
+("checks whether the symbols received from the trusted processors in `P_match` are consistent")
+and the proof of Lemma 4 (case 2(a)) state the intended reading.
+
+### Typos and slips
+- Lemma 3 should assume that no processor *announces* a detection, not that none *detects* one.
+- "`v_i(g)`, represented by `n − t` symbols" in §3.1 should be `n − 2t`.
+- "`Detected_i`" in §3.2 should be `Detected_j`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

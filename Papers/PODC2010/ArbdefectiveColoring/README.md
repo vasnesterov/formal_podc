@@ -12,33 +12,54 @@ on `a` is wrong. The corollary is still true, and we prove it with a corrected t
 
 ## Mistakes in the paper
 
-* **Corollary 4.4: wrong case split in the proof; the statement is true.** For "superlogarithmic"
-  `a` the paper runs Legal-Coloring with `p = ⌊a^{μ'}/log n⌋`, `μ' = μ/2`. It claims that
-  `p > a^{μ'/2}` "since `a` is superlogarithmic", which would bound the number of iterations by a
-  constant. This needs `a^{μ'/2} > log n`, i.e. `a > (log n)^{2/μ'}`. Counterexample: take
-  `a = (log₂ n)²` (superlogarithmic) and any `μ' ≤ 1/2`. Then `p ≤ 1 < a^{μ'/2}` for every `n ≥ 4`
-  (`p = 0` if `μ' < 1/2`). With `p = 1`, line 15 gives `α ↦ ⌊(3+ε)α⌋ ≥ α`, so the while-loop never
-  ends. So the second case is only valid for `a > (log n)^{2/μ'}`, not for all superlogarithmic
-  `a`. The `a` below this threshold are polylogarithmic, and the paper's remark before the
-  corollary (Theorem 4.3 for polylogarithmic `a`) can handle them, but only if the threshold is made
-  explicit and Theorem 4.3 is used with a smaller exponent (`μ'' = μ²/4`). This is a proof gap
-  (a wrongly stated case condition), not a false statement. We prove the corollary with three cases:
-  (1) `p₁ = ⌊a^{μ/2}/ℓ⌋ ≥ 16` and `(3+ε)a^{μ/4} ≤ p₁`, where `ℓ = ⌊log₂ n⌋+1`: Legal-Coloring with
-  `p₁`, `O(a^μ + log n)` rounds;
-  (2) otherwise `a^{μ/4} ≤ 5ℓ`: Theorem 4.3 with `μ²/4`, `O(ℓ^{1+μ})` rounds;
-  (3) `a` bounded by a constant: Lemma 2.2(1).
-  (`corollary_4_4_proof_gap`, `line15_one`; repaired: `corollary_4_4`)
-* **Implicit parameter choices (minor).** Theorem 3.5 needs an `⌊a/t⌋`-defective colouring of the
-  H-sets. These have maximum degree `⌊(2+ε)a⌋`, not `a`, so Lemma 2.1 must be called with
-  parameter `≈ (2+ε)t`; we use `3t` (valid for `ε ≤ 1`). Algorithm 2 calls Arbdefective-Coloring on
-  subgraphs whose arboricity is only bounded by `α`. The H-partition and the defect must use the
-  bound `α`, not the unknown exact arboricity (line 2 `α := a(G₁)` must be a known upper bound).
-  The final step of Theorem 4.3 needs only `O(p² log n) = O(a^μ log n)` rounds. So the legal
-  colouring of Lemma 2.1 (`q = Δ+1`) suffices there, and the `(Δ+1)`-colouring of [BE09] is not
-  needed for Theorem 4.3.
-* **Typos.** Theorem 4.3 states `p = ⌈a^{μ/2}⌉`, while the text and the proof use `⌊a^{μ/2}⌋`. In
-  the proof of Theorem 3.2, "for each parent `w` of `u`, `len(u) ≤ i−1`" should be `len(w)`.
-  Theorem 5.3 says "`O(a/t)`-coloring" for `O(a·t)` (Section 5 is not formalized).
+No mistakes in the statements.
+
+### Typos and slips
+- Theorem 4.3 states `p = ⌈a^{μ/2}⌉`, while the text and the proof use `⌊a^{μ/2}⌋`.
+- In the proof of Theorem 3.2, "for each parent `w` of `u`, `len(u) ≤ i−1`" should be `len(w)`.
+- Theorem 5.3 says "`O(a/t)`-coloring" for `O(a·t)` (Section 5 is not formalized).
+
+## Proof gaps (statements true)
+
+### 🛠️ Corollary 4.4 (case split on `a`)
+The proof claims that `p = ⌊a^{μ'}/log n⌋ > a^{μ'/2}` for every superlogarithmic `a`, but this
+needs `a > (log n)^{2/μ'}` and fails for `a = (log₂ n)²` (`corollary_4_4_proof_gap`).
+
+**Impact.** Statement true; repaired with a corrected three-way case split (`corollary_4_4`).
+
+**Details.** For "superlogarithmic" `a` the paper runs Legal-Coloring with `p = ⌊a^{μ'}/log n⌋`,
+`μ' = μ/2`. The claim `p > a^{μ'/2}` "since `a` is superlogarithmic" would bound the number of
+iterations by a constant. This needs `a^{μ'/2} > log n`, i.e. `a > (log n)^{2/μ'}`. Counterexample: take `a = (log₂ n)²` (superlogarithmic) and any
+`μ' ≤ 1/2`. Then `p ≤ 1 < a^{μ'/2}` for every `n ≥ 4` (`p = 0` if `μ' < 1/2`). With `p = 1`,
+line 15 gives `α ↦ ⌊(3+ε)α⌋ ≥ α`, so the while-loop never ends (`line15_one`). So the second case
+is only valid for `a > (log n)^{2/μ'}`, not for all superlogarithmic `a`. The `a` below this
+threshold are polylogarithmic, and the paper's remark before the corollary (Theorem 4.3 for
+polylogarithmic `a`) can handle them, but only if the threshold is made explicit and Theorem 4.3
+is used with a smaller exponent (`μ'' = μ²/4`). This is a wrongly stated case condition, not a
+false statement.
+
+**Repair.** We prove the corollary with three cases, where `ℓ = ⌊log₂ n⌋+1`:
+1. `p₁ = ⌊a^{μ/2}/ℓ⌋ ≥ 16` and `(3+ε)a^{μ/4} ≤ p₁`: Legal-Coloring with `p₁`,
+   `O(a^μ + log n)` rounds;
+2. otherwise `a^{μ/4} ≤ 5ℓ`: Theorem 4.3 with `μ²/4`, `O(ℓ^{1+μ})` rounds;
+3. `a` bounded by a constant: Lemma 2.2(1).
+
+(`corollary_4_4`)
+
+### 🛠️ Theorem 3.5 and Algorithm 2 (implicit parameter choices)
+The proofs leave two parameter choices implicit: the degree parameter with which Theorem 3.5 calls
+Lemma 2.1, and the fact that Algorithm 2 must use a known arboricity bound `α` instead of the
+exact arboricity.
+
+**Impact.** Statements true; routine fixes.
+
+**Details.**
+- Theorem 3.5 needs an `⌊a/t⌋`-defective colouring of the H-sets. These have maximum degree
+  `⌊(2+ε)a⌋`, not `a`, so Lemma 2.1 must be called with parameter `≈ (2+ε)t`; we use `3t` (valid
+  for `ε ≤ 1`).
+- Algorithm 2 calls Arbdefective-Coloring on subgraphs whose arboricity is only bounded by `α`.
+  The H-partition and the defect must use the bound `α`, not the unknown exact arboricity (line 2
+  `α := a(G₁)` must be a known upper bound).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -94,6 +115,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 Explicit bounds:
 * Theorem 4.3, for `0 < ε ≤ 1/2`, `μ > 0` and `p = ⌊a^{μ/2}⌋ ≥ 16`:
   fewer than `(3+ε)^{4/μ+1}·a` colours, in at most `(4/μ+1)(L(9C·a^μ+2)+R)` rounds.
+  The final step of Theorem 4.3 needs only `O(p² log n) = O(a^μ log n)` rounds. So the legal
+  colouring of Lemma 2.1 (`q = Δ+1`) suffices there, and the `(Δ+1)`-colouring of [BE09] is not
+  needed for Theorem 4.3.
 * Lemma 4.1: fewer than `((2+ε)(3+ε)+1)a` colours, in at most
   `(9C+25)L·a^{2/3} + 25C'a^{2/3} + R + R' + 4L` rounds.
 * Corollary 4.4: constants `c₁, c₂, c₃` depending only on `ε, μ, C`, with time

@@ -17,52 +17,68 @@ and the density argument of Theorem 10 breaks down at the source.
 
 ## Mistakes in the paper
 
-* **Theorem 10: the threshold round `T` is mis-defined (proof gap, statement true).** The proof
-  takes `T` to be the first round with `den(1,T) < ρ`, where `den` counts nodes that get the
-  message *for the first time*. It then claims every node has the message by the end of round
-  `T`. The source is not counted. If the source's identifier is not in the first set `F_1[1]`,
-  nobody sends in round 1, so `den(1,1) = 0` and `T = 1`, and the claim is false.
-  * The proof's final contradiction ("`u` received the message for the first time in
-    `[T − 1/ρ + 1, T]`, contradicting Lemma 9") also fails when the uninformed node's neighbour
-    `u` is the source.
-  * Lemma 8's count `P ≤ R` misses the source when `T − 6ℓ'_s < 1`.
-  * Fix: count the source as receiving the message in round 1, i.e. use `|inf t| / t` as the
-    density. Then `T > 1/ρ`, and Lemmas 8, 9 and the theorem go through with the paper's
-    constants and the bound `X = n/ρ`.
-  * The Lean illustration uses a 3-node directed path with `s_max = f = 1`, below the paper's
-    parameter range. The same failure occurs for every `n` and `s_max` in the paper's range: the
-    order of the sets of `F_1` is arbitrary, and some set of an `(n, 2)`-SSF misses the source.
-  * The wrong claim sits inside the proof of Theorem 10 (and in the roadmap sentence "we will
-    eventually show that the algorithm terminates no later than round `T`"). Theorem 10 itself is
-    true. Lemmas 8 and 9 also stay true with the paper's `T` (in Lemma 8, `P ≤ R + 1 ≤ k_s`
-    suffices); we prove them for the repaired `T`, which the repaired proof uses.
+No mistakes in the statements.
 
-  (`paper_T_claim_fails`, `Execution.lemma8`, `Execution.lemma9`, `Execution.theorem10`)
-* **Theorem 12, Claim 13, Case III: some senders are overlooked (proof gap, statement true).**
-  Subcase IIIa asserts that no process outside `A_k ∪ {i₁, i₁'}` sends in round `ℓ + 1`.
-  Subcase IIIb asserts that the only such sender is `n₁`. Both ignore the processes removed from the
-  candidate set in *earlier* steps, for instance the two `N`-processes dropped in a Case I step.
-  `N_{ℓ+1}` only looks at the current candidates `C_ℓ`, and the removed processes may well send.
-  * Part 2 of `P(ℓ+1)` still holds, by a uniform argument. Every process outside both candidate
-    pairs is in the same state in both executions. In Case III no member of either pair sends.
-    So the two executions have the *same* set of senders, disjoint from both pairs, and every
-    process in both or neither pair receives the same value.
-  * This replaces Subcases IIIa/IIIb.
+### Typos and slips
+- Theorem 12 says each stage adds at least `log(n−1) − 2` rounds. Counting the isolated round that
+  starts the stage, it adds at least `log(n−1) − 1`; we prove the resulting stronger bound.
+- Theorem 12's proof assigns the new pair to `L_k`; it should be `L_{k+1}`.
+- In Claim 13 Part 1, the cases are called "1, 2(a), 2(b)" instead of I/II/III, and the bound ends
+  with `n/2^{ℓ+2}` instead of `(n−1)/2^{ℓ+2}`.
+- Claim 5 (Theorem 4) sums over sets of exactly `n − 2 − k` elements, while the sets `I_k` only
+  have at least that many.
+- In Lemma 8's proof, `den(1,T')` should be `den(1,T'−1)`, and the display writes `den(T,T')` for
+  `den(T',T)`. `2ℓ'_1 = 8f(2^{s_max} − 1)`, not `8f√(n/log n)`.
+- The proof of Theorem 10 needs SSFs of *exact* size `4^s f` (pad by repetition) for
+  `ℓ'_s = 2ℓ'_{s−1}`. The round-robin family `F_{s_max}` needs `4^{s_max} f ≥ n`.
+- "The algorithm terminates by `T`": only delivery by `T` is shown.
 
-  (`Algorithm.claim_13`, `theorem_12`)
-* Small slips, none affecting the results:
-  * Theorem 12 says each stage adds at least `log(n−1) − 2` rounds. Counting the isolated round
-    that starts the stage, it adds at least `log(n−1) − 1`; we prove the resulting stronger bound.
-  * Theorem 12's proof assigns the new pair to `L_k`; it should be `L_{k+1}`.
-  * In Claim 13 Part 1, the cases are called "1, 2(a), 2(b)" instead of I/II/III, and the bound
-    ends with `n/2^{ℓ+2}` instead of `(n−1)/2^{ℓ+2}`.
-  * Claim 5 (Theorem 4) sums over sets of exactly `n − 2 − k` elements, while the sets `I_k` only
-    have at least that many.
-  * In Lemma 8's proof, `den(1,T')` should be `den(1,T'−1)`, and the display writes `den(T,T')`
-    for `den(T',T)`. `2ℓ'_1 = 8f(2^{s_max} − 1)`, not `8f√(n/log n)`.
-  * The proof of Theorem 10 needs SSFs of *exact* size `4^s f` (pad by repetition) for
-    `ℓ'_s = 2ℓ'_{s−1}`. The round-robin family `F_{s_max}` needs `4^{s_max} f ≥ n`.
-  * "The algorithm terminates by `T`": only delivery by `T` is shown.
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 10 (the threshold round `T`)
+The proof claims that every node has the message by round `T`, the first round with
+`den(1,T) < ρ`, but `den` ignores the source: if the source is not in `F_1[1]`, then
+`den(1,1) = 0`, `T = 1`, and the claim fails (`paper_T_claim_fails`).
+
+**Impact.** Statement true; repaired by counting the source, with the paper's constants
+(`Execution.theorem10`).
+
+**Details.** `den` counts nodes that get the message *for the first time*. If the source's
+identifier is not in the first set `F_1[1]`, nobody sends in round 1.
+- The proof's final contradiction ("`u` received the message for the first time in
+  `[T − 1/ρ + 1, T]`, contradicting Lemma 9") also fails when the uninformed node's neighbour `u`
+  is the source.
+- Lemma 8's count `P ≤ R` misses the source when `T − 6ℓ'_s < 1`.
+- The Lean illustration uses a 3-node directed path with `s_max = f = 1`, below the paper's
+  parameter range. The same failure occurs for every `n` and `s_max` in the paper's range: the
+  order of the sets of `F_1` is arbitrary, and some set of an `(n, 2)`-SSF misses the source.
+- The wrong claim sits inside the proof of Theorem 10 (and in the roadmap sentence "we will
+  eventually show that the algorithm terminates no later than round `T`"). Theorem 10 itself is
+  true. Lemmas 8 and 9 also stay true with the paper's `T` (in Lemma 8, `P ≤ R + 1 ≤ k_s`
+  suffices); we prove them for the repaired `T`, which the repaired proof uses.
+
+**Repair.** Count the source as receiving the message in round 1, i.e. use `|inf t| / t` as the
+density. Then `T > 1/ρ`, and Lemmas 8, 9 and the theorem go through with the paper's constants and
+the bound `X = n/ρ`. (`paper_T_claim_fails`, `Execution.lemma8`, `Execution.lemma9`,
+`Execution.theorem10`)
+
+### 🛠️ Theorem 12 (Claim 13, Case III)
+Subcases IIIa and IIIb of Claim 13 overlook senders: they ignore the processes removed from the
+candidate set in earlier steps, which may well send in round `ℓ + 1`.
+
+**Impact.** Statement true; Part 2 of `P(ℓ+1)` holds by a uniform argument that replaces the two
+subcases (`Algorithm.claim_13`, `theorem_12`).
+
+**Details.** Subcase IIIa asserts that no process outside `A_k ∪ {i₁, i₁'}` sends in round
+`ℓ + 1`. Subcase IIIb asserts that the only such sender is `n₁`. Both ignore the processes removed
+from the candidate set in *earlier* steps, for instance the two `N`-processes dropped in a Case I
+step. `N_{ℓ+1}` only looks at the current candidates `C_ℓ`, and the removed processes may well
+send.
+
+**Repair.** Every process outside both candidate pairs is in the same state in both executions. In
+Case III no member of either pair sends. So the two executions have the *same* set of senders,
+disjoint from both pairs, and every process in both or neither pair receives the same value. This
+replaces Subcases IIIa/IIIb. (`Algorithm.claim_13`, `theorem_12`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

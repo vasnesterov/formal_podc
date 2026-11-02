@@ -25,50 +25,83 @@ Several statements need fixing:
 
 ## Mistakes in the paper
 
-* **Theorem 4.1 is false as stated.** It claims one bit `i` such that, in *every* execution with
-  all inputs `i` and the upper bound `2n`, no node decides before hearing from everybody. But the
-  bound `2n` reveals `n`, so the algorithm may favour `0` for some sizes and `1` for others.
-  Counterexample: decide `b = [⌊N/2⌋ odd]` as soon as an input `b` is heard, else decide `¬b` at
-  time `N − 1`. This is a correct comparison-based consensus algorithm for every valid bound
-  `N ≥ n`. It decides at time 0 in the all-`0` execution with `n = 2` and in the all-`1` execution
-  with `n = 3`. The stitching proof tacitly assumes that both bad executions have the same size.
-  With "for every `n` there is an `i`" the theorem and its proof are correct. *False statement;
-  the intended per-`n` statement holds.* (`theorem_4_1_literal_false`; repaired: `theorem_4_1`)
-* **The running time of the dynamic-diameter protocol is overstated.** The paper says nodes can stop
-  at `n − kmax·Δ − 1` once `kmax ≥ ⌊n/(D+Δ)⌋`, with the side condition `(k−1)D < n − kΔ − 1`. But
-  to know that the diameter was `≤ D` up to time `(k−1)D`, a node must hear every node's state at
-  that time, which takes until `kD`. So level `k` fires only when `k(D+Δ) ≤ n − 1`.
-  The paper is inconsistent about the side condition: the rule says `(k−1)D ≤ n − kΔ − 1`, and the
-  later remark says `<`. With `≤`, the 4-clique with `D = Δ = 1`, `kmax = 2` is a counterexample:
-  nobody decides at time 1, because a node cannot exclude that round 1 was a star centred at
-  itself. With the strict `<` and `D = 1`, the paper's condition coincides with the correct one, so
-  a counterexample needs `D ≥ 2`. One exists: `n = 6`, `D = 2`, `Δ = 1`, `kmax = 2`, and the static
+### ❌ Theorem 4.1 (quantifier order)
+Theorem 4.1 claims one bit `i` such that, in *every* execution with all inputs `i` and the upper
+bound `2n`, no node decides before hearing from everybody, but the bound `2n` reveals `n`, so a
+correct algorithm may favour `0` for some sizes and `1` for others (`theorem_4_1_literal_false`).
+
+**Impact.** The statement is false as written; the per-`n` version ("for every `n` there is an
+`i`") and its proof are correct (`theorem_4_1`).
+
+**Details.** Counterexample: decide `b = [⌊N/2⌋ odd]` as soon as an input `b` is heard, else
+decide `¬b` at time `N − 1`. This is a correct comparison-based consensus algorithm for every
+valid bound `N ≥ n`. It decides at time 0 in the all-`0` execution with `n = 2` and in the all-`1`
+execution with `n = 3`. The stitching proof tacitly assumes that both bad executions have the same
+size.
+
+### ❌ Running time of the dynamic-diameter protocol (§6)
+The paper says nodes can stop at `n − kmax·Δ − 1` once `kmax ≥ ⌊n/(D+Δ)⌋`, but level `k` fires
+only when `k(D+Δ) ≤ n − 1`; a counterexample is the static graph on 6 nodes with `D = 2`, `Δ = 1`
+(`diamProtocol_counterexample_strict`).
+
+**Impact.** A false intermediate claim; the final bound `t < nD/(D+Δ) + Δ` is still true
+(`diamProtocol_decides`, `diamProtocol_time`). The abstract's `min{O(nD/Δ), …}` drops this
+additive `Δ`, which matters when `Δ` is large.
+
+**Details.** The paper's side condition `(k−1)D < n − kΔ − 1` is necessary but not sufficient.
+To know that the diameter was `≤ D` up to time `(k−1)D`, a node must hear every
+node's state at that time, which takes until `kD`. The paper is inconsistent about the side
+condition: the rule says `(k−1)D ≤ n − kΔ − 1`, and the later remark says `<`.
+- With `≤`, the 4-clique with `D = Δ = 1`, `kmax = 2` is a counterexample: nobody decides at
+  time 1, because a node cannot exclude that round 1 was a star centred at itself
+  (`diamProtocol_counterexample`).
+- With the strict `<` and `D = 1`, the paper's condition coincides with the correct one, so a
+  counterexample needs `D ≥ 2`. One exists: `n = 6`, `D = 2`, `Δ = 1`, `kmax = 2`, and the static
   graph with edges `01, 02, 03, 14, 24, 35, 45` (diameter 2). Node 3 cannot decide at time 3: it
-  cannot exclude an execution in which node 2 has not heard from node 5 by time 3. The final bound
-  `t < nD/(D+Δ) + Δ` is still true. The abstract's `min{O(nD/Δ), …}` drops this additive `Δ`, which
-  matters when `Δ` is large. *False intermediate claim; final bound true.*
-  (`diamProtocol_counterexample`, `diamProtocol_counterexample_strict`; proved: `diamProtocol_decides`,
-  `diamProtocol_time`)
-* **Definition 3 (dynamic diameter) is vacuous.** "`(u, max{0, t'−D}) ↝ (v, t')` for all `t' ≤ t`"
-  fails at `t' = 0`, so no graph with two or more nodes has a dynamic diameter. Read literally, the
-  dynamic-diameter protocol never decides early. Fix: quantify only over `t' ≥ D`. *Under-specified
-  definition.* (`not_diamLit`, `DiamUpTo`)
-* **Lemma 6.5 picks the wrong node.** The node that cannot distinguish the cycle-prefix from the
-  path-prefix execution is `u_{k+s+1}` (the start of `P_{k+s}`), not `u_{k+s−1}`. In the instance
-  `n = 6, k = 0, s = 2, a = 1, b = 2, t = 3`, `u_1` does distinguish. For `s < 0` the hypothesis
-  must be `a + b < n − |s|`. Only `s ≥ 0` is used later. *Typo, plus a false unused case.*
-  (`lemma_6_5_paper_node_false`, `lemma_6_5_neg_false`; repaired: `lemma_6_5`)
-* Minor:
-  - Lemma 6.6 omits its base case and needs `n ≥ 3`.
-  - Theorem 6.7's proof writes `log₂ e` for `log₂ 3`.
-  - Lemma 6.2's proof drops a factor `Δ`, and its two conditions on `Δ` differ.
-  - Lemma 6.3 never states the level-0 rule.
-  - Lemma 3.1 holds only for unknown `n` (implicit in the text).
-  - Theorem 6.8 leaves `H` and the `O(t/D)`-step walk unspecified. We reconstructed them: the
-    path `0 — ⋯ — (n−1)` plus a star at `a` covering everything left of `a`, and a star at
-    `b = n/2 − 1` covering everything right of `b`, with `b − a = D − 2`. The walk deletes the left
-    and right stars alternately in staggered blocks of `D − 1` rounds, observed by the far ends of
-    the path. It needs `D ≥ 2`, and `D = O(Δ)` is unnecessary. (`Diameter68.theorem_6_8`)
+  cannot exclude an execution in which node 2 has not heard from node 5 by time 3
+  (`diamProtocol_counterexample_strict`).
+
+### ⚠️ Definition 3 (dynamic diameter)
+The definition is vacuous: "`(u, max{0, t'−D}) ↝ (v, t')` for all `t' ≤ t`" fails at `t' = 0`, so
+no graph with two or more nodes has a dynamic diameter (`not_diamLit`).
+
+**Impact.** Under-specified definition with an evident fix: quantify only over `t' ≥ D`
+(`DiamUpTo`). Read literally, the dynamic-diameter protocol never decides early.
+
+### ⚠️ Lemma 6.5 (wrong node; case `s < 0`)
+The node that cannot distinguish the cycle-prefix from the path-prefix execution is `u_{k+s+1}`
+(the start of `P_{k+s}`), not `u_{k+s−1}`, and for `s < 0` the hypothesis must be
+`a + b < n − |s|` (`lemma_6_5_paper_node_false`, `lemma_6_5_neg_false`).
+
+**Impact.** A typo in the node index, plus a false case that is never used: only `s ≥ 0` is used
+later. Repaired: `lemma_6_5`.
+
+**Details.** In the instance `n = 6, k = 0, s = 2, a = 1, b = 2, t = 3`, `u_1` does distinguish.
+
+### Typos and slips
+- Theorem 6.7's proof writes `log₂ e` for `log₂ 3`.
+- Lemma 6.2's proof drops a factor `Δ`, and its two conditions on `Δ` differ.
+- Lemma 6.3 never states the level-0 rule.
+- Lemma 3.1 holds only for unknown `n` (implicit in the text).
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 6.8 (graph `H` and walk unspecified)
+The proof is only a sketch that never specifies its graph `H` or the `O(t/D)`-step walk.
+
+**Impact.** We supply `H` and the walk, and the bound `Ω(nD/Δ)` then holds
+(`Diameter68.theorem_6_8`).
+
+**Details.** We reconstructed them: the path `0 — ⋯ — (n−1)` plus a star at `a` covering
+everything left of `a`, and a star at `b = n/2 − 1` covering everything right of `b`, with
+`b − a = D − 2`. The walk deletes the left and right stars alternately in staggered blocks of
+`D − 1` rounds, observed by the far ends of the path. It needs `D ≥ 2`, and `D = O(Δ)` is
+unnecessary.
+
+### 🛠️ Lemma 6.6 (base case)
+The proof omits its base case and needs `n ≥ 3`.
+
+**Impact.** Statement true in the paper's model, which assumes `|V| > 2` (`lemma_6_6`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

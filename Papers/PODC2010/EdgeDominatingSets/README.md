@@ -13,14 +13,13 @@ form than stated. The paper has only typos and trivially fillable gaps.
 
 ## Mistakes in the paper
 
-No mistakes that affect a statement. Minor points:
+No mistakes in the statements.
 
-* **§7.7, case `c(v) = 3/2`.** "`d_G(v) − 2` other nodes `x1, x2` in addition to `v`" should read "in addition to
-  `s` and `t`". (Typo.)
-* **§7.7, unstated facts.** In case `c(v) = 1`, the weight `2 − d(v) ≤ 0` needs `d(v) ≥ 2`. In case `c(v) = 2`,
-  the `D*`-partner of `v` must differ from `s, t`. Both are immediate. (Trivial proof gap, true statement.)
-* **§7.8 divides by `|D*|`.** This is `0` for an edgeless graph. We prove the integer form
-  `2k·|D| ≤ (8k − 2)·|D*|` instead. (Degenerate case.)
+### Typos and slips
+- §7.7, case `c(v) = 3/2`: "`d_G(v) − 2` other nodes `x1, x2` in addition to `v`" should read "in
+  addition to `s` and `t`".
+- §7.8 divides by `|D*|`, which is `0` for an edgeless graph (degenerate case). We prove the integer
+  form `2k·|D| ≤ (8k − 2)·|D*|` instead.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -61,6 +60,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Lemma 2 (`M_G(i, j)` is a matching) | `M_matching` | `Distinguishable.lean` |
 | covering maps preserve outputs (§2.3) | `Algorithm.eval_covering` | `Cslib/Computability/Distributed/PortNumbering/Basic.lean` |
 | each edge dominates `≤ 2Δ − 1` edges | `card_edgeFinset_add_le` | `Basic.lean` |
+
+**Proof remarks.** §7.7 uses two facts without stating them, both immediate: in case `c(v) = 1`, the weight
+`2 − d(v) ≤ 0` needs `d(v) ≥ 2`; in case `c(v) = 2`, the `D*`-partner of `v` must differ from `s, t`.
 
 Supporting files:
 * `Gadget.lean`: an explicit closed-form 2-factorisation of the lower-bound graphs, which replaces Petersen's
