@@ -14,37 +14,50 @@ uses.
 
 ## Mistakes in the paper
 
-* **Theorem 1.2 and Lemma 4.7 (size `Õ(n^{1+δ})`) are false.** In every trial of `Cluster_j`, every
-  node samples `s_j = c² n^{2^j δ + ε} log³ n` edges and keeps one edge per queried neighbour in `F_v`.
-  The test `|F_v| < c n^{2^j δ} log n` (Pseudocode 2, line 4) is made only *between* trials, so the
-  last trial can add up to `s_j` edges. The proof of Lemma 4.7 counts `O(n^{2^j δ} log³ n)` edges per
-  trial and node, dropping the factor `n^ε`. Counterexample: `k = 1`, `h = 2` (`δ = 1/3`, `ε = 1/2`),
-  `G = K_n`, any constant `c ≥ 1`. In the first trial of level 0 every node draws `≈ c² n^{5/6} log³ n`
-  of its `n − 1` edges, and all distinct draws enter `S`. A node hits at least `s/2` distinct
-  neighbours on average, and an edge is counted at most twice. So, by a reverse Markov argument, with
-  probability `≥ 1/8` this single trial already puts `≥ n·s/8 ≈ n^{11/6}` edges into `S`. For all large
-  `n` this exceeds `C · n^{4/3} · log^D n`, for any `C`, `D`. So `|S| = Õ(n^{1+δ})` fails with
-  probability `≥ 1/8`, not `n^{−c}` (`theorem_1_2_size_false`, `first_trial_large`). The correct bound
-  is `|F_v| < τ_j + s_j` (`Setup.card_F_lt`). Summed over the levels (with Lemma 4.1) this gives
-  `|S| = Õ(n^{1+δ+ε})`, the same as the message complexity. Theorem 1.2 holds after this change of the
-  size bound, or after capping `F_v` at the threshold inside a trial. Theorem 1.3 / Lemma 6.1 are
-  unaffected: they set `ε = δ` and only need `|S| = Õ(n^{1+2δ})`.
-* **Lemma 4.3's volume classes miss volume 1 (proof slip).** Class `x` is defined by
-  `|E_j(v,u)| ∈ (n^{xε}, n^{(x+1)ε}]`, which excludes neighbours with a single edge. At level 0
-  (simple `G_0`) these are *all* neighbours, so the maximum class need not carry `m_i/2h` of the
-  volume. With the classes `[n^{xε}, n^{(x+1)ε})` the proof goes through. We also needed the unstated
-  `α ≥ 6` for `⌊(β−1)α/β⌋ ≥ α/3`; it holds for the paper's `α`. Lemma 4.3 is proved for one node, with the
-  `2h` adaptive trials and the union bound made explicit (`Setup.lemma_4_3_node`). The paper's
-  "abuse of probabilistic arguments" is harmless here: each trial fails with probability
-  `≤ |N|(1 − θ)^s` conditionally on any history.
-* **Typos and small slips.**
-  - `V' = ⋃_{1≤j≤k−1} V'_j` (before Lemma 4.5) should range over `0 ≤ j ≤ k`, as the proof of
-    Theorem 4.6 uses ("any node in `G_k` is unclustered").
-  - Theorem 1.2 allows `h = 0`, but `ε = 1/h`.
-  - The prose says a node joins a center in `N̂_j(v)` (an edge of `F_v`); Pseudocode 2, line 19, uses any
-    edge of `F = ⋃ F_u`. The stretch proof works with either rule; we formalize the pseudocode.
-  - The proof of Lemma 4.5 speaks of a spanning tree of "height" `3^j − 1`; its induction bounds the
-    diameter, which is what the lemma states.
+### ❌ Theorem 1.2 and Lemma 4.7 (spanner size `Õ(n^{1+δ})`)
+`Sampler` as written can put `≈ n^{11/6}` edges into `S` for `k = 1`, `h = 2` on `K_n`, so `|S| = Õ(n^{1+δ})`
+fails with probability `≥ 1/8`, not `n^{−c}`; the true bound is `Õ(n^{1+δ+ε})` (`theorem_1_2_size_false`,
+`first_trial_large`).
+
+**Impact.** Theorem 1.2 holds after this change of the size bound, or after capping `F_v` at the threshold inside
+a trial; the corrected size equals the message bound the paper already uses. The headline claims survive:
+Theorem 1.3 / Lemma 6.1 set `ε = δ` and only need `|S| = Õ(n^{1+2δ})`.
+
+**Details.** In every trial of `Cluster_j`, every node samples `s_j = c² n^{2^j δ + ε} log³ n` edges and keeps one
+edge per queried neighbour in `F_v`. The test `|F_v| < c n^{2^j δ} log n` (Pseudocode 2, line 4) is made only
+*between* trials, so the last trial can add up to `s_j` edges. The proof of Lemma 4.7 counts
+`O(n^{2^j δ} log³ n)` edges per trial and node, dropping the factor `n^ε`.
+
+Counterexample: `k = 1`, `h = 2` (`δ = 1/3`, `ε = 1/2`), `G = K_n`, any constant `c ≥ 1`. In the first trial of
+level 0 every node draws `≈ c² n^{5/6} log³ n` of its `n − 1` edges, and all distinct draws enter `S`. A node hits
+at least `s/2` distinct neighbours on average, and an edge is counted at most twice. So, by a reverse Markov
+argument, with probability `≥ 1/8` this single trial already puts `≥ n·s/8 ≈ n^{11/6}` edges into `S`. For all
+large `n` this exceeds `C · n^{4/3} · log^D n`, for any `C`, `D`. (`theorem_1_2_size_false`, `first_trial_large`)
+
+**Repair.** The correct bound is `|F_v| < τ_j + s_j` (`Setup.card_F_lt`). Summed over the levels (with Lemma 4.1)
+this gives `|S| = Õ(n^{1+δ+ε})`, the same as the message complexity.
+
+### Typos and slips
+- `V' = ⋃_{1≤j≤k−1} V'_j` (before Lemma 4.5) should range over `0 ≤ j ≤ k`, as the proof of Theorem 4.6 uses ("any
+  node in `G_k` is unclustered").
+- Theorem 1.2 allows `h = 0`, but `ε = 1/h`.
+- The prose says a node joins a center in `N̂_j(v)` (an edge of `F_v`); Pseudocode 2, line 19, uses any edge of
+  `F = ⋃ F_u`. The stretch proof works with either rule; we formalize the pseudocode.
+- The proof of Lemma 4.5 speaks of a spanning tree of "height" `3^j − 1`; its induction bounds the diameter, which
+  is what the lemma states.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 4.3 (volume classes miss volume 1)
+Class `x` is defined by `|E_j(v,u)| ∈ (n^{xε}, n^{(x+1)ε}]`, which excludes neighbours with a single edge, so at
+level 0 (simple `G_0`, where these are *all* neighbours) the maximum class need not carry `m_i/2h` of the volume.
+
+**Impact.** A proof slip; with the classes `[n^{xε}, n^{(x+1)ε})` the proof goes through (`Setup.lemma_4_3_node`).
+
+**Details.** We also needed the unstated `α ≥ 6` for `⌊(β−1)α/β⌋ ≥ α/3`; it holds for the paper's `α`. Lemma 4.3 is
+proved for one node, with the `2h` adaptive trials and the union bound made explicit (`Setup.lemma_4_3_node`). The
+paper's "abuse of probabilistic arguments" is harmless here: each trial fails with probability `≤ |N|(1 − θ)^s`
+conditionally on any history.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
