@@ -12,39 +12,53 @@ polynomial `Π` are wrong for slowly growing `P`. Neither changes a statement.
 
 ## Mistakes in the paper
 
-* **Lemma 3.3: a case is missing in the proof; the statement is true.** The proof says: "if during this time
-  interval agent `a` has not started any fence, it would have to follow a trajectory included in a piece
-  `T_a(k)`". But `a` may spend the whole fence `Ω_b(2(n+l))` of `b` inside one of its own fences, started
-  before `b`'s. That case satisfies the lemma's conclusion anyway, but the proof then derives that `a` *must*
-  start a fence during the interval, which is not shown. We prove the lemma differently. Let `j` be the last
-  piece of `a` completed by the end of the interval. Then the last atom of piece `j` cannot have been followed
-  entirely during the interval (catching, Lemma 3.1). Neither can the first atom of piece `j + 1`. Nor can
-  `a` stay inside the single piece `j + 1` (counting); here `j + 1 ≤ 2(n+l)` because `b` finished first.
-  (`lemma_3_3`)
-* **The length estimates in the proof of Theorem 3.1 are wrong; the theorem is true.** The paper bounds
-  `|Y(k, v)| ≤ Y*_k = 2P(k)·Q*_k` and `|A(k, v)| ≤ A*_k = 2P(k)·Z*_k`. But `Y'(k, v₁)` inserts `Q(k, ·)` at
-  each of the `P(k) + 1` nodes of `R(k, v₁)` and adds `P(k)` edges, so `|Y(k)| = 2(P(k)+1)|Q(k)| + 2P(k)`.
-  Similarly for `A`. For `P ≡ 1`, `|Y(1)| = 10 > 6 = Y*_1` and `|A(1)| = 42 > 12 = A*_1`. The same values arise
-  for `P(k) = k`. At `k = 1` the bound fails for every `P`: `|Y(1)| = 4P(1)² + 6P(1) > 4P(1)² + 2P(1) = Y*_1`.
-  As a result the paper's
-  `Π(n, m)` is not justified. A numerical check (`P ≡ 1`, `n = 2`, labels `1` and `3`) shows that it is even
-  smaller than the length of the first `2(n+l)+1` pieces of the agent with the longer label (2.92·10¹¹ vs
-  2.77·10¹¹). Theorem 3.1 only claims that *some* polynomial `Π` exists. We define `Π` from the exact lengths
-  (`piBound`) and prove that it is polynomially bounded. (`paper_Ystar_wrong`, `paper_Astar_wrong`,
-  `theorem_3_1`)
-* **Typos and small slips.**
-  - Definition 3.8: the pseudocode loop body should be "Follow trajectory `X(k, v)`", not `Ω(k, v)`.
-  - Lemma 3.6, Case 2, `µ = 1`: the contradiction comes from Lemma 3.3 (`a` has not completed the first atom
-    `N` of piece `j+1` when `b` ends its fence), not from Lemma 3.4.
-  - Proof of Lemma 3.3: `Ω_b(2(n+l))` contains `(4(n+l)−1)|K(2(n+l))|` copies of `X(2(n+l))`, not
-    `2(2(n+l)−1)|K(2(n+l))|`. This is harmless, since the latter is smaller.
-  - §2: `|x| = ⌈log x⌉` should be `⌊log x⌋ + 1`, the length of the binary representation, which is what is used.
-  - The proof of Theorem 3.1 says "since the polynomial `P(k)` is non-decreasing". Monotonicity of `P` (and
-    `P ≥ 1`) is used already in the correctness proof (Lemmas 3.2–3.6 compare `|A(·)|`, `|B(·)|` at different
-    parameters), but it is stated only there. It is harmless: the step count can always be padded.
-  - Lemma 2.1: `H` must keep `G`'s port numbers on the copied trajectory edges. The proof never says why the
-    procedure follows the same trajectory in `H` (it sees the same degrees and entry ports). That a free port
-    exists also uses connectivity.
+No mistakes in the statements.
+
+### Typos and slips
+- Definition 3.8: the pseudocode loop body should be "Follow trajectory `X(k, v)`", not `Ω(k, v)`.
+- Lemma 3.6, Case 2, `µ = 1`: the contradiction comes from Lemma 3.3 (`a` has not completed the first atom
+  `N` of piece `j+1` when `b` ends its fence), not from Lemma 3.4.
+- Proof of Lemma 3.3: `Ω_b(2(n+l))` contains `(4(n+l)−1)|K(2(n+l))|` copies of `X(2(n+l))`, not
+  `2(2(n+l)−1)|K(2(n+l))|`. This is harmless, since the latter is smaller.
+- §2: `|x| = ⌈log x⌉` should be `⌊log x⌋ + 1`, the length of the binary representation, which is what is used.
+- The proof of Theorem 3.1 says "since the polynomial `P(k)` is non-decreasing". Monotonicity of `P` (and
+  `P ≥ 1`) is used already in the correctness proof (Lemmas 3.2–3.6 compare `|A(·)|`, `|B(·)|` at different
+  parameters), but it is stated only there. It is harmless: the step count can always be padded.
+- Lemma 2.1: `H` must keep `G`'s port numbers on the copied trajectory edges. The proof never says why the
+  procedure follows the same trajectory in `H` (it sees the same degrees and entry ports). That a free port
+  exists also uses connectivity.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 3.3 (missing case)
+The proof says "if during this time interval agent `a` has not started any fence, it would have to follow a
+trajectory included in a piece `T_a(k)`", overlooking that `a` may spend the whole fence `Ω_b(2(n+l))` of `b`
+inside one of its own fences, started before `b`'s.
+
+**Impact.** Statement true; proved with a different argument (`lemma_3_3`).
+
+**Details.** That case satisfies the lemma's conclusion anyway, but the proof then derives that `a` *must*
+start a fence during the interval, which is not shown.
+
+**Repair.** Let `j` be the last piece of `a` completed by the end of the interval. Then the last atom of piece
+`j` cannot have been followed entirely during the interval (catching, Lemma 3.1). Neither can the first atom of
+piece `j + 1`. Nor can `a` stay inside the single piece `j + 1` (counting); here `j + 1 ≤ 2(n+l)` because `b`
+finished first. (`lemma_3_3`)
+
+### 🛠️ Theorem 3.1 (length estimates defining `Π`)
+The proof's bounds `|Y(k, v)| ≤ Y*_k = 2P(k)·Q*_k` and `|A(k, v)| ≤ A*_k = 2P(k)·Z*_k` are false, e.g. for
+`P ≡ 1`, `|Y(1)| = 10 > 6 = Y*_1` and `|A(1)| = 42 > 12 = A*_1` (`paper_Ystar_wrong`, `paper_Astar_wrong`), so
+the paper's `Π(n, m)` is not justified.
+
+**Impact.** Theorem 3.1 only claims that *some* polynomial `Π` exists, and that is true: we define `Π` from the
+exact lengths (`piBound`) and prove that it is polynomially bounded (`theorem_3_1`).
+
+**Details.** `Y'(k, v₁)` inserts `Q(k, ·)` at each of the `P(k) + 1` nodes of `R(k, v₁)` and adds `P(k)` edges,
+so `|Y(k)| = 2(P(k)+1)|Q(k)| + 2P(k)`. Similarly for `A`. The same values arise for `P(k) = k`. At `k = 1` the
+bound fails for every `P`: `|Y(1)| = 4P(1)² + 6P(1) > 4P(1)² + 2P(1) = Y*_1`. A numerical check (`P ≡ 1`,
+`n = 2`, labels `1` and `3`) shows that the paper's `Π` is even smaller than the length of the first
+`2(n+l)+1` pieces of the agent with the longer label (2.92·10¹¹ vs 2.77·10¹¹).
+(`paper_Ystar_wrong`, `paper_Astar_wrong`, `theorem_3_1`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

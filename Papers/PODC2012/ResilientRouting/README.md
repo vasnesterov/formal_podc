@@ -14,59 +14,96 @@ proof of Theorem 4.3.
 
 ## Mistakes in the paper
 
-* **Lemma 4.2 is false.** It claims that every node in `d`'s component routes along a cyclic
-  ordering of its live links. Counterexample: the path `d – 1 – 2 – 3` with no failures, where
-  every node forwards to its neighbour closer to `d`. This pattern is perfectly resilient, yet
-  node 2 sends packets from 1 and from 3 both to 1. The proof assumes that every neighbour of the
-  node has its own route to `d`; dead ends and links to `d` break this. Theorem 4.3 needs the
-  lemma only for node 1 of Figure 3 with all four of its links up. We prove that instance:
-  node 1 permutes `{2,3,4,5}` in one 4-cycle. (`lemma_4_2_false`, `Fig3.exists_cycle`)
-* **Lemma 4.1 is false as stated, and the proof of Theorem 4.3 misuses it.** The lemma: if `v`
-  has a working path to `d` that avoids the *edge* `vu`, then `v` must not send packets travelling
-  `u → v` back to `u`. The proof fails all other links of `u`, so it needs a path that avoids the
-  *node* `u`. Counterexample: `d – 1` plus the triangle `1, 2, 3`, where every node forwards to 1
-  and node 1 forwards to `d`. This pattern is perfectly resilient. Node 2 has the path
-  `2, 3, 1, d`, which avoids edge `21`, yet it sends packets from 1 back to 1. The proof of
-  Theorem 4.3 applies the lemma to node 2 in the Figure 3 scenario. There every path from 2 to `d`
-  passes through node 1, so only the false literal statement applies; the corrected lemma says
-  nothing. In fact, the paper's other ingredients do not suffice: one pattern is good in the four
-  scenarios that force node 1 to route cyclically (those of `Fig3.closed_false`) and in the
-  Figure 3 scenario of each of the six possible cycles. A SAT check (`satcheck/`, not part of the
-  Lean development) finds it. So the written proof is incomplete, though Theorem 4.3 is
-  true. We prove the corrected Lemma 4.1 (`v` reaches `d` after the other links of `u` fail). We
-  then add three scenarios with the same local views. They force node 2 to pass packets from 1
-  on to 10, node 10 to pass packets from 2 on to 4, and node 4 to pass packets from 10 on to 1.
-  For the other five 4-cycles of node 1 we use the matching scenarios. Then the packet of node 5
-  loops `5 → 1 → 2 → 10 → 4 → 1 → 5 → …`, as the paper says. Only condition (1) is used, so even
-  "every connected node has *some* forwarding path to `d`" is impossible on this network.
-  (`lemma_4_1_false`, `lemma_4_1`, `pass_through`, `Fig3.theorem_4_3`)
-* **The algorithm of §3.2.1 is not well defined, and the proof of Theorem 3.1 is only a sketch.**
-  Some steps are ambiguous or wrong:
-  - Step 1 makes the forwarding functions partial (`∅`), but the model requires total functions.
-  - In Step 3, `T` is the set of *failed* links (it says "the highest element of `E^i_D` not in
-    `T`"), while the model's second argument is the set of *live* links. The condition
-    "`T ∩ E^i_D ≠ ∅`" should say that some outgoing DAG link is up.
-  - Steps 4e–4f drop the failure-set argument, so it is unclear for which failure sets the new
-    rules apply.
-  - The loop of Step 4e starts at `c = k−1`, so it never installs a rule at `i = v_k` itself.
-  - The proof of Claim 3.2 takes a route "not in `D`", but every edge is in `D`.
-  - Case II of the correctness proof is argued on a picture (Figure 2).
-  - Nodes connected to `d` only through bridges are never handled. Neither is condition (2)
-    (no forwarding loops) in components cut off from `d`.
+### ❌ Lemma 4.2 (nodes route along a cyclic ordering)
+Lemma 4.2 is false: on the path `d – 1 – 2 – 3` with no failures, the perfectly resilient pattern
+"forward to the neighbour closer to `d`" makes node 2 send packets from 1 and from 3 both to 1, so
+it routes along no cyclic ordering (`lemma_4_2_false`).
 
-  We did not formalize this algorithm. Theorem 3.1 itself is true; we prove it with a simple
-  construction from a rooted spanning tree (see below). (`theorem_3_1`)
-* **Degenerate readings of the model.**
-  - *The destination must be a sink.* The definition of a forwarding path constrains only nodes
-    `i ∈ [n]`, so taken literally a path may go on after reaching `d`. Then on the network `d – 1`
-    with no failures, `d, 1, d, 1` is a forwarding loop, and no pattern is even 0-resilient on any
-    network where `d` has a link. We let paths stop at `d`. (`literal_K2`)
-  - *The network must be connected.* "For every network" in Theorem 3.1 fails if a component
-    without `d` has a link: with no failures, packets there bounce forever. (`theorem_3_1_disconnected`)
-* **Typos and slips.** Lemma 4.1's proof says "sends it back to `i`" (should be `v`). Lemma 4.2
-  cites "figure ??", and Theorem 4.3 cites "figure (c)" (both mean Figure 3). The Case II proof says "iteration `q₁` of
-  Step 2" (should be Step 4) and uses "`i_1 <_D γ`" without defining γ's role. Claim 3.2 and Step
-  4b write "`i ⋬_D x`" without saying it means `x` is not above `i`.
+**Impact.** Only the instance used by Theorem 4.3 is needed, and it is true: node 1 of Figure 3
+with all four of its links up permutes `{2,3,4,5}` in one 4-cycle (`Fig3.exists_cycle`).
+
+**Details.** The lemma claims that every node in `d`'s component routes along a cyclic ordering of
+its live links. The proof assumes that every neighbour of the node has its own route to `d`; dead
+ends and links to `d` break this.
+
+### ❌ Lemma 4.1 (do not send packets back)
+Lemma 4.1 is false as stated: on `d – 1` plus the triangle `1, 2, 3`, where every node forwards to
+1 and node 1 forwards to `d` (a perfectly resilient pattern), node 2 has the path `2, 3, 1, d`
+avoiding edge `21`, yet sends packets from 1 back to 1 (`lemma_4_1_false`).
+
+**Impact.** The corrected lemma (hypothesis: a path avoiding the *node* `u`) holds (`lemma_4_1`),
+but it does not apply where the proof of Theorem 4.3 uses the lemma; Theorem 4.3 itself is true
+(see Proof gaps).
+
+**Details.** The lemma: if `v` has a working path to `d` that avoids the *edge* `vu`, then `v` must
+not send packets travelling `u → v` back to `u`. The proof fails all other links of `u`, so it
+needs a path that avoids the *node* `u`.
+
+**Repair.** We prove the corrected Lemma 4.1: `v` reaches `d` after the other links of `u` fail
+(`lemma_4_1`, `pass_through`).
+
+### ⚠️ §3.2.1 (the algorithm behind Theorem 3.1)
+The algorithm of §3.2.1 is not well defined and the proof of Theorem 3.1 is only a sketch, so the
+algorithm's correctness is unestablished (we did not formalize it).
+
+**Impact.** Theorem 3.1 itself is true; we prove it with a simple construction from a rooted
+spanning tree (see below) (`theorem_3_1`).
+
+**Details.** Some steps are ambiguous or wrong:
+- Step 1 makes the forwarding functions partial (`∅`), but the model requires total functions.
+- In Step 3, `T` is the set of *failed* links (it says "the highest element of `E^i_D` not in
+  `T`"), while the model's second argument is the set of *live* links. The condition
+  "`T ∩ E^i_D ≠ ∅`" should say that some outgoing DAG link is up.
+- Steps 4e–4f drop the failure-set argument, so it is unclear for which failure sets the new
+  rules apply.
+- The loop of Step 4e starts at `c = k−1`, so it never installs a rule at `i = v_k` itself.
+- The proof of Claim 3.2 takes a route "not in `D`", but every edge is in `D`.
+- Case II of the correctness proof is argued on a picture (Figure 2).
+- Nodes connected to `d` only through bridges are never handled. Neither is condition (2)
+  (no forwarding loops) in components cut off from `d`.
+
+### ⚠️ §2 (forwarding paths: the destination must be a sink)
+Taken literally, the definition of a forwarding path lets a path go on after reaching `d`, and then
+no pattern is even 0-resilient on any network where `d` has a link (`literal_K2`).
+
+**Impact.** Degenerate reading with evident intent; we let paths stop at `d`.
+
+**Details.** The definition constrains only nodes `i ∈ [n]`. On the network `d – 1` with no
+failures, `d, 1, d, 1` is then a forwarding loop.
+
+### ⚠️ Theorem 3.1 (disconnected networks)
+"For every network" in Theorem 3.1 fails if a component without `d` has a link: with no failures,
+packets there bounce forever (`theorem_3_1_disconnected`).
+
+**Impact.** Implied assumption; we assume the network is connected.
+
+### Typos and slips
+- Lemma 4.1's proof says "sends it back to `i`" (should be `v`).
+- Lemma 4.2 cites "figure ??", and Theorem 4.3 cites "figure (c)" (both mean Figure 3).
+- The Case II proof says "iteration `q₁` of Step 2" (should be Step 4) and uses "`i_1 <_D γ`"
+  without defining γ's role.
+- Claim 3.2 and Step 4b write "`i ⋬_D x`" without saying it means `x` is not above `i`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 4.3 (Figure 3 has no perfectly resilient pattern)
+The proof applies Lemma 4.1 to node 2 in the Figure 3 scenario, where every path from 2 to `d`
+passes through node 1, so only the false literal statement applies and the corrected lemma says
+nothing.
+
+**Impact.** Statement true; repaired with three extra scenarios per cycle (`Fig3.theorem_4_3`).
+
+**Details.** The paper's other ingredients do not suffice: one pattern is good in the four
+scenarios that force node 1 to route cyclically (those of `Fig3.closed_false`) and in the Figure 3
+scenario of each of the six possible cycles. A SAT check (`satcheck/`, not part of the Lean
+development) finds it. So the written proof is incomplete, though Theorem 4.3 is true.
+
+**Repair.** We add three scenarios with the same local views. They force node 2 to pass packets
+from 1 on to 10, node 10 to pass packets from 2 on to 4, and node 4 to pass packets from 10 on to
+1 (`pass_through`). For the other five 4-cycles of node 1 we use the matching scenarios. Then the
+packet of node 5 loops `5 → 1 → 2 → 10 → 4 → 1 → 5 → …`, as the paper says. Only condition (1) is
+used, so even "every connected node has *some* forwarding path to `d`" is impossible on this
+network. (`Fig3.theorem_4_3`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

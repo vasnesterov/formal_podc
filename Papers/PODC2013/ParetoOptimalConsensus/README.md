@@ -14,44 +14,70 @@ inner induction.
 
 ## Mistakes in the paper
 
-* **Lemma 10 is false as stated (false numbered lemma; Theorem 4 survives).** This is Lemma 1 of the authors' PODC
-  2016 paper, with the same five conditions. With `n = 6`, `k = 2`, `t = 1`, `V = {0, 1, 2}`, a 2-set consensus
-  protocol in which low processes decide at once can make process `0` decide `2` at time 1 even though all five
-  conditions hold for it with `v = 0`. The "changes" in the proof suppress messages carrying `v` to `j_b`, which
-  may need more than `t` crashes. Theorem 4 itself is true: the proof goes through with an extra hypothesis that
-  holds wherever Lemma 10 is used. The counterexample and the repair are in
-  [`UnbeatableSetConsensus`](../../PODC2016/UnbeatableSetConsensus/README.md). (`lemma10_false`, `theorem4`)
-* **Lemma 6 is false when `d = t` (missing hypothesis; recoverable from its proof).** Condition (b), "`K_i(K_j ∃v
-  held at m − 1)` for at least `t − d` processes `j`", holds vacuously when `i` knows of `d = t` failures, even if
-  `v` occurs nowhere. Example: `n = 3`, `t = 1`, all inputs `1`, process `2` crashes in round 1 sending nothing.
-  At time 1, process `0` knows of one failure, so (b) holds for `v = 0`, but `K_0 ∃correct(0)` is false. The proof
-  sketch counts "processes knowing `∃0`, including `i` itself", so it assumes `K_i ∃v`. We prove Lemma 6 with
-  "`K_i ∃v` and ((a) or (b))". All uses in the paper are consistent with this version. (`lemma6_literal_false`;
-  repaired: `lemma6`)
-* **Corollary 1 ("`P0opt` of [HMW] is not unbeatable") holds only for `t ≥ 2` (or `t = n − 1`).** We read `P0opt`
-  as the paper describes it: decide `0` on `K_i ∃0`; decide `1` after a round in which no new failure became
-  known. For `t ≤ 1` (and `n ≥ 3`), `P0opt` makes exactly the same decisions as `Opt0`, so it is unbeatable by
-  Theorem 2. The paper's own example ("one failure seen in each of the first two rounds") needs `t ≥ 2`. As a
-  refutation of HMW's general claim, the corollary is correct. (`corollary1`; for `t ≤ 1`:
-  `p0opt_sameDecisions`, `p0opt_unbeatable`)
-* **Lemma 15, proof (statement true; proof repaired).** The inner induction on `|C_i \ Z_i|` does not decrease in
-  Case II: the new process `j` does not see `⟨k, m⟩` and may consider more processes possibly alive, so `C_j` can
-  be larger than `C_i`. The induction hypothesis is also applied to `j` without checking that `j` knows `∃0` for
-  the first time at `m` and does not know `∃correct(0)` at `m`. The counting argument for Part 1 ("fewer Case II
-  than Case I invocations") is not needed. We prove Lemma 15 by an induction on `n − |Z_i|`. Case II followed by
-  Case I becomes one step `x ~_i x' ~_j x''`: in `x''`, `k` has received `z`'s message, `Z_i` has grown by `k`,
-  and the induction hypothesis is applied to `i` itself. The number of failures in these runs never exceeds
-  `F⟨i, m+1⟩ + 1 ≤ t`. The base case becomes "`⟨z, m⟩` hidden" (Case C). (`lemma15_part1`, `lemma15_part2`,
-  `ic`, `ic_caseII`)
-* **Smaller slips.**
-  - Theorem 2: the paper says a process deciding `1` must know `never-known(∃0)`. By Agreement this is only a
-    precondition for *correct* deciders. The proof works by making `i` correct in the run that contains the
-    hidden path.
-  - Lemma 2 needs `P0` to decide at the first time `K_i ∃0` holds. This holds because first knowledge happens by
-    time `f + 1 ≤ t + 1`.
-  - Lemma 17, case `F⟨i, m⟩ = t`: it suffices that only `z` carries `0`. The paper makes every hidden process at
-    `m − 1` carry it.
-  - Two different results are numbered "Corollary 1" (§3 and Appendix C).
+### ❌ Lemma 10 (the core of the `k`-set part)
+Lemma 10 is false as stated: with `n = 6`, `k = 2`, `t = 1`, `V = {0, 1, 2}`, a 2-set consensus protocol in which
+low processes decide at once can make process `0` decide `2` at time 1 even though all five conditions hold for it
+with `v = 0` (`lemma10_false`).
+
+**Impact.** A false numbered lemma; Theorem 4 survives: the proof goes through with an extra hypothesis that holds
+wherever Lemma 10 is used (`theorem4`).
+
+**Details.** This is Lemma 1 of the authors' PODC 2016 paper, with the same five conditions. The "changes" in the
+proof suppress messages carrying `v` to `j_b`, which may need more than `t` crashes. The counterexample and the
+repair are in [`UnbeatableSetConsensus`](../../PODC2016/UnbeatableSetConsensus/README.md). (`lemma10_false`,
+`theorem4`)
+
+### ⚠️ Lemma 6 when `d = t` (missing hypothesis)
+Condition (b), "`K_i(K_j ∃v held at m − 1)` for at least `t − d` processes `j`", holds vacuously when `i` knows of
+`d = t` failures, even if `v` occurs nowhere, so Lemma 6 is false then (`lemma6_literal_false`).
+
+**Impact.** Recoverable from its proof: the proof sketch counts "processes knowing `∃0`, including `i` itself", so
+it assumes `K_i ∃v`. We prove Lemma 6 with "`K_i ∃v` and ((a) or (b))" (`lemma6`). All uses in the paper are
+consistent with this version.
+
+**Details.** Example: `n = 3`, `t = 1`, all inputs `1`, process `2` crashes in round 1 sending nothing. At time 1,
+process `0` knows of one failure, so (b) holds for `v = 0`, but `K_0 ∃correct(0)` is false.
+(`lemma6_literal_false`; repaired: `lemma6`)
+
+### ⚠️ Corollary 1 ("`P0opt` of [HMW] is not unbeatable") for `t ≤ 1`
+Corollary 1 holds only for `t ≥ 2` (or `t = n − 1`): for `t ≤ 1` (and `n ≥ 3`), `P0opt` makes exactly the same
+decisions as `Opt0`, so it is unbeatable by Theorem 2 (`p0opt_sameDecisions`, `p0opt_unbeatable`).
+
+**Impact.** Implied assumption: the paper's own example ("one failure seen in each of the first two rounds") needs
+`t ≥ 2`. As a refutation of HMW's general claim, the corollary is correct (`corollary1`).
+
+**Details.** We read `P0opt` as the paper describes it: decide `0` on `K_i ∃0`; decide `1` after a round in which
+no new failure became known. (`corollary1`; for `t ≤ 1`: `p0opt_sameDecisions`, `p0opt_unbeatable`)
+
+### Typos and slips
+- Two different results are numbered "Corollary 1" (§3 and Appendix C).
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 15 (inner induction)
+The inner induction on `|C_i \ Z_i|` does not decrease in Case II: the new process `j` does not see `⟨k, m⟩` and
+may consider more processes possibly alive, so `C_j` can be larger than `C_i`.
+
+**Impact.** Statement true; proved with a different induction (`lemma15_part1`, `lemma15_part2`).
+
+**Details.** The induction hypothesis is also applied to `j` without checking that `j` knows `∃0` for the first
+time at `m` and does not know `∃correct(0)` at `m`. The counting argument for Part 1 ("fewer Case II than Case I
+invocations") is not needed.
+
+**Repair.** We prove Lemma 15 by an induction on `n − |Z_i|`. Case II followed by Case I becomes one step
+`x ~_i x' ~_j x''`: in `x''`, `k` has received `z`'s message, `Z_i` has grown by `k`, and the induction hypothesis
+is applied to `i` itself. The number of failures in these runs never exceeds `F⟨i, m+1⟩ + 1 ≤ t`. The base case
+becomes "`⟨z, m⟩` hidden" (Case C). (`lemma15_part1`, `lemma15_part2`, `ic`, `ic_caseII`)
+
+### 🛠️ Theorem 2 and Lemma 2 (small derivation gaps)
+Theorem 2's proof says a process deciding `1` must know `never-known(∃0)`, but by Agreement this is only a
+precondition for *correct* deciders, and Lemma 2's proof needs `P0` to decide at the first time `K_i ∃0` holds.
+
+**Impact.** Statements true; minor fixes.
+
+**Details.**
+- Theorem 2: the proof works by making `i` correct in the run that contains the hidden path.
+- Lemma 2: `P0` decides at the first time `K_i ∃0` holds because first knowledge happens by time `f + 1 ≤ t + 1`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -72,6 +98,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
   `K_i ∃v` is "`v` has been seen" (`Lemma 1`/KoP via `decided_mem_vals`). `K_i(Maj = v)` is characterized
   explicitly (`knows_maj_iff`). `∃correct(v)` means "some correct process knows `∃v` at time `m`".
 * No randomness.
+
+Lemma 17, case `F⟨i, m⟩ = t`: it suffices that only `z` carries `0`. The paper makes every hidden process at
+`m − 1` carry it.
 
 **Main results in Lean.** Namespace `Podc.ParetoOptimalConsensus`.
 
