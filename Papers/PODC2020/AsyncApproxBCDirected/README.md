@@ -22,53 +22,74 @@ Several proof steps (Theorems 10, 11, 14, Lemma 8) also needed repairs.
 
 ## Mistakes in the paper
 
-* **The message-set definitions are inconsistent, and under either reading the algorithm never makes
-  progress (under-specified definition).**
-  * *Paths stored by `v` end at `v`* (Definition 9). An `f`-cover (Definition 4) may contain any
-    `≤ f` nodes, so `{v}` covers every message `v` holds. Then Algorithm 2 (`Completeness`) never
-    holds: take `Fw` with `v ∈ Fu ∪ Fw`, so that `v ∉ S_{Fu,Fw}`. FIFO-Receive-All always includes
-    `v`'s own `COMPLETE(Fv)`, so `Verify` fails in every thread forever. Algorithm 3 would trim
-    everything.
-  * *Paths end at the sender* (Appendix E). Then no stored path has `ter(p) = v`, so no message set
-    is ever full for `(A, v)` (Definition 9), and Maximal-Consistency never fires.
+### ⚠️ Definitions 4, 9 and Appendix E (message sets; the algorithm never makes progress)
+The paper is inconsistent about whether a stored path ends at the receiver, and under either reading Algorithm BW
+never makes progress, e.g. with paths ending at `v` the set `{v}` is an `f`-cover of everything `v` holds, so
+`Verify` fails in every thread forever (`RoundExec.never_verifyLit`).
 
-  The intent is evident: a node never suspects itself. Thread sets satisfy `Fv ⊆ V \ {v}` (line 5),
-  covers in Lemma 8 (Eq. (1)) avoid `v`, and footnote 5 says the same. We fix it accordingly: paths
-  end at `v`, and `v` is never in a cover. The Lean counterexample for the first reading
-  (`RoundExec.never_verifyLit`) is proved in the abstract round model `RoundExec` for every round
-  execution, including the fault-free one on `K₄` with `f = 1`. It is not proved for an operational
-  run of the literal algorithm. (`RoundExec.never_verifyLit`, `not_completenessLit`, `not_isFALit`)
-* **Typo with real consequences: `(max − min)/2`.** It appears in Algorithm 3, line 5, in the proof of
-  Lemma 15 and in Appendix G. `x_v[r+1] = (max O' − min O')/2` breaks validity: all inputs `1` give
-  `0`. It must be `(max + min)/2`; the proofs' inequalities are those of `(max + min)/2`.
-  (`minus_update_invalid`)
-* **The known input range is missing from the statements.** Section 4.6 states explicitly that the
-  inputs lie in `[0, K]` with `K` known to all nodes, and the termination argument needs this. The
-  assumption is missing only from Definition 1 and Theorem 4. We prove
-  Theorem 4 in that setting with `0 < ε < K`; for `K ≤ ε` the problem is trivial. The necessity
-  also holds for arbitrary real inputs. With unbounded inputs and no known bound, the sufficiency
-  stays open, as in the paper. (`theorem4`, `threeReach_of_solves`)
-* **Proof gaps, statements true.**
-  * *Theorems 10, 11 and 14* use the common values `R_{F_lo}` for the trimming cover `F_lo`, but
-    `R_W` is defined only for `W ≠ F_t`, and `F_lo = F_t` is possible. For `f = 0` the index set
-    is empty. When the cover is `F_t`, any other `W` works. (`theorem10`)
-  * *Theorem 10* needs FIFO order along the specific path `c → v`. Appendix F defines
-    FIFO-receive by receipt along any path, under which a forged copy on a Byzantine path would
-    satisfy the condition. We use per-path FIFO-receive with counters.
-  * *Lemma 8, Case II* claims the `f+1` paths into `z` "trivially" have no `f`-cover outside `S`.
-    `{z}` covers them; the argument works only because the relevant `F'` avoids `z`. Lemma 8
-    also holds without its extra hypotheses. (`completeness_eventually`)
-  * *Theorem 14* handles duplicate values informally. We bypass Lemma 13 and Theorem 14: Theorem 12
-    directly gives a value `x_q` with `min O'_v ≤ x_q ≤ max O'_u`, which is all Lemma 15 needs.
-    (`pair_le`)
-  * *Theorem 18* uses inputs `0` and `ε`, which are still "within `ε`"; inputs `0` and `2ε` (any
-    two more than `ε` apart) fix this. Its executions are not fully specified; we construct the
-    replay explicitly. (`threeReach_of_solvesOn`)
-* **Minor slips.**
-  * In a clique, 1-reach always holds, not "iff `n > f`". 2- and 3-reach also hold for `n = 1`.
-  * `U[r+1] − μ[r+1] ≤ (U[0] − μ[0])/2^r` should be `/2^{r+1}`; the stated bound is still true.
-  * Theorems 5 and 12 do not need their disjointness hypotheses.
-  * Nodes must keep relaying after they output; the paper does not say so.
+**Impact.** An under-specified definition with evident intent: a node never suspects itself. With that fix (paths
+end at `v`, and `v` is never in a cover) the algorithm works and Theorem 4 holds.
+
+**Details.**
+* *Paths stored by `v` end at `v`* (Definition 9). An `f`-cover (Definition 4) may contain any `≤ f` nodes, so
+  `{v}` covers every message `v` holds. Then Algorithm 2 (`Completeness`) never holds: take `Fw` with
+  `v ∈ Fu ∪ Fw`, so that `v ∉ S_{Fu,Fw}`. FIFO-Receive-All always includes `v`'s own `COMPLETE(Fv)`, so `Verify`
+  fails in every thread forever. Algorithm 3 would trim everything.
+* *Paths end at the sender* (Appendix E). Then no stored path has `ter(p) = v`, so no message set is ever full for
+  `(A, v)` (Definition 9), and Maximal-Consistency never fires.
+
+The intent is evident from the paper: thread sets satisfy `Fv ⊆ V \ {v}` (line 5), covers in Lemma 8 (Eq. (1))
+avoid `v`, and footnote 5 says the same. The Lean counterexample for the first reading
+(`RoundExec.never_verifyLit`) is proved in the abstract round model `RoundExec` for every round execution,
+including the fault-free one on `K₄` with `f = 1`. It is not proved for an operational run of the literal
+algorithm. (`RoundExec.never_verifyLit`, `not_completenessLit`, `not_isFALit`)
+
+### ⚠️ Algorithm 3, line 5 (update rule `(max − min)/2`)
+The update `x_v[r+1] = (max O' − min O')/2` breaks validity: all inputs `1` give `0` (`minus_update_invalid`).
+
+**Impact.** A typo with evident intent: it must be `(max + min)/2`, and the proofs' inequalities are those of
+`(max + min)/2`. It also appears in the proof of Lemma 15 and in Appendix G.
+
+### ⚠️ Definition 1 and Theorem 4 (known input range missing)
+Section 4.6 states explicitly that the inputs lie in `[0, K]` with `K` known to all nodes, and the termination
+argument needs this, but the assumption is missing from Definition 1 and Theorem 4.
+
+**Impact.** We prove Theorem 4 in that setting with `0 < ε < K`; for `K ≤ ε` the problem is trivial. The necessity
+also holds for arbitrary real inputs. With unbounded inputs and no known bound, the sufficiency stays open, as in
+the paper. (`theorem4`, `threeReach_of_solves`)
+
+### Typos and slips
+- In a clique, 1-reach always holds, not "iff `n > f`". 2- and 3-reach also hold for `n = 1`.
+- `U[r+1] − μ[r+1] ≤ (U[0] − μ[0])/2^r` should be `/2^{r+1}`; the stated bound is still true.
+- Nodes must keep relaying after they output; the paper does not say so.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorems 10, 11 and 14 (common values for the trimming cover, FIFO-receive, ties)
+The proofs use the common values `R_{F_lo}` for the trimming cover `F_lo`, but `R_W` is defined only for
+`W ≠ F_t`, and `F_lo = F_t` is possible.
+
+**Impact.** Statements true; repaired (`theorem10`, `pair_le`).
+
+**Details.**
+* For `f = 0` the index set is empty. When the cover is `F_t`, any other `W` works. (`theorem10`)
+* *Theorem 10* needs FIFO order along the specific path `c → v`. Appendix F defines FIFO-receive by receipt along
+  any path, under which a forged copy on a Byzantine path would satisfy the condition. We use per-path
+  FIFO-receive with counters.
+* *Theorem 14* handles duplicate values informally. We bypass Lemma 13 and Theorem 14: Theorem 12 directly gives a
+  value `x_q` with `min O'_v ≤ x_q ≤ max O'_u`, which is all Lemma 15 needs. (`pair_le`)
+
+### 🛠️ Lemma 8, Case II
+The proof claims the `f+1` paths into `z` "trivially" have no `f`-cover outside `S`, but `{z}` covers them.
+
+**Impact.** Statement true: the argument works only because the relevant `F'` avoids `z`. Lemma 8 also holds
+without its extra hypotheses. (`completeness_eventually`)
+
+### 🛠️ Theorem 18 (necessity)
+The proof uses inputs `0` and `ε`, which are still "within `ε`", and its executions are not fully specified.
+
+**Impact.** Statement true: inputs `0` and `2ε` (any two more than `ε` apart) fix this, and we construct the replay
+explicitly. (`threeReach_of_solvesOn`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -124,6 +145,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 The PODC 2012 condition for *iterative* approximate BC (formalized in
 `Papers/PODC2012/IterativeApproxBC`) implies 3-reach. The implication is strict: a 5-node digraph
 with `f = 1` satisfies 3-reach but not the iterative condition.
+
+Theorems 5 and 12 do not need their disjointness hypotheses.
 
 **Not formalized.** Theorems 1–3 (cited results of Tseng–Vaidya), Menger's theorem for digraphs
 (Theorem 5 is used in its equivalent cover form), the `k`-reach family (Definition 20), and

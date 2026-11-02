@@ -17,60 +17,80 @@ non-compact case). Corollaries 6.1 and 6.5 about compact adversaries are false a
 
 ## Mistakes in the paper
 
-* **Corollary 5.6, Theorem 5.11 and Theorem 6.7 are false in the "if" direction.**
-  - *Model.* Three processes; message adversary `{π_k | k ≥ 1} ∪ {σ_∞}`.
-    - `σ_∞` has `1→0` and `1→2` in every round.
-    - `π_k` has no edges in rounds `1..k-1`, `2→0` in round `k`, and then `0→1`, `0→2` forever.
-  - *The conditions hold.*
-    - The executions with pattern `π_k` fall into clopen sets, one per `(x₀, x₂, k)`. Inside each,
-      nobody ever hears of process 1, and process 0 broadcasts.
-    - The component of `(x, σ_∞)` is `{(y, σ_∞) | y₁ = x₁}`, and process 1 broadcasts there.
-    - So every component is broadcastable, and no component contains valent executions of two
-      different values.
-  - *Consensus is impossible.*
-    - `((1,0,1), π_k)` must decide like `((1,1,1), π_k)`, because process 0 never hears of
-      process 1. So it decides 1.
-    - For large `k`, process 1 cannot distinguish `((1,0,1), π_k)` from `((0,0,0), σ_∞)` before
-      it has to decide in the latter.
-  - *Why the proofs fail.*
-    - Theorem 5.11 "⇐" and the meta-procedure behind Corollary 5.6 assume that the union of the
-      components of the `v`-valent executions is open. That holds only with finitely many
-      components. Here the components `{(x, σ_∞)}` are not open.
-    - v3 repairs this by adding "the strong broadcaster decision sets are clopen" to its version
-      of Theorem 5.11 (Theorem 7.9).
-  - *Severity.* False statement. (`V1Cex.v1_theorem_5_11_false`)
-* **Corollary 6.1 ("only finitely many connected components" for compact adversaries) is false.**
-  - *Counterexample.* The limit-closed adversary `{σ_n} ∪ {σ_∞}` on two processes:
-    `σ_∞ = (1→0)^ω`, and `σ_n` is `σ_∞` with `0↔1` in round `n+1`.
-  - Consensus is solvable there, yet every `(x, σ_n)` is its own component, so there are
-    infinitely many.
-  - *Severity.* False statement. (`CanonicalCex.v1_corollary_6_1_false`)
-* **Corollary 6.5 is false, and the arguments for Lemma 6.4 and Theorem 6.6 are invalid.**
-  - *Counterexample.* In the same example, for every `ε > 0` the `ε`-approximation of `(y, σ_∞)`
-    contains executions `(x, σ_n)` from other components.
-  - *Consequence.* Lemma 6.4 and Theorem 6.6 rest on Corollaries 6.1 and 6.5, so their proofs are
-    invalid. We did not settle their statements.
-  - *Severity.* False statement (Cor. 6.5); proof gaps (Lemma 6.4, Thm. 6.6).
-    (`CanonicalCex.v1_corollary_6_5_false`)
-* **Corollary 5.15 ("⇐") relies on the triangle inequality, which `d_min` does not satisfy.** v3
-  drops this direction. We did not formalize Corollary 5.15. A related Lean example
-  (`ClosureCounterexample.closure_not_setDistZero`) shows a point in the closure of a set at
-  positive distance from it.
-* **Lemma 4.7 (product topology) has a proof gap.**
-  - *The gap.* The proof claims that the balls `B_1(C)` are open. This fails when the zero-distance
-    relation is not transitive, which is the case for `d_min` on configurations, where v1 applies
-    the lemma (`BallCounterexample.ball_one_not_isOpen`).
-  - *Status.* The statement is true for reflexive 0/1 distances; we prove it by a chain argument
-    (`lemma_4_2`). It fails without reflexivity, which the stated hypotheses allow
-    (`Lemma42Counterexample.lemma_4_2_false_without_refl`).
-* **Minor.**
-  - *Theorem 5.9.* The proof treats an asymmetric reachability as an equivalence. The statement is
-    true for message adversaries: every component of a solvable adversary has a common
-    broadcaster with constant input (`DN.dn_corollary_7_7`).
-  - *Theorem 5.11 "⇒".* The proof's execution `c` is not shown to be in the needed component. The
-    statement holds for message adversaries (`DN.dn_corollary_7_7`).
-  - *Corollary 5.18.* "Limit points in `PT^ω`" is ambiguous for these non-metric topologies; we
-    state it in `Σ`.
+### ❌ Corollary 5.6, Theorem 5.11 and Theorem 6.7 ("if" direction)
+On three processes, the message adversary `{π_k | k ≥ 1} ∪ {σ_∞}` has only broadcastable components and no
+component with valent executions of two values, yet consensus is impossible (`V1Cex.v1_theorem_5_11_false`).
+
+**Impact.** The paper's succinct characterizations built on Theorem 5.5 are false; Theorem 5.5 itself and the
+"only if" directions stand. v3 repairs Theorem 5.11 by adding "the strong broadcaster decision sets are clopen"
+(Theorem 7.9).
+
+**Details.**
+- *Model.* Three processes; message adversary `{π_k | k ≥ 1} ∪ {σ_∞}`.
+  - `σ_∞` has `1→0` and `1→2` in every round.
+  - `π_k` has no edges in rounds `1..k-1`, `2→0` in round `k`, and then `0→1`, `0→2` forever.
+- *The conditions hold.*
+  - The executions with pattern `π_k` fall into clopen sets, one per `(x₀, x₂, k)`. Inside each,
+    nobody ever hears of process 1, and process 0 broadcasts.
+  - The component of `(x, σ_∞)` is `{(y, σ_∞) | y₁ = x₁}`, and process 1 broadcasts there.
+  - So every component is broadcastable, and no component contains valent executions of two
+    different values.
+- *Consensus is impossible.*
+  - `((1,0,1), π_k)` must decide like `((1,1,1), π_k)`, because process 0 never hears of
+    process 1. So it decides 1.
+  - For large `k`, process 1 cannot distinguish `((1,0,1), π_k)` from `((0,0,0), σ_∞)` before
+    it has to decide in the latter.
+- *Why the proofs fail.* Theorem 5.11 "⇐" and the meta-procedure behind Corollary 5.6 assume that the union of
+  the components of the `v`-valent executions is open. That holds only with finitely many components. Here the
+  components `{(x, σ_∞)}` are not open.
+- The adversary is not limit-closed, which is why it also refutes Theorem 6.7 (the non-compact case).
+
+### ❌ Corollary 6.1 (finitely many connected components for compact adversaries)
+The limit-closed adversary `{σ_n} ∪ {σ_∞}` on two processes, with `σ_∞ = (1→0)^ω` and `σ_n` equal to `σ_∞` with
+`0↔1` in round `n+1`, makes consensus solvable but has infinitely many components
+(`CanonicalCex.v1_corollary_6_1_false`).
+
+**Impact.** False statement; it also invalidates the proofs of Lemma 6.4 and Theorem 6.6 (next items).
+
+**Details.** Every `(x, σ_n)` is its own component.
+
+### ❌ Corollary 6.5 (`ε`-approximations of components)
+In the same example, for every `ε > 0` the `ε`-approximation of `(y, σ_∞)` contains executions `(x, σ_n)` from
+other components (`CanonicalCex.v1_corollary_6_5_false`).
+
+**Impact.** False statement; Lemma 6.4 and Theorem 6.6 rest on it.
+
+### ⚠️ Lemma 6.4 and Theorem 6.6 (unestablished)
+Their proofs rest on the false Corollaries 6.1 and 6.5, so they are invalid.
+
+**Impact.** Statements unestablished: we did not settle them.
+
+### ⚠️ Corollary 5.15 ("⇐")
+The proof relies on the triangle inequality, which `d_min` does not satisfy.
+
+**Impact.** Unestablished; v3 drops this direction. We did not formalize Corollary 5.15. A related Lean example
+(`ClosureCounterexample.closure_not_setDistZero`) shows a point in the closure of a set at positive distance from
+it.
+
+### Typos and slips
+- *Corollary 5.18.* "Limit points in `PT^ω`" is ambiguous for these non-metric topologies; we state it in `Σ`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 4.7 (product topology)
+The proof claims that the balls `B_1(C)` are open, which fails when the zero-distance relation is not transitive,
+as for `d_min` on configurations, where v1 applies the lemma (`BallCounterexample.ball_one_not_isOpen`).
+
+**Impact.** The statement is true for reflexive 0/1 distances; we prove it by a chain argument (`lemma_4_2`). It
+fails without reflexivity, which the stated hypotheses allow
+(`Lemma42Counterexample.lemma_4_2_false_without_refl`).
+
+### 🛠️ Theorem 5.9 and Theorem 5.11 "⇒" (broadcastable components)
+The proof of Theorem 5.9 treats an asymmetric reachability as an equivalence, and the proof of Theorem 5.11 "⇒"
+does not show that its execution `c` lies in the needed component.
+
+**Impact.** Both statements are true for message adversaries: every component of a solvable adversary has a common
+broadcaster with constant input (`DN.dn_corollary_7_7`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
