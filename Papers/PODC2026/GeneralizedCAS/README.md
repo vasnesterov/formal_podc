@@ -14,27 +14,36 @@ formalized.
 
 ## Mistakes in the paper
 
-* **Lemma B.2.14: the inductive step does not follow (proof gap; the statement is true).**
-  * The lemma bounds the number of non-initial periods of an operation `o` by `3|S(o)|`.
-  * The proof shows `|{o₁,…,o_{3n+1}}| ≥ n+1` by induction, where `oᵢ` is the operation identified by
-    the `i`-th period. In the inductive step it assumes the set did not grow, so `o_{3n+2}`,
-    `o_{3n+3}`, `o_{3n+4}` all lie in `O_n`. It then concludes "`o' = o_{3n+2} = o_{3n+3} = o_{3n+4}`
-    for some `o' ∈ O_n`" and applies Proposition B.2.13 to four periods identifying one operation.
-  * This is a non sequitur: the three new operations can be three different elements of `O_n`.
-  * Repair: Proposition B.2.13 says that no operation is identified by four periods. So each operation
-    of `S(o)` is identified by at most three periods, and pigeonhole gives at most `3|S(o)|` periods.
-  * In Lean we count differently. A *rise* of an operation `τ` is a step after which `τ` is done and not
-    in `A`. Every operation rises at most 3 times, because its owner writes it into `A` at most twice
-    after it is done (`Trace.card_RE_le`). Every non-initial period contains a rise of an operation of
-    `S(o)`, and disjoint periods give distinct rises (`OpStart.useful`, `OpStart.it_le`).
-* **Minor slips.**
-  * Proof of Theorem B.2.15: at most `3c` disjoint periods allow up to `15c + 4` complete non-terminal
-    iterations after the first, not `15c`. The total is then `15c + 6` iterations, not `15c + 2`.
-    Linearity is unaffected. We prove that an operation completes at most `15|S(o)| + 5` iterations and
-    takes at most `105c + 44` memory steps.
-  * Lemma B.2.6 uses Proposition B.2.5 ("not pending ⇒ complete") also for `Noop`, which is not an
-    operation execution. The case is easy: no process ever writes `Noop` into `A`. We treat it
-    separately (`OpStart.old_out`).
+No mistakes in the statements.
+
+### Typos and slips
+- Proof of Theorem B.2.15: at most `3c` disjoint periods allow up to `15c + 4` complete non-terminal
+  iterations after the first, not `15c`. The total is then `15c + 6` iterations, not `15c + 2`. Linearity is
+  unaffected. We prove that an operation completes at most `15|S(o)| + 5` iterations and takes at most
+  `105c + 44` memory steps.
+- Lemma B.2.6 uses Proposition B.2.5 ("not pending ⇒ complete") also for `Noop`, which is not an operation
+  execution. The case is easy: no process ever writes `Noop` into `A`. We treat it separately
+  (`OpStart.old_out`).
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma B.2.14 (counting periods; inductive step)
+The inductive step concludes "`o' = o_{3n+2} = o_{3n+3} = o_{3n+4}` for some `o' ∈ O_n`" from the set not
+growing, which is a non sequitur: the three new operations can be three different elements of `O_n`.
+
+**Impact.** Statement true; repaired by a pigeonhole argument (`OpStart.it_le`).
+
+**Details.** The lemma bounds the number of non-initial periods of an operation `o` by `3|S(o)|`. The proof
+shows `|{o₁,…,o_{3n+1}}| ≥ n+1` by induction, where `oᵢ` is the operation identified by the `i`-th period.
+In the inductive step it assumes the set did not grow, so `o_{3n+2}`, `o_{3n+3}`, `o_{3n+4}` all lie in
+`O_n`. It then applies Proposition B.2.13 to four periods identifying one operation.
+
+**Repair.** Proposition B.2.13 says that no operation is identified by four periods. So each operation of
+`S(o)` is identified by at most three periods, and pigeonhole gives at most `3|S(o)|` periods. In Lean we
+count differently. A *rise* of an operation `τ` is a step after which `τ` is done and not in `A`. Every
+operation rises at most 3 times, because its owner writes it into `A` at most twice after it is done
+(`Trace.card_RE_le`). Every non-initial period contains a rise of an operation of `S(o)`, and disjoint
+periods give distinct rises (`OpStart.useful`, `OpStart.it_le`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

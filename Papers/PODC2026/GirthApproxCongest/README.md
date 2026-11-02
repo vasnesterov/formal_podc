@@ -11,36 +11,48 @@ as written. A literature bound quoted in §6 has an off-by-one exponent.
 
 ## Mistakes in the paper
 
-* **Claim 6.2(1) gives the wrong value (false as stated, harmless).** For intersecting inputs the claim says the weighted girth
-  *equals* `2q/ε · (1 + ε) = 2q + 2q/ε`. The proof counts `2q` pipe edges of weight 1, but each pipe `r_1 → … → r_q` has only
-  `q − 1` edges. The directed Claim 6.1 counts this correctly. The cycle through a shared edge therefore weighs
-  `2(q − 1) + 2q/ε`, which is 2 less than claimed, so the girth is strictly below the stated value. The reduction only needs
-  `girth ≤ 2q/ε · (1 + ε)`, which still holds, so Theorem 6.2 is unaffected. We prove the corrected upper bound and that the
-  stated value is strictly too large. (`uGraph_mwc_of_inter`, `claim_6_2_value_lt`)
-* **Proof gap in the weighted disjoint case (Claim 6.2(2)).** The proof projects a minimum cycle onto `H`, says this "yields a
-  cycle in `H`" and concludes there are at least 6 input edges. This step fails for undirected graphs. A cycle may enter the
-  pipe of `l` at both ends, using two Alice edges at `l_1` and two Bob edges at `l_q`, and then the projection visits `l`
-  twice. In general the projection is only a closed *trail* in `H` (no repeated edges, because the inputs are disjoint), not a
-  cycle. The claim is still true: a non-empty closed trail is at least as long as the girth. The case of a cycle with no
-  input edge at all (inside one pipe) also has to be excluded. We prove the claim, for every `k`, with this argument.
-  (`uGraph_mwc_of_disj`, `egirth_le_card_of_stutter`)
-* **The black-box communication lower bound is correct here, but not via a fixed cut (checked, not a mistake).** The paper invokes Das Sarma et al.
-  (Lemma 4.1 of [9]) "on the underlying undirected communication network consisting of the pipes and the shortcut tree".
-  This network is not literally theirs: the inputs are edges inside layers `1` and `q`. Every *fixed* cut separating
-  Alice's input nodes from Bob's cuts all `2a` pipes, so a fixed-cut simulation only gives `T = Ω(m / (aB)) = Ω(√a / B)`. We formalized the moving-cut simulation in general
-  and checked it for this network. Alice's simulated set shrinks by one column per round, and per round only one arc per
-  tree level crosses into each shrinking set, so `T` rounds cost `2T(⌈log₂ q⌉ + 1)B + 2` bits as long as `2T + 2 ≤ q`.
-  The black box is therefore correct here. (`MovingCutFamily.simulation`, `gadgetFamily`, `card_toA_le`)
-* **Slips** (none affects a result):
-  - §6, "Before presenting …": the paper attributes `ex(n, C_{<2k}) = O(n^{1+1/k})` to Bondy–Simonovits and calls it
-    conjecturally tight. For graphs with no cycle shorter than `2k` (girth `≥ 2k`) the right exponent is `1 + 1/(k−1)`.
-    The cited bound is for `C_{2k}` alone. For `k = 3`, girth-6 bipartite graphs with `Ω(n^{3/2})` edges exist, so
-    `O(n^{4/3})` is false. The rest of §6 uses the correct exponent (`z(n^{2/5}, C_{<6}) = Θ(n^{3/5})`,
-    `m = Θ(a^{1+1/(k−1)})`), and "known for `k ∈ {3, 4, 6}`" matches the corrected exponent. (`ex_bound_misquoted`)
-  - "The total number of vertices is `n^{2/5} · n^{3/5} = n`" ignores the about `2q` tree vertices. Our parameter choice
-    accounts for every vertex and pads to exactly `n`.
-  - The output convention ("each node computes an approximation") and the randomized communication bound (public coins
-    are needed, since middle pipe nodes are simulated by both players) are left implicit. See the model below.
+### ❌ Claim 6.2(1) (weighted girth for intersecting inputs)
+The claim says the weighted girth *equals* `2q/ε · (1 + ε) = 2q + 2q/ε`, but each pipe `r_1 → … → r_q` has only
+`q − 1` edges, so the girth is `2(q − 1) + 2q/ε`, 2 less than claimed (`claim_6_2_value_lt`).
+
+**Impact.** Harmless: the reduction only needs `girth ≤ 2q/ε · (1 + ε)`, which still holds, so Theorem 6.2 is
+unaffected. The claim is nevertheless false as written.
+
+**Details.** The proof counts `2q` pipe edges of weight 1. The directed Claim 6.1 counts this correctly. The
+cycle through a shared edge therefore weighs `2(q − 1) + 2q/ε`, so the girth is strictly below the stated value.
+
+**Repair.** We prove the corrected upper bound and that the stated value is strictly too large.
+(`uGraph_mwc_of_inter`, `claim_6_2_value_lt`)
+
+### Typos and slips
+None of these affects a result.
+- §6, "Before presenting …": the paper attributes `ex(n, C_{<2k}) = O(n^{1+1/k})` to Bondy–Simonovits and calls
+  it conjecturally tight. For graphs with no cycle shorter than `2k` (girth `≥ 2k`) the right exponent is
+  `1 + 1/(k−1)`. The cited bound is for `C_{2k}` alone. For `k = 3`, girth-6 bipartite graphs with `Ω(n^{3/2})`
+  edges exist, so `O(n^{4/3})` is false. The rest of §6 uses the correct exponent
+  (`z(n^{2/5}, C_{<6}) = Θ(n^{3/5})`, `m = Θ(a^{1+1/(k−1)})`), and "known for `k ∈ {3, 4, 6}`" matches the
+  corrected exponent. (`ex_bound_misquoted`)
+- "The total number of vertices is `n^{2/5} · n^{3/5} = n`" ignores the about `2q` tree vertices. Our parameter
+  choice accounts for every vertex and pads to exactly `n`.
+- The output convention ("each node computes an approximation") and the randomized communication bound (public
+  coins are needed, since middle pipe nodes are simulated by both players) are left implicit. See the model
+  below.
+
+## Proof gaps (statements true)
+
+### 🛠️ Claim 6.2(2) (weighted disjoint case)
+The proof projects a minimum cycle onto `H` and says this "yields a cycle in `H`", which fails for undirected
+graphs: a cycle may enter the pipe of `l` at both ends (two Alice edges at `l_1`, two Bob edges at `l_q`), so
+the projection visits `l` twice.
+
+**Impact.** Statement true; repaired for every `k` (`uGraph_mwc_of_disj`, `egirth_le_card_of_stutter`).
+
+**Details.** In general the projection is only a closed *trail* in `H` (no repeated edges, because the inputs are
+disjoint), not a cycle. The proof then concludes there are at least 6 input edges. The case of a cycle with no
+input edge at all (inside one pipe) also has to be excluded.
+
+**Repair.** A non-empty closed trail is at least as long as the girth. We prove the claim, for every `k`, with
+this argument. (`uGraph_mwc_of_disj`, `egirth_le_card_of_stutter`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -69,6 +81,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
   (generalized polygons) are not formalized.
 * Explicit bounds. Fixed parameters: `q ≤ 2T + 1` or `|E(H)| ≤ 2T(d + 1)B + 2` (randomized: `κ|E(H)| ≤ …`). Asymptotic:
   `C · n^{k/(2k−1)} ≤ (T + 1)(B + 1)(log₂ n + 2)`, i.e. `T = Ω(n^{k/(2k−1)} / (B log n))`.
+* *The black-box communication lower bound is correct here, but not via a fixed cut (checked, not a mistake).* The
+  paper invokes Das Sarma et al. (Lemma 4.1 of [9]) "on the underlying undirected communication network consisting of
+  the pipes and the shortcut tree". This network is not literally theirs: the inputs are edges inside layers `1` and
+  `q`. Every *fixed* cut separating Alice's input nodes from Bob's cuts all `2a` pipes, so a fixed-cut simulation only
+  gives `T = Ω(m / (aB)) = Ω(√a / B)`. We formalized the moving-cut simulation in general and checked it for this
+  network. Alice's simulated set shrinks by one column per round, and per round only one arc per tree level crosses
+  into each shrinking set, so `T` rounds cost `2T(⌈log₂ q⌉ + 1)B + 2` bits as long as `2T + 2 ≤ q`. The black box is
+  therefore correct here. (`MovingCutFamily.simulation`, `gadgetFamily`, `card_toA_le`)
 
 **Main results in Lean.**
 

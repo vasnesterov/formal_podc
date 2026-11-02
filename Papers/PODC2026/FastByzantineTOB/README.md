@@ -17,48 +17,62 @@ versions are true.
 
 ## Mistakes in the paper
 
-* **"At least `5f + 1` servers" (abstract, introduction) does not hold for the algorithms as written.** §2.1
-  fixes `n = 5f + 1`, and every proof uses it. But the thresholds are hard-coded as `4f + 1` and `2f + 1`, so
-  they stop working when there are more servers.
-  * *Blink.* Take `f = 1`, `n = 7`, with server 6 Byzantine. Servers 0–3 propose `True` and servers 4–5
-    propose `False`. Server 0 receives `True` from 0–3 and from 6. That is `4f + 1 = 5` matching suggestions,
-    so it fast-decides `True`. Server 4 receives `False` from 4, 5, 6 and `True` from 0, 1. That is 5
-    suggestions, 3 of them `False`, so it proposes `False` to `dep`. Then `dep` may decide `False`, because a
-    correct server proposed it, and server 4 decides `False`. The run can be completed so that `dep` decides
-    everywhere and terminates. (`blink_agreement_fails_5f2`)
-  * *Flutter (using only the specification of Representative Binary Consensus).* With `n = 5f + 2`, the `f + 1` correct
-    servers backing a message need not meet the `4f + 1` servers whose `Time` messages raise a lock time.
-    So Lemma 16 fails. Concretely, take `f = 1`, `n = 7`. Servers 0 and 1 receive `y` (bet 10) in time.
-    Servers 2–5 receive `z` (bet 20) in time and announce time 20. Server 6 (Byzantine) also announces 20.
-    Server 2 never hears of `y`. Both `con[y]` and `con[z]` decide `True`, each backed by at least 2
-    correct proposals. Server 0 delivers `y` first, while server 2 delivers `z` first.
-    (`flutter_totalOrder_fails_5f2`, `flutter_not_prefix_5f2`)
-  * How serious: the paper's own model (`n = 5f + 1`) is fine. The "at least" in the abstract is a claim about
-    the stated algorithms that is false for `n > 5f + 1`. The fix is local: use `n − f` instead of `4f + 1`.
-    We prove Blink safe for every `n ≥ 5f + 1` with thresholds `n − f`/`2f + 1`/`n − f` (`blink_safe_general`).
-    We prove Flutter's safety argument for every `n > f` with lock quorum `n − f`
-    (`theorem8_totalOrder_general`). We classify this as a statement imprecision rather than a false headline:
-    the intended reading "tolerates `f < n/5`" is achievable by an evident local change. See `differencies.md`
-    for this borderline call.
-* **Lemmas 5 and 6 are imprecisely stated** (an imprecision, not an error). Lemma 5 does not say whether the
-  sequence may be finite; it must be, for finite `X` (no strictly increasing `ℕ`-indexed sequence lives in a
-  finite nonempty set, `lemma5_literal_false`). The proof builds a bijection with `{n ≤ |X|}`, so a finite *or*
-  infinite sequence is meant. We prove that version: `lemma5_infinite` gives a strictly increasing `z : ℕ → α`
-  with range `X`, and `lemma5_finite` gives a sorted list. Lemma 6 does not say that `z` and `z'` take values in
-  `X`; if they may leave `X` it fails (`X = {0}`, `z n = n`, `z' n = 2n`, `lemma6_literal_false`). The proof
-  uses `z_n, z'_n ∈ X`, and at its use (Corollary 3) the sequences stay in `X` by Lemma 18. With
-  `range z = range z' = X` the lemma holds (`lemma6_infinite`, `lemma6_finite`).
-* **Typos and slips in proofs (statements unaffected).** Each is listed with the intended reading.
-  * Lemma 4 says "previously set `decided = False`" twice; it means `True`.
-  * The proof of Theorem 2 writes `v̄` where it means `v`, in "`ρ` satisfies `|{σ : suggestions[σ] = v̄}| ≥ 2f+1`".
-  * Lemma 16 defines `Φ` with `remote_times[σ] > b`; it should be `≥ b`. It also says "before `t*`"; it means
-    `t⁺`.
-  * Lemma 17 writes `last_order` and Lemma 19 writes `last_delivered`; both mean `last_processed`.
-  * Lemma 22 cites line 18; it means line 48.
-  * Lemma 23 writes `order(m, _)`; it means `submit(m, _)`.
-  * In Lemma 5, `φ` maps onto `1..|X|`, not `{n ≤ |X|}`.
-  * The proofs of Theorems 2 and 4 invoke Lemma 1, i.e. the Termination of `dep`, for a safety property. This is
-    unnecessary; our proofs use only the Validity and Agreement of `dep`.
+### ⚠️ Abstract and introduction ("at least `5f + 1` servers")
+With the paper's hard-coded thresholds `4f + 1` and `2f + 1`, both Blink's Agreement and Flutter's Total Order
+fail for `n = 5f + 2`, although the abstract and introduction say both protocols work with "at least `5f + 1`
+servers" (`blink_agreement_fails_5f2`, `flutter_totalOrder_fails_5f2`).
+
+**Impact.** The paper's own model (§2.1 fixes `n = 5f + 1`, and every proof uses it) is fine, and the fix is
+local: use `n − f` instead of `4f + 1`. A borderline call: the "at least" is a claim about the stated algorithms
+that is false for `n > 5f + 1`, but we classify it as a statement imprecision rather than a false headline,
+because the intended reading "tolerates `f < n/5`" is achievable by an evident local change (see
+`differencies.md`).
+
+**Details.**
+* *Blink.* Take `f = 1`, `n = 7`, with server 6 Byzantine. Servers 0–3 propose `True` and servers 4–5
+  propose `False`. Server 0 receives `True` from 0–3 and from 6. That is `4f + 1 = 5` matching suggestions,
+  so it fast-decides `True`. Server 4 receives `False` from 4, 5, 6 and `True` from 0, 1. That is 5
+  suggestions, 3 of them `False`, so it proposes `False` to `dep`. Then `dep` may decide `False`, because a
+  correct server proposed it, and server 4 decides `False`. The run can be completed so that `dep` decides
+  everywhere and terminates. (`blink_agreement_fails_5f2`)
+* *Flutter (using only the specification of Representative Binary Consensus).* With `n = 5f + 2`, the `f + 1`
+  correct servers backing a message need not meet the `4f + 1` servers whose `Time` messages raise a lock time.
+  So Lemma 16 fails. Concretely, take `f = 1`, `n = 7`. Servers 0 and 1 receive `y` (bet 10) in time.
+  Servers 2–5 receive `z` (bet 20) in time and announce time 20. Server 6 (Byzantine) also announces 20.
+  Server 2 never hears of `y`. Both `con[y]` and `con[z]` decide `True`, each backed by at least 2
+  correct proposals. Server 0 delivers `y` first, while server 2 delivers `z` first.
+  (`flutter_totalOrder_fails_5f2`, `flutter_not_prefix_5f2`)
+
+**Repair.** We prove Blink safe for every `n ≥ 5f + 1` with thresholds `n − f`/`2f + 1`/`n − f`
+(`blink_safe_general`). We prove Flutter's safety argument for every `n > f` with lock quorum `n − f`
+(`theorem8_totalOrder_general`).
+
+### ⚠️ Lemmas 5 and 6 (imprecise statements)
+Read literally, Lemma 5 is false for finite `X` and Lemma 6 is false when `z`, `z'` may leave `X`
+(`lemma5_literal_false`, `lemma6_literal_false`), but the intended versions are true.
+
+**Impact.** An imprecision, not an error: the proofs use the intended versions, which we prove
+(`lemma5_infinite`, `lemma5_finite`, `lemma6_infinite`, `lemma6_finite`).
+
+**Details.** Lemma 5 does not say whether the sequence may be finite; it must be, for finite `X` (no strictly
+increasing `ℕ`-indexed sequence lives in a finite nonempty set). The proof builds a bijection with
+`{n ≤ |X|}`, so a finite *or* infinite sequence is meant. Lemma 6 does not say that `z` and `z'` take values
+in `X`; if they may leave `X` it fails (`X = {0}`, `z n = n`, `z' n = 2n`). The proof uses `z_n, z'_n ∈ X`,
+and at its use (Corollary 3) the sequences stay in `X` by Lemma 18.
+
+**Repair.** `lemma5_infinite` gives a strictly increasing `z : ℕ → α` with range `X`, and `lemma5_finite`
+gives a sorted list. With `range z = range z' = X` Lemma 6 holds (`lemma6_infinite`, `lemma6_finite`).
+
+### Typos and slips
+Typos and slips in proofs (statements unaffected), each with the intended reading:
+- Lemma 4 says "previously set `decided = False`" twice; it means `True`.
+- The proof of Theorem 2 writes `v̄` where it means `v`, in "`ρ` satisfies `|{σ : suggestions[σ] = v̄}| ≥ 2f+1`".
+- Lemma 16 defines `Φ` with `remote_times[σ] > b`; it should be `≥ b`. It also says "before `t*`"; it means
+  `t⁺`.
+- Lemma 17 writes `last_order` and Lemma 19 writes `last_delivered`; both mean `last_processed`.
+- Lemma 22 cites line 18; it means line 48.
+- Lemma 23 writes `order(m, _)`; it means `submit(m, _)`.
+- In Lemma 5, `φ` maps onto `1..|X|`, not `{n ≤ |X|}`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -118,7 +132,9 @@ Lean names are in `Podc.FastByzantineTOB.Blink`, `Podc.FastByzantineTOB` and `Po
 
 **Remark.** With an RBC black box, Flutter's own safety argument needs only `n < (f + 1) + q`, so it works with
 quorum `q = n − f` for every `n > f` (`theorem8_totalOrder_general`). The `5f + 1` bound comes only from Blink.
-This bears on the paper's open question (2) in §6.
+This bears on the paper's open question (2) in §6. The proofs of Theorems 2 and 4 invoke Lemma 1, i.e. the
+Termination of `dep`, for a safety property. This is unnecessary; our proofs use only the Validity and Agreement
+of `dep`.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and `Quot.sound`.
 Non-vacuity: `Flutter.example_delivers` is a run with one server and one client in which the black box meets its

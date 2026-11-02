@@ -16,39 +16,62 @@ of the signed statement) is clear from the proofs. Two proofs (3.3, 3.8) need sm
 
 ## Mistakes in the paper
 
-* **Key/lock/commit proofs must sign the view number (pseudocode imprecision; protocol unsafe as written,
-  intent evident).** Appendix B.1 forms proofs as `tcombine((KEY, value), ρ)`, without the view. A party then
-  stores `key ← (v, view, proof)`, and the key phase compares the *claimed* view of a proposed key with the
-  view of its own lock. With unsigned views, a Byzantine leader can re-use a key proof for `v₂` from view 3,
-  claim it is from view 9, and pass the lock check of parties locked on `v₁` in view 5. Lemma B.2 then fails,
-  and two values can get commit proofs. The paper's proofs speak of "a key proof with view number `view3`" and
-  "a commit proof contains a view number", so the view is meant to be signed. Our statements
-  `key b v`, `lock b v`, `commit b v` include it (`Stmt`, `key_after_commit`).
-* **Theorem 3.3: arithmetic slip in the Markov step (proof repaired; statement true, even stronger).** The
-  proof claims `⋂_{p∈C} E_pᶜ ⊆ {M ≥ t²/2}`. With `|C| = t/2` parties each receiving more than `t/2` messages,
-  one only gets `M > t²/4`. So `P(⋃ E_p) ≥ 1/2` and "`P(E_p) ≥ 1/t` for some `p`" are unjustified. Positive
-  probability is enough for the final contradiction, so the theorem survives. In fact no probability estimate
-  is needed: the Final-setup argument applies pointwise to almost every random string. Hence a.s. every
-  `p ∈ C` receives more than `t/2` messages, and `M ≥ (⌊t/2⌋+1)(⌈t/2⌉+1) ≥ t²/4` almost surely. The proof
-  also silently assumes `t` even (`|C| = t/2`). Its "decides within time `T`" step has no meaning in an
-  asynchronous model; we replace it by "decides before receiving any message".
-  (`Async.theorem_3_3`, `Async.lower_bound_general`, `Async.no_init_decision`)
-* **Theorem 3.8: the proof uses Theorem 6.2 outside its range (proof repaired; statement true).** The proof
-  takes a disperser with `N = n` left and `M = 4c_d·f̂·log n` right vertices. Theorem 6.2 is stated only for
-  `M ≤ N`, which fails once `f̂` is close to `n / log n`. For `f̂ = 0` the construction has `M = 0` committees,
-  so every party is vacuously blocked (degenerate case). We prove the disperser existence directly by a union
-  bound, for all `N, M`. This gives Theorem 3.8 for every `n, f̂` with explicit constants: `(4f̂+1)(⌈log₂ n⌉+1)`
-  committees, at most `2(⌈log₂ n⌉+1)` committees per party, and at most `4f̂` blocked parties.
-  (`theorem_3_8`, `exists_disperser`, `theorem_6_2`)
-* **Smaller imprecisions in `SyncBA`** (Appendix B):
-  - Whether a party that already has a commit answers `RunRetrieval` is ambiguous. Lemma 10.1 needs every
-    honest party to answer an honest leader's retrieval. We take "a party is active in a view iff it had no
-    commit when suggesting". Then an honest leader that runs the retrieval sees every honest party active,
-    since otherwise it would have received a commit.
-  - Line 30 sets the fallback input to `v_in`, which may have become `⊥`; we use the original input. This
-    only matters when the honest inputs are not unanimous.
-  - Theorem 10.5 says `f < ⌊(n−t−1)/2⌋`, Theorem 7.2 says `f ≤`; `≤` is what holds.
-  - `O(n·f)` / `O(f)` are meant with the convention `f ≥ 1` (footnote 2); we state `O(n(f+1))`, `O(f+1)`.
+### ⚠️ Appendix B.1 (`ViewByzantineAgreement`: key/lock/commit proofs must sign the view)
+The pseudocode forms proofs as `tcombine((KEY, value), ρ)` without the view, so a Byzantine leader can replay a
+key proof under a larger claimed view, bypass the lock check, and get commit proofs for two values.
+
+**Impact.** The protocol is unsafe as written, but the intent is evident and the fix is local (sign the view):
+the paper's proofs speak of "a key proof with view number `view3`" and "a commit proof contains a view number".
+Theorem 3.1 holds with the fix.
+
+**Details.** A party stores `key ← (v, view, proof)`, and the key phase compares the *claimed* view of a
+proposed key with the view of its own lock. With unsigned views, a Byzantine leader can re-use a key proof for
+`v₂` from view 3, claim it is from view 9, and pass the lock check of parties locked on `v₁` in view 5.
+Lemma B.2 then fails, and two values can get commit proofs.
+
+**Repair.** Our statements `key b v`, `lock b v`, `commit b v` include the view (`Stmt`, `key_after_commit`).
+
+### Typos and slips
+Smaller imprecisions in `SyncBA` (Appendix B):
+- Whether a party that already has a commit answers `RunRetrieval` is ambiguous. Lemma 10.1 needs every
+  honest party to answer an honest leader's retrieval. We take "a party is active in a view iff it had no
+  commit when suggesting". Then an honest leader that runs the retrieval sees every honest party active,
+  since otherwise it would have received a commit.
+- Line 30 sets the fallback input to `v_in`, which may have become `⊥`; we use the original input. This
+  only matters when the honest inputs are not unanimous.
+- Theorem 10.5 says `f < ⌊(n−t−1)/2⌋`, Theorem 7.2 says `f ≤`; `≤` is what holds.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 3.3 (asynchronous `Ω(t²)` lower bound, Markov step)
+The proof claims `⋂_{p∈C} E_pᶜ ⊆ {M ≥ t²/2}`, but with `|C| = t/2` parties each receiving more than `t/2`
+messages one only gets `M > t²/4`.
+
+**Impact.** Statement true, even stronger: the bound holds almost surely
+(`Async.theorem_3_3`, `Async.lower_bound_general`).
+
+**Details.** So `P(⋃ E_p) ≥ 1/2` and "`P(E_p) ≥ 1/t` for some `p`" are unjustified. Positive probability is
+enough for the final contradiction, so the theorem survives. The proof also silently assumes `t` even
+(`|C| = t/2`). Its "decides within time `T`" step has no meaning in an asynchronous model.
+
+**Repair.** No probability estimate is needed: the Final-setup argument applies pointwise to almost every
+random string. Hence a.s. every `p ∈ C` receives more than `t/2` messages, and
+`M ≥ (⌊t/2⌋+1)(⌈t/2⌉+1) ≥ t²/4` almost surely. We replace "decides within time `T`" by "decides before
+receiving any message" (`Async.no_init_decision`).
+
+### 🛠️ Theorem 3.8 (committee assignment; Theorem 6.2 used outside its range)
+The proof takes a disperser with `N = n` left and `M = 4c_d·f̂·log n` right vertices, but Theorem 6.2 is
+stated only for `M ≤ N`, which fails once `f̂` is close to `n / log n`.
+
+**Impact.** Statement true; repaired by proving the disperser existence directly, for all `N, M`
+(`theorem_3_8`, `exists_disperser`, `theorem_6_2`).
+
+**Details.** For `f̂ = 0` the construction has `M = 0` committees, so every party is vacuously blocked
+(degenerate case).
+
+**Repair.** We prove the disperser existence by a union bound, for all `N, M`. This gives Theorem 3.8 for every
+`n, f̂` with explicit constants: `(4f̂+1)(⌈log₂ n⌉+1)` committees, at most `2(⌈log₂ n⌉+1)` committees per
+party, and at most `4f̂` blocked parties.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -74,6 +97,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
   whose links need not be fair. These are Byzantine behaviours, so a Byzantine-resilient protocol satisfies
   our requirement `Solves`. The weak adversary and scheduler make the lower bound stronger.
 * *Theorem 3.8.* Pure combinatorics; `log n` is `⌈log₂ n⌉ + 1`.
+* *Complexities.* `O(n·f)` / `O(f)` are meant with the convention `f ≥ 1` (footnote 2); we state `O(n(f+1))`,
+  `O(f+1)`.
 * *Weaker than the paper:* Theorem 3.1 is proved against a *static* adversary. The paper claims a dynamic
   one. Correctness transfers for deterministic protocols. For the message bound, messages a later-corrupted
   party sends while still honest are not counted. Local timers / null steps are not modelled in asynchrony.
