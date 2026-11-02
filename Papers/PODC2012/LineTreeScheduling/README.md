@@ -13,50 +13,62 @@ ideal-decomposition construction, and an imprecise length grouping for line netw
 
 ## Mistakes in the paper
 
-* **Depth bounds of the tree decompositions are off in small cases (statements fail in edge cases).**
-  - BuildIdealTD is claimed to output depth `≤ 2⌈log|C|⌉`. For `|C| = 1` the depth is 1, not 0.
-  - The induction "recursive inputs have size `≤ ⌊|C|/2⌋`, hence depth `≤ 2⌈log|C|⌉`" therefore breaks at its
-    base. For `|C| = 2` it only gives `3`. The bound is true for `|C| ≥ 2`, but that needs the extra base case
-    `f(2) = 2`.
-  - The overall bound `2⌈log n⌉` is false for `n = 1`.
-  - The balancing decomposition (§4.2) is claimed to have depth `≤ ⌈log n⌉`. It does not: on a path with 4
-    vertices the balancer leaves pieces of sizes 2 and 1, so the depth is `3 > 2`. The correct bound is
-    `⌊log₂ n⌋ + 1`.
+### ⚠️ Lemma 4.1 and §4.2 (depth bounds of the tree decompositions)
+The claimed depth bounds fail in small cases: BuildIdealTD has depth 1, not `≤ 2⌈log|C|⌉ = 0`, for
+`|C| = 1`, the overall bound `2⌈log n⌉` is false for `n = 1`, and the balancing decomposition has
+depth `3 > ⌈log n⌉ = 2` on a path with 4 vertices.
 
-  None of this affects the `O(log n)` claims. We prove depth `≤ 2⌊log₂ n⌋ + 1` for the ideal decomposition
-  (`lemma_4_1`), and Lemma 4.3 with length `2⌊log₂ n⌋ + 1` (`lemma_4_3`). The balancing decomposition is not
-  formalized.
-* **Degenerate cases of BuildIdealTD are ignored (proof gap, statement true).**
-  - Cases 1 and 2 assume that the node `u′ᵢ ∈ C` adjacent to the outside neighbour `uᵢ` lies in some component
-    `Cᵢ`. But `u′ᵢ` may be the balancer `z` itself.
-  - In Case 2(b) the claim "there exist three distinct components `C′₁, C′₂, C′₃`" fails when the junction `j`
-    equals `u′₁` or `u′₂` (or both, if `u′₁ = u′₂`). It also fails when `z` is adjacent to `j`, since then `C′₁`
-    is empty.
-  - The equalities `Γ(C₁) = {u₁, z}` etc. are only inclusions.
+**Impact.** None of this affects the `O(log n)` claims, which are all that is used; we prove depth
+`≤ 2⌊log₂ n⌋ + 1` for the ideal decomposition (`lemma_4_1`) and Lemma 4.3 with length
+`2⌊log₂ n⌋ + 1` (`lemma_4_3`).
 
-  The construction works once empty or missing components are allowed. Our proof splits into "no component of
-  `C∖{z}` touches two outside neighbours" (Cases 1, 2(a) and `u′ᵢ = z`) and the junction case. We define the
-  junction as the median of `u′₁, u′₂, z`. (`IdealTD.exists_good`)
-* **Line-network decomposition (Section 7) is imprecise (under-specified definition).**
-  - The groups `Gᵢ = {d : 2^{i-1}L_min ≤ len(d) ≤ 2^i L_min}` overlap at the boundaries, so they do not form a
-    partition.
-  - `ℓ = ⌈log(L_max/L_min)⌉` is `0` when all lengths are equal, so then there are no groups at all.
+**Details.**
+- The induction "recursive inputs have size `≤ ⌊|C|/2⌋`, hence depth `≤ 2⌈log|C|⌉`" therefore breaks
+  at its base. For `|C| = 2` it only gives `3`. The bound is true for `|C| ≥ 2`, but that needs the
+  extra base case `f(2) = 2`.
+- On the path with 4 vertices the balancer leaves pieces of sizes 2 and 1. The correct bound for the
+  balancing decomposition is `⌊log₂ n⌋ + 1`. The balancing decomposition is not formalized.
 
-  We use the half-open classes `grp d = ⌊log₂(len(d)/L_min)⌋` and `ℓ = ⌊log₂(L_max/L_min)⌋ + 1`, and we prove the
-  layering property, which the paper leaves as "not difficult". It holds because `len(d₁) < 2 len(d₂)` within
-  the order. (`LineInput.lineLayered`, `interval_hits`)
-* **Terse steps.** Lemma 4.2, Cases 1–2, says "path(d₂) must include one of the wings". This needs the
-  convexity of `path(d₁) ∩ path(d₂)` in a tree (`wings_inter_nonempty`). The appeal to property (ii) in Case 2
-  is unnecessary: a path leaving any vertex set passes through its neighbourhood. So Lemma 4.2 holds for every
-  rooted tree with the LCA property. Lemma 6.1's pigeonhole step is fine; we replace it by the equivalent
-  double count `∑_{e∈π(d′)} ∑_{d∼e} h(d) = ∑_d h(d)|π(d′) ∩ path(d)|`.
-* **Typos and stale text.**
-  - The introduction of Section 6 still announces the conference ratios: `(20+ε)` overall and `(13+ε)` for
-    narrow instances. Lemma 6.2 and Theorem 6.3 give `73` and `80`.
-  - Theorem 7.2 says "tree-networks", and its round bound has `(1/h_min) log n` instead of
-    `(1/h_min) log(L_max/L_min)`.
-  - §4.2: "the path between `x` and `z`" should read "`x` and `y`".
-  - "inference property" should read "interference property".
+### ⚠️ Section 7 (length groups of the line-network decomposition)
+The groups `Gᵢ = {d : 2^{i-1}L_min ≤ len(d) ≤ 2^i L_min}` overlap at the boundaries, so they do not
+form a partition, and `ℓ = ⌈log(L_max/L_min)⌉` is `0` when all lengths are equal, so then there are
+no groups at all.
+
+**Impact.** An under-specified definition with an evident fix; Theorems 7.1 and 7.2 hold with
+half-open classes (`LineInput.lineLayered`).
+
+**Repair.** We use the half-open classes `grp d = ⌊log₂(len(d)/L_min)⌋` and
+`ℓ = ⌊log₂(L_max/L_min)⌋ + 1`, and we prove the layering property, which the paper leaves as "not
+difficult". It holds because `len(d₁) < 2 len(d₂)` within the order. (`LineInput.lineLayered`,
+`interval_hits`)
+
+### Typos and slips
+- The introduction of Section 6 still announces the conference ratios: `(20+ε)` overall and `(13+ε)`
+  for narrow instances. Lemma 6.2 and Theorem 6.3 give `73` and `80`.
+- Theorem 7.2 says "tree-networks", and its round bound has `(1/h_min) log n` instead of
+  `(1/h_min) log(L_max/L_min)`.
+- §4.2: "the path between `x` and `z`" should read "`x` and `y`".
+- "inference property" should read "interference property".
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 4.1 (degenerate cases of BuildIdealTD)
+Cases 1 and 2 assume that the node `u′ᵢ ∈ C` adjacent to the outside neighbour `uᵢ` lies in some
+component `Cᵢ`, but `u′ᵢ` may be the balancer `z` itself, and in Case 2(b) the three distinct
+components `C′₁, C′₂, C′₃` need not exist.
+
+**Impact.** Statement true; the construction works once empty or missing components are allowed
+(`IdealTD.exists_good`).
+
+**Details.**
+- In Case 2(b) the claim "there exist three distinct components `C′₁, C′₂, C′₃`" fails when the
+  junction `j` equals `u′₁` or `u′₂` (or both, if `u′₁ = u′₂`). It also fails when `z` is adjacent to
+  `j`, since then `C′₁` is empty.
+- The equalities `Γ(C₁) = {u₁, z}` etc. are only inclusions.
+
+**Repair.** Our proof splits into "no component of `C∖{z}` touches two outside neighbours" (Cases 1,
+2(a) and `u′ᵢ = z`) and the junction case. We define the junction as the median of `u′₁, u′₂, z`.
+(`IdealTD.exists_good`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -109,6 +121,12 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 7.2 | `LineInput.theorem_7_2` | `LineNetworks.lean` |
 | Observation A.1 | `observation_A_1`, `card_rfCrit_le` | `TreeDecomp.lean` |
 | Appendix A (sequential 3-approximation) | `TreeInput.appendix_A` (generic: `Inst.seq_alg`) | `Sequential.lean` |
+
+**Proof remarks.** Lemma 4.2, Cases 1–2, says "path(d₂) must include one of the wings". This needs the
+convexity of `path(d₁) ∩ path(d₂)` in a tree (`wings_inter_nonempty`). The appeal to property (ii) in Case 2
+is unnecessary: a path leaving any vertex set passes through its neighbourhood. So Lemma 4.2 holds for every
+rooted tree with the LCA property. Lemma 6.1's pigeonhole step is fine; we replace it by the equivalent
+double count `∑_{e∈π(d′)} ∑_{d∼e} h(d) = ∑_d h(d)|π(d′) ∩ path(d)|`.
 
 **Not formalized.**
 * The balancing decomposition (§4.2).

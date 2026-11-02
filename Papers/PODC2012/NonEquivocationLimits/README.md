@@ -16,56 +16,76 @@ Byzantine process can replay messages that were addressed to other processes.
 
 ## Mistakes in the paper
 
-* **The Section 4 translation does not preserve the guarantees of crash-tolerant protocols.**
-  Section 4 claims that Figure 2 turns any protocol tolerating `f` crashes into one tolerating `f`
-  Byzantine faults with the same number of processes ("provides the same guarantees", abstract
-  and introduction). A translated B-message `((k, m, R, S), σ)` carries the sender's received
-  messages `R` and sent messages `S`. The receiver replays the sender's state machine on `R`.
-  Neither the signed tuple nor the checks mention recipients. So a Byzantine process can feed its
-  replayed state machine an authentic message that a correct process sent to *someone else*, and
-  everything it then sends passes the checks. It learns such messages, signature included, from
-  the `R` field of any later message of their recipient. The paper's Integrity requirement (§4.1)
-  has the same blind spot: a valid message is "the output of applying a sequence of valid messages
-  to the state machine", with no condition on who those messages were sent to. So Appendix B's
-  argument cannot exclude this attack.
+### ❌ Section 4, Figure 2, Appendix B (crash-to-Byzantine translation)
+The translation does not preserve the guarantees of crash-tolerant protocols: a 3-process protocol in
+which server `0` records only client `1` in every crash execution, once translated, lets a single
+Byzantine client `2` replay the grant addressed to `1` and get itself recorded by the correct server
+(`Translation.translation_unsafe`).
 
-  Counterexample (`n = 3`, `f = 1`). Server `0` grants a token to client `1` only. A client
-  granted by `0` multicasts `use` to the two other processes, and the server records who sent
-  `use`. In every crash execution the server records only `1` (any crashes, losses, or
-  orders). In the translated system:
-  1. client `1` T-receives the grant `g` and multicasts `u₁ = ((1, use, [g], []), σ₁)`;
-  2. the Byzantine client `2` takes `g` out of `u₁` and sends `u₂ = ((1, use, [g], []), σ₂)` to
-     the server;
-  3. `u₂` passes all checks, so the correct server records `2`.
+**Impact.** Refutes the paper's witness for the claim "it is possible to … transform" any crash-tolerant
+protocol (abstract, intro, §4), which stays unestablished; a repaired compiler appears to exist. The
+lower bounds of Section 3 are unaffected.
 
-  The adversary signs only as `2`, relays `0`'s signature that it has seen, and uses key `1`
-  once, so it respects unforgeability and non-equivocation. `u₂` is exactly what the translated
-  code of a correct `2` would send after receiving `g`. Its signed contents equal those of the
-  honest `u₁`; only the signer differs. So every reading of the sloppy check `kp = |Rp| = |Sp|`
-  that accepts `u₁` from `1` also accepts `u₂` from `2`. A verifier could reject `u₂` by
-  recomputing, during the recursive replay, each input's recipient set (`grant` goes to `{1}`).
-  But Figure 2 compares only payloads with `Sp`, and neither §4.1 Integrity nor Appendix B asks
-  for a recipient check. Adding one changes the protocol; it is not a reading of it. This is a
-  false claim, not just a gap. We rate it ❌ rather than 🚨 because every statement of the
-  headline (abstract, intro, §4) is existential ("it is possible to … transform", "there exists a
-  translation"), not "Figure 2 is correct". The counterexample refutes only the paper's witness,
-  and a repaired compiler appears to exist (R5). One repair is to sign recipient sets, check that every replayed input
-  was addressed to the sender, and reject duplicate inputs. Ben-David, Chan and Shi (PODC 2022)
-  give a corrected compiler in a multicast model. (`Translation.translation_unsafe`,
-  `Translation.check_u₂`, `Translation.attack_eq_honest`)
-* **Claim 3.1: gap in the proof; the statement holds for `n ≥ 3`.** In Run 3, messages between
-  `A` and `B` are "delivered in a timely fashion" throughout. But in Run 3 the processes of `A` do
-  not crash at time `t`, so after `t` the processes of `B` may hear from `A` and act differently
-  from Run 2. Then `C` need not deliver `m'`, as the proof claims. The repair is to also delay the
-  `A → B` messages sent after `t`, like the other slow links. With this change all four runs go
-  through. They work even against an adversary that only *imitates* correct processes of another
-  run, and even in partially synchronous runs. (`Claim31.claim_3_1`, `Claim31.claim_3_1_imitating`)
-* **Claims 3.1 and 3.2 are false for `n ≤ 2` (degenerate).** Both claims are stated for every
-  `n < 3f + 1`, and both proofs assume "w.l.o.g. `n = 3f`" with three nonempty groups. For
-  `n ≤ 2`, r-broadcast is solvable for every `f`, without signatures and against equivocation:
-  the sender delivers its message and keeps sending it, and the other process delivers the first
-  message it gets from the sender. Two distinct correct processes then include the sender.
-  (`claim_3_1_false_small`, `claim_3_2_false_small`)
+**Details.** Section 4 claims that Figure 2 turns any protocol tolerating `f` crashes into one
+tolerating `f` Byzantine faults with the same number of processes ("provides the same guarantees",
+abstract and introduction). A translated B-message `((k, m, R, S), σ)` carries the sender's received
+messages `R` and sent messages `S`. The receiver replays the sender's state machine on `R`. Neither
+the signed tuple nor the checks mention recipients. So a Byzantine process can feed its replayed
+state machine an authentic message that a correct process sent to *someone else*, and everything it
+then sends passes the checks. It learns such messages, signature included, from the `R` field of any
+later message of their recipient. The paper's Integrity requirement (§4.1) has the same blind spot: a
+valid message is "the output of applying a sequence of valid messages to the state machine", with no
+condition on who those messages were sent to. So Appendix B's argument cannot exclude this attack.
+
+Counterexample (`n = 3`, `f = 1`). Server `0` grants a token to client `1` only. A client granted by
+`0` multicasts `use` to the two other processes, and the server records who sent `use`. In every
+crash execution the server records only `1` (any crashes, losses, or orders). In the translated
+system:
+1. client `1` T-receives the grant `g` and multicasts `u₁ = ((1, use, [g], []), σ₁)`;
+2. the Byzantine client `2` takes `g` out of `u₁` and sends `u₂ = ((1, use, [g], []), σ₂)` to the
+   server;
+3. `u₂` passes all checks, so the correct server records `2`.
+
+The adversary signs only as `2`, relays `0`'s signature that it has seen, and uses key `1` once, so it
+respects unforgeability and non-equivocation. `u₂` is exactly what the translated code of a correct
+`2` would send after receiving `g`. Its signed contents equal those of the honest `u₁`; only the
+signer differs. So every reading of the sloppy check `kp = |Rp| = |Sp|` that accepts `u₁` from `1`
+also accepts `u₂` from `2`. A verifier could reject `u₂` by recomputing, during the recursive replay,
+each input's recipient set (`grant` goes to `{1}`). But Figure 2 compares only payloads with `Sp`, and
+neither §4.1 Integrity nor Appendix B asks for a recipient check. Adding one changes the protocol; it
+is not a reading of it. This is a false claim, not just a gap. We rate it ❌ rather than 🚨 because
+every statement of the headline (abstract, intro, §4) is existential ("it is possible to …
+transform", "there exists a translation"), not "Figure 2 is correct". The counterexample refutes only
+the paper's witness, and a repaired compiler appears to exist (R5). (`Translation.translation_unsafe`,
+`Translation.check_u₂`, `Translation.attack_eq_honest`)
+
+**Repair.** One repair is to sign recipient sets, check that every replayed input was addressed to the
+sender, and reject duplicate inputs. Ben-David, Chan and Shi (PODC 2022) give a corrected compiler in
+a multicast model. We did not formalize a repaired translation.
+
+### ⚠️ Claims 3.1 and 3.2 for `n ≤ 2`
+Both claims are stated for every `n < 3f + 1`, but for `n ≤ 2` r-broadcast is solvable for every `f`,
+without signatures and against equivocation (`claim_3_1_false_small`, `claim_3_2_false_small`).
+
+**Impact.** Degenerate; both claims hold for `3 ≤ n ≤ 3f` (`Claim31.claim_3_1`, `Claim32.claim_3_2`).
+
+**Details.** Both proofs assume "w.l.o.g. `n = 3f`" with three nonempty groups. For `n ≤ 2`, the
+sender delivers its message and keeps sending it, and the other process delivers the first message it
+gets from the sender. Two distinct correct processes then include the sender.
+
+## Proof gaps (statements true)
+
+### 🛠️ Claim 3.1 (Run 3)
+In Run 3, messages between `A` and `B` are "delivered in a timely fashion" throughout, but the
+processes of `A` do not crash at time `t`, so after `t` the processes of `B` may act differently from
+Run 2, and then `C` need not deliver `m'`, as the proof claims.
+
+**Impact.** Statement true for `n ≥ 3`; repaired (`Claim31.claim_3_1`, `Claim31.claim_3_1_imitating`).
+
+**Repair.** Also delay the `A → B` messages sent after `t`, like the other slow links. With this change
+all four runs go through. They work even against an adversary that only *imitates* correct processes
+of another run, and even in partially synchronous runs. (`Claim31.claim_3_1`,
+`Claim31.claim_3_1_imitating`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

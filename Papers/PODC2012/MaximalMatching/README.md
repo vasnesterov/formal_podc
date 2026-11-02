@@ -14,17 +14,28 @@ simple graphs needs an extra construction, which we supply.
 
 ## Mistakes in the paper
 
-There are no substantive mistakes.
+No mistakes in the statements.
 
-* **Finite graphs: minor proof gap, statement true.** Theorem 2 and Corollary 3 talk about
-  `k`-edge-coloured *graphs*, but the formal model (§2.3) only has colour systems. These are
-  edge-coloured trees, and the trees built in the proof (realisations, and the final `U`, `V`) are
-  infinite. For finite graphs one more step is needed: every finite ball of a `d`-regular colour
-  system must appear as the view of a node in a finite, simple, `d`-regular, `k`-edge-coloured
-  graph. The paper does not give this step. We add it with a `2^k`-copies construction, so all
-  lower bounds hold for finite simple graphs. (`completion`, `findsMaximalMatching_of_finite`,
-  `theorem2_lower_messagePassing`, `theorem6_messagePassing`)
-* **Typo.** The proof of Lemma 8 says "`w ∈ ȳY`"; it should be "`w ∈ ȳX`".
+### Typos and slips
+- The proof of Lemma 8 says "`w ∈ ȳY`"; it should be "`w ∈ ȳX`".
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 2, Theorem 6 and Corollary 3 (from infinite trees to finite graphs)
+The lower bounds are proved in the formal model of §2.3, whose instances are edge-coloured trees, all
+infinite in the proof, while Theorem 2 and Corollary 3 talk about `k`-edge-coloured *graphs*; the
+paper does not give the passage to finite graphs.
+
+**Impact.** Statements true; we add the missing step, so all lower bounds hold for finite simple
+graphs (`completion`, `findsMaximalMatching_of_finite`, `theorem2_lower_messagePassing`,
+`theorem6_messagePassing`).
+
+**Details.** The trees built in the proof (realisations, and the final `U`, `V`) are infinite. For
+finite graphs one more step is needed: every finite ball of a `d`-regular colour system must appear as
+the view of a node in a finite, simple, `d`-regular, `k`-edge-coloured graph.
+
+**Repair.** A `2^k`-copies construction (`completion`): `2^k` copies of the ball; a boundary node
+lacking its colour-`c` edge is joined to its twin in the copy with coordinate `c` flipped.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

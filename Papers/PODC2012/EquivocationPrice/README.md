@@ -12,38 +12,76 @@ when `n − h` is odd. Theorem 2 fails only for `n = 0`. Several proofs are miss
 
 ## Mistakes in the paper
 
-* **Theorem 13 is off by `h²/2` when `n ≢ h (mod 2)`.** The paper claims `Uₙ(h) = C(n,3) − ((n−h)/2)·h² + 1`.
-  Its proof minimises `abc` over integers `a, b, c ≥ h` with `a + b + c ≥ (n+3h)/2`. It only treats
-  `n ≡ h (mod 2)` and says the other case "is proved similarly". When `n − h` is odd, `c` must be at least
-  `⌈(n−h)/2⌉`, so the correct value is `C(n,3) − h²⌈(n−h)/2⌉ + 1`. That is `h²/2` below the paper's formula,
-  which for odd `h` is not even an integer. Example: `U₄(1) = 3` (any three of the four triples on 4 vertices
-  form a 1-disjoint hypergraph, two do not), while the formula gives `3.5`. We prove the corrected formula for
-  all `h ≤ n/3`. We count this as a missing rounding with evident intent; it is a borderline call, see
-  [differencies.md](differencies.md). (`theorem_13`, `theorem_13_false`, `U_four_one`)
-* **Proposition 15 (inside the proof of Theorem 13) misidentifies a maximum as a minimum.** Its second bullet
-  says the minimum of `g(a,b) = ab((n+3h)/2 − a − b)` along each face of the triangle is `(n+h)²h/16`. Along a
-  face, `g` is a concave quadratic, so that value is the face *maximum*; the face minimum is at the endpoints.
-  Example: `n = 4`, `h = 1`, `(a,b) = (1,1)` gives `g = 3/2 < 25/16`. The final answer survives because the
-  vertices are compared too. We replace the calculus by `abc ≥ h²(a+b+c−2h)` for `a, b, c ≥ h`, a two-line
-  integer argument. (`prop_15_face_false`, `mul_mul_ge`)
-* **Theorem 7's proof needs expanders that are not known to exist (statement true).** The proof uses
-  Ramanujan graphs of degree `d = Θ(n/h)` for every `n`. It justifies them by Friedman's theorem, which is
-  about fixed `d` as `n → ∞`; here `d` grows unless `h = Θ(n)`. The degree the proof requires,
-  `d > 6n/(k²h) ≈ 210·n/h`, also exceeds `n − 1` when `h ≲ 210`. The bound itself is true. We prove
-  `Tₙ(h)·h² ≤ n³` for all `1 ≤ h ≤ n/3` by the counting argument the paper mentions but does not give. The
-  expander route (Lemmas 8, 9, Claim 10, all algebraically correct) is formalized with the expander mixing
-  lemma as a hypothesis. (`theorem_7`, `T_le`, `hDisjoint_lift`)
-* **Missing proofs, supplied here.**
-  * Theorem 2 (deferred to the full version). The (⇐) direction is the paper's Figure 1 and needs no hypothesis
-    on `f`. The (⇒) direction shrinks a valid colouring to sizes `p, q, c ≥ h` with `p + q + c = 2n − 3f` and
-    pads it with fresh faulty vertices. This is exactly where `f ≥ n/3` is needed. The theorem fails only for
-    `n = 0`, where `f`-tolerance holds vacuously. (`theorem_2`, `theorem_2_card_zero`)
-  * Lemma 4 (deferred). It also holds for odd `n`. (`lemma_4`)
-* **Imprecisions.**
-  * The proof of Theorem 3 silently assumes `3 ∣ n`. The statement is true for every `n`: we prove the exact bound
-    for `n = 3k`, and `|E| ≥ 3n/4 − 2` for all `n` and all `h ≤ n/3`.
-  * Lemma 6 needs `n` even. Theorem 5 applies it with `|B| = (n−h)/2`, which need not be an integer. We use
-    `⌈(n−h)/2⌉` and get `n(n−1)(n−2) ≤ 24h²|E|` for `1 ≤ h ≤ n/6`.
+### ⚠️ Theorem 13 (exact value of `Uₙ(h)` when `n ≢ h (mod 2)`)
+The claimed `Uₙ(h) = C(n,3) − ((n−h)/2)·h² + 1` lacks a ceiling: for `n − h` odd the correct value is
+`C(n,3) − h²⌈(n−h)/2⌉ + 1`, `h²/2` lower; e.g. `U₄(1) = 3`, while the formula gives `3.5`
+(`theorem_13_false`, `U_four_one`).
+
+**Impact.** A missing rounding with evident intent: the extremal structure and every asymptotic
+consequence are unchanged, and we prove the corrected formula for all `h ≤ n/3` (`theorem_13`). This
+is a borderline call, see [differencies.md](differencies.md).
+
+**Details.** The proof minimises `abc` over integers `a, b, c ≥ h` with `a + b + c ≥ (n+3h)/2`. It
+only treats `n ≡ h (mod 2)` and says the other case "is proved similarly". When `n − h` is odd, `c`
+must be at least `⌈(n−h)/2⌉`. For odd `h` the paper's formula is not even an integer. In the example,
+any three of the four triples on 4 vertices form a 1-disjoint hypergraph, two do not.
+
+### ⚠️ Theorem 2 (`n = 0`)
+Theorem 2 fails for `n = 0`, where `f`-tolerance holds vacuously but no hypergraph is
+`(−2f)`-disjoint (`theorem_2_card_zero`).
+
+**Impact.** Degenerate; we prove it for `n ≥ 1` (`theorem_2`).
+
+## Proof gaps (statements true)
+
+### 🛠️ Proposition 15 (inside the proof of Theorem 13)
+Its second bullet calls `(n+h)²h/16` the minimum of `g(a,b) = ab((n+3h)/2 − a − b)` along each face
+of the triangle, but that value is the face *maximum*: `n = 4`, `h = 1`, `(a,b) = (1,1)` gives
+`g = 3/2 < 25/16` (`prop_15_face_false`).
+
+**Impact.** The final answer survives because the vertices are compared too; we replace the calculus
+by an integer inequality (`mul_mul_ge`).
+
+**Details.** Along a face, `g` is a concave quadratic, so the face minimum is at the endpoints.
+
+**Repair.** We replace the calculus by `abc ≥ h²(a+b+c−2h)` for `a, b, c ≥ h`, a two-line integer
+argument (`mul_mul_ge`).
+
+### 🛠️ Theorem 7 (expanders that are not known to exist)
+The proof uses Ramanujan graphs of degree `d = Θ(n/h)` for every `n`, justified by Friedman's
+theorem, which is about fixed `d` as `n → ∞`.
+
+**Impact.** The bound is true: we prove `Tₙ(h)·h² ≤ n³` for all `1 ≤ h ≤ n/3` by a counting argument
+(`theorem_7`, `T_le`).
+
+**Details.** Here `d` grows unless `h = Θ(n)`. The degree the proof requires,
+`d > 6n/(k²h) ≈ 210·n/h`, also exceeds `n − 1` when `h ≲ 210`.
+
+**Repair.** The counting argument is the one the paper mentions but does not give. The expander route
+(Lemmas 8, 9, Claim 10, all algebraically correct) is formalized with the expander mixing lemma as a
+hypothesis (`hDisjoint_lift`).
+
+### 🛠️ Theorem 2 and Lemma 4 (proofs deferred to the full version)
+The proofs of Theorem 2 and Lemma 4 are deferred to an unavailable full version; we supply them.
+
+**Impact.** Statements true (Theorem 2 for `n ≥ 1`) (`theorem_2`, `lemma_4`).
+
+**Details.**
+- Theorem 2: the (⇐) direction is the paper's Figure 1 and needs no hypothesis on `f`. The (⇒)
+  direction shrinks a valid colouring to sizes `p, q, c ≥ h` with `p + q + c = 2n − 3f` and pads it
+  with fresh faulty vertices. This is exactly where `f ≥ n/3` is needed. (`theorem_2`)
+- Lemma 4 also holds for odd `n`. (`lemma_4`)
+
+### 🛠️ Theorems 3 and 5 (divisibility and parity)
+The proof of Theorem 3 silently assumes `3 ∣ n`, and Theorem 5 applies Lemma 6 (which needs `n` even)
+with `|B| = (n−h)/2`, which need not be an integer.
+
+**Impact.** Statements true for every `n`; repaired with explicit bounds.
+
+**Details.**
+- Theorem 3: we prove the exact bound for `n = 3k`, and `|E| ≥ 3n/4 − 2` for all `n` and all
+  `h ≤ n/3`.
+- Theorem 5: we use `⌈(n−h)/2⌉` and get `n(n−1)(n−2) ≤ 24h²|E|` for `1 ≤ h ≤ n/6`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
