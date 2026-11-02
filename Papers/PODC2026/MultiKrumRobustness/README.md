@@ -14,39 +14,62 @@ in Proposition B.1 and the upper-bound step of Theorem 2.
 
 ## Mistakes in the paper
 
-* **Theorem 1 is printed with the wrong inequality.** Display (1) reads
-  `κ⋆_m ≥ (n−f)/(n−2f)·min((√2+1)², κ^>_2(m))`, but the theorem is announced as an upper bound and its
-  proof proves `≤`. Taken literally the display is false. For `f = 0` and `m = n`, MultiKrum is the
-  plain mean, so `κ⋆ ≤ 0`, while the right-hand side is `min((√2+1)², 1) = 1`. This is a typo with
-  evident intent. We prove the intended upper bound, together with "MultiKrum is robust"
-  (`theorem_1`; literal reading refuted by `theorem_1_as_written_false`).
-* **Proposition B.1: wrong bias in the proof; the statement is still true.** The barycentre of the
-  reference set is `x̄_S = −f/(n−f)·e`, so the bias is `f/(n−f) + (m−a)(1−ε)/m`. The paper writes
-  `(a·f/(n−f) + (m−a)(1−ε))/m`, i.e. it scales `f/(n−f)` by `a/m` instead of 1. The stated
-  `R(n,f,m)` is therefore not the limit of the ratio. It is still a lower bound, because it is at most
-  the correct limit `R' = (n−f)²/(f(n−2f))·(f/(n−f) + (m−a)/m)²`. One consequence: B.1 as stated
-  does not contain Theorem 4. At `m = n−f` it gives `f(2n−3f)²/((n−2f)(n−f)²) < 4f/(n−2f)`. We prove
-  the corrected `R'` and derive both B.1 and Theorem 4 from it (`prop_B1_corrected`, `prop_B1`,
-  `prop_B1_paper_lt_theorem_4`).
-* **Theorem 2: the proof's upper bound does not give the asymptotics.** The proof bounds
-  `m† ≤ (A² + √(A⁴ + 2Cf²))/C` (with `A = √(n−2f) + √(2f)`, `C = (√2+1)²`) and claims that "both
-  bounds reduce to `n/C·(1+o(1))`". This one reduces to `2n/C`: at `f = 0` it equals exactly
-  `2n/C = 2m†`. The theorem itself is true. Solving the quadratic in `√m†` gives `m†·C/n = g(f/n)` for
-  an explicit continuous `g` with `g(0) = 1` (`theorem_2`, `mDagger_mul_div`;
-  `paper_upper_not_asymp` shows the gap).
-* **Degenerate `n = 1`.** With `0/0 = −∞`, Krum on a single input has `κ⋆ = −∞`. So Proposition 1
-  (a robust rule with `κ⋆ < 0 = f/(n−2f)`), Theorem 3 for odd `n` and Theorem 4 (bounds equal to 0)
-  fail for `n = 1` (`kappaStar_eq_bot_of_n_eq_one`). Theorem 3 states no hypotheses; we prove it
-  under Definition 2's standing assumption `f ≤ n/2` (for `n = 2f`, `κ⋆ = +∞`).
-* Typos and small slips:
-  * Theorem 4 / B.1 give scores `f/(n−f)` and `(1−ε)(n−2f)/(n−f)` where the exact values are
-    `f(1−ε)²/(n−f)` and `(1−ε)²(n−2f)/(n−f)`. The ordering, which is all that matters, is right.
-  * The proof of Lemma 3 swaps `∪` and `∩`.
-  * The proof of Theorem 2 writes `Cx⁴ = (A + f/x)²` for `Cx² = …`.
-  * "the κ^<_2 regime becomes active" should be `κ^>_2`.
-  * Section 5 cites Theorem 3 for Theorem 1.
-  * Table 1's `(n−f)`-MultiKrum entry omits the `min` of Theorem 1. Without it the entry exceeds
-    Krum's bound when `f/(n−f)` is near 1, e.g. `n = 19`, `f = 9`.
+### ⚠️ Theorem 1, display (1) (`≥` instead of `≤`)
+Display (1) reads `κ⋆_m ≥ (n−f)/(n−2f)·min((√2+1)², κ^>_2(m))`, which is false for `f = 0`, `m = n`
+(`theorem_1_as_written_false`), although the theorem is announced as an upper bound and its proof proves `≤`.
+
+**Impact.** A typo with evident intent; the intended upper bound holds. We prove it, together with "MultiKrum
+is robust" (`theorem_1`).
+
+**Details.** For `f = 0` and `m = n`, MultiKrum is the plain mean, so `κ⋆ ≤ 0`, while the right-hand side is
+`min((√2+1)², 1) = 1`.
+
+### ⚠️ Proposition 1, Theorem 3 (odd `n`), Theorem 4 for `n = 1`
+With the paper's own convention `0/0 = −∞`, Krum on a single input is robust with `κ⋆ = −∞`, so these lower
+bounds, which all equal 0 for `n = 1` (Proposition 1: `κ⋆ ≥ f/(n−2f)`), fail there
+(`kappaStar_eq_bot_of_n_eq_one`).
+
+**Impact.** Degenerate case only; the lower bounds hold for `n ≥ 2`.
+
+**Details.** Against Proposition 1, Krum is then a robust rule with `κ⋆ < 0 = f/(n−2f)`; Theorems 3 (odd `n`) and 4 give bounds equal to 0. Theorem 3 states no hypotheses; we prove it under Definition 2's standing assumption `f ≤ n/2`
+(for `n = 2f`, `κ⋆ = +∞`).
+
+### Typos and slips
+- Theorem 4 / B.1 give scores `f/(n−f)` and `(1−ε)(n−2f)/(n−f)` where the exact values are `f(1−ε)²/(n−f)`
+  and `(1−ε)²(n−2f)/(n−f)`. The ordering, which is all that matters, is right.
+- The proof of Lemma 3 swaps `∪` and `∩`.
+- The proof of Theorem 2 writes `Cx⁴ = (A + f/x)²` for `Cx² = …`.
+- "the κ^<_2 regime becomes active" should be `κ^>_2`.
+- Section 5 cites Theorem 3 for Theorem 1.
+- Table 1's `(n−f)`-MultiKrum entry omits the `min` of Theorem 1. Without it the entry exceeds Krum's bound
+  when `f/(n−f)` is near 1, e.g. `n = 19`, `f = 9`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Proposition B.1 (bias computation)
+The proof writes the bias as `(a·f/(n−f) + (m−a)(1−ε))/m`, scaling `f/(n−f)` by `a/m` instead of 1; the
+correct bias is `f/(n−f) + (m−a)(1−ε)/m`.
+
+**Impact.** Statement still true, since the stated `R(n,f,m)` is below the correct limit; but B.1 as stated
+does not contain Theorem 4. Repaired (`prop_B1_corrected`, `prop_B1`, `prop_B1_paper_lt_theorem_4`).
+
+**Details.** The barycentre of the reference set is `x̄_S = −f/(n−f)·e`. The stated `R(n,f,m)` is therefore
+not the limit of the ratio. It is still a lower bound, because it is at most the correct limit
+`R' = (n−f)²/(f(n−2f))·(f/(n−f) + (m−a)/m)²`. At `m = n−f`, B.1 as stated gives
+`f(2n−3f)²/((n−2f)(n−f)²) < 4f/(n−2f)`.
+
+**Repair.** We prove the corrected `R'` and derive both B.1 and Theorem 4 from it (`prop_B1_corrected`,
+`prop_B1`, `prop_B1_paper_lt_theorem_4`).
+
+### 🛠️ Theorem 2 (asymptotics of the transition point)
+The proof's upper bound `m† ≤ (A² + √(A⁴ + 2Cf²))/C` (with `A = √(n−2f) + √(2f)`, `C = (√2+1)²`) reduces to
+`2n/C`, not to `n/C·(1+o(1))` as claimed: at `f = 0` it equals exactly `2n/C = 2m†`.
+
+**Impact.** Statement true; proved by solving the quadratic exactly (`theorem_2`, `mDagger_mul_div`;
+`paper_upper_not_asymp` shows the gap).
+
+**Repair.** Solving the quadratic in `√m†` gives `m†·C/n = g(f/n)` for an explicit continuous `g` with
+`g(0) = 1` (`theorem_2`, `mDagger_mul_div`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

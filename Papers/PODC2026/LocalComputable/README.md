@@ -23,54 +23,77 @@ Lemma 5.5 handle. We give a corrected notion ("critical" views) with which the p
 
 ## Mistakes in the paper
 
-* **"Maximally `T`-safe" depends on the radius-`(t+1)` view (Definition 5.1, used in Lemma 5.2 and
-  Theorems 5.3–5.4). Under-specified definition and proof gap; the statements are true.**
-  `t` is maximally safe for `v` if `t` is safe and `t+1` is not, and safety of `t+1` is defined with
-  radius-`(t+1)` neighbourhoods. A node that has seen only `N^t(v)` cannot evaluate this. Yet both
-  algorithms "grow the view until it is maximally `T`-safe" and are claimed to run within `T(n)`
-  rounds.
-  Counterexample with `T(n) = ⌊(n-1)/2⌋`: a node of the triangle and a node of the 5-cycle have the
-  same radius-1 view (same identifiers and ports). Radius `1 = T(3)` is maximally safe in `C₃`,
-  since radius 2 is unsafe because of `C₃` itself. In `C₅` it is not maximally safe: every network
-  containing the radius-2 view has ≥ 5 nodes, so radius 2 is still safe. So no ball-growing rule
-  stops exactly at maximally safe radii. Any algorithm that never stops before a maximally safe
-  radius fails to stop within `T(3) = 1` rounds in `C₃`
-  (`maxSafe_not_view_determined`, `no_alg_stops_at_maxSafe`, `maxSafe_rule_exceeds`); the view-level reading is sound (`maxSafeView_iff`, `first_critical_maxSafeView`).
-  The paper's sentence "if `t` is maximally safe for `v`, then `N^t(v)` is maximally safe" can
-  also be read as a property of views: maximally safe for *some* node with this view. Under that
-  reading the radius-1 view above is maximally safe, also in `C₅`, and the algorithms stay within
-  `T(n)`. A view is then maximally safe iff it is safe and critical (below). The first such radius
-  of a node is exactly its first critical radius, which is where our `B` stops. But then the
-  paper's arguments do not establish what is needed. Lemma 5.2's procedure tests only safety of
-  `t`, never criticality. Lemma 5.5 does not show that `A_N` stops within the view (next item).
-  So in either reading this is a proof gap, not a false claim.
-  *Fix.* Call a radius-`t` view **critical** if it occurs in some network `G'` with
-  `T(|V(G')|) ≤ t`. Every node meets a critical radius by `T(n)`, and any algorithm of locality
-  `T` has already stopped there (`Model.Critical`, `out_of_critical`). Maximal safety implies
-  criticality (`MaxSafe.critical`).
-* **Lemma 5.5 (inside Theorem 5.4) uses the wrong witness. Proof gap; statement true.** It takes
-  the neighbourhood `X_i` itself as a graph. That is not a network: boundary degree labels count
-  unseen edges. It then only gets that `A_N` stops within `T(N_i)` rounds, while the sandbox needs
-  `A_N` to stop within the radius of `X_i`. Taking `N_i` to be the size of a criticality witness
-  repairs the argument (`exists_boundFree`).
-* **Theorem 5.3's proof leaves the class of "safe" unspecified. Proof gap; statement true.** If
-  safety ranges over all graphs, the final contradiction uses a network that need not satisfy the
-  promise `n ≤ N ≤ f(n)` for the same `N`, and the uncomputable algorithm owes nothing there. We
-  prove the theorem differently: for fixed `N`, search over the finitely many finite tables
-  "(view, radius) ↦ output" for one that solves the problem on all legal networks. The
-  uncomputable algorithm's table shows that the search terminates
-  (`exists_computable_of_promise`).
-* **Definition 3.5's reason why the locality `T` is non-decreasing is wrong; the claim is true.**
-  The paper says "the set of graphs with `n₁` nodes is contained in the class of graphs with
-  `n₂` nodes", which is false. The correct reason is to pad with isolated nodes that have fresh
-  identifiers (identifiers lie in `[1, n^c]`, `c ≥ 1`); this does not change the views
-  (`stops_of_le`).
-* **Minor.** "Maximal" vs. "safe with `t+1` unsafe" (Definition 5.1) coincide only if safety is
-  downward closed, which is not shown. Lemma 5.2's case "`t = T(N') = C`" should read "`T` bounded
-  with supremum `C ≤ t`". Its step 3 ("reject if ... `t < T(n)`") has the inequality reversed: it
-  should be `T(n) < t`. In Lemma 4.17, "do not see farther than the first `k−1` layers" must
-  also avoid the constantly many special layers near the bottom. "The value computed by `T` will
-  equal `k₀`" is not true in general, but this is immaterial.
+### ⚠️ Definition 5.1 ("maximally `T`-safe"; used in Lemma 5.2 and Theorems 5.3–5.4)
+Maximal safety of radius `t` depends on the unseen radius-`(t+1)` view, so the paper's algorithms that "grow
+the view until it is maximally `T`-safe", read literally, exceed the time bound by one round: in `C₃` with
+`T(n) = ⌊(n-1)/2⌋` they cannot stop within `T(3) = 1` (`maxSafe_rule_exceeds`).
+
+**Impact.** An under-specified definition and a proof gap; Theorems 5.3 and 5.4 are true and proved with a
+corrected notion ("critical" views). Under the view-level reading the algorithms stay within `T(n)`, but then
+the paper's proofs of Lemma 5.2 and Lemma 5.5 do not handle that notion.
+
+**Details.** `t` is maximally safe for `v` if `t` is safe and `t+1` is not, and safety of `t+1` is defined
+with radius-`(t+1)` neighbourhoods. A node that has seen only `N^t(v)` cannot evaluate this. Yet both
+algorithms "grow the view until it is maximally `T`-safe" and are claimed to run within `T(n)` rounds.
+
+Counterexample with `T(n) = ⌊(n-1)/2⌋`: a node of the triangle and a node of the 5-cycle have the same
+radius-1 view (same identifiers and ports). Radius `1 = T(3)` is maximally safe in `C₃`, since radius 2 is
+unsafe because of `C₃` itself. In `C₅` it is not maximally safe: every network containing the radius-2 view
+has ≥ 5 nodes, so radius 2 is still safe. So no ball-growing rule stops exactly at maximally safe radii. Any
+algorithm that never stops before a maximally safe radius fails to stop within `T(3) = 1` rounds in `C₃`
+(`maxSafe_not_view_determined`, `no_alg_stops_at_maxSafe`, `maxSafe_rule_exceeds`); the view-level reading is
+sound (`maxSafeView_iff`, `first_critical_maxSafeView`).
+
+The paper's sentence "if `t` is maximally safe for `v`, then `N^t(v)` is maximally safe" can also be read as a
+property of views: maximally safe for *some* node with this view. Under that reading the radius-1 view above
+is maximally safe, also in `C₅`, and the algorithms stay within `T(n)`. A view is then maximally safe iff it
+is safe and critical (below). The first such radius of a node is exactly its first critical radius, which is
+where our `B` stops. But then the paper's arguments do not establish what is needed. Lemma 5.2's procedure
+tests only safety of `t`, never criticality. Lemma 5.5 does not show that `A_N` stops within the view (next
+item). So in either reading this is a proof gap, not a false claim.
+
+**Repair.** Call a radius-`t` view **critical** if it occurs in some network `G'` with `T(|V(G')|) ≤ t`.
+Every node meets a critical radius by `T(n)`, and any algorithm of locality `T` has already stopped there
+(`Model.Critical`, `out_of_critical`). Maximal safety implies criticality (`MaxSafe.critical`).
+
+### Typos and slips
+- "Maximal" vs. "safe with `t+1` unsafe" (Definition 5.1) coincide only if safety is downward closed, which is
+  not shown.
+- Lemma 5.2's case "`t = T(N') = C`" should read "`T` bounded with supremum `C ≤ t`". Its step 3 ("reject if
+  ... `t < T(n)`") has the inequality reversed: it should be `T(n) < t`.
+- In Lemma 4.17, "do not see farther than the first `k−1` layers" must also avoid the constantly many special
+  layers near the bottom. "The value computed by `T` will equal `k₀`" is not true in general, but this is
+  immaterial.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 5.5 (inside Theorem 5.4)
+The proof takes the neighbourhood `X_i` itself as a graph, which is not a network, and then only gets that
+`A_N` stops within `T(N_i)` rounds, while the sandbox needs `A_N` to stop within the radius of `X_i`.
+
+**Impact.** Statement true; taking `N_i` to be the size of a criticality witness repairs the argument
+(`exists_boundFree`).
+
+**Details.** `X_i` is not a network: boundary degree labels count unseen edges.
+
+### 🛠️ Theorem 5.3 (class of "safe" unspecified)
+If safety ranges over all graphs, the final contradiction uses a network that need not satisfy the promise
+`n ≤ N ≤ f(n)` for the same `N`, and the uncomputable algorithm owes nothing there.
+
+**Impact.** Statement true; proved by a different argument (`exists_computable_of_promise`).
+
+**Repair.** For fixed `N`, search over the finitely many finite tables "(view, radius) ↦ output" for one that
+solves the problem on all legal networks. The uncomputable algorithm's table shows that the search terminates
+(`exists_computable_of_promise`).
+
+### 🛠️ Definition 3.5 (why the locality `T` is non-decreasing)
+The paper's reason, "the set of graphs with `n₁` nodes is contained in the class of graphs with `n₂` nodes",
+is false.
+
+**Impact.** The claim is true, for a different reason (`stops_of_le`).
+
+**Repair.** Pad with isolated nodes that have fresh identifiers (identifiers lie in `[1, n^c]`, `c ≥ 1`); this
+does not change the views (`stops_of_le`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

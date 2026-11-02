@@ -15,48 +15,59 @@ good-case latency of 3δ holds, and so does non-triviality.
 
 ## Mistakes in the paper
 
-* **Robust good-case latency 3δ (Theorem 3, first item) is false as defined.** §3 defines
-  `T_rgc` over the executions in which "GST coincides with a correct leader entering its view".
-  Nothing stops the other correct processes from having entered that view earlier, during the
-  asynchronous period, and from having timed out there. After the timeout (line 65,
-  `vc[V] = true`) they never send `vote-1` in that view (line 37). So the leader's proposal
-  cannot gather a quorum, and the decision waits for the leader's own timeout and a further view.
-  Concrete run: `n = 4`, `f = 1`, `Δ = 2` ticks, one message delay after GST = one tick.
-  Process 0 leads view 1 and is Byzantine; process 1 leads view 2 and is correct. All messages
-  to process 1 are delayed until GST = 21. Processes 2 and 3 finish view 1 with the help of
-  Byzantine `SAFE` echoes and enter view 2 at tick 11. They time out there, so `vc[2] = true` by
-  tick 19. At GST process 1 receives `f + 1` `echo-3` for view 1 and enters view 2 (line 80). It
-  proposes, but nobody votes. The processes decide only in view 3, at tick GST + 14, where the
-  claim promises GST + 3. The run is a valid run of CSLib's partially synchronous model: start at
-  0, no drift, no crashes, reliable delivery by `max(τ, GST) + δ`. It is therefore an execution of
-  the paper's model, and the facts are checked by evaluation
-  (`RobustLatency.robust_latency_counterexample`, `others_timed_out`, `decides_later`).
-  The run also misses the weaker bound 3Δ = 6 ticks. The claim stays false if `δ` is read as the
-  maximum delay `δ(E)` over the whole execution (§3, Responsiveness). Then a crash–recovery of
-  processes 2 and 3 before GST plays the role of the timeout: line 53 sets `vc[2]`, and every
-  delay can be small (informal argument, `differencies.md`).
-  The termination sketch has the gap that causes this: it says every correct process "enters view
-  V (line 85)" on the leader's prepare, which ignores processes already in V. The intended notion
-  is probably "the whole view lies after GST". We did not prove the claim for that version. Even
-  then it needs `δ < Δ` or favourable tie-breaking: with `δ = Δ` the first entrant's 3Δ timer
-  (line 45) can fire just when the `vote-1` quorum arrives, and then it never locks. As written,
-  though, the claim is false. This is the
-  paper's distinctive claim over TetraBFT, but the title and abstract only claim (non-robust)
-  good-case latency, so we rate it ❌ rather than 🚨 (see `differencies.md`).
-* **Agreement proof sketch: small slips, statement true.** The sketch says a decision implies that
-  "at least `2f + 1` correct processes" broadcast the deciding `vote-2`. Only `f + 1` correct ones
-  are guaranteed, and that is enough: any `2f + 1` senders meet them. It also treats the views
-  after the decision as if all correct processes entered `V_dec + 1` together. In an asynchronous
-  run, processes may lock or echo in `V_dec` *after* others have moved on. The induction must be
-  stated as an invariant that holds as soon as the `f + 1` lockers are fixed, even before they
-  lock (`Hyp`/`Concl` in `Safety.lean`). With these repairs the sketch's argument goes through
-  unchanged: guards, the three `echo-1` triggers, the `SAFE` wildcard, and the second-echo
-  mechanism.
-* **Remark (not an error).** Non-triviality is required only when GST = 0, and that restriction
-  matters. Because of the `SAFE` wildcard, `cert(echo-3, f+1, V, v)` holds for *every* value once
-  `f + 1` `SAFE` echoes arrive. A leader resolving line 80's "for some v" adversarially may then
-  propose a value nobody proposed, so weak validity without the GST clause is not guaranteed by
-  the pseudocode. Our implementation tries `SAFE` first.
+### ❌ Theorem 3, first item (robust good-case latency 3δ; also introduction and Table 1)
+The claim is false under the paper's own definition: correct processes that entered the leader's view during
+the asynchronous period and timed out there never vote in it, so with `n = 4`, `f = 1` a run in which GST is
+the moment a correct leader enters its view decides only at GST + 14 ticks instead of GST + 3
+(`RobustLatency.robust_latency_counterexample`).
+
+**Impact.** This is the paper's distinctive claim over TetraBFT, but the title and abstract only claim
+(non-robust) good-case latency, which holds, so we rate it ❌ rather than 🚨 (see `differencies.md`).
+Agreement and the 3δ good-case latency are unaffected; the plausible intended version is not proved.
+
+**Details.** §3 defines `T_rgc` over the executions in which "GST coincides with a correct leader entering its
+view". Nothing stops the other correct processes from having entered that view earlier, during the
+asynchronous period, and from having timed out there. After the timeout (line 65, `vc[V] = true`) they never
+send `vote-1` in that view (line 37). So the leader's proposal cannot gather a quorum, and the decision waits
+for the leader's own timeout and a further view.
+
+Concrete run: `n = 4`, `f = 1`, `Δ = 2` ticks, one message delay after GST = one tick. Process 0 leads view 1
+and is Byzantine; process 1 leads view 2 and is correct. All messages to process 1 are delayed until GST = 21.
+Processes 2 and 3 finish view 1 with the help of Byzantine `SAFE` echoes and enter view 2 at tick 11. They
+time out there, so `vc[2] = true` by tick 19. At GST process 1 receives `f + 1` `echo-3` for view 1 and enters
+view 2 (line 80). It proposes, but nobody votes. The processes decide only in view 3, at tick GST + 14, where
+the claim promises GST + 3. The run is a valid run of CSLib's partially synchronous model: start at 0, no
+drift, no crashes, reliable delivery by `max(τ, GST) + δ`. It is therefore an execution of the paper's model,
+and the facts are checked by evaluation (`RobustLatency.robust_latency_counterexample`, `others_timed_out`,
+`decides_later`).
+
+The run also misses the weaker bound 3Δ = 6 ticks. The claim stays false if `δ` is read as the maximum delay
+`δ(E)` over the whole execution (§3, Responsiveness). Then a crash–recovery of processes 2 and 3 before GST
+plays the role of the timeout: line 53 sets `vc[2]`, and every delay can be small (informal argument,
+`differencies.md`).
+
+The termination sketch has the gap that causes this: it says every correct process "enters view V (line 85)"
+on the leader's prepare, which ignores processes already in V. The intended notion is probably "the whole
+view lies after GST". We did not prove the claim for that version. Even then it needs `δ < Δ` or favourable
+tie-breaking: with `δ = Δ` the first entrant's 3Δ timer (line 45) can fire just when the `vote-1` quorum
+arrives, and then it never locks. As written, though, the claim is false.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 2 (agreement proof sketch)
+The sketch claims that a decision implies that "at least `2f + 1` correct processes" broadcast the deciding
+`vote-2` (only `f + 1` are guaranteed), and it treats the views after the decision as if all correct processes
+entered `V_dec + 1` together.
+
+**Impact.** Statement true, even in a fully asynchronous model with crash–recovery (`agreement`); small
+slips, and the sketch's argument goes through after the repairs.
+
+**Details.** `f + 1` correct senders are enough: any `2f + 1` senders meet them. In an asynchronous run,
+processes may lock or echo in `V_dec` *after* others have moved on.
+
+**Repair.** The induction must be stated as an invariant that holds as soon as the `f + 1` lockers are fixed,
+even before they lock (`Hyp`/`Concl` in `Safety.lean`). With these repairs the sketch's argument goes through
+unchanged: guards, the three `echo-1` triggers, the `SAFE` wildcard, and the second-echo mechanism.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -83,6 +94,12 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Persistent memory is kept as unbounded per-view arrays. Every rule reads only the three-view
   window or the guard of the view being entered, and views only grow, so this is equivalent to the
   paper's window.
+
+**Remark on non-triviality (not an error).** Non-triviality is required only when GST = 0, and that
+restriction matters. Because of the `SAFE` wildcard, `cert(echo-3, f+1, V, v)` holds for *every* value once
+`f + 1` `SAFE` echoes arrive. A leader resolving line 80's "for some v" adversarially may then propose a value
+nobody proposed, so weak validity without the GST clause is not guaranteed by the pseudocode. Our
+implementation tries `SAFE` first.
 
 **Main results in Lean.**
 
