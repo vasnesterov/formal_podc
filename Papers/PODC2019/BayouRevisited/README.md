@@ -14,36 +14,54 @@ formalized.
 
 ## Mistakes in the paper
 
-* **Theorem 5's proof uses a stronger hypothesis than the theorem states (proof gap; statement
-  true).** The theorem assumes `SinOrd(strong) ∧ BEC(strong, F)` only in *stable* runs. The proof
-  starts with "consider an implementation that satisfies … `BEC(weak) ∧ SinOrd(strong) ∧
-  BEC(strong)` in both the asynchronous and stable runs" and needs it. In the final execution `H`,
-  the messages that `R1` `TOB-cast` for its weak `append(a)` (`msgs_a^TOB`) are never
-  `TOB-delivered`. Only `R2`'s outstanding messages are delivered after the partition heals. Hence
-  `H` is not a stable run whenever `msgs_a^TOB ≠ ∅`, and the stable-run hypothesis does not apply
-  to it. Repair: at the end, `TOB-deliver` everything at every replica, `R2`'s messages first and
-  then `R1`'s. This keeps one total order, adds no new messages (after a replica becomes passive,
-  op-driven messages forbid new casts), and makes `H` a fair stable run. (`main_contra`, `CH_stable`)
-* **The indistinguishability steps ignore local clocks (proof gap; statement true).** The paper's
-  replicas read a monotone local clock (Section 3.2.1), and invisible reads only fix the *state*
-  after a weak read. So a weak read's response may depend on the clock, and "each read returns the
-  same response as `e'_c`" (Claim 1) and "`rval(e_r) = v`" (main execution) do not follow from
-  determinism. Repair: let the reads in `H'` continue and pick a *late* read of `R1` (or of `R2`, by
-  symmetry) that sees both appends. Its value is fixed by the arbitration order. Then `H` replays
-  `R1`'s local input sequence up to that read, including the earlier reads, so the clock values
-  coincide. (`claim1`, `rvalOf_weak`)
-* **Op-driven messages (restriction 3) contradicts the proof and AcuteBayou (imprecise
-  definition).** As written, only "not read-only" operations may cause `RB/TOB-cast`s. Then a
-  strong read could never synchronize. Yet the proof of Theorem 5 says strong reads "can cause `R2`
-  to `RB-cast` and `TOB-cast` messages", and AcuteBayou `TOB-casts` strong read-only operations
-  (Appendix A.5). We exempt only *weak* read-only operations. This allows more implementations and
-  so strengthens Theorem 5.
-* **Typos.**
-  * In `F_seq` (Figure 3), `rank(appends(E), ar, e) = i` for `i ≤ n` is off by one, because `rank`
-    counts strict predecessors and is therefore `0`-based. Also `n` is never defined; it should be
-    `|appends(E)|`. Read literally, `read` has no value on a nonempty context. We use rank `i − 1`
-    for `i = 1..n`.
-  * "show how it can be easily to a system with `n > 2` replicas" (a word is missing).
+No mistakes in the statements.
+
+### Typos and slips
+- Restriction 3 (op-driven messages) as written lets only "not read-only" operations cause
+  `RB/TOB-cast`s, so a strong read could never synchronize. Yet the proof of Theorem 5 says strong
+  reads "can cause `R2` to `RB-cast` and `TOB-cast` messages", and AcuteBayou `TOB-casts` strong
+  read-only operations (Appendix A.5). We exempt only *weak* read-only operations. This allows more
+  implementations and so strengthens Theorem 5.
+- In `F_seq` (Figure 3), `rank(appends(E), ar, e) = i` for `i ≤ n` is off by one, because `rank`
+  counts strict predecessors and is therefore `0`-based. Also `n` is never defined; it should be
+  `|appends(E)|`. Read literally, `read` has no value on a nonempty context. We use rank `i − 1`
+  for `i = 1..n`.
+- "show how it can be easily to a system with `n > 2` replicas" (a word is missing).
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 5 (the final execution `H` is not a stable run)
+The proof assumes `BEC(weak) ∧ SinOrd(strong) ∧ BEC(strong)` in asynchronous *and* stable runs, but the
+theorem assumes `SinOrd(strong) ∧ BEC(strong, F)` only in *stable* runs, and the final execution `H`
+is not stable.
+
+**Impact.** Statement true; repaired by delivering all outstanding `TOB` messages in `H`
+(`main_contra`, `CH_stable`).
+
+**Details.** The proof starts with "consider an implementation that satisfies …
+`BEC(weak) ∧ SinOrd(strong) ∧ BEC(strong)` in both the asynchronous and stable runs" and needs it. In the final
+execution `H`, the messages that `R1` `TOB-cast` for its weak `append(a)` (`msgs_a^TOB`) are never
+`TOB-delivered`. Only `R2`'s outstanding messages are delivered after the partition heals. Hence `H`
+is not a stable run whenever `msgs_a^TOB ≠ ∅`, and the stable-run hypothesis does not apply to it.
+
+**Repair.** At the end, `TOB-deliver` everything at every replica, `R2`'s messages first and then
+`R1`'s. This keeps one total order, adds no new messages (after a replica becomes passive, op-driven
+messages forbid new casts), and makes `H` a fair stable run. (`main_contra`, `CH_stable`)
+
+### 🛠️ Claim 1 and the main execution of Theorem 5 (local clocks)
+The indistinguishability steps ignore the replicas' local clocks, so "each read returns the same
+response as `e'_c`" (Claim 1) and "`rval(e_r) = v`" do not follow from determinism.
+
+**Impact.** Statement true; repaired by replaying a late read together with the replica's whole local
+input sequence (`claim1`, `rvalOf_weak`).
+
+**Details.** The paper's replicas read a monotone local clock (Section 3.2.1), and invisible reads only
+fix the *state* after a weak read. So a weak read's response may depend on the clock.
+
+**Repair.** Let the reads in `H'` continue and pick a *late* read of `R1` (or of `R2`, by symmetry)
+that sees both appends. Its value is fixed by the arbitration order. Then `H` replays `R1`'s local
+input sequence up to that read, including the earlier reads, so the clock values coincide.
+(`claim1`, `rvalOf_weak`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -65,7 +83,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
   own client session. These are fair runs of the paper's model, and restricting the class of runs
   only strengthens an impossibility result.
 * ACT restrictions (`IsACT`), quantified over reachable configurations: (1) invisible reads, (2)
-  input-driven processing (no infinite internal-only computation), (3) op-driven messages, as above.
+  input-driven processing (no infinite internal-only computation), (3) op-driven messages, with only
+  *weak* read-only operations exempt (see Typos and slips).
   Restrictions (4) and (5) (highly available weak and non-blocking strong operations) are *not*
   assumed: `BEC` itself forces every weak and strong operation to return. So the result covers more
   implementations than the paper's.

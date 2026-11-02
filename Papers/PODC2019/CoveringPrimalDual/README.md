@@ -16,70 +16,120 @@ choice `ε = 1/(nW)` does not give an `f`-approximation. Lemma 4.7 is off by a c
 
 ## Mistakes in the paper
 
-* **Claim 5.7 / abstract: the covering-ILP algorithm is not an `(f(A)+ε)`-approximation.** The
-  reduction (binary expansion, Claim 5.6, then Lemma 5.2) produces a hypergraph of rank
-  `f(A)·⌈log₂ M + 1⌉`, not `f(A)`. MWHVC only guarantees rank `+ ε`, and the proof of Claim 5.7
-  never addresses the ratio. Concretely, take `min x s.t. x ≥ 2`, so `f(A) = 1`, `M = 2`, and
-  `B = 2` bits `x = x₀ + 2x₁`. The reduced hypergraph has edges `{x₀,x₁}` and `{x₁}` with weights
-  `1, 2`. MWHVC with `ε = 1/4` makes both vertices stuck in iteration 1 and puts both into the cover
-  in iteration 2. So it outputs `x = 3` of cost 3, while the optimum is 2 and `(f(A)+ε)·2 = 5/2`.
-  No vertex ever sends "raise" and both become tight exactly in iteration 2, so the run is the same
-  for every `ε ∈ (0,1]` and every `α`: the ratio is 3/2. This also refutes the introduction's claim
-  that `ε = 1/(nWM)` gives an `f`-approximation for ILPs (`f(A) = 1` here). The paper's assumption
-  `Δ ≥ 3` is not needed for the approximation claim. A simulation of the same pipeline on
-  `x ≥ 4` (3 bits, `Δ = 4`) gives `x = 5` against an optimum of 4, which also violates the claim for
-  `ε < 1/4`; that instance is not in Lean. This is a false algorithm claim. The true guarantee is
-  `f(A)·⌈log₂ M + 1⌉ + ε`. (`ILPCex.claim_5_7_false`; the hypergraph is shown to be
-  exactly the Lemma 5.2 reduction of the Claim 5.6 expansion in `ILPCex.edges_eq`.)
-* **Claim 5.7's degree parameter is wrong.** The proof writes `2^{f(1+log M)} = 2^f·2M`, and the
-  statement uses `Δ' = 2^{f(A)}·M·Δ(A)`. In fact `2^{f(1+log M)} = (2M)^f`, and the reduced
-  hypergraph can exceed the stated degree. For `x₁ + x₂ ≥ 8` (`f(A) = 2`, `Δ(A) = 1`, `M = 8`,
-  `B = 4`), the top bit of `x₁` lies in 36 hyperedges, more than `2²·8·1 = 32`. The running-time
-  expression of Claim 5.7 is therefore unsupported. We did not try to repair it.
-  (`Degree57.claim_5_7_degree_false`)
-* **Proposition 5.5 is false for non-integral `M`.** Take `2x ≥ 3`, so `M = 3/2` by Definition 5.4.
-  The ILP is feasible (`x = 2`), but no integer point of the box `[0, 3/2]` is feasible. The fix is
-  the box `[0, ⌈M⌉]ⁿ`: capping a feasible `x` at `⌈M⌉` keeps it feasible and does not increase the
-  cost. (`prop_5_5_false`; repaired: `prop_5_5_ceil`)
-* **Claim 5.6 is false as stated for `M < 1`, and its proof uses too few bits.** For `2x ≥ 1`
-  (`M = 1/2`) the stated bound `f(A') ≤ f(A)·⌈log₂ M + 1⌉ = 0` forces `A' = 0`, so no such zero-one
-  program is feasible. (The introduction's `M = max{1, ⌈1/a_min⌉}` avoids this, but Definition 5.4
-  has no `max{1,·}`.) The proof uses `B = ⌈log₂ M⌉` bits, which loses solutions when `M` is a power
-  of two: for `x ≥ 2`, one bit is not enough. With `B` bits such that `⌈M⌉ < 2^B` (for example the
-  statement's `B = ⌈log₂ M + 1⌉` when `M ≥ 1`), the reduction is correct, `f(A') = f(A)·B` and
-  `Δ(A') = Δ(A)`. (`claim_5_6_false`, `claim_5_6_proof_false`; repaired: `claim_5_6`,
-  `claim_5_6_bits`, `fA_binExp`, `ΔA_binExp`)
-* **Lemma 5.2: the rank bound `f' < f(A)` is false.** The hyperedge `σᵢ \ ∅ = σᵢ` has `f(A)`
-  vertices. On the single constraint `x₁ ≥ 1`, no hypergraph with edges smaller than `f(A) = 1` has
-  the feasible solutions as its covers. The correct bound `f' ≤ f(A)` holds, and so does the degree
-  bound, in the sharper form `≤ 2^{f(A)-1}Δ(A)`. Correctness of the reduction is proved.
-  (`lemma_5_2_rank_false`; `lemma_5_2_cover_iff`, `lemma_5_2_rank`, `lemma_5_2_degree`)
-* **Corollary 4.10: `ε = 1/(nW)` does not give an `f`-approximation.** Here `W = max w/min w`, and
-  `ε·OPT` can be as large as `min w`, so integrality does not help. Take three parallel edges `{0,1}`
-  (`Δ = 3`) with weights `9, 10`, so `n = 2`, `W = 10/9`, `ε = 9/20`. Neither vertex ever sends
-  "raise", so the run is the same for every `α`. Both vertices join in iteration 2, at cost
-  `19 > f·OPT = 18`. With `ε < 1/(n·max w)` the integrality argument works, and the round bound is
-  still `O(f log n)` for polynomial weights. The `O(f log n)` part is not formalized. The error is
-  in the definition of `W`: the introduction uses `W` for the maximum weight (`w : V → {1,…,W}`),
-  and with that reading the corollary is essentially right. The Lean instance uses parallel edges
-  only to reach `Δ = 3`. A simulation also found a simple graph with `Δ = 3` (6 vertices, 7 edges,
-  weights 31–33) on which the output costs more than `2·OPT`; that instance is not in Lean.
-  (`Cor410.corollary_4_10_false`)
-* **Lemma 4.7 (and C.2) is off by a ceiling.** The paper divides the slack by the minimum stuck
-  increment, which only gives `#stuck < α+1`. That is `≤ α` only for integral `α`, while
-  Theorem 4.9 uses non-integral `α`. For `α = 29/10`, a vertex is stuck three times at level 1. We
-  prove `≤ ⌈α/κ⌉` (`κ = 1`, or `κ = 1/2` for Appendix C). Theorem 4.8 is unaffected
-  asymptotically. (`Stuck.lemma_4_7_false`; `lemma_4_7`, `lemma_4_7_ceil`, `lemma_4_7_of_nat`)
-* **Claim 4.2, Eq. (1), is stated "for every `v ∉ C`".** It fails for a vertex that terminated
-  without joining `C`, because its level is no longer updated. Example: one edge `{0,1}` with weights
-  `4, 7`. Vertex 1 terminates in iteration 2 with level 0, but `∑δ₁ = 4 > 7/2`. The proof only uses
-  Eq. (1) for active vertices, where it holds. (`Eq1.claim_4_2_eq1_false`; `claim_4_2`)
-* **Theorem 4.9 for `f = 1, ε = 1`.** Here `f·log(f/ε) = 0`: the definition of `α` divides by zero,
-  and `O(f log(f/ε) + …)` cannot absorb the additive constant. We use `F = f·z` with
-  `z = ⌈log₂(1/β)⌉ ≥ 1` instead. This is `Θ(f log(f/ε))` whenever `f/ε ≥ 2`.
-* Minor: Appendix B sets `deal₀(e) = β·min w/|E|`, but Section 3 uses `0.5·min w/|E|`. Both satisfy
-  the analysis; we parametrize by `c₀ ∈ (0, 1/2]`. In the proof of Theorem 4.8, "e-stuck" should
-  read "e-raise".
+### ❌ Claim 5.7 and abstract (approximation ratio for covering ILPs)
+The covering-ILP algorithm is not an `(f(A)+ε)`-approximation: on `min x s.t. x ≥ 2` (`f(A) = 1`) it
+outputs `x = 3` for every `ε ∈ (0,1]` and every `α`, while the optimum is 2 and `(f(A)+ε)·2 = 5/2` for
+`ε = 1/4` (`ILPCex.claim_5_7_false`).
+
+**Impact.** Refutes the ILP extension as stated in the abstract and introduction, including the claim
+that `ε = 1/(nWM)` gives an `f`-approximation for ILPs. The true guarantee of the reduction is
+`f(A)·⌈log₂ M + 1⌉ + ε`; the hypergraph results of Section 4 are unaffected.
+
+**Details.** The reduction (binary expansion, Claim 5.6, then Lemma 5.2) produces a hypergraph of rank
+`f(A)·⌈log₂ M + 1⌉`, not `f(A)`. MWHVC only guarantees rank `+ ε`, and the proof of Claim 5.7 never
+addresses the ratio. In the example, `M = 2` and `B = 2` bits `x = x₀ + 2x₁`. The reduced hypergraph
+has edges `{x₀,x₁}` and `{x₁}` with weights `1, 2`. MWHVC with `ε = 1/4` makes both vertices stuck in
+iteration 1 and puts both into the cover in iteration 2, so it outputs `x = 3` of cost 3. No vertex
+ever sends "raise" and both become tight exactly in iteration 2, so the run is the same for every
+`ε ∈ (0,1]` and every `α`: the ratio is 3/2. The paper's assumption `Δ ≥ 3` is not needed for the
+approximation claim. A simulation of the same pipeline on `x ≥ 4` (3 bits, `Δ = 4`) gives `x = 5`
+against an optimum of 4, which also violates the claim for `ε < 1/4`; that instance is not in Lean.
+The hypergraph is shown to be exactly the Lemma 5.2 reduction of the Claim 5.6 expansion in
+`ILPCex.edges_eq`.
+
+### ❌ Claim 5.7 (degree parameter `Δ'`)
+The proof writes `2^{f(1+log M)} = 2^f·2M`, but in fact `2^{f(1+log M)} = (2M)^f`, and the reduced
+hypergraph can exceed the stated degree `Δ' = 2^{f(A)}·M·Δ(A)` (`Degree57.claim_5_7_degree_false`).
+
+**Impact.** The running-time expression of Claim 5.7 is unsupported; we did not try to repair it.
+
+**Details.** For `x₁ + x₂ ≥ 8` (`f(A) = 2`, `Δ(A) = 1`, `M = 8`, `B = 4`), the top bit of `x₁` lies in
+36 hyperedges, more than `2²·8·1 = 32`.
+
+### ❌ Corollary 4.10 (`ε = 1/(nW)` gives an `f`-approximation)
+With `W = max w/min w`, `ε = 1/(nW)` does not give an `f`-approximation: on three parallel edges `{0,1}`
+with weights `9, 10` the output costs `19 > f·OPT = 18` (`Cor410.corollary_4_10_false`).
+
+**Impact.** The error is in the definition of `W`: the introduction uses `W` for the maximum weight
+(`w : V → {1,…,W}`), and with that reading the corollary is essentially right. The main approximation
+result (Corollary 4.3) is unaffected.
+
+**Details.** `ε·OPT` can be as large as `min w`, so integrality does not help. In the example `Δ = 3`,
+`n = 2`, `W = 10/9`, `ε = 9/20`. Neither vertex ever sends "raise", so the run is the same for every
+`α`. Both vertices join in iteration 2. The Lean instance uses parallel edges only to reach `Δ = 3`. A
+simulation also found a simple graph with `Δ = 3` (6 vertices, 7 edges, weights 31–33) on which the
+output costs more than `2·OPT`; that instance is not in Lean.
+
+**Repair.** With `ε < 1/(n·max w)` the integrality argument works, and the round bound is still
+`O(f log n)` for polynomial weights. The `O(f log n)` part is not formalized.
+
+### ❌ Lemma 4.7 (and Lemma C.2, number of stuck iterations)
+The bound `#stuck ≤ α` is off by a ceiling: for `α = 29/10`, a vertex is stuck three times at level 1
+(`Stuck.lemma_4_7_false`).
+
+**Impact.** Theorem 4.8 is unaffected asymptotically; we prove `≤ ⌈α/κ⌉` (`lemma_4_7`,
+`lemma_4_7_ceil`).
+
+**Details.** The paper divides the slack by the minimum stuck increment, which only gives
+`#stuck < α+1`. That is `≤ α` only for integral `α` (`lemma_4_7_of_nat`), while Theorem 4.9 uses
+non-integral `α`. Here `κ = 1`, or `κ = 1/2` for Appendix C.
+
+### ❌ Proposition 5.5 (box `[0, M]ⁿ`)
+Proposition 5.5 is false for non-integral `M`: for `2x ≥ 3`, `M = 3/2` by Definition 5.4, the ILP is
+feasible (`x = 2`), but no integer point of the box `[0, 3/2]` is feasible (`prop_5_5_false`).
+
+**Impact.** Local fix: with the box `[0, ⌈M⌉]ⁿ` the proposition holds (`prop_5_5_ceil`).
+
+**Repair.** Capping a feasible `x` at `⌈M⌉` keeps it feasible and does not increase the cost.
+(`prop_5_5_ceil`)
+
+### ❌ Claim 5.6 for `M < 1` (binary expansion)
+For `2x ≥ 1` (`M = 1/2`) the stated bound `f(A') ≤ f(A)·⌈log₂ M + 1⌉ = 0` forces `A' = 0`, so no such
+zero-one program is feasible (`claim_5_6_false`).
+
+**Impact.** The introduction's `M = max{1, ⌈1/a_min⌉}` avoids this, but Definition 5.4 has no
+`max{1,·}`. For `M ≥ 1` the claim holds (`claim_5_6`, `claim_5_6_bits`).
+
+### ⚠️ Lemma 5.2 (rank bound `f' < f(A)`)
+The rank bound `f' < f(A)` is false: the hyperedge `σᵢ \ ∅ = σᵢ` has `f(A)` vertices, and on the single
+constraint `x₁ ≥ 1` no hypergraph with edges smaller than `f(A) = 1` has the feasible solutions as its
+covers (`lemma_5_2_rank_false`).
+
+**Impact.** The correct bound `f' ≤ f(A)` holds, and so does the degree bound, in the sharper form
+`≤ 2^{f(A)-1}Δ(A)`. Correctness of the reduction is proved. (`lemma_5_2_cover_iff`, `lemma_5_2_rank`,
+`lemma_5_2_degree`)
+
+### ⚠️ Claim 4.2, Eq. (1) ("for every `v ∉ C`")
+Eq. (1) fails for a vertex that terminated without joining `C`, because its level is no longer updated:
+on one edge `{0,1}` with weights `4, 7`, vertex 1 terminates in iteration 2 with level 0, but
+`∑δ₁ = 4 > 7/2` (`Eq1.claim_4_2_eq1_false`).
+
+**Impact.** The proof only uses Eq. (1) for active vertices, where it holds (`claim_4_2`).
+
+### ⚠️ Theorem 4.9 for `f = 1, ε = 1`
+Here `f·log(f/ε) = 0`: the definition of `α` divides by zero, and `O(f log(f/ε) + …)` cannot absorb
+the additive constant.
+
+**Impact.** Degenerate corner. We use `F = f·z` with `z = ⌈log₂(1/β)⌉ ≥ 1` instead. This is
+`Θ(f log(f/ε))` whenever `f/ε ≥ 2`.
+
+### Typos and slips
+- Appendix B sets `deal₀(e) = β·min w/|E|`, but Section 3 uses `0.5·min w/|E|`. Both satisfy the
+  analysis; we parametrize by `c₀ ∈ (0, 1/2]`.
+- In the proof of Theorem 4.8, "e-stuck" should read "e-raise".
+
+## Proof gaps (statements true)
+
+### 🛠️ Claim 5.6 (number of bits in the proof)
+The proof uses `B = ⌈log₂ M⌉` bits, which loses solutions when `M` is a power of two: for `x ≥ 2`, one
+bit is not enough (`claim_5_6_proof_false`).
+
+**Impact.** Statement true for `M ≥ 1`; repaired (`claim_5_6`, `claim_5_6_bits`, `fA_binExp`,
+`ΔA_binExp`).
+
+**Repair.** With `B` bits such that `⌈M⌉ < 2^B` (for example the statement's `B = ⌈log₂ M + 1⌉` when
+`M ≥ 1`), the reduction is correct, `f(A') = f(A)·B` and `Δ(A') = Δ(A)`. (`claim_5_6`,
+`claim_5_6_bits`, `fA_binExp`, `ΔA_binExp`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

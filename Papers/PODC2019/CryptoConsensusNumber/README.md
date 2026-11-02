@@ -16,42 +16,70 @@ Theorem 1 holds once a set-vs-sequence slip in Figure 1 is fixed.
 
 ## Mistakes in the paper
 
-* **Lemma 3 (liveness of Figure 4) is false as written.** A process may spend
-  `balance(a, hist[p] ∪ deps)`, i.e. including freshly received incoming transfers `deps`, and it
-  ships them as the dependencies `h`. Validation (line 25), however, checks `balance(c, hist[q])`
-  *without* `h`, and incoming transfers enter `hist[q]` only after a later transfer of `q` has been
-  validated. Example with two correct processes and a perfect broadcast: process 0 (balance 5) pays
-  5 to process 1 (balance 0). Then process 1 pays the 5 back. That message is invalid at every
-  process forever, so process 1's `transfer` never returns. The intended check
-  `balance(c, hist[q] ∪ h) ≥ y` fixes it. This is a liveness bug in the pseudocode. It also falsifies
-  Theorem 3 as stated, since Definition 1 requires every operation of a correct process to return;
-  only the safety part of Theorem 3 survives. (`Fig4.lemma_3_false`; with the fix: `Fig4.fixed_completes`)
-* **Figure 1 is not linearizable (Theorem 1 as written).** Each process keeps its successful
-  transfers in a set `ops_p` and adds `(a, b, x)` to it. Repeating an identical transfer therefore
-  does not change `ops_p`, so the second withdrawal is never debited. Example: an owner with
-  balance 2 calls `transfer(a, b, 1)` three times solo, and all three return `true`. That is
-  double-spending, the very thing the paper sets out to prevent. This is a slip with an evident intent:
-  Figure 3 tags transfers with unique sequence numbers. The literal pseudocode is wrong; it is repaired by keeping `ops_p` as a sequence, after which the paper's proof goes through
-  with its linearization points. (`Fig1.Bug.literal_not_linearizable`; repaired:
-  `Fig1.fig1_linearizable`, `Fig1.fig1_waitFree`)
-* **Lemma 2's proof has gaps; its statement is true.** The algorithm of Figure 3 (asset transfer
-  from a snapshot, registers and `k`-consensus objects) is correct, and we proved it linearizable
-  and wait-free. The linearizability proof has four gaps:
-  * it completes incomplete transfers "with response true" even when they were decided as failures;
-  * it gives no linearization point to non-owner transfers;
-  * it claims prefixes linearize to prefixes, which fails because failed transfers are linearized
-    retroactively at the proposer's snapshot;
-  * it leaves the key "no outgoing transfer in between" step unjustified.
-  The wait-freedom argument ("some instance will be only accessed with `o`") is false as stated:
-  processes with stale `collected` sets keep proposing other transfers. We replace it with a
-  potential argument. (`Fig3.fig3_linearizable`, `Fig3.fig3_waitFree`)
-* **Degenerate case `k = 0` of Theorem 2.** With "`k`-shared" defined as `max_a |μ(a)| = k`, an
-  object whose accounts have no owner is `0`-shared. Its consensus number is 1, not 0, since one
-  process always solves consensus. (`atSolvable_one`)
-* **Small slips.** The transition relation `Δ` is not total, contrary to the paper's assumption: a
-  self-transfer `transfer(a, a, x)` with `x > 0` has no successor state. We use "debit, then
-  credit". Figure 4's `balance` omits initial balances. Figure 3's `proposal((a, b, q, x), ·)` has
-  the wrong arity. Definition 1 (2) cannot hold for finite executions.
+### ⚠️ Lemma 3 and Theorem 3, liveness (Figure 4, message passing)
+Figure 4 as written blocks a correct process that spends money it has just received: process 0
+(balance 5) pays 5 to process 1 (balance 0), and process 1's transfer of the 5 back never returns,
+even with two correct processes and a perfect broadcast (`Fig4.lemma_3_false`).
+
+**Impact.** A one-term pseudocode slip with evident intent: with the check `balance(c, hist[q] ∪ h) ≥ y`
+the transfer completes (`Fig4.fixed_completes`). As written it falsifies Theorem 3, since Definition 1
+requires every operation of a correct process to return; only the safety part of Theorem 3 survives.
+
+**Details.** A process may spend `balance(a, hist[p] ∪ deps)`, i.e. including freshly received incoming
+transfers `deps`, and it ships them as the dependencies `h`. Validation (line 25), however, checks
+`balance(c, hist[q])` *without* `h`, and incoming transfers enter `hist[q]` only after a later transfer
+of `q` has been validated. So process 1's message is invalid at every process forever. This is a
+liveness bug in the pseudocode.
+
+**Repair.** The intended check `balance(c, hist[q] ∪ h) ≥ y` fixes it. (`Fig4.fixed_completes`)
+
+### ⚠️ Theorem 1 (Figure 1 is not linearizable as written)
+Figure 1 keeps successful transfers in a set `ops_p`, so repeating an identical transfer is never
+debited: an owner with balance 2 calls `transfer(a, b, 1)` three times solo and all three return
+`true` (`Fig1.Bug.literal_not_linearizable`).
+
+**Impact.** That is double-spending, the very thing the paper sets out to prevent, but it is a slip with
+an evident intent: Figure 3 tags transfers with unique sequence numbers. Keeping `ops_p` as a sequence
+repairs it, after which the paper's proof goes through with its linearization points
+(`Fig1.fig1_linearizable`, `Fig1.fig1_waitFree`).
+
+**Details.** Each process adds `(a, b, x)` to the set `ops_p`. Repeating an identical transfer therefore
+does not change `ops_p`, so the second withdrawal is never debited.
+
+### ⚠️ Theorem 2 for `k = 0`
+With "`k`-shared" defined as `max_a |μ(a)| = k`, an object whose accounts have no owner is `0`-shared,
+but its consensus number is 1, not 0, since one process always solves consensus (`atSolvable_one`).
+
+**Impact.** Degenerate case; for `k ≥ 1` Theorem 2 holds (`theorem_2`).
+
+### Typos and slips
+- The transition relation `Δ` is not total, contrary to the paper's assumption: a self-transfer
+  `transfer(a, a, x)` with `x > 0` has no successor state. We use "debit, then credit".
+- Figure 4's `balance` omits initial balances.
+- Figure 3's `proposal((a, b, q, x), ·)` has the wrong arity.
+- Definition 1 (2) cannot hold for finite executions.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 2 (Figure 3, linearizability and wait-freedom)
+The linearizability proof of Figure 3 (asset transfer from a snapshot, registers and `k`-consensus
+objects) has four gaps, and its wait-freedom argument is false as stated.
+
+**Impact.** Statement true: the algorithm is correct, and we proved it linearizable and wait-free
+(`Fig3.fig3_linearizable`, `Fig3.fig3_waitFree`).
+
+**Details.** The linearizability proof:
+* completes incomplete transfers "with response true" even when they were decided as failures;
+* gives no linearization point to non-owner transfers;
+* claims prefixes linearize to prefixes, which fails because failed transfers are linearized
+  retroactively at the proposer's snapshot;
+* leaves the key "no outgoing transfer in between" step unjustified.
+
+The wait-freedom argument ("some instance will be only accessed with `o`") is false as stated:
+processes with stale `collected` sets keep proposing other transfers.
+
+**Repair.** We replace the wait-freedom argument with a potential argument. (`Fig3.fig3_linearizable`,
+`Fig3.fig3_waitFree`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

@@ -16,70 +16,101 @@ Lemma 1 is false as stated, but the consistency proof survives once Lemma 1 is r
 
 ## Mistakes in the paper
 
-* **Theorem 4: the key conditional-probability step is unjustified (proof gap; statement
-  true).** The proof conditions on `X₁ ∩ X₂`: under adversary `A`, the randomly chosen `p ∈ V`
-  receives at most `f/2` messages. It then claims `Pr[Y₁ | X₁ ∩ X₂] ≥ 1/2`, "by the definition of
-  `V`". But `V` only bounds the *unconditional* probability that `p`, receiving nothing, outputs
-  `0`. Both that silent output and `X₁ ∩ X₂` depend on `p`'s own coins. Under `A`, `p` behaves
-  honestly towards `U`, so it can reveal its coin, and `U` can then contact `p` exactly when `p`'s
-  silent output would be `1`. With a plain union bound the paper's constants only give
-  `Pr[Y₁ ∩ Y₂] > 1/4 - 3ε`, which is no contradiction. Our repair has two steps.
-  1. For every `p ∈ V`, the event "`p` does not output `0` when silent" is covered by three
-     events: failure under `A`, failure under `A'_p`, and "`U` sends `p` more than `f/2`
-     messages".
-  2. Markov's inequality is applied to each `p` separately, instead of the paper's
-     Markov-plus-averaging step.
+### ⚠️ Theorem 13 (Byzantine broadcast without setup) for `n = 2`
+Theorem 13 is false for `n = 2`: with nodes `{sender, S}` and `C = 1`, the sender sends its bit once
+and `S` outputs it, which solves Byzantine broadcast with probability 1 with at most one speaker
+(`theorem_13_false_n2`).
 
-  This gives `E[#messages] ≥ 2ε·⌈f/2⌉·(⌊f/2⌋+1) ≥ εf²/2`. Since `ε ≤ 1/4`, this is at least the
-  paper's `(εf)²`. (`theorem_4`, `theorem_4_paper`, `Protocol.core_bound`)
-* **Theorem 13 (BB version) is false for `n = 2` (false only in a degenerate case).** Theorem 3,
-  the BA version, is not affected: BA with `n = 2`, `t = 1` is impossible by the classical
-  `n ≤ 2t` argument. Take nodes
-  `{sender, S}` and `C = 1`. The sender sends its bit once, and `S` outputs what it received.
-  This solves Byzantine broadcast with probability 1 against one adaptive corruption, and at most
-  one node speaks. The proof needs a forever-honest node other than `S` in world `W_{h,b}`, so it
-  needs `n ≥ C + 2`. We prove the theorem under `1 ≤ C`, `C + 2 ≤ n`. The counterexample is
-  Lean-checked against our restricted (injecting) adversary. It is also valid against the full
-  Byzantine adversary: an honest `S` can only be fooled by a corrupt sender, and then validity is
-  vacuous. That part is argued informally only. (`theorem_13_false_n2`, `theorem_13`)
-* **Theorem 13: "Pr[A_s] ≥ p" is unjustified, and A_r is measured wrongly (proof gap; statement
-  true).** The protocol's complexity guarantee counts only messages of *honest* nodes. In
-  `W_{h,b}` the adversary has corrupted the simulated speakers, so the guarantee does not bound
-  the number of speakers of the whole real copy, which is what the symmetry argument needs. The
-  simulated execution `A_s` is not an execution against any adversary, so no guarantee applies to
-  it directly. The bound `Pr[A_r ∩ A_s] ≥ 2p − 1` is still true. We prove it with a first-crossing
-  argument that uses only the worlds `W_{c,b}` and `W_{c,1−b}` (there only `S` is corrupted):
-  whichever copy exceeds `C` speakers first does so identically in the corresponding `W_c` world.
-  The paper's "without loss of generality `Pr[X | A_r ∩ A_s] ≥ 1/2`" is also replaced by an
-  explicit symmetry. A measure-preserving exchange of the two copies' tapes maps `W_{h,0}` to
-  `W_{h,1}`. Measurability is never needed. (`theorem_13_general`, `Protocol.not_E`,
-  `Protocol.output_S_symm`)
-* **Lemma 1 (Section 5.3) is false as stated (not formalized).** It says that, except with
-  probability `exp(−Ω(λ))`, fewer than `λ/2` *eventually-corrupt* nodes are eligible for any given
-  message. Counterexample: in iteration 1 all honest nodes vote for their common input `b`, and
-  about `(1/2+ε)λ` eligible honest nodes send `(Vote, 1, b)`. The adaptive adversary then corrupts
-  them all; its budget `f ≈ n/2 ≫ λ` allows this. These nodes become eventually-corrupt and are
-  eligible, so the claim fails with probability close to 1. The proof ("each so-far-honest node
-  independently has a `λ/n` probability") ignores that corruption can depend on revealed
-  eligibility. The correct statement counts nodes that were *already corrupt when they mined* the
-  message, which is the distinction the paper itself makes in Section 4.3. With it, Theorems 5 and
-  6 go through: the node `i*` only needs to be honest when it sends `Commit`, not forever-honest.
-  The same imprecision ("forever-honest" / "eventually-corrupt") appears in Theorems 5, 6 and 9.
-* **Theorem 7 (Section 5.3) uses the wrong threshold (proof gap; not formalized, not
-  Lean-checked).** Lemma 2's statement is true, but its proof's `n_h > n/2` is wrong: fewer than
-  `n/2` terminated forever-honest nodes only gives `n_h > εn`, because there are only about
-  `(1/2+ε)n` honest nodes. This still gives a `Θ(1)` probability, so Lemma 2 survives. The real
-  error is in Theorem 7, which claims that
-  `(1/2+ε/2)n` so-far-honest nodes have not terminated. That needs fewer than `εn/2` terminated
-  honest nodes, not fewer than `n/2`. The case split should be at `εn/2`. Lemma 3 then still holds
-  with probability `1 − (1−λ/n)^{εn/2} ≥ 1 − e^{−ελ/2}`.
-* **Typos and small slips.**
-  - Theorem 8 says "`O(λ)` messages" and Theorem 12 says "`O(λ² log Δ)` messages". Both mean
-    multicasts; Theorems 7 and 11 say `O(nλ)` / `O(nλ² log Δ)` messages.
-  - "Section 8 presents the model" / "for the reasons mentioned in Section 8" should refer to
-    Section 2.
-  - `V` must avoid the designated sender, so one needs `f/2 ≤ ⌈n/2⌉ − 1` rather than
-    `f/2 < ⌈n/2⌉`. With `f < n` and `|V| = ⌈f/2⌉` it is fine.
+**Impact.** Degenerate case; the theorem holds for `n ≥ C + 2` (`theorem_13`). Theorem 3, the BA
+version, is not affected: BA with `n = 2`, `t = 1` is impossible by the classical `n ≤ 2t` argument.
+
+**Details.** The protocol solves broadcast against one adaptive corruption. The proof needs a
+forever-honest node other than `S` in world `W_{h,b}`, so it needs `n ≥ C + 2`. The counterexample is
+Lean-checked against our restricted (injecting) adversary. It is also valid against the full Byzantine
+adversary: an honest `S` can only be fooled by a corrupt sender, and then validity is vacuous. That part
+is argued informally only.
+
+**Repair.** We prove the theorem under `1 ≤ C`, `C + 2 ≤ n` (`theorem_13`).
+
+### ⚠️ Lemma 1 (Section 5.3, eligible eventually-corrupt nodes; not formalized)
+Lemma 1 is false as stated: the adaptive adversary can corrupt, after the fact, the about `(1/2+ε)λ`
+eligible honest nodes that sent `(Vote, 1, b)` in iteration 1, so more than `λ/2` eventually-corrupt
+nodes are eligible with probability close to 1.
+
+**Impact.** Not formalized (argued informally). The correct statement, which counts nodes already
+corrupt when they mined the message, is the distinction the paper itself makes in Section 4.3, and with
+it the consistency proof (Theorems 5 and 6) goes through.
+
+**Details.** The lemma says that, except with probability `exp(−Ω(λ))`, fewer than `λ/2`
+*eventually-corrupt* nodes are eligible for any given message. In iteration 1 all honest nodes vote for
+their common input `b`, and about `(1/2+ε)λ` eligible honest nodes send `(Vote, 1, b)`. The adversary
+then corrupts them all; its budget `f ≈ n/2 ≫ λ` allows this. These nodes become eventually-corrupt and
+are eligible. The proof ("each so-far-honest node independently has a `λ/n` probability") ignores that
+corruption can depend on revealed eligibility.
+
+**Repair.** Count nodes that were *already corrupt when they mined* the message. With it, Theorems 5
+and 6 go through: the node `i*` only needs to be honest when it sends `Commit`, not forever-honest. The
+same imprecision ("forever-honest" / "eventually-corrupt") appears in Theorems 5, 6 and 9.
+
+### Typos and slips
+- Theorem 8 says "`O(λ)` messages" and Theorem 12 says "`O(λ² log Δ)` messages". Both mean multicasts;
+  Theorems 7 and 11 say `O(nλ)` / `O(nλ² log Δ)` messages.
+- "Section 8 presents the model" / "for the reasons mentioned in Section 8" should refer to Section 2.
+- `V` must avoid the designated sender, so one needs `f/2 ≤ ⌈n/2⌉ − 1` rather than `f/2 < ⌈n/2⌉`.
+  With `f < n` and `|V| = ⌈f/2⌉` it is fine.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 4 (the key conditional-probability step)
+The proof's claim `Pr[Y₁ | X₁ ∩ X₂] ≥ 1/2`, "by the definition of `V`", is unjustified: `V` only bounds
+the *unconditional* probability that `p`, receiving nothing, outputs `0`.
+
+**Impact.** Statement true; repaired, with a better constant `εf²/2` instead of `(εf)²` (`theorem_4`,
+`theorem_4_paper`, `Protocol.core_bound`).
+
+**Details.** The proof conditions on `X₁ ∩ X₂`: under adversary `A`, the randomly chosen `p ∈ V`
+receives at most `f/2` messages. Both `p`'s silent output and `X₁ ∩ X₂` depend on `p`'s own coins.
+Under `A`, `p` behaves honestly towards `U`, so it can reveal its coin, and `U` can then contact `p`
+exactly when `p`'s silent output would be `1`. With a plain union bound the paper's constants only give
+`Pr[Y₁ ∩ Y₂] > 1/4 - 3ε`, which is no contradiction.
+
+**Repair.** Two steps.
+1. For every `p ∈ V`, the event "`p` does not output `0` when silent" is covered by three events:
+   failure under `A`, failure under `A'_p`, and "`U` sends `p` more than `f/2` messages".
+2. Markov's inequality is applied to each `p` separately, instead of the paper's Markov-plus-averaging
+   step.
+
+This gives `E[#messages] ≥ 2ε·⌈f/2⌉·(⌊f/2⌋+1) ≥ εf²/2`. Since `ε ≤ 1/4`, this is at least the paper's
+`(εf)²`. (`theorem_4`, `theorem_4_paper`, `Protocol.core_bound`)
+
+### 🛠️ Theorem 13 ("Pr[A_s] ≥ p" and the speaker count of `A_r`)
+The proof's bound "Pr[A_s] ≥ p" is unjustified, and `A_r` is measured wrongly: the protocol's
+complexity guarantee counts only messages of *honest* nodes, and the simulated execution `A_s` is not an
+execution against any adversary.
+
+**Impact.** Statement true (for `n ≥ C + 2`); the bound `Pr[A_r ∩ A_s] ≥ 2p − 1` is re-proved by a
+first-crossing argument (`theorem_13_general`, `Protocol.not_E`, `Protocol.output_S_symm`).
+
+**Details.** In `W_{h,b}` the adversary has corrupted the simulated speakers, so the guarantee does not
+bound the number of speakers of the whole real copy, which is what the symmetry argument needs. No
+guarantee applies to `A_s` directly.
+
+**Repair.** The first-crossing argument uses only the worlds `W_{c,b}` and `W_{c,1−b}` (there only `S`
+is corrupted): whichever copy exceeds `C` speakers first does so identically in the corresponding `W_c`
+world. The paper's "without loss of generality `Pr[X | A_r ∩ A_s] ≥ 1/2`" is also replaced by an
+explicit symmetry. A measure-preserving exchange of the two copies' tapes maps `W_{h,0}` to `W_{h,1}`.
+Measurability is never needed. (`theorem_13_general`, `Protocol.not_E`, `Protocol.output_S_symm`)
+
+### 🛠️ Theorem 7 and Lemma 2 (Section 5.3, wrong threshold; not formalized)
+Theorem 7's proof claims that `(1/2+ε/2)n` so-far-honest nodes have not terminated, which needs fewer
+than `εn/2` terminated honest nodes, not fewer than `n/2`.
+
+**Impact.** Not formalized and not Lean-checked. With the case split at `εn/2`, Lemma 3 still holds with
+probability `1 − (1−λ/n)^{εn/2} ≥ 1 − e^{−ελ/2}`.
+
+**Details.** Lemma 2's statement is true, but its proof's `n_h > n/2` is wrong: fewer than `n/2`
+terminated forever-honest nodes only gives `n_h > εn`, because there are only about `(1/2+ε)n` honest
+nodes. This still gives a `Θ(1)` probability, so Lemma 2 survives. The real error is in Theorem 7.
 
 Full list of differences (including modelling choices and minor imprecisions):
 [differencies.md](differencies.md).

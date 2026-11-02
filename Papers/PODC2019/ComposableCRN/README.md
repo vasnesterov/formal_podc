@@ -15,13 +15,7 @@ of "⇒"); its hardest part, the necessity of condition (ii), is not checked.
 
 ## Mistakes in the paper
 
-No mistakes found in the formalized part. Minor remarks:
-
-* Lemma 4.1 assumes the sequence `(aᵢ)` is increasing; the proof never uses this, and we prove the
-  lemma without it.
-* Observation 2.2 is stated for one upstream module; Lemma 6.2 needs the "more generally, g can take
-  any number of inputs" remark (with fan-out of inputs and one leader per module). We prove that
-  general form.
+No mistakes in the statements.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -64,6 +58,13 @@ The constructions of Theorem 3.1 and Lemma 6.1 are instances of one generic, onc
 leader-automaton CRN (`obliviouslyComputable_of_automaton`, `Automaton.lean`). It covers any
 function whose finite differences and next state are determined by a finite abstraction of the
 input consumed so far.
+
+**Proof remarks.**
+* Lemma 4.1 assumes the sequence `(aᵢ)` is increasing; the proof never uses this, and we prove the
+  lemma without it.
+* Observation 2.2 is stated for one upstream module; Lemma 6.2 needs the "more generally, g can take
+  any number of inputs" remark (with fan-out of inputs and one leader per module). We prove that
+  general form.
 
 **Not formalized.** Lemma 2.7 (cited), Lemma 2.3, Observation 2.4, Theorem 5.4, §7 (Theorem 7.1)
 and §8 (scaling limits); the equivalent fairness/probability-1 semantics of footnote 2.
