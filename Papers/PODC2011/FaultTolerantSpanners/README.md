@@ -17,62 +17,91 @@ proof of Theorem 3.9 use it), and with it the lemma holds.
 
 ## Mistakes in the paper
 
-* **Lemma 3.8 is false as stated (Section 3.5).** `LP(C)` is LP (4) on `G(C)`, the subgraph induced
-  by `C ∪ N(C)`, where *only the arcs of `δ(C)`* get cost 0. Arcs with both endpoints in `N(C)`
-  keep their cost, and inside `G(C)` they may have no cheap length-2 bypass. The proof ignores these
-  arcs: it sets `x^C` only on `E(C) ∪ δ(C)` and zeroes all other flows.
+### ⚠️ Lemma 3.8 (Section 3.5, the cluster LP `LP(C)`)
+Lemma 3.8 is false as stated because `LP(C)` gives cost 0 only to the arcs of `δ(C)`, so arcs with both
+endpoints in `N(C)` keep their cost and may have no cheap length-2 bypass inside `G(C)`
+(`Lemma38Counterexample.lemma_3_8_counterexample`).
 
-  Counterexample with `r = 0`:
-  * vertices `a, b, c, d`;
-  * arcs `c→a`, `c→b`, `a→d`, `d→b` of cost 1, and `a→b` of cost `M > 4`;
-  * partition `{{c}, {a, b, d}}`.
+**Impact.** A misdefinition with evident intent: with the intended `LP(C)` the lemma holds
+(`lemma_3_8_corrected`), and Theorem 3.9 / Theorem 1.3 are unaffected.
 
-  LP (4) for `G` has a solution of value 4 (route `a→b` via `d`). `G({c})` is induced by `{c, a, b}`
-  and contains no length-2 path from `a` to `b`, so `LP({c}) ≥ M > 4 ≥ LP*`.
+**Details.** `LP(C)` is LP (4) on `G(C)`, the subgraph induced by `C ∪ N(C)`, where *only the arcs of
+`δ(C)`* get cost 0. The proof ignores the other arcs: it sets `x^C` only on `E(C) ∪ δ(C)` and zeroes all
+other flows. Counterexample with `r = 0`:
+* vertices `a, b, c, d`;
+* arcs `c→a`, `c→b`, `a→d`, `d→b` of cost 1, and `a→b` of cost `M > 4`;
+* partition `{{c}, {a, b, d}}`.
 
-  Severity: a false statement caused by a misdefined `LP(C)`; the intended lemma is true and
-  Theorem 3.9 / Theorem 1.3 are unaffected (their cost argument only needs
-  `∑_{e∈E(C)} c_e x^C_e ≤ LP*(C)`, true for any nonnegative costs). One repair is to give cost 0 to
-  *all* arcs of `G(C)` outside `E(C)`, matching the phrase "the rounds in which the edge `e` does not
-  have cost 0" in the proof of Theorem 3.9; dropping the covering constraints of arcs outside
-  `E(C)` would also work. With the first repair Lemma 3.8 holds, and we prove it.
-  (`Lemma38Counterexample.lemma_3_8_counterexample`, `lemma_3_8_corrected`)
-* **Theorem 2.1: implicit `f` monotone, and a degenerate case `r > 2n`.**
-  * The proof bounds the size of the spanner on `G \ J` (at most `2n/r` vertices) by `f(2n/r)`,
-    which needs `f` nondecreasing. This is a proof gap with a true statement: since the base
-    algorithm works on every graph, one can pad `G \ J` with isolated vertices up to `⌊2n/r⌋`
-    vertices. Our `SpannerAlg` only runs on induced subgraphs of `G`, so we assume `Monotone f`.
-  * For `r > 2n` the claimed size `O(r³ log n · f(2n/r))` can be 0, because `f(0) = f(1) = 0` is
-    legitimate. Yet any fault-tolerant spanner of a graph with an edge is nonempty.
-  * We assume `1 ≤ r ≤ n`, `f` monotone and `f(2) ≥ 1`. The last condition holds for any algorithm
-    that is correct on a single edge.
-  * We prove the theorem with explicit constants: `α = ⌈8r²(r+2+C) ln(n+1)⌉` iterations and size
-    `≤ (8C+26) r³ ln(n+1) f(⌊2n/r⌋)`.
-  * The success probability is `≥ 1 − (n+1)^{−C} − α e^{−n^{1/3}/6}`. The last term is the paper's
-    Chernoff bound on the number of survivors under its "w.l.o.g. `r ≤ n^{2/3}`".
+LP (4) for `G` has a solution of value 4 (route `a→b` via `d`). `G({c})` is induced by `{c, a, b}` and
+contains no length-2 path from `a` to `b`, so `LP({c}) ≥ M > 4 ≥ LP*`. The cost argument of Theorem 3.9
+only needs `∑_{e∈E(C)} c_e x^C_e ≤ LP*(C)`, true for any nonnegative costs.
 
-  (`theorem_2_1`)
-* **Lemma 3.1 and the exactness of IP (3) need a loopless digraph. Degenerate case.** With a
-  self-loop `(u,u) ∈ E`, `H = ∅` is a fault-tolerant 2-spanner that does not "satisfy" `(u,u)`. The
-  proof also has a slip: "in `H \ W` there is no `u–v` path" should read "no `u–v` path of length
-  `≤ 2`". The weaker claim is the true one, and it suffices. (`isFTSpanner_two_iff`)
-* **Theorem 3.3: implicit conditions, all fine.**
-  * `i* = max{i : f_{P_i} ≥ 1/α}` is undefined when no path has flow `≥ 1/α`; we take `i* = 0`.
-  * The steps "`x_uv ≥ 1/2` ⇒ selected" and "`i* + αr′/4 ≥ r+1`" need `α ≥ 2` and `α ≥ 4`.
-  * "With probability 1" means almost surely.
-  * We prove: per-arc failure `≤ e^{−α/4}` for `α ≥ 4`, expected cost `≤ 2α·LP`, and with
-    `α = 12 ln n` success probability `≥ 2/3 − 1/n` for cost `≤ 72 ln n · LP`.
+**Repair.** Give cost 0 to *all* arcs of `G(C)` outside `E(C)`, matching the phrase "the rounds in which
+the edge `e` does not have cost 0" in the proof of Theorem 3.9; dropping the covering constraints of arcs
+outside `E(C)` would also work. With the first repair Lemma 3.8 holds, and we prove it
+(`lemma_3_8_corrected`).
 
-  (`prob_not_satisfies_le`, `theorem_3_3`)
-* **Typos and small slips.**
-  * Section 2: the sufficiency claim needs "a path … in `H \ F`", not "in `G \ F`".
-  * Section 2: `ℓ({u,e})` should be `ℓ({u,v})`, and the set defined is `E′_F`, not `E_F`.
-  * Section 2: the iteration count is garbled as "`O(e³ ln n log n)`".
-  * Theorem 3.3: "`T_z ≤ min{x_(u,z), x_(z,v)}`" is missing the factor `α`.
-  * Theorem 3.4, not formalized: `Z_u^−` uses `x_{u,v}` where `x_{v,u}` is meant.
-  * Theorem 3.4: `A_{u,v}` also depends on `T_v`, which does not change the `O(Δ³)` dependency count.
-  * The introduction calls the `O(log Δ)` bound non-algorithmic, while Section 3.4 makes it
-    algorithmic via Moser–Tardos.
+### ⚠️ Theorem 2.1 for `r > 2n` (generic conversion)
+For `r > 2n` the claimed size `O(r³ log n · f(2n/r))` can be 0, because `f(0) = f(1) = 0` is legitimate,
+yet any fault-tolerant spanner of a graph with an edge is nonempty.
+
+**Impact.** Degenerate parameter range; we prove the theorem for `1 ≤ r ≤ n` with explicit constants
+(`theorem_2_1`), and Corollary 2.2 follows.
+
+**Repair.**
+* We assume `1 ≤ r ≤ n`, `f` monotone (see the proof gap below) and `f(2) ≥ 1`. The last condition holds
+  for any algorithm that is correct on a single edge.
+* We prove the theorem with explicit constants: `α = ⌈8r²(r+2+C) ln(n+1)⌉` iterations and size
+  `≤ (8C+26) r³ ln(n+1) f(⌊2n/r⌋)`.
+* The success probability is `≥ 1 − (n+1)^{−C} − α e^{−n^{1/3}/6}`. The last term is the paper's
+  Chernoff bound on the number of survivors under its "w.l.o.g. `r ≤ n^{2/3}`".
+
+(`theorem_2_1`)
+
+### ⚠️ Lemma 3.1 and the exactness of IP (3) (self-loops)
+Lemma 3.1 and the exactness of IP (3) need a loopless digraph: with a self-loop `(u,u) ∈ E`, `H = ∅` is a
+fault-tolerant 2-spanner that does not "satisfy" `(u,u)` (`isFTSpanner_two_iff`).
+
+**Impact.** Degenerate case; for loopless digraphs both hold (`isFTSpanner_two_iff`).
+
+### Typos and slips
+* Lemma 3.1, proof: "in `H \ W` there is no `u–v` path" should read "no `u–v` path of length `≤ 2`". The
+  weaker claim is the true one, and it suffices.
+* Section 2: the sufficiency claim needs "a path … in `H \ F`", not "in `G \ F`".
+* Section 2: `ℓ({u,e})` should be `ℓ({u,v})`, and the set defined is `E′_F`, not `E_F`.
+* Section 2: the iteration count is garbled as "`O(e³ ln n log n)`".
+* Theorem 3.3: "`T_z ≤ min{x_(u,z), x_(z,v)}`" is missing the factor `α`.
+* Theorem 3.4, not formalized: `Z_u^−` uses `x_{u,v}` where `x_{v,u}` is meant.
+* Theorem 3.4: `A_{u,v}` also depends on `T_v`, which does not change the `O(Δ³)` dependency count.
+* The introduction calls the `O(log Δ)` bound non-algorithmic, while Section 3.4 makes it algorithmic via
+  Moser–Tardos.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 2.1 (implicit `f` monotone)
+The proof bounds the size of the spanner on `G \ J` (at most `2n/r` vertices) by `f(2n/r)`, which needs
+`f` nondecreasing.
+
+**Impact.** Statement true: since the base algorithm works on every graph, one can pad `G \ J` with
+isolated vertices up to `⌊2n/r⌋` vertices.
+
+**Details.** Our `SpannerAlg` only runs on induced subgraphs of `G`, so we assume `Monotone f`
+(`theorem_2_1`).
+
+### 🛠️ Theorem 3.3 (implicit conditions of the rounding)
+The rounding leaves some conditions implicit: `i* = max{i : f_{P_i} ≥ 1/α}` is undefined when no path has
+flow `≥ 1/α`, and two steps need `α ≥ 2` and `α ≥ 4`.
+
+**Impact.** Statement true; all these conditions are fine (`prob_not_satisfies_le`, `theorem_3_3`).
+
+**Details.**
+* For undefined `i*` we take `i* = 0`.
+* The steps "`x_uv ≥ 1/2` ⇒ selected" and "`i* + αr′/4 ≥ r+1`" need `α ≥ 2` and `α ≥ 4`.
+* "With probability 1" means almost surely.
+
+**Repair.** We prove: per-arc failure `≤ e^{−α/4}` for `α ≥ 4`, expected cost `≤ 2α·LP`, and with
+`α = 12 ln n` success probability `≥ 2/3 − 1/n` for cost `≤ 72 ln n · LP`. (`prob_not_satisfies_le`,
+`theorem_3_3`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

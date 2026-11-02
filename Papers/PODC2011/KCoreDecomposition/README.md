@@ -15,45 +15,73 @@ initial broadcast. The proofs of Theorems 3 and 5 have gaps.
 
 ## Mistakes in the paper
 
-* **The worst-case family needs N − 2 rounds, not N − 1 (§4.2, Fig. 3).** The paper claims a family
-  (hub `N` joined to all nodes but `N − 3`, a path `1 – 2 – … – N − 1`, and the chord
-  `(N − 3, N − 1)`) whose execution time is exactly `N − 1` for every `N ≥ 5`. In the paper's own
-  synchronous model and with its own definition of execution time, it is `N − 2`. That accounting
-  gives the 3 rounds of the Fig. 2 example. Round 1 broadcasts the degrees; already in that round
-  node 2 drops to 2 and the hub to 3. Nodes 3, …, N − 4 then drop one per round, and two more
-  rounds settle `N − 3, N` and then `N − 2, N − 1`. The paper counts the initial round twice. This
-  is a false statement, off by one. The Introduction's claim that the family "requires exactly"
-  the upper bound `N − K + 1` (`= N` here, since `K = 1`) is further off. An exhaustive search over
-  all graphs with `N ≤ 8` nodes (computational, not formalized) finds a maximum execution time of
-  `N − 2` for `4 ≤ N ≤ 8`. So the family is optimal there, and the bound `N` is never reached.
-  (`worstGraph_execTime`)
-* **Corollary 2 ignores the initial broadcast.** The bound `Σ_v d(v)² − 2M` counts only update
-  messages. Algorithm 1 also sends every degree to every neighbour at initialization, which is
-  `2M` messages. For a single edge the bound is `0`, but 2 messages are sent. This is an imprecise
-  statement. We prove the bound for update messages, and `Σ_v d(v)²` for all messages.
-  (`corollary_2_false`, `corollary_2_updates`, `total_messages_le`)
-* **Theorem 5's proof is off by one and then incomplete; the statement is true.** The proof says
-  "the execution time equals T + 1", where `T` is the first round in which all estimates are
-  correct. In the model of §4.2 it equals `T`: in Fig. 2, `T = 3` and the time is 3. (With the
-  indexing of the Fig. 2 narrative, `T + 1` is right, and the lost round is instead that the nodes
-  of minimal degree are correct already before round 1.) To compensate, the proof
-  adds an argument for `T ≤ N − 1` about the last two wrong nodes. That argument skips the case
-  where they become correct in consecutive rounds. The real content is the progress claim: in each
-  round some wrong node of minimal coreness becomes correct. With the correct accounting this gives
-  `execTime ≤ N − K + 1 ≤ N` at once. The paper argues the progress claim only informally; we
-  prove it. (`progress`, `corollary_1`, `theorem_5`)
-* **Theorem 3's induction step has a gap; the statement is true.** The proof builds a cycle of
-  stuck nodes of coreness `k` and assumes each of them has `k` neighbours of coreness `> k`
-  ("the remaining f − 1 ≥ k neighbors of u₁ have coreness k + 1 or more"). Nothing guarantees
-  this: such a node may have many neighbours of coreness exactly `k`. We use a fixpoint argument
-  instead. A stable estimate vector `c` with `c(u) ≤ h-index of the neighbours' c` lies below the
-  coreness, since `{v : c(v) ≥ c(u)}` induces minimum degree `≥ c(u)`. (`le_coreness_of_le_hIndex`,
-  `theorem_3`)
-* **Typos and small slips.** In Theorem 1's proof (⇐), "d_{G(U)}(v) ≥ k + 1" should be `≥ k`. In
-  Theorem 2's proof, "|V₁| = k(u)" should be `k(u₁)`, and "⟨u₂, core(u₃)⟩" should be
-  `⟨u₃, core(u₃)⟩`. Algorithm 2 returns `1`, not `0`, when no neighbour has estimate `≥ 1`; this is
-  harmless, because it never happens in a run. The Fig. 3 family has diameter 2 (not 3) for
-  `N = 5, 6`.
+### ❌ §4.2, Fig. 3 (the "worst-case" family)
+The paper claims the family of Fig. 3 needs exactly `N − 1` rounds for every `N ≥ 5`, but in the paper's
+own synchronous model it needs `N − 2` (`worstGraph_execTime`).
+
+**Impact.** A false side claim, off by one, not a typo; the theorems are unaffected. The Introduction's
+claim that the family "requires exactly" the upper bound `N − K + 1` (`= N` here, since `K = 1`) is
+further off.
+
+**Details.** The family: hub `N` joined to all nodes but `N − 3`, a path `1 – 2 – … – N − 1`, and the
+chord `(N − 3, N − 1)`. We use the paper's own definition of execution time; that accounting gives the
+3 rounds of the Fig. 2 example. Round 1 broadcasts the degrees; already in that round node 2 drops to 2
+and the hub to 3. Nodes 3, …, N − 4 then drop one per round, and two more rounds settle `N − 3, N` and
+then `N − 2, N − 1`. The paper counts the initial round twice. An exhaustive search over all graphs with
+`N ≤ 8` nodes (computational, not formalized) finds a maximum execution time of `N − 2` for
+`4 ≤ N ≤ 8`. So the family is optimal there, and the bound `N` is never reached.
+(`worstGraph_execTime`)
+
+### ⚠️ Corollary 2 (message complexity)
+The bound `Σ_v d(v)² − 2M` counts only update messages and ignores the initial broadcast of the degrees,
+so for a single edge it gives `0` while 2 messages are sent (`corollary_2_false`).
+
+**Impact.** An imprecise statement: the bound holds for update messages, which is what the proof counts.
+
+**Details.** Algorithm 1 sends every degree to every neighbour at initialization, which is `2M` messages.
+
+**Repair.** We prove the bound for update messages, and `Σ_v d(v)²` for all messages.
+(`corollary_2_updates`, `total_messages_le`)
+
+### Typos and slips
+* In Theorem 1's proof (⇐), "d_{G(U)}(v) ≥ k + 1" should be `≥ k`.
+* In Theorem 2's proof, "|V₁| = k(u)" should be `k(u₁)`, and "⟨u₂, core(u₃)⟩" should be
+  `⟨u₃, core(u₃)⟩`.
+* Algorithm 2 returns `1`, not `0`, when no neighbour has estimate `≥ 1`; this is harmless, because it
+  never happens in a run.
+* The Fig. 3 family has diameter 2 (not 3) for `N = 5, 6`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 5 (execution time `≤ N`)
+The proof says "the execution time equals T + 1", which is off by one in the model of §4.2, and its
+compensating argument for `T ≤ N − 1` skips the case where the last two wrong nodes become correct in
+consecutive rounds.
+
+**Impact.** Statement true; proved via the progress claim (`progress`, `corollary_1`, `theorem_5`).
+
+**Details.** `T` is the first round in which all estimates are correct. In the model of §4.2 the
+execution time equals `T`: in Fig. 2, `T = 3` and the time is 3. (With the indexing of the Fig. 2
+narrative, `T + 1` is right, and the lost round is instead that the nodes of minimal degree are correct
+already before round 1.) To compensate, the proof adds an argument for `T ≤ N − 1` about the last two
+wrong nodes, which is incomplete.
+
+**Repair.** The real content is the progress claim: in each round some wrong node of minimal coreness
+becomes correct. With the correct accounting this gives `execTime ≤ N − K + 1 ≤ N` at once. The paper
+argues the progress claim only informally; we prove it. (`progress`, `corollary_1`, `theorem_5`)
+
+### 🛠️ Theorem 3 (liveness, induction step)
+The proof builds a cycle of stuck nodes of coreness `k` and assumes each of them has `k` neighbours of
+coreness `> k`, which nothing guarantees.
+
+**Impact.** Statement true; proved by a fixpoint argument (`le_coreness_of_le_hIndex`, `theorem_3`).
+
+**Details.** The proof says "the remaining f − 1 ≥ k neighbors of u₁ have coreness k + 1 or more". Such
+a node may have many neighbours of coreness exactly `k`.
+
+**Repair.** A stable estimate vector `c` with `c(u) ≤ h-index of the neighbours' c` lies below the
+coreness, since `{v : c(v) ≥ c(u)}` induces minimum degree `≥ c(u)`. (`le_coreness_of_le_hIndex`,
+`theorem_3`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
