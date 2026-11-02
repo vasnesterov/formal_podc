@@ -13,51 +13,84 @@ small `D/ε`, a protocol of [25] whose correctness theorem is false for `t ≥ n
 
 ## Mistakes in the paper
 
-* **Theorem 7 (authenticated RealAA, `t = c·n`, `c ∈ [1/3, 1/2)`) cites a false theorem.** For constant `D/ε` it
-  uses Theorem 10, i.e. Theorem 3.1 of [25] (PODC 2022) with `t_a = 0`. That theorem is false in synchronous
-  networks when `n ≤ 3t`. This project's formalization of [25] has a run with `n = 3`, `t = 1`, `t_a = 0` in
-  which the honest values stay at `0` and `1` forever (`Papers/PODC2022/HybridApproxAgreement/`,
-  `AA.theorem_3_1_sync_false`). So the protocol `RealAA^PKI` defined in the proof of Theorem 7 is itself incorrect
-  for small `D/ε`: with `n = 3`, `t = 1` (`c = 1/3`), `D = 1`, `ε = 1/2` the test `log₂((1−2c)/c) + log₂log₂(D/ε) > 0`
-  fails, so `RealAA^PKI` runs exactly that broken protocol and the honest outputs `0` and `1` are not `ε`-close.
-  The statement of Theorem 7 (existence of some protocol) is probably still true: run the Proxcensus-based `RealAA₁^PKI` for a
-  constant number `R` of iterations with `(c′R)^R ≥ D/ε`. Corollaries 3 and 5 depend on Theorem 7; our
-  reductions use RealAA as a black box and are unaffected. Not formalized.
-* **Theorem 2's bound fails in a degenerate range.** For `1 < D/ε < 2` the bound `7 log₂δ / log₂log₂δ + 3` is
-  below 3 rounds, i.e. below one iteration. At `D/ε = 2` it divides by zero. The arithmetic is correct for
-  `D/ε > 2`. (`theorem2_bound_degenerate`, `theorem2`)
-* **Lemma 13, Case 3: wrong proof, true statement.** Case 3 is a clique output `c` that does not contain the
-  party's input `v_in`. The proof says the output (the vertex of `c` closest to `v_in`) is the separator between
-  `c` and its neighbour towards the honest clique `c_b`. In fact it is the separator towards the party's *own*
-  clique. Example: the path `x₀–x₁–x₂–x₃` with cliques `{x₀x₁}, {x₁x₂}, {x₂x₃}`. Take honest inputs `x₀`
-  (this party) and `x₃`, and the tree output `{x₁x₂}`. The party outputs `x₁`, while the separator towards
-  `{x₂x₃}` is `x₂`. Validity still holds: by the tripod property of trees, `c` lies between the own clique
-  and one of the two honest cliques, and Lemma 12 puts the correct separator on a shortest path. (`blockOut_spec`)
-* **Lemma 15 (`D(T) ≤ 2·D(G)` for a minimum-diameter clique tree): wrong proof, true statement, not
-  formalized.** The proof says that if a longest path passes ≥ 4 consecutive cliques sharing a vertex, then
-  "replacing them by a star strictly decreases the diameter". But another longest path may survive the change.
-  Counterexample to this step: the path `x₀ … x₆` with two pendant vertices at `x₃`. Exhaustive enumeration
-  (`scripts/lemma15_check.py`) finds minimum-diameter clique trees (diameter 5) whose longest path has the
-  separators `x₁, x₂, x₃, x₃, x₃`. The final counting is also off by one, and `|P_G| ≤ D(G)` is justified only by "`P_G` is a path" (it holds
-  because such a path is a shortest path in a block graph). The statement is still true:
-  compare with the clique tree in which the cliques at each cut vertex form a star. Theorem 8's bound
-  `R_TreeAA(4·D(G))` rests on this lemma, and also silently assumes `R_TreeAA` is monotone. We state Theorem 8
-  with the round bound of the tree protocol on `T_S` and prove `D(T_S) ≤ 2·D(T)`.
-* **Lemma 12 (Appendix D): proof gaps, true statement.** The proof assumes the first clique of the walk lies on
-  `c`'s side. It also asserts without justification that some walk vertex lies in both cliques of the crossing
-  edge. Our proof is an induction along the walk with the invariant "every clique containing the current vertex
-  is on `c`'s side". (`sep_mem_support`, `sep_btw`)
-* **Lemma 3 (Euler tour) and Theorem 3: sketchy but correct proofs.** Properties 3–4 of Lemma 3 are argued
-  informally; Theorem 3's validity step `k* ∈ [i_min, i_max]` needs the unstated remark that the short-path
-  party's own projection index is at most `k*`. Lemma 3.1 does not need `|V(T)| > 1`. (`subtree_iff_indices`,
-  `exists_median_between`, `treeAA0_spec`)
-* **Slips.** §4.1 says "the `k := D(P)` vertices of `P`", but there are `D(P)+1`. The proof of Lemma 6 claims
-  `k_max ≤ D`, but in fact `k_max ≤ D+1`; the inputs are still `D`-close. The proof of Theorem 3 writes
-  `R_RealAA(|V(T)|,1)` where the statement has `2·|V(T)|`.
+### ⚠️ Theorem 7 (authenticated RealAA, `t = c·n`, `c ∈ [1/3, 1/2)`)
+For small `D/ε` the protocol `RealAA^PKI` of Theorem 7's proof runs Theorem 10 (Theorem 3.1 of [25], PODC 2022),
+which is false for `t ≥ n/3`, so it fails already for `n = 3`, `t = 1`, `D = 1`, `ε = 1/2`
+(`AA.theorem_3_1_sync_false`).
+
+**Impact.** Theorem 7 is unestablished, not refuted: its statement (existence of some protocol) is probably still
+true. Corollaries 3 and 5 depend on Theorem 7; our reductions use RealAA as a black box and are unaffected. Not
+formalized.
+
+**Details.** For constant `D/ε` the proof uses Theorem 10, i.e. Theorem 3.1 of [25] with `t_a = 0`. That theorem is
+false in synchronous networks when `n ≤ 3t`. This project's formalization of [25] has a run with `n = 3`, `t = 1`,
+`t_a = 0` in which the honest values stay at `0` and `1` forever (`Papers/PODC2022/HybridApproxAgreement/`,
+`AA.theorem_3_1_sync_false`). With `n = 3`, `t = 1` (`c = 1/3`), `D = 1`, `ε = 1/2` the test
+`log₂((1−2c)/c) + log₂log₂(D/ε) > 0` fails, so `RealAA^PKI` runs exactly that broken protocol and the honest
+outputs `0` and `1` are not `ε`-close.
+
+**Repair.** Run the Proxcensus-based `RealAA₁^PKI` for a constant number `R` of iterations with
+`(c′R)^R ≥ D/ε`.
+
+### ⚠️ Theorem 2 (round bound of BDH's RealAA, `1 < D/ε ≤ 2`)
+For `1 < D/ε < 2` the bound `7 log₂δ / log₂log₂δ + 3` is below 3 rounds, i.e. below one iteration, and at `D/ε = 2`
+it divides by zero (`theorem2_bound_degenerate`).
+
+**Impact.** Degenerate range; the arithmetic is correct for `D/ε > 2` (`theorem2`).
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 13, Case 3 (validity on block graphs)
+For a clique output `c` that does not contain the party's input `v_in`, the proof says the output (the vertex of `c`
+closest to `v_in`) is the separator between `c` and its neighbour towards the honest clique `c_b`, but it is the
+separator towards the party's *own* clique.
+
+**Impact.** Statement true; repaired (`blockOut_spec`).
+
+**Details.** Example: the path `x₀–x₁–x₂–x₃` with cliques `{x₀x₁}, {x₁x₂}, {x₂x₃}`. Take honest inputs `x₀` (this
+party) and `x₃`, and the tree output `{x₁x₂}`. The party outputs `x₁`, while the separator towards `{x₂x₃}` is `x₂`.
+
+**Repair.** By the tripod property of trees, `c` lies between the own clique and one of the two honest cliques, and
+Lemma 12 puts the correct separator on a shortest path. (`blockOut_spec`)
+
+### 🛠️ Lemma 15 (`D(T) ≤ 2·D(G)` for a minimum-diameter clique tree)
+The proof says that if a longest path passes ≥ 4 consecutive cliques sharing a vertex, then "replacing them by a
+star strictly decreases the diameter", but another longest path may survive the change.
+
+**Impact.** Statement true, not formalized. Theorem 8's bound `R_TreeAA(4·D(G))` rests on this lemma; we state
+Theorem 8 with the round bound of the tree protocol on `T_S` and prove `D(T_S) ≤ 2·D(T)`.
+
+**Details.** Counterexample to this step: the path `x₀ … x₆` with two pendant vertices at `x₃`. Exhaustive
+enumeration (`scripts/lemma15_check.py`) finds minimum-diameter clique trees (diameter 5) whose longest path has the
+separators `x₁, x₂, x₃, x₃, x₃`. The final counting is also off by one, and `|P_G| ≤ D(G)` is justified only by
+"`P_G` is a path" (it holds because such a path is a shortest path in a block graph). Theorem 8's bound also
+silently assumes `R_TreeAA` is monotone.
+
+**Repair.** The statement is still true: compare with the clique tree in which the cliques at each cut vertex form
+a star.
+
+### 🛠️ Lemma 12 (Appendix D, clique-tree edge separator)
+The proof assumes the first clique of the walk lies on `c`'s side, and asserts without justification that some walk
+vertex lies in both cliques of the crossing edge.
+
+**Impact.** Statement true; repaired (`sep_mem_support`, `sep_btw`).
+
+**Repair.** Our proof is an induction along the walk with the invariant "every clique containing the current vertex
+is on `c`'s side". (`sep_mem_support`, `sep_btw`)
+
+### Typos and slips
+- §4.1 says "the `k := D(P)` vertices of `P`", but there are `D(P)+1`.
+- The proof of Lemma 6 claims `k_max ≤ D`, but in fact `k_max ≤ D+1`; the inputs are still `D`-close.
+- The proof of Theorem 3 writes `R_RealAA(|V(T)|,1)` where the statement has `2·|V(T)|`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
 ## The formalization
+
+**Proof remarks.** The proofs of Lemma 3 (Euler tour) and Theorem 3 are sketchy but correct. Properties 3–4 of
+Lemma 3 are argued informally; Theorem 3's validity step `k* ∈ [i_min, i_max]` needs the unstated remark that the
+short-path party's own projection index is at most `k*`. Lemma 3.1 does not need `|V(T)| > 1`.
+(`subtree_iff_indices`, `exists_median_between`, `treeAA0_spec`)
 
 **Model.**
 * CSLib's synchronous lock-step Byzantine model (`Cslib.Byzantine.LockStep`) on the complete network, with
