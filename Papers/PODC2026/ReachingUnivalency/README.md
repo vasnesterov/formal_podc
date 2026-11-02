@@ -13,55 +13,73 @@ contain Byzantine processors). The appendix lower bounds and Propositions 3 and 
 
 ## Mistakes in the paper
 
-- **Lemma 6 is false, and the §5 protocol is incorrect as specified (false statement; Theorem 1 itself is true).**
-  - *What breaks.* The proof needs "time-slot-1 agreement": two correct, accurately sampling processors never get
-    different response values in step 1. With the threshold `k(2/3 − ε/2)` this needs perfectly representative
-    samples. Write `f/n = 1/3 − ε − η`. Any sample deviation larger than about `η` lets the Byzantine processors push
-    one sampler to `0` and another to `1`. Here `η` can be arbitrarily small, while samples may deviate by up to
-    `ε/2`.
-  - *A second gap.* The proof never bounds the Byzantine processors in a sample. "Bad" only compares the fractions of
-    *correct* processors with value `b`. The step "a non-bad `p` sees `≥ 2k/3` copies of `b`, hence
-    `α_{2,b} > 2/3 − ε/2`" ignores that these copies may come from Byzantine processors.
-  - *Counterexample.* `n = 38`, `ε = 1/5`, `f = 5 < 38(1/3 − ε)`, `k = 37`. The 5 Byzantine processors lie in
-    `C₁ = {0..18}`; `C₂ = {19..37}` is fault-free. In steps 1 and 2 every processor samples the 37 processors other
-    than `13`. In step 3 it samples the round's committee `C_r` cyclically. For every step, every processor and every set of
-    processors, the sample deviates by at most `1/19 < ε/2`. So no processor is ever bad, under §4's definition or
-    §5's stronger "every configuration" definition.
-  - *The run.* Before round 2, 16 correct processors have value 0 and 16 have value 1 among those sampled, so in
-    step 4 the Byzantine processors can steer each correct processor to response 0 or 1. They make 20 respond 1 and
-    12 respond 0. In step 5 the 14 correct members of `C₁` see `20 + 5 = 25 ≥ 2k/3` copies of `1` and keep `1` with
-    grade 2. All members of `C₂` see both values at least `k/3` times, so they get grade 0 and keep their values: 16
-    zeros and 3 ones. `C₂` then outputs `0`, which ε-Validity forces since only `3 < 19ε` inputs differ, and everyone
-    but `C₁` adopts `0`. Final outputs: 14 correct processors output `1` and 19 output `0`, while `nε = 7.6`.
-  - *Recursive version.* The committees may behave as an ideal BA functionality (`Counterexample.lean`). They may
-    also run the paper's own recursive protocol with a sampler at size 19 that is accurate on every set
-    (`PaperProtocolFails.lean`). Either way ε-Agreement fails, whatever the sampling choices at the other sizes.
-  - *Larger `k`.* Lean proves this for `k = 37` only. For every `k = 37m` the same execution works: repeat each
-    step-1/2 sample `m` times and sample the committee cyclically (`j mod |C_r|`). This is argued by hand, not
-    checked in Lean.
-  - *Fix.* With the step-1 threshold `k(2/3 − ε/4)`, and samples `ε/8`-accurate also on sets that contain Byzantine
-    processors, the paper's argument goes through. We prove the corrected one-level lemma, the existence of such
-    samplers with `k = k(ε)`, the recursion and the message bound. (`lemma6_false`, `paper_protocol_fails`,
-    `lemma6_corrected`, `theorem1_corrected`)
-- **§5's derandomisation proves a property that the proof of Lemma 6 does not use (proof gap).** The counting
-  argument gives samplers that are good on every configuration, which also bounds the Byzantine processors in a
-  sample. Lemma 6, however, is stated and proved only for the actual configuration. Our `exists_sampler` proves the
-  needed form: for every set `S`, at most `γn` processors deviate by `≥ δ` on `S`. This needs only Chebyshev plus
-  the product structure, not KL-Chernoff.
-- **Proposition 4 (Extractable BA ⇒ BA): proof gap.** The text after the definition claims that Consistency
-  together with `F(M_c) ∈ {0,1}` implies `F(M) = F(M_c)` for all `M_c ⊆ M ⊆ M_a`. This does not follow, since
-  `F(M)` may be the empty string. Also, during dissemination faulty processors may forward messages that are not in
-  `M_a`. Requiring `F` to be monotone (`M ⊆ M' ⊆ M_a ⇒ F(M) ⪯ F(M')`) fixes this. The extraction function of
-  Proposition 5 is monotone, so Theorem 2 is unaffected. (`consistency_not_monotone`, `prop5_extract`)
-- **Minor.**
-  - Appendix B argues about processors: "fewer than `f/2` correct processors send or receive". The step to
-    `Ω(f)` *messages* is implicit. The proof uses only the two fault-free executions with uniform inputs, in which
-    every message has two correct endpoints, so we get `≥ f/4` messages (`appendixB_messages`).
-  - Theorem 7 assumes `f < n − 1`. The implication holds for `f ≤ n`; for `f ≥ n − 1` its hypothesis cannot be
-    satisfied.
-  - Footnote 6 lets `t*` depend on the inputs; we fix `t*`.
-  - With samples drawn "with replacement", the deterministic protocol must count a processor sampled twice twice.
-    Fig. 3 ("send your value to every processor that samples you") leaves this implicit.
+### ❌ Lemma 6 and the §5 protocol (Fig. 3)
+Lemma 6 is false and the §5 protocol does not solve ε-BA: with `n = 38`, `ε = 1/5`, `f = 5`, `k = 37` and every
+sample accurate to within `1/19 < ε/2` on every set, 14 correct processors output `1` and 19 output `0`, while
+`nε = 7.6` (`lemma6_false`, `paper_protocol_fails`).
+
+**Impact.** Theorem 1 itself is true: with the step-1 threshold `k(2/3 − ε/4)` and samplers accurate also on sets
+that contain Byzantine processors, the paper's argument goes through (`theorem1_corrected`).
+
+**Details.**
+- *What breaks.* The proof needs "time-slot-1 agreement": two correct, accurately sampling processors never get
+  different response values in step 1. With the threshold `k(2/3 − ε/2)` this needs perfectly representative
+  samples. Write `f/n = 1/3 − ε − η`. Any sample deviation larger than about `η` lets the Byzantine processors push
+  one sampler to `0` and another to `1`. Here `η` can be arbitrarily small, while samples may deviate by up to
+  `ε/2`.
+- *A second gap.* The proof never bounds the Byzantine processors in a sample. "Bad" only compares the fractions of
+  *correct* processors with value `b`. The step "a non-bad `p` sees `≥ 2k/3` copies of `b`, hence
+  `α_{2,b} > 2/3 − ε/2`" ignores that these copies may come from Byzantine processors.
+- *Counterexample.* `n = 38`, `ε = 1/5`, `f = 5 < 38(1/3 − ε)`, `k = 37`. The 5 Byzantine processors lie in
+  `C₁ = {0..18}`; `C₂ = {19..37}` is fault-free. In steps 1 and 2 every processor samples the 37 processors other
+  than `13`. In step 3 it samples the round's committee `C_r` cyclically. For every step, every processor and every
+  set of processors, the sample deviates by at most `1/19 < ε/2`. So no processor is ever bad, under §4's definition
+  or §5's stronger "every configuration" definition.
+- *The run.* Before round 2, 16 correct processors have value 0 and 16 have value 1 among those sampled, so in
+  step 4 the Byzantine processors can steer each correct processor to response 0 or 1. They make 20 respond 1 and
+  12 respond 0. In step 5 the 14 correct members of `C₁` see `20 + 5 = 25 ≥ 2k/3` copies of `1` and keep `1` with
+  grade 2. All members of `C₂` see both values at least `k/3` times, so they get grade 0 and keep their values: 16
+  zeros and 3 ones. `C₂` then outputs `0`, which ε-Validity forces since only `3 < 19ε` inputs differ, and everyone
+  but `C₁` adopts `0`. Final outputs: 14 correct processors output `1` and 19 output `0`, while `nε = 7.6`.
+- *Recursive version.* The committees may behave as an ideal BA functionality (`Counterexample.lean`). They may
+  also run the paper's own recursive protocol with a sampler at size 19 that is accurate on every set
+  (`PaperProtocolFails.lean`). Either way ε-Agreement fails, whatever the sampling choices at the other sizes.
+- *Larger `k`.* Lean proves this for `k = 37` only. For every `k = 37m` the same execution works: repeat each
+  step-1/2 sample `m` times and sample the committee cyclically (`j mod |C_r|`). This is argued by hand, not
+  checked in Lean.
+
+**Repair.** With the step-1 threshold `k(2/3 − ε/4)`, and samples `ε/8`-accurate also on sets that contain
+Byzantine processors, the paper's argument goes through. We prove the corrected one-level lemma, the existence of
+such samplers with `k = k(ε)`, the recursion and the message bound. (`lemma6_corrected`, `theorem1_corrected`)
+
+### ⚠️ Proposition 4 (Extractable BA ⇒ BA)
+The text after the definition claims that Consistency together with `F(M_c) ∈ {0,1}` implies `F(M) = F(M_c)` for
+all `M_c ⊆ M ⊆ M_a`, which does not follow since `F(M)` may be the empty string (`consistency_not_monotone`), so
+Proposition 4 is unestablished.
+
+**Impact.** Theorem 2 is unaffected: the extraction function of Proposition 5 is monotone (`prop5_extract`).
+
+**Details.** Also, during dissemination faulty processors may forward messages that are not in `M_a`.
+
+**Repair.** Requiring `F` to be monotone (`M ⊆ M' ⊆ M_a ⇒ F(M) ⪯ F(M')`) fixes this.
+
+### Typos and slips
+- Appendix B argues about processors: "fewer than `f/2` correct processors send or receive". The step to `Ω(f)`
+  *messages* is implicit. The proof uses only the two fault-free executions with uniform inputs, in which every
+  message has two correct endpoints, so we get `≥ f/4` messages (`appendixB_messages`).
+- With samples drawn "with replacement", the deterministic protocol must count a processor sampled twice twice.
+  Fig. 3 ("send your value to every processor that samples you") leaves this implicit.
+
+## Proof gaps (statements true)
+
+### 🛠️ §5 (derandomisation of the samplers)
+§5's counting argument gives samplers that are good on every configuration, but Lemma 6 is stated and proved only
+for the actual configuration, so the property that also bounds the Byzantine processors in a sample is never used.
+
+**Impact.** Our `exists_sampler` proves the needed form: for every set `S`, at most `γn` processors deviate by
+`≥ δ` on `S`.
+
+**Details.** This needs only Chebyshev plus the product structure, not KL-Chernoff.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -90,6 +108,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
 - *Complexity.* Each sample is one message carrying a value in `{0,1,⊥}`. The count `6kn` per level plus the
   recursive calls is a recurrence that follows the protocol's structure; it is not derived from an operational
   message semantics.
+
+**Remarks.**
+- Theorem 7 assumes `f < n − 1`. The implication holds for `f ≤ n`; for `f ≥ n − 1` its hypothesis cannot be
+  satisfied.
+- Footnote 6 lets `t*` depend on the inputs; we fix `t*`.
 
 **Main results in Lean.** Namespace `ReachingUnivalency`.
 

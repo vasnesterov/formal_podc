@@ -14,50 +14,71 @@ broadcast (`n ≥ 2` for agreement). Theorem 5.1 holds.
 
 ## Mistakes in the paper
 
-- **Theorem 4.1 omits "the sender is unregistered" (imprecise statement; true with it).** As printed, it
-  says broadcast is impossible whenever `t ≥ max{⌈s/2⌉, ⌈n/3⌉}`. This contradicts the paper's own Theorem 3.14:
-  with `n = s = 3`, a registered sender and `t = 2`, broadcast is solvable. The surrounding text makes clear that an
-  unregistered sender is meant. We prove the theorem with this hypothesis. (`theorem41_false_registered_sender`,
-  `theorem41`)
-- **Theorem 4.1 fails for `n = 2`, Corollary 4.2 for `n = 1` (false only in degenerate cases).**
-  - For `n = 2`, broadcast is solvable against any number of faults: the sender sends its value and the other
-    party outputs what it receives. Yet `max{⌈s/2⌉, ⌈2/3⌉} = 1 ≤ t = 1`.
-  - For `n = 1`, agreement is trivial.
-  - The cover proof needs three nonempty groups for broadcast (two for agreement). We prove Theorem 4.1 for
-    `n ≥ 3` and Corollary 4.2 for `n ≥ 2`.
-  - The "if and only if" of the abstract inherits the `n = 2` exception for broadcast.
+### ⚠️ Theorem 4.1 (lower bound; missing "the sender is unregistered")
+As printed, Theorem 4.1 says broadcast is impossible whenever `t ≥ max{⌈s/2⌉, ⌈n/3⌉}`, which contradicts the
+paper's own Theorem 3.14: with `n = s = 3`, a registered sender and `t = 2`, broadcast is solvable
+(`theorem41_false_registered_sender`).
 
-  (`theorem41_false_card_two`, `corollary42_false_card_one`, `theorem41`, `corollary42`)
-- **Figure 1, Phase 2 is ambiguous. Under the else-if reading, Lemma 3.10 and Theorem 3.13 are false
-  (under-specified definition).**
-  - **The ambiguity.** An unregistered party that receives a valid Extension has two rules: "if `v = 0`, set
-    `v = 1` and echo" and "if `v = 1` and `g = 0`, set `g = 1` and echo".
-  - **The else-if reading fails.** If the two rules exclude each other, a party in state `(0, 0)` ends in
-    `(1, 0)`. Example with `n = 4`, `S = {0 = sender, 1}`, and Byzantine parties `{0, 3}`:
-    - in super round 1, party 3 sends party 2 an Echo2 with the 1-chain `[0]`;
-    - party 2 sets `g = 0` and sends Echo3, so the honest registered party 1 accepts `[0]`;
-    - in super round 2, party 1 extends the chain, and party 2 sets `v = 1` but keeps `g = 0`.
+**Impact.** Imprecise statement with evident intent: the surrounding text makes clear that an unregistered sender
+is meant, and with this hypothesis the theorem holds (`theorem41`).
 
-    So party 2 outputs grade 0 although an honest registered party exists.
-  - **Theorem 3.13 breaks too.** Take as Π_unau among `N = {2, 3}` the protocol "AND of the exchanged values",
-    which is a valid BA when nobody in `N` is faulty. Party 3 sends 0, so party 2 outputs 0 while party 1 outputs
-    1, with `t = 2 ≤ s + ⌈(n−s)/3⌉ − 1`.
-  - **The fix.** The proof of Lemma 3.10 uses the sequential reading: "set `v = 1`; now `v = 1` and `g = 0`, so
-    set `g = 1`". After a valid Extension the party is in `(1, 1)`. We formalize this reading, and all lemmas hold.
+### ⚠️ Theorem 4.1 for `n = 2` and Corollary 4.2 for `n = 1`
+For `n = 2` broadcast is solvable against any number of faults although `max{⌈s/2⌉, ⌈2/3⌉} = 1 ≤ t = 1`, and for
+`n = 1` agreement is trivial (`theorem41_false_card_two`, `corollary42_false_card_one`).
 
-  (`Exclusive.lemma310_fails_exclusive`, `Exclusive.theorem313_fails_exclusive`)
-- **Proof gaps in Section 3 (statements true).**
-  - **Lemma 3.3.** "Every `P_j` with `v_j = 0` accepts the extended chain" requires `P_j` not to be on the chain.
-    If it is on the chain, it signed it, so it already has `v_j = 1`. This unforgeability step is skipped. We
-    prove a general origin lemma: a signature of an honest registered `i` seen by an honest party is `c ++ [i]`,
-    for the chain `c` that `i` accepted. (`emit_origin`, `signed_v`)
-  - **Lemmas 3.4 and 3.7.** Their proofs say that an unregistered party receiving an Echo2 "sets `v = 1`"; it only
-    sets `g = 0`. The contradiction still follows through the grade.
-- **Minor.**
-  - Three different versions of the small-`N` result appear: `t ≤ s + 1`, "any number of corruptions"
-    (Theorem 3.14), and `t ≤ n − 2` (Lemma 6.1). We prove the strongest one: for `n − s ≤ 2`, every Byzantine set.
-  - Theorem 5.1 implicitly needs Π_auth to have a known round bound. Its statement is stronger than claimed: only
-    Byzantine *registered* parties count (`theorem51_unreg`).
+**Impact.** False only in degenerate cases. We prove Theorem 4.1 for `n ≥ 3` and Corollary 4.2 for `n ≥ 2`
+(`theorem41`, `corollary42`). The "if and only if" of the abstract inherits the `n = 2` exception for broadcast.
+
+**Details.**
+- For `n = 2`, the sender sends its value and the other party outputs what it receives.
+- The cover proof needs three nonempty groups for broadcast (two for agreement).
+
+### ⚠️ Figure 1, Phase 2 (ambiguous rule; Lemma 3.10 and Theorem 3.13 under the else-if reading)
+If the two Phase-2 rules for an unregistered party receiving a valid Extension exclude each other, a party in
+state `(0, 0)` ends in `(1, 0)`, and Lemma 3.10 and Theorem 3.13 are false (`Exclusive.lemma310_fails_exclusive`,
+`Exclusive.theorem313_fails_exclusive`).
+
+**Impact.** Under-specified definition with evident intent: the proof of Lemma 3.10 uses the sequential reading,
+and under it all lemmas hold.
+
+**Details.**
+- **The ambiguity.** The two rules are "if `v = 0`, set `v = 1` and echo" and "if `v = 1` and `g = 0`, set
+  `g = 1` and echo".
+- **The else-if reading fails.** Example with `n = 4`, `S = {0 = sender, 1}`, and Byzantine parties `{0, 3}`:
+  - in super round 1, party 3 sends party 2 an Echo2 with the 1-chain `[0]`;
+  - party 2 sets `g = 0` and sends Echo3, so the honest registered party 1 accepts `[0]`;
+  - in super round 2, party 1 extends the chain, and party 2 sets `v = 1` but keeps `g = 0`.
+
+  So party 2 outputs grade 0 although an honest registered party exists.
+- **Theorem 3.13 breaks too.** Take as Π_unau among `N = {2, 3}` the protocol "AND of the exchanged values", which
+  is a valid BA when nobody in `N` is faulty. Party 3 sends 0, so party 2 outputs 0 while party 1 outputs 1, with
+  `t = 2 ≤ s + ⌈(n−s)/3⌉ − 1`.
+
+**Repair.** The proof of Lemma 3.10 uses the sequential reading: "set `v = 1`; now `v = 1` and `g = 0`, so set
+`g = 1`". After a valid Extension the party is in `(1, 1)`. We formalize this reading.
+
+### Typos and slips
+- Three different versions of the small-`N` result appear: `t ≤ s + 1`, "any number of corruptions"
+  (Theorem 3.14), and `t ≤ n − 2` (Lemma 6.1). We prove the strongest one: for `n − s ≤ 2`, every Byzantine set.
+- Theorem 5.1 implicitly needs Π_auth to have a known round bound.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 3.3 (unforgeability step)
+"Every `P_j` with `v_j = 0` accepts the extended chain" requires `P_j` not to be on the chain, and the
+unforgeability argument for this is skipped.
+
+**Impact.** Statement true; repaired (`emit_origin`, `signed_v`).
+
+**Details.** If `P_j` is on the chain, it signed it, so it already has `v_j = 1`.
+
+**Repair.** We prove a general origin lemma: a signature of an honest registered `i` seen by an honest party is
+`c ++ [i]`, for the chain `c` that `i` accepted. (`emit_origin`, `signed_v`)
+
+### 🛠️ Lemmas 3.4 and 3.7 (effect of an Echo2)
+Their proofs say that an unregistered party receiving an Echo2 "sets `v = 1`", but it only sets `g = 0`.
+
+**Impact.** Statements true: the contradiction still follows through the grade.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -98,6 +119,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Thm 5.1 (Π_SBA, black-box authenticated BA) | `theorem51`, `theorem51_unreg`, `theorem51_solvable` | `SimpleBA.lean` |
 | Cor 5.2 | `corollary52`, `paper_bound_iff` | `SimpleBA.lean` |
 | Else-if reading of Fig. 1 breaks Lemma 3.10 / Thm 3.13 | `Exclusive.lemma310_fails_exclusive`, `Exclusive.theorem313_fails_exclusive` | `Exclusive.lean` |
+
+Theorem 5.1 is stronger than claimed: only Byzantine *registered* parties count (`theorem51_unreg`).
 
 **Not formalized.**
 - The multivalued protocol (full version only).

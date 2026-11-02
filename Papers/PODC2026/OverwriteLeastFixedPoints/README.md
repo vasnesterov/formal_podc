@@ -15,58 +15,83 @@ levels) has no common fixed point at all. These are applications, not headline r
 
 ## Mistakes in the paper
 
-* **"Algorithm 5 is inflationary and monotone" is false (full version, §6.1).** Take two men who both rank
-  `w₀` first and `w₁` second, and let `w₀` prefer `m₁`. Let `G = (1,1)` (both propose to `w₀`) and
-  `H = (1,2)` (`m₁` has moved on to `w₁`), so `G ≤ H`. Then `f₀(G) = (2,1)`: `m₀` is rejected because
-  `m₁` is at `w₀`. But `f₀(H) = (1,2)`, because nobody `w₀` prefers is at `w₀`. And `(2,1) ≰ (1,2)`. The
-  test "`mpref[j][G[j]] = w`" looks at where `j` proposes *now*, which is not monotone in `G[j]`. A
-  monotone test would ask whether `j` has *ever* proposed to `w`. So the derivations "from Theorem 3 /
-  Theorem 4 it follows that Algorithm 5 yields the man-optimal stable marriage" are invalid. The
-  conclusion itself seems true. We model-checked an over-approximation that covers the interleaving,
-  parallel and stale-view executions: exhaustively for `n ≤ 3`, and for 300 random profiles with `n = 4`.
-  Every reachable common fixed point was the man-optimal matching (`scripts/alg5_modelcheck.py`). That
-  is evidence, not a proof.
-  (`Apps.alg5_not_monotone`)
-* **Algorithm 7 (Bellman–Ford with levels) does not satisfy Corollary 4.2 (full version, §6.2).** Its
-  `fᵢ` increments `G[i].level` whenever no vertex lags behind `i`. So the vertex of minimal level always
-  changes, and **no state is a common fixed point**, whatever the weights and the relaxation rule. The
-  level component is unbounded, so the lattice is not finite either. The functions are not monotone
-  either. Take one edge `0 → 1` of weight 1, `G = ((0,1),(5,1)) ⊑ H = ((0,1),(5,2))`. Vertex 1 relaxes in
-  `G` to distance 1, but in `H` it waits for vertex 0 and keeps distance 5. So "from Corollary 4.2, it
-  follows that Algorithm 7 converges to the cost of the shortest paths" has no basis. The distance
-  components may still converge; we did not check. (`Apps.alg7_no_common_fixed_point`,
-  `Apps.alg7_not_monotone`)
-* **The fixed points of one `fᵢ` do not form a sublattice (§2, before Theorem 2.1).** Take
-  `f x = if (1,1) ≤ x then (2,2) else x` on `{0,1,2}²`. It is monotone and inflationary, and it fixes
-  `(1,0)` and `(0,1)` but not their join `(1,1)`. What is true, and enough for the least common fixed
-  point to exist: these fixed points are closed under meets and contain `⊤`.
-  (`fixedPoints_not_supClosed`, `isCommonFixed_inf`)
-* **Theorem 3.1 needs the full product lattice.** The brief announcement states it for "a finite
-  distributive lattice of vectors", for instance a lattice of consistent cuts. On a proper sublattice the
-  coordinatewise last-writer-wins commit can leave `L`. In the distributive sublattice
-  `{000, 010, 110, 021, 121}` of `{0,1,2}³`, take `f_A = · ⊔ 110` and `f_B = · ⊔ 021`. One round from
-  `000` can commit `111 ∉ L`. The full version's "for simplicity, each `G[i]` is between 0 and m" reading
-  (the whole box `{0,…,m}ⁿ`) is what the proof uses, and distributivity is never used. Theorem 4.1 is
-  different: with `i`-local functions its commit is a join of admissible states, so it does stay inside
-  any join-closed `L`. (`sublattice_round_escapes`, `distCommit_mem`)
-* **Proof gaps, statements true.**
-  - Theorem 3.1: the fixed-point step says "the update rule gives `G_{t+1}[j] > G_t[j]`". It never
-    argues that process `i` actually reads `G*`. The missing step: a round that changes nothing has no
-    writes at all (Lemma 3.2(3)), so every read returns the committed value. (`theorem_3_1`)
-  - Theorem 4.1: the proof picks a round `t ≤ U + τ` in which `i` is active and concludes that its view
-    equals `G*`. This needs `t ≥ U + T`, so that every coordinate of the view dates from after
-    stabilization. One must take a round after `U + T`. Then **strong fairness is unnecessary**:
-    any round `t ≥ U + T` with `i ∈ S_t` works, so plain fairness suffices. (`theorem_4_1_fair`)
-* **Minor slips.**
-  - Algorithm 10 (fair division): `G[i] + maxEnvy` can exceed `mΔ`, so `fᵢ` does not map
-    `{0,…,mΔ}ⁿ` into itself. Example: 2 agents, 1 item valued 1 by both, `G = (1,1)` gives `G[1] = 2`.
-    Capping the update fixes this. (`Apps.alg10_out_of_range`)
-  - §2.1 starts the transitive-closure computation from `R₀ ≠ ⊥`. Theorem 2.1 needs the version
-    "converges to the least common fixed point above `G₀`", which the paper only mentions in Theorem 2's
-    proof. Proved here as `converges_from`.
-  - Corollary 4.1 says "`fᵢ : L′ → L′` monotone and deflationary". It means deflationary on `L`, that
-    is, inflationary on `L′`.
-  - Lemma 3.2(1): the full version says `≥ G_t[j]` and the brief announcement says `>`. Both hold.
+### ❌ Full version §6.1 ("Algorithm 5 is inflationary and monotone")
+Algorithm 5 (lock-free Gale–Shapley) is not monotone: with two men who both rank `w₀` first, `G = (1,1) ≤ H = (1,2)`
+but `f₀(G) = (2,1) ≰ (1,2) = f₀(H)` (`Apps.alg5_not_monotone`).
+
+**Impact.** An application, not a headline result: the derivations "from Theorem 3 / Theorem 4 it follows that
+Algorithm 5 yields the man-optimal stable marriage" are invalid, but the conclusion itself seems true.
+
+**Details.** Let both men rank `w₀` first and `w₁` second, and let `w₀` prefer `m₁`. In `G = (1,1)` both propose
+to `w₀`; in `H = (1,2)` `m₁` has moved on to `w₁`. Then `f₀(G) = (2,1)`: `m₀` is rejected because `m₁` is at `w₀`.
+But `f₀(H) = (1,2)`, because nobody `w₀` prefers is at `w₀`. The test "`mpref[j][G[j]] = w`" looks at where `j`
+proposes *now*, which is not monotone in `G[j]`. A monotone test would ask whether `j` has *ever* proposed to `w`.
+
+We model-checked an over-approximation that covers the interleaving, parallel and stale-view executions:
+exhaustively for `n ≤ 3`, and for 300 random profiles with `n = 4`. Every reachable common fixed point was the
+man-optimal matching (`scripts/alg5_modelcheck.py`). That is evidence, not a proof.
+
+### ❌ Full version §6.2 (Algorithm 7, Bellman–Ford with levels, as an instance of Corollary 4.2)
+Algorithm 7 has no common fixed point at all, whatever the weights and the relaxation rule, and its functions are
+not monotone (`Apps.alg7_no_common_fixed_point`, `Apps.alg7_not_monotone`).
+
+**Impact.** An application: "from Corollary 4.2, it follows that Algorithm 7 converges to the cost of the
+shortest paths" has no basis. The distance components may still converge; we did not check.
+
+**Details.** Its `fᵢ` increments `G[i].level` whenever no vertex lags behind `i`. So the vertex of minimal level
+always changes, and **no state is a common fixed point**. The level component is unbounded, so the lattice is not
+finite either. Non-monotonicity: take one edge `0 → 1` of weight 1, `G = ((0,1),(5,1)) ⊑ H = ((0,1),(5,2))`.
+Vertex 1 relaxes in `G` to distance 1, but in `H` it waits for vertex 0 and keeps distance 5.
+
+### ❌ §2, before Theorem 2.1 ("the fixed points of each `fᵢ` form a sublattice")
+The fixed points of one `fᵢ` are not closed under joins: `f x = if (1,1) ≤ x then (2,2) else x` on `{0,1,2}²` is
+monotone and inflationary and fixes `(1,0)` and `(0,1)` but not `(1,1)` (`fixedPoints_not_supClosed`).
+
+**Impact.** Harmless for the paper's use: these fixed points are closed under meets and contain `⊤`, which is
+enough for the least common fixed point to exist (`isCommonFixed_inf`).
+
+### ⚠️ Theorem 3.1 on a proper sublattice (the parallel model)
+The brief announcement states Theorem 3.1 for "a finite distributive lattice of vectors", but on a proper
+sublattice the coordinatewise last-writer-wins commit can leave `L` (`sublattice_round_escapes`).
+
+**Impact.** Evident intent: the full version's reading "for simplicity, each `G[i]` is between 0 and m" (the whole
+box `{0,…,m}ⁿ`) is what the proof uses, and the theorem holds for it; distributivity is never used.
+
+**Details.** In the distributive sublattice `{000, 010, 110, 021, 121}` of `{0,1,2}³` (for instance a lattice of
+consistent cuts would be such an `L`), take `f_A = · ⊔ 110` and `f_B = · ⊔ 021`. One round from `000` can commit
+`111 ∉ L`. Theorem 4.1 is different: with `i`-local functions its commit is a join of admissible states, so it
+does stay inside any join-closed `L` (`distCommit_mem`).
+
+### Typos and slips
+- Algorithm 10 (fair division): `G[i] + maxEnvy` can exceed `mΔ`, so `fᵢ` does not map `{0,…,mΔ}ⁿ` into itself.
+  Example: 2 agents, 1 item valued 1 by both, `G = (1,1)` gives `G[1] = 2`. Capping the update fixes this.
+  (`Apps.alg10_out_of_range`)
+- §2.1 starts the transitive-closure computation from `R₀ ≠ ⊥`. Theorem 2.1 needs the version "converges to the
+  least common fixed point above `G₀`", which the paper only mentions in Theorem 2's proof. Proved here as
+  `converges_from`.
+- Corollary 4.1 says "`fᵢ : L′ → L′` monotone and deflationary". It means deflationary on `L`, that is,
+  inflationary on `L′`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 3.1 (parallel convergence, fixed-point step)
+The proof says "the update rule gives `G_{t+1}[j] > G_t[j]`" but never argues that process `i` actually reads
+`G*`.
+
+**Impact.** Statement true; repaired (`theorem_3_1`).
+
+**Repair.** A round that changes nothing has no writes at all (Lemma 3.2(3)), so every read returns the committed
+value.
+
+### 🛠️ Theorem 4.1 (distributed convergence, fixed-point step)
+The proof picks a round `t ≤ U + τ` in which `i` is active and concludes that its view equals `G*`, which needs
+`t ≥ U + T`.
+
+**Impact.** Statement true; repaired, and then **strong fairness is unnecessary**: plain fairness suffices
+(`theorem_4_1_fair`).
+
+**Repair.** Take a round after `U + T`, so that every coordinate of the view dates from after stabilization. Any
+round `t ≥ U + T` with `i ∈ S_t` works.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -111,6 +136,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Alg. 5 is monotone: false | `Apps.alg5_not_monotone` | `Applications.lean` |
 | Alg. 7 satisfies Cor 4.2: false | `Apps.alg7_no_common_fixed_point`, `Apps.alg7_not_monotone` | `Applications.lean` |
 | Alg. 10 maps `L` to `L`: false | `Apps.alg10_out_of_range` | `Applications.lean` |
+
+Lemma 3.2(1): the full version says `≥ G_t[j]` and the brief announcement says `>`. Both hold.
 
 **Not formalized.** Algorithm 2 (CAS counting), Algorithm 4, the correctness of Algorithms 5, 6, 8, 9
 and 10 (shortest paths, Floyd–Warshall, Johnson, subsidies), and the termination-detection remark.

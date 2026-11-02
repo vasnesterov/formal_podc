@@ -14,19 +14,18 @@ not formalized.
 
 ## Mistakes in the paper
 
-No error affects the results. Minor slips and remarks:
+### ⚠️ Lemma 2.2, "in particular" clause (degree `δ` for degree `< δ`)
+The clause says the ball of radius `⌈log_{δ−1} n⌉` contains "a node of degree `δ` or a cycle", but it should read
+"degree `< δ`" (`lemma_2_2_clog`).
 
-- **Lemma 2.2, "in particular" (typo).** The ball of radius `⌈log_{δ−1} n⌉` contains "a node of degree `δ` or a
-  cycle". It should read "degree `< δ`", which is what the main statement (item (i)) gives and Algorithm 2 uses
-  (`lemma_2_2_clog`). The paper gives no proof of Lemma 2.2 ("the argument is standard").
-- **Definition of `k`-sinksparse.** The definition asks for sinks at distance `≥ k`, but the proof of
-  Theorem 2.1 gives `> k`; we use the stronger `> k`.
-- **Redundant hypothesis.** The hypothesis `r ≥ 1` of Lemma 2.2 is redundant: for `r = 0` the bound is 1.
-- **Section 3 phrasing (remark, not an error).** "At least `max(ε deg(v), 1)` outgoing and incoming edges" is
-  meant for minimum degree `δ ≥ 3`. Read literally for arbitrary graphs, it is impossible at degree-1 nodes: a
-  single edge has no such orientation (`no_orientation_in_and_out_single_edge`).
-- **Constants.** Algorithm 1's `k = 4⌈log_{δ−1} n⌉` is twice what is needed; we keep the paper's value. The
-  tightness of Theorem 2.1 is only asserted ("obviously tight, even in LOCAL").
+**Impact.** A typo with evident intent: "degree `< δ`" is what the main statement (item (i)) gives and what
+Algorithm 2 uses. No result is affected.
+
+**Details.** The paper gives no proof of Lemma 2.2 ("the argument is standard").
+
+### Typos and slips
+- The definition of `k`-sinksparse asks for sinks at distance `≥ k`, but the proof of Theorem 2.1 gives `> k`; we
+  use the stronger `> k`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -62,6 +61,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
 The tightness proof is the classical reflection argument. A `T`-local algorithm with `2T + 2 ≤ k` (given
 `2T + 2 + 3k` identifiers) puts two sinks on some `(k+1)`-node path. So `k`-sinksparse orientations need about
 `k/2` rounds, while `k + 1` suffice.
+
+**Remarks.**
+- The hypothesis `r ≥ 1` of Lemma 2.2 is redundant: for `r = 0` the bound is 1.
+- Section 3 phrasing (not an error): "at least `max(ε deg(v), 1)` outgoing and incoming edges" is meant for minimum
+  degree `δ ≥ 3`. Read literally for arbitrary graphs, it is impossible at degree-1 nodes: a single edge has no such
+  orientation (`no_orientation_in_and_out_single_edge`).
+- Constants: Algorithm 1's `k = 4⌈log_{δ−1} n⌉` is twice what is needed; we keep the paper's value. The tightness
+  of Theorem 2.1 is only asserted ("obviously tight, even in LOCAL").
 
 **Not formalized.** The randomized part of Theorem 1.1 and Corollary 1.2 (they rely on the shattering and
 reduction results of Ghaffari–Su and Ghaffari et al.), the CONGEST implementation of Algorithm 2, and the cited
