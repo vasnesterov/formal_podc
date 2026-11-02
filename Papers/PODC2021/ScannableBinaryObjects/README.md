@@ -12,28 +12,57 @@ in the abstract, introduction and conclusion fails for `k = 1`, `n = 3`, and som
 
 ## Mistakes in the paper
 
-* **Observation 3 is false when the start configuration is not `p₀`-idle** (false only in a degenerate
-  case). If `p₀` has a pending `Update` that has not taken a step, a scanner's solo `Scan` may be
-  linearized before that update and return the old value `V`. Yet the execution is `V`-absent, because
-  the only `p₀`-idle configuration reached during `αα'` is the one after the update. The paper applies
-  Observation 3 only from `C₀α_j`, which is `p₀`-idle, so the proofs are unaffected. We prove the
-  correct version: a scan returns the value after some number of `p₀`'s operations that is at least
-  the number of operations completed before the scan was invoked (`scan_resp`). The counterexample to
-the statement as written is given in prose only, not in Lean.
-* **The abstract overstates the range of the `n + k − 2` bound** ("when `n ≤ 2^(k−1) + 2`"). The body
-  assumes `k ≥ 3` and `n > 2`, and the claim fails without them. For `k = 1` a single 1-bit object
-  suffices for every `n`, because the atomic implementation works and the component is itself a 1-bit
-  object. So the claimed bound of 2 for `n = 3` is false, and Lemma 6's `k ≥ 2` is needed
-  (`abstract_bound_fails_k1`). For `n = 1` no shared object is needed at all, yet the claim gives `k − 1`.
-  For `k = 2`, `n = 4` the abstract claims 4 objects, but the paper proves only 3 (Lemma 6). Theorem 8
-  needs `k ≥ 3`, so this case is unproved; we do not know whether it holds. Similarly, the introduction
-  states the `n + k − r − 2` range without Theorem 8's condition `k ≥ r + 3`.
-* **Small gaps, true statements.** Corollary 9 (c) for `n > 2^k − 2` is asserted ("also applies to
-  larger values of `n`") without proof. We prove it for all `n ≥ 2^k − 2` and all `k ≥ 2` (`corollary9c`).
-  Lemma 7 does not argue that the simulated implementation `I'` is obstruction-free (local simulation
-  steps must terminate). We avoid `I'` altogether (see below). Lemma 6's proof treats only `m = k`.
-* **Typo.** In the proof of Lemma 6, "`V₁` contains a 1 in every component" should be "in its `k`-th
-  component", which is all the argument uses.
+### ⚠️ Abstract, introduction and conclusion (range of the `n + k − 2` bound)
+The bound "`n + k − 2` when `n ≤ 2^(k−1) + 2`" is stated without the body's `k ≥ 3` and `n > 2`, and it fails
+for `k = 1`, `n = 3`, where a single 1-bit object suffices (`abstract_bound_fails_k1`).
+
+**Impact.** False only in degenerate cases (`k = 1`, `n = 1`); the body's Theorem 8 and Corollary 9 hold. The case
+`k = 2`, `n = 4` is unproved: the paper proves only 3 objects there.
+
+**Details.**
+- `k = 1`: a single 1-bit object suffices for every `n`, because the atomic implementation works and the
+  component is itself a 1-bit object. So the claimed bound of 2 for `n = 3` is false, and Lemma 6's `k ≥ 2` is
+  needed (`one_component_one_object`, `abstract_bound_fails_k1`).
+- `n = 1`: no shared object is needed at all, yet the claim gives `k − 1`.
+- `k = 2`, `n = 4`: the abstract claims 4 objects, but the paper proves only 3 (Lemma 6). Theorem 8 needs
+  `k ≥ 3`, so this case is unproved; we do not know whether it holds.
+- Similarly, the introduction states the `n + k − r − 2` range without Theorem 8's condition `k ≥ r + 3`.
+
+### ⚠️ Observation 3 (start configuration not `p₀`-idle)
+Observation 3 is false when the start configuration is not `p₀`-idle: a scanner's solo `Scan` may return the old
+value `V` of a pending `Update` of `p₀` that has not taken a step, although the execution is `V`-absent (prose
+counterexample only, not in Lean).
+
+**Impact.** Degenerate: the paper applies Observation 3 only from `C₀α_j`, which is `p₀`-idle, so the proofs are
+unaffected. We prove a correct version (`scan_resp`).
+
+**Details.** The scan may be linearized before the pending update. Yet the execution is `V`-absent, because the
+only `p₀`-idle configuration reached during `αα'` is the one after the update.
+
+**Repair.** A scan returns the value after some number of `p₀`'s operations that is at least the number of
+operations completed before the scan was invoked (`scan_resp`).
+
+### Typos and slips
+- In the proof of Lemma 6, "`V₁` contains a 1 in every component" should be "in its `k`-th component", which is
+  all the argument uses.
+
+## Proof gaps (statements true)
+
+### 🛠️ Corollary 9 (c) for `n > 2^k − 2`
+The claim that the bound "also applies to larger values of `n`" is asserted without proof.
+
+**Impact.** Statement true; we prove it for all `n ≥ 2^k − 2` and all `k ≥ 2` (`corollary9c`).
+
+### 🛠️ Lemma 7 (obstruction-freedom of the simulated `I'`)
+Lemma 7 does not argue that the simulated implementation `I'` is obstruction-free (local simulation steps must
+terminate).
+
+**Impact.** Statement true; we avoid `I'` altogether and work with stages (`reduce_stage`, see the Model).
+
+### 🛠️ Lemma 6 (only `m = k` treated)
+Lemma 6's proof treats only `m = k`.
+
+**Impact.** Statement true; the same argument covers `m ≤ k` (`lemma6`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

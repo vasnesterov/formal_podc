@@ -17,44 +17,64 @@ fixed by a one-line change.
 
 ## Mistakes in the paper
 
-* **The `t < n/3` expansion is wrong for `n ≥ 3t + 2` (Lemma 3.2, Cor. 3.3, Cor. 3.8).** A party
-  outputs the slot "between" or "on" two adjacent old slots. The choice depends on which slot has
-  `≥ n - 2t` echoes. If `n ≥ 3t + 2`, the `≥ n - t` honest echoes may split so that neither slot
-  reaches `n - 2t` without Byzantine help. Then one Byzantine echo moves a receiver by several grades.
-  Example: `n = 5`, `t = 1`, honest `Prox_5` outputs `(0,1),(0,1),(0,2),(0,2)`. A receiver getting the
-  extra echo `(0,2)` outputs grade 3. A receiver getting nothing from the Byzantine party outputs
-  grade 0. The protocol then breaks down from honest inputs `0,0,0,1`. After 3 rounds the honest
-  `Prox_9` outputs are `(0,2),(0,2),(0,3),(0,0)`, and the BA of Cor. 3.8 (`κ = 3`) fails for 3 of the
-  8 coin values (error `3/8`, not `1/8`). Using the largest admissible `t` does not help:
-  `n = 5, t = 1` already is that case. This is a false statement, easily repaired: with threshold
-  `t + 1` we prove Lemmas 3.1–3.2, Cor. 3.3 and Cor. 3.8 (`t < n/3`) for all `n > 3t`. For
-  `n = 3t + 1` that is the paper's protocol verbatim. (`lemma32_counterexample`,
-  `paper_cor33_counterexample`, `paper_cor38_counterexample`; repaired: `expand_isProx`,
-  `proxProtocol_spec`, `ba_third`)
-* **"The slot pair is fixed after round 2" is false against the paper's adversary (Cor. 3.8,
-  `t < n/2`).** To get 3 rounds per iteration, the coin is tossed in parallel to round 3 of `Prox_5`.
-  The coin is revealed during that round (§2.2), so a strongly rushing adaptive adversary can corrupt
-  a party in round 3 depending on the coin, and drop its round-3 forwarding. Example: `n = 5`, `t = 2`,
-  inputs `1,1,0,0`, party 4 Byzantine. Party 4 makes everybody hold `Σ` on 1, and lets only party 0
-  form `Ω` on 1.
-  * Coin 4: nothing more happens. Party 0 outputs `(1,2)` and the others `(1,1)`, split by coin 4.
-  * Coin 3: the adversary corrupts party 0 in round 3 and forwards `Ω` only to party 1. Party 1
-    outputs `(1,1)` and parties 2, 3 output `(⊥,0)`, split by coin 3.
+### 🚨 Lemma 3.2, Cor. 3.3 and Cor. 3.8 for `t < n/3` (Proxcensus expansion, `n ≥ 3t + 2`)
+For every `n ≥ 3t + 2` with `t ≥ 1` the expansion's threshold `n - 2t` lets one Byzantine echo move a receiver
+by several grades; with `n = 5`, `t = 1` the `(κ+1)`-round BA errs with probability `3/8` for `κ = 3`
+(`lemma32_counterexample`, `paper_cor33_counterexample`, `paper_cor38_counterexample`).
 
-  One iteration fails with probability `≥ 1/2`. For `κ = 2` this contradicts Cor. 3.8's `2^{-κ}`.
-  This is a proof gap whose statement is false in the paper's model. We prove the claim for
-  coin-independent corruption (e.g. a static adversary), even when the adversary picks its round-3
-  messages after seeing the coin. Tossing the coin after round 3 also works, but costs 4 rounds per
-  iteration, i.e. `2κ` rounds and no gain over prior work. (`coin_parallel_adaptive_attack`;
-  repaired: `coin_parallel_static`)
-* **Proof gap, statement true (Lemma 3.2 for `n = 3t + 1`, case `b = 0`, `gᵢ = gⱼ = 1`).** The
-  proof claims `n - 2t` *honest* parties in `S_{yᵢ,0}`, where only `n - 3t` are guaranteed. It then
-  adds counts from two receivers' views, which differ in their Byzantine echoes. The correct
-  argument compares honest counts. Our proof is organized differently. (`expand_isProx`)
-* **Typos.**
-  * The pseudocode of `Prox_{2r-1}` (§3.3.2) writes `s` for the number of rounds `r`.
-  * In the proof of Theorem 3.7, `2G + 1 - j` should be `2G + 1 - r`, and this `r = s mod 2` clashes
-    with `r` = rounds.
+**Impact.** A false headline statement, but easily repaired: with threshold `t + 1` (the same as `n - 2t` when
+`n = 3t + 1`) Lemmas 3.1–3.2, Cor. 3.3 and Cor. 3.8 (`t < n/3`) hold for all `n > 3t` (`expand_isProx`,
+`proxProtocol_spec`, `ba_third`).
+
+**Details.** A party outputs the slot "between" or "on" two adjacent old slots. The choice depends on which slot
+has `≥ n - 2t` echoes. If `n ≥ 3t + 2`, the `≥ n - t` honest echoes may split so that neither slot reaches
+`n - 2t` without Byzantine help. Then one Byzantine echo moves a receiver by several grades.
+- Example: `n = 5`, `t = 1`, honest `Prox_5` outputs `(0,1),(0,1),(0,2),(0,2)`. A receiver getting the extra
+  echo `(0,2)` outputs grade 3. A receiver getting nothing from the Byzantine party outputs grade 0.
+- The protocol then breaks down from honest inputs `0,0,0,1`. After 3 rounds the honest `Prox_9` outputs are
+  `(0,2),(0,2),(0,3),(0,0)`, and the BA of Cor. 3.8 (`κ = 3`) fails for 3 of the 8 coin values (error `3/8`,
+  not `1/8`).
+- Using the largest admissible `t` does not help: `n = 5, t = 1` already is that case.
+
+**Repair.** With threshold `t + 1` we prove Lemmas 3.1–3.2, Cor. 3.3 and Cor. 3.8 (`t < n/3`) for all `n > 3t`,
+including error `≤ 2^{-κ}`. For `n = 3t + 1` that is the paper's protocol verbatim. (`expand_isProx`,
+`proxProtocol_spec`, `ba_third`)
+
+### 🚨 Cor. 3.8 for `t < n/2` (coin tossed in parallel to round 3)
+The claim "the slot pair is fixed after round 2" is false against the paper's adaptive strongly rushing
+adversary, which corrupts a party in round 3 depending on the coin, so one iteration errs with probability
+`≥ 1/2`, not `1/4` (`coin_parallel_adaptive_attack`).
+
+**Impact.** For `κ = 2` this contradicts Cor. 3.8's `2^{-κ}`. The Proxcensus protocol (Lemmas 3.4–3.6) and
+Theorem 3.7 are correct, and the claimed `1/4` holds against coin-independent corruptions
+(`coin_parallel_static`).
+
+**Details.** To get 3 rounds per iteration, the coin is tossed in parallel to round 3 of `Prox_5`. The coin is
+revealed during that round (§2.2), so a strongly rushing adaptive adversary can corrupt a party in round 3
+depending on the coin, and drop its round-3 forwarding. Example: `n = 5`, `t = 2`, inputs `1,1,0,0`, party 4
+Byzantine. Party 4 makes everybody hold `Σ` on 1, and lets only party 0 form `Ω` on 1.
+* Coin 4: nothing more happens. Party 0 outputs `(1,2)` and the others `(1,1)`, split by coin 4.
+* Coin 3: the adversary corrupts party 0 in round 3 and forwards `Ω` only to party 1. Party 1
+  outputs `(1,1)` and parties 2, 3 output `(⊥,0)`, split by coin 3.
+
+**Repair.** We prove the claim for coin-independent corruption (e.g. a static adversary), even when the adversary
+picks its round-3 messages after seeing the coin (`coin_parallel_static`). Tossing the coin after round 3 also
+works, but costs 4 rounds per iteration, i.e. `2κ` rounds and no gain over prior work.
+
+### Typos and slips
+- The pseudocode of `Prox_{2r-1}` (§3.3.2) writes `s` for the number of rounds `r`.
+- In the proof of Theorem 3.7, `2G + 1 - j` should be `2G + 1 - r`, and this `r = s mod 2` clashes with
+  `r` = rounds.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 3.2 for `n = 3t + 1` (case `b = 0`, `gᵢ = gⱼ = 1`)
+The proof claims `n - 2t` *honest* parties in `S_{yᵢ,0}`, where only `n - 3t` are guaranteed.
+
+**Impact.** Statement true; our proof is organized differently (`expand_isProx`).
+
+**Details.** The proof then adds counts from two receivers' views, which differ in their Byzantine echoes. The
+correct argument compares honest counts.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

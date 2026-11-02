@@ -15,23 +15,27 @@ direction of round elimination (Theorem 3), they give the `Ω(log Δ)` port-numb
 
 ## Mistakes in the paper
 
-* **Lemma 15 is false for `Δ = 1` (degenerate case).** The lemma claims that for all `x ≤ Δ − 1` and
-  `a ≥ 1`, every randomized 0-round algorithm for `Π_Δ(a, x)` fails with probability at least `1/Δ⁸`.
-  For `Δ = 1` this bound is `1`. On the 1-regular tree `K₂`, output `M` or `A` with probability `1/2`
-  each (both are node configurations of `Π_1(1, 0)`). The algorithm fails only on `MM` or `AA`,
-  i.e. with probability `1/2`. The proof gives a failure probability of at least `1/(3Δ)²` and then
-  uses `1/(3Δ)² ≥ 1/Δ⁸`, which needs `Δ ≥ 2`. The paper only uses large `Δ`, so nothing downstream is
-  affected. We prove the lemma for `Δ ≥ 2`, with the better bound `1/(36Δ²)` that also covers
-  algorithms whose outputs are not always valid configurations (`lemma_15`, counterexample
-  `lemma_15_false_delta_one`).
-* **Typos and tiny slips (no effect).**
-  * §2.3, definition of `R̄`: `Σ_{Π''}` is "the sets that appear in the configurations of `E_{Π''}`",
-    but `E_{Π''}` is defined from `Σ_{Π''}`. It should say `N_{Π''}`. Also "`Σ_{Π''} =⊆ …`".
-  * Lemmas 5 and 11 implicitly need `k ≤ Δ` and `x ≤ Δ`. Without them the configuration
-    `M^{Δ−x}X^x` does not exist. This is consistent with the paper's convention `0 ≤ a, x ≤ Δ`
-    for the family.
-  * In the proof of Lemma 8, the step "each `Yᵢ` contains `B`" does not need the earlier fact
-    `Yᵢ ⊆ OUABPQ`: a right-closed set without `B` already lies in `PQ`.
+### ⚠️ Lemma 15 for `Δ = 1` (randomized 0-round failure probability)
+Lemma 15's bound `1/Δ⁸` is `1` for `Δ = 1`, but on `K₂` the algorithm that outputs `M` or `A` with
+probability `1/2` each fails only with probability `1/2` (`lemma_15_false_delta_one`).
+
+**Impact.** Degenerate corner: the paper only uses large `Δ`, so nothing downstream is affected. The
+lemma holds for `Δ ≥ 2`, with a better bound (`lemma_15`).
+
+**Details.** The lemma claims that for all `x ≤ Δ − 1` and `a ≥ 1`, every randomized 0-round algorithm
+for `Π_Δ(a, x)` fails with probability at least `1/Δ⁸`. For `Δ = 1`, both `M` and `A` are node
+configurations of `Π_1(1, 0)`, and the algorithm fails only on `MM` or `AA`. The proof gives a failure
+probability of at least `1/(3Δ)²` and then uses `1/(3Δ)² ≥ 1/Δ⁸`, which needs `Δ ≥ 2`.
+
+**Repair.** We prove the lemma for `Δ ≥ 2` with the bound `1/(36Δ²)`, which also covers algorithms
+whose outputs are not always valid configurations (`lemma_15`).
+
+### Typos and slips
+- §2.3, definition of `R̄`: `Σ_{Π''}` is "the sets that appear in the configurations of `E_{Π''}`",
+  but `E_{Π''}` is defined from `Σ_{Π''}`. It should say `N_{Π''}`. Also "`Σ_{Π''} =⊆ …`".
+- Lemmas 5 and 11 implicitly need `k ≤ Δ` and `x ≤ Δ`. Without them the configuration
+  `M^{Δ−x}X^x` does not exist. This is consistent with the paper's convention `0 ≤ a, x ≤ Δ`
+  for the family.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -66,6 +70,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * **Strength of the result.** This setting (tree, colouring, orientation) is the strongest one in which
   the paper proves its port-numbering bound. The paper also allows arbitrary port numbers; as argued
   above, this changes nothing.
+
+**Proof remarks.** In the proof of Lemma 8, the step "each `Yᵢ` contains `B`" does not need the
+earlier fact `Yᵢ ⊆ OUABPQ`: a right-closed set without `B` already lies in `PQ`.
 
 **Main results in Lean.**
 
