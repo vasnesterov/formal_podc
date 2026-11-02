@@ -14,42 +14,57 @@ justified by the argument (the lemma only claims existence). The rest is small s
 
 ## Mistakes in the paper
 
-No statement is wrong. Points worth knowing:
+No mistakes in the statements.
 
-* **Exclusive selection is handled by citation, not by the proofs (Lemmas 3.1, 3.2, 3.4).** The paper
-  says it "generally assumes exclusive selection". Yet:
-  * the proofs of Lemmas 3.2 and 3.4 run the automaton synchronously (as a `DA$` automaton);
-  * the proof of Lemma 3.1 selects all copies of the nodes chosen by ρ_G and ρ_H at the same time.
+### Typos and slips
+- In Lemma 3.4's induction step, "`⌈Q_{G(t+1)}⌉_β`" should be `⌈·⌉_{β+1}`.
+- In Lemma 3.2's proof, "`C_t(v) = C_t(f(v))`" should be `C'_t(v) = C_t(f(v))`.
+- In Lemma 3.5's proof, "the fact that `MinPre*(C)` is upward-closed" should read `Pre*(C)`.
+- In Lemma 3.5's proof, states and labels are identified ("`L_G(q)`" for a state `q`).
+- The definition of a covering does not say that `H` must be connected and have at least three
+  nodes. This is implicit in the graph convention.
 
-  None of these is an exclusive schedule. For exclusive selection the proofs therefore rely on the
-  theorem of [16] that the selection constraint does not affect decision power. That theorem relates
-  classes of automata, so on its own it does not give the explicit cutoff `β + 1` of Lemma 3.4 for an
-  exclusive automaton. We prove all three lemmas directly for every selection constraint:
-  * Lemma 3.1 alternates G-steps and H-steps. Every lifted selection is then the set of copies of a
-    single node, which is independent and can be executed one node at a time. Sequentialising the
-    paper's simultaneous selection would also work, since it only changes states at the junction
-    nodes, which the distance argument already discards.
-  * Lemma 3.2 executes the fibre `f⁻¹(v)` one node at a time.
-  * Lemma 3.4 uses stars instead of cliques, with the schedule "all leaves (one at a time), then the
-    centre".
+## Proof gaps (statements true)
 
-  This gives Lemma 3.4 with the cutoff `β + 1` for exclusive selection too.
-  (`lemma_3_1`, `lemma_3_2`, `lemma_3_4`)
-* **Lemma 3.5: unjustified explicit constant.** The proof shows that adding a leaf with label `q` preserves
-  acceptance when `L_G(q) ≥ (m−1)|Q| + 2`, which is what the pigeonhole step needs. It then concludes
-  that "`K := m(|Q|−1) + 2` is a valid cutoff". This value is smaller than `(m−1)|Q| + 2` whenever
-  `m > |Q|`, so the argument does not justify it. The lemma only claims that some `K` exists, so it
-  is unaffected. We use `K = B + 3` with `B = max(m_Y, m_N)·|Q| + 1` (`lemma_3_5`).
-* **Lemma 3.5 needs stable *acceptance* as well.** "An analogous argument shows that the same holds
-  for acceptance" requires a second cutoff `m'`, for the set of configurations that can reach a
-  non-accepting configuration. We take `max(m, m')`.
-* Typos and small slips:
-  * In Lemma 3.4's induction step, "`⌈Q_{G(t+1)}⌉_β`" should be `⌈·⌉_{β+1}`.
-  * In Lemma 3.2's proof, "`C_t(v) = C_t(f(v))`" should be `C'_t(v) = C_t(f(v))`.
-  * In Lemma 3.5's proof, "the fact that `MinPre*(C)` is upward-closed" should read `Pre*(C)`.
-  * In Lemma 3.5's proof, states and labels are identified ("`L_G(q)`" for a state `q`).
-  * The definition of a covering does not say that `H` must be connected and have at least three
-    nodes. This is implicit in the graph convention.
+### 🛠️ Lemmas 3.1, 3.2, 3.4 (exclusive selection)
+The paper "generally assumes exclusive selection", but the proofs of Lemmas 3.1, 3.2 and 3.4 use non-exclusive
+schedules and rely, for exclusive selection, on the selection-independence theorem of [16], which does not give
+the explicit cutoff `β + 1` of Lemma 3.4.
+
+**Impact.** Statements true; we prove all three lemmas directly for every selection constraint, including Lemma
+3.4 with the cutoff `β + 1` for exclusive selection (`lemma_3_1`, `lemma_3_2`, `lemma_3_4`).
+
+**Details.** The non-exclusive schedules:
+* the proofs of Lemmas 3.2 and 3.4 run the automaton synchronously (as a `DA$` automaton);
+* the proof of Lemma 3.1 selects all copies of the nodes chosen by ρ_G and ρ_H at the same time.
+
+None of these is an exclusive schedule. The theorem of [16] relates classes of automata, so on its own it does not
+give the explicit cutoff `β + 1` of Lemma 3.4 for an exclusive automaton.
+
+**Repair.**
+* Lemma 3.1 alternates G-steps and H-steps. Every lifted selection is then the set of copies of a
+  single node, which is independent and can be executed one node at a time. Sequentialising the
+  paper's simultaneous selection would also work, since it only changes states at the junction
+  nodes, which the distance argument already discards.
+* Lemma 3.2 executes the fibre `f⁻¹(v)` one node at a time.
+* Lemma 3.4 uses stars instead of cliques, with the schedule "all leaves (one at a time), then the
+  centre".
+
+### 🛠️ Lemma 3.5 (explicit cutoff constant)
+The proof concludes that "`K := m(|Q|−1) + 2` is a valid cutoff", but its argument needs
+`L_G(q) ≥ (m−1)|Q| + 2`, and `K` is smaller than `(m−1)|Q| + 2` whenever `m > |Q|`.
+
+**Impact.** The lemma only claims that some `K` exists, so it is unaffected. We use `K = B + 3` with
+`B = max(m_Y, m_N)·|Q| + 1` (`lemma_3_5`).
+
+**Details.** The proof shows that adding a leaf with label `q` preserves acceptance when
+`L_G(q) ≥ (m−1)|Q| + 2`, which is what the pigeonhole step needs.
+
+### 🛠️ Lemma 3.5 (stable acceptance)
+"An analogous argument shows that the same holds for acceptance" requires a second cutoff `m'`, for the set of
+configurations that can reach a non-accepting configuration.
+
+**Impact.** Statement true; we take `max(m, m')`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

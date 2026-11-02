@@ -16,90 +16,113 @@ the text; Algorithm 3's pseudocode omits that check and then violates agreement 
 
 ## Mistakes in the paper
 
-* **The Claim of §4.1 is false (main error).** Counterexample protocol (`Echo.echoProtocol`). In
-  round `r`, each process SRB-broadcasts its signed message. Whenever it delivers some process's
-  round-`r` message, it SRB-broadcasts an *echo* of it, i.e. relays the signed message. It ends round
-  `r` once it has delivered echoes of its *own* message from `n − f` distinct senders. It has
-  received `q`'s message if it delivered `q`'s message or any echo of it.
-  - *Why it works.* Take two correct processes `p`, `q`. Their echo-sender sets have `n − f`
-    elements each, so they share a sender `s` (possibly Byzantine), because `n > 2f`. SRB delivers
-    `s`'s messages to everybody as prefixes of a single sequence. Whichever of `echo(p)`, `echo(q)`
-    comes first in that sequence has been delivered by *both* `p` and `q` before they ended the
-    round.
-  - *Liveness.* The `≥ n − f` correct processes echo everything.
-  - *Within the paper's model.* The protocol uses only what the paper itself assumes and uses:
-    transferable signatures (§2), relayed signed messages counting as "received", and waiting for
-    messages from `n − f` processes — exactly the ingredients of the paper's own Appendix A protocol
-    for `f = 1`. Definition 2 puts no other constraint (e.g. wait-freedom) on how rounds end.
-  - *What breaks in the paper's proof.* Scenario 1 asserts that `C₂` "must eventually start the
-    next round since they are receiving all messages sent by correct processes". This is
-    unjustified: a round may wait until its own messages have been echoed by `n − f` processes. In
-    Scenarios 1–3, `C₁` and `C₂` do not end the round until their delayed messages reach `Q`, and
-    then the scenarios are no longer indistinguishable.
-  - *Lean.* We prove that the echo protocol satisfies Definition 2, plus integrity and liveness in
-    every fair execution, against any SRB adversary with unforgeable signatures, for every
-    `n > 2f`. The formal statement of the claim is refuted for `n = 5`, `f = 2`.
-  - *Consequences.* The appendix "corner case" `f = 1` is not special, and the headline
-    classification in the abstract and §1 does not follow from the paper. A remark we did **not**
-    formalize: the same echo idea seems to work with TrInc-style attested logs. A receiver accepts
-    the `k`-th attested message of `s` only after all earlier ones (Algorithm 2's `prev`), so
-    "trusted logs do not give unidirectionality" is doubtful as well.
-  (`claim_4_1_false`, `srb_implements_unidirectional`, `Echo.echoProtocol_implements`)
-* **Algorithm 3 as printed violates agreement (property 2 of SRB).** The text of §4.2 says a
-  process builds an L1 proof only if it sees `t+1` copies of its own value "*and no other value*".
-  This check is what the Lemma 3 Case 1 argument uses. The pseudocode (lines 29–39,
-  `validateValue`) merely ignores conflicting copies.
-  - *Counterexample* (`n = 3`, `t = 1`). The sender `0` is Byzantine; it sends `m` to `1` and `m'`
-    to `2`. In the forwarding round, `2` hears `1` (so unidirectionality holds), but `1` does not
-    hear `2`. Each of `1` and `2` has two copies of its own value: its own and `0`'s. Under the
-    printed rule both build L1 proofs.
-  - *Result.* Process `0` builds L1 proofs for both values. So `{1, 0}` is an L2 proof of `m` and
-    `{2, 0}` is an L2 proof of `m'`, and the correct processes `1` and `2` deliver different
-    messages with the same sequence number.
-  - *With the text's rule.* Agreement (Lemma 3 Case 1) and Lemma 4 are proved.
-  - *Seriousness.* A pseudocode slip, not a flaw of the construction: the text states the intended
-    rule, and the safety core of the Claim of §4.2 holds with it.
-  (`Alg3.pseudo_disagreement`; repaired: `Alg3.agreement`)
-* **Unidirectional rounds are under-specified for Algorithm 3.**
-  - *The gap.* Definition 2 only relates messages sent in the *same* round `r`. Algorithm 3 uses
-    "the unidirectional round" for every (sender, sequence number) instance without saying which
-    round. Processes handle instances at different paces, and may skip one after seeing an L2
-    proof. So a single round sequence cannot be aligned across processes.
-  - *Fix.* The argument needs a separate round instance per (sender, sequence number), which
-    tagging provides. Under-specified definition; harmless once fixed. Our `Alg3` model assumes
-    this.
-* **Theorem 1 is stated for the exact TrInc interface but proved only in an eventual form.**
-  Algorithm 2 asks `CheckAttestation` to return true for every attestation previously output. The
-  SRB implementation can only return true once the attestation has been delivered; the paper's
-  proof shows exactly this eventual property (1). Further problems in the implementation:
-  - `Attest` never returns `null` for a non-increasing counter. The returned "attestation" is
-    simply never valid (`TrInc.attest_nonincreasing_invalid`).
-  - `k` is never incremented.
-  - The attestation omits `prev`.
+### 🚨 Claim of §4.1 (SRB cannot implement unidirectional rounds for `n > 2f`, `f > 1`)
+The claim is false: a simple echo protocol over SRB implements unidirectional rounds for every `n > 2f`; the
+formal claim is refuted for `n = 5`, `f = 2` (`claim_4_1_false`, `srb_implements_unidirectional`).
 
-  We prove consistency between checkers, non-equivocation (one valid attestation per counter),
-  soundness (property (2)) and completeness for increasing counters (property (1)). Imprecise
-  statement; the result holds in the eventual form.
-* **Appendix A's proof has gaps; the statement is true.**
-  - "All processes in `Q` must receive at least one of `p` or `p'`'s messages in phase 1" is false
-    for a Byzantine member of `Q`.
-  - "W.l.o.g. they receive `p`'s value" ignores that different members of `Q` may see different
-    values.
-  - "Valid phase-2 messages must contain `n − 1` values" contradicts the protocol's check
-    `m ≥ 2`.
-  - *Correct argument* (`AppendixRB.appendix_claim`). If `n ≥ 4`, `Q` contains a correct process.
-    If `n = 3`, the `m ≥ 2` check and the non-equivocation of reliable broadcast force the
-    Byzantine member's phase-2 message to contain `p`'s or `p'`'s value.
-* **Typos and small slips.**
-  - `validateL1Prf` is defined twice; the second definition should be `validateL2Prf`.
-  - `maybeDeliver(val)` takes no parameter.
-  - `key == k` refers to an undefined `key`.
-  - Lemmas 2 and 3 speak of `last[p]`; the code has `next_p`.
-  - "line ??" in Lemma 2.
-  - `checkL2Proof` is called without a proof argument.
-  - Lemma 2 needs a process to count its own copy, otherwise `n = 2t + 1` correct processes only
-    produce `t` copies from others.
-  - §3.1 says "but using" for "by using".
+**Impact.** The paper's separation "shared memory ⊋ unidirectionality ⊋ SRB" (Fig. 1, abstract) collapses: with
+the Claim of §4.2, unidirectionality and SRB are equivalent for `n > 2f`. The appendix "corner case" `f = 1` is not
+special.
+
+**Details.** Counterexample protocol (`Echo.echoProtocol`). In round `r`, each process SRB-broadcasts its signed
+message. Whenever it delivers some process's round-`r` message, it SRB-broadcasts an *echo* of it, i.e. relays the
+signed message. It ends round `r` once it has delivered echoes of its *own* message from `n − f` distinct senders.
+It has received `q`'s message if it delivered `q`'s message or any echo of it.
+- *Why it works.* Take two correct processes `p`, `q`. Their echo-sender sets have `n − f`
+  elements each, so they share a sender `s` (possibly Byzantine), because `n > 2f`. SRB delivers
+  `s`'s messages to everybody as prefixes of a single sequence. Whichever of `echo(p)`, `echo(q)`
+  comes first in that sequence has been delivered by *both* `p` and `q` before they ended the
+  round.
+- *Liveness.* The `≥ n − f` correct processes echo everything.
+- *Within the paper's model.* The protocol uses only what the paper itself assumes and uses:
+  transferable signatures (§2), relayed signed messages counting as "received", and waiting for
+  messages from `n − f` processes — exactly the ingredients of the paper's own Appendix A protocol
+  for `f = 1`. Definition 2 puts no other constraint (e.g. wait-freedom) on how rounds end.
+- *What breaks in the paper's proof.* Scenario 1 asserts that `C₂` "must eventually start the
+  next round since they are receiving all messages sent by correct processes". This is
+  unjustified: a round may wait until its own messages have been echoed by `n − f` processes. In
+  Scenarios 1–3, `C₁` and `C₂` do not end the round until their delayed messages reach `Q`, and
+  then the scenarios are no longer indistinguishable.
+- *Lean.* We prove that the echo protocol satisfies Definition 2, plus integrity and liveness in
+  every fair execution, against any SRB adversary with unforgeable signatures, for every
+  `n > 2f` (`Echo.echoProtocol_implements`).
+- *Consequences.* The headline classification in the abstract and §1 does not follow from the
+  paper. A remark we did **not** formalize: the same echo idea seems to work with TrInc-style
+  attested logs. A receiver accepts the `k`-th attested message of `s` only after all earlier ones
+  (Algorithm 2's `prev`), so "trusted logs do not give unidirectionality" is doubtful as well.
+
+### ⚠️ Algorithm 3 (pseudocode of the L1 rule, agreement)
+As printed, Algorithm 3 violates agreement (property 2 of SRB): with `n = 3`, `t = 1` and a Byzantine sender, two
+correct processes deliver different messages with the same sequence number (`Alg3.pseudo_disagreement`).
+
+**Impact.** A pseudocode slip, not a flaw of the construction: the text of §4.2 states the intended rule, and the
+safety core of the Claim of §4.2 holds with it (`Alg3.agreement`).
+
+**Details.** The text of §4.2 says a process builds an L1 proof only if it sees `t+1` copies of its own value
+"*and no other value*". This check is what the Lemma 3 Case 1 argument uses. The pseudocode (lines 29–39,
+`validateValue`) merely ignores conflicting copies.
+- *Counterexample* (`n = 3`, `t = 1`). The sender `0` is Byzantine; it sends `m` to `1` and `m'`
+  to `2`. In the forwarding round, `2` hears `1` (so unidirectionality holds), but `1` does not
+  hear `2`. Each of `1` and `2` has two copies of its own value: its own and `0`'s. Under the
+  printed rule both build L1 proofs.
+- *Result.* Process `0` builds L1 proofs for both values. So `{1, 0}` is an L2 proof of `m` and
+  `{2, 0}` is an L2 proof of `m'`, and the correct processes `1` and `2` deliver different
+  messages with the same sequence number.
+
+**Repair.** With the text's rule, agreement (Lemma 3 Case 1) and Lemma 4 are proved (`Alg3.agreement`).
+
+### ⚠️ Claim of §4.2 (which unidirectional round Algorithm 3 uses)
+Definition 2 only relates messages sent in the *same* round, but Algorithm 3 uses "the unidirectional round" for
+every (sender, sequence number) instance without saying which round.
+
+**Impact.** Under-specified definition; harmless once fixed by a separate round instance per (sender, sequence
+number), which tagging provides. Our `Alg3` model assumes this.
+
+**Details.** Processes handle instances at different paces, and may skip one after seeing an L2 proof. So a single
+round sequence cannot be aligned across processes.
+
+### ⚠️ Theorem 1 (SRB implements TrInc: exact vs eventual interface)
+Theorem 1 is stated for the exact TrInc interface, where `CheckAttestation` returns true for every attestation
+previously output, but over SRB this holds only once the attestation has been delivered.
+
+**Impact.** Imprecise statement; the result holds in the eventual form, which is exactly what the paper's proof
+shows (property (1)). We prove consistency between checkers, non-equivocation (one valid attestation per counter),
+soundness (property (2)) and completeness for increasing counters (property (1)).
+
+**Details.** Further problems in the implementation:
+- `Attest` never returns `null` for a non-increasing counter. The returned "attestation" is
+  simply never valid (`TrInc.attest_nonincreasing_invalid`).
+- `k` is never incremented.
+- The attestation omits `prev`.
+
+### Typos and slips
+- `validateL1Prf` is defined twice; the second definition should be `validateL2Prf`.
+- `maybeDeliver(val)` takes no parameter.
+- `key == k` refers to an undefined `key`.
+- Lemmas 2 and 3 speak of `last[p]`; the code has `next_p`.
+- "line ??" in Lemma 2.
+- `checkL2Proof` is called without a proof argument.
+- Lemma 2 needs a process to count its own copy, otherwise `n = 2t + 1` correct processes only
+  produce `t` copies from others.
+- §3.1 says "but using" for "by using".
+
+## Proof gaps (statements true)
+
+### 🛠️ Claim of Appendix A (reliable broadcast gives unidirectionality for `f = 1`)
+The proof ignores a Byzantine member of `Q` and assumes w.l.o.g. that all of `Q` sees the same value.
+
+**Impact.** Statement true; repaired by a different case split (`AppendixRB.appendix_claim`).
+
+**Details.**
+- "All processes in `Q` must receive at least one of `p` or `p'`'s messages in phase 1" is false
+  for a Byzantine member of `Q`.
+- "W.l.o.g. they receive `p`'s value" ignores that different members of `Q` may see different
+  values.
+- "Valid phase-2 messages must contain `n − 1` values" contradicts the protocol's check
+  `m ≥ 2`.
+
+**Repair.** If `n ≥ 4`, `Q` contains a correct process. If `n = 3`, the `m ≥ 2` check and the non-equivocation of
+reliable broadcast force the Byzantine member's phase-2 message to contain `p`'s or `p'`'s value.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
