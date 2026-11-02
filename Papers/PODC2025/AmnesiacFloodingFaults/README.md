@@ -17,78 +17,101 @@ All other Section 5 claims are proved. The Section 4 uniqueness theorem is not f
 
 ## Mistakes in the paper
 
-* **Theorem 5.7, first claim, is false for non-singleton initiator sets.** The claim: for every
-  graph and every initiator set `I ⊊ V`, some uni-directional link failure makes flooding fail to
-  broadcast or fail to terminate. Counterexample: the path `0 – 1 – 2` with `I = {0, 2}`. Each of the
-  four possible failures leaves at least one of `0 → 1`, `2 → 1` working, so node `1` is informed in
-  round 1. Node `1` forwards at most one message, to a leaf, and flooding stops by round 3. The
-  paper's proof speaks of "the initiating node" and so only covers singletons. For a single
-  initiator `s` the claim holds: fail the link from `s` to any neighbour `b`. Then either `b` is
-  unreachable along working links, or there is a cycle `s ⇝ b → s` of working links. Around that
-  cycle, one more message travels with it than against it, and this surplus never decreases
-  (Lemma D.3). We prove this, and the second claim of Theorem 5.7 the same way, with a simpler proof
-  than the paper's strong-connectivity case split.
-  (`theorem_5_7_multi_false`; `theorem_5_7_singleton`, `theorem_5_7_second`)
-* **Theorem 5.8, broadcast part, is false.** The claim: Byzantine nodes `J` can force a failure
-  to broadcast iff `J` contains a cut vertex set. Counterexample: the same path, with `I = {0, 2}`
-  and `J = {1}`. `{1}` is a cut vertex set, but whatever the adversary does, every node is an
-  initiator or receives the message in round 1. This holds whether or not Byzantine nodes must
-  receive it. The "if" direction also fails for one initiator if failure is counted over honest
-  nodes only. Example: a star with centre `c`, the initiator `s` a leaf, and `J` = everything except
-  `s`. `J ⊇ {c}` is a cut vertex set, but the only honest node is `s`. What is true, and proved, is
-  this: the adversary can make some honest node never receive the message iff some honest node is
-  unreachable from every initiator in `G − J`. For the "if" direction the adversary stays silent
-  until flooding on `G − J` has died out. The same example refutes consequence (3) of the PODC
-  version. Node `1` is not a leaf, but it can force neither non-termination (the path has no cycle)
-  nor a broadcast failure.
-  (`theorem_5_8_broadcast_false`; `theorem_5_8_broadcast`)
-* **Theorem 5.1: the proof of the hard direction is only a sketch; the statement is true.** The
-  hard direction is "balanced ⇒ terminates". Appendix A argues informally:
-  * Lemmas A.3–A.6 bound how long a message can stay on a cycle or FEC. Their proofs are "new
-    messages must collide with …" sketches.
-  * The word combinatorics of Lemmas A.8–A.15 then show that a recurrent message's path must linger
-    on a cycle or FEC.
-  
-  We replace all of this with a different proof:
-  1. Pull the configuration back along any closed walk. Amnesiac flooding becomes flooding on a
-     cycle with external activations.
-  2. A three-line prefix-sum potential shows that a message cannot travel once around a closed walk
-     if the walk is balanced (`not_balancedOn_of_front`).
-  3. Every message surviving `2|E|` rounds has an ancestor chain. It repeats a directed edge, so it
-     contains such a tour.
-  4. Balance on cycles and FECs implies balance on every closed walk. This is a spanning theorem for
-     cycles and "handcuffs" (the circuits of the signed-graphic matroid), proved by walk surgery
-     (`walkSig_eq_zero_of_isCycle_of_fec`).
-  
-  The easy direction (Lemma A.1, invariance) is as in the paper.
-  (`theorem_5_1`, `corollary_5_1_1`, `theorem_5_5`)
-* **Proposition C.2 (Random Flooding): the termination argument is wrong.** The paper claims that if
-  all bits are `1` for `D + 1` rounds and then all `0`, flooding has stopped two rounds later. On the
-  5-cycle (`D = 2`) a reachable configuration with a single message violates this. Choosing bits
-  that keep a single message `(0,1)` alive, then `1, 1, 1, 0, 0`, leaves messages in flight. The
-  statement (almost sure termination) is plausible with a longer window (about `2n` all-ones rounds),
-  but we do not formalize the probability.
-  (`random_flooding_window_false`)
-* **Lemma 5.2 as printed is false (typo).** The statement takes `T` to be the sinks of `S`. The proof
-  uses the sinks of `S̄`, i.e. the nodes sending to all neighbours in `S`. Counterexample with the
-  printed `T`: a single message on an edge. We prove the lemma with the proof's `T`, and Lemma 5.3
-  from it. (`lemma_5_2_as_stated_false`; `lemma_5_2`, `lemma_5_3`)
-* **The PODC version's bound `2|E| − 3`** (its Theorem 4.1(2)) fails on the path with two edges:
-  `{(0,1)}` needs 2 rounds. It also fails on a single edge. This is a degenerate case only: the full
-  version's `2|E|` holds, and brute force on all graphs with `n ≤ 6` and `3 ≤ |E| ≤ 8` agrees with
-  `2|E| − 3`, which we do not formalize. (`podc_bound_false`; `corollary_5_1_1`)
-* **Fault-model indexing.** Section 5.2.2 lets uni-directional failures act only from `S_2` on
-  (`∀ i ≥ 1, S_{i+1} = A(S_i) \ X`), and drops only from round `k ≥ 1`. Read literally, the
-  initiator's first-round messages cannot fail, and the second claim of Theorem 5.7 fails on a single
-  edge. We let faults act from the first round, which is what the proofs use.
-* **Typos and slips.**
-  * Lemma 5.2 reads "`∀ v ∈ N(v)`".
-  * Definition A.1 has an empty bullet.
-  * Appendix C refers to "Theorem C.3" (a lemma), Lemma B.6 to "Theorem B.4", and Observation C.5
-    to "Theorem D.5" for balance under Parrot Flooding.
-  * Two figures are both labelled "Fig. 5".
-  * Theorem 5.6 states only "if" for non-termination. Brute force (all graphs with `n ≤ 6`, `|E| ≤ 8`) shows it
-    is in fact "iff"; we prove the "if" as stated.
+### ❌ Theorem 5.7, first claim (uni-directional link failure, several initiators)
+The claim that for every initiator set `I ⊊ V` some uni-directional link failure breaks broadcast or termination
+fails on the path `0 – 1 – 2` with `I = {0, 2}` (`theorem_5_7_multi_false`).
+
+**Impact.** The claim holds for a single initiator, which is all the paper's proof covers ("the initiating
+node"); we prove that case and the second claim of Theorem 5.7 (`theorem_5_7_singleton`,
+`theorem_5_7_second`).
+
+**Details.** Each of the four possible failures leaves at least one of `0 → 1`, `2 → 1` working, so node `1` is
+informed in round 1. Node `1` forwards at most one message, to a leaf, and flooding stops by round 3.
+
+**Repair.** For a single initiator `s`, fail the link from `s` to any neighbour `b`. Then either `b` is
+unreachable along working links, or there is a cycle `s ⇝ b → s` of working links. Around that cycle, one more
+message travels with it than against it, and this surplus never decreases (Lemma D.3). We prove this, and the
+second claim of Theorem 5.7 the same way, with a simpler proof than the paper's strong-connectivity case split.
+
+### ❌ Theorem 5.8, broadcast part (Byzantine failure)
+The claim that Byzantine nodes `J` can force a failure to broadcast iff `J` contains a cut vertex set fails on
+the path `0 – 1 – 2` with `I = {0, 2}` and `J = {1}`: `{1}` is a cut vertex set, but every node is an
+initiator or receives the message in round 1 (`theorem_5_8_broadcast_false`).
+
+**Impact.** The non-termination half of Theorem 5.8 holds; the broadcast half is true only in a corrected form
+(`theorem_5_8_broadcast`). The same example refutes consequence (3) of the PODC version.
+
+**Details.** The counterexample holds whether or not Byzantine nodes must receive the message. The "if"
+direction also fails for one initiator if failure is counted over honest nodes only. Example: a star with
+centre `c`, the initiator `s` a leaf, and `J` = everything except `s`. `J ⊇ {c}` is a cut vertex set, but the
+only honest node is `s`. For consequence (3): node `1` is not a leaf, but it can force neither non-termination
+(the path has no cycle) nor a broadcast failure.
+
+**Repair.** What is true, and proved, is this: the adversary can make some honest node never receive the message
+iff some honest node is unreachable from every initiator in `G − J`. For the "if" direction the adversary stays
+silent until flooding on `G − J` has died out (`theorem_5_8_broadcast`).
+
+### ⚠️ Proposition C.2 (Random Flooding, termination window)
+The proof's claim that if all bits are `1` for `D + 1` rounds and then all `0`, flooding has stopped two rounds
+later, fails on the 5-cycle (`D = 2`) from a reachable configuration with a single message
+(`random_flooding_window_false`).
+
+**Impact.** The statement (almost sure termination) is unestablished but plausible with a longer window (about
+`2n` all-ones rounds); we do not formalize the probability.
+
+**Details.** Choosing bits that keep a single message `(0,1)` alive, then `1, 1, 1, 0, 0`, leaves messages in
+flight.
+
+### ⚠️ Lemma 5.2 (definition of `T`)
+As printed, with `T` the sinks of `S`, the lemma is false already for a single message on an edge
+(`lemma_5_2_as_stated_false`).
+
+**Impact.** A typo with evident intent: the proof uses the sinks of `S̄`, i.e. the nodes sending to all
+neighbours in `S`. We prove the lemma with the proof's `T`, and Lemma 5.3 from it (`lemma_5_2`, `lemma_5_3`).
+
+### ⚠️ Section 5.2.2 (fault-model indexing)
+Uni-directional failures act only from `S_2` on (`∀ i ≥ 1, S_{i+1} = A(S_i) \ X`), and drops only from round
+`k ≥ 1`, so read literally the initiator's first-round messages cannot fail, and the second claim of
+Theorem 5.7 fails on a single edge.
+
+**Impact.** An indexing slip: we let faults act from the first round, which is what the proofs use.
+
+### ⚠️ PODC version, Theorem 4.1(2) (bound `2|E| − 3`)
+The bound fails on the path with two edges: `{(0,1)}` needs 2 rounds (`podc_bound_false`).
+
+**Impact.** A degenerate case only: it also fails on a single edge, the full version's `2|E|` holds
+(`corollary_5_1_1`), and brute force on all graphs with `n ≤ 6` and `3 ≤ |E| ≤ 8` agrees with `2|E| − 3`, which
+we do not formalize.
+
+### Typos and slips
+- Lemma 5.2 reads "`∀ v ∈ N(v)`".
+- Definition A.1 has an empty bullet.
+- Appendix C refers to "Theorem C.3" (a lemma), Lemma B.6 to "Theorem B.4", and Observation C.5 to
+  "Theorem D.5" for balance under Parrot Flooding.
+- Two figures are both labelled "Fig. 5".
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 5.1 (hard direction, "balanced ⇒ terminates", Appendix A)
+The proof of the hard direction is only a sketch: Lemmas A.3–A.6 bound how long a message can stay on a cycle
+or FEC by "new messages must collide with …" sketches, and the word combinatorics of Lemmas A.8–A.15 then
+show that a recurrent message's path must linger on a cycle or FEC.
+
+**Impact.** Statement true; we replace all of this with a different proof (`theorem_5_1`, `corollary_5_1_1`,
+`theorem_5_5`).
+
+**Repair.**
+1. Pull the configuration back along any closed walk. Amnesiac flooding becomes flooding on a cycle with
+   external activations.
+2. A three-line prefix-sum potential shows that a message cannot travel once around a closed walk if the walk
+   is balanced (`not_balancedOn_of_front`).
+3. Every message surviving `2|E|` rounds has an ancestor chain. It repeats a directed edge, so it contains such
+   a tour.
+4. Balance on cycles and FECs implies balance on every closed walk. This is a spanning theorem for cycles and
+   "handcuffs" (the circuits of the signed-graphic matroid), proved by walk surgery
+   (`walkSig_eq_zero_of_isCycle_of_fec`).
+
+The easy direction (Lemma A.1, invariance) is as in the paper.
 
 Full list of differences: [differencies.md](differencies.md).
 
@@ -132,6 +155,9 @@ Full list of differences: [differencies.md](differencies.md).
 | Theorem 5.8, non-termination (iff) | `theorem_5_8_nonterm` | `Faults.lean` |
 | Theorem 5.8, broadcast | `theorem_5_8_broadcast_false`; corrected `theorem_5_8_broadcast` | `Examples.lean`, `ByzBroadcast.lean` |
 | Prop. C.2 proof, Lemma 5.2 typo, PODC bound | `random_flooding_window_false`, `lemma_5_2_as_stated_false`, `podc_bound_false` | `Examples.lean` |
+
+**Remark.** Theorem 5.6 states only "if" for non-termination. Brute force (all graphs with `n ≤ 6`, `|E| ≤ 8`)
+shows it is in fact "iff"; we prove the "if" as stated.
 
 **Not formalized.**
 * Theorem 4.1 (uniqueness). Definition 4.1 is under-specified, the proof needs Ramsey numbers

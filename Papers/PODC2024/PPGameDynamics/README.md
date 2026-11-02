@@ -15,50 +15,78 @@ the initiator itself). Under the standard distinct-pair scheduler it is off by `
 
 ## Mistakes in the paper
 
-* **Theorem 2.5 (upper bound) is false when `a + b` is small.** The theorem fixes any `a, b > 0` with
-  `a + b ≤ 1` and claims `t_mix = O(k² m log m)` for `a = b`, and `O(min{k/|a−b|, k²} m log m)` for
-  `a ≠ b`. But from `x = (m, 0, …, 0)` the chain stays put with probability `1 − a`. So `t_mix` grows
-  like `1/a` as `a → 0`, while the claimed bound does not depend on `a` once `k, m` are fixed.
-  Concretely, take `k = m = 2` and `a = b = ε`. Then `P(x, x) = 1 − ε` and `π(x) = 1/4`, so
-  `d(t) ≥ (1 − ε)^t − 1/4`, and `d(t) ≤ 1/4` forces `t ≥ 1/(2ε)`. The same happens for `a = 2b = 2ε`,
-  where `min{k/|a−b|, k²} = k²`. The error is in Proposition A.7. For `a = b`, the process
-  `Z_t² − t` is not a martingale (the right one is `Z_t² − 2at`), so `E[τ_absorb] = k²/(2a)`, not
-  `k²`. The claim "the right-hand side of (26) is at most `k²`" fails in the same way: it tends to
-  `k²/(a+b)` as `a − b → 0`. Every `k²` term needs a factor `1/(a+b)`; the `k/|a−b|` branch is
-  correct. In the application (Theorem 2.7), `a + b = γ` and `m = γn`, so `(k²/γ)·m log m ≤ k² n log n`
-  and Theorem 2.7's bound is not affected. If one reads the `O` of Theorem 2.5 as allowing constants that
-  depend on `a, b`, the theorem itself survives, but the explicit `|a − b|` shows that the bound is meant
-  uniformly in `a, b`. In any case the constant-free numbered statements behind it are false. Proposition
-  A.7 claims `E[τ_absorb] ≤ k²` for `a = b`, but the truth is `k²/(2a)`. Lemma A.5 claims `E[τ_coal] ≤ k²`; for
-  `k = 2`, `z = 1`, `w = 2` the walks coalesce at the first non-null step, so `E[τ_coal] = 1/(a+b)`.
-  Lemma A.8 claims `Pr[τ_couple > 2Φ log(4m)] ≤ 1/4`, hence `d(2Φ log(4m)) ≤ 1/4`. Take the fixed values
+### ❌ Theorem 2.5, upper bound (and Proposition A.7, Lemmas A.5, A.8)
+The bound `t_mix = O(k² m log m)` (`a = b`), resp. `O(min{k/|a−b|, k²} m log m)` (`a ≠ b`), ignores the
+laziness of the chain: for `k = m = 2` and `a = b = ε`, `t_mix ≥ 1/(2ε)` grows without bound while the claimed
+bound stays fixed (`theorem_2_5_upper_false`, `theorem_2_5_upper_false_ne`, `lemma_A_8_false`).
+
+**Impact.** Every `k²` term needs a factor `1/(a+b)`; the `k/|a−b|` branch is correct. The headline
+Theorem 2.7 is not affected: there `a + b = γ` and `m = γn`, so `(k²/γ)·m log m ≤ k² n log n`.
+
+**Details.** The theorem fixes any `a, b > 0` with `a + b ≤ 1`. From `x = (m, 0, …, 0)` the chain stays put
+with probability `1 − a`, so `t_mix` grows like `1/a` as `a → 0`, while the claimed bound does not depend on
+`a` once `k, m` are fixed. Concretely, take `k = m = 2` and `a = b = ε`. Then `P(x, x) = 1 − ε` and
+`π(x) = 1/4`, so `d(t) ≥ (1 − ε)^t − 1/4`, and `d(t) ≤ 1/4` forces `t ≥ 1/(2ε)`. The same happens for
+`a = 2b = 2ε`, where `min{k/|a−b|, k²} = k²`.
+
+The error is in Proposition A.7. For `a = b`, the process `Z_t² − t` is not a martingale (the right one is
+`Z_t² − 2at`), so `E[τ_absorb] = k²/(2a)`, not `k²`. The claim "the right-hand side of (26) is at most `k²`"
+fails in the same way: it tends to `k²/(a+b)` as `a − b → 0`.
+
+If one reads the `O` of Theorem 2.5 as allowing constants that depend on `a, b`, the theorem itself survives,
+but the explicit `|a − b|` shows that the bound is meant uniformly in `a, b`. In any case the constant-free
+numbered statements behind it are false:
+- Proposition A.7 claims `E[τ_absorb] ≤ k²` for `a = b`, but the truth is `k²/(2a)`.
+- Lemma A.5 claims `E[τ_coal] ≤ k²`; for `k = 2`, `z = 1`, `w = 2` the walks coalesce at the first non-null
+  step, so `E[τ_coal] = 1/(a+b)`.
+- Lemma A.8 claims `Pr[τ_couple > 2Φ log(4m)] ≤ 1/4`, hence `d(2Φ log(4m)) ≤ 1/4`. Take the fixed values
   `k = m = 2`, `a = 1/100`, `b = 1/200`. Then `Φ = 8` and `2Φ log₂ 8 = 48`, but `d(t) > 1/4` for all
-  `t ≤ 48`. (`theorem_2_5_upper_false`, `theorem_2_5_upper_false_ne`, `lemma_A_8_false`)
-* **Theorem 2.7: the formula `p_j ∝ (1/β − 1)^{j−1}` depends on the sampling convention.**
-  Section 2.2.1 says the initiator, at level `j`, meets a non-AD agent with probability
-  `(z_j/n)(1 − β)`. That is exact only if the responder is drawn uniformly from all `n` agents,
-  independently of the initiator (a GTFT agent may "meet itself"). With the standard
-  population-protocol scheduler (an ordered pair of *distinct* agents, as in the paper's
-  references), the count process is still exactly an Ehrenfest process. But its parameters are
-  `a' = γ(n−1−βn)/(n−1)` and `b' = γβn/(n−1)`. So the stationary law is multinomial with ratio
-  `λ' = (n−1−βn)/(βn) = (1/β − 1) − 1/(βn)`, not `1/β − 1`. Example: one AD and two GTFT agents,
-  `k = 2`. The paper's law gives `π(2,0) = 1/9`; the true stationary law gives `1/4`. We count this as
-  an implied-assumption issue (the paper's own computation fixes the convention); the formula is
-  exactly right in that model. (`distinct_counterexample`; positive result: `theorem_2_7_stationary`)
-* **Proposition A.9: "`D ≥ km`" is off by one urn.** The graph diameter is `(k−1)m`: each ball
-  moves at most `k − 1` urns. For example, `k = m = 2` gives the path `(2,0) – (1,1) – (0,2)` with
-  `D = 2 < 4`. The conclusion `t_mix = Ω(km)` holds: we prove `t_mix ≥ (k−1)m/2` for all `a, b`.
-  (`theorem_2_5_lower`)
-* **Proof gaps with true statements.** (i) Theorem 2.4 calls the multinomial "the unique stationary
-  distribution", but detailed balance gives only stationarity. Uniqueness needs irreducibility,
-  which is argued only for `k = 2, 3` ("easy to see"); we prove it for all `k`
-  (`ehrenfest_isIrreducible`). (ii) Theorem 2.7 also claims a lower bound `t_mix ≥ Ω(kn)`, but
-  Theorem 2.5 gives only `Ω(km) = Ω(kγn)`. This is `Ω(kn)` only for constant `γ` (not formalized).
-* **Typos and slips.** Definition 2.3 writes `P : Δ_k^m → Δ_k^m` for a matrix on `Δ_k^m × Δ_k^m`.
-  In A.3, the index runs over "`j = 0, …, k − 1`" (it should be `j ∈ [k−1]`), and an "inequality"
-  should be "equality". Remark A.2 says `Δ_k^m` for `Δ_2^m`. In Proposition A.6, `Z` is initialized
-  both to `z` and to `0`. Lemma A.8 needs `log = log₂`. Contribution (ii) in §1.2 says
-  `O(kn log n)` for `β ≠ 1/2`, hiding the factor `1/|1 − 2β|` of Theorem 2.7.
+  `t ≤ 48` (`lemma_A_8_false`).
+
+### ⚠️ Theorem 2.7 (formula `p_j ∝ (1/β − 1)^{j−1}`, sampling convention)
+The stationary formula is exact only if the responder is drawn uniformly from all `n` agents, independently of
+the initiator; under the standard distinct-pair scheduler it is off by `O(1/n)` (`distinct_counterexample`).
+
+**Impact.** An implied-assumption issue: the paper's own computation in Section 2.2.1 fixes the convention, and
+the formula is exactly right in that model (`theorem_2_7_stationary`).
+
+**Details.** Section 2.2.1 says the initiator, at level `j`, meets a non-AD agent with probability
+`(z_j/n)(1 − β)`. That is exact only if a GTFT agent may "meet itself". With the standard population-protocol
+scheduler (an ordered pair of *distinct* agents, as in the paper's references), the count process is still
+exactly an Ehrenfest process. But its parameters are `a' = γ(n−1−βn)/(n−1)` and `b' = γβn/(n−1)`. So the
+stationary law is multinomial with ratio `λ' = (n−1−βn)/(βn) = (1/β − 1) − 1/(βn)`, not `1/β − 1`. Example:
+one AD and two GTFT agents, `k = 2`. The paper's law gives `π(2,0) = 1/9`; the true stationary law gives
+`1/4`.
+
+### ⚠️ Proposition A.9 ("`D ≥ km`")
+The diameter of the transition graph is `(k−1)m`, not `≥ km`, since each ball moves at most `k − 1` urns; e.g.
+`k = m = 2` gives the path `(2,0) – (1,1) – (0,2)` with `D = 2 < 4`.
+
+**Impact.** Off by one urn; the conclusion `t_mix = Ω(km)` holds: we prove `t_mix ≥ (k−1)m/2` for all
+`a, b` (`theorem_2_5_lower`).
+
+### Typos and slips
+- Definition 2.3 writes `P : Δ_k^m → Δ_k^m` for a matrix on `Δ_k^m × Δ_k^m`.
+- In A.3, the index runs over "`j = 0, …, k − 1`" (it should be `j ∈ [k−1]`), and an "inequality" should be
+  "equality".
+- Remark A.2 says `Δ_k^m` for `Δ_2^m`.
+- In Proposition A.6, `Z` is initialized both to `z` and to `0`.
+- Lemma A.8 needs `log = log₂`.
+- Contribution (ii) in §1.2 says `O(kn log n)` for `β ≠ 1/2`, hiding the factor `1/|1 − 2β|` of Theorem 2.7.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 2.4 (uniqueness of the stationary distribution)
+The paper calls the multinomial "the unique stationary distribution", but detailed balance gives only
+stationarity, and irreducibility is argued only for `k = 2, 3` ("easy to see").
+
+**Impact.** Statement true; we prove irreducibility for all `k` (`ehrenfest_isIrreducible`).
+
+### 🛠️ Theorem 2.7 (lower bound `t_mix ≥ Ω(kn)`)
+Theorem 2.5 gives only `Ω(km) = Ω(kγn)`, which is `Ω(kn)` only for constant `γ`.
+
+**Impact.** Not formalized, so it does not enter the verdict; the statement is plausible (the chain is lazy
+with rate `≤ γ`, which compensates).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
