@@ -18,46 +18,79 @@ iterative algorithm.
 
 ## Mistakes in the paper
 
-* **Theorem 5: the counterexample fails for fixed-iteration outputs (proof wrong under that
-  reading).** Section 3 never says when an iterative algorithm outputs. The proof claims that a fixed
-  transition function `Z` must map all-0 (all-1) collections to 0 (1) and that the source's value
-  never changes. If the output is the value after a fixed iteration `T`, as for Algorithm Min-Max,
-  this is false. For `f = 1`, `Z(R) = ¬max R` with output after iteration 4 solves binary crash
-  consensus on the paper's own graph (source, clique of `f + 1 = 2` nodes, leaf), against every crash
-  pattern with one crash, including mid-round crashes with partial delivery. The values alternate
-  between "true" and "negated", so `¬max` simulates alternating Max and Min rounds. Python search also
-  confirms this for `f = 2`; for `f = 3` the same `Z` fails at `T = 4`. With "eventual" outputs (from
-  some iteration on, the fault-free values agree and are inputs) the paper's argument is sound, and we
-  prove Theorem 5 for every `f`. The paper's executions crash a clique node, which is impossible for
-  `f = 0`; our proof also covers that case. Whether Theorem 5 holds with fixed-iteration outputs for
-  some other graph is open. (`notMax_solvesAt`; `theorem5`)
-* **Algorithm WA (Theorem 7) can deadlock (under-specified handling of early messages).** The
-  pseudocode does not say what happens to a phase-`p` message that arrives before `i` enters phase `p`.
-  If the handler runs on arrival, as its wording suggests, then "on entering phase `p`" resets
-  `Rᵢ[p]` and `heardᵢ[p]`, but phase-`p` messages can arrive and be marked as seen while `i` is still in
-  phase `p − 1`. They are then lost: later copies are not "received for the first time". In a
-  failure-free run on 5 nodes with `f = 1` (edges `0→1,2,3; 1→0,2,4; 2→0,1,3,4; 3→4`, which satisfies
-  the condition of Theorem 6), node 4 gets the phase-2 messages of nodes 1 and 2 before finishing
-  phase 1. In phase 2 it then waits forever: Condition WAIT would need `reach₄(F) ⊆ {0, 3, 4}` with
-  `|F| ≤ 1`, but `reach₄({1}) ∋ 2` and `reach₄({2}) ∋ 1`. The run was found by simulating the
-  pseudocode. If early messages are instead buffered until `i` enters phase `p` (and nodes keep
-  relaying), simulation finds no deadlock. The fix is to keep early messages and re-check WAIT when entering a phase. The proof of
-  Theorem 7 is only a sketch ("the rest of the proof is standard"). We prove the fixed algorithm correct, including the liveness and the
-  `1 − 1/n` contraction per phase that the sketch omits (`theorem7`).
-* **Algorithm MVC needs integer inputs.** "Inputs in the range `[0, K]`" must mean integers, because the
-  OUTER-LOOP tests `tᵢ = l` for integers `l`. With all inputs equal to `1/2` and `K = 1`, everybody
-  outputs `1`, which is nobody's input. We prove Theorem 4 for inputs in `{0, …, K}` (`theorem4`).
-* **Minor proof gaps (statements true).**
-  * Theorem 1 uses without proof that "no single root" means "some pair `i, j` without a common
-    ancestor" (`ctConn_iff_oneReach`). Its validity step is made precise by indistinguishability with
-    the all-0 execution.
-  * The proof of Theorem 3 does not say that agreement persists after the clean pair of phases.
-  * In Lemma 4, the case "nobody exits the OUTER-LOOP, output `K`" in fact never occurs for inputs in
-    `[0, K]`.
-  * Claim 3's "iff" holds only in the "only if" direction, which is the one used.
-* **Typos.** Step 4 of MVC: `|min{b | …}| > 0` should be "`{b | …}` is non-empty". The induction step
-  of Lemma 3 says "`l ≥ r`" for "`l ≤ r`". Claim 8 speaks of "sets of `2f + 1` values" of size
-  `f + 1`; Claim 8 is not needed for the case analysis.
+### ⚠️ Algorithm WA and Theorem 7 (early messages, deadlock)
+If a phase-`p` message is handled on arrival, as the pseudocode's wording suggests, a node can lose
+it before entering phase `p` and then wait forever, already in a failure-free run on 5 nodes with
+`f = 1` (found by simulation, not in Lean).
+
+**Impact.** The pseudocode does not say what happens to early messages, and the evident fix (keep
+early messages, re-check WAIT on entering a phase) works: we prove Theorem 7 for the fixed algorithm
+(`theorem7`). The asynchronous characterization stands.
+
+**Details.** "On entering phase `p`" resets `Rᵢ[p]` and `heardᵢ[p]`, but phase-`p` messages can
+arrive and be marked as seen while `i` is still in phase `p − 1`. They are then lost: later copies
+are not "received for the first time". In a failure-free run on 5 nodes with `f = 1` (edges
+`0→1,2,3; 1→0,2,4; 2→0,1,3,4; 3→4`, which satisfies the condition of Theorem 6), node 4 gets the
+phase-2 messages of nodes 1 and 2 before finishing phase 1. In phase 2 it then waits forever:
+Condition WAIT would need `reach₄(F) ⊆ {0, 3, 4}` with `|F| ≤ 1`, but `reach₄({1}) ∋ 2` and
+`reach₄({2}) ∋ 1`. The run was found by simulating the pseudocode. If early messages are instead
+buffered until `i` enters phase `p` (and nodes keep relaying), simulation finds no deadlock.
+
+**Repair.** Keep early messages and re-check WAIT when entering a phase. The proof of Theorem 7 is
+only a sketch ("the rest of the proof is standard"). We prove the fixed algorithm correct, including
+the liveness and the `1 − 1/n` contraction per phase that the sketch omits (`theorem7`).
+
+### ⚠️ Theorem 5 (no fixed iterative algorithm), under fixed-iteration outputs
+If an iterative algorithm outputs its value after a fixed iteration, as Algorithm Min-Max does, the
+paper's own counterexample graph admits a fixed iterative algorithm for `f = 1`: `Z(R) = ¬max R`
+with output after iteration 4 (`notMax_solvesAt`).
+
+**Impact.** Section 3 never says when an iterative algorithm outputs. With "eventual" outputs the
+paper's argument is sound and we prove Theorem 5 for every `f` (`theorem5`). Under the
+fixed-iteration reading the theorem is unestablished: whether it holds for some other graph is open.
+
+**Details.** The proof claims that a fixed transition function `Z` must map all-0 (all-1)
+collections to 0 (1) and that the source's value never changes. With fixed-iteration outputs this is
+false. For `f = 1`, `Z(R) = ¬max R` with output after iteration 4 solves binary crash consensus on
+the paper's graph (source, clique of `f + 1 = 2` nodes, leaf), against every crash pattern with one
+crash, including mid-round crashes with partial delivery. The values alternate between "true" and
+"negated", so `¬max` simulates alternating Max and Min rounds. Python search also confirms this for
+`f = 2`; for `f = 3` the same `Z` fails at `T = 4`.
+
+**Repair.** With "eventual" outputs (from some iteration on, the fault-free values agree and are
+inputs) we prove Theorem 5 for every `f` (`theorem5`). The paper's executions crash a clique node,
+which is impossible for `f = 0`; our proof also covers that case.
+
+### ⚠️ Algorithm MVC and Theorem 4 (inputs must be integers)
+"Inputs in the range `[0, K]`" must mean integers: with all inputs equal to `1/2` and `K = 1`,
+everybody outputs `1`, which is nobody's input.
+
+**Impact.** The OUTER-LOOP tests `tᵢ = l` for integers `l`, so integer inputs are evidently meant.
+We prove Theorem 4 for inputs in `{0, …, K}` (`theorem4`).
+
+### Typos and slips
+- Step 4 of MVC: `|min{b | …}| > 0` should be "`{b | …}` is non-empty".
+- The induction step of Lemma 3 says "`l ≥ r`" for "`l ≤ r`".
+- Claim 8 speaks of "sets of `2f + 1` values" of size `f + 1`; Claim 8 is not needed for the case
+  analysis.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorems 1 and 3, Lemma 4, Claim 3 (minor gaps)
+Several proofs skip small steps: Theorem 1 uses an unproved graph equivalence, and Theorem 3 does
+not show that agreement persists.
+
+**Impact.** Statements true; routine repairs (`ctConn_iff_oneReach`, `theorem1`, `theorem3`,
+`theorem4`).
+
+**Details.**
+- Theorem 1 uses without proof that "no single root" means "some pair `i, j` without a common
+  ancestor" (`ctConn_iff_oneReach`). Its validity step is made precise by indistinguishability with
+  the all-0 execution.
+- The proof of Theorem 3 does not say that agreement persists after the clean pair of phases.
+- In Lemma 4, the case "nobody exits the OUTER-LOOP, output `K`" in fact never occurs for inputs in
+  `[0, K]`.
+- Claim 3's "iff" holds only in the "only if" direction, which is the one used.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

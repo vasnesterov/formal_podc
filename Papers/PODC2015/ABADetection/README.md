@@ -16,43 +16,54 @@ version is not formalized.
 
 ## Mistakes in the paper
 
-* **The WeakRead()/WeakWrite() condition is not implied by linearizability.** Section 2 requires that
-  "a WeakRead() `r` by `p` returns True iff there is a WeakWrite() `w` that happens before `r` and
-  every other WeakRead() by `p` happens before `w`". It then claims that linearizable ABA-detecting
-  registers satisfy this. Read literally, this fails twice.
-  First, take a DRead() concurrent with a DWrite(). If it is linearized after the write it returns
-  True, but no write *happens before* it.
-  Second, take the sequential history `DWrite(); DRead() → True; DRead() → False`. "Every other
-  WeakRead() by `p`" includes the *later* read, which does not happen before the write, so the first
-  read would have to return False.
-  Both histories are executions of the trivial atomic implementation, which is linearizable and
-  wait-free. Read literally, the condition cannot be met by any implementation in which a reader
-  can complete two reads after a write: in `DWrite(); DRead()` the read must return True, and in
-  the extension `DWrite(); DRead(); DRead()` the same read must return False (informal argument, not
-  formalized). So lower bounds "for the literal condition" are vacuous. The appendix proof of
-  Observation 1 shows the intended meaning ("every *earlier* WeakRead() by `p`", reads not
-  concurrent with writes). This is an under-specified definition, not a false theorem. The
-  lower-bound proofs use the condition only through Observation 1, and only in situations that
-  linearizability does determine. We drop the condition and prove Observation 1 (and Observation 2
-  for LL/SC) directly from linearizability. The paper's remark that the lower bounds hold for weaker
-  correctness conditions is not covered as such. The abstract theorems (`card_le_of_separates`,
-  `..._wcas`, `..._regOrCas`) do apply to any implementation of any object for which clean and dirty
-  configurations are distinguishable, i.e. to any repaired weak condition that implies
-  Observation 1; no such condition is formalized.
-  (`weakSpecLiteral_not_of_linearizable_concurrent`, `weakSpecLiteral_not_of_linearizable_later_read`;
-  repaired: `separates_aba`, `separates_llsc`)
-* **Lemma 2, Case 1 misses a case (proof gap, statement true).** `q` is poised to read or CAS an
-  object `V`, and the proof takes "the first process `z ∈ P` that executes a step on `V` in
-  `Exec(C,β)`". No such process need exist. If `q`'s CAS would then succeed, no two-step schedule
-  `λ` hides it. The fix is simple. If `q`'s step does not change `V`, it is hidden anyway. If it is a
-  successful CAS, case (c) holds directly with `σ = β`, because no process of `P` covers `V`.
-  (`lemma2`)
-* **Smaller slips in Lemmas 2–3.**
-  * Lemma 2 derives `|WCov(C′,R) ∩ P′| ≤ t′` and then only `≤ t`, where `< t′` and `< t` are needed
-    and follow from the induction hypothesis.
-  * Lemma 2 does not state that `σ` is `(P ∪ {q})`-only and invocation-free, but Lemma 3 uses both.
-  * The w.l.o.g. "no `CAS(x,x)`" is unnecessary: such a step can be treated as a read.
-  * Lemma 3 has index typos in `λ′` and in `Dⱼ′ = Conf(Dᵢ′, λ′αⱼβⱼ)`, which should end in `βᵢ`.
+### ⚠️ Section 2 (the WeakRead()/WeakWrite() correctness condition)
+The paper claims that linearizable ABA-detecting registers satisfy its WeakRead()/WeakWrite() condition, but read literally even the trivial atomic implementation violates it (`weakSpecLiteral_not_of_linearizable_concurrent`, `weakSpecLiteral_not_of_linearizable_later_read`).
+
+**Impact.** An under-specified definition, not a false theorem: the lower-bound proofs use the condition only through Observation 1, which we prove directly from linearizability (`separates_aba`, `separates_llsc`), so all lower bounds hold for linearizable implementations. The paper's remark that they also hold for the weaker condition is not covered as such.
+
+**Details.** Section 2 requires that "a WeakRead() `r` by `p` returns True iff there is a WeakWrite()
+`w` that happens before `r` and every other WeakRead() by `p` happens before `w`". Read literally,
+this fails twice.
+- Take a DRead() concurrent with a DWrite(). If it is linearized after the write it returns True,
+  but no write *happens before* it.
+- Take the sequential history `DWrite(); DRead() → True; DRead() → False`. "Every other WeakRead()
+  by `p`" includes the *later* read, which does not happen before the write, so the first read
+  would have to return False.
+
+Both histories are executions of the trivial atomic implementation, which is linearizable and
+wait-free. Read literally, the condition cannot be met by any implementation in which a reader can
+complete two reads after a write: in `DWrite(); DRead()` the read must return True, and in the
+extension `DWrite(); DRead(); DRead()` the same read must return False (informal argument, not
+formalized). So lower bounds "for the literal condition" are vacuous. The appendix proof of
+Observation 1 shows the intended meaning ("every *earlier* WeakRead() by `p`", reads not concurrent
+with writes), and the proofs use the condition only in situations that linearizability does
+determine.
+
+**Repair.** We drop the condition and prove Observation 1 (and Observation 2 for LL/SC) directly
+from linearizability (`separates_aba`, `separates_llsc`). The abstract theorems
+(`card_le_of_separates`, `..._wcas`, `..._regOrCas`) apply to any implementation of any object for
+which clean and dirty configurations are distinguishable, i.e. to any repaired weak condition that
+implies Observation 1; no such condition is formalized.
+
+### Typos and slips
+- Lemma 2 derives `|WCov(C′,R) ∩ P′| ≤ t′` and then only `≤ t`, where `< t′` and `< t` are needed
+  and follow from the induction hypothesis.
+- Lemma 2 does not state that `σ` is `(P ∪ {q})`-only and invocation-free, but Lemma 3 uses both.
+- The w.l.o.g. "no `CAS(x,x)`" is unnecessary: such a step can be treated as a read.
+- Lemma 3 has index typos in `λ′` and in `Dⱼ′ = Conf(Dᵢ′, λ′αⱼβⱼ)`, which should end in `βᵢ`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 2, Case 1 (the "first process `z ∈ P`" on `V`)
+The proof takes "the first process `z ∈ P` that executes a step on `V` in `Exec(C,β)`", but no such process need exist.
+
+**Impact.** Statement true; repaired with a simple extra case (`lemma2`).
+
+**Details.** Here `q` is poised to read or CAS an object `V`. If no process of `P` accesses `V` and
+`q`'s CAS would succeed, no two-step schedule `λ` hides it.
+
+**Repair.** If `q`'s step does not change `V`, it is hidden anyway. If it is a successful CAS,
+case (c) holds directly with `σ = β`, because no process of `P` covers `V`. (`lemma2`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

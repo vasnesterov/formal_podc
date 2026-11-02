@@ -13,39 +13,60 @@ argument that gives the same bound.
 
 ## Mistakes in the paper
 
-* **Proof of Lemma 4.4: men can become bad while inactive (proof gap, statement true).** The proof charges each man
-  who is bad at the end to the set `B_i` of men that became bad in outer iteration `i` with `|Q^m| < 2^i`. It then
-  bounds these sets with Lemma 4.5, which only counts the men *active* in iteration `i`. But a man can be matched
-  when he leaves the active set and be displaced later. An active man proposes to his partner, she accepts the
-  better proposal and rejects him. He then never proposes again and stays bad with a nonempty list. The
-  application of Lemma 4.5 does not cover such men. The construction of the sets `H_i` and inequality (2) are not
-  justified either.
-  *Concrete run* (5 men, 5 women, `k = 2`, `ℓ = 1`, iterations 0–2, greedy maximal matching):
-  1. In iteration 1, man 3 displaces man 0, who ends the iteration unmatched with `|Q| = 4`.
-  2. In iteration 2 only man 0 is active. He proposes to woman 3 and displaces man 2, who is inactive (`|Q| = 3`).
-  3. Man 2 ends bad without ever having been bad while active.
+No mistakes in the statements.
 
-  We found no such run with the paper's parameters (`ℓ = 16k/ε`) by random search. Those parameters make bad active
-  men rare, but the argument does not rule such runs out.
-  *Our repair.* The number of unmatched men never increases. Hence the inactive men displaced in iteration `j` are at
-  most the bad active men at the *start* of iteration `j`, i.e. at the end of iteration `j − 1`, and each has
-  `|Q| < 2^j`. A per-man potential (`2^j` if matched, `|Q^m|` if not) shows that inactive men gain nothing else. This
-  gives `∑_{m bad} |Q^m| ≤ ∑_i 2^{i+1} b_i`, where `b_i` is the number of bad active men at the end of iteration `i`.
-  With Lemma 4.5 this yields Lemma 4.4's bound `4δ|E|` for every `δ > 0` (the paper needs `δ ≤ 1/2`).
-  (`Example.bad_while_inactive`; repaired: `sum_bad_card_le`, `lemma_4_4`)
-* **Proof of Lemma 4.5: a small missing step.** "The number of matched players can only increase, hence the number
-  of good players can only increase" is applied to the *active* men. Individual active men can lose their partners,
-  so the count needs two facts: inactive men are never newly matched, and the number of matched men equals the number
-  of matched women, which is monotone. The statement is true. (`card_bad_act_le`, `lemma_4_5`)
-* **Under-specified details** (we fixed natural readings):
+### Typos and slips
+- Display (1) in Lemma 4.3 has the rank differences reversed (it should be
+  `P^m(p(m)) − P^m(w) < 2deg(m)/k`).
+- The proof of Lemma 4.2 ends with "ε-blocking" for "(2/k)-blocking".
+- In §3.1 the men's quantiles are described as sets of "men".
+- Under-specified details (we fixed natural readings):
   - The rounding of the quantile sizes `deg v / k` is not given. We use `⌈k · rank / deg⌉`.
-  - Algorithm 3 has *every* processor test `|Q| ≥ 2^i`. Only the men can be meant: women and inactive men must still
-    react to proposals and rejections.
+  - Algorithm 3 has *every* processor test `|Q| ≥ 2^i`. Only the men can be meant: women and
+    inactive men must still react to proposals and rejections.
   - `P^v(∅) = deg v + 1` in Definition 2.3 is introduced only inside the proof of Lemma 4.3.
-* **Typos.**
-  - Display (1) in Lemma 4.3 has the rank differences reversed (it should be `P^m(p(m)) − P^m(w) < 2deg(m)/k`).
-  - The proof of Lemma 4.2 ends with "ε-blocking" for "(2/k)-blocking".
-  - In §3.1 the men's quantiles are described as sets of "men".
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 4.4, proof (men who become bad while inactive)
+The proof bounds the men who end bad with Lemma 4.5, which counts only men *active* in the
+iteration, but a man can be displaced and become bad while inactive (`Example.bad_while_inactive`).
+
+**Impact.** Statement true, with the paper's bound `4δ|E|`; repaired by a different charging
+argument (`sum_bad_card_le`, `lemma_4_4`). Theorem 4.1 is unaffected.
+
+**Details.** The proof charges each man who is bad at the end to the set `B_i` of men that became
+bad in outer iteration `i` with `|Q^m| < 2^i`. But a man can be matched when he leaves the active
+set and be displaced later. An active man proposes to his partner, she accepts the better proposal
+and rejects him. He then never proposes again and stays bad with a nonempty list. The application
+of Lemma 4.5 does not cover such men. The construction of the sets `H_i` and inequality (2) are not
+justified either.
+
+*Concrete run* (5 men, 5 women, `k = 2`, `ℓ = 1`, iterations 0–2, greedy maximal matching):
+1. In iteration 1, man 3 displaces man 0, who ends the iteration unmatched with `|Q| = 4`.
+2. In iteration 2 only man 0 is active. He proposes to woman 3 and displaces man 2, who is inactive
+   (`|Q| = 3`).
+3. Man 2 ends bad without ever having been bad while active.
+
+We found no such run with the paper's parameters (`ℓ = 16k/ε`) by random search. Those parameters
+make bad active men rare, but the argument does not rule such runs out.
+
+**Repair.** The number of unmatched men never increases. Hence the inactive men displaced in
+iteration `j` are at most the bad active men at the *start* of iteration `j`, i.e. at the end of
+iteration `j − 1`, and each has `|Q| < 2^j`. A per-man potential (`2^j` if matched, `|Q^m|` if not)
+shows that inactive men gain nothing else. This gives `∑_{m bad} |Q^m| ≤ ∑_i 2^{i+1} b_i`, where
+`b_i` is the number of bad active men at the end of iteration `i`. With Lemma 4.5 this yields
+Lemma 4.4's bound `4δ|E|` for every `δ > 0` (the paper needs `δ ≤ 1/2`).
+(`sum_bad_card_le`, `lemma_4_4`)
+
+### 🛠️ Lemma 4.5, proof (monotonicity of good active men)
+"The number of matched players can only increase, hence the number of good players can only
+increase" is applied to the *active* men, although individual active men can lose their partners.
+
+**Impact.** Statement true; a small missing step (`card_bad_act_le`, `lemma_4_5`).
+
+**Repair.** The count needs two facts: inactive men are never newly matched, and the number of
+matched men equals the number of matched women, which is monotone. (`card_bad_act_le`, `lemma_4_5`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

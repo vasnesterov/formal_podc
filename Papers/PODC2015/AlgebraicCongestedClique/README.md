@@ -18,32 +18,65 @@ proof of Lemma 12 also needs a small repair for degrees 1–3, and the final rou
 
 ## Mistakes in the paper
 
-* **Section 2.1, Step 1: the `T`-blocks go to the wrong nodes (typo; R3).** The paper says node `v`
-  sends `T[v, w₃∗∗]` to every `w ∈ ∗v₂∗`, and that `v` receives `T[w, v₃∗∗]` from every
-  `w ∈ ∗v₂∗`. But node `v` multiplies `S[v₁∗∗, v₂∗∗] T[v₂∗∗, v₃∗∗]`, so it needs the rows
-  `w ∈ v₂∗∗` of `T`. As written, for `n^{1/3} ≥ 2` some needed row is never sent to `v`. The
-  intended pattern is clear from "each node `v` receives … `T[v₂∗∗, v₃∗∗]`": `v` sends to
-  `w ∈ ∗v₁∗` and receives from `w ∈ v₂∗∗`. We implement the corrected pattern.
-  (`step1_as_written_wrong`, `step1_corrected`)
-* **Lemma 12 omits its hypothesis (R4).** As stated, Lemma 12 claims disjoint tiles
-  `A(y) × B(y) ⊆ V × V` with `|A(y)| ≥ deg(y)/8` for every graph. This fails for dense graphs: the
-  tiles of the complete graph `K_n` would need total area at least `n(n−1)²/64 > n²` once
-  `n ≥ 67`. The lemma is meant under
-  the bound `∑_y deg(y)² < 2n²` derived just before it ("Using this bound, we obtain the following
-  lemma"), and it is only used there. We state it with that hypothesis. (`lemma_12`)
-* **Lemma 12, proof: `f(y)` is undefined for degrees 1–3 (proof gap).** `f(y)` is "`deg(y)/4`
-  rounded down to the nearest power of 2". For `1 ≤ deg(y) ≤ 3` no positive integer power of two
-  is `≤ deg(y)/4`. Yet `|A(y)| = f(y) ≥ deg(y)/8 > 0` must hold. With the natural fix `f(y) = 1`,
-  the first step of the chain `∑ f(y)² ≤ ∑ deg(y)²/16 < n²/8 < k²` fails. The conclusion
-  `∑ f(y)² ≤ k²` still holds: `16 f² ≤ deg² + 15` gives `16 ∑ f² < 2n² + 15n ≤ 16k²` for `n ≥ 3`,
-  and `n ≤ 2` is direct. (`sixteen_mul_tileSize_sq_le`, `sum_tileSize_sq_le`)
-* **4-cycle detection, last step: routing with `O(n)` loads (proof gap).** "Each node needs to send
-  `O(n)` words and receive `O(n)` words, and the running time is therefore `O(1)` rounds" [46]. But
-  Lenzen's routing (Theorem 3.7 of [46]) needs loads of at most `n`. Here a node sends up to `64n`
-  walks and receives up to `2n − 2`. Splitting the instance needs coordination, because a node does
-  not know the loads of the others. We add a deterministic reduction: one round of counts, one round
-  of receiver-side offsets, then `a·b` Lenzen instances of load `≤ n` each, for send loads `≤ a·n`
-  and receive loads `≤ b·n`. A referee may consider this folklore. (`Prog.exists_routedBig`)
+### ⚠️ Section 2.1, Step 1 (3D matrix multiplication: recipients of the `T`-blocks)
+Step 1 sends the `T`-blocks to the wrong nodes, so for `n^{1/3} ≥ 2` some node never receives a
+row of `T` it needs (`step1_as_written_wrong`).
+
+**Impact.** An index typo with evident intent (R3): the paper itself says "each node `v` receives …
+`T[v₂∗∗, v₃∗∗]`". With the corrected pattern the algorithm is correct and Theorem 1 (semiring part)
+holds (`step1_corrected`, `theorem_1_semiring`).
+
+**Details.** The paper says node `v` sends `T[v, w₃∗∗]` to every `w ∈ ∗v₂∗`, and that `v` receives
+`T[w, v₃∗∗]` from every `w ∈ ∗v₂∗`. But node `v` multiplies `S[v₁∗∗, v₂∗∗] T[v₂∗∗, v₃∗∗]`, so it
+needs the rows `w ∈ v₂∗∗` of `T`. As written, for `n^{1/3} ≥ 2` some needed row is never sent to
+`v`.
+
+**Repair.** `v` sends to `w ∈ ∗v₁∗` and receives from `w ∈ v₂∗∗`. We implement the corrected
+pattern. (`step1_corrected`)
+
+### ⚠️ Lemma 12 (missing hypothesis `∑ deg(y)² < 2n²`)
+As stated, Lemma 12 claims disjoint tiles `A(y) × B(y) ⊆ V × V` with `|A(y)| ≥ deg(y)/8` for every
+graph, which fails for the complete graph `K_n` once `n ≥ 67`.
+
+**Impact.** An implied assumption (R4): the lemma is meant under the bound `∑_y deg(y)² < 2n²`
+derived just before it ("Using this bound, we obtain the following lemma"), and it is only used
+there. With that hypothesis it holds (`lemma_12`).
+
+**Details.** The tiles of `K_n` would need total area at least `n(n−1)²/64 > n²` once `n ≥ 67`.
+
+**Repair.** We state the lemma with that hypothesis. (`lemma_12`)
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 12, proof (`f(y)` for degrees 1–3)
+`f(y)` is "`deg(y)/4` rounded down to the nearest power of 2", which is undefined for
+`1 ≤ deg(y) ≤ 3`, and the natural fix `f(y) = 1` breaks the first step of the paper's chain.
+
+**Impact.** Statement true; repaired (`sixteen_mul_tileSize_sq_le`, `sum_tileSize_sq_le`).
+
+**Details.** For `1 ≤ deg(y) ≤ 3` no positive integer power of two is `≤ deg(y)/4`. Yet
+`|A(y)| = f(y) ≥ deg(y)/8 > 0` must hold. With `f(y) = 1`, the first step of the chain
+`∑ f(y)² ≤ ∑ deg(y)²/16 < n²/8 < k²` fails.
+
+**Repair.** The conclusion `∑ f(y)² ≤ k²` still holds: `16 f² ≤ deg² + 15` gives
+`16 ∑ f² < 2n² + 15n ≤ 16k²` for `n ≥ 3`, and `n ≤ 2` is direct.
+(`sixteen_mul_tileSize_sq_le`, `sum_tileSize_sq_le`)
+
+### 🛠️ Theorem 4, last step (routing with `O(n)` loads)
+The paper routes the walks with Lenzen's algorithm [46] at send loads up to `64n`, but that
+algorithm needs loads of at most `n`, and splitting the instance needs coordination the paper does
+not give.
+
+**Impact.** Statement true; repaired by a deterministic reduction (`Prog.exists_routedBig`). A
+referee may consider this folklore.
+
+**Details.** The paper says "each node needs to send `O(n)` words and receive `O(n)` words, and the
+running time is therefore `O(1)` rounds" [46]. But Lenzen's routing (Theorem 3.7 of [46]) needs
+loads of at most `n`. Here a node sends up to `64n` walks and receives up to `2n − 2`. Splitting
+the instance needs coordination, because a node does not know the loads of the others.
+
+**Repair.** One round of counts, one round of receiver-side offsets, then `a·b` Lenzen instances of
+load `≤ n` each, for send loads `≤ a·n` and receive loads `≤ b·n`. (`Prog.exists_routedBig`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
