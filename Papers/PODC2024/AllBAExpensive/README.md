@@ -15,28 +15,23 @@ t = 1`**. We prove corrected versions.
 
 ## Mistakes in the paper
 
-- **Lemma 10 and Theorem 4 (unauthenticated) fail for `n = 2`, `t = 1` (false in a degenerate case).** Lemma 10
-  says an unauthenticated-solvable problem with `n ≤ 3t` is trivial. Theorem 4 says a non-trivial problem is
-  unauthenticated-solvable iff CC holds and `n > 3t`. Both rest on the cited FLM-style fact that weak consensus needs
-  `n > 3t`. With two processes and one fault, every faulty execution has a single correct process, so Agreement
-  constrains only fault-free executions. "Exchange proposals; decide the common value if they agree, a default
-  otherwise" therefore solves weak consensus, a non-trivial problem, and the same idea solves interactive
-  consistency. The FLM argument needs three non-empty groups of size `≤ t`, i.e. `n ≥ 3`. Corrected statements:
-  Lemma 10 holds for `3 ≤ n ≤ 3t`. A non-trivial problem is unauthenticated-solvable iff CC holds and (`n > 3t` or
-  `n ≤ 2`). The lower bound and the authenticated half of Theorem 4 are unaffected. (`lemma10_counterexample`,
-  `theorem4_unauth_as_stated_false`, `trivial_of_solvableSync`, `theorem4_unauth'`)
-- **Lemma 1 is proved only for `t ≥ 8` divisible by 8** (the "without loss of generality" step). For other `t`, the
-  group sizes `t/4` and `t/2` must be rounded, and `t = 1` admits no group of size `≥ 1` of the required kind. We
-  prove a parametric bound (`⌈β/2⌉·σ` messages) and choose parameters for every `t`. For `t = 1` we add a separate
-  zero-message argument: without any messages each process decides as in isolation, which contradicts Agreement in
-  a mixed fault-free execution. (`omission_lower_bound`, `omission_lower_bound_sq`, `one_message`)
-- **Algorithm 1 (Lemma 6) needs lock-step rounds.** It assumes that a fault-free execution is determined by the
-  proposals. That fails if the adversary may choose delays in `[0, δ]` with `δ > 0`. This is harmless: the paper's
-  model is lock-step, and we prove Theorem 3 directly in the omission model for every `δ`.
-- **Minor.**
-  - The proof of Theorem 5 assumes "without loss of generality `n = 2t`"; we prove it for every `n ≤ 2t`.
-  - "Without loss of generality, the default is 1" before Lemma 4 is made explicit.
-  - As in the 2023 paper, "Γ is computable" requires the algorithm to be computable.
+### ⚠️ Lemma 10 and Theorem 4 (unauthenticated), `n = 2`, `t = 1`
+Lemma 10 (unauthenticated-solvable with `n ≤ 3t` ⇒ trivial) and the unauthenticated half of Theorem 4 are false for `n = 2`, `t = 1`: weak consensus, a non-trivial problem, is solvable there by "exchange proposals; decide the common value if they agree, a default otherwise" (`lemma10_counterexample`, `theorem4_unauth_as_stated_false`).
+
+**Impact.** Degenerate case; the lower bound and the authenticated half of Theorem 4 are unaffected, and we prove corrected statements (`trivial_of_solvableSync`, `theorem4_unauth'`).
+
+**Details.** Theorem 4 says a non-trivial problem is unauthenticated-solvable iff CC holds and `n > 3t`. Both statements rest on the cited FLM-style fact that weak consensus needs `n > 3t`. With two processes and one fault, every faulty execution has a single correct process, so Agreement constrains only fault-free executions. The same idea solves interactive consistency. The FLM argument needs three non-empty groups of size `≤ t`, i.e. `n ≥ 3`.
+
+**Repair.** Lemma 10 holds for `3 ≤ n ≤ 3t`. A non-trivial problem is unauthenticated-solvable iff CC holds and (`n > 3t` or `n ≤ 2`). (`trivial_of_solvableSync`, `theorem4_unauth'`)
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 1 (the "without loss of generality" step)
+Lemma 1 is proved only for `t ≥ 8` divisible by 8: for other `t` the group sizes `t/4` and `t/2` must be rounded, and `t = 1` admits no group of size `≥ 1` of the required kind.
+
+**Impact.** Statement true for every `t < n`; repaired (`omission_lower_bound`, `omission_lower_bound_sq`, `one_message`).
+
+**Repair.** We prove a parametric bound (`⌈β/2⌉·σ` messages) and choose parameters for every `t`. For `t = 1` we add a separate zero-message argument: without any messages each process decides as in isolation, which contradicts Agreement in a mixed fault-free execution. (`omission_lower_bound`, `omission_lower_bound_sq`, `one_message`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -54,6 +49,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
   omission lower bounds transfer.
 - **Message complexity.** Messages sent by correct processes to *others* from time 0. Omitted messages count, and
   self-messages do not. Results are stated as "some valid run has `≥ …` messages within finite time".
+
+**Remarks.**
+- Algorithm 1 (Lemma 6) needs lock-step rounds. It assumes that a fault-free execution is determined by the
+  proposals. That fails if the adversary may choose delays in `[0, δ]` with `δ > 0`. This is harmless: the paper's
+  model is lock-step, and we prove Theorem 3 directly in the omission model for every `δ`.
+- The proof of Theorem 5 assumes "without loss of generality `n = 2t`"; we prove it for every `n ≤ 2t`.
+- "Without loss of generality, the default is 1" before Lemma 4 is made explicit.
+- As in the 2023 paper, "Γ is computable" requires the algorithm to be computable.
 
 **Main results in Lean** (namespace `AllBAExpensive`).
 

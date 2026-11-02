@@ -14,23 +14,28 @@ decision values, and Theorem 3's "Turing-computable `Λ`" needs computable algor
 
 ## Mistakes in the paper
 
-- **Lemma 3 (proof of Theorem 1) breaks down for `n < 2t` (proof gap; statement true).** The proof builds a
-  configuration in `I_{n−t}` from *all* `t` processes outside `π(base)` plus `n − 2t` processes of `π(base)`. For
-  `n < 2t` this is impossible: `t` processes do not fit into a configuration of size `n − t`, and `n − 2t < 0`.
-  The smallest instance is `n = 3`, `t = 2`, which the paper allows (`0 < t < n ≤ 3t`). Repair: take
-  `min(t, n − t)` processes outside `π(base)` and fill up from `π(base)`. This configuration is compatible with
-  `base` in the whole range. (`trivial_of_solvesConsensus_auth`)
-- **Theorem 2 is formally trivial.** "A finite procedure returning an always-admissible value" exists as soon as
-  one always-admissible value exists, which Theorem 1 gives: return that constant. (`alwaysAdmissible_computable`)
-- **Theorem 3's "Turing-computable Λ" needs computable algorithms.** The model allows arbitrary deterministic
-  state machines. Solvability then only yields *some* function `Λ`, not a computable one. We prove both versions:
-  any `Λ` for arbitrary algorithms, and a computable `Λ` (in Mathlib's sense) when the algorithm's transition
-  functions are computable. (`similarityCondition_of_solvable`, `similarityCondition_computable`)
-- **Implicit assumptions.**
-  - The proposal set must be nonempty. Otherwise there are no executions, every algorithm vacuously solves
-    consensus, and Theorem 1 fails when also `V_O = ∅`.
-  - (Not a paper issue.) "A correct process decides at most once" is stated in the paper (§3.2); our Agreement
-    also covers `p = q` to encode it.
+### ⚠️ Theorem 3 ("Turing-computable `Λ`")
+Theorem 3 claims a Turing-computable `Λ`, but the model allows arbitrary deterministic state machines, so solvability only yields *some* function `Λ`, not a computable one (`similarityCondition_of_solvable`).
+
+**Impact.** Needs the implicit assumption that algorithms are computable; with it the computable version holds (`similarityCondition_computable`).
+
+**Repair.** We prove both versions: any `Λ` for arbitrary algorithms, and a computable `Λ` (in Mathlib's sense) when the algorithm's transition functions are computable. (`similarityCondition_of_solvable`, `similarityCondition_computable`)
+
+### ⚠️ Theorem 1 (empty proposal set)
+Theorem 1 fails when the proposal set is empty and `V_O = ∅`: then there are no executions and every algorithm vacuously solves consensus.
+
+**Impact.** Degenerate case; the proposal set must be nonempty, which we assume.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 3 (proof of Theorem 1), case `n < 2t`
+The proof builds a configuration in `I_{n−t}` from *all* `t` processes outside `π(base)` plus `n − 2t` processes of `π(base)`, which is impossible for `n < 2t` (smallest instance `n = 3`, `t = 2`, allowed by `0 < t < n ≤ 3t`).
+
+**Impact.** Statement true; easily repaired (`trivial_of_solvesConsensus_auth`).
+
+**Details.** For `n < 2t`, `t` processes do not fit into a configuration of size `n − t`, and `n − 2t < 0`.
+
+**Repair.** Take `min(t, n − t)` processes outside `π(base)` and fill up from `π(base)`. This configuration is compatible with `base` in the whole range. (`trivial_of_solvesConsensus_auth`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -49,6 +54,12 @@ Full list of differences (including modelling choices and minor imprecisions): [
   consensus, Theorem 5, the full classification) is correspondingly weaker. Lifting it to the paper's model would
   need a view synchronizer, which is not formalized.
 - Solvability quantifies over algorithms whose state and message types are in `Type`.
+
+**Remarks.**
+- Theorem 2 is formally trivial. "A finite procedure returning an always-admissible value" exists as soon as one
+  always-admissible value exists, which Theorem 1 gives: return that constant. (`alwaysAdmissible_computable`)
+- "A correct process decides at most once" is stated in the paper (§3.2); our Agreement also covers `p = q` to
+  encode it.
 
 **Main results in Lean** (namespace `ValidityConsensus`).
 

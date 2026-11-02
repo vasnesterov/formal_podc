@@ -20,58 +20,50 @@ different, direct argument.
 
 ## Mistakes in the paper
 
-* **Corollary 3.2 is false as worded (imprecise statement).** It says that in an execution of BFDN,
-  `Reanchor` is called at most `D(k·min{log k, log Δ} + k)` times. But every robot standing at the root calls `Reanchor` in every
-  round (lines 6–7 of Algorithm 1). Take one robot on a star with two leaves (`D = 1`). The bound is `1`,
-  yet `Reanchor` is called in rounds 0 and 2, and the exploration is still unfinished at round 2. On a
-  star with many leaves and any `k`, the calls grow like `n`, while the bound does not depend on `n`.
-  All these calls return the root itself (depth 0), which is not a move of any urn game; read as
-  "assignments of anchors at depth `d ≥ 1`", the corollary is not refuted (random simulations on small
-  trees stay far below the bound), but the paper proves only the weaker per-depth constant below.
-  The statement the analysis needs is Lemma 2 [full version]: for each depth `d ≥ 1`, at most
-  `k(min{log k, log Δ} + 2)` anchor assignments go to nodes of depth `d`. We prove that lemma. Note the
-  `+2`: it is not `+1`, as the per-depth reading of Cor. 3.2 would suggest. (`corollary_3_2_false`;
-  `lemma_2`)
-* **Algorithm 1 (BA) does not explore the tree as written (pseudo-code slip).** Line 14 is `while not all robots are at the root`.
-  With one robot on the star with two leaves, every execution has the robot on a leaf after round 0 and
-  back at the root after round 1. The loop then stops with a leaf never visited. The prose of the BA
-  and the full version use the right condition (`while some robot changes position`), and that is the
-  one we formalize: we run until the tree is explored and all robots are back. This is a slip in the
-  pseudo-code. (`algorithm_1_loop_stops_early`)
-* **Claim 1 [full version, proof of Thm 1] is false.** It says at most `D + 1` rounds contain a robot
-  that does not move. The proof misses robots that are still on a breadth-first trip when the last
-  dangling edge is taken. Such a robot first walks down to its (now closed) anchor and only then
-  returns, while the others idle at the root for up to `2D − 1` rounds. Lean counterexample: `k = 3`
-  robots on a 7-node tree of depth `D = 4` (a path `1–3–5–6` and a path `2–4` below the root), with
-  lowest-index tie-breaking. In round 3 robot 2 is sent to node 5 at the moment robot 0 takes the last
-  dangling edge there. The run ends after 9 rounds, and 6 of them contain an idle robot (> `D+1 = 5`).
-  The correct bound is `2D`, which still fits in the slack of Theorem 2.1, so Theorem 2.1 is unaffected.
-  (`claim_1_false`; corrected: `card_idleRounds_le`)
-* **Lemma 2 [full version] (the per-depth bound behind Cor. 3.2): proof gap, statement true.** The
-  reduction to the urn game in Section 3.1 is a sketch, and the BFDN process is not literally a play of
-  the game:
-  * the load BFDN balances (`#{j : v_j = v}`) leaves out the robot exploring `T(v)`, which is "formally
-    re-anchored" only in the analysis;
-  * a node stops being a candidate as soon as its dangling edges are taken, without any robot returning
-    from it, so the player's argmin ranges over a subset of `U_t`;
-  * several urns can disappear between two re-assignments;
-  * the final "`+k` for the last `d` rounds" is off by one round, because robots leaving a node in the
-    very round it closes can be re-assigned once more.
+### ⚠️ Corollary 3.2 (number of calls to `Reanchor`)
+Corollary 3.2 bounds the number of calls to `Reanchor` by `D(k·min{log k, log Δ} + k)`, but every robot standing at the root calls `Reanchor` in every round, so one robot on a star with two leaves (`D = 1`, bound `1`) already calls it twice (`corollary_3_2_false`).
 
-  We prove the lemma directly. Open depth-`d` nodes are urns, and each holds its discoverer robot
-  (Claim 5, proved as an invariant). Loads stay balanced. A robot anchored at an open node cannot come
-  back. Removing an urn when `u` urns are alive frees at most `min(Δ, ⌈k/u⌉)` robots. These facts give
-  at most `S_k(Δ) = Σ_{u=1}^{k} min(Δ, ⌈k/u⌉) ≤ k(min{log Δ, log k} + 2)` assignments. The `log Δ`
-  part needs a careful window argument in the synchronous model. (`lemma_2`, `lemma_2_urnSum`,
-  `alloc_bound`, `sync_window`)
-* **Theorem 3.1 (game): proof gap, statement true.** Lemma 4 [full version] on the adversary's best
-  response is only sketched, and so is the final sum estimate. We prove the bound by direct accounting:
-  every play lasts at most `S_k(Δ) − k + 1` steps. (`game_ends`)
-* Typos and small slips: the strategy is written `argmin_{i∈[k]\{a_1,…,a_t}}` in the full version but
-  `a_0,…,a_t` in the BA (`a_0` must be included). "If `Δ ≥ k` the game stops when all urns have been
-  chosen" holds only for `Δ > k`. Claim 3 [full version] counts "explored dangling edges" per trip; the
-  accounting only needs the global inequality moves ≤ 2(n−1) + 2·Σ(anchor depths), and that is what we
-  prove.
+**Impact.** An imprecise wording: all these calls return the root (depth 0), which is not a move of any urn game. Read as "anchor assignments at depth `d ≥ 1`", the corollary is not refuted, but the paper proves only the weaker per-depth constant `+2`; that is what the analysis needs and what we prove (`lemma_2`).
+
+**Details.** In the star example, `Reanchor` is called in rounds 0 and 2, and the exploration is still unfinished at round 2 (lines 6–7 of Algorithm 1). On a star with many leaves and any `k`, the calls grow like `n`, while the bound does not depend on `n`. In the per-depth reading, random simulations on small trees stay far below the bound.
+
+**Repair.** The statement the analysis needs is Lemma 2 [full version]: for each depth `d ≥ 1`, at most `k(min{log k, log Δ} + 2)` anchor assignments go to nodes of depth `d`. We prove that lemma. Note the `+2`: it is not `+1`, as the per-depth reading of Cor. 3.2 would suggest. (`lemma_2`)
+
+### ⚠️ Algorithm 1 (BA), line 14 (loop condition)
+With line 14 `while not all robots are at the root`, Algorithm 1 stops with unexplored edges: one robot on the star with two leaves is on a leaf after round 0, back at the root after round 1, and the other leaf is never visited (`algorithm_1_loop_stops_early`).
+
+**Impact.** A pseudo-code slip: the prose of the BA and the full version use the right condition (`while some robot changes position`), and that is the one we formalize: we run until the tree is explored and all robots are back.
+
+### Typos and slips
+- The strategy is written `argmin_{i∈[k]\{a_1,…,a_t}}` in the full version but `a_0,…,a_t` in the BA (`a_0` must be included).
+- "If `Δ ≥ k` the game stops when all urns have been chosen" holds only for `Δ > k`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Claim 1 [full version, proof of Theorem 1] (idle rounds)
+Claim 1 says at most `D + 1` rounds contain a robot that does not move, but it is false: with `k = 3` robots on a 7-node tree of depth `D = 4`, 6 such rounds occur (`claim_1_false`).
+
+**Impact.** The correct bound is `2D` (`card_idleRounds_le`), which still fits in the slack of Theorem 2.1, so Theorem 2.1 is unaffected.
+
+**Details.** The proof misses robots that are still on a breadth-first trip when the last dangling edge is taken. Such a robot first walks down to its (now closed) anchor and only then returns, while the others idle at the root for up to `2D − 1` rounds. Lean counterexample: the tree is a path `1–3–5–6` and a path `2–4` below the root, with lowest-index tie-breaking. In round 3 robot 2 is sent to node 5 at the moment robot 0 takes the last dangling edge there. The run ends after 9 rounds, and 6 of them contain an idle robot (> `D+1 = 5`).
+
+### 🛠️ Lemma 2 [full version] (the per-depth bound behind Cor. 3.2)
+The reduction to the urn game in Section 3.1 is a sketch, and the BFDN process is not literally a play of the game.
+
+**Impact.** Statement true; proved by a different, direct argument (`lemma_2`).
+
+**Details.**
+* the load BFDN balances (`#{j : v_j = v}`) leaves out the robot exploring `T(v)`, which is "formally re-anchored" only in the analysis;
+* a node stops being a candidate as soon as its dangling edges are taken, without any robot returning from it, so the player's argmin ranges over a subset of `U_t`;
+* several urns can disappear between two re-assignments;
+* the final "`+k` for the last `d` rounds" is off by one round, because robots leaving a node in the very round it closes can be re-assigned once more.
+
+**Repair.** Open depth-`d` nodes are urns, and each holds its discoverer robot (Claim 5, proved as an invariant). Loads stay balanced. A robot anchored at an open node cannot come back. Removing an urn when `u` urns are alive frees at most `min(Δ, ⌈k/u⌉)` robots. These facts give at most `S_k(Δ) = Σ_{u=1}^{k} min(Δ, ⌈k/u⌉) ≤ k(min{log Δ, log k} + 2)` assignments. The `log Δ` part needs a careful window argument in the synchronous model. (`lemma_2`, `lemma_2_urnSum`, `alloc_bound`, `sync_window`)
+
+### 🛠️ Theorem 3.1 (urn game)
+Lemma 4 [full version] on the adversary's best response is only sketched, and so is the final sum estimate.
+
+**Impact.** Statement true; we prove the bound by direct accounting: every play lasts at most `S_k(Δ) − k + 1` steps (`game_ends`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -97,6 +89,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
   `(Σ'_t |act t|)/k ∈ ℝ≥0∞`. The model of Theorem 2.1 is `act t = univ`.
 * The urn game: arbitrary adversary moves, the player's balancing strategy with arbitrary tie-breaking,
   and plays of any finite length that have not stopped.
+
+Claim 3 [full version] counts "explored dangling edges" per trip; the accounting only needs the global
+inequality moves ≤ 2(n−1) + 2·Σ(anchor depths), and that is what we prove.
 
 **Main results in Lean.**
 
