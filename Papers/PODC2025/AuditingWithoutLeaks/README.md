@@ -15,70 +15,94 @@ value `w₀`. The paper never fixes the nonce domain.
 
 ## Mistakes in the paper
 
-* **Lemma 38 is false for natural-number nonces, at the initial value `w₀`.**
-  The claim: in Algorithm 2, for every value `w` and reader `p_j`, either `p_j` has a `w`-effective
-  read, or some execution indistinguishable to `p_j` has no `writeMax(w)`. The proof replaces
-  `(w, N)` by `(u, N')`, where `u` is "the largest input smaller than `w`" and `N' > N`.
-  Counterexample (values and nonces in ℕ, initial pair `(0, 0)`, one reader, two writers):
-  - writer A runs `writeMax(0)` with nonce 2, so `R` becomes `(1, (0,2), ·)`;
-  - writer B runs `writeMax(1)` with nonce 1, so `R` becomes `(2, (1,1), ·)`;
-  - the reader runs one read, fetching `(2, (1,1), ·)` and returning 1.
+### ❌ Lemma 38 (max-register extension, at the initial value `w₀`)
+With natural-number nonces, even fresh ones, a reader with no `w₀`-effective read can still learn
+that `writeMax(w₀)` occurred, so Lemma 38's "no writeMax has input `w`" in some indistinguishable
+execution fails for `w = w₀` (`lemma38_false`, all nonces; `lemma38_false_fresh`, fresh nonces).
 
-  The reader has no 0-effective read. Yet in every execution it cannot distinguish from this one, it
-  fetches the same triple. `R.seq` grows by one per change and `R.val` strictly increases, so the
-  pair stored at sequence number 1 lies strictly between `(0,0)` and `(1,1)`. That pair is `(0, N)`
-  with `N ≥ 1`, or `(1, 0)`. `(1, 0)` reuses the initial nonce and is excluded by freshness. So a
-  `writeMax(0)` occurs in every such execution. The reader learns that 0 was written without
-  reading it.
+**Impact.** A false numbered lemma in a secondary result (the max-register extension); the main
+result, Theorem 8, is unaffected. With nonces in ℕ the failure is confined to `w = w₀`, and the
+paper's own use (Algorithm 3, version numbers ≥ 1) never invokes `writeMax(w₀)`; see
+differencies.md, item 1, for the verdict call.
 
-  The proof fails because no input smaller than `w = w₀` exists. With bounded nonces (k-bit
-  strings) the leak the nonces were meant to prevent comes back: reading `(v, N_max)` and later
-  `(v+2, N_min)` two sequence numbers apart reveals a `writeMax(v+1)`. The lemma seems to need
-  nonces from a domain with no least and no greatest element, such as ℤ or ℚ. That case is not
-  formalized, and neither is the bounded-nonce leak.
+**Details.** The claim: in Algorithm 2, for every value `w` and reader `p_j`, either `p_j` has a
+`w`-effective read, or some execution indistinguishable to `p_j` has no `writeMax(w)`. The proof
+replaces `(w, N)` by `(u, N')`, where `u` is "the largest input smaller than `w`" and `N' > N`.
+Counterexample (values and nonces in ℕ, initial pair `(0, 0)`, one reader, two writers):
+- writer A runs `writeMax(0)` with nonce 2, so `R` becomes `(1, (0,2), ·)`;
+- writer B runs `writeMax(1)` with nonce 1, so `R` becomes `(2, (1,1), ·)`;
+- the reader runs one read, fetching `(2, (1,1), ·)` and returning 1.
 
-  How far this goes. With nonces in ℕ the failure is confined to `w = w₀`. Any other pair the
-  reader knows, it has fetched (which makes its read effective), and ℕ has no largest nonce.
-  `writeMax(w₀)` does not change the abstract max register, and the paper's own use (Algorithm 3,
-  version numbers ≥ 1) never invokes it. Our Lean counterexample uses two writers. Under a
-  per-instance reading of Definition 3, the writers could swap inputs, so it refutes Lemma 38's
-  "no writeMax has input `w`", not that reading of Theorem 40's clause. With a single writer the
-  swap is impossible, but that variant is argued, not formalized. This is a false numbered lemma in
-  a secondary result (the max-register extension); see differencies.md, item 1, for the verdict
-  call (`lemma38_false`, all nonces; `lemma38_false_fresh`, fresh nonces).
-* **Lemma 7's proof has two gaps (the statement is true).** The proof removes the reads of `p_k`
-  and flips bit `k` of the pads. This misses two effects of `p_k`.
-  - A direct read also runs `SN.compare&swap(sn−1, sn)` (line 5). If that step is the one that
-    moves `SN`, removing it changes the values of `SN` that `p_j` reads later.
-  - A writer's `R.compare&swap` may fail only because `p_k` inserted itself into the reader set.
-    Without `p_k` it would succeed earlier, and the executions diverge.
+The reader has no 0-effective read. Yet in every execution it cannot distinguish from this one, it
+fetches the same triple. `R.seq` grows by one per change and `R.val` strictly increases, so the
+pair stored at sequence number 1 lies strictly between `(0,0)` and `(1,1)`. That pair is `(0, N)`
+with `N ≥ 1`, or `(1, 0)`. `(1, 0)` reuses the initial nonce and is excluded by freshness. So a
+`writeMax(0)` occurs in every such execution. The reader learns that 0 was written without
+reading it.
 
-  Our repair: the writer poised at line 15 takes over `p_k`'s successful `SN` step. Writer loop
-  iterations whose compare&swap fails in α are dropped. These iterations start and end in the same
-  local state and only write `V`/`B`, which readers never read. With these repairs the lemma holds
-  in a stronger form: in the indistinguishable execution `p_k` invokes nothing at all (`lemma7`,
-  `read_uncompromised`).
-* **Claim 4, Lemma 3 and Lemma 5 need at least one writer and two distinct values.** These are
-  degenerate cases. Without writers, a read is `v₀`-effective as soon as it is invoked. An audit
-  invoked right after the invocation does not report it, so Lemma 5 fails. We assume a writer and
-  two distinct values; "multi-writer" implies the first (`claim4`, `lemma5`). Lemma 5 also needs
-  the audit to be invoked *after* α. An audit already running when the read becomes effective may
-  miss it. The proof ("linearized after the read is effective") shows this is the intended
-  reading.
-* **The linearization `L(α)` is described only in outline.** Rules R1–R3 push silent reads and
-  silent writes back before the visible write. We use a different, prefix-closed linearization
-  instead. The writes with sequence number `x+1` are linearized at the step that moves `SN` to
-  `x+1`. Fetch&xor and audit reads of `R` in the window between are linearized there too, in
-  access order. This gives strong linearizability, which the paper does not claim
-  (`alg1_stronglyLinearizable`).
-* **Typos and slips.**
-  - Algorithm 1, line 22: `lsa ← sn` should be `lsa ← rsn`.
-  - Line 21 uses `bits` for the audit's `rbits`.
-  - Lemma 19 has "for x > 1" where it means `x ≥ 1`.
-  - Claim 4's proof has "`x > prev_val`" where it means `prev_sn`.
-  - Appendix B: `q_x` reads `x − 1`, not `x`, from `SN`.
-  - Appendix B: `V[x−1]` and `B[x−1]` are finalized by `A_x`, not `V[x]` and `B[x]`.
-  - Algorithm 2, line 30: `continue` must restart at line 26, since `mval` is undefined otherwise.
+The proof fails because no input smaller than `w = w₀` exists. The paper never fixes the nonce
+domain. With bounded nonces (k-bit strings) the leak the nonces were meant to prevent comes back:
+reading `(v, N_max)` and later `(v+2, N_min)` two sequence numbers apart reveals a
+`writeMax(v+1)`. The lemma seems to need nonces from a domain with no least and no greatest
+element, such as ℤ or ℚ. That case is not formalized, and neither is the bounded-nonce leak.
+
+How far this goes. With nonces in ℕ the failure is confined to `w = w₀`. Any other pair the
+reader knows, it has fetched (which makes its read effective), and ℕ has no largest nonce.
+`writeMax(w₀)` does not change the abstract max register. Our Lean counterexample uses two
+writers. Under a per-instance reading of Definition 3, the writers could swap inputs, so it
+refutes Lemma 38's "no writeMax has input `w`", not that reading of Theorem 40's clause. With a
+single writer the swap is impossible, but that variant is argued, not formalized.
+
+### ⚠️ Claim 4, Lemma 3 and Lemma 5 (no writer, one value)
+These results fail without writers or with a single value: a read is then `v₀`-effective as soon
+as it is invoked, and an audit invoked right after the invocation does not report it, so Lemma 5
+fails.
+
+**Impact.** Degenerate cases: we assume a writer and two distinct values, and "multi-writer"
+implies the first (`claim4`, `lemma5`).
+
+**Details.** Lemma 5 also needs the audit to be invoked *after* α. An audit already running when
+the read becomes effective may miss it. The proof ("linearized after the read is effective") shows
+this is the intended reading.
+
+### Typos and slips
+- Algorithm 1, line 22: `lsa ← sn` should be `lsa ← rsn`.
+- Line 21 uses `bits` for the audit's `rbits`.
+- Lemma 19 has "for x > 1" where it means `x ≥ 1`.
+- Claim 4's proof has "`x > prev_val`" where it means `prev_sn`.
+- Appendix B: `q_x` reads `x − 1`, not `x`, from `SN`.
+- Appendix B: `V[x−1]` and `B[x−1]` are finalized by `A_x`, not `V[x]` and `B[x]`.
+- Algorithm 2, line 30: `continue` must restart at line 26, since `mval` is undefined otherwise.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 7 (removing the reads of `p_k`)
+The proof removes the reads of `p_k` and flips bit `k` of the pads, but misses two effects of
+`p_k`: its `SN` step and the writers' failed compare&swaps it causes.
+
+**Impact.** Statement true; repaired, and it holds in a stronger form: in the indistinguishable
+execution `p_k` invokes nothing at all (`lemma7`, `read_uncompromised`).
+
+**Details.**
+- A direct read also runs `SN.compare&swap(sn−1, sn)` (line 5). If that step is the one that
+  moves `SN`, removing it changes the values of `SN` that `p_j` reads later.
+- A writer's `R.compare&swap` may fail only because `p_k` inserted itself into the reader set.
+  Without `p_k` it would succeed earlier, and the executions diverge.
+
+**Repair.** The writer poised at line 15 takes over `p_k`'s successful `SN` step. Writer loop
+iterations whose compare&swap fails in α are dropped. These iterations start and end in the same
+local state and only write `V`/`B`, which readers never read.
+
+### 🛠️ Linearization `L(α)` (rules R1–R3, Lemmas 21–24)
+The linearization `L(α)` is described only in outline: rules R1–R3 push silent reads and silent
+writes back before the visible write.
+
+**Impact.** Statements true; we use a different, prefix-closed linearization, which even gives
+strong linearizability, not claimed by the paper (`alg1_stronglyLinearizable`).
+
+**Repair.** The writes with sequence number `x+1` are linearized at the step that moves `SN` to
+`x+1`. Fetch&xor and audit reads of `R` in the window between are linearized there too, in
+access order.
 
 Full list of differences, including modelling choices and minor imprecisions:
 [differencies.md](differencies.md).

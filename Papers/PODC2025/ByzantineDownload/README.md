@@ -14,54 +14,85 @@ query-optimal, time `O(nf)`) are correct; Theorem 3.6's proof needed a small rep
 
 ## Mistakes in the paper
 
-* **Algorithm 7 does not solve Download; Lemmas 5.13 and 5.15 are false.** Peers `M0,…,M3`,
-  `lead(v) = v mod 4`; `M1` and `M2` crash (`f = 2 ≤ βk` with `β = 1/2`). In the run below, "index" is the
-  paper's 1-based bit index.
-  - **View 1** (leader `M1`). `M1` sends `⟨view 1, 1, b₁⟩` to all, then crashes during its second
-    transmission, which reaches only `M2`. `M2` now has two messages, sets `I = 2` and sends
-    `⟨view change 2, 2⟩`. `M0` and `M3` see the silence and send `⟨view change 2, 1⟩`. All three
-    messages reach `M2` in the same round, so `M2` works on index 2.
-  - **View 2** (leader `M2`). `M2` queries `b₂` and crashes during its first transmission, which reaches
-    only `M0`; `M0` sets `I = 2`, `res[2] = b₂`. `M3` heard nothing, so it suspects `M2` one round earlier
-    than `M0` and sends `⟨view change 3, 1⟩` to `lead(3) = M3`, i.e. to itself.
-  - **View 3** (leader `M3`). `M3` starts when its own message arrives. Line 8 takes the highest index
-    among the view-change messages of *that round only*, which is 1. `M0`'s `⟨view change 3, 2⟩`
-    arrives one round later and is ignored ("for the first time", line 7). `M3` sends `⟨view 3, 1, b₁⟩`
-    twice. `M0` keeps `I = 2` (line 19: `1 < 2`), but on the second message line 23 increments `I` to 3
-    regardless of the index carried.
-  - **The skip.** At this point the nonfaulty `M0` has `I = 3`, while the nonfaulty `M3` has
-    `res[2] = ⊥`; this refutes Lemma 5.13. From now on every leader works on index `≥ 3`. `M3` downloads
-    bits 3 and 4, finishes with `I = 5 > n`, and keeps `res[2] = ⊥` forever, which refutes Lemma 5.15 and
-    the correctness of Algorithm 7.
+### ❌ Algorithm 7 (Rapid Download), Lemmas 5.13 and 5.15
+Algorithm 7 does not solve Download: with `k = 4` peers, `n = 4` bits and `f = 2` crashes
+(`β = 1/2`), a run makes the nonfaulty `M3` skip bit 2 and finish with `res[2] = ⊥`, which refutes
+Lemmas 5.13 and 5.15 (`Rapid.lemma_5_13_false`, `Rapid.lemma_5_15_false`,
+`Rapid.rapid_not_solves`).
 
-  The pseudocode is event-driven and does not fix initialisation or timing. We fix the round timing of the
-  paper's own Remark 1 (also Remark 2's claim "M will work on `i+1`" fails here). Under the other natural
-  timing (a view-changing peer stays idle for two rounds), a simulator finds the same index skip with
-  `n = 6`, caused by different `F` sets instead of different detection times. With Remark 1's timing, the protocol
-  still fails (simulation, `n = 6`) if a leader adopts a higher index that arrives later, as Remark 2
-  suggests. The theorem's `f ≤ βk`,
-  `β < 1` (also claimed in §1.4.3) contradicts Table 2, which marks Theorem 5.16 "#: `β ≤ 1/k`", i.e.
-  `f ≤ 1`. For `f = 1`, exhaustive simulation (`k ≤ 4`, `n ≤ 4`) found no failure; this is not a proof.
-  The existential Theorem 5.16 may still hold with a repaired protocol; this is not settled.
-  (`Rapid.lemma_5_13_false`, `Rapid.lemma_5_15_false`, `Rapid.rapid_not_solves`)
-* **Theorem 3.6: a false step in the proof of Lemma 3.4; the statement is true.** Eq. (8) claims
-  `p(R̂(Byz)) > (1 − e⁻¹)/2` *for every* Byzantine set `Byz`. This fails, e.g., when the defective peer
-  `v(R)` always lies in `Byz`. Only the average over the uniformly random `Byz` is bounded. That suffices
-  once the involution `Byz ↦ V \ (Byz ∪ {v(R)})` is applied per random profile `R`; the paper applies it
-  to sets that depend on `R`. We prove the derandomized statement: for every algorithm there are an input,
-  a bit `ℓ` and a fixed set of `(n−1)/2` Byzantine peers that run the algorithm on the input with `ℓ`
-  flipped, with failure probability `≥ (1 − e⁻¹)/4`. In Lemma 3.3, "q(i) is maximized when
-  `p_v(i) = 1/n`" is not justified; we use `1 − x ≤ e^{−x}` and pigeonhole instead. (`theorem_3_6`,
-  `lemma_3_3`)
-* **Minor.**
-  - Algorithm 7 never says how view 1 starts: no peer sends `⟨view change 1, ·⟩`. Read literally, all
-    peers suspect the nonfaulty `lead(1)` after one round, contradicting Lemma 5.11. We let `lead(1)`
-    start view 1 at time 0.
-  - Peer IDs are `[1, k]` but `lead(v) = v mod k ∈ [0, k−1]`.
-  - The proof of Theorem 5.9 says each nonfaulty peer leads "at most `n/γk`" views. The exact bound is
-    `(n + k − 1)/(k − f) ≤ 2n/(γk)`, which still gives `Q = O(n/γk)`.
-  - `T = O(nf)` is literally false for `f = 0` (it is `n`).
-  - In §3 the letter `n` is both the number of peers and of bits, and Lemma 3.3 needs them equal.
+**Impact.** Theorem 5.16 (time `O(n + f)` for any `β < 1`) is unestablished for `f ≥ 2`; the
+existential Theorem 5.16 may still hold with a repaired protocol, which is not settled. The lower
+bound (Theorem 3.6) and Static Download (Theorem 5.9) are unaffected.
+
+**Details.** Peers `M0,…,M3`, `lead(v) = v mod 4`; `M1` and `M2` crash (`f = 2 ≤ βk` with
+`β = 1/2`). In the run below, "index" is the paper's 1-based bit index.
+- **View 1** (leader `M1`). `M1` sends `⟨view 1, 1, b₁⟩` to all, then crashes during its second
+  transmission, which reaches only `M2`. `M2` now has two messages, sets `I = 2` and sends
+  `⟨view change 2, 2⟩`. `M0` and `M3` see the silence and send `⟨view change 2, 1⟩`. All three
+  messages reach `M2` in the same round, so `M2` works on index 2.
+- **View 2** (leader `M2`). `M2` queries `b₂` and crashes during its first transmission, which
+  reaches only `M0`; `M0` sets `I = 2`, `res[2] = b₂`. `M3` heard nothing, so it suspects `M2` one
+  round earlier than `M0` and sends `⟨view change 3, 1⟩` to `lead(3) = M3`, i.e. to itself.
+- **View 3** (leader `M3`). `M3` starts when its own message arrives. Line 8 takes the highest
+  index among the view-change messages of *that round only*, which is 1. `M0`'s
+  `⟨view change 3, 2⟩` arrives one round later and is ignored ("for the first time", line 7). `M3`
+  sends `⟨view 3, 1, b₁⟩` twice. `M0` keeps `I = 2` (line 19: `1 < 2`), but on the second message
+  line 23 increments `I` to 3 regardless of the index carried.
+- **The skip.** At this point the nonfaulty `M0` has `I = 3`, while the nonfaulty `M3` has
+  `res[2] = ⊥`; this refutes Lemma 5.13. From now on every leader works on index `≥ 3`. `M3`
+  downloads bits 3 and 4, finishes with `I = 5 > n`, and keeps `res[2] = ⊥` forever, which refutes
+  Lemma 5.15 and the correctness of Algorithm 7.
+
+The pseudocode is event-driven and does not fix initialisation or timing. We fix the round timing
+of the paper's own Remark 1 (also Remark 2's claim "M will work on `i+1`" fails here). Under the
+other natural timing (a view-changing peer stays idle for two rounds), a simulator finds the same
+index skip with `n = 6`, caused by different `F` sets instead of different detection times. With
+Remark 1's timing, the protocol still fails (simulation, `n = 6`) if a leader adopts a higher index
+that arrives later, as Remark 2 suggests. The theorem's `f ≤ βk`, `β < 1` (also claimed in §1.4.3)
+contradicts Table 2, which marks Theorem 5.16 "#: `β ≤ 1/k`", i.e. `f ≤ 1`. For `f = 1`,
+exhaustive simulation (`k ≤ 4`, `n ≤ 4`) found no failure; this is not a proof.
+
+### ⚠️ Algorithm 7 (start of view 1)
+Algorithm 7 never says how view 1 starts: no peer sends `⟨view change 1, ·⟩`, so read literally all
+peers suspect the nonfaulty `lead(1)` after one round, contradicting Lemma 5.11.
+
+**Impact.** A missing case with evident intent; we let `lead(1)` start view 1 at time 0.
+
+### ⚠️ Theorem 5.9 for `f = 0`
+`T = O(nf)` is literally false for `f = 0` (it is `n`).
+
+**Impact.** Degenerate case; the bound holds for `f ≥ 1`.
+
+### Typos and slips
+- Peer IDs are `[1, k]` but `lead(v) = v mod k ∈ [0, k−1]`.
+- In §3 the letter `n` is both the number of peers and of bits, and Lemma 3.3 needs them equal.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 3.6 (Eq. (8) in the proof of Lemma 3.4)
+Eq. (8) claims `p(R̂(Byz)) > (1 − e⁻¹)/2` *for every* Byzantine set `Byz`, which fails, e.g., when
+the defective peer `v(R)` always lies in `Byz`.
+
+**Impact.** Statement true; we prove a derandomized version (`theorem_3_6`).
+
+**Details.** Only the average over the uniformly random `Byz` is bounded. That suffices once the
+involution `Byz ↦ V \ (Byz ∪ {v(R)})` is applied per random profile `R`; the paper applies it to
+sets that depend on `R`.
+
+**Repair.** For every algorithm there are an input, a bit `ℓ` and a fixed set of `(n−1)/2`
+Byzantine peers that run the algorithm on the input with `ℓ` flipped, with failure probability
+`≥ (1 − e⁻¹)/4`.
+
+### 🛠️ Lemma 3.3 (maximizing `q(i)`)
+The claim "q(i) is maximized when `p_v(i) = 1/n`" is not justified.
+
+**Impact.** Statement true; we use `1 − x ≤ e^{−x}` and pigeonhole instead (`lemma_3_3`).
+
+### 🛠️ Theorem 5.9 (query bound)
+The proof says each nonfaulty peer leads "at most `n/γk`" views, but the exact bound is
+`(n + k − 1)/(k − f) ≤ 2n/(γk)`.
+
+**Impact.** Statement true: the exact bound still gives `Q = O(n/γk)` (`theorem_5_9_queries`, `Static.theorem_5_9`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

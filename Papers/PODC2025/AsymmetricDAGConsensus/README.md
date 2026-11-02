@@ -13,45 +13,72 @@ Section 4 is not formalized.
 
 ## Mistakes in the paper
 
-* **The "`log n − 1` rounds" claim is false (Appendix A; also "would require `log n` rounds",
-  §3).** Appendix A says that, by quorum consistency, the common core "can be obtained in
-  `log n − 1` rounds" of receiving messages from a quorum and sending them on. For `n = 8` that is
-  `log₂ 8 − 1 = 2` rounds. Counterexample: 8 processes with single quorums `{1,2,4}`, `{3,4,5}`,
-  `{1,4,5}`, `{1,5}`, `{1,3,4}`, plus three processes that copy the first quorum. The quorums
-  pairwise intersect, so the canonical fail-prone system satisfies `B³`. All processes are correct
-  and each one hears exactly its own quorum. After 2 rounds no quorum lies inside every output.
-  After 3 rounds a common core does exist. The first five processes alone already defeat 2 rounds
-  (5 < 2³), so the §3.2 heuristic "3 rounds suffice below 16 = 2⁴ processes" does not carry over to
-  2 rounds. Rounds are counted as the paper counts them: "the 3 rounds of Algorithm 2", which waits
-  for a quorum three times. With the floor reading, `⌊log₂ 30⌋ − 1 = 3`, the claim is refuted by
-  the paper's own Figure 1. This is an unproved side remark, not a headline result.
-  (`log_rounds_claim_false`, `two_rounds_five_processes`)
-* **Lemmas 3.5 and 3.7: two proof gaps, statements true.**
-  (i) Lemma 3.5 goes "all quorums contain a wise process (Lemma 7 of Alpos et al.), so a wise
-  process sent `CONFIRM`; apply Lemma 3.4". But Lemma 3.4 needs a *maximal-guild* member, and a
-  wise process need not be one. Fix: a quorum `Q` of a guild member `g` meets `g`'s quorum inside
-  the guild, so `Q` contains a guild member. (ii) Lemma 3.7 picks a process in `Qᵢ ∩ Qⱼ` and uses
-  that it put `Sᵢ` into its `T`. That process may be Byzantine. Both `pᵢ` and `pⱼ` are wise, though,
-  so consistency against the actual faulty set gives a *correct* process in the intersection. In
-  the same way, Lemma 3.5's "the processes of `Qᵢ` receive `DISTRIBUTES` before sending
-  `DISTRIBUTET`" only makes sense for the correct members of `Qᵢ`. We prove that version.
-  (`lemma_3_5`, `lemma_3_7`, `exists_candidate`)
-* **Definition 3.1 has no termination property.** A protocol that never ag-delivers satisfies
-  Definition 3.1 as written. Lemma 3.8 and the text clearly intend that every maximal-guild member
-  ag-delivers, and Algorithm 3 does. We prove termination too. (`termination`, `lemma_3_8`)
-* **Small slips.**
-  - Appendix A's "easy way to observe" no common core is a non sequitur. "Every `S` set has an
-    element in `[16,30]`" plus "every `U` misses some element of `[16,30]`" does not imply that no
-    `S` lies in all `U`s. The conclusion is still true (`fig1_no_core`).
-  - §3.2 says "3 rounds, fewer than 16 processes", then "`n` rounds, fewer than `2ⁿ`
-    processes". These two statements do not match: `2³ = 8`.
-  - §3.2 says Algorithm 2 gives a common core "after four rounds". Elsewhere it speaks of three
-    rounds; "four" presumably also counts the input broadcast, as DAG-Rider's 4-round waves do.
-    With that count the "`log n − 1`" claim is off by even more.
-  - Line 62 ("upon receiving `DISTRIBUTET` from a quorum, ag-deliver `U`") should count only
-    `DISTRIBUTET` messages already incorporated by line 60, that is, those with `T ⊆ Sᵢ`. If not,
-    `U` may lack the core. We model the intended reading.
-  - §2.4: "`2f − 1` processes" should be `2f + 1`.
+### ❌ Appendix A, "common core in `log n − 1` rounds" (also "would require `log n` rounds", §3)
+The quorum-replacement pattern does not reach a common core in `log n − 1` rounds: for `n = 8`
+(`log₂ 8 − 1 = 2` rounds) a fault-free `B³` system has a run with no common core after 2 rounds
+(`log_rounds_claim_false`, `two_rounds_five_processes`).
+
+**Impact.** An unproved side remark, not a headline result; Lemma 3.2 and the new gather
+(Algorithm 3) are unaffected.
+
+**Details.** Appendix A says that, by quorum consistency, the common core "can be obtained in
+`log n − 1` rounds" of receiving messages from a quorum and sending them on. Counterexample: 8
+processes with single quorums `{1,2,4}`, `{3,4,5}`, `{1,4,5}`, `{1,5}`, `{1,3,4}`, plus three
+processes that copy the first quorum. The quorums pairwise intersect, so the canonical fail-prone
+system satisfies `B³`. All processes are correct and each one hears exactly its own quorum. After 2
+rounds no quorum lies inside every output. After 3 rounds a common core does exist. The first five
+processes alone already defeat 2 rounds (5 < 2³), so the §3.2 heuristic "3 rounds suffice below
+16 = 2⁴ processes" does not carry over to 2 rounds. Rounds are counted as the paper counts them:
+"the 3 rounds of Algorithm 2", which waits for a quorum three times. With the floor reading,
+`⌊log₂ 30⌋ − 1 = 3`, the claim is refuted by the paper's own Figure 1.
+
+### ⚠️ Definition 3.1 (asymmetric gather, no termination)
+Definition 3.1 has no termination property, so a protocol that never ag-delivers satisfies it.
+
+**Impact.** Evident intent: Lemma 3.8 and the text clearly intend that every maximal-guild member
+ag-delivers, and Algorithm 3 does. We prove termination too (`termination`, `lemma_3_8`).
+
+### Typos and slips
+- §3.2 says "3 rounds, fewer than 16 processes", then "`n` rounds, fewer than `2ⁿ`
+  processes". These two statements do not match: `2³ = 8`.
+- §3.2 says Algorithm 2 gives a common core "after four rounds". Elsewhere it speaks of three
+  rounds; "four" presumably also counts the input broadcast, as DAG-Rider's 4-round waves do.
+  With that count the "`log n − 1`" claim is off by even more.
+- Line 62 ("upon receiving `DISTRIBUTET` from a quorum, ag-deliver `U`") should count only
+  `DISTRIBUTET` messages already incorporated by line 60, that is, those with `T ⊆ Sᵢ`. If not,
+  `U` may lack the core. We model the intended reading.
+- §2.4: "`2f − 1` processes" should be `2f + 1`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 3.5 (wise vs. maximal-guild process)
+The proof goes "all quorums contain a wise process (Lemma 7 of Alpos et al.), so a wise process
+sent `CONFIRM`; apply Lemma 3.4", but Lemma 3.4 needs a *maximal-guild* member, and a wise process
+need not be one.
+
+**Impact.** Statement true (for the correct members of the quorum, see below); repaired
+(`lemma_3_5`, `exists_candidate`).
+
+**Details.** The statement's "the processes of `Qᵢ` receive `DISTRIBUTES` before sending
+`DISTRIBUTET`" only makes sense for the correct members of `Qᵢ`. We prove that version.
+
+**Repair.** A quorum `Q` of a guild member `g` meets `g`'s quorum inside the guild, so `Q` contains
+a guild member.
+
+### 🛠️ Lemma 3.7 (possibly Byzantine intersection process)
+The proof picks a process in `Qᵢ ∩ Qⱼ` and uses that it put `Sᵢ` into its `T`, but that process may
+be Byzantine.
+
+**Impact.** Statement true; repaired (`lemma_3_7`).
+
+**Repair.** Both `pᵢ` and `pⱼ` are wise, so consistency against the actual faulty set gives a
+*correct* process in the intersection.
+
+### 🛠️ Lemma 3.2 (Appendix A, "easy way to observe" no common core)
+The argument is a non sequitur: "every `S` set has an element in `[16,30]`" plus "every `U` misses
+some element of `[16,30]`" does not imply that no `S` lies in all `U`s.
+
+**Impact.** The conclusion is still true; checked directly (`fig1_no_core`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
