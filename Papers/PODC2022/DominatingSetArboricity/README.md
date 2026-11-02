@@ -20,35 +20,50 @@ No stated result is false outside degenerate corners (Lemma 4.6 at `λ = 1`, The
 
 ## Mistakes in the paper
 
-* **Theorem 1.3's arithmetic fails for large `k`.** The proof uses Lemma 4.6 with `γ = Δ^{1/k}`, which yields the
-  factor `γ(γ+1)⌈log_γ(Δ+1)⌉`. This is `≤ Δ^{1/k}(Δ^{1/k}+1)(k+1)` only if `(Δ+1)^k ≤ Δ^{k+1}`, and `γ > 1`
-  needs `Δ ≥ 2`. For `Δ = k = 2`, `⌈log_{√2} 3⌉ = 4`, so the proof gives about 13.7 instead of the claimed 10.2.
-  *Severity:* proof gap, statement true. In the uncovered regime the claimed factor is at least `Δ + 1`, and the
-  trivial one-round algorithm "every node picks a lightest node of `N⁺_v`" achieves `Δ + 1`. (`logb_gap`,
-  `claimed_factor_ge`, `trivial_approx`; combined statement `theorem_1_3_full`)
-* **Observation A.1: the algorithm in the proof fails on `K₂`.** The observation claims that *some*
-  single-round 3-approximation exists on graphs of arboricity 1, and this is true. But the algorithm of the
-  proof, "take all non-leaf nodes" (also stated in the introduction for trees), outputs nothing on a single
-  edge `K₂`, since both nodes are leaves. If "non-leaf" means "degree ≥ 2", isolated vertices are missed too.
-  *Severity:* proof gap, statement true. *Fix:* also output the larger-ID endpoint of every `K₂` component;
-  this is still one round. The paper's parent/grandparent charging then gives the factor 3. It needs only an
-  orientation of out-degree ≤ 1, so pseudoforests are covered too. (`obsA1_proof_alg_fails_K2`,
-  `observation_A_1_fixed`)
-* **Lemma 4.6 is under-specified at `λ = 1`.** The lemma says "for `λ > 0`". Its input is "the output of
-  Lemma 4.1", which forces `λ < 1`, but this is not stated. Taken literally with `λ = 1`, there are
-  `⌈log_γ λ⁻¹⌉ = 0` phases, so `S'` is empty. Example: a single vertex with `w = x = 1` and `S = ∅`. We assume
-  `λ < 1`, which every application satisfies. The lemma also writes `E[w_{S'}] = …` where `≤ …` is meant.
-  (`lemma_4_6_false_lam_one`, `lemma_4_6_dominating`)
-* **Lemma 4.7: missing justification for adaptivity.** The proof bounds `E[c_v]` via "the sequence
-  `d_1 ≥ … ≥ d_r` that maximizes `E[c_v]`". But the `d_i` are random and depend on earlier coin flips, and the
-  proof does not explain why a bound for every fixed sequence bounds the expectation. A standard argument closes
-  the gap, since the coins are fresh in every iteration. We prove Lemmas 4.7 and 4.8 together by backward
-  induction with the potential `γ ∑_{v undominated} x_v (p_i d_v + γ)`, using `(1-p)^d (1+pd) ≤ 1`.
-  (`lemma_4_6_expect`)
-* **Minor slips:**
-  - Lemma 4.1 and Theorem 1.1 need `α ≥ 1`. For `α = 0` the parameter `λ = 1/((2α+1)(1+ε))` violates
-    `λ < 1/((α+1)(1+ε))`; arboricity-0 graphs are edgeless and trivial.
-  - The round bound `O(log(Δ/α)/ε)` should be `O(1 + log(Δ/α)/ε)`.
+### ⚠️ Lemma 4.6 at `λ = 1` (randomized extension)
+Read literally with `λ = 1` (the lemma only says "for `λ > 0`"), there are `⌈log_γ λ⁻¹⌉ = 0` phases, so `S'` is empty and `S ∪ S'` need not dominate, e.g. for a single vertex with `w = x = 1` and `S = ∅` (`lemma_4_6_false_lam_one`).
+
+**Impact.** Under-specified hypothesis: the lemma's input is "the output of Lemma 4.1", which forces `λ < 1`,
+but this is not stated. We assume `λ < 1`, which every application satisfies (`lemma_4_6_dominating`).
+
+### ⚠️ Lemma 4.1 and Theorem 1.1 at `α = 0`
+Lemma 4.1 and Theorem 1.1 need `α ≥ 1`: for `α = 0` the parameter `λ = 1/((2α+1)(1+ε))` violates `λ < 1/((α+1)(1+ε))`.
+
+**Impact.** Degenerate: arboricity-0 graphs are edgeless and the theorem is trivial there. We assume `α ≥ 1`.
+
+### Typos and slips
+- Lemma 4.6 writes `E[w_{S'}] = …` where `≤ …` is meant.
+- The round bound `O(log(Δ/α)/ε)` should be `O(1 + log(Δ/α)/ε)`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 1.3 (arithmetic for large `k`)
+The proof uses Lemma 4.6 with `γ = Δ^{1/k}`, whose factor `γ(γ+1)⌈log_γ(Δ+1)⌉` is `≤ Δ^{1/k}(Δ^{1/k}+1)(k+1)` only if `(Δ+1)^k ≤ Δ^{k+1}` (and `γ > 1` needs `Δ ≥ 2`); for `Δ = k = 2`, `⌈log_{√2} 3⌉ = 4`, so the proof gives about 13.7 instead of the claimed 10.2 (`logb_gap`).
+
+**Impact.** Statement true: in the uncovered regime the claimed factor is at least `Δ + 1`, and the trivial
+one-round algorithm "every node picks a lightest node of `N⁺_v`" achieves `Δ + 1` (`claimed_factor_ge`,
+`trivial_approx`; combined statement `theorem_1_3_full`).
+
+### 🛠️ Observation A.1 (the algorithm of the proof fails on `K₂`)
+The algorithm of the proof, "take all non-leaf nodes" (also stated in the introduction for trees), outputs nothing on a single edge `K₂`, since both nodes are leaves (`obsA1_proof_alg_fails_K2`).
+
+**Impact.** Statement true: the observation claims only that *some* single-round 3-approximation exists on
+graphs of arboricity 1 (`observation_A_1_fixed`).
+
+**Details.** If "non-leaf" means "degree ≥ 2", isolated vertices are missed too.
+
+**Repair.** Also output the larger-ID endpoint of every `K₂` component; this is still one round. The paper's
+parent/grandparent charging then gives the factor 3. It needs only an orientation of out-degree ≤ 1, so
+pseudoforests are covered too.
+
+### 🛠️ Lemma 4.7 (adaptive degrees)
+The proof bounds `E[c_v]` via "the sequence `d_1 ≥ … ≥ d_r` that maximizes `E[c_v]`", but the `d_i` are random and depend on earlier coin flips, and the proof does not explain why a bound for every fixed sequence bounds the expectation.
+
+**Impact.** Statement true; a standard argument closes the gap, since the coins are fresh in every iteration
+(`lemma_4_6_expect`).
+
+**Repair.** We prove Lemmas 4.7 and 4.8 together by backward induction with the potential
+`γ ∑_{v undominated} x_v (p_i d_v + γ)`, using `(1-p)^d (1+pd) ≤ 1`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

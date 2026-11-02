@@ -11,27 +11,32 @@ of Lemma 8 had to be repaired. The clock-synchronization results (Sections 3 and
 
 ## Mistakes in the paper
 
-* **Lemma 8: the induction step is written backwards (the statement is true).** The induction is on the
-  number `k` of `⊥` values received by honest nodes. The paper starts from a `k`-execution and replaces one
-  value by `⊥`. It then concludes `x ∈ I_w ⊇ Ĩ_w`, where `Ĩ_w` is the interval *with* the extra `⊥`. This
-  inclusion points the wrong way: Lemma 7 says that a `⊥` *enlarges* the interval, so the correct step is
-  `x ∈ I_w ⊆ Ĩ_w`. The step is also built in the wrong direction. To cover every `(k+1)`-execution, one must
-  start from an arbitrary `(k+1)`-execution and remove a `⊥` (honest `w`, faulty dealer `d`). The `⊥` must be
-  replaced by the value the other honest nodes got from `d` (any value if all of them got `⊥`). Only then does
-  the `k`-configuration still satisfy crusader consistency, so that the induction hypothesis applies. The
-  closing sentence "this construction applies for any inputs … the claim follows for all executions" leaves
-  this out. The repaired induction runs over configurations of CB outputs that satisfy validity and crusader
-  consistency (`lemma_8`). A direct argument via order statistics of the common values would also work.
-* **Small slips.**
-  - Lemma 7's proof writes the lists with lengths `n − k` and `n − k + 1` instead of `n − b` and `n − b + 1`.
-    The upper indices are off by `b`: the retained maximum is the `(n − f)`-th smallest value in both lists, not
-    `r̃^{n−(f−(b−1))}` and `r^{n−(f−b)}`. The inequalities used are correct.
-  - Definition 6 and Algorithm CB (Figure 4) are stated for binary inputs `b_v ∈ {0, 1}`. APA uses them for
-    real values. Signatures work for any message, and we formalize CB on reals directly.
-  - Corollary 2 "repeats the algorithm" with fresh CB instances. This needs signatures tagged with the
-    iteration number (a session id). Without the tag, the adversary can echo an honest dealer's signature from an
-    earlier iteration and make honest nodes output `⊥` for an honest dealer, which breaks CB validity. Our
-    tokens carry the iteration number.
+No mistakes in the statements.
+
+### Typos and slips
+- Lemma 7's proof writes the lists with lengths `n − k` and `n − k + 1` instead of `n − b` and `n − b + 1`.
+  The upper indices are off by `b`: the retained maximum is the `(n − f)`-th smallest value in both lists, not
+  `r̃^{n−(f−(b−1))}` and `r^{n−(f−b)}`. The inequalities used are correct.
+- Definition 6 and Algorithm CB (Figure 4) are stated for binary inputs `b_v ∈ {0, 1}`. APA uses them for
+  real values. Signatures work for any message, and we formalize CB on reals directly.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 8 (induction step written backwards)
+The induction step concludes `x ∈ I_w ⊇ Ĩ_w`, where `Ĩ_w` is the interval *with* the extra `⊥`, but Lemma 7 gives the opposite inclusion, and the step goes from a `k`-execution to some `(k+1)`-execution instead of covering every one.
+
+**Impact.** Statement true; repaired induction (`lemma_8`).
+
+**Details.** The induction is on the number `k` of `⊥` values received by honest nodes. The paper starts from
+a `k`-execution and replaces one value by `⊥`. Lemma 7 says that a `⊥` *enlarges* the interval, so the
+correct step is `x ∈ I_w ⊆ Ĩ_w`. To cover every `(k+1)`-execution, one must start from an arbitrary
+`(k+1)`-execution and remove a `⊥` (honest `w`, faulty dealer `d`). The `⊥` must be replaced by the value the
+other honest nodes got from `d` (any value if all of them got `⊥`). Only then does the `k`-configuration still
+satisfy crusader consistency, so that the induction hypothesis applies. The closing sentence "this
+construction applies for any inputs … the claim follows for all executions" leaves this out.
+
+**Repair.** The induction runs over configurations of CB outputs that satisfy validity and crusader
+consistency. A direct argument via order statistics of the common values would also work.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -45,7 +50,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
   iteration `j` is `v`". Honest nodes are `Unforging` (proved: `alg_unforging`). The adversary
   (`Scenario.AuthValid`) is rushing and eavesdropping. It can send any token signed by a corrupted node, or any
   token an honest node has emitted in this round or earlier. This is the paper's "rushing adversary that cannot
-  forge signatures".
+  forge signatures". Corollary 2 "repeats the algorithm" with fresh CB instances. This needs signatures
+  tagged with the iteration number (a session id). Without the tag, the adversary can echo an honest dealer's
+  signature from an earlier iteration and make honest nodes output `⊥` for an honest dealer, which breaks CB
+  validity. Our tokens carry the iteration number.
 * `alg f K` runs `K` iterations of APA, two rounds each (the two rounds of Algorithm CB). All `n` CB instances
   run in parallel. After round `2K` every node decides its last value. CB at node `w` for dealer `d`: output
   `⊥` if `d`'s token is invalid or missing, or if an echo carries a valid signature of `d` with a different

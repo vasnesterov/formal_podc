@@ -18,61 +18,63 @@ over the wrong set of executions. A few statements fail in degenerate cases.
 
 ## Mistakes in the paper
 
-1. **Lemma 16, Case 2, property (d) for `i+1` (proof gap; statement true).**
-   * **What is needed.** If the block swap `dβ_i` changes an object of `Y_i ∪ {B}` when applied in `C_{i+1}λ'`,
-     then `Q` is univalent in `C_{i+1}λ'dβ_i`.
-   * **What the proof shows.** Via Lemma 14(b), only that `Q` is univalent in `C_{i+1}λ'd`, and then says
-     "therefore".
-   * **Why that is not enough.** Univalence of `Q` is not preserved by steps of processes outside `Q`. The block
-     `β_i` is such a step sequence.
-   * **Repair.** Split cases.
-     * If `β_i` changes an object of `Y_i` in `C_{i+1}λ'd`, the induction hypothesis (d), with `λ = γα_jλ'd`,
-       applies directly.
-     * Otherwise `β_i` leaves the memory unchanged. Observation 15 then transfers univalence from `C_{i+1}λ'd` to
-       `C_{i+1}λ'dβ_i`.
+### ⚠️ Observation 4 for `m = 1` (Algorithm 1)
+Observation 4 ("`V[x] ≥ 2` when `x` is decided") is false for `m = 1`: the only value is decided with `V[0] = 1` (`example` in `Alg1Agree.lean`).
 
-   (`lemma16_step`)
-2. **Valency definitions are ambiguous, and Lemma 13 depends on the reading (under-specified definition).**
-   * **The ambiguity.** "`P` is bivalent in `C` if … there is an execution from `C` … in which some process in
-     `P` decides `v`" does not say whether decisions taken before `C` count.
-   * **Where it matters.** Lemma 13's proof uses "`Q` is `v̄`-univalent in `Cαβ`", where `α` contains a decision
-     of `v̄`.
-   * **Why the strict reading fails.** If decisions must happen inside the extension, and both processes of `Q`
-     have already decided in `α`, then `Q` is vacuously `v`-univalent in `Cαβ` as well. The prefix `α'` used by
-     the proof need not exist.
-   * **Fix.** Count earlier decisions (`CanDec`), or cut `α` after its first decision. We do the former; with
-     agreement, nothing else in the paper changes.
+**Impact.** Degenerate case: Lemma 6 uses Observation 4 only when two values are decided, so nothing breaks
+(`lemma6_agreement`).
 
-   (`CanDec`, `lemma13`)
-3. **Lemma 14 picks `j` over the wrong set of executions (proof gap; statement true).**
-   * **The paper's choice.** `j` is the least index such that `Q` is univalent after *every* execution `α ∼_{p_i}
-     δ_{j+1}` from `C`.
-   * **Why (a) does not follow.** Minimality then only yields some bivalent execution `α_{j'}`. Part (a) needs a
-     `(Q ∪ P_i)`-only one.
-   * **Fix.** The minimum must range over `(Q ∪ P_i)`-only executions. Parts (b) and (c) only use such
-     executions, so the fix is harmless.
+### Typos and slips
+- Lemma 16, Case 2: "then `P` is univalent" should be `Q`.
+- Section 5.2: "`S_1 = {p_1}` covers" should be `{p_0}`.
+- Lemma 6, Step 1: "`V_j[v_j] = ℓ_j > V_{k+1}[v_j] + 2`" should read `x_j` for `v_j`.
 
-   (`lemma14`)
-4. **Algorithm 1 (Observation 4, Lemma 6): degenerate case and a missing case.**
-   * **`m = 1`.** Observation 4 ("`V[x] ≥ 2` when `x` is decided") is false: the only value is decided with
-     `V[0] = 1`. Lemma 6 uses Observation 4 only when two values are decided, so nothing breaks.
-   * **Lemma 6, Step 2.** The proof splits into "`C` before `C_t`" and "`C` after `C_t`" and omits `C = C_t`.
-     That case is trivial: it would force `q = p_t`.
+## Proof gaps (statements true)
 
-   (`example` in `Alg1Agree.lean`, `lemma6_agreement`)
-5. **Theorem 10, induction step (imprecision).**
-   * **The claim.** "The algorithm solves `k`-valued `(k−1)`-set agreement among the processes in `R`."
-   * **The problem.** Validity only says that a decided value is the input of *some* process. In an `R`-only
-     execution, a decided value could therefore be the input of a process outside `R`, so the restriction does
-     not obviously satisfy validity.
-   * **Fix.** Reset the inputs outside `R`, which is invisible to `R`. We use a different split of `R` (peel off
-     `#objects + 1` processes), which gives the same bound with no base case and no hypothesis `n > k`.
+### 🛠️ Lemma 16, Case 2, property (d) for `i+1`
+The proof shows only that `Q` is univalent in `C_{i+1}λ'd` (via Lemma 14(b)) and then says "therefore" `Q` is univalent in `C_{i+1}λ'dβ_i`, but univalence of `Q` is not preserved by steps of processes outside `Q`, and the block `β_i` is such a step sequence.
 
-   (`theorem10_gen`)
-6. **Typos.**
-   * Lemma 16, Case 2: "then `P` is univalent" should be `Q`.
-   * Section 5.2: "`S_1 = {p_1}` covers" should be `{p_0}`.
-   * Lemma 6, Step 1: "`V_j[v_j] = ℓ_j > V_{k+1}[v_j] + 2`" should read `x_j` for `v_j`.
+**Impact.** Statement true; repaired by a case split (`lemma16_step`).
+
+**Details.** What is needed: if the block swap `dβ_i` changes an object of `Y_i ∪ {B}` when applied in
+`C_{i+1}λ'`, then `Q` is univalent in `C_{i+1}λ'dβ_i`.
+
+**Repair.**
+* If `β_i` changes an object of `Y_i` in `C_{i+1}λ'd`, the induction hypothesis (d), with `λ = γα_jλ'd`,
+  applies directly.
+* Otherwise `β_i` leaves the memory unchanged. Observation 15 then transfers univalence from `C_{i+1}λ'd` to
+  `C_{i+1}λ'dβ_i`.
+
+### 🛠️ Lemma 13 (ambiguous valency definitions)
+"`P` is bivalent in `C` if … there is an execution from `C` … in which some process in `P` decides `v`" does not say whether decisions taken before `C` count, and Lemma 13's proof works only if they do.
+
+**Impact.** Statement true under the inclusive reading; with agreement, nothing else in the paper changes
+(`CanDec`, `lemma13`).
+
+**Details.** Lemma 13's proof uses "`Q` is `v̄`-univalent in `Cαβ`", where `α` contains a decision of `v̄`. If
+decisions must happen inside the extension, and both processes of `Q` have already decided in `α`, then `Q`
+is vacuously `v`-univalent in `Cαβ` as well. The prefix `α'` used by the proof need not exist.
+
+**Repair.** Count earlier decisions (`CanDec`), or cut `α` after its first decision. We do the former.
+
+### 🛠️ Lemma 14 (choice of `j`)
+The proof picks `j` as the least index such that `Q` is univalent after *every* execution `α ∼_{p_i} δ_{j+1}` from `C`, but then minimality only yields some bivalent execution `α_{j'}`, while part (a) needs a `(Q ∪ P_i)`-only one.
+
+**Impact.** Statement true; the minimum must range over `(Q ∪ P_i)`-only executions. Parts (b) and (c) only
+use such executions, so the fix is harmless (`lemma14`).
+
+### 🛠️ Lemma 6, Step 2 (missing case)
+The proof splits into "`C` before `C_t`" and "`C` after `C_t`" and omits `C = C_t`.
+
+**Impact.** Statement true; the case is trivial, since it would force `q = p_t` (`lemma6_agreement`).
+
+### 🛠️ Theorem 10, induction step (restricted algorithm)
+The claim "the algorithm solves `k`-valued `(k−1)`-set agreement among the processes in `R`" does not obviously hold, because in an `R`-only execution a decided value could be the input of a process outside `R`, so validity may fail.
+
+**Impact.** Statement true; repaired (`theorem10_gen`).
+
+**Repair.** Reset the inputs outside `R`, which is invisible to `R`. We use a different split of `R` (peel off
+`#objects + 1` processes), which gives the same bound with no base case and no hypothesis `n > k`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

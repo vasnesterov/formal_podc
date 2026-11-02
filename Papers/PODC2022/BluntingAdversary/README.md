@@ -11,33 +11,54 @@ random steps; for `r ≥ 2` the stated bound remains unestablished (neither prov
 
 ## Mistakes in the paper
 
-- **Lemma 4.3 is false.** It claims `Prob[(P(O^k)||A → B) | X] ≤ Prob[P(O^a) → B]` for every adversary `A`,
-  where `X` = "every object random step picks a randomization-free preamble iteration". Conditioning on `X`
-  biases the program's own coins: the adversary can decide, after seeing the first coin, whether the
-  preamble iteration that might be chosen later overlaps the second coin. Instance: processes `p, q`; a register
-  `R` and an object `S` whose read has a one-step preamble (the object is strongly linearizable, so all
-  hypotheses of Theorem 4.2 hold, with `r = 2`); `p: c1 := coin; R.write(c1); c2 := coin`, `q: S.read();
-  y := R.read()`, `B = {y = 1}`. With atomic objects (and with the original object) `Pr[B] ≤ 1/2` for every adversary. With `k = 2`, the
-  adversary that lets `q` start `S.read` before `p`'s write and `c2` only when `c1 = 0` gets
-  `Pr[B | X] = 2/3`. (`Counterexample.lemma_4_3_false`)
-- **Lemma 4.4 is false.** Same instance; overlapping only when `c1 = 1` gives `Pr[B | ¬X] = 1`, while
-  `Prob[P(O) → B] ≤ 1/2`. (`Counterexample.lemma_4_4_false`)
-- **The adversary `A_O` built in these proofs is not an adversary.** It chooses each object random value as
-  the "best" one *after* later program coins, and `remRedundant` moves preamble steps relative to earlier
-  coins, so its schedule depends on future coins (violating the paper's own definition of an adversary).
-  The repair: the object random choices are independent of everything the adversary sees before they are
-  made, so they can be sampled in advance; for each advance choice the removal of unused iterations is a
-  causal adversary against `P(O)`. (`Removal.opt_le_avg`)
-- **Theorem 4.2 is unestablished for `r ≥ 2`.** Its proof is the decomposition (1)–(2) over `X`, which needs
-  the two false lemmas. We prove the stated bound for `r = 1` (the only case used in the paper's example,
-  Appendix A.3.1) and, for every `r`, `Prob[O^k] ≤ Prob[O^a] + (1 − q)` and `Prob[O^k] ≤ Prob[O]` with
-  `q = (max{0,k−r}/k)^{n−1}`. The stated bound `Prob[O^a] + (1−q)(Prob[O] − Prob[O^a])` is stronger whenever
-  `Prob[O] < 1`; a repair along the lines of the paper fails when the adversary makes the choice of which
-  iterations get spoiled at a later coin depend on earlier coins. (`theorem_4_2_r1`, `theorem_4_2_weak`)
-- Minor: the proof of Lemma 4.5 treats the events `X_i` as independent with fixed probabilities although the
-  set of spoiled iterations depends adaptively on earlier choices (the bound is nevertheless true, proved by
-  a potential argument); Theorem 3.1 speaks of tail strong linearizability of a set of *histories*, which is
-  not defined (the notion needs executions and control points).
+### ❌ Lemma 4.3 (conditioning on randomization-free iterations)
+Lemma 4.3 (`Prob[(P(O^k)||A → B) | X] ≤ Prob[P(O^a) → B]` for every adversary `A`) is false: in a two-process program with one register, one object read with a one-step preamble and two coins, an adaptive adversary with `k = 2` gets `Pr[B | X] = 2/3 > 1/2` (`Counterexample.lemma_4_3_false`).
+
+**Impact.** The proof of the main Theorem 4.2 rests on this lemma, so Theorem 4.2 is left unestablished for
+`r ≥ 2` (see below). The instance does not refute Theorem 4.2 itself.
+
+**Details.** `X` = "every object random step picks a randomization-free preamble iteration". Conditioning on
+`X` biases the program's own coins: the adversary can decide, after seeing the first coin, whether the
+preamble iteration that might be chosen later overlaps the second coin. Instance: processes `p, q`; a
+register `R` and an object `S` whose read has a one-step preamble (the object is strongly linearizable, so
+all hypotheses of Theorem 4.2 hold, with `r = 2`); `p: c1 := coin; R.write(c1); c2 := coin`,
+`q: S.read(); y := R.read()`, `B = {y = 1}`. With atomic objects (and with the original object) `Pr[B] ≤ 1/2`
+for every adversary. With `k = 2`, the adversary that lets `q` start `S.read` before `p`'s write and `c2` only
+when `c1 = 0` gets `Pr[B | X] = 2/3`.
+
+### ❌ Lemma 4.4 (conditioning on `¬X`)
+Lemma 4.4 is false in the same instance: the adversary that overlaps only when `c1 = 1` gets `Pr[B | ¬X] = 1`, while `Prob[P(O) → B] ≤ 1/2` (`Counterexample.lemma_4_4_false`).
+
+**Impact.** Like Lemma 4.3, it breaks the proof of Theorem 4.2.
+
+### ❌ Theorem 4.2 (main theorem) for `r ≥ 2`
+Theorem 4.2 is unestablished for programs with `r ≥ 2` random steps: its proof is the decomposition (1)–(2) over `X`, which needs the two false lemmas, and the simulating adversary `A_O` built in their proofs is not a valid adversary.
+
+**Impact.** The headline bound holds as stated for `r = 1` (the only case used in the paper's example,
+Appendix A.3.1) and in a weaker form for every `r`; for `r ≥ 2` it is neither proved nor refuted here
+(`theorem_4_2_r1`, `theorem_4_2_weak`).
+
+**Details.** The adversary `A_O` chooses each object random value as the "best" one *after* later program
+coins, and `remRedundant` moves preamble steps relative to earlier coins, so its schedule depends on future
+coins (violating the paper's own definition of an adversary). A repair along the lines of the paper fails
+when the adversary makes the choice of which iterations get spoiled at a later coin depend on earlier coins.
+
+**Repair.** The object random choices are independent of everything the adversary sees before they are
+made, so they can be sampled in advance; for each advance choice the removal of unused iterations is a
+causal adversary against `P(O)` (`Removal.opt_le_avg`). For every `r` we prove
+`Prob[O^k] ≤ Prob[O^a] + (1 − q)` and `Prob[O^k] ≤ Prob[O]` with `q = (max{0,k−r}/k)^{n−1}`. The stated bound
+`Prob[O^a] + (1−q)(Prob[O] − Prob[O^a])` is stronger whenever `Prob[O] < 1`.
+
+### Typos and slips
+- Theorem 3.1 speaks of tail strong linearizability of a set of *histories*, which is not defined (the
+  notion needs executions and control points).
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 4.5 (probability of `X`)
+The proof treats the events `X_i` as independent with fixed probabilities, although the set of spoiled iterations depends adaptively on earlier choices.
+
+**Impact.** Statement true; proved by a potential argument (`lemma_4_5`, `Clean.optNX_le`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

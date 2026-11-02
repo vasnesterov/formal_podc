@@ -17,32 +17,38 @@ Corollary 3 are tight.
 
 ## Mistakes in the paper
 
-No numbered statement is false; the abstract's claim is false only as literally worded (see the first item).
-Imprecisions, by decreasing importance:
+### ⚠️ Abstract, Section 1.2 and Conclusion (scope of the binary-consensus result)
+The abstract says binary consensus objects "are not more powerful as far as helping solving approximate agreement faster is concerned", but Theorem 4, the only supporting result, gives a bound one round below the IIS bound whenever `1/ε ≤ n ≤ 2^⌈log₂ 1/ε⌉` (for `n = 4`, `ε = 1/4`: 1 round versus 2).
 
-* **Overstated scope of the binary-consensus result (abstract, Section 1.2, Conclusion).** The abstract
-  says binary consensus objects "are not more powerful as far as helping solving approximate agreement
-  faster is concerned". The conclusion says they are not useful "at least when `n ≥ 1/ε`". Theorem 4,
-  the only supporting result, covers only algorithms whose consensus inputs depend on the process id and
-  the round. Its bound `min(⌈log₂ n⌉ − 1, ⌈log₂ 1/ε⌉)` is one round below the IIS bound whenever
-  `1/ε ≤ n ≤ 2^⌈log₂ 1/ε⌉`: for `n = 4`, `ε = 1/4` it gives 1 round, the IIS bound gives 2. It matches the
-  IIS bound only for `n > 2^⌈log₂ 1/ε⌉` (e.g. `n ≥ 2/ε`). Theorem 4
-  itself is correct as stated (`theorem4_log`).
-* **Implicit assumptions in Theorems 1 and 2 (under-specified, true for the paper's models).** The proof
-  uses that a round in which only some processes take part extends to a round of all of them, with
-  the same views for the early ones (`P^(1)(τ') ⊆ P^(1)(τ)`). It also needs that a box called solo
-  returns a value determined by the caller's input ("`b_i = B_t(a_i)`"). Both are explicit hypotheses
-  (`Model.Extendable`, `Model.SoloDet`), proved for IIS, iterated snapshot, IIS + test&set and
-  IIS + binary consensus. A related ambiguity: the paper drops the carrier-map requirement on `Δ` but
-  keeps the complex-based definition of solvability, under which the liberal task of Definition 4 would
-  not be liberal. We use the standard reading: the processes of `σ` participate exactly.
-* **Unchecked side condition in the proof of Theorem 4 (gap, statement true).** Claim 6 assumes
-  `|S| ≥ 5`, and the iteration applies it to every `S_k` but only checks `|S_{t−1}| ≥ 3`. The missing
-  inequality holds. Claim 6 in fact needs no size hypothesis, and we iterate with the cleaner invariant
-  "`|S| ≤ 2^(t+1)` or `1 ≤ 2^t ε`" (`theorem4_aux`).
-* Slips: the claims are applied to `3^k ε` and `2^k ε` beyond Definition 3's range `ε ≤ 1` (we prove
-  them for every `ε ≥ 0`). Claim 4's proof (and Corollary 2's) says `P^(1)(σ)` for the protocol
-  complex `P^(1)(τ)` of the local task. The proceedings version of Theorem 1's proof mixes `ρ'`/`ϱ'`.
+**Impact.** An overstatement of informal claims; no numbered statement is false, and Theorem 4 itself is
+correct as stated (`theorem4_log`).
+
+**Details.** The conclusion says binary consensus is not useful "at least when `n ≥ 1/ε`". Theorem 4 covers
+only algorithms whose consensus inputs depend on the process id and the round. Its bound
+`min(⌈log₂ n⌉ − 1, ⌈log₂ 1/ε⌉)` matches the IIS bound only for `n > 2^⌈log₂ 1/ε⌉` (e.g. `n ≥ 2/ε`).
+
+### ⚠️ Theorems 1 and 2 (implicit model assumptions)
+The speedup proofs use two model properties that the paper never states: a round of some processes extends to a round of all of them with the same views for the early ones (`P^(1)(τ') ⊆ P^(1)(τ)`), and a box called solo returns a value determined by the caller's input ("`b_i = B_t(a_i)`").
+
+**Impact.** Both properties hold in all the paper's models, so every application is correct. We make them
+explicit hypotheses (`Model.Extendable`, `Model.SoloDet`) and prove them for IIS, iterated snapshot,
+IIS + test&set and IIS + binary consensus.
+
+### Typos and slips
+- The claims are applied to `3^k ε` and `2^k ε` beyond Definition 3's range `ε ≤ 1` (we prove them for every
+  `ε ≥ 0`).
+- Claim 4's proof (and Corollary 2's) says `P^(1)(σ)` for the protocol complex `P^(1)(τ)` of the local task.
+- The proceedings version of Theorem 1's proof mixes `ρ'`/`ϱ'`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 4 (iteration of Claim 6)
+Claim 6 assumes `|S| ≥ 5`, and the proof of Theorem 4 applies it to every `S_k` but only checks `|S_{t−1}| ≥ 3`.
+
+**Impact.** Statement true; the missing inequality holds (`theorem4_aux`).
+
+**Repair.** Claim 6 in fact needs no size hypothesis, and we iterate with the cleaner invariant
+"`|S| ≤ 2^(t+1)` or `1 ≤ 2^t ε`".
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -61,7 +67,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
   `id(σ)` participates, the decisions form an element of `Δ(σ)`. Crashes mid-execution are faces of
   such executions (`Model.Extendable`). Deterministic processes, adversarial scheduler, no randomness.
 * Tasks are relations `Δ(σ)` without carrier-map assumption; approximate agreement on the grid
-  `{0, 1/m, …, 1}` is scaled to integers `{0,…,m}` with `ε = e/m`.
+  `{0, 1/m, …, 1}` is scaled to integers `{0,…,m}` with `ε = e/m`. The paper drops the carrier-map
+  requirement on `Δ` but keeps the complex-based definition of solvability, under which the liberal task of
+  Definition 4 would not be liberal. We use the standard reading: the processes of `σ` participate exactly.
 
 **Main results in Lean.** (namespace `AsyncSpeedup`)
 
