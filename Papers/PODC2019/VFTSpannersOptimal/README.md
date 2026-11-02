@@ -12,29 +12,47 @@ fault set contain the edge's own endpoints, and Theorem 1's bound degenerates to
 
 ## Mistakes in the paper
 
-* **Algorithm 1, read literally, outputs the whole graph; low-severity imprecision.** The test asks
-  for a set `F` of `≤ f` vertices with `dist_{H\F}(u, v) > k·w(u, v)`, but does not require
-  `u, v ∉ F`. Taking `F = {u}` makes the distance `∞`, so for `f ≥ 1` every edge is added. On `K_n`
-  with `f = 1` and stretch 3 the output has `n(n−1)/2` edges, which contradicts Corollary 2's
-  `O(n^{3/2})`. The proof of Lemma 3 clearly uses `F ⊆ V \ {u, v}`, so the intended algorithm is
-  unambiguous, and we formalize that. The counterexample assumes that the distance to a deleted
-  vertex is `∞`; if it is read as undefined, the literal test is merely ill-posed.
-  (`literal_violates_corollary2`)
-* **Theorem 1 is false as stated for large `f` (`f > n/2`); cosmetic.** The proof dismisses the
-  regime `f = Ω(n)` as "trivially `O(n²)`". But once `n/f < 2`, `b(n/f, k+1) = 0`, so the stated
-  bound is `0` even though `H` has edges. With floor rounding this happens for `f > n/2`, with ceiling rounding for `f ≥ n`.
-  We prove `|E(H)| ≤ 32 f² · max(b(⌊n/2f⌋, k+1), 1)` for all `n` and all `f, k ≥ 1`.
-  (`ftGreedy_card_edges_le`)
-* **Lemma 4's `(1 + o(1))` factors hide slack.** Sampling `⌈n/2f⌉` vertices and writing the
-  probabilities as `(1+o(1))/(4f²)` and `(1+o(1))/(8f³)` is only asymptotic, under the lemma's
-  hypothesis `f = o(n)`. For small `n/f` the edge probability can be well below `1/(4f²)` (e.g.
-  `1/(2f(4f−1))` for `n = 4f`); the triple probability never exceeds `1/(8f³)`. We prove the exact,
-  non-asymptotic counting version, sampling `s` vertices with `2fs ≤ n`.
-* **Small slips.**
-  * The proof of Theorem 1 swaps `n` and `m` ("`n` edges and `m` nodes").
-  * `f ≥ 1` is used but left implicit.
-  * The edge-fault case is only asserted to be "essentially identical". We prove it via a vertex
-    blocking set, which also explains the closing remark that edge blocking sets give nothing more.
+### ⚠️ Algorithm 1 (the fault test does not exclude the edge's endpoints)
+Read literally, the test lets the fault set be `F = {u}`, which makes the distance `∞`, so for `f ≥ 1` every edge
+is added and on `K_n` with `f = 1` and stretch 3 the output has `n(n−1)/2` edges, contradicting Corollary 2's
+`O(n^{3/2})` (`literal_violates_corollary2`).
+
+**Impact.** Low severity: the proof of Lemma 3 clearly uses `F ⊆ V \ {u, v}`, so the intended algorithm is
+unambiguous, and we formalize that.
+
+**Details.** The test asks for a set `F` of `≤ f` vertices with `dist_{H\F}(u, v) > k·w(u, v)`, but does not
+require `u, v ∉ F`. The counterexample assumes that the distance to a deleted vertex is `∞`; if it is read as
+undefined, the literal test is merely ill-posed.
+
+### ⚠️ Theorem 1 for large `f` (`f > n/2`)
+Once `n/f < 2`, `b(n/f, k+1) = 0`, so the stated bound is `0` even though `H` has edges.
+
+**Impact.** Cosmetic: the proof dismisses the regime `f = Ω(n)` as "trivially `O(n²)`". We prove
+`|E(H)| ≤ 32 f² · max(b(⌊n/2f⌋, k+1), 1)` for all `n` and all `f, k ≥ 1` (`ftGreedy_card_edges_le`).
+
+**Details.** With floor rounding this happens for `f > n/2`, with ceiling rounding for `f ≥ n`.
+
+### Typos and slips
+- The proof of Theorem 1 swaps `n` and `m` ("`n` edges and `m` nodes").
+- `f ≥ 1` is used but left implicit.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 4 (`(1 + o(1))` factors)
+Sampling `⌈n/2f⌉` vertices and writing the probabilities as `(1+o(1))/(4f²)` and `(1+o(1))/(8f³)` is only
+asymptotic, under the lemma's hypothesis `f = o(n)`, and hides slack.
+
+**Impact.** Statement true; we prove the exact, non-asymptotic counting version, sampling `s` vertices with
+`2fs ≤ n` (`SimpleGraph.IsBlockingSet.exists_dense_subgraph_of_le`).
+
+**Details.** For small `n/f` the edge probability can be well below `1/(4f²)` (e.g. `1/(2f(4f−1))` for `n = 4f`);
+the triple probability never exceeds `1/(8f³)`.
+
+### 🛠️ Edge faults (only asserted)
+The edge-fault case is only asserted to be "essentially identical".
+
+**Impact.** True; we prove it via a vertex blocking set (`ftGreedyEdge_exists_blockingSet`,
+`ftGreedyEdge_card_edges_le`), which also explains the closing remark that edge blocking sets give nothing more.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

@@ -16,51 +16,81 @@ typo.
 
 ## Mistakes in the paper
 
-* **The `2f + 1` thresholds are wrong unless `n = 3f + 1`.** Theorem 1 and the model allow any
-  `f < n/3`, but signatures, skip shares and view-change waits all use `2f + 1`.
-  - Lemma 3 (PB-provability) concludes that two sets of `2f + 1` signers share an honest party.
-    That needs `n = 3f + 1`. Lemma 8 says "`2f + 1 = n − f`".
-  - Take `n = 5`, `f = 1`. The corrupted party 4 is elected leader of view 1 and equivocates in
-    every stage of its broadcast: 0 and 1 deliver `true`, 2 and 3 deliver `false`, and 4 signs
-    both. The broadcasts of 0 and 1 complete normally, so the skip certificate forms, and honest
-    parties 0 and 2 decide `true` and `false`.
-  - This is a 58-step run of our model (`Counterexample.agreement_fails`).
-  - Severity: Lemmas 3 and 13 (PB-provability, Agreement) are false for the algorithms as written
-    whenever `n > 3f + 1`. The paper never restricts to `n = 3f + 1` (§2, §3 and Theorem 1 say
-    `f < n/3`). Theorem 1 itself, an existence claim, survives: with threshold `n − f`, all our
-    results hold for every `n > 3f`.
-* **Termination is proved vacuously; Efficiency fails as stated.**
-  - Algorithm 6 loops forever: deciding does not stop a party.
-  - The proof of Lemma 20 says that honest parties never stop sending messages, "therefore,
-    termination trivially follows". That uses the vacuity of "all messages have been delivered".
-  - For the same reason honest parties send infinitely many messages, so Efficiency (Definition 4)
-    fails. Lemma 24 only bounds the messages sent before everybody decides.
-  - The real content is that every view completes (Lemma 19) and that each view decides with
-    probability `≥ 2/3`. We prove both (`view_progress`, `card_undecided_le`).
-  - A halting rule is missing. Note that a party cannot just halt after deciding: others may only
-    be locked and still need its messages.
-  - Severity: proof gap, under-specified protocol.
-* **Typo in the key check (Algorithm 6, line 4): `j ≠ 1` must be `j ≠ 0`.**
-  - Here `j` is the key's view, and the initial key is `⟨0, ⊥⟩`.
-  - Read literally, every honest proposal of view 1 fails validation, so view 1 never completes.
-    Keys of view 1 would also be accepted unchecked.
-  - The proof of Lemma 15 reads `j` as the current view ("no key required in view 1"). That
-    reading fails in view 2 whenever nobody got a key in view 1.
-  - We use: the key view is `0`, or it carries a stage-1 certificate of that view's leader, and in
-    both cases it is `≥ LOCK`.
-* **View-change messages that arrive early.**
-  - Algorithm 7 validates a view-change message against `L[j]`, which is `⊥` until the receiver's
-    own `elect` returns.
-  - Read literally, early messages lose their content but still count among the `2f + 1`.
-  - Lemma 8 needs them buffered; our model buffers them.
-  - Severity: under-specified. We did not check whether the literal reading breaks agreement.
-* **Smaller gaps.**
-  - Lemma 14 is stated only for a lock set *in* view `j`. Locks can be set later, and Lemma 15 needs
-    the general form. That form is true: `Inv.key_of_lockQC`.
-  - Lemma 6 is stated for stages 2–4 but used for stage 1 in Lemma 12; the proof works.
-  - The Quality property of Definition 4 is never proved.
-* **Typos.** Algorithm 3 has `return σ` for `σ_in`. Algorithm 7 has `lock` and `key.round` for
-  `LOCK` and `KEY.view`, and forwards unvalidated skip messages. Lemma 21 has "`2f = 1`".
+### 🚨 Lemmas 3 and 13 (PB-provability, Agreement): `2f + 1` thresholds for `f < n/3`
+The protocol hard-codes `2f + 1` thresholds although the paper allows any `f < n/3`, and with `n = 5`, `f = 1` a
+corrupted leader makes honest parties decide `true` and `false` (`Counterexample.agreement_fails`).
+
+**Impact.** Lemmas 3 and 13 are false for the algorithms as written whenever `n > 3f + 1`; the protocol is correct
+for `n = 3f + 1`. Theorem 1 itself, an existence claim, survives: with threshold `n − f`, all our results hold for
+every `n > 3f`.
+
+**Details.**
+- Signatures, skip shares and view-change waits all use `2f + 1`. The paper never restricts to `n = 3f + 1`
+  (§2, §3 and Theorem 1 say `f < n/3`).
+- Lemma 3 (PB-provability) concludes that two sets of `2f + 1` signers share an honest party. That needs
+  `n = 3f + 1`. Lemma 8 says "`2f + 1 = n − f`".
+- Take `n = 5`, `f = 1`. The corrupted party 4 is elected leader of view 1 and equivocates in every stage of its
+  broadcast: 0 and 1 deliver `true`, 2 and 3 deliver `false`, and 4 signs both. The broadcasts of 0 and 1 complete
+  normally, so the skip certificate forms, and honest parties 0 and 2 decide `true` and `false`.
+- This is a 58-step run of our model (`Counterexample.agreement_fails`).
+
+**Repair.** Threshold `n − f`; everything (agreement, validity, view completion, expected views `< 3/2`) is proved
+for all `n > 3f`.
+
+### ⚠️ Algorithm 6, line 4 (key check: `j ≠ 1` must be `j ≠ 0`)
+Read literally, every honest proposal of view 1 fails validation, so view 1 never completes, and keys of view 1
+would be accepted unchecked.
+
+**Impact.** A typo in the pseudocode with evident intent; with the fix, honest proposals pass validation
+(`proposal_valid`).
+
+**Details.**
+- Here `j` is the key's view, and the initial key is `⟨0, ⊥⟩`.
+- The proof of Lemma 15 reads `j` as the current view ("no key required in view 1"). That reading fails in view 2
+  whenever nobody got a key in view 1.
+
+**Repair.** We use: the key view is `0`, or it carries a stage-1 certificate of that view's leader, and in both
+cases it is `≥ LOCK`.
+
+### ⚠️ Lemma 20 and Definition 4 (termination proved vacuously; Efficiency fails as stated)
+Algorithm 6 loops forever, because deciding does not stop a party, so termination holds only vacuously and honest
+parties send infinitely many messages, which violates Efficiency (Definition 4).
+
+**Impact.** Proof gap and under-specified protocol: a halting rule is missing. The real content, that every view
+completes (Lemma 19) and that each view decides with probability `≥ 2/3`, is proved (`view_progress`,
+`card_undecided_le`).
+
+**Details.**
+- The proof of Lemma 20 says that honest parties never stop sending messages, "therefore, termination trivially
+  follows". That uses the vacuity of "all messages have been delivered".
+- Lemma 24 only bounds the messages sent before everybody decides.
+- A party cannot just halt after deciding: others may only be locked and still need its messages.
+
+### ⚠️ Algorithm 7 (view-change messages that arrive early)
+Algorithm 7 validates a view-change message against `L[j]`, which is `⊥` until the receiver's own `elect`
+returns, so read literally, early messages lose their content but still count among the `2f + 1`.
+
+**Impact.** Under-specified pseudocode. Lemma 8 needs these messages buffered; our model buffers them. We did not
+check whether the literal reading breaks agreement.
+
+### ⚠️ Definition 4 (Quality)
+The Quality property of Definition 4 is never proved.
+
+**Impact.** Unestablished; not formalized.
+
+### Typos and slips
+- Algorithm 3 has `return σ` for `σ_in`.
+- Algorithm 7 has `lock` and `key.round` for `LOCK` and `KEY.view`, and forwards unvalidated skip messages.
+- Lemma 21 has "`2f = 1`".
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemmas 14 and 6 (stated too narrowly for their uses)
+Lemma 14 is stated only for a lock set *in* view `j`, but locks can be set later and Lemma 15 needs the general
+form; Lemma 6 is stated for stages 2–4 but used for stage 1 in Lemma 12.
+
+**Impact.** The general form of Lemma 14 is true (`Inv.key_of_lockQC`); for Lemma 6 the proof works for all stages
+(`Inv.qc_agree`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

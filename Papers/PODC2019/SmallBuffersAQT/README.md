@@ -16,59 +16,107 @@ destinations) is never proved in the paper.
 
 ## Mistakes in the paper
 
-* **Lemma 4.8 is false for Algorithm 3 as printed.** Algorithm 3 works at level `λ = t mod ℓ` and accepts new packets
-  when `λ = 0`, so a phase runs the levels `0, 1, …, ℓ−1`. The indexing in the statement of Lemma 4.8 (rounds
-  `t+1, …, t+ℓ`) gives `1, …, ℓ−1, 0`. The proof assumes the opposite: "levels are activated in decreasing order over
-  the course of a phase". In the round of level `λ`, a bad packet can be traded for a bad packet at a lower level
-  (Case 2 of Claim 2). If that lower level was already processed in this phase, the badness does not decrease.
-  Counterexample (`m = ℓ = 3`, 27 nodes, no injections): node 8 holds two packets to 15, node 9 one packet to 15,
-  node 10 two packets to 20 and one packet to 15. Node 10 has badness 1: a bad level-2 packet with intermediate
-  destination 18. The rounds at levels 0 and 1 do nothing. At level 2, node 8 sends a packet to its intermediate
-  destination 9, where it becomes pre-bad at level 1. `ActivatePreBad` then pushes node 9's level-1 packet into
-  node 10, which is busy forwarding at level 2. Node 10's badness stays 1, for both orders `0,1,2` and `1,2,0`.
-  Here badness follows Definition 4.5 restricted to intermediate destinations `w_k > i` (see the item on Algorithm 5
-  below; the other fix there, to Algorithm 5 line 5, plays no role in this instance). Read
-  literally, Definition 4.5 also counts node 8's bad level-2 packet at node 10, although that packet never crosses
-  node 10; then node 10's badness drops from 2 to 1 in this instance. But the literal definition breaks the first
-  step of the proof of Theorem 4.1, `B(i) ≤ ξ(i) + 1`: with `m ≥ 6`, three packets injected at once at node 0 for
-  node 1 (`σ = 2`) give `B(5) = 2` and `ξ(5) = 0`. The restricted definition is the one the proof needs.
-  This is a false lemma, and the proof of Theorem 4.1 rests on it. Nothing shows that the theorem itself fails for
-  the printed order: random simulations found no violation, and the bound has slack `ℓ`. With levels in decreasing
-  order (`ℓ−1, …, 0`) we prove Lemma 4.8 and Theorem 4.1. (`lemma_4_8_false_alg3`, `lemma_4_8_false_indexing`;
-  repaired: `lemma_4_8`, `theorem_4_1`)
-* **The proof of Claim 2 (badness never increases in a round) is not a proof; the claim is true.** Item 1 should say
-  `j > λ`, not `j < λ`. Item 3 is argued through events (a)–(c) and Cases 1–3, which do not account for each unit of
-  badness. Our replacement: within a level-`(λ−1)` block, the nodes active at level `λ` form a suffix. A lower-level
-  pseudo-buffer can gain a bad packet only at the first node of that suffix. So for every node `i`, the lower levels
-  gain at most one unit of badness, and only when `i` is active at level `λ`, where it loses one unit (Lemma 3.4).
-  The final step of the proof of Lemma 4.8 ("hence `B^{s+}(i) = B^s(i)`, as desired") is also garbled.
-  (`Bad_low_le`, `Bad_lam_le`, `phase_decreasing`)
-* **Algorithm 5 (`ActivatePreBad`) and Definition 4.5 are imprecise.** Line 5 should read `i < w_k`. Activating the
-  empty pseudo-buffer at `w_k` itself would block the pre-bad run of a packet arriving at `w_k` one level lower. The
-  sum in Definition 4.5 must be restricted to intermediate destinations `w_k > i`, as in Definition 3.3. (Formalized
-  with both fixes.)
-* **The abstract and introduction claim a result the paper never proves.** They state `O(ℓ d^{1/ℓ} + σ)` space for
-  `d` destinations, and `O(log d)` space when `ρ ≤ 1/log d`. Theorem 4.1 and its proof are in terms of the number
-  `n` of nodes, and the hierarchy is built on node indices, so the `d`-form does not follow directly. Not
-  formalized; our sharper form gives only `min(ℓ n^{1/ℓ}, d) + σ + 1`. (The lower bound in terms of `d` follows
-  from Theorem 5.1, since `d ≤ n`.)
-* **Lower bound (Theorem 5.1): gaps, statement true.** (i) Injecting "`ρm` packets per phase" at once is not
-  `(ρ,1)`-bounded; we spread the injections at rate `ρ`. (ii) Lemma 5.4 counts β-stale packets by the load of
-  `[F(t+1)+1, F(t)]` in round `t+1`, but such a packet may already be delivered then and occupy no buffer. We count
-  them in round `t`. (iii) The construction needs `(ℓ+1)m^ℓ + 1` nodes, not `(ℓ+1)m^ℓ` ("destination `n`"). We prove
-  load `≥ ((ℓ+1)ρ−1)(m−1)/(4(ℓ+1)) − 1` against every protocol. With `n ≈ (ℓ+1)m^ℓ`, this is the paper's
-  `Ω(((ℓ+1)ρ−1)/ℓ · n^{1/ℓ})` up to constants. Lemma 5.5 is replaced by a global telescoping count.
-  (`theorem_5_1`, `exists_load_ge`)
-* **Trees (Appendix B.2): badness defined too broadly; statements true.** Definition B.4 / the PPTS-tree badness sums
-  `B_k(v)` over *all* destinations. With that definition "`B(v) ≤ ξ(v) + 1`" fails: inject 3 packets at a child of
-  `v` with destination `v`; then `ξ(v) = 0` but `B(v) = 2`. Restricting to destinations above `v` (as Definition 3.3
-  does on the path) repairs it. Proposition 3.5 also omits `ρ ≤ 1`. (`Tree.prop_3_5`, `Tree.prop_3_5_depth`)
-* **Typos and small slips.** Definition 2.1 writes `N_T(v)` for an interval `I`. The proof of Lemma 2.5 writes
-  `ℓ·s + 1` for `ℓ(s−1) + 1`. Algorithm 2 line 2 uses an undefined `w_d`. The proof of Theorem 5.1 writes `/2k` for
-  `/2ℓ`. The phase boundaries in Section 4.2 (rounds `(φ−1)ℓ … φℓ−1`) and in Lemma 4.8 (`t+1 … t+ℓ`) disagree.
-  Section 4.1 says `I_{j,r}` has `m^j` nodes and `I_j = {I_{j,r} : r ∈ ⟨m^j⟩}`, and Algorithm 3 line 6 ranges over
+### ⚠️ Lemma 4.8 (Algorithm 3, order of the levels in a phase)
+Lemma 4.8 is false for HPTS as printed: Algorithm 3 runs the levels of a phase in increasing order, while the proof
+needs (and says) decreasing order, and with `m = ℓ = 3` and 27 nodes a node's badness does not decrease over a
+phase (`lemma_4_8_false_alg3`, `lemma_4_8_false_indexing`).
+
+**Impact.** We count this as a pseudocode slip: with the levels of each phase in decreasing order (a one-line change
+to Algorithm 3) we prove Lemma 4.8 and Theorem 4.1 (`lemma_4_8`, `theorem_4_1`), and Theorem 4.1 only claims that
+*some* algorithm "HPTS" achieves the bound. For Algorithm 3 as printed, Theorem 4.1 is unverified (open).
+
+**Details.** Algorithm 3 works at level `λ = t mod ℓ` and accepts new packets when `λ = 0`, so a phase runs the
+levels `0, 1, …, ℓ−1`. The indexing in the statement of Lemma 4.8 (rounds `t+1, …, t+ℓ`) gives `1, …, ℓ−1, 0`. The
+proof assumes the opposite: "levels are activated in decreasing order over the course of a phase". In the round of
+level `λ`, a bad packet can be traded for a bad packet at a lower level (Case 2 of Claim 2). If that lower level was
+already processed in this phase, the badness does not decrease.
+
+Counterexample (`m = ℓ = 3`, 27 nodes, no injections): node 8 holds two packets to 15, node 9 one packet to 15,
+node 10 two packets to 20 and one packet to 15. Node 10 has badness 1: a bad level-2 packet with intermediate
+destination 18. The rounds at levels 0 and 1 do nothing. At level 2, node 8 sends a packet to its intermediate
+destination 9, where it becomes pre-bad at level 1. `ActivatePreBad` then pushes node 9's level-1 packet into
+node 10, which is busy forwarding at level 2. Node 10's badness stays 1, for both orders `0,1,2` and `1,2,0`.
+
+Here badness follows Definition 4.5 restricted to intermediate destinations `w_k > i` (see the item on Algorithm 5
+below; the other fix there, to Algorithm 5 line 5, plays no role in this instance). Read literally, Definition 4.5
+also counts node 8's bad level-2 packet at node 10, although that packet never crosses node 10; then node 10's
+badness drops from 2 to 1 in this instance. But the literal definition breaks the first step of the proof of
+Theorem 4.1, `B(i) ≤ ξ(i) + 1`: with `m ≥ 6`, three packets injected at once at node 0 for node 1 (`σ = 2`) give
+`B(5) = 2` and `ξ(5) = 0`. The restricted definition is the one the proof needs.
+
+This is a false lemma, and the proof of Theorem 4.1 rests on it. Nothing shows that the theorem itself fails for the
+printed order: random simulations found no violation, and the bound has slack `ℓ`.
+
+**Repair.** With levels in decreasing order (`ℓ−1, …, 0`) we prove Lemma 4.8 and Theorem 4.1 (space
+`ℓ n^{1/ℓ} + σ + 1` when `ρℓ ≤ 1`) (`lemma_4_8`, `theorem_4_1`).
+
+### ⚠️ Abstract and introduction (the `O(ℓ d^{1/ℓ} + σ)` upper bound in terms of destinations)
+The abstract and introduction claim `O(ℓ d^{1/ℓ} + σ)` space for `d` destinations (and `O(log d)` space when
+`ρ ≤ 1/log d`), but the paper never proves it: Theorem 4.1 is in terms of the number `n` of nodes.
+
+**Impact.** An unestablished claim, not refuted. The hierarchy is built on node indices, so the `d`-form does not
+follow directly; our sharper form gives only `min(ℓ n^{1/ℓ}, d) + σ + 1`. The lower bound in terms of `d` follows
+from Theorem 5.1, since `d ≤ n`. Not formalized.
+
+### ⚠️ Algorithm 5 (`ActivatePreBad`) and Definition 4.5 (badness)
+Algorithm 5 line 5 should read `i < w_k`, and the sum in Definition 4.5 must be restricted to intermediate
+destinations `w_k > i`, as in Definition 3.3.
+
+**Impact.** Local fixes with evident intent; formalized with both fixes.
+
+**Details.** Activating the empty pseudo-buffer at `w_k` itself would block the pre-bad run of a packet arriving at
+`w_k` one level lower. Without the restriction in Definition 4.5, the first step of the proof of Theorem 4.1 fails
+(see the Lemma 4.8 item).
+
+### Typos and slips
+- Definition 2.1 writes `N_T(v)` for an interval `I`.
+- The proof of Lemma 2.5 writes `ℓ·s + 1` for `ℓ(s−1) + 1`.
+- Algorithm 2 line 2 uses an undefined `w_d`.
+- The proof of Theorem 5.1 writes `/2k` for `/2ℓ`.
+- The phase boundaries in Section 4.2 (rounds `(φ−1)ℓ … φℓ−1`) and in Lemma 4.8 (`t+1 … t+ℓ`) disagree.
+- Section 4.1 says `I_{j,r}` has `m^j` nodes and `I_j = {I_{j,r} : r ∈ ⟨m^j⟩}`, and Algorithm 3 line 6 ranges over
   `r ∈ ⟨m^{ℓ−λ}⟩`; it should be `m^{j+1}` nodes and `r ∈ ⟨m^{ℓ−j−1}⟩` (as in the definition of `I_{j,r}` and in
   Algorithm 5).
+- Proposition 3.5 omits `ρ ≤ 1` (added).
+
+## Proof gaps (statements true)
+
+### 🛠️ Claim 2 (badness never increases in a round) and the end of the proof of Lemma 4.8
+The proof of Claim 2 is not a proof: item 3 is argued through events (a)–(c) and Cases 1–3, which do not account
+for each unit of badness.
+
+**Impact.** Claim true; replaced by a new argument (`Bad_low_le`, `Bad_lam_le`, `phase_decreasing`).
+
+**Details.** Item 1 should say `j > λ`, not `j < λ`. The final step of the proof of Lemma 4.8 ("hence
+`B^{s+}(i) = B^s(i)`, as desired") is also garbled.
+
+**Repair.** Within a level-`(λ−1)` block, the nodes active at level `λ` form a suffix. A lower-level pseudo-buffer
+can gain a bad packet only at the first node of that suffix. So for every node `i`, the lower levels gain at most
+one unit of badness, and only when `i` is active at level `λ`, where it loses one unit (Lemma 3.4).
+(`Bad_low_le`, `Bad_lam_le`, `phase_decreasing`)
+
+### 🛠️ Theorem 5.1 (lower bound: injection pattern, Lemma 5.4, path length)
+The construction injects "`ρm` packets per phase" at once, which is not `(ρ,1)`-bounded, and Lemma 5.4 counts
+β-stale packets in a round where they may already be delivered.
+
+**Impact.** Statement true; we prove load `≥ ((ℓ+1)ρ−1)(m−1)/(4(ℓ+1)) − 1` against every protocol
+(`theorem_5_1`, `exists_load_ge`), which with `n ≈ (ℓ+1)m^ℓ` is the paper's `Ω(((ℓ+1)ρ−1)/ℓ · n^{1/ℓ})` up to
+constants.
+
+**Details.**
+- (i) Injecting "`ρm` packets per phase" at once is not `(ρ,1)`-bounded; we spread the injections at rate `ρ`.
+- (ii) Lemma 5.4 counts β-stale packets by the load of `[F(t+1)+1, F(t)]` in round `t+1`, but such a packet may
+  already be delivered then and occupy no buffer. We count them in round `t`.
+- (iii) The construction needs `(ℓ+1)m^ℓ + 1` nodes, not `(ℓ+1)m^ℓ` ("destination `n`").
+
+**Repair.** Lemma 5.5 is replaced by a global telescoping count. (`theorem_5_1`, `exists_load_ge`)
+
+### 🛠️ Proposition 3.5 (trees, Appendix B.2: badness defined too broadly)
+Definition B.4 / the PPTS-tree badness sums `B_k(v)` over *all* destinations, and with that definition the step
+"`B(v) ≤ ξ(v) + 1`" fails: inject 3 packets at a child of `v` with destination `v`; then `ξ(v) = 0` but `B(v) = 2`.
+
+**Impact.** Statements true; restricting to destinations above `v` (as Definition 3.3 does on the path) repairs it
+(`Tree.prop_3_5`, `Tree.prop_3_5_depth`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

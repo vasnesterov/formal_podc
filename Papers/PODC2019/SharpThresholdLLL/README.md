@@ -14,39 +14,56 @@ proof of the key geometric fact (Lemma 3.7): no Hessians, two weighted AM–GM i
 
 ## Mistakes in the paper
 
-* **The reduction to rank exactly 3 (Section 3) does not work as written (proof gap; the statement is true).**
-  A rank-2 variable on `{u, v}` is made rank 3 by adding a "virtual third bad event" `w`. The bookkeeping of
-  Lemma 3.2 needs the dependency-graph edges `{u,w}` and `{v,w}`.
-  * A new node `w` gives `u` and `v` an extra incident edge, whose value (up to 2) enters the final bound
-    `p · ∏ φ ≤ p · 2^{deg}`, which then exceeds `p · 2^d`.
-  * An existing `w` need not be adjacent to `u` and `v`.
-  * Rank-1 variables are not addressed.
+### ⚠️ Lemma 3.5 (closed form of `S_rep`, missing parentheses)
+As printed, `f(a,b) = 4 + ½·ab − 2a − 2b − √(ab(4−a)(4−b))` lacks the parentheses of Lemma 3.6, and then
+`(0, 1, 3)` is representable but `3 > f(0,1) = 2` (`lemma_3_5_as_printed_false`).
 
-  The repair is easy. For hyperedges of size 1 or 2, the set of representable values is a half-space, and the
-  linearity argument of Section 2 (in the weighted form sketched in §3.1) gives the fixing step directly. We prove
-  one fixing property for every hyperedge of size `≤ 3` and Lemma 3.2 for every variable of rank `≤ 3`, with no
-  virtual events (`fixingProperty_of_card_le_three`, `variable_fixing_lemma`).
-* **Lemma 3.5 is false as printed (typo).** The statement writes `f(a,b) = 4 + ½·ab − 2a − 2b − √(ab(4−a)(4−b))`,
-  without the parentheses of Lemma 3.6. With this reading `(0, 1, 3)` is representable but `3 > f(0,1) = 2`. With
-  the parentheses the lemma holds. Equivalently, and more simply,
-  `S_rep = {(a,b,c) ≥ 0 | a + b + c + √(abc) ≤ 4}`. (`lemma_3_5_as_printed_false`; repaired: `srep_eq_f`,
-  `representable_iff`)
-* **Degenerate cases glossed over (proof gaps; statements true).**
-  * Theorem 1.1's proof claims that variables other than those on edges at `v` do not change `Pr[E_v]`. This
-    overlooks variables that affect only `E_v`.
-  * The same proof divides by `Pr[E_u | θ]`, which may be 0.
-  * In Lemma 3.9, the identity `Σ pᵢ sᵢ = (a,b,c)` fails when some conditional probability is 0. Only `≤` holds,
-    so downward-closedness of `S_rep` is needed. It is true but not stated.
+**Impact.** A typo with evident intent: with the parentheses of Lemma 3.6 the lemma holds (`srep_eq_f`), and
+nothing else is affected.
 
-  All are handled in the formalization (`exists_inc_add_inc_le_two`, `exists_hval_le_four`,
-  `Representable.mono`).
-* **Typos and remarks.**
-  * In the proof of Lemma 3.5, case `a = b = 0`, `b₂` should be `b₁`.
-  * The Applications remark "the degree of the dependency graph must be at least 7" (three orientations of a rank-3
-    hypergraph, no node a sink in two of them) could not be reproduced. On `k`-regular linear hypergraphs (`d = 2k`)
-    the criterion already holds for `k = 2` (`p·2^d = 400/729`) and fails only for `k = 1`. This was checked by
-    exact arithmetic, not in Lean.
-  * We checked the appendix's Hessian formulas numerically; they are right.
+**Repair.** Equivalently, and more simply, `S_rep = {(a,b,c) ≥ 0 | a + b + c + √(abc) ≤ 4}`
+(`representable_iff`).
+
+### Typos and slips
+- In the proof of Lemma 3.5, case `a = b = 0`, `b₂` should be `b₁`.
+- The Applications remark "the degree of the dependency graph must be at least 7" (three orientations of a rank-3
+  hypergraph, no node a sink in two of them) could not be reproduced. On `k`-regular linear hypergraphs (`d = 2k`)
+  the criterion already holds for `k = 2` (`p·2^d = 400/729`) and fails only for `k = 1`. This was checked by
+  exact arithmetic, not in Lean.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 1.3 (Section 3, reduction "w.l.o.g. all variables have rank exactly 3")
+The proof makes a rank-2 variable on `{u, v}` rank 3 by adding a "virtual third bad event" `w`, but the
+bookkeeping of Lemma 3.2 then needs dependency-graph edges `{u,w}` and `{v,w}` that break the degree bound or do
+not exist.
+
+**Impact.** Statement true; repaired without virtual events (`fixingProperty_of_card_le_three`,
+`variable_fixing_lemma`).
+
+**Details.**
+* A new node `w` gives `u` and `v` an extra incident edge, whose value (up to 2) enters the final bound
+  `p · ∏ φ ≤ p · 2^{deg}`, which then exceeds `p · 2^d`.
+* An existing `w` need not be adjacent to `u` and `v`.
+* Rank-1 variables are not addressed.
+
+**Repair.** For hyperedges of size 1 or 2, the set of representable values is a half-space, and the linearity
+argument of Section 2 (in the weighted form sketched in §3.1) gives the fixing step directly. We prove one fixing
+property for every hyperedge of size `≤ 3` and Lemma 3.2 for every variable of rank `≤ 3`, with no virtual events
+(`fixingProperty_of_card_le_three`, `variable_fixing_lemma`).
+
+### 🛠️ Theorem 1.1 and Lemma 3.9 (degenerate cases glossed over)
+The proofs ignore variables that affect only one event and conditional probabilities equal to 0.
+
+**Impact.** Statements true; all cases are handled in the formalization (`exists_inc_add_inc_le_two`,
+`exists_hval_le_four`, `Representable.mono`).
+
+**Details.**
+* Theorem 1.1's proof claims that variables other than those on edges at `v` do not change `Pr[E_v]`. This
+  overlooks variables that affect only `E_v`.
+* The same proof divides by `Pr[E_u | θ]`, which may be 0.
+* In Lemma 3.9, the identity `Σ pᵢ sᵢ = (a,b,c)` fails when some conditional probability is 0. Only `≤` holds,
+  so downward-closedness of `S_rep` is needed. It is true but not stated.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -100,7 +117,8 @@ The proof of Lemma 3.7 is new. Write `h(a,b,c) = a + b + c + √(abc)`, so `S_re
 `s ≥ 0` below the tangent plane of `h` at `m` satisfies `h(s) ≤ h(m)`. In the coordinates `uᵢ = sᵢ/mᵢ` this is
 `2√(u₁u₂u₃) ≤ (Σ(1−βᵢ)uᵢ)·√(Σβᵢuᵢ)` for weights `β` in the simplex: one weighted AM–GM with weights `(1−βᵢ)/2`
 and one with weights `βᵢ`. The averaging step of Lemma 3.2 then follows directly, Lemma 3.7 is the two-point
-case, and Lemma 3.6 follows from Lemma 3.7.
+case, and Lemma 3.6 follows from Lemma 3.7. We checked the appendix's Hessian formulas numerically; they are
+right.
 
 **Not formalized.**
 * The round bounds `O(d + log* n)` and `O(d² + log* n)`. They need the cited colouring algorithms ([PR01],
