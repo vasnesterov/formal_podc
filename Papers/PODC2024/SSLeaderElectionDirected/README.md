@@ -20,44 +20,48 @@ election (Corollary 3) and, with the repaired algorithm, synchronous unison (Cor
 
 ## Mistakes in the paper
 
-* **Theorem 5 is false; `U(K)` (Algorithm 2 on top of PEL) does not stabilize.** Section 5.3 and the
-  proofs of Lemmas 16 and 19 use that in a terminal configuration of PEL, `p.E.d = ‖ℓ, p‖`, so
-  the leader `ℓ` is "the only process satisfying `E.d = 0`". The paper cites Theorem 1 for this.
-  But Theorem 1 gives `p.E.d = Mind(p)`: the distance to the closest ancestor whose `E`-input
-  equals the minimum `(0, mid)`. That input `I_E(q) = (¬q.A.M, q.MI.M)` equals `(0, mid)` for
-  *every* `q` with `q.MI.M = mid`. This includes the whole source component (Corollary 4 and
-  Lemma 14). So all these processes have `E.d = 0`, and `U-DAG` makes each of them increment its
-  own clock independently. Counterexample: the 2-cycle `0 ⇄ 1` with identifiers `0, 1`, `α = 1`
-  and `K = 2`. Start from a terminal configuration of PEL with clocks `(0, 1)`. Under the
-  synchronous daemon the clocks alternate `(1, 0), (0, 1), …` forever. They are never equal, so
-  no choice of legitimate configurations makes `U(K)` self-stabilizing. The paper's own example
-  is inconsistent in the same way. In Figure 5(c), the six processes of the two triangular components have
-  `E`-input `(0,4)`, yet Figure 6 shows `E.d = 0, 1, 2, 3, 4, 5` for them. We prove the failure
-  for every network whose source component has two distinct processes, every `K ≥ 2`, every
-  identifier assignment and every `α ≥ MAD` (`U.paper_unison_not_selfStab`; concrete instance
-  `twoCycle_paper_unison_fails`). More generally, it fails as soon as two processes have only
-  ancestors with identifiers `≥ mid` (`U.paper_unison_not_selfStab_gen`). So if the smallest
-  identifier lies in the source component, *every* process has `E.d = 0`, and `U(K)` fails on
-  every network with `n ≥ 2` (`U.paper_unison_not_selfStab_of_min`). An example is the dipath
-  `0 → 1`, whose source component is a single process (`dipath_paper_unison_fails`). Severity: false statement, and an algorithm that does not work. The
-  characterization of Corollary 5 survives with the fix. With `I_E(p) = (¬p.A.M, p.Id)`, PEL still
-  elects `mid`: Lemma 15 holds for both inputs (`PEL.lemma15`). Moreover the leader is now the
-  only process with `E.d = 0`, and `E.d` is a BFS distance from it (`U.fixed_ed`). The paper's
-  Lemmas 16 and 19 then go through. We prove Theorem 5 for the repaired algorithm, with the
-  claimed bound of `3α + 4MAD + 6` synchronous steps (`U.theorem5`, `U.theorem5_time`), and
-  Corollary 5 (`corollary5`).
-* **Theorem 4 is only cited.** The paper refers to [ACDD23] for it; we prove it directly
-  (`theorem4`). Shift the configuration of one source component by one synchronous step. The two
-  components never hear from each other, so their clocks stay one apart forever.
-* **Small slips (statements unaffected).**
-  * Lemma 10's induction claim reads "If `MinI(p) < i`"; it should be "`Mind(p) < i`".
-  * Lemma 5's proof writes `q ∈ F_{i+1}(q)` for `q ∈ F_{i+1}(p)`, and Lemma 8 has `F_j(q)` for
-    `F_j(p)`.
-  * Lemma 9 has a stray `q` in "`Mdf_{R(α+1)} q(p)`".
-  * Lemma 9 and Lemma 10 index rounds by `R(i)`, which is undefined once the (finite) execution
-    has ended. This is harmless: terminal configurations are legitimate.
-  * Lemma 4's limit-inferior argument is correct. We replace it by an elementary
-    "freeze keys from the smallest up" induction.
+### ❌ Theorem 5 (Algorithm 2 on top of PEL, synchronous unison)
+`U(K)` does not stabilize: every process of the source component gets `E.d = 0` and increments its clock on its
+own, so e.g. on the 2-cycle `0 ⇄ 1` with `K = 2` the clocks alternate `(1, 0), (0, 1), …` forever
+(`twoCycle_paper_unison_fails`, `U.paper_unison_not_selfStab`).
+
+**Impact.** A false statement and an algorithm that does not work, but a one-line change
+(`I_E(p) = (¬p.A.M, p.Id)` instead of `(¬p.A.M, p.MI.M)`) repairs it, and the characterization of
+Corollary 5 survives. Leader election (PEL, Theorem 3) is unaffected.
+
+**Details.** Section 5.3 and the proofs of Lemmas 16 and 19 use that in a terminal configuration of PEL,
+`p.E.d = ‖ℓ, p‖`, so the leader `ℓ` is "the only process satisfying `E.d = 0`". The paper cites Theorem 1 for
+this. But Theorem 1 gives `p.E.d = Mind(p)`: the distance to the closest ancestor whose `E`-input equals the
+minimum `(0, mid)`. That input `I_E(q) = (¬q.A.M, q.MI.M)` equals `(0, mid)` for *every* `q` with
+`q.MI.M = mid`. This includes the whole source component (Corollary 4 and Lemma 14). So all these processes
+have `E.d = 0`, and `U-DAG` makes each of them increment its own clock independently.
+
+Counterexample: the 2-cycle `0 ⇄ 1` with identifiers `0, 1`, `α = 1` and `K = 2`. Start from a terminal
+configuration of PEL with clocks `(0, 1)`. Under the synchronous daemon the clocks alternate
+`(1, 0), (0, 1), …` forever. They are never equal, so no choice of legitimate configurations makes `U(K)`
+self-stabilizing. The paper's own example is inconsistent in the same way. In Figure 5(c), the six processes
+of the two triangular components have `E`-input `(0,4)`, yet Figure 6 shows `E.d = 0, 1, 2, 3, 4, 5` for them.
+
+Scope: we prove the failure for every network whose source component has two distinct processes, every
+`K ≥ 2`, every identifier assignment and every `α ≥ MAD` (`U.paper_unison_not_selfStab`; concrete instance
+`twoCycle_paper_unison_fails`). More generally, it fails as soon as two processes have only ancestors with
+identifiers `≥ mid` (`U.paper_unison_not_selfStab_gen`). So if the smallest identifier lies in the source
+component, *every* process has `E.d = 0`, and `U(K)` fails on every network with `n ≥ 2`
+(`U.paper_unison_not_selfStab_of_min`). An example is the dipath `0 → 1`, whose source component is a single
+process (`dipath_paper_unison_fails`).
+
+**Repair.** With `I_E(p) = (¬p.A.M, p.Id)`, PEL still elects `mid`: Lemma 15 holds for both inputs
+(`PEL.lemma15`). Moreover the leader is now the only process with `E.d = 0`, and `E.d` is a BFS distance from
+it (`U.fixed_ed`). The paper's Lemmas 16 and 19 then go through. We prove Theorem 5 for the repaired
+algorithm, with the claimed bound of `3α + 4MAD + 6` synchronous steps (`U.theorem5`, `U.theorem5_time`), and
+Corollary 5 (`corollary5`).
+
+### Typos and slips
+- Lemma 10's induction claim reads "If `MinI(p) < i`"; it should be "`Mind(p) < i`".
+- Lemma 5's proof writes `q ∈ F_{i+1}(q)` for `q ∈ F_{i+1}(p)`, and Lemma 8 has `F_j(q)` for `F_j(p)`.
+- Lemma 9 has a stray `q` in "`Mdf_{R(α+1)} q(p)`".
+- Lemma 9 and Lemma 10 index rounds by `R(i)`, which is undefined once the (finite) execution has ended. This
+  is harmless: terminal configurations are legitimate.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -110,6 +114,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 5: **false** for the paper's `U(K)` | `U.paper_unison_not_selfStab_gen`, `U.paper_unison_not_selfStab`, `U.paper_unison_not_selfStab_of_min`, `twoCycle_paper_unison_fails`, `dipath_paper_unison_fails` | `Unison.lean`, `Examples.lean` |
 | Theorem 5, Lemmas 16, 19, Corollary 6 (repaired `U(K)`, `3α + 4MAD + 6` steps) | `U.theorem5`, `U.legit_step`, `U.theorem5_time` | `Unison.lean` |
 | Corollary 5 (unison iff unique source component) | `corollary5` | `Unison.lean` |
+
+**Proof remarks.** Theorem 4 is only cited in the paper (from [ACDD23]); we prove it directly (`theorem4`):
+shift the configuration of one source component by one synchronous step; the two components never hear from
+each other, so their clocks stay one apart forever. Lemma 4's limit-inferior argument is correct; we replace
+it by an elementary "freeze keys from the smallest up" induction.
 
 **Not formalized.**
 * The generic composition results (Lemma 1, Corollary 1). We prove their instances for PEL

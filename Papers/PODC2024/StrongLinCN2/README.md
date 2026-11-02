@@ -16,58 +16,73 @@ The **proof of Lemma 12 has a gap** that breaks the stack case of Theorem 17.
 
 ## Mistakes in the paper
 
-* **Theorem 10 / Algorithm 2 is not strongly linearizable** (false as proved). Take three processes:
-  `put(1)`, `put(2)` and `take()`. Both puts do their `fetch&increment` (`Max = 3`). The take
-  scans `Items[1..2] = ⊥`, reads `Max = 3` again and reads `Items[1] = ⊥`. Then `put(1)` writes
-  `Items[1]` and **completes**; call this prefix `π`.
-  - In one extension the take reads `Items[2] = ⊥` and returns `EMPTY` (double collect unchanged).
-    Since `put(1)` completed and `1` is never taken, the take must be linearized before `put(1)`.
-    So it already belongs to `h(π)`, with response `EMPTY`.
-  - In another extension `put(2)` writes `Items[2]`, and the take reads it and returns `2`.
+### ❌ Theorem 10 (Algorithm 2, set from test&set)
+Algorithm 2 is not strongly linearizable: with three processes running `put(1)`, `put(2)` and `take()`, a
+prefix exists after which the take must already be linearized with response `EMPTY` in one extension but
+returns `2` in another (`SetCE.alg2_not_stronglyLinearizable`).
 
-  So no prefix-closed linearization function exists. The paper linearizes an `EMPTY` at "its last
-  read of `Max`", a point that depends on the future. (At that point both slots are still `⊥`;
-  but its claim that *when the take returns* `EMPTY` every slot is `⊥` or taken fails here, with
-  `Items[1] = 1` and `TS[1] = 0`.) This holds whether or not the never-incremented
-  `taken_new` is read as a counter of failed test&sets. Theorem 10, a lock-free SL set from
-  test&set, is therefore unproved. (`SetCE.alg2_not_stronglyLinearizable`)
-* **Lemma 12's proof ignores helping** (proof gap; the stack case of Theorem 17 is unproved). The
-  proof writes `f(F_i) = α·α'·β_i` with `β_i` made only of `p_i`'s decision operations. But during
-  `p_i`'s solo simulation, `f` may also linearize *pending* proposal operations of other processes,
-  so Definition 11 must allow them interleaved in `β_i` (our `KOrderingI`).
-  - Queues satisfy this stronger definition (`KOrd.queue_kOrderingI`).
-  - Stacks with the paper's sequences (`push(i)` / `pop^{n+1}`) do not, for any `d`
-    (`KOrd.stack_not_kOrderingI`, `n = 3`). Process 0 observes `OK·0·1·2·ε` both when `α = push(1)`
-    and a pending `push(2)` is linearized after the stack has been emptied, and when
-    `α = push(2)`, `α' = push(1)·push(0)`. A lock-free SL stack (from CAS) whose `pop` on an empty
-    stack first applies an announced push realizes this, and then the reduction `B` violates
-    agreement (informal argument, not formalized).
+**Impact.** Theorem 10, a lock-free SL set from test&set, is unproved; all other positive constructions
+(Theorems 1, 2, 5, 6, 9) hold.
 
-  Under Definition 11 as literally stated, the stack example is correct (`KOrd.stack_kOrdering`): the
-  definition is simply too weak for the lemma. The impossibility results for stacks and their
-  relaxations, and the remark in §6 about stacks, are not established by the paper.
-* **"`k`-out-of-order queues are `k`-ordering" fails for the given sequences** (wrong witness; the statement itself is true).
-  With `prop_i = enq(i)` and `n = 3`, `k = 2`, `α = enq(1)`, the processes' own enqueues in `α'` are
-  among the 2 oldest items. Then processes 0, 1, 2 can decide 0, 1, 2 respectively, so no `S_α` of
-  size 2 works, for any `d` (`KOrd.ooo_not_kOrderingW`). Repair: `prop_i = enq(i)^k`, which works
-  even for the strengthened definition (`KOrd.ooo_kOrderingI`).
-* **Definition 11 is imprecise** (under-specified definition).
-  - It requires the chosen process `ℓ` to have *completed* `prop_ℓ`. The stuttering examples only
-    give that `ℓ` *started*, which is also all that validity needs.
-  - Its condition `invs(α) ⊆ ⋃ invs(prop_x)` must be read per process: each process executes a
-    prefix of its own `prop_j`.
+**Details.** Both puts do their `fetch&increment` (`Max = 3`). The take scans `Items[1..2] = ⊥`, reads
+`Max = 3` again and reads `Items[1] = ⊥`. Then `put(1)` writes `Items[1]` and **completes**; call this
+prefix `π`.
+- In one extension the take reads `Items[2] = ⊥` and returns `EMPTY` (double collect unchanged). Since
+  `put(1)` completed and `1` is never taken, the take must be linearized before `put(1)`. So it already
+  belongs to `h(π)`, with response `EMPTY`.
+- In another extension `put(2)` writes `Items[2]`, and the take reads it and returns `2`.
 
-  We use the repaired readings.
-* **Theorem 3 (simple types) is only sketched** and not formalized. The forward simulation relates a
-  configuration to *every* topological sort of `lingraph(G*)`. The step case needs sorts that extend
-  earlier ones, and `lingraph`'s greedy edge insertion does not obviously provide them.
-* **Typos.**
-  - Algorithm 2's caption ("From test&set to fetch&increment").
-  - `taken_new` is never incremented.
-  - Theorem 9 says "maximum index `i` with `M[i] = 0`"; it means the minimum.
-  - Theorem 17's proof says "queue" where it means "1-agreement object"; "1-agreement" and
-    "1-ordering" are used interchangeably.
-  - `|S_α| = k` vs `≤ k`.
+So no prefix-closed linearization function exists. The paper linearizes an `EMPTY` at "its last read of
+`Max`", a point that depends on the future. (At that point both slots are still `⊥`; but its claim that *when
+the take returns* `EMPTY` every slot is `⊥` or taken fails here, with `Items[1] = 1` and `TS[1] = 0`.) This
+holds whether or not the never-incremented `taken_new` is read as a counter of failed test&sets.
+
+### ⚠️ Lemma 12 and Theorem 17 for stacks (helping in the reduction)
+Lemma 12's proof ignores that the strong linearization function `f` may linearize *pending* proposal operations of
+other processes during `p_i`'s solo simulation, and stacks with the paper's sequences fail the stronger
+definition this needs (`KOrd.stack_not_kOrderingI`), so the stack case of Theorem 17 is unestablished.
+
+**Impact.** Unestablished, not refuted: the impossibility results for stacks and their relaxations, and the
+remark in §6 about stacks, are not established by the paper. Queues satisfy the stronger definition
+(`KOrd.queue_kOrderingI`), so the queue case is unaffected.
+
+**Details.** The proof writes `f(F_i) = α·α'·β_i` with `β_i` made only of `p_i`'s decision operations. But
+Definition 11 must allow pending proposal operations of others interleaved in `β_i` (our `KOrderingI`).
+Stacks with the paper's sequences (`push(i)` / `pop^{n+1}`) do not satisfy this, for any `d`
+(`KOrd.stack_not_kOrderingI`, `n = 3`). Process 0 observes `OK·0·1·2·ε` both when `α = push(1)` and a pending
+`push(2)` is linearized after the stack has been emptied, and when `α = push(2)`, `α' = push(1)·push(0)`. A
+lock-free SL stack (from CAS) whose `pop` on an empty stack first applies an announced push realizes this, and
+then the reduction `B` violates agreement (informal argument, not formalized).
+
+Under Definition 11 as literally stated, the stack example is correct (`KOrd.stack_kOrdering`): the definition
+is simply too weak for the lemma.
+
+### ⚠️ Definition 11 (under-specified)
+Definition 11 requires the chosen process `ℓ` to have *completed* `prop_ℓ`, while the stuttering examples only
+give that `ℓ` *started*, and its condition `invs(α) ⊆ ⋃ invs(prop_x)` must be read per process.
+
+**Impact.** Evident intent: "started" is also all that validity needs, and the proof uses the per-process
+reading (each process executes a prefix of its own `prop_j`). We use the repaired readings.
+
+### Typos and slips
+- Algorithm 2's caption ("From test&set to fetch&increment").
+- `taken_new` is never incremented.
+- Theorem 9 says "maximum index `i` with `M[i] = 0`"; it means the minimum.
+- Theorem 17's proof says "queue" where it means "1-agreement object"; "1-agreement" and "1-ordering" are used
+  interchangeably.
+- `|S_α| = k` vs `≤ k`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Section 5 ("`k`-out-of-order queues are `k`-ordering")
+The witness `prop_i = enq(i)` fails: with `n = 3`, `k = 2`, `α = enq(1)`, processes 0, 1, 2 can decide 0, 1, 2
+respectively, so no `S_α` of size 2 works, for any `d` (`KOrd.ooo_not_kOrderingW`).
+
+**Impact.** Wrong witness; the statement itself is true with other sequences.
+
+**Details.** The processes' own enqueues in `α'` are among the 2 oldest items.
+
+**Repair.** `prop_i = enq(i)^k`, which works even for the strengthened definition (`KOrd.ooo_kOrderingI`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -126,7 +141,9 @@ Shared infrastructure (upstreamed to CSLib, `Cslib/Computability/Distributed/Sha
 
 **Not formalized.**
 * Theorems 3, 4 (simple types; the proof is a sketch) and Corollaries 7, 8 (need a composition
-  theorem).
+  theorem). Theorem 3's forward simulation relates a configuration to *every* topological sort of
+  `lingraph(G*)`. The step case needs sorts that extend earlier ones, and `lingraph`'s greedy edge insertion
+  does not obviously provide them; we neither confirm nor refute the sketch.
 * Lemma 12 with Claim 13, Corollary 14, Lemma 16, Theorems 17, 19, and the cited Corollaries 15, 18.
   The reduction needs one algorithm simulating another over readable base objects, plus execution
   surgery. We formalized Definition 11 and the examples instead, which is where the errors are.

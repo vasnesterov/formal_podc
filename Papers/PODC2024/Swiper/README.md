@@ -12,39 +12,62 @@ prove a different, correct bound instead.
 
 ## Mistakes in the paper
 
-1. **Theorem 2.4 is false (false statement).** Claimed: every weight-separation instance has a solution with
-   `T ≤ (α+β)(1−α)/(β−α)·n` tickets. Counterexample: `α = 1/20`, `β = 1/10`, 8 parties of weight 14 and 13 of
-   weight 1 (`n = 21`, `W = 125`). Each weight-14 party alone is heavy, all 13 unit parties together are heavy, and
-   light sets contain at most 6 unit parties. If at most 6 unit parties hold tickets, those (light) and all unit
-   parties (heavy) have equally many tickets, a violation. Otherwise any 6 ticketed unit parties hold `≥ 6`
-   tickets, so each weight-14 party needs `≥ 7` and the unit parties together `≥ 7`: `T ≥ 63 > 59.85`. (The
-   optimum is exactly 63; for this family `OPT/n → α/β²`, here 5 versus the claimed 2.85.) This instance compares
-   a set of unit parties with a superset of it, which the paper's Problem 3 allows. Under a "disjoint `S₁, S₂`"
-   reading it would not be a counterexample, but item 2 refutes the proof and Swiper's guarantee under either
-   reading (`ws_upper_bound_false`).
-2. **The proof in Appendix A.2 is wrong, and Swiper's weight-separation construction does not meet the bound.**
-   The proof rounds `t_i = ⌊w_i s + γ⌋` with `γ = (α+β)/2`. Case 1 (`t(S₁) ≥ γT`) is correct (up to typos: its complement bound writes `βWs` for `(1−α)Ws`, and
-   "`t(S₂) > (1−γ)T`" means `t([n]∖S₂)`); case 2 is claimed
-   "analogous by substituting `1−γ` for `γ` and `1−β` for `α`". That would also require changing the rounding
-   offset from `γ` to `1−γ`, which is not done, so the argument works only for `γ = 1/2`. Redone honestly, case 2
-   gives `max(γ², (1−γ)²)·n` instead of `γ(1−γ)·n`. Concretely, on three parties `w = (1, 1, 15)` with the same
-   `α, β`, the paper's `s` yields `t = (0, 0, 7)`, and the two unit parties (weight 2 > `βW` = 1.7) are heavy yet
-   ticketless, so they tie with `S₁ = ∅` (disjoint sets). Every valid member of the `γ`-offset family has `T ≥ 14`,
-   while the bound is 8.55, which contradicts §3's "Robustness" claim for weight separation
-   (`swiper_ws_counterexample`, `swiper_ws_family_exceeds_bound`). The authors' public solver
-   ([DCL-TelecomParis/swiper](https://github.com/DCL-TelecomParis/swiper), commit f1d7a3d) hard-codes this bound
-   and silently returns invalid tickets when it binds: weights `(2, 14)` with `α = 1/20`, `β = 1/10` give tickets
-   `(0, 5)`, although party 1 alone is heavy (checked by running it).
-   **What we prove instead:** `T ≤ ⌈(1−d²)/(2d)·n⌉` with `d = β − α`, using rounding offset `(1−d)/2`
-   (`ws_upper_bound`). It is symmetric under `(α, β) ↦ (1−β, 1−α)`, as the problem is (the paper's bound is not).
-   It beats the paper's bound when `α+β` is near 1 and is weaker when `α+β` is small.
-3. **Gaps in Appendix A.1 (Theorem 2.1 true).** "Since we already proved that viable `s` exist": no such proof is
-   in the paper. "It is easy to see that such `s*` exists": this needs a right-continuity/discreteness argument for
-   the infimum. The border set `J` being non-empty needs `0 < αw < 1`. All three are proved
-   (`exists_viable`, `exists_locallyMinimal`, `LocallyMinimal.border_nonempty`).
-4. **Minor.** In Definition 4.1 the second conjunct has `F` unbound (we read it as `∀ F, ∃ A, A ∩ F = ∅`). The
-   §4.1 random-beacon example writes `(1−αn)T ≥ ⌈αn T⌉`, which is false in general (`αn = 1/2`, `T = 3`) but
-   harmless there because ticket counts are integers.
+### ❌ Theorem 2.4 (weight separation bound)
+The claimed bound `T ≤ (α+β)(1−α)/(β−α)·n` fails for `α = 1/20`, `β = 1/10`, 8 parties of weight 14 and 13 of
+weight 1 (`n = 21`): every solution needs `T ≥ 63 > 59.85` (`ws_upper_bound_false`).
+
+**Impact.** The weight-separation guarantee is false as stated; the weight restriction and qualification
+results (Theorems 2.1, 2.2, Corollary 2.3) are unaffected. We prove a different, correct bound instead
+(`ws_upper_bound`).
+
+**Details.** Here `W = 125`. Each weight-14 party alone is heavy, all 13 unit parties together are heavy, and
+light sets contain at most 6 unit parties. If at most 6 unit parties hold tickets, those (light) and all unit
+parties (heavy) have equally many tickets, a violation. Otherwise any 6 ticketed unit parties hold `≥ 6`
+tickets, so each weight-14 party needs `≥ 7` and the unit parties together `≥ 7`: `T ≥ 63 > 59.85`. (The
+optimum is exactly 63; for this family `OPT/n → α/β²`, here 5 versus the claimed 2.85.) This instance compares
+a set of unit parties with a superset of it, which the paper's Problem 3 allows. Under a "disjoint `S₁, S₂`"
+reading it would not be a counterexample, but the next item refutes the proof and Swiper's guarantee under
+either reading.
+
+**Repair.** `T ≤ ⌈(1−d²)/(2d)·n⌉` with `d = β − α`, using rounding offset `(1−d)/2` (`ws_upper_bound`). It is
+symmetric under `(α, β) ↦ (1−β, 1−α)`, as the problem is (the paper's bound is not). It beats the paper's bound
+when `α+β` is near 1 and is weaker when `α+β` is small.
+
+### ❌ Section 3, "Robustness" for weight separation (Swiper's construction, Appendix A.2)
+Swiper's own weight-separation construction violates the bound: on three parties `w = (1, 1, 15)` with
+`α = 1/20`, `β = 1/10`, the paper's `s` yields `t = (0, 0, 7)`, which is invalid, and every valid member of
+its rounding family has `T ≥ 14`, while the bound is 8.55 (`swiper_ws_counterexample`, `swiper_ws_family_exceeds_bound`).
+
+**Impact.** The proof of Theorem 2.4 in Appendix A.2 is wrong, and the algorithm's guarantee fails even under a
+disjoint-sets reading of Problem 3; the authors' public solver returns invalid tickets when the bound binds.
+
+**Details.** The proof rounds `t_i = ⌊w_i s + γ⌋` with `γ = (α+β)/2`. Case 1 (`t(S₁) ≥ γT`) is correct; case 2
+is claimed "analogous by substituting `1−γ` for `γ` and `1−β` for `α`". That would also require changing the
+rounding offset from `γ` to `1−γ`, which is not done, so the argument works only for `γ = 1/2`. Redone
+honestly, case 2 gives `max(γ², (1−γ)²)·n` instead of `γ(1−γ)·n`.
+
+In the 3-party instance, the two unit parties (weight 2 > `βW` = 1.7) are heavy yet ticketless, so they tie
+with `S₁ = ∅` (disjoint sets). The authors' public solver
+([DCL-TelecomParis/swiper](https://github.com/DCL-TelecomParis/swiper), commit f1d7a3d) hard-codes this bound
+and silently returns invalid tickets when it binds: weights `(2, 14)` with `α = 1/20`, `β = 1/10` give tickets
+`(0, 5)`, although party 1 alone is heavy (checked by running it).
+
+### Typos and slips
+- Appendix A.2, case 1: its complement bound writes `βWs` for `(1−α)Ws`, and "`t(S₂) > (1−γ)T`" means
+  `t([n]∖S₂)`.
+- In Definition 4.1 the second conjunct has `F` unbound (we read it as `∀ F, ∃ A, A ∩ F = ∅`).
+- The §4.1 random-beacon example writes `(1−αn)T ≥ ⌈αn T⌉`, which is false in general (`αn = 1/2`, `T = 3`)
+  but harmless there because ticket counts are integers.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 2.1 (Appendix A.1)
+Three steps are unjustified: "since we already proved that viable `s` exist" (no such proof is in the paper),
+"it is easy to see that such `s*` exists" (needs a right-continuity/discreteness argument for the infimum), and
+the non-emptiness of the border set `J` (needs `0 < αw < 1`).
+
+**Impact.** Statement true; all three are proved (`exists_viable`, `exists_locallyMinimal`,
+`LocallyMinimal.border_nonempty`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

@@ -17,56 +17,73 @@ check does not.
 
 ## Mistakes in the paper
 
-* **Theorem 1 (termination) is false: the view change can deadlock forever.** The rule is: on
-  timeout, send `⟨view-change, v+1⟩`; on `f + 1` view-change messages for `v'`, send
-  `⟨view-change, v'⟩` *"if it has not sent a view-change message for view `v'` or any higher
-  view"*; on `n − f` of them, move to `v'`. Timers fire once per view and nothing is resent.
-  The guard lets a node that has already echoed a *higher* view refuse to help the others reach
-  the view it is itself entering.
+### 🚨 Theorem 1, termination (view-change echo rule of §3.2)
+After GST the view change can deadlock forever: a node that has already echoed a *higher* view never echoes
+the view it is itself entering, so with `n = 7`, `f = 2` (reliable channels) correct nodes end split between
+views 1 and 2 and no one ever decides (`Deadlock.termination_fails`, `Lossy.termination_fails_lossy`).
 
-  Counterexample (`n = 7`, `f = 2`, Byzantine nodes 0 and 1 lead views 0 and 1, Δ = 1, timeout
-  9Δ):
-  1. Nodes 2–5 move to view 1 together; node 6's copies of their messages are delayed until
-     GST + Δ.
-  2. Nodes 2–5 time out in view 1. Node 5 alone reaches view 2, with one Byzantine view-2 message.
-  3. Node 5 times out in view 2. Its view-3 message and two Byzantine ones make node 6 echo view 3.
-  4. Only then does node 6 receive the view-2 messages, and it enters view 2. Because it has
-     already sent view 3, it never sends view 2.
-  5. Nodes 2, 3, 4 now see 4 < n − f view-2 messages and 2 < f + 1 view-3 messages forever.
+**Impact.** The liveness half of the headline Theorem 1 is false for the protocol as specified; agreement and
+validity hold in every run, and with a repaired echo rule the protocol terminates (`fixed_solvesConsensus`).
 
-  From time 41 nothing is in transit and no timer is pending, so no correct node ever decides
-  (`Deadlock.termination_fails`, with timeout 9Δ; the same schedule rescaled deadlocks with
-  timeout 17 = 8δ + 9, the bound of the repair theorem below: `Deadlock17.termination_fails`;
-  both runs use reliable channels and satisfy CSLib's `Run.Valid`). The same pattern works for every `f ≥ 2` (informal). If messages before GST may
-  be lost, as §2 of the paper allows, `n = 4`, `f = 1` already deadlocks
-  (`Lossy.termination_fails_lossy`). That deadlock comes from the lack of retransmission, not
-  from the echo guard: the repaired echo rule deadlocks there too.
+**Details.** The rule is: on timeout, send `⟨view-change, v+1⟩`; on `f + 1` view-change messages for `v'`,
+send `⟨view-change, v'⟩` *"if it has not sent a view-change message for view `v'` or any higher view"*; on
+`n − f` of them, move to `v'`. Timers fire once per view and nothing is resent. The guard lets a node that has
+already echoed a *higher* view refuse to help the others reach the view it is itself entering.
 
-  The paper never proves view synchronization. The 9Δ timeout justification assumes that every
-  node echoes, and the termination proof only cites Lemmas 2, 4, 5, which assume all correct nodes
-  are in a good view after GST. Multi-shot TetraBFT (Algorithm 2) has the same guard. The likely
-  fix: echo every view `≥` the current one that was not echoed yet (plus retransmission in the
-  lossy model). For reliable channels we prove that this repair works: with timeout `T ≥ 8δ + 9`
-and round-robin leaders, the repaired protocol solves consensus (`fixed_solvesConsensus`).
-* **Proof of Lemma 7 uses a false claim (statement true).** It asserts that once a correct node
-  decides `val` in view `v`, every correct vote-1 in view `v` is for `val`. A Byzantine leader
-  breaks this: a synchronous run with `n = 4` where correct node 1 decides `true` in view 0 while
-  correct node 3 votes vote-1 for `false` in view 0 (`Lemma7.lemma7_proof_claim_false`). Lemma 7
-  follows from Lemma 6 instead (`Execution.lemma7`).
-* **Proof gaps with true statements.**
-  * Lemma 2's proof picks the "last view with a vote-3" among a quorum that may contain
-    Byzantine nodes with fake reports. It works when the quorum is the set of correct nodes
-    (`Execution.lemma2`).
-  * Lemma 4 leaves its hypotheses implicit: a correct leader, and proof messages from all correct
-    nodes (`Execution.lemma4`).
-  * The validity proof is circular as written. We prove it by induction over time
-    (`tetra_validity`).
-* **The mechanized check does not cover the paper's rule.** The TLA+ spec (Appendix B) omits Rule 3
-  item 2(b)iiiB, and Apalache checked only `n = 4`. Our Lean proof covers the full Rule 3 for all
-  `n > 3f`.
-* **Typos.** Lemma 8 (d)ii: "either `m` or `m'` satisfies Rule 4 Item 3" should be "neither";
-  Section 6's proof says "vote-4 for block `s − 4`" but Fig. 2 gives `s − 3`; plus a few spelling
-  slips.
+Counterexample (`n = 7`, `f = 2`, Byzantine nodes 0 and 1 lead views 0 and 1, Δ = 1, timeout 9Δ):
+1. Nodes 2–5 move to view 1 together; node 6's copies of their messages are delayed until GST + Δ.
+2. Nodes 2–5 time out in view 1. Node 5 alone reaches view 2, with one Byzantine view-2 message.
+3. Node 5 times out in view 2. Its view-3 message and two Byzantine ones make node 6 echo view 3.
+4. Only then does node 6 receive the view-2 messages, and it enters view 2. Because it has already sent
+   view 3, it never sends view 2.
+5. Nodes 2, 3, 4 now see 4 < n − f view-2 messages and 2 < f + 1 view-3 messages forever.
+
+From time 41 nothing is in transit and no timer is pending, so no correct node ever decides
+(`Deadlock.termination_fails`, with timeout 9Δ; the same schedule rescaled deadlocks with timeout 17 = 8δ + 9,
+the bound of the repair theorem below: `Deadlock17.termination_fails`; both runs use reliable channels and
+satisfy CSLib's `Run.Valid`). The same pattern works for every `f ≥ 2` (informal). If messages before GST may be
+lost, as §2 of the paper allows, `n = 4`, `f = 1` already deadlocks (`Lossy.termination_fails_lossy`). That
+deadlock comes from the lack of retransmission, not from the echo guard: the repaired echo rule deadlocks there
+too.
+
+The paper never proves view synchronization. The 9Δ timeout justification assumes that every node echoes, and
+the termination proof only cites Lemmas 2, 4, 5, which assume all correct nodes are in a good view after GST.
+Multi-shot TetraBFT (Algorithm 2) has the same guard.
+
+**Repair.** The likely fix: echo every view `≥` the current one that was not echoed yet (plus retransmission in
+the lossy model). For reliable channels we prove that this repair works: with timeout `T ≥ 8δ + 9` and
+round-robin leaders, the repaired protocol solves consensus (`fixed_solvesConsensus`).
+
+### Typos and slips
+- Lemma 8 (d)ii: "either `m` or `m'` satisfies Rule 4 Item 3" should be "neither".
+- Section 6's proof says "vote-4 for block `s − 4`" but Fig. 2 gives `s − 3`.
+- A few spelling slips.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 7 (false claim in the proof)
+The proof asserts that once a correct node decides `val` in view `v`, every correct vote-1 in view `v` is for
+`val`, but with a Byzantine leader a synchronous run with `n = 4` has correct node 1 decide `true` in view 0
+while correct node 3 votes vote-1 for `false` in view 0 (`Lemma7.lemma7_proof_claim_false`).
+
+**Impact.** Statement true; Lemma 7 follows from Lemma 6 instead (`Execution.lemma7`).
+
+### 🛠️ Lemma 2 (choice of quorum)
+The proof picks the "last view with a vote-3" among a quorum that may contain Byzantine nodes with fake
+reports.
+
+**Impact.** Statement true; the argument works when the quorum is the set of correct nodes
+(`Execution.lemma2`).
+
+### 🛠️ Lemma 4 (implicit hypotheses)
+Lemma 4 leaves its hypotheses implicit: a correct leader, and proof messages from all correct nodes.
+
+**Impact.** Statement true with these hypotheses made explicit (`Execution.lemma4`).
+
+### 🛠️ Theorem 1, validity
+The validity proof is circular as written.
+
+**Impact.** Statement true; we prove it by induction over time (`tetra_validity`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -107,6 +124,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | — same, in the paper's lossy model, `n = 4` | `Lossy.termination_fails_lossy` | `Counterexample.lean` |
 | Proof of Lemma 7: intermediate claim false | `Lemma7.lemma7_proof_claim_false` | `Counterexample.lean` |
 | Repaired echo rule (not in the paper): views synchronize, termination, consensus | `sync_window`, `fixed_termination`, `fixed_solvesConsensus` | `ViewSync.lean` |
+
+**The paper's mechanized check.** It does not cover the paper's rule: the TLA+ spec (Appendix B) omits
+Rule 3 item 2(b)iiiB, and Apalache checked only `n = 4`. Our Lean proof covers the full Rule 3 for all
+`n > 3f`.
 
 **Not formalized.** Multi-shot TetraBFT (Section 6, Theorem 2), which is under-specified. The
 complexity and latency claims. A repair for the lossy model (it would also need retransmission).
