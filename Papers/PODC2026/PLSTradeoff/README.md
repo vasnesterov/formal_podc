@@ -16,32 +16,52 @@ decompositions of Conroy–Filtser.
 
 ## Mistakes in the paper
 
-* **Theorem 1.6: the ball-size claim is false for `t = 1`.** The theorem claims that every `t`-ball
-  of `G_{t,m}` contains `Ω(|V|)` nodes, for all `t, m ≥ 1`. For `t = 1`, a node of an even layer
-  has only two neighbours, so its 1-ball has 3 nodes while `|V| = 2m + 3`. For `t ≥ 2` the claim
-  holds with constant `1/3`. The cost lower bound `Ω(m/t)` is not affected. False only in a
-  degenerate case. (`Layered.ball_t1_counterexample`, `Layered.ball_large`)
-* **Lemma 5.6 is false when `n < r/O(1)`.** It promises to share any `r`-bit string with `O(1)`
-  bits per node for every `r`. With `c` bits per node a graph on `n` nodes can carry fewer than
-  `2^{(c+1)n}` distinct labelings, so this fails once `r > (c+1)n`. The proof's Lemma B.1 indeed
-  assumes `|V| > r`. The correct cost is `O(1 + r/n)`. Theorem 1.2 only shares `r ≈ 2 log n` bits,
-  so it is unaffected. False only in a degenerate case. (`exists_stringShare`)
-* **Lemma 4.5: the stated radius does not fit the verifier.** The proof claims a `(3t+2)`-PLS.
-  But a node reconstructs clusters `{w ∈ B_{3t+2}(u) | …}` for nodes `u` at distance up to
-  `3t+4`, which needs radius about `6t+6`. The lemma is still true. We search for cluster mates
-  within radius `2t`, which suffices (the diameter checks show `Ĉ_u = Ĉ_v` for `u ∈ Ĉ_v`), and
-  then radius `3t+2` is enough. Proof gap; statement true. (`exists_tsCert`)
-* **Small gaps in Section 5, all repaired.**
-  * Lemma 5.1's final inequality `(1+1/t)^{t log n} > n` only gives `≥ n`. The missing strict
-    factor comes from the first bad radius. (`card_bad_le`)
-  * Lemma 5.2 and Corollary 5.4 assume `n ≥ 2t log n`, and the case `n < 2t log n` of Theorem 1.2
-    is never treated. Our counting covers every `n`, using that a radius-`k` ball in a connected
-    graph has `≥ min(n, k+1)` nodes. (`card_not_allClustered`)
-  * The union bound in Newman's trick (Lemma 5.5) undercounts the graphs whose identifiers come
-    from `[poly(n)]`. It still works. (`exists_good_family`)
-* **Minor points.**
-  * "Cost `O(⌈p/t⌉)`" should read `O(⌈p/t⌉ + 1)` when `p = 0`.
-  * Lemma 4.2 and Theorem 1.4 need `t ≥ 2/δ` (the paper writes "`t = Ω(1)`").
+### ⚠️ Theorem 1.6 (ball size of `G_{t,m}` for `t = 1`)
+The claim that every `t`-ball of `G_{t,m}` contains `Ω(|V|)` nodes, for all `t, m ≥ 1`, is false for `t = 1`: a
+node of an even layer has only two neighbours, so its 1-ball has 3 nodes while `|V| = 2m + 3`
+(`Layered.ball_t1_counterexample`).
+
+**Impact.** False only in a degenerate case. For `t ≥ 2` the claim holds with constant `1/3`
+(`Layered.ball_large`), and the cost lower bound `Ω(m/t)` is not affected.
+
+### ⚠️ Lemma 5.6 (sharing an `r`-bit string with `O(1)` bits per node)
+Lemma 5.6 is false when `n < r/O(1)`: with `c` bits per node a graph on `n` nodes can carry fewer than
+`2^{(c+1)n}` distinct labelings, so it fails once `r > (c+1)n`.
+
+**Impact.** False only in a degenerate case. The correct cost is `O(1 + r/n)` (`exists_stringShare`). Theorem 1.2
+only shares `r ≈ 2 log n` bits, so it is unaffected.
+
+**Details.** The lemma promises the sharing for every `r`. The proof's Lemma B.1 indeed assumes `|V| > r`.
+
+### Typos and slips
+- "Cost `O(⌈p/t⌉)`" should read `O(⌈p/t⌉ + 1)` when `p = 0`.
+- Lemma 4.2 and Theorem 1.4 need `t ≥ 2/δ` (the paper writes "`t = Ω(1)`").
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 4.5 (radius of the TS certification)
+The proof claims a `(3t+2)`-PLS, but a node reconstructs clusters `{w ∈ B_{3t+2}(u) | …}` for nodes `u` at
+distance up to `3t+4`, which needs radius about `6t+6`.
+
+**Impact.** Statement true; repaired with radius `3t+2` (`exists_tsCert`).
+
+**Repair.** We search for cluster mates within radius `2t`, which suffices (the diameter checks show `Ĉ_u = Ĉ_v`
+for `u ∈ Ĉ_v`), and then radius `3t+2` is enough.
+
+### 🛠️ Section 5 (small gaps in Lemmas 5.1, 5.2, 5.5 and Corollary 5.4)
+Lemma 5.1's final inequality is only non-strict, Lemma 5.2 and Corollary 5.4 skip the case `n < 2t log n`, and
+Newman's trick (Lemma 5.5) undercounts the graphs.
+
+**Impact.** Statements true; all repaired (`card_bad_le`, `card_not_allClustered`, `exists_good_family`).
+
+**Details.**
+* Lemma 5.1's final inequality `(1+1/t)^{t log n} > n` only gives `≥ n`. The missing strict factor comes from the
+  first bad radius. (`card_bad_le`)
+* Lemma 5.2 and Corollary 5.4 assume `n ≥ 2t log n`, and the case `n < 2t log n` of Theorem 1.2 is never
+  treated. Our counting covers every `n`, using that a radius-`k` ball in a connected graph has `≥ min(n, k+1)`
+  nodes. (`card_not_allClustered`)
+* The union bound in Newman's trick (Lemma 5.5) undercounts the graphs whose identifiers come from `[poly(n)]`. It
+  still works. (`exists_good_family`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

@@ -14,43 +14,73 @@ reading. The `O(log n)` convergence-time claim is not verified.
 
 ## Mistakes in the paper
 
-1. **Proposition 6 (⇐): proof gap, statement true.** Weighted Copy-or-Max on a connected circulation has the
-   geometric fixation law. The proof relabels the nodes at every round by rank. The resulting matrices `P^(t)`
-   then depend on the random configuration, so eq. (6), `P[X^t_(i) = X^0_(j)] = (∏_s P^(s))_{j,i}`, has a random
-   right-hand side. It is not justified by "similarly to Lemmas 4.3 and 4.4", since the expectation of a product
-   of dependent random matrices is not the product of expectations. Lemma 4.7 concerns deterministic sequences.
-   New proof: a bounded harmonic function of threshold counts, which only needs `π` to be stationary for every
-   possible `P^(t)`, i.e. balanced flows across every cut (`copyOrMaxW_fixation`).
-2. **Proposition 6 (⇒): invalid proof, statement true.** The proof claims that geometric fixation probabilities
-   give an `N` with `P[X^t_(i) = X^0_(j)] = π_j` for all `t ≥ N`. A limit need not be attained in finite time:
-   already on the clique with `n = 2`, `P[X^t_(1) = x_(1)] = π_1 + (1−π_1)r^t ≠ π_1` for every `t`. The proof
-   also again treats `P^(N)` as deterministic. New proof: projecting onto a threshold reduces to binary
-   Copy-or-Max. Harmonicity of the binary fixation probability at the configuration with a single `0` at `v`
-   forces in-flow(`v`) = out-flow(`v`). Disconnection would make consensus unreachable
-   (`copyOrMaxW_geomFix_iff`).
-3. **Definition 4.2 is under-specified, so Theorem 7 is false under its literal reading.** The definition only
-   constrains configurations with pairwise distinct opinions, but after the first copy every configuration has
-   ties. Instance: a dynamics that equals Copy-or-Max (`p = 1/2`) on distinct configurations but runs Max on tied
-   ones. It is Order-Based in the literal sense, yet from `(0, 1, 2)` it fixes on `2` with probability `7/9`
-   instead of `π_3 = 4/7`. The paper's gloss ("a function of the ranks only") shows the intended class. With
-   the rank structure required on all configurations (in threshold form), Theorem 7 holds; Copy-or-Max,
-   Biased-Median and Self-Excluding Median satisfy it with exactly the paper's `f_k, h_k`
-   (`Counterexample.tieMax_not_geometric`; fix `orderBased_fixation`).
-4. **Theorem 1's "O(log n) parallel rounds w.h.p." (full-version Theorem 9): not formalized, proof sketchy.** The
-   geometric, state-dependent holding times are "upper-bounded by i.i.d. `Z_s`" with a bounded,
-   state-independent distribution, but no such domination holds. The restart step ("consensus is only faster")
-   lacks a monotonicity argument. The bound implicitly needs `p` constant: as `p → 1` the dynamics approaches the
-   voter model, which needs `Θ(n)` parallel rounds. The claim is plausible but unverified.
-5. **Ambiguity in Biased-Median (§4.5).** "An unordered pair `(v, s)`, may be equal" must mean two independent
-   uniform samples, as Lemma 4.8's counts require. With a uniform unordered pair, the Median law for `n = 3` is
-   `(2/7, 3/7, 2/7)`, not binomial (an exact computation, not formalized). Theorem 2 needs `p ≤ 1/2`, so the
-   abstract's `K − 1 ~ Bin(n−1, 1−p)` covers only `1 − p ≥ 1/2`.
-6. **Minor slips.**
-   - Proposition 6, item iv) instantiates Lemma 4.7 with `D = diag(√π)` where `diag(1/√π)` is needed
-     (`Counterexample.prop6_itemIv_sqrt_slip`); Lemma 4.7 itself is fine.
-   - Lemma 4.2's footnote boundary should be `k = n + 1`, not `k = n`.
-   - Fact 4.1 as written covers neither Copy-or-Max nor Biased-Median.
-   - The full version divides by `n³` where `n⁴` is meant (ratios unaffected).
+### ⚠️ Definition 4.2 and Theorem 7 (Order-Based dynamics)
+Definition 4.2 only constrains configurations with pairwise distinct opinions, and under this literal reading
+Theorem 7 is false: a dynamics that is Copy-or-Max (`p = 1/2`) on distinct configurations but Max on tied ones fixes on `2`
+from `(0, 1, 2)` with probability `7/9` instead of `π_3 = 4/7` (`Counterexample.tieMax_not_geometric`).
+
+**Impact.** Evident intent: the paper's gloss ("a function of the ranks only") shows the intended class, and
+under it Theorem 7 holds (`orderBased_fixation`). All three concrete dynamics are covered.
+
+**Details.** After the first copy every configuration has ties, so the definition says nothing about the states
+the dynamics actually visits. The instance above is Order-Based in the literal sense.
+
+**Repair.** We require the rank structure on all configurations, in threshold form. Then Theorem 7 holds;
+Copy-or-Max, Biased-Median and Self-Excluding Median satisfy it with exactly the paper's `f_k, h_k`
+(`orderBased_fixation`).
+
+### ⚠️ §4.5 (Biased-Median sampling)
+"An unordered pair `(v, s)`, may be equal" must mean two independent uniform samples, as Lemma 4.8's counts
+require; with a uniform unordered pair the Median law for `n = 3` is `(2/7, 3/7, 2/7)`, not binomial.
+
+**Impact.** Evident intent, recoverable from Lemma 4.8; Theorem 2 holds under that reading.
+
+**Details.** The `n = 3` law is an exact computation, not formalized. Theorem 2 needs `p ≤ 1/2`, so the
+abstract's `K − 1 ~ Bin(n−1, 1−p)` covers only `1 − p ≥ 1/2`.
+
+### ⚠️ Theorem 1 (the `O(log n)` parallel-rounds claim; full-version Theorem 9)
+The convergence-time claim rests on a sketchy proof and is unestablished (not formalized).
+
+**Impact.** The claim is plausible but unverified; the fixation laws, the paper's main content, are unaffected.
+
+**Details.** The geometric, state-dependent holding times are "upper-bounded by i.i.d. `Z_s`" with a bounded,
+state-independent distribution, but no such domination holds. The restart step ("consensus is only faster")
+lacks a monotonicity argument. The bound implicitly needs `p` constant: as `p → 1` the dynamics approaches the
+voter model, which needs `Θ(n)` parallel rounds.
+
+### Typos and slips
+- Proposition 6, item iv) instantiates Lemma 4.7 with `D = diag(√π)` where `diag(1/√π)` is needed
+  (`Counterexample.prop6_itemIv_sqrt_slip`); Lemma 4.7 itself is fine.
+- Lemma 4.2's footnote boundary should be `k = n + 1`, not `k = n`.
+- Fact 4.1 as written covers neither Copy-or-Max nor Biased-Median.
+- The full version divides by `n³` where `n⁴` is meant (ratios unaffected).
+
+## Proof gaps (statements true)
+
+### 🛠️ Proposition 6 (⇐) (weighted Copy-or-Max has the geometric law)
+The proof relabels the nodes by rank at every round, so the matrices `P^(t)` depend on the random configuration
+and eq. (6), `P[X^t_(i) = X^0_(j)] = (∏_s P^(s))_{j,i}`, has a random right-hand side.
+
+**Impact.** Statement true; new proof (`copyOrMaxW_fixation`).
+
+**Details.** Eq. (6) is not justified by "similarly to Lemmas 4.3 and 4.4", since the expectation of a product of
+dependent random matrices is not the product of expectations. Lemma 4.7 concerns deterministic sequences.
+
+**Repair.** A bounded harmonic function of threshold counts, which only needs `π` to be stationary for every
+possible `P^(t)`, i.e. balanced flows across every cut (`copyOrMaxW_fixation`).
+
+### 🛠️ Proposition 6 (⇒) (the geometric law forces a connected circulation)
+The proof claims that geometric fixation probabilities give an `N` with `P[X^t_(i) = X^0_(j)] = π_j` for all
+`t ≥ N`, but a limit need not be attained in finite time.
+
+**Impact.** Statement true; new proof (`copyOrMaxW_geomFix_iff`).
+
+**Details.** Already on the clique with `n = 2`, `P[X^t_(1) = x_(1)] = π_1 + (1−π_1)r^t ≠ π_1` for every `t`.
+The proof also again treats `P^(N)` as deterministic.
+
+**Repair.** Projecting onto a threshold reduces to binary Copy-or-Max. Harmonicity of the binary fixation
+probability at the configuration with a single `0` at `v` forces in-flow(`v`) = out-flow(`v`). Disconnection
+would make consensus unreachable (`copyOrMaxW_geomFix_iff`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
