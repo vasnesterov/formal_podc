@@ -15,53 +15,65 @@ Theorem 4 are correct and are proved.
 
 ## Mistakes in the paper
 
-* **Lemma 2 / Theorem 3 are false: Figure 3 can block forever.** A correct process that returns at line 4 never
-  executes line 5, so its `timer[r]` is never set. It then broadcasts `EA_RELAY[r]` only if it receives
-  `EA_COORD[r]` from the coordinator (lines 15–19). If `coord(r)` is faulty and silent, these processes never relay.
-  The processes that did not return at line 4 can then wait at line 6 forever for `n − t` relays.
-  *Counterexample* (`n = 7`, `t = 2`, `m = ⌊(n−(t+1))/t⌋ = 2`):
-  * Process `p₁ = coord(1)` crashes at the start.
-  * Three correct processes propose `true` and three propose `false`.
-  * The run is synchronous (all delays ≤ 1), so every correct process is a `⟨t+1⟩bisource`.
-  * `CB[0]` returns each process its own proposal (three estimates `true`, three `false`). `CB[1]` (EA round 1)
-    gives `aux = true` to five processes and `false` to the sixth.
-  * Two processes see five `true` messages first and return at line 4. The other four see a mixed first five, set
-    their timers and relay `⊥`.
-  * Only `4 < n − t = 5` relays are ever sent, so the four wait forever at line 6 of round 1. The two others wait
-    forever inside the CB of `AC_OBJECT[1]`, which has only two `AC_PROP` messages, fewer than `t + 1 = 3`.
+### 🚨 Lemma 2, Theorem 3 and Theorem 4 (EA-Termination, consensus termination)
+Figure 3 can block forever, so EA-Termination (Lemma 2, Theorem 3) and the termination of the consensus
+algorithm of Figure 4 (Theorem 4) are false: in a synchronous run with `n = 7`, `t = 2` and a coordinator
+that crashes at the start, no correct process ever decides (`lemma2_false`, `theorem4_termination_false`).
 
-  So in a run of Figure 4 where every correct process invokes `EA_propose(1, −)`, four invocations never return
-  (`lemma2_false`), and no correct process ever decides (`theorem4_termination_false`). The paper's
-  proof of Theorem 4 relies on EA-Termination in exactly this situation ("it follows from the EA-Termination and
-  AC-Termination properties that they all terminate the first round"). *A repair* is to set the timer before
-  returning at line 4, so that every correct process relays. With it, the same run decides
-  (`repaired_blocking_run_decides`). We do not know whether the repaired algorithm is correct, because of the next
-  item.
-* **Lemma 3's proof ignores line 4 (proof gap; we do not know whether the statement holds).** The proof picks a
-  round `r > 2δ` coordinated by the bisource `p_ℓ`, with `F(r) ⊆ C`, and concludes that every correct process returns
-  the coordinator's value `w` "after executing lines 7–10". Processes that return at line 4 never reach line 7, and
-  they may return a different value. *Lean witness*, for the EA object alone:
-  * `n = 4`, `t = 1`, a synchronous run.
-  * Round 15 has `coord(15) = p₃` correct and `F(15)` equal to the set of correct processes. The coordinator is a
-    bisource with `X⁻ = X⁺ ⊆ F(15)`, so it is a round of exactly the kind the proof chooses.
-  * The Byzantine process RB-broadcasts `EA_PROP1(false)` consistently and sends `EA_PROP2[15](true)`.
-  * Process `p₁` returns `true` at line 4. The coordinator champions its own `false`, which `p₂` and `p₃` return.
+**Impact.** The paper does not establish its headline claim that an eventual `⟨t+1⟩bisource` suffices for
+signature-free Byzantine consensus. A local repair unblocks this run, but its correctness is open (see
+Lemma 3 below).
 
-  (`lemma3_proof_fails`.) Lemma 3 needs infinitely many such rounds, so this refutes the proof, not the statement.
-  It also leaves the repaired algorithm unproven.
-* **Lemma 3 also uses `p_k ∈ X⁻_ℓ ⊆ F(r)`, but the chosen round only guarantees `X⁺_ℓ ⊆ F(r) ⊆ C` (proof gap,
-  fixable).** Choose instead `r` with `X⁻_ℓ ∪ X⁺_ℓ ⊆ F(r) ⊆ C`. Such rounds exist infinitely often:
-  `|X⁻ ∪ X⁺| ≤ 2t + 1 ≤ n − t` because both sets contain `ℓ`. Our `lemma3_proof_fails` round satisfies the stronger
-  choice. This point was not formalized further.
-* **Minor.**
-  * AC-Obligation and EA-Validity are stated as "if all correct processes propose `v`". Theorem 4 uses them in rounds
-    that some correct processes may never reach. We state and prove them for the correct processes that invoke the
-    object, which is what the proof needs.
-  * The proof of Theorem 4 uses that `cb_valid` sets only grow, and that rounds take time (otherwise `CB[0]`'s
-    "never updated after round `r₀`" can fail). Neither is stated.
-  * Feasibility needs `t ≥ 1` for `⌊(n−(t+1))/t⌋`; we use `n − t > m t`.
-  * "Decides and stops" must not stop the RB layer.
-  * Claim C says the timer is set "at line 8"; it is set at line 5.
+**Details.** A correct process that returns at line 4 never executes line 5, so its `timer[r]` is never set.
+It then broadcasts `EA_RELAY[r]` only if it receives `EA_COORD[r]` from the coordinator (lines 15–19). If
+`coord(r)` is faulty and silent, these processes never relay. The processes that did not return at line 4
+can then wait at line 6 forever for `n − t` relays.
+
+*Counterexample* (`n = 7`, `t = 2`, `m = ⌊(n−(t+1))/t⌋ = 2`):
+* Process `p₁ = coord(1)` crashes at the start.
+* Three correct processes propose `true` and three propose `false`.
+* The run is synchronous (all delays ≤ 1), so every correct process is a `⟨t+1⟩bisource`.
+* `CB[0]` returns each process its own proposal (three estimates `true`, three `false`). `CB[1]` (EA round 1)
+  gives `aux = true` to five processes and `false` to the sixth.
+* Two processes see five `true` messages first and return at line 4. The other four see a mixed first five, set
+  their timers and relay `⊥`.
+* Only `4 < n − t = 5` relays are ever sent, so the four wait forever at line 6 of round 1. The two others wait
+  forever inside the CB of `AC_OBJECT[1]`, which has only two `AC_PROP` messages, fewer than `t + 1 = 3`.
+
+So in a run of Figure 4 where every correct process invokes `EA_propose(1, −)`, four invocations never
+return, and no correct process ever decides. The paper's proof of Theorem 4 relies on EA-Termination in
+exactly this situation ("it follows from the EA-Termination and AC-Termination properties that they all
+terminate the first round").
+
+**Repair.** Set the timer before returning at line 4, so that every correct process relays. With it, the same
+run decides (`repaired_blocking_run_decides`). We do not know whether the repaired algorithm is correct,
+because of the next item.
+
+### ⚠️ Lemma 3 (EA-Eventual agreement; unestablished)
+The proof of Lemma 3 ignores processes that return at line 4: in a round of exactly the kind the proof
+chooses, one correct process returns `true` at line 4 while the others return the coordinator's `false`
+(`lemma3_proof_fails`).
+
+**Impact.** Refutes the proof, not the statement (Lemma 3 needs infinitely many such rounds); whether Lemma 3
+holds, with or without the repair above, is open. It also leaves the repaired algorithm unproven.
+
+**Details.** The proof picks a round `r > 2δ` coordinated by the bisource `p_ℓ`, with `F(r) ⊆ C`, and
+concludes that every correct process returns the coordinator's value `w` "after executing lines 7–10".
+Processes that return at line 4 never reach line 7, and they may return a different value. *Lean witness*,
+for the EA object alone:
+* `n = 4`, `t = 1`, a synchronous run.
+* Round 15 has `coord(15) = p₃` correct and `F(15)` equal to the set of correct processes. The coordinator is a
+  bisource with `X⁻ = X⁺ ⊆ F(15)`, so it is a round of exactly the kind the proof chooses.
+* The Byzantine process RB-broadcasts `EA_PROP1(false)` consistently and sends `EA_PROP2[15](true)`.
+* Process `p₁` returns `true` at line 4. The coordinator champions its own `false`, which `p₂` and `p₃` return.
+
+A second, fixable gap: the proof also uses `p_k ∈ X⁻_ℓ ⊆ F(r)`, but the chosen round only guarantees
+`X⁺_ℓ ⊆ F(r) ⊆ C`. Choose instead `r` with `X⁻_ℓ ∪ X⁺_ℓ ⊆ F(r) ⊆ C`. Such rounds exist infinitely often:
+`|X⁻ ∪ X⁺| ≤ 2t + 1 ≤ n − t` because both sets contain `ℓ`. Our `lemma3_proof_fails` round satisfies the
+stronger choice. This point was not formalized further.
+
+### Typos and slips
+- Claim C says the timer is set "at line 8"; it is set at line 5.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -88,6 +100,15 @@ Full list of differences (including modelling choices and minor imprecisions): [
     `Machine` resolves nondeterminism.
 * The `coord(r)`/`F(r)` schedule is the paper's, with `F₁ … F_α` in `List.sublistsLen` order. The blocking run
   never consults `F`.
+
+**Remarks (minor imprecisions of the paper, handled in the model).**
+* AC-Obligation and EA-Validity are stated as "if all correct processes propose `v`". Theorem 4 uses them in rounds
+  that some correct processes may never reach. We state and prove them for the correct processes that invoke the
+  object, which is what the proof needs.
+* The proof of Theorem 4 uses that `cb_valid` sets only grow, and that rounds take time (otherwise `CB[0]`'s
+  "never updated after round `r₀`" can fail). Neither is stated.
+* Feasibility needs `t ≥ 1` for `⌊(n−(t+1))/t⌋`; we use `n − t > m t`.
+* "Decides and stops" must not stop the RB layer.
 
 **Main results in Lean.**
 

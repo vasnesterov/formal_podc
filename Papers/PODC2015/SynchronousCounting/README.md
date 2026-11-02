@@ -15,38 +15,57 @@ For `n ≥ 3` the theorem holds exactly as stated.
 
 ## Mistakes in the paper
 
-* **Theorem 1 is false for `n = 1` (false statement in the boundary case `n = 1`; downstream unaffected).** The paper says (§3.4) that
-  `F < N/3`, which the phase king needs, "follows from the preconditions of Theorem 1". Take `n = 1`,
-  `f = 0`, `k = 3`. The precondition `F < (f+1)⌈k/2⌉ = 2` allows `F = 1` on `N = 3` nodes. The base
-  counter exists (one node incrementing its counter), but no 1-resilient counter on 3 nodes exists. We
-  prove this impossibility by an FLM-style covering argument on an infinite line of node copies. The
-  paper's construction also fails concretely: the Byzantine node echoes each correct node's own
-  phase-king register back to it. Every correct node then sees its own value `N − F = 2` times and the
-  other correct value only `F = 1` time, so whatever instruction it executes it keeps counting on its own,
-  and the two correct counters stay apart forever. For `n ≥ 2` with `f < n/3` the claim `F < N/3` is right,
-  and Corollary 1 (which uses `n = 1`) explicitly replaces the hypothesis by `F < N/3`. So nothing
-  downstream breaks. (`theorem1_as_stated_false`, `construction_fails`; repaired: `boost`,
-  `theorem1_paper`, `theorem1_of_three_le`)
-* **Lemma 3 relies on an unproved impossibility (proof gap, statement true for `n ≥ 3`).** The proof
-  needs the correct nodes of a non-faulty block to form a strict majority. It justifies `f < n/3` by "as
-  otherwise counting cannot be solved". We proved that impossibility for `3 ≤ n ≤ 3f`. So for `n ≥ 3`,
-  Theorem 1 holds exactly as stated (`theorem1_of_three_le`). For `n = 2, f ≥ 1` it holds iff no 1-resilient
-  counter on two nodes exists; we did not prove that. (`not_isCounter_of_three_le_card`)
-* **§4.3 miscomputes `n/f` (statement true).** With the stated `R_p = 2k_p` iterations, `n/f = 2^{8·2^P−6}`,
-  not `2^{2(2^P−1)}`. The paper's value corresponds to `R_p = 2·2^{P−p}` and drops a factor 4. Still
-  `log(n/f) = Θ(k_1)`, so `f = n^{1−O(1/log log f)}` survives. (`thm3N`, `theorem3_asymptotic`)
-* **Theorem 2's time bound is not established (proof gap).** The proof uses a per-step cost `h^k`, but
-  Theorem 1 gives `(2m)^k = k^k`. So the proof does not establish the claimed `O(2^{2^{1/ε}} f)`. We prove
-  the weaker bound `2^{2^{O(1/ε)}} f` and do not know whether the claimed one holds. Corollary 2 (constant
-  `ε`) is unaffected. (`theorem2`, `corollary2`)
-* **Imprecise statements.** Corollary 1 is stated for every `n > 3f` but proved only for `n = 3f+1`.
-  Theorems 2 and 3 produce counters only for special network sizes. The bit count
-  `S(B) = S(A) + ⌈log(C+1)⌉ + 1` is an upper bound, not an equality. The instruction `min{j : z_j > F}` does
-  not define the empty case (we use `∞`).
-* **Typos:** `c_k` for `c_{k−1}` (Lemmas 2–3, §3.5); `u + (β−1)c_{i−1}` for `u + βc_{i−1}` (Lemma 1);
+### ⚠️ Theorem 1 for `n = 1` (resilience boosting)
+Theorem 1 is false in the boundary case `n = 1`: with `f = 0`, `k = 3` its precondition allows `F = 1` on
+`N = 3` nodes, but no 1-resilient counter on 3 nodes exists (`theorem1_as_stated_false`,
+`construction_fails`).
+
+**Impact.** Degenerate case; nothing downstream breaks. For `n ≥ 2` with `f < n/3` the claim `F < N/3` is
+right, and Corollary 1 (which uses `n = 1`) explicitly replaces the hypothesis by `F < N/3`. Repaired:
+`boost`, `theorem1_paper`, `theorem1_of_three_le`.
+
+**Details.** The paper says (§3.4) that `F < N/3`, which the phase king needs, "follows from the
+preconditions of Theorem 1". Take `n = 1`, `f = 0`, `k = 3`. The precondition `F < (f+1)⌈k/2⌉ = 2` allows
+`F = 1` on `N = 3` nodes. The base counter exists (one node incrementing its counter). We prove the
+impossibility of a 1-resilient counter on 3 nodes by an FLM-style covering argument on an infinite line of
+node copies. The paper's construction also fails concretely: the Byzantine node echoes each correct node's
+own phase-king register back to it. Every correct node then sees its own value `N − F = 2` times and the
+other correct value only `F = 1` time, so whatever instruction it executes it keeps counting on its own, and
+the two correct counters stay apart forever.
+
+### ⚠️ Theorem 2 (time bound unestablished)
+The proof of Theorem 2 uses a per-step cost `h^k`, but Theorem 1 gives `(2m)^k = k^k`, so the claimed
+`O(2^{2^{1/ε}} f)` time is not established (`theorem2`).
+
+**Impact.** We prove the weaker bound `2^{2^{O(1/ε)}} f` and do not know whether the claimed one holds.
+Corollary 2 (constant `ε`) is unaffected (`corollary2`).
+
+### Typos and slips
+- Corollary 1 is stated for every `n > 3f` but proved only for `n = 3f+1`. Theorems 2 and 3 produce
+  counters only for special network sizes.
+- The bit count `S(B) = S(A) + ⌈log(C+1)⌉ + 1` is an upper bound, not an equality.
+- The instruction `min{j : z_j > F}` does not define the empty case (we use `∞`).
+- Typos: `c_k` for `c_{k−1}` (Lemmas 2–3, §3.5); `u + (β−1)c_{i−1}` for `u + βc_{i−1}` (Lemma 1);
   "Checking `I₃ℓ₊₂`" for `I₃ℓ₊₁` (Lemma 4); `mod c` for `mod C` (Lemma 5); `π_F(x) = d` for `π_F(x) = e`
   (§2); "fewer than `f`" for "at most `f`" faulty nodes (§3.1); `(3f+2)(2m)^k` for `3(f+2)(2m)^k`
   (Corollary 1).
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 3 (`f < n/3` from an unproved impossibility)
+The proof needs the correct nodes of a non-faulty block to form a strict majority, and justifies `f < n/3`
+only by "as otherwise counting cannot be solved".
+
+**Impact.** Statement true for `n ≥ 3`: we proved that impossibility for `3 ≤ n ≤ 3f`
+(`not_isCounter_of_three_le_card`), so Theorem 1 holds exactly as stated (`theorem1_of_three_le`). For
+`n = 2, f ≥ 1` it holds iff no 1-resilient counter on two nodes exists; we did not prove that.
+
+### 🛠️ §4.3 (computation of `n/f`)
+With the stated `R_p = 2k_p` iterations, `n/f = 2^{8·2^P−6}`, not `2^{2(2^P−1)}`; the paper's value
+corresponds to `R_p = 2·2^{P−p}` and drops a factor 4.
+
+**Impact.** Statement true: still `log(n/f) = Θ(k_1)`, so `f = n^{1−O(1/log log f)}` survives (`thm3N`,
+`theorem3_asymptotic`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
