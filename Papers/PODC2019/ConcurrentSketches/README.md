@@ -17,44 +17,74 @@ one the error analysis needs. The error bounds of Section 6 check out algebraica
 
 ## Mistakes in the paper
 
-* **The hard-coded initial hint `1` breaks Lemma 1 and Theorem 1 for general composable sketches.**
-  Algorithm 2 starts with `hint_i = prop_i = 1`. The pre-filtering requirement of Section 5.1 only
-  constrains `shouldAdd(h, ·)` for hints `h` produced by `calcHint()`. So the first batch of every
-  thread is filtered with a hint about which nothing is assumed. Counterexample: an exact counter
-  whose `calcHint` always returns `2` and with `shouldAdd(h, a) = (h ≠ 1)`. It meets all
-  requirements, but with the initial hint `1` every update is dropped forever. With `N = b = 1`,
-  two completed updates followed by two queries returning `0` is an execution with no linearization
-  in `SeqSketch_{Nb}`. For the paper's Θ sketch, `1` is exactly the empty sketch's Θ, so the
-  intended reading is clear. We prove both results with "initial hint = hint of the empty sketch"
-  (more generally, any hint that filters harmlessly on every stream).
-  (`parSketch_hint_one_not_stronglyLinearizable`; repaired: `lemma1`, `theorem1`)
-* **Definition 2 is weaker than what Section 6 uses; the stronger property holds.** An
-  `r`-relaxation may drop up to `r` operations altogether, including queries, which may then return
-  anything. It may also put an operation after arbitrarily many operations that follow it in `H'`:
-  `U, q` is a `1`-relaxation of `q, U` for every list of updates `U`. So "strongly linearisable w.r.t.
-  `SeqSketch_r`" does not by itself give the model of Section 6 ("a query misses up to `r` of the
-  updates preceding it"), on which the error bounds rest. The algorithms satisfy the intended
-  property: in the witnessing relaxation no query is dropped, and a query is preceded only by
-  operations that precede it in the linearization. We prove Lemma 1 and Theorem 1 in this form.
-  (`isRelaxation_drop`, `isRelaxation_future`; `lemma1_pastOnly`, `theorem1_pastOnly`)
-* **Two gaps in the full version's proofs; the statements are true.** (1) Lemma 6 overlooks updates
-  that are invoked but have not yet run `shouldAdd`: they have no visibility point and are not in
-  `up_suff_i`. The bound `Nb` survives because such an update can only be pending while
-  `counter_i < b`. (2) Theorem 1 is derived from a simulation of each `OptParSketch` thread by two
-  `ParSketch` threads. That mapping does not preserve histories: an update that fills a buffer
-  returns in `OptParSketch` while the simulating `ParSketch` update still waits at line 125, and in
-  the first round line 225 is mapped to line 125 of a thread with no pending operation. We prove
-  Theorem 1 directly instead.
-* **Off by one in Section 5.3.** "The sequential Θ sketch answers queries with perfect accuracy in
-  streams with up to `k` unique elements" holds for Algorithm 1 only up to `k − 1` distinct hashes.
-  With exactly `k`, the initial `1` is evicted and the estimate becomes `(k−1)/Θ`, for every `k`.
-  The same slip appears in "Θ is 1 during the first `k` updates". A remark motivating eager
-  propagation; nothing depends on it. (`thetaSketch_query_exact`, `thetaSketch_query_of_le`;
-  smallest instance `thetaSketch_not_exact_k`)
-* **Typos.** Update threads are indexed `0 ≤ i ≤ N` (`t₀` is the propagator). `hint_i` and `prop_i`
-  are declared `int` but carry real Θ values. The full version states Lemma 1 with `r = 2Nb` but
-  proves `Nb` (the PODC version says `Nb`). It writes the extreme order statistics of Claim 1 as
-  `M(0)`, `M(j)`, and in Claims 4–6 writes `i, j > 0` for `i, j ≥ 0`.
+### ⚠️ Lemma 1 and Theorem 1 (Algorithm 2's initial hint `1`)
+Algorithm 2 starts with `hint_i = prop_i = 1`, which breaks Lemma 1 and Theorem 1 for general
+composable sketches: an exact counter whose `calcHint` always returns `2` and with
+`shouldAdd(h, a) = (h ≠ 1)` meets all requirements, but drops every update forever
+(`parSketch_hint_one_not_stronglyLinearizable`).
+
+**Impact.** Evident intent: for the paper's Θ sketch, `1` is exactly the empty sketch's Θ. With
+"initial hint = hint of the empty sketch" both results hold (`lemma1`, `theorem1`).
+
+**Details.** The pre-filtering requirement of Section 5.1 only constrains `shouldAdd(h, ·)` for hints
+`h` produced by `calcHint()`. So the first batch of every thread is filtered with a hint about which
+nothing is assumed. With the counter above and `N = b = 1`, two completed updates followed by two
+queries returning `0` is an execution with no linearization in `SeqSketch_{Nb}`.
+
+**Repair.** We prove both results with "initial hint = hint of the empty sketch" (more generally, any
+hint that filters harmlessly on every stream). (`lemma1`, `theorem1`)
+
+### ⚠️ Section 5.3 (exactness of the sequential Θ sketch, off by one)
+"The sequential Θ sketch answers queries with perfect accuracy in streams with up to `k` unique
+elements" holds for Algorithm 1 only up to `k − 1` distinct hashes: with exactly `k`, the initial `1` is
+evicted and the estimate becomes `(k−1)/Θ`, for every `k` (`thetaSketch_query_exact`,
+`thetaSketch_query_of_le`; smallest instance `thetaSketch_not_exact_k`).
+
+**Impact.** A remark motivating eager propagation; nothing depends on it. The same slip appears in "Θ is
+1 during the first `k` updates".
+
+### Typos and slips
+- Update threads are indexed `0 ≤ i ≤ N` (`t₀` is the propagator).
+- `hint_i` and `prop_i` are declared `int` but carry real Θ values.
+- The full version states Lemma 1 with `r = 2Nb` but proves `Nb` (the PODC version says `Nb`).
+- The full version writes the extreme order statistics of Claim 1 as `M(0)`, `M(j)`, and in
+  Claims 4–6 writes `i, j > 0` for `i, j ≥ 0`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Definition 2 vs. Section 6 (what "strongly linearisable w.r.t. `SeqSketch_r`" gives)
+Definition 2 is weaker than what Section 6 uses: an `r`-relaxation may drop queries and may place an
+operation after arbitrarily many operations that follow it (`isRelaxation_drop`,
+`isRelaxation_future`).
+
+**Impact.** The algorithms satisfy the stronger property Section 6 needs; we prove Lemma 1 and Theorem 1
+in this form (`lemma1_pastOnly`, `theorem1_pastOnly`).
+
+**Details.** An `r`-relaxation may drop up to `r` operations altogether, including queries, which may
+then return anything. It may also put an operation after arbitrarily many operations that follow it in
+`H'`: `U, q` is a `1`-relaxation of `q, U` for every list of updates `U`. So "strongly linearisable
+w.r.t. `SeqSketch_r`" does not by itself give the model of Section 6 ("a query misses up to `r` of the
+updates preceding it"), on which the error bounds rest.
+
+**Repair.** In the witnessing relaxation no query is dropped, and a query is preceded only by operations
+that precede it in the linearization. (`lemma1_pastOnly`, `theorem1_pastOnly`)
+
+### 🛠️ Lemma 6 of the full version (pending updates)
+Lemma 6 overlooks updates that are invoked but have not yet run `shouldAdd`: they have no visibility
+point and are not in `up_suff_i`.
+
+**Impact.** Statement true: the bound `Nb` survives because such an update can only be pending while
+`counter_i < b`.
+
+### 🛠️ Theorem 1 (simulation by `ParSketch` in the full version)
+The full version derives Theorem 1 from a simulation of each `OptParSketch` thread by two `ParSketch`
+threads, but that mapping does not preserve histories.
+
+**Impact.** Statement true; we prove Theorem 1 directly instead (`theorem1`).
+
+**Details.** An update that fills a buffer returns in `OptParSketch` while the simulating `ParSketch`
+update still waits at line 125, and in the first round line 225 is mapped to line 125 of a thread with
+no pending operation.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

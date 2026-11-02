@@ -13,54 +13,73 @@ A one-line repair of the `VOTE` handler restores Theorems 1–5 and linearizabil
 
 ## Mistakes in the paper
 
-* **Theorems 3 and 4 and Lemma 3 are false, and Algorithm 2 is not linearizable.** Take five processes
-  `p₀…p₄`, majority quorums, a G-set, and only incremental prepares; no message is lost, some are only late.
-  1. A query `C` raises the round numbers of `p₀, p₁, p₃, p₄` to 1.
-  2. Query `A` (at `p₀`) gets `ACK((2,A), ∅)` from `p₀` and `p₁`.
-  3. Update `u₁`, issued at `p₄`, is merged at `p₀, p₁, p₂` and completes on their three `MERGED`s.
-  4. Query `B` reads `{u₁}` from `p₀, p₁, p₂` and learns it **by consistent quorum**.
-  5. Update `u₂` is applied at `p₃` only.
-  6. `A`'s `PREPARE` reaches `p₂, p₃, p₄`, which all move to round `(2, A)`. The round numbers coincide because of
-     step 1. `A` takes the quorum `{p₀, p₁, p₃}` with states `∅, ∅, {u₂}`, all in round `(2, A)`, and sends
-     `VOTE((2,A), {u₂})`.
-  7. `p₂, p₃, p₄` are still in round `(2, A)` and answer `VOTED`, so `A` **learns `{u₂}` by vote**, although
-     `p₂` and `p₄` hold `u₁`.
+### 🚨 Algorithm 2 (linearizability), Theorem 3, Theorem 4 and Lemma 3
+Algorithm 2 is not linearizable, and Lemma 3, Theorem 3 (Consistency) and Theorem 4 (Update Stability)
+are false: with five processes and majority quorums, one query learns `{u₂}` by vote while another
+learns `{u₁}` by consistent quorum, although `u₁` completed before `u₂` was invoked
+(`Cex.not_linearizable`, `paper_false`).
 
-  So `{u₁}` and `{u₂}` are incomparable, which refutes Theorem 3 and Lemma 3. Since `u₁` precedes `u₂`, Theorem 4
-  fails too. For the G-set, `A` returns `{u₂}` after `u₁` completed and `u₂` was invoked, so the history has no
-  linearization.
+**Impact.** The headline claim fails, and the flaw is in the protocol (the `VOTE` handler), not only in
+the proofs. Lemmas 1, 2, 4, Corollary 1, Theorems 1, 2, 5 and the Section III-E reduction hold, and a
+one-line repair of the `VOTE` handler restores Theorems 1–5 and linearizability.
 
-  Both proofs confuse the `ACK` quorum with the `VOTED` quorum. The proof of Lemma 3 applies condition C1, which
-  holds only on `Q₁ ∩ Q₂` (here `{p₀, p₁}`), to the voter `a = p₂ ∈ Q₁` outside `Q₂`. It also tacitly assumes
-  that a later `PREPARE` cannot get the same round number at all acceptors. The proof of Theorem 4 says "∄Q: a.r = r
-  for all a ∈ Q, as all a ∈ Q_u updated their round". But the acceptors of `Q_u` that receive the `PREPARE`
-  *after* the `MERGE` do hold round `r`, and their payloads (with `u₁`) are not part of the proposed LUB. The flaw
-  is in the protocol, not only in the proofs: a `VOTED` certifies that the acceptor's round is unchanged, not that
-  its payload is `⊑` the proposal.
+**Details.** Take five processes `p₀…p₄`, majority quorums, a G-set, and only incremental prepares; no
+message is lost, some are only late.
+1. A query `C` raises the round numbers of `p₀, p₁, p₃, p₄` to 1.
+2. Query `A` (at `p₀`) gets `ACK((2,A), ∅)` from `p₀` and `p₁`.
+3. Update `u₁`, issued at `p₄`, is merged at `p₀, p₁, p₂` and completes on their three `MERGED`s.
+4. Query `B` reads `{u₁}` from `p₀, p₁, p₂` and learns it **by consistent quorum**.
+5. Update `u₂` is applied at `p₃` only.
+6. `A`'s `PREPARE` reaches `p₂, p₃, p₄`, which all move to round `(2, A)`. The round numbers coincide
+   because of step 1. `A` takes the quorum `{p₀, p₁, p₃}` with states `∅, ∅, {u₂}`, all in round
+   `(2, A)`, and sends `VOTE((2,A), {u₂})`.
+7. `p₂, p₃, p₄` are still in round `(2, A)` and answer `VOTED`, so `A` **learns `{u₂}` by vote**,
+   although `p₂` and `p₄` hold `u₁`.
 
-  The schedule respects the paper's own reading of line 47 too: the voters' payloads changed *before* they
-  received `A`'s `PREPARE`, not "in the meantime". The same flaw is in arXiv v1 (2019), whose handlers and proofs
-  (Lemma 3.6, Theorem 3.9) are identical in the relevant lines.
+So `{u₁}` and `{u₂}` are incomparable, which refutes Theorem 3 and Lemma 3. Since `u₁` precedes `u₂`,
+Theorem 4 fails too. For the G-set, `A` returns `{u₂}` after `u₁` completed and `u₂` was invoked, so the
+history has no linearization. (`Cex.lemma3_false`, `Cex.theorem3_false`, `Cex.theorem4_false`,
+`Cex.not_linearizable`, `paper_false`)
 
-  The non-linearizability needs queries that can tell which updates are included. On the paper's own G-counter
-  with the `sum` query, this particular execution is linearizable, although the same schedule still yields the
-  incomparable learned vectors `e₄` and `e₃` (not formalized). (`Cex.lemma3_false`, `Cex.theorem3_false`,
-  `Cex.theorem4_false`, `Cex.not_linearizable`, `paper_false`)
-* **Repair.** An acceptor answers `VOTE(r', s')` only if, in addition, its payload *before the merge* is `⊑ s'`
-  (`Variant.fixed`). Then every learned state was, at some moment, the exact payload of every acceptor of a quorum.
-  Consistency follows from monotonicity alone, and Lemma 4's Paxos-style round argument is no longer needed.
-  Update stability follows because a quorum acquired `u₁` before `u₂` existed. We prove Theorems 1–5 and
-  linearizability for the repaired protocol. (`fixed_theorem3`, `fixed_theorem4`, `fixed_linearizable`)
-* **Lemma 4 is true, but its proof is incomplete.** It does not handle two attempts with the same round number,
-  and it uses that round numbers of accepted prepares strictly increase at each acceptor. We prove it with the
-  Paxos-style invariant "every `ACK` with a larger round number carries a state above an earlier `VOTED`".
-  (`paper_lemma4`)
-* **Under-specified definitions (minor).**
-  * Line 13 tests `sᵢ ≡ s'`, and the paper defines `≡` as query equivalence. The proof of Lemma 2(i) needs
-    `s' ⊑ a.s`, i.e. equality, so we use equality.
-  * The causal history `C(s)` is treated as a function of the state, which is not well defined for every CRDT.
-    Also `u ∈ C(u(s))` is too weak for Theorem 1. We assume a causal-history map with `C(s₀) = ∅`,
-    `C(u(s)) = C(s) ∪ {u}`, `C(s ⊔ t) = C(s) ∪ C(t)` and Shapiro et al.'s `C(s) = C(t) ⇒ s ≡ t`. The G-set has one.
+Both proofs confuse the `ACK` quorum with the `VOTED` quorum. The proof of Lemma 3 applies condition C1,
+which holds only on `Q₁ ∩ Q₂` (here `{p₀, p₁}`), to the voter `a = p₂ ∈ Q₁` outside `Q₂`. It also tacitly
+assumes that a later `PREPARE` cannot get the same round number at all acceptors. The proof of Theorem 4
+says "∄Q: a.r = r for all a ∈ Q, as all a ∈ Q_u updated their round". But the acceptors of `Q_u` that
+receive the `PREPARE` *after* the `MERGE` do hold round `r`, and their payloads (with `u₁`) are not part
+of the proposed LUB. The flaw is in the protocol, not only in the proofs: a `VOTED` certifies that the
+acceptor's round is unchanged, not that its payload is `⊑` the proposal.
+
+The schedule respects the paper's own reading of line 47 too: the voters' payloads changed *before* they
+received `A`'s `PREPARE`, not "in the meantime". The same flaw is in arXiv v1 (2019), whose handlers and
+proofs (Lemma 3.6, Theorem 3.9) are identical in the relevant lines.
+
+The non-linearizability needs queries that can tell which updates are included. On the paper's own
+G-counter with the `sum` query, this particular execution is linearizable, although the same schedule
+still yields the incomparable learned vectors `e₄` and `e₃` (not formalized).
+
+**Repair.** An acceptor answers `VOTE(r', s')` only if, in addition, its payload *before the merge* is
+`⊑ s'` (`Variant.fixed`). Then every learned state was, at some moment, the exact payload of every
+acceptor of a quorum. Consistency follows from monotonicity alone, and Lemma 4's Paxos-style round
+argument is no longer needed. Update stability follows because a quorum acquired `u₁` before `u₂`
+existed. We prove Theorems 1–5 and linearizability for the repaired protocol. (`fixed_theorem3`,
+`fixed_theorem4`, `fixed_linearizable`)
+
+### Typos and slips
+- Line 13 tests `sᵢ ≡ s'`, and the paper defines `≡` as query equivalence. The proof of Lemma 2(i) needs
+  `s' ⊑ a.s`, i.e. equality, so we use equality.
+- The causal history `C(s)` is treated as a function of the state, which is not well defined for every
+  CRDT. Also `u ∈ C(u(s))` is too weak for Theorem 1. We assume a causal-history map with `C(s₀) = ∅`,
+  `C(u(s)) = C(s) ∪ {u}`, `C(s ⊔ t) = C(s) ∪ C(t)` and Shapiro et al.'s `C(s) = C(t) ⇒ s ≡ t`. The G-set
+  has one.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 4
+The proof does not handle two attempts with the same round number, and it uses without proof that round
+numbers of accepted prepares strictly increase at each acceptor.
+
+**Impact.** Statement true; proved with the Paxos-style invariant "every `ACK` with a larger round number
+carries a state above an earlier `VOTED`" (`paper_lemma4`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

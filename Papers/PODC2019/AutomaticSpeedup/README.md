@@ -13,42 +13,42 @@ forward direction, Theorem 2, Lemmas 1–4 and the lower bounds (§4.4, Theorem 
 
 ## Mistakes in the paper
 
-* **Theorem 1, (2) ⇒ (1), and Corollary 1 are false without edge symmetry breaking (false statement).**
-  The proof turns a `(t−1)`-round algorithm for `Π_1` into an algorithm for `Π_{1/2}`. Both endpoints
-  of an edge `e` look only at `N^t(e)` and must pick a pair `(o, o')` with `{o, o'} ∈ g_{1/2}`; `v`
-  takes `o` and `u` takes `o'`. If `N^t(e)` looks the same from both sides, they make the same choice,
-  so a pair with `o ≠ o'` cannot be split.
-  * *Counterexample.* Take `Π` = edge orientation (labels `0, 1`, edge configuration `{0, 1}` only,
-    any node configuration). Outputting the constant `{{0}, {1}}` solves `Π_1` in 0 rounds on every
-    graph.
-  * On the class `{K_2}` (no inputs, both ports `1`; simple, connected, girth `∞`, `t`-independent for
-    every `t`), `Π` is not solvable at all.
-  * The same happens on any single `d`-regular graph whose port numbering is a proper edge colouring,
-    such as high-girth bipartite graphs.
-  * This also refutes the "reversible" / "exactly one round faster" claims of the abstract and §1.1.
-  * *Fix.* We prove (2) ⇒ (1) under edge symmetry breaking at radius `t`: the endpoints of every edge
-    have different radius-`(t−1)` views or different port numbers for the edge. This direction then
-    needs no independence. Input orientations (Theorem 2, §4.4, Lemmas 3–4, Theorem 4), colourings or
-    IDs (§4.5) and unique IDs (Theorem 3) all provide such symmetry breaking.
-  * (`theorem_1_backward_false`, `theorem_1_backward_false_of_symmetric`; repaired: `theorem_1_backward`,
-    `theorem_1`, `corollary_1`)
-* **Minor imprecisions (under-specified, statements true).**
-  * In the proof of Theorem 3, the new IDs should be spaced by `2Δ^t` *elements of `S`* (ranks), with
-    room at both ends. The text asks for a difference of `2Δ^t + 1` in value. Not formalized.
-  * In §5.1, the per-colour listing of the maximal `g'_{1/2}` configurations omits the swapped case
-    `({⊸}, {→, ⊸, •})`. The trit description that is actually used handles it (`edgeAllMax_superweak`).
-  * §4.4's `g_{1/2}` listing omits the configurations containing `∅` (harmless).
-  * In the proof of Theorem 4, the edge joining a port to an opposite-orientation port of an identical
-    node is "possible due to our choice of `G'`". We make this a hypothesis (`RichFor`).
-  * The remark in §4.2 that, with node colourings or IDs, the simplification fails for
-    "1-round ⇒ 0-round" is overly cautious: radius-1 edge views already contain both endpoints' inputs.
-* **Typos.** In Theorem 4 the bound is `(log*Δ − 7)/5` once and `(log*Δ − 8)/5` later. With CSLib's
-  `log*`, `5T + 7 ≤ log*Δ` suffices.
+### 🚨 Theorem 1, (2) ⇒ (1), and Corollary 1 (the converse of the speedup)
+Without edge symmetry breaking, `Π_1` in `t − 1` rounds does not give `Π` in `t` rounds: for edge
+orientation `Π_1` is solvable in 0 rounds on every graph, but `Π` is unsolvable on the `t`-independent
+class `{K_2}` (`theorem_1_backward_false`).
 
-Model checking (not part of the Lean development). The unproved claim of §4.6 is that `h'_1` derived
-from weak 2-colouring has only 9 elements. We checked it by exhaustive enumeration for `Δ = 3, 4, 5`:
-there are exactly 9 maximal families with nonempty sets, plus one degenerate family containing `∅`.
-For `Δ = 2` there are 8 ([`modelcheck/weak2_h1.c`](modelcheck/weak2_h1.c)).
+**Impact.** Corollary 1 and the "reversible" / "exactly one round faster" / "exact complexities
+`T − 1, T − 2, …`" claims of the abstract and §1.1 fall with it, already for the natural class of
+input-free `Δ`-regular high-girth graphs with arbitrary port numbers. The forward direction and all
+applications (Theorem 2, §4.4, §4.5, Lemmas 3–4, Theorem 4) have edge symmetry breaking and stand.
+
+**Details.** The proof turns a `(t−1)`-round algorithm for `Π_1` into an algorithm for `Π_{1/2}`. Both
+endpoints of an edge `e` look only at `N^t(e)` and must pick a pair `(o, o')` with
+`{o, o'} ∈ g_{1/2}`; `v` takes `o` and `u` takes `o'`. If `N^t(e)` looks the same from both sides,
+they make the same choice, so a pair with `o ≠ o'` cannot be split.
+* *Counterexample.* Take `Π` = edge orientation (labels `0, 1`, edge configuration `{0, 1}` only,
+  any node configuration). Outputting the constant `{{0}, {1}}` solves `Π_1` in 0 rounds on every
+  graph.
+* On the class `{K_2}` (no inputs, both ports `1`; simple, connected, girth `∞`, `t`-independent for
+  every `t`), `Π` is not solvable at all.
+* The same happens on any single `d`-regular graph whose port numbering is a proper edge colouring,
+  such as high-girth bipartite graphs (`theorem_1_backward_false_of_symmetric`).
+
+**Repair.** We prove (2) ⇒ (1) under edge symmetry breaking at radius `t`: the endpoints of every edge
+have different radius-`(t−1)` views or different port numbers for the edge. This direction then needs
+no independence. Input orientations (Theorem 2, §4.4, Lemmas 3–4, Theorem 4), colourings or IDs (§4.5)
+and unique IDs (Theorem 3) all provide such symmetry breaking. (`theorem_1_backward`, `theorem_1`,
+`corollary_1`)
+
+### Typos and slips
+- In Theorem 4 the bound is `(log*Δ − 7)/5` once and `(log*Δ − 8)/5` later. With CSLib's `log*`,
+  `5T + 7 ≤ log*Δ` suffices.
+- In the proof of Theorem 3 (not formalized), the new IDs should be spaced by `2Δ^t` *elements of `S`*
+  (ranks), with room at both ends; the text asks for a difference of `2Δ^t + 1` in value.
+- In §5.1, the per-colour listing of the maximal `g'_{1/2}` configurations omits the swapped case
+  `({⊸}, {→, ⊸, •})`. The trit description that is actually used handles it (`edgeAllMax_superweak`).
+- §4.4's `g_{1/2}` listing omits the configurations containing `∅` (harmless).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -76,6 +76,16 @@ Full list of differences (including modelling choices and minor imprecisions): [
   richness condition on the class. The LOCAL-model statement additionally needs Theorem 3
   (order-invariance), Naor–Stockmeyer's Ramsey argument and the existence of high-girth graphs; none of
   these is formalized.
+* In the proof of Theorem 4, the edge joining a port to an opposite-orientation port of an identical
+  node is "possible due to our choice of `G'`". We make this a hypothesis (`RichFor`).
+
+**Remarks.** The remark in §4.2 that, with node colourings or IDs, the simplification fails for
+"1-round ⇒ 0-round" is overly cautious: radius-1 edge views already contain both endpoints' inputs.
+
+Model checking (not part of the Lean development). The unproved claim of §4.6 is that `h'_1` derived
+from weak 2-colouring has only 9 elements. We checked it by exhaustive enumeration for `Δ = 3, 4, 5`:
+there are exactly 9 maximal families with nonempty sets, plus one degenerate family containing `∅`.
+For `Δ = 2` there are 8 ([`modelcheck/weak2_h1.c`](modelcheck/weak2_h1.c)).
 
 **Main results in Lean.**
 
