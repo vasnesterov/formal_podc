@@ -13,51 +13,84 @@ timing claimed by Theorems 2/3, and **Corollary 9 is false**. Four proofs need s
 
 ## Mistakes in the paper
 
-* **Lemma 5 is false for `t = n − 1` (false statement).** The paper assumes `t ≤ n − 1` (§2.1,
-  and again in §4). Take `n ≥ 2`, `t = n − 1`, any complete input set, and a protocol in which
-  everybody sends a message in round 1. Let `r⋆` be the run in which all processes but `p₀` crash
-  in round 1 without sending anything. Then `W(r⋆) = t − 1`, so round 1 is premature in `r⋆`, as it
-  is in the failure-free run (`W = 0`). At time 1 only `p₀` is alive in `r⋆`, and it received
-  nothing. Every run that `p₀` cannot tell apart from `r⋆` at time 1 is of the same kind, so the
-  failure-free run is not connected to `r⋆`. Lemma 7 fails in the same way. The cited sources
-  presumably assume `n ≥ t + 2`. (`lemma5_false`, `not_lemma5Hyp`)
-* **For `t = n − 1`, Theorem 6 and the timing of Theorems 2/3 cannot both hold (false
-  statement).** Take `n = 3`, `t = 2` and binary consensus. All hypotheses of Theorem 6 hold with
-  `k̂ = 2` and `A` = FloodSet: complete inputs, `2` is a worst-case lower bound, and FloodSet
-  decides at time 2. In `r⋆` (two processes crash silently in round 1) `W = 1`, so Theorem 3 has
-  `Opt(A, 2)` decide at `min{2, 3 − 1} = 2`. But a simultaneous consensus protocol can decide at
-  time 1 in `r⋆`: the survivor sees an empty round-1 inbox, knows it is alone and decides its own
-  input; in all other runs the protocol runs FloodSet. So no protocol has both the timing of
-  Theorem 3 and the all-case optimality of Theorem 6. For every continuous-consensus protocol with
-  the properties listed in §2.3 (accuracy, consistency, (i), (ii)), `Opt(A, 2)` is not all-case
-  optimal, and such a protocol exists for `n = 3`, `t = 2`. Which claim fails for the actual ConCon
-  of Mizrahi–Moses depends on its behaviour at `t = n − 1`. Its claimed maximality (iii) and the
-  emptiness of the core before `t + 1 − W` (ii) are incompatible there: some CC protocol puts the
-  lone survivor's value into its core at time 1. If ConCon satisfies (ii), the headline Theorem 6
-  fails. Otherwise ConCon(A) decides before `t + 1 − W`, and Theorem 2's "decides at time
-  `t + 1 − W(F)`" fails. (`thm3_thm6_incompatible`, `theorem6_fails`, `theorem6_counterexample`)
-* **Corollary 9 is false for `k = 1`, `n = 3`, `t = 2` (false statement).** It claims that
-  `Opt(sa, ⌊t/k⌋ + 1) = Opt(sa, 3)` is all-case optimal and halts at `min{3, 3 − W}`, which is time
-  3 in failure-free runs. FloodSet decides at time 2 in every run, so no protocol has both
-  properties. This does not depend on ConCon. The paper quotes the `⌊t/k⌋ + 1` bound of [CHLT00]
-  without its hypothesis `n ≥ t + k + 1`, and here `3` is not a lower bound.
-  (`corollary9_false`, `not_lb_three`)
-* **Processes that crash later (proof gap, statements true).** Lemma 1, Theorem 3 and Lemma 4 all
-  assume without argument that in a simultaneous protocol, if some process decides at time `k`,
-  then every process *alive* at time `k` decides at time `k`, including processes that crash
-  later. Lemma 4's proof says "p has not failed", but `p` only survives round `k`. Theorem 3's
-  proof says the protocol "would also have caused q to decide". In Lemma 1, a faulty process of `A`
-  could a priori decide after `k̂` and break simultaneity. The fact is true: truncate the failure
-  pattern after round `k`. The process becomes correct, its first `k` rounds do not change, and
-  completeness and simultaneity apply. (`SolvesSim.decides_of_alive`,
-  `SolvesWithin.decides_of_alive`)
-* **Theorem 2, correctness (proof gap, statement true).** All processes simulate the same run of
-  `A`. This makes their outputs consistent with the *simulated* input vector, which differs from
-  the real one outside the core. The paper does not even say which inputs those processes get;
-  they must be chosen so that the input vector is allowed. Repair: for the core processes, the
-  simulated run looks the same as the run of `A` with the real inputs and the same silent crashes.
-  `A`'s correctness in that run gives an output vector for the real inputs. (`theorem2`,
-  `decides_simRun`)
+### ❌ Lemma 5 for `t = n − 1` (connectivity of premature runs)
+Lemma 5 is false for `t = n − 1`: the run `r⋆` in which all processes but `p₀` crash silently in round 1
+is premature, as is the failure-free run, but the two are not connected (`lemma5_false`,
+`not_lemma5Hyp`).
+
+**Impact.** The paper explicitly assumes `t ≤ n − 1` (§2.1, and again in §4), so this is not a degenerate
+corner; Lemma 5 is needed for Theorem 6. Lemma 7 fails in the same way. The cited sources presumably
+assume `n ≥ t + 2`.
+
+**Details.** Take `n ≥ 2`, `t = n − 1`, any complete input set, and a protocol in which everybody sends a
+message in round 1. Then `W(r⋆) = t − 1`, so round 1 is premature in `r⋆`, as it is in the failure-free
+run (`W = 0`). At time 1 only `p₀` is alive in `r⋆`, and it received nothing. Every run that `p₀` cannot
+tell apart from `r⋆` at time 1 is of the same kind, so the failure-free run is not connected to `r⋆`.
+
+### ❌ Theorem 6 vs. the timing of Theorems 2/3 for `t = n − 1`
+For `n = 3`, `t = 2` and binary consensus, a simultaneous protocol decides at time 1 in the run where two
+processes crash silently in round 1, while Theorem 3 has `Opt(A, 2)` decide at time 2 there, so Theorem 6
+and the timing of Theorems 2/3 cannot both hold (`thm3_thm6_incompatible`, `theorem6_fails`,
+`theorem6_counterexample`).
+
+**Impact.** For `t = n − 1` either the headline Theorem 6 or Theorem 2's timing is false, depending on the
+actual ConCon; for `t ≤ n − 2` the constructions and the optimality argument are correct.
+
+**Details.** All hypotheses of Theorem 6 hold with `k̂ = 2` and `A` = FloodSet: complete inputs, `2` is a
+worst-case lower bound, and FloodSet decides at time 2. In `r⋆` (two processes crash silently in
+round 1) `W = 1`, so Theorem 3 has `Opt(A, 2)` decide at `min{2, 3 − 1} = 2`. But a simultaneous
+consensus protocol can decide at time 1 in `r⋆`: the survivor sees an empty round-1 inbox, knows it is
+alone and decides its own input; in all other runs the protocol runs FloodSet. So no protocol has both
+the timing of Theorem 3 and the all-case optimality of Theorem 6. For every continuous-consensus
+protocol with the properties listed in §2.3 (accuracy, consistency, (i), (ii)), `Opt(A, 2)` is not
+all-case optimal, and such a protocol exists for `n = 3`, `t = 2`.
+
+Which claim fails for the actual ConCon of Mizrahi–Moses depends on its behaviour at `t = n − 1`. Its
+claimed maximality (iii) and the emptiness of the core before `t + 1 − W` (ii) are incompatible there:
+some CC protocol puts the lone survivor's value into its core at time 1. If ConCon satisfies (ii), the
+headline Theorem 6 fails. Otherwise ConCon(A) decides before `t + 1 − W`, and Theorem 2's "decides at
+time `t + 1 − W(F)`" fails.
+
+### ❌ Corollary 9 for `k = 1`, `n = 3`, `t = 2`
+Corollary 9 claims that `Opt(sa, ⌊t/k⌋ + 1) = Opt(sa, 3)` is all-case optimal and halts at time 3 in
+failure-free runs, but FloodSet decides at time 2 in every run (`corollary9_false`, `not_lb_three`).
+
+**Impact.** A false application, independent of ConCon: the paper quotes the `⌊t/k⌋ + 1` bound of
+[CHLT00] without its hypothesis `n ≥ t + k + 1`, and here `3` is not a lower bound.
+
+**Details.** The corollary claims halting at `min{3, 3 − W}`, which is time 3 in failure-free runs. So
+no protocol has both properties.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 1, Theorem 3 and Lemma 4 (processes that crash later)
+The three proofs assume without argument that in a simultaneous protocol, if some process decides at
+time `k`, then every process *alive* at time `k` decides at time `k`, including processes that crash
+later.
+
+**Impact.** Statements true; the fact is proved by truncating the failure pattern
+(`SolvesSim.decides_of_alive`, `SolvesWithin.decides_of_alive`).
+
+**Details.** Lemma 4's proof says "p has not failed", but `p` only survives round `k`. Theorem 3's proof
+says the protocol "would also have caused q to decide". In Lemma 1, a faulty process of `A` could a priori
+decide after `k̂` and break simultaneity.
+
+**Repair.** Truncate the failure pattern after round `k`. The process becomes correct, its first `k`
+rounds do not change, and completeness and simultaneity apply. (`SolvesSim.decides_of_alive`,
+`SolvesWithin.decides_of_alive`)
+
+### 🛠️ Theorem 2 (correctness of `ConCon(A)`)
+All processes simulate the same run of `A`, which makes their outputs consistent only with the
+*simulated* input vector, and that differs from the real one outside the core.
+
+**Impact.** Statement true; repaired by an indistinguishability argument (`theorem2`, `decides_simRun`).
+
+**Details.** The paper does not even say which inputs the processes outside the core get; they must be
+chosen so that the input vector is allowed.
+
+**Repair.** For the core processes, the simulated run looks the same as the run of `A` with the real
+inputs and the same silent crashes. `A`'s correctness in that run gives an output vector for the real
+inputs. (`theorem2`, `decides_simRun`)
 
 Full list of differences (including modelling choices and minor imprecisions):
 [differencies.md](differencies.md).

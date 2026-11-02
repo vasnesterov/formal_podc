@@ -14,57 +14,85 @@ functions the paper's proof has a gap; we repair it for 1-recall, and for `k ≥
 
 ## Mistakes in the paper
 
-* **Corollary 5.2 / Theorem B.2 / Theorem 5.1 are false as stated (false statement).** Corollary 5.2
-  says that if a game has two pure Nash equilibria, then best-response dynamics with consistent
-  tie-breaking can fail to converge asynchronously. Counterexample: a 2×2 game. Player 0 gets 1
-  unless it plays `y` against `x`, so `x` weakly dominates `y`. Player 1 gets 1 iff it matches player 0.
-  The pure equilibria are `(x,x)` and `(y,y)`. Break ties towards `x`. Then player 0 always plays `x`,
-  player 1 copies player 0, and every fair dynamics converges to `(x,x)`. The proof applies Theorem 4.1
-  to the Nash equilibria, but `(y,y)` is not a fixed point of the tie-broken best-response map, so it is
-  not a stable state. The same example refutes Theorem 5.1 ("all bounded-recall self-independent
-  dynamics can oscillate"). What is true, and what we prove, is the statement for two equilibria that are
-  fixed points of the best-response map; this is automatic when best responses are unique.
-  (`corollary_5_2_false`, `theorem_5_1_false`; repaired: `corollary_5_2`, `corollary_5_2_of_unique`)
-* **Theorem 4.1 for non-stationary reaction functions: proof gap.** The main text says Theorem 4.1
-  holds "even if nodes' reaction functions are not stationary". The valency argument (Appendix F)
-  builds a fair run in which every history is bivalent, meaning at least two limits are still possible.
-  For stationary functions such a run cannot converge: once the run sits at a limit `c` for `k` steps,
-  `c` is a fixed point, so only `c` remains reachable. For non-stationary functions this step fails. A
-  run can converge to `c` while every history stays bivalent, because `c` may be reproduced only at the
-  time steps at which the run happens to activate the nodes. Appendix F.7 (Theorem F.14) avoids the
-  problem by quietly changing what a stable state is ("a vector of actions and a time after which it is
-  a fixed point"). That is not the notion of Section 3, and the proof also assumes finite action spaces.
-  Appendix F.8 extends it to `k`-recall only by a sketch. Two further defects: the act-and-tell
-  translation lets `W` reveal an empty set of reactions, and the "number of time steps" argument then
-  counts steps with an empty activation set, which Section 3 forbids. We repair the argument as
-  follows. The FLP-style extension lemma holds for non-stationary `k`-recall; we only allow `W` when
-  something is pending. Non-convergence follows once the limit of every fair dynamics is eventually
-  absorbing. We prove that absorption property for 1-recall functions with arbitrary action spaces: a
-  node that deviates infinitely often could be made to oscillate fairly. For non-stationary `k`-recall
-  with `k ≥ 2` we could neither prove nor refute Theorem 4.1. A brute-force search over small periodic
-  systems found no counterexample. (`not_convergent_of_absorbing`, `absorbingAfter_of_oneRecall`,
-  `theorem_4_1_oneRecall`)
-* **"Stable state" must mean the limit of a *fair* dynamics (under-specified definition).** Section 3
-  calls `a` a stable state when the `(s⁰, σ)`-dynamics converges to `a`, for a schedule `σ` that need not
-  be fair. Read literally, Theorem 4.1 is false. Take the system in which every node always plays `x`. It
-  is historyless, self-independent and convergent, but the unfair dynamics that only ever activates
-  node 0 converges to `(x,y)`. The intended reading is clear from the paper's remark that in the
-  historyless case the stable states are exactly the fixed points; we use it. (`stableState_literal_reading`)
-* **Randomized reaction functions (not formalized).** The main text says Theorem 4.1 also holds for
-  randomized reaction functions, but the paper never defines convergence of randomized dynamics:
-  every realization, or almost surely. The proof in Appendix F treats deterministic functions only.
-  We formalize deterministic reaction functions.
-* Typos and slips:
-  - Section 3 types `f(i,t) : H_t → Δ(A_i)`, but the dynamics applies `f(i,w+1)` to `s⁰ ∈ H_w`. The
-    input is `H_{t−1}`.
-  - Section 3 writes `s(t) = a` for a history `s(t)`; it means the last profile.
-  - "Safe" (Appendix F, Example 4.2) is used for "convergent".
-  - In the proof of Lemma F.12, case `e = e_i, e' = W`, "the second color equality" should be the
-    first one.
-  - Lemma F.13's "activate `v` first" suffices only for 1-recall. For `k`-recall `v` must be activated
-    `k` times, as F.8 notes.
-  - Def. F.4 defines a "fair extension" as an arbitrary finite extension; the fairness actually used is
-    the one in the proof of Lemma F.8.
+### ❌ Corollary 5.2, Theorem B.2 and Theorem 5.1 (best-response dynamics)
+With "consistent tie-breaking" a pure Nash equilibrium need not be a stable state, so a 2×2 game with
+two pure equilibria, one weakly dominated, has best-response dynamics that always converge
+(`corollary_5_2_false`, `theorem_5_1_false`).
+
+**Impact.** The game-theoretic application is false as stated; Theorem 4.1 is unaffected. What is true,
+and what we prove, is the statement for two equilibria that are fixed points of the best-response map;
+this is automatic when best responses are unique (`corollary_5_2`, `corollary_5_2_of_unique`).
+
+**Details.** Corollary 5.2 says that if a game has two pure Nash equilibria, then best-response dynamics
+with consistent tie-breaking can fail to converge asynchronously. Counterexample: a 2×2 game. Player 0
+gets 1 unless it plays `y` against `x`, so `x` weakly dominates `y`. Player 1 gets 1 iff it matches
+player 0. The pure equilibria are `(x,x)` and `(y,y)`. Break ties towards `x`. Then player 0 always plays
+`x`, player 1 copies player 0, and every fair dynamics converges to `(x,x)`. The proof applies
+Theorem 4.1 to the Nash equilibria, but `(y,y)` is not a fixed point of the tie-broken best-response
+map, so it is not a stable state. The same example refutes Theorem 5.1 ("all bounded-recall
+self-independent dynamics can oscillate").
+
+### ⚠️ Theorem 4.1 for non-stationary reaction functions
+The main text says Theorem 4.1 holds "even if nodes' reaction functions are not stationary", but the
+valency proof of Appendix F does not cover this case; we repair it for 1-recall
+(`theorem_4_1_oneRecall`), and for `k`-recall with `k ≥ 2` it remains open.
+
+**Impact.** The stationary version (the one Appendix F restates and proves) holds. The non-stationary
+claim is established for 1-recall and unestablished, but not refuted, for `k ≥ 2`.
+
+**Details.** The valency argument (Appendix F) builds a fair run in which every history is bivalent,
+meaning at least two limits are still possible. For stationary functions such a run cannot converge:
+once the run sits at a limit `c` for `k` steps, `c` is a fixed point, so only `c` remains reachable. For
+non-stationary functions this step fails. A run can converge to `c` while every history stays bivalent,
+because `c` may be reproduced only at the time steps at which the run happens to activate the nodes.
+Appendix F.7 (Theorem F.14) avoids the problem by quietly changing what a stable state is ("a vector of
+actions and a time after which it is a fixed point"). That is not the notion of Section 3, and the proof
+also assumes finite action spaces. Appendix F.8 extends it to `k`-recall only by a sketch. A brute-force
+search over small periodic systems found no counterexample for `k ≥ 2`.
+
+**Repair.** The FLP-style extension lemma holds for non-stationary `k`-recall. Non-convergence follows
+once the limit of every fair dynamics is eventually absorbing (`not_convergent_of_absorbing`). We prove
+that absorption property for 1-recall functions with arbitrary action spaces: a node that deviates
+infinitely often could be made to oscillate fairly (`absorbingAfter_of_oneRecall`,
+`theorem_4_1_oneRecall`).
+
+### ⚠️ Section 3, "stable state" (unfair schedules)
+Section 3 calls `a` a stable state when some `(s⁰, σ)`-dynamics converges to `a`, for a schedule `σ`
+that need not be fair, and with this literal reading Theorem 4.1 is false (`stableState_literal_reading`).
+
+**Impact.** An under-specified definition with evident intent: "stable state" must mean the limit of a
+*fair* dynamics, as the paper's remark that in the historyless case the stable states are exactly the
+fixed points shows; we use it.
+
+**Details.** Take the system in which every node always plays `x`. It is historyless, self-independent
+and convergent, but the unfair dynamics that only ever activates node 0 converges to `(x,y)`.
+
+### ⚠️ Theorem 4.1 for randomized reaction functions (not formalized)
+The main text says Theorem 4.1 also holds for randomized reaction functions, but the paper never defines
+convergence of randomized dynamics (every realization, or almost surely).
+
+**Impact.** An under-specified, unestablished claim: the proof in Appendix F treats deterministic
+functions only. We formalize deterministic reaction functions.
+
+### Typos and slips
+- Section 3 types `f(i,t) : H_t → Δ(A_i)`, but the dynamics applies `f(i,w+1)` to `s⁰ ∈ H_w`. The input is
+  `H_{t−1}`.
+- Section 3 writes `s(t) = a` for a history `s(t)`; it means the last profile.
+- "Safe" (Appendix F, Example 4.2) is used for "convergent".
+- In the proof of Lemma F.12, case `e = e_i, e' = W`, "the second color equality" should be the first one.
+- Lemma F.13's "activate `v` first" suffices only for 1-recall. For `k`-recall `v` must be activated `k`
+  times, as F.8 notes.
+- Def. F.4 defines a "fair extension" as an arbitrary finite extension; the fairness actually used is the
+  one in the proof of Lemma F.8.
+
+## Proof gaps (statements true)
+
+### 🛠️ Appendix F.6–F.7 (act-and-tell translation)
+The act-and-tell translation lets `W` reveal an empty set of reactions, and the "number of time steps"
+argument then counts steps with an empty activation set, which Section 3 forbids.
+
+**Impact.** Repaired: we only allow `W` when something is pending, and the extension lemma still holds
+(`System.exists_bivalent_after`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

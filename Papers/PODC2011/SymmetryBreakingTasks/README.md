@@ -14,56 +14,91 @@ comparison-based algorithms that Section 2.3 requires of all algorithms.
 
 ## Mistakes in the paper
 
-* **Theorem 4 is false as stated (boundary case `ℓ = 0`).** The criterion "`u`-anchored iff
-  `ℓ ≤ n − u(m−1)`" fails whenever `ℓ = 0` and `u(m−1) > n`. Every `⟨n,m,0,u⟩` task is trivially
-  `u`-anchored, as the paper itself says, but the right-hand side is negative. Examples:
-  `⟨6,3,0,6⟩`, which Figure 1 labels "trivially u-anchored", and every `(2n−1)`-renaming task
-  `⟨n,2n−1,0,1⟩` with `n ≥ 3`. Corollary 1 uses `max(0, n−u(m−1))`, so the authors knew the expression
-  can be negative. With `n − u(m−1)` truncated at 0 the theorem holds (for `m ≥ 1`), and we prove that
-  version. (`theorem_4_int_false`, `theorem_4_int_false_renaming`; repaired: `theorem_4`)
-* **Lemma 1 misses a hypothesis.** "Feasible iff `Σℓ_v ≤ n ≤ Σu_v`" is false for asymmetric bounds with
-  some `ℓ_v > u_v`. Example: `n = 3`, `ℓ⃗ = [2,0]`, `u⃗ = [1,5]` satisfies `2 ≤ 3 ≤ 6`, but value 1
-  would have to be decided at least twice and at most once. The correct statement adds `ℓ_v ≤ u_v` for
-  all `v`. Lemma 2, the symmetric case, is correct as stated. (`lemma_1_false`; repaired: `lemma_1`)
-* **Theorem 9 depends on the algorithm class, and the paper uses two incompatible classes.**
-  Section 2.3 says that only index-independent *and comparison-based* algorithms are considered, and
-  Theorem 2 claims this is without loss of generality. That claim only holds with communication: its
-  transformation runs a renaming algorithm first. Without communication, a comparison-based decision
-  function is constant. Then a GSB task with `m ≥ 2` is solvable iff `ℓ = 0 ∧ u ≥ n`, and Theorem 9's
-  "if" direction fails. Example: `⟨2,3,0,1⟩` meets `ℓ = 0`, `⌈3/3⌉ ≤ 1`. The same goes for the
-  "decide your own identity" solution of `(2n−1)`-renaming and for Corollary 2. Theorem 9 is correct
-  for index-independent algorithms that may use the identity's value; we formalize it that way.
-  Index independence is essential: with index-dependent decisions, perfect renaming needs no
-  communication. (`noComm_comparisonBased_iff`, `theorem_9_comparisonBased_false`,
-  `perfectRenaming_indexDependent`; proved: `theorem_9`)
-* **Theorem 9's proof skips a step (statement true).** "The task specification requires
-  `|G_i| ≤ u`" is not what the specification says. The real argument picks `u+1` identities from a
-  group of size `> u` and completes them to `n` distinct identities. This needs `u+1 ≤ n`, which holds
-  because `⌈(2n−1)/m⌉ ≤ n` for `m ≥ 2`. The `ℓ > 0` part is fine. (`theorem_9`)
-* **Theorem 6 is trivial as stated; its proof shows something else.** `S(T1) ⊆ S(T)` for `ℓ' ≥ ℓ` is
-  just Lemma 5 (and (ii) is Lemma 4). The intended statement is that `T1` and `T` are *synonyms*. That
-  is true and needs no feasibility assumption. (`theorem_6`, `theorem_6_eq`)
-* **The canonical representative is ill-defined in degenerate cases; Theorem 7 fixes it.** "An
-  `(ℓ,u)`-anchored task is its own representative" picks two different representatives when `u > n`.
-  For example, `⟨4,2,0,5⟩` and `⟨4,2,0,4⟩` are synonyms and both `(ℓ,u)`-anchored. The same happens for
-  `m = 1`. Theorem 7's map `f` resolves this. It reaches its fixed point after one step, and two
-  feasible tasks are synonyms iff they have the same `f`-image. The `f`-image is the pair (least, largest)
-  number of times a value is decided in a legal output. (`canonical_not_unique`, `theorem_7`,
-  `theorem_7_iff`)
-* **Theorem 10's proof uses Lemma 4 in the wrong direction (statement true, given the cited results).**
-  `S(T) ⊆ S(T')` makes `T'` *easier*, so unsolvability of `T` says nothing about `T'`. The conclusion
-  survives because the tasks involved are synonyms (Theorem 3). It also follows directly: the parity map
-  turns every `⟨n,m,1,u⟩` output into a WSB output, for every `u`. (`parity_mem_wsb`, `theorem_10`)
-* **Missing side conditions and small slips.**
-  - Theorem 8 needs a *feasible* task. Its proof writes `m/n` for `n/m` throughout.
-  - Corollary 2 needs `x ≥ 1`. Corollary 4 needs `k ≤ n` (implicit in `k ≤ n/2`).
-  - Theorem 11 needs `n ≥ 2`: for `n = 1` election is trivial. Its proof cites "Lemma 2" for
-    Theorem 2.
-  - Table 1 claims to list all feasible `⟨6,3,ℓ,u⟩` tasks with `u ≤ 6`, but `⟨6,3,2,6⟩` is missing.
-    Every printed entry is correct (`table_1`, `table_1_missing_row`).
-  - The kernel set of `⟨6,3,1,4⟩` is printed as `{[4,1,1],[4,1,1],[2,2,2]}`; it should be
-    `{[4,1,1],[3,2,1],[2,2,2]}`.
-  - In the Remark of §4.1, `[4,2,1]` sums to 7, so it is not a kernel vector of any 6-process task.
+### ❌ Theorem 9 (no-communication solvability) vs. Section 2.3
+Theorem 9 is false for the comparison-based algorithms that Section 2.3 requires of all algorithms: then
+`⟨2,3,0,1⟩` meets the criterion (`ℓ = 0`, `⌈3/3⌉ ≤ 1`) but is not solvable without communication
+(`theorem_9_comparisonBased_false`).
+
+**Impact.** Theorem 9 is correct for index-independent algorithms that may use the identity's value; we
+formalize it that way (`theorem_9`). The same goes for the "decide your own identity" solution of
+`(2n−1)`-renaming and for Corollary 2.
+
+**Details.** Section 2.3 says that only index-independent *and comparison-based* algorithms are
+considered, and Theorem 2 claims this is without loss of generality. That claim only holds with
+communication: its transformation runs a renaming algorithm first. Without communication, a
+comparison-based decision function is constant. Then a GSB task with `m ≥ 2` is solvable iff
+`ℓ = 0 ∧ u ≥ n`, and Theorem 9's "if" direction fails (`noComm_comparisonBased_iff`). Index independence
+is essential: with index-dependent decisions, perfect renaming needs no communication
+(`perfectRenaming_indexDependent`).
+
+### ⚠️ Theorem 4 (anchoring criterion, `ℓ = 0`)
+The criterion "`u`-anchored iff `ℓ ≤ n − u(m−1)`" fails in integer arithmetic whenever `ℓ = 0` and
+`u(m−1) > n`, e.g. for `⟨6,3,0,6⟩` and every `(2n−1)`-renaming task `⟨n,2n−1,0,1⟩` with `n ≥ 3`
+(`theorem_4_int_false`, `theorem_4_int_false_renaming`).
+
+**Impact.** A boundary case with evident intent: Corollary 1 uses `max(0, n−u(m−1))`, so the authors knew
+the expression can be negative. With `n − u(m−1)` truncated at 0 the theorem holds (for `m ≥ 1`), and we
+prove that version (`theorem_4`).
+
+**Details.** Every `⟨n,m,0,u⟩` task is trivially `u`-anchored, as the paper itself says, but the
+right-hand side is negative. `⟨6,3,0,6⟩` is the task that Figure 1 labels "trivially u-anchored".
+
+### ⚠️ Lemma 1 (missing hypothesis `ℓ_v ≤ u_v`)
+"Feasible iff `Σℓ_v ≤ n ≤ Σu_v`" is false for asymmetric bounds with some `ℓ_v > u_v`: `n = 3`,
+`ℓ⃗ = [2,0]`, `u⃗ = [1,5]` satisfies `2 ≤ 3 ≤ 6`, but value 1 would have to be decided at least twice and at
+most once (`lemma_1_false`).
+
+**Impact.** The correct statement adds `ℓ_v ≤ u_v` for all `v` (`lemma_1`). Lemma 2, the symmetric case,
+is correct as stated.
+
+### ⚠️ Section 4.2, the canonical representative (degenerate cases)
+"An `(ℓ,u)`-anchored task is its own representative" picks two different representatives when `u > n`:
+`⟨4,2,0,5⟩` and `⟨4,2,0,4⟩` are synonyms and both `(ℓ,u)`-anchored (`canonical_not_unique`).
+
+**Impact.** Ill-defined only in degenerate cases (also for `m = 1`); Theorem 7's map `f` fixes it
+(`theorem_7`, `theorem_7_iff`).
+
+**Details.** `f` reaches its fixed point after one step, and two feasible tasks are synonyms iff they
+have the same `f`-image. The `f`-image is the pair (least, largest) number of times a value is decided
+in a legal output.
+
+### ⚠️ Theorem 8, Corollaries 2 and 4, Theorem 11 (missing side conditions)
+Theorem 8 needs a *feasible* task, Corollary 2 needs `x ≥ 1`, Corollary 4 needs `k ≤ n` (implicit in
+`k ≤ n/2`), and Theorem 11 needs `n ≥ 2` (for `n = 1` election is trivial).
+
+**Impact.** Degenerate or implied conditions; the statements hold with them (`theorem_8`, `corollary_2`,
+`corollary_4`).
+
+### Typos and slips
+- Theorem 6 is trivial as stated: `S(T1) ⊆ S(T)` for `ℓ' ≥ ℓ` is just Lemma 5 (and (ii) is Lemma 4). The
+  intended statement, shown by its proof, is that `T1` and `T` are *synonyms*. That is true and needs no
+  feasibility assumption (`theorem_6`, `theorem_6_eq`).
+- Theorem 8's proof writes `m/n` for `n/m` throughout.
+- Theorem 11's proof cites "Lemma 2" for Theorem 2.
+- Table 1 claims to list all feasible `⟨6,3,ℓ,u⟩` tasks with `u ≤ 6`, but `⟨6,3,2,6⟩` is missing. Every
+  printed entry is correct (`table_1`, `table_1_missing_row`).
+- The kernel set of `⟨6,3,1,4⟩` is printed as `{[4,1,1],[4,1,1],[2,2,2]}`; it should be
+  `{[4,1,1],[3,2,1],[2,2,2]}`.
+- In the Remark of §4.1, `[4,2,1]` sums to 7, so it is not a kernel vector of any 6-process task.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 9 (the `ℓ = 0` part of the proof)
+"The task specification requires `|G_i| ≤ u`" is not what the specification says.
+
+**Impact.** Statement true (for index-independent algorithms); the `ℓ > 0` part is fine (`theorem_9`).
+
+**Repair.** Pick `u+1` identities from a group of size `> u` and complete them to `n` distinct
+identities. This needs `u+1 ≤ n`, which holds because `⌈(2n−1)/m⌉ ≤ n` for `m ≥ 2`. (`theorem_9`)
+
+### 🛠️ Theorem 10 (Lemma 4 used in the wrong direction)
+`S(T) ⊆ S(T')` makes `T'` *easier*, so unsolvability of `T` says nothing about `T'`.
+
+**Impact.** Statement true, given the cited results: the conclusion survives because the tasks involved
+are synonyms (Theorem 3) (`theorem_10`).
+
+**Repair.** It also follows directly: the parity map turns every `⟨n,m,1,u⟩` output into a WSB output,
+for every `u`. (`parity_mem_wsb`, `theorem_10`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

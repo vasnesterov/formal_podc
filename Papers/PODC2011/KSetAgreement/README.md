@@ -18,51 +18,88 @@ applications.
 
 ## Mistakes in the paper
 
-* **Theorem 1 relies on an unstated property of the model.** Fact 1 ("in every run of `R(D̄)` all of `D̄` decide on a
-  common value") is derived from (B) and k-agreement alone. Then `A|D̄` is said to solve consensus
-  in `M'`. Both steps tacitly assume that `D̄` cannot decide a value proposed only in `D`.
-  Otherwise `D̄` may split between `v₁` and a new value `w`, which together with `v₁, …, v_{k−1}`
-  are still only `k` values, and `A|D̄` need not be valid in `M'`. Counterexample: `n = 3`,
-  `k = 2`, `D₁ = {0}`, `D̄ = {1, 2}`, no communication, and process 0 always proposes 0 in `M`.
-  "Everybody decides 0" solves consensus in `M`, yet (A)–(D) hold, with `M'` = two silent
-  processes with inputs in `{1,2,3}`. The counterexample needs a model in which `D̄`'s
-  view is correlated with `D`'s inputs (here: process 0's input is fixed). The paper's models
-  ([DDS87]-style, all inputs `x_q ∈ V` possible, admissibility independent of input values)
-  exclude this. There the missing hypothesis follows by changing the inputs of `D`. So Theorem 1
-  is false only in the literal "arbitrary system model" generality the paper claims. This is an
-  under-specified statement, and the applications are not affected. (`Abstract.Counterexample.theorem1_statement_false`; repaired:
-  `Abstract.theorem1_corrected`)
-* **Condition (B) of Theorem 1 cannot hold as written in the applications.** The values `v_i` are
-  fixed in advance, and `R(D, D̄)` requires `v_i` to be proposed in `D`. A run of `R(D̄)` in which a
-  process of `D̄` proposes `v₁` therefore has no `D̄`-indistinguishable partner in `R(D, D̄)`. With
-  arbitrary distinct inputs (Theorems 2 and 10) such runs exist. The values must be allowed to
-  depend on the run, and the proof works verbatim then. Under-specified statement.
-  (`Abstract.condB_fails`)
-* **Two more gaps in the proof of Theorem 1.** First, "clearly ρ ∈ R(D̄)" does not follow from
-  indistinguishability *until decision*: a process of `D̄` that decided early may hear from `D`
-  in ρ before the other processes of `D̄` decide. Second, termination of `A|D̄` in `M'` is never
-  argued, and it needs (D) to preserve correctness. Both hold in the applications. Condition (A)
-  is never used. Proof gaps. (`Abstract.theorem1_corrected`)
-* **Theorem 8 "only if" is proved only for the border case `kn = (k+1)f`.** For `kn < (k+1)f`
-  the paper relies on "Theorem 2 tightly captures the impossibility". But Theorem 2 assumes a
-  different and harsher failure model (`f − 1` initial crashes plus one crash during the run), so
-  its impossibility does not transfer, and its bound `(n−1)/(n−f)` is not `f/(n−f)`. Example:
-  `n = 5, f = 3, k = 2` is impossible under Theorem 2's failures but solvable with initial crashes
-  only (`theorem2_vs_theorem8`). The paper's partitioning argument works for all `kn ≤ (k+1)f`.
-  Proof gap; statement true. (`initDead_impossible`)
-* **Degenerate case `f = n`.** Theorem 8 (in the form `kn > (k+1)f`) fails for `f = n ≤ k`:
-  "decide your own input" works there. Theorem 2's bound `(n−1)/(n−f)` is undefined at `f = n`.
-  In the multiplied-out form `k(n−f) ≤ n−1` it would fail for `f = n = k`. The paper implicitly assumes `f < n`
-  (its sets `D_i` of size `n − f` must be nonempty). False only in a degenerate case.
-  (`theorem8_false_of_f_eq_n`, `theorem2_false_of_f_eq_n`)
-* **Section VI, minor slips.** Lemma 6 needs a nonempty graph; the empty graph has no source
-  component. The claim that processes have "complete and consistent knowledge of G" after stage 2
-  is too strong: a process only learns its ancestors. That suffices, but one must also argue that
-  a chosen root's ancestor set is frozen once all its ancestors have chosen their in-lists. For
-  `k = 1`, what is chosen is a source component, not a "clique". The algorithm is correct as
-  intended. (`SourceComp.exists_sourceComponent`, `InitDeadAlg.kSafe`)
-* **Typos.** In the proof of Theorem 10, "applying Theorem 2" should be Theorem 1. The proof of
-  Lemma 7 cites "the previous theorem", meaning Lemma 6.
+### ⚠️ Theorem 1 (unstated property of the model)
+Theorem 1's proof tacitly assumes that the processes of `D̄` cannot decide a value proposed only in `D`,
+and without this the theorem fails in a model where process 0's input is fixed
+(`Abstract.Counterexample.theorem1_statement_false`).
+
+**Impact.** False only in the literal "arbitrary system model" generality the paper claims; an
+under-specified statement. In the paper's own models the missing hypothesis holds, and the applications
+are not affected. Repaired: `Abstract.theorem1_corrected`.
+
+**Details.** Fact 1 ("in every run of `R(D̄)` all of `D̄` decide on a common value") is derived from (B)
+and k-agreement alone. Then `A|D̄` is said to solve consensus in `M'`. Both steps need the unstated
+property. Otherwise `D̄` may split between `v₁` and a new value `w`, which together with
+`v₁, …, v_{k−1}` are still only `k` values, and `A|D̄` need not be valid in `M'`.
+
+Counterexample: `n = 3`, `k = 2`, `D₁ = {0}`, `D̄ = {1, 2}`, no communication, and process 0 always
+proposes 0 in `M`. "Everybody decides 0" solves consensus in `M`, yet (A)–(D) hold, with `M'` = two
+silent processes with inputs in `{1,2,3}`.
+
+The counterexample needs a model in which `D̄`'s view is correlated with `D`'s inputs (here: process 0's
+input is fixed). The paper's models ([DDS87]-style, all inputs `x_q ∈ V` possible, admissibility
+independent of input values) exclude this. There the missing hypothesis follows by changing the inputs
+of `D`.
+
+### ⚠️ Theorem 1, condition (B) (fixed values `v_i`)
+Condition (B) cannot hold as written in the applications: the values `v_i` are fixed in advance, so a
+run of `R(D̄)` in which a process of `D̄` proposes `v₁` has no `D̄`-indistinguishable partner in
+`R(D, D̄)` (`Abstract.condB_fails`).
+
+**Impact.** Under-specified statement: the values must be allowed to depend on the run, and the proof
+works verbatim then.
+
+**Details.** `R(D, D̄)` requires `v_i` to be proposed in `D`. With arbitrary distinct inputs (Theorems 2
+and 10) such runs exist.
+
+### ⚠️ Theorems 8 and 2 for `f = n` (degenerate case)
+Theorem 8 (in the form `kn > (k+1)f`) fails for `f = n ≤ k`, where "decide your own input" works
+(`theorem8_false_of_f_eq_n`, `theorem2_false_of_f_eq_n`).
+
+**Impact.** False only in a degenerate case: the paper implicitly assumes `f < n` (its sets `D_i` of
+size `n − f` must be nonempty).
+
+**Details.** Theorem 2's bound `(n−1)/(n−f)` is undefined at `f = n`. In the multiplied-out form
+`k(n−f) ≤ n−1` it would fail for `f = n = k`.
+
+### Typos and slips
+* In the proof of Theorem 10, "applying Theorem 2" should be Theorem 1.
+* The proof of Lemma 7 cites "the previous theorem", meaning Lemma 6.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 1 (two more gaps in the proof)
+"Clearly ρ ∈ R(D̄)" does not follow from indistinguishability *until decision*, and termination of `A|D̄`
+in `M'` is never argued.
+
+**Impact.** Both hold in the applications; repaired in `Abstract.theorem1_corrected`.
+
+**Details.** A process of `D̄` that decided early may hear from `D` in ρ before the other processes of
+`D̄` decide. Termination needs (D) to preserve correctness. Condition (A) is never used.
+(`Abstract.theorem1_corrected`)
+
+### 🛠️ Theorem 8, "only if" (proved only for `kn = (k+1)f`)
+The paper proves impossibility only for the border case `kn = (k+1)f` and for `kn < (k+1)f` relies on
+"Theorem 2 tightly captures the impossibility", which does not transfer.
+
+**Impact.** Statement true; the paper's partitioning argument works for all `kn ≤ (k+1)f`
+(`initDead_impossible`).
+
+**Details.** Theorem 2 assumes a different and harsher failure model (`f − 1` initial crashes plus one
+crash during the run), so its impossibility does not transfer, and its bound `(n−1)/(n−f)` is not
+`f/(n−f)`. Example: `n = 5, f = 3, k = 2` is impossible under Theorem 2's failures but solvable with
+initial crashes only (`theorem2_vs_theorem8`).
+
+### 🛠️ Section VI (minor slips)
+Lemma 6 needs a nonempty graph, and the claim that processes have "complete and consistent knowledge of
+G" after stage 2 is too strong.
+
+**Impact.** The algorithm is correct as intended (`SourceComp.exists_sourceComponent`,
+`InitDeadAlg.kSafe`).
+
+**Details.** The empty graph has no source component. A process only learns its ancestors. That
+suffices, but one must also argue that a chosen root's ancestor set is frozen once all its ancestors have
+chosen their in-lists. For `k = 1`, what is chosen is a source component, not a "clique".
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

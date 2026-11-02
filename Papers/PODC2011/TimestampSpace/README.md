@@ -15,41 +15,69 @@ invariants.
 
 ## Mistakes in the paper
 
-* **Theorem 1.2, final counting not justified.** The step "`|idle(C_last)| ≤ 1` is impossible"
-  needs every `Cᵢ` to be `ℓᵢ`-constrained.
-  - This is not part of the stated construction invariant (a)–(e), and it is never proved for the
-    columns already in `Rᵢ`.
-  - The association argument `g(r) = |poised(C_{f(r)}, {r})|` is also inexact: after its block
-    write, a block-writer may cover another register, and then it is associated with a register it
-    did not cover at time `f(r)`.
+No mistakes in the statements.
 
-  We replace both with an inductive invariant: the number of non-idle processes that cover nothing
-  outside `R` is at most `Σ_{c≤j}(m - c)`. Together with sparsity (gap below), it gives
-  `n - |idle| ≤ m(m-1)/2 ≤ n - 2`. Proof gap; statement true. (`Inv.nbound`, `idle_ge_two`)
-* **Theorem 1.2, empty prefix after Case 2.** The bound `|poised(C_{k+1}, Q)| ≤ Σ(ℓ_k - c - 1) + 1`
-  comes from the minimality of the prefix `γ_{k+1}`. A Case-2 step lowers `ℓ`, so the next
-  configuration may already contain a full column set w.r.t. the new `ℓ`. Then `γ_{k+2}` is empty
-  and minimality gives nothing. We repair this with sparsity w.r.t. the *previous* diagonal (no
-  nonempty `S ⊆ R̄` has all counts `≥ ℓ + 1 - j - |S|`), which is preserved in both cases. Proof
-  gap; statement true. (`Inv.sparse`, `step`)
-* **Lemma 6.5 (space of Algorithm 4), last phase.** "`Σ_{ϕ=1}^{Φ} ϕ ≤ 2M`" treats the last phase
-  as complete, but Claim 6.10 applies only to completed phases. The honest count from the paper's
-  claims gives only `⌈2√M⌉ + 1` registers. The bound `⌈2√M⌉` is nevertheless true: the getTS that
-  starts a phase never spends its "first invalidation" credit, so `#invalidations + Φ ≤ 2M`, which
-  gives `K² + K + 2 ≤ 4M` for every written index `K`. Proof gap; statement true.
-  (`sq_le_of_written`, `alg4_space`)
-* **Theorem 1.2, Case-2 count (log term).** The proof claims each Case-2 step moves at least
-  `⌈|idle|/2⌉` idle processes. But `γ_{k+1}` may cut `σ'`, so only the `≥ ⌊|idle|/2⌋` processes of
-  `σ` are guaranteed to move. Case 2 then occurs up to `⌈log₂ n⌉` times (e.g. idle sizes
-  5 → 3 → 2 → 1), so the proof gives `⌊√(2n)⌋ - ⌈log₂ n⌉ - 2` instead of `⌊√(2n)⌋ - log n - 2`.
-  The O(1) form of the theorem is unaffected. Minor proof gap. (`theorem_1_2`, `theorem_1_2_real`)
-* **Lemma 3.1/3.2 (long-lived).** Lemma 3.1 is stated for every quiescent `D` but needs `D`
-  reachable. The proof of Lemma 3.2 uses, without justification, that the first two block writes
-  commute once `B₂` has written. Minor; statement true. (`lemma_3_1`, `blockWrite_swap`)
-* **Typos.**
-  - Proof of Lemma 3.2: "`πBᵢλπB₁₋ᵢπBⱼη`" should be `πB₂`.
-  - Section 4: "`idle(Cᵢ) < idle(Cᵢ₊₁)`" should be `>`.
-  - Algorithm 2's comment: "processes `2i` and `2i+1`" should be `2i-1, 2i`, as in its code.
+### Typos and slips
+- Proof of Lemma 3.2: "`πBᵢλπB₁₋ᵢπBⱼη`" should be `πB₂`.
+- Section 4: "`idle(Cᵢ) < idle(Cᵢ₊₁)`" should be `>`.
+- Algorithm 2's comment: "processes `2i` and `2i+1`" should be `2i-1, 2i`, as in its code.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 1.2 (final counting)
+The step "`|idle(C_last)| ≤ 1` is impossible" needs every `Cᵢ` to be `ℓᵢ`-constrained, which the proof
+never establishes, and its association argument is inexact.
+
+**Impact.** Statement true; repaired with a new inductive invariant (`Inv.nbound`, `idle_ge_two`).
+
+**Details.**
+- Being `ℓᵢ`-constrained is not part of the stated construction invariant (a)–(e), and it is never proved
+  for the columns already in `Rᵢ`.
+- The association argument `g(r) = |poised(C_{f(r)}, {r})|` is also inexact: after its block write, a
+  block-writer may cover another register, and then it is associated with a register it did not cover at
+  time `f(r)`.
+
+**Repair.** We replace both with an inductive invariant: the number of non-idle processes that cover
+nothing outside `R` is at most `Σ_{c≤j}(m - c)`. Together with sparsity (next item), it gives
+`n - |idle| ≤ m(m-1)/2 ≤ n - 2`. (`Inv.nbound`, `idle_ge_two`)
+
+### 🛠️ Theorem 1.2 (empty prefix after Case 2)
+The bound `|poised(C_{k+1}, Q)| ≤ Σ(ℓ_k - c - 1) + 1` comes from the minimality of the prefix `γ_{k+1}`,
+but after a Case-2 step `γ_{k+2}` may be empty, and then minimality gives nothing.
+
+**Impact.** Statement true; repaired with a sparsity invariant (`Inv.sparse`, `step`).
+
+**Details.** A Case-2 step lowers `ℓ`, so the next configuration may already contain a full column set
+w.r.t. the new `ℓ`.
+
+**Repair.** We use sparsity w.r.t. the *previous* diagonal (no nonempty `S ⊆ R̄` has all counts
+`≥ ℓ + 1 - j - |S|`), which is preserved in both cases. (`Inv.sparse`, `step`)
+
+### 🛠️ Lemma 6.5 (space of Algorithm 4, last phase)
+"`Σ_{ϕ=1}^{Φ} ϕ ≤ 2M`" treats the last phase as complete, but Claim 6.10 applies only to completed phases,
+so the paper's claims give only `⌈2√M⌉ + 1` registers.
+
+**Impact.** The bound `⌈2√M⌉` is nevertheless true (`sq_le_of_written`, `alg4_space`).
+
+**Repair.** The getTS that starts a phase never spends its "first invalidation" credit, so
+`#invalidations + Φ ≤ 2M`, which gives `K² + K + 2 ≤ 4M` for every written index `K`.
+(`sq_le_of_written`, `alg4_space`)
+
+### 🛠️ Theorem 1.2 (Case-2 count, log term)
+The proof claims each Case-2 step moves at least `⌈|idle|/2⌉` idle processes, but only `⌊|idle|/2⌋` are
+guaranteed to move.
+
+**Impact.** Minor: the proof gives `⌊√(2n)⌋ - ⌈log₂ n⌉ - 2` instead of `⌊√(2n)⌋ - log n - 2`; the O(1)
+form of the theorem is unaffected (`theorem_1_2`, `theorem_1_2_real`).
+
+**Details.** `γ_{k+1}` may cut `σ'`, so only the `≥ ⌊|idle|/2⌋` processes of `σ` are guaranteed to move.
+Case 2 then occurs up to `⌈log₂ n⌉` times (e.g. idle sizes 5 → 3 → 2 → 1).
+
+### 🛠️ Lemmas 3.1 and 3.2 (long-lived)
+Lemma 3.1 is stated for every quiescent `D` but needs `D` reachable, and the proof of Lemma 3.2 uses
+without justification that the first two block writes commute once `B₂` has written.
+
+**Impact.** Minor; statements true (`lemma_3_1`, `blockWrite_swap`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

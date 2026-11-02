@@ -29,35 +29,11 @@ A few proof steps are only sketched and a few details are imprecise. None of the
 
 ## Mistakes in the paper
 
-No statement is wrong. Imprecisions and sketched steps, all repaired or confirmed in Lean:
+No mistakes in the statements.
 
-* **Theorem 5.1, gluing step.** The text adds the edges `{b_{i-1}[1], a_i[1]}` "for each `i > 1`". This
-  produces a path, not a `kn`-cycle. The definition `b_0 = b_k` and Figure 1c show that every `i` is meant.
-  This is a typo. (`glued`)
-* **Theorem 5.1, graph problems with edge labels.** The glued instance inherits only node data `L(v)` and
-  `P(v)`. For spanning trees and matchings the solution lives on edges, and the paper does not say what
-  label the new edges `{b_{i-1}[1], a_i[1]}` get. We store the label of the edge to a node's successor at that
-  node, so a new edge inherits the label of the removed edge `{a_i[1], b_i[1]}`, and we put these labels into
-  the colour `c(a,b)`. The argument then works as the paper says, and the lower bound holds for weak schemes
-  too. (`glue_accept`, `theorem_5_1_spanningTree`, `theorem_5_1_maxMatching`)
-* **Theorem 6.1.** The paper says that "by the construction of `G`" every non-trivial automorphism of
-  `G₁ ⊛ G₂` swaps `G₁` and `G₂`, and gives no argument. This is true in general, with a short argument (checked
-  on paper, not in Lean). The connecting path lies in a run of degree-2 nodes with at least `k` nodes. Every
-  other such run lies inside one copy and has fewer than `k` nodes. So `ϕ` fixes or reverses this run. If it
-  reverses the run, the two sides have equal size, and `ϕ` maps the `G₁` copy onto the `G₂` copy. If it fixes
-  the run, it restricts to automorphisms of `G₁` and `G₂`, which are trivial. We sidestep the step with a smaller family of `G₁`: asymmetric graphs in which any two
-  vertices have three common neighbours. In `G₁ ⊛ G₂` the degree-2 nodes are then exactly the path nodes. We
-  prove that this family still has at least `2^{C(k,2)}/2` labelled members, replacing the citation of
-  Erdős–Rényi. (`symmetric_lcp_lower_bound`, `exists_many_good`)
-* **Theorem 7.1.** The honest proof is described as `P(v) = (H, v)`, but the encoded graph must have
-  identifiers `{1, …, n(G)}`. One has to use a relabelled copy of `H`, which lies in `P` because isomorphisms are
-  coverings. Also left implicit: surjectivity of `ϕ` needs the encoded graph to be connected, which the check
-  `G ∈ P ⊆ F` provides. (`theorem_7_1`)
-* **Odds and ends.**
-  * Table 2 lists `Θ(log n)` for verifying a Hamiltonian cycle, but §5 gives no lower-bound argument for it. The
-    cycle gluing does not apply: the glued all-marked `2n`-cycle is a Hamiltonian cycle. Not formalized.
-  * §5.1 certifies non-bipartiteness by a counter "along the odd cycle". It certifies only an odd closed walk,
-    which also rules out a 2-colouring. Our scheme uses two BFS-like trees instead (`nonBipartite_logLCP`).
+### Typos and slips
+- Theorem 5.1, gluing step: the text adds the edges `{b_{i-1}[1], a_i[1]}` "for each `i > 1`", which produces a
+  path, not a `kn`-cycle; the definition `b_0 = b_k` and Figure 1c show that every `i` is meant (`glued`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -107,6 +83,32 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 Supporting files: `Cycle.lean` (labelled cycles and the segment gluing lemma), `Star.lean` (the `⊛`
 construction), `AsymCount.lean` (counting asymmetric graphs), `LocalTools.lean` (bit encodings of numbers).
+
+**Proof remarks.** A few proof steps are only sketched and a few details are imprecise; all are repaired or
+confirmed in Lean, and none affects a statement.
+* **Theorem 5.1, graph problems with edge labels.** The glued instance inherits only node data `L(v)` and
+  `P(v)`. For spanning trees and matchings the solution lives on edges, and the paper does not say what label the
+  new edges `{b_{i-1}[1], a_i[1]}` get. We store the label of the edge to a node's successor at that node, so a
+  new edge inherits the label of the removed edge `{a_i[1], b_i[1]}`, and we put these labels into the colour
+  `c(a,b)`. The argument then works as the paper says, and the lower bound holds for weak schemes too.
+  (`glue_accept`, `theorem_5_1_spanningTree`, `theorem_5_1_maxMatching`)
+* **Theorem 6.1.** The paper says that "by the construction of `G`" every non-trivial automorphism of
+  `G₁ ⊛ G₂` swaps `G₁` and `G₂`, and gives no argument. This is true in general, with a short argument (checked
+  on paper, not in Lean). The connecting path lies in a run of degree-2 nodes with at least `k` nodes. Every
+  other such run lies inside one copy and has fewer than `k` nodes. So `ϕ` fixes or reverses this run. If it
+  reverses the run, the two sides have equal size, and `ϕ` maps the `G₁` copy onto the `G₂` copy. If it fixes
+  the run, it restricts to automorphisms of `G₁` and `G₂`, which are trivial. We sidestep the step with a smaller
+  family of `G₁`: asymmetric graphs in which any two vertices have three common neighbours. In `G₁ ⊛ G₂` the
+  degree-2 nodes are then exactly the path nodes. We prove that this family still has at least `2^{C(k,2)}/2`
+  labelled members, replacing the citation of Erdős–Rényi. (`symmetric_lcp_lower_bound`, `exists_many_good`)
+* **Theorem 7.1.** The honest proof is described as `P(v) = (H, v)`, but the encoded graph must have
+  identifiers `{1, …, n(G)}`. One has to use a relabelled copy of `H`, which lies in `P` because isomorphisms are
+  coverings. Also left implicit: surjectivity of `ϕ` needs the encoded graph to be connected, which the check
+  `G ∈ P ⊆ F` provides. (`theorem_7_1`)
+* Table 2 lists `Θ(log n)` for verifying a Hamiltonian cycle, but §5 gives no lower-bound argument for it. The
+  cycle gluing does not apply: the glued all-marked `2n`-cycle is a Hamiltonian cycle. Not formalized.
+* §5.1 certifies non-bipartiteness by a counter "along the odd cycle". It certifies only an odd closed walk,
+  which also rules out a 2-colouring. Our scheme uses two BFS-like trees instead (`nonBipartite_logLCP`).
 
 **Not formalized.**
 * §4: reachability, connectivity, bipartite matching.
