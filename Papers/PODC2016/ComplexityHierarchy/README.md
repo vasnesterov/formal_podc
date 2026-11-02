@@ -13,46 +13,69 @@ algorithms. But several proofs needed repair: Lemma 9.1 has a real gap, Lemma 7.
 
 ## Mistakes in the paper
 
-* **Lemma 9.1 (test-and-set): proof gap, statement true.** The proof takes `β`, the shortest prefix of
-  `z`'s solo execution from `Cα_kξ` that ends with a test-and-set on a location `r ∉ L_k`. It then
-  reasons about `Cα_kξψβ` and `Cα_kξψψ'β`, where `ψ, ψ'` are steps of `p_1`. But in those executions
-  `z`'s preliminary steps of `β` (reads, test-and-sets on `L_k`) run *after* `ψ`, which may set
-  locations to 1. They may then return different values, so `z` need not perform `β` at all, and the
-  claims that "`β` sets `r` to 1" and that the two configurations are indistinguishable to `p_0` are
-  unjustified. Repair: run `z`'s preliminary steps first (they change no memory), so that `z` is
-  poised on `r`; its single remaining step commutes with any single step of `p_0`/`p_1`. This also
-  removes the case analysis on `ψ'`. Lemma 9.1 and Theorem 9.2 then hold as stated (`lemma_9_1`).
-* **Lemma 7.1: proof wrong, statement true.** The proof takes *any* maximal Eulerian trail
-  `r_1, …, r_t` and re-packs along it from each `r_j` to `r_t`. If the trail visits `r_t` earlier,
-  this does nothing. Example: locations `A, B, C`, processes `p1, p2, p3`, 2-packings `g = (A, B, C)`
-  and `h = (B, C, B)`. The unique maximal trail from `A` is `A→B→C→B`, and re-packing from `j = 2`
-  leaves `B` unchanged. Taking a *shortest* such sequence fixes the proof. We prove Lemma 7.2 directly
-  instead, by an augmenting-path argument (`lemma71_trail_counterexample`; `fullyPacked_of_cov`).
-* **Lemma 8.2 (swap/read algorithm): false in an unused edge case.** For a scan `S` with
-  `ℓ_v(S) = 1` it asks for an earlier scan `T` in which all laps are `0`. But every scanner has lap
-  `≥ 1` on its own input from line 1, so no such `T` exists. The lemma is applied only with
-  `ℓ_v(S) ≥ 2` (Lemma 8.4), where it holds. Theorem 8.8 is unaffected (invariant `SwapRead.AInv`).
-* **The proofs of Lemmas 6.5 / 7.3 need `R ≠ ∅`** (they start from a process `p ∈ R`), but
-  Theorems 6.8 / 7.5 use them for `n = 2`, where `R = ∅`.
-  The needed conclusion (at least one location) follows from a separate easy argument: with no
-  locations, two processes cannot communicate (`no_locations`).
-* **Implicit steps, filled in.**
-  * Lemma 3.2: validity needs every scan to see a nonzero component. Otherwise the argmax of an
-    all-zero vector could be an unproposed value, since decrements lower counts.
-  * Lemma 6.6: one must truncate `α` after its first decision, so that `U'` stays undecided.
-  * Theorem 4.2 and Section 8: the step from linearizable double-collect scans to atomic-scan
-    reasoning is left implicit; we prove it (a ghost chain of
-    observed pairs for Theorem 4.2, a step-by-step simulation for Section 8).
-  * Theorem 4.2: validity needs the observation that a process seeing `m1 = (0,0)` itself wrote
-    `(0, input)`.
-  * Lemma 8.6 proves only weak validity; standard validity also holds.
-* **Typos.**
-  * The Section 7 introduction says `⌈n/2ℓ⌉` locations are necessary; Theorem 7.5 and the proof
-    give `⌈(n−1)/2ℓ⌉`.
-  * Lemma 7.3: "`Cζβ1β2`" should be "`Cξβ1β2`".
-  * Lemma 7.4: "at mostwot two".
-  * Theorem 4.2: "(r,x) ≺ (r′,x)" should be "(r,x) ≺ (r′,x′)".
-  * "Anonymous" (Section 8) is inaccurate: the swapped values carry process ids.
+### ⚠️ Lemma 8.2 (swap/read algorithm, scans with `ℓ_v(S) = 1`)
+For a scan `S` with `ℓ_v(S) = 1`, Lemma 8.2 asks for an earlier scan `T` in which all laps are `0`, but no such `T`
+exists, since every scanner has lap `≥ 1` on its own input from line 1.
+
+**Impact.** An unused edge case: the lemma is applied only with `ℓ_v(S) ≥ 2` (Lemma 8.4), where it holds.
+Theorem 8.8 is unaffected (invariant `SwapRead.AInv`).
+
+### Typos and slips
+- The Section 7 introduction says `⌈n/2ℓ⌉` locations are necessary; Theorem 7.5 and the proof give `⌈(n−1)/2ℓ⌉`.
+- Lemma 7.3: "`Cζβ1β2`" should be "`Cξβ1β2`".
+- Lemma 7.4: "at mostwot two".
+- Theorem 4.2: "(r,x) ≺ (r′,x)" should be "(r,x) ≺ (r′,x′)".
+- "Anonymous" (Section 8) is inaccurate: the swapped values carry process ids.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 9.1 (test-and-set)
+The proof runs `z`'s preliminary steps of `β` *after* `p_1`'s steps `ψ, ψ'`, which may set locations to 1, so `z`
+need not perform `β` at all, and the claims that "`β` sets `r` to 1" and that the two configurations are
+indistinguishable to `p_0` are unjustified.
+
+**Impact.** Statement true; Lemma 9.1 and Theorem 9.2 hold as stated (`lemma_9_1`).
+
+**Details.** The proof takes `β`, the shortest prefix of `z`'s solo execution from `Cα_kξ` that ends with a
+test-and-set on a location `r ∉ L_k`. It then reasons about `Cα_kξψβ` and `Cα_kξψψ'β`, where `ψ, ψ'` are steps of
+`p_1`. But in those executions `z`'s preliminary steps of `β` (reads, test-and-sets on `L_k`) run *after* `ψ`. They
+may then return different values.
+
+**Repair.** Run `z`'s preliminary steps first (they change no memory), so that `z` is poised on `r`; its single
+remaining step commutes with any single step of `p_0`/`p_1`. This also removes the case analysis on `ψ'`.
+
+### 🛠️ Lemma 7.1 (re-packing along an Eulerian trail)
+The proof re-packs along *any* maximal Eulerian trail `r_1, …, r_t` from each `r_j` to `r_t`, which does nothing if
+the trail visits `r_t` earlier (`lemma71_trail_counterexample`).
+
+**Impact.** Statement true; taking a *shortest* such sequence fixes the proof.
+
+**Details.** Example: locations `A, B, C`, processes `p1, p2, p3`, 2-packings `g = (A, B, C)` and `h = (B, C, B)`.
+The unique maximal trail from `A` is `A→B→C→B`, and re-packing from `j = 2` leaves `B` unchanged.
+
+**Repair.** We prove Lemma 7.2 directly, by an augmenting-path argument (`fullyPacked_of_cov`).
+
+### 🛠️ Lemmas 6.5 and 7.3 for `R = ∅` (used by Theorems 6.8 and 7.5)
+The proofs of Lemmas 6.5 / 7.3 start from a process `p ∈ R`, but Theorems 6.8 / 7.5 use them for `n = 2`, where
+`R = ∅`.
+
+**Impact.** Theorems true; the needed conclusion (at least one location) follows from a separate easy argument:
+with no locations, two processes cannot communicate (`no_locations`).
+
+### 🛠️ Implicit steps (Lemmas 3.2, 6.6, 8.6, Theorem 4.2, Section 8)
+Several proofs leave steps implicit, which we fill in.
+
+**Impact.** Statements true; routine repairs.
+
+**Details.**
+- Lemma 3.2: validity needs every scan to see a nonzero component. Otherwise the argmax of an all-zero vector
+  could be an unproposed value, since decrements lower counts.
+- Lemma 6.6: one must truncate `α` after its first decision, so that `U'` stays undecided.
+- Theorem 4.2 and Section 8: the step from linearizable double-collect scans to atomic-scan reasoning is left
+  implicit; we prove it (a ghost chain of observed pairs for Theorem 4.2, a step-by-step simulation for
+  Section 8).
+- Theorem 4.2: validity needs the observation that a process seeing `m1 = (0,0)` itself wrote `(0, input)`.
+- Lemma 8.6 proves only weak validity; standard validity also holds.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

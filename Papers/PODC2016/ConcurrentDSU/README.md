@@ -18,44 +18,62 @@ can be fixed on paper by changing constants, but this repair is not checked in L
 
 ## Mistakes in the paper
 
-* **Work bound for one-try splitting (PODC version; acknowledged by the authors, not checked by
-  us).** The conference paper claims the expected work bound `O(m(α(n, m/(np)) + log(np/m + 1)))`
-  (Theorem 5.1 of the arXiv version, stated in the PODC abstract) also for one-try splitting. The
-  arXiv version says: "In the conference version of our paper [JT16], we claimed that Theorem 5.1
-  holds for one-try splitting, but our proof, essentially the proof of Theorem 5.1, is not correct
-  for this algorithm." It proves only a weaker bound (Theorem 5.2, `m/(np²)` in place of `m/(np)`)
-  and calls the original claim "an open problem" (Section 7). We could not consult the proceedings
-  text and do not formalize Sections 4–5, so we neither confirm nor refute the claim.
-* **Lemma 4.2's exponent `h²` is not justified (proof gap; checked in the arXiv text).** The proof
-  bounds the probability that fewer than `h` of `c·h` independent links are "good", each good with
-  probability ≥ 1/2, "by a Chernoff bound". Chernoff gives `exp(−(c/2−1)²h/c)`, linear in `h`, not
-  the claimed `exp(−(c/2−1)²h²/c)`. The quadratic bound already fails for fair coins, which Lemma 4.1
-  allows: with `c = 4`, `h = 6`, fewer than 6 heads among 24 coins has probability
-  `55455/2²⁴ ≈ 3.3·10⁻³ > e⁻⁹`. Corollary 4.2.1 and Theorem 4.3 survive with a larger constant
-  `c`. The case `d < 1` of the proof of Theorem 5.1 uses the quadratic form to show that there are
-  very few "middle" nodes. With the paper's threshold `4h` and the linear exponent, its charge is not
-  `O(m)`. A threshold `7h` repairs it (on paper; not formalized). We do not know whether the
-  stated lemma is false; only its proof is broken. (`chernoff_step_fails`)
-* **Lemma 3.1's proof: "u, v and w are distinct" is false (imprecision; lemma true).** A splitting
-  `Find` can read `v ← u.parent = u` while `u` is a root. If `u` is linked before the next read, the
-  `Find` executes `Cas(u.parent, u, w)` with `u = v`. This `Cas` always fails, so the lemma holds.
-  The same execution gives a `Find` iteration in which `u` does not advance, contrary to a sentence in
-  the proof of Lemma 3.3. This happens at most once per `Find`. (`cas_same_node`, a concrete
-  2-process execution)
-* **Lemma 3.2's proof leaves two facts implicit (statement true).**
-  * When `SameSet` returns false, the answer is decided at the later test `u = u.parent`, but the
-    operation is linearized earlier, at the last read of `Find(v)`. One needs that `u` was a root
-    already at that read: it was a root when `Find(u)` returned and is one at the test, and non-roots
-    never become roots again. Linearizing at the test instead would be wrong, because `v` may have
-    been linked into `u`'s tree in between.
-  * The link case needs that the larger node is not in the smaller root's tree. This holds because
-    ids increase along parent pointers.
-* **Typos and slips:**
-  * Algorithm 4, line 7: `u.p` should be `u.parent`.
-  * Proof of Lemma 4.1: "rank … never less than the rank of its parent" should be "never more".
-  * Proof of Lemma 4.2: "fewer than h bad links" should be "good links".
-  * Proof of Theorem 5.1: the two exponents `h²/16` and `h²/4` are inconsistent.
-  * Proof of Lemma 5.3: "depth 1 before the Find" should be "depth 2".
+No mistakes in the statements we checked (correctness, Sections 3 and 6).
+
+Not checked by us: the PODC version claims the expected work bound `O(m(α(n, m/(np)) + log(np/m + 1)))` (Theorem
+5.1 of the arXiv version, stated in the PODC abstract) also for one-try splitting, and the authors later
+acknowledged that its proof is incorrect. The arXiv version says: "In the conference version of our paper [JT16],
+we claimed that Theorem 5.1 holds for one-try splitting, but our proof, essentially the proof of Theorem 5.1, is
+not correct for this algorithm." It proves only a weaker bound (Theorem 5.2, `m/(np²)` in place of `m/(np)`) and
+calls the original claim "an open problem" (Section 7). We could not consult the proceedings text and do not
+formalize Sections 4–5, so we neither confirm nor refute the claim.
+
+### Typos and slips
+- Algorithm 4, line 7: `u.p` should be `u.parent`.
+- Proof of Lemma 4.1: "rank … never less than the rank of its parent" should be "never more".
+- Proof of Lemma 4.2: "fewer than h bad links" should be "good links".
+- Proof of Theorem 5.1: the two exponents `h²/16` and `h²/4` are inconsistent.
+- Proof of Lemma 5.3: "depth 1 before the Find" should be "depth 2".
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 4.2 (exponent `h²`, checked in the arXiv text)
+The proof claims the bound `exp(−(c/2−1)²h²/c)` "by a Chernoff bound", but Chernoff gives only `exp(−(c/2−1)²h/c)`,
+linear in `h`, and the quadratic bound already fails for fair coins with `c = 4`, `h = 6` (`chernoff_step_fails`).
+
+**Impact.** We do not know whether the stated lemma is false; only its proof is broken. Corollary 4.2.1 and
+Theorem 4.3 survive with a larger constant `c`, and Theorem 5.1 (which inherits the gap) can be repaired on paper
+with another threshold; not checked in Lean.
+
+**Details.** The proof bounds the probability that fewer than `h` of `c·h` independent links are "good", each good
+with probability ≥ 1/2. Fair coins are allowed by Lemma 4.1: with `c = 4`, `h = 6`, fewer than 6 heads among 24
+coins has probability `55455/2²⁴ ≈ 3.3·10⁻³ > e⁻⁹`. The case `d < 1` of the proof of Theorem 5.1 uses the
+quadratic form to show that there are very few "middle" nodes. With the paper's threshold `4h` and the linear
+exponent, its charge is not `O(m)`.
+
+**Repair.** A threshold `7h` repairs the proof of Theorem 5.1 (on paper; not formalized).
+
+### 🛠️ Lemma 3.1 ("u, v and w are distinct")
+The proof's claim that `u`, `v` and `w` are distinct is false: a splitting `Find` can read `v ← u.parent = u` while
+`u` is a root, and if `u` is linked before the next read, it executes `Cas(u.parent, u, w)` with `u = v`
+(`cas_same_node`, a concrete 2-process execution).
+
+**Impact.** Lemma true: this `Cas` always fails. The same execution gives a `Find` iteration in which `u` does not
+advance, contrary to a sentence in the proof of Lemma 3.3; this happens at most once per `Find`.
+
+### 🛠️ Lemma 3.2 (linearizability: two implicit facts)
+The proof leaves implicit that `u` is already a root at the linearization point of a `SameSet` that returns false,
+and that in the link case the larger node is not in the smaller root's tree.
+
+**Impact.** Statement true; both facts are easy (`linearizable`).
+
+**Details.**
+- When `SameSet` returns false, the answer is decided at the later test `u = u.parent`, but the operation is
+  linearized earlier, at the last read of `Find(v)`. One needs that `u` was a root already at that read: it was a
+  root when `Find(u)` returned and is one at the test, and non-roots never become roots again. Linearizing at the
+  test instead would be wrong, because `v` may have been linked into `u`'s tree in between.
+- The link case needs that the larger node is not in the smaller root's tree. This holds because ids increase
+  along parent pointers.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
