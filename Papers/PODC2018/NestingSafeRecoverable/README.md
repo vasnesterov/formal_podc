@@ -15,43 +15,63 @@ recoverable `READ` crashes, and `INC.RECOVER` has an off-by-one test.
 
 ## Mistakes in the paper
 
-* **Algorithm 4's `READ` is not NRL (false claim about an example algorithm).** `READ` sums
-  `R[1..N]` with nested recoverable `R[i].READ` calls, keeping `val` and the loop index `i` in
-  volatile variables. Under the paper's own model, a crash inside `R[i].READ` is recovered by
-  `R[i].READ.RECOVER`, the innermost pending recoverable operation, and not by the counter's
-  `READ.RECOVER`. The caller then continues line 14 with `val` and `i` lost. Counterexample with two
-  processes and the most benign reset (volatile variables become 0): process 0 completes `INC`.
-  Process 1 starts `READ`, reads `R[1] = 1`, and crashes inside `R[2].READ`. After `R[2].READ.RECOVER`
-  it adds 0 to the reset `val = 0` and returns `0`. Repairing this requires a design change, e.g.
-  keeping `val` and `i` in non-volatile memory. (`Alg4.read_not_nrl`)
-* **`INC.RECOVER` tests `LI_p < 4`; it should be `LI_p ≤ 4`.** Suppose process 0 crashes in `INC`
-  when it is about to execute line 4, before invoking `R[p].WRITE`. Then `LI_p = 4`, and
-  `INC.RECOVER` returns `ack` without incrementing. A later `READ` returns `0`. The prose ("before
-  line 4 – INC is re-executed") gives the intended test. Typo. (`Alg4.inc_recover_not_nrl`)
-* **Theorem 4's proof: the "w.l.o.g." renaming breaks the infinite construction; statement true.**
-  At each critical configuration the proof assumes "w.l.o.g. `C₁∘p` is `p`-valent" and crashes `p`.
-  Renaming the processes can therefore make the crashing process change from round to round. The
-  concluding step needs "a crash-free execution of `q`" with infinitely many steps, and a process
-  that crashes infinitely often does not contradict wait-freedom. The repair: always crash the same
-  process `p`. Whichever of `D·p`, `D·q` is `p`-valent, one of `D·p·q·crash_p` and `D·q·p·crash_p`
-  is bivalent. The two configurations share a valency, because `p`'s solo recovery cannot tell
-  them apart. Each also inherits the valency of `D·p` or `D·q`, because `q` cannot see `p`'s crash.
-  We proved the theorem for all base objects that are read/write-like or test&set-like.
-  (`theorem4`, `round`)
-* **Lemma 2 needs written values to differ from the initial value too.** The paper assumes "all
-  values written to the object are distinct". If a process may later write the initial value
-  `v₀`, the following run breaks Algorithm 1. `p` writes 1 and crashes after its write to `R`.
-  Then `q` writes `v₀`. `p`'s recovery sees `R` equal to its saved old value, so it writes 1 a
-  second time, and a reader sees `1, v₀, 1`. Implied assumption, satisfied by the paper's counter.
-  (`alg1_not_nrl_of_initial_rewritten`; `lemma2` is proved with the assumption.)
-* **Typos and slips.**
-  * Algorithm 3, lines 26 and 28 read `await(R[p] = …)`; they should be `R[i]`. As printed, line 26
-    never terminates. Not formalized.
-  * In Lemma 3 (Algorithm 2), `new` must not be `null`, because the helping registers start at
-    `null`. This is the paper's sentinel convention.
-  * The paper's proofs of Lemmas 2 and 3 leave implicit that "linearize the recovered `WRITE` /
-    failed `CAS` right before / after another process's step" is a speculative point. Our proofs
-    linearize speculatively and retract the entry if the guess turns out wrong.
+### ❌ Algorithm 4, `READ` (the "nesting-safe recoverable counter")
+Algorithm 4's `READ` is not NRL: when a nested recoverable `R[i].READ` crashes, the caller resumes after `R[i].READ.RECOVER` with its volatile partial sum `val` and loop index `i` lost, so a `READ` after a completed `INC` can return `0` (`Alg4.read_not_nrl`).
+
+**Impact.** The counter is an example built on top of the main results, which all hold. Repairing it
+requires a design change, e.g. keeping `val` and `i` in non-volatile memory.
+
+**Details.** `READ` sums `R[1..N]` with nested recoverable `R[i].READ` calls, keeping `val` and `i`
+in volatile variables. Under the paper's own model, a crash inside `R[i].READ` is recovered by
+`R[i].READ.RECOVER`, the innermost pending recoverable operation, and not by the counter's
+`READ.RECOVER`. The caller then continues line 14 with `val` and `i` lost. Counterexample with two
+processes and the most benign reset (volatile variables become 0): process 0 completes `INC`.
+Process 1 starts `READ`, reads `R[1] = 1`, and crashes inside `R[2].READ`. After
+`R[2].READ.RECOVER` it adds 0 to the reset `val = 0` and returns `0`.
+
+### ⚠️ Algorithm 4, `INC.RECOVER` (test `LI_p < 4`)
+`INC.RECOVER` tests `LI_p < 4` where it should test `LI_p ≤ 4`, so a crash just before line 4 makes `INC` return `ack` without incrementing (`Alg4.inc_recover_not_nrl`).
+
+**Impact.** Typo with evident intent: the prose ("before line 4 – INC is re-executed") gives the
+intended test.
+
+**Details.** Suppose process 0 crashes in `INC` when it is about to execute line 4, before invoking
+`R[p].WRITE`. Then `LI_p = 4`, and `INC.RECOVER` returns `ack` without incrementing. A later `READ`
+returns `0`.
+
+### ⚠️ Lemma 2 (Algorithm 1: written values must also differ from the initial value)
+Lemma 2 is false if a process may write the initial value `v₀`: the paper assumes only that "all values written to the object are distinct" (`alg1_not_nrl_of_initial_rewritten`).
+
+**Impact.** Implied assumption, satisfied by the paper's counter; `lemma2` is proved with the
+assumption.
+
+**Details.** `p` writes 1 and crashes after its write to `R`. Then `q` writes `v₀`. `p`'s recovery
+sees `R` equal to its saved old value, so it writes 1 a second time, and a reader sees `1, v₀, 1`.
+
+### ⚠️ Algorithm 3, lines 26 and 28 (`R[p]` for `R[i]`)
+Lines 26 and 28 read `await(R[p] = …)` where they should read `R[i]`, so as printed line 26 never terminates.
+
+**Impact.** Typo with evident intent; not formalized.
+
+### Typos and slips
+- In Lemma 3 (Algorithm 2), `new` must not be `null`, because the helping registers start at
+  `null`. This is the paper's sentinel convention.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 4 (no wait-free recoverable test&set from read/write and test&set)
+At each critical configuration the proof assumes "w.l.o.g. `C₁∘p` is `p`-valent" and crashes `p`, so the renaming can change the crashing process from round to round, and a process that crashes infinitely often does not contradict wait-freedom.
+
+**Impact.** Statement true; repaired by always crashing the same process (`theorem4`, `round`).
+
+**Details.** The concluding step needs "a crash-free execution of `q`" with infinitely many steps,
+which the infinite construction does not provide once the roles of `p` and `q` can swap.
+
+**Repair.** Always crash the same process `p`. Whichever of `D·p`, `D·q` is `p`-valent, one of
+`D·p·q·crash_p` and `D·q·p·crash_p` is bivalent. The two configurations share a valency, because
+`p`'s solo recovery cannot tell them apart. Each also inherits the valency of `D·p` or `D·q`,
+because `q` cannot see `p`'s crash. We proved the theorem for all base objects that are
+read/write-like or test&set-like.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -76,6 +96,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Nesting (Algorithm 4) is modelled by a separate concrete interpreter with two-level frames. A
   crash inside a nested operation runs the nested `RECOVER`, and the caller keeps only its return
   address.
+
+**Proof remarks.** The paper's proofs of Lemmas 2 and 3 leave implicit that "linearize the recovered
+`WRITE` / failed `CAS` right before / after another process's step" is a speculative point. Our proofs
+linearize speculatively and retract the entry if the guess turns out wrong.
 
 **Main results in Lean.**
 

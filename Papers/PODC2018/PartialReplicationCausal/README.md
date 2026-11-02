@@ -13,41 +13,60 @@ Constraint 1 of the lower-bound section. We prove Theorem 3 by a new argument.
 
 ## Mistakes in the paper
 
-* **Lemma 4 is false.** It claims that if `u'` (from `k` to `i`, timestamp `T'`) happened before
-  `u` (from `j` to `i`, timestamp `T`), then `T[e_ki] ≥ T'[e_ki]`. When `e_ki ∉ E_j`, `T` has no such
-  entry, and the proof of Lemma 5 nevertheless applies the lemma there. Even when `e_ki ∈ E_j` it
-  fails. Take five replicas with `X_A = {f,e,b}`, `X_B = {e,a}`, `X_C = {a,g}`, `X_D = {g,b}`,
-  `X_I = {f,a,g}`. `A` writes `f` (`u'`, delayed on its way to `I`), then `e`. `B` applies `e` and
-  writes `a`; `C` applies that and writes `g`; `D` applies that and writes `g` (`u`). Then `u' ↪ u`
-  and `e_AI ∈ E_D` (triangle `D, I, A`). But `e_AI ∉ E_C` (`X_C ⊆ X_I`, so condition (iii) fails on
-  every loop through `C`), so `C` drops the information and `T[e_AI] = 0 < 1 = T'[e_AI]`. Safety is
-  not violated: `B`'s and `C`'s updates also go to `I` and must be applied first. The lemma's proof
-  also assumes that causal chains form simple loops. (`Lemma4.lemma_4_false`,
-  `Lemma4.not_lemma4Statement`)
-* **The proof of Lemma 5 / Theorem 3 rests on Lemma 4; the statements are true.** We replace it by a
-  strong induction on the length of a causal chain `a ↪ v₀ ↪ ⋯ ↪ v_m = u`. If a replica repeats,
-  or an intermediate update also goes to the receiver `i`, the chain gets shorter (the latter by
-  safety of earlier steps). Otherwise, either every replica on the chain tracks `e_ji` and the
-  counter reaches `u`'s timestamp, or the chain closes with `i` into a simple loop that is not a
-  `(p_q, e_ji)`-loop. Each of the three failing conditions of Definition 6 then exhibits an update
-  sent directly further down the chain, which again shortens it. (`chain_main`, `lemma_5`,
-  `theorem_3_safety`)
-* **Footnote 2 is false.** It claims the algorithm satisfies Constraint 1 (the timestamp is a
-  function of the causal past, a *set* of updates). Take six replicas with `X₀ = {e,b}`,
-  `X₁ = {a,b}`, `X₂ = {a,c}`, `X₃ = {c,d}`, `X₄ = {e,d}`, `X₅ = {c,e,d}`. Replicas `2, 3, 4, 5` write
-  once each. In both executions replica `0` ends up with the same causal past (all four updates).
-  In one, `2`'s update reaches `0` through `5`, which tracks `e_25`; in the other, only through `4`,
-  which does not. So `τ₀[e_25]` is `1` vs. `0`. Hence the lower bound of Section 4 does not apply to
-  the paper's algorithm in general. (`Footnote2.footnote_2_false`)
-* **Theorem 1 is true, but its proof has gaps.** In Case 2, applying `u₁` also brings `j`'s whole
-  causal past into `i`'s graph, so the two graphs differ in more than updates on `e_ji`. In Case 3,
-  all other messages are "delayed indefinitely", which breaks the liveness arguments. Also, an
-  earlier update on the path `l₁ … l_s` may already reach `k`, and in Case 3.2 the execution without
-  `u₀` loses `j`'s causal past. We repair it as follows. Both executions share a first update `u_A`
-  of `j`, which `k` applies, and one execution adds a second update `u_B`. Every relay applies all
-  updates sent to it (liveness forces this). The critical message is the first path update stored
-  at `k`. The two executions are compared by an explicit simulation. We prove the theorem for every
-  deterministic metadata algorithm and every quiescent state `R₀`. (`Necessity.theorem_1`)
+### ❌ Lemma 4 (Appendix B, timestamps along causal chains)
+Lemma 4 (if `u'` from `k` to `i` with timestamp `T'` happened before `u` from `j` to `i` with timestamp `T`, then `T[e_ki] ≥ T'[e_ki]`) is false even when `e_ki ∈ E_j`, its only well-typed reading, on five replicas (`Lemma4.lemma_4_false`, `Lemma4.not_lemma4Statement`).
+
+**Impact.** The correctness proof of the headline Theorem 3 rests on it, but Theorem 3 is true: we
+prove it by a new argument (see Proof gaps). Safety is not violated in the counterexample.
+
+**Details.** When `e_ki ∉ E_j`, `T` has no such entry, and the proof of Lemma 5 nevertheless
+applies the lemma there. Even when `e_ki ∈ E_j` it fails. Take five replicas with
+`X_A = {f,e,b}`, `X_B = {e,a}`, `X_C = {a,g}`, `X_D = {g,b}`, `X_I = {f,a,g}`. `A` writes `f`
+(`u'`, delayed on its way to `I`), then `e`. `B` applies `e` and writes `a`; `C` applies that and
+writes `g`; `D` applies that and writes `g` (`u`). Then `u' ↪ u` and `e_AI ∈ E_D` (triangle
+`D, I, A`). But `e_AI ∉ E_C` (`X_C ⊆ X_I`, so condition (iii) fails on every loop through `C`), so
+`C` drops the information and `T[e_AI] = 0 < 1 = T'[e_AI]`. Safety is not violated: `B`'s and
+`C`'s updates also go to `I` and must be applied first. The lemma's proof also assumes that causal
+chains form simple loops.
+
+### ❌ Footnote 2 (the algorithm satisfies Constraint 1)
+Footnote 2's claim that the algorithm's timestamp is a function of the causal past (a *set* of updates) is false: on six replicas, two executions give replica `0` the same causal past but different `τ₀[e_25]` (`Footnote2.footnote_2_false`).
+
+**Impact.** The lower bound of Section 4 (which assumes Constraint 1) does not apply to the paper's
+algorithm in general. Not a headline claim.
+
+**Details.** Take six replicas with `X₀ = {e,b}`, `X₁ = {a,b}`, `X₂ = {a,c}`, `X₃ = {c,d}`,
+`X₄ = {e,d}`, `X₅ = {c,e,d}`. Replicas `2, 3, 4, 5` write once each. In both executions replica `0`
+ends up with the same causal past (all four updates). In one, `2`'s update reaches `0` through `5`,
+which tracks `e_25`; in the other, only through `4`, which does not. So `τ₀[e_25]` is `1` vs. `0`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 5 and Theorem 3 (safety of the algorithm)
+The proof of Lemma 5, and with it Theorem 3, rests on the false Lemma 4.
+
+**Impact.** Statements true; new proof (`chain_main`, `lemma_5`, `theorem_3_safety`).
+
+**Repair.** We replace it by a strong induction on the length of a causal chain
+`a ↪ v₀ ↪ ⋯ ↪ v_m = u`. If a replica repeats, or an intermediate update also goes to the receiver
+`i`, the chain gets shorter (the latter by safety of earlier steps). Otherwise, either every replica
+on the chain tracks `e_ji` and the counter reaches `u`'s timestamp, or the chain closes with `i`
+into a simple loop that is not a `(p_q, e_ji)`-loop. Each of the three failing conditions of
+Definition 6 then exhibits an update sent directly further down the chain, which again shortens it.
+
+### 🛠️ Theorem 1 (necessity of tracking every timestamp-graph edge)
+In Case 2 applying `u₁` also brings `j`'s whole causal past into `i`'s graph, so the two graphs differ in more than updates on `e_ji`, and Case 3 delays all other messages "indefinitely", which breaks its liveness arguments.
+
+**Impact.** Statement true; repaired for every deterministic metadata algorithm and every quiescent
+state `R₀` (`Necessity.theorem_1`).
+
+**Details.** Also, in Case 3 an earlier update on the path `l₁ … l_s` may already reach `k`, and in
+Case 3.2 the execution without `u₀` loses `j`'s causal past.
+
+**Repair.** Both executions share a first update `u_A` of `j`, which `k` applies, and one execution
+adds a second update `u_B`. Every relay applies all updates sent to it (liveness forces this). The
+critical message is the first path update stored at `k`. The two executions are compared by an
+explicit simulation.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

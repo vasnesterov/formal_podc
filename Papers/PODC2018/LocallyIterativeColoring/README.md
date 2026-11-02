@@ -14,42 +14,67 @@ rounds), is correct. Two other claims are false. The introduction's `2p + 1`-rou
 
 ## Mistakes in the paper
 
-* **Section 7: Algorithm 3AG does not terminate; Corollaries 7.2 and 7.3 are false.** Take `K₂` with
-  the proper colouring `⟨1,0,0⟩`, `⟨1,0,1⟩`. The two vertices always have the same `b`. So in every
-  round both conflict, both move to `⟨1, b+1, ·⟩`, and `c` never becomes `0`. This holds for every
-  `p ≥ 2`, including the paper's `p ≥ 3Δ + 1` and `p ≥ 2Δ + 2`. The termination argument says
-  "each neighbour may have a conflicting `b_u` at most three times". It assumes that two neighbours
-  in the same phase with the same `c` have different `b`. That is forced by properness in 2-D AG,
-  but in 3-D, `⟨c, b⟩` can coincide while only `a` differs. The phase-based alternative at the
-  start of Section 7 is not affected (`threeAG_never_finalizes`).
-* **Section 1.2: the `2p + 1`-round claim is false.** The intro says: from a proper
-  `(Δ+1)²`-colouring with `p = Δ + 1` prime, `2p + 1` rounds of AG over `GF(p)` give a proper
-  `(Δ+1)`-colouring. Counterexample: a tree on 16 vertices with `Δ = 4`, `p = 5`. After 11 rounds
-  vertex 0 still has colour `⟨1,1⟩`, 6 colours are in use, and vertex 0 finalizes only after 13
-  rounds. (On paths, `Δ = 2`, the claim does hold.) The argument breaks because with `q = Δ + 1`, a
-  neighbour that finalizes inside a window of `q` rounds can conflict twice in that window, so a
-  window may have no free round. Correct bound: for any prime `q > Δ`, everything is final after
-  `(Δ + 1)·q` rounds. Section 3 itself correctly assumes `q > 2Δ` (`intro_claim_false`;
-  `ag_final_of_lt`).
-* **Section 5's condition on `q` is too weak for the cited argument (not refuted).** Edge colouring
-  runs AG on the line graph, whose degree is `Δ_L ≤ 2Δ − 2`. Section 5 only requires `q ≥ 2Δ − 1`,
-  i.e. `q > Δ_L`. That gives our `O(Δ²)` bound, whereas Corollary 3.5's `O(Δ)` argument needs
-  `q > 2Δ_L`. The result is morally right with a larger prime. We did not look for a counterexample.
-* **Proof gaps with true statements.**
-  * Lemma 3.2 overlooks the case where the conflicting vertex already has `a = 0`. It is still true,
-    since then the second coordinates differ.
-  * Corollary 3.13's proof needs "each neighbour blocks at most one index per round", but never
-    says so. It follows from Lemma 3.11 for working neighbours and from `j = c_u` for final ones.
-    We count blocked (round, index) pairs instead.
-  * Section 4.1's round-independent step: the paper does not check that the extra recolouring rule
-    leaves the AG analysis intact. It does, because the rule's guard (all neighbours final) means a
-    final vertex with a working neighbour never recolours.
-* **Slips.**
-  * Section 3.1 picks a prime `√k ≤ q ≤ 2√k` but then uses `q > 2Δ`; we use the least prime above
-    `max(2Δ, ⌊√k⌋)`.
-  * Algorithms 1 and 2 loop one round longer than needed.
-  * Refine-AG's conflict definition has `b_u` for `b_v`, and index ranges `j ≤ k` for `j < k`.
-  * The final-state case of Lemma 3.12 swaps `u` and `v`.
+### ❌ Section 7, Algorithm 3AG (Corollaries 7.2 and 7.3)
+Algorithm 3AG never terminates on `K₂` with the proper colouring `⟨1,0,0⟩`, `⟨1,0,1⟩`, for every `p ≥ 2`, so Corollaries 7.2 and 7.3 are false (`threeAG_never_finalizes`).
+
+**Impact.** Refutes the 3-D variant of Section 7, including `p ≥ 3Δ + 1` and `p ≥ 2Δ + 2`. The
+phase-based alternative at the start of Section 7 is not affected, and neither is the core of the
+paper (Section 3).
+
+**Details.** The two vertices always have the same `b`. So in every round both conflict, both move
+to `⟨1, b+1, ·⟩`, and `c` never becomes `0`. The termination argument says "each neighbour may have a
+conflicting `b_u` at most three times". It assumes that two neighbours in the same phase with the
+same `c` have different `b`. That is forced by properness in 2-D AG, but in 3-D, `⟨c, b⟩` can
+coincide while only `a` differs.
+
+### ❌ Section 1.2 (`2p + 1` rounds of AG for `p = Δ + 1`)
+The introduction's claim that `2p + 1` rounds of AG over `GF(p)`, with `p = Δ + 1` prime, turn a proper `(Δ+1)²`-colouring into a proper `(Δ+1)`-colouring is false on a 16-vertex tree with `Δ = 4`, `p = 5` (`intro_claim_false`).
+
+**Impact.** An explicit claim of the introduction, not used later: Section 3 itself correctly
+assumes `q > 2Δ`. A correct bound with `q = Δ + 1` is `(Δ + 1)·q` rounds (`ag_final_of_lt`).
+
+**Details.** After 11 rounds vertex 0 still has colour `⟨1,1⟩`, 6 colours are in use, and vertex 0
+finalizes only after 13 rounds. (On paths, `Δ = 2`, the claim does hold.) The argument breaks
+because with `q = Δ + 1`, a neighbour that finalizes inside a window of `q` rounds can conflict
+twice in that window, so a window may have no free round.
+
+**Repair.** For any prime `q > Δ`, everything is final after `(Δ + 1)·q` rounds (`ag_final_of_lt`).
+
+### ⚠️ Section 5 (edge colouring: the condition on `q`)
+Section 5 only requires `q ≥ 2Δ − 1`, i.e. `q > Δ_L` for the line graph, but the cited `O(Δ)` argument of Corollary 3.5 needs `q > 2Δ_L`, so the bound is unestablished (not refuted).
+
+**Impact.** Morally right with a larger prime (still `O(Δ)`); under the stated condition our bound
+is `O(Δ²)`. We did not look for a counterexample.
+
+**Details.** Edge colouring runs AG on the line graph, whose degree is `Δ_L ≤ 2Δ − 2`.
+
+### Typos and slips
+- Section 3.1 picks a prime `√k ≤ q ≤ 2√k` but then uses `q > 2Δ`; we use the least prime above
+  `max(2Δ, ⌊√k⌋)`.
+- Algorithms 1 and 2 loop one round longer than needed.
+- Refine-AG's conflict definition has `b_u` for `b_v`, and index ranges `j ≤ k` for `j < k`.
+- The final-state case of Lemma 3.12 swaps `u` and `v`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 3.2 (properness of AG)
+The proof overlooks the case where the conflicting vertex already has `a = 0`.
+
+**Impact.** Statement true: then the second coordinates differ (`ag_isProper`).
+
+### 🛠️ Corollary 3.13 (Refine-AG running time)
+The proof needs "each neighbour blocks at most one index per round", but never says so.
+
+**Impact.** Statement true; repaired (`corollary_3_13`, `corollary_3_13_paper`).
+
+**Details.** It follows from Lemma 3.11 for working neighbours and from `j = c_u` for final ones. We
+count blocked (round, index) pairs instead.
+
+### 🛠️ Section 4.1 (round-independent step)
+The paper does not check that the extra recolouring rule leaves the AG analysis intact.
+
+**Impact.** Statement true (`uniform_isProper`, `uniform_le`): the rule's guard (all neighbours
+final) means a final vertex with a working neighbour never recolours.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

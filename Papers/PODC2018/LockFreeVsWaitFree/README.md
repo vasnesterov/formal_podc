@@ -12,22 +12,7 @@ are not formalized.
 
 ## Mistakes in the paper
 
-We found no mistakes. Some steps of Section 5 are informal, and we made them precise:
-
-* **Lemma 10: "since A is wait-free, eventually we reach …".** Proof sketch; the statement is true.
-  We give the full argument. If every bivalent execution had an extension (without `p₀`) after
-  which `p₀`'s next step is not univalent, iterating would build an infinite admissible execution.
-  In it `p₀` would stay pending forever while taking infinitely many steps, contradicting
-  wait-freedom (`exists_biv_univ`, `exists_critical`).
-* **Lemma 8, case `n > 2`.** The "otherwise" branch uses an infinite solo run of some `q` that
-  never writes `R`, and then needs a critical `q`-extension (Definition 4). This is unnecessary.
-  We stop each solo run once the process is about to write `R` or has completed `k + 3` operations,
-  where `k` is fixed by `1/2^k < |v − v'|`. The finite run already gives the contradiction of
-  Theorem 11, Case 2 (`Ctx.build`).
-* **Lemma 8, "w.l.o.g. `p₁`" and the case split.** Steps that access no memory (invocations,
-  responses) are not discussed. Our case split is semantic: does `q`'s step write the object
-  accessed by `p₀`'s step? It covers all steps. The case `n = 2` needs no separate treatment: the
-  window argument with the block `p₀, p₂, …, p_{n-1}` reduces to `p₀` alone.
+No mistakes in the statements.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -52,6 +37,22 @@ Full list of differences (including modelling choices and minor imprecisions): [
   `theorem_11_window` is the unrestricted form for window registers.
 * No crashes are needed, and the adversary is the scheduler. Since the statement is an
   impossibility, crash-freedom only makes it stronger.
+
+**Proof remarks.** Some steps of Section 5 are informal, and we made them precise:
+* **Lemma 10: "since A is wait-free, eventually we reach …".** Proof sketch; the statement is true.
+  We give the full argument. If every bivalent execution had an extension (without `p₀`) after
+  which `p₀`'s next step is not univalent, iterating would build an infinite admissible execution.
+  In it `p₀` would stay pending forever while taking infinitely many steps, contradicting
+  wait-freedom (`exists_biv_univ`, `exists_critical`).
+* **Lemma 8, case `n > 2`.** The "otherwise" branch uses an infinite solo run of some `q` that
+  never writes `R`, and then needs a critical `q`-extension (Definition 4). This is unnecessary.
+  We stop each solo run once the process is about to write `R` or has completed `k + 3` operations,
+  where `k` is fixed by `1/2^k < |v − v'|`. The finite run already gives the contradiction of
+  Theorem 11, Case 2 (`Ctx.build`).
+* **Lemma 8, "w.l.o.g. `p₁`" and the case split.** Steps that access no memory (invocations,
+  responses) are not discussed. Our case split is semantic: does `q`'s step write the object
+  accessed by `p₀`'s step? It covers all steps. The case `n = 2` needs no separate treatment: the
+  window argument with the block `p₀, p₂, …, p_{n-1}` reduces to `p₀` alone.
 
 **Main results in Lean.** (namespace `Podc.LockFreeVsWaitFree`)
 
