@@ -17,26 +17,41 @@ bound of `2^w` poised processes per register, and Claim 1 misses one case.
 
 ## Mistakes in the paper
 
-* **Under-specified definition of "poised" (§4) — the final count needs a fix.** Condition (1)
-  for FAIs says "fewer than `2^w` processes poised on `Rᵢ`". Condition (2) for `write(x)` only
-  forbids a second poised `write(x)`. Under this literal definition the proof's case split is
-  exactly the negation of "poised", and Claim 1 works with `≥ 2^w` poised processes, so the
-  argument goes through. But a register can then collect up to `2^w` FAIs plus `2^w` distinct
-  writes, and the final count "at most `2^w` processes poised on every register" fails: the
-  argument yields only `k·2^{w+1} + k + 1`. Adding "fewer than `2^w` processes are poised" to
-  condition (2) as well gives the stated bound `k·2^w + k + 1` (`theorem_4_1`).
-* **Claim 1: proof gap, statement true.** The pigeonhole step ("one of `x, x−1, …, x−f` is a poised
-  write value") fails when all `2^w` poised primitives are FAIs, because then no write is poised.
-  The register can still be set to any `x` with fewer than `2^w` of those FAIs (`claim1` covers
-  both cases).
-* **Imprecise use of "wait-free" for Algorithm 2.** The paper says the algorithm "remains
-  wait-free since the object produces a finite number of distinct identifiers". This argument
-  already relies on a bounded number of calls, which is the regime where correctness is claimed.
-  It is not standard wait-freedom: with unboundedly many calls, a process can starve in the
-  `repeat` loop. We prove wait-freedom for every bound on the number of invocations
-  (`alg_waitFreeUpTo`). Algorithm 1 is wait-free unconditionally (`alg1_waitFree`).
-* **Small slip.** §3, first variation: "since `k' ≥ k/2`, `B ≥ k/2·2^w`" with `B = (k'−1)·2^w`
-  does not follow as written. It is true since `k' − 1 ≥ k/2` (`variation_bound`).
+### ⚠️ §4, definition of "poised" (Theorem 4.1's final count)
+Condition (2) of "poised" for `write(x)` lacks the bound "fewer than `2^w` processes poised on `Rᵢ`"
+that condition (1) has for FAIs, so up to `2^{w+1}` processes can be poised on one register and the
+argument yields only `k·2^{w+1} + k + 1`, not the stated `k·2^w + k + 1`.
+
+**Impact.** A local fix: adding "fewer than `2^w` processes are poised" to condition (2) as well gives
+the stated bound `k·2^w + k + 1` (`theorem_4_1`). The lower-bound argument is otherwise sound.
+
+**Details.** Condition (1) for FAIs says "fewer than `2^w` processes poised on `Rᵢ`". Condition (2) for
+`write(x)` only forbids a second poised `write(x)`. Under this literal definition the proof's case split
+is exactly the negation of "poised", and Claim 1 works with `≥ 2^w` poised processes, so the argument
+goes through. But a register can then collect up to `2^w` FAIs plus `2^w` distinct writes, and the final
+count "at most `2^w` processes poised on every register" fails.
+
+### ⚠️ Algorithm 2 ("remains wait-free")
+The paper says Algorithm 2 "remains wait-free since the object produces a finite number of distinct
+identifiers", but with unboundedly many calls a process can starve in the `repeat` loop, so this is not
+standard wait-freedom.
+
+**Impact.** The argument already relies on a bounded number of calls, which is the regime where
+correctness is claimed; we prove wait-freedom for every bound on the number of invocations
+(`alg_waitFreeUpTo`). Algorithm 1 is wait-free unconditionally (`alg1_waitFree`).
+
+### Typos and slips
+- §3, first variation: "since `k' ≥ k/2`, `B ≥ k/2·2^w`" with `B = (k'−1)·2^w` does not follow as
+  written. It is true since `k' − 1 ≥ k/2` (`variation_bound`).
+
+## Proof gaps (statements true)
+
+### 🛠️ Claim 1 (pigeonhole step)
+The step "one of `x, x−1, …, x−f` is a poised write value" fails when all `2^w` poised primitives are
+FAIs, because then no write is poised.
+
+**Impact.** Statement true: the register can still be set to any `x` with fewer than `2^w` of those
+FAIs (`claim1` covers both cases).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

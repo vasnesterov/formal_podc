@@ -13,24 +13,40 @@ statement that is wrong as written is Lemma 5.3, and only in the degenerate case
 
 ## Mistakes in the paper
 
-* **Lemma 5.3 fails for `Δ = 0`.** Lemma 5.3 claims that in a graph of maximum degree `Δ` whose
-  degree-`Δ` vertices are independent, some matching covers all degree-`Δ` vertices. A single
-  isolated vertex is a counterexample with `Δ = 0`. The case is degenerate, since Algorithm 2 uses the
-  lemma only for `Δ ≥ 8`. For `Δ ≥ 1` the lemma holds. Hall's theorem gives every degree-`Δ` vertex
-  its own neighbour using only "maximum degree `≤ Δ`". The independence hypothesis then makes the
-  chosen edges pairwise disjoint. (`lemma_5_3_false_of_zero`; repaired version `lemma_5_3_matching`)
-* **Theorem 3, ambiguous step.** The proof says each party "sequentially identifies edges connecting
-  two vertices of degree `Δ` and colors them using any color from the other party's palette". This
-  is correct only if *degree* means the current degree in the remaining graph. Then the deferred
-  edges form a maximal matching and one colour of the other palette suffices. If it means the
-  degree in the party's graph, all such edges are deferred at once and they need not be colourable
-  with `Δ` colours: take Alice holding a triangle with `Δ = 2`. We formalized the sequential reading
-  (`exists_deferral`), the one Algorithm 2 uses. The theorem is true.
-* Typos and slips:
-  - Proof of Theorem 2: "for `Δ < 7` apply Lemma 5.1 … otherwise, for `Δ ≥ 8`" leaves out `Δ = 7`.
-    Lemma 5.1 covers it.
-  - Lemma 5.2 says "the maximum degree of DG is 2" where "at most 2" is meant.
-  - Proof of Lemma 6.2, last display: `E_A ∩ E_B ∩ E_1 ∩ E_2` should be `E_A ∩ E_B ∩ E'_A ∩ E'_B`.
+### ⚠️ Lemma 5.3 for `Δ = 0` (matching covering the degree-`Δ` vertices)
+Lemma 5.3 fails for `Δ = 0`: a single isolated vertex has degree `Δ` and no matching covers it
+(`lemma_5_3_false_of_zero`).
+
+**Impact.** Degenerate: Algorithm 2 uses the lemma only for `Δ ≥ 8`, and for `Δ ≥ 1` the lemma holds
+(`lemma_5_3_matching`).
+
+**Details.** Lemma 5.3 claims that in a graph of maximum degree `Δ` whose degree-`Δ` vertices are
+independent, some matching covers all degree-`Δ` vertices.
+
+**Repair.** For `Δ ≥ 1`, Hall's theorem gives every degree-`Δ` vertex its own neighbour using only
+"maximum degree `≤ Δ`". The independence hypothesis then makes the chosen edges pairwise disjoint.
+(`lemma_5_3_matching`)
+
+### Typos and slips
+- Proof of Theorem 2: "for `Δ < 7` apply Lemma 5.1 … otherwise, for `Δ ≥ 8`" leaves out `Δ = 7`.
+  Lemma 5.1 covers it.
+- Lemma 5.2 says "the maximum degree of DG is 2" where "at most 2" is meant.
+- Proof of Lemma 6.2, last display: `E_A ∩ E_B ∩ E_1 ∩ E_2` should be `E_A ∩ E_B ∩ E'_A ∩ E'_B`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 3 (ambiguous deferral step)
+The proof's step "sequentially identifies edges connecting two vertices of degree `Δ` and colors them
+using any color from the other party's palette" is correct only if *degree* means the current degree
+in the remaining graph.
+
+**Impact.** Statement true; we formalized the sequential reading (`exists_deferral`), the one
+Algorithm 2 uses.
+
+**Details.** With the current-degree reading the deferred edges form a maximal matching and one colour
+of the other palette suffices. If it means the degree in the party's graph, all such edges are
+deferred at once and they need not be colourable with `Δ` colours: take Alice holding a triangle with
+`Δ = 2`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
