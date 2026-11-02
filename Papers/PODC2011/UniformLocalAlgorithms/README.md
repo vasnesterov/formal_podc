@@ -14,41 +14,83 @@ matchings. With matchings encoded by partner identities it is a pruning algorith
 
 ## Mistakes in the paper
 
-* **Observation 3.3 is false.** In the paper, `u` and `v` are *matched* if they are adjacent, output the
-  same value, and no other neighbour of `u` or `v` outputs that value. Take the path `v₀ — u₀ — u — v`
-  with tentative output `(5, 5, 1, 2)`. `P_MM` prunes `W = {v₀, u₀}` (they are matched; `u` and `v` are
-  neither matched nor surrounded by matched nodes). The residual edge `u — v` is correctly solved by
-  `(5, 5)`. The combined output `(5, 5, 5, 5)` matches nobody, so gluing fails. A solution of the
-  residual graph may reuse the values of pruned nodes, and the paper's "matched" notion looks at
-  neighbours' values. This fails for any new inputs the pruning algorithm might assign
-  (`observation_3_3_false`). Fix: output the partner's identity. The same pruning rule is then a pruning
-  algorithm, and it needs 2 rounds instead of 3 (`observation_3_3_repaired`). Corollary 1(vi) holds for
-  this encoding (`corollary_1_vi`).
-* **Theorem 3: the proof's inverse functions are undefined.** The proof sets
-  `g_j⁻¹(x) = min g_j⁻¹({x})` and uses `g_j(g_j⁻¹(x)) = x`. An ascending `g_j` need not take the value
-  `x`, and the argument mixes reals with integer coordinates. Repair: take `g_j⁻¹(x) = max {y : g_j(y) ≤ x}`.
-  We prove Theorem 3 by a direct reduction to Theorem 1: guesses for the correctness parameters `Γ`
-  are computed from guesses for the time parameters `Λ`. This needs only `Λ`-monotone pruning, not
-  `Λ ∪ Γ` (`theorem_3`).
-* **Theorem 2: an unjustified step in the expected-time bound.** The proof claims `α_{i+1} ≤ K·α_i`
-  "since `s_f` is moderately slow", where `α_i` is the number of rounds of the first `i` iterations of
-  `τ`. This does not follow: only `|S_f(2^j)| ≤ s_f(2^j)` is known, and the actual sizes can be far
-  smaller for some `j` and then jump. Repair: use the upper bound `α_{s+i} ≤ C·s_f(2^s)·2^s·(2a)^i`
-  (`a` is the moderate-slowness constant). With the failure bound `(1−ρ)^{i(i+1)/2}` the series still
-  converges, so the claimed bound holds (`theorem_2`).
-* **Corollaries 3 and 4 apply the theorems to families that are not closed under inclusion.**
-  Section 2 requires every family to be closed under inclusion, and a pruning algorithm must map the
-  family into itself. The families `F_large`, `F_med` and "arboricity `o(√log n)`" are not closed
-  (deleting isolated nodes lowers `n`). The bounds can be recovered by working on all graphs; we
-  sketch this for Corollary 3 in [differencies.md](differencies.md) but did not formalize it. Corollary 4
-  also needs the cited algorithm's time bound `f(ñ)` to hold for *every* good arboricity guess,
-  including `ã = ñ`. The paper does not argue this; our `corollary_4` assumes it.
-* **Degenerate cases and slips.**
-  * Theorems 1–4 claim `O(f*·s_f(f*))` and `O(f_min)`. Both fail when `f* < 1`, since the transformed
-    algorithm always spends at least one iteration. We prove `C·(f*·s_f(⌊f*⌋) + 1)` and `C·(f_j + 1)`.
-  * Observation 3.2 needs `β ≥ 1`. The `(2,0)` case is degenerate.
-  * Observation 3.3 says "monotone with respect to any parameter". It should say any *non-decreasing*
-    parameter.
+### ❌ Observation 3.3 (`P_MM` is a pruning algorithm for maximal matching)
+`P_MM` does not satisfy gluing for the paper's own encoding of matchings: on the path `v₀ — u₀ — u — v`
+with tentative output `(5, 5, 1, 2)` it prunes `{v₀, u₀}`, the residual edge `u — v` is solved by
+`(5, 5)`, and the combined output `(5, 5, 5, 5)` matches nobody (`observation_3_3_false`).
+
+**Impact.** A numbered observation, not a headline: with matchings encoded by partner identities the
+same rule is a pruning algorithm, so Corollary 1(vi) survives (`observation_3_3_repaired`,
+`corollary_1_vi`).
+
+**Details.** In the paper, `u` and `v` are *matched* if they are adjacent, output the same value, and
+no other neighbour of `u` or `v` outputs that value. In the example, `v₀` and `u₀` are matched, while
+`u` and `v` are neither matched nor surrounded by matched nodes, so `P_MM` prunes `W = {v₀, u₀}`. A
+solution of the residual graph may reuse the values of pruned nodes, and the paper's "matched" notion
+looks at neighbours' values. This fails for any new inputs the pruning algorithm might assign.
+
+**Repair.** Output the partner's identity. The same pruning rule is then a pruning algorithm, and it
+needs 2 rounds instead of 3 (`observation_3_3_repaired`). Corollary 1(vi) holds for this encoding
+(`corollary_1_vi`).
+
+### ⚠️ Theorems 1–4 (bounds `O(f*·s_f(f*))` and `O(f_min)` when `f* < 1`)
+The claimed bounds fail when `f* < 1`, since the transformed algorithm always spends at least one
+iteration.
+
+**Impact.** Degenerate case; we prove `C·(f*·s_f(⌊f*⌋) + 1)` and `C·(f_j + 1)` (`theorem_1`,
+`theorem_2`, `theorem_3`, `theorem_4`).
+
+### ⚠️ Observation 3.2 (`β = 0`)
+Observation 3.2 needs `β ≥ 1`.
+
+**Impact.** Degenerate: the `(2,0)` case.
+
+### ⚠️ Observation 3.3 ("monotone with respect to any parameter")
+The pruning algorithm is monotone only with respect to *non-decreasing* parameters, not "any
+parameter".
+
+**Impact.** Typo with evident intent; formalized for any non-decreasing parameter
+(`observation_3_3_repaired`).
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 3 (inverse functions in the proof)
+The proof sets `g_j⁻¹(x) = min g_j⁻¹({x})` and uses `g_j(g_j⁻¹(x)) = x`, but an ascending `g_j` need
+not take the value `x`.
+
+**Impact.** Statement true; repaired (`theorem_3`).
+
+**Details.** The argument also mixes reals with integer coordinates.
+
+**Repair.** Take `g_j⁻¹(x) = max {y : g_j(y) ≤ x}`. We prove Theorem 3 by a direct reduction to
+Theorem 1: guesses for the correctness parameters `Γ` are computed from guesses for the time
+parameters `Λ`. This needs only `Λ`-monotone pruning, not `Λ ∪ Γ` (`theorem_3`).
+
+### 🛠️ Theorem 2 (expected-time bound)
+The proof claims `α_{i+1} ≤ K·α_i` "since `s_f` is moderately slow", where `α_i` is the number of
+rounds of the first `i` iterations of `τ`, but this does not follow.
+
+**Impact.** Statement true; repaired (`theorem_2`).
+
+**Details.** Only `|S_f(2^j)| ≤ s_f(2^j)` is known, and the actual sizes can be far smaller for some
+`j` and then jump.
+
+**Repair.** Use the upper bound `α_{s+i} ≤ C·s_f(2^s)·2^s·(2a)^i` (`a` is the moderate-slowness
+constant). With the failure bound `(1−ρ)^{i(i+1)/2}` the series still converges, so the claimed bound
+holds (`theorem_2`).
+
+### 🛠️ Corollaries 3 and 4 (families not closed under inclusion)
+The corollaries apply the theorems to the families `F_large`, `F_med` and "arboricity `o(√log n)`",
+which are not closed under inclusion (deleting isolated nodes lowers `n`), as Section 2 requires.
+
+**Impact.** The bounds can be recovered by working on all graphs; we sketch this for Corollary 3 in
+[differencies.md](differencies.md) but did not formalize it. `corollary_4` is proved under one extra
+hypothesis (below).
+
+**Details.** Section 2 requires every family to be closed under inclusion, and a pruning algorithm
+must map the family into itself. Corollary 4 also needs the cited algorithm's time bound `f(ñ)` to
+hold for *every* good arboricity guess, including `ã = ñ`. The paper does not argue this; our
+`corollary_4` assumes it.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

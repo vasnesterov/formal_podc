@@ -14,40 +14,75 @@ of Thm 4.1 and Thm 5.1 contain wrong steps, which we repaired.
 
 ## Mistakes in the paper
 
-* **Thm 4.1 (proof gap; statement true).** The proof takes `kᵢ = 2ⁱ`, `Dᵢ = √(T kᵢ/φ(kᵢ))` and the shells
-  `Sᵢ = B(Dᵢ) \ B(Dᵢ₋₁)`. It then claims `|Sᵢ|/kᵢ = Ω(T/φ(kᵢ))` "since `φ(kᵢ) = O(i)`". This needs
-  `Dᵢ > Dᵢ₋₁`, i.e. `φ(2ⁱ) < 2φ(2ⁱ⁻¹)`, and even then a quantitative version of it. Neither follows from
-  `φ(k) = O(log k)`: an `O(log k)` function may jump by a factor 4 at some `i`, and then `Sᵢ = ∅`. Our repair
-  replaces the radii by their running maxima `R'ᵢ = max_{j≤i} Rⱼ`. A node within distance `Rⱼ`, `j ≤ i`, is still
-  visited with probability `≥ 1/(2·2ⁱ)`. The shells are then combined by Abel summation. This proves the paper's
-  intermediate claim for *every* `φ`: if a uniform algorithm is `φ`-competitive, then `∑ᵢ 1/φ(2ⁱ) ≤ 320`
-  (`sum_inv_le_of_isCompetitive`, `summable_inv_of_isCompetitive`). Thm 4.1 follows (`theorem_4_1`). The bound
-  also excludes, e.g., `φ = O(log k · log log k)`, since `∑ 1/(i log i)` diverges (this remark is not formalized).
-  (For `O(log k)` alone, the paper's proof can also be saved by running it with `φ` replaced by its bound
-  `c·log k`, for which the radii do increase; the gap is therefore a fixable proof step, not a false claim.)
-* **Thm 5.1 (wrong constants in the proof; statement true).** With `α = 12β/c` and `λ = 4βD^{1+δ}/(ck)`, the
-  hypothesis `k > αD^δ` gives only `λ < D/3`, not the claimed `λ < D/4`. So "`√(λD) < D/2`, hence
-  `3D/4 < d(u) < 5D/4`" does not follow. Also, "there are at least `λD/2` nodes in `B_λ`" is false for small
-  radii. For example, radius `√(λD)/2 = 1.9` gives `λD/2 ≈ 7.2`, but the ball has 5 nodes. Both slips only
-  change constants. We prove the theorem with `α = 16σγ`, `γ = 2·(5/4)^{2+δ}·ln(1/ε)/c` (`theorem_5_1`). The
-  restriction `δ ≤ 0.8` is not needed.
-* **Algorithms undefined at one point (typo-level, R3).** In Algorithm 1 (Thm 3.3) the phase `j = 0` uses
-  `D_{i,0} = √(2^i/0^{1+ε})` and `t_{i,0} = 2^{i+2}/0^{1+ε}`. For `k = 1` the proof uses exactly this phase. We
-  use `(j+1)^{1+ε}`. In Algorithm 2 (Thm 5.1), `p(u) = c/d(u)^{2+δ}` is infinite at the source. We set
-  `p(s) = 0`. Also, "`O(log^{1+ε} k)`-competitive" literally means a bound `0` for `k = 1`. We prove
-  `C (1 + log₂ k)^{1+ε} (D + D²/k)` (`theorem_3_3`).
-* **Thm 5.1's wording.** "With probability at least `1 − ε`, the *expected* running time is `O(…)`" is
-  meaningless as written. The proof shows that with probability `≥ 1 − ε` the running time is `O(D + D^{2+δ}/k)`,
-  and this is what we prove.
-* **Smaller gaps and imprecisions.**
-  - Thm 4.2's proof bounds `φ(k̃)` by the number of admissible `i` in
-    `[⌈(1−ε)/2 · log k̃⌉, ⌊½ log k̃⌋]`. This range may be empty when `ε(k̃) log k̃ < 2`. Then `Ω(ε log k)`
-    needs the trivial bound `φ = Ω(1)` (footnote 2). We add it (`one_div_le_of_competitive`).
-  - Thm 3.3's proof says "at least half of the ball of radius `√t_{i,j}` around the treasure is contained in
-    `B(D_{i,j})`". The fraction can be less than `1/2`; a constant fraction suffices (`card_near_ge`).
-    The proof also uses radius `√t` where its own spiral convention gives `√t/2`.
-  - Footnote 2 bounds the worst case over treasures at distance *at most* `D`. For a fixed exact distance the
-    `D²/k` bound is false in general, but competitiveness quantifies over all `D`.
+### ⚠️ Algorithm 1 and Thm 3.3 (phase `j = 0`, `k = 1`)
+Algorithm 1 is undefined in every phase `j = 0`, which uses `D_{i,0} = √(2^i/0^{1+ε})` and
+`t_{i,0} = 2^{i+2}/0^{1+ε}`, and for `k = 1` the proof uses exactly this phase.
+
+**Impact.** Typo with evident intent: we use `(j+1)^{1+ε}` and prove Thm 3.3 as
+`C (1 + log₂ k)^{1+ε} (D + D²/k)` (`theorem_3_3`).
+
+**Details.** Also, "`O(log^{1+ε} k)`-competitive" literally means a bound `0` for `k = 1`
+(degenerate); the `1 +` in our bound handles it.
+
+### ⚠️ Algorithm 2 (Thm 5.1, distribution at the source)
+In Algorithm 2, `p(u) = c/d(u)^{2+δ}` is infinite at the source `s`.
+
+**Impact.** Typo with evident intent: we set `p(s) = 0`.
+
+### ⚠️ Thm 5.1 (wording)
+"With probability at least `1 − ε`, the *expected* running time is `O(…)`" is meaningless as written.
+
+**Impact.** The proof shows the intended claim, that with probability `≥ 1 − ε` the running time is
+`O(D + D^{2+δ}/k)`, and this is what we prove (`theorem_5_1`).
+
+## Proof gaps (statements true)
+
+### 🛠️ Thm 4.1 (the shells need not be nested)
+The proof's claim `|Sᵢ|/kᵢ = Ω(T/φ(kᵢ))` "since `φ(kᵢ) = O(i)`" needs `Dᵢ > Dᵢ₋₁`, i.e.
+`φ(2ⁱ) < 2φ(2ⁱ⁻¹)`, which does not follow from `φ(k) = O(log k)`.
+
+**Impact.** Statement true; repaired, and the paper's intermediate claim is proved for *every* `φ`
+(`theorem_4_1`, `sum_inv_le_of_isCompetitive`).
+
+**Details.** The proof takes `kᵢ = 2ⁱ`, `Dᵢ = √(T kᵢ/φ(kᵢ))` and the shells
+`Sᵢ = B(Dᵢ) \ B(Dᵢ₋₁)`. Even `Dᵢ > Dᵢ₋₁` is not enough; it needs a quantitative version of it. An
+`O(log k)` function may jump by a factor 4 at some `i`, and then `Sᵢ = ∅`. (For `O(log k)` alone, the
+paper's proof can also be saved by running it with `φ` replaced by its bound `c·log k`, for which the
+radii do increase; the gap is therefore a fixable proof step, not a false claim.)
+
+**Repair.** Replace the radii by their running maxima `R'ᵢ = max_{j≤i} Rⱼ`. A node within distance
+`Rⱼ`, `j ≤ i`, is still visited with probability `≥ 1/(2·2ⁱ)`. The shells are then combined by Abel
+summation. This proves the paper's intermediate claim for *every* `φ`: if a uniform algorithm is
+`φ`-competitive, then `∑ᵢ 1/φ(2ⁱ) ≤ 320` (`sum_inv_le_of_isCompetitive`,
+`summable_inv_of_isCompetitive`). Thm 4.1 follows (`theorem_4_1`). The bound also excludes, e.g.,
+`φ = O(log k · log log k)`, since `∑ 1/(i log i)` diverges (this remark is not formalized).
+
+### 🛠️ Thm 5.1 (constants in the proof)
+With `α = 12β/c` and `λ = 4βD^{1+δ}/(ck)`, the hypothesis `k > αD^δ` gives only `λ < D/3`, not the
+claimed `λ < D/4`, so "`√(λD) < D/2`, hence `3D/4 < d(u) < 5D/4`" does not follow.
+
+**Impact.** Statement true; both slips only change constants (`theorem_5_1`).
+
+**Details.** Also, "there are at least `λD/2` nodes in `B_λ`" is false for small radii. For example,
+radius `√(λD)/2 = 1.9` gives `λD/2 ≈ 7.2`, but the ball has 5 nodes.
+
+**Repair.** We prove the theorem with `α = 16σγ`, `γ = 2·(5/4)^{2+δ}·ln(1/ε)/c` (`theorem_5_1`). The
+restriction `δ ≤ 0.8` is not needed.
+
+### 🛠️ Thm 4.2 and Thm 3.3 (smaller gaps)
+Thm 4.2's proof can range over an empty set of indices, and Thm 3.3's proof claims a "half of the
+ball" that can be less than half.
+
+**Impact.** Statements true; routine fixes (`one_div_le_of_competitive`, `card_near_ge`).
+
+**Details.**
+- Thm 4.2's proof bounds `φ(k̃)` by the number of admissible `i` in
+  `[⌈(1−ε)/2 · log k̃⌉, ⌊½ log k̃⌋]`. This range may be empty when `ε(k̃) log k̃ < 2`. Then
+  `Ω(ε log k)` needs the trivial bound `φ = Ω(1)` (footnote 2). We add it
+  (`one_div_le_of_competitive`).
+- Thm 3.3's proof says "at least half of the ball of radius `√t_{i,j}` around the treasure is
+  contained in `B(D_{i,j})`". The fraction can be less than `1/2`; a constant fraction suffices
+  (`card_near_ge`). The proof also uses radius `√t` where its own spiral convention gives `√t/2`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -90,6 +125,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Thm 5.1 | `theorem_5_1` | `Theorem51.lean` |
 | §2, footnote 2: `T = Ω(D + D²/k)` | `footnote_2` (counting part `sq_div_le`) | `Footnote.lean` |
 | Markov + one-node-per-step counting | `half_le_sum_visit`, `sum_visit_le` | `Basic.lean` |
+
+Footnote 2 bounds the worst case over treasures at distance *at most* `D`. For a fixed exact distance the
+`D²/k` bound is false in general, but competitiveness quantifies over all `D`, so this is harmless.
 
 **Not formalized.** The construction of the navigation primitives (walks, spirals) for the upper bounds. The
 memory remarks of §6 and the biological discussion.

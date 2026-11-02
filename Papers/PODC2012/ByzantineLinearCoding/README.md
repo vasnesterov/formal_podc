@@ -14,36 +14,55 @@ theorem. Lemma 2 holds once a typo in the field size is fixed. Lemma 1 is false 
 
 ## Mistakes in the paper
 
-* **Lemma 1 fails for small fields.** Lemma 1 says that for any `ρ_k ≤ U_k/2`, `M̃_H` is invertible with probability
-  at least `(1 − (n−f−1)/2^{L/ρ_k})^{ρ_k}`. Suppose `2^{L/ρ_k} < (n−f−1)/2` and `ρ_k` is even. Then the base
-  `1 − (n−f−1)/2^{L/ρ_k}` is below −1 and the bound exceeds 1. When the base is exactly −1, the lemma claims that
-  `M̃_H` is *always* invertible. Example: `n = 7`, `f = 2`, `H = K_5` with every link of capacity 2 (`U_k = 16`),
-  `ρ_k = 2`, `L = 2`. The field is then GF(2) and the bound is `(1 − 4/2)² = 1`, but the all-zero coding makes `M̃_H`
-  singular. The induction multiplies `Pr[M_q invertible] ≥ (1−w/q)^q` by the factor `1 − w/q`, which may be
-  negative. The lemma holds when `n−f−1 ≤ |F|`, and we prove it under that hypothesis. Theorem 1 only needs
-  `det M̃_H ≢ 0`, so it is unaffected. This is a minor issue: the paper states that NAB "is intended to be
-  used for sufficiently large L", Theorem 1 itself is only meaningful for `2^{L/ρ} > C(n,n−f)(n−f−1)ρ`, and in
-  that regime Lemma 1 holds (`lemma_1_false_small_field`; repaired: `TreePacking.lemma_1`).
-* **Appendix C.3: the invertibility argument for `A_q` has a gap.** The argument uses only three facts:
-  1. some column of `A_q` has a single nonzero entry;
-  2. every row has a nonzero entry;
-  3. no two columns have the same support.
+### ⚠️ Lemma 1 (invertibility probability of `M̃_H`, small fields)
+For `2^{L/ρ_k} < (n−f−1)/2` and even `ρ_k` the claimed bound `(1 − (n−f−1)/2^{L/ρ_k})^{ρ_k}` exceeds 1,
+and for `n = 7`, `f = 2`, `H = K_5` with all capacities 2, `ρ_k = 2`, `L = 2` (GF(2)) it equals 1
+although the all-zero coding makes `M̃_H` singular (`lemma_1_false_small_field`).
 
-  It never uses that the edges form a tree. The incidence matrix of the edges `(1,5), (2,3), (3,4), (4,2)` (root 5)
-  has all three properties and is singular. The claim is still true: if `D·A_q = 0`, then `D` takes equal values at
-  the two ends of every tree edge, and connectivity forces `D = 0`. Our proof uses exactly this, over any field
-  (`c3_argument_insufficient`; repaired: `TreePacking.det_A_ne_zero`).
-* Typos and small slips:
-  - Lemma 2 and the text before it take the diagonal entries from `GF(2^{ρ_k})` and give the bound `1 − w/2^{ρ_k}`.
-    The field is `GF(2^{L/ρ_k})`, so the bound is `1 − w/2^{L/ρ_k}`, as Lemma 2 is used in (16) (`lemma_2`).
-  - In (11) the first two blocks of `P_q` are both written `A_{q+1}S_{q+1,1}`. In (8) two blocks are written
-    `A_{ρ_k}C_{ρ_k,ρ_k}` instead of `A_{ρ_k}S_{ρ_k,p}`. (12)–(13) write `S_{1,k+1}` and `M_{k+1}` for `S_{1,q+1}`
-    and `M_{q+1}`.
-  - Proof of Lemma 2: `R` for `W`, and `det(S − R)`.
-  - The definition of `U_k` has `Ω` where it means `Ω̄_k`. `Ω_k` must consist of *induced* subgraphs, otherwise
-    `|Ω_1| = C(n, n−f)` and `U_k > 0` fail.
-  - Section 5.1 sets `ρ* = U_1/2`, which can be a non-integer. `ρ_k` must be an integer dividing `L`. Rescaling the
-    time unit (doubling all capacities) repairs this.
+**Impact.** Outside the paper's regime: NAB "is intended to be used for sufficiently large L", and
+Theorem 1, which only needs `det M̃_H ≢ 0`, is unaffected. The lemma holds when `n−f−1 ≤ |F|`
+(`TreePacking.lemma_1`).
+
+**Details.** When the base `1 − (n−f−1)/2^{L/ρ_k}` is exactly −1, the lemma claims that `M̃_H` is
+*always* invertible; when it is below −1 the bound exceeds 1. In the example (`U_k = 16`) the bound is `(1 − 4/2)² = 1`. The induction multiplies
+`Pr[M_q invertible] ≥ (1−w/q)^q` by the factor `1 − w/q`, which may be negative. Theorem 1 itself is
+only meaningful for `2^{L/ρ} > C(n,n−f)(n−f−1)ρ`, and in that regime Lemma 1 holds.
+
+**Repair.** We prove the lemma under the hypothesis `n−f−1 ≤ |F|` (`TreePacking.lemma_1`).
+
+### ⚠️ Lemma 2 (field size)
+Lemma 2 and the text before it take the diagonal entries from `GF(2^{ρ_k})` and give the bound
+`1 − w/2^{ρ_k}`, but the field is `GF(2^{L/ρ_k})`, so the bound is `1 − w/2^{L/ρ_k}`.
+
+**Impact.** Typo with evident intent: (16) uses Lemma 2 with the right field; we prove it for any
+finite field (`lemma_2`).
+
+### Typos and slips
+- In (11) the first two blocks of `P_q` are both written `A_{q+1}S_{q+1,1}`. In (8) two blocks are
+  written `A_{ρ_k}C_{ρ_k,ρ_k}` instead of `A_{ρ_k}S_{ρ_k,p}`. (12)–(13) write `S_{1,k+1}` and
+  `M_{k+1}` for `S_{1,q+1}` and `M_{q+1}`.
+- Proof of Lemma 2: `R` for `W`, and `det(S − R)`.
+- The definition of `U_k` has `Ω` where it means `Ω̄_k`. `Ω_k` must consist of *induced* subgraphs,
+  otherwise `|Ω_1| = C(n, n−f)` and `U_k > 0` fail.
+- Section 5.1 sets `ρ* = U_1/2`, which can be a non-integer. `ρ_k` must be an integer dividing `L`.
+  Rescaling the time unit (doubling all capacities) repairs this.
+
+## Proof gaps (statements true)
+
+### 🛠️ Appendix C.3 (`A_q` is invertible)
+The invertibility argument for `A_q` never uses that the edges form a tree, and the incidence matrix
+of the edges `(1,5), (2,3), (3,4), (4,2)` (root 5) satisfies all its premises yet is singular
+(`c3_argument_insufficient`).
+
+**Impact.** Statement true; repaired over any field (`TreePacking.det_A_ne_zero`).
+
+**Details.** The argument uses only three facts:
+1. some column of `A_q` has a single nonzero entry;
+2. every row has a nonzero entry;
+3. no two columns have the same support.
+
+**Repair.** If `D·A_q = 0`, then `D` takes equal values at the two ends of every tree edge, and
+connectivity forces `D = 0`. Our proof uses exactly this, over any field (`TreePacking.det_A_ne_zero`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
