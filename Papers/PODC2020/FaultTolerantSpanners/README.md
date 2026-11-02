@@ -14,20 +14,30 @@ stays true (when `kf ≥ n` the claimed subgraph exists trivially), so only the 
 
 ## Mistakes in the paper
 
-No substantive errors. Two minor slips, neither affecting any statement:
+No mistakes in the statements.
 
-* **Lemma 3 (weighted), "if" direction, case `p = 1`.** The paper writes
-  `d_{H\F}(u, v) = w(u, v) = d_{G\F}(u, v)`, but `H` need not contain the edge `uv`. What holds, and
-  suffices, is `d_{H\F}(u, v) ≤ t·w(u, v)` by hypothesis. We prove the full iff by a different
-  argument. A non-tight edge has a strictly lighter walk made of strictly lighter edges, so strong
-  induction on the number of lighter edges applies; no shortest paths are needed
-  (`isWeightedVFTSpanner_iff`).
-* **Lemma 7 assumes `f = o(n)`, but the estimate
-  `s(s−1)/(n(n−1)) ≥ (1−o(1))/(4((2k−1)f)²)` needs `kf = o(n)`,** since `k` may grow with `n`.
-  Harmless, because Theorem 8 is trivial when `kf = Ω(n)`. We replace the asymptotic lemma by exact
-  counting over all `s`-subsets: if `|B| ≤ D·m` and `2Ds ≤ n`, some `s`-set carries a subgraph of
-  girth `> 2k` with `m·s(s−1) ≤ 2n(n−1)·|E(H′)|`. A case split at `n < 8(2k−1)f` replaces "if
-  `f = Ω(n)` the theorem is trivial".
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 3 (weighted, "if" direction, case `p = 1`)
+The paper writes `d_{H\F}(u, v) = w(u, v) = d_{G\F}(u, v)`, but `H` need not contain the edge `uv`.
+
+**Impact.** Statement true; what holds, and suffices, is `d_{H\F}(u, v) ≤ t·w(u, v)` by hypothesis. We prove the
+full iff (`isWeightedVFTSpanner_iff`).
+
+**Repair.** We prove the full iff by a different argument. A non-tight edge has a strictly lighter walk made of
+strictly lighter edges, so strong induction on the number of lighter edges applies; no shortest paths are needed
+(`isWeightedVFTSpanner_iff`).
+
+### 🛠️ Lemma 7 (hypothesis `f = o(n)`)
+The lemma assumes `f = o(n)`, but the estimate `s(s−1)/(n(n−1)) ≥ (1−o(1))/(4((2k−1)f)²)` needs `kf = o(n)`, since
+`k` may grow with `n`.
+
+**Impact.** Harmless, because Theorem 8 is trivial when `kf = Ω(n)`; replaced by an exact form
+(`SimpleGraph.IsBlockingSet.exists_dense_subgraph`).
+
+**Repair.** We replace the asymptotic lemma by exact counting over all `s`-subsets: if `|B| ≤ D·m` and `2Ds ≤ n`,
+some `s`-set carries a subgraph of girth `> 2k` with `m·s(s−1) ≤ 2n(n−1)·|E(H′)|`. A case split at
+`n < 8(2k−1)f` replaces "if `f = Ω(n)` the theorem is trivial".
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

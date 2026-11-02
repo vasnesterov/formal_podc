@@ -16,59 +16,70 @@ the gap with a simpler construction that needs no sieving.
 
 ## Mistakes in the paper
 
-* **The W2R1 algorithm (Algorithms 1–2) is not atomic; MWA2 / Lemma 5 is false.** Take `S = 4`,
-  `t = 1`, `R = 1`, `W = 2`, initial value `0`.
-  1. Both writers query and see timestamp 0, so `w₁` writes `(1, w₁)` (value 1) and `w₂` writes
-     `(1, w₂)` (value 2).
-  2. `(1, w₁)` reaches `s₀, s₁, s₂` and `write(1)` returns.
-  3. Then the read starts, and `(1, w₂)` reaches `s₀, s₁`.
-  4. The read hears from `s₀, s₂, s₃`.
-     * `(1, w₂)` occurs in only one reply, so it is not admissible.
-     * `(1, w₁)` occurs at `s₀` and `s₂`, but at `s₀` its `updated` set is just `{w₁}`. The
-       server's current value there is `(1, w₂)`, so the reader is never recorded with `(1, w₁)`.
-       The intersection is `{w₁}`, and degree 2 fails.
-     * The read returns `0` although `write(1)` completed before it started.
+### ❌ §5.2 / Appendix A (the W2R1 algorithm, Algorithms 1–2; MWA2 / Lemma 5)
+The algorithm is not atomic: with `S = 4`, `t = 1`, `R = 1`, `W = 2`, a read that starts after `write(1)` has
+returned can return the initial value `0` (`W2R1.w2r1_not_linearizable`).
 
-  Lemma 5 claims that `(k, wᵢ)` is "admissible with degree 2" because the read sees it at
-  `S − 2t` servers. It forgets that the `updated` sets must also contain the reader. In the
-  single-writer algorithm this holds because the writer's value is always the current one. With
-  several writers a concurrent larger value hides it. The counterexample holds both for the
-  literal line 20 (record the reader only for the values in its `valQueue`) and for the
-  single-writer-style reading (also record it with the server's current value). The second
-  reading is the one that matters: under the literal one the algorithm already fails with a single
-  writer, because a first read is never recorded with a new value, so a completed `write(1)` seen
-  at only `S − 2t = 2` of the read's servers is never admissible. (`W2R1.w2r1_not_linearizable`)
+**Impact.** The sufficiency half of the claimed tight condition for W2R1 (`R < S/t − 2`) is not established; the
+main result, Theorem 1, is unaffected. Whether some repaired W2R1 algorithm exists for all `R < S/t − 2` is open
+here.
 
-  *Scope and further evidence (model checking, not in Lean).* A third reading records the reader
-  with *every* value the server holds. It defeats this execution, but it fails too, with
-  `S = 5`, `t = 1`, `R = 2` and a single writer. There a late (stale) read request records `r₂`
-  with a value `r₂` never saw, so `r₁` returns the new value and a later read of `r₂` returns the
-  old one (new–old inversion; Lemma 8's case (ii) is wrong). Only that reading *plus* per-reader
-  read counters, which are in the single-writer original but not in the paper's pseudo-code,
-  survived our exhaustive search at `S = 4` (and a non-exhaustive one at `S = 5, R = 2`). Even on
-  correct runs, Lemma 2, Lemma 6 and Corollary 1 are false, so the proof of MWA3 (Lemma 7) does
-  not stand either. Whether some repaired W2R1 algorithm exists for all `R < S/t − 2` is open
-  here. Scripts and traces: [scripts/](scripts/).
-* **§4 ("sieve-based construction", crucial-info model) does not prove what §3 needs.** The chain
-  argument of §3 assumes that the first round-trip `R₂⁽¹⁾` of the second read does not change the
-  value returned by the first read `R₁`. §3.3 uses this when it claims that `R₁` returns the same
-  value in `β'₀` as in `α_{i₁−1}` ("appending `R₂` should not change the return value of an
-  existing read"). But in `β'₀`, `R₂⁽¹⁾` reaches every server before `R₁⁽²⁾`, so `R₁` has not
-  finished. §4 then argues in a "crucial-info model": a server only holds the order "12"/"21" of
-  the two writes, and a first round-trip can only flip it. The "affected" servers are sieved out,
-  and at least 3 servers are said to remain. A general algorithm's servers can store arbitrary
-  information, so none of these steps follows. The statement is nevertheless true. **Fix:** the
-  first round-trip of `R₂` is *blind*: it is `r₂`'s first action, so its messages are fixed.
-  Include `R₂⁽¹⁾` (between `R₁⁽¹⁾` and `R₁⁽²⁾`) in every execution of chain `α`. In chains `β`,
-  `γ` let `r₂` ignore the *reply* of the critical server in round one, while its *request* is
-  still delivered. Then `R₁` behaves exactly as in chain `α`, and the zigzag chain of §3.4 goes
-  through unchanged. This is a proof gap with a true statement. (`theorem_1`, `zigzag`)
-* **Imprecise "skip".** "One round-trip skips server `s`" (§3.1) does not say whether the
-  request or the reply is delayed. The argument needs the reply variant for `R₂⁽¹⁾` (see above).
-* **Chain `α` and real time.** `α₀` is "W₁ precedes W₂" and `α_S` is "W₂ precedes W₁". From `α₂`
-  on, the writes must be concurrent (two servers see `W₂` first, yet `W₁` waits for `S − 1`
-  acknowledgements). Harmless: the end values come from sequential executions with the same server
-  logs (`ret_seq`).
+**Details.** Initial value `0`.
+1. Both writers query and see timestamp 0, so `w₁` writes `(1, w₁)` (value 1) and `w₂` writes `(1, w₂)` (value 2).
+2. `(1, w₁)` reaches `s₀, s₁, s₂` and `write(1)` returns.
+3. Then the read starts, and `(1, w₂)` reaches `s₀, s₁`.
+4. The read hears from `s₀, s₂, s₃`.
+   * `(1, w₂)` occurs in only one reply, so it is not admissible.
+   * `(1, w₁)` occurs at `s₀` and `s₂`, but at `s₀` its `updated` set is just `{w₁}`. The server's current value
+     there is `(1, w₂)`, so the reader is never recorded with `(1, w₁)`. The intersection is `{w₁}`, and degree 2
+     fails.
+   * The read returns `0` although `write(1)` completed before it started.
+
+Lemma 5 claims that `(k, wᵢ)` is "admissible with degree 2" because the read sees it at `S − 2t` servers. It
+forgets that the `updated` sets must also contain the reader. In the single-writer algorithm this holds because the
+writer's value is always the current one. With several writers a concurrent larger value hides it. The
+counterexample holds both for the literal line 20 (record the reader only for the values in its `valQueue`) and for
+the single-writer-style reading (also record it with the server's current value). The second reading is the one
+that matters: under the literal one the algorithm already fails with a single writer, because a first read is never
+recorded with a new value, so a completed `write(1)` seen at only `S − 2t = 2` of the read's servers is never
+admissible. (`W2R1.w2r1_not_linearizable`)
+
+*Scope and further evidence (model checking, not in Lean).* A third reading records the reader with *every* value
+the server holds. It defeats this execution, but it fails too, with `S = 5`, `t = 1`, `R = 2` and a single writer.
+There a late (stale) read request records `r₂` with a value `r₂` never saw, so `r₁` returns the new value and a
+later read of `r₂` returns the old one (new–old inversion; Lemma 8's case (ii) is wrong). Only that reading *plus*
+per-reader read counters, which are in the single-writer original but not in the paper's pseudo-code, survived our
+exhaustive search at `S = 4` (and a non-exhaustive one at `S = 5, R = 2`). Even on correct runs, Lemma 2, Lemma 6
+and Corollary 1 are false, so the proof of MWA3 (Lemma 7) does not stand either. Scripts and traces:
+[scripts/](scripts/).
+
+### Typos and slips
+- "One round-trip skips server `s`" (§3.1) does not say whether the request or the reply is delayed. The argument
+  needs the reply variant for `R₂⁽¹⁾` (see the Theorem 1 item below).
+- Chain `α` and real time: `α₀` is "W₁ precedes W₂" and `α_S` is "W₂ precedes W₁". From `α₂` on, the writes must be
+  concurrent (two servers see `W₂` first, yet `W₁` waits for `S − 1` acknowledgements). Harmless: the end values
+  come from sequential executions with the same server logs (`ret_seq`).
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 1 (§4, "sieve-based construction" in the crucial-info model)
+§4 does not prove what §3 needs: the assumption that the first round-trip `R₂⁽¹⁾` of the second read does not
+change the value returned by the first read `R₁` is argued only in a "crucial-info model" whose steps do not follow
+for a general algorithm.
+
+**Impact.** Statement true; repaired by a simpler construction that needs no sieving (`theorem_1`, `zigzag`).
+
+**Details.** §3.3 uses the assumption when it claims that `R₁` returns the same value in `β'₀` as in `α_{i₁−1}`
+("appending `R₂` should not change the return value of an existing read"). But in `β'₀`, `R₂⁽¹⁾` reaches every
+server before `R₁⁽²⁾`, so `R₁` has not finished. §4 then argues in a "crucial-info model": a server only holds the
+order "12"/"21" of the two writes, and a first round-trip can only flip it. The "affected" servers are sieved out,
+and at least 3 servers are said to remain. A general algorithm's servers can store arbitrary information, so none
+of these steps follows.
+
+**Repair.** The first round-trip of `R₂` is *blind*: it is `r₂`'s first action, so its messages are fixed. Include
+`R₂⁽¹⁾` (between `R₁⁽¹⁾` and `R₁⁽²⁾`) in every execution of chain `α`. In chains `β`, `γ` let `r₂` ignore the
+*reply* of the critical server in round one, while its *request* is still delivered. Then `R₁` behaves exactly as
+in chain `α`, and the zigzag chain of §3.4 goes through unchanged. (`theorem_1`, `zigzag`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

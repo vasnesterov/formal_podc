@@ -12,33 +12,49 @@ intended definition. The TLA+ invariant printed in Appendix B is vacuous.
 
 ## Mistakes in the paper
 
-* **Lemmas 4.2′ and 4.3′ are false for Definition 6 as written (fix evident).** Definition 6 says
-  `Chosen(i, v) ≡ ∃Qᵢ. CQ(Qᵢ, v) ∧ ∃α ∈ Qᵢ. accept(i, v)_α ∈ sent_α`. The ballot-`i` accept of `α` need not be
-  one of the accepts forming the Consecutive Quorum. Counterexample with five acceptors in Classic Paxos:
-  * Ballot 3: `A, B, C` promise; `x` is proposed and accepted by `A`.
-  * Ballot 5: `B, C, D` promise, all `⊥`; `y` is proposed and accepted by `D`.
-  * Ballot 9: `A` reports `(3, x)`, `B, C` report `⊥`; `x` is proposed and accepted by `A, B, C`.
+### ⚠️ Lemmas 4.2′ and 4.3′ (with Definition 6, CQ Chosen, as written)
+Both lemmas are false for the literal Definition 6, because the ballot-`i` accept it requires need not be one of
+the accepts forming the Consecutive Quorum (`lemma_4_3'_literal_false`, `lemma_4_2'_literal_false`).
 
-  Then `{A, B, C}` in ballot 9 is a CQ for `x`, and `A` also sent `accept(3, x)`, so "`x` is chosen in ballot 3".
-  But `y` was proposed in ballot 5 > 3 (against Lemma 4.3′) and accepted by `D` in ballot 5 > 3 (against
-  Lemma 4.2′). Safety is not affected: `y` can never be chosen. The intended reading, in which the ballot-`i`
-  accept is part of the CQ, is clear from the proof ("the acceptor in `Qᵢ` that accepted `v` in ballot `i`").
-  Under it both lemmas hold. Lemma 4.3 itself is true, but the paper derives it from the false Lemma 4.3′.
-  (`lemma_4_3'_literal_false`, `lemma_4_2'_literal_false`; repaired: `lemma_4_3'`, `lemma_4_2'`)
-* **Proof of Lemma 4.3′ misses a case.** The base case says the intersecting acceptor accepted `v` "in ballot `i`
-  or in some ballot `< i`". This treats `i` as the largest ballot of the CQ. When `i` is a smaller ballot of the
-  CQ, the intersecting acceptor may have accepted `v` in a ballot `≥ j`, after promising `j`. Then its promise
-  reports nothing useful, and the argument as written does not apply. The statement still holds because every
-  ballot in the CQ's span carries `v`. Our proof is a strong induction on the ballot over the whole span
-  `[lo, hi]` of the CQ: every proposal in a ballot `≥ lo` has value `v` (`propose_eq_of_interval`).
-* **The TLA+ check in Appendix B is vacuous as printed.** `ConsecQ(Q, b, v) ≜ ∀ r ∈ Acceptor : ∧ NotIn(Q, r)
-  ∧ …` makes `r ∉ Q` a top-level conjunct for every acceptor `r`. So `ConsecQ` is false for every nonempty `Q`.
-  Hence `AgreedConsecQ` never holds, and the invariant `SafeValue` is true independently of the protocol.
-  (`NotIn(Q, r) ⟹ …` was presumably meant, and the inner `∃ n ∈ msgs : … ⟹ …` should presumably be `∀`.) This
-  concerns the paper's supporting evidence, not its theorems (`tla_agreedConsecQ_false`).
-* **Typos.** In the proof of Lemma 4.1′, "an acceptor that has accepted *v* in ballot *j*" should say *w*.
-  Appendix A writes `Chosen(v, i)` for the earlier `Chosen(i, v)` and uses `ℤ⁺` for ballots, where Section 3
-  uses `ℕ`. Definitions 7–9 are properties of the protocol (Definition 8 is an invariant), not definitions.
+**Impact.** Typo with evident intent: the proof reads the ballot-`i` accept as part of the CQ ("the acceptor in
+`Qᵢ` that accepted `v` in ballot `i`"), and under that reading both lemmas hold (`lemma_4_3'`, `lemma_4_2'`).
+Safety is not affected; Lemma 4.3 itself is true, but the paper derives it from the false Lemma 4.3′.
+
+**Details.** Definition 6 says `Chosen(i, v) ≡ ∃Qᵢ. CQ(Qᵢ, v) ∧ ∃α ∈ Qᵢ. accept(i, v)_α ∈ sent_α`.
+Counterexample with five acceptors in Classic Paxos:
+* Ballot 3: `A, B, C` promise; `x` is proposed and accepted by `A`.
+* Ballot 5: `B, C, D` promise, all `⊥`; `y` is proposed and accepted by `D`.
+* Ballot 9: `A` reports `(3, x)`, `B, C` report `⊥`; `x` is proposed and accepted by `A, B, C`.
+
+Then `{A, B, C}` in ballot 9 is a CQ for `x`, and `A` also sent `accept(3, x)`, so "`x` is chosen in ballot 3".
+But `y` was proposed in ballot 5 > 3 (against Lemma 4.3′) and accepted by `D` in ballot 5 > 3 (against
+Lemma 4.2′). Safety is not affected: `y` can never be chosen.
+
+### Typos and slips
+- Appendix B's TLA+ check is vacuous as printed: `ConsecQ(Q, b, v) ≜ ∀ r ∈ Acceptor : ∧ NotIn(Q, r) ∧ …` makes
+  `r ∉ Q` a top-level conjunct for every acceptor `r`, so `ConsecQ` is false for every nonempty `Q`,
+  `AgreedConsecQ` never holds, and the invariant `SafeValue` is true independently of the protocol
+  (`tla_agreedConsecQ_false`). (`NotIn(Q, r) ⟹ …` was presumably meant, and the inner `∃ n ∈ msgs : … ⟹ …` should
+  presumably be `∀`.) This concerns the paper's supporting evidence, not its theorems.
+- In the proof of Lemma 4.1′, "an acceptor that has accepted *v* in ballot *j*" should say *w*.
+- Appendix A writes `Chosen(v, i)` for the earlier `Chosen(i, v)` and uses `ℤ⁺` for ballots, where Section 3
+  uses `ℕ`.
+- Definitions 7–9 are properties of the protocol (Definition 8 is an invariant), not definitions.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 4.3′ (missing case in the proof)
+The base case treats `i` as the largest ballot of the CQ, but when `i` is a smaller ballot of the CQ the
+intersecting acceptor may have accepted `v` in a ballot `≥ j`, after promising `j`, so its promise reports nothing
+useful.
+
+**Impact.** Statement true (for the intended Definition 6); repaired (`propose_eq_of_interval`).
+
+**Details.** The base case says the intersecting acceptor accepted `v` "in ballot `i` or in some ballot `< i`".
+The statement still holds because every ballot in the CQ's span carries `v`.
+
+**Repair.** Strong induction on the ballot over the whole span `[lo, hi]` of the CQ: every proposal in a ballot
+`≥ lo` has value `v` (`propose_eq_of_interval`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

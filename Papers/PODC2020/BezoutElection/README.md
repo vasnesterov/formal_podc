@@ -13,43 +13,60 @@ safety proof of Algorithm 2 (Lemma 2) are sketches with genuine gaps, repaired h
 
 ## Mistakes in the paper
 
-No main statement is wrong. The proofs have gaps:
+### ⚠️ Section 4 (Bezout rewriting: "both `u′` and `v′` are positive")
+The claim fails for `m = 1`, `n = 2`, `(u, v) = (−1, 1)`, where `v′ = 0` (`v_prime_zero_example`).
 
-* **Theorem 4's proofs (Lemmas 1 and 2) are sketches (proof gap, statement true).** Lemma 2
-  reuses Claim 1 of Algorithm 1 for each competition. In Algorithm 2, however, a process decides
-  a write from a copy read in an earlier, *non-atomic* collect, and the write can land much
-  later. The property really needed is that a write for level `L` never lands after the register
-  has reached level `L + 1`. Proving it takes a per-register invariant over every process's
-  status for that register. The counting behind "exactly `d` leaders" is also missing. When the
-  first process sets `finishing`, every process has already won exactly `v ℓ` competitions: the
-  collected sum of levels never exceeds the true sum, because levels are monotone. Lemma 1
-  (termination) is one paragraph. Our proof shows that once solved competitions stop increasing,
-  the candidate flags, `to_win` and `finishing` stabilize. It then finds an open register with a
-  stable candidate, using `d ≤ n`, and replays Algorithm 1's convergence argument there.
-  (`theorem_4`, `Alg2.alg2_agreement`, `Alg2.alg2_terminates`)
-* **Theorem 2's termination proof is a sketch (proof gap, statement true).** "This pattern is
-  repeated until all processes except one are losers" does not explain why two candidates
-  cannot overwrite each other forever while losers keep re-announcing their loss. The missing
-  step is a "minimal discarded set" argument. Once the candidates and their sets are stable,
-  any ⊥-value a candidate `c′` reads was written by a loser `j` who had read another candidate
-  `c`'s value without `j` in it, so `D_c ⊊ D_{c′}`. This is impossible for the candidate with
-  the smallest set. The committing phase needs "quiet" losers: once the leader knows `j`, `j`
-  never writes again. Line 16 copies `REG.discarded` without checking its phase; the paper
-  ignores this, and it turns out harmless. (`Alg1.alg1_terminates`, `Alg1.alg1_agreement`)
-* **Theorem 1's proof is imprecise (statement true).** It fixes the anonymity permutations
-  lazily, through "the k-th *new* register `pᵢ` accesses". This is legitimate without snapshots,
-  and the paper explains it. It also says that processes of a group with the same number of
-  steps are "in the same state". Literally they differ by their identifiers: they are in the
-  same state *up to a renaming of identifiers*. We fix the permutations in advance (process `i`
-  of each group sees the memory rotated by `i·m/δ`), which also covers snapshots.
-  (`theorem_1_1`, `theorem_1_2`)
-* **Smaller slips.** In Section 4, "both `u′` and `v′` are positive" fails for `m = 1`, `n = 2`,
-  `(u, v) = (−1, 1)`, where `v′ = 0`; only `v′ ≥ 0` is needed (`v_prime_zero_example`).
-  The prose of §3.1 says line 8 "leaves `REG.id = id_ℓ`", but the code writes `⊥`; we follow
-  the code. Typos in Algorithm 2
-  and Section 5: `reg_i.discarded` should be `reg_i[x].discarded`; there are wrong line
-  references (N(2)/N(3) instead of N(5)/N(6), N(3) instead of N(4)); "jumps to the level" where
-  the code increments by one. In Claim 1, `loser_i` "false" should be "true".
+**Impact.** Degenerate case, harmless: only `v′ ≥ 0` is needed, and that holds (`paper_rewrite`).
+
+### Typos and slips
+- The prose of §3.1 says line 8 "leaves `REG.id = id_ℓ`", but the code writes `⊥`; we follow the code.
+- Algorithm 2: `reg_i.discarded` should be `reg_i[x].discarded`.
+- Section 5: wrong line references (N(2)/N(3) instead of N(5)/N(6), N(3) instead of N(4)); "jumps to the level"
+  where the code increments by one.
+- In Claim 1, `loser_i` "false" should be "true".
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 4 (Algorithm 2: Lemmas 1 and 2 are sketches)
+Lemma 2 reuses Claim 1 of Algorithm 1 for each competition, which does not cover writes decided from an earlier,
+non-atomic collect, and Lemma 1 (termination) is one paragraph.
+
+**Impact.** Statements true; repaired (`theorem_4`, `Alg2.alg2_agreement`, `Alg2.alg2_terminates`).
+
+**Details.** In Algorithm 2 a process decides a write from a copy read in an earlier, *non-atomic* collect, and
+the write can land much later. The property really needed is that a write for level `L` never lands after the
+register has reached level `L + 1`. Proving it takes a per-register invariant over every process's status for that
+register. The counting behind "exactly `d` leaders" is also missing. When the first process sets `finishing`,
+every process has already won exactly `v ℓ` competitions: the collected sum of levels never exceeds the true sum,
+because levels are monotone.
+
+**Repair.** Our termination proof shows that once solved competitions stop increasing, the candidate flags,
+`to_win` and `finishing` stabilize. It then finds an open register with a stable candidate, using `d ≤ n`, and
+replays Algorithm 1's convergence argument there.
+
+### 🛠️ Theorem 2 (Algorithm 1, termination proof is a sketch)
+"This pattern is repeated until all processes except one are losers" does not explain why two candidates cannot
+overwrite each other forever while losers keep re-announcing their loss.
+
+**Impact.** Statement true; repaired (`Alg1.alg1_terminates`, `Alg1.alg1_agreement`).
+
+**Details.** The missing step is a "minimal discarded set" argument. Once the candidates and their sets are stable,
+any ⊥-value a candidate `c′` reads was written by a loser `j` who had read another candidate `c`'s value without
+`j` in it, so `D_c ⊊ D_{c′}`. This is impossible for the candidate with the smallest set. The committing phase
+needs "quiet" losers: once the leader knows `j`, `j` never writes again. Line 16 copies `REG.discarded` without
+checking its phase; the paper ignores this, and it turns out harmless.
+
+### 🛠️ Theorem 1 (lower bound, imprecise proof)
+The proof says that processes of a group with the same number of steps are "in the same state", but literally they
+differ by their identifiers and are in the same state only *up to a renaming of identifiers*.
+
+**Impact.** Statement true; repaired (`theorem_1_1`, `theorem_1_2`).
+
+**Details.** The proof fixes the anonymity permutations lazily, through "the k-th *new* register `pᵢ` accesses".
+This is legitimate without snapshots, and the paper explains it.
+
+**Repair.** We fix the permutations in advance (process `i` of each group sees the memory rotated by `i·m/δ`),
+which also covers snapshots.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
