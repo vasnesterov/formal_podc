@@ -14,39 +14,62 @@ discarding the irrelevant edges. The proof sketch of Lemma 3 misses one case, wh
 
 ## Mistakes in the paper
 
-- **Lemma 1 is false as literally stated (degenerate case; definitional imprecision).** Definition 4 lets a
-  `T`-restricted `H_i` contain any tree edges. Definition 5 counts only the components of `(V, H_i)` that contain
-  a node of `P_i`. Dilation (Definition 2) is the diameter of `E_G[P_i] ∪ H_i`. On the path `0 – 1 – 2` rooted at
-  `0` (depth 2), take the part `P = {2}` and `H = {01}`. The block parameter is 1, but `E_G[P] ∪ H` is
-  disconnected, so the dilation is infinite rather than `≤ 1·(2·2+1)`. This does not depend on whether the
-  vertex set of "`E_G[P_i] ∪ H_i`" includes `P_i`: on the path `0 – … – 4`, `P = {4}`, `H = {01, 23}` has one block
-  component, yet the edge set `{01, 23}` itself is disconnected. The paper even remarks (after Definition 5)
-  that components of `(V, H_i)` missing `P_i` need not be counted, so such `H_i` are explicitly allowed. The
-  paper's proof ("contract every block
-  component … remove all other nodes") bounds the distance between nodes of `P_i`. We prove exactly that: any two
-  nodes of `P_i` are at distance `≤ b(2D+1) − 1` in `G[P_i] + H_i`. We also prove the full dilation bound when every
-  component of `H_i` meets `P_i` (dropping the other components changes neither the block parameter nor the
-  routing). Theorem 2 only needs the first form. (`lemma_1_literal_false`, `lemma_1_literal_false_edgeSet`, `lemma_1`, `lemma_1_dilation`)
-- **Lemma 3 (verification), proof gap; the statement is true.** The proof floods the minimum ID for `b₀`
-  supersteps. Then each leader `r` builds a BFS tree of "all the nodes that believe `r` is the leader", and
-  neighbouring nodes of different trees report failure. But the nodes believing in `r` need not be connected to
-  `r` within that set. Example (not formalized): supergraph `r – u – w` plus a path `s – x – u`, `b₀ = 2`, IDs `s < r < u, w, x`.
-  `w` believes in `r` (`s` is at distance 3 from `w`), but its only neighbour `u` believes in `s`. So `w` belongs
-  to no BFS tree and cannot learn the outcome from one. Repair: BFS only along edges whose endpoints share a
-  leader, let unreached nodes reject, and add "unreached neighbour" to the failure flags. We prove that a node
-  then accepts iff the supergraph has at most `b₀` nodes, using `4b₀ + 1` supersteps. (`verification_correct`,
-  `corollary_6`)
-- **Lemma 2: the broadcast half is only claimed by "symmetry".** The paper's induction on `height(v) + p` uses
-  that a higher-priority subtree containing a child edge of `v` also contains `v`'s parent edge. This holds
-  upwards (convergecast) but not downwards. For the greedy broadcast with the same priority, the rank of a subtree
-  is not monotone along its root-to-leaf paths. Example (not formalized): `c − 1` higher-priority subtrees share `i`'s first edge,
-  then branch off. Then `i`'s message reaches depth 2 only at round `c + 1`, while the per-edge invariant would
-  give 3. The `O(D + c)` bound itself is fine. We prove it by time reversal: the reversed greedy convergecast
-  schedule is a valid broadcast schedule of the same length, `D − 1 + c` rounds. Whether the greedy broadcast also
-  meets `D − 1 + c` was not formalized. (`IsConvergecastSchedule.reverse`, `exists_schedules`)
-- **Typos and slips.** In `CoreFast`, an edge is unusable if `|L̃_v| ≥ 4c·p` (Algorithm 2, "at least `4c·p`" in
-  the outline), while the detailed description assigns the edge if `|L_v| ≤ 4c·p` and otherwise tests `> 4·p`. In the proof of Lemma 4, "`Pr[X₁+…+X_t ≤ 2E[S]] ≤ exp(−δE[S])`" should read `≥`, as the next sentence
-  uses. "After `O(log N)` iterations" is exactly `⌊log₂ N⌋ + 1` (one iteration for `N = 1`).
+### ⚠️ Lemma 1 (dilation bound; Definitions 4 and 5)
+Lemma 1 is false as literally stated because Definitions 4 and 5 allow shortcut edges in components that miss the part: on the path `0 – 1 – 2` rooted at `0`, the part `P = {2}` with `H = {01}` has block parameter 1, but `E_G[P] ∪ H` is disconnected, so the dilation is infinite (`lemma_1_literal_false`).
+
+**Impact.** Degenerate case / definitional imprecision: the bound holds for distances between nodes of the
+part, which is what the proof shows and all Theorem 2 needs, and in full once the useless components are dropped
+(`lemma_1`, `lemma_1_dilation`).
+
+**Details.** Definition 4 lets a `T`-restricted `H_i` contain any tree edges. Definition 5 counts only the
+components of `(V, H_i)` that contain a node of `P_i`. Dilation (Definition 2) is the diameter of
+`E_G[P_i] ∪ H_i`. In the example the depth is 2, so the bound would be `≤ 1·(2·2+1)`. The failure does not
+depend on whether the vertex set of "`E_G[P_i] ∪ H_i`" includes `P_i`: on the path `0 – … – 4`, `P = {4}`,
+`H = {01, 23}` has one block component, yet the edge set `{01, 23}` itself is disconnected
+(`lemma_1_literal_false_edgeSet`). The paper even remarks (after Definition 5) that components of `(V, H_i)`
+missing `P_i` need not be counted, so such `H_i` are explicitly allowed.
+
+**Repair.** The paper's proof ("contract every block component … remove all other nodes") bounds the distance
+between nodes of `P_i`. We prove exactly that: any two nodes of `P_i` are at distance `≤ b(2D+1) − 1` in
+`G[P_i] + H_i` (`lemma_1`). We also prove the full dilation bound when every component of `H_i` meets `P_i`
+(dropping the other components changes neither the block parameter nor the routing) (`lemma_1_dilation`).
+
+### Typos and slips
+- In `CoreFast`, an edge is unusable if `|L̃_v| ≥ 4c·p` (Algorithm 2, "at least `4c·p`" in the outline), while the
+  detailed description assigns the edge if `|L_v| ≤ 4c·p` and otherwise tests `> 4·p`.
+- In the proof of Lemma 4, "`Pr[X₁+…+X_t ≤ 2E[S]] ≤ exp(−δE[S])`" should read `≥`, as the next sentence uses.
+- "After `O(log N)` iterations" is exactly `⌊log₂ N⌋ + 1` (one iteration for `N = 1`).
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 3 (verification)
+The proof has each leader `r` build a BFS tree of "all the nodes that believe `r` is the leader", but these nodes need not be connected to `r` within that set, so some node belongs to no BFS tree.
+
+**Impact.** Statement true; repaired with `4b₀ + 1` supersteps (`verification_correct`, `corollary_6`).
+
+**Details.** The proof floods the minimum ID for `b₀` supersteps; then neighbouring nodes of different trees
+report failure. Example (not formalized): supergraph `r – u – w` plus a path `s – x – u`, `b₀ = 2`, IDs
+`s < r < u, w, x`. `w` believes in `r` (`s` is at distance 3 from `w`), but its only neighbour `u` believes in
+`s`. So `w` belongs to no BFS tree and cannot learn the outcome from one.
+
+**Repair.** BFS only along edges whose endpoints share a leader, let unreached nodes reject, and add "unreached
+neighbour" to the failure flags. We prove that a node then accepts iff the supergraph has at most `b₀` nodes,
+using `4b₀ + 1` supersteps. (`verification_correct`, `corollary_6`)
+
+### 🛠️ Lemma 2 (broadcast half claimed by "symmetry")
+The induction on `height(v) + p` for the convergecast does not transfer to the broadcast, because the rank of a subtree is not monotone along its root-to-leaf paths.
+
+**Impact.** The `O(D + c)` bound itself is fine; we prove it by time reversal (`IsConvergecastSchedule.reverse`,
+`exists_schedules`).
+
+**Details.** The induction uses that a higher-priority subtree containing a child edge of `v` also contains `v`'s
+parent edge. This holds upwards (convergecast) but not downwards. Example (not formalized): `c − 1`
+higher-priority subtrees share `i`'s first edge, then branch off. Then `i`'s message reaches depth 2 only at round
+`c + 1`, while the per-edge invariant would give 3.
+
+**Repair.** The reversed greedy convergecast schedule is a valid broadcast schedule of the same length,
+`D − 1 + c` rounds. Whether the greedy broadcast also meets `D − 1 + c` was not formalized.
+(`IsConvergecastSchedule.reverse`, `exists_schedules`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

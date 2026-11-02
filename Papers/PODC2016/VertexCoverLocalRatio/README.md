@@ -14,23 +14,7 @@ down, with twice the constant. The arithmetic of Section 5 checks out.
 
 ## Mistakes in the paper
 
-There are no mathematical mistakes. Minor points:
-
-* **Section 4 is slightly under-specified.** After a partial answer `t·ε'w_0(v)/2`, the paper does not say
-  explicitly which amount `v` deducts (the rounded one or `budget_i(v,u)`), nor how later requests are
-  handled. Its remark that the remainder is "at most ε'w_0(v)/2" almost forces the reading "`v` deducts
-  exactly the rounded amount and goes on with the remaining bank", which we formalize. Then the claims
-  hold: `(2+ε)`-approximation and the same round bounds. Our constant 4 instead of 2 is just what halving
-  the vault gives; the paper states no constant for Section 4, so this is not a deviation.
-  (`congest_correct`, `congest_small`, `congest_large`)
-* **Implicit constants.** "ε = O(1)" is needed: for large ε the `K_v` term of `K_v/ε'` dominates. We
-  assume `ε ≤ E` and give explicit constants. Section 5 drops the constant hidden in `Ω`. With it the
-  conditions become `2k³+4k ≤ 4ε log n − 4k² log₂ c` and `k(k+1) ≤ 2ε log Δ − 2(k+1) log₂ c`, which
-  still force `k = O((log n)^{1/3})` and `k = O(√log Δ)`. (`KMW.first_constraint_k_le`,
-  `KMW.second_constraint_k_le`)
-* The symmetry of the neighbourhoods `N_i` (needed for lines 18–21 to make sense) is used without
-  comment. It holds: a neighbour is dropped at line 16 only when its bank is exhausted, so it returns
-  `InCover` in the same iteration. (`actN_step`)
+No mistakes in the statements.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -70,6 +54,23 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 The headline bound in `Δ` follows from the per-vertex bound in `d(v)`, because `log x/log log x` is increasing
 for `x > e^e ≈ 15.2`. This step is not stated in Lean.
+
+**Proof remarks.** There are no mathematical mistakes. Minor points:
+* **Section 4 is slightly under-specified.** After a partial answer `t·ε'w_0(v)/2`, the paper does not say
+  explicitly which amount `v` deducts (the rounded one or `budget_i(v,u)`), nor how later requests are
+  handled. Its remark that the remainder is "at most ε'w_0(v)/2" almost forces the reading "`v` deducts
+  exactly the rounded amount and goes on with the remaining bank", which we formalize. Then the claims
+  hold: `(2+ε)`-approximation and the same round bounds. Our constant 4 instead of 2 is just what halving
+  the vault gives; the paper states no constant for Section 4, so this is not a deviation.
+  (`congest_correct`, `congest_small`, `congest_large`)
+* **Implicit constants.** "ε = O(1)" is needed: for large ε the `K_v` term of `K_v/ε'` dominates. We
+  assume `ε ≤ E` and give explicit constants. Section 5 drops the constant hidden in `Ω`. With it the
+  conditions become `2k³+4k ≤ 4ε log n − 4k² log₂ c` and `k(k+1) ≤ 2ε log Δ − 2(k+1) log₂ c`, which
+  still force `k = O((log n)^{1/3})` and `k = O(√log Δ)`. (`KMW.first_constraint_k_le`,
+  `KMW.second_constraint_k_le`)
+* The symmetry of the neighbourhoods `N_i` (needed for lines 18–21 to make sense) is used without
+  comment. It holds: a neighbour is dropped at line 16 only when its bank is exhausted, so it returns
+  `InCover` in the same iteration. (`actN_step`)
 
 **Not formalized.** Message sizes in the CONGEST variant; the claims about anonymous networks and
 non-simultaneous start; the claim that [KMW10]'s Theorem 9 depends only on the two constraints analysed

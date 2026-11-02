@@ -13,41 +13,58 @@ wherever the paper uses it, so the proof of Theorem 1 goes through.
 
 ## Mistakes in the paper
 
-* **Lemma 1 is false as stated (false statement; Theorem 1 survives).** Lemma 1 says: in any solution in
-  which low processes decide at once, a process `i` that becomes low at `m` with a single low value `v`,
-  hidden capacity `≥ k − 1`, and `k` hidden processes `j_b` that are high at `m − 1` must decide `v` at
-  `m`. Counterexample with `n = 6`, `k = 2`, `t = 1`, `m = 1`: `i` has input 2, two processes `x`, `y`
-  have input 0, a process `z` crashes in round 1 sending nothing, and `j₁`, `j₂` have input 2. All four
-  hypotheses hold for `i` at time 1 with `v = 0` (`⟨z, 0⟩` and `⟨j₁, 1⟩` witness `HC ≥ 1`). Now take
-  this protocol: a low process decides its input at time 0; at time 1, a high process that missed a
-  round-1 message and whose only low value is `0` decides its smallest high value, and every other
-  process decides its minimum. It solves 2-set consensus for `t = 1`: whoever misses a message knows the
-  unique faulty process, so `0` is held by correct processes and only one more value can be decided.
-  Here `i` decides `2`. The proof fails in the "changes": when `j_{b'}` (`b' > b`) has decided `v`,
-  process `j_b` must get *no* message carrying `v` in round `m`. That needs every process that told `i`
-  about `v` to crash in round `m`, which can exceed `t` (here `x` and `y` would both have to crash). The
-  topological proof has the same gap: it assumes that `j_y` gets low values only from the `i_x`. The
-  failure does not depend on `t < k`: with `t + 1` carriers of `0`, a variant of `Optmin[k]` breaks the
-  lemma for every `t ≥ 1`, `k ≥ 2` (sketch in [differencies.md](differencies.md), item 1). We
-  prove Lemma 1 with an extra hypothesis 5: *every process alive and low at `m − 1` crashes in round
-  `m`*. In the proof of Lemma 3, hypothesis 5 holds because `i` is still high at `m`. Inside Lemma 1's own
-  induction it holds because `i` is high at `m − 1`. So Lemma 3 and Theorems 1–2 are unaffected.
-  (`lemma1_paper_false`; repaired: `lemma1` with `Lemma1Hyp.lowCrash`)
-* **Lemma 1, the induction step: unchecked hypotheses (proof gap, true statement).** The induction
-  hypothesis is applied to the processes `i_w` "to decide `w` by time `m − 1`". Only hypothesis 3
-  (`HC ≥ k − 1`) is checked. The lemma must be applied at the first time `i_w` is low, and hypothesis 4
-  must be checked too. It holds: `j_1, …, j_k`, made correct, are hidden from `⟨i_w, m''⟩` and high
-  before. (`lemma1_step`)
-* **Lemma 5 (Appendix D), case `m = 0`: slip.** The run `r'` "with all initial values `0`" contradicts
+### ❌ Lemma 1 (low processes force the decision `v` at `m`)
+Lemma 1 is false: with `n = 6`, `k = 2`, `t = 1`, `m = 1` there is a 2-set consensus protocol in which low processes decide at once and a process `i` satisfying all four hypotheses with `v = 0` decides `2` (`lemma1_paper_false`).
+
+**Impact.** Lemma 1 is the core of the combinatorial unbeatability proof, but it holds with an extra hypothesis
+that is true wherever the paper uses it, so Lemma 3 and Theorems 1–2 are unaffected (`lemma1` with
+`Lemma1Hyp.lowCrash`).
+
+**Details.** Lemma 1 says: in any solution in which low processes decide at once, a process `i` that becomes low
+at `m` with a single low value `v`, hidden capacity `≥ k − 1`, and `k` hidden processes `j_b` that are high at
+`m − 1` must decide `v` at `m`. In the counterexample `i` has input 2, two processes `x`, `y` have input 0, a
+process `z` crashes in round 1 sending nothing, and `j₁`, `j₂` have input 2. All four hypotheses hold for `i` at
+time 1 with `v = 0` (`⟨z, 0⟩` and `⟨j₁, 1⟩` witness `HC ≥ 1`). The protocol: a low process decides its input at
+time 0; at time 1, a high process that missed a round-1 message and whose only low value is `0` decides its
+smallest high value, and every other process decides its minimum. It solves 2-set consensus for `t = 1`: whoever
+misses a message knows the unique faulty process, so `0` is held by correct processes and only one more value can
+be decided. Here `i` decides `2`.
+
+The proof fails in the "changes": when `j_{b'}` (`b' > b`) has decided `v`, process `j_b` must get *no* message
+carrying `v` in round `m`. That needs every process that told `i` about `v` to crash in round `m`, which can
+exceed `t` (here `x` and `y` would both have to crash). The topological proof has the same gap: it assumes that
+`j_y` gets low values only from the `i_x`. The failure does not depend on `t < k`: with `t + 1` carriers of `0`,
+a variant of `Optmin[k]` breaks the lemma for every `t ≥ 1`, `k ≥ 2` (sketch in
+[differencies.md](differencies.md), item 1).
+
+**Repair.** We prove Lemma 1 with an extra hypothesis 5: *every process alive and low at `m − 1` crashes in round
+`m`*. In the proof of Lemma 3, hypothesis 5 holds because `i` is still high at `m`. Inside Lemma 1's own induction
+it holds because `i` is high at `m − 1`. (`lemma1` with `Lemma1Hyp.lowCrash`)
+
+### Typos and slips
+- Lemma 5 (Appendix D), case `m = 0`: the run `r'` "with all initial values `0`" contradicts
   `r'_i(0) = r_i(0)` when `i`'s low input is not `0`. All inputs equal to `i`'s input works. (`lemma5`)
-* **Theorem 3's proof writes `K_j ∃correct(w)` for "j knows that w will persist" (imprecise).** It then
-  uses it as "some correct process knows `w`". That consequence needs its own argument. We prove the
-  persistence claim stated after Definition 3 directly: everyone alive at `m + 1` has seen `w`. The count
-  `t − d` there also needs `d` to count processes disjoint from the `t − d` carriers; we show this.
-  (`persist`)
-* **Small slips.** Proof of Theorem 3: "`v = Min⟨i, m′_i⟩ < k − 1`" should be `≤ k − 1`. Prop. 1 and
-  Thm. 3 say "all processes decide by …"; this holds for processes alive at that time. Lemma 2 assumes `i`
-  active at `m − 1`; we use `i` alive at `m`, which is all that is needed.
+- Proof of Theorem 3: "`v = Min⟨i, m′_i⟩ < k − 1`" should be `≤ k − 1`.
+- Prop. 1 and Thm. 3 say "all processes decide by …"; this holds for processes alive at that time.
+- Lemma 2 assumes `i` active at `m − 1`; we use `i` alive at `m`, which is all that is needed.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 1 (induction step: unchecked hypotheses)
+The induction hypothesis is applied to the processes `i_w` "to decide `w` by time `m − 1`" after checking only hypothesis 3 (`HC ≥ k − 1`).
+
+**Impact.** The (repaired) statement is true; the step is fixed (`lemma1_step`).
+
+**Repair.** The lemma must be applied at the first time `i_w` is low, and hypothesis 4 must be checked too. It
+holds: `j_1, …, j_k`, made correct, are hidden from `⟨i_w, m''⟩` and high before. (`lemma1_step`)
+
+### 🛠️ Theorem 3 (`K_j ∃correct(w)`, "j knows that w will persist")
+The proof writes `K_j ∃correct(w)` and then uses it as "some correct process knows `w`", a consequence that needs its own argument.
+
+**Impact.** Statement true; we prove the persistence claim stated after Definition 3 directly (`persist`).
+
+**Repair.** Everyone alive at `m + 1` has seen `w`. The count `t − d` there also needs `d` to count processes
+disjoint from the `t − d` carriers; we show this. (`persist`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
