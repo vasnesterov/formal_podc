@@ -16,45 +16,64 @@ Proposition 2.3 (FastWithRelabeling) is false. The correct bound is `(8w+6)E`, s
 
 ## Mistakes in the paper
 
-* **Proposition 2.3: the cost bound `2·w(L)·E` is false (time bound `(4t+5)E` true).**
-  FastWithRelabeling runs Algorithm Fast on the new `t`-bit labels. Its schedule starts with an
-  exploration (`T[1] = 1`) and doubles every bit of `M(ℓ')`. With simultaneous start, both agents
-  explore in segment 1 in lock-step, which in an oriented ring cannot produce a meeting. So `2E`
-  is spent before anything distinguishes the agents, and at least one more move is needed.
-  Concrete instance: oriented 3-ring (`E = 2`), `L = 2`, `w ≡ 1` (so `t = 2`, labels `01` and
-  `10`), simultaneous start at nodes 0 and 1. The agents first meet at time 4 with cost
-  `6 > 2wE = 4`. The failure is not specific to `w = 1`: agents whose new labels share a leading
-  `1` explore in lock-step for 5 segments (cost `10E > 4E` for `w = 2`), and a simulation of the
-  oriented 5-ring with simultaneous start gives worst-case cost `44 > 2wE` for `w = 2, 3`
-  (`E = 4`). Each agent explores in at most `4w+3` segments, so the true bound is `(8w+6)E`.
-  This is still `O(E)` for constant `w`, so Corollary 2.1 survives, although its proof quotes the
-  false `2cE`. (`prop_2_3_cost_false`; repaired: `prop_2_3_cost_repaired`, `cor_2_1`)
-* **Theorem 3.2: Fact 3.11 is false; the proof is repaired (statement true).** The proof cuts
-  the ring into 6 sectors of size `n/6` and time into blocks of `n/6` rounds, and it tracks the
-  sector of each agent only at block boundaries. Fact 3.11 claims that partial surpluses of
-  absolute value at most 1 keep `x` inside `P_{j-1} ∪ P_j ∪ P_{j+1}`. In mid-block, however, an
-  agent at the end of `P_{j+1}` can step into `P_{j+2}` and return. Counterexample with `n = 12`:
-  `x` moves `+1,+1,+1,-1` from node 0 and `y` moves `-1,-1,-1,+1` from node 6. Then
-  `Agg_x = (1,0)` and `Agg_y = (-1,0)`, all surpluses are `±1`, yet both agents are at node 3
-  after round 3. The vectors come from a correct 2-label algorithm and survive trimming. Fact 3.15
-  (distinct labels have distinct progress vectors) uses Fact 3.11 on every zero run, so it is not
-  established as written. We repair the proof with blocks and sectors of size `⌊n/10⌋`. Two agents
-  with equal progress vectors then stay within distance `< 5⌊n/10⌋ ≤ n/2` relative to their
-  antipodal starts. This also removes the assumption `6 ∣ n`. The rest of the argument is the
-  paper's, with different constants. (`Fact311.fact_3_11_false`, `Fact311.V_correct`,
-  `Fact311.mx_ge_four`; repaired: `thm_3_2_core`, `thm_3_2`)
-* **Theorem 3.1: small slips in the proof (statement true).** Fact 3.1's shifted start
-  `p'_B = p_A + forward(A) + 1 + back(B)` uses `B`'s solo extent instead of its extent during
-  the execution. With the larger value the segments can overlap around the ring; the extent
-  within the execution works. Facts 3.6–3.8 need `F > 3φ`, which the paper leaves implicit in
-  `φ = o(E)`. Fact 3.7's index range is off by one. (`LBCost.back_le_phi`, `LBCost.step`)
-* Typos and minor slips:
-  - Proposition 2.2's proof says "`i ∈ {2,…,m}`" for "`i ∈ {1,…,m}`" and mixes `τ ≥ 1` with
-    `0 ≤ τ ≤ E`.
-  - In Fact 3.16 the count of `{-1,0,1}`-vectors forgets the factor `2^i` for signs (only
-    constants change).
-  - Corollary 2.1 uses `t' = c L^{1/c}` as if it were an integer.
-  - The abstract's "cost exactly `E`" for simultaneous-start Cheap means "at most `E`".
+### ❌ Proposition 2.3 (FastWithRelabeling, cost `2·w(L)·E`)
+The cost bound `2·w(L)·E` is false: on the oriented 3-ring (`E = 2`) with `L = 2`, `w ≡ 1` and
+simultaneous start at nodes 0 and 1, the agents first meet at time 4 with cost `6 > 2wE = 4`
+(`prop_2_3_cost_false`).
+
+**Impact.** The time bound `(4t+5)E` is true, and the correct cost bound `(8w+6)E` is still `O(E)` for
+constant `w`, so Corollary 2.1 survives, although its proof quotes the false `2cE`
+(`prop_2_3_cost_repaired`, `cor_2_1`).
+
+**Details.** FastWithRelabeling runs Algorithm Fast on the new `t`-bit labels (here `t = 2`, labels `01`
+and `10`). Its schedule starts with an exploration (`T[1] = 1`) and doubles every bit of `M(ℓ')`. With
+simultaneous start, both agents explore in segment 1 in lock-step, which in an oriented ring cannot
+produce a meeting. So `2E` is spent before anything distinguishes the agents, and at least one more move
+is needed. The failure is not specific to `w = 1`: agents whose new labels share a leading `1` explore in
+lock-step for 5 segments (cost `10E > 4E` for `w = 2`), and a simulation of the oriented 5-ring with
+simultaneous start gives worst-case cost `44 > 2wE` for `w = 2, 3` (`E = 4`).
+
+**Repair.** Each agent explores in at most `4w+3` segments, so the true bound is `(8w+6)E`
+(`prop_2_3_cost_repaired`, `cor_2_1`).
+
+### Typos and slips
+- Proposition 2.2's proof says "`i ∈ {2,…,m}`" for "`i ∈ {1,…,m}`" and mixes `τ ≥ 1` with
+  `0 ≤ τ ≤ E`.
+- In Fact 3.16 the count of `{-1,0,1}`-vectors forgets the factor `2^i` for signs (only constants
+  change).
+- Corollary 2.1 uses `t' = c L^{1/c}` as if it were an integer.
+- The abstract's "cost exactly `E`" for simultaneous-start Cheap means "at most `E`".
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 3.2 (Fact 3.11)
+Fact 3.11 is false: on the ring with `n = 12`, `x` moving `+1,+1,+1,-1` from node 0 and `y` moving
+`-1,-1,-1,+1` from node 6 have all partial surpluses `±1`, yet both are at node 3 after round 3
+(`Fact311.fact_3_11_false`).
+
+**Impact.** Statement true; the proof is repaired with different constants (`thm_3_2_core`, `thm_3_2`).
+
+**Details.** The proof cuts the ring into 6 sectors of size `n/6` and time into blocks of `n/6` rounds,
+and it tracks the sector of each agent only at block boundaries. Fact 3.11 claims that partial surpluses
+of absolute value at most 1 keep `x` inside `P_{j-1} ∪ P_j ∪ P_{j+1}`. In mid-block, however, an agent at
+the end of `P_{j+1}` can step into `P_{j+2}` and return. In the counterexample `Agg_x = (1,0)` and
+`Agg_y = (-1,0)`. The vectors come from a correct 2-label algorithm and survive trimming
+(`Fact311.V_correct`, `Fact311.mx_ge_four`). Fact 3.15 (distinct labels have distinct progress vectors)
+uses Fact 3.11 on every zero run, so it is not established as written.
+
+**Repair.** Blocks and sectors of size `⌊n/10⌋`. Two agents with equal progress vectors then stay within
+distance `< 5⌊n/10⌋ ≤ n/2` relative to their antipodal starts. This also removes the assumption `6 ∣ n`.
+The rest of the argument is the paper's, with different constants. (`thm_3_2_core`, `thm_3_2`)
+
+### 🛠️ Theorem 3.1 (small slips in the proof)
+Fact 3.1's shifted start `p'_B = p_A + forward(A) + 1 + back(B)` uses `B`'s solo extent instead of its
+extent during the execution, Facts 3.6–3.8 need an implicit `F > 3φ`, and Fact 3.7's index range is off
+by one.
+
+**Impact.** Statement true; minor repairs (`LBCost.back_le_phi`, `LBCost.step`).
+
+**Details.** With `B`'s solo extent the segments can overlap around the ring; the extent within the
+execution works. The paper leaves `F > 3φ` implicit in `φ = o(E)`.
 
 Full list of differences (including modelling choices and minor imprecisions):
 [differencies.md](differencies.md).

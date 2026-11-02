@@ -16,45 +16,80 @@ The lower bounds (§3.3) and the enhanced-model algorithm (§4) are not formaliz
 
 ## Mistakes in the paper
 
-* **The times `t_{d,ℓ}` of §3.2.4 are never defined** (under-specified definition). Lemma 3.12 lists their
-  properties and Lemmas 3.13–3.15 use them. Theorem 3.16 only gives `t₁ = (D + (r+1)k − 2) F_prog + r(k−1) F_ack`,
-  which suggests `t_{d,ℓ} = (d + (r+1)ℓ − 2) F_prog + r(ℓ−1) F_ack`. For `r > 1` that formula contradicts
-  `t_{0,1} = 0`, which Lemma 3.13 states. We use `t_{d,ℓ} = d F_prog + (ℓ−1)((r+1) F_prog + r F_ack)`. It satisfies
-  parts 1–4 of Lemma 3.12 and `t_{0,1} = 0`, and `t_{D,k} ≤ t₁`, so Theorem 3.16 follows with the paper's `t₁`.
-  (`tdl`, `lemma_3_12_1` … `lemma_3_12_4`)
-* **Lemma 3.12, part 5 (`ℓ F_ack ≤ t_{0,ℓ}` for `ℓ > 1`) is false.** It fails for our `t_{d,ℓ}` and for the formula
-  read off Theorem 3.16, whenever `F_ack > 2 F_prog`, which is the regime the paper cares about. Example: `r = 1`,
-  `ℓ = 2`, `F_prog = 1`, `F_ack = 3` gives `ℓ F_ack = 6 > 5 = t_{0,2}`. This does not depend on how `t_{d,ℓ}` is
-  read: *no* definition satisfying part 4 and `t_{D,k} ≤ t₁` (needed to get Theorem 3.16 "directly from Lemma
-  3.15") satisfies part 5 in this example, since part 4 gives `t_{0,2} = t_{D,2} − D F_prog ≤ 5`. The statement is
-  false but the proof survives: its only use (Lemma 3.14) needs `ℓ F_ack ≤ t_{0,ℓ} + F_ack`, i.e.
-  `(ℓ−1) F_ack ≤ t_{0,ℓ}`, which holds for `r ≥ 1`. (`lemma_3_12_5_false`, `lemma_3_12_5_false_any`; repaired:
-  `lemma_3_12_5'`)
-* **Theorem 3.16 needs a connected `G`.** It claims `R_j(t₁) = K` for every node `j`, with `D` the diameter. The
-  problem statement (§2) explicitly does not assume `G` connected. Then a message only reaches its source's
-  component, and the claim fails for two isolated nodes with one message each. Degenerate case. We prove the
-  per-component statement and the paper's statement for connected `G`. (`theorem_3_16`, `theorem_3_16_connected`)
-* **The MMB specification of §3.2.2 is inconsistent with §2 in the same way.** Part (a) asks every process to deliver
-  every message, but §2 asks only for the source's component. We use the component version. (`SolvesMMB`)
-* **Theorem 3.2's `O(D F_prog + r k F_ack)` does not follow from `t₁` alone.** `t₁` contains `(r+1) k F_prog`, which is
-  `O(r k F_ack)` only if `F_prog = O(F_ack)`. The model never assumes this ("we think of `F_prog` as smaller"). The
-  theorem is still true without it: if `F_prog > F_ack`, Theorem 3.1 gives `(D + k) F_ack ≤ D F_prog + k F_ack`. We
-  prove `D F_prog + 3 r k F_ack` in all cases. (`theorem_3_2`)
-* **Proof gap in the lower bound (§3.3, Lemma 3.20); not formalized.** The model allows a constant number `c` of
-  MMB messages per local broadcast (§2: "only a constant number of these messages can fit into a single local
-  broadcast message"). In the delay schedule, `b_{i+1}` receives `a_i`'s `m₀`-broadcast over a `G'`
-  edge. With `c ≥ 2`, `b_{i+1}`'s later broadcast "containing `m₁`" may also carry `m₀`. The schedule delivers that
-  broadcast to `a_{i+2}` over a `G'` edge, so `m₀` jumps ahead and the frontier no longer advances one hop per
-  `F_ack`. Against "always send everything you know" the schedule only costs `O(F_ack + D F_prog)`. The argument as
-  written covers `c = 1`. We did not determine whether Theorem 3.17 holds for `c ≥ 2`.
-* Typos and small slips:
-  * Corollary 3.8, proof: "`|R_i(t + F_ack)| ≥ |R_i(t)| + 1`" should be `C_i`.
-  * Lemma 3.15, Case 1: "`m′ ∈ R_{j″}(t*) \ C_{j″}(t*)`" should be `R_{j*}(t*) \ C_{j*}(t*)`.
-  * Lemma 3.15, Case 2: "by Part 1 of Lemma 3.15" should be "of Lemma 3.5".
-  * §3.2: `N^r_G(j)` is defined with "`≤ z`"; "`G′` is a subgraph of `G` (denoted `G ⊆ G′`)" has the roles swapped.
-  * Theorem 3.1, proof: the base case "`h = 0`" cannot occur for `ℓ ≥ 1`. The induction should start from the
-    trivial case `ℓ = 0`.
-  * Lemma 3.11: choosing a *closest* `j″` is unnecessary.
+### ⚠️ Lemma 3.12, part 5 (`ℓ F_ack ≤ t_{0,ℓ}` for `ℓ > 1`)
+Part 5 is false whenever `F_ack > 2 F_prog`, for every reading of `t_{d,ℓ}` that gives Theorem 3.16: with
+`r = 1`, `ℓ = 2`, `F_prog = 1`, `F_ack = 3` we get `ℓ F_ack = 6 > 5 = t_{0,2}` (`lemma_3_12_5_false`,
+`lemma_3_12_5_false_any`).
+
+**Impact.** A slip with evident intent: its only use (Lemma 3.14) needs the weaker
+`ℓ F_ack ≤ t_{0,ℓ} + F_ack`, which holds for `r ≥ 1` (`lemma_3_12_5'`); the theorems are unaffected.
+
+**Details.** It fails for our `t_{d,ℓ}` and for the formula read off Theorem 3.16, in the regime
+`F_ack > 2 F_prog` that the paper cares about. This does not depend on how `t_{d,ℓ}` is read: *no*
+definition satisfying part 4 and `t_{D,k} ≤ t₁` (needed to get Theorem 3.16 "directly from Lemma
+3.15") satisfies part 5 in this example, since part 4 gives `t_{0,2} = t_{D,2} − D F_prog ≤ 5`.
+
+**Repair.** Prove `ℓ F_ack ≤ t_{0,ℓ} + F_ack`, i.e. `(ℓ−1) F_ack ≤ t_{0,ℓ}`, which holds for `r ≥ 1`
+(`lemma_3_12_5'`).
+
+### ⚠️ §3.2.4 (the times `t_{d,ℓ}` are never defined)
+The times `t_{d,ℓ}` that Lemma 3.12 lists properties of and Lemmas 3.13–3.15 use are never defined, and
+the formula suggested by Theorem 3.16 contradicts `t_{0,1} = 0` (stated in Lemma 3.13) for `r > 1`.
+
+**Impact.** An under-specified definition; a suitable definition exists, satisfies parts 1–4 of Lemma 3.12,
+and gives Theorem 3.16 with the paper's `t₁` (`tdl`, `lemma_3_12_1` … `lemma_3_12_4`).
+
+**Details.** Theorem 3.16 only gives `t₁ = (D + (r+1)k − 2) F_prog + r(k−1) F_ack`, which suggests
+`t_{d,ℓ} = (d + (r+1)ℓ − 2) F_prog + r(ℓ−1) F_ack`. For `r > 1` that formula contradicts `t_{0,1} = 0`.
+
+**Repair.** We use `t_{d,ℓ} = d F_prog + (ℓ−1)((r+1) F_prog + r F_ack)`. It satisfies parts 1–4 of
+Lemma 3.12 and `t_{0,1} = 0`, and `t_{D,k} ≤ t₁`, so Theorem 3.16 follows with the paper's `t₁`.
+(`tdl`, `lemma_3_12_1` … `lemma_3_12_4`)
+
+### ⚠️ Theorem 3.16 and the MMB specification of §3.2.2 (disconnected `G`)
+Theorem 3.16 claims `R_j(t₁) = K` for every node `j`, which fails for two isolated nodes with one message
+each, since §2 explicitly does not assume `G` connected (`theorem_3_16_connected` assumes it).
+
+**Impact.** Degenerate case, implied by the use of the diameter `D`; we prove the per-component statement
+and the paper's statement for connected `G` (`theorem_3_16`, `theorem_3_16_connected`).
+
+**Details.** Without connectivity a message only reaches its source's component. The MMB specification
+of §3.2.2 is inconsistent with §2 in the same way: part (a) asks every process to deliver every message,
+but §2 asks only for the source's component. We use the component version (`SolvesMMB`).
+
+### ⚠️ Lemma 3.20 and Theorem 3.17 for `c ≥ 2` messages per broadcast (not formalized)
+The delay schedule of Lemma 3.20 assumes one MMB message per local broadcast, but §2 allows a constant
+number `c`, and for `c ≥ 2` the schedule breaks, so Theorem 3.17 is unestablished for `c ≥ 2`.
+
+**Impact.** An informal observation, not checked in Lean (the lower bounds are not formalized). The
+argument as written covers `c = 1`. We did not determine whether Theorem 3.17 holds for `c ≥ 2`.
+
+**Details.** §2 says "only a constant number of these messages can fit into a single local broadcast
+message". In the delay schedule, `b_{i+1}` receives `a_i`'s `m₀`-broadcast over a `G'` edge. With
+`c ≥ 2`, `b_{i+1}`'s later broadcast "containing `m₁`" may also carry `m₀`. The schedule delivers that
+broadcast to `a_{i+2}` over a `G'` edge, so `m₀` jumps ahead and the frontier no longer advances one hop
+per `F_ack`. Against "always send everything you know" the schedule only costs `O(F_ack + D F_prog)`.
+
+### Typos and slips
+- Corollary 3.8, proof: "`|R_i(t + F_ack)| ≥ |R_i(t)| + 1`" should be `C_i`.
+- Lemma 3.15, Case 1: "`m′ ∈ R_{j″}(t*) \ C_{j″}(t*)`" should be `R_{j*}(t*) \ C_{j*}(t*)`.
+- Lemma 3.15, Case 2: "by Part 1 of Lemma 3.15" should be "of Lemma 3.5".
+- §3.2: `N^r_G(j)` is defined with "`≤ z`"; "`G′` is a subgraph of `G` (denoted `G ⊆ G′`)" has the roles
+  swapped.
+- Theorem 3.1, proof: the base case "`h = 0`" cannot occur for `ℓ ≥ 1`. The induction should start from
+  the trivial case `ℓ = 0`.
+- Lemma 3.11: choosing a *closest* `j″` is unnecessary.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 3.2 (`O(D F_prog + r k F_ack)` from `t₁`)
+The bound does not follow from `t₁` alone: `t₁` contains `(r+1) k F_prog`, which is `O(r k F_ack)` only
+if `F_prog = O(F_ack)`, and the model never assumes this ("we think of `F_prog` as smaller").
+
+**Impact.** Statement true without the assumption; we prove `D F_prog + 3 r k F_ack` in all cases
+(`theorem_3_2`).
+
+**Repair.** If `F_prog > F_ack`, Theorem 3.1 gives `(D + k) F_ack ≤ D F_prog + k F_ack`. (`theorem_3_2`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
