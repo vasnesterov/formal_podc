@@ -19,71 +19,110 @@ decoder is not even sound.
 
 ## Mistakes in the paper
 
-* **Theorem 4.2 is false: a counter modulo `M > 2N` gives a strong, hiding, anonymous LCP.** Each
-  node gets a counter `ℓ(v)`. With `M = 5(2N+1)` (odd, and larger than twice the number of nodes;
-  nodes know `N` in the paper's model), a node accepts iff every neighbour's counter is
-  `ℓ(v) ± 1 (mod M)`.
-  - *Complete:* a proper `0/1` colouring is accepted on every bipartite graph.
-  - *Strongly sound on every graph:* along a closed walk through accepting nodes, the integer
-    displacement `z` satisfies `M | z`, `|z| ≤ L` and `z ≡ L (mod 2)`. A walk of length `L < 2n < M`
-    therefore has even length, and short closed walks suffice for bipartiteness.
-  - *Hiding, even against identifier-aware extraction algorithms:* use `θ(5,5,5)`, i.e. three paths
-    of length 5 between two endpoints. It is bipartite, connected, 1-forgetful under both the BA
-    and v3 definitions, has minimum degree 2, and is not a cycle. Label it `t + height`
-    (`t ∈ ZMod M`), with identifiers rotating mod 5 on five nodes. Then node 2's view for `t` equals
-    node 1's view for `t+1`: identifiers, ports, labels and degrees all agree. Nodes 1 and 2 are
-    adjacent, so a successful extractor would flip its output at node 1 with every step `t ↦ t+1`.
-    This is impossible since `M` is odd.
+### 🚨 Theorem 4.2 (no strong and hiding LCP for 2-colouring)
+Theorem 4.2 is false already for `r = 1`: a counter modulo `M > 2N` gives a strong, hiding, anonymous LCP with
+`O(log n)`-bit certificates for all bipartite graphs, hidden on the 1-forgetful graph `θ(5,5,5)`
+(`baTheorem42_false`).
 
-  The proof's gap: Lemma 5.3 (v3: Lemma 21) needs the odd closed walk in `V(D,n)` to have at most
-  `√(N/Δʳ)` views, and this is never checked. Here every odd cycle of `V(D,n)` has length `≥ M > 2N`.
-  This refutes BA Thm 4.2 for `H` = all bipartite graphs (`baTheorem42_false`). It also refutes
-  v3's corrected statement for the class `{θ(5,5,5)}` (`v3Theorem4_false`); the same LCP is
-  anonymous, so it refutes v1 Thm 1.5 (order-invariant) too.
-* **Theorem 4.2's proof also restricts the class without justification.** v1 §5.2 says: "without
-  restriction `H` only consists of `r`-forgetful graphs …, since a strong and hiding LCP for `H` is
-  one for every subclass". This is false, because hiding only needs *one* hard instance. As a result,
-  Theorem 4.2 fails even for anonymous **constant-size** LCPs: the paper's own LCP of Lemma 4.1 is
-  complete on all bipartite graphs, strongly sound, and hiding through `P₆ ⊔ K₂`, so it works for
-  `H` = all bipartite graphs (`baTheorem42Anon_false`). The authors concede the quantifier issue in
-  v3 §2.2.4 and add `G ∩ H = ∅`.
-* **The BA definition of `r`-forgetful is unsatisfiable for `r ≥ 2`.** The definition requires every
-  `w ∈ Nʳ(u)` to move away along the path. Taking `w = v₁`, the distance drops from 1 to 0. So BA
-  Theorem 4.2 is vacuous for `r ≥ 2` as written (`not_isForgetful_of_two_le`). v3 Definition 22
-  fixes this.
-* **Theorem 4.3's decoder is not strongly sound (statement true).** Two type-1 nodes `u, u'` attached
-  to the same type-0 node (which rejects) can carry different colour vectors `(0,0)` and `(0,1)`.
-  Then `u – w – u' – z' – z – u` is an accepted 5-cycle, with `w` in component 0 and `z, z'` in
-  component 1. The proof's step "by 2(c), all neighbours of a type-1 node share the same colour" is
-  false (`shatterLCP_not_stronglySound`). The theorem still holds. Graphs with a shatter point include
-  `P₆` and `P₆ ⊔ K₂`, so the counter LCP (hiding against all algorithms) and the constant-size LCP of
-  Lemma 4.1 (anonymous hiding) both work (`theorem_4_3`).
-* **Theorem 4.4's decoder is not sound (statement true).** Rule 2(b) only asks that *some* entry of
-  a path node records the endpoint's port, and a path node never checks the entry facing an
-  endpoint. On a 5-cycle with endpoints `v₁, v₂`, path node `a` stores in its `v₂`-entry the port
-  number that `v₁` uses towards `a`. So `v₁` reads the colour of the wrong edge, and every node of the
-  5-cycle accepts (`watermelonLCP_not_sound`). The theorem still holds, because the counter LCP is
-  hiding on the watermelon `θ(5,5,5)` (`theorem_4_4`).
-* **Lemma 4.1 (δ = 1, part of Thm 4.1): proof gap, ambiguous rule, wrong figure.**
-  - The soundness argument ("since `C` is odd, then `u ∈ V(C)`") proves nothing.
-  - The rule "all other neighbours of `⊤` are labelled `β ∈ {0,1}`" works only if `β` is the same
-    for all of them. If each neighbour may carry its own colour, a 5-cycle with a pendant node is
-    accepted everywhere (`literalLCP_not_sound`).
-  - Fig. 4's odd cycle in `V(D,4)` uses an edge between the views of nodes 3 and 4 that would need
-    a triangle 2-3-4 (`fig4_edge_not_compatible`).
+**Impact.** The main lower bound falls, even on the one-graph class `{θ(5,5,5)}`, which also refutes the authors'
+corrected v3 statement (`v3Theorem4_false`). The same LCP is anonymous, so it refutes v1 Thm 1.5 (order-invariant)
+too.
 
-  We prove the lemma with the uniform reading. Strong soundness follows from an explicit 2-colouring:
-  a `⊤` node gets `1-β` and a `⊥` node gets the `β` of its `⊤`. Hiding uses three labellings of
-  `P₆ ⊔ K₂` (`theorem_4_1`).
-* **Lemma 4.2 (even cycles): hiding argument mixes `C₄` and `C₆`.** Their views differ in `N`, so the
-  claimed odd cycle is not in any `V(D,n)` of the paper's own model. A single `C₄` with
-  reflection-symmetric ports suffices: two adjacent nodes get identical anonymous views
-  (`lemma_4_2`).
-* **v3 Theorem 1 is false as stated** ("for any class of bipartite graphs meeting `H`"). On `{P₃}`, an
-  anonymous algorithm colours by degree (`v3Theorem1_false`). The paper itself makes this
-  observation for stars.
-* *Minor.* `k-col` is defined with colours `{0,…,k}` (k+1 colours). In Lemma 3.2's proof, "proper
-  2-coloring" should read "k-coloring", and (v3) `D′(u) ≠ A(v)` mixes names.
+**Details.** Each node gets a counter `ℓ(v)`. With `M = 5(2N+1)` (odd, and larger than twice the number of nodes;
+nodes know `N` in the paper's model), a node accepts iff every neighbour's counter is `ℓ(v) ± 1 (mod M)`.
+- *Complete:* a proper `0/1` colouring is accepted on every bipartite graph.
+- *Strongly sound on every graph:* along a closed walk through accepting nodes, the integer
+  displacement `z` satisfies `M | z`, `|z| ≤ L` and `z ≡ L (mod 2)`. A walk of length `L < 2n < M`
+  therefore has even length, and short closed walks suffice for bipartiteness.
+- *Hiding, even against identifier-aware extraction algorithms:* use `θ(5,5,5)`, i.e. three paths
+  of length 5 between two endpoints. It is bipartite, connected, 1-forgetful under both the BA
+  and v3 definitions, has minimum degree 2, and is not a cycle. Label it `t + height`
+  (`t ∈ ZMod M`), with identifiers rotating mod 5 on five nodes. Then node 2's view for `t` equals
+  node 1's view for `t+1`: identifiers, ports, labels and degrees all agree. Nodes 1 and 2 are
+  adjacent, so a successful extractor would flip its output at node 1 with every step `t ↦ t+1`.
+  This is impossible since `M` is odd.
+
+The proof's gap: Lemma 5.3 (v3: Lemma 21) needs the odd closed walk in `V(D,n)` to have at most
+`√(N/Δʳ)` views, and this is never checked. Here every odd cycle of `V(D,n)` has length `≥ M > 2N`.
+This refutes BA Thm 4.2 for `H` = all bipartite graphs (`baTheorem42_false`) and v3's corrected statement for the
+class `{θ(5,5,5)}` (`v3Theorem4_false`).
+
+### 🚨 Theorem 4.2 for anonymous constant-size LCPs (unjustified restriction of the class)
+Theorem 4.2 fails even for anonymous **constant-size** LCPs: the paper's own LCP of Lemma 4.1 is complete on all
+bipartite graphs, strongly sound, and hiding through `P₆ ⊔ K₂` (`baTheorem42Anon_false`).
+
+**Impact.** A second refutation of the headline, caused by a false step of its proof; the authors concede the
+quantifier issue in v3 §2.2.4 and add `G ∩ H = ∅`.
+
+**Details.** v1 §5.2 says: "without restriction `H` only consists of `r`-forgetful graphs …, since a strong and
+hiding LCP for `H` is one for every subclass". This is false, because hiding only needs *one* hard instance. So the
+counterexample works for `H` = all bipartite graphs.
+
+### ❌ Theorem 4.3 (shatter-point decoder is not strongly sound)
+The paper's decoder accepts a 5-cycle: two type-1 nodes `u, u'` attached to the same (rejecting) type-0 node can carry
+different colour vectors `(0,0)` and `(0,1)` (`shatterLCP_not_stronglySound`).
+
+**Impact.** The protocol claim is false, but the theorem holds as an existence statement: graphs with a shatter
+point include `P₆` and `P₆ ⊔ K₂`, so the counter LCP (hiding against all algorithms) and the constant-size LCP of
+Lemma 4.1 (anonymous hiding) both work (`theorem_4_3`).
+
+**Details.** `u – w – u' – z' – z – u` is an accepted 5-cycle, with `w` in component 0 and `z, z'` in component 1.
+The proof's step "by 2(c), all neighbours of a type-1 node share the same colour" is false.
+
+### ❌ Theorem 4.4 (watermelon decoder is not sound)
+The paper's decoder accepts every node of a 5-cycle, because rule 2(b) only asks that *some* entry of a path node
+records the endpoint's port (`watermelonLCP_not_sound`).
+
+**Impact.** The protocol claim is false, but the theorem holds as an existence statement, because the counter LCP is
+hiding on the watermelon `θ(5,5,5)` (`theorem_4_4`).
+
+**Details.** A path node never checks the entry facing an endpoint. On a 5-cycle with endpoints `v₁, v₂`, path node
+`a` stores in its `v₂`-entry the port number that `v₁` uses towards `a`. So `v₁` reads the colour of the wrong edge,
+and every node of the 5-cycle accepts.
+
+### ❌ v3 Theorem 1 ("for any class of bipartite graphs meeting `H`")
+On `{P₃}` an anonymous algorithm colours by degree, so v3 Theorem 1 is false as stated (`v3Theorem1_false`).
+
+**Impact.** Not a statement of the BA (recorded for completeness); the paper itself makes this observation for
+stars.
+
+### ⚠️ Definition of `r`-forgetful (BA, used in Theorem 4.2)
+The BA definition requires every `w ∈ Nʳ(u)` to move away along the path, which is unsatisfiable for `r ≥ 2` (take
+`w = v₁`: the distance drops from 1 to 0), so BA Theorem 4.2 is vacuous for `r ≥ 2` as written
+(`not_isForgetful_of_two_le`).
+
+**Impact.** Typo-level: v3 Definition 22 fixes this, and for `r = 1` both definitions hold for `θ(5,5,5)`.
+
+### ⚠️ Lemma 4.1 (δ = 1, part of Thm 4.1), rule "all other neighbours of `⊤` are labelled `β ∈ {0,1}`"
+The rule works only if `β` is the same for all neighbours; if each neighbour may carry its own colour, a 5-cycle
+with a pendant node is accepted everywhere (`literalLCP_not_sound`).
+
+**Impact.** Ambiguous rule with evident intent: we prove the lemma with the uniform reading (`theorem_4_1`).
+
+### Typos and slips
+- `k-col` is defined with colours `{0,…,k}` (k+1 colours).
+- In Lemma 3.2's proof, "proper 2-coloring" should read "k-coloring".
+- (v3) `D′(u) ≠ A(v)` mixes names.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 4.1 (δ = 1, part of Thm 4.1): soundness argument and Fig. 4
+The soundness argument ("since `C` is odd, then `u ∈ V(C)`") proves nothing, and Fig. 4's odd cycle in `V(D,4)` uses
+an edge between the views of nodes 3 and 4 that would need a triangle 2-3-4 (`fig4_edge_not_compatible`).
+
+**Impact.** Statement true; repaired (`theorem_4_1`).
+
+**Repair.** Strong soundness follows from an explicit 2-colouring: a `⊤` node gets `1-β` and a `⊥` node gets the `β`
+of its `⊤`. Hiding uses three labellings of `P₆ ⊔ K₂` (`theorem_4_1`).
+
+### 🛠️ Lemma 4.2 (even cycles), hiding argument
+The hiding argument mixes `C₄` and `C₆`, whose views differ in `N`, so the claimed odd cycle is not in any `V(D,n)`
+of the paper's own model.
+
+**Impact.** Statement true; repaired (`lemma_4_2`).
+
+**Repair.** A single `C₄` with reflection-symmetric ports suffices: two adjacent nodes get identical anonymous views
+(`lemma_4_2`).
 
 Full list of differences (including modelling choices and minor imprecisions):
 [differencies.md](differencies.md).

@@ -15,76 +15,100 @@ impossibility results hold as stated.
 
 ## Mistakes in the paper
 
-* **Lemma 5.3 is false for `WEC_COUNT` as defined (Definition 2.7); it is true for a modified
-  language.** Property (3) says: "for every finite prefix α such that the (infinite) suffix β has
-  only reads, eventually all operations in β return the number of incs in α". This is a precise
-  universal condition, the quiescent-convergence clause of eventual counters [2]. It holds
-  vacuously when there are infinitely many increments, so `WEC_COUNT` contains such words. A
-  linearizable counter history with infinitely many incs, for example, satisfies (1)–(3).
-  * The proof of Lemma 5.3 assumes instead that every word of the language has finitely many incs
-    ("eventually every process always picks read operations").
-  * For the language as defined, no algorithm weakly decides it, nor weakly-all decides it. Diagonal
-    argument: each time `p₀` reports `NO` on a word outside the language, insert one more inc. The
-    limit word has infinitely many incs, so it is in the language, yet `p₀` reports `NO`
-    infinitely often. Hence `WEC_COUNT ∉ WD` (n = 2), contradicting Lemma 5.3 and Table 1.
-    Since `SD ⊆ WD`, `WEC_COUNT ∉ SD` (Lemma 5.2) still holds. (`Counter.not_WD_WEClit`,
-    `not_WAD_WEClit`)
-  * The lemma holds for the modified language `WEC` that also requires finitely many incs
-    (`Counter.lemma_5_3`, `wec_mem_WD`). Theorem 5.1 (`SD ⊊ WD`) is proved with that language
-    (`Counter.thm_5_1`).
-* **The monitor of Figure 5 (Lemma 5.3) is wrong, and so is Figure 9 (Lemma 6.4).**
-  * The second clause of Line 06 tests `curr_read < snap[i] ∨ curr_read < prev_read`. It also runs
-    in iterations whose operation is an `inc`, where `curr_read` holds the value of the last read.
-    So a process that increments after reading a smaller value sets its flag and reports `NO`
-    forever. This rejects correct histories.
-  * Example independent of the initial value of `curr_read`, which the paper never sets: `p₀`
-    reads `0`, increments, then reads `1` forever. The read overwrites `curr_read`, and the `inc`
-    iteration then flags (`0 < snap[0] = 1`).
-    * In Lean, `p₁` reads `1` throughout; that word is in the modified `WEC`
-      (`Counter.fig5_not_weakAllDecides'`).
-    * If `p₁` instead reads `0` before the inc and `1` after, the word is in `SEC_COUNT` (by
-      inspection).
-    * With `curr_read` initially 0, already "`p₀` increments, then all reads return 1" is in
-      `SEC_COUNT` and is rejected (`Counter.fig5_not_weakAllDecides`). For Figure 9 against
-      `A_τ`, on a tight execution whose sketch is this `SEC_COUNT` word, see
-      `Counter.fig9_fails`.
-  * Fix: apply the clause only to `read` responses, and also flag ill-typed operations
-    (`wecAlg`, proved in `Counter.lemma_5_3`).
-* **The construction of Figure 4 (proof of Lemma 4.3, hence of `WOD ⊆ WAD` in Theorem 4.1)
-  is wrong; the statements are true.** In Figure 4 a process reports `YES` iff some counter
-  `C[j]` is unchanged since its *previous* snapshot. The proof argues that if no counter
-  stabilizes, then all processes report `NO` infinitely often. This does not follow: a counter
-  can change infinitely often without changing between two consecutive snapshots of a given
-  process. Counterexample: `n = 2`, `L = ∅`, and a `V` in which every process alternately
-  reports `YES`/`NO`; this `V` weakly-one decides `∅`. In the schedule `p₀,p₀,p₁,p₁,…` (two
-  iterations at a time), the `W` of Figure 4 reports `YES` forever at both processes. Fix:
-  report `NO` iff *every* counter has grown since the last time the process reported `NO`.
-  (`Fig4.fig4_fails`, repaired: `lemma_4_3`, `thm_4_1`)
-* **The words in the proofs of Lemma 5.2 and Lemma 6.2 do not work; the lemmas are true
-  (for the modified language and also for Definition 2.7).** The
-  proofs use `x = <⁺₁ >₁ <₂ >⁰₂ <₁ >⁰₁ …`. Here `p₁` reads `0` after its own inc, which
-  violates property (1). Every continuation of a prefix that contains this read (the paper's
-  `x'`) is therefore also outside the language, and the argument gives no contradiction. A
-  corrected word (other processes read `0`; continuations read `1`) works. The step "since
-  `SEC ⊂ WEC`, `SEC ∉ SD`" is also invalid as an inference (a subset of an undecidable language
-  can be decidable). `SEC ∉ SD` is still true, directly or because `SEC` is not real-time
-  oblivious. (`Counter.xPaper_cut_not_mem`; repaired: `Counter.lemma_5_2`,
-  `Counter.lemma_6_2`)
-* **"Decidability predicate" (Definition 5.1) is under-specified.** If `P(E)` may be any
-  predicate of the execution, Theorem 5.2 is false: `P(E) := x(E) ∈ L` makes every language
-  decidable (`decides_literal`). We take `P` to be any predicate of the reports, as the text
-  intends. We let it see the global report trace, including the order and timing of reports.
-* **Proof of Lemma 6.4 (Figure 9), by inspection beyond the formalized bug:** the proof claims
-  that the proof of Lemma 5.3 shows "every process reports `NO` infinitely often" when one of
-  properties (1)–(3) fails. That proof shows this only for *some* process. Predictive weak
-  decidability needs *every* process, so a transformation such as Figure 3 would be needed.
-  (The flag bug of Figure 5 in Figure 9: `Counter.fig9_fails`.)
-* Smaller slips: Lemma 4.2's proof concludes "weakly-one" for "weakly-all", and Lemma 4.3's
-  proof cites "weakly-all" for "weakly-one". Lemma 5.1's execution has no steps by `p₃, …, pₙ`,
-  so it is not well-formed for `n > 2`; adding reads by them fixes this. Lemma 6.2 ends with
-  "`∉ SD`" for "`∉ PSD`". In Lemma 6.5, "`x₁ ∈ WEC_COUNT`" should be `EC_LED` and `x(H)` should
-  be `x(F')`. Theorem 5.2 is called a "characterization" in the abstract, but it is only a
-  necessary condition, as Section 5.2 itself notes.
+### ❌ Lemma 5.3 and Table 1 (`WEC_COUNT ∈ WD`)
+For `WEC_COUNT` as defined (Definition 2.7), property (3) holds vacuously on words with infinitely many increments,
+and a diagonal argument shows that no algorithm weakly decides (or weakly-all decides) the language, already for
+`n = 2` (`Counter.not_WD_WEClit`, `not_WAD_WEClit`).
+
+**Impact.** The lemma holds for the modified language `WEC` that also requires finitely many incs
+(`Counter.lemma_5_3`, `wec_mem_WD`), and Theorem 5.1 (`SD ⊊ WD`) survives with that language (`Counter.thm_5_1`).
+Since `SD ⊆ WD`, `WEC_COUNT ∉ SD` (Lemma 5.2) still holds.
+
+**Details.** Property (3) says: "for every finite prefix α such that the (infinite) suffix β has only reads,
+eventually all operations in β return the number of incs in α". This is a precise universal condition, the
+quiescent-convergence clause of eventual counters [2]. It holds vacuously when there are infinitely many increments,
+so `WEC_COUNT` contains such words. A linearizable counter history with infinitely many incs, for example, satisfies
+(1)–(3).
+- The proof of Lemma 5.3 assumes instead that every word of the language has finitely many incs ("eventually every
+  process always picks read operations").
+- Diagonal argument: each time `p₀` reports `NO` on a word outside the language, insert one more inc. The limit word
+  has infinitely many incs, so it is in the language, yet `p₀` reports `NO` infinitely often. Hence
+  `WEC_COUNT ∉ WD` (n = 2), contradicting Lemma 5.3 and Table 1.
+
+### ❌ Figure 5 (monitor of Lemma 5.3) and Figure 9 (Lemma 6.4)
+The monitor rejects correct histories, including words of `SEC_COUNT`: the second clause of Line 06 also runs in
+`inc` iterations, so a process that increments after reading a smaller value flags and reports `NO` forever
+(`Counter.fig5_not_weakAllDecides`, `Counter.fig9_fails`).
+
+**Impact.** The paper's algorithm is wrong under any reading of the language; a local fix (apply the clause only to
+`read` responses) gives a correct monitor for the modified language (`wecAlg`, proved in `Counter.lemma_5_3`).
+
+**Details.** The clause tests `curr_read < snap[i] ∨ curr_read < prev_read`, where in an `inc` iteration
+`curr_read` holds the value of the last read. Example independent of the initial value of `curr_read`, which the
+paper never sets: `p₀` reads `0`, increments, then reads `1` forever. The read overwrites `curr_read`, and the `inc`
+iteration then flags (`0 < snap[0] = 1`).
+- In Lean, `p₁` reads `1` throughout; that word is in the modified `WEC` (`Counter.fig5_not_weakAllDecides'`).
+- If `p₁` instead reads `0` before the inc and `1` after, the word is in `SEC_COUNT` (by inspection).
+- With `curr_read` initially 0, already "`p₀` increments, then all reads return 1" is in `SEC_COUNT` and is
+  rejected (`Counter.fig5_not_weakAllDecides`). For Figure 9 against `A_τ`, on a tight execution whose sketch is
+  this `SEC_COUNT` word, see `Counter.fig9_fails`.
+
+The proof of Lemma 6.4 has a further gap (by inspection, beyond the formalized bug): it claims that the proof of
+Lemma 5.3 shows "every process reports `NO` infinitely often" when one of properties (1)–(3) fails. That proof shows
+this only for *some* process. Predictive weak decidability needs *every* process, so a transformation such as
+Figure 3 would be needed.
+
+**Repair.** Apply the clause only to `read` responses, and also flag ill-typed operations (`wecAlg`, proved in
+`Counter.lemma_5_3`).
+
+### ⚠️ Definition 5.1 ("decidability predicate", used in Theorem 5.2)
+If `P(E)` may be any predicate of the execution, Theorem 5.2 is false: `P(E) := x(E) ∈ L` makes every language
+decidable (`decides_literal`).
+
+**Impact.** Under-specified definition with evident intent: we take `P` to be any predicate of the reports, as the
+text intends, and Theorem 5.2 holds (`thm_5_2`). We let `P` see the global report trace, including the order and
+timing of reports.
+
+### Typos and slips
+- Lemma 4.2's proof concludes "weakly-one" for "weakly-all", and Lemma 4.3's proof cites "weakly-all" for
+  "weakly-one".
+- Lemma 5.1's execution has no steps by `p₃, …, pₙ`, so it is not well-formed for `n > 2`; adding reads by them
+  fixes this.
+- Lemma 6.2 ends with "`∉ SD`" for "`∉ PSD`".
+- In Lemma 6.5, "`x₁ ∈ WEC_COUNT`" should be `EC_LED` and `x(H)` should be `x(F')`.
+- Theorem 5.2 is called a "characterization" in the abstract, but it is only a necessary condition, as Section 5.2
+  itself notes.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 4.3 (Figure 4), hence `WOD ⊆ WAD` in Theorem 4.1
+Figure 4 reports `YES` iff some counter `C[j]` is unchanged since the process's *previous* snapshot, but a counter
+can change infinitely often without changing between two consecutive snapshots of a given process
+(`Fig4.fig4_fails`).
+
+**Impact.** Statements true; repaired (`lemma_4_3`, `thm_4_1`).
+
+**Details.** The proof argues that if no counter stabilizes, then all processes report `NO` infinitely often. This
+does not follow. Counterexample: `n = 2`, `L = ∅`, and a `V` in which every process alternately reports `YES`/`NO`;
+this `V` weakly-one decides `∅`. In the schedule `p₀,p₀,p₁,p₁,…` (two iterations at a time), the `W` of Figure 4
+reports `YES` forever at both processes.
+
+**Repair.** Report `NO` iff *every* counter has grown since the last time the process reported `NO`
+(`lemma_4_3`, `thm_4_1`).
+
+### 🛠️ Lemmas 5.2 and 6.2 (the words in the proofs)
+The proofs use `x = <⁺₁ >₁ <₂ >⁰₂ <₁ >⁰₁ …`, where `p₁` reads `0` after its own inc, which violates property (1), so
+every continuation `x'` is also outside the language and the argument gives no contradiction
+(`Counter.xPaper_cut_not_mem`).
+
+**Impact.** Statements true, for the modified language and also for Definition 2.7; repaired with a corrected word
+(`Counter.lemma_5_2`, `Counter.lemma_6_2`).
+
+**Details.** The step "since `SEC ⊂ WEC`, `SEC ∉ SD`" is also invalid as an inference (a subset of an undecidable
+language can be decidable). `SEC ∉ SD` is still true, directly or because `SEC` is not real-time oblivious.
+
+**Repair.** A corrected word (other processes read `0`; continuations read `1`) works (`Counter.lemma_5_2`,
+`Counter.lemma_6_2`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
