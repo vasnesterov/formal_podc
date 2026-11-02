@@ -112,7 +112,7 @@ PODC 2019, arXiv 1811.01643v3. Verdict rules: `.claude/skills/formalize-paper/ve
       neighbour w points to w with d = 0, but w is forced to output (⊥, deg w).
     - Root cause: the case irr(p(v)) ≠ C only checks non-backtracking, not d(v) = d(p(v)). The claim "each node v on
       C will have a cycle as their closest irregularity" is false.
-    - Scripts: `/home/vasilii/podc-wt/p10/MinimalSymmetryBreaking-work/pstar/lemma3_cex*.py`.
+    - Found by a brute-force search script (not included in the repository).
     - Repair: the mode-based algorithm described in the README, `pstarAlg`.
     - **Borderline (R1/R5):** the algorithm appears only inside the proof of Lemma 3 and the lemma is existential,
       so we count this as a proof repair (🛠️), not a false algorithm claim. A reader who counts the algorithm of
