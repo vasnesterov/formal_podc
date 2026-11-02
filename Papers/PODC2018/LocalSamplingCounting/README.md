@@ -14,44 +14,65 @@ proof steps and fix one typo in the JVV algorithm along the way.
 
 ## Mistakes in the paper
 
-* **Corollary 5.2 (TV-SSM ⇒ multiplicative SSM) is false.** The multiplicative error (2) is
-  `err = max_x |ln μ(x) − ln μ̂(x)|`, and the only convention is `ln 0 − ln 0 = 0`. In the hardcore
-  model, let `u` be a neighbour of `v`. Pin `u` to *occupied* (`σ`) and to *unoccupied* (`τ`). Then
-  `μ^σ_v(occupied) = 0` while `μ^τ_v(occupied) > 0`, so `err(μ^σ_v, μ^τ_v) = ∞`. No rate
-  `δ_n(1) = poly(n)·α` can bound it. The class of hardcore models on perfect matchings (every even
-  `n`) meets every hypothesis of the corollary. Its members are locally admissible, their constraints have
-  diameter 1, and they have TV-SSM with `δ_n(d) = 2·(1/2)^d`. Yet they have no multiplicative SSM,
-  whatever the rate (`corollary_5_2_false`). On any graph with an edge the hardcore model has no
-  multiplicative SSM (`hardcore_err_infinite`, `hardcore_not_mssm`). The counterexample keeps `v` free
-  and changes only a neighbour, so it does not rely on the trivial case `v ∈ D`, where `err = ∞` for
-  every distribution. The paper itself says the hardcore model has SSM with
-  exponential decay in the uniqueness regime, so Corollary 5.2 would contradict this. Large weights
-  break it with soft constraints alone too, so the true statement can only bound `err` once
-  `poly(n)·α^d` is small. There is a second problem. The paper's route (Theorem 5.1 ⇐, then Lemma 4.1,
-  then Theorem 5.1 ⇒ for `err`) gives locality `2t + ℓ`. It therefore proves decay only at rate `√α`,
-  not `α`. We believe the same `α` can be recovered at large distances by a direct pinning
-  argument, but we did not formalize this. The easy direction (multiplicative ⇒ TV, same rate)
-  holds, because `d_TV ≤ err` (`ssm_of_mssm`).
-* **Local JVV sampler: acceptance and rejection are swapped (typo, ⚠️).** §4.2.1 lets node `vᵢ` set
-  `F'_{vᵢ} = 1` with probability `q_{vᵢ}` and fail when `F'_{vᵢ} = 1`. Lemma 4.8 says the
-  algorithm "fails with probability at most `∑ E[F'_{vᵢ}] = 1 − O(1/n)`". Since
-  `q_{vᵢ} ≥ e^{−5/n²}`, this algorithm would fail almost surely. The proof uses
-  `Pr[success | Y = σ] = ∏ q_{vᵢ}(σ)`, so the intended reading is: accept with probability
-  `q_{vᵢ}`, and fail with probability `O(1/n)`. We formalize this version (`lemma_4_8_success`,
-  `lemma_4_8`).
-* **Lemma 4.1, proof of the Claim: a wrong inequality (proof repaired).** The paper writes
-  `μ_{Λᵢ∪{v}}(τᵢᶜ) = μ_{Λᵢ₋₁∪{v}}(τᵢ₋₁ᶜ)·μ^{τᵢ₋₁ᶜ}_{vᵢ}(cᵢ) ≥ μ^{τᵢ₋₁ᶜ}_{vᵢ}(cᵢ)`. The first factor
-  is a probability, so the inequality goes the other way. Only positivity is needed, and positivity
-  follows from the induction hypothesis together with (4) and (5). The bound (3) is correct
-  (`lemma_4_1_core`, `lemma_4_1`).
-* **Theorem 5.1 (⇒): `min` should be `inf`, with `inf ∅ = ∞`.** The rate
-  `δ_n(t) = 2 min{δ | t(n, δ) ≤ t − 1}` need not be attained. For small `t` the set is empty. We
-  prove the statement with the infimum, using `[0, ∞]`-valued rates (`theorem_5_1_forward`).
-* Small slips:
-  * In the Claim of Lemma 4.1, "`dist_G(v, v_{i−1}) > t`" and "at node `v_{i−1}`" should read `vᵢ`.
-  * In the proof of (3), "`m = |Λ| ≤ n`" should read `m = |Γ|`.
-  * In Claim 4.6, `Γ` uses `B_t(v)` for `B_t(vᵢ)`, and the pinnings `τ₁, τ₂` are implicitly
-    combined with `τ`.
+### ❌ Corollary 5.2 (TV-SSM ⇒ multiplicative SSM)
+Corollary 5.2 is false: the hardcore model on perfect matchings has SSM with exponential decay in total variation but no SSM in multiplicative error, whatever the rate (`corollary_5_2_false`).
+
+**Impact.** A by-product, not a headline result; it contradicts the paper's own main application (the
+hardcore model in the uniqueness regime). The easy direction (multiplicative ⇒ TV, same rate) holds
+(`ssm_of_mssm`).
+
+**Details.** The multiplicative error (2) is `err = max_x |ln μ(x) − ln μ̂(x)|`, and the only
+convention is `ln 0 − ln 0 = 0`. In the hardcore model, let `u` be a neighbour of `v`. Pin `u` to
+*occupied* (`σ`) and to *unoccupied* (`τ`). Then `μ^σ_v(occupied) = 0` while `μ^τ_v(occupied) > 0`,
+so `err(μ^σ_v, μ^τ_v) = ∞`. No rate `δ_n(1) = poly(n)·α` can bound it.
+- The class of hardcore models on perfect matchings (every even `n`) meets every hypothesis of the
+  corollary. Its members are locally admissible, their constraints have diameter 1, and they have
+  TV-SSM with `δ_n(d) = 2·(1/2)^d`.
+- On any graph with an edge the hardcore model has no multiplicative SSM (`hardcore_err_infinite`,
+  `hardcore_not_mssm`).
+- The counterexample keeps `v` free and changes only a neighbour, so it does not rely on the trivial
+  case `v ∈ D`, where `err = ∞` for every distribution.
+- Large weights break it with soft constraints alone too, so the true statement can only bound `err`
+  once `poly(n)·α^d` is small.
+- There is a second problem. The paper's route (Theorem 5.1 ⇐, then Lemma 4.1, then Theorem 5.1 ⇒
+  for `err`) gives locality `2t + ℓ`. It therefore proves decay only at rate `√α`, not `α`. We
+  believe the same `α` can be recovered at large distances by a direct pinning argument, but we did
+  not formalize this.
+
+**Repair.** Only the true direction is proved: `d_TV ≤ err`, so multiplicative SSM implies TV-SSM
+with the same rate (`ssm_of_mssm`).
+
+### ⚠️ §4.2.1 and Lemma 4.8 (local JVV sampler: acceptance and rejection swapped)
+As written, node `vᵢ` sets `F'_{vᵢ} = 1` with probability `q_{vᵢ} ≥ e^{−5/n²}` and fails when `F'_{vᵢ} = 1`, so the algorithm fails almost surely.
+
+**Impact.** A typo with evident intent: the proof uses `Pr[success | Y = σ] = ∏ q_{vᵢ}(σ)`, so the
+intended reading is "accept with probability `q_{vᵢ}`, fail with probability `O(1/n)`". We
+formalize this version (`lemma_4_8_success`, `lemma_4_8`).
+
+**Details.** Lemma 4.8 says the algorithm "fails with probability at most
+`∑ E[F'_{vᵢ}] = 1 − O(1/n)`", which matches neither reading.
+
+### ⚠️ Theorem 5.1 (⇒) (the rate `δ_n(t)`)
+The rate `δ_n(t) = 2 min{δ | t(n, δ) ≤ t − 1}` need not be attained, and for small `t` the set is empty.
+
+**Impact.** Typo with evident intent: `min` should be `inf`, with `inf ∅ = ∞`. We prove the statement
+with the infimum, using `[0, ∞]`-valued rates (`theorem_5_1_forward`).
+
+### Typos and slips
+- In the Claim of Lemma 4.1, "`dist_G(v, v_{i−1}) > t`" and "at node `v_{i−1}`" should read `vᵢ`.
+- In the proof of (3), "`m = |Λ| ≤ n`" should read `m = |Γ|`.
+- In Claim 4.6, `Γ` uses `B_t(v)` for `B_t(vᵢ)`, and the pinnings `τ₁, τ₂` are implicitly combined
+  with `τ`.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 4.1 (the Claim in its proof)
+The proof writes `μ_{Λᵢ∪{v}}(τᵢᶜ) = μ_{Λᵢ₋₁∪{v}}(τᵢ₋₁ᶜ)·μ^{τᵢ₋₁ᶜ}_{vᵢ}(cᵢ) ≥ μ^{τᵢ₋₁ᶜ}_{vᵢ}(cᵢ)`, but the first factor is a probability, so the inequality goes the other way.
+
+**Impact.** Statement true; repaired (`lemma_4_1_core`, `lemma_4_1`).
+
+**Repair.** Only positivity is needed, and positivity follows from the induction hypothesis together
+with (4) and (5). The bound (3) is correct.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

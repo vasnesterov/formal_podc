@@ -13,40 +13,58 @@ Fisk) for the graphs used.
 
 ## Mistakes in the paper
 
-* **Theorem 2.6 is false for odd `k`.** "No distributed algorithm can 3-color the rectangular `k × k`
-  grid in the plane in less than `k/2` rounds." Take `k = 2t + 1`. After `t` rounds a node knows how
-  many nodes are at distance exactly `t` from it, and in the `(2t+1) × (2t+1)` grid this number
-  determines `x + y mod 2`: with `a, b` the distances to the nearest horizontal and vertical side, it
-  is `t + 1 + a + b` if `a + b < t` (values `≤ 2t`), `2(a + b) + 2` if `a + b ≥ t` and `a, b < t`
-  (even values `≥ 2t + 2`), `2t + 1 + 2b` if `a = t > b` (odd values) and `4t` at the centre. So
-  "output `0` or `1` according to this count" is a proper 2-colouring in `t < k/2` rounds. Already
-  for `k = 3`: in one round a node knows its degree, and colouring by degree (2 and 4 vs 3) works.
-  The algorithm is a genuine `t`-round LOCAL algorithm (CSLib's `IsLocal`), and ignores identifiers.
-  It is designed for the grid, which the statement allows: like Observation 2.4, from which the paper
-  derives it, Theorem 2.6 is about colouring one fixed graph under every identifier assignment (and nodes
-  know `n = k²`). Under a stronger "uniform" reading (an algorithm correct on all planar bipartite graphs
-  needs `k/2` rounds on the `k × k` grid) the counterexample does not apply; that reading is not settled here.
-  The error costs one round: the asymptotic content (`Ω(√n)`) is unaffected.
-  The correct bound from the paper's method is `2r + 3 ≤ k`, which we prove; for odd `k` it is tight.
-  For even `k` the paper's bound `r < k/2` is neither proved nor refuted here. The "in particular"
-  part (`Ω(√n)` rounds for planar bipartite graphs) is true. (`theorem_2_6_false_3`, …,
-  `theorem_2_6_false_11`, `theorem_2_6_false_odd`; repaired: `theorem_2_6`)
-* **Theorem 2.5: the proof does not give the stated bound; the statement is true.** The paper applies
-  Observation 2.4 to `H = G_{5,2ℓ+1}` (Klein bottle) and `G = H_{2ℓ}`. But `G_{5,2ℓ+1}` has `10ℓ + 5`
-  vertices, more than `H_{2ℓ}` (`10ℓ`), violating the hypothesis `|V(H)| ≤ |V(G)|`. And "balls of
-  radius `< ℓ`" combined with Observation 2.4 (balls of radius `r + 1`) only gives `r ≤ ℓ - 2`. We
-  prove the stated bound `r < ℓ` with the Klein bottle grid `G_{5,2ℓ}` (same size as `H_{2ℓ}`) and a
-  sharper form of the indistinguishability argument: only the views of the two endpoints of each edge
-  must be realised by one identifier assignment. (`theorem_2_5`)
-* **Theorem 2.6: the proof, as written, gives less.** Balls of radius `< k` of `G_{2k+1,2k+1}` and
-  Observation 2.4 give `r ≤ k - 2` for the `(2k+1)`-grid, i.e. `2r + 5 ≤ N` for side `N`; the sharp
-  form of the same argument gives `2r + 3 ≤ N` (`theorem_2_6`), which is optimal for odd `N` by the
-  first item.
-* **Observation 2.4 is imprecise.** "Each ball of `H` is isomorphic to some ball of `G`" must be read
-  with *rooted* isomorphisms (the centre must go to the centre), otherwise the argument fails. With
-  that reading it is correct. (`observation_2_4`)
-* Minor: Theorem 2.5 speaks of `H_k`, which is only defined for even `k` (Figure 2); Theorem 1.5's
-  graph is only given by a picture ("versions … clearly exist"), we give an explicit family.
+### ❌ Theorem 2.6 (3-colouring the `k × k` grid needs `k/2` rounds)
+Theorem 2.6 is false for every odd `k ≥ 3`, `k = 2t + 1`: in `t < k/2` rounds a node can count the nodes at distance exactly `t`, which determines `x + y mod 2`, so the grid can even be 2-coloured (`theorem_2_6_false_odd`, `theorem_2_6_false_3`, …, `theorem_2_6_false_11`).
+
+**Impact.** The error costs one round: the asymptotic content (`Ω(√n)`) is unaffected, and the
+"in particular" part (`Ω(√n)` rounds for planar bipartite graphs) is true. The correct bound from
+the paper's method is `2r + 3 ≤ k`, which we prove (`theorem_2_6`); for odd `k` it is tight.
+
+**Details.** The statement: "No distributed algorithm can 3-color the rectangular `k × k` grid in
+the plane in less than `k/2` rounds."
+- In the `(2t+1) × (2t+1)` grid, with `a, b` the distances to the nearest horizontal and vertical
+  side, the number of nodes at distance exactly `t` is `t + 1 + a + b` if `a + b < t` (values
+  `≤ 2t`), `2(a + b) + 2` if `a + b ≥ t` and `a, b < t` (even values `≥ 2t + 2`), `2t + 1 + 2b` if
+  `a = t > b` (odd values) and `4t` at the centre. So "output `0` or `1` according to this count" is
+  a proper 2-colouring in `t < k/2` rounds. Already for `k = 3`: in one round a node knows its
+  degree, and colouring by degree (2 and 4 vs 3) works.
+- The algorithm is a genuine `t`-round LOCAL algorithm (CSLib's `IsLocal`), and ignores identifiers.
+  It is designed for the grid, which the statement allows: like Observation 2.4, from which the
+  paper derives it, Theorem 2.6 is about colouring one fixed graph under every identifier assignment
+  (and nodes know `n = k²`). Under a stronger "uniform" reading (an algorithm correct on all planar
+  bipartite graphs needs `k/2` rounds on the `k × k` grid) the counterexample does not apply; that
+  reading is not settled here.
+- For even `k` the paper's bound `r < k/2` is neither proved nor refuted here.
+- The proof, as written, gives less: balls of radius `< k` of `G_{2k+1,2k+1}` and Observation 2.4
+  give `r ≤ k - 2` for the `(2k+1)`-grid, i.e. `2r + 5 ≤ N` for side `N`.
+
+**Repair.** The sharp form of the same argument gives `2r + 3 ≤ N` (`theorem_2_6`), which is optimal
+for odd `N`.
+
+### ⚠️ Observation 2.4 (isomorphic balls)
+"Each ball of `H` is isomorphic to some ball of `G`" must be read with *rooted* isomorphisms (the centre must go to the centre), otherwise the argument fails.
+
+**Impact.** Imprecise statement with evident intent: with that reading it is correct
+(`observation_2_4`).
+
+### Typos and slips
+- Theorem 2.5 speaks of `H_k`, which is only defined for even `k` (Figure 2).
+- Theorem 1.5's graph is only given by a picture ("versions … clearly exist"); we give an explicit
+  family.
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 2.5 (`H_{2ℓ}` needs `ℓ` rounds)
+The proof applies Observation 2.4 to `H = G_{5,2ℓ+1}` (Klein bottle) and `G = H_{2ℓ}`, but `G_{5,2ℓ+1}` has `10ℓ + 5` vertices, more than `H_{2ℓ}` (`10ℓ`), violating the hypothesis `|V(H)| ≤ |V(G)|`.
+
+**Impact.** Statement true; we prove the stated bound `r < ℓ` (`theorem_2_5`).
+
+**Details.** Also, "balls of radius `< ℓ`" combined with Observation 2.4 (balls of radius `r + 1`)
+only gives `r ≤ ℓ - 2`.
+
+**Repair.** We use the Klein bottle grid `G_{5,2ℓ}` (same size as `H_{2ℓ}`) and a sharper form of
+the indistinguishability argument: only the views of the two endpoints of each edge must be realised
+by one identifier assignment.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

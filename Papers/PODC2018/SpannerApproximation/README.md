@@ -14,27 +14,34 @@ is correct. Lemma 3.2 has a gap: after the simulation, a node cannot compute its
 
 ## Mistakes in the paper
 
-* **Lemma 3.2: the conversion from spanner to vertex cover needs communication.** The paper says
-  that after simulating the 2-spanner algorithm on `G_S`, every node converts the spanner `H` into
-  `C_H` "without any communication". By §1.5, a node outputs *some* of its incident edges and the
-  spanner is the union of the outputs. So node `v` does not know whether `u₂` output the cross edge
-  `{v₁, u₂}`, and that edge decides whether `v ∈ C_H`. The natural local rule (apply `C_H` only to
-  the edges that `v`'s own copies output) fails. Take the triangle and the optimal 2-spanner of
-  `G_S` made of all weight-0 edges plus the cross edge `{0₁, 2₂}`. Either `0₁` or `2₂` may be the
-  node that outputs that cross edge. The rule then gives `{0}` or `{2}`, and neither is a vertex
-  cover (`localRule_counterexample`). One extra round, in which each node tells each neighbour
-  whether it output their shared cross edge, repairs the proof. We prove Lemma 3.2 with `T + 1`
-  rounds of `3B`-bit messages, or `3(T + 1)` rounds of `B`-bit messages, instead of `3T`
-  (`lemma_3_2`, `lemma_3_2_congest`). This is a proof gap; the `+O(1)` does not affect
-  Thms 3.3/3.4.
-* **Minor slips.**
-  - Proof of Lemma 2.4: "`V_B = Y1, V_A = V \ V_A`" should read `V_A = V \ V_B`.
-  - Claim 3.1 / Lemma 3.2: the conversion `H → H'` gives `w(H') ≤ w(H)`. It has "the same cost"
-    only because `H` is a minimum spanner in Claim 3.1. Lemma 3.2 applies the conversion to an
-    `α`-approximate `H`, so there only `|C_H| ≤ w(H)` holds, and that is all the proof needs.
-  - Proof of Thm 2.8: the constants `c₁`, `c₂` are handled loosely (`β` is defined from `α(n')`,
-    the bound is used with `α(n)`). The argument is routine; our version has explicit constants
-    and no monotonicity assumption.
+No mistakes in the statements.
+
+### Typos and slips
+- Proof of Lemma 2.4: "`V_B = Y1, V_A = V \ V_A`" should read `V_A = V \ V_B`.
+- Claim 3.1 / Lemma 3.2: the conversion `H → H'` gives `w(H') ≤ w(H)`. It has "the same cost" only
+  because `H` is a minimum spanner in Claim 3.1. Lemma 3.2 applies the conversion to an
+  `α`-approximate `H`, so there only `|C_H| ≤ w(H)` holds, and that is all the proof needs.
+- Proof of Thm 2.8: the constants `c₁`, `c₂` are handled loosely (`β` is defined from `α(n')`, the
+  bound is used with `α(n)`). The argument is routine; our version has explicit constants and no
+  monotonicity assumption.
+
+## Proof gaps (statements true)
+
+### 🛠️ Lemma 3.2 (from a 2-spanner algorithm to vertex cover)
+The proof claims that after simulating the 2-spanner algorithm on `G_S` every node converts the spanner `H` into `C_H` "without any communication", but node `v` cannot know whether `u₂` output the cross edge `{v₁, u₂}`, which decides whether `v ∈ C_H` (`localRule_counterexample`).
+
+**Impact.** Repaired with one extra round: `T + 1` rounds of `3B`-bit messages, or `3(T + 1)` rounds
+of `B`-bit messages, instead of `3T` (`lemma_3_2`, `lemma_3_2_congest`). The `+O(1)` does not affect
+Thms 3.3/3.4.
+
+**Details.** By §1.5, a node outputs *some* of its incident edges and the spanner is the union of
+the outputs. The natural local rule (apply `C_H` only to the edges that `v`'s own copies output)
+fails. Take the triangle and the optimal 2-spanner of `G_S` made of all weight-0 edges plus the
+cross edge `{0₁, 2₂}`. Either `0₁` or `2₂` may be the node that outputs that cross edge. The rule
+then gives `{0}` or `{2}`, and neither is a vertex cover.
+
+**Repair.** In one extra round each node tells each neighbour whether it output their shared cross
+edge.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
