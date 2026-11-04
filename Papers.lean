@@ -2379,3 +2379,8 @@ import Papers.PODC2010.KBakery.RMRCC
 import Papers.PODC2010.KBakery.NonVacuity
 import Papers.PODC2010.KBakery.Main
 import Papers.PODC2010.KBakery.NonAtomic
+import Papers.PODC2011.PartialReversalAcyclicity.Model
+import Papers.PODC2011.PartialReversalAcyclicity.PR
+import Papers.PODC2011.PartialReversalAcyclicity.NewPR
+import Papers.PODC2011.PartialReversalAcyclicity.Simulation
+import Papers.PODC2011.PartialReversalAcyclicity.Counterexamples
