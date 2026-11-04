@@ -2262,3 +2262,11 @@ import Papers.PODC2010.EventualLinearizability.Algorithm1
 import Papers.PODC2010.EventualLinearizability.ImplModel
 import Papers.PODC2010.EventualLinearizability.Runs
 import Papers.PODC2010.EventualLinearizability.Theorem2
+import Papers.PODC2013.IncentiveTrees.Basic
+import Papers.PODC2013.IncentiveTrees.Impossibility
+import Papers.PODC2013.IncentiveTrees.Geometric
+import Papers.PODC2013.IncentiveTrees.CDRM
+import Papers.PODC2013.IncentiveTrees.CDRMExample
+import Papers.PODC2013.IncentiveTrees.TDRMChain
+import Papers.PODC2013.IncentiveTrees.TDRM
+import Papers.PODC2013.IncentiveTrees.TDRMProps
