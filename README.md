@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 15, 🛠️ 48, ⚠️ 121, ❌ 77, 🚨 27 (288 papers).
+Counts: ✅ 15, 🛠️ 48, ⚠️ 121, ❌ 77, 🚨 28 (289 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -256,6 +256,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2021 | 4 | Elkin, Matar — *Ultra-Sparse Near-Additive Emulators* | [UltraSparseEmulators](Papers/PODC2021/UltraSparseEmulators) | ⚠️ Centralized construction (Section 2) proved for every order of consideration: (1+ε, 30(34 log κ/ε)^{log κ−1})-emulator with at most n^{1+1/κ} edges (Lemmas 2.3–2.12, Cor. 2.13–2.14) and the ultra-sparse n + o(n) Corollary 2.15; Algorithm 1 line 18 typo (r_{C'} for r_{C''}) breaks Lemma 2.5 if read literally, intent clear from the prose; Lemma 2.10 proof gaps repaired; ℓ ≤ log κ needs the paper's integer-κ convention |
 | 2011 | 4 | Golab — *A complexity separation between the cache-coherent and distributed shared memory models* | [CCvsDSMSeparation](Papers/PODC2011/CCvsDSMSeparation) | ⚠️ Separation proved: the one-Boolean CC algorithm (≤ 2 RMRs per process) and Thm 6.2 (no deterministic terminating read/write solution has O(1) amortized DSM RMRs; uniform N₀(c), k ≤ c²+c+1); Cor 6.14 drops "terminating" (0-RMR spinning counterexample, intent evident from its proof); Lemma 6.10's construction breaks regularity condition 3 (repaired with a weaker invariant), Lemma 6.13 proof gaps repaired |
 | 2018 | 4 | Burman, Beauquier, Sohier — *Brief Announcement: Space-Optimal Naming in Population Protocols* | [PPNaming](Papers/PODC2018/PPNaming) | ⚠️ All formalized propositions true (Props. 1, 3, 4, 6, 12–14, Lemma 2, Thm 11); Table 1/§1 "symmetric, no leader, global fairness: P+1 states" omits Prop. 13's `n > 2` — no symmetric leaderless protocol names 2 agents; Thm 11 proof gap (weak fairness of the constructed execution, final segment) repaired with a new adversary argument |
+| 2010 | 4 | Danek — *The k-Bakery: Local-Spin k-Exclusion Using Non-atomic Reads and Writes* | [KBakery](Papers/PODC2010/KBakery) | 🚨 Atomic algorithms of Fig. 2 proved (Thms 8, 9: k-exclusion, starvation freedom with < k crashes, k-FCFS, FIFE within 4N+7 own steps, DSM exactly 4(N−1)/5(N−1) and CC ≤ 9N−6/13N−6, ≥ 3N−1 RMRs per passage); **the non-atomic algorithm of Fig. 3 (Thm 10, named in the title) violates k-exclusion**: with safe registers, N = 3, k = 1, a read of `Ticket[r]` overlapping `r`'s rewrite returns 0 and a stale `Capture[r][p]` lets two processes into the CS (thesis Lemma 5.21 fails) |
 | 2024 | 3 | Chang, Mishra, Nguyen, Yang, Yeh — *A Tight Lower Bound for 3-Coloring Grids in the Online-LOCAL Model* | [OnlineLocalGrids](Papers/PODC2024/OnlineLocalGrids) | ⚠️ Theorems 1.1, 1.3 proved; Theorem 1.3 omits that √n must be odd |
 | 2023 | 3 | Bashari, Jamadi, Woelfel — *Efficient Bounded Timestamping from Standard Synchronization Primitives* | [BoundedTimestamping](Papers/PODC2023/BoundedTimestamping) | 🚨 **The LL/SC algorithm (Figs. 1–2) is not linearizable**: helper steps share the process's LL/SC link, so Lemma 6 (hence Lemmas 8, 9, Cor. 10) is false — sequential 438-operation counterexample (n=3); Theorem 1 not established; wait-freedom (≤ 2κ+107 steps) and Section 6 algorithm proved |
 | 2022 | 3 | Dory, Ghaffari, Ilchi — *Near-Optimal Distributed Dominating Set in Bounded Arboricity Graphs* | [DominatingSetArboricity](Papers/PODC2022/DominatingSetArboricity) | ⚠️ Theorems 1.1–1.3 proved (deterministic distributed algorithm, randomized bounds) and the Theorem 1.4 reduction; Theorem 1.3's proof arithmetic fails for small Δ (statement rescued); missing justifications and degenerate slips |
@@ -519,6 +520,12 @@ the refutation is checked by Lean; details, and the corrected statements we prov
   echoer, whose SRB sequence orders their two echoes consistently. The paper's proof wrongly assumes that the
   processes of C₂ end their round while their messages are delayed. Lean proves the echo protocol correct
   (safety, integrity, liveness in every fair execution) and refutes the claim for n = 5, f = 2.
+- **The k-Bakery: Local-Spin k-Exclusion Using Non-atomic Reads and Writes** (PODC 2010, 4 citations) —
+  [KBakery](Papers/PODC2010/KBakery). The non-atomic algorithm of Figure 3 (Theorem 10) violates k-exclusion. `Ticket` is not
+  duplicated, so under the paper's safe-register semantics a process choosing its ticket while another process `r` rewrites
+  `Ticket[r]` may read 0. It then gets a ticket below an old capture value `Capture[r][p]` from an earlier passage of `r`,
+  detects a stale capture and enters the CS. With N = 3 and k = 1, two processes are in the CS together (246-step
+  execution, no crashes). The atomic algorithms (Theorems 8, 9) are correct and fully proved.
 - **Efficient Bounded Timestamping from Standard Synchronization Primitives** (PODC 2023, 3 citations) —
   [BoundedTimestamping](Papers/PODC2023/BoundedTimestamping). The headline algorithm (Figures 1–2) is not linearizable.
   The helping routine `helpMoveTS` runs a few steps at a time across later operations of the same process, while
