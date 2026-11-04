@@ -2344,3 +2344,12 @@ import Papers.PODC2011.RobustAtomicStorage.ReadLB
 import Papers.PODC2011.RobustAtomicStorage.WriteLB
 import Papers.PODC2011.RobustAtomicStorage.Sanity
 import Papers.PODC2011.RobustAtomicStorage.Main
+import Papers.PODC2018.CausalRecordReplay.Basic
+import Papers.PODC2018.CausalRecordReplay.Model
+import Papers.PODC2018.CausalRecordReplay.Offline1
+import Papers.PODC2018.CausalRecordReplay.Online1
+import Papers.PODC2018.CausalRecordReplay.Model2
+import Papers.PODC2018.CausalRecordReplay.Sufficiency2
+import Papers.PODC2018.CausalRecordReplay.Completion
+import Papers.PODC2018.CausalRecordReplay.Necessity2
+import Papers.PODC2018.CausalRecordReplay.Counterexamples

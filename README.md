@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 15, 🛠️ 48, ⚠️ 119, ❌ 77, 🚨 27 (286 papers).
+Counts: ✅ 15, 🛠️ 48, ⚠️ 120, ❌ 77, 🚨 27 (287 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -341,6 +341,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2020 | 0 | Goren, Moses — *Brief Announcement: On Using Null Messages in a Byzantine Setting* | [NullMessagesByzantine](Papers/PODC2020/NullMessagesByzantine) | ✅ Theorem 1.2 (a silent validation round gives knowledge of the global milestone, Definition 1.1 via CSLib knowledge) and Theorem 2.1 (SmallCouncil + any binary BA protocol is binary BA for 2t < n; failure-free: decides MAJ at time 3 with ≤ n(t+1.5) bits; in general ≤ n(t+1.5)+2n² layer bits by correct processes, 4 rounds before the base protocol) proved; the paper gives no proofs (reconstructed); both results rely on its convention that "send to all" includes the sender (Lean counterexamples without it) |
 | 2019 | 0 | Severson, Haley, Doty — *Composable Computation in Discrete Chemical Reaction Networks* | [ComposableCRN](Papers/PODC2019/ComposableCRN) | ✅ 1D characterization (Thm 3.1, ⇒ via cited Lemma 2.7), Lemma 4.1 (`max` not obliviously-computable), quilt-affine construction (Lemma 6.1), composition and the "⇐" direction of main Theorem 5.2 (Lemma 6.2), and leaderless 1D Thm 9.2 proved; the necessity of the eventually-min condition (Thm 7.1, §7 geometry) is assumed, not checked |
 | 2019 | 0 | Chaudhuri, Frank, Welch — *Brief Announcement: How Fast Reads Affect Multi-Valued Register Simulations* | [FastReadsRegisterSim](Papers/PODC2019/FastReadsRegisterSim) | 🛠️ Theorems 3.1, 3.2, Corollary 3.5, Lemmas 3.3–3.4 and Theorem 4.1 (no atomic k-valued register with two readers has reads of log₂ k steps, k > 2) all proved; the proof of Lemma 4.2 (same root register) rests on a false decision-tree inference, so Theorem 4.1's proof was repaired by a case split; small gaps in Section 3 |
+| 2018 | 0 | Jones, Khan, Vaidya — *Brief Announcement: Optimal Record and Replay under Causal Consistency* | [CausalRecordReplay](Papers/PODC2018/CausalRecordReplay) | ⚠️ Offline and online optimal records under strong causal consistency proved good and least (Thms 5.3–5.6, 6.6, 6.7). Definition 6.4 omits `w₃ ≠ w₄`, which makes Thm 6.6 false as written; the proof uses the intended version. The online-record notion of Thm 5.6 needs the uniform, knowledge-based reading. Proofs of Lemma C.1(b) and Thms 5.6 and 6.7 repaired |
 
 ## Papers with critical mistakes
 
