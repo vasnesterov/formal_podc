@@ -2335,3 +2335,12 @@ import Papers.PODC2015.KAtomicityVerification.GPO
 import Papers.PODC2015.KAtomicityVerification.GPOCorrect
 import Papers.PODC2015.KAtomicityVerification.GPOComplete
 import Papers.PODC2015.KAtomicityVerification.LargeK
+import Papers.PODC2011.RobustAtomicStorage.Model
+import Papers.PODC2011.RobustAtomicStorage.Blocks
+import Papers.PODC2011.RobustAtomicStorage.Arith
+import Papers.PODC2011.RobustAtomicStorage.Sim
+import Papers.PODC2011.RobustAtomicStorage.Label
+import Papers.PODC2011.RobustAtomicStorage.ReadLB
+import Papers.PODC2011.RobustAtomicStorage.WriteLB
+import Papers.PODC2011.RobustAtomicStorage.Sanity
+import Papers.PODC2011.RobustAtomicStorage.Main
