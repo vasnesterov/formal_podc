@@ -2188,3 +2188,10 @@ import Papers.PODC2014.RandomizationTwoHop.Theorem1
 import Papers.PODC2014.RandomizationTwoHop.Measure
 import Papers.PODC2014.RandomizationTwoHop.Main
 import Papers.PODC2014.RandomizationTwoHop.LocalityGap
+import Papers.PODC2015.DAPInvisibleReads.Model
+import Papers.PODC2015.DAPInvisibleReads.Commute
+import Papers.PODC2015.DAPInvisibleReads.Scenario
+import Papers.PODC2015.DAPInvisibleReads.Impossibility
+import Papers.PODC2015.DAPInvisibleReads.Figure1
+import Papers.PODC2015.DAPInvisibleReads.NonVacuity
+import Papers.PODC2015.DAPInvisibleReads.Lemma1
