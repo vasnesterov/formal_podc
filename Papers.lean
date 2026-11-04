@@ -2253,3 +2253,12 @@ import Papers.PODC2013.EarlyDecidingExpensive.Theorem36
 import Papers.PODC2013.EarlyDecidingExpensive.Crash
 import Papers.PODC2013.EarlyDecidingExpensive.Orderly
 import Papers.PODC2013.EarlyDecidingExpensive.CrashCounterexample
+import Papers.PODC2010.EventualLinearizability.Defs
+import Papers.PODC2010.EventualLinearizability.Locality
+import Papers.PODC2010.EventualLinearizability.Nonblocking
+import Papers.PODC2010.EventualLinearizability.Theorem1
+import Papers.PODC2010.EventualLinearizability.Layer
+import Papers.PODC2010.EventualLinearizability.Algorithm1
+import Papers.PODC2010.EventualLinearizability.ImplModel
+import Papers.PODC2010.EventualLinearizability.Runs
+import Papers.PODC2010.EventualLinearizability.Theorem2
