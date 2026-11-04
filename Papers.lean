@@ -2325,3 +2325,13 @@ import Papers.PODC2019.RecoverableHierarchy.Fig2Prog
 import Papers.PODC2019.RecoverableHierarchy.Fig2Generic
 import Papers.PODC2019.RecoverableHierarchy.Tightness
 import Papers.PODC2019.RecoverableHierarchy.Assumption1Gap
+import Papers.PODC2015.KAtomicityVerification.Basic
+import Papers.PODC2015.KAtomicityVerification.Characterization
+import Papers.PODC2015.KAtomicityVerification.CGS
+import Papers.PODC2015.KAtomicityVerification.Normalization
+import Papers.PODC2015.KAtomicityVerification.Examples
+import Papers.PODC2015.KAtomicityVerification.ExamplesGPO
+import Papers.PODC2015.KAtomicityVerification.GPO
+import Papers.PODC2015.KAtomicityVerification.GPOCorrect
+import Papers.PODC2015.KAtomicityVerification.GPOComplete
+import Papers.PODC2015.KAtomicityVerification.LargeK
