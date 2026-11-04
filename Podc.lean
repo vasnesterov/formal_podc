@@ -125,3 +125,5 @@ import Podc.Foundations.GameTheory.NetworkCostSharing
 import Podc.Computability.Distributed.MessagePassing.Timed.Basic
 import Podc.Computability.Distributed.MessagePassing.Timed.Lin
 import Podc.Computability.Distributed.Congest.Typed
+import Podc.Computability.Distributed.SharedMemory.Awareness
+import Podc.Computability.Distributed.SharedMemory.AwarenessRound
