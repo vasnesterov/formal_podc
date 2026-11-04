@@ -2318,3 +2318,10 @@ import Papers.PODC2015.SafetyLivenessExclusion.CounterexampleWF
 import Papers.PODC2015.SafetyLivenessExclusion.Order
 import Papers.PODC2015.SafetyLivenessExclusion.NonVacuity
 import Papers.PODC2015.SafetyLivenessExclusion.LKFreedom
+import Papers.PODC2019.RecoverableHierarchy.Theorem3
+import Papers.PODC2019.RecoverableHierarchy.Theorem6
+import Papers.PODC2019.RecoverableHierarchy.Fig1
+import Papers.PODC2019.RecoverableHierarchy.Fig2Prog
+import Papers.PODC2019.RecoverableHierarchy.Fig2Generic
+import Papers.PODC2019.RecoverableHierarchy.Tightness
+import Papers.PODC2019.RecoverableHierarchy.Assumption1Gap
