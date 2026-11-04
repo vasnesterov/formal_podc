@@ -2233,3 +2233,15 @@ import Papers.PODC2010.AsymmetricProgress.Theorems
 import Papers.PODC2010.AsymmetricProgress.NonVacuity
 import Papers.PODC2010.AsymmetricProgress.Arbiter
 import Papers.PODC2010.AsymmetricProgress.GroupConsensus
+import Papers.PODC2013.TMObservationalRefinement.Basic
+import Papers.PODC2013.TMObservationalRefinement.Opacity
+import Papers.PODC2013.TMObservationalRefinement.Trace
+import Papers.PODC2013.TMObservationalRefinement.Rearrangement
+import Papers.PODC2013.TMObservationalRefinement.Semantics
+import Papers.PODC2013.TMObservationalRefinement.Program
+import Papers.PODC2013.TMObservationalRefinement.Sufficiency
+import Papers.PODC2013.TMObservationalRefinement.Literal
+import Papers.PODC2013.TMObservationalRefinement.NonVacuity
+import Papers.PODC2013.TMObservationalRefinement.Theorem24
+import Papers.PODC2013.TMObservationalRefinement.Theorem24Intended
+import Papers.PODC2013.TMObservationalRefinement.TraceNecessity
