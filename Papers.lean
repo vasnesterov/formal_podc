@@ -2391,3 +2391,15 @@ import Papers.PODC2011.SharedObjectTimeBounds.TheoremD1
 import Papers.PODC2011.SharedObjectTimeBounds.TheoremE1
 import Papers.PODC2011.SharedObjectTimeBounds.Examples
 import Papers.PODC2012.OptimalAPSP.Main
+import Papers.PODC2011.AtMostOnceEffectiveness.Model
+import Papers.PODC2011.AtMostOnceEffectiveness.Algorithm
+import Papers.PODC2011.AtMostOnceEffectiveness.Steps
+import Papers.PODC2011.AtMostOnceEffectiveness.Rank
+import Papers.PODC2011.AtMostOnceEffectiveness.Safety
+import Papers.PODC2011.AtMostOnceEffectiveness.Progress
+import Papers.PODC2011.AtMostOnceEffectiveness.WaitFree
+import Papers.PODC2011.AtMostOnceEffectiveness.Adversary
+import Papers.PODC2011.AtMostOnceEffectiveness.UpperBound
+import Papers.PODC2011.AtMostOnceEffectiveness.Main
+import Papers.PODC2011.AtMostOnceEffectiveness.Degenerate
+import Papers.PODC2011.AtMostOnceEffectiveness.FewCrashes
