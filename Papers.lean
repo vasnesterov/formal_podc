@@ -2245,3 +2245,11 @@ import Papers.PODC2013.TMObservationalRefinement.NonVacuity
 import Papers.PODC2013.TMObservationalRefinement.Theorem24
 import Papers.PODC2013.TMObservationalRefinement.Theorem24Intended
 import Papers.PODC2013.TMObservationalRefinement.TraceNecessity
+import Papers.PODC2013.EarlyDecidingExpensive.Model
+import Papers.PODC2013.EarlyDecidingExpensive.Combinatorics
+import Papers.PODC2013.EarlyDecidingExpensive.Critical
+import Papers.PODC2013.EarlyDecidingExpensive.Byzantine
+import Papers.PODC2013.EarlyDecidingExpensive.Theorem36
+import Papers.PODC2013.EarlyDecidingExpensive.Crash
+import Papers.PODC2013.EarlyDecidingExpensive.Orderly
+import Papers.PODC2013.EarlyDecidingExpensive.CrashCounterexample
