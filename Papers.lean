@@ -2297,3 +2297,9 @@ import Papers.PODC2018.PPNaming.Thm11
 import Papers.PODC2018.PPNaming.Prop12
 import Papers.PODC2018.PPNaming.Prop13
 import Papers.PODC2018.PPNaming.Prop14
+import Papers.PODC2012.DAPUniversalConstruction.Model
+import Papers.PODC2012.DAPUniversalConstruction.List
+import Papers.PODC2012.DAPUniversalConstruction.Instances
+import Papers.PODC2012.DAPUniversalConstruction.Impossibility
+import Papers.PODC2012.DAPUniversalConstruction.Theorem5
+import Papers.PODC2012.DAPUniversalConstruction.NonVacuity
