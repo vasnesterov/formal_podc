@@ -2303,3 +2303,9 @@ import Papers.PODC2012.DAPUniversalConstruction.Instances
 import Papers.PODC2012.DAPUniversalConstruction.Impossibility
 import Papers.PODC2012.DAPUniversalConstruction.Theorem5
 import Papers.PODC2012.DAPUniversalConstruction.NonVacuity
+import Papers.PODC2010.BayesianIgnorance.UpperBounds
+import Papers.PODC2010.BayesianIgnorance.Lemma32
+import Papers.PODC2010.BayesianIgnorance.Lemma33
+import Papers.PODC2010.BayesianIgnorance.Lemma35
+import Papers.PODC2010.BayesianIgnorance.Lemma36
+import Papers.PODC2010.BayesianIgnorance.Section4
