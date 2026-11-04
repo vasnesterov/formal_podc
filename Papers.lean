@@ -2353,3 +2353,14 @@ import Papers.PODC2018.CausalRecordReplay.Sufficiency2
 import Papers.PODC2018.CausalRecordReplay.Completion
 import Papers.PODC2018.CausalRecordReplay.Necessity2
 import Papers.PODC2018.CausalRecordReplay.Counterexamples
+import Papers.PODC2014.EventualLinParadox.Defs
+import Papers.PODC2014.EventualLinParadox.Basic
+import Papers.PODC2014.EventualLinParadox.Lemma17
+import Papers.PODC2014.EventualLinParadox.Safety
+import Papers.PODC2014.EventualLinParadox.Locality
+import Papers.PODC2014.EventualLinParadox.ImplModel
+import Papers.PODC2014.EventualLinParadox.Prop18
+import Papers.PODC2014.EventualLinParadox.Theorem12
+import Papers.PODC2014.EventualLinParadox.Counterexamples
+import Papers.PODC2014.EventualLinParadox.Prop16
+import Papers.PODC2014.EventualLinParadox.Prop14
