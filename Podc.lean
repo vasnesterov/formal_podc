@@ -122,3 +122,5 @@ import Podc.Computability.Distributed.PopulationProtocols.Phases
 import Podc.Computability.Distributed.SharedMemory.Contention
 import Podc.Foundations.GameTheory.BayesianGame
 import Podc.Foundations.GameTheory.NetworkCostSharing
+import Podc.Computability.Distributed.MessagePassing.Timed.Basic
+import Podc.Computability.Distributed.MessagePassing.Timed.Lin

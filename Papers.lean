@@ -2384,3 +2384,9 @@ import Papers.PODC2011.PartialReversalAcyclicity.PR
 import Papers.PODC2011.PartialReversalAcyclicity.NewPR
 import Papers.PODC2011.PartialReversalAcyclicity.Simulation
 import Papers.PODC2011.PartialReversalAcyclicity.Counterexamples
+import Papers.PODC2011.SharedObjectTimeBounds.Spec
+import Papers.PODC2011.SharedObjectTimeBounds.Setup
+import Papers.PODC2011.SharedObjectTimeBounds.TheoremC1
+import Papers.PODC2011.SharedObjectTimeBounds.TheoremD1
+import Papers.PODC2011.SharedObjectTimeBounds.TheoremE1
+import Papers.PODC2011.SharedObjectTimeBounds.Examples
