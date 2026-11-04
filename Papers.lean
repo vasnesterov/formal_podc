@@ -2289,3 +2289,11 @@ import Papers.PODC2011.HomonymsBA.RestrictedBroadcast
 import Papers.PODC2011.HomonymsBA.RestrictedSafety
 import Papers.PODC2011.HomonymsBA.RestrictedLiveness
 import Papers.PODC2011.HomonymsBA.RestrictedProp18
+import Papers.PODC2018.PPNaming.Model
+import Papers.PODC2018.PPNaming.Basic
+import Papers.PODC2018.PPNaming.Prop1
+import Papers.PODC2018.PPNaming.Sink
+import Papers.PODC2018.PPNaming.Thm11
+import Papers.PODC2018.PPNaming.Prop12
+import Papers.PODC2018.PPNaming.Prop13
+import Papers.PODC2018.PPNaming.Prop14
