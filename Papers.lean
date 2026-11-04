@@ -2225,3 +2225,11 @@ import Papers.PODC2014.WritableObjects.Lemma48Exec4
 import Papers.PODC2014.WritableObjects.Lemma48Exec5
 import Papers.PODC2014.WritableObjects.Lemma48
 import Papers.PODC2014.WritableObjects.Theorem41
+import Papers.PODC2010.AsymmetricProgress.Model
+import Papers.PODC2010.AsymmetricProgress.Valency
+import Papers.PODC2010.AsymmetricProgress.Critical
+import Papers.PODC2010.AsymmetricProgress.LiveCons
+import Papers.PODC2010.AsymmetricProgress.Theorems
+import Papers.PODC2010.AsymmetricProgress.NonVacuity
+import Papers.PODC2010.AsymmetricProgress.Arbiter
+import Papers.PODC2010.AsymmetricProgress.GroupConsensus
