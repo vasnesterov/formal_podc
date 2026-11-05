@@ -2563,3 +2563,16 @@ import Papers.PODC2012.LeaderElectionSpaceLB.Main
 import Papers.PODC2016.MobileByzantineStorage.Model
 import Papers.PODC2016.MobileByzantineStorage.ReadAttack
 import Papers.PODC2016.MobileByzantineStorage.LowerBound
+import Papers.PODC2013.MessageAdversariesVsFD.Model
+import Papers.PODC2013.MessageAdversariesVsFD.Tasks
+import Papers.PODC2013.MessageAdversariesVsFD.StronglyCorrect
+import Papers.PODC2013.MessageAdversariesVsFD.Theorem1
+import Papers.PODC2013.MessageAdversariesVsFD.BlockSim
+import Papers.PODC2013.MessageAdversariesVsFD.TourVariants
+import Papers.PODC2013.MessageAdversariesVsFD.Counterexample
+import Papers.PODC2013.MessageAdversariesVsFD.Async
+import Papers.PODC2013.MessageAdversariesVsFD.SigmaSeen
+import Papers.PODC2013.MessageAdversariesVsFD.AsyncLocal
+import Papers.PODC2013.MessageAdversariesVsFD.Refutations
+import Papers.PODC2013.MessageAdversariesVsFD.ArwOmega
+import Papers.PODC2013.MessageAdversariesVsFD.ArwOmegaCons
