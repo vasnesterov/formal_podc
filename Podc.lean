@@ -129,3 +129,4 @@ import Podc.Computability.Distributed.SharedMemory.Awareness
 import Podc.Computability.Distributed.SharedMemory.AwarenessRound
 import Podc.Foundations.Combinatorics.SetPairs
 import Podc.Computability.Distributed.SharedMemory.SeqCompose
+import Podc.Computability.Distributed.MessagePassing.FailureDetectors.Sigma
