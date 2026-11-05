@@ -2488,3 +2488,7 @@ import Papers.PODC2011.UnboundedConcurrency.Swap.WaitFree
 import Papers.PODC2011.UnboundedConcurrency.Swap.Lin
 import Papers.PODC2011.UnboundedConcurrency.Swap.Theorem9
 import Papers.PODC2011.UnboundedConcurrency.Swap.Lemma1
+import Papers.PODC2012.LimitedUseSnapshots.Steps
+import Papers.PODC2012.LimitedUseSnapshots.Counterexample
+import Papers.PODC2012.LimitedUseSnapshots.Linearizable
+import Papers.PODC2012.LimitedUseSnapshots.Snapshot
