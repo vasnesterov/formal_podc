@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 16, 🛠️ 49, ⚠️ 124, ❌ 86, 🚨 31 (306 papers).
+Counts: ✅ 16, 🛠️ 49, ⚠️ 124, ❌ 86, 🚨 32 (307 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -168,6 +168,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2019 | 15 | Skrzypczak, Schintke, Schütt — *Linearizable State Machine Replication of State-Based CRDTs without Logs* | [CRDTReplication](Papers/PODC2019/CRDTReplication) | 🚨 **Algorithm 2 not linearizable; Theorem 3 (Consistency), Lemma 3 and Theorem 4 (Update Stability) false** — G-set, 5 processes, majority quorums, incremental prepares, no losses: acceptors outside the ACK quorum vote for a proposal that misses their payload; Theorems 1, 2, 5, Lemmas 1, 2, 4 and the §III-E reduction hold; repaired VOTE handler proved linearizable |
 | 2016 | 15 | Spiegelman, Cassuto, Chockler, Keidar — *Space Bounds for Reliable Storage: Fundamental Limits of Coding* | [ReliableStorageSpace](Papers/PODC2016/ReliableStorageSpace) | ❌ **Algorithm 2 (safe erasure-coded register, §3.1) unsafe as written for k ≤ f**: line 16 may decode a stale timestamp (replication n=3, f=1); with the largest qualifying timestamp Cor 3 proved; **Theorem 1 (each write adds ≥ log₂\|U_s\| bits) false as stated** (rounding/padding; cumulative form proved) and does not justify the "each stored bit belongs to one write" model; main lower bound (Thm 2, Cor 2: unbounded storage or f+1 objects holding D bits of one write) proved in that model (black-box coding) after repairing gaps in Lemmas 3–4 and the fair-run step; Lemma 2's proof wrong (lemma trivial); Theorem 3's bound misstated (not formalized) |
 | 2014 | 15 | Michail, Spirakis — *Simple and Efficient Local Codes for Distributed Stable Network Construction* | [NetworkConstructors](Papers/PODC2014/NetworkConstructors) | ❌ **Theorem 10 (Global-Ring) false**: its closing rule also joins two different lines, and for n = 6 a globally fair execution alternates forever between a spanning line and a spanning ring; correctness of Simple/Fast-Global-Line (Thms 3, 5), Cycle-Cover with waste ≤ 2 (Thm 6, Q_out = {q₂}), Global-Star (Thm 8) and its 2-state bound (Thm 7), 2RC (Thm 11, n ≥ 3), kRC (Thm 12, typo l₀ := q₀ fixed) and c-Cliques (Thm 13, c ≥ 3) proved; Q_out unspecified for Thms 6, 13; kRC and c-Cliques proofs are sketches; running times not formalized |
+| 2016 | 15 | Bonomi, Del Pozzo, Potop-Butucaru, Tixeuil — *Optimal Mobile Byzantine Fault Tolerant Distributed Storage* | [MobileByzantineStorage](Papers/PODC2016/MobileByzantineStorage) | 🚨 **Both regular-register protocols are wrong at the paper's own parameters** (Theorems 9 and 12; Lean counterexamples): a read with no concurrent write returns a never-written value — in CAM via faulty replies sent just before the read (delay ≤ δ), in CUM already with the faulty and cured liars the paper itself counts (4f ≥ 3f+1, 6f ≥ 5f+1); lower-bound proofs (Theorems 3–6) compare executions an authenticated reader distinguishes, Theorems 3 and 5 repaired in the paper's lower-bound model; Lemma 6 misses `min n` |
 | 2010 | 14 | Suomela — *Distributed Algorithms for Edge Dominating Sets* | [EdgeDominatingSets](Papers/PODC2010/EdgeDominatingSets) | ✅ All approximation lower bounds (stronger than stated) and matching port-numbering algorithms proved; typos only |
 | 2015 | 14 | Ostrovsky, Rosenbaum — *Fast Distributed Almost Stable Matchings* | [AlmostStableMatchings](Papers/PODC2015/AlmostStableMatchings) | 🛠️ Theorem 4.1 ((1−ε)-stability of ASM's output, any maximal-matching subroutine) proved with the paper's constants, and Theorem 4.7 (O(ε⁻³ log⁵ n) rounds) as an explicit round count; the proof of Lemma 4.4 misses men who become bad while inactive (displaced after leaving the active set; run with k=2, ℓ=1), repaired by a new charging argument with the same bound; small gap in Lemma 4.5, quantile rounding unspecified |
 | 2012 | 14 | Hella, Järvisalo, Kuusisto, Laurinharju, Lempiäinen, Luosto, Suomela, Virtema — *Weak Models of Distributed Computing, with Connections to Modal Logic* | [WeakModelsModalLogic](Papers/PODC2012/WeakModelsModalLogic) | 🛠️ Both linear orders `SB ⊊ MB = VB ⊊ SV = MV = VV ⊊ VVc` (general and constant-time) proved with all numbered results; the simulations of Theorems 4 and 8/9 ignore stopped neighbours (they send `m0`) — repaired, Theorem 8/9 needs an extra history-extension mechanism |
@@ -486,6 +487,15 @@ the refutation is checked by Lean; details, and the corrected statements we prov
   `{u₂}` by vote, although `u₁` completed before `u₂` was invoked. The proofs apply the `ACK`-quorum condition to voters
   outside that quorum. With the repaired `VOTE` handler (vote only if the payload is `⊑` the proposal), Theorems
   1–5 and linearizability are proved. Checked against arXiv 1905.08733 v1 and v2, whose relevant lines are identical.
+- **Optimal Mobile Byzantine Fault Tolerant Distributed Storage** (PODC 2016, 15 citations) —
+  [MobileByzantineStorage](Papers/PODC2016/MobileByzantineStorage). Both "optimal" regular-register protocols fail:
+  a read with no concurrent write returns a never-written value at the parameters of Tables 1 and 3
+  (Theorems 8/9 for CAM, `n = 4f+1`, `2δ ≤ Δ < 3δ` and `n = 5f+1`, `δ ≤ Δ < 3δ/2`; Theorems 11/12 for CUM,
+  `n = 5f+1` and `8f+1`). In CAM, faulty servers send fake replies just before the read and the model's delay
+  bound δ delivers them during it; in CUM the `4f` (resp. `6f`) faulty and cured servers that the proof of
+  Theorem 11 itself counts outnumber the threshold `3f+1` (resp. `5f+1`). The tightness claims therefore have no
+  matching upper bound; the lower-bound proofs (Theorems 3–6) also compare distinguishable executions, and
+  Theorems 3 and 5 are re-proved in the paper's lower-bound model.
 - **On the Amortized Communication Complexity of Byzantine Broadcast** (PODC 2023, 13 citations) —
   [AmortizedByzantineBroadcast](Papers/PODC2023/AmortizedByzantineBroadcast). The honest-majority protocol (Algorithm 4), which
   the abstract presents as achieving amortized linear communication, is not a correct multi-shot Byzantine broadcast. In
