@@ -2586,3 +2586,10 @@ import Papers.PODC2019.PaxosRaftRefinement.Counterexamples
 import Papers.PODC2019.PaxosRaftRefinement.TLAMultiPaxos
 import Papers.PODC2019.PaxosRaftRefinement.NonVacuity
 import Papers.PODC2019.PaxosRaftRefinement.Porting
+import Papers.PODC2012.IteratedSnapshotFD.Model
+import Papers.PODC2012.IteratedSnapshotFD.Consensus
+import Papers.PODC2012.IteratedSnapshotFD.Termination
+import Papers.PODC2012.IteratedSnapshotFD.NonVacuity
+import Papers.PODC2012.IteratedSnapshotFD.Fig3
+import Papers.PODC2012.IteratedSnapshotFD.SimulationCores
+import Papers.PODC2012.IteratedSnapshotFD.Fig3Live
