@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 16, 🛠️ 49, ⚠️ 123, ❌ 86, 🚨 30 (304 papers).
+Counts: ✅ 16, 🛠️ 49, ⚠️ 123, ❌ 86, 🚨 31 (305 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -315,6 +315,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2019 | 1 | Golab — *Brief Announcement: The Recoverable Consensus Hierarchy* | [RecoverableHierarchy](Papers/PODC2019/RecoverableHierarchy) | 🛠️ All four results proved (Fig. 1 under simultaneous failures; Fig. 2 with `f+1` consensus instances for ≤ `f` independent failures; `f` rTAS objects do not suffice, Thm 3; `f` consensus objects do not suffice for generic constructions, Thm 6, so exactly `f+1`); the literal Assumption 1 (crash after the first *access*, reads included) breaks Case C of Thm 3's proof — a correct-in-the-restricted-model algorithm shows it — repaired by counting only `tas` |
 | 2011 | 1 | Wang, Welch, Lee — *Time Bounds for Shared Objects in Partially Synchronous Systems* | [SharedObjectTimeBounds](Papers/PODC2011/SharedObjectTimeBounds) | ❌ Lower bounds d + min{ε, u, d/3} for strongly immediately non-self-commuting operations (Thm C.1) and for mutator + pure accessor pairs (Thm E.1, gap repaired) proved in a new timed message-passing model (full version: Wang's MS thesis); **Thm D.1's (1 − 1/k)u bound is unestablished** (Step 1.1 unjustified; proved only under a stronger hypothesis and ε ≥ (1 − 1/k)u); **E.1 does not apply to push/peek on a stack**, contrary to §IV.E and Table III |
 | 2011 | 1 | Kentros, Kiayias — *Solving the At-Most-Once Problem with Nearly Optimal Effectiveness* | [AtMostOnceEffectiveness](Papers/PODC2011/AtMostOnceEffectiveness) | ❌ KK_β proved at-most-once (Lemma 4.1), wait-free for β ≥ m (Lemma 4.3, POOL gap repaired), with effectiveness exactly n − (β + m − 2) under m − 1 crashes (Thm 4.4, abstract's n − 2m + 2 for β = m, n ≥ 2m − 1); Thm 2.1 (E ≤ n − f) proved; **Thm 4.4's "=" for f < m − 1 crashes false** (m = 2, β = 4, n = 5, f = 0: E ≥ 2, not 1); formula also wrong for n ≤ β + m − 2 (degenerate); Sections 5–7 not formalized |
+| 2020 | 1 | Attiya, Kumari, Somani, Welch — *Brief Announcement: Collect in the Presence of Continuous Churn with Application to Snapshots and Lattice Agreement* | [StoreCollectChurn](Papers/PODC2020/StoreCollectChurn) | 🚨 **CCC (Algorithms 1–3) is not regular; Theorem 6, Corollary 7, Lemma 10 and Observation 5 false**: a collect returns its current `LView`, into which its own server thread may have merged a concurrent store it never wrote back, so a later collect misses it (5 nodes, no churn or crash, parameters satisfying Constraints A–D); the atomic snapshot (Algorithm 7) on any regular store-collect object is linearizable with an `n + 2` collect bound (Theorem 8, Lemmas 11–13), and the churn arithmetic (Lemmas 1–3, Corollary 1) holds up to a sign slip in Constraint (A) |
 | 2026 | 0 | Attiya, Flam, Welch — *Why Canonical-Round Algorithms Fail for Optimal Byzantine Resilience* | [CanonicalRoundByzantine](Papers/PODC2026/CanonicalRoundByzantine) | ⚠️ Lower bounds proved (for 2f ≤ n ≤ 5f); Corollary 10's proof covers only part of the range (statement true); Theorem 14 implicitly uses the i = j case of gather agreement |
 | 2026 | 0 | D'Archivio, AlMahmoud, Natale, Mallmann-Trenn — *Order Statistics in Population Protocols via Simple Dynamics* | [OrderStatisticsPP](Papers/PODC2026/OrderStatisticsPP) | ⚠️ Laws of the consensus value proved; both proofs of Proposition 6 invalid (statement true); Definition 4.2 under-specified |
 | 2026 | 0 | Nolin — *Sinkless Orientation Made Trivial* | [SinklessOrientation](Papers/PODC2026/SinklessOrientation) | ⚠️ Deterministic part proved; Lemma 2.2's 'in particular' clause says 'degree δ' for 'degree < δ' (one-symbol slip) |
@@ -568,6 +569,13 @@ the refutation is checked by Lean; details, and the corrected statements we prov
   ∅, {a}, {b}, k_max = 2 yet a quorum-echo algorithm is a 1-CB for every source, and the paper's own Algorithms 1–2 never
   double-spend there. The correct optimum is max(1, λ_s), λ_s the maximum over faulty sets containing the source; both bounds
   are proved. The upper bound (Algorithms 1–2 are k_max-spending, Theorem 4.8) holds.
+- **Brief Announcement: Collect in the Presence of Continuous Churn with Application to Snapshots and Lattice Agreement** (PODC 2020, 1 citations) —
+  [StoreCollectChurn](Papers/PODC2020/StoreCollectChurn). The churn-tolerant store-collect algorithm CCC, the paper's headline algorithm, does not satisfy
+  regularity (Theorem 6, Corollary 7): at Line 47 a collect returns its node's current `LView`, which its own server thread (Line 48) may have enlarged
+  during the store-back with a concurrent store that was never written back to a quorum. With 5 nodes, no churn and no crash, and parameters satisfying
+  Constraints A–D, a collect returns `{⟨r, 1⟩}` and a later collect returns `∅`. Lemma 10 and Observation 5 fail for the same reason: `view(φ)` is defined
+  as `LView` at the end of the phase, not as the view the phase stored. The journal version (2022) keeps the same code. A one-line repair (return the
+  view written back) is plausible but not verified. The atomic snapshot built on any correct store-collect object (Theorem 8) is proved linearizable.
 - **Fault Tolerant Coloring of the Asynchronous Cycle** (PODC 2022, 0 citations) —
   [AsyncCycleColoring](Papers/PODC2022/AsyncCycleColoring). The 5-colouring algorithms are not wait-free, so the
   headline claim — wait-free 5-colouring of the cycle in O(log* n) rounds (Theorem 4.4, and Theorem 3.11 for the
