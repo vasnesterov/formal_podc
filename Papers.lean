@@ -2576,3 +2576,13 @@ import Papers.PODC2013.MessageAdversariesVsFD.AsyncLocal
 import Papers.PODC2013.MessageAdversariesVsFD.Refutations
 import Papers.PODC2013.MessageAdversariesVsFD.ArwOmega
 import Papers.PODC2013.MessageAdversariesVsFD.ArwOmegaCons
+import Papers.PODC2019.PaxosRaftRefinement.Paxos
+import Papers.PODC2019.PaxosRaftRefinement.PaxosSafety
+import Papers.PODC2019.PaxosRaftRefinement.PaxosBatch
+import Papers.PODC2019.PaxosRaftRefinement.RaftStar
+import Papers.PODC2019.PaxosRaftRefinement.RaftInv
+import Papers.PODC2019.PaxosRaftRefinement.Refinement
+import Papers.PODC2019.PaxosRaftRefinement.Counterexamples
+import Papers.PODC2019.PaxosRaftRefinement.TLAMultiPaxos
+import Papers.PODC2019.PaxosRaftRefinement.NonVacuity
+import Papers.PODC2019.PaxosRaftRefinement.Porting

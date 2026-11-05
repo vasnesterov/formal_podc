@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 16, 🛠️ 49, ⚠️ 124, ❌ 86, 🚨 33 (308 papers).
+Counts: ✅ 16, 🛠️ 49, ⚠️ 124, ❌ 87, 🚨 33 (309 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -123,6 +123,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2016 | 31 | Jayanti, Tarjan — *A Randomized Concurrent Algorithm for Disjoint Set Union* | [ConcurrentDSU](Papers/PODC2016/ConcurrentDSU) | 🛠️ Linearizability and wait-freedom (Thm 3.4, §6 early termination) proved for every id order; work bounds (§§4–5) not formalized — the authors later retracted the proof of the PODC one-try-splitting bound (open), and Lemma 4.2's h² exponent is unjustified (fixable by constants); minor gaps in Lemmas 3.1, 3.2 |
 | 2011 | 30 | Korman, Sereni, Viennot — *Toward More Localized Local Algorithms: Removing Assumptions Concerning Global Knowledge* | [UniformLocalAlgorithms](Papers/PODC2011/UniformLocalAlgorithms) | ❌ Pruning-based transformers proved: Thm 1 (deterministic), Thm 2 (weak Monte-Carlo → Las Vegas, expected time), Thm 3 (deterministic), Thm 4, Obs 3.2/4.1, Cors 1(i), 2, 4 (cited algorithms as hypotheses), with `+1` for `f* < 1`; **Obs 3.3 false**: `P_MM` violates gluing for the paper's encoding of matchings (4-node path); partner-ID encoding repairs it, so Cor 1(vi) holds; proof repairs in Thms 2 (`α_{i+1} ≤ K·α_i` unjustified) and 3 (undefined `g⁻¹`) |
 | 2011 | 30 | Delporte-Gallet, Fauconnier, Guerraoui, Kermarrec, Ruppert, Tran-The — *Byzantine Agreement with Homonyms* | [HomonymsBA](Papers/PODC2011/HomonymsBA) | ⚠️ Full characterization of Table 1 proved (both directions, all six cells: ℓ > 3t sync, ℓ > (n+3t)/2 partially sync, ℓ > t numerate vs restricted Byzantine), including both partially synchronous algorithms; Prop. 26 false for α = 0, Lemma 34 unestablished (unused); proofs of Thm 19 (non-WLOG reduction) and Lemmas 12/37 (wrong case split) repaired |
+| 2019 | 30 | Wang, Zhao, Mu, Chen, Li — *On the Parallels between Paxos and Raft, and how to Port Optimizations* | [PaxosRaftRefinement](Papers/PODC2019/PaxosRaftRefinement) | ❌ Repaired Raft* proved to refine MultiPaxos (Appendix C mapping), hence safe; **TLA+ MultiPaxos `theorem Invariance` (App. B.1) false** — `Propose` records nothing, two values chosen at one index (3 acceptors); Figure 2 as printed unsafe (vote-rule index slip; heartbeats); §4.3 porting theorem proved for single-step refinements, but its guarantee for Raft* (multi-step) is unestablished |
 | 2021 | 29 | Ghaffari, Haeupler — *Low-Congestion Shortcuts for Graphs Excluding Dense Minors* | [LowCongestionShortcuts](Papers/PODC2021/LowCongestionShortcuts) | ⚠️ Main theorem proved (8δ+1 blocks; 8δ fails on the one-vertex graph); several proof errors (incl. a failing Lemma 3.2 construction); Observation 2.6 false as stated |
 | 2019 | 29 | Khan, Naqvi, Vaidya — *Exact Byzantine Consensus on Undirected Graphs under Local Broadcast Model* | [LocalBroadcastBC](Papers/PODC2019/LocalBroadcastBC) | ⚠️ Characterization proved (Menger's theorem formalized); Thm 4.1 fails for a single node; sufficiency proof gaps repaired |
 | 2011 | 28 | Imbs, Rajsbaum, Raynal — *The Universe of Symmetry Breaking Tasks* | [SymmetryBreakingTasks](Papers/PODC2011/SymmetryBreakingTasks) | ❌ GSB structure theory (feasibility, kernel sets, anchoring, hardest task, canonical form), universality of perfect renaming (Thm 8), no-communication characterization (Thm 9) and the slot-to-renaming algorithm (Thm 12) proved; Thm 4 false for ℓ = 0 without max(0, ·), Lemma 1 misses ℓ_v ≤ u_v; **Thm 9 false under §2.3's standing comparison-based assumption** (holds only for non-comparison-based algorithms); Table 1 misses a row |
@@ -690,6 +691,14 @@ the refutation is checked by Lean; details, and the corrected statements we prov
   output `(5, 5, 1, 2)`, `P_MM` prunes `{v₀, u₀}`, the residual edge is solved by `(5, 5)`, and the glued output
   `(5, 5, 5, 5)` matches nobody. With matchings encoded by partner identities the same rule is a pruning algorithm
   (2 rounds), so Corollary 1(vi) still holds. The general transformers (Theorems 1–4) are correct.
+- **On the Parallels between Paxos and Raft, and how to Port Optimizations** (PODC 2019, 30 citations) —
+  [PaxosRaftRefinement](Papers/PODC2019/PaxosRaftRefinement). The `Invariance` theorem of the TLA+ MultiPaxos
+  specification (Appendix B.1) is false: `Propose` neither records the proposal nor checks for an earlier one, so a
+  leader can propose two values for one index in one ballot, and with 3 acceptors and majority quorums both are
+  chosen (also, 1b messages are unaddressed, so two acceptors can lead one ballot). The porting guarantee of §4.3
+  needs single-step refinement, which Raft* → Paxos is not, so "guaranteed correctness" of the ported Raft*
+  optimizations is unestablished. Figure 2's Raft* is unsafe as printed (a local vote-rule index slip); the repaired
+  Raft* is proved to refine a repaired MultiPaxos and to be safe.
 - **The Universe of Symmetry Breaking Tasks** (PODC 2011, 28 citations) —
   [SymmetryBreakingTasks](Papers/PODC2011/SymmetryBreakingTasks). Theorem 9 (which GSB tasks are solvable without communication) is false under the paper's standing assumption (Section 2.3) that algorithms are comparison-based: without communication such a decision function is constant, so e.g. ⟨2,3,0,1⟩ meets the theorem's condition but is unsolvable. It holds for index-independent algorithms that use identity values, which its proof uses. The GSB structure theory is correct after small repairs.
 - **A Local Constant Factor MDS Approximation for Bounded Genus Graphs** (PODC 2016, 27 citations) —
