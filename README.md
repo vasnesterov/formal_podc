@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 16, 🛠️ 49, ⚠️ 125, ❌ 90, 🚨 33 (313 papers).
+Counts: ✅ 16, 🛠️ 49, ⚠️ 125, ❌ 90, 🚨 34 (314 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -323,6 +323,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2011 | 1 | Wang, Welch, Lee — *Time Bounds for Shared Objects in Partially Synchronous Systems* | [SharedObjectTimeBounds](Papers/PODC2011/SharedObjectTimeBounds) | ❌ Lower bounds d + min{ε, u, d/3} for strongly immediately non-self-commuting operations (Thm C.1) and for mutator + pure accessor pairs (Thm E.1, gap repaired) proved in a new timed message-passing model (full version: Wang's MS thesis); **Thm D.1's (1 − 1/k)u bound is unestablished** (Step 1.1 unjustified; proved only under a stronger hypothesis and ε ≥ (1 − 1/k)u); **E.1 does not apply to push/peek on a stack**, contrary to §IV.E and Table III |
 | 2011 | 1 | Kentros, Kiayias — *Solving the At-Most-Once Problem with Nearly Optimal Effectiveness* | [AtMostOnceEffectiveness](Papers/PODC2011/AtMostOnceEffectiveness) | ❌ KK_β proved at-most-once (Lemma 4.1), wait-free for β ≥ m (Lemma 4.3, POOL gap repaired), with effectiveness exactly n − (β + m − 2) under m − 1 crashes (Thm 4.4, abstract's n − 2m + 2 for β = m, n ≥ 2m − 1); Thm 2.1 (E ≤ n − f) proved; **Thm 4.4's "=" for f < m − 1 crashes false** (m = 2, β = 4, n = 5, f = 0: E ≥ 2, not 1); formula also wrong for n ≤ β + m − 2 (degenerate); Sections 5–7 not formalized |
 | 2020 | 1 | Attiya, Kumari, Somani, Welch — *Brief Announcement: Collect in the Presence of Continuous Churn with Application to Snapshots and Lattice Agreement* | [StoreCollectChurn](Papers/PODC2020/StoreCollectChurn) | 🚨 **CCC (Algorithms 1–3) is not regular; Theorem 6, Corollary 7, Lemma 10 and Observation 5 false**: a collect returns its current `LView`, into which its own server thread may have merged a concurrent store it never wrote back, so a later collect misses it (5 nodes, no churn or crash, parameters satisfying Constraints A–D); the atomic snapshot (Algorithm 7) on any regular store-collect object is linearizable with an `n + 2` collect bound (Theorem 8, Lemmas 11–13), and the churn arithmetic (Lemmas 1–3, Corollary 1) holds up to a sign slip in Constraint (A) |
+| 2023 | 1 | Jayanti, Jayanti, Jayanti — *Brief Announcement: Efficient Recoverable Writable-CAS* | [DuraCAS](Papers/PODC2023/DuraCAS) | 🚨 **Theorem 4.1(1) is false under the brief announcement's recovery rule** ("recover `O` before any other operation on `O`"). DurEC handles are shared across objects, so after a crash a `CAS` on `O₁` can overwrite the unforwarded value of `O₀` (2 processes, 2 objects: a `READ` of `O₀` returns a value only proposed to `O₁`). Under per-process recovery DuraCAS is proved durably linearizable, detectable and wait-free (≤ 54 steps). The unproved step "W and Z behave like atomic EC objects" is repaired by refinement. Lemma A.10(2) of the full version is false; the corrected version is proved |
 | 2026 | 0 | Attiya, Flam, Welch — *Why Canonical-Round Algorithms Fail for Optimal Byzantine Resilience* | [CanonicalRoundByzantine](Papers/PODC2026/CanonicalRoundByzantine) | ⚠️ Lower bounds proved (for 2f ≤ n ≤ 5f); Corollary 10's proof covers only part of the range (statement true); Theorem 14 implicitly uses the i = j case of gather agreement |
 | 2026 | 0 | D'Archivio, AlMahmoud, Natale, Mallmann-Trenn — *Order Statistics in Population Protocols via Simple Dynamics* | [OrderStatisticsPP](Papers/PODC2026/OrderStatisticsPP) | ⚠️ Laws of the consensus value proved; both proofs of Proposition 6 invalid (statement true); Definition 4.2 under-specified |
 | 2026 | 0 | Nolin — *Sinkless Orientation Made Trivial* | [SinklessOrientation](Papers/PODC2026/SinklessOrientation) | ⚠️ Deterministic part proved; Lemma 2.2's 'in particular' clause says 'degree δ' for 'degree < δ' (one-symbol slip) |
@@ -601,6 +602,14 @@ the refutation is checked by Lean; details, and the corrected statements we prov
   Constraints A–D, a collect returns `{⟨r, 1⟩}` and a later collect returns `∅`. Lemma 10 and Observation 5 fail for the same reason: `view(φ)` is defined
   as `LView` at the end of the phase, not as the view the phase stored. The journal version (2022) keeps the same code. A one-line repair (return the
   view written back) is plausible but not verified. The atomic snapshot built on any correct store-collect object (Theorem 8) is proved linearizable.
+- **Brief Announcement: Efficient Recoverable Writable-CAS** (PODC 2023, 1 citations) —
+  [DuraCAS](Papers/PODC2023/DuraCAS). The headline claim (Theorem 4.1(1): DuraCAS is recoverably linearizable and
+  detectable) fails under the recovery discipline the paper states, which requires only that `O.Recover()` runs before
+  the next operation *on O*. Every process uses one DurEC handle for all objects. A process that crashes right after
+  installing on `O₀` and then, legally, invokes a `CAS` on `O₁` overwrites the handle's `Val` field. A helper then
+  forwards that value into `O₀`. The algorithm is correct (proved durably linearizable, detectable and wait-free) under
+  the usual per-process discipline, which the cited model and the full version's wording suggest. The fix is a usage
+  restriction; the algorithm does not change.
 - **Fault Tolerant Coloring of the Asynchronous Cycle** (PODC 2022, 0 citations) —
   [AsyncCycleColoring](Papers/PODC2022/AsyncCycleColoring). The 5-colouring algorithms are not wait-free, so the
   headline claim — wait-free 5-colouring of the cycle in O(log* n) rounds (Theorem 4.4, and Theorem 3.11 for the

@@ -2612,3 +2612,5 @@ import Papers.PODC2020.LongLivedSnapshotsPolylog.WaitFreeSeg
 import Papers.PODC2020.LongLivedSnapshotsPolylog.WaitFreeIter
 import Papers.PODC2020.LongLivedSnapshotsPolylog.WaitFree
 import Papers.PODC2020.LongLivedSnapshotsPolylog.Amortized
+import Papers.PODC2023.DuraCAS.Main
+import Papers.PODC2023.DuraCAS.LemmaA10
