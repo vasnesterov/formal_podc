@@ -2560,3 +2560,6 @@ import Papers.PODC2012.LeaderElectionSpaceLB.Claim53
 import Papers.PODC2012.LeaderElectionSpaceLB.Arith
 import Papers.PODC2012.LeaderElectionSpaceLB.Lemma54
 import Papers.PODC2012.LeaderElectionSpaceLB.Main
+import Papers.PODC2016.MobileByzantineStorage.Model
+import Papers.PODC2016.MobileByzantineStorage.ReadAttack
+import Papers.PODC2016.MobileByzantineStorage.LowerBound
