@@ -49,7 +49,7 @@ Verdicts (each paper gets the worst label that applies to the statements we form
 - 🚨 **headline claim false** — a headline result (named in the title or presented by the abstract as a primary
   contribution) is false; see [below](#papers-with-critical-mistakes).
 
-Counts: ✅ 16, 🛠️ 49, ⚠️ 123, ❌ 86, 🚨 29 (303 papers).
+Counts: ✅ 16, 🛠️ 49, ⚠️ 123, ❌ 86, 🚨 30 (304 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -358,6 +358,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2018 | 0 | Jones, Khan, Vaidya — *Brief Announcement: Optimal Record and Replay under Causal Consistency* | [CausalRecordReplay](Papers/PODC2018/CausalRecordReplay) | ⚠️ Offline and online optimal records under strong causal consistency proved good and least (Thms 5.3–5.6, 6.6, 6.7). Definition 6.4 omits `w₃ ≠ w₄`, which makes Thm 6.6 false as written; the proof uses the intended version. The online-record notion of Thm 5.6 needs the uniform, knowledge-based reading. Proofs of Lemma C.1(b) and Thms 5.6 and 6.7 repaired |
 | 2016 | 0 | Hendler — *On the Complexity of Reader-Writer Locks* | [RWLockRMRTradeoff](Papers/PODC2016/RWLockRMRTradeoff) | ❌ Lower bound proved in exact form (Thm 5: `n ≤ Wb·3^Rb`, so writer entry `O(f(n))` forces reader exit `Ω(log(n/f(n)))`; Cor. 6) for every CC cache protocol, after repairing its proof; **Lemma 1 (every expanding step is an RMR) is false** in the write-back model (a trivial write gives a valid copy, then an expanding local read); **the algorithm family `A_f` violates Mutual Exclusion** (Lemmas 8–9, Thm 18) with line 51 reading `C[i]` before `W[i]` (3 readers, one group), and line 47's `op` for `op'` breaks Mutual Exclusion and Deadlock Freedom; Mutual Exclusion of the repaired algorithm proved, its liveness and RMR bounds (tightness) not formalized |
 | 2024 | 0 | Gay, Mostéfaoui, Perrin — *Brief Announcement: No Broadcast Abstraction Characterizes k-Set-Agreement in Message-Passing Systems* | [NoBroadcastKSA](Papers/PODC2024/NoBroadcastKSA) | ❌ **Lemma 9 is false** (`lemma9_false`): k-Bounded-Order broadcast restricted to "chained" messages is content-neutral and compositional, k-SA is solvable on top of it with k+1 processes, yet it has N-solo executions for every N; the headline Theorem 1 (no such abstraction is equivalent to k-SA, 1 < k < n) is proved with a repaired adversary that needs no content-neutrality, for k-SA algorithms that use only the broadcast abstraction (no point-to-point channels) |
+| 2014 | 0 | Raynal, Stainer, Taubenfeld — *Brief Announcement: Distributed Universality: Contention-Awareness; Wait-Freedom; Object Progress, and Other Properties* | [DistributedUniversality](Papers/PODC2014/DistributedUniversality) | 🚨 The (k, ℓ)-universal constructions are proved linearizable (Lemmas 1–4), non-blocking (Lemmas 5–6, Thm 1), wait-free with helping (Thm 3) and ℓ-wait-free with (k, ℓ)-SC (Thm 4(a)), and (k, ℓ)-SC is built from a (k, ℓ)-UC (Thm 4(b), via first-value objects); the proofs of Lemmas 3 and 6 and Theorems 3 and 4(b) needed repairs; **Figure 2 is not contention-aware (Thm 2, abstract property (4))**: with n = 3, k = 1, a process running alone after the others completed their operations adopts their stale round-1 proposals and invokes the k-SC object (checked in Lean; with the weak adopt-commit reading even a fully sequential 2-process run fails) |
 
 ## Papers with critical mistakes
 
@@ -597,6 +598,8 @@ the refutation is checked by Lean; details, and the corrected statements we prov
   a node onto the view of its neighbour, which forces an odd cycle of length M in the view graph. The proof's Lemma 5.3 needs
   this odd cycle to be short and never checks it. The authors' corrected statement (arXiv v3) fails on the same example.
   The decoders given for Theorems 4.3 and 4.4 are wrong too (accepted 5-cycles), although both theorems hold.
+- **Brief Announcement: Distributed Universality: Contention-Awareness; Wait-Freedom; Object Progress, and Other Properties** (PODC 2014, 0 citations) —
+  [DistributedUniversality](Papers/PODC2014/DistributedUniversality). The construction of Figure 2 is not contention-aware (Theorem 2, abstract property (4)): adopt-commit objects are indexed by per-process round numbers, so a process that runs completely alone, after other processes have completed their operations, can receive `adopt` from their stale proposals at line N1 and invoke the k-SC object.
 
 ### ❌ Other false claims
 
