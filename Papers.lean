@@ -2492,3 +2492,10 @@ import Papers.PODC2012.LimitedUseSnapshots.Steps
 import Papers.PODC2012.LimitedUseSnapshots.Counterexample
 import Papers.PODC2012.LimitedUseSnapshots.Linearizable
 import Papers.PODC2012.LimitedUseSnapshots.Snapshot
+import Papers.PODC2010.ModularConsensus.Basic
+import Papers.PODC2010.ModularConsensus.AdoptCommit
+import Papers.PODC2010.ModularConsensus.Quorums
+import Papers.PODC2010.ModularConsensus.Consensus
+import Papers.PODC2010.ModularConsensus.FastPath
+import Papers.PODC2010.ModularConsensus.ImpatientConciliator
+import Papers.PODC2010.ModularConsensus.ComposeBridge

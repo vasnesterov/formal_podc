@@ -127,3 +127,5 @@ import Podc.Computability.Distributed.MessagePassing.Timed.Lin
 import Podc.Computability.Distributed.Congest.Typed
 import Podc.Computability.Distributed.SharedMemory.Awareness
 import Podc.Computability.Distributed.SharedMemory.AwarenessRound
+import Podc.Foundations.Combinatorics.SetPairs
+import Podc.Computability.Distributed.SharedMemory.SeqCompose
