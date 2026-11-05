@@ -130,3 +130,6 @@ import Podc.Computability.Distributed.SharedMemory.AwarenessRound
 import Podc.Foundations.Combinatorics.SetPairs
 import Podc.Computability.Distributed.SharedMemory.SeqCompose
 import Podc.Computability.Distributed.MessagePassing.FailureDetectors.Sigma
+import Podc.Computability.Distributed.NIS.Subdivision
+import Podc.Computability.Distributed.NIS.Views
+import Podc.Computability.Distributed.NIS.Layers

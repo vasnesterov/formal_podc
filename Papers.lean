@@ -2614,3 +2614,10 @@ import Papers.PODC2020.LongLivedSnapshotsPolylog.WaitFree
 import Papers.PODC2020.LongLivedSnapshotsPolylog.Amortized
 import Papers.PODC2023.DuraCAS.Main
 import Papers.PODC2023.DuraCAS.LemmaA10
+import Papers.PODC2020.WhyExtensionBased.Defs
+import Papers.PODC2020.WhyExtensionBased.Actions
+import Papers.PODC2020.WhyExtensionBased.OutputQuery
+import Papers.PODC2020.WhyExtensionBased.Phase2
+import Papers.PODC2020.WhyExtensionBased.Chain
+import Papers.PODC2020.WhyExtensionBased.Main
+import Papers.PODC2020.WhyExtensionBased.NonVacuity
