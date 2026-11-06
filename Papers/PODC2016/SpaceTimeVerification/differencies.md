@@ -27,7 +27,7 @@ Rosenbaum). Numbering follows the arXiv version.
 
 ## Section 3.2: Definitions 2–3, Proposition 4, Theorem 5
 
-6. **Proposition 4 and Theorem 5 are false in the identifier model for `t ≥ 2`.** Decided by R1/R4: the
+6. **Proposition 4 and Theorem 5 are false in the identifier model for `t ≥ 2`.** (❌) The
    paper claims explicitly that "the lower bounds of Subsections 3.2 and 4.1 hold for a stronger model
    where vertices have unique identifiers" (Section 1.1, repeated at the start of Section 4).
    - The counterexample has `r ≥ 2` disjoint triangles, `e_i = ((i,0),(i,1))`, `t = 2`, `q = 3`, and
@@ -40,11 +40,10 @@ Rosenbaum). Numbering follows the arXiv version.
    - The false step is the proof's claim that every node of `N_t(e_i) ∪ N_t(e_j)` has "the same
      `t`-neighbourhood" in `G` and in `C(e_i, e_j, G)`. This fails whenever `e_i` lies on a cycle of
      length `≤ 2t+1`.
-7. **Severity of item 6 (borderline ❌/🚨).** The abstract presents "a general technique to prove lower
+7. **Scope of item 6.** The abstract presents "a general technique to prove lower
    bounds" as a contribution. The technique is sound without identifiers (item 8), where `F` arbitrary
    and Proposition 4 as stated are fine. It is also sound in the identifier model for the paper's own
-   application (Theorem 7, a path). What is false is the explicit extension to the identifier model, a
-   secondary claim. Hence ❌, not 🚨.
+   application (Theorem 7, a path). What is false is the explicit extension to the identifier model.
 8. **The anonymous model** (`Anonymous.lean`). In the identifier-free broadcast model, where views are
    view trees, Proposition 4 holds. The crossing preserves every depth-`t` view, and this is the repaired
    proof (`proposition_4_view`, `proposition_4_accept`; pigeonhole form `proposition_4_anon`; Theorem 5
@@ -55,8 +54,7 @@ Rosenbaum). Numbering follows the arXiv version.
    right only for fixed-length labels. Distinct tuples of variable-length strings can have the same
    concatenation, and there are `2^{|ℓ|+1} - 1` strings of length `≤ |ℓ|`. We count label tuples
    instead: a labelling with values in `A` forces `r ≤ |A|^q`. For strings of length `≤ L` this gives
-   `log₂ r < q (L+1)` instead of `log₂ r ≤ qL`. The asymptotics are unaffected. This is a proof repair
-   (🛠️).
+   `log₂ r < q (L+1)` instead of `log₂ r ≤ qL`. The asymptotics are unaffected. (🔧)
 10. **Hypotheses.** `CrossingHyp` asks for isomorphisms between any two neighbourhoods, not only from
     `N_t(e_1)` to each `N_t(e_i)`. The two are equivalent, and our version is stronger, which is the
     right direction for a counterexample. States are trivial in the counterexample.
@@ -73,14 +71,14 @@ Rosenbaum). Numbering follows the arXiv version.
 12. **Statement.** The exact bound is `⌊n/(2t+2)⌋ - 1 ≤ |A|^{2t+2}` (`lowerBound_card`). For bit-string
     labels of length `≤ L(n)` this gives `log₂(⌊n/(2t+2)⌋ - 1) < (2t+2)(L(n)+1)` (`theorem_7`), which is
     `Ω(log n / t)` for `t ≤ n/c`.
-13. **Large `t` (R2, degenerate).** For `t ≥ n` a verifier with empty labels sees the whole graph, so
+13. **Large `t` (✏️, degenerate).** For `t ≥ n` a verifier with empty labels sees the whole graph, so
     "`Ω(log n / t)`" cannot hold uniformly in `t`. Our exact statement is trivially true there and claims
     nothing. This is not formalized, and the paper's range is `t ≤ log n`.
 14. **States.** States are empty (`ι = Unit`), as in the paper's proof.
 
 ## Section 4.2: Definitions 10–14, Proposition 16, Lemma 17, Theorem 8
 
-15. **Condition 4 of "correct block labels" is off by one (R3 typo, ⚠️).** It reads "an oriented path
+15. **Condition 4 of "correct block labels" is off by one (✏️).** It reads "an oriented path
     `w_0, …, w_{k-1} = v` of length `k < t`" with `b(w_0) = head`. A tail is `t - 1` edges, i.e. `t`
     vertices, below its head, so taken literally no tail can satisfy it.
     - For `t = 2` no graph with an edge has a correct labelling (`correctLiteral_two_no_edges`).
@@ -90,7 +88,7 @@ Rosenbaum). Numbering follows the arXiv version.
       and from Fig. 1.
     - With `k ≤ t`, Proposition 16 holds for every `t ≥ 2` (`prop16`). Both readings are formalized
       (`Correct`, `CorrectLiteral`).
-16. **`t = 1` (R2, degenerate, ⚠️).** Even with `k ≤ t`, no nonempty graph has a correct labelling for
+16. **`t = 1` (✏️, degenerate).** Even with `k ≤ t`, no nonempty graph has a correct labelling for
     `t = 1`, since a node would be both head and tail (`correct_one_isEmpty`). In the proof of
     Proposition 16 the labels "head if `d ≡ 0`, tail if `d ≡ -1 (mod t)`" collide. Theorem 8 for
     `t = 1` is the classical 1-round scheme. We state Proposition 16 and Theorem 8 for `t ≥ 2`.
@@ -103,8 +101,7 @@ Rosenbaum). Numbering follows the arXiv version.
       is to initialize `HEAD_CHECK ← (b(v) = head)`.
     - The relay loop runs `for i = 1 to t-1`, while the prose and the proof of Lemma 17 use the labels
       "received in the `t`-th round" from the `t`-th ancestor. The message timing is not fully specified.
-    These are typos with evident intent and are not counted in the verdict, since Algorithm 1 is not
-    formalized.
+    Both are ✏️ slips with evident intent; Algorithm 1 is not formalized.
 18. **Theorem 8 radius and range.** The radius is exactly `t`, versus the paper's `O(t)` rounds (`3t`).
     It holds for every `t ≥ 2`, not only `t ≤ min{log n, D}`. Label size is
     `5 + ⌈⌈log₂ n⌉ / t⌉` bits (`theorem8_bits`). The verifier reads the share width off the labels and
@@ -119,7 +116,7 @@ Rosenbaum). Numbering follows the arXiv version.
 
 ## Section 3.1: Theorem 1
 
-22. **"For every `t ∈ Ω(D)`": the scheme needs `t ∈ O(D)` (R3 typo; at most ⚠️).** The shares sit at
+22. **"For every `t ∈ Ω(D)`": the scheme needs `t ∈ O(D)` (✏️).** The shares sit at
     distances `0, …, t/4` from the distinguished node `v`, so `v` needs eccentricity `≳ t/4`. The
     introduction says "for every `t ∈ O(diam(G_s))`". We assume `t ≤ 2·diam(G) + 2`. The statement as
     printed is nevertheless true: a node whose eccentricity is `< t` sees the whole configuration in `t`
@@ -128,7 +125,7 @@ Rosenbaum). Numbering follows the arXiv version.
     works for every `t` (if any node has eccentricity `≥ t`, the diameter is large enough for the
     universal labels). This extension is not formalized; the issue is in the proof's range, not in
     the statement.
-23. **Implicit assumptions (R4, ⚠️ at most).**
+23. **Implicit assumptions (✏️).**
     - `P` must be invariant under state-preserving isomorphism, as any universal scheme requires
       (`IsoInvariant`).
     - Configurations must be connected.
@@ -141,7 +138,6 @@ Rosenbaum). Numbering follows the arXiv version.
 25. **Proof gap in soundness.** "All vertices hold the correct representation" is asserted without
     showing that a decoded configuration consistent with every local view is isomorphic to `G`. We prove
     it by sending each node to its entry and using that the decoded graph is connected (`verify_sound`).
-    This is a proof repair (🛠️).
 
 ## Not formalized
 

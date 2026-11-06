@@ -5,8 +5,8 @@ PODC 2022 (proceedings version, 4 pages; proofs are sketches).
 
 ## Errors in the paper (statement level)
 
-1. **Theorem 4.4 is false as stated** (rule R4: the paper explicitly claims generality, "any implemented
-   object"; not R2, test-and-set is a standard object; R5: not a headline result, so ❌ rather than 🚨). The
+1. ⚠️ **Theorem 4.4 is false as stated** (the paper explicitly claims generality, "any implemented
+   object", and test-and-set is a standard object). The
    abstract's primary contributions are the problem formalization and the FAI implementation, and the
    introduction only claims optimality *of the counter*, which holds.
    *Counterexample* (`Tas.lean`): `tasAlg` = `CAS(A[0], false, true); Flush(A[0]); return ¬success`, with `k = 1`
@@ -21,10 +21,9 @@ PODC 2022 (proceedings version, 4 pages; proofs are sketches).
    *Where the proof breaks*: "each update operation on the implemented object must update at least one base
    object" is false for objects whose updates do not change the state (TAS after the first operation, max
    registers, consensus, …).
-   *Why ❌ and not ⚠️ (R3)*: the intended scope (the counter / FAI) is recoverable from the sentence before the
+   *Scope*: the intended scope (the counter / FAI) is recoverable from the sentence before the
    theorem ("the endurance bound stated in Theorem 4.3 is optimal"), but the statement explicitly claims "any
-   implemented object" (R4 excludes explicit generality) and the proof argues with the general, false step, so
-   R3 does not excuse it. The objects that violate it are exactly those whose sequential update sequences have a
+   implemented object" and the proof argues with the general, false step. The objects that violate it are exactly those whose sequential update sequences have a
    bounded number of distinguishable state changes (TAS, consensus, sticky bits, one-shot objects); for objects
    with unboundedly many (FAI, registers with alternating writes, max registers), the `pm_ne` argument of
    `Optimality.lean` adapts.
@@ -44,8 +43,7 @@ PODC 2022 (proceedings version, 4 pages; proofs are sketches).
    then returns the same value in both, but strict linearizability forces `j` resp. `j + 1`
    (`resp_after_crash`). Non-vacuity: `counter_exceeds`.
 
-2. **Theorem 4.3: exact endurance depends on how worn-out words fail** (not counted against the paper; at worst ⚠️
-   under R4, so it does not affect the verdict). The paper never fixes the failure mode of a worn-out word;
+2. **Theorem 4.3: exact endurance depends on how worn-out words fail** (not counted as a mistake). The paper never fixes the failure mode of a worn-out word;
    Definition 2.1 says it loses "safety and liveness". If a worn-out word may stop responding (the `Flush` that
    performs its `(T+1)`-st write-back never completes; a non-responsive failure in the sense of
    Jayanti–Chandra–Toueg, the paper's reference [4]), FAI `k·T + 1` of a sequential run never returns and the
@@ -62,18 +60,18 @@ PODC 2022 (proceedings version, 4 pages; proofs are sketches).
    stuck-at words, `k·T + 1` sequential FAIs, a crash and one more FAI give two FAIs returning `k·T`
    (`hist_failSched`, `strictLin_res_inj`). Together: `hasEndurance_counter : HasEndurance (counter k) P T
    (k·T + 1)` and `not_hasEndurance_kT`.
-   *Why not ❌*: the off-by-one stems from the convention (the counter has no read operation, so the
+   *Why this is not a mistake*: the off-by-one stems from the convention (the counter has no read operation, so the
    damage of the `(k·T+1)`-st FAI is unobservable without one more FAI). The paper's own proof makes the intended
    meaning clear ("FAI `k×T+1` … exceeds its endurance limit, and this *may* cause the implemented object to
    lose correctness"). The same convention applied to a hardware FAI word ("provides endurance `T`") has the same
    off-by-one in the safety-only model. Since the paper's definitions also admit non-responsive wear, under which
    `k·T` is exact, this is a modelling-dependent remark rather than an error; if one insists on reading Theorem
-   4.3 as "for *every* base object of endurance `T`" (including safety-only ones), it is a ⚠️-level imprecision
-   (R4: the failure mode is an unstated assumption). Either way the verdict is decided by item 1.
+   4.3 as "for *every* base object of endurance `T`" (including safety-only ones), the failure mode is an unstated
+   assumption.
 
 ## Proof gaps and typos (true statements)
 
-3. Proof of Theorem 4.1, crucial claim: `iter = ⌊ℓ/2^k⌋`, `index = ℓ mod 2^k` should be `⌊ℓ/k⌋`, `ℓ mod k`
+3. ✏️ Proof of Theorem 4.1, crucial claim: `iter = ⌊ℓ/2^k⌋`, `index = ℓ mod 2^k` should be `⌊ℓ/k⌋`, `ℓ mod k`
    (positions `ℓ` counted from 0; rendered page checked, not a `pdftotext` artefact). In Lean: `CInv.step_cas_succ`
    proves that a successful CAS with `iter, index` happens exactly when `|L| = iter·k + index` and all earlier CASes
    are persistent.
@@ -84,12 +82,12 @@ PODC 2022 (proceedings version, 4 pages; proofs are sketches).
    argues order preservation with "the helping mechanism at line 9 / lines 2 and 13". Our local invariant makes
    this explicit (`LocInv`: a thread at line 5 with `iter, index` knows `iter·k + index ≤ m` persisted
    increments).
-5. Proof of Theorem 4.2: "read a value `v` from `A[k−1]` at line 13" — line 12. "after performing `k` additional
-   iterations" — `k − 1`. The proof also needs finitely many threads (R4, standard; `[Finite P]` in
+5. ✏️ Proof of Theorem 4.2: "read a value `v` from `A[k−1]` at line 13" — line 12. "after performing `k` additional
+   iterations" — `k − 1`. The proof also needs finitely many threads (an implied assumption, ✏️; `[Finite P]` in
    `theorem_4_2`): it uses a suffix without successful CAS, which exists because, without responses, each thread
    performs at most one successful CAS. Our proof (potential argument, `phi_step`, `done_step`) follows the
    paper's idea.
-6. Proof of Theorem 4.3: "element `A[0]` is accessed `T+1` times" — it is *written back* `T + 1` times. Every FAI
+6. ✏️ Proof of Theorem 4.3: "element `A[0]` is accessed `T+1` times" — it is *written back* `T + 1` times. Every FAI
    accesses `A[0]` (line 5).
 
 ## Modelling choices
@@ -102,7 +100,8 @@ PODC 2022 (proceedings version, 4 pages; proofs are sketches).
    invocation (for `k ≥ 2`, `b ≥ 1`). So the comparison modulo `2^b` gives the same result, and the `b`-bit run is
    the unbounded run modulo `2^b`. It returns `(index + iter·k) mod 2^b = ℓ mod 2^b`, matching footnote 2. The
    assumption `b ≥ ⌈log₂ k⌉` is not needed for this.
-8. **Persistence model**: the assumptions (1)–(3) of the proof of Theorem 4.3 and "a failed CAS does not dirty the
+8. **Persistence model** (✏️: Definition 2.1 counts updates invoked on an object, while the proof of Theorem 4.3
+   counts write-backs): the assumptions (1)–(3) of the proof of Theorem 4.3 and "a failed CAS does not dirty the
    line" are built into the model and used for *all* theorems. One word per cache line. Write-backs happen only by
    `Flush` or spontaneous eviction (`Ev.evict`, at any time). A crash reloads the whole cache from persistent memory
    and abandons all running operations; there is no recovery code, and threads may invoke new operations after a

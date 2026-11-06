@@ -5,13 +5,11 @@ Computation in the Population Protocol Model.* PODC 2024. DOI
 [10.1145/3662158.3662768](https://doi.org/10.1145/3662158.3662768). Formalized version: arXiv
 [2307.07297](https://arxiv.org/abs/2307.07297) v3 (May 2024); numbering follows it.
 
-**Verdict: ❌ False claim.** The upper bound on the mixing time of the `(k, a, b, m)`-Ehrenfest
-process (Theorem 2.5) is false as stated: it ignores the laziness of the chain, and fails when
-`a + b` is small. The explicit bounds of Lemmas A.5, A.8 and Proposition A.7 behind it are false too. The stationary distribution results are correct: Theorem 2.4, Propositions A.1
-and A.3, the stationary part of Theorem 2.7 and Proposition 2.8. The `Ω(km)` mixing lower bound also
-holds. The headline Theorem 2.7 survives, because its parameters satisfy `a + b = γ`, `m = γn`. Its
-formula for `p_j` is exact only if the responder is drawn independently of the initiator (possibly
-the initiator itself). Under the standard distinct-pair scheduler it is off by `O(1/n)`.
+**Verdict: ⚠️ Weakened.** The exact stationary results hold (Theorem 2.4, Propositions A.1 and A.3, the
+stationary part of Theorem 2.7 and Proposition 2.8), and so does the `Ω(km)` mixing lower bound. The upper bound
+on the mixing time of the `(k, a, b, m)`-Ehrenfest process (Theorem 2.5) is false as stated: it ignores the
+laziness of the chain and fails when `a + b` is small, and its corrected form is not proved. The mixing and
+convergence claims of Theorem 2.7 and the equilibrium result Theorem 2.9 were not checked.
 
 ## Mistakes in the paper
 
@@ -20,8 +18,8 @@ The bound `t_mix = O(k² m log m)` (`a = b`), resp. `O(min{k/|a−b|, k²} m log
 laziness of the chain: for `k = m = 2` and `a = b = ε`, `t_mix ≥ 1/(2ε)` grows without bound while the claimed
 bound stays fixed (`theorem_2_5_upper_false`, `theorem_2_5_upper_false_ne`, `lemma_A_8_false`).
 
-**Impact.** Every `k²` term needs a factor `1/(a+b)`; the `k/|a−b|` branch is correct. The headline
-Theorem 2.7 is not affected: there `a + b = γ` and `m = γn`, so `(k²/γ)·m log m ≤ k² n log n`.
+**Impact.** Every `k²` term needs a factor `1/(a+b)`; the `k/|a−b|` branch is correct. This corrected bound is
+not proved in Lean, because the coupling part is not formalized.
 
 **Details.** The theorem fixes any `a, b > 0` with `a + b ≤ 1`. From `x = (m, 0, …, 0)` the chain stays put
 with probability `1 − a`, so `t_mix` grows like `1/a` as `a → 0`, while the claimed bound does not depend on
@@ -43,29 +41,27 @@ numbered statements behind it are false:
   `k = m = 2`, `a = 1/100`, `b = 1/200`. Then `Φ = 8` and `2Φ log₂ 8 = 48`, but `d(t) > 1/4` for all
   `t ≤ 48` (`lemma_A_8_false`).
 
-### ⚠️ Theorem 2.7 (formula `p_j ∝ (1/β − 1)^{j−1}`, sampling convention)
-The stationary formula is exact only if the responder is drawn uniformly from all `n` agents, independently of
-the initiator; under the standard distinct-pair scheduler it is off by `O(1/n)` (`distinct_counterexample`).
-
-**Impact.** An implied-assumption issue: the paper's own computation in Section 2.2.1 fixes the convention, and
-the formula is exactly right in that model (`theorem_2_7_stationary`).
-
-**Details.** Section 2.2.1 says the initiator, at level `j`, meets a non-AD agent with probability
-`(z_j/n)(1 − β)`. That is exact only if a GTFT agent may "meet itself". With the standard population-protocol
-scheduler (an ordered pair of *distinct* agents, as in the paper's references), the count process is still
-exactly an Ehrenfest process. But its parameters are `a' = γ(n−1−βn)/(n−1)` and `b' = γβn/(n−1)`. So the
-stationary law is multinomial with ratio `λ' = (n−1−βn)/(βn) = (1/β − 1) − 1/(βn)`, not `1/β − 1`. Example:
-one AD and two GTFT agents, `k = 2`. The paper's law gives `π(2,0) = 1/9`; the true stationary law gives
-`1/4`.
-
-### ⚠️ Proposition A.9 ("`D ≥ km`")
+### 🔧 Proposition A.9 ("`D ≥ km`")
 The diameter of the transition graph is `(k−1)m`, not `≥ km`, since each ball moves at most `k − 1` urns; e.g.
 `k = m = 2` gives the path `(2,0) – (1,1) – (0,2)` with `D = 2 < 4`.
 
 **Impact.** Off by one urn; the conclusion `t_mix = Ω(km)` holds: we prove `t_mix ≥ (k−1)m/2` for all
 `a, b` (`theorem_2_5_lower`).
 
-### Typos and slips
+### ✏️ Slips
+- Theorem 2.7 (formula `p_j ∝ (1/β − 1)^{j−1}`, sampling convention): the stationary formula is exact only if
+  the responder is drawn uniformly from all `n` agents, independently of the initiator; under the standard
+  distinct-pair scheduler it is off by `O(1/n)` (`distinct_counterexample`). The paper's own computation in
+  Section 2.2.1 fixes the convention, and the formula is exactly right in that model
+  (`theorem_2_7_stationary`). That section says the initiator, at level `j`, meets a non-AD agent with
+  probability `(z_j/n)(1 − β)`, which is exact only if a GTFT agent may "meet itself". With the standard
+  population-protocol scheduler (an ordered pair of *distinct* agents, as in the paper's references), the count
+  process is still exactly an Ehrenfest process, but its parameters are `a' = γ(n−1−βn)/(n−1)` and
+  `b' = γβn/(n−1)`. So the stationary law is multinomial with ratio `λ' = (n−1−βn)/(βn) = (1/β − 1) − 1/(βn)`,
+  not `1/β − 1`. Example: one AD and two GTFT agents, `k = 2`. The paper's law gives `π(2,0) = 1/9`; the true
+  stationary law gives `1/4`.
+
+### Typos
 - Definition 2.3 writes `P : Δ_k^m → Δ_k^m` for a matrix on `Δ_k^m × Δ_k^m`.
 - In A.3, the index runs over "`j = 0, …, k − 1`" (it should be `j ∈ [k−1]`), and an "inequality" should be
   "equality".
@@ -73,20 +69,6 @@ The diameter of the transition graph is `(k−1)m`, not `≥ km`, since each bal
 - In Proposition A.6, `Z` is initialized both to `z` and to `0`.
 - Lemma A.8 needs `log = log₂`.
 - Contribution (ii) in §1.2 says `O(kn log n)` for `β ≠ 1/2`, hiding the factor `1/|1 − 2β|` of Theorem 2.7.
-
-## Proof gaps (statements true)
-
-### 🛠️ Theorem 2.4 (uniqueness of the stationary distribution)
-The paper calls the multinomial "the unique stationary distribution", but detailed balance gives only
-stationarity, and irreducibility is argued only for `k = 2, 3` ("easy to see").
-
-**Impact.** Statement true; we prove irreducibility for all `k` (`ehrenfest_isIrreducible`).
-
-### 🛠️ Theorem 2.7 (lower bound `t_mix ≥ Ω(kn)`)
-Theorem 2.5 gives only `Ω(km) = Ω(kγn)`, which is `Ω(kn)` only for constant `γ`.
-
-**Impact.** Not formalized, so it does not enter the verdict; the statement is plausible (the chain is lazy
-with rate `≤ γ`, which compensates).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -112,6 +94,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
   `t`-step Ehrenfest probability from `z(C)` to `y`.
 * Our Theorems 2.4/2.7 and Propositions A.1/A.3 hold for all `k ≥ 1` and `m ≥ 0`. The paper needs
   `k, m ≥ 2`.
+* The paper calls the multinomial "the unique stationary distribution" in Theorem 2.4, but detailed balance
+  gives only stationarity, and irreducibility is argued only for `k = 2, 3` ("easy to see"). We prove
+  irreducibility for all `k` (`ehrenfest_isIrreducible`).
 
 **Main results in Lean.**
 
@@ -136,7 +121,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Not formalized.** The corrected Theorem 2.5 upper bound (coupling, Lemmas A.5, A.8); the
 mixing-time bounds and the convergence claim of Theorem 2.7; Proposition 2.2 and Theorem 2.9
-(game payoffs, ε-approximate distributional equilibrium); Appendices B–D.
+(game payoffs, ε-approximate distributional equilibrium); Appendices B–D. The derivation of Theorem 2.7's
+mixing upper bound uses the false Theorem 2.5, but the bound itself looks fine after the `1/(a+b)` correction:
+there `a + b = γ` and `m = γn`, so `(k²/γ)·m log m ≤ k² n log n`. For Theorem 2.7's lower bound
+`t_mix ≥ Ω(kn)`, Theorem 2.5 gives only `Ω(km) = Ω(kγn)`, which is `Ω(kn)` only for constant `γ`; the statement
+is plausible (the chain is lazy with rate `≤ γ`, which compensates).
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: the hypotheses of `theorem_2_7_stationary` hold for the 3-agent

@@ -5,15 +5,16 @@ Line and Tree Networks.* PODC 2012. DOI [10.1145/2332432.2332503](https://doi.or
 Formalized version: arXiv [1205.1924](https://arxiv.org/abs/1205.1924) v2 (Oct 2012). This version corrects the
 conference version's ratios for arbitrary heights (20 → 80 on trees, 11 → 23 on lines); numbering follows it.
 
-**Verdict: ⚠️ Minor statement issues.** All approximation guarantees of v2 are proved. They are Lemma 3.1, Lemma 5.1 /
+**Verdict: 🔧 Easy fix.** All approximation guarantees of v2 are proved. They are Lemma 3.1, Lemma 5.1 /
 Claim 5.2, Theorem 5.3 (`7/(1-ε)`), Lemma 6.1, Lemma 6.2 (`73/(1-ε)`), Theorem 6.3 (`80/(1-ε)`), Theorems 7.1 /
-7.2 (`4/(1-ε)`, `23/(1-ε)`) and Appendix A (`3`). So are the tree-decomposition Lemmas 4.1–4.3 and Observation A.1.
-The constants are right. The fixes concern depth/length bounds that fail in edge cases, degenerate cases of the
-ideal-decomposition construction, and an imprecise length grouping for line networks.
+7.2 (`4/(1-ε)`, `23/(1-ε)`) and Appendix A (`3`), together with the tree-decomposition Lemmas 4.1–4.3 and
+Observation A.1, with the right constants. The local fixes concern depth/length bounds that fail in small cases,
+degenerate cases of the ideal-decomposition construction, and an imprecise length grouping for line networks; rounds
+are counted as MIS calls, since message passing is not modelled.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 4.1 and §4.2 (depth bounds of the tree decompositions)
+### 🔧 Lemma 4.1 and §4.2 (depth bounds of the tree decompositions)
 The claimed depth bounds fail in small cases: BuildIdealTD has depth 1, not `≤ 2⌈log|C|⌉ = 0`, for
 `|C| = 1`, the overall bound `2⌈log n⌉` is false for `n = 1`, and the balancing decomposition has
 depth `3 > ⌈log n⌉ = 2` on a path with 4 vertices.
@@ -24,12 +25,12 @@ depth `3 > ⌈log n⌉ = 2` on a path with 4 vertices.
 
 **Details.**
 - The induction "recursive inputs have size `≤ ⌊|C|/2⌋`, hence depth `≤ 2⌈log|C|⌉`" therefore breaks
-  at its base. For `|C| = 2` it only gives `3`. The bound is true for `|C| ≥ 2`, but that needs the
-  extra base case `f(2) = 2`.
+  at its base. For `|C| = 2` it only gives `3`. The bound is true for `|C| ≥ 2` (argued on paper, not in
+  Lean), but that needs the extra base case `f(2) = 2`.
 - On the path with 4 vertices the balancer leaves pieces of sizes 2 and 1. The correct bound for the
   balancing decomposition is `⌊log₂ n⌋ + 1`. The balancing decomposition is not formalized.
 
-### ⚠️ Section 7 (length groups of the line-network decomposition)
+### 🔧 Section 7 (length groups of the line-network decomposition)
 The groups `Gᵢ = {d : 2^{i-1}L_min ≤ len(d) ≤ 2^i L_min}` overlap at the boundaries, so they do not
 form a partition, and `ℓ = ⌈log(L_max/L_min)⌉` is `0` when all lengths are equal, so then there are
 no groups at all.
@@ -42,17 +43,19 @@ half-open classes (`LineInput.lineLayered`).
 difficult". It holds because `len(d₁) < 2 len(d₂)` within the order. (`LineInput.lineLayered`,
 `interval_hits`)
 
-### Typos and slips
+### ✏️ Slips
 - The introduction of Section 6 still announces the conference ratios: `(20+ε)` overall and `(13+ε)`
   for narrow instances. Lemma 6.2 and Theorem 6.3 give `73` and `80`.
 - Theorem 7.2 says "tree-networks", and its round bound has `(1/h_min) log n` instead of
   `(1/h_min) log(L_max/L_min)`.
 - §4.2: "the path between `x` and `z`" should read "`x` and `y`".
+
+### Typos
 - "inference property" should read "interference property".
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 4.1 (degenerate cases of BuildIdealTD)
+### 🔧 Lemma 4.1 (degenerate cases of BuildIdealTD)
 Cases 1 and 2 assume that the node `u′ᵢ ∈ C` adjacent to the outside neighbour `uᵢ` lies in some
 component `Cᵢ`, but `u′ᵢ` may be the balancer `z` itself, and in Case 2(b) the three distinct
 components `C′₁, C′₂, C′₃` need not exist.
@@ -69,6 +72,7 @@ components `C′₁, C′₂, C′₃` need not exist.
 **Repair.** Our proof splits into "no component of `C∖{z}` touches two outside neighbours" (Cases 1,
 2(a) and `u′ᵢ = z`) and the junction case. We define the junction as the median of `u′₁, u′₂, z`.
 (`IdealTD.exists_good`)
+
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

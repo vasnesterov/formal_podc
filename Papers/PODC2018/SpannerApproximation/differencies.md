@@ -46,12 +46,11 @@ arXiv:1802.03160v1 (numbering as there).
    hypotheses are unsatisfiable on these graphs, so nothing changes).
 
 No statement of §2 that we formalized is wrong. The proofs go through as written, up to the
-routine details above. Decided by R1: none of the items is a false statement or a genuine proof
-gap.
+routine details above. None of the items is a false statement or a genuine proof gap.
 
 ## Section 3: weighted 2-spanner vs. minimum vertex cover
 
-9. **Lemma 3.2, proof gap: an extra round is needed.** The proof says that, after the
+9. **Lemma 3.2, proof gap (🔧): an extra round is needed.** The proof says that, after the
    simulation, every node computes `C_H` "without any communication". Under the paper's own
    output convention (§1.5: each node outputs incident edges, the spanner is the union), `v`
    cannot know whether `u₂` output the cross edge `{v₁, u₂}`. The communication-free rule "apply
@@ -61,11 +60,10 @@ gap.
    We prove `T + 1` rounds with `3B`-bit messages (`lemma_3_2`), and `3(T + 1)` rounds with
    `B`-bit messages via a generic slowdown (`lemma_3_2_congest`; `slow 3`, `slow_run`,
    `slow_out`). The paper claims `3T(3n)`.
-   *Verdict call (R1/R6, borderline).* The lemma is a statement, and the exact `3T(3n)` count is
-   not established. We did not refute it either: we refuted only the natural local rule, not every
-   algorithm. The lemma is used only inside `Ω`-bounds (Thms 3.3/3.4), where `+O(1)` is
-   irrelevant. Under the also-common convention that both endpoints learn the output edges, the
-   paper's argument is exact. We treat the item as a proof repair (🛠️), not a false claim.
+   The exact `3T(3n)` count is not established. We did not refute it either: we refuted only the
+   natural local rule, not every algorithm. The lemma is used only inside `Ω`-bounds (Thms 3.3/3.4),
+   where `+O(1)` is irrelevant. Under the also-common convention that both endpoints learn the
+   output edges, the paper's argument is exact.
 10. **Claim 3.1.** True; the proof is correct. The paper converts `H` into `H'` and asserts
     "`H'` has the same cost". In general only `w(H') ≤ w(H)` holds. For the minimum `H` of Claim
     3.1 this gives equality, but Lemma 3.2 reuses the conversion for an `α`-approximate `H`. There

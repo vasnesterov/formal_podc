@@ -7,14 +7,14 @@ numbering** (Theorem 4.1, Lemmas 4.2, 4.5, 4.8, Claims 4.6–4.25, Figures 4.2�
 
 ## Statement-level issues
 
-None of the formalized statements is false. Calls decided by the verdict rules:
+None of the formalized statements is false.
 
-- **Lemma 4.2, `k ≥ 1`** (R2, degenerate): the `(k,b)`-array implementation computes `Ver + 1 mod k`;
+- **Lemma 4.2, `k ≥ 1`** (degenerate): the `(k,b)`-array implementation computes `Ver + 1 mod k`;
   for `k = 0` there is nothing to implement. We assume `[NeZero k]`. Not an issue.
 
 ## Proof gaps
 
-- **Lemma 4.5, proof of Claim 4.7 / construction of `S_ℓ`** (🛠️, R1: a step inside a proof of a true
+- **Lemma 4.5, proof of Claim 4.7 / construction of `S_ℓ`** (🛠️: a step inside a proof of a true
   lemma). The proof takes the sub-history `Λ_ℓ` of the base-object operations of the calls with
   timestamp `ℓ` and says: "Subsequence `Λ_ℓ` is a history, and by (4.1), no `A[i_ℓ].SWrite()` overlaps any
   other operation call on `A[i_ℓ]`. Therefore, there is a linearization `S_ℓ` of `Λ_ℓ`." Sequential
@@ -37,14 +37,14 @@ None of the formalized statements is false. Calls decided by the verdict rules:
   should be `q`. The proof also does not say how pending operations are linearized; the formalization
   handles them (linearization points at lines 59/64/58).
 
-- **Theorem 4.1 / Figure 4.4 "not in use"** (🛠️): the template requires that the write-index is not in use
+- **Theorem 4.1 / Figure 4.4 "not in use"** (🔧): the template requires that the write-index is not in use
   when chosen; the proof of Theorem 4.1 only proves (C) (Lemma 4.8). It holds (from Claims 4.22/4.23) and is
   part of our invariant (`WF.Inv.notInUse`, `WF.lemma_4_8` gives `Template ∧ CondC`).
-- **Lemma 4.8, proof of (4.32)** (🛠️): "p invokes more than n Write() calls during `[t_E@36, t_E@39]`, and so
+- **Lemma 4.8, proof of (4.32)** (🔧): "p invokes more than n Write() calls during `[t_E@36, t_E@39]`, and so
   q completes at least n Write() calls during this interval" — the counted `Write`s may include one invoked
   before `t_E@35`, outside the hypothesis of Claim 4.20; only its line 14 must come after `t_E@35`, which holds.
   Typo: "q completes" should be "p completes".
-- **Claims 4.15(b), 4.16** (inside the proof, R1): false at the level of single points — within one
+- **Claims 4.15(b), 4.16** (✏️, inside the proof): false at the level of single points — within one
   `recycle()`, line 26 may add `i*` to `free_p` at the same point at which lines 27–28 read `i*` from `Annc`
   and enqueue it (mechanism: `example` at the end of `Lemma48.lean`; we did not build a full execution). The
   uses of these claims keep one `recycle()` call of margin, so nothing breaks; our invariant uses "an index is

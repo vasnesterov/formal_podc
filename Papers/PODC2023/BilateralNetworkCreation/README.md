@@ -6,32 +6,34 @@ Bilateral Network Creation.* PODC 2023. DOI
 [2207.03798](https://arxiv.org/abs/2207.03798) v2 (full version with appendix); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🛠️ Proof repaired.** Every statement we checked is true: Lemma 2.4, Lemma B.1,
-Proposition 3.1, Corollary 3.2, Lemmas 3.3–3.5, Theorem 3.6 (trees in BSwE have
-`ρ ≤ 2 + 2 log α`), and Propositions 3.8 and 3.9 (stretched binary trees give the matching
-`Ω(log α)` lower bound for BGE). Two proofs need real repairs. The explicit `α`-range given in the
-proof of Lemma 2.4 is wrong for odd `n`. One case of the proof of Lemma 3.5 rests on an invalid
-inference. For Proposition 3.8 we give our own, shorter proof instead of Lemmas D.2–D.7.
+**Verdict: 🔧 Easy fix.** Every statement we checked is true, and the proofs of Lemmas 2.4 and 3.5 are saved by local
+changes: this covers Lemma 2.4, Lemma B.1, Proposition 3.1, Corollary 3.2, Lemmas 3.3–3.5, Theorem 3.6 (trees in BSwE
+have `ρ ≤ 2 + 2 log α`), and Propositions 3.8 and 3.9 (stretched binary trees give the matching `Ω(log α)` lower
+bound for BGE). The paper's most significant result, the constant Price of Anarchy for 3-BSE on trees, was not
+checked, and neither were the bounds for general networks and the refutation of the conjecture of Corbo and Parkes.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
-- The proof of Lemma 2.4 misstates `dist_{C_n}(u)` for odd `n` as `(n-1)(n-2)/4` instead of `(n²-1)/4`.
-- Proposition 3.9 says "for sufficiently large `η`". The paper's proof (with `k = ⌈α/η⌉`) needs a threshold that
-  depends on `γ`; `η^γ ≥ 512` suffices (`prop_3_9`). The statement also holds with the `γ`-independent threshold
-  `η ≥ 512` (`prop_3_9_uniform`): if `η^γ < 512`, the claimed bound is below `1 ≤ ρ`, and a complete binary tree
-  of the right size is in BGE.
+### ✏️ Slips
+- The proof of Lemma 2.4 misstates `dist_{C_n}(u)` for odd `n` as `(n-1)(n-2)/4` instead of `(n²-1)/4`; the bound
+  derived from it uses the correct value.
+- The proof of Lemma 2.4 says "if every node in `G'` has degree 2, then `G'` is isomorphic to `C_n`", which ignores
+  disjoint unions of cycles. Those are disconnected and excluded by the penalty `M`.
 - The definition of the Bilateral `k`-Strong Equilibrium must require a nonempty coalition; otherwise the empty
   coalition "improves" vacuously and no graph is in BSE.
 - With `M` only required to exceed `α n³`, disconnecting is not always worse when `α` is tiny (e.g. `n = 3`,
   `α = 0.01`, `M = 1`: an agent of the triangle drops both edges). This never matters under the paper's standing
   assumption `α ≥ 1`.
 
+### Typos
+- Proposition 3.9 says "for sufficiently large `η`". The paper's proof (with `k = ⌈α/η⌉`) needs a threshold that
+  depends on `γ`; `η^γ ≥ 512` suffices (`prop_3_9`). The statement also holds with the `γ`-independent threshold
+  `η ≥ 512` (`prop_3_9_uniform`): if `η^γ < 512`, the claimed bound is below `1 ≤ ρ`, and a complete binary tree
+  of the right size is in BGE.
+
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 2.4 (the explicit `α`-range for odd `n`)
+### 🔧 Lemma 2.4 (the explicit `α`-range for odd `n`)
 The proof claims `C_n` is in BSE for `(n+1)(n-1)/4 - (n-1) < α < (n+1)(n-1)/4` when `n` is odd, but for
 `(n-1)²/4 < α < (n²-1)/4` the cycle is not even in RE (as for `C_5` with `α = 5`; `C5_not_BSE`,
 `cycle_odd_not_BSE`, `cycle_not_RE`).
@@ -42,26 +44,23 @@ range is correct.
 
 **Details.** The proof cites [14] for Remove Equilibrium on this range. But an agent on `C_n` who drops one of its
 two edges saves `α` and loses only `n(n-1)/2 - (n²-1)/4 = (n-1)²/4` in distance. `C_5` with `α = 5` lies inside
-the claimed range `(2, 6)`. The proof's path case also assumes that "one of the end nodes must be part of the
-coalition", which is unjustified: the edge may have been dropped by the other endpoint.
+the claimed range `(2, 6)`.
+
+### 🔧 Lemma 2.4 (path case)
+The proof's path case assumes that "one of the end nodes must be part of the coalition", which is unjustified: the
+edge may have been dropped by the other endpoint, and then both end nodes can stay outside.
+
+**Impact.** Statement true (`cycle_BSE`, `lemma_2_4`).
 
 **Repair.** Our proof avoids the case analysis by counting distance levels: every coalition member of degree `≤ 1`
 in a path, and every member of degree 2, is not better off (`cycle_BSE`, `lemma_2_4`).
 
-### 🛠️ Lemma 3.5 (case `α ≥ n/2`)
+### 🔧 Lemma 3.5 (case `α ≥ n/2`)
 The proof starts with "if `α ≥ n/2`, the claim holds by definition of the 1-median `r`", but `|T_u| ≤ n/2 ≤ α`
 does not give `|T_u| ≤ α/(ℓ(u)-1)` once `ℓ(u) ≥ 3`.
 
 **Impact.** Statement true; the case split is unnecessary: the swap argument of the main case (`u` swaps its parent
 edge for an edge to `r`) works for every `α` (`lemma_3_5`).
-
-### 🛠️ Lemma 3.4 (a step rests on an unproved characterization)
-The proof uses "for all `w ∈ T_u` with `ℓ(w) ≥ ℓ(v)+1`, `|T_w| ≤ |T_u|/2`" for the `T_u`-1-median `v`, which
-follows from the "equivalent" component-size definition of 1-medians stated in Section 3.2 without proof.
-
-**Impact.** Minor gap; statement true. We prove the step directly from minimality: otherwise moving from `v`
-towards `w` (to a child of `v`, or to its parent if `w ∉ T_v`) decreases the distance cost within `T_u`
-(`two_mul_card_sub_le_of_subMedian`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -113,8 +112,15 @@ on the layer and halves every `k` layers (`LayerSized`). For such trees:
   `α ≥ 7kn`.
 * For additions, a layer-cake argument bounds the gain of the shallower endpoint by `2kn`.
 
+**Remark on Lemma 3.4 (not a mistake).** The proof uses "for all `w ∈ T_u` with `ℓ(w) ≥ ℓ(v)+1`,
+`|T_w| ≤ |T_u|/2`" for the `T_u`-1-median `v`, which follows from the "equivalent" component-size definition of
+1-medians stated in Section 3.2 without proof. We prove the step directly from minimality: otherwise moving from `v`
+towards `w` (to a child of `v`, or to its parent if `w ∉ T_v`) decreases the distance cost within `T_u`
+(`two_mul_card_sub_le_of_subMedian`).
+
 **Not formalized.** Section 2 apart from Lemma 2.4, Theorem 3.10 and Sections 3.2.3–3.3, and the
-auxiliary Lemmas D.2, D.3, D.5, D.6 (our proof of Proposition 3.8 does not need them).
+auxiliary Lemmas D.2, D.3, D.5, D.6 and the case analysis of Lemma D.7: our own, shorter proof of Proposition 3.8
+does not need them, and they were not checked step by step.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: `prop_3_8` / `prop_3_9` exhibit trees in BGE (hence in BSwE, the

@@ -1,7 +1,7 @@
 # Differences between the formalization and the paper
 
 Paper: Kentros, Kiayias, *Solving the At-Most-Once Problem with Nearly Optimal Effectiveness*, PODC 2011;
-full version arXiv 1107.2990v2 (TCS 2013). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
+full version arXiv 1107.2990v2 (TCS 2013).
 
 ## Model (Section 2)
 
@@ -37,18 +37,18 @@ full version arXiv 1107.2990v2 (TCS 2013). Verdict rules: `.claude/skills/formal
 9. **Lemma 4.1** (`lemma_4_1`): proved for every `β ≥ 1`, with any `m` and `n`. For `β = 0` a process
    may "choose" from an empty set; the paper's algorithm is undefined there. The paper says
    correctness holds also for `β < m`, where its `rank` is undefined. With clamping, safety holds for
-   all `β ≥ 1`. Slip, not a statement error (typo item in README).
+   all `β ≥ 1`. ✏️ (Slips item in README).
 10. **Lemma 4.2** (`lemma_4_2`, `lemma_4_2_extend`). The paper's "for any finite execution α ∈ execs"
     must be read as "with at most `f ≤ m − 1` crashes". Otherwise the lemma is trivial in IOA, where
     `stop_p` is always enabled, or false if stops are excluded and all processes crashed. The
     hypothesis `Do(α) ≤ n − (β + m − 1)` is stated additively as `Do + (β + m − 1) ≤ n` to avoid ℕ
-    truncation. We also prove the stronger fact that no process has terminated (`lemma_4_2`). Rule:
-    R4 (implied assumption), recorded as a proof-gap item (🛠️), since the intended statement is true.
+    truncation. We also prove the stronger fact that no process has terminated (`lemma_4_2`).
+    ✏️ (implied assumption); the intended statement is true.
 11. **Lemma 4.3** (`lemma_4_3`). Stronger than the paper: for `β ≥ m`, *every* run takes finitely many
     steps, with no fairness or crash-bound hypothesis. An infinite run is always fair for the set of
     processes that step finitely often, so this is equivalent to "no infinite fair execution". The
     paper's proof has a gap, since `POOL_α` ignores jobs held by terminated processes. It is repaired
-    with `pool` (README 🛠️ item). The paper's Cases A/B and A.1/A.2 are merged: any synchronised
+    with `pool` (README 🔧 item). The paper's Cases A/B and A.1/A.2 are merged: any synchronised
     `compNext` of `p₀` whose `TRY` was gathered late enough picks `x₀`.
 12. **Theorem 4.4.**
     - The lower bound `E ≥ n − (β + m − 2)` is proved for all `f ≤ m − 1` (`theorem_4_4_ge`), and per
@@ -57,23 +57,21 @@ full version arXiv 1107.2990v2 (TCS 2013). Verdict rules: `.claude/skills/formal
       `exists_fair_run_do_le`: processes `1..m−1` announce distinct jobs and crash, and process `m`
       runs solo. The paper only sketches it ("it is easy to see").
     - **False for `n ≤ β + m − 2`** (`theorem_4_4_false_small`: `m = n = β = 2`, `f = 1`, `E = 1 ≠ 0`).
-      Rule R2 (degenerate: the claimed value is `≤ 0`, a parameter corner outside the range the
-      paper uses), hence ⚠️ rather than ❌.
+      ✏️ (degenerate: the claimed value is `≤ 0`, a parameter corner outside the range the
+      paper uses).
     - **False for `f < m − 1`** (`theorem_4_4_false_few_crashes`: `m = 2`, `β = 4`, `n = 5`,
       `f = 0`: the formula gives `1`, but `E ≥ 2`; proof in `FewCrashes.lean` via the invariants
       `u1`, `invA`, `invB` and wait-freedom). Model checking gives more cases inside the paper's
       hypotheses, e.g. `(9, 2, 6, 0)` (`E = 4` vs `3`) and `(8, 3, 6, 1)` (`E = 2` vs `1`, with a
       crash). The paper's adversary crashes `m − 1` processes, so its proof only covers `f = m − 1`.
-      Rule: not excused by R4, since Theorem 4.4 explicitly says "for any β ≥ m, f ≤ m − 1" and
+      🔧: more than an implied assumption, since Theorem 4.4 explicitly says "for any β ≥ m, f ≤ m − 1" and
       Definition 2.4 makes `f` a genuine parameter (the paper itself computes `E = (m − f)·n/m` for the
-      trivial algorithm); not excused by R3, since restricting to `f = m − 1` drops content of the
-      claim. Hence ❌.
-    - Borderline call (R5/R6): ❌ rather than 🚨. The abstract's headline "effectiveness `n − 2m + 2`"
+      trivial algorithm); the condition changes to "≥" for all `f ≤ m − 1` and "=" at `f = m − 1`.
+    - The abstract's "effectiveness `n − 2m + 2`"
       is `β = m`, compared there with the bound `n − m + 1 = n − f` for `f = m − 1`, so it is read as
       the worst case `f = m − 1`, which is proved (`kk_m_effectiveness`, `n ≥ 2m − 1`). For `β = m`
       and `f < m − 1` no counterexample was found (model checking `m = 2`, `n ≤ 7`; `m = 3`, `n ≤ 6`
-      partially). Even under a reading of the headline for all `f`, it would only be unestablished,
-      which R5 also rates ❌.
+      partially); the exact value there is not proved.
 13. **Theorem 2.1** (`effectiveness_le_sub`): holds without `n ≥ m`, `f < m` or `0 < m` (see 8).
 
 ## Not formalized

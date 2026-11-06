@@ -6,23 +6,23 @@ RMR on Both CC and DSM.* PODC 2019. DOI
 [1904.02124](https://arxiv.org/abs/1904.02124) v2 (full version, proofs in Appendices C–E);
 numbering follows it.
 
-**Verdict: ❌ False claim.** The `k`-ported algorithm of Figures 3–4 is correct. We prove mutual
-exclusion, starvation freedom (finitely many crashes), wait-free exit, wait-free critical-section
-re-entry and critical-section re-entry (Lemmas 4–8), and Theorem 1 on the Signal object. But Lemma 9,
-the 39-condition invariant on which all the correctness proofs rest, is false as stated: several of
-its conditions fail in crash-free runs with two processes. We replace it with our own invariant.
+**Verdict: 🛠️ Hard fix.** Lemma 9, the 39-condition invariant on which all the correctness proofs rest, is
+false as stated: several of its conditions fail in crash-free runs with two processes. We replace it with our
+own invariant and a new liveness argument, and prove that the `k`-ported algorithm of Figures 3–4 is correct:
+mutual exclusion, starvation freedom (finitely many crashes), wait-free exit, wait-free critical-section
+re-entry and critical-section re-entry (Lemmas 4–8), and Theorem 1 on the Signal object. The paper's main point,
+the sub-logarithmic RMR bounds of Theorems 2 and 3, was not checked.
 
 ## Mistakes in the paper
 
-### ❌ Lemma 9 (the invariant of Figures 8–14)
-Lemma 9 claims that all 39 conditions hold in every configuration, but Condition 5 fails as soon as
-one process has executed line 14 in a crash-free run (`PaperInv.cond5_csSignal_false`,
-`PaperInv.cond5_nonNil_false`), and Condition 4 fails once two processes are queued
-(`PaperInv.cond4_false`).
+### 🛠️ Lemma 9, Condition 5 (and hence the proofs of Lemmas 4 and 5)
+Lemma 9 claims that all 39 conditions hold in every configuration, but Condition 5 fails as soon as one process
+has executed line 14 in a crash-free run (`PaperInv.cond5_csSignal_false`, `PaperInv.cond5_nonNil_false`).
 
-**Impact.** The proofs of Lemmas 4 and 5 (mutual exclusion and starvation freedom) cite conditions
-of this invariant, so they are not established by the paper. The algorithm itself is correct: we
-prove Lemmas 4–8 from a new invariant (`inv_reach`).
+**Impact.** The proofs of Lemmas 4 and 5 (mutual exclusion and starvation freedom) cite conditions of this
+invariant, so they are not established by the paper: the proof of Lemma 4 is one line from Condition 19, and the
+proof of Lemma 5 uses Conditions 15 and 19. The algorithm itself is correct: we prove Lemmas 4–8 from a new
+invariant (`inv_reach`).
 
 **Details.**
 - Condition 5 says `qnode.CS_Signal = 0 ⇒ qnode.Pred ∈ {NIL, &Crash, &InCS}`. Every waiting node
@@ -30,58 +30,51 @@ prove Lemmas 4–8 from a new invariant (`inv_reach`).
   node at line 28, with `Pred = &Exit`.
 - Condition 5 also says `qnode.NonNil_Signal = 0 ⇒ qnode.Pred = NIL`. Between lines 14 and 15 (and
   between lines 18 and 23 after a crash) `Pred` is already set while `NonNil_Signal` is still `0`.
-- Condition 4 asks that `Pred` be iterated at most `k` times from a node to reach
-  `{NIL, &Crash, &InCS, &Exit}`. With `k = 2` and both processes queued behind `SpecialNode`, the
-  second node needs 3 hops (node → first node → `SpecialNode` → `&Exit`). The bound should be
-  `k + 1`.
-- The fixes are not evident from the paper: for Condition 5 one would have to add node values and
-  `&Exit` to the right-hand side, which makes the conjunct nearly empty. Reversing the
-  implications gives true statements, but they merely restate Condition 5's `= 1` conjuncts. The
-  proof of Lemma 9 (Appendix E) claims that the conjunction of all conditions is preserved by every
-  step, but never re-checks Condition 5 at line 14. Its Condition 4 case counts `b1 + b2 ≤ k` and
-  forgets the fragment's head (`SpecialNode` or an exited node).
+- The fixes are not evident from the paper: one would have to add node values and `&Exit` to the right-hand
+  side, which makes the conjunct nearly empty. Reversing the implications gives true statements, but they
+  merely restate Condition 5's `= 1` conjuncts. The proof of Lemma 9 (Appendix E) claims that the conjunction
+  of all conditions is preserved by every step, but never re-checks Condition 5 at line 14.
 
-**Repair.** Our invariant (`Inv`, `InvDefs.lean`) is preserved by every step and crash
-(`inv_reach`); Lemmas 4–8 follow from it.
+**Repair.** Our invariant (`Inv`, `InvDefs.lean`) is preserved by every step and crash (`inv_reach`); Lemmas 4–8
+follow from it.
 
-### Typos and slips
+*Lemma 4 (`mutual_exclusion`).* The new invariant's core: every node has at most one successor, nobody is behind
+`Tail`, and at most one node "holds the right to the CS" (`InH`). A node holds it if it is in the CS, is behind a
+released node, or is exiting with a successor. The hard part is the repair code (lines 30–49). We characterise
+what the non-atomic scan of `Node[]` still says when the decision at line 46 is taken. It uses a ghost set of
+nodes that had already done their `FAS` when `Tail` was read (line 31): every later node hangs behind that `Tail`
+value. Then the `FAS` branch never creates a cycle. In the attach branch, the chosen predecessor has no successor
+and is not `Tail`. If `headpath = NIL`, nobody holds the right to the CS (`ScanInv.fas_facts`,
+`ScanInv.attach_facts`, `ScanInv.none_noH`).
+
+*Lemma 5 (`starvation_freedom`),* true under finitely many crashes and the paper's fairness conditions. After the
+last crash, every recovering process gets through `RLock`. The repair terminates: the waits at line 35 end, and
+the loop over maximal paths is finite. Eventually nobody is in the recovery code or in `RLock`
+(`eventually_no_rec`). From then on, the unique holder of the right to the CS is an ancestor of every waiting
+node. A rank (10 × number of unreleased ancestors + stage of the holder) never increases and drops at every step
+of the holder (`token_step`, `phase2_cs`).
+
+### 🛠️ Lemma 9, Condition 4 (third conjunct)
+Condition 4 asks that `Pred` be iterated at most `k` times from a node to reach
+`{NIL, &Crash, &InCS, &Exit}`, which fails once two processes are queued (`PaperInv.cond4_false`).
+
+**Impact.** The paper uses this bound to exclude cycles in the proof of Condition 23. The correctness lemmas it
+served are proved from our invariant (`inv_reach`).
+
+**Details.** With `k = 2` and both processes queued behind `SpecialNode`, the second node needs 3 hops (node →
+first node → `SpecialNode` → `&Exit`). The proof's Condition 4 case counts `b1 + b2 ≤ k` and forgets the
+fragment's head (`SpecialNode` or an exited node).
+
+**Repair.** The bound should be `k + 1`. We did not prove the invariant with this bound; the proved repair is our
+invariant (`Inv`, `inv_reach`).
+
+### ✏️ Slips
 - Condition 18 quantifies over the real program counter `PC_π'` where `\hat{PC}_π'` is meant (as
   in Condition 19(g)). Read literally it fails in the initial configuration, where every `PC_π = 10`.
 - Theorem 2 claims `O(1)` RMRs "for a process that does not crash during its passage". A passage
   that starts after a crash runs `RLock` and the repair scan of all `k` entries of `Node[]`, even
   if no crash happens during it. The intended statement is about crash-free super-passages, and
   `O(fk)` should read `O(1 + fk)`. Not formalized.
-
-## Proof gaps (statements true)
-
-### 🛠️ Lemma 4 (Mutual Exclusion)
-The proof is one line from Condition 19 of the (false) Lemma 9 invariant.
-
-**Impact.** Statement true; proved from our invariant (`mutual_exclusion`).
-
-**Details.** The new invariant's core: every node has at most one successor, nobody is behind
-`Tail`, and at most one node "holds the right to the CS" (`InH`). A node holds it if it is in the
-CS, is behind a released node, or is exiting with a successor. The hard part is the repair code
-(lines 30–49). We characterise what the non-atomic scan of `Node[]` still says when the decision
-at line 46 is taken. It uses a ghost set of nodes that had already done their `FAS` when `Tail`
-was read (line 31): every later node hangs behind that `Tail` value. Then the `FAS` branch never
-creates a cycle. In the attach branch, the chosen predecessor has no successor and is not `Tail`.
-If `headpath = NIL`, nobody holds the right to the CS (`ScanInv.fas_facts`,
-`ScanInv.attach_facts`, `ScanInv.none_noH`).
-
-### 🛠️ Lemma 5 (Starvation Freedom)
-The proof uses Conditions 15 and 19 of the false invariant, and an informal argument ("applying
-the above argument inductively on these fragments …") for the case where the queue is broken.
-
-**Impact.** Statement true under finitely many crashes and the paper's fairness conditions;
-proved (`starvation_freedom`).
-
-**Details.** After the last crash, every recovering process gets through `RLock`. The repair
-terminates: the waits at line 35 end, and the loop over maximal paths is finite. Eventually nobody
-is in the recovery code or in `RLock` (`eventually_no_rec`). From then on, the unique holder of
-the right to the CS is an ancestor of every waiting node. A rank (10 × number of unreleased
-ancestors + stage of the holder) never increases and drops at every step of the holder
-(`token_step`, `phase2_cs`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -129,7 +122,11 @@ With crashes, a `set()` that crashes after line 1 leaves a spinning waiter with 
 re-executed. The algorithm of Figures 3–4 always does this (lines 22–23).
 
 **Not formalized.** The RMR bounds of Theorem 2, Theorem 3 (arbitration tree), and the two
-scenarios of Appendix A against Golab–Hendler's algorithm.
+scenarios of Appendix A against Golab–Hendler's algorithm. The composition of Figure 2's non-atomic Signal object
+with crashes inside Figures 3–4. Whether the paper's invariant with Conditions 4, 5 and 18 patched is inductive:
+we prove our own invariant instead. The informal argument of Lemma 5's proof for the case where the queue is
+broken ("applying the above argument inductively on these fragments …"): it cites the invariant, but no specific
+step was shown wrong, and we prove Lemma 5 by a different argument.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Before the Lean proof, explicit-state model checking (`modelcheck/`) confirmed

@@ -5,23 +5,22 @@ Distributed Complexity Landscape on Trees Depends on the Knowledge About the Net
 DOI [10.1145/3796701.3815947](https://doi.org/10.1145/3796701.3815947). Formalized version: arXiv
 [2605.12787](https://arxiv.org/abs/2605.12787) v1; numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** Theorem 1 holds as stated: if the nodes know nothing about `n` and IDs
-are arbitrary natural numbers, `k`-hierarchical 2½-colouring needs `Ω(n)` rounds for every `k ≥ 1`.
-The paper's induction has a gap: the parity surgery needs the induction hypothesis in the modified
-graph `Ĝ`, but the hypothesis is stated only for the lower bound graph `G`. We repaired this by
-running the induction over a class of graphs that is closed under the surgery.
+**Verdict: 🛠️ Hard fix.** Theorem 1 holds as stated: if the nodes know nothing about `n` and IDs are arbitrary natural
+numbers, `k`-hierarchical 2½-colouring needs `Ω(n)` rounds for every `k ≥ 1`. The paper's induction has a gap, because
+the parity surgery needs the induction hypothesis in the modified graph `Ĝ` but the hypothesis is stated only for the
+lower bound graph `G`; the fix runs the induction over a class of graphs closed under the surgery. We checked only
+Theorem 1: Theorem 2, Theorems 3–7 and the landscape as a whole, which is the paper's main point, were not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
+### ✏️ Slips
+- Proof of Theorem 1, choice of `z`: property 2 ("`u`, `v` at distance at least `2T_i + 1`") does not guarantee a node
+  `z` at distance `> T_i` from both. The chosen `u`, `v` (at distance `T_i + 1` from the two ends) are about `0.8 ℓ_i`
+  apart, so such a `z` exists.
 
-### Typos and slips
-Small slips in the proof of Theorem 1, with no effect on the result:
+### Typos
 - `T_i = ℓ_i/10` need not be an integer. The proof uses "distance exactly `T_i + 1`" and round counts `≤ T_i`; we
   use `⌊ℓ_i/10⌋`.
-- Property 2 ("`u`, `v` at distance at least `2T_i + 1`") does not guarantee a node `z` at distance `> T_i` from
-  both. The chosen `u`, `v` (at distance `T_i + 1` from the two ends) are about `0.8 ℓ_i` apart, so such a `z`
-  exists.
 
 ## Proof gaps (statements true)
 
@@ -29,8 +28,8 @@ Small slips in the proof of Theorem 1, with no effect on the result:
 The parity surgery applies the induction hypothesis in the modified graph `Ĝ`, but the hypothesis was proved only
 for runs on the lower bound graph `G`.
 
-**Impact.** Statement true; the repair is routine once identified: run the induction over a class of graphs closed
-under the surgery (`claim`, `hostOK_hat`, `emb_hat_child`).
+**Impact.** Theorem 1 stands, but not by a local edit: the induction has to be restated and proved again over a class
+of graphs closed under the surgery (`claim`, `hostOK_hat`, `emb_hat_child`).
 
 **Details.** The induction claims properties 1–4 "by running `A` on `G`", where `G` is the `k`-hierarchical lower
 bound graph. To show property 4 for a level-`i` path, the proof removes a path node `z` (with its subtree) and joins

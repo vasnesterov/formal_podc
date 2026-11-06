@@ -5,27 +5,32 @@ Jonni Virtema. *Weak models of distributed computing, with connections to modal 
 [10.1145/2332432.2332466](https://doi.org/10.1145/2332432.2332466). Formalized version: the full journal version,
 arXiv [1205.2051](https://arxiv.org/abs/1205.2051) v3 (Dec 2013); numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** Both linear orders hold as stated:
+**Verdict: 🔧 Easy fix.** Both linear orders hold as stated:
 `SB ⊊ MB = VB ⊊ SV = MV = VV ⊊ VVc` (1) and the same for the constant-time classes (2), together with every
 numbered result on the way (Theorems 4, 8, 9, 11, 13, 17, Lemmas 5, 6, 15, 16, Corollaries 3, 7, 10, 12, 14, 18).
-The two simulation proofs (Theorems 4 and 8/9) ignore nodes that have already stopped. A stopped node sends the
-empty message `m0`, and so the simulating node cannot receive the extra information it needs from it. For Theorem 8
-this needs a real (if small) extra mechanism.
+The two simulation proofs (Theorems 4 and 8/9) ignore nodes that have already stopped: a stopped node sends the empty
+message `m0`, so the simulating node cannot receive the extra information it needs from it, and a local change to each
+simulation closes this with the claimed running times. The modal-logic characterisation (Theorem 2) was not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
-- Lemma 6's consequence silently uses order `k = 2` (the pair `u, w` itself).
+### ✏️ Slips
+- Theorem 17, proof: the step "there are nodes `u, v` with `t(u) < t(v)` and `t(v)` maximal; this means `S(u) = 0`" is
+  loose: `S(u) = 0` needs a *neighbour* of larger type. Connectivity, which the paper invokes, gives an edge whose
+  endpoints have different types, and its smaller endpoint outputs `0` (`thm17_mem`).
 - In Theorem 11, `Π(G)` is undefined for stars with `k ≤ 1`: they are stars, but not `k`-stars with `k > 1`. We
   leave the output unrestricted there.
+
+### Typos
+- Lemma 6's consequence silently uses order `k = 2` (the pair `u, w` itself).
+- Theorem 11, proof: the algorithm tests "the set of messages `{1}`", but the received set also contains `m0` when
+  `Δ > 1`; the padding is notational, and the algorithm works when `m0` is ignored.
 - In Theorem 17 the local type is defined through out-ports (`p((v, i))`), but a node can only learn the in-port
   version (`p⁻¹((v, i))`). Under consistency the two agree, which is all the proof uses.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorems 8 and 9 (`Multiset` simulation; stopped neighbours)
+### 🔧 Theorems 8 and 9 (`Multiset` simulation; stopped neighbours)
 The simulating algorithm `B` sorts the full message histories received from neighbours, but a neighbour `w` that
 has stopped sends `m0`, so `u` no longer receives `w`'s history and cannot place `w`'s `m0` in the sorted order.
 
@@ -43,24 +48,15 @@ out-ports of `p₀` and sorts the in-ports by the time-`T` histories of `B`'s ow
 show by induction that `A` on `p*` follows `B` on `p₀` exactly, using that truncation is monotone for the
 lexicographic order. Time `T` is kept, as claimed. (`theorem8`, `theorem9`)
 
-### 🛠️ Theorem 4 (`Set` simulation; "all messages received are distinct")
+### 🔧 Theorem 4 (`Set` simulation; "all messages received are distinct")
 The proof's claim "now all messages received by a node are distinct" is false: stopped neighbours and padding all
 deliver `m0`.
 
-**Impact.** Statement true; harmless, repaired locally with running time `T + 2Δ + 1 = T + O(Δ)` (`theorem4`).
+**Impact.** Statement true; repaired locally with running time `T + 2Δ + 1 = T + O(Δ)` (`theorem4`).
 
 **Repair.** The non-`m0` messages are pairwise distinct by Lemma 6, so the number of `m0`s is
 `Δ − #(distinct non-m0 messages)`, and the multiset of `A`'s messages can be rebuilt from the set. Our `Set`
 algorithm runs `C_Δ` for `2Δ + 1` rounds and then simulates `A`. (`theorem4`)
-
-### 🛠️ Theorem 17 (loose step)
-The step "there are nodes `u, v` with `t(u) < t(v)` and `t(v)` maximal; this means `S(u) = 0`" is loose:
-`S(u) = 0` needs a *neighbour* of larger type.
-
-**Impact.** Statement true; fixed with the connectivity the paper invokes (`thm17_mem`).
-
-**Repair.** Connectivity gives an edge whose endpoints have different types, and its smaller endpoint outputs `0`.
-(`thm17_mem`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

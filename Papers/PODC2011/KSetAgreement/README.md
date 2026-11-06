@@ -6,26 +6,34 @@ Message Passing Systems.* PODC 2011 (brief announcement). DOI
 [1103.3671](https://arxiv.org/abs/1103.3671) v2 (full version, latest arXiv version, March 2011);
 numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The concrete results hold: k-set agreement is impossible in
-asynchronous message passing with `f` crashes when `k ≤ (n−1)/(n−f)` (Theorem 2 with asynchronous
-processes, Corollary 5), proved by the paper's reduction to FLP, and with up to `f < n` initially
-dead processes k-set agreement is solvable iff `kn > (k+1)f` (Theorem 8). But the generic
-Theorem 1, the paper's main tool, is imprecisely stated: its condition (B) is not satisfiable
-as written, and its proof needs an unstated hypothesis (processes of `D̄` can only decide values
-proposed in `D̄`). That hypothesis holds in the paper's own models, where inputs are free, but
-fails for models that restrict inputs. With these repairs it holds and covers the paper's
-applications.
+**Verdict: ⚠️ Weakened.** Theorem 1, the paper's main tool, is saved by local repairs and its asynchronous
+consequences hold: k-set agreement is impossible with `f` crashes when `k ≤ (n−1)/(n−f)` (Theorem 2 with
+asynchronous processes, Corollary 5, by the paper's reduction to FLP), and with up to `f < n` initially dead
+processes it is solvable iff `kn > (k+1)f` (Theorem 8). But the claim that Theorem 2 tightly captures the
+impossibility is lost: its bound is not matched, and the exact border is proved only for initial crashes, by a
+separate partitioning argument. The failure-detector part (Section VII) was not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorem 1 (unstated property of the model)
+### ⚠️ Section VI opening and contribution list ("Theorem 2 tightly captures the impossibility")
+The bound `(n−1)/(n−f)` of Theorem 2 is not matched by the solvability bound `f/(n−f)` for initial crashes,
+because the two results are about different failure models.
+
+**Impact.** A tight border is proved only in the initial-crash model, by a separate partitioning argument
+(`theorem8`). Tightness of Theorem 2's own bound is not saved.
+
+**Details.** Theorem 2 assumes a different and harsher failure model (`f − 1` initial crashes plus one crash
+during the run). Example: `n = 5, f = 3, k = 2` is impossible under Theorem 2's failures but solvable with initial
+crashes only (`theorem2_vs_theorem8`).
+
+### 🔧 Theorem 1 (unstated property of the model)
 Theorem 1's proof tacitly assumes that the processes of `D̄` cannot decide a value proposed only in `D`,
 and without this the theorem fails in a model where process 0's input is fixed
 (`Abstract.Counterexample.theorem1_statement_false`).
 
-**Impact.** False only in the literal "arbitrary system model" generality the paper claims; an
-under-specified statement. In the paper's own models the missing hypothesis holds, and the applications
-are not affected. Repaired: `Abstract.theorem1_corrected`.
+**Impact.** The theorem fails only in the literal "arbitrary system model" generality the paper claims; the
+statement is under-specified. In the paper's own models the missing hypothesis holds, and the applications
+are not affected. Repaired by one added condition (E): `Abstract.theorem1_corrected`.
 
 **Details.** Fact 1 ("in every run of `R(D̄)` all of `D̄` decide on a common value") is derived from (B)
 and k-agreement alone. Then `A|D̄` is said to solve consensus in `M'`. Both steps need the unstated
@@ -41,65 +49,64 @@ input is fixed). The paper's models ([DDS87]-style, all inputs `x_q ∈ V` possi
 independent of input values) exclude this. There the missing hypothesis follows by changing the inputs
 of `D`.
 
-### ⚠️ Theorem 1, condition (B) (fixed values `v_i`)
+### 🔧 Theorem 1, condition (B) (fixed values `v_i`)
 Condition (B) cannot hold as written in the applications: the values `v_i` are fixed in advance, so a
 run of `R(D̄)` in which a process of `D̄` proposes `v₁` has no `D̄`-indistinguishable partner in
 `R(D, D̄)` (`Abstract.condB_fails`).
 
-**Impact.** Under-specified statement: the values must be allowed to depend on the run, and the proof
-works verbatim then.
+**Impact.** The statement is under-specified: the values must be allowed to depend on the run, and the proof
+works verbatim then (`Abstract.theorem1_corrected`).
 
 **Details.** `R(D, D̄)` requires `v_i` to be proposed in `D`. With arbitrary distinct inputs (Theorems 2
 and 10) such runs exist.
 
-### ⚠️ Theorems 8 and 2 for `f = n` (degenerate case)
-Theorem 8 (in the form `kn > (k+1)f`) fails for `f = n ≤ k`, where "decide your own input" works
-(`theorem8_false_of_f_eq_n`, `theorem2_false_of_f_eq_n`).
+### 🔧 Theorem 1, proof ("Therefore, we have that, in fact, ρ ∈ R(D̄)")
+"Clearly ρ ∈ R(D̄)" does not follow from indistinguishability *until decision*.
 
-**Impact.** False only in a degenerate case: the paper implicitly assumes `f < n` (its sets `D_i` of
-size `n − f` must be nonempty).
+**Impact.** Requiring the runs given by (D) to lie in `R(D̄)` repairs it, and this holds by construction in
+the applications (`Abstract.theorem1_corrected`).
 
-**Details.** Theorem 2's bound `(n−1)/(n−f)` is undefined at `f = n`. In the multiplied-out form
-`k(n−f) ≤ n−1` it would fail for `f = n = k`.
+**Details.** A process of `D̄` that decided early may hear from `D` in ρ before the other processes of
+`D̄` decide.
 
-### Typos and slips
+### 🔧 Theorem 1, proof (termination of `A|D̄`)
+Termination of `A|D̄` in `M'` is never argued: a process correct in `ρ'` might be faulty in the compatible run ρ.
+
+**Impact.** One clause added to (D), preserving correctness, closes the gap, and it holds in the applications
+(`Abstract.theorem1_corrected`). Condition (A) is never used.
+
+### 🔧 Section VI ("complete and consistent knowledge of G after the second stage")
+The claim that processes have "complete and consistent knowledge of G" after stage 2 is too strong: a process only
+learns its ancestors.
+
+**Impact.** The algorithm is correct as intended (`InitDeadAlg.kSafe`).
+
+**Details.** Ancestor knowledge suffices, but one must also argue that a chosen root's ancestor set is frozen once
+all its ancestors have chosen their in-lists.
+
+### ✏️ Slips
+* Theorem 8 (in the form `kn > (k+1)f`) fails for `f = n ≤ k`, where "decide your own input" works
+  (`theorem8_false_of_f_eq_n`, `theorem2_false_of_f_eq_n`). The paper implicitly assumes `f < n` (its sets `D_i` of
+  size `n − f` must be nonempty). Theorem 2's bound `(n−1)/(n−f)` is undefined at `f = n`; in the multiplied-out form
+  `k(n−f) ≤ n−1` it would fail for `f = n = k`.
+* Lemma 6 needs a nonempty graph: the empty graph has no source component (`SourceComp.exists_sourceComponent`).
+* For `k = 1`, what Section VI chooses is a source component, not a "clique" (a fully connected subgraph).
+
+### Typos
 * In the proof of Theorem 10, "applying Theorem 2" should be Theorem 1.
 * The proof of Lemma 7 cites "the previous theorem", meaning Lemma 6.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 1 (two more gaps in the proof)
-"Clearly ρ ∈ R(D̄)" does not follow from indistinguishability *until decision*, and termination of `A|D̄`
-in `M'` is never argued.
-
-**Impact.** Both hold in the applications; repaired in `Abstract.theorem1_corrected`.
-
-**Details.** A process of `D̄` that decided early may hear from `D` in ρ before the other processes of
-`D̄` decide. Termination needs (D) to preserve correctness. Condition (A) is never used.
-(`Abstract.theorem1_corrected`)
-
-### 🛠️ Theorem 8, "only if" (proved only for `kn = (k+1)f`)
+### 🔧 Theorem 8, "only if" (proved only for `kn = (k+1)f`)
 The paper proves impossibility only for the border case `kn = (k+1)f` and for `kn < (k+1)f` relies on
 "Theorem 2 tightly captures the impossibility", which does not transfer.
 
-**Impact.** Statement true; the paper's partitioning argument works for all `kn ≤ (k+1)f`
-(`initDead_impossible`).
+**Impact.** The paper's partitioning argument works unchanged for all `kn ≤ (k+1)f`, with `k+1` groups of size
+`n−f` (`initDead_impossible`).
 
-**Details.** Theorem 2 assumes a different and harsher failure model (`f − 1` initial crashes plus one
-crash during the run), so its impossibility does not transfer, and its bound `(n−1)/(n−f)` is not
-`f/(n−f)`. Example: `n = 5, f = 3, k = 2` is impossible under Theorem 2's failures but solvable with
-initial crashes only (`theorem2_vs_theorem8`).
-
-### 🛠️ Section VI (minor slips)
-Lemma 6 needs a nonempty graph, and the claim that processes have "complete and consistent knowledge of
-G" after stage 2 is too strong.
-
-**Impact.** The algorithm is correct as intended (`SourceComp.exists_sourceComponent`,
-`InitDeadAlg.kSafe`).
-
-**Details.** The empty graph has no source component. A process only learns its ancestors. That
-suffices, but one must also argue that a chosen root's ancestor set is frozen once all its ancestors have
-chosen their in-lists. For `k = 1`, what is chosen is a source component, not a "clique".
+**Details.** Theorem 2's failure model is harsher than initial crashes, so its impossibility does not transfer, and
+its bound `(n−1)/(n−f)` is not `f/(n−f)`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -146,7 +153,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Not formalized.** Section VII (failure detectors `Σ_k`, `Ω_k`: Lemmas 9, 11, 12, Theorem 10,
 Corollary 13) needs a failure-detector framework and cited results (weakest failure detector for
 consensus, the `Ω₂` vs `Ω` separation). Also not formalized: T-independence (Definition 6) as a
-separate notion, and the synchronous-process version of Theorem 2.
+separate notion, and the synchronous-process version of Theorem 2, whose condition (C) rests on [DDS87, Table I].
+Whether the repaired conditions of Theorem 1 hold for Theorem 10 is open: it is not checked here.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. The model and the consensus impossibility are CSLib's

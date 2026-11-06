@@ -5,23 +5,24 @@ PODC 2010. DOI [10.1145/1835698.1835802](https://doi.org/10.1145/1835698.1835802
 author's full version of May 14, 2011 (18 pp., with proofs; no arXiv version); numbering follows it. The author's
 erratum (ratifiers are Gafni's adopt-commit objects) only fixes credit. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ✅ Correct.** Every checked result holds as stated: the composition lemmas (Lemmas 1–3,
+**Verdict: ✏️ Slip.** The only mistakes are two slips in intermediate sentences: the composition lemmas (Lemmas 1–3,
 Theorem 4), the safety of the conciliator/adopt-commit consensus construction, the multi-valued adopt-commit
 object (Theorems 8 and 10), the quorum optimality via Bollobás's theorem (Theorem 9) and the new
 probabilistic-write conciliator (Theorem 7: agreement probability `(1 − e^{−1/4})/4`, `2⌈lg n⌉ + 5` individual
-work, `O(n)` expected total work). The probabilistic part of Section 4 (termination with probability 1, the
-expected-cost bound, Theorem 5) is checked only *conditionally*: the per-stage bound "a reached conciliator fails
-with probability `≤ 1 − δ`" is a hypothesis, not derived from Theorem 7 (see **Model**). The only slip is a typo in
-an intermediate sentence of Section 5.2; the paper's final bound is right.
+work, `O(n)` expected total work) all hold as stated. The paper's end-to-end consensus result was not fully
+checked: the probabilistic part of Section 4 (termination with probability 1, the expected-cost bound, Theorem 5)
+is proved only *conditionally*, because the per-stage bound "a reached conciliator fails with probability
+`≤ 1 − δ`" is a hypothesis, not derived from Theorem 7 (see **Model**).
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
 - §5.2: "the loop is never executed for more than `⌈lg n⌉ + 1` iterations" should be `⌈lg n⌉ + 2` (`= ⌈lg 2n⌉ + 1`):
   the write probability `2^k/(2n)` reaches 1 only at `k = ⌈lg n⌉ + 1`. For `n = 1` the loop runs twice
   (`attempts_tight`). The paper's bound `2⌈lg 2n⌉ + 3 = 2⌈lg n⌉ + 5` uses the right count and is attained.
+- §6.1, sentence before Theorem 8: the prose condition "`R_{v′}` includes some register written in `W_v` that is not
+  written in `W_{v′}`" is not sufficient, since it does not exclude `R_v ∩ W_v ≠ ∅`, and then a process sees its own
+  write and convergence fails. The precise condition is printed in Theorem 8, and we follow it (`AC.theorem8_safety`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -98,7 +99,10 @@ noisy/priority schedulers of §4.2, the cheap-collect variant (§6.2 item 4), th
 abstract's "`lg m + Θ(log log m)`" (the upper bound and the optimality among quorum systems are proved), and the
 abstract's end-to-end consensus bound for the probabilistic-write model (`O(log m + log n)` individual work,
 `O(n log m)` total work): it combines Theorems 7 and 10 through Section 4, whose probabilistic step is only
-assumed (see **Model**).
+assumed (see **Model**). Open points: termination with probability 1, the `E[T(U)]` bound and Theorem 5 are proved
+only under the per-stage failure hypothesis, and it was not checked that Theorem 7 gives this hypothesis conditionally
+on the history with adaptively chosen inputs. Our cost hypothesis also bounds stage costs by constants, so
+conciliators with only an expected `O(n)` total-work bound (a Wald-type argument) are not covered.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: concrete executions of the binary AdoptCommit, one committing and one adopting (`Quorums.lean`);

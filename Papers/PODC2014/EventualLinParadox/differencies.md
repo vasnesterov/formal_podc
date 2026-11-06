@@ -59,14 +59,14 @@ Paper: Guerraoui, Ruppert. *A Paradox of Eventual Linearizability in Shared Memo
 
 ## Statement-level findings
 
-- **Lemma 6 is false for partial types** (`lemma6_false_partial`). Rule R4: the implied assumption
+- **Lemma 6 is false for partial types** (`lemma6_false_partial`). ✏️ The implied assumption
   "operations are total" holds for every type the paper uses (registers, fetch&increment, consensus,
   test&set), and the paper's own remarks ("trivially `t`-linearizable", "any permutation yields a
   legal sequential history") assume it. But its model (`δ ⊆ Q × OP × RES × Q`, finite nondeterminism
-  allowing zero transitions) does not exclude partial operations. Verdict ⚠️ (excused, not ❌). Proved
+  allowing zero transitions) does not exclude partial operations. Proved
   for total types: `TLinearizable.prefix`. The liveness remark (`exists_tLinearizable_isLiveness`) and
   `tLinearizable_take_self` also assume totality and initial states.
-- **Theorem 12 / Proposition 14 need total base types** (rule R4, ⚠️; not a separate verdict level).
+- **Theorem 12 / Proposition 14 need total base types** (✏️).
   The paper never says its base objects always respond: its model only says a programme "can invoke an
   operation on a base object and await a response from it". If some base type has an operation with no
   transition (or no initial state), no response to it is weakly consistent, so a process calling it

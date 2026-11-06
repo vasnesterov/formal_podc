@@ -5,14 +5,14 @@ arXiv:2102.10174v4 (numbering follows the arXiv version).
 
 ## Errors and imprecisions in the paper
 
-1. **Definition 17 has no connectivity hypothesis.** *False only in a degenerate case.* Definition 17
+1. ✏️ **Definition 17 has no connectivity hypothesis.** Definition 17
    requires a replacement path for *all* `s, t` and all nonempty `F` with `|F| ≤ f`. If `F` disconnects `s`
    from `t` there is no replacement path. So no scheme is restorable on any graph in which some fault set
    with `|F| ≤ f` separates two vertices: any graph with a bridge when `f ≥ 1`, and any disconnected graph
    with at least one edge. As a consequence Theorem 19, read literally, is false (e.g. on `K₂`). Theorem 2 has the right hypothesis
    ("an `s ⇝ t` path remains in `G \ {e}`"), and we add it to Definition 17 (`IsRestorable`).
    Lean: `IsRestorableLiteral`, `not_isRestorableLiteral`, `theorem19_literal_false`.
-2. **Corollary 22: the union bound miscounts the fault sets.** *A false intermediate claim; the corollary
+2. 🔧 **Corollary 22: the union bound miscounts the fault sets.** *A false intermediate claim; the corollary
    holds with a larger constant.* The proof bounds the number of choices of `s, t, F` by `n^{f+2}`. There
    are `n² · N_f` choices, where `N_f = #{F ⊆ E : |F| ≤ f}` can be as large as about `n^{2f}`. For `K₄` and
    `f = 1` there are `16 · 7 = 112 > 4³` choices with *ordered* pairs `(s, t)` (still `12 · 7 = 84 > 64`
@@ -22,7 +22,7 @@ arXiv:2102.10174v4 (numbering follows the arXiv version).
    Lean: `paper_count_false`. `corollary22` proves the correct bound: the failure probability is at most
    `n² N_f |E| / (2W+1)`. The final arithmetic (`N_f ≤ n^{2f}`, choice of `W`, `O(f log n)` bits) is not
    stated in Lean.
-3. **Theorem 23's proof picks the wrong minimum.** *Proof gap; the statement is true.*
+3. 🔧 **Theorem 23's proof picks the wrong minimum.** *Proof gap; the statement is true.*
    - The main gap: it takes "the edge in `π₁ \ π₂` with smallest ID". It should be the smallest ID in the
      whole *symmetric difference*; otherwise an edge of `π₂ \ π₁` with smaller ID can dominate.
    - Minor: it speaks of "distinct (not-necessarily-shortest) paths" and concludes that `π₂` is shorter,
@@ -32,11 +32,13 @@ arXiv:2102.10174v4 (numbering follows the arXiv version).
    The argument is clean for *shortest* paths of `G \ F`, which have equal length and traverse common
    edges in the same direction (`IsShortestIn.dart_eq_of_edge_eq`). The first bullet of the proof already
    reduces to that case. We prove it this way (`coeff_of_ne`, `theorem23`), with `C = 2`.
+3a. ✏️ **Theorem 23's proof, first bullet.** "the initial length of any non-shortest path is at least 1 less than
+   the length of a shortest path" should say at least 1 *more*, as in Theorem 20's proof. Lean: `theorem23`.
 4. **Theorem 20: the proof is fine (clarification only).** For `e ∈ q₁ \ q₂` the coefficient of `r(e)`
    in the weight difference is `±1` simply because `e ∉ q₂`, so "at most one value of `r(e)` makes
    `q₁, q₂` tie" is correct as written. Our Lean proof goes through the coefficient vector of the whole
    difference instead (`coeff_of_ne`, `volume_degenerate`, `theorem20`).
-4a. **Corollary 22 applies the isolation lemma to signed weights without comment.** *Proof gap; the
+4a. 🔧 **Corollary 22 applies the isolation lemma to signed weights without comment.** *Proof gap; the
    statement is true.* The weight of a path in `G*` is `∑ ±r(e)`, with the sign given by the direction in
    which the path crosses `e`. Applying Theorem 21 to the family of shortest `s ⇝ t` paths needs two
    facts the proof does not state:
@@ -46,15 +48,17 @@ arXiv:2102.10174v4 (numbering follows the arXiv version).
      uniform on `{−W,…,W}`.
 
    Lean: `cnt_eq_tau` and `tau` (common sign), and the sign flip `i ↦ τ·i` in `corollary22`.
-5. **Theorem 21 (isolation lemma) needs distinct edge sets.** *Under-specified.* It is stated for "a set of
+4b. ✏️ **Corollary 22's proof, reweighting.** "since path lengths change by `< 1/(2n)` over the reweighting" is the
+   per-edge change; a path changes by `< 1/2`, as Theorem 20's proof says. Lean: `isATW_of_coeff`.
+5. ✏️ **Theorem 21 (isolation lemma) needs distinct edge sets.** *Under-specified.* It is stated for "a set of
    paths `Π`". The paths must have pairwise distinct edge sets (a path and its reverse always tie). In the
    application all paths go from `s` to `t`, and distinct shortest `s ⇝ t` paths have distinct edge sets
    (`IsShortestIn.exists_mem_edges_not_mem`). Our isolation lemma (`Cslib.Isolation.card_not_uniqueMin_le`)
    is stated for a family of sets.
-6. **Theorem 30's proof uses the wrong `f`.** *Typo/slip.* It takes "a consistent stable restorable
+6. ✏️ **Theorem 30's proof uses the wrong `f`.** *Typo/slip.* It takes "a consistent stable restorable
    `f`-RPTS". For `f + 1` faults it needs an `(f+1)`-restorable `(f+1)`-RPTS whose `f`-fault overlays are
    stored, as in Theorem 31. Lean: `theorem30_correct`.
-7. **Lemma 32's correctness proof misses a case.** *Proof gap; the statement is true.* It takes "the first
+7. ✏️ **Lemma 32's correctness proof misses a case.** *Proof gap; the statement is true.* It takes "the first
    and last clustered vertex" of the replacement path but does not treat paths without clustered vertices.
    Then every edge of the path is in `H`. Lean: `lemma32_correct`.
 8. **Theorem 19's proof is terse but correct.** Two steps are left implicit, and we prove both:
@@ -64,15 +68,15 @@ arXiv:2102.10174v4 (numbering follows the arXiv version).
      shortest paths from `t`.
 
    Lean: `restore_one`.
-9. **Appendix B (Theorem 27) has several slips. Not formalized.**
-   - `W : E → (1, 1 + 1/n²)`, but the bipartite weights are set to `(λ − j)/n⁴`. They should be
+9. **Appendix B (Theorem 27): slips and one open point. Not formalized.**
+   - ✏️ `W : E → (1, 1 + 1/n²)`, but the bipartite weights are set to `(λ − j)/n⁴`. They should be
      `1 + (λ − j)/n⁴`.
    - The vertex `v*` is never defined.
-   - `Label(z)` is undefined for the leaves of the last copy `G'_d` (the edge `(u_d, u_{d+1})` does not
+   - ✏️ `Label(z)` is undefined for the leaves of the last copy `G'_d` (the edge `(u_d, u_{d+1})` does not
      exist), at every level. Only about a `∏ₖ(1 − d^{-1/2^k}) ≥ 2^{-f}` fraction of the bipartite edges is
      forced. This only changes constants.
-   - Observation 1(c) states `N(f,d) = 2^f d²` where `≤` is meant.
-   - `W` does not break all ties: `z_j – x₁ – z_k` and `z_j – x₂ – z_k` have equal weight. So the scheme
+   - ✏️ Observation 1(c) states `N(f,d) = 2^f d²` where `≤` is meant.
+   - Open point: `W` does not break all ties: `z_j – x₁ – z_k` and `z_j – x₂ – z_k` have equal weight. So the scheme
      needs a further generic perturbation before it is a full consistent stable symmetric RPTS.
 
    A numerical check of the key claim, for `f ≤ 3` and small `d`, confirms that the corrected construction

@@ -2,26 +2,20 @@
 
 Paper: Déprés, Mostéfaoui, Perrin, Raynal, *Brief Announcement: The MBroadcast Abstraction*, PODC 2023. For the
 converse direction (MBroadcast from registers) the brief announcement gives no algorithm; we use Algorithm 2 and
-App. A.1 of the extended version (DISC 2023). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
-
-**Verdict call (borderline ✅ vs ⚠️, item 1).** The literal reading of the abstract's paraphrase of mutual ordering
-makes Property 1 and Theorem 2 false. The main-text definition, read with the paper's own convention for "deliver
-m′ before m" (FIFO and causal properties, Property 1), is the strong reading, under which every checked statement
-holds. The definition is not a result claim and the intended meaning is fixed by the paper itself. So we grade ✅
-and report the imprecision; a stricter grader could apply R3 and give ⚠️.
+App. A.1 of the extended version (DISC 2023).
 
 ## Definitions (Section 3, `Spec.lean`)
 
-1. **Mutual ordering: reading of "before".** The paper (main text): "it is not possible that p mdelivers m
+1. **Mutual ordering: reading of "before" (✏️).** The paper (main text): "it is not possible that p mdelivers m
    before m′ and p′ mdelivers m′ before m"; abstract/introduction: "it is not possible for p to deliver first
    (its message) m and then m′ while p′ delivers first m′ and then m". We formalize the reading used by the
    paper's own FIFO/causal definitions and by Property 1: "when p mdelivers m, it has not (yet, or ever)
    mdelivered m′" (`DelivBefore`). The literal reading of the abstract ("p mdelivers both, m first",
    `WeakMutualOrdering`) is strictly weaker, and with it Property 1 and Theorem 2 are false
-   (`property1_false_weak`, `alg3_weak_not_linearizable`). Rule R3 (intent recoverable: Property 1, Fig. 1, the
+   (`property1_false_weak`, `alg3_weak_not_linearizable`). The intent is recoverable: Property 1, Fig. 1, the
    "p′ does not ignore p" remark of the introduction and the paper's usage of "deliver m′ before m" in the FIFO
-   and causal properties all force the strong reading; local fix of one phrase). Borderline between ✅ and ⚠️:
-   see README.
+   and causal properties all force the strong reading, under which every checked statement holds. The fix is
+   local, one phrase. The definition is not a result claim, and the paper itself fixes the intended meaning.
 2. **Pairs with p = p′.** "For any pair of processes p and p′" — we quantify over all `(p, m) ≠ (p′, m′)`;
    the case `p = p′` holds automatically (`not_delivBefore_same`).
 3. **All mbroadcast messages are different** (the paper's WLOG assumption). Messages are identified by

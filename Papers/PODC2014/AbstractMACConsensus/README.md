@@ -4,16 +4,15 @@ Calvin Newport. *Consensus with an abstract MAC layer.* PODC 2014. DOI
 [10.1145/2611462.2611479](https://doi.org/10.1145/2611462.2611479). Formalized version: arXiv
 [1405.1382](https://arxiv.org/abs/1405.1382) v1; numbering follows it.
 
-**Verdict: ❌ False claim.** All lower bounds hold: Theorems 3.2, 3.3, 3.9 and 3.10 are proved
-(Theorem 3.2 needs `n ≥ 2`). Theorem 4.1 holds for the two-phase algorithm described in the prose, with the
-`2 F_ack` time bound. The pseudocode of Algorithm 1 has a one-symbol slip: line 23 looks for `decided(0)` only
-in `R2`, and read literally the algorithm violates agreement on two nodes. The false statement is Claim 3.4, a numbered
-claim: it fails for `D = 4` (a non-degenerate case that Theorem 3.3 covers), so the networks of Figure 1 do not
-prove Theorem 3.3 there; we prove the theorem for every even `D ≥ 4` with a different gadget.
+**Verdict: 🛠️ Hard fix.** All lower bounds hold: Theorems 3.2 (with `n ≥ 2`), 3.3, 3.9 and 3.10 are proved, and Theorem
+4.1 holds for the two-phase algorithm described in the prose, with the `2 F_ack` time bound, although line 23 of
+Algorithm 1 has a one-symbol slip. Claim 3.4 fails for `D = 4`, a non-degenerate case that Theorem 3.3 covers, so the
+networks of Figure 1 do not prove Theorem 3.3 there; we prove the theorem for every even `D ≥ 4` with a different gadget,
+found by computer search. The multihop algorithm wPAXOS was not checked.
 
 ## Mistakes in the paper
 
-### ❌ Claim 3.4 for `D = 4` (the networks of Figure 1)
+### 🛠️ Claim 3.4 for `D = 4` (the networks of Figure 1)
 For `D = 4` (`d = (D−2)/2 = 1`) the paper's Network A has diameter 6, not 4, because node `a₂⁺` of the
 gadget is at distance 2 from `c` (`claim_3_4_false_D4`).
 
@@ -22,53 +21,31 @@ Theorem 3.3 there. The theorem is still true: we prove it for all even `D ≥ 4`
 (`theorem_3_3`, `exists_nets`).
 
 **Details.** In Lean the counterexample is the 15-node network for `k = 0`, i.e. `4 ≤ n ≤ 15`. The
-padding nodes `a*_j` are attached to `a_{d−1} = a₀`, which does not exist. For `D ≥ 6` the paper's
-networks are fine (checked numerically, not formalized).
+padding nodes `a*_j` are attached to `a_{d−1} = a₀`, which does not exist.
 
 **Repair.** Our gadget, found by computer search: a core `c, t, s, r, u, p`, padding twins of `p`, and a
 path of length `d − 1` below `t`. B is a 3-fold voltage cover of it. (`theorem_3_3`, `exists_nets`)
 
-### ⚠️ Algorithm 1, line 23 (Theorem 4.1 read literally)
-Read literally, Algorithm 1 violates agreement on two nodes, because line 23 looks for
-`⟨phase 2, *, decided(0)⟩` in `R2` only, while a phase-2 message received during the receiver's phase 1
-goes into `R1` (`twoPhaseLit_not_solvesConsensus`).
-
-**Impact.** A one-symbol pseudocode slip with evident intent: with the check over `R1 ∪ R2`, Theorem 4.1
-holds, including the bound "decide by `2 F_ack`" (`theorem_4_1`, `theorem_4_1_time`).
-
-**Details.** A phase-2 message received during the receiver's own phase 1 goes into `R1` (line 6), and
-the loop of line 20 then does not wait for it again. Counterexample with two nodes, crash-free and
-timely (bound `F_ack = 8`):
-* `u` (input 0) gets its phase-1 ack before hearing `x` (input 1), so `u` is `decided(0)`;
-* `x`, still in phase 1, has heard `u`'s input 0 (so it will be bivalent) and receives `u`'s
-  `⟨phase 2, u, decided(0)⟩` into `R1`;
-* `u` decides 0. `x` finishes phase 2 with `R2 = {⟨phase 2, x, bivalent⟩}`; both witnesses are covered by
-  `R1 ∪ R2`, so it leaves the loop and decides 1.
-
-The intended rule is evident: line 8 already looks for phase-2 messages in `R1`, line 20 checks
-`R1 ∪ R2`, the prose says "if the set contains any message of the form decided `v_w`, then it decides
-`v_w`", and the proof assumes `v` "will see that `u` has a status of decided(0)".
-
-**Repair.** Check `R1 ∪ R2` in line 23 (`theorem_4_1`, `theorem_4_1_time`).
-
-### ⚠️ Theorem 3.2 for `n = 1`
-Theorem 3.2 needs `n ≥ 2`: with one node, deciding one's own input solves consensus with any number of
-crashes (`theorem_3_2_card_one`).
-
-**Impact.** Degenerate case; `theorem_3_2` assumes `2 ≤ n`.
-
-### ⚠️ Lemma 3.8 (lines of every length `d`)
+### 🔧 Lemma 3.8 (lines of every length `d`)
 Lemma 3.8 claims one `t` for lines of every length `d`, but its hypothesis only concerns networks of
 diameter `D`, so only `d = D` follows.
 
-**Impact.** Over-general but harmless: only `d = D` is used, and we prove that case (`lemma_3_8`).
+**Impact.** Only `d = D` is used, and we prove that case (`lemma_3_8`). Nothing is known for `d ≠ D`.
 
-### Typos and slips
+### ✏️ Slips
+- Algorithm 1, line 23: read literally, the algorithm violates agreement on two nodes, because the line looks for
+  `⟨phase 2, *, decided(0)⟩` in `R₂` only, while a phase-2 message received during the receiver's phase 1 goes into
+  `R₁` (`twoPhaseLit_not_solvesConsensus`; counterexample below, under **Proof remarks**). With the check over
+  `R₁ ∪ R₂`, Theorem 4.1 holds, including the bound "decide by `2 F_ack`" (`theorem_4_1`, `theorem_4_1_time`).
+- Theorem 3.2 needs `n ≥ 2`: with one node, deciding one's own input solves consensus with any number of crashes
+  (`theorem_3_2_card_one`); `theorem_3_2` assumes `2 ≤ n`.
 - Lemma 3.8: "all nodes begin with initial value 0" should be `b`.
+- Lemma 3.6: the synchronous scheduler does not fix the order in which a node receives the messages of one round, and
+  corresponding nodes must use the same order; we sort messages by a fixed order.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 3.1 (valency and crashes)
+### 🔧 Lemma 3.1 (valency and crashes)
 The proof's valency notion is ill-posed and Case 1 applies the valency of `β₁` to an execution in which
 `w` crashes, which is not an extension by valid steps.
 
@@ -87,16 +64,6 @@ The proof's valency notion is ill-posed and Case 1 applies the valency of `β₁
 * both cases of the proof become one: the two orders of the steps agree except at one node.
 
 (`lemma_3_1`, `exists_decision_off`, `stepV_comm`)
-
-### 🛠️ Lemma 3.6 and Sections 3.1, 3.3 (under-specified scheduler, w.l.o.g. step)
-The synchronous scheduler does not fix the order in which a node receives the messages of one round,
-and "w.l.o.g. nodes always broadcast" is not justified.
-
-**Impact.** Statements true; routine fixes in the model.
-
-**Details.**
-* Lemma 3.6 needs corresponding nodes to use the same order; we sort messages by a fixed order.
-* Our model allows idle nodes, so the bounds cover all algorithms without the w.l.o.g. step.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -138,8 +105,26 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Algorithm 1 with literal line 23 violates agreement | `twoPhaseLit_not_solvesConsensus` | `TwoPhase.lean` |
 | Theorem 4.1 (repaired line 23) | `theorem_4_1`, `theorem_4_1_time` | `TwoPhase.lean` |
 
+**Proof remarks.**
+
+*Algorithm 1, line 23.* A phase-2 message received during the receiver's own phase 1 goes into `R₁` (line 6), and
+the loop of line 20 then does not wait for it again. Counterexample with two nodes, crash-free and
+timely (bound `F_ack = 8`):
+* `u` (input 0) gets its phase-1 ack before hearing `x` (input 1), so `u` is `decided(0)`;
+* `x`, still in phase 1, has heard `u`'s input 0 (so it will be bivalent) and receives `u`'s
+  `⟨phase 2, u, decided(0)⟩` into `R₁`;
+* `u` decides 0. `x` finishes phase 2 with `R₂ = {⟨phase 2, x, bivalent⟩}`; both witnesses are covered by
+  `R₁ ∪ R₂`, so it leaves the loop and decides 1.
+
+The intended rule is evident: line 8 already looks for phase-2 messages in `R₁`, line 20 checks
+`R₁ ∪ R₂`, the prose says "if the set contains any message of the form decided `v_w`, then it decides
+`v_w`", and the proof assumes `v` "will see that `u` has a status of decided(0)".
+
+*"W.l.o.g. nodes always broadcast"* (Sections 3.1, 3.3) is not justified in the paper. Our model allows idle nodes, so
+the bounds cover all algorithms without the w.l.o.g. step.
+
 **Not formalized.** Corollary 3.7 (standard asynchronous broadcast model) and wPAXOS (Section 4.2, Lemmas 4.2–4.5,
-Theorem 4.6).
+Theorem 4.6). Claim 3.4 for `D ≥ 6` on the paper's own networks: they look fine, checked numerically for `d ≤ 6`, `k ≤ 2`.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity of `SolvesConsensus`: the repaired two-phase algorithm satisfies it on every clique

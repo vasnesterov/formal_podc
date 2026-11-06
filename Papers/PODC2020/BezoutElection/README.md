@@ -6,45 +6,28 @@ Space-Optimal Election in Anonymous Memory Systems.* PODC 2020. DOI
 proceedings text (HAL hal-03148627); there is no arXiv version.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** All results are proved: Theorems 1, 2 and 4, and
-Corollaries 1–3 as iff characterizations. The termination proofs of Algorithms 1 and 2 and the
-safety proof of Algorithm 2 (Lemma 2) are sketches with genuine gaps, repaired here. The claim in
-§4 that `v′` is positive fails for `m = 1`.
+**Verdict: 🛠️ Hard fix.** All results are proved: Theorems 1, 2 and 4, and Corollaries 1–3 as iff
+characterizations. But the termination proofs of Algorithms 1 and 2 and the safety proof of Algorithm 2 are
+sketches whose missing steps took new arguments and invariants.
 
 ## Mistakes in the paper
 
-### ⚠️ Section 4 (Bezout rewriting: "both `u′` and `v′` are positive")
-The claim fails for `m = 1`, `n = 2`, `(u, v) = (−1, 1)`, where `v′ = 0` (`v_prime_zero_example`).
+### ✏️ Slips
+- Section 4: "both `u′` and `v′` are positive" fails for `m = 1`, `n = 2`, `(u, v) = (−1, 1)`, where `v′ = 0`
+  (`v_prime_zero_example`). The same paragraph starts with "`v′` is positive or null"; only `v′ ≥ 0` is needed,
+  and that holds (`paper_rewrite`).
+- The proof of Theorem 2 says line 8 "leaves `REG.id = id_ℓ`", but the code writes `⊥`; we follow the code.
+- In the proof of Claim 1, `loser_i` "false" should be "true".
+- Section 5.2, Case 1: "jumps to the level" where the code increments by one.
 
-**Impact.** Degenerate case, harmless: only `v′ ≥ 0` is needed, and that holds (`paper_rewrite`).
-
-### Typos and slips
-- The prose of §3.1 says line 8 "leaves `REG.id = id_ℓ`", but the code writes `⊥`; we follow the code.
+### Typos
 - Algorithm 2: `reg_i.discarded` should be `reg_i[x].discarded`.
-- Section 5: wrong line references (N(2)/N(3) instead of N(5)/N(6), N(3) instead of N(4)); "jumps to the level"
-  where the code increments by one.
-- In Claim 1, `loser_i` "false" should be "true".
+- Sections 3.2, 5.2, 5.3: wrong line references (N(2)/N(3) instead of N(5)/N(6), N(3) instead of N(4); "the
+  predicate of line 16" means lines 5–6).
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 4 (Algorithm 2: Lemmas 1 and 2 are sketches)
-Lemma 2 reuses Claim 1 of Algorithm 1 for each competition, which does not cover writes decided from an earlier,
-non-atomic collect, and Lemma 1 (termination) is one paragraph.
-
-**Impact.** Statements true; repaired (`theorem_4`, `Alg2.alg2_agreement`, `Alg2.alg2_terminates`).
-
-**Details.** In Algorithm 2 a process decides a write from a copy read in an earlier, *non-atomic* collect, and
-the write can land much later. The property really needed is that a write for level `L` never lands after the
-register has reached level `L + 1`. Proving it takes a per-register invariant over every process's status for that
-register. The counting behind "exactly `d` leaders" is also missing. When the first process sets `finishing`,
-every process has already won exactly `v ℓ` competitions: the collected sum of levels never exceeds the true sum,
-because levels are monotone.
-
-**Repair.** Our termination proof shows that once solved competitions stop increasing, the candidate flags,
-`to_win` and `finishing` stabilize. It then finds an open register with a stable candidate, using `d ≤ n`, and
-replays Algorithm 1's convergence argument there.
-
-### 🛠️ Theorem 2 (Algorithm 1, termination proof is a sketch)
+### 🛠️ Theorem 2 (Algorithm 1, termination proof)
 "This pattern is repeated until all processes except one are losers" does not explain why two candidates cannot
 overwrite each other forever while losers keep re-announcing their loss.
 
@@ -54,9 +37,31 @@ overwrite each other forever while losers keep re-announcing their loss.
 any ⊥-value a candidate `c′` reads was written by a loser `j` who had read another candidate `c`'s value without
 `j` in it, so `D_c ⊊ D_{c′}`. This is impossible for the candidate with the smallest set. The committing phase
 needs "quiet" losers: once the leader knows `j`, `j` never writes again. Line 16 copies `REG.discarded` without
-checking its phase; the paper ignores this, and it turns out harmless.
+checking its phase; the paper ignores this, and it turns out to do no damage.
 
-### 🛠️ Theorem 1 (lower bound, imprecise proof)
+### 🛠️ Lemma 2 (safety of Algorithm 2)
+The proof reuses Claim 1 of Algorithm 1 for each competition, which does not cover writes decided from an earlier,
+non-atomic collect, and the counting behind "exactly `d` leaders" is missing.
+
+**Impact.** Statement true; repaired (`theorem_4`, `Alg2.alg2_agreement`).
+
+**Details.** In Algorithm 2 a process decides a write from a copy read in an earlier, *non-atomic* collect, and
+the write can land much later. The property really needed is that a write for level `L` never lands after the
+register has reached level `L + 1`. Proving it takes a per-register invariant over every process's status for that
+register. For the count: when the first process sets `finishing`, every process has already won exactly `v ℓ`
+competitions, because the collected sum of levels never exceeds the true sum, levels being monotone.
+
+### 🛠️ Lemma 1 (termination of Algorithm 2)
+The one-paragraph proof asserts that all competitions with a candidate terminate, without handling candidate sets
+that change over time or showing that some open register keeps a stable candidate.
+
+**Impact.** Statement true; repaired (`theorem_4`, `Alg2.alg2_terminates`).
+
+**Repair.** Our termination proof shows that once solved competitions stop increasing, the candidate flags,
+`to_win` and `finishing` stabilize. It then finds an open register with a stable candidate, using `d ≤ n`, and
+replays Algorithm 1's convergence argument there.
+
+### 🔧 Theorem 1 (lower bound, "at the same state")
 The proof says that processes of a group with the same number of steps are "in the same state", but literally they
 differ by their identifiers and are in the same state only *up to a renaming of identifiers*.
 

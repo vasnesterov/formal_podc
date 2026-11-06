@@ -5,37 +5,31 @@ and Bounded (Out-)Degree Dominating Sets in Trees.* PODC 2021. DOI
 [10.1145/3465084.3467901](https://doi.org/10.1145/3465084.3467901). Formalized version: arXiv
 [2106.02440](https://arxiv.org/abs/2106.02440) v1; numbering follows it.
 
-**Verdict: ⚠️ Minor statement issues.** The whole deterministic port-numbering part (§3) is correct: the
-round-elimination step `Π_Δ(a, x) → Π_Δ(⌊(a−2x−1)/2⌋, x+1)` (Lemmas 6, 8, 9, Corollary 10), Lemmas 5, 11,
-12 and the sequence of Lemma 13 (with an explicit condition in place of "`Δ` large enough") are all
-formalized; Lemma 8 is proved in its "at most `max{T−1, 0}`" form, which is what its proof gives. Together with a Lean proof of the forward
-direction of round elimination (Theorem 3), they give the `Ω(log Δ)` port-numbering lower bound for
-`k`-outdegree dominating sets, `k ≤ Δ^ε`, with `ε = 1/6`. The only false statement is Lemma 15 (randomized
-0-round failure probability ≥ `1/Δ⁸`), and only in the degenerate case `Δ = 1`.
+**Verdict: ✏️ Slip.** The whole deterministic port-numbering part (§3) is correct: the round-elimination step
+`Π_Δ(a, x) → Π_Δ(⌊(a−2x−1)/2⌋, x+1)` (Lemmas 6, 8, 9, Corollary 10), Lemmas 5, 11, 12 and the sequence of Lemma 13
+(with an explicit condition in place of "`Δ` large enough") are all formalized and, with a Lean proof of the forward
+direction of round elimination (Theorem 3), give the `Ω(log Δ)` port-numbering lower bound for `k`-outdegree
+dominating sets, `k ≤ Δ^ε`, with `ε = 1/6`. Only Lemma 15 for `Δ = 1` and one symbol in the definition of `R̄` are
+wrong. The lifting to LOCAL (imported Theorem 14, hence Theorem 1 and Corollary 2) was not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 15 for `Δ = 1` (randomized 0-round failure probability)
-Lemma 15's bound `1/Δ⁸` is `1` for `Δ = 1`, but on `K₂` the algorithm that outputs `M` or `A` with
-probability `1/2` each fails only with probability `1/2` (`lemma_15_false_delta_one`).
+### ✏️ Slips
+- Lemma 15 for `Δ = 1` (randomized 0-round failure probability): the lemma claims that for all `x ≤ Δ − 1` and
+  `a ≥ 1`, every randomized 0-round algorithm for `Π_Δ(a, x)` fails with probability at least `1/Δ⁸`. This bound is
+  `1` for `Δ = 1`, but on `K₂` the algorithm that outputs `M` or `A` with probability `1/2` each fails only with
+  probability `1/2` (`lemma_15_false_delta_one`): both `M` and `A` are node configurations of `Π_1(1, 0)`, and the
+  algorithm fails only on `MM` or `AA`. The proof gives a failure probability of at least `1/(3Δ)²` and then uses
+  `1/(3Δ)² ≥ 1/Δ⁸`, which needs `Δ ≥ 2`. The paper only uses large `Δ`, so nothing downstream is affected. We prove
+  the lemma for `Δ ≥ 2` with the bound `1/(36Δ²)`, which also covers algorithms whose outputs are not always valid
+  configurations (`lemma_15`).
+- §2.3, definition of `R̄`: `Σ_{Π''}` is "the sets that appear in the configurations of `E_{Π''}`", but `E_{Π''}` is
+  defined from `Σ_{Π''}`. It should say `N_{Π''}` (`Problem.alphRbar`).
 
-**Impact.** Degenerate corner: the paper only uses large `Δ`, so nothing downstream is affected. The
-lemma holds for `Δ ≥ 2`, with a better bound (`lemma_15`).
-
-**Details.** The lemma claims that for all `x ≤ Δ − 1` and `a ≥ 1`, every randomized 0-round algorithm
-for `Π_Δ(a, x)` fails with probability at least `1/Δ⁸`. For `Δ = 1`, both `M` and `A` are node
-configurations of `Π_1(1, 0)`, and the algorithm fails only on `MM` or `AA`. The proof gives a failure
-probability of at least `1/(3Δ)²` and then uses `1/(3Δ)² ≥ 1/Δ⁸`, which needs `Δ ≥ 2`.
-
-**Repair.** We prove the lemma for `Δ ≥ 2` with the bound `1/(36Δ²)`, which also covers algorithms
-whose outputs are not always valid configurations (`lemma_15`).
-
-### Typos and slips
-- §2.3, definition of `R̄`: `Σ_{Π''}` is "the sets that appear in the configurations of `E_{Π''}`",
-  but `E_{Π''}` is defined from `Σ_{Π''}`. It should say `N_{Π''}`. Also "`Σ_{Π''} =⊆ …`".
-- Lemmas 5 and 11 implicitly need `k ≤ Δ` and `x ≤ Δ`. Without them the configuration
-  `M^{Δ−x}X^x` does not exist. This is consistent with the paper's convention `0 ≤ a, x ≤ Δ`
-  for the family.
+### Typos
+- §2.3, definition of `R̄`: "`Σ_{Π''} =⊆ …`".
+- Lemma 8 says `Π⁺_Δ(a, x)` "has time complexity `max{T − 1, 0}`", but its proof gives only "at most", as Corollary
+  10 says; we prove this "at most `max{T−1, 0}`" form (`lemma_8`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -71,7 +65,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
   the paper proves its port-numbering bound. The paper also allows arbitrary port numbers; as argued
   above, this changes nothing.
 
-**Proof remarks.** In the proof of Lemma 8, the step "each `Yᵢ` contains `B`" does not need the
+**Proof remarks.** Lemmas 5 and 11 need `k ≤ Δ` and `x ≤ Δ`, since without them the configuration
+`M^{Δ−x}X^x` does not exist. This is the paper's convention `0 ≤ a, x ≤ Δ` for the family. In the proof of Lemma 8, the step "each `Yᵢ` contains `B`" does not need the
 earlier fact `Yᵢ ⊆ OUABPQ`: a right-closed set without `B` already lies in `PQ`.
 
 **Main results in Lean.**

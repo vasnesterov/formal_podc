@@ -5,33 +5,13 @@ Raft, and how to Port Optimizations.* PODC 2019. DOI
 [10.1145/3293611.3331595](https://doi.org/10.1145/3293611.3331595). Formalized version: the extended
 version with Appendices A–C (TLA+ specifications and the refinement proof).
 
-**Verdict: ❌ False claim.** The main idea holds, for a repaired Raft*. We prove the following. A
-Raft variant whose leader adopts the voters' extra entries refines MultiPaxos under the Appendix C
-mapping, so it is safe. The general porting theorem of Section 4 is proved for single-step
-refinements. But the printed protocols are not safe:
-- Figure 2's vote rule loses committed entries.
-- So does Figure 2 with heartbeats.
-- The `Invariance` theorem of the TLA+ MultiPaxos spec (B.1) is false.
-- The porting guarantee of Section 4.3 is unestablished for Raft*, whose refinement is multi-step.
+**Verdict: ⚠️ Weakened.** The first half of the paper holds for a repaired Raft*: a Raft variant whose leader adopts
+the voters' extra entries refines repaired MultiPaxos under the Appendix C mapping, so it is safe, though this takes a
+new inductive invariant. The porting guarantee, the other half, is proved only for single-step refinements (the
+general theorem of Section 4), which excludes the multi-step Raft* refinement, and the ported protocols Raft*-PQL and
+Raft*-Mencius were not checked. The printed protocols are unsafe, and short local changes repair them.
 
 ## Mistakes in the paper
-
-### ❌ TLA+ module MultiPaxos, `theorem Invariance` (Appendix B.1)
-With 3 acceptors and majority quorums the spec reaches a state where one ballot has two proposals and both `TRUE` and `FALSE` are chosen at index 0, violating `OneValuePerBallot`, `Inv` and agreement (`tla_invariance_false`).
-
-**Impact.** The paper's formal MultiPaxos is unsafe, and its stated invariance theorem is false.
-The pseudocode MultiPaxos (Figure 1) has the same flaw. A repaired MultiPaxos is safe (`safety`).
-
-**Details.** `Propose(a, i, v)` records nothing in `logs[a]`. So a leader may propose `TRUE` and then `FALSE`
-for the same index in the same ballot. Then `{a0, a2}` accepts one value and `{a1, a2}` the other.
-The grey comment "⇒ v is safe at i, b" does not help: both values are safe at ballot 1.
-Independently, 1b messages are not addressed to the proposer, so two acceptors can become leaders
-of the same ballot from the same 1b messages (`tla_two_leaders_same_ballot`). Figure 1's `Phase2a`
-also records nothing, and its `Phase1a` does not reset `phase1Succeeded`.
-
-**Repair.** In `Paxos.lean`, a proposal per instance and ballot is recorded and `Phase1a` resets
-leadership. `Phase1Succeed` needs the proposer's own report and `¬leader`. Safety is proved in
-`chosenAt_agree` and `safety`.
 
 ### ❌ Section 4.3 applied to Raft* (porting Paxos optimizations to Raft* "with guaranteed correctness")
 The correctness argument for ported optimizations assumes single-step refinement (`b_j ⇒ a_i`), but the Raft* → Paxos refinement is multi-step (one `AppendEntries` is several `Phase2a`/`Phase2b` steps).
@@ -43,13 +23,44 @@ formalized). The general theorem of Section 4.3 is true (`port_correct`). For
 multi-step refinements, evaluating the added clauses at the end points is unsound in general
 (`naive_multistep_port_unsound`).
 
-### ⚠️ Figure 2, `ReceiveVote` (lines 9–11, the vote rule)
+### 🔧 TLA+ module MultiPaxos, `theorem Invariance` (Appendix B.1)
+With 3 acceptors and majority quorums the spec reaches a state where one ballot has two proposals and both `TRUE` and `FALSE` are chosen at index 0, violating `OneValuePerBallot`, `Inv` and agreement (`tla_invariance_false`).
+
+**Impact.** The paper's formal MultiPaxos is unsafe, and its stated invariance theorem is false.
+The pseudocode MultiPaxos (Figure 1) has the same flaw. A repaired MultiPaxos is safe (`safety`).
+
+**Details.** `Propose(a, i, v)` records nothing in `logs[a]`. So a leader may propose `TRUE` and then `FALSE`
+for the same index in the same ballot. Then `{a0, a2}` accepts one value and `{a1, a2}` the other.
+The grey comment "⇒ v is safe at i, b" does not help: both values are safe at ballot 1.
+Figure 1's `Phase2a` also records nothing.
+
+**Repair.** In `Paxos.lean`, a proposal per instance and ballot is recorded. Safety is proved in
+`chosenAt_agree` and `safety`.
+
+### 🔧 Appendix B.1, `Phase1b` and `BecomeLeader` (two leaders of one ballot)
+1b messages are not addressed to the proposer, so two acceptors can become leaders of the same ballot from the same
+1b messages (`tla_two_leaders_same_ballot`).
+
+**Impact.** This breaks the spec independently of the previous item; the repaired MultiPaxos is safe (`safety`).
+
+**Repair.** `Phase1Succeed` needs the proposer's own report.
+
+### 🔧 Figures 1 and 2 (leadership guards)
+The pseudocode lacks leadership guards: Figure 1's `Phase1a` does not reset `phase1Succeeded`, and `Phase1Succeed` and
+`BecomeLeader` can re-run, which in Figure 2 can shrink `lastIndex`.
+
+**Impact.** The repaired protocols are safe (`safety`, `raftStar_commitSafe_raftVote`).
+
+**Repair.** In `Paxos.lean`, `Phase1a` resets leadership and `Phase1Succeed` needs `¬leader`; `BecomeLeader` in
+`RaftStar.lean` is guarded in the same way.
+
+### 🔧 Figure 2, `ReceiveVote` (lines 9–11, the vote rule)
 Because a voter compares its entry *at the candidate's last index* (not its last entry) with the candidate's last term, it can vote for a candidate behind it, and a committed entry is overwritten (`fig2_not_commitSafe`; key step `fig2_voter_reports_higher_term`).
 
 **Impact.** Raft* as printed is unsafe and refines no safe Paxos. Step 4.2 of Appendix C is false
-for it. This is a local index slip with evident intent: Section 3 says Raft* is "identical to
-Raft" except for two differences unrelated to voting, and the TLA+ spec B.2 and Raft compare the
-voter's *last* entry, and with that rule the refinement holds (`raftStar_commitSafe_fig2Fixed`).
+for it. The fix is local: Section 3 says Raft* is "identical to Raft" except for two differences
+unrelated to voting, and the TLA+ spec B.2 and Raft compare the voter's *last* entry, and with that
+rule the refinement holds (`raftStar_commitSafe_fig2Fixed`).
 
 **Details.** The run uses five servers; every `AppendEntries` carries a value:
 1. `A` writes `x@1` only to itself.
@@ -60,20 +71,24 @@ voter's *last* entry, and with that rule the refinement holds (`raftStar_commitS
    `1 < 2`, although their last term is `3`.
 5. `C` keeps `y` at index 0 and commits it.
 
-### ⚠️ Figure 2, `AppendEntries` with no new value (heartbeats)
+### 🔧 Figure 2, `AppendEntries` with no new value (heartbeats)
 Figure 2 does not exclude `vals = []`, and with empty appends Raft*'s commit rule loses committed entries in Raft's "Figure 8" scenario, even with Raft's own vote rule (`heartbeat_not_commitSafe`).
 
 **Impact.** Section 3 says re-stamping ballots makes Raft's §5.4.2 rule unnecessary. That holds
 only if every append carries an entry of the leader's term. The TLA+ spec B.2 always appends one
 value, and under that assumption the refinement holds (`refinement_repaired`).
 
+### ✏️ Slips
+- Figure 3 maps `instance.bal` to the per-entry `bal` field, which gives no refinement even for repaired Raft* (scenario
+  in [differencies.md](differencies.md), in prose only). The intended mapping is in Section 3 and Appendix C, and the
+  refinement is proved for it (`refinement`).
+
 ## Proof gaps (statements true)
 
-### 🛠️ Appendix C, steps 2.3 (`BecomeLeader ⇒ Phase1Succeed`) and 2.5 (`ReceiveAppend ⇒ Phase2b`)
-Step 4.2 ("the leader's entries are already the safe entries") has no argument, and step 2.5
-ignores the follower's `commitIndex` update.
+### 🛠️ Appendix C, steps 2.3 and 4.2 (`BecomeLeader ⇒ Phase1Succeed`)
+Step 4.2 ("the leader's entries are already the safe entries") has no argument.
 
-**Impact.** For the repaired Raft* both steps hold (`sim_becomeLeader`, `sim_receiveAppend`).
+**Impact.** For the repaired Raft* the step holds (`sim_becomeLeader`).
 
 **Details.** Step 4.2 needs a real inductive invariant of Raft* (`Raft.Inv`, 18 clauses):
 - log matching;
@@ -82,8 +97,13 @@ ignores the follower's `commitIndex` update.
 - voters' last terms are at most the candidate's;
 - every entry is a proposal of its term and of its log's last term.
 
-Under the mapping, a follower re-accepts its *whole* log in the leader's term, not just the new
-entries. The commit update maps to Paxos `Learn` steps. Showing that committed entries are never
+### 🛠️ Appendix C, step 2.5 (`ReceiveAppend ⇒ Phase2b`)
+Step 2.5 maps only the new entries, although under the mapping a follower re-accepts its *whole* log in the leader's
+term, and it ignores the follower's `commitIndex` update.
+
+**Impact.** For the repaired Raft* the step holds (`sim_receiveAppend`).
+
+**Details.** The commit update maps to Paxos `Learn` steps. Showing that committed entries are never
 overwritten needs MultiPaxos safety itself, so the refinement and the invariant are proved together
 (`inv_and_reachable`). Raft* never truncates: a replaced entry is a Paxos acceptance in a higher
 ballot.
@@ -126,7 +146,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | §4.3 recipe fails for multi-step refinements | `Porting.naive_multistep_port_unsound` | `Porting.lean` |
 
 **Not formalized.** The TLA+ module Raft* (B.2), PQL, Mencius and their Raft* ports (B.3–B.6,
-Appendix A), the classification of Paxos variants (Fig. 6), and the evaluation.
+Appendix A), the classification of Paxos variants (Fig. 6), and the evaluation. The `ProposeEntries` of B.2 also
+records nothing in the leader's log, so its `Invariance` very likely fails the same way as B.1's; not checked.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity:

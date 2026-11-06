@@ -3,27 +3,25 @@
 Danek, *The k-Bakery*, PODC 2010 (author copy, 9 pp.), with proofs from Danek's PhD thesis (Toronto 2010,
 Chapter 5) where the paper omits them.
 
-## Verdict and deciding rule
+## Main finding
 
-- **🚨 Headline claim false (R5).** Theorem 10 claims that the algorithm of Figure 3 satisfies
-  k-exclusion with non-atomic (safe) reads and writes. It does not (`NonAtomic.counterexample`, `N = 3`,
-  `k = 1`). This is a headline: the title ("… Using Non-atomic Reads and Writes") and the abstract
-  ("Finally, we present a modification … that works with non-atomic reads and writes") present it as a
-  primary contribution, and the claim is about the paper's specific algorithm (R5, last sentence).
-- Not excused by R4: the paper explicitly fixes the semantics of non-atomic accesses ("behave the same as
+- **❌ Theorem 10.** It claims that the algorithm of Figure 3 satisfies k-exclusion with non-atomic
+  (safe) reads and writes. It does not (`NonAtomic.counterexample`, `N = 3`, `k = 1`). The title
+  ("… Using Non-atomic Reads and Writes") and the abstract ("Finally, we present a modification … that
+  works with non-atomic reads and writes") present it as a primary contribution, and the claim is about
+  the paper's specific algorithm.
+- Not an implied assumption: the paper explicitly fixes the semantics of non-atomic accesses ("behave the same as
   … single-writer … safe registers"; "if a non-atomic read and write access the same variable
   concurrently, then the read returns an arbitrary value") for all variables, and Figure 3 keeps `Ticket`
   a single, non-duplicated register. Making `Ticket` atomic/regular is a change of the model, not an
   implied assumption.
-- Not degenerate (R2): `k = 1` is ordinary mutual exclusion, `N = 3` processes, no crashes. The paper
+- Not a degenerate case: `k = 1` is ordinary mutual exclusion, `N = 3` processes, no crashes. The paper
   allows `k = 1` explicitly (k-FCFS "makes sense for all `k ≥ 1`"; Section 6 itself uses `k = 1` for its
   scenario against Figure 2).
-- Borderline call (🚨 vs ❌), recorded per R6: the introduction calls the *atomic* algorithms "our main
-  contribution" and the abstract introduces the non-atomic variant with "Finally". We still apply R5's
-  first criterion, a result the title names: the title is "The k-Bakery: … Using Non-atomic Reads and
-  Writes". R5's existential exception does not apply: the claim (Theorem 10, Table 1) is about the paper's
-  specific algorithm, Figure 3, with `Θ(N)` RMRs, and no repaired local-spin non-atomic algorithm is known
-  or verified here.
+- The introduction calls the *atomic* algorithms "our main contribution" and the abstract introduces the
+  non-atomic variant with "Finally", but the title is "The k-Bakery: … Using Non-atomic Reads and Writes".
+  The claim (Theorem 10, Table 1) is about the paper's specific algorithm, Figure 3, with `Θ(N)` RMRs, and
+  no repaired local-spin non-atomic algorithm is known or verified here.
 - Theorems 8 and 9 (and Lemmas 1–7) are true as stated: proved.
 
 ## Modelling choices (Figure 2, atomic registers)
@@ -109,8 +107,7 @@ Chapter 5) where the paper omits them.
     FIFE, `Θ(N)` RMRs) was not examined.
 19. **Thesis.** The thesis' Lemma 5.21 (`Cp → Cq ⇒ tp < tq`) is false for Figure 5.6. In the
     counterexample `C_r → C_p` but `t_p = 3 < t_r = 101`. Lemma 5.25 (the non-atomic analogue of
-    Lemma 5.14) and Theorem 5.33 are false as well. These are not statements of the PODC paper and do not
-    enter the verdict.
+    Lemma 5.14) and Theorem 5.33 are false as well. These are not statements of the PODC paper.
 
 ## Not formalized
 

@@ -5,39 +5,40 @@ Data-Center Routing with Congestion Control and Unsplittable Flows.* PODC 2024. 
 [10.1145/3662158.3662777](https://doi.org/10.1145/3662158.3662777). Formalized version: the PODC
 proceedings version (no arXiv version); numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** Theorems 3.4, 4.2 and 4.3, the upper bound of Theorem 5.4 and
-all lemmas are correct. The proofs that the paper omits as "routine" (Lemma 2.2, Lemma 3.2, Lemma 4.4,
-Lemma 4.6, Lemma 5.2) are also proved here. The tightness part of Theorem 5.4 is proved only for odd
-`n`. The paper reduces to odd `n` "without loss of generality", but for even `n` its construction gives
-only `ε → 1/(n-2)`. The proof of Theorem 5.4 also computes wrong rates for `n = 3`.
+**Verdict: 🔧 Easy fix.** Theorems 3.4, 4.2 and 4.3, the upper bound of Theorem 5.4 and all lemmas are correct, and the
+proofs that the paper omits as "routine" (Lemma 2.2, Lemma 3.2, Lemma 4.4, Lemma 4.6, Lemma 5.2) are also proved here.
+The tightness part of Theorem 5.4 is proved only for odd `n`: the paper reduces to odd `n` "without loss of
+generality", but for even `n` its construction gives only `ε → 1/(n-2)`, which still shows that the bound becomes tight
+as `n` grows. The other gaps close locally, including the wrong rates that the proof of Theorem 5.4 computes for
+`n = 3`.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
+### 🔧 Theorem 5.4, second part (the "w.l.o.g. `n` odd" step)
+The tightness proof stacks `(n-1)/2` copies of the gadget of Example 3.3 plus one extra middle "doom" switch, which needs `n` odd, and nothing reduces even `n` to odd `n`; for even `n` the same idea gives only `ε > 1/(n-2)`.
 
-### Typos and slips
+**Impact.** We prove the claim for odd `n` and the weaker bound `ε > 1/(n-2)` for even `n ≥ 4` (`theorem_5_4_tight_odd`, `theorem_5_4_tight_even`). Whether the claim holds for even `n` is open. The paper's message ("the bound becomes tight as `n` grows") is unaffected.
+
+**Details.** The claim is: for every `n ≥ 3` and every `ε > 1/(n-1)`, some collection of flows has `T^{T-MmF} ≥ 2(1-ε) T^MmF`. For even `n` only `(n-2)/2` gadgets fit. Other gadget shapes do not seem to help. By an informal count (not formalized): take `L ≤ n-1` type-1 flows on `I_1`/`O_1` forming chains of length ≥ 2, consecutive flows of a chain joined by a bundle of `k` type-2 flows, `B` bundles in all, every bundle on the doom switch. Then the Doom-Switch throughput is `L(1 - 1/B) + 1`, while `T^MmF → B ≥ L/2`. For even `n` the best ratio is `max(2 - 2/(n-2), 2 - 4/n + 4/n²)`, still below `2(1 - 1/(n-1))`. (For `n = 4` a single chain of three type-1 flows gives ratio `→ 5/4`, i.e. `ε → 3/8`. This beats the formalized `1/(n-2) = 1/2` but not the paper's `1/3`.)
+
+### ✏️ Slips
 - In the routing of Lemma 4.6, the type-2.b flow is written `(s_i^1, t_i^j)`. It should be `(s_i^1, t_{n+1}^j)`.
+
+### Typos
 - Definitions 2.4/2.5 speak of "the" max-min fair allocation of every routing. Existence (water-filling) is assumed; we prove uniqueness, and our statements do not need existence.
 - The proof of Theorem 5.4 writes `T^{T-MmF} ≤ T^{T-MT} = T^MT`. Only `≤` is needed, so Lemma 5.2 is not used for the bound.
 - In (R1), "max-main" should be "max-min".
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 5.4, second part (the "w.l.o.g. `n` odd" step)
-The tightness proof stacks `(n-1)/2` copies of the gadget of Example 3.3 plus one extra middle "doom" switch, which needs `n` odd, and nothing reduces even `n` to odd `n`; for even `n` the same idea gives only `ε > 1/(n-2)`.
-
-**Impact.** We prove the claim for odd `n` and the weaker bound `ε > 1/(n-2)` for even `n ≥ 4` (`theorem_5_4_tight_odd`, `theorem_5_4_tight_even`). Whether the claim holds for even `n` is open. This is a proof gap in a stated theorem; the paper's message ("the bound becomes tight as `n` grows") is unaffected.
-
-**Details.** The claim is: for every `n ≥ 3` and every `ε > 1/(n-1)`, some collection of flows has `T^{T-MmF} ≥ 2(1-ε) T^MmF`. For even `n` only `(n-2)/2` gadgets fit. Other gadget shapes do not seem to help. By an informal count (not formalized): take `L ≤ n-1` type-1 flows on `I_1`/`O_1` forming chains of length ≥ 2, consecutive flows of a chain joined by a bundle of `k` type-2 flows, `B` bundles in all, every bundle on the doom switch. Then the Doom-Switch throughput is `L(1 - 1/B) + 1`, while `T^MmF → B ≥ L/2`. For even `n` the best ratio is `max(2 - 2/(n-2), 2 - 4/n + 4/n²)`, still below `2(1 - 1/(n-1))`. (For `n = 4` a single chain of three type-1 flows gives ratio `→ 5/4`, i.e. `ε → 3/8`. This beats the formalized `1/(n-2) = 1/2` but not the paper's `1/3`.)
-
-### 🛠️ Proof of Theorem 5.4, `n = 3` (Doom-Switch rates)
+### 🔧 Proof of Theorem 5.4, `n = 3` (Doom-Switch rates)
 The proof says that under the Doom-Switch routing the type-1 flows get `1 - 2/(n-1)` and the type-2 flows get `2/(k(n-1))`, but for `n = 3` (type-1 rate `0`, type-2 rate `1/k`) this allocation is not max-min fair (`doom_paper_rates_not_isMaxMinFair`).
 
 **Impact.** The statement for `n = 3` is still true, trivially, because then `2(1-ε) < 1`. The rates are correct for odd `n ≥ 5`, where `k(n-3) ≥ 2` (`doom_clos_isMaxMinFair`).
 
 **Details.** The type-1 flows have no bottleneck, and giving every flow `1/(k+1)` is feasible for the same routing and lexicographically larger.
 
-### 🛠️ Lemma 4.6, Step 2 (lexicographic principle)
+### 🔧 Lemma 4.6, Step 2 (lexicographic principle)
 Step 2 argues that every routing that raises some rate must lower "a flow of equal (or no greater) rate" and concludes `a*↑ ⪰ a_r↑`, but never states which lexicographic principle makes this inference valid, especially when several rates change at once.
 
 **Impact.** Statement true; repaired, and Step 2 shows more than the paper claims (`sortedRates_lt_of_forall`, `aStar_criterion`, `lemma_4_6`).
@@ -89,7 +90,7 @@ line-colouring theorem. (`isMaxMinFair_iff_hasBottlenecks`, `lemma_3_2`, `lemma_
 | Lemma 5.2 | `lemma_5_2` (routing: `exists_routing_feasible_of_isMatching`) | `Section5.lean`, `LinkDisjoint.lean` |
 | Example 5.3 | `example_5_3` | `DoomSwitch.lean` |
 | Theorem 5.4 | `theorem_5_4_upper`, `theorem_5_4_tight_odd`, `theorem_5_4_tight_even` | `Section5.lean`, `DoomSwitch.lean` |
-| Proof of Thm 5.4, `n = 3` slip | `doom_paper_rates_not_isMaxMinFair` | `DoomSwitch.lean` |
+| Proof of Thm 5.4, `n = 3` rates | `doom_paper_rates_not_isMaxMinFair` | `DoomSwitch.lean` |
 
 `theorem_3_4_lower` is proved through the general bound `throughput_le_mul_of_isMaxMinFair`: if every
 path has at most `k` links, every feasible allocation has throughput at most `k · T^MmF`. This replaces

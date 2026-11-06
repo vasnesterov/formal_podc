@@ -14,11 +14,11 @@ power-law graphs*, arXiv:1502.03971v1 (full version of the PODC 2016 brief annou
 2. **`log n`** is read as `⌈log₂ n⌉` (`lg`), the length of an identifier. This holds in Theorems 1
    and 2 and in Definition 1 (where we use `Real.logb 2 n`). With the real `log₂ n` and ceiling-size
    identifiers, the stated bounds are not what the paper's scheme gives (the identifiers would cost
-   `⌈log₂ n⌉` bits). We regard `⌈·⌉` as the standard convention (R4).
+   `⌈log₂ n⌉` bits). We regard `⌈·⌉` as the standard convention.
 3. **`c`-sparse / `S_{c,n}`** is never defined. The proof of Theorem 1 uses `|E| ≤ cn`, so `Sparse c G`
    is `|E| ≤ c·n`, with `c ≥ 0` real.
 4. **The constant `C`** in Definition 2 is never defined. We set `C = 1/ζ(α)` (`C`). Prop. 1's proof
-   needs `Cζ(α) ≥ 1`. Thm 3's proof needs `Cζ(α) ≤ 1` (`Σ_{i ≤ i₁} ⌊Cn/i^α⌋ ≤ n`). (R4: standard
+   needs `Cζ(α) ≥ 1`. Thm 3's proof needs `Cζ(α) ≤ 1` (`Σ_{i ≤ i₁} ⌊Cn/i^α⌋ ≤ n`). (✏️: standard
    normalisation of a power law; the only value consistent with the proofs.)
 5. **`i₁`** is "the smallest integer with `⌊Cn/i₁^α⌋ ≤ 1`". We take the smallest *positive* integer
    (`i₁`); `i = 0` would qualify trivially.
@@ -60,7 +60,7 @@ power-law graphs*, arXiv:1502.03971v1 (full version of the PODC 2016 brief annou
 * **Proposition 4** (`prop4`): proved under the extra hypothesis `c < n` (and `c > 0`). **False in
   general** (`prop4_false`): for `n = 2`, `c = 100`, 1-bit labels exist but `⌊√(cn)/2⌋ = 7`. For
   `c ≥ (n-1)/2`, `S_{c,n}` contains all graphs, so the bound cannot grow with `c`. This is a
-  degenerate parameter corner: the paper intends constant `c` and growing `n` (R2 → ⚠️).
+  degenerate parameter corner: the paper intends constant `c` and growing `n` (✏️).
 * **Theorem 3** (`theorem3_proper` for `P'_α`, `theorem3` for `P_α` with `C' ≥ C'₀`): for `α > 2`,
   `∃ κ > 0` such that for all large `n` every scheme needs `κ n^{1/α}` bits. We use
   `κ = (C/2)^{1/α}/4`. For `P_α` the Lean statement covers only `C' ≥ C'₀`, which exceeds the

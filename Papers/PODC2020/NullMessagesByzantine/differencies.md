@@ -5,7 +5,7 @@ PODC 2020 (3 pages, proceedings version; no proofs are given). A journal full ve
 (*Optimistically tuning synchronous Byzantine consensus: another win for null messages*,
 Distributed Computing 34(5), 2021); it is not open access and was not consulted.
 
-## Statement-level issues (verdict-relevant)
+## Statement-level issues
 
 1. **Self-delivery convention (Figure 1 lines 10–13; Definition 1.1 / Theorem 1.2).** The protocol
    is correct only if a process that sends `err` (resp. `help!`) "to all" also counts it as
@@ -15,11 +15,10 @@ Distributed Computing 34(5), 2021); it is not open access and was not consulted.
    others decide 1 through the base protocol). Theorem 1.2 likewise needs `φ_j` for the receiver `j`
    itself (`theorem_1_2_literal_false`: two processes, `φ_0` false, `φ_1` true, process `0` receives
    nothing).
-   *Rule.* Not counted as an error (verdict stays ✅): the paper's own wording ("sends messages to
+   Not counted as an error: the paper's own wording ("sends messages to
    everyone", "send to all", "broadcasts an err message to alert all") includes the sender, and the
-   counterexamples need our model's convention that simple graphs have no self-loops. This is a
-   borderline R4 call. It would be ⚠️ if one reads "all" as "all others", but nothing in the paper
-   suggests that reading. We formalize the paper's protocol with `selfRcv = true` and state
+   counterexamples need our model's convention that simple graphs have no self-loops. Nothing in the
+   paper suggests reading "all" as "all others". We formalize the paper's protocol with `selfRcv = true` and state
    Theorem 1.2 with the hypothesis "`φ_j` held at time `m`", which is local to `j` and holds
    automatically when `j` receives its own broadcast. Evidence that self-delivery is the paper's
    convention: Figure 1 quantifies over all of `P` / all of the Council including the process
@@ -28,13 +27,13 @@ Distributed Computing 34(5), 2021); it is not open access and was not consulted.
    *Slight weakening.* Under self-delivery the printed Theorem 1.2 also covers a *faulty* `j` with
    `¬φ_j` that receives nothing (then `j` can infer that it is faulty, so `φ̄_c` concerns only the
    others). `theorem_1_2` excludes that case through the hypothesis `φ_j`; `knows_others_of_noMsgs`
-   covers the other correct processes without it. No effect on the verdict.
+   covers the other correct processes without it. This is a limit of our statement, not of the paper.
 1b. **Bit bound of Theorem 2.1 (2).** Printed: "When failures occur, at most `n(t+1.5)+2n²` bits
    are sent by correct processes, and 4 rounds elapse before reverting to the base protocol."
    Taken literally for the whole run this is false for any base protocol that sends many bits; the
    evident reading (the cost of the layer, before reverting; cf. §2 "SmallCouncil adds only 4
    rounds and sends fewer than `3n²` bits") is what we prove (`layer_bits_le`, rounds 1–4, every
-   run). *Rule.* Wording, not an error (at worst R3, evident intent); verdict stays ✅. The
+   run). Wording, not an error (evident intent). The
    constants of (1) and (2) were checked against the rendered page: `n(t + 1.5)` and
    `n(t + 1.5) + 2n²`, decisions "after 3 rounds" (time 3).
 

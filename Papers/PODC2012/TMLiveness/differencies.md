@@ -4,22 +4,21 @@ Paper: Bushkov, Guerraoui, Kapałka, *On the liveness of transactional memory*, 
 dated 2011/12/5, EPFL Infoscience 170486). "Chapter" = Bushkov, Guerraoui, *Liveness in Transactional
 Memory* (Euro-TM book chapter), the later write-up of the same results.
 
-## Statement-level issues (with the rule from `verdicts.md` that decides them)
+## Statement-level issues
 
-1. **PODC framework is vacuous for TMs that do not answer** (R4 implied assumption / R3 evident intent →
-   ⚠️). In PODC §2.2–3.1 a TM is an I/O automaton over events with no internal steps and no fairness.
+1. **PODC framework is vacuous for TMs that do not answer** (🛠️). In PODC §2.2–3.1 a TM is an I/O automaton over events with no internal steps and no fairness.
    A process crashes iff its projection is finite and non-empty, and Definition 3 constrains only
    infinite histories. The silent TM (accept one invocation per process, never respond) has no
    infinite history when there are finitely many processes, and it is opaque. So it ensures local
    progress and opacity in every fault-prone system, contradicting Theorem 1 read literally
    (`PodcModel.silent_ensures`). The same TM satisfies the hypotheses of Lemma 1 vacuously and has no
-   infinite history at all, so Lemma 1 and Theorem 2 fail literally too. Why ⚠️ and not ❌: the
+   infinite history at all, so Lemma 1 and Theorem 2 fail literally too. The
    assumption that a process taking steps is eventually answered holds in the paper's own §2.1 model
    ("classical asynchronous shared memory"). The proofs use it explicitly ("receives as a response"),
    and local progress is presented as the analogue of wait-freedom. The chapter version repairs the
-   framework exactly this way: steps, and crash = finitely many steps. Borderline call: the fix
-   changes the model (I/O automaton → step semantics), but not the statements.
-2. **Degenerate parameters** (R2 → ⚠️). The theorems say "for every fault-prone system" with no
+   framework exactly this way: steps, and crash = finitely many steps. The fix changes the model
+   (I/O automaton → step semantics), but not the statements.
+2. **Degenerate parameters** (✏️). The theorems say "for every fault-prone system" with no
    restriction on the number of processes `n`, the t-variables `X` or the values `V`. They fail for
    `n = 1`, `X = ∅` or `|V| = 1`: a TM answering every operation at once from one store and never
    aborting is opaque and ensures local progress. We assume `p₁ ≠ p₂`, `x : X` and `Infinite V` (the
@@ -29,10 +28,10 @@ Memory* (Euro-TM book chapter), the later write-up of the same results.
    serializability". We prove the strongest reading, for serializability without real-time order
    (`theorem_2_serializable`), and the §5.1 reading (`theorem_2`). No issue.
 
-## Proof-level issues (→ 🛠️ if alone)
+## Proof-level issues
 
-4. **Crash-free case (Algorithm 2 / chapter Strategy 2)** (R1: the algorithm is part of the proof, not
-   of a stated claim → 🛠️ if alone). In the literal PODC framework the proof just assumes that every
+4. **Crash-free case (Algorithm 2 / chapter Strategy 2)** (🛠️; the algorithm is part of the proof, not
+   of a stated claim). In the literal PODC framework the proof just assumes that every
    invocation is answered; under that assumption Algorithm 2 works for `n = 2`. The gap appears in the
    repaired framework (item 1, the chapter's step model). The proof schedules one process at a time
    until its operation returns, and only `p₁`, `p₂` take steps. In a crash-free system this execution
@@ -60,7 +59,7 @@ Memory* (Euro-TM book chapter), the later write-up of the same results.
    `p₂` crashes, or neither. In the last case `p₂` is not parasitic, because a parasitic `p₂` freezes
    the schedule on `p₂` and `p₁` would crash. The paper's text instead argues per step of the
    algorithm.
-6. **"Both read the same v" (PODC Algorithms 1, 2 write `v + 1` for each process's own read).** For a
+6. **"Both read the same v" (PODC Algorithms 1, 2 write `v + 1` for each process's own read)** (🔧). For a
    committing `T₁` this follows from opacity or strict serializability of prefixes: both reads must
    return the current committed value. The PODC text does not say so. The chapter uses cross values
    (`p₂` writes `v' + 1`, `p₁` writes `v'' + 1`), which needs no such argument. We use cross values,
@@ -73,10 +72,10 @@ Memory* (Euro-TM book chapter), the later write-up of the same results.
    pending invocation. The TM is any nondeterministic agent that knows the whole execution so far
    (`TM.next`). This only strengthens the impossibility.
 8. **Crash.** Chapter definition: finitely many steps (an empty projection counts as crashed).
-9. **PODC's "finite non-empty" crash definition** (typo, R3). With it, a process that never takes a
+9. **PODC's "finite non-empty" crash definition** (✏️). With it, a process that never takes a
    step is correct and starving, so every history in which some process does not participate
    violates local progress. The chapter drops "non-empty". We follow the chapter.
-10. **PODC's well-formedness `H|p_k ∈ Σ_k^∞`** (typo, R3). Histories are prefix-closed, so a literal
+10. **PODC's well-formedness `H|p_k ∈ Σ_k^∞`** (🔧). Histories are prefix-closed, so a literal
     reading forbids any pending invocation. We use the chapter's `Σ_k^∞ ∪ Σ_k^* · Inv_k` in
     `PodcModel`. In the step model well-formedness holds by construction.
 11. **Responses record their invocation** (`Ev.res k i r`). This is redundant in well-formed histories

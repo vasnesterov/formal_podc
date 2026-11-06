@@ -7,24 +7,20 @@ proceedings version (no arXiv version; the online appendix with the full proofs 
 us). Numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The headline results hold. Under strong non-equivocation,
-interactive consistency (IC) takes 1 round for any `n`, `t`. Under weak non-equivocation it takes
-exactly `t + 1` rounds and `n > 2t` processes. Theorem 6.1 ("impossible for `n ≤ 2t`") is false for
-`n ≤ 3`, and in that range it contradicts the paper's own Theorem 4.2. Under a reading in which `v`
-ranges over values and `⊥`, Lemmas 4.7 and 4.8 are false, and a reading of line 8 of Algorithm 2
-that allows `v = ⊥` breaks agreement. Algorithm 2 with `v ∈ V`, the type-consistent reading, is
-correct. The authenticated Byzantine model of Section 7.2 is defined imprecisely. All these points
-are repaired and proved.
+**Verdict: 🔧 Easy fix.** Under strong non-equivocation interactive consistency (IC) takes 1 round for any `n`, `t`, and
+under weak non-equivocation it takes exactly `t + 1` rounds and `n > 2t` processes, for `n ≥ 4`. Local conditions repair
+everything: the impossibility of Theorem 6.1 needs `n ≥ 4`, majorities must be for genuine values, and the authenticated
+Byzantine model needs one more case.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorem 6.1 for `n ≤ 3` (impossibility for `n ≤ 2t` under weak non-equivocation)
+### 🔧 Theorem 6.1 for `n ≤ 3` (impossibility for `n ≤ 2t` under weak non-equivocation)
 Theorem 6.1 claims that no algorithm solves IC under weak non-equivocation for `n ≤ 2t`, but for
 `n = 2, t = 1` and `n = 3, t = 2` IC is solvable (`theorem_6_1_false_n2`, `theorem_6_1_false_n3`).
 
-**Impact.** False only in degenerate cases (`n = 1` is trivial); for `n ≥ 4` the four-run argument is
-correct. We prove the exact threshold: IC is solvable under weak non-equivocation iff `n > 2t` or
-`n ≤ 3` (`theorem_6_1`, `icSolvable_wne_iff`).
+**Impact.** In that range the theorem contradicts the paper's own Theorem 4.2. For `n ≥ 4` the four-run argument is
+correct (`n = 1` is trivial), so the bound `n > 2t` stays tight there. We prove the exact threshold: IC is solvable under
+weak non-equivocation iff `n > 2t` or `n ≤ 3` (`theorem_6_1`, `icSolvable_wne_iff`).
 
 **Details.** When at most one process is correct, only its own entry is constrained. So these cases
 reduce to `t = 0`, resp. `t = 1`, which Algorithm 2 solves. The proof needs four non-empty groups
@@ -32,7 +28,7 @@ reduce to `t = 0`, resp. `t = 1`, which Algorithm 2 solves. The proof needs four
 `n > 1` if `t ≤ 1`") covers `n = 2, t = 1`, which lies inside "`n ≤ 2t`". "WLOG `n = 2t`" with groups
 of size `t/2` hides this, and it does not fit odd `t` either.
 
-### ⚠️ Lemmas 4.7 and 4.8 (when `v` ranges over `V ∪ {⊥}`)
+### 🔧 Lemmas 4.7 and 4.8; Algorithm 2, line 8 (when `v` ranges over `V ∪ {⊥}`)
 Under the reading in which `⊥` counts as a value, Lemma 4.7 ("no consistent majority for `⊥`") and
 Lemma 4.8 fail for `n = 3`, `t = 1`, two rounds, and a reading of line 8 of Algorithm 2 that allows
 `v = ⊥` breaks agreement (`lemma_4_7_false`, `literal_line8_fails`).
@@ -53,7 +49,7 @@ two rounds, and the faulty `q = 2` omits everything to `0` but otherwise behaves
 * A reading of line 8 that allows `v = ⊥` then breaks agreement: `0` returns `⊥` and `1` returns
   `v`.
 
-### ⚠️ Section 7.2 (definition of the authenticated Byzantine model)
+### 🔧 Section 7.2 (definition of the authenticated Byzantine model)
 As printed, `σ(w'|p|w) ∈ {σ(p|w), ⊥}` for correct `p` forgets the `⟨⊥⟩` convention of
 Definition 2.1, so with `k ≥ 2` rounds it excludes crash executions and Fig. 4's
 "Omission ⊆ AB" fails (`silentσ_not_authByzLiteral`).
@@ -65,36 +61,15 @@ relations hold (`authByz_of_omission`).
 observes an omission reports `⟨⊥⟩ ≠ σ(p|w) = ⊥`. (Our first attempted repair, without `⟨⊥⟩`, fails
 for `k ≥ 3`; this concerns our repair, not the paper.)
 
-### ⚠️ Definitions 3.1, 4.1 and Algorithms 1, 2 (missing side conditions)
-Several definitions and lines of pseudocode omit a side condition without which they misbehave; for instance,
-Algorithm 1, line 5 must let `r` range over processes other than `p` and `q`, otherwise line 6
-returns `⊥`.
+### ✏️ Slips
+- In Definitions 3.1 and 4.1, `r = p` must be excluded. Otherwise the convention `σ(p|p|w) = σ(p|w)` forces faulty
+  processes to relay truthfully.
+- In Algorithm 1, line 5 `r` must range over processes other than `p` and `q`. Otherwise line 6 returns `⊥`.
 
-**Impact.** Local fixes with evident intent; all results are proved with them.
-
-**Details.**
-* In Definitions 3.1 and 4.1, `r = p` must be excluded. Otherwise the convention
-  `σ(p|p|w) = σ(p|w)` forces faulty processes to relay truthfully.
-* In Algorithm 1, line 5 `r` must range over processes other than `p` and `q`. Otherwise line 6
-  returns `⊥`.
-* Line 20 of Algorithm 2 must make a deterministic choice.
-* Algorithm 2's recursion bottoms out at `t = 0`, not at `t = 1`.
-
-### Typos and slips
+### Typos
+- Definition 4.3: `q ∈ Q` is stated in the text ("including `q`") but missing from the formula.
 - Section 3 has a truncated sentence ("a faulty process `q` may receive `v` from").
-
-## Proof gaps (statements true)
-
-### 🛠️ Theorem 5.1 (correctness of Algorithm 2)
-The proof is only sketched, and its hard case (one correct process has a consistent majority and
-another has none) is deferred to an appendix we could not access.
-
-**Impact.** Statement true; proved in full (`psl_correct`).
-
-**Repair.** Every member of `Q \ {q}` gets value `v` in the recursive vector, which gives `≥ t`
-votes. Any competing value with `≥ t` votes comes from a correct process (only `t − 1` faulty ones
-remain). By weak non-equivocation of `q`'s first-round message it equals `v`. This also covers
-`v = ⟨⊥⟩`.
+- Section 4.1 cites Definition 2.1 for weak non-equivocation, where Definition 4.1 is meant.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -117,6 +92,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Impossibility results quantify over all such algorithms. Their runs are built as families of
   full-information executions in which a faulty process imitates the correct behaviour of another
   "world" towards everybody it does not omit (`ExecSys`, FLM-style). So it never equivocates.
+* Line 20 of Algorithm 2 is made a deterministic choice, and the recursion bottoms out at `t = 0`, not at `t = 1`.
 
 **Main results in Lean.**
 
@@ -138,11 +114,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | §7.2 AB definition | `silentσ_not_authByzLiteral`, `silentσ_not_authByzRep` | `FaultModels.lean` |
 
 Some statements hold more generally: Theorem 4.2 does not need `n > 1`, and the Section 3 algorithm
-does not need `n > t`. Example (3) of §7.2 deduces "`t ≥ 2`, `n ≥ 5`" from an algorithmic criterion
-("general-omission algorithms cannot solve agreement"). As a pure fault-space separation, a smaller
-witness exists: a single faulty process lying consistently about its own value (`n = 3`, `t = 1`) is
-in weak NE ∩ AB but not in Omission (`sne_inter_authByz_not_le_omission`). This reinterprets the
-claim; it does not refute it.
+does not need `n > t`.
 
 **Not formalized.**
 * The informal converses "Byzantine broadcast oracle ⇒ strong NE" (§3) and "crusader agreement
@@ -150,6 +122,17 @@ claim; it does not refute it.
 * The "algorithms can / cannot solve agreement" reading of the §7.2 examples (only their fault-model
   memberships are proved).
 * The consensus column of Table 1.
+* Example (3) of §7.2 deduces "`t ≥ 2`, `n ≥ 5`" from an algorithmic criterion ("general-omission algorithms cannot
+  solve agreement"), which we did not formalize. As a pure fault-space separation, a smaller witness exists: a single
+  faulty process lying consistently about its own value (`n = 3`, `t = 1`) is in weak NE ∩ AB but not in Omission
+  (`sne_inter_authByz_not_le_omission`). This reinterprets the claim; it does not refute it.
+* The paper's proof of Theorem 5.1 was not compared with ours: it is only sketched, and its hard case (one correct
+  process has a consistent majority and another has none) is deferred to an appendix (Lemma C.1) we could not access.
+  The theorem itself is proved in full (`psl_correct`): every member of `Q \ {q}` gets value `v` in the recursive vector,
+  which gives `≥ t` votes. Any competing value with `≥ t` votes comes from a correct process (only `t − 1` faulty ones
+  remain). By weak non-equivocation of `q`'s first-round message it equals `v`. This also covers `v = ⟨⊥⟩`.
+* The paper's proof of the Section 6 round lower bound is in the same appendix; we proved the bound independently and
+  did not compare the two.
 
 **Trust.** No `sorry`. All listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: the fault models are inhabited by fault-free and crash executions

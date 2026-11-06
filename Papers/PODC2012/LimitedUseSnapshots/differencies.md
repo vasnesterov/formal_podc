@@ -8,7 +8,7 @@ Theorem 4, …).
 
 ## Errors in the paper
 
-1. **Theorem 3.4 is false: Algorithm 2 is not linearizable** (journal Theorem 3.4 = proceedings
+1. 🛠️ **Theorem 3.4 is false: Algorithm 2 is not linearizable** (journal Theorem 3.4 = proceedings
    Theorem 4; both versions have the same Algorithm 2, checked on the rendered proceedings page 3 and
    the journal pseudocode). `alg2_not_linearizable` (`Counterexample.lean`): for `k = 3` with the paper's
    balanced tree (`m = ⌈3/2⌉ = 2`, `Shape.balanced 3 = T3`, `balanced_three`), any `h ≥ 2` (the value `1`
@@ -17,18 +17,13 @@ Theorem 4, …).
    reads `r.second = 0` and `r.switch = 0`; `p₁` runs `MaxUpdate1(r, 1)` to completion; then `p₂` runs
    `MaxUpdate0(r, 1)` to completion; `p₀` finishes and returns `(1, 0)`. Since `MaxUpdate1(r,1)` precedes
    `MaxUpdate0(r,1)` in real time, a scan seeing the first component `1` must see the second component `1`.
-   *Rule.* A numbered theorem about the paper's algorithm, false for a small non-degenerate instance
-   (R2 does not apply: `k = 3`, three processes), and not a typo (R3: the fix adds a step to the
-   algorithm and changes its step complexity) → ❌. *Borderline (R5/R6).* The abstract calls the max
-   array "the key to this implementation", but the headline result (title, first sentence of the
-   abstract: "a novel implementation of a snapshot object … with O(log² b log n) step complexity for
-   update operations and O(log b) … for scan operations") is the limited-use snapshot of Section 4;
-   Theorem 3.4 is the tool. The headline names the paper's specific algorithm (Algorithm 3 over
-   Algorithm 2), but it is only *unestablished*, not refuted: its proof uses the false Theorem 3.4,
-   and no counterexample to the snapshot is known (item 2). R5: unestablished headline → ❌. Even if
-   the max array itself counted as a headline, it is an existential claim (a new object with a
-   polylogarithmic scan), and the erratum's repair exists with `MaxScan` cost unchanged and
-   `MaxUpdate1` still polylogarithmic → ❌ by R5's existential exception. Hence ❌, not 🚨.
+   The abstract calls the max array "the key to this implementation"; the paper's main result (title,
+   first sentence of the abstract: "a novel implementation of a snapshot object … with O(log² b log n)
+   step complexity for update operations and O(log b) … for scan operations") is the limited-use
+   snapshot of Section 4, with Theorem 3.4 as its tool. That result (Algorithm 3 over Algorithm 2) is
+   only *unestablished*, not refuted: its proof uses the false Theorem 3.4, and no counterexample to
+   the snapshot is known (item 2). The fix adds a step to the algorithm and changes its step
+   complexity; the erratum's repair keeps the `MaxScan` cost and leaves `MaxUpdate1` polylogarithmic.
    *Credit.* The error and the execution are the authors' own (erratum to the J. ACM version); the
    formalization confirms them. The new findings are items 4 and the remarks on the erratum below.
    *Where the proof breaks* (as the erratum says): the proof of Theorem 3.4 orders scans correctly
@@ -50,23 +45,22 @@ Theorem 4, …).
 
 ## Proof gaps (statements true)
 
-4. **Theorem 4.2: the linearization points of Section 4.1 are wrong** (not mentioned in the erratum). The paper linearizes an `Update`
+4. 🔧 **Theorem 4.2: the linearization points of Section 4.1 are wrong** (not mentioned in the erratum). The paper linearizes an `Update`
    whose root pointer is `d` at the first `WriteMax(root.mr, ptr)` with `ptr ≥ d`. Another process can
    carry the updater's new leaf pointer to the root inside a *smaller* root pointer `c < d` and complete
    `WriteMax(root.mr, c)`; a `Scan` that reads `c` then returns the new value although the paper
    linearizes the `Update` after that `Scan` (`Snapshot.Counterexample.paper_linearization_points_fail`,
    3 processes: every linearization of the execution must put the `Update` before the `Scan`). The false
-   step is "if there is no `Update` by process `j` linearized before `op`, `count_j = 0`". Rule R1: a
-   claim inside a proof of a true theorem → 🛠️. Repair: linearize an `Update` of process `j` with counter
+   step is "if there is no `Update` by process `j` linearized before `op`, `count_j = 0`". Repair: linearize an `Update` of process `j` with counter
    `m` at the first `WriteMax(root.mr, c)` with `root.seq[c]_j ≥ m` (several at one step in leaf order);
    `Snapshot.theorem_4_2` uses these points.
-5. **Lemma 4.1**: the proof does not justify that the parent's stored index at the invocation is at most
+5. 🔧 **Lemma 4.1**: the proof does not justify that the parent's stored index at the invocation is at most
    the sum of the children's components at that time; it follows from the monotonicity of `seq` along the
-   chain of max-array states (used in `Snapshot.lemma_4_1`). 🛠️ (minor).
+   chain of max-array states (used in `Snapshot.lemma_4_1`).
 
 ## Remarks on the erratum
 
-- The erratum's description of the fix has a slip: "Forcing each `MaxUpdate0(r, v)` to perform an embedded
+- ✏️ The erratum's description of the fix has a slip: "Forcing each `MaxUpdate0(r, v)` to perform an embedded
   `MaxScan(r)` operation after its `WriteMax(r.second, v)`" — `WriteMax(r.second, v)` is line 9 of
   `MaxUpdate1`; the intended fix (and the one formalized) embeds the scan in `MaxUpdate1`, as the erratum's
   own step-complexity paragraph confirms.

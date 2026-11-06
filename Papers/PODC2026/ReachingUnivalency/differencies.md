@@ -4,7 +4,7 @@ Paper: A. Lewis-Pye, *Reaching Univalency with Subquadratic Communication*, PODC
 
 ## Errors in the paper
 
-1. **Lemma 6 is false (false statement).**
+1. 🔧 **Lemma 6 is false.**
    - Lean: `RPK.Lemma6Claim`, refuted by `Counterexample.lemma6_false`.
    - Instance: `n = 38`, `ε = 1/5`, `f = 5`, `k = 37`.
    - The sampling is accurate to within `≤ 1/19 < ε/2` on *every* set for every processor (`sampling_accurate`).
@@ -17,10 +17,9 @@ Paper: A. Lewis-Pye, *Reaching Univalency with Subquadratic Communication*, PODC
        as soon as `f` is close to `n(1/3 − ε)`. "Time-slot-1 agreement" fails.
      - (b) "Bad" only looks at the fractions of correct processors with value `b`. The proof's step from "a non-bad
        `p` sees `≥ 2k/3` copies of `b`" to "`α_{2,b} > 2/3 − ε/2`" ignores Byzantine samples.
-     - (c) The case split "at least `nε/4` correct processors have grade 2" should be "some non-bad processor has
+     - (c) ✏️ The case split "at least `nε/4` correct processors have grade 2" should be "some non-bad processor has
        grade 2". This one is presentation only.
-2. **The protocol of §5 (Fig. 3) is incorrect for admissible sampling choices (false statement about the protocol;
-   Theorem 1 is still true).**
+2. 🔧 **The protocol of §5 (Fig. 3) is incorrect for admissible sampling choices (Theorem 1 is still true).**
    - Lean: `PaperFails.paper_protocol_fails`.
    - The recursive protocol uses the paper's threshold, `Smp₃₈ = σ38` and `Smp₁₉ = σ19`. Both are accurate to within
      `ε/2` on every set (`σ38_accurate`, `σ19_accurate`). The sampling choices at all other sizes are arbitrary.
@@ -31,12 +30,12 @@ Paper: A. Lewis-Pye, *Reaching Univalency with Subquadratic Communication*, PODC
      is repeated `m` times, step 3 samples the committee cyclically (`j mod |C_r|`), and all counts and thresholds
      scale with the stated slack. This is argued by hand, not in Lean, but it suggests "sufficiently large `k`"
      does not help.
-3. **§5's union bound proves accuracy on all configurations, but Lemma 6 is stated for the actual one (proof gap).**
+3. 🔧 **§5's union bound proves accuracy on all configurations, but Lemma 6 is stated for the actual one.**
    The corrected lemma needs accuracy on sets containing Byzantine processors, and these sets are among the
    configurations. `exists_sampler` proves the needed form: for every set `S`, at most `γ n` processors are
    `δ`-inaccurate on `S`, with `k` depending only on `δ` and `γ`. Chebyshev plus independence across processors
    suffices; KL-Chernoff is not needed.
-4. **Proposition 4 (proof gap).**
+4. ⚠️ **Proposition 4.**
    - The claim "Consistency ⇒ `F(M) = F(M_c)` for `M_c ⊆ M ⊆ M_a`" does not follow, because `F(M)` may be empty
      (`consistency_not_monotone`, an abstract counterexample to the inference).
    - Faulty processors may disseminate messages outside `M_a`.

@@ -4,11 +4,9 @@ Paper: S. A. Amiri, S. Schmid, S. Siebertz, *A Local Constant Factor MDS Approxi
 Genus Graphs*, PODC 2016. Text used: arXiv:1602.02991v2 (12 Feb 2016, the latest arXiv version).
 The ACM proceedings version could not be compared. All statements refer to arXiv v2.
 
-Verdict rules are those of `verdicts.md` (R1–R6).
-
 ## Errors in the paper (statement level)
 
-1. **Lemma 7 (items 2 and 3) is false** (R1: numbered lemma → ❌).
+1. **Lemma 7 (items 2 and 3) is false** (🔧).
    - *Graph.* `G7 K` has vertices `m_i, c', m_j, u_1..u_K` and edges `m_i c'`, `c' u_k`, `m_j u_k`.
      It is planar, and every edge meets `{c', m_j}`. So every depth-1 minor has `|E(H)| ≤ 2|V(H)|`
      and `K_{3,3}` is not a depth-1 minor (`SimpleGraph.depth1_of_cover_two`): Assumption 6 holds
@@ -25,14 +23,14 @@ Verdict rules are those of `verdicts.md` (R1–R6).
      `N_i`-neighbour is `c`.
    - *Repair.* Count only leaves outside `C` with a neighbour outside `C` (`Setup.X a b`). The bounds
      become `2c(t-1)` (`Setup.lemma_7_12`) and `4c(t-1)` (`Setup.lemma_7_3`).
-2. **Corollary 8 is false** (R1 → ❌). In `G7 145` the paper's `Y` contains all 145 vertices `u_k`,
+2. **Corollary 8 is false** (🔧). In `G7 145` the paper's `Y` contains all 145 vertices `u_k`,
    but `6c²t|M| = 144` (`corollary_8_false`). This holds for every choice of `C`.
    - *Repair.* Use `Y` = leaves outside `C` of stars of `M \ D` with a neighbour outside `C` in another
      star, and `Y_D` = its part that sees stars of `M ∩ D`. Then `|Y| + |Y_D| ≤ 6c²(t-1)|M|`
      (`Setup.corollary_8`). The proof charges every vertex to an oriented edge of the depth-1 minor
      `H`, at most `2c(t-1)` (forward) and `4c(t-1)` (backward) per edge. It splits the `≤ 2c|M|`
      oriented edges by the order of their endpoints.
-3. **Lemma 11 is false** (R1 → ❌).
+3. **Lemma 11 is false** (🔧).
    - *Graph.* The book `K_{1,1,17}` (spine `m x`, pages `u_k`; vertex cover `{m, x}`), with `c = 2`,
      `t = 3`.
    - *Setup.* `M = {m}`, `D = ∅`, `C_m = {x}`. Every admissible `C_m` (`|C_m| ≤ 4`, `m ∉ C_m`,
@@ -47,7 +45,7 @@ Verdict rules are those of `verdicts.md` (R1–R6).
      Per star: `#sources ≤ |N_{E'}(m) \ N[D]| ≤ deg(x) ≤ 4c + 2c(t-1)`. The middle inequality comes from
      `d_{V-D}(m) ≤ d_{V-D}(x)`; it is not "`m` has at most … `E'`-neighbours", which fails when `m`'s
      leaves are dominated by `D`.
-4. **Lemma 9 is false for some admissible `C_m`** (R1 → ❌; not formalized, informal counterexample).
+4. **Lemma 9 is false for some admissible `C_m`** (🔧; not formalized, informal counterexample).
    - *Graph.* `m – v`, both adjacent to 18 vertices forming 6 paths `a_i – c_i – b_i`. This is
      planar: draw `K_{2,18}` with the `u`'s on a line and the path edges inside consecutive faces.
      So `c = 3` and `t = 3`.
@@ -55,9 +53,7 @@ Verdict rules are those of `verdicts.md` (R1–R6).
    - *Violation.* `v` has 18 neighbours in `N_{E'}(m)`, but the lemma claims `2c(t-1) = 12`.
    - *Where the proof breaks.* It covers only neighbours `u ∈ N(c)` for `c ∈ C_m`, not `u ∈ C_m`.
    - *Repair.* Count only neighbours outside `C` (`Setup.lemma_9`), which is all Lemma 11 needs.
-   - This item does not affect the verdict (items 1–3 are formal).
-5. **Theorem 13: the `O(g)` approximation factor is not established** (headline, unestablished →
-   ❌ by R5).
+5. **Theorem 13: the `O(g)` approximation factor is not established** (⚠️).
    - *What the paper uses.* The proof uses Lemma 12 with `t = 4g+3` and treats `c` as a constant
      ("`c ≤ 3.01` … in sufficiently large graphs", §4).
    - *Why `c` grows with `g`.* Lemma 5 (applied to `H̃`) and Lemma 10 (applied to `G[Z ∪ M ∪ C]`)
@@ -92,15 +88,15 @@ Verdict rules are those of `verdicts.md` (R1–R6).
      = 6c²t + (2t+5)c + 4 + (4c − 6c²) ≤ 6c²t + (2t+5)c + 4`, for `t ≥ 1`. So the paper's constant is
      recovered exactly.
    - *Degenerate case.* `t = 0`: excluding `K_{0,3}` forces `|V| ≤ 2`, handled separately.
-8. **Lemma 10.** The claim `|Z| < |M ∪ C|` fails for the empty graph (both sides 0; R2,
-   degenerate). We prove `|Z| ≤ |M ∪ C|` (`Setup.lemma_10`). The paper's "more than `½·4c|Z|`
+8. **Lemma 10.** The claim `|Z| < |M ∪ C|` fails for the empty graph (both sides 0;
+   degenerate, ✏️). We prove `|Z| ≤ |M ∪ C|` (`Setup.lemma_10`). The paper's "more than `½·4c|Z|`
    edges" is also handled correctly when `Z ∩ C ≠ ∅`: we count ordered pairs.
 
 ## Imprecisions and typos
 
 9. **Lemma 12's hypothesis** reads "edge density at most `c`", but the proof needs Assumption 6
    (all depth-1 minors have density `≤ c`). Lemma 12 lies in the scope of Assumption 6 ("for the
-   rest of this section"), so we read it with Assumption 6 (R4). The Lean statement assumes
+   rest of this section"), so we read it with Assumption 6 (✏️). The Lean statement assumes
    `Depth1DensityLE G c`.
 10. The last display of Lemma 12 drops the factor `|M|` on the right-hand side.
 11. Proof of Lemma 7:

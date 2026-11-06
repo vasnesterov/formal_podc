@@ -3,48 +3,47 @@
 Paper: Attiya, Hendler, Levy, *An O(1)-Barriers Optimal RMRs Mutual Exclusion Algorithm*, PODC 2013
 (extended abstract, 11 pp., author copy). Section numbers and statement numbers refer to it.
 
-## Statement-level issues (verdict rules)
+## Statement-level issues
 
-1. **Lemma 2(c) is false, also under sequential consistency** (`lemma2c_false_sc`). With 2 processes, a
+1. **Lemma 2(c) is false, also under sequential consistency** (🔧, `lemma2c_false_sc`). With 2 processes, a
    process signalled in its current passage reaches `pc = 48` after `lock ← next`; `signal[r]` is
-   true but `r` does not own the lock. Rule R3 does not excuse it. The fix `< 48` is an index change,
-   but the paper's proof reasons with the wrong range: case 4 claims statement 47 cannot violate (c),
-   and case 5 applies (c) to the exiting process at `pc = 48`. Label ❌ (non-headline numbered
-   lemma). *Borderline*: the intended content (the signalled process waiting in the entry section
-   owns the lock) is recoverable and is what the later proofs use (Lemma 6).
-2. **Lemma 2(c) under TSO** (`lemma2c_false`): a stale `signal[r] = true` remains in memory while
-   `r`'s reset (statement 17) is buffered. Same label; our corrected version restricts to statements
-   23–27 (after the barrier).
-3. **Lemma 2(b) under TSO** (`lemma2b_false`): at `pc = 48` the write `lock ← next` may still be
-   buffered. Rule R4 does not excuse it: the paper's model is TSO (Section 3), and `C.lock` is the
-   memory value. Under SC (b) holds. Label ❌ (same lemma).
-4. Verdict: worst label ❌ (R6). Headline (Theorem 1, the algorithm's properties) is true (R5: no 🚨).
+   true but `r` does not own the lock. The fix `< 48` is an index change, but the paper's proof
+   reasons with the wrong range: case 4 claims statement 47 cannot violate (c), and case 5 applies
+   (c) to the exiting process at `pc = 48`. The intended content (the signalled process waiting in
+   the entry section owns the lock) is recoverable and is what the later proofs use (Lemma 6).
+2. **Lemma 2(c) under TSO** (🛠️, `lemma2c_false`): a stale `signal[r] = true` remains in memory while
+   `r`'s reset (statement 17) is buffered. Our corrected version restricts to statements 23–27
+   (after the barrier).
+3. **Lemma 2(b) under TSO** (🛠️, `lemma2b_false`): at `pc = 48` the write `lock ← next` may still be
+   buffered. The paper's model is TSO (Section 3), and `C.lock` is the memory value. Under SC (b)
+   holds.
+4. Theorem 1 (the algorithm's properties) is true: none of these failures affects it.
 
 ## Proof gaps (statements true)
 
-5. **Safety under TSO.** The proof of Lemma 2 treats issued writes as performed. Replaced by the
+5. **Safety under TSO** (🛠️). The proof of Lemma 2 treats issued writes as performed. Replaced by the
    inductive invariant `Inv` (`InvDefs.lean`). It records buffer contents per program counter; lock
    ownership (`Holds`, `Hands`); the logical memory `lv` (the lock owner's view) for `promQ`,
    `inPromQ`, `exits`; a TSO version of (c) (`sig`); and `exits` against a ghost counter of CS
    entries (`ex1`–`ex4`).
-6. **Lemma 7 / Claim 2, base case.** The paper does not use the `exits − e ≥ 2` disjunct of statement
+6. **Lemma 7 / Claim 2, base case** (🔧). The paper does not use the `exits − e ≥ 2` disjunct of statement
    25 explicitly and does not treat a process stuck at statement 25. Repaired by `Run.waiting_entry`.
 7. **Claim 2, inductive step.** "Let `t′` be the point when `n^k_p` is last written in `EE1`" and "by
    total store ordering, `t ≤ t1 ≤ t2`" are made precise via the number `perf` of performed
    doorway writes (`Doorway.lean`). We use the minimal level among starved processes instead of
    induction on the level (equivalent). The stabilization time of Claim 1 is the maximum over the
    finite set of starved processes.
-8. **Lemma 9.** The case `r = q′` is missing; case 1 implicitly needs `r` to have remained in its
+8. **Lemma 9** (🔧). The case `r = q′` is missing; case 1 implicitly needs `r` to have remained in its
    entry section since its node write. Both are handled in `BoundedWaitingCore.lean`. Our Lemma 9
    statement is the TSO version: "`p` has been promoted in `[t₁, e]` (it is in the promotion order
    `BW.Q`: the handed process followed by the logical queue), or some exit section reads `anc p l`
    at statement 34 before `q`'s `(l+2)`-th entry, after a time at which `anc p l` holds `p` from `p`'s
    current doorway". The paper's `s(P)` (enqueue time) is replaced by membership in `BW.Q`.
 9. **Lemma 8** holds with `log n + 2` (`lemma8`). The paper's `log n + 3` is a corollary.
-10. **Lemma 10.** The proof's "at most 4 RMRs at statement 25" is wrong: 6, attained by
+10. **Lemma 10** (🔧). The proof's "at most 4 RMRs at statement 25" is wrong: 6, attained by
     `stmt25_tight`. Its "a single RMR at statement 27" is wrong: 2, attained by `stmt27_two`, because
     the first read counts. Our total bound is `19·log n + 23` per passage (explicit constant).
-11. **Footnote 4** (reads never hit the own store buffer) is false: statements 36, 37, 42, 45
+11. **Footnote 4** (🔧; reads never hit the own store buffer) is false: statements 36, 37, 42, 45
     read `inPromQ`/`promQ` entries written earlier in the same exit section with no barrier in
     between. (Statement 32 is not an instance: `exits` is written only there, and the previous
     write is followed by the barrier of statement 50.) Not used

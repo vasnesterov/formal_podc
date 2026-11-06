@@ -4,21 +4,21 @@ Mor Baruch, Pierre Fraigniaud, Boaz Patt-Shamir. *Randomized Proof-Labeling Sche
 DOI [10.1145/2767386.2767421](https://doi.org/10.1145/2767386.2767421). Formalized version: the 10-page
 author copy (no arXiv version; the proof of Theorem 3.6 is omitted there).
 
-**Verdict: ❌ False claim.** The main message holds. Theorem 3.1 holds: a PLS with `κ`-bit labels
-becomes a one-sided RPLS with `2 log₂ κ + 6`-bit certificates. Corollary 3.5 holds: `O(log n + log k)`
-certificates for every predicate. The crossing lower bounds hold for a legal `G` (Propositions 4.3,
-4.6, 4.8; Theorems 4.4 and 4.7 in that case), and so do the acyclicity bounds of Theorem 5.1. But
-Theorems 4.4 and 4.7, and Proposition 4.3, are stated for any `G` with `P(G) ≠ P(σ(G))`. They are
-false when `G` is illegal and all its crossings are legal.
+**Verdict: 🔧 Easy fix.** The main message holds: Theorem 3.1 (a PLS with `κ`-bit labels becomes a one-sided RPLS
+with `2 log₂ κ + 6`-bit certificates) and Corollary 3.5 (`O(log n + log k)` certificates for every predicate).
+Proposition 4.3 and Theorems 4.4 and 4.7, stated for any `G` with `P(G) ≠ P(σ(G))`, are false when `G` is illegal
+and all its crossings are legal, but they hold for a legal `G` (as do Propositions 4.6 and 4.8), which is all that
+the acyclicity bounds of Theorem 5.1 and the other applications use. The MST parts of Theorem 5.1 and the upper
+bounds of Theorems 5.2 and 5.3 were not checked.
 
 ## Mistakes in the paper
 
-### ❌ Proposition 4.3, Theorems 4.4 and 4.7 (the crossing tool for an illegal `G`)
+### 🔧 Proposition 4.3, Theorems 4.4 and 4.7 (the crossing tool for an illegal `G`)
 The crossing lower bounds are stated for any `G` with `P(G) ≠ P(σ(G))`, but they are false when `G` is
 illegal and all its crossings are legal: on a windmill graph a PLS with `3 + log₂ log₂ r` bits exists, while
 Theorem 4.4 promises `Ω(log r)` bits (`thm_4_4_false`, `thm_4_7_false`, `prop_4_3_false`).
 
-**Impact.** Secondary results, over-general as stated; all applications in Section 5 use a legal `G`, and in
+**Impact.** The tools are over-general as stated; all applications in Section 5 use a legal `G`, and in
 that case we prove the tools (`prop_4_3`, `thm_4_4`, `thm_4_7_correct`, `prop_4_8`). The paper's main message
 (Theorem 3.1, Corollary 3.5) is unaffected.
 
@@ -43,7 +43,10 @@ In `G`, the flagged `L_k` faces `R_k`, so `G` is rejected under every labelling.
 * For `r = 2^32` and 8-bit labels, Proposition 4.3 fails for every pair: `G` is rejected and the crossing is
   accepted (`prop_4_3_false`).
 
-### Typos and slips
+**Repair.** Add the condition `P(G) = TRUE`, which Propositions 4.6 and 4.8 already carry (`prop_4_3`, `thm_4_4`,
+`thm_4_7_correct`).
+
+### ✏️ Slips
 - Propositions 4.3, 4.6 and 4.8 count as if every label or certificate had exactly `κ` bits. With "at most
   `κ` bits" there are `2^(κ+1) − 1` strings, so our thresholds read `r ≤ (2^(κ+1)−1)^(2s)` (Prop. 4.3) and
   `r ≤ 2^((2^(κ+1)−1)·2s)` (Prop. 4.8). The asymptotics are the same.
@@ -55,7 +58,7 @@ In `G`, the flagged `L_k` faces `R_k`, so `G` is rejected under every labelling.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Proposition 4.6 (rounding the certificate distributions)
+### 🔧 Proposition 4.6 (rounding the certificate distributions)
 The proof rounds the *joint* distribution of the certificates of a copy, but Eq. (6) uses that one arc's
 *marginal* is `ε`-close, while equal joint roundings only give closeness `ε·2^((2s−1)κ)`.
 
@@ -64,7 +67,7 @@ factor (the total error is exactly `1/3`), so Eqs. (6)–(8) need fixing, but th
 
 **Repair.** We round each arc separately and get `log₂ log₂ r ≤ 2κ + 5 + 2 log₂ s`.
 
-### 🛠️ Theorem 5.1 (Theorem 4.7 applied outside its hypotheses)
+### 🔧 Theorem 5.1 (Theorem 4.7 applied outside its hypotheses)
 The crossed path is not in `F`; the proof uses its cycle component instead.
 
 **Impact.** Statement true. This is sound because verification is local. We state the tools for crossings

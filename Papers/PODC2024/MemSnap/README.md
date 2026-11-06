@@ -6,46 +6,41 @@ for RMWable Shared-Memory.* PODC 2024. DOI
 proceedings version (no arXiv version); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The main result, Theorem 7.3, holds. MemSnap (Algorithm 1)
-is a linearizable, wait-free checkpointable object, with at most 9 shared-memory steps per
-operation. This holds for every set of updaters and every family of RMW primitives. We prove it by
-the paper's own route, meta-configuration tracking. Lemma 7.1 (the Forwarding Invariant `I₁`) holds
-as stated. **Lemma 7.2 as printed is false.** The third disjunct of the set `Q` (Figure 2) lacks
-the condition `x_μ = X`. With that condition, which the paper's prose states, the lemma holds and
-gives `P ≠ ∅`. The paper omits the proofs of both lemmas; we supply them.
+**Verdict: 🔧 Easy fix.** The main result, Theorem 7.3, holds: MemSnap (Algorithm 1) is a linearizable, wait-free
+checkpointable object, with at most 9 shared-memory steps per operation, for every set of updaters and every family of
+RMW primitives, and we prove it by the paper's own route, meta-configuration tracking. **Lemma 7.2 as printed is
+false**: the third disjunct of the set `Q` (Figure 2) lacks the condition `x_μ = X`, and with that condition, which
+the paper's prose states, the lemma holds and gives `P ≠ ∅`. Lemma 7.1 (the Forwarding Invariant `I₁`) holds as stated,
+but its induction needs a local strengthening of `I₁`; the paper omits the proofs of both lemmas, and we supply them.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 7.2 (Figure 2, the set `Q`)
-As printed, the third disjunct of `Q` lacks the condition `x_μ = X`, so in an execution with one component, two
-updaters and the scanner `Q` contains a possibility that no linearization realizes and `Q ⊆ P` fails
-(`Counterexample.lemma_7_2_false`, `Counterexample.not_tracked`).
+### ✏️ Slips
+- Lemma 7.2 (Figure 2, the set `Q`): as printed, the third disjunct of `Q` lacks the condition `x_μ = X`, so in an
+  execution with one component, two updaters and the scanner `Q` contains a possibility that no linearization realizes
+  and `Q ⊆ P` fails (`Counterexample.lemma_7_2_false`, `Counterexample.not_tracked`). The paper's prose states the
+  condition, the fix is local, and no published proof uses the wrong version. Adding `x_μ = X` makes the lemma true, and
+  `P ≠ ∅` follows as the paper says, so Theorem 7.3 stands (`lemma_7_2_fixed`).
 
-**Impact.** A slip with evident intent (rule R3): the paper's prose states the condition, the fix is local, and no
-published proof uses the wrong version; with it the lemma holds and gives `P ≠ ∅`, so Theorem 7.3 stands
-(`lemma_7_2_fixed`).
+  For a component `j` with `B[j].seq ≠ X`, the third disjunct of `Q` allows `p.snap[j] = a_μ` for every
+  process `μ` at line 12 whose CAS would succeed (`b_μ = B[j]`). It does not ask that the CAS make `B[j].seq` equal to
+  `X`. If `μ` read `X` before the latest click (`x_μ < X`), then `a_μ` can be stale. Counterexample: one component,
+  initially `0`; updaters `ν`, `μ`; scanner `σ`.
+  1. `ν` starts `update(write 1)` and finishes `forward`.
+  2. `μ` starts an update and reads `B = (0, 0)`.
+  3. `σ` clicks (`X = 1`).
+  4. `μ` reads `X = 1` and `A = 0`; it is now at line 12.
+  5. `ν` writes `A = 1` and returns.
+  6. `σ` clicks again (`X = 2`) and is at line 2.
 
-**Details.** For a component `j` with `B[j].seq ≠ X`, the third disjunct of `Q` allows `p.snap[j] = a_μ` for every
-process `μ` at line 12 whose CAS would succeed (`b_μ = B[j]`). It does not ask that the CAS make `B[j].seq` equal to
-`X`. If `μ` read `X` before the latest click (`x_μ < X`), then `a_μ` can be stale. Counterexample: one component,
-initially `0`; updaters `ν`, `μ`; scanner `σ`.
-1. `ν` starts `update(write 1)` and finishes `forward`.
-2. `μ` starts an update and reads `B = (0, 0)`.
-3. `σ` clicks (`X = 1`).
-4. `μ` reads `X = 1` and `A = 0`; it is now at line 12.
-5. `ν` writes `A = 1` and returns.
-6. `σ` clicks again (`X = 2`) and is at line 2.
-
-`Q` now contains the possibility `val = 1`, `snap = 0`, click linearized (`S = ∅`, third disjunct with witness
-`μ`). No linearization realizes it: `ν`'s write returned before the second click was invoked, so the snapshot holds
-`1`. Hence it is not in `P`, and `Q ⊆ P` fails. The text before the lemma says the third disjunct is about "a
-successful CAS at Line 12 that will cause `B[j].seq` to become equal to `X`".
-
-**Repair.** Adding `x_μ = X` makes the lemma true, and `P ≠ ∅` follows as the paper says (`lemma_7_2_fixed`).
+  `Q` now contains the possibility `val = 1`, `snap = 0`, click linearized (`S = ∅`, third disjunct with witness
+  `μ`). No linearization realizes it: `ν`'s write returned before the second click was invoked, so the snapshot holds
+  `1`. Hence it is not in `P`, and `Q ⊆ P` fails. The text before the lemma says the third disjunct is about "a
+  successful CAS at Line 12 that will cause `B[j].seq` to become equal to `X`".
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 7.1 (`I₁` is an invariant, but not an inductive one; proof omitted in the paper)
+### 🔧 Lemma 7.1 (`I₁` is an invariant, but not an inductive one; proof omitted in the paper)
 Part (6) of `I₁` covers a process in its second `forward` iteration only at line 9, so from an unreachable state
 satisfying `I₁` a successful CAS can break Part (7), and an induction on `I₁` alone fails.
 

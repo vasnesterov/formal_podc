@@ -103,8 +103,9 @@ Each item is classified as one of: **false statement**, **false only in a degene
     `1 + log₂(1 + kL) ≤ kL`, which fails for `kL < 3` (e.g. `|Σ| = 2, k = 1`). The final step
     `n − log n ≥ n/2` needs `n` large enough; it holds for `n > 8`.
 14. **Under-specified definition.** "A protocol computes at most one function" needs a node, an
-    initial labeling (`Nonempty Σ`) and an admissible schedule; otherwise every function is
-    computed vacuously. "Maximal degree" of a digraph is read as "in-degree and out-degree `≤ k`".
+    initial labeling and an admissible schedule; otherwise every function is computed vacuously.
+    An initial labeling exists because the paper's `Σ` is nonempty (Section 2.1), which we state as
+    `Nonempty Σ`. "Maximal degree" of a digraph is read as "in-degree and out-degree `≤ k`".
 15. **Strengthening.** We prove the theorem for `n ≥ 6` (instead of `n > 8`), with one `f` for
     all label spaces, and with the weakest notion of computing (synchronous). Lean:
     `exists_hard_function`, `exists_hard_function_logb`. Below `n = 6` the counting argument fails
@@ -118,7 +119,7 @@ Each item is classified as one of: **false statement**, **false only in a degene
     prove the theorem without them. We also allow an arbitrary node set `A` in place of `[m]` and
     arbitrary input and output types. Lean: `FoolingSet.card_le_of_isFoolingSet`
     (`|S| ≤ |Σ|^{|C ∪ D|}`) and `logb_le_of_isFoolingSet` (the paper's logarithmic form).
-17. **Under-specified definition.** `Nonempty Σ` is needed (see item 14).
+17. **Modelling choice.** `Nonempty Σ` is an explicit hypothesis (see item 14).
 18. **False only in a degenerate case (Cor. 6.3).** The paper defines `EQ_n = 1` iff `n` is even
     and the halves are equal, so for odd `n` the function is constantly 0 (and `m = n/2` is not an
     integer). Then `EQ_n ≡ 0` is computed with `|Σ| = 1`, i.e. label complexity

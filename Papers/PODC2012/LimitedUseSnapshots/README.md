@@ -7,27 +7,27 @@ journal version *Limited-Use Atomic Snapshots with Polylogarithmic Step Complexi
 proceedings version has the same Algorithm 2 (its Lemmas 1–3 and Theorem 4). Copy of the paper:
 [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** Theorem 3.4 is false: the 2-component max array of Algorithm 2 (as published,
-in both versions) is not linearizable. The authors found this error and published it in their erratum; we
-confirm it in Lean for `k = 3`. With the erratum's fix (an embedded `MaxScan` in `MaxUpdate1`), the max
-array is linearizable for every tree shape. The headline is not refuted, only left unproved as published:
-over atomic max arrays, Algorithm 3 is a linearizable `(b−1)`-limited-use snapshot with `O(log² b log n)`
-Updates and `O(log b)` Scans, and so is the multi-writer version (Theorem 5.1). The corrected max array keeps
-these bounds. Theorem 4.2 needed new linearization points, because the paper's ones are wrong; this flaw is
-not in the erratum.
+**Verdict: 🛠️ Hard fix.** The 2-component max array of Algorithm 2, the paper's key tool, is not linearizable as published
+in either version, an error the authors found and published in their erratum, which we confirm in Lean for `k = 3`; with
+the erratum's fix (an embedded `MaxScan` in `MaxUpdate1`) it is linearizable for every tree shape, but proving this takes
+a new linearization and criterion. Over atomic max arrays, Algorithm 3 is a linearizable `(b−1)`-limited-use snapshot
+with `O(log² b log n)` Updates and `O(log b)` Scans, and so is the multi-writer version (Theorem 5.1); the corrected max
+array keeps these bounds, and Theorem 4.2 needed new linearization points, because the paper's ones are wrong, a flaw
+not in the erratum. Joining the two halves is informal here, and Section 6 was not checked.
 
 ## Mistakes in the paper
 
-### ❌ Theorem 3.4 (Algorithm 2, linearizability of `MaxArray_{k×h}`)
+### 🛠️ Theorem 3.4 (Algorithm 2, linearizability of `MaxArray_{k×h}`)
 Algorithm 2 is not linearizable: with `k = 3` (balanced tree, `m = 2`) and three processes, a slow
 `MaxScan` returns `(1, 0)` although `MaxUpdate1(r, 1)` completed before `MaxUpdate0(r, 1)` started
 (`alg2_not_linearizable`).
 
 **Impact.** The authors found this error and published it in their erratum; we confirm it in Lean.
-The max array is the paper's key tool. The headline snapshot is left unproved as published,
-because the proof of Theorem 4.2 uses Theorem 3.4, but it is not refuted. The erratum's correction is
-linearizable (`alg2_fixed_linearizable`, for every tree shape). It changes the cost of `MaxUpdate1` from
-`O(log h)` to `O(log k log h)`, and Algorithm 3's `O(log² b log n)` per Update absorbs this.
+The max array is the paper's key tool. The snapshot is left unproved as published, because the proof
+of Theorem 4.2 uses Theorem 3.4, but it is not refuted. The erratum's correction is linearizable
+(`alg2_fixed_linearizable`, for every tree shape). Lemma 3.5 is correct for Algorithm 2 as published
+(`lemma_3_5`), but it is not the cost of the corrected algorithm (`lemma_3_5_erratum`): `MaxUpdate1`
+goes from `O(log h)` to `O(log k log h)`, and Algorithm 3's `O(log² b log n)` per Update absorbs this.
 
 **Details.** The execution is the erratum's:
 1. `p₀` starts `MaxScan`, reads `r.second = 0` (line 11) and `r.switch = 0` (line 12), then pauses.
@@ -46,31 +46,26 @@ orders `MaxUpdate0` against `MaxUpdate1`. The PODC 2012 version has the same Alg
 
 **Repair.** Line 9.5 of the erratum: `MaxUpdate1` performs a `MaxScan` after its `WriteMax`. We prove
 this version linearizable (`alg2_fixed_linearizable`) with a new history-level criterion for max arrays
-(`exists_isLinearization_maxArr`). The erratum gives only a sketch of the linearization of `MaxUpdate1`
-("after its invocation and immediately before any `MaxScan` returns `≥ v`"). It does not say which such
-scan is meant, given that scans are ordered by their results and not by real time. So we do not use it.
-Instead each update goes immediately before the first scan that may see it, or last if there is none.
+(`exists_isLinearization_maxArr`). Each update goes immediately before the first scan that may see it,
+or last if there is none.
 
-In Algorithm 3, every `MaxUpdate1` (line 10) is followed by a `MaxScan` of the same process (line 12),
-which is what the erratum's line 9.5 adds. So Algorithm 3 may be linearizable even over the original
-Algorithm 2. We did not check this.
-
-### Typos and slips
+### ✏️ Slips
 - The erratum says the embedded `MaxScan` is added to `MaxUpdate0(r, v)` "after its
   `WriteMax(r.second, v)`". That line belongs to `MaxUpdate1`, which is what its own step-complexity
-  paragraph uses.
-- Lemma 3.5 is correct for Algorithm 2 as published (`lemma_3_5`), but it is not the cost of the
-  linearizable, corrected algorithm (`lemma_3_5_erratum`: `MaxUpdate1` is `O(log k log h)`).
+  paragraph uses (`alg2_fixed_linearizable`).
+- The proof of Theorem 5.1 says "`op` is always linearized after it performs Line 2". An operation can be
+  linearized at another process's Update between its `ReadMax` and its `WriteMax` of `GetTS`. What the
+  proof uses, that `op` is linearized after it begins, still holds (`Snapshot.MW.theorem_5_1`).
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 4.2 (linearization points of Section 4.1)
+### 🔧 Theorem 4.2 (linearization points of Section 4.1)
 Linearizing an `Update` at the first `WriteMax(root.mr, ptr ≥ d)` (`d` its own root pointer) is wrong,
 because another process may carry the new value to the root inside a smaller pointer `c < d`, and a
 `Scan` reading `c` returns the value before the `Update` is linearized
 (`Snapshot.Counterexample.paper_linearization_points_fail`, 3 processes).
 
-**Impact.** Statement true; repaired (`Snapshot.theorem_4_2`).
+**Impact.** The statement stands, with repaired linearization points (`Snapshot.theorem_4_2`).
 
 **Details.** The false step is "if there is no `Update` by process `j` linearized before `op`, then
 `count_j = 0`".
@@ -78,11 +73,11 @@ because another process may carry the new value to the root inside a smaller poi
 **Repair.** Linearize an `Update` of process `j` with counter `m` at the first `WriteMax(root.mr, c)` with
 `(root.seq[c])_j ≥ m`.
 
-### 🛠️ Lemma 4.1
+### 🔧 Lemma 4.1
 The proof does not justify that the parent's index at the invocation is at most the sum of the
 children's components (it follows from the monotonicity of `seq` along max-array states).
 
-**Impact.** Statement true; repaired (`Snapshot.lemma_4_1`).
+**Impact.** The statement stands, with the step added (`Snapshot.lemma_4_1`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -127,6 +122,12 @@ Full list of differences (including modelling choices and minor imprecisions): [
 - From Section 3.2: the adaptive unbalanced-tree costs, the swapped-cost max array and the `c`-component
   extension.
 - The register implementation of `MaxReg_h`; it is taken as atomic.
+- Whether Algorithm 3 is linearizable over the original Algorithm 2. In Algorithm 3, every `MaxUpdate1` (line 10) is
+  followed by a `MaxScan` of the same process (line 12), which is what the erratum's line 9.5 adds, so it may be. We did
+  not check this.
+- The erratum's linearization of `MaxUpdate1`. It gives only a sketch ("after its invocation and immediately before any
+  `MaxScan` returns `≥ v`") and does not say which such scan is meant, given that scans are ordered by their results and
+  not by real time. So we do not use it, and follow our own linearization instead.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and
 `Quot.sound`. Both the counterexample and the positive results are about the same concrete `Impl`

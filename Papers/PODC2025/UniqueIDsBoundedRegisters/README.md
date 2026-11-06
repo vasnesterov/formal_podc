@@ -6,18 +6,27 @@ Unique Identifiers from Bounded Registers.* PODC 2025. DOI
 4-page brief announcement (no arXiv or full version found).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** All claims hold, reading "Algorithm 2 remains wait-free" as wait-free for every
-bounded number of calls, the regime in which the paper claims correctness.
-* Algorithms 1 and 2 generate `(k−1)·2^w` distinct identifiers from `k` `w`-bit read/write/FAI
-  registers.
-* No anonymous obstruction-free implementation supports more than `k·2^w + k + 1` calls.
-
-The lower-bound argument is sound. To reach the stated count, poised writes must also respect the
-bound of `2^w` poised processes per register, and Claim 1 misses one case.
+**Verdict: 🔧 Easy fix.** The main claims hold: Algorithms 1 and 2 generate `(k−1)·2^w` distinct identifiers from `k`
+`w`-bit read/write/FAI registers, and no anonymous obstruction-free implementation supports more than
+`k·2^w + k + 1` calls. The lower-bound argument is sound, but to reach the stated count poised writes must also
+respect the bound of `2^w` poised processes per register, and Claim 1 misses one case. "Algorithm 2 remains
+wait-free" must be read as wait-free for every bounded number of calls, the regime in which the paper claims
+correctness.
 
 ## Mistakes in the paper
 
-### ⚠️ §4, definition of "poised" (Theorem 4.1's final count)
+### ✏️ Slips
+- Algorithm 2 ("remains wait-free"): the paper says Algorithm 2 "remains wait-free since the object produces a finite
+  number of distinct identifiers", but with unboundedly many calls a process can starve in the `repeat` loop, so
+  this is not standard wait-freedom. The argument already relies on a bounded number of calls, which is the regime
+  where correctness is claimed; we prove wait-freedom for every bound on the number of invocations
+  (`alg_waitFreeUpTo`). Algorithm 1 is wait-free unconditionally (`alg1_waitFree`).
+- §3, first variation: "since `k' ≥ k/2`, `B ≥ k/2·2^w`" with `B = (k'−1)·2^w` does not follow as
+  written. It is true since `k' − 1 ≥ k/2` (`variation_bound`).
+
+## Proof gaps (statements true)
+
+### 🔧 §4, definition of "poised" (Theorem 4.1's final count)
 Condition (2) of "poised" for `write(x)` lacks the bound "fewer than `2^w` processes poised on `Rᵢ`"
 that condition (1) has for FAIs, so up to `2^{w+1}` processes can be poised on one register and the
 argument yields only `k·2^{w+1} + k + 1`, not the stated `k·2^w + k + 1`.
@@ -31,22 +40,7 @@ is exactly the negation of "poised", and Claim 1 works with `≥ 2^w` poised pro
 goes through. But a register can then collect up to `2^w` FAIs plus `2^w` distinct writes, and the final
 count "at most `2^w` processes poised on every register" fails.
 
-### ⚠️ Algorithm 2 ("remains wait-free")
-The paper says Algorithm 2 "remains wait-free since the object produces a finite number of distinct
-identifiers", but with unboundedly many calls a process can starve in the `repeat` loop, so this is not
-standard wait-freedom.
-
-**Impact.** The argument already relies on a bounded number of calls, which is the regime where
-correctness is claimed; we prove wait-freedom for every bound on the number of invocations
-(`alg_waitFreeUpTo`). Algorithm 1 is wait-free unconditionally (`alg1_waitFree`).
-
-### Typos and slips
-- §3, first variation: "since `k' ≥ k/2`, `B ≥ k/2·2^w`" with `B = (k'−1)·2^w` does not follow as
-  written. It is true since `k' − 1 ≥ k/2` (`variation_bound`).
-
-## Proof gaps (statements true)
-
-### 🛠️ Claim 1 (pigeonhole step)
+### 🔧 Claim 1 (pigeonhole step)
 The step "one of `x, x−1, …, x−f` is a poised write value" fails when all `2^w` poised primitives are
 FAIs, because then no write is poised.
 

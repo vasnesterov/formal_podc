@@ -72,6 +72,5 @@ Paper: Dinitz–Robelle, *Efficient and Simple Algorithms for Fault-Tolerant Spa
 
 ## Errors found
 
-No substantive errors. The paper's results hold as stated, with the explicit constants above. The
-minor issues are the `p = 1` slip in the proof of Lemma 3 (item 10) and `f = o(n)` vs. `kf = o(n)`
-in Lemma 7 (item 11).
+The paper's results hold as stated, with the explicit constants above. The mistakes are the `p = 1`
+step in the proof of Lemma 3 (item 10, ✏️) and `f = o(n)` vs. `kf = o(n)` in Lemma 7 (item 11, 🔧).

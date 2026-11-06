@@ -16,12 +16,11 @@ Leader Election on General Graphs*, PODC 2026 (4 pages, proof sketches only).
    (`Pointer.not_linkRel_of_nodup`) and every class has at least two circuits
    (`Pointer.two_mul_card_image_top_le`). Each class is led by its root, the maximum ID
    (`Pointer.id_le_id_top_of_top_eq`). Implementing the rule requires `C` to learn whether `C'`
-   selected `C` (one more broadcast per phase); this is not formalized. *Verdict rule:* the
-   description is part of the proof sketch of an existential lemma ("There is an algorithm …"),
-   and a repaired algorithm exists (R1, R5), so this is a proof repair (🛠️). Borderline: if one
-   reads the §2.2 prose as a correctness claim about a specific algorithm, the algorithm is
-   under-specified rather than wrong. Whether the double merge splits depends on the labelling of
-   the pairs, which the paper leaves "w.l.o.g." (R3/R4 would give ⚠️ at most).
+   selected `C` (one more broadcast per phase); this is not formalized. The description is part of
+   the proof sketch of an existential lemma ("There is an algorithm …"), and a repaired algorithm
+   exists. Read as a correctness claim about a specific algorithm, the §2.2 prose is
+   under-specified rather than wrong: whether the double merge splits depends on the labelling of
+   the pairs, which the paper leaves "w.l.o.g." → 🔧
 2. **Lemma 5: OR protocol, the leader's input is not specified.** As described, the leader
    initiates and forwards its pulse; if the pulse completes the cycle, everyone outputs 0. Read
    literally (the leader is never "the first node with input 1"), this is wrong when only the
@@ -31,7 +30,7 @@ Leader Election on General Graphs*, PODC 2026 (4 pages, proof sketches only).
    its own pulse when its input is 1), the protocol is verified for all asynchronous schedules:
    quiescent termination, correct OR at every node, at most `2|C|` pulses, and the stated
    observation patterns (`OrProtocol.orProc_final`, `orProc_totalSent_le`,
-   `orProc_observations`). A claim inside a proof (R1): at most 🛠️, close to a routine detail.
+   `orProc_observations`). A claim inside a proof, close to a routine detail. → 🔧
 3. **Lemma 3 (not formalized; unverified assumptions on the black box).** The sketch needs the
    ring election of Chalopin et al. to satisfy properties that the paper does not state:
    - passive relays can recognise that an election on their circuit has finished ("observed the

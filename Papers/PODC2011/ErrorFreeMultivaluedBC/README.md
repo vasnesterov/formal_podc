@@ -4,15 +4,15 @@ Guanfeng Liang, Nitin Vaidya. *Error-Free Multi-Valued Consensus with Byzantine 
 DOI [10.1145/1993806.1993809](https://doi.org/10.1145/1993806.1993809). Formalized version: arXiv
 [1101.3520](https://arxiv.org/abs/1101.3520) v1; numbering follows it.
 
-**Verdict: ⚠️ Minor statement issues.** Algorithm 1 achieves consensus on `L`-bit values for `3t < n`
-(Lemmas 1–5 and the correctness part of Theorem 1 hold). But the claim that the diagnosis stage runs at
-most `t(t+1)` times (and thus the complexity bound) is false for the pseudo-code as printed: an already
-isolated faulty processor can trigger the diagnosis stage in every generation. It holds once
-announcements of isolated processors are ignored, as the paper's prose intends.
+**Verdict: 🔧 Easy fix.** Algorithm 1 achieves consensus on `L`-bit values for `3t < n` (Lemmas 1–3 and 5 and the
+correctness part of Theorem 1 hold). The claim that the diagnosis stage runs at most `t(t+1)` times (Lemma 4, and thus
+the complexity bound) is false for the pseudo-code as printed: an already isolated faulty processor can trigger the
+diagnosis stage in every generation. It holds once announcements of isolated processors are ignored, as the paper's
+prose intends.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 4 and Theorem 1's `t(t+1)` bound (Algorithm 1 as printed)
+### 🔧 Lemma 4 and Theorem 1's `t(t+1)` bound (Algorithm 1 as printed)
 An already isolated faulty processor can announce `Detected = true` in every generation, so the
 diagnosis stage runs forever without removing an edge: with `n = 4`, `t = 1` there are already
 `3 > t(t+1)` diagnosis stages in 3 generations (`Counterexample.literal_not_theorem_1`,
@@ -39,23 +39,18 @@ diagnosis stage will not be performed any more".
 **Repair.** Ignore the `Detected` bits of isolated processors. For this repaired algorithm we
 prove Lemma 4 and the `t(t+1)` bound. (`Run.theorem_1_numDiag`)
 
-### ⚠️ `⊥` in the checking stage (steps 2(a), 2(c))
-Read literally, a received vector with a `⊥` entry is never in `C₂ₜ`, so a fault-free processor
-that distrusts a faulty member of `P_match` always reports a detection, and step 3(f) can then
-isolate this *fault-free* processor.
-
-**Impact.** Under-specified pseudo-code with an evident intended reading, which we formalize: `⊥`
-entries are ignored, and the check and decoding use the trusted members of `P_match`. The literal
-reading's failure is described in `differencies.md` but not proved in Lean.
-
-**Details.** Untrusted senders give `R_i[j] = ⊥`, and "`R_j/P_match ∈ C₂ₜ`" is defined by equality
-with a codeword. A 2-generation scenario with `n = 4` is in `differencies.md`. The prose of §3.2
-("checks whether the symbols received from the trusted processors in `P_match` are consistent")
-and the proof of Lemma 4 (case 2(a)) state the intended reading.
-
-### Typos and slips
+### ✏️ Slips
+- `⊥` in the checking stage (steps 2(a), 2(c)): read literally, a received vector with a `⊥` entry is never in `C₂ₜ`,
+  so a fault-free processor that distrusts a faulty member of `P_match` always reports a detection, and step 3(f) can
+  then isolate this *fault-free* processor. Untrusted senders give `R_i[j] = ⊥`, and "`R_j/P_match ∈ C₂ₜ`" is defined by
+  equality with a codeword. The prose of §3.2 ("checks whether the symbols received from the trusted processors in
+  `P_match` are consistent") and the proof of Lemma 4 (case 2(a)) state the intended reading, which we formalize: `⊥`
+  entries are ignored, and the check and decoding use the trusted members of `P_match`. The literal reading's failure,
+  a 2-generation scenario with `n = 4`, is described in `differencies.md` but not proved in Lean.
 - Lemma 3 should assume that no processor *announces* a detection, not that none *detects* one.
 - "`v_i(g)`, represented by `n − t` symbols" in §3.1 should be `n − 2t`.
+
+### Typos
 - "`Detected_i`" in §3.2 should be `Detected_j`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).

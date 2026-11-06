@@ -2,28 +2,26 @@
 
 Paper: Dolev, Lenzen, *Early-Deciding Consensus is Expensive*, PODC 2013 (camera-ready author copy).
 
-## Verdict calibration
+## Proof repairs
 
-Verdict 🛠️ (Proof repaired). Every checked statement is true as written (Lemmas 3.4, 3.5, 3.7, 3.8, 4.2,
+Every checked statement is true as written (Lemmas 3.4, 3.5, 3.7, 3.8, 4.2,
 Theorems 3.2, 3.6, 4.3, 4.5), and four proofs need repairs:
 
-- **Theorem 3.6.** The statement says "for any consensus protocol". The proof iterates Lemma 3.5, whose proof
+- **Theorem 3.6** (🔧). The statement says "for any consensus protocol". The proof iterates Lemma 3.5, whose proof
   needs decision deadlines (`(f+2)`-deciding for fewer faults). This is a proof gap, not a false statement:
-  we prove the theorem for every algorithm (`theorem_3_6_general`). Rule R1: a claim inside a proof that is
-  wrong, with a true result, gives 🛠️.
-- **Lemma 3.8.** It averages Lemma 3.7's bound over `V \ F_r`, but Lemma 3.7 as stated may count the
+  we prove the theorem for every algorithm (`theorem_3_6_general`).
+- **Lemma 3.8** (🔧). It averages Lemma 3.7's bound over `V \ F_r`, but Lemma 3.7 as stated may count the
   critical node's messages. Lemma 3.7 is true as stated; its proof gives the needed stronger form.
-- **Theorem 4.3.** The proof reduces "w.l.o.g." to `t ≤ n - 2`, which covers only `f ≤ n - 3`; the
-  theorem claims every `f < t`. A missing case of a true statement (R1): 🛠️, not R2 (nothing is false).
-  Repaired by `theorem_4_3_all'`.
-- **Theorem 4.5.** The correctness proof never uses orderliness and contains a false claim ("a unique node
+- **Theorem 4.3** (🔧). The proof reduces "w.l.o.g." to `t ≤ n - 2`, which covers only `f ≤ n - 3`; the
+  theorem claims every `f < t`. A missing case of a true statement. Repaired by `theorem_4_3_all'`.
+- **Theorem 4.5** (🛠️). The correctness proof never uses orderliness and contains a wrong assertion ("a unique node
   `i₀` deciding in round `i₀` on its input"). The statement is true (proved).
 
-Borderline calls:
+Readings of the text:
 - "Section 3 fixes an `(f+1)`-deciding algorithm" (and the proofs say so) where `(f+2)`-deciding is meant.
   Read literally, all of Section 3 would be vacuous, because Theorem 3.6 shows no algorithm is
   `(f+1)`-deciding. The theorem statements (Theorem 3.2, Corollary 3.9) say `(f+2)`, and every deadline the
-  proofs use is the `(f+2)` one. We treat this as a slip in the setup text, not a statement issue (R1, R3).
+  proofs use is the `(f+2)` one. We treat this as a slip in the setup text (✏️).
 - Theorem 3.6 does not say "with `f` faults". We prove the natural reading: an execution with exactly `f`
   faulty nodes in which some never-faulty node has not decided within `f + 1` rounds.
 
@@ -126,7 +124,7 @@ Borderline calls:
   - The paper's contradiction execution is the same as ours: `E(W)` with `W = {v}`, plus the senders `S` to
     `v, w` failing in round `r + 1`.
 - **Lemma 3.8.**
-  - The averaging step needs Lemma 3.7 for senders in `V \ F_r` (see Verdict calibration).
+  - The averaging step needs Lemma 3.7 for senders in `V \ F_r` (see Proof repairs).
   - The final extension of `E₀, E₁` "without further faults so that nodes in `V \ (W₀ ∪ {v} ∪ F_r)` cannot
     distinguish them" is replaced by stopping at round `r + 3`. `E₀` has `r + 1` faults, so these nodes
     decide by round `r + 3` (`(f+2)`-deciding), and their views coincide up to that round.

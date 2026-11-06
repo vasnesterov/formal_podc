@@ -1,11 +1,11 @@
 # Differences between the formalization and the paper
 
 Paper: Boppana, Halldórsson, Rawitz, *Simple and Local Independent Set Approximation*, PODC 2018 (BA),
-full version arXiv 1803.00786v1. Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
+full version arXiv 1803.00786v1.
 
-## Statement-level issues (decide the verdict)
+## Statement-level issues
 
-1. **Theorem 2 is false as stated (❌, R3 not applicable, R5: secondary result).** "CaroWei has performance
+1. **Theorem 2 is false as stated (✏️).** "CaroWei has performance
    ratio at most `(d̄+2)/1.657`", i.e. `1.657·α ≤ (d̄+2)·CaroWei` for every graph. The proof derives
    `(d̄+2)/(4(√2−1))` and then writes `(d̄+2)/(4(√2−1)) ≤ (d̄+2)/1.657`, which is the wrong direction:
    `4(√2−1) = 1.65685… < 1.657` (`four_mul_sqrt_two_sub_one_lt`). The paper's own tightness family
@@ -14,35 +14,33 @@ full version arXiv 1803.00786v1. Verdict rules: `.claude/skills/formalize-paper/
    complete bipartite counterexample, by number of vertices, is `K_{13721,5683}`; found by exact rational
    search over all `K_{a,b}` with `a+b < 19404`; not part of the Lean development). The statement with
    the constant `4(√2−1)` is proved (`theorem2_corrected`).
-   *Borderline call.* The intended constant is recoverable from the proof and the error is a rounding in the
-   fourth significant digit, which argues for ⚠️ (R3). We chose ❌ because R3 explicitly excludes fixes
-   that change "another constant … that is itself the claim" and the paper's proof itself asserts the
-   wrong inequality. The result is in the introduction's contribution list, not the abstract, hence ❌ and
-   not 🚨.
-2. **Theorem 1 fails for `Δ = 0` (⚠️, R2).** With `Δ(G) = 0` the ratio `(Δ+1)/2 = 1/2 < 1` is impossible
+   The intended constant is printed in the proof and the error is a rounding in the fourth significant
+   digit, although the paper's proof itself asserts the wrong inequality. The result is in the
+   introduction's contribution list, not the abstract.
+2. **Theorem 1 fails for `Δ = 0` (✏️).** With `Δ(G) = 0` the ratio `(Δ+1)/2 = 1/2 < 1` is impossible
    (`theorem1_false_zero`); the proof's step `O_i·(Δ+1)/(i+1) ≥ 2O_i` only covers `i ≥ 1`, and degree-0
    vertices need `Δ ≥ 1`. Formalized for every `Δ ≥ 1`. Similarly Theorem 3's ratio `(2Δ+1)²/(8Δ)` is
    undefined for `Δ = 0` (not formalized separately).
-3. **Lemma 5 is false as stated (⚠️, R4).** It assumes only `a > b > 0` and `Z − Y ≥ X > 0`; without `Y > 0`
+3. **Lemma 5 is false as stated (✏️).** It assumes only `a > b > 0` and `Z − Y ≥ X > 0`; without `Y > 0`
    the minimum need not be at `t = 1` (`lemma5_false`: `a=2, b=1, X=1, Y=−100, Z=−50`). The derivative
    argument needs `0 < Y + tX`. In the only use `Y = w(opt) > 0`; we prove Lemma 5 with `Y > 0`
    (and the weaker `a ≥ b ≥ 0`, `X ≥ 0`) (`lemma5`).
-4. **Theorem 6's minimum is over `x ≤ 1` (⚠️, R3).** Over all `x ≤ 1` the expression
+4. **Theorem 6's minimum is over `x ≤ 1` (✏️).** Over all `x ≤ 1` the expression
    `x²/(Δ+x) + 1/(xΔ+1)` takes negative values (`theorem6_min_unbounded`, at `x = −(Δ+1)`), so the formula
    is meaningless as written; the proof (`x = β = w(V′)/w(opt) ∈ [0,1)`) and the tightness example make
    clear that `0 ≤ x ≤ 1` is meant. Formalized with `x ∈ [0,1]`.
-5. **Abstract: "For weighted graphs, it gives only a `Δ`-approximation" (⚠️, R3).** Read as a guarantee this
+5. **Abstract: "For weighted graphs, it gives only a `Δ`-approximation" (✏️).** Read as a guarantee this
    is false: on `K_{Δ,Δ}` with weights `1` and `Q > Δ` the ratio exceeds `Δ`
    (`boppana_weighted_not_Delta`). Section 3 states and proves the correct `Δ+1`. Likewise the abstract's
    "0.529Δ" vs. the text's "0.529(Δ+1)" (same asymptotically). The PODC brief announcement's abstract
    already says `(Δ+1)` and `0.529(Δ+1)`, so this concerns the arXiv abstract only.
-6. **"For `Δ = 2`, `1/ρ ∼ 0.593`, or `ρ ∼ 1.657 ∼ 0.562(Δ+1)`" (⚠️, R3).** `1/0.593 = 1.686 = 0.562·3`; the
+6. **"For `Δ = 2`, `1/ρ ∼ 0.593`, or `ρ ∼ 1.657 ∼ 0.562(Δ+1)`" (✏️).** `1/0.593 = 1.686 = 0.562·3`; the
    value `1.657` is a slip (it is the constant of Theorem 2). We prove `ρ(2) > 1.68` (`rho_two_gt`).
    ("20% smaller than `Δ`" is then about 16%.)
 
 ## Proof-level issues
 
-7. **Theorem 4's indistinguishability argument (proof repaired, 🛠️).** The paper compares `G₁ = K_{Δ+1}`
+7. **Theorem 4's indistinguishability argument (🔧).** The paper compares `G₁ = K_{Δ+1}`
    with an arbitrary `Δ`-regular bipartite `G₂`. But the model gives nodes knowledge of `n`, and
    `K_{Δ+1}` has fewer nodes than any `Δ`-regular bipartite graph, so the two are distinguishable in zero
    rounds. "Distributions over neighbourhoods are identical" also ignores the port numbers a node can

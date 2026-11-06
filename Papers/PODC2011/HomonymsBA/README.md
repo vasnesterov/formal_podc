@@ -6,16 +6,15 @@ Carole Delporte-Gallet, Hugues Fauconnier, Rachid Guerraoui, Anne-Marie Kermarre
 [hal-00580133v1](https://hal.science/hal-00580133v1) (PODC paper plus appendix with the detailed proofs); numbering
 follows it.
 
-**Verdict: ⚠️ Minor statement issues.** The whole characterization of Table 1 holds as stated, both directions in
-all six cells. Necessity (Props. 1, 4, 16, Thms. 19, 20) and sufficiency (Props. 2, 5, 18) are proved, including both
-partially synchronous algorithms. Two auxiliary statements of Prop. 18's proof are off: Prop. 26 is false in the
-degenerate case α = 0, and Lemma 34 is not established under the reading of the pseudocode that Lemma 36 needs
-(it is not needed). Several proofs need repairs: Theorem 19 rests on a non-WLOG assumption, and the liveness lemmas
-12 and 37 split cases wrongly.
+**Verdict: 🛠️ Hard fix.** The whole characterization of Table 1 holds as stated, both directions in all six cells:
+necessity (Props. 1, 4, 16, Thms. 19, 20) and sufficiency (Props. 2, 5, 18), including both partially synchronous
+algorithms. The necessity proof of Theorem 19 rests on a non-WLOG assumption and needed a different argument, while
+the other proof errors have local repairs. Lemma 34 is not established under the reading of the pseudocode that
+Lemma 36 needs, but no result needs it.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 34 (Appendix A.3, "at most one lock pair at the end of each phase")
+### ❌ Lemma 34 (Appendix A.3, "at most one lock pair at the end of each phase")
 Lemma 34 is unestablished, not refuted: its proof assumes that the lock-removal test (lines 24–26 of Figure 7)
 still sees the `n−t` witnesses of line 16, which fails under the per-superround witnesses that Lemma 36's proof
 needs.
@@ -26,27 +25,24 @@ because line 6 then excludes every other value (`Restricted.decAt_agree`).
 **Details.** The paper defines witnesses per superround, and line 25 does not say which superround's accepts it
 uses. Lemma 36 needs the accepts of superround 4 of the current phase, which is the reading we formalize. Before T,
 all echoes sent to `p` in that superround can be lost. A process locked on `(v′, ph′)` that locks `(v, ph)` in a
-later phase then keeps both pairs: a hand-built run with `n = ℓ = 4`, `t = 1` works (not in Lean). Under a
-cumulative reading of witnesses (all accepts so far), the paper's proof of Lemma 34 goes through, and Lemma 30 and
-Lemma 36 should survive, but we did not formalize that variant. Rule R3 applies (ambiguous pseudocode, a reading
-exists that keeps the lemma): ⚠️, not ❌.
+later phase then keeps both pairs: a hand-built run with `n = ℓ = 4`, `t = 1` works (not in Lean). The pseudocode is
+ambiguous: under a cumulative reading of witnesses (all accepts so far), the paper's proof of Lemma 34 goes through.
 
-### ⚠️ Proposition 26 (correctness of the broadcast with multiplicity, Appendix A.3.1)
-For α = 0 the statement asks every correct process to perform an `Accept(i, α′, m, r)` although nobody broadcast
-`m`, which Figure 6 never does.
+### ✏️ Slips
+- Proposition 26 (correctness of the broadcast with multiplicity, Appendix A.3.1): for α = 0 the statement asks every
+  correct process to perform an `Accept(i, α′, m, r)` although nobody broadcast `m`, which Figure 6 never does.
+  Degenerate case: Prop. 26 is only used with α ≥ 1, and the paper's own Lemma 24 separates the case α > 0. We prove
+  the witness form (`Restricted.cc_le_witnesses`: the number of correct broadcasters is at most the number of
+  witnesses after GST), which is trivially true for α = 0.
+- Appendix A.4 (Thm. 19): "Assume that for ℓ < 3t" should be ℓ ≤ 3t; "a number of processes less than 3t" should be
+  "at most 3t".
+- Appendix A.4 (Thm. 19): "If ℓ ≥ t, the result is clear" should be ℓ ≤ t.
+- Proof of Prop. 5 (termination): "(since n ≤ 2ℓ−3t)" needs the strict inequality, which the hypothesis gives.
+- Proof of Prop. 5 (termination): acks are sent in "round 1 of superround 3", which should be superround 4. The
+  overview of Section 4.2 has the same slip.
 
-**Impact.** Degenerate case (rule R2). Prop. 26 is only used with α ≥ 1, and the paper's own Lemma 24 separates
-the case α > 0.
-
-**Repair.** We prove the witness form (`Restricted.cc_le_witnesses`: the number of correct broadcasters is at most
-the number of witnesses after GST), which is trivially true for α = 0.
-
-### Typos and slips
-- Appendix A.4 (Thm. 19): "Assume that for ℓ < 3t" should be ℓ ≤ 3t; "If ℓ ≥ t, the result is clear" should be
-  ℓ ≤ t; "a number of processes less than 3t" should be "at most 3t".
+### Typos
 - Proof of Lemma 33 cites "Lemma 22"; it means Lemma 32.
-- Proof of Prop. 5 (termination): "(since n ≤ 2ℓ−3t)" needs the strict inequality, which the hypothesis gives; acks
-  are sent in "round 1 of superround 3", which should be superround 4.
 
 ## Proof gaps (statements true)
 
@@ -59,14 +55,14 @@ clones) is correct in the classical run, which is not without loss of generality
 **Details.** If `q₀` is Byzantine in the classical run, the paper's simulation would need all `n−ℓ+1` processes
 with identifier 0 to be Byzantine. So the derived algorithm `A′` is only shown correct in runs where `q₀` is
 correct. That weaker classical problem *is* solvable for any `ℓ` (everyone adopts `q₀`'s broadcast value), so no
-contradiction with [9, 13] follows. A simple repair: per run, choose the identifier of the clone group among the
-correct `qᵢ`. `A` must work for every identifier assignment, so this is allowed.
+contradiction with [9, 13] follows. A possible repair, not proved: per run, choose the identifier of the clone group
+among the correct `qᵢ`. `A` must work for every identifier assignment, so this is allowed.
 
 **Repair.** We reuse the covering system of Proposition 1 instead. The stacks of the hexagon are clones, so with
 innumerate receivers a Byzantine process only needs to send one copy per identifier, and the scenarios become
 restricted runs (`not_solves_three_t_innumerate`, `restricted_scenario_dedup`).
 
-### 🛠️ Lemma 12 (Prop. 5, Case 2) and Lemma 37 (Prop. 18, Case 2)
+### 🔧 Lemma 12 (Prop. 5, Case 2) and Lemma 37 (Prop. 18, Case 2)
 The case split "if there are t+1 correct processes with the same input value, that value will be in the proper
 set of all correct processes" fails with homonyms (and should be on the current proper sets, not on inputs).
 
@@ -86,25 +82,11 @@ universal reading (all received sets) a Byzantine process that sends each proces
 forever. Example (Prop. 18 setting): n = 4, t = 1, correct inputs a, b, c; no common proper value ever appears and
 no lock is ever requested. The existential reading keeps validity.
 
-### 🛠️ Smaller gaps in the proofs of Props. 5 and 18 (Lemmas 10, 11, 30, 35, 36, Props. 27, 39, 40)
-Several steps of the two algorithm proofs use slightly more than the cited lemma states, or rely on tight timing.
+### 🔧 Lemma 36 and Prop. 40 (use of relay, Prop. 27)
+Prop. 27 gives the relayed accepts only in superround max(r′, T)+1, but with per-superround witnesses Lemma 36 and
+Prop. 40 need them in later superrounds as well.
 
-**Impact.** Statements true; all repaired in the Lean proofs (`Psync.alg_solves`, `Restricted.alg_solves`).
-
-**Details.**
-- Lemma 10 is applied with A = the identifiers from which the leader received acks, some of which may be
-  Byzantine. Its proof only needs that each identifier of A held by a single correct process acked
-  (`Psync.lemma10` assumes exactly that).
-- Lemma 11 relies on relay arriving exactly in time for the lock release at the end of phase ph₃. The timing is
-  tight (gst ≤ 8·ph₃ + 6) but works.
-- Prop. 18: relay must hold in every later superround, not only in superround max(r′, T)+1, for Lemma 36. The proof
-  of Prop. 27 gives this (`Restricted.thr_relay`).
-- Prop. 18: Lemma 35 uses the `r ≤ r′` part of unforgeability, which Lemma 30 drops (`Restricted.lemma30` keeps
-  it).
-- Prop. 18 termination: the leaders of the all-correct identifier may request different values. Correct processes
-  must choose deterministically from the *set* of requested values, which relay makes common after GST.
-- Prop. 39 cites Lemma 34 ("at most one lock pair"), which is not needed (`Restricted.decAt_agree`; see the ⚠️
-  item above).
+**Impact.** Statements true: the proof of Prop. 27 gives relay in every later superround (`Restricted.thr_relay`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -162,8 +144,22 @@ Full list of differences (including modelling choices and minor imprecisions): [
 - Prop. 4 uses `t > 0`; the paper assumes it throughout. Prop. 5 does not need `n > 3t`.
 - The algorithms of Props. 5 and 18 bundle each round's output in one record. Phases take 8 rounds. Echo tags and
   thresholds follow the paper, with harmless adaptations listed in [differencies.md](differencies.md).
+- Several steps of the proofs of Props. 5 and 18 use slightly more than the cited lemma states, or rely on tight
+  timing; all are handled in the Lean proofs (`Psync.alg_solves`, `Restricted.alg_solves`):
+  - Lemma 10 is applied with A = the identifiers from which the leader received acks, some of which may be
+    Byzantine. Its proof only needs that each identifier of A held by a single correct process acked
+    (`Psync.lemma10` assumes exactly that).
+  - Lemma 11 relies on relay arriving exactly in time for the lock release at the end of phase ph₃. The timing is
+    tight (gst ≤ 8·ph₃ + 6) but works.
+  - Prop. 18: Lemma 35 uses the `r ≤ r′` part of unforgeability, which Lemma 30 drops (`Restricted.lemma30` keeps
+    it).
+  - Prop. 18 termination: the leaders of the all-correct identifier may request different values. Correct processes
+    must choose deterministically from the *set* of requested values, which relay makes common after GST.
+  - Prop. 39 cites Lemma 34 ("at most one lock pair"), which is not needed (`Restricted.decAt_agree`; see the Lemma
+    34 item above).
 
-**Not formalized.** Lemma 34 (unestablished, not needed; see above). Proposition 25 (unicity) holds by construction and is
+**Not formalized.** Lemma 34 (unestablished, not needed; see above). Under the cumulative reading of witnesses,
+Lemma 30 and Lemma 36 should survive, but we did not formalize that variant. Proposition 25 (unicity) holds by construction and is
 not stated separately. The equivalence of the basic partially synchronous model with the other DLS variants is
 cited by the paper and not formalized.
 

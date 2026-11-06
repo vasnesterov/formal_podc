@@ -5,71 +5,70 @@ PODC 2020. DOI [10.1145/3382734.3405745](https://doi.org/10.1145/3382734.3405745
 [2002.08216](https://arxiv.org/abs/2002.08216) v1; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The main result holds. In the deterministic port-numbering model on
-2-coloured `Δ`-regular trees, bipartite `x`-maximal `y`-matching (the encoded version `Φ^W_Δ(x, y)`) has white
-round complexity exactly `T_Δ(x, y)` for `0 ≤ x ≤ Δ`, `1 ≤ y ≤ Δ − 1`; in particular it is `2Δ − 1` for maximal
-matching. We prove both bounds, and the round elimination step they use. The tightness claim of Theorem 1.2
-and §6 is false in the degenerate case `y = Δ`. Several proofs needed small repairs: empty sets in `R_B`, an
-ill-defined problem in Lemma 4.3, and two errors in the output rule of the algorithm.
+**Verdict: 🔧 Easy fix.** The main result holds: in the deterministic port-numbering model on 2-coloured `Δ`-regular
+trees, bipartite `x`-maximal `y`-matching (the encoded version `Φ^W_Δ(x, y)`) has white round complexity exactly
+`T_Δ(x, y)` for `0 ≤ x ≤ Δ`, `1 ≤ y ≤ Δ − 1`, in particular `2Δ − 1` for maximal matching, and we prove both bounds and
+the round elimination step they use. Several proofs needed small repairs (empty sets in `R_B`, an ill-defined problem in
+Lemma 4.3, two errors in the output rule of the algorithm), and the tightness claim of Theorem 1.2 and §6 is false in
+the degenerate case `y = Δ`. The randomized and LOCAL lower bounds (Theorems 1.3 and 1.4) were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorem 1.2 and end of §6 (tightness for `y = Δ`)
-The tightness claim fails for `y = Δ` and `x < Δ`: the formula gives `T_Δ(x, Δ) = 1`, but matching every edge
-is a valid 0-round solution (`theorem_1_2_false_y_eq_Δ`).
-
-**Impact.** Degenerate case; the paper itself notes the trivial algorithm after Theorem 4.5. The paper claims
-tightness "for any combination of integers `x ≥ 0, y ≥ 1, Δ ≥ 2`"; we prove Theorem 1.2 for `0 ≤ x ≤ Δ`,
-`1 ≤ y ≤ Δ − 1` (`theorem_1_2`).
-
-### ⚠️ Lemma 4.3 (undefined problem `Ψ^W_Δ(y, x, 0)` for `x > Δ − y`)
+### 🔧 Lemma 4.3 (undefined problem `Ψ^W_Δ(y, x, 0)` for `x > Δ − y`)
 Lemma 4.3 produces `Ψ^W_Δ(y, x, 0)`, which is undefined for `x > Δ − y`, since the family requires `a + b ≤ Δ`.
 
-**Impact.** Under-specified, not false: we prove the lemma with `Ψ^W_Δ(y, min{x, Δ − y}, 0)` (`lemma_4_3`).
-Theorem 4.5 is unaffected, since it only uses the lemma when `x < Δ − y`.
+**Impact.** We prove the lemma with `Ψ^W_Δ(y, min{x, Δ − y}, 0)` (`lemma_4_3`). Theorem 4.5 is unaffected, since it only
+uses the lemma when `x < Δ − y`.
 
-### Typos and slips
+### ✏️ Slips
+- Theorem 1.2 and end of §6: the tightness claim fails for `y = Δ` and `x < Δ`: the formula gives `T_Δ(x, Δ) = 1`, but
+  matching every edge is a valid 0-round solution (`theorem_1_2_false_y_eq_Δ`). The paper itself notes the trivial
+  algorithm after Theorem 4.5. The paper claims tightness "for any combination of integers `x ≥ 0, y ≥ 1, Δ ≥ 2`"; we
+  prove Theorem 1.2 for `0 ≤ x ≤ Δ`, `1 ≤ y ≤ Δ − 1` (`theorem_1_2`).
+- Lemmas 4.1–4.3, proofs: the empty set is ignored. `R_B(Π)` uses labels from `2^Σ`, and a configuration such as
+  `(∅, MZPOX, …, MZPOX)` is vacuously universal and maximal, but for `a ≤ Δ − 2` it extends to none of the three
+  configurations listed in the proof of Lemma 4.1 (`emptyConf_counterexample`). `∅` never appears in a correct solution,
+  and we use nonempty sets throughout.
 - Theorem 2.1 says "complexity `min{0, T − 1}`"; it should be `max`.
-- The proof of Lemma 4.1 says the universal quantifier is applied to the *white* constraint; it should be the
-  black one.
-- "Δ-regular balanced trees" is imprecise: finite trees have leaves, while the problems are defined for
-  `Δ`-regular graphs (§2 uses regular graphs of girth `≥ 4Δ + 2`). We use the infinite 2-coloured `Δ`-regular
-  tree.
+- The proof of Lemma 4.1 says the universal quantifier is applied to the *white* constraint; it should be the black
+  one.
+
+### Typos
+- "Δ-regular balanced trees" is imprecise: finite trees have leaves, while the problems are defined for `Δ`-regular
+  graphs (§2 uses regular graphs of girth `≥ 4Δ + 2`). We use the infinite 2-coloured `Δ`-regular tree.
 
 ## Proof gaps (statements true)
 
-### 🛠️ §5 (output rule of the upper-bound algorithm)
-The algorithm's output rule, as literally written, fails on small cycles in two places.
+### 🔧 §5 (output rule, last round)
+White nodes do not accept proposals received in the last round, so an unmatched black node that proposed in the last
+round may see more than `x` labels `X`.
 
-**Impact.** Bound true: the text hints at both fixes, and with them the bound holds on all `Δ`-regular properly
-2-coloured port-numbered graphs (`upper_bound`).
+**Impact.** The text hints at the fix, and with it the bound holds on all `Δ`-regular properly 2-coloured port-numbered
+graphs (`upper_bound`).
 
-**Details.**
-* White nodes must accept proposals received in the last round. Without this, an unmatched black node that
-  proposed in the last round may see more than `x` labels `X`. Example: `Δ = 2`, `x = y = 1` (2 rounds) on an
-  8-cycle, where a black node gets `X` from both neighbours.
-* In the `2⌈(Δ−x)/y⌉ − 1`-round variant, unmatched whites must output `P` on all ports, not only where they
-  proposed. Whites are active only `k − 1` times there. Example: BMM with `Δ = 2` (3 rounds) on a 6-cycle,
-  where an unmatched white node outputs `P X`, which violates `x = 0`.
+**Details.** Example: `Δ = 2`, `x = y = 1` (2 rounds) on an 8-cycle, where a black node gets `X` from both neighbours.
 
-### 🛠️ Lemmas 4.1–4.3 (the empty set in `R_B`)
-The proofs ignore the empty set: `R_B(Π)` uses labels from `2^Σ`, and a configuration such as
-`(∅, MZPOX, …, MZPOX)` is vacuously universal and maximal but extends to none of the configurations listed in
-the proof of Lemma 4.1 (`emptyConf_counterexample`).
+**Repair.** White nodes must accept proposals received in the last round.
 
-**Impact.** Statements true: `∅` never appears in a correct solution. We use nonempty sets throughout.
+### 🔧 §5 (output rule of the `2⌈(Δ−x)/y⌉ − 1`-round variant)
+Whites are active only `k − 1` times in this variant, so outputting `P` only where they proposed can give too few
+labels `P`.
 
-**Details.** For `a ≤ Δ − 2` the configuration above extends to none of the three configurations listed in the
-proof of Lemma 4.1.
+**Impact.** The text hints at the fix, and with it the exact bound holds, also on all `Δ`-regular properly 2-coloured
+port-numbered graphs (`upper_bound`).
 
-### 🛠️ Theorem 4.5 (small gaps)
-Theorem 4.5's parameter formulas break down when `⌈(Δ−x)/y⌉ = 1`, and the proof ignores the caps of Lemma 4.1.
+**Details.** Example: BMM with `Δ = 2` (3 rounds) on a 6-cycle, where an unmatched white node outputs `P X`, which
+violates `x = 0`.
 
-**Impact.** Statement true; we prove both points (`phi_not_zero`, `phi'_not_zero`, `seqBC_le`).
+**Repair.** Unmatched whites must output `P` on all ports, not only where they proposed.
 
-**Details.**
-* The case `⌈(Δ−x)/y⌉ = 1` needs `Φ^W` and `Φ'` to be not 0-round solvable, which is asserted without proof.
-* The caps `min{c + a, Δ − a}` of Lemma 4.1 are ignored. They are inactive.
+### 🔧 Theorem 4.5 (case `⌈(Δ−x)/y⌉ = 1`)
+Theorem 4.5's parameter formulas break down when `⌈(Δ−x)/y⌉ = 1`; this case needs `Φ^W` and `Φ'` to be not 0-round
+solvable, which is asserted without proof.
+
+**Impact.** We prove this case (`phi_not_zero`, `phi'_not_zero`).
+
+**Details.** The proof also ignores the caps `min{c + a, Δ − a}` of Lemma 4.1. They are inactive (`seqBC_le`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

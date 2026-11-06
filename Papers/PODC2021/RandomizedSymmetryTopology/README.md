@@ -5,23 +5,23 @@ PODC 2021. DOI [10.1145/3465084.3467936](https://doi.org/10.1145/3465084.3467936
 conference version (numbering follows it). For the proofs it defers we used the full version
 [arXiv:2105.11713](https://arxiv.org/abs/2105.11713) v1. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** All main results hold in the model the paper describes in words (Section 2.1:
-every node may send a message to each other node; port numbers "may assist in breaking symmetry"), which is the
-standard port-numbering model that the full version's proof uses. But the formal knowledge equation for message
-passing, **Eq. (2), mis-models it**: there a receiver never learns the port number at the sender's end. Read
-literally with Eq. (2), the **"if" direction of Theorem 4.2 is false** (Lean counterexample `n₁ = 2`, `n₂ = 3`), and
-the correct condition becomes the blackboard one, some `nⱼ = 1`. Since the paper's prose model and its own proof use the standard model, we count Eq. (2) as a modelling slip rather than a false theorem. In the standard model we prove **both directions
-of Theorem 4.2**. Theorem 4.1 (blackboard), Lemma 3.2, Lemma 3.5, Lemma 4.3 and Corollary 4.4 hold in both models.
+**Verdict: 🔧 Easy fix.** Eq. (2), the paper's formal knowledge equation for message passing, mis-models the model
+described in words (Section 2.1: every node may send a message to each other node; port numbers "may assist in breaking
+symmetry"), and read literally with it the "if" direction of Theorem 4.2 is false. Adding the sender's port saves both
+directions of Theorem 4.2 in the standard port-numbering model that the prose and the full version's proof use, and a
+few lines replace the misapplied zero–one law in Lemma 3.2, so the framework and both leader-election characterizations
+stand. The informal Theorem 5.1 was not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Eq. (2) (message-passing knowledge) and Theorem 4.2, "if" direction
+### 🔧 Eq. (2) (message-passing knowledge) and Theorem 4.2, "if" direction
 Eq. (2) never lets a receiver learn the port number at the sender's end, and in that model the "if" direction of
-Theorem 4.2 is false for `n₁ = 2`, `n₂ = 3` (`theorem_4_2_if_false`, `theorem_4_2_counterexample_explicit`).
+Theorem 4.2 is false for `n₁ = 2`, `n₂ = 3` (`theorem_4_2_if_false`, `theorem_4_2_counterexample_explicit`): the correct
+condition becomes the blackboard one, some `nⱼ = 1`.
 
-**Impact.** A modelling slip, not a false theorem: in the standard port-numbering model, which the paper's prose
-(Section 2.1) and the full version's proof use, Theorem 4.2 holds in both directions (`theorem_4_2_if_twoSided`,
-`corollary_4_4_standard`).
+**Impact.** In the standard port-numbering model, which the paper's prose (Section 2.1) and the full version's proof
+use, Theorem 4.2 holds in both directions (`theorem_4_2_if_twoSided`, `corollary_4_4_standard`). Theorem 4.1
+(blackboard), Lemma 3.2, Lemma 3.5, Lemma 4.3 and Corollary 4.4 hold in both models.
 
 **Details.** By Eq. (2), the knowledge
 `Kᵢ(t) = (Kᵢ(t-1), Xᵢ(t), K_{πᵢ(1)}(t-1), …, K_{πᵢ(n-1)}(t-1))` only records what lies behind each of *my*
@@ -49,25 +49,28 @@ rounds. In a stable partition, a fixed port `p` with back-port `q` maps each cla
 class, so all classes have the same size `m`. Each source is a union of classes, so `m ∣ gcd = 1`.
 (`theorem_4_2_if_twoSided`, `corollary_4_4_standard`)
 
-### Typos and slips
+### ✏️ Slips
+- Proof of Lemma 3.2: "`Kᵢ(t)` is included in `Kᵢ(s+t)`" is not literally true. The property actually needed is that
+  knowledge at `s+t` determines the knowledge of the run that starts with the same window, which we prove for both
+  models (`lemma_3_2`, `lemma_3_2'`).
 - Proof of Lemma 4.3 (full version): as printed, "port `j` of party `i` goes to
   `((i+j) mod g + ⌈i/g⌉g + ⌈j/g⌉g) mod n`" connects a party to itself whenever `1 < g < n` (e.g. `n = 4`,
   `g = 2`: port 2 of party 1). With floors `⌊i/g⌋`, `⌊j/g⌋` it is a valid port numbering (checked by script
   for `n ≤ 12`), and the argument goes through. The lemma is true; we use other constructions (`lemma_4_3`,
   `lemma_4_3_standard`).
+
+### Typos
 - In the proof of Lemma 3.2, "independent whenever `|s − s'| > t`" should read `≥ t`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 3.2 (zero–one law)
+### 🔧 Lemma 3.2 (zero–one law)
 The proof applies Kolmogorov's zero–one law to `E = ⋃ₛ E_{st}`, which is not a tail event (it contains `E₀`).
 
-**Impact.** Statement true; repaired by a direct counting argument (`lemma_3_2`, `lemma_3_2'`).
+**Impact.** The statement is true, and a direct counting argument replaces the step (`lemma_3_2`, `lemma_3_2'`).
 
 **Details.** The zero–one law is also not needed: disjoint windows are independent, so
-`Pr[no E_{st}, s < m] = (1-p)^m → 0`. Also, "`Kᵢ(t)` is included in `Kᵢ(s+t)`" is not literally true. The
-property actually needed is that knowledge at `s+t` determines the knowledge of the run that starts with the same
-window, which we prove for both models. (`lemma_3_2`, `lemma_3_2'`)
+`Pr[no E_{st}, s < m] = (1-p)^m → 0`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -116,7 +119,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Observation after Def 3.1 (facet ⇒ algorithm) | `exists_algorithm`, `eventuallySolvable_iff_exists_algorithm` | `Algorithm.lean` |
 
 **Not formalized.** Theorem 5.1 (an informal reduction of name-independent tasks with inputs). The
-homotopy-level discussion.
+homotopy-level discussion. The full version's proof of the "if" direction of Theorem 4.2 (Lemmas 4.7–4.8,
+CreateMatching) is an informal sketch; we replaced it with our own argument and did not check it in detail.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity:

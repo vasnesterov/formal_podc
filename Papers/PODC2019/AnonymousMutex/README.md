@@ -6,19 +6,19 @@ Symmetric Deadlock-Free Mutual Exclusion.* PODC 2019. DOI
 [1810.03723](https://arxiv.org/abs/1810.03723) v1 (the only version); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** **Theorem 2 is false**: the read/write algorithm (Algorithm 1) livelocks
-for `n = 4` processes and `m = 5 ∈ M(4)` registers. So the headline tight characterization
-`m ∈ M(n) \ {1}` for read/write anonymous memory is only half established: necessity holds, sufficiency
-does not follow from the paper. Theorems 1, 3, 4 and 5 hold, and the characterization for
-read-modify-write (compare&swap) registers is proved.
+**Verdict: ⚠️ Weakened.** **Theorem 2 is false**: the read/write algorithm (Algorithm 1) livelocks
+for `n = 4` processes and `m = 5 ∈ M(4)` registers. So the tight characterization `m ∈ M(n) \ {1}` for
+read/write anonymous memory is only half established: necessity holds, sufficiency does not follow from
+the paper. Theorems 1, 3, 4 and 5 hold, and the characterization for read-modify-write (compare&swap)
+registers is proved, with a new proof of Theorem 4.
 
 ## Mistakes in the paper
 
-### 🚨 Theorem 2 (Algorithm 1, deadlock-freedom)
+### ❌ Theorem 2 (Algorithm 1, deadlock-freedom)
 Algorithm 1 livelocks: with `n = 4` processes and `m = 5 ∈ M(4)` registers there is a fair execution
 in which all four processes stay in `lock()` forever and nobody enters the CS (`theorem_2_false`).
 
-**Impact.** The headline tight characterization `m ∈ M(n) \ {1}` for read/write anonymous memory is
+**Impact.** The tight characterization `m ∈ M(n) \ {1}` for read/write anonymous memory is
 only half established: necessity holds (`theorem_5`), sufficiency does not follow from the paper.
 Theorems 1, 3, 4 and 5 and the read-modify-write characterization stand.
 
@@ -37,14 +37,17 @@ competing processes have the same view" has the same issue.
 *Scope.* Line 6 says "write into some `x` with `view[x] = ⊥`" without fixing `x`, so Theorem 2 must
 hold for every resolution. The Lean counterexample uses "first `⊥` in the process's local order".
 Since the permutations are adversarial, this covers every "first `⊥` w.r.t. a fixed order of local
-names" rule. Our model checker also finds the livelock when line 6 may pick any `⊥`. Rules that
-inspect the view's contents were not explored and might rescue the algorithm. Bounded exhaustive
-model checking found no livelock for `n = 2` (`m ∈ {3,5,7}`) or `n = 3` (`m ∈ {5,7}`), so
-Algorithm 1 may be correct for `n ≤ 3`; this is not proved.
+names" rule. Our model checker also finds the livelock when line 6 may pick any `⊥`.
 
-### Typos and slips
+### ✏️ Slips
 - §1.3 says `compare&swap(x, old, new)` succeeds "iff `new = v`"; it should be `old = v`. The
   algorithm uses it correctly.
+
+### Typos
+- The proof of Theorem 5 describes the schedule awkwardly via "order(pᵢ, k)" and reuses `ℓ` for the
+  divisor of `m`; the real argument, a lock-step execution preserving a rotational symmetry, is sound.
+  We use `g = gcd(ℓ, m)` processes and rotation permutations; in each round they access different
+  physical registers (`theorem_5`).
 
 ## Proof gaps (statements true)
 
@@ -63,16 +66,6 @@ more registers than `q` owned *simultaneously* at some point of the scan. (2) Le
 eventual maximum number of owned registers; a process owning `c*` registers late never withdraws.
 (3) Once the memory is constant and full, all competitors own equally many registers, which
 contradicts `m ∈ M(n)`. (`theorem_4`)
-
-### 🛠️ Theorem 5 (lower bound `m ∈ M(n)`)
-The proof describes the schedule via "order(pᵢ, k)", but processes do not access registers in a
-fixed order.
-
-**Impact.** Statement true; the real argument, a lock-step execution preserving a rotational
-symmetry, is sound.
-
-**Repair.** We use `g = gcd(ℓ, m)` processes and rotation permutations; in each round they access
-different physical registers. (`theorem_5`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -112,7 +105,10 @@ assignment. So it also yields the read/write necessity result attributed to [15]
 of the read/write characterization, which the paper cites from Burns–Lynch, is proved directly,
 without symmetry.
 
-**Not formalized.** The double-collect implementation of the snapshot.
+**Not formalized.** The double-collect implementation of the snapshot. Whether Algorithm 1 is correct
+under a line-6 rule that inspects the view's contents: such rules were not explored and might rescue
+the algorithm. Whether Algorithm 1 is correct for `n ≤ 3`: bounded exhaustive model checking found no
+livelock for `n = 2` (`m ∈ {3,5,7}`) or `n = 3` (`m ∈ {5,7}`), so it may be; this is not proved.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. The livelock is checked by kernel computation (`decide +kernel`). Both algorithms are

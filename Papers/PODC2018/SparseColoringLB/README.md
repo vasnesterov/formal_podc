@@ -5,15 +5,16 @@ with Fewer Colors.* PODC 2018. DOI [10.1145/3212734.3212740](https://doi.org/10.
 Formalized version: arXiv [1802.05582](https://arxiv.org/abs/1802.05582) v4; numbering follows it.
 Only the lower bounds of §2 are formalized (Observation 2.4, Theorems 2.5, 2.6, 1.5).
 
-**Verdict: ❌ False claim.** **Theorem 2.6 is false as stated for every odd `k ≥ 3`**: the `k × k` grid
-*can* be 3-coloured (even 2-coloured) in `(k-1)/2 < k/2` rounds. The asymptotic statements (Ω(√n) for
-planar bipartite graphs, Theorem 2.5, Theorem 1.5) are correct; we prove them with explicit constants,
-Theorem 2.5 with exactly the paper's bound, and the non-colourability facts the paper cites (Gallai,
-Fisk) for the graphs used.
+**Verdict: 🔧 Easy fix.** Only the lower bounds of §2 were checked, not the paper's main result, the polylog-round
+6-colouring algorithm. There **Theorem 2.6 is false as stated for every odd `k ≥ 3`**: the `k × k` grid *can* be
+3-coloured (even 2-coloured) in `(k-1)/2 < k/2` rounds, and changing one constant saves it. The asymptotic statements
+(Ω(√n) for planar bipartite graphs, Theorem 2.5, Theorem 1.5) are correct; we prove them with explicit constants,
+Theorem 2.5 with exactly the paper's bound (only that exact bound took a new argument), and the non-colourability
+facts the paper cites (Gallai, Fisk) for the graphs used.
 
 ## Mistakes in the paper
 
-### ❌ Theorem 2.6 (3-colouring the `k × k` grid needs `k/2` rounds)
+### 🔧 Theorem 2.6 (3-colouring the `k × k` grid needs `k/2` rounds)
 Theorem 2.6 is false for every odd `k ≥ 3`, `k = 2t + 1`: in `t < k/2` rounds a node can count the nodes at distance exactly `t`, which determines `x + y mod 2`, so the grid can even be 2-coloured (`theorem_2_6_false_odd`, `theorem_2_6_false_3`, …, `theorem_2_6_false_11`).
 
 **Impact.** The error costs one round: the asymptotic content (`Ω(√n)`) is unaffected, and the
@@ -31,23 +32,19 @@ the plane in less than `k/2` rounds."
 - The algorithm is a genuine `t`-round LOCAL algorithm (CSLib's `IsLocal`), and ignores identifiers.
   It is designed for the grid, which the statement allows: like Observation 2.4, from which the
   paper derives it, Theorem 2.6 is about colouring one fixed graph under every identifier assignment
-  (and nodes know `n = k²`). Under a stronger "uniform" reading (an algorithm correct on all planar
-  bipartite graphs needs `k/2` rounds on the `k × k` grid) the counterexample does not apply; that
-  reading is not settled here.
-- For even `k` the paper's bound `r < k/2` is neither proved nor refuted here.
+  (and nodes know `n = k²`).
 - The proof, as written, gives less: balls of radius `< k` of `G_{2k+1,2k+1}` and Observation 2.4
   give `r ≤ k - 2` for the `(2k+1)`-grid, i.e. `2r + 5 ≤ N` for side `N`.
 
 **Repair.** The sharp form of the same argument gives `2r + 3 ≤ N` (`theorem_2_6`), which is optimal
 for odd `N`.
 
-### ⚠️ Observation 2.4 (isomorphic balls)
-"Each ball of `H` is isomorphic to some ball of `G`" must be read with *rooted* isomorphisms (the centre must go to the centre), otherwise the argument fails.
+### ✏️ Slips
+- Observation 2.4: "each ball of `H` is isomorphic to some ball of `G`" must be read with *rooted* isomorphisms (the
+  centre must go to the centre), otherwise the argument fails. Every use in the paper is rooted, and with that reading
+  it is correct (`observation_2_4`).
 
-**Impact.** Imprecise statement with evident intent: with that reading it is correct
-(`observation_2_4`).
-
-### Typos and slips
+### Typos
 - Theorem 2.5 speaks of `H_k`, which is only defined for even `k` (Figure 2).
 - Theorem 1.5's graph is only given by a picture ("versions … clearly exist"); we give an explicit
   family.
@@ -57,7 +54,8 @@ for odd `N`.
 ### 🛠️ Theorem 2.5 (`H_{2ℓ}` needs `ℓ` rounds)
 The proof applies Observation 2.4 to `H = G_{5,2ℓ+1}` (Klein bottle) and `G = H_{2ℓ}`, but `G_{5,2ℓ+1}` has `10ℓ + 5` vertices, more than `H_{2ℓ}` (`10ℓ`), violating the hypothesis `|V(H)| ≤ |V(G)|`.
 
-**Impact.** Statement true; we prove the stated bound `r < ℓ` (`theorem_2_5`).
+**Impact.** The stated bound `r < ℓ` holds (`theorem_2_5`), but saving it takes a different graph, beyond the cited
+Gallai result, and a sharper indistinguishability principle.
 
 **Details.** Also, "balls of radius `< ℓ`" combined with Observation 2.4 (balls of radius `r + 1`)
 only gives `r ≤ ℓ - 2`.
@@ -108,8 +106,12 @@ graph and the non-colourable graph live on the same vertex set and differ only b
 (the twisted edges of the Klein bottle, the cut of the torus); an automorphism or a choice of the
 seam puts it far from the edge being looked at (`ballAgree_of_le`).
 
-**Not formalized.** The algorithmic part (Theorem 1.3, §3–§6) and its corollaries; planarity; the
-upper bound of Gallai's theorem; Fisk's theorem in general (only for our family).
+**Not formalized.** The algorithmic part (Theorem 1.3, §3–§6) and its corollaries; planarity (of the explicit
+families, triangle-freeness of `H_k`, and of the balls of radius `(n-1)/6 - 3` of the Figure 3 graph); the
+upper bound of Gallai's theorem; Fisk's theorem in general (only for our family). Theorem 2.6 for even `k`: the
+paper's bound `r < k/2` is neither proved nor refuted here. Under a stronger "uniform" reading of Theorem 2.6 (an
+algorithm correct on all planar bipartite graphs needs `k/2` rounds on the `k × k` grid) the counterexample does not
+apply; that reading is not settled here.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Finite checks use `decide` / `decide +kernel`. The counterexamples exhibit algorithms,

@@ -5,11 +5,11 @@ PODC 2014. DOI [10.1145/2611462.2611466](https://doi.org/10.1145/2611462.2611466
 [1309.6978](https://arxiv.org/abs/1309.6978) v2 (full version); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** **Theorem 10 is false**: Protocol 6 (Global-Ring) does not construct a spanning ring.
-For `n = 6` there is a globally fair execution in which the network switches forever between a spanning line and a
-spanning ring. The other correctness claims checked hold: Theorems 3, 5, 6, 8, 11, and 12 after an obvious typo
-fix in Protocol 8, plus the state bound of Theorem 7. Theorem 13 also holds, for `c ≥ 3` and with the output
-states we chose. Some of these needed missing details or new proofs. The running-time bounds were not formalized.
+**Verdict: 🛠️ Hard fix.** **Theorem 10 is false**: Protocol 6 (Global-Ring) does not construct a spanning ring, but
+nothing depends on it and the paper's own 2RC (Theorem 11) gives the spanning ring with fewer states. The other
+correctness claims checked hold: Theorems 3, 5, 6, 8, 11, 12 (after a typo fix in Protocol 8, and with a new argument),
+the state bound of Theorem 7, and Theorem 13 for `c ≥ 3`. The running times and the universality half of the paper
+were not checked.
 
 ## Mistakes in the paper
 
@@ -18,9 +18,9 @@ Protocol 6 does not construct a spanning ring: for `n = 6` a globally fair execu
 between spanning lines and a spanning ring, because the closing rule `(l, q₁, 0) → (l', q₁', 1)` can also
 join two *different* lines (`GlobalRing.globalRing_not_constructs`).
 
-**Impact.** A false statement, not a proof gap. The protocol is correct for `n ≤ 5` (exhaustive model
-checking), so `n = 6` is the smallest counterexample. A natural repair is Protocol 7 (2RC), which we prove
-correct.
+**Impact.** The protocol is correct for `n ≤ 5` (exhaustive model checking), so `n = 6` is the smallest
+counterexample. No repair of Protocol 6 is proved. Nothing else in the paper depends on Theorem 10, and the separate
+Protocol 7 (2RC), with 6 states instead of 9, constructs a spanning ring (`TwoRC.twoRC_constructs`).
 
 **Details.** The proof says the closing rule applies "whenever one endpoint is in state `l` and the other
 is in state `q₁`" of the same line. But an `l` endpoint of one line can also meet the `q₁` endpoint of
@@ -44,47 +44,35 @@ forever. This set alternates between spanning lines (path `2–1–0–4–5` wi
 `5`) and the spanning ring `0–1–2–3–5–4–0`, and agent `0` stays `q₁''` forever. Under global fairness
 every one of these configurations recurs, so the output never stabilizes.
 
-### ⚠️ Protocol 8 (kRC, Theorem 12): the non-state `l₀`
-The rule `(l_{k+1}, l_i, 1) → (l_k, l_{i−1}, 0)` for `1 ≤ i ≤ k` produces the non-state `l₀` when
-`i = 1`, and if `l₀` is kept as a dead state the protocol fails (`k = 3`, `n = 5`: a `K₄` plus an
-isolated `l₀`, found by the model checker).
-
-**Impact.** A typo with evident intent: Protocol 7 has `(l₃, l₁, 1) → (l₂, q₀, 0)` at the same place. We
-read `l₀` as `q₀`; with this fix Theorem 12 holds for all `k ≥ 2` and `n ≥ k + 1` (`KRC.kRC_constructs`).
-
-### ⚠️ Theorem 6 (Cycle-Cover): `Q_out` unspecified
-The paper leaves `Q_out` unspecified, and with `Q_out = Q` the claim is false: for `n = 4` the protocol
-can stop at a triangle plus an isolated `q₀`.
-
-**Impact.** With `Q_out = {q₂}` the statement holds: the output stabilizes to a cycle cover on at least
-`n − 2` agents (`CycleCover.constructs_cycleCover`). Waste 2 does occur, for example at `n = 5`
-(`CycleCover.waste_two_attained`).
-
-**Details.** The paper's justification of "waste 2" is a single sentence. Our proof uses the handshake
-lemma to rule out a lone `q₁` hanging on a cycle.
-
-### ⚠️ Theorem 13 (Protocol 9, c-Cliques): `c ∈ {1, 2}` and `Q_out`
-The theorem claims every positive `c`, but Protocol 9 does not make sense for `c ∈ {1, 2}`, and with the
-unspecified `Q_out = Q` the leftover `n mod c` agents form an extra star in the output.
+### 🔧 Theorem 13 (Protocol 9, c-Cliques): `c ∈ {1, 2}`
+The theorem claims every positive `c`, but Protocol 9 does not make sense for `c ∈ {1, 2}`.
 
 **Impact.** With `c ≥ 3` and `Q_out` = states of completed components the theorem holds for every `n`
 (`Cliques.cliques_constructs`).
 
 **Details.** For `c ∈ {1, 2}` indices go out of range, and for `c = 2` there are two contradictory rules
-for `(l₀, l₀, 0)`. The paper's proof is a sketch: it does not treat the release of sub-followers (`f_j`)
-or why merging terminates.
+for `(l₀, l₀, 0)`.
 
-**Repair.** Our proof lets a partial leader of maximal index absorb the others.
+### ✏️ Slips
+- Protocol 8 (kRC, Theorem 12): the rule `(l_{k+1}, l_i, 1) → (l_k, l_{i−1}, 0)` for `1 ≤ i ≤ k` produces the
+  non-state `l₀` when `i = 1`, and if `l₀` is kept as a dead state the protocol fails (`k = 3`, `n = 5`: a `K₄` plus
+  an isolated `l₀`, found by the model checker). Protocol 7 has `(l₃, l₁, 1) → (l₂, q₀, 0)` at the same place. We
+  read `l₀` as `q₀`; with this fix Theorem 12 holds for all `k ≥ 2` and `n ≥ k + 1` (`KRC.kRC_constructs`).
+- Theorem 6 (Cycle-Cover): the paper leaves `Q_out` unspecified, and with `Q_out = Q` the claim is false: for
+  `n = 4` the protocol can stop at a triangle plus an isolated `q₀`. With `Q_out = {q₂}` the statement holds: the
+  output stabilizes to a cycle cover on at least `n − 2` agents (`CycleCover.constructs_cycleCover`). Waste 2 does
+  occur, for example at `n = 5` (`CycleCover.waste_two_attained`).
+- Theorem 13 (c-Cliques): with the unspecified `Q_out = Q` the leftover `n mod c` agents form an extra star in the
+  output. The statement speaks of the completed cliques only, so we take `Q_out` = states of completed components.
+- Theorem 11 needs `n ≥ 3`, which is left implicit (for `n ≤ 2` there is no spanning ring); proved for `n ≥ 3`
+  (`TwoRC.twoRC_constructs`).
 
-### ⚠️ Theorem 11 (2RC) for `n ≤ 2`
-Theorem 11 needs `n ≥ 3`, which is left implicit (for `n ≤ 2` there is no spanning ring).
-
-**Impact.** Degenerate case; proved for `n ≥ 3` (`TwoRC.twoRC_constructs`).
-
-### Typos and slips
+### Typos
 - Protocols 7 and 8 list rules for both orientations of some pairs with different outcomes, e.g.
   `(l₁, l₂, 0)` and `(l₂, l₁, 0)`. This contradicts the convention of Definition 1 but is harmless when read
   nondeterministically.
+- Protocol 9, rule `(l'_i, l'_j, 1) → (l'_{i−1}, l'_{j−1}, 0)`: for `i = 1` or `j = 1` it would produce the non-state
+  `l'₀`. This case is unreachable: our invariant shows it never occurs.
 
 ## Proof gaps (statements true)
 
@@ -92,23 +80,33 @@ Theorem 11 needs `n ≥ 3`, which is left implicit (for `n ≤ 2` there is no sp
 The paper's proof is a single sentence ("almost the same ideas as Theorem 11") and misses that a
 `k`-regular component may have bridges.
 
-**Impact.** Statement true (after the typo fix above); proved with two extra ideas (`KRC.kRC_constructs`).
+**Impact.** Statement true (after the typo fix above); proved with two extra ideas that do not occur in the proof of
+Theorem 11 (`KRC.kRC_constructs`).
 
 **Details.** The component's leader must first walk to a cycle edge before opening. Otherwise the
 component splits and nothing is gained. Also, two `k`-regular components are joined by `(l_k, l_k, 0)`
 and must each drop a cycle edge.
 
-### 🛠️ Theorem 7 (state bound for stars)
+### 🔧 Theorem 6 (Cycle-Cover, waste 2, proof)
+The paper's justification of "waste 2" is a single sentence: it overlooks leftovers such as an isolated `q₀` and never
+rules out a lone `q₁` hanging on a cycle.
+
+**Impact.** Statement true with `Q_out = {q₂}` (`CycleCover.constructs_cycleCover`).
+
+**Repair.** A counting invariant, and the handshake lemma to rule out a lone `q₁` hanging on a cycle.
+
+### 🔧 Theorem 13 (c-Cliques, proof)
+The paper's proof is a sketch: it does not treat the release of sub-followers (`f_j`) or why merging terminates.
+
+**Impact.** Statement true for `c ≥ 3` (`Cliques.cliques_constructs`).
+
+**Repair.** Our proof lets a partial leader of maximal index absorb the others.
+
+### 🔧 Theorem 7 (state bound for stars)
 The proof argues that a one-state protocol that activates edges "ends with a global clique", overlooking
 protocols that also deactivate edges, where the output never stabilizes.
 
 **Impact.** Statement true; our proof covers this case (`Star.star_needs_two_states`).
-
-### 🛠️ Theorem 5 (Fast-Global-Line, correctness)
-The proof only treats the running time; the correctness of Fast-Global-Line is asserted without an
-invariant.
-
-**Impact.** Statement true; our proof supplies the invariant (`FastLine.constructs_spanningLine`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -156,11 +154,14 @@ configuration space this is equivalent to construction (CSLib `globallyFair_iff_
 The invariants used:
 * lines: a forest of paths with one token per component;
 * kRC: degree = state index, plus every component has a leader;
-* stars and cycle covers: simple counting invariants.
+* stars and cycle covers: simple counting invariants;
+* Fast-Global-Line: the paper's proof treats mainly the running time and describes the correctness mechanism without
+  an invariant; our proof supplies one (`FastLine.constructs_spanningLine`).
 
 **Not formalized.**
 * All running-time results: Propositions 1–6, Theorems 1, 2 and 9, and the time parts of Theorems 3–8.
 * Theorem 4 (Intermediate-Global-Line); it was only model-checked, for `n ≤ 6`.
+* Tightness of the waste in Theorem 6 for `n` other than `5`.
 * Replication (Theorem 14) and Section 6 (universality, Theorems 15–19).
 
 **Trust.** The listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.

@@ -5,52 +5,49 @@ Networks.* PODC 2018. DOI [10.1145/3212734.3212767](https://doi.org/10.1145/3212
 Formalized version: arXiv [1805.04778](https://arxiv.org/abs/1805.04778) v2; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The attacks on `A-LEADuni` hold: Lemma 2.4, the success
+**Verdict: ⚠️ Weakened.** The attacks on `A-LEADuni`, the paper's main focus, hold: Lemma 2.4, the success
 characterization (Lemmas 3.3–3.5), Lemma 4.1 (honest origin), Theorem 4.2 (`k ≥ √n`), the Cubic
 Attack (Theorem 4.3, Lemmas 4.4–4.5), Corollary 4.6 (`ε < 1 − 1/n`) and Claim D.1 (`k < n/2`) are
-proved. **Theorem 7.2 (no resilient FLE on `k`-simulated trees) is proved only for `n = 2`**: for
-`n ≥ 3` its proof (Lemma F.3, Corollary F.4) has gaps we could not close, and its status there is
-open. The other problems are edge cases (Corollary 4.6 and Theorem 7.2 fail at the boundary value of
-`ε`; Claim D.1 omits the bound `k < n/2` that the introduction states), a proof gap in Lemma 4.1 and
-slips. Theorem 5.1 (`∜n`-resilience) and Section 6 are not formalized.
+proved. But **Theorem 7.2 (no resilient FLE on `k`-simulated trees) is proved only for `n = 2`**, its
+status for `n ≥ 3` is open, and the claimed equivalence of Fair Leader Election and Fair Coin Toss
+(Theorem 8.1) has a wrong step and no repair. The resilience side was not checked: Theorem 5.1
+(`∜n`-resilience) and Section 6 (`PhaseAsyncLead`) are not formalized.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorem 7.2 for `n ≥ 3` (no resilient FLE on `k`-simulated trees)
+### ❌ Theorem 7.2 for `n ≥ 3` (no resilient FLE on `k`-simulated trees)
 The proof's Lemma F.3 and Corollary F.4 treat `b`, which "simulates the rest of the tree", as a
 processor of the model, but it is not one, so Theorem 7.2 is unestablished for `n ≥ 3`; we prove it
 for `n = 2` (`Trees.thm_7_2_two`).
 
-**Impact.** For `n ≥ 3` the theorem is neither proved nor refuted. The attacks on `A-LEADuni`
-(Sections 3–4) are unaffected.
+**Impact.** For `n ≥ 3` the theorem is neither proved nor refuted, and `n = 2` is only the two-party
+case, none of the claimed generalization to trees. The attacks on `A-LEADuni` (Sections 3–4) are
+unaffected.
 
-**Details.**
-- *Lemma F.3 / Corollary F.4.* The super-node's behaviour toward the leaf depends on how the leaf's
-  messages interleave with internal events. So neither "`a` assures `o` in `P_a` ⇒ `a` assures `o`
-  in `P`" nor "`b` is a dictator" transfers. Also, for a super-node, termination under every fair
-  schedule does not bound the number of messages (ping-pong until a third processor's message
-  arrives), and Lemma F.2 needs such a bound. The same issue affects connected fibres in
-  Corollary F.4.
-- *Reduction to coin toss.* The last step goes through a coin toss (leader parity, Theorem 8.1).
-  The coin can succeed while the election fails: processors may output different leaders of the
-  same parity, so `Pr(coin = 0) ≤ Σ_{i even} Pr(leader = i)` does not follow. The proof also covers
-  only even `n`.
+**Details.** The super-node's behaviour toward the leaf depends on how the leaf's messages interleave
+with internal events. So neither "`a` assures `o` in `P_a` ⇒ `a` assures `o` in `P`" nor "`b` is a
+dictator" transfers. Also, for a super-node, termination under every fair schedule does not bound the
+number of messages (ping-pong until a third processor's message arrives), and Lemma F.2 needs such a
+bound. The same issue affects connected fibres in Corollary F.4.
 
-**Repair.** We prove Lemma F.2 itself, for two processors, in a generalized form: arbitrary output
-sets, finite inputs, and no message bound needed, since it follows from finite inputs
-(`Trees.lemma_F2`). We replace the coin-toss step by a direct lemma: a coalition that forces the
-leader into a proper subset breaks `ε`-`k`-resilience for every `ε < 1/n` and every `n`
-(`Trees.not_resilient_of_assures`). Together they give Theorem 7.2 for `n = 2`, all `1 ≤ k ≤ 2`,
-`ε < 1/n`.
+**Repair.** For `n = 2` only. We prove Lemma F.2 itself, for two processors, in a generalized form:
+arbitrary output sets, finite inputs, and no message bound needed, since it follows from finite inputs
+(`Trees.lemma_F2`). With `Trees.not_resilient_of_assures` (see the next item) this gives Theorem 7.2
+for `n = 2`, all `1 ≤ k ≤ 2`, `ε < 1/n`.
 
-### ⚠️ Theorem 7.2 at the boundary `ε = 1/n`
-For `n = 2` and `ε = 1/n` Theorem 7.2 is false: `K₂` is a 1-simulated tree, and the protocol in
-which one processor draws a bit and both output it is `½`-`1`-resilient
-(`Trees.thm_7_2_boundary_false`).
+### ❌ Theorem 8.1, first direction (also the last step of the proof of Theorem 7.2)
+The step `Pr(coin = 0) ≤ Σ_{i even} Pr(leader = i)` is wrong, because the parity coin can succeed while the election
+fails: processors may output different leaders of the same parity.
 
-**Impact.** An edge case of the stated range `ε ≤ 1/n`: every FLE protocol is `(1 − 1/n)`-resilient
-(see the Corollary 4.6 item), and for `n = 2`, `1 − 1/n = 1/n`. For `n ≥ 3` and `ε = 1/n` the
-status is open.
+**Impact.** The claimed equivalence of Fair Leader Election and Fair Coin Toss is not established. Theorem 8.1 is
+neither repaired nor formalized; its status is unknown, not refuted.
+
+**Details.** The last step of the proof of Theorem 7.2 goes through this coin toss (leader parity), and it also covers
+only even `n`.
+
+**Repair.** For the use in Theorem 7.2 only. We replace the coin-toss step by a direct lemma: a coalition that forces
+the leader into a proper subset breaks `ε`-`k`-resilience for every `ε < 1/n` and every `n`
+(`Trees.not_resilient_of_assures`).
 
 ### ⚠️ Lemma 4.1 (adversarial origin)
 Lemma 4.1 is stated for every coalition whose segments have length `≤ k − 1`, but its attack
@@ -62,41 +59,34 @@ adversary just forwards, so nobody ever sends and the outcome is `FAIL`
 modified attack. We prove the lemma for an honest origin, which is all Theorems 4.2 and 4.3 need
 (`lemma_4_1`).
 
-### ⚠️ Claim D.1 (omits the bound `k < n/2`)
-Claim D.1 claims `Pr(outcome = j) ≤ 1/n` for *every* consecutive coalition, but for `n ≥ 3` the
-block of all processors except the origin forces any outcome by the attack of Lemma 4.1
-(`claim_D_1_false`).
+### 🔧 Theorem 7.2 at the boundary `ε = 1/n`
+For `n = 2` and `ε = 1/n` Theorem 7.2 is false: `K₂` is a 1-simulated tree, and the protocol in
+which one processor draws a bit and both output it is `½`-`1`-resilient
+(`Trees.thm_7_2_boundary_false`).
 
-**Impact.** A missing hypothesis: the introduction presents Appendix D as a proof of the result of
-Abraham et al. for `k < n/2`, and the claim is not used elsewhere. We prove it for `2k + 1 ≤ n`
-and any position of the origin (`claim_D_1`). Consequence: `A-LEADuni` is `0`-`1`-resilient for
-`n ≥ 3` (`isResilient_aLead_one`).
+**Impact.** An edge case of the stated range `ε ≤ 1/n`: every FLE protocol is `(1 − 1/n)`-resilient
+(see Corollary 4.6 under Slips), and for `n = 2`, `1 − 1/n = 1/n`. For `n ≥ 3` and `ε = 1/n` the
+status is open.
 
-**Details.** That block leaves one honest processor; its segment has length `1 ≤ k − 1`. The proof
-needs the honest segment to be longer than the coalition (the text says "length `k > l`", meant as
-`l > k`).
+**Repair.** The condition `ε < 1/n`, under which we prove the case `n = 2` (`Trees.thm_7_2_two`).
 
-### ⚠️ Corollary 4.6 at the boundary `ε = 1 − 1/n`
-Corollary 4.6 is stated for `0 ≤ ε ≤ 1 − 1/n`, but every FLE protocol, in particular `A-LEADuni`,
-is `(1 − 1/n)`-`k`-resilient for every `k` (`corollary_4_6_boundary_false`).
-
-**Impact.** An edge case: Theorems 4.2 and 4.3 themselves use the strict `ε < 1 − 1/n`, and we
-prove the corollary for `ε < 1 − 1/n` (`corollary_4_6`).
-
-**Details.** No deviation can raise an expected rational utility by more than `1 − 1/n`: the
-deviation gets at most `max u`, and the honest run already gets `(1/n)·Σ u ≥ max u / n`.
-
-### ⚠️ Lemma 3.3 (imprecise success characterization)
-Lemma 3.3 says "the execution succeeds iff conditions 1–3", but `outcome` also needs the adversaries
-to terminate with the same output, which conditions 1–3 do not control.
-
-**Impact.** The intended reading is "all honest processors terminate with the same valid output";
-we prove it, and its version for every fair schedule (`lemma_3_3`, `lemma_3_3_run`).
-
-**Details.** Also, "sends `n` messages" should be "at least `n`", and the sums are over the first
-`n` messages.
-
-### Typos and slips
+### ✏️ Slips
+- Claim D.1 claims `Pr(outcome = j) ≤ 1/n` for *every* consecutive coalition, but for `n ≥ 3` the block of all
+  processors except the origin forces any outcome by the attack of Lemma 4.1 (`claim_D_1_false`). That block leaves one
+  honest processor; its segment has length `1 ≤ k − 1`. The proof needs the honest segment to be longer than the
+  coalition (the text says "length `k > l`", meant as `l > k`), and the introduction presents Appendix D as a proof of
+  the result of Abraham et al. for `k < n/2`. The claim is not used elsewhere. We prove it for `2k + 1 ≤ n` and any
+  position of the origin (`claim_D_1`). Consequence: `A-LEADuni` is `0`-`1`-resilient for `n ≥ 3`
+  (`isResilient_aLead_one`).
+- Corollary 4.6 is stated for `0 ≤ ε ≤ 1 − 1/n`, but every FLE protocol, in particular `A-LEADuni`, is
+  `(1 − 1/n)`-`k`-resilient for every `k` (`corollary_4_6_boundary_false`): no deviation can raise an expected rational
+  utility by more than `1 − 1/n`, since the deviation gets at most `max u` and the honest run already gets
+  `(1/n)·Σ u ≥ max u / n`. Theorems 4.2 and 4.3 themselves use the strict `ε < 1 − 1/n`, and we prove the corollary
+  for `ε < 1 − 1/n` (`corollary_4_6`).
+- Lemma 3.3 says "the execution succeeds iff conditions 1–3", but `outcome` also needs the adversaries to terminate
+  with the same output, which conditions 1–3 do not control. The intended reading is "all honest processors terminate
+  with the same valid output"; we prove it, and its version for every fair schedule (`lemma_3_3`, `lemma_3_3_run`).
+  Also, "sends `n` messages" should be "at least `n`", and the sums are over the first `n` messages.
 - Definition 7.1 asks for a graph homomorphism `f` with `{(f(x), f(y)) | (x, y) ∈ E} ⊆ E_T`. A tree
   has no loops, so every connected fibre is a singleton
   (`Trees.IsKSimTreeLiteral.card_fiber_le_one`). The next sentence describes the intended notion (a
@@ -110,11 +100,13 @@ we prove it, and its version for every fair schedule (`lemma_3_3`, `lemma_3_3_ru
 - Appendix C: in the Cubic Attack the zeros are sent only when `count == n−k−lᵢ` after incrementing
   `count`. This never happens if `n − k − lᵢ = 0`, and the attack deadlocks (e.g. `n = 4`, `k = 2`,
   `l = (2, 0)`). Following the text, we send them at wake-up.
-- Proof of Lemma 3.3: the case analysis swaps the numbering of conditions 1 and 2.
 - Proof of Theorem 4.3: `Σ_{i=1}^{k'−1}(k'−1)i` is written `(k'−1)k'(k'+1)/2`; it is
   `(k'−1)²k'/2` (harmless).
 - Proof of Lemma 4.4: "since `l₁ = maxᵢ lᵢ`" does not follow from the relaxed conditions
   `l_k ≤ k−1`, `lᵢ ≤ lᵢ₊₁ + k − 1`; the lemma holds anyway, and our liveness proof does not use it.
+
+### Typos
+- Proof of Lemma 3.3: the case analysis swaps the numbering of conditions 1 and 2.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

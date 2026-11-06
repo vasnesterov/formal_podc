@@ -3,12 +3,11 @@
 Paper: Peluso, Palmieri, Romano, Ravindran, Quaglia, *Disjoint-Access Parallelism: Impossibility, Possibility,
 and Cost of Transactional Memory Implementations*, PODC 2015; Virginia Tech technical report (May 2015) used.
 
-## Statement-level issues and verdict rules
+## Statement-level issues
 
-1. **Lemma 1 is false** (`Lemma1.lemma_1_false`). Rule R1: a false numbered lemma is a statement → ❌. Not a
-   headline result (R5): the abstract presents the impossibility theorems, the algorithm and the lower bounds.
-   Not excused by R4: the paper's model has `Np` processes and Lemma 1 is used in histories with other
-   transactions (Lemma 2, Theorems 1–3). The counterexample uses three processes and two transactional objects.
+1. **Lemma 1 is false** (❌, `Lemma1.lemma_1_false`). The abstract presents the impossibility theorems, the
+   algorithm and the lower bounds, not this lemma. The paper's model has `Np` processes and Lemma 1 is used in
+   histories with other transactions (Lemma 2, Theorems 1–3). The counterexample uses three processes and two transactional objects.
    - Reading of "WDAP" / "disjoint-access": the paper says it uses the definition of [4] (Attiya, Hillel,
      Milani): a path in the conflict graph, whose edges join transactions with intersecting data sets. The
      counterexample TM satisfies the strongest data-set form: concurrently contending transactions have
@@ -25,20 +24,20 @@ and Cost of Transactional Memory Implementations*, PODC 2015; Virginia Tech tech
    - "Concurrent": formalized as "both live at the end of the execution", which implies overlapping intervals.
    - "Contend": a step of each transaction on the same base object, at least one non-trivial (paper's
      definition).
-2. **Theorems 1 and 2 need termination** of solo / isolated write transactions. The paper's definitions of
+2. **Theorems 1 and 2 need termination** (✏️) of solo / isolated write transactions. The paper's definitions of
    obstruction-freedom ("forcefully aborted only if step contention") and weak progressiveness ("can only abort
    if it experiences a conflict") contain no termination requirement; literally, a TM whose write transactions
-   never return satisfies them, and its histories preserve RTO (no committed writer, no version, no edge). Rule
-   R4: the standard definitions (the cited [15] OFTM, [17]) include it, and the proofs use it ("T₂ and T₃ cannot
-   be aborted" is meant as "commit") → ⚠️ at most; the verdict is decided by item 1.
+   never return satisfies them, and its histories preserve RTO (no committed writer, no version, no edge). The
+   standard definitions (the cited [15] OFTM, [17]) include it, and the proofs use it ("T₂ and T₃ cannot
+   be aborted" is meant as "commit").
 3. **Proof gap in Theorems 1 and 2** (🛠️): the proofs rely on Lemma 3, i.e. on Lemmas 1–2, whose proofs only
    consider the two transactions `Tᵢ`, `Tⱼ`; in `H_WRTO`, `T₃` must also be reordered. Repaired: `theorem_1`,
    `theorem_2` via `commute_scenario`.
 4. **Lemma 2** (its non-concurrent case cites Lemma 2 of [4] for "consecutive" transactions, but other
    transactions may run in between; the chain pattern of `chainTM` applies) and **Lemma 3** in general: not
    formalized. Only the instance of Lemma 3 used in the proofs of Theorems 1–2 is proved (`hWRTO_of_run`: under
-   WDAP, WFRO, legal reads and WRTO, `R₄(x)` returns `T₂`'s value). These do not affect the verdict (not checked).
-5. **Theorems 3 and 4, Section 4**: not formalized (do not affect the verdict). Remarks only: Theorem 3's
+   WDAP, WFRO, legal reads and WRTO, `R₄(x)` returns `T₂`'s value). The rest is not checked.
+5. **Theorems 3 and 4, Section 4**: not formalized. Remarks only: Theorem 3's
    `Ω(k·Nₒ)` multiplies an informally argued `Ω(Nₒ)` by `k` with no argument that each version needs a separate
    check; its proof applies Lemma 1 to `Ti*`, `Ti+`, which are not disjoint-access (both connected to `Tro`).
    Theorem 4's "space complexity for each version" is not defined (one unbounded base object can hold a vector

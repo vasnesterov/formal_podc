@@ -5,11 +5,11 @@ Objects.* PODC 2010. DOI [10.1145/1835698.1835723](https://doi.org/10.1145/18356
 version: the authors' copy with the appendix (full proofs of Theorems 1–3); no arXiv version. Copy of the
 paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** Locality (Theorem 1, Lemmas 1–2) and Theorem 2 hold. But the nonblocking part
-of Theorem 1 is false, Lemma 5 is false, and the sufficiency half of Theorem 3 fails: Algorithm 1 is not
-even weakly consistent over an Eventual Consensus layer, and with Eventual Stability read per run (as
-the rest of the layer specification) no implementation over such a layer is eventually linearizable.
-The headline tradeoff (Theorem 4) and Aurora were not formalized.
+**Verdict: ❌ Intent lost.** Eventual Consensus is not shown to suffice for Eventual Linearizability:
+Algorithm 1 is not even weakly consistent over an Eventual Consensus layer, and with Eventual Stability
+read per run (as the rest of the layer specification) no implementation over such a layer is eventually
+linearizable. The nonblocking part of Theorem 1 and Lemma 5 are false as well, while locality (Theorem 1,
+Lemmas 1–2) and Theorem 2 hold. The tradeoff (Theorem 4) and Aurora were not checked.
 
 ## Mistakes in the paper
 
@@ -18,13 +18,9 @@ Algorithm 1 over a layer satisfying Eventual Consensus can return `0` to a read 
 earlier read of `p0` returned `1` written by `swap(1)`, so its history is not weakly consistent
 (`algorithm1_not_weaklyConsistent`).
 
-**Impact.** The proof of "Eventual Consensus is sufficient" fails at its first step. With Eventual
-Stability read per run, sufficiency is false for every implementation, even for a single-writer
-single-reader binary register (`not_eventuallyLinearizable_eCons`). This uses one `t_l` for all
-runs, which the paper requires and its proof of Theorem 2 uses. Read uniformly over runs,
-sufficiency may hold with a repaired algorithm, but then the necessity proof (Lemma 7) yields only a
-per-run stability time. If both `t_l` and the stability time are read per run, sufficiency is not
-refuted; only Algorithm 1 and the proof of Lemma 6 fail. Theorem 2 and the definition of Eventual Consensus as a target are unaffected.
+**Impact.** The proof of "Eventual Consensus is sufficient" fails at its first step, under every
+reading of Eventual Stability. Theorem 2 and the definition of Eventual Consensus as a target are
+unaffected.
 
 **Details.** In the counterexample (`tr₁`), `p1` submits `x = swap(1)`, `p0` submits `o' = read`
 and gets `[x, o']`, so `o'` returns `1`. Then `p0` submits `o = read` and gets `[o, x, o']`, which set
@@ -35,17 +31,28 @@ stable from time 7 on and converges to `[o, x, o']`; all processes are correct. 
 "weak consistency directly derives from the set stability and nontriviality properties" overlooks
 that set stability allows observed operations to move after the new one.
 
-The definitions do not say whether the stability time of Eventual Stability may depend on the run.
-Every other layer property is a property of a run, and Lemma 7 constructs a run-dependent time
-(`t_s > max(t_l, t_d)`, where `t_d` depends on the run). With that reading the proof of Theorem 2
+**Repair.** None formalized. With a uniform stability time, completing `o` after the operations
+observed earlier (rather than at its position in the delivered sequence) restores weak consistency;
+whether the rest of Lemma 6 then goes through is not checked.
+
+### ❌ Theorem 3 and Eventual Stability (the stability time, Lemmas 6–7)
+The definitions do not say whether the stability time of Eventual Stability may depend on the run, and
+no reading gives both halves of Theorem 3: read per run, no implementation over such a layer is
+eventually linearizable, even for a single-writer single-reader binary register
+(`not_eventuallyLinearizable_eCons`).
+
+**Impact.** With Eventual Stability read per run, sufficiency is false for every implementation. This
+uses one `t_l` for all runs, which the paper requires and its proof of Theorem 2 uses. Read uniformly
+over runs, sufficiency may hold with a repaired algorithm, but then the necessity proof (Lemma 7)
+yields only a per-run stability time. If both `t_l` and the stability time are read per run,
+sufficiency is not refuted; only Algorithm 1 and the proof of Lemma 6 fail.
+
+**Details.** Every other layer property is a property of a run, and Lemma 7 constructs a run-dependent
+time (`t_s > max(t_l, t_d)`, where `t_d` depends on the run). With that reading the proof of Theorem 2
 applies verbatim to Eventual Consensus: its layer behaviour becomes stable at the final delivery.
 So no implementation over such a layer has one `t_l` for all runs, which Eventual Linearizability
 requires (`not_eventuallyLinearizable_eCons`). The proof of Lemma 6 is also built on the false
 Lemma 5, and its `t_l = max(t_s, t_p, t_c)` depends on the run through `t_p` and the crash time `t_c`.
-
-**Repair.** None formalized. With a uniform stability time, completing `o` after the operations
-observed earlier (rather than at its position in the delivered sequence) restores weak consistency;
-whether the rest of Lemma 6 then goes through is not checked.
 
 ### ❌ Theorem 1, nonblocking part
 "Eventual Linearizability is nonblocking" is false: in a weakly consistent, `3`-linearizable history
@@ -78,22 +85,23 @@ sequences differ, but (C3) covers only operations submitted by correct processes
 counterexample a faulty process submits `a` and `b`; the common prefix `[c]` contains the only
 operation of a correct process.
 
-### Typos and slips
-- Lemma 3's proof writes `p_j` for `p_i`.
+### ✏️ Slips
+- Definition of Eventual Linearizability and Theorem 2: the definition has no liveness requirement, so
+  literally an implementation that never responds is eventually linearizable and Theorem 2 fails. The
+  proofs use termination ("Let `t_w` be the time when the write operation completes"); with it Theorem 2
+  is proved (`theorem2`).
 - Lemma 4's proof says "`L` only contains completed operations", contradicting (P1); under (P1)
   the pending operation is always in `L`, and totality is not needed.
 - Section 3.2: "every well-formed history has a `t`-permutation for each `t`" needs total operations.
+- Theorem 4's proof puts all messages sent after `σ_{k-1}` into `M_k`, "not received in `σ_k`", but
+  messages inside `Π_m` before `t_k` must be received, or `p_i` could tell `σ_k` from `σ_E1` up to `t_k`.
+- Theorem 4's proof says "Runs `σ_E21` and `σ_E22` are indistinguishable"; it should read `σ_E22` and
+  `σ_E23`.
+
+### Typos
+- Lemma 3's proof writes `p_j` for `p_i`.
 
 ## Proof gaps (statements true)
-
-### 🛠️ Lemma 1, "if" direction (weak consistency is local)
-Reusing `τ_x(i, o)` from `H|x` for `H` violates condition (iii) across objects: `τ(i, o')` of an
-earlier operation on another object is not contained in `τ_x(i, o)`.
-
-**Impact.** Statement true; repaired (`weaklyConsistent_of_restrictX`).
-
-**Repair.** For each object `y`, glue `τ_y` of the last operation of `p_i` on `y` before `o`, and put
-`τ_x(i, o)` last.
 
 ### 🛠️ Lemma 2, "if" direction (`t`-linearizability is local)
 The minimal-cycle argument asserts `o_k <_{H,tmax} o_i <_{H,tmax} o_j`, which does not follow.
@@ -102,6 +110,15 @@ The minimal-cycle argument asserts `o_k <_{H,tmax} o_i <_{H,tmax} o_j`, which do
 
 **Repair.** Merge the `L_x` by a key: the latest invocation time of a late operation at or before
 the operation in its `L_x`. Keys are monotone along each `L_x` and strictly increase along `<_{H,t}`.
+
+### 🔧 Lemma 1, "if" direction (weak consistency is local)
+Reusing `τ_x(i, o)` from `H|x` for `H` violates condition (iii) across objects: `τ(i, o')` of an
+earlier operation on another object is not contained in `τ_x(i, o)`.
+
+**Impact.** Statement true; repaired (`weaklyConsistent_of_restrictX`).
+
+**Repair.** For each object `y`, glue `τ_y` of the last operation of `p_i` on `y` before `o`, and put
+`τ_x(i, o)` last.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -141,7 +158,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 3 sufficiency, per-run Eventual Stability (false) | `not_eventuallyLinearizable_eCons` | `Theorem2.lean` |
 
 **Not formalized.** Theorem 4 (its proof needs one stability time for all runs), Lemma 7 (necessity
-in Theorem 3), Aurora (Section 5.2, Lemmas 8–13).
+in Theorem 3) beyond the run-dependence of `t_s`, Aurora (Section 5.2, Lemmas 8–13) and its use of
+Theorem 3, the remarks of Section 2.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Counterexamples are checked by `decide +kernel` (no `native_decide`). The history layer

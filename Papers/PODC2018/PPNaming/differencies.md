@@ -39,7 +39,7 @@ Source: full version HAL hal-01790517v3 (the PODC 2018 brief announcement has no
    explicitly (`exists_matching`). The phases need not cover all pairs at once: one matching per pair suffices.
 9. **Lemma 2** is proved without the symmetry hypothesis (`lemma2_core`, `lemma2_leader_core`). The paper assumes a
    symmetric protocol, but symmetry is not used.
-10. **Props. 3 and 4** need `P ≥ 2` (degenerate case R2: for `P = 1` naming is trivial). Prop. 4 is proved for
+10. **Props. 3 and 4** need `P ≥ 2` (✏️ degenerate case: for `P = 1` naming is trivial). Prop. 4 is proved for
     arbitrary (`initArb`) and for uniformly initialized mobile agents with an arbitrary leader
     (`initArbLeaderUniform`), under weak and global fairness. The core `prop4_core` only needs, for some mobile
     configuration with homonyms, all leader states to be allowed.
@@ -51,7 +51,7 @@ Source: full version HAL hal-01790517v3 (the PODC 2018 brief announcement has no
 12. **Prop. 6** is proved as stated (existence, `hom m = m`, attraction of every homonym pair, uniqueness of
     the periodic state), assuming correctness for the sizes `P − 1` and `P` and `P ≥ 2`.
 13. **Theorem 11** is proved as stated (and stronger: only the sizes `P − 1`, `P` are used, the leader may have
-    infinitely many states), for `P ≥ 2` (R2: false for `P = 1`). Rule R1: the theorem is true; the gap is in
+    infinitely many states), for `P ≥ 2` (✏️ false for `P = 1`). The theorem is true; the gap is in
     the proof (🛠️, see below).
 14. **Prop. 12** is proved for the leaderless case under weak (unordered) and global fairness, arbitrary
     initialization, all `n ≤ P`. The "with leader" cells of Table 1 (an idle leader) are not formalized. The
@@ -59,18 +59,16 @@ Source: full version HAL hal-01790517v3 (the PODC 2018 brief announcement has no
     lexicographic (holes, hole distance); the paper's argument is also correct.
 15. **Prop. 13** is proved as stated (global fairness, arbitrary initialization, `3 ≤ n ≤ P`). The step "pick a
     unique name `s` with `s + 1 mod P` absent" is proved by counting.
-16. **Table 1 / §1 (⚠️, rule R3).** The summary "no leader, global fairness, symmetric: possible with `P + 1`
+16. **Table 1 / §1 (✏️).** The summary "no leader, global fairness, symmetric: possible with `P + 1`
     states" and "with symmetric rules the norm is `P + 1` states" hold only for `n ≥ 3`. For `n = 2` no
     symmetric leaderless protocol names under any fairness (`not_solvesGlobal_of_card_two`,
-    `not_solvesWeak_of_card_two`). `n = 2` is not degenerate (R2), and the model demands correctness for all
-    `n ≤ P`. The intended version is recoverable from Prop. 13 itself (it says `n > 2`) and the fix is local,
-    so ⚠️ rather than ❌. *Borderline:* one may read the table as merely pointing to Prop. 13 with its
-    hypothesis. We count it as a minor statement issue because §1 restates it as a claim without the restriction.
-    *Review:* ⚠️ confirmed. Taken literally in the paper's model (one protocol for all `n ≤ P`), the cell's
-    true entry is "impossible" for every `P ≥ 2`, and the abstract claims a protocol for every combination, so
-    this is a claim (R1), not mere navigation. `n = 2` is the basic symmetry-breaking instance, not a trivial one
-    (R2 does not apply). R3 applies: the paper's numbered Prop. 13 carries `n > 2` and its proof uses it, so
-    the fix (add `n ≥ 3` to the cell and to §1) is local and recoverable. Not ❌: no numbered statement is false.
+    `not_solvesWeak_of_card_two`). `n = 2` is not degenerate, and the model demands correctness for all
+    `n ≤ P`. One may read the table as merely pointing to Prop. 13 with its hypothesis, but §1 restates it as a
+    claim without the restriction. Taken literally in the paper's model (one protocol for all `n ≤ P`), the
+    cell's true entry is "impossible" for every `P ≥ 2`, and the abstract claims a protocol for every
+    combination, so this is a claim, not mere navigation. `n = 2` is the basic symmetry-breaking instance, not a
+    trivial one. The paper's numbered Prop. 13 carries `n > 2` and its proof uses it, so the fix (add `n ≥ 3` to
+    the cell and to §1) is local and recoverable. No numbered statement is false.
 17. **Prop. 14** is proved as stated (weak and global fairness, all `n ≤ P`).
 18. **Not formalized:** Corollary 7, Lemmas 8–10 (bypassed by the repaired proof of Theorem 11), Theorem 15
     (cited from [6]), Props. 16 and 17 (they depend on the internals of the counting protocol `Count_P` of
@@ -78,7 +76,7 @@ Source: full version HAL hal-01790517v3 (the PODC 2018 brief announcement has no
 
 ## Proofs
 
-19. **Lemma 2, Prop. 4 (proof remark).** The paper's proofs use "after stabilization, a name change is
+19. **Lemma 2, Prop. 4 (🔧).** The paper's proofs use "after stabilization, a name change is
     impossible" (Ce is "terminal"). Under weak fairness this is not immediate: a stabilized *execution* does not
     make its configuration closed. We derive the needed form (a closed named configuration is reachable) from
     correctness via a weakly fair adversary (`exists_stablyGood_of_weaklyFair`). Prop. 4's proof is replaced by

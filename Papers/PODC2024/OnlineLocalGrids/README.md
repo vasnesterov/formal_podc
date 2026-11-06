@@ -7,46 +7,21 @@ Yi-Jun Chang, Gopinath Mishra, Hung Thuan Nguyen, Mingyang Yang, Yu-Cheng Yeh. *
 [2312.01384](https://arxiv.org/abs/2312.01384)).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** Theorem 1.1 (`Ω(log n)` for grids) and Theorem 1.3 (`Ω(√n)` for cylinders and
-tori) are proved, with explicit constants, together with Lemmas 3.3–3.6. No proof step fails, but Theorem 1.3 as
-stated omits that `√n` must be odd (the proof chooses `√n` odd); read as a bound for all large `n`, it is false
-for even `√n`.
+**Verdict: ✏️ Slip.** Theorem 1.1 (`Ω(log n)` for grids) and Theorem 1.3 (`Ω(√n)` for cylinders and tori) are proved,
+with explicit constants, together with Lemmas 3.3–3.6. No proof step fails, and the only labeled mistake is that
+Theorem 1.3 as stated omits that `√n` must be odd, which its proof assumes; read as a bound for all large `n`, it is
+false for even `√n`. The results on `k`-partite graphs (Theorems 1.5, 1.8, 1.10) were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorem 1.3 (and the abstract: parity of `√n` omitted)
-The theorem claims locality `Ω(√n)` for 3-colouring `√n × √n` toroidal and cylindrical grids with no condition on
-`n`, but for even `√n` these graphs are bipartite and the `O(log n)` Online-LOCAL algorithm for bipartite graphs
-(the one behind Corollary 1.2) applies, so it is false if `Ω` is read "for all large `n`".
-
-**Impact.** An imprecise statement: the proof picks `√n` odd, and the correct reading is "for `√n` odd" (or
-"infinitely often"); we prove the general `a × b` form with `b ≥ 3` odd (`theorem_1_3_cylinder`,
-`theorem_1_3_torus`).
-
-**Details.** Outside the proof, only §2.1 (odd-column cylinders/tori are not bipartite) and the closing remark of
-§3.3 (the `Ω(a)` bound for `a × b` grids needs `b` odd) mention parity.
-
-## Proof gaps (statements true)
-
-### 🛠️ Lemma 3.6, Theorem 1.1, Lemma 3.4 (implicit assumptions in the proofs)
-No step fails, but the adversary arguments leave conditions implicit: the margins needed when the discovered
-region is re-embedded, the proper colouring in Lemma 3.6, and the reflections of the second path.
-
-**Impact.** Statements true; we make the assumptions explicit and prove all results.
-
-**Details.**
-- *Re-embedding.* The adversary "adjusts how the discovered region fits into G". This is sound only if moved
-  pieces stay at distance `≥ 2T+2` from everything else and keep their radius-`T` balls away from the grid border
-  (translating a piece that touches the border changes its view). The paper leaves these margins, including all
-  vertical ones, unstated.
-- *Lemma 3.6* only makes sense if the algorithm colours the revealed segment properly (the parity argument of
-  Lemma 3.5 fails otherwise); we state it as "if properly coloured, then a row path with `|b| ≥ k` exists".
-  Concatenating `P_{u,v}`, `P_{v,s}`, `P_{s,t}` silently requires reflecting the second piece so that both large
-  `b`-values point the same way, and the paper never says where `P_{s,t}` is built before being moved.
-- *Theorem 1.1:* "simply reverse the direction of `P_{s,t}`" must be a reflection about the midpoint of its column
-  range, so that `s` stays above `v` and `t` above `u`.
-- *Lemma 3.4* sums cells "inside" a simple cycle, implicitly using a Jordan curve theorem for grids. We avoid it
-  with a potential function and get the stronger statement that every closed walk has `b`-value 0.
+### ✏️ Slips
+- Theorem 1.3 (and the abstract): the theorem claims locality `Ω(√n)` for 3-colouring `√n × √n` toroidal and
+  cylindrical grids with no condition on `n`, but for even `√n` these graphs are bipartite and the `O(log n)`
+  Online-LOCAL algorithm for bipartite graphs (the one behind Corollary 1.2) applies, so it is false if `Ω` is read
+  "for all large `n`". The proof picks `√n` odd, and the correct reading is "for `√n` odd" (or "infinitely often");
+  we prove the general `a × b` form with `b ≥ 3` odd (`theorem_1_3_cylinder`, `theorem_1_3_torus`). Outside the
+  proof, only §2.1 (odd-column cylinders/tori are not bipartite) and the closing remark of §3.3 (the `Ω(a)` bound
+  for `a × b` grids needs `b` odd) mention parity.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -74,6 +49,22 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 1.3, cylinder (`a ≥ 4T+3`, `b ≥ 3` odd) / square | `theorem_1_3_cylinder`, `theorem_1_3_cylinder_square` | `Theorem13.lean` |
 | Theorem 1.3, torus (`a ≥ 4T+4`, `b ≥ 3` odd) / square | `theorem_1_3_torus`, `theorem_1_3_torus_square` | `Theorem13.lean` |
 | Corollary 1.4, Online-LOCAL part (`Θ(√n)`) | `torus_square_tight`, `cylinder_square_tight` | `NonVacuity.lean` |
+
+**Proof remarks.** No step of the paper fails, but its adversary arguments (Lemma 3.6, Theorem 1.1, Lemma 3.4) leave
+conditions implicit: the margins needed when the discovered region is re-embedded, the proper colouring in Lemma 3.6,
+and the reflections of the second path. We make them explicit and prove all results.
+- *Re-embedding.* The adversary "adjusts how the discovered region fits into G". This is sound only if moved
+  pieces stay at distance `≥ 2T+2` from everything else and keep their radius-`T` balls away from the grid border
+  (translating a piece that touches the border changes its view). The paper leaves these margins, including all
+  vertical ones, unstated.
+- *Lemma 3.6* only makes sense if the algorithm colours the revealed segment properly (the parity argument of
+  Lemma 3.5 fails otherwise); we state it as "if properly coloured, then a row path with `|b| ≥ k` exists".
+  Concatenating `P_{u,v}`, `P_{v,s}`, `P_{s,t}` silently requires reflecting the second piece so that both large
+  `b`-values point the same way, and the paper never says where `P_{s,t}` is built before being moved.
+- *Theorem 1.1:* "simply reverse the direction of `P_{s,t}`" must be a reflection about the midpoint of its column
+  range, so that `s` stays above `v` and `t` above `u`.
+- *Lemma 3.4* sums cells "inside" a simple cycle, implicitly using a Jordan curve theorem for grids. We avoid it
+  with a potential function and get the stronger statement that every closed walk has `b`-value 0.
 
 **Constants.** Region length `5^{k+1}T` in Lemma 3.6 can be `2^k(2T+3)`.
 

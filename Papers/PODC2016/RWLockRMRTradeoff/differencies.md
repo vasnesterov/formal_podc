@@ -25,7 +25,7 @@ Extended Abstract, 11 pp.). Numbering follows the paper.
    than the paper's constant bound, so our theorem is stronger. The paper's Concurrent Entering
    says "any reader that executes **at most** `b` steps … enters the CS"; we read it as "a reader
    that has taken `b` steps of its entry section (writers in the remainder section and not
-   stepping) is in the CS", the evident intent (R3; typo).
+   stepping) is in the CS", the evident intent (✏️).
 7. **Deadlock Freedom**: CSLib's `Impl.DeadlockFree` (in every fair client well-formed infinite
    execution, if at time `t` some operation is pending and nobody is in the CS, some operation
    completes later). The paper's version (infinitely many passages complete in every infinite
@@ -53,8 +53,8 @@ Extended Abstract, 11 pp.). Numbering follows the paper.
 
 ## Statements
 
-11. **Lemma 1 is false** (R1: a false numbered lemma; not excused: the fix changes the content of the
-    claim and the paper's proof reasons with the wrong case). In the write-back model, `q` writes `1`
+11. **Lemma 1 is false** (🛠️): the fix changes the content of the claim and the paper's proof reasons
+    with the wrong case. In the write-back model, `q` writes `1`
     to `v`, then `p` writes `1` to `v` (a trivial write, so `F(v)` stays `{q}`, but `p` gets an
     exclusive copy), then `p` reads `v`: expanding, no RMR (`lemma1_false`; same in write-through when
     a write leaves the writer with a valid copy: `lemma1_false_writeThrough`). The proof assumes that
@@ -69,7 +69,7 @@ Extended Abstract, 11 pp.). Numbering follows the paper.
     "steps after which the stepping process is aware of `p`" (awareness *after* the step). Read
     literally (awareness before the step) the statement is false: if `p` writes `1` to `v` and `q`
     then reads `v`, the read of `q` is kept but returns `0` instead of `1` in `E'`. The paper's proof
-    ("this implies that `s_q` should have been removed") uses our reading (R3, evident intent).
+    ("this implies that `s_q` should have been removed") uses our reading (✏️, evident intent).
 14. **Lemma 4** (`lemma4`): stated for any fragment `C₁ ↪ E` that starts with reader `i` in the CS and
     ends with writer `w` in the CS (the paper: the specific `E₂E₃`). The paper writes `⊂` for `⊆`.
 15. **Observation 3**: `exists_E1` (Concurrent Entering) and `solo_returns_of_deadlockFree`.
@@ -78,7 +78,7 @@ Extended Abstract, 11 pp.). Numbering follows the paper.
     `Ω(log (n / f(n)))` with explicit constants: `Rb ≥ log₃(n / f(n)) − log₃ c`. When `n / f(n)` is
     bounded (e.g. `f(n) = n/2`) the asymptotic claim `Rb = Ω(log (n / f(n)))` would require `Rb ≥ 1`
     for large `n`, which the paper's proof does not give (the reader of the last round may not exist
-    when `r = 0`); this degenerate corner is outside the interesting range (R2) and is not formalized.
+    when `r = 0`); this corner is outside the interesting range and is not formalized.
     `theorem5_general`: the same for any number `m ≥ 1` of writers (one of them is used).
 17. **Corollary 6** (`corollary6`): `⌊log₃ n⌋ ≤ Wb + Rb ≤ 2 · max(Wb, Rb)`.
 18. **Corollary 7** is not formalized: it combines `theorem5_general` (which holds for any `m`) with
@@ -86,7 +86,7 @@ Extended Abstract, 11 pp.). Numbering follows the paper.
 
 ## Proofs
 
-19. **Lemma 2, case 1** (proof gap, 🛠️): "if `v` was written to in `σ₂`, then its value after
+19. **Lemma 2, case 1** (proof gap, 🔧): "if `v` was written to in `σ₂`, then its value after
     `Eσ₁σ₂` differs from the expected parameter of all CAS steps of `σ₃`" is false (a write may
     restore the expected value), so one CAS of `σ₃` may succeed. The bound still holds: all CAS steps
     of `σ₃` on `v` expect the value of `v` after `E`, so at most one of them succeeds, and then
@@ -94,11 +94,11 @@ Extended Abstract, 11 pp.). Numbering follows the paper.
 20. **Theorem 5, use of Lemma 1** (🛠️): both uses ("`W₁` performs `O(f(n))` expanding steps",
     "`R_i` executes exactly `r` expanding events … The theorem now follows from Lemma 1") go through
     with `lemma1_count`, applied to the fragments `C₁ ↪ E₂E₃` (writer) and `C₁ ↪ E₂` (reader).
-21. **Theorem 5, expanding steps after reordering** (🛠️): invariant 2 says that readers are *about
+21. **Theorem 5, expanding steps after reordering** (🔧): invariant 2 says that readers are *about
     to* perform expanding steps, but Lemma 2 reorders these steps, and whether a step is expanding
     depends on what was executed before it. Not argued in the paper; true because all poised steps
     are reading steps (read/CAS), during which familiarity sets only grow (`round_expanding`).
-22. **Theorem 5, the steps `σ''`** (🛠️): "let all the readers of `R_j` take steps until they either
+22. **Theorem 5, the steps `σ''`** (🔧): "let all the readers of `R_j` take steps until they either
     return to the remainder section or are about to perform another expanding step" — a
     non-expanding write of one reader can change whether another reader's poised step is expanding.
     `e2_construct` repeats single non-expanding steps until all readers are simultaneously poised on
@@ -118,29 +118,24 @@ Extended Abstract, 11 pp.). Numbering follows the paper.
     are atomic objects with `add`/`read`, as the paper assumes (the `f`-array implementation and its
     `O(log K)` cost are cited, not modelled). One writer: the writers' lock `WL` is omitted and
     `WSEQ` is writer-local. Readers are partitioned by an arbitrary function `grp : Fin n → Fin G`.
-    Line 30 writes `⌊p/f(n)⌋`, intended `⌊p/K⌋` (typo; covered by arbitrary `grp`).
-26. **Line 51 order** (❌, decides the verdict): the literal left-to-right evaluation of
+    Line 30 writes `⌊p/f(n)⌋`, intended `⌊p/K⌋` (✏️; covered by arbitrary `grp`).
+26. **Line 51 order** (🔧): the literal left-to-right evaluation of
     `C[i].read() = W[i].read()` violates Mutual Exclusion (`mutex_violation_literal_order`,
-    `not_mutualExclusion_literal_order`; 3 readers, one group). Not excused by R3: the paper never
+    `not_mutualExclusion_literal_order`; 3 readers, one group). The paper never
     fixes the order, and the proof of Lemma 8 reasons as if both counters were read atomically. With
     `W[i]` read first Mutual Exclusion holds (`mutualExclusion_repaired`, all `n`, all groupings,
     unbounded sequence numbers). Lemma 8, Lemma 9 and the Mutual Exclusion part of Theorem 18 are
-    false as written (R1).
-27. **Line 47** (⚠️, R3): `else if op = WAIT` should be `op' = WAIT`. As written, Deadlock Freedom
+    false as written.
+27. **Line 47** (✏️): `else if op = WAIT` should be `op' = WAIT`. As written, Deadlock Freedom
     fails (`deadlock_literal_line47`, `deadlock_literal_line47_noCS`; one reader) and Mutual Exclusion
     fails (`mutex_violation_literal_line47`; one reader, two writer passages), for either order in
     line 51. Intent recoverable: the branch passes `seq'` (line 41) and the other branch tests `op'`.
-28. **Verdict, borderline call (❌ vs 🚨).** The abstract presents "a family of reader-writer lock
-    algorithms that establishes that the tradeoff is asymptotically tight". We read this as an
-    existential headline (the tradeoff is tight), with the family as its witness: the family as
-    written is wrong, a two-line repair makes Mutual Exclusion provable, but its liveness and RMR
-    bounds are not established here. By R5 an unestablished (not refuted) headline is ❌. If one
-    reads the headline as "Algorithm `A_f` is a correct reader-writer lock with these RMR bounds",
-    it would be 🚨. Independent review concurs with ❌: Section 4 ("we show that the complexity
-    tradeoff … is tight. We do so by presenting a family `A_f`") uses the family as the witness of an
-    existential claim; the repair is a swap of two reads plus the `op'` typo and leaves Lemma 17's RMR
-    count unchanged (same calibration as `NonEquivocationLimits`, PODC 2012). The verdict is ❌
-    independently of this call, by Lemma 1 (item 11).
+28. **Tightness of the tradeoff.** The abstract presents "a family of reader-writer lock
+    algorithms that establishes that the tradeoff is asymptotically tight", and Section 4 ("we show
+    that the complexity tradeoff … is tight. We do so by presenting a family `A_f`") uses the family
+    as the witness of an existential claim. The family as written is wrong. A two-line repair, a swap
+    of two reads plus the `op'` typo, makes Mutual Exclusion provable and leaves Lemma 17's RMR count
+    unchanged, but its liveness and RMR bounds are not established here.
 29. **Lemma 10** (Bounded Exit): proved for every variant (`boundedExit_reader`: from the CS a reader
     reaches the remainder section within 5 own steps; `boundedExit_writer`: within 2). The paper's
     proof refers to the "Bounded Waiting" of `WL`; irrelevant with one writer.
@@ -149,8 +144,8 @@ Extended Abstract, 11 pp.). Numbering follows the paper.
     Lemma 17 (RMR bounds), Observation 4 / multiple writers. Bounded explicit-state model checking
     (`af.py`, `n ≤ 3`, one group, ≤ 2 passages each) of the repaired algorithm found no state in which
     all non-remainder processes are stuck.
-32. **Slips in Section 5 proofs:** Lemma 8 writes `t' < t` where the order is the other way round;
-    Lemma 13's discussion says "read 0 from `W[i]`", meaning `C[i]`.
+32. **Slips in Sections 4 and 5** (✏️): Lemma 8 writes `t' < t` where the order is the other way round;
+    the description of line 14 in Section 4 says "read 0 from `W[i]`", meaning `C[i]`.
 33. **RMR model remark (Lemma 17, not formalized):** the claim that the writer incurs one RMR per
     await in lines 14/21 assumes that failed CAS steps of readers on `WSIG[i]` do not invalidate
     the writer's cached copy; in protocols where every CAS takes the line exclusively, stale

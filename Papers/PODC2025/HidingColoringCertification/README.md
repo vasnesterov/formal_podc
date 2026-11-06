@@ -8,18 +8,16 @@ statements, using the v1 definitions and proofs. Numbering: BA Theorems 4.1–4.
 We also checked the corrected statements of v3 (Feb 2026, retitled "…of Bipartiteness", co-author
 B. Jauregui). Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** The main lower bound, **Theorem 4.2** ("no strong and hiding
-`r`-round LCP for 2-colouring on classes containing an `r`-forgetful graph that is neither an even
-cycle nor of minimum degree 1, no matter the certificate size, even if not anonymous"), is false. It
-fails already for `r = 1`, for *anonymous* LCPs with `O(log n)`-bit certificates, and even on a
-one-graph class. The authors' corrected v3 version (Theorems 2(1), 3(1), 4) is also false. The upper
-bounds hold: Theorem 4.1 and Lemma 3.2 as stated. Theorems 4.3 and 4.4 hold as existence statements,
-but their decoders are wrong: the shatter-point decoder is not strongly sound, and the watermelon
-decoder is not even sound.
+**Verdict: ❌ Intent lost.** The paper's main result, **Theorem 4.2** ("no strong and hiding `r`-round LCP for 2-colouring
+on classes containing an `r`-forgetful graph that is neither an even cycle nor of minimum degree 1, no matter the
+certificate size, even if not anonymous"), is false. It fails already for `r = 1`, for *anonymous* LCPs with
+`O(log n)`-bit certificates, and even on a one-graph class, and the authors' corrected v3 version (Theorems 2(1), 3(1),
+4) is also false. The upper bounds hold, Theorem 4.1 and Lemma 3.2 as stated and Theorems 4.3 and 4.4 as existence
+statements, but the shatter-point decoder is not strongly sound and the watermelon decoder is not even sound.
 
 ## Mistakes in the paper
 
-### 🚨 Theorem 4.2 (no strong and hiding LCP for 2-colouring)
+### ❌ Theorem 4.2 (no strong and hiding LCP for 2-colouring)
 Theorem 4.2 is false already for `r = 1`: a counter modulo `M > 2N` gives a strong, hiding, anonymous LCP with
 `O(log n)`-bit certificates for all bipartite graphs, hidden on the 1-forgetful graph `θ(5,5,5)`
 (`baTheorem42_false`).
@@ -47,18 +45,31 @@ The proof's gap: Lemma 5.3 (v3: Lemma 21) needs the odd closed walk in `V(D,n)` 
 This refutes BA Thm 4.2 for `H` = all bipartite graphs (`baTheorem42_false`) and v3's corrected statement for the
 class `{θ(5,5,5)}` (`v3Theorem4_false`).
 
-### 🚨 Theorem 4.2 for anonymous constant-size LCPs (unjustified restriction of the class)
+### ❌ Theorem 4.2 for anonymous constant-size LCPs (unjustified restriction of the class)
 Theorem 4.2 fails even for anonymous **constant-size** LCPs: the paper's own LCP of Lemma 4.1 is complete on all
 bipartite graphs, strongly sound, and hiding through `P₆ ⊔ K₂` (`baTheorem42Anon_false`).
 
-**Impact.** A second refutation of the headline, caused by a false step of its proof; the authors concede the
+**Impact.** A second refutation of the main lower bound, caused by a false step of its proof; the authors concede the
 quantifier issue in v3 §2.2.4 and add `G ∩ H = ∅`.
 
 **Details.** v1 §5.2 says: "without restriction `H` only consists of `r`-forgetful graphs …, since a strong and
 hiding LCP for `H` is one for every subclass". This is false, because hiding only needs *one* hard instance. So the
 counterexample works for `H` = all bipartite graphs.
 
-### ❌ Theorem 4.3 (shatter-point decoder is not strongly sound)
+### ✏️ Slips
+- Definition of `r`-forgetful (BA, used in Theorem 4.2): it requires every `w ∈ Nʳ(u)` to move away along the path,
+  which is unsatisfiable for `r ≥ 2` (take `w = v₁`: the distance drops from 1 to 0), so BA Theorem 4.2 is vacuous for
+  `r ≥ 2` as written (`not_isForgetful_of_two_le`). v3 Definition 22 fixes this, and for `r = 1` both definitions hold
+  for `θ(5,5,5)`.
+- Lemma 4.1 (δ = 1, part of Thm 4.1), rule "all other neighbours of `⊤` are labelled `β ∈ {0,1}`": the rule works only
+  if `β` is the same for all neighbours; if each neighbour may carry its own colour, a 5-cycle with a pendant node is
+  accepted everywhere (`literalLCP_not_sound`). We prove the lemma with the uniform reading (`theorem_4_1`).
+- `k-col` is defined with colours `{0,…,k}` (k+1 colours).
+- In Lemma 3.2's proof, "proper 2-coloring" should read "k-coloring".
+
+## Proof gaps (statements true)
+
+### 🛠️ Theorem 4.3 (shatter-point decoder is not strongly sound)
 The paper's decoder accepts a 5-cycle: two type-1 nodes `u, u'` attached to the same (rejecting) type-0 node can carry
 different colour vectors `(0,0)` and `(0,1)` (`shatterLCP_not_stronglySound`).
 
@@ -69,7 +80,7 @@ Lemma 4.1 (anonymous hiding) both work (`theorem_4_3`).
 **Details.** `u – w – u' – z' – z – u` is an accepted 5-cycle, with `w` in component 0 and `z, z'` in component 1.
 The proof's step "by 2(c), all neighbours of a type-1 node share the same colour" is false.
 
-### ❌ Theorem 4.4 (watermelon decoder is not sound)
+### 🛠️ Theorem 4.4 (watermelon decoder is not sound)
 The paper's decoder accepts every node of a 5-cycle, because rule 2(b) only asks that *some* entry of a path node
 records the endpoint's port (`watermelonLCP_not_sound`).
 
@@ -80,46 +91,27 @@ hiding on the watermelon `θ(5,5,5)` (`theorem_4_4`).
 `a` stores in its `v₂`-entry the port number that `v₁` uses towards `a`. So `v₁` reads the colour of the wrong edge,
 and every node of the 5-cycle accepts.
 
-### ❌ v3 Theorem 1 ("for any class of bipartite graphs meeting `H`")
-On `{P₃}` an anonymous algorithm colours by degree, so v3 Theorem 1 is false as stated (`v3Theorem1_false`).
+### 🔧 Lemma 4.1 (δ = 1, part of Thm 4.1): soundness argument
+The soundness argument ("since `C` is odd, then `u ∈ V(C)`") proves nothing.
 
-**Impact.** Not a statement of the BA (recorded for completeness); the paper itself makes this observation for
-stars.
-
-### ⚠️ Definition of `r`-forgetful (BA, used in Theorem 4.2)
-The BA definition requires every `w ∈ Nʳ(u)` to move away along the path, which is unsatisfiable for `r ≥ 2` (take
-`w = v₁`: the distance drops from 1 to 0), so BA Theorem 4.2 is vacuous for `r ≥ 2` as written
-(`not_isForgetful_of_two_le`).
-
-**Impact.** Typo-level: v3 Definition 22 fixes this, and for `r = 1` both definitions hold for `θ(5,5,5)`.
-
-### ⚠️ Lemma 4.1 (δ = 1, part of Thm 4.1), rule "all other neighbours of `⊤` are labelled `β ∈ {0,1}`"
-The rule works only if `β` is the same for all neighbours; if each neighbour may carry its own colour, a 5-cycle
-with a pendant node is accepted everywhere (`literalLCP_not_sound`).
-
-**Impact.** Ambiguous rule with evident intent: we prove the lemma with the uniform reading (`theorem_4_1`).
-
-### Typos and slips
-- `k-col` is defined with colours `{0,…,k}` (k+1 colours).
-- In Lemma 3.2's proof, "proper 2-coloring" should read "k-coloring".
-- (v3) `D′(u) ≠ A(v)` mixes names.
-
-## Proof gaps (statements true)
-
-### 🛠️ Lemma 4.1 (δ = 1, part of Thm 4.1): soundness argument and Fig. 4
-The soundness argument ("since `C` is odd, then `u ∈ V(C)`") proves nothing, and Fig. 4's odd cycle in `V(D,4)` uses
-an edge between the views of nodes 3 and 4 that would need a triangle 2-3-4 (`fig4_edge_not_compatible`).
-
-**Impact.** Statement true; repaired (`theorem_4_1`).
+**Impact.** Statement true (`degOneLCP_stronglySoundAll`, `theorem_4_1`).
 
 **Repair.** Strong soundness follows from an explicit 2-colouring: a `⊤` node gets `1-β` and a `⊥` node gets the `β`
-of its `⊤`. Hiding uses three labellings of `P₆ ⊔ K₂` (`theorem_4_1`).
+of its `⊤`.
 
-### 🛠️ Lemma 4.2 (even cycles), hiding argument
+### 🔧 Lemma 4.1 (δ = 1, part of Thm 4.1): Fig. 4
+Fig. 4's odd cycle in `V(D,4)` uses an edge between the views of nodes 3 and 4 that would need a triangle 2-3-4
+(`fig4_edge_not_compatible`).
+
+**Impact.** Statement true (`degOneLCP_anonHiding`, `theorem_4_1`).
+
+**Repair.** Hiding uses three labellings of `P₆ ⊔ K₂`.
+
+### 🔧 Lemma 4.2 (even cycles), hiding argument
 The hiding argument mixes `C₄` and `C₆`, whose views differ in `N`, so the claimed odd cycle is not in any `V(D,n)`
 of the paper's own model.
 
-**Impact.** Statement true; repaired (`lemma_4_2`).
+**Impact.** Statement true (`lemma_4_2`).
 
 **Repair.** A single `C₄` with reflection-symmetric ports suffices: two adjacent nodes get identical anonymous views
 (`lemma_4_2`).
@@ -165,9 +157,13 @@ Full list of differences (including modelling choices and minor imprecisions):
 | Theorem 4.3 (statement true; decoder not strongly sound) | `theorem_4_3`, `shatterLCP_not_stronglySound` | `ShatterWatermelon.lean` |
 | Theorem 4.4 (statement true; decoder not sound) | `theorem_4_4`, `watermelonLCP_not_sound` | `ShatterWatermelon.lean` |
 
+**Later version (v3).** Not statements of the BA, recorded for completeness. On `{P₃}` an anonymous algorithm colours by
+degree, so v3 Theorem 1 ("for any class of bipartite graphs meeting `H`") is false as stated (`v3Theorem1_false`); the
+paper itself makes this observation for stars. In v3, `D′(u) ≠ A(v)` mixes names.
+
 **Not formalized.**
 * Lemma 3.1 (computability of `V(D,n)`).
-* The `r ≥ 2` model.
+* The `r ≥ 2` model, including Lemmas 5.1–5.5.
 * v1 §6: the Ramsey reduction to order-invariant LCPs, and Theorem 6.3, the constant-size
   non-anonymous lower bound. Our counterexamples use `Θ(log n)`-bit or anonymous LCPs, so they do
   not touch Theorem 6.3; its proof relies on Theorem 1.5, whose proof has both gaps above.

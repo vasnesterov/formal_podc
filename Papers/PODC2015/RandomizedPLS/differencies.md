@@ -1,8 +1,7 @@
 # Differences between the formalization and the paper
 
 Paper: M. Baruch, P. Fraigniaud, B. Patt-Shamir, *Randomized Proof-Labeling Schemes*, PODC 2015
-(10-page author copy; the proof of Theorem 3.6 is omitted there). Verdict rules: `verdicts.md` of the
-`formalize-paper` skill.
+(10-page author copy; the proof of Theorem 3.6 is omitted there).
 
 ## Model
 
@@ -32,12 +31,12 @@ Paper: M. Baruch, P. Fraigniaud, B. Patt-Shamir, *Randomized Proof-Labeling Sche
   paper's theorems require the crossing itself to be in `F`, but the proof of Theorem 5.1 applies
   them to a component ("`σ₁(P) ∉ F`, but `C` is a connected component of `σ₁(P)` and `C ∈ F`"). The
   restriction lemmas (`Restrict.lean`) justify this (locality; for probabilities, a marginal lemma).
-  Proof gap in Theorem 5.1, repaired.
+  Proof gap in Theorem 5.1, repaired (🔧).
 
 ## Statement-level issues
 
-1. **Proposition 4.3, Theorem 4.4 and Theorem 4.7 are false when `P(G) = FALSE`** (decided by R1/R3/
-   R4/R5, see "Verdict" below). Theorems 4.4 and 4.7 assume `P(G_s) ≠ P(σ^{ij}₁(G)_s)` (checked on the
+1. **🔧 Proposition 4.3, Theorem 4.4 and Theorem 4.7 are false when `P(G) = FALSE`** (see "Notes on
+   item 1" below). Theorems 4.4 and 4.7 assume `P(G_s) ≠ P(σ^{ij}₁(G)_s)` (checked on the
    rendered page 5). Proposition 4.3's proof also treats "`G_s` is rejected" explicitly, but transfers
    one labelling of `G` to the crossing, while rejection of the crossing concerns all of its
    labellings. Counterexample (`Counterexample.lean`, `Refutations.lean`): windmill `G_r` (hub +
@@ -53,7 +52,7 @@ Paper: M. Baruch, P. Fraigniaud, B. Patt-Shamir, *Randomized Proof-Labeling Sche
    The case `P(G) = TRUE` (the only one used in Section 5) is proved: `prop_4_3`, `thm_4_4`,
    `thm_4_7_correct` (`TwoSided.lean`), and Proposition 4.8 (which the paper states only for
    `P(G) = TRUE`).
-2. **Proposition 4.3 and 4.8: exact constants.** The paper counts `2s` labels of `< log r / 2s` bits
+2. **✏️ Proposition 4.3 and 4.8: exact constants.** The paper counts `2s` labels of `< log r / 2s` bits
    as `< r` bit strings, i.e. as if all labels had exactly `κ` bits ("w.l.o.g. exactly κ bits" in
    Prop. 4.6/4.8). With labels/certificates of *at most* `κ` bits there are `2^(κ+1) − 1` of them. We
    prove `r ≤ (2^(κ+1) − 1)^(2s)` (Prop. 4.3/Thm 4.4, i.e. `κ + 1 ≥ log₂ r / 2s`) and
@@ -66,7 +65,7 @@ Paper: M. Baruch, P. Fraigniaud, B. Patt-Shamir, *Randomized Proof-Labeling Sche
    the message has a length that depends on the label length, and labels of different lengths with
    different field sizes are rejected deterministically.
 4. **Lemma 3.4 / Corollary 3.5** (`Universal.lean`): Lemma 3.4 is cited by the paper. Our universal
-   scheme needs three assumptions implicit in the paper's model (R4): connected configurations,
+   scheme needs three assumptions implicit in the paper's model: connected configurations,
    distinct identities in the states, and `P` invariant under port-preserving isomorphisms
    (`Config.Iso`); states are encoded injectively with `≤ k` bits. Label bound
    `2 log n + 4 + 2n(4k+3) + 4(2 log n + 3) Σ deg = O(nk + m log n)`; the paper's
@@ -80,12 +79,12 @@ Paper: M. Baruch, P. Fraigniaud, B. Patt-Shamir, *Randomized Proof-Labeling Sche
 
 ## Proof-level issues (true statements)
 
-6. **Proposition 4.6 proof.** It rounds the *joint* distribution of the `2s` certificates of a copy,
+6. **🔧 Proposition 4.6 proof.** It rounds the *joint* distribution of the `2s` certificates of a copy,
    but Eq. (6) uses that a single arc's *marginal* is `ε`-close; equal joint roundings only give
    marginal closeness `ε·2^((2s−1)κ)`. With the chosen `ε = 1/(12s·2^(2sκ))` the total error is still
    `4s · 2^κ · ε · 2^((2s−1)κ) = 1/3`, so the argument survives after correcting Eqs. (6)–(8). We round
    every arc's distribution separately. Also "w.l.o.g. exactly κ bits" (see 2).
-7. **Theorem 5.1** applies Theorem 4.7 to a connected component of the crossing, outside the
+7. **🔧 Theorem 5.1** applies Theorem 4.7 to a connected component of the crossing, outside the
    theorem's hypotheses (see "Refuted crossings" above); repaired by the restriction lemmas.
 8. **Theorem 5.1** is stated for MST; we formalize acyclicity (the predicate its lower-bound proof
    uses) on lines/cycles (`LinesCycles`; as for Theorems 5.2–5.6 the lower bounds are stated for every
@@ -104,31 +103,29 @@ Paper: M. Baruch, P. Fraigniaud, B. Patt-Shamir, *Randomized Proof-Labeling Sche
    function of `n`.
    * Copies are `{v_{3k+1}, v_{3k+2}}`, `k < ⌊n/3⌋` (resp. `⌊c/3⌋`), one more copy than the paper's
      range; the paper's ranges are consistent.
-   * **Theorem 5.4: printed `H_1 = G_e{v₀, v₁}` is not independent** of the other copies (`v₀` is
-     adjacent to all nodes; `printed_H1_not_independent`). Typo with evident intent (R3: `{v₁,v₂}` as
-     in Theorem 5.2), local fix → at most ⚠️-level, inside a proof (R1: proof-level).
+   * **✏️ Theorem 5.4: printed `H_1 = G_e{v₀, v₁}` is not independent** of the other copies (`v₀` is
+     adjacent to all nodes; `printed_H1_not_independent`). Typo with evident intent (`{v₁,v₂}` as
+     in Theorem 5.2), inside a proof.
    * Theorem 5.4: the claim "every simple cycle of the crossing has `< c` nodes" is proved via a
      cut-vertex/block argument (`cycle_support_of_cut`); the paper only asserts it.
-   * Theorem 5.6: the graph is a chain of `m` cycles of `c` nodes (`n = m·c`); the paper's "except one
+   * ✏️ Theorem 5.6: the graph is a chain of `m` cycles of `c` nodes (`n = m·c`); the paper's "except one
      of at most `c` nodes" is not a cycle when 1–2 nodes are left over.
 
-## Verdict reasoning
+## Notes on item 1
 
-* Proposition 4.3 and Theorems 4.4, 4.7 are false as printed (item 1). Not excused by R3/R4: the
+* Proposition 4.3 and Theorems 4.4, 4.7 are false as printed (item 1). The
   paper explicitly states the general condition `P(G) ≠ P(σ(G))`, and Proposition 4.3's proof
   explicitly (and wrongly) argues the rejected case. The counterexample satisfies every hypothesis of
   the paper's model (connected networks, distinct identities, port-preserving independent copies).
 * **Is "`G` legal" a standing assumption? No.** Propositions 4.6 and 4.8 explicitly assume
   `P(G_s) = TRUE`, while Proposition 4.3 has no legality hypothesis and its proof argues the case
   "`G_s` is rejected" explicitly, and Theorems 4.4 and 4.7 ask only `P(G_s) ≠ P(σ(G)_s)`. The
-  authors distinguished the two forms, so R4 does not excuse it. For Theorem 4.7 alone one could
-  argue R3 (it is announced as a corollary of Proposition 4.6, which assumes `P(G) = TRUE`), but
-  Proposition 4.3 and Theorem 4.4 are argued with the general version, which R3 does not excuse.
-* **Borderline ❌ vs 🚨 (R5).** The abstract's primary claim is the exponential saving of randomization
+  authors distinguished the two forms. For Theorem 4.7 alone one could argue that legality is meant
+  (it is announced as a corollary of Proposition 4.6, which assumes `P(G) = TRUE`), but
+  Proposition 4.3 and Theorem 4.4 are argued with the general version.
+* **Role in the paper.** The abstract's primary claim is the exponential saving of randomization
   (Theorem 3.1, Corollary 3.5), which is correct. The crossing technique is introduced "In addition"
   (abstract and contributions), and is correct in the form used everywhere in the paper
-  (`P(G) = TRUE`). We therefore treat Theorems 4.4/4.7 as secondary results: **❌ False claim**. Even
-  if the lower-bound technique is counted as a co-equal headline, what the abstract claims is that
-  the technique exists and applies to deterministic and randomized schemes; that claim survives in
-  the `P(G) = TRUE` form, which yields every bound of Section 5. Only the over-general formal
-  statements are false, so R5 still gives ❌ rather than 🚨.
+  (`P(G) = TRUE`). What the abstract claims of it is that the technique exists and applies to
+  deterministic and randomized schemes; that claim survives in the `P(G) = TRUE` form, which yields
+  every bound of Section 5. Only the over-general formal statements are false.

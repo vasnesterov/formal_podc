@@ -26,7 +26,7 @@ PODC 2022 (brief announcement), full version arXiv:2207.11198v1.
    - Processes `0` and `n-1` are a local minimum and a local maximum; they set `r ← ∞` at time 1 and
      never change `X` again.
    - Lean: `theorem_4_4_false`, `theorem_4_4_false_all`, `alg3_not_waitFree_of`.
-   - So the headline claim of the paper (wait-free 5-colouring of all cycles in `O(log* n)` rounds)
+   - So the paper's main result (wait-free 5-colouring of all cycles in `O(log* n)` rounds)
      is not established. Its proof is also built on Lemma 3.13 (via Lemmas 4.8–4.10 and the proof of
      Theorem 4.4).
    - We do not claim that wait-free 5-colouring of `C_n` is impossible; only the algorithms fail.
@@ -38,7 +38,7 @@ PODC 2022 (brief announcement), full version arXiv:2207.11198v1.
      prove and use: `fresh_of_conflict`, specialised to Algorithm 1.
    - It is used only inside proofs, so this is not a gap in a main result.
 
-## Proof gaps (statements true)
+## Proofs replaced or repaired (statements true)
 
 5. **Theorem 3.1.**
    - The statement is proved (`theorem_3_1`), with the sharper bound `max(4, n)` instead of

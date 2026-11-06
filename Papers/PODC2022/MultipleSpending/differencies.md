@@ -2,13 +2,13 @@
 
 Paper: J. P. Bezerra, P. Kuznetsov, *How to Tame Multiple Spending in Decentralized
 Cryptocurrencies*, PODC 2022 (brief announcement); full version arXiv:2205.14076v1, whose numbering
-we follow. Verdict rules: `../../../.claude/skills/formalize-paper/verdicts.md`.
+we follow.
 
 ## Statement-level issues
 
-1. **Theorem 5.1 is false** (R1 statement; R5 headline: the abstract and introduction present "the
+1. ⚠️ **Theorem 5.1 is false** (the abstract and introduction present "the
    optimal spending number is precisely the inconsistency number" as a main contribution, and the
-   lower bound is half of it; not excused by R2–R4 because the repaired bound is a different
+   lower bound is half of it; the repaired bound is a different
    quantity). The proof takes the source `r ∈ F` for the faulty set `F` of a graph `G_{F,S}` of
    maximum independence number, but nothing guarantees that such an `F` contains the source.
    * `theorem_5_1_false` (`Broadcast.lean`): uniform model `n = 3`, `q = 1`, `f = 1`; `λ = 3`
@@ -26,15 +26,14 @@ we follow. Verdict rules: `../../../.claude/skills/formalize-paper/verdicts.md`.
      `∅ ∈ F` (Integrity applies to the failure-free Local-Progress runs only if they comply with
      `F`); it follows from inclusion-closure, and without it the bound fails
      (`lower_bound_needs_empty_mem`). It also uses `p ∈ S(p)`, which follows from Local Progress.
-2. **Theorem 5.1 also needs a per-value Local Progress** (R3-borderline; recorded, does not change
-   the verdict). The proof needs the values `m_1, …, m_k` delivered in the Local-Progress executions
+2. 🔧 **Theorem 5.1 also needs a per-value Local Progress.** The proof needs the values `m_1, …, m_k` delivered in the Local-Progress executions
    to be distinct, but Local Progress only promises that `p` delivers *some* value.
    `WeakLP.theorem_5_1_needs_localProgressAll` (`WeakLocalProgress.lean`): three processes, the
    source is faulty in the unique maximizing faulty set (`k_max = λ_s = 2`), and an algorithm that
    lets a process deliver a default value alone (other values only with help from outside its
    quorum) satisfies the paper's Local Progress and is a `1`-CB. Intended version (per-value) is
-   recoverable from the proof ("`k` different values"), so on its own this would be R3 ⚠️.
-3. **Optimality claim "Theorems 5.1 and 5.2 imply that Algorithms 1 and 2 implement the k-SAT
+   recoverable from the proof ("`k` different values").
+3. ⚠️ **Optimality claim "Theorems 5.1 and 5.2 imply that Algorithms 1 and 2 implement the k-SAT
    abstraction with optimal k"** (end of §5) is false as a consequence of 1. Moreover the paper's own
    algorithm does better than `k_max`: only faulty issuers multiply spend
    (`spend_le_one_of_correct`), and a faulty issuer `r` spends at most `λ(Q, {B})` times, `B` the
@@ -42,23 +41,23 @@ we follow. Verdict rules: `../../../.claude/skills/formalize-paper/verdicts.md`.
    `q = 1`, `f = 1` model (`k_max = 3`) every run has spending number `≤ 2`;
    `algorithms_no_double_spending_pairsT`: in the four-process model of `theorem_5_1_false'`
    (`k_max = 2`) the spending number is `≤ 1`.
-4. **Theorem 3.6** lacks the hypotheses `f < q ≤ n` (R4 ⚠️: the formula's denominator `q − f`
+4. ✏️ **Theorem 3.6** lacks the hypotheses `f < q ≤ n` (the formula's denominator `q − f`
    is `≤ 0` otherwise, so a reader assumes `q > f`; all uses, e.g. Table 1, satisfy it).
    `theorem_3_6` proves the paper's formula under `f < q ≤ n`; `inconsistencyNumber_uniform` gives
    the value for all `f` (`⌊(n−m)/(q−m)⌋`, `m = min(f, q−1)`); `theorem_3_6_needs_q_gt_f` shows the
    value `n − q + 1` for `q ≤ f`.
-5. **Accuracy (§4.2) is stated as "verify-acc(AC, P) returns true iff AC ⊆ F"**: the "if"
+5. ✏️ **Accuracy (§4.2) is stated as "verify-acc(AC, P) returns true iff AC ⊆ F"**: the "if"
    direction is impossible for a run-independent function (`Setup.accuracy_iff_impossible`). Evident
-   intent "only if" (R3 typo); we prove that (`accused_byzantine`).
+   intent "only if"; we prove that (`accused_byzantine`).
 6. **Lemma 4.4 / Definition 3.4 when some process has no quorum**: then there is no quorum map,
    `𝒢_{Q,F}` is empty and `k_max = max ∅` is undefined (in Lean `sSup ∅ = 0`). We assume
-   `HasQuorums` (R2: degenerate). The protocol theorems also assume `SelfMem` (`p ∈ Q` for
+   `HasQuorums` (a degenerate corner, not listed as a mistake). The protocol theorems also assume `SelfMem` (`p ∈ Q` for
    `Q ∈ Q(p)`), a standing assumption of §2; without it a process with an empty quorum accepts
    anything and Integrity fails.
 
 ## Proof-level issues (statements true)
 
-* **Theorem 3.6 proof** only fixes a faulty set of size exactly `f` (smaller `F` need the
+* 🔧 **Theorem 3.6 proof** only fixes a faulty set of size exactly `f` (smaller `F` need the
   monotonicity of `(n−x)/(q−x)`, `le_div_of_mul_max_le`) and only proves the upper bound: the
   construction attaining `⌊(n−f)/(q−f)⌋` (disjoint blocks of `q − f` correct processes plus all of
   `F`) is not given. Both added.
@@ -69,7 +68,7 @@ we follow. Verdict rules: `../../../.claude/skills/formalize-paper/verdicts.md`.
   inputs of `w`'s transactions (Validity), these input sets are disjoint (No-Conflict) and inside
   `T` (Completeness). Cycle-Freedom is not needed.
 * **Theorem 5.2** (k-SAT implements k-CB) is not formalized. Its proof writes `deliver(m)` for a
-  transaction carrying `m'` (typo), and to transfer the lower bound of Theorem 5.1 to k-SAT one also
+  transaction carrying `m'` (✏️), and to transfer the lower bound of Theorem 5.1 to k-SAT one also
   needs Local Progress for the derived broadcast, which is not discussed.
 
 ## Typos and slips
@@ -77,12 +76,12 @@ we follow. Verdict rules: `../../../.claude/skills/formalize-paper/verdicts.md`.
 * Example 3.1: `F = {{p₃}}` is not inclusion-closed (we check both `{∅, {p₃}}` and `{{p₃}}`;
   answer `2` in both cases, `example_3_5`, `example_3_5_literal`); `Q(p₃) = {{p₁,p₂,p₄}}` violates
   `p ∈ Q` (`example_3_1_not_selfMem`); irrelevant for the claim.
-* Algorithm 1 line 5 verifies the REQ signature with the *sender's* key `p_j` and then stores the
+* ✏️ Algorithm 1 line 5 verifies the REQ signature with the *sender's* key `p_j` and then stores the
   pair as a request signed by `tx.s`; read literally, a Byzantine `p_j` can make a correct process
   store and echo a "request" of a correct issuer and accuse it (lines 26–31 add accusations without
   `verify-acc`). The text says `σ` is a signature of `tx.s`; we model a REQ as valid only when it
   comes from the issuer.
-* Algorithm 2 line 26 must require `tx ≠ tx'` (otherwise every transaction with a nonempty input
+* ✏️ Algorithm 2 line 26 must require `tx ≠ tx'` (otherwise every transaction with a nonempty input
   set yields an accusation of its issuer); the text says "distinct transactions".
 
 ## Modelling choices
@@ -121,7 +120,7 @@ we follow. Verdict rules: `../../../.claude/skills/formalize-paper/verdicts.md`.
 ## Liveness (Lemmas 4.5–4.7, Agreement)
 
 * All proved (`agreement`, `lemma_4_5`/`conviction`, `lemma_4_6`, `lemma_4_7`), assuming `SelfMem`.
-* **Lemma 4.7 (Validity)** needs three assumptions the paper only uses implicitly (R4 ⚠️, recorded):
+* ✏️ **Lemma 4.7 (Validity)** needs three assumptions the paper only uses implicitly:
   `HonestIssuers` ("since p is correct, it will not send conflicting requests"), the issued
   transaction is valid (§4.3: "transactions issued by correct processes are always valid", not in
   the problem statement), and the issuer has accepted all inputs of `tx` (the proof: "p must have

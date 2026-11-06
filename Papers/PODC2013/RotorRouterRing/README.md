@@ -5,54 +5,76 @@ Deterministic Alternative to Parallel Random Walks.* PODC 2013. DOI
 [10.1145/2484239.2484260](https://doi.org/10.1145/2484239.2484260). Formalized version: the full version
 HAL hal-00735113v2 (September 2014, 28 pp.); numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The delayed-deployment technique (Lemmas 2.1–2.3, the slow-down lemma) is correct
-on every graph. The best-case lower bound (Theorem 3.7, cover time `Ω((n/k)²)` for every start set) is true; we
-prove it with a new argument and explicit constant, for `n ≥ 8k` instead of `n ≥ 440k²`. Two lemmas are false as
-stated. Lemma 3.1 is contradictory because of a misprinted identity, which the proof of Theorem 3.2 then uses.
-The first property of Lemma 2.4 fails when two agents cross on an edge. The upper bounds (Theorems 3.2, 3.4,
-3.5) and the return-time result (Theorem 4.1) are not formalized. So the headline `Θ(n²/log k)` worst case rests
-on the misprinted Lemma 3.1 (plausibly true, needs the corrected lemma and a reworked deployment), and the
-headline `O((n/k)²)` best-case upper bound (Theorem 3.5) has a proof gap; neither is established here.
+**Verdict: ❌ Intent lost.** The proofs of Theorem 3.2 (worst case `Θ(n²/log k)`) and Theorem 3.5 (best-case upper
+bound `O((n/k)²)`) are broken and nothing we proved repairs them; neither statement is refuted, but neither is
+established here. Of the range the paper claims, only the best-case lower bound stands: Theorem 3.7 (cover time `Ω((n/k)²)` for
+every start set) is true, and we prove it with a new argument and explicit constant, for `n ≥ 8k` instead of
+`n ≥ 440k²`. The delayed-deployment technique (Lemmas 2.1–2.3, the slow-down lemma) is correct on every graph, while
+Theorem 3.4 and the return-time result (Theorem 4.1) were not checked.
 
 ## Mistakes in the paper
 
-### ❌ Lemma 3.1 (the sequence `a_i`, identity (4))
+### ❌ Theorem 3.2, proof (worst case `Θ(n²/log k)`, Phase B and final bound)
+The deployment and its analysis use the misprinted identity (4) of Lemma 3.1 (`g_i ≈ 2 a_i a_k k⁴ a₁`,
+`S_{j+1} = S_j + ⌈k⁴ a₁ a_k⌉ + 12k`), and the last step goes from `B₁ ∈ Θ(n²/a₁)` with `a₁ = Θ(1/H_k)` to
+`Θ(n²/log k)`, although that would really be `Θ(n² log k)`.
+
+**Impact.** The worst-case bound of the abstract is not established. The statement is not refuted and looks true with the
+corrected lemma, but Theorem 3.2 is not formalized here.
+
+**Details.** The two errors cancel: with the corrected identity the computation gives `Θ(n² a₁) = Θ(n²/log k)` as
+claimed. But the Phase B deployment itself is defined with the step `⌈k⁴ a₁ a_k⌉`, so a correct proof needs a redefined
+deployment, with steps of about `2k⁴ a_k / a₁`. That deployment is not in the paper, and we did not check that the
+proof works with it.
+
+**Repair.** None proved. It needs the corrected lemma (`lemma_3_1_corrected`) and a reworked deployment.
+
+### ❌ Theorem 3.5, proof (best-case upper bound `O((n/k)²)`)
+The deployment is inconsistent: an agent "returns to `q_i`" after each step, but `q_i`'s pointer then points left, so
+the next step cannot start "to the right"; also, two of the `q_i` may coincide, and two agents on one node then leave
+in opposite directions.
+
+**Impact.** The best-case upper bound of the abstract is not established; Theorem 3.5 is not formalized here.
+
+**Details.** Simulation with hill-climbing over pointer initializations finds cover times `≤ 1.25 (L+1)²` for gaps
+`L ∈ {3, 5, 8}` and up to 32 agents (16 for `L = 8`), so the statement looks true.
+
+**Repair.** None proved. A rigorous proof needs the domain-size dynamics.
+
+### 🔧 Lemma 3.1 (the sequence `a_i`, identity (4))
 No sequence satisfies (1)–(4) for any `k ≥ 2`: summing (4) `a_i · a₁ = 2/a_i − 1/a_{i−1} − 1/a_{i+1}` over
 `i = 1..k` telescopes to `a₁ Σ a_i = 1/a₁`, so (3) `Σ a_i = 1` forces `a₁ = 1`, which is impossible
 (`lemma_3_1_false`).
 
 **Impact.** The intended identity is `a_i / a₁ = …`, which is what the lemma's own construction gives
-(`a_i = 1/(c b_i)`, `a₁ = 1/c²`). With it, all six properties hold for every `k ≥ 2`
-(`lemma_3_1_corrected`). But the proof of
-Theorem 3.2 computes with the misprinted form. It obtains `B₁ ∈ Θ(n²/a₁)`, and then, with `a₁ = Θ(1/H_k)`,
-writes `Θ(n²/log k)`. That would really be `Θ(n² log k)`. Two slips cancel; with the corrected identity the
-computation gives `Θ(n² a₁) = Θ(n²/log k)` as claimed. Theorem 3.2 is not formalized here.
+(`a_i = 1/(c b_i)`, `a₁ = 1/c²`). The fix is a one-symbol change visible in the lemma's proof, but a later proof, that
+of Theorem 3.2, reasons with the wrong version.
 
 **Details.** The telescoping uses `1/a₀ = 0` (property (1), `a₀ = +∞`) and `a_{k+1} = a_k` (property (2)).
 The right-hand sides sum to `1/a₁ + 1/a_k − 1/a_{k+1} = 1/a₁`. Only (1)–(4) and positivity are used; (5)
-and (6) are irrelevant. The borderline between ❌ and ⚠️ is discussed in [differencies.md](differencies.md):
-the fix is a one-symbol change visible in the lemma's proof, but a later proof reasons with the wrong version.
+and (6) are irrelevant.
 
-### ⚠️ Lemma 2.4 (agent domains on the ring, first property)
-In a deployment where no two agents ever share a node, a domain need not be a sub-path: on the 6-ring, agents
-on `0` and `3` with pointers `0→1, 1→2, 2→1, 3→2` swap along the edge `{1, 2}` in round 2, giving
-the agent that started on `0` the domain `{0, 2}` after round 2 (`lemma_2_4_false`; both agents are stopped afterwards).
+**Repair.** With the intended identity, all six properties hold for every `k ≥ 2` (`lemma_3_1_corrected`).
 
-**Impact.** The intended hypothesis also excludes agents passing each other on an edge, as the proof of
-Theorem 4.1 says explicitly ("no two agents meet or pass each other on an edge"). Alternatively a swap can be
-re-read as two bounces, since agents are indistinguishable. A label-free form of the domain picture holds in
-the undelayed system for every initialization (`pattern_invariant`). The lemma is stated without proof and is
-used by Lemmas 2.5–2.9, which are not formalized.
-
-### Typos and slips
+### ✏️ Slips
+- Lemma 2.4, first property: in a deployment where no two agents ever share a node, a domain need not be a sub-path.
+  On the 6-ring, agents on `0` and `3` with pointers `0→1, 1→2, 2→1, 3→2` swap along the edge `{1, 2}` in round 2,
+  giving the agent that started on `0` the domain `{0, 2}` after round 2 (`lemma_2_4_false`; both agents are stopped
+  afterwards). The intended hypothesis also excludes agents passing each other on an edge, as the proof of Theorem 4.1
+  says explicitly ("no two agents meet or pass each other on an edge"). Alternatively a swap can be re-read as two
+  bounces, since agents are indistinguishable. A label-free form of the domain picture holds in the undelayed system
+  for every initialization (`pattern_invariant`). The lemma is stated without proof and is used by Lemmas 2.5–2.9,
+  which are not formalized.
+- Abstract and Theorem 3.2: `Θ(n²/log k)` is meaningless for `k = 1`, which the abstract includes
+  ("`1 ≤ k < n^{1/11}`").
 - Proof of Lemma 2.1, equation (4) (and the recurrence in the proof of Lemma 2.2): the arrivals up to round
   `t + 1` must use the exits `e_v(t + 1)`, not `e_v(t)` (cf. equation (2)). The lemma is unaffected.
 - Lemma 2.8: "holds for `2n²` consecutive time steps `t, …, t + n² − 1`".
 - Proof of Lemma 3.6: step (a) uses windows of length `r(n/k)` and step (c) jumps by `r(n/k)`, while step (b)
   and the definition of good vertices use `r(n/(10k))`.
-- Lemma 2.5 is stated with the constants `22k` and `11k`. Theorem 3.7 applies it with initial interiors
-  `n/(20k)` and needs the scaled conclusion `Ω(n/k)`. The proof of Lemma 2.5 only supports a loss of `11k`
-  (the "minimum configuration" `22k, 22k − 11, …`), i.e. `M − 11k ≥ M/2`.
+
+### Typos
+- Proof of Lemma 2.1: the notation switches between `port_v(u)` and `port_u(v)`.
 
 ## Proof gaps (statements true)
 
@@ -68,7 +90,9 @@ before time `n²/(8192 k²)`.
   negative initialization of Lemma 2.5, where an agent entering a new node is sent back;
 - concludes "by Lemma 2.1", which only gives upper bounds on the undelayed cover time. A lower bound needs the
   left inequality of Lemma 2.2/2.3;
-- needs Lemmas 2.5/2.6 at scale `n/(20k)` instead of `22k` (see Typos);
+- needs Lemmas 2.5/2.6 at scale `n/(20k)` instead of `22k`: Lemma 2.5 is stated with the constants `22k` and `11k`,
+  Theorem 3.7 applies it with initial interiors `n/(20k)` and needs the scaled conclusion `Ω(n/k)`, and the proof of
+  Lemma 2.5 only supports a loss of `11k` (the "minimum configuration" `22k, 22k − 11, …`), i.e. `M − 11k ≥ M/2`;
 - argues that the unexplored stretch "will be explored by agents having domains of sizes at least `Ω(n/20k)`,
   so it takes `Ω(n²/400k²)`". This is not derived from anything proved.
 
@@ -121,13 +145,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Potential identity (tool) | `potential_run` | `Ring.lean` |
 
 **Not formalized.**
-- Theorem 3.5 (well-spaced starts, cover time `O((n/k)²)`). Its proof has a gap: an agent "returns to `q_i`"
-  after each step, but `q_i`'s pointer then points left, so the next step cannot start "to the right". Also two
-  of the `q_i` may coincide. Simulation with hill-climbing over pointer initializations finds cover times
-  `≤ 1.25 (L+1)²` for gaps `L ∈ {3, 5, 8}` and up to 32 agents (16 for `L = 8`), so the statement looks true. A rigorous proof needs the
-  domain-size dynamics.
-- Lemmas 2.5–2.9, Theorems 3.2, 3.4 and 4.1. The proof of Theorem 3.2 uses "cover time is monotone in the ring
-  size" without proof; simulation confirms it for its initialization, `n ≤ 60`, `k ≤ 16`.
+- Theorems 3.2 and 3.5 (see above). The proof of Theorem 3.2 also uses "cover time is monotone in the ring size"
+  without proof; simulation confirms it for its initialization, `n ≤ 60`, `k ≤ 16`, but this was not checked further.
+- Lemmas 2.5–2.9, whose proofs read as sketches (their use in Theorem 3.7 is discussed above).
+- Lemma 3.3 and Theorem 3.4, which depend on the analysis of Theorem 3.2.
+- Theorem 4.1 (return time `Θ(n/k)`).
 - Lemma 3.6 and the random-walk results (Section 3.3).
 
 **Trust.** No `sorry`; all listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.

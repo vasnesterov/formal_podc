@@ -5,28 +5,29 @@ Approximation on Power Graphs.* PODC 2020. DOI
 [10.1145/3382734.3405750](https://doi.org/10.1145/3382734.3405750). Formalized version: arXiv
 [2006.03746](https://arxiv.org/abs/2006.03746) v1; numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🛠️ Proof repaired.** Every checked statement is true. That covers the centralized 5/3-approximation for
+**Verdict: 🔧 Easy fix.** Every checked statement is true: the centralized 5/3-approximation for
 `G²`-MVC (Theorem 12, Lemmas 13–16), Lemma 6, the combinatorial core of the `(1+ε)`-approximation (Theorem 1,
 Lemmas 2–5), Corollary 17, and the `Ω̃(n²)` CONGEST lower bounds for exact `G²`-MWVC and `G²`-MVC (Theorems 20 and 22,
-Lemmas 21, 23, 24, with the [CKP17] family lemma proved from scratch). Two proofs need repairs. The proof of
-Corollary 17 applies Theorem 12 to a graph that is not a square, and Algorithm 2 really is only a 2-approximation
-there. The proof of Lemma 6 claims a strict inequality that is false.
+Lemmas 21, 23, 24, with the [CKP17] family lemma proved from scratch). The one serious flaw sits in a side result
+that nothing depends on: the proof of Corollary 17 applies Theorem 12 to a graph that is not a square, where Algorithm 2
+really is only a 2-approximation, and a new accounting saves the 5/3 bound. The CONGEST round complexities and the
+`G²`-MDS half of the paper were not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
+- Proof of Lemma 6: the claim `|I| < n/α` fails for the path `0–1–2–3` with `r = 2`, where `I = {0, 3}` is independent
+  in `G²` and `|I| = 2 = n/α` (`lemma_6_strict_false`). The non-strict bound `|I| ≤ n/α` follows from the paper's own
+  argument and is all the lemma needs (`card_mul_le_of_indep`, `lemma_6`).
+- Lemma 6's second sentence (the `(1 + 1/⌊r/2⌋)`-approximation) needs `r ≥ 2`; for `r = 1` it divides by 0.
 - Theorem 12, degree-3 case: the three disjoint edges are `{y₁,z₁}, {y₂,z₂}, {x,y₃}`, not `{x,y₂}`.
-- In the degree-2 case, the edges `{z,y₁}` and `{x,y₂}` are disjoint only because `z ≠ y₂`. This holds because
-  the graph is triangle-free, which the paper does not say.
-- Lemma 5 writes `Sᵢ = N(vᵢ) ∩ R` for `N(cᵢ) ∩ R`.
 - The distributed description of Phase I calls vertices with "at least `1/ε`" neighbours in `R` candidates;
   the pseudocode, Lemma 2 and Lemma 5 need "more than `1/ε`".
 - Theorem 1, case `ε > 1`: "a `G²`-MIS has at most `n/2` vertices" fails for `n = 1`.
 - Theorems 20 and 22: `V_B = V(G) \ V_B` should be `\ V_A`.
-- The order of the 4-cycle in the [CKP17] bit gadgets is not specified. We use `t_A – f_A – t_B – f_B`.
-- Lemma 6's second sentence (the `(1 + 1/⌊r/2⌋)`-approximation) needs `r ≥ 2`; for `r = 1` it divides by 0.
+
+### Typos
+- Lemma 5 writes `Sᵢ = N(vᵢ) ∩ R` for `N(cᵢ) ∩ R`.
 
 ## Proof gaps (statements true)
 
@@ -49,13 +50,6 @@ of a perfect matching), while 4 vertices suffice (`corollary_17_proof_gap`).
 one blue edge, just like a triangle vertex. Lemma 5 charges `S` at ratio `3/2`, the same as part 1 charges
 triangles. So Lemma 14 (4) becomes `s₁ + |S| ≥ (3/2)|V_{R'}|` and the 5/3 computation goes through
 (`induced_bound`, `corollary_17`).
-
-### 🛠️ Lemma 6 (the strict bound `|I| < n/α`)
-The proof claims `|I| < n/α`, which fails for the path `0–1–2–3` with `r = 2`, where `I = {0, 3}` is independent
-in `G²` and `|I| = 2 = n/α` (`lemma_6_strict_false`).
-
-**Impact.** Statement true: the non-strict bound `|I| ≤ n/α` follows from the paper's own argument and is all the
-lemma needs (`card_mul_le_of_indep`, `lemma_6`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -113,8 +107,13 @@ The namespaces sit under `Podc.PowerGraphApproximation`. `theorem_2x` gives `k²
 `n² ≤ c · log² n · (8TB log n + 2)`. The generic gadget machinery is in `PathGadget.lean`: attaching paths to a core
 graph so that the square, restricted to the core, is the core.
 
-**Not formalized.** The CONGEST round complexities of Theorems 1, 7 and 11. Theorem 7 and Lemma 8 (weighted).
-Theorem 11 and Corollary 10 (Congested Clique). Lemma 25, Theorem 26 and Corollary 27. Section 6 (G²-MDS
+**Remarks.** Two routine details the paper leaves implicit. In the degree-2 case of Theorem 12, the edges `{z,y₁}`
+and `{x,y₂}` are disjoint only because `z ≠ y₂`, which holds because the graph is triangle-free; the paper does not
+say so. The order of the 4-cycle in the [CKP17] bit gadgets is not specified; we use `t_A – f_A – t_B – f_B`.
+
+**Not formalized.** The CONGEST round complexities of Theorems 1, 7 and 11 and of Corollary 17. Theorem 7 and Lemma 8
+(weighted). Theorem 11 and Corollary 10 (Congested Clique), and so the CONGESTED CLIQUE half of Corollary 17 beyond
+`Centralized.induced_bound`. Lemma 25, Theorem 26 and Corollary 27. Section 6 (G²-MDS
 algorithm). Section 7 (MDS lower bounds). Section 8 (centralized hardness).
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. Several

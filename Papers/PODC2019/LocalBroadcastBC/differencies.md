@@ -3,7 +3,7 @@
 Paper: Khan, Naqvi, Vaidya, *Exact Byzantine Consensus on Undirected Graphs under Local Broadcast
 Model*, PODC 2019 / arXiv:1903.11677v2.
 
-**Verdict.** The characterization (Theorems 4.1 and 5.1) is correct for `n ≥ 2`. Theorem 4.1 and
+**Summary.** The characterization (Theorems 4.1 and 5.1) is correct for `n ≥ 2`. Theorem 4.1 and
 Lemma A.2 are false as stated for `n = 1`, `f = 0`; the paper's standing assumption `f < n` allows
 this case. The other points are proof gaps that are easy to fix, imprecisions, and resolved
 ambiguities.

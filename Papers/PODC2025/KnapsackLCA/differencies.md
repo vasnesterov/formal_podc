@@ -6,7 +6,7 @@ whose numbering is used throughout.
 
 ## Errors in the paper
 
-1. **Theorem 4.1 is false** (headline; `Sec4.theorem_4_1_false`, `Sec4.lcaKP_not_correct`,
+1. **Theorem 4.1 is false** (❌; `Sec4.theorem_4_1_false`, `Sec4.lcaKP_not_correct`,
    `Sec4.answerKP_uniform`).
    *Instance.* `N` items with normalised profit `1/N` and weight `1/N`, weight limit `1/2`. In
    integer form: weights `1`, limit `N/2`, which satisfies Definition 2.2. Parameters: `ε = 1/m`,
@@ -36,23 +36,22 @@ whose numbering is used throughout.
    items of `Ĩ`. `rQuantile` could in principle output `±∞`, the extra points of its domain. Such
    outputs are not accurate, since `Pr[eff ≥ +∞] = 0 < 1 − π − τ` and `Pr[eff ≤ −∞] = 0 < π − τ`,
    so modelling outputs as reals loses nothing.
-   *Why not excused (R2–R4).* The instance is not degenerate (any `N ≥ 900`; a natural
+   *Not a corner case.* The instance is not degenerate (any `N ≥ 900`; a natural
    instance whose optimum, any `⌊N/2⌋` items, is obvious), and nothing in the paper assumes distinct
    efficiencies; Section 4.2 explicitly treats profits and weights as arbitrary. Ties are not an
    exotic corner: the synthetic items of `Ĩ` have efficiency exactly `ẽ_{k+1}` by construction,
    and two consecutive quantiles `ẽ_k = ẽ_{k+1}` coincide whenever one efficiency value carries
-   profit mass above about `q`. Nor is there a local fix (R3): replacing `>` by `≥` in Line 3 of
+   profit mass above about `q`. Nor is there a local fix: replacing `>` by `≥` in Line 3 of
    Algorithm 3 gives `k = t ≥ 3`, `e_small = 1`, and `LCA-KP` then answers "yes" to every item
    (weight `1 > K = 1/2`, infeasible). A repair needs consistent tie-breaking (e.g. quantiles of
    `(efficiency, index)` pairs) and, by the atom remark in item 2, different EPS tolerances, so
    Lemma 4.4 of [IKY12] would have to be re-checked.
-   *Verdict rule.* This is R5: Theorem 4.1 names the paper's specific algorithm ("Algorithm 2
-   (`LCA−KP`) is a `(t(n), ε)`-LCA …"), and Theorem 1.4 calls it the main theorem. So the label
-   is 🚨. Borderline aspect: Theorem 1.4 and the abstract are existential ("there exists an
-   LCA …"). A repair is plausible, for example breaking efficiency ties consistently by item index
+   *Scope.* Theorem 4.1 names the paper's specific algorithm ("Algorithm 2 (`LCA−KP`) is a
+   `(t(n), ε)`-LCA …"), and Theorem 1.4 calls it the main theorem. Theorem 1.4 and the abstract
+   are existential ("there exists an LCA …"). A repair is plausible, for example breaking efficiency ties consistently by item index
    and adjusting the EPS tolerances (see item 2). It is neither given in the paper nor checked
    here, so the existential claim is at best unestablished.
-2. **Lemma 4.6 is false** (`Sec4.no_eps_uniform`). On the same instance, with `ε + ε² ≤ 1`, no
+2. **Lemma 4.6 is false** (❌, same root cause; `Sec4.no_eps_uniform`). On the same instance, with `ε + ε² ≤ 1`, no
    sequence of length `t ≥ 1` is an EPS (Definition 4.3). `A_0(I)` must have profit `≥ ε`, so it
    is nonempty and hence contains everything (all efficiencies are equal). Its profit is then
    `1 ≥ ε + ε²`, contradicting the upper bound. And `A_1(I)` must also be nonempty. The algorithm
@@ -63,8 +62,7 @@ whose numbering is used throughout.
    distinct efficiencies, a single small item of profit `ε²` sitting at a quantile adds up to
    `ε²/c` to an interval. That breaks the claimed bound `ε + 7ε²/10 < ε + ε²`, so the constants
    of Definition 4.3 would have to change. This second point is a remark, not formalized.
-3. **Proof of Theorem 3.4 (Lemma 3.5) is not valid; theorem true.** Proof repair under R1, since
-   Lemma 3.5 is vacuously true. Lemma 3.5 claims that for every query `k` with `w_k = 3/4`, the
+3. **Proof of Theorem 3.4 (Lemma 3.5) is not valid; theorem true (🛠️).** Lemma 3.5 claims that for every query `k` with `w_k = 3/4`, the
    answer is "yes" with probability `≥ 9/10`. Its proof argues that a "no" on the default view
    costs conditional error `1/3 − 1/10 > 1/5`. But the error bound `1/5` is an average over the
    whole distribution, hence over `k`. So it does not force "yes" for each `k`, and the later
@@ -76,7 +74,7 @@ whose numbering is used throughout.
    `j ∉ P_i` and `i ∉ P_j`. The number of good instances out of `2n(n−1)` is at most
    `2n(n−1) − (7n² − 10n − 1)/8 + 3nq`. With global success `4/5` this gives `q ≥ n/11` for every
    `n ≥ 2`, the paper's constant. With per-query failure `1/5` it gives `q ≥ n/40 − 1/5`.
-4. **Proofs of Theorems 3.2 and 3.3 leave the paper's model; theorems true.** Proof repair.
+4. **Proofs of Theorems 3.2 and 3.3 leave the paper's model; theorems true (🛠️).**
    Definition 2.2 assumes the total profit is normalised to `1`. The reduction instance `I(x)` has
    total profit `|x| + 1/2` (resp. `|x| + β`). An LCA that is correct only on normalised instances
    may behave arbitrarily on `I(x)`, and normalising `I(x)` on the fly needs `|x|`, that is, all of
@@ -90,7 +88,7 @@ whose numbering is used throughout.
    cannot change while the sum stays fixed), so the single-bit reduction from `OR` cannot be kept.
    Whether one reads the normalisation as part of the LCA's promise is a modelling question.
    Both versions are proved, so the statements hold either way.
-5. **Theorem 3.4 statement: "`(t(n), 4/5)`-LCA".** Typo (R3). By Definition 2.2 the second
+5. **Theorem 3.4 statement: "`(t(n), 4/5)`-LCA".** Typo (✏️). By Definition 2.2 the second
    parameter is the failure probability, but the proof assumes success probability `4/5`, and we
    formalize that. The literal statement (success `≥ 1/5`) cannot follow from the paper's hard
    distribution. The 1-query algorithm "answer yes on weights `0` and `1/4`; on weight `3/4`
@@ -98,7 +96,7 @@ whose numbering is used throughout.
    distribution. This remark is not formalized. Whether the literal statement is true is open
    here.
 6. **Proof of Theorem 3.4: `(i, j)` uniform in `[n]²`.** This allows `i = j`, where the weight
-   assignment is ill-defined. Proof repair (minor): we use ordered pairs of distinct indices,
+   assignment is ill-defined (✏️). We use ordered pairs of distinct indices,
    uniform, with `j`'s weight uniform in `{1/4, 3/4}`.
 
 ## Typos and imprecisions (no effect on the formal results)

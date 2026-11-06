@@ -5,33 +5,28 @@ Objects.* PODC 2024, pp. 14–24. DOI [10.1145/3662158.3662814](https://doi.org/
 version: arXiv:2403.14445v1 (with appendices).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** Every result of the paper is formalized and proved:
-- the impossibilities (Props. 6, 14, 19, Thm. 17, Cor. 18, Thm. 20);
-- Algorithms 2 and 4 (Theorems 9, 12);
-- the universal construction (Algorithms 5, 6, Theorems 28, 32).
-
-No statement is wrong within the paper's intended scope. The impossibilities silently need at least two processes.
-Lemma 16 and the proof of Prop. 14 have small gaps, and the proof of Theorem 32 has a rigor gap. **Our Theorem 32
-covers one fixed resolution of the `∥` interleavings**, not all of them.
+**Verdict: 🛠️ Hard fix.** Every result of the paper is formalized and proved: the impossibilities (Props. 6, 14, 19,
+Thm. 17, Cor. 18, Thm. 20), Algorithms 2 and 4 (Theorems 9, 12) and the universal construction (Algorithms 5, 6,
+Theorems 28, 32). The proof of Theorem 32 is broken in two places, and we saved it with a new proof of the flattened
+algorithm, using our own potential function. **Our Theorem 32 covers one fixed resolution of the `∥` interleavings**,
+not all of them.
 
 ## Mistakes in the paper
 
-### ⚠️ Props. 14, 19, Thm. 17, Cor. 18, Thm. 20 (implicit `n ≥ 2`)
-All these impossibility results fail with a single process, which can keep the abstract state locally and leave
-shared memory constant, e.g. a wait-free, perfectly history-independent 3-valued register with no base objects at
-all (`prop14_needs_two_processes`).
-
-**Impact.** An implicit scope assumption, not an error: the results hold with at least two processes, and we
-assume a reader and a changer `c ≠ r` with suitable access rights. Prop. 6 is not affected: its proof uses a single
-process, and constant memory gives distance 0.
-
-### Typos and slips
+### ✏️ Slips
+- Props. 14, 19, Thm. 17, Cor. 18, Thm. 20 (implicit `n ≥ 2`): all these impossibility results fail with a single
+  process, which can keep the abstract state locally and leave shared memory constant, e.g. a wait-free, perfectly
+  history-independent 3-valued register with no base objects at all (`prop14_needs_two_processes`). The results hold
+  with at least two processes, and we assume a reader and a changer `c ≠ r` with suitable access rights. Prop. 6 is
+  not affected: its proof uses a single process, and constant memory gives distance 0.
 - Lines 6R.1 and 18R.1 read "wait until `Load(announce[i]) ∉ R`"; it must be `∈ R`.
 - `o_change` for `o_read` in Prop. 14; `X_i` for `R_i` in Thm. 17; `α` for `β` in Prop. 6 ("`state(H(α)) = q₂`").
-- "`t` executions" for `t + 1` in Lemma 38. Theorem 20's proof cites Lemma 16 for Lemma 38.
-- Wrong line numbers in Theorem 12. `W` for `W₂` in Lemma 10.
-- Unclear count (immaterial): in the proof of Theorem 32, "after at most `n` mode transitions" may need `n + 1`.
-  Two readings disagree, and our proof uses its own potential function.
+- "`t` executions" for `t + 1` in Lemma 38.
+- In the history-independence proof of Theorem 12, "for any other index `j ≠ v`, `A[v] = 0`" should be `A[j] = 0`.
+
+### Typos
+- Theorem 20's proof cites Lemma 16 for Lemma 38.
+- Wrong line numbers in Theorem 12 ("Line 6" for Line 8). `W` for `W₂` in Lemma 10.
 
 ## Proof gaps (statements true)
 
@@ -40,27 +35,35 @@ In Algorithm 5 the right side of `∥` (lines 6R, 18R, 25R) can jump away while 
 so the per-object history seen by the R-LLSC implementation is not well-formed, whereas Theorem 28 (Algorithm 6 is
 linearizable) is proved only for well-formed histories.
 
-**Impact.** A rigor gap that looks easy to patch. **Our Theorem 32 covers one fixed resolution of the `∥`
-interleavings** (strict alternation, flattened algorithm, `Universal.theorem32`), not all of them.
+**Impact.** The patch sketched below is not in Lean; the proved repair is a new proof of the flattened algorithm.
+**Our Theorem 32 covers one fixed resolution of the `∥` interleavings** (strict alternation, flattened algorithm,
+`Universal.theorem32`), not all of them. The paper leaves `∥` unspecified, so this schedule is a legal instance.
 
 **Details.** The non-well-formed history has two pending operations of one process on one object. An abandoned
 `LL` either never performed its successful CAS (no effect) or can be linearized at that CAS, and the later
 `RL`/`SC` on the same object (lines 18R.2, 26, 27) clears the context bit. The paper itself notes, for line 18R.2,
-that an abandoned `LL` may already have taken effect. Relatedly, Lemma 41 only discusses the `RL` of line 22. The
-`RL` of line 18R.2 can also run while the process is still in the context of `announce[j]` from an earlier
-iteration, and it needs the same argument.
+that an abandoned `LL` may already have taken effect.
 
-### 🛠️ Lemma 16 (the case `q_k = q_{k+1}`)
+### 🛠️ Lemma 41 (the `RL` of line 18R.2)
+The lemma covers every `RL(announce[j])`, but its proof only discusses the `RL` of line 22. The `RL` of line 18R.2 can
+also run while the process is still in the context of `announce[j]` from an earlier iteration.
+
+**Impact.** Wait-freedom is proved only through the potential of the flattened algorithm, which includes this `RL`
+(`Universal.theorem32`).
+
+**Details.** The missing case needs the same argument as line 22, but that patch is not in Lean.
+
+### 🔧 Lemma 16 (the case `q_k = q_{k+1}`)
 The construction may pick the same state twice in a row, but Definition 13 provides `o_change(q, q')` only for
 `q ≠ q'`, so the changer's step is undefined.
 
-**Impact.** Morally trivial; fixed by letting the changer do nothing in that round (`thm17`).
+**Impact.** Statement true; fixed by letting the changer do nothing in that round (`thm17`).
 
-### 🛠️ Prop. 14 (solo `o_read` from the same memory)
+### 🔧 Prop. 14 (solo `o_read` from the same memory)
 The proof's claim that "a solo `o_read` from the same memory returns the same response" needs the same local
 state, and can fail with the same reader process, whose local state may differ between the two executions.
 
-**Impact.** Statement true; we use a second process that has taken no steps.
+**Impact.** Statement true; we use a second process that has taken no steps (`prop14`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -101,7 +104,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 `t ≥ 1` (the paper says `t ≥ 2`). The footnote-4 assumption of Lemma 15 ("no unused values") is unnecessary.
 
 **Not formalized.** A compositional proof of Theorem 32 (Lemma 25 + Theorem 28 + Lemma 27) covering every
-interleaving of `∥`.
+interleaving of `∥`. Open remark: in the proof of Theorem 32, "after at most `n` mode transitions" may need `n + 1`.
+Two readings disagree, we did not settle it, and our proof uses its own potential function.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: `register_tight` gives a wait-free, perfectly HI register, and the algorithms themselves are concrete

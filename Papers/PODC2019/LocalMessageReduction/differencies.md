@@ -3,34 +3,34 @@
 Paper: Bitton, Emek, Izumi, Kutten, *Message Reduction in the LOCAL Model is a Free Lunch*, PODC 2019,
 arXiv 1909.08369v1.
 
-## Statement-level issues (with the deciding rule)
+## Statement-level issues
 
-1. **Theorem 1.2 (size clause) and Lemma 4.7 are false** (❌, R3 not applicable, R5 → not 🚨).
+1. **Theorem 1.2 (size clause) and Lemma 4.7 are false** (⚠️).
    - Claim: `|S| ≤ Õ(n^{1+1/(2^{k+1}−1)})` whp, for every `1 ≤ k ≤ log log n`, `0 ≤ h ≤ log n`.
    - Counterexample: `k = 1`, `h = 2`, `K_n`. With probability `≥ 1/8`, `|S| ≥ n s/8 = Ω(n^{11/6} log³ n)`
      (`theorem_1_2_size_false`; for any `C`, `D` and all large `n`, `P(|S| > C n^{4/3} log^D n) ≥ 1/8`).
-   - Not R3: the fix changes either the claimed bound (`n^{1+δ}` → `n^{1+δ+ε}`) or the algorithm
+   - The fix changes either the claimed bound (`n^{1+δ}` → `n^{1+δ+ε}`) or the algorithm
      (capping `F_v` inside a trial), and the paper's proof reasons with the wrong count. The prose
      "each node `v` tries to identify `min{c n^{2^j δ} log n, |N_j(v)|}` neighbors" hints at a cap, but
      both the prose ("advances to the next trial unless `|F_v| ≥ …`") and Pseudocode 2 test the
      threshold only between trials. The proof of Lemma 4.7 does not use a cap either: it multiplies a
      per-trial count `O(n^{2^j δ} log³ n)` (that is `s_j` without the factor `n^ε`) by the number of
      trials. So the error is in the counting, not a pseudocode typo.
-   - Not R4: the parameter range `0 ≤ h ≤ log n` is explicit, and the counterexample uses constant `h`. For
+   - The parameter range `0 ≤ h ≤ log n` is explicit, and the counterexample uses constant `h`. For
      `h = Θ(log n)`, `n^ε = O(1)` and the claim holds.
-   - Not 🚨 (R5, borderline). The headline claims hold: the abstract's spanner with "constant stretch
-     and `O(n^{1+ε})` edges … sending `O(n^{1+ε})` messages" (choose `δ, 1/h ≤ ε/3`), and Theorem 1.3.
-     Theorem 1.2 names `Sampler`, but only its precise size/parameter trade-off is false, not the
-     algorithm's headline guarantee. The case for 🚨: the introduction calls `Sampler` with the
-     guarantees of Theorem 1.2 "our main technical contribution". Against it: the abstract and the
-     title result (Theorem 1.3) do not depend on the false exponent, and `Sampler` itself, with its
-     size bound corrected to the paper's own message bound `Õ(n^{1+δ+ε})`, delivers them. Lemma 4.7 is a numbered lemma (❌ by R1).
-2. **Lemma 4.3 proof: class intervals** (proof repair 🛠️, inside a proof). The classes
+   - The abstract's spanner with "constant stretch and `O(n^{1+ε})` edges … sending `O(n^{1+ε})`
+     messages" (choose `δ, 1/h ≤ ε/3`) and Theorem 1.3 hold. Theorem 1.2 names `Sampler`, but only its
+     precise size/parameter trade-off is false, not the algorithm's main guarantee. The introduction
+     calls `Sampler` with the guarantees of Theorem 1.2 "our main technical contribution". The abstract
+     and the title result (Theorem 1.3) do not depend on the false exponent, and `Sampler` itself, with
+     its size bound corrected to the paper's own message bound `Õ(n^{1+δ+ε})`, delivers them. Lemma 4.7,
+     a numbered lemma, is false in the same way.
+2. **Lemma 4.3 proof: class intervals** (🔧, inside a proof). The classes
    `(n^{xε}, n^{(x+1)ε}]` exclude volume 1. We use `[b^x, b^{x+1})` via `cls = ⌊log_b vol⌋`.
-3. **`V' = ⋃_{1≤j≤k−1} V'_j`** (typo inside the proof of Theorem 4.6; the intent `0 ≤ j ≤ k` is
+3. **`V' = ⋃_{1≤j≤k−1} V'_j`** (✏️; typo inside the proof of Theorem 4.6; the intent `0 ≤ j ≤ k` is
    evident from the proof). In Lean, the final cluster of `x` is `(lvl x, cl (lvl x) x)` with
    `lvl x ≤ k` maximal (`Run.label`).
-4. **`h = 0` allowed in Theorem 1.2** (degenerate, R2): `ε = 1/h` is undefined. We use `h ≥ 1`.
+4. **`h = 0` allowed in Theorem 1.2** (✏️; degenerate): `ε = 1/h` is undefined. We use `h ≥ 1`.
 
 ## Modelling choices
 

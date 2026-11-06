@@ -4,20 +4,20 @@ Vassos Hadzilacos, Xing Hu, Sam Toueg. *On Register Linearizability and Terminat
 [10.1145/3465084.3467925](https://doi.org/10.1145/3465084.3467925). Formalized version: arXiv
 [2102.13242](https://arxiv.org/abs/2102.13242) v1; numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🛠️ Proof repaired.** Every theorem we formalized holds: Theorem 14 (linearizable SWMR ⇒ write
+**Verdict: 🛠️ Hard fix.** Every theorem we formalized holds: Theorem 14 (linearizable SWMR ⇒ write
 strongly-linearizable), Theorems 10/12/13 and Corollary 11 (Algorithm 2 is write strongly-linearizable but not
-strongly linearizable; Algorithm 4 is linearizable but not write strongly-linearizable) and Theorem 6 (with merely
+strongly linearizable; Algorithm 4 is linearizable but not write strongly-linearizable), Theorem 6 (with merely
 linearizable registers a strong adversary keeps Algorithm 1 running forever) and Theorem 7 (if `R1` is write
 strongly-linearizable, Algorithm 1 terminates with probability 1 — in fact at most one coin sequence defeats any
-given strong adversary). **The proof of Theorem 14
-(Lemma 67) is wrong**; we prove the theorem with a different construction. Several smaller gaps.
+given strong adversary). **The proof of Theorem 14 (Lemma 67) is wrong**; we prove the theorem with a different
+construction. The gaps in the proofs of Theorems 7, 10 and 12 are closed by local changes.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
 - Lemma 17 says "line 37" for line 34; Claims 17.1/17.3 say "round 2" in the general case.
+
+### Typos
 - Algorithm 3 (Theorem 10) is ambiguous on ties: two pending writes can have equal partial timestamps (e.g.
   both `[0, ∞, ∞]`). Harmless — only "`w_i` last in `B_i`" is used; we order the rest by process id.
 
@@ -42,7 +42,7 @@ linearization of an extension to the operations of the prefix shows this number 
 sequences are prefixes of each other (`swmr_writeStrongLin`, for any set of SWMR histories — shared memory,
 message passing or hybrid).
 
-### 🛠️ Theorem 7 (Lemma 19 is too weak; Lemma 18)
+### 🔧 Theorem 7 (Lemma 19 is too weak)
 Lemma 19 ("for each round `j`, with probability ≥ 1/2 nobody enters round `j + 1`") only bounds the
 probability of an infinite game by 1/2, not by 0.
 
@@ -50,24 +50,19 @@ probability of an infinite game by 1/2, not by 0.
 (`Thm7.forever_subsingleton`, `theorem7`).
 
 **Details.** The proof does give the needed conditional statement (the adversary's order of the two round-`j`
-writes is fixed before the round-`j` coin is flipped). Lemma 18's step "(*) implies that the round of the write
-is ≥ j" needs an induction over rounds that the paper leaves implicit.
+writes is fixed before the round-`j` coin is flipped).
 
 **Repair.** Against a fixed (deterministic) strong adversary, the round-`j` coin that lets the game go on is
 determined by the history before it is flipped, so **at most one coin sequence** keeps the game alive
 (`Thm7.forever_subsingleton`), which has probability 0 (`theorem7`).
 
-### 🛠️ Theorems 10 and 12 (Lemma 42, Appendix D)
+### 🔧 Theorems 10 and 12 (Lemma 42, Case (b))
 Lemma 42 Case (b) uses "`r` starts after `w` completes" where only "`w` writes `Val[-]` before `r` starts" is
 available.
 
-**Impact.** Statements true; small gaps, filled.
+**Impact.** Statements true; the gap is filled (`Alg2.alg2_writeStronglyLinearizable`).
 
-**Details.**
-- Lemma 42 Case (b): fixed via Lemma 40.
-- Appendix D asserts without proof that the timestamps in each `Val[-]` never decrease (needs an invariant:
-  `p_k` reads its own register).
-- Definition 55 lists constraints on `f(H)` without showing that such a sequence exists.
+**Repair.** Fixed via Lemma 40.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -85,6 +80,13 @@ Full list of differences (including modelling choices and minor imprecisions): [
   function of the whole execution (`σ : List Ev → Ev`), and `p₀`'s coin flips take their values from a coin
   sequence `ω` (`genRun σ ω`). Crashes are processes that are no longer scheduled; returned processes may take
   `noop` steps.
+
+**Routine details the paper skips.**
+* Lemma 18's step "(*) implies that the round of the write is ≥ j" needs an induction over rounds that the paper
+  leaves implicit.
+* Appendix D asserts without proof that the timestamps in each `Val[-]` never decrease (needs an invariant:
+  `p_k` reads its own register).
+* Definition 55 lists constraints on `f(H)` without showing that such a sequence exists.
 
 **Main results in Lean.**
 
@@ -104,6 +106,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Not formalized.** Corollary 9 (composition with an arbitrary algorithm `A`), Appendix B (bounded `R1`),
 the remark that ABD is write strongly-linearizable (it follows from Theorem 14 once ABD is proved linearizable).
+Theorem 10 for functions of invocation/response histories only: Algorithm 3 reads internal steps and we prove the
+execution-based notion, so plugging it into Theorem 7 was not examined.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: the atomic SWMR register satisfies the hypotheses of Theorem 14

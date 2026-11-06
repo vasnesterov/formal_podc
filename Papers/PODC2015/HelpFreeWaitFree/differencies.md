@@ -2,7 +2,6 @@
 
 Paper: K. Censor-Hillel, E. Petrank, S. Timnat, *Help!*, PODC 2015. We use the full version, Chapter 4 of S. Timnat's
 PhD thesis (Technion, 2015), and its numbering (Definitions 4.4.x, 4.5.1, Claims 4.5.x, Theorems 4.3, 4.7, 4.8, 4.11).
-Verdict rules refer to `.claude/skills/formalize-paper/verdicts.md`.
 
 The PODC extended abstract (author copy) was checked as well. The PODC numbering maps to the thesis as follows:
 Definitions 3.2/3.3 → 4.4.2/4.4.3, Observation 3.4 → 4.4.4, Claim 3.5 → 4.4.5, Definition 4.1 → 4.5.1, Claims
@@ -18,7 +17,7 @@ definition and the proof to the full paper; the read/write max-register result (
 1.1 ("Theorems 4.18, 5.1 (rephrased)") with the proof deferred. So every statement-level finding below applies to the
 PODC paper as published.
 
-## Statement-level issues (decide the verdict)
+## Statement-level issues
 
 1. **"The stack is an exact order type" is false** (examples after Definition 4.5.1; also Section 4.1 "exact order
    types (examples are the queue and the stack)" and Section 4.5.1). For every `op, W, R, n, m` there are
@@ -27,28 +26,28 @@ PODC paper as published.
    is Theorem 1 of Aksenov–Kuznetsov–Shalyto, *On Helping and Stacks*, NETYS 2018). The definition allows *moving* `W_{n+1}` into `R(m)`, and a LIFO
    stack can hide the swap: e.g. for `op = push(a)`, `W_{n+1} = push(b)`, re-insert `push(b)` right after the pop
    that removes `a`. The conclusion drawn for stacks (no wait-free help-free stack) is nevertheless true (Aksenov et
-   al. prove it directly); only the classification is wrong. Rule R1 (concrete claim "object X is in class C") and R5
-   (an example, not a headline) → ❌. Not excusable by R3/R4: the definition is the paper's own and is used as stated.
+   al. prove it directly); only the classification is wrong (❌). The definition is the
+   paper's own and is used as stated.
 2. **Theorem 4.3 holds** (`theorem_4_3_helpFree`, and the stronger `theorem_4_3`); its proof needed repairs (below).
 3. **The queue is an exact order type** (`queue_exactOrderStrong`), with the paper's witnesses.
 4. **Claim 4.8.1** holds under hypotheses the paper leaves implicit: the linearization function is built
    incrementally (each step appends at most its own operation; `LinPointFun`), the implementation is
    obstruction-free, and every process may invoke some operation (needed to run the owner of a *future* operation
-   solo). These hold in every use in the paper (R4) → no label change. Figures 4.4 and 4.5 are wait-free,
+   solo). These hold in every use in the paper (✏️). Figures 4.4 and 4.5 are wait-free,
    linearizable and help-free (`set_helpFree_waitFree`, `maxRegister_helpFree_waitFree`).
 5. **Theorem 4.8 (global view types) is unestablished as stated; proved for strong global view types.** Gap in
    Claim 4.6.8 (see "Proof gaps" 4). We prove it for `StrongGlobalView` (the four result classes — none, `op` only,
    the next modifier only, both — are pairwise disjoint), which covers snapshots (`theorem_4_7`) but not
    fetch&increment (`fetchInc_globalView`, `fetchInc_not_strongGlobalView`) nor increment objects, which the paper
    explicitly lists as covered ("this way the proof also holds for an increment object"; "the fetch&increment type
-   … the fetch-and-cons object … satisfies the condition in theorem 4.8"). Theorem 4.8 is a headline result (one of
-   the two families of types requiring help); it is only *unestablished*, not refuted (R5 → ❌, same label as item 1).
+   … the fetch-and-cons object … satisfies the condition in theorem 4.8"). Theorem 4.8 covers one of
+   the two families of types requiring help; it is only *unestablished*, not refuted (⚠️).
 6. **Theorem 4.7** is proved for snapshot implementations that are correct in all executions (multi-writer,
    multi-scanner; every process may invoke every operation). The paper's single-scanner, single-writer snapshot
    restricts scans to one process at a time and each component to its owner, so it allows more implementations; that
-   stronger version is not formalized. The verdict does not depend on it.
+   stronger version is not formalized.
 7. **Theorem 4.11 (max register from read/write) — proof gap, not repaired.** See "Proof gaps" (3). The theorem is not
-   formalized; it does not enter the verdict table.
+   formalized (❌).
 
 ## Definitions and modelling choices
 
@@ -85,7 +84,7 @@ PODC paper as published.
   arbitrary value type per location; `cas` returns a success flag, `write` an acknowledgement).
 - **Number of processes.** Theorem 4.3 is stated for systems with three distinct processes `p₁ p₂ p₃` (other
   processes may exist), as in the proof ("Consider a system of three processes"); the paper's theorem statement does
-  not mention it (R4).
+  not mention it.
 - **Progress.** The paper assumes lock-freedom inside the proof "for convenience"; we use CSLib's `WaitFree` directly
   (a process pending forever takes finitely many steps), and solo runs complete by wait-freedom.
 - **Figure 4.5** uses natural numbers instead of `int` (initial value 0); **Figure 4.4** works for any key type.
@@ -97,10 +96,10 @@ PODC paper as published.
    but `p₂`'s step writes the expected value: then `p₁`'s cas succeeds in `h∘p₂∘p₁` and the two histories differ. Repair:
    compare `h` with `h∘p₁` (resp. `h∘p₂`), which agree on memory and on the other processes if the step changes no
    memory, and apply Claim 4.5.3 (2) (resp. (3)) (`claim_4_5_3_2`, `claim_4_5_3_3`, used in `Ctx.claim_4_5_10`). So the
-   Remark "(3) is not needed in the proof" is wrong: (3) is needed. Proof repair (🛠️).
+   Remark "(3) is not needed in the proof" is wrong: (3) is needed (🔧).
 2. **Claim 4.5.13** says the failed cas "contradicts Claim 4.5.3 (2)", but 4.5.3 (2) is about `op₁` vs `op₂`, whereas
    4.5.13 is about `op₁` vs `op₃`. We use 4.5.3 (2) at level `n + 1` for `op₁` vs the next operation of `p₂`, with
-   Claim 4.4.5 to move between `op₃` and that operation (`critical_step`). Minor.
+   Claim 4.4.5 to move between `op₃` and that operation (`critical_step`) (🔧).
 3. **Theorem 4.11, Claim 4.7.1, second case for line 4 (and line 7).** "If `R₁` cannot possibly return a value `≥ 3`,
    then `R₁` is decided before `W₃`" is invalid for a *pending* `R₁`: a linearization function may leave a pending
    read out of the linearization until it returns, so `R₁` is not decided before `W₃` although its result is fixed.
@@ -108,7 +107,7 @@ PODC paper as published.
    `claim_4_7_1_inference_fails` (`MaxRegGap.lean`). Once `R₁` returns, `R₁` *is* decided before `W₃`, but that
    decision is made by `R₁`'s owner, which help-freedom allows, so the intended contradiction is lost. We found no
    repair; the status of Theorem 4.11 is open in our formalization. (The case for line 10/13 is fine: there the
-   reader `R₂` has completed.) Claim inside a proof (R1) of a non-formalized theorem: reported, no label.
+   reader `R₂` has completed.) A claim inside a proof of a non-formalized theorem (❌).
 4. **Claim 4.6.8 (Theorem 4.8).** From "`op₁` decided before `op₃` in `h∘p₁∘p₃`, not in `h∘p₃∘p₁`" the paper concludes
    that `op₃` returns different results after a solo run of `p₃` ("because each operation by `p₁` changes the return
    value of `op₃`"). With the three classes of Definition 4.6.18 both results may lie in `RS1` (`op₁ ≺ op₃ ≺ op₂`

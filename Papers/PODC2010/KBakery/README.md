@@ -6,21 +6,20 @@ DOI [10.1145/1835698.1835707](https://doi.org/10.1145/1835698.1835707). Formaliz
 are taken from Danek's PhD thesis (Toronto, 2010, Chapter 5: Figures 5.3, 5.5, 5.6, Theorems 5.9, 5.20,
 5.33). Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** The non-atomic algorithm of Figure 3 — the variant named in the
+**Verdict: ❌ Intent lost.** The non-atomic algorithm of Figure 3 — the variant named in the
 title — violates k-exclusion: with safe registers, 3 processes and `k = 1`, two processes end up in the
-critical section together (`NonAtomic.counterexample`). The two algorithms for atomic reads and writes
-are correct: Theorems 8 and 9 (k-exclusion, starvation freedom with up to `k − 1` crashes, k-FCFS,
-FIFE, `Θ(N)` RMRs per passage in the DSM and CC models) are fully proved.
+critical section together (`NonAtomic.counterexample`), and no repair is proved. The two algorithms for
+atomic reads and writes are correct: Theorems 8 and 9 (k-exclusion, starvation freedom with up to `k − 1`
+crashes, k-FCFS, FIFE, `Θ(N)` RMRs per passage in the DSM and CC models) are fully proved.
 
 ## Mistakes in the paper
 
-### 🚨 Theorem 10 (Figure 3, non-atomic reads and writes)
+### ❌ Theorem 10 (Figure 3, non-atomic reads and writes)
 Figure 3 does not satisfy k-exclusion: for `N = 3` processes `y, p, r` and `k = 1` there is a legal
 execution with safe registers after which `y` and `p` are both in the CS (`NonAtomic.counterexample`).
 
 **Impact.** The title's claim of a k-exclusion algorithm with non-atomic reads and writes is refuted
-for the paper's algorithm; the rest of Theorem 10 (starvation freedom, FIFE, `Θ(N)` RMRs) is moot. The
-atomic results (Theorems 8 and 9) are unaffected. The thesis' Theorem 5.33 (same algorithm, Figure 5.6)
+for the paper's algorithm. The atomic results (Theorems 8 and 9) are unaffected. The thesis' Theorem 5.33 (same algorithm, Figure 5.6)
 is false for the same reason.
 
 **Details.** `Ticket` is a safe register too (the paper duplicates `Want` and `Capture`, but not
@@ -107,8 +106,9 @@ Explicit constants: per passage, DSM exactly `4(N − 1)` / `5(N − 1)` RMRs (u
 CC at most `9N − 6` / `13N − 6` and at least `3N − 1`; FIFE within `4N + 7` own steps after `q` is in
 the CS.
 
-**Not formalized.** The scenarios of Section 5 (Figure 2 unshaded violates FIFE) and Section 6
-(Figure 2 is incorrect with non-atomic registers); Table 1; the CC write-back variant; the
+**Not formalized.** The rest of Theorem 10 (starvation freedom, FIFE, `Θ(N)` RMRs for Figure 3) was not
+examined, as k-exclusion already fails. The scenarios of Section 5 (Figure 2 unshaded violates FIFE) and
+Section 6 (Figure 2 is incorrect with non-atomic registers); Table 1; the CC write-back variant; the
 ticket-resetting algorithms of the thesis.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,

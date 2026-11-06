@@ -5,26 +5,15 @@ Causal Consistency.* PODC 2018. DOI [10.1145/3212734.3212789](https://doi.org/10
 Formalized version: arXiv [1805.08804](https://arxiv.org/abs/1805.08804) v2 (full version with all
 proofs); numbering follows it.
 
-**Verdict: ⚠️ Minor statement issues.** All optimality results hold under strong causal consistency: the
+**Verdict: 🛠️ Hard fix.** All optimality results hold under strong causal consistency: the
 offline records for both RnR models are good and least (Theorems 5.3, 5.4, 6.6, 6.7), and the online record
-for Model 1 is good and least among online schemes (Theorems 5.5, 5.6). Two statements are wrong as written,
-both fixable from the paper's own proofs: Definition 6.4 omits `w₃ ≠ w₄`, and without it Theorem 6.6 fails;
-and the notion of "online record" in Theorem 5.6 is defined per execution, which makes the theorem false.
-Several proofs in Appendices A and C have gaps; we repaired them all.
+for Model 1 is good and least among online schemes (Theorems 5.5, 5.6). Definition 6.4 and the notion of
+online record need small fixes, both available from the paper's own proofs, and the proofs of two central
+results, necessity in Theorem 6.7 and sufficiency through Lemma C.1(b), needed new arguments.
 
 ## Mistakes in the paper
 
-### ⚠️ Definition 6.4 (and hence Theorem 6.6)
-Read literally, `C¹_i(V, o₁, w₂)` contains the self-loop `(o₁, o₁)` whenever `o₁` is a write of `i`, so
-`B_i(V)` swallows such edges and Theorem 6.6's record is not good: two processes each write `x` once,
-both views order `w₁` before `w₀`, the record is empty, yet swapping both views is a valid replay with other
-data races (`theorem_6_6_literal_false`).
-
-**Impact.** Local fix with evident intent: the proof of Lemma C.1(a) uses "`w³ ≠ w⁴₁`, by Definition 6.4",
-and the definition's wording "two write operations" suggests distinct ones.
-With `w₃ ≠ w₄` added at every level, Theorems 6.6 and 6.7 hold (`theorem_6_6`, `theorem_6_7`).
-
-### ⚠️ Theorem 5.6 (notion of "online record")
+### 🔧 Theorem 5.6 (notion of "online record")
 "`R` is an online record of `V`" is defined for one fixed execution, and in that reading any record of `V` is
 online, so Theorem 5.6 would contradict Theorem 5.3.
 
@@ -45,11 +34,20 @@ Then `(w₁, w₂)` is a `B₁` edge outside `SCO₁ ∪ PO`. When 1 observes `w
 the `B_i` edges the oracle reveals" contains the offline record of Theorem 5.3, so it is good, yet it omits
 `(w₁, w₂)`.
 
-### Typos and slips
+### ✏️ Slips
+- Definition 6.4 (and hence Theorem 6.6) omits `w₃ ≠ w₄`. Read literally, `C¹_i(V, o₁, w₂)` contains the
+  self-loop `(o₁, o₁)` whenever `o₁` is a write of `i`, so `B_i(V)` swallows such edges and Theorem 6.6's
+  record is not good: two processes each write `x` once, both views order `w₁` before `w₀`, the record is
+  empty, yet swapping both views is a valid replay with other data races (`theorem_6_6_literal_false`).
+  The intent is evident: the proof of Lemma C.1(a) uses "`w³ ≠ w⁴₁`, by Definition 6.4", and the
+  definition's wording "two write operations" suggests distinct ones. With `w₃ ≠ w₄` added at every level,
+  Theorems 6.6 and 6.7 hold (`theorem_6_6`, `theorem_6_7`).
 - Lemma C.1(a), Case 1 of the proof: the record is written `Â₁(V) \ (SWO(V) ∪ PO ∪ B₁(V))`. The lemma's
   statement, and Theorem 6.6, have `SWO₁(V)`. With `SWO` the four cases miss the edges in
   `SWO(V) \ SWO₁(V)`, and for that record the lemma would indeed fail (`lemma_C_1_SWO_record_false`).
   With `SWO₁`, as stated, the case split is complete.
+
+### Typos
 - Theorem 6.7, proof, read case: `(o³, w⁴)` should be `(w³, w⁴)`.
 
 ## Proof gaps (statements true)
@@ -79,7 +77,7 @@ induction on the level of `C` (`lemmaX`) that no cycle of `(A_i \ {(u,w)}) ∪ C
 Hence every `A_m(V)` segment of the cycle starts at a `C`-target other than such a `u` and is preserved
 in `V'`.
 
-### 🛠️ Theorem 5.6 (indistinguishable execution)
+### 🔧 Theorem 5.6 (indistinguishable execution)
 The proof argues that "both orders are valid for future observation" but never builds a strongly causal
 execution indistinguishable to process `i` in which the edge is not a `B_i` edge, which is what is needed
 to invoke Theorem 5.4.
@@ -90,7 +88,7 @@ to invoke Theorem 5.4.
 puts known writes first, extends `SCO(V)` and `PO`, and orders `w₂` before `w₁`. This order exists by
 `extend_partialOrder`.
 
-### 🛠️ Lemma A.1(b), Case 4
+### 🔧 Lemma A.1(b), Case 4
 The proof uses the maximality of `wᵢ¹` with respect to `SCO(V)`, but derives only `(wᵢ¹, o^{ρ,j}) ∈ SCO(V′)`.
 
 **Impact.** Statement true; `(wᵢ¹, o^{ρ,j}) ∈ SCO(V)` holds as well, because `o^{ρ,j}` is a write of

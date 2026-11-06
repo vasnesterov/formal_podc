@@ -3,9 +3,9 @@
 Paper: R. L. Jones, M. S. Khan, N. H. Vaidya, *Optimal Record and Replay under Causal Consistency*
 (brief announcement PODC 2018), full version arXiv:1805.08804v2; numbering follows the full version.
 
-## Statement-level issues (verdict rules)
+## Statement-level issues
 
-1. **Definition 6.4 lacks `w₃ ≠ w₄`, so Theorem 6.6 is false as written** (⚠️, R3). With the literal
+1. **Definition 6.4 lacks `w₃ ≠ w₄`, so Theorem 6.6 is false as written** (✏️). With the literal
    definition, `(o₁, o₁) ∈ C¹_i(V, o₁, w₂)` whenever `o₁` is a write of `i`. `B_i` then contains such
    edges, and the record is not good: `Counterexample.theorem_6_6_literal_false`. The proof of Lemma C.1(a)
    says "`w³ ≠ w⁴₁`, by Definition 6.4", so the intent is recoverable and the fix is local. We model
@@ -18,7 +18,7 @@ Paper: R. L. Jones, M. S. Khan, N. H. Vaidya, *Optimal Record and Replay under C
    `Counterexample.lemma_C_1_SWO_record_false` shows that Lemma C.1(a) fails for the mistyped record. It
    refutes no statement of the paper. An earlier draft of this formalization listed it as a false
    statement, which was wrong.
-3. **Theorem 5.6: "online record of V" is per-execution** (⚠️, R4/R3). Taken literally, any record of a fixed
+3. **Theorem 5.6: "online record of V" is per-execution** (🔧). Taken literally, any record of a fixed
    `V` is "online" and the theorem contradicts Theorem 5.3. We formalize the evident intent: online
    *schemes* (`IsOnline`) whose decision for `(o₁, o₂)` at `i` depends only on `i`'s knowledge when it
    observes `o₂` (`SameKnow`: the prefix of `V_i` up to `o₂`, and the prefix of `V_j` up to every observed
@@ -26,8 +26,7 @@ Paper: R. L. Jones, M. S. Khan, N. H. Vaidya, *Optimal Record and Replay under C
    restricted accordingly. This is exactly the paper's "at most" knowledge bound. An SCO oracle
    unrestricted by that bound would let `i` detect some `B_i` edges and break Theorem 5.6. This is argued on
    paper only (3-process example in the README), not in Lean. The intent is recoverable from the proof of
-   Theorem 5.6, which argues by indistinguishability, i.e. over all executions. Borderline between ⚠️ and
-   a modelling choice; it does not change the verdict, which Item 1 already makes ⚠️.
+   Theorem 5.6, which argues by indistinguishability, i.e. over all executions.
 
 ## Proof gaps (statements true)
 

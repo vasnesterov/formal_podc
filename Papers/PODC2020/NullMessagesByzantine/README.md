@@ -20,6 +20,10 @@ convention that a process receives its own broadcasts ("send to all" includes th
 
 No mistakes in the statements.
 
+### Typos
+- Theorem 2.1 (2): "at most `n(t + 1.5) + 2n²` bits are sent by correct processes" bounds the layer before reverting,
+  not the whole run including the base protocol (`layer_bits_le`).
+
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
 ## The formalization
@@ -82,7 +86,8 @@ tie-break works (ours: 0). The bit bound in (2) counts the four layer rounds onl
 protocol's messages.
 
 **Not formalized.** Comparisons with the literature (24-fold improvement over Phase King,
-the `nt/4` lower bound), the "fewer than `3n²` bits" remark, and the plurality/multi-valued remark.
+the `nt/4` lower bound), the "fewer than `3n²` bits" remark, the plurality/multi-valued remark, and the
+radio network / atomic commitment discussion.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: for `t = 0` the leader protocol `leaderBA` satisfies the base-protocol

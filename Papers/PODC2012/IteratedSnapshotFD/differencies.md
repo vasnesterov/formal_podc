@@ -40,7 +40,7 @@ report PI 1991, February 2012 (hal-00670154v1), whose numbering we follow.
   simulator trusts exactly the correct simulators. **`Σ`** (`IsSigma`): only the intersection property;
   the completeness property is void in the failure-free run used.
 
-## Statement-level issues (decided by `verdicts.md`)
+## Statement-level issues
 
 - **Section 4.4 and Theorem 4 false for `Σ`** (`Fig3.sigma_simulation_false`). Two simulators,
   failure-free, a legal `Σ` history and a fair schedule. Figure 3 with `PROP_{◇P}` (the predicate
@@ -48,16 +48,15 @@ report PI 1991, February 2012 (hal-00670154v1), whose numbering we follow.
   `Σ*` outputs contain `q_1` forever, also at the strongly correct `q_0`. So the simulated failure
   detector is not in `Σ*` and the produced run is not an `IIS_2[Σ*]` run. Theorem 4 ("for the failure
   detector classes studied in this paper", `t = n − 1 = 1`, where the extra conjunct
-  `|arw_view| ≥ n − t − 1 = 0` is void) is false for `Σ`. **Label ❌ (R1, R5).** The claim is a
-  correctness claim about the paper's simulation and a numbered theorem, but not a headline: the
-  headline equivalences, Theorem 2 / Corollary 1 (`Ω_k`) and Theorem 3 (`◇P`), are unaffected, and `Σ`,
-  `S`, `◇S`, `S_x`, `◇S_x` are handled in a one-paragraph remark (Section 4.4) and in the `t`-resilience
-  extension (Section 5). *Borderline:* the abstract says the simulations work "for a large family of
-  failure detector classes". That claim stays true for `{Ω_k}_k`, `◇P`, `P`, so we do not count it as a
-  false headline (R5). The introduction is more specific ("This simulation is generic in the sense that
-  it works for any of the previously cited failure detectors", which include `Σ`), but the headline
-  result, the equivalence of `ARW_n[C]` and `IIS_n[C*]`, is existential and is not refuted for `Σ`
-  (only this simulation is); R5 then gives ❌, not 🚨 (reviewer's call). Not an implied-assumption or typo case (R3/R4): repairing it changes the
+  `|arw_view| ≥ n − t − 1 = 0` is void) is false for `Σ`. **Label ❌.** The claim is a
+  correctness claim about the paper's simulation and a numbered theorem. The equivalences of Theorem 2 /
+  Corollary 1 (`Ω_k`) and Theorem 3 (`◇P`) are unaffected, and `Σ`, `S`, `◇S`, `S_x`, `◇S_x` are handled in a
+  one-paragraph remark (Section 4.4) and in the `t`-resilience extension (Section 5). The abstract says the
+  simulations work "for a large family of failure detector classes". That claim stays true for `{Ω_k}_k`,
+  `◇P`, `P`. The introduction is more specific ("This simulation is generic in the sense that it works for
+  any of the previously cited failure detectors", which include `Σ`), but the equivalence of `ARW_n[C]` and
+  `IIS_n[C*]` is existential and is not refuted for `Σ` (only this simulation is). Not an implied-assumption
+  or typo case: repairing it changes the
   simulation (e.g. `C*.read()` must return the value used at the last owned round), and even then the
   literal `Σ*` also constrains weakly correct processes, whose quorums need not consist of strongly
   correct processes (`q_1`'s quorum is `{q_0, q_1}` in our run).
@@ -68,9 +67,9 @@ report PI 1991, February 2012 (hal-00670154v1), whose numbering we follow.
   correspondence between correct simulators and correct simulated processes, and the `Ω*_k` / `◇P*`
   properties of the simulated detector. The claim "produces an execution that could have been obtained
   in `IIS_n[C*]`" is checked through these properties plus the IS properties of `simSchedule`. The
-  simulated algorithm `A` and the task are not modelled. Label ✅.
+  simulated algorithm `A` and the task are not modelled.
 - **Theorem 5 / Lemmas 1–3 (consensus in `IIS_n[Ω*]`): true** (`theorem5`). Proof of Lemma 3 repaired, see
-  below. Proofs of Lemmas 1 and 2 are fine up to routine details. **Label 🛠️ (R1).**
+  below. Proofs of Lemmas 1 and 2 are fine up to routine details. **Label 🛠️.**
 
 ## Proof gaps
 
@@ -104,7 +103,7 @@ report PI 1991, February 2012 (hal-00670154v1), whose numbering we follow.
   adopt a decision written by another (in IIS weakly correct processes see the strongly correct ones
   forever; in ARW a simulator can read a shared decision register). This is the standard trick and
   presumably why Corollary 1 is restricted to colorless tasks, but "immediate consequence" omits it. Not
-  formalized, so it does not affect the verdict.
+  formalized.
 - Section 2.6's informal claims are formalized: `SC₀ ≠ ∅` if some process is correct
   (`SCk_zero_nonempty`), `SC ⊆ C` (`correct_of_mem_SC`), the chain is increasing (`SCk_mono`), and after
   some round strongly correct processes see only strongly correct processes (`eventually_view_SC`,

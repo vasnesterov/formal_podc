@@ -6,20 +6,20 @@ follows the proceedings version.
 
 ## Errors and imprecisions in the paper
 
-1. **Theorem 4.1 omits the hypothesis "the sender is unregistered" (imprecise statement; intended meaning clear
-   from the surrounding text).** As printed ("Assume there exist s registered parties ... no Byzantine Broadcast
+1. **Theorem 4.1 omits the hypothesis "the sender is unregistered" (✏️; intended meaning clear from the
+   surrounding text).** As printed ("Assume there exist s registered parties ... no Byzantine Broadcast
    protocol if t ≥ max{⌈s/2⌉, ⌈n/3⌉}") it contradicts the paper's own Theorems 3.13/3.14: with `n = s = 3`,
    sender registered and `t = 2 = max{⌈3/2⌉, ⌈3/3⌉}`, broadcast is solvable. Lean:
    `theorem41_false_registered_sender` (via `theorem314_solvable`). We prove Theorem 4.1 with `snd ∉ Reg`
    (`theorem41`).
-2. **Theorem 4.1 is false for `n = 2` and Corollary 4.2 is false for `n = 1` (false only in a degenerate case).**
+2. **Theorem 4.1 is false for `n = 2` and Corollary 4.2 is false for `n = 1` (🔧).**
    For `n = 2` broadcast is solvable against any number of Byzantine parties (the sender sends its value; the
    other party outputs what it receives), but `max{⌈s/2⌉, ⌈2/3⌉} = 1 ≤ t = 1`. For `n = 1` agreement is trivial.
    Lean: `bb_solvable_card_two`, `theorem41_false_card_two`, `ba_solvable_card_one`, `corollary42_false_card_one`.
    We prove Theorem 4.1 for `n ≥ 3` and Corollary 4.2 for `n ≥ 2` (`theorem41`, `corollary42`). The same caveat
    applies to the "if and only if" of the abstract for broadcast with an unregistered sender.
-3. **Figure 1, Phase 2 is ambiguous; under the "else-if" reading Lemma 3.10 is false (under-specified
-   definition).** For an unregistered party receiving a valid Extension the figure has two bullets: "if `v = 0`,
+3. **Figure 1, Phase 2 is ambiguous; under the "else-if" reading Lemma 3.10 is false (✏️: the proof
+   uses the sequential reading).** For an unregistered party receiving a valid Extension the figure has two bullets: "if `v = 0`,
    set `v = 1` and send Echo1" and "if `v = 1` and `g = 0`, set `g = 1` and send Echo1". If they are exclusive, a
    party with `(v, g) = (0, 0)` ends with `(1, 0)`. Run (`n = 4`, `Reg = {0 (sender), 1}`, Byzantine `{0, 3}`):
    in super round 1, party 3 sends party 2 an Echo2 with the chain `[0]`; party 2 sets `g = 0` and sends Echo3; the
@@ -32,7 +32,7 @@ follows the proceedings version.
    Lemma 3.10 ("sets `v_j = 1` and it must have `g_j = 1` in phase 2") uses the
    sequential reading ("set `v = 1`, then, since `v = 1` and `g = 0`, set `g = 1`"), which we formalize; with it
    all lemmas hold. Lean: `Exclusive.lean` (see README for the exact statement).
-4. **Proof gaps with true statements (Section 3).**
+4. **Proof gaps with true statements (Section 3; 🔧).**
    - Lemma 3.3: "each party `P_j` with `v_j = 0` sets `v_j = 1` in phase 2 of super round `k+1`" needs the
      extended chain to be valid *for `P_j`*, i.e. `P_j` not on it. If `P_j` is registered and on the chain, it
      signed, hence had accepted, hence `v_j = 1` already — an unforgeability argument the paper skips. We prove
@@ -42,12 +42,12 @@ follows the proceedings version.
      Figure 1 it only sets `g_i = 0` (keeping `v_i = 0`). The contradiction still follows, via the grade (it can
      only return to `1` together with `v = 1`); our proofs do this.
    - Lemma 3.7 Case 2's restriction to super rounds `k < s` is unnecessary; the argument works for all `k ≤ s`.
-5. **Inconsistent statements of the small-`N` result (typo-level).** Section 3 says that for `n − s < 3` one can
+5. **Inconsistent statements of the small-`N` result (typo).** Section 3 says that for `n − s < 3` one can
    tolerate `t ≤ s + 1`; Theorem 3.14 says "any number of corruptions"; Lemma 6.1 assumes `t ≤ n − 2`; the
    overview mentions "`t ∈ {s+1, s+2}`". We prove the strongest version: for `n − s ≤ 2`, Π_BC with the OR exchange
    among `N` (Figure 4) solves broadcast against **every** Byzantine set (`theorem314`).
 
-6. **Theorem 5.1 (correct; minor remarks).** Π_auth must have a known round bound `R` (registered parties must know
+6. **Theorem 5.1 (✏️ implied assumption; the statement is true).** Π_auth must have a known round bound `R` (registered parties must know
    when to send, unregistered parties when to decide) — implicit for "deterministic" in the paper; we make it a
    hypothesis (`BoundedAuthBA`). The signatures in the dissemination step and the tie-breaking rule are never
    needed. The result is stronger than stated: only Byzantine *registered* parties count, `2|B ∩ S| < s` suffices

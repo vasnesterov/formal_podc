@@ -4,22 +4,22 @@ Keren Censor-Hillel, Bernhard Haeupler, D. Ellis Hershkowitz, Goran Zuzic. *Broa
 Networks.* PODC 2017. DOI [10.1145/3087801.3087808](https://doi.org/10.1145/3087801.3087808). Formalized
 version: arXiv [1705.07369](https://arxiv.org/abs/1705.07369) v1 (full version); numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** The formalized results all hold as stated, for every constant
-`p ∈ (0, 1)`:
-* the star gap (Lemmas 15 and 16, Theorem 17): with receiver faults, adaptive routing on the star has
-  throughput `Θ(1/log n)`, coding has `Θ(1)`, so the coding gap is `Θ(log n)`;
-* the sender-fault transformation for routing (Lemma 25).
-
-The proof of the routing lower bound in Lemma 15 does not work and had to be replaced. The upper-bound
-half of Lemma 15 relies on an independence that the paper never justifies.
+**Verdict: 🛠️ Hard fix.** The formalized results all hold, for every constant `p ∈ (0, 1)`: the star gap (Lemmas 15
+and 16, Theorem 17: with receiver faults, adaptive routing on the star has throughput `Θ(1/log n)`, coding has
+`Θ(1)`, so the coding gap is `Θ(log n)`) and the sender-fault transformation for routing (Lemma 25). The proof of the
+routing lower bound in Lemma 15 does not work and had to be replaced by a new coupling argument, and the upper-bound
+half of Lemma 15 relies on an independence that the paper never justifies. Much of the paper's main point was not
+checked: the broadcast algorithms of Section 4, the worst-case gap, and Lemma 26, where we noticed a gap but did not
+decide it.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
 - Lemma 15: `Pr(Hᵢ ≥ t) = (1/2)^t` should be `(1/2)^{t-1}`; the domination still holds.
-- Lemma 25: "sends `k'₀ = k₀x` messages in `(τ-ε)^{-1}(1-p)^{-1}(1+η)` rounds" is missing the factor `k'₀`.
+- Lemma 25: "sends `k'₀ = k₀x` messages in `(τ-ε)^{-1}(1-p)^{-1}(1+η)` rounds" is missing the factor `k'₀`, and the
+  closing "`k'₀(τ-ε)(1-p)(1+η)^{-1}` rounds" has the exponents inverted.
+- Lemma 15 for `p = 0`: the model allows `p ∈ [0, 1)`, but with `p = 0` the star has throughput `1`, not
+  `Θ(1/log n)`. We read "with receiver faults" as `p > 0`.
 
 ## Proof gaps (statements true)
 
@@ -48,7 +48,7 @@ message reaches all `n` leaves with probability `(1 - p^T)^n`, independently of 
 over the `C(k, ⌊k/2⌋+1)` candidate sets of messages finishes the proof. (`star_prob_delivered_le`,
 `star_routingRounds_ge`)
 
-### 🛠️ Lemma 15, possibility half (missing independence)
+### 🔧 Lemma 15, possibility half (missing independence)
 The proof dominates `Y = Σ Yᵢ` by a sum of independent geometric variables, which needs the per-message cover times
 to be independent, but they come from one adaptive run and the paper does not address this.
 
@@ -57,7 +57,7 @@ to be independent, but they come from one adaptive run and the paper does not ad
 **Repair.** After the coupling we use a direct exponential-moment bound instead of Doerr's Theorem 34, with
 `λ = 2/(1+p)` and `E[λ^{excess}] ≤ 2`. (`star_greedy_succeeds`)
 
-### 🛠️ Lemma 25 (sender-fault transformation, under-specified construction)
+### 🔧 Lemma 25 (sender-fault transformation, under-specified construction)
 "Broadcast `m_{i1}` until it succeeds" is not directly expressible: an adaptive routing schedule (Definition 14)
 sees only who knows which message, not the sender's coin.
 
@@ -113,7 +113,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * The worst-case topology (Lemmas 18–24), which rests on the construction of [19].
 * Lemma 26, the coding transformation. It has a gap: a coding schedule may decide to stay silent based
   on packet contents, so the `x` parallel copies of a meta-round can disagree on whether a node
-  broadcasts.
+  broadcasts. We did not decide whether the statement holds.
 * Theorems 27–28, which rest on [3].
 * Appendix A.
 

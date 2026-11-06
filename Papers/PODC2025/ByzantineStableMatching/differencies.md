@@ -5,16 +5,16 @@ Paper: A. Constantinescu, M. Dufay, D. Ghinea, R. Wattenhofer, *Byzantine Stable
 
 ## Errors in the paper
 
-1. **`k = 1` breaks all "only if" directions (Theorems 2, 3, 4, 6, 7).** The paper never assumes
+1. ✏️ **`k = 1` breaks all "only if" directions (Theorems 2, 3, 4, 6, 7).** The paper never assumes
    `k ≥ 2`. For `k = 1` bSM is solvable without any communication on every network against every
    adversary (each party outputs the only party on the other side): `bSM_solvable_k1`,
    `bSM_solvableAuth_k1`, `theorem2_only_if_false_k1` (`Necessity.lean`). E.g. Theorem 2 claims
    unsolvability for `k = 1`, `tL = tR = 1` (since `1 ≥ 1/3`). All our characterizations assume `k ≥ 2`.
-2. **`k = 2` is not covered by the paper's proof of Theorem 2 (necessity).** The proof applies
+2. 🔧 **`k = 2` is not covered by the paper's proof of Theorem 2 (necessity).** The proof applies
    Lemma 3 with `d = 3`, which needs `k ≥ d = 3`. The claim is nevertheless true for `k = 2`: our
    generalized Lemma 5 (`lemma5`) covers every `k ≥ 2` (for `k = 2` the cover degenerates to an 8-node
    double cover of `K₄`).
-3. **Lemma 13's reduction is invalid.** "Using Corollary 2 and Lemma 3, this means that there exists a
+3. 🔧 **Lemma 13's reduction is invalid.** "Using Corollary 2 and Lemma 3, this means that there exists a
    protocol Π which solves sSM on n := 6 nodes with tR = 3 and tL = 1." Lemma 3 with `d = 3` only gives
    `⌊tR/⌈k/3⌉⌋ = ⌊k/⌈k/3⌉⌋` Byzantine parties on the right, which is `< 3` for `k = 4, 5, 7, 8, …`
    (`lemma3_not_enough_for_lemma13`: `4 / ⌈4/3⌉ = 2`), and it needs `k ≥ 3`; Corollary 2 is about
@@ -22,7 +22,7 @@ Paper: A. Constantinescu, M. Dufay, D. Ghinea, R. Wattenhofer, *Byzantine Stable
    argument directly for every `k ≥ 2` with groups (`lemma13_sSM`). (A generalized Lemma 3 tolerating
    "any union of groups that is admissible" would also repair it; our `GroupSim.Solvable.of_groupSim` is
    such a statement.)
-4. **Proof of Theorem 7, case `tR = k`, `tL < k/3`, cites the wrong result.** It invokes Theorem 4,
+4. ✏️ **Proof of Theorem 7, case `tR = k`, `tL < k/3`, cites the wrong result.** It invokes Theorem 4,
    which requires `tR < k/2` (unauthenticated one-sided). The case is still solvable: the protocol
    `ΠbSM` of Lemma 9 also works on the one-sided network (it only uses `L–R` edges); we use it there.
 5. **Typos / misreferences (harmless).** Lemma 5's proof says "c1 must … decide to match party v2"

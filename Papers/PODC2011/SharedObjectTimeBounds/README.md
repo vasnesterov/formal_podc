@@ -5,24 +5,38 @@ Synchronous Systems.* PODC 2011. DOI [10.1145/1993806.1993877](https://doi.org/1
 Formalized version: the full version, J. Wang's MS thesis of the same title (Texas A&M, December 2011, advisor
 J. L. Welch); numbering follows the thesis (Chapter IV for the lower bounds).
 
-**Verdict: ❌ False claim.** The `d + min {ε, u, d/3}` lower bounds hold: for every strongly immediately
+**Verdict: ⚠️ Weakened.** The `d + min {ε, u, d/3}` lower bounds hold: for every strongly immediately
 non-self-commuting operation (read-modify-write, dequeue, pop; Theorem C.1) and for `|OP| + |AOP|` under the
-hypotheses of Theorem E.1. The `(1 - 1/k) u` bound of Theorem D.1, one of the three main results, is not established:
-its proof has an unrepaired gap; we prove it only under a stronger hypothesis, which covers writes and every `k = 2`,
-and for skew `ε ≥ (1 - 1/k) u`. The claim that Theorem E.1 covers push/peek on a stack is false.
+hypotheses of Theorem E.1. The `(1 - 1/k) u` bound of Theorem D.1, one of the three main results, is established only
+under a stronger hypothesis, which covers writes and every `k = 2`, and for skew `ε ≥ (1 - 1/k) u`; the claim that
+Theorem E.1 covers push/peek on a stack is false. The upper bounds of Chapter V were not checked.
 
 ## Mistakes in the paper
 
-### ❌ Theorem D.1 of Chapter IV (Step 1.1 of the proof)
+### ❌ §IV.E and Table III (push and peek on a stack)
+The thesis says that Theorem E.1 "can be applied to push and peek on a stack" and lists `d + min {ε, u, d/3}` as a
+lower bound for `|push| + |peek|`, but push/peek never satisfy the hypotheses of Theorem E.1
+(`stack_push_peek_not_E1`).
+
+**Impact.** The push+peek entry of Table III (and the same claim in Chapter VI) is unproved, and we have neither a
+proof nor a refutation of the bound itself; the theorem itself and its application to enqueue/peek on a queue are
+fine (`queue_E1_hyps`). For E.1's hypotheses, a peek after pushes behaves like a read after writes, a case the thesis
+itself excludes from Theorem E.1 (overwriting).
+
+**Details.** Hypothesis A asks that exactly one of `ρ ∘ op₁ ∘ aop₁` and `ρ ∘ op₂ ∘ op₁ ∘ aop₁` be legal. With
+`op₁`, `op₂` pushes and `aop₁` a peek, both sequences leave the element of `op₁` on top, so they are legal
+together or illegal together (as soon as hypothesis C makes `op₁`, `op₂` legal instances). A peek of a queue sees
+the first element, which is why enqueue/peek works.
+
+### ⚠️ Theorem D.1 of Chapter IV (Step 1.1 of the proof)
 Step 1.1 asserts a single legal permutation `π` of the `k` concurrent operations that fixes the results of *every*
 later sequence of operations; correctness does not give this, and without it the runs of the proof yield no
 contradiction (`tr_answers`).
 
-**Impact.** Theorem D.1, a main result of the thesis (abstract), is unestablished in its stated generality (rule
-R5: an unestablished headline is ❌); we have neither a proof nor a counterexample. We prove it under a stronger
-hypothesis, `LastRevealing` (one fixed query sequence whose results determine the last of the `k` operations). This
-covers writes with `k = n` (`write_lastRevealing`), every case `k = 2` (`theorem_D1_two`), and, by the same argument
-(not formalized), push (one pop) and enqueue (`k` dequeues).
+**Impact.** Theorem D.1, a main result of the thesis (abstract), is unestablished in its stated generality; we have
+neither a proof nor a counterexample. We prove it under a stronger hypothesis, `LastRevealing` (one fixed query
+sequence whose results determine the last of the `k` operations). This covers writes with `k = n`
+(`write_lastRevealing`) and every case `k = 2` (`theorem_D1_two`).
 
 **Details.** Correctness gives a linearization for each complete run; an algorithm may decide the order of
 concurrent operations lazily, depending on later operations. The proof's runs `R₁` and its shifts `R₂^z` only
@@ -35,50 +49,29 @@ only the last write matters, so one with `op_z` before `op_{z+1}` exists). So th
 `LastRevealing` (`tr_not_lastRevealing`). We do not know whether Theorem D.1 itself fails for this object.
 
 **Repair.** `theorem_D1`: with `ε ≥ (1 - 1/k) u` and `LastRevealing`, `|OP| ≥ (1 - 1/k) u`. The thesis's shifts
-and its six-case delay check are correct (after the typo below).
+and its six-case delay check are correct (after the typo in the shift, see Slips).
 
-### ❌ §IV.E and Table III (push and peek on a stack)
-The thesis says that Theorem E.1 "can be applied to push and peek on a stack" and lists `d + min {ε, u, d/3}` as a
-lower bound for `|push| + |peek|`, but push/peek never satisfy the hypotheses of Theorem E.1
-(`stack_push_peek_not_E1`).
-
-**Impact.** The push+peek entry of Table III (and the same claim in Chapter VI) is unproved; the theorem itself and
-its application to enqueue/peek on a queue are fine (`queue_E1_hyps`). For E.1's hypotheses, a peek after pushes
-behaves like a read after writes, a case the thesis itself excludes from Theorem E.1 (overwriting).
-
-**Details.** Hypothesis A asks that exactly one of `ρ ∘ op₁ ∘ aop₁` and `ρ ∘ op₂ ∘ op₁ ∘ aop₁` be legal. With
-`op₁`, `op₂` pushes and `aop₁` a peek, both sequences leave the element of `op₁` on top, so they are legal
-together or illegal together (as soon as hypothesis C makes `op₁`, `op₂` legal instances). A peek of a queue sees
-the first element, which is why enqueue/peek works.
-
-### ⚠️ Theorem D.1 of Chapter IV (missing assumption on the clock skew)
-The run `R₂` of the proof has clock skew `(1 - 1/k) u`, but the theorem allows any `ε`; the bound is established
-only for `ε ≥ (1 - 1/k) u` (`theorem_D1`).
-
-**Impact.** Local fix: the proof states that it assumes the optimal skew `ε = (1 - 1/n) u ≥ (1 - 1/k) u`, and
-Chapter V makes the same assumption. For smaller `ε` the bound appears to fail: Algorithm 1 of Chapter V answers
-pure mutators (writes) after `ε` (not formalized).
-
-### ⚠️ Definitions D.1 and D.4 (mutator, pure accessor)
-Read literally, no operation type is a pure accessor (`not_pureAccessor`), so Theorem E.1 is vacuous.
-
-**Impact.** Typo-level: the intended definition (Kosa) compares only legal sequences; with it (`NonMutator`)
-Theorem E.1 is proved (`theorem_E1`).
-
-**Details.** An accessor has a legal `ρ` with `ρ ∘ op` illegal; then `ρ ∘ op` is not equivalent to `ρ`, so `op` is a
-"mutator" by Definition D.1.
-
-### Typos and slips
+### ✏️ Slips
+- Theorem D.1 (clock skew): the run `R₂` of the proof has skew `(1 - 1/k) u`, but the theorem allows any `ε`; the
+  bound is established only for `ε ≥ (1 - 1/k) u` (`theorem_D1`). The proof states that it assumes the optimal skew
+  `ε = (1 - 1/n) u ≥ (1 - 1/k) u`, and Chapter V makes the same assumption. For smaller `ε` the bound appears to
+  fail: Algorithm 1 of Chapter V answers pure mutators (writes) after `ε` (not formalized).
+- Definitions D.1, D.2, D.4: read literally, an accessor has a legal `ρ` with `ρ ∘ op` illegal, so `ρ ∘ op` is not
+  equivalent to `ρ` and `op` is a "mutator". No operation type is then a pure accessor (`not_pureAccessor`) and
+  Theorem E.1 is vacuous. The intended definition (Kosa) compares only legal sequences; with it (`NonMutator`)
+  Theorem E.1 is proved (`theorem_E1`).
 - Proof of Theorem D.1, Step 2: the shift `x_i = [-(k-1)/2 + ((z-i) mod k)/k] u` should read `-(k-1)/(2k)` (as in
   Step 2.2 and in the skew computation).
 - Proof of Theorem C.1, Step 2: "messages from `p_j` to `p_k` cost `δ = d - m`" should be `p_j` to `p_i`.
 - Proof of Theorem E.1, Step 1: "since `aop'₁` and `aop'₂` are pure mutators" should be pure accessors.
 - §III.B.2: views require strictly increasing clock times, which rules out simultaneous receipts such as those at
   `p_k` in the run `R₁` of Theorem C.1; non-decreasing times are meant.
+- Claim B.2: for timed automata whose timers accumulate at a finite time (Zeno), a finite admissible run has no
+  complete admissible extension; non-Zeno algorithms are meant.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem E.1 (both orders of `op₁`, `op₂` are legal)
+### 🔧 Theorem E.1 (both orders of `op₁`, `op₂` are legal)
 The proof infers that `ρ ∘ op₁ ∘ op₂` and `ρ ∘ op₂ ∘ op₁` are both legal from immediate self-commutativity, which
 needs `ρ ∘ op₁` and `ρ ∘ op₂` legal; hypothesis C gives only one of them.
 
@@ -126,7 +119,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Claims B.1–B.4, Lemma B.1 | `IsRun.shift`, `agree_of_cut`, `agree_window`, `restart` | `Podc/…/Timed/Basic.lean`, `Setup.lean` |
 
 **Not formalized.** Chapter V (Algorithm 1 and its correctness and time bounds, Theorems C.18, D.1, D.2 of
-Chapter V) and the remaining entries of the tables of Chapter VI.
+Chapter V) and the remaining entries of the tables of Chapter VI. The `(1 - 1/n) u` entries for push and enqueue
+(Tables II, III): the `LastRevealing` argument should apply to push (one pop) and enqueue (`k` dequeues), but this is
+not formalized. We did not check whether the 2-page PODC brief announcement repeats the push/peek claim.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. The
 hypotheses of the theorems on specifications are shown satisfiable by concrete objects (`Examples.lean`); the

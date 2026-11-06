@@ -5,15 +5,15 @@ on Trees and Block Graphs.* PODC 2026. DOI [10.1145/3796701.3815967](https://doi
 Formalized version: arXiv [2502.05591](https://arxiv.org/abs/2502.05591) v5; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The reductions are correct: AA on trees reduces to real-valued AA plus
-gradecast (Theorems 3 and 5), and AA on block graphs reduces to AA on trees (Theorem 8). We proved them in the
-synchronous lock-step model with the black boxes as hypotheses. Some proofs are wrong but the statements hold:
-Lemma 13 (validity on block graphs), Lemma 12 and Lemma 15. The authenticated RealAA protocol of Theorem 7 uses, for
-small `D/ε`, a protocol of [25] whose correctness theorem is false for `t ≥ n/3`. Theorem 2's round bound fails for `1 < D/ε ≤ 2`.
+**Verdict: ⚠️ Weakened.** The reductions are correct: AA on trees reduces to real-valued AA plus gradecast (Theorems 3
+and 5), and AA on block graphs reduces to AA on trees (Theorem 8); we proved them in the synchronous lock-step model
+with the black boxes as hypotheses. The resilience `c ∈ [1/3, 1/2)` with signatures rests on a refuted protocol
+(Theorem 7), and the block-graph round bound `R_TreeAA(4·D(G))` on the unproved Lemma 15; both are unestablished, not
+refuted. The cited real-valued AA protocols and Fekete's lower bound construction were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorem 7 (authenticated RealAA, `t = c·n`, `c ∈ [1/3, 1/2)`)
+### ❌ Theorem 7 (authenticated RealAA, `t = c·n`, `c ∈ [1/3, 1/2)`)
 For small `D/ε` the protocol `RealAA^PKI` of Theorem 7's proof runs Theorem 10 (Theorem 3.1 of [25], PODC 2022),
 which is false for `t ≥ n/3`, so it fails already for `n = 3`, `t = 1`, `D = 1`, `ε = 1/2`
 (`AA.theorem_3_1_sync_false`).
@@ -29,23 +29,43 @@ false in synchronous networks when `n ≤ 3t`. This project's formalization of [
 `log₂((1−2c)/c) + log₂log₂(D/ε) > 0` fails, so `RealAA^PKI` runs exactly that broken protocol and the honest
 outputs `0` and `1` are not `ε`-close.
 
-**Repair.** Run the Proxcensus-based `RealAA₁^PKI` for a constant number `R` of iterations with
-`(c′R)^R ≥ D/ε`.
+**Repair.** Proposed, not proved in Lean: run the Proxcensus-based `RealAA₁^PKI` for a constant number `R` of
+iterations with `(c′R)^R ≥ D/ε`.
 
-### ⚠️ Theorem 2 (round bound of BDH's RealAA, `1 < D/ε ≤ 2`)
-For `1 < D/ε < 2` the bound `7 log₂δ / log₂log₂δ + 3` is below 3 rounds, i.e. below one iteration, and at `D/ε = 2`
-it divides by zero (`theorem2_bound_degenerate`).
+### ❌ Lemma 15 (`D(T) ≤ 2·D(G)` for a minimum-diameter clique tree)
+The proof says that if a longest path passes ≥ 4 consecutive cliques sharing a vertex, then "replacing them by a
+star strictly decreases the diameter", but another longest path may survive the change.
 
-**Impact.** Degenerate range; the arithmetic is correct for `D/ε > 2` (`theorem2`).
+**Impact.** The lemma is unestablished, not refuted, and not formalized. Theorem 8's bound `R_TreeAA(4·D(G))` and
+Corollaries 4 and 5 rest on it; we state Theorem 8 with the round bound of the tree protocol on `T_S` and prove
+`D(T_S) ≤ 2·D(T)`.
+
+**Details.** Counterexample to this step: the path `x₀ … x₆` with two pendant vertices at `x₃`. Exhaustive
+enumeration (`scripts/lemma15_check.py`) finds minimum-diameter clique trees (diameter 5) whose longest path has the
+separators `x₁, x₂, x₃, x₃, x₃`. The final counting is also off by one, and `|P_G| ≤ D(G)` is justified only by
+"`P_G` is a path" (it holds because such a path is a shortest path in a block graph).
+
+**Repair.** Sketch, not proved in Lean: the statement is believed true; compare with the clique tree in which the
+cliques at each cut vertex form a star.
+
+### ✏️ Slips
+- Theorem 2's round bound: for `1 < D/ε < 2` the bound `7 log₂δ / log₂log₂δ + 3` is below 3 rounds, i.e. below one
+  iteration, and at `D/ε = 2` it divides by zero (`theorem2_bound_degenerate`). The arithmetic is correct for
+  `D/ε > 2` (`theorem2`).
+- Theorem 8's bound silently assumes `R_TreeAA` is monotone; `blockGraphAA_solves` is stated with the rounds on `T_S`,
+  which avoids this.
+- §4.1 says "the `k := D(P)` vertices of `P`", but there are `D(P)+1`.
+- The proof of Lemma 6 claims `k_max ≤ D`, but in fact `k_max ≤ D+1`; the inputs are still `D`-close.
+- The proof of Theorem 3 writes `R_RealAA(|V(T)|,1)` where the statement has `2·|V(T)|`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 13, Case 3 (validity on block graphs)
+### 🔧 Lemma 13, Case 3 (validity on block graphs)
 For a clique output `c` that does not contain the party's input `v_in`, the proof says the output (the vertex of `c`
 closest to `v_in`) is the separator between `c` and its neighbour towards the honest clique `c_b`, but it is the
 separator towards the party's *own* clique.
 
-**Impact.** Statement true; repaired (`blockOut_spec`).
+**Impact.** The case as argued picks the wrong separator; validity on block graphs still holds (`blockOut_spec`).
 
 **Details.** Example: the path `x₀–x₁–x₂–x₃` with cliques `{x₀x₁}, {x₁x₂}, {x₂x₃}`. Take honest inputs `x₀` (this
 party) and `x₃`, and the tree output `{x₁x₂}`. The party outputs `x₁`, while the separator towards `{x₂x₃}` is `x₂`.
@@ -53,35 +73,14 @@ party) and `x₃`, and the tree output `{x₁x₂}`. The party outputs `x₁`, w
 **Repair.** By the tripod property of trees, `c` lies between the own clique and one of the two honest cliques, and
 Lemma 12 puts the correct separator on a shortest path. (`blockOut_spec`)
 
-### 🛠️ Lemma 15 (`D(T) ≤ 2·D(G)` for a minimum-diameter clique tree)
-The proof says that if a longest path passes ≥ 4 consecutive cliques sharing a vertex, then "replacing them by a
-star strictly decreases the diameter", but another longest path may survive the change.
-
-**Impact.** Statement true, not formalized. Theorem 8's bound `R_TreeAA(4·D(G))` rests on this lemma; we state
-Theorem 8 with the round bound of the tree protocol on `T_S` and prove `D(T_S) ≤ 2·D(T)`.
-
-**Details.** Counterexample to this step: the path `x₀ … x₆` with two pendant vertices at `x₃`. Exhaustive
-enumeration (`scripts/lemma15_check.py`) finds minimum-diameter clique trees (diameter 5) whose longest path has the
-separators `x₁, x₂, x₃, x₃, x₃`. The final counting is also off by one, and `|P_G| ≤ D(G)` is justified only by
-"`P_G` is a path" (it holds because such a path is a shortest path in a block graph). Theorem 8's bound also
-silently assumes `R_TreeAA` is monotone.
-
-**Repair.** The statement is still true: compare with the clique tree in which the cliques at each cut vertex form
-a star.
-
-### 🛠️ Lemma 12 (Appendix D, clique-tree edge separator)
+### 🔧 Lemma 12 (Appendix D, clique-tree edge separator)
 The proof assumes the first clique of the walk lies on `c`'s side, and asserts without justification that some walk
 vertex lies in both cliques of the crossing edge.
 
-**Impact.** Statement true; repaired (`sep_mem_support`, `sep_btw`).
+**Impact.** Both steps are closed in a few lines (`sep_mem_support`, `sep_btw`).
 
 **Repair.** Our proof is an induction along the walk with the invariant "every clique containing the current vertex
 is on `c`'s side". (`sep_mem_support`, `sep_btw`)
-
-### Typos and slips
-- §4.1 says "the `k := D(P)` vertices of `P`", but there are `D(P)+1`.
-- The proof of Lemma 6 claims `k_max ≤ D`, but in fact `k_max ≤ D+1`; the inputs are still `D`-close.
-- The proof of Theorem 3 writes `R_RealAA(|V(T)|,1)` where the statement has `2·|V(T)|`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -140,8 +139,9 @@ short-path party's own projection index is at most `k*`. Lemma 3.1 does not need
 **Not formalized.**
 * Fekete's chain construction (Lemma 1, cited), and the contraction of BDH's RealAA (Lemma 16, cited).
 * The authenticated RealAA (Theorems 6, 7, 9, 10, cited).
-* Lemma 15, and the existence of minimum-diameter clique trees.
+* Lemma 15, the existence of minimum-diameter clique trees, and the deterministic algorithm of [11] that computes them.
 * The asynchronous tree protocol of [37] (Corollary 6 is covered only at the level of the reduction).
+* Adaptive corruption (our model is static).
 * The asymptotic corollaries beyond the stated combinations.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and `Quot.sound`.

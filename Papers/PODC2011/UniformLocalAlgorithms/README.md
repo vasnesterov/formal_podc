@@ -6,22 +6,52 @@ Assumptions Concerning Global Knowledge.* PODC 2011. DOI
 [1512.03306](https://arxiv.org/abs/1512.03306) v1 (journal version, Distributed Computing); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The main transformers hold: Theorem 1, Theorem 2 (randomized: weak Monte-Carlo
-to Las Vegas), Theorem 3 (deterministic case) and Theorem 4. They need a `+1` in their `O(·)` bounds
-(degenerate case `f* < 1`), and the proofs of Theorems 2 and 3 need repairs. Observation 3.3 is false:
-the maximal-matching pruning algorithm `P_MM` does not satisfy gluing for the paper's own encoding of
-matchings. With matchings encoded by partner identities it is a pruning algorithm, so Corollary 1(vi) survives.
+**Verdict: ⚠️ Weakened.** The main transformers hold after local repairs: Theorem 1, Theorem 2 (randomized: weak
+Monte-Carlo to Las Vegas), Theorem 3 (deterministic case) and Theorem 4, and uniform maximal matching survives with
+matchings encoded by partner identities. The randomized half of Theorem 3 and the arboricity applications are not
+saved: Corollary 3 has only a sketched repair, and Corollary 4 is proved only under an extra hypothesis. The coloring
+results of Section 5 were not checked.
 
 ## Mistakes in the paper
 
-### ❌ Observation 3.3 (`P_MM` is a pruning algorithm for maximal matching)
+### ❌ Corollaries 3 and 4 (families not closed under inclusion; hence Corollary 1(i))
+The corollaries apply Theorems 1 and 3 to the families `F_large`, `F_med` and "arboricity `o(√log n)`", which are not
+closed under inclusion (deleting isolated nodes lowers `n`, deleting edges lowers `a`), as Section 2 requires.
+
+**Impact.** The non-uniform algorithm has no guarantee on residual instances. The bounds can be recovered by working
+on all graphs; we sketch this for Corollary 3 in [differencies.md](differencies.md) but did not formalize it.
+`corollary_4` is proved under one extra hypothesis (next items).
+
+**Details.** Section 2 requires every family to be closed under inclusion, and a pruning algorithm must map the
+family into itself.
+
+### ⚠️ Theorem 3 (inverse functions in the proof)
+The proof sets `g_j⁻¹(x) = min g_j⁻¹({x})` and uses `g_j(g_j⁻¹(x)) = x`, but an ascending `g_j` need not take the
+value `x`.
+
+**Impact.** Statement true; repaired for the deterministic case (`theorem_3`). The randomized case has the same
+broken step and no Lean proof; the reduction below acts on the non-uniform algorithm, so it would transfer verbatim,
+but this is not formalized.
+
+**Details.** The argument also mixes reals with integer coordinates.
+
+**Repair.** Take `g_j⁻¹(x) = max {y : g_j(y) ≤ x}`. We prove Theorem 3 by a direct reduction to Theorem 1: guesses for
+the correctness parameters `Γ` are computed from guesses for the time parameters `Λ`. This needs only `Λ`-monotone
+pruning, not `Λ ∪ Γ` (`theorem_3`).
+
+### ⚠️ Corollary 4 (time bound of the cited algorithm for every good guess)
+Corollary 4 also needs the cited algorithm's time bound `f(ñ)` to hold for *every* good arboricity guess, including
+`ã = ñ`, and the paper does not argue this.
+
+**Impact.** Our `corollary_4` assumes it, and it is stated on all finite graphs.
+
+### 🔧 Observation 3.3 (`P_MM` is a pruning algorithm for maximal matching)
 `P_MM` does not satisfy gluing for the paper's own encoding of matchings: on the path `v₀ — u₀ — u — v`
 with tentative output `(5, 5, 1, 2)` it prunes `{v₀, u₀}`, the residual edge `u — v` is solved by
 `(5, 5)`, and the combined output `(5, 5, 5, 5)` matches nobody (`observation_3_3_false`).
 
-**Impact.** A numbered observation, not a headline: with matchings encoded by partner identities the
-same rule is a pruning algorithm, so Corollary 1(vi) survives (`observation_3_3_repaired`,
-`corollary_1_vi`).
+**Impact.** With matchings encoded by partner identities the same rule is a pruning algorithm, so Corollary 1(vi)
+survives (`observation_3_3_repaired`, `corollary_1_vi`).
 
 **Details.** In the paper, `u` and `v` are *matched* if they are adjacent, output the same value, and
 no other neighbour of `u` or `v` outputs that value. In the example, `v₀` and `u₀` are matched, while
@@ -33,40 +63,17 @@ looks at neighbours' values. This fails for any new inputs the pruning algorithm
 needs 2 rounds instead of 3 (`observation_3_3_repaired`). Corollary 1(vi) holds for this encoding
 (`corollary_1_vi`).
 
-### ⚠️ Theorems 1–4 (bounds `O(f*·s_f(f*))` and `O(f_min)` when `f* < 1`)
-The claimed bounds fail when `f* < 1`, since the transformed algorithm always spends at least one
-iteration.
-
-**Impact.** Degenerate case; we prove `C·(f*·s_f(⌊f*⌋) + 1)` and `C·(f_j + 1)` (`theorem_1`,
-`theorem_2`, `theorem_3`, `theorem_4`).
-
-### ⚠️ Observation 3.2 (`β = 0`)
-Observation 3.2 needs `β ≥ 1`.
-
-**Impact.** Degenerate: the `(2,0)` case.
-
-### ⚠️ Observation 3.3 ("monotone with respect to any parameter")
-The pruning algorithm is monotone only with respect to *non-decreasing* parameters, not "any
-parameter".
-
-**Impact.** Typo with evident intent; formalized for any non-decreasing parameter
-(`observation_3_3_repaired`).
+### ✏️ Slips
+- Theorems 1–4: the claimed bounds `O(f*·s_f(f*))` and `O(f_min)` fail when `f* < 1`, since the transformed algorithm
+  always spends at least one iteration. Degenerate case; we prove `C·(f*·s_f(⌊f*⌋) + 1)` and `C·(f_j + 1)` (`theorem_1`,
+  `theorem_2`, `theorem_3`, `theorem_4`).
+- Observation 3.2 needs `β ≥ 1`. Degenerate: the `(2,0)` case.
+- Observation 3.3: the pruning algorithm is monotone only with respect to *non-decreasing* parameters, not "any
+  parameter". Formalized for any non-decreasing parameter (`observation_3_3_repaired`).
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 3 (inverse functions in the proof)
-The proof sets `g_j⁻¹(x) = min g_j⁻¹({x})` and uses `g_j(g_j⁻¹(x)) = x`, but an ascending `g_j` need
-not take the value `x`.
-
-**Impact.** Statement true; repaired (`theorem_3`).
-
-**Details.** The argument also mixes reals with integer coordinates.
-
-**Repair.** Take `g_j⁻¹(x) = max {y : g_j(y) ≤ x}`. We prove Theorem 3 by a direct reduction to
-Theorem 1: guesses for the correctness parameters `Γ` are computed from guesses for the time
-parameters `Λ`. This needs only `Λ`-monotone pruning, not `Λ ∪ Γ` (`theorem_3`).
-
-### 🛠️ Theorem 2 (expected-time bound)
+### 🔧 Theorem 2 (expected-time bound)
 The proof claims `α_{i+1} ≤ K·α_i` "since `s_f` is moderately slow", where `α_i` is the number of
 rounds of the first `i` iterations of `τ`, but this does not follow.
 
@@ -78,19 +85,6 @@ rounds of the first `i` iterations of `τ`, but this does not follow.
 **Repair.** Use the upper bound `α_{s+i} ≤ C·s_f(2^s)·2^s·(2a)^i` (`a` is the moderate-slowness
 constant). With the failure bound `(1−ρ)^{i(i+1)/2}` the series still converges, so the claimed bound
 holds (`theorem_2`).
-
-### 🛠️ Corollaries 3 and 4 (families not closed under inclusion)
-The corollaries apply the theorems to the families `F_large`, `F_med` and "arboricity `o(√log n)`",
-which are not closed under inclusion (deleting isolated nodes lowers `n`), as Section 2 requires.
-
-**Impact.** The bounds can be recovered by working on all graphs; we sketch this for Corollary 3 in
-[differencies.md](differencies.md) but did not formalize it. `corollary_4` is proved under one extra
-hypothesis (below).
-
-**Details.** Section 2 requires every family to be closed under inclusion, and a pruning algorithm
-must map the family into itself. Corollary 4 also needs the cited algorithm's time bound `f(ñ)` to
-hold for *every* good arboricity guess, including `ã = ñ`. The paper does not argue this; our
-`corollary_4` assumes it.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

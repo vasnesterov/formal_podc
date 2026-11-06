@@ -5,71 +5,67 @@ simultaneous tasks into all-case optimal solutions.* PODC 2011. DOI
 [10.1145/1993806.1993849](https://doi.org/10.1145/1993806.1993849). Formalized version: the ACM
 proceedings version (8 pages; there is no arXiv version). Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The constructions and the optimality argument are correct when
-`t ≤ n − 2`: Lemma 1, Theorems 2 and 3, Lemma 4, and Theorems 6 and 8 hold, taking the cited
-connectivity results (Lemmas 5 and 7) and the listed properties of ConCon as hypotheses. But the
-paper explicitly allows `t = n − 1`. There, **Lemma 5 is false**, Theorem 6 contradicts the
-timing claimed by Theorems 2/3, and **Corollary 9 is false**. Four proofs need small repairs.
+**Verdict: ⚠️ Weakened.** The transformation and its optimality are proved for `t ≤ n − 2`: Lemma 1,
+Theorems 2 and 3, Lemma 4, and Theorems 6 and 8 hold, taking the cited connectivity results (Lemmas 5
+and 7) and the listed properties of ConCon as hypotheses. The paper explicitly allows `t = n − 1`, and
+there Lemma 5 is false and Theorem 6 contradicts the timing claimed by Theorems 2/3. Corollary 9, the
+set-agreement application, is false without the hypothesis `n ≥ t + k + 1` of the bound it cites.
 
 ## Mistakes in the paper
 
-### ❌ Lemma 5 for `t = n − 1` (connectivity of premature runs)
-Lemma 5 is false for `t = n − 1`: the run `r⋆` in which all processes but `p₀` crash silently in round 1
-is premature, as is the failure-free run, but the two are not connected (`lemma5_false`,
-`not_lemma5Hyp`).
-
-**Impact.** The paper explicitly assumes `t ≤ n − 1` (§2.1, and again in §4), so this is not a degenerate
-corner; Lemma 5 is needed for Theorem 6. Lemma 7 fails in the same way. The cited sources presumably
-assume `n ≥ t + 2`.
-
-**Details.** Take `n ≥ 2`, `t = n − 1`, any complete input set, and a protocol in which everybody sends a
-message in round 1. Then `W(r⋆) = t − 1`, so round 1 is premature in `r⋆`, as it is in the failure-free
-run (`W = 0`). At time 1 only `p₀` is alive in `r⋆`, and it received nothing. Every run that `p₀` cannot
-tell apart from `r⋆` at time 1 is of the same kind, so the failure-free run is not connected to `r⋆`.
-
-### ❌ Theorem 6 vs. the timing of Theorems 2/3 for `t = n − 1`
-For `n = 3`, `t = 2` and binary consensus, a simultaneous protocol decides at time 1 in the run where two
-processes crash silently in round 1, while Theorem 3 has `Opt(A, 2)` decide at time 2 there, so Theorem 6
-and the timing of Theorems 2/3 cannot both hold (`thm3_thm6_incompatible`, `theorem6_fails`,
+### ⚠️ Lemma 5 (and Lemma 7), and Theorem 6 against the timing of Theorems 2/3, for `t = n − 1`
+The `t + 1 − W` analysis needs `t ≤ n − 2`, but the paper allows `t = n − 1`, where Lemma 5 is false
+(`lemma5_false`, `not_lemma5Hyp`), Lemma 7 fails in the same way, and for `n = 3`, `t = 2` Theorem 6 and
+the timing of Theorems 2/3 cannot both hold (`thm3_thm6_incompatible`, `theorem6_fails`,
 `theorem6_counterexample`).
 
-**Impact.** For `t = n − 1` either the headline Theorem 6 or Theorem 2's timing is false, depending on the
-actual ConCon; for `t ≤ n − 2` the constructions and the optimality argument are correct.
+**Impact.** The paper explicitly assumes `t ≤ n − 1` (§2.1, and again in §4), so this is not a degenerate
+corner, and Lemma 5 is needed for Theorem 6. The cited sources presumably assume `n ≥ t + 2`. For
+`t = n − 1` either Theorem 6 or Theorem 2's timing is false, depending on the actual ConCon; for
+`t ≤ n − 2` the constructions and the optimality argument are correct.
 
-**Details.** All hypotheses of Theorem 6 hold with `k̂ = 2` and `A` = FloodSet: complete inputs, `2` is a
-worst-case lower bound, and FloodSet decides at time 2. In `r⋆` (two processes crash silently in
-round 1) `W = 1`, so Theorem 3 has `Opt(A, 2)` decide at `min{2, 3 − 1} = 2`. But a simultaneous
-consensus protocol can decide at time 1 in `r⋆`: the survivor sees an empty round-1 inbox, knows it is
-alone and decides its own input; in all other runs the protocol runs FloodSet. So no protocol has both
-the timing of Theorem 3 and the all-case optimality of Theorem 6. For every continuous-consensus
-protocol with the properties listed in §2.3 (accuracy, consistency, (i), (ii)), `Opt(A, 2)` is not
-all-case optimal, and such a protocol exists for `n = 3`, `t = 2`.
+**Details.**
+- **Lemma 5.** Take `n ≥ 2`, `t = n − 1`, any complete input set, and a protocol in which everybody
+  sends a message in round 1. Let `r⋆` be the run in which all processes but `p₀` crash silently in
+  round 1. Then `W(r⋆) = t − 1`, so round 1 is premature in `r⋆`, as it is in the failure-free run
+  (`W = 0`). At time 1 only `p₀` is alive in `r⋆`, and it received nothing. Every run that `p₀` cannot
+  tell apart from `r⋆` at time 1 is of the same kind, so the failure-free run is not connected to `r⋆`.
+- **Theorem 6.** Take `n = 3`, `t = 2` and binary consensus. All hypotheses of Theorem 6 hold with
+  `k̂ = 2` and `A` = FloodSet: complete inputs, `2` is a worst-case lower bound, and FloodSet decides at
+  time 2. In `r⋆` (two processes crash silently in round 1) `W = 1`, so Theorem 3 has `Opt(A, 2)` decide
+  at `min{2, 3 − 1} = 2`. But a simultaneous consensus protocol can decide at time 1 in `r⋆`: the
+  survivor sees an empty round-1 inbox, knows it is alone and decides its own input; in all other runs
+  the protocol runs FloodSet. So no protocol has both the timing of Theorem 3 and the all-case
+  optimality of Theorem 6. For every continuous-consensus protocol with the properties listed in §2.3
+  (accuracy, consistency, (i), (ii)), `Opt(A, 2)` is not all-case optimal, and such a protocol exists
+  for `n = 3`, `t = 2`.
 
-Which claim fails for the actual ConCon of Mizrahi–Moses depends on its behaviour at `t = n − 1`. Its
-claimed maximality (iii) and the emptiness of the core before `t + 1 − W` (ii) are incompatible there:
-some CC protocol puts the lone survivor's value into its core at time 1. If ConCon satisfies (ii), the
-headline Theorem 6 fails. Otherwise ConCon(A) decides before `t + 1 − W`, and Theorem 2's "decides at
-time `t + 1 − W(F)`" fails.
+**Repair.** `theorem6` proves the transformation and its optimality with Lemma 5 as the cited hypothesis
+`Lemma5Hyp`, which excludes `t = n − 1`. `theorem6_instance` discharges every hypothesis for `t = 1`,
+`n ≥ 3`.
 
-### ❌ Corollary 9 for `k = 1`, `n = 3`, `t = 2`
-Corollary 9 claims that `Opt(sa, ⌊t/k⌋ + 1) = Opt(sa, 3)` is all-case optimal and halts at time 3 in
-failure-free runs, but FloodSet decides at time 2 in every run (`corollary9_false`, `not_lb_three`).
+### ⚠️ Corollary 9 (the `⌊t/k⌋ + 1` bound)
+The [CHLT00] bound `⌊t/k⌋ + 1` is quoted without its hypothesis `n ≥ t + k + 1`, and for `k = 1`, `n = 3`,
+`t = 2` it is not a lower bound, so `Opt(sa, ⌊t/k⌋ + 1) = Opt(sa, 3)` cannot be all-case optimal and halt
+at time 3 in failure-free runs (`corollary9_false`, `not_lb_three`).
 
-**Impact.** A false application, independent of ConCon: the paper quotes the `⌊t/k⌋ + 1` bound of
-[CHLT00] without its hypothesis `n ≥ t + k + 1`, and here `3` is not a lower bound.
+**Impact.** A false application, independent of ConCon.
 
-**Details.** The corollary claims halting at `min{3, 3 − W}`, which is time 3 in failure-free runs. So
-no protocol has both properties.
+**Details.** The corollary claims halting at `min{3, 3 − W}`, which is time 3 in failure-free runs, but
+FloodSet decides at time 2 in every run. So no protocol has both properties.
+
+**Repair.** Under `n ≥ t + k + 1` the corollary is `theorem6` applied to the cited bound (`WorstCaseLB` is
+a hypothesis of `theorem6`). There is no separate Lean statement of the repaired corollary.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 1, Theorem 3 and Lemma 4 (processes that crash later)
+### 🔧 Lemma 1, Theorem 3 and Lemma 4 (processes that crash later)
 The three proofs assume without argument that in a simultaneous protocol, if some process decides at
 time `k`, then every process *alive* at time `k` decides at time `k`, including processes that crash
 later.
 
-**Impact.** Statements true; the fact is proved by truncating the failure pattern
-(`SolvesSim.decides_of_alive`, `SolvesWithin.decides_of_alive`).
+**Impact.** The fact is proved by truncating the failure pattern (`SolvesSim.decides_of_alive`,
+`SolvesWithin.decides_of_alive`).
 
 **Details.** Lemma 4's proof says "p has not failed", but `p` only survives round `k`. Theorem 3's proof
 says the protocol "would also have caused q to decide". In Lemma 1, a faulty process of `A` could a priori
@@ -79,11 +75,11 @@ decide after `k̂` and break simultaneity.
 rounds do not change, and completeness and simultaneity apply. (`SolvesSim.decides_of_alive`,
 `SolvesWithin.decides_of_alive`)
 
-### 🛠️ Theorem 2 (correctness of `ConCon(A)`)
+### 🔧 Theorem 2 (correctness of `ConCon(A)`)
 All processes simulate the same run of `A`, which makes their outputs consistent only with the
 *simulated* input vector, and that differs from the real one outside the core.
 
-**Impact.** Statement true; repaired by an indistinguishability argument (`theorem2`, `decides_simRun`).
+**Impact.** Repaired by an indistinguishability argument (`theorem2`, `decides_simRun`).
 
 **Details.** The paper does not even say which inputs the processes outside the core get; they must be
 chosen so that the input vector is allowed.
@@ -134,7 +130,13 @@ Full list of differences (including modelling choices and minor imprecisions):
 
 **Not formalized.** The ConCon protocol itself and its maximality. Lemmas 5 and 7 for
 `t ≤ n − 2`. Corollaries 10 and 11 (they rest on cited bounds for d-tight conditions and strong
-renaming). §6.
+renaming). §6. Corollary 9 for `t ≤ n − 2` with `n < t + k + 1` was not explored.
+
+Which claim fails at `t = n − 1` for the actual ConCon of Mizrahi–Moses depends on its behaviour there, and
+this is open. Its claimed maximality (iii) and the emptiness of the core before `t + 1 − W` (ii) are
+incompatible there: some CC protocol puts the lone survivor's value into its core at time 1. If ConCon
+satisfies (ii), Theorem 6 fails. Otherwise ConCon(A) decides before `t + 1 − W`, and Theorem 2's "decides
+at time `t + 1 − W(F)`" fails.
 
 **CSLib candidates** (marked `-- CSLib candidate`): decision tasks and first-write decisions over
 `SyncCrash`, failure-pattern truncation and `SolvesSim.decides_of_alive`, waste, and the combinators

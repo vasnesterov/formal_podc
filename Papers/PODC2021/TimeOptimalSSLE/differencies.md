@@ -86,13 +86,13 @@ Paper: J. Burman, H.-L. Chen, H.-P. Chen, D. Doty, T. Nowak, E. Severson, C. Xu,
     scheduler we also prove the geometric tail: the chain is still at `C'` after `t` interactions with
     probability `≥ (1 − 2/(n(n−1)))^t` (`obs26_stay_prob`), which gives the `Ω(n)` expected time. The
     resulting expectation `≥ C(n,2)` interactions (tail-sum formula) is not written out in Lean.
-18. **False only in a degenerate case.** "For any `α > 0`, probability `≥ ½ n^{−3α}` to require
+18. **False for `n = 2`** (⚠️). "For any `α > 0`, probability `≥ ½ n^{−3α}` to require
     `≥ α n ln n` convergence time" fails for `n = 2`: `Silent-n-state-SSR` (a silent SSLE protocol) is
     correct after the first interaction from every configuration under every schedule, i.e. its
     convergence time is at most `1/2`, while `α n ln n = 2 ln 2 > 1/2` for `α = 1`
     (`obs26_n2_counterexample`). Likewise "expected time `≥ n/3`" uses `C(n,2)/n ≥ n/3`, false for
     `n = 2`.
-19. **Proof gap (statement true for `n ≥ 4`).** The displayed estimate
+19. **Wrong estimate (⚠️; claim true for `n ≥ 4`, false for `n = 3`).** The displayed estimate
     `(1 − 3/n²)^{α n² ln n} ≥ ½ e^{−3α ln n}` is false for large `α` at fixed `n` (since
     `n² ln(1 − 3/n²) < −3`; e.g. `n = 10`, `α = 7`), and `1/C(n,2) < 3/n²` needs `n ≥ 4`. The claim itself
     holds for `n ≥ 4` because the true success probability `p = 2/(n(n−1))` satisfies
@@ -104,7 +104,7 @@ Paper: J. Burman, H.-L. Chen, H.-P. Chen, D. Doty, T. Nowak, E. Severson, C. Xu,
 
 ## Section 3–4: `Propagate-Reset` and `Optimal-Silent-SSR` (Protocols 2–4)
 
-20. **Off-by-one in Protocol 3, line 9 (false as printed).** The recruitment guard
+20. **Off-by-one in Protocol 3, line 9 (✏️, false as printed).** The recruitment guard
     `2 · i.rank + i.children < n` never allows rank `n` to be assigned (new ranks come only from
     `Reset`, rank 1, and from recruitment, rank `2·rank + children < n`). Hence from every
     configuration without a settled agent of rank `n` — e.g. all agents `Unsettled`, or any

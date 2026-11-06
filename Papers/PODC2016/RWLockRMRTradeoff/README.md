@@ -5,17 +5,16 @@ Danny Hendler. *On the Complexity of Reader-Writer Locks.* PODC 2016. DOI
 copy "ReadersWritersLock-CR" (Extended Abstract, 11 pp., with the proofs of Sections 3 and 5; no arXiv
 version); numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The lower bound holds: Theorem 5 (`n ≤ Wb · 3^Rb`, i.e. writer entry `O(f(n))` forces reader exit
-`Ω(log(n/f(n)))`) and Corollary 6 are proved, after repairing its proof, because **Lemma 1 is false**
-(an expanding step need not be an RMR in the write-back model). The matching algorithm family `A_f`
-is **incorrect as written**: with the two counter reads of line 51 done in the written order a writer
-and a reader can be in the CS together, and line 47 (`op` for `op'`) breaks both Mutual Exclusion and
-Deadlock Freedom. With both lines repaired we prove Mutual Exclusion; liveness and the RMR upper
-bounds, hence the tightness of the tradeoff, are not established here.
+**Verdict: 🛠️ Hard fix.** The lower bound holds: Theorem 5 (`n ≤ Wb · 3^Rb`, i.e. writer entry `O(f(n))`
+forces reader exit `Ω(log(n/f(n)))`) and Corollary 6 are proved, but **Lemma 1 is false** (an expanding step
+need not be an RMR in the write-back model) and had to be replaced by a new counting lemma. The matching
+algorithm family `A_f` is **incorrect as written**, because of the order of the two counter reads in line 51
+and of `op` for `op'` in line 47, and with both lines repaired we prove Mutual Exclusion. The liveness and the
+RMR upper bounds of the repaired `A_f`, hence the tightness of the tradeoff, were not checked.
 
 ## Mistakes in the paper
 
-### ❌ Lemma 1 (every expanding step is an RMR)
+### 🛠️ Lemma 1 (every expanding step is an RMR)
 False in the write-back CC model with the paper's Definition 1: `q` writes `1` to `v`, then `p` writes `1` to `v` (a trivial write, so `F(v)` stays `{q}`, but `p` now holds `v` exclusively), then `p` reads `v` — an expanding step without RMR (`lemma1_false`).
 
 **Impact.** Lemma 1 is used twice in the proof of Theorem 5, which survives: the counting version
@@ -34,12 +33,10 @@ that created its valid copy. Potential: the number of variables of which `p` hol
 without knowing their familiarity set; it starts at `0` in every fragment and is increased only by
 RMRs of `p`.
 
-### ❌ Lemmas 8–9, Theorem 18 (Mutual Exclusion of `A_f`, line 51)
+### 🔧 Lemmas 8–9, Theorem 18 (Mutual Exclusion of `A_f`, line 51)
 With `HelpWCS` reading `C[i]` before `W[i]` (line 51, `if C[i].read() = W[i].read()` read left to right), three readers of one group and the writer reach a configuration where the writer and a reader are both in the CS (`mutex_violation_literal_order`).
 
-**Impact.** The algorithms as written do not satisfy Mutual Exclusion, so the tightness half of the
-abstract is not established by the paper (nor refuted: the repair leaves the RMR counting of
-Lemma 17 unchanged, but Lemmas 12–17 are not formalized here). Reading `W[i]` first repairs it: Mutual Exclusion then holds
+**Impact.** The algorithms as written do not satisfy Mutual Exclusion. Reading `W[i]` first repairs it: Mutual Exclusion then holds
 for every `n`, every grouping and unbounded sequence numbers (`mutualExclusion_repaired`).
 
 **Details.** Writer at line 21 waits for `<0,CS>` because reader `r₂` entered the CS on
@@ -55,30 +52,31 @@ reader counted in `W[i]` is counted in `C[i]`, so `c = w` forces every group-`i`
 to be waiting when `C[i]` is read. The invariant (`Inv` in `Alg/Safety.lean`) also gives Lemma 11
 (`lemma11_repaired`).
 
-### ⚠️ Line 47 of Algorithm 1 (`op` instead of `op'`)
-With the literal test `op = WAIT` (the opcode read on entry) a single reader breaks Deadlock Freedom (the writer waits in line 21 forever while the reader is in the remainder section, `deadlock_literal_line47`) and Mutual Exclusion (`mutex_violation_literal_line47`).
-
-**Impact.** A typo with evident intent (the branch uses `seq'` from line 41 and the `PREENTRY` branch
-tests `op'`); with `op'` both executions disappear. Counted as ⚠️ (R3); the line-51 issue above
-decides the verdict.
-
-**Details.** Deadlock: the reader entered on `PREENTRY`, the writer then publishes `WAIT` and waits for
-`<seq,CS>`; the exiting reader reads `<seq,WAIT>` in line 41 but skips `HelpWCS` because its entry
-opcode was `PREENTRY`. Mutual exclusion: a reader that waited on entry reads `<1,NOP>` on exit and
-still calls `HelpWCS(1)`; it signals `<1,CS>` to writer passage 1 before that passage publishes
-`WAIT`, then re-enters on `PREENTRY`, and the writer enters its CS too.
-
-### Typos and slips
+### ✏️ Slips
+- Line 47 of Algorithm 1 has `op` instead of `op'`. With the literal test `op = WAIT` (the opcode read on
+  entry) a single reader breaks Deadlock Freedom (the writer waits in line 21 forever while the reader is in
+  the remainder section, `deadlock_literal_line47`) and Mutual Exclusion (`mutex_violation_literal_line47`).
+  The intent is evident (the branch uses `seq'` from line 41 and the `PREENTRY` branch tests `op'`), and with
+  `op'` both executions disappear. Deadlock: the reader entered on `PREENTRY`, the writer then publishes
+  `WAIT` and waits for `<seq,CS>`; the exiting reader reads `<seq,WAIT>` in line 41 but skips `HelpWCS` because
+  its entry opcode was `PREENTRY`. Mutual exclusion: a reader that waited on entry reads `<1,NOP>` on exit and
+  still calls `HelpWCS(1)`; it signals `<1,CS>` to writer passage 1 before that passage publishes `WAIT`, then
+  re-enters on `PREENTRY`, and the writer enters its CS too.
 - Concurrent Entering (§2.1): "any reader that executes **at most** `b` steps … enters the CS" should
   read "after `b` steps of its entry section".
 - Lemma 3: "steps executed by other processes when they are aware of `p`" must mean awareness *after*
   the step (read literally, a read that makes `q` aware of `p` is kept and returns a different value);
   the proof uses the intended reading.
+- Line 30 of Algorithm 1 writes the group index as `⌊p/f(n)⌋`; it should be `⌊p/K⌋`, as in the prose.
+- The proof of Lemma 8 writes `t' < t` where the order is the other way round.
+- Section 4, description of line 14: "one of the readers that read 0 from `W[i]`" should say `C[i]`.
+
+### Typos
 - Lemma 4 writes `⊂` for `⊆`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 5 (the tradeoff `Ω(log (n / f(n)))`)
+### 🔧 Theorem 5 (the tradeoff `Ω(log (n / f(n)))`)
 The proof relies on the false Lemma 1 and does not show that the readers' poised steps stay expanding after Lemma 2 reorders them, nor that its drain phase leaves all readers poised simultaneously.
 
 **Impact.** Statement true; repaired (`theorem5`, exact form `n ≤ Wb · 3^Rb`).
@@ -92,7 +90,7 @@ non-expanding steps until all remaining readers are simultaneously poised on exp
 During `E₃` each expanding step of the writer adds at most `3^r` processes to its awareness set,
 although the writer itself changes familiarity sets (`aw_solo_bound`).
 
-### 🛠️ Lemma 2 (one round at most triples awareness)
+### 🔧 Lemma 2 (one round at most triples awareness)
 Case 1 of the proof claims that after the writes of `σ₂` the value of `v` differs from the expected value of all CAS steps of `σ₃`; a write may restore that value.
 
 **Impact.** Statement true: at most one CAS of `σ₃` on `v` succeeds, which keeps the factor 3. We
@@ -145,6 +143,12 @@ starvation (Lemmas 12–16), the RMR bounds (Lemma 17; they also depend on the c
 and `m > 1` writers (the writers' lock `WL` is omitted). `A_f` is modelled with atomic counters
 `C[i]`, `W[i]` (as the paper assumes), one writer, an arbitrary static partition of the readers into
 groups, and the two disputed lines as parameters.
+
+So the tightness of the tradeoff, the second half of the abstract, is neither established nor refuted here: the
+repair of line 51 leaves the RMR counting of Lemma 17 unchanged, and bounded model checking of the repaired
+algorithm (`n ≤ 3`) found no stuck state, but this is not a proof. Lemma 17's one RMR per await assumes that
+failed reader CAS steps on `WSIG[i]` do not invalidate the writer's copy; we did not analyse this. Theorem 5
+when `n/f(n)` is bounded is also open: the proof does not give `Rb ≥ 1` (no last-round reader when `r = 0`).
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: `toyLock_spec` (`NonVacuity.lean`) gives, for every `n`, a reader-writer lock (reader flags plus a writer flag) satisfying all non-RMR hypotheses of Theorem 5 (every process may invoke, Mutual Exclusion, Bounded Exit, Concurrent Entering, Deadlock Freedom). The model is built on CSLib's `Impl`, `regionOf`,

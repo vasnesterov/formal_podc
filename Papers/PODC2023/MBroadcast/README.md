@@ -6,21 +6,18 @@ version: the brief announcement (Theorems 1, 2, Property 1). For the converse di
 proof of the extended version (DISC 2023, *Send/Receive Patterns Versus Read/Write Patterns in Crash-Prone
 Asynchronous Distributed Systems*, Algorithm 2 and App. A), since the brief announcement gives no algorithm for it.
 
-**Verdict: ✅ Correct.** Every result we checked holds: Property 1, Theorem 1 (Algorithm 2 builds MBroadcast from
+**Verdict: ✏️ Slip.** Every result we checked holds: Property 1, Theorem 1 (Algorithm 2 builds MBroadcast from
 causal message delivery when t < n/2), Theorem 2 (Algorithm 3 builds a linearizable, terminating MWMR register on
 top of MBroadcast, for any number of crashes), and the converse (MBroadcast, even a FIFO and reliable version, from
-atomic SWMR registers, for any number of crashes). The one weak spot is the wording of *mutual ordering*. The
-abstract says "p delivers first m and then m′". Read literally (p delivers both messages), this property is too
-weak, and then Property 1 and Theorem 2 are false. Everything holds under the reading the paper itself uses
-elsewhere for "deliver m′ before m". We count this as an imprecise paraphrase, not an error; see the first item
-below.
+atomic SWMR registers, for any number of crashes). The only flaw is the abstract's wording of *mutual ordering*,
+"p delivers first m and then m′": read literally (p delivers both messages), this property is too weak, and then
+Property 1 and Theorem 2 are false. Everything holds under the wording of Section 3, with the reading the paper
+itself uses elsewhere for "deliver m′ before m".
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
-- Mutual ordering, the meaning of "before" (imprecise wording, results true). The main text says "it is not
+### ✏️ Slips
+- Abstract and Section 1, paraphrase of mutual ordering (the meaning of "before"). The main text says "it is not
   possible that p mdelivers m before m′ and p′ mdelivers m′ before m". The abstract paraphrases it as "it is not
   possible for p to deliver first m and then m′ while p′ delivers first m′ and then m". The pattern MP1 of the full
   version is also drawn with both processes delivering both messages. The results need the stronger reading: "when

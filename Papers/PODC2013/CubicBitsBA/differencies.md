@@ -13,14 +13,12 @@ Communication Bits*, PODC 2013 (author version hal-01151136).
    - Round 2: to receiver `i`, both Byzantine processes send the echo array with the correct inputs,
      `b₂ ↦ 1` and `b₁ ↦ (the value i received from b₁)`.
    - Round 3: both send an empty suspicion set and echo the round-2 arrays as `i` received them.
-   Then `A` decides `0` and `3, 4` decide `v0 = 1` (`decide_exec`). Rule R5: the protocol is the
-   paper's specific algorithm (title and abstract), so the verdict is 🚨. Borderline aspect: the
-   title is phrased existentially; R5's existential carve-out (→ ❌) does not apply because the
-   paper presents this specific protocol as its solution and no repaired protocol with `t + 1`
-   rounds and `O(n³ log n)` bits is given (nor known to us). Not degenerate (R2): `n = 7`,
-   `t = 2` is inside the claimed range `t < n/3`. Not a typo (R3): repairing it needs a protocol
-   change (the round-`(t+1)` information would have to carry suspicions of round-`(t−1)`
-   equivocations, or the evaluation would have to use the round-3 echoes as EIG values).
+   Then `A` decides `0` and `3, 4` decide `v0 = 1` (`decide_exec`). The protocol is the paper's
+   specific algorithm (title and abstract), which the paper presents as its solution, and no
+   repaired protocol with `t + 1` rounds and `O(n³ log n)` bits is given (nor known to us).
+   `n = 7`, `t = 2` is inside the claimed range `t < n/3`. Repairing it needs a protocol change
+   (the round-`(t+1)` information would have to carry suspicions of round-`(t−1)` equivocations,
+   or the evaluation would have to use the round-3 echoes as EIG values).
 2. **Lemma 5 is false** (`Counterexample.lemma_5_false`): in the run above the set of nodes whose label
    ends with a correct id is a common path covering of the whole tree (`lemma_4`), but the root is not
    common. The failing step is the level-`l ≤ t − 1` case of the proof: "If they do not suspect `p_j`
@@ -42,7 +40,7 @@ Communication Bits*, PODC 2013 (author version hal-01151136).
    text (§4.2 defines `T` only by `newval = ⊤` and counts all of `T`), so the Lean counterexample
    refutes the protocol as written, and the simulation indicates that these repairs do not help.
 
-## Typos and slips (not affecting the verdict)
+## Typos and slips
 
 - §4.1: "when `val(x)` of some node `x = yjk` is set to `⊤`, this means that `p_k` reported that it
   suspects `p_j`" — inverted; `⊤` means "does not suspect" (as in the bullets).
@@ -92,5 +90,5 @@ Communication Bits*, PODC 2013 (author version hal-01151136).
   `≤ 5n³ + 3n²(b + 1)` bits per correct process, matching `O(n³)` per process for binary values and
   `O(max(n⁴, n³ log k))` in total. The incremental variant (the abstract's `O(n³ log n)`) is only
   sketched in the paper (no precise protocol) and is not formalized; it carries the same information,
-  so the counterexample run applies to it as well.
+  so the counterexample run is expected to apply to it as well.
 - **Termination** is immediate (decision after round `t + 1`, `validity_termination`).

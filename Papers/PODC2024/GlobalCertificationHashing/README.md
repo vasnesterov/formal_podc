@@ -5,51 +5,37 @@ hashing.* PODC 2024. DOI [10.1145/3662158.3662781](https://doi.org/10.1145/36621
 HAL [hal-04467834v2](https://hal.science/hal-04467834v2) (same text as the proceedings brief announcement).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The main results hold. Theorem 4 (homomorphism to `H` with
-`O(n log n' + log log M)` bits) and Theorem 3 (bipartiteness with `O(n + log log M)` bits) are proved, with
-explicit constant 10, uniformly in `H` and `M`. So Conjecture 1 of Feuilloley–Hirvonen is indeed false. Two
-small issues: the theorems need the implicit assumption `M(n) ≥ n`, and the cited Theorem 7 (perfect hash
-families) is wrong as literally stated in the degenerate case `k = ℓ = 1` and should say "at most".
+**Verdict: ✏️ Slip.** Theorem 4 (homomorphism to `H` with `O(n log n' + log log M)` bits) and Theorem 3 (bipartiteness with
+`O(n + log log M)` bits) are proved, with explicit constant 10, uniformly in `H` and `M`, so Conjecture 1 of
+Feuilloley–Hirvonen is indeed false. The only mistakes are the implied assumption `M(n) ≥ n`, degenerate cases, and the
+words "has size" in the cited Theorem 7, which should say "at most".
 
 ## Mistakes in the paper
 
-### ⚠️ Theorems 3 and 4 (implicit assumption `M(n) ≥ n`)
-If `M(n) < n`, no identifier assignment exists, so the definition of a scheme forces every `n`-vertex graph to
-satisfy `P`, and no scheme for bipartiteness exists at all, of any size (`theorem_3_false_of_small_range`).
+### ✏️ Slips
+- Theorems 3 and 4, implied assumption `M(n) ≥ n`: the definition of a scheme asks that `G` satisfies `P` iff *for every
+  identifier assignment* some certificate is accepted. If `M(n) < n`, no injective identifier assignment into
+  `{0,…,M(n)−1}` exists, so the right-hand side holds trivially and every `n`-vertex graph would have to satisfy `P`. For
+  example, with `M(3) < 3` the triangle would have to be bipartite, and no scheme for bipartiteness exists at all, of any
+  size (`theorem_3_false_of_small_range`). Every reader makes this assumption (identifiers must exist); we assume
+  `M(n) ≥ n` too, and then both theorems hold.
+- Theorem 7 (perfect hash families, cited from Mehlhorn), degenerate parameters: the claimed `(k, ℓ)`-perfect hash family
+  "which has size `⌈k e^k log ℓ⌉`" (for all `k ≤ ℓ`) does not exist for `k = ℓ = 1`: the bound is `⌈e · log 1⌉ = 0` in any
+  base, but the empty family is not perfect for `S = {0}` (`theorem_7_false_l_one`). The case `k = 0 < ℓ` is just as
+  degenerate: no function into the empty set exists.
+- Theorem 7, "has size": read as "exactly this size" it fails already for `k = ℓ = 2`: the bound is `⌈2e² ln 2⌉ = 11` (`15`
+  with `log₂`), but there are only `4` functions `{0,1} → {0,1}` (`theorem_7_exact_size_false`). The paper uses the result
+  only as an upper bound. We prove the intended statement: size **at most** `⌈k e^k ln ℓ⌉` for `1 ≤ k ≤ ℓ`, `ℓ ≥ 2` (hence
+  also with `log₂`), by the counting argument (`theorem_7`); it gives Theorems 3 and 4. The trivial family `{id}` covers
+  `n = M(n)` (using `n ≤ M(n)`).
+- Proof of Theorem 4, size count: the `O(n)` bits for `h` are absorbed into `O(n log n')`, which needs `n' ≥ 2`; for
+  `n' ≤ 1` a trivial 0-bit scheme is used instead (`isGlobalScheme_small`).
 
-**Impact.** An implicit assumption every reader makes (identifiers must exist); we assume `M(n) ≥ n` too, and
-then both theorems hold.
-
-**Details.** The definition of a scheme asks: `G` satisfies `P` iff *for every identifier assignment* some
-certificate is accepted. If `M(n) < n`, no injective identifier assignment into `{0,…,M(n)−1}` exists, so the
-right-hand side holds trivially. For example, with `M(3) < 3` the triangle would have to be bipartite.
-
-### ⚠️ Theorem 7 (perfect hash families, cited from Mehlhorn)
-The claimed `(k, ℓ)`-perfect hash family "which has size `⌈k e^k log ℓ⌉`" (for all `k ≤ ℓ`) does not exist for `k = ℓ = 1`, where the
-size is `0` (`theorem_7_false_l_one`), and read as "exactly this size" it fails already for `k = ℓ = 2`
-(`theorem_7_exact_size_false`).
-
-**Impact.** Wrong only in trivial ways: the paper uses the result only as an upper bound, and the intended
-statement ("at most") holds and gives Theorems 3 and 4.
-
-**Details.**
-(a) For `k = ℓ = 1` the bound is `⌈e · log 1⌉ = 0` in any base, but the empty family is not perfect for
-`S = {0}`. The case `k = 0 < ℓ` is just as degenerate: no function into the empty set exists.
-(b) For `k = ℓ = 2` the bound is `⌈2e² ln 2⌉ = 11` (`15` with `log₂`), but there are only `4` functions
-`{0,1} → {0,1}`.
-
-**Repair.** We prove the intended statement: size **at most** `⌈k e^k ln ℓ⌉` for `1 ≤ k ≤ ℓ`, `ℓ ≥ 2` (hence
-also with `log₂`), by the counting argument (`theorem_7`). The trivial family `{id}` covers `n = M(n)` (using
-`n ≤ M(n)`).
-
-### Typos and slips
+### Typos
 - The proof in Section 3 is labelled "Proof of Theorem 3" but proves Theorem 4.
 - In Theorem 4, `n' = |V(H')|` should be `|V(H)|`.
 - The verifier "reads `n` in the global certificate", but the certificate is a fixed-length bit string, so `n`
-  must be written in a self-delimiting way. This is not discussed; it is harmless (unary `n` costs `n + 1 = O(n)`
-  bits, which we use).
-- The size count absorbs the `O(n)` bits for `h` into `O(n log n')`, which needs `n' ≥ 2`; for `n' ≤ 1` a
-  trivial 0-bit scheme is used instead (`isGlobalScheme_small`).
+  must be written in a self-delimiting way. This is not discussed; unary `n` costs `n + 1 = O(n)` bits, which we use.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

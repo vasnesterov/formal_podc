@@ -8,43 +8,18 @@ the proofs and Algorithm 3 of the full version, arXiv
 Lemmas 2, 4, 6, 7 / Theorem 2.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** **Lemma 4 and Theorem 1 (the rotor-coordinator, one of the two algorithms
-the abstract presents) are false.** With
-`n > 3f`, every correct node can terminate without any good round, and without ever accepting the
-opinion of a correct coordinator. Smallest instances: `n = 7, f = 2` for Lemma 4 and `n = 4, f = 1`
-for Theorem 1.
-
-The headline results survive in repaired form, though. With a corrected termination rule, the rotor-coordinator
-works with `n > 3f` in `O(n)` rounds, with a good round among the first `f + 1` iterations. A
-repaired version of the consensus algorithm solves consensus with `n > 3f` in `3f + 7` rounds.
-The full version's consensus algorithm (Algorithm 3) is under-specified; under the natural
-reading of its "fill rule" it violates agreement.
+**Verdict: 🛠️ Hard fix.** Both algorithms keep `n > 3f` and their round bounds, but the rotor-coordinator's
+Lemma 4 and Theorem 1 are false as written, and saving them took a changed stopping rule and a new good-round
+argument. The consensus algorithm needed only local repairs. The full version's extra sections (approximate
+agreement, impossibility results, dynamic networks) were not checked.
 
 ## Mistakes in the paper
 
-### 🚨 Theorem 1 (BA) / Theorem 2 (full version): rotor-coordinator
-There need not be a round in which every correct node accepts the opinion of a common correct coordinator: in
-the `n = 7, f = 2` run of Lemma 4 below no correct node ever accepts any opinion, and an independent gap
-already appears for `n = 4, f = 1` (`Cex.theorem1_false`, `Cex4.theorem1_false`).
-
-**Impact.** One of the two algorithms the abstract presents fails as written. The termination half of
-Theorem 1 does hold (everybody breaks within `n` iterations, `paper_terminates`), and a one-line change of the
-termination rule repairs the rotor-coordinator with the claimed `O(n)` rounds (`rotor_fixed`).
-
-**Details.** For `n = 4, f = 1`, iteration 1 *is* a good round, but two correct nodes reselect in that very
-iteration and break. The coordinator's opinion would only be accepted in the next iteration, so they never
-accept it.
-
-**Repair.** Break once `2r > n_v` instead of on reselection. Since `n_v ≥ g > 2f`, nobody stops before
-iteration `f + 1`. We prove that some iteration `r ≤ f` is good, and that in iteration `r + 1` every correct
-node accepts exactly the coordinator's opinion. Every node stops by iteration `⌊n/2⌋ + 1`. The bound `r ≤ f`
-is tight in a bounded search. (`rotor_fixed`)
-
-### ❌ Lemma 4 (BA) / Lemma 7 (full version): good round
+### 🛠️ Lemma 4 (BA) / Lemma 7 (full version): good round
 A correct node can terminate without witnessing a good round: with `n = 7`, `f = 2`, every correct node
 "reselects" and breaks in iteration 1, and no iteration was ever good (`Cex.lemma4_false`, `Cex.no_good`).
 
-**Impact.** The good-round lemma behind Theorem 1 is false; the repaired rule above restores a good round
+**Impact.** The good-round lemma behind Theorem 1 is false; the repaired rule below restores a good round
 among the first `f + 1` iterations (`rotor_fixed`).
 
 **Details.** Take `n = 7` with correct nodes `2,…,6` and Byzantine nodes `0, 1`. Both Byzantine nodes make
@@ -57,12 +32,33 @@ themselves known to everybody in round 1, so the thresholds are 3 and 5 copies. 
 The proof's last step treats `C_v` as fixed ("a reselected node is in `{C_v[r mod |C_v|] : r < r_c}`"). But
 `C_v` is kept sorted, and inserting a smaller identifier shifts the index back onto the previous coordinator.
 
-### ⚠️ Full version, Algorithm 3 (the fill rule)
+**Repair.** Break once `2r > n_v` instead of on reselection. Since `n_v ≥ g > 2f`, nobody stops before
+iteration `f + 1`. The paper's counting does not carry over, so the good round needs a new argument: as long as
+iterations are bad, the number of identifiers below the smallest correct one grows, and those are all faulty.
+So some iteration `r ≤ f` is good (`exists_good_round`, `layer_good`). Every node stops by iteration
+`⌊n/2⌋ + 1`. The bound `r ≤ f` is tight in a bounded search. (`rotor_fixed`)
+
+### 🔧 Theorem 1 (BA) / Theorem 2 (full version): rotor-coordinator
+There need not be a round in which every correct node accepts the opinion of a common correct coordinator: in
+the `n = 7, f = 2` run of Lemma 4 above no correct node ever accepts any opinion, and an independent gap
+already appears for `n = 4, f = 1` (`Cex.theorem1_false`, `Cex4.theorem1_false`).
+
+**Impact.** One of the two algorithms the abstract presents fails as written. The termination half of
+Theorem 1 does hold (everybody breaks within `n` iterations, `paper_terminates`), and the one-line change of the
+termination rule above repairs the rotor-coordinator with the claimed `O(n)` rounds (`rotor_fixed`).
+
+**Details.** For `n = 4, f = 1`, iteration 1 *is* a good round, but two correct nodes reselect in that very
+iteration and break. The coordinator's opinion would only be accepted in the next iteration, so they never
+accept it.
+
+**Repair.** With the rule above nodes run past the good iteration `r`, and in iteration `r + 1` every correct
+node accepts exactly the coordinator's opinion. (`rotor_fixed`)
+
+### 🔧 Full version, Algorithm 3 (the fill rule)
 Algorithm 3's fill rule is under-specified, and under its natural reading silent correct nodes count as support
 for the receiver's value, which breaks agreement for `n = 4, f = 1` (`FillCex.fill_rule_breaks_agreement`).
 
-**Impact.** An under-specified algorithm rather than a refutation of Algorithm 3 verbatim: the Lean witness adds
-the fill rule to our (otherwise verified) phase layout. The same adversary is harmless without the rule
+**Impact.** Agreement fails under this reading of the rule. The same adversary achieves nothing without the rule
 (`FillCex.without_fill`).
 
 **Details.** The rule says that a node `v` that sends nothing is assumed to have sent what the receiver itself
@@ -73,13 +69,18 @@ threshold. With `n = 4, f = 1` and inputs `0, 0, 1`:
 - the others adopt the Byzantine coordinator's `1`, and in the next phase one of them decides `1` by the same
   mechanism.
 
-### Typos and slips
-- The inequality chain in the proof of Lemma 1 is garbled. What is needed is `g > 2f_v'`.
-- Lemma 3 (relay) silently assumes that no correct node has terminated yet.
+**Repair.** Drop the fill rule and let decided nodes keep participating; agreement, validity and `O(f)` are then
+kept (`consensus_correct`).
+
+### ✏️ Slips
+- Lemma 3 (BA) / Lemma 6 (full version), relay, silently assumes that no correct node has terminated yet: a
+  terminated node no longer echoes or adds `p`. Our `relay` assumes it.
+- BA Section 4: the prose says a node "selects the coordinator with the next larger identifier", which is a
+  different rule from line 14, `C_v[r mod |C_v|]`. The proof of Lemma 4 uses line 14.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Full version, Theorem 3 (consensus)
+### 🔧 Full version, Theorem 3 (consensus)
 The proof relies on the false Theorem 2, takes the coordinator's opinion from the previous phase although
 Lemma 11 needs the current one, and does not specify a rotor `break` inside the consensus.
 
@@ -134,7 +135,12 @@ Full list of differences (including modelling choices and minor imprecisions):
   candidate layer.
 * Approximate agreement, the asynchronous / semi-synchronous impossibility results, parallel
   consensus and dynamic networks (full version, Sections VIII–XI).
-* Halting of the consensus algorithm after deciding.
+* Halting of the consensus algorithm after deciding: our repair never halts. Halting one phase later
+  would also be safe, but this is not formalized.
+* Lemma 4 and Theorem 1 under the prose rule "next larger identifier": both counterexample runs stop
+  being counterexamples there, and we did not analyse that rule.
+* Algorithm 3 verbatim: the fill-rule witness adds our reading of the rule to our own (otherwise
+  verified) phase layout, not to a line-by-line model of Algorithm 3.
 
 **Trust.** No `sorry`. All listed theorems use only the axioms `propext`, `Classical.choice` and
 `Quot.sound`. The counterexamples are concrete runs checked by `decide +kernel`. The repaired

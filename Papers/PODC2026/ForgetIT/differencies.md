@@ -3,7 +3,7 @@
 Paper: proceedings version, PODC 2026 (Algorithms 1–3, §3 definitions, §4.2 proof sketch). The
 full version [3] was not available.
 
-## Statement-level issues (with the deciding rule of `verdicts.md`)
+## Statement-level issues
 
 1. **Theorem 3, robust good-case latency `3δ` — false (❌).** Definition (§3): `F_rgc` is the set
    of `f`-bounded adversaries "for which GST coincides with a correct leader entering its view";
@@ -19,7 +19,7 @@ full version [3] was not available.
      and none is lost. After GST every message is delivered in one tick. Process 0 sends only
      `echo-1/2/3(1, SAFE)` to processes 2 and 3. Process 1's entry is an active entry (line 80) and
      it broadcasts its `prepare`.
-   * Why not ⚠️ (R3/R4): the fix changes the family of executions over which the metric is taken,
+   * Why this is not a local fix: the fix changes the family of executions over which the metric is taken,
      i.e. the content of the claim. The paper also motivates robust latency precisely by "brief
      periods of asynchrony", which is the situation here. The proof sketch's "first view V after
      GST … each correct process enters view V (line 85)" suggests the intended reading "the whole
@@ -27,11 +27,10 @@ full version [3] was not available.
      tie-breaking in the protocol's favour): when `δ = Δ`, the 3Δ timer of the first process to
      enter the view (line 45) may fire exactly when the `vote-1` quorum arrives, and that process
      then never locks.
-   * Why ❌ and not 🚨 (R5): the title and the abstract claim *good-case latency* 3 rounds. That is
+   * Scope: the title and the abstract claim *good-case latency* 3 rounds. That is
      the non-robust notion, the one Theorem 1 states, and it is true (`good_case_latency`). The
      robust variant comes in the introduction as "in fact, our main result obtains an even
-     stronger notion". It is the paper's distinguishing claim over TetraBFT (Table 1), so the call
-     is borderline; we rate it as a non-headline numbered claim.
+     stronger notion". It is the paper's distinguishing claim over TetraBFT (Table 1).
    * About `δ`: the responsiveness paragraph defines `δ(E)` as the maximum delay over *all*
      messages of the execution. Under that reading the pre-GST delays to process 1 (up to 21
      ticks) would make `3δ(E)` large. That reading contradicts the partial-synchrony paragraph
@@ -50,7 +49,7 @@ full version [3] was not available.
 
 ## Proof-level issues (statements true)
 
-2. **Agreement sketch.** The sketch says "at least `2f + 1` correct processes broadcast
+2. 🔧 **Agreement sketch.** The sketch says "at least `2f + 1` correct processes broadcast
    `⟨vote-2, V_dec, v_dec⟩`"; only `f + 1` correct ones are guaranteed. That suffices:
    `|S| + |L| = (2f + 1) + (f + 1) > n` (`base`). The sketch also argues as if all correct
    processes had entered view `V_dec + 1` before anything happens there. In asynchronous runs, the

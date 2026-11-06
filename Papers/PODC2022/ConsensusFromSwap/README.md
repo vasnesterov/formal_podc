@@ -5,33 +5,30 @@ Sean Ovens. *The Space Complexity of Consensus from Swap.* PODC 2022. DOI
 [2305.06507](https://arxiv.org/abs/2305.06507) v2 (Aug 2023), which also covers k-set agreement.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** Every formalized result holds as stated, for obstruction-free
-algorithms:
-* Algorithm 1 is an obstruction-free k-set agreement algorithm from `n − k` swap objects;
-* `⌈n/k⌉ − 1` swap objects are needed, so `n − 1` is tight for consensus;
-* `n − 2` readable binary swap objects are needed;
-* `(n−2)/(3b+1)` readable swap objects with domain size `b` are needed.
-
-Repairs were needed in a few places. One step of the proof of Lemma 16 does not follow as written. The valency
-definitions are ambiguous, and Lemma 13's proof relies on one reading of them. The proof of Lemma 14 picks `j`
-over the wrong set of executions. A few statements fail in degenerate cases.
+**Verdict: 🔧 Easy fix.** Every formalized result holds as stated, for obstruction-free algorithms: Algorithm 1 is
+an obstruction-free k-set agreement algorithm from `n − k` swap objects, `⌈n/k⌉ − 1` swap objects are needed (so
+`n − 1` is tight for consensus), `n − 2` readable binary swap objects are needed, and `(n−2)/(3b+1)` readable swap
+objects with domain size `b` are needed. The proofs of Lemmas 13, 14 and 16 and Theorem 10 need local repairs, one
+of them a condition on the ambiguous valency definitions. The nondeterministic and randomized forms and the
+extension to historyless objects were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Observation 4 for `m = 1` (Algorithm 1)
-Observation 4 ("`V[x] ≥ 2` when `x` is decided") is false for `m = 1`: the only value is decided with `V[0] = 1` (`example` in `Alg1Agree.lean`).
-
-**Impact.** Degenerate case: Lemma 6 uses Observation 4 only when two values are decided, so nothing breaks
-(`lemma6_agreement`).
-
-### Typos and slips
+### ✏️ Slips
+- Observation 4 ("`V[x] ≥ 2` when `x` is decided") is false for `m = 1`: the only value is decided with `V[0] = 1`
+  (`example` in `Alg1Agree.lean`). Lemma 6 uses Observation 4 only when two values are decided, so nothing breaks
+  (`lemma6_agreement`).
+- Lemma 6, Step 2: the proof splits into "`C` before `C_t`" and "`C` after `C_t`" and omits `C = C_t`. That case
+  would force `q = p_t` (`lemma6_agreement`).
 - Lemma 16, Case 2: "then `P` is univalent" should be `Q`.
 - Section 5.2: "`S_1 = {p_1}` covers" should be `{p_0}`.
+
+### Typos
 - Lemma 6, Step 1: "`V_j[v_j] = ℓ_j > V_{k+1}[v_j] + 2`" should read `x_j` for `v_j`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 16, Case 2, property (d) for `i+1`
+### 🔧 Lemma 16, Case 2, property (d) for `i+1`
 The proof shows only that `Q` is univalent in `C_{i+1}λ'd` (via Lemma 14(b)) and then says "therefore" `Q` is univalent in `C_{i+1}λ'dβ_i`, but univalence of `Q` is not preserved by steps of processes outside `Q`, and the block `β_i` is such a step sequence.
 
 **Impact.** Statement true; repaired by a case split (`lemma16_step`).
@@ -45,7 +42,7 @@ The proof shows only that `Q` is univalent in `C_{i+1}λ'd` (via Lemma 14(b)) an
 * Otherwise `β_i` leaves the memory unchanged. Observation 15 then transfers univalence from `C_{i+1}λ'd` to
   `C_{i+1}λ'dβ_i`.
 
-### 🛠️ Lemma 13 (ambiguous valency definitions)
+### 🔧 Lemma 13 (ambiguous valency definitions)
 "`P` is bivalent in `C` if … there is an execution from `C` … in which some process in `P` decides `v`" does not say whether decisions taken before `C` count, and Lemma 13's proof works only if they do.
 
 **Impact.** Statement true under the inclusive reading; with agreement, nothing else in the paper changes
@@ -57,21 +54,17 @@ is vacuously `v`-univalent in `Cαβ` as well. The prefix `α'` used by the proo
 
 **Repair.** Count earlier decisions (`CanDec`), or cut `α` after its first decision. We do the former.
 
-### 🛠️ Lemma 14 (choice of `j`)
+### 🔧 Lemma 14 (choice of `j`)
 The proof picks `j` as the least index such that `Q` is univalent after *every* execution `α ∼_{p_i} δ_{j+1}` from `C`, but then minimality only yields some bivalent execution `α_{j'}`, while part (a) needs a `(Q ∪ P_i)`-only one.
 
 **Impact.** Statement true; the minimum must range over `(Q ∪ P_i)`-only executions. Parts (b) and (c) only
-use such executions, so the fix is harmless (`lemma14`).
+use such executions, so nothing else changes (`lemma14`).
 
-### 🛠️ Lemma 6, Step 2 (missing case)
-The proof splits into "`C` before `C_t`" and "`C` after `C_t`" and omits `C = C_t`.
-
-**Impact.** Statement true; the case is trivial, since it would force `q = p_t` (`lemma6_agreement`).
-
-### 🛠️ Theorem 10, induction step (restricted algorithm)
+### 🔧 Theorem 10, induction step (restricted algorithm)
 The claim "the algorithm solves `k`-valued `(k−1)`-set agreement among the processes in `R`" does not obviously hold, because in an `R`-only execution a decided value could be the input of a process outside `R`, so validity may fail.
 
-**Impact.** Statement true; repaired (`theorem10_gen`).
+**Impact.** Statement true; repaired for deterministic obstruction-free algorithms (`theorem10_gen`). The repair
+does not depend on determinism.
 
 **Repair.** Reset the inputs outside `R`, which is invisible to `R`. We use a different split of `R` (peel off
 `#objects + 1` processes), which gives the same bound with no base case and no hypothesis `n > k`.
@@ -120,7 +113,7 @@ Further result: validity of Algorithm 1 holds in the stronger form "the decided 
 that took a step".
 
 **Not formalized.**
-* Nondeterministic solo-termination and randomized wait-freedom.
+* Theorem 10 and Corollary 11 for nondeterministic solo-terminating and randomized wait-free algorithms.
 * The transformation of Ellen–Gelashvili–Zhu (needed for Corollaries 19 and 23).
 * The simulations of historyless objects by (readable) swap objects.
 * Table 1 entries cited from other papers.

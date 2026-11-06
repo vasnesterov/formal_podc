@@ -5,15 +5,15 @@ DOI [10.1145/3583668.3594565](https://doi.org/10.1145/3583668.3594565). Formaliz
 [2305.07229](https://arxiv.org/abs/2305.07229) v1 (the PODC paper plus Appendix A with the deferred
 proofs); numbering follows it.
 
-**Verdict: ⚠️ Minor statement issues.** Two typos make the algorithm of Fig. 4 wrong as printed. Line 13
-never sets the `super` field of leaf blocks, and line 78 reads the wrong node's blocks. With either
-typo the queue is not linearizable (Lean counterexamples). With both lines repaired as the paper's own
-proofs intend, the queue is linearizable (Theorem 18) and wait-free (Corollary 23). Lemmas 9–17, 20
-and 21 hold.
+**Verdict: 🔧 Easy fix.** Fig. 4 is not linearizable as printed: line 13 never sets the `super` field of leaf blocks, and
+line 78 reads the wrong node's blocks, and with either error the queue fails (Lean counterexamples). With both lines
+repaired as the paper's own proofs intend, the queue is linearizable (Theorem 18) and wait-free (Corollary 23), and
+Lemmas 9–17, 20 and 21 hold. The `O(log p)` bound for enqueues and null dequeues is proved, but the `O(log² p + log q)`
+bound for the other dequeues was checked only in parts, and the bounded-space version was not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Fig. 4, line 13 (`Append` never sets `super` of leaf blocks; Invariant 3, Theorem 18)
+### 🔧 Fig. 4, line 13 (`Append` never sets `super` of leaf blocks; Invariant 3, Theorem 18)
 As printed, `Append` increments `leaf.head` with a plain write instead of calling `Advance`, so the
 `super` field of a leaf block stays `null` and the third claim of Invariant 3 is false for leaves
 (`invariant3_false`); `IndexDequeue` then reads this `null` at line 72, and in the solo sequential
@@ -36,40 +36,46 @@ is clear: a leaf's head is advanced by `Advance`.
 Reading `null` as `0` (Lean: `(M.sup v b).getD 0`) gives the wrong root block in the counterexample.
 Any other reading of `v.parent.blocks[null]` fails as well.
 
-A second race: if line 13 re-reads `leaf.head`, a helper's `Advance(leaf, h)` between lines 12
-and 13 makes the owner write `h + 2`. That skips an index and breaks Invariant 3 again. The repair
-removes this race too.
+The prose claim "there cannot be concurrent updates to a leaf" is false too. A second race: if line 13
+re-reads `leaf.head`, a helper's `Advance(leaf, h)` between lines 12 and 13 makes the owner write
+`h + 2`. That skips an index and breaks Invariant 3 again. The repair removes this race too.
 
 **Repair.** `Variant.fixed` keeps the index `h` written at line 12 and calls `Advance(leaf, h)` instead of
 line 13 (`Pc.adv0 .app`).
 
-### ⚠️ Fig. 4, line 78 (`IndexDequeue` counts dequeues of the wrong node)
-Line 78 reads `v.blocks[…]` at indices taken from `endleft` fields, which index the blocks of the *left
-sibling* (it should read `v.parent.left.blocks[…]`), so with only this typo left two concurrent dequeues
-after one `Enqueue(7)` both return `7` (`line78_not_linearizable`).
+### ✏️ Slips
+- **Fig. 4, line 78 (`IndexDequeue` counts dequeues of the wrong node).** Line 78 reads `v.blocks[…]` at indices taken
+  from `endleft` fields, which index the blocks of the *left sibling* (it should read `v.parent.left.blocks[…]`), so with
+  only this error left two concurrent dequeues after one `Enqueue(7)` both return `7` (`line78_not_linearizable`). The
+  proof of Lemma 13 states the intended computation ("all of the subblocks of B′ from v's left sibling also precede the
+  required dequeue"). Corrected, Lemma 13 holds (`idxStep_spec`).
 
-**Impact.** This is a local typo. The proof of Lemma 13 states the intended computation ("all of the
-subblocks of B′ from v's left sibling also precede the required dequeue"). Corrected, Lemma 13 holds
-(`idxStep_spec`).
-
-**Details.** In the counterexample, process `1`'s block is `leaf₃.blocks[1]` and its root block is
-`root.blocks[2]` (`endleft = 2`, `endright = 1`). Printed line 78 adds
-`leaf₃.blocks[2].sumdeq − leaf₃.blocks[1].sumdeq`, but `leaf₃.blocks[2]` is still `null`. Read
-literally, this is a null dereference. The model reads a `null` block as the empty block `B₀` and
-uses truncated subtraction, so the rank is `1` instead of `2`. With integer subtraction it would be
-`0`, which violates the precondition of `FindResponse`. No reading gives the correct rank `2`.
-
-### Typos and slips
+  In the counterexample, process `1`'s block is `leaf₃.blocks[1]` and its root block is `root.blocks[2]` (`endleft = 2`,
+  `endright = 1`). Printed line 78 adds `leaf₃.blocks[2].sumdeq − leaf₃.blocks[1].sumdeq`, but `leaf₃.blocks[2]` is still
+  `null`. Read literally, this is a null dereference. The model reads a `null` block as the empty block `B₀` and uses
+  truncated subtraction, so the rank is `1` instead of `2`. With integer subtraction it would be `0`, which violates the
+  precondition of `FindResponse`. No reading gives the correct rank `2`.
+- Section 3.1 and Fig. 4, line 14: with `p = 1` the tree of height `⌈log₂ p⌉ = 0` has `leaf = root`, so `leaf.parent` does
+  not exist. A tree of height 1 handles this case (`theorem_18`).
 - Proof of Proposition 19: "A Refresh does at most 5 CAS steps". Line 29 can call `Advance` once for
   each child, so the count is 7 (1 at line 35, 2 per `Advance` at lines 29, 29, 36). The `O(log p)`
-  bound is unaffected.
+  bound is unaffected (`steps_le`).
+- Proof of Invariant 7 (App. A): the second `E(v.left.blocks[0]) ⋯ E(v.left.blocks[B.endright])`
+  should read `v.right` (`Shape.sumenq_eq`).
+
+### Typos
 - Proof of Lemma 10: "By Lemma 4, `v.blocks[h₂] = null`" should cite Invariant 3, together with
   `h₂ > h₁`.
-- Proof of Invariant 7 (App. A): the second `E(v.left.blocks[0]) ⋯ E(v.left.blocks[B.endright])`
-  should read `v.right`.
-- Proof of Lemma 21: it takes "the earliest termination `t` of any operation contained in `B`". Such
-  a termination need not exist. The fix is easy: when `B` is installed, all of its operations are
-  pending (`lemma_21`).
+
+## Proof gaps (statements true)
+
+### 🔧 Lemma 21
+The proof takes "the earliest termination `t` of any operation contained in `B`", but such a termination need not exist,
+since no operation in `B` may have terminated.
+
+**Impact.** The statement stands (`lemma_21`).
+
+**Repair.** Take the time `B` is installed, when all of its operations are pending.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -132,8 +138,10 @@ contention `c`. Two steps are left informal: the cost `O(log m)` of a doubling o
 `m` monotone entries, and the conversion of `size(bₑ)`, `size(b−1)` into `q_e`, `q_d` (they differ by
 at most `c`).
 
-**Not formalized.** The bounded-space variant of Section 6 and App. B (red-black trees, garbage
-collection, Theorems 31–32).
+**Not formalized.**
+- The bound of Theorem 22 for non-null Dequeues as one statement, and so the abstract's `O(log² p + log q)`: only the
+  parts above are proved.
+- The bounded-space variant of Section 6 and App. B (red-black trees, garbage collection, Theorems 31–32).
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and
 `Quot.sound`. The counterexamples are checked by kernel evaluation (`decide +kernel`, no

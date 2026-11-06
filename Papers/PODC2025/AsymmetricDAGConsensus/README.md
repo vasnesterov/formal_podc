@@ -4,12 +4,13 @@ Ignacio Amores-Sesar, Christian Cachin, Juan Villacis, Luca Zanolini. *DAG-based
 Trust.* PODC 2025. DOI [10.1145/3732772.3733527](https://doi.org/10.1145/3732772.3733527). Formalized
 version: arXiv [2505.17891](https://arxiv.org/abs/2505.17891) v1 (extended version); numbering follows it.
 
-**Verdict: ❌ False claim.** The gather part of the paper holds. Lemma 3.2 is true: the 30-process
-system of Figure 1 satisfies `B³` and makes the quorum-replacement gather (Algorithm 2) miss a common
-core. The new constant-round asymmetric gather (Algorithm 3) is correct: Lemmas 3.3–3.8 hold, but the
-proofs of Lemmas 3.5 and 3.7 need a repair. The claim in Appendix A that the quorum-replacement
-pattern reaches a common core within `log n − 1` rounds is false. The DAG consensus protocol of
-Section 4 is not formalized.
+**Verdict: 🔧 Easy fix.** The gather part of the paper holds after local repairs: Lemma 3.2 is true (the 30-process
+system of Figure 1 satisfies `B³` and makes the quorum-replacement gather, Algorithm 2, miss a common core), and the new
+constant-round asymmetric gather (Algorithm 3) is correct, with Lemmas 3.3–3.8 holding once Definition 3.1, line 62 and
+the proofs of Lemmas 3.5 and 3.7 are fixed. The claim in Appendix A that the quorum-replacement pattern reaches a common
+core within `log n − 1` rounds is false, but it is an unproved side remark about the approach the paper rejects, and
+nothing depends on it. The DAG consensus protocol of Section 4 is not formalized, so that part of the paper's point was
+not checked.
 
 ## Mistakes in the paper
 
@@ -18,8 +19,8 @@ The quorum-replacement pattern does not reach a common core in `log n − 1` rou
 (`log₂ 8 − 1 = 2` rounds) a fault-free `B³` system has a run with no common core after 2 rounds
 (`log_rounds_claim_false`, `two_rounds_five_processes`).
 
-**Impact.** An unproved side remark, not a headline result; Lemma 3.2 and the new gather
-(Algorithm 3) are unaffected.
+**Impact.** An unproved side remark about the gather the paper rejects; Lemma 3.2 and the new gather (Algorithm 3) are
+unaffected. We proved no corrected round bound.
 
 **Details.** Appendix A says that, by quorum consistency, the common core "can be obtained in
 `log n − 1` rounds" of receiving messages from a quorum and sending them on. Counterexample: 8
@@ -32,49 +33,59 @@ processes alone already defeat 2 rounds (5 < 2³), so the §3.2 heuristic "3 rou
 "the 3 rounds of Algorithm 2", which waits for a quorum three times. With the floor reading,
 `⌊log₂ 30⌋ − 1 = 3`, the claim is refuted by the paper's own Figure 1.
 
-### ⚠️ Definition 3.1 (asymmetric gather, no termination)
+### 🔧 Definition 3.1 (asymmetric gather, no termination)
 Definition 3.1 has no termination property, so a protocol that never ag-delivers satisfies it.
 
-**Impact.** Evident intent: Lemma 3.8 and the text clearly intend that every maximal-guild member
-ag-delivers, and Algorithm 3 does. We prove termination too (`termination`, `lemma_3_8`).
+**Impact.** Lemma 3.8 and the text clearly intend that every maximal-guild member ag-delivers, and Algorithm 3 does.
+Adding the property is enough: we prove termination too (`termination`, `lemma_3_8`).
 
-### Typos and slips
+### 🔧 Algorithm 3, line 62 (delivery trigger)
+Line 62 ("upon receiving `DISTRIBUTET` from a quorum, ag-deliver `U`") counts raw receptions, also those with
+`T ⊄ Sᵢ` that line 60 has not incorporated, so `U` may lack the core.
+
+**Impact.** One added condition fixes the pseudocode, and Lemma 3.8 is proved for it (`lemma_3_8`).
+
+**Repair.** Count only `DISTRIBUTET` messages already incorporated by line 60, that is, those with `T ⊆ Sᵢ`. We model
+this reading (`QualT`).
+
+### ✏️ Slips
+- §2.4: "`2f − 1` processes" should be `2f + 1`.
+- Lemma 3.5: the statement's "the processes of `Qᵢ` receive `DISTRIBUTES` before sending `DISTRIBUTET`" only makes
+  sense for the correct members of `Qᵢ`. We prove that version.
+- Line 148 of Algorithm 6 commits with "a quorum `Q ∈ Qⱼ` for some `Qⱼ ∈ ℚ`", a quorum of *any* process. The text says
+  a quorum of `pᵢ`, and Lemma 4.2's intersection argument needs that. Not checked in Lean.
+
+### Typos
 - §3.2 says "3 rounds, fewer than 16 processes", then "`n` rounds, fewer than `2ⁿ`
   processes". These two statements do not match: `2³ = 8`.
 - §3.2 says Algorithm 2 gives a common core "after four rounds". Elsewhere it speaks of three
   rounds; "four" presumably also counts the input broadcast, as DAG-Rider's 4-round waves do.
   With that count the "`log n − 1`" claim is off by even more.
-- Line 62 ("upon receiving `DISTRIBUTET` from a quorum, ag-deliver `U`") should count only
-  `DISTRIBUTET` messages already incorporated by line 60, that is, those with `T ⊆ Sᵢ`. If not,
-  `U` may lack the core. We model the intended reading.
-- §2.4: "`2f − 1` processes" should be `2f + 1`.
+- Lemma 4.3 writes `strong_path(u, v)` from round 1 to round 4, so the direction is reversed.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 3.5 (wise vs. maximal-guild process)
+### 🔧 Lemma 3.5 (wise vs. maximal-guild process)
 The proof goes "all quorums contain a wise process (Lemma 7 of Alpos et al.), so a wise process
 sent `CONFIRM`; apply Lemma 3.4", but Lemma 3.4 needs a *maximal-guild* member, and a wise process
 need not be one.
 
-**Impact.** Statement true (for the correct members of the quorum, see below); repaired
+**Impact.** The lemma stands for the correct members of the quorum (see Slips), with one replacement fact
 (`lemma_3_5`, `exists_candidate`).
-
-**Details.** The statement's "the processes of `Qᵢ` receive `DISTRIBUTES` before sending
-`DISTRIBUTET`" only makes sense for the correct members of `Qᵢ`. We prove that version.
 
 **Repair.** A quorum `Q` of a guild member `g` meets `g`'s quorum inside the guild, so `Q` contains
 a guild member.
 
-### 🛠️ Lemma 3.7 (possibly Byzantine intersection process)
+### 🔧 Lemma 3.7 (possibly Byzantine intersection process)
 The proof picks a process in `Qᵢ ∩ Qⱼ` and uses that it put `Sᵢ` into its `T`, but that process may
 be Byzantine.
 
-**Impact.** Statement true; repaired (`lemma_3_7`).
+**Impact.** The lemma stands, with a one-line change (`lemma_3_7`).
 
 **Repair.** Both `pᵢ` and `pⱼ` are wise, so consistency against the actual faulty set gives a
 *correct* process in the intersection.
 
-### 🛠️ Lemma 3.2 (Appendix A, "easy way to observe" no common core)
+### 🔧 Lemma 3.2 (Appendix A, "easy way to observe" no common core)
 The argument is a non sequitur: "every `S` set has an element in `[16,30]`" plus "every `U` misses
 some element of `[16,30]`" does not imply that no `S` lies in all `U`s.
 
@@ -123,12 +134,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Termination (implicit in Lemma 3.7/3.8) | `Gather3.termination` | `Gather3Liveness.lean` |
 | Lemma 3.8 (Alg. 3 is an asymmetric gather) | `Gather3.lemma_3_8`, `Gather3.lemma_3_8_maxGuild` | `Gather3Liveness.lean`, `NonVacuity.lean` |
 
-**Not formalized.** Section 4 (asymmetric DAG-Rider, Lemmas 4.2–4.10). Remarks from reading it, not
-checked in Lean: line 148 of Algorithm 6 commits with "a quorum `Q ∈ Qⱼ` for some `Qⱼ ∈ ℚ`", a
-quorum of *any* process. The text says a quorum of `pᵢ`, and Lemma 4.2's intersection argument needs
-that. Lemma 4.3 writes `strong_path(u, v)` from round 1 to round 4, so the direction is reversed.
-Lemma 4.4 needs the coin to be independent of the common core; the binding issue raised in §2.4 is
-not addressed for the asymmetric protocol. Also not formalized: the §3.2 claim that Algorithm 2 always
+**Not formalized.** Section 4 (asymmetric DAG-Rider, Lemmas 4.2–4.10). An open remark from reading it,
+not checked in Lean: Lemma 4.4 seems to need the coin to be independent of the common core; the binding
+issue raised in §2.4 is not addressed for the asymmetric protocol. Also not formalized: the §3.2 claim that Algorithm 2 always
 reaches a common core with fewer than 16 processes. We neither proved nor refuted it. Exhaustive SAT
 search found no single-quorum fault-free counterexample with `n ≤ 7`. Heuristic local search found
 none up to 15, but it is weak evidence: the same search did not rediscover a 30-process example either.

@@ -5,13 +5,13 @@ Proofs omitted in the BA are taken from its full version arXiv:2506.12282v1 ("fu
 Numbering: BA Algorithm 1 = full Algorithm 2; BA Lemmas 1–4 = full Lemmas 2–5; BA Theorem 2 = full Theorem 6;
 `JoinCommittees` = full Algorithm 1; binary algorithm = full Algorithm 3.
 
-## Statement-level issues (with the deciding rule of `verdicts.md`)
+## Statement-level issues
 
-1. **Theorem 2 (binary consensus) — the algorithm is incorrect; the claim is unestablished. ❌ (R1, R5).**
+1. **Theorem 2 (binary consensus) — the algorithm is incorrect; the claim is unestablished. ❌**
    - *What fails.* The full version's Algorithm 3 with its `JoinCommittees(f, ⌈√n⌉)` and `T₀ = ⌈(f+1)/√n⌉` violates
      agreement for `n = 5, f = 3`, `n = 7, f = 4` and `n = 9, f = 7` (Lean: `algorithm3_violates_agreement`,
      `_7_4`, `_9_7`).
-   - *Not degenerate (R2).* `n = 5`, `f = 3` leaves two non-faulty players, and `n = 7` leaves three. A simulation
+   - *Not degenerate.* `n = 5`, `f = 3` leaves two non-faulty players, and `n = 7` leaves three. A simulation
      (`scripts/family.py`) gives a disagreeing execution for every `n = s²`, `f = n − 2`, `3 ≤ s ≤ 12`.
    - *The BA sketch fails too.* It leaves the committees unspecified ("analogously to the multi value consensus
      algorithm"). For `n = 5`, `f = 3` the sketch fails for **all** 1000 assignments of 3 committees of size 3
@@ -20,13 +20,12 @@ Numbering: BA Algorithm 1 = full Algorithm 2; BA Lemmas 1–4 = full Lemmas 2–
    - *Why the Lean executions also cover the sketch.* The sketch differs from Algorithm 3 in two places. Input-1
      players send to `C_1..C_T` (Algorithm 3: `C_1..C_{T+1}`), and the sketch never re-activates them. The Lean
      executions use neither difference, since the only input-1 player crashes in round 1.
-   - *Why ❌ and not 🚨.* Theorem 2 is phrased existentially ("There is a deterministic algorithm …"), and the
+   - *Not refuted.* Theorem 2 is phrased existentially ("There is a deterministic algorithm …"), and the
      abstract says "we show that `O(⌈f/√n⌉)` rounds are possible". The paper's algorithm is wrong, but the
-     existential claim is not refuted, only unestablished (R5). The authors' later OPODIS 2025 paper (arXiv v2,
+     existential claim is not refuted, only unestablished. The authors' later OPODIS 2025 paper (arXiv v2,
      with Meir and Peleg) describes this attack and gives a different algorithm for the same bounds. We did not
-     check it, so the claim stays unestablished here. *Borderline:* a reader may see the BA's binary algorithm
-     as the headline itself ("our binary consensus algorithm operates as follows"). Under that reading the
-     verdict would be 🚨.
+     check it, so the claim stays unestablished here. The BA does present the binary algorithm itself
+     ("our binary consensus algorithm operates as follows").
    - *Full-version lemmas.* Lemma 11 ("either `|P_{f+1}| ≥ f + 1` or the algorithm reaches agreement on 0") is
      false: in the `n = 5` execution `P₄ = {p₂, p₃, p₄}`, and the decisions differ. Its proof assumes that a
      1-valued message is sent and delivered to a new player in every round from `t` on. In the execution, the
@@ -38,7 +37,7 @@ Numbering: BA Algorithm 1 = full Algorithm 2; BA Lemmas 1–4 = full Lemmas 2–
      `f > ⌈√n⌉`, or `f = ⌈√n⌉` with `n` not a perfect square (e.g. `n = 5`, `f = 3`): the property makes
      `min(f, ⌈√n⌉ + 2)` consecutive committees of size `⌈√n⌉` pairwise disjoint, which needs more than `n`
      players since `⌈√n⌉² ≥ n`.
-2. **Lemma 2 is false as stated — ⚠️ (R3).** The hypothesis "`p` is alive in round `i`" means, by the paper's own
+2. **Lemma 2 is false as stated — 🔧.** The hypothesis "`p` is alive in round `i`" means, by the paper's own
    definition, not crashed in rounds `1, …, i − 1`. So `p` may crash in round `i` and its message to `C_i` may be
    lost (`lemma_2_as_stated_false`: `n = 2`, `f = 1`). The proof uses "`p` successfully sends its message to all
    destinations", so the intended hypothesis is recoverable and the fix is local: `p` does not crash in round `i`.
@@ -51,7 +50,7 @@ Numbering: BA Algorithm 1 = full Algorithm 2; BA Lemmas 1–4 = full Lemmas 2–
 
 ## Proof-level issues (statements true)
 
-4. **Lemma 4 (agreement) — proof repaired 🛠️.**
+4. **Lemma 4 (agreement) — proof gap 🔧.**
    - The case where the first clean round is `t = f + 1` is missing. The proof covers only `t = 1` and
      `1 < t < f + 1`. Repair: every decider receives all alive `C_f` members, and Lemma 3 bounds its own value.
    - "Since `p` does not crash" is unjustified. `p` is an arbitrary alive member of `C_t` holding `δ` and may crash
@@ -84,7 +83,7 @@ Numbering: BA Algorithm 1 = full Algorithm 2; BA Lemmas 1–4 = full Lemmas 2–
 9. **Values.** Multi-value inputs come from an arbitrary linear order (the paper uses integers, "polynomial in
    `n`"). This is a generalization. Message sizes (`O(log |Δ|)` bits, constant for binary) are not formalized:
    each message carries a single value or a single bit.
-10. **`f ≥ 1`** is assumed for Algorithm 1 (R2: with `f = 0` the pseudo-code refers to `C_0`). `f < n` is needed
+10. **`f ≥ 1`** is assumed for Algorithm 1 (✏️: with `f = 0` the pseudo-code refers to `C_0`). `f < n` is needed
     for the committees of size `f + 1` (from `JoinCommittees(f, f+1)`, Algorithm 1 of the full version). The
     correctness lemmas (`lemma_2`, `lemma_3`, `lemma_4`) hold for **any** committees with more than `f`
     members.

@@ -37,7 +37,7 @@ Depends on the Knowledge About the Network Size*, PODC 2026 (arXiv 2605.12787 v1
 
 ## Proof of Theorem 1
 
-9. **Gap (repaired; decides the verdict 🛠️).** Property 4 is proved with the modified graph `Ĝ`. The
+9. **Gap (repaired, 🛠️).** Property 4 is proved with the modified graph `Ĝ`. The
    conclusion "the produced 2-colouring cannot be proper" needs the `u`–`v` path in `Ĝ` to be properly
    2-coloured. That needs all lower-level nodes adjacent to it to output `D` in `Ĝ`, so that no path
    node may output `E`. The induction hypothesis is stated only for `G` ("by running `A` on `G`"), and
@@ -45,9 +45,8 @@ Depends on the Knowledge About the Network Size*, PODC 2026 (arXiv 2605.12787 v1
    every *host*, i.e. every rooted tree with a level labelling satisfying local degree conditions
    (`HostOK`), and every level-`j` component embedded in it by an ID renaming (`Emb`). Hosts are closed
    under the surgery (`hostOK_hat`), and the attached components stay embedded (`emb_hat_child`).
-   Verdict rule: a gap in a proof whose statement is true → 🛠️ (R1). The statement is not affected.
-   Borderline call (✅ vs 🛠️): one could argue that "the induction hypothesis also holds in `Ĝ`" is
-   routine. We count it as a genuine repair for two reasons. The paper explicitly fixes the induction
+   The statement is not affected. One could argue that "the induction hypothesis also holds in `Ĝ`"
+   is routine, but this is a genuine repair for two reasons. The paper explicitly fixes the induction
    to runs on `G`. And applying it in `Ĝ` needs the induction itself to be re-run on surgered graphs,
    whose own property-4 steps do further surgery. So the claim has to be generalised to a class closed
    under surgery.
@@ -75,6 +74,5 @@ Depends on the Knowledge About the Network Size*, PODC 2026 (arXiv 2605.12787 v1
 15. Theorem 2 (`k`-rake-and-compress). Lemma 19 and Observation 20 are not formalized either. The
     proof of property 1 is a sketch. The parity surgery of Theorem 1 does not transfer directly,
     because a single-sink orientation of a path can be locally consistent (e.g. with increasing IDs,
-    every node points to its larger-ID neighbour). We neither verified nor refuted it. It does not
-    enter the verdict.
+    every node points to its larger-ID neighbour). We neither verified nor refuted it.
 16. Theorems 3–7, Lemma 21 onwards, and the randomized results of Section 7.

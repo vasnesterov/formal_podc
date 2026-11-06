@@ -25,7 +25,7 @@ hal-03148627, the proceedings text; there is no arXiv version).
    `n = 2` and the Bezout pair `(u, v) = (−1, 1)`, the third case gives `(u′, v′) = (1, 0)`
    (`v_prime_zero_example`). Only `v′ ≥ 0` holds, and that is all the algorithm needs
    (`paper_rewrite`). The case `v ≤ 0` also silently uses `u > 0`, which holds because
-   `u m = gcd(m, n) − v n > 0`. *Classification: typo / degenerate case, harmless.*
+   `u m = gcd(m, n) − v n > 0`. *Classification: slip.*
 
 3. **Theorem 2 (Algorithm 1): the termination proof is a sketch; the statement is true.**
    "It follows that this pattern is repeated until all the processes except one are losers"
@@ -80,10 +80,10 @@ hal-03148627, the proceedings text; there is no arXiv version).
      `level_i[x]` by one per collect. We formalize the code.
    * Claim 1's proof says "every other process `p_i` has `loser_i` set to false"; it should be
      `true`. The proof of Theorem 2 refers to "the predicate of line 16"; it means lines 5–6.
-   * §3.1 prose says line 8 "leaves `REG.id = id_ℓ`", but the code writes
+   * The proof of Theorem 2 says line 8 "leaves `REG.id = id_ℓ`", but the code writes
      `⟨⊥, ∅, committing⟩`. The Lean model follows the code.
-   * The register size "1 + n log₂ n bits" for Algorithm 1 ignores the `id` field (≈ `log n`
-     more bits). Not formalized.
+   * The register size "1 + n log₂ n bits" for Algorithm 1 is not formalized. It is not an error:
+     `discarded` holds at most `n − 1` identities, so `id`, `discarded` and `phase` fit.
 
 ## Modelling choices
 

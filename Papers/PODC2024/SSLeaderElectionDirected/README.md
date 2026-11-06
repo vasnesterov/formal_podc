@@ -7,25 +7,22 @@ version on HAL, [hal-04434345v4](https://hal.science/hal-04434345v4) (4 March 20
 follows it (v1 has the same statements and algorithms).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** **Theorem 5 is false**: the synchronous unison algorithm `U(K)` is not
-self-stabilizing on *any* network with `n ≥ 2` once the smallest identifier lies in the source
-component. It also fails for every identifier assignment once the source component has two
-processes, e.g. on every strongly connected network with `n ≥ 2`. The dipath `0 → 1` is a concrete
-case. The bug is in the input of the third instance `E` of PEL. A one-line change
-(`I_E(p) = (¬p.A.M, p.Id)` instead of `(¬p.A.M, p.MI.M)`) repairs it, and with that change the
-paper's proof of Theorem 5 goes through. Everything else holds. This covers C-MAI (Theorems 1 and 2,
-with the bound `α + MAD + 2`), PEL (Theorem 3, with `3α + 3MAD + 6` rounds under the distributed
-unfair daemon) and the impossibility (Lemma 13, Corollary 2). Both characterizations hold: leader
-election (Corollary 3) and, with the repaired algorithm, synchronous unison (Corollary 5).
+**Verdict: 🔧 Easy fix.** Both characterizations hold, for leader election (Corollary 3) and synchronous unison
+(Corollary 5), but the unison algorithm `U(K)` of Theorem 5 is not self-stabilizing as printed: the bug is in the
+input of the third instance `E` of PEL. A one-line change (`I_E(p) = (¬p.A.M, p.Id)` instead of
+`(¬p.A.M, p.MI.M)`) repairs it, and with that change the paper's proof of Theorem 5 goes through. Everything else
+we checked holds: C-MAI (Theorems 1 and 2, with the bound `α + MAD + 2`), PEL (Theorem 3, with `3α + 3MAD + 6`
+rounds under the distributed unfair daemon) and the impossibility (Lemma 13, Corollary 2); the space bounds were
+not checked.
 
 ## Mistakes in the paper
 
-### ❌ Theorem 5 (Algorithm 2 on top of PEL, synchronous unison)
+### 🔧 Theorem 5 (Algorithm 2 on top of PEL, synchronous unison)
 `U(K)` does not stabilize: every process of the source component gets `E.d = 0` and increments its clock on its
 own, so e.g. on the 2-cycle `0 ⇄ 1` with `K = 2` the clocks alternate `(1, 0), (0, 1), …` forever
 (`twoCycle_paper_unison_fails`, `U.paper_unison_not_selfStab`).
 
-**Impact.** A false statement and an algorithm that does not work, but a one-line change
+**Impact.** The printed algorithm does not work, but a one-line change
 (`I_E(p) = (¬p.A.M, p.Id)` instead of `(¬p.A.M, p.MI.M)`) repairs it, and the characterization of
 Corollary 5 survives. Leader election (PEL, Theorem 3) is unaffected.
 
@@ -42,13 +39,13 @@ configuration of PEL with clocks `(0, 1)`. Under the synchronous daemon the cloc
 self-stabilizing. The paper's own example is inconsistent in the same way. In Figure 5(c), the six processes
 of the two triangular components have `E`-input `(0,4)`, yet Figure 6 shows `E.d = 0, 1, 2, 3, 4, 5` for them.
 
-Scope: we prove the failure for every network whose source component has two distinct processes, every
-`K ≥ 2`, every identifier assignment and every `α ≥ MAD` (`U.paper_unison_not_selfStab`; concrete instance
-`twoCycle_paper_unison_fails`). More generally, it fails as soon as two processes have only ancestors with
-identifiers `≥ mid` (`U.paper_unison_not_selfStab_gen`). So if the smallest identifier lies in the source
-component, *every* process has `E.d = 0`, and `U(K)` fails on every network with `n ≥ 2`
-(`U.paper_unison_not_selfStab_of_min`). An example is the dipath `0 → 1`, whose source component is a single
-process (`dipath_paper_unison_fails`).
+Scope: we prove the failure for every network whose source component has two distinct processes (so on every
+strongly connected network with `n ≥ 2`), every `K ≥ 2`, every identifier assignment and every `α ≥ MAD`
+(`U.paper_unison_not_selfStab`; concrete instance `twoCycle_paper_unison_fails`). More generally, it fails as
+soon as two processes have only ancestors with identifiers `≥ mid` (`U.paper_unison_not_selfStab_gen`). So if
+the smallest identifier lies in the source component, *every* process has `E.d = 0`, and `U(K)` fails on every
+network with `n ≥ 2` (`U.paper_unison_not_selfStab_of_min`). An example is the dipath `0 → 1`, whose source
+component is a single process (`dipath_paper_unison_fails`).
 
 **Repair.** With `I_E(p) = (¬p.A.M, p.Id)`, PEL still elects `mid`: Lemma 15 holds for both inputs
 (`PEL.lemma15`). Moreover the leader is now the only process with `E.d = 0`, and `E.d` is a BFS distance from
@@ -56,12 +53,14 @@ it (`U.fixed_ed`). The paper's Lemmas 16 and 19 then go through. We prove Theore
 algorithm, with the claimed bound of `3α + 4MAD + 6` synchronous steps (`U.theorem5`, `U.theorem5_time`), and
 Corollary 5 (`corollary5`).
 
-### Typos and slips
+### ✏️ Slips
 - Lemma 10's induction claim reads "If `MinI(p) < i`"; it should be "`Mind(p) < i`".
-- Lemma 5's proof writes `q ∈ F_{i+1}(q)` for `q ∈ F_{i+1}(p)`, and Lemma 8 has `F_j(q)` for `F_j(p)`.
-- Lemma 9 has a stray `q` in "`Mdf_{R(α+1)} q(p)`".
 - Lemma 9 and Lemma 10 index rounds by `R(i)`, which is undefined once the (finite) execution has ended. This
   is harmless: terminal configurations are legitimate.
+
+### Typos
+- Lemma 5's proof writes `q ∈ F_{i+1}(q)` for `q ∈ F_{i+1}(p)`, and Lemma 8 has `F_j(q)` for `F_j(p)`.
+- Lemma 9 has a stray `q` in "`Mdf_{R(α+1)} q(p)`".
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -125,8 +124,10 @@ it by an elementary "freeze keys from the smallest up" induction.
   directly: each layer is a C-MAI run whose inputs become constant once the lower layers have
   frozen.
 * Lemma 17 (no configuration of `U(K)` is terminal).
-* The space bound `O(log α + B)`. It can be read off the state types: `CState` holds a key with
-  `d ≤ α`, `PState` holds three of them, and `UState` adds a clock.
+* The space bounds `O(log α + B)` and `O(log α + B + log K)`. They can be read off the state types: `CState`
+  holds a key with `d ≤ α`, `PState` holds three of them, and `UState` adds a clock.
+* The proof of Theorem 4 cited from [ACDD23] was not examined; we prove the theorem directly (see **Proof
+  remarks**).
 
 **Trust.**
 * No `sorry`. All listed theorems use only `propext`, `Classical.choice` and `Quot.sound`.

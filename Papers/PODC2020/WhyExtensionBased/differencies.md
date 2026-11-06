@@ -10,10 +10,8 @@ Paper: Alistarh, Aspnes, Ellen, Gelashvili, Zhu, *Why extension-based proofs fai
    processes and any finite, nonempty input set; `n > k` is not needed (for `n ≤ k` the task is
    solvable anyway). **Both are weaker than the paper's Theorem 5.7** in one respect: the class of
    provers is smaller (item 8, interleaved infinite chains). The Lean theorem does not formally
-   imply the paper's.
-   Decision: the verdict judges the paper. The restriction leaves part of Theorem 5.7 unchecked
-   but shows nothing false, so it does not change the label. It is stated in the README's
-   verdict paragraph and table.
+   imply the paper's. The restriction leaves part of Theorem 5.7 unchecked but shows nothing false.
+   It is stated in the README's verdict paragraph and table.
 2. **Lemmas 4.11, 4.13** are proved in a "carrier" form (`Far.subdiv`, `Far.subdiv_succ`). This form
    is more general than the paper's: the sets `A`, `B` need not be unions of cliques or sets of
    terminated vertices, only "carrier-closed" (every carrier of a vertex of `A'` lies in `A`). The
@@ -23,22 +21,16 @@ Paper: Alistarh, Aspnes, Ellen, Gelashvili, Zhu, *Why extension-based proofs fai
    `N_t(a)`. By the paper's Lemma 5.3 these are the same vertex sets, so the statements are equivalent.
 4. **Lemma 5.5** (`subdiv_far`, `AInv.subdiv`): the distance part is proved for any distances
    `d₄ ≥ 2`, `d₅ ≥ 3` (each grows by one). The invariant part is proved for **our** invariants
-   (`AInv`), which replace invariant 6 (see below). Decision rule: the claim "invariant 6 remains true"
-   is part of the adversary's correctness argument. We neither prove nor refute it for the paper's
-   invariant 6. It is classified as a proof gap of Theorem 5.7 (🛠️), because Theorem 5.7 is proved
-   and unformalized claims do not decide the verdict (verdicts.md, first paragraph). If it were
-   counted as an unestablished numbered lemma, the label would be ⚠️; this is the borderline call of
-   the verdict.
-   Reviewer note: ⚠️ is not the alternative. The rules give ⚠️ only to a statement that is wrong as
-   written with an excuse, and nothing here is shown wrong. The literal definition of `X_t(a)`
-   (all levels `≤ t`) does make invariant 6 fail for active vertices of lower levels. But that
-   inconsistency is in a definition, the strategy text shows the intent (item 18), and the
+   (`AInv`), which replace invariant 6 (see below). The claim "invariant 6 remains true" is part of
+   the adversary's correctness argument. We neither prove nor refute it for the paper's invariant 6.
+   It is a proof gap of Theorem 5.7 (🛠️). Nothing here is shown wrong. The literal definition of
+   `X_t(a)` (all levels `≤ t`) does make invariant 6 fail for active vertices of lower levels. But
+   that inconsistency is in a definition, the strategy text shows the intent (item 18), and the
    literal invariants hold in no non-trivial run, so it is not a refutation of the lemma. If
    someone showed that the intended invariant 6 can actually fail after a subdivision, Lemma 5.5
-   would be a false numbered lemma. That would be ❌ by R1, with Theorem 5.7 still true. A
-   candidate scenario is in README proof gap 1: `n = 3`, a Case-3 vertex `u`, and a descendant
-   `(i, {u, x_k})` with no clique containing it and a terminated vertex. We did not construct it.
-   For now the label stays 🛠️.
+   would be a false numbered lemma, with Theorem 5.7 still true. A candidate scenario, based on
+   README proof gap 1: `n = 3`, a Case-3 vertex `u`, and a descendant `(i, {u, x_k})` with no clique
+   containing it and a terminated vertex. We did not construct it.
 5. **Lemma 5.6** (`IsChain.false`): proved for chains of *consecutive* queries in phase 1 (see Model,
    winning condition).
 6. **Lemma 5.3, Lemmas 4.4–4.10, Corollary 4.9** are not formalized: connectivity is not needed and
@@ -88,7 +80,7 @@ Paper: Alistarh, Aspnes, Ellen, Gelashvili, Zhu, *Why extension-based proofs fai
       terminate the next state. The paper subdivides once and terminates `(i, {u})`; this schedule
       exists for the paper's adversary only by an unstated invariant (no process has written to
       `S_{t+1}` in a reached configuration); in our model undecided states are active, so it can
-      fail and we use a solo run (README, proof gap 2).
+      fail and we use a solo run (README, slips).
     * **(N)** Otherwise answer `none`. Descendants are considered at **all** levels, in the protocol
       where undecided states are active. The paper uses only `Q` ∩ `G_t` and Case 3 (README, proof
       gap 1).
@@ -117,8 +109,8 @@ Paper: Alistarh, Aspnes, Ellen, Gelashvili, Zhu, *Why extension-based proofs fai
 
 ## Paper slips (no influence on the result)
 
-18. `X_t(a)` is defined over all levels `V_r`, `r ≤ t`, but invariant 6 and the strategy treat it as
+18. ✏️ `X_t(a)` is defined over all levels `V_r`, `r ≤ t`, but invariant 6 and the strategy treat it as
     a set of vertices of `G_t`.
 19. Lemma 5.5's proof: `χ(N_t(a), Δ)` for `χ(N_t(a), δ)`, and `χ(T_t(t), δ)` for `χ(T_t(a), δ)`.
-20. Case 1 uses "each vertex in `X_t(y)` is adjacent to a vertex in `T_t(b)`" and drops invariant 6's
+20. ✏️ Case 1 uses "each vertex in `X_t(y)` is adjacent to a vertex in `T_t(b)`" and drops invariant 6's
     alternative `v ∈ N_t(y)`. This is harmless, since `T_t(y)` is far from `N_t(y)`.

@@ -4,19 +4,19 @@ Eli Goldweber, Nuda Zhang, Manos Kapritsos. *Brief Announcement: On the Signific
 Paxos.* PODC 2020. DOI [10.1145/3382734.3405700](https://doi.org/10.1145/3382734.3405700). Formalized version:
 arXiv [2006.01885](https://arxiv.org/abs/2006.01885) v1 (full version); numbering follows it.
 
-**Verdict: ⚠️ Minor statement issues.** The main claim holds. A value may be learned once a majority has
-accepted it in a consecutive span of ballots, and this keeps Paxos safe (Theorems 3.1, 3.2, Lemmas 4.1–4.3). It
-stays safe when combined with Consecutive Proposals (Consecutive Paxos). However, Definition 6 (CQ Chosen) is
-written so loosely that the auxiliary Lemmas 4.2′ and 4.3′ are false as stated. They are true for the evident
-intended definition. The TLA+ invariant printed in Appendix B is vacuous.
+**Verdict: 🔧 Easy fix.** The main claim holds: a value may be learned once a majority has accepted it in a consecutive
+span of ballots, and this keeps Paxos safe (Theorems 3.1, 3.2, Lemmas 4.1–4.3), also when combined with Consecutive
+Proposals (Consecutive Paxos). Definition 6 (CQ Chosen) is written so loosely that the auxiliary Lemmas 4.2′ and 4.3′
+are false as stated, the proof of Lemma 4.3′ misses a case and the TLA+ invariant printed in Appendix B is vacuous, but
+local changes repair all three. The IronFleet/Dafny artifact of §6 was not inspected.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemmas 4.2′ and 4.3′ (with Definition 6, CQ Chosen, as written)
+### 🔧 Definition 6 (CQ Chosen), with Lemmas 4.2′ and 4.3′
 Both lemmas are false for the literal Definition 6, because the ballot-`i` accept it requires need not be one of
 the accepts forming the Consecutive Quorum (`lemma_4_3'_literal_false`, `lemma_4_2'_literal_false`).
 
-**Impact.** Typo with evident intent: the proof reads the ballot-`i` accept as part of the CQ ("the acceptor in
+**Impact.** The proof reads the ballot-`i` accept as part of the CQ ("the acceptor in
 `Qᵢ` that accepted `v` in ballot `i`"), and under that reading both lemmas hold (`lemma_4_3'`, `lemma_4_2'`).
 Safety is not affected; Lemma 4.3 itself is true, but the paper derives it from the false Lemma 4.3′.
 
@@ -30,12 +30,9 @@ Then `{A, B, C}` in ballot 9 is a CQ for `x`, and `A` also sent `accept(3, x)`, 
 But `y` was proposed in ballot 5 > 3 (against Lemma 4.3′) and accepted by `D` in ballot 5 > 3 (against
 Lemma 4.2′). Safety is not affected: `y` can never be chosen.
 
-### Typos and slips
-- Appendix B's TLA+ check is vacuous as printed: `ConsecQ(Q, b, v) ≜ ∀ r ∈ Acceptor : ∧ NotIn(Q, r) ∧ …` makes
-  `r ∉ Q` a top-level conjunct for every acceptor `r`, so `ConsecQ` is false for every nonempty `Q`,
-  `AgreedConsecQ` never holds, and the invariant `SafeValue` is true independently of the protocol
-  (`tla_agreedConsecQ_false`). (`NotIn(Q, r) ⟹ …` was presumably meant, and the inner `∃ n ∈ msgs : … ⟹ …` should
-  presumably be `∀`.) This concerns the paper's supporting evidence, not its theorems.
+**Repair.** Require the ballot-`i` accept to be a member's CQ accept (`x_α = i`; our `CQChosen'`).
+
+### Typos
 - In the proof of Lemma 4.1′, "an acceptor that has accepted *v* in ballot *j*" should say *w*.
 - Appendix A writes `Chosen(v, i)` for the earlier `Chosen(i, v)` and uses `ℤ⁺` for ballots, where Section 3
   uses `ℕ`.
@@ -43,7 +40,7 @@ Lemma 4.2′). Safety is not affected: `y` can never be chosen.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 4.3′ (missing case in the proof)
+### 🔧 Lemma 4.3′ (missing case in the proof)
 The base case treats `i` as the largest ballot of the CQ, but when `i` is a smaller ballot of the CQ the
 intersecting acceptor may have accepted `v` in a ballot `≥ j`, after promising `j`, so its promise reports nothing
 useful.
@@ -55,6 +52,20 @@ The statement still holds because every ballot in the CQ's span carries `v`.
 
 **Repair.** Strong induction on the ballot over the whole span `[lo, hi]` of the CQ: every proposal in a ballot
 `≥ lo` has value `v` (`propose_eq_of_interval`).
+
+### 🔧 Appendix B (`ConsecQ`, `SafeValue`), cited by §6.2
+The TLA+ check is vacuous as printed: `ConsecQ(Q, b, v) ≜ ∀ r ∈ Acceptor : ∧ NotIn(Q, r) ∧ …` makes `r ∉ Q` a
+top-level conjunct for every acceptor `r`, so `ConsecQ` is false for every nonempty `Q`, `AgreedConsecQ` never holds,
+and the invariant `SafeValue` is true independently of the protocol (`tla_agreedConsecQ_false`).
+
+**Impact.** This concerns the paper's supporting evidence, not its theorems: safety of Consecutive Paxos holds
+(`theorem_3_2` with `cp = true`). We judge the typeset text only; the file actually model-checked may differ.
+
+**Details.** `NotIn(Q, r) ⟹ …` was presumably meant, and the inner `∃ n ∈ msgs : … ⟹ …` should presumably be `∀`.
+Even with these changes, `ConsecQ` does not express Definition 5.
+
+**Repair.** Replace the operator `ConsecQ` by Definition 5; the invariant then says what `cq_propose_eq` proves with
+`cp = true`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -97,7 +108,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Appendix B TLA+ `SafeValue` vacuous | `tla_agreedConsecQ_false` | `TLAAppendix.lean` |
 
 **Not formalized.** Liveness under partial synchrony: only the weakening argument of §4.2 is checked. The §4.3
-discussion and the IronFleet/Dafny Multi-Paxos refinement of §6 are also not formalized.
+discussion and the IronFleet/Dafny Multi-Paxos refinement of §6 are also not formalized, and that proof artifact was
+not inspected.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: concrete reachable executions with five acceptors. These are Table 3, Table 2 extended by ballot

@@ -6,26 +6,26 @@ Transactional Memory Consistency.* PODC 2013. DOI
 copy (10 pp.; no arXiv version); numbering follows it. The journal version (JACM 2017) was only used to
 confirm intended definitions.
 
-**Verdict: ❌ False claim.** The sufficiency half holds after fixing two slips in the definitions:
-the opacity relation implies observational refinement with respect to traces and to states
-(Theorem 21, Corollary 19). The necessity half (Theorem 24, a headline) is unestablished. As printed
-it is false, but only because of the Figure 2 slip that also breaks Proposition 13. With the abort
-semantics the prose states, our counterexample fails, yet the proof sketch's program cannot tell an
-aborted call from a returned one. A marker assignment after each call is a plausible fix, not
-proved here. Necessity does hold for trace-observational refinement.
+**Verdict: ⚠️ Weakened.** Sufficiency holds after fixing two slips in the definitions: the opacity relation implies
+observational refinement with respect to traces and to states (Theorem 21, Corollary 19). Necessity is proved for
+trace-observational refinement, which makes the opacity relation an exact characterization there. Necessity for
+state refinement (Theorem 24) is not saved: it is false as printed, only because of the Figure 2 mistake that also
+breaks Proposition 13, and for the abort semantics the prose states it is neither proved nor refuted, since the proof
+sketch's program cannot tell an aborted call from a returned one and a marker assignment after each call is a
+plausible fix that is not proved here.
 
 ## Mistakes in the paper
 
-### ❌ Theorem 24 (third implication of Theorem 16, necessity) — unestablished
+### ⚠️ Theorem 24 (third implication of Theorem 16, necessity)
 Unestablished: the proof sketch's `P_H` cannot tell an aborted last call from a call that returned
 the initial value, and the marker fix is plausible but unproved; as printed (literal Figure 2,
 deterministic commands) the theorem is even false (`theorem_24_false`), but that counterexample
 fails for the abort semantics the prose states (`theorem_24_cex_fails_intended`).
 
-**Impact.** A headline result whose proof is broken and whose statement is neither proved nor
-refuted for the intended semantics (rule R5 → ❌). Figure 2 as printed lets an atomic block run on
+**Impact.** Half of the necessity claim is lost: for states the proof is broken and the statement is neither
+proved nor refuted for the intended semantics. Figure 2 as printed lets an atomic block run on
 after one of its calls was aborted, against the prose "Once this happens, the execution of C
-terminates"; our refutation needs exactly this slip, so it does not refute the headline. For
+terminates"; our refutation needs exactly this mistake, so it does not refute the intended theorem. For
 trace-observational refinement necessity holds outright (`trace_necessity`).
 
 **Details.** Let `H_C` be the prefixes of `H = (t,txbegin)(t,OK)(t,call o.f(1))(t,aborted)`, and
@@ -58,53 +58,42 @@ repair for states.
 complete ones (`trace_necessity`, `trace_necessity_complete`). Combined with Theorem 21 this gives
 `H_C ⊑ H_A ⟺ H_C ⊑_trace H_A` (`theorem_16_repaired`).
 
-### ⚠️ Definition 2 (`txcommit` outside transactions) — Lemma 17 and Theorem 21 as printed
-The third condition of Definition 2 lists only `call`/`ret`, so a "stray" `txcommit` outside any
-transaction is well-formed, and then Lemma 17 and Theorem 21 are false (`lemma_17_false_literal`,
-`theorem_21_false_literal`).
-
-**Impact.** Local fix with evident intent: `txcommit` is "issued when a transaction tries to commit
-upon exiting an atomic block", and the journal version adds it to the condition. With the fix,
-Lemma 17 and Theorem 21 hold (`rearrangement`, `theorem_21`).
-
-**Details.** A stray `txcommit` is a non-transactional action, so `∼` fixes its position among the
-non-transactional actions of other threads, while `⊑` can move it. Lemma 17 fails for
-`H = (t₁,txcommit)(t₂,txcommit) ⊑ S = (t₂,txcommit)(t₁,txcommit)`.
-
-Programs really produce stray `txcommit`s, because of the Proposition 13 issue below. Two threads
-run `x := atomic { x := o.f(1); x := 1 }`. Both calls abort, both threads go on with `x := 1` and
-then issue `txcommit`. This is a trace with a history in `H_C` whose stray `txcommit`s `H_A`
-reorders, and no trace of `H_A` is observationally equivalent to it.
-
-### ⚠️ Definition 12 (global accesses inside transactions) — Lemma 18 as printed
-The third condition of Definition 12 looks for `committed`/`aborted` of *any* thread after `t`'s
-`txbegin` (the projection `τ₁|t` is missing), and then Lemma 18 is false (`lemma_18_false_literal`).
-
-**Impact.** Local fix with evident intent (the journal version uses `τ₁|t`). With it, Lemma 18 holds
-(`lemma_18`, even without the hypothesis `eval(s, τH) ≠ ∅`). Program traces satisfy the repaired
-condition, so Corollary 19 is unaffected.
-
-**Details.** Thread `t₁` opens a transaction, thread `t₂` runs a whole transaction, then `t₁` writes
-`g := x` inside its transaction and `t₂` writes `g := x` outside. Swapping the two writes preserves
-`∼`, because `t₁`'s write is transactional, but changes the final value of `g`.
-
-### ⚠️ Proposition 13 (`A(P)` contains only well-formed traces)
-False: Figure 2 lets the body of an atomic block continue after a method call in it was aborted, so
-`txbegin OK call aborted call` is the history of a trace in `A(P)` (`prop_13_false`).
+### 🔧 Figure 2 and Proposition 13 (`A(P)` contains only well-formed traces)
+Proposition 13 is false: Figure 2 lets the body of an atomic block continue after a method call in it was aborted,
+so `txbegin OK call aborted call` is the history of a trace in `A(P)` (`prop_13_false`).
 
 **Impact.** The prose says "once this happens, the execution of C terminates", so the intent is clear
 and the fix is local (stop the body at the aborted call, as JACM Figure 4 does). What the paper uses
 it for holds: a program trace with a well-formed history is a well-formed trace (`wfTrace_of_inA`).
-The same slip is what makes Theorem 21 fail with the printed Definition 2, and Theorem 24 fail as
-printed (above). Borderline with ❌; see `differencies.md`.
+The same clause of Figure 2 is what makes Theorem 21 fail with the printed Definition 2, and Theorem 24 fail as
+printed (above).
 
-### Typos and slips
+### ✏️ Slips
+- Definition 2 (`txcommit` outside transactions): the third condition lists only `call`/`ret`, so a "stray"
+  `txcommit` outside any transaction is well-formed, and then Lemma 17 and Theorem 21 are false
+  (`lemma_17_false_literal`, `theorem_21_false_literal`). The intent is evident: `txcommit` is "issued when a
+  transaction tries to commit upon exiting an atomic block", and the journal version adds it to the condition. With
+  the fix, Lemma 17 and Theorem 21 hold (`rearrangement`, `theorem_21`). A stray `txcommit` is a non-transactional
+  action, so `∼` fixes its position among the non-transactional actions of other threads, while `⊑` can move it.
+  Lemma 17 fails for `H = (t₁,txcommit)(t₂,txcommit) ⊑ S = (t₂,txcommit)(t₁,txcommit)`. Programs really produce
+  stray `txcommit`s, because of the Proposition 13 issue above. Two threads run `x := atomic { x := o.f(1); x := 1 }`.
+  Both calls abort, both threads go on with `x := 1` and then issue `txcommit`. This is a trace with a history in
+  `H_C` whose stray `txcommit`s `H_A` reorders, and no trace of `H_A` is observationally equivalent to it.
+- Definition 12 (global accesses inside transactions): the third condition looks for `committed`/`aborted` of *any*
+  thread after `t`'s `txbegin` (the projection `τ₁|t` is missing), and then Lemma 18 is false
+  (`lemma_18_false_literal`). The intent is evident (the journal version uses `τ₁|t`). With the fix, Lemma 18 holds
+  (`lemma_18`, even without the hypothesis `eval(s, τH) ≠ ∅`). Program traces satisfy the repaired condition, so
+  Corollary 19 is unaffected. Counterexample: thread `t₁` opens a transaction, thread `t₂` runs a whole transaction,
+  then `t₁` writes `g := x` inside its transaction and `t₂` writes `g := x` outside. Swapping the two writes
+  preserves `∼`, because `t₁`'s write is transactional, but changes the final value of `g`.
+
+### Typos
 - Lemma 18's statement binds `s` twice ("`eval(s, τH) ≠ ∅ ⟹ ∀s. …`"). The proof shows equality of the
   evaluations for every `s`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 22 (rearrangement step), footnote 3
+### 🔧 Lemma 22 (rearrangement step), footnote 3
 The footnote classifies the actions of `τ₃` on their own ("all non-transactional" without
 `txbegin`), and read literally this gives `τ^{i+1} = τ^i`, breaking the invariant
 `H^{i+1}_{i+1} = S_{i+1}`.
@@ -131,8 +120,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 - Programs (`Cmd`, `Cmd.Allowed`) obey the syntactic restrictions of Section 2. Figure 2 as printed
   is the inductive `Tr`, and `A(P)` is the prefix closure of interleavings (`InA`). All positive
   results use `Tr`. `TrI` (`Theorem24Intended.lean`) is Figure 2 with the intended abort semantics:
-  the body of an atomic block stops at its first aborted call. The positive results only use
-  per-thread projections of `A(P)`, so they should carry over to `TrI`; this is not formalized.
+  the body of an atomic block stops at its first aborted call.
 - Observational refinement: `StateRef` (Definition 14) and `TraceRef` (Definition 15). There is no
   randomness. The results are proved for every instance of `Lang`; the Theorem 24 counterexample
   needs deterministic commands and Figure 2 as printed.
@@ -169,6 +157,8 @@ and no global variables.
 
 **Not formalized.** Proposition 10 (equivalence with the original definition of opacity; proved only
 in the technical report). Theorem 24 for the intended abort semantics (`TrI`), with a repaired `P_H`.
+The positive results only use per-thread projections of `A(P)`, so they should carry over to `TrI`; this
+is not formalized.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. `instLangMinCmd` shows the language hypotheses are satisfiable (and deterministic, so

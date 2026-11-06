@@ -5,48 +5,33 @@ Graph Coloring.* PODC 2025. DOI [10.1145/3732772.3733508](https://doi.org/10.114
 Formalized version: arXiv [2412.12589](https://arxiv.org/abs/2412.12589) v2 (9 May 2025); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The edge-colouring results we checked hold. Theorem 2 is the
-deterministic `(2Δ−1)`-edge colouring with `O(n)` bits and `O(1)` rounds; we even get it in a single
-round. Theorem 3 is `2Δ` colours without communication, and Lemma 6.2 is the ZEC game bound
-`11024/11025`. Fournier's theorem (Prop. 3.5) and Vizing's theorem (Prop. 3.4) are proved too. The only
-statement that is wrong as written is Lemma 5.3, and only in the degenerate case `Δ = 0`.
+**Verdict: ✏️ Slip.** The edge-colouring results we checked hold: Theorem 2, the deterministic `(2Δ−1)`-edge colouring
+with `O(n)` bits and `O(1)` rounds, which we even get in a single round; Theorem 3, `2Δ` colours without communication;
+and Lemma 6.2, the ZEC game bound `11024/11025`, while Fournier's theorem (Prop. 3.5) and Vizing's theorem (Prop. 3.4)
+are proved too. What is wrong is only slips, chiefly Lemma 5.3 in the degenerate case `Δ = 0`. The vertex-colouring
+protocol (Theorem 1) and the final lower bound (Theorem 4) were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 5.3 for `Δ = 0` (matching covering the degree-`Δ` vertices)
-Lemma 5.3 fails for `Δ = 0`: a single isolated vertex has degree `Δ` and no matching covers it
-(`lemma_5_3_false_of_zero`).
-
-**Impact.** Degenerate: Algorithm 2 uses the lemma only for `Δ ≥ 8`, and for `Δ ≥ 1` the lemma holds
-(`lemma_5_3_matching`).
-
-**Details.** Lemma 5.3 claims that in a graph of maximum degree `Δ` whose degree-`Δ` vertices are
-independent, some matching covers all degree-`Δ` vertices.
-
-**Repair.** For `Δ ≥ 1`, Hall's theorem gives every degree-`Δ` vertex its own neighbour using only
-"maximum degree `≤ Δ`". The independence hypothesis then makes the chosen edges pairwise disjoint.
-(`lemma_5_3_matching`)
-
-### Typos and slips
+### ✏️ Slips
+- **Lemma 5.3 for `Δ = 0` (matching covering the degree-`Δ` vertices).** Lemma 5.3 claims that in a graph of maximum
+  degree `Δ` whose degree-`Δ` vertices are independent, some matching covers all degree-`Δ` vertices. It fails for
+  `Δ = 0`: a single isolated vertex has degree `Δ` and no matching covers it (`lemma_5_3_false_of_zero`). Algorithm 2
+  uses the lemma only for `Δ ≥ 8`, and for `Δ ≥ 1` the lemma holds (`lemma_5_3_matching`): Hall's theorem gives every
+  degree-`Δ` vertex its own neighbour using only "maximum degree `≤ Δ`", and the independence hypothesis then makes
+  the chosen edges pairwise disjoint.
 - Proof of Theorem 2: "for `Δ < 7` apply Lemma 5.1 … otherwise, for `Δ ≥ 8`" leaves out `Δ = 7`.
   Lemma 5.1 covers it.
 - Lemma 5.2 says "the maximum degree of DG is 2" where "at most 2" is meant.
+
+### Typos
 - Proof of Lemma 6.2, last display: `E_A ∩ E_B ∩ E_1 ∩ E_2` should be `E_A ∩ E_B ∩ E'_A ∩ E'_B`.
-
-## Proof gaps (statements true)
-
-### 🛠️ Theorem 3 (ambiguous deferral step)
-The proof's step "sequentially identifies edges connecting two vertices of degree `Δ` and colors them
-using any color from the other party's palette" is correct only if *degree* means the current degree
-in the remaining graph.
-
-**Impact.** Statement true; we formalized the sequential reading (`exists_deferral`), the one
-Algorithm 2 uses.
-
-**Details.** With the current-degree reading the deferred edges form a maximal matching and one colour
-of the other palette suffices. If it means the degree in the party's graph, all such edges are
-deferred at once and they need not be colourable with `Δ` colours: take Alice holding a triangle with
-`Δ = 2`.
+- Proof of Theorem 3: the step "sequentially identifies edges connecting two vertices of degree `Δ` and colors them
+  using any color from the other party's palette" is correct only if *degree* means the current degree in the
+  remaining graph. With the current-degree reading, the one Algorithm 2 uses and the one we formalize
+  (`exists_deferral`), the deferred edges form a maximal matching and one colour of the other palette suffices. If it
+  means the degree in the party's graph, all such edges are deferred at once and they need not be colourable with
+  `Δ` colours: take Alice holding a triangle with `Δ = 2`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -88,8 +73,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Sec. 2.3, deterministic hard instance (`2Δ − 1 = 3` colours need communication, `Δ = 2`) | `exists_losing_input` | `ZEC.lean` |
 
 **Not formalized.** Theorem 1 and Section 4 (randomized `(Δ+1)`-vertex colouring, palette
-sparsification). Theorem 4 and Corollaries 1.1, 1.2, Theorem 5: they need Newman's theorem and the
-parallel repetition theorem (Raz/Holenstein). Lemma 6.1.
+sparsification), with Lemmas 3.1 and 3.3. Theorem 4 and Corollaries 1.1, 1.2, Theorem 5: they need Newman's theorem
+and the parallel repetition theorem (Raz/Holenstein). Lemmas 6.1 and 6.4.
 
 **Trust.** No `sorry`. `theorem_2`, `theorem_2_tree`, `theorem_3`, `lemma_5_1`, `lemma_5_3_matching` and `lemma_6_2` use only the axioms
 `propext`, `Classical.choice` and `Quot.sound`, and so do Fournier's and Vizing's theorems. Non-vacuity:

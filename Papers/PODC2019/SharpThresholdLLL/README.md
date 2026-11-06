@@ -5,35 +5,31 @@ Lovász Local Lemma.* PODC 2019. DOI [10.1145/3293611.3331636](https://doi.org/1
 Formalized version: arXiv [1908.06270](https://arxiv.org/abs/1908.06270) v2; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** Both main theorems hold. Theorem 1.1 covers variables affecting `≤ 2` events
-and Theorem 1.3 variables affecting `≤ 3` events. In both, `p · 2^d < 1` and the deterministic variable-fixing
-process works for any adaptive order of the variables. Lemmas 3.2, 3.6, 3.7 and 3.9 hold, and so does Lemma 3.5
-once a parenthesis typo is fixed. Two things needed repair: the proof of Theorem 1.3 reduces "w.l.o.g." to variables
-of rank exactly 3 by a step that does not work as written, and Lemma 3.5 is false as printed. We also give a shorter
-proof of the key geometric fact (Lemma 3.7): no Hessians, two weighted AM–GM inequalities.
+**Verdict: 🔧 Easy fix.** Both main theorems hold: Theorem 1.1 covers variables affecting `≤ 2` events and Theorem 1.3
+variables affecting `≤ 3` events, in both `p · 2^d < 1` and the deterministic variable-fixing process works for any
+adaptive order of the variables. Their proofs need local repairs, since the reduction "w.l.o.g. to rank exactly 3"
+does not work as written and variables private to one event are overlooked, and Lemmas 3.2, 3.6, 3.7 and 3.9 hold,
+as does Lemma 3.5 once a parenthesis typo is fixed. The round bounds of Corollaries 1.2 and 1.4 and the cited lower
+bounds, which make this a threshold of distributed complexity, were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 3.5 (closed form of `S_rep`, missing parentheses)
-As printed, `f(a,b) = 4 + ½·ab − 2a − 2b − √(ab(4−a)(4−b))` lacks the parentheses of Lemma 3.6, and then
-`(0, 1, 3)` is representable but `3 > f(0,1) = 2` (`lemma_3_5_as_printed_false`).
+### ✏️ Slips
+- Lemma 3.5 lacks the parentheses of Lemma 3.6: as printed, `f(a,b) = 4 + ½·ab − 2a − 2b − √(ab(4−a)(4−b))`, and
+  then `(0, 1, 3)` is representable but `3 > f(0,1) = 2` (`lemma_3_5_as_printed_false`). With the parentheses of
+  Lemma 3.6 the lemma holds (`srep_eq_f`), and nothing else is affected. Equivalently, and more simply,
+  `S_rep = {(a,b,c) ≥ 0 | a + b + c + √(abc) ≤ 4}` (`representable_iff`).
+- The proofs of Theorem 1.1 and Lemma 3.9 ignore conditional probabilities equal to 0. Theorem 1.1's proof divides by
+  `Pr[E_u | θ]`, which may be 0. In Lemma 3.9, the identity `Σ pᵢ sᵢ = (a,b,c)` fails when some conditional
+  probability is 0. Only `≤` holds, so downward-closedness of `S_rep` is needed; it is true but not stated. All cases
+  are handled in the formalization (`exists_hval_le_four`, `Representable.mono`).
 
-**Impact.** A typo with evident intent: with the parentheses of Lemma 3.6 the lemma holds (`srep_eq_f`), and
-nothing else is affected.
-
-**Repair.** Equivalently, and more simply, `S_rep = {(a,b,c) ≥ 0 | a + b + c + √(abc) ≤ 4}`
-(`representable_iff`).
-
-### Typos and slips
+### Typos
 - In the proof of Lemma 3.5, case `a = b = 0`, `b₂` should be `b₁`.
-- The Applications remark "the degree of the dependency graph must be at least 7" (three orientations of a rank-3
-  hypergraph, no node a sink in two of them) could not be reproduced. On `k`-regular linear hypergraphs (`d = 2k`)
-  the criterion already holds for `k = 2` (`p·2^d = 400/729`) and fails only for `k = 1`. This was checked by
-  exact arithmetic, not in Lean.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 1.3 (Section 3, reduction "w.l.o.g. all variables have rank exactly 3")
+### 🔧 Theorem 1.3 (Section 3, reduction "w.l.o.g. all variables have rank exactly 3")
 The proof makes a rank-2 variable on `{u, v}` rank 3 by adding a "virtual third bad event" `w`, but the
 bookkeeping of Lemma 3.2 then needs dependency-graph edges `{u,w}` and `{v,w}` that break the degree bound or do
 not exist.
@@ -52,18 +48,14 @@ argument of Section 2 (in the weighted form sketched in §3.1) gives the fixing 
 property for every hyperedge of size `≤ 3` and Lemma 3.2 for every variable of rank `≤ 3`, with no virtual events
 (`fixingProperty_of_card_le_three`, `variable_fixing_lemma`).
 
-### 🛠️ Theorem 1.1 and Lemma 3.9 (degenerate cases glossed over)
-The proofs ignore variables that affect only one event and conditional probabilities equal to 0.
+### 🔧 Theorem 1.1 (variables that affect only one event)
+The proof claims that variables other than those on edges at `v` do not change `Pr[E_v]`, overlooking variables that
+affect only `E_v`: these can raise `Pr[E_v]` and lie on no edge.
 
-**Impact.** Statements true; all cases are handled in the formalization (`exists_inc_add_inc_le_two`,
-`exists_hval_le_four`, `Representable.mono`).
+**Impact.** Statement true; all cases are handled in the formalization (`exists_inc_add_inc_le_two`,
+`fixingProperty_of_card_le_three`).
 
-**Details.**
-* Theorem 1.1's proof claims that variables other than those on edges at `v` do not change `Pr[E_v]`. This
-  overlooks variables that affect only `E_v`.
-* The same proof divides by `Pr[E_u | θ]`, which may be 0.
-* In Lemma 3.9, the identity `Σ pᵢ sᵢ = (a,b,c)` fails when some conditional probability is 0. Only `≤` holds,
-  so downward-closedness of `S_rep` is needed. It is true but not stated.
+**Repair.** Set such a variable to a value that does not raise `Pr[E_v]`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -126,6 +118,10 @@ right.
 * The cited `Ω(log n)` / `Ω(log log n)` lower bounds above the threshold. Only the instance-level reduction from
   sinkless orientation is formalized.
 * The fixing property for hyperedges of size `≥ 4` (Conjecture 1.5) and the Applications section.
+* The Applications remark "the degree of the dependency graph must be at least 7" (three orientations of a rank-3
+  hypergraph, no node a sink in two of them) remains open: the paper gives no proof and it is unclear what is counted.
+  We could not reproduce the 7. On `k`-regular linear hypergraphs (`d = 2k`) the criterion already holds for `k = 2`
+  (`p·2^d = 400/729`) and fails only for `k = 1`. This was checked by exact arithmetic, not in Lean.
 
 **Trust.** No `sorry`. All listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity:

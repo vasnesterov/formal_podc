@@ -3,7 +3,7 @@
 Paper: Chang, Mishra, Nguyen, Yang, Yeh, *A Tight Lower Bound for 3-Coloring Grids in the
 Online-LOCAL Model*, PODC 2024.
 
-Overall verdict: **the results formalized here (Theorems 1.1 and 1.3, Lemmas 3.3–3.6) are correct.**
+Overall: **the results formalized here (Theorems 1.1 and 1.3, Lemmas 3.3–3.6) are correct.**
 No step fails. The differences below are imprecise statements, implicit assumptions, and changed
 constants or conventions.
 
@@ -75,7 +75,7 @@ constants or conventions.
 
 ## Theorem 1.3
 
-15. **The statement in the paper omits that the side length must be odd.** Theorem 1.3 says "the
+15. **✏️ The statement in the paper omits that the side length must be odd.** Theorem 1.3 says "the
     locality of 3-coloring `√n × √n` toroidal and cylindrical grids is `Ω(√n)`", with no condition
     on `n`. The proof chooses `n` with `√n` odd. For even `√n` these graphs are bipartite. The
     `O(log n)` algorithm of Akbari et al. for bipartite graphs (Corollary 1.2) then applies, so

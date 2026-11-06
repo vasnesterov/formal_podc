@@ -11,8 +11,7 @@ are as stated below, and true with `N ≤ |R|`.
 
 ## Errors in the paper (statement level)
 
-1. **Lemmas 4.6, 4.7 and Theorem 4.8 need at least `N` registers.** The verdict rests on this
-   item. Decided by R4, **not excused**; borderline with ⚠️.
+1. **Lemmas 4.6, 4.7 and Theorem 4.8 need at least `N` registers.** 🔧
    * With 2 registers and 4 processors with inputs `0, 0, 1, 1`, the two groups take turns
      covering both registers and scanning. Each processor reads only its own group, so the stable
      views `{0}`, `{1}` are incomparable (`theorem_4_8_needs_registers'`).
@@ -21,22 +20,21 @@ are as stated below, and true with `N ≤ |R|`.
    * The same execution refutes Lemma 4.6 for `A = {0}`: at most `1 = |A|` register is last
      written by `Ā = {1}`, `Ā` is live, and `Ā` never reads from `A`
      (`lemma_4_6_needs_registers`). Lemma 4.7 then fails as well, since `A` is closed.
-   * Arguments for ❌: Section 2 fixes an arbitrary number `M > 0` of registers, and Section 4
+   * Section 2 fixes an arbitrary number `M > 0` of registers, and Section 4
      never restricts it. Section 4 says its pathological executions arise "regardless of the
      number of registers". Its running example (§4.1, the 5-processor extension of Figure 2,
      reused in §5.1 to reason about stable views) has 5 processors and 3 registers.
-   * Arguments for ⚠️: the proof of Lemma 4.6 counts `N` registers. Section 2.1 shows that fewer
+   * On the other hand, the proof of Lemma 4.6 counts `N` registers. Section 2.1 shows that fewer
      than `N` registers are useless for wait-free synchronization, and Section 5 uses `N`
      registers.
-   * The `N = 4, M = 2` instance is not degenerate (R2).
+   * The `N = 4, M = 2` instance is not degenerate.
    * An exhaustive state-space search over Figure 1 finds no two-source execution for
      `(N, M) = (2, 2)` or `(3, 2)`. In general, `Exec.false_of_two_closed` shows that the two
      groups with minimal views must together have more than `M` members.
-   * Section 4 is labelled a warm-up, so Theorem 4.8 is not a headline result (R5): ❌, not 🚨.
+   * Section 4 is labelled a warm-up.
    * We prove Lemmas 4.5–4.7 as printed (`Exec.lemma_4_5`; `Exec.lemma_4_6`, `Exec.lemma_4_7`
      with `N ≤ |R|`) and Theorem 4.8 with `N ≤ |R|`.
-2. **Lemma 5.2 is false as printed.** Decided by R1 + R3, not excused; not formalized, so it does
-   not enter the verdict.
+2. **Lemma 5.2 is false as printed.** 🛠️ The lemma itself is not formalized.
    * Lemma 5.2 says: if `W` is durably stored despite `P` at `t`, every processor that takes a
      step after `t` and then terminates has `W ⊆ view`.
    * Counterexample with `N = 2`: `q` runs solo to level 2 with view `{1}` and stops at label
@@ -46,9 +44,12 @@ are as stated below, and true with `N ≤ |R|`.
    * The intended statement concerns scans that *start* after `t`. It is true, and our
      `durable_scan` proves it for a stronger durability notion.
    * The paper's derivation of safety from Lemmas 5.2 and 5.3 needs the printed version: a final
-     scan of `q` may still be in progress when `p` terminates. So R3 does not excuse it.
+     scan of `q` may still be in progress when `p` terminates.
    * Our model merges the output step into the last read of the scan, so this counterexample is
      not expressible in it.
+2b. **Typos not affecting the formalization.** Definition 3.2 reads "either `o[i] ⊆ o[j]` or
+   `o[i] ⊆ o[j]`"; the second disjunct should be `o[j] ⊆ o[i]`. The first sentence of §5.1 says
+   "Figure 3" where Figure 1 is meant.
 
 ## Gaps in proofs (statements true)
 

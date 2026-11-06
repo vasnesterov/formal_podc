@@ -2,11 +2,10 @@
 
 Paper: K. Alpturer, J. Y. Halpern, R. van der Meyden, *Optimal Eventual Byzantine Agreement Protocols
 with Omission Failures*, PODC 2023 (arXiv:2305.06271v1). Scope: §§2–6 (Prop. 6.1 – Cor. 6.7).
-Verdict rules refer to the verdict scale (R1–R6).
 
 ## Errors in the paper (statement level)
 
-1. **Proposition 6.4 is false with the paper's Definition of 0-chain.**
+1. 🔧 **Proposition 6.4 is false with the paper's Definition of 0-chain.**
    - *The definition.* Condition (c) reads "`i_{m'}` knows at the point `(r, m')` that `i_{m'−1}` has
      just decided 0" (rendered p. 8, to rule out extraction errors).
    - *Counterexample.* `γ_min,3,0`, implementation `P^min_1` (the unique implementation of `P0` up to
@@ -21,7 +20,7 @@ Verdict rules refer to the verdict scale (R1–R6).
    - *Repair.* With condition (c) replaced by "`i_{m'}` knows that *some* agent has just decided 0"
      (`IsZeroChain`; `i_{m'−1}` has just decided by (b)), Prop. 6.4 holds (`prop_6_4_min`,
      `prop_6_4_basic`). Agent 2 then has received a chain (`receivedChain_at_counterexample`).
-   - *Call: ⚠️ by R3, borderline ❌.* The intended notion is recoverable from the paper itself:
+   - *Intent.* The intended notion is recoverable from the paper itself:
      - "We will show that the second condition for deciding 0, that `i` knows that someone has just
        decided 0, holds iff `i` receives a 0-chain" (§6). This claim is false with the literal
        definition (same example) and true with the repaired one (`Implements.receivedChain_iff`
@@ -30,24 +29,23 @@ Verdict rules refer to the verdict scale (R1–R6).
        `K_i(⋁_j jdecided_j = 0) ⇒ K_i(jdecided_j = 0)` for some `j`.
      - The proof of Prop. 6.4 never uses the knowledge clause.
 
-     The fix is local: one clause of one definition. Against excusing it: the paper deliberately
-     contrasts its definition with those of [1, 8]. Prop. 6.4 is not a headline result, so the worst
-     case is ❌.
+     The fix is local: one clause of one definition. It is not a mere typo, since the paper
+     deliberately contrasts its definition with those of [1, 8].
    - *Effect on Theorem 6.3.* None: safety with literal chains implies safety with repaired chains
      (`SafeWrt.of_lit`). Theorem 6.3 with the paper's definition of safety is `thm_6_3_lit`.
-2. **Corollary 6.7 is false for `t = n − 1`.**
+2. ✏️ **Corollary 6.7 is false for `t = n − 1`.**
    - *Scope of the claim.* `γ_min,n,t` and `γ_basic,n,t` are defined for every `t < n`. Cor. 6.7 is
      stated without the hypothesis `t ≤ n − 2` of Thms. 6.5/6.6, from which it is "immediate".
    - *Counterexample.* For `t = n − 1` the implementation of `P0` is `P^min_{n−1}`, which decides 1 at
      time `n − 1` (`Min.pmin_implements` with `T = n − 1`). It is an EBA protocol (Prop. 6.1) and
      strictly dominates `P^min` (decides at `t + 1 = n`). Lean: `Counterexamples.cor_6_7_min_false`
      (one-shot sense) and `cor_6_7_min_false'` (the paper's sense).
-   - *Call: ⚠️ by R4/R3.* The missing hypothesis holds at every use (it is the hypothesis of the two
+   - *Intent.* The missing hypothesis holds at every use (it is the hypothesis of the two
      theorems the corollary is derived from).
    - *Not formalized.* The analogous failure for `P^basic`: at `t = n − 1`, state `⟨n−1, 1, ⊥, ⊥, 1⟩`
      is reachable, `P0` decides 1 there and `P^basic` does not.
 
-## Theorem 6.3: what is proved
+## ⚠️ Theorem 6.3: what is proved
 
 The paper claims: in every EBA context in which `P0` is safe, every implementation of `P0` is optimal.
 We prove (`Context.thm_6_3_core`, `thm_6_3`, `thm_6_3_lit`) the following. If `P` implements `P0`,
@@ -76,8 +74,8 @@ Gaps in the paper's proof:
 Whether Theorem 6.3 holds in every safe EBA context (without `NFConsistent`, or for competitors that
 repeat decisions) is **open**. The risk is contexts in which agents can learn that they are faulty
 (e.g. through omitted self-messages). Safety condition (2) only forces such agents to be able to
-decide 1. Theorem 6.3 is a headline result. It is not refuted, but in full generality it is not
-established by the paper's proof. Statement-level we checked the restricted version, which is true.
+decide 1. Theorem 6.3 is not refuted, but in full generality it is not established by the paper's
+proof. Statement-level we checked the restricted version, which is true.
 
 ## Proof repairs (statements true)
 
@@ -127,7 +125,7 @@ established by the paper's proof. Statement-level we checked the restricted vers
 * **Failure model.** Prop. 6.1 claims termination "after at most `t + 1` rounds", so it needs
   `F ⊆ SO(t)`; we assume this (`hFM`). Literally the paper states Prop. 6.1 for every EBA context,
   whose failure model may drop messages of nonfaulty agents (then Agreement fails trivially); the
-  paper only ever uses `SO(t)`, so this is an implied assumption (R4), not counted as an error. `thm_6_3_core` holds for any failure model;
+  paper only ever uses `SO(t)`, so this is an implied assumption (✏️). `thm_6_3_core` holds for any failure model;
   `thm_6_3`/`thm_6_3_lit` add `F ⊆ SO(t)` only to get the EBA part of optimality from Prop. 6.1. For
   `γ_min`/`γ_basic` the model is exactly `SO(t)`, including possible omission of self-messages.
 * **`#1` update in `γ_basic`.** "if `decided_i = ⊥` … otherwise `#1_i` is set to 0": we read

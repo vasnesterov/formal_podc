@@ -4,22 +4,21 @@ Weiming Feng, Yitong Yin. *On Local Distributed Sampling and Counting.* PODC 201
 [10.1145/3212734.3212757](https://doi.org/10.1145/3212734.3212757). Formalized version: arXiv
 [1802.06686](https://arxiv.org/abs/1802.06686) v1; numbering follows it.
 
-**Verdict: ❌ False claim.** Corollary 5.2 is false as stated. It is a by-product, not a headline
-result. Strong spatial mixing (SSM) with exponential decay in total variation does **not** imply
-SSM in multiplicative error. The hardcore model is a counterexample, and it is the paper's own
-main application. The probabilistic and locality cores of the main results do hold: Theorem 3.2
-(sampling from inference), Theorem 3.4, the boosting Lemma 4.1, the correctness of the local JVV
-sampler (Claims 4.5–4.7, Lemma 4.8), and both directions of Theorem 5.1. We had to repair a few
-proof steps and fix one typo in the JVV algorithm along the way.
+**Verdict: 🔧 Easy fix.** The probabilistic and locality cores of the main results hold after local changes:
+Theorem 3.2 (sampling from inference), Theorem 3.4, the boosting Lemma 4.1, the correctness of the local JVV sampler
+(Claims 4.5–4.7, Lemma 4.8), and both directions of Theorem 5.1. Corollary 5.2 is false, since strong spatial mixing
+(SSM) with exponential decay in total variation does **not** imply SSM in multiplicative error, but it is a by-product
+that the paper lists under minor results and no main theorem uses. The composition into Theorem 4.2, the round counts
+and the applications were not checked.
 
 ## Mistakes in the paper
 
 ### ❌ Corollary 5.2 (TV-SSM ⇒ multiplicative SSM)
 Corollary 5.2 is false: the hardcore model on perfect matchings has SSM with exponential decay in total variation but no SSM in multiplicative error, whatever the rate (`corollary_5_2_false`).
 
-**Impact.** A by-product, not a headline result; it contradicts the paper's own main application (the
-hardcore model in the uniqueness regime). The easy direction (multiplicative ⇒ TV, same rate) holds
-(`ssm_of_mssm`).
+**Impact.** The counterexample is the paper's own main application (the hardcore model in the uniqueness regime), but
+the paper lists the corollary under minor results and nothing depends on it. The easy direction (multiplicative ⇒
+TV, same rate) holds (`ssm_of_mssm`).
 
 **Details.** The multiplicative error (2) is `err = max_x |ln μ(x) − ln μ̂(x)|`, and the only
 convention is `ln 0 − ln 0 = 0`. In the hardcore model, let `u` be a neighbour of `v`. Pin `u` to
@@ -34,31 +33,27 @@ so `err(μ^σ_v, μ^τ_v) = ∞`. No rate `δ_n(1) = poly(n)·α` can bound it.
   case `v ∈ D`, where `err = ∞` for every distribution.
 - Large weights break it with soft constraints alone too, so the true statement can only bound `err`
   once `poly(n)·α^d` is small.
-- There is a second problem. The paper's route (Theorem 5.1 ⇐, then Lemma 4.1, then Theorem 5.1 ⇒
-  for `err`) gives locality `2t + ℓ`. It therefore proves decay only at rate `√α`, not `α`. We
-  believe the same `α` can be recovered at large distances by a direct pinning argument, but we did
-  not formalize this.
 
 **Repair.** Only the true direction is proved: `d_TV ≤ err`, so multiplicative SSM implies TV-SSM
 with the same rate (`ssm_of_mssm`).
 
-### ⚠️ §4.2.1 and Lemma 4.8 (local JVV sampler: acceptance and rejection swapped)
-As written, node `vᵢ` sets `F'_{vᵢ} = 1` with probability `q_{vᵢ} ≥ e^{−5/n²}` and fails when `F'_{vᵢ} = 1`, so the algorithm fails almost surely.
+### ❌ Corollary 5.2, proof route (Theorem 5.1 ⇐, then Lemma 4.1, then Theorem 5.1 ⇒ for `err`)
+The boosting lemma has locality `2t + ℓ`, so the paper's route proves decay only at rate `√α`, not at the claimed
+rate `α`, even at large distances.
 
-**Impact.** A typo with evident intent: the proof uses `Pr[success | Y = σ] = ∏ q_{vᵢ}(σ)`, so the
-intended reading is "accept with probability `q_{vᵢ}`, fail with probability `O(1/n)`". We
-formalize this version (`lemma_4_8_success`, `lemma_4_8`).
+**Impact.** The stated rate is not reached by the paper's proof, and no route to it is formalized.
 
-**Details.** Lemma 4.8 says the algorithm "fails with probability at most
-`∑ E[F'_{vᵢ}] = 1 − O(1/n)`", which matches neither reading.
+### ✏️ Slips
+- §4.2.1 and Lemma 4.8 swap acceptance and rejection: node `vᵢ` sets `F'_{vᵢ} = 1` with probability
+  `q_{vᵢ} ≥ e^{−5/n²}` and fails when `F'_{vᵢ} = 1`, so the algorithm fails almost surely. The proof uses
+  `Pr[success | Y = σ] = ∏ q_{vᵢ}(σ)`, so the intended reading is "accept with probability `q_{vᵢ}`, fail with
+  probability `O(1/n)`"; we formalize this version (`lemma_4_8_success`, `lemma_4_8`). Lemma 4.8 says the algorithm
+  "fails with probability at most `∑ E[F'_{vᵢ}] = 1 − O(1/n)`", which matches neither reading.
+- Theorem 5.1 (⇒): the rate `δ_n(t) = 2 min{δ | t(n, δ) ≤ t − 1}` need not be attained, and for small `t` the set is
+  empty. `min` should be `inf`, with `inf ∅ = ∞`. We prove the statement with the infimum, using `[0, ∞]`-valued rates
+  (`theorem_5_1_forward`).
 
-### ⚠️ Theorem 5.1 (⇒) (the rate `δ_n(t)`)
-The rate `δ_n(t) = 2 min{δ | t(n, δ) ≤ t − 1}` need not be attained, and for small `t` the set is empty.
-
-**Impact.** Typo with evident intent: `min` should be `inf`, with `inf ∅ = ∞`. We prove the statement
-with the infimum, using `[0, ∞]`-valued rates (`theorem_5_1_forward`).
-
-### Typos and slips
+### Typos
 - In the Claim of Lemma 4.1, "`dist_G(v, v_{i−1}) > t`" and "at node `v_{i−1}`" should read `vᵢ`.
 - In the proof of (3), "`m = |Λ| ≤ n`" should read `m = |Γ|`.
 - In Claim 4.6, `Γ` uses `B_t(v)` for `B_t(vᵢ)`, and the pinnings `τ₁, τ₂` are implicitly combined
@@ -66,10 +61,10 @@ with the infimum, using `[0, ∞]`-valued rates (`theorem_5_1_forward`).
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 4.1 (the Claim in its proof)
+### 🔧 Lemma 4.1 (the Claim in its proof)
 The proof writes `μ_{Λᵢ∪{v}}(τᵢᶜ) = μ_{Λᵢ₋₁∪{v}}(τᵢ₋₁ᶜ)·μ^{τᵢ₋₁ᶜ}_{vᵢ}(cᵢ) ≥ μ^{τᵢ₋₁ᶜ}_{vᵢ}(cᵢ)`, but the first factor is a probability, so the inequality goes the other way.
 
-**Impact.** Statement true; repaired (`lemma_4_1_core`, `lemma_4_1`).
+**Impact.** Repaired by changing one line (`lemma_4_1_core`, `lemma_4_1`).
 
 **Repair.** Only positivity is needed, and positivity follows from the induction hypothesis together
 with (4) and (5). The bound (3) is correct.
@@ -124,10 +119,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Lemmas 3.1 and 4.4 (cited) and Proposition 3.3 (derandomization). We do have the convexity it
   uses, `tv_mix_le`.
 * The composition into Theorem 4.2 / Proposition 4.3, including the locality `3t + ℓ` of `q_{vᵢ}`
-  (eqs. (11), (12)).
+  (eqs. (11), (12)), and the vertex bookkeeping of Claim 4.6.
 * Corollary 5.3 and the applications. They are round-count bookkeeping on top of the formalized
   statements plus the cited SSM results.
-* A repaired Corollary 5.2 with the same rate `α`.
+* A repaired Corollary 5.2 with the same rate `α`. We believe the same `α` can be recovered at large distances by a
+  direct pinning argument, but we did not formalize this.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and
 `Quot.sound`. Non-vacuity: the hardcore model on perfect matchings meets all hypotheses of

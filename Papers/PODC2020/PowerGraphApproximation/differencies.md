@@ -1,11 +1,11 @@
 # Differences between the formalization and the paper
 
 Paper: Bar-Yehuda, Censor-Hillel, Maus, Pai, Pemmaraju, *Distributed Approximation on Power Graphs*, PODC 2020,
-arXiv 2006.03746 v1. Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
+arXiv 2006.03746 v1.
 
 ## Errors and gaps in the paper
 
-1. **Corollary 17, proof gap (R1 → 🛠️).** The proof applies Theorem 12 to the remaining graph `G²[U]`, which is
+1. **Corollary 17, proof gap (🛠️).** The proof applies Theorem 12 to the remaining graph `G²[U]`, which is
    not a square. Algorithm 2 is not a 5/3-approximation there. `Cor17Gap.corollary_17_proof_gap` gives a run of
    Phase I (`ε = 1/2`) that ends with `G²[U] = K₄,₄`, followed by a complete run of Algorithm 2 that outputs 8
    vertices while 4 suffice. The corollary itself is true. We prove the approximation part (`corollary_17`) with a
@@ -13,15 +13,15 @@ arXiv 2006.03746 v1. Verdict rules: `.claude/skills/formalize-paper/verdicts.md`
    edge's midpoint is in `V1` or outside `U₀`. Combined with Lemma 5 (`2|S| ≤ 3|OPT ∩ S|`), this gives
    `3|S ∪ S₂| ≤ 5|OPT|`. Only the CONGEST variant (Phase I of Theorem 1) is formalized, not the CONGESTED CLIQUE
    one (Theorem 11). The same accounting works there, because it only uses that `S` is charged at ratio `≤ 3/2`.
-2. **Lemma 6, proof (R1 → 🛠️).** "This implies `|I| < n/α`" is false (`lemma_6_strict_false`: `P₄`, `r = 2`).
+2. **Lemma 6, proof (✏️).** "This implies `|I| < n/α`" is false (`lemma_6_strict_false`: `P₄`, `r = 2`).
    The argument gives `|I|·α ≤ n` (`card_mul_le_of_indep`), which suffices for the statement.
    - Our proof of `|I|·α ≤ n` uses disjoint balls of radius `⌊r/2⌋` and `|B(v, j)| ≥ min(n, j + 1)` in a connected
      graph (`card_ballF`). The paper instead assigns "`⌊r/2⌋` unique vertices on the path from `u` to `v`", which
      needs a second vertex of `I`. For `|I| = 1` it needs `r ≤ n`, which the hypothesis `r ≤ n` provides.
    - Hypothesis `1 ≤ r` is not needed for the first sentence (for `r = 0` the bound is trivial).
-3. **Lemma 6, second sentence (borderline, not counted).** "(1 + 1/⌊r/2⌋)-approximation" is undefined for `r = 1`.
-   We state it for `2 ≤ r ≤ n` (`lemma_6_approx`). With the convention `1/0 = ∞` the case `r = 1` is trivially true,
-   so we do not count it as a statement error. In any case it would only be a degenerate parameter corner (R2).
+3. **Lemma 6, second sentence (✏️).** "(1 + 1/⌊r/2⌋)-approximation" is undefined for `r = 1`.
+   We state it for `2 ≤ r ≤ n` (`lemma_6_approx`). With the convention `1/0 = ∞` the case `r = 1` is trivially true.
+   It is only a degenerate parameter corner.
 4. **Theorem 12, degree-3 case (typo in proof).** The disjoint edges are `{y₁,z₁}, {y₂,z₂}, {x,y₃}`. The paper writes
    `{x,y₂}`, which meets `{y₂,z₂}`.
 5. **Theorem 12, degree-2 case (routine detail).** `{z,y₁}` and `{x,y₂}` are disjoint because `z ≠ y₂`. This
@@ -32,7 +32,7 @@ arXiv 2006.03746 v1. Verdict rules: `.claude/skills/formalize-paper/verdicts.md`
    isolated vertex in part 1. It cannot have, since it has two remaining neighbours. This is covered by
    `Inv.triClosed`.
 7. **Theorem 1, case `ε > 1`.** The claim "`G²`-MIS has size `≤ n/2` in a connected graph" fails for `n = 1`
-   (degenerate, R2, inside a proof). This case is not formalized.
+   (degenerate, inside a proof). This case is not formalized.
 8. **Phase I, CONGEST implementation (prose slip, not formalized).** The pseudocode (line 4), Lemma 2 and
    Lemma 5 use "more than `1/ε` neighbours in `R`", but the description of the distributed symmetry
    breaking says "any vertex with degree at least `1/ε` in `R` is a candidate". With "at least", Lemma 5's

@@ -5,24 +5,24 @@ Hsueh-Ping Chen, Ho-Lin Chen. *Self-Stabilizing Leader Election in Regular Graph
 proceedings version (no arXiv version exists); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** Both protocols, as printed, fail. **SS-Tree (Theorem 4.3) is false**:
-there is a configuration in which every node is a root, hence a leader, forever; no detector
-ever fires. **SS-EulerCycle (Theorem 3.3) as printed is false as well**: no configuration is
-output-stable, because the coherence check rejects every interaction in which the scheduler makes
-the head of a virtual edge the initiator. This second error has a natural one-line repair: use the
-virtual edge in either role. With the repair, we prove Theorem 3.3 on every connected `2k`-regular
-graph, assuming (as the paper does) that the Ring-Protocol of [11] solves SSLE on directed rings.
+**Verdict: ⚠️ Weakened.** SS-EulerCycle (Theorem 3.3), which answers the open question, fails as printed because no
+configuration is output-stable, but a natural one-line repair saves it: we prove Theorem 3.3 on every connected
+`2k`-regular graph, assuming (as the paper does) that the Ring-Protocol of [11] solves SSLE on directed rings.
+**SS-Tree (Theorem 4.3), the `O(k¹²)` protocol, is false**: there is a configuration in which every node is a root,
+hence a leader, forever, no detector ever fires, and no repair is proved. The odd-degree and general-graph extensions
+(Section 3.5) were not checked.
 
 ## Mistakes in the paper
 
-### 🚨 Theorem 4.3 and Lemma 4.2 (SS-Tree)
+### ❌ Theorem 4.3 and Lemma 4.2 (SS-Tree, MultipleRootDetector)
 SS-Tree does not detect multiple roots: in a configuration where every node is a root with a "ghost" parent
 colour and all coins are `+1`, every node stays a leader forever (`ssTree_all_roots_forever`,
 `ssTree_not_solvesSSLE`).
 
-**Impact.** False statement; the detector needs a redesign, not a typo fix. This works for every `k ≥ 2`, every
-graph of maximum degree `≤ k` (e.g. `K_{k+1}`, `ssTree_fails_on_complete`), every neighbourhood-injective
-`k²`-colouring and every ring protocol; it also fails with probability 1 (`ssTree_prob_zero`).
+**Impact.** The detector needs a redesign, not a typo fix, and no repaired SS-Tree is proved, so the `O(k¹²)` protocol
+is not saved. The failure occurs for every `k ≥ 2`, every graph of maximum degree `≤ k` (e.g. `K_{k+1}`,
+`ssTree_fails_on_complete`), every neighbourhood-injective `k²`-colouring and every ring protocol; it also fails with
+probability 1 (`ssTree_prob_zero`).
 
 **Details.** MultipleRootDetector only moves coins between a parent and its child. A root tosses only when its
 coin is `0`, and a root's coin never returns to `0` (only a *child* is reset), so the re-tossing that the proof
@@ -32,16 +32,31 @@ every node be a root whose `parentColor` is the colour of none of its neighbours
 coin ever moves. The ghost parents are never checked, because roots do not count. CycleDetector never runs the
 ring protocol and only copies non-leader states. Every node stays a leader forever.
 
-Lemma 4.2's case analysis is also incomplete: it forgets the invalid configurations that already have one
-leader.
+### ❌ Lemma 4.2, proof (case analysis)
+Lemma 4.2's case analysis is incomplete: it forgets the invalid configurations that already have one leader but are
+not output-stable (a cycle elsewhere in the pedigree graph, ghost parents, a bad colouring).
 
-### 🚨 Theorem 3.3 and Lemma 3.1 (SS-EulerCycle, Protocol 1 as printed)
+**Impact.** The lemma is not repaired, because SS-Tree itself is not; no remedy can exist without a working detector.
+
+### ❌ Lemma 4.1, proof (chain argument; existence of a stable SS-Tree configuration)
+Lemma 4.1's proof does not cover CycleDetector's dynamics, so the lemma is unestablished (not formalized, not
+refuted).
+
+**Impact.** The step stands unrepaired, and SS-Tree already fails by Theorem 4.3. Whether a leader can appear
+depends on the internals of [11].
+
+**Details.** The proof cuts a chain out of a stable ring of [11]: such a chain never creates a leader. But nodes
+unmark at random and leave stale `loopChild`/`loopParent` flags. A re-marked parent then copies a fresh
+`ringState` and runs the ring protocol with a child whose copy has already evolved. These mixed configurations
+are not reachable on the static chain.
+
+### 🔧 Theorem 3.3 and Lemma 3.1 (SS-EulerCycle, Protocol 1 as printed)
 No configuration of Protocol 1 as printed is output-stable on any `2k`-regular graph (`k ≥ 1`), because the
 coherence check raises an error whenever the scheduler lets the head of a virtual edge initiate
 (`literal_not_solvesSSLE`, `literal_fails_on_complete`).
 
-**Impact.** False as printed, whatever the ring protocol, but fixable by a one-line change: use the virtual edge
-in either role. With this repair we prove Theorem 3.3 (`repaired_solvesSSLE`).
+**Impact.** The printed protocol fails whatever the ring protocol, but a one-line change fixes it: use the virtual
+edge in either role. With this repair we prove Theorem 3.3 (`repaired_solvesSSLE`).
 
 **Details.** The coherence check accepts an interaction only if there is a virtual edge *from the initiator to
 the responder*; otherwise `u.errFlag ← True`. An Euler cycle traverses each edge in one direction, but both
@@ -55,33 +70,21 @@ takes a random state, so its output changes.
 it with `v`'s virtual node as the ring initiator. With this repair we prove Theorem 3.3
 (`repaired_solvesSSLE`).
 
-### ⚠️ Lemma 4.1 (existence of a stable SS-Tree configuration)
-Lemma 4.1's proof does not cover CycleDetector's dynamics, so the lemma is unestablished (not formalized, not
-refuted).
-
-**Impact.** Moot for the verdict, since SS-Tree already fails (Theorem 4.3). Whether a leader can appear
-depends on the internals of [11].
-
-**Details.** The proof cuts a chain out of a stable ring of [11]: such a chain never creates a leader. But nodes
-unmark at random and leave stale `loopChild`/`loopParent` flags. A re-marked parent then copies a fresh
-`ringState` and runs the ring protocol with a child whose copy has already evolved. These mixed configurations
-are not reachable on the static chain.
-
-### ⚠️ Lemma 2.1 (detect-error-and-random-change)
-Lemma 2.1 omits two hypotheses that the paper states only in the prose: a valid output-stable configuration
-exists, and error-detected configurations can reach it.
-
-**Impact.** Local fix: we prove the lemma with both hypotheses explicit (`derc_lemma`).
-
-### Typos and slips
-- The SS-TwoHop guard is garbled; we use Sudo et al.'s "matching colours, different bits".
+### ✏️ Slips
+- Lemma 2.1 omits two hypotheses that the paper states only in the prose: a valid output-stable configuration
+  exists, and error-detected configurations can reach it. We prove the lemma with both hypotheses explicit
+  (`derc_lemma`).
+- The SS-TwoHop guard is garbled: it demands `v.prevColor = v.color` instead of `u.prevColor = v.color`. We use
+  Sudo et al.'s "matching colours, different bits".
 - "2-hop colouring" must mean "the neighbours of each node have distinct colours"; for that, `4k²` colours
   suffice.
+
+### Typos
 - The indentation of Protocols 5–6 is lost.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 3.2 (repaired SS-EulerCycle)
+### 🔧 Lemma 3.2, proof (repaired SS-EulerCycle)
 Lemma 3.2's proof is a sketch that uses several facts without proof.
 
 **Impact.** For the repaired SS-EulerCycle we prove everything Lemma 3.2 uses (`multi_reach`,
@@ -131,8 +134,9 @@ The state counts of the paper are right: exactly `(64ck⁴)^k·64k⁴` for SS-Eu
 `320c²k⁶(k²+1)²(k+1)²` for SS-Tree.
 
 **Not formalized.** We do not formalize the Ring-Protocol of [11] itself; `RingSpec` is assumed.
-Also not formalized: the odd-degree and general-graph extensions (Section 3.5), and a repair of
-SS-Tree.
+Also not formalized: the odd-degree and general-graph extensions (Section 3.5), so "arbitrary `k`-regular graphs" is
+established only for even degree; the general correctness of SS-TwoHop [20], of which only the facts used are proved;
+and a repair of SS-Tree.
 
 **Trust.** No `sorry`. All listed theorems use only `propext`, `Classical.choice` and `Quot.sound`.
 Non-vacuity:

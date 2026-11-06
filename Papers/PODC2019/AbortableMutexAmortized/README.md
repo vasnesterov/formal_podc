@@ -4,16 +4,17 @@ Prasad Jayanti, Siddhartha Jayanti. *Constant Amortized RMR Abortable Mutex for 
 DOI [10.1145/3293611.3331592](https://doi.org/10.1145/3293611.3331592). Formalized version: arXiv
 [1809.04561](https://arxiv.org/abs/1809.04561) v1 (full version with all proofs); numbering follows it.
 
-**Verdict: ⚠️ Minor statement issues.** The headline results hold for Algorithm 1: mutual exclusion,
+**Verdict: 🔧 Easy fix.** The main results hold for Algorithm 1 as printed: mutual exclusion,
 starvation freedom, O(1) amortized RMRs per attempt in both the CC and DSM models, O(1) worst-case
 Exit, Fast Abort and O(n) space. The new fairness property AFCFS is false as defined, because the
-definition forgets passages that end with an abort; a corrected version holds. The distance function
-of the starvation proof misses the case of line 11. The invariant of Theorem 4.1 is true but not
-inductive, so its proof needs an extra conjunct.
+definition forgets passages that end with an abort, and one added condition gives a corrected version
+that holds. The distance function of the starvation proof misses the case of line 11, the invariant of
+Theorem 4.1 is true but needs an extra conjunct to be inductive, and a constant in the proof of Lemma 5.3
+changes from 4 to 5.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorem 4.2 (AFCFS)
+### 🔧 Theorem 4.2 (AFCFS)
 As defined, AFCFS fails whenever `p` aborts the last attempt of its passage: if `p` completes its
 doorway and then aborts for good, a later process `p'` splices out `p`'s node and enters the CS
 although `p` never enters the CS in that passage (`afcfs_literal_false`, a 13-step run with `n = 3`).
@@ -31,9 +32,8 @@ that never comes). Under the weaker reading "if both enter, `p` enters first", t
 says what is intended and Theorem 4.2 holds. Three things show the intended exception: the airline
 analogy ("people behind you occupy your original position"), the paper's proof (it only orders
 processes while they are in `Q`, and "leaves `Q` from any position" includes aborting), and the
-fact that the strict reading cannot be met by any starvation-free abortable lock. We count it as a
-definitional slip with an evident, local fix (R3). It is borderline, because AFCFS is the paper's own
-new definition and the abstract lists it. It is not ❌, because the fix only adds the missing case
+fact that the strict reading cannot be met by any starvation-free abortable lock. AFCFS is the
+paper's own new definition and the abstract lists it, but the fix only adds the missing case
 "unless `p`'s passage ends with an abort", the proof reasons with the intended version, and the
 algorithm is unchanged.
 
@@ -43,7 +43,7 @@ and its last step, if any, completed the Exit section). It concludes that whenev
 `p` was at line 7, 9, 10 or 11 at some time in between. The proof keeps `p` ahead of `p'` in the
 queue (`before_step`) and uses `I10`.
 
-### ⚠️ Definition 4.1 / Lemma 4.4 (the digit function `f` misses line 11)
+### 🔧 Definition 4.1 / Lemma 4.4 (the digit function `f` misses line 11)
 Equation (1) gives no value of `f` at line 11, so `δ(p)` is undefined when the prefix leader `q_m`
 is an aborted process at line 11 (marked node, about to wake its successor), a case the proof of
 Lemma 4.4 itself lists.
@@ -51,14 +51,14 @@ Lemma 4.4 itself lists.
 **Impact.** This is a local fix. With `f(11) = 4`, the only value between `f(10) = 5` and
 `f(1) = 3`, Lemma 4.4 and Theorem 4.5 hold (`lemma_4_4_part1`, `lemma_4_4_part2`, `theorem_4_5`).
 
-### Typos and slips
+### ✏️ Slips
 - Figure 1, `I7`: `*mynode_p` should be `*mynode_{q_i}`; `I9`: `go_{q₁}` should be `&go_{q₁}`.
 - Lemma 4.4 should exclude an aborting step of `p` itself, after which `δ(p)` is undefined.
 - Appendix C, Lemma 5.3, lines 3, 7, 9: the proof writes `α_CC(11)` for `α_CC(9)`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 4.1 (the invariant `I` is not inductive)
+### 🔧 Theorem 4.1 (the invariant `I` is not inductive)
 The induction step for line 3 (case 3, splicing out an aborted predecessor) fails from a
 configuration satisfying `I` in which the new predecessor's node still holds the spliced process's
 go-address, after which `I7` fails (`paperInv_not_inductive`: `n = 3`, `Q = [r, x, π]`, `r` at line 3
@@ -72,7 +72,7 @@ its own go-address in its predecessor node, since it erased it at line 9. With t
 invariant is inductive (`inv_step`), and it implies `I` verbatim (`paperInv_of`). An exhaustive model
 check of all 11 413 reachable configurations for `n = 2`, plus random runs for `n = 3, 4`, agrees.
 
-### 🛠️ Lemma 5.3 (CC constant for lines 8 and 11)
+### 🔧 Lemma 5.3 (CC constant for lines 8 and 11)
 The proof claims `α_CC(8), α_CC(11) ≤ 4`, but the write `*v ← true` also invalidates `go_q` in
 `q`'s cache, which adds one more unit of potential, so the true bound is 5.
 

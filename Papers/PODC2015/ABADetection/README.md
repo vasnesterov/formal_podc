@@ -5,21 +5,17 @@ PODC 2015. DOI [10.1145/2767386.2767403](https://doi.org/10.1145/2767386.2767403
 arXiv [1507.02722](https://arxiv.org/abs/1507.02722) v1; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** All lower bounds hold for linearizable implementations:
-Theorem 1(a) `m ≥ n − 1` for bounded registers, Theorem 1(b) `t·m ≥ n − 1`, Theorem 1(c)
-`2t·m ≥ n − 1`, and Corollary 1 for LL/SC. The paper's own weak correctness condition for
-`WeakRead()/WeakWrite()` is mis-stated: even atomic registers violate it. The proof of Lemma 2 also
-misses a case. Both are repaired. **Theorem 1(a) is proved only in a weaker form**: for
-deterministic obstruction-free implementations. The paper proves it for the strictly larger class of
-nondeterministic (e.g. randomized) implementations with nondeterministic solo-termination; that
-version is not formalized.
+**Verdict: 🔧 Easy fix.** The lower bounds hold for linearizable implementations: Theorem 1(a) `m ≥ n − 1` for bounded
+registers (checked for deterministic implementations only), Theorem 1(b) `t·m ≥ n − 1`, Theorem 1(c) `2t·m ≥ n − 1`, and
+Corollary 1 for LL/SC. The repairs are local: the WeakRead()/WeakWrite() condition is reworded and the proof of Lemma 2
+gets one more case. The upper bounds of Theorems 2 and 3 were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Section 2 (the WeakRead()/WeakWrite() correctness condition)
+### 🔧 Section 2 (the WeakRead()/WeakWrite() correctness condition)
 The paper claims that linearizable ABA-detecting registers satisfy its WeakRead()/WeakWrite() condition, but read literally even the trivial atomic implementation violates it (`weakSpecLiteral_not_of_linearizable_concurrent`, `weakSpecLiteral_not_of_linearizable_later_read`).
 
-**Impact.** An under-specified definition, not a false theorem: the lower-bound proofs use the condition only through Observation 1, which we prove directly from linearizability (`separates_aba`, `separates_llsc`), so all lower bounds hold for linearizable implementations. The paper's remark that they also hold for the weaker condition is not covered as such.
+**Impact.** An under-specified definition, not a false theorem: the lower-bound proofs use the condition only through Observation 1, which we prove directly from linearizability (`separates_aba`, `separates_llsc`), so all lower bounds hold for linearizable implementations.
 
 **Details.** Section 2 requires that "a WeakRead() `r` by `p` returns True iff there is a WeakWrite()
 `w` that happens before `r` and every other WeakRead() by `p` happens before `w`". Read literally,
@@ -45,19 +41,18 @@ from linearizability (`separates_aba`, `separates_llsc`). The abstract theorems
 which clean and dirty configurations are distinguishable, i.e. to any repaired weak condition that
 implies Observation 1; no such condition is formalized.
 
-### Typos and slips
+### ✏️ Slips
 - Lemma 2 derives `|WCov(C′,R) ∩ P′| ≤ t′` and then only `≤ t`, where `< t′` and `< t` are needed
   and follow from the induction hypothesis.
 - Lemma 2 does not state that `σ` is `(P ∪ {q})`-only and invocation-free, but Lemma 3 uses both.
-- The w.l.o.g. "no `CAS(x,x)`" is unnecessary: such a step can be treated as a read.
-- Lemma 3 has index typos in `λ′` and in `Dⱼ′ = Conf(Dᵢ′, λ′αⱼβⱼ)`, which should end in `βᵢ`.
+- Lemma 3 has index typos: `λ′` repeats `αᵢ₊₁` where `αᵢ₊₂` is meant, and `Dⱼ′ = Conf(Dᵢ′, λ′αⱼβⱼ)` should end in `βᵢ`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 2, Case 1 (the "first process `z ∈ P`" on `V`)
+### 🔧 Lemma 2, Case 1 (the "first process `z ∈ P`" on `V`)
 The proof takes "the first process `z ∈ P` that executes a step on `V` in `Exec(C,β)`", but no such process need exist.
 
-**Impact.** Statement true; repaired with a simple extra case (`lemma2`).
+**Impact.** The lemma stands; repaired with a simple extra case (`lemma2`).
 
 **Details.** Here `q` is poised to read or CAS an object `V`. If no process of `P` accesses `V` and
 `q`'s CAS would succeed, no two-step schedule `λ` hides it.
@@ -80,6 +75,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
   than the paper's**: a space lower bound for a smaller class of implementations, excluding
   randomized ones. The paper's proof looks like it carries over (schedules would carry the coin
   flips), but CSLib's model has no nondeterminism, and this is not checked.
+* The paper's w.l.o.g. "no `CAS(x,x)`" is unnecessary: such a step can be treated as a read.
 * Implemented objects: the ABA-detecting register `abaObj` (DRead carries the reader) and CSLib's
   LL/SC object `llscObj`. Single-writer use is expressed by the hypotheses that the writer `w0` may
   invoke `DWrite(x)` and each reader `p` may invoke `DRead()`. Executions in the proofs use only
@@ -117,7 +113,9 @@ Other files: `Defs.lean` defines the objects, `Std`/`Clean`/`Dirty`/`Separates` 
 `Common.lean` has the finishing round `γᵢ` and the clean/dirty bookkeeping. `CasDefs.lean` has
 successful schedules (`Succ`), `WCov`/`CCov` and `Budget`.
 
-**Not formalized.** Theorem 1(a) for nondeterministic implementations (the paper's full statement). The upper bounds: Theorem 2 (LL/SC/VL
+**Not formalized.** Theorem 1(a) and Observation 1 for nondeterministic implementations with nondeterministic
+solo-termination (the paper's full statement, a strictly larger class). The paper's remark that the lower bounds also
+hold for the weak condition itself: no repaired condition is formalized. The upper bounds: Theorem 2 (LL/SC/VL
 from one bounded CAS object), Theorem 3 (ABA-detecting register from `n + 1` registers) and
 Appendix A.
 

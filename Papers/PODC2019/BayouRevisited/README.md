@@ -6,17 +6,14 @@ Consistency: Bayou Revisited.* PODC 2019. DOI
 version *On Mixing Eventual and Strong Consistency: Acute Cloud Types*, arXiv
 [1905.11762](https://arxiv.org/abs/1905.11762) v2 (Jan 2021); numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** The headline impossibility result (Theorem 5) and Corollary 1 hold as
-stated, for every number `n ≥ 2` of replicas. The proof needs two repairs. As written it applies the
-strong-consistency guarantee to a run that is not stable. It also overlooks that a weak read's response
-may depend on the replica's local clock. Theorems 1–4 (correctness of ANNC and AcuteBayou) were not
-formalized.
+**Verdict: 🔧 Easy fix.** The impossibility result (Theorem 5) and Corollary 1 hold as stated, for every number `n ≥ 2`
+of replicas. The proof needs two local repairs: as written it applies the strong-consistency guarantee to a run that
+is not stable, and it overlooks that a weak read's response may depend on the replica's local clock. Theorems 1–4
+(correctness of ANNC and AcuteBayou) were not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
 - Restriction 3 (op-driven messages) as written lets only "not read-only" operations cause
   `RB/TOB-cast`s, so a strong read could never synchronize. Yet the proof of Theorem 5 says strong
   reads "can cause `R2` to `RB-cast` and `TOB-cast` messages", and AcuteBayou `TOB-casts` strong
@@ -26,11 +23,13 @@ No mistakes in the statements.
   counts strict predecessors and is therefore `0`-based. Also `n` is never defined; it should be
   `|appends(E)|`. Read literally, `read` has no value on a nonempty context. We use rank `i − 1`
   for `i = 1..n`.
+
+### Typos
 - "show how it can be easily to a system with `n > 2` replicas" (a word is missing).
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 5 (the final execution `H` is not a stable run)
+### 🔧 Theorem 5 (the final execution `H` is not a stable run)
 The proof assumes `BEC(weak) ∧ SinOrd(strong) ∧ BEC(strong)` in asynchronous *and* stable runs, but the
 theorem assumes `SinOrd(strong) ∧ BEC(strong, F)` only in *stable* runs, and the final execution `H`
 is not stable.
@@ -48,7 +47,7 @@ is not a stable run whenever `msgs_a^TOB ≠ ∅`, and the stable-run hypothesis
 `R1`'s. This keeps one total order, adds no new messages (after a replica becomes passive, op-driven
 messages forbid new casts), and makes `H` a fair stable run. (`main_contra`, `CH_stable`)
 
-### 🛠️ Claim 1 and the main execution of Theorem 5 (local clocks)
+### 🔧 Claim 1 and the main execution of Theorem 5 (local clocks)
 The indistinguishability steps ignore the replicas' local clocks, so "each read returns the same
 response as `e'_c`" (Claim 1) and "`rval(e_r) = v`" do not follow from determinism.
 
@@ -84,7 +83,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
   only strengthens an impossibility result.
 * ACT restrictions (`IsACT`), quantified over reachable configurations: (1) invisible reads, (2)
   input-driven processing (no infinite internal-only computation), (3) op-driven messages, with only
-  *weak* read-only operations exempt (see Typos and slips).
+  *weak* read-only operations exempt (see Slips).
   Restrictions (4) and (5) (highly available weak and non-blocking strong operations) are *not*
   assumed: `BEC` itself forces every weak and strong operation to return. So the result covers more
   implementations than the paper's.
@@ -107,7 +106,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Correctness predicates of Sections 4–5 | `AbsExec.BEC`, `AbsExec.SinOrd`, `AbsExec.FEC`, `AbsExec.LIN`, … | `Framework.lean` |
 
 **Not formalized.** Theorems 1–4 (ANNC and AcuteBayou correctness), the relations between
-consistency criteria (`FEC < BEC`, etc.), and the related-work discussion.
+consistency criteria (`FEC < BEC`, etc.), and the related-work discussion. Theorem 5 read with separate
+abstract executions for the weak and the strong guarantees: we read it as one abstract execution, as the proof needs,
+and did not study the other reading.
 
 **Trust.** No `sorry`. `theorem5`, `corollary1` and `isACT_trivialImpl` use only the axioms
 `propext`, `Classical.choice`, `Quot.sound`. Non-vacuity: `isACT_trivialImpl` shows that the

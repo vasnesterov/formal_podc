@@ -6,54 +6,51 @@ Janna Burman, Ho-Lin Chen, Hsueh-Ping Chen, David Doty, Thomas Nowak, Eric Sever
 [1907.06068](https://arxiv.org/abs/1907.06068) v5 (29 Nov 2021); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The structural results hold: SSLE needs `≥ n` states and exact knowledge
-of `n` (Theorem 2.1, proved here), `Silent-n-state-SSR` solves ranking (Lemmas 2.2, 2.3, Theorem 2.4), and
-Observation 2.5 holds. **`Optimal-Silent-SSR` as printed (Protocol 3) never stabilizes**: an off-by-one in the
-recruitment guard means rank `n` can never be assigned. With the evidently intended guard `≤ n` we prove the protocol
-correct: from every valid configuration a silent, correctly ranked configuration is reachable (for
-`Rmax, Dmax ≥ 2`, which the paper's choices satisfy). Observation 2.6's explicit tail bound fails for `n = 2` (and for `n = 3`, large `α`). The time bounds and Section 5
-(`Sublinear-Time-SSR`) are not formalized.
+**Verdict: 🔧 Easy fix.** The paper's time bounds, its main point, and Section 5 (`Sublinear-Time-SSR`) were not
+checked. What was checked holds apart from one typo and a by-product: SSLE needs `≥ n` states and exact knowledge of `n`
+(Theorem 2.1, proved here), `Silent-n-state-SSR` solves ranking (Lemmas 2.2, 2.3, Theorem 2.4), Observation 2.5 holds,
+and `Optimal-Silent-SSR`, which as printed never stabilizes, is correct with the evidently intended guard `≤ n` (from
+every valid configuration a silent, correctly ranked configuration is reachable, for `Rmax, Dmax ≥ 2`, which the
+paper's choices satisfy). Only the explicit tail bound of Observation 2.6 is lost, and nothing depends on it.
 
 ## Mistakes in the paper
 
-### ⚠️ Protocol 3 (`Optimal-Silent-SSR`, recruitment guard) and Theorem 4.3
-As printed, Protocol 3 never stabilizes: line 9's guard `2 · i.rank + i.children < n` means no agent can ever
-obtain rank `n`, so from the all-`Unsettled` configuration no correctly ranked configuration is reached, for every
-`n ≥ 2` (`OptimalSilent.asWritten_never_ranked`, `asWritten_not_selfStabilizes`).
-
-**Impact.** A typo with evident intent: Figure 1 (rank 12 assigned for `n = 12`) shows that `≤ n` is meant, and
-with `≤ n` we prove Theorem 4.3's correctness for `Rmax, Dmax ≥ 2` (`OptimalSilent.fixed_selfStabilizes`). But the
-printed protocol is false.
-
-**Details.** New ranks are created only by `Reset` (rank 1) and by recruitment (rank `2·rank + children`), so
-**no agent can ever obtain rank `n`** unless it already had it. Hence from the all-`Unsettled` configuration — or
-from any configuration after a complete reset — no correctly ranked configuration is ever reached, for every
-`n ≥ 2` and all `Rmax, Dmax, Emax`; the protocol stabilizes with probability 0.
-
 ### ⚠️ Observation 2.6 for `n = 2` and `n = 3` (explicit tail bound)
 The claim "for any `α > 0`, probability `≥ ½ n^{-3α}` to require `≥ α n ln n` convergence time" fails for `n = 2`,
-where `Silent-n-state-SSR` is correctly ranked after the first interaction (`obs26_n2_counterexample`).
+where `Silent-n-state-SSR` is correctly ranked after the first interaction (`obs26_n2_counterexample`), and for
+`n = 3` with large `α`.
 
-**Impact.** Degenerate: the claim holds for `n ≥ 4` with the exact success probability `2/(n(n−1))`, and the
-`Ω(n)` expected-time statement is fine. For `n = 3` the claim also fails for large `α`.
+**Impact.** The paper uses only the `Ω(n)` expected time of the observation, which is fine. The claim holds for
+`n ≥ 4` with the exact success probability `2/(n(n−1))`, but this was checked by hand, not in Lean. In Lean we have the
+two-leader core and the geometric tail, for deterministic protocols.
 
 **Details.** With two agents, `Silent-n-state-SSR` is correctly ranked after the first interaction from every
 configuration, under every schedule, so its convergence time is at most `1/2 < 2 ln 2`. The proof has a wrong
 estimate: `(1 − 3/n²)^{α n² ln n} ≥ ½ e^{−3α ln n}` is false for large `α` (e.g. `n = 10`, `α = 7`), and
-`1/C(n,2) < 3/n²` needs `n ≥ 4`. For `n = 3` the claim fails e.g. for `α = 10` (checked numerically, not in
-Lean). The deterministic core and the geometric tail are `obs26_null_of_ne`, `obs26_two_leaders`,
-`obs26_stay_prob`.
+`1/C(n,2) < 3/n²` needs `n ≥ 4`. Also, "expected time `≥ n/3`" fails for `n = 2`. For `n = 3` the claim fails e.g. for
+`α = 10` (checked numerically, not in Lean). The deterministic core and the geometric tail are `obs26_null_of_ne`,
+`obs26_two_leaders`, `obs26_stay_prob`.
 
-### Typos and slips
+### ✏️ Slips
+- Protocol 3 (`Optimal-Silent-SSR`), line 9, and Theorem 4.3: the guard `2 · i.rank + i.children < n` should be `≤ n`.
+  As printed, the protocol never stabilizes. New ranks are created only by `Reset` (rank 1) and by recruitment (rank
+  `2·rank + children`), so **no agent can ever obtain rank `n`** unless it already had it. Hence from the all-`Unsettled`
+  configuration, or from any configuration after a complete reset, no correctly ranked configuration is ever reached,
+  for every `n ≥ 2` and all `Rmax, Dmax, Emax`; the protocol stabilizes with probability 0
+  (`OptimalSilent.asWritten_never_ranked`, `asWritten_not_selfStabilizes`). Figure 1 (rank 12 assigned for `n = 12`)
+  shows that `≤ n` is meant, and with it we prove Theorem 4.3's correctness for `Rmax, Dmax ≥ 2`
+  (`OptimalSilent.fixed_selfStabilizes`).
+- Proof of Lemma 2.2: `∑_{j=1}^{n−1} m_j = n` should start at `j = 0`, and `S_k − S_{k−r+1}` should be
+  `S_{k−r−1}`, `S_{−1} = 0`.
+- Proof of Theorem 2.4: the slow initial configuration is "`m_1(C_0) = 2`" but should be `m_0(C_0) = 2`.
+
+### Typos
 - Under-specified pseudocode of Protocols 2–4. The field list of Protocol 3 omits `resetcount = 0`;
   `Propagate-Reset(a, b)` is written for a Resetting `a` but called also when only `b` is Resetting; the `leader`
   bit of agents brought into `Resetting` is not set (the text says `L`); "just became 0" and line 10's
   `b.role ≠ Resetting` (for `i = b`) are ambiguous. We fixed one reading (`differencies.md`, item 21); the
   off-by-one does not depend on it, and the model checker finds the fixed protocol correct under the alternative
   reading of line 10 too.
-- Proof of Lemma 2.2: `∑_{j=1}^{n−1} m_j = n` (should start at `j = 0`) and `S_k − S_{k−r+1}` (should be
-  `S_{k−r−1}`, `S_{−1} = 0`).
-- Proof of Theorem 2.4: the slow initial configuration is "`m_1(C_0) = 2`" but should be `m_0(C_0) = 2`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -95,9 +92,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Ranked configurations are silent | `OptimalSilent.Ranked.reachable` | `OptimalSilent.lean` |
 | Theorem 4.3 (correctness, fixed guard; `Rmax, Dmax ≥ 2`) | `OptimalSilent.fixed_reachable_ranked`, `fixed_selfStabilizes`, `valid_step` | `OptimalSilentCorrect.lean` |
 
-**Not formalized.** All time and probability bounds (Theorem 2.4's `Θ(n²)`, Lemmas 2.7–2.11, 3.2–3.3, Theorem 3.4,
-Corollary 3.5, Lemmas 4.1–4.2, the `O(n)` time and state count of Theorem 4.3, Corollary 4.4), Section 5
-(`Sublinear-Time-SSR`, exponential states, Theorem 5.7) and the derandomization of Section 6.
+**Not formalized.** All time and probability bounds (Theorem 2.4's `Θ(n²)`, whose stochastic-domination step is only
+sketched, Lemmas 2.7–2.11, 3.2–3.3, Theorem 3.4, Corollary 3.5, Lemmas 4.1–4.2, the `O(n)` time and state count of
+Theorem 4.3, Corollary 4.4), Section 5 (`Sublinear-Time-SSR`, exponential states, Theorem 5.7), the derandomization of
+Section 6 and footnote 7.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: `Silent-n-state-SSR` and the protocol of Observation 2.5 satisfy the SSLE/SSR hypotheses of the

@@ -3,39 +3,41 @@
 Paper: Barenboim, Elkin, Maimon, *Deterministic Distributed (Δ + o(Δ))-Edge-Coloring, and Vertex-Coloring of
 Graphs with Bounded Diversity*, PODC 2017, arXiv 1610.06759v1.
 
-## Statement-level issues (with the deciding rule of `verdicts.md`)
+## Issues in the paper
 
-1. **Theorem 3.2, proof of the colour bound (appendix B): inductive step invalid for `i = 1` — proof repair
-   (🛠️, R1: the statement is true).**
+1. **Theorem 3.2, proof of the colour bound (appendix B): inductive step invalid for `i = 1`
+   (🔧; the statement is true).**
    - The step bounds `𝒜_{i+1}`'s colours by `(D(t−1)+1)·D^{i+1}⌈S/t⌉` using only the induction hypothesis.
    - It claims `≤ D^{i+2}S` for large `S` "because `t = ⌊S^{1/(i+1)}⌋` and `i ≥ 2`". `i = 1` (`𝒜_2`) is not
      covered, and for `i = 1`, `t = ⌊√S⌋` the inequality is false for infinitely many `S`
      (`paper_inductive_step_fails`: `D = 2, S = 31, t = 5`).
    - The running-time part of the proof switches to `t = ⌊S^{1/(i+2)}⌋`. With it the step works for `S`
-     above a constant (constant `S`: §3's direct colouring). Borderline 🛠️ vs ✅: the fix is recoverable
+     above a constant (constant `S`: §3's direct colouring). The fix is recoverable
      from the paper, but the colour-count argument as written has a missing case (`𝒜_2`) and a false
-     inequality for the parameter it states; we count it as a proof repair (R1: a false claim inside a
-     proof whose result is true).
+     inequality for the parameter it states.
    - Repair: the invariant `pal_j (D S_j − 1) ≤ D^j (D S − 1)` holds for every level choice with
      `t² ≤ S_cur` and `D ≥ 2` (`step_bound`, `theorem_3_2`). It gives `< D^{x+1}S` colours for all
      `S ≥ 1`, for both of the paper's choices of `t` (`theorem_3_2_algA` uses `t = ⌊S_cur^{1/(x−j+1)}⌋` at
      level `j`), with no colour reduction.
-2. **Theorem 3.2, base case `𝒜_1`: correct (no verdict impact).** The `+(D−1)²` term disappears between the
+2. **Theorem 3.2, base case `𝒜_1`: correct.** The `+(D−1)²` term disappears between the
    4th and 5th lines of the chain, but legitimately: `t + k ≥ 2⌊√S⌋` and `D(D−1) ≥ (D−1)²`, so
    `−D(D−1)(t+k) + (D−1)² ≤ −(D²−D)(2⌊√S⌋−1)`. The resulting `≤ D²S + 2` holds for `D ≥ 2` and `S ≥ 4`. It is
    not tight: the count is `≤ D(DS − 1) < D²S` (`theorem_3_2` with `x = 1`), so the paper's 2 extra
    colour-reduction rounds are not needed.
-3. **Theorem 3.2 for `D = 1`: not covered by the proof (degenerate, R2).** The proof assumes `D ≥ 2`; the
+3. **Theorem 3.2 for `D = 1`: not covered by the proof (✏️, degenerate).** The proof assumes `D ≥ 2`; the
    statement does not. For `D = 1` (disjoint unions of cliques) the algorithm without reduction can exceed
    `S` colours (e.g. `S = 5`: `t = 2`, palette `2·3 = 6`). Colour reduction (allowed by the paper) fixes
    this, and the instance is trivial. Our `theorem_3_2` assumes `D ≥ 2`.
 4. **Definition of (p,q)-clique-decomposition**: "the maximum size of a clique in `G(U_i)` is `q`". We read it
-   as "at most `q`" (R3, evident intent).
+   as "at most `q`" (✏️, evident intent).
 5. **Theorem 2.4's clique bound `S/t^x + 2`**: we prove the sharper `⌈S/t^x⌉ ≤ S/t^x + 1`. The paper's bound
    follows.
-6. **Theorem 5.4 (not formalized; recorded only).** Its last factor `Δ^{1/x} + â^{1/x} + 3` is attributed to
+6. **Theorem 5.4 (❌; not formalized).** Its last factor `Δ^{1/x} + â^{1/x} + 3` is attributed to
    Theorem 5.2, which only gives `Δ' + O(a')` colours. The degree of the final subgraphs is bounded by
-   in-degree plus out-degree, not by `Δ^{1/x}`. Not part of the checked statements, so no verdict impact.
+   in-degree plus out-degree, not by `Δ^{1/x}`. Nothing about Theorem 5.4 is proved in Lean, so the step stands
+   unrepaired.
+7. **Typos.** The proof of Lemma 2.3 (i) says `G'` for `G_i`. The heading of Appendix B reads "Proof of Lemma 3.2" for
+   Theorem 3.2. "See Theorem 5.1" before Theorem 5.4 means Lemma 5.1.
 
 ## Modelling choices
 

@@ -6,17 +6,16 @@ Adaptive Byzantine Agreement.* PODC 2026. DOI
 [2505.19989](https://arxiv.org/abs/2505.19989) v3 (17 Jun 2026); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The three checked results hold. **Theorem 3.1** (synchronous BA,
-`t < n/2`, `O(n·f)` messages, `O(f)` rounds) is proved for the paper's protocol `SyncBA`, with the quadratic
-fallback (Momose–Ren) taken as a black box. **Theorem 3.3** (`Ω(t²)` expected messages in asynchrony) holds, in
-fact almost surely. **Theorem 3.8** (committee assignment) holds, and we also prove the disperser existence the
-paper only cites. The ⚠️ comes from the pseudocode of `ViewByzantineAgreement`: read literally, key proofs do
-not certify their view number, and then the lock check can be bypassed. The intended reading (the view is part
-of the signed statement) is clear from the proofs. Two proofs (3.3, 3.8) need small repairs.
+**Verdict: 🔧 Easy fix.** **Theorem 3.1** (synchronous BA, `t < n/2`, `O(n·f)` messages, `O(f)` rounds) holds for
+the paper's protocol `SyncBA` against a static adversary, with the quadratic fallback (Momose–Ren) taken as a black
+box, once the proofs of `ViewByzantineAgreement` sign the view. **Theorem 3.3** (`Ω(t²)` expected messages in
+asynchrony) holds, in fact almost surely, and **Theorem 3.8** (committee assignment) holds, and we also prove the
+disperser existence the paper only cites; each needed one local repair of its proof. The partially synchronous
+and QAB protocols were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Appendix B.1 (`ViewByzantineAgreement`: key/lock/commit proofs must sign the view)
+### 🔧 Appendix B.1 (`ViewByzantineAgreement`: key/lock/commit proofs must sign the view)
 The pseudocode forms proofs as `tcombine((KEY, value), ρ)` without the view, so a Byzantine leader can replay a
 key proof under a larger claimed view, bypass the lock check, and get commit proofs for two values.
 
@@ -31,19 +30,24 @@ Lemma B.2 then fails, and two values can get commit proofs.
 
 **Repair.** Our statements `key b v`, `lock b v`, `commit b v` include the view (`Stmt`, `key_after_commit`).
 
-### Typos and slips
-Smaller imprecisions in `SyncBA` (Appendix B):
-- Whether a party that already has a commit answers `RunRetrieval` is ambiguous. Lemma 10.1 needs every
-  honest party to answer an honest leader's retrieval. We take "a party is active in a view iff it had no
-  commit when suggesting". Then an honest leader that runs the retrieval sees every honest party active,
-  since otherwise it would have received a commit.
-- Line 30 sets the fallback input to `v_in`, which may have become `⊥`; we use the original input. This
-  only matters when the honest inputs are not unanimous.
+### ✏️ Slips
+- `SyncBA` (Appendix B.3), line 30 sets the fallback input to `v_in`, which may have become `⊥`; we use the
+  original input, as the proof of Theorem B.14 says. This only matters when the honest inputs are not unanimous.
+- Theorem 3.8 for `f̂ = 0`: the construction has `M = 0` committees, so every party is vacuously blocked. The paper
+  uses `f̂ ≥ 1` only.
+
+### Typos
+- `SyncBA` (Appendix B.1): whether a party that already has a commit answers `RunRetrieval` is ambiguous. Lemma 10.1
+  needs every honest party to answer an honest leader's retrieval. We take "a party is active in a view iff it had
+  no commit when suggesting". Then an honest leader that runs the retrieval sees every honest party active, since
+  otherwise it would have received a commit.
 - Theorem 10.5 says `f < ⌊(n−t−1)/2⌋`, Theorem 7.2 says `f ≤`; `≤` is what holds.
+- The Section 7 overview says a party accepts if its lock has a lower view than the proposed key (strict), while
+  the pseudocode of Appendix B.1 rejects only a strictly smaller key view.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 3.3 (asynchronous `Ω(t²)` lower bound, Markov step)
+### 🔧 Theorem 3.3 (asynchronous `Ω(t²)` lower bound, Markov step)
 The proof claims `⋂_{p∈C} E_pᶜ ⊆ {M ≥ t²/2}`, but with `|C| = t/2` parties each receiving more than `t/2`
 messages one only gets `M > t²/4`.
 
@@ -59,15 +63,12 @@ random string. Hence a.s. every `p ∈ C` receives more than `t/2` messages, and
 `M ≥ (⌊t/2⌋+1)(⌈t/2⌉+1) ≥ t²/4` almost surely. We replace "decides within time `T`" by "decides before
 receiving any message" (`Async.no_init_decision`).
 
-### 🛠️ Theorem 3.8 (committee assignment; Theorem 6.2 used outside its range)
+### 🔧 Theorem 3.8 (committee assignment; Theorem 6.2 used outside its range)
 The proof takes a disperser with `N = n` left and `M = 4c_d·f̂·log n` right vertices, but Theorem 6.2 is
 stated only for `M ≤ N`, which fails once `f̂` is close to `n / log n`.
 
 **Impact.** Statement true; repaired by proving the disperser existence directly, for all `N, M`
 (`theorem_3_8`, `exists_disperser`, `theorem_6_2`).
-
-**Details.** For `f̂ = 0` the construction has `M = 0` committees, so every party is vacuously blocked
-(degenerate case).
 
 **Repair.** We prove the disperser existence by a union bound, for all `N, M`. This gives Theorem 3.8 for every
 `n, f̂` with explicit constants: `(4f̂+1)(⌈log₂ n⌉+1)` committees, at most `2(⌈log₂ n⌉+1)` committees per
@@ -129,7 +130,8 @@ Explicit constants: `syncBA` decides within `11(2f+1)` rounds if `f ≤ ⌊(n−
 It sends at most `22n(2f+1)+3nf` messages, respectively `25n²+n·mfb`. With `Rfb ≤ cR·n` and `mfb ≤ cM·n` this
 gives `(47+4cR)(f+1)` rounds and `(100+4cM)·n·(f+1)` messages.
 
-**Not formalized.** Theorems 3.2, 3.4–3.6 and 5.1, the partially synchronous protocol and retrieval
+**Not formalized.** Theorem 3.1 against a dynamic adversary (only the static case is proved, see above).
+Theorems 3.2, 3.4–3.6 and 5.1, the partially synchronous protocol and retrieval
 (Section 11), the QAB protocols (Sections 8–11), Theorem B.15 (round/message complexity of Momose–Ren; it is
 the `Fallback` hypothesis) and Theorem 6.3.
 

@@ -5,28 +5,23 @@ DOI [10.1145/3796701.3815946](https://doi.org/10.1145/3796701.3815946). Formaliz
 [2412.14061](https://arxiv.org/abs/2412.14061) v2 (full version with appendices); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The safety results hold in the paper's model (`n = 5f + 1`).
-Blink's Integrity, Agreement and Representative Validity (Theorems 2–4) hold with the underlying Binary
-Consensus as a black box. For Flutter, No Duplication and Integrity (Theorems 6–7) hold, and so does the safety
-core of Agreement and Total Order (Lemmas 15–20, Theorem 8): delivery sequences of correct servers are always
-prefixes of one another. The abstract and introduction say both protocols work with "at least `5f + 1`
-servers". With the paper's fixed thresholds (`4f + 1`, `2f + 1`) they do not: for `n = 5f + 2` both Blink's
-Agreement and Flutter's Total Order fail, and we give Lean counterexamples. With thresholds `n − f` they work for
-every `n ≥ 5f + 1`. Lemmas 5 and 6 are imprecisely stated (finite sequences, values in `X`); their intended
-versions are true.
+**Verdict: 🔧 Easy fix.** The safety results hold in the paper's model (`n = 5f + 1`), with the underlying
+consensus as a black box: Theorems 2–4 for Blink, and for Flutter Theorems 6–7 and the safety core of Agreement
+and Total Order (Lemmas 15–20, Theorem 8), so delivery sequences of correct servers are always prefixes of one
+another. "At least `5f + 1` servers" fails at `n = 5f + 2` with the paper's fixed thresholds `4f + 1` and
+`2f + 1`, and thresholds `n − f` repair it locally. The paper's main point, the `2Δ + ε` good-case latency and
+its quasi-optimality, was not checked, and neither was liveness.
 
 ## Mistakes in the paper
 
-### ⚠️ Abstract and introduction ("at least `5f + 1` servers")
+### 🔧 Abstract and introduction ("at least `5f + 1` servers")
 With the paper's hard-coded thresholds `4f + 1` and `2f + 1`, both Blink's Agreement and Flutter's Total Order
 fail for `n = 5f + 2`, although the abstract and introduction say both protocols work with "at least `5f + 1`
 servers" (`blink_agreement_fails_5f2`, `flutter_totalOrder_fails_5f2`).
 
 **Impact.** The paper's own model (§2.1 fixes `n = 5f + 1`, and every proof uses it) is fine, and the fix is
-local: use `n − f` instead of `4f + 1`. A borderline call: the "at least" is a claim about the stated algorithms
-that is false for `n > 5f + 1`, but we classify it as a statement imprecision rather than a false headline,
-because the intended reading "tolerates `f < n/5`" is achievable by an evident local change (see
-`differencies.md`).
+local: use `n − f` instead of `4f + 1`. The intended reading "tolerates `f < n/5`" is achieved by this change
+(see `differencies.md`).
 
 **Details.**
 * *Blink.* Take `f = 1`, `n = 7`, with server 6 Byzantine. Servers 0–3 propose `True` and servers 4–5
@@ -45,26 +40,19 @@ because the intended reading "tolerates `f < n/5`" is achievable by an evident l
 
 **Repair.** We prove Blink safe for every `n ≥ 5f + 1` with thresholds `n − f`/`2f + 1`/`n − f`
 (`blink_safe_general`). We prove Flutter's safety argument for every `n > f` with lock quorum `n − f`
-(`theorem8_totalOrder_general`).
+(`theorem8_totalOrder_general`). The repair covers safety only, which is the part that fails.
 
-### ⚠️ Lemmas 5 and 6 (imprecise statements)
-Read literally, Lemma 5 is false for finite `X` and Lemma 6 is false when `z`, `z'` may leave `X`
-(`lemma5_literal_false`, `lemma6_literal_false`), but the intended versions are true.
+### ✏️ Slips
+- Lemma 6 does not say that `z` and `z'` take values in `X`; if they may leave `X` it fails (`X = {0}`,
+  `z n = n`, `z' n = 2n`; `lemma6_literal_false`). The proof uses `z_n, z'_n ∈ X`, and at its use (Corollary 3)
+  the sequences stay in `X` by Lemma 18. With `range z = range z' = X` Lemma 6 holds (`lemma6_infinite`,
+  `lemma6_finite`).
 
-**Impact.** An imprecision, not an error: the proofs use the intended versions, which we prove
-(`lemma5_infinite`, `lemma5_finite`, `lemma6_infinite`, `lemma6_finite`).
-
-**Details.** Lemma 5 does not say whether the sequence may be finite; it must be, for finite `X` (no strictly
-increasing `ℕ`-indexed sequence lives in a finite nonempty set). The proof builds a bijection with
-`{n ≤ |X|}`, so a finite *or* infinite sequence is meant. Lemma 6 does not say that `z` and `z'` take values
-in `X`; if they may leave `X` it fails (`X = {0}`, `z n = n`, `z' n = 2n`). The proof uses `z_n, z'_n ∈ X`,
-and at its use (Corollary 3) the sequences stay in `X` by Lemma 18.
-
-**Repair.** `lemma5_infinite` gives a strictly increasing `z : ℕ → α` with range `X`, and `lemma5_finite`
-gives a sorted list. With `range z = range z' = X` Lemma 6 holds (`lemma6_infinite`, `lemma6_finite`).
-
-### Typos and slips
-Typos and slips in proofs (statements unaffected), each with the intended reading:
+### Typos
+- Lemma 5 does not say whether the sequence may be finite; it must be, for finite `X` (no strictly increasing
+  `ℕ`-indexed sequence lives in a finite nonempty set; `lemma5_literal_false`). The proof builds a bijection with
+  `{n ≤ |X|}`, so a finite *or* infinite sequence is meant. `lemma5_infinite` gives a strictly increasing
+  `z : ℕ → α` with range `X`, and `lemma5_finite` gives a sorted list.
 - Lemma 4 says "previously set `decided = False`" twice; it means `True`.
 - The proof of Theorem 2 writes `v̄` where it means `v`, in "`ρ` satisfies `|{σ : suggestions[σ] = v̄}| ≥ 2f+1`".
 - Lemma 16 defines `Φ` with `remote_times[σ] > b`; it should be `≥ b`. It also says "before `t*`"; it means

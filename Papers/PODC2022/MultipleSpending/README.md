@@ -6,26 +6,26 @@ Decentralized Cryptocurrencies.* PODC 2022. DOI
 version, arXiv [2205.14076](https://arxiv.org/abs/2205.14076) v1; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** The lower bound (Theorem 5.1: no `k`-Consistent Broadcast
-for `k` below the inconsistency number `k_max`), and with it the advertised "the optimal spending
-number is precisely the inconsistency number", is false: we give trust models with `k_max = 3`
-and `k_max = 2` where `2`-CB, resp. `1`-CB, is implementable (for every source, with per-value
-Local Progress). The correct optimum for a source `s` is `max(1, λ_s)`, the maximum restricted to
-faulty sets containing `s`; we prove both bounds. Theorem 3.6 (uniform model, with the implicit
-`f < q ≤ n`), Theorem 4.1, Lemmas 4.3–4.7 and Theorem 4.8 (Algorithms 1–2 implement
-`k_max`-spending asset transfer, safety and liveness) hold, the latter with assumptions on the
-correct issuers that the paper uses implicitly.
+**Verdict: ⚠️ Weakened.** The lower bound (Theorem 5.1: no `k`-Consistent Broadcast for `k` below the
+inconsistency number `k_max`), and with it the advertised "the optimal spending number is precisely the
+inconsistency number", is false: we give trust models with `k_max = 3` and `k_max = 2` where `2`-CB, resp. `1`-CB,
+is implementable (for every source, with per-value Local Progress). The correct optimum of `k`-CB for a source `s`
+is `max(1, λ_s)`, the maximum restricted to faulty sets containing `s`; we prove both bounds, but optimality for
+`k`-SAT itself was not checked, as Theorem 5.2 is not formalized. Theorem 3.6 (uniform model, with the implicit
+`f < q ≤ n`), Theorem 4.1, Lemmas 4.3–4.7 and Theorem 4.8 (Algorithms 1–2 implement `k_max`-spending asset transfer,
+safety and liveness) hold, the latter with assumptions on the correct issuers that the paper uses implicitly.
 
 ## Mistakes in the paper
 
-### 🚨 Theorem 5.1 (lower bound: no `k`-CB for `k < k_max`)
+### ⚠️ Theorem 5.1 (lower bound: no `k`-CB for `k < k_max`) and the optimality claim of §5, the abstract and the introduction
 Theorem 5.1 is false: with three processes, each process's only quorum being itself, and at most one failure,
 `k_max = 3`, yet "every process delivers the first value it gets from the source" is a `2`-CB for every source
 (`theorem_5_1_false`).
 
 **Impact.** Sinks the advertised "the optimal spending number is precisely the inconsistency number". The
 correct optimum for a source `s` is `max(1, λ_s)`, the maximum restricted to faulty sets containing `s`; we prove
-both bounds (`optimal_kcb`).
+both bounds (`optimal_kcb`). The claim at the end of §5, "Algorithms 1 and 2 implement k-SAT with optimal k", fails
+for the same reason; the safety and liveness of Algorithms 1–2 (Theorem 4.8) are unaffected.
 
 **Details.** The proof lets a Byzantine source `r ∈ F` equivocate to the members of an independent set of a graph
 `G_{F,S}` with maximum independence number. But the maximum may be attained only by faulty sets that do *not*
@@ -38,71 +38,56 @@ only two processes are correct. A less degenerate example has four processes `a,
 `{a,a'}`, `{b,b'}`, `Π`, `Π` and faulty sets `∅, {a}, {b}`: `k_max = 2`, yet a quorum-echo algorithm is a `1`-CB
 for every source (`theorem_5_1_false'`).
 
+The paper's own algorithm even beats `k_max`: in the three-process example (`k_max = 3`) every run of
+Algorithms 1–2 has spending number at most `2` (`algorithms_beat_kmax`). Only faulty issuers spend an input twice,
+and a faulty issuer spends it at most `λ(Q, {B})` times, `B` the actual faulty set (`spendingNumber_le_refined`). In
+the four-process example (`k_max = 2`) nothing is ever spent twice (`algorithms_no_double_spending_pairsT`).
+
 **Repair.** With `λ_s` the largest independence number of the graphs `G_{F,S}` with `s ∈ F`, every `k`-CB with
 (per-value) Local Progress has `k ≥ λ_s` (`lower_bound`, `srcInconsistencyNumber_le`, the paper's gluing
 argument; it uses `∅ ∈ F`, which follows from the standing inclusion-closure assumption), and the quorum-echo
 algorithm achieves `max(1, λ_s)` (`echoAlg_isKCB`). So the optimal `k` is `max(1, λ_s)`, not `k_max`
 (`optimal_kcb`).
 
-### ❌ End of §5 ("Algorithms 1 and 2 implement k-SAT with optimal k")
-The optimality claim fails for the same reason, and the paper's own algorithm even beats `k_max`: in the
-three-process example above (`k_max = 3`) every run of Algorithms 1–2 has spending number at most `2`
-(`algorithms_beat_kmax`).
-
-**Impact.** A consequence of the false Theorem 5.1; the safety and liveness of Algorithms 1–2 (Theorem 4.8) are
-unaffected.
-
-**Details.** Only faulty issuers spend an input twice, and a faulty issuer spends it at most `λ(Q, {B})` times,
-`B` the actual faulty set (`spendingNumber_le_refined`). In the four-process example (`k_max = 2`) nothing is
-ever spent twice (`algorithms_no_double_spending_pairsT`).
-
-### ⚠️ Theorem 5.1 (Local Progress is too weak for the proof)
+### 🔧 §5.1, Local Progress (too weak for the proof of Theorem 5.1)
 The proof needs Local-Progress executions in which the `k` processes deliver `k` *different* values, but Local
 Progress only promises that `p` delivers *some* value (`WeakLP.theorem_5_1_needs_localProgressAll`).
 
 **Impact.** Per-value Local Progress, which the proof evidently intends, fixes this; our repaired lower bound
-uses it.
+uses it, and the quorum-echo algorithm satisfies it (`lower_bound`, `echoAlg_localProgressAll`).
 
 **Details.** With three processes `s, a, b`, quorums `Π`, `{s,a}`, `{s,b}` and faulty sets `∅, {s}`, the
 source is faulty in the only graph attaining `k_max = λ_s = 2`; still, an algorithm in which `a` and `b` deliver a
 default value on their own, and any other value only when both echoed it, satisfies Local Progress and is a
 `1`-CB.
 
-### ⚠️ Theorem 3.6 (needs `f < q ≤ n`)
-Theorem 3.6 does not state `f < q ≤ n`; for `q ≤ f` the formula's denominator is `≤ 0` and the inconsistency
-number is `n − q + 1` (`theorem_3_6_needs_q_gt_f`).
-
-**Impact.** An implied assumption: the formula holds under `f < q ≤ n` (`theorem_3_6`), and
-`inconsistencyNumber_uniform` gives the value for all `f`.
-
-### ⚠️ Lemma 4.7 (Validity; implicit assumptions on correct issuers)
-Validity silently assumes that a correct process issues only valid transactions whose inputs it has already
-accepted and never issues conflicting ones, but `transfer` checks neither; without the input condition Validity
-fails (`ValidityCex.validity_needs_inputs`).
-
-**Impact.** Holds with these assumptions, which the paper uses implicitly (`Setup.lemma_4_7`,
-`Setup.lemma_4_7_of_issue`).
-
-### Typos and slips
+### ✏️ Slips
+- Theorem 3.6 does not state `f < q ≤ n`, an implied assumption; for `q ≤ f` the formula's denominator is `≤ 0` and
+  the inconsistency number is `n − q + 1` (`theorem_3_6_needs_q_gt_f`). The formula holds under `f < q ≤ n`
+  (`theorem_3_6`), and `inconsistencyNumber_uniform` gives the value for all `f`.
+- Lemma 4.7 (Validity) and Accuracy in Theorem 4.8 silently assume that a correct process issues only valid
+  transactions whose inputs it has already accepted and never issues conflicting ones, but `transfer` checks
+  neither; without the input condition Validity fails (`ValidityCex.validity_needs_inputs`). They hold with these
+  assumptions, which the paper uses implicitly (`Setup.lemma_4_7`, `Setup.lemma_4_7_of_issue`,
+  `Setup.accused_byzantine`).
 - Accuracy says verify-acc returns true "iff `AC ⊆ F`"; the "if" direction is impossible for a run-independent
   function (`Setup.accuracy_iff_impossible`), "only if" is meant.
-- Example 3.1 writes the fault model `{{p₃}}` (not inclusion-closed) and gives `p₃` a quorum without `p₃`.
-- Algorithm 1 line 5 checks the REQ signature against the sender instead of the issuer, and Algorithm 2 line 26
-  omits `tx ≠ tx'`.
+- Algorithm 1 line 5 checks the REQ signature against the sender instead of the issuer.
+- Algorithm 2 line 26 omits `tx ≠ tx'`.
 - Theorem 5.2's proof writes `deliver(m)` for a transaction carrying `m'`.
+
+### Typos
+- Example 3.1 writes the fault model `{{p₃}}` (not inclusion-closed) and gives `p₃` a quorum without `p₃`.
+- The proof of Lemma 4.4 does not say why the `k` acceptors are distinct; it follows from No-Conflict of each
+  history (`Setup.lemma_4_4`).
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 3.6 (proof covers only `|F| = f` and only the upper bound)
+### 🔧 Theorem 3.6 (proof covers only `|F| = f` and only the upper bound)
 The proof only handles faulty sets of size exactly `f` and never shows that `⌊(n−f)/(q−f)⌋` is attained.
 
 **Impact.** Statement true (with `f < q ≤ n`); both parts are easy and added (`theorem_3_6`,
 `inconsistencyNumber_uniform`).
-
-### 🛠️ Lemma 4.4 (distinct acceptors)
-The proof of Lemma 4.4 does not say why the `k` acceptors are distinct.
-
-**Impact.** Statement true; it follows from No-Conflict of each history (`Setup.lemma_4_4`).
 
 Full list of differences (including modelling choices and minor imprecisions):
 [differencies.md](differencies.md).
@@ -153,7 +138,8 @@ Full list of differences (including modelling choices and minor imprecisions):
 | Optimality of Algorithms 1–2 (end of §5): **false** | `algorithms_beat_kmax`, `algorithms_no_double_spending_pairsT` | `Optimality.lean` |
 
 **Not formalized.** Theorem 5.2 (reduction from `k`-CB to `k`-SAT), Section 6 (clusters; no
-theorem there).
+theorem there). Transferring the lower bound to `k`-SAT also needs Local Progress for the derived broadcast,
+which the paper does not discuss and we did not examine.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. The counterexample algorithms are proved to satisfy the full `k`-CB specification

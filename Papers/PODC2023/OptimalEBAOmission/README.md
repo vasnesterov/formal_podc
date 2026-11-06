@@ -5,45 +5,14 @@ with Omission Failures.* PODC 2023. DOI [10.1145/3583668.3594573](https://doi.or
 Formalized version: arXiv [2305.06271](https://arxiv.org/abs/2305.06271) v1 (full version with
 appendix); numbering follows it. Targets: §6 (Prop. 6.1, Thm. 6.3, Prop. 6.4, Thms. 6.5–6.6, Cor. 6.7).
 
-**Verdict: ⚠️ Minor statement issues.** Correctness of `P0` (Prop. 6.1) and the concrete results hold
-for `t ≤ n − 2`. Under that hypothesis we prove that `P^min` and `P^basic` implement `P0`
-(Thms. 6.5, 6.6), that `P0` is safe (Prop. 6.4) and that both protocols are optimal (Cor. 6.7). Two
-statements are false as written. Prop. 6.4 fails with the paper's own definition of a 0-chain, and
-Cor. 6.7 fails for `t = n − 1`. Both have evident repairs. The general Theorem 6.3 ("safe ⇒ optimal" in
-every EBA context) has a gap in its proof. We prove it only with an extra hypothesis that holds in the
-two concrete contexts. The general claim is neither proved nor refuted.
+**Verdict: ⚠️ Weakened.** Correctness of `P0` (Prop. 6.1) and the concrete results hold for `t ≤ n − 2`: `P^min` and
+`P^basic` implement `P0` (Thms. 6.5, 6.6), and `P0` is safe (Prop. 6.4) once the definition of a 0-chain is repaired.
+The general "safe ⇒ optimal" (Thm. 6.3) is proved only with an extra hypothesis, which holds in the two concrete
+contexts, and against one-shot competitors, so both protocols are optimal in that sense (Cor. 6.7) and the general
+claim is neither proved nor refuted. The full-information protocol of Section 7, which settles the open problem of
+the abstract, was not checked.
 
 ## Mistakes in the paper
-
-### ⚠️ Proposition 6.4 (definition of 0-chain, condition (c))
-With the paper's 0-chains, Prop. 6.4 is false already for `n = 3`, `t = 0`, no failures and preferences `0, 1, 1`:
-at time 1 agent 2 knows that *somebody* just decided 0 but not who, so it has received no 0-chain, and safety
-condition (1) fails for `P^min` (`Counterexamples.prop_6_4_lit_false`; every `n ≥ 3`, `t ≤ n − 2`:
-`prop_6_4_lit_false_gen`).
-
-**Impact.** A one-clause fix of a definition with evident intent: with "`i_{m'}` knows that *some* agent has just
-decided 0" Prop. 6.4 holds (`prop_6_4_min`, `prop_6_4_basic`), and Thm. 6.3 with the paper's definition still
-follows. Statement-level, borderline (see differencies.md).
-
-**Details.** Condition (c) of a 0-chain asks that `i_{m'}` *knows that `i_{m'−1}`* has just decided 0. In the
-minimal context an agent only learns that *somebody* just decided 0, not who. In the example, at time 1 agent 2 has
-`jd = 0`. In the run with preferences `1, 0, 1` it has the same local state, so it does not know that agent 0
-decided. Hence it has received no 0-chain. Yet every run in which it has this local state contains a preference 0.
-This breaks safety condition (1) for `P^min`, the unique implementation of `P0` there. The same failure-free
-example works for every `n ≥ 3`, `t ≤ n − 2`. It also refutes the main-text claim that
-"`K_i(⋁_j jdecided_j = 0)` holds iff `i` receives a 0-chain". The proof of Prop. 6.1 reaches the paper's definition
-by an invalid step: from `K_i(⋁_j jdecided_j = 0)` it concludes `K_i(jdecided_j = 0)` for some `j`.
-
-### ⚠️ Corollary 6.7 for `t = n − 1` (optimality of `P^min`)
-Corollary 6.7 is stated for all of `γ_min,n,t`, i.e. for every `t < n`, but for `t = n − 1` the protocol `P^min_{n−1}` implements `P0`, is an
-EBA protocol and strictly dominates `P^min` (`Counterexamples.cor_6_7_min_false`, `cor_6_7_min_false'`).
-
-**Impact.** A missing hypothesis: Cor. 6.7 is derived from Thms. 6.5/6.6, which assume `t ≤ n − 2`, and with that
-hypothesis it holds (`cor_6_7_min`, `cor_6_7_basic`).
-
-**Details.** For `t = n − 1`, a 0-chain reaching time `n − 1` would need `n` agents besides the undecided agent. So
-`P0` already decides 1 at time `n − 1 = t`, one round before `P^min` does. In the failure-free all-1 run the
-decisions are at `n − 1` vs `n`, so `P^min` is not optimal.
 
 ### ⚠️ Theorem 6.3 (safe ⇒ optimal in every EBA context)
 The proof takes the first round `k` in which `P` and a strictly dominating `P'` differ, for an agent `i` that "may
@@ -67,25 +36,58 @@ agent's local state also occurs, with the same preferences, in a run where that 
 holds in `γ_min` (trivially) and in `γ_basic` (by swapping the roles of `i` and a nonfaulty agent).
 (`Context.thm_6_3`, `Context.thm_6_3_lit`)
 
-### Typos and slips
+### 🔧 Proposition 6.4 (definition of 0-chain, condition (c))
+With the paper's 0-chains, Prop. 6.4 is false already for `n = 3`, `t = 0`, no failures and preferences `0, 1, 1`:
+at time 1 agent 2 knows that *somebody* just decided 0 but not who, so it has received no 0-chain, and safety
+condition (1) fails for `P^min` (`Counterexamples.prop_6_4_lit_false`; every `n ≥ 3`, `t ≤ n − 2`:
+`prop_6_4_lit_false_gen`).
+
+**Impact.** A one-clause fix of a definition with evident intent: with "`i_{m'}` knows that *some* agent has just
+decided 0" Prop. 6.4 holds (`prop_6_4_min`, `prop_6_4_basic`), and Thm. 6.3 with the paper's definition still
+follows.
+
+**Details.** Condition (c) of a 0-chain asks that `i_{m'}` *knows that `i_{m'−1}`* has just decided 0. In the
+minimal context an agent only learns that *somebody* just decided 0, not who. In the example, at time 1 agent 2 has
+`jd = 0`. In the run with preferences `1, 0, 1` it has the same local state, so it does not know that agent 0
+decided. Hence it has received no 0-chain. Yet every run in which it has this local state contains a preference 0.
+This breaks safety condition (1) for `P^min`, the unique implementation of `P0` there. The same failure-free
+example works for every `n ≥ 3`, `t ≤ n − 2`. It also refutes the main-text claim that
+"`K_i(⋁_j jdecided_j = 0)` holds iff `i` receives a 0-chain". The proof of Prop. 6.1 reaches the paper's definition
+by an invalid step: from `K_i(⋁_j jdecided_j = 0)` it concludes `K_i(jdecided_j = 0)` for some `j`.
+
+### ✏️ Slips
+- Corollary 6.7 is stated for all of `γ_min,n,t`, i.e. for every `t < n`, but for `t = n − 1` the protocol
+  `P^min_{n−1}` implements `P0`, is an EBA protocol and strictly dominates `P^min`
+  (`Counterexamples.cor_6_7_min_false`, `cor_6_7_min_false'`). A 0-chain reaching time `n − 1` would need `n` agents
+  besides the undecided agent, so `P0` already decides 1 at time `n − 1 = t`, one round before `P^min` does; in the
+  failure-free all-1 run the decisions are at `n − 1` vs `n`. Cor. 6.7 is derived from Thms. 6.5/6.6, which assume
+  `t ≤ n − 2`, and with that hypothesis it holds (`cor_6_7_min`, `cor_6_7_basic`).
+- Proposition 6.1 is stated for every EBA context, whose failure model may drop messages of nonfaulty agents, but
+  Agreement and termination in `t + 1` rounds need `F ⊆ SO(t)`, the only model the paper uses (`Context.prop_6_1`
+  assumes it).
+- Section 5: the update rule of `jd` sets both `jd = 0` and `jd = 1` if a 0-message and a 1-message arrive in the
+  same round. This never happens for implementations of `P0`; we set `jd = 0`.
+
+### Typos
 - Proof of Thm. 6.5: `I` should be the system of `P^min`, not of `P0`; `jdecided` should be `deciding`;
   "(Note that `t′ = m`.)".
 
 ## Proof gaps (statements true)
 
-### 🛠️ Proposition 6.4, repaired (`γ_basic` and safety (2))
+### 🔧 Proposition 6.4, safety (1) in `γ_basic`
 In `γ_basic` the proof's all-1 run with "the same adversary" fails: an agent that decided 0 in `r` sends
 `(init,1)` in `r'` and changes the counts `#1`.
 
 **Impact.** The repaired statement is true (`prop_6_4_min`, `prop_6_4_basic`).
 
-**Repair.** We also silence each faulty agent from the round in which it decides 0 (`ZeroBiased.allOnes`). For
-safety (2), the role-swap argument "details left to the reader" is replaced by explicit chain runs.
+**Repair.** We also silence each faulty agent from the round in which it decides 0 (`ZeroBiased.allOnes`).
 
-### 🛠️ Theorem 6.6 (decide-1 case)
-The proof does not show `¬K_i(⋁_j jdecided_j = 0)` in the decide-1 case.
+### 🔧 Theorems 6.5 and 6.6 (decide-1 case)
+The proofs show only one of the two conditions needed for `P0` to decide 1: they do not show
+`¬K_i(⋁_j jdecided_j = 0)` in the decide-1 case.
 
-**Impact.** Statement true; the missing fact follows from safety (1) (`Basic.thm_6_6`).
+**Impact.** Statements true; the missing fact follows from safety (1) (`ZeroBiased.not_knows_jDecided`, `thm_6_5`,
+`Basic.thm_6_6`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -125,9 +127,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | safety (1) in contexts where decided agents are silent | `Context.ZeroBiased.allOnes`, `Implements.safe_one` | `AllOnes.lean` |
 | undecided agents cannot detect their faultiness | `Min.nfConsistent`, `Basic.nfConsistent` | `MinCtx.lean`, `BasicCtx.lean` |
 
-**Not formalized.** Section 7 (`P1`, full information, weak safety, Thms. 7.5–7.7, Prop. 7.9) and
-Section 8 (bit/round counts). Cor. 6.7 for `P^basic` with `t = n − 1` is presumably also false (same
-phenomenon) but is not formalized.
+**Not formalized.** Section 7 (`P1`, full information, weak safety, Thms. 7.5–7.7, Prop. 7.9), including
+the abstract's settling of the open problem of Halpern, Moses and Waarts, and Section 8 (bit/round counts).
+Cor. 6.7 for `P^basic` with `t = n − 1` is presumably also false (same phenomenon) but is not formalized. For
+safety (2) of Prop. 6.4, the role-swap argument "details left to the reader" is replaced by explicit chain runs;
+we did not check whether it works as printed.
 
 **Trust.** No `sorry`; all listed theorems use only `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity:

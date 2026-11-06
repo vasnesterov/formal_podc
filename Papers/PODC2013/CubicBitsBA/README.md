@@ -5,23 +5,25 @@ Communication Bits.* PODC 2013. DOI [10.1145/2484239.2484271](https://doi.org/10
 Formalized version: the authors' final version on HAL ([hal-01151136](https://hal.science/hal-01151136v1),
 16 pp.); there is no arXiv version. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** The protocol of Section 4 does not solve Byzantine agreement:
-with `n = 7`, `t = 2` (so `t < n/3`) and binary values, two Byzantine processes make the correct
-processes decide differently, whatever the default value `v0`. Theorem 2 (agreement) and Lemma 5
-are false. Lemmas 1–4 and Theorem 1 (validity) hold.
+**Verdict: ❌ Intent lost.** The protocol of Section 4, the contribution named in the title and abstract, does not
+solve Byzantine agreement: with `n = 7`, `t = 2` (so `t < n/3`) and binary values, two Byzantine processes make the
+correct processes decide differently, whatever the default value `v0`, so Theorem 2 (agreement) and Lemma 5 are false.
+No repaired protocol with `t + 1` rounds and this bit bound is proved or known to us. Lemmas 1–4, Theorem 1 (validity)
+and the bit count of the basic protocol hold.
 
 ## Mistakes in the paper
 
-### 🚨 Theorem 2 (agreement of the protocol of Section 4)
+### ❌ Protocol of Section 4: Theorem 2 (agreement) and Lemma 5
 The protocol violates agreement for `n = 7`, `t = 2`: Byzantine `b₁` sends `0` to three correct
 processes and `1` to the other two, Byzantine `b₂` reports `b₁`'s value in round 2 as `0` to the
 first group and as `1` to the second, and then the first group decides `0` while the second decides
-the default `v0 = 1` (`not_solves_BA`, `theorem_2_false`).
+the default `v0 = 1` (`not_solves_BA`, `theorem_2_false`); in this run the whole tree has a common
+path covering (Lemma 4), but the root is not common (`lemma_5_false`).
 
 **Impact.** The paper's algorithm, the contribution named in the title and abstract, is not a
-Byzantine agreement protocol, so its `O(n³ log n)` bound is not established. The incremental
-variant of Section 6 uses the same information and fails on the same run. Validity holds
-(`theorem_1`).
+Byzantine agreement protocol, so its `O(n³ log n)` bound is not established. Lemma 5 is the only
+route from Lemma 4 to agreement, so Theorem 2 has no proof; the run shows it is false. Validity
+holds (`theorem_1`).
 
 **Details.**
 - Run (correct `0..4`, Byzantine `b₁ = 5`, `b₂ = 6`, inputs `0,0,0,1,1`). Round 1: `b₁` sends `0`
@@ -39,28 +41,15 @@ variant of Section 6 uses the same information and fails on the same run. Validi
   round 3. But `newval(b₁ k)` reads `k`'s reports about `b₁` only through the echoes of round
   `t + 1 = 3`, which carry round-2 arrays, not suspicion sets. So the masks that should remove
   `3, 4` from the top set of `b₁` are all `⊤`.
-- Other readings of §4. The run also violates agreement if a process discards, at decision time,
-  all messages of every process it ever suspected. It does not if a process also drops from a top
-  set the children whose last id it suspects itself, or takes the majority among non-`⊥` echoes
-  only. A different attack with `n = 10`, `t = 3` breaks agreement under all eight combinations
-  of these readings (Python simulation in [`simulation/`](simulation/), not formalized).
+- The proof of Lemma 5 fails at the level-1 node `b₁`, all of whose children are common
+  (`children_b1_common`, `node_b1_not_common`). It claims that the correct processes in the top set
+  "do not suspect `p_j`" and hence "reported the same value `cval(xk)`". But membership of `xk` in
+  the top set only says that `k` reported no suspicion of `j` *by round `t`*. A suspicion created by
+  a round-`l` equivocation is reported in round `l + 2`, outside that window when `l = t − 1`. So
+  correct members of the top set can echo different values, and a Byzantine member of the top set
+  then decides the strict majority differently at different processes.
 
-### ❌ Lemma 5 (common path coverings propagate to the root)
-In the run above the whole tree has a common path covering (Lemma 4), but the root is not common
-(`lemma_5_false`).
-
-**Impact.** Lemma 5 is the only route from Lemma 4 to agreement, so Theorem 2 has no proof; the
-run above shows it is false.
-
-**Details.** The proof fails at the level-1 node `b₁`, all of whose children are common
-(`children_b1_common`, `node_b1_not_common`). It claims that the correct processes in the top set
-"do not suspect `p_j`" and hence "reported the same value `cval(xk)`". But membership of `xk` in
-the top set only says that `k` reported no suspicion of `j` *by round `t`*. A suspicion created by
-a round-`l` equivocation is reported in round `l + 2`, outside that window when `l = t − 1`. So
-correct members of the top set can echo different values, and a Byzantine member of the top set
-then decides the strict majority differently at different processes.
-
-### Typos and slips
+### ✏️ Slips
 - §4.1, decoration example: "when `val(x)` of some node `x = yjk` is set to `⊤`, this means that
   `p_k` reported that it suspects `p_j`": `⊤` means "does not suspect" (as the bullets say).
 - §4.2, intuition paragraph: "for the nodes of level 1 and level 2, `val(x)` is a proposed value";
@@ -69,6 +58,11 @@ then decides the strict majority differently at different processes.
 - Proof of Lemma 5: "`n − 2t > t + 1`" should be "`n − 2t > t`" (`n − 2t ≥ t + 1`).
 - §6: "each process … relays `(n − 1)t` suspicions" ignores that Byzantine processes may report
   up to `n − 1` suspicions each. The relayed amount is still `O(nt)` (at most about `2nt`).
+
+### Typos
+- Proof of Lemma 5: the induction hypothesis gives "a child `xℓ` *or one of its ancestors* is
+  common", while the proof uses "`xℓ` is common". Harmless: the ancestors of `xℓ` are `x` and the
+  ancestors of `x`, whose commonness is the claim.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -111,8 +105,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
 Lemma 1 needs only `|byz| ≤ t`, not `n > 3t`. Lemma 3, Theorem 1 and Lemma 4 use `n > 3t`. For
 `t = 0` the level-1 nodes are leaves and `newval = val` (`newval1`).
 
-**Not formalized.** The incremental protocol of §6 (`O(n³ log n)` total bits) is only sketched
-in the paper. The `t = 3` attack is simulated only.
+**Not formalized.**
+* The incremental protocol of §6 (`O(n³ log n)` total bits) is only sketched in the paper. It uses
+  the same information, so the run above is expected to break it too.
+* Other readings of §4 (Python simulation in [`simulation/`](simulation/), not in Lean). The run also
+  violates agreement if a process discards, at decision time, all messages of every process it ever
+  suspected. It does not if a process also drops from a top set the children whose last id it
+  suspects itself, or takes the majority among non-`⊥` echoes only. A different attack with `n = 10`,
+  `t = 3` breaks agreement under all eight combinations of these readings.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. The counterexample is checked by kernel evaluation (`decide +kernel`, no

@@ -5,15 +5,15 @@ Combinatorial Reasoning.* PODC 2016. DOI [10.1145/2933057.2933120](https://doi.o
 Formalized version: arXiv [1605.07354](https://arxiv.org/abs/1605.07354) v1 (full version with appendices);
 numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The main results hold: `Optmin[k]` solves nonuniform `k`-set consensus
-with decisions by `⌊f/k⌋ + 1` (Prop. 1), it is unbeatable (Thm. 1) and last-decider unbeatable (Thm. 2), and
-`u-Pmin[k]` solves uniform `k`-set consensus by `min(⌊t/k⌋+1, ⌊f/k⌋+2)` (Thm. 3). But **Lemma 1, the core of
-the combinatorial unbeatability proof, is false as stated.** We prove it under an extra hypothesis that holds
-wherever the paper uses it, so the proof of Theorem 1 goes through.
+**Verdict: 🔧 Easy fix.** The main results hold: `Optmin[k]` solves nonuniform `k`-set consensus with decisions by
+`⌊f/k⌋ + 1` (Prop. 1), it is unbeatable (Thm. 1) and last-decider unbeatable (Thm. 2), and `u-Pmin[k]` solves uniform
+`k`-set consensus by `min(⌊t/k⌋+1, ⌊f/k⌋+2)` (Thm. 3). But **Lemma 1, the core of the combinatorial unbeatability
+proof, is false as stated**; we prove it under an extra hypothesis that holds wherever the paper uses it, so the proof
+of Theorem 1 goes through. The topological proof of Lemma 1 was not checked beyond noting that it shares the gap.
 
 ## Mistakes in the paper
 
-### ❌ Lemma 1 (low processes force the decision `v` at `m`)
+### 🔧 Lemma 1 (low processes force the decision `v` at `m`)
 Lemma 1 is false: with `n = 6`, `k = 2`, `t = 1`, `m = 1` there is a 2-set consensus protocol in which low processes decide at once and a process `i` satisfying all four hypotheses with `v = 0` decides `2` (`lemma1_paper_false`).
 
 **Impact.** Lemma 1 is the core of the combinatorial unbeatability proof, but it holds with an extra hypothesis
@@ -32,25 +32,21 @@ be decided. Here `i` decides `2`.
 
 The proof fails in the "changes": when `j_{b'}` (`b' > b`) has decided `v`, process `j_b` must get *no* message
 carrying `v` in round `m`. That needs every process that told `i` about `v` to crash in round `m`, which can
-exceed `t` (here `x` and `y` would both have to crash). The topological proof has the same gap: it assumes that
-`j_y` gets low values only from the `i_x`. The failure does not depend on `t < k`: with `t + 1` carriers of `0`,
-a variant of `Optmin[k]` breaks the lemma for every `t ≥ 1`, `k ≥ 2` (sketch in
+exceed `t` (here `x` and `y` would both have to crash). The failure does not depend on `t < k`: with `t + 1`
+carriers of `0`, a variant of `Optmin[k]` breaks the lemma for every `t ≥ 1`, `k ≥ 2` (sketch in
 [differencies.md](differencies.md), item 1).
 
 **Repair.** We prove Lemma 1 with an extra hypothesis 5: *every process alive and low at `m − 1` crashes in round
 `m`*. In the proof of Lemma 3, hypothesis 5 holds because `i` is still high at `m`. Inside Lemma 1's own induction
 it holds because `i` is high at `m − 1`. (`lemma1` with `Lemma1Hyp.lowCrash`)
 
-### Typos and slips
-- Lemma 5 (Appendix D), case `m = 0`: the run `r'` "with all initial values `0`" contradicts
-  `r'_i(0) = r_i(0)` when `i`'s low input is not `0`. All inputs equal to `i`'s input works. (`lemma5`)
-- Proof of Theorem 3: "`v = Min⟨i, m′_i⟩ < k − 1`" should be `≤ k − 1`.
+### ✏️ Slips
 - Prop. 1 and Thm. 3 say "all processes decide by …"; this holds for processes alive at that time.
-- Lemma 2 assumes `i` active at `m − 1`; we use `i` alive at `m`, which is all that is needed.
+- Proof of Theorem 3: "`v = Min⟨i, m′_i⟩ < k − 1`" should be `≤ k − 1`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 1 (induction step: unchecked hypotheses)
+### 🔧 Lemma 1 (induction step: unchecked hypotheses)
 The induction hypothesis is applied to the processes `i_w` "to decide `w` by time `m − 1`" after checking only hypothesis 3 (`HC ≥ k − 1`).
 
 **Impact.** The (repaired) statement is true; the step is fixed (`lemma1_step`).
@@ -58,13 +54,12 @@ The induction hypothesis is applied to the processes `i_w` "to decide `w` by tim
 **Repair.** The lemma must be applied at the first time `i_w` is low, and hypothesis 4 must be checked too. It
 holds: `j_1, …, j_k`, made correct, are hidden from `⟨i_w, m''⟩` and high before. (`lemma1_step`)
 
-### 🛠️ Theorem 3 (`K_j ∃correct(w)`, "j knows that w will persist")
-The proof writes `K_j ∃correct(w)` and then uses it as "some correct process knows `w`", a consequence that needs its own argument.
+### 🔧 Lemma 5 (Appendix D, case `m = 0`)
+The run `r'` "with all initial values `0`" contradicts `r'_i(0) = r_i(0)` when `i`'s low input is not `0`.
 
-**Impact.** Statement true; we prove the persistence claim stated after Definition 3 directly (`persist`).
+**Impact.** Statement true; the proof is fixed (`lemma5`).
 
-**Repair.** Everyone alive at `m + 1` has seen `w`. The count `t − d` there also needs `d` to count processes
-disjoint from the `t − d` carriers; we show this. (`persist`)
+**Repair.** All inputs equal to `i`'s input works.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -88,6 +83,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
   per-process decision times on the same adversary. Last-decider domination (Def. 6) compares the times
   by which all correct processes have decided.
 
+**Reading of Theorem 3.** The proof writes `K_j ∃correct(w)` ("`j` knows that `w` will persist") and then uses it as
+"some correct process knows `w`", a consequence that needs its own argument. We prove the persistence claim stated
+after Definition 3 directly (`persist`): everyone alive at `m + 1` has seen `w`. The count `t − d` there also needs
+`d` to count processes disjoint from the `t − d` carriers; we show this.
+
 **Main results in Lean.** Namespace `Podc.UnbeatableSetConsensus`.
 
 | Paper | Lean | File |
@@ -109,7 +109,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 Other files: `Model.lean` (definitions), `Views.lean` (basic facts about views, hidden nodes and the
 locality lemma `sameView_of_agree`), `LastRound.lean` (the "changes" of round `m` in Lemma 1's proof).
 
-**Not formalized.** The topological proof of Lemma 1 (§B.1, Sperner) and Proposition 2. Conjecture 1. The
+**Not formalized.** The topological proof of Lemma 1 (§B.1, Sperner) and Proposition 2; we only observed that it has
+the same gap as the combinatorial proof: it assumes that `j_y` gets low values only from the `i_x`. Lemma 2 for `i`
+active only at `m − 1`: we use `i` alive at `m`, which is all that is needed. Conjecture 1. The
 `O(n log n)`-bit implementation (Lemma 6). The comparison of `u-Pmin[k]` with earlier protocols (Fig. 4).
 Remark 2, except that domination implies last-decider domination.
 

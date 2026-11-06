@@ -4,65 +4,59 @@ Maria A. Schett, George Danezis. *Embedding a Deterministic BFT Protocol in a Bl
 [10.1145/3465084.3467930](https://doi.org/10.1145/3465084.3467930). Formalized version: arXiv
 [2102.09594](https://arxiv.org/abs/2102.09594) v2 (full version with appendix); numbering follows it.
 
-**Verdict: 🚨 Headline claim false.** The interpreted block DAG does not give an authenticated *perfect*
-link: a Byzantine server that equivocates makes a correct server receive the same message twice. So
-Lemma 4.3 (2) (no duplication) is false. Theorem 5.1 (every property that `P` has over reliable links is
-kept) is false too: some deterministic `P` relies on no duplication. Everything else checks out: the block
-DAG lemmas of Sections 2–3, gossip safety and liveness, the order-independence of the interpretation
-(Lemma 4.2), reliable delivery and authenticity. We prove a repaired Theorem 5.1: it holds for every
-property that `P` keeps over authenticated links that may duplicate messages of Byzantine senders.
+**Verdict: ⚠️ Weakened.** The paper's main theorem, that the embedding keeps all properties of any
+deterministic BFT protocol, fails as printed: an equivocating Byzantine server makes a correct server receive
+the same message twice, so the interpreted block DAG does not give an authenticated *perfect* link. We prove a
+repaired Theorem 5.1 for every property that `P` keeps over authenticated links that may duplicate messages of
+Byzantine senders; the transfer of arbitrary liveness properties was not checked. Everything else we checked
+holds: the block DAG lemmas of Sections 2–3, gossip safety and liveness, the order-independence of the
+interpretation (Lemma 4.2), reliable delivery and authenticity.
 
 ## Mistakes in the paper
 
-### 🚨 Theorem 5.1 (property transfer to the block DAG)
-Theorem 5.1 is false: a deterministic protocol that relies on the promised no-duplication property breaks
-when embedded, because an equivocating Byzantine server makes a correct server receive the same message
-twice (`Counterexample.theorem_5_1_false`).
-
-**Impact.** Sinks the headline as stated. What holds is a repaired Theorem 5.1 for every property that `P`
-keeps over authenticated links that may duplicate messages of Byzantine senders (`theorem_5_1_repaired`).
-The paper's demonstration protocol (Algorithm 4, Bracha's broadcast) counts *senders*, so it is not affected.
-
-**Details.** Theorem 5.1 transfers properties that `P` has "using the reliable point-to-point link
-abstraction", and Lemma 4.3 says this abstraction is Cachin et al.'s authenticated perfect link, no
-duplication included. A protocol written for that abstraction may rely on no duplication. Our example is the
-deterministic protocol "echo once when requested; deliver after `2f+1 = 3` received messages". Its messages
-are unique and carry their sender. Over authenticated perfect links it satisfies "if a correct server
-delivers, then two different correct servers were requested". In the run of the Lemma 4.3 (2) item below,
-only server 0 is requested. Yet `shim(P)` at server 1 delivers, since it counts 0's echo once and 3's echo
-twice. The variant that echoes on *every* request, as the paper's convention "messages triggered by requests
-do not depend on the state" requires, fails the same way (`Counterexample.theorem_5_1_false_stateless`).
-
-*Borderline.* Section 4 says in passing that a BFT protocol "can deal with duplicate messages". If "BFT
-protocol" is read as *assuming* that, the theorem survives in the form we prove (`theorem_5_1_repaired`), and
-the verdict would drop to ❌ (because of the false Lemma 4.3 (2)). We keep 🚨 because Lemma 4.3 and
-Theorem 5.1 explicitly promise a link with no duplication.
-
-**Repair.** Dedup per receiver chain in Algorithm 2, or restrict Theorem 5.1 to properties that survive
-Byzantine duplicates (`theorem_5_1_repaired`).
-
-### ❌ Lemma 4.3 (2) (no duplication)
+### ⚠️ Lemma 4.3 (2) and Theorem 5.1 (no duplication and property transfer)
 Lemma 4.3 (2) is false: with `n = 4`, `f = 1`, a Byzantine server that equivocates with two genesis blocks
-makes the correct server 1 receive the same message `(3 → 1, ECHO)` twice (`Counterexample.lemma_4_3_2_false`).
+makes the correct server 1 receive the same message `(3 → 1, ECHO)` twice (`Counterexample.lemma_4_3_2_false`),
+so Theorem 5.1 fails for a deterministic protocol that relies on the promised no duplication
+(`Counterexample.theorem_5_1_false`).
 
-**Impact.** The interpreted block DAG does not give an authenticated *perfect* link, which breaks
-Theorem 5.1 (above). No duplication does hold for correct senders when messages are unique
-(`lemma_4_3_2_correct`, `trace_noDupCorrect`).
+**Impact.** The interpreted block DAG does not give an authenticated *perfect* link, and Theorem 5.1 does not
+hold as stated. What holds is a repaired Theorem 5.1 for every property that `P` keeps over authenticated links
+that may duplicate messages of Byzantine senders (`theorem_5_1_repaired`). No duplication does hold for correct
+senders when messages are unique (`lemma_4_3_2_correct`, `trace_noDupCorrect`). The paper's demonstration
+protocol (Algorithm 4, Bracha's broadcast) counts *senders*, so it is not affected.
 
-**Details.** The proof says a correct `s₂` can receive the same message `m` twice only by referencing the
-same block twice, which Lemma A.6 forbids. But two *different* blocks can trigger the same `m`. Take
-`n = 4`, `f = 1`, with server 3 Byzantine. Server 3 builds two genesis blocks `Bb₁` and `Bb₂` that differ
+**Details.** The proof of Lemma 4.3 (2) says a correct `s₂` can receive the same message `m` twice only by
+referencing the same block twice, which Lemma A.6 forbids. But two *different* blocks can trigger the same `m`.
+Take `n = 4`, `f = 1`, with server 3 Byzantine. Server 3 builds two genesis blocks `Bb₁` and `Bb₂` that differ
 only in their payload. Both are valid, and this is exactly the equivocation of Example 3.5 / Fig. 3. Each
 triggers the protocol message `ECHO` from 3 to 1. The correct server 1 follows Algorithm 1: it references
 `Bb₁` in its first block `D₁` and, after receiving `Bb₂`, references `Bb₂` in its second block `D₂`. In the
 interpretation, `1` receives the message `(3 → 1, ECHO)` at `D₁` and again at `D₂`. The 12-event run is a
 checked run of Algorithms 1 and 3.
 
-### Typos and slips
-- Definition 3.3 (iii) is under-specified (no verdict impact): "`s` considers all `B' ∈ B.preds` valid" must
-  mean "has already *inserted* them"; under the recursive reading ("would consider valid") line 6 of
-  Algorithm 1 may insert a block before its predecessor, and Lemma A.5 (`G` is a block DAG) fails. We use the
-  reading under which Lemma A.5 holds (`lemma_A_5`).
+Theorem 5.1 transfers properties that `P` has "using the reliable point-to-point link abstraction", and
+Lemma 4.3 says this abstraction is Cachin et al.'s authenticated perfect link, no duplication included. A
+protocol written for that abstraction may rely on no duplication. Our example is the deterministic protocol
+"echo once when requested; deliver after `2f+1 = 3` received messages". Its messages are unique and carry their
+sender. Over authenticated perfect links it satisfies "if a correct server delivers, then two different correct
+servers were requested". In the run above, only server 0 is requested. Yet `shim(P)` at server 1 delivers,
+since it counts 0's echo once and 3's echo twice. The variant that echoes on *every* request, as the paper's
+convention "messages triggered by requests do not depend on the state" requires, fails the same way
+(`Counterexample.theorem_5_1_false_stateless`).
+
+Section 4 says in passing that a BFT protocol "can deal with duplicate messages". If "BFT protocol" is read as
+*assuming* that, the theorem survives in the form we prove (`theorem_5_1_repaired`). But Lemma 4.3 and
+Theorem 5.1 explicitly promise a link with no duplication.
+
+**Repair.** Restrict Theorem 5.1 to properties that survive Byzantine duplicates (`theorem_5_1_repaired`). Dedup
+per receiver chain in Algorithm 2 is an alternative, which we did not prove.
+
+### ✏️ Slips
+- Definition 3.3 (iii) is under-specified: "`s` considers all `B' ∈ B.preds` valid" must mean "has already
+  *inserted* them"; under the recursive reading ("would consider valid") line 6 of Algorithm 1 may insert a
+  block before its predecessor, and Lemma A.5 (`G` is a block DAG) fails. We use the reading under which
+  Lemma A.5 holds (`lemma_A_5`).
 - Line 6 of Algorithm 2 *assigns* `B.Ms[out, ℓⱼ] ≔ B.PIs[ℓⱼ].rⱼ` inside the loop over `B.rs`: with two
   requests for one label, the messages of the first request are lost. We accumulate them.
 - In Lemma A.7, "any `G ⩾ G_s ∪ G_{s'}`" should be the union itself (or a block DAG containing it).

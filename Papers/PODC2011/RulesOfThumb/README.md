@@ -5,21 +5,28 @@ PODC 2011. DOI [10.1145/1993806.1993870](https://doi.org/10.1145/1993806.1993870
 arXiv [0910.1585](https://arxiv.org/abs/0910.1585) v2 (*Distributed Computing with Adaptive Heuristics*,
 the ICS 2011 / full version); numbering follows it.
 
-**Verdict: ❌ False claim.** The main impossibility result, Theorem 4.1, is true for deterministic,
-self-independent, stationary bounded-recall reaction functions (the version restated and proved in
-Appendix F) and for non-stationary 1-recall ones. Examples 4.2 and 4.3 are correct. The game-theoretic
-application, Corollary 5.2 (and Theorems 5.1 and B.2), is false as stated: with "consistent tie-breaking",
-a pure Nash equilibrium need not be a stable state of best-response dynamics. For non-stationary reaction
-functions the paper's proof has a gap; we repair it for 1-recall, and for `k ≥ 2` it remains open.
+**Verdict: ⚠️ Weakened.** The main impossibility result, Theorem 4.1, is true for deterministic, self-independent,
+stationary bounded-recall reaction functions (the version restated and proved in Appendix F) and for non-stationary
+1-recall ones, and Examples 4.2 and 4.3 are correct. Its announced extensions to randomized reaction functions and
+to non-stationary `k`-recall with `k ≥ 2` are not established, and the game-theoretic application (Theorem 5.1,
+Corollary 5.2, Theorem B.2) holds only for equilibria that are fixed points of the best-response map. The other
+applications of Section 5 and Sections 6–8 were not checked.
 
 ## Mistakes in the paper
 
-### ❌ Corollary 5.2, Theorem B.2 and Theorem 5.1 (best-response dynamics)
+### ❌ Theorem 4.1 for randomized reaction functions (not formalized)
+The main text and the end of Appendix B.1 say Theorem 4.1 also holds for randomized reaction functions, but the
+paper never defines convergence of randomized dynamics (every realization, or almost surely) and gives no proof.
+
+**Impact.** The claim is neither proved nor refuted: the proof in Appendix F treats deterministic functions only,
+and nothing we proved covers the randomized case. We formalize deterministic reaction functions.
+
+### ⚠️ Corollary 5.2, Theorem B.2 and Theorem 5.1 (best-response dynamics)
 With "consistent tie-breaking" a pure Nash equilibrium need not be a stable state, so a 2×2 game with
 two pure equilibria, one weakly dominated, has best-response dynamics that always converge
 (`corollary_5_2_false`, `theorem_5_1_false`).
 
-**Impact.** The game-theoretic application is false as stated; Theorem 4.1 is unaffected. What is true,
+**Impact.** The game-theoretic application fails as stated; Theorem 4.1 is unaffected. What is true,
 and what we prove, is the statement for two equilibria that are fixed points of the best-response map;
 this is automatic when best responses are unique (`corollary_5_2`, `corollary_5_2_of_unique`).
 
@@ -56,25 +63,15 @@ that absorption property for 1-recall functions with arbitrary action spaces: a 
 infinitely often could be made to oscillate fairly (`absorbingAfter_of_oneRecall`,
 `theorem_4_1_oneRecall`).
 
-### ⚠️ Section 3, "stable state" (unfair schedules)
-Section 3 calls `a` a stable state when some `(s⁰, σ)`-dynamics converges to `a`, for a schedule `σ`
-that need not be fair, and with this literal reading Theorem 4.1 is false (`stableState_literal_reading`).
+### ✏️ Slips
+- Section 3, "stable state" (unfair schedules). Section 3 calls `a` a stable state when some `(s⁰, σ)`-dynamics
+  converges to `a`, for a schedule `σ` that need not be fair, and with this literal reading Theorem 4.1 is false
+  (`stableState_literal_reading`). Take the system in which every node always plays `x`. It is historyless,
+  self-independent and convergent, but the unfair dynamics that only ever activates node 0 converges to `(x,y)`.
+  "Stable state" must mean the limit of a *fair* dynamics, as the paper's remark that in the historyless case the
+  stable states are exactly the fixed points shows; we use it.
 
-**Impact.** An under-specified definition with evident intent: "stable state" must mean the limit of a
-*fair* dynamics, as the paper's remark that in the historyless case the stable states are exactly the
-fixed points shows; we use it.
-
-**Details.** Take the system in which every node always plays `x`. It is historyless, self-independent
-and convergent, but the unfair dynamics that only ever activates node 0 converges to `(x,y)`.
-
-### ⚠️ Theorem 4.1 for randomized reaction functions (not formalized)
-The main text says Theorem 4.1 also holds for randomized reaction functions, but the paper never defines
-convergence of randomized dynamics (every realization, or almost surely).
-
-**Impact.** An under-specified, unestablished claim: the proof in Appendix F treats deterministic
-functions only. We formalize deterministic reaction functions.
-
-### Typos and slips
+### Typos
 - Section 3 types `f(i,t) : H_t → Δ(A_i)`, but the dynamics applies `f(i,w+1)` to `s⁰ ∈ H_w`. The input is
   `H_{t−1}`.
 - Section 3 writes `s(t) = a` for a history `s(t)`; it means the last profile.
@@ -87,12 +84,12 @@ functions only. We formalize deterministic reaction functions.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Appendix F.6–F.7 (act-and-tell translation)
+### 🔧 Appendix F.6–F.7 (act-and-tell translation)
 The act-and-tell translation lets `W` reveal an empty set of reactions, and the "number of time steps"
 argument then counts steps with an empty activation set, which Section 3 forbids.
 
-**Impact.** Repaired: we only allow `W` when something is pending, and the extension lemma still holds
-(`System.exists_bivalent_after`).
+**Impact.** One condition closes the gap: we only allow `W` when something is pending, and the extension lemma
+still holds (`System.exists_bivalent_after`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -153,7 +150,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Sections 6–8: `r`-convergence and snakes in boxes (Theorem 6.2), the communication and computational
   complexity results (Theorems 7.1, 7.2), and no-regret dynamics.
 * The other applications of Section 5 (circuits, diffusion, BGP, congestion control) and the
-  consensus results of Appendix G.
+  consensus results of Appendix G. For these applications the "equilibria" must be stable states of the
+  specific dynamics; we noted this caveat but did not investigate it.
+* Corollary 5.2 for the bounded-recall best-response dynamics of [35]: only the historyless best-response
+  case is formalized.
 
 **Trust.**
 * No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.

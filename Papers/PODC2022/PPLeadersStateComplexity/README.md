@@ -4,36 +4,14 @@ Jérôme Leroux. *State Complexity of Protocols With Leaders.* PODC 2022. DOI
 [10.1145/3519270.3538421](https://doi.org/10.1145/3519270.3538421). Formalized version: arXiv
 [2109.15171](https://arxiv.org/abs/2109.15171) **v2** (March 2022); numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** The main result holds as stated. Theorem 4.3 is proved for every protocol of finite
-interaction-width: `n ≤ (4 + 4·width + 2|ρ_L|)^(|P|^((|P|+2)²))`. Corollary 4.4, the `Ω((log log n)^h)` lower bound
-for `h < 1/2`, and Examples 4.1 and 4.2 are proved too. Lemmas 5.2–5.4, 6.2, 7.1, 7.2 and Theorem 6.1 are proved as
-stated. Two proofs have genuine gaps, in Lemma 6.2 and Lemma 7.3. Lemma 7.3 is proved only with a weaker constant
-(the weak Pottier bound instead of Pottier's), but that constant is still enough for Theorem 4.3's bound.
+**Verdict: 🛠️ Hard fix.** The main result holds as printed: Theorem 4.3 is proved for every protocol of finite
+interaction-width, `n ≤ (4 + 4·width + 2|ρ_L|)^(|P|^((|P|+2)²))`, and so are Corollary 4.4 (the `Ω((log log n)^h)`
+lower bound for `h < 1/2`) and Examples 4.1 and 4.2. The proof of Lemma 7.3, on which Section 8 rests, is broken: it
+took a new argument, which gives Lemma 7.3 only with a weaker constant (the weak Pottier bound instead of Pottier's),
+and re-derived constants in Section 8, which are still enough for Theorem 4.3's bound. Lemmas 5.2–5.4, 6.2, 7.1, 7.2
+and Theorem 6.1 are proved as stated, Lemma 6.2 with a short repair of its proof.
 
 ## Mistakes in the paper
-
-No mistakes in the statements.
-
-### Typos and slips
-Slips in the proof of Theorem 4.3 (Section 8), all harmless:
-- The decomposition of a path into a multicycle `Θ` and an elementary path `π` gives `#Θ(e) ≥ ℓ − 1` (or
-  `≥ ℓ − |S|` for a short path), not `#Θ(e) ≥ ℓ`. There is ample slack.
-- Theorem 6.1 is applied to `P' = P \ {i}`, so it gives `(d−1)‖α‖∞ ≤ b`, not `d‖α‖∞ ≤ b`. The weaker bound
-  suffices, because the sum is over `R' ⊆ P'`.
-- "`Δ(Θ)(p) = μ(p) − η'(p) − Δ(π)(p)`" should read `α'(p)` instead of `η'(p)`. The following estimate only works
-  with `α'`.
-- "`α'(i) = ρ_L(i) + (n−1) − Δ(σ)(i)`" has the wrong sign; the bound `≥ n − h` holds anyway.
-- Lemma 7.3 is used with its hypothesis `‖T‖∞ > 0` without checking it. We avoid the issue with `M = 1 + ‖T‖∞`.
-- The final estimate claims `r ≤ d^(d²+d+3)`. The factors `2(d−1)^(d−1) ≤ d^d`, `1+(2+(d−1)^(d−1))^d ≤ d^(d²)` and
-  `5d²+2d+4 ≤ d^5` only give `d^(d²+d+5)`. That is still `≤ d^((d+2)²)`, so the theorem is unaffected.
-
-Typos:
-- Section 8 writes "`d = |Q|`" (meaning `|P|`), "the `(n > i)` predicate" (meaning `(i ≥ n)`) and "a cycle `θ` on
-  `x|_Q`" (meaning `α|_Q`).
-- The proof of Lemma 7.3 writes `Δ(Δ)` for `Δ(Θ)` and swaps `α'`/`β'` in one sentence.
-- Pottier's decomposition is a multiset, not a "set `H`".
-
-## Proof gaps (statements true)
 
 ### 🛠️ Lemma 7.3 (Pottier step)
 The proof reads the variables `β(a)` of system (1), one per *displacement* `a ∈ A` of a simple cycle, as counts
@@ -41,7 +19,7 @@ The proof reads the variables `β(a)` of system (1), one per *displacement* `a �
 factor `|S|`.
 
 **Impact.** Proved with a weaker constant (the weak Pottier bound), which is still enough for Theorem 4.3's bound
-(`lemma_7_3`). We do not know whether Lemma 7.3 holds with the paper's constant.
+(`lemma_7_3`). The lemma with the paper's constant is neither proved nor refuted (see **Not formalized.**).
 
 **Details.** The proof reads `β(e)` for edges ("`Σ_H β(e) = #Θ(e)`") and builds `Θ'` with "`#Θ' = β'`". That is a
 type error: different cycles with the same displacement are merged, so the system no longer knows which edges a
@@ -54,7 +32,24 @@ constant becomes `K = (2|S|M)^(2^d−1)`, with `k > ‖Δ(Θ)|_Q‖₁·|S|·M·
 through with this constant (`ℓ = h^(2^d+2d+4)`, `k = d·h^(2^d+1)`, threshold `h^(2d+5)·ℓ`). The final exponent
 still fits under `|P|^((|P|+2)²)`, so Theorem 4.3 is unaffected. (`lemma_7_3`)
 
-### 🛠️ Lemma 6.2 (bound on the restricted reachability set)
+### ✏️ Slips
+- Section 8: Theorem 6.1 is applied to `P' = P \ {i}`, so it gives `(d−1)‖α‖∞ ≤ b`, not `d‖α‖∞ ≤ b`. The weaker bound
+  suffices, because the sum is over `R' ⊆ P'`.
+- Section 8: "`Δ(Θ)(p) = μ(p) − η'(p) − Δ(π)(p)`" should read `α'(p)` instead of `η'(p)`. The following estimate only
+  works with `α'`.
+- Section 8: "`α'(i) = ρ_L(i) + (n−1) − Δ(σ)(i)`" has the wrong sign; the bound `≥ n − h` holds anyway.
+- Section 8: Lemma 7.3 is used with its hypothesis `‖T‖∞ > 0` without checking it. We avoid the issue with
+  `M = 1 + ‖T‖∞`.
+- Lemma 7.3's proof: Pottier's decomposition is a multiset, not a "set `H`".
+
+### Typos
+- Section 8 writes "`d = |Q|`" (meaning `|P|`), "the `(n > i)` predicate" (meaning `(i ≥ n)`) and "a cycle `θ` on
+  `x|_Q`" (meaning `α|_Q`).
+- The proof of Lemma 7.3 writes `Δ(Δ)` for `Δ(Θ)` and swaps `α'`/`β'` in one sentence.
+
+## Proof gaps (statements true)
+
+### 🔧 Lemma 6.2 (bound on the restricted reachability set)
 In the case where every `β` reachable from `ρ_n` has `β(p) < λ_{n+1}` on `R_n`, the proof asserts that the
 `T|_{Q'}`-reachability set of `ρ_n|_{Q'}` has at most `sλ_{n+1}^{d−n}` elements, but the case hypothesis is about
 the full net `T`.
@@ -67,6 +62,18 @@ does not apply directly.
 **Repair.** Suppose an `R_n`-place reaches `λ_{n+1}` in `T|_{Q'}`. A shortest such path stays in a set of at
 most `sλ_{n+1}^{d−n}` configurations, so it is that short. It then lifts to `T` by Lemma 5.2, since
 `ρ_n(p_j) ≥ λ_n ≥ sλ_{n+1}^{d−n}‖T‖`. That contradicts the case hypothesis. (`lemma_6_2_step`)
+
+### 🔧 Section 8, "`#Θ(e) ≥ ℓ` for every `e`"
+The decomposition of a path into a multicycle `Θ` and an elementary path `π` gives `#Θ(e) ≥ ℓ − 1` (or `≥ ℓ − |S|`
+for a short path), not `#Θ(e) ≥ ℓ`.
+
+**Impact.** One constant changes, and the ample slack of `ℓ` over `k` absorbs it (`Sec8.main_bound`).
+
+### 🔧 Section 8, final estimate
+The proof claims `r ≤ d^(d²+d+3)`, but the factors `2(d−1)^(d−1) ≤ d^d`, `1+(2+(d−1)^(d−1))^d ≤ d^(d²)` and
+`5d²+2d+4 ≤ d^5` only give `d^(d²+d+5)`.
+
+**Impact.** That is still `≤ d^((d+2)²)`, so the theorem is unaffected (`Arith.final`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -106,7 +113,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Lemma 7.2 | `lemma_7_2` | `ControlStates.lean` |
 | Lemma 7.3 (weak Pottier constant) | `lemma_7_3` | `ControlStates.lean` |
 
-**Not formalized.** Lemma 7.3 with Pottier's constant `(1+2|S|‖T‖)^(d(d+1))` (Pottier's theorem itself), and Remark 1
+**Not formalized.** Lemma 7.3 with Pottier's constant `(1+2|S|‖T‖)^(d(d+1))` (Pottier's theorem itself): we do not
+know whether the lemma holds with that constant. Also Remark 1
 (Presburger characterization with leaders, which the paper leaves open). The cited upper bound of Blondin–Esparza–Jaax
 is not formalized.
 

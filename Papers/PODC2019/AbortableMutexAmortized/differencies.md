@@ -55,16 +55,16 @@ formalized from the full version arXiv 1809.04561v1 (numbering as there).
   Typos fixed: in `I7` "`*mynode_p`" is `*mynode_{q_i}`; in `I9` "`go_{q₁}`" is `&go_{q₁}`.
   `I4` ("`N = {a₀} ∪ {mynode_p}`") is read as: every node is `a₀` or some `mynode_p` (with
   `|N| = n + 1` this forces `mynode` injective and `a₀` nobody's node, `cover_inj`).
-- **Proof gap in Theorem 4.1 (🛠️).** `I` is *not inductive*: `paperInv_not_inductive` gives a
+- **Proof gap in Theorem 4.1 (🔧).** `I` is *not inductive*: `paperInv_not_inductive` gives a
   configuration satisfying `I` whose successor (line 3, case 3: splicing an aborted predecessor)
   satisfies no instance of `I` (`I7` fails for the new predecessor, whose node still holds the
   spliced process's go-address). The appendix's "the rest of the invariants continue to hold
   since they are unaffected" misses this. Repair: the extra conjunct `Loc.x1` ("an aborted queue
   member at line 1, 10 or 11 does not have its own go-address in its predecessor node"); with it
   the invariant is inductive (`inv_step`). Since `I` itself holds in all reachable configurations,
-  the statement of Theorem 4.1 is true (rule R1: a proof gap → 🛠️).
+  the statement of Theorem 4.1 is true.
 - **Corollary 4.1.1** (`mutual_exclusion`): as stated.
-- **Theorem 4.2 (AFCFS) — false as stated (⚠️, borderline ❌).** `afcfs_literal_false`: a run in which
+- **Theorem 4.2 (AFCFS) — false as stated (🔧).** `afcfs_literal_false`: a run in which
   `p` completes the doorway of its only attempt, aborts it (lines 9, 10) and never returns; `p'`
   begins its first passage afterwards, splices out `p`'s node and enters the CS. `p`'s passage
   (one aborted attempt, the last one: `j = k` in the passage definition) A-precedes `p'`'s, and `p'`
@@ -73,23 +73,22 @@ formalized from the full version arXiv 1809.04561v1 (numbering as there).
   forever). Corrected statement proved (`theorem_4_2`): `p'` does not enter the CS before `p`
   enters the CS **or the Abort section**. The definition of "attempt", "passage", "begins"
   is encoded semantically (`PassageStart`: `p'` in the Remainder, and its last step, if any, was
-  an Exit step at line 7 or 8); the doorway completion is "`p` at line 3". Classification: the
+  an Exit step at line 7 or 8); the doorway completion is "`p` at line 3". The
   missing case ("unless `p`'s passage ends with an abort") is evident from the airline analogy
   (people behind you may take your spot when you leave) and the proof (which only uses that `p`
-  stays ahead in `Q` while it is there); the fix is local, so R3 → ⚠️. Borderline because AFCFS
-  is the paper's own new definition and is listed in the abstract; we judged it a definitional
-  slip, not a false claim about the algorithm. The counterexample needs the strict reading of
+  stays ahead in `Q` while it is there); the fix is local. AFCFS is the paper's own new definition
+  and is listed in the abstract; the failure lies in the definition, not in the algorithm. The
+  counterexample needs the strict reading of
   "`p'` does not enter the CS before `p` enters the CS" (`p'` must wait for an entry of `p` that never
   happens). Under the weaker reading "if both enter, `p` enters first", the literal definition is
-  already the corrected one and Theorem 4.2 holds as stated. This ambiguity is a further reason
-  against ❌. On the sidestep (line 9 reads `token`, then line 7): `theorem_4_2` counts line 9 as
+  already the corrected one and Theorem 4.2 holds as stated. On the sidestep (line 9 reads `token`, then line 7): `theorem_4_2` counts line 9 as
   "entering the Abort section". For a successful last attempt that sidesteps, it therefore only
   gives "`p` reached line 9 by the time `p'` is at line 7", not "`p` reached line 7 first". This is
   harmless because the sidestep is a degenerate CS entry by the paper's own convention (`I10`).
-- **Definition 4.1 / Lemma 4.4 — `f` undefined at line 11 (⚠️).** `f` in eq. (1) has no value for
+- **Definition 4.1 / Lemma 4.4 — `f` undefined at line 11 (🔧).** `f` in eq. (1) has no value for
   `PC = 11`, but `q_m` can be at line 11 (aborted, node marked, about to wake its successor), and
   the proof of Lemma 4.4 itself lists `11` among the cases. We set `f(11) = 4`, the only value
-  between `f(10) = 5` and `f(1) = 3` (R3: missing case with evident fix).
+  between `f(10) = 5` and `f(1) = 3`.
 - **Lemma 4.3** (`lemma_4_3`): as stated (for `p` in the Try section or CS; `p ∈ Q` follows from
   the invariant).
 - **Lemma 4.4** (`lemma_4_4_part1`, `lemma_4_4_part2`): we exclude an *aborting step of `p`
@@ -110,7 +109,7 @@ formalized from the full version arXiv 1809.04561v1 (numbering as there).
 - **Lemma 5.2** (`lemma_5_2`): exactly the paper's constants (1 for lines 1, 2, 3, 7, 9; 2 for
   8, 10, 11; 0 for 4, 5, 6), for every placement of nodes/`tail`, `go_p` local to `p`, and every
   configuration satisfying the invariant.
-- **Lemma 5.3 — proof slip (🛠️-level, statement true).** The statement only claims "a constant";
+- **Lemma 5.3 — proof gap (🔧, statement true).** The statement only claims "a constant";
   the proof claims `α_CC(8), α_CC(11) ≤ 4`, but the write `*v ← true` also invalidates `go_q` in
   `q`'s cache, raising `1{notcached(q)}` too: the true bound is 5 (`lemma_5_3`, `boundC`; our
   exhaustive check for `n = 2` attains 5). Also the proof's "`α_CC(3), α_CC(7), α_CC(11) ≤ 1`"

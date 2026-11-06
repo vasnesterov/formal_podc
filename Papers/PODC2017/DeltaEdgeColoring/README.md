@@ -5,30 +5,45 @@ Vertex-Coloring of Graphs with Bounded Diversity.* PODC 2017. DOI
 [10.1145/3087801.3087812](https://doi.org/10.1145/3087801.3087812). Formalized version: arXiv
 [1610.06759](https://arxiv.org/abs/1610.06759) v1 (full version with appendix); numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** The combinatorial correctness of the clique-decomposition colouring
+**Verdict: ⚠️ Weakened.** The combinatorial correctness of the clique-decomposition colouring
 (Lemmas 2.1–2.3, Theorems 2.4–2.6), its colour count `D^{x+1} S` (Theorem 3.2), Lemma 5.1, Theorem 5.2
-(`Δ + O(a)` colours) and Theorem 5.3 (`Δ + o(Δ)` colours when `a = o(Δ)`) all hold. The appendix proof of
-the `D^{x+1} S` bound of Theorem 3.2 does not work as written: its inductive step does not cover the
-first recursion step (`𝒜_2`), and with the parameter it states for that step the inequality is false.
-We prove the bound with a stronger invariant. It then holds for every `S ≥ 1` and needs no colour
-reduction.
+(`Δ + O(a)` colours) and Theorem 5.3 (`Δ + o(Δ)` colours when `a = o(Δ)`) all hold. But the last step of
+Theorem 5.4, which carries the abstract's polylogarithmic-time claim through Corollary 5.5, does not give the stated
+colour count, and it is not repaired. No running time was checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
+### ❌ Theorem 5.4, last stage of the proof
+The last stage colours subgraphs of in-degree `≤ Δ^{1/x}` and out-degree `≤ â^{1/x}` "with
+`Δ^{1/x} + â^{1/x} + 3` colours by Theorem 5.2", but Theorem 5.2 does not give that many colours.
 
-### Typos and slips
+**Impact.** The bound `(Δ^{1/x} + â^{1/x} + 3)^x` feeds Corollary 5.5's `Δ(1 + O(1/log Δ))` colours, and through it the
+polylogarithmic-time claim. Nothing about Theorem 5.4 is proved in Lean, so the step stands unrepaired.
+
+**Details.** Theorem 5.2 only gives `Δ' + O(a')` colours (`Δ' + (2+ε)a' − 1` with the paper's own procedure), and
+those subgraphs can have total degree up to `Δ^{1/x} + â^{1/x}`. So the exact constant `+3` in
+`(Δ^{1/x} + â^{1/x} + 3)^x` is not justified as written.
+
+### ✏️ Slips
+- Theorem 3.2 for `D = 1`: the proof assumes `D ≥ 2`, which the statement does not; `𝒜_1` produces up to
+  `⌊√S⌋⌈S/⌊√S⌋⌉` colours, e.g. 6 > 5 for `S = 5`. The graph is a disjoint union of cliques, and the `S` colours of
+  the statement are reached by the colour reduction the paper allows. Our `theorem_3_2` assumes `D ≥ 2`.
 - The (p,q)-clique-decomposition is defined with clique size "is `q`"; "at most `q`" is meant.
+
+### Typos
 - The proof of Lemma 2.3 (i) speaks of "a clique `Q` of `G'`" where a clique of `G_i` is meant.
+- The heading of Appendix B reads "Proof of Lemma 3.2"; there is no Lemma 3.2, and the proof is that of Theorem 3.2.
+- "See Theorem 5.1" before Theorem 5.4: there is no Theorem 5.1, and Lemma 5.1 is meant.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 3.2, colour bound (appendix proof, inductive step for `𝒜_2`)
+### 🔧 Theorem 3.2, colour bound (appendix proof, inductive step for `𝒜_2`)
 The inductive step's inequality `(D(t−1)+1)·D^{i+1}⌈S/t⌉ ≤ D^{i+2} S` is justified only for `i ≥ 2`, and for `𝒜_2`
 (`i = 1`, `t = ⌊√S⌋`) it fails for arbitrarily large `S` (`paper_inductive_step_fails`).
 
-**Impact.** Statement true; repaired with a stronger invariant, which gives the bound for every `S ≥ 1` without
-colour reduction (`theorem_3_2`, `theorem_3_2_algA`).
+**Impact.** The proof as written does not establish `𝒜_2`, but the parameter the same proof states for the running
+time closes the step. We prove the bound with a stronger invariant, for every `S ≥ 1` and without colour reduction
+(`theorem_3_2`, `theorem_3_2_algA`).
 
 **Details.** The proof builds `𝒜_{i+1}` from `𝒜_i` with `t = ⌊S^{1/(i+1)}⌋`. It uses only the induction hypothesis
 "`𝒜_i` uses `D^{i+1} S'` colours". Then it claims `(D(t−1)+1)·D^{i+1}⌈S/t⌉ ≤ D^{i+2} S` "for `S` larger than some
@@ -36,21 +51,13 @@ constant, since `(D−1)(S/t) > Dt` because `t = ⌊S^{1/(i+1)}⌋` and `i ≥ 2
 `t = ⌊√S⌋`, and the inequality fails for arbitrarily large `S`. For example, `D = 2`, `S = 31`, `t = 5` gives
 `9·4·7 = 252 > 248 = 8·31` (`paper_inductive_step_fails`). In the running-time part the proof uses a different
 parameter, `t = ⌊S^{1/(i+2)}⌋`. With that choice the step works for `S` above a constant (constant `S` is covered by
-§3's direct `D(S−1)+1`-colouring), so the gap is repairable from the paper itself, but the proof as written does not
-establish `𝒜_2`.
+§3's direct `D(S−1)+1`-colouring), so the gap is repairable from the paper itself.
 
 **Repair.** The bound is true for the actual algorithm. For `D ≥ 2`, the invariant
 `pal_j · (D·S_j − 1) ≤ D^j (D S − 1)` holds whenever every level uses some `t` with `t² ≤ S_cur`. Here `pal_j` is the
 number of subgraphs after `j` levels and `S_j` the current clique bound. So `𝒜_x` uses fewer than `D^{x+1}S`
 colours, for all `S ≥ 1`, with either choice of `t` and with no colour-reduction rounds (`theorem_3_2`,
 `theorem_3_2_algA`).
-
-### 🛠️ Theorem 3.2 for `D = 1` (base case `𝒜_1`)
-The proof assumes `D ≥ 2`, which the statement does not; for `D = 1`, `𝒜_1` produces up to
-`⌊√S⌋⌈S/⌊√S⌋⌉` colours, e.g. 6 > 5 for `S = 5`.
-
-**Impact.** Degenerate case (the graph is a disjoint union of cliques); the `S` colours of the statement are reached
-by the colour reduction the paper allows. Our `theorem_3_2` assumes `D ≥ 2`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -127,14 +134,8 @@ Supporting files:
 * All `Õ(·)` running times (Theorems 2.7, 3.1, 3.3, the time parts of 3.2, 4.1, 5.2–5.4) and the `log*`
   bookkeeping of §3. They are compositions of the black boxes' running times.
 * The §4 edge-connector algorithm itself; only its colour arithmetic is checked.
-* Theorem 5.4 and Corollary 5.5.
-
-**Remark (not formalized, no verdict impact).** In Theorem 5.4 the last stage colours subgraphs of
-in-degree `≤ Δ^{1/x}` and out-degree `≤ â^{1/x}` "with `Δ^{1/x} + â^{1/x} + 3` colours by Theorem 5.2". But
-Theorem 5.2 only gives `Δ' + O(a')` colours (`Δ' + (2+ε)a' − 1` with the paper's own procedure), and those
-subgraphs can have total degree up to `Δ^{1/x} + â^{1/x}`. So the exact constant `+3` in
-`(Δ^{1/x} + â^{1/x} + 3)^x` is not justified as written. Constant factors on `â^{1/x}` would only change
-constants in Corollary 5.5's analysis.
+* Theorem 5.4 and Corollary 5.5. Corollary 5.5 rests on Theorem 5.4. Constant factors on `â^{1/x}` would only change
+  constants in Corollary 5.5's analysis, but this was not formalized.
 
 **Trust.** No `sorry`, `axiom` or `native_decide`. All listed theorems use only `propext`, `Classical.choice`
 and `Quot.sound`. Hypotheses are shown satisfiable: the reduction colourer satisfies `IsDeltaColorer`,

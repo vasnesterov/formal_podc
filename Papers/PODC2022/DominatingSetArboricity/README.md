@@ -6,45 +6,38 @@ Formalized version: arXiv [2206.05174](https://arxiv.org/abs/2206.05174) v1 (ful
 appendix); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The main results hold:
-- the deterministic `(2α+1)(1+ε)`-approximation for weighted MDS (Theorem 1.1; Theorem 3.1 for unit weights);
-- the randomized `α + O(α/t)` approximation (Theorem 1.2);
-- the general-graph bound of Theorem 1.3;
-- the combinatorial reduction behind the lower bound (Theorem 1.4).
-
-No stated result is false outside degenerate corners (Lemma 4.6 at `λ = 1`, Theorem 1.1 at `α = 0`). Four places in the proofs need repair:
-- Theorem 1.3's arithmetic fails for large `k`; a different algorithm covers that regime.
-- The algorithm in the proof of Observation A.1 fails on `K₂`.
-- Lemma 4.6 is under-specified at `λ = 1`.
-- Lemma 4.7's bound for adaptive processes is not justified.
+**Verdict: 🔧 Easy fix.** The main results hold: the deterministic `(2α+1)(1+ε)`-approximation for weighted MDS
+(Theorem 1.1; Theorem 3.1 for unit weights), the randomized `α + O(α/t)` approximation (Theorem 1.2), the
+general-graph bound of Theorem 1.3 and the combinatorial reduction behind the lower bound (Theorem 1.4); the KMW bound
+itself is external and not checked. Apart from the slips below, no stated result is false. Three places in the proofs
+need local repairs: Theorem 1.3's arithmetic fails for large `k`, where a different algorithm covers that regime; the
+algorithm in the proof of Observation A.1 fails on `K₂`; and Lemma 4.7's bound for adaptive processes is not justified.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 4.6 at `λ = 1` (randomized extension)
-Read literally with `λ = 1` (the lemma only says "for `λ > 0`"), there are `⌈log_γ λ⁻¹⌉ = 0` phases, so `S'` is empty and `S ∪ S'` need not dominate, e.g. for a single vertex with `w = x = 1` and `S = ∅` (`lemma_4_6_false_lam_one`).
-
-**Impact.** Under-specified hypothesis: the lemma's input is "the output of Lemma 4.1", which forces `λ < 1`,
-but this is not stated. We assume `λ < 1`, which every application satisfies (`lemma_4_6_dominating`).
-
-### ⚠️ Lemma 4.1 and Theorem 1.1 at `α = 0`
-Lemma 4.1 and Theorem 1.1 need `α ≥ 1`: for `α = 0` the parameter `λ = 1/((2α+1)(1+ε))` violates `λ < 1/((α+1)(1+ε))`.
-
-**Impact.** Degenerate: arboricity-0 graphs are edgeless and the theorem is trivial there. We assume `α ≥ 1`.
-
-### Typos and slips
+### ✏️ Slips
+- Lemma 4.6 at `λ = 1`: the lemma only says "for `λ > 0`". Read literally with `λ = 1`, there are `⌈log_γ λ⁻¹⌉ = 0`
+  phases, so `S'` is empty and `S ∪ S'` need not dominate, e.g. for a single vertex with `w = x = 1` and `S = ∅`
+  (`lemma_4_6_false_lam_one`). The lemma's input is "the output of Lemma 4.1", which forces `λ < 1`, but this is not
+  stated. We assume `λ < 1`, which every application satisfies (`lemma_4_6_dominating`).
 - Lemma 4.6 writes `E[w_{S'}] = …` where `≤ …` is meant.
+- Lemma 4.1 and Theorem 1.1 need `α ≥ 1`: for `α = 0` the parameter `λ = 1/((2α+1)(1+ε))` violates
+  `λ < 1/((α+1)(1+ε))`. Arboricity-0 graphs are edgeless and the theorem is trivial there. We assume `α ≥ 1`.
 - The round bound `O(log(Δ/α)/ε)` should be `O(1 + log(Δ/α)/ε)`.
+
+### Typos
+- Section 3 reuses the symbol `λ` for `α/((2α+1)(1+ε))`, which differs from the `λ` of Section 4.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 1.3 (arithmetic for large `k`)
+### 🔧 Theorem 1.3 (arithmetic for large `k`)
 The proof uses Lemma 4.6 with `γ = Δ^{1/k}`, whose factor `γ(γ+1)⌈log_γ(Δ+1)⌉` is `≤ Δ^{1/k}(Δ^{1/k}+1)(k+1)` only if `(Δ+1)^k ≤ Δ^{k+1}` (and `γ > 1` needs `Δ ≥ 2`); for `Δ = k = 2`, `⌈log_{√2} 3⌉ = 4`, so the proof gives about 13.7 instead of the claimed 10.2 (`logb_gap`).
 
 **Impact.** Statement true: in the uncovered regime the claimed factor is at least `Δ + 1`, and the trivial
 one-round algorithm "every node picks a lightest node of `N⁺_v`" achieves `Δ + 1` (`claimed_factor_ge`,
 `trivial_approx`; combined statement `theorem_1_3_full`).
 
-### 🛠️ Observation A.1 (the algorithm of the proof fails on `K₂`)
+### 🔧 Observation A.1 (the algorithm of the proof fails on `K₂`)
 The algorithm of the proof, "take all non-leaf nodes" (also stated in the introduction for trees), outputs nothing on a single edge `K₂`, since both nodes are leaves (`obsA1_proof_alg_fails_K2`).
 
 **Impact.** Statement true: the observation claims only that *some* single-round 3-approximation exists on
@@ -56,7 +49,7 @@ graphs of arboricity 1 (`observation_A_1_fixed`).
 parent/grandparent charging then gives the factor 3. It needs only an orientation of out-degree ≤ 1, so
 pseudoforests are covered too.
 
-### 🛠️ Lemma 4.7 (adaptive degrees)
+### 🔧 Lemma 4.7 (adaptive degrees)
 The proof bounds `E[c_v]` via "the sequence `d_1 ≥ … ≥ d_r` that maximizes `E[c_v]`", but the `d_i` are random and depend on earlier coin flips, and the proof does not explain why a bound for every fixed sequence bounds the expectation.
 
 **Impact.** Statement true; a standard argument closes the gap, since the coins are fresh in every iteration
@@ -64,6 +57,7 @@ The proof bounds `E[c_v]` via "the sequence `d_1 ≥ … ≥ d_r` that maximizes
 
 **Repair.** We prove Lemmas 4.7 and 4.8 together by backward induction with the potential
 `γ ∑_{v undominated} x_v (p_i d_v + γ)`, using `(1-p)^d (1+pd) ≤ 1`.
+
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

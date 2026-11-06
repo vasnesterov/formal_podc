@@ -7,21 +7,23 @@ the later write-up of the same results, V. Bushkov and R. Guerraoui, *Liveness i
 (Euro-TM book chapter, 20 pages), called "the chapter" below. Its Theorem 1, Lemma 1 and Theorem 2 are
 the PODC ones.
 
-**Verdict: ⚠️ Minor statement issues.** Theorem 1, Lemma 1 and Theorem 2 hold in the model the paper
-intends, in all three fault-prone systems. They even hold with plain serializability, as the
-introduction claims. Read literally, the PODC formal framework makes them false: a TM that never answers
-satisfies its definitions of opacity and local progress vacuously. Separately, the proof of the
-crash-free case had a gap; a new schedule repairs it.
+**Verdict: 🛠️ Hard fix.** Theorem 1, Lemma 1 and Theorem 2 hold in the model the paper intends, in all three
+fault-prone systems, and even with plain serializability, as the introduction claims. Read literally, the PODC
+formal framework makes them false, because a TM that never answers satisfies its definitions of opacity and local
+progress vacuously, so the framework had to be redesigned, and the proof of the crash-free case had a gap that a
+new schedule repairs. Theorem 3 (the automaton `F_gp`) and finite value sets were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ §2.2–2.3 (the formal framework; Theorem 1, Lemma 1, Theorem 2 read literally)
+### 🛠️ §2.2–2.3 and Definition 3 (the formal framework; Theorem 1, Lemma 1, Theorem 2 read literally)
 Read literally, the PODC framework does not force a TM to answer, so the *silent* TM, which accepts
 one invocation per process and never responds, ensures local progress and opacity in every
 fault-prone system, contradicting Theorem 1 (`PodcModel.silent_ensures`).
 
-**Impact.** Implied assumption with evident intent: in the model the paper intends (the chapter's
-step model) Theorem 1, Lemma 1 and Theorem 2 hold (`theorem_1`, `lemma_1`, `theorem_2`).
+**Impact.** In the model the paper intends (the chapter's step model) Theorem 1, Lemma 1 and Theorem 2 hold
+(`theorem_1`, `lemma_1`, `theorem_2`). The missing condition cannot be added as an assumption to the printed
+model, and always answering would exclude the blocking TMs the paper discusses (the global lock), so the
+framework has to change.
 
 **Details.** In §2.2 a TM is an I/O automaton over invocation and response events. It has no
 internal steps and no fairness. §2.3 says a process crashes in an infinite history iff its
@@ -38,24 +40,24 @@ analogue of wait-freedom).
 takes finitely many steps, and a process that keeps taking steps in an operation that never
 returns is correct. We prove the results in that model (`theorem_1`, `lemma_1`, `theorem_2`).
 
-### ⚠️ Theorem 1 (degenerate systems)
-Theorem 1 says "for every fault-prone system" with no restriction, but it fails with one process,
-with no t-variable, or with a single value.
+### 🔧 §2.2 (well-formedness `H|p_k ∈ Σ_k^∞`)
+§2.2 requires `H|p_k ∈ Σ_k^∞` for every history of a TM, but histories are prefix-closed, so this forbids
+accepting any invocation.
 
-**Impact.** Degenerate cases; we assume two processes, a t-variable `x` and infinitely many values.
+**Impact.** One clause in one definition fixes it; in the step model well-formedness holds by construction.
 
-**Details.** In each case a TM that answers every operation immediately from a single store and
-never aborts is opaque and ensures local progress. The paper's proof writes `v + 1`, so it assumes
-integer values. Finite value sets with at least two elements are not covered by our proof (see Not
-formalized).
+**Repair.** The chapter allows a final pending invocation (`Σ_k^* · Inv_k`).
 
-### Typos and slips
-- §2.2 requires `H|p_k ∈ Σ_k^∞` for every history of a TM. Histories are prefix-closed, so this
-  forbids accepting any invocation. The chapter allows a final pending invocation
-  (`Σ_k^* · Inv_k`).
+### ✏️ Slips
+- Theorem 1 says "for every fault-prone system" with no restriction, but it fails with one process, with no
+  t-variable, or with a single value. In each case a TM that answers every operation immediately from a single
+  store and never aborts is opaque and ensures local progress. We assume two processes, a t-variable `x` and
+  infinitely many values.
 - §2.3 defines a crash as a finite *non-empty* projection. Then a process that never takes a step
   is correct and starving, and local progress fails trivially in every history where some process
   does not participate. The chapter drops "non-empty".
+
+### Typos
 - The proof of Lemma 1 writes `pₙ` for `p₂` twice.
 - Theorem 2 says "serializable safety property". The definition in §5.1 is "strictly serializable",
   while the introduction claims "at least as strong as serializability". Both readings are true
@@ -73,14 +75,14 @@ obstruction-freedom argument yields nothing.
 
 **Details.** The gap appears once the framework is fixed as in the first item; the PODC proof
 simply assumes that every invocation is answered, and under that stronger assumption Algorithm 2
-works with two processes. Algorithm 2 is part of the proof, not of a stated claim, so this is a
-proof repair. Algorithm 2 (Strategy 2 in the chapter) runs one process at a time until its
+works with two processes. Algorithm 2 is part of the proof, not of a stated claim. Algorithm 2 (Strategy 2 in the
+chapter) runs one process at a time until its
 operation returns, and only p₁ and p₂ ever take steps. A crash-free system admits only executions
 in which every process takes infinitely many steps. If p₂ runs alone, p₁ "crashes", the execution
 is not admissible, and the obstruction-freedom argument ("if the operation does not return, pₖ
 takes infinitely many steps and is correct") yields nothing. With three or more processes the idle
 processes crash as well. (The PODC definition of a crash as a *non-empty* finite projection hides
-this; see Typos and slips.)
+this; see Slips.)
 
 **Repair.** Our repair uses a round-robin schedule. It needs a sturdier environment strategy, since
 p₁ must now keep taking steps while p₂ works. Idle processes invoke filler reads of `x`. p₂ writes
@@ -92,6 +94,15 @@ after p₁'s next transaction has begun. With this strategy p₁ can never commi
 schedule. In a crash-free system the analysis is then short: if p₁ is parasitic, p₂ is correct but
 makes no progress, so it does not run alone; otherwise p₁ is correct and never commits.
 (`lemma1_crashFree`, `stratRun_ne_commit₁`)
+
+### 🔧 Algorithms 1 and 2 (the conflict argument, Figures 8 and 11)
+Each process writes `v + 1` for its own read, and the argument that `H_s` is illegal assumes that p₁ and p₂ read
+the same `v`, which the text never justifies.
+
+**Impact.** Statement true; a few lines close the step (`conflict_seq`).
+
+**Repair.** For a committing transaction of p₁, safety of prefixes forces both reads to return the current
+committed value. The chapter uses cross values instead, which needs no such argument, and so do we.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -150,8 +161,9 @@ not formalize this counterexample. The chapter's crash-prone/parasitic-prone pro
 admissibility gap of the crash-free case (see Proof gaps).
 
 **Not formalized.** Theorem 3 (§6: the automaton `F_gp` ensures opacity and global progress). Finite
-value sets with at least two elements. The counterexample to the chapter's version of Lemma 1. The
-examples (Figures 1–7, 14–16).
+value sets with at least two elements: our strategy needs infinitely many values, and the paper's proof writes
+`v + 1`, so it assumes integer values. The counterexample to the chapter's version of Lemma 1. The
+examples (Figures 1–7, 14–16) and the remarks on existing TM implementations (§3.2).
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and
 `Quot.sound`. Non-vacuity: TMs exist, and the TM that never answers ensures opacity

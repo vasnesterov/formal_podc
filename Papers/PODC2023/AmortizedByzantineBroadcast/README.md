@@ -5,23 +5,24 @@ Byzantine Broadcast.* PODC 2023. DOI [10.1145/3583668.3594596](https://doi.org/1
 Formalized version: the PODC proceedings version (9 pages; no arXiv version). Copy of the paper:
 [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** The honest-majority protocol (Algorithm 4), which the abstract presents
-as achieving amortized linear communication, is not a correct multi-shot Byzantine broadcast. Its
-**Validity** fails, and so does **Lemma 3** ("an honest leader's epoch always succeeds"). Consistency
-(Lemmas 1, 2, Theorem 1) is correct and proved. The dishonest-majority protocol (Algorithm 5.2) satisfies
-Validity (Lemma 4) and Consistency (Lemma 5) only under a corrected reading of how TrustCast is invoked.
-Read literally, both lemmas fail.
+**Verdict: ❌ Intent lost.** The honest-majority protocol (Algorithm 4), which the abstract presents as achieving
+optimal amortized linear communication, is not a correct multi-shot Byzantine broadcast: its **Validity** and
+**Lemma 3** ("an honest leader's epoch always succeeds") fail in a concrete run with `n = 6`, `f = 2`, and no repaired
+protocol is proved. Consistency (Lemmas 1, 2, Theorem 1) is correct and proved, and the dishonest-majority protocol
+(Algorithm 5.2), which the paper presents as a generalization, satisfies Validity (Lemma 4) and Consistency (Lemma 5)
+only under a corrected reading of how TrustCast is invoked; read literally, both lemmas fail. The
+communication-complexity analyses were not checked.
 
 ## Mistakes in the paper
 
-### 🚨 Algorithm 4 (Validity) and Lemma 3 (an honest leader's epoch succeeds)
+### ❌ Algorithm 4 (Validity) and Lemma 3 (an honest leader's epoch succeeds)
 In step (8) (Query-1) a node may query an honest helper `v` that accuses the leader in the same round, then accuse
 `v` in Query-2, so an honest node gets a corrupt-proof and all its epochs are skipped: with `n = 6`, `f = 2` the
 honest sender's value is never committed (`not_validity`) and an honest leader's epoch fails (`not_lemma3`).
 
-**Impact.** Sinks the honest-majority protocol, which the abstract presents as achieving amortized linear
-communication: it is not a correct multi-shot Byzantine broadcast, and fixing it needs a protocol change, not a
-local edit. Consistency (Lemmas 1, 2, Theorem 1) is correct and proved.
+**Impact.** The protocol that the abstract presents as achieving amortized linear communication is not a correct
+multi-shot Byzantine broadcast. Fixing it needs a protocol change, not a local edit, and no repaired protocol is
+proved. Consistency (Lemmas 1, 2, Theorem 1) is correct and proved.
 
 **Details.** In step (8), a node `u` without a commit-proof sends `query₁` to the smallest node `v` that "has not
 accused `L_i`". An honest `v` that also lacks the commit-proof accuses `L_i` *in the same round*, so `u` cannot know
@@ -50,19 +51,21 @@ every step). Read literally, both conditions are checked at every step, so a nod
 already committed and never answers queries. Rounds 8–11 then cannot disseminate anything, and Lemma 3 fails in the
 same run, already in slot 1.
 
-A second, independent mismatch: Respond-1 condition 2 ("`u` is the smallest node `v` has not accused") ignores the
-Query-1 filter "has not accused `L_i`". A helper chosen past a smaller node that had accused `L_i` therefore refuses
-to answer and gets accused (not formalized). The complexity analysis (§4.2) and Termination are claims about this
-broken protocol. We did not formalize them.
+### ❌ Algorithm 4, Respond-1 condition 2
+Respond-1 condition 2 ("`u` is the smallest node `v` has not accused") ignores the Query-1 filter "has not accused
+`L_i`", so a helper chosen past a smaller node that had accused `L_i` refuses to answer and gets accused although it
+is honest.
 
-### ⚠️ Lemmas 4 and 5 (Algorithm 5.2, how TrustCast is invoked)
+**Impact.** A second mismatch, independent of the one above: the helper cannot evaluate the querier's view of who
+accused `L_i`, and no fix is proved. This is not formalized; it comes from our analysis of the protocol in prose.
+
+### 🔧 Lemmas 4 and 5 (Algorithm 5.2, how TrustCast is invoked)
 Read literally, `TrustCast(G_u, n, k)` maintains the shared trust graph only in rounds `1..n` of slot `k`, and then
 with `n = 3`, `f = 1` Lemma 5 fails in slot 1 and Lemma 4 in slot 3 (`literal_consistency_fails`,
 `literal_validity_fails`).
 
 **Impact.** Both lemmas hold for every slot of the multi-shot execution with maintenance in every round and
-evidence of every slot (`validity`, `consistency`). The intent is recoverable from the proof of Lemma 5, so we count
-this as a statement issue with evident intent (⚠️).
+evidence of every slot (`validity`, `consistency`). The proof of Lemma 5 already assumes such maintenance.
 
 **Details.** Algorithm 5.2 invokes `TrustCast(G_u, n, k)`, whose rules run in rounds `1..n` of the slot and only
 consider proposals of slot `k`. The trust graph, however, is shared across slots. Read literally, equivocation
@@ -75,15 +78,23 @@ sender in slot 3. In slot 1 one honest node commits `⊥` and the other commits 
 persist across slots (`slotLocal_validity_fails`). The proof of Lemma 5 uses transferability in the Dolev–Strong
 rounds, i.e. graph maintenance after round `n`.
 
-### Typos and slips
+**Repair.** Run graph maintenance in every round and keep the equivocation evidence of every slot (the `charitable`
+`Reading`).
+
+### ✏️ Slips
+- The skip condition of Algorithm 4 does not say when it is evaluated; read literally, a node holding a commit-proof
+  never answers queries, so the check must be made at the start of the epoch. Consistency is proved for all three
+  readings (`theorem1`); the failure of Validity under that reading is the first mistake above.
 - The definition of equivocation requires the two proposals to carry the same certificate `C`. Taken literally, a
   leader escapes detection by attaching different certificates. We use "two proposals with different values".
-- The proof of Lemma 2 refers to a "Leader setup" round; this is Collect.
 - The expander definition ("for any set `S` of `αn` vertices, the number of neighbours of `S` is more than `βn`")
   does not say whether `S` counts among its neighbours. It must: no graph has more than `n − |S| = (1 − 2ε)n`
   neighbours outside a set of `2εn` vertices, so the exclusive reading admits no `(n, 2ε, 1 − 2ε)`-expander at
   all. We assume only the weaker form `|S ∪ N(S)| > βn`. `K₆` in the counterexample satisfies even the stronger
   form `|⋃_{v∈S} N(v)| > βn`.
+
+### Typos
+- The proof of Lemma 2 refers to a "Leader setup" round; this is Collect.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -134,7 +145,8 @@ The TrustCast properties are stated in the paper only for a complete initial gra
 shared multi-slot graph. We prove them there.
 
 **Not formalized.** The communication-complexity analyses (§4.2, §5.4; amortized `O(κn)` and `O(κn²)`).
-Termination of Algorithm 4. Appendix A (HotStuff).
+Termination and sequentiality of Algorithm 4. Appendix A (HotStuff). The analysis of §4.2 and Termination are claims
+about the protocol refuted above.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`; no `native_decide`. The counterexample run is computed by the kernel (`decide +kernel`,

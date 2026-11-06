@@ -6,46 +6,50 @@ Registers in Crash-prone Systems.* PODC 2016. DOI
 [1602.02695](https://arxiv.org/abs/1602.02695) v1 (the only version); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🛠️ Proof repaired.** The algorithm of Figure 1 implements a linearizable SWMR register in
-`CAMP_{n,t}[t < n/2]`, and every operation of a correct process terminates. Messages carry a two-bit
-type, plus a value for two of the four types. FIFO channels are not needed, as the paper itself
-states (§2.1 assumes non-FIFO channels): the parity bit and the `wait` at line 11 form an
-alternating-bit protocol. Correctness relies on the implicit (standard)
-convention that code between two `wait`s runs atomically. The proofs have one gap and a few slips, none
-affecting the result.
+**Verdict: 🔧 Easy fix.** The algorithm of Figure 1 implements a linearizable SWMR register in
+`CAMP_{n,t}[t < n/2]`, every operation of a correct process terminates, and messages carry a two-bit type, plus a value
+for two of the four types. FIFO channels are not needed, as the paper itself states (§2.1 assumes non-FIFO channels):
+the parity bit and the `wait` at line 11 form an alternating-bit protocol. The algorithm stands unchanged under the
+standard convention that code between two `wait`s runs atomically; the proofs of Lemmas 5 and 10 need only an extra
+case, an extra invariant conjunct and two corrected steps.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
+- Figure 1 / Section 3: the paper never says that code between two `wait`s runs atomically with respect to the message
+  handlers. This is the implied, standard convention, and the algorithm is wrong without it (see "Implicit convention"
+  below).
 - Claim 3: "computed by `p_i`" should be `p_j`.
+
+### Typos
 - Claim 2: `i` and `j` are mixed in the quorum `Q_w`.
-- Lemma 8: `w_sync_i[i] ≥ w_sync_w[i]` should be `w_sync_w[i] ≥ wsn`.
+- Lemma 8: `w_sync_i[i] ≥ w_sync_w[i] = wsn` is awkward, but every part of it is true (Lemmas 2 and 6). What line 3
+  needs is `w_sync_w[i] ≥ wsn`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 5 (alternating-bit invariant)
+### 🔧 Lemma 5 (alternating-bit invariant)
 The case analysis for a pair `(i, j)` omits `p_i` receiving a `WRITE` from a third process `p_k`, and the induction lacks the hypothesis "at most two unprocessed `WRITE`s per channel, with different parities".
 
 **Impact.** Statement true; we prove an exact invariant covering both points (`lemma5`, `lemma5_sent`).
 
 **Details.** The paper considers `p_i` invoking `write` and `p_i` receiving a `WRITE` from `p_j`. A reception
-from `p_k` may raise `w_sync_i[i]` (line 14) and send a `WRITE` to `p_j` (line 15), changing the premises of
-R1/R2. The missing hypothesis is what makes the parity test of line 11 pick the right message.
+from `p_k` may raise `w_sync_i[i]` (line 14) and send a `WRITE` to `p_j` (line 15), changing the premises of the
+paper's counts `R1`/`R2` of the `WRITE`s sent to `p_j`. The missing hypothesis is what makes the parity test of line 11
+pick the right message.
 
-### 🛠️ Lemma 9 (`r_sync_i[j] = rsn` means the current request was answered)
-Channels are not FIFO and `READ()`/`PROCEED()` carry no sequence number, so "`r_sync_i[j] = rsn` means `p_j` answered the *current* request" needs proof, which the paper only asserts.
+### 🔧 Lemma 10, Claim 2
+Claim 2 says `w_sync_k[k] = x` when the read starts, but only `≥ x` is true, because a later write may already have
+started.
 
-**Impact.** Statement true: each `READ()` is at all times in exactly one place (in transit, a pending handler, a
-`PROCEED()` in transit, or already counted) (`read_terminates`).
+**Impact.** Only `≥ x` is used (`lemma10`).
 
-### 🛠️ Lemma 10 (Claims 2 and 3)
-Claim 2 says `w_sync_k[k] = x` when the read starts, but only `≥ x` is true, and Claim 3 asserts a *correct* process in the intersection of two `(n − t)`-quorums, which does not follow.
+### 🔧 Lemma 10, Claim 3
+Claim 3 asserts a *correct* process in the intersection of two `(n − t)`-quorums, which does not follow.
 
-**Impact.** Harmless: only `≥ x` is used, and correctness of that process is never used (`lemma10`).
+**Impact.** Correctness of that process is never used (`lemma10`).
 
-**Details.** For Claim 3: with `n = 3`, `t = 1`, quorums `{1,2}` and `{2,3}`, `p_2` may be faulty.
+**Details.** With `n = 3`, `t = 1`, quorums `{1,2}` and `{2,3}`, `p_2` may be faulty.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -72,6 +76,11 @@ process: once at line 16, while it handles a late echo of `v_{x−1}`, and again
 passes the parity test as message `x + 2`, and the receiver appends a wrong value to its history. Our model
 checker found a 14-step execution with `n = 3`, `t = 1`, no crashes, no reads and three writes, in which `p2`
 accepts the stale `WRITE(0, v2)` as its 4th value.
+
+**Lemma 9.** Channels are not FIFO and `READ()`/`PROCEED()` carry no sequence number, so "`r_sync_i[j] = rsn` means
+`p_j` answered the *current* request" needs a counting argument, which the paper only asserts. It is routine: each
+`READ()` is at all times in exactly one place (in transit, a pending handler, a `PROCEED()` in transit, or already
+counted) (`read_terminates`).
 
 **Theorem 2's message complexity** (`O(n)` per read, `O(n²)` per write) holds when messages are attributed to the
 operation (value) they belong to, as the paper's proof does, i.e. amortized; it does not bound the messages sent

@@ -45,7 +45,7 @@ Actively Dynamic Networks*, PODC 2020 (arXiv:2003.03355v1, full version with App
 5. **Observation 1 (App. D.1)** says a Depth-`log n` tree forces `PO_{u,v} ≤ log n`. The correct
    bound is `2 log n`: two leaves can be at distance twice the depth. Lemma D.3's final bound
    `n − 1 − 2 log n` is nevertheless what we obtain (`lemma_6_2_total` with `d = log n`).
-6. **Minor slips.**
+6. **Smaller items.**
    - Proof of Prop. A.1: "`O(log n)` total edge activations" should be `O(n log n)`.
    - Prop. 2.2 says maximum degree 3, while §2.3 and the proof of A.2 say at most 4. We prove
      `≤ 3` for every snapshot (`degree_le_three`); 4 is only reached in the middle of a round,

@@ -5,16 +5,15 @@ Damien Imbs, Sergio Rajsbaum, Michel Raynal. *The universe of symmetry breaking 
 Formalized version: the full version, IRISA technical report PI 1965 (January 2011; HAL inria-00560453v1, the PDF
 in this repository). There is no arXiv version. Numbering follows the technical report.
 
-**Verdict: ❌ False claim.** The combinatorics of GSB tasks hold after small repairs: feasibility,
-kernel sets, anchoring, the hardest task and the canonical form. So do the reductions: perfect renaming
-is universal, Theorem 10's parity reduction works, and so does the slot-to-renaming algorithm. Theorem 4
-is false as written in integer arithmetic when `ℓ = 0`. Lemma 1 misses the hypothesis `ℓ_v ≤ u_v`.
-Theorem 9 (no-communication solvability) is correct for index-independent algorithms, but false for the
-comparison-based algorithms that Section 2.3 requires of all algorithms.
+**Verdict: 🔧 Easy fix.** The combinatorics of GSB tasks (feasibility, kernel sets, anchoring, the hardest task and
+the canonical form) and the reductions (perfect renaming is universal, Theorem 10's parity reduction, the
+slot-to-renaming algorithm) hold after local changes. Theorem 9 is correct for index-independent algorithms but
+false for the comparison-based algorithms that Section 2.3 requires of all algorithms, and Lemma 1 misses the
+hypothesis `ℓ_v ≤ u_v`. Theorems 1, 2 and 11 were not checked, and the cited impossibility of WSB is a hypothesis.
 
 ## Mistakes in the paper
 
-### ❌ Theorem 9 (no-communication solvability) vs. Section 2.3
+### 🔧 Theorem 9 (no-communication solvability) vs. Section 2.3
 Theorem 9 is false for the comparison-based algorithms that Section 2.3 requires of all algorithms: then
 `⟨2,3,0,1⟩` meets the criterion (`ℓ = 0`, `⌈3/3⌉ ≤ 1`) but is not solvable without communication
 (`theorem_9_comparisonBased_false`).
@@ -31,19 +30,7 @@ comparison-based decision function is constant. Then a GSB task with `m ≥ 2` i
 is essential: with index-dependent decisions, perfect renaming needs no communication
 (`perfectRenaming_indexDependent`).
 
-### ⚠️ Theorem 4 (anchoring criterion, `ℓ = 0`)
-The criterion "`u`-anchored iff `ℓ ≤ n − u(m−1)`" fails in integer arithmetic whenever `ℓ = 0` and
-`u(m−1) > n`, e.g. for `⟨6,3,0,6⟩` and every `(2n−1)`-renaming task `⟨n,2n−1,0,1⟩` with `n ≥ 3`
-(`theorem_4_int_false`, `theorem_4_int_false_renaming`).
-
-**Impact.** A boundary case with evident intent: Corollary 1 uses `max(0, n−u(m−1))`, so the authors knew
-the expression can be negative. With `n − u(m−1)` truncated at 0 the theorem holds (for `m ≥ 1`), and we
-prove that version (`theorem_4`).
-
-**Details.** Every `⟨n,m,0,u⟩` task is trivially `u`-anchored, as the paper itself says, but the
-right-hand side is negative. `⟨6,3,0,6⟩` is the task that Figure 1 labels "trivially u-anchored".
-
-### ⚠️ Lemma 1 (missing hypothesis `ℓ_v ≤ u_v`)
+### 🔧 Lemma 1 (missing hypothesis `ℓ_v ≤ u_v`)
 "Feasible iff `Σℓ_v ≤ n ≤ Σu_v`" is false for asymmetric bounds with some `ℓ_v > u_v`: `n = 3`,
 `ℓ⃗ = [2,0]`, `u⃗ = [1,5]` satisfies `2 ≤ 3 ≤ 6`, but value 1 would have to be decided at least twice and at
 most once (`lemma_1_false`).
@@ -51,39 +38,39 @@ most once (`lemma_1_false`).
 **Impact.** The correct statement adds `ℓ_v ≤ u_v` for all `v` (`lemma_1`). Lemma 2, the symmetric case,
 is correct as stated.
 
-### ⚠️ Section 4.2, the canonical representative (degenerate cases)
-"An `(ℓ,u)`-anchored task is its own representative" picks two different representatives when `u > n`:
-`⟨4,2,0,5⟩` and `⟨4,2,0,4⟩` are synonyms and both `(ℓ,u)`-anchored (`canonical_not_unique`).
+### ✏️ Slips
+- Theorem 4 (anchoring criterion, `ℓ = 0`): "`u`-anchored iff `ℓ ≤ n − u(m−1)`" fails in integer arithmetic whenever
+  `ℓ = 0` and `u(m−1) > n`, e.g. for `⟨6,3,0,6⟩` and every `(2n−1)`-renaming task `⟨n,2n−1,0,1⟩` with `n ≥ 3`
+  (`theorem_4_int_false`, `theorem_4_int_false_renaming`). Every `⟨n,m,0,u⟩` task is trivially `u`-anchored, as the
+  paper itself says, but the right-hand side is negative; `⟨6,3,0,6⟩` is the task that Figure 1 labels "trivially
+  u-anchored". Corollary 1 uses `max(0, n−u(m−1))`, so the authors knew the expression can be negative. With
+  `n − u(m−1)` truncated at 0 the theorem holds (for `m ≥ 1`), and we prove that version (`theorem_4`).
+- Section 4.2, the canonical representative: "an `(ℓ,u)`-anchored task is its own representative" picks two
+  different representatives when `u > n`: `⟨4,2,0,5⟩` and `⟨4,2,0,4⟩` are synonyms and both `(ℓ,u)`-anchored
+  (`canonical_not_unique`). This happens only in degenerate cases (also for `m = 1`), and Theorem 7's map `f` fixes it
+  (`theorem_7`, `theorem_7_iff`): `f` reaches its fixed point after one step, and two feasible tasks are synonyms iff
+  they have the same `f`-image. The `f`-image is the pair (least, largest) number of times a value is decided in a
+  legal output.
+- Theorem 8 needs a *feasible* task (`theorem_8`).
+- Corollary 2 needs `x ≥ 1` (`corollary_2`).
+- Theorem 11 needs `n ≥ 2`: for `n = 1` election is trivial.
+- Table 1 claims to list all feasible `⟨6,3,ℓ,u⟩` tasks with `u ≤ 6`, but `⟨6,3,2,6⟩` is missing. Every
+  printed entry is correct (`table_1`, `table_1_missing_row`).
+- The kernel set of `⟨6,3,1,4⟩` is printed as `{[4,1,1],[4,1,1],[2,2,2]}`; it should be
+  `{[4,1,1],[3,2,1],[2,2,2]}`.
+- Section 4.2 says `⟨6,3,2,2⟩` is the representative for four tasks, but §4.1 and Table 1 list six synonyms.
 
-**Impact.** Ill-defined only in degenerate cases (also for `m = 1`); Theorem 7's map `f` fixes it
-(`theorem_7`, `theorem_7_iff`).
-
-**Details.** `f` reaches its fixed point after one step, and two feasible tasks are synonyms iff they
-have the same `f`-image. The `f`-image is the pair (least, largest) number of times a value is decided
-in a legal output.
-
-### ⚠️ Theorem 8, Corollaries 2 and 4, Theorem 11 (missing side conditions)
-Theorem 8 needs a *feasible* task, Corollary 2 needs `x ≥ 1`, Corollary 4 needs `k ≤ n` (implicit in
-`k ≤ n/2`), and Theorem 11 needs `n ≥ 2` (for `n = 1` election is trivial).
-
-**Impact.** Degenerate or implied conditions; the statements hold with them (`theorem_8`, `corollary_2`,
-`corollary_4`).
-
-### Typos and slips
+### Typos
 - Theorem 6 is trivial as stated: `S(T1) ⊆ S(T)` for `ℓ' ≥ ℓ` is just Lemma 5 (and (ii) is Lemma 4). The
   intended statement, shown by its proof, is that `T1` and `T` are *synonyms*. That is true and needs no
   feasibility assumption (`theorem_6`, `theorem_6_eq`).
 - Theorem 8's proof writes `m/n` for `n/m` throughout.
 - Theorem 11's proof cites "Lemma 2" for Theorem 2.
-- Table 1 claims to list all feasible `⟨6,3,ℓ,u⟩` tasks with `u ≤ 6`, but `⟨6,3,2,6⟩` is missing. Every
-  printed entry is correct (`table_1`, `table_1_missing_row`).
-- The kernel set of `⟨6,3,1,4⟩` is printed as `{[4,1,1],[4,1,1],[2,2,2]}`; it should be
-  `{[4,1,1],[3,2,1],[2,2,2]}`.
 - In the Remark of §4.1, `[4,2,1]` sums to 7, so it is not a kernel vector of any 6-process task.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 9 (the `ℓ = 0` part of the proof)
+### 🔧 Theorem 9 (the `ℓ = 0` part of the proof)
 "The task specification requires `|G_i| ≤ u`" is not what the specification says.
 
 **Impact.** Statement true (for index-independent algorithms); the `ℓ > 0` part is fine (`theorem_9`).
@@ -91,7 +78,7 @@ Theorem 8 needs a *feasible* task, Corollary 2 needs `x ≥ 1`, Corollary 4 need
 **Repair.** Pick `u+1` identities from a group of size `> u` and complete them to `n` distinct
 identities. This needs `u+1 ≤ n`, which holds because `⌈(2n−1)/m⌉ ≤ n` for `m ≥ 2`. (`theorem_9`)
 
-### 🛠️ Theorem 10 (Lemma 4 used in the wrong direction)
+### 🔧 Theorem 10 (Lemma 4 used in the wrong direction)
 `S(T) ⊆ S(T')` makes `T'` *easier*, so unsolvability of `T` says nothing about `T'`.
 
 **Impact.** Statement true, given the cited results: the conclusion survives because the tasks involved
@@ -125,6 +112,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Not modelled: the full asynchronous crash-prone read/write model of Section 2 (runs, schedules).
   Impossibility results (Theorem 10, Corollary 5) are taken as hypotheses about any iterated model.
 
+**Proof remarks.** Corollary 4 is stated with `k ≤ n` (`corollary_4`), which is implicit in the `k ≤ n/2` of
+Section 3.2.
+
 **Main results in Lean** (namespace `Podc.SymmetryBreakingTasks`).
 
 | Paper | Lean | File |
@@ -153,7 +143,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Not formalized.** Theorems 1 and 2 (they rely on a cited comparison-based `(2n−1)`-renaming
 algorithm) and Theorem 11 (pseudomanifold/connectivity argument on the protocol complex). The cited
 impossibility of WSB (Castañeda–Rajsbaum) is a hypothesis of `theorem_10`; election impossibility is a
-hypothesis of `corollary_5`.
+hypothesis of `corollary_5`. The cited equivalence of WSB with `(2n−2)`-renaming was not checked.
 
 **Trust.** No `sorry`, `axiom` or `native_decide`. The listed theorems use only the axioms `propext`,
 `Classical.choice`, `Quot.sound`; Table 1 is checked by `decide +kernel`. Non-vacuity: every

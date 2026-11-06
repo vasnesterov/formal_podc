@@ -5,7 +5,7 @@ Networks*, PODC 2017 (arXiv:1705.07369v1).
 
 ## Proof gaps and errors (statements true)
 
-1. **Lemma 15, impossibility half (verdict-relevant, 🛠️).** The paper's argument is internally
+1. **Lemma 15, impossibility half (🛠️).** The paper's argument is internally
    inconsistent:
    - it proves `E[Xᵢ] ≥ (log n)/4` and then uses `E[Xᵢ] ≤ (log n)/4`;
    - "on average `(log n)/16`" does not follow from `(k log n)/4` rounds;
@@ -48,9 +48,9 @@ Networks*, PODC 2017 (arXiv:1705.07369v1).
 
 6. **Fault parameter.** The paper proves Lemma 15 for `p = 1/2` ("for concreteness"). We prove all
    results for every constant `p ∈ (0, 1)` (Lemma 16 and Lemma 25 also for `p = 0`).
-   Borderline call (R4/R6): at `p = 0` (no faults) Lemma 15 is false, since the star then has
-   throughput 1. We read "with receiver faults" as `p > 0`, because the paper treats the faultless
-   setting separately throughout. So this is not counted as a statement issue.
+   At `p = 0` (no faults) Lemma 15 is false, since the star then has throughput 1 (✏️). We read
+   "with receiver faults" as `p > 0`, because the paper treats the faultless setting separately
+   throughout.
 7. **`Θ(·)` in `n`.** We prove: there are `c₁, c₂ > 0` and `n₀`, depending on `p`, such that for all
    `n ≥ n₀`, `c₁/log n ≤ τ^R(star n) ≤ c₂/log n` (`lemma15`). The constants are `c₁ = log(1/p)/2` and
    `c₂ = 8 log(1/p)`. Similarly `ofReal((1-p)/8) ≤ τ^NC ≤ 2` (`lemma16`), and the gap lies between

@@ -5,14 +5,15 @@ Population Protocols.* PODC 2026. DOI [10.1145/3796701.3815913](https://doi.org/
 Formalized version: arXiv [2605.18707](https://arxiv.org/abs/2605.18707) v1.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** Theorem 1.1 (Circles: relative majority with `k³` states) is proved, and so are
-Theorems 4.2, 4.3, 5.1 and 5.2, under the readings explained below. **Theorem 4.1 (TieReport) is false**, and
-**the ranking protocol of Theorem 1.2 is incorrect as written**. Each has a small fix, and the fixed protocols
-are proved correct with the same state counts.
+**Verdict: 🛠️ Hard fix.** Theorem 1.1 (Circles: relative majority with `k³` states) is proved, and so are
+Theorems 4.2, 4.3, 5.1 and 5.2, under the readings explained below; the proofs of Theorem 4.2 and of Lemma 8.11
+needed new arguments. **Theorem 4.1 (TieReport) is false**, and **the ranking protocol of Theorem 1.2 is incorrect
+as written**, but each has a small fix, and the fixed protocols are proved correct with the same state counts.
+Time complexity and the binary win/lose variants were not checked.
 
 ## Mistakes in the paper
 
-### ❌ Theorem 1.2 (the ranking protocol of Section 6)
+### 🔧 Theorem 1.2 (the ranking protocol of Section 6)
 The ranking protocol is incorrect: for `k = 2` and three agents with colours `0, 1, 1` a globally fair execution
 reaches, after 9 steps, a configuration that no interaction changes and in which agent 2 outputs ranking 1
 instead of 0 (`Ranking.Counterexample.literal_not_correct`).
@@ -29,12 +30,13 @@ overlooks this. The failure is not a quirk of one reading: the literal protocol 
 **Repair.** After each interaction, an agent with a token and `bc = kc` sets `br := kr`
 (`Ranking.ranking_correct`).
 
-### ❌ Theorem 4.1 (TieReport, no-tie case)
+### 🔧 Theorem 4.1 (TieReport, no-tie case)
 TieReport fails with a unique majority: for `k = 3`, colours `0, 0, 1, 2` and schedule `(1,2), (0,3), (0,2)`,
 agent 0 ends as the only diagonal agent and outputs "tie" forever under every fair continuation
 (`tieReport_counterexample_noTie`).
 
-**Impact.** Theorem 4.1 is false as stated; a small fix gives a correct protocol (`tieReport_fixed_correct`).
+**Impact.** Theorem 4.1 is false as stated; a small fix gives a correct protocol with the same `3k³` states
+(`tieReport_fixed_correct`).
 
 **Details.** Agent 0 decays from `⟨0|0⟩` to `⟨0|2⟩`, becomes a tie spreader, and recombines to `⟨0|0⟩`. The
 brakets are then stable, and agent 0 is the *only* diagonal agent. Rule 3 lets a diagonal agent reset only
@@ -48,36 +50,60 @@ simultaneously in both directions, so it is an ambiguity rather than a definite 
 **Repair.** A diagonal agent also resets itself, and tie spreading affects only `no_tie` agents. The tie case then
 needs an invariant the paper lacks: there is always a diagonal agent or a spreader (`tieReport_fixed_correct`).
 
-### Typos and slips
-- Lemma 6.2 (backward) and 6.12 need Section 6's standing no-tie assumption.
-- Lemma 6.12's indexing is off by one.
+### 🔧 Theorem 4.2 (output of TieSharing)
+TieSharing keeps Circles' "Output: return out", and with it the claim that every winner outputs its initial colour
+is false (`OutCounterexample.tieShare_out_counterexample`: `k = 2`, colours `0,0,1,1`, a fixed configuration with a
+winner spreader of colour 1 and `out = 0` forever).
+
+**Impact.** One line defining the output by status saves the theorem at no state cost (`tieShare_correct`).
+
+**Details.** The paper states no output rule for TieSharing; its proof only says that agents "update their out
+accordingly".
+
+**Repair.** A status-dependent output map: winners output their bra, losers `out`.
+
+### ✏️ Slips
+- Lemma 6.2 (backward direction) and Lemmas 6.7(2) and 6.12 need Section 6's standing assumptions (no tie, every
+  colour present); read alone, Lemma 6.2 fails for `k = 2` and counts (1, 1).
+- Lemma 6.12's indexing is off by one: ranks `0..l−1` are called "the `l−1` most popular colors".
+
+### Typos
 - The set X of Def. 6.4 is closed only as a set.
+- Ord-Circles, "pending agents do not interact otherwise": the rule must also exclude Circles step (5) for an agent
+  that became pending in step (4) of the same interaction, or Invariant 3.3 breaks. Read step by step, the printed
+  sentence says this, but it is placed at step (2). Theorem 5.2 holds with this reading (`ordCircles_correct`).
 
 ## Proof gaps (statements true)
-
-### 🛠️ Lemma 8.11 (Ordering, finitely many ordering-state changes)
-The proof's step "a used label never becomes free" is false (reachable with `k = 3`, colours `0,0,1,1`).
-
-**Impact.** Statement true: the lemma itself holds by a different potential.
 
 ### 🛠️ Lemmas 8.2 and 8.3 (TieSharing)
 Lemma 8.2 ignores tokens alive after stabilization, and Lemma 8.3's proof is a sketch.
 
-**Impact.** Statements true; repaired (Theorem 4.2: `tieShare_correct`).
+**Impact.** The statements Theorem 4.2 needs are true, with a new argument (`tieShare_correct`).
 
-### 🛠️ Lemma 8.4 (TieBreak)
+**Details.**
+- Lemma 8.2 (`r = 1`): the tokens still alive can demote majority agents or promote others, and tokens can
+  multiply, so their extinction needs a separate potential argument (`extinction`).
+- Lemma 8.3 (`r > 1`): Claim 3 holds only once all agents of colour `μ_s` have their final braket (`witness`), and
+  "token ascent until attached" with the inductive spreading of tokens does not work as written.
+
+**Repair.** Tokens off top brakets die out (`no_spurious`), the set of token holders stabilizes, and the induction
+gets a starting token from the last ket exchange.
+
+### 🛠️ Lemma 8.11 (Ordering, finitely many ordering-state changes)
+The proof's step "a used label never becomes free" is false (reachable with `k = 3`, colours `0,0,1,1`).
+
+**Impact.** The lemma itself holds by a different potential (`oc_ord_stabilizes`).
+
+**Details.** A label used only by leaders in state `I`, left over from before leader stability, can be freed, and
+the counting argument of the proof rests on this step.
+
+**Repair.** The labels of `U`-leaders, a cyclic-distance potential and a non-leader rank potential.
+
+### 🔧 Lemma 8.4 (TieBreak)
 Lemma 8.4's "the maximum weight is in `f(G_q)`" needs an arc argument.
 
-**Impact.** Statement true; repaired (Theorem 4.3: `tieBreak_correct`).
-
-**Details.** TieBreak leaves token transfer between agents with equal weight and bra unspecified (we keep the
-token in place).
-
-### 🛠️ Ord-Circles ("pending agents do not interact otherwise")
-The rule must also exclude Circles step (5) for an agent that became pending in step (4) of the same interaction,
-or Invariant 3.3 breaks.
-
-**Impact.** Theorem 5.2 holds with this reading (`ordCircles_correct`).
+**Impact.** The statement is true; a short arc comparison fills the step (`exists_key_gt`, `w_add_of_closest`;
+Theorem 4.3: `tieBreak_correct`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -98,11 +124,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
   (`Cslib/Computability/Distributed/PopulationProtocols/Nondet.lean`).
 
 **Readings of ambiguous rules** (clarifications, not mistakes).
-- Theorem 4.2 (TieSharing) is true only under specific readings. If all status rules read the pre-interaction
+- Theorem 4.2 (TieSharing) depends on the order of its rules. If all status rules read the pre-interaction
   statuses, the theorem fails already for colours `0, 0, 1` (`tieShare_pre_counterexample`). With the rules applied
-  sequentially, as listed, it holds. "The output of every winner is its initial colour" also needs a
-  status-dependent output map. If every agent outputs its `out` variable, the theorem fails
-  (`OutCounterexample.tieShare_out_counterexample`: `k = 2`, colours `0,0,1,1`).
+  sequentially, as listed, it holds.
+- Theorem 4.3: TieBreak leaves token transfer between agents with equal weight and bra unspecified (we keep the
+  token in place).
 - Theorems 5.1, 5.2 depend on the orientation of weak fairness. Ordering and Ord-Circles are asymmetric: mostly
   only the initiator changes. They are correct if every *ordered* pair interacts infinitely often, the natural
   reading of §2.1's directed interaction graph. Under an unordered-pair reading of Definition 2.1 both fail

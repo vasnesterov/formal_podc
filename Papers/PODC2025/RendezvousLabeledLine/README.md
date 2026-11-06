@@ -6,49 +6,22 @@ Rendezvous in Labeled Lines.* PODC 2025. DOI
 version, arXiv [2505.04564](https://arxiv.org/abs/2505.04564) v2 (24 pp.); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The main result, Theorem 1.1, holds: rendezvous within
-`O(D log* ℓ_min)` rounds of the first wake-up. We prove it with an explicit constant, with no
-assumption left open: Lemma 2.1, the cited MIS/colouring subroutine, is also proved. Theorem 3.1
-(CarefulWalk), Proposition 3.2 and Lemma 3.4 hold as stated. The complexity proof of Lemma 3.5
-(early-stopping coloured ruling sets) does not work as written. The lemma itself is true; we repair
-the colouring step of Algorithm 3. Part (2) of Lemma 3.5 is imprecise as worded (it holds for the ruling set
-committed by `v`'s commitment round, not for the final one). Lemma 4.5 is proved with `8L` instead of `7L`.
+**Verdict: 🛠️ Hard fix.** The main result, Theorem 1.1, holds: rendezvous within `O(D log* ℓ_min)` rounds of the first
+wake-up, with an explicit constant and no assumption left open (Lemma 2.1, the cited MIS/colouring subroutine, is also
+proved for the graphs used). The complexity proof of Lemma 3.5 (early-stopping coloured ruling sets) does not work as
+written and would lose the optimal bound, so saving it takes a redesign of the colouring step of Algorithm 3 with a new
+induction on levels. Theorem 3.1 (CarefulWalk) and Proposition 3.2 hold as stated, the other repairs are local, and the
+cited lower bound behind "optimal" was not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 3.5 (2) ("if outside `S`, `v` knows the members of `S` at distance `≤ R-1`")
-Part (2) is false for the final ruling set `S`: members of *higher* levels may join `S` within `R-1` of `v` after `v`
-committed; it holds only for `S_T` at `v`'s commitment round `T`.
-
-**Impact.** Imprecise wording: what `v` knows at commitment time is `S_T ∩ N^{R-1}(v)`, which contains at least one
-node by part (3). That is all Algorithm 5 needs (it only needs *some* known ruling-set node). Our interface
-`ColRuling.knows` is stated this way.
-
-**Details.** A node of a higher level can join `S` within `R-1` of `v` after `v` committed, if it is at distance
-`≥ R` from `v`'s ruling-set neighbour.
-
-### ⚠️ Lemma 4.5 (`T_{α,L} + 7L`)
-The proof places the `ZWalk(8R_α)` of `SearchingWalk` between rounds `T+5L` and `T+6L`, but it lasts `32R ≤ 2L`
-rounds and can end at `T+7L`, so the argument only gives `T_{α,L} + 8L` (`lemma_4_5`).
-
-**Impact.** Unestablished, not refuted: we prove `T_{α,L} + 8L` and do not know whether `T+7L` itself fails. The
-slip only changes the constant of Theorem 1.1.
-
-**Details.** In the case `R_β > R_α` the extra delay `τ` then gives `T+τ+5L+24R_β < T+8L` rather than `T+7L`.
-
-### Typos and slips
-- `N^k(v)` is defined as an *open* neighbourhood (distance in `[1, k]`). Line 4 of Algorithm 5 and the proofs of
-  Lemmas 4.4–4.7 need closed balls.
-- Lemma 4.7 uses "the first bit where the colours differ"; any differing bit works.
-
-## Proof gaps (statements true)
-
-### 🛠️ Lemma 3.5 (running time of the early-stopping coloured ruling set)
+### 🛠️ Lemma 3.5 (1) (running time of the early-stopping coloured ruling set)
 The recurrence `T_i ≤ max(O(R·i), T_{i-1}) + O(R·i)` for the commitment round of level `V_i` only gives
 `T_i = O(R i²)`, not the claimed "by induction `T_i ∈ O(R·i)`" (`lemma_3_5_recurrence_gap`).
 
-**Impact.** Statement true; repaired by changing the colouring step of Algorithm 3 (`ES.rule`, `ES.colLe_isLocal`).
-Left unrepaired, Theorem 1.1 would only give `O(D (log* ℓ_min)²)`.
+**Impact.** We do not know whether the printed Algorithm 3 meets the bound. With the colouring step changed the bound
+holds (`ES.rule`, `ES.colLe_isLocal`), and so does Theorem 1.1. Left unrepaired, Theorem 1.1 would only give
+`O(D (log* ℓ_min)²)`.
 
 **Details.** `T_i = 1+2+⋯+i` satisfies the recurrence with equality. The `+O(R·i)` comes from the `(deg+1)`-list
 colouring (line 11), run with Lemma 2.1 in `Θ(R log* n_i) = Θ(R i)` rounds. It starts only after all lower levels
@@ -66,11 +39,34 @@ rounds, because the chain through lower levels only adds `O(R)` per level. Split
 Then colours of level `i` are fixed after `40000 R i` rounds, and Lemma 3.5 holds with `κ₃ = 40001` (`ES.rule`,
 `ES.colLe_isLocal`).
 
-### 🛠️ Lemma 3.4 (iteration count of the greedy extension)
+### 🔧 Lemma 4.5 (`T_{α,L} + 7L`)
+The proof places the `ZWalk(8R_α)` of `SearchingWalk` between rounds `T+5L` and `T+6L`, but it lasts `32R ≤ 2L`
+rounds and can end at `T+7L`, so the argument only gives `T_{α,L} + 8L` (`lemma_4_5`).
+
+**Impact.** Unestablished, not refuted: we prove `T_{α,L} + 8L` and do not know whether `T+7L` itself fails. This
+only changes the constant of Theorem 1.1.
+
+**Details.** In the case `R_β > R_α` the extra delay `τ` then gives `T+τ+5L+24R_β < T+8L` rather than `T+7L`.
+
+### ✏️ Slips
+- Lemma 3.5 (2) ("if outside `S`, `v` knows the members of `S` at distance `≤ R-1`") is false for the final ruling set
+  `S`: a node of a *higher* level can join `S` within `R-1` of `v` after `v` committed, if it is at distance `≥ R` from
+  `v`'s ruling-set neighbour. It holds only for `S_T` at `v`'s commitment round `T`. What `v` knows at commitment time
+  is `S_T ∩ N^{R-1}(v)`, which contains at least one node by part (3). That is all Algorithm 5 needs (it only needs
+  *some* known ruling-set node). Our interface `ColRuling.knows` is stated this way.
+- `N^k(v)` is defined as an *open* neighbourhood (distance in `[1, k]`). Line 4 of Algorithm 5 and the proofs of
+  Lemmas 4.4–4.7 need closed balls.
+
+### Typos
+- Lemma 4.7 uses "the first bit where the colours differ"; any differing bit works.
+
+## Proof gaps (statements true)
+
+### 🔧 Lemma 3.4 (iteration count of the greedy extension)
 The claim that a node `w` with locally maximal `b_w` lies within `2R-3` of `v` is not justified, and "`N^{3R-4}(v)` contains at most
 6 ruling-set nodes, therefore 6 iterations suffice" is off by one.
 
-**Impact.** Statement true; minor slips, and the algorithm's 6 iterations are enough (`gIter_spec`).
+**Impact.** Statement true; the algorithm's 6 iterations are enough (`gIter_spec`).
 
 **Details.**
 * A hill-climbing argument can end farther away (up to `3R-4`).
@@ -138,6 +134,10 @@ particular for the one with the smallest label `ℓ_min`.
 **Not formalized.**
 * Corollary 1.2 and Remark 5.1 (finite paths, cycles, half-lines).
 * The cited Miller–Pelc lower bound `Ω(D log* ℓ_max)`, which is what makes the result "optimal".
+* Lemma 3.5 (3) for every round `T`: it is represented only by `ColRuling.knows` and `knows_exists`.
+* Lemma 2.1 in its general form (degree+1-list colouring, cited from Linial): it is proved only for the graphs
+  `G^k[S]` used, and the list colouring is replaced by the sweep.
+* The simulation of a frame algorithm by a port-number algorithm.
 
 **Trust.** No `sorry`; `thm_1_1_final`, `thm_3_1`, `lemma_3_4_isLocal`, `lemma_3_5_recurrence_gap`
 and the other listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.

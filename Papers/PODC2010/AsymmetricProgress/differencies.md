@@ -48,8 +48,8 @@ matches the PODC version for Theorems 1–6 and Lemmas 1–11; Lemmas 12–16 ar
 
 9. **`n ≥ 2` added** (Theorems 1 and 4; Lemmas 3–9). These are false for `n = 1`. One process that
    decides its own input is a wait-free consensus algorithm without any objects
-   (`theorem1_false_one_process`), and it has no bivalent run (`lemma3_false_one_process`). Rule R2/R4:
-   degenerate case and a standard implicit assumption, so ⚠️.
+   (`theorem1_false_one_process`), and it has no bivalent run (`lemma3_false_one_process`). This is a
+   degenerate case and a standard implicit assumption (✏️).
 10. **Lemma 1** (`lemma1`) assumes that *all* objects have the same state (not only those `p` can access)
     and that the first configuration is reachable. This is the form used everywhere in the paper's proofs.
 11. **Lemma 2** (`lemma2`) is stated for configurations `D` with `D p` `v`-valent and `D q p`
@@ -93,22 +93,21 @@ matches the PODC version for Theorems 1–6 and Lemmas 1–11; Lemmas 12–16 ar
 
 ## Proofs
 
-19. **Lemma 6, induction step (proof repaired).** The paper applies Lemma 1 to `x` and `z` (and to `xq`
+19. **Lemma 6, induction step (🔧).** The paper applies Lemma 1 to `x` and `z` (and to `xq`
     and `zq`, later to `x`, `y`). It claims that "the state of all the objects that `p` can access in `x`
     and `z` are the same, because the only object that `p` accesses in `x` and `z` is `o`". The suffix
     `z − x` consists of steps of `s` that may write registers, which `p` can access. So the hypothesis of
     Lemma 1 fails. The conclusions (`xp`, `zp` compatible; `xqp`, `zqp` compatible) are still true: the
     step of `p` (on `o`) commutes with the steps of `s` (which avoid `o`), so `zp = xp (z − x)` is an
     extension of `xp`. Repaired with `run_comm_of_avoids` and `Avoids.step_of_poised` (`CritK.extend`).
-    Classified as a proof gap (🛠️).
-20. **Theorem 2 (proof repaired).** The proof applies Lemma 6 to an implementation from `(n, x)`-live
+20. **Theorem 2 (🛠️).** The proof applies Lemma 6 to an implementation from `(n, x)`-live
     base objects, but Lemmas 1–6 are developed only for atomic events. "The other `n − x` processes
     access `o` simultaneously … may never run in isolation" needs a semantics of steps on non-atomic
     objects. Our blocking-object model (item 4) and the adversarial object `advCons` make this precise.
     The process `w` must be chosen wait-free for the implementation but not for `o` (it exists because
     `|X_P| = x + 1 > |X_o|`), and the second process `r ∉ X_o ∪ {w}` exists because `x + 1 < n`. Both stay
     blocked forever when they alternate, starting with the one that did not take the last step on `o`
-    (`theorem2`). Classified as a proof gap (🛠️).
+    (`theorem2`).
 21. **Lemma 5, Cases 1/2.** The claims "`z′ = z`" and "`z′p = z`" are correct but not needed. We only use
     "`z′p` is `v̄`-valent". The prefix `z′` is obtained by a structural recursion
     (`exists_prefix_without`) instead of "longest prefix".
@@ -139,7 +138,7 @@ matches the PODC version for Theorems 1–6 and Lemmas 1–11; Lemmas 12–16 ar
 27. **Arbiter validity in real-time form** (`arbiter_validity_owner`/`_guest`): "a process with role
     `owner` (resp. `guest`) took a step before the return". The paper's specification (Section 6.1) omits
     "before", but its proofs of Lemma 10 Case 2 and Lemma 11 Case 2 use the real-time version. Figure 4
-    satisfies it. Classified as a proof gap of Theorem 6 (🛠️).
+    satisfies it. A proof gap of Theorem 6 (🔧).
 28. **Theorem 6 validity** (left to the reader in the paper) is proved in real-time form
     (`group_validity`).
 29. **Theorem 5** is stated for the standalone Figure 4 algorithm: each process invokes once, with a fixed

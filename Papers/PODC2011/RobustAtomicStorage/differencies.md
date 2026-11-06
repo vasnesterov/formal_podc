@@ -84,14 +84,14 @@ Storage.* PODC 2011 (EPFL accepted version, 10 pages, proofs included).
 
 ## Lemma 2 (`Main.lemma2`)
 
-16. **Proof gap (🛠️, R1: claim inside a proof).** "By Lemma 1 … Observe that this is valid even with
+16. **Proof gap (🔧).** "By Lemma 1 … Observe that this is valid even with
     `R ≥ k` readers and `t ≥ t_k` faults": Lemma 1 is about `3t_k + 1` objects and `t_k` faults, and
     going to `S = 3t + 1` objects and `t > t_k` faults needs larger blocks; the paper's scaling
     argument (Proposition 2) only handles `t_k ∣ t`. Repaired by `Arith.exists_fits` (extra objects
     in the blocks `B_k`, `C_k`, `B_{k+1}`, which never lie in a common constrained set).
-17. **Direction of "solving for k".** The proof needs `k ≤ ⌊log ⌈(3t+1)/2⌉⌋ ⇒ t ≥ t_k` but derives
+17. **Direction of "solving for k" (✏️).** The proof needs `k ≤ ⌊log ⌈(3t+1)/2⌉⌋ ⇒ t ≥ t_k` but derives
     the converse from the closed form; both directions hold (`Arith.tseq_le_iff`).
-18. **Degenerate cases (R2).** For `R = 0` (no reader) or `t = 0` the bound
+18. **Degenerate cases.** For `R = 0` (no reader) or `t = 0` the bound
     `min {R, ⌊log ⌈(3t+1)/2⌉⌋}` is `0` and the statement is about 0-round writes; our model has no
     0-round operations, so we state Lemma 2 for `1 ≤ K ≤ min {…}`. (With `R = 0` the statement would
     be false — atomicity is vacuous without reads — but the paper's "multi-reader" excludes it.)
@@ -100,7 +100,7 @@ Storage.* PODC 2011 (EPFL accepted version, 10 pages, proofs included).
 
 ## Proposition 2 (`Main.proposition2`)
 
-20. **Proof gap (🛠️, R1).** "By carefully choosing `c = t/t_k`, we obtain a lower bound proof for
+20. **Proof gap (🔧).** "By carefully choosing `c = t/t_k`, we obtain a lower bound proof for
     `S' = 3t + ⌊t/t_k⌋` and `t` faults": multiplying every block by `c` requires an integer `c`, i.e.
     `t_k ∣ t`; for other `t` it yields only `3c t_k + c < 3t + c` objects. Statement true: we add
     `d = t − c·t_k` objects to each of `B_k`, `C_k`, `B_{k+1}` (`Arith.exists_fits`; total `3t + c`),

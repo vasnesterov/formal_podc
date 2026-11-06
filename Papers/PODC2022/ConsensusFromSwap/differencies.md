@@ -33,12 +33,12 @@ Paper: Sean Ovens, *The Space Complexity of Consensus from Swap*, PODC 2022, arX
 
 ## Definitions
 
-7. **Valency (under-specified in the paper).**
+7. 🔧 **Valency (under-specified in the paper).**
    * `CanDec Q C v`: some `Q`-only execution from `C` leads to a configuration in which some process of `Q` *has
      decided* `v`. Decisions before `C` count.
    * `Biv Q C`: `CanDec Q C 0 ∧ CanDec Q C 1`; "univalent" means `¬ Biv`.
    * Why decisions before `C` must count: under the other reading (decision inside the execution), Lemma 13's
-     proof breaks when both processes of `Q` decide within `α` (see README, item 2). With agreement, both readings
+     proof breaks when both processes of `Q` decide within `α` (see README, Lemma 13). With agreement, both readings
      agree on bivalence.
 8. **Indistinguishability `α ∼_p α'`** (`Indist`): `p` has the same local state before each of its steps, and the
    same final local state. For deterministic processes this is the paper's "same sequence of steps", up to the
@@ -54,14 +54,14 @@ Paper: Sean Ovens, *The Space Complexity of Consensus from Swap*, PODC 2022, arX
 11. **Lemma 6 / Algorithm 1.**
     * **Modelling note: `k ≥ 1`.** `lemma6_agreement` assumes `1 ≤ k`, as the paper does throughout. For `k = 0`
       the statement fails (example in `Alg1Agree.lean`).
-    * **Observation 4 false for `m = 1` (false only in a degenerate case).** Example in `Alg1Agree.lean`. Lemma 6
+    * ✏️ **Observation 4 false for `m = 1`.** Example in `Alg1Agree.lean`. Lemma 6
       does not need it in that case.
     * **Restructured proof.** It works with *any* `k + 1` decided values ordered by first decision time; "first
       decider" and "prefix with exactly `k + 1` values" are not needed.
     * **Lemma 5 as an invariant.** It is proved as a forward invariant (an injective "destroyer" map) instead of
       the paper's history argument. It also yields that the destroyers are undecided at `C`, which the paper argues
       inline.
-    * **Missing case in Step 2.** The paper omits `C = C_t`; that case is trivial.
+    * ✏️ **Missing case in Step 2.** The paper omits `C = C_t`; that case is trivial.
     * **Number of objects.** The proof works for any `N ≥ n − k` objects (`hN : n ≤ N + k`).
 12. **Theorem 10.**
     * **Different induction (proof restructured).**
@@ -71,7 +71,7 @@ Paper: Sean Ovens, *The Space Complexity of Consensus from Swap*, PODC 2022, arX
         (`decBy`).
       * Our base case is `k = 0` and is trivial. The final bound is the same: `n ≤ k(#objects + 1)`, i.e.
         `⌈n/k⌉ − 1 ≤ #objects`. No hypothesis `n > k ≥ 1` is needed.
-    * **Imprecision in the paper's restriction.** The restricted algorithm need not satisfy validity, because a
+    * 🔧 **Gap in the paper's restriction.** The restricted algorithm need not satisfy validity, because a
       decided value may be the input of a process outside `R`. Resetting the outside inputs (invisible to `R`)
       fixes this; we do so in the proof.
 13. **Lemma 9** is stated for an arbitrary configuration `C` (the paper's `Cα`) and an arbitrary `D` (the paper's
@@ -79,10 +79,10 @@ Paper: Sean Ovens, *The Space Complexity of Consensus from Swap*, PODC 2022, arX
     validity and solo termination from `D`.
 14. **Lemma 13.** Proved with the inclusive valency of item 7. The proof is otherwise the paper's (two cases: the
     next step of `α` accesses a covered object or not), for arbitrary objects.
-15. **Lemma 14 (proof gap; statement true).** `j` is chosen minimal over `(Q ∪ P_i)`-only executions; the paper's
+15. 🔧 **Lemma 14 (statement true).** `j` is chosen minimal over `(Q ∪ P_i)`-only executions; the paper's
     text quantifies over all executions, which does not give (a). We state Lemma 14 for an arbitrary set
     `R ⊇ Q` (the paper's `Q ∪ P_{i+1}`) and a process `p ∉ R`.
-16. **Lemma 16, Case 2, (d) for `i + 1` (proof gap; statement true).**
+16. 🔧 **Lemma 16, Case 2, (d) for `i + 1` (statement true).**
     * **The gap.** From "`Q` univalent in `C_{i+1}λ'd`" the paper concludes "`Q` univalent in `C_{i+1}λ'dβ_i`",
       but univalence is not preserved by steps outside `Q`.
     * **Repair.** Case split. If `β_i` changes an object of `Y_i`, use the induction hypothesis (d); otherwise
@@ -97,6 +97,6 @@ Paper: Sean Ovens, *The Space Complexity of Consensus from Swap*, PODC 2022, arX
 
 ## Typos
 
-19. Lemma 16, Case 2: "then `P` is univalent in `C_{i+1}λ'`" should be `Q`.
-20. Section 5.2 (example for `i = 1`): "`S_1 = {p_1}` covers" should be `{p_0}`.
+19. ✏️ Lemma 16, Case 2: "then `P` is univalent in `C_{i+1}λ'`" should be `Q`.
+20. ✏️ Section 5.2 (example for `i = 1`): "`S_1 = {p_1}` covers" should be `{p_0}`.
 21. Lemma 6, Step 1: "`V_j[v_j] = ℓ_j > V_{k+1}[v_j] + 2`" should be `V_j[x_j] = ℓ_j > ℓ_{k+1} ≥ V_{k+1}[x_j] + 2`.

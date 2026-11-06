@@ -40,7 +40,7 @@ version *Recoverable Consensus in Shared Memory*, arXiv:1804.10597v2 (May 2018).
   generalized to arbitrary read/write-like objects (`ObjSpec.RWLike`: every operation is read-only or a blind
   overwrite), the rTAS objects are indexed by a finite type of size `≤ f`. `theorem3_gen`: any `n`, any two
   participating processes, any admissible set containing the restricted executions.
-- **Proof gap (🛠️, deciding the verdict): Assumption 1 and Case C.** Assumption 1 makes `p₁` crash right after
+- **Proof gap (🔧): Assumption 1 and Case C.** Assumption 1 makes `p₁` crash right after
   its first *access* to each TAS object. For *readable* TAS (the theorem's objects) a read is an access (the paper
   itself uses "access" for reads: Case D is "both processes are poised to access the same base object and at least
   one process is poised to read"), and Case C
@@ -55,7 +55,7 @@ version *Recoverable Consensus in Shared Memory*, arXiv:1804.10597v2 (May 2018).
   **Repair**: crash `p₁` right after its first `tas` operation on each rTAS object (reads do not count). Then an
   rTAS object on which `p₁` has applied `tas` holds `1` (`Theorem3.tasInv`), Case B applies whenever the object
   holds `0`, Case C whenever it holds `1`, and the crash budget is still `≤` the number of rTAS objects. Statement
-  true; verdict rule R1 (a wrong step in the proof of a true theorem) ⇒ 🛠️.
+  true.
 - Gap (routine): the proof does not show that an initial bivalent state exists (it starts "in the initial system
   state"); `biv_init` (inputs `p₁ ↦ 0`, `p₂ ↦ 1`; `p₁` alone decides `0`, `p₂` alone `1` by validity).
 - Gap (routine): "the construction must succeed eventually by the wait-freedom of `A`": made precise in
@@ -91,15 +91,15 @@ version *Recoverable Consensus in Shared Memory*, arXiv:1804.10597v2 (May 2018).
   Corollary 7 ("as well as from any type with consensus number `n`") go beyond Theorem 6, which concerns generic
   constructions from consensus objects. We read "universal construction" as "generic construction from consensus
   objects" (the paper's own Section 6 framing) and formalize only that; the broader reading (arbitrary types `T`,
-  non-generic constructions) is neither proved nor refuted by the paper. Not counted against the verdict
-  (interpretation of a loosely worded summary). Borderline call: in the same list, (i) and (ii) use "any
+  non-generic constructions) is neither proved nor refuted by the paper. This is an open reading of a loosely worded
+  summary, not a mistake: in the same list, (i) and (ii) use "any
   conventional consensus algorithm" in the black-box sense, and the main text states the result only for "generic
   constructions" (Section 6 before Definition 5, remark after Corollary 7), so "universal construction" =
   black-box (generic) construction is the paper's evident meaning; the paper proves nothing about non-generic
   constructions and introduces Definition 5 precisely to exclude them (non-generically, e.g. one atomic sticky
-  consensus object without port bound, re-proposed after each crash, suffices for every `f`). Had the abstract wording
-  been counted as wrong, the fix ("universal" → "generic") is local and recoverable from the paper (R3, ⚠️); we judge
-  the abstract faithful under its evident meaning and keep 🛠️.
+  consensus object without port bound, re-proposed after each crash, suffices for every `f`). A wording fix
+  ("universal" → "generic") would be local and recoverable from the paper; we judge the abstract faithful under its
+  evident meaning.
 
 ## Theorem 1 / Theorem 11 / Lemma 8 (Figure 1, simultaneous failures)
 
@@ -111,7 +111,7 @@ version *Recoverable Consensus in Shared Memory*, arXiv:1804.10597v2 (May 2018).
   evaluated by two separate reads (`P[i]`, then `P[other]`), each line re-reading as written; `C` is an atomic
   sticky consensus object. Lines 13–14 read `P[1]`; if it were `⊥` the process would return its own input — proved
   unreachable (`l13_recorded`).
-- Proof gaps (🛠️, statements true; README item "Lemmas 9, 10, 14"): the paper's proofs treat the two-register tests as atomic snapshots without
+- Proof gaps (🔧, statements true; README item "Lemmas 9, 10, 14"): the paper's proofs treat the two-register tests as atomic snapshots without
   arguing that the non-atomic reads are safe (they are: `P[i]` only changes when `p_i` writes it, and `P` never
   returns to `⊥`); the fact that "an idle process whose proposal is recorded implies nobody is in lines 3–5" is used
   implicitly in Lemmas 9 and 10 (invariant field `quiet`). The space claim ("three registers in addition to `C`")
@@ -133,7 +133,7 @@ version *Recoverable Consensus in Shared Memory*, arXiv:1804.10597v2 (May 2018).
   writes `R[i]`), instead of re-reading `R[i]`; the loop's end without return (footnote 4) is a stuck state that
   never outputs (keeps reading `R[i]`) — proved unreachable with at most `f` crashes; `v` is the proposal carried
   across iterations and reset to the input after a crash.
-- Proof gaps (🛠️, statements true; README item "Lemmas 9, 10, 14"): Lemma 14's "at the time when `p_i` reached line 26 in iteration `k_i`, no process
+- Proof gaps (🔧, statements true; README item "Lemmas 9, 10, 14"): Lemma 14's "at the time when `p_i` reached line 26 in iteration `k_i`, no process
   had reached line 17 in its own iteration `k_i` or higher" treats the scan of `R[1..n]` as atomic (each `R[z]` is
   read at a different time; the argument works per process, invariant "`G k₀ d` holds or some unchecked process has
   `R ≥ k₀+2`"), and "`k_i` or higher" should be "`k_i + 1` or higher". Lemma 15, Case 1 does not consider a process

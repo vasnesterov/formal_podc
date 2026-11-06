@@ -4,16 +4,33 @@ Christoph Lenzen, Sahar Sheikholeslami. *A Recursive Early-Stopping Phase King P
 DOI [10.1145/3519270.3538425](https://doi.org/10.1145/3519270.3538425). Formalized version: the
 proceedings version (no arXiv version exists). Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** **Lemma 4.2 is false**: the voting barrier (Algorithm 7) can violate
-electors' agreement and "termination within one round of each other", even with a good elector set
-and a correct consensus routine. A one-line repair makes all of Lemma 4.2 true. So Theorem 1.2
-(the `O(n²)`-bit recursive algorithm) is not established by the paper, though it is very likely
-true after repairs. Theorem 1.1 and Theorem 2.9 (`6(f+1)` rounds) are correct. Lemma 3.1 and
-Corollary 3.2 are off by one iteration for `f = 2`; this does not affect `O(f+1)`.
+**Verdict: ❌ Intent lost.** Theorem 1.2, the `O(n²)`-bit recursive algorithm that gives the paper its title and its
+claim to be first, is not established: the proof does not cover correct nodes that return while others continue,
+and nothing we proved closes this, although the theorem is not refuted and is very likely true after repairs.
+Lemma 4.2 is false as printed: the voting barrier (Algorithm 7) can violate electors' agreement and "termination
+within one round of each other", even with a good elector set and a correct consensus routine, and a one-line
+repair makes it true. Theorem 1.1 (relative to the cited Theorem 3.3) and Theorem 2.9 (`6(f+1)` rounds) are correct,
+and Lemma 3.1 and Corollary 3.2 are off by one iteration for `f = 2`, which does not affect `O(f+1)`.
 
 ## Mistakes in the paper
 
-### ❌ Lemma 4.2 (voting barrier, Algorithm 7)
+### ❌ Theorem 1.2 (Algorithm 8 ignores terminated correct nodes)
+In Algorithm 8 a termination check can let some correct nodes return while others continue
+(`alg2_split_term`), and the returned nodes no longer take part in the later calls of Algorithm 7, whose barrier
+argument needs all `n − f` correct nodes.
+
+**Impact.** The proof of Theorem 1.2 does not cover these executions, so Theorem 1.2 is unestablished. We did not
+formalize Algorithm 8 end to end, so we do not claim Theorem 1.2 is false; it is very likely true after repairs.
+
+**Details.** Convention (3) ("assume that `i` sends `b`") is not defined for `elect`/`vote` messages. At the
+level of Algorithm 7:
+- with two silent terminated nodes (`n = 7`, `t = 2`), even the repaired Algorithm 7 lets one node return in
+  round 1 and the others at the timeout (`np_fails`);
+- the "phantom voter" reading of convention (3) fails similarly for the unrepaired algorithm (`ph_fails`).
+
+The next compiled step then starts with more than one round of skew, outside the precondition of Theorem 4.1.
+
+### 🔧 Lemma 4.2 (voting barrier, Algorithm 7)
 With `n = 4`, `t = 1`, one faulty node and a correct consensus thread, the faulty node can make one correct node
 return `1` without ever voting, while the other two return `1` and `0` at the timeout, two rounds later
 (`cx_fails`, `cx_not_electorsBC`, `cx_not_within_one`).
@@ -38,29 +55,13 @@ for a node that has already returned.
 **Repair.** A returning node still broadcasts its pending votes for one more round. With the repair, all bullets
 of Lemma 4.2 hold (`lemma_4_2`, `good_ret`).
 
-### ❌ Theorem 1.2 (Algorithm 8 ignores terminated correct nodes)
-In Algorithm 8 a termination check can let some correct nodes return while others continue
-(`alg2_split_term`), and the returned nodes no longer take part in the later calls of Algorithm 7, whose barrier
-argument needs all `n − f` correct nodes.
-
-**Impact.** The proof of Theorem 1.2 does not cover these executions, so Theorem 1.2 is unestablished. We did not
-formalize Algorithm 8 end to end, so we do not claim Theorem 1.2 is false; it is very likely true after repairs.
-
-**Details.** Convention (3) ("assume that `i` sends `b`") is not defined for `elect`/`vote` messages. At the
-level of Algorithm 7:
-- with two silent terminated nodes (`n = 7`, `t = 2`), even the repaired Algorithm 7 lets one node return in
-  round 1 and the others at the timeout (`np_fails`);
-- the "phantom voter" reading of convention (3) fails similarly for the unrepaired algorithm (`ph_fails`).
-
-The next compiled step then starts with more than one round of skew, outside the precondition of Theorem 4.1.
-
-### ❌ Lemma 3.1 and Corollary 3.2 for `f = 2`
+### 🔧 Lemma 3.1 and Corollary 3.2 for `f = 2`
 Lemma 3.1 claims some iteration `j ≤ ⌈log(max{f/2, 1})⌉` has fewer than a third faulty electors, but for `f = 2`
 the bound is `j = 0` and the first elector set `{1, 2, 3, 4}` can contain both faults (`n = 7`)
 (`lemma_3_1_false`, `corollary_3_2_false`).
 
-**Impact.** Off by one iteration and harmless: termination by iteration `1` instead of `0` for `f = 2` does not
-affect `O(f+1)` (Theorem 1.1).
+**Impact.** Off by one iteration: termination by iteration `1` instead of `0` for `f = 2` does not affect `O(f+1)`
+(Theorem 1.1).
 
 **Details.** The proof's final inequality equals `2 > 2` exactly at `f = 2`. A spec-level execution where no node
 terminates in iteration 0 refutes the corollary.
@@ -68,20 +69,37 @@ terminates in iteration 0 refutes the corollary.
 **Repair.** Termination by iteration `jStar f` (least `J` with `2^{J+1} + J > f`). This is at most the paper's
 bound, except for `f = 2`, where it is `1` (paper: `0`) (`lemma_3_1`, `corollary_3_2`, `jStar_le_paperJ`).
 
-### ⚠️ Algorithm 4 for `n ≤ 3` (never returns)
-The loop `for j = 0 to ⌈log(n/6)⌉` is empty for `n ≤ 3`, so Algorithm 4 never returns, including for `t = 0`
-under the paper's own "run on `3t + 1` nodes" convention (`loopEnd_neg`).
-
-**Impact.** False only in a degenerate case; for `n ≥ 4` the loop is long enough (`jStar_le_loopEnd`).
-
-### Typos and slips
+### ✏️ Slips
+- Algorithm 4 for `n ≤ 3`: the loop `for j = 0 to ⌈log(n/6)⌉` is empty, so Algorithm 4 never returns, including for
+  `t = 0` under the paper's own "run on `3t + 1` nodes" convention (`loopEnd_neg`). For `n ≥ 4` the loop is long
+  enough (`jStar_le_loopEnd`).
+- The bit bounds `O(n t log(f+2))` of Theorem 1.1 and `O(nt)` of Theorem 1.2 are literally `0` for `t = 0`, while
+  nodes do send messages for `n ∈ {2, 3}`.
 - Algorithm 4 line 5 has `max` for `min`.
 - Algorithm 7 line 9 has "`elect(b)` from `t + 1` nodes" for `vote(b)`.
 - The proof of Lemma 4.2 has `strong_i = 0` for `strong_i = 1`.
-- "Each correct node broadcasts at most twice" should be three times (`three_bcasts`).
 - Lemma 4.5's induction states `B ≤ C n t log(ℓ+1)` but proves `C n² log(ℓ+1)`; the `nt` form fails for
-  `n ∈ {2, 3}`. Its case (3) applies `T` outside its domain.
-- The `O(n t log(f+2))` bit bound of Theorem 1.1 is literally `0` for `t = 0`.
+  `n ∈ {2, 3}`.
+
+### Typos
+- Proof of Lemma 4.5, case (2): "`|V₀| ≤ n/2 ≤ 2^{k+1}`" should be strict, since the induction hypothesis needs
+  `n < 2^{k+1}`.
+- Proof of Theorem 1.1: the cost sums are written with `Θ` although only an upper bound is shown.
+
+## Proof gaps (statements true)
+
+### 🔧 Lemma 4.2, last sentence of the proof (number of broadcasts)
+"Each correct node broadcasts at most twice" should be three times: an elector can broadcast `elect`, `vote(0)` and
+`vote(1)` (`three_bcasts`).
+
+**Impact.** One constant changes; the `O(n²)` term is unaffected (`lemma_4_2`).
+
+### 🔧 Lemma 4.5, case (3) of the proof
+The step `T(|V₀|, ⌈|V₀|/3⌉ − 1) ≤ T(|V₀|, f₀ − 1)` applies `T` outside its domain when `f₀ − 1 ≥ |V₀|/3`.
+
+**Impact.** The time recurrence stands (`lemma_4_5_time`).
+
+**Repair.** Bound `T(|V₀|, ⌈|V₀|/3⌉ − 1) ≤ C⌈|V₀|/3⌉ ≤ C f₀` directly, as the proved recurrence does.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

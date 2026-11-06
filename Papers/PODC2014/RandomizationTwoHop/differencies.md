@@ -3,9 +3,9 @@
 Paper: Y. Emek, C. Pfister, J. Seidel, R. Wattenhofer, *Anonymous Networks: Randomization = 2-Hop
 Coloring*, PODC 2014 (authors' copy, 10 pages, with proofs).
 
-## Statement-level issues and their verdict rules
+## Statement-level issues
 
-1. **Lemma 9 / correctness of `A*` as written: unestablished (⚠️).** The proof of Lemma 9 claims
+1. **Lemma 9 / correctness of `A*` as written: unestablished (🔧).** The proof of Lemma 9 claims
    that "the first `k` rounds in `η` for a single node `v` are fully determined by `L_k(v, I)` and
    the first `k − i` bits of each node `u ∈ H_i(v)`". With `L_1` = root only (the paper's
    definition), `k` rounds depend on the view of tree depth `k` (`L_{k+1}`) even without ports. In
@@ -22,29 +22,25 @@ Coloring*, PODC 2014 (authors' copy, 10 pages, with proofs).
    *Repair (used in the formalization):* Update-Graph uses the view `L_{p+1}(v, I^p)` (tree depth
    `p`) in condition C2 and for `v*` (`AStar.Lv`). This costs `p` rounds, which is the paper's own
    round count for this step ("requires `p` rounds"). With it, Lemmas 5–9 and Theorem 1 hold.
-   *Rule (decides the verdict, ⚠️ — reviewer decision):* R1: Lemma 9, and with it the correctness
-   of the paper's algorithm `A*`, is a statement, not a claim inside a proof. It is not 🛠️: 🛠️
-   requires every checked statement to be true *as written*, and Lemma 9 is verified only for `A*`
-   with Update-Graph's view changed from `L_p` to `L_{p+1}`, i.e. for a changed algorithm (the
-   false locality claim inside the proof is not the only issue; the repair had to change the
-   algorithm, not just the argument). The change is a local index fix whose intent is recoverable
-   from the paper (Update-Graph is said to take `p` rounds, which is what `L_{p+1}` costs), so R3
-   applies. It is not ❌: Lemma 9 for the original `A*` is unestablished, not refuted (R5 grades an
-   unestablished claim one level below a refuted one; same treatment as the unestablished time
-   constant of SynchronousCounting, Theorem 2). Theorem 1 (headline, existential) is proved, so
-   R5's 🚨 does not apply either. The argument for 🛠️ (the paper's §1.3 says randomized algorithms
-   need no port numbers, and for a port-oblivious `A_R` the original depth suffices) does not carry:
-   `A*` is stated for an arbitrary `A_R` that solves `Π` in the port model. Note also that the bits
-   `b^p` encode information from beyond the view radius, so the original `A*` may well be correct
-   by a different argument; we have neither such a proof nor a counterexample.
+   *Scope of the repair.* Lemma 9 is verified only for `A*` with Update-Graph's view changed from
+   `L_p` to `L_{p+1}`, i.e. for a changed algorithm (the false locality claim inside the proof is
+   not the only issue; the repair had to change the algorithm, not just the argument). The change
+   is a local index fix whose intent is recoverable from the paper (Update-Graph is said to take
+   `p` rounds, which is what `L_{p+1}` costs). Lemma 9 for the original `A*` is unestablished, not
+   refuted. Theorem 1 (existential) is proved. The paper's §1.3 says randomized algorithms need no
+   port numbers, and for a port-oblivious `A_R` the original depth suffices, but `A*` is stated for
+   an arbitrary `A_R` that solves `Π` in the port model. Note also that the bits `b^p` encode
+   information from beyond the view radius, so the original `A*` may well be correct by a different
+   argument; we have neither such a proof nor a counterexample.
 
-## Proof gaps (statements true)
+## Proof gaps and proof differences (statements true)
 
 2. **Lemma 3.** The proof establishes "every prime factor is isomorphic to `G∞`" but not that `G∞`
    is prime (needed for existence and used in Lemma 7). Repaired: distinct nodes of `G∞` have
    distinct views, so factorizing maps out of `G∞` are injective (`lemma_3`).
 3. **Lemma 7.** Compares views of nodes in two different graphs. Theorem 3 (as stated, from Norris)
-   is about one graph. Repaired by colour refinement on the disjoint union (`teq_stable_two`): agreement to
+   is about one graph; the printed proof is terse, truncating subtrees of equal depth-`p` views and
+   using Corollary 1 inside each graph. We take another route, colour refinement on the disjoint union (`teq_stable_two`): agreement to
    tree depth `m + n − 1` suffices, and `p ≥ 2n ≥ n + n'`. Our proof then shows the candidate's set
    of views equals that of `I^p` (`AStar.eq_of_mem_Fam`) instead of the truncating-map argument.
 4. **Corollary 2** is said to follow from Theorem 3. Theorem 3 gives depth `|V|`, Corollary 2 needs

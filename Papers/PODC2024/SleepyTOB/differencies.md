@@ -1,9 +1,9 @@
 # Differences between the formalization and the paper
 
 D'Amato, Losa, Zanolini, *Asynchrony-Resilient Sleepy Total-Order Broadcast Protocols*, PODC 2024,
-arXiv:2309.05347v2. The verdict rules R1–R6 are from the project's verdict scale.
+arXiv:2309.05347v2.
 
-## Statement-level issues (and the rule deciding each)
+## Statement-level issues
 
 1. **Algorithm 1, lines 6–7, input rule of `GA_{v,1}`: "not conflicting with `L_{v-1}`".** With this
    rule Algorithm 1 is unsafe. A Byzantine VRF winner proposes a strict prefix of the decided log, all
@@ -16,30 +16,29 @@ arXiv:2309.05347v2. The verdict rules R1–R6 are from the project's verdict sca
    typesetting artefacts. They are not evidence of a dropped line.) The wording is consistent:
    arXiv v1 says "not conflicting with `L_{v-1}`" in the pseudocode, in the prose and in the proof of
    its Proposition 1, and v2 says it in the pseudocode and the prose. So this is not a one-off typo.
-   *Decision: R3, ⚠️ (borderline with 🚨; reviewer endorses ⚠️).* The paper presents Algorithm 1 as [MMR]'s protocol ("We
+   *Label: 🔧.* The paper presents Algorithm 1 as [MMR]'s protocol ("We
    recall the total-order broadcast protocol proposed by [MMR]", and its correctness is delegated to
    [MMR]'s Lemmas 6–7). [MMR] requires the proposal to *extend* `L_{v-1}` and inputs `L_{v-1}`
    otherwise. The paper's proofs reason with that version: Lemma 2 ("outputs `Λ` with grade 1, and
    thus multi-casts a vote message for an extension of it"), Lemma 3's inductive step, and Theorem 2
    ("deciding `Λ'` would imply multi-casting a vote for an extension of `Λ'`"). The fix is one word
-   plus a missing case in pseudocode. Had the fix been judged a protocol design change, the verdict
-   would be 🚨 (R5: Theorem 2 names Algorithm 1). The R3 call rests on the paper's own proofs and on
-   its attribution to [MMR]. The [MMR] ePrint could not be retrieved during the review, so its exact
+   plus a missing case in pseudocode. Reading it as the intended rule rests on the paper's own proofs
+   and on its attribution to [MMR]. The [MMR] ePrint could not be retrieved during the review, so its exact
    wording was not re-checked. We formalize the "extends" rule (`Exec.Follows`), and show that it is
    a special case of the printed rule (`Exec.Follows.followsLiteral`).
 2. **Definition 4, integrity: "there exists a well-behaved process that inputs the log".** Taken
    literally, this is false for every graded agreement with validity (`integrity_literal_false`), so
-   Lemma 1's claim "satisfies the original properties" is literally false. *Decision: R3, ⚠️.* The
+   Lemma 1's claim "satisfies the original properties" is literally false. *Label: ✏️.* The
    proof of Lemma 1 proves, and [MMR] states, "some honest input extends the log". We formalize that.
 3. **Lemma 1 / clique validity: hypotheses too narrow for its uses.** Stated for
    `H' ⊆ H_r ∪ H_{r+1}` and receivers in `H' ∩ H_{r+1}`. Lemma 2 applies it with
    `H' = H_ra \ B_r'`, which may contain processes asleep in rounds `r'` and `r'+1`. Theorem 2 needs
-   it for all receivers of round `ra+π+1`. *Decision: proof repair (🛠️), R1.* The statement as
+   it for all receivers of round `ra+π+1`. *Label: 🔧 (proof gap).* The statement as
    written is true (`lemma_1_clique_validity`). The general form (`H'` disjoint from `B_r`, any
    receiver whose `M0` contains the clique's votes) has the same proof (`clique_validity`).
 4. **Lemma 3, base case.** "Follows from graded consistency": insufficient, since graded consistency
    yields only grade ≥ 0, and a longer conflicting grade-0 output may exist
-   (`graded_consistency_insufficient`). *Decision: proof repair (🛠️).* Repaired with [MMR]'s
+   (`graded_consistency_insufficient`). *Label: 🔧 (proof gap).* Repaired with [MMR]'s
    argument: integrity of `GA_{v-1,2}` plus uniqueness of `GA_{v-1,1}`
    (`Exec.Follows.decision_lock`). This uses the synchrony and η-sleepiness of rounds `r-2`, `r-1`.
    In the paper's network model (Section 2.1: in a synchronous round every awake honest receiver gets
@@ -58,7 +57,7 @@ arXiv:2309.05347v2. The verdict rules R1–R6 are from the project's verdict sca
    the worst-case bound exact (`betaTilde_identity`). The paper does not state this implication; it
    is consistent with Figure 1. The "must have" (necessity) of `β̃` is not formalized.
 6. **Lemma 2** uses validity at round `ra`, so round `ra` must be η-sleepy (assumed). We also assume
-   `ra ≥ 1`: in round 0 nobody votes, and the round-1 vote is unconstrained (degenerate case, R2).
+   `ra ≥ 1`: in round 0 nobody votes, and the round-1 vote is unconstrained (degenerate case).
 7. **Lemma 3** needs synchrony (automatic for rounds `≤ ra`) and η-sleepiness of all rounds in
    `[r-2, ra]` (assumed for all rounds `≤ ra`). The hypothesis `r ≤ ra` is dropped (vacuous).
 8. **Theorem 2** additionally needs η-sleepiness in rounds `≥ ra+π+2` for the synchronous

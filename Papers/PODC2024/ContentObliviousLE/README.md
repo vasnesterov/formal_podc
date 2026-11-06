@@ -6,37 +6,38 @@ Formalized version: the full paper, arXiv [2405.03646](https://arxiv.org/abs/240
 version); numbering follows it (BA Theorems 1 and 3 = full Theorems 1 and 3).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The algorithms are correct exactly as claimed. Algorithm 2 is a
-quiescently terminating leader election on oriented rings with exactly `n(2·IDmax+1)` pulses, the
-leader terminating last. Algorithm 3 elects and orients non-oriented rings quiescently with
-`n(2·IDmax+1)` pulses (Theorem 2) or `n(4·IDmax−1)` pulses (Proposition 14). The lower bound holds
-only as a worst case over ID assignments (as Theorem 17 of the full version says), not per
-instance; the statement of Theorem 3 leaves this quantifier implicit. Its proof
-has a repairable gap. IDs must be positive.
+**Verdict: 🔧 Easy fix.** The algorithms are correct exactly as claimed: Algorithm 2 is a quiescently terminating
+leader election on oriented rings with exactly `n(2·IDmax+1)` pulses, the leader terminating last, and Algorithm 3
+elects and orients non-oriented rings quiescently with `n(2·IDmax+1)` pulses (Theorem 2) or `n(4·IDmax−1)` pulses
+(Proposition 14). The lower bound holds as a worst case over ID assignments, as Theorem 17 of the full version
+says, once one step of its lockstep proof is repaired locally; IDs must be positive. Corollary 2 (the external
+compiler) and Appendix B (anonymous rings) were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorem 3 (lower bound, per instance vs. worst case)
-Theorem 3 ("any … algorithm sends at least `n⌊log₂(IDmax/n)⌋` messages") is false if read for each ring and ID assignment: Algorithm 2 with IDs relabelled by the swap `1 ↔ 16` sends at most 3 pulses on the single-node ring with ID 16, while `1·⌊log₂ 16⌋ = 4` (`theorem_3_per_instance_false`).
+### ✏️ Slips
+- Theorem 3 ("any … algorithm sends at least `n⌊log₂(IDmax/n)⌋` messages") is false if read for each ring and ID
+  assignment: Algorithm 2 with IDs relabelled by the swap `1 ↔ 16` is still a correct quiescently terminating
+  leader election, and it sends at most 3 pulses in every execution on the single-node ring with ID 16, while
+  `1·⌊log₂ 16⌋ = 4` (`theorem_3_per_instance_false`). The full version's Theorem 17 states the quantifier
+  explicitly ("for some assignment of IDs") and derives Theorem 3 from it, so the intended reading is clear from
+  the full paper. What Theorem 17 proves, and what we prove, is the worst case: for `n ≤ M`, some assignment of
+  distinct IDs from `{1,…,M}` has an execution with at least `n⌊log₂(M/n)⌋ ≥ n⌊log₂(IDmax/n)⌋` pulses
+  (`theorem_3`).
+- IDs must be positive: the paper writes `ID_v ∈ ℕ` without excluding `0`, but a node with ID `0` relays every
+  pulse, so on the 1-node ring Algorithm 2 runs forever (`infinite_execution_id_zero`). The proofs (Lemma 5's base
+  case, the pigeonhole in Lemma 22) silently use `ID ≥ 1`, and with it all results hold.
+- The lower bound needs correctness on rings with 1 node (a self-loop) and 2 nodes (a double link). The paper uses
+  these explicitly, but its definition of a ring ("connected graph with all degrees 2") does not literally include
+  them.
 
-**Impact.** An imprecise statement: the full version's Theorem 17 states the quantifier explicitly ("for some assignment of IDs") and derives Theorem 3 from it, so the intended reading is clear from the full paper. The worst-case bound holds (`theorem_3`).
-
-**Details.** The relabelled algorithm is still a correct quiescently terminating leader election, and it sends at most 3 pulses in every execution on that ring.
-
-**Repair.** What Theorem 17 proves, and what we prove, is the worst case: for `n ≤ M`, some assignment of distinct IDs from `{1,…,M}` has an execution with at least `n⌊log₂(M/n)⌋ ≥ n⌊log₂(IDmax/n)⌋` pulses. (`theorem_3`)
-
-### ⚠️ IDs must be positive (under-specified definition)
-The paper writes `ID_v ∈ ℕ` without excluding `0`, but a node with ID `0` relays every pulse, so on the 1-node ring Algorithm 2 runs forever (`infinite_execution_id_zero`).
-
-**Impact.** An implied assumption: the proofs (Lemma 5's base case, the pigeonhole in Lemma 22) silently use `ID ≥ 1`, and with it all results hold.
-
-### Typos and slips
-- The lower bound needs correctness on rings with 1 node (a self-loop) and 2 nodes (a double link). The paper uses these explicitly, but its definition of a ring ("connected graph with all degrees 2") does not literally include them.
-- Several cross-references are wrong: "Lemma 1–5" in Lemmas 6–8 and Appendix A mean the items of Lemma 5 and Lemma 24, "Algorithms 2–2" means line ranges, and Lemma 11's proof has `ID_v` for `ID_b`.
+### Typos
+- Several cross-references are wrong: "Lemma 1–5" in Lemmas 6–8 and Appendix A mean the items of Lemma 5 and
+  Lemma 24, "Algorithms 2–2" means line ranges, and Lemma 11's proof has `ID_v` for `ID_b`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 19 / Theorem 17 (lockstep argument)
+### 🔧 Lemma 19 / Theorem 17 (lockstep argument)
 The lockstep argument says that nodes with equal solitude patterns "send their first pulse in the same direction … receive and send exactly the pattern", one pulse per time step, but patterns record *received* pulses, so two IDs with equal patterns may still send in different batches.
 
 **Impact.** Statement true; repaired (`Cslib.ContentOblivious.reach_sync`, `lemma_19`, `theorem_17`).
@@ -89,7 +90,7 @@ lockstep/indistinguishability lemma (`reach_sync`) and the solitude characteriza
 are in `Cslib/Computability/Distributed/ContentOblivious/Lockstep.lean`.
 
 **Not formalized.** Corollary 2 (simulation via the external compiler of Censor-Hillel et al.) and
-Appendix B (anonymous rings, randomized ID sampling).
+Appendix B (anonymous rings, randomized ID sampling); neither was checked.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: Algorithm 2 satisfies the lower bound's hypothesis for every ring size

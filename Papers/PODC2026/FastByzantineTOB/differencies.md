@@ -2,7 +2,7 @@
 
 Paper: Monti, Camaioni, Roman, *Fast Byzantine Total Order Broadcast*, PODC 2026, arXiv:2412.14061v2.
 
-## Statement-level issues (with the deciding rule from `verdicts.md`)
+## Statement-level issues
 
 1. **"At least `5f + 1` servers" (abstract; introduction) vs. hard-coded thresholds.** §2.1 fixes `n = 5f + 1`,
    and all proofs use it. Blink's `4f + 1`/`2f + 1` and Flutter's lock quorum `4f + 1` are wrong for
@@ -11,30 +11,27 @@ Paper: Monti, Camaioni, Roman, *Fast Byzantine Total Order Broadcast*, PODC 2026
    `con` satisfying Representative Validity and Agreement). Repaired: thresholds `n − f`
    (`blink_safe_general`, `theorem8_totalOrder_general`). In both counterexamples every black-box decision comes
    after the correct proposals that justify it, so they also hold under a temporal reading of the specs.
-   *Rule:* borderline between R4 and a false claim. We chose ⚠️ for three reasons. (a) The paper's model
-   section states `n = 5f + 1` explicitly, and the counterexamples violate that model. (b) Writing thresholds
-   for `n = 5f + 1` and saying "at least `5f + 1`" is a common convention in BFT papers, meaning the resilience
-   bound `f < n/5`. (c) The repair (`4f + 1 ↦ n − f`) is local and evident. A stricter reader could rate it a false claim
-   (R4: "NOT excused if the paper explicitly claims more generality"); on that reading the label would be 🚨,
-   not ❌, because the claim is about the paper's specific algorithm Flutter, the title result (R5: a false
-   named algorithm is 🚨 even if a repaired protocol exists).
-   *Reviewer note.* Precedents rated 🚨 for the same threshold pattern (`Papers/PODC2019/VABA`,
-   `Papers/PODC2021/RoundEfficientBA`) differ in one decisive way: there the model section and the numbered
-   theorems themselves claim every `f < n/3`, and the proofs reason in that generality. Here the model (§2.1,
-   with a citation) fixes `n = 5f + 1`, every numbered result is stated and proved in that model and is true
-   there; only the abstract/introduction phrase "at least `5f + 1` servers" overreaches. That is why ⚠️ is
-   endorsed, as a borderline call.
+   This is a 🔧 mistake. (a) The paper's model section states `n = 5f + 1` explicitly, and the counterexamples
+   violate that model. (b) Writing thresholds for `n = 5f + 1` and saying "at least `5f + 1`" is a common
+   convention in BFT papers, meaning the resilience bound `f < n/5`. (c) The repair (`4f + 1 ↦ n − f`) is local
+   and evident. But the paper does explicitly claim more generality, and the claim is about its specific
+   algorithm Flutter, the title result.
+   The same threshold pattern occurs in `Papers/PODC2019/VABA` and `Papers/PODC2021/RoundEfficientBA`, with one
+   difference: there the model section and the numbered theorems themselves claim every `f < n/3`, and the proofs
+   reason in that generality. Here the model (§2.1, with a citation) fixes `n = 5f + 1`, every numbered result is
+   stated and proved in that model and is true there; only the abstract/introduction phrase "at least `5f + 1`
+   servers" overreaches.
 2. **Lemma 5 as stated** does not say whether the sequence may be finite. Read as an `ℕ`-indexed strictly
    increasing sequence of elements of `X`, it is false for finite nonempty `X` (`lemma5_literal_false`); "sequence"
    may however be read as finite or infinite, so this is an imprecision rather than an error. Intended: a finite
    or infinite enumeration, as the proof shows (`φ` is a bijection with `{n ≤ |X|}`). Proved as `lemma5_finite` (sorted list) and `lemma5_infinite` (`z : ℕ → α`,
-   `range z = X`). Our infinite case assumes `X` infinite instead of splitting on `|X|`. *Rule:* R3 (evident
-   intent, local fix, the proof uses the intended version) → at most ⚠️.
-3. **Lemma 6 as stated** does not say that `z`, `z'` take values in `X`; if they may leave `X` it is false
+   `range z = X`). Our infinite case assumes `X` infinite instead of splitting on `|X|`. The proof uses the
+   intended version.
+3. ✏️ **Lemma 6 as stated** does not say that `z`, `z'` take values in `X`; if they may leave `X` it is false
    (`lemma6_literal_false`: `X = {0}`, `z = id`, `z' = 2·`). Read as sequences in `X` it is true.
    Proved with `range z = range z' (= X)` (`lemma6_infinite`, via Mathlib's
    `StrictMono.range_inj_of_wellFoundedLT`; `lemma6_finite` for sorted lists). The proof uses `z_n, z'_n ∈ X`,
-   and the hypothesis holds at its uses (Corollary 2 by construction; Corollary 3 by Lemma 18). *Rule:* R3 → at most ⚠️.
+   and the hypothesis holds at its uses (Corollary 2 by construction; Corollary 3 by Lemma 18).
 
 ## Proof-level differences (statements unaffected)
 

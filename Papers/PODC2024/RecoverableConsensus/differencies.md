@@ -99,7 +99,7 @@ non-readable fails for `n' = n − 1` if readability is understood up to encodin
 
 ## Section 4
 
-19. **Lemma 15, proof, case `o_i = opR` (false claim, repaired).** The paper claims that if `p_i`
+19. **Lemma 15, proof, case `o_i = opR` (false step, repaired).** The paper claims that if `p_i`
     (team `v`) applies `opR` then `value(O, C′p_ip_j) = value(O, C′p_j)` for `p_j` on team `v̄`
     "in either case". This is false when `value(O, C′) = s_{x,t}` with `n′ < t < n − 1` and `p_j`
     applies `op_y`: then `C′p_ip_j` has `O = s⊥` but `C′p_j` has `O = s_{x,t+1}`. Repair (used in

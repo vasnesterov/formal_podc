@@ -6,44 +6,21 @@ arXiv [1612.01514](https://arxiv.org/abs/1612.01514) v1 (the only version; a rev
 conference paper). Numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🛠️ Proof repaired (correctness part only; work bounds not checked).** We verified
-the correctness theorem, Theorem 3.4: `SameSet`/`Unite` with CAS-based linking by node id is
-linearizable and wait-free with each of the three versions of `Find` (no compaction, one-try and
-two-try splitting), for every fixed order of the ids, and so are the early-termination variants of
-Section 6. The proofs in Section 3 have small gaps, all easy to fill. The work bounds (Sections 4–5),
-the paper's headline efficiency result, are not formalized. For one-try splitting the PODC version
-claims the work bound of Theorem 5.1 with a proof that the authors themselves later called incorrect;
-the claim is open. We found a proof gap in Lemma 4.2, which the proof of Theorem 5.1 inherits; it
-can be fixed on paper by changing constants, but this repair is not checked in Lean.
+**Verdict: ⚠️ Weakened.** Linearizability and wait-freedom (Theorem 3.4 and the early-termination variants of
+Section 6) are proved for all three versions of `Find` and every fixed order of the ids, after easy repairs of the
+proofs in Section 3. The paper's efficiency results (Sections 4–5) were not checked in Lean. The one step of them we
+examined, the Chernoff bound in the proof of Lemma 4.2, on which the `O(log n)` high-probability bound and part of
+Theorem 5.1 rest, is wrong, and its repair exists only on paper.
 
 ## Mistakes in the paper
 
-No mistakes in the statements we checked (correctness, Sections 3 and 6).
-
-Not checked by us: the PODC version claims the expected work bound `O(m(α(n, m/(np)) + log(np/m + 1)))` (Theorem
-5.1 of the arXiv version, stated in the PODC abstract) also for one-try splitting, and the authors later
-acknowledged that its proof is incorrect. The arXiv version says: "In the conference version of our paper [JT16],
-we claimed that Theorem 5.1 holds for one-try splitting, but our proof, essentially the proof of Theorem 5.1, is
-not correct for this algorithm." It proves only a weaker bound (Theorem 5.2, `m/(np²)` in place of `m/(np)`) and
-calls the original claim "an open problem" (Section 7). We could not consult the proceedings text and do not
-formalize Sections 4–5, so we neither confirm nor refute the claim.
-
-### Typos and slips
-- Algorithm 4, line 7: `u.p` should be `u.parent`.
-- Proof of Lemma 4.1: "rank … never less than the rank of its parent" should be "never more".
-- Proof of Lemma 4.2: "fewer than h bad links" should be "good links".
-- Proof of Theorem 5.1: the two exponents `h²/16` and `h²/4` are inconsistent.
-- Proof of Lemma 5.3: "depth 1 before the Find" should be "depth 2".
-
-## Proof gaps (statements true)
-
-### 🛠️ Lemma 4.2 (exponent `h²`, checked in the arXiv text)
+### ❌ Lemma 4.2 (exponent `h²`, checked in the arXiv text)
 The proof claims the bound `exp(−(c/2−1)²h²/c)` "by a Chernoff bound", but Chernoff gives only `exp(−(c/2−1)²h/c)`,
 linear in `h`, and the quadratic bound already fails for fair coins with `c = 4`, `h = 6` (`chernoff_step_fails`).
 
-**Impact.** We do not know whether the stated lemma is false; only its proof is broken. Corollary 4.2.1 and
-Theorem 4.3 survive with a larger constant `c`, and Theorem 5.1 (which inherits the gap) can be repaired on paper
-with another threshold; not checked in Lean.
+**Impact.** We do not know whether the stated lemma is false; only its proof is broken. Corollaries 4.2.1 and 4.2.2,
+Theorem 4.3 and the case `d < 1` of Theorem 5.1 inherit the gap. Corollary 4.2.1 and Theorem 4.3 survive with a larger
+constant `c`, and Theorem 5.1 can be repaired on paper with another threshold; not checked in Lean.
 
 **Details.** The proof bounds the probability that fewer than `h` of `c·h` independent links are "good", each good
 with probability ≥ 1/2. Fair coins are allowed by Lemma 4.1: with `c = 4`, `h = 6`, fewer than 6 heads among 24
@@ -53,27 +30,25 @@ exponent, its charge is not `O(m)`.
 
 **Repair.** A threshold `7h` repairs the proof of Theorem 5.1 (on paper; not formalized).
 
-### 🛠️ Lemma 3.1 ("u, v and w are distinct")
+### ✏️ Slips
+- Proof of Lemma 4.1: "rank … never less than the rank of its parent" should be "never more".
+- Proof of Lemma 4.2: "fewer than h bad links" should be "good links".
+- Proof of Lemma 5.3: "depth 1 before the Find" should be "depth 2".
+
+### Typos
+- Algorithm 4, line 7: `u.p` should be `u.parent`.
+- Proof of Theorem 5.1: the two exponents `h²/16` and `h²/4` are inconsistent.
+
+## Proof gaps (statements true)
+
+### 🔧 Lemma 3.1 ("u, v and w are distinct"; same point in the proof of Lemma 3.3)
 The proof's claim that `u`, `v` and `w` are distinct is false: a splitting `Find` can read `v ← u.parent = u` while
 `u` is a root, and if `u` is linked before the next read, it executes `Cas(u.parent, u, w)` with `u = v`
 (`cas_same_node`, a concrete 2-process execution).
 
 **Impact.** Lemma true: this `Cas` always fails. The same execution gives a `Find` iteration in which `u` does not
-advance, contrary to a sentence in the proof of Lemma 3.3; this happens at most once per `Find`.
-
-### 🛠️ Lemma 3.2 (linearizability: two implicit facts)
-The proof leaves implicit that `u` is already a root at the linearization point of a `SameSet` that returns false,
-and that in the link case the larger node is not in the smaller root's tree.
-
-**Impact.** Statement true; both facts are easy (`linearizable`).
-
-**Details.**
-- When `SameSet` returns false, the answer is decided at the later test `u = u.parent`, but the operation is
-  linearized earlier, at the last read of `Find(v)`. One needs that `u` was a root already at that read: it was a
-  root when `Find(u)` returned and is one at the test, and non-roots never become roots again. Linearizing at the
-  test instead would be wrong, because `v` may have been linked into `u`'s tree in between.
-- The link case needs that the larger node is not in the smaller root's tree. This holds because ids increase
-  along parent pointers.
+advance, contrary to a sentence in the proof of Lemma 3.3; this happens at most once per `Find`. Both lemmas are
+proved with this case added (`lemma_3_1_union`, `waitFree`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -111,6 +86,13 @@ Full list of differences (including modelling choices and minor imprecisions): [
   of `SameSet = false` are inserted retroactively, at a cut of the linearization recorded when
   `Find(v)` found its root; this uses `IsLinearization.insert` from
   `Cslib/Computability/Distributed/SharedMemory/LinPoints.lean`.
+  The proof of Lemma 3.2 leaves two facts implicit; both are easy (`linearizable`):
+  - When `SameSet` returns false, the answer is decided at the later test `u = u.parent`, but the operation is
+    linearized earlier, at the last read of `Find(v)`. One needs that `u` was a root already at that read: it was a
+    root when `Find(u)` returned and is one at the test, and non-roots never become roots again. Linearizing at the
+    test instead would be wrong, because `v` may have been linked into `u`'s tree in between.
+  - The link case needs that the larger node is not in the smaller root's tree. This holds because ids increase
+    along parent pointers.
 * *Wait-freedom.* The potential is `bound · Σₐ #{ids above a.parent} + Φ`. The first term
   decreases at every successful `Cas`. `Φ` is a lexicographic local potential: positions of `u`,
   `v` (taken at their roots while a `Find` runs), then the phase, then the `Find`'s progress. It
@@ -119,6 +101,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Not formalized.** The randomized analysis of Sections 4–5 (Lemma 4.1 relies on Goel et al.,
 SODA 2014), the `O(h+1)` step bound of Lemma 3.3, and the `MakeSet` remark.
+
+The PODC version claims the expected work bound `O(m(α(n, m/(np)) + log(np/m + 1)))` (Theorem 5.1 of the arXiv
+version, stated in the PODC abstract) also for one-try splitting, and the authors later acknowledged that its proof
+is incorrect. The arXiv version says: "In the conference version of our paper [JT16], we claimed that Theorem 5.1
+holds for one-try splitting, but our proof, essentially the proof of Theorem 5.1, is not correct for this algorithm."
+It proves only a weaker bound (Theorem 5.2, `m/(np²)` in place of `m/(np)`) and calls the original claim "an open
+problem" (Section 7). We could not consult the proceedings text and do not formalize Sections 4–5, so we neither
+confirm nor refute the claim.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: concrete valid executions (`seqDemo_valid`: `Unite(0,1)` then

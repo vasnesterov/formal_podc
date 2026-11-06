@@ -4,11 +4,11 @@ Scope: Section 2 (model of the synchronous part), Definitions 1 and 6, Algorithm
 (Figure 1), Lemma 7, Lemma 8, Theorem 9, Corollary 2. Sections 3 and 4 (pulse synchronization, lower bound) are
 not formalized.
 
-## Statement-level issues (decide the verdict)
+## Errors in the paper
 
-None of the checked statements is false.
+None of the checked statements is false, apart from the degenerate corner of Corollary 2 (item 10).
 
-1. **Lemma 8, induction step (proof repair, 🛠️ under R1).** The step uses "`x ∈ I_w ⊇ Ĩ_w` by Lemma 7". Here
+1. 🔧 **Lemma 8, induction step.** The step uses "`x ∈ I_w ⊇ Ĩ_w` by Lemma 7". Here
    `Ĩ_w` belongs to the execution with one more `⊥`. Lemma 7 gives the opposite inclusion `I_w ⊆ Ĩ_w`, and with the
    inclusion as written the conclusion `x ∈ Ĩ_w` does not follow. The construction also goes from a
    `k`-execution to a `(k+1)`-execution, which does not by itself reach every `(k+1)`-execution. Repair
@@ -17,9 +17,8 @@ None of the checked statements is false.
    received from `d`, or by `0` if there is none. The new configuration satisfies validity and crusader
    consistency (`IsCrusader`) and has `k` honest `⊥`s. The IH gives `x` in all its intervals, and Lemma 7 gives
    `x ∈ Ĩ^c_w ⊆ I_w`. Choosing `c` is necessary: with an arbitrary replacement the configuration may violate
-   crusader consistency and the IH does not apply. Borderline between ✅ and 🛠️. We chose 🛠️ because the step
-   as written proves nothing (wrong inclusion), and the missing coverage argument needs the specific choice of
-   the replacement value.
+   crusader consistency and the IH does not apply. The step as written proves
+   nothing (wrong inclusion), and the missing coverage argument needs the specific choice of the replacement value.
 
 ## Modelling choices
 
@@ -30,9 +29,9 @@ None of the checked statements is false.
 3. **Signatures carry the iteration number.** Token `(d, j, v)` = `d`'s signature on `(j, v)`. Figure 4 signs
    only `b_v`. For one instance (Theorem 9) this changes nothing. For Corollary 2's repetition it is necessary:
    without it, old signatures of honest dealers can be replayed and CB validity fails. This is the standard
-   session-id convention, accepted under R4.
+   session-id convention (✏️).
 4. **Real-valued CB.** Definition 6 and Figure 4 have binary inputs `{0, 1}`. APA broadcasts reals. We run CB
-   on reals; the signature argument is value-agnostic (R3: evident intent).
+   on reals; the signature argument is value-agnostic (✏️).
 5. **Self-delivery.** CSLib's networks are simple graphs, so a node does not receive its own messages. A node
    uses its own value as "the token received from itself" and its own received token as its own echo.
    Figure 4's rule "two nodes `w₁ ≠ w₂` with valid but different values" then becomes "some echo carries a valid
@@ -54,7 +53,7 @@ None of the checked statements is false.
    all honest nodes decide by round `T` (`TerminatesBy`).
 10. **Corollary 2's round count.** The paper's `2⌈log(ℓ/ε)⌉` is read as `2⌈log₂(ℓ/ε)⌉₊` (natural-number
     ceiling), with `ε > 0`. If `ℓ ≤ ε` this is `0` rounds: every node outputs its input. The paper's real ceiling
-    can be negative or undefined there (R2: degenerate).
+    can be negative or undefined there (✏️: a degenerate corner).
 
 ## Minor imprecisions in the paper's proofs (no effect on statements)
 

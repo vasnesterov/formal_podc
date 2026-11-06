@@ -6,19 +6,19 @@ Formalized version: arXiv:2311.08060v2 (numbering follows it). Companion of *On 
 [ValidityConsensus](../../PODC2023/ValidityConsensus)).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The main result holds: every non-trivial Byzantine agreement problem needs
-`Ω(t²)` messages, even in synchrony (the paper proves the weak-consensus bound even against omission faults; we
-also get the omission version for every non-trivial problem). We prove it for every `t < n` with the
-explicit bound `t² ≤ 32 · #messages`, with or without signatures. The solvability characterization (Theorem 4) is
-proved too, but **Lemma 10 and the unauthenticated half of Theorem 4 are false in the degenerate case `n = 2,
-t = 1`**. We prove corrected versions.
+**Verdict: 🔧 Easy fix.** The main result holds: every non-trivial Byzantine agreement problem needs `Ω(t²)` messages,
+even in synchrony, and we prove it for every `t < n` with the explicit bound `t² ≤ 32 · #messages`, with or without
+signatures (the paper proves the weak-consensus bound even against omission faults; we also get the omission version
+for every non-trivial problem). Lemma 1's proof covers only `t` divisible by 8 and is repaired by rounding its
+parameters. The solvability characterization (Theorem 4) is proved too, but **Lemma 10 and the unauthenticated half of
+Theorem 4 are false for `n = 2, t = 1`**, and one added condition corrects them.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 10 and Theorem 4 (unauthenticated), `n = 2`, `t = 1`
+### 🔧 Lemma 10 and Theorem 4 (unauthenticated), `n = 2`, `t = 1`
 Lemma 10 (unauthenticated-solvable with `n ≤ 3t` ⇒ trivial) and the unauthenticated half of Theorem 4 are false for `n = 2`, `t = 1`: weak consensus, a non-trivial problem, is solvable there by "exchange proposals; decide the common value if they agree, a default otherwise" (`lemma10_counterexample`, `theorem4_unauth_as_stated_false`).
 
-**Impact.** Degenerate case; the lower bound and the authenticated half of Theorem 4 are unaffected, and we prove corrected statements (`trivial_of_solvableSync`, `theorem4_unauth'`).
+**Impact.** The lower bound and the authenticated half of Theorem 4 are unaffected, and we prove corrected statements (`trivial_of_solvableSync`, `theorem4_unauth'`).
 
 **Details.** Theorem 4 says a non-trivial problem is unauthenticated-solvable iff CC holds and `n > 3t`. Both statements rest on the cited FLM-style fact that weak consensus needs `n > 3t`. With two processes and one fault, every faulty execution has a single correct process, so Agreement constrains only fault-free executions. The same idea solves interactive consistency. The FLM argument needs three non-empty groups of size `≤ t`, i.e. `n ≥ 3`.
 
@@ -26,7 +26,7 @@ Lemma 10 (unauthenticated-solvable with `n ≤ 3t` ⇒ trivial) and the unauthen
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 1 (the "without loss of generality" step)
+### 🔧 Lemma 1 (the "without loss of generality" step)
 Lemma 1 is proved only for `t ≥ 8` divisible by 8: for other `t` the group sizes `t/4` and `t/2` must be rounded, and `t = 1` admits no group of size `≥ 1` of the required kind.
 
 **Impact.** Statement true for every `t < n`; repaired (`omission_lower_bound`, `omission_lower_bound_sq`, `one_message`).

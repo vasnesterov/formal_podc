@@ -3,20 +3,19 @@
 Shiri Chechik, Gur Lifshitz, Doron Mukhtar. *Girth Approximations in the CONGEST Model.* PODC 2026.
 DOI [10.1145/3796701.3815933](https://doi.org/10.1145/3796701.3815933). Formalized version: arXiv:2603.27601v1, §6 (lower bounds).
 
-**Verdict: ❌ False claim.** The lower bounds of §6 hold as stated: Theorem 6.1 and its asymptotic form (`(3 − ε)`-approximation needs
+**Verdict: 🔧 Easy fix.** The lower bounds of §6 hold: Theorem 6.1 and its asymptotic form (`(3 − ε)`-approximation needs
 `Ω̃(n^{3/5})` rounds, unconditionally) and Theorem 6.2 under the Erdős–Simonovits hypothesis, for directed and for undirected
-weighted graphs, deterministic and randomized, on networks of diameter `O(log n)`. Claim 6.2(1) gives a slightly wrong value
-for the weighted girth. The error is off by 2 and harmless, because the proof only uses an upper bound, but the claim is false
-as written. A literature bound quoted in §6 has an off-by-one exponent.
+weighted graphs, deterministic and randomized, on networks of diameter `O(log n)`. They need one corrected constant in
+Claim 6.2(1) and a few-line repair of the proof of Claim 6.2(2). Only §6 was checked: the upper bounds of §§3–5, the paper's
+algorithmic results, were not examined.
 
 ## Mistakes in the paper
 
-### ❌ Claim 6.2(1) (weighted girth for intersecting inputs)
+### 🔧 Claim 6.2(1) (weighted girth for intersecting inputs)
 The claim says the weighted girth *equals* `2q/ε · (1 + ε) = 2q + 2q/ε`, but each pipe `r_1 → … → r_q` has only
 `q − 1` edges, so the girth is `2(q − 1) + 2q/ε`, 2 less than claimed (`claim_6_2_value_lt`).
 
-**Impact.** Harmless: the reduction only needs `girth ≤ 2q/ε · (1 + ε)`, which still holds, so Theorem 6.2 is
-unaffected. The claim is nevertheless false as written.
+**Impact.** The reduction only needs `girth ≤ 2q/ε · (1 + ε)`, which still holds, so Theorem 6.2 is unaffected.
 
 **Details.** The proof counts `2q` pipe edges of weight 1. The directed Claim 6.1 counts this correctly. The
 cycle through a shared edge therefore weighs `2(q − 1) + 2q/ε`, so the girth is strictly below the stated value.
@@ -24,23 +23,25 @@ cycle through a shared edge therefore weighs `2(q − 1) + 2q/ε`, so the girth 
 **Repair.** We prove the corrected upper bound and that the stated value is strictly too large.
 (`uGraph_mwc_of_inter`, `claim_6_2_value_lt`)
 
-### Typos and slips
-None of these affects a result.
+### ✏️ Slips
 - §6, "Before presenting …": the paper attributes `ex(n, C_{<2k}) = O(n^{1+1/k})` to Bondy–Simonovits and calls
   it conjecturally tight. For graphs with no cycle shorter than `2k` (girth `≥ 2k`) the right exponent is
   `1 + 1/(k−1)`. The cited bound is for `C_{2k}` alone. For `k = 3`, girth-6 bipartite graphs with `Ω(n^{3/2})`
   edges exist, so `O(n^{4/3})` is false. The rest of §6 uses the correct exponent
   (`z(n^{2/5}, C_{<6}) = Θ(n^{3/5})`, `m = Θ(a^{1+1/(k−1)})`), and "known for `k ∈ {3, 4, 6}`" matches the
   corrected exponent. (`ex_bound_misquoted`)
-- "The total number of vertices is `n^{2/5} · n^{3/5} = n`" ignores the about `2q` tree vertices. Our parameter
-  choice accounts for every vertex and pads to exactly `n`.
+
+### Typos
+None of these affects a result.
+- "The total number of vertices is `n^{2/5} · n^{3/5} = n`" (and `n = 2aq` in §6.2) ignores the about `2q` tree vertices.
+  Our parameter choice accounts for every vertex and pads to exactly `n`.
 - The output convention ("each node computes an approximation") and the randomized communication bound (public
   coins are needed, since middle pipe nodes are simulated by both players) are left implicit. See the model
   below.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Claim 6.2(2) (weighted disjoint case)
+### 🔧 Claim 6.2(2) (weighted disjoint case)
 The proof projects a minimum cycle onto `H` and says this "yields a cycle in `H`", which fails for undirected
 graphs: a cycle may enter the pipe of `l` at both ends (two Alice edges at `l_1`, two Bob edges at `l_q`), so
 the projection visits `l` twice.
@@ -108,7 +109,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Erdős–Simonovits for `k = 3` (girth-6 graphs with `a^{3/2}/9` edges) | `denseHighGirth_three` | `PointsLines.lean` |
 | §6 quoted bound `ex(n, C_{<2k}) = O(n^{1+1/k})` is false for `k = 3` | `ex_bound_misquoted` | `Theorems.lean` |
 
-**Not formalized.** The upper bounds of §§3–5, which are randomized w.h.p. algorithms. The unconditional cases `k = 4, 6` of
+**Not formalized.** The upper bounds of §§3–5, which are randomized w.h.p. algorithms; they were not examined. The unconditional cases `k = 4, 6` of
 Theorem 6.2. The remark on Lazebnik–Ustimenko–Woldar graphs. The randomized communication complexity of set disjointness.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.

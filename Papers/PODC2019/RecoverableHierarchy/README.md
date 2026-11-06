@@ -5,29 +5,30 @@ Wojciech Golab. *Brief Announcement: The Recoverable Consensus Hierarchy.* PODC 
 *Recoverable Consensus in Shared Memory*, arXiv [1804.10597](https://arxiv.org/abs/1804.10597) v2 (May 2018);
 numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** All four results hold: the two transformations (Figure 1 under simultaneous
+**Verdict: 🔧 Easy fix.** All four results hold: the two transformations (Figure 1 under simultaneous
 failures, Theorem 1; Figure 2 with `f + 1` consensus instances under at most `f` independent failures, Theorem 2)
 and the two lower bounds (`f` readable test-and-set objects do not suffice, Theorem 3; `f` consensus objects do
 not suffice for generic constructions, Theorem 6). The proof of Theorem 3 rests on a restricted failure model
-(Assumption 1) in which its Case C is false for *readable* TAS; with that model the argument cannot work, but a
-small change of the assumption repairs it.
+(Assumption 1) in which its Case C is false for *readable* TAS, and changing one condition of that model repairs
+it; the multi-register reads of Figures 1–2 need only a local argument. The Θ(`f`) tightness for TAS was not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
 - Section 5, after Corollary 4: "2-process conventional consensus implemented using a single TAS object and no
   additional read/write registers" is impossible (the loser must learn the winner's input); with `O(1)` registers
-  per instance the intended `O(f)` space bound holds.
-- Theorem 2 sketch and Lemma 15, Case 2: "`R[z] > R[j] = x`" should be `R[j] = x + 1`; Lemma 14: "line 17 in its
-  own iteration `k_i` or higher" should be `k_i + 1`; Lemma 13: there is no condition `k > 0` at line 19; Theorem 2
-  sketch, validity: "at line 4" should be line 21.
+  per instance, as the abstract says, the intended `O(f)` space bound holds.
+- Theorem 2 sketch and Lemma 15, Case 2: "`R[z] > R[j] = x`" should be `R[j] = x + 1`.
+- Lemma 14, Case B: "line 17 in its own iteration `k_i` or higher" should be `k_i + 1`.
+
+### Typos
+- Lemma 13: there is no condition `k > 0` at line 19; the loop is simply empty.
+- Theorem 2 sketch, validity: "at line 4" should be line 21.
 - Lemma 9: Case 3 "reads `P[j] = ⊥` at line 10" should be line 9; Cases 4–5 say `p_j` for `p_i`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 3 (Assumption 1 and Case C)
+### 🔧 Theorem 3 (Assumption 1 and Case C)
 With Assumption 1 as written — `p₁` crashes right after its first *access* to a TAS object — Case C ("`p₁` has
 accessed `T` already, so `T` holds 1") is false when that access was a read of the readable TAS, and the
 restricted-model statement the proof establishes is then false (`literal_assumption1_rcorrect`).
@@ -52,7 +53,7 @@ proof omits: an initial bivalent state (`biv_init`), termination of the critical
 outputs in restricted executions although the paper's agreement is only between distinct processes (`agree'`), and
 the non-symmetric Case D in which `p₂` reads and `p₁` runs solo with its forced crashes (`contra_a`).
 
-### 🛠️ Lemmas 9, 10, 14 (non-atomic multi-register reads)
+### 🔧 Lemmas 9, 10, 14 (non-atomic multi-register reads)
 The proofs for Figures 1 and 2 treat the two-register tests of Figure 1 (lines 2, 9, 11) and the scan of
 `R[1..n]` in Figure 2 (lines 24–25) as atomic snapshots.
 
@@ -61,8 +62,7 @@ The proofs for Figures 1 and 2 treat the two-register tests of Figure 1 (lines 2
 **Details.** Figure 1: `P[i]` changes only when `p_i` writes it and never returns to `⊥`, and an idle process
 whose proposal is recorded implies that nobody is in lines 3–5 (used implicitly in Lemmas 9–10). Figure 2: the
 argument "when `p_i` reached line 26 no process had reached line 17 of a later iteration" holds per checked process;
-the invariant is "the commitment holds, or some not-yet-checked process has `R ≥ k_i + 2`". Lemma 15, Case 1 also
-omits a process that reaches iteration `k` by skipping at line 16 after a crash (covered by the invariant `PInv`).
+the invariant is "the commitment holds, or some not-yet-checked process has `R ≥ k_i + 2`".
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -110,10 +110,12 @@ Full list of differences (including modelling choices and minor imprecisions): [
 The restricted failure model of Assumptions 1–2 is a reusable framework (`Restricted.lean`: schedules, the crash
 bookkeeping, `RCorrect`, `SolvesP.rcorrect`; `Valency.lean`: valency, `exists_crit`, `contra_a`/`contra_b`;
 `Critical.lean`: initial bivalence and the per-case lemmas). Proof remark: for consensus objects (Theorem 6) the
-paper's Case C is correct, since a consensus object has no read.
+paper's Case C is correct, since a consensus object has no read. In Lemma 15, Case 1, a process can also reach
+iteration `k` by skipping at line 16 after a crash; the invariant `PInv` covers it.
 
 **Not formalized.** Θ(`f`) tightness for TAS (needs composing Figure 2 with a TAS-based 2-process consensus
-implementation), the universality claims of Section 6, the consensus-number corollaries ("level two remains level
+implementation), the composition theorem replacing the atomic consensus objects `C`, `C[k]` by conventional
+implementations, the universality claims of Section 6, the consensus-number corollaries ("level two remains level
 two"), and the broad reading of abstract claim (iv) (arbitrary types `T` with consensus number `n`, see
 differencies.md).
 

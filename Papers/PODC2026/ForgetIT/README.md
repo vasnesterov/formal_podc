@@ -7,11 +7,12 @@ proceedings version (11 pages). The full version [3] (Cryptology ePrint) was not
 the proofs were rebuilt from the proof sketch of §4.2.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The robust good-case latency claim (Theorem 3, first item, also in
-the introduction and Table 1) is false under the paper's own definition. A run in which GST is
-the moment a correct leader enters its view can still take 14 message delays to decide. Agreement
-(Theorem 2) holds even in a fully asynchronous model with crash–recovery. The headline
-good-case latency of 3δ holds, and so does non-triviality.
+**Verdict: ⚠️ Weakened.** The title's good-case latency of 3δ holds, and so do non-triviality and agreement (Theorem 2),
+even in a fully asynchronous model with crash–recovery. The stronger robust good-case latency (Theorem 3, first item,
+also in the introduction and Table 1), the paper's distinctive claim over TetraBFT, is false under the paper's own
+definition, and we proved no robust variant: a run in which GST is the moment a correct leader enters its view can
+still take 14 message delays to decide. Termination after GST in general, view length, `O(n²)` messages per view and
+`O(1)` persistent storage were not checked.
 
 ## Mistakes in the paper
 
@@ -21,9 +22,9 @@ the asynchronous period and timed out there never vote in it, so with `n = 4`, `
 the moment a correct leader enters its view decides only at GST + 14 ticks instead of GST + 3
 (`RobustLatency.robust_latency_counterexample`).
 
-**Impact.** This is the paper's distinctive claim over TetraBFT, but the title and abstract only claim
-(non-robust) good-case latency, which holds, so we rate it ❌ rather than 🚨 (see `differencies.md`).
-Agreement and the 3δ good-case latency are unaffected; the plausible intended version is not proved.
+**Impact.** This is the paper's distinctive claim over TetraBFT; the title and abstract only claim (non-robust)
+good-case latency, which holds (`good_case_latency`). Agreement and the 3δ good-case latency are unaffected; the
+plausible intended version is not proved.
 
 **Details.** §3 defines `T_rgc` over the executions in which "GST coincides with a correct leader entering its
 view". Nothing stops the other correct processes from having entered that view earlier, during the
@@ -54,20 +55,23 @@ arrives, and then it never locks. As written, though, the claim is false.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 2 (agreement proof sketch)
+### 🔧 Theorem 2, agreement sketch (number of `vote-2` senders)
 The sketch claims that a decision implies that "at least `2f + 1` correct processes" broadcast the deciding
-`vote-2` (only `f + 1` are guaranteed), and it treats the views after the decision as if all correct processes
-entered `V_dec + 1` together.
+`vote-2`, but only `f + 1` are guaranteed.
 
-**Impact.** Statement true, even in a fully asynchronous model with crash–recovery (`agreement`); small
-slips, and the sketch's argument goes through after the repairs.
+**Impact.** Statement true, even in a fully asynchronous model with crash–recovery (`agreement`).
 
-**Details.** `f + 1` correct senders are enough: any `2f + 1` senders meet them. In an asynchronous run,
-processes may lock or echo in `V_dec` *after* others have moved on.
+**Repair.** `f + 1` correct senders are enough: any `2f + 1` senders meet them (`base`).
+
+### 🔧 Theorem 2, agreement sketch (induction over views)
+The sketch treats the views after the decision as if all correct processes entered `V_dec + 1` together, but in an
+asynchronous run processes may lock or echo in `V_dec` *after* others have moved on.
+
+**Impact.** Statement true (`agreement`); the sketch's argument goes through after the repair.
 
 **Repair.** The induction must be stated as an invariant that holds as soon as the `f + 1` lockers are fixed,
-even before they lock (`Hyp`/`Concl` in `Safety.lean`). With these repairs the sketch's argument goes through
-unchanged: guards, the three `echo-1` triggers, the `SAFE` wildcard, and the second-echo mechanism.
+even before they lock (`Hyp`/`Concl` in `Safety.lean`, `concl_reach`). With this repair the sketch's argument goes
+through unchanged: guards, the three `echo-1` triggers, the `SAFE` wildcard, and the second-echo mechanism.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -113,9 +117,10 @@ implementation tries `SAFE` first.
 | Theorem 2, non-triviality | `non_triviality` | `Latency.lean` |
 | Theorem 3, robust good-case latency `3δ`: **false** | `RobustLatency.robust_latency_counterexample` | `Counterexample.lean` |
 
-**Not formalized.** Termination after GST in general (view synchronization), view length 7Δ,
-message complexity `O(n²)`, the `O(1)` memory bound, optimistic responsiveness, the corrected
-robust-latency claim.
+**Not formalized.** Termination after GST in general (view synchronization; the sketch has the gap
+described in the Theorem 3 item, but in the counterexample the protocol still decides in the next view), view
+length 7Δ, message complexity `O(n²)`, the `O(1)` memory bound, optimistic responsiveness, the corrected
+robust-latency claim. The full version [3] was not available, so we judged the proceedings sketch only.
 
 **CSLib candidates.** `foldl_pres`/`foldl_progress` and `quorum_of_all` (`Latency.lean`).
 

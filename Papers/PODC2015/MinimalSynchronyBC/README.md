@@ -6,21 +6,21 @@ hal-01178651v1 (July 2015). Its numbering is that of the proceedings. There is n
 cited as [6] ("Tech Report 2025, IRISA, 2015"; 2025 is the report number) is not available to us, so the proofs of
 Lemmas 1 and 2 ("Proof in [6]") were reconstructed. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** The EA object of Figure 3 is not live: **Lemma 2 (EA-Termination) and Theorem 3 are
-false**. As a result, the consensus algorithm of Figure 4 does not terminate, so **Theorem 4 is false**. This holds
-even in a synchronous run in which the only faulty process crashes at the start. The proof of Lemma 3 has two
-further gaps. The paper therefore does not establish its headline claim that an eventual `⟨t+1⟩bisource` suffices for
+**Verdict: ❌ Intent lost.** The EA object of Figure 3 is not live: **Lemma 2 (EA-Termination) and Theorem 3 are
+false**, so the consensus algorithm of Figure 4 does not terminate and **Theorem 4 is false**, even in a synchronous
+run in which the only faulty process crashes at the start. The proof of Lemma 3 fails as well and nothing we proved
+repairs the algorithm, so the paper does not establish its main claim that an eventual `⟨t+1⟩bisource` suffices for
 signature-free Byzantine consensus. Theorems 1 and 2 (CB-broadcast, adopt-commit), Lemma 1 and the safety part of
 Theorem 4 are correct and are proved.
 
 ## Mistakes in the paper
 
-### 🚨 Lemma 2, Theorem 3 and Theorem 4 (EA-Termination, consensus termination)
+### ❌ Lemma 2, Theorem 3 and Theorem 4 (EA-Termination, consensus termination)
 Figure 3 can block forever, so EA-Termination (Lemma 2, Theorem 3) and the termination of the consensus
 algorithm of Figure 4 (Theorem 4) are false: in a synchronous run with `n = 7`, `t = 2` and a coordinator
 that crashes at the start, no correct process ever decides (`lemma2_false`, `theorem4_termination_false`).
 
-**Impact.** The paper does not establish its headline claim that an eventual `⟨t+1⟩bisource` suffices for
+**Impact.** The paper does not establish its main claim that an eventual `⟨t+1⟩bisource` suffices for
 signature-free Byzantine consensus. A local repair unblocks this run, but its correctness is open (see
 Lemma 3 below).
 
@@ -49,7 +49,7 @@ terminate the first round").
 run decides (`repaired_blocking_run_decides`). We do not know whether the repaired algorithm is correct,
 because of the next item.
 
-### ⚠️ Lemma 3 (EA-Eventual agreement; unestablished)
+### ❌ Lemma 3 (EA-Eventual agreement; unestablished)
 The proof of Lemma 3 ignores processes that return at line 4: in a round of exactly the kind the proof
 chooses, one correct process returns `true` at line 4 while the others return the coordinator's `false`
 (`lemma3_proof_fails`).
@@ -67,13 +67,26 @@ for the EA object alone:
 * The Byzantine process RB-broadcasts `EA_PROP1(false)` consistently and sends `EA_PROP2[15](true)`.
 * Process `p₁` returns `true` at line 4. The coordinator champions its own `false`, which `p₂` and `p₃` return.
 
-A second, fixable gap: the proof also uses `p_k ∈ X⁻_ℓ ⊆ F(r)`, but the chosen round only guarantees
-`X⁺_ℓ ⊆ F(r) ⊆ C`. Choose instead `r` with `X⁻_ℓ ∪ X⁺_ℓ ⊆ F(r) ⊆ C`. Such rounds exist infinitely often:
-`|X⁻ ∪ X⁺| ≤ 2t + 1 ≤ n − t` because both sets contain `ℓ`. Our `lemma3_proof_fails` round satisfies the
-stronger choice. This point was not formalized further.
+### ✏️ Slips
+- Proof of Lemma 3: Claim C uses `p_k ∈ X⁻_ℓ ⊆ F(r)`, but the chosen round only guarantees
+  `X⁺_ℓ ⊆ F(r) ⊆ C`. Choose instead `r` with `X⁻_ℓ ∪ X⁺_ℓ ⊆ F(r) ⊆ C`. Such rounds exist infinitely often:
+  `|X⁻ ∪ X⁺| ≤ 2t + 1 ≤ n − t` because both sets contain `ℓ`. Our `lemma3_proof_fails` round satisfies the
+  stronger choice. This point was not formalized further.
 
-### Typos and slips
+### Typos
 - Claim C says the timer is set "at line 8"; it is set at line 5.
+
+## Proof gaps (statements true)
+
+### 🔧 Theorem 4, CONS-Agreement (use of EA-Validity and AC-Obligation)
+The proof applies EA-Validity and AC-Obligation in round `r + 1`, whose premises say that all correct processes
+propose `v`, although some correct processes may never reach that round; Theorem 2 even assumes that each correct
+process invokes `AC_propose()`.
+
+**Impact.** Statement true; both properties have to be restated for the correct processes that invoke the object.
+
+**Repair.** We state and prove both properties in that form, which Figures 2 and 3 satisfy, and the proof then goes
+through (`theorem2`, `lemma1`, `Fig4.agreement`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -129,7 +142,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * An implementation of RB, which is a primitive here.
 * The real-time part of Lemma 3 (Claim C).
 * The parameterized EA of Section 5.4 and its `αn`-round bound.
-* Whether the repaired algorithm terminates.
+* Whether the repaired algorithm terminates, and whether Lemma 3 holds for it: open.
 * No bridge from the operational machine to the abstract layer. The safety theorems are proved at the level of the
   paper's object specifications.
 

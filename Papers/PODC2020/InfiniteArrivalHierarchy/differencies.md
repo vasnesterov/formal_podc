@@ -168,7 +168,7 @@ Perrin, Mostéfaoui, Bonin. *Extending the Wait-free Hierarchy to Multi-Threaded
 
 22. Not formalized. Lemma 10 and the iterator-stack argument were not targets.
 
-## Typos and small slips noticed
+## Typos noticed
 
 * Definition 3:
   * "`node′ = listₙ`" should be "`node′ = nodeₙ`";

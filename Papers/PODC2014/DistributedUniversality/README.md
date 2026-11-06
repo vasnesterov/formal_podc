@@ -6,19 +6,18 @@ Contention-Awareness; Wait-Freedom; Object Progress, and Other Properties.* PODC
 version, IRISA research report PI-2014 (HAL hal-00947657v2, May 2014), with all proofs in the
 appendices; numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** The construction is **not contention-aware**, contrary to
-Theorem 2 and to property (4) of the abstract. A process that runs alone, after the other processes
-have completed their operations and stopped, can still be forced to use the `k`-SC object, because
-an `adopt` tag at line N1 does not mean contention. Everything else we checked holds: the
-constructions of Figures 1 and 2 and of Section 4.3 are linearizable (Lemmas 1–4) and non-blocking
-(Lemmas 5, 6, Corollary 1, Theorem 1); with helping they are wait-free (Theorem 3); at least `ℓ`
-objects progress with `(k, ℓ)`-SC objects (Theorem 4(a)); and `(k, ℓ)`-SC can be built from a
-`(k, ℓ)`-universal construction (Theorem 4(b)). Several proofs needed genuine repairs: Lemma 3,
-Lemma 6, Theorem 3 and Theorem 4(b).
+**Verdict: ⚠️ Weakened.** The construction is **not contention-aware**, contrary to the title, Theorem 2 and
+property (4) of the abstract: a process that runs alone, after the other processes have completed their operations
+and stopped, can still be forced to use the `k`-SC object, because an `adopt` tag at line N1 does not mean
+contention, and no repaired construction is proved. Everything else we checked holds: the constructions of Figures 1
+and 2 and of Section 4.3 are linearizable (Lemmas 1–4) and non-blocking (Lemmas 5, 6, Corollary 1, Theorem 1); with
+helping they are wait-free (Theorem 3); at least `ℓ` objects progress with `(k, ℓ)`-SC objects (Theorem 4(a)); and
+`(k, ℓ)`-SC can be built from a `(k, ℓ)`-universal construction (Theorem 4(b)). Several proofs needed genuine repairs
+(Lemma 3, Lemma 6, Theorem 3 and Theorem 4(b)), and properties (3) and (5) of the abstract were not checked.
 
 ## Mistakes in the paper
 
-### 🚨 Theorem 2 and abstract property (4) (contention-awareness of Figure 2)
+### ❌ Theorem 2 and abstract property (4) (contention-awareness of Figure 2)
 With `n = 3` processes and `k = 1` object, processes 1 and 2 run round 1 concurrently, complete their
 first operations and stop, and then process 0, running its first operation completely alone, gets
 `adopt` at line N1 of round 1 and invokes `kSC[1]` (`theorem_2_not_contention_aware`).
@@ -66,40 +65,24 @@ property would then mean the same weak thing.
 that no one has started yet: publish round numbers and start each operation at the largest
 published round plus one.
 
-### ⚠️ Section 4.3, line 4M of the `(k, ℓ)`-construction (typo)
-The text of Section 4.3 has line 4M propose `oper_i[m]` instead of Figure 2's `ac_op_i[m]`, and with
-this version two processes can commit different operations on the same object in the same round
-(`Typo4M.section_4_3_line_4M_unsafe`: `n = 2`, `k = 2`, `ℓ = 1`).
-
-**Impact.** Local fix with evident intent: Section 4.3 says the algorithm is Figure 2 with only
-`(k, ℓ)`-SC substituted. All our results use Figure 2's line 4M (`Mode.Good`).
-
-**Details.** Process A commits at line N1 on both objects and skips lines 2M–4M. Process B adopts A's
-value on object 0 at N1, gets object 1 from SC, and at 4M proposes its own operation to the fresh
-`AC[2r][0]`, where it commits. A and B each return their own operation as the first operation on
-object 0. Their histories are not prefix-comparable, so the run is not linearizable. Both readings of
-the adopt-commit specification allow this run, and with Figure 2's line 4M the same schedule is not
-executable (`Typo4M.sched_not_executable_fig2`).
-
-### Typos and slips
+### ✏️ Slips
+- Section 4.3, line 4M of the `(k, ℓ)`-construction: the text has line 4M propose `oper_i[m]` instead of Figure 2's
+  `ac_op_i[m]`, and with this version two processes can commit different operations on the same object in the
+  same round (`Typo4M.section_4_3_line_4M_unsafe`: `n = 2`, `k = 2`, `ℓ = 1`). The intent is evident: Section 4.3
+  says the algorithm is Figure 2 with only `(k, ℓ)`-SC substituted, and all our results use Figure 2's line 4M
+  (`Mode.Good`). The run: process A commits at line N1 on both objects and skips lines 2M–4M. Process B adopts A's
+  value on object 0 at N1, gets object 1 from SC, and at 4M proposes its own operation to the fresh `AC[2r][0]`,
+  where it commits. A and B each return their own operation as the first operation on object 0. Their histories are
+  not prefix-comparable, so the run is not linearizable. Both readings of the adopt-commit specification allow
+  this run, and with Figure 2's line 4M the same schedule is not executable (`Typo4M.sched_not_executable_fig2`).
 - Lemma 5 is stated "∀ r ≥ 1" but needs some process to complete the adopt-commit part of round `r`
   (true in every infinite execution); we state it so.
+
+### Typos
 - Line 30 of Figure 1 writes `GSTATE`; the proof of Lemma 2 refers to it as "line 31".
 - Corollary 1 is numbered Corollary 2 in Appendix B.
 
 ## Proof gaps (statements true)
-
-### 🛠️ Lemma 6 (an object progresses forever)
-The proof counts commits, not operations (a round's commit may repeat an operation committed
-earlier), and claims that every committed operation becomes visible in `GSTATE`, which fails if the
-committer crashes first.
-
-**Impact.** Statement true; repaired (`lemma_6`, with `Exec.G_unbounded` and `NoRepeat`).
-
-**Details.** Repair: an operation committed in round `ρ` is never proposed from round `ρ + 2` on
-(`NoRepeat`). So commits in infinitely many rounds give infinitely many distinct operations. Each of
-them reaches every process that completes round `ρ + 1` (the knowledge invariant `InvB.know`),
-whether or not the committer survives.
 
 ### 🛠️ Lemma 3 (valid histories)
 The definition of "valid" and its "consequence (i)" (`R` determines `VH(R)`) silently assume that an
@@ -131,11 +114,28 @@ the first moment the global sequence of `x` reaches a length `L ≡ j (mod n)`, 
 round `ρ`. Until the sequence grows again, every proposal for `x` of a round `> ρ` is `e` or `X`, and
 from round `ρ + 2` on it is `X` (`Wst.start`, `Wst.step`). Every process with a history of length `L`
 helps `p_j`, adopters of `e` learn `e`, and no other operation can be proposed. So the next operation
-appended is `X` (`Wst.close`), a contradiction. Theorem 3's lemmas also show that with helping an
-operation can be linearized before its owner proposes it. So in Lemma 4, the start of an operation
-must be its invocation (`next()`), not its first proposal; we use invocation times.
+appended is `X` (`Wst.close`), a contradiction.
 
-### 🛠️ Theorem 4(b) (`(k, ℓ)`-SC from a `(k, ℓ)`-UC)
+### 🔧 Lemma 6 (an object progresses forever)
+The proof counts commits, not operations (a round's commit may repeat an operation committed
+earlier), and claims that every committed operation becomes visible in `GSTATE`, which fails if the
+committer crashes first.
+
+**Impact.** Statement true; repaired (`lemma_6`, with `Exec.G_unbounded` and `NoRepeat`).
+
+**Details.** Repair: an operation committed in round `ρ` is never proposed from round `ρ + 2` on
+(`NoRepeat`). So commits in infinitely many rounds give infinitely many distinct operations. Each of
+them reaches every process that completes round `ρ + 1` (the knowledge invariant `InvB.know`),
+whether or not the committer survives.
+
+### 🔧 Section 3.4 and Lemma 4 with lines L1–L5 (start of an operation)
+Theorem 3's lemmas show that with helping an operation can be linearized before its owner proposes it, so the
+paper's start of an operation (its first proposal by its issuer) does not contain the linearization point.
+
+**Impact.** Statement true: in Lemma 4, the start of an operation must be its invocation (`next()`), not its first
+proposal; we use invocation times (`lemma_4_realtime`).
+
+### 🔧 Theorem 4(b) (`(k, ℓ)`-SC from a `(k, ℓ)`-UC)
 The proof instantiates the construction with `k` registers and returns "the values written in these
 objects", but with the universal construction used as a black box a read returns the *last* write,
 so two processes can return different values for the same entry.

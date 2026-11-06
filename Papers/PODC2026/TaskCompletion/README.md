@@ -4,20 +4,22 @@ Orr Fischer, Ran Gelles. *The Task Completion Problem and its Application to Cra
 Computation.* PODC 2026. DOI [10.1145/3796701.3815916](https://doi.org/10.1145/3796701.3815916).
 Formalized version: arXiv:2605.17961v1.
 
-**Verdict: 🛠️ Proof repaired.** All checked statements are true as written:
-- the existence of load balancing covering families (Lemma 3.1);
-- the analysis of Algorithm 1 (Lemmas 4.3–4.5);
-- the `O(R⌈M/n⌉ log n)` deterministic task-completion algorithm (Theorem 4.1);
-- the `Ω(log n / log log n)` lower bound (Theorem B.1).
-
-The probabilistic proof of Lemma 3.1 has two genuine errors and needs a different tail argument.
+**Verdict: 🔧 Easy fix.** Lemma 3.1, the analysis of Algorithm 1 (Lemmas 4.3–4.5), the `O(R⌈M/n⌉ log n)` deterministic
+task-completion algorithm (Theorem 4.1) and the `Ω(log n / log log n)` lower bound (Theorem B.1) are all true as written.
+The proof of Lemma 3.1 has two errors: a backwards Chernoff step, which Markov's inequality replaces, and a union bound
+that fails for `ε ≥ 0.53`, which took a different tail argument but does not matter for Theorem 4.1, since the paper uses
+only a small `ε`. The robust congested-clique simulation of Section 5 was not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
+- The proof of Lemma 4.3 runs the loop "until `k_i < 1`", but `k_i = ⌈(1−ε)^{i−1}m⌉ ≥ 1` always. The correct stopping
+  rule is the one in footnote 3: stop after the first iteration with `k_i ≤ 2B`, at which point `N_{i+1} = 0`. We
+  formalize that rule (`numIter`, `lemma_4_3_1`).
 - Claim B.2's proof negates "at most `2n'/k'`" as "at least `2n'/k'+1`".
+
+### Typos
+- The proof of Lemma 3.1 says "for any `i ∈ [m]`"; it should be `i ∈ [2m]`.
 
 ## Proof gaps (statements true)
 
@@ -37,7 +39,7 @@ claims every `ε ∈ (0,1)`.
 `a ≤ 2/(ε²B) ≤ ε/288`. The bad events are independent across elements. So the probability that `⌊εn⌋+1` elements
 are bad is at most `C(n,t)a^t ≤ (e a/ε)^t`, which beats `2^{2cn}` for every `ε`. (`lemma_3_1`, `lemma_3_1_all_n`)
 
-### 🛠️ Lemma 3.1, first half (wrong inequality direction)
+### 🔧 Lemma 3.1, first half (wrong inequality direction)
 To show that at least `m` of the `2m` random sets have the right size, the paper writes
 `Pr(M < m) ≤ Pr(M < (1−0.98)E[M])`, but the right-hand event `M < 0.04m` is smaller than `M < m`, so this is
 backwards.
@@ -47,23 +49,6 @@ backwards.
 **Details.** A correct Chernoff bound gives only `Pr(M ≥ m) ≥ 0.22` for `m = 1`.
 
 **Repair.** Markov's inequality on the number of bad sets: each set is bad with probability `≤ 1/576`.
-
-### 🛠️ Lemma 4.3 (termination of Algorithm 1)
-The proof of Lemma 4.3 runs the loop "until `k_i < 1`", but `k_i = ⌈(1−ε)^{i−1}m⌉ ≥ 1` always.
-
-**Impact.** Proof slip with the fix in the paper itself; statement true (`lemma_4_3_1`).
-
-**Repair.** The correct stopping rule is the one in footnote 3: stop after the first iteration with `k_i ≤ 2B`, at
-which point `N_{i+1} = 0`. We formalize that rule (`numIter`, `lemma_4_3_1`).
-
-### 🛠️ Lemma 4.5 and Theorem B.1 (unproved steps)
-Lemma 4.5's induction uses an unproved inequality, and Theorem B.1 leaves a needed bound on `r` implicit.
-
-**Impact.** Statements true; routine fixes.
-
-**Details.**
-- Lemma 4.5's induction uses `N_i > k_{i+1} ⇒ N_i ≥ (1−ε)k_i` without proof; it holds by integrality.
-- Theorem B.1's crash count `r · 4n/log n ≤ αn` needs `r ≤ α log n/4`, which is left implicit.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -112,6 +97,10 @@ For `n = 1` the bound `O(R⌈M/n⌉ log n)` is 0; we state Theorem 4.1 for `n �
 - Section 5: the robust congested-clique simulation (Theorems 1.2/5.1, error-correcting codes,
   NetStore/NetRetrieve).
 - The `O(log n)` message-size bound (Algorithm 1 only sends single bits).
+
+**Routine details the paper skips.**
+- Lemma 4.5's induction uses `N_i > k_{i+1} ⇒ N_i ≥ (1−ε)k_i` without proof; it holds by integrality.
+- Theorem B.1's crash count `r · 4n/log n ≤ αn` needs `r ≤ α log n/4`, which is left implicit.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Theorem 4.1 is existential over the algorithm parameters, and its hypotheses

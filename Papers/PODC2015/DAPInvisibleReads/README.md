@@ -6,11 +6,12 @@ Parallelism: Impossibility, Possibility, and Cost of Transactional Memory Implem
 technical report of May 2015 (14 pp., with the proofs of Section 3); no arXiv version. Numbering is the same in
 both versions.
 
-**Verdict: ❌ False claim.** The two impossibility theorems (Theorems 1 and 2: no weakly disjoint-access-parallel
+**Verdict: 🛠️ Hard fix.** The two impossibility theorems (Theorems 1 and 2: no weakly disjoint-access-parallel
 TM with wait-free read-only transactions and obstruction-free, resp. weakly progressive write transactions with
-invisible reads, ensures real-time order) are true, and the claims about the histories of Figure 1 hold. But
-Lemma 1, on which their proofs rest, is false as soon as a third process takes steps; we re-prove both theorems
-without it. The lower bounds (Theorems 3 and 4) and the algorithm of Section 4 are not formalized.
+invisible reads, ensures real-time order) are true, and the claims about the histories of Figure 1 hold. But Lemma 1,
+on which their proofs rest, is false as soon as a third process takes steps, so we re-prove both theorems by a new
+commutation argument. The other two parts of the paper's point, the algorithm of Section 4 and the lower bounds
+(Theorems 3 and 4), were not checked.
 
 ## Mistakes in the paper
 
@@ -21,7 +22,7 @@ concurrent, disjoint-access transaction `Tᵢ` (`Lemma1.lemma_1_false`).
 
 **Impact.** Lemma 1 is the basis of Lemmas 2 and 3, so the paper's proofs of Theorems 1 and 2 (and the uses of
 Lemma 1 in the proof of Theorem 3) are not valid as written. Theorems 1 and 2 themselves are true (see the proof
-gap below).
+gap below). We have no general replacement for the lemma, only the commutation of two sides split by accessed objects.
 
 **Details.** The proof only considers executions in which `Tᵢ` and `Tⱼ` are the only transactions taking steps:
 it delays the first contending event of `Tⱼ` until it is concurrent with that of `Tᵢ`. With a third process,
@@ -45,19 +46,13 @@ path in the DSG" of the current history: then two transactions with pending oper
 "disjoint" until one of them commits, which rules out even a reader and a writer of the same object touching a
 common base object concurrently.
 
-The same pattern breaks the non-concurrent case of Lemma 2's proof, which cites Lemma 2 of [4] for two
-"consecutive" transactions although other transactions may run in between; we did not formalize Lemma 2.
-
-### ⚠️ Theorems 1 and 2 (progress conditions without termination)
-As defined in Section 2, obstruction-freedom and weak progressiveness only forbid aborts, so a TM whose write
-transactions never return satisfies them and trivially preserves RTO.
-
-**Impact.** The intended (standard) definitions include termination of operations that run solo, as in the
-cited [15, 17]; with it both theorems hold.
-
-**Details.** The proofs need `T₃` and `T₂` to commit ("they cannot be aborted"). We assume that a write
-transaction running solo completes its operations (`ObstructionFreeWrites`), resp. that a write transaction
-running with no concurrent transaction completes and commits (`IsolatedWritesCommit`).
+### ✏️ Slips
+- Section 2 progress definitions, Theorems 1 and 2: as defined, obstruction-freedom and weak progressiveness only
+  forbid aborts, so a TM whose write transactions never return satisfies them and trivially preserves RTO. The intended
+  (standard) definitions include termination of operations that run solo, as in the cited [15, 17]; with it both
+  theorems hold. The proofs need `T₃` and `T₂` to commit ("they cannot be aborted"). We assume that a write transaction
+  running solo completes its operations (`ObstructionFreeWrites`), resp. that a write transaction running with no
+  concurrent transaction completes and commits (`IsolatedWritesCommit`).
 
 ## Proof gaps (statements true)
 
@@ -126,7 +121,9 @@ written by `T₂` and `T₃`; with unique values when `v₁` differs from the in
 show that a TM ensuring WRTO produces `H_WRTO` itself.
 
 **Not formalized.** Lemma 2 and Lemma 3 in general; Theorems 3 and 4; the algorithm of Section 4 and its
-correctness arguments; Consistent View and EUS. Theorems 3 and 4 are argued informally and do not fix what is
+correctness arguments; Consistent View and EUS. The concurrent case of Lemma 2 uses the false Lemma 1, and the chain
+pattern of `chainTM` applies to its non-concurrent case, which cites Lemma 2 of [4] for two "consecutive" transactions although
+other transactions may run in between. Theorems 3 and 4 are argued informally and do not fix what is
 counted. For Theorem 3, the proof argues `Ω(Nₒ)` for a single version check and then multiplies by `k` without
 justification. It also applies Lemma 1 to `Ti*` and `Ti+`, which are not disjoint-access since both are
 connected to `Tro`. For Theorem 4, "space per version" is undefined: an unbounded register can hold a whole

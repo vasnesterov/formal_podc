@@ -4,35 +4,59 @@ Mohsen Ghaffari, Erez Kantor, Nancy Lynch, Calvin Newport. *Multi-Message Broadc
 Unreliable Links.* PODC 2014. DOI [10.1145/2611462.2611492](https://doi.org/10.1145/2611462.2611492). Formalized
 version: arXiv [1405.1671](https://arxiv.org/abs/1405.1671) v1; numbering follows it.
 
-**Verdict: ⚠️ Minor statement issues.** The BMMB results of Section 3 hold. These are correctness (Theorem 3.4), the
-`O((D + k) F_ack)` bound for arbitrary `G'` (Theorem 3.1) and the `O(D F_prog + r k F_ack)` bound for an `r`-restricted
-`G'` (Theorems 3.2 and 3.16 with Lemmas 3.3–3.15). All are proved with explicit constants. The problems are local and do not affect the theorems:
-* the times `t_{d,ℓ}` used by the key lemma are never defined;
-* Lemma 3.12, part 5 is off by one `F_ack` (a slip with evident intent: the proof of Lemma 3.14 cites it in the
-  correct, weaker form `ℓF_ack ≤ t_{0,ℓ} + F_ack`);
-* Theorem 3.16 as stated ("`R_j(t₁) = K` for every node `j`") needs `G` to be connected (implied by its use of the diameter `D`).
-
-The lower bounds (§3.3) and the enhanced-model algorithm (§4) are not formalized.
+**Verdict: ⚠️ Weakened.** The BMMB results of Section 3 hold with explicit constants, after local repairs: correctness
+(Theorem 3.4), the `O((D + k) F_ack)` bound for arbitrary `G'` (Theorem 3.1) and the `O(D F_prog + r k F_ack)` bound
+for an `r`-restricted `G'` (Theorems 3.2 and 3.16 with Lemmas 3.3–3.15). The delay schedule behind the grey zone lower
+bound (Theorem 3.17) breaks for the `c ≥ 2` messages per local broadcast that the model allows, and no repair is proved.
+The lower bounds for `c = 1` (§3.3) and the enhanced-model algorithm (§4) were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 3.12, part 5 (`ℓ F_ack ≤ t_{0,ℓ}` for `ℓ > 1`)
-Part 5 is false whenever `F_ack > 2 F_prog`, for every reading of `t_{d,ℓ}` that gives Theorem 3.16: with
-`r = 1`, `ℓ = 2`, `F_prog = 1`, `F_ack = 3` we get `ℓ F_ack = 6 > 5 = t_{0,2}` (`lemma_3_12_5_false`,
-`lemma_3_12_5_false_any`).
+### ❌ Lemma 3.20 and Theorem 3.17 for `c ≥ 2` messages per broadcast (not formalized)
+The delay schedule of Lemma 3.20 assumes one MMB message per local broadcast, but §2 allows a constant
+number `c`, and for `c ≥ 2` the schedule breaks, so Theorem 3.17 is unestablished for `c ≥ 2`.
 
-**Impact.** A slip with evident intent: its only use (Lemma 3.14) needs the weaker
-`ℓ F_ack ≤ t_{0,ℓ} + F_ack`, which holds for `r ≥ 1` (`lemma_3_12_5'`); the theorems are unaffected.
+**Impact.** The lower bound is not established for the model of §2. This comes from reading the proof
+and is not checked in Lean (the lower bounds are not formalized). We did not determine whether
+Theorem 3.17 holds for `c ≥ 2`.
 
-**Details.** It fails for our `t_{d,ℓ}` and for the formula read off Theorem 3.16, in the regime
-`F_ack > 2 F_prog` that the paper cares about. This does not depend on how `t_{d,ℓ}` is read: *no*
-definition satisfying part 4 and `t_{D,k} ≤ t₁` (needed to get Theorem 3.16 "directly from Lemma
-3.15") satisfies part 5 in this example, since part 4 gives `t_{0,2} = t_{D,2} − D F_prog ≤ 5`.
+**Details.** §2 says "only a constant number of these messages can fit into a single local broadcast
+message". In the delay schedule, `b_{i+1}` receives `a_i`'s `m₀`-broadcast over a `G'` edge. With
+`c ≥ 2`, `b_{i+1}`'s later broadcast "containing `m₁`" may also carry `m₀`. The schedule delivers that
+broadcast to `a_{i+2}` over a `G'` edge, so `m₀` jumps ahead and the frontier no longer advances one hop
+per `F_ack`. Against "always send everything you know" the schedule only costs `O(F_ack + D F_prog)`.
 
-**Repair.** Prove `ℓ F_ack ≤ t_{0,ℓ} + F_ack`, i.e. `(ℓ−1) F_ack ≤ t_{0,ℓ}`, which holds for `r ≥ 1`
-(`lemma_3_12_5'`).
+### ✏️ Slips
+- Lemma 3.12, part 5 (`ℓ F_ack ≤ t_{0,ℓ}` for `ℓ > 1`) is off by one `F_ack`: it is false whenever
+  `F_ack > 2 F_prog`, the regime the paper cares about. With `r = 1`, `ℓ = 2`, `F_prog = 1`, `F_ack = 3` we get
+  `ℓ F_ack = 6 > 5 = t_{0,2}` (`lemma_3_12_5_false`). This holds for our `t_{d,ℓ}`, for the formula read off
+  Theorem 3.16, and for *every* definition satisfying part 4 and `t_{D,k} ≤ t₁` (needed to get Theorem 3.16 "directly
+  from Lemma 3.15"), since part 4 gives `t_{0,2} = t_{D,2} − D F_prog ≤ 5` (`lemma_3_12_5_false_any`). Its only use
+  (Lemma 3.14) cites the weaker `ℓ F_ack ≤ t_{0,ℓ} + F_ack`, i.e. `(ℓ−1) F_ack ≤ t_{0,ℓ}`, which holds for `r ≥ 1`
+  (`lemma_3_12_5'`); the theorems are unaffected.
+- Theorem 3.16 claims `R_j(t₁) = K` for every node `j`, which fails for two isolated nodes with one message each,
+  since §2 explicitly does not assume `G` connected; a message only reaches its source's component. Connectivity is
+  implied by the use of the diameter `D`. The MMB specification of §3.2.2 is inconsistent with §2 in the same way:
+  part (a) asks every process to deliver every message, but §2 asks only for the source's component. We prove the
+  per-component statement and the paper's statement for connected `G` (`theorem_3_16`, `theorem_3_16_connected`), and
+  use the component version (`SolvesMMB`).
+- Lemma 3.20, proof: "At the end of each sub-interval, deliver `m₀` from `a₁` to `b₂`" repeats a delivery of the same
+  broadcast instance, which receive correctness forbids. One delivery suffices, because condition (c) of the progress
+  bound counts earlier receive events.
+- Corollary 3.8, proof: "`|R_i(t + F_ack)| ≥ |R_i(t)| + 1`" should be `C_i`.
+- Lemma 3.15, Case 1: "`m′ ∈ R_{j″}(t*) \ C_{j″}(t*)`" should be `R_{j*}(t*) \ C_{j*}(t*)`.
+- §3.2: "`G′` is a subgraph of `G` (denoted `G ⊆ G′`)" has the roles swapped.
 
-### ⚠️ §3.2.4 (the times `t_{d,ℓ}` are never defined)
+### Typos
+- Lemma 3.15, Case 2: "by Part 1 of Lemma 3.15" should be "of Lemma 3.5".
+- §3.2: `N^r_G(j)` is defined with "`≤ z`".
+- Theorem 3.1, proof: the base case "`h = 0`" cannot occur for `ℓ ≥ 1`. The induction should start from
+  the trivial case `ℓ = 0`.
+- Lemma 3.11: choosing a *closest* `j″` is unnecessary.
+
+## Proof gaps (statements true)
+
+### 🔧 §3.2.4 (the times `t_{d,ℓ}` are never defined)
 The times `t_{d,ℓ}` that Lemma 3.12 lists properties of and Lemmas 3.13–3.15 use are never defined, and
 the formula suggested by Theorem 3.16 contradicts `t_{0,1} = 0` (stated in Lemma 3.13) for `r > 1`.
 
@@ -46,43 +70,7 @@ and gives Theorem 3.16 with the paper's `t₁` (`tdl`, `lemma_3_12_1` … `lemma
 Lemma 3.12 and `t_{0,1} = 0`, and `t_{D,k} ≤ t₁`, so Theorem 3.16 follows with the paper's `t₁`.
 (`tdl`, `lemma_3_12_1` … `lemma_3_12_4`)
 
-### ⚠️ Theorem 3.16 and the MMB specification of §3.2.2 (disconnected `G`)
-Theorem 3.16 claims `R_j(t₁) = K` for every node `j`, which fails for two isolated nodes with one message
-each, since §2 explicitly does not assume `G` connected (`theorem_3_16_connected` assumes it).
-
-**Impact.** Degenerate case, implied by the use of the diameter `D`; we prove the per-component statement
-and the paper's statement for connected `G` (`theorem_3_16`, `theorem_3_16_connected`).
-
-**Details.** Without connectivity a message only reaches its source's component. The MMB specification
-of §3.2.2 is inconsistent with §2 in the same way: part (a) asks every process to deliver every message,
-but §2 asks only for the source's component. We use the component version (`SolvesMMB`).
-
-### ⚠️ Lemma 3.20 and Theorem 3.17 for `c ≥ 2` messages per broadcast (not formalized)
-The delay schedule of Lemma 3.20 assumes one MMB message per local broadcast, but §2 allows a constant
-number `c`, and for `c ≥ 2` the schedule breaks, so Theorem 3.17 is unestablished for `c ≥ 2`.
-
-**Impact.** An informal observation, not checked in Lean (the lower bounds are not formalized). The
-argument as written covers `c = 1`. We did not determine whether Theorem 3.17 holds for `c ≥ 2`.
-
-**Details.** §2 says "only a constant number of these messages can fit into a single local broadcast
-message". In the delay schedule, `b_{i+1}` receives `a_i`'s `m₀`-broadcast over a `G'` edge. With
-`c ≥ 2`, `b_{i+1}`'s later broadcast "containing `m₁`" may also carry `m₀`. The schedule delivers that
-broadcast to `a_{i+2}` over a `G'` edge, so `m₀` jumps ahead and the frontier no longer advances one hop
-per `F_ack`. Against "always send everything you know" the schedule only costs `O(F_ack + D F_prog)`.
-
-### Typos and slips
-- Corollary 3.8, proof: "`|R_i(t + F_ack)| ≥ |R_i(t)| + 1`" should be `C_i`.
-- Lemma 3.15, Case 1: "`m′ ∈ R_{j″}(t*) \ C_{j″}(t*)`" should be `R_{j*}(t*) \ C_{j*}(t*)`.
-- Lemma 3.15, Case 2: "by Part 1 of Lemma 3.15" should be "of Lemma 3.5".
-- §3.2: `N^r_G(j)` is defined with "`≤ z`"; "`G′` is a subgraph of `G` (denoted `G ⊆ G′`)" has the roles
-  swapped.
-- Theorem 3.1, proof: the base case "`h = 0`" cannot occur for `ℓ ≥ 1`. The induction should start from
-  the trivial case `ℓ = 0`.
-- Lemma 3.11: choosing a *closest* `j″` is unnecessary.
-
-## Proof gaps (statements true)
-
-### 🛠️ Theorem 3.2 (`O(D F_prog + r k F_ack)` from `t₁`)
+### 🔧 Theorem 3.2 (`O(D F_prog + r k F_ack)` from `t₁`)
 The bound does not follow from `t₁` alone: `t₁` contains `(r+1) k F_prog`, which is `O(r k F_ack)` only
 if `F_prog = O(F_ack)`, and the model never assumes this ("we think of `F_prog` as smaller").
 
@@ -144,8 +132,9 @@ Hypotheses actually needed:
 
 **Not formalized.**
 * §3.3: the lower bounds Theorem 3.17 and Lemmas 3.18–3.20. These need a model of arbitrary, randomized algorithms
-  and the grey-zone geometry; see the gap noted above.
-* §4: the enhanced model and FMMB.
+  and the grey-zone geometry; see the mistake noted above. The argument as written covers `c = 1`, which we did not
+  check further.
+* §4: the enhanced model, FMMB, Theorem 4.1 and Lemma 4.2.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 

@@ -6,20 +6,25 @@ Models of Distributed Computing.* PODC 2021. DOI
 [2102.11630](https://arxiv.org/abs/2102.11630) v2 (full version with appendix); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🛠️ Proof repaired.** All the impossibility results of Section 3 hold: Lemmas 3.1, 3.2, 3.4 and
-3.5 and Corollaries 3.3 and 3.6. We prove each of them directly for all three selection constraints
-(liberal, exclusive, synchronous). The paper's proofs of 3.1, 3.2 and 3.4 do not work for exclusive
-selection as written, and fall back on the selection-independence theorem of Esparza–Reiter. The explicit cutoff in the proof of Lemma 3.5 is not
-justified by the argument (the lemma only claims existence). The rest is small slips. Sections 4–6 (the expressiveness characterization) are not formalized.
+**Verdict: 🔧 Easy fix.** Only Section 3 was checked, not the paper's main point, the characterizations of Sections 4–6.
+In Section 3 all the impossibility results hold: Lemmas 3.1, 3.2, 3.4 and 3.5 and Corollaries 3.3 and 3.6, which we
+prove directly for all three selection constraints (liberal, exclusive, synchronous). The one heavy repair concerns the
+explicit cutoff `β + 1` of Lemma 3.4 for exclusive automata, which nothing else depends on (Proposition C.3 uses only
+some cutoff, and the paper's class-level results go through [16]); the rest is local.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
+### ✏️ Slips
+- Lemma 3.5's proof concludes that "`K := m(|Q|−1) + 2` is a valid cutoff", but its argument needs
+  `L_G(q) ≥ (m−1)|Q| + 2`, the bound printed one line earlier, and `K` is smaller than `(m−1)|Q| + 2` whenever `m > |Q|`.
+  The proof shows that adding a leaf with label `q` preserves acceptance when `L_G(q) ≥ (m−1)|Q| + 2`, which is what
+  the pigeonhole step needs. The lemma only claims that some `K` exists, so it is unaffected. We use `K = B + 3` with
+  `B = max(m_Y, m_N)·|Q| + 1` (`lemma_3_5`).
+- In Lemma 3.5's proof, "the fact that `MinPre*(C)` is upward-closed" should read `Pre*(C)`.
 
-### Typos and slips
+### Typos
 - In Lemma 3.4's induction step, "`⌈Q_{G(t+1)}⌉_β`" should be `⌈·⌉_{β+1}`.
 - In Lemma 3.2's proof, "`C_t(v) = C_t(f(v))`" should be `C'_t(v) = C_t(f(v))`.
-- In Lemma 3.5's proof, "the fact that `MinPre*(C)` is upward-closed" should read `Pre*(C)`.
 - In Lemma 3.5's proof, states and labels are identified ("`L_G(q)`" for a state `q`).
 - The definition of a covering does not say that `H` must be connected and have at least three
   nodes. This is implicit in the graph convention.
@@ -50,21 +55,11 @@ give the explicit cutoff `β + 1` of Lemma 3.4 for an exclusive automaton.
 * Lemma 3.4 uses stars instead of cliques, with the schedule "all leaves (one at a time), then the
   centre".
 
-### 🛠️ Lemma 3.5 (explicit cutoff constant)
-The proof concludes that "`K := m(|Q|−1) + 2` is a valid cutoff", but its argument needs
-`L_G(q) ≥ (m−1)|Q| + 2`, and `K` is smaller than `(m−1)|Q| + 2` whenever `m > |Q|`.
-
-**Impact.** The lemma only claims that some `K` exists, so it is unaffected. We use `K = B + 3` with
-`B = max(m_Y, m_N)·|Q| + 1` (`lemma_3_5`).
-
-**Details.** The proof shows that adding a leaf with label `q` preserves acceptance when
-`L_G(q) ≥ (m−1)|Q| + 2`, which is what the pigeonhole step needs.
-
-### 🛠️ Lemma 3.5 (stable acceptance)
+### 🔧 Lemma 3.5 (stable acceptance)
 "An analogous argument shows that the same holds for acceptance" requires a second cutoff `m'`, for the set of
 configurations that can reach a non-accepting configuration.
 
-**Impact.** Statement true; we take `max(m, m')`.
+**Impact.** Statement true; we take `max(m, m')` (`lemma_3_5`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

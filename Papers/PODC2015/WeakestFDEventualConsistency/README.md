@@ -4,22 +4,22 @@ Swan Dubois, Rachid Guerraoui, Petr Kuznetsov, Franck Petit, Pierre Sens. *The W
 Eventual Consistency.* PODC 2015. DOI [10.1145/2767386.2767404](https://doi.org/10.1145/2767386.2767404).
 Formalized version: arXiv:1505.03469v1 (full version with the appendix; numbering follows it).
 
-**Verdict: ❌ False claim.** The sufficiency half of the headline holds: `Ω` implements eventual consensus (Lemma
-2), and EC and ETOB are equivalent (Theorem 1). Both proofs needed the same small repair. Lemma 3 is false: the
-paper's ETOB algorithm (Algorithm 5) is not stable over non-FIFO links. Adding sequence numbers to promotions fixes
-it. Theorem 3 (EC ⇔ EIC, appendix) is false if EIC-Agreement is read literally, and holds among correct
-processes. The necessity half (Lemma 1, a CHT-style extraction) is not formalized.
+**Verdict: 🔧 Easy fix.** The sufficiency half of the main result holds: `Ω` implements eventual consensus (Lemma 2),
+and EC and ETOB are equivalent (Theorem 1); both proofs needed the same small repair. Local changes save the rest:
+Lemma 3 is false because the paper's ETOB algorithm (Algorithm 5) is not stable over non-FIFO links, and sequence
+numbers on promotions fix it, while Theorem 3 (EC ⇔ EIC, appendix) is false if EIC-Agreement is read literally, and
+holds among correct processes. The necessity half of the main result (Lemma 1, a CHT-style extraction) is not
+formalized, so this verdict does not cover it.
 
 ## Mistakes in the paper
 
-### ❌ Lemma 3 (Algorithm 5 does not implement ETOB)
+### 🔧 Lemma 3 (Algorithm 5 does not implement ETOB)
 Algorithm 5 is not stable over non-FIFO links: an older, shorter promotion from the leader can arrive after a
 newer one and shrink `d_i`, so with two processes, no crashes and a leader stable from time 0, ETOB-Stability
 fails for every `τ` (`Alg5.lemma_3_false`).
 
 **Impact.** Breaks the paper's ETOB algorithm and the §5 claim that it gives TOB when `Ω` is stable from the
-start. Not a headline result: the sufficiency half of the headline rests on Lemma 2 and Theorem 1, which
-hold. Adding sequence numbers to
+start. The sufficiency half of the main result rests on Lemma 2 and Theorem 1, which hold. Adding sequence numbers to
 promotions repairs it (`Alg5Fixed.lemma_3_fixed`, `Alg5Fixed.tob_of_const_leader`).
 
 **Details.** On receiving a promotion from its current leader, a process sets `d_i := promote_j`. Links are
@@ -27,21 +27,30 @@ reliable but not FIFO. Counterexample: two processes, no crashes, `Ω` outputs p
 time 0, and the application broadcasts `0, 1, 2, …`. The adversary delivers promotion `b` followed by the
 delayed promotion `b − 1` infinitely often, with all delays bounded. ETOB-Stability then fails for every
 `τ`. The proof's step "`d_i(t₁) = promote_j(t₃)`, `d_i(t₂) = promote_j(t₄)`, hence prefix" silently assumes
-`t₃ ≤ t₄`, i.e. FIFO delivery. The same run refutes the §5 TOB claim. The proof also uses a "longest
-communication delay `Δc`", which need not exist in an asynchronous run.
+`t₃ ≤ t₄`, i.e. FIFO delivery. The same run refutes the §5 TOB claim.
 
 **Repair.** The leader numbers its promotions, and a process adopts a promotion only if its number is larger
 than the last one it adopted from that leader. The repaired algorithm implements ETOB from `Ω` in every
 environment, and TOB under a leader that is stable from the start.
 
-### ❌ Theorem 3 and Lemma 4 (EC ⇔ EIC, literal EIC-Agreement)
+### 🔧 Lemma 3 (proof, the choice `τ = τ_Ω + Δt + Δc`)
+The proof uses a "longest communication delay `Δc`" and a longest local timeout `Δt`, which need not exist in an
+asynchronous run, where delays are finite but unbounded.
+
+**Impact.** The step that gives every process a promotion after `τ` is not justified; it is replaced in the repaired
+algorithm (`Alg5Fixed.lemma_3_fixed`).
+
+**Repair.** Take instead the maximum, over the finitely many correct processes, of the first adoption of a promotion
+of the final leader after `τ_Ω`.
+
+### 🔧 Theorem 3 and Lemma 4 (EC ⇔ EIC, literal EIC-Agreement)
 Under the literal, uniform reading of EIC-Agreement, EIC cannot be implemented with `Ω` at all, already with 3
 processes and at least one correct (`EICImpossible.not_solvesEIC`), and Algorithm 6 violates it concretely
 (`Alg6Counterexample.not_EICAgreement`).
 
 **Impact.** Appendix result. With agreement among correct processes, Lemmas 4 and 5, and hence Theorem 3,
-hold (`Alg6.lemma4`, `Alg7.lemma5`). Reading it among correct processes is a plausible intent, but the paper
-words it exactly like the uniform EC-Agreement, so we count it as a false statement.
+hold, with the printed Algorithms 6 and 7 (`Alg6.lemma4`, `Alg7.lemma5`). Reading it among correct processes is a
+plausible intent, but the paper words it exactly like the uniform EC-Agreement, so as printed the statement is false.
 
 **Details.** The paper requires that "no two processes return infinitely different values", and it defines a
 process's response as its *last* response, so a crashed process keeps its response forever. Two processes
@@ -50,15 +59,19 @@ last responses afterwards. EC, by contrast, is implementable with `Ω`. In Algor
 decides `true` and crashes while the correct one decides `false` forever, even though the EC box satisfies
 EC.
 
-### ⚠️ Algorithm 2 (ETOB's usage assumption)
-ETOB is specified only for distinct broadcast messages, but two processes that propose the same `v` to
-instance `ℓ` both broadcast `(ℓ, v)`.
-
-**Impact.** Local fix: broadcast `(p_i, ℓ, v)` (`ETOBtoEC.tobHist_distinct`).
+### Typos
+- Lemma 3's proof (ETOB-Total-order) says "`p_i` and `p_j` receive at least one message of type promote from `p_j`";
+  the leader there is `p_k`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 2 and Theorem 1, ETOB → EC (uniform agreement)
+### 🔧 Algorithm 2 (ETOB's usage assumption)
+ETOB is specified only for distinct broadcast messages, but two processes that propose the same `v` to
+instance `ℓ` both broadcast `(ℓ, v)`.
+
+**Impact.** Local fix: broadcast `(p_i, ℓ, v)` (`ETOBtoEC.tobHist_distinct`, `ETOBtoEC.ec_of_etob`).
+
+### 🔧 Lemma 2 and Theorem 1, ETOB → EC (uniform agreement)
 Both proofs pick `k` as the first instance invoked after the stabilization time of `Ω` (resp. ETOB), but `Ω`
 and ETOB constrain only correct processes, while EC-Agreement covers all processes.
 
@@ -109,7 +122,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Not formalized.**
 - Lemma 1 (`Ω` is necessary for EC; a CHT extraction with `k`-tags and Algorithm 3), and therefore the necessity
   half of Theorem 2. An informal check of Lemma 1 found no error.
-- TOB-Causal-Order, the communication-step claims, and Sections 6–7.
+- TOB-Causal-Order of Algorithm 5 (printed and repaired), the communication-step claims, and Sections 6–7.
 
 **Trust.** No `sorry`. All theorems listed above use only the axioms `propext`, `Classical.choice` and
 `Quot.sound`. Non-vacuity checks:

@@ -5,43 +5,23 @@ Fabian Frei, Koichi Wada. *Distinct Gathering and the Virtue of Self-Consistency
 version. The announced full arXiv version (ref. [17], "arXiv:xxxx.xxxxx") could not be found, so the proceedings
 version is all there is; it gives only proof sketches.
 
-**Verdict: ⚠️ Minor statement issues.** The impossibility results are correct. Theorem 4 (no algorithm gathers 3
-robots from distinct positions under Round-Robin) and Theorem 1 (no algorithm gathers `n ≥ 3` robots from arbitrary
-positions, even with a shared unit length) are proved in Lean. Both are proved in a stronger form: they hold with
-rigid movement and a common chirality too. The only statement-level slip is that Conjecture 3 is printed with
-"Gathering" instead of "Distinct Gathering". In that form, Theorem 1 makes it vacuously true, so the claim
-"we disprove both conjectures" fails for it as printed. The intended version is clear from the context.
+**Verdict: ✏️ Slip.** Only the impossibility results were checked, and they are correct: Theorem 4 (no algorithm gathers
+3 robots from distinct positions under Round-Robin) and Theorem 1 (no algorithm gathers `n ≥ 3` robots from arbitrary
+positions, even with a shared unit length) are proved in Lean, in a stronger form that also holds with rigid movement
+and a common chirality. The one mistake is that Conjecture 3 is printed with "Gathering" instead of "Distinct
+Gathering". The paper's main positive results, Theorem 5 (`n ≥ 4`) and Theorems 6 and 7 (self-consistency), were not
+checked, because their algorithms and proofs appear only in the unavailable full version.
 
 ## Mistakes in the paper
 
-### ⚠️ Conjecture 3 (§3, misquoted as "Gathering")
-Conjecture 3 is printed as "every algorithm that solves *Gathering* under RoundRobin is a rapid-gathering algorithm", which by the paper's own Theorem 1 is vacuously true for every `n ≥ 3`, so the claim in §1 and §4.1 that Theorem 5 disproves it fails as printed (`conjecture_3_as_stated`).
-
-**Impact.** A typo with evident intent: Distinct Gathering is meant. For `n = 3` the intended version holds vacuously by Theorem 4 (`conjecture_3_distinct_three`); the disproof for `n ≥ 4` was not checked.
-
-**Details.** §3 states Conjecture 3 after Défago et al., Conj. 1. The intended reading is clear: the
-sentence before it speaks of "any algorithm solving this problem", meaning Distinct Gathering, and
-Definition 5 starts from distinct positions. For `n = 3` the vacuous truth agrees with the paper's
-remark "confirming Conjectures 2 and 3 in this case". The disproof for `n ≥ 4` rests on Theorem 5
-together with Défago et al., Thm. 16. (`conjecture_3_as_stated`, `conjecture_3_distinct_three`)
-
-## Proof gaps (statements true)
-
-### 🛠️ Theorem 4 (only a sketch)
-The paper defers the rigorous proof to the full version, and its sketch only mentions the last 3→2-point transition and "the fact that the algorithm does not revert to a three-point configuration multiple times".
-
-**Impact.** The theorem is true as stated; this is not an error, only a missing proof. A short complete proof exists, and it works under rigid movement (`theorem_4`).
-
-**Repair.** Our proof does not need non-rigid movement.
-1. The step that first gathers is a lone robot jumping onto the point of the other two. The
-   adversary can rotate and scale every two-point view to the same view `{0, w}`, so *every* robot
-   seeing a two-point configuration jumps onto the other point.
-2. Robots starting at distinct positions must eventually collide. So in some distinct configuration
-   `C`, some robot `x` jumps exactly onto some robot `y`.
-3. Start from `C` with the Round-Robin order `x, y, z`. After `x` joins `y`, the activated robot is
-   always accompanied, and the robots swap between the two points forever.
-
-(`theorem_4`)
+### ✏️ Slips
+- Conjecture 3 (§3) is printed as "every algorithm that solves *Gathering* under RoundRobin is a rapid-gathering
+  algorithm", which by the paper's own Theorem 1 is vacuously true for every `n ≥ 3`, so the claim in §1 and §4.1 that
+  Theorem 5 disproves it fails as printed (`conjecture_3_as_stated`). Distinct Gathering is meant: §3 states Conjecture 3
+  after Défago et al., Conj. 1, the sentence before it speaks of "any algorithm solving this problem", meaning Distinct
+  Gathering, and Definition 5 starts from distinct positions. For `n = 3` the intended version holds vacuously by
+  Theorem 4 (`conjecture_3_distinct_three`), which agrees with the paper's remark "confirming Conjectures 2 and 3 in
+  this case". The disproof for `n ≥ 4` rests on Theorem 5 together with Défago et al., Thm. 16, and was not checked.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -82,9 +62,22 @@ Proof ingredients are in `TwoPoint.lean`. `exists_fixed_view` shows that some vi
 onto the other point. `step_normFrame` covers the normalizing frames. `run_cycle` is the swapping execution, with
 the closed form "robot `σ i` is at `v` at time `t` iff `[i = 1] xor [⌊t/n⌋ odd] xor [i < t mod n]`".
 
-**Not formalized.** Theorem 5 (`n ≥ 4`, the nine-phase algorithm) and Theorems 6 and 7 (`n = 3` with a
-self-consistent unit length or compass). Their algorithms and proofs appear only in the unavailable full
-version.
+**Not formalized.**
+* Theorem 5 (`n ≥ 4`, the nine-phase algorithm), and with it the disproof of Conjectures 2 and 3 for `n ≥ 4`, and
+  Theorems 6 and 7 (`n = 3` with a self-consistent unit length or compass), with the "paradox" discussion. Their
+  algorithms and proofs appear only in the unavailable full version.
+* Theorem 4's proof sketch. The paper defers the rigorous proof to the full version, and its sketch only mentions the
+  last 3→2-point transition and "the fact that the algorithm does not revert to a three-point configuration multiple
+  times". We did not try to check the sketch; this is a missing proof, not an error. The theorem itself is true as
+  stated: a short complete proof exists, it works under rigid movement, and it does not need non-rigid movement
+  (`theorem_4`).
+  1. The step that first gathers is a lone robot jumping onto the point of the other two. The
+     adversary can rotate and scale every two-point view to the same view `{0, w}`, so *every* robot
+     seeing a two-point configuration jumps onto the other point.
+  2. Robots starting at distinct positions must eventually collide. So in some distinct configuration
+     `C`, some robot `x` jumps exactly onto some robot `y`.
+  3. Start from `C` with the Round-Robin order `x, y, z`. After `x` joins `y`, the activated robot is
+     always accompanied, and the robots swap between the two points forever.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and `Quot.sound`.
 Non-vacuity check: `twoAlg` solves (Distinct) Gathering of two robots in the full default model (variable

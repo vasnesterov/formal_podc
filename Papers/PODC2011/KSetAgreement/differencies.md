@@ -58,7 +58,7 @@ impossible). In Lean the groups are `Dg i` and `D̄` is `Dbar`.
    is undefined at `f = n`, so this concerns only the multiplied-out form; the sets `D_i` of size
    `n − f` must be nonempty). For `f = n = k`, `k (n − f) = 0 ≤ n − 1`, but
    "decide your own input" solves `n`-set agreement (`theorem2_false_of_f_eq_n`).
-7. **Section VI, minor slips** (proof gaps / imprecisions, statements true). Lemma 6 needs a
+7. **Section VI, imprecisions** (the algorithm and Theorem 8 are unaffected). Lemma 6 needs a
    nonempty graph (the empty graph has no source component); `δ > 0` is not needed
    (`SourceComp.exists_sourceComponent` assumes `Nonempty α`). After stage 2 a process does not
    have "complete knowledge of G", only of its ancestors; this suffices, but the safety proof also

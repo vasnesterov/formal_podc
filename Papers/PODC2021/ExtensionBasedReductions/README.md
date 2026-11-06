@@ -4,33 +4,23 @@ Kayman Brusse, Faith Ellen. *Reductions and Extension-Based Proofs.* PODC 2021. 
 [10.1145/3465084.3467906](https://doi.org/10.1145/3465084.3467906). Formalized version: the PODC proceedings
 version (no arXiv version; the "full version" cited for Sections 5–7 was not available).
 
-**Verdict: 🛠️ Proof repaired.** We prove Theorem 1 (an augmented extension-based impossibility proof transfers
-from `T` to `S` along a reduction) for reductions `(R₁, R₂)` in which `R₂` needs no communication, i.e. each
-process applies a function to its own output of `S`. `R₁` is an arbitrary NIS-solvable task. One step of the
-paper's "Why the prover wins" argument fails as written; we fix it by choosing the initial configuration
-`D₀` of `A` canonically. The general case, where `R₂` needs the NIS composition `A₂ ∘ (A ∘ A₁)` of
-Section 6, is **not** formalized. Its correctness proof is deferred by the paper to a full version, and its
-assignment-query step depends on an unproved claim. The Section 4 claim (extension-based ⇒ augmented
-extension-based) and the cited fact "NIS-solvable ⇒ IS-solvable" are proved.
+**Verdict: ⚠️ Weakened.** We prove Theorem 1 (an augmented extension-based impossibility proof transfers from `T` to
+`S` along a reduction) and the transfer of §8 only for reductions `(R₁, R₂)` in which `R₂` needs no communication, i.e.
+each process applies a function to its own output of `S`, with `R₁` an arbitrary NIS-solvable task. Two steps of the
+paper's proof fail as written, and the general case, where `R₂` needs the NIS composition `A₂ ∘ (A ∘ A₁)` of Section 6
+whose correctness the paper defers to a full version, was neither proved nor refuted; Section 5 was not checked either.
+The Section 4 claim (extension-based ⇒ augmented extension-based) and the cited fact "NIS-solvable ⇒ IS-solvable" are
+proved.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
-- "Suppose `R₂ ∘ S ∘ R₂` is a reduction" (§1) and "`R₁ ∘ S ∘ R₂`" / "`R₂ ∘ S ∘ R₂`" (§7, "Why the prover wins")
-  should read `R₂ ∘ S ∘ R₁`.
-- In §3, "if `δ(s'ᵢ) ≠ ⊥` then `pᵢ` outputs `δ(sᵢ)`. If `δ(sᵢ) = ⊥` …" should read `δ(s'ᵢ)` in both places.
-
-## Proof gaps (statements true)
-
-### 🛠️ Theorem 1 ("Why the prover wins", first case)
+### ⚠️ Theorem 1 ("Why the prover wins", first case)
 The step "if the values output in `D₀γ'` did satisfy the specifications of `S`, then the values output in
 `C` would satisfy `R₂ ∘ S ∘ R₁`" fails when the prover reaches `C` before every process has finished `A₁`,
 because `D₀` then gives those processes arbitrary inputs.
 
-**Impact.** Statement true in the case we check (`R₂` local); repaired by choosing `D₀` canonically
-(`theorem1_local`, `step_queryA1`, `ucan_mem`).
+**Impact.** Theorem 1 was not refuted, but it is saved only for `R₂` without communication: the repair, choosing `D₀`
+canonically, is proved in that case (`theorem1_local`, `step_queryA1`, `ucan_mem`).
 
 **Details.** `D₀` is any initial configuration of `A` compatible with `C₀γ₁`, so its inputs are only fixed
 for processes that finished `A₁`. If the prover reaches `C` before every process has finished `A₁`, `D₀`'s
@@ -45,25 +35,23 @@ configuration by a chain of queries from the start of its phase. We also handle 
 infinitely-many-phases case by a potential argument, since "`𝒫_T` can only end a finite number of phases
 with `A₁`/`A₂`-only steps" needs one. (`theorem1_local`, `step_queryA1`, `ucan_mem`)
 
-### 🛠️ General Theorem 1 (non-local `R₂`, assignment queries)
-In the general case the assignment-query step filters candidates in a way that can drop the right `g`, and
-it relies on the unproved claim that the `A₂`-schedules simulable from `C μ₁ μ'` "do not depend on the
-particular schedule `μ'`".
+### ⚠️ Theorem 1 (assignment queries, enumeration of `C₂`)
+The assignment-query step enumerates "the initial configurations `C₂` of `A₂` such that there is a `P'`-only schedule
+from `C₂` that results in a configuration satisfying `f`", which ignores the steps of `A₂` that other processes,
+possibly outside `P`, already took during `γ`.
 
-**Impact.** Outside the checked scope: the general case is not formalized, and we did not try to resolve
-these two gaps; the first is easily repaired, the second is neither proved nor refuted. The verdict concerns
-only the local case.
+**Impact.** Such a step can be necessary for `f`, so the filter can drop the right `g`, and the prover then answers
+`None` although a schedule exists. Correct answers to assignment queries are proved only for `R₂` without communication
+(`assign_sound`, `assign_complete`).
 
-**Details.**
-- The assignment-query step enumerates "the initial configurations `C₂` of `A₂` such that there is a
-  `P'`-only schedule from `C₂` that results in a configuration satisfying `f`". This ignores the steps of
-  `A₂` that other processes, possibly outside `P`, already took during `γ`. Such a step can be necessary for
-  `f`, so the filter can drop the right `g`, and the prover then answers `None` although a schedule exists.
-  The later exhaustive search over `μ₂` makes the filter unnecessary: enumerating all `g` repairs this.
-- More seriously, the independence claim is asserted without proof. It is needed for the `None` answers to
-  be correct. With estimate vectors, the composite configuration after `μ'` records more than the outputs
-  of `A`: composite rounds and copied estimates. So the claim needs a real argument, which the paper defers
-  together with the correctness of the composition. We neither prove nor refute it.
+**Repair.** The later exhaustive search over `μ₂` makes the filter unnecessary: enumerating all `g` repairs this. We
+proved this only in the local case, where `𝒫` enumerates every `g` with `h ∘ g = f`.
+
+### Typos
+- "Suppose `R₂ ∘ S ∘ R₂` is a reduction" (§1) and "`R₁ ∘ S ∘ R₂`" / "`R₂ ∘ S ∘ R₂`" (§7, "Why the prover wins")
+  should read `R₂ ∘ S ∘ R₁`.
+- In §3, "if `δ(s'ᵢ) ≠ ⊥` then `pᵢ` outputs `δ(sᵢ)`. If `δ(sᵢ) = ⊥` …" should read `δ(s'ᵢ)` in both places.
+- In §7, Ending phases, `α'(ϕ)` is written for `α'(φ)`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -117,6 +105,11 @@ The prover of §7 is `proverS` (`Prover.lean`); its correctness is in `Theorem1.
 **Not formalized.**
 * Theorem 1 for reductions whose `R₂` needs communication, and the general composition `A₂ ∘ A₁` of
   Section 6 (estimate vectors).
+* The claim of the general assignment-query step that the `A₂`-schedules simulable from `C μ₁ μ'` "do not depend on
+  the particular schedule `μ'`". It is asserted without proof and is needed for the `None` answers to be correct.
+  With estimate vectors, the composite configuration after `μ'` records more than the outputs of `A`: composite rounds
+  and copied estimates. So the claim needs a real argument, which the paper defers together with the correctness of
+  the composition. We neither prove nor refute it, and we did not try to resolve it.
 * Section 5 (no augmented EBP for `k`-set agreement), which the paper defers to the full version.
 * Corollary 2 (anonymous protocols).
 * The specific reductions cited in §2/§8.

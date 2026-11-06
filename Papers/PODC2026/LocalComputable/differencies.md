@@ -36,8 +36,8 @@ follow).
    at the first critical radius, within `T(n)`. This is the formalization's `B`. The C₃ node and
    the C₅ node both stop at radius 1. The paper's arguments, however, do not establish what this
    reading needs. Lemma 5.2's procedure checks safety only (item 5). Lemma 5.5 does not show that
-   `A_N` stops inside the view (item 2). So in either reading this is a proof gap with true
-   statements, not a false claim. `maxSafe_rule_exceeds` refutes only the per-node reading; under the view-level reading a view is maximally safe iff it is safe and critical, and the first such radius is the first critical radius (`maxSafeView_iff`, `first_critical_maxSafeView`).
+   `A_N` stops inside the view (item 2). So in either reading the statements are true and the gap
+   is in the proofs. `maxSafe_rule_exceeds` refutes only the per-node reading; under the view-level reading a view is maximally safe iff it is safe and critical, and the first such radius is the first critical radius (`maxSafeView_iff`, `first_critical_maxSafeView`).
    *Fix.* We call a radius-`t` view `x` **`T`-critical** if `x` occurs in some network `G'` with
    `T(|V(G')|) ≤ t` (`Model.Critical`). This depends only on `x`. Every node has a critical radius
    `≤ T(n)` (its own network is a witness). Any algorithm of locality `T` has stopped at a node
@@ -72,7 +72,7 @@ follow).
    `[1, n^c]` with `c ≥ 1` and disconnected graphs are allowed. The views of the old nodes do not
    change. (`stops_of_le`)
 
-5. **Minor imprecisions** (typo / under-specified level).
+5. **Further imprecisions.**
    * Definition 5.1 says "maximal with this property (i.e., `t` is safe but `t + 1` is not)". These
      two readings agree only if safety is downward closed in `t`, and the paper does not show
      that. (Our fix avoids the issue: `B` stops at the *first* critical radius.)

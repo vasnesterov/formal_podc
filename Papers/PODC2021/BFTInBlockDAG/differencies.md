@@ -1,33 +1,32 @@
 # Differences between the formalization and the paper
 
 Paper: Schett, Danezis, *Embedding a Deterministic BFT Protocol in a Block DAG*, PODC 2021,
-arXiv:2102.09594v2. Rule labels (R1–R6) refer to the verdict scale.
+arXiv:2102.09594v2.
 
-## Statement-level issues (decide the verdict)
+## Statement-level issues
 
-1. **Lemma 4.3 (2) (no duplication) is false.** It fails for messages with a Byzantine sender.
+1. **⚠️ Lemma 4.3 (2) (no duplication) is false.** It fails for messages with a Byzantine sender.
    Counterexample: `Counterexample.lemma_4_3_2_false`, with `n = 4`, `f = 1` and an equivocating
    server 3 building two valid genesis blocks. Correct server 1 references them in two of its blocks and
    receives the same message twice. The proof's claim "a duplicate requires `B₁ = B₁'`" is wrong.
-   No R2–R4 excuse: the lemma is explicitly about every message received by a correct server, and the
-   equivocation used is the one the paper itself describes (Example 3.5, Fig. 3). → ❌ (numbered lemma, R1).
+   The lemma is explicitly about every message received by a correct server, and the equivocation used is
+   the one the paper itself describes (Example 3.5, Fig. 3).
    What holds: no duplication for correct senders when messages are unique (`lemma_4_3_2_correct`,
    `trace_noDupCorrect`).
-2. **Theorem 5.1 is false as stated** (`Counterexample.theorem_5_1_false`). Our counting protocol
+2. **⚠️ Theorem 5.1 is false as stated** (`Counterexample.theorem_5_1_false`; same mistake as item 1). Our counting protocol
    `countP` is deterministic, its messages are unique and carry their sender. Over authenticated perfect
    links it satisfies `Φ` = "if a correct server delivers, then two different correct servers were
    requested" (`holdsOverAPL_phi`). The embedding violates `Φ` in a reachable state.
-   → 🚨 (headline, R5: the theorem is about the paper's specific construction).
+   The theorem is about the paper's specific construction.
    `countP` echoes only on its first request, so its request handling depends on the state, which
    the paper's interface convention (Section 4: "messages triggered by requests do not depend on the
    state") excludes. The variant `countP₀` that echoes on every request satisfies that convention and
    fails in the same run (`Counterexample.theorem_5_1_false_stateless`); in `run12` each process
    instance is requested at most once, so no correct process sends a message twice.
-   *Borderline (R4).* Section 4 says that, `P` being BFT, the simulated servers "can deal with duplicate
+   *Section 4's remark.* Section 4 says that, `P` being BFT, the simulated servers "can deal with duplicate
    messages". Reading "BFT protocol" as *assuming* tolerance of duplicated Byzantine messages would
-   excuse the theorem; then `theorem_5_1_repaired` is the theorem and the verdict would be ❌ because of
-   item 1. We do not apply R4, for two reasons. First, the theorem's hypothesis is "using the reliable
-   point-to-point link abstraction", and Lemma 4.3, cited for exactly this, claims no duplication. A
+   make `theorem_5_1_repaired` the theorem. We do not read it so, for three reasons. First, the theorem's
+   hypothesis is "using the reliable point-to-point link abstraction", and Lemma 4.3, cited for exactly this, claims no duplication. A
    reader taking the paper at its word is misled about a channel property the proof needs. Second, the
    remark is about Byzantine behaviour in general, not a stated hypothesis of the theorem.
    Third, read literally the remark concerns case (2), a Byzantine `š` referencing a block several
@@ -35,14 +34,14 @@ arXiv:2102.09594v2. Rule labels (R1–R6) refer to the verdict scale.
    behaviour is arbitrary anyway. The counterexample duplicates a message at a *correct* receiver,
    through equivocation (case (1)). For case (1) the paper only foresees "conflicting messages"
    to servers referencing `B` or `B'`, not the same message twice to one correct server.
-3. **Definition 3.3 (iii) is ambiguous; this does not affect the verdict.** We read "`s` considers all
+3. **✏️ Definition 3.3 (iii) is ambiguous.** We read "`s` considers all
    predecessors valid" as "`s` has already inserted all predecessors into `G`". Under the recursive
    reading, line 6 of Algorithm 1 may insert a block before its predecessor (both in `blks`, both
    "valid"). `G` then stops being closed, and Lemma A.5 fails. The paper's proof of A.5 implicitly uses
    our reading. Under-specified definition, charitable reading adopted, no Lean counterexample.
-4. **Algorithm 2, line 6** assigns `B.Ms[out, ℓⱼ] ≔ …` in a loop over `B.rs`. With two requests for the
+4. **✏️ Algorithm 2, line 6** assigns `B.Ms[out, ℓⱼ] ≔ …` in a loop over `B.rs`. With two requests for the
    same label in one block, the first request's messages would be lost, and Lemma 4.1 (1) "⇒" would fail
-   for them. We accumulate the messages. Typo with evident intent (R3), no verdict impact.
+   for them. We accumulate the messages. Typo with evident intent.
 
 ## Modelling choices
 

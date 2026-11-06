@@ -5,22 +5,21 @@ Complexity from Standard Primitives.* PODC 2020. DOI
 [10.1145/3382734.3405736](https://doi.org/10.1145/3382734.3405736). Formalized version: the
 conference version (10 pages); proofs deferred to the full version were not used.
 
-**Verdict: ⚠️ Minor statement issues.** The algorithm of Figure 1 is correct: mutual exclusion,
-critical-section re-entry (wait-free), starvation freedom, wait-free recovery and wait-free
-recovery to exit are all proved, as is the constant amortized RMR bound in the DSM model. Two
-statements are wrong as written, both with evident intent. The RMR bound "`O(m)` when `m`
-passages begin" fails under the paper's literal definition of a passage, but holds when every
-crash also starts a passage. Lemma 2.1 (19) (and Lemmas 2.4–2.6) omit the fairness hypothesis.
+**Verdict: 🔧 Easy fix.** The algorithm of Figure 1 is correct: mutual exclusion, critical-section re-entry
+(wait-free), starvation freedom, wait-free recovery and wait-free recovery to exit are all proved. The RMR bound
+"`O(m)` when `m` passages begin" fails under the paper's literal definition of a passage, but holds in the DSM
+model when every crash also starts a passage, a one-clause change to the definition. The bound in the CC model,
+proved only in the full version, was not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorems 1–2 (RMR bound "`O(m)` when `m` passages begin")
+### 🔧 Theorems 1–2 (RMR bound "`O(m)` when `m` passages begin")
 Under the paper's literal definition of a passage, a single process that calls `Enter()` once and then
 crashes in the critical section over and over begins one passage but incurs unboundedly many RMRs
 (`Literal.rmr_literal_unbounded`).
 
-**Impact.** A definitional slip with evident intent: with the usual RME convention that a crash ends a
-passage and the recovery starts a new one, the bound holds (`rmr_bound`).
+**Impact.** The intent is evident: with the usual RME convention that a crash ends a passage and the recovery
+starts a new one, the bound holds (`rmr_bound`).
 
 **Details.** The paper says a passage "begins when [the process] calls `Enter()` and ends when the
 process crashes or when it finishes its following `Exit()` call". Read literally, the steps of
@@ -33,17 +32,16 @@ non-read operation), and in the DSM model for every process whose segment does n
 **Repair.** We prove at most `25·#Enter() + 76·#crashes` RMRs in the DSM model, counting only crashes
 outside the remainder section (`rmr_bound`).
 
-### ⚠️ Lemma 2.1 (19) and Lemmas 2.4–2.6 (missing fairness hypothesis)
-Lemma 2.1 is stated for "any run" and (19) assumes only finitely many crashes, but without fairness it
-fails: a process that granted itself ticket 1 stops taking steps, and the other busy-waits forever with
-`Token` stuck at 0 (`Lemma2_1_19.lemma2_1_19_false`).
+### ✏️ Slips
+- Lemma 2.1 (19) and Lemmas 2.4–2.6 omit the fairness hypothesis. Lemma 2.1 is stated for "any run" and (19)
+  assumes only finitely many crashes, but take two processes and no crash: process `false` gets ticket 1 and grants
+  it to itself (`W = (1,true)`), then stops taking steps; process `true` gets ticket 2 and busy-waits forever with
+  `Token` stuck at 0 (`Lemma2_1_19.lemma2_1_19_false`). These lemmas are only used in the starvation-freedom proof,
+  where fairness holds, and there the paper's argument goes through.
 
-**Impact.** A missing implied assumption: these lemmas are only used in the starvation-freedom proof,
-where fairness holds, and there the paper's argument goes through.
-
-**Details.** Take two processes and no crash. Process `false` gets ticket 1 and grants it to itself
-(`W = (1,true)`), then stops taking steps. Process `true` gets ticket 2 and busy-waits forever. `Token`
-stays 0.
+### Typos
+- Section 1, definition of a super-passage: "begins when the process calls `Enter()` and when it completes its
+  following `Exit()` call" should read "and ends when".
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

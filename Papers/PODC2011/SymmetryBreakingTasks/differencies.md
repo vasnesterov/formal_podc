@@ -25,7 +25,8 @@ IRISA PI 1965 (January 2011), whose numbering we follow.
    parity map for every `u` (`parity_mem_wsb`).
 7. **Theorem 8** needs feasibility ("any GSB task" → any feasible GSB task); typos `m/n` for `n/m` in
    the proof.
-8. **Corollary 2** needs `x ≥ 1` (`corollary_2 (hk : 1 ≤ k)`); **Corollary 4** needs `k ≤ n`.
+8. **Corollary 2** needs `x ≥ 1` (`corollary_2 (hk : 1 ≤ k)`); **Corollary 4** needs `k ≤ n`, which is implicit in Section 3.2's
+   `k ≤ n/2`.
 9. **Theorem 11** (not formalized) needs `n ≥ 2`; its proof cites "Lemma 2" instead of Theorem 2.
 10. **Canonical representative** (Section 4.2): the definition is ambiguous for `u > n` (and for
     `m = 1`); `canonical_not_unique` exhibits two synonymous `(ℓ,u)`-anchored tasks. We take
@@ -34,7 +35,8 @@ IRISA PI 1965 (January 2011), whose numbering we follow.
     correct (`table_1`).
 12. **Text typos**: kernel set of `⟨6,3,1,4⟩` printed as `{[4,1,1],[4,1,1],[2,2,2]}` (should be
     `{[4,1,1],[3,2,1],[2,2,2]}`); in the §4.1 Remark `[4,2,1]` sums to 7; Theorem 7's proof asserts
-    `u ≤ n`, which need not hold (e.g. `⟨4,2,0,5⟩`), though it is not used.
+    `u ≤ n`, which need not hold (e.g. `⟨4,2,0,5⟩`), though it is not used; §4.2 says `⟨6,3,2,2⟩` represents four tasks, but §4.1 and Table 1 list six
+    synonyms.
 
 ## Modelling choices
 

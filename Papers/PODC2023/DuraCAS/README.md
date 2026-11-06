@@ -6,21 +6,36 @@ Formalized version: the brief announcement (statements, Algorithms 1–2, line n
 the full version *Durable Algorithms for Writable LL/SC and CAS with Dynamic Joining*, arXiv
 [2302.00135](https://arxiv.org/abs/2302.00135) v1 (Appendix A.1, A.3). Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** Theorem 4.1(1) (DuraCAS is durably linearizable) is false under
-the recovery rule the brief announcement states ("recover `O` before invoking any other operation on
-`O`"): with two objects sharing a handle, a value proposed to one object shows up in the other. Under
-the usual per-process rule (recover before invoking anything else) Theorem 4.1(1) holds, with
-detectability, and so does Theorem 4.1(2) (wait-free, at most 54 steps). Some DurEC lemmas are
-misstated, and the composition step "W and Z behave like atomic EC objects" is unproved in the paper;
-both are repaired.
+**Verdict: 🛠️ Hard fix.** Under the usual per-process recovery rule (recover before invoking anything else)
+Theorem 4.1(1) (DuraCAS is durably linearizable) holds, with detectability, and so does Theorem 4.1(2) (wait-free, at
+most 54 steps); under the rule the brief announcement states ("recover `O` before invoking any other operation on
+`O`") it is false: with two objects sharing a handle, a value proposed to one object shows up in the other. The proof
+took new arguments: the invariant behind Lemma A.10 is wrong and was replaced, and the composition step "W and Z behave
+like atomic EC objects", unproved in the paper, became a refinement. Dynamic joining and the space bound were not
+checked.
 
 ## Mistakes in the paper
 
-### 🚨 Theorem 4.1(1) (recoverable linearizability, per-object recovery rule)
+### 🛠️ Lemma A.10(2) (who can change `h.DetVal`)
+"If `h.DetVal` is changed by line 15, then `X.hndl = h` and `h.pc ∈ {13,14,15}`" is false, since a helper can
+raise `h.DetVal` while the installer sits at line 11 or has crashed (`lemmaA10_2_counterexample`).
+
+**Impact.** The intended statement ("h's installing `ECSC` has not completed") is what the rest of the
+proof uses. The corrected version is proved (`detVal_help_pending`), and detectability (A.10(1), A.10(3),
+A.11) holds.
+
+**Details.** The invariant used to prove A.10 has its proof omitted, and it is also wrong. Statement 3
+fails once a helper moves while the installer is still at lines 13–15. Statement 4 fails once a handle is
+used on two DurEC objects, which DuraCAS does with `h.Critical` on `W` and `Z`.
+
+**Repair.** The invariant is replaced by a different one, per-process uniqueness of pending installs (`CInv.lean`,
+`reach_aReach`).
+
+### 🔧 Theorem 4.1(1) (recoverable linearizability, per-object recovery rule)
 Two processes, two DuraCAS objects with initial value 0, only `CAS(0,1)` and `READ` on `O₀`: a `READ` of
 `O₀` returns 2, a value only ever proposed to `O₁` (`theorem_4_1_1_false`, `perObject_counterexample`).
 
-**Impact.** The headline correctness claim fails in the model the brief announcement states. It holds
+**Impact.** The correctness claim fails in the model the brief announcement states. It holds
 under the per-process rule, which the full version's wording ("when p restarts, it is required to
 execute `O.Recover()`") arguably intends. With that rule we prove it in full (`theorem_4_1_1`). The fix is
 a usage restriction, not a change to the algorithm.
@@ -41,38 +56,25 @@ anything else. Under it, `theorem_4_1_1` proves durable linearizability *and* de
 history. The setting has any number of processes and objects, values of any type, and individual
 crashes.
 
-### ⚠️ Algorithm 1, `FORWARD` (lines 14 and 16: null dereference)
+### 🔧 Algorithm 1, `FORWARD` (lines 14 and 16: null dereference)
 `X` starts as `(null, 0)`, and `RECOVER` (which DuraCAS always runs on both `W` and `Z`) runs `FORWARD`
 even on objects that never had an install, where `x.hndl.DetVal` dereferences null.
 
-**Impact.** A missing case in the pseudocode with an evident fix ("if `x.hndl = null` return"), which we
-model. Nothing else depends on it.
+**Impact.** A missing case in the pseudocode, reached by `RECOVER` on a fresh object. Nothing else depends on it.
 
-### ⚠️ Lemma A.10(2) (who can change `h.DetVal`)
-"If `h.DetVal` is changed by line 15, then `X.hndl = h` and `h.pc ∈ {13,14,15}`" is false, since a helper can
-raise `h.DetVal` while the installer sits at line 11 or has crashed (`lemmaA10_2_counterexample`).
+**Repair.** "if `x.hndl = null` return", which we model (`Model.lean`).
 
-**Impact.** The intended statement ("h's installing `ECSC` has not completed") is what the rest of the
-proof uses. The corrected version is proved (`detVal_help_pending`), and detectability (A.10(1), A.10(3),
-A.11) holds.
-
-**Details.** The invariant used to prove A.10 has its proof omitted, and it is also wrong. Statement 3
-fails once a helper moves while the installer is still at lines 13–15. Statement 4 fails once a handle is
-used on two DurEC objects, which DuraCAS does with `h.Critical` on `W` and `Z`.
-
-### ⚠️ Lemma 4.4 / A.5(1) (handle of the installer)
-"`X.hndl = h`, `h.Val = v`" names the mover's handle `h` instead of the installer's `h′`, so as written it
-is false whenever another process moves.
-
-**Impact.** A typo; the proof reasons with `h′`.
-
-### Typos and slips
+### ✏️ Slips
+- Lemma 4.4 / A.5(1): "`X.hndl = h`, `h.Val = v`" names the mover's handle `h` instead of the installer's `h′`, so as
+  written it is false whenever another process moves; the proof reasons with `h′`.
 - Definition 4.6(2) (full version, main text) linearizes a hitchhiker at "the earliest move"; it must be
   the earliest move after `α[6]`, as Definition A.8 has it.
-- Definition A.43(2): "the earliest time when `Z.val ≠ old`" must be read within the operation's
+- Definitions A.42(3), A.43(2): "the earliest time when `Z.val ≠ old`" must be read within the operation's
   interval.
-- Lemma A.9, case 4 is a copy of case 3 (it says `ECVL` returns `Y`). A.3 says imprints happen "at
-  Line 14" (line 10).
+- Lemma A.9, case 4 is a copy of case 3 (it says `ECVL` returns `Y`).
+
+### Typos
+- A.3 says imprints happen "at Line 14" (line 10).
 
 ## Proof gaps (statements true)
 

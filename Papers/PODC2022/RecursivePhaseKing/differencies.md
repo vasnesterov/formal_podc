@@ -123,7 +123,7 @@ is `i - 1` in Lean (`Fin n`), iterations are 0-based as in the paper's Algorithm
     (typo).** The surrounding text and the proof use `t + 1` votes. Formalized with `vote(b)`.
 16. **Lemma 4.2's proof: "Nodes with `strong_i = 0` maintain their opinion" should be
     `strong_i = 1` (typo).**
-17. **"Each correct node broadcasts at most twice" (proof of Lemma 4.2) is wrong (minor slip).** An
+17. **"Each correct node broadcasts at most twice" (proof of Lemma 4.2) is wrong (🔧).** An
     elector can broadcast `elect`, `vote(0)` and `vote(1)` in three different rounds when `K` is bad
     (`three_bcasts`); at most three (`lemma_4_2`). Asymptotically irrelevant.
 18. **Theorem 4.1 is correct as stated** (`theorem_4_1`, `Synchronizer.lean`), including the

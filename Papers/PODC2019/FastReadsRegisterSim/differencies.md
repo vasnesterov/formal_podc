@@ -1,12 +1,10 @@
 # Differences between the formalization and the paper
 
-Verdict rules: see `.claude/skills/formalize-paper/verdicts.md`. Every checked statement is true as written;
-the issues below are proof repairs (R1: a false claim inside a proof whose result is true is a proof repair)
-or modelling choices.
+Every checked statement is true as written; the issues below are gaps in proofs or modelling choices.
 
 ## Proof gaps and repairs
 
-1. **Lemma 4.2, proof (genuine gap, R1 → 🛠️).** "Let `z` be a value whose root-to-leaf path in `T₂` does not
+1. **Lemma 4.2, proof (genuine gap, 🛠️).** "Let `z` be a value whose root-to-leaf path in `T₂` does not
    include `r₁`. Such a value must exist since `r₁` is not the root of `T₂`." False for complete decision trees:
    root reads register 1, both children read register 0; every path reads 0 (`lemma_4_2_gap`). The remainder of
    the proof is correct and proves `lemma_4_2_core` (= `Sec4.caseA`). Lemma 4.2 as stated ("`T₁` and `T₂` have the
@@ -16,9 +14,7 @@ or modelling choices.
    proof does not establish it. We did not find a direct proof of "same root" from the facts available at that
    point (Lemmas 3.3–3.4, invisibility, atomicity), and none is needed. `lemma_4_2_gap` refutes the inference
    "r₁ not the root of T₂ ⇒ some path of T₂ avoids r₁" for abstract complete decision trees without repeated
-   registers; it is a claim inside a proof (R1), not a stated lemma.
-   *Borderline call:* Lemma 4.2 is a numbered lemma (R1: a statement). Since it is true and only its proof is
-   wrong, the label is 🛠️, not ❌ (R5's "unestablished headline → ❌" applies only when a lemma used is false).
+   registers; it is a claim inside a proof, not a stated lemma. Lemma 4.2 itself is true; only its proof is wrong.
 2. **Theorem 4.1, repaired structure.** The main argument (writes `W₀(a) W₁(z) W₂(b)`) only needs that `b`'s path
    in `T₂` reads the root register `ρ` of `T₁`. We case-split on "some path of `T₂` avoids `ρ`". If yes, we use
    the Lemma 4.2 argument (`caseA`). If no, every path of `T₂` reads `ρ` at some depth, and we use the main

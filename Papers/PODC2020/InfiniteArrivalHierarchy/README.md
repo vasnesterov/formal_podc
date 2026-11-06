@@ -4,25 +4,31 @@ Matthieu Perrin, Achour Mostéfaoui, Grégoire Bonin. *Extending the Wait-free H
 Systems.* PODC 2020. DOI [10.1145/3382734.3405723](https://doi.org/10.1145/3382734.3405723). Formalized
 version: the 10-page proceedings version (there is no arXiv version); numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** All formalized claims hold:
-* the impossibility results for window registers in `MA₃` (Lemmas 8–9, Proposition 5);
-* the impossibility result for binary consensus + window registers in `M₂` (Proposition 4), for algorithms
-  whose objects are all allocated at set-up;
-* the finite-memory reduction (Lemma 4);
-* the two consensus algorithms (Algorithm 2 for Theorem 3, Algorithm 3 for Proposition 3).
-
-The proof of Proposition 4 needs real repairs (partition invariant, counting, last step). We proved
-Proposition 4 only for algorithms whose objects are all allocated at set-up. The universal construction
-(Theorem 1) is stated without proof in the paper and is not formalized.
+**Verdict: ⚠️ Weakened.** Proposition 4 (binary consensus + window registers in `M₂`), on which the placements of
+binary consensus and window registers rest, is proved only for algorithms whose objects are all allocated at set-up,
+because its proof ignores the run-time allocation of `M₂`; the rest of that proof also needs real repairs (partition
+invariant, counting, last step). The other formalized claims hold: the impossibility results for window registers in
+`MA₃` (Lemmas 8–9, Proposition 5), the finite-memory reduction (Lemma 4) and the two consensus algorithms (Algorithm 2
+for Theorem 3, Algorithm 3 for Proposition 3). The hierarchy as a whole was not checked: the universal construction
+(Theorem 1), stated without proof in the paper, the placements as such and Section 8 are not formalized.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
+### ❌ Proposition 4 (run-time allocation is ignored)
+In `M₂` processes may allocate finitely many fresh objects at run time, and the `γ` step's pigeonhole over the
+`m − i` set-up objects fails when `p` covers an object it just allocated.
 
-### Typos and slips
+**Impact.** Only the static version is proved: our theorem covers algorithms whose (finitely many) objects are all
+allocated at set-up (`Prop4.not_consensus`). We believe the statement for `M₂` is true, but nothing we proved saves it.
+
+**Details.** The `γ` step runs `p` "until it covers an object not in `{x₁, …, xᵢ}`", which may be an object `p`
+just allocated. The natural repair is to stop only at set-up objects and to treat objects allocated inside a class
+as private to that class. It needs a model of references and allocation that we did not build.
+
+### Typos
 - Definition 3: "`node′ = listₙ`" should be `nodeₙ`, and "a value `v` precedes a value `v`" should end with `v′`.
 - Proposition 4 uses "separable" for "partitioned" and indexes `i ∈ {0, …, m−1}` for a sequence starting at 1.
-- "it is is" (Definition 6); "multi-treaded" (Figure 1).
+- "it is is" (Definition 6); "if if" (Definition 3); "multi-treaded" (Figure 1).
 
 ## Proof gaps (statements true)
 
@@ -30,7 +36,7 @@ No mistakes in the statements.
 Definition 4 only asks that the restriction of `α` to each *class* be a valid execution, which does not imply that
 the restriction to a merged class gives its members their real local states.
 
-**Impact.** Statement true; repaired with a stronger invariant (`Prop4.Inv`, `Prop4.Inv.block_memEq`).
+**Impact.** Repaired with a stronger invariant, for the static model (`Prop4.Inv`, `Prop4.Inv.block_memEq`).
 
 **Details.**
 * Equality of the shared memory (condition 3 of Definition 4) is required for one process `p` only.
@@ -44,44 +50,24 @@ the restriction to a merged class gives its members their real local states.
 everywhere" and "consensus objects of `Xᵢ` are initial or decided `b`". After each block, the memory of any
 restriction containing the block equals the real memory. (`Prop4.Inv`, `Prop4.Inv.block_memEq`)
 
-### 🛠️ Proposition 4 (the end of the proof and the counting are garbled)
-The final paragraph says two processes "are about to write … to the last register" and decide differently, which
-does not follow from the construction, and the coverage counts are off by a factor `l`.
+### 🔧 Proposition 4 (the end of the proof)
+The final paragraph says two processes "are about to write … to the last register" (in `C(α_{i+1})`, which should be
+`C(α_m)`) and decide differently, which by our analysis does not follow from the construction.
 
-**Impact.** Statement true; repaired (`Prop4.iteration`, `Prop4.not_consensus`).
+**Impact.** Repaired, for the static model (`Prop4.iteration`, `Prop4.not_consensus`).
 
-**Details.**
-* The coverage after `j` scheduling steps is `uᵢ − l·j`, not `uᵢ − j`; likewise "`uᵢ − v = 2 l u_{i+1}`" should be
-  `uᵢ − l·v`.
-* The w.l.o.g. "registers `first`/`last`" assumption is unnecessary.
+**Details.** The w.l.o.g. "registers `first`/`last`" assumption is unnecessary.
 
 **Repair.** The correct end reuses the argument of the `γ` step. In the last stage `Xₘ` is the whole memory, so the
 solo run of `p` must decide. Another class then performs a block, and its representative runs solo and decides an
 input of its own class, which contradicts agreement. (`Prop4.iteration`, `Prop4.not_consensus`)
 
-### 🛠️ Proposition 4 (run-time allocation is ignored)
-In `M₂` processes may allocate finitely many fresh objects at run time, and the `γ` step's pigeonhole over the
-`m − i` set-up objects fails when `p` covers an object it just allocated.
+### 🔧 Proposition 4 (the counting)
+The coverage after `j` scheduling steps is `uᵢ − l·j`, not `uᵢ − j`, since each step consumes `l` covering processes
+per object; likewise "`uᵢ − v = 2 l u_{i+1}`" should be `uᵢ − l·v`.
 
-**Impact.** Only the static version is proved: our theorem covers algorithms whose (finitely many) objects are all
-allocated at set-up (`Prop4.not_consensus`).
-
-**Details.** The `γ` step runs `p` "until it covers an object not in `{x₁, …, xᵢ}`", which may be an object `p`
-just allocated. The natural repair is to stop only at set-up objects and to treat objects allocated inside a class
-as private to that class. It needs a model of references and allocation that we did not build.
-
-### 🛠️ Claim 2, Lemmas 5–7 and Proposition 3 (stated without proofs)
-The paper states Theorem 1 (Algorithm 1, Propositions 1–2, Lemmas 1–3), Claim 2 and Lemmas 5–7 (Algorithm 2), and
-Proposition 3 (Algorithm 3) without proofs.
-
-**Impact.** We proved Claim 2, Lemmas 5–7 and the consensus part of Proposition 3 (`Alg2.alg2_solvesCons`,
-`Alg3.alg3_solvesCons`); Theorem 1 is not formalized.
-
-**Details.**
-* For Algorithm 3, wait-freedom cannot be argued by *arrival* order. A process may have written `proposed[j]` but
-  not `isSet[j]` when it is overtaken.
-* It works with the order in which the `isSet` flags are set: the first process to set its flag never sees its
-  `cons` decided `false`.
+**Impact.** Repaired with our own thresholds, for the static model (`Prop4.not_consensus`). The paper's `uᵢ` already
+fit the corrected counts.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -99,7 +85,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
   finite schedules.
 * Objects are indexed by an arbitrary type, all allocated at set-up. An infinite index type is *infinite
   allocation* (`MA`); a finite one is a memory without run-time allocation. Dynamic finite allocation with
-  references is **not** modelled (see above).
+  references is **not** modelled (see the ❌ item above).
 * Objects:
   * atomic consensus `cons⟨V⟩`;
   * `consₙ⟨V⟩`, whose responses after `n` invocations are arbitrary;
@@ -124,8 +110,16 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 All Lean names are in namespace `Podc.InfiniteArrivalHierarchy` unless fully qualified.
 
+**Results stated without proof in the paper (not mistakes).** Besides Theorem 1, the paper states Claim 2 and Lemmas
+5–7 (Algorithm 2) and Proposition 3 (Algorithm 3) without proofs. We proved Claim 2, Lemmas 5–7 and the consensus part
+of Proposition 3 (`Alg2.alg2_solvesCons`, `Alg3.alg3_solvesCons`).
+* For Algorithm 3, wait-freedom cannot be argued by *arrival* order. A process may have written `proposed[j]` but
+  not `isSet[j]` when it is overtaken.
+* It works with the order in which the `isSet` flags are set: the first process to set its flag never sees its
+  `cons` decided `false`.
+
 **Not formalized.**
-* Theorem 1 (Algorithm 1, the weak log, Propositions 1–2, Lemmas 1–3) and Remark 1.
+* Theorem 1 (Algorithm 1, the weak log, Propositions 1–2, Lemmas 1–3), stated without proof in the paper, and Remark 1.
 * The hierarchy-placement statements Theorems 2–6 as such: they need universality and composition.
 * Section 8 (iterator stacks: Proposition 6, Lemma 10, Theorem 6).
 

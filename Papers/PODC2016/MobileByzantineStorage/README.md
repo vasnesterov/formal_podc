@@ -6,24 +6,24 @@ Fault Tolerant Distributed Storage.* PODC 2016. DOI
 research report HAL [hal-01348830v2](https://hal.sorbonne-universite.fr/hal-01348830v2) (Feb 2017, 42 pp);
 numbering follows it.
 
-**Verdict: 🚨 Headline claim false.** Both "optimal" regular-register protocols are wrong at the paper's
-own parameters: a read with no concurrent write returns a never-written value. In the CAM model
-(Theorems 8/9, for `2δ ≤ Δ < 3δ` and `δ ≤ Δ < 3δ/2`) the extra liars are faulty servers that send a
-fake reply just *before* the read starts, delivered during the read. In the CUM model (Theorems 11/12,
-for `2δ ≤ Δ < 5δ/2` and `δ ≤ Δ < 5δ/4`) the faulty and cured servers that the paper itself counts already
-outnumber the threshold `#reply_CUM`. The lower-bound proofs (Theorems 3–6) compare
-executions that the reader can tell apart, because replies are authenticated. We repair Theorems 3 and 5
-in the paper's own lower-bound model. The optimality claims therefore have no matching upper bound.
+**Verdict: ❌ Intent lost.** Both "optimal" regular-register protocols are wrong at the paper's own parameters, and a
+read with no concurrent write returns a never-written value: in the CAM model (Theorems 8/9, for `2δ ≤ Δ < 3δ` and
+`δ ≤ Δ < 3δ/2`) the extra liars are faulty servers that send a fake reply just *before* the read starts, delivered
+during the read, and in the CUM model (Theorems 11/12, for `2δ ≤ Δ < 5δ/2` and `δ ≤ Δ < 5δ/4`) the faulty and cured
+servers that the paper itself counts already outnumber the threshold `#reply_CUM`. No corrected protocol is proved, so
+the optimality claims have no matching upper bound. The lower-bound proofs (Theorems 3–6) compare executions that the
+reader can tell apart, because replies are authenticated; we repair Theorems 3 and 5 in the paper's own lower-bound
+model.
 
 ## Mistakes in the paper
 
-### 🚨 Theorems 8 and 9 (the `(ΔS, CAM)` protocol, Section 5)
+### ❌ Theorems 8 and 9 (the `(ΔS, CAM)` protocol, Section 5)
 A read with no concurrent write returns a never-written value: for `2δ ≤ Δ < 3δ`, `n = 4f + 1`,
 `#reply_CAM = 2f + 1`, the `3f` servers hosting an agent during `(t − δ, t + 2δ)` all report a fake pair
 with the highest sequence number, and for `δ ≤ Δ < 3δ/2`, `n = 5f + 1`, `#reply_CAM = 3f + 1`, `4f` such
 servers do (`theorem9_false_k1`, `theorem9_false_k2`, `theorem9_false`).
 
-**Impact.** The headline protocol violates even safe-register validity, in a read with no concurrent
+**Impact.** The CAM protocol violates even safe-register validity, in a read with no concurrent
 write, at the parameters of Table 1. So the claimed tight bounds `n ≥ 4f + 1` and `n ≥ 5f + 1` for the CAM
 model have no proved upper bound. Lemma 7, the counting lemma behind the proof, is true (`lemma7`) but
 counts the wrong time window.
@@ -41,11 +41,8 @@ disjoint blocks of `f` servers. Each liar sends one reply `{⟨v′, N + 1⟩}`,
 writes so far. `select_value` returns, among the pairs with at least `#reply_CAM` occurrences, the one with
 the highest sequence number, which is the fake pair.
 
-The Lean statement quantifies over *all* other replies whose sequence numbers are at most `N`. In the
-counterexample the faulty servers send nothing to servers, so correct servers only ever hold written
-pairs (and `⟨⊥, 0⟩`). The result holds for any tie-breaking rule of `select_value` and for every `n ≥ 3f`
-(resp. `4f`) with these thresholds. The paper's Theorem 9 has no upper bound on `Δ`. For
-`3δ/2 ≤ Δ < 2δ` and for `Δ ≥ 3δ` the attack gives too few liars; correctness there is open.
+The Lean statement quantifies over *all* other replies whose sequence numbers are at most `N`. The result
+holds for any tie-breaking rule of `select_value` and for every `n ≥ 3f` (resp. `4f`) with these thresholds.
 
 *Scope.* The attack needs only what the system model allows: a delay of at most `δ` on the faulty
 servers' messages. No foresight is needed either: a faulty server may send the fake reply to every client
@@ -55,9 +52,9 @@ apply (the CUM attack below would).
 
 **Repair.** None proved. Counting the liars over `(t − δ, t + 2δ)` suggests
 `#reply_CAM > (⌈3δ/Δ⌉ + 1) f` and `n ≥ #reply_CAM + 2f`, i.e. `n ≥ 5f + 1` for `2δ ≤ Δ < 3δ` and
-`n ≥ 6f + 1` for `δ ≤ Δ < 3δ/2`. This is not verified.
+`n ≥ 6f + 1` for `δ ≤ Δ < 3δ/2`. This is not verified, and it would give up the claimed optimal thresholds.
 
-### 🚨 Theorems 11, 12 and 13 (the `(ΔS, CUM)` protocol, Section 6)
+### ❌ Theorems 11, 12 and 13 (the `(ΔS, CUM)` protocol, Section 6)
 The CUM read is fooled even without replies sent before the read: for `2δ ≤ Δ < 5δ/2`
 (`#reply_CUM = 3f + 1`) `3f` faulty and `f` cured servers, and for `δ ≤ Δ < 5δ/4` (`#reply_CUM = 5f + 1`)
 `4f` faulty and `2f` cured servers, report a fake pair with the highest sequence number
@@ -78,10 +75,6 @@ replies at once.
 Every lying reply is sent during the read. The faulty liars are the servers hosting an agent during
 the read `[t, t + 3δ]`: `3f` (resp. `4f`). The cured liars are the servers whose agent left at most `2δ`
 before the request reaches them: `f` (resp. `2f`).
-
-Theorem 12 also states the hypothesis `n ≥ 2(k+1)f + 1`, which contradicts Table 3 (`n ≥ (3k+2)f + 1`)
-and Theorem 4 (no protocol for `n ≤ 8f` when `δ ≤ Δ < 2δ`). The counterexamples need only `4f` resp.
-`6f` servers, so they refute both readings.
 
 ### ⚠️ Theorems 3–6 (lower bounds, Sections 4.5–4.6)
 The executions `E₁`, `E₀` are not indistinguishable: they use the same agent schedule, so the reader
@@ -107,19 +100,27 @@ same, for every read duration and every decision rule. That gives `n ≤ 5f` for
 In this model correct servers reply only once, so "waiting more does not help" is true. For general
 protocols — e.g. the paper's own, where cured servers reply again once correct — it is not proved.
 
-### ⚠️ Lemma 6 (`MaxB̃(t, t+T) = (⌈T/Δ⌉ + 1) f`)
-The equality is false when `(⌈T/Δ⌉ + 1) f > n`, e.g. for `n = 6 = 5f + 1`, `f = 1`, `δ = Δ = 1`,
-`T = 10` it claims `11` affected servers out of `6` (`lemma6_false`).
-
-**Impact.** Harmless: the paper uses it only for `T ∈ {δ, 2δ, 3δ}`, where the bound is below `n`. The
-correct value is `min(n, (⌈T/Δ⌉ + 1) f)` (`lemma6`); the hypotheses `δ ≤ Δ < 3δ`, `T ≥ δ` are not needed.
-
-### Typos and slips
+### ✏️ Slips
+- Lemma 6 (also Lemma 13): `MaxB̃(t, t+T) = (⌈T/Δ⌉ + 1) f` is false when `(⌈T/Δ⌉ + 1) f > n`, e.g. for
+  `n = 6 = 5f + 1`, `f = 1`, `δ = Δ = 1`, `T = 10` it claims `11` affected servers out of `6` (`lemma6_false`). The
+  paper uses it only for `T ∈ {δ, 2δ, 3δ}`, where the bound is below `n`. The correct value is
+  `min(n, (⌈T/Δ⌉ + 1) f)` (`lemma6`); the hypotheses `δ ≤ Δ < 3δ`, `T ≥ δ` are not needed.
+- Theorem 12 states the hypothesis `n ≥ 2(k+1)f + 1`, which contradicts Table 3 (`n ≥ (3k+2)f + 1`) and Theorem 4 (no
+  protocol for `n ≤ 8f` when `δ ≤ Δ < 2δ`). The counterexamples need only `4f` resp. `6f` servers, so they refute both
+  readings.
 - Lemma 7, proof: `minC̃oR(t, t+2δ) = n − (⌈2δ/Δ⌉ + 1) f` should read `⌈δ/Δ⌉`; the numbers used
   (`5f + 1 − 2f`) are those of `⌈δ/Δ⌉ = 1`.
 - Lemma 8, proof: `n − 2f = 3(k+1)f + 1 − 2f = (k+1)f + 1` should start from `n = (k+3)f + 1`.
-- Theorem 6, proof: "we consider directly `n ≤ 5`" (for `5f`), and the two multisets listed for
-  `E₁‴`, `E₀‴` are identical.
+- Theorem 6, proof: the two multisets listed for `E₁‴`, `E₀‴` are identical; the second should be the first with the
+  values swapped.
+- Figure 25, line 02 (CUM maintenance): `Expired(timer) ∧ timer > 2δ` read literally never removes an entry with
+  `timer ≤ 2δ`; the prose says the entry is deleted when the timer expires *or* has a non-compliant value.
+
+### Typos
+- Theorem 6, proof: "we consider directly `n ≤ 5`" (for `5f`) and `n ≤ 6` (for `6f`), correct for the case `f = 1`
+  that the proof treats.
+- Section 6, `select_value`: the CUM version is worded "If there are more pairs with the same occurrence", unlike the
+  CAM version; the proof of Theorem 11 fixes the same reading.
 - Corollary 2 ends with "□ Lemma 2", Theorem 5 with "□ Theorem 3".
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
@@ -161,7 +162,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Not formalized.** Theorems 1 and 2, Lemmas 1–3 and Corollaries 1–2 (informal claims about all
 protocols, with no system semantics to state them against). Theorems 4 and 6 (CUM lower bounds).
 Lemmas 8–12 and 14–21, which prove correctness of the refuted protocols. Theorems 7 and 10 (termination;
-the operations just wait `δ`, `2δ`, `3δ`).
+the operations just wait `δ`, `2δ`, `3δ`). The paper's Theorem 9 has no upper bound on `Δ`: for `3δ/2 ≤ Δ < 2δ` and
+for `Δ ≥ 3δ` the attack gives too few liars, and correctness there is open. The counterexamples model only the reader:
+the faulty servers send nothing to servers, so correct servers only ever hold written pairs (and `⟨⊥, 0⟩`), but this
+is argued informally, not formalized.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. The attack hypotheses are satisfied by explicit schedules and messages built in the

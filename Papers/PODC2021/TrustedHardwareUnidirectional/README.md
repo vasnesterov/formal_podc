@@ -5,24 +5,23 @@ Communication.* PODC 2021. DOI [10.1145/3465084.3467948](https://doi.org/10.1145
 Formalized version: arXiv [2105.10566](https://arxiv.org/abs/2105.10566) v1 (full version, 11 pp.);
 numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** **The Claim of §4.1 is false.** It says sequenced reliable broadcast (SRB)
-cannot implement unidirectional rounds when `n > 2f` and `f > 1`. In fact a simple echo protocol
-implements them over SRB for every `n > 2f`. So the paper's separation "shared memory ⊋
-unidirectionality ⊋ SRB" (Fig. 1, abstract) collapses: for `n > 2f`, unidirectionality and SRB are
-equivalent, using the Claim of §4.2 for the other direction. The positive claims hold. Theorem 1
-holds in an eventual form. The §3.2 claim (SWMR objects give unidirectionality) holds as stated.
-The Appendix A claim holds. The §4.2 construction is safe with the conflict check described in
-the text; Algorithm 3's pseudocode omits that check and then violates agreement (a pseudocode slip).
+**Verdict: ❌ Intent lost.** The paper set out to split trusted hardware into two power classes, but the Claim of §4.1
+is false: a simple echo protocol implements unidirectional rounds over sequenced reliable broadcast (SRB) for every
+`n > 2f`, so the separation "shared memory ⊋ unidirectionality ⊋ SRB" (Fig. 1, abstract) collapses, and with the
+Claim of §4.2 unidirectionality and SRB are equivalent for `n > 2f`. The positive claims hold: Theorem 1 in an eventual
+form, the §3.2 claim (SWMR objects give unidirectionality) as stated, and the Appendix A claim. The §4.2 construction
+is safe with the conflict check described in the text; Algorithm 3's pseudocode omits that check and then violates
+agreement.
 
 ## Mistakes in the paper
 
-### 🚨 Claim of §4.1 (SRB cannot implement unidirectional rounds for `n > 2f`, `f > 1`)
+### ❌ Claim of §4.1 (SRB cannot implement unidirectional rounds for `n > 2f`, `f > 1`)
 The claim is false: a simple echo protocol over SRB implements unidirectional rounds for every `n > 2f`; the
 formal claim is refuted for `n = 5`, `f = 2` (`claim_4_1_false`, `srb_implements_unidirectional`).
 
 **Impact.** The paper's separation "shared memory ⊋ unidirectionality ⊋ SRB" (Fig. 1, abstract) collapses: with
 the Claim of §4.2, unidirectionality and SRB are equivalent for `n > 2f`. The appendix "corner case" `f = 1` is not
-special.
+special. The classification in the abstract and §1 does not follow from the paper.
 
 **Details.** Counterexample protocol (`Echo.echoProtocol`). In round `r`, each process SRB-broadcasts its signed
 message. Whenever it delivers some process's round-`r` message, it SRB-broadcasts an *echo* of it, i.e. relays the
@@ -46,56 +45,36 @@ It has received `q`'s message if it delivered `q`'s message or any echo of it.
 - *Lean.* We prove that the echo protocol satisfies Definition 2, plus integrity and liveness in
   every fair execution, against any SRB adversary with unforgeable signatures, for every
   `n > 2f` (`Echo.echoProtocol_implements`).
-- *Consequences.* The headline classification in the abstract and §1 does not follow from the
-  paper. A remark we did **not** formalize: the same echo idea seems to work with TrInc-style
-  attested logs. A receiver accepts the `k`-th attested message of `s` only after all earlier ones
-  (Algorithm 2's `prev`), so "trusted logs do not give unidirectionality" is doubtful as well.
 
-### ⚠️ Algorithm 3 (pseudocode of the L1 rule, agreement)
-As printed, Algorithm 3 violates agreement (property 2 of SRB): with `n = 3`, `t = 1` and a Byzantine sender, two
-correct processes deliver different messages with the same sequence number (`Alg3.pseudo_disagreement`).
+### ✏️ Slips
+- **Algorithm 3 (pseudocode of the L1 rule, agreement).** As printed, it violates agreement (property 2 of SRB): with
+  `n = 3`, `t = 1` and a Byzantine sender, two correct processes deliver different messages with the same sequence
+  number (`Alg3.pseudo_disagreement`). The text of §4.2 says a process builds an L1 proof only if it sees `t+1` copies
+  of its own value "*and no other value*", and the Lemma 3 Case 1 argument uses this check; the pseudocode (lines
+  29–39, `validateValue`) merely ignores conflicting copies. With the text's rule, agreement (Lemma 3 Case 1) and
+  Lemma 4 are proved (`Alg3.agreement`), so the construction itself is not affected.
+  - *Counterexample* (`n = 3`, `t = 1`). The sender `0` is Byzantine; it sends `m` to `1` and `m'`
+    to `2`. In the forwarding round, `2` hears `1` (so unidirectionality holds), but `1` does not
+    hear `2`. Each of `1` and `2` has two copies of its own value: its own and `0`'s. Under the
+    printed rule both build L1 proofs.
+  - *Result.* Process `0` builds L1 proofs for both values. So `{1, 0}` is an L2 proof of `m` and
+    `{2, 0}` is an L2 proof of `m'`, and the correct processes `1` and `2` deliver different
+    messages with the same sequence number.
+- **Claim of §4.2 (which unidirectional round Algorithm 3 uses).** Definition 2 only relates messages sent in the
+  *same* round, but Algorithm 3 uses "the unidirectional round" for every (sender, sequence number) instance without
+  saying which round. Processes handle instances at different paces, and may skip one after seeing an L2 proof, so a
+  single round sequence cannot be aligned across processes. A separate round instance per (sender, sequence number),
+  which tagging provides, settles it; our `Alg3` model assumes this.
+- **Theorem 1 (SRB implements TrInc: exact vs eventual interface).** Theorem 1 is stated for the exact TrInc interface,
+  where `CheckAttestation` returns true for every attestation previously output, but over SRB this holds only once
+  the attestation has been delivered. The result holds in the eventual form, which is exactly what the paper's proof
+  shows (property (1)). We prove consistency between checkers, non-equivocation (one valid attestation per counter),
+  soundness (property (2)) and completeness for increasing counters (property (1)).
+- **Proof of Theorem 1 (implementation of `Attest`).** `Attest` never returns `null` for a non-increasing counter; the
+  returned "attestation" is simply never valid (`TrInc.attest_nonincreasing_invalid`). `k` is never incremented. The
+  attestation omits `prev`, which is determined anyway (`TrInc.accepted_prev`).
 
-**Impact.** A pseudocode slip, not a flaw of the construction: the text of §4.2 states the intended rule, and the
-safety core of the Claim of §4.2 holds with it (`Alg3.agreement`).
-
-**Details.** The text of §4.2 says a process builds an L1 proof only if it sees `t+1` copies of its own value
-"*and no other value*". This check is what the Lemma 3 Case 1 argument uses. The pseudocode (lines 29–39,
-`validateValue`) merely ignores conflicting copies.
-- *Counterexample* (`n = 3`, `t = 1`). The sender `0` is Byzantine; it sends `m` to `1` and `m'`
-  to `2`. In the forwarding round, `2` hears `1` (so unidirectionality holds), but `1` does not
-  hear `2`. Each of `1` and `2` has two copies of its own value: its own and `0`'s. Under the
-  printed rule both build L1 proofs.
-- *Result.* Process `0` builds L1 proofs for both values. So `{1, 0}` is an L2 proof of `m` and
-  `{2, 0}` is an L2 proof of `m'`, and the correct processes `1` and `2` deliver different
-  messages with the same sequence number.
-
-**Repair.** With the text's rule, agreement (Lemma 3 Case 1) and Lemma 4 are proved (`Alg3.agreement`).
-
-### ⚠️ Claim of §4.2 (which unidirectional round Algorithm 3 uses)
-Definition 2 only relates messages sent in the *same* round, but Algorithm 3 uses "the unidirectional round" for
-every (sender, sequence number) instance without saying which round.
-
-**Impact.** Under-specified definition; harmless once fixed by a separate round instance per (sender, sequence
-number), which tagging provides. Our `Alg3` model assumes this.
-
-**Details.** Processes handle instances at different paces, and may skip one after seeing an L2 proof. So a single
-round sequence cannot be aligned across processes.
-
-### ⚠️ Theorem 1 (SRB implements TrInc: exact vs eventual interface)
-Theorem 1 is stated for the exact TrInc interface, where `CheckAttestation` returns true for every attestation
-previously output, but over SRB this holds only once the attestation has been delivered.
-
-**Impact.** Imprecise statement; the result holds in the eventual form, which is exactly what the paper's proof
-shows (property (1)). We prove consistency between checkers, non-equivocation (one valid attestation per counter),
-soundness (property (2)) and completeness for increasing counters (property (1)).
-
-**Details.** Further problems in the implementation:
-- `Attest` never returns `null` for a non-increasing counter. The returned "attestation" is
-  simply never valid (`TrInc.attest_nonincreasing_invalid`).
-- `k` is never incremented.
-- The attestation omits `prev`.
-
-### Typos and slips
+### Typos
 - `validateL1Prf` is defined twice; the second definition should be `validateL2Prf`.
 - `maybeDeliver(val)` takes no parameter.
 - `key == k` refers to an undefined `key`.
@@ -108,10 +87,10 @@ soundness (property (2)) and completeness for increasing counters (property (1))
 
 ## Proof gaps (statements true)
 
-### 🛠️ Claim of Appendix A (reliable broadcast gives unidirectionality for `f = 1`)
+### 🔧 Claim of Appendix A (reliable broadcast gives unidirectionality for `f = 1`)
 The proof ignores a Byzantine member of `Q` and assumes w.l.o.g. that all of `Q` sees the same value.
 
-**Impact.** Statement true; repaired by a different case split (`AppendixRB.appendix_claim`).
+**Impact.** The claim stands, with the same protocol and a different case split (`AppendixRB.appendix_claim`).
 
 **Details.**
 - "All processes in `Q` must receive at least one of `p` or `p'`'s messages in phase 1" is false
@@ -184,7 +163,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
   which is immediate.
 * Fig. 1's claim that trusted logs are *weaker* than SRB (only "SRB implements TrInc" is claimed and
   proved).
-* The remark about attested logs above.
+* The §3.2 claim for ACL objects other than SWMR registers (PEATS, sticky bits, all objects of [16]).
+* The introduction's "not by message passing primitives (e.g., trusted counters, trusted logs)". An open remark: the
+  same echo idea seems to work with TrInc-style attested logs. A receiver accepts the `k`-th attested message of `s`
+  only after all earlier ones (Algorithm 2's `prev`), so "trusted logs do not give unidirectionality" is doubtful as
+  well.
 
 **Trust.** No `sorry`. All listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`.

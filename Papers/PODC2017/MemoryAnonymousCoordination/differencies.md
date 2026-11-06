@@ -1,13 +1,10 @@
 # Differences between the formalization and the paper
 
-Verdict: ⚠️ Minor statement issues — decided by the two pseudocode issues below (R3: the
-"arbitrary index" of Fig. 2 line 6 / Fig. 3 line 15 does not exist in the last iteration; R4: Fig. 2
-fails for an input equal to the initial value `0`). Borderline: both are evident-intent issues and
-every theorem holds in the intended reading; all proof gaps (Theorems 3.3, 4.1, 5.1, 5.2, 5.3) are
-repairs (🛠️) of claims inside proofs.
-
 Gadi Taubenfeld, *Coordination Without Prior Agreement*, PODC 2017 (author copy, 10 pp.).
-Rules cited (R1–R6) are those of the project's verdict scale.
+
+Two pseudocode issues (the "arbitrary index" of Fig. 2 line 6 / Fig. 3 line 15 does not exist in the
+last iteration; Fig. 2 fails for an input equal to the initial value `0`) and the proof gaps of
+Theorems 3.3, 4.1, 5.1, 5.2, 5.3 are listed below; every theorem holds in the intended reading.
 
 ## Model (all sections)
 
@@ -64,8 +61,8 @@ Rules cited (R1–R6) are those of the project's verdict scale.
   for `q` (each process of `P` must reach a write before returning in its solo run). For mutual
   exclusion, deadlock-freedom is used through a round-robin run of the covering processes
   (`df_progress`, `df_enter`): a solo run of one of them would not be fair. These are routine
-  details (no verdict impact).
-* Typo (R3): in the proof of Theorem 6.5, "By construction, in y the processes in P together cover
+  details.
+* Typo: in the proof of Theorem 6.5, "By construction, in y the processes in P together cover
   …" should be "in x".
 * **Not formalized:** Theorem 6.1 and Corollary 6.4 (they combine Theorems 6.2/6.3 with results of
   [17] and the unpublished manuscript [25]); the remark on k-set consensus; Theorems 3.1/3.4
@@ -75,25 +72,24 @@ Rules cited (R1–R6) are those of the project's verdict scale.
 ## Section 4 (Figure 2, obstruction-free consensus with 2n − 1 registers)
 
 * Registers hold `Option (P × V)`; `none` is the initial record `(0, 0)`. Inputs range over `V`,
-  hence can never be the initial `val` value `0`. **Paper issue (⚠️, R4):** the input domain is not
+  hence can never be the initial `val` value `0`. **Paper issue (🔧):** the input domain is not
   restricted, but line 4 ignores the value `0`; if a process may have input `0`, agreement fails:
   with `n = 2`, a process with input `0` runs alone, fills the 3 registers with `(i, 0)` and decides
   `0`; then a process with input `1` ignores the `0` entries, keeps `1`, overwrites all registers
-  and decides `1` (found by `modelcheck/cons.py 2 0,1 any skip`). Since `0` is plainly used as the
-  "empty" value, a reader would assume inputs are non-zero; we treat it as an implied assumption.
-  *Borderline (recorded per R6).* Against the excuse: the paper never restricts the inputs, and
-  Section 6.3 states binary consensus with inputs `{0, 1}` while referring back to Figure 2 ("In
-  Section 4, we have presented an obstruction-free consensus for n processes"). For the excuse
-  (R3): the intended version is recoverable from the paper (identifiers are positive integers, so
-  `id = 0` marks an unwritten register; the proof of Theorem 4.2 speaks of "a value (different
-  from 0)" read from a register), the fix is local (line 4 counts only entries with `id ≠ 0`, or
-  the registers start at `⊥`), and no proof step uses the wrong version. Hence ⚠️, not ❌/🚨.
-* **Line 6 (⚠️, R3, pseudocode missing case):** "Clearly, such an arbitrary entry exists" is false
+  and decides `1` (found by `modelcheck/cons.py 2 0,1 any skip`). `0` is plainly used as the
+  "empty" value, so a reader would assume inputs are non-zero. But the paper never restricts the
+  inputs, and Section 6.3 states binary consensus with inputs `{0, 1}` while referring back to
+  Figure 2 ("In Section 4, we have presented an obstruction-free consensus for n processes"). The
+  intended version is recoverable from the paper (identifiers are positive integers, so `id = 0`
+  marks an unwritten register; the proof of Theorem 4.2 speaks of "a value (different from 0)" read
+  from a register), the fix is local (line 4 counts only entries with `id ≠ 0`, or the registers
+  start at `⊥`), and no proof step uses the wrong version.
+* **Line 6 (✏️, pseudocode missing case):** "Clearly, such an arbitrary entry exists" is false
   in the deciding iteration, where every entry equals `(i, mypref)` (the until-test of line 8 is
   evaluated after the write of line 7). We write `(i, mypref)` to the selected register anyway
   (harmless). Correctness is proved for every `sel` (safety) and every `sel` choosing a differing
   entry when one exists (termination).
-* **Proof gap (🛠️):** the proof of Theorem 4.1 says that after the first decider `i` saw all
+* **Proof gap (🔧):** the proof of Theorem 4.1 says that after the first decider `i` saw all
   registers equal to `(i, v)`, "all the other processes, when executing line 4, will find that `v`
   appears in at least `n`" entries. This is false for a process whose (non-atomic) collect started
   before that point: its partly stale view need not contain `n` copies of `v`, and it then writes
@@ -125,7 +121,7 @@ Rules cited (R1–R6) are those of the project's verdict scale.
 * **Theorem 3.2** (`theorem_3_2`) is proved for every `m ≥ 2`: the threshold `⌈m/2⌉` and oddness play
   no role in mutual exclusion (for `m = 1` it fails). The paper's proof is essentially right; it omits
   that the other process may still have one pending write from its exit section (line 12) and its
-  "less than `⌈m/2⌉`, resets" step is not needed. Routine (no verdict impact).
+  "less than `⌈m/2⌉`, resets" step is not needed. Routine.
 * **Theorem 3.3** (`theorem_3_3`) is proved for every odd `m` (also `m = 1`); parity is needed
   (livelocks for `m = 2, 4` in the model checker). **Proof gap (🛠️):** the proof's claim "When there
   is contention … exactly one of the two processes must find that less than `⌈m/2⌉` of the registers
@@ -151,7 +147,7 @@ Rules cited (R1–R6) are those of the project's verdict scale.
   classically (it is unique in every execution, as a consequence of the proof). Lines 9 and 15 are
   parameters (`Sel`); proofs assume `Sel.OK`: line 9 copies an entry of maximal round, line 15
   picks an entry different from the own record when one exists. As in Fig. 2, in the iteration
-  that leaves the inner loop no such entry exists (⚠️, R3, same pseudocode missing case); the write
+  that leaves the inner loop no such entry exists (✏️, same pseudocode missing case); the write
   is still performed. Line 21 keeps the paper's test `myround = n`.
 * Specification: `adaptiveRenaming P` (distinct names; every name in `{1..k}` for `k`
   participants), the same object as in Theorem 6.5. Theorem 5.2 (names in `{1..n}`) follows from
@@ -168,16 +164,16 @@ Rules cited (R1–R6) are those of the project's verdict scale.
   a ghost invariant for collects and the well-formedness of histories (one winner per earlier round,
   distinct winners, each locked, never the record's owner) this gives agreement per round and that
   a process is elected at most once (`RenamingSafety.lean`).
-* **Proof gap in Theorem 5.3 (🛠️):** "the algorithm will terminate after `k` rounds" does not by
+* **Proof gap in Theorem 5.3 (🔧):** "the algorithm will terminate after `k` rounds" does not by
   itself bound the names. The repaired argument: a process that gets name `a` sees a history naming
   `a − 1` other, distinct participants, so `a ≤ k`; that two processes cannot both get the name `n`
   (line 22) needs a counting argument (otherwise there would be `n + 1` distinct processes).
-* **Proof errors in Theorem 5.1 (🛠️):** (a) item (4) claims that a process continuing alone into the
+* **Proof errors in Theorem 5.1 (🔧):** (a) item (4) claims that a process continuing alone into the
   next round wins it ("since mypref = i, it returns the current round number"); false — records of
   that round written earlier by other processes may contain another value at least `n` times, which
   the solo process adopts at line 14, so it loses that round too. Termination is instead proved by
   induction on `n − myround` (`RenamingOF.lean`). (b) The proof never shows that `myround` stays
   below `n` (needed for the test `myround = n` of line 21 to stop the loop); we derive `round + 1 ≤
-  |P|` from the invariant. (c) Typo (R3): item (3) says "Process i increments mypref by 1 (line
+  |P|` from the invariant. (c) Typo: item (3) says "Process i increments mypref by 1 (line
   20)"; it is `myround`. Also "updates its history (line 19) and round number (line 19)" — line 20.
 * Theorem 5.1 is proved as `ObstructionFree` from every reachable configuration.

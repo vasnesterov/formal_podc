@@ -5,17 +5,42 @@ Fundamental Limits of Coding.* PODC 2016. DOI [10.1145/2933057.2933104](https://
 Formalized version: arXiv [1507.05169](https://arxiv.org/abs/1507.05169) v1 (the only arXiv version); numbering
 follows it.
 
-**Verdict: ❌ False claim.** Algorithm 2 (Section 3.1, the safe erasure-coded register) is not safe as
-written when `k ≤ f`, e.g. for replication with `n = 3`, `f = 1` (Lean counterexample). With the reader decoding
-the largest qualifying timestamp, Corollary 3 is proved. Theorem 1 ("every write adds at least `log₂|U_s|` bits")
-is false as stated, and it does not justify the storage model the paper builds on it: "every stored bit
-belongs to one write". The main lower bound (Theorem 2, Corollary 2: unbounded storage, or a time when `f + 1`
-objects each hold `D` bits of one write) is proved in that model, the paper's own, after several repairs. Whether
-it holds for algorithms that code across writes is open.
+**Verdict: ⚠️ Weakened.** The main lower bound (Theorem 2, Corollary 2: unbounded storage, or a time when `f + 1`
+objects each hold `D` bits of one write) is proved, after several repairs, only in the paper's own storage model
+("every stored bit belongs to one write"), not for "any reliable storage algorithm": Theorem 1 ("every write adds at
+least `log₂|U_s|` bits") is false as stated, and it does not justify that model. Algorithm 2 (Section 3.1, the safe
+erasure-coded register) is not safe as written when `k ≤ f`, e.g. for replication with `n = 3`, `f = 1` (Lean
+counterexample), and with the reader decoding the largest qualifying timestamp, Corollary 3 is proved. The adaptive
+algorithm of Section 5 was not checked, and whether the bound holds for algorithms that code across writes is open.
 
 ## Mistakes in the paper
 
-### ❌ Algorithm 2 (Section 3.1, line 16) and Lemma 9 (safety for `k ≤ f`)
+### ❌ Theorem 1 ("every write adds at least `log₂|U_s|` bits")
+Theorem 1 (a write of `u_s ∈ U_s` adds at least `log₂|U_s|` bits) is false: with `|U₁| = 5`, `|U₂| = 3` and an object that stores the minimum each time (`⌈log₂ 5⌉ = 3`, then `⌈log₂ 15⌉ = 4` bits), the second write adds one bit, less than `log₂ 3` (`theorem1_false`).
+
+**Impact.** The per-write property is lost: the cumulative bound of Lemma 1 is what is true in general
+(`theorem1_cumulative`), and it says nothing about a single write. The paper's main use of Theorem 1 is the storage
+model of Section 4 (next item).
+
+**Details.** With padding, a write can add no bits at all. The proof subtracts two lower bounds, which is
+invalid. Its induction hypothesis ("the object stores exactly `log₂(|U₁|⋯|U_{s−1}|)` bits") assumes minimal
+storage. The statement holds only for minimal encodings and power-of-two set sizes, the simplification made in
+Lemma 1's proof.
+
+### ⚠️ Section 4 storage model ("each stored bit is associated with a particular write")
+The paper adopts this model "without loss of generality" on the strength of Theorem 1, but neither Theorem 1 nor its correct cumulative version justifies it, so the abstract's lower bound for "any reliable storage algorithm" is proved only for algorithms that do not code across writes.
+
+**Impact.** The main lower bound (Theorem 2, Corollary 2) holds in the paper's own model (`theorem2`,
+`corollary2`), which covers replication and per-value erasure coding.
+
+**Details.** Lemma 1 concerns one object that must keep *all* its inputs recoverable from its own bits. A
+register emulation may discard old values, spread a value over several objects, or store functions of several
+values (e.g. `v₁ ⊕ v₂`). Section 4's bookkeeping (`C⁺`, `F(t)`, Observation 1, Lemma 3) depends on this
+attribution. Our black-box model makes it hold by construction: values are opaque, and stored data are blocks,
+each a fixed function of one written value, which clients only copy. Re-encoding another client's value is
+excluded as well.
+
+### 🔧 Algorithm 2 (Section 3.1, line 16) and Lemma 9 (safety for `k ≤ f`)
 Algorithm 2 is not safe when `k ≤ f`: with replication (`k = 1`, `n = 3`, `f = 1`) a read with no concurrent write may return the stale value of an earlier write, because line 16 lets the reader decode *any* timestamp with `k` pieces (`Safe.not_stronglySafe`, `Safe.not_weakRegular`).
 
 **Impact.** A local fix to the reader: decoding the *largest* qualifying timestamp makes Algorithm 2 wait-free
@@ -29,70 +54,49 @@ Lean counterexample uses the "smallest qualifying timestamp" reading of line 16.
 
 **Repair.** The reader takes the largest qualifying timestamp; then Corollary 3 is proved (`Safe.corollary3`).
 
-### ❌ Theorem 1 ("every write adds at least `log₂|U_s|` bits")
-Theorem 1 (a write of `u_s ∈ U_s` adds at least `log₂|U_s|` bits) is false: with `|U₁| = 5`, `|U₂| = 3` and an object that stores the minimum each time (`⌈log₂ 5⌉ = 3`, then `⌈log₂ 15⌉ = 4` bits), the second write adds one bit, less than `log₂ 3` (`theorem1_false`).
-
-**Impact.** The cumulative bound of Lemma 1 is what is true in general (`theorem1_cumulative`); the paper's main
-use of Theorem 1 is the storage model of Section 4 (next item).
-
-**Details.** With padding, a write can add no bits at all. The proof subtracts two lower bounds, which is
-invalid. Its induction hypothesis ("the object stores exactly `log₂(|U₁|⋯|U_{s−1}|)` bits") assumes minimal
-storage. The statement holds only for minimal encodings and power-of-two set sizes, the simplification made in
-Lemma 1's proof.
-
-### ❌ Section 4 storage model ("each stored bit is associated with a particular write")
-The paper adopts this model "without loss of generality" on the strength of Theorem 1, but neither Theorem 1 nor its correct cumulative version justifies it, so the abstract's lower bound for "any reliable storage algorithm" is proved only for algorithms that do not code across writes.
-
-**Impact.** The main lower bound (Theorem 2, Corollary 2) holds in the paper's own model (`theorem2`,
-`corollary2`); whether it holds with coding across writes is not settled by the paper.
-
-**Details.** Lemma 1 concerns one object that must keep *all* its inputs recoverable from its own bits. A
-register emulation may discard old values, spread a value over several objects, or store functions of several
-values (e.g. `v₁ ⊕ v₂`). Section 4's bookkeeping (`C⁺`, `F(t)`, Observation 1, Lemma 3) depends on this
-attribution. Our black-box model makes it hold by construction: values are opaque, and stored data are blocks,
-each a fixed function of one written value, which clients only copy. Re-encoding another client's value is
-excluded as well.
-
-### ⚠️ Observation 1 (under-specified storage measure)
+### 🔧 Observation 1 (under-specified storage measure)
 `C⁺(t)` counts writes whose bits are in base objects *or in other clients*, so Observation 1 (storage `≥ |C⁺(t)|`) holds only if the storage also counts copies of other writers' data held by clients, which the paper does not say.
 
 **Impact.** We use that measure in the hypothesis of Theorem 2 (`Alg.storage`, `obs1`). The conclusion of
 Corollary 2 is about base objects only.
 
-### ⚠️ Theorem 3 / Corollary 4 (Section 5, not formalized)
-"With at most `c < k` concurrent writes the storage is bounded by `(c + 1)D/k` bits" is false as written: the initial configuration already stores `(2f + k)D/k` bits.
+### ✏️ Slips
+- Theorem 3 / Corollary 4 (Section 5, not formalized): "with at most `c < k` concurrent writes the storage is bounded
+  by `(c + 1)D/k` bits" is false as written, since the initial configuration already stores `(2f + k)D/k` bits.
+  Lemma 12 has the intended `(2f + k)(c + 1)D/k`, and it assumes `c < k − 1`.
+- Theorem 2 (number of clients): the bound needs at least `S + 1` clients, `S` concurrent writers and a reader, while
+  the paper only says Π is finite. The assumption is in the opening of Section 4 and in the abstract ("no bound on the
+  concurrency level"); we prove the theorem with `S + 1` clients (`theorem2`, `theorem2_run`).
+- Lemma 12's proof writes `ts' ≥ ts₁ > ts₁`, meaning `ts' ≥ ts₁ > ts₂`.
 
-**Impact.** Lemma 12 has the intended `(2f + k)(c + 1)D/k`, and it assumes `c < k − 1`. Not formalized.
-
-### Typos and slips
-- Lemma 12's proof cites itself (meant Lemma 11) and writes `ts' ≥ ts₁ > ts₁`.
+### Typos
+- Lemma 12's proof cites itself (meant Lemma 11).
 - Corollary 5 says "WF-termination" for FW-termination.
 - In Observation 2's proof, `|B| = N − f` should be `n − f`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 2 (adaptive choice of encoders)
+### 🔧 Lemma 2 (adaptive choice of encoders)
 The proof says that choosing adaptively among `m` encoders forces `log₂ m` extra bits, which is false: two encoders of a 4-element set into 2 bits, chosen adaptively, decode without an extra bit (`lemma2_no_extra_bits`).
 
 **Impact.** The lemma is trivially true: an adaptive choice of encoders is one fixed function (`lemma2`).
 
-### 🛠️ Lemma 3 (copies of a write's bits)
+### 🔧 Lemma 3 (copies of a write's bits)
 The proof ignores copies: a client may read another writer's bits and spread them over several objects.
 
-**Impact.** Statement true in the black-box model (`inv_exec`, `lemma3`).
+**Impact.** The lemma holds in the black-box model (`inv_exec`, `lemma3`).
 
 **Repair.** The claim holds because `Ad` never lets an RMW touch an object of `F(t)`. A batch of `D` bits is
 frozen in its object the moment it is stored, and smaller batches never add up to `D`. Our invariant states
 exactly this.
 
-### 🛠️ Theorem 2 (the fair run `r'`, number of clients)
-The fair run `r'` cannot be "identical to `r`", because clients that receive finitely many responses must stop taking steps; and the bound needs at least `S + 1` clients, while the paper only says Π is finite.
+### 🔧 Observation 2 (reads returning a completed write)
+The proof says "no value satisfying weak regularity can be returned", which ignores that the read may return the value of an earlier completed write concurrent with `w`, not only one in `C(t)`, so the argument works only at the first completion.
 
-**Impact.** Statement true in the black-box model with `S + 1` clients (`theorem2`, `theorem2_run`).
+**Impact.** Corollary 1, the only use, applies it at the first completion, where this does not matter.
 
-**Repair.** We remove the later steps of those clients and show by simulation that nothing else changes.
-Liveness of each RMW of the other clients uses the oldest-first rule of `Ad`. The `S + 1` clients are `S`
-concurrent writers and a reader.
+**Repair.** `Alg.reader_restore` concludes that the objects of `B` hold `D` bits of *some* write of the history, which
+covers both cases.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -146,8 +150,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
 Lemma 4's proof can be simplified: iterating the growth of `T_cᵢ` is unnecessary; it suffices to crash `F(t)`
 itself in the solo run (`solo_progress`, `rule1_infinitely_often`).
 
-**Not formalized.** Section 5 (the adaptive strongly regular algorithm, Theorem 3, Lemmas 10–22); Section 3.2
-(intuition).
+Theorem 2's fair run `r'` cannot be literally "identical to `r`", because clients that receive finitely many responses
+must stop taking steps. We remove the later steps of those clients and show by simulation that nothing else changes.
+Liveness of each RMW of the other clients uses the oldest-first rule of `Ad`.
+
+**Not formalized.** Section 5 (the adaptive strongly regular algorithm, the corrected Theorem 3, Lemmas 10–22, and
+the case `c = k − 1` that Lemma 12 leaves out); Section 3.2 (intuition); the remark that the same bound applies to
+message passing systems with limited channel capacity. Whether the lower bound holds for algorithms that code across
+writes, or re-encode another client's value, is not settled by the paper and not addressed here.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. The
 model is self-contained (Mathlib only). The hypotheses of Theorem 2 are satisfiable: a single-object atomic register

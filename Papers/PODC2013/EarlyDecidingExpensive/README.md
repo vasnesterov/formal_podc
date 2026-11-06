@@ -4,19 +4,15 @@ Danny Dolev, Christoph Lenzen. *Early-Deciding Consensus is Expensive.* PODC 201
 [10.1145/2484239.2484269](https://doi.org/10.1145/2484239.2484269). Formalized version: the authors'
 camera-ready copy (10 pages, proofs included; the paper says no full version exists).
 
-**Verdict: 🛠️ Proof repaired.** Every checked result holds. These are the `t²f/44` Byzantine bound for
-`(f+2)`-deciding consensus (Theorem 3.2), the `f + 2` decision bound (Theorem 3.6), the `Ω(n²f)` crash bound
-(Theorem 4.3), the orderly-crash algorithm (Theorem 4.5), and Lemmas 3.4–3.8 and 4.2. Three proofs need
-repairs. The proof of Theorem 3.6 only covers `(f+2)`-deciding algorithms, although the theorem claims every
-algorithm. Lemma 3.8 uses a stronger bound than Lemma 3.7 states. The correctness proof of the orderly-crash
-algorithm never uses orderliness, and the algorithm is wrong without it. The proof of Theorem 4.3 also
-misses the corner `f ≥ n - 2`.
+**Verdict: 🛠️ Hard fix.** Every checked result holds: the `t²f/44` Byzantine bound for `(f+2)`-deciding consensus
+(Theorem 3.2), the `f + 2` decision bound (Theorem 3.6), the `Ω(n²f)` crash bound (Theorem 4.3), the orderly-crash
+algorithm (Theorem 4.5), and Lemmas 3.4–3.8 and 4.2. The lower bounds need only local repairs of their proofs. But the
+correctness proof of the orderly-crash algorithm, one of the paper's three results, never uses orderliness, and the
+algorithm is wrong without it, so it took a new induction.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
 - Section 3 fixes "an `(f+1)`-deciding algorithm". So do the proofs of Lemmas 3.5 and 3.7 and of Theorem 3.2.
   All of them need, and Theorem 3.2 states, `(f+2)`-deciding. Taken literally the section would be vacuous,
   since Theorem 3.6 shows that no algorithm is `(f+1)`-deciding.
@@ -26,47 +22,19 @@ No mistakes in the statements.
   should be `(n-f-2)(n-f-1)(2(n-f)-3)/6`; for `n = 5`, `f = 1` the sum is 9, not 13 (`sum_identity_false`).
   The next line carries a spurious `+6n²`. The final bound `nf(n-f) + f³/3 - O(nf)` is right
   (`sum_sq_bound`).
+
+### Typos
 - Definition 4.1: "a subset `W \ V`" should read `W ⊆ V`.
 
 ## Proof gaps (statements true)
-
-### 🛠️ Theorem 3.6 (decision before round `f + 2` is impossible)
-The theorem is stated "for any consensus protocol", but its proof iterates Lemma 3.5, which needs the
-algorithm to decide within `f' + 2` rounds whenever there are `f' < f` faults.
-
-**Impact.** Statement true for every algorithm; repaired by a small change of the paper's construction
-(`theorem_3_6_general`, `not_deciding_succ`). The deadline-based version is `theorem_3_6`.
-
-**Details.** In the paper's `E(W)` the faulty critical node `v_r` falls silent after round `r + 1`. So
-`E(V \ F_r)` looks like `E₀` to the honest nodes only before round `r + 2`. Its output equals that of `E₀`
-only if `E₀` (with `r - 1` faults) has decided by round `r + 1`.
-
-**Repair.** Let `v_r` equivocate forever: in every round `k ≥ r` it sends to `W` what it sends in `E₀` and to
-the rest what it sends in `E₁`. Then `E(V \ F_r)` and `E(∅)` look like `E₀` and `E₁` forever, and their
-outputs follow without any deadline. The pairs obtained satisfy Definition 3.3 except that faulty nodes may
-keep talking. They send the same messages in both executions to everybody but the critical node
-(`IsCriticalG`, `lemma_3_5_general`). This is all the final step of the proof of Theorem 3.6 needs.
-
-### 🛠️ Lemma 3.8 (uses more than Lemma 3.7 states)
-Lemma 3.7 bounds the round-`(r+1)` messages of all non-faulty nodes, including the critical node `v_r`,
-but Lemma 3.8 averages this bound over `V \ F_r`, which excludes `v_r`.
-
-**Impact.** Statements true; repaired (`lemma_3_7`, `lemma_3_8`).
-
-**Details.** For `t < 22` the `nt/22` messages of Lemma 3.7 could all come from `v_r` (it can send `n - 1`
-of them). Then inequality (1) of Lemma 3.8 does not follow.
-
-**Repair.** The proof of Lemma 3.7 only counts messages from senders in `V \ F_r`, so it gives the bound we
-need. `lemma_3_7` states it that way: `n t ≤ 11 (c₀ + c₁)`, counting the senders of `V \ F_r` in both
-executions.
 
 ### 🛠️ Theorem 4.5 (correctness of the orderly-crash algorithm)
 The correctness proof claims "a unique node `i₀` deciding in round `i₀` on its input", which is false, and
 never uses that crashes are orderly, although without orderly crashes the algorithm violates agreement
 (`not_crash_correct`).
 
-**Impact.** Statement true; repaired (`Orderly.correct`, `Orderly.decidedBy`, `Orderly.stopping`,
-`Orderly.totalCount_le`).
+**Impact.** The statement is true, but the printed proof lacks the idea; we prove the theorem with a new argument
+(`Orderly.correct`, `Orderly.decidedBy`, `Orderly.stopping`, `Orderly.totalCount_le`).
 
 **Details.** If node 1 crashes before sending, node 2 also decides its own input, so `i₀` is not unique. The
 real issue is the claim that every node `> i₀` adopts the value of `i₀`. It needs messages from nodes
@@ -79,11 +47,41 @@ Node 2 has received nothing, so it decides its input 1, while node 3 decides 0. 
 induction on rounds, every message delivered to a node after `i₀` carries `i₀`'s input. A sender before `i₀`
 would also have reached `i₀` (prefix property) in a round `≤ i₀`.
 
-### 🛠️ Theorem 4.3 (case `f ≥ n - 2`)
+### 🔧 Theorem 3.6 (decision before round `f + 2` is impossible)
+The theorem is stated "for any consensus protocol", but its proof iterates Lemma 3.5, which needs the
+algorithm to decide within `f' + 2` rounds whenever there are `f' < f` faults.
+
+**Impact.** Statement true for every algorithm; a small change of the paper's construction proves it
+(`theorem_3_6_general`, `not_deciding_succ`). The deadline-based version is `theorem_3_6`.
+
+**Details.** In the paper's `E(W)` the faulty critical node `v_r` falls silent after round `r + 1`. So
+`E(V \ F_r)` looks like `E₀` to the honest nodes only before round `r + 2`. Its output equals that of `E₀`
+only if `E₀` (with `r - 1` faults) has decided by round `r + 1`.
+
+**Repair.** Let `v_r` equivocate forever: in every round `k ≥ r` it sends to `W` what it sends in `E₀` and to
+the rest what it sends in `E₁`. Then `E(V \ F_r)` and `E(∅)` look like `E₀` and `E₁` forever, and their
+outputs follow without any deadline. The pairs obtained satisfy Definition 3.3 except that faulty nodes may
+keep talking. They send the same messages in both executions to everybody but the critical node
+(`IsCriticalG`, `lemma_3_5_general`). This is all the final step of the proof of Theorem 3.6 needs.
+
+### 🔧 Lemma 3.8 (uses more than Lemma 3.7 states)
+Lemma 3.7 bounds the round-`(r+1)` messages of all non-faulty nodes, including the critical node `v_r`,
+but Lemma 3.8 averages this bound over `V \ F_r`, which excludes `v_r`.
+
+**Impact.** Statements true (`lemma_3_7`, `lemma_3_8`).
+
+**Details.** For `t < 22` the `nt/22` messages of Lemma 3.7 could all come from `v_r` (it can send `n - 1`
+of them). Then inequality (1) of Lemma 3.8 does not follow.
+
+**Repair.** The proof of Lemma 3.7 only counts messages from senders in `V \ F_r`, so it gives the bound we
+need. `lemma_3_7` states it that way: `n t ≤ 11 (c₀ + c₁)`, counting the senders of `V \ F_r` in both
+executions.
+
+### 🔧 Theorem 4.3 (case `f ≥ n - 2`)
 The proof's reduction to `t ≤ n - 2` only covers `f ≤ n - 3`, while the theorem claims every `f < t`,
 including `f ≥ n - 2` when `t ≥ n - 1`.
 
-**Impact.** Statement true; repaired (`theorem_4_3_all'`, `theorem_4_3_omega_all`).
+**Impact.** Statement true for every `f < t` (`theorem_4_3_all'`, `theorem_4_3_omega_all`).
 
 **Repair.** Take the execution for `n - 3` faults. Let `f - (n - 3)` more nodes crash silently after round
 `f + 1`. This changes no counted message, and `∑_{i=1}^{n-3} (n-i-1)²` still meets the bound

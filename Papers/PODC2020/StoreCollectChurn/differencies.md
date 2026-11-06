@@ -2,7 +2,7 @@
 
 Paper: Attiya, Kumari, Somani, Welch. *Store-Collect in the Presence of Continuous Churn with
 Application to Snapshots and Lattice Agreement* (arXiv 2003.07787v3, full version of the PODC 2020
-brief announcement). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
+brief announcement).
 
 ## Store-collect specification (Section 2) — `Spec.lean`
 
@@ -31,10 +31,10 @@ brief announcement). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`
 - The server handler for `store` broadcasts two messages (store-ack, store-echo) in one step, as in
   the pseudocode (Section 3 allows one message per step; immaterial).
 - `optype` is replaced by an explicit phase (`idle`/`collect`/`store`).
-- **Charitable repair 1** (⚠️ typo, R3): `is_joined` is initialized to `true` for the nodes of `S₀`
+- **Charitable repair 1** (✏️ typo): `is_joined` is initialized to `true` for the nodes of `S₀`
   (the pseudocode initializes it to `false` for everyone, which would make every collect and every
   join block forever in a system consisting of `S₀`; the proofs assume `S₀` nodes are joined).
-- **Charitable repair 2** (⚠️ missing case, R3): client handlers act only on messages of the current
+- **Charitable repair 2** (✏️ missing case): client handlers act only on messages of the current
   phase of a pending operation. Literally, collect-replies arriving during the store-back increment
   the shared `counter`, and store-acks arriving after the return trigger "return" again. In the
   counterexample no stray reply/ack reaches `p₁`/`p₂` before the violation (up to time 12), so the
@@ -44,30 +44,27 @@ brief announcement). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`
 - **Theorem 6 / Corollary 7 are false** (`theorem6_false`), **Lemma 10 is false**
   (`lemma10_false`), **Observation 5 is false** (`observation5_false`). Lemmas 7 and 8 (and Case I
   of Lemma 10) rely on Observation 5 with the same `view(·)`; we did not refute them separately.
-  Decisive rule: R5 — the headline names the paper's algorithm (CCC), which is wrong as written.
-  **Borderline (recorded):** the likely repair is local (Line 47 should return the view broadcast
+  ❌: the paper's algorithm (CCC) is wrong as written, and no repair is proved.
+  The likely repair is local (Line 47 should return the view broadcast
   at Line 36, and `view(φ)` should be the view broadcast in `φ`), but it is not recoverable from
   the paper (the text says "returning LView", `view(φ)` is explicitly "LView at the end of the
-  phase", and the proofs of Observation 5, Lemmas 7, 8, 10 reason with that `view`), so R3 does
-  not excuse it.
-  *Reviewer's note on the borderline.* For ⚠️: the justifications of Observation 5 ("p receives
+  phase", and the proofs of Observation 5, Lemmas 7, 8, 10 reason with that `view`).
+  The justifications of Observation 5 ("p receives
   phase s's store message directly") and of Lemma 10 Case II (a node of `Qs ∩ Qc` has
   `LView ⪰ view(s)`) are valid exactly for the view *carried by the store message*, so with
   `view(φ)` := that view and Line 47 returning it, the paper's own arguments for Observation 5 and
   Lemmas 7, 8, 10 and Theorem 6 go through essentially verbatim (informal check, not in Lean).
-  For 🚨 (endorsed): the error is a missed interleaving (the client returns a variable that its own
+  The error is a missed interleaving (the client returns a variable that its own
   server thread mutates), i.e. a protocol bug, not a symbol slip; prose, pseudocode and
   definition consistently say "LView"; Theorem 6(2)'s proof uses `view(s) = V₁`, which needs the
   printed definition; and the journal version (Information and Computation 285, 2022, Line 51
-  "else return LView", same definition of `view(φ)`) keeps it. Same calibration as the
-  CRDTReplication (PODC 2019) and DetectableSpace (PODC 2020) verdicts (one-line protocol repairs,
-  still 🚨).
+  "else return LView", same definition of `view(φ)`) keeps it.
 - Observation 5 and Lemmas 7, 8 refer to store phases that call "broadcast (Line 42)", the store
   operation's broadcast; the Lean refutation (`observation5_false`) uses a store-back phase (Line 36),
   which is how Lemma 10 / Theorem 6(2) apply them. The same failure occurs for a store operation
   (its `LView` at the end can contain a concurrently merged value; not in Lean). We did not verify the repaired algorithm (the churn part, Lemmas 4–9, is not
   formalized).
-- Slip: the proof of Lemma 10, Case I, says "enter-echo message" for "collect-reply".
+- Typo: the proof of Lemma 10, Case I, says "enter-echo message" for "collect-reply".
 
 ## Churn model and arithmetic (Lemmas 1–3, Corollary 1, Constraints) — `Churn.lean`, `Constraints.lean`
 
@@ -82,7 +79,7 @@ brief announcement). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`
   `2(1−α)² ≥ 1`, i.e. `α ≤ 0.293` (`lemma2_of_sq`); `α < 0.206 ≈ 1 − 2^{-1/3}` already gives `i ≤ 4`
   (`lemma2_four`). Lemmas use the weaker hypotheses `α ≥ 0`, `Δ ≥ 0`.
 - Lemma 3 needs `t₁ ≥ 0` (implicit in the paper).
-- **Constraint (A)** (⚠️ R3): printed as `N_min ≥ 1 / (Z + γ − (1+α)³)`; its denominator can be `≤ 0`
+- **Constraint (A)** (✏️): printed as `N_min ≥ 1 / (Z + γ − (1+α)³)`; its denominator can be `≤ 0`
   while (B)–(D) hold, and then (A) is vacuous (`literal_constraints_not_imply_ZNmin`: `α = 0.04`,
   `Δ = 0.01`, `γ = 0.1`, `β = 0.8`, `N_min = 1` satisfy the printed A–D but `Z·N_min < 1`). We use
   the evident intent `N_min·(Z + γ − (1+α)³) ≥ 1` (`ConstraintA'`), which is what Lemma 5 uses.
@@ -97,7 +94,7 @@ brief announcement). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`
   A–D (`example_alpha_004`); the set `α = 0, Δ = 0.21, γ = β = 0.79` satisfies A–D at `α = 0`
   (`example_alpha_zero`) but `α = 0` is excluded by the model (`α > 0`), and for every `α > 0`
   these `γ, β` violate (B) and (C) (`not_constraintB_021_079`, `not_constraintC_021_079`);
-  `γ = β = 0.78` works at `α = 1/1000` (`example_alpha_small`). Slip, not a statement error (the
+  `γ = β = 0.78` works at `α = 1/1000` (`example_alpha_small`). Not a statement error (the
   text speaks of the extreme case `α = 0`).
 - The arithmetic core of Lemma 10 Case II (`lemma10_core`) and the inequalities used in Theorems
   3–4 (from (B), (C)) are proved; the operational parts are not.
@@ -137,8 +134,8 @@ brief announcement). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`
   borrowing chains; Lemma 12's nesting (`borrow_cert`) is what makes the certificate lie inside the
   borrowing scan, so chains are not needed and the well-foundedness of borrowing is automatic.
 - Lemma 11 is proved for the certificates of all scans (`vec_total`), Lemma 13 in the form
-  `kU_le_vec_of_precedes_upd`. Slips: Lemma 11's proof says "Consider any `⟨r, w⟩ ∈ W₂`" for `W₁`;
-  Lemma 13's proof speaks of "both stores of `uop_p`".
+  `kU_le_vec_of_precedes_upd`. Slip (✏️): Lemma 11's proof says "Consider any `⟨r, w⟩ ∈ W₂`" for `W₁`.
+  Typo: Lemma 13's proof speaks of "both stores of `uop_p`".
 - Updates included in the linearization: those some stored value reflects (`Vis`; includes all
   completed ones), rather than "those whose Line 83 store started" (same set up to updates whose
   store started but whose value is never stored — irrelevant: neither is seen by any scan).

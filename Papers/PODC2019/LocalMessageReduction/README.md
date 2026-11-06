@@ -4,24 +4,24 @@ Shimon Bitton, Yuval Emek, Taisuke Izumi, Shay Kutten. *Message Reduction in the
 Lunch.* PODC 2019. DOI [10.1145/3293611.3331582](https://doi.org/10.1145/3293611.3331582). Formalized
 version: arXiv [1909.08369](https://arxiv.org/abs/1909.08369) v1; numbering follows it.
 
-**Verdict: ❌ False claim.** The size bound of Theorem 1.2 and Lemma 4.7 is false for algorithm
-`Sampler` as written: `|S|` is `Õ(n^{1+δ+ε})`, not `Õ(n^{1+δ})` (`ε = 1/h`). The stretch analysis
-holds: we prove the deterministic core of Theorem 4.6 (stretch `2·3^k − 1`), Lemmas 4.4 and 4.5, and the
-probabilistic core of Lemma 4.3 for one node, including the adaptive trials. The headline claims
-survive: the abstract's spanner (constant stretch, `O(n^{1+ε})` edges and messages, `O(1)` rounds) and
-the message-reduction scheme (Theorem 1.3). The corrected size equals the message bound the paper already
-uses.
+**Verdict: 🔧 Easy fix.** The size bound of Theorem 1.2 and Lemma 4.7 is false for algorithm `Sampler` as written:
+`|S|` is `Õ(n^{1+δ+ε})`, not `Õ(n^{1+δ})` (`ε = 1/h`), but the corrected size equals the message bound the paper already
+uses, so the abstract's spanner (constant stretch, `O(n^{1+ε})` edges and messages, `O(1)` rounds) survives. The stretch
+analysis holds: we prove the deterministic core of Theorem 4.6 (stretch `2·3^k − 1`), Lemmas 4.4 and 4.5, and the
+probabilistic core of Lemma 4.3 for one node, including the adaptive trials. The LOCAL implementation (Section 5) and
+the message-reduction scheme (Theorem 1.3) were not checked.
 
 ## Mistakes in the paper
 
-### ❌ Theorem 1.2 and Lemma 4.7 (spanner size `Õ(n^{1+δ})`)
+### ⚠️ Theorem 1.2 and Lemma 4.7 (spanner size `Õ(n^{1+δ})`)
 `Sampler` as written can put `≈ n^{11/6}` edges into `S` for `k = 1`, `h = 2` on `K_n`, so `|S| = Õ(n^{1+δ})`
 fails with probability `≥ 1/8`, not `n^{−c}`; the true bound is `Õ(n^{1+δ+ε})` (`theorem_1_2_size_false`,
 `first_trial_large`).
 
-**Impact.** Theorem 1.2 holds after this change of the size bound, or after capping `F_v` at the threshold inside
-a trial; the corrected size equals the message bound the paper already uses. The headline claims survive:
-Theorem 1.3 / Lemma 6.1 set `ε = δ` and only need `|S| = Õ(n^{1+2δ})`.
+**Impact.** Theorem 1.2 holds after this change of the size bound, which gives up its separation of size from messages:
+the corrected size equals the message bound the paper already uses. Capping `F_v` at the threshold inside a trial
+would also work, but we did not prove that. The paper does not rely on the separation: the abstract's spanner survives,
+and Theorem 1.3 / Lemma 6.1 set `ε = δ` and only need `|S| = Õ(n^{1+2δ})`.
 
 **Details.** In every trial of `Cluster_j`, every node samples `s_j = c² n^{2^j δ + ε} log³ n` edges and keeps one
 edge per queried neighbour in `F_v`. The test `|F_v| < c n^{2^j δ} log n` (Pseudocode 2, line 4) is made only
@@ -35,12 +35,14 @@ argument, with probability `≥ 1/8` this single trial already puts `≥ n·s/8 
 large `n` this exceeds `C · n^{4/3} · log^D n`, for any `C`, `D`. (`theorem_1_2_size_false`, `first_trial_large`)
 
 **Repair.** The correct bound is `|F_v| < τ_j + s_j` (`Setup.card_F_lt`). Summed over the levels (with Lemma 4.1)
-this gives `|S| = Õ(n^{1+δ+ε})`, the same as the message complexity.
+this gives `|S| = Õ(n^{1+δ+ε})`, the same as the message complexity (`size_exponent`).
 
-### Typos and slips
+### ✏️ Slips
 - `V' = ⋃_{1≤j≤k−1} V'_j` (before Lemma 4.5) should range over `0 ≤ j ≤ k`, as the proof of Theorem 4.6 uses ("any
-  node in `G_k` is unclustered").
+  node in `G_k` is unclustered"). As printed, `{C(v) | v ∈ V'}` is not a partition of `V`.
 - Theorem 1.2 allows `h = 0`, but `ε = 1/h`.
+
+### Typos
 - The prose says a node joins a center in `N̂_j(v)` (an edge of `F_v`); Pseudocode 2, line 19, uses any edge of
   `F = ⋃ F_u`. The stretch proof works with either rule; we formalize the pseudocode.
 - The proof of Lemma 4.5 speaks of a spanning tree of "height" `3^j − 1`; its induction bounds the diameter, which
@@ -48,11 +50,11 @@ this gives `|S| = Õ(n^{1+δ+ε})`, the same as the message complexity.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 4.3 (volume classes miss volume 1)
+### 🔧 Lemma 4.3 (volume classes miss volume 1)
 Class `x` is defined by `|E_j(v,u)| ∈ (n^{xε}, n^{(x+1)ε}]`, which excludes neighbours with a single edge, so at
 level 0 (simple `G_0`, where these are *all* neighbours) the maximum class need not carry `m_i/2h` of the volume.
 
-**Impact.** A proof slip; with the classes `[n^{xε}, n^{(x+1)ε})` the proof goes through (`Setup.lemma_4_3_node`).
+**Impact.** Statement true; with the classes `[n^{xε}, n^{(x+1)ε})` the proof goes through (`Setup.lemma_4_3_node`).
 
 **Details.** We also needed the unstated `α ≥ 6` for `⌊(β−1)α/β⌋ ≥ α/3`; it holds for the paper's `α`. Lemma 4.3 is
 proved for one node, with the `2h` adaptive trials and the union bound made explicit (`Setup.lemma_4_3_node`). The

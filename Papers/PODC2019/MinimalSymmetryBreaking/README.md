@@ -4,25 +4,22 @@ Alkida Balliu, Juho Hirvonen, Dennis Olivetti, Jukka Suomela. *Hardness of minim
 computing.* PODC 2019. DOI [10.1145/3293611.3331605](https://doi.org/10.1145/3293611.3331605). Formalized version:
 arXiv 1811.01643v3 (full version with Sections 5–8).
 
-**Verdict: 🛠️ Proof repaired.** Every checked statement holds. These are Lemma 2, the speedup Lemmas 7/8/14/15,
-Claim 16, the Ω(log\* n) lower bound for weak 2-colouring (Theorems 6/13), and Θ(log n) for the pointer problem P\*
-(Theorem 4, with Lemmas 3, 17, 18). Three proofs needed genuine repairs:
-- The algorithm in the proof of Lemma 3 is wrong; we replaced it with a different, correct one.
-- The independence argument of Claim 10 is wrong as written.
-- The threshold in the speedup lemmas is chosen circularly.
+**Verdict: 🛠️ Hard fix.** Every checked statement holds: Lemma 2, the speedup Lemmas 7/8/14/15, Claim 16, the
+Ω(log\* n) lower bound for weak 2-colouring (Theorems 6/13), and Θ(log n) for the pointer problem P\* (Theorem 4, with
+Lemmas 3, 17, 18). The lower bound needed only local repairs to its proofs, but the algorithm in the proof of Lemma 3,
+which the classification of Theorem 5 relies on, is wrong, and we replaced it with a different, correct one. The
+classification itself (Theorem 5) and the minimality argument of Section 8.3 were not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
 - In Claim 11 the recurrence for p̂ is written with ĉ_t; it should be ĉ_{t−1}.
-- In the proof of Lemma 2, "u must be *the* closest node of different colour to w" is imprecise under ties. Only the
-  distance matters.
-- Lemma 3's tie-break "cycle with the smallest maximum identifier" is ambiguous, because two cycles may share their
-  maximum-ID node.
 - Section 3.2 defines the distance to a cycle C using ℓ(C) ≈ |C|/2. Section 8.1 uses "the length of the cycle"
   instead.
+
+### Typos
+- In the proof of Lemma 2, "u must be *the* closest node of different colour to w" is imprecise under ties. Only the
+  distance matters.
 
 ## Proof gaps (statements true)
 
@@ -57,27 +54,40 @@ backtrack. It never checks d(v) = d(p(v)) when p(v) chose a *low-degree* irregul
 
 (`lemma3_repaired`, `lemma17`, `theorem4`; analysis scripts in the work notes.)
 
-### 🛠️ Claim 10 (proof of Lemma 9, independence)
+### 🔧 Claim 10 (proof of Lemma 9, independence)
 The proof treats failure events of nodes at pairwise distance ≥ 2t+1 as independent, but a node's failure depends on
 its (t+1)-ball, and two such balls intersect when the distance is 2t+1 or 2t+2.
 
 **Impact.** Lemma 9 and Claim 10 are not refuted, and Theorem 13 is unaffected; the exact bound n^{1/(3(2t+1))} of
 Claim 10/Lemma 9 is not re-derived (`succProb_le`, `theorem_6`).
 
-**Details.** The step Pr[X | Y] ≤ Pr[X' | Y'] also mixes conditionings on different events.
+**Repair.** We use disjoint (t+1)-balls (distance ≥ 2t+3), which changes the counting. (`succProb_le`, `theorem_6`.)
 
-**Repair.** We use disjoint (t+1)-balls (distance ≥ 2t+3), which changes the counting. We bypass the conditioning
-step: we choose identifiers that are injective on the central ball by averaging, and extend them to a bijection.
-(`succProb_le`, `theorem_6`.)
+### 🔧 Claim 10 (proof, step Pr[X | Y] ≤ Pr[X' | Y'])
+The step Pr[X | Y] ≤ Pr[X' | Y'] mixes conditionings on different events, and X' (all nodes of B_k(v) succeed) is not
+determined by the identifiers in B_k(v), since nodes near the boundary see outside the ball.
 
-### 🛠️ Lemmas 7/8/14/15 (circular choice of the threshold)
+**Impact.** The local-to-global bound survives once this step is replaced (`succProb_le`).
+
+**Repair.** We bypass the conditioning step: we choose identifiers that are injective on the central ball by
+averaging, and extend them to a bijection. (`succProb_le`, `theorem_6`.)
+
+### 🔧 Lemmas 7/8/14/15 (circular choice of the threshold)
 The proofs set f = p'/(5c), where p' is the failure probability of the algorithm built *with threshold f*.
 
-**Impact.** Statements true; repaired (`lemma_14`, `lemma_15`).
+**Impact.** The lemmas hold as stated, and the inequality the paper derives is unchanged (`lemma_14`, `lemma_15`).
 
 **Repair.** We set f from the target bound instead and argue by contradiction. This needs p > 0, which holds on the
 infinite tree because of the 0-round bound (`lemma_14`, `lemma_15`, `NodeAlg.failProb_pos`). The lower-bound form
 used by Claim 11 needs no fixed point (`nodeLB_succ_of_edgeLB`, `edgeLB_of_nodeLB`).
+
+### 🔧 Lemma 3 (tie-break between cycles)
+The tie-break "cycle with the smallest maximum identifier" is ambiguous, because two cycles may share their maximum-ID
+node.
+
+**Impact.** Nodes need not agree on the chosen cycle; the repaired algorithm of Lemma 3 does not use this rule.
+
+**Repair.** Any fixed total order on candidate cycles works (`lemma3_repaired`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

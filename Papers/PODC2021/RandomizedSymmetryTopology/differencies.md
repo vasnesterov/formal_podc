@@ -28,8 +28,8 @@ version arXiv:2105.11713v1.
    after `k` rounds of a realization separating the sources, the knowledge partition stabilizes within `n` rounds
    (`exists_stable`). In a stable partition, `c ↦ π_c(p)` maps a class injectively into another class
    (`card_class_le`), so all classes have the same size `m`, and `m` divides every `nⱼ`. The "only if" direction
-   in the standard model is `corollary_4_4_standard`. Since the theorem holds in the model the paper describes
-   and uses in its proof, we count this as a modelling error in Eq. (2), not as a false theorem.
+   in the standard model is `corollary_4_4_standard`. The theorem holds in the model the paper describes and
+   uses in its proof; the error is in Eq. (2) (🔧).
 2. **Lemma 3.2, proof.** `E = ⋃ₛ E_{st}` is called a tail event; it is not (it contains `E₀`). The conclusion
    holds anyway because the disjoint windows are independent, so `Pr[no E_{st}, s < m] = (1-p)^m → 0`; we
    formalize this counting argument (`IsGoodEvent.one_sub_pow_le_probEvent`) and no zero–one law is needed. The

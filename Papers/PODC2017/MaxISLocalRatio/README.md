@@ -6,58 +6,45 @@ of Maximum Independent Set and Maximum Matching.* PODC 2017. DOI
 [1708.00276](https://arxiv.org/abs/1708.00276) v1; numbering follows it. Scope: Section 2 (deterministic
 parts). Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The local-ratio theorem (Thm 2.1), Lemma 2.2, the `Δ`-approximation of
+**Verdict: ✏️ Slip.** The local-ratio theorem (Thm 2.1), Lemma 2.2, the `Δ`-approximation of
 the sequential meta-algorithm (Algorithm 1) for *every* choice of independent sets, the colouring-based
 Algorithm 3 (a `Δ`-approximation in `O(Δ)` rounds after a `(Δ+1)`-colouring), the layer argument of
 Lemma A.1, and the 2-approximation for maximum-weight matching via the line graph (Thm 2.10,
-deterministic half) all hold. They need closed neighbourhoods and `Δ ≥ 1`. Line 11 of Algorithm 1, read
-literally, breaks the approximation; the text of Section 2.1 has the correct rule.
+deterministic half) all hold. They need closed neighbourhoods and `Δ ≥ 1`, and line 11 of Algorithm 1, read
+literally, breaks the approximation, while the text of Section 2.1 has the correct rule. Only this deterministic
+core of Section 2 was checked: the randomized results, the CONGEST simulation on the line graph and the
+`O(log Δ/log log Δ)` matching algorithms of Section 3 were not.
 
 ## Mistakes in the paper
 
-### ⚠️ Algorithm 1, line 11 (weight reduction overwrites)
-Read literally, line 11 sets `w₁(v) = w(v) − w(u)` inside `foreach u ∈ U, foreach v ∈ N(u)`, so a vertex keeps only
-the reduction of the last `u` and Algorithm 1 is not a `Δ`-approximation (`LiteralLine11.literal_line_11_fails`).
+### ✏️ Slips
+- **Algorithm 1, line 11 (weight reduction overwrites).** Read literally, line 11 sets `w₁(v) = w(v) − w(u)` inside
+  `foreach u ∈ U, foreach v ∈ N(u)`, so a vertex keeps only the reduction of the last `u` and Algorithm 1 is not a
+  `Δ`-approximation (`LiteralLine11.literal_line_11_fails`). The text before Lemma 2.2 defines the sum
+  `w₂[v] = ∑_{u∈U∩N(v)} w[u]`, and with `w₁(v) = w₁(v) − w(u)` everything is correct. Counterexample (`Δ = 2`):
+  edges `a₁v, a₂v, a₁b`, weights `w(a₁)=3, w(a₂)=1, w(v)=2, w(b)=3`, `U = {a₁, a₂}` processed in this order (loop
+  over the closed neighbourhoods `N[u]`, see the next item). Then `v` keeps weight `1` (`a₁, a₂, b` drop to `0`), the
+  recursion can only return `{v}`, and line 13 adds nothing. The output `{v}` has weight 2 while `{v, b}` has weight
+  5 > 2·2.
+- **Section 2.1, Lemma 2.2, Algorithm 1 (`N(v)` must be closed).** The proof of Lemma 2.2 uses `w₂[u] = w[u]` for
+  `u ∈ U` and "at most `|N(u)| − 1` vertices of `N(u)` are independent". Both hold only for `N[u] = N(u) ∪ {u}`.
+  Algorithms 2 and 3 already use closed neighbourhoods (`w(v) = 0` after reducing).
+- **Lemma 2.2, Algorithms 1 and 3 (`Δ ≥ 1`).** The correct bound on `|I ∩ N[u]|` for an independent `I` is
+  `max(1, deg u)`, not `deg u`, so the `Δ`-approximation needs `Δ ≥ 1`; an edgeless graph (`Δ = 0`) is the
+  counterexample. We prove Lemma 2.2 for closed neighbourhoods and every factor `r` that bounds `|I ∩ N[u]|`. This
+  gives `r = Δ` for `Δ ≥ 1` and `r = 2` on line graphs (`lemma_2_2`, `card_inter_cl_le`, `localBound_of_degree_le`).
+- **Algorithm 1, line 7.** Algorithm 1 terminates only if `U ≠ ∅` while vertices remain; our choice rules require
+  `U ≠ ∅` (`algorithm_1`).
+- **Algorithm 3, lines 8, 13, 16.** An earlier candidate waits forever unless `removed`/`addedToIS` go to *all*
+  neighbours in `G`: if the messages go only to the current `N(v)`, it never learns the decision of a later candidate
+  neighbour. Our model sends to all `G`-neighbours, and with this reading the algorithm is correct (`algorithm_3`).
+- **Section 2.2, Theorem 2.3, Lemma A.1.** There are `⌈log₂ W⌉ + 1` weight layers, not `log W`.
 
-**Impact.** A pseudocode slip with evident intent: the text before Lemma 2.2 defines the sum
-`w₂[v] = ∑_{u∈U∩N(v)} w[u]`, and with `w₁(v) = w₁(v) − w(u)` everything is correct.
-
-**Details.** Counterexample (`Δ = 2`): edges `a₁v, a₂v, a₁b`, weights `w(a₁)=3, w(a₂)=1, w(v)=2, w(b)=3`,
-`U = {a₁, a₂}` processed in this order (loop over the closed neighbourhoods `N[u]`, see the next item). Then `v`
-keeps weight `1` (`a₁, a₂, b` drop to `0`), the recursion can only return `{v}`, and line 13 adds nothing. The
-output `{v}` has weight 2 while `{v, b}` has weight 5 > 2·2.
-
-### ⚠️ Section 2.1 and Lemma 2.2 (`N(v)` must be closed; `Δ ≥ 1`)
-The proof of Lemma 2.2 needs the closed neighbourhood `N[u]`, and the `Δ`-approximation fails for an edgeless
-graph (`Δ = 0`).
-
-**Impact.** Implied assumption and degenerate case: Algorithms 2 and 3 already use closed neighbourhoods
-(`w(v) = 0` after reducing). We prove Lemma 2.2 for closed neighbourhoods and `Δ ≥ 1` (`lemma_2_2`).
-
-**Details.** The proof of Lemma 2.2 uses `w₂[u] = w[u]` for `u ∈ U` and "at most `|N(u)| − 1` vertices of `N(u)`
-are independent". Both hold only for `N[u] = N(u) ∪ {u}`. The correct bound on `|I ∩ N[u]|` for an independent `I`
-is `max(1, deg u)`, not `deg u`. So the `Δ`-approximation needs `Δ ≥ 1`; an edgeless graph is the degenerate
-counterexample.
-
-**Repair.** We prove Lemma 2.2 for closed neighbourhoods and every factor `r` that bounds `|I ∩ N[u]|`. This gives
-`r = Δ` for `Δ ≥ 1` and `r = 2` on line graphs. (`lemma_2_2`, `card_inter_cl_le`, `localBound_of_degree_le`)
-
-### ⚠️ Algorithms 1 and 3 (under-specified pseudocode)
-Algorithm 1 terminates only if `U ≠ ∅` while vertices remain, and in Algorithm 3 an earlier candidate waits forever
-unless `removed`/`addedToIS` go to *all* neighbours in `G`, not to the current `N(v)`.
-
-**Impact.** Missing details with evident intent; our choice rules require `U ≠ ∅`, and our model sends to all
-`G`-neighbours. With these readings both algorithms are correct (`algorithm_1`, `algorithm_3`).
-
-**Details.** In Algorithm 3, if the messages go only to the current `N(v)`, an earlier candidate never learns the
-decision of a later candidate neighbour and waits forever.
-
-### Typos and slips
+### Typos
 - In the proof of Lemma 2.2 several indices are swapped (`w₂[u]x*[u]` for `w[u]x*[v]`, `x'[u]` for `x'[v]`,
   `|N(v)|−1` for `|N(u)|−1`).
 - §2.3 says "removal stage" for the addition stage.
 - §2.4 says "weighted nodes" for weighted edges.
-- There are `⌈log₂ W⌉ + 1` weight layers, not `log W`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -98,7 +85,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Not formalized.** The `(Δ+1)`-colouring in `O(Δ + log* n)` rounds [BEK14, Bar15]. Message sizes and
 the CONGEST simulation on the line graph (Defs. 2.4–2.7, Thms. 2.8–2.9). How rounds of `L(G)` are
 simulated in `G`. All randomized results (Thm 2.3's probability, randomized half of Thm 2.10, Section 3,
-Appendix B).
+Appendix B). The addition-stage bound of Algorithm 2.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and
 `Quot.sound`. Non-vacuity (`Main.lean`): every finite graph has a proper colouring with `|V|` colours

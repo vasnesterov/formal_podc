@@ -5,7 +5,7 @@ Message Adversaries*, PODC 2019. **The PODC'19 paper is arXiv:1905.09590 v1** (2
 setting is synchronous, fault-free dynamic networks under an arbitrary message adversary, with
 process-time graphs and the minimum topology. The local `paper.pdf` is v3 (2024), *Topological
 Characterization of Consensus in Distributed Systems*. v3 generalizes v1 to a generic model with
-benign faults. We formalized both. The PODC verdict concerns v1. Errors that appear only in v3 are
+benign faults. We formalized both. The README's labels concern v1. Errors that appear only in v3 are
 listed separately below.
 
 ## v1 (PODC'19): false statements
@@ -47,8 +47,10 @@ B. **Corollary 6.1**: "for a compact message adversary [where consensus is solva
 C. **Corollary 6.5**: "`PS^ε_z = PS_z` for small `ε`". This is false
    (`CanonicalCex.v1_corollary_6_5_false`). For every `ε`, the `ε`-approximation of `(y, σ_∞)`
    contains some `(x, σ_T)` from another component.
-D. **Lemma 6.4 and Theorem 6.6.** Their proofs rely on Corollaries 6.1 and 6.5, so they are
-   invalid. Statement status not determined.
+D. **Lemma 6.4 and Theorem 6.6.** Theorem 6.6 is derived from Theorem 5.11 and Corollary 6.5, both
+   false. The proof of Lemma 6.4 rests on Corollary 6.1 and on the step "setting `ε < d/2`", which
+   gives no bound on the iteratively grown `PS^ε`. So the proofs are invalid. Statement status not
+   determined.
 E. **Corollary 5.15 "⇐"** (zero distance from limits with distance 0). The proof carries over the
    triangle inequality "literally" to `d_min`, which does not satisfy it; v3 drops this direction.
    Not formalized; `ClosureCounterexample.closure_not_setDistZero` illustrates the phenomenon.
@@ -63,7 +65,8 @@ F. **Lemma 4.7** (product topology induced by `d^ω`) holds for reflexive 0/1 di
 G. **Theorem 5.9.** The sets `U(a)` are built by asymmetric forward reachability, so the claimed
    disjointness of `U(a)` and `V(a)` does not follow. It is repaired by equivalence classes. For
    message adversaries, the conclusion "a common broadcaster with constant input on every
-   component" is `DN.dn_corollary_7_7`.
+   component" is `DN.dn_corollary_7_7`, for solvable adversaries; no Lean theorem states Theorem
+   5.9 itself, for an arbitrary connected broadcastable set and a given broadcaster.
 H. **Theorem 5.11 "⇒".** The execution `c` is asserted to lie in the component of `a_{i+1}`
    ("the same sequence of communication graphs ... can be used"), which is unjustified. The
    statement is true for message adversaries (`DN.dn_corollary_7_7`, via `DN.broadcaster_bProc`).

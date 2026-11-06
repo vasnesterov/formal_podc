@@ -1,8 +1,7 @@
 # Differences between the formalization and the paper
 
 Paper: Bonomi, Del Pozzo, Potop-Butucaru, Tixeuil, *Optimal Mobile Byzantine Fault Tolerant Distributed
-Storage*, PODC 2016; full version HAL hal-01348830v2 (Feb 2017). Rules R1–R6 refer to
-`.claude/skills/formalize-paper/verdicts.md`.
+Storage*, PODC 2016; full version HAL hal-01348830v2 (Feb 2017).
 
 ## Model
 
@@ -48,16 +47,15 @@ Storage*, PODC 2016; full version HAL hal-01348830v2 (Feb 2017). Rules R1–R6 r
 - **Lemma 6** (`lemma6`, `lemma6_false`). The paper's equality `MaxB̃(t, t+T) = (⌈T/Δ⌉+1) f` is false
   when it exceeds `n`. Formalized: the upper bound for every schedule, and `MaxB̃ = min(n, (⌈T/Δ⌉+1) f)`
   (as an `IsGreatest`) for `0 < f`. The hypotheses `δ ≤ Δ < 3δ`, `T ≥ δ` are dropped (only `Δ > 0`,
-  `T ≥ 0` are needed). Rule: R4 (the missing `min n` holds at every use, `T ≤ 3δ` with `n ≥ 4f + 1`) → ⚠️.
+  `T ≥ 0` are needed). ✏️: the missing `min n` holds at every use (`T ≤ 3δ` with `n ≥ 4f + 1`).
 - **Lemma 7** (`lemma7`). Stated with the paper's reading of `minC̃oR(t, t+2δ)` (servers never affected
   during `[t, t+δ]`), as: for every schedule and every `t`, `n − |B̃[t, t+δ]| ≥ (k+1) f + 1` and
   `> |B̃[t, t+2δ]|`. True. The paper's formula `n − (⌈2δ/Δ⌉+1) f` in the proof is a typo for `⌈δ/Δ⌉`.
 - **Theorems 8/9** (`theorem9_false_k1`, `theorem9_false_k2`, `theorem9_false`). Refuted for
   `2δ ≤ Δ < 3δ` (`k = 1`) and `δ ≤ Δ < 3δ/2` (`k = 2`). `theorem9_false` instantiates `n = (k+3) f + 1`
   and `#reply_CAM = (k+1) f + 1` (Table 1); `_k1`/`_k2` hold for all `n ≥ 3f` resp. `4f`. Not
-  decided: `3δ/2 ≤ Δ < 2δ` and `Δ ≥ 3δ`. Rule: R5, the named protocol of the headline is false → 🚨. Not
-  excused by R2–R4: `f = 1` and the paper's own `n`, `#reply` are used; the delay assumption is the
-  paper's own system model. *Borderline note*: the refutation depends on faulty servers being allowed to
+  decided: `3δ/2 ≤ Δ < 2δ` and `Δ ≥ 3δ`. ❌: `f = 1` and the paper's own `n`, `#reply` are used; the delay
+  assumption is the paper's own system model. *Note*: the refutation depends on faulty servers being allowed to
   use the full delay `δ`. The paper's correctness section assumes instant delivery "as the worst case",
   but that is a (false) claim about the worst case, not a model assumption (Section 2 allows any delay
   `≤ δ`).
@@ -75,15 +73,15 @@ Storage*, PODC 2016; full version HAL hal-01348830v2 (Feb 2017). Rules R1–R6 r
   Theorem 11 confirms ("even if an older value has `#reply_CUM` occurrences the one with the highest
   sequence number is chosen"). The statement of Theorem 12 itself has `n ≥ 2(k+1) f + 1`, which contradicts
   Table 3 and Theorem 4. Both readings are refuted (the attack needs `4f` resp. `6f` servers). The
-  refutation uses the paper's Lemma 18 window of `2δ` for cured liars. Rule: R5 → 🚨 (the CUM protocol is
-  the paper's second main protocol). **Theorem 13** (tightness of the CUM protocol) falls with it.
+  refutation uses the paper's Lemma 18 window of `2δ` for cured liars. ❌: the CUM protocol is the paper's
+  second main protocol. **Theorem 13** (tightness of the CUM protocol) falls with it.
 - **Theorems 3 and 5** (`theorem3`, `theorem5`). The paper's proofs compare executions with the same
   schedule, which an authenticated reader distinguishes. Re-proved in the Section 4.4 model with
   different schedules, for every read duration `D` and every decision rule. `theorem5` assumes only
   `Δ ≥ 2δ` (no upper bound `3δ`); the proof works for `Δ > δ/2`. The general statement "no protocol
   `P_reg`" (arbitrary server behaviour, e.g. replying again after a cure) is not established by the paper
-  and not by us. Rule: proof broken, statement in the restricted model repaired, general statement
-  unestablished → ⚠️ item (worse items decide the verdict anyway).
+  and not by us. ⚠️: proof broken, statement in the restricted model repaired, general statement
+  unestablished.
 - **Theorems 4 and 6** (CUM lower bounds): not formalized. Their executions have the same defect
   (e.g. Theorem 4, `s₁` replies `0` in `E₁` and `1` in `E₀`). In Theorem 6 the multisets of `E₁‴` and
   `E₀‴` are printed identically.

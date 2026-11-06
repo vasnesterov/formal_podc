@@ -1,13 +1,12 @@
 # Differences between the formalization and the paper
 
 Paper: Gay, Mostéfaoui, Perrin, *No Broadcast Abstraction Characterizes k-Set-Agreement in Message-Passing
-Systems*, PODC 2024 brief announcement; extended version HAL hal-04571653v1 (numbering used here). Verdict rules:
-`.claude/skills/formalize-paper/verdicts.md`.
+Systems*, PODC 2024 brief announcement; extended version HAL hal-04571653v1 (numbering used here).
 
 ## Statement-level issues
 
-1. **Lemma 9 is false** (`lemma9_false`). Rule R1: a numbered lemma, false → ❌. Not a headline result (R5:
-   the title and abstract claim Theorem 1, which is true), so the verdict is ❌, not 🚨.
+1. **Lemma 9 is false** (`lemma9_false`, 🛠️). It is not the main result: the title and abstract claim Theorem 1,
+   which is true.
    - The counterexample satisfies all of the paper's hypotheses. The abstraction `chainedBO k` is a set of
      executions satisfying the four BC properties (plus unique messages and well-formed invocations), defined
      "by a predicate on the relative order of emission and delivery events", which is exactly the class the
@@ -18,16 +17,16 @@ Systems*, PODC 2024 brief announcement; extended version HAL hal-04571653v1 (num
    - The algorithm `algQ` is deterministic, well-formed (`algQ_wellFormed`), uses no point-to-point channel
      and proposes from `ℕ`. The counterexample works for every `k`, in particular `k > 1`, with `k + 1`
      processes as in the lemma.
-   - Not excused by R2–R4: no degenerate case, and no implicit assumption of the paper rules it out. Definition 5
+   - There is no degenerate case, and no implicit assumption of the paper rules it out. Definition 5
      explicitly constrains only deliveries. The ordering predicate of `chainedBO` ("the sender had delivered one of
      its own messages before broadcasting") is of the same kind as causal broadcast's, which the paper lists among
      its examples; the abstraction never constrains invocations (it contains every total-order execution).
-   - Borderline call (recorded per R6): Lemma 9 might be rescued by strengthening Definition 5 to require that
+   - Lemma 9 might be rescued by strengthening Definition 5 to require that
      each `pᵢ`'s selected messages are `sync-broadcast` one after another (the shape Lemma 10's β has; `chainedBO`
-     admits no such execution for `N ≥ 2`) and by making A' use `sync-broadcast`. This is not an R3 fix: it changes
+     admits no such execution for `N ≥ 2`) and by making A' use `sync-broadcast`. This is not a local fix: it changes
      a definition, needs a proof step the paper does not have, and the "δ is finite" gap (item 3) remains.
 2. **Theorem 1 is true; its proof is repaired** (🛠️). The paper derives it from the false Lemma 9. We prove it
-   with a different adversary (README, "Proof gaps"), and in a stronger form: compositionality alone suffices
+   with a different adversary (README, item on Lemma 9), and in a stronger form: compositionality alone suffices
    (`theorem1`); `theorem1_paper` is the paper's form with content-neutrality as an (unused) hypothesis.
 
 ## Proof-level differences
@@ -38,7 +37,7 @@ Systems*, PODC 2024 brief announcement; extended version HAL hal-04571653v1 (num
      deciding; the paper does not address this.
    - The claim that A can be replaced by a broadcast-only A' ("send and receive can be trivially emulated using
      B") is unjustified: SR-Termination holds for crashed senders, BC-Global-CS-Termination does not. A claim
-     inside a proof (R1); our model restricts A to broadcast-only algorithms anyway (item 8).
+     inside a proof (⚠️); our model restricts A to broadcast-only algorithms anyway (item 8).
 4. **Our adversary differs from Algorithm 1.**
    - The upper layer runs copies of A, not `sync-broadcast(synch)`. The phase of `pᵢ` ends when its current
      copy decides, not after `N` local deliveries.

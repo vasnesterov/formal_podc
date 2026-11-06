@@ -2,7 +2,7 @@
 
 Paper: Bareilles, Bouaziz, Fageot, El Mhamdi, *Byzantine Machine Learning: MultiKrum and an Optimal
 Notion of Robustness*, PODC 2026 (brief announcement); formalized from the full version
-arXiv:2602.03899v1. Verdict rules: `.claude/skills/formalize-paper/verdicts.md` (R1–R6).
+arXiv:2602.03899v1.
 
 ## Statement-level issues in the paper
 
@@ -10,21 +10,21 @@ arXiv:2602.03899v1. Verdict rules: `.claude/skills/formalize-paper/verdicts.md` 
    ("has the following upper-bound"), the proof concludes `κ⋆_m ≤ min(κ₁, κ₂(m))`, and the paper
    uses it as an upper bound everywhere, but the display reads `κ⋆_m ≥ (n-f)/(n-2f) min(...)`.
    Read literally it is false: `theorem_1_as_written_false` (for `f = 0`, `m = n`, MultiKrum is the
-   mean, `κ⋆ ≤ 0 < 1 =` right-hand side). Typo with evident intent (R3) → ⚠️. We prove the
+   mean, `κ⋆ ≤ 0 < 1 =` right-hand side). Typo with evident intent → ✏️. We prove the
    intended `≤` (`theorem_1`).
 2. **`n = 1` (degenerate).** With the paper's own convention `0/0 = -∞`, for `n = 1` (`f = 0`) Krum
    (= the only MultiKrum rule, `F(x) = x₁`) has `κ⋆ = -∞`: the only reference set is `{1}`, with
    variance 0 and zero bias. Hence Proposition 1 (this `F` is robust but `κ⋆ ≥ f/(n-2f) = 0`
    fails), Theorem 3 for odd `n` (`κ⋆₁ ≥ (n-1)/(n-2f+1) = 0`) and Theorem 4 (`n > 3f`,
    `κ⋆_{n-f} ≥ 0`) all fail at `n = 1` (`kappaStar_eq_bot_of_n_eq_one`,
-   `exists_isMultiKrum_kappaStar_eq_bot`). Degenerate case (R2) → ⚠️. We assume `n ≥ 2` and a
+   `exists_isMultiKrum_kappaStar_eq_bot`). Degenerate case → ✏️. We assume `n ≥ 2` and a
    nontrivial vector space (`d ≥ 1`; for `d = 0` every ratio is `0/0` as well).
 3. **Theorem 3 has no explicit hypotheses.** We assume Definition 2's standing `f ≤ n/2` (for
    `n = 2f`, `f ≥ 1`, the bound holds trivially because `κ⋆ = +∞`,
    `kappaStar_eq_top_of_n_eq_two_mul`; the paper's construction itself needs `n - 2f > 0`) and
    `n ≥ 2` (even case) / `n ≥ 3` (odd case). For `n = 2` the paper's
    construction (`n/2 - 1 = 0` copies of `e`) has zero variance; the bound is `0` there and we prove
-   it with another instance (`zero_le_kappaStar`). (R4, R2.)
+   it with another instance (`zero_le_kappaStar`). → ✏️
 4. **Proposition B.1 needs `f ≥ 1`**: for `f = 0` its formula divides by `f = 0` (and the
    configuration has zero variance). We state B.1 for `f ≥ 1`; Theorem 4 is proved for all `f`
    (`f = 0` gives the bound `0`, true for `n ≥ 2`).
@@ -38,13 +38,13 @@ arXiv:2602.03899v1. Verdict rules: `.claude/skills/formalize-paper/verdicts.md` 
    `R'(n,f,m) = (n-f)²/(f(n-2f)) (f/(n-f) + (m-a)/m)²` (as `a ≤ m`), so the *statement* of B.1 is
    true. Consequence: B.1 as stated does not recover Theorem 4 at `m = n - f` (it gives
    `f(2n-3f)²/((n-2f)(n-f)²) < 4f/(n-2f)`), contrary to "closed-form lower bounds for all `m`".
-   We prove the corrected bound `R'` and derive both B.1 and Theorem 4 from it. → 🛠️
+   We prove the corrected bound `R'` and derive both B.1 and Theorem 4 from it. → 🔧
 6. **Theorem 2, upper bound in the proof.** The proof derives
    `m† ≤ (A² + √(A⁴ + 2Cf²))/C` and claims "both bounds reduce to `n/C (1+o(1))`". The upper bound
    reduces to `2n/C (1+o(1))` (at `f = 0` it is exactly `2n/C = 2 m†`:
    `paper_upper_bound_at_f_zero`, `paper_upper_not_asymp`), so the proof does not establish the
    asymptotics. Theorem 2 is true: `m† C / n = g(f/n)` exactly for an explicit continuous `g` with
-   `g(0) = 1` (`mDagger_mul_div`, `theorem_2`). → 🛠️
+   `g(0) = 1` (`mDagger_mul_div`, `theorem_2`). → 🔧
 7. **Theorem 6, optimisation over `α₁`, `α₂`.** The minimisers `α₁ = √(B/A)`, `α₂ = √(u/(2m))` need
    `A, B, u > 0`. We avoid `α₁` altogether (triangle inequality for the norm gives
    `‖a + b‖² ≤ (√A + √B)²` directly) and treat `u = 0` separately. Routine.

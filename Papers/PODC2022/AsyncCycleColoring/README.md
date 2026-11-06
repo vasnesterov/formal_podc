@@ -6,19 +6,19 @@ Formalized version: arXiv [2207.11198](https://arxiv.org/abs/2207.11198) v1 (the
 version of the brief announcement). Numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** The headline result is false. The paper claims a wait-free 5-colouring
-of every asynchronous cycle `C_n` in `O(log* n)` rounds (Algorithm 3, Theorem 4.4). Neither 5-colouring
-algorithm is wait-free. Algorithm 2 (Theorem 3.11) and Algorithm 3 (Theorem 4.4) have executions on
-every cycle `C_n`, `n ≥ 3`, in which two processes take rounds forever without returning. The 6-colour
-Algorithm 1 is correct: we prove Theorem 3.1, with a better bound. The Cole–Vishkin lemmas 4.1–4.3 and the
-safety Lemma 4.5 (the evolving identifiers of Algorithm 3 stay a proper colouring) also hold.
+**Verdict: ❌ Intent lost.** The paper claims a wait-free 5-colouring of every asynchronous cycle `C_n` in
+`O(log* n)` rounds (Algorithm 3, Theorem 4.4), but neither 5-colouring algorithm is wait-free: Algorithm 2
+(Theorem 3.11) and Algorithm 3 (Theorem 4.4) have executions on every cycle `C_n`, `n ≥ 3`, in which two processes
+take rounds forever without returning, and we proved no replacement. The 6-colour Algorithm 1 is correct: we prove
+Theorem 3.1, with a better bound. The Cole–Vishkin lemmas 4.1–4.3 and the safety Lemma 4.5 (the evolving
+identifiers of Algorithm 3 stay a proper colouring) also hold.
 
 ## Mistakes in the paper
 
-### 🚨 Theorems 3.11 and 4.4 (Algorithms 2 and 3 are not wait-free)
-On `C_3` with identifiers `0, 1, 2`, if all three processes take a round at time 1, process 1 then stops, and processes 0 and 2 keep taking rounds simultaneously, then neither of them ever returns, under both Algorithm 2 and Algorithm 3 (`theorem_3_11_false`, `theorem_4_4_false`).
+### ❌ Theorems 3.11 and 4.4, Lemma 3.13 (Algorithms 2 and 3 are not wait-free)
+On `C_3` with identifiers `0, 1, 2`, if all three processes take a round at time 1, process 1 then stops, and processes 0 and 2 keep taking rounds simultaneously, then neither of them ever returns, under both Algorithm 2 and Algorithm 3 (`theorem_3_11_false`, `theorem_4_4_false`), which also refutes Lemma 3.13 (`lemma_3_13_false`).
 
-**Impact.** Sinks the headline: the wait-free 5-colouring in `O(log* n)` rounds is not established, and no
+**Impact.** The wait-free 5-colouring in `O(log* n)` rounds is not established, and no
 bound on the number of rounds exists for either algorithm. The correctness and palette parts of both theorems
 do hold. Whether some wait-free 5-colouring of `C_n` exists is not settled here: we refute the algorithms, not
 the possibility.
@@ -35,46 +35,29 @@ each of them always finds both of its colours in the conflict set `C`.
 - The same pattern works on every `C_n`, `n ≥ 3`, with identifiers `0, …, n-1`. Processes `0` and `n-1` play
   the roles of 0 and 2. Their other neighbours `1` and `n-2` stop after their first round
   (`theorem_3_11_false_all`, `theorem_4_4_false_all`).
+- Lemma 3.13 (non-minima return), on which the termination proofs of Theorems 3.11 and 4.4 rest, fails in the same
+  run: process 2 is not a local minimum and its set `A_2` stays empty, yet it never returns. The lemma's proof
+  claims that the neighbours' `a`-values are positive "by time `t_4`", which ignores registers that are frozen at
+  the initial value `0`.
 - Two remarks from bounded model checking. If at most one process is activated per time step (no
   simultaneous rounds), Algorithm 2 terminates on all `C_n` with `n ≤ 5`. Leaving the initial colours
   unwritten (`⊥`) does not repair it.
 
-### ❌ Lemma 3.13 (non-minima return)
-Lemma 3.13 is refuted by the same run: process 2 is not a local minimum and its set `A_2` stays empty, yet it never returns (`lemma_3_13_false`).
+### ✏️ Slips
+- Lemma 3.3 is false as written with the open interval `(t₁, t₂)`: a neighbour that takes a round exactly at `t₂`
+  can still conflict with `p`, and random simulation finds such runs on `C_4`. It holds for the half-open interval
+  `(t₁, t₂]`, which is the form we prove and use (`fresh_of_conflict`); it is used only inside the proof of
+  Theorem 3.1.
+- Theorem 4.4 assumes only a proper colouring `X`, but its `O(log* n)` bound needs identifiers in `[0, poly(n)]`,
+  as Section 2.1 assumes for identifiers.
 
-**Impact.** A false lemma on which the termination proofs of Theorems 3.11 and 4.4 rest.
-
-**Details.** The proof's claim that the neighbours' `a`-values are positive "by time `t_4`" ignores registers
-that are frozen at the initial value `0`.
-
-### ⚠️ Lemma 3.3 (open interval)
-Lemma 3.3 is false as written with the open interval `(t₁, t₂)`: a neighbour that takes a round exactly at `t₂` can still conflict with `p`, and random simulation finds such runs on `C_4`.
-
-**Impact.** Local fix: the lemma holds for the half-open interval `(t₁, t₂]`, which is the form we prove and
-use (`fresh_of_conflict`); it is used only inside the proof of Theorem 3.1.
-
-### Typos and slips
+### Typos
+- The proof of Theorem 3.1 says "`min{ℓ, ℓ'}` is bounded by `⌊3n/2⌋`", which is true but not what is needed: the
+  bound used is `n/2`. The final bound holds.
 - In the proof of Lemma 3.5, `Y` and `τ` should be `x` and `t'`.
 - The proof of Lemma 4.10 uses an undefined `R`.
 
 ## Proof gaps (statements true)
-
-### 🛠️ Theorem 3.1 (Algorithm 1 terminates)
-The proof leans on loose lemmas (Lemma 3.3 as written, the parity bookkeeping of Lemmas 3.4–3.8), so we give a new, sharper proof with bound `max(4, n)` activations, where the paper has `⌊3n/2⌋ + 4`.
-
-**Impact.** Statement true; proved with a sharper bound (`theorem_3_1`, `alg1_workActs_le`).
-
-**Repair.**
-- Local extrema return within 4 activations, as the paper claims. Our argument: after the first round of a
-  local maximum `p`, each smaller neighbour can cause at most one more failure of `p`
-  (`workActs_le_four_of_max`).
-- A non-extremal process returns within `ℓ + ℓ' + 1` activations (Lemma 3.9, third term), where `ℓ`, `ℓ'`
-  are the monotone distances to the closest local maximum and minimum. Our argument: every failed round
-  changes the colour (Lemma 3.2), `a_p` changes at most `ℓ` times, and `b_p` at most `ℓ'` times
-  (`lemma_3_9`).
-- The parity bookkeeping with the sets `A_p`, `B_p` (Lemmas 3.5–3.8) is not needed.
-- The terms `3ℓ + 4`, `3ℓ' + 4` of Lemma 3.9 (via Lemma 3.4 for non-extremal processes) are not formalized.
-  Exhaustive model checking for `n ≤ 6` found no violation.
 
 ### 🛠️ Lemma 4.5 (Algorithm 3 keeps identifiers proper)
 The proof's induction claim `X_p ∉ {X_q, X̂_q}` is not inductive on its own.
@@ -150,7 +133,19 @@ Supporting pieces:
 * Properties 2.1–2.3: MIS impossibility, the `Ω(log* n)` lower bound and the 5-colour lower bound for
   `C_3`. They are reductions to cited results (strong symmetry breaking, Linial, renaming lower bounds).
 * Lemmas 3.4–3.8, 3.14 and 4.6–4.10, which are steps of proofs we replaced or of claims that are false.
-* The `3ℓ + 4` terms of Lemma 3.9.
+* The paper's proof of Theorem 3.1 leans on loose lemmas (Lemma 3.3 as written, the parity bookkeeping of
+  Lemmas 3.4–3.8), which we did not check. We give a new, sharper proof with bound `max(4, n)` activations, where
+  the paper has `⌊3n/2⌋ + 4` (`theorem_3_1`, `alg1_workActs_le`):
+  - Local extrema return within 4 activations, as the paper claims. Our argument: after the first round of a
+    local maximum `p`, each smaller neighbour can cause at most one more failure of `p`
+    (`workActs_le_four_of_max`).
+  - A non-extremal process returns within `ℓ + ℓ' + 1` activations (Lemma 3.9, third term), where `ℓ`, `ℓ'`
+    are the monotone distances to the closest local maximum and minimum. Our argument: every failed round
+    changes the colour (Lemma 3.2), `a_p` changes at most `ℓ` times, and `b_p` at most `ℓ'` times
+    (`lemma_3_9`).
+  - The parity bookkeeping with the sets `A_p`, `B_p` (Lemmas 3.5–3.8) is not needed.
+* The terms `3ℓ + 4`, `3ℓ' + 4` of Lemma 3.9 (via Lemma 3.4 for non-extremal processes). Exhaustive model checking
+  for `n ≤ 6` found no violation.
 * Appendix A (`O(Δ²)` colours on general graphs).
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and

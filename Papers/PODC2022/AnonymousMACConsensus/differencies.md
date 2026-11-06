@@ -11,7 +11,7 @@ Layer*, PODC 2022 (3-page BA; numbering as there).
    `View.merge` keeps the entry with the larger index. This makes the merge computable by a node. With values
    alone it is not: a node that holds `j`'s newer value and then receives a stale view cannot tell which entry is
    newer. Client values need not be unique in our model, so the assumption is dropped rather than added. This
-   is an implied assumption (R4): sequence numbers are the paper's own suggested implementation.
+   is an implied assumption (✏️): sequence numbers are the paper's own suggested implementation.
 2. **Operation identities in the history.** Events are `inv i n o` and `ret i n r`. Histories are lists, and
    `<_H` is the list order (`Before`, `Precedes`). In regularity, "`Store_j(v)`" is the store operation `(j, m)`
    whose entry is `(m, v)`. The paper's `v' ≠ v` becomes `m' ≠ m`.
@@ -43,13 +43,13 @@ Layer*, PODC 2022 (3-page BA; numbering as there).
    `Preservation.lean`, `Regular.lean`). Gaps in the sketch that we fill:
    - The sketch reasons with "node `i` has not received any message from `j`'s mac-broadcast". It must use
      (iii): a message *delivered* before a collect's invocation has been *processed* before line 4.
-   - Property II: "all the fault-free nodes have received the broadcast message" should be "all nodes not
+   - Property II (✏️): "all the fault-free nodes have received the broadcast message" should be "all nodes not
      crashed yet". The node of the later collect may crash after that collect returns, so it need not be
      fault-free.
    - Property I(ii) ("we can prove by contradiction") needs the merge to be monotone in the sequence number, and
      the stores of `j` to complete in increasing index order.
 
-   These are routine details, not a genuine repair (✅-level for this statement).
+   These are routine details, not a genuine repair.
 10. **Assumption (iii) is necessary** (`theorem_1_needs_priority`). With `prio = false`, the two-node history
     `inv 0 0 (store 7), ret 0 0 ack, inv 1 0 collect, ret 1 0 (view ∅)` is reachable and violates Property
     I(i). The paper does assume (iii), so this is not an error. It documents that the assumption carries the
@@ -70,10 +70,9 @@ Layer*, PODC 2022 (3-page BA; numbering as there).
     stays `invoked collect` forever. Fairness: every broadcast is delivered to all nodes and acknowledged, and
     every handler message is processed. Node `0`'s main-thread step is never enabled, so even strong fairness
     holds.
-13. **Classification (R3/R4, borderline with ❌).** The claim fails because of the literal reading of (iii).
+13. **Classification (✏️).** The claim fails because of the literal reading of (iii).
     The proof of Theorem 1 only needs the messages delivered before the invocation of an operation to be
-    processed before its line 1/4. The paper's own proof gives this repaired assumption ("a local fix of a
-    hypothesis"). Under it the main thread cannot be starved (finitely many messages precede the invocation), and
+    processed before its line 1/4. The paper's own proof gives this repaired assumption. Under it the main thread cannot be starved (finitely many messages precede the invocation), and
     MAC-SC is wait-free given that the MAC layer acknowledges every broadcast of a live node. The usual
     convention that local computation takes no time also excludes the starvation. Not formalized: the regularity
     proof under the repaired rule (it would need `Knows` to record knowledge at invocation time) and the positive

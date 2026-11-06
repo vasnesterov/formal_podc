@@ -5,25 +5,17 @@ DOI [10.1145/3732772.3733559](https://doi.org/10.1145/3732772.3733559). Formaliz
 [2502.12697](https://arxiv.org/abs/2502.12697) v2; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** All main results hold:
-* Theorem 2: for every fixed `p ∈ (0,1)`, BFW elects a unique leader almost surely, and w.h.p.
-  within `O(D² log n)` rounds.
-* Theorem 3: `O(D log n)` rounds for `p = 1/(D+1)`.
-* Section 3: flow conservation, Ohm's law, and "there is always a leader".
-
-Some proofs have gaps that we repaired:
-* Lemma 19's case analysis.
-* The "almost surely" claim.
-* Lemmas 14 and 17 of the anti-concentration argument (we replace that argument by a
-  martingale/Lyapunov proof).
-
-Lemma 19 (used for Theorem 3) is false as stated for small `D` (`K₂`, `P₃`); Theorem 3 still
-holds with a window of `2D+3` rounds. Two lemma statements are imprecise (Lemmas 12 and 14), and Lemma 21 has
-an off-by-one typo.
+**Verdict: 🛠️ Hard fix.** All main results hold: Theorem 2 (for every fixed `p ∈ (0,1)`, BFW elects a unique leader
+almost surely, and w.h.p. within `O(D² log n)` rounds), Theorem 3 (`O(D log n)` rounds for `p = 1/(D+1)`) and Section 3
+(flow conservation, Ohm's law, and "there is always a leader"). The paper's anti-concentration proof of the
+`O(D² log n)` bound fails at Lemmas 14 and 17, and we replace it by a new martingale/Lyapunov proof. Lemma 19 (used for
+Theorem 3) is false as stated for small `D` (`K₂`, `P₃`), Theorem 3 still holds with a window of `2D+3` rounds, the
+"almost surely" claim needed a separate argument, and knowing `D` only up to a constant factor was checked only for
+upper bounds on `D`.
 
 ## Mistakes in the paper
 
-### ❌ Lemma 19 (elimination within `2D+1` rounds, used for Theorem 3)
+### 🔧 Lemma 19 (elimination within `2D+1` rounds, used for Theorem 3)
 Lemma 19, read per configuration in round `t` as its proof does, is false for small `D`: on `K₂` (`D = 1`) with both
 nodes in `B•` in round `t = 1`, neither node loses leadership before round `t + 4 > t + 2D + 1`, whatever the coins
 (`lemma19_fails_K2`, `lemma19_fails_P3`).
@@ -42,31 +34,42 @@ counterexamples hold for every coin field and are proved in Lean. The proof of L
 and use windows of length `2D+3`. Theorem 3 then holds with explicit constants:
 `P(no single leader from round k(2D+3) on) ≤ n²(127/128)^k` (`elim_window`, `theorem3`, `theorem3_whp`).
 
-### ⚠️ Lemma 12 (stated too weakly for Lemma 19)
-Lemma 12 as stated only gives a beep of `v` in some round `s ≤ t + dis(u,v)`, but Lemma 19 needs it to happen *after*
-round `t`.
+### ✏️ Slips
+- Lemma 12 as stated only gives a beep of `v` in some round `s ≤ t + dis(u,v)`, but Lemma 19 needs it to happen *after*
+  round `t`. Its proof does give `s > t`, and we prove that version (`lemma12`).
+- Lemma 14 is stated for the chain started in `W`, but its proof needs the stationary start. The lemma is applied (in
+  Lemma 15) only to the stationary copy. Not formalized; our proof of Theorem 2 does not use it.
+- Lemma 21 should read `P(Σ_{i≤n} W_i ≥ k) = P(Bin(k−1,p) ≤ n−1)`, not `P(Bin(k,p) ≤ n)`: for `n = 1`, `k = 2`,
+  `p = 1/2` the two sides are `1/2` and `3/4`. The form used in Lemma 14 is correct. Not formalized.
 
-**Impact.** Imprecise statement with evident intent: its proof does give `s > t`, and we prove that version
-(`lemma12`).
-
-### ⚠️ Lemma 14 (stated for the wrong chain)
-Lemma 14 is stated for the chain started in `W`, but its proof needs the stationary start.
-
-**Impact.** Imprecise statement: the lemma is applied (in Lemma 15) only to the stationary copy. Not formalized; our
-proof of Theorem 2 does not use it.
-
-### ⚠️ Lemma 21 (off by one)
-Lemma 21 should read `P(Σ_{i≤n} W_i ≥ k) = P(Bin(k−1,p) ≤ n−1)`, not `P(Bin(k,p) ≤ n)`: for `n = 1`, `k = 2`,
-`p = 1/2` the two sides are `1/2` and `3/4`.
-
-**Impact.** Typo: the form used in Lemma 14 is correct. Not formalized.
-
-### Typos and slips
+### Typos
+- Proof of Lemma 19, case `N_t(u) = N_t(v)`: "`N_s^beep(u) ≥ 1`" should read `N_s(u) > N_s(v)`.
+- Proof of Lemma 17, last bound: the display ends with `≤ 1/n²`, while the lemma states `n^{−4}`, which is what the
+  chosen `A` gives and what the union bound in Theorem 2 uses.
 - The Discussion (§5) cites "Theorem 1", which does not exist; Theorem 2 is meant.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 2 ("almost surely")
+### 🛠️ Lemma 14 (proof of the anti-concentration bound)
+The proof of Lemma 14 claims `P(Z ≥ EZ + k(2p+1)) ≥ 1/2` for a binomial `Z`, which is false.
+
+**Impact.** This is the first step of the chain (Lemmas 14, 15, 17) behind Theorem 2's `O(D² log n)` bound. The
+statements are true. We prove that bound by a different route (see "The formalization") (`theorem2_time`,
+`theorem2_whp`).
+
+**Details.** A binomial's median is within 1 of its mean, so the probability in Lemma 14's proof is `< 1/2` (for
+`p = 1/2`, `k = 1`, `t = 100` it is 0.333). Any smaller constant works instead; this repair is not in Lean.
+
+### 🛠️ Lemma 17 (proof of `P(σ_{u,v} > AD² log n) ≤ n^{−4}`)
+The proof applies Lemma 15, which bounds `P(|Δ| < d)`, where it needs a shifted interval `|Δ + δ| ≤ D`.
+
+**Impact.** The gap is fixable and the statement is true, but that repair is not in Lean; the `O(D² log n)` bound is
+saved by the same different route (`theorem2_time`, `theorem2_whp`).
+
+**Details.** The proof also conditions only on `E_{k−1}` instead of the whole past, and it uses Lemma 15's
+"`d` large enough" although `D` may be 1.
+
+### 🔧 Theorem 2 ("almost surely")
 The proof only bounds the probability of two leaders in round `AD² log n` by `n^{−2}`, and that does not give
 probability 1.
 
@@ -74,20 +77,6 @@ probability 1.
 
 **Repair.** Each window of `2D+3` rounds has a good event of positive probability `(1−(1−p)^{D+1})(1−p)^{2D+3}`, and
 that event eliminates one of any two given leaders. (`theorem2_ae`, `theorem2_tail`)
-
-### 🛠️ Theorem 2, `O(D² log n)` bound (anti-concentration chain, Lemmas 14, 15, 17)
-The proof of Lemma 14 claims `P(Z ≥ EZ + k(2p+1)) ≥ 1/2` for a binomial `Z`, which is false, and Lemma 17 applies
-Lemma 15 to the wrong interval.
-
-**Impact.** All of these are fixable proof gaps; the statements are true. We prove the `O(D² log n)` bound by a
-different route (see "The formalization") (`theorem2_time`, `theorem2_whp`).
-
-**Details.**
-* A binomial's median is within 1 of its mean, so the probability in Lemma 14's proof is `< 1/2` (for `p = 1/2`,
-  `k = 1`, `t = 100` it is 0.333). Any smaller constant works instead.
-* Lemma 17 applies Lemma 15, which bounds `P(|Δ| < d)`, where it needs a shifted interval `|Δ + δ| ≤ D`. It
-  conditions only on `E_{k−1}` instead of the whole past. And it uses Lemma 15's "`d` large enough" although `D`
-  may be 1.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -142,7 +131,9 @@ leader from round `⌈6 ln n⌉·T₂` on with probability `≥ 1 − 1/n²`.
 
 **Not formalized.** The anti-concentration machinery: Theorem 13, Theorem 20 (Berry–Esseen for
 mixing sequences) and Lemmas 14, 15, 17, 21. Our Theorem 2 proof does not need it. Also not
-formalized: the Discussion's tightness conjecture.
+formalized: the Discussion's tightness conjecture. The remark after Theorem 3 that the proof "can be easily
+generalized" to a constant-factor approximation of `D` is open: Lean covers upper bounds on `D` only, and
+approximations from below were not examined.
 
 **Trust.** No `sorry`. All theorems in the table use only the axioms `propext`, `Classical.choice`
 and `Quot.sound`.

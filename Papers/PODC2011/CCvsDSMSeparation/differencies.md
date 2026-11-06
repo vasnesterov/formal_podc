@@ -5,22 +5,22 @@ models*, PODC 2011 (arXiv:1109.5153v1).
 
 ## Statement-level issues in the paper
 
-1. **Corollary 6.14 omits "terminating" (false as stated; ⚠️ by R3).** The statement says "for any
+1. **Corollary 6.14 omits "terminating" (✏️, false as stated).** The statement says "for any
    deterministic algorithm". The proof begins "some deterministic terminating algorithm". Without
    termination there is a counterexample. `spinAlg`: `Poll()` reads the caller's own variable
    forever; `Signal()` returns at once. Specification 4.1 constrains only completed polls, so
    `spinAlg` solves the problem, and `rmr τ = 0` for every execution
    (`corollary_6_14_needs_terminating`, `NonTerminating.lean`). It uses only reads, so it is an
-   algorithm "using atomic reads and writes, and either CAS or LL/SC" in the literal sense. R3: the
-   intended statement is recoverable from the proof and the fix is local (one word), hence ⚠️ and
-   not ❌. The same counterexample shows that the `Terminating`/`SoloTerminating` hypothesis of our
+   algorithm "using atomic reads and writes, and either CAS or LL/SC" in the literal sense. The
+   intended statement is recoverable from the proof and the fix is local (one word). The same
+   counterexample shows that the `Terminating`/`SoloTerminating` hypothesis of our
    `theorem_6_2` cannot be dropped.
-2. **Theorem 6.2: "N large enough" and the meaning of "constant" are implicit (R4, not counted as a
+2. **Theorem 6.2: "N large enough" and the meaning of "constant" are implicit (not counted as a
    mistake).** Read literally (algorithm `A` for a fixed `N`, then "for any constant `c`"), the
    theorem is false for fixed `N`. A signaler that writes `true` to every process' own flag makes at
    most `N − 1` RMRs per history, so `c = N` is a counterexample. This example is not formalized.
    The proof explicitly assumes "`N` large enough", and "constant" conventionally means independent
-   of `N`. We formalize `∀ c, ∃ N₀, ∀ N ≥ N₀, ∀ A, …`. The theorem also asks for a constant `k`. In
+   of `N`. We formalize `∀ c, ∃ N₀, ∀ N ≥ N₀, ∀ A, …`. The theorem also asks for a constant `k` (🔧). In
    the branch through Lemma 6.11, the paper's contradiction history has
    `k = c + ⌊N^{1/3^c}/2⌋`, which is not constant. Our version gives `k ≤ c² + c + 1` in all
    branches: in Lemma 6.11 we keep only `c² + 1` unstable processes, and
@@ -28,7 +28,7 @@ models*, PODC 2011 (arXiv:1109.5153v1).
 
 ## Proof gaps (repaired; the statements we need are proved)
 
-3. **Regularity condition 3 (Definition 6.6) is not maintained by the construction of Lemma 6.10.**
+3. **Regularity condition 3 (Definition 6.6) is not maintained by the construction of Lemma 6.10 (🛠️).**
    In the erasing case only conflicts with variables previously written by *active* processes are
    removed. A kept unstable process may write a variable previously written by a *finished* process
    (for example a shared variable written by a rolled-forward process). Then the variable has two
@@ -46,8 +46,8 @@ models*, PODC 2011 (arXiv:1109.5153v1).
    (`SoleW.erase_writer_not_mem`, `SoleW.writer_of_erase`).
    Consequently Lemma 6.10 *as stated* (`S(i)` with regularity in the sense of Definition 6.6) is
    neither proved nor refuted; we prove the variant with `SoleW` (and the constants of item 8).
-   Since Lemma 6.10 is not refuted, this is a proof-level issue (R1), not a false statement.
-4. **Lemma 6.13: termination is applied to unfair histories.** The stable processes "complete any
+   Since Lemma 6.10 is not refuted, this is a proof-level issue, not a false statement.
+4. **Lemma 6.13: termination is applied to unfair histories (🔧).** The stable processes "complete any
    pending call", and `s`'s `Signal()` "must eventually terminate". In the histories considered,
    the other active processes are stopped in mid-call, so the history is not fair and termination
    says nothing. *Repair:* `s` runs `Signal()` solo after *all* stable processes are erased; there
@@ -58,16 +58,16 @@ models*, PODC 2011 (arXiv:1109.5153v1).
    the same run without `s`, which contains no signal. But it began after `s`'s `Signal()`
    completed: contradiction (`final_stable`). The paper's step "first complete the pending polls"
    is not needed.
-5. **Lemma 6.13: one RMR per stable process needs disjointness.** "`s` performs one such RMR for
+5. **Lemma 6.13: one RMR per stable process needs disjointness (🔧).** "`s` performs one such RMR for
    each stable process" requires the sets `D(p) =` "variables in `p`'s module or last written by
    `p`" to be pairwise disjoint over the stable processes and remote for `s`. Disjointness follows
    from regularity conditions 2 and 3; the paper does not say so. We prove it and count with
    `card_le_rmr_of_injOn`.
-6. **Lemma 6.13: choice of `s`.** "Some process `s` whose memory module is not written in `H`" does
+6. **Lemma 6.13: choice of `s` (🔧).** "Some process `s` whose memory module is not written in `H`" does
    not exclude `s ∈ Par(H)`. A finished `s` cannot call `Signal()`, and an active one is not solo.
    We choose `s` outside `Par(H)` and outside the modules written remotely by the stable
    processes. This needs `N > c + 2M + M·c(c+1)` with `M = c(c+1) + 1`.
-7. **Lemma 6.10: roll-forward needs termination in a fair history too.** The rolled-forward
+7. **Lemma 6.10: roll-forward needs termination in a fair history too (🔧).** The rolled-forward
    process `r` completes its `Poll()`. We run it solo in the history where all other active
    processes are erased, so that every other participant has terminated. We erase exactly the
    active processes whose module or last writes `r` accesses, and replay (`roll_forward`). Each

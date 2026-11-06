@@ -5,20 +5,20 @@ Labeling Schemes*, PODC 2026 (arXiv:2605.19078v1). Numbering follows the arXiv v
 
 ## Errors and imprecisions in the paper
 
-1. **Theorem 1.6, ball-size claim: false for `t = 1`** (false only in a degenerate case). The paper
+1. ✏️ **Theorem 1.6, ball-size claim: false for `t = 1`.** The paper
    claims `min_v |B_t(v)| = Ω(|V(G_{t,m})|)` for the whole family `t, m ≥ 1`. For `t = 1` a node of
    an even layer has exactly two neighbours, so `|B_1(v)| = 3` while `|V| = 2m + 3`
    (`Layered.ball_t1_counterexample`, `Layered.ball_inr_one`). For `t ≥ 2` (and `m ≥ 1`) the claim
    holds with constant `1/3` (`Layered.ball_large`). The lower bound part of Theorem 1.6 is
    unaffected (and for `t = 1` the question is moot, since a 1-PLS is a `t`-PLS).
-2. **Lemma 5.6 is false for `n < r / O(1)`** (false only in a degenerate case). It claims, for every
+2. 🔧 **Lemma 5.6 is false for `n < r / O(1)`.** It claims, for every
    `r ≥ 1`, an `O(r)`-PLS sharing any `r`-bit string with `O(1)` bits per node. On a graph with
    `n` nodes the labelings with `c` bits per node can encode fewer than `2^{(c+1)n}` strings, so
    this is impossible when `r > (c+1)n`. The proof uses Lemma B.1, which assumes `|V| > r`. The
    correct cost is `O(1 + r/n)`; we prove cost `2⌈r/n⌉ + 8` with radius `4r + 2`
    (`exists_stringShare`; sharper: radius `2r+1`, cost `2⌈r/n⌉ + 6`). In the application
    (`r ≈ 2 log₂ n`) this is `O(1)`, so Theorem 1.2 is unaffected.
-3. **Lemma 4.5: the stated radius does not match the verifier** (proof gap; statement true). The
+3. 🔧 **Lemma 4.5: the stated radius does not match the verifier** (statement true). The
    proof builds an `r`-PLS with `r = 3t + 2`, but node `v` reconstructs
    `C̃_u(v) = {w ∈ B_r(u) | …}` for nodes `u` at distance up to `r + 2`, which requires seeing
    radius about `2r + 2`. We search clusters within radius `2t` instead of `3t + 2` (enough: a node
@@ -26,23 +26,23 @@ Labeling Schemes*, PODC 2026 (arXiv:2605.19078v1). Numbering follows the arXiv v
    diameter checks), and then radius `3t + 2` does suffice (`exists_tsCert`). We also check only the
    node's own cluster (weak diameter, ratio) and two separation at the node itself; since every
    node checks, this is equivalent.
-4. **Lemma 5.1, last inequality** (proof slip; statement true). From `|Bad_i| ≥ t log n + 1` the
+4. 🔧 **Lemma 5.1, last inequality** (statement true). From `|Bad_i| ≥ t log n + 1` the
    proof derives `|B ∩ L_i| ≥ (1 + 1/t)^{t log n} |B_{2t log n}(v_i) ∩ L_i| > n`, but
    `(1+1/t)^{t log n} ≥ n` only gives `≥ n`. The missing strict factor comes from the first bad
    radius itself (`|B_{r'_1}| > (1+1/t)|B_{r'_1 - 2}|`). Our proof (`card_bad_le`) counts this
    factor. The same strictness issue appears in the warm-up overview ("`(1+1/t)^{Θ(t log n)} > n`");
    the warm-up formalization uses `K = t⌈log₂ n⌉ + 1` steps.
-5. **Corollary 5.4 / Lemma 5.2 assume `n ≥ 2t log n`; Theorem 1.2 does not** (proof gap in a
-   degenerate case). The case `n < 2t log n` is not treated. Our counting proof
+5. 🔧 **Corollary 5.4 / Lemma 5.2 assume `n ≥ 2t log n`; Theorem 1.2 does not** (statement true).
+   The case `n < 2t log n` is not treated. Our counting proof
    (`card_not_allClustered`) covers all `n`: in a connected graph the ball `B_{2K}(u)` has at least
    `min(n, 2K + 1)` nodes (`card_ball_ge`), and both cases give failure probability `≤ 1/(2n)` per
    node.
-6. **Lemma 5.5 (Newman's trick), count of graphs** (imprecision). The union bound uses
+6. ✏️ **Lemma 5.5 (Newman's trick), count of graphs.** The union bound uses
    `|G_n| ≤ 2^{n choose 2}`, but graphs with identifiers from `[poly(n)]` are more numerous (the
    choice of the identifier set adds a factor `poly(n)^n`); the bound `n^{-n²}` still wins. In our
    model the identifier set is the fixed node type, and we use failure probability `≤ 1/2` per graph
    with `n² + 1` samples (`exists_good_family`), which needs only `|G_n| ≤ 2^{n²}`.
-7. **"Cost `O(⌈p/t⌉)`" for `p = 0`** (typo-level). The schemes always use a constant number of bits,
+7. ✏️ **"Cost `O(⌈p/t⌉)`" for `p = 0`.** The schemes always use a constant number of bits,
    so the bound should read `O(⌈p/t⌉ + 1)` (Section 5 itself speaks of "constant additive factors").
    Our Theorem 1.2 has cost `2⌈(2p+1)/t⌉ + 64`.
 8. **Theorem 1.4 / Lemma 4.2 need `2/t ≤ δ`** (implicit). The paper writes `t = Ω(1)`. For smaller `t`

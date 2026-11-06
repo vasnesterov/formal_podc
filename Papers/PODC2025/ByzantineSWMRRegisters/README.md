@@ -5,46 +5,18 @@ processes.* PODC 2025. DOI [10.1145/3732772.3733550](https://doi.org/10.1145/373
 arXiv [2504.09805](https://arxiv.org/abs/2504.09805) v2; numbering follows it. Copy of the paper:
 [paper.pdf](paper.pdf).
 
-**Verdict: 🛠️ Proof repaired.** The optimality result of Section 10 holds. For `3 ≤ n ≤ 3f` there is no correct
-implementation from SWMR registers of the one-shot test-or-set object (Theorem 29). The same holds for verifiable,
-authenticated and sticky registers (Theorem 31). Observation 30 (test-or-set from each of these registers) also
-holds. Lemma 28 has only a proof sketch, and Theorem 31 is derived via an unstated composition property; both
-gaps are closed (Theorem 31 is proved directly). The implementations for `n > 3f` (Theorems 14, 20, 25) are not
-formalized.
+**Verdict: ✅ Correct.** We found no mistake in what we checked, the optimality result of Section 10. For
+`3 ≤ n ≤ 3f` there is no correct implementation from SWMR registers of the one-shot test-or-set object
+(Theorem 29), nor of verifiable, authenticated and sticky registers (Theorem 31), and Observation 30 (test-or-set
+from each of these registers) also holds. The implementations for `n > 3f` (Theorems 14, 20, 25), the other half
+of the paper's main point, are not formalized and were not checked.
 
 ## Mistakes in the paper
 
 No mistakes in the statements.
 
-### Typos and slips
+### Typos
 - Section 6 introduces the authenticated register as "a multivalued SWMR *verifiable* register".
-
-## Proof gaps (statements true)
-
-### 🛠️ Theorem 31 (derivation from Theorem 29 and Observation 30)
-Theorem 31 is derived from Theorem 29 and Observation 30 via an unstated composition property: a
-correct implementation of test-or-set *from a verifiable register*, composed with a correct
-implementation of the verifiable register *from SWMR registers*, gives a correct implementation of
-test-or-set *from SWMR registers*.
-
-**Impact.** Statement true; we avoid the composition and prove Theorem 31 directly for all four
-objects at once (`SigTest.no_byzCorrect`, `theorem31_verifiable`, `theorem31_authenticated`,
-`theorem31_sticky`).
-
-**Details.** The paper does not state the composition property. Its Section 3.2 motivates Byzantine
-linearizability by exactly this use ("as if it were an atomic object"), so the step is a standard
-tacit assumption. For deterministic implementations it is plausible, but it is not trivial:
-Byzantine processes may deviate at both levels.
-
-**Repair.** The proof of Theorem 29 only uses three properties of a positive test: validity,
-unforgeability and relay (Lemma 28). We prove these for every "signature-like" object directly from
-Byzantine linearizability. The impossibility then applies to all four objects at once.
-
-### 🛠️ Lemma 28 (proof sketch only)
-Lemma 28 has only a proof sketch.
-
-**Impact.** The sketch is correct, and we prove the lemma in full (`SigTest.validity`,
-`SigTest.unforgeability`, `SigTest.relay`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -81,7 +53,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 31 | `theorem31_verifiable`, `theorem31_authenticated`, `theorem31_sticky` | `Main.lean` |
 | (degenerate case) | `authenticated_unit_byzCorrect`, `authenticated_unit_swmr` | `Degenerate.lean` |
 
-The impossibility proof (histories H1–H3 of Figure 1) is sound.
+The impossibility proof (histories H1–H3 of Figure 1) is sound. Lemma 28 has only a proof sketch in the paper; the
+sketch is correct, and we prove the lemma in full (`SigTest.validity`, `SigTest.unforgeability`, `SigTest.relay`).
 
 **Degenerate value domains (implicit convention).** Theorem 31 for authenticated registers is false if the value
 domain is `{v₀}`: then `Read` always returns `v₀` and `Verify(v₀)` always returns true, so every operation can
@@ -94,8 +67,19 @@ error. We make it explicit with the hypotheses `v ≠ v₀` and `Nonempty V`.
 (Byzantine shared-memory model, Byzantine linearizability, replay, single-writer objects, termination ⇒ completion,
 history restriction); the positional linearization lemmas `stAt`, `idx`, `lin_*` of `SigTest.lean`.
 
-**Not formalized.** The implementations for `n > 3f` (Algorithms 1–3, Theorems 14, 20, 25, appendix) and the
-`n = 2` remark.
+**Not formalized.**
+* The implementations for `n > 3f` (Algorithms 1–3, Theorems 14, 20, 25 and their appendix proofs).
+* The remark that `n = 2` is trivial.
+* The paper's derivation of Theorem 31 from Theorem 29 and Observation 30, which we did not check. It goes through
+  an unstated composition property: a correct implementation of test-or-set *from a verifiable register*, composed
+  with a correct implementation of the verifiable register *from SWMR registers*, gives a correct implementation
+  of test-or-set *from SWMR registers*. The paper's Section 3.2 motivates Byzantine linearizability by exactly this
+  use ("as if it were an atomic object"), so the step is a standard tacit assumption. For deterministic
+  implementations it is plausible, but it is not trivial: Byzantine processes may deviate at both levels. We avoid
+  the composition and prove Theorem 31 directly for all four objects at once (`SigTest.no_byzCorrect`,
+  `theorem31_verifiable`, `theorem31_authenticated`, `theorem31_sticky`). The proof of Theorem 29 only uses three
+  properties of a positive test: validity, unforgeability and relay (Lemma 28). We prove these for every
+  "signature-like" object directly from Byzantine linearizability, so the impossibility applies to all four objects.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: `Impl.ByzCorrect` is satisfiable. Observation 30 gives correct implementations for every `f`, and

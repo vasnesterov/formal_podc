@@ -5,25 +5,25 @@ Protocols.* PODC 2024. DOI [10.1145/3662158.3662779](https://doi.org/10.1145/366
 Formalized version: arXiv [2309.05347](https://arxiv.org/abs/2309.05347) v2 (6 May 2024); numbering
 follows it.
 
-**Verdict: ⚠️ Minor statement issues.** Lemma 1 (the extended graded agreement and clique validity),
-Lemmas 2–3 and the headline Theorem 2 (π-asynchrony resilience for `π < η`) hold for the protocol the
-paper means, which is Malkhi–Momose–Ren's protocol [MMR] with latest unexpired votes. Algorithm 1 *as
-printed* is not that protocol. Its input rule lets a Byzantine VRF winner erase the lock, and the
-printed algorithm then violates safety even with no asynchrony at all. With the one-word fix taken
-from [MMR] and from the paper's own proofs, all checked statements are true. Two proofs needed
-repairs.
+**Verdict: 🔧 Easy fix.** Algorithm 1 *as printed* is not the protocol the paper means, which is
+Malkhi–Momose–Ren's protocol [MMR] with latest unexpired votes: its input rule lets a Byzantine VRF
+winner erase the lock, and the printed algorithm then violates safety even with no asynchrony at all.
+With the one-word fix taken from [MMR] and from the paper's own proofs, all checked statements are
+true, namely Lemma 1 (the extended graded agreement and clique validity), Lemmas 2–3, Theorem 1's
+safety and the main Theorem 2 (π-asynchrony resilience for `π < η`), and two proofs need short repairs.
+Liveness (Theorem 1's second half) and healing (Theorem 3) were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Algorithm 1, lines 6–7 (input rule of `GA_{v,1}`)
+### 🔧 Algorithm 1, lines 6–7 (input rule of `GA_{v,1}`)
 With the printed rule "highest-VRF proposal *not conflicting with* `L_{v-1}`", a Byzantine VRF winner can
 propose a strict prefix of the decided log and erase the lock, so Algorithm 1 as printed violates safety even
 with no asynchrony (`algorithm_1_literal_unsafe`, `theorem_1_false_for_literal_algorithm`,
 `theorem_2_false_for_literal_algorithm`).
 
-**Impact.** A slip with evident intent (R3, borderline): the paper presents Algorithm 1 as [MMR]'s protocol,
-whose rule is "*extends* `L_{v-1}`, else input `L_{v-1}`", and its own proofs reason with that rule; with this
-one-word fix all checked statements, including Theorem 2, are true.
+**Impact.** The paper presents Algorithm 1 as [MMR]'s protocol, whose rule is "*extends* `L_{v-1}`, else
+input `L_{v-1}`", and its own proofs reason with that rule; with this one-word fix all checked statements,
+including Theorem 2, are true.
 
 **Details.** arXiv v1 says "not conflicting" too, three times. The printed algorithm also has no fallback when
 no proposal qualifies. With the printed rule, the winning proposal may be a strict prefix of the decided log,
@@ -39,30 +39,28 @@ execution: η-sleepiness `3 > 2/3·4` in every round, Equations 4 and 5, `π < �
 from a Byzantine view-0 proposal that wins the lottery. Shifting the run by one view gives a variant in which
 the Byzantine process wins only once (not formalized).
 
-Why R3: the paper defers the protocol's correctness to [MMR]'s proof, and its own proofs use the step
-"outputs `Λ` with grade 1, hence votes for an extension of `Λ`", which holds in odd rounds only under the
-"extends" rule. Judged a protocol design change, the verdict would be 🚨.
+The paper defers the protocol's correctness to [MMR]'s proof, and its own proofs use the step "outputs `Λ`
+with grade 1, hence votes for an extension of `Λ`", which holds in odd rounds only under the "extends" rule.
 
 **Repair.** We formalize the [MMR] rule (`Exec.Follows`), and the printed rule only for the counterexample.
 
-### ⚠️ Definition 4 (integrity)
-Integrity as stated, "there exists a well-behaved process that inputs the log", fails for every graded
-agreement with validity: one honest process with input `[1]` outputs `[]` with grade 1
-(`integrity_literal_false`).
-
-**Impact.** Evident intent: the intended property, as in [MMR] and the proof of Lemma 1, is that some honest
-input *extends* the log. That is what we prove.
-
-### Typos and slips
+### ✏️ Slips
+- Definition 4 (integrity): "there exists a well-behaved process that inputs the log" fails for every graded
+  agreement with validity: one honest process with input `[1]` outputs `[]` with grade 1
+  (`integrity_literal_false`). The intended property, as in [MMR] and the proof of Lemma 1, is that some honest
+  input *extends* the log. That is what we prove.
 - Algorithm 1, line 1, for `v = 1` refers to `GA_{0,2}`, which does not exist (view 0 only proposes). We
   start decisions at round 3 and leave round-1 votes unconstrained.
 - In the proof of Theorem 2, `|H_ra \ H_{ra+π+1}|` should be `|H_ra \ B_{ra+π+1}|`.
-- In the proof of Lemma 2, `|S_r' ∪ P0|` should be `|O_r' ∪ P0|`, and the latest votes in `M0` are "from
-  rounds no later than `ra`" only up to later honest votes, which also extend `Λ`.
+- In the proof of Lemma 2, the latest votes in `M0` are "from rounds no later than `ra`" only up to later
+  honest votes, which also extend `Λ`.
+
+### Typos
+- In the proof of Lemma 2, `|S_r' ∪ P0|` should be `|O_r' ∪ P0|`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 3 (base case)
+### 🔧 Lemma 3 (base case)
 The proof says that once some process decides `Λ`, "by graded consistency" every process of `H_r` votes for an
 extension of `Λ`, but graded consistency only gives `Λ` grade `≥ 0` elsewhere
 (`graded_consistency_insufficient`).
@@ -79,11 +77,11 @@ tallies agree and the conclusion also follows directly. Only the cited justifica
 inputs are grade-1 outputs of `GA_{v-1,1}` and pairwise compatible by its uniqueness. So no output of
 `GA_{v-1,2}` conflicts with `Λ`, and the longest one extends `Λ` (`Exec.Follows.decision_lock`).
 
-### 🛠️ Lemma 2 and Theorem 2 (clique validity applied outside its hypotheses)
+### 🔧 Lemma 2 and Theorem 2 (clique validity applied outside its hypotheses)
 Lemma 1 requires `H' ⊆ H_r ∪ H_{r+1}` and concludes only for receivers in `H'`, but the proof of Lemma 2
 applies it to `H' = H_ra \ B_r'`, which contains processes asleep at both `r'` and `r'+1`.
 
-**Impact.** Statements true; easy repair with a more general form of clique validity (`clique_validity`).
+**Impact.** Statements true; a more general form of clique validity covers both uses (`clique_validity`).
 
 **Details.** The proof of Theorem 2 needs the conclusion for every receiver of the synchronous round `ra+π+1`
 and redoes the argument by hand.
@@ -91,15 +89,6 @@ and redoes the argument by hand.
 **Repair.** The proof of clique validity in fact only needs `H'` disjoint from `B_r`, and works for any
 receiver whose initial votes contain the clique's votes. We prove this general form (`clique_validity`) and
 derive the paper's form from it (`lemma_1_clique_validity`).
-
-### 🛠️ Lemmas 2, 3 and Theorem 2 (implicit η-sleepiness assumptions)
-The paper states Equations 1–2 as the synchronous-round assumptions but uses η-sleepiness (Equation 3)
-throughout: Lemma 2's base case needs it in round `ra`, Lemma 3 in rounds `≤ ra`, and Theorem 2 in rounds
-`≥ ra+π+2`.
-
-**Impact.** Statements true: Equations 1 and 2 imply 3 with exactly the paper's `β̃`
-(`Exec.sleepy_of_churn_of_failure`, `betaTilde_identity`). Footnote 7's equivalences hold
-(`Exec.footnote_7`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -142,6 +131,12 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Def. 4 literal integrity fails | `integrity_literal_false` | `Examples.lean` |
 | Lemma 3's cited argument insufficient | `graded_consistency_insufficient` | `Examples.lean` |
 | §2.3: Eq. 1 ∧ Eq. 2 ⇒ Eq. 3; footnote 7 | `Exec.sleepy_of_churn_of_failure`, `betaTilde_identity`, `Exec.footnote_7` | `Adversary.lean` |
+
+**Remarks.** The paper states Equations 1–2 as the synchronous-round assumptions but uses η-sleepiness
+(Equation 3) throughout: Lemma 2's base case needs it in round `ra`, Lemma 3 in rounds `≤ ra`, and Theorem 2
+in rounds `≥ ra+π+2`. This is not a mistake: Section 3.3 works in the η-sleepy model, and Equations 1 and 2
+imply 3 with exactly the paper's `β̃` (`Exec.sleepy_of_churn_of_failure`, `betaTilde_identity`). Footnote 7's
+equivalences hold (`Exec.footnote_7`).
 
 **Not formalized.** Liveness: Theorem 1's liveness half, which is probabilistic via the VRF and
 deferred to [MMR], and Theorem 3 (healing), which has a two-line informal proof. Also the necessity

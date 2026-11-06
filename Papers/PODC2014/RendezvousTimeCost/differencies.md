@@ -1,14 +1,12 @@
 # Differences between the formalization and the paper
 
 Paper: A. Miller, A. Pelc, *Time versus cost tradeoffs for deterministic rendezvous in networks*,
-PODC 2014; arXiv 1508.02471v1 (identical to the proceedings text we have). Rules R1–R6 refer to
-the project's verdict scale.
+PODC 2014; arXiv 1508.02471v1 (identical to the proceedings text we have).
 
 ## Statement-level issues
 
-1. **Proposition 2.3, cost bound `2·w(L)·E`: false.** (R1 numbered proposition; R3 not
-   applicable, since the fix changes the constant, which is the claim itself; R5 secondary result, so
-   ❌.) FastWithRelabeling runs Algorithm Fast (Algorithm 2) on the new labels. The time bound
+1. 🔧 **Proposition 2.3, cost bound `2·w(L)·E`: false.** FastWithRelabeling runs Algorithm Fast
+   (Algorithm 2) on the new labels. The time bound
    `(4t+5)E` shows that the modified label `M(ℓ')` of length `2t+2` is used. Every agent explores
    in segment 1 (`T[1] = 1`), and segments are doubled. With simultaneous start in the oriented
    ring the two agents explore in lock-step during segment 1 and cannot meet, so the cost is already
@@ -17,7 +15,7 @@ the project's verdict scale.
    `6 > 2wE = 4` (`prop_2_3_cost_false`). The bound fails under every reading we could find: with
    or without `M`, and with arbitrary or simultaneous start whenever `M` is used. The only exception
    is simultaneous start without `M` and without the leading `1`, which is not the algorithm the
-   proposition is about. The failure is not confined to `w = 1` (so R2 does not apply): for
+   proposition is about. The failure is not confined to `w = 1`: for
    `w = 2` two new labels sharing a leading `1` (e.g. `1001`, `1100` for `L = 6`, `t = 4`) give
    schedules that agree on their first 5 segments, all explorations, so in an oriented ring with
    simultaneous start the cost is already `10E > 2wE = 4E` (a simulation of the 5-ring also finds
@@ -31,7 +29,7 @@ the project's verdict scale.
 
 ## Proof-level issues (statements true)
 
-3. **Theorem 3.2: Fact 3.11 is false; the proof is repaired.** (R1: a claim inside a proof → 🛠️.)
+3. 🔧 **Theorem 3.2: Fact 3.11 is false; the proof is repaired.**
    The proof says that if all partial surpluses of `Agg_x` are at most 1 in absolute value, then
    `x` stays in `P_{j-1} ∪ P_j ∪ P_{j+1}`. That holds only at block boundaries: in mid-block an
    agent at the end of `P_{j+1}` can enter `P_{j+2}` and come back. Counterexample (`n = 12`,

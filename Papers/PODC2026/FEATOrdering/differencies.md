@@ -2,7 +2,7 @@
 
 Paper: Dinh, Kang, Sadoghi, *FEAT: Fair and Efficient Adversarial Transaction Ordering*, PODC 2026 (11-page version).
 
-## Statement-level issues (decide the verdict)
+## Statement-level issues
 
 1. **Lemma 6.3, Theorem 6.4 and Theorem 6.6 are false with the paper's score.** The score `score(T)` in §5.1 counts
    honest replicas only. Lean counterexample: `lemma_6_3_false`, `theorem_6_4_false`, `theorem_6_6_false`
@@ -18,31 +18,29 @@ Paper: Dinh, Kang, Sadoghi, *FEAT: Fair and Efficient Adversarial Transaction Or
    It relies on fragments being allowed to be empty (assumption (2) asks for fragments from `≥ n − f` replicas each
    round). The violated property is clause (1) of Definition 4.1 (linear batch partition), together with ACC. The
    γ-precedence clause (2) holds in this run.
-   *Rule:* R5 + R3. Theorem 6.6 ("FEAT achieves γ-Batch-Order-Fairness") is the paper's headline correctness claim
-   for its named algorithm, so we give 🚨.
-   *Borderline (R3).* The fix is one word: count all replicas (`scoreAll`). The honest-only score cannot be
+   Theorem 6.6 ("FEAT achieves γ-Batch-Order-Fairness") is the paper's main correctness claim for its named algorithm.
+   The fix is one word: count all replicas (`scoreAll`) → 🔧. The honest-only score cannot be
    computed by replicas. The final inequality of the paper's proof is valid only for the all-replica score.
-   Against excusing it: the paper states "honest" explicitly in the definition, and again in the proof ("more than
+   It is not a mere typo: the paper states "honest" explicitly in the definition, and again in the proof ("more than
    `τ_dec` honest replicas have committed `z` but not `m`"). The natural "conservative" implementation
    (`score_all − f`, a lower bound on the honest count) also fails, by the same counterexample pattern with Byzantine
-   weight. Changing the classification rule changes the protocol, and R3 excludes protocol design changes and proofs
-   that reason with the wrong version. A reviewer who reads "honest" as a slip would give ⚠️.
+   weight. Changing the classification rule changes the protocol.
    *Repaired:* `Setup.lemma_6_3`, `Setup.theorem_6_4`, `Setup.theorem_6_6` (with `scoreAll`).
 
 2. **Algorithm 3 pseudocode drops the remaining suffix.** The post-loop tests `i = |TailList|` and `j = |RO_r|`
    should be `i > |TailList|` and `j > |RO_r|`. The prose (stitching steps (1)–(3)) is correct, and we formalize
-   the prose (`List.merge` with `cmp_T`). *Rule:* R3 (local fix, intent recoverable) → ⚠️; dominated by item 1.
+   the prose (`List.merge` with `cmp_T`). → ✏️
 
 3. **Algorithm 1, "newly solid / newly shaded".** Read literally, a transaction that was shaded in round `r` and
    becomes solid in round `r' > r` would be inserted again. The prose says "newly non-blank", and we formalize that
-   (`InsOK.new`). *Rule:* R3 → ⚠️.
+   (`InsOK.new`). → ✏️
 
 ## Proof-level issues (true statements)
 
 4. **Lemma 6.3, Case 1.** The proof assumes that `z` was finalized in round `r − 1`. If round `r − 1` finalized
    nothing, `z` comes from an earlier round. Repaired by an invariant over rounds (`Setup.Inv`, `Setup.inv_step`):
    `FO ++ TailList` satisfies ACC, has no duplicates and consists of non-blank transactions, and the last finalized
-   transaction is solid.
+   transaction is solid. → 🔧
 5. **Theorem 4.5, proof.** "Fix `cmp★`; then `A` sorts the random permutation" is valid only in the positional
    comparison model. There the algorithm sees input positions, not transaction names. We prove that version
    (`theorem_4_5_of_linear`, for every linear `cmp★`). We also prove the identity-aware version by averaging over

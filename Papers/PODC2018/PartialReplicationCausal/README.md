@@ -5,19 +5,31 @@ Shared Memory.* PODC 2018. DOI [10.1145/3212734.3212790](https://doi.org/10.1145
 Formalized version: arXiv [1703.05424](https://arxiv.org/abs/1703.05424) v3 (full version, *…: Lower
 Bounds and An Algorithm*); numbering follows it.
 
-**Verdict: ❌ False claim.** The two headline results hold: the edge-indexed timestamp algorithm
-achieves replica-centric causal consistency (Theorem 3), and tracking every edge of the timestamp
-graph is necessary (Theorem 1). But Lemma 4, on which the correctness proof rests, is false (also
-in its only well-typed reading), and so is footnote 2's claim that the algorithm satisfies
-Constraint 1 of the lower-bound section. We prove Theorem 3 by a new argument.
+**Verdict: 🛠️ Hard fix.** The paper's necessary and sufficient condition survives: the edge-indexed timestamp
+algorithm achieves replica-centric causal consistency (Theorem 3), and tracking every edge of the timestamp graph is
+necessary (Theorem 1). Both take new arguments: Lemma 4, on which the correctness proof rests, is false (also in its
+only well-typed reading), and the executions in the proof of Theorem 1 had to be redesigned. Footnote 2's claim that
+the algorithm satisfies Constraint 1 of the lower-bound section is also false, but it is a side remark nothing is
+derived from, and the paper's third contribution, the timestamp-size lower bound, was not checked.
 
 ## Mistakes in the paper
 
-### ❌ Lemma 4 (Appendix B, timestamps along causal chains)
+### ❌ Footnote 2 (the algorithm satisfies Constraint 1)
+Footnote 2's claim that the algorithm's timestamp is a function of the causal past (a *set* of updates) is false: on six replicas, two executions give replica `0` the same causal past but different `τ₀[e_25]` (`Footnote2.footnote_2_false`).
+
+**Impact.** The lower bound of Section 4 (which assumes Constraint 1) does not apply to the paper's
+algorithm in general. Nothing is proved in place of the footnote.
+
+**Details.** Take six replicas with `X₀ = {e,b}`, `X₁ = {a,b}`, `X₂ = {a,c}`, `X₃ = {c,d}`,
+`X₄ = {e,d}`, `X₅ = {c,e,d}`. Replicas `2, 3, 4, 5` write once each. In both executions replica `0`
+ends up with the same causal past (all four updates). In one, `2`'s update reaches `0` through `5`,
+which tracks `e_25`; in the other, only through `4`, which does not. So `τ₀[e_25]` is `1` vs. `0`.
+
+### 🛠️ Lemma 4 (Appendix B, timestamps along causal chains), and with it the proofs of Lemma 5 and Theorem 3
 Lemma 4 (if `u'` from `k` to `i` with timestamp `T'` happened before `u` from `j` to `i` with timestamp `T`, then `T[e_ki] ≥ T'[e_ki]`) is false even when `e_ki ∈ E_j`, its only well-typed reading, on five replicas (`Lemma4.lemma_4_false`, `Lemma4.not_lemma4Statement`).
 
-**Impact.** The correctness proof of the headline Theorem 3 rests on it, but Theorem 3 is true: we
-prove it by a new argument (see Proof gaps). Safety is not violated in the counterexample.
+**Impact.** The correctness proof of Theorem 3 rests on it, through Lemma 5, but Theorem 3 is true: we prove it by a
+new argument (`chain_main`, `lemma_5`, `theorem_3_safety`). Safety is not violated in the counterexample.
 
 **Details.** When `e_ki ∉ E_j`, `T` has no such entry, and the proof of Lemma 5 nevertheless
 applies the lemma there. Even when `e_ki ∈ E_j` it fails. Take five replicas with
@@ -29,24 +41,6 @@ writes `g`; `D` applies that and writes `g` (`u`). Then `u' ↪ u` and `e_AI ∈
 `C`'s updates also go to `I` and must be applied first. The lemma's proof also assumes that causal
 chains form simple loops.
 
-### ❌ Footnote 2 (the algorithm satisfies Constraint 1)
-Footnote 2's claim that the algorithm's timestamp is a function of the causal past (a *set* of updates) is false: on six replicas, two executions give replica `0` the same causal past but different `τ₀[e_25]` (`Footnote2.footnote_2_false`).
-
-**Impact.** The lower bound of Section 4 (which assumes Constraint 1) does not apply to the paper's
-algorithm in general. Not a headline claim.
-
-**Details.** Take six replicas with `X₀ = {e,b}`, `X₁ = {a,b}`, `X₂ = {a,c}`, `X₃ = {c,d}`,
-`X₄ = {e,d}`, `X₅ = {c,e,d}`. Replicas `2, 3, 4, 5` write once each. In both executions replica `0`
-ends up with the same causal past (all four updates). In one, `2`'s update reaches `0` through `5`,
-which tracks `e_25`; in the other, only through `4`, which does not. So `τ₀[e_25]` is `1` vs. `0`.
-
-## Proof gaps (statements true)
-
-### 🛠️ Lemma 5 and Theorem 3 (safety of the algorithm)
-The proof of Lemma 5, and with it Theorem 3, rests on the false Lemma 4.
-
-**Impact.** Statements true; new proof (`chain_main`, `lemma_5`, `theorem_3_safety`).
-
 **Repair.** We replace it by a strong induction on the length of a causal chain
 `a ↪ v₀ ↪ ⋯ ↪ v_m = u`. If a replica repeats, or an intermediate update also goes to the receiver
 `i`, the chain gets shorter (the latter by safety of earlier steps). Otherwise, either every replica
@@ -54,11 +48,13 @@ on the chain tracks `e_ji` and the counter reaches `u`'s timestamp, or the chain
 into a simple loop that is not a `(p_q, e_ji)`-loop. Each of the three failing conditions of
 Definition 6 then exhibits an update sent directly further down the chain, which again shortens it.
 
+## Proof gaps (statements true)
+
 ### 🛠️ Theorem 1 (necessity of tracking every timestamp-graph edge)
 In Case 2 applying `u₁` also brings `j`'s whole causal past into `i`'s graph, so the two graphs differ in more than updates on `e_ji`, and Case 3 delays all other messages "indefinitely", which breaks its liveness arguments.
 
-**Impact.** Statement true; repaired for every deterministic metadata algorithm and every quiescent
-state `R₀` (`Necessity.theorem_1`).
+**Impact.** The statement holds for every deterministic metadata algorithm and every quiescent state `R₀`
+(`Necessity.theorem_1`), with redesigned executions.
 
 **Details.** Also, in Case 3 an earlier update on the path `l₁ … l_s` may already reach `k`, and in
 Case 3.2 the execution without `u₀` loses `j`'s causal past.
@@ -104,8 +100,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Footnote 2 (algorithm satisfies Constraint 1): **false** | `Footnote2.footnote_2_false` | `Footnote2.lean` |
 
 **Not formalized.** Lemma 2 / Theorem 2 (lower bound `σ_i(m) ≥ χ(H_i)`: "possible causal pasts"
-and the spanning-tree executions of Appendix D are too informal to pin down), the closed-form
-"Implication" bullets, Section 3.3, Appendices C, E, F (client–server architecture).
+and the spanning-tree executions of Appendix D are too informal to pin down, not found broken), the closed-form
+"Implication" bullets and the tightness claims for trees, cycles and full replication, Section 3.3, Appendices C, E, F (client–server architecture).
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: the counterexamples are reachable states of the algorithm. The

@@ -6,41 +6,30 @@ Alkida Balliu, Sebastian Brandt, Yuval Efron, Juho Hirvonen, Yannic Maus, Dennis
 arXiv [1911.13294](https://arxiv.org/abs/1911.13294) v3 (48 pages); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🛠️ Proof repaired.** Everything we checked holds as stated:
-- Observation 3.2 (the four equivalent problems);
-- Theorems 8.1–8.3 (families V and VI have deterministic complexity `Θ(n)`), proved for every number of nodes;
-- Lemma 10.4 (every problem not of type I–IV relaxes to a forbidden-degree or bipartite sinkless-orientation problem);
-- Lemmas 10.8–10.9 (FDSO(s) is a fixed point of round elimination).
-
-Two steps in the §8 proofs need small repairs. In the proof of Theorem 8.3 an orientation goes the wrong way. In the
-proof of Theorem 8.2 an intermediate claim is false for general trees, though it holds for the instances the proof uses.
+**Verdict: 🔧 Easy fix.** Everything we checked holds as stated: Observation 3.2 (the four equivalent problems),
+Theorems 8.1–8.3 (families V and VI have deterministic complexity `Θ(n)`), proved for every number of nodes, Lemma 10.4
+(every problem not of type I–IV relaxes to a forbidden-degree or bipartite sinkless-orientation problem) and
+Lemmas 10.8–10.9 (FDSO(s) is a fixed point of round elimination). The proofs of Theorems 8.1 and 8.2 need short local
+changes, and the proof of Theorem 8.3 has an orientation going the wrong way. The complete classification itself was
+not checked, since Sections 6, 7, 9 and 11, Theorem 10.11 and the completeness of Table 2 are not formalized.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
+- Proof of Theorem 8.3: it roots the tree at a leaf and orients all edges *towards* it, which gives a non-root node of
+  degree `k` exactly `k − 1` incoming edges and violates the constraints of the hardest VI.b problem `W = 010⁺`, `B = 0⁺10` for
+  `k ≥ 3`. With the paper's convention (an `X`-edge points from black to white), every relevant node must have exactly
+  one incoming edge. Orienting *away* from the leaf, every non-root node has one incoming edge, and the leaf root is
+  irrelevant (`viHard_exists`, `theorem_8_3`). The same slip appears in the sentence "it is always possible to orient a
+  tree towards a root" about the Theorem 8.2 problem.
 - Proof of Lemma 10.4, case `1010`: the case `B = 0⁺` (type II.b) is not mentioned; the lemma's hypothesis excludes it.
 - Proof of Lemma 10.8 (2): "configurations consisting of `δ` labels" (and `Z₁ … Z_δ`) should read `d`.
 - Proof of Lemma 10.9, items (1)–(2): "black" and "white" (and `d`, `δ`) are swapped in the description of the
   output problem; the proof itself uses the right constraints.
-- The `Ω(n)` arguments of §8 build a caterpillar with `n ≡ 1 (mod d)` nodes, and do not say how to obtain other
-  values of `n`. We pad with extra leaves at one end, so the bounds hold for every `n`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 8.3 (the orientation goes the wrong way)
-The proof roots the tree at a leaf and orients all edges *towards* it, which gives a non-root node of degree `k`
-`k − 1` incoming edges and violates the constraints of the hardest VI.b problem for `k ≥ 3`.
-
-**Impact.** Statement true; orienting *away* from the leaf works (`viHard_exists`, `theorem_8_3`).
-
-**Details.** The hardest VI.b problem is `W = 010⁺`, `B = 0⁺10`. With the paper's convention (an `X`-edge points
-from black to white), every relevant node must have exactly one incoming edge. Orienting *away* from the leaf, every
-non-root node has one incoming edge, and the leaf root is irrelevant. The same slip appears in the sentence "it is
-always possible to orient a tree towards a root" about the Theorem 8.2 problem.
-
-### 🛠️ Theorem 8.2 ("at most a single vertex has all edges outgoing")
+### 🔧 Theorem 8.2 ("at most a single vertex has all edges outgoing")
 This intermediate claim of the proof is false for general trees, and so is the claimed equivalence with the
 "oriented tree problem", though both hold on the instances the reduction actually uses.
 
@@ -54,7 +43,7 @@ on the instances the reduction uses: a path whose nodes are all relevant, with l
 **Repair.** Our proof runs the paper's mirroring argument directly on those caterpillars and never uses the general
 claim.
 
-### 🛠️ Theorem 8.1 (upper bound, only subdivided regular trees)
+### 🔧 Theorem 8.1 (upper bound, only subdivided regular trees)
 The proof only treats subdivided `d`-regular trees ("it is sufficient that V.a is solvable on any `d`-regular
 tree"), but on a general bipartite tree black nodes of degree `≠ 2` are not edges of an underlying tree.
 
@@ -106,6 +95,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **How the lower bounds are proved.**
 - **Instances.** `Caterpillar.lean` builds the caterpillar: a spine `w₀ b₀ w₁ b₁ …` of relevant nodes with hairs,
   plus padding. It is a tree via parent pointers (`Podc/Foundations/Combinatorics/SimpleGraph/ParentGraph.lean`).
+- **Other values of `n`.** The `Ω(n)` arguments of §8 build a caterpillar with `n ≡ 1 (mod d)` nodes, and do not say
+  how to obtain other values of `n`. We pad with extra leaves at one end, so the bounds hold for every `n`.
 - **Mirrored copies.** A mirrored copy is the caterpillar relabelled along the permutation that reverses a spine
   segment, `graph.comap σ`. It is a tree by isomorphism, and it agrees with the caterpillar at every node except
   the four segment-boundary nodes (`adj_mirror`).
@@ -117,7 +108,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Not formalized.**
 - Sections 6–7 (types I–IV), the `O(log n)` algorithms of §9, Lemmas 10.5, 10.7, 10.10, Theorem 10.11 and
-  Corollary 10.12 (local failure probability, the `Ω(log log n)` randomized bound, the gap theorem of [12]), and §11.
+  Corollary 10.12 (local failure probability, the `Ω(log log n)` randomized bound, the gap theorem of [12]), §11, and the completeness of Table 2.
 - Lemma 10.4 is proved assuming only "not of type II, III or IV"; type I is not needed.
 
 **Trust.** No `sorry`; `theorem_8_1`, `theorem_8_2_8_3`, `lemma_10_4` and `RoundElim.fdso_fixedPoint` use only the

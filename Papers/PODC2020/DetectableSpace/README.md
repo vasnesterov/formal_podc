@@ -5,21 +5,21 @@ Detectable Objects.* PODC 2020. DOI [10.1145/3382734.3405725](https://doi.org/10
 Formalized version: arXiv [2002.11378](https://arxiv.org/abs/2002.11378) v1; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** Algorithm 2, the detectable CAS implementation that the abstract presents
-among the main contributions (Lemma 2), is not linearizable: a crash-free run of
-two processes each executing `Cas(v₀, v₀)` breaks it. We prove a fixed version correct. Theorems 1 and 2 (the
-first assuming |V| ≥ N values), Lemmas 3–8 and Algorithm 3 are proved, and Algorithm 1's initialization is
-under-specified (it fails only with 0-based process ids; the fixed version is proved).
+**Verdict: 🔧 Easy fix.** All three contributions survive. Algorithm 2, the detectable CAS implementation that the
+abstract presents among the main contributions (Lemma 2), is not linearizable: a crash-free run of two processes each
+executing `Cas(v₀, v₀)` breaks it, and Algorithm 1's initialization is inconsistent, yet one local change each saves
+them, and we prove the fixed versions. Theorems 1 and 2 (the first assuming |V| ≥ N values), Lemmas 3–8 and
+Algorithm 3 are proved, Theorem 2 after a few-line repair of its last step.
 
 ## Mistakes in the paper
 
-### 🚨 Lemma 2 (Algorithm 2, detectable CAS)
+### 🔧 Lemma 2 (Algorithm 2, detectable CAS)
 Algorithm 2 is not linearizable: two processes both running `Cas(v₀, v₀)` while the value is `v₀` give the
 crash-free history `inv a, inv b, res a true, res b false`, which has no linearization (`alg2_not_durLinDet`).
 
-**Impact.** False statement about a headline algorithm; `Cas(v, v)` is a legitimate operation that the paper never
-excludes, and the run consists of the first operations of the two processes. A local fix of the algorithm is
-proved wait-free, durably linearizable and detectable (`alg2fix_durLinDet`).
+**Impact.** Algorithm 2 is one of the paper's main contributions; `Cas(v, v)` is a legitimate operation that the
+paper never excludes, and the run consists of the first operations of the two processes. A local fix of the
+algorithm is proved wait-free, durably linearizable and detectable (`alg2fix_durLinDet`).
 
 **Details.** Both processes read `C = ⟨v₀, vec⟩`. The first hardware CAS succeeds and flips its own bit of `vec`,
 so the second one fails. That process returns `false`, although the value was `v₀` the whole time. No crash is
@@ -29,13 +29,14 @@ be other than old", which overlooks successful CASes that do not change the valu
 **Repair.** `Cas(v, v)` just reads `C` and persists and returns `val = v`. We prove the fixed algorithm wait-free,
 durably linearizable and detectable. (`alg2_not_durLinDet`; fix `alg2fix_durLinDet`)
 
-### ⚠️ Algorithm 1 (Lemma 1; initialization `R = ⟨v_init, 0, 0⟩`)
-The initialization is under-specified, and if process 0 is a real process a run with 2 processes and 1 crash has a
-read return `v_init` after a completed `Write(v₁)` while the only `Write(v_init)` "failed" (`alg1_not_durLinDet`).
+### 🔧 Algorithm 1 (Lemma 1; initialization `R = ⟨v_init, 0, 0⟩`)
+The initialization is inconsistent: with 1-based ids it is under-specified, and if process 0 is a real process a run
+with 2 processes and 1 crash has a read return `v_init` after a completed `Write(v₁)` while the only `Write(v_init)`
+"failed" (`alg1_not_durLinDet`).
 
-**Impact.** Under-specified definition: the paper's ids are 1-based ("for i = 1 to N", `p1, …, pN`), so "process 0"
-is fictitious, and the counterexample applies only to the 0-based reading. But then line 2 writes the entry
-`A[p][0][·]`, which is not part of `A[N][N][2]`. Initializing `R = ⟨v_init, 0, 1⟩` fixes it (`alg1fix_durLinDet`).
+**Impact.** The paper's ids are 1-based ("for i = 1 to N", `p1, …, pN`), so "process 0" is fictitious, and the
+counterexample applies only to the 0-based reading. But then line 2 writes the entry `A[p][0][·]`, which is not part
+of `A[N][N][2]`. Initializing `R = ⟨v_init, 0, 1⟩` fixes it (`alg1fix_durLinDet`).
 
 **Details.** The proof's key observation is that q writes with the same toggle index again only after completing a
 write with the other index. This fails for the fictitious initial write, because `T_0 = 0` and process 0's first
@@ -52,55 +53,33 @@ A read after a completed `Write(v₁)` thus returns a value whose only write "fa
 **Repair.** Initialize `R = ⟨v_init, 0, 1⟩`. We prove the fixed algorithm wait-free, durably linearizable and
 detectable for all `n` and all value types. (`alg1_not_durLinDet`; fix `alg1fix_durLinDet`)
 
-### ⚠️ Definition 1 (auxiliary state via NVM)
-"A write is made to a non-volatile variable accessible by `Op` in-between two successive invocations" is satisfied
-by the operation's *own* writes (e.g. `Ann.result := r`), which would make the conclusion of Theorem 2 trivially
-satisfied.
-
-**Impact.** Under-specified definition with evident intent: the intended (and needed) notion is a write made
-*outside* the operation, by the system or the caller; we model it as a hook `aux` applied at invocation.
-
-### ⚠️ Theorem 2 (statement: "Let Op be a recoverable operation")
-Read universally, the statement is false: a register `read`, for instance, needs no auxiliary state.
-
-**Impact.** Evident intent: `Op` is the witness of double perturbation, and we prove the theorem in that form
-(`theorem2`).
-
-### Typos and slips
+### ✏️ Slips
+- Definition 1 (auxiliary state via NVM): "a write is made to a non-volatile variable accessible by `Op` in-between
+  two successive invocations" is satisfied by the operation's *own* writes (e.g. `Ann.result := r`), which would make
+  the conclusion of Theorem 2 trivially satisfied. The intended (and needed) notion, stated in the abstract, is a
+  write made *outside* the operation, by the system or the caller; we model it as a hook `aux` applied at invocation.
+- Theorem 2 ("Let Op be a recoverable operation"): read universally, the statement is false, since a register `read`,
+  for instance, needs no auxiliary state. `Op` is the witness of double perturbation, as the proof's opening says, and
+  we prove the theorem in that form (`theorem2`).
+- Section 3, description of line 20 of Algorithm 1: recovery is said to detect a write between the two reads of `R`
+  "if and only if" q's toggle bit is 1, but the "only if" direction is false. q may complete a whole write with the
+  other toggle between p's lines 1 and 2; then the bit is 0 although a write occurred, and recovery returns `fail`.
+  Only the "if" direction is used, and the proof states exactly that (`alg1fix_durLinDet`).
 - Proof of Lemma 2: "Cas.Recover simply re-invokes Op (line 41)", but line 41 returns `fail`.
+
+### Typos
+- Section 5, description of Algorithm 3: `MD` is written for the array `MR`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 2 (last step)
+### 🔧 Theorem 2 (last step)
 "Executing `Op_q` starting from `E₁` returns `u ≠ v`" does not follow from linearizability, because the second
 `Op_p` is pending in `E₁` and could be linearized first.
 
-**Impact.** Statement true; repaired (`theorem2`).
+**Impact.** The theorem holds with a few-line repair (`theorem2`).
 
 **Repair.** The contradiction is obtained instead from the linearization of execution `D`, where the single `Op_p`
 must precede `Op_r`. (`theorem2`)
-
-### 🛠️ Theorem 1 (induction)
-The induction hypothesis is applied to a non-initial configuration with a halted pending operation and a shrunk
-value domain.
-
-**Impact.** Statement true; we unroll the induction (`theorem1`).
-
-**Details.** Also, "`Cas_q(0,1)` after `C ∘ α` returns true" needs an indistinguishability argument when `α` is
-empty.
-
-### 🛠️ Lemma 1 (imprecisions in the proof)
-The text says recovery detects a write between the two reads of `R` "if and only if" q's toggle bit is 1, but the
-"only if" direction is false.
-
-**Impact.** Statement (of the fixed algorithm) true; harmless (`alg1fix_durLinDet`).
-
-**Details.**
-- For the "only if" direction, q may complete a whole write with the other toggle between p's lines 1 and 2. Then
-  the bit is 0 although a write occurred, and recovery returns `fail`. This is harmless.
-- "Linearize W immediately before W′" must use the first write W′ after p's line 1. Recovery may be re-run after a
-  crash between deciding `fail` and returning, so the linearization must be retractable. The paper does not
-  discuss this; our proof handles it with speculative entries.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -156,6 +135,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * The notion of perturbable objects, hence the claims "bounded counter is not perturbable" and
   "max register is perturbable".
 * The NRL transformation of Section 6.
+
+**Notes on the proofs.** These are places where our proof differs from the paper's, with no error in the paper.
+* Theorem 1: the induction hypothesis is applied to a non-initial configuration with a halted pending operation and a
+  shrunk value domain; we unroll the induction (`theorem1`). Also, "`Cas_q(0,1)` after `C ∘ α` returns true" needs an
+  indistinguishability argument when `α` is empty.
+* Lemma 1: "Linearize W immediately before W′" must use the first write W′ after p's line 1. Recovery may be re-run
+  after a crash between deciding `fail` and returning, so the linearization must be retractable. The paper does not
+  discuss this; our proof handles it with speculative entries.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`.

@@ -11,8 +11,8 @@ Proof of Theorem 4.1 from the full version, arXiv:2501.05267 (Section 6, Theorem
    be tailored to `n`; only independence of the round count from the identifier domain is used (as the full
    version states: "if its round complexity does not depend on the domain from which the node identifiers are
    chosen"). Bounded form (`lemma_4_bounded`, `mis_lowerBound_bounded`): identifiers `< D(n, T)` suffice, which
-   covers the full version's alternative hypothesis "`d` is a sufficiently large function of `n`". No rule of
-   `verdicts.md` applies (statement true as written).
+   covers the full version's alternative hypothesis "`d` is a sufficiently large function of `n`". The statement
+   is true as written.
 2. **Lemma 4 (full version)** (`lemma_4`). Proved for any finite colour type `β`, not only 3 colours; bound
    `(n − 3)/2 ≤ T`. Same proof.
 3. **Lemma 5 (full version)**. Split into the reduction (`misToColour_isLocal`: `T + 1` rounds;

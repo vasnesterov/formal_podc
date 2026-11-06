@@ -2,13 +2,12 @@
 
 Paper: P. Berenbrink, R. Klasing, A. Kosowski, F. Mallmann-Trenn, P. Uznański, *Improved Analysis of
 Deterministic Load-Balancing Schemes*, PODC 2015 (arXiv:1404.4344v4; the proceedings PDF has the same
-text). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
+text).
 
 ## Errors in the paper (statement level)
 
-1. **Observation 3.2, first claim, is false** (R1: a numbered observation; R3 does not excuse it,
-   because the fix changes the constant `s`, which is the content of the claim; R5: secondary,
-   hence ❌, not 🚨). "`SEND([x/d⁺])` is a good `(d⁺ − 2d)`-balancer for `d⁺ > 2d`."
+1. **Observation 3.2, first claim, is false** (🔧). "`SEND([x/d⁺])` is a good `(d⁺ − 2d)`-balancer
+   for `d⁺ > 2d`." The fix changes the constant `s`, and the correct constant is not in the paper.
    * Counterexample: `d = 1`, `d◦ = 4`, `x = 3`; `K₂` in Lean (the example after
      `observation_3_2_false`).
    * General refutation: `observation_3_2_false`, valid whenever `d ≥ 1` and `d◦ ≥ d + 2`.
@@ -18,7 +17,7 @@ text). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
      it fails for every `d◦ ≥ d + 2` with `d⁺` odd under any tie rule.
    * Downstream claims still hold, assuming Theorem 3.3: Table 1's "`SEND([x/d⁺])`, `d⁺ > 2d`" needs
      only `s ≥ 1`, and "`d⁺ ≥ 3d`" needs `s = Ω(d)`; `⌈d⁺/2⌉ − d ≥ ⌈(d◦ − d)/2⌉` gives both.
-2. **Observations 3.6 and 3.8 as printed are false** (R3: typo with evident intent → ⚠️).
+2. **Observations 3.6 and 3.8 as printed are false** (✏️: typo with evident intent; Appendix B.4 shows the intended `min`).
    * The printed bounds have `max{s, x_t(u) − cd⁺}` and `max{s, cd⁺ + s − x_t(u)}`; Appendix B.4
      uses them with `min` ("contributes `x_t(u) − cd⁺` … contributes exactly `s`").
    * Counterexamples: `observation_3_6_false` and `observation_3_8_false`. They use `K₂`, `d◦ = 2`,
@@ -26,7 +25,7 @@ text). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
      `c = 0`, loads `(1,3)` (for 3.8). The printed statements are `Observation36Printed` and
      `Observation38Printed` (in ℤ).
    * Observation 3.8 also prints `φ_t(c)` instead of `φ'_t(c)` on the right-hand side; we read
-     `φ'` (R3).
+     `φ'`.
    * Proved instead: `observation_3_6` and `observation_3_8`. They drop the hypotheses
      `x_t(u) ≥ cd⁺ + 1` (resp. `x_t(u) < cd⁺ + s`), which only weakens the assumptions.
 
@@ -45,13 +44,14 @@ text). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
    * The paper's constant is `c`; we get `c = 1`, i.e. discrepancy `≥ dϕ`.
 4. **Theorem 4.2 (C.2).**
    * The clique `C` of size `⌊d/2⌋` with load `ℓ = |C| − 1` gives discrepancy `⌊d/2⌋ − 1`, which is
-     `0` for `d ≤ 3`, so the proof fails for `d ∈ {1,2,3}`. We use the clique `{0,…,⌊d/2⌋}` (also a
+     `0` for `d ≤ 3`, so the proof fails for `d ∈ {1,2,3}`, although the statement is true
+     (constant `c ≤ 1/3`). We use the clique `{0,…,⌊d/2⌋}` (also a
      clique of the paper's circulant graph) with load `⌊d/2⌋`, and for `d = 1` one token in total
      (`n ∤ 1`). Constant `c = 1/3`.
    * "`(i, (i+k) mod d)`" should be "mod `|C|`".
    * The offset set `{n − ⌊d/2⌋, …, n−1, 0, 1, …, ⌊d/2⌋}` contains `0` (a self-loop).
 5. **Theorem 4.1 (C.1).** On `K₂` (`d = diam = 1`) the steady flow is all-zero and the discrepancy
-   is `0` (R2: degenerate). We handle the cases `diam ≤ 1, d ≤ 1` with one token in total. Elsewhere
+   is `0`. We handle the cases `diam ≤ 1, d ≤ 1` with one token in total. Elsewhere
    we prove the paper's construction gives discrepancy `≥ d·diam/2`, constant `c = 1/2`. The paper's
    "there exists a way to assign `⌈⌉`/`⌊⌋` values" is proved (`steady_fair`): self-loops carry
    `b(v) − 1` each.
@@ -114,10 +114,3 @@ text). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
 
 Theorem 2.3, Lemma 3.4, Proposition A.2 and Lemma A.1 (spectral / mixing arguments); Theorem 3.3 and
 its phase argument (B.4); the remark in Section 1.1 that the class contains ROTOR-ROUTER*; Table 1.
-
-## Borderline calls
-
-* Observation 3.2 → ❌ rather than ⚠️: the evident fix (`s = ⌈d⁺/2⌉ − d`) is not recoverable from the
-  paper and changes the claimed constant. The asymptotic uses survive, so no headline is affected.
-* Observations 3.6/3.8 → ⚠️: Appendix B.4 shows the intended `min`.
-* Theorem 4.2 for `d ≤ 3`: the statement is true (constant `c ≤ 1/3`), only the proof fails → 🛠️.

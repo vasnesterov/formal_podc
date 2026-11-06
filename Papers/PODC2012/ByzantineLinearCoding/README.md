@@ -5,51 +5,43 @@ PODC 2012. DOI [10.1145/2332432.2332492](https://doi.org/10.1145/2332432.2332492
 [1106.1845](https://arxiv.org/abs/1106.1845) v3 ("Network-Aware Byzantine Broadcast in Point-to-Point Networks using
 Local Linear Coding"). Its numbering matches the proceedings version.
 
-**Verdict: ⚠️ Minor statement issues.** Theorem 1 holds as stated: random coding matrices make the Equality Check
-correct with probability ≥ `1 − 2^{−L/ρ}·C(n, n−f)(n−f−1)ρ`. It is proved for every finite field, given that each
-`H ∈ Ω_k` carries `ρ` edge-disjoint spanning trees. The paper gets these trees from the cited Nash-Williams–Tutte
-theorem. Lemma 2 holds once a typo in the field size is fixed. Lemma 1 is false when the field is small
-(`2^{L/ρ} ≤ (n−f−1)/2`, `ρ` even). That case lies outside the regime the paper works in (large `L`). The proof that `A_q` is invertible
-(Appendix C.3) has a gap; the claim itself is true. Theorem 3 is correct arithmetic.
+**Verdict: 🔧 Easy fix.** Theorem 1 holds as stated: random coding matrices make the Equality Check correct with
+probability ≥ `1 − 2^{−L/ρ}·C(n, n−f)(n−f−1)ρ`, proved for every finite field, given that each `H ∈ Ω_k` carries `ρ`
+edge-disjoint spanning trees, which the paper gets from the cited Nash-Williams–Tutte theorem. The proof that `A_q` is
+invertible (Appendix C.3) has a gap closed in a few lines, the claim itself being true, and everything else is a slip,
+including Lemma 1, which is false only for small fields outside the paper's large-`L` regime. NAB's capacity
+fraction was checked only as arithmetic: Theorem 3 is correct given Theorem 2 and the time bound (24), which enter as
+hypotheses and, like Phases 1 and 3, were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 1 (invertibility probability of `M̃_H`, small fields)
-For `2^{L/ρ_k} < (n−f−1)/2` and even `ρ_k` the claimed bound `(1 − (n−f−1)/2^{L/ρ_k})^{ρ_k}` exceeds 1,
-and for `n = 7`, `f = 2`, `H = K_5` with all capacities 2, `ρ_k = 2`, `L = 2` (GF(2)) it equals 1
-although the all-zero coding makes `M̃_H` singular (`lemma_1_false_small_field`).
-
-**Impact.** Outside the paper's regime: NAB "is intended to be used for sufficiently large L", and
-Theorem 1, which only needs `det M̃_H ≢ 0`, is unaffected. The lemma holds when `n−f−1 ≤ |F|`
-(`TreePacking.lemma_1`).
-
-**Details.** When the base `1 − (n−f−1)/2^{L/ρ_k}` is exactly −1, the lemma claims that `M̃_H` is
-*always* invertible; when it is below −1 the bound exceeds 1. In the example (`U_k = 16`) the bound is `(1 − 4/2)² = 1`. The induction multiplies
-`Pr[M_q invertible] ≥ (1−w/q)^q` by the factor `1 − w/q`, which may be negative. Theorem 1 itself is
-only meaningful for `2^{L/ρ} > C(n,n−f)(n−f−1)ρ`, and in that regime Lemma 1 holds.
-
-**Repair.** We prove the lemma under the hypothesis `n−f−1 ≤ |F|` (`TreePacking.lemma_1`).
-
-### ⚠️ Lemma 2 (field size)
-Lemma 2 and the text before it take the diagonal entries from `GF(2^{ρ_k})` and give the bound
-`1 − w/2^{ρ_k}`, but the field is `GF(2^{L/ρ_k})`, so the bound is `1 − w/2^{L/ρ_k}`.
-
-**Impact.** Typo with evident intent: (16) uses Lemma 2 with the right field; we prove it for any
-finite field (`lemma_2`).
-
-### Typos and slips
-- In (11) the first two blocks of `P_q` are both written `A_{q+1}S_{q+1,1}`. In (8) two blocks are
-  written `A_{ρ_k}C_{ρ_k,ρ_k}` instead of `A_{ρ_k}S_{ρ_k,p}`. (12)–(13) write `S_{1,k+1}` and
-  `M_{k+1}` for `S_{1,q+1}` and `M_{q+1}`.
-- Proof of Lemma 2: `R` for `W`, and `det(S − R)`.
+### ✏️ Slips
+- **Lemma 1 (small fields).** For `2^{L/ρ_k} < (n−f−1)/2` and even `ρ_k` the claimed bound
+  `(1 − (n−f−1)/2^{L/ρ_k})^{ρ_k}` exceeds 1, and for `n = 7`, `f = 2`, `H = K_5` with all capacities 2, `ρ_k = 2`,
+  `L = 2` (GF(2)) it equals 1 although the all-zero coding makes `M̃_H` singular (`lemma_1_false_small_field`). When the
+  base `1 − (n−f−1)/2^{L/ρ_k}` is exactly −1, the lemma claims that `M̃_H` is *always* invertible; when it is below −1
+  the bound exceeds 1. In the example (`U_k = 16`) the bound is `(1 − 4/2)² = 1`. The induction multiplies
+  `Pr[M_q invertible] ≥ (1−w/q)^q` by the factor `1 − w/q`, which may be negative. This is outside the paper's regime:
+  NAB "is intended to be used for sufficiently large L", and Theorem 1, which only needs `det M̃_H ≢ 0`, is unaffected.
+  Theorem 1 itself is only meaningful for `2^{L/ρ} > C(n,n−f)(n−f−1)ρ`, and in that regime Lemma 1 holds. We prove the
+  lemma under the hypothesis `n−f−1 ≤ |F|` (`TreePacking.lemma_1`).
+- **Lemma 2 (field size).** Lemma 2 and the text before it take the diagonal entries from `GF(2^{ρ_k})` and give the
+  bound `1 − w/2^{ρ_k}`, but the field is `GF(2^{L/ρ_k})`, so the bound is `1 − w/2^{L/ρ_k}`. (16) uses Lemma 2 with the
+  right field; we prove it for any finite field (`lemma_2`).
 - The definition of `U_k` has `Ω` where it means `Ω̄_k`. `Ω_k` must consist of *induced* subgraphs,
   otherwise `|Ω_1| = C(n, n−f)` and `U_k > 0` fail.
 - Section 5.1 sets `ρ* = U_1/2`, which can be a non-integer. `ρ_k` must be an integer dividing `L`.
   Rescaling the time unit (doubling all capacities) repairs this.
 
+### Typos
+- In (11) the first two blocks of `P_q` are both written `A_{q+1}S_{q+1,1}`. In (8) two blocks are
+  written `A_{ρ_k}C_{ρ_k,ρ_k}` instead of `A_{ρ_k}S_{ρ_k,p}`. (12)–(13) write `S_{1,k+1}` and
+  `M_{k+1}` for `S_{1,q+1}` and `M_{q+1}`.
+- Proof of Lemma 2: `R` for `W`, and `det(S − R)`.
+
 ## Proof gaps (statements true)
 
-### 🛠️ Appendix C.3 (`A_q` is invertible)
+### 🔧 Appendix C.3 (`A_q` is invertible)
 The invertibility argument for `A_q` never uses that the edges form a tree, and the incidence matrix
 of the edges `(1,5), (2,3), (3,4), (4,2)` (root 5) satisfies all its premises yet is singular
 (`c3_argument_insufficient`).
@@ -113,6 +105,7 @@ paper's bound for every field size.
 - The Nash-Williams–Tutte packing theorem.
 - Phases 1 and 3 and the multi-instance protocol: unreliable broadcast via spanning trees, dispute control,
   1-bit Byzantine broadcasts, and the time bound (24), which enters as a hypothesis.
+- `det A_q = ±1`: we prove only `det A_q ≠ 0`, which is all the paper uses.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and `Quot.sound`.
 Non-vacuity: `TreePacking.star` builds packings and `theorem_1_complete` discharges the packing hypothesis. The

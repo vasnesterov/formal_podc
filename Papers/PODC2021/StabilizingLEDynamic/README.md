@@ -8,49 +8,40 @@ journal version on HAL, [hal-03346225](https://hal.science/hal-03346225) (Resear
 docstrings.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** All main results are proved:
-* the class hierarchy (Theorem 1);
-* all impossibility results (Theorems 2–5, Corollaries 1–3);
-* the correctness of Algorithm `LE` (Corollary 6), with the speculative `6Δ + 2` bound of
-  Theorem 7.
-
-There are four caveats.
-* The impossibilities need an identifier domain with more than `n` elements; the paper never says
-  so.
-* Lemma 7 is false as stated, though harmless.
-* The proofs of Lemmas 12 and 16 have small gaps, which we fix.
-* The proof of Theorem 1 does not work for two vertices.
+**Verdict: 🔧 Easy fix.** All main results are proved after local changes: the class hierarchy (Theorem 1), all
+impossibility results (Theorems 2–5, Corollaries 1–3) and the correctness of Algorithm `LE` (Corollary 6), with the
+speculative `6Δ + 2` bound of Theorem 7. The false Lemma 7 needs one added condition, and the proofs of Lemmas 12 and
+16 and of Theorem 1 need small repairs. The self-stabilizing algorithms cited from the authors' ICDCN 2021 paper were
+not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorems 2–5 (identifier domain `IDSET`, under-specified)
-The impossibilities fail when `|IDSET| = n`: then "`lid := min IDSET`" is self-stabilizing in every
-class (`constAlg_selfStab`).
+### 🔧 Lemma 7 and Lemma 16 (own relayed records)
+Lemma 7 says that if `p` receives a record whose map contains `id ≠ id(p)`, then `id ∈ Gstable(p)` for the next `Δ`
+configurations; this fails when the record is `p`'s own relayed record, because line 12 skips records with
+`id = id(p)`, and the proof of Lemma 16 overlooks the same thing.
 
-**Impact.** An implied assumption: every impossibility proof swaps a process for a fresh one, so it
-needs fake identifiers, i.e. more identifiers than processes. With an infinite identifier domain
-all impossibilities hold.
+**Impact.** Every use of Lemma 7 has `id ≠ id(p)`, and we add this hypothesis (`lemma_7`). Lemma 16's statement is
+true.
 
-**Details.** The paper only says `IDSET` is "an arbitrary totally ordered domain". If
-`|IDSET| = n`, every system is the whole of `IDSET`, so there are no fake identifiers.
-
-**Repair.** We assume an infinite identifier domain.
-
-### ⚠️ Lemma 7 (own relayed record)
-Lemma 7 says that if `p` receives a record whose map contains `id ≠ id(p)`, then
-`id ∈ Gstable(p)` for the next `Δ` configurations; this fails when the record is `p`'s own relayed
-record, because line 12 skips records with `id = id(p)`.
-
-**Impact.** Harmless: every use of the lemma has `id ≠ id(p)`. We add this hypothesis
-(`lemma_7`).
-
-**Details.**
+**Details.** Lemma 7:
 - Setup: 0-indexed rounds, `Δ = 2`, `V = {p, a, k}`, empty initial maps.
 - Edges: `k → p` in round 1, `p → a` in round 3, `a → p` in round 4.
 - In round 4, `p` receives its own record `⟨p, {p, k}, 1⟩` back, and it is skipped. The entry
   of `k` expired at configuration 4, so `k ∉ Gstable(p)` at configuration 5.
 
-### Typos and slips
+Lemma 16: the proof takes the last round in which `q` received *any* record mentioning `id(p)` and assumes
+that line 17 refreshed `Gstable(q)[id(p)]` in that round, but line 12 skips `q`'s own relayed records.
+
+**Repair.** Restricting Lemma 16's proof to records with `id ≠ id(q)` fixes it; Lemma 5's proof already does so.
+(`lemma_5`, `lemma_16`)
+
+### ✏️ Slips
+- Theorems 2–5, identifier domain `IDSET`: the paper only says `IDSET` is "an arbitrary totally ordered domain", but
+  the impossibilities fail when `|IDSET| = n`: every system is then the whole of `IDSET`, there are no fake
+  identifiers, and "`lid := min IDSET`" is self-stabilizing in every class (`constAlg_selfStab`). Every impossibility
+  proof swaps a process for a fresh one, so it needs more identifiers than processes. We assume an infinite identifier
+  domain, and all impossibilities hold.
 - An intermediate claim of Lemma 8's proof is wrong: "no record tagged with a fake ID in any
   `msgs` after `Δ` rounds" fails at `γ_{Δ+1}`. An initial record can still be there with timer
   `0`, but it is never sent. Lemma 8 itself (for `i > 4Δ`) holds. (`lemma_8a_imprecise`,
@@ -60,25 +51,17 @@ record, because line 12 skips records with `id = id(p)`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 16 (own relayed records)
-The proof takes the last round in which `q` received *any* record mentioning `id(p)` and assumes
-that line 17 refreshed `Gstable(q)[id(p)]` in that round, but line 12 skips `q`'s own relayed
-records.
-
-**Impact.** Statement true; same root cause as Lemma 7. Restricting to records with
-`id ≠ id(q)` fixes this; Lemma 5's proof already does so. (`lemma_5`, `lemma_16`)
-
-### 🛠️ Lemma 12 (quantifiers in the third case)
+### 🔧 Lemma 12 (quantifiers in the third case)
 In the third case the distance `d = d̂_i(r, q)` depends on `i`, yet the proof concludes
 "`∀ i ≥ t_p + d + 1`".
 
-**Impact.** Statement true; choosing the source round as (target − `Δ`) fixes it. (`lemma_12`)
+**Impact.** Choosing the source round as (target − `Δ`) fixes it. (`lemma_12`)
 
-### 🛠️ Theorem 1 (proof for two vertices)
+### 🔧 Theorem 1 (proof for two vertices)
 The proof works inside "a set `V` of `n > 1` vertices", but with `n = 2` the per-`V` hierarchy
 collapses (`theorem_1_false_card_two`, `J_src_eq_snk_of_card_two`, `not_theorem_1_card_two`).
 
-**Impact.** Statement true: classes range over all vertex sets, so Theorem 1 itself holds
+**Impact.** Classes range over all vertex sets, so Theorem 1 itself holds
 (`theorem_1_classes`). It follows from the per-`V` version for `n ≥ 3` (`theorem_1`).
 
 **Details.** With `n = 2` the per-`V` hierarchy collapses in two ways.
@@ -139,7 +122,8 @@ Theorem 4 needs `n ≥ 3`, as the paper says. For `n = 2`, LE is pseudo-stabiliz
 | `IDSET` must be larger than `n` | `constAlg_selfStab` | `Counterexample.lean` |
 
 **Not formalized.** The self-stabilizing algorithms for the three `J_{*,*}` classes, which come
-from the authors' earlier paper (ICDCN 2021) and give the green area of Figure 1.
+from the authors' earlier paper (ICDCN 2021) and give the green area of Figure 1. The informal discussion in the
+conclusion (bi-sources, eventual timeliness).
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. The hypotheses are satisfiable:

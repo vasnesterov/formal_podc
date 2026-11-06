@@ -4,19 +4,19 @@ Keren Censor-Hillel, Michal Dory. *Distributed Spanner Approximation.* PODC 2018
 [10.1145/3212734.3212758](https://doi.org/10.1145/3212734.3212758). Formalized version: arXiv
 [1802.03160](https://arxiv.org/abs/1802.03160) v1; numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** The main hardness results hold: the
-`Ω(n/(√α·log n))` deterministic and (given the randomized communication complexity of set
-disjointness) `Ω(√n/(√α·log n))` randomized CONGEST lower bounds for `α`-approximate minimum
-directed `k`-spanner, `k ≥ 5` (Thms 2.8, 1.1). Their supporting lemmas also hold, including the
-cited gap-disjointness bound (Lemma 2.5), which we prove. The vertex-cover reduction (Claim 3.1)
-is correct. Lemma 3.2 has a gap: after the simulation, a node cannot compute its cover membership
-"without any communication". One extra round fixes it, which is harmless for the asymptotic uses.
+**Verdict: 🔧 Easy fix.** The main hardness results hold: the `Ω(n/(√α·log n))` deterministic and (given the
+randomized communication complexity of set disjointness) `Ω(√n/(√α·log n))` randomized CONGEST lower bounds for
+`α`-approximate minimum directed `k`-spanner, `k ≥ 5` (Thms 2.8, 1.1), with their supporting lemmas, including the
+cited gap-disjointness bound (Lemma 2.5), which we prove. The vertex-cover reduction (Claim 3.1) is correct, and
+Lemma 3.2's gap, that a node cannot compute its cover membership "without any communication", is closed by one extra
+round, which does not touch the asymptotic uses. The algorithms of §§4–6, the weighted `k`-spanner bounds and
+Thms 3.3, 3.4 were not checked.
 
 ## Mistakes in the paper
 
 No mistakes in the statements.
 
-### Typos and slips
+### Typos
 - Proof of Lemma 2.4: "`V_B = Y1, V_A = V \ V_A`" should read `V_A = V \ V_B`.
 - Claim 3.1 / Lemma 3.2: the conversion `H → H'` gives `w(H') ≤ w(H)`. It has "the same cost" only
   because `H` is a minimum spanner in Claim 3.1. Lemma 3.2 applies the conversion to an
@@ -27,7 +27,7 @@ No mistakes in the statements.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 3.2 (from a 2-spanner algorithm to vertex cover)
+### 🔧 Lemma 3.2 (from a 2-spanner algorithm to vertex cover)
 The proof claims that after simulating the 2-spanner algorithm on `G_S` every node converts the spanner `H` into `C_H` "without any communication", but node `v` cannot know whether `u₂` output the cross edge `{v₁, u₂}`, which decides whether `v ∈ C_H` (`localRule_counterexample`).
 
 **Impact.** Repaired with one extra round: `T + 1` rounds of `3B`-bit messages, or `3(T + 1)` rounds
@@ -38,7 +38,8 @@ Thms 3.3/3.4.
 the outputs. The natural local rule (apply `C_H` only to the edges that `v`'s own copies output)
 fails. Take the triangle and the optimal 2-spanner of `G_S` made of all weight-0 edges plus the
 cross edge `{0₁, 2₂}`. Either `0₁` or `2₂` may be the node that outputs that cross edge. The rule
-then gives `{0}` or `{2}`, and neither is a vertex cover.
+then gives `{0}` or `{2}`, and neither is a vertex cover. The exact count `3T(3n)` is neither proved
+nor refuted: we refuted only this rule, not every algorithm.
 
 **Repair.** In one extra round each node tells each neighbour whether it output their shared cross
 edge.
@@ -96,7 +97,8 @@ with probability `≤ δ` satisfies `κ·⌊√⌊n/8q⌋⌋ ≤ 6·B·T + 1` (`
 
 **Not formalized.** The weighted `k`-spanner bounds (Thms 2.9, 2.10), the LOCAL lower bounds for
 weighted 2-spanner derived from Kuhn–Moscibroda–Wattenhofer (Thms 3.3, 3.4), and all algorithms of
-§§4–6 (randomized upper bounds).
+§§4–6 (randomized upper bounds). The randomized part of the cited Lemma 2.1 is a hypothesis of
+`theorem_1_1`, not proved.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: full-information gathering plus a locally computed minimum spanner is an

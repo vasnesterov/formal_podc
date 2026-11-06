@@ -65,7 +65,7 @@ true)**, **under-specified definition**, **typo**, **modelling choice**.
    often (`Counter.fig9_fails`). Moreover (by inspection, not formalized) the proof of Lemma 6.4
    claims that the proof of Lemma 5.3 shows that *every* process reports `NO` infinitely often
    when properties (1)–(3) fail; it shows this only for *some* process, while Definition 6.2
-   requires every process.
+   requires every process. Nothing we proved saves Lemma 6.4 or Theorem 6.3 (❌).
 7. **Lemma 5.1 — only `n = 2`.** The execution `E` has no steps of `p₃, …, pₙ`, so for `n > 2`
    its input is not well-formed. We use words in which the other processes also read; the result
    holds for every `n ≥ 2` (`Objects.lemma_5_1`, `cor_5_1`).

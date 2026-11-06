@@ -5,9 +5,12 @@ Shared-Memory Model.* PODC 2024 (brief announcement). DOI
 [10.1145/3662158.3662786](https://doi.org/10.1145/3662158.3662786). Formalized version: arXiv
 [2405.03573](https://arxiv.org/abs/2405.03573) v2, the full version with proofs. Numbering follows it.
 
-**Verdict: ❌ False claim.** Lemmas 4.6–4.7 and Theorem 4.8 are false when there are fewer
-registers than processors. Section 4 never bounds the number of registers. With at least `N`
-registers everything checked holds:
+**Verdict: 🛠️ Hard fix.** The snapshot algorithm, the stable-view theorem and the renaming reduction hold with at
+least `N` registers, but Lemmas 4.6–4.7 and Theorem 4.8 are false with fewer, and Section 4 never bounds the number of
+registers. The proofs of Theorem 4.8 and of snapshot safety (§5.3.2) do not go through, and we prove both with new
+arguments. Obstruction-free consensus (Section 7) was not checked.
+
+With at least `N` registers everything checked holds:
 
 * Lemmas 4.5–4.7 as printed.
 * Theorem 4.8: stable views form a DAG with a unique source.
@@ -15,15 +18,21 @@ registers everything checked holds:
   suffices.
 * The renaming reduction of Section 6 is correct.
 
-The proofs of Theorem 4.8 and of snapshot safety (§5.3.2) do not go through. We prove both with
-repaired or new arguments.
-
 ## Mistakes in the paper
 
-### ❌ Lemmas 4.6–4.7 and Theorem 4.8 (fewer registers than processors)
+### 🛠️ Lemma 5.2 (durably stored values) and the derivation of safety
+Lemma 5.2 is false as printed: with `N = 2`, `q` runs solo to level 2 with view `{1}`, then `p` writes `{1,2}` into both registers, so `W = {1,2}` is durable, and afterwards `q` executes its output step, "takes a step and terminates", with `W ⊄ view[q]`.
+
+**Impact.** Snapshot safety itself is true (see Proof gaps); the intended statement covers scans that *start* after `t`. This counterexample is not in Lean: our model merges the output step into the last read.
+
+**Details.** Without the printed version, the derivation of safety from Lemmas 5.2 and 5.3 misses two final scans that overlap in time.
+
+**Repair.** Restating the lemma for scans is not enough, so we prove safety by a new chain argument with a stronger durability notion (see Proof gaps). (`snapshot_safety_paper`, `snapshot_safety_outputs`, `Exec.durable_scan`, `Exec.chain`)
+
+### 🔧 Lemmas 4.6–4.7 and Theorem 4.8 (fewer registers than processors)
 Theorem 4.8 (stable views form a DAG with a unique source) and Lemmas 4.6–4.7 are false with fewer registers than processors: with two registers and four processors with inputs `0, 0, 1, 1`, the stable views `{0}` and `{1}` are incomparable and the stable-view graph has two sources (`theorem_4_8_needs_registers'`).
 
-**Impact.** Section 4 is a warm-up for the snapshot algorithm, which uses `N` registers, so the headline results are unaffected; we prove Lemmas 4.5–4.7 and Theorem 4.8 with `N ≤ |R|`. The missing hypothesis `M ≥ N` is borderline between an implied assumption (⚠️) and a false claim (❌); we count it as ❌ because the paper itself works with fewer registers than processors in Section 4.
+**Impact.** Section 4 is a warm-up for the snapshot algorithm, which uses `N` registers, so the snapshot and renaming results are unaffected; we prove Lemmas 4.5–4.7 and Theorem 4.8 with `N ≤ |R|`. The hypothesis `M ≥ N` is not merely implied, because the paper itself works with fewer registers than processors in Section 4.
 
 **Details.** In the counterexample the two groups take turns: both members of a group write, one register each, and then both scan. Each processor only ever reads its own group's value.
 * With one register, two processors that alternate *write; scan* behave the same way (`theorem_4_8_needs_registers`). This execution also refutes Lemma 4.6 with `A = {0}`: `Ā = {1}` is live and covers at most one register, yet never reads from `A` (`lemma_4_6_needs_registers`).
@@ -34,15 +43,22 @@ Theorem 4.8 (stable views form a DAG with a unique source) and Lemmas 4.6–4.7 
 
 **Repair.** Lemmas 4.5–4.7 and Theorem 4.8 with `N ≤ |R|`. (`Exec.lemma_4_5`, `Exec.lemma_4_6`, `Exec.lemma_4_7`, `theorem_4_8`)
 
-### ❌ Lemma 5.2 (durably stored values)
-Lemma 5.2 is false as printed: with `N = 2`, `q` runs solo to level 2 with view `{1}`, then `p` writes `{1,2}` into both registers, so `W = {1,2}` is durable, and afterwards `q` executes its output step, "takes a step and terminates", with `W ⊄ view[q]`.
+### 🔧 Definition 4.1 (GST), used by Lemma 4.4 and §5.3.3
+The GST of Definition 4.1 does not require registers to have been rewritten after the views stabilized, so a register may still hold an old view of a live processor, and "reads from a processor that has view `V₁`" does not give a view containing `V₁`.
 
-**Impact.** Snapshot safety itself is true (see Proof gaps); the intended statement covers scans that *start* after `t`. This counterexample is not in Lean: our model merges the output step into the last read.
+**Impact.** Lemma 4.4 needs registers to hold the writers' *stable* views, and the wait-freedom proof tacitly uses fresh register contents after stabilization.
 
-**Details.** Without the printed version, the derivation of safety from Lemmas 5.2 and 5.3 misses two final scans that overlap in time.
+**Details.** The wait-freedom proof only needs a minimal stable view, not Theorem 4.8.
 
-### Typos and slips
+**Repair.** One extra clause in Definition 4.1: wait until every register is rewritten after the views stabilized. (`Exec.exists_gst`, `Exec.readsOnlyFrom_minimal`, `snapshot_live_false`)
+
+### ✏️ Slips
+- Lemma 4.6's proof ignores registers that still hold their initial value: the case "|R_t^Ā| < |A|" needs a scan that starts after every register has been written (`Exec.lemma_4_6`).
 - Figure 1 has a typo: `written ∪ {r} = P` should be `= R`. Figure 3 has the same typo.
+- Definition 3.2 reads "either `o[i] ⊆ o[j]` or `o[i] ⊆ o[j]`"; the second disjunct should be `o[j] ⊆ o[i]`.
+
+### Typos
+- §5.1, first sentence: "the write-scan loop in Figure 3" should refer to Figure 1.
 
 ## Proof gaps (statements true)
 
@@ -63,7 +79,7 @@ The proof claims, by Lemma 4.4, that live processors with a stable view in `X` (
 
 (`theorem_4_8`, `theorem_4_8_unique_source`, `Exec.false_of_two_closed`, `Exec.exists_gst`)
 
-### 🛠️ Snapshot safety (§5.3.2)
+### 🛠️ Snapshot safety (§5.3.2, Lemmas 5.5 and 5.8)
 The derivation of safety from Lemmas 5.2 and 5.3 misses two final scans that overlap in time, and Lemma 5.8 assumes that "durably stored" is preserved over time, which it is not.
 
 **Impact.** Statement true; new proof (`snapshot_safety_paper`, `snapshot_safety`).
@@ -76,15 +92,6 @@ The derivation of safety from Lemmas 5.2 and 5.3 misses two final scans that ove
 * For two incomparable outputs, the two durable starts would each have to precede the other.
 
 This proof needs only level `N − 1`, so it also proves footnote 4, which the paper states without proof. (`snapshot_safety_paper`, `snapshot_safety`, `Exec.durable_scan`, `Exec.chain`)
-
-### 🛠️ Lemma 4.6 and wait-freedom (smaller points)
-Lemma 4.6's proof ignores registers that still hold their initial value, and the wait-freedom proof tacitly uses fresh register contents after stabilization.
-
-**Impact.** Statements true; routine fixes.
-
-**Details.**
-* Lemma 4.6's case "|R_t^Ā| < |A|" needs a scan that starts after every register has been written.
-* The wait-freedom proof only needs a minimal stable view, not Theorem 4.8.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -133,9 +140,13 @@ their ranks differ.
 | Chain outputs group-solve snapshot | `groupSnapshot_of_chain` | `Groups.lean` |
 
 **Not formalized.**
-* Section 2.1, an informal lower bound.
-* Section 7, long-lived snapshot and obstruction-free consensus, which the paper only sketches.
-* The paper's own induction for safety (Lemmas 5.2–5.8), which our new proof replaces.
+* Section 2.1, an informal lower bound, and the informal argument of §5.3.1.
+* Section 7, long-lived snapshot and obstruction-free consensus, which the paper only sketches. The
+  introduction's consensus claim is therefore unchecked.
+* The paper's own induction for safety (Lemmas 5.2–5.8), which our new proof replaces. Whether Lemma 5.3
+  and Lemmas 5.7–5.8 hold as statements is open: we replaced them rather than deciding.
+* The 5-processor extension of the Figure 2 execution (Section 4.1) and the TLC claim in the caption of
+  Figure 3.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 * Concrete executions are checked by kernel computation (`decide +kernel`, `Periodic.lean`).

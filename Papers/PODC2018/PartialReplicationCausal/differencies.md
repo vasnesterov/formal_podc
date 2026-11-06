@@ -6,7 +6,7 @@ numbering follows the full version.
 
 ## Errors in the paper
 
-1. **Lemma 4 is false** (Appendix B; a numbered lemma ⇒ statement, rule R1; not a headline ⇒ ❌).
+1. **Lemma 4 is false** (Appendix B). 🛠️
    It claims: if `u'` (from `k` to `i`, timestamp `T'`) happened before `u` (from `j` to `i`,
    timestamp `T`), then `T[e_ki] ≥ T'[e_ki]` (`k ≠ j`).
    * As stated it is ill-typed when `e_ki ∉ E_j` (then `T` has no entry `e_ki`); random testing
@@ -26,7 +26,7 @@ numbering follows the full version.
      *simple* loop (chains may revisit replicas or pass through `i`), and it applies the induction
      hypothesis to loops whose replicas do not carry `e` either.
 
-2. **Proof of Lemma 5 (and hence of Theorem 3) has a gap** (🛠️ for the theorem; the gap is the use
+2. **Proof of Lemma 5 (and hence of Theorem 3) has a gap** (🛠️; the gap is the use
    of Lemma 4). Lemma 5's proof uses `T[e_ki] ≤ τ_i[e_ki]` from the predicate of Step 4, which only
    checks edges in `E_i ∩ E_j`, together with Lemma 4. Our replacement (`Chain.lean`,
    `chain_main`): strong induction on the length of a causal chain `a ↪ v₀ ↪ ⋯ ↪ v_m = u`.
@@ -38,9 +38,8 @@ numbering follows the full version.
      the three failing conditions of Definition 6 then yields an update of the chain (or `a`) that is
      sent directly to a later replica of the chain, i.e. a shorter chain.
 
-3. **Footnote 2 is false** ("our proposed algorithm in Section 3.2 actually satisfies this
-   constraint", i.e. Constraint 1: the timestamp is a function of the causal past *set*). Explicit
-   claim in the text about the paper's algorithm (R1), not a headline ⇒ ❌.
+3. **Footnote 2 is false** ❌ ("our proposed algorithm in Section 3.2 actually satisfies this
+   constraint", i.e. Constraint 1: the timestamp is a function of the causal past *set*).
    `Footnote2.footnote_2_false`: six replicas, `X₀ = {e, b}`, `X₁ = {a, b}`, `X₂ = {a, c}`,
    `X₃ = {c, d}`, `X₄ = {e, d}`, `X₅ = {c, e, d}`. In two executions replica `0` ends with the same
    causal past `{u_c, u_d, u_e⁴, u_e⁵}` (one update per writer), but `τ₀[e_25] = 1` in one and
@@ -48,7 +47,7 @@ numbering follows the full version.
    `e_25`) or only through `4` (does not). Consequence: the lower bound of Section 4 (which assumes
    Constraint 1) does not in general apply to the paper's own algorithm. The special cases where
    the paper claims tightness (trees, cycles, full replication) are not formalized.
-   * *Identity of updates (borderline reading, recorded per R6).* Updates are identified across
+   * *Identity of updates (a reading we had to choose).* Updates are identified across
      executions by issuer, register and (unique) value, not by the attached timestamp `T`. If the
      message tuple `update(i, T, x, v)` (with `T`) were the identity, footnote 2 would be true:
      `τ_i` is the entrywise max of the timestamps of the updates applied at `i`, and by safety these
@@ -56,11 +55,10 @@ numbering follows the full version.
      Section 4. The paper calls the causal pasts produced by different executions (with
      algorithm-dependent timestamps) "identical" (Appendix D, Cases 1–2), and its conflict graph
      `H_i` is meant to be independent of the algorithm. So we use the value-based identity.
-   * Footnote 2 does not decide the verdict: Lemma 4 already gives ❌, and neither is a headline.
 
 ## Theorem 1 (necessity)
 
-Statement true; proof repaired (🛠️). Formalized as `Necessity.theorem_1` (`Necessity/Theorem1.lean`).
+Statement true; the proof needs redesigned executions (🛠️). Formalized as `Necessity.theorem_1` (`Necessity/Theorem1.lean`).
 
 * **Class of algorithms.** "Implements causal consistency by storing and attaching metadata … when
   to apply is determined only using the local metadata and the attached metadata" is formalized as

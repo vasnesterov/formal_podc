@@ -4,23 +4,34 @@ Petr Kuznetsov, Pierre Sutra, Guillermo Toyos-Marfurt. *Conflict-Freedom as a Pr
 PODC 2026. DOI [10.1145/3796701.3815956](https://doi.org/10.1145/3796701.3815956). Formalized version:
 extended version, arXiv [2605.19531](https://arxiv.org/abs/2605.19531) v1; numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** Every checked result holds as stated:
-- the progress hierarchy (Prop. 3.3);
-- invariance of return values on traces (Lemmas 4.1–4.2);
-- the read-write generalized commit-adopt (Alg. 2, Thm. 5.1);
-- the universal construction built from it (Alg. 1), which is linearizable and weakly conflict-free (Thms. 4.3, 4.4).
-
-The appendix proofs of Adoption and Commitment for Algorithm 2 contain false intermediate claims. They also
-silently use coherence of the trace order. Invariant (I) in the proof of Theorem 4.4 is stated too broadly. We
-give correct proofs.
+**Verdict: 🔧 Easy fix.** The progress hierarchy (Prop. 3.3), the invariance of return values on traces (Lemmas 4.1–4.2),
+the read-write generalized commit-adopt (Alg. 2, Thm. 5.1) and the weakly conflict-free universal construction built from
+it (Alg. 1, Thms. 4.3, 4.4) hold, and their proofs need only local corrections. The proof of the direction lock-freedom ⇒
+weak conflict-freedom in Proposition 3.4 stays broken, but nothing depends on it. The conflict-free construction of
+Section 6, which the abstract announces, was not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
+### ❌ Proposition 3.4, second item (lock-freedom implies weak conflict-freedom; not formalized)
+The proof argues that "a suffix where Φ runs pending and alone contradicts lock-freedom", which it does not, because an
+idle process is correct and vacuously completes all its operations.
+
+**Impact.** No later result uses this direction. The other direction, weak conflict-freedom ⇒ lock-freedom for empty `≍`,
+is proved (`WeakConflictFree.lockFreeP_of_empty`).
+
+**Repair.** The fix is to let idle processes invoke and crash. This is not proved in Lean.
+
+### ✏️ Slips
+- GCA Commitment (Section 4.2) and Lemma A.3: taken literally, Commitment fails when nobody participates
+  (`P = P_r = ∅`), because all inputs are vacuously compatible but no process exists. The case is never used;
+  `GCA.commitment_of_reach` assumes at least one participant.
+
+### Typos
+- Proof of Lemma A.2, first case split: "`B_j ⊂ B_j`" should read `B_j ⊂ B_i`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma A.3 (Commitment of Algorithm 2)
+### 🔧 Lemma A.3 (Commitment of Algorithm 2)
 The proof follows a chain `i ↦ f(i)` of processes whose candidate was missing and claims that `f(i)`
 again wrote the least output `β` into `B` ("`B_{f(i)} = β`, therefore `f(i) ∈ P_β`"), which fails with
 three processes.
@@ -35,7 +46,7 @@ three processes.
 **Repair.** Among the processes whose input is `≤ β₀` (the least candidate) and whose `B`-view contains
 `β₀`, one with a maximal `B`-view must commit (`GCA.commitment_of_reach`).
 
-### 🛠️ Lemma A.2 (Adoption of Algorithm 2)
+### 🔧 Lemma A.2 (Adoption of Algorithm 2)
 The case `w_i = True` asserts that no flag in `B_i` is `False`, which is false.
 
 **Impact.** Statement true; our proof is a direct case analysis on the comparability of the `A`- and
@@ -46,7 +57,7 @@ holds `a, b, c` with `b ≍ c` (and `a` independent of both) writes `(a, False)`
 `w₁ = True` and sees that `False` flag. Adoption still holds, because all entries seen by `p₁` equal its
 input.
 
-### 🛠️ Algorithm 2 (coherence of the trace order used but never stated)
+### 🔧 Algorithm 2 (coherence of the trace order used but never stated)
 Algorithm 2's proofs need that a pairwise compatible finite set of traces has an upper bound, which the
 paper never states.
 
@@ -57,7 +68,7 @@ paper never states.
 to go from incompatible least upper bounds to incompatible elements. The paper cites
 Aalbersberg–Rozenberg only for the existence of GLBs and of LUBs of compatible sets.
 
-### 🛠️ Theorem 4.4 (invariant (I))
+### 🔧 Theorem 4.4 (invariant (I))
 Invariant (I) is claimed for every round `r > r₀`, which the argument does not give: "`u_i` contains only
 commands from pending operations" fails for operations that complete between `τ` and `τ'`.
 
@@ -67,12 +78,6 @@ commands from pending operations" fails for operations that complete between `τ
 **Details.** Operations that complete between `τ` and `τ'` commit at rounds above `r₀`. At round `r* + 1`
 every operation is pending forever, and there (I) holds: completed operations committed at rounds
 `≤ r*`, so by Lemma A.1 their commands lie in the common prefix (`Alg1.Setup.compat_round`).
-
-### 🛠️ Proposition 3.4 (lock-freedom implies weak conflict-freedom; not formalized)
-The proof argues that "a suffix where Φ runs pending and alone contradicts lock-freedom", which it does
-not, because an idle process is correct and vacuously completes all its operations.
-
-**Impact.** Not part of the checked results; the fix is to let idle processes invoke and crash.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -96,9 +101,6 @@ Full list of differences (including modelling choices and minor imprecisions): [
   is all the algorithms ever handle. Algorithm 2 is proved for any `GCADomain`: a meet-semilattice with
   least upper bounds of compatible finite sets that is coherent.
 
-**Remark.** Definition 3.2 (2) as worded is satisfied by any process that stays idle. Our Lean definitions
-are the paper's, verbatim.
-
 **Main results in Lean.**
 
 | Paper | Lean | File |
@@ -116,7 +118,11 @@ are the paper's, verbatim.
 
 **Not formalized.**
 - The converse lock-freedom ⇒ weak conflict-freedom in Proposition 3.4.
-- Section 6: Algorithm 3, Lemmas 6.1–6.2, Theorems 6.4 and 6.6.
+- Section 6: Algorithm 3, Lemmas 6.1–6.2, Theorems 6.4 and 6.6. The proof of Lemma 6.2 repeats invariant (I) for all
+  `r > r₀` and may share the imprecision of Theorem 4.4; we did not check it.
+- Definition 3.2 (2) as worded is satisfied by any process that stays idle, so it says less than the introduction's
+  "ensures progress for one of them". Our Lean definitions are the paper's, verbatim, and we did not check whether
+  Algorithm 1 meets the stronger reading.
 
 **Trust.** There is no `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and
 `Quot.sound`.

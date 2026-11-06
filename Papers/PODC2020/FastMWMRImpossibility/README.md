@@ -5,14 +5,13 @@ Multi-writer Atomic Registers.* PODC 2020. DOI
 [10.1145/3382734.3405698](https://doi.org/10.1145/3382734.3405698). Formalized version: arXiv
 [2001.07855](https://arxiv.org/abs/2001.07855) v6; numbering follows it.
 
-**Verdict: ❌ False claim.** The fast-read (W2R1) algorithm of §5.2 / Appendix A is **not
-atomic**. With `S = 4`, `t = 1`, one reader (so `R < S/t − 2` holds) and two writers, a read that
-starts after `write(1)` has returned can return the initial value. So the sufficiency half of the
-claimed tight condition for W2R1 is not established. The main result, Theorem 1 (no multi-writer
-atomic register with one-round-trip writes and two-round-trip reads, for `t ≥ 1`, `W ≥ 2`, `R ≥ 2`),
-is **true**; we prove it for every algorithm in the paper's round-trip model. Its proof has a real
-gap: §4, which handles reads whose first round-trip changes server state, is not a proof. We close
-the gap with a simpler construction that needs no sieving.
+**Verdict: ⚠️ Weakened.** The main result, Theorem 1 (no multi-writer atomic register with one-round-trip writes and
+two-round-trip reads, for `t ≥ 1`, `W ≥ 2`, `R ≥ 2`), is **true**; we prove it for every algorithm in the paper's
+round-trip model, with a simpler construction that needs no sieving, because §4 is not a proof. The fast-read (W2R1)
+algorithm of §5.2 / Appendix A is **not atomic**: with `S = 4`, `t = 1`, one reader (so `R < S/t − 2` holds) and two
+writers, a read that starts after `write(1)` has returned can return the initial value. So the sufficiency half of the
+claimed tight condition for W2R1 is lost, as we proved no repaired algorithm; its necessity half (§5.1) was not
+checked.
 
 ## Mistakes in the paper
 
@@ -20,9 +19,8 @@ the gap with a simpler construction that needs no sieving.
 The algorithm is not atomic: with `S = 4`, `t = 1`, `R = 1`, `W = 2`, a read that starts after `write(1)` has
 returned can return the initial value `0` (`W2R1.w2r1_not_linearizable`).
 
-**Impact.** The sufficiency half of the claimed tight condition for W2R1 (`R < S/t − 2`) is not established; the
-main result, Theorem 1, is unaffected. Whether some repaired W2R1 algorithm exists for all `R < S/t − 2` is open
-here.
+**Impact.** The sufficiency half of the claimed tight condition for W2R1 (`R < S/t − 2`) is not established; Theorem 1
+is unaffected.
 
 **Details.** Initial value `0`.
 1. Both writers query and see timestamp 0, so `w₁` writes `(1, w₁)` (value 1) and `w₂` writes `(1, w₂)` (value 2).
@@ -44,21 +42,31 @@ that matters: under the literal one the algorithm already fails with a single wr
 recorded with a new value, so a completed `write(1)` seen at only `S − 2t = 2` of the read's servers is never
 admissible. (`W2R1.w2r1_not_linearizable`)
 
-*Scope and further evidence (model checking, not in Lean).* A third reading records the reader with *every* value
-the server holds. It defeats this execution, but it fails too, with `S = 5`, `t = 1`, `R = 2` and a single writer.
-There a late (stale) read request records `r₂` with a value `r₂` never saw, so `r₁` returns the new value and a
-later read of `r₂` returns the old one (new–old inversion; Lemma 8's case (ii) is wrong). Only that reading *plus*
-per-reader read counters, which are in the single-writer original but not in the paper's pseudo-code, survived our
-exhaustive search at `S = 4` (and a non-exhaustive one at `S = 5, R = 2`). Even on correct runs, Lemma 2, Lemma 6
-and Corollary 1 are false, so the proof of MWA3 (Lemma 7) does not stand either. Scripts and traces:
-[scripts/](scripts/).
+### ❌ Appendix A (Lemmas 2 and 6, Corollary 1, hence Lemma 7 / MWA3)
+Even on correct runs, Lemma 2, Lemma 6 and Corollary 1 are false (model checking, not in Lean), so the proof of MWA3
+(Lemma 7) does not stand either.
 
-### Typos and slips
-- "One round-trip skips server `s`" (§3.1) does not say whether the request or the reply is delayed. The argument
-  needs the reply variant for `R₂⁽¹⁾` (see the Theorem 1 item below).
-- Chain `α` and real time: `α₀` is "W₁ precedes W₂" and `α_S` is "W₂ precedes W₁". From `α₂` on, the writes must be
-  concurrent (two servers see `W₂` first, yet `W₁` waits for `S − 1` acknowledgements). Harmless: the end values
-  come from sequential executions with the same server logs (`ret_seq`).
+**Impact.** Nothing in Lean replaces these lemmas, so the part of the atomicity proof they carry is unsaved.
+
+**Details.** With concurrent writers a smaller `(k, wᵢ)` can be invoked after a read has seen a larger value. Scripts
+and traces: [scripts/](scripts/).
+
+### ❌ Algorithms 1–2 and Lemma 8, case (ii) (MWA4; no per-reader read counters)
+The pseudo-code has no per-reader read counters, unlike the single-writer original, and Lemma 8's case (ii) is wrong:
+a late read request can cause a new–old inversion (model checking, not in Lean).
+
+**Impact.** Adding the counters survives a bounded search, but that variant is neither proved nor refuted, so no fix
+counts.
+
+**Details.** A third reading of line 20 records the reader with *every* value the server holds. It defeats the
+execution of the first item, but it fails too, with `S = 5`, `t = 1`, `R = 2` and a single writer. There a late (stale)
+read request records `r₂` with a value `r₂` never saw, so `r₁` returns the new value and a later read of `r₂` returns
+the old one. Only that reading *plus* per-reader read counters survived our exhaustive search at `S = 4` (and a
+non-exhaustive one at `S = 5, R = 2`). Scripts and traces: [scripts/](scripts/).
+
+### Typos
+- "One round-trip skips server `s`" (§3.1) does not say whether the request or the reply is delayed. Our repair of
+  Theorem 1 needs the reply variant for `R₂⁽¹⁾` (see the Theorem 1 item below).
 
 ## Proof gaps (statements true)
 
@@ -80,6 +88,15 @@ of these steps follows.
 `R₂⁽¹⁾` (between `R₁⁽¹⁾` and `R₁⁽²⁾`) in every execution of chain `α`. In chains `β`, `γ` let `r₂` ignore the
 *reply* of the critical server in round one, while its *request* is still delivered. Then `R₁` behaves exactly as
 in chain `α`, and the zigzag chain of §3.4 goes through unchanged. (`theorem_1`, `zigzag`)
+
+### 🔧 §3.2 (chain `α` and real time)
+`α₀` is "W₁ precedes W₂" and `α_S` is "W₂ precedes W₁", and each `αᵢ` is described as identical to `α₀` except for
+swapped arrivals. But from `α₂` on, the writes must be concurrent (two servers see `W₂` first, yet `W₁` waits for
+`S − 1` acknowledgements).
+
+**Impact.** Statement true; all chain elements are concurrent in our proof.
+
+**Repair.** The end values come from sequential executions with the same server logs (`ret_seq`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -124,7 +141,8 @@ multisets).
 and the W1Rk extension (`k ≥ 3`), which the paper only mentions. For the W2R1 algorithm we give
 only the counterexample: `W2R1.lean` models Algorithms 1–2 concretely (`S = 4`, `t = 1`, `R = 1`,
 `W = 2`) as a `Cslib.AsyncMP.Protocol` and checks the execution by `decide`. The other readings
-were explored only by the model checker in `scripts/`.
+were explored only by the model checker in `scripts/`. Open remark: whether some repaired W2R1 algorithm exists for
+all `R < S/t − 2` is open here.
 
 **Trust.** No `sorry`. `theorem_1` uses only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity of the model: `single_server_linearizable` proves a fast-write algorithm

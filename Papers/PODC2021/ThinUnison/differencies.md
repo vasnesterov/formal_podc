@@ -4,8 +4,8 @@ Paper: Y. Emek, E. Keren, *A Thin Self-Stabilizing Asynchronous Unison Algorithm
 Fault Tolerant Biological Networks*, PODC 2021. Formalized against the full version
 (arXiv:2102.12787v2, 18 May 2021).
 
-Verdict: **Theorem 1.1 is correct** (formalized in full, with explicit constants). Every gap
-below is minor, and each has been repaired in the formalization.
+**Theorem 1.1 is correct** (formalized in full, with explicit constants). Every gap in its
+analysis below has been repaired in the formalization.
 
 ## Model
 

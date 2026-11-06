@@ -76,7 +76,7 @@ formalized version arXiv 1304.1007v1.
     saturation indicator `A*` of step (i) needs radius `≥ 1` to see its own edges. For `t = 0` the
     hypothesis of Lemma 7 (a 0-round ID-algorithm finding a maximal FM) is unsatisfiable
     (`not_hasRunTime_zero`: such an algorithm fails on a 3-node path), so Lemma 7 is vacuously true
-    there. Not a statement-level issue; at most a degenerate case of the proof (R2).
+    there. Not a statement-level issue; at most a degenerate case of the proof (✏️).
 13. **Walk in the proof of Lemma 7 (Fact 8).** The paper walks from `v` "away from `v*`". We take,
     among the nodes `w` in the shadow of the root as seen from `v*` (`|v*⁻¹ w| = |v*| + |w|`) whose
     parent edge carries a disagreement, one of maximal depth. This is the same argument
@@ -90,7 +90,7 @@ formalized version arXiv 1304.1007v1.
     supplied: `H_0` is loopy, so it is saturated too (needs `Δ ≥ 2`). Both loads are `1` and
     `y(e) ≠ 0`, so the common loops cannot all keep their weights (`exists_inv_zero`). Only
     `y(e) ≠ 0` is used, not positivity.
-16. **Equation (3) needs a separate nested induction (proof repair).** The paper says the critical
+16. **Equation (3) needs a separate nested induction (🔧).** The paper says the critical
     case is `g* = g`, and that `τ_i(GG, ĝ) ≅ τ_i(GH, h)` follows "by our induction assumption"
     `τ_i(G, g) ≅ τ_i(H, h)`. `GG` is a lift of `G`, but `GH` is not a lift of `H`: walks in the views
     can cross the colour-`c` edge between the two halves several times (through loops), so
@@ -98,21 +98,20 @@ formalized version arXiv 1304.1007v1.
     proof inducts on the radius `r ≤ i + 1`, simultaneously for all nodes of the `G`-part (`GG` vs
     `GH`) and of the `H`-part (`HH` vs `GH`). It uses `ball_view_succ_of_step_eq`: the radius-`(r+1)`
     view is determined by the edges at the root and the radius-`r` views of the neighbours. The
-    paper's idea is correct, but the justification given is not, so we count this as a genuine (if
-    small) repair of the proof of Step 1, not a routine detail.
+    paper's idea is correct, but the justification given is not, so this is a real (if small)
+    repair of the proof of Step 1, not a routine detail.
 17. **The "analogous" case of the inductive step** (weight of `{g,h}` differs from that of `f`) is
     handled by the symmetry `mix_swap`: `D.mix C c` is `C.mix D c` re-rooted at `c`.
 18. **Typo in the proof of Lemma 6.** "By order homogeneity, `τ_t(U_G, ≺, v) ≅ τ_t(U_G, ≺, v)`": the
     right-hand side should be `τ_t(U_G, ≺, u)`.
 
-## Verdict calculation
+## Summary of what was checked
 
 Checked statements: Theorem 1 (deterministic part), Lemma 2 (multigraph form), Step 1, Fact 3/8,
 Lemma 4, Lemma 5 (finite form), Lemma 6, Lemma 7 (for labellings of a slightly larger ball),
 Corollary 9 / Section 5.5 (as `simEC_isMaxFM`). All are true as written. The proof of Step 1 needs a
 repair at equation (3) (item 16: the cited induction hypothesis does not give the claimed view
 isomorphism; a nested induction is needed). Items 15 and 17 supply routine details, item 12 concerns
-only the proof and only the vacuous case `t = 0` (R2), item 18 is a typo inside a proof. No statement
-is wrong, so no rule R2–R4 is needed; the worst label is 🛠️ (proof repaired). Borderline: item 16
-could be read as a routine detail (→ ✅); we count it as a gap because the paper's stated
-justification ("by our induction assumption") does not apply to `GH`.
+only the proof and only the vacuous case `t = 0`, item 18 is a typo inside a proof. No statement
+is wrong. Item 16 (🔧) is a gap because the paper's stated justification ("by our induction
+assumption") does not apply to `GH`.

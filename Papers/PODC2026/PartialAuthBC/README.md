@@ -5,80 +5,68 @@ Setting.* PODC 2026. DOI [10.1145/3796701.3815929](https://doi.org/10.1145/37967
 the proceedings version (pp. 282–292); numbering follows it. The full version (ePrint 2026/470) was not used.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The main positive result holds: the gradecast Π_GC works against any number of
-corruptions and has the special grade-1 property (Theorem 3.9, Lemma 3.10). The broadcast Π_BC for a registered
+**Verdict: 🔧 Easy fix.** The main positive result holds: the gradecast Π_GC works against any number of
+corruptions and has the special grade-1 property (Theorem 3.9, Lemma 3.10), the broadcast Π_BC for a registered
 sender tolerates `t ≤ s + ⌈(n−s)/3⌉ − 1` given the black-box BA among the unregistered parties (Theorem 3.13), and
-Theorem 3.14 holds. All of this needs the right reading of an ambiguous step in Figure 1. The lower bound
-(Theorem 4.1, Corollary 4.2) holds once two missing hypotheses are added: an unregistered sender, and `n ≥ 3` for
-broadcast (`n ≥ 2` for agreement). Theorem 5.1 holds.
+Theorems 3.14 and 5.1 hold. All of this needs the right reading of an ambiguous step in Figure 1, and the lower bound
+(Theorem 4.1, Corollary 4.2) holds for deterministic protocols once two missing hypotheses are added: an unregistered
+sender, and `n ≥ 3` for broadcast (`n ≥ 2` for agreement). The randomized lower bounds, the communication complexity
+and the multivalued protocol were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorem 4.1 (lower bound; missing "the sender is unregistered")
-As printed, Theorem 4.1 says broadcast is impossible whenever `t ≥ max{⌈s/2⌉, ⌈n/3⌉}`, which contradicts the
-paper's own Theorem 3.14: with `n = s = 3`, a registered sender and `t = 2`, broadcast is solvable
-(`theorem41_false_registered_sender`).
-
-**Impact.** Imprecise statement with evident intent: the surrounding text makes clear that an unregistered sender
-is meant, and with this hypothesis the theorem holds (`theorem41`).
-
-### ⚠️ Theorem 4.1 for `n = 2` and Corollary 4.2 for `n = 1`
+### 🔧 Theorem 4.1 for `n = 2` and Corollary 4.2 for `n = 1`
 For `n = 2` broadcast is solvable against any number of faults although `max{⌈s/2⌉, ⌈2/3⌉} = 1 ≤ t = 1`, and for
 `n = 1` agreement is trivial (`theorem41_false_card_two`, `corollary42_false_card_one`).
 
-**Impact.** False only in degenerate cases. We prove Theorem 4.1 for `n ≥ 3` and Corollary 4.2 for `n ≥ 2`
+**Impact.** One condition saves the bounds: we prove Theorem 4.1 for `n ≥ 3` and Corollary 4.2 for `n ≥ 2`
 (`theorem41`, `corollary42`). The "if and only if" of the abstract inherits the `n = 2` exception for broadcast.
 
 **Details.**
 - For `n = 2`, the sender sends its value and the other party outputs what it receives.
 - The cover proof needs three nonempty groups for broadcast (two for agreement).
 
-### ⚠️ Figure 1, Phase 2 (ambiguous rule; Lemma 3.10 and Theorem 3.13 under the else-if reading)
-If the two Phase-2 rules for an unregistered party receiving a valid Extension exclude each other, a party in
-state `(0, 0)` ends in `(1, 0)`, and Lemma 3.10 and Theorem 3.13 are false (`Exclusive.lemma310_fails_exclusive`,
-`Exclusive.theorem313_fails_exclusive`).
+### ✏️ Slips
+- Theorem 4.1 omits "the sender is unregistered". As printed it says broadcast is impossible whenever
+  `t ≥ max{⌈s/2⌉, ⌈n/3⌉}`, which contradicts the paper's own Theorem 3.14: with `n = s = 3`, a registered sender and
+  `t = 2`, broadcast is solvable (`theorem41_false_registered_sender`). The surrounding text makes clear that an
+  unregistered sender is meant, and with this hypothesis the theorem holds (`theorem41`).
+- Figure 1, Phase 2 does not say whether the two rules for an unregistered party receiving a valid Extension, "if
+  `v = 0`, set `v = 1` and echo" and "if `v = 1` and `g = 0`, set `g = 1` and echo", run in sequence or exclude each
+  other. The proof of Lemma 3.10 uses the sequential reading ("set `v = 1`; now `v = 1` and `g = 0`, so set `g = 1`"):
+  after a valid Extension the party is in `(1, 1)`. We formalize this reading, and under it all lemmas hold. If the
+  rules exclude each other, a party in state `(0, 0)` ends in `(1, 0)`, and Lemma 3.10 and Theorem 3.13 are false
+  (`Exclusive.lemma310_fails_exclusive`, `Exclusive.theorem313_fails_exclusive`):
+  - Example with `n = 4`, `S = {0 = sender, 1}`, and Byzantine parties `{0, 3}`. In super round 1, party 3 sends party
+    2 an Echo2 with the 1-chain `[0]`; party 2 sets `g = 0` and sends Echo3, so the honest registered party 1 accepts
+    `[0]`. In super round 2, party 1 extends the chain, and party 2 sets `v = 1` but keeps `g = 0`. So party 2 outputs
+    grade 0 although an honest registered party exists.
+  - Theorem 3.13 breaks too. Take as Π_unau among `N = {2, 3}` the protocol "AND of the exchanged values", which is a
+    valid BA when nobody in `N` is faulty. Party 3 sends 0, so party 2 outputs 0 while party 1 outputs 1, with
+    `t = 2 ≤ s + ⌈(n−s)/3⌉ − 1`.
+- Theorem 5.1 implicitly needs Π_auth to have a known round bound.
 
-**Impact.** Under-specified definition with evident intent: the proof of Lemma 3.10 uses the sequential reading,
-and under it all lemmas hold.
-
-**Details.**
-- **The ambiguity.** The two rules are "if `v = 0`, set `v = 1` and echo" and "if `v = 1` and `g = 0`, set
-  `g = 1` and echo".
-- **The else-if reading fails.** Example with `n = 4`, `S = {0 = sender, 1}`, and Byzantine parties `{0, 3}`:
-  - in super round 1, party 3 sends party 2 an Echo2 with the 1-chain `[0]`;
-  - party 2 sets `g = 0` and sends Echo3, so the honest registered party 1 accepts `[0]`;
-  - in super round 2, party 1 extends the chain, and party 2 sets `v = 1` but keeps `g = 0`.
-
-  So party 2 outputs grade 0 although an honest registered party exists.
-- **Theorem 3.13 breaks too.** Take as Π_unau among `N = {2, 3}` the protocol "AND of the exchanged values", which
-  is a valid BA when nobody in `N` is faulty. Party 3 sends 0, so party 2 outputs 0 while party 1 outputs 1, with
-  `t = 2 ≤ s + ⌈(n−s)/3⌉ − 1`.
-
-**Repair.** The proof of Lemma 3.10 uses the sequential reading: "set `v = 1`; now `v = 1` and `g = 0`, so set
-`g = 1`". After a valid Extension the party is in `(1, 1)`. We formalize this reading.
-
-### Typos and slips
+### Typos
 - Three different versions of the small-`N` result appear: `t ≤ s + 1`, "any number of corruptions"
   (Theorem 3.14), and `t ≤ n − 2` (Lemma 6.1). We prove the strongest one: for `n − s ≤ 2`, every Byzantine set.
-- Theorem 5.1 implicitly needs Π_auth to have a known round bound.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 3.3 (unforgeability step)
+### 🔧 Lemma 3.3 (unforgeability step)
 "Every `P_j` with `v_j = 0` accepts the extended chain" requires `P_j` not to be on the chain, and the
 unforgeability argument for this is skipped.
 
-**Impact.** Statement true; repaired (`emit_origin`, `signed_v`).
+**Impact.** The statement is true; a short signature-origin observation fills the step (`emit_origin`, `signed_v`).
 
 **Details.** If `P_j` is on the chain, it signed it, so it already has `v_j = 1`.
 
 **Repair.** We prove a general origin lemma: a signature of an honest registered `i` seen by an honest party is
 `c ++ [i]`, for the chain `c` that `i` accepted. (`emit_origin`, `signed_v`)
 
-### 🛠️ Lemmas 3.4 and 3.7 (effect of an Echo2)
+### 🔧 Lemmas 3.4 and 3.7 (effect of an Echo2)
 Their proofs say that an unregistered party receiving an Echo2 "sets `v = 1`", but it only sets `g = 0`.
 
-**Impact.** Statements true: the contradiction still follows through the grade.
+**Impact.** The statements are true: the contradiction still follows through the grade.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -123,6 +111,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 Theorem 5.1 is stronger than claimed: only Byzantine *registered* parties count (`theorem51_unreg`).
 
 **Not formalized.**
+- Theorem 4.1 and Corollary 4.2 for randomized protocols: our lower bounds are for deterministic protocols only.
 - The multivalued protocol (full version only).
 - Theorem 3.15 (communication complexity).
 - Theorem 4.3 (randomized lower bound in the delayed-public-state model) and the shared-coin protocol of §4.3.

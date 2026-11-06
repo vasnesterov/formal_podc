@@ -7,27 +7,27 @@ Synchronization Primitives.* PODC 2023. DOI
 Numbering follows the full version.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** The algorithm of Figures 1–2 is **not linearizable**: Lemma 6 is
-false, and so are Lemmas 9 and 8 and Corollary 10 and Theorem 1 is not established by it. Lean checks a sequential
-execution with 3 processes in which `isEarlier(1, 0)` gives the wrong answer. The cause is
-reusable: a `helpMoveTS()` call spread over several operations shares its LL/SC links with the
-rest of the process's code. A simple repair (a separate link for `helpMoveTS`) blocks our attack,
-but we did not prove it correct. Section 6 (bounded FAI from bounded FAA) is
-correct, with a slightly better bound. The constant step complexity (Lemma 12) holds: every
-operation takes at most `2κ + 107` base-object steps, independently of `n`.
+**Verdict: ❌ Intent lost.** The algorithm of Figures 1–2 is **not linearizable**: Lean checks a sequential
+execution with 3 processes in which `isEarlier(1, 0)` gives the wrong answer, so Lemmas 6, 8 and 9 and Corollary 10
+are false and Theorem 1 is not established by it. A simple repair (a separate link for `helpMoveTS`) blocks our
+attack, but we did not prove it correct, so the paper's main point is not saved. What stands is Section 6 (bounded
+FAI from bounded FAA), with a slightly better bound, and the constant step complexity (Lemma 12): every operation
+takes at most `2κ + 107` base-object steps, independently of `n`.
 
 ## Mistakes in the paper
 
-### 🚨 Theorem 1 and Corollary 10 via Lemma 6 (linearizability of Figures 1–2)
+### ❌ Theorem 1 and Corollary 10 via Lemma 6 (linearizability of Figures 1–2)
 The algorithm is not linearizable, because the `helpMoveTS()` coroutine shares its LL/SC links with the process's
 other `LL()`s: with `n = 3`, `κ = 4` a sequential execution makes `isEarlier(1, 0)` return `false`
 (`alg_not_linearizable`), and Lemma 6 is false (`lemma6_false`).
 
-**Impact.** The headline claim fails: Lemmas 6, 9 and 8 and Corollary 10 are false for Figures 1–2, and Theorem 1
-is not established. A simple repair (a separate link for `helpMoveTS`) blocks our attack, but we did not prove it
-correct. Section 6 and the constant step complexity (Lemma 12) are unaffected.
+**Impact.** Lemmas 6, 9 and 8 and Corollary 10 are false for Figures 1–2, and Theorem 1 is not established. A simple
+repair (a separate link for `helpMoveTS`) blocks our attack, but we did not prove it correct. Section 6 and the
+constant step complexity (Lemma 12) are unaffected.
 
 **Details.**
+- The cause is reusable: a `helpMoveTS()` call spread over several operations shares its LL/SC links
+  with the rest of the process's code.
 - Line 23 executes `helpMoveTS()` `κ` steps per `helpActiveCluster()` call, so one call is spread over several
   operations of the same process.
 - Those operations perform their own `LL()`s on `TS` entries: `isEarlier` lines 35/37/44/45/50, `helpUpdateTS`
@@ -55,26 +55,30 @@ An `updateTS()` can increment `Counter` up to 12 times before its first `helpAct
 because `helpSystem()` may call `isEarlier()` (line 18), which runs two `helpUpdateTS()` calls first
 (`observation13_false`: 7 increments in one `updateTS()`, no `helpActiveCluster()` started).
 
-**Impact.** False numbered lemmas, and a proof gap in Lemmas 21 and 33, whose constants `ζ = 6n + 2` and
-`μ = 6n³ + 6n² + 2` rely on the bound 6. Larger constants probably repair this; we did not check.
+**Impact.** Lemmas 21 and 33 lose their proofs, because their constants `ζ = 6n + 2` and `μ = 6n³ + 6n² + 2` rely on
+the bound 6. Larger constants probably repair this; we did not check.
 
-### ⚠️ Observation 56 (`isEarlier(x, x)`)
-`isEarlier(x, x)` can return `true`: for `x = y`, lines 44–46 validate only the second `LL()`, so if process `x`
-completes an update between lines 44 and 45 the comparison sees two different values of `TS[x]`
-(`alg_not_linearizable_self`).
+**Details.** The count of 12 is informal; Lean shows 7. The Lean witness calls `isEarlier(2, 2)`. The oversight does
+not depend on `x = y`, since the two `helpUpdateTS()` calls exist for any arguments, but a witness with `x ≠ y` is
+not in Lean.
 
-**Impact.** False only in a degenerate case: Observation 56 tacitly assumes `x ≠ y`, and returning `false` for
-`x = y` fixes it.
+### ✏️ Slips
+- Observation 56: `isEarlier(x, x)` can return `true`. For `x = y`, lines 44–46 validate only the second `LL()`, so
+  if process `x` completes an update between lines 44 and 45 the comparison sees two different values of `TS[x]`
+  (`alg_not_linearizable_self`). Observation 56 tacitly assumes `x ≠ y`, and returning `false` for `x = y` fixes it.
+- Proof of Lemma 8, Case 2b: the text says "`i ≺ j` at point `t*x1`" where `t*y1` is meant.
+- The informal specification in Section 1 disagrees with the interpreted value of Section 5. In Section 1,
+  `isEarlier(p, q)` is false when only `p` updated. In `≪` and the interpreted value it is true. We formalize the
+  latter.
+- Section 6: `T = n(m − 1)` should be `n(φ − 1)`, as in Figure 3.
+- Section 3 promises a mod `φ`-FAI for any `φ ∈ {0, …, ⌊2^w/n⌋}`, but `φ = 0` is meaningless and the top value
+  `φn = 2^w` is outside Theorem 11's hypothesis `B > φn`; the sharper bound `B ≥ φn` covers it.
 
-### Typos and slips
-- Proof of Lemma 8, Case 2b: the text says "`i ≺ j` at point `t*x1`" where `t*y1` is meant. The other subcase
-  needs `t*x1 < t*y2`, which is not argued.
-- The informal specification in Section 1 disagrees with the interpreted value of Section 5 (under-specified
-  definition). In Section 1, `isEarlier(p, q)` is false when only `p` updated. In `≪` and the interpreted value it
-  is true. We formalize the latter.
-- Lines 70–72 do not say what to do with `⊥` indices.
-- Process `n − 1` may not call `updateTS()`, so "`n`-process MTS" really means `n − 1` updaters.
-- Typos: `T = n(m − 1)` should be `n(φ − 1)`; "mod 3δ-FNI" should be "FAI".
+### Typos
+- "mod 3δ-FNI" should be "FAI".
+- Lines 70–72 do not say what to do with `⊥` indices; the prose ("dominant", "dominated active timestamp") settles it.
+- Process `n − 1` may not call `updateTS()`, so "`n`-process MTS" really means `n − 1` updaters. The paper says so, and
+  running one more process gives `n`.
 
 Full list of differences (including modelling choices): [differencies.md](differencies.md).
 
@@ -135,6 +139,9 @@ Paper-specific tools:
 exceeds `φn − 1`, so `B ≥ φn` suffices instead of `B > φn`. This is tight for `φ ≥ 2`.
 
 **Not formalized.**
+* Proof of Lemma 8, Case 2b, second subcase: "`i ≺ j` at `t*y2`" needs `t*x1 < t*y2`, which the paper does not
+  argue. We did not analyse this formally.
+* Lemmas 3–9 and 15–62 in general.
 * Linearizability of any repaired algorithm (a separate link context for `helpMoveTS`, and
   `isEarlier(x, x) = false`). In simulation the repair blocks our attacks. Random runs of the
   repaired algorithm found no violation, but random runs also miss the original bug, so this is

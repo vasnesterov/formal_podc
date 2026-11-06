@@ -5,39 +5,41 @@ Sean Ovens. *Determining Recoverable Consensus Numbers.* PODC 2024. DOI
 [2405.04775](https://arxiv.org/abs/2405.04775) v1.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The main result (Theorem 13: a set of deterministic types solving recoverable
-wait-free consensus among `n` processes contains an `n`-recording type) is proved, following the paper's proof.
-Section 4's separation (`T_{n,n'}` has consensus number `n` and recoverable consensus number `n'`) is also true,
-but one step of the proof of Lemma 15 is false and the proof of Lemma 16 has a non-symmetric "symmetric" case;
-both are repaired. Observation 5 needs an extra hypothesis (nobody outside `P′` has output), which holds in
-every use.
+**Verdict: 🔧 Easy fix.** The main result (Theorem 13: a set of deterministic types solving recoverable wait-free
+consensus among `n` processes contains an `n`-recording type) is proved, following the paper's proof up to implied
+assumptions. Section 4's separation (`T_{n,n'}` has consensus number `n` and recoverable consensus number `n'`) is also
+true, after local repairs of false steps in the proofs of Lemmas 15 and 16. The consequence for DFFR's readable type
+`X_n` was not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Observation 5 (missing hypothesis)
-Observation 5 is stated for any `C′ ∼_{P′} Cα` with equal object values, but fails if a process outside `P′`
-has already decided the other value in `C′`.
+### ✏️ Slips
+- Observation 5 is stated for any `C′ ∼_{P′} Cα` with equal object values, but fails if a process outside `P′` has
+  already decided the other value in `C′`; with the paper's history-based "decided", it is not even well defined for an
+  arbitrary `C′`. The extra hypothesis (nobody outside `P′` has output) holds in every use, since those processes are in
+  their state at a critical configuration.
+- *Agreement* must cover two outputs of the *same* process in different incarnations; Lemma 6's proof needs this, the
+  paper's wording ("no two processes") does not say it.
+- Lemma 6 (and 7–10, 12) implicitly assume `C` is reachable — the usual valency convention.
+- Observation 2's converse is not justified by the paper (only the forward direction is used).
+- Lemma 7 does not treat the case where `β_{v̄}` is empty.
+- Lemma 16: the bound `ℓ < n − n′ − 1` is off by one (harmless for the budget).
+- Lemma 16: `τ_{i+1} = ρ_iδ′…` should be `τ_iδ′…`.
+- Lemma 16: the first invariant `Cασ₀ρ_i ∼ Cασ₀τ_i` should be `Cασ₁τ_i`.
 
-**Impact.** An implied assumption: the extra hypothesis (nobody outside `P′` has output) holds in every use,
-since those processes are in their state at a critical configuration.
-
-**Details.** With the paper's history-based "decided", the observation is not even well defined for an
-arbitrary `C′`.
-
-### Typos and slips
+### Typos
 - Observation 2: "`P` is univalent" should be `P′`.
 - Lemma 12: "`E*_z(C′Xλ_k)`" should be `E*_z(CαXλ_k)`.
-- Lemma 16: `τ_{i+1} = ρ_iδ′…` should be `τ_iδ′…`; the first invariant `Cασ₀ρ_i ∼ Cασ₀τ_i` should be
-  `Cασ₁τ_i`; a missing "is" in its statement.
+- Lemma 16: a missing "is" in its statement.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 15 (case `o_i = opR`)
+### 🔧 Lemma 15 (case `o_i = opR`)
 The proof claims that if `p_i` (team `v`) applies `opR` then `value(O, C′p_ip_j) = value(O, C′p_j)` for any
 `p_j` on team `v̄`, "in either case", which fails when `value(O, C′) = s_{x,t}` with `n′ < t < n − 1` and
 `p_j` applies `op_y`.
 
-**Impact.** Statement true; repaired by a local argument (`lemma15`).
+**Impact.** The statement is true, and a local argument replaces the step (`lemma15`).
 
 **Details.** After `p_i p_j` the object is `s⊥`, but after `p_j` alone it is `s_{x,t+1}`.
 
@@ -45,28 +47,18 @@ The proof claims that if `p_i` (team `v`) applies `opR` then `value(O, C′p_ip_
 configurations are already indistinguishable to `p_i` (no third process is needed). The same comparison is
 reused in Lemma 16 (`lemma15`, `lemma16`).
 
-### 🛠️ Lemma 16 (the "symmetric" case and the `ρ, τ` construction)
+### 🔧 Lemma 16 (the "symmetric" case)
 "The case `j < i` is symmetric" is not: the crash of `p_j` is within `E*_z`'s crash budget only when a process
 with a smaller identifier has already stepped.
 
-**Impact.** Statement true; the crash-free comparison of the Lemma 15 repair handles both orders (`lemma16`).
+**Impact.** The statement is true; the crash-free comparison of the Lemma 15 repair handles both orders (`lemma16`).
 
-**Details.** Also in the `ρ, τ` construction: the bound `ℓ < n − n′ − 1` is off by one (harmless for the
-budget), and the claim that `p_{n′}` has decided in `Cασ₀ρ_ℓ` fails when `O` becomes `s⊥`; the contradiction
-follows directly from equal memory and equal state of the last process.
+### 🔧 Lemma 16 (the `ρ, τ` construction)
+The claim that `p_{n′}` has decided in `Cασ₀ρ_ℓ` fails when `O` becomes `s⊥`.
 
-### 🛠️ Section 3 (implicit assumptions in Lemmas 6, 7, 12 and Observation 2)
-Several Section 3 proofs rely on unstated conventions or skip a case; no step fails.
+**Impact.** The statement is true, but the final contradiction does not follow as written.
 
-**Impact.** Statements true; routine fixes.
-
-**Details.**
-- *Agreement* must cover two outputs of the *same* process in different incarnations; Lemma 6's proof needs
-  this, the paper's wording ("no two processes") does not say it.
-- Lemma 6 (and 7–10, 12) implicitly assume `C` is reachable — the usual valency convention.
-- Observation 2's converse is not justified by the paper (only the forward direction is used); Lemma 7 does not
-  treat the case where `β_{v̄}` is empty; Lemma 12 needs that all processes are poised on a common object,
-  which follows from Lemma 9 but is not stated.
+**Repair.** The contradiction follows directly from equal memory and equal state of the last process (`lemma16`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -102,6 +94,9 @@ the progress tool `prog_of_rank` from the shared library `Cslib/Computability/Di
 **Remark on readability.** The paper calls `T_{n,n'}` non-readable for all `n > n′ ≥ 1`. For `n′ = n − 1`,
 `opR` never changes the value and its response determines it, so it is a read up to encoding `s⊥` as `⊥`
 (`readable_Tnn_pred`). No theorem is affected.
+
+**Remark on Lemma 12.** Lemma 12 needs that all processes are poised on a common object, which follows from Lemma 9 but
+is not stated (hypothesis `hpo'` of `lemma12`).
 
 **Not formalized here.** DFFR'22 Theorem 8 (sufficiency of `n`-recording for readable types; a hypothesis of
 `theorem14`) and Ruppert's characterization of consensus numbers are formalized in

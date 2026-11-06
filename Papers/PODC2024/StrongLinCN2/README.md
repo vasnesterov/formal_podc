@@ -6,13 +6,12 @@ version: arXiv [2402.13618](https://arxiv.org/abs/2402.13618) v1, whose text and
 as the proceedings version.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** All positive constructions we checked hold: the max register and snapshot
+**Verdict: ⚠️ Weakened.** All positive constructions we checked hold: the max register and snapshot
 from fetch&add (Theorems 1, 2), readable test&set (Theorem 5), multi-shot test&set (Theorem 6) and
-fetch&increment (Theorem 9). Each is strongly linearizable and wait-free or lock-free as claimed. But
-**Algorithm 2, the set behind Theorem 10, is not strongly linearizable.** On the impossibility side, the
-paper's **witness that `k`-out-of-order queues are `k`-ordering is wrong** (the claim itself holds with
-other sequences).
-The **proof of Lemma 12 has a gap** that breaks the stack case of Theorem 17.
+fetch&increment (Theorem 9), each strongly linearizable and wait-free or lock-free as claimed. But
+Algorithm 2, the set behind Theorem 10, is not strongly linearizable, and a gap in the proof of Lemma 12
+leaves the impossibility for stacks unestablished. The impossibility for queues was not checked: we
+formalized Definition 11 and its examples, not the reduction.
 
 ## Mistakes in the paper
 
@@ -21,8 +20,8 @@ Algorithm 2 is not strongly linearizable: with three processes running `put(1)`,
 prefix exists after which the take must already be linearized with response `EMPTY` in one extension but
 returns `2` in another (`SetCE.alg2_not_stronglyLinearizable`).
 
-**Impact.** Theorem 10, a lock-free SL set from test&set, is unproved; all other positive constructions
-(Theorems 1, 2, 5, 6, 9) hold.
+**Impact.** Theorem 10, a lock-free SL set from test&set, is unproved; we did not study whether another
+algorithm works. All other positive constructions (Theorems 1, 2, 5, 6, 9) hold.
 
 **Details.** Both puts do their `fetch&increment` (`Max = 3`). The take scans `Items[1..2] = ⊥`, reads
 `Max = 3` again and reads `Items[1] = ⊥`. Then `put(1)` writes `Items[1]` and **completes**; call this
@@ -37,7 +36,7 @@ So no prefix-closed linearization function exists. The paper linearizes an `EMPT
 the take returns* `EMPTY` every slot is `⊥` or taken fails here, with `Items[1] = 1` and `TS[1] = 0`.) This
 holds whether or not the never-incremented `taken_new` is read as a counter of failed test&sets.
 
-### ⚠️ Lemma 12 and Theorem 17 for stacks (helping in the reduction)
+### ❌ Lemma 12 and Theorem 17 for stacks (helping in the reduction)
 Lemma 12's proof ignores that the strong linearization function `f` may linearize *pending* proposal operations of
 other processes during `p_i`'s solo simulation, and stacks with the paper's sequences fail the stronger
 definition this needs (`KOrd.stack_not_kOrderingI`), so the stack case of Theorem 17 is unestablished.
@@ -57,24 +56,24 @@ then the reduction `B` violates agreement (informal argument, not formalized).
 Under Definition 11 as literally stated, the stack example is correct (`KOrd.stack_kOrdering`): the definition
 is simply too weak for the lemma.
 
-### ⚠️ Definition 11 (under-specified)
-Definition 11 requires the chosen process `ℓ` to have *completed* `prop_ℓ`, while the stuttering examples only
-give that `ℓ` *started*, and its condition `invs(α) ⊆ ⋃ invs(prop_x)` must be read per process.
+### ✏️ Slips
+- Definition 11 requires the chosen process `ℓ` to have *completed* `prop_ℓ`, while the stuttering examples only
+  give that `ℓ` *started*. Evident intent: "started" is also all that validity needs. We use the repaired
+  reading.
+- The condition `invs(α) ⊆ ⋃ invs(prop_x)` of Definition 11 must be read per process: the proof uses the
+  per-process reading (each process executes a prefix of its own `prop_j`). We use this reading.
+- Section 4.2 and the proof of Theorem 9 say "maximum index `i` with `M[i] = 0`"; it means the minimum.
 
-**Impact.** Evident intent: "started" is also all that validity needs, and the proof uses the per-process
-reading (each process executes a prefix of its own `prop_j`). We use the repaired readings.
-
-### Typos and slips
+### Typos
 - Algorithm 2's caption ("From test&set to fetch&increment").
 - `taken_new` is never incremented.
-- Theorem 9 says "maximum index `i` with `M[i] = 0`"; it means the minimum.
 - Theorem 17's proof says "queue" where it means "1-agreement object"; "1-agreement" and "1-ordering" are used
   interchangeably.
 - `|S_α| = k` vs `≤ k`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Section 5 ("`k`-out-of-order queues are `k`-ordering")
+### 🔧 Section 5 ("`k`-out-of-order queues are `k`-ordering")
 The witness `prop_i = enq(i)` fails: with `n = 3`, `k = 2`, `α = enq(1)`, processes 0, 1, 2 can decide 0, 1, 2
 respectively, so no `S_α` of size 2 works, for any `d` (`KOrd.ooo_not_kOrderingW`).
 

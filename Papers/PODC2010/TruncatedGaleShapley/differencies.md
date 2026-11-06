@@ -5,15 +5,15 @@ arXiv:0812.4893v1 (full version of the PODC 2010 brief announcement).
 
 ## Errors in the paper
 
-1. **Lemma 6 is false as stated for `Δ = 1`.** The hypothesis `i ≥ 1 + (Δ-1)/γ` allows `i = 1`
+1. 🔧 **Lemma 6 is false as stated for `Δ = 1`.** The hypothesis `i ≥ 1 + (Δ-1)/γ` allows `i = 1`
    when `Δ = 1`. Then `w_1(B) = 0`, since nothing is matched after round 1, while
    `f_1(R) = Σ_r w(r, first(C(r))) > 0`. Counterexample: `K₂` with unit weights, every `γ > 0`
    (`lemma_6_false_at_one`, `Counterexample.lean`). For `Δ ≥ 2` the hypothesis forces `i ≥ 2`, and
    the lemma is true. We prove Lemma 6 with the extra hypothesis `i ≥ 2` (`Bicoloured.lemma_6`).
-   *Rule.* R3 (with R2 as support) ⇒ ⚠️. The missing `i ≥ 2` is recoverable from the paper:
+   The missing `i ≥ 2` is recoverable from the paper:
    the proof is "By Lemma 4 and Lemma 5", both stated for `i ≥ 2`, so the paper's proof reasons
    with the intended version. The fix is local (one hypothesis) and changes no constant of
-   Theorems 1–3. Borderline aspect (recorded per R6): `K₂` by itself is not a degenerate instance
+   Theorems 1–3. `K₂` by itself is not a degenerate instance
    for a distributed algorithm, but the failure needs `Δ = 1`, where every node has a single
    acceptable partner and the unique stable matching is all of `E`; and it occurs only at `i = 1`,
    when no proposal has been answered yet. The failure exists for no `Δ ≥ 2`.
@@ -22,7 +22,7 @@ arXiv:0812.4893v1 (full version of the PODC 2010 brief announcement).
    allowed and wrong: `M_1 = ∅` while every edge is unstable. Choosing `i = max(2, ⌈…⌉)` repairs
    this with the same bound on `T = 2i` (`rounds1`, `rounds2`, `rounds1_bound`, `rounds2_bound`).
    This is a proof repair; the theorem statements are true.
-2. **Proof of Lemma 5:** "`w({r,b}) < w_j(b)`" should be `≤`, since weights respect the
+2. ✏️ **Proof of Lemma 5:** "`w({r,b}) < w_j(b)`" should be `≤`, since weights respect the
    preferences only weakly (`w ≡ 1` gives equality). Typo inside a proof; only `≤` is used.
 
 ## Statements: what is proved, compared with the paper

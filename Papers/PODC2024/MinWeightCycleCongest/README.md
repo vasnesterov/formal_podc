@@ -7,18 +7,17 @@ version arXiv:2308.08670v3, which in turn defers them to the companion paper arX
 (*Near Optimal Bounds for Replacement Paths and Related Problems in the CONGEST Model*, §3.1.1–3.1.2,
 Lemmas 13–14, Figures 4–5). We formalize those proofs.
 
-**Verdict: 🛠️ Proof repaired.** Both checked lower bounds hold as stated. Computing a
+**Verdict: 🔧 Easy fix.** Both checked lower bounds hold as stated: computing a
 `(2 − ε)`-approximation of the minimum weight cycle (MWC) needs `Ω(n / log n)` CONGEST rounds, both
 in directed graphs (weighted or unweighted) and in undirected weighted graphs, even on networks of
-constant diameter. The proofs need two repairs. The cited constructions are disconnected, so the
-"constant diameter" part is not proved there. And Lemma 14's argument covers only the heavy weight
-`w = 2`, not the large `w` that the `(2 − ε)` claim needs.
+constant diameter. The proofs need two local repairs: the cited constructions are disconnected, so the
+"constant diameter" part is not proved there, and Lemma 14's argument covers only the heavy weight
+`w = 2`, not the large `w` that the `(2 − ε)` claim needs. The sublinear-round algorithms, the paper's other main
+part, and the lower bounds for larger approximation factors were not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
 All in the companion paper's proofs; none affects a result.
 - The directed proof decides "by checking if the minimum cycle has length at least 4". Every cycle has length at
   least 4; the test should be "at least 8" (or "greater than 4").
@@ -30,7 +29,7 @@ All in the companion paper's proofs; none affects a result.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Thm 1.2.A, 1.4.A ("even on graphs with constant diameter")
+### 🔧 Thm 1.2.A, 1.4.A ("even on graphs with constant diameter")
 The constant-diameter part is not proved: the graphs of Lemmas 13 and 14 in the cited proofs can be disconnected
 (for `S_a = S_b = ∅` they are perfect matchings).
 
@@ -46,7 +45,7 @@ triangles `hub–ℓ_i–r_i` of weight 3, below the gap `2w + 2`, and the reduc
 bound holds on diameter-2 networks. We also add pendant padding vertices so that every `n` is covered, not only
 `n = 4k`.
 
-### 🛠️ Lemma 14 (the heavy weight `w` needed for `(2 − ε)`)
+### 🔧 Lemma 14 (the heavy weight `w` needed for `(2 − ε)`)
 The proof bounds cycles with at least 6 edges by "at most as many light edges as heavy edges", which for heavy
 weight `w` gives only `3w + 3` for a 6-cycle, below the needed `4w` once `w > 3`.
 
@@ -105,8 +104,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Reduction from set disjointness (approximation gap) | `approx_lowerBound`, `approx_rand_lowerBound` | `Reduction.lean` |
 
 **Not formalized.** Thm 1.2.B/1.3.A/1.4.B (the `Ω̃(√n)` and `Ω̃(n^{1/4})` bounds for larger
-approximation factors, via Das Sarma et al.), 4-cycle detection for `q ≥ 5`, and all upper bounds
-(Thm 1.2.C–D, 1.3.B, 1.4.C, 1.6), which are randomized, w.h.p. algorithms.
+approximation factors, via Das Sarma et al.), Thm 2.A of the full version, 4-cycle detection for `q ≥ 5`, and all
+upper bounds (Thm 1.2.C–D, 1.3.B, 1.4.C, 1.6), which are randomized, w.h.p. algorithms, with the algorithms of
+Sections 2–5. The randomized versions of the lower bounds remain conditional on the cited set-disjointness bound
+(`RandDisjLB`, see **Model**).
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: `gather_approx_directed` and `gather_approx_undirected` (`NonVacuity.lean`)

@@ -5,11 +5,11 @@ DOI [10.1145/3732772.3733545](https://doi.org/10.1145/3732772.3733545). Formaliz
 (no full version used).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** Theorem 2.1 (a stranger-free task for `n` processes needs `n` registers) and the lower
+**Verdict: ⚠️ Weakened.** Theorem 2.1 (a stranger-free task for `n` processes needs `n` registers) and the lower
 bound of Theorem 3.1 (`k`-bounded lattice agreement needs `k + 1` registers) are proved. **The upper bound of
-Theorem 3.1 fails: Algorithm 1 is not wait-free for any `k ≥ 2`**, already with two processes. It is safe and
-obstruction-free for every `k`, and wait-free for `k = 1`. So the claimed wait-free hierarchy is established only
-in the obstruction-free sense (and for `k = 1`).
+Theorem 3.1 is not established: Algorithm 1 is not wait-free for any `k ≥ 2`**, already with two processes, though it
+is safe and obstruction-free for every `k`, and wait-free for `k = 1`. So the claimed wait-free hierarchy is
+established only in the obstruction-free sense (and for `k = 1`).
 
 ## Mistakes in the paper
 
@@ -36,13 +36,12 @@ other than `p` can write `A[2]` (the second register; `A[1]` in the 0-based Lean
 write, and only if it read `⊥` there before anybody wrote it. So only finitely many interfering writes on
 `A[2]` exist, while every two failed iterations of `p` need one (`theorem_3_1_k1`).
 
-### ⚠️ Theorem 2.1, obstruction-free variant (remark after its proof; unstated hypothesis)
-The obstruction-free variant of Theorem 2.1 needs stranger-freedom with respect to *obstruction-free*
-algorithms, a stronger hypothesis that the paper does not state.
+### ✏️ Slips
+- Remark after the proof of Theorem 2.1: the obstruction-free variant needs stranger-freedom with respect to
+  *obstruction-free* algorithms, a stronger hypothesis that the paper does not state
+  (`theorem_2_1_obstructionFree`). It holds for `k`-bounded lattice agreement, the paper's application.
 
-**Impact.** The stronger hypothesis holds for `k`-bounded lattice agreement, the paper's application.
-
-### Typos and slips
+### Typos
 - Line 21 of Algorithm 1 (`seen ∪ collect[j][3]`) is a no-op as written, probably a typo for `A[j][3]`.
 
 ## Proof gaps (statements true)
@@ -63,15 +62,6 @@ completed a collect since all registers became dirty carries a seen-set of size 
 process makes at most one write without such a collect. So if all registers become clean, the union of
 their seen-sets is too large for a later output of size `≤ k` (`card_union_of_obliterate`,
 `alg1_solves`).
-
-### 🛠️ §3.2 (`k`-bounded lattice agreement is stranger-free; step omitted as routine)
-The claim that `k`-bounded lattice agreement for `k + 1` processes is stranger-free needs "`j` in `i`'s
-output ⇒ `j` appears in `i`'s view", which the paper omits.
-
-**Impact.** Statement true (`boundedLA_strangerFree`).
-
-**Details.** This takes a causal-erasure argument: erase `j`'s causal future to obtain an execution
-without `j` in which `i` outputs the same set.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -102,8 +92,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 3.1, obstruction-free hierarchy; `k = 1` wait-free | `theorem_3_1_obstructionFree`; `theorem_3_1_k1` | `Main.lean` |
 | Tightness of Theorem 2.1 for `n = 2` | `theorem_2_1_tight` | `TwoProcess.lean` |
 
-**Not formalized.** The anonymous-memory/anonymous-process remarks at the end of §3.1 and the introduction's
-discussion of related work (splitters, adopt-commit, renaming).
+**Remark (no error).** The claim of §3.2 that `k`-bounded lattice agreement for `k + 1` processes is stranger-free needs
+"`j` in `i`'s output ⇒ `j` appears in `i`'s view", a step the paper omits as routine. In Lean this takes a
+causal-erasure argument: erase `j`'s causal future to obtain an execution without `j` in which `i` outputs the same
+set (`boundedLA_strangerFree`).
+
+**Not formalized.** The anonymous-memory/anonymous-process remarks at the end of §3.1 (Guerraoui–Ruppert,
+`k(n − 1) + 2` collects): their wait-free claims rest on Algorithm 1, so they stay open. Also the introduction's
+discussion of related work (Delporte-Gallet et al., splitters, adopt-commit, Moir–Anderson renaming).
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: `theorem_2_1_tight` exhibits a stranger-free task (1-bounded LA for two processes) solved wait-free

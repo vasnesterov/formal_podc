@@ -6,20 +6,20 @@ Jukka Suomela. *Distributed Algorithms for Edge Dominating Sets.* PODC 2010. DOI
 version).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ✅ Correct.** All results are formalized and hold as stated: the lower bounds `4 - 2/d` (even `d`) and
+**Verdict: ✏️ Slip.** All results are formalized and hold as stated: the lower bounds `4 - 2/d` (even `d`) and
 `4 - 6/(d+1)` (odd `d`) for `d`-regular graphs (Theorems 1, 2), their bounded-degree consequence `4 - 1/k`
 (Corollary 1), and the matching algorithms (Theorems 3, 4, 5). The lower bounds are proved in a slightly stronger
-form than stated. The paper has only typos and trivially fillable gaps.
+form than stated. The only labeled mistake is a division by `|D*| = 0` on edgeless graphs, a degenerate case.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
+### ✏️ Slips
+- §7.8 divides by `|D*|`, which is `0` for an edgeless graph (degenerate case). We prove the integer
+  form `2k·|D| ≤ (8k − 2)·|D*|` instead (`card_le_of_props`).
 
-### Typos and slips
+### Typos
 - §7.7, case `c(v) = 3/2`: "`d_G(v) − 2` other nodes `x1, x2` in addition to `v`" should read "in
   addition to `s` and `t`".
-- §7.8 divides by `|D*|`, which is `0` for an edgeless graph (degenerate case). We prove the integer
-  form `2k·|D| ≤ (8k − 2)·|D*|` instead.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

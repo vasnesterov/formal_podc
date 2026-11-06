@@ -5,43 +5,43 @@ Correctness Criterion.* PODC 2020. DOI [10.1145/3382734.3405712](https://doi.org
 Formalized version: arXiv [2006.12889](https://arxiv.org/abs/2006.12889) v1 (full version). Numbering
 follows it.
 
-**Verdict: 🛠️ Proof repaired.** All results hold: locality of IVL, Theorem 1 (IVL preserves
+**Verdict: 🔧 Easy fix.** All results hold: locality of IVL, Theorem 1 (IVL preserves
 `(ε, δ)` error bounds), Lemma 1 (the concurrent CountMin sketch is IVL), Lemma 2 and Theorem 2 (an IVL
 batched counter with `O(1)` updates), Lemmas 3 and 4, the claim that PCM is not linearizable, and
 Theorem 3 (the `Ω(n)` bound for linearizable batched counters). Theorem 3 is proved **conditionally**:
 the cited Israeli–Shirazi lower bound for snapshots from SWMR registers is not formalized and enters as
-the hypothesis `ISLowerBound`. The locality proof (Appendix A) has a gap, and the witness execution of
-Example 2 is not well formed (one process has two operations pending at once); both are easy to repair.
-There are also several typos in proofs.
+the hypothesis `ISLowerBound`. Only proofs needed changes, all of them local: the acyclicity step of
+the locality proof (Appendix A), the witness of Example 2, which is not well formed (one process has two
+operations pending at once), and the descriptions of `H₁`, `H₂` in Lemmas 1 and 2.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
 - Proof of Theorem 1 (p. 9): the first display should read
   `ret(Q, τ_{A(c)}(H₁)) ≤ ret(Q, H(A′, σ, c)) ≤ ret(Q, τ_{A(c)}(H₂))`, not `A` and `H₁`;
   "`ret(Q, τ_{A(c)}(H₂)) ≤ v_max`" should be `τ_I(H₂)`; the last line should have `≤ v_max + ε`, not
   `≥`.
 - Definition of `v_min`/`v_max`: `min{τ_I(L)}` should be `min{ret(Q, τ_I(L))}`.
-- Proof of Invariant 1, case `v = 0`: "`v′ᵢ = 1`" should be `v′ᵢ = 0`. Invariant 1 and Lemma 3 use
-  `H′` before it is defined (in Lemma 4's proof). The summation index `i` clashes with the process
-  index `i`.
+- Proof of Invariant 1, case `v = 0`: "`v′ᵢ = 1`" should be `v′ᵢ = 0`.
 - Lemma 3: "the last update invocation" should be "the last `updateᵢ` invocation". The literal
   reading is also true but weaker.
+
+### Typos
+- Invariant 1 and Lemma 3 use `H′` before it is defined (in Lemma 4's proof). The summation index `i`
+  clashes with the process index `i`.
 - Lemma 1's proof starts "We next prove that i is IVL".
 - Appendix A: "`H₂` of `H 2`" should be "of `H?`".
 - Example 2: the text says "P DC" where PCM is meant.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Locality of IVL (§3.2, Appendix A)
+### 🔧 Locality of IVL (§3.2, Appendix A)
 The proof asserts that the union of the per-object linearization orders and the real-time order is
 "a well defined partial order", but that union is not transitive and the acyclicity of its
 transitive closure is never argued.
 
-**Impact.** Statement true; repaired with CSLib's merge of per-object linearizations
-(`HW.ivl_locality`).
+**Impact.** The statement is true; our proof fills this step with CSLib's merge of per-object
+linearizations (`HW.ivl_locality`).
 
 **Details.** The paper justifies the claim by the per-object orders respecting real time and being
 disjoint. The real work, as in Herlihy–Wing's locality proof, is showing that the transitive closure
@@ -50,7 +50,7 @@ is acyclic, since cycles may alternate between objects and real-time edges.
 **Repair.** Our proof uses CSLib's merge of per-object linearizations by explicit linearization
 points, which proves exactly this step.
 
-### 🛠️ Example 2 (the witness that PCM is not linearizable)
+### 🔧 Example 2 (the witness that PCM is not linearizable)
 Example 2's execution is not well formed: process `p` invokes `Q₁ = query(a)` and `Q₂ = query(b)`
 while its own `U = update(a)` is still pending.
 
@@ -63,28 +63,21 @@ We also reach the paper's initial matrix `[[1,4],[2,3]]` from the all-zero matri
 with the updates `a, b, e, e, e`. The responses force `U` before `Q₁` and `Q₂` before `U`, while
 `Q₁` precedes `Q₂` in real time.
 
-### 🛠️ Lemma 2 (the linearizations `H₁`, `H₂`)
+### 🔧 Lemma 2 (the linearizations `H₁`, `H₂`)
 The proof of Lemma 2 places reads "after all preceding operations and before concurrent ones" with
 ties broken arbitrarily, which is contradictory for two concurrent reads.
 
-**Impact.** Statement true; the intended orders work and the rest of the proof goes through as
+**Impact.** The statement is true; the intended orders work and the rest of the proof goes through as
 written (`Alg2.alg2_sandwich`).
 
 **Repair.** Reads at their invocation and updates at their response, and the converse.
 
-### 🛠️ Lemmas 1 and 4 (imprecise steps)
-Lemma 1's proof misdescribes the count in `H₁`, and Lemma 4's proof applies the sequential Lemma 3
-to a linearization without justification.
+### 🔧 Lemma 1 (the count in `H₁`)
+Lemma 1's proof describes `c_{σ₁}(Q)[i]` as "the value when the query starts", but the count in `H₁`
+only lower-bounds the counter at the query's start, because pending updates may already have
+incremented it.
 
-**Impact.** Statements true; routine fixes (`pcm_sandwich`, `alg3_linearizable`).
-
-**Details.**
-- Lemma 1: "`c_{σ₁}(Q)[i]` (the value when the query starts)": the count in `H₁` only lower-bounds
-  the counter at the query's start, because pending updates may already have incremented it. The
-  bound still holds. (`pcm_sandwich`)
-- Lemma 4: applying Lemma 3 needs each process's operations to appear in program order in the
-  linearization. It is true (each process's operations are ordered by real time) but not mentioned.
-  (`alg3_linearizable`)
+**Impact.** The statement is true; only the lower bound is used, and it still holds (`pcm_sandwich`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -136,6 +129,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Invariant 1, Lemma 3 | `alg3_invariant1`, `binSnap_scan_resp` | `Snapshot.lean` |
 | Lemma 4 (+ wait-free, update/scan ≤ 1 counter access) | `alg3_linearizable`, `alg3_waitFree`, `alg3_update_steps`, `alg3_scan_steps` | `Snapshot.lean` |
 | Theorem 3 (conditional on Israeli–Shirazi) | `theorem3` (hypothesis `ISLowerBound`) | `LowerBound.lean` |
+
+**Proof remarks.** Applying the sequential Lemma 3 in Lemma 4's proof needs each process's operations
+to appear in program order in the linearization. This is true (each process's operations are ordered
+by real time) but not mentioned (`alg3_linearizable`).
 
 **Not formalized.** The sequential error analysis of CountMin [7], and hence Corollary 1's concrete
 bound `f_a^start ≤ f̂_a ≤ f_a^end + αn`; it enters only as the hypothesis of `pcm_concBounded`. The

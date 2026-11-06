@@ -4,23 +4,21 @@ Paper: Y. Efron, O. Grossman, S. Khoury, *Beyond Alice and Bob: Improved Inappro
 Independent Set in CONGEST*, PODC 2020 (arXiv:2003.07427v2; numbering follows it).
 
 Classification: **false statement** / **false only in a degenerate case** / **proof gap (statement true)** /
-**under-specified definition** / **typo** / **modelling choice**. Verdict rules: `verdicts.md` (R1–R6).
+**under-specified definition** / **typo** / **modelling choice**.
 
-## Verdict reasoning
+## Overview
 
-* No numbered statement checked here is false. The serious error is the cut count inside the proofs of
-  Theorems 1 and 2 (item 1). Theorems 1 and 2 themselves are proved, conditional on Theorem 3 like the
-  paper, by a repaired argument that uses a different code. By R1 a false claim inside a proof whose
-  result is true is a proof repair, so the verdict is 🛠️.
-* Borderline call: the repair changes an ingredient of the construction (the code). The *statements* of
-  Theorems 1 and 2 are unchanged and are even strengthened. They are existential lower bounds on all
-  algorithms, so the change of construction is a change of proof, not of claim. We therefore classify
-  this as 🛠️ and not as ❌ ("headline unestablished"). Had the theorems been tied to the paper's specific
-  family, ❌ would apply: the paper's argument with its own construction yields only `Ω(n/log⁴ n)`.
+* The main error is the cut count inside the proofs of Theorems 1 and 2 (item 1). Theorems 1 and 2
+  themselves are proved, conditional on Theorem 3 like the paper, by a repaired argument that uses a
+  different code.
+* The repair changes an ingredient of the construction (the code). The *statements* of Theorems 1 and 2 are
+  unchanged and are even strengthened. They are existential lower bounds on all algorithms, so the change
+  of construction is a change of proof, not of claim. The paper's argument with its own construction
+  yields only `Ω(n/log⁴ n)`.
 
 ## Main issues
 
-1. **Cut size (proof gap in Theorems 1 and 2; statements true).** The proofs use
+1. **Cut size (🛠️; proof gap in Theorems 1 and 2, statements true).** The proofs use
    `|cut(G_x̄)| = t² log² k` (Thm 1) and `Θ(t² log² k)` (Thm 2). The construction has exactly
    `(t choose 2)·q²(q−1)` cut edges with `q = ℓ + α` (Thm 2: twice that), i.e. `Θ(t² log³ k)`
    (`paper_cut_edges`, `card_linFamily_Ecut`, `card_quadFamily_Ecut`; `Ecut` counts ordered arcs, i.e. twice
@@ -29,22 +27,22 @@ Classification: **false statement** / **false only in a degenerate case** / **pr
    length `M`, `2^M` messages, pairwise agreement `≤ ⌊M/D⌋` (`Cslib.exists_code_agree_le`). Heavy nodes get
    weight `M`. The cut has `O(M) = O(log n)` edges, and the results are `T·B·log n ≥ C n` and `≥ C n²`.
    These are stronger than the paper's `Ω(n/log³ n)`, `Ω(n²/log³ n)` for `B = O(log n)`.
-2. **Lemma 3, choice of `t` (proof slip; statement true).** `t = 3/(4ε) − 1` is too small (see README). We
+2. **Lemma 3, choice of `t` (🔧; proof gap, statement true).** `t = 3/(4ε) − 1` is too small (see README). We
    use `t = ⌈3/(2ε)⌉ + 3` and the condition `3αt² ≤ 2εℓ` (`lemma3_gap`). Lemma 2's `t = 2/ε` is fine; we
    use `t = ⌈1/ε⌉ + 3` with `αt ≤ εℓ` (`lemma2_gap`).
-3. **Corollary 1 / Definition 6, strictness (proof gap).** A γ-approximation algorithm separates
+3. **Corollary 1 / Definition 6, strictness (✏️; proof gap).** A γ-approximation algorithm separates
    "OPT ≥ β" from "OPT ≤ γ'β" only if `γ' < γ`; Definition 6 allows `γ' = γ`. `corollary1` assumes
    `hi < γ·lo`. In the applications we take the family for `ε/2` (more precisely, we prove the strict
    inequality directly in `lin_gap`, `quad_gap`).
 4. **Theorem 4 (cited; over-general statement).** It is stated for any alphabet of size `q`, while the
    cited source (Reed–Solomon / Arora–Barak Lemma 19.11) needs a field. Proved for prime `q`
    (`theorem4`; distance `≥ M − L`, in fact `M − L + 1`). The paper's parameters can always be chosen with
-   `ℓ + α` prime, so nothing else depends on this. Status for composite `q`: not investigated. Not counted
-   for the verdict, since it is not formalized in that generality.
+   `ℓ + α` prime, so nothing else depends on this. Status for composite `q`: not investigated, so this
+   is not a mistake; it is not formalized in that generality.
 
 ## Definitions and model
 
-5. **Definition 5 (typo).** `w(I) ≥ OPT/γ` replaced by `w(I) ≥ γ·OPT` (`IsApprox`).
+5. **Definition 5 (✏️; typo).** `w(I) ≥ OPT/γ` replaced by `w(I) ≥ γ·OPT` (`IsApprox`).
 6. **What "an algorithm finds a γ-approximation" means (under-specified; modelling choice).** Each node
    outputs one bit (membership). The output must be an independent set of weight `≥ γ·OPT` with
    probability `≥ 2/3` on every graph with node set `V` and weights in `{0,…,|V|}` (`ApproxMIS`). The paper

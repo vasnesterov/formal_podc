@@ -5,18 +5,25 @@ Zahra Aghazadeh, Wojciech Golab, Philipp Woelfel. *Making Objects Writable.* POD
 PhD thesis *Efficient Shared Memory Algorithms for Bounding Space* (U. Calgary, 2018), which contains the paper
 with full proofs; numbering follows the thesis (the PODC version is not openly available).
 
-**Verdict: 🛠️ Proof repaired.** All checked statements hold: the template lemma (Lemma 4.5), the correctness of the
+**Verdict: 🛠️ Hard fix.** All checked statements hold: the template lemma (Lemma 4.5), the correctness of the
 wait-free algorithm (Lemma 4.8, hence the linearizability part of Theorem 4.1 and of Corollary 4.4) and the
 sequentially resettable `(k,b)`-array (Lemma 4.2). The proof of Lemma 4.5 has a genuine gap: it never uses the
-template's "not in use" requirement, without which the lemma is false; the proof of Lemma 4.8 has smaller gaps.
+template's "not in use" requirement, without which the lemma is false, and it took a new construction of the
+linearization to save it; the proof of Lemma 4.8 has smaller gaps. The wait-freedom and complexity claims of
+Theorem 4.1 were not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
+### ✏️ Slips
+- Claims 4.15(b) and 4.16 (inside the proof of Lemma 4.8) are literally false at the level of single points, because
+  within one `recycle()` line 26 can add `i*` to `free_p` at the same point at which lines 27–28 read `i*` from `Annc`
+  and enqueue it (the mechanism is checked on the local queue state by an `example` in `Lemma48.lean`; no full
+  execution was built). Their uses (Claims 4.17, 4.21–4.22) keep one `recycle()` call of margin.
 
-### Typos and slips
+### Typos
 - Lemma 4.2, proof of Part (b1): "`[t_W@rsp, t_R@inv] = [t_W@64, t_R@60]`" and "q reads `(x_W, v_W)` from `A[i*]` in
   line 60" should say line 59; "when p reads this variable in line 60 of R" should say q.
+- Lemma 4.8, proof of (4.32): "q completes" should be "p completes".
 - Lemma 4.2 needs `k ≥ 1` (the version counter is taken `mod k`); implicit.
 
 ## Proof gaps (statements true)
@@ -46,28 +53,22 @@ timestamp-`ℓ` block is then a contiguous segment of `L_{i_ℓ}` starting with 
 follows from that of `L_{i_ℓ}`. The high-level linearization lists these blocks by increasing timestamp
 (`linWT`, `IsCtrl.isLinearization_linWT`).
 
-### 🛠️ Lemma 4.8 (the algorithm satisfies (C)), proof of (4.32)
+### 🔧 Theorem 4.1 (the algorithm follows the template)
+Lemma 4.5 requires that the write-index of a `Write` is not in use when chosen, but this is never proved for the
+algorithm of Figure 4.5; the proof of Theorem 4.1 only establishes condition (C) (Lemma 4.8).
+
+**Impact.** Statement true; it follows quickly from Claim 4.22(a) (a `Write` contains only one `recycle()`),
+and is proved as part of our invariant (`WF.lemma_4_8`, which gives `Template ∧ CondC`).
+
+### 🔧 Lemma 4.8 (the algorithm satisfies (C)), proof of (4.32)
 The count "p invokes more than `n` `Write()` calls during `[t_E@36, t_E@39]`, and so q completes at least `n`
 `Write()` calls during this interval" may include a `Write` invoked before `t_E@35`, to which Claim 4.20 (stated
-for `Write`s completing during `(t_E@35, t_E@40]`) does not apply as stated; also "q completes" should be
-"p completes".
+for `Write`s completing during `(t_E@35, t_E@40]`) does not apply as stated.
 
 **Impact.** Statement true; only line 14 of that `Write` (its read of `S_q`) needs to come after `t_E@35`, which
 holds (`WF.lemma_4_8`).
 
-**Details.** Two further imprecisions inside the proof of Lemma 4.8 (claims inside a proof, rule R1), both
-harmless: Claims 4.15(b)/4.16 are literally false at the level of single points, because within one `recycle()`
-line 26 can add `i*` to `free_p` at the same point at which lines 27–28 read `i*` from `Annc` and enqueue it (the
-mechanism is checked on the local queue state by an `example` in `Lemma48.lean`; no full execution was built);
-their uses (Claims 4.17, 4.21–4.22) keep one `recycle()` call of margin. Claim 4.19's "both writes happen in the
-same `Write`" is asserted without argument; it is true.
-
-### 🛠️ Theorem 4.1 (the algorithm follows the template)
-Lemma 4.5 requires that the write-index of a `Write` is not in use when chosen, but this is never proved for the
-algorithm of Figure 4.5; the proof of Theorem 4.1 only establishes condition (C) (Lemma 4.8).
-
-**Impact.** Statement true; minor: it follows quickly from Claim 4.22(a) (a `Write` contains only one `recycle()`),
-and is proved as part of our invariant (`WF.lemma_4_8`, which gives `Template ∧ CondC`).
+**Details.** Claim 4.19's "both writes happen in the same `Write`" is asserted without argument; it is true.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -107,8 +108,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Corollary 4.4 (linearizable `k`-word register) | `WF.corollary_4_4`, `template_kWord_linearizable` | `Theorem41.lean`, `Cor44.lean` |
 
 **Not formalized.** The complexity parts of Theorem 4.1 and Corollary 4.4 (constant additive step overhead,
-register sizes `2 log n + O(1)`, wait-freedom; they hold by inspection of `WF.Step`, and Claim 4.14 — `free_p` is
-never empty — is not proved), Corollary 4.3 and the applications of Sections 4.1.2–4.1.3.
+register sizes `2 log n + O(1)`, wait-freedom; they look right by inspection of `WF.Step`, but we did not examine
+them, and Claim 4.14 — `free_p` is never empty — is not proved), Corollary 4.3 and the applications of Sections 4.1.2–4.1.3.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: `Counterexample.lemma_4_5_nonvacuous` (a concurrent transcript satisfying all hypotheses of

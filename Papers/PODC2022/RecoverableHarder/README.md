@@ -4,19 +4,23 @@ Carole Delporte-Gallet, Panagiota Fatourou, Hugues Fauconnier, Eric Ruppert. *Wh
 Harder Than Consensus?* PODC 2022. DOI [10.1145/3519270.3538418](https://doi.org/10.1145/3519270.3538418).
 Formalized version: arXiv [2205.14213](https://arxiv.org/abs/2205.14213) v1 (with appendices).
 
-**Verdict: 🛠️ Proof repaired.** All results of Section 3 hold and are formalized with the paper's proofs:
+**Verdict: 🔧 Easy fix.** All results of Section 3 hold and are formalized with the paper's proofs:
 `n`-recording suffices for recoverable consensus (Theorem 8, with the algorithm of Figure 2 and the tournament
 of Proposition 30), `(n-1)`-recording is necessary (Theorem 14), Theorem 16, Propositions 18, 19, 21, Corollaries
 17, 20 and Theorem 22. Corollary 20 rests on an unproved claim (`cons(T_n) ≤ n`), which we prove; two
-"commute or overwrite" steps in the proofs of Propositions 19 and 21 are false as stated but easily repaired.
+"commute or overwrite" steps in the proofs of Propositions 19 and 21 are false as stated and a step of Lemma 11 is
+circular, but all are easily repaired. Section 4 and simultaneous crashes were not checked, and sufficiency is proved
+for binary consensus only.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
+### ✏️ Slips
+- Lemma 7 is false for the empty sequence, which takes `q₀` to `q₀` without containing team `X`: it needs the schedule
+  to be nonempty, and its uses never reach this case (`lemma7`).
 
 ## Proof gaps (statements true)
 
-### 🛠️ Corollary 20 (`cons(T_n) = n`)
+### 🔧 Corollary 20 (`cons(T_n) = n`)
 The paper derives `rcons(T_n) < cons(T_n) = n` "from Proposition 19 combined with Theorems 3 and 14", but
 `cons(T_n) ≤ n` needs that `T_n` is not `(n+1)`-discerning, which is nowhere shown.
 
@@ -28,7 +32,7 @@ resp. `⌈n/2⌉ + 1` processes), so a schedule of that team returns the object 
 of the other team cannot tell who went first; values other than `(⊥,0,0)` and read operations are excluded as in
 the paper.
 
-### 🛠️ Proposition 19 ("commute or overwrite" step)
+### 🔧 Proposition 19 ("commute or overwrite" step)
 The proof's claim "if `q₀ ≠ (⊥,0,0)` then any pair of operations either commute or overwrite" is false for
 `q₀ = (w, ⌈n/2⌉−1, ⌊n/2⌋−1)`.
 
@@ -38,7 +42,7 @@ The proof's claim "if `q₀ ≠ (⊥,0,0)` then any pair of operations either co
 (`op_A op_B` ends in `(B,0,0)`, `op_B op_A` in `(A,0,0)`) nor overwrite each other. The conclusion survives because
 the two single operations reach the same value, which already violates condition 1 of `2`-recording.
 
-### 🛠️ Proposition 21 (why `q₀` must be `(B,0)`)
+### 🔧 Proposition 21 (why `q₀` must be `(B,0)`)
 The argument that `q₀` must be `(B,0)` uses only "operations of opposite teams cannot commute or overwrite", but
 from `q₀ = (w, n−1)` the operations `op_A` and `op_B` neither commute nor overwrite each other and both lead to
 `(B,0)`.
@@ -49,19 +53,11 @@ from `q₀ = (w, n−1)` the operations `op_A` and `op_B` neither commute nor ov
 **Details.** The schedules `op_A op_k` and `op_B op_k` give `k` the same response and value. (A `Read` assigned
 to a process is excluded by the paper's overwrite argument: any operation overwrites `Read`.)
 
-### 🛠️ Theorems 8 and 14 (small gaps)
-Lemmas 7, 11 and 13 (for Theorem 8) and Case 2 of Theorem 14 have small gaps in otherwise correct proofs.
+### 🔧 Lemma 11 (circular step)
+Lemma 11 uses "no update by the same process twice after `s''`" to show that `O` never returns to `q₀`, and
+conversely.
 
-**Impact.** Statements true; routine fixes (`theorem8`, `theorem14`).
-
-**Details.**
-- Lemma 13, Case 3, claims without justification that an earlier run of the single process of `B` finds
-  `R_A = ⊥` at line 19 (true because `R_A` is never reset and that process later finds `⊥`).
-- Lemma 11 uses "no update by the same process twice after `s''`" to show that `O` never returns to `q₀`, and
-  conversely — a simultaneous induction.
-- Lemma 7 needs the schedule to be nonempty.
-- In Theorem 14, condition 3 in Case 2 is shown without using `|A| > 1`: no cycle starts on team `B` at all (we
-  formalize this slightly stronger statement).
+**Impact.** Statement true; a simultaneous induction resolves it (`fig2_safe`, `theorem8`).
 
 **Repair.** Our proof of Theorem 8 replaces the execution-based Lemmas 9–13 by an invariant with ghost state
 (`InvV`), checked for every step and crash.
@@ -106,6 +102,12 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Proposition 21 | `SS.isRecording`, `SS.not_isDiscerning`, `prop21` | `TypeS.lean`, `Corollaries.lean` |
 | Theorem 22 | `theorem22`, `theorem22_ovens`, `recSolvableSet_of_recSolvable` | `Corollaries.lean` |
 | Ovens'24 Theorem 14 without hypothesis | `ovens_theorem14` | `Corollaries.lean` |
+
+**Proof remarks.** Two small points, with routine fixes (`theorem8`, `theorem14`):
+- Lemma 13, Case 3, claims without justification that an earlier run of the single process of `B` finds
+  `R_A = ⊥` at line 19 (true because `R_A` is never reset and that process later finds `⊥`).
+- In Theorem 14, condition 3 in Case 2 is shown without using `|A| > 1`: no cycle starts on team `B` at all (we
+  formalize this slightly stronger statement).
 
 **Remark (not an error).** Theorem 22 and the "`rcons(T)` is `n` or `n + 1`" bound are not tight: by Ovens'
 Theorem 13 (PODC'24, formalized in [`RecoverableConsensus`](../../PODC2024/RecoverableConsensus)) recoverable
