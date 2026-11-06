@@ -5,55 +5,59 @@ Distributed Optimization.* PODC 2019. DOI [10.1145/3293611.3331597](https://doi.
 Formalized version: arXiv [1905.10284](https://arxiv.org/abs/1905.10284) v1; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The near-quadratic CONGEST lower bounds of Section 2 hold. We formalize
-them for minimum dominating set (Thm 2.1), directed Hamiltonian path and cycle (Thms 2.2, 2.3), Steiner tree (Thm 2.7)
-and weighted max-cut (Thm 2.8), with the deterministic framework (Theorem 1.1, including `CC(DISJ) ≥ K`)
-proved. Every gadget lemma is true, but several proofs have gaps or rely on statements that are false as
-written: one intermediate claim in the MDS proof is false, the Steiner-tree proof relies on that false
-claim, the text of the Hamiltonian-path construction omits arcs that its proof uses (they appear only in
-Figure 2), and the max-cut proof only works for `k ≥ 128`.
+**Verdict: 🛠️ Hard fix.** The near-quadratic CONGEST lower bounds of Section 2 hold: we formalize them for minimum
+dominating set (Thm 2.1), directed Hamiltonian path and cycle (Thms 2.2, 2.3), Steiner tree (Thm 2.7) and weighted
+max-cut (Thm 2.8), with the deterministic framework (Theorem 1.1, including `CC(DISJ) ≥ K`) proved. Every gadget lemma
+is true; the dominating-set and Steiner-tree proofs need local repairs, but Claim 2.2 for Hamiltonian path needed a new
+proof replacing Claims 2.3–2.5. The undirected variants and Sections 3–5 were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Section 2.2.1 (Hamiltonian path construction: missing arcs)
-The textual construction defines no arcs out of `r_c`, so taken literally `r_0` and `end` both have out-degree 0
-and no input has a Hamiltonian path (`paperArc_not_hamPath`).
-
-**Impact.** An under-specified definition with evident intent: the proof of Claim 2.1 goes "from `r_s` into
-`ℓ^{s,k−1}_{q'}`", and Figure 2 draws these arcs. With the arcs `r_c → ℓ^{c,k−1}_q` added, Claims 2.1 and 2.2 hold
-(`hamPath_iff`).
-
-**Details.** The partition `V_A/V_B` and `E_cut` are not given; we choose one with `|E_cut| ≤ 24 log k + 1`.
-
-### ⚠️ Claim 2.7 (2-edge-connected subgraph with `n` edges)
-Claim 2.7 omits "spanning": `K₄` plus two pendant vertices has a 2-edge-connected subgraph with `n = 6` edges but no
-Hamiltonian cycle.
-
-**Impact.** Typo-level: the proof assumes a spanning subgraph, and the claim is true for spanning subgraphs.
-(Not formalized.)
-
-### ⚠️ Claim 2.8 for `k = 1` (Steiner tree)
-For `k = 1` there is no crossing edge, so the Steiner-tree graph is disconnected and Claim 2.8 is false.
-
-**Impact.** Degenerate case; we prove Claim 2.8 for `k ≥ 2` (`claim_2_8`).
-
-### Typos and slips
+### ✏️ Slips
+- Section 2.2.1: the textual construction defines no arcs out of `r_c`, so taken literally `r_0` and `end` both have
+  out-degree 0 and no input has a Hamiltonian path (`paperArc_not_hamPath`). The proof of Claim 2.1 goes "from `r_s`
+  into `ℓ^{s,k−1}_{q'}`", and Figure 2 draws these arcs. With the arcs `r_c → ℓ^{c,k−1}_q` added, Claims 2.1 and 2.2
+  hold (`hamPath_iff`). The partition `V_A/V_B` and `E_cut` are not given; we choose one with `|E_cut| ≤ 24 log k + 1`.
+- Section 2.2.1, Claims 2.1 and 2.5: index errors. "`log(k) ≤ s ≤ log(k) − 1`" should end at `2 log k − 1`,
+  `r_{log k − 1}` should be `r_{2 log k − 1}`, `choose_s` for `s ≥ log k` tests bit `s − log k` of `j`, and Claim 2.5's
+  range excludes the last box.
+- Claim 2.7 omits "spanning": `K₄` plus two pendant vertices has a 2-edge-connected subgraph with `n = 6` edges but no
+  Hamiltonian cycle. The proof assumes a spanning subgraph, and the claim is true for spanning subgraphs. (Not
+  formalized.)
+- For `k = 1` there is no crossing edge, so the Steiner-tree graph is disconnected and Claim 2.8 is false; we prove
+  Claim 2.8 for `k ≥ 2` (`claim_2_8`). The max-cut weight `2k² log k − k²` is also negative for `k = 1`.
+- Claim 2.9: the proof bounds the total weight of the light edges, exactly `16k³ log k − 4k³ + 2k² + |x| + |y|`, by
+  `k⁴`, which fails for `k ≤ 64`, so the proof only works for `k ≥ 128`. Claim 2.9 and Lemma 2.4 still hold for every
+  `k ≥ 2` (`claim_2_9`, `lemma_2_4`): we prove them with a direct counting inequality valid for every cut instead of
+  the exchange arguments of Claims 2.9–2.12.
 - Definition 1.1 requires "`P` iff `DISJ = TRUE`"; all constructions give "`P` iff `DISJ = FALSE`".
 - In the max-cut construction `|E_cut| = 4 log k + 1`, not only the T/F edges: `C̄_A – C_B` also crosses.
-- "Three crossing edges" should be two (Claim 2.8).
-- `i ∈ [n]` should be `[k]` (bin); `t^j_S` in `bin̄`.
-- `b^{j_i}_z` should be `b^{j_z}_z`, plus other index typos in Section 2.4.1.
+- Proof of Claim 2.10: the edges from `a^j_1` to `A₂` and `N_A` are said to have weight 1, but the `N_A` edge weighs
+  `Σ_j x_{i,j}`; only the total at most `k` is used.
 - In Lemma 2.3, `E'` should only contain pairs `(u, w) ∈ E`.
 - The step "`T(n) = O(n²)` hence `2T(3n) = O(T(n))`" in Lemmas 2.2–2.3 is not a valid inference. The lower bound
   transfers directly anyway. (Not formalized.)
 
+### Typos
+- "Three crossing edges" should be two (Claim 2.8).
+- `i ∈ [n]` should be `[k]` (bin); `t^j_S` in `bin̄`.
+- `b^{j_i}_z` should be `b^{j_z}_z`, plus other index typos in Section 2.4.1.
+
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 2.1 (MDS), case "two row vertices in `D`"
+### 🛠️ Claims 2.3–2.5 (Hamiltonian path, Claim 2.2)
+Claim 2.4 assumes `g_c` is visited before `r_c`, and Claim 2.5 uses an unproved "rows before `s¹₁` are entered from
+launch vertices".
+
+**Impact.** Claim 2.2 is true; our proof replaces Claims 2.3–2.5 (`hamPath_iff`).
+
+**Repair.** A new proof with path positions and a classification of the blocks (`claim_2_2`).
+
+### 🔧 Lemma 2.1 (MDS), case "two row vertices in `D`"
 The proof claims that `D` contains exactly one of every pair `f^h_S, t^h_S`, which is false
 (`paper_intermediate_claim_false`).
 
-**Impact.** Statement true; reproved by a different case analysis (`lemma_2_1`).
+**Impact.** The lemma stands; a different case analysis replaces this step (`lemma_2_1`).
 
 **Details.** The proof argues "if `f_A ∈ D` then `f_B ∈ D` to dominate `u_A`", overlooking `u_A ∈ D`.
 Counterexample for `k = 2`: with `x = y =` "column `p` all ones",
@@ -63,35 +67,20 @@ first-layer cycle is covered by `{u_A, u_B}`.
 **Repair.** Every 6-cycle holds exactly two vertices of `D`, `D` has exactly one row per side, and the nine possible
 two-vertex patterns of a cycle are analysed by `decide`. (`paper_intermediate_claim_false`, `lemma_2_1`)
 
-### 🛠️ Lemma 2.1 (MDS), case "`4 log k + 1` gadget vertices, one row vertex in `A₁`"
+### 🔧 Lemma 2.1 (MDS), case "`4 log k + 1` gadget vertices, one row vertex in `A₁`"
 The conclusion that `B₁` or `B₂` gets exactly `log k` gadget vertices of `D` is not implied by the counts.
 
-**Impact.** Statement true; the step needs one extra fact.
+**Impact.** The lemma stands; the step needs one extra fact.
 
 **Repair.** The rows of `A₁` outside `D` force `log k` gadget vertices on `A₁`.
 
-### 🛠️ Claim 2.8 (Steiner tree), `⇐` direction
+### 🔧 Claim 2.8 (Steiner tree), `⇐` direction
 The proof joins the two copy-cliques through a crossing edge, assuming that an *arbitrary* minimum dominating set
 contains `f⁰_{A₁}, f⁰_{B₁}` or `t⁰_{A₁}, t⁰_{B₁}`, which the Lemma 2.1 counterexample refutes.
 
-**Impact.** Statement true for `k ≥ 2`; repaired (`claim_2_8`).
+**Impact.** The claim holds for `k ≥ 2`, with the repair below (`claim_2_8`).
 
 **Repair.** Use the canonical dominating set of the intersecting index.
-
-### 🛠️ Claims 2.3–2.5 (Hamiltonian path, Claim 2.2)
-Claim 2.4 assumes `g_c` is visited before `r_c`, and Claim 2.5 uses an unproved "rows before `s¹₁` are entered from
-launch vertices".
-
-**Impact.** Claim 2.2 is true; our proof replaces Claims 2.3–2.5 (`hamPath_iff`).
-
-### 🛠️ Claim 2.9 (max-cut)
-The proof bounds the total weight of the light edges, exactly `16k³ log k − 4k³ + 2k² + |x| + |y|`, by `k⁴`, which
-fails for `k ≤ 64`, so the proof only works for `k ≥ 128`.
-
-**Impact.** Claim 2.9 and Lemma 2.4 still hold for every `k ≥ 2` (`claim_2_9`, `lemma_2_4`).
-
-**Repair.** We prove them with a direct counting inequality valid for every cut instead of the exchange arguments
-of Claims 2.9–2.12.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -143,6 +132,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
   coin spaces; without nonemptiness it would be degenerate, `hCC_without_nonempty_degenerate`).
 * The "computing" (search) versions of the problems.
 * The undirected Hamiltonian path/cycle and 2-ECSS results (Lemmas 2.2–2.3, Theorems 2.4–2.5, Claim 2.7).
+* Claims 2.10–2.12: replaced by a counting inequality, not checked one by one.
 * Section 2.4.2 (approximation algorithm for max-cut), Section 3 (bounded degree), Section 4
   (approximation) and Section 5 (limitations).
 

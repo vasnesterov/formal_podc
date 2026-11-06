@@ -5,22 +5,21 @@ Consensus.* PODC 2022. DOI [10.1145/3519270.3538430](https://doi.org/10.1145/351
 the PODC paper (Protocol ICC0, Figures 1–2, and the three lemmas of Section 4). The PODC version has no proofs; they
 are deferred to the full version (IACR ePrint 2021/632), which we did not use. All proofs here are our own.
 
-**Verdict: ⚠️ Minor statement issues.** Safety (Property P2) and Deadlock freeness (P1) of ICC0 hold as stated for
-`t < n/3`, and so does the consistency of the honest outputs. Liveness under partial synchrony (P3) holds in the
-intended sense: the honest leader's block is committed by every honest party. Read literally, its conclusion
-("`B_Q` is in every honest pool as a *finalized* block") can fail because of Figure 2's `kmax` skipping. This is a
-wording issue, and a borderline call (see below).
+**Verdict: 🔧 Easy fix.** Safety (Property P2) and Deadlock freeness (P1) of ICC0 hold as stated for `t < n/3`, and so
+does the consistency of the honest outputs. Liveness under partial synchrony (P3) holds in the intended sense, that the
+honest leader's block is committed by every honest party, but read literally its conclusion ("`B_Q` is in every honest
+pool as a *finalized* block") can fail because of Figure 2's `kmax` skipping, and rewording it keeps the intent. Protocols
+ICC1 and ICC2, the ones meant for large blocks, were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Liveness lemma (conclusion "as a finalized block")
+### 🔧 Liveness lemma (conclusion "as a finalized block")
 The lemma promises that every honest party has `Q`'s block `B_Q` "in its pool as a finalized block", but if the
 adversary delivers the round-`(k+1)` finalization shares before the round-`k` ones, every honest party skips
 `B_Q` via Figure 2's `kmax` and never forms a finalization of it (counterexample in words only).
 
-**Impact.** A wording issue and a borderline call: the intended reading (P3 and its discussion) holds, namely
-every honest party holds `n − t` finalization shares of `B_Q`, has `kmax ≥ k`, and has committed `B_Q`: the chain
-ending at `B_Q` is a prefix of its output (`liveness`).
+**Impact.** The literal conclusion can fail, but what P3 and its discussion are after still holds: every honest party
+outputs `B_Q`.
 
 **Details.** By Section 3.4, "finalized" means that a combined finalization is in the pool. But Figure 2
 combines round-`k` finalization shares only if `k > kmax`. After the two synchronous instants of hypothesis (iv)
@@ -29,7 +28,10 @@ ones to every honest party. Then every honest party finalizes the round-`(k+1)` 
 `kmax = k + 1`, and outputs `B_Q` without ever forming a finalization of it. Nobody honest broadcasts one, so the
 literal conclusion fails. This counterexample is argued in words, not in Lean.
 
-### Typos and slips
+**Repair.** State the conclusion as commitment: every honest party holds `n − t` finalization shares of `B_Q`, has
+`kmax ≥ k`, and has committed `B_Q`: the chain ending at `B_Q` is a prefix of its output (`liveness`).
+
+### Typos
 - Section 3.5 describes clause (c) with "at least `Δntry(t)` time units"; it should be `Δntry(r)`, as in
   Figure 1.
 

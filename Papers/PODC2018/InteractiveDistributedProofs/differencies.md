@@ -1,12 +1,11 @@
 # Differences between the formalization and the paper
 
 Kol, Oshman, Saxena, *Interactive Distributed Proofs*, PODC 2018 (author copy, 10 pp.).
-Rules R1–R6 refer to the project's verdict scale.
 
 ## Errors in the paper
 
-1. **Lemma 3.11 is false** (❌, R1: numbered lemma; not excusable by R3/R4 because the paper's proof
-   reasons with the wrong object, and the fix changes the lemma's content).
+1. **Lemma 3.11 is false** (⚠️: the paper's proof reasons with the wrong object, and the fix changes the
+   lemma's content).
    `μ_A(F)` is defined as the law of the random set `𝓜_A(F, r)`, but the event the proof uses to separate
    `μ_A(F₁)` from `μ_A(F₂)` ("intersects `𝓜_B(F₁, r)`") depends on `r` itself. Counterexample
    (`LowerBound.lemma_3_11_false`): 6-vertex asymmetric graphs `F₁`, `F₂ = F₁ + {01}`, a simple protocol
@@ -21,8 +20,8 @@ Rules R1–R6 refer to the project's verdict scale.
    (checked locally) and the bridges `(enc(F_A) ⊕ r_{x_A}, enc(F_B) ⊕ r_{x_B})` with `n²`-bit challenges.
    This decides `Sym` on `𝒢`, and `𝓜_A(F, r)` is a uniform singleton for every `F`, so Lemma 3.11 fails for
    the paper's large family too (with `L = O(n²)`; the lemma has no bound on `L`).
-2. **Theorem 1.4 (lower bound `Ω(log log n)`) is unestablished as proved** (❌ by R5: a headline result
-   whose proof uses a false lemma). The intro's stronger claim ("even if the nodes share an unbounded amount
+2. **Theorem 1.4 (lower bound `Ω(log log n)`) is unestablished as proved** (⚠️, same mistake as item 1:
+   its proof uses a false lemma). The intro's stronger claim ("even if the nodes share an unbounded amount
    of randomness with the prover and with each other") is not supported by any argument.
    **Repair** (`LowerBound/Repair.lean`): `𝓜_A(F, r)` depends only on the A-side challenges and on
    `r_{x_A}, r_{x_B}`, and `𝓜_B` only on the B-side challenges and the same two. So with
@@ -36,13 +35,13 @@ Rules R1–R6 refer to the project's verdict scale.
    family `𝓕` with `|𝓕| ≥ 2^{c n²}` (cited from the literature) and the paper's claim
    `Sym(G(F_A, F_B)) ↔ F_A = F_B` (hypothesis `hiff`; proved for the counterexample family,
    `cexFamily_hiff`). The repaired dimension grows with `|R|²`, so the intro's "unbounded randomness"
-   claim remains unproved. (Borderline call, R5/R6: Definition 1 gives challenges length `ℓ`, so Theorem 1.4
+   claim remains unproved. (Definition 1 gives challenges length `ℓ`, so Theorem 1.4
    as formally defined is recovered by the repair, modulo the unformalized Lemma 3.7 and family facts; but
    the introduction says "for our lower bound we do not charge for [the random bits]" and claims the bound
-   with unbounded shared randomness. That stronger claim is unestablished, not refuted, hence ❌, not 🚨.)
+   with unbounded shared randomness. That stronger claim is unestablished, not refuted.)
    Lemmas 3.8 and 3.9 and Corollary 3.10 are formalized as stated
    (`lemma_3_8`, `lemma_3_9`, `corollary_3_10`). `FamilyOK` is not needed there, only `hiff`.
-3. **Protocol 1, line 2 counts the root as a child** (⚠️, R3: missing case in pseudocode; the intended
+3. **Protocol 1, line 2 counts the root as a child** (🔧: missing case in pseudocode; the intended
    version is the tree `T` "formed by the edges `{v, t_v}` for `v ≠ r`" of the proof of Lemma 3.3).
    The prover sends every node, including the root, a parent identifier `t_v`, and
    `C(v) = {u ∈ N(v) | t_u = v}` with `N(v) ∋ v`. If `t_r ∈ N(r)` (e.g. `t_r = r`), the root is in
@@ -60,31 +59,30 @@ Rules R1–R6 refer to the project's verdict scale.
      only with the repaired line.
    Repair used: `C(v) = {u ∈ N(v) | u ≠ r ∧ t_u = v}` (flag `excl = true`); then `lemma_3_3` and
    `theorem_3_4` hold as stated.
-   (Borderline call, R3/R5: Protocol 2 says explicitly `t_v ∈ V`, so the root's pointer cannot be `⊥`. The
-   fix is excused because the paper's own proof of Lemma 3.3 uses only the edges `{v, t_v}` for `v ≠ r`, the
-   honest prover gives each node "its parent in `T`" (the root has none), and the fix is local. Even if not
-   excused, the headline Theorem 1.1 is existential and holds with the repaired protocol (`theorem_1_1`),
-   so by R5 it could not be 🚨.)
-4. **Proof gap in Theorem 3.5** (🛠️, statement true). The proof fixes a root `r₀` and union-bounds over the
+   (Protocol 2 says explicitly `t_v ∈ V`, so the root's pointer cannot be `⊥`. But the paper's own proof of
+   Lemma 3.3 uses only the edges `{v, t_v}` for `v ≠ r`, the honest prover gives each node "its parent in `T`"
+   (the root has none), and the fix is local. Theorem 1.1 is existential and holds with the repaired protocol
+   (`theorem_1_1`).)
+4. **Proof gap in Theorem 3.5** (🔧, statement true). The proof fixes a root `r₀` and union-bounds over the
    `n^n` maps `σ`, but in Protocol 2 the prover names the root `r` (and must echo `i = i_r`) *after* seeing
    all challenges, so it can pick any node whose index is bad: the union bound must also range over `r`,
    which multiplies the paper's bound by `n`. Repair (`Protocol2.soundness_bound`, `soundness`): since `ρ`
    is broadcast as a permutation, union over `n · n!` pairs `(r, σ)`; `2 n · n! (n² − 1)/p < 1/3` for
    `p ≥ 10 n^{n+2}` because `n! ≤ n^{n−1}`. So the paper's parameters suffice.
-5. **Lemma 3.12: statement true, proof sloppy** (🛠️). The balls are intersected with `[0,1]^d`, which makes
+5. **Lemma 3.12: statement true, proof sloppy** (🔧). The balls are intersected with `[0,1]^d`, which makes
    their volumes depend on the centre, and the ℓ₁-ball volume formula `(4r)^d/(d+1)!` is wrong (it is
    `(2r)^d/d!` in `ℝ^d`). Repair (`LowerBound/Packing.lean`): full ℓ₁ balls in `ℝ^d` and translation/scaling
    invariance of Haar measure; we even get `|U| ≤ 5^d − 3^d`. Also a typo: the ball is written
    `{x | ‖µ − η‖₁ < r}` instead of `‖µ − x‖₁ < r`.
 6. **Theorem 3.2 is stated for inputs in `{0,1}^m`** but is applied to `∑_v [ρ(v), ρ(N(v))]`, whose entries
    lie in `{0, …, n}` when `ρ` is not injective (Lemma 3.1 is designed exactly for such `ρ`), and the
-   linearity clause itself adds vectors mod `p`. (⚠️-level imprecision, R3: the intended domain `(Z_p)^m`
+   linearity clause itself adds vectors mod `p`. (🔧: the intended domain `(Z_p)^m`
    is evident from the linearity clause.) We prove Theorem 3.2 on `(ZMod p)^m` (`theorem_3_2`), which the
    standard polynomial family satisfies. Taken literally (a family only known to be good on `{0,1}^m`),
    the protocols would not be sound: a linear family can vanish on a fixed non-0/1 difference vector while
    having small collision probability on `{0,1}^m`.
 
-## Typos and small slips (not affecting the verdict)
+## Typos and small slips
 
 * Protocol 1, line 3: `N_ρ(v)` "the vector whose `v`-th coordinate is 1 iff there exists `c ∈ C(v)` with
   `ρ_c = v`" should be `ρ(N(v))` (as in eq. (1), Lemma 3.3 and Protocol 2); with `C(v)` the honest prover

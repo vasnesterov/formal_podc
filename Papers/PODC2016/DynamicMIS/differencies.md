@@ -23,7 +23,7 @@ Section 4 (Algorithm 2) is formalized; see the last section below.
    - The reasoning "`u2 ∈ S_4` via `w2`" only works if the states in (1) are the *current*,
      dynamically updated states, not the states before the change.
 
-   **Verdict:** a genuine but notational flaw.
+   This is a genuine but notational flaw (🔧).
 
    We formalize the only unambiguous object, `S = ⋃ S_i`: the least set containing `v*` that is
    closed under the two rules (`DynamicMIS.Influenced`, with `mem_layers_iff` proving

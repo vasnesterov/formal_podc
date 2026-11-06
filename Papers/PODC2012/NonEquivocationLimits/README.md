@@ -5,14 +5,12 @@ Non-Equivocation.* PODC 2012. DOI [10.1145/2332432.2332490](https://doi.org/10.1
 Formalized version: the 8-page author copy (A. Kate's Purdue page; no arXiv version), which includes
 the appendices. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The two lower bounds hold for `n ≥ 3`. Claim 3.1 says
-non-equivocation without transferable authentication does not beat `n > 3f`; its proof needs a
-small repair. Claim 3.2 says signatures without non-equivocation do not beat it either; its proof
-is correct. Both claims fail in the degenerate case `n ≤ 2`. The positive direction for
-r-broadcast holds: with both primitives it works for every `n` and `f`. The paper's generic
-crash-to-Byzantine translation (Section 4, Figure 2, Appendix B) is **unsound**. A crash-safe
-3-process protocol becomes unsafe after translation with one Byzantine process, because a
-Byzantine process can replay messages that were addressed to other processes.
+**Verdict: ⚠️ Weakened.** The two lower bounds hold for `n ≥ 3`: Claim 3.1 says non-equivocation without transferable
+authentication does not beat `n > 3f`, and Claim 3.2 says signatures without non-equivocation do not beat it either.
+The positive direction holds for r-broadcast: with both primitives it works for every `n` and `f`. But the paper's
+generic crash-to-Byzantine translation (Section 4, Figure 2, Appendix B) is **unsound**: a crash-safe 3-process protocol
+becomes unsafe after translation with one Byzantine process, because a Byzantine process can replay messages that were
+addressed to other processes, and no repaired compiler is proved.
 
 ## Mistakes in the paper
 
@@ -53,29 +51,40 @@ signer differs. So every reading of the sloppy check `kp = |Rp| = |Sp|` that acc
 also accepts `u₂` from `2`. A verifier could reject `u₂` by recomputing, during the recursive replay,
 each input's recipient set (`grant` goes to `{1}`). But Figure 2 compares only payloads with `Sp`, and
 neither §4.1 Integrity nor Appendix B asks for a recipient check. Adding one changes the protocol; it
-is not a reading of it. This is a false claim, not just a gap. We rate it ❌ rather than 🚨 because
-every statement of the headline (abstract, intro, §4) is existential ("it is possible to …
-transform", "there exists a translation"), not "Figure 2 is correct". The counterexample refutes only
-the paper's witness, and a repaired compiler appears to exist (R5). (`Translation.translation_unsafe`,
-`Translation.check_u₂`, `Translation.attack_eq_honest`)
+is not a reading of it. So the failure is real, not just a gap. Every statement of the claim (abstract,
+intro, §4) is existential ("it is possible to … transform", "there exists a translation"), not "Figure 2
+is correct". The counterexample refutes only the paper's witness, and a repaired compiler appears to
+exist. (`Translation.translation_unsafe`, `Translation.check_u₂`, `Translation.attack_eq_honest`)
 
 **Repair.** One repair is to sign recipient sets, check that every replayed input was addressed to the
 sender, and reject duplicate inputs. Ben-David, Chan and Shi (PODC 2022) give a corrected compiler in
 a multicast model. We did not formalize a repaired translation.
 
-### ⚠️ Claims 3.1 and 3.2 for `n ≤ 2`
+### 🔧 Claims 3.1 and 3.2 for `n ≤ 2`
 Both claims are stated for every `n < 3f + 1`, but for `n ≤ 2` r-broadcast is solvable for every `f`,
 without signatures and against equivocation (`claim_3_1_false_small`, `claim_3_2_false_small`).
 
-**Impact.** Degenerate; both claims hold for `3 ≤ n ≤ 3f` (`Claim31.claim_3_1`, `Claim32.claim_3_2`).
+**Impact.** The added condition `3 ≤ n` saves the bound: both claims hold for `3 ≤ n ≤ 3f`
+(`Claim31.claim_3_1`, `Claim32.claim_3_2`). The proof of Claim 3.2 is otherwise correct.
 
 **Details.** Both proofs assume "w.l.o.g. `n = 3f`" with three nonempty groups. For `n ≤ 2`, the
 sender delivers its message and keeps sending it, and the other process delivers the first message it
 gets from the sender. Two distinct correct processes then include the sender.
 
+### ✏️ Slips
+- Figure 2, check `kp = |Rp| = |Sp|`: read literally, it rejects every honest message (for example `u₁` has `k = 1`,
+  `|R| = 1`, `|S| = 0`). The key is the sender's sequence number, and Appendix B does not depend on the exact form;
+  we read the check as `k = |S| + 1`.
+- Figure 2, receive handler: the received message is added to `R` only after the T-receive handler runs, so outputs
+  caused by it are not justified by `R` and honest messages fail the replay check. We add it before, the order
+  Appendix B describes.
+
+### Typos
+- In Claim 3.1's proof, Run 2 says "by the Agreement property", but the step also needs Completeness (L2).
+
 ## Proof gaps (statements true)
 
-### 🛠️ Claim 3.1 (Run 3)
+### 🔧 Claim 3.1 (Run 3)
 In Run 3, messages between `A` and `B` are "delivered in a timely fashion" throughout, but the
 processes of `A` do not crash at time `t`, so after `t` the processes of `B` may act differently from
 Run 2, and then `C` need not deliver `m'`, as the proof claims.

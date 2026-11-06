@@ -6,19 +6,36 @@ Lewis Tseng, Nitin H. Vaidya. *Fault-Tolerant Consensus in Directed Graphs.* POD
 authors); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The headline synchronous result holds: crash consensus with at most
-`f` crashes is solvable on a digraph iff every reduced graph `G_F` (`|F| ≤ f`) has a node reaching all
-of it (Theorems 1–4, binary and multi-valued). The asynchronous necessity (Theorem 6) holds.
-Its sufficiency (Theorem 7, only sketched) fails for Algorithm WA if phase-`p` messages are handled
-as soon as they arrive (the pseudocode does not say what happens to early messages): then a node can
-deadlock. It holds for the evident fix, which we verify.
-The proof of Theorem 5 (no fixed iterative algorithm) works only if outputs are "eventual"; with
-outputs at a fixed iteration — as Min-Max does — the paper's counterexample graph admits a fixed
-iterative algorithm.
+**Verdict: 🔧 Easy fix.** The tight conditions hold. Synchronous crash consensus with at most `f` crashes is solvable on a
+digraph iff every reduced graph `G_F` (`|F| ≤ f`) has a node reaching all of it (Theorems 1–4, binary and multi-valued),
+and in the asynchronous case the necessity (Theorem 6) holds, while the sufficiency (Theorem 7, only sketched) fails for
+Algorithm WA if phase-`p` messages are handled as soon as they arrive, but holds for the evident fix, which we verify.
+The side result Theorem 5 (no fixed iterative algorithm) survives only with "eventual" outputs: with outputs at a fixed
+iteration, as Min-Max does, the paper's counterexample graph admits a fixed iterative algorithm.
 
 ## Mistakes in the paper
 
-### ⚠️ Algorithm WA and Theorem 7 (early messages, deadlock)
+### ⚠️ Theorem 5 (no fixed iterative algorithm), under fixed-iteration outputs
+If an iterative algorithm outputs its value after a fixed iteration, as Algorithm Min-Max does, the
+paper's own counterexample graph admits a fixed iterative algorithm for `f = 1`: `Z(R) = ¬max R`
+with output after iteration 4 (`notMax_solvesAt`).
+
+**Impact.** Section 3 never says when an iterative algorithm outputs. With "eventual" outputs the
+paper's argument is sound and we prove Theorem 5 for every `f` (`theorem5`). Under the
+fixed-iteration reading the theorem is unestablished: whether it holds for some other graph is open.
+
+**Details.** The proof claims that a fixed transition function `Z` must map all-0 (all-1)
+collections to 0 (1) and that the source's value never changes. With fixed-iteration outputs this is
+false. For `f = 1`, `Z(R) = ¬max R` with output after iteration 4 solves binary crash consensus on
+the paper's graph (source, clique of `f + 1 = 2` nodes, leaf), against every crash pattern with one
+crash, including mid-round crashes with partial delivery. The values alternate between "true" and
+"negated", so `¬max` simulates alternating Max and Min rounds. Python search also confirms this for
+`f = 2`; for `f = 3` the same `Z` fails at `T = 4`.
+
+**Repair.** With "eventual" outputs (from some iteration on, the fault-free values agree and are
+inputs) we prove Theorem 5 for every `f` (`theorem5`).
+
+### 🔧 Algorithm WA and Theorem 7 (early messages, deadlock)
 If a phase-`p` message is handled on arrival, as the pseudocode's wording suggests, a node can lose
 it before entering phase `p` and then wait forever, already in a failure-free run on 5 nodes with
 `f = 1` (found by simulation, not in Lean).
@@ -40,57 +57,29 @@ buffered until `i` enters phase `p` (and nodes keep relaying), simulation finds 
 only a sketch ("the rest of the proof is standard"). We prove the fixed algorithm correct, including
 the liveness and the `1 − 1/n` contraction per phase that the sketch omits (`theorem7`).
 
-### ⚠️ Theorem 5 (no fixed iterative algorithm), under fixed-iteration outputs
-If an iterative algorithm outputs its value after a fixed iteration, as Algorithm Min-Max does, the
-paper's own counterexample graph admits a fixed iterative algorithm for `f = 1`: `Z(R) = ¬max R`
-with output after iteration 4 (`notMax_solvesAt`).
-
-**Impact.** Section 3 never says when an iterative algorithm outputs. With "eventual" outputs the
-paper's argument is sound and we prove Theorem 5 for every `f` (`theorem5`). Under the
-fixed-iteration reading the theorem is unestablished: whether it holds for some other graph is open.
-
-**Details.** The proof claims that a fixed transition function `Z` must map all-0 (all-1)
-collections to 0 (1) and that the source's value never changes. With fixed-iteration outputs this is
-false. For `f = 1`, `Z(R) = ¬max R` with output after iteration 4 solves binary crash consensus on
-the paper's graph (source, clique of `f + 1 = 2` nodes, leaf), against every crash pattern with one
-crash, including mid-round crashes with partial delivery. The values alternate between "true" and
-"negated", so `¬max` simulates alternating Max and Min rounds. Python search also confirms this for
-`f = 2`; for `f = 3` the same `Z` fails at `T = 4`.
-
-**Repair.** With "eventual" outputs (from some iteration on, the fault-free values agree and are
-inputs) we prove Theorem 5 for every `f` (`theorem5`). The paper's executions crash a clique node,
-which is impossible for `f = 0`; our proof also covers that case.
-
-### ⚠️ Algorithm MVC and Theorem 4 (inputs must be integers)
-"Inputs in the range `[0, K]`" must mean integers: with all inputs equal to `1/2` and `K = 1`,
-everybody outputs `1`, which is nobody's input.
-
-**Impact.** The OUTER-LOOP tests `tᵢ = l` for integers `l`, so integer inputs are evidently meant.
-We prove Theorem 4 for inputs in `{0, …, K}` (`theorem4`).
-
-### Typos and slips
-- Step 4 of MVC: `|min{b | …}| > 0` should be "`{b | …}` is non-empty".
+### ✏️ Slips
+- Algorithm MVC and Theorem 4: "inputs in the range `[0, K]`" must mean integers. With all inputs equal to `1/2` and
+  `K = 1`, everybody outputs `1`, which is nobody's input. The OUTER-LOOP tests `tᵢ = l` for integers `l`, so integer
+  inputs are evidently meant. We prove Theorem 4 for inputs in `{0, …, K}` (`theorem4`).
+- Claim 3's "iff" holds only in the "only if" direction, which is the one used (`inv_iteration`).
 - The induction step of Lemma 3 says "`l ≥ r`" for "`l ≤ r`".
+- The executions of Theorem 5 crash a clique node, which is impossible for `f = 0`; our proof also covers that case
+  (`theorem5`).
+
+### Typos
+- Step 4 of MVC: `|min{b | …}| > 0` should be "`{b | …}` is non-empty".
 - Claim 8 speaks of "sets of `2f + 1` values" of size `f + 1`; Claim 8 is not needed for the case
   analysis.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorems 1 and 3, Lemma 4, Claim 3 (minor gaps)
-Several proofs skip small steps: Theorem 1 uses an unproved graph equivalence, and Theorem 3 does
-not show that agreement persists.
+### 🔧 Theorem 1 (first step)
+The proof uses without proof that "no single root" means "some pair `i, j` without a common ancestor".
 
-**Impact.** Statements true; routine repairs (`ctConn_iff_oneReach`, `theorem1`, `theorem3`,
-`theorem4`).
+**Impact.** The statement stands (`theorem1`).
 
-**Details.**
-- Theorem 1 uses without proof that "no single root" means "some pair `i, j` without a common
-  ancestor" (`ctConn_iff_oneReach`). Its validity step is made precise by indistinguishability with
-  the all-0 execution.
-- The proof of Theorem 3 does not say that agreement persists after the clean pair of phases.
-- In Lemma 4, the case "nobody exits the OUTER-LOOP, output `K`" in fact never occurs for inputs in
-  `[0, K]`.
-- Claim 3's "iff" holds only in the "only if" direction, which is the one used.
+**Repair.** A short finite argument fills the step: a node with a maximal set of descendants reaches everything
+(`ctConn_iff_oneReach`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -140,6 +129,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
 The agreement argument of Min-Max is proved once for any binary trajectory that follows the Min/Max
 rule (`minmax_core`) and reused for MVC's INNER-LOOP. The clean pair of phases is found by
 pigeonhole over the `f + 1` disjoint (Max, Min) pairs.
+
+Routine details the paper skips:
+- The validity step of Theorem 1 is made precise by indistinguishability with the all-0 execution (`theorem1`).
+- The proof of Theorem 3 does not say that agreement persists after the clean pair of phases (`theorem3`).
+- In Lemma 4, the case "nobody exits the OUTER-LOOP, output `K`" in fact never occurs for inputs in `[0, K]` (`theorem4`).
 
 **Not formalized.** The literal (deadlocking) pseudocode of Algorithm WA; its deadlock was found and
 checked only by simulation. Whether Theorem 5 holds with fixed-iteration outputs for some other graph

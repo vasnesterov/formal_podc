@@ -14,7 +14,7 @@ Agreement, Revisited*, PODC 2019, arXiv 1805.03391v4.
    - Repaired in `LowerBound.lean`: we use a union bound per `p ∈ V` together with Markov's
      inequality per node. The averaging over `p` and the event `X₁` are no longer needed.
    - Result: `E ≥ 2ε·|V|·(k+1)` with `|V| = ⌈f/2⌉`, `k = ⌊f/2⌋`, hence `≥ εf²/2 ≥ (εf)²`.
-2. **Theorem 13 (BB version): false for `n = 2`** (false only in a degenerate case).
+2. **Theorem 13 (BB version): false for `n = 2`** (false statement; one added condition saves it).
    - Theorem 3 (BA) is true at `n = 2` by the classical `n ≤ 2t` argument. The BA ⇒ BB transfer
      is not formalized.
    - Lean counterexample: `theorem_13_false_n2` (`C = 1`, probability 1). It is checked against

@@ -10,8 +10,7 @@ faulty processes: the sender keeps sending its message and delivers it at once; 
 process delivers the first message it receives from the sender (`echo`). With `n ≤ 2`, two
 distinct correct processes include the sender, so Agreement reduces to Validity.
 
-This is a degenerate case (rule R2 of our verdict scale); the claims hold for `n ≥ 3`
-(`claim_3_1`, `claim_3_2`).
+The claims hold for `n ≥ 3` (`claim_3_1`, `claim_3_2`).
 -/
 
 set_option linter.unusedSectionVars false

@@ -1,11 +1,11 @@
 # Differences between the formalization and the paper
 
 Paper: Clement, Junqueira, Kate, Rodrigues, *On the (Limited) Power of Non-Equivocation*, PODC 2012
-(8-page author copy with appendices). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
+(8-page author copy with appendices).
 
 ## Errors in the paper
 
-1. **Section 4 / Figure 2 / Appendix B: the translation is unsound (false claim, ❌ by R5).**
+1. **Section 4 / Figure 2 / Appendix B: the translation is unsound (❌).**
    * **Claim.** "There exists a translation of a distributed protocol that can tolerate `f` crash
      faults into one that tolerates `f` Byzantine faults using the same number of processes"
      (§4). The abstract says "transform any protocol that works under the crash fault model into a
@@ -29,25 +29,25 @@ Paper: Clement, Junqueira, Kate, Rodrigues, *On the (Limited) Power of Non-Equiv
      could recompute each replayed input's recipient set during the recursive replay (`grant`
      goes to `{1}`) and check that it contains the replayed process. Figure 2 does not do this:
      it compares only the payloads of `S` with the replay. §4.1 Integrity and Appendix B do not
-     ask for it either. So this is a design change, not a typo with evident intent (R3).
-   * **Why ❌ and not 🚨 (borderline, R5).** The translation is a headline of the abstract. But
+     ask for it either. So this is a design change, not a typo with evident intent.
+   * **Scope of the refutation.** The translation is a main claim of the abstract. But
      every place that states it is existential: the abstract says "it is possible to use
      non-equivocation to transform any protocol", §4 says "there exists a translation", and the
      introduction says "we show how we can … obtain a generic transformation". None of them names
      the Figure 2 compiler as the result. The counterexample refutes only the paper's witness. The
-     existential headline is at worst unestablished, which is ❌ under R5. A repaired compiler
+     existential statement is at worst unestablished. A repaired compiler
      also appears to exist: sign the recipient set (or recompute it by replay), check that every
      replayed input was addressed to the replayed process, and reject duplicated inputs.
      Ben-David–Chan–Shi (PODC 2022) give a corrected 1:1 compiler (PKI + non-equivocation,
      multicast model, f < n/2). We have not formalized a repaired translation.
-2. **Claim 3.1: proof gap, statement true for `n ≥ 3` (🛠️).**
+2. **Claim 3.1: proof gap, statement true for `n ≥ 3` (🔧).**
    * **Gap.** Run 3 keeps the `A ↔ B` messages timely after time `t`, so `B` may diverge from
      Run 2 (where `A` crashed at `t`). The step "processes in `C` deliver `m'` by `t''`, since they
      cannot distinguish Run 3 from Run 2" then fails.
    * **Repair.** We also delay `A → B` messages sent after `T₁` until `H` (`Claim31.dl34`).
    * **Smaller imprecisions.** Run 1 cites "Liveness and Agreement" where L1, L2 and S2 are used.
      Run 2's "by Agreement" also needs L2 (Completeness).
-3. **Claims 3.1 and 3.2 are false for `n ≤ 2` (degenerate, R2 → ⚠️).**
+3. **Claims 3.1 and 3.2 are false for `n ≤ 2` (🔧).**
    * **Why.** "W.l.o.g. `n = 3f`" fails: the three groups must be nonempty, which needs `n ≥ 3`.
      For `n ≤ 2`, r-broadcast is solvable for every `f` (`SmallCases.lean`, protocol `echo`).
    * **Lean.** `claim_3_1_false_small` (with `RespectsNE` for every key map) and
@@ -119,7 +119,7 @@ Paper: Clement, Junqueira, Kate, Rodrigues, *On the (Limited) Power of Non-Equiv
   * In Figure 2 the received message is added to `R` *after* the T-receive handler runs. We add it
     before, so that the outputs caused by a message are justified by an `R` containing it.
     Otherwise honest messages would fail the replay check. Appendix B confirms this intent: the
-    receiver runs `R₁ … R_h` and checks that `m` "corresponds to the state `Σ_{p_s,h}`" (R3).
+    receiver runs `R₁ … R_h` and checks that `m` "corresponds to the state `Σ_{p_s,h}`".
   * Crash executions (`CReach`) allow any delivery order, message loss, and crashes, which is a
     superset of the paper's crash model. The safety of `grantProto` is proved for all of them.
   * The Byzantine adversary of the translated system (`TStep.inject`) is weaker than a general

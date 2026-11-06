@@ -61,7 +61,7 @@ Non-Volatile Memory.* PODC 2018 (author copy, 10 pages, proofs included).
    only for histories in which every process invokes `T&S` at most once (`OneShot`; the paper
    assumes this for Algorithm 3). Only two processes `p ≠ q` are used. The hypotheses are weaker
    than or equal to the paper's, so the statement is at least as strong.
-10. **Proof repair: the "w.l.o.g." renaming of `p` and `q` (🛠️).** At each critical configuration
+10. **Proof repair: the "w.l.o.g." renaming of `p` and `q` (🔧).** At each critical configuration
     the paper assumes "w.l.o.g. `C₁∘p` is `p`-valent and `C₁∘q` is `q`-valent" and then crashes
     `p`. In the other case (`C₁∘p` is `q`-valent), renaming the processes makes *`q`* the crashing
     process. "Repeating the same argument" can therefore change the crashing process from round to
@@ -73,7 +73,7 @@ Non-Volatile Memory.* PODC 2018 (author copy, 10 pages, proofs included).
     same value, so they share a valency, and each of them also has the valency of `D·p` or `D·q`
     respectively, because `q` cannot see `p`'s crash (`agree_val` applied three times). The paper's
     own case split on `u` ("the other case is symmetric") covers only half of this.
-    Rule R1: this is a gap in the proof of a true theorem (🛠️).
+    This is a gap in the proof of a true theorem.
 11. "This must be a TAS base object other than those previously used" is true but not needed. The
     contradiction comes from `q` taking infinitely many steps without crashing. We do not use it,
     which is why the proof extends to objects with a finite state set.
@@ -101,7 +101,7 @@ A. **Lemma 2 (`lemma2`, files `Alg1*.lean`).** The implemented object is CSLib's
    `p` recovers, sees `R` equal to its saved `temp` and re-executes the write, and `q` reads 1
    again. The history is not linearizable. The paper's own use (the counter writes 1, 2, …, never
    the initial 0) satisfies the stronger assumption, and "the initial value is the first write" is
-   the standard convention. Rule R4: implied assumption, ⚠️.
+   the standard convention. Implied assumption (✏️).
    **Proof.** The paper linearizes a recovered `WRITE` that did not write `R` "immediately before
    `q`'s write". At the time of `q`'s write, `p` may still be about to execute line 4 itself, so
    this is a speculative linearization point; the paper leaves that implicit. We add such
@@ -110,7 +110,7 @@ A. **Lemma 2 (`lemma2`, files `Alg1*.lean`).** The implemented object is CSLib's
 B. **Lemma 3 (`lemma3`, files `Alg2*.lean`).** The implemented object is `casRObj V`: state
    `Option V`, initially `null`; operations `cas (old : Option V) (new : V)` and `read`. `new` is
    never `null`. This is needed, because the registers `R[p][j]` start at `null` and would make the
-   recovery return `true`. Null is the paper's sentinel (R4, standard convention).
+   recovery return `true`. Null is the paper's sentinel (✏️, standard convention).
    **Environment (`Env2`):** the `new` values of each process's `CAS` invocations are pairwise
    distinct, and `old ≠ new`. The paper says "values written to `C` by the same process are
    distinct"; we read it as distinct `new` arguments, which is the paper's "augment with a sequence
@@ -129,7 +129,7 @@ C. **Non-vacuity of Theorem 4's hypotheses (`NonVacuity.lean`, not in the paper)
 14. **Not formalized.** Lines 26 and 28 of Algorithm 3 read `await(R[p] = 0 or R[p] = 3)` and
     `await(R[p] = 0 or R[p] > 2)`. They should be `R[i]`: the prose says "p waits for all
     lower-indexed processes", and the proof uses `R[i]`. As printed, line 26 never terminates for
-    `p > 0`, because `p` has just set `R[p] ← 4`. Typo with evident intent (R3, ⚠️). We checked the
+    `p > 0`, because `p` has just set `R[p] ← 4`. Typo with evident intent (✏️). We checked the
     proof of Claim 1 informally with `R[i]` and found no error. Its second part ("if all operations
     run long enough, some operation returns 0") is a liveness argument used to build linearizations
     of finite histories; a mechanized proof would need a prophecy or a retroactive argument.
@@ -151,23 +151,14 @@ C. **Non-vacuity of Theorem 4's hypotheses (`NonVacuity.lean`, not in the paper)
     `R[2].READ`, recovers and returns `0`. This is not linearizable. The interpreter in `Alg4.lean`
     follows the paper's nesting semantics literally ("once its recovery is completed, INC returns
     in line 5"). A repair needs a design change (e.g. `val` and `i` in non-volatile memory, or
-    primitive reads of `R[i]`'s register instead of the recoverable `READ`), so R3 does not apply.
-    Rule R5: the counter is an example, not a headline result, so the label is ❌, not 🚨.
-16. **`INC.RECOVER` tests `LI_p < 4`; it should be `LI_p ≤ 4` (⚠️, `inc_recover_not_nrl`).** A
+    primitive reads of `R[i]`'s register instead of the recoverable `READ`); no repair is proved.
+16. **`INC.RECOVER` tests `LI_p < 4`; it should be `LI_p ≤ 4` (✏️, `inc_recover_not_nrl`).** A
     crash when `p` is about to execute line 4 (before invoking `R[p].WRITE`) gives `LI_p = 4`, and
     `INC.RECOVER` returns `ack` without incrementing. The prose says "whether the last crash inside
     INC occurred before line 4 – in which case INC is re-executed". Counterexample `schedInc`: a
-    later `READ` returns `0`. Typo with evident intent (R3).
+    later `READ` returns `0`. Typo with evident intent.
 17. Claim 2 (the non-recoverable counter is linearizable) is standard and not formalized.
 
 ## Not formalized
 
 * Definition 1 (strict recoverability), the nested version of Lemma 1, Claim 1, Claim 2.
-
-## Verdict
-
-Worst label: ❌ (item 15). Algorithm 4 is claimed to be an NRL recoverable counter, and that claim
-about one of the paper's algorithms is false (R1). It is an example, not a headline result (R5),
-and the fix is a design change (R3 does not apply). The other labels: 🛠️ for Theorem 4's proof
-(item 10); ⚠️ for the `LI_p < 4` typo (item 16), the Algorithm 3 typo (item 14), and the implied
-"≠ initial value" assumption of Lemma 2 (item A).

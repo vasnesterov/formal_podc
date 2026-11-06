@@ -6,20 +6,21 @@ PODC 2018. DOI [10.1145/3212734.3212769](https://doi.org/10.1145/3212734.3212769
 arXiv [1712.00285](https://arxiv.org/abs/1712.00285) v2 (Aug 2021).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The core of the paper, Section 3 (the additive-group algorithm AG, one-bit
-halving, Refine-AG, and Corollary 3.6: a locally-iterative `(Δ+1)`-colouring in `O(Δ) + log* n`
-rounds), is correct. Two other claims are false. The introduction's `2p + 1`-round bound for
-`p = Δ + 1` fails. **Algorithm 3AG of Section 7 never terminates on `K₂`**, which refutes Corollaries
-7.2 and 7.3.
+**Verdict: 🔧 Easy fix.** The core of the paper, Section 3 (the additive-group algorithm AG, one-bit halving, Refine-AG,
+and Corollary 3.6: a locally-iterative `(Δ+1)`-colouring in `O(Δ) + log* n` rounds), holds end to end after local
+changes; the introduction's `2p + 1`-round bound for `p = Δ + 1` fails, and Section 3's `q > 2Δ` replaces it.
+**Algorithm 3AG of Section 7 never terminates on `K₂`**, which refutes Corollaries 7.2 and 7.3, and no uniform
+replacement is proved, but nothing else in the paper uses it. The applications to self-stabilization, edge colouring and
+arbdefective colouring were not checked beyond the AG bounds they use.
 
 ## Mistakes in the paper
 
 ### ❌ Section 7, Algorithm 3AG (Corollaries 7.2 and 7.3)
 Algorithm 3AG never terminates on `K₂` with the proper colouring `⟨1,0,0⟩`, `⟨1,0,1⟩`, for every `p ≥ 2`, so Corollaries 7.2 and 7.3 are false (`threeAG_never_finalizes`).
 
-**Impact.** Refutes the 3-D variant of Section 7, including `p ≥ 3Δ + 1` and `p ≥ 2Δ + 2`. The
-phase-based alternative at the start of Section 7 is not affected, and neither is the core of the
-paper (Section 3).
+**Impact.** Refutes the 3-D variant of Section 7, including `p ≥ 3Δ + 1` and `p ≥ 2Δ + 2`, and we proved no uniform
+replacement. The phase-based alternative at the start of Section 7, which 3AG was meant to avoid, is not affected, and
+neither is the core of the paper (Section 3); nothing else in the paper uses 3AG.
 
 **Details.** The two vertices always have the same `b`. So in every round both conflict, both move
 to `⟨1, b+1, ·⟩`, and `c` never becomes `0`. The termination argument says "each neighbour may have a
@@ -27,54 +28,54 @@ conflicting `b_u` at most three times". It assumes that two neighbours in the sa
 same `c` have different `b`. That is forced by properness in 2-D AG, but in 3-D, `⟨c, b⟩` can
 coincide while only `a` differs.
 
-### ❌ Section 1.2 (`2p + 1` rounds of AG for `p = Δ + 1`)
+### 🔧 Section 1.2 (`2p + 1` rounds of AG for `p = Δ + 1`)
 The introduction's claim that `2p + 1` rounds of AG over `GF(p)`, with `p = Δ + 1` prime, turn a proper `(Δ+1)²`-colouring into a proper `(Δ+1)`-colouring is false on a 16-vertex tree with `Δ = 4`, `p = 5` (`intro_claim_false`).
 
-**Impact.** An explicit claim of the introduction, not used later: Section 3 itself correctly
-assumes `q > 2Δ`. A correct bound with `q = Δ + 1` is `(Δ + 1)·q` rounds (`ag_final_of_lt`).
+**Impact.** A claim of the introduction, not used later: Section 3 itself correctly assumes `q > 2Δ` and still gets
+`O(Δ)` rounds (`ag_final_of_two_mul_lt`, `corollary_3_6`). A correct bound with `q = Δ + 1` is `(Δ + 1)·q` rounds
+(`ag_final_of_lt`).
 
 **Details.** After 11 rounds vertex 0 still has colour `⟨1,1⟩`, 6 colours are in use, and vertex 0
 finalizes only after 13 rounds. (On paths, `Δ = 2`, the claim does hold.) The argument breaks
 because with `q = Δ + 1`, a neighbour that finalizes inside a window of `q` rounds can conflict
 twice in that window, so a window may have no free round.
 
-**Repair.** For any prime `q > Δ`, everything is final after `(Δ + 1)·q` rounds (`ag_final_of_lt`).
+**Repair.** Rewrite the paragraph with Section 3's prime `q > 2Δ`. For any prime `q > Δ`, everything is final after `(Δ + 1)·q` rounds (`ag_final_of_lt`).
 
-### ⚠️ Section 5 (edge colouring: the condition on `q`)
-Section 5 only requires `q ≥ 2Δ − 1`, i.e. `q > Δ_L` for the line graph, but the cited `O(Δ)` argument of Corollary 3.5 needs `q > 2Δ_L`, so the bound is unestablished (not refuted).
-
-**Impact.** Morally right with a larger prime (still `O(Δ)`); under the stated condition our bound
-is `O(Δ²)`. We did not look for a counterexample.
-
-**Details.** Edge colouring runs AG on the line graph, whose degree is `Δ_L ≤ 2Δ − 2`.
-
-### Typos and slips
+### ✏️ Slips
 - Section 3.1 picks a prime `√k ≤ q ≤ 2√k` but then uses `q > 2Δ`; we use the least prime above
   `max(2Δ, ⌊√k⌋)`.
-- Algorithms 1 and 2 loop one round longer than needed.
 - Refine-AG's conflict definition has `b_u` for `b_v`, and index ranges `j ≤ k` for `j < k`.
 - The final-state case of Lemma 3.12 swaps `u` and `v`.
 
+### Typos
+- Algorithms 1 and 2 loop one round longer than needed.
+
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 3.2 (properness of AG)
+### 🔧 Section 5 (edge colouring: the condition on `q`)
+Section 5 only requires `q ≥ 2Δ − 1`, i.e. `q > Δ_L` for the line graph, but the cited `O(Δ)` argument of Corollary 3.5 needs `q > 2Δ_L`, so the bound is unestablished (not refuted).
+
+**Impact.** Under the stated condition our bound is `O(Δ²)`. We did not look for a counterexample.
+
+**Details.** Edge colouring runs AG on the line graph, whose degree is `Δ_L ≤ 2Δ − 2`.
+
+**Repair.** A prime `q > 4Δ − 4` is still `O(Δ)` and satisfies the printed lower bound; the bound is then our general
+theorem applied to `G.lineGraph` (`ag_final_of_two_mul_lt`). Section 5 itself is not formalized, so this covers its AG
+part, the only part affected.
+
+### 🔧 Lemma 3.2 (properness of AG)
 The proof overlooks the case where the conflicting vertex already has `a = 0`.
 
-**Impact.** Statement true: then the second coordinates differ (`ag_isProper`).
+**Impact.** The statement stands: then the second coordinates differ (`ag_isProper`).
 
-### 🛠️ Corollary 3.13 (Refine-AG running time)
+### 🔧 Corollary 3.13 (Refine-AG running time)
 The proof needs "each neighbour blocks at most one index per round", but never says so.
 
-**Impact.** Statement true; repaired (`corollary_3_13`, `corollary_3_13_paper`).
+**Impact.** The statement stands (`corollary_3_13`, `corollary_3_13_paper`).
 
 **Details.** It follows from Lemma 3.11 for working neighbours and from `j = c_u` for final ones. We
 count blocked (round, index) pairs instead.
-
-### 🛠️ Section 4.1 (round-independent step)
-The paper does not check that the extra recolouring rule leaves the AG analysis intact.
-
-**Impact.** Statement true (`uniform_isProper`, `uniform_le`): the rule's guard (all neighbours
-final) means a final vertex with a working neighbour never recolours.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -110,9 +111,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
 constants follow as `corollary_3_13_paper`. Section 7's `(1+ε)Δ` phase argument for 2-D AG is the
 case `m = 1 + ⌈1/ε⌉` of `ag_final`.
 
+The paper does not check that the extra recolouring rule of Section 4.1 leaves the AG analysis intact. It does
+(`uniform_isProper`, `uniform_le`): the rule's guard (all neighbours final) means a final vertex with a working neighbour
+never recolours.
+
 **Not formalized.**
 * Section 4: the self-stabilization fault model, Excl-/Mod-Linial, Theorem 4.4 as stated, MIS and MM.
 * Section 5 (edge colouring) and Section 6 (arbdefective colouring).
+* The phase-based algorithm at the start of Section 7.
 * All bit and message complexity claims.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,

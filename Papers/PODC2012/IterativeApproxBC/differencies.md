@@ -3,9 +3,9 @@
 Paper: Vaidya, Tseng, Liang, *Iterative Approximate Byzantine Consensus in Arbitrary Directed
 Graphs*, PODC 2012 / arXiv:1201.4183v2.
 
-**Verdict:** the characterization (Theorems 1–3) and all of Section 6 hold as stated, under the
+**Summary:** the characterization (Theorems 1–3) and all of Section 6 hold as stated, under the
 paper's standing assumption `n ≥ 2`. One step of the necessity proof is not justified as written (§2
-below); it is fixable. The other points are minor slips, imprecisions or generalizations.
+below); it is fixable. The other points are slips, imprecisions or generalizations.
 
 ## 1. Model and specification (made precise)
 
@@ -34,7 +34,7 @@ below); it is fixable. The other points are minor slips, imprecisions or general
 * **Node set.** The paper assumes `n ≥ 2`. `exists_correct_iff` holds for every finite `V`: for
   `n ≤ 1` the condition holds vacuously, and the identity algorithm is correct (`id_correct`).
 
-## 2. Gap in the proof of Theorem 1 (necessity)
+## 2. 🔧 Gap in the proof of Theorem 1 (necessity)
 
 The paper argues per node `i ∈ L`, for example: "from i's perspective, it is possible that all the
 nodes in `N'(i)` are faulty … the values sent to node `i` by the fault-free nodes are all `m`, and
@@ -61,12 +61,12 @@ on time, this applies at every iteration.
 Also, the auxiliary messages `m⁻ < m` and `M⁺ > M` of the faulty nodes are unnecessary. Our proof
 lets `F` send `m` to `L ∪ C` and `M` to `R`, with `m = 0`, `M = 1`, and `C` starting at `0`.
 
-## 3. Minor slips and imprecisions
+## 3. Slips and imprecisions
 
 * **Corollary 2** (`n > 3f`) needs `n ≥ 2`. For `n = 1` the condition holds vacuously. This is the
   paper's standing assumption; our `Condition.three_mul_lt_card` has the hypothesis
   `2 ≤ Fintype.card V`.
-* **Corollary 3.** The proof sets `R = V − F − {i}` but does not check `R ≠ ∅`, which Corollary 1
+* **Corollary 3 (✏️).** The proof sets `R = V − F − {i}` but does not check `R ≠ ∅`, which Corollary 1
   requires. It follows from Corollary 2: `|R| ≥ 3f + 1 − f − 1 = 2f ≥ 1`. We use exactly this.
 * **Theorem 2** uses Corollary 3 (`|N_i⁻| ≥ 2f + 1`). Validity needs only that trimming is possible
   (`|N_i⁻| ≥ 2f`). `alg1_validStep` has no graph hypothesis at all. The case `≥ 2f + 1` is needed
@@ -84,7 +84,7 @@ lets `F` send `m` to `L ∪ C` and `M` to `R`, with `m = 0`, `M = 1`, and `C` st
   case. Lemma 5 is stated as "there are bounds `lo' ≤ hi'` at time `s + l` with
   `hi' - lo' ≤ (1 - α^l/2)(hi - lo)`", which implies the paper's inequality (7). Claim 1 holds for
   every `τ`, not only `τ ≤ l`.
-* **Typo**, end of the proof of Claim 4 (Appendix A): `U[s] − v_i[s + τ] ≥ α^{τ+1}…` should read
+* **Typo (✏️)**, end of the proof of Claim 4 (Appendix A): `U[s] − v_i[s + τ] ≥ α^{τ+1}…` should read
   `v_i[s + τ + 1]`.
 * **Theorem 3.** The paper iterates Lemma 5 with the variable lengths `l(s) ≤ n − f − 1` and leaves
   "choose `i` large enough" implicit; this needs the uniform bound on `l(s)`. We use the uniform

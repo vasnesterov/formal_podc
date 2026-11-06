@@ -34,8 +34,7 @@ Classification: **false statement** / **degenerate case** / **proof gap (stateme
    `isWeightedVFTSpanner_of_adj`. Same bound up to the count of edges (`≤ n²`).
 6. **Typos in the proof of Theorem 2.1.** "a path of length at most `k·d_{G\F}(u,v)` between `u` and
    `v` in `G \ F`" should be "in `H \ F`"; `k·ℓ({u,e})` should be `k·ℓ({u,v})`; the set defined as
-   `E_F = {… d_{G\F}(u,v) = ℓ}` is `E′_F`; "`α = O(r³ log n) ≤ O(e³ ln n log n)`" is garbled
-   (should be `O(n² log n)` using `r ≤ n^{2/3}`).
+   `E_F = {… d_{G\F}(u,v) = ℓ}` is `E′_F`.
 7. **Model of the spanner algorithm** — *modelling choice*. `SpannerAlg G w k f` gives, for every
    `S ⊆ V`, a subgraph of `G[S]` (`G.deleteVerts Sᶜ`) with stretch `k` for `u, v ∈ S` and `≤ f(|S|)`
    edges. The paper assumes an algorithm correct "on every graph"; ours only needs the induced
@@ -101,7 +100,7 @@ Classification: **false statement** / **degenerate case** / **proof gap (stateme
     (not only on `T_z`, `z ∈ (N⁺(u) ∩ N⁻(v)) ∪ {u}`), which does not affect the `O(Δ³)` dependency
     degree (*slip*); the introduction calls this result non-algorithmic while Section 3.4 makes it
     algorithmic via Moser–Tardos (*inconsistency*).
-20. **Lemma 3.8** — **false statement** as written. `LP(C)` gives cost 0 only to the arcs of `δ(C)`;
+20. **Lemma 3.8** — **false statement** as written (🔧). `LP(C)` gives cost 0 only to the arcs of `δ(C)`;
     arcs of `G(C)` with both endpoints in `N(C)` keep their cost, and the proof never assigns them a
     value (it sets `x^C` on `E(C) ∪ δ(C)` and zero flow elsewhere). Counterexample (`r = 0`, vertices
     `a, b, c, d`, arcs `c→a, c→b, a→d, d→b` of cost 1 and `a→b` of cost `M > 4`, partition

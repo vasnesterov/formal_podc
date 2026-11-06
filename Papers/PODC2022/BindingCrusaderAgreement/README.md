@@ -5,36 +5,32 @@ Agreement via Binding Crusader Agreement.* PODC 2022. DOI
 [10.1145/3519270.3538426](https://doi.org/10.1145/3519270.3538426). Formalized version: the 11-page
 proceedings version (no arXiv version; the proofs it defers to the "full version" are supplied here).
 
-**Verdict: ⚠️ Minor statement issues.** All four (G)BCA protocols are correct as intended: Algorithm 3
-(crash BCA, `n ≥ 2t + 1`), Algorithm 4 (Byzantine BCA, `n ≥ 3t + 1`, Lemmas 4.4–4.9), Algorithm 5
-(crash GBCA) and Algorithm 6 (Byzantine GBCA). They satisfy agreement, validity, binding and termination
-against an adaptive adversary, with at most 2/4/3/6 broadcasts per party. The deterministic core of the
-framework (Theorems 3.1, 3.3–3.5: agreement, validity, the binding step of termination) holds. The only
-statement-level slip is in the pseudocode of Algorithm 5: read literally, it can output "`⊥` grade 2",
-which is not a GBCA output. The prose gives the intended version, which we prove. Two proof steps of
-Section 4 need small repairs, and Theorems 4.1, 5.1 and 5.3 have no proofs in this version.
+**Verdict: 🔧 Easy fix.** All four (G)BCA protocols are correct as intended: Algorithm 3 (crash BCA, `n ≥ 2t + 1`),
+Algorithm 4 (Byzantine BCA, `n ≥ 3t + 1`, Lemmas 4.4–4.9), Algorithm 5 (crash GBCA) and Algorithm 6 (Byzantine GBCA)
+satisfy agreement, validity, binding and termination against an adaptive adversary, with at most 2/4/3/6 broadcasts
+per party. Two proof steps of Section 4 need local repairs, and the pseudocode of Algorithm 5 needs one more word.
+The deterministic core of the framework (Theorems 3.1, 3.3–3.5: agreement, validity, the binding step of termination)
+holds; the efficiency comparisons and the probabilistic parts of the round bounds were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Algorithm 5, line 9 (output "`⊥` grade 2")
-Read literally, line 9 ("if all of the messages contain the same value `v` then decide `v, 2`") also fires when all `n − t` echo2's are `⊥`, e.g. for `n = 3`, `t = 1`, inputs `0, 1, 0`, no crash, so Algorithm 5 can output "`⊥` grade 2", which is not a GBCA output.
+### ✏️ Slips
+- Algorithm 5, line 9 (output "`⊥` grade 2"). Read literally, "if all of the messages contain the same value `v`
+  then decide `v, 2`" also fires when all `n − t` echo2's are `⊥`, e.g. for `n = 3`, `t = 1`, inputs `0, 1, 0`, no
+  crash, so Algorithm 5 can output "`⊥` grade 2", which is not a GBCA output. Line 10 counts `⊥` as "a value other
+  than `v`", so "value" includes `⊥`. In the example, every party first receives one `⟨val, 0⟩` and one `⟨val, 1⟩`.
+  Then everybody sends `⟨echo, ⊥⟩` and then `⟨echo2, ⊥⟩`, and line 9 outputs `⊥` with grade 2. That is not one of the
+  five buckets of Definition 3.2, so Theorem 5.1 fails for the literal code. Line 11 becomes dead code, and
+  Algorithm 2, line 7 ("if grade = 2 then commit val") would commit `⊥`. The prose above the algorithm says that a
+  party with all `⊥` decides `⊥`. We prove Theorem 5.1 for this intended version (all `⊥` gives `⊥` grade 0)
+  (`Alg5.decideG`, `Alg5.theorem_5_1`). No other checked theorem or lemma is false.
 
-**Impact.** A typo with evident intent (rule R3): the prose above the algorithm says that a party with all
-`⊥` decides `⊥`. We prove Theorem 5.1 for this intended version (all `⊥` gives `⊥` grade 0) (`Alg5.decideG`,
-`Alg5.theorem_5_1`). No theorem or lemma is false.
-
-**Details.** Line 10 counts `⊥` as "a value other than `v`", so "value" includes `⊥`. In the example, every
-party first receives one `⟨val, 0⟩` and one `⟨val, 1⟩`. Then everybody sends `⟨echo, ⊥⟩` and then
-`⟨echo2, ⊥⟩`, and line 9 outputs `⊥` with grade 2. That is not one of the five buckets of Definition 3.2, so
-Theorem 5.1 fails for the literal code. Line 11 becomes dead code, and Algorithm 2, line 7 ("if grade = 2
-then commit val") would commit `⊥`.
-
-### Typos and slips
+### Typos
 - Algorithm 6, line 11 reads "if 1 then"; it means "if (1) then", as in Algorithm 4, line 11.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 4.5 (validity of Algorithm 4)
+### 🔧 Lemma 4.5 (validity of Algorithm 4)
 The proof says that to decide `1 − v` a non-faulty party "must have `1 − v` in its approvedVals set (line 15)", but line 15 only asks for `n − t` messages `⟨echo3, 1 − v⟩`.
 
 **Impact.** Statement true; repaired by one more link of the chain (`Alg4.validity`).
@@ -42,7 +38,7 @@ The proof says that to decide `1 − v` a non-faulty party "must have `1 − v` 
 **Repair.** An uncorrupted sender of `⟨echo3, 1 − v⟩` saw `n − t` messages `⟨echo2, 1 − v⟩`. One of their
 senders is uncorrupted and has `1 − v` approved, which needs an uncorrupted party with input `1 − v`.
 
-### 🛠️ Lemma 4.9 (binding of Algorithm 4, adaptive adversary)
+### 🔧 Lemma 4.9 (binding of Algorithm 4, adaptive adversary)
 The proof argues with "the `t + 1` echo3 messages from non-faulty parties", but under adaptive corruption who is non-faulty depends on the extension, while `b` must be fixed at the first decision.
 
 **Impact.** Statement true; repaired by fixing `b` from the prefix (`Alg4.binding`, `Alg6.graded_binding`).
@@ -82,12 +78,7 @@ decision on `v` needs a genuine `⟨echo4, v⟩`, which is why line 25 checks `t
 (`Alg3.theorem_4_1`, `Alg5.theorem_5_1`, `Alg6.theorem_5_3`)
 
 **"Communication rounds" = broadcasts, not asynchronous time.** "Terminates within 4 communication rounds"
-(Lemma 4.7) is proved by counting messages, and that is what we verify (≤ 4 broadcasts per party). In the
-normalized-delay measure, Algorithm 4 can take almost 5 time units. With `n = 7`, `t = 2`, the Byzantine
-parties make one correct party approve the minority value first. Then nobody gets `n − t` equal `echo2`'s,
-and everybody waits until both values are approved at time `≈ 4`. We checked this by an event simulation,
-not in Lean ([`scripts/latency.py`](scripts/latency.py)). The round comparisons with other papers in
-Tables 1–2 are fair only if those papers count the same way.
+(Lemma 4.7) is proved by counting messages, and that is what we verify (≤ 4 broadcasts per party).
 
 **Main results in Lean.**
 
@@ -111,7 +102,12 @@ Tables 1–2 are fair only if those papers count the same way.
 
 **Not formalized.** Section 6 (threshold signatures), the EVBCA variants, and the broadcast totals of the
 composed protocols (Theorems 4.2, 4.10, 4.11, 5.2, 5.4). Probability spaces: unpredictability, `ε`-good
-coins, the `1 + 1/ε` bound of Theorems 3.4/3.5, and `E[T] = ∑ P(T > k)`.
+coins, the `1 + 1/ε` bound of Theorems 3.4/3.5, and `E[T] = ∑ P(T > k)`. The round comparisons with other papers in
+Tables 1–2, which are fair only if those papers count the same way; we did not check how [9, 11, 28] count. In the
+normalized-delay measure, Algorithm 4 can take almost 5 time units. With `n = 7`, `t = 2`, the Byzantine
+parties make one correct party approve the minority value first. Then nobody gets `n − t` equal `echo2`'s,
+and everybody waits until both values are approved at time `≈ 4`. We checked this by an event simulation,
+not in Lean ([`scripts/latency.py`](scripts/latency.py)).
 
 **Trust.** No `sorry`. All listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: for every `n`, `t` and inputs, a fair execution exists and every party decides in it

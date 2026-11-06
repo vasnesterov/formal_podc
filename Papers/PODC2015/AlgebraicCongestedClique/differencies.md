@@ -10,27 +10,27 @@ in the Congested Clique*, PODC 2015 (arXiv:1503.04963v1).
    receives `T[w, v₃∗∗]` from `w ∈ ∗v₂∗`. Node `v` computes `S[v₁∗∗, v₂∗∗] T[v₂∗∗, v₃∗∗]` and so
    needs the rows `v₂∗∗` of `T`. Correct: send to `w ∈ ∗v₁∗` (`w₂ = v₁`); receive from
    `w ∈ v₂∗∗`. With the pattern as written, for `q = n^{1/3} ≥ 2` node `v` misses a needed row
-   (`step1_as_written_wrong`). The message counts (`2n^{4/3}`) are unaffected. *Rule:* R3
-   (typo, intent evident from "each node `v` receives … `T[v₂∗∗, v₃∗∗]`") → ⚠️.
+   (`step1_as_written_wrong`). The message counts (`2n^{4/3}`) are unaffected. ✏️ Slip
+   (typo, intent evident from "each node `v` receives … `T[v₂∗∗, v₃∗∗]`").
 2. **Lemma 12 is stated without its hypothesis.** The lemma itself says only "It is possible to find
    sets …". It is false for dense graphs: for `K_n`, `n ≥ 67`, disjoint tiles with sides
    `≥ (n−1)/8` cannot fit in `V × V`. It is meant (and used) only under `∑_y deg(y)² < 2n²`, which
    is derived in the sentence before ("Using this bound, we obtain the following lemma"). We add the
-   hypothesis, and also `deg(y) < n` (true in a simple graph). *Rule:* R4 (implied assumption,
-   holds at the only use) → ⚠️.
+   hypothesis, and also `deg(y) < n` (true in a simple graph). ✏️ Slip (implied assumption,
+   holds at the only use).
 3. **Proof of Lemma 12: `f(y)` for `1 ≤ deg(y) ≤ 3`.** "`deg(y)/4` rounded down to the nearest power
    of 2" is not a positive integer for these degrees, but `|A(y)| = f(y) ≥ deg(y)/8 > 0` is needed.
    With `f(y) = 1` the step `∑ f(y)² ≤ ∑ deg(y)²/16` fails. Repaired: `16 f(d)² ≤ d² + 15`
    for all `d` (`sixteen_mul_tileSize_sq_le`), hence `∑ f² ≤ k²` for `n ≥ 3` (via `2k ≥ n + 1`),
    and directly for `n ≤ 2` (`sum_tileSize_sq_le`). The rest of the chain
-   (`∑ deg²/16 < n²/8 < k²`) is correct. *Proof repair* (🛠️).
+   (`∑ deg²/16 < n²/8 < k²`) is correct. 🔧 Proof repair.
 4. **Last step of 4-cycle detection: Lenzen's routing with loads `> n`.** The paper routes
    `P(x,∗,∗)` to `x` with "the dynamic routing scheme [46]", where nodes send `≤ 64n` and receive
    `≤ 2n − 2` words, and concludes `O(1)` rounds. Lenzen's Theorem 3.7 needs loads `≤ n`, and
    splitting without global knowledge needs an argument. We give one (`Prog.exists_routedBig`): one
    round of counts, one round of receiver offsets, then `a·b` routing instances of load `≤ n`
    (sender class × receiver class), in `2 + a·b·16` rounds; the receiver restores the original
-   order (`flatMap_sel`). *Proof gap* (🛠️; arguably folklore).
+   order (`flatMap_sel`). A routine detail, arguably folklore; not a mistake.
 
 ## Modelling choices
 

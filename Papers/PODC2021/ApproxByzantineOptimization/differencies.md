@@ -6,8 +6,8 @@ Section 3 (Lemma 1, Theorems 1, 2).
 
 ## Issues in the paper
 
-1. **Theorem 1 is under-specified.** *Classification: under-specified statement; literal reading
-   false, excused by R4 (borderline, see the verdict section).* Definition 2 defines resilience of an
+1. **Theorem 1 is under-specified.** 🛠️ *Under-specified statement; the literal reading is false.*
+   Definition 2 defines resilience of an
    algorithm for the agents' cost functions at hand. Theorem 1 says resilience exists "only if the
    agents' cost functions satisfy `(2f, ε)`-redundancy". It does not fix the class of inputs on which
    the algorithm must be correct.
@@ -32,15 +32,19 @@ Section 3 (Lemma 1, Theorems 1, 2).
      costs are discontinuous. Section 3 allows arbitrary functions ("need not even be
      differentiable", non-convex). Whether continuous or convex costs give the same bound is not
      investigated.
-   We take (c) as the corrected Theorem 1. With Theorem 2 it gives `resilience_window`.
-2. **The algorithm in the proof of Theorem 2 is undefined in a case.** *Proof gap (missing case),
+   We take (c) as the corrected Theorem 1. With Theorem 2 it gives `resilience_window`. A competent
+   reader takes "necessary" to mean "for an algorithm that must work on a class of inputs". Under the
+   natural class (the `(2f, ε')`-redundant profiles) the statement is true, and the paper's message
+   ("the redundancy level controls the achievable resilience") is not misleading. This agrees with the
+   treatment of the same issue in `Papers/PODC2020/RedundantOptimization`.
+2. **The algorithm in the proof of Theorem 2 is undefined in a case.** 🔧 *Proof gap (missing case),
    statement true.* Step 2 computes `x_T ∈ arg min ∑_{i∈T} Qᵢ` for every set `T` of `n − f` received
    functions, and `dist(x_T, arg min ∑_{T̂})`. If `T` contains faulty agents, these `arg min` sets can
    be empty, and Assumption 1 only covers non-faulty sets. `dist(x, ∅)` is also undefined in (3).
    Repair (`candidate`, `score`): pick an arbitrary point if the `arg min` is empty, and use the
    extended distance (`dist(x, ∅) = ∞`). The proof uses `x_T ∈ X_T` only for `T = G` non-faulty, and
    the minimum in (12) exists over a finite set.
-3. **Lemma 1 fails for `f ≥ n`.** *False only in a degenerate case (R2).* For `f = n`, Definition 2
+3. **Lemma 1 fails for `f ≥ n`.** ✏️ *False only in a degenerate case.* For `f = n`, Definition 2
    only constrains `S = ∅`, whose `arg min` is `ℝ^d`, so every algorithm is `(n, 0)`-resilient
    (`lemma_1_false_of_le`, via `isResilient_of_le`). For `f > n` there is no `S` at all. For
    `n/2 ≤ f < n`, `lemma_1` proves the lemma in the reading of its proof: no algorithm is resilient
@@ -60,22 +64,9 @@ Section 3 (Lemma 1, Theorems 1, 2).
      It needs `2f ≤ n`, which is implied by the standing assumption `f < n/2`.
    - Theorem 1's proof writes `n − 2f ≤ |Ŝ| < n − f`, whereas Definition 3 uses `|Ŝ| = n − 2f`. This is
      harmless.
-   - The claim "2f-redundancy is equivalent to `(2f, 0)`-redundancy" is not formalized. It needs
-     closed `arg min`s, since Hausdorff distance `0` only gives equal closures. It also needs an
-     averaging argument to pass from `|Ŝ| = n − 2f` to `|Ŝ| ≥ n − 2f`.
-
-## Verdict
-
-Worst label ⚠️, from items 1 and 3.
-- Item 3 is a degenerate case (R2).
-- Item 1 is borderline between ⚠️ and ❌/🚨. The literal per-profile statement is false, and Theorem 1
-  is a co-headline ("necessary and sufficient conditions"). We apply R4: a competent reader takes
-  "necessary" to mean "for an algorithm that must work on a class of inputs". Under the natural class
-  (the `(2f, ε')`-redundant profiles) the statement is true, and the paper's message ("the redundancy
-  level controls the achievable resilience") is not misleading. The repair needed for (c) is at the
-  proof level. This agrees with the treatment of the same issue in
-  `Papers/PODC2020/RedundantOptimization`.
-- Item 2 is a proof-level gap (🛠️).
+   - The claim "2f-redundancy is equivalent to `(2f, 0)`-redundancy" is not formalized and not checked.
+     It seems to need closed `arg min`s, since Hausdorff distance `0` only gives equal closures. It also
+     seems to need an averaging argument to pass from `|Ŝ| = n − 2f` to `|Ŝ| ≥ n − 2f`.
 
 ## Modelling choices
 

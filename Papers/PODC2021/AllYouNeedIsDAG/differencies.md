@@ -60,11 +60,12 @@ Paper: Keidar, Kokoris-Kogias, Naor, Spiegelman, *All You Need is DAG*, PODC 202
    leader may be Byzantine. The missing step: every vertex of round `≥ R₀ + 1` has `2f + 1` strong
    edges, so it has at least one strong edge to a correct vertex of round `≥ R₀`, which reaches
    `v`. Here `R₀` exceeds all correct rounds at `T₀`. (`run_validity`, internal lemmas A/B.)
-6. **The RBC specification lacks authenticity.** The paper's Integrity says only "at most once
-   per `(r, k)`". Validity also needs the standard property that a correct process delivers a
-   message of a correct sender `k` only if `k` broadcast it. Otherwise the contents of a correct
-   process's vertex could be forged. We assume it (`Run.Valid.auth`). Classification: missing
-   (standard) assumption.
+6. **RBC authenticity is not among the listed RBC properties.** The paper's Integrity says only
+   "at most once per `(r, k)`". Validity also needs the standard property that a correct process
+   delivers a message of a correct sender `k` only if `k` broadcast it. Otherwise the contents of a
+   correct process's vertex could be forged. Section 2 says this in prose: `p_k` in
+   `r_deliver(m, r, p_k)` "is the process that called the corresponding `r_bcast_k(m, r)`", and the
+   recipient can verify the sender's identity. We model it as `Run.Valid.auth`. Not a mistake.
 7. **Claim 6 arithmetic.** With success probability `2/3 − ε` per wave the expectation is
    `1/(2/3 − ε) = 3/2 + 9ε/(4 − 6ε) + …`, not `≤ 3/2 + ε`. We prove `≤ (3f+1)/(2f+1) ≤ 3/2` for a
    perfect coin (`ε = 0`). Classification: typo-level imprecision.

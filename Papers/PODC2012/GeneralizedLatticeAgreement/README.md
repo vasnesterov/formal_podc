@@ -5,17 +5,16 @@ Agreement.* PODC 2012. DOI [10.1145/2332432.2332458](https://doi.org/10.1145/233
 Formalized version: the 10-page extended abstract as distributed by Microsoft Research; numbering follows
 it. There is no arXiv version.
 
-**Verdict: 🚨 Headline claim false.** The safety part of the generalized lattice agreement algorithm
-(Algorithm 2) holds: Theorems 5.1, 5.3 and 5.6 and Lemmas 5.4 and 5.5. So do the round lemmas behind the
-`O(N)` bound (5.7, 5.10, 5.11, and the `Propose` half of 5.9). But **the liveness theorem (Theorem 5.15) is
-false**, and with it the abstract's claim that "every value received by a correct process is learnt in
-`O(N)` message delays". With three processes, one of which crashes, a value received by a correct process is
-never learnt, even with reliable channels. Algorithm 1 as written also violates Consistency; a one-conjunct
-fix of `Decide` repairs that.
+**Verdict: ❌ Intent lost.** The algorithm of the title does not solve its problem: Theorem 5.15 is false, so with three
+processes, one of which crashes, a value received by a correct process is never learnt, even with reliable channels, and
+the abstract's claim that "every value received by a correct process is learnt in `O(N)` message delays" falls with no
+repair proved. The safety part of Algorithm 2 holds (Theorems 5.1, 5.3 and 5.6 and Lemmas 5.4 and 5.5), and so do the
+round lemmas behind the `O(N)` bound (5.7, 5.10, 5.11, and the `Propose` half of 5.9). Algorithm 1 as written also
+violates Consistency; a one-conjunct fix of `Decide` repairs that.
 
 ## Mistakes in the paper
 
-### 🚨 Theorem 5.15 (liveness of Algorithm 2)
+### ❌ Theorem 5.15 (liveness of Algorithm 2)
 Algorithm 2 does not solve generalized lattice agreement: with three processes, one of which crashes,
 there are fair executions in which a value received by a correct process is never learnt, even with
 reliable channels (`Cex515.theorem_5_15_false`, `Cex515b.theorem_5_15_false_reliable`,
@@ -70,69 +69,57 @@ bounds of the abstract and Section 5.3. We did not formalize a repaired algorith
 In execution 2 above no proposal and no `ACK` ever covers the received value `{1,2}`
 (`Cex515b.theorem_5_15_false_reliable`).
 
-**Impact.** Part of the failure of Theorem 5.15.
+**Impact.** A second, separate cause of the failure of liveness; no corrected lemma is proved.
 
 **Details.** The proof says: "if any correct proposer … is passive when it receives `u`, it will
 initiate `u`". This ignores that `proposedValue` grows while the proposer is passive.
 
-### ⚠️ Algorithm 1 (Consistency, failure-free)
-Algorithm 1 as written violates Consistency: with initial values `{1}, {2}, {3}` and three acceptors,
-two proposers decide the incomparable `{1,2}` and `{1,3}` (`Cex1.alg1_consistency_false`).
+### 🔧 Algorithm 1 and Lemma 5.9 (the guard of `Decide`)
+`ProcessNACK` enlarges `proposedValue` while `ACK`s are still counted and `Decide` has no conjunct `nackCount = 0`, so
+the output may be a value that was never chosen.
 
-**Impact.** Typo with evident intent (borderline, see [differencies.md](differencies.md)): adding the
-guard `nackCount = 0` to `Decide` makes every output a chosen value, and Consistency holds
-(`consistency_of_clean`).
+**Impact.** Algorithm 1 violates Consistency even failure-free, "at most one `Decide` per round" fails, and the proof
+step "`v₂` must be a chosen value" is false. Lemma 5.11 needs only the `Propose` half of Lemma 5.9.
 
-**Details.** `ProcessNACK` joins a rejection value into `proposedValue` while `ACK`s for the same
-proposal are still being counted. `Decide` (guard `ackCount ≥ ⌈(N_a+1)/2⌉`) then outputs this
-enlarged value, which was never proposed. Proposer 0 processes a `NACK` `{1,2}` (caused by proposer
-1's `{2}`) and then two `ACK`s for `{1}`, and it decides `{1,2}`. Proposer 2 is rejected, refines to
-`{1,3}` and decides it. The prose of Section 3 has the intended rule: "if all these responses are
-acceptances, the proposer is done".
+**Details.**
+- *Algorithm 1 (Consistency, failure-free).* With initial values `{1}, {2}, {3}` and three acceptors, two proposers
+  decide the incomparable `{1,2}` and `{1,3}` (`Cex1.alg1_consistency_false`). `ProcessNACK` joins a rejection value
+  into `proposedValue` while `ACK`s for the same proposal are still being counted. `Decide` (guard
+  `ackCount ≥ ⌈(N_a+1)/2⌉`) then outputs this enlarged value, which was never proposed. Proposer 0 processes a `NACK`
+  `{1,2}` (caused by proposer 1's `{2}`) and then two `ACK`s for `{1}`, and it decides `{1,2}`. Proposer 2 is rejected,
+  refines to `{1,3}` and decides it. The prose of Section 3 has the intended rule: "if all these responses are
+  acceptances, the proposer is done".
+- *Lemma 5.9 ("at most one `Decide` per round").* It fails for the same reason, even failure-free: proposer 0 decides
+  the unchosen `{1,2}` (its `{1}` was chosen) and then the chosen `{1,2,3}`, which lie below exactly the same chosen
+  values (`Cex59.lemma_5_9_decide_false`).
+- *Lemma 5.9, `Propose` half.* "At most one `Propose` per round" is true, but the proof's "`v₂` must be a chosen value"
+  is false.
 
-### ⚠️ Lemma 5.9 ("at most one `Decide` per round")
-"At most one `Decide` per round" fails for the same reason, even failure-free: proposer 0 decides the
-unchosen `{1,2}` (its `{1}` was chosen) and then the chosen `{1,2,3}`, which lie below exactly the same
-chosen values (`Cex59.lemma_5_9_decide_false`).
+**Repair.** Adding the guard `nackCount = 0` to `Decide` makes every output a chosen value, and Consistency holds
+(`consistency_of_clean`). We prove the `Decide` half of Lemma 5.9 for decisions with `nackCount = 0`
+(`lemma_5_9_decide_clean`). For the `Propose` half, which we prove for the printed algorithm (`lemma_5_9_propose`), the
+right argument uses the *last proposal* before the `Decide`, which a quorum acknowledged.
 
-**Impact.** Same fix as Algorithm 1; we prove the `Decide` half for decisions with `nackCount = 0`
-(`lemma_5_9_decide_clean`). Lemma 5.11 needs only the `Propose` half.
+### ✏️ Slips
+- **Lemma 5.13 (missing "initiated by a correct proposer").** A proposer may initiate `{3}`, crash, and lose its
+  messages; then `{3}` is never part of a chosen value (`Cex513.lemma_5_13_false`). The lemma is only used for correct
+  proposers.
+- **Section 5 (definition of "learnt").** "A value `v` is learnt by `p` if `p` executes `Learn(w)` for some `w ⊒ v`"
+  makes Theorem 5.6 false if taken literally: every `ACK` makes all values below it "learnt", so one `ACK` of `{1,2}`
+  "learns" the incomparable `{1}` and `{2}`. We read Theorem 5.6 as being about `learntValue`, and Theorem 5.15 with the
+  problem definition "`v ⊑` a learnt value". Execution 2 above refutes Theorem 5.15 under both readings.
 
-### ⚠️ Lemma 5.13 (missing "initiated by a correct proposer")
-A proposer may initiate `{3}`, crash, and lose its messages; then `{3}` is never part of a chosen value
-(`Cex513.lemma_5_13_false`).
-
-**Impact.** Implied assumption: the lemma is only used for correct proposers.
-
-### ⚠️ Section 5 (definition of "learnt")
-"A value `v` is learnt by `p` if `p` executes `Learn(w)` for some `w ⊒ v`" makes Theorem 5.6 false if
-taken literally: one `ACK` of `{1,2}` "learns" the incomparable `{1}` and `{2}`.
-
-**Impact.** Typo with evident intent: we read Theorem 5.6 as being about `learntValue`, and Theorem
-5.15 with the problem definition "`v ⊑` a learnt value". Execution 2 above refutes Theorem 5.15 under
-both readings.
-
-**Details.** Taken literally, every `ACK` makes all values below it "learnt".
-
-### Typos and slips
+### Typos
 - "Proposed" literally means "proposed exactly"; Lemma 5.14 needs "included in a proposal".
 - The first author's name is misspelled "Falerio" on the paper.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 5.9, `Propose` half
-"At most one `Propose` per round" is true, but the proof's "`v₂` must be a chosen value" is false.
-
-**Impact.** Statement true; repaired (`lemma_5_9_propose`).
-
-**Repair.** The right argument uses the *last proposal* before the `Decide`, which a quorum
-acknowledged.
-
-### 🛠️ Lemma 5.11 (length of the `covered` chain)
+### 🔧 Lemma 5.11 (length of the `covered` chain)
 The proof shows `covered₂ ⊇ Prev` and then asserts "the strictly increasing sequence … can have length
 at most `N_p + 1`", which also needs `covered₁ ∩ Curr ≠ ∅`.
 
-**Impact.** Statement true; repaired (`lemma_5_11`).
+**Impact.** The lemma stands; a few lines close the step (`lemma_5_11`).
 
 **Details.** `covered₁ ∩ Curr ≠ ∅` means that `w₁` is not a join of values of earlier rounds. That
 holds because the chosen values form a chain. With it, `covered₂, …, covered_k` lie between

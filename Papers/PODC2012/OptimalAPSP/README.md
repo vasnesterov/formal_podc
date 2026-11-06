@@ -5,10 +5,11 @@ DOI [10.1145/2332432.2332504](https://doi.org/10.1145/2332432.2332504). Formaliz
 full version" of 22.05.2012 (38 pp., with proofs; no arXiv version); numbering follows it. Copy of the paper:
 [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The headline results hold: Algorithm 1 computes APSP in `O(n)` CONGEST rounds (Lemma 1,
-Theorem 1, Lemmas 2–6), and the diameter lower bounds (Theorems 4, 8, 9 with Lemmas 8, 9, 15 and the exact parts
-of Lemmas 10, 11, 16, Theorem 11) are proved. **Theorem 5 is false**: Algorithm 2, the S-SP algorithm, computes
-wrong distances already on a triangle, and still does so with any tie-breaking rule and any neighbour numbering.
+**Verdict: ⚠️ Weakened.** Algorithm 1 computes APSP in `O(n)` CONGEST rounds (Lemma 1, Theorem 1, Lemmas 2–6), and the
+diameter lower bounds (Theorems 4, 8, 9 with Lemmas 8, 9, 15 and the exact parts of Lemmas 10, 11, 16, Theorem 11) are
+proved. But Theorem 5 is false: Algorithm 2, the S-SP algorithm, computes wrong distances already on a triangle, and
+still does so with any tie-breaking rule and any neighbour numbering. The `(×, 1+ε)` approximations built on it are
+therefore not established by the paper.
 
 ## Mistakes in the paper
 
@@ -20,8 +21,8 @@ with `δ[4] = 2` although `3` and `4` are adjacent (`Alg2.exB_wrong`, `Alg2.theo
 (`Alg2.not_eventuallyCorrect`). Theorem 6, Corollary 4 and Theorem 7 (the `(×, 1+ε)` approximations of
 eccentricities, diameter, radius, center, peripheral vertices and girth) use Algorithm 2 and are therefore not
 established by the paper. Their bounds are still plausible, because a correct `O(|S| + D)` algorithm for S-SP is
-known from later work, for example Lenzen–Peleg's source detection (PODC 2013). The headline APSP result does not
-use Algorithm 2.
+known from later work, for example Lenzen–Peleg's source detection (PODC 2013). The APSP result does not use
+Algorithm 2.
 
 **Details.** In round 1 nodes `3` and `4` send their own IDs to each other. The smaller ID wins the edge, so ID `4`
 does not cross. Node `4` then sends the smaller ID `2` to node `3` first. Meanwhile ID `4` crossed the edge `4 → 1`,
@@ -29,7 +30,8 @@ and node `1` forwards it to `3` in round 2 with `δ = 2`. When the direct copy f
 `4` and ignores it. The run has no ties, and `Alg2.exB_wrong` checks all 24 neighbour numberings, both for the
 paper's rule (the lowest neighbour index wins) and for "take the smallest `δ` received in the round". The proof
 of Theorem 5 assumes that the same smaller IDs delay ID `u` on every path. That is false: whether a message is
-delayed on an edge depends on what the other endpoint sends at that moment.
+delayed on an edge depends on what the other endpoint sends at that moment. Its claim that each smaller ID delays
+`u` at most once is false too.
 
 The minimal counterexample is the triangle `{1, 2, 3}` with `S = {1, 3}`. ID `3` reaches node `1` in round 2
 simultaneously from `2` (with `δ = 2`) and from `3` (with `δ = 1`). If node `1` numbers its neighbours by
@@ -39,20 +41,26 @@ node `5` attached to `1` and `S = {1, 2, 3, 4}`, node `5` has no `δ` for ID `4`
 
 **Repair.** None formalized. A correct algorithm forwards tokens in order of (distance, ID), not by ID alone.
 
-### Typos and slips
-- §5.2: the bit index `k(n)·(μ − k(n) + 1) + ν` of the edge `(l_ν, l_μ)` is out of range `[k(n)² − 1]`, and
-  Figure 1 uses a third indexing. Any bijection works; Lean indexes the inputs by `Fin k × Fin k`.
-- §7.1: in Theorem 9's proof "`i ∈ [n − 1]`" should be `i ∈ [k(n)² − 1]`; in `E_b` "`i ∈ [n − 4k(n) + 1]`" should
-  be the index range of `V_b`'s fill-up nodes (and with `[k] = {0, …, k}`, `V_b`'s "`[n − 4k(n) − 2]`" is one too
-  many); the prose on p. 28 writes the lower clique as "`{k(n), …, k(n) − 1}`" (the formal `E_a` has
-  `{k(n), …, 2k(n) − 1}`); Figure 2's caption uses a different bit indexing than `E_a`.
-- Lemma 16's proof says "diameter 2 from graphs of diameter 2" (meant: 3). Theorem 11's proof says
-  "`n − 1`" nodes in the 2-neighbourhood (meant: `n`, since `v ∈ N₂(v)`).
+### ✏️ Slips
+- §5.2: the bit index `k(n)·(μ − k(n) + 1) + ν` of the edge `(l_ν, l_μ)` is out of range `[k(n)² − 1]`. The pairing
+  of Lemma 8's proof is the intended one. Any bijection works; Lean indexes the inputs by `Fin k × Fin k`.
+- §7.1: in Theorem 9's proof "`i ∈ [n − 1]`" should be `i ∈ [k(n)² − 1]`.
+- §7.1: in `E_b` "`i ∈ [n − 4k(n) + 1]`" should be the index range of `V_b`'s fill-up nodes, and with
+  `[k] = {0, …, k}`, `V_b`'s "`[n − 4k(n) − 2]`" is one too many.
+- Theorem 11's proof says "`n − 1`" nodes in the "`k`-neighbourhood" (meant: `n` nodes in the 2-neighbourhood, since
+  `v ∈ N₂(v)`).
 - Claim 2 says `p + 3 = d/2 + 2` is "less than `d`". It equals `d` for `d = 4`; "at most" is what is used.
+
+### Typos
+- The prose on p. 28 writes the lower clique as "`{k(n), …, k(n) − 1}`" (the formal `E_a` has
+  `{k(n), …, 2k(n) − 1}`).
+- Lemma 16's proof says "diameter 2 from graphs of diameter 2" (meant: 3).
+- Figure 1 uses a third indexing of the bits, and Figure 2's caption uses a different bit indexing than `E_a`. Any
+  bijection works.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 9 (disjoint ⇔ diameter `d`) and Theorem 4
+### 🔧 Lemma 9 (disjoint ⇔ diameter `d`) and Theorem 4
 For disjoint inputs the proof only shows `diam ≤ d`; that the diameter is not smaller (so *exactly* `d`) is never
 argued.
 
@@ -61,13 +69,13 @@ argued.
 **Repair.** For disjoint inputs the two path ends `l'_ν` (upper) and `r'_μ` (lower) are at distance exactly
 `2p + 2 = d`. The lower bound is proved with a potential that changes by at most one along edges.
 
-### 🛠️ Lemma 8 (non-disjoint ⇒ diameter `d + 2`)
+### 🔧 Lemma 8 (non-disjoint ⇒ diameter `d + 2`)
 The upper-bound part says that any two nodes of `G_a` are within `p + 3` "via `c₀`", which is false for `p ≥ 2`
 (two path ends `l'_ν, l'_ν'` are at distance `2p + 2`).
 
 **Impact.** Statement true. The bound actually needed, `≤ d + 2 = 2p + 4`, holds (`lemma8`, `claim2`).
 
-### 🛠️ Theorem 4 (construction for odd `n`)
+### 🔧 Theorem 4 (construction for odd `n`)
 Each side receives `n/2` nodes, which is impossible for odd `n`, although the theorem claims every `n ≥ d + 6`.
 
 **Impact.** Statement true; the Lean construction splits the fill-up nodes `⌊r/2⌋ / ⌈r/2⌉` (`theorem4`).
@@ -144,6 +152,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
   nor refuted here.
 - Lemma 7 / Claim 1 (girth), Lemmas 12–14, Theorems 6, 7, 10, Corollaries 1–4, and the parts of Lemma 10 that
   cite [22].
+- Lemma 16's extension to larger diameters by attaching a path.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 - Non-vacuity of the lower-bound hypotheses: flooding / gathering algorithms satisfy them for large `B`

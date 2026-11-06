@@ -4,39 +4,35 @@ Andrea Cerone, Alexey Gotsman. *Analysing Snapshot Isolation.* PODC 2016. DOI
 [10.1145/2933057.2933096](https://doi.org/10.1145/2933057.2933096). Formalized version: the extended version
 with the appendix proofs (§A, §B; no arXiv version); numbering follows it. The JACM 2018 version was consulted.
 
-**Verdict: ⚠️ Minor statement issues.** The main results hold as stated: the dependency-graph characterisation of
+**Verdict: 🔧 Easy fix.** The main results hold as stated: the dependency-graph characterisation of
 SI (Theorems 9 and 10, with Lemmas 12, 13, 15), the dynamic chopping criterion (Theorem 16, with Lemmas 17, 24,
-26, 27) and its static version (Corollary 18), and the robustness criteria (Theorems 19, 22). The only
-statement-level problem is a typo: Definition 20 defines `HistPSI` from `ExecSI` instead of `ExecPSI`, which makes
-Theorem 21 false as written.
+26, 27) and its static version (Corollary 18), and the robustness criteria (Theorems 19, 22). The proof of
+Lemma 26 misses a case, closed by proving its two parts in the other order. A typo in Definition 20 (`ExecSI`
+instead of `ExecPSI`) makes Theorem 21 false as written; it holds for the intended definition.
 
 ## Mistakes in the paper
 
-### ⚠️ Definition 20 and Theorem 21 (`HistPSI` defined from `ExecSI`)
-Definition 20 defines `HistPSI = {H | ∃VIS, CO. (H, VIS, CO) ∈ ExecSI}` with `ExecSI` instead of `ExecPSI`, which
-makes Theorem 21 false as written: the long-fork history of Figure 2(c) has a graph in `GraphPSI` but is not in
-`HistSI` (`Examples.theorem21_literal_false`).
-
-**Impact.** A typo with evident intent (the `ExecPSI` defined on the line above); with `ExecPSI`, Theorem 21 holds
-(`theorem21`), and no other result is affected.
-
-**Details.** Read literally, `HistPSI = HistSI`, and Theorem 21 would then say that SI histories are exactly the
-histories of graphs in `GraphPSI`. The JACM version has the same typo. We prove Theorem 21 for the intended
-definition although the paper cites it.
-
-### Typos and slips
-- §6.1 refers to "the long fork anomaly in Figure 4"; it is Figure 2(c).
-- The proof of Theorem 10(i) says "Figure 3" for Figure 4.
+### ✏️ Slips
+- Definition 20 defines `HistPSI = {H | ∃VIS, CO. (H, VIS, CO) ∈ ExecSI}` with `ExecSI` instead of the `ExecPSI`
+  defined on the line above, which makes Theorem 21 false as written: the long-fork history of Figure 2(c) has a
+  graph in `GraphPSI` but is not in `HistSI` (`Examples.theorem21_literal_false`). Read literally, `HistPSI =
+  HistSI`, and Theorem 21 would then say that SI histories are exactly the histories of graphs in `GraphPSI`.
+  With `ExecPSI`, Theorem 21 holds (`theorem21`), and no other result is affected. The JACM version has the same
+  typo. We prove Theorem 21 for the intended definition although the paper cites it.
 - Some derived anti-dependencies `S' —RW→ V'` in the proofs of Lemmas 26 and 27 need `S' ≠ V'`; the excluded case
   is a short cycle forbidden by `G ∈ GraphSI`.
 
+### Typos
+- §6.1 refers to "the long fork anomaly in Figure 4"; it is Figure 2(c).
+- The proof of Theorem 10(i) says "Figure 3" for Figure 4.
+
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 26 (transitivity of `WW_splice(G)`)
+### 🔧 Lemma 26 (transitivity of `WW_splice(G)`)
 The first part of the proof rules out `S'' —WW→ T'` with a cycle of `DCG(G)` (Figure 10(f)) that is in `DCG(G)`
-only if `S'' ≉ T'`, and the case `T ≈ S` is not treated.
+only if `S'' ≉ T'`, and the case `T ≈ S` is not covered at that point.
 
-**Impact.** Statement true; a routine fix (`Chopped.Hyp.splice_ww_trans`).
+**Impact.** Statement true; the proof only needs reordering (`Chopped.Hyp.splice_ww_trans`).
 
 **Details.** The proof first shows `T' —WW→ S''` and only then `T ≉ S`.
 
@@ -92,8 +88,8 @@ finite-relational, and finiteness is never needed.
 
 **Not formalized.** The equivalence of the axiomatic SI specification with the operational SI concurrency
 control, which the paper cites. Also not formalized: §B, i.e. the chopping criteria for serializability and
-parallel SI (Theorems 29 and 31, cited) and their comparison with Corollary 18, and most worked examples
-(Figures 4–6, 11–13).
+parallel SI (Theorems 29 and 31, cited) and their comparison with Corollary 18, the static robustness analyses
+beyond Theorems 19 and 22, and most worked examples (Figures 4–6, 11–13).
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. The
 hypotheses are non-vacuous: `Examples.lean` contains concrete dependency graphs, including write skew in

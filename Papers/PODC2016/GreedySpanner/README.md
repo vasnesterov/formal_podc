@@ -5,23 +5,24 @@ Arnold Filtser, Shay Solomon. *The Greedy Spanner is Existentially Optimal.* POD
 [1605.06852](https://arxiv.org/abs/1605.06852) v2 (full version, January 2020); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ✅ Correct.** Lemma 3, Observation 2, Theorem 5 (greedy is existentially optimal for size
-and lightness in any family closed under edge removal), Lemmas 5 and 6, Observation 7 and Theorem 6
-(near-optimality in doubling metrics) are all proved as stated. Corollaries 1–3 are proved relative to
-the cited external bounds, which are taken as hypotheses. The only issues are a small unstated step in
-the proof of Lemma 6 and some loose definitions. None affects any statement.
+**Verdict: ✏️ Slip.** Lemma 3, Observation 2, Theorem 5 (greedy is existentially optimal for size and lightness in any
+family closed under edge removal), Lemmas 5 and 6, Observation 7 and Theorem 6 (near-optimality in doubling metrics)
+are all proved, with only a radius typo, an off-by-one count, a maximum that should be a supremum and loose connectivity
+conventions to correct. Corollaries 1–3 are proved relative to the cited external bounds, which are taken as
+hypotheses. The approximate-greedy construction of Section 5 was not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
-- In the proof of Observation 7, the covering balls in `M` should have radius `r/4`, not `4r`.
+### ✏️ Slips
+- In the proof of Observation 7, the covering balls in `M` should have radius `r/4`, not `4r` (the next step's
+  "`t · 4r ≤ 2r`" is false; with `r/4` the proof goes through, `observation7`).
 - `OPT_t(𝒢)` is defined as a *maximum* over `𝒢`. For lightness over an infinite family of weighted
   graphs the maximum need not be attained; we use the supremum.
 - Section 2 assumes all graphs connected, but a family closed under edge removal contains
   disconnected graphs. We define the MST weight as the weight of a minimum spanning *forest*. For
   connected graphs it is the minimum weight of a spanning tree (`mstWeight_eq_iInf_isTree`).
+- In the proof of Observation 4, "contains at least `n + 1` edges" should be `n`: replacing one edge of a spanning
+  tree by a path of at least two edges gives at least `n` edges, which already force the cycle the proof needs.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -70,7 +71,7 @@ Lemmas 5 and 6 are proved for an arbitrary connected weighted graph `G`, not onl
 additionally needs positive edge weights and `1 ≤ t < 2`. Lemma 3 and Observation 2 hold for every stretch `t`
 (the paper assumes `t ≥ 1`) and for non-negative weights (the paper assumes positive weights).
 
-**Proof remarks.**
+**Proof remark.**
 * *Lemma 6 (`|H| ≤ |H'|`), an unstated step.* The injection `f : H → H'` sets `f(e) = e` for
   `e ∈ H ∩ H'` because "an edge `e' ∈ H ∩ H'` covers itself". So the fixed shortest path `P_{e'}` in
   `H` between the endpoints of `e'` must be the edge `e'` itself. This fact is used in the
@@ -78,11 +79,6 @@ additionally needs positive edge weights and `1 ≤ t < 2`. Lemma 3 and Observat
   it. It is true for the greedy spanner: a different path of weight `≤ w(e')` would make `H − e'` a
   `t`-spanner of `H`, contradicting Lemma 3. Our proof avoids the special case. For *every*
   `e ∈ H`, `f(e)` is an edge of a shortest `H'`-path `Q_e` whose `P_{f(e)}` contains `e` (`lemma6`).
-* *Observation 4 (MST of `M_G`).* The proof replaces an MST edge `e ∈ M_G \ G` by a shortest path
-  with at least two edges, and treats only MST edges outside `G`. An edge of `G` heavier than the
-  distance between its endpoints needs the same treatment, and the argument works for it verbatim.
-  Theorem 6 does not need Observation 4: all edges of a greedy spanner of a metric are shortest
-  paths, so we prove the equality `w(MST(M_H)) = w(MST(M))` directly (`mstWeight_inducedW`).
 
 **Not formalized.** The cited Theorems 1–4 and Lemma 1 are used only as hypotheses, in
 Corollaries 1–3. For Corollaries 1 and 2 the hypothesis is stated for all weighted graphs on `V`,
@@ -91,6 +87,12 @@ Section 5 is not formalized: the approximate-greedy algorithm, Lemmas 8 and 10,
 Observation 9 and Theorem 7. Its claims are about running time in the algebraic computation-tree
 model and rest on cited geometric lemmas. The illustrative Petersen-graph example of Figure 1 is
 also not formalized.
+
+Observation 4 (MST of `M_G`) as stated is not formalized either. Its proof replaces an MST edge `e ∈ M_G \ G` by a
+shortest path with at least two edges, and treats only MST edges outside `G`. An edge of `G` heavier than the
+distance between its endpoints needs the same treatment, and the argument works for it verbatim.
+Theorem 6 does not need Observation 4: all edges of a greedy spanner of a metric are shortest
+paths, so we prove the equality `w(MST(M_H)) = w(MST(M))` directly (`mstWeight_inducedW`).
 
 **Trust.** No `sorry`. All listed theorems use only the axioms `propext`, `Classical.choice` and
 `Quot.sound`. Non-vacuity: every weighted graph has a greedy `t`-spanner (`exists_isGreedySpanner`).

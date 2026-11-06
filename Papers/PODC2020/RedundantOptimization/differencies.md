@@ -5,7 +5,7 @@ PODC 2020, DOI 10.1145/3382734.3405748 (proceedings version; no arXiv version).
 
 ## Issues in the paper
 
-1. **Theorem 1 is under-specified.** *Classification: under-specified statement.* Definition 2
+1. **Theorem 1 is under-specified (⚠️).** Definition 2
    (f-resilience) does not say which inputs (honest sets and honest cost functions) the algorithm
    must handle. We formalize three readings.
    - *(a) Literal (all executions): true but vacuous.* In Part II the faulty agents' functions
@@ -37,35 +37,35 @@ PODC 2020, DOI 10.1145/3382734.3405748 (proceedings version; no arXiv version).
      `C_B = ‖x − ŵ‖²`. (⇐): `S = H ∩ H'` has `|S| ≥ n − 2f`, and a common minimum point of `e'`
      minimizes `Σ_S Q_i`, hence lies in `W*` by 2f-redundancy. This reading is our repaired
      Theorem 1.
-2. **Part II of the proof assumes `|H| = n - f`.** *False statement under reading (c); the repair is
+2. **Part II of the proof assumes `|H| = n - f` (⚠️).** *False statement under reading (c); the repair is
    "exactly `f` faulty agents".* "Then `|H| = |{1,…,n} \ B| = n − f`" silently fixes the number of
    faulty agents to `f`. Counterexample: `n = 3`, `f = 1`, no faulty agent, `H = {0,1,2}` with
    `x², y², x² + y²` on `ℝ²`. The honest costs share the minimum point `0` and violate 2f-redundancy.
    Yet every execution producing the same received vector has `0` as a solution
    (`theorem1_indistinguishable_false_fewer_faults`, via `not_disjoint_of_univ`).
-3. **Theorem 1 needs `n > 2f`, which it does not state.** *False only in a degenerate case.* Part II
+3. **Theorem 1 needs `n > 2f`, which it does not state (✏️).** *False only in a degenerate case.* Part II
    uses `n > 2f` ("Recall that … `n > 2f`"). Without it the statement fails for `n = f = 1`. Then
    "output a minimum point of the only received function" is f-resilient on all executions, but the
    execution whose only (honest) agent has cost `x²` is not 2f-redundant: its empty subset has
    `|∅| ≥ n - 2f`, and `arg min 0 = ℝ ≠ {0}` (`theorem1_false_n_eq_one`). `theorem1` assumes
    `2f < n`.
-4. **Existence of minimum points is implicit.** *Under-specified definitions.* Definition 2 can only
+4. **Existence of minimum points is implicit (✏️).** *Under-specified definitions.* Definition 2 can only
    be met if `arg min ∑_{i∈H} Q_i ≠ ∅`. Otherwise no algorithm is resilient even with `f = 0`
    (e.g. a linear cost). Assumption 4 uses the projection onto `W*`, which needs `W* ≠ ∅`. The paper
    only says "closed and convex". We require a minimum point in `AllExecs` / `RedExecs`, and
    Theorem 2's `Assumptions` contain a projection map with values in `W*`.
-5. **Theorem 2 (i) (`ρ ∈ [0,1)`) is false when `W* = ℝ^d`.** *False only in a degenerate case.*
+5. **Theorem 2 (i) (`ρ ∈ [0,1)`) is false when `W* = ℝ^d` (✏️).** *False only in a degenerate case.*
    Appendix B derives `λ ≤ μ` from (31) and (32), which needs a point `w ∉ W*`. If all honest costs
    are constant, Assumptions 2–4 hold for every `λ > 0`. With `n = 3`, `f = 1`, `μ = 1`, `λ = 30`,
    `η = 29/3 ∈ (0, η̄ = 58/3)` we get `ρ = 1 − 9α² = −840 < 0` (`theorem2_rho_nonneg_false`). Part (ii)
    is trivially true there. With a point off `W*`, (i) holds (`theorem2_rho_nonneg`).
-6. **(30) needs `f ≥ 1`.** *Proof gap, statement true.* "From (29) it is easy to obtain
+6. **(30) needs `f ≥ 1` (✏️).** *Proof gap, statement true.* "From (29) it is easy to obtain
    `∇Q_i(w*) = 0` for all `i ∈ H`" uses a subset of `H` of size `|H| − 1 ≥ n − 2f`. For `f = 0` this is
    false (e.g. `(x−1)²` and `(x+1)²`), and so is (41). Theorem 2 still holds for `f = 0` (plain
    gradient descent): `key_estimates` treats `f = 0` separately, using the Lipschitz bound of the
    aggregate gradient.
-7. **Minor.**
-   - Appendix B: "if 2f-redundancy property holds true then `n > 2f`" does not follow from
+7. **Other remarks.**
+   - Appendix B (✏️): "if 2f-redundancy property holds true then `n > 2f`" does not follow from
      Definition 1. We assume `2f < n` explicitly in Theorem 2.
    - Theorem 2 assumes `α > 0` and `η ∈ (0, η̄)`. The former follows from the latter, since
      `η̄ = 6α/(nμ)`, so `theorem2` omits it. Part (ii) only needs `η ≥ 0` in each step (`step`).

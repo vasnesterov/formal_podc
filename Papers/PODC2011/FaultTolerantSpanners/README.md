@@ -5,19 +5,15 @@ Michael Dinitz, Robert Krauthgamer. *Fault-Tolerant Spanners: Better and Simpler
 [1101.5753](https://arxiv.org/abs/1101.5753) v1; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The main results hold, with explicit constants:
-* the generic conversion (Theorem 2.1) and its greedy instance (Corollary 2.2);
-* Lemma 3.1, the LP relaxation with knapsack-cover inequalities (validity, LP ≤ OPT, the integrality
-  gap example);
-* the `O(log n)` rounding of Theorem 3.3.
-
-Lemma 3.8, a step of the distributed algorithm (Section 3.5), is false as stated, but only because the
-cluster LP is misdefined; the intended definition is evident from the paper (the lemma's proof and the later
-proof of Theorem 3.9 use it), and with it the lemma holds.
+**Verdict: 🔧 Easy fix.** The generic conversion (Theorem 2.1) and its greedy instance (Corollary 2.2), Lemma 3.1, the
+LP relaxation with knapsack-cover inequalities (validity, LP ≤ OPT, the integrality gap example) and the `O(log n)`
+rounding of Theorem 3.3 hold with explicit constants, up to slips. The one real mistake is Lemma 3.8, a step of the
+distributed algorithm (Section 3.5): the cluster LP is misdefined, and one clause fixes it. The `O(log Δ)` bound
+(Theorem 3.4) and the distributed results that use the lemma were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 3.8 (Section 3.5, the cluster LP `LP(C)`)
+### 🔧 Lemma 3.8 (Section 3.5, the cluster LP `LP(C)`)
 Lemma 3.8 is false as stated because `LP(C)` gives cost 0 only to the arcs of `δ(C)`, so arcs with both
 endpoints in `N(C)` keep their cost and may have no cheap length-2 bypass inside `G(C)`
 (`Lemma38Counterexample.lemma_3_8_counterexample`).
@@ -41,67 +37,29 @@ the edge `e` does not have cost 0" in the proof of Theorem 3.9; dropping the cov
 outside `E(C)` would also work. With the first repair Lemma 3.8 holds, and we prove it
 (`lemma_3_8_corrected`).
 
-### ⚠️ Theorem 2.1 for `r > 2n` (generic conversion)
-For `r > 2n` the claimed size `O(r³ log n · f(2n/r))` can be 0, because `f(0) = f(1) = 0` is legitimate,
-yet any fault-tolerant spanner of a graph with an edge is nonempty.
-
-**Impact.** Degenerate parameter range; we prove the theorem for `1 ≤ r ≤ n` with explicit constants
-(`theorem_2_1`), and Corollary 2.2 follows.
-
-**Repair.**
-* We assume `1 ≤ r ≤ n`, `f` monotone (see the proof gap below) and `f(2) ≥ 1`. The last condition holds
-  for any algorithm that is correct on a single edge.
-* We prove the theorem with explicit constants: `α = ⌈8r²(r+2+C) ln(n+1)⌉` iterations and size
-  `≤ (8C+26) r³ ln(n+1) f(⌊2n/r⌋)`.
-* The success probability is `≥ 1 − (n+1)^{−C} − α e^{−n^{1/3}/6}`. The last term is the paper's
-  Chernoff bound on the number of survivors under its "w.l.o.g. `r ≤ n^{2/3}`".
-
-(`theorem_2_1`)
-
-### ⚠️ Lemma 3.1 and the exactness of IP (3) (self-loops)
-Lemma 3.1 and the exactness of IP (3) need a loopless digraph: with a self-loop `(u,u) ∈ E`, `H = ∅` is a
-fault-tolerant 2-spanner that does not "satisfy" `(u,u)` (`isFTSpanner_two_iff`).
-
-**Impact.** Degenerate case; for loopless digraphs both hold (`isFTSpanner_two_iff`).
-
-### Typos and slips
+### ✏️ Slips
+* Theorem 2.1 for `r > 2n`: the claimed size `O(r³ log n · f(2n/r))` can be 0, because `f(0) = f(1) = 0` is legitimate,
+  yet any fault-tolerant spanner of a graph with an edge is nonempty. This parameter range is never used: we prove the
+  theorem for `1 ≤ r ≤ n` (`theorem_2_1`), and Corollary 2.2 follows.
+* Theorem 2.1, proof: bounding the size of the spanner on `G \ J` (at most `2n/r` vertices) by `f(2n/r)` needs `f`
+  nondecreasing. Since the base algorithm works on every graph, one can instead pad `G \ J` with isolated vertices up
+  to `⌊2n/r⌋` vertices.
+* Lemma 3.1 and the exactness of IP (3) need a loopless digraph: with a self-loop `(u,u) ∈ E`, `H = ∅` is a
+  fault-tolerant 2-spanner that does not "satisfy" `(u,u)`. For loopless digraphs both hold (`isFTSpanner_two_iff`).
+* Theorem 3.3, proof: `i* = max{i : f_{P_i} ≥ 1/α}` is undefined when no path has flow `≥ 1/α` (we take `i* = 0`), and
+  the steps "`x_uv ≥ 1/2` ⇒ selected" and "`i* + αr′/4 ≥ r+1`" need `α ≥ 2` and `α ≥ 4`. "With probability 1" means
+  almost surely. All these conditions are fine (`prob_not_satisfies_le`, `theorem_3_3`).
 * Lemma 3.1, proof: "in `H \ W` there is no `u–v` path" should read "no `u–v` path of length `≤ 2`". The
   weaker claim is the true one, and it suffices.
 * Section 2: the sufficiency claim needs "a path … in `H \ F`", not "in `G \ F`".
-* Section 2: `ℓ({u,e})` should be `ℓ({u,v})`, and the set defined is `E′_F`, not `E_F`.
-* Section 2: the iteration count is garbled as "`O(e³ ln n log n)`".
 * Theorem 3.3: "`T_z ≤ min{x_(u,z), x_(z,v)}`" is missing the factor `α`.
 * Theorem 3.4, not formalized: `Z_u^−` uses `x_{u,v}` where `x_{v,u}` is meant.
 * Theorem 3.4: `A_{u,v}` also depends on `T_v`, which does not change the `O(Δ³)` dependency count.
 * The introduction calls the `O(log Δ)` bound non-algorithmic, while Section 3.4 makes it algorithmic via
   Moser–Tardos.
 
-## Proof gaps (statements true)
-
-### 🛠️ Theorem 2.1 (implicit `f` monotone)
-The proof bounds the size of the spanner on `G \ J` (at most `2n/r` vertices) by `f(2n/r)`, which needs
-`f` nondecreasing.
-
-**Impact.** Statement true: since the base algorithm works on every graph, one can pad `G \ J` with
-isolated vertices up to `⌊2n/r⌋` vertices.
-
-**Details.** Our `SpannerAlg` only runs on induced subgraphs of `G`, so we assume `Monotone f`
-(`theorem_2_1`).
-
-### 🛠️ Theorem 3.3 (implicit conditions of the rounding)
-The rounding leaves some conditions implicit: `i* = max{i : f_{P_i} ≥ 1/α}` is undefined when no path has
-flow `≥ 1/α`, and two steps need `α ≥ 2` and `α ≥ 4`.
-
-**Impact.** Statement true; all these conditions are fine (`prob_not_satisfies_le`, `theorem_3_3`).
-
-**Details.**
-* For undefined `i*` we take `i* = 0`.
-* The steps "`x_uv ≥ 1/2` ⇒ selected" and "`i* + αr′/4 ≥ r+1`" need `α ≥ 2` and `α ≥ 4`.
-* "With probability 1" means almost surely.
-
-**Repair.** We prove: per-arc failure `≤ e^{−α/4}` for `α ≥ 4`, expected cost `≤ 2α·LP`, and with
-`α = 12 ln n` success probability `≥ 2/3 − 1/n` for cost `≤ 72 ln n · LP`. (`prob_not_satisfies_le`,
-`theorem_3_3`)
+### Typos
+* Section 2: `ℓ({u,e})` should be `ℓ({u,v})`, and the set defined is `E′_F`, not `E_F`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -147,6 +105,15 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Thm 3.3 analysis (per arc, cost, total) | `prob_not_satisfies_le`, `expected_cost_le`, `rounding_success` | `TwoSpanner/Rounding.lean` |
 | Thm 3.3 | `theorem_3_3`, `theorem_3_3'` | `TwoSpanner/Theorem33.lean` |
 | Lemma 3.8 false / corrected | `Lemma38Counterexample.lemma_3_8_counterexample`, `lemma_3_8_corrected` | `TwoSpanner/Distributed.lean` |
+
+**Explicit forms.**
+* Theorem 2.1. We assume `1 ≤ r ≤ n`, `f` monotone and `f(2) ≥ 1`. The last condition holds for any algorithm that is
+  correct on a single edge. Our `SpannerAlg` only runs on induced subgraphs of `G`, so padding is not available and we
+  assume `Monotone f`. With `α = ⌈8r²(r+2+C) ln(n+1)⌉` iterations, the size is `≤ (8C+26) r³ ln(n+1) f(⌊2n/r⌋)` and the
+  success probability is `≥ 1 − (n+1)^{−C} − α e^{−n^{1/3}/6}`. The last term is the paper's Chernoff bound on the
+  number of survivors under its "w.l.o.g. `r ≤ n^{2/3}`". (`theorem_2_1`)
+* Theorem 3.3. Per-arc failure `≤ e^{−α/4}` for `α ≥ 4`, expected cost `≤ 2α·LP`, and with `α = 12 ln n` success
+  probability `≥ 2/3 − 1/n` for cost `≤ 72 ln n · LP`. (`prob_not_satisfies_le`, `theorem_3_3`)
 
 **Not formalized.**
 * Theorem 3.4 (`O(log Δ)`): it needs the Lovász Local Lemma (Moser–Tardos), which Mathlib lacks.

@@ -5,29 +5,22 @@ DOI [10.1145/2484239.2501983](https://doi.org/10.1145/2484239.2501983). Formaliz
 [1207.1852](https://arxiv.org/abs/1207.1852) v4 (10 May 2013, the PODC version); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🛠️ Proof repaired.** Both headline results hold: routing (Theorem 3.7, 16 rounds)
-and sorting (Theorem 4.5, 37 rounds). We prove them for every `n`, with packets of a constant
-number of `O(log n)`-bit items, in 15 and 32 rounds. The square case `n = s²` follows the paper's
-algorithms. The proofs have gaps that need fixing:
-- the non-square case of Theorem 3.7 does not work as written;
-- the relay nodes of Corollary 3.3 lack routing information;
-- the final step of the sorting algorithm needs global information that no step distributes;
-- several "bundling" and "exactly `f|W|` messages" steps are not justified.
+**Verdict: 🛠️ Hard fix.** Both main results hold for every `n`: routing (Theorem 3.7, 16 rounds) and sorting
+(Theorem 4.5, 37 rounds); we prove them with packets of a constant number of `O(log n)`-bit items, in 15 and 32 rounds.
+The square case `n = s²` follows the paper's algorithms after local repairs to the relay nodes of Corollary 3.3, the
+global information of the sorting algorithm's final step, and the "bundling" and "exactly `f|W|` messages" steps. The
+non-square case of Theorem 3.7 does not work as written and needed a different reduction through virtual nodes.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
-- Problem 4.1 asks for the keys with indices `i(n−1)+1, …, in`; it should be `(i−1)n+1, …, in`.
+### ✏️ Slips
+- Problem 4.1 asks for the keys with indices `i(n−1)+1, …, in`; it should be `(i−1)n+1, …, in`, as in the introduction.
 - Proof of Corollary 3.3: node `i` receives exactly **one** message (not `f`) for each destination `j`. The
   nearby claim "each node will receive exactly one message of each color" is also wrong (node `c` receives only
-  messages of colour `c`); this is cosmetic.
-- Lemma 3.6, Steps 2–3: the group-level colouring must be distributed over the group members (a transportation
-  problem). The paper hands this to a footnote ("deferred completion"), and Step 3 should announce counts per
-  destination group.
-- Corollaries 3.3/3.4 are stated for exactly `f|W|` messages per node but used with fewer; this needs dummies or
-  an "at most" version (we prove the "at most" version).
+  messages of colour `c`).
+- Corollaries 3.3/3.4 are stated for exactly `f|W|` messages per node but used with fewer or with upper bounds only
+  (Corollary 3.4, Lemma 4.4, Theorem 3.7). The paper's "at most" remark and dummy messages cover this (we prove the
+  "at most" version, `mem_tagged_c33`).
 
 ## Proof gaps (statements true)
 
@@ -36,7 +29,7 @@ With `s = ⌊√n⌋` the proof splits the messages into sub-instances on `V₁ 
 `V₃`, but the cover claim fails for `n = 3` and Corollary 3.4 is applied outside its hypotheses
 (`coverClaim_false_three`, `cor34_size_fails_eight`, `cor34_load_fails_seven`).
 
-**Impact.** Statement true; proved by a different reduction: we simulate the square algorithm on
+**Impact.** The 16-round bound for every `n` survives, by a different reduction: we simulate the square algorithm on
 `⌈√n⌉² ≤ 2n` virtual nodes, at most two per real node (`theorem_3_7`).
 
 **Details.** Four things go wrong:
@@ -53,34 +46,32 @@ With `s = ⌊√n⌋` the proof splits the messages into sub-instances on `V₁ 
   parallel. Its remark after Problem 3.1 (overloaded instances "can be split up into smaller ones") partly
   covers this, but how to split them without coordination is not worked out.
 
-### 🛠️ Corollary 3.3 (relay nodes lack routing information)
+### 🔧 Corollary 3.3 (relay nodes lack routing information)
 In round 1 the messages go to nodes `1..m`, which need not be in `W`, but only nodes of `W` know the routing
 pattern.
 
-**Impact.** Statement true; fixed by attaching the target to the message, at a constant factor in message size
-(`c33a`/`c33b`).
+**Impact.** The two-round routing survives, at a constant factor in message size (`c33a`/`c33b`).
 
-**Details.** This is harmless when a message's current target is its final destination, which the message
-header contains. It is not harmless in Step 5 of Algorithm 2 and Step 3 of Algorithm 1 (Corollary 3.5), where
-the targets are intermediate.
+**Details.** This causes no problem when a message's current target is its final destination, which the message
+header contains. It does in Step 5 of Algorithm 2 and Step 3 of Algorithm 1 (Corollary 3.5), where the targets are
+intermediate.
 
 **Repair.** Attach the target (and the target group in Algorithm 2) to the message (`c33a`/`c33b`).
 
-### 🛠️ Theorem 4.5, Algorithm 4 Step 8 (global information never distributed)
+### 🔧 Theorem 4.5, Algorithm 4 Step 8 (global information never distributed)
 To send a key to the node responsible for its global rank, a node must know the sizes of all buckets of the
 other groups, but no step announces these counts.
 
-**Impact.** Statement true; the round count survives: one extra round (`P29`) still fits easily into 37 rounds.
+**Impact.** The round count survives: one extra round (`P29`) still fits easily into 37 rounds.
 
 **Details.** Corollary 3.3 (with `W = V`) also requires everyone to know all sources and destinations.
 
 **Repair.** We add one round in which every node broadcasts how many keys it holds (`P29`).
 
-### 🛠️ Theorem 4.5 and Lemma 4.4 (bundling arguments)
-"Bundling up to two keys in each message, nodes need to … receive at most `n` messages" does not follow, and
-Lemma 4.4 applies Corollary 3.4 (exactly `f|W|` messages) where only an upper bound holds.
+### 🔧 Theorem 4.5, Step 6 (bundling arguments)
+"Bundling up to two keys in each message, nodes need to … receive at most `n` messages" does not follow.
 
-**Impact.** Statements true; fixed at the cost of constant factors (`load_tgt`, `box_spec`).
+**Impact.** The 37-round claim is kept, at the cost of constant factors (`load_tgt`, `box_deliver`).
 
 **Details.**
 - Step 6 of Algorithm 4: "receive at most `2n` keys" is true. It follows from `⌈|K_{i,j}|/√n⌉ ≤ d_i + 1`, not
@@ -88,12 +79,19 @@ Lemma 4.4 applies Corollary 3.4 (exactly `f|W|` messages) where only an upper bo
 - With per-sender bundling a node can need about `1.5 n` messages.
 
 **Repair.** We use packets with a few more slots and route Step 6 through the routing algorithm on a virtual
-clique of `4n` nodes, which allows receiver loads up to `4n` (`load_tgt`, `box_spec`).
+clique of `4n` nodes, which allows receiver loads up to `4n` (`load_tgt`, `box_deliver`; `box_spec` in the docstring
+of `RoutingBox.lean`).
 
-### 🛠️ Theorem 4.5, non-square `n`
-The proof of the non-square case is a one-sentence sketch.
+### 🔧 Lemma 3.6, Algorithm 2 Steps 2–3 (quotas not known in advance)
+Nodes cannot know how many messages they "need to move to each set" before knowing the others' counts, so the
+group-level colouring must be distributed over the group members (a transportation problem).
 
-**Impact.** Statement true; proved by the same virtual-node simulation (`theorem_4_5`).
+**Impact.** The round count survives (`HB_of_inp`, `Setup.q`).
+
+**Details.** The paper hands this to a footnote ("deferred completion"), which only half states it.
+
+**Repair.** Step 3 announces counts per destination group, and the quota is settled afterwards by a transportation
+step among the group members.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -139,7 +137,9 @@ are already known. Delimiters are announced in one round with larger packets.
 
 **Not formalized.** Corollary 4.6 (ranks with repeated keys), Section 5 (local computation and
 memory, Theorem 5.4's 12-round variant) and Section 6 (other parameter ranges). Edge colourings are
-obtained by `Classical.choice` (deterministic, but not efficiently computable).
+obtained by `Classical.choice` (deterministic, but not efficiently computable). For Theorem 4.5 with non-square `n` the
+paper gives a one-sentence sketch; we prove the theorem by the same virtual-node simulation (`theorem_4_5`) and did not
+check whether the sketch itself works.
 
 **Trust.** No `sorry`; `theorem_3_7`, `theorem_3_7_exact`, `theorem_4_5` and the square-case
 theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. Non-vacuity:

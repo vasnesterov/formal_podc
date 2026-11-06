@@ -4,14 +4,12 @@ Thomas Kesselheim. *Dynamic Packet Scheduling in Wireless Networks.* PODC 2012. 
 [10.1145/2332432.2332487](https://doi.org/10.1145/2332432.2332487). Formalized version: arXiv
 [1203.1226](https://arxiv.org/abs/1203.1226) v1; numbering follows it.
 
-**Verdict: ❌ False claim.** **Theorem 1 is false.** Theorem 1 is the transformation (Algorithm 1)
-that makes static `O(I log n)`-type algorithms scale linearly in `I`. There are instances that satisfy
-its hypothesis on which Algorithm 1 fails with probability `> 0.98`, while the theorem claims
-failure probability `≤ 1/n^φ`. The proof's halving step is off by a factor 2. Doubling the number of
-delay classes probably repairs it, with leading constant `4 f(mχ)` instead of `2 f(mχ)`; we did not
-formalize that repair. Theorem 20 (local clocks cost a factor `m/(2 ln m)`) holds for `m ≥ 4`
-after a repair of its proof. For `m ≤ 3` the proof's network cannot give the bound, and the
-statement is open there.
+**Verdict: ⚠️ Weakened.** Theorem 1, the transformation (Algorithm 1) that makes static `O(I log n)`-type
+algorithms scale linearly in `I` and the first of the paper's two steps, is false: there are instances
+satisfying its hypothesis on which Algorithm 1 fails with probability `> 0.98`, while the theorem claims
+failure probability `≤ 1/n^φ`. No repair is proved, so the results that go through it (Cor. 13, 14) are
+unestablished, and the second step, the stable protocol of Section 4, was not checked. Theorem 20 (local
+clocks cost a factor `m/(2 ln m)`) holds for `m ≥ 4` after a repair of its proof.
 
 ## Mistakes in the paper
 
@@ -20,11 +18,11 @@ Theorem 1 is false: packet routing on `m = 200` links with `5100` packets per li
 "all or nothing" static algorithm satisfies the hypothesis, yet Algorithm 1 fails with probability
 `> 0.98` instead of `≤ 1/n^φ` (`theorem1_false`, `theorem1_false_ln`).
 
-**Impact.** A false numbered theorem about the paper's own algorithm. Section 4 is not touched when it
-starts from an `f(m)·I + g(m,n)` algorithm. But all corollaries that go through Algorithm 1 (Cor. 13,
-14, Thm 19 + Sec. 7.2) are unestablished as written. They very likely hold up to constants: doubling
-the number of delay classes probably repairs Theorem 1, with leading constant `4 f(mχ)` instead of
-`2 f(mχ)` (not formalized).
+**Impact.** The first step of the paper's transformation fails for its own algorithm. Section 4 is not
+touched when it starts from an `f(m)·I + g(m,n)` algorithm. But all corollaries that go through
+Algorithm 1 (Cor. 13, 14, Thm 19 + Sec. 7.2) are unestablished as written. They very likely hold up to
+constants: doubling the number of delay classes probably repairs Theorem 1, with leading constant
+`4 f(mχ)` instead of `2 f(mχ)` (not formalized).
 
 **Details.** Iteration `i` gives every packet a uniform delay in `[ψ]`, `ψ = ⌈2^{-i+1} I/χ⌉`. The
 proof of Claim 2 asserts that a delay class has expected load
@@ -54,15 +52,21 @@ chosen sizes. The failure probability is ≈ 0.57 for
 `n = 2376`, ≈ 0.78 for `n = 20000` and ≈ 0.99 for `n = 10⁵`. Once a round leaves more than half
 of the load, the next round's classes are overloaded on average, and the process stalls.
 
-Other errors in the proof of Claim 2 / Theorem 1 (not formalized):
-* The claimed `ψ ≥ 4(ξ − i + 2φ log n)` is false for the last iterations. For `i = ξ`, the
-  definition of `ξ` only gives `ψ > 2φ log n`.
-* `‖W R^{(i)}‖ ≤ χ ∑(Y_j + Z_j) < χψ/2` gives `2^{-i} I + χ/2`, not `2^{-i} I`, because of the
-  ceiling in `ψ`.
-* The bound `E[∏ e^{4Y_j}] ≤ ∏ E[e^{4Y_j}]` needs negative association of the balls-into-bins
-  loads; the FKG sketch does not show it.
+### ❌ Claim 2, proof: `ψ ≥ 4(ξ − i + 2φ log n)`
+The claimed inequality is false for the last iterations: for `i = ξ`, the definition of `ξ` only gives
+`ψ > 2φ log n`.
 
-### ⚠️ Theorem 20 for `m ≤ 3` (local clocks)
+**Impact.** A separate wrong step in the proof of Claim 2 (not formalized). A larger constant in `ξ`
+probably repairs it, but no repair is proved.
+
+### ❌ Claim 2, proof: bound on `‖W R^{(i)}‖`
+`‖W R^{(i)}‖ ≤ χ ∑(Y_j + Z_j) < χψ/2` gives `2^{-i} I + χ/2`, not `2^{-i} I`, because of the ceiling in
+`ψ`.
+
+**Impact.** A separate wrong step in the proof of Claim 2 (not formalized): the exact halving is not
+recovered by anything proved.
+
+### 🔧 Theorem 20 for `m ≤ 3` (local clocks)
 For `m = 2, 3` the proof's intermediate claim "no local-clock protocol is stable for `λ ≥ ln m/m`" is
 false on the network of Figure 1, so Theorem 20 is unestablished there, not refuted
 (`immediate_stable_two`, `immediate_stable_three`).
@@ -72,42 +76,45 @@ Proof gaps).
 
 **Details.** Short links can send each packet in its arrival slot. Then the long link gets i.i.d.
 opportunities of probability `(1−λ)^{m−1} > λ`, so its queue is stable at `λ = ln m/m`. So the network
-of Figure 1 cannot prove Theorem 20 for `m ≤ 3`.
+of Figure 1 cannot prove Theorem 20 for `m ≤ 3`, and the statement is open there.
 
-### ⚠️ Theorem 1 (step bound drops a factor `log m`)
-Theorem 1 states the middle term of its step bound as `O(log n · f(mχ))`, but
-`ξ f(mχ) χ = O(log n · log m · f(mχ))`, since `χ = Θ(log m)`.
+### ✏️ Slips
+- Theorem 1 states the middle term of its step bound as `O(log n · f(mχ))`, but
+  `ξ f(mχ) χ = O(log n · log m · f(mχ))`, since `χ = Θ(log m)`. The displayed estimate
+  `≤ 2 f(mχ) I + ξ f(mχ) χ + (⌈φ⌉+1) f(n) 2φχ log n` is correct (`alg1Time_le`), and the introduction
+  states the correct `O(I log m + log n log² m + log² n log m)`.
+- Proof of Theorem 1: "`2^{-ψ/4} ≤ 2^{ξ−i+2φ log n}`" should have a minus sign, and the factor `2^ξ/2^i`
+  in Claim 2 should be `2^i/2^ξ`.
+- "for each constant `φ ≥ 0`" needs `φ > 0`.
+- Lemma 7: `Pr[∆ = −1] = 1` should be `q`, as used in the proof.
 
-**Impact.** Typo with evident intent: the displayed estimate
-`≤ 2 f(mχ) I + ξ f(mχ) χ + (⌈φ⌉+1) f(n) 2φχ log n` is correct (`alg1Time_le`), and the introduction
-states the correct `O(I log m + log n log² m + log² n log m)`.
-
-### Typos and slips
+### Typos
 - Proof of Theorem 20: the expected number of transmissions in a window of length `k` should
   be `≥ (1−1/m)λk`, not `(1−1/m)λ`.
-- Proof of Theorem 1: "`2^{-ψ/4} ≤ 2^{ξ−i+2φ log n}`" should have a minus sign.
-- The factor `2^ξ/2^i` in Claim 2 should be `2^i/2^ξ`.
 - "one of the last `φ log n` executions" should be `⌈φ⌉ + 1`.
-- "for each constant `φ ≥ 0`" needs `φ > 0`.
+- Proof of Claim 2: the superscript in `(W · R_j^{(i+1)})(e)` should be `i − 1`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 20 for `m ≥ 4` (local clocks cost a factor `m/(2 ln m)`)
-The proof's final chain `(1 − (1−1/m)λ)^{m−1} < 1/e^{ln m} ≤ λ` at `λ = ln m/m` is false, and the
-argument shows instability only for `λ ≥ ln m/m`, while competitiveness asks for stability only at
-`λ < ln m/m`.
+### 🔧 Theorem 20, proof: final chain at `λ = ln m/m`
+The proof's final chain `(1 − (1−1/m)λ)^{m−1} < 1/e^{ln m} ≤ λ` at `λ = ln m/m` is false.
 
-**Impact.** Statement true for every `m ≥ 4`; repaired (`theorem_20`).
+**Impact.** Statement true for every `m ≥ 4`; repaired (`key_ineq`, `theorem_20`).
 
-**Details.**
-* *Wrong bound.* The left side is about `m^{-(1-1/m)²} > 1/m`. For `m = 4` it is even `> λ`
-  (`paper_step_fails_four`).
-* *Endpoint not excluded.* `m/(2 ln m)`-competitiveness asks for stability only at `λ < ln m/m`,
-  so the conclusion does not follow as written.
+**Details.** The left side is about `m^{-(1-1/m)²} > 1/m`. For `m = 4` it is even `> λ`
+(`paper_step_fails_four`).
 
-**Repair.** Let the window length `k` grow, so that the factor `1 − 1/m` disappears, and use
-continuity. We prove that for every `m ≥ 4` there is `λ < ln m/m` at which no protocol with local
-clocks is stable (`theorem_20`). The protocol may be arbitrary, and the long link even
+**Repair.** Let the window length `k` grow, so that the factor `1 − 1/m` disappears, leaving
+`(1 − λ)^{m−1} < λ` (`key_ineq`).
+
+### 🔧 Theorem 20, proof: endpoint not excluded
+The argument shows instability only for `λ ≥ ln m/m`, while `m/(2 ln m)`-competitiveness asks for
+stability only at `λ < ln m/m`, so the conclusion does not follow as written.
+
+**Impact.** Statement true for every `m ≥ 4`; repaired (`exists_rate_below`, `theorem_20`).
+
+**Repair.** Use continuity. We prove that for every `m ≥ 4` there is `λ < ln m/m` at which no protocol
+with local clocks is stable (`theorem_20`). The protocol may be arbitrary, and the long link even
 omniscient.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
@@ -152,7 +159,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Not formalized.**
 * The repaired Theorem 1 (needs Chernoff bounds and negative association).
-* Section 4 (Theorems 3, 8, Lemma 7), Theorem 11.
+* The bound `E[∏ e^{4Y_j}] ≤ ∏ E[e^{4Y_j}]` in the proof of Claim 2 needs negative association of the
+  balls-into-bins loads; the FKG sketch does not show it. The inequality is true by negative
+  association, and we did not dig further.
+* Section 4 (Theorems 3, 8, Lemma 7), Theorem 11. Lemma 7's `Pr[∆ = i·H + 1] = a/(1−b) · b^i` does not
+  sum to a probability distribution; we did not check this further.
 * The SINR applications (Section 6) and Section 7.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,

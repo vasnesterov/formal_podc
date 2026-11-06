@@ -6,16 +6,15 @@ Formalized version: arXiv [2101.09337](https://arxiv.org/abs/2101.09337) v5 (ful
 numbering follows it. Copy of the paper: [paper.pdf](paper.pdf). Formalized: Section 3 (Lemma 1,
 Theorems 1 and 2).
 
-**Verdict: ⚠️ Minor statement issues.** Theorem 2 ("`(2f, ε)`-redundancy ⇒ `(f, 2ε)`-resilience")
-holds as stated. Its algorithm misses a case, which is easy to repair. Theorem 1 ("`(f, ε)`-resilience
-⇒ `(2f, ε)`-redundancy") does not say on which inputs the algorithm must work. Read for the given cost
-functions, it is false. Read for all inputs, it is vacuous. Read for the class of
-`(2f, ε')`-redundant inputs, it is true, and we prove it for all `n > 2f ≥ 2`. But the paper's proof
-does not cover that reading. Lemma 1 is true, except in the degenerate case `f ≥ n`.
+**Verdict: 🛠️ Hard fix.** Theorem 2 ("`(2f, ε)`-redundancy ⇒ `(f, 2ε)`-resilience") holds as stated, and a local
+change repairs the case its algorithm misses. Theorem 1 ("`(f, ε)`-resilience ⇒ `(2f, ε)`-redundancy") does not say on
+which inputs the algorithm must work: read for the given cost functions it is false, read for all inputs it is vacuous,
+and read for the class of `(2f, ε')`-redundant inputs it is true, which we prove for all `n > 2f ≥ 2` by a new argument
+because the paper's proof does not cover that reading. The gradient-descent results (Sections 4–5) were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorem 1 (`(f, ε)`-resilience ⇒ `(2f, ε)`-redundancy)
+### 🛠️ Theorem 1 (`(f, ε)`-resilience ⇒ `(2f, ε)`-redundancy)
 Theorem 1 does not say on which inputs the algorithm must work: read for the given cost functions it is false
 (`n = 3`, `f = 1`, `d = 1`, `theorem_1_false_per_profile`), read for all inputs it is vacuous
 (`theorem_1_uniform`), and read for `(2f, ε')`-redundant inputs it is true but not covered by the paper's proof
@@ -52,26 +51,25 @@ and not group 3 (resp. the converse). So nested sets always have their `arg min`
 group 2 have `{−v}`, at distance `2ε' > 2ε`. These costs are discontinuous, which Section 3 allows.
 (`theorem_1_corrected`, `theorem_1_class`, `resilience_window`)
 
-### ⚠️ Lemma 1 for `f ≥ n`
-Lemma 1 fails for `f ≥ n`: for `f = n` the only set of `n − f` non-faulty agents is `∅`, whose `arg min` is all
-of `ℝ^d`, so every algorithm is `(n, 0)`-resilient (`lemma_1_false_of_le`).
+### ✏️ Slips
+- Lemma 1 fails for `f ≥ n`: for `f = n` the only set of `n − f` non-faulty agents is `∅`, whose `arg min` is all
+  of `ℝ^d`, so every algorithm is `(n, 0)`-resilient (`lemma_1_false_of_le`). For `f > n` the condition is empty. For
+  `n/2 ≤ f < n` the lemma holds in the reading of its proof (no algorithm works for all profiles) (`lemma_1`); in the
+  uniform reading, `f ≥ 1` already suffices (`no_uniform_resilience`). Read per profile, Lemma 1 is false (e.g. all
+  costs equal), just like Theorem 1.
 
-**Impact.** Degenerate case. For `n/2 ≤ f < n` the lemma holds in the reading of its proof (no algorithm works
-for all profiles) (`lemma_1`); in the uniform reading, `f ≥ 1` already suffices (`no_uniform_resilience`).
-
-**Details.** For `f > n` the condition is empty. Read per profile, Lemma 1 is false (e.g. all costs equal),
-just like Theorem 1.
-
-### Typos and slips
-- Theorem 1's proof writes `n − 2f ≤ |Ŝ| < n − f`, while Definition 3 has `|Ŝ| = n − 2f`. This is harmless.
+### Typos
+- Theorem 1's proof writes `n − 2f ≤ |Ŝ| < n − f`, while Definition 3 has `|Ŝ| = n − 2f`.
+- Appendix A, last sentence: "extends easily for the case when `n > 2`, and `f > n/2`" should say `f ≥ n/2`, as the
+  lemma does; the omitted case `f = n/2` is equally easy.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 2 (the algorithm misses a case)
+### 🔧 Theorem 2 (the algorithm misses a case)
 Step 2 of the algorithm picks `x_T ∈ arg min ∑_{i∈T} Qᵢ` for *every* set `T` of `n − f` received functions, but
 if `T` contains faulty agents this `arg min` may be empty, and then Step 2 is undefined.
 
-**Impact.** Statement true; repaired (`algorithm`, `theorem_2`).
+**Impact.** The theorem holds as stated, with the repaired algorithm (`algorithm`, `theorem_2`).
 
 **Details.** Step 2 also takes distances to `arg min ∑_{i∈T̂} Qᵢ`. For example, a faulty agent can send minus
 the other agents' aggregate plus a non-zero linear function, so that the aggregate is linear and has no minimum.
@@ -122,7 +120,7 @@ redundancy inequality for sets of non-faulty agents are used (`theorem_2_strong`
 which the proof excludes.
 
 **Not formalized.** Appendix B ((f, 0)-resilience ⇔ exact fault tolerance). The remark "2f-redundancy
-⇔ (2f, 0)-redundancy". Sections 4–5 (DGD with CGE/CWTM gradient filters, Theorems 3–6) and the
+⇔ (2f, 0)-redundancy": it seems to need closed `arg min`s and an averaging step, but we did not check it. Sections 4–5 (DGD with CGE/CWTM gradient filters, Theorems 3–6) and the
 experiments. The peer-to-peer simulation remark.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice`,

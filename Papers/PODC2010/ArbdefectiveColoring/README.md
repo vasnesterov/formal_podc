@@ -4,28 +4,28 @@ Leonid Barenboim, Michael Elkin. *Deterministic Distributed Vertex Coloring in P
 Time.* PODC 2010. DOI [10.1145/1835698.1835797](https://doi.org/10.1145/1835698.1835797).
 Formalized version: arXiv [1003.1608](https://arxiv.org/abs/1003.1608) v1; numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** Sections 3 and 4 hold. This covers Lemma 3.1, Theorems 3.2
-and 3.5, Corollaries 3.4 and 3.6, Lemmas 4.1 and 4.2, Theorem 4.3 and Corollary 4.4, all with
-explicit constants. Lemma 2.1 (Kuhn's defective colouring) is a black-box hypothesis, and so is the
-`(Δ+1)`-colouring of [BE09] for Lemma 4.1. The proof of Corollary 4.4 has a gap: its case split
-on `a` is wrong. The corollary is still true, and we prove it with a corrected three-way split.
+**Verdict: 🔧 Easy fix.** Sections 3 and 4 hold up to Corollary 4.4, all with explicit constants: Lemma 3.1, Theorems 3.2
+and 3.5, Corollaries 3.4 and 3.6, Lemmas 4.1 and 4.2, Theorem 4.3 and Corollary 4.4, with Lemma 2.1 (Kuhn's defective
+colouring) and, for Lemma 4.1, the `(Δ+1)`-colouring of [BE09] as black-box hypotheses. The proof of Corollary 4.4 has a
+wrong case split on `a`; the corollary is proved with a corrected three-way split. Theorem 4.5 and Corollaries 4.6 and
+4.7, the polylogarithmic colourings that answer Linial's question, were not formalized.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
-- Theorem 4.3 states `p = ⌈a^{μ/2}⌉`, while the text and the proof use `⌊a^{μ/2}⌋`.
-- In the proof of Theorem 3.2, "for each parent `w` of `u`, `len(u) ≤ i−1`" should be `len(w)`.
+### ✏️ Slips
 - Theorem 5.3 says "`O(a/t)`-coloring" for `O(a·t)` (Section 5 is not formalized).
+- In the proof of Theorem 3.2, "for each parent `w` of `u`, `len(u) ≤ i−1`" should be `len(w)`.
+
+### Typos
+- Theorem 4.3 states `p = ⌈a^{μ/2}⌉`, while the text and the proof use `⌊a^{μ/2}⌋`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Corollary 4.4 (case split on `a`)
+### 🔧 Corollary 4.4 (case split on `a`)
 The proof claims that `p = ⌊a^{μ'}/log n⌋ > a^{μ'/2}` for every superlogarithmic `a`, but this
 needs `a > (log n)^{2/μ'}` and fails for `a = (log₂ n)²` (`corollary_4_4_proof_gap`).
 
-**Impact.** Statement true; repaired with a corrected three-way case split (`corollary_4_4`).
+**Impact.** The statement stands, with a corrected threshold and a three-way case split (`corollary_4_4`).
 
 **Details.** For "superlogarithmic" `a` the paper runs Legal-Coloring with `p = ⌊a^{μ'}/log n⌋`,
 `μ' = μ/2`. The claim `p > a^{μ'/2}` "since `a` is superlogarithmic" would bound the number of
@@ -45,21 +45,6 @@ false statement.
 3. `a` bounded by a constant: Lemma 2.2(1).
 
 (`corollary_4_4`)
-
-### 🛠️ Theorem 3.5 and Algorithm 2 (implicit parameter choices)
-The proofs leave two parameter choices implicit: the degree parameter with which Theorem 3.5 calls
-Lemma 2.1, and the fact that Algorithm 2 must use a known arboricity bound `α` instead of the
-exact arboricity.
-
-**Impact.** Statements true; routine fixes.
-
-**Details.**
-- Theorem 3.5 needs an `⌊a/t⌋`-defective colouring of the H-sets. These have maximum degree
-  `⌊(2+ε)a⌋`, not `a`, so Lemma 2.1 must be called with parameter `≈ (2+ε)t`; we use `3t` (valid
-  for `ε ≤ 1`).
-- Algorithm 2 calls Arbdefective-Coloring on subgraphs whose arboricity is only bounded by `α`.
-  The H-partition and the defect must use the bound `α`, not the unknown exact arboricity (line 2
-  `α := a(G₁)` must be a known upper bound).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -122,6 +107,12 @@ Explicit bounds:
   `(9C+25)L·a^{2/3} + 25C'a^{2/3} + R + R' + 4L` rounds.
 * Corollary 4.4: constants `c₁, c₂, c₃` depending only on `ε, μ, C`, with time
   `c₁(a^μ + ℓ^{1+μ}) + c₂R` and fewer than `c₃·a` colours.
+
+Two parameter choices that the paper leaves implicit:
+* Theorem 3.5 needs an `⌊a/t⌋`-defective colouring of the H-sets. These have maximum degree `⌊(2+ε)a⌋`, not `a`, so
+  Lemma 2.1 must be called with parameter `≈ (2+ε)t`; we use `3t` (valid for `ε ≤ 1`).
+* Algorithm 2 calls Arbdefective-Coloring on subgraphs whose arboricity is only bounded by `α`. The H-partition and the
+  defect must use the bound `α`, not the unknown exact arboricity (line 2 `α := a(G₁)` must be a known upper bound).
 
 **Not formalized.** Lemma 2.1 and the [BE09] colouring (black boxes), Lemma 2.2(2) (forest
 decomposition), Theorem 4.5, Corollaries 4.6 and 4.7, Section 5 (Arb-Kuhn, Theorems 5.2 and 5.3)

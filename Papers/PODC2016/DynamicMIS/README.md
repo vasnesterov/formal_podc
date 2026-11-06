@@ -5,39 +5,47 @@ DOI [10.1145/2933057.2933083](https://doi.org/10.1145/2933057.2933083). Formaliz
 [1507.04330](https://arxiv.org/abs/1507.04330) v2.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** Theorem 1 (`E_π|S| ≤ 1` for every single topology change) and
-Theorem 7 (Algorithm 2: expected `O(1)` rounds and broadcasts, `O(min(log n, deg))` for abrupt
-deletion) hold. Lemma 3 as stated ("`= 1/|P|`") is false for edge changes, but its own proof handles the
-failing case and concludes `≤`, so the intended statement is evident; `≤` is all Theorem 1 needs. The recursion defining the layers `S_i` is ill-formed as written,
-and several arguments are informal; all are repaired.
+**Verdict: 🔧 Easy fix.** Theorem 1 (`E_π|S| ≤ 1` for every single topology change) and Theorem 7
+(Algorithm 2: expected `O(1)` rounds and broadcasts, `O(min(log n, deg))` for abrupt deletion) hold in the
+synchronous model. The repairs are all local: the recursion defining the layers `S_i` is ill-formed as
+written, rule 4 of Algorithm 2 needs one condition, Lemma 3 as stated ("`= 1/|P|`") is false for edge
+changes but its own proof concludes the `≤` that Theorem 1 needs, and several proofs have small gaps. The
+asynchronous model, the deterministic lower bound and history independence of Algorithm 2 were not
+checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 3 ("`= 1/|P|`" for edge changes)
-Lemma 3's equality is false for edge changes: on the path `v* – z – v**`, inserting or deleting the edge
-`{v*, v**}` with any order `z < v** < v*` gives `S′ = P = {v*, z, v**}` and conditional probability `0`, not `1/3`,
-that `v*` is first in `P` (`lemma3_eq_counterexample`).
-
-**Impact.** Harmless misstatement: the paper's proof handles this case ("clearly 0") and concludes only `≤ 1/|P|`,
-which is all Theorem 1 needs.
-
-**Details.** In the counterexample `π(v**) ≤ π(v*)`, so the probability that `v*` is first in `P`, given this
-event, is `0`. For node changes (`v** = v*`) equality does hold. As a by-product we get `E|S| = 1` *exactly* for
-effective node insertions and deletions, which is stronger than Theorem 1's `≤ 1` (`theorem1_node_eq`).
-
-### ⚠️ Recursion (1) (the layers `S_i`)
+### 🔧 Recursion (1) (the layers `S_i`)
 The rule for `M̄`-nodes is cumulative ("every `v ∈ I(u) ∩ M` is in `S_0 ∪ … ∪ S_{i−1}`"), so taken literally a node
 that enters some `S_i` by this rule is in every later `S_j`, `i_u = max{i | u ∈ S_i}` is undefined, and Algorithm
 1's loop "until `S_i = ∅`" never terminates when `S` contains such a node (`mem_layer_of_inMbar`).
 
-**Impact.** A notational flaw: Theorem 1 concerns only `|S| = |⋃ S_i|`, so we use `S` as the least set closed under
-the two rules (`Influenced`).
+**Impact.** Notational: Theorem 1 concerns only `|S| = |⋃ S_i|`.
 
 **Details.** In the paper's own example, `u2` lies in every `S_i` with `i ≥ 1`, not just `S_1` and `S_4`.
 
+**Repair.** We use `S` as the least set closed under the two rules (`Influenced`).
+
+### 🔧 Algorithm 2, rule 4 (graceful node deletion)
+Algorithm 2 never says that a gracefully deleted node, which keeps participating, must not enter `M`.
+
+**Impact.** The pseudocode needs one condition; Theorem 7 is proved for it (`Alg2.theorem7_graceful`).
+
+**Repair.** We add this to rule 4: only active nodes enter `M`.
+
+### ✏️ Slips
+- **Lemma 3 ("`= 1/|P|`" for edge changes).** Lemma 3's equality is false for edge changes: on the path
+  `v* – z – v**`, inserting or deleting the edge `{v*, v**}` with any order `z < v** < v*` gives
+  `S′ = P = {v*, z, v**}` and conditional probability `0`, not `1/3`, that `v*` is first in `P`
+  (`lemma3_eq_counterexample`). The paper's proof handles this case ("clearly 0") and concludes only
+  `≤ 1/|P|`, which is all Theorem 1 needs. In the counterexample `π(v**) ≤ π(v*)`, so the probability
+  that `v*` is first in `P`, given this event, is `0`. For node changes (`v** = v*`) equality does hold.
+  As a by-product we get `E|S| = 1` *exactly* for effective node insertions and deletions, which is
+  stronger than Theorem 1's `≤ 1` (`theorem1_node_eq`).
+
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 12, second part (entries into `C`)
+### 🔧 Lemma 12, second part (entries into `C`)
 The claim that each entry of `v` into `C` "can be associated with a different `v_i*`" is argued incompletely: the
 paper itself concedes that the new path may pass through `v_i*`.
 
@@ -46,22 +54,27 @@ paper itself concedes that the new path may pass through `v_i*`.
 **Repair.** The missing fact: the root of the entry at `t₂` stays in `C` throughout `[0, 2t₂+1]`, whereas the root
 of the entry at `t₁` is already final by time `t₂ − 1 − t₁`, so the two roots differ.
 
-### 🛠️ Lemmas 2 and 3, Claims 4–5, Algorithm 2 (informal steps)
-Several arguments are informal or mix up objects, and we make them rigorous.
+### 🔧 Lemma 2, proof
+The proof mixes states computed for `π` and for `π′`.
 
-**Impact.** Statements true; routine repairs.
+**Impact.** Statement true; repaired (`lemma2`).
 
-**Details.**
-- Lemma 2: the proof mixes states computed for `π` and for `π′`. We prove `S = S′` whenever `S ≠ ∅` (the paper
-  states `S ⊆ S′`).
-- Claims 4–5 are stated for `π|P = σ|P`, which fixes `v*`'s position, but Lemma 3 applies them to orders that agree
-  only on `P \ {v*}`. This is harmless because `S′` does not depend on `π(v*)`.
-- The end of Lemma 3 rests on an independence claim. It is true, and we replace it by a counting argument:
-  swapping `v*` with its successor in `P` is an injection.
-- Algorithm 2 never says that a gracefully deleted node, which keeps participating, must not enter `M`. We add
-  this to rule 4.
-- Correctness of the final MIS after an abrupt deletion ("straightforward to verify") is proved by two
-  invariants.
+**Details.** We prove `S = S′` whenever `S ≠ ∅` (the paper states `S ⊆ S′`).
+
+### 🔧 Claims 4–5, as used in Lemma 3
+Claims 4–5 are stated for `π|P = σ|P`, which fixes `v*`'s position, but Lemma 3 applies them to orders that agree
+only on `P \ {v*}`.
+
+**Impact.** Statement true; the repair is one condition, because `S′` does not depend on `π(v*)`.
+
+**Details.** The end of Lemma 3 rests on an independence claim. It is true, and we replace it by a counting
+argument: swapping `v*` with its successor in `P` is an injection.
+
+### 🔧 Lemma 11, final claim (abrupt deletion)
+Correctness of the final MIS after an abrupt deletion is asserted without argument ("straightforward to verify"),
+although the modified start makes several nodes enter `C` at once.
+
+**Impact.** Statement true; proved by two invariants (`abrupt_stableFrom`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -99,6 +112,8 @@ The Section 4 bounds come out slightly better than the paper's: stabilisation by
 **Not formalized.**
 * The asynchronous model of Corollary 6, the deterministic lower bound, correlation clustering and
   the `O(1)`-bit ID encoding.
+* Node insertion with announcement rounds (§4.1, Lemma 10) is not modelled separately; unmuting stands
+  in for it.
 * Section 5 (history independence): only a weak, almost trivial version is proved, for the direct
   implementation (`historyIndependent`).
 

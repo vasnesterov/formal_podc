@@ -1,11 +1,11 @@
 # Differences between the formalization and the paper
 
 King, Kutten, Thorup. *Construction and impromptu repair of an MST in a distributed network with
-o(m) communication.* PODC 2015 (arXiv 1502.03320v1). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
+o(m) communication.* PODC 2015 (arXiv 1502.03320v1).
 
 ## Errors and gaps in the paper
 
-1. **`HP-TestOut` with the paper's edge numbers is blind** (Section 2.2; algorithm claim "w.h.p.
+1. 🔧 **`HP-TestOut` with the paper's edge numbers is blind** (Section 2.2; algorithm claim "w.h.p.
    `HP-TestOut(x)` outputs 1 if `T_x` has a leaving edge"). The *edge number* is defined for an
    undirected edge `{u, v}` (concatenation of the IDs, *smallest first*), but `𝒫(D)(z) =
    ∏_{e∈D}(z − edge_number(e))` is applied to the sets `E↑(T)`, `E↓(T)` of *ordered* pairs. With
@@ -13,11 +13,11 @@ o(m) communication.* PODC 2015 (arXiv 1502.03320v1). Verdict rules: `.claude/ski
    identically (even node by node: `Local↑(y) = Local↓(y)`), so `HP-TestOut` always returns 0.
    Lean: `fp_Eup_eq_fp_Edown_of_symm`, `hpTestOut_symm_never`, `hpTestOut_edgeNumber_never`.
    Fix: number a dart `(u, v)` by the ordered concatenation `ID(u)·ID(v)` (`dartNumber`), and take
-   `p` larger than the largest *dart* number. Rule R3 (⚠️): the intent is evident from
+   `p` larger than the largest *dart* number. The intent is evident from
    Observation 1, which is about ordered pairs; the fix is local to one definition.
    With the fix everything works: `hpTestOut_dartNumber_error_lt`.
 
-2. **`FindMin`'s initial range misses `maxWt`** (Section 3.1, step 3 `k ← maxWt(T_x)`;
+2. 🔧 **`FindMin`'s initial range misses `maxWt`** (Section 3.1, step 3 `k ← maxWt(T_x)`;
    Lemma 2). Step 5 tests `[j_i, k_i]` with `j_i = j + i⌈(k−j)/w⌉`, `k_i = j + (i+1)⌈(k−j)/w⌉ − 1`;
    their union is `[j, j + w⌈(k−j)/w⌉ − 1]`, which is `[j, k − 1]` when `w | k − j` (and empty
    when `k = j`). Step 7(a)'s update `k = k_min + 1` shows the range is meant half-open, `[j, k)`,
@@ -27,9 +27,9 @@ o(m) communication.* PODC 2015 (arXiv 1502.03320v1). Verdict rules: `.claude/ski
    Example: the path `0 − 1 − 2` with weights `1, 3`, `T = {0}` (a singleton fragment in the first
    phase of `Build MST`): `maxWt(T) = 1`, all subranges are empty. Lean: `run_none_of_max`,
    `findMin_paper_misses`, `p3_counterexample`; corrected version `findMinFixed_correct`.
-   Rule R3 (⚠️): off-by-one, intent recoverable from step 7(a).
+   Off-by-one, intent recoverable from step 7(a).
 
-3. **`FindAny`'s hash range `r > ∑ deg` is too small for Lemma 4** (Section 4.1, step 3a; Lemma 5).
+3. 🔧 **`FindAny`'s hash range `r > ∑ deg` is too small for Lemma 4** (Section 4.1, step 3a; Lemma 5).
    Lemma 4 assumes `0 < |W| < 2^(ℓ−1) = r/2` and its witness `j = ℓ − ⌈lg|W|⌉ − 1` can be `0`,
    while step 3a only asks `r > ∑_{y∈T} deg y ≥ |W|` and step 3b uses the indices
    `i = 1, …, lg r`. The proof of Lemma 5 applies Lemma 4 without checking its hypothesis. This
@@ -44,58 +44,58 @@ o(m) communication.* PODC 2015 (arXiv 1502.03320v1). Verdict rules: `.claude/ski
    `FindAnyCex.hfam_pairwiseIndep` (via the general `IsPairwiseIndep.extend`).
    Fix: `r ≥ 4 ∑ deg` (then `j ≥ 1`) or `r > 2 ∑ deg` with the index `0` added; with it Lemma 5
    holds (`lemma5_findAnyC`, `lemma5_findAny`, `lemma5_findAny_whp`).
-   Rule: borderline ❌/⚠️, recorded as ⚠️ by R3 — the intended requirement is stated in the paper's
+   The intended requirement is stated in the paper's
    own Lemma 4 (`|W| < 2^(ℓ−1)`), the fix is a local parameter change (constant factor in `r`, no
    effect on the complexity) and the claim itself is unchanged; moreover the failing family is
    artificial (for the linear family `x ↦ Ax` over `GF(2)` the three numbers are linearly independent,
    their hash values independent, and the round succeeds with probability `≥ 3/8` on this instance).
 
-4. **Lemma 5's proof gives `1/16 − 1/(2n^c)`, the statement claims `1/16`** for `FindAny-C`.
+4. 🔧 **Lemma 5's proof gives `1/16 − 1/(2n^c)`, the statement claims `1/16`** for `FindAny-C`.
    The statement is nevertheless true (with item 3's fix): the chain of inequalities in Lemma 4
    actually yields `> 1/8` (the paper writes `= 1/16` at the end; `(1/4)·(1/2) = 1/8`), and the
    exact bound `|W| p (1 − (|W|−1) p)` with `p ∈ (1/(4|W|), 1/(2|W|)]` is `≥ 3/16`
    (`lemma4_strong`); then `(1 − 1/2)·3/16 ≥ 1/16` as soon as `p ≥ 2 ∑ deg` (`lemma5_findAnyC`).
-   Proof repair (🛠️).
 
-5. **`B` in inequality (2).** Section 2.2 calls `B` "the number of edges incident to nodes in `T`",
+5. ✏️ **`B` in inequality (2).** Section 2.2 calls `B` "the number of edges incident to nodes in `T`",
    but step 0 computes it "by summing up the degrees of nodes in `T`". Only the latter works: the
    fingerprints agree at the number of every dart with both endpoints in `T`, so at least
    `2·#(edges inside T)` values of `α` are bad (`card_inter_le_card_hpTestOut_fail`), and with
    `B = #incident edges` the bound `Pr < ε` for `p > B/ε` fails when `T` has many inside edges.
    With `D = ∑ deg` we prove `Pr ≤ (D−1)/p < ε` (`hpTestOut_fail_prob_le`, `hpTestOut_error_lt`).
-   Typo with evident intent (step 0), R3. Also, (2) is stated unconditionally; it holds only when
+   Typo with evident intent (step 0). Also (✏️), (2) is stated unconditionally; it holds only when
    `E↑(T) ≠ E↓(T)`.
 
-6. **`FindMin`'s step 6 is undefined when no subrange answers 1** (`min` of the empty set) and
+6. ✏️ **`FindMin`'s step 6 is undefined when no subrange answers 1** (`min` of the empty set) and
    step 7 names `TestHigh` what step 6 calls `TestInterval`. We repeat the iteration in that case
    (`iter`). With exact `HP-TestOut`s and one-sided `TestOut`s, step 7(b) ("both return 0") is dead
    code, so `FindMin` returns `∅` only when `Count` runs out — and returns `∅` with no leaving edge
-   (`run_none_of_empty`). Missing case in pseudocode, R3.
+   (`run_none_of_empty`). Missing case in pseudocode.
 
-7. **Lemma 2, `FindMin-C` (not formalized, noted).** "The probability that the number of `TestOut`
+7. ❌ **Lemma 2, `FindMin-C` (not formalized, noted).** "The probability that the number of `TestOut`
    trials needed exceeds the expected number by a factor of `2c/q + 1` is less than 1/3 for `c ≥ 1`,
    by Markov's inequality": the budget is `K′ = (2c/q)L` failures plus `L = lg maxWt/lg(w−1)`
    successes, i.e. `(2c/q + 1)L` trials, which is only `2c + q` times the *expected* number `L/q`
    of trials; so Markov gives `1/(2c + q) ≈ 0.47` for `c = 1`, `q = 1/8`, not `< 1/3` (that
-   needs `c ≥ 1.44`). This is a claim inside a proof (R1), so it does not affect the verdict. The bound is
-   still true by concentration of sums of geometric variables. Also "worst case `O(log n)` time and
+   needs `c ≥ 1.44`). This is a claim inside a proof, and we did not repair it in Lean. The bound is
+   still true by concentration of sums of geometric variables, and only the constant `C` of Lemma 3
+   depends on it. Also (✏️) "worst case `O(log n)` time and
    messages" should be `O(|T_x| log n)`.
 
-8. **Lemma 3, phase count (not formalized, noted).** "Let `c′ = 8c/C`. Then `(16 + 24)(c/C) lg n`
+8. ✏️ **Lemma 3, phase count (not formalized, noted).** "Let `c′ = 8c/C`. Then `(16 + 24)(c/C) lg n`
    phases suffice": `16c/C + (2c′ + 8c)/C = 24c/C + 16c/C²`, which exceeds `40c/C` for `C < 1`
-   (`C ≈ 2/3`); the slip treats `c′` as `8c`. Only constants change. Also "reduced by a fraction of
+   (`C ≈ 2/3`); the slip treats `c′` as `8c`. Only constants change. Also (✏️) "reduced by a fraction of
    `C/2` ... `lg n / lg(C/2)` phases" (the log is negative; the count of fragments drops by a factor
    `1 − C/4`).
 
-9. **Section 3.2 `Insert(u, v)` (not formalized, noted).** Only the case `v ∈ T_u` is described;
+9. ✏️ **Section 3.2 `Insert(u, v)` (not formalized, noted).** Only the case `v ∈ T_u` is described;
    if `u` and `v` are in different trees, `{u, v}` must be added to the forest. Typo: `Delete` marks
    "`{u′, v}`" for `{u′, v′}`.
 
-10. **Section 4.2 (not formalized, noted).** "it is possible that k distinct edges are picked and (at
+10. ✏️ **Section 4.2 (not formalized, noted).** "it is possible that k distinct edges are picked and (at
     most one) cycle is formed": one cycle per merged component (each fragment picks one edge, so
     every component of the fragment graph has exactly one cycle, possibly of length 2).
 
-11. **Thorup's odd hash for `w = 1` (degenerate).** With `a` odd in `[1, 2]`, `t ∈ [1, 2]` and keys
+11. ✏️ **Thorup's odd hash for `w = 1` (degenerate).** With `a` odd in `[1, 2]`, `t ∈ [1, 2]` and keys
     `{1, 2}`, both keys are always sampled (`thorup_not_odd_one`). Irrelevant for `w = Θ(log n)`;
     the `1/8` bound of [33] is checked exhaustively for `w = 2, 3` (`thorup_odd_two`,
     `thorup_odd_three`) and by a Python script for `w = 4` (min probability `7/32`).

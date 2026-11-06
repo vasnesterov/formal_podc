@@ -57,7 +57,7 @@ full version MIT-CSAIL-TR-2010-029 (June 2010), whose numbering we follow.
 * The network, the fixed adversary rule `R` (admissible) and 2-broadcastability are part of the
   statement. The adversary class is "choose the placement only, then follow `R`", as in the paper.
 * Claim 5's proof sums over `(n−2−k)`-element sets `J`, while the derived sets `I_k` only have *at
-  least* `n − 2 − k` elements (imprecision, harmless). We count directly: for every outcome `ω`,
+  least* `n − 2 − k` elements (🔧). We count directly: for every outcome `ω`,
   at most `k` of the `n − 2` placements succeed (`hpt`), then integrate (`lintegral_finset_sum`).
 
 ## Theorem 12 — `theorem_12`, `theorem_12_nlogn` (LowerBoundCore.lean, LowerBound.lean)
@@ -85,13 +85,13 @@ full version MIT-CSAIL-TR-2010-029 (June 2010), whose numbering we follow.
   either pair sends. Hence the sets of senders coincide and avoid both pairs, and the reception
   of `j` is the same: `⊥`, `⊤`, the message of a lone sender outside `A_k` reaching everybody,
   or the message of a lone sender in `A_k` reaching `A_k ∪ pair`. This is the argument in
-  `claim_13`. It also makes the split into IIIa/IIIb unnecessary. (Rule R1: a false claim inside
-  a proof of a true result, so a proof repair.)
+  `claim_13`. It also makes the split into IIIa/IIIb unnecessary. (🔧: a wrong claim inside
+  a proof of a true result.)
 * The adversary's realisability ("the adversary can always follow the rules regardless of the
   assignment to nodes `2k+3, …`") is proved: the delivery rule only ever restricts a lone message of
   a process on a layer `≤ s` to the processes on layers `≤ s + 1` (`LayerAdm`), and the final
   placement is built incrementally by two swaps per stage (`exists_equiv_extend`).
-* Typos/slips: "we assign processes `i` and `i'` to `L_k`" should be `L_{k+1}`. The case names
+* Typos: "we assign processes `i` and `i'` to `L_k`" should be `L_{k+1}`. The case names
   "Cases 1 and 2(a) … Case 2(b)" in the proof of Claim 13 Part 1 refer to Cases I/II/III. The
   final bound there reads `n/2^{ℓ+2}` instead of `(n−1)/2^{ℓ+2}`. "`C_{ℓ+1}` … the two smallest
   elements of `N_{ℓ+1}`": any two work.
@@ -112,14 +112,14 @@ full version MIT-CSAIL-TR-2010-029 (June 2010), whose numbering we follow.
   of *exactly* `ℓ_s = 4^s f` sets. The proof uses `ℓ'_s = 2ℓ'_{s−1}`, which needs exact sizes
   (pad by repetition), and `ℓ'_s = ℓ_s(2^{s_max} − 1)/2^{s−1}` must be an integer. `F_s` is
   `(n, 2^s)`-strongly selective for `s < s_max`, and `F_{s_max}` is `(n, n)`-strongly selective (the
-  paper's "round robin", which needs `4^{s_max} f ≥ n`, i.e. `f ≥ log n` with the paper's `s_max`).
+  paper's "round robin", which needs `4^{s_max} f ≥ n`, i.e. `f ≥ log n` with the paper's `s_max`). ✏️
   The existence of small SSFs (Theorem 7, [14]) stays a hypothesis: `theorem10_asymptotic` turns
   `4^{s_max} f ≤ c₁ n` and `f ≤ c₂ log n` into `X² ≤ 144 c₁ c₂ n³ log n`, i.e.
   `X = O(n^{3/2} √log n)`.
 * **Statement.** `theorem10`: every node is informed by round `X = n/ρ = 12 n f 2^{s_max}`, as in
   the paper. The paper also says the algorithm "terminates" by `T`. Nodes informed shortly before
   `T` still take part in later iterations, so it is only the delivery of the message that happens
-  by `T`. Stopping is not formalized.
+  by `T` (✏️). Stopping is not formalized.
 * **Proof gap (repaired), definition of `T`.** The paper takes `T` to be the first round with
   `den(1,T) < ρ`, where `den` counts nodes that receive the message *for the first time*. The
   source is not counted. If the source's identifier is not in `F_1[1]`, nobody sends in round 1,
@@ -131,13 +131,12 @@ full version MIT-CSAIL-TR-2010-029 (June 2010), whose numbering we follow.
   `F_1[1]`. Repair: count the source as receiving in round 1, i.e. `den(1,t) = |inf t| / t`. Then
   `T > 1/ρ` (`D_lt_T`), and Lemma 9, Lemma 8 and the final step go through with the paper's
   constants. Lemma 8's *proof* also needs the repair: when `T' = 1`, the source can be among the
-  participants, and `P ≤ R` fails without it. (Rule R1: claims inside a proof; the theorem is true,
-  so a proof repair.)
-* **Borderline call (R1).** The false claim "every node receives the message by the end of round
+  participants, and `P ≤ R` fails without it. (🔧: claims inside a proof; the theorem is true.)
+* **Where the wrong claim sits.** The claim "every node receives the message by the end of round
   `T`" appears as the first step of the proof of Theorem 10 and, as a roadmap, in the Analysis
   preamble ("We will eventually show that the algorithm terminates no later than round `T`").
-  `T` is an auxiliary quantity of the analysis, not part of any numbered statement, so we treat
-  both as proof-internal. The numbered Lemmas 8 and 9 are true with the paper's `T` as well
+  `T` is an auxiliary quantity of the analysis, not part of any numbered statement, so both are
+  proof-internal. The numbered Lemmas 8 and 9 are true with the paper's `T` as well
   (not formalized in that form): Lemma 9 directly from minimality (when `T' = 1` the interval is
   `[1, T]` and `den(1, T) < ρ`); in Lemma 8 the participants are at most `R + 1` (the source) and
   `R < k_s(1 − 2^{-s_max})` gives `R ≤ k_s − 1`, so at most `k_s` participants, which the
@@ -148,7 +147,7 @@ full version MIT-CSAIL-TR-2010-029 (June 2010), whose numbering we follow.
 * Lemma 8 is formalized as `lemma8`: if `(m+1)ℓ'_s ≤ T < (m+5)ℓ'_s`, then every participant of
   iteration `m` of `F_s` sends alone during that iteration. Lemma 9 is formalized as `lemma9`:
   every node informed by `T` was informed by `T − 1/ρ`. Both use the repaired `T`.
-* Slips: in Lemma 8's proof, "otherwise we would have `den(1, T') < ρ`" should be
+* Typos: in Lemma 8's proof, "otherwise we would have `den(1, T') < ρ`" should be
   `den(1, T' − 1)`, and the display writes `den(T, T')` for `den(T', T)`. `2ℓ'_1 = 8f√(n/log n)`
   should be `8f(2^{s_max} − 1)` (harmless). In the induction step, `(m+4)ℓ' > T` follows from
   the induction hypothesis directly.

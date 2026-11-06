@@ -6,80 +6,91 @@ Consensus Number of a Cryptocurrency.* PODC 2019. DOI
 [1906.05574](https://arxiv.org/abs/1906.05574) v1 (extended version, the only arXiv version; the journal version, Distributed Computing 2022, was not checked);
 numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** For the message-passing algorithm of Figure 4 as written, Lemma 3 and the
-liveness part of Theorem 3 are false: a correct process that spends money it has just received
-blocks forever, even with two correct processes. The cause is a one-term pseudocode slip with evident intent
-(line 2 spends `balance(a, hist[p] ∪ deps)` and ships `deps` as `h`, and Lemma 3's proof assumes the receiver's
-check passes because the sender checked its balance); we prove that the fix `balance(c, hist[q] ∪ h)` makes
-that transfer complete. Theorem 2 (consensus number exactly `k`, `k ≥ 1`) and Corollary 1 hold, and
-Theorem 1 holds once a set-vs-sequence slip in Figure 1 is fixed.
+**Verdict: 🛠️ Hard fix.** Theorem 2 (consensus number exactly `k`, `k ≥ 1`), Corollary 1 and Lemma 2 hold, but
+the wait-freedom proof of Lemma 2 is false as stated and we replaced it with a new potential argument. Theorem 1
+needs a local change to Figure 1, the linearizability proof of Lemma 2 needs local repairs, and Figure 4 needs a
+one-term fix, which we prove only on the counterexample. The safety of the message-passing algorithm (Theorem 3)
+was not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 3 and Theorem 3, liveness (Figure 4, message passing)
-Figure 4 as written blocks a correct process that spends money it has just received: process 0
-(balance 5) pays 5 to process 1 (balance 0), and process 1's transfer of the 5 back never returns,
-even with two correct processes and a perfect broadcast (`Fig4.lemma_3_false`).
-
-**Impact.** A one-term pseudocode slip with evident intent: with the check `balance(c, hist[q] ∪ h) ≥ y`
-the transfer completes (`Fig4.fixed_completes`). As written it falsifies Theorem 3, since Definition 1
-requires every operation of a correct process to return; only the safety part of Theorem 3 survives.
-
-**Details.** A process may spend `balance(a, hist[p] ∪ deps)`, i.e. including freshly received incoming
-transfers `deps`, and it ships them as the dependencies `h`. Validation (line 25), however, checks
-`balance(c, hist[q])` *without* `h`, and incoming transfers enter `hist[q]` only after a later transfer
-of `q` has been validated. So process 1's message is invalid at every process forever. This is a
-liveness bug in the pseudocode.
-
-**Repair.** The intended check `balance(c, hist[q] ∪ h) ≥ y` fixes it. (`Fig4.fixed_completes`)
-
-### ⚠️ Theorem 1 (Figure 1 is not linearizable as written)
+### 🔧 Theorem 1 (Figure 1 is not linearizable as written)
 Figure 1 keeps successful transfers in a set `ops_p`, so repeating an identical transfer is never
 debited: an owner with balance 2 calls `transfer(a, b, 1)` three times solo and all three return
 `true` (`Fig1.Bug.literal_not_linearizable`).
 
-**Impact.** That is double-spending, the very thing the paper sets out to prevent, but it is a slip with
-an evident intent: Figure 3 tags transfers with unique sequence numbers. Keeping `ops_p` as a sequence
-repairs it, after which the paper's proof goes through with its linearization points
-(`Fig1.fig1_linearizable`, `Fig1.fig1_waitFree`).
+**Impact.** That is double-spending, the very thing the paper sets out to prevent, but the intent is evident:
+Figure 3 tags transfers with unique sequence numbers.
 
 **Details.** Each process adds `(a, b, x)` to the set `ops_p`. Repeating an identical transfer therefore
 does not change `ops_p`, so the second withdrawal is never debited.
 
-### ⚠️ Theorem 2 for `k = 0`
-With "`k`-shared" defined as `max_a |μ(a)| = k`, an object whose accounts have no owner is `0`-shared,
-but its consensus number is 1, not 0, since one process always solves consensus (`atSolvable_one`).
+**Repair.** Keeping `ops_p` as a sequence is a two-line change, after which the paper's proof goes through with
+its linearization points (`Fig1.fig1_linearizable`, `Fig1.fig1_waitFree`).
 
-**Impact.** Degenerate case; for `k ≥ 1` Theorem 2 holds (`theorem_2`).
+### 🔧 Lemma 2, proof ("the linearization of a prefix of `E` is a prefix of `L`")
+The side claim that prefixes linearize to prefixes is false, because failed transfers are linearized
+retroactively at the proposer's snapshot.
 
-### Typos and slips
+**Impact.** The claim is not needed for linearizability, and the paper's linearization points stay.
+
+**Repair.** We drop the claim and insert such operations retroactively (`Fig3.fig3_linearizable`).
+
+### ✏️ Slips
+- Lemma 3 and Theorem 3, liveness (Figure 4, line 25). Figure 4 as written blocks a correct process that spends
+  money it has just received: process 0 (balance 5) pays 5 to process 1 (balance 0), and process 1's transfer of
+  the 5 back never returns, even with two correct processes and a perfect broadcast (`Fig4.lemma_3_false`). A
+  process may spend `balance(a, hist[p] ∪ deps)`, i.e. including freshly received incoming transfers `deps`, and it
+  ships them as the dependencies `h`. Validation (line 25), however, checks `balance(c, hist[q])` *without* `h`, and
+  incoming transfers enter `hist[q]` only after a later transfer of `q` has been validated. So process 1's message
+  is invalid at every process forever. As written this falsifies Theorem 3, since Definition 1 requires every
+  operation of a correct process to return; only the safety part of Theorem 3 is unaffected. The intended check is
+  `balance(c, hist[q] ∪ h) ≥ y`: line 2 spends that amount, and Lemma 3's proof assumes the receiver's check passes
+  because the sender checked its balance. With it the transfer completes (`Fig4.fixed_completes`). Lean shows this
+  on the counterexample only, not Theorem 3 for the fixed algorithm.
+- Theorem 2 for `k = 0`. With "`k`-shared" defined as `max_a |μ(a)| = k`, an object whose accounts have no owner is
+  `0`-shared, but its consensus number is 1, not 0, since one process always solves consensus (`atSolvable_one`).
+  For `k ≥ 1` Theorem 2 holds (`theorem_2`).
 - The transition relation `Δ` is not total, contrary to the paper's assumption: a self-transfer
   `transfer(a, a, x)` with `x > 0` has no successor state. We use "debit, then credit".
-- Figure 4's `balance` omits initial balances.
+- Figure 4's `balance` omits initial balances, so taken literally no transfer of a positive amount ever succeeds.
+  The prose of Section 3 includes them.
+- Definition 1 (2) cannot hold for finite executions, and it also covers reads and failed transfers of other
+  processes. The comment after the definition gives the intended reading.
+
+### Typos
 - Figure 3's `proposal((a, b, q, x), ·)` has the wrong arity.
-- Definition 1 (2) cannot hold for finite executions.
+- The successful-transfer case of Lemma 2's proof writes `L_k` where `L_s` is meant.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 2 (Figure 3, linearizability and wait-freedom)
-The linearizability proof of Figure 3 (asset transfer from a snapshot, registers and `k`-consensus
-objects) has four gaps, and its wait-freedom argument is false as stated.
+Figure 3 implements asset transfer from a snapshot, registers and `k`-consensus objects. The algorithm is correct,
+and we proved it linearizable and wait-free (`Fig3.fig3_linearizable`, `Fig3.fig3_waitFree`).
 
-**Impact.** Statement true: the algorithm is correct, and we proved it linearizable and wait-free
-(`Fig3.fig3_linearizable`, `Fig3.fig3_waitFree`).
+### 🛠️ Lemma 2, wait-freedom
+The argument "some instance will be only accessed with `o`" is false as stated: processes with stale `collected`
+sets keep proposing other transfers.
 
-**Details.** The linearizability proof:
-* completes incomplete transfers "with response true" even when they were decided as failures;
-* gives no linearization point to non-owner transfers;
-* claims prefixes linearize to prefixes, which fails because failed transfers are linearized
-  retroactively at the proposer's snapshot;
-* leaves the key "no outgoing transfer in between" step unjustified.
+**Impact.** The paper's argument does not survive; the statement does.
 
-The wait-freedom argument ("some instance will be only accessed with `o`") is false as stated:
-processes with stale `collected` sets keep proposing other transfers.
+**Repair.** We replace the wait-freedom argument with a potential argument. (`Fig3.fig3_waitFree`)
 
-**Repair.** We replace the wait-freedom argument with a potential argument. (`Fig3.fig3_linearizable`,
-`Fig3.fig3_waitFree`)
+### 🔧 Lemma 2, incomplete transfers
+The linearizability proof completes incomplete transfers "with response true" even when they were decided as
+failures.
+
+**Impact.** One-line change: complete them with the decided response, or linearize at the proposer's snapshot.
+(`Fig3.fig3_linearizable`)
+
+### 🔧 Lemma 2, non-owner transfers (lines 1–2)
+The proof gives no linearization point to non-owner transfers.
+
+**Impact.** One extra case: we linearize them at their invocation. (`Fig3.fig3_linearizable`)
+
+### 🔧 Lemma 2, successful-transfer case
+The proof leaves the key "no outgoing transfer in between" step unjustified.
+
+**Impact.** A few lines from the round ordering the paper already mentions. (`Fig3.fig3_linearizable`)
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -129,8 +140,8 @@ This needs neither the cited `k`-consensus hierarchy result nor composition of i
 and it allows any number of objects with different owner maps.
 
 **Not formalized.** The read/write implementation of atomic snapshots, and composition of implementations (so Lemma 2 is stated from an atomic snapshot). Theorem 3 (safety of
-Figure 4 under Byzantine faults with secure broadcast). Section 6 (BFT-based `k`-shared transfers
-in message passing; informal).
+Figure 4 under Byzantine faults with secure broadcast), also for the fixed check. Section 6 (BFT-based `k`-shared
+transfers in message passing; informal).
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: Lemma 1's algorithm satisfies all hypotheses of the consensus model

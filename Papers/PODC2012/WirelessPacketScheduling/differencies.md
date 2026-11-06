@@ -1,7 +1,7 @@
 # Differences between the formalization and the paper
 
 Paper: Kesselheim, *Dynamic Packet Scheduling in Wireless Networks*, PODC 2012, arXiv 1203.1226v1.
-Formalized: Theorem 1 (Section 3) and Theorem 20 (Section 8). Verdict rules: `verdicts.md` (R1–R6).
+Formalized: Theorem 1 (Section 3) and Theorem 20 (Section 8).
 
 ## Theorem 1 (Algorithm 1)
 
@@ -16,16 +16,16 @@ Formalized: Theorem 1 (Section 3) and Theorem 20 (Section 8). Verdict rules: `ve
      falsity uses exactly this freedom, which the proof's `Y_j` also assumes away). `φ = 1`
      is a constant. The single-hop instance is exactly the setting of Section 3, with
      `m = max(|E|, D) = |E| = 200`.
-   * *Why not excused.* R2: not degenerate, since `n` is large and `φ = 1` is the standard choice.
-     R3: the repair changes the algorithm (`ψ` doubled) or the leading constant (`2 f(mχ)` →
-     `4 f(mχ)`), and that constant is part of the claim (it is the throughput in Section 4). R4:
-     no implied assumption rescues it, because the paper's own proof treats overloaded classes
+   * *Why not excused.* It is not degenerate, since `n` is large and `φ = 1` is the standard
+     choice. The repair changes the algorithm (`ψ` doubled) or the leading constant (`2 f(mχ)` →
+     `4 f(mχ)`), and that constant is part of the claim (it is the throughput in Section 4). No
+     implied assumption rescues it, because the paper's own proof treats overloaded classes
      as total failures.
-   * *Headline?* Borderline ❌ vs 🚨. Theorem 1 is about the paper's specific Algorithm 1. But the
-     title and abstract headline is the dynamic stable protocol built from static algorithms with
-     their throughput. Section 4 is stated for algorithms with `f(m) I + g(m,n)` schedules and is
-     not refuted. The applications that go through Algorithm 1 (Cor. 13, 14; Sec. 7.2) are only
-     *unestablished*, and probably hold with a constant factor 2 worse. Hence ❌ (R5).
+   * *Scope.* Theorem 1 is about the paper's specific Algorithm 1. The title and abstract are about
+     the dynamic stable protocol built from static algorithms with their throughput. Section 4 is
+     stated for algorithms with `f(m) I + g(m,n)` schedules and is not refuted. The applications
+     that go through Algorithm 1 (Cor. 13, 14; Sec. 7.2) are only *unestablished*, and probably
+     hold with a constant factor 2 worse.
    * *Which log.* The paper writes "log" without a base. The counterexample holds for base 2 and
      base `e`; the claim is parametrized by the base `b` (`Theorem1Claim b`).
    * *Our reading of "success".* "Algorithm 1 uses at most X steps" requires all packets to be
@@ -52,7 +52,7 @@ Formalized: Theorem 1 (Section 3) and Theorem 20 (Section 8). Verdict rules: `ve
 4. **Step bound.** `alg1Time_le` proves the displayed estimate exactly, for `I ≥ 0`, `f(mχ) ≥ 0` and
    `m ≥ 1`. The paper's `= 2 f(mχ) I + O(log n · f(mχ) + …)` drops a factor `χ = Θ(log m)` in the
    middle term. The correct form `O(log n · log m · f(mχ))` matches the introduction's
-   `O(I log m + log n log² m + log² n log m)`. This is a typo (R3) and is not formalized as an
+   `O(I log m + log n log² m + log² n log m)`. This is a typo (✏️) and is not formalized as an
    asymptotic statement.
 5. **Typos.**
    * `2^{-ψ/4} ≤ 2^{ξ-i+2φ log n}` (sign).
@@ -90,10 +90,9 @@ Formalized: Theorem 1 (Section 3) and Theorem 20 (Section 8). Verdict rules: `ve
    (`immediate_stable_two/three`). Short links have empty queues.
    * Theorem 20 quantifies over all networks of size `m`. So for `m ≤ 3` it is not refuted, only
      unestablished by this proof.
-   * By R1 a false claim inside a proof of a statement that may still be true counts as a proof
-     issue. Our `theorem_20` covers `m ≥ 4`.
+   * Our `theorem_20` covers `m ≥ 4`.
    * `m ≤ 3` (two or three links, competitive ratio `≈ 1.37–1.44`) is a corner of the
-     asymptotic statement. We do not count it towards the verdict (R2-like), and record it here.
+     asymptotic statement (🔧: the condition `m ≥ 4` saves the intent).
 10. **Model of "acknowledgement-based with only a local clock" (modelling choice).** The paper argues
     informally. We model the *consequence* of this restriction on the network of Figure 1:
     * *Short links.* Each runs as an independent process in its own local time, because its

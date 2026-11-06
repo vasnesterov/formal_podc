@@ -56,8 +56,8 @@ version of PODC 2011).
     is stored at `x` (`cyc l lab mk`). A new edge `{b_{i-1}[1], a_i[1]}` therefore inherits the mark stored at `b_{i-1}[1]`,
     i.e. the mark of the removed edge `{a_{i-1}[1], b_{i-1}[1]}` of the same piece. The paper inherits only
     `L(v)` and `P(v)`, which does not determine the solution on the new edges.
-12. **Gluing typo.** The paper adds `{b_{i−1}[1], a_i[1]}` "for each `i > 1`"; this should be "for each `i`"
-    (with `b_0 = b_k`). Typo in a proof (R3); it does not affect the label.
+12. ✏️ **Gluing typo.** The paper adds `{b_{i−1}[1], a_i[1]}` "for each `i > 1`"; this should be "for each `i`"
+    (with `b_0 = b_k`). Typo in a proof.
 13. **Identifier blocks.** `a_i = {1+in+j : j < ⌊n/2⌋}`, `b_i = {1+in+⌊n/2⌋+j : j < ⌈n/2⌉}`. This is a concrete
     instance of the paper's "any partition".
 14. **Problem definitions.**
@@ -71,8 +71,7 @@ version of PODC 2011).
     glued `2n`-cycle has `n−1` marked edges but a matching with `n` edges.
 16. **Not formalized: the Hamiltonian-cycle entry of Table 2** (`Θ(log n)`). §5 has no lower-bound argument for
     it, and the cycle gluing cannot give one: a glued all-marked cycle is a Hamiltonian cycle. A modified gadget
-    (cycles plus an unmarked chord that is swapped during gluing) should work. Not counted in the verdict
-    (unformalized).
+    (cycles plus an unmarked chord that is swapped during gluing) should work. Unchecked.
 
 ## Section 5.1 (upper bounds)
 
@@ -120,7 +119,7 @@ version of PODC 2011).
     which makes Theorem 7.1 stronger. The converse remark (PN verifiers are fooled by lifts) is proved for this
     class.
 26. **Theorem 7.1.**
-    * The honest proof "`(H, v)`" conflicts with the requirement that the encoded graph has identifiers
+    * ✏️ The honest proof "`(H, v)`" conflicts with the requirement that the encoded graph has identifiers
       `{1,…,n(G)}`. We use a relabelled copy of `H`, which lies in `P` because an isomorphism is a covering.
     * The paper's two checks (`deg_H v = deg_G ϕ(v)` and image of neighbours `= N_G(ϕ v)`) are merged into one
       equivalent multiset check.
@@ -134,31 +133,31 @@ version of PODC 2011).
 28. **Not formalized:** Theorem 7.2 (needs a full PN model with leaders / known `n` and DFS-interval identifiers);
     §7.4 (NP/poly); §7.5 (monadic Σ¹₁); §4 (reachability, connectivity, bipartite matching via König/LP duality).
 
-## Verdict calibration
+## Proof sketches
 
 No checked statement is false; all repairs concern proof sketches (gluing typo, edge labels under gluing, the
-automorphism step of 6.1, the honest proof of 7.1). These are routine details a referee would accept as
-sketched, so the label is ✅. Borderline: item 11 (edge labels). A literal reading inherits only node data.
-But the paper's colour `c(a,b)` holds "all auxiliary information ... within distance `2r+1`", and that includes
+automorphism step of 6.1, the honest proof of 7.1). The gluing typo (item 12) and the honest proof (item 26) are
+slips (✏️); the other two are routine details a referee would accept as sketched. Item 11 (edge labels): a literal
+reading inherits only node data. But the paper's colour `c(a,b)` holds "all auxiliary information ... within distance `2r+1`", and that includes
 the label of the junction edge `{a[1], b[1]}`. Giving each new edge this common label makes the paper's
-argument work as written. So this is not counted as a genuine repair (🛠️). Also borderline: the 6.1 step
+argument work as written. So this is not a mistake. The 6.1 step
 "`ϕ` must swap `G₁` and `G₂`". It is true by a short argument (the unique longest run of degree-2 nodes, see
 README), which a referee would accept as "by construction". The formalization avoids it rather than checking it.
 
 ## PODC 2011 version
 
-The verdict is for the PODC 2011 paper. Its authors' copy is `https://jukkasuomela.fi/doc/lcp-podc.pdf`, and it
+The formalization follows the journal version. The authors' copy of the PODC 2011 paper is `https://jukkasuomela.fi/doc/lcp-podc.pdf`, and it
 has no numbered theorems.
 * §5.2–5.4 make the claims of Theorem 5.1 and §5.4, with the same gluing proof: the same "`i > 1`" typo and
   the same silence about edge labels.
 * The cycles `C(a,b)` use a different identifier layout, `a, a+4n, a+6n, …` (identifiers up to about
   `n² + 3n`). This is still polynomial, so our `{1,…,n²}` construction proves the same statement.
 * §6.1 and §6.2 are the journal's Theorems 6.1 and 6.3. §6.1 states "if `G₁`, `G₂` are not isomorphic, then `G`
-  must be asymmetric" without argument; see the calibration above.
+  must be asymmetric" without argument; see "Proof sketches" above.
 * §7.2 (weak/strong schemes) is the journal's §2.3; §7.3 (`coLCP(0) ⊆ LogLCP`) is the same as the journal's §7.3.
 * The PODC §7.1 is the analogue of the journal's Theorem 7.2: a leader or port numbers instead of identifiers.
   It is not formalized.
 * The journal's Theorem 7.1 (lifts, PN verifiers) does **not** appear in the PODC version. Our
-  `Lifts.theorem_7_1` is therefore extra and does not affect the verdict.
+  `Lifts.theorem_7_1` is therefore extra, and the slip of item 26 exists only in the journal version.
 * Table 2 of the PODC version also lists Hamiltonian cycle as `Θ(log n)`. The lower bound is unargued and
   unchecked (item 16).

@@ -5,52 +5,23 @@ Categorization.* PODC 2021, pp. 331–341. DOI [10.1145/3465084.3467899](https:/
 Formalized version: arXiv:2102.07240v3 (numbering follows it).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** All the lower bounds of Table 1 hold in their intended ranges, and we
-formalized every one of them: 2 rounds (asynchrony and partial synchrony), 3 rounds for `n ≤ 5f − 2`, `2δ`,
-`Δ + δ`, `Δ + 1.5δ` with unsynchronized start, and `Θ(n/(n−f))Δ`. We also verified the 2-round BRB protocol.
-Three kinds of fixes were needed:
-- several theorems are false for very small `n`, mostly outside the paper's intended ranges;
-- the proof of the dishonest-majority bound gives one `Δ` more than claimed, and does not cover `f = n − 1`;
-- the paper never checks unforgeable signatures in its lower-bound executions, and the `Δ + 1.5δ` executions are
-  invalid with signatures until they are slightly modified.
+**Verdict: 🔧 Easy fix.** All the lower bounds of Table 1 hold after local repairs, and we formalized every one of them:
+2 rounds (asynchrony and partial synchrony), 3 rounds for `n ≤ 5f − 2`, `2δ`, `Δ + δ`, `Δ + 1.5δ` with unsynchronized
+start, and `Θ(n/(n−f))Δ`; for `f = n − 1`, `n ≥ 4` only `⌊n/2⌋Δ` is proved instead of `(n − 1)Δ`, which keeps the `Θ`.
+The `Δ + 1.5δ` executions are invalid with signatures until slightly modified, and several theorems need very small `n`
+excluded, mostly outside the paper's intended ranges. Of the upper bounds, on which tightness rests, we checked only the
+2-round BRB protocol and the timing core of Lemma 1.
 
 ## Mistakes in the paper
-
-### ⚠️ Theorem 10 for `n = 3` (`Δ + 1.5δ` with unsynchronized start, `f > n/3`)
-Read literally, Theorem 10 is false for `n = 3`: a simple 3-party BRB protocol has good-case latency `Δ + δ`
-for every `f` (`ThreeParties.theorem_10_false_three`).
-
-**Impact.** Degenerate: for `n = 3` no integer `f` satisfies the paper's intended range `n/3 < f < n/2`
-(Table 1, §5.4), and the counterexample has `f ≥ n/2`, so it refutes only the literal hypothesis `f > n/3`.
-Theorem 10 holds for all `n ≥ 4` (`Thm10.theorem_10`).
-
-**Details.** In the protocol, a non-broadcaster commits the proposal `Δ` after first learning it, provided it
-has seen no conflicting proposal. A party that saw two proposals adopts the commit certificate of the other
-non-broadcaster. The latency `Δ + δ` is measured from the broadcaster's start. We prove it both with
-synchronized start and with unsynchronized start, for any skew allowed by our model; that model forces
-correct parties to start before time `δ`. The paper's proof needs five groups `g, h, A, B ∋ s, C` with `A`
-non-empty, i.e. `n ≥ 4` (`ThreeParties.theorem_10_n4_necessary`).
-
-### ⚠️ Theorems 4, 8 and 9 for `n = 2`
-Theorems 4, 8 and 9 are false for `n = 2`: with a single non-broadcaster, "commit the first value received
-from the broadcaster" is BRB and commits after one message delay (`theorem_4_false_two`, `theorem_8_false_two`).
-
-**Impact.** Degenerate case; the proofs need two non-empty groups besides the broadcaster, and our theorems
-assume `n ≥ 3` (`theorem_4`, `theorem_8`, `theorem_9`).
-
-**Details.** For `n = 1`, Theorems 6 and 7 fail too (`theorem_7_false_one`). That case forces `f ≥ n`,
-outside the paper's implicit `f < n`, so it is out of range rather than an error. Theorems 6 and 7 hold
-vacuously for `n = 2` and for `n = 3, f = 1`, because psync-BB is unsolvable there (`psyncBB_impossible`).
-The paper's own construction for Theorem 7 needs `f ≥ 2`.
 
 ### ⚠️ Theorem 19 for `f = n − 1` (dishonest majority)
 For `f = n − 1` the proof of Theorem 19 does not work, so for `n ≥ 4` the claimed `(n − 1)Δ` is unestablished:
 the groups of size `n − f − 1` are empty and every execution has a single honest party, so agreement gives
 nothing.
 
-**Impact.** A proof gap in a degenerate corner; the bound holds for `n − f ≥ 2` (even one `Δ` stronger,
-`dishonestMajority_lower_bound`, `theorem_19`) and for `n = 3` (`theorem_19_three`). For `n ≥ 4` we only
-get `⌊n/2⌋Δ` (`allButOne_lower_bound`).
+**Impact.** The bound holds for `n − f ≥ 2` (even one `Δ` stronger, `dishonestMajority_lower_bound`, `theorem_19`) and
+for `n = 3` (`theorem_19_three`). For `f = n − 1`, `n ≥ 4` we only get `⌊n/2⌋Δ` (`allButOne_lower_bound`), which still
+matches the `O(n/(n−f))Δ` upper bound up to a constant.
 
 **Details.** The hypothesis `n − f ≥ 2` of our stronger bound is necessary. For `n = 3, f = 2`, the 3-party
 protocol above (at `δ = Δ`) commits by `2Δ < 3Δ = ⌊n/(n−f)⌋Δ`; we argue this transfer informally. The paper's
@@ -58,18 +29,31 @@ claim `(n − 1)Δ` for `f = n − 1` does hold for `n = 3`, since it is Theorem
 (`theorem_19_three`). For `n ≥ 4` and `f = n − 1` the bound `⌊n/2⌋Δ` follows by monotonicity in `f`; this is
 proved, but not shown tight (`allButOne_lower_bound`).
 
-### Typos and slips
+### ✏️ Slips
+- Theorem 10 is false for `n = 3` if read literally: a simple 3-party BRB protocol has good-case latency `Δ + δ`
+  for every `f` (`ThreeParties.theorem_10_false_three`). For `n = 3` no integer `f` satisfies the paper's intended range
+  `n/3 < f < n/2` (Table 1, §5.4), and the counterexample has `f ≥ n/2`, so it refutes only the literal hypothesis
+  `f > n/3`. Theorem 10 holds for all `n ≥ 4` (`Thm10.theorem_10`).
+- Theorems 4, 8 and 9 are false for `n = 2`: with a single non-broadcaster, "commit the first value received from the
+  broadcaster" is BRB and commits after one message delay (`theorem_4_false_two`, `theorem_8_false_two`). The proofs
+  need two non-empty groups besides the broadcaster, and our theorems assume `n ≥ 3` (`theorem_4`, `theorem_8`,
+  `theorem_9`).
+- Theorems 6 and 7 fail for `n = 1` (`theorem_7_false_one`). That case forces `f ≥ n`, outside the paper's implicit
+  `f < n`.
+
+### Typos
 - In Theorem 19 the broadcaster's split assigns both values to the middle group (overlapping index ranges).
 - Execution 1 of Theorem 10 is described differently in Section 5.4 ("`C` pretends to start late") and in
   Appendix C.4 (modified delays).
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 10 (signatures in the lower-bound executions)
+### 🔧 Theorem 10 (signatures in the lower-bound executions)
 The paper assumes ideal signatures but never checks unforgeability, and with it Executions 2 and 3 of
 Theorem 10 are not valid executions as written.
 
-**Impact.** Statement true; repaired by delaying some links in Executions 1 and 4 (`X_authValid`).
+**Impact.** The statement stands and the indistinguishability chain is kept, with some links delayed in Executions 1
+and 4 (`Thm10.theorem_10`, `X_authValid`).
 
 **Details.** In Execution 1 the Byzantine `C` and `h` behave honestly with value `0` and reach the honest `B`
 within `δ`. In Execution 2 the Byzantine `B` must replay its Execution-1 messages to `g` until about
@@ -79,11 +63,11 @@ within `δ`. In Execution 2 the Byzantine `B` must replay its Execution-1 messag
 **Repair.** Delaying `C → B` and `h → B` in Execution 1 (and the mirror links in Execution 4) fixes it
 (`X_authValid`).
 
-### 🛠️ Lemma 1, part (1) (the `Δ + 1.5δ` protocol)
+### 🔧 Lemma 1, parts (1) and (2) (the `Δ + 1.5δ` protocol)
 The proof argues that a conflicting proposal reaching `h` by its commit time `t` "stops `h` from committing",
 but Step 4a only checks for equivocation until `t_prop + Δ + 0.5d`, which can be earlier than `t`.
 
-**Impact.** An imprecision in the proof; the lemma is still true (`Lemma1.part1`, `Lemma1.part2`).
+**Impact.** The lemma stands (`Lemma1.part1`, `Lemma1.part2`).
 
 **Repair.** Compare with `t_prop + 0.5d` instead; we check this timing core abstractly (`Lemma1.part1`,
 `Lemma1.part2`).
@@ -138,6 +122,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
 Theorem 19's proof gives `⌊n/(n−f)⌋Δ`, one `Δ` more than the stated `(⌊n/(n−f)⌋ − 1)Δ`: it suffices to let
 the good-case proposal take `Δ` instead of `0`. For `f = n/2` the stated bound (`Δ`) is even weaker than
 Theorem 9 (`Δ + δ`). The stated bound is true; it is just not tight to its proof.
+
+**Small cases.** In the 3-party protocol, a non-broadcaster commits the proposal `Δ` after first learning it, provided
+it has seen no conflicting proposal. A party that saw two proposals adopts the commit certificate of the other
+non-broadcaster. The latency `Δ + δ` is measured from the broadcaster's start. We prove it both with synchronized start
+and with unsynchronized start, for any skew allowed by our model; that model forces correct parties to start before
+time `δ`. The paper's proof of Theorem 10 needs five groups `g, h, A, B ∋ s, C` with `A` non-empty, i.e. `n ≥ 4`
+(`ThreeParties.theorem_10_n4_necessary`). Theorems 6 and 7 hold vacuously for `n = 2` and for `n = 3, f = 1`, because
+psync-BB is unsolvable there (`psyncBB_impossible`). The paper's own construction for Theorem 7 needs `f ≥ 2`.
 
 The executions of Theorem 7 are those of the Kuznetsov–Tonkikh–Zhang lower bound (same PODC, same
 construction), taken from the library module `Cslib/Computability/Distributed/Byzantine/PartialSync/TwoStepLowerBound.lean` (FastByzantineConsensus still

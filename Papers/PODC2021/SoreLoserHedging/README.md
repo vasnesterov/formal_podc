@@ -5,22 +5,22 @@ Yingjie Xue, Maurice Herlihy. *Hedging Against Sore Loser Attacks in Cross-Chain
 [2105.06322](https://arxiv.org/abs/2105.06322) v2. It has the same text as the proceedings version, and the
 numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The main claims hold once the protocols' unspecified details are
-filled in consistently: the hedged two-party swap is safe, live and hedged, and the multi-party swap protocol is
-hedged (Lemma 6): a conforming party gains at least `p` for every escrowed asset that is not redeemed, whatever
-the other parties do. The auction lemmas (7, 8) hold. Lemma 2, and the form in which Lemma 3 is stated, are
-false for a leader that withholds its secret. The proof of Lemma 3 shows how the authors intended the accounting,
-and with that reading the total holds.
+**Verdict: 🔧 Easy fix.** Once the protocols' unspecified details are filled in consistently, the hedged two-party swap
+is safe, live and hedged, the multi-party swap protocol is hedged (Lemma 6: a conforming party gains at least `p` for
+every escrowed asset that is not redeemed, whatever the other parties do), and the auction lemmas (7, 8) hold. This
+takes local changes to Lemmas 2 and 3, Equation (1) and Alice's redemption rule in §5.2. Brokered commerce and the
+general liveness of multi-party swaps were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 2 (a leader that withholds its secret)
+### 🔧 Lemmas 2 and 3 (a leader that withholds its secret)
 Lemma 2 is false for `v = Lᵢ` withholding its own secret: on `A ⇄ B` with leader `A`, Alice's net
-redemption-premium profit is `−p`, not `≥ p` (`TwoCycle.lemma_2_false`).
+redemption-premium profit is `−p`, not `≥ p` (`TwoCycle.lemma_2_false`). Lemma 3's split claim (escrow profit `≥ 0`
+*and* redemption profit `≥ p` per escrowed asset) fails in the same execution (`TwoCycle.lemma_3_split_false`).
 
-**Impact.** An imprecise statement, not a false claim: the proof of Lemma 3 shows the intended accounting, and
-the hedging result (Lemma 6) is unaffected. Lemma 2 holds for every `v ≠ Lᵢ` (`lemma_2`) and for a leader that
-released its secret (`lemma_2_leader_released`).
+**Impact.** The hedging result (Lemma 6) is unaffected. Lemma 2 holds for every `v ≠ Lᵢ` (`lemma_2`) and for a leader
+that released its secret (`lemma_2_leader_released`). In Lemma 3 the redemption part is `−p` but the escrow part there
+is `+2p`, so the total, `+p`, is what matters, and it is what we prove (`lemma_3`).
 
 **Details.** The claim: if hashkey `kᵢ` never appears on `v`'s leaving arcs, then `v`'s net redemption-premium
 profit is at least `p` per escrowed asset. Take `v = Lᵢ` withholding its own secret. It pays its whole redemption
@@ -29,38 +29,42 @@ awarded at least p") forgets the leader's own deposits. Counterexample: the two-
 `A`. Bob deposits all his premiums but does not escrow his asset. Alice escrowed hers, so she withholds her
 secret. She pays `R(A) = 2p` and receives `p`, a net of `−p`. (`TwoCycle.lemma_2_false`)
 
-We class this as an imprecise statement rather than a false claim. The proof of Lemma 3 charges the leader's own
-redemption premiums to the escrow premium `E(u, v) = R(v)` ("the premium `E(u,v)` is enough to cover…") and only
-then cites Lemma 2. So the intended accounting is recoverable.
+The proof of Lemma 3 charges the leader's own redemption premiums to the escrow premium `E(u, v) = R(v)` ("the premium
+`E(u,v)` is enough to cover…") and only then cites Lemma 2. So the intended accounting is recoverable.
 
-### ⚠️ Lemma 3 (split into escrow and redemption profit)
-Lemma 3's split claim (escrow profit `≥ 0` *and* redemption profit `≥ p` per escrowed asset) fails in the same
-execution: the redemption part is `−p` (`TwoCycle.lemma_3_split_false`).
-
-**Impact.** The escrow part there is `+2p`, so the total, `+p`, is what matters, and it is what we prove
-(`lemma_3`).
-
-### ⚠️ Equation (1) (redemption premiums, not well defined)
+### 🔧 Equation (1) (redemption premiums, not well defined)
 For `v ∥ q` that is not a cycle, Eq. (1) recurses on `R(v ∥ q, u)`, which never ends when `v` already occurs
 inside `q` (this happens with two or more leaders).
 
-**Impact.** Evident intent: the value `p` in that case is what the protocol needs, since a conforming `v` does
-not extend such a `q` (`R_eq`).
+**Impact.** One case condition changes: the value `p` in that case is what the protocol needs, since a conforming `v`
+does not extend such a `q` (`R_eq`).
 
 **Details.** When `v` occurs inside `q`, `v ∥ q` is not a path. The argument "each path is finite, being acyclic"
 covers only paths. (`R_eq`)
 
-### Typos and slips
-- §7 defines paths with arcs `(uᵢ₊₁, uᵢ)`. Figure 3b and every later use need `(uᵢ, uᵢ₊₁)`.
-- The proof of Lemma 2 writes `q = (v, w, …, Lᵢ)` for `q = (w, …, Lᵢ)`.
-- The proof of Lemma 6 says "a profit of at least `p` for that asset" for every escrowed asset. That holds only
-  for assets that are *not redeemed*, since Lemma 1 refunds everything otherwise.
+### 🔧 §5.2 (Alice's redemption rule)
+§5.2 is hedged for Alice only if she redeems Bob's principal whenever he escrows it, even if she escrowed nothing, and
+the paper does not have this rule. Under the other reading, Bob can escrow without paying his premium, and Alice loses
+`pa + pb` (`TwoParty.alt_reading_alice_loses`).
+
+**Impact.** With this one rule Alice never loses premiums (`TwoParty.aliceNet_nonneg`, `TwoParty.hedged_alice`).
+
+**Details.** The parties run the swap only "if this premium distribution phase is successful". If Bob skips his premium,
+Alice does not escrow, and Bob escrows anyway, her unredeemed Bob principal awards her premium to Bob. This does not
+violate Definition 1, since Alice escrowed nothing, but it contradicts the claim that a party's risk is limited to
+locking up premiums.
+
+### ✏️ Slips
+- Lemma 7 needs at least one conforming bidder, and it fails without one (`Auction.lemma7_needs_compliant_bidder`). The
+  proof names the compliant party, and Lemma 8 uses the lemma only for a compliant bidder.
 - §9's hashkey timeout `|q|Δ` must be counted from the start of the declaration phase. Counted from time 0,
   Alice's own key `(A)` would expire before she can publish it.
-- §5.2 is hedged for Alice only if she redeems Bob's principal whenever he escrows it, even if she escrowed
-  nothing. Under the other reading, Bob can escrow without paying his premium, and Alice loses `pa + pb`
-  (`TwoParty.alt_reading_alice_loses`).
-- In §6, "`r` rounds" counts the swap's own premium round. The "$1,000,000 swap" example needs `A = B = 10⁶`.
+- The proof of Lemma 6 says "a profit of at least `p` for that asset" for every escrowed asset. That holds only
+  for assets that are *not redeemed*, since Lemma 1 refunds everything otherwise.
+- §7 defines paths with arcs `(uᵢ₊₁, uᵢ)`. Figure 3b and every later use need `(uᵢ, uᵢ₊₁)`.
+
+### Typos
+- The proof of Lemma 2 writes `q = (v, w, …, Lᵢ)` for `q = (w, …, Lᵢ)`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -102,6 +106,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * Hashkey paths are those of [Herlihy 2018]: every vertex except possibly the last is distinct. The companion
   formalization `Papers/PODC2018/AtomicCrossChainSwaps` shows that simple paths and cycles do not work for
   keys.
+* In §6, "`r` rounds" counts the swap's own premium round. The "$1,000,000 swap" example needs `A = B = 10⁶`.
 
 **Main results in Lean.**
 
@@ -124,6 +129,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | §9.2 no sore-loser attack by bidders; premiums | `Auction.completes_of_alice_compliant`, `Auction.compliant_bidder_outcome` | `Auction.lean` |
 
 **Not formalized.**
+* Lemma 1 with deviators: we prove it only when everybody conforms. With deviators a conforming `v` may pay a premium
+  and be compensated by another, which is argued in `differencies.md` and depends on premium deadlines the paper does
+  not fix.
 * The safety and liveness of the base multi-party protocol, which the paper cites from [Herlihy 2018]. See the
   companion `Papers/PODC2018/AtomicCrossChainSwaps`.
 * Liveness of the hedged multi-party protocol in general. It is shown only on the Figure 3a example.

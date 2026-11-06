@@ -4,7 +4,7 @@ Paper: Vaidya, Garg, *Byzantine Vector Consensus in Complete Graphs*, PODC 2013,
 
 ## Errors and gaps in the paper
 
-1. **Theorem 6, synchronous necessity (`n ≥ (d+2)f+1`) — false as stated (under-specified
+1. **❌ Theorem 6, synchronous necessity (`n ≥ (d+2)f+1`) — false as stated (under-specified
    definition).** The restricted synchronous structure allows an arbitrary update function of
    the old state and the received vectors. A state in `ℝ^d` can injectively encode `(ℝ^d)^n`.
    For `n = 4`, `d = 2`, `f = 1` (`(d+2)f+1 = 5 > 4`), the two-round algorithm "store the
@@ -19,13 +19,13 @@ Paper: Vaidya, Garg, *Byzantine Vector Consensus in Complete Graphs*, PODC 2013,
      ignores `t`. Inputs lie in the box `[0,1]²` (Section 3.2's known bounds with `ν = 0`,
      `U = 1`), and encodings have first coordinate `> 1`. So the own state tells round 1 from
      round 2.
-2. **Theorem 6, asynchronous case — under-specified algorithm; necessity unproved.** "Step 2
+2. **🔧 Theorem 6, asynchronous case — under-specified algorithm; necessity unproved.** "Step 2
    analogous to Section 3.2" with subsets of size `n − f` leaves `Z_i = {one point}`, since
    `|B_i| = n − f`. The paper's common-point argument fails. We use subsets of size `n − 3f` (any
    `s` with `(d+1)f < s ≤ n − 3f` works, `RoundExec.correct_of_valid`) and prove sufficiency for
    `n ≥ (d+4)f+1` (`theorem_6_async`). Necessity: no proof in the paper; not formalized. The
    objection of item 1 applies.
-3. **Theorem 4 — minor presentational gap, true statement.** The scenario "`p_j` faulty,
+3. **🔧 Theorem 4 — proof gap, true statement.** The scenario "`p_j` faulty,
    `p_{d+2}` slow but correct" yields the hull of `X_i^j ∪ {x_{d+2}}`, not `H(X_i^j)`. The paper's
    remark that `p_i` has no information about `x_{d+2}` already implies the fix: choose `x_{d+2}`
    per scenario inside `H(X_i^j)`. Only the later sentence fixing `x_{d+2} = 0` for all scenarios
@@ -47,7 +47,7 @@ Paper: Vaidya, Garg, *Byzantine Vector Consensus in Complete Graphs*, PODC 2013,
 6. **Theorem 1, `3f+1` part.** The citation of scalar consensus is fine. We reduce to CSLib's
    Fischer–Lynch–Merritt theorem for weak validity (diagonal inputs, `weak_of_bvc`), which needs
    `n ≥ 3`. The case `n = 2` follows from the `(d+1)f+1` part.
-7. **Number of rounds in Step 3.** `1 + ⌈log_{1/(1−γ)}((U−ν)/ε)⌉` is undefined for `U = ν` and
+7. **✏️ Number of rounds in Step 3.** `1 + ⌈log_{1/(1−γ)}((U−ν)/ε)⌉` is undefined for `U = ν` and
    can be `≤ 0`. We use `1 + ⌈·⌉₊` (Lean's `Real.logb` and `Nat.ceil`), which works in all cases
    (`rounds_spec`).
 8. **Typos.** Section 4 cites "the proof of Theorem 4" for the correctness of the restricted

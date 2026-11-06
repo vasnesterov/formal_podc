@@ -6,20 +6,21 @@ Constructions for Non-Volatile Memory.* PODC 2018. DOI
 copy of the conference paper (10 pages, proofs included; no arXiv version). Copy of the paper:
 [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The main results hold. Lemma 1 holds. The recoverable read/write
-object (Lemma 2) and the recoverable compare&swap object (Lemma 3) satisfy NRL. Theorem 4 (no
-wait-free recoverable test&set from read/write and test&set) is true, but its proof needed a
-repair. The false claim is the example built on top of these results: Algorithm 4, the "nesting-safe
-recoverable counter", does not satisfy NRL. Its `READ` loses its partial sum when a nested
-recoverable `READ` crashes, and `INC.RECOVER` has an off-by-one test.
+**Verdict: ⚠️ Weakened.** Lemma 1 holds, the recoverable read/write object (Lemma 2) and the recoverable
+compare&swap object (Lemma 3) satisfy NRL, and Theorem 4 (no wait-free recoverable test&set from
+read/write and test&set) is true, though its proof needed a repair. But the paper's only example of
+nesting, Algorithm 4, the "nesting-safe recoverable counter", does not satisfy NRL: its `READ` loses its
+partial sum when a nested recoverable `READ` crashes. No repair is proved, so the promised modular
+construction has no working instance.
 
 ## Mistakes in the paper
 
 ### ❌ Algorithm 4, `READ` (the "nesting-safe recoverable counter")
 Algorithm 4's `READ` is not NRL: when a nested recoverable `R[i].READ` crashes, the caller resumes after `R[i].READ.RECOVER` with its volatile partial sum `val` and loop index `i` lost, so a `READ` after a completed `INC` can return `0` (`Alg4.read_not_nrl`).
 
-**Impact.** The counter is an example built on top of the main results, which all hold. Repairing it
-requires a design change, e.g. keeping `val` and `i` in non-volatile memory.
+**Impact.** The counter is an example built on top of the other results, which do not depend on it, but it
+is the only nesting the paper shows. Repairing it requires a design change, e.g. keeping `val` and `i` in
+non-volatile memory; we proved no repair.
 
 **Details.** `READ` sums `R[1..N]` with nested recoverable `R[i].READ` calls, keeping `val` and `i`
 in volatile variables. Under the paper's own model, a crash inside `R[i].READ` is recovered by
@@ -29,37 +30,26 @@ processes and the most benign reset (volatile variables become 0): process 0 com
 Process 1 starts `READ`, reads `R[1] = 1`, and crashes inside `R[2].READ`. After
 `R[2].READ.RECOVER` it adds 0 to the reset `val = 0` and returns `0`.
 
-### ⚠️ Algorithm 4, `INC.RECOVER` (test `LI_p < 4`)
-`INC.RECOVER` tests `LI_p < 4` where it should test `LI_p ≤ 4`, so a crash just before line 4 makes `INC` return `ack` without incrementing (`Alg4.inc_recover_not_nrl`).
-
-**Impact.** Typo with evident intent: the prose ("before line 4 – INC is re-executed") gives the
-intended test.
-
-**Details.** Suppose process 0 crashes in `INC` when it is about to execute line 4, before invoking
-`R[p].WRITE`. Then `LI_p = 4`, and `INC.RECOVER` returns `ack` without incrementing. A later `READ`
-returns `0`.
-
-### ⚠️ Lemma 2 (Algorithm 1: written values must also differ from the initial value)
-Lemma 2 is false if a process may write the initial value `v₀`: the paper assumes only that "all values written to the object are distinct" (`alg1_not_nrl_of_initial_rewritten`).
-
-**Impact.** Implied assumption, satisfied by the paper's counter; `lemma2` is proved with the
-assumption.
-
-**Details.** `p` writes 1 and crashes after its write to `R`. Then `q` writes `v₀`. `p`'s recovery
-sees `R` equal to its saved old value, so it writes 1 a second time, and a reader sees `1, v₀, 1`.
-
-### ⚠️ Algorithm 3, lines 26 and 28 (`R[p]` for `R[i]`)
-Lines 26 and 28 read `await(R[p] = …)` where they should read `R[i]`, so as printed line 26 never terminates.
-
-**Impact.** Typo with evident intent; not formalized.
-
-### Typos and slips
-- In Lemma 3 (Algorithm 2), `new` must not be `null`, because the helping registers start at
-  `null`. This is the paper's sentinel convention.
+### ✏️ Slips
+- **Algorithm 4, `INC.RECOVER`.** The test `LI_p < 4` should be `LI_p ≤ 4`, so a crash just before line 4
+  makes `INC` return `ack` without incrementing (`Alg4.inc_recover_not_nrl`). The prose ("before line 4 –
+  INC is re-executed") gives the intended test. Suppose process 0 crashes in `INC` when it is about to
+  execute line 4, before invoking `R[p].WRITE`. Then `LI_p = 4`, and `INC.RECOVER` returns `ack` without
+  incrementing. A later `READ` returns `0`.
+- **Lemma 2 (Algorithm 1).** Written values must also differ from the initial value: the lemma is false
+  if a process may write `v₀`, and the paper assumes only that "all values written to the object are
+  distinct" (`alg1_not_nrl_of_initial_rewritten`). This is an implied assumption, satisfied by the paper's
+  counter; `lemma2` is proved with it. `p` writes 1 and crashes after its write to `R`. Then `q` writes
+  `v₀`. `p`'s recovery sees `R` equal to its saved old value, so it writes 1 a second time, and a reader
+  sees `1, v₀, 1`.
+- **Algorithm 3, lines 26 and 28.** They read `await(R[p] = …)` where they should read `R[i]`, so as
+  printed line 26 never terminates. Not formalized.
+- **Lemma 3 (Algorithm 2).** `new` must not be `null`, because the helping registers start at `null`.
+  This is the paper's sentinel convention.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 4 (no wait-free recoverable test&set from read/write and test&set)
+### 🔧 Theorem 4 (no wait-free recoverable test&set from read/write and test&set)
 At each critical configuration the proof assumes "w.l.o.g. `C₁∘p` is `p`-valent" and crashes `p`, so the renaming can change the crashing process from round to round, and a process that crashes infinitely often does not contradict wait-freedom.
 
 **Impact.** Statement true; repaired by always crashing the same process (`theorem4`, `round`).
@@ -115,7 +105,8 @@ linearize speculatively and retract the entry if the guess turns out wrong.
 | (sanity) NRL + wait-freedom satisfiable with compare&swap | `casTAS_nrl_waitFree`, `casTASObj_not_rw_tas` | `NonVacuity.lean` |
 
 **Not formalized.** Claim 1 (Algorithm 3), Claim 2 (non-recoverable counter), Definition 1
-(strict recoverability), and the nested version of Lemma 1.
+(strict recoverability), and the nested version of Lemma 1. Claim 1 was only read informally, with
+`R[i]`; its liveness-based linearization was not verified.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Theorem 4's hypotheses are jointly satisfiable once a compare&swap base object is

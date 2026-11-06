@@ -18,14 +18,14 @@ version (many proofs are sketches).
    The proof sketch stitches the two bad executions `G₀, G₁` and gives every node the bound `2n`.
    This silently assumes `|V₀| = |V₁| = n`. With `i` allowed to depend on `n` ("for every `n` there
    is an `i`") the theorem and the stitching proof are correct (`theorem_4_1`).
-   *Severity:* false statement as written, but the intended per-`n` statement holds.
+   *Label:* 🔧. False statement as written, but the intended per-`n` statement holds.
 
 2. **Definition 3 (dynamic diameter) is vacuous as written.** "`(u, max{0, t'−D}) ↝ (v, t')` for all
    `t' ≤ t`" fails at `t' = 0` for any two distinct nodes, so no graph with `n ≥ 2` has a finite
    dynamic diameter (`not_diamLit`, `UpperBoundsDiameter.lean`). The parenthetical form
    `past(u,t')(t'−D) = V` has the same problem. Read literally, the dynamic-diameter protocol never
    decides early. We use the evident fix: only `D ≤ t' ≤ t` (`DiamUpTo`).
-   *Severity:* under-specified definition / typo.
+   *Label:* ✏️. Under-specified definition / typo.
 
 3. **Running time of the dynamic-diameter protocol: the precise claim is false; the final bound
    holds.** The paper says "if we choose `kmax ≥ ⌊n/(D+Δ)⌋`, nodes can stop as early as time
@@ -48,12 +48,12 @@ version (many proofs are sketches).
    is true is `diamProtocol_decides`: with dynamic diameter `≤ D` up to time `kD` and
    `k(D+Δ) ≤ n − 1`, everybody decides by `n − kΔ − 1`. The paper's final bound
    `t < nD/(D+Δ) + Δ` follows (`diamProtocol_time`, with `kmax ≥ ⌊(n−1)/(D+Δ)⌋`).
-   *Severity:* false intermediate statement; the stated asymptotic bound survives.
+   *Label:* 🔧. False intermediate statement; the stated asymptotic bound survives.
 
 4. **The abstract's `min{O(nD/Δ), n − Ω(nΔ/D)}` holds only up to an additive `Δ`.** The proved bound
    is `nD/(D+Δ) + Δ`. For `Δ ≥ n` the protocol never decides before `n − 1`
    (`diamProtocol_eq_none_of_le`), which is not `O(nD/Δ)`.
-   *Severity:* imprecise asymptotic claim, false only in a degenerate regime.
+   *Label:* ✏️. Imprecise asymptotic claim; the bound with its `+ Δ` is printed in §6.
 
 5. **Lemma 6.5 names the wrong node, and the case `s < 0` needs a stronger hypothesis.** For `s ≥ 0`
    the node that cannot distinguish `G` from `G'` is `u_{k+s+1}`, the first node of `P_{k+s}`, not
@@ -63,36 +63,36 @@ version (many proofs are sketches).
    `a + b < n − s` must be `a + b < n − |s|`: with `n = 6, k = 0, s = −2, a = 2, b = 4, t = 5`,
    every node distinguishes (`lemma_6_5_neg_false`). Only `s ≥ 0` is used later, so nothing
    downstream breaks. The hypotheses `b < t ≤ n − 1` are not needed.
-   *Severity:* typo (node index), plus a false statement in an unused case.
+   *Label:* 🔧 for the node index, ✏️ for the unused case `s < 0`.
 
 6. **Lemma 6.6: base case omitted, `n ≥ 3` needed.** The base case `n ≤ 2β + 1` is handled as
    `P_k → C → P_{k'}` with Lemma 6.5 (`b = 0`). For `n = 2` the "paths" `P_k` are disconnected,
    so `n ≥ 3` is required. The model section indeed says `|V| > 2`.
-   *Severity:* proof gap (statement true) / missing assumption.
+   No label: the statement is true in the paper's model, and the base case is omitted openly.
 
 7. **Theorem 6.7: typos and constants.** The proof writes `(n/β)^{log₂ e}` twice for
    `(n/β)^{log₂ 3}`. The indistinguishability time can be `T = n − β − 1` instead of `n − 2β − 1`.
    Explicit statement (`theorem_6_7`): with `n ≤ 2^m β`, no node decides by any `t` with
    `t + ⌈n/β⌉·3^{m+1}·Δ ≤ n − 1 − β`. Asymptotic statement (`theorem_6_7_asymptotic`): no node
    decides by `t` whenever `t + 57·Δ^{1/(2+log₂3)} n^{1−1/(2+log₂3)} ≤ n`, assuming `Δ ≥ 1`.
-   *Severity:* typos; constants made explicit.
+   *Label:* ✏️. Typos; constants made explicit.
 
 8. **Lemma 6.2 (clear majority).** The proof writes "`(kmax choose 2)`" without the factor `Δ`. The
    statement assumes `Δ ≤ (εn−1)/2` but the proof uses `Δ ≤ (2εn−1)/4` (the former implies the
    latter). The arithmetic needs `Δ ≥ 1`. The formula for `kmax` is
    `⌊√((2εn−1)/Δ) − 1⌋` (the square root is lost in text extraction).
-   *Severity:* typos; statement correct.
+   No label: typos; statement correct.
 
 9. **Lemma 6.3 (approximate Δ-ladder) leaves the level-0 rule implicit.** The rule at time `n − 1`
    (deciding `v` when `Φ^{0,v}` holds) is never written down, but termination and (a)/(b) rely on
    it. Levels with `kΔ ≥ n` must be disabled, otherwise their decision times are negative. With
    these made explicit no hypothesis is missing. Agreement holds even if two levels fire for
    different values, because (c) iterated down to level 0 and (a) force the valency (`LadderSpec.val_eq`).
-   *Severity:* under-specified definition.
+   *Label:* ✏️. Under-specified definition.
 
 10. **Lemma 3.1 is about the system with unknown `n`.** This is said in the surrounding text but not
     in the statement. With `n` known, `u` knows `past(u,t)(0) = V` iff `|past(u,t)(0)| = n`.
-    *Severity:* imprecise statement.
+    *Label:* ✏️. Imprecise statement.
 
 ## Modelling choices
 
@@ -167,7 +167,7 @@ version (many proofs are sketches).
       hypothesis `D = O(Δ)` is not needed for the explicit bound.
     - "`E(r) = E_H` until the first node decides" is formalized as "`G` follows `H` in rounds
       `≤ t` ⇒ no decision by `t`", which is equivalent by locality. Nodes are `{0, …, n−1}`.
-    *Severity:* under-specified proof; the statement is true.
+    *Label:* 🛠️. Under-specified proof; the statement is true.
 
 ## Not formalized
 
