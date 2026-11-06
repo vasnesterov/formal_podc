@@ -5,16 +5,17 @@ DOI [10.1145/3293611.3331632](https://doi.org/10.1145/3293611.3331632). Formaliz
 [1908.10826](https://arxiv.org/abs/1908.10826) v1 (full version, 51 pp.); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** Theorem 1 holds: Algorithm 2 is a lock-free strongly linearizable
-ABA-detecting register from `n + 1` registers of `O(log n + log |D|)` bits. It holds for the natural
-specification, but not for the one the paper writes down, which wrongly forces every process's first `DRead`
-to report "no write". Observation 4 (Algorithm 1 is not strongly linearizable) holds. Theorem 25 (Algorithm 3,
-the snapshot, is strongly linearizable) and its lock-freedom (Theorem 32) are proved with *atomic* `S` and
-`R`, not for a merely linearizable `S`. Theorem 3 (simple types) is not formalized.
+**Verdict: 🔧 Easy fix.** The one mistake of substance is the specification of the first `DRead`, which wrongly
+forces every process's first `DRead` to report "no write"; for the natural specification, one condition away, Theorem 1
+holds: Algorithm 2 is a lock-free strongly linearizable ABA-detecting register from `n + 1` registers of
+`O(log n + log |D|)` bits. Observation 4 (Algorithm 1 is not strongly linearizable) holds, and Theorem 25 (Algorithm 3,
+the snapshot, is strongly linearizable) and its lock-freedom (Theorem 32) are proved with *atomic* `S` and `R`. The
+paper's main claim of a bounded-space snapshot, which needs a merely linearizable `S`, and Theorem 3 (simple types)
+were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Section 3 (specification of the first `DRead`) and Theorem 12
+### 🔧 Section 3 (specification of the first `DRead`) and Theorem 12
 The specification makes a process's first `DRead` return "no write", but Algorithms 1 and 2 return `true` for it,
 so in the sequential execution `DWrite_p(x); DRead_p()` the read returns `(x, true)` and Algorithm 2 is not even
 linearizable for the literal specification, for every `n ≥ 1` (`not_linearizable_literal`).
@@ -31,14 +32,12 @@ because Lemma 8 only compares two consecutive `DRead`s and Theorem 10 never trea
 **Repair.** The specification "a `DWrite` since `q`'s last `DRead_q()` *or since the beginning*". This is the
 PODC'15 ABADetection formalization's `abaObj`, and Theorem 1 is proved for it.
 
-### ⚠️ Observation 6(b) (mistyped)
-It reads "`A[p] = s` throughout `[t, t']`", while the intended statement, used in Lemma 7, is "`A[q] = (p, s)`
-throughout `[t, t']`".
+### ✏️ Slips
+- Observation 6(b) reads "`A[p] = s` throughout `[t, t']`", while the intended statement, used in Lemma 7, is
+  "`A[q] = (p, s)` throughout `[t, t']`". The intended statement is true. The paper takes it from a thesis without
+  proof; we prove it as an invariant of `GetSeq` (`protBy_getSeq`, `protBy_of_wInv`).
 
-**Impact.** Typo with evident intent; the intended statement is true. The paper takes it from a thesis without
-proof; we prove it as an invariant of `GetSeq` (`protBy_getSeq`, `protBy_of_wInv`).
-
-### Typos and slips
+### Typos
 - Lemma 8 refers to "the loop-guard on line 53" (line 41 is meant).
 - Theorem 12's proof cites "Theorem 11" (Lemma 11 is meant).
 - Lemma 11's case (ii) cites Q-2 instead of Q-1.

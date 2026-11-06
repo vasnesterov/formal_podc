@@ -5,55 +5,54 @@ DOI [10.1145/2611462.2611484](https://doi.org/10.1145/2611462.2611484). Formaliz
 Infoscience copy of the PODC paper (10 pages, with the appendix proving Proposition 11); no arXiv
 version.
 
-**Verdict: ⚠️ Minor statement issues.** All three halves of the paradox hold. Eventually linearizable
-objects cannot implement any non-trivial linearizable object (Theorem 12, Proposition 14). They make
-consensus easy (Proposition 16). An eventually linearizable non-blocking fetch&increment can be turned
-into a linearizable one (Lemma 17, Proposition 18). The statement issues all come from one implied assumption: operations are total. The paper's
-model allows partial operations, but every type it uses is total. Without totality, Lemma 6 (prefixes
-of `t`-linearizable histories are `t`-linearizable) is false, and Theorem 12 and Proposition 14 fail
-for partial base types. Two proofs needed repairs (Lemma 17, Lemma 8).
+**Verdict: 🔧 Easy fix.** Eventually linearizable objects cannot implement any non-trivial linearizable object
+(Theorem 12, Proposition 14), they make consensus easy (Proposition 16), and an eventually linearizable non-blocking
+fetch&increment can be turned into a linearizable one (Lemma 17, Proposition 18). This needs only the implied assumption
+that operations are total, which the paper's model leaves out although every type it uses is total, and a local repair
+of one wrong step in the proof of Lemma 17. The claim that eventually linearizable objects do not boost the consensus
+power of registers (Proposition 15) was not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 6 (prefixes of `t`-linearizable histories)
-Lemma 6 is false for types whose operations are not applicable in every state: the paper's
-`δ ⊆ Q × OP × RES × Q` may leave an operation without a transition (`lemma6_false_partial`).
+### ✏️ Slips
+- **Partial operations: Lemma 6 (prefixes of `t`-linearizable histories).** Lemma 6 is false for types whose operations
+  are not applicable in every state: the paper's `δ ⊆ Q × OP × RES × Q` may leave an operation without a transition
+  (`lemma6_false_partial`). The lemma and its proof are correct for total types (`TLinearizable.prefix`,
+  `tLinearizable_take_self`), and every type the paper uses is total. So are its other uses of totality ("a prefix of
+  length at most `t` is trivially `t`-linearizable", "any permutation yields a legal sequential history").
 
-**Impact.** Local: the lemma and its proof are correct for total types (`TLinearizable.prefix`), and
-every type the paper uses is total. So are its other uses of totality ("a prefix of length at most `t`
-is trivially `t`-linearizable", "any permutation yields a legal sequential history").
+  Counterexample: take a one-bit object whose operation `use` is only enabled once `enable` has set the bit. Process 0
+  runs `use` (events 1–2), then process 1 runs `enable` (events 3–4). With `t = 2` the history is `2`-linearizable: the
+  order `enable`, `use` is legal, and `use` responded among the first two events, so its response is unconstrained. The
+  prefix of length 2 is not `2`-linearizable: it contains only `use`, which must be linearized and cannot be applied in
+  the initial state. The proof breaks when it completes the early operations "with the responses they would have if
+  executed in that order".
+- **Partial operations: Theorem 12 and Proposition 14 (base objects that never respond).** Both need base objects whose
+  operations always have a legal response (total types with an initial state), which the paper never states. Every base
+  object in the paper is total, and the proof of Theorem 12 presupposes it. With it added (`theorem12`, `prop14`), both
+  results hold.
 
-**Details.** Take a one-bit object whose operation `use` is only enabled once `enable` has set the bit.
-Process 0 runs `use` (events 1–2), then process 1 runs `enable` (events 3–4). With `t = 2` the history
-is `2`-linearizable: the order `enable`, `use` is legal, and `use` responded among the first two events,
-so its response is unconstrained. The prefix of length 2 is not `2`-linearizable: it contains only
-`use`, which must be linearized and cannot be applied in the initial state. The proof breaks when it
-completes the early operations "with the responses they would have if executed in that order".
-
-**Repair.** Assume total operations (`TLinearizable.prefix`, `tLinearizable_take_self`).
-
-### ⚠️ Theorem 12 and Proposition 14 (base objects that never respond)
-Both need base objects whose operations always have a legal response (total types with an initial
-state), which the paper never states.
-
-**Impact.** Excused as an implied assumption: every base object in the paper is total, and the proof
-of Theorem 12 presupposes it. With it added (`theorem12`, `prop14`), both results hold.
-
-**Details.** The model only says a programme "can invoke an operation on a base object and await a response". If
-a base type has an operation with no transition, no response to it is weakly consistent, so the caller
-waits forever. An implementation of any type whose operations all start with such a call never
-responds. It is therefore linearizable, and it is vacuously obstruction-free: no process takes
-infinitely many steps. So item 4 of Theorem 12 holds for every type, while item 1 fails for registers.
-This is argued in prose, not as a Lean counterexample.
+  The model only says a programme "can invoke an operation on a base object and await a response". If a base type has an
+  operation with no transition, no response to it is weakly consistent, so the caller waits forever. An implementation of
+  any type whose operations all start with such a call never responds. It is therefore linearizable, and it is vacuously
+  obstruction-free: no process takes infinitely many steps. So item 4 of Theorem 12 holds for every type, while item 1
+  fails for registers. This is argued in prose, not as a Lean counterexample.
+- **Partial operations: Lemma 8, "if" direction (weak consistency is local).** The proof inserts the process's operations
+  on other objects "with responses as dictated by the objects' sequential specifications", which needs total operations.
+  The statement is true even without totality (`weaklyConsistent_iff_restrict`): for each other object, take the
+  weak-consistency witness of the process's last operation on it, and concatenate these witnesses (they are on different
+  objects) before `op`'s own witness.
+- **Claim 1 in the proof of Proposition 18** applies Lemma 17 with `t = ℓ₀ = 0`, outside its hypothesis `t > 0`. Lemma 17
+  holds for `t = 0` (`lemma17`).
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 17 (fetch&increment: `t`-linearizable prefixes ⇒ `t`-linearizable)
+### 🔧 Lemma 17 (fetch&increment: `t`-linearizable prefixes ⇒ `t`-linearizable)
 In the real-time case `op₂ ∈ A₄`, the proof's claim that in a `t`-linearization of the prefix with all
 responses `≤ v` "all the slots of `E` prior to slot `v` are filled using operations of `A₁` and
 operations of `A₄`" is false.
 
-**Impact.** Statement true; repaired (`lemma17`). The hypothesis `t > 0` is not needed.
+**Impact.** The statement stands, with a repaired proof (`lemma17`). The hypothesis `t > 0` is not needed.
 
 **Details.** An operation of `A₂ ∪ A₃` that is still pending in that prefix, and later returns a value
 `> v`, can occupy an `E`-slot below `v`. Example with `t = 1`: `x`, `z` and `y` are invoked at positions
@@ -65,19 +64,6 @@ invoked before `op₂`. In any `t`-linearization of it, the `E`-slots below `v` 
 `A₁ ∪ A₄` invoked before `op₁`'s response (`count_free_le`). With finitely many processes the bound
 `|E| ≤ |A₁| + |A₄|` then follows from the prefixes alone. The `t₀`-linearization is needed only for
 `|A₁| ≤ |E|`.
-
-### 🛠️ Lemma 8, "if" direction (weak consistency is local)
-The proof inserts the process's operations on other objects "with responses as dictated by the
-objects' sequential specifications", which needs total operations.
-
-**Impact.** Statement true, even without totality (`weaklyConsistent_iff_restrict`).
-
-**Repair.** For each other object, take the weak-consistency witness of the process's last operation
-on it, and concatenate these witnesses (they are on different objects) before `op`'s own witness.
-
-### Typos and slips
-- Claim 1 in the proof of Proposition 18 applies Lemma 17 with `t = ℓ₀ = 0`, outside its hypothesis
-  `t > 0`. Harmless: Lemma 17 holds for `t = 0` (`lemma17`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -137,9 +123,15 @@ local-copy histories are weakly consistent, and every finite prefix is eventuall
 infinite path is built directly. König's lemma is used only for the safety of linearizability, which
 Theorem 12 needs. Proposition 16 is proved register by register, without Lemma 7.
 
-**Not formalized.** Proposition 11 (appendix), Proposition 15, and the classical fact behind
-Corollary 19 (registers cannot solve two-process consensus, while a linearizable fetch&increment and
-registers can).
+**Not formalized.**
+- Proposition 11 (appendix).
+- Proposition 15 (valency argument), so it is open here whether eventually linearizable objects can boost the consensus
+  power of registers.
+- The remark after Proposition 18 (obstruction-free and wait-free variants) and the test&set and one-shot remarks of
+  Section 4.
+- The classical fact behind Corollary 19 (registers cannot solve two-process consensus, while a linearizable
+  fetch&increment and registers can): only the reduction is proved, and this fact is a hypothesis.
+- Computability in Definition 13 and Proposition 14: dropped on both sides of the equivalence.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: `trivImpl` is a linearizable wait-free implementation of every trivial

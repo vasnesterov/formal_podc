@@ -9,21 +9,22 @@ v1 (Feb. 2019, proofs in its Appendix A), v2 and the journal version. v2 defers 
 full paper"; the proofs we checked are those of the journal version (ACM TOPC 9(2), 2022), Sections
 6–7. See `differencies.md` for version differences. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** Lemma 1 and Theorem 1 hold: the generic algorithms are
-strongly linearisable with respect to `SeqSketch_{Nb}` and `SeqSketch_{2Nb}`, for every composable
-sketch, provided the threads' initial hint is the empty sketch's hint (Algorithm 2 hard-codes `1`,
-which is right for the Θ sketch but not in general). We prove them in a stronger form, which is the
-one the error analysis needs. The error bounds of Section 6 check out algebraically.
+**Verdict: 🛠️ Hard fix.** Lemma 1 and Theorem 1 hold: the generic algorithms are strongly linearisable with respect
+to `SeqSketch_{Nb}` and `SeqSketch_{2Nb}`, for every composable sketch, provided the threads' initial hint is the
+empty sketch's hint (Algorithm 2 hard-codes `1`, which is right for the Θ sketch but not in general). The simulation
+behind Theorem 1, the paper's main correctness result, does not preserve histories, so Theorem 1 took a new direct
+invariant proof; we prove both results in a stronger form, which is the one the error analysis needs. The error bounds
+of Section 6 check out algebraically, with the order-statistic moments of §6.1 taken as hypotheses.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 1 and Theorem 1 (Algorithm 2's initial hint `1`)
+### 🔧 Lemma 1 and Theorem 1 (Algorithm 2's initial hint `1`)
 Algorithm 2 starts with `hint_i = prop_i = 1`, which breaks Lemma 1 and Theorem 1 for general
 composable sketches: an exact counter whose `calcHint` always returns `2` and with
 `shouldAdd(h, a) = (h ≠ 1)` meets all requirements, but drops every update forever
 (`parSketch_hint_one_not_stronglyLinearizable`).
 
-**Impact.** Evident intent: for the paper's Θ sketch, `1` is exactly the empty sketch's Θ. With
+**Impact.** For the paper's Θ sketch, `1` is exactly the empty sketch's Θ, so only the generic claim is affected. With
 "initial hint = hint of the empty sketch" both results hold (`lemma1`, `theorem1`).
 
 **Details.** The pre-filtering requirement of Section 5.1 only constrains `shouldAdd(h, ·)` for hints
@@ -34,25 +35,34 @@ queries returning `0` is an execution with no linearization in `SeqSketch_{Nb}`.
 **Repair.** We prove both results with "initial hint = hint of the empty sketch" (more generally, any
 hint that filters harmlessly on every stream). (`lemma1`, `theorem1`)
 
-### ⚠️ Section 5.3 (exactness of the sequential Θ sketch, off by one)
+### 🔧 Section 5.3 (exactness of the sequential Θ sketch, off by one)
 "The sequential Θ sketch answers queries with perfect accuracy in streams with up to `k` unique
 elements" holds for Algorithm 1 only up to `k − 1` distinct hashes: with exactly `k`, the initial `1` is
 evicted and the estimate becomes `(k−1)/Θ`, for every `k` (`thetaSketch_query_exact`,
 `thetaSketch_query_of_le`; smallest instance `thetaSketch_not_exact_k`).
 
-**Impact.** A remark motivating eager propagation; nothing depends on it. The same slip appears in "Θ is
+**Impact.** A remark motivating eager propagation; nothing depends on it. The same off-by-one appears in "Θ is
 1 during the first `k` updates".
 
-### Typos and slips
+### Typos
 - Update threads are indexed `0 ≤ i ≤ N` (`t₀` is the propagator).
 - `hint_i` and `prop_i` are declared `int` but carry real Θ values.
-- The full version states Lemma 1 with `r = 2Nb` but proves `Nb` (the PODC version says `Nb`).
-- The full version writes the extreme order statistics of Claim 1 as `M(0)`, `M(j)`, and in
-  Claims 4–6 writes `i, j > 0` for `i, j ≥ 0`.
+- Section 6.1 has a broken reference, "the RSE bound of Lemma ??".
 
 ## Proof gaps (statements true)
 
-### 🛠️ Definition 2 vs. Section 6 (what "strongly linearisable w.r.t. `SeqSketch_r`" gives)
+### 🛠️ Theorem 1 (simulation by `ParSketch`)
+Section 5.2 announces a proof of Theorem 1 by simulating `N` `OptParSketch` threads with `2N` `ParSketch` threads, and
+the full version carries it out, but the mapping does not preserve histories.
+
+**Impact.** Statement true; the simulation is not repaired, and we prove Theorem 1 directly instead, by a separate
+invariant argument (`theorem1`).
+
+**Details.** An update that fills a buffer returns in `OptParSketch` while the simulating `ParSketch`
+update still waits at line 125, and in the first round line 225 is mapped to line 125 of a thread with
+no pending operation.
+
+### 🔧 Definition 2 vs. Section 6 (what "strongly linearisable w.r.t. `SeqSketch_r`" gives)
 Definition 2 is weaker than what Section 6 uses: an `r`-relaxation may drop queries and may place an
 operation after arbitrarily many operations that follow it (`isRelaxation_drop`,
 `isRelaxation_future`).
@@ -68,23 +78,6 @@ updates preceding it"), on which the error bounds rest.
 
 **Repair.** In the witnessing relaxation no query is dropped, and a query is preceded only by operations
 that precede it in the linearization. (`lemma1_pastOnly`, `theorem1_pastOnly`)
-
-### 🛠️ Lemma 6 of the full version (pending updates)
-Lemma 6 overlooks updates that are invoked but have not yet run `shouldAdd`: they have no visibility
-point and are not in `up_suff_i`.
-
-**Impact.** Statement true: the bound `Nb` survives because such an update can only be pending while
-`counter_i < b`.
-
-### 🛠️ Theorem 1 (simulation by `ParSketch` in the full version)
-The full version derives Theorem 1 from a simulation of each `OptParSketch` thread by two `ParSketch`
-threads, but that mapping does not preserve histories.
-
-**Impact.** Statement true; we prove Theorem 1 directly instead (`theorem1`).
-
-**Details.** An update that fills a buffer returns in `OptParSketch` while the simulating `ParSketch`
-update still waits at line 125, and in the first round line 225 is mapped to line 125 of a thread with
-no pending operation.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -130,6 +123,13 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Not formalized.** The order-statistic moments of uniform samples used in §6.1 are hypotheses of
 `rse_weak_lt`. Also not formalized: the strong adversary (numerical in the paper), Tables 1–2, the
 experiments, the adaptive eager phase (§5.3), and Quantiles/HLL instances.
+
+**Full version.** These remarks concern the journal version only and are not findings about the formalized text:
+- Lemma 6 overlooks updates that are invoked but have not yet run `shouldAdd`: they have no visibility point and are
+  not in `up_suff_i`. The statement is true: the bound `Nb` survives because such an update can only be pending while
+  `counter_i < b`.
+- Lemma 1 is stated with `r = 2Nb` but proved with `Nb` (the PODC version says `Nb`).
+- The extreme order statistics of Claim 1 are written `M(0)`, `M(j)`, and Claims 4–6 write `i, j > 0` for `i, j ≥ 0`.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: `thetaComposable` instantiates all hypotheses with the paper's Θ sketch,

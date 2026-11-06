@@ -5,28 +5,45 @@ Damien Imbs, Michel Raynal, Gadi Taubenfeld. *On Asymmetric Progress Conditions.
 IRISA research report PI-1952 (May 2010, HAL inria-00486977), whose numbering matches the PODC paper and adds
 the proofs of Appendix A. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** All results hold for `n ≥ 2` processes. These are the
-impossibility of `(n,1)`-liveness from `(n−1)`-port objects (Theorem 1), the `(n,x)`-liveness hierarchy
-(Theorems 2, 3, Corollary 1) and the fault-freedom variant (Theorem 4). Theorems 1 and 4 and Lemmas 3–9
-are false only in the degenerate one-process case. The proofs of Lemma 6 and Theorem 2 needed repairs.
-The arbiter (Theorem 5) and the group-based consensus algorithm (Theorem 6) are correct.
+**Verdict: 🛠️ Hard fix.** All results hold for `n ≥ 2` processes: the impossibility of `(n,1)`-liveness from
+`(n−1)`-port objects (Theorem 1), the `(n,x)`-liveness hierarchy (Theorems 2, 3, Corollary 1), the fault-freedom
+variant (Theorem 4), the arbiter (Theorem 5) and the group-based consensus algorithm (Theorem 6). The proof of
+Theorem 2, on which the hierarchy rests, had to be redone in a new model of base objects that may withhold
+responses, with a new adversarial object. Theorems 1 and 4 and Lemmas 3–9 are false only in the degenerate
+one-process case, and the proofs of Lemma 6 and Theorem 6 need only local repairs.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorems 1 and 4, Lemmas 3–9 (one process)
-With `n = 1` these statements are false: one process that decides its own input is a wait-free consensus
-algorithm without any shared object, and it has no bivalent run (`theorem1_false_one_process`,
-`lemma3_false_one_process`).
+### ✏️ Slips
+- Theorems 1 and 4, Lemmas 3–9: with `n = 1` these statements are false, because one process that decides its own
+  input is a wait-free consensus algorithm without any shared object, and it has no bivalent run
+  (`theorem1_false_one_process`, `lemma3_false_one_process`). The paper never states `n ≥ 2`, but every proof needs
+  two processes (Lemma 3 picks two processes with different inputs). With `n ≥ 2` all of them are proved.
+- The text of Section 6.1 describing Figure 4 says "the owners win the arbitration and `p_i` updates consequently
+  `WINNER` to guest (line 03)"; it should say owner, as line 03 does.
 
-**Impact.** Degenerate case only. The paper never states `n ≥ 2`, but every proof needs two processes
-(Lemma 3 picks two processes with different inputs). With `n ≥ 2` all of them are proved.
-
-### Typos and slips
+### Typos
 - Lemma 10 says "`y ∈ [1..n]`"; it should be `[1..m]` (groups). Its end marker reads "Lemma 11".
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 6 (induction step)
+### 🛠️ Theorem 2 (blocking base objects)
+The proof applies Lemma 6 (developed only for atomic events) to implementations from non-wait-free
+`(n,x)`-live base objects and lets processes "access `o` simultaneously" forever, without saying what a step on
+such an object is.
+
+**Impact.** Statement true (for every `0 ≤ x < n − 1`); repaired (`theorem2`). The upper bound of Theorem 3 and
+Corollary 1 rest on it.
+
+**Repair.** Base objects are deterministic, caller-aware objects that may withhold a response (`BObj`).
+Lemmas 1–6 are proved in this model. The adversary lets every `(n,x)`-live base object behave as `advCons`:
+wait-free ports are answered at once, any other process only at a step that directly follows its own previous
+step on the object. This is a legal `(n,x)`-live consensus object (`advCons_isLive`). At the configuration of
+Lemma 6 take a process `w` wait-free for the implementation but not for `o` (it exists since `x + 1 > x`) and
+another process `r ∉ X_o` (it exists since `x + 1 < n`). Alternating `w` and `r` keeps both blocked forever,
+so `w` violates wait-freedom.
+
+### 🔧 Lemma 6 (induction step)
 The proof applies Lemma 1 to `x` and `z` (and `xq`, `zq`, `y`), claiming that all objects `p` can access have
 the same state there, although the steps of `s` in `z − x` may write registers that `p` can access.
 
@@ -40,22 +57,7 @@ of its next step. So the hypothesis of Lemma 1 fails as soon as `s` writes a reg
 an extension of `x p`, and `z q p = x q p (z − x)` one of `x q p`. Compatibility follows without Lemma 1
 (`run_comm_of_avoids`, `Avoids.step_of_poised`).
 
-### 🛠️ Theorem 2 (blocking base objects)
-The proof applies Lemma 6 (developed only for atomic events) to implementations from non-wait-free
-`(n,x)`-live base objects and lets processes "access `o` simultaneously" forever, without saying what a step on
-such an object is.
-
-**Impact.** Statement true (for every `0 ≤ x < n − 1`); repaired (`theorem2`).
-
-**Repair.** Base objects are deterministic, caller-aware objects that may withhold a response (`BObj`).
-Lemmas 1–6 are proved in this model. The adversary lets every `(n,x)`-live base object behave as `advCons`:
-wait-free ports are answered at once, any other process only at a step that directly follows its own previous
-step on the object. This is a legal `(n,x)`-live consensus object (`advCons_isLive`). At the configuration of
-Lemma 6 take a process `w` wait-free for the implementation but not for `o` (it exists since `x + 1 > x`) and
-another process `r ∉ X_o` (it exists since `x + 1 < n`). Alternating `w` and `r` keeps both blocked forever,
-so `w` violates wait-freedom.
-
-### 🛠️ Theorem 6 (use of the arbiter's validity)
+### 🔧 Theorem 6 (use of the arbiter's validity)
 The proofs of Lemma 10 (Case 2) and Lemma 11 (Case 2) need "a guest (owner) invoked `arbitrate()` *before*
 the return", but the arbiter specification of Section 6.1 only says "if no guest (owner) invokes
 `arbitrate()`, the value guest (owner) cannot be returned".

@@ -3,9 +3,9 @@
 Paper: S. Dolan, *The Only Undoable CRDTs are Counters*, PODC 2020 (brief announcement), full
 version arXiv:2006.10494v1 (with Appendix A).
 
-**Overall verdict: the paper is correct.** Every claim below was formalized and holds under the
-paper's definitions. The paper has no false statements. Item 2 is a clarification of how
-Axiom 1 is read, item 6 is a minor edge case, and items 4 and 17 list typos.
+Every claim below was formalized and holds under the paper's definitions, up to the degenerate
+case of items 6 and 7 (✏️). Item 2 is a clarification of how Axiom 1 is read, and items 4 and 17
+list typos.
 
 ## Definitions (Section 2)
 

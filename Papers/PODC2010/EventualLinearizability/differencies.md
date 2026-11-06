@@ -65,8 +65,7 @@ Version used: the authors' copy with the appendix (full proofs of Theorems 1–3
   definition of Eventual Linearizability contains no liveness requirement, but its proofs use it
   (Theorem 2: "Let `t_w` be the time when the write operation completes"; Lemma 6: "each invoked
   operation is eventually completed"). Without it the statement of Theorem 2 is false (an
-  implementation that never responds is trivially eventually linearizable). Implied assumption
-  (rule R4: standard convention), not counted as a mistake.
+  implementation that never responds is trivially eventually linearizable). Implied assumption (✏️).
 - **Eventual Linearizability of an implementation** (`EventuallyLinearizable`): one `t_l` for all
   admissible runs (the paper insists on this: "Showing Eventual Linearizability on an implementation
   entails identifying a single value of `t` for all histories"); every prefix weakly consistent, and
@@ -79,16 +78,15 @@ Version used: the authors' copy with the appendix (full proofs of Theorems 1–3
 
 ## Statement-level findings
 
-1. **Theorem 1, nonblocking part — false** (rule: ❌; not a headline: the abstract does not mention
-   locality or nonblocking, only the introduction). `theorem1_nonblocking_false`,
+1. **Theorem 1, nonblocking part — false** (❌). `theorem1_nonblocking_false`,
    `not_eventuallyLinearizable_nonblocking`. Lemma 3 and Lemma 4 are true
    (`weaklyConsistent_nonblocking`, `tLinearizable_nonblocking`), but "directly follows from Lemmas
-   1, 2, 3 and 4" combines two different responses. Borderline reading: if "Eventual Linearizability"
+   1, 2, 3 and 4" combines two different responses. Other reading: if "Eventual Linearizability"
    of a single history meant "weakly consistent and `t`-linearizable for *some* `t`", nonblocking would
    hold, but trivially (the paper itself notes every finite history is `t`-linearizable for a late
    `t`), and Lemma 4 (which keeps `t`) would be pointless; the paper's notion fixes one `t` for all
    histories of an implementation, so the fixed-`t` reading is the meaningful one.
-   Second borderline (reviewer note): Section 3.2 words nonblocking as "there exist no history such
+   A further reading: Section 3.2 words nonblocking as "there exist no history such
    that every extension of the history violates Eventual Linearizability". Taken literally (arbitrary
    extensions), `H₀` is not a counterexample: if `p2` first invokes `swap(0)` and `o` then returns
    `0` with `τ(p0, o) = [i1, swap(0), o]`, both properties hold. But that literal notion is nearly
@@ -98,12 +96,11 @@ Version used: the authors' copy with the appendix (full proofs of Theorems 1–3
    Linearizability". We judge the claim against that notion.
 2. **Theorem 1, locality — true.** Lemma 1 (`weaklyConsistent_iff_restrictX`) and Lemma 2
    (`tLinearizable_iff_restrictX`, `tLinearizable_of_restrictX_after`) hold.
-3. **Lemma 5 — false** (❌, numbered lemma). `lemma5_false`, `not_lemma5`. The proof applies (C3) to
+3. **Lemma 5 — false** (❌). `lemma5_false`, `not_lemma5`. The proof applies (C3) to
    arbitrary operations, but (C3) only covers operations submitted by correct processes. The
    counterexample needs a faulty process (it submits `a`, `b`, then never receives anything); all
    other ingredients are as the paper allows. If all processes are correct the proof goes through.
-4. **Theorem 3, sufficiency (Lemma 6 / Algorithm 1) — false** (❌; Theorem 3 is announced in the
-   introduction but not in the abstract, so rule R5 makes it non-headline; borderline).
+4. **Theorem 3, sufficiency (Lemma 6 / Algorithm 1) — false** (❌).
    - Algorithm 1 is not weakly consistent over an Eventual Consensus layer
      (`algorithm1_not_weaklyConsistent`): set stability allows an operation observed earlier to be
      reordered after the new one. Holds under either reading of Eventual Stability (the

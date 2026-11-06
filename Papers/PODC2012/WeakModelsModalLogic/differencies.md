@@ -37,12 +37,12 @@ Paper: Hella et al., *Weak models of distributed computing, with connections to 
       non-`m0` entries are pairwise distinct by Lemma 6, so any vector with the same set and pairwise distinct
       non-`m0` entries has the same multiset.
     * The values `β_t` are encoded injectively in `ℕ` (`Encodable`); only their equalities are used.
-    * Proof repair, minor (decides the 🛠️ verdict only together with item 12).
+    * Proof repair (🔧).
 11. **Lemma 5** is proved for `t ≥ 3` (`lemma5'`); the paper's statement for `t ≥ 4` is `lemma5`. "Order `k`" is
     formalized as "`v` has at least `k` distinct neighbours with the same `β_t`" (the same notion). The case `k = 0`
     is handled separately; the paper's proof needs `v₁`. In Lemma 6's consequence the paper uses order 2 without
     saying so.
-12. **Theorems 8/9: genuine repair (🛠️).**
+12. **Theorems 8/9: repair of the simulation (🔧).**
     * The paper's `B` cannot receive the histories of neighbours that have stopped (they send `m0`). Our `B` stores
       the multiset of received histories and extends the missing ones by `m0`:
       `H' = R + (H − R.map dropLast).map (· ++ [m0])`.
@@ -82,11 +82,9 @@ Paper: Hella et al., *Weak models of distributed computing, with connections to 
 * "It is easy to construct `k`-regular graphs in `𝒢` for each odd `k ≥ 3`" (only `k = 3` is used).
 * The explicit numbering of Figure 9b; the remark after Lemma 15 (its converse).
 
-## Verdict rule
+## Stopped neighbours
 
-The worst issue is a proof gap in Theorems 8/9: the simulation as described does not handle stopped neighbours, and
-the fix needs an extra mechanism. All statements are true as written, so the verdict is **🛠️ Proof repaired** (R1: false claims inside a proof of a
-true result — "all messages received are distinct" in Theorem 4, the history-based reconstruction in Theorems 8/9 —
-are proof repairs; R6: worst label wins).
-Borderline: one could call the gap routine, which would give ✅. We chose 🛠️ because the paper's construction, read
-literally, does not work as soon as some node stops before others, and that is the generic case.
+The main issue is a proof gap in Theorems 8/9: the simulation as described does not handle stopped neighbours, and
+the fix needs an extra mechanism. All statements are true as written; the false claims sit inside proofs of true
+results ("all messages received are distinct" in Theorem 4, the history-based reconstruction in Theorems 8/9). The
+paper's construction, read literally, does not work as soon as some node stops before others, and that is the generic case.

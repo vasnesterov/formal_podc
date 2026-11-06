@@ -8,47 +8,45 @@ Impossibility Theorem* (MPRA 120023, 2024; Social Choice and Welfare, 2025). Num
 marked "full version".
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** Arrow's theorem (Thm. 2.1), its topological form (Thm. 2.2), the index lemma, the
-orientability of `N_I` and the index-lemma proof of the base case are all correct, after small repairs. **Theorem
-4.2 (domain restrictions) is false**, and Proposition 4.1 misses a hypothesis in its last sentence. The full version
-corrects Section 4, and its corrected characterization (Theorem 6) is verified.
+**Verdict: ⚠️ Weakened.** The topological proof of Arrow's theorem stands after small repairs: Arrow's theorem
+(Thm. 2.1), its topological form (Thm. 2.2), the index lemma, the orientability of `N_I` and the index-lemma proof of
+the base case are all correct. The promised characterization of domain restrictions does not hold as printed: **Theorem
+4.2 is false**, and the corrected characterization of the full version (Theorem 6), which we verified, needs critical
+triples. The claim that every subdomain admits a non-dictatorial map, in Prop. 4.1 and Thm. 4.2, holds only for
+subdomains in which every pair of alternatives stays free.
 
 ## Mistakes in the paper
-
-### ❌ Theorem 4.2 (domain restrictions, two critical profiles)
-Theorem 4.2 is false whenever the blue edges of the two removed critical profiles share a vertex, e.g. for `R₁ = (BAC, ACB)`, `R₂ = (CBA, ACB)` every unanimous IIA map on `N_I \ {R₁, R₂}` is dictatorial (`thm42_counterexample`, `thm42_not_admits_of_adjacent`).
-
-**Impact.** A secondary result of Section 4; Arrow's theorem and its topological proof are unaffected. The
-statement is true for disjoint blue edges (critical pairs), and the full version replaces it by a correct
-characterization (Theorem 6), which we verified (`thm42_admits_of_disjoint`, `thm6`).
-
-**Details.** The theorem considers `n = 2`, `|X| = 3`, and two critical profiles `R₁ ∈ C₁`, `R₂ ∈ C₂` with
-*different* blue edges, and claims that `N_I \ {R₁, R₂}` admits a non-dictatorial unanimous IIA map. When the
-two blue edges share a vertex (12 of the 30 choices), the antiunanimity profile spanned by the two edges is
-still in the domain, and it forces dictatorship. In the explicit instance the remaining profile is
-`(BCA, ACB)`. The full version's Theorem 6 adds critical triples.
 
 ### ⚠️ Proposition 4.1 and Theorem 4.2, "moreover" sentences (subdomains)
 "Every domain contained in one of these maximal domains admits a non-dictatorial map" is false, e.g. for the one-profile domain `{(ABC, ACB)}`, where unanimity forces `F(R) ∈ {ABC, ACB}`, one voter's preference (`prop41_moreover_false`, `thm42_moreover_false`).
 
 **Impact.** A missing hypothesis: non-dictatoriality is not inherited by subdomains that lose a vertex of
 `N_I`. The sentence holds for subdomains in which every pair of alternatives stays free, and the rest of
-Prop. 4.1 is correct (`prop41_moreover_of_pairFree`).
+Prop. 4.1 is correct (`prop41_moreover_of_pairFree`, `thm42_moreover_of_pairFree`).
 
-### ⚠️ Full version, example of a critical triple
-The full version's example of a critical triple uses `(BCA, ABC)`, which lies in `C₁`, not `C₂`, so removing the three listed profiles leaves a dictatorial domain (`paper_triple_example_not_critical`).
+### 🛠️ Theorem 4.2 (domain restrictions, two critical profiles)
+Theorem 4.2 is false whenever the blue edges of the two removed critical profiles share a vertex, e.g. for `R₁ = (BAC, ACB)`, `R₂ = (CBA, ACB)` every unanimous IIA map on `N_I \ {R₁, R₂}` is dictatorial (`thm42_counterexample`, `thm42_not_admits_of_adjacent`).
 
-**Impact.** Typo-level slip: the intended profile is `(CBA, ACB)`.
+**Impact.** Section 4's characterization needs a new statement; Arrow's theorem and its topological proof are
+unaffected.
 
-### Typos and slips
+**Details.** The theorem considers `n = 2`, `|X| = 3`, and two critical profiles `R₁ ∈ C₁`, `R₂ ∈ C₂` with
+*different* blue edges, and claims that `N_I \ {R₁, R₂}` admits a non-dictatorial unanimous IIA map. When the
+two blue edges share a vertex (12 of the 30 choices), the antiunanimity profile spanned by the two edges is
+still in the domain, and it forces dictatorship. In the explicit instance the remaining profile is
+`(BCA, ACB)`.
+
+**Repair.** The statement is true for disjoint blue edges (critical pairs) (`thm42_admits_of_disjoint`,
+`thm42_maximal`). The full version replaces it by a correct characterization (Theorem 6), which adds critical
+triples and which we verified (`thm6`).
+
+### ✏️ Slips
 - Lemma 3.2: "`σ₃(i) = +` (resp. `+`)" should be "`−` (resp. `+`)".
 - Lemma 5.2, Step 3: `F^n(R)` should be `F^n(R')`.
-- Full version, Section 4.2: "deleting a triangle on each of the concentric cylinders" is imprecise (two of
-  the six profiles of each are deleted).
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 5.1 (reduction from `|X| = 3` to `|X| ≥ 3`)
+### 🔧 Lemma 5.1 (reduction from `|X| = 3` to `|X| ≥ 3`)
 The auxiliary profile `x R' b R' a R' y` needs `a, b, x, y` pairwise distinct, but `x, y` are fixed in advance, so `a = x` breaks the construction.
 
 **Impact.** Statement true; repaired (`arrow_of_three`).
@@ -56,20 +54,12 @@ The auxiliary profile `x R' b R' a R' y` needs `a, b, x, y` pairwise distinct, b
 **Repair.** If `a, b` both lie in the triple, IIA finishes the proof. Otherwise, run the construction with two
 elements of the triple different from `a` and `b`.
 
-### 🛠️ Section 3.3 (base case via the index lemma)
-"The two remaining contributions have to be `−1` each" needs each of them to be `≥ −1`, which the paper does not show (a priori a cycle that is not tricoloured could contribute `±2`).
+### 🔧 Lemma 3.2 (orientability of `N_I`)
+The proof's pairing is not a pairing when `≥ 2` coordinates are free.
 
-**Impact.** Statement true; the missing step is proved (`cyc_split`).
+**Impact.** Statement true; repaired (`lemma_3_2`).
 
-**Repair.** Each contribution lies in `{0, −1}`, because a non-unanimous Condorcet cycle is oriented opposite
-to the unanimous ones.
-
-### 🛠️ Lemma 3.2 (orientability of `N_I`)
-The proof's pairing is not a pairing when `≥ 2` coordinates are free, and the boundary-edge characterization used in Figure 7 is stated without proof.
-
-**Impact.** Statement true; repaired (`lemma_3_2`, `isBoundary_iff`).
-
-**Repair.** We pair by flipping one fixed free coordinate, and prove the boundary-edge characterization.
+**Repair.** We pair by flipping one fixed free coordinate.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -85,6 +75,18 @@ Full list of differences (including modelling choices and minor imprecisions): [
     automatically chromatic, so nothing is lost.
 - **Three alternatives.** Computations use a sign model, proved equivalent to the set-level complexes. The Section 4
   statements are decided by the kernel after a proved reduction to sign functions on the 12 vertices.
+
+**Routine details the paper skips.**
+- Section 3.3: "the two remaining contributions have to be `−1` each" needs each of them to be `≥ −1`, which the paper
+  does not show (a priori a cycle that is not tricoloured could contribute `±2`). Each contribution lies in `{0, −1}`,
+  because a non-unanimous Condorcet cycle is oriented opposite to the unanimous ones (`cyc_split`).
+- Figure 7: the boundary-edge characterization is used without proof (`isBoundary_iff`).
+
+**Full version.** Problems found only there:
+- The example of a critical triple uses `(BCA, ABC)`, which lies in `C₁`, not `C₂`, so removing the three listed
+  profiles leaves a dictatorial domain (`paper_triple_example_not_critical`). The intended profile is `(CBA, ACB)`.
+- Section 4.2: "deleting a triangle on each of the concentric cylinders" is imprecise (two of the six profiles of
+  each are deleted).
 
 **Main results in Lean** (namespace `Podc.ArrowTopology`).
 
@@ -105,6 +107,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 - Non-contractibility of the polarised domain. Mathlib has no geometric realization; we prove the certificate
   `χ = −8 ≠ 1` but not "contractible ⇒ χ = 1".
 - The dimension of `N_I` (the vertex counts are proved).
+- The index-lemma argument of Section 4.1 that `C₁` is dictatorial. Its conclusion is checked by kernel computation
+  (`not_admits_C1`).
 - The infinite-voters remark, weak orders, and Remarks 2.1–2.3.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. The

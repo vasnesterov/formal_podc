@@ -4,17 +4,16 @@ Paper: Constantinescu, Dufay, Paramonov, Wattenhofer, *From Few to Many Faults: 
 Agreement*, PODC 2026, arXiv 2505.19989 v3. Checked: Theorems 3.1, 3.3, 3.8 (with 6.2), and the lemmas of
 Appendix B / Section 10.1 behind Theorem 3.1.
 
-## Verdict calibration
+## Main issues
 
-* Worst issue: **the view number is not part of the signed statements** (Appendix B.1: `tcombine((KEY, value),
+* Worst issue (🔧): **the view number is not part of the signed statements** (Appendix B.1: `tcombine((KEY, value),
   ρ)`, same for `LOCK`, `COMMIT`). As written, the key-phase lock check compares an *unauthenticated* claimed
   view, and a Byzantine leader can replay an old key proof under a larger view number (see README). This is
   an algorithm that is wrong as written, but the intended version is recoverable from the paper's own proofs
   ("key proof with view number view3", "a commit proof contains a view number"). The fix is local: sign
-  `(KEY, value, view)`. → **R3 → ⚠️**. *Borderline:* the sentence "for every message sent, we implicitly
-  bundle along it the view number" could be read as covering partial signatures; under that reading this
-  item is only an imprecision and the verdict would be 🛠️ (because of the repairs of 3.3 and 3.8).
-* Theorem 3.3 and Theorem 3.8: statements true, proofs with a wrong step / a gap → 🛠️ (dominated by ⚠️).
+  `(KEY, value, view)`. The sentence "for every message sent, we implicitly bundle along it the view number"
+  could be read as covering partial signatures; under that reading this item is only an imprecision.
+* Theorem 3.3 and Theorem 3.8: statements true, proofs with a wrong step / a gap (🔧).
 
 ## Theorem 3.1 (synchronous BA, `SyncBA`)
 
@@ -28,7 +27,7 @@ Appendix B / Section 10.1 behind Theorem 3.1.
    on one statement (`Valid`). Real threshold signatures are one word; we count messages, not words, and every
    message has a bounded number of components (certificates count as one component each).
 3. **View in signed statements:** `Stmt.key b v`, `Stmt.lock b v`, `Stmt.commit b v` include the view (see
-   calibration above). Retrieval signatures `Stmt.inp b` carry no view, as in the paper (`tsign(v_in)`).
+   above). Retrieval signatures `Stmt.inp b` carry no view, as in the paper (`tsign(v_in)`).
    The key-phase lock check follows the pseudocode of Appendix B.1 (reject iff the proposed key's view is
    *strictly less* than the lock's view, i.e. accept iff `lock view ≤ key view`, `lockOK`); the overview
    in Section 7 says "their current lock has a lower view number than the proposed key" (strict). Both

@@ -6,50 +6,71 @@ Power of Distributed Shared-Memory Models with Bounded-Size Registers.* PODC 202
 the proofs of the full version arXiv [2309.13977](https://arxiv.org/abs/2309.13977) v1 (Sections 4–5 there =
 Sections 3–4 of the conference paper).
 
-**Verdict: ⚠️ Minor statement issues.** Theorem 1.1 (bounded registers are not universal when `n/2 < t < n`) is proved, together with
-the two results it cites (Lemma 2.1, FLP for read/write memory; Lemma 2.2, wait-free ε-agreement). Algorithm 1
-(two-process ε-agreement with 1-bit registers, Proposition 5.1) is proved correct. Theorem 1.2 (3-bit registers are
-universal for two processes) is proved from the Biran–Moran–Zaks characterization, which the paper cites: its "only if"
-direction (solvable with unbounded registers ⇒ connectivity and covering) is **assumed** as the hypothesis `BMZ Δ`; the
-rest (BMZ conditions ⇒ Algorithm 2 with 3-bit coordination registers solves the task) is proved. Theorems 1.3–1.5 are
-not formalized. We found only small imprecisions; the only ones in a statement or algorithm are index slips with
-evident intent (Algorithm 2's resolution and path indices in the full version).
+**Verdict: 🔧 Easy fix.** Theorem 1.1 (bounded registers are not universal when `n/2 < t < n`) is proved, together with
+the two results it cites (Lemma 2.1, FLP for read/write memory; Lemma 2.2, wait-free ε-agreement), and so is Algorithm 1
+(two-process ε-agreement with 1-bit registers, Proposition 5.1). Theorem 1.2 (3-bit registers are universal for two
+processes) is proved from the Biran–Moran–Zaks characterization, which the paper cites: its "only if" direction
+(solvable with unbounded registers ⇒ connectivity and covering) is **assumed** as the hypothesis `BMZ Δ`; the rest (BMZ
+conditions ⇒ Algorithm 2 with 3-bit coordination registers solves the task) is proved. All repairs are local, namely
+Algorithm 2's parameters and a few missing proof cases, while Theorems 1.3–1.5, which include the `t < n/2` and iterated
+results, were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Algorithm 2 (full version), resolution and path indices
-Algorithm 2's indices do not match: the text calls `A_{L/2}` with ε = 1/(L+1) and then indexes the node `Y_{dL}`, and "for every `j ∈ {1,…,L}`, `Y_j ∈ Δ(X)`" should read `j ∈ {0,…,L−1}`.
+### 🔧 Algorithm 2 (full version), resolution
+The pseudocode calls `A_{L/2}` with ε = 1/(L+1) and then indexes the node `Y_{dL}`, while the text and Lemma 5.8 use
+ε = 1/L; `dL` is not an integer as printed, and `L/2` need not be one either.
 
-**Impact.** Index slips with evident intent; the only issues in a statement or algorithm. We use resolution `1/L` with odd `L = 2k+1`, and Theorem 1.2 holds.
+**Impact.** Nothing else in the construction changes, and Theorem 1.2 holds.
 
-### Typos and slips
+**Repair.** We use resolution `1/L` with odd `L = 2k+1` and call Algorithm 1 with parameter `k`, so the decision
+indexes the path node directly (`alg2`).
+
+### ✏️ Slips
+- In Section 5.2.4, "for every `j ∈ {1,…,L}`, `Y_j ∈ Δ(X)`" should read `j ∈ {0,…,L−1}`, as in Section 5.2.2; the last
+  step of Lemma 5.8 repeats the index range (`PathSystem.legal`).
+- In the proof of Theorem 1.1, `w_ℓ` is taken "after each process has decided", but a process may crash. The word
+  `w_ℓ` should be the register contents at the *end* of `E_ℓ` (`not_solves_epsAgreement`).
+- Claim 3.1's "`D ⊆ O_ℓ'` for some `ℓ' ≠ ℓ`" fails for `D = {0}`, `ℓ = 0`. This is harmless, since singletons are
+  handled separately (`solves_binConsensus_of_not_claim`).
+- Proposition 5.1 says "for every `k ≥ 0`", but for `k = 0` the loop is empty and `r` is undefined. Algorithm 2 only
+  needs `k ≥ 1`, which we assume (`alg1_solves`).
 - In the proofs of Lemmas 5.1 and 5.4 the registers `R1`/`R2` are swapped.
+- The caption of Figure 1 says "1-bit registers are universal (Theorem 1.2)"; Theorem 1.2 says 3 bits (which is what is
+  proved: Algorithm 1's ternary input register plus its 1-bit register).
+
+### Typos
 - `|W| = …` should be `|W| ≤ …`.
-- The caption of Figure 1 says "1-bit registers are universal (Theorem 1.2)"; Theorem 1.2 says 3 bits (which is what is proved: Algorithm 1's ternary input register plus its 1-bit register).
-- Claim 3.1's "`D ⊆ O_ℓ'` for some `ℓ' ≠ ℓ`" fails for `D = {0}`, `ℓ = 0`. This is harmless, since singletons are handled separately.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Claim 3.1 (inputs of the absent processes)
-The reduction to consensus uses the validity of ε-agreement, which only applies when *all `n`* inputs are equal, but consensus fixes only the inputs of `p₁…p_{n−t+1}`.
+### 🔧 Claim 3.1 and Theorem 1.1 (inputs of the absent processes)
+The inputs of `p_{n−t+2}…p_n` are never fixed: the reduction to consensus uses the validity of ε-agreement, which only
+applies when *all `n`* inputs are equal, while consensus fixes only the inputs of `p₁…p_{n−t+1}`, and the final step
+needs `E_{2i}` and `E_{2j}` to agree on everything that `p_{n−t+2}…p_n` can observe, including those processes' own
+inputs, which the paper calls "arbitrary".
 
-**Impact.** The proof works because `p_{n−t+2}…p_n` never take a step, so their inputs do not matter and can be set to the common value; the paper does not say this. (`solves_binConsensus_of_not_claim`)
+**Impact.** Statements true. The proof works because `p_{n−t+2}…p_n` never take a step, so their inputs do not matter;
+the paper does not say this.
 
-### 🛠️ Theorem 1.1 (the final indistinguishability)
-The final step needs `E_{2i}` and `E_{2j}` to agree on everything that `p_{n−t+2}…p_n` can observe, including those processes' own inputs, which the paper calls "arbitrary".
+**Repair.** In the validity argument those inputs are set to the common value (`solves_binConsensus_of_not_claim`).
+Everywhere else they are fixed the same way in all executions `E_ℓ` (`not_solves_epsAgreement`).
 
-**Impact.** Statement true; repaired (`not_solves_epsAgreement`).
+### 🔧 Lemma 5.8 (Algorithm 2, one process deciding)
+Lemma 5.8 assumes that both processes decide, yet Theorem 1.2's proof concludes correctness from it, so the case where
+one process decides and the other crashes is not treated.
 
-**Details.** The inputs of `p_{n−t+2}…p_n` must be fixed the same way in all executions `E_ℓ`. The word `w_ℓ` should be the register contents at the *end* of `E_ℓ`, not "after each process has decided", since a process may crash. (`not_solves_epsAgreement`)
+**Impact.** Statement true. This is exactly the case where the covering condition is needed.
 
-### 🛠️ Lemmas 5.5 and 5.8 (Algorithm 2, missing cases)
-Lemma 5.8 assumes that both processes decide, and Lemma 5.5's case "`I_j` read as ⊥" says the other process decides at line 17 with `r_j = 2`, which is wrong for `k = 1`.
+**Repair.** Solo decisions are legal too (covering condition); we prove that case (`alg2_safe`).
 
-**Impact.** Statements true; routine fixes.
+### 🔧 Lemma 5.5 (Algorithm 1, case `k = 1`)
+Lemma 5.5's case "`I_j` read as ⊥" says the other process decides at line 17 with `r_j = 2`, which is wrong for `k = 1`.
 
-**Details.**
-- Lemma 5.8: solo decisions are legal too (covering condition); we prove that case.
-- Lemma 5.5: for `k = 1` the other process completes the loop and decides at line 14 instead. The value is the same, so the statement holds.
+**Impact.** Statement true (`alg1_solves`).
+
+**Repair.** For `k = 1` the other process completes the loop and decides at line 14 instead. The value is the same, so
+the statement holds.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -96,7 +117,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Not formalized.**
 * The "only if" direction of the Biran–Moran–Zaks characterization (Lemma 5.7), which the paper cites. It turns
-  "solvable with unbounded registers" into the hypothesis `BMZ Δ` of `theorem_1_2`.
+  "solvable with unbounded registers" into the hypothesis `BMZ Δ` of `theorem_1_2`. The paper's remark that this
+  message-passing characterization transfers to shared memory is covered by the same hypothesis and was not checked.
+* Theorem 1.2 for a restricted input set `I ⊊ In × In`: `theorem_1_2` covers only the full product.
 * Theorem 1.3 (`t < n/2`: `O(t)`-bit registers suffice), Theorem 1.4 (1-bit iterated immediate snapshot) and
   Theorem 1.5 (6-bit `O(log 1/ε)` ε-agreement). Their proofs are only sketched in the full version and rely on further
   cited simulations.

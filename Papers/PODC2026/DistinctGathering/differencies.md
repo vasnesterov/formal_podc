@@ -4,16 +4,16 @@ Source: PODC 2026 proceedings version (8 pages). The full arXiv version announce
 All proofs in the paper are sketches. The Lean proofs of Theorems 1 and 4 are our own; they follow the ingredients
 of the sketches.
 
-## Statement-level issues (verdict rules from `verdicts.md`)
+## Statement-level issues
 
 1. **Conjecture 3 is printed with "Gathering"** (§3: "Every algorithm that solves Gathering under RoundRobin is a
    rapid-gathering algorithm"). §1 and the end of §4.1 claim that the paper disproves it. As printed, it is
    vacuously true for every `n ≥ 3` by the paper's own Theorem 1 (`conjecture_3_as_stated`), so it cannot be
    disproved. The intended version is "Distinct Gathering": the preceding sentence says "any algorithm solving this
    problem" about Distinct Gathering, and Definition 5 uses distinct initial configurations.
-   Rule: **R3** (typo with evident intent; local fix) → ⚠️.
-   Borderline: this misquotes a *conjecture*, and the paper never states it as a theorem. We still count
-   "we disprove both conjectures" as an explicit claim of a result (R1), so the label is ⚠️ rather than ✅.
+   ✏️ Slip: one wrong word, and the intended version is in the paper.
+   This misquotes a *conjecture*, and the paper never states it as a theorem, but "we disprove both conjectures" is
+   an explicit claim of a result.
    We did not check the disproof of the intended version for `n ≥ 4`. It needs Theorem 5 plus Défago et al.,
    Thm. 16 (rapid-gathering algorithms cannot solve Distinct Gathering), and neither is formalized.
 

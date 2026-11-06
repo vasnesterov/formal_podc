@@ -6,11 +6,11 @@ Solving Two-process Consensus.* PODC 2025. DOI
 proceedings version (no arXiv version found); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The main result is fully formalized. A deterministic two-shot
-type `(T, m)`, together with registers, solves wait-free two-process consensus iff it lies in
-`C₁ ∪ C₁.₅ ∪ C₂`. Both directions hold, and all three algorithms are correct, after fixing a
-typo in Algorithm 3. The necessity proof has gaps, which we filled. The illustrating example
-"the asymmetric queue AQ is in `C₁.₅`" is false: AQ is in `C₂`.
+**Verdict: 🔧 Easy fix.** The main result is fully formalized: a deterministic two-shot type `(T, m)`,
+together with registers, solves wait-free two-process consensus iff it lies in `C₁ ∪ C₁.₅ ∪ C₂`. Both
+directions and all three algorithms hold after local repairs: a typo in Algorithm 3, and missing cases and a
+changed graph definition in the proofs. The one claim lost is the illustrating example "the asymmetric queue AQ
+is in `C₁.₅`", which is false (AQ is in `C₂`) and which nothing depends on.
 
 ## Mistakes in the paper
 
@@ -19,7 +19,8 @@ The asymmetric queue, where only `p₀` may dequeue, is not in `C₁.₅`: the p
 property (1), and no witness exists (`paper_AQ_witness_fails`, `aq_not_C15`).
 
 **Impact.** Illustration only: AQ is in `C₂` (with the WQ witness), so it still solves consensus
-(`aq_C2`). The characterization itself is unaffected.
+(`aq_C2`). The characterization itself is unaffected, but `C₁.₅` is left without a concrete object: we proved
+no other example.
 
 **Details.** The paper's witness is queue `[0]`, `f = dequeue`, `f' = read`, `g = enqueue(1)`,
 `g' = read`.
@@ -29,17 +30,20 @@ property (1), and no witness exists (`paper_AQ_witness_fails`, `aq_not_C15`).
   `g = enqueue(y)`. Properties (1) and (3) then force `g' = read`, `f = dequeue` and an empty queue.
   But then `p₁` reads `[y]` both in `gg'ff'` and in `fgg'f'`, so property (4) fails.
 
-### ⚠️ Algorithm 3, line 30 (typo `v[1][1]` for `v[0][1]`)
-Line 30 tests `v[1][1]` where `v[0][1]` is meant; only `p₀` executes the line, and its `v[1][1]` is
-`⊥`, so taken literally agreement fails in the run where `p₁` runs solo first.
+### 🔧 §4.2.5, paragraph on WQ (conditions for distinguishing `fg` from `gf`)
+"If `fg` and `gf` are distinguishable to `p₀` then `f = read()`, `g = enqueue(1)` and the queue is initially
+empty" is false: for WQ, `f = read`, `g = enqueue(y)` distinguish from every state, so emptiness is not forced.
 
-**Impact.** A typo with evident intent: with `v[0][1]` Algorithm 3 is correct (proved in Lean), and the
-characterization stands.
+**Impact.** Dropping the overstated conditions is enough, and the conclusion that WQ is not in `C₁.₅` is proved
+(part of `wq_C2`).
 
-**Details.** A brute-force search (Python, not in Lean) found a 4-state object in `C₂` exhibiting the
-failure.
+**Details.** For AQ, `f = dequeue()` on an empty queue also works.
 
-### Typos and slips
+### ✏️ Slips
+- Algorithm 3, line 30 tests `v[1][1]` where `v[0][1]` is meant; only `p₀` executes the line, and its `v[1][1]`
+  is `⊥`, so taken literally agreement fails in the run where `p₁` runs solo first. A brute-force search (Python,
+  not in Lean) found a 4-state object in `C₂` exhibiting the failure. With `v[0][1]` Algorithm 3 is correct
+  (proved in Lean, `solvable_of_C2Cond`), and the characterization stands.
 - Corollary 1's "`op ∈ [0, k]`" should be `[0, 3^k]`.
 - The proof of Lemma 2 is imprecise (its case `a = 0` gives `n = 3^{k-1}`, which for `n = 1` violates
   `k > 0`; it cites the "third" property of `C₂` for the pairs of property (2)); the padding argument is
@@ -48,7 +52,7 @@ failure.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Necessity proof, §6 (`f` and `g` assumed to be first accesses)
+### 🔧 Necessity proof, §6 (`f` and `g` assumed to be first accesses)
 At the critical configuration the paper treats `f` and `g` as each process's first call to `O`, and
 Lemma 5 / Proposition 1 use "the second call `f'`", which need not exist.
 
@@ -59,7 +63,7 @@ Lemma 5 / Proposition 1 use "the second call `f'`", which need not exist.
 - The object is then in `C₁`, or in `C₁.₅` with alternative (5a) and an arbitrary `f'`.
 - Likewise, `p₀` may decide without calling `O` again after `fgσg'`; then (5a) holds.
 
-### 🛠️ Proposition 2 (the graph `G` must be bipartite)
+### 🔧 Proposition 2 (the graph `G` must be bipartite)
 With *operations* as nodes, an operation allowed to both processes merges a `p₀`-node with a `p₁`-node,
 so a path can switch sides there and "`cᵢ ∈ m(p₀)` for even `i`" fails.
 
@@ -71,7 +75,7 @@ so a path can switch sides there and "`cᵢ ∈ m(p₀)` for even `i`" fails.
 - The "minimal number of objects" argument becomes an induction on the number of copies, which needs
   finitely many copies. We prove the reduced algorithm correct and wait-free.
 
-### 🛠️ Lemma 4 (Algorithm 3, omitted histories)
+### 🔧 Lemma 4 (Algorithm 3, omitted histories)
 Its case analysis ignores histories where the other process applies its operations on `O` after the
 decider's reads.
 

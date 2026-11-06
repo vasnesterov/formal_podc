@@ -1,7 +1,7 @@
 # Differences between the formalization and the paper
 
 Paper: BA (PODC 2025) + full version arXiv:2502.13854v1 (cited by the BA as [23]); v3 (Feb 2026)
-consulted for the corrected statements. Rule references (R1–R6) are to the project's verdict scale.
+consulted for the corrected statements.
 
 ## Model
 
@@ -29,8 +29,8 @@ consulted for the corrected statements. Rule references (R1–R6) are to the pro
 7. **Graph classes** are predicates on `(V, G)`. Theorem 4.1's `H₁` ("δ(G) = 1") contains
    non-bipartite graphs; the paper's promise problems need `H ⊆ G(2-col)` (v1 §2.5), so we use
    `H41 = bipartite ∩ (H₁ ∪ H₂)`. Even cycles: graphs isomorphic to `C_{2n}`, `n ≥ 2`.
-8. **`k-col`** is defined in v1 with colours `{0,…,k}` (k+1 colours) — a typo; we use `Fin k`
-   (R3, not a statement-level issue for the formalized results).
+8. **`k-col`** is defined in v1 with colours `{0,…,k}` (k+1 colours) — a typo (✏️); we use `Fin k`
+   (not a statement-level issue for the formalized results).
 9. **Strong soundness** is the paper's *strong promise soundness* (`StronglySound`, only on
    non-bipartite graphs). All our positive results prove the stronger `StronglySoundAll` (every graph,
    every labelling).
@@ -47,13 +47,13 @@ consulted for the corrected statements. Rule references (R1–R6) are to the pro
 
 11. **Rule 2(b) ambiguity.** "For all `w ∈ N(v) \ {u}`, `ℓ(w) = β ∈ {0,1}`": we read `β` as one
     colour for all such `w` (the completeness part suggests this). With the literal per-neighbour
-    reading the decoder is not even sound (`literalLCP_not_sound`: 5-cycle plus pendant). Rule R3:
-    intent recoverable → ⚠️-level at most; the theorem holds with the uniform reading.
+    reading the decoder is not even sound (`literalLCP_not_sound`: 5-cycle plus pendant). The
+    intent is evident (✏️); the theorem holds with the uniform reading.
 12. **Proof gap (strong soundness).** "Since C is odd, then u ∈ V(C)" is not an argument. Repaired by
-    an explicit 2-colouring of the accepting nodes (`pot`). → 🛠️.
+    an explicit 2-colouring of the accepting nodes (`pot`). → 🔧.
 13. **Hiding instances.** Fig. 4's 5-cycle in `V(D,4)` contains an edge between the views of node 3
     in `I₁` and node 4 in `I₂`, which is realisable only with a triangle (`fig4_edge_not_compatible`).
-    We use three labellings of `P₆ ⊔ K₂` (8 nodes, all of minimum degree 1). → 🛠️ (figure inside a
+    We use three labellings of `P₆ ⊔ K₂` (8 nodes, all of minimum degree 1). → 🔧 (figure inside a
     proof).
 14. **Theorem 4.1 is proved with the Lemma 4.1 LCP alone**: it is complete on *all* bipartite graphs
     (including even cycles), strongly sound everywhere, and hiding through `P₆ ⊔ K₂ ∈ H₁`. The paper
@@ -67,11 +67,11 @@ consulted for the corrected statements. Rule references (R1–R6) are to the pro
     The paper's "ℓ(v₁) contains edge p₁p₂ and colour c₁" is made precise in this (strict) way.
 16. **Hiding.** The paper's odd cycle (Fig. 6) mixes views of a `C₄` and a `C₆`; in its own model the
     views contain `N = poly(n)`, which differs between the two. We use one `C₄` with
-    reflection-symmetric ports: adjacent nodes 0 and 1 have equal anonymous views. → 🛠️.
+    reflection-symmetric ports: adjacent nodes 0 and 1 have equal anonymous views. → 🔧.
 17. **Strong soundness** proved via "odd closed walk ⇒ odd cycle" (`exists_odd_cycle`) and colour
     alternation along a cycle (the paper's argument, made precise).
 
-## Theorem 4.2 (false) — decides the verdict
+## Theorem 4.2 (false)
 
 18. **Statement formalized** (`BATheorem42`) for `r = 1`, with the hypotheses on the special graph
     *strengthened* (strictly increasing distances in "forgetful", connected (v1 adds this), not
@@ -86,14 +86,16 @@ consulted for the corrected statements. Rule references (R1–R6) are to the pro
     and hiding against every algorithm. Robust to stricter readings of "hiding": the hard instance is
     `θ(5,5,5)` itself (so it works for the class `{θ(5,5,5)}`, and under a per-graph reading), and
     against anonymous extractors the shift argument works with *fixed* ports and identifiers, since
-    the anonymous views of node 2 at `t` and node 1 at `t+1` coincide. → R5: headline, 🚨.
+    the anonymous views of node 2 at `t` and node 1 at `t+1` coincide. The counterexample satisfies
+    the hypotheses (even the strengthened ones and v3's corrected class conditions) and uses no
+    degenerate instance. → ❌.
 20. **Where the proof fails.** (a) v1 §5.2 restricts `H` to its forgetful members "without
     restriction"; false for hiding (`baTheorem42Anon_false`, constant-size anonymous LCP of Lemma
     4.1). (b) Lemma 5.3 (v3 Lemma 21) needs `|V(W)| ≤ √(N/Δʳ)`; the proof of Theorem 1.5 never
     checks it, and for the counter LCP every odd cycle of `V(D,n)` has length `≥ M > 2N`.
 21. **Definition of `r`-forgetful (BA/v1).** As written ("for every `w ∈ Nʳ(u)`, `dist(vᵢ, w)` is
     increasing") it is unsatisfiable for `r ≥ 2` in any graph with an edge (take `w = v₁`)
-    (`not_isForgetful_of_two_le`). Typo-level (R3, v3 Definition 22 fixes it). For `r = 1` both
+    (`not_isForgetful_of_two_le`). Typo-level (✏️; v3 Definition 22 fixes it). For `r = 1` both
     definitions are satisfied by `θ(5,5,5)`. (v3 Definition 22 itself has a slip: it writes
     `dist(vᵢ, u) = d + i + 1`, which fails already at `i = 0` for a neighbour `w` of `u` with
     `d = 1`; `IsForgetfulV3` uses the evident intent `dist(vᵢ, w) = d + i + 1`. In that reading the
@@ -108,8 +110,7 @@ consulted for the corrected statements. Rule references (R1–R6) are to the pro
 23. **Decoder formalized** (`shatterRule`) with rules 1, 2(a–c), 3(a–c); out-of-range component
     numbers make the colour check fail (stricter than the paper, harmless for the counterexample).
 24. **The decoder is not strongly sound** (`shatterLCP_not_stronglySound`): 6-node graph, accepted
-    5-cycle. Statement-level for the paper's protocol claim (R1: correctness claim about the paper's
-    protocol), but the theorem is existential and true (R5) → ❌-level for this item.
+    5-cycle. The paper's protocol claim is false, but the theorem is existential and true → 🛠️.
 25. **Statement proved** (`theorem_4_3`) with the counter LCP (hiding on `P₆`, which has a shatter
     point; `O(log n) ⊆ O(min{Δ²,n} + log n)`) and, anonymously with constant size, the Lemma 4.1 LCP.
     Shatter point = `∃ v`, two vertices outside `N[v]` not connected in `G − N[v]`.
@@ -120,11 +121,10 @@ consulted for the corrected statements. Rule references (R1–R6) are to the pro
     2(a–d), 3(a–c). Rule 2(b)'s garbled index ("p^w_{i2}") read as "some entry `i` of `w` records
     `prt(u,{u,w})`"; 2(d) "singleton" as "all matching colours equal" (non-emptiness follows from
     2(b) here).
-27. **The decoder is not sound** (`watermelonLCP_not_sound`): all nodes of a 5-cycle accept. → ❌-level
-    item (protocol claim), statement true. The rule refuted is the printed one ("`p^w_i = prt(u,{u,w})`
+27. **The decoder is not sound** (`watermelonLCP_not_sound`): all nodes of a 5-cycle accept. The
+    protocol claim is false, the statement true → 🛠️. The rule refuted is the printed one ("`p^w_i = prt(u,{u,w})`
     for some `i`", rendered from v1 p. 28); binding the endpoint to the entry `i = prt(w,{u,w})` (which
-    it sees) looks like the intended repair, but we did not verify it. Borderline R3; it does not
-    affect the verdict, which Theorem 4.2 decides.
+    it sees) looks like the intended repair, but we did not verify it.
 28. **Statement proved** (`theorem_4_4`) for every class of bipartite graphs containing `θ(5,5,5)`
     (a watermelon with three paths of length 5); the watermelon class itself is not defined formally.
 
@@ -134,10 +134,3 @@ consulted for the corrected statements. Rule references (R1–R6) are to the pro
     `G = {P₃}` (`v3Theorem1_false`). Not a BA statement; recorded for completeness.
 30. Theorem 4.1's "constant-size certificates" for the cycle part rely on ports being in `{0,1}`;
     our Lemma 4.2 certificates are pairs of `(ℕ, ℕ, Bool)` entries whose accepted values are bounded.
-
-## Verdict calibration
-
-Worst item: Theorem 4.2 false (items 18–20), a headline result (abstract: "we prove that there are
-no strong and hiding LCPs for 2-coloring in general, regardless of certificate size"), without R2–R4
-excuses: the counterexample satisfies the paper's model (nodes know `N`), the hypotheses (even the
-strengthened ones and v3's corrected class conditions), and uses no degenerate instance → 🚨.

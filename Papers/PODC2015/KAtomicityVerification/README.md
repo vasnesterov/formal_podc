@@ -13,15 +13,20 @@ the graph characterization of k-atomicity (Lemma 3.8), the correctness of GPO fo
 Assumption 4.1 (Lemmas 4.2–4.5, Theorem 4.10, for every `k ≥ 2`), and the correctness of CGS for arbitrary
 histories with distinct written values (Lemmas 5.5–5.7, Theorem 5.8), plus the size bounds of the
 configuration graph (Lemmas 5.9–5.10), which concern the graph built by CGS on its inputs `2 ≤ k ≤ n`.
-The proofs go through with only routine additions.
+The proofs go through with only routine additions. The running-time bounds (second part of Theorem 4.10, Theorem
+5.11) are not formalized, so the polynomial-time half of the paper's point is not covered.
 
 ## Mistakes in the paper
 
 No mistakes in the statements.
 
-### Typos and slips
+### Typos
 - Lemma 4.5, `P(x)`-(c) asks for `b ∈ B_x[k-1-j]` for all `0 ≤ j ≤ i`, which mentions the nonexistent set
-  `B[0]` when `i ≥ k-1`. Such edges cannot occur once `P(x)`-(a) holds, so only `j` with `k-1-j ≥ 1` matter.
+  `B[0]` when `i ≥ k-1`. Such edges cannot occur once `P(x)`-(a) holds, so only `j` with `k-1-j ≥ 1` matter. The
+  phrase "for any value `v`" there binds an unused `v`.
+- The proof of Lemma 4.4 says "since we are considering `k > 2`"; for `k = 2` the same argument works with the range
+  `1 ≤ y < k-1` empty.
+- Lemma 5.7 attributes distinctness of the induced sequence to Corollary 5.6; it actually comes from Lemma 5.5.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -55,13 +60,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
   leaves out.
 - Lemma 5.5's proof establishes "distinct values, no inversion" and then needs a linear-extension step
   to reach "subsequence of a topological ordering". We supply it (`Good.exists_topoOrder_sublist`).
-- Lemma 5.7 attributes distinctness of the induced sequence to Corollary 5.6; it actually comes from
-  Lemma 5.5.
 - Range of `k`. The abstract and Section 1 announce the algorithms "for any `k ≥ 3`" (the new range:
   `k ≤ 2` was solved before), while the inputs of Algorithms 2–3 and Section 7 say `2 ≤ k ≤ n`. Both
   ranges are correct: GPO is correct for `k ≥ 2` (`theorem_4_10`) and CGS even for `k ≥ 1`
-  (`cgs_iff_kAtomic`). The proof of Lemma 4.4 says "since we are considering `k > 2`"; for `k = 2` the
-  same argument works with the range `1 ≤ y < k-1` empty.
+  (`cgs_iff_kAtomic`).
 - Lemma 5.10 is about the graph `G_C` "computed at line 11 of the algorithm" (§5.3), so `k ≥ 2`. Its
   edge bound indeed needs `max(m,k) ≥ 2` (`card_edges_le`): for `m = k = 1`, `n_w` sequential writes and
   no reads give `n_w(n_w-1)/2` configuration-graph edges. The vertex bound holds for every `k ≥ 1`.

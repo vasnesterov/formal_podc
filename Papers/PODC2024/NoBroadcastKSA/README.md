@@ -7,21 +7,32 @@ k-Set-Agreement in Message-Passing Systems.* PODC 2024. DOI
 OPODIS 2024 version (hal-05521071, "No *Symmetric* Broadcast Abstraction …") has the same Lemma 9 (its Lemma 15)
 with the same proof.
 
-**Verdict: ❌ False claim.** Lemma 9 is false: a content-neutral, compositional broadcast abstraction on top of
-which k-set agreement is solvable can still admit `N`-solo executions for every `N`. The headline Theorem 1 is
-true as far as we checked, but the paper's proof rests on Lemma 9. We prove Theorem 1 with a repaired adversary,
-which does not even need content-neutrality, for k-SA algorithms that communicate only through the broadcast
-abstraction (the paper also lets them use point-to-point channels).
+**Verdict: ⚠️ Weakened.** Lemma 9 is false: a content-neutral, compositional broadcast abstraction on top of
+which k-set agreement is solvable can still admit `N`-solo executions for every `N`, and the paper's proof of the
+main Theorem 1 rests on it. Theorem 1 is true as far as we checked, and we prove it with a repaired adversary,
+which does not even need content-neutrality, but only for k-SA algorithms that communicate only through the
+broadcast abstraction. The paper also lets them use point-to-point channels, and its reduction to the
+channel-free case is unjustified.
 
 ## Mistakes in the paper
 
-### ❌ Lemma 9 (a k-SA-solving abstraction has no `N`-solo execution)
+### ⚠️ Proof of Lemma 9 (reduction of A to a channel-free A')
+"send and receive can be trivially emulated using B" overlooks that SR-Termination also holds for messages of
+crashed senders, while BC-Global-CS-Termination does not.
+
+**Impact.** The case of a k-SA algorithm A that also uses the point-to-point channels of `CAMP_n[B]` is not covered.
+In our Theorem 1 the k-SA algorithm A uses only the broadcast abstraction, so for such A the theorem is not
+formalized (see [differencies.md](differencies.md), item 8).
+
+### 🛠️ Lemma 9 (a k-SA-solving abstraction has no `N`-solo execution), and the proof of Theorem 1
 Lemma 9 fails for every `k`: "k-Bounded-Order broadcast restricted to *chained* messages" is content-neutral and
 compositional, an algorithm solves k-set agreement on top of it with `k + 1` processes, and yet it admits an
 `N`-solo execution for every `N` (`lemma9_false`).
 
 **Impact.** The paper's proof of Theorem 1 is Lemma 9 plus Lemma 10, so the main result is not established by
-the paper. Theorem 1 itself is true; see the repaired proof below.
+the paper. Theorem 1 itself is true; we prove it with a different adversary (`theorem1_paper`, `theorem1`), with the
+restriction of the previous item. Our proof shows more: for `1 < k < n` no *compositional* broadcast abstraction
+is equivalent to k-SA; content-neutrality is not needed.
 
 **Details.** A message is *chained* if its sender had already delivered one of its own messages when it invoked
 `broadcast` for it. The abstraction (`chainedBO`) requires that among any `k + 1` distinct chained messages, two
@@ -40,25 +51,11 @@ are delivered in the same order by every process.
 The proof breaks at "αᵢ is indistinguishable from δ, as both executions involve identical B-broadcast and
 B-delivery steps for pᵢ". Definition 5 constrains only the order of *deliveries*. Restricting and renaming an
 `N`-solo execution cannot change when `pᵢ` *invokes* its broadcasts relative to its returns and deliveries, so
-the local view of `pᵢ` in δ need not be its view in αᵢ. Two further steps of the proof are unjustified (they do
-not matter for the counterexample):
-- δ is finite, while running A' "on δ" needs an admissible continuation in which A' keeps acting, possibly
-  broadcasting after it decided.
-- "send and receive can be trivially emulated using B" overlooks that SR-Termination also holds for messages of
-  crashed senders, while BC-Global-CS-Termination does not.
+the local view of `pᵢ` in δ need not be its view in αᵢ. A further step of the proof is unjustified (it does not
+matter for the counterexample): δ is finite, while running A' "on δ" needs an admissible continuation in which A'
+keeps acting, possibly broadcasting after it decided.
 
-## Proof gaps (statements true)
-
-### 🛠️ Theorem 1 (no content-neutral compositional abstraction is equivalent to k-SA)
-The proof combines the false Lemma 9 with Lemma 10; we prove Theorem 1 with a different adversary
-(`theorem1_paper`, `theorem1`).
-
-**Impact.** Statement true; repaired. Our proof shows more: for `1 < k < n` no *compositional* broadcast abstraction
-is equivalent to k-SA; content-neutrality is not needed. Caveat: in our Theorem 1 the k-SA algorithm A uses only the
-broadcast abstraction. The paper's `CAMP_n[B]` also gives A point-to-point channels, so for such A the theorem is
-not formalized (see [differencies.md](differencies.md), item 8).
-
-**Details.** The paper runs the dummy loop `sync-broadcast(synch)` on top of B, then renames the `synch`
+The paper runs the dummy loop `sync-broadcast(synch)` on top of B, then renames the `synch`
 messages into A's messages. Lemma 9 shows that this does not reproduce A's local views. We keep the paper's
 scheduler (Algorithm 1), but let the upper layer of each process run a *copy of A itself*. On top of B,
 `pᵢ`'s copy invokes A's own messages at the times A wants. Its view is its own invocations, returns and
@@ -121,7 +118,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Not formalized.** The paper's Lemmas 1–8 and 10 for its own `sync-broadcast(synch)` adversary (we reprove their
 content for the copy-of-A adversary). Neither is the remark "`CAMP_n[∅]` with `n − k − 1` initial crashes is
-`CAMP_{k+1}[∅]`": we work with `n` processes directly, the extra ones never taking a step.
+`CAMP_{k+1}[∅]`": we work with `n` processes directly, the extra ones never taking a step. Theorem 1 for algorithms A
+that also use point-to-point channels is open here: it should still hold, since those messages can be held back
+until after the decisions and then simulated by the upper layer of `p_{k+1}`.
 
 **Trust.** No `sorry`; `lemma9_false`, `theorem1`, `theorem1_paper` use only `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: `algQ` has admissible executions on top of `chainedBO` (`soloRun_admissible`), and

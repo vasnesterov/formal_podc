@@ -5,7 +5,7 @@ Paper: Bodwin–Patel, *A Trivial Yet Optimal Solution to Vertex Fault Tolerant 
 
 ## Errors and imprecisions found
 
-1. **Algorithm 1 read literally is wrong** (genuine imprecision, low severity). The test reads "there exists a set `F` of `|F| ≤ f`
+1. **Algorithm 1 read literally is wrong** (✏️). The test reads "there exists a set `F` of `|F| ≤ f`
    vertices such that `dist_{H\F}(u, v) > k·w(u, v)`". It does not exclude `u, v ∈ F`.
    * With `F = {u}` the distance is `∞`, so for `f ≥ 1` every edge is added and the output is `G`
      (`ftGreedyLiteral_eq`).
@@ -22,7 +22,7 @@ Paper: Bodwin–Patel, *A Trivial Yet Optimal Solution to Vertex Fault Tolerant 
      (ours: `wdist = ⊤`). One could instead read `dist_{H\F}(u, v)` as undefined for `u ∈ F`.
      The intended reading (`x ≠ u, v`) is clear from the proof of Lemma 3. So this is a
      statement-level slip, and the result is morally right.
-2. **Theorem 1 needs a `max(·, 1)` or an additive term when `f = Ω(n)`** (genuine but cosmetic).
+2. **Theorem 1 needs a `max(·, 1)` or an additive term when `f = Ω(n)`** (✏️).
    * The proof says the theorem "holds trivially since it states `|E(H)| = O(n²)`". But when
      `n/f < 2`, `b(n/f, k+1) = 0`, so the stated bound `O(f²·b(n/f, k+1))` is `0` even though `H`
      can have edges.

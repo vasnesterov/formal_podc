@@ -68,8 +68,8 @@ announcement); full version arXiv:2505.03627v2 (numbering follows it).
     that it then differs from `0`. We use instead the same symmetric merge as for Theorem 1 (`merge_object`),
     which needs only `|Z| + 2 ≤ f`. Only Definition 5 (1) is used, as the paper remarks
     (`theorem_2_lower_of_item1`).
-16. **Typos in §B.** B.1 base case: `σ₀ = 1σ_{E₀′∪F₀} …` should read `E₀` (no `E₀′` in the base case).
-    B.2: `σ′ = … decide(p, 1) …` should be `decide(p, 0)`; "`F ∪ {p, q} = f`" should be `|F ∪ {p, q}| = f`;
+16. **Typos in §B.** (The apparent `E₀′` in the B.1 base case is a text-extraction artefact: rendered, the
+    formula has `σ′` as a subscript and is correct.) B.2: `σ′ = … decide(p, 1) …` should be `decide(p, 0)`; "`F ∪ {p, q} = f`" should be `|F ∪ {p, q}| = f`;
     `E₀*`, `E₁*` require `p ∉ E₁`, `q ∉ E₀` (implicit). Brief announcement Fig. 1, lines 33 and 35: `∀ q ∈ Q_f` should be
     `∀ q ∈ S` (correct in arXiv v2).
 17. **Introduction (EPaxos remark).** "EPaxos decides within two message delays under `e = ⌈(f+1)/2⌉` failures
@@ -79,7 +79,7 @@ announcement); full version arXiv:2505.03627v2 (numbering follows it).
 
 ## Upper bounds (Theorems 1, 2 "if"; §3, §C)
 
-18. **Object protocol not wait-free: false claim (§C.3, Theorem 2 "if").** Formal counterexamples on the
+18. **🛠️ Object protocol not wait-free (§C.3, Theorem 2 "if").** Formal counterexamples on the
     abstract transition system: `Fig1.object_not_wait_free_omega` (Ω stable on a correct `l ≠ r` that never
     invoked; `r` invokes after all processes moved to a slow ballot; `n − f − e ≥ 1`, i.e. all admissible
     parameters) and `Fig1.object_not_wait_free` (`p` proposes, only `r` accepts, `p` crashes, `r` invokes

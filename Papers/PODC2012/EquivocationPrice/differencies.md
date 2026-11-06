@@ -2,7 +2,6 @@
 
 Jaffe, Moscibroda, Sen, *On the Price of Equivocation in Byzantine Agreement*, PODC 2012
 (10-page proceedings version; the "full version" with the deferred proofs was not available).
-Verdict rules refer to `.claude/skills/formalize-paper/verdicts.md`.
 
 ## Statement-level issues
 
@@ -14,22 +13,17 @@ Verdict rules refer to `.claude/skills/formalize-paper/verdicts.md`.
    smaller than the displayed one by `h²/2` (`theorem_13_false`). Example: `U₄(1) = 3`, while the
    formula gives `3.5` (`U_four_one`). For odd `h` the displayed value is not even an integer,
    although `Uₙ(h)` is defined as a minimum integer.
-   *Classification:* ⚠️ by R3 (missing ceiling: the intended version is forced by the paper's own
-   Claim 14, which is about integers with `a + b + c ≥ (n+3h)/2`; the fix is a rounding symbol; the
-   proof never reasons with the odd case). Borderline: if the missing ceiling were read as a
-   change of the claimed exact value (R3 exclusion), it would be ❌ (not a headline: the abstract
-   only claims asymptotically tight bounds; `Uₙ` is "our final result" of the introduction).
-   *Reviewer's decision (independent review):* ⚠️ endorsed. The paper's proof does not compute the
+   🔧. The intended version follows from the paper's own Claim 14, which is about integers with
+   `a + b + c ≥ (n+3h)/2`, and the fix is a rounding symbol. The abstract only claims asymptotically
+   tight bounds; `Uₙ` is "our final result" of the introduction. The paper's proof does not compute the
    ceiling: it explicitly restricts to `n ≡ h (mod 2)` and defers the other parity as "proved
    similarly". Carrying out that case with the paper's own argument (integer `c ≥ (n+3h)/2 − 2h`)
    gives exactly `c = ⌈(n−h)/2⌉`, with the same extremal configuration (two classes of size `h`,
    the third as small as allowed). The displayed value is not an integer for odd `h` and odd `n − h`,
    while `Uₙ(h)` is defined as an integer. So the statement is wrong only in the parity case the proof
-   sets aside, and the fix is a rounding symbol; the extremal structure and every asymptotic
-   consequence are unchanged. This is a missing rounding with evident intent, not a different
-   claimed value.
+   sets aside; the extremal structure and every asymptotic consequence are unchanged.
 2. **Theorem 2 fails for `n = 0`.** With no vertices there are no `S ≠ T`, so every hypergraph is
-   `f`-tolerant, but no hypergraph is `(−2f)`-disjoint (`theorem_2_card_zero`). Degenerate (R2);
+   `f`-tolerant, but no hypergraph is `(−2f)`-disjoint (`theorem_2_card_zero`). Degenerate (✏️);
    we assume `n ≥ 1`.
 3. **Theorem 2 for `f ≥ n/2`.** Then `h = n − 2f ≤ 0`. We use natural-number subtraction
    (`h = 0` when `2f ≥ n`). Both sides are false for every `n ≥ 1` in this range, with the paper's
@@ -39,7 +33,7 @@ Verdict rules refer to `.claude/skills/formalize-paper/verdicts.md`.
 ## Proof-level issues (statements true)
 
 4. **Proposition 15, second bullet, is false** (claim inside the proof of Claim 14, inside the
-   proof of Theorem 13; R1 → proof repair). It says the minimum of
+   proof of Theorem 13; 🔧). It says the minimum of
    `g(a,b) = ab((n+3h)/2 − a − b)` along the faces of the triangle `P` is `(n+h)²h/16`. Along
    each face `g` is a concave quadratic, and `(n+h)²h/16` is its *maximum* there; the minimum along
    a face is attained at its endpoints and equals `h²(n−h)/2`. Counterexample `n = 4, h = 1,
@@ -58,15 +52,15 @@ Verdict rules refer to `.claude/skills/formalize-paper/verdicts.md`.
    (`theorem_3`, `theorem_3'`: `|E| ≥ (n−1)(n−2)/(4n/3−2)`) and, for every `n` and `h ≤ n/3`,
    `|E| ≥ 3n/4 − 2` (`theorem_3_asymptotic`) as the precise form of `(3/4)n(1 − o(1))`.
    The statement of Theorem 3 (for every `h` with `h ≤ n/3`) is therefore true for every `n`; only
-   the proof is restricted to `3 ∣ n`. This is a proof-level gap (repaired), not an R4 statement issue.
-8. **Lemma 6 / Theorem 5: parity.** Lemma 6 uses `n/2`-sets (needs `n` even), and Theorem 5 applies
+   the proof is restricted to `3 ∣ n`. This is a proof-level gap (repaired, 🔧), not a statement issue.
+8. **Lemma 6 / Theorem 5: parity** (🔧). Lemma 6 uses `n/2`-sets (needs `n` even), and Theorem 5 applies
    it with `n' = n − h` and `|B| = n'/2`, not an integer when `n − h` is odd. We prove a general
    Lemma 6 for `(i, b)`-crossing graphs (`lemma_6_general`), the paper's form for even `n`
    (`lemma_6`), and Theorem 5 with `b = ⌈n'/2⌉`, in the explicit form
    `n(n−1)(n−2) ≤ 24h²|E|` for `1 ≤ h ≤ n/6` (`theorem_5`, `theorem_5_T`); the paper's
    arithmetic gives the slightly weaker `|E| ≥ 25n⁴/(864h²(n−2))`. Theorem 5 needs `h ≥ 1`
    (implicit in the paper).
-9. **Theorem 7 (upper bound `Tₙ(h) = O(n³/h²)`): gap in the existence of the expanders.**
+9. **Theorem 7 (upper bound `Tₙ(h) = O(n³/h²)`): gap in the existence of the expanders** (🛠️).
    The paper builds `L(G)` from a near-Ramanujan graph `G` of degree `d = Θ(n/h)`. It asserts the
    existence of Ramanujan graphs "for every `n` and `d`" via Friedman's theorem, but Friedman's theorem
    is about *fixed* `d` as `n → ∞`, while here `d` grows with `n` unless `h = Θ(n)` (spectral bounds

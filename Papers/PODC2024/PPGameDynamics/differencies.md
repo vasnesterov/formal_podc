@@ -1,24 +1,23 @@
 # Differences between the formalization and the paper
 
 Paper: Alistarh, Chatterjee, Karrabi, Lazarsfeld, *Game Dynamics and Equilibrium Computation in the
-Population Protocol Model*, PODC 2024 (arXiv 2307.07297v3). Rules R1–R6 refer to the project's
-verdict scale.
+Population Protocol Model*, PODC 2024 (arXiv 2307.07297v3).
 
 ## Statement-level issues
 
-1. **Theorem 2.5, upper bound — false (❌, R5: secondary result).** The theorem fixes any
+1. **Theorem 2.5, upper bound — false (❌).** The theorem fixes any
    `a, b > 0` with `a + b ≤ 1` and claims `t_mix = O(min{k/|a−b|, k²}·m log m)` (`a ≠ b`) and
    `O(k² m log m)` (`a = b`), with the dependence on `a, b` shown explicitly. The text below the
    theorem stresses "the impact of more biased a and b". For `k = m = 2` and `b ≤ a`, every `t` with
    `d(t) ≤ 1/4` has `t ≥ 1/(2a)` (`isMixedAt_two_two`). So no constant `C` satisfies the bound for
    all `a = b` (`theorem_2_5_upper_false`), nor for all `a = 2b` (`theorem_2_5_upper_false_ne`).
-   - *Why not R2/R4.* `a + b < 1` is explicitly allowed by Definition 2.3, and the paper's own
+   - *Parameter range.* `a + b < 1` is explicitly allowed by Definition 2.3, and the paper's own
      application has `a + b = γ < 1`. Small `a + b` is a legitimate parameter range, not a
      degenerate corner.
-   - *Why not 🚨 (R5).* The paper presents Theorem 2.5 as a tool for Theorem 2.7 that "may be of
+   - *Role in the paper.* The paper presents Theorem 2.5 as a tool for Theorem 2.7 that "may be of
      independent interest". The contribution list (§1.2) names Theorem 2.7, not Theorem 2.5. The
-     headline mixing bound of Theorem 2.7 remains true after the fix (`a + b = γ`, `m = γn`), but we
-     did not formalize it.
+     mixing bound of Theorem 2.7 looks fine after the fix (`a + b = γ`, `m = γn`), but we did not
+     formalize it.
    - *Location of the error.* Proposition A.7. For `a = b`, `G_t = Z_t² − t` is not a martingale
      (`E[Z_{t+1}² − Z_t²] = a + b`), so `E[τ_absorb] = k²/(2a)`. The bound "RHS of (26) `≤ k²`"
      likewise tends to `k²/(a+b)`. The correct statement multiplies the `k²` terms by `1/(a+b)`.
@@ -26,8 +25,8 @@ verdict scale.
      (the reading the paper intends: it displays the dependence on `|a − b|`, and Theorem 2.7 plugs
      `a − b = γ(1 − 2β)` into it). If the `O` were allowed to hide constants depending on `a, b`, the
      displayed Theorem 2.5 would be true, but then the false statement is located in the numbered,
-     constant-free lemmas below, so the label is ❌ under either reading (R1).
-   - *Numbered lemmas behind it — false (❌, R1).* **Proposition A.7** (`E[τ_absorb] ≤ k²` for
+     constant-free lemmas below, so a false statement remains under either reading.
+   - *Numbered lemmas behind it — false.* **Proposition A.7** (`E[τ_absorb] ≤ k²` for
      `a = b`; truth `k²/(2a)`, false for every `a < 1/2`), **Lemma A.5** (`E[τ_coal] ≤ min{k/|a−b|,
      k²}`, resp. `≤ k²`; for `k = 2`, `X_0 = 1`, `Y_0 = 2` the two walks coalesce at the first non-null
      step, so `E[τ_coal] = 1/(a+b)`, false for `a + b < 1/4`) and **Lemma A.8**
@@ -37,7 +36,7 @@ verdict scale.
      coupling inequality (22) (`d(t) ≤ max_{x,y} Pr[τ_couple > t]`, a standard fact we did not
      formalize), some `x, y` violate Lemma A.8. Propositions A.7 and Lemma A.5 are checked by hand
      only (expected hitting times are not formalized).
-2. **Theorem 2.7 / Section 2.2.1 — sampling convention (⚠️, R4; borderline with ❌).** The formula
+2. **Theorem 2.7 / Section 2.2.1 — sampling convention (✏️).** The formula
    `p_j ∝ (1/β − 1)^{j−1}` is exact iff the responder is drawn uniformly from all `n` agents,
    independently of the initiator (`replKernel`; `theorem_2_7_stationary` proves the stationary part
    in that model). Under the standard PP scheduler (distinct ordered pair, `distinctKernel`), the
@@ -45,25 +44,21 @@ verdict scale.
    (`distinctKernel_counts`). Its stationary law has ratio `(1/β − 1) − 1/(βn)`.
    `distinct_counterexample` shows the claimed law is not stationary for one AD and two GTFT agents
    (`k = 2`).
-   - *Why ⚠️.* The paper never names the scheduler, but its computation (5) uses the
+   - *Convention.* The paper never names the scheduler, but its computation (5) uses the
      with-replacement probabilities `(z_j/n)(1−β)`, so the intended model can be recovered from the
      paper. The formula is exactly right there.
-   - *Why borderline.* "Agents interact in pairs" normally means distinct pairs in the PP
+   - *Caveat.* "Agents interact in pairs" normally means distinct pairs in the PP
      literature the paper cites, and a GTFT agent "meeting itself" is unusual.
-   - The verdict does not depend on this call (item 1 is ❌).
-3. **Proposition A.9 — "`D ≥ km`" (⚠️, R3).** The diameter of the transition graph is `(k−1)m`.
+3. **Proposition A.9 — "`D ≥ km`" (🔧).** The diameter of the transition graph is `(k−1)m`.
    For `k = m = 2` the graph is the path `(2,0) – (1,1) – (0,2)`, so `D = 2 < km = 4` (a hand check;
    not in Lean). The proposition's purpose, `t_mix = Ω(km)`, holds. We prove `t_mix ≥ (k−1)m/2`
    for all `a, b` and every distribution `π` (`theorem_2_5_lower`). The local fix `k → k−1` is
    recoverable, and the claim is asymptotic.
-   - *Borderline (⚠️ vs ❌).* The proof also reasons with `km` ("at least `km` total transitions are
-     needed"), which by R3 argues against the excuse. We keep ⚠️ because the proposition's stated
-     purpose (`t_mix = Ω(km)`) is unaffected and `(k−1)m ≥ km/2` for `k ≥ 2`. The verdict does not
-     depend on this call (item 1 is ❌).
-4. **Theorem 2.7, lower bound `Ω(kn)` (not formalized; proof gap).** Theorem 2.5 gives
+   - The proof also reasons with `km` ("at least `km` total transitions are needed"). The
+     proposition's stated purpose (`t_mix = Ω(km)`) is unaffected, and `(k−1)m ≥ km/2` for `k ≥ 2`.
+4. **Theorem 2.7, lower bound `Ω(kn)` (not formalized).** Theorem 2.5 gives
    `Ω(km) = Ω(kγn)`, which is `Ω(kn)` only for constant `γ`. The statement itself is plausible: the
-   chain is lazy with rate `≤ γ`, which compensates. We did not formalize it, so it does not enter
-   the verdict.
+   chain is lazy with rate `≤ γ`, which compensates. We did not formalize it.
 
 ## Proof gaps (statements true)
 

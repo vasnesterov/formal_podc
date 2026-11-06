@@ -35,7 +35,7 @@ formalized; numbering follows it).
 8. Lemma 6.2 and Theorem 6.1 are proved relative to a set `U` of active places (`NetOn U T`, `ρ` vanishing outside
    `U`, `d = |U \ Q|` resp. `d = |U|`, `Q ⊆ U`). The paper's Theorem 6.1 is the case `U = P` (`theorem_6_1`). Section 8
    applies Theorem 6.1 to `T|_{P'}` with `P' = P \ {i}`, which is the relative form with `U = P'`.
-9. **Gap in Lemma 6.2 (repaired).** In the case where every configuration reachable from `ρ_n` has `β(p) < λ_{n+1}`
+9. **🔧 Gap in Lemma 6.2 (repaired).** In the case where every configuration reachable from `ρ_n` has `β(p) < λ_{n+1}`
    on `R_n`, the bound on the `T|_{Q'}`-reachability set of `ρ_n|_{Q'}` is not justified. The restricted net does not
    constrain `p_1, …, p_n`. Repair: a shortest path argument followed by Lemma 5.2 (`lemma_6_2_step`); see the README.
 10. The third case of Lemma 6.2 takes a shortest `T|_{Q∪R_n}`-path and lifts it, instead of a `T`-shortest
@@ -52,15 +52,14 @@ formalized; numbering follows it).
     control-state; the paper does this by "rotation" in Section 8.
 14. "Elementary path" in Section 8 is replaced by "path of length `< |S|`" (`exists_decomp`); cycles of the
     decomposition have length `≤ |S|`. This is what the estimates use.
-15. **Lemma 7.3 is proved with a different constant.** The paper's proof has a gap (see the README): the variables of
+15. **🛠️ Lemma 7.3 is proved with a different constant.** The paper's proof has a gap (see the README): the variables of
     system (1) are indexed by displacements, but the proof uses them as edge counts, and the length bound misses a
     factor `|S|`. We index the variables by the cycles occurring in `Θ`. We use the weak Pottier bound
     `Cslib.exists_small_decomposition` (`ℓ₁`-norm `≤ (2M')^(2^d−1)` for parts of a sign-conformal decomposition,
     independent of the number of variables), with `M' = |S|·M`. The statement becomes: for `M ≥ 1` bounding all label
     displacements, `K = (2|S|M)^(2^d−1)` and `k > ‖Δ(Θ)|_Q‖₁·|S|·M·K`, there is `Θ'` with the paper's sign, zero and
     edge conditions and `|Θ'| ≤ (|E|+d)·|S|·K`. The paper's hypothesis `‖T‖∞ > 0` becomes `M ≥ 1`. Whether the paper's
-    constant `(1+2|S|‖T‖∞)^(d(d+1))` is correct is left open. Rule: unverified statement (not counted in the
-    verdict); the gap is a proof gap (🛠️).
+    constant `(1+2|S|‖T‖∞)^(d(d+1))` is correct is left open.
 
 ## Section 8 (Theorem 4.3)
 
@@ -70,14 +69,14 @@ formalized; numbering follows it).
     `n > h^(2d+5)·ℓ` (paper: `h^(2d+4)·ℓ`). The extra factor `h` absorbs a factor 2 in the word-length estimate. The
     final estimate is `h^(2^d+4d+9) ≤ (4+4M+2‖ρ_L‖∞)^(d^((d+2)²))` (`Arith.final`), using
     `2E₁(d)(2^d+4d+9) ≤ d^((d+2)²)`. So the statement of Theorem 4.3 is exactly the paper's.
-17. Lemma 7.3 is applied with `M = 1 + ‖T‖∞`. The paper silently needs `‖T‖∞ > 0`; for `‖T‖∞ = 0` the net is
+17. ✏️ Lemma 7.3 is applied with `M = 1 + ‖T‖∞`. The paper silently needs `‖T‖∞ > 0`; for `‖T‖∞ = 0` the net is
     trivial.
-18. Slips repaired (see the README):
-    * `#Θ(e) ≥ ℓ` should be `≥ ℓ − |S|`.
-    * `d‖α‖∞ ≤ b` should be `(d−1)‖α‖∞ ≤ b`.
-    * `μ(p) − η'(p) − Δ(π)(p)` should be `μ(p) − α'(p) − Δ(π)(p)`.
-    * The sign of `Δ(σ)(i)` is wrong.
-    * `r ≤ d^(d²+d+3)` should be `d^(d²+d+5)`.
+18. Small errors repaired (see the README):
+    * 🔧 `#Θ(e) ≥ ℓ` should be `≥ ℓ − |S|`.
+    * ✏️ `d‖α‖∞ ≤ b` should be `(d−1)‖α‖∞ ≤ b`.
+    * ✏️ `μ(p) − η'(p) − Δ(π)(p)` should be `μ(p) − α'(p) − Δ(π)(p)`.
+    * ✏️ The sign of `Δ(σ)(i)` is wrong.
+    * 🔧 `r ≤ d^(d²+d+3)` should be `d^(d²+d+5)`.
 19. The path in the control-state net is built as the concatenation of the path of `w^(aℓ)`, the `ℓ`-th power of the
     total cycle `θ_E`, and the path of `σ'`. This makes `#π(e) ≥ ℓ` immediate, since paths are determined by their
     labels.

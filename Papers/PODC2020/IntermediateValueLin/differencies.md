@@ -15,7 +15,7 @@ Rinberg, Keidar. *Intermediate Value Linearizability: A Quantitative Correctness
    including completed pending ones). The paper's `≺_H` is defined through `inv(op₂)` only, so it
    relates a completed operation to a pending one; this is the amended definition. Under the original
    Herlihy–Wing reading locality would fail (Sela–Herlihy–Petrank); we read the paper the amended way
-   (R4: standard convention, holds throughout the paper).
+   (standard convention, holds throughout the paper).
 3. **Skeleton histories and `τ`.** `skel α` (paper `H?`) replaces responses by `()`; a linearization of
    `H?` is `IsLinearization (skel α) L` with `L : List (OpId P × Op)`. The paper's `τ_H(L)` is
    `tau S L` (the response that the deterministic specification gives in the unique legal history with
@@ -68,11 +68,11 @@ Rinberg, Keidar. *Intermediate Value Linearizability: A Quantitative Correctness
     proof needs. The paper first completes pending updates; we instead leave pending updates out of
     `H₁` (they are not needed). Proof otherwise as in the paper (per-register sandwich, sums of
     non-negative values).
-13. **Theorem 1 (proof typos, statement correct).** In the proof (p. 9): the first display should read
+13. **Theorem 1 (✏️ proof typos, statement correct).** In the proof (p. 9): the first display should read
     `ret(Q, τ_{A(c)}(H₁)) ≤ ret(Q, H(A′, σ, c)) ≤ ret(Q, τ_{A(c)}(H₂))` (the paper writes `A` and `H₁` on
     the right); "`ret(Q, τ_{A(c)}(H₂)) ≤ v_max`" should be `ret(Q, τ_I(H₂)) ≤ v_max`; the final
     "`≥ v_max + ε`" should be `≤`. The argument is otherwise exactly ours (`theorem1`).
-14. **Appendix A (locality, proof gap; statement true; R1 → 🛠️, this decides the verdict).** The paper takes the union of the
+14. **Appendix A (🔧 locality, proof gap; statement true).** The paper takes the union of the
     per-object linearization orders and the real-time order and asserts it is a well-defined partial
     order. This union is not transitive and the acyclicity of its transitive closure is the
     non-trivial part of Herlihy–Wing locality; it is not argued. The formal proof uses CSLib's merge of
@@ -83,24 +83,22 @@ Rinberg, Keidar. *Intermediate Value Linearizability: A Quantitative Correctness
 16. **Lemma 1 (CountMin, Section 5).** Elements of any type `E`, hash functions `h : Fin d → E → Fin w`
     fixed per coin vector; the matrix starts at 0 as in Algorithm 1. Base objects: one atomic counter
     (increment/read) per cell. The query returns `⨅ i, c[i][hᵢ(a)]`, which is `0` for `d = 0` (the paper's
-    algorithm would return `∞`; degenerate, R2). We prove the strong form with the paper's `H₁`/`H₂`
+    algorithm would return `∞`; degenerate case). We prove the strong form with the paper's `H₁`/`H₂`
     (`pcm_sandwich`), whose linearizations depend only on the skeleton, as Definition 2 needs.
     Proof imprecision: "`c_{σ₁}(Q)[i]` (the value when the query starts)" — the `H₁` count only
     lower-bounds the counter at the query's start (pending updates may have incremented it); the bound
     used is still correct. Our proof does not need the index `j` of the final minimum.
 17. **Corollary 1** is not formalized: it needs the sequential CountMin analysis [7]. We prove the
     combination step "Lemma 1 + Theorem 1" with that analysis as a hypothesis (`pcm_concBounded`).
-18. **Example 2 (proof-level, R1 → 🛠️; borderline).** The execution has the same process `p` invoke
+18. **Example 2 (🔧 proof-level).** The execution has the same process `p` invoke
     `U`, `Q₁` and `Q₂` while `U` is pending — not well formed. Evident intent: another process issues
     the queries; we use process `q` (`Example2.example2`). "P DC" should be "PCM". The paper's initial
     matrix `[[1,4],[2,3]]` is not the all-zero initial matrix of Algorithm 1; it is reached by the
     updates `a, b, e, e, e`. With these fixes the example is a valid counterexample
-    (`Example2.pcm_not_linearizable`). Verdict call: the statement (R1) is "PCM is not a linearizable
+    (`Example2.pcm_not_linearizable`). The statement is "PCM is not a linearizable
     implementation of CM" (abstract "albeit not linearizable", introduction, and the sentence
     introducing Example 2), which is true as written; Example 2 is its demonstration and ends in a
-    proof by contradiction, and it makes no separate claim about a property of `σ`. A defective
-    witness for a true claim is a proof repair (🛠️). Had Example 2 been read as a statement of its
-    own ("this execution of PCM is not linearizable"), the evident-intent fix (R3) would give ⚠️.
+    proof by contradiction, and it makes no separate claim about a property of `σ`.
 19. **Algorithm 3 / Lemmas 3, 4.** Binary snapshot `binSnap n`: update returns the all-`false` vector as
     a dummy; process `i` may only update component `i`. In `alg3` the local `vᵢ` is set in the same
     step as the counter access (local state, equivalent). Invariant 1 is proved for concurrent

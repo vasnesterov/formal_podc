@@ -5,64 +5,34 @@ Fabien Dufoulon, Janna Burman, Joffroy Beauquier. *Can Uncoordinated Beeps tell 
 version (there is no arXiv version). The extended version [7], which contains the omitted proof of Theorem 1, was
 not used. Numbering follows the proceedings.
 
-**Verdict: ⚠️ Minor statement issues.** The coding-theory core of the paper (Section 3) holds. We prove that
-Definitions 2 and 3 of uncoordinated superimposed (USI) codes are equivalent (Theorem 1). A USI(h,k)-code decodes
-every uncoordinated transmission scenario with conflict at most k (Theorem 2). Sidon sets give USI(h,k)-codes of
-length at most 8h²(k+1)² (Theorems 3, 5, 7, Lemma 6, Corollary 8). Lemma 4 is false as literally stated, because
-it takes differences mod l. Its integer version is what the proof establishes and what is used, so the intent is evident, and it holds. The remaining problems are
-missing side conditions in degenerate cases. The beeping simulation of Sections 4–6 was not formalized.
+**Verdict: ✏️ Slip.** The coding-theory core of the paper (Section 3) holds: Definitions 2 and 3 of uncoordinated
+superimposed (USI) codes are equivalent (Theorem 1), a USI(h,k)-code decodes every uncoordinated transmission scenario
+with conflict at most k (Theorem 2), and Sidon sets give USI(h,k)-codes of length at most 8h²(k+1)² (Theorems 3, 5, 7,
+Lemma 6, Corollary 8). What needs correcting is a typo in Lemma 4, the wording of Definition 4 and degenerate cases.
+The beeping simulation of Sections 4–6, which carries the paper's algorithmic claims (2-hop beeps, 2-hop
+desynchronization, message passing), was not formalized, so this verdict does not cover it.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 4 (differences "mod l")
-Lemma 4 is false as stated because it takes differences mod l: D = {0, 1, 3} is a (4, 3) Sidon set, yet
-1 ≡ 1 − 0 ≡ 0 − 3 (mod 4) comes from two different pairs (`lemma_4_mod_false'`).
-
-**Impact.** Harmless: the proof ignores the "mod l" and proves the integer statement (non-zero integer
-differences are distinct, a Golomb ruler), which is all Lemma 6 needs. We prove that version (`lemma_4`).
-
-**Details.** The counterexample above works even if a pair and its reverse count once. The sets of the paper's
-own Theorem 3 fail too, for ordered pairs. For p = K = 3 the Erdős–Turán set is D = {0, 7, 13}, a (14, 3)
-Sidon set since 14 ≤ 2p². There 7 − 0 ≡ 0 − 7 (mod 14) (`lemma_4_mod_false`).
-
-### ⚠️ Definition 4 (Sidon sets must count the sums d + d)
-Definition 4's "all pairwise sums of elements in D are different" must include the sums d + d: under the weaker
-reading D = {0,1,2} is a Sidon set, but its codeword 111 overlaps its own shift by 1 in two positions, and
-Lemmas 4 and 6 fail (`lemma_6_needs_strong_sidon`).
-
-**Impact.** The results stand, because the Erdős–Turán sets satisfy the strong reading, which we use.
-
-### ⚠️ Lemma 6, Theorems 1, 5, 7 and Corollary 8 (missing side conditions)
-Several statements miss side conditions needed in degenerate cases.
-
-**Impact.** Degenerate cases only; we add the conditions and prove the statements.
-
-**Details.**
+### ✏️ Slips
+- Lemma 4 takes differences "mod l" and is false as stated: D = {0, 1, 3} is a (4, 3) Sidon set, yet
+  1 ≡ 1 − 0 ≡ 0 − 3 (mod 4) comes from two different pairs (`lemma_4_mod_false'`). This works even if a pair and its
+  reverse count once. The sets of the paper's own Theorem 3 fail too, for ordered pairs: for p = K = 3 the Erdős–Turán
+  set is D = {0, 7, 13}, a (14, 3) Sidon set since 14 ≤ 2p², and 7 − 0 ≡ 0 − 7 (mod 14) (`lemma_4_mod_false`). The
+  lemma itself ends "i.e., D is a Golomb ruler", and the proof ignores the "mod l" and proves the integer statement
+  (non-zero integer differences are distinct), which is all Lemma 6 needs. We prove that version (`lemma_4`).
+- Definition 4's "all pairwise sums of elements in D are different" must include the sums d + d: under the weaker
+  reading D = {0,1,2} is a Sidon set, but its codeword 111 overlaps its own shift by 1 in two positions, and Lemmas 4
+  and 6 fail (`lemma_6_needs_strong_sidon`). The results stand, because the Erdős–Turán sets satisfy the strong
+  reading, which we use.
 - Lemma 6 needs t ≠ t'. The surrounding text says "two" shifted words, so this is clearly intended. (`lemma_6`)
 - Theorem 1 needs codeword length l ≥ 1. For l = 0 no shift is admissible, so Definition 2 holds vacuously while
   Definition 3 fails. (`theorem_1_length_zero`)
 - Theorems 5 and 7 need K ≥ 1. Otherwise "USI(1, K−1)" is meaningless.
-- Corollary 8 uses Theorem 3, which needs an *odd* prime in [K, 2K]. For K = h(k+1) = 1 none exists. This case
-  is trivial (D = {0}).
-
-### ⚠️ Section 4, Algorithm 3 (suspected gap; not formalized, not checked in Lean)
-Algorithm 3 tests history windows that start before the node's wake-up, which the paper does not define and
-Lemma 11 does not cover; this is a suspicion, not a confirmed error.
-
-**Impact.** If the missing bits read as 0, a node could relay a 2-hop beep for a round in which the relay path
-was not yet awake, contradicting Definition 5 and Remark 2. Either of two local fixes would close the gap.
-
-**Details.** The windows are H[r−l−(i−1), r−1−(i−1)], which can start at local index ≤ 0. Suppose the missing
-bits read as 0 and c₁[1] = 0, which Theorem 7 allows because it fixes no partition. Then a node u that wakes one
-round after a neighbour w started c₁ would "decode" that c₁ and relay it. A neighbour v of u would then record a
-2-hop beep of w in a round when the path v–u–w was not yet awake.
-
-**Repair.** Choose c₁ to contain the position of the Sidon element 0, or decode only windows that lie inside the
-awake period.
-
-### Typos and slips
-- Theorem 10's last step, f(Δ_up² + Δ_up + 2) ≤ f(Δ_up+1)², needs Δ_up ≥ 1 (arithmetic check only; Section 4
-  is not formalized).
+- Corollary 8 uses Theorem 3, which needs an *odd* prime in [K, 2K]. For K = h(k+1) = 1 none exists. This case is
+  trivial (D = {0}).
+- Theorem 10's last step, f(Δ_up² + Δ_up + 2) ≤ f(Δ_up+1)², needs Δ_up ≥ 1 (arithmetic check only; Section 4 is not
+  formalized).
 - Footnote 4 ("σ̄(c,t₁) ≠ σ̄(c,t₂) iff t₁ ≠ t₂") fails for the all-zero codeword.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
@@ -100,6 +70,16 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Not formalized.** Section 4 (BEEP2H/LISTEN2H, Algorithms 1–3, Lemma 9, Theorem 10, Lemma 11, Theorem 12),
 Section 5 (2-hop desynchronization, probabilistic) and Section 6 (local message broadcast).
+
+Open remark on Algorithm 3, a suspicion and not a confirmed error; it was not checked in Lean or against Lemma 11 in
+depth. Algorithm 3 tests history windows H[r−l−(i−1), r−1−(i−1)], which can start at local index ≤ 0, before the
+node's wake-up. The paper does not define these bits, and Lemma 11 does not cover such windows. Suppose the missing
+bits read as 0 and c₁[1] = 0, which Theorem 7 allows because it fixes no partition. Then a node u that wakes one round
+after a neighbour w started c₁ would "decode" that c₁ and relay it. A neighbour v of u would then record a 2-hop beep
+of w in a round when the path v–u–w was not yet awake, contradicting Definition 5 and Remark 2. Either of two local
+fixes would close the gap: choose c₁ to contain the position of the Sidon element 0, or decode only windows that lie
+inside the awake period. Theorem 10's base case ("no node starts transmitting c₂ in rounds 1 to l") suggests that
+windows outside the awake period are not meant to be decoded.
 
 **Trust.** No `sorry`. All listed theorems use only the axioms `propext`, `Classical.choice` and `Quot.sound`.
 Corollary 8 shows that the code definitions are not vacuous: USI(h,k)-codes exist for all h and k. The Sidon-set

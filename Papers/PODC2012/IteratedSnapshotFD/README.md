@@ -6,10 +6,11 @@ Snapshot Model with Failure Detectors.* PODC 2012. DOI
 version, IRISA research report PI 1991, February 2012 (hal-00670154v1); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The generic simulation of Figure 3 does **not** work for `Σ`, contrary to
-Section 4.4 and Theorem 4: with two simulators it produces runs whose simulated failure detector is
-not in `Σ*`. The headline simulations for `Ω_k` (Theorem 2) and `◇P` (Theorem 3) hold, and so does the
-`Ω*`-based consensus algorithm (Theorem 5), whose agreement proof needed a repair.
+**Verdict: ⚠️ Weakened.** The generic simulation of Figure 3 does **not** work for `Σ`, contrary to
+Section 4.4 and Theorem 4: with two simulators it produces runs whose simulated failure detector is not in `Σ*`,
+and no repaired simulation is proved. The simulations for `Ω_k` (Theorem 2) and `◇P` (Theorem 3) hold, and so does
+the `Ω*`-based consensus algorithm (Theorem 5), whose agreement proof needed a stronger invariant. The converse
+simulation (Theorem 1) and the other classes of Section 4.4 were not checked.
 
 ## Mistakes in the paper
 
@@ -18,8 +19,7 @@ With two simulators, a legal `Σ` history and a fair failure-free schedule, Figu
 `PROP_{◇P}` makes `q₁` weakly correct while the simulated quorums contain `q₁` forever, even at the
 strongly correct `q₀`; so the simulated detector is not in `Σ*` (`Fig3.sigma_simulation_false`).
 
-**Impact.** The claim that one predicate covers `P, Σ, S, ◇S, S_x, ◇S_x` fails for `Σ` (the same run
-appears to break `S` and `◇S` too; not formalized); Theorem 4 ("for the failure detector classes studied in this paper", here
+**Impact.** The claim that one predicate covers `P, Σ, S, ◇S, S_x, ◇S_x` fails for `Σ`; Theorem 4 ("for the failure detector classes studied in this paper", here
 `t = n − 1`) is false for `Σ`. The `Ω_k` and `◇P` simulations (Theorems 2, 3, Corollary 1) are not
 affected.
 
@@ -98,8 +98,8 @@ proved for every correct process, not only the strongly correct ones: a decision
 process reaches all correct processes (`Exec.all_decide_of_SC`).
 
 **Not formalized.** Theorem 1 (Borowsky–Gafni simulation of `ARW_n[C]` in `IIS_n[C*]`, Figure 2),
-Corollary 1 and all task-solvability statements, the remaining classes of Section 4.4, Theorem 4 for
-`t < n − 1`. Corollary 1 also silently needs that undecided weakly correct processes (or the simulators of
+Corollary 1 and all task-solvability statements, the remaining classes of Section 4.4 (the run of
+`Fig3.sigma_simulation_false` appears to break `S` and `◇S` too, which is open here), Theorem 4 for `t < n − 1`. Corollary 1 also silently needs that undecided weakly correct processes (or the simulators of
 weakly correct processes) adopt a decision of another process. This is fine for colorless tasks but not
 argued (see [differencies.md](differencies.md)).
 

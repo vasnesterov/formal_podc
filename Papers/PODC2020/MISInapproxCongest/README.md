@@ -4,26 +4,26 @@ Yuval Efron, Ofer Grossman, Seri Khoury. *Beyond Alice and Bob: Improved Inappro
 Independent Set in CONGEST.* PODC 2020. DOI [10.1145/3382734.3405702](https://doi.org/10.1145/3382734.3405702).
 Formalized version: arXiv [2003.07427](https://arxiv.org/abs/2003.07427) v2; numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** The t-party framework (Theorem 5, Corollary 1) and the combinatorial heart
-of the paper (Properties 1–3, Claims 1–7, Corollary 2, Lemmas 1–3) are correct. The round bounds of
-Theorems 1 and 2 do not follow from the paper's proof as written: it miscounts the cut, which has
-`Θ(log³ k)` edges, not `Θ(log² k)`, so the argument only gives `Ω(n/log⁴ n)` and `Ω(n²/log⁴ n)`. Both
-theorems are nevertheless true. Using a code over a constant-size alphabet in the same construction
-proves them, and even improves the bounds to `Ω(n/log² n)` and `Ω(n²/log² n)` rounds. As in the paper,
-the Chakrabarti–Khot–Sun communication lower bound is a hypothesis.
+**Verdict: 🛠️ Hard fix.** Theorems 1 and 2 hold, conditional on the Chakrabarti–Khot–Sun communication lower bound as
+in the paper, but the paper's proof miscounts the cut, which has `Θ(log³ k)` edges, not `Θ(log² k)`, and so only gives
+`Ω(n/log⁴ n)` and `Ω(n²/log⁴ n)`. Saving them takes a redesigned ingredient: a code over a constant-size alphabet in
+the same construction, which even improves the bounds to `Ω(n/log² n)` and `Ω(n²/log² n)` rounds. The t-party framework
+(Theorem 5, Corollary 1) and the combinatorial heart of the paper (Properties 1–3, Claims 1–7, Corollary 2, Lemmas 1–3)
+are correct.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
-- Definition 5 reads `w(I) ≥ OPT/γ`; it should be `w(I) ≥ γ·OPT`. As written, no `(1/2+ε)`-approximation
+### ✏️ Slips
+- Definition 5 reads `w(I) ≥ OPT/γ`; it should be `w(I) ≥ γ·OPT` (`IsApprox`). As written, no `(1/2+ε)`-approximation
   could exist.
+- Corollary 1 needs a strict gap: with Definition 6 a γ-approximation may output weight exactly `γβ` in both cases, so
+  it does not decide the gap predicate. We require `hi < γ·lo`, and since Lemmas 2 and 3 hold for every `ε`, one uses
+  `ε/2` (`corollary1`).
+
+### Typos
 - In the proof of Claim 6 the weight is written `t(4ℓ+α)` instead of `4tℓ + 2tα`.
-- The proof of Lemma 3 has a sign slip (`4t log k − 2t log k/log log k`) and drops the constants of
-  Claim 7 (`t²` for `3t³`).
-- The base cases of Claims 2 and 5 need `ℓ ≥ 1`, and the inductive step of Claim 5 needs `α ≥ 1`. Both
-  are implicit in `ℓ ≫ α ≥ 1`.
+- The proof of Lemma 3 has a sign error (`4t log k − 2t log k/log log k`), drops a factor `t` in `2αt`, and drops the
+  constants of Claim 7 (`t²` for `3t³`). Its bounds `≥ 4(t−1) log k` and `≤ 3(t+2) log k` still hold for `k ≫ t`.
 - Step (4) of Claim 4 sums `2ψ` over `i ≠ j ∈ [t]`, but step (6) counts unordered pairs.
 
 ## Proof gaps (statements true)
@@ -50,7 +50,7 @@ through with the same proofs, and the cut has `t(t−1)/2 · M · Q(Q−1) = O(l
 then gives `T·B·log n = Ω(n)` (resp. `Ω(n²)`), so `T = Ω(n/log² n)` (resp. `Ω(n²/log² n)`) for
 `B = O(log n)`. This implies the paper's claims. (`theorem1`, `theorem2`)
 
-### 🛠️ Lemma 3 (the choice of `t`)
+### 🔧 Lemma 3 (the choice of `t`)
 The proof of Lemma 3 picks `t = 3/(4ε) − 1`, which is too small: for `ε = 1/8` and `t = 5` the gap
 ratio between Claims 6 and 7 is `0.9 > 0.875` (`= 3/4 + ε`).
 
@@ -59,13 +59,6 @@ ratio between Claims 6 and 7 is `0.9 > 0.875` (`= 3/4 + ε`).
 **Details.** The gap between Claims 6 and 7 has leading terms `3(t+1)ℓ` versus `4tℓ`, with ratio
 `3/4 + 3/(4t)`. For `t = 3/(4ε) − 1` this ratio exceeds `3/4 + ε`. With the paper's own simplified
 bounds `3(t+2)` vs `4(t−1)` it is even `21/16 > 1` at `ε = 1/8`.
-
-### 🛠️ Corollary 1 (needs a strict gap)
-With Definition 6 a γ-approximation may output weight exactly `γβ` in both cases, so it does not
-decide the gap predicate.
-
-**Impact.** Harmless: we require `hi < γ·lo`, and since Lemmas 2 and 3 hold for every `ε`, one uses
-`ε/2` (`corollary1`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -114,7 +107,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 size `n` such that every randomized algorithm satisfying `ApproxMIS A (1/2+ε) T (1/3)` has
 `C·n ≤ T·B·log n`. `theorem2` is the same with `3/4+ε` and `C·n² ≤ T·B·log n`. The generic claims
 (`claim5_generic`, `claim7_generic`, `card_code_le`) hold for any code with pairwise agreement `≤ a`. They
-serve both the paper's Reed–Solomon parameters and the repaired constant-alphabet instance.
+serve both the paper's Reed–Solomon parameters and the repaired constant-alphabet instance. The base cases of
+Claims 2 and 5 use `ℓ ≥ 1` and the inductive step of Claim 5 uses `α ≥ 1`; both are implicit in `ℓ ≫ α ≥ 1`, and the
+paper fixes `k, α, ℓ` as positive integers.
 
 Theorem 4 (cited) is stated for arbitrary alphabets, but Reed–Solomon codes need a field, and the paper
 takes `Σ = [ℓ+α]` of arbitrary size. We prove Theorem 4 for prime `q` (`theorem4`). That is enough, since

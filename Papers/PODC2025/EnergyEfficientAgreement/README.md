@@ -7,11 +7,12 @@ with the algorithms and proofs of its full version arXiv [2506.12282](https://ar
 the BA = Theorem 6 there). arXiv v2 is a different, later paper (OPODIS 2025, with Meir and Peleg) with a redesigned
 binary algorithm; it is not formalized here.
 
-**Verdict: ❌ False claim.** The multi-value result (Theorem 1) holds: Algorithm 1 solves crash consensus in `f + 1`
-rounds with `2 + 2⌈f(f+1)/n⌉` awake rounds per player and `O(f³ + nf)` messages. Its proof needs one repair, and
-Lemma 2 is false as literally stated. The binary-consensus result (Theorem 2) is not established. The algorithm
-behind it, sketched in the BA and given as Algorithm 3 in the full version, **violates agreement**, e.g. for
-`n = 5`, `f = 3`. The claim itself is existential, so it is not refuted: ❌ rather than 🚨 (R5).
+**Verdict: ⚠️ Weakened.** The paper has two results of equal weight, and only one survives. The multi-value result
+(Theorem 1) holds: Algorithm 1 solves crash consensus in `f + 1` rounds with `2 + 2⌈f(f+1)/n⌉` awake rounds per
+player and `O(f³ + nf)` messages, although its proof needs one repair and Lemma 2 is false as literally stated. The
+binary-consensus result (Theorem 2) is not established: the algorithm behind it, sketched in the BA and given as
+Algorithm 3 in the full version, **violates agreement**, e.g. for `n = 5`, `f = 3`, although the claim itself is
+existential and so not refuted.
 
 ## Mistakes in the paper
 
@@ -21,8 +22,8 @@ agreement: for `n = 5`, `f = 3`, a chain of single-recipient crashes makes the n
 decide 1 and `p₁` decide 0 (`algorithm3_violates_agreement`, `algorithm3_violates_agreement_7_4`,
 `algorithm3_violates_agreement_9_7`).
 
-**Impact.** Theorem 2 is existential, so it is not refuted but unestablished (❌ rather than 🚨,
-R5); Theorem 1 (multi-value consensus) is unaffected.
+**Impact.** Theorem 2 is existential, so it is not refuted but unestablished; Theorem 1 (multi-value
+consensus) is unaffected.
 
 **Details.** Take `n = 5`, `f = 3`. Committees (`JoinCommittees(3, 3)`): `C₁ = {p₁,p₂,p₃}`,
 `C₂ = {p₄,p₀,p₁}`, `C₃ = {p₂,p₃,p₄}`, and `T = ⌈4/√5⌉ = 2`. Only `p₂` has input 1. The run goes as
@@ -44,15 +45,21 @@ to Algorithm 1, unspecified) is affected just as much. A model check shows that 
 `f = 3`, **every** choice of 3 committees of size 3 admits a disagreeing execution.
 
 In the full version, Lemma 11 (used for Lemma 12, agreement) is false: in the run above
-`|P₄| = 3 ≤ f`, yet agreement on 0 fails. The full version's claim that a player in `C_i` is in none
-of `C_{i+1}, …, C_{i+⌈√n⌉+1}` is also wrong. `JoinCommittees` does not guarantee it, and no
-assignment can once `f > ⌈√n⌉`, or `f = ⌈√n⌉` with `n` not a perfect square, as in the `n = 5`,
-`f = 3` run (it would need `min(f, ⌈√n⌉+2)` pairwise-disjoint committees of size `⌈√n⌉`, i.e. more
-than `n` players). The authors' later OPODIS 2025 version describes this exact attack ("crash
-players, one at each round, such that eventually … all the members of a committee have already
-crashed") and redesigns the algorithm. That redesign is not checked here.
+`|P₄| = 3 ≤ f`, yet agreement on 0 fails. The authors' later OPODIS 2025 version describes this exact
+attack ("crash players, one at each round, such that eventually … all the members of a committee have
+already crashed") and redesigns the algorithm.
 
-### ⚠️ Lemma 2 (hypothesis "alive in round `i`")
+### ❌ Full version, Section 4.1 (committee spacing, used in Lemmas 9 and 11)
+The full version's claim that a player in `C_i` is in none of `C_{i+1}, …, C_{i+⌈√n⌉+1}` is wrong:
+`JoinCommittees` does not guarantee it, and no assignment can once `f > ⌈√n⌉`, or `f = ⌈√n⌉` with
+`n` not a perfect square, as in the `n = 5`, `f = 3` run.
+
+**Impact.** The analysis of the binary algorithm depends on this property, and we have no replacement for it.
+
+**Details.** The property would need `min(f, ⌈√n⌉+2)` pairwise-disjoint committees of size `⌈√n⌉`, i.e. more
+than `n` players.
+
+### 🔧 Lemma 2 (hypothesis "alive in round `i`")
 Lemma 2 is false as stated: it assumes only that `p` is *alive in round `i`* (not crashed in rounds
 `1, …, i − 1`), so `p` may crash in round `i` itself and lose its message
 (`lemma_2_as_stated_false`).
@@ -64,12 +71,12 @@ every decision is `≥ v` (corrected `lemma_2`).
 **Details.** Example: `n = 2`, `f = 1`, inputs `5, 0`. `p₀` sends `5` to `C₁` in round 1 and
 crashes, reaching nobody; `p₁` decides `δ = 0 < 5`.
 
-### Typos and slips
+### ✏️ Slips
 - Algorithm 1 needs `f ≥ 1`, since it refers to `C_f`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 4 (agreement)
+### 🔧 Lemma 4 (agreement)
 The proof treats the first clean round `t` only for `t = 1` and `1 < t < f + 1`, missing
 `t = f + 1`, and in the main case concludes "since `p` does not crash" for an arbitrary alive
 holder `p` of `δ`, which may crash later.
@@ -118,8 +125,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 Lemma 3's hypothesis `m ≥ δ` is unnecessary (proved without it, `lemma_3`).
 
 **Not formalized.** Message sizes in bits (each message is one value or one bit). The `O(n²)` message and
-`O(⌈f/√n⌉)` energy bounds of Theorem 2, which are moot since the algorithm is incorrect. The repaired binary
-algorithm of the OPODIS version. The family `n = s², f = n − 2` and the all-committee-assignments check for `n = 5` are
+`O(⌈f/√n⌉)` energy bounds of Theorem 2, which are moot since the algorithm is incorrect. The redesigned binary
+algorithm of the OPODIS version, which was not checked. The family `n = s², f = n − 2` and the all-committee-assignments check for `n = 5` are
 Python checks only (`scripts/family.py`, `scripts/allcomm.py`; exhaustive adversary search for small `n` in
 `scripts/binmc.py`, restricted search in `scripts/chain.py`).
 

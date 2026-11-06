@@ -6,20 +6,25 @@ that Ensure Disjoint-Access Parallelism and Wait-Freedom.* PODC 2012. DOI
 research report [hal-00697198v2](https://inria.hal.science/hal-00697198v2) (May 2012, 34 pp.); no arXiv version.
 Numbering follows the full version.
 
-**Verdict: ✅ Correct.** The impossibility result (Theorem 5: no feebly disjoint-access parallel universal
+**Verdict: ✏️ Slip.** The impossibility result (Theorem 5: no feebly disjoint-access parallel universal
 construction is wait-free) holds, and its proof (Lemma 4 and the construction of the infinite execution `α'`)
-goes through as written. The construction DAP-UC and its correctness (Theorem 6) are not formalized.
+goes through as written, apart from assumptions the statement leaves implied and an ambiguous wording of
+Assumption 3. The positive half of the paper's main point, the construction DAP-UC and its correctness (Theorem 6),
+was not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
-- Section 4 calls the pointer to the first node `L.first` (Section 3: `first`/`last`), while the code of Figure 6
-  calls it `L.start`/`L.end`.
+### ✏️ Slips
+- Theorem 5 omits "linearizable", "satisfying Assumption 3" and "with at least two processes", all of which the proof
+  uses. The surrounding text and the abstract state the first two, and one process is degenerate. The Lean theorems
+  take them as hypotheses (`theorem_5_list`, `theorem_5`).
 - Assumption 3 speaks of "the sets of base objects read from and written to during any solo execution of a
   sequence of consecutive instances"; the proof needs these sets *per instance* (it uses `B(ℓ)`, the objects
   written by the `ℓ`-th instance alone). The per-instance reading is the one we formalize.
+
+### Typos
+- Section 4 calls the pointer to the first node `L.first` (Section 3: `first`/`last`), while the code of Figure 6
+  calls it `L.start`/`L.end`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

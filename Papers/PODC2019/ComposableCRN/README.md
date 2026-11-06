@@ -4,18 +4,20 @@ Eric E. Severson, David Haley, David Doty. *Composable computation in discrete c
 networks.* PODC 2019. DOI [10.1145/3293611.3331615](https://doi.org/10.1145/3293611.3331615).
 Formalized version: arXiv [1903.02637](https://arxiv.org/abs/1903.02637) v2 (numbering follows it).
 
-**Verdict: ✅ Correct.** Every checked statement holds as written. This covers the 1D
+**Verdict: ✏️ Slip.** The only mistake is a wrong formula in §1.2, and every checked statement holds as written: the 1D
 characterization (Theorem 3.1), the impossibility tool (Lemma 4.1) and `max`, the whole sufficiency
 direction of the main Theorem 5.2 (Lemmas 6.1, 6.2 with closure under composition), Observations
 2.1, 5.3, 9.1 and the leaderless 1D characterization (Theorem 9.2). Two parts are cited or left
 unformalized and enter only as hypotheses: Lemma 2.7 (stably computable ⇒ semilinear, cited from
 [10]) and the necessity of the eventually-min condition (Theorem 7.1, the long geometric §7).
-So the headline Theorem 5.2 is verified only in its "⇐" direction (plus conditions (i) and (iii)
+So the main Theorem 5.2 is verified only in its "⇐" direction (plus conditions (i) and (iii)
 of "⇒"); its hardest part, the necessity of condition (ii), is not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
+### ✏️ Slips
+- §1.2, second paragraph: "`X1 + X2 → W` (computing `w = x1 + x2`)" should say `w = min(x1, x2)`. The same sentence
+  has the intended version, and nothing else depends on it.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -67,7 +69,8 @@ input consumed so far.
   general form.
 
 **Not formalized.** Lemma 2.7 (cited), Lemma 2.3, Observation 2.4, Theorem 5.4, §7 (Theorem 7.1)
-and §8 (scaling limits); the equivalent fairness/probability-1 semantics of footnote 2.
+and §8 (scaling limits); the equivalent fairness/probability-1 semantics of footnote 2. We read the proofs of
+Lemma 2.3 and Observation 2.4, and they looked sound.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Hypotheses are satisfiable: the gadgets, `⌊3x/2⌋` and Lemma 6.1 give concrete

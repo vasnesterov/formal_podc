@@ -5,21 +5,21 @@ impossibility results, and how to avoid them* (Brief Announcement). PODC 2025. D
 [10.1145/3732772.3733515](https://doi.org/10.1145/3732772.3733515). Formalized version: arXiv
 [2504.01543](https://arxiv.org/abs/2504.01543) v1 (full version); numbering follows it.
 
-**Verdict: 🚨 Headline claim false.** The main positive result, Theorem 4.1 ("Algorithm 2
-`LCA-KP` is an LCA giving access to a `(1/2, 6ε)`-approximate solution"), is false: on a
-Knapsack instance whose items all have the same efficiency, `LCA-KP` answers "no" to every query,
-with probability close to 1. Lemma 4.6, on which it rests, is false on the same instance. The
-impossibility results (Lemma 3.1, Theorems 3.2–3.4) are true. Their proofs need repairs: the
-reductions of 3.2/3.3 break the paper's own normalisation of the profits, and Lemma 3.5 in the
-proof of 3.4 is not justified.
+**Verdict: ⚠️ Weakened.** The impossibility results (Lemma 3.1, Theorems 3.2–3.4) are true, although their proofs needed
+new arguments: the reductions of 3.2/3.3 break the paper's own normalisation of the profits, and Lemma 3.5 in the proof
+of 3.4 is not justified. The other half of the paper, how weighted sampling avoids them, is lost: Theorem 4.1 ("Algorithm
+2 `LCA-KP` is an LCA giving access to a `(1/2, 6ε)`-approximate solution"), the paper's main theorem, is false, because
+on a Knapsack instance whose items all have the same efficiency `LCA-KP` answers "no" to every query, with probability
+close to 1. Lemma 4.6, on which it rests, is false on the same instance, and no repaired algorithm was proved.
 
 ## Mistakes in the paper
 
-### 🚨 Theorem 4.1 (Algorithm 2 `LCA-KP` is a `(1/2, 6ε)`-approximation LCA)
+### ❌ Theorem 4.1 and Lemma 4.6 (`LCA-KP` is a `(1/2, 6ε)`-approximation LCA; ties in efficiency)
 On `N` identical items (weights `1`, weight limit `N/2`, `ε = 1/m` with `m ≥ 30`, `N ≥ m²`), `LCA-KP` answers "no" to
-every query with probability `≥ 1 − ε/36`, which is not a `(1/2, 6ε)`-approximation (`Sec4.theorem_4_1_false`).
+every query with probability `≥ 1 − ε/36`, which is not a `(1/2, 6ε)`-approximation (`Sec4.theorem_4_1_false`), and no
+equally partitioning sequence exists (`Sec4.no_eps_uniform`).
 
-**Impact.** The main positive result falls, even in the weakest, per-query reading of correctness; there is no local
+**Impact.** The main positive result is lost, even in the weakest, per-query reading of correctness; there is no local
 fix, and the existential claim of Theorem 1.4 is at best unestablished. The impossibility results are unaffected.
 
 **Details.** In normalised form every item has profit and weight `1/N`. All items are small with efficiency `1`, so
@@ -35,26 +35,26 @@ Reading `>` as `≥` in Line 3 of Algorithm 3 does not help: `LCA-KP` then answe
 infeasible. The paper never assumes distinct efficiencies, and ties are built into the design: the synthetic items
 of `Ĩ` have efficiency exactly `ẽ_{k+1}`.
 
-### ❌ Lemma 4.6 (an equally partitioning sequence exists with probability `≥ 1 − 13ε/36`)
-On the same instance every set `A_k(I)` of Definition 4.3 is either empty or contains every item, so no equally
-partitioning sequence of length `t ≥ 1` exists and the probability in Lemma 4.6 is `0` (`Sec4.no_eps_uniform`).
+Theorem 4.1 rests on Lemma 4.6 (an equally partitioning sequence exists with probability `≥ 1 − 13ε/36`). On the same
+instance every set `A_k(I)` of Definition 4.3 is either empty or contains every item, so no equally partitioning
+sequence of length `t ≥ 1` exists and the probability in Lemma 4.6 is `0`. The proof of Lemma 4.6 turns
+`Pr[p/w > ẽ_k] ≤ kq + τ` into `Pr[p/w ≥ ẽ_k] ≤ kq + τ`, which ignores the mass of items with efficiency exactly `ẽ_k`.
 
-**Impact.** Theorem 4.1 rests on this lemma; nothing in the paper assumes distinct efficiencies.
-
-**Details.** The proof of Lemma 4.6 turns `Pr[p/w > ẽ_k] ≤ kq + τ` into `Pr[p/w ≥ ẽ_k] ≤ kq + τ`, which ignores the
-mass of items with efficiency exactly `ẽ_k`.
-
-### Typos and slips
+### ✏️ Slips
 - Theorem 3.4 says "`(t(n), 4/5)`-LCA", which is failure probability `4/5` by Definition 2.2. The proof uses
   success probability `4/5`, and we formalize that version. The literal version cannot follow from the paper's
   distribution: a 1-query algorithm that answers "yes" on a weight-`3/4` item with a random hash bit succeeds with
   probability `1/2 > 1/5` on it.
 - The proof of Theorem 3.4 draws `(i, j)` uniformly from `[n]²`, so `i = j` is possible, and then the weights are
-  ill-defined. We use distinct pairs. Its weights `3/4, 1/4` are not integers, as Definition 2.2 requires. We scale
-  them to `3, 1` with weight limit `4`.
+  ill-defined. We use distinct pairs.
 - Theorem 2.7 states the sample complexity with `Ω̃`; it should be `Õ`.
 - The approximation guarantee is stated inconsistently: `(1/2 + ε)` in Theorem 1.4, `(2 + ε)` in the technical
   overview, `(1/2, 6ε)` in Theorem 4.1.
+- Algorithm 3, Lines 2–3 do not say what happens when no `k` satisfies `ẽ_k > p_j/w_j`, or when no `j ≥ 1` exists. The
+  evident reading is `k = 0`, the branch `k < 3`.
+
+### Typos
+- The "`τ`-approximate `p`-quantile" of Theorem 4.5 is never defined; its proof derives the definition.
 
 ## Proof gaps (statements true)
 
@@ -77,7 +77,7 @@ bound `⌊n/b⌋/3`, still `Ω(n)` for fixed `α`. (`theorem_3_2_normalized`, `t
 Lemma 3.5's argument that the default answer to each query `k` must be "yes" confuses an error conditional on the
 query being `k` with the `1/5` bound, which is an average over all `k`.
 
-**Impact.** Theorem 3.4 is true with the paper's constant; repaired by a joint count (`theorem_3_4`,
+**Impact.** Theorem 3.4 is true with the paper's constant, by a new joint count (`theorem_3_4`,
 `theorem_3_4_perQuery`, `LCA.count_le`).
 
 **Details.** The argument is that answering "no" costs error `1/3 − 1/10 > 1/5`. An algorithm may answer "no" on a
@@ -88,6 +88,14 @@ constant fraction of the `k` and still meet the average bound. The lemma's hypot
 `½(1 − y) + ½(y² + (1 − y)²) − O(q/n) ≥ 7/16 − O(q/n)` fraction of the hard distribution. This gives `t(n) ≥ n/11`
 for every `n ≥ 2` with success probability `4/5`, the paper's constant, and `t(n) ≥ n/40 − 1/5` under the per-query
 reading. (`theorem_3_4`, `theorem_3_4_perQuery`, `LCA.count_le`)
+
+### 🔧 Theorem 3.4 (hard distribution outside the model)
+The instances have weights `3/4`, `1/4` and profits `0`, while Definition 2.2 requires integer weights and total
+profit `1`.
+
+**Impact.** Statement true (`theorem_3_4`).
+
+**Repair.** We scale the weights to `3, 1` with weight limit `4` and use profits `1/n`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -132,7 +140,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Not formalized.** Theorems 2.7 and 4.5 (reproducible median and quantile), Lemmas 4.2 and 4.4
 (from [IKY12]), Lemmas 4.7, 4.8 and 4.10, and the Chernoff step of Lemma 4.6. None of them is
-needed for the counterexample.
+needed for the counterexample. Open remarks: Lemma 4.7 seems to assume `j ≥ 1`; even with distinct efficiencies, one
+small item at a quantile may break the bound `ε + 7ε²/10` of Lemma 4.6; and whether the literal Theorem 3.4, with
+failure probability `4/5`, is true is open here.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: `exists_lca_optimal` and `exists_lca_maximalFeasible` give LCAs

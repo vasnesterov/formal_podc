@@ -6,11 +6,12 @@ DOI [10.1145/3732772.3733526](https://doi.org/10.1145/3732772.3733526). Formaliz
 arXiv [2412.19649](https://arxiv.org/abs/2412.19649) v1 ("… in Faulty Majority Settings", the only version);
 numbering follows it.
 
-**Verdict: ❌ False claim.** The deterministic crash-tolerant **Rapid Download** protocol (Algorithm 7) is
-wrong. With `k = 4` peers, `n = 4` bits and `f = 2` crashes, a nonfaulty peer finishes without ever learning a
-bit. So Lemmas 5.13 and 5.15 are false, and Theorem 5.16 (time `O(n + f)` for any `β < 1`) is unestablished
-for `f ≥ 2`. The one-round lower bound (Theorem 3.6) and the simple **Static Download** protocol (Theorem 5.9:
-query-optimal, time `O(nf)`) are correct; Theorem 3.6's proof needed a small repair.
+**Verdict: ⚠️ Weakened.** The deterministic crash-tolerant **Rapid Download** protocol (Algorithm 7) is wrong: with
+`k = 4` peers, `n = 4` bits and `f = 2` crashes, a nonfaulty peer finishes without ever learning a bit, so Lemmas
+5.13 and 5.15 are false and Theorem 5.16 (time `O(n + f)` for any `β < 1`) is unestablished for `f ≥ 2`. The
+one-round lower bound (Theorem 3.6) and the simple **Static Download** protocol (Theorem 5.9: query-optimal, time
+`O(nf)`) are correct, after small repairs of their proofs. The paper's main point, the randomized protocols against
+Byzantine peers, was not checked.
 
 ## Mistakes in the paper
 
@@ -20,8 +21,7 @@ Algorithm 7 does not solve Download: with `k = 4` peers, `n = 4` bits and `f = 2
 Lemmas 5.13 and 5.15 (`Rapid.lemma_5_13_false`, `Rapid.lemma_5_15_false`,
 `Rapid.rapid_not_solves`).
 
-**Impact.** Theorem 5.16 (time `O(n + f)` for any `β < 1`) is unestablished for `f ≥ 2`; the
-existential Theorem 5.16 may still hold with a repaired protocol, which is not settled. The lower
+**Impact.** Theorem 5.16 (time `O(n + f)` for any `β < 1`) is unestablished for `f ≥ 2`. The lower
 bound (Theorem 3.6) and Static Download (Theorem 5.9) are unaffected.
 
 **Details.** Peers `M0,…,M3`, `lead(v) = v mod 4`; `M1` and `M2` crash (`f = 2 ≤ βk` with
@@ -49,27 +49,22 @@ other natural timing (a view-changing peer stays idle for two rounds), a simulat
 index skip with `n = 6`, caused by different `F` sets instead of different detection times. With
 Remark 1's timing, the protocol still fails (simulation, `n = 6`) if a leader adopts a higher index
 that arrives later, as Remark 2 suggests. The theorem's `f ≤ βk`, `β < 1` (also claimed in §1.4.3)
-contradicts Table 2, which marks Theorem 5.16 "#: `β ≤ 1/k`", i.e. `f ≤ 1`. For `f = 1`,
-exhaustive simulation (`k ≤ 4`, `n ≤ 4`) found no failure; this is not a proof.
+contradicts Table 2, which marks Theorem 5.16 "#: `β ≤ 1/k`", i.e. `f ≤ 1`.
 
-### ⚠️ Algorithm 7 (start of view 1)
-Algorithm 7 never says how view 1 starts: no peer sends `⟨view change 1, ·⟩`, so read literally all
-peers suspect the nonfaulty `lead(1)` after one round, contradicting Lemma 5.11.
-
-**Impact.** A missing case with evident intent; we let `lead(1)` start view 1 at time 0.
-
-### ⚠️ Theorem 5.9 for `f = 0`
-`T = O(nf)` is literally false for `f = 0` (it is `n`).
-
-**Impact.** Degenerate case; the bound holds for `f ≥ 1`.
-
-### Typos and slips
+### ✏️ Slips
+- Algorithm 7 never says how view 1 starts: no peer sends `⟨view change 1, ·⟩`, so read literally all
+  peers suspect the nonfaulty `lead(1)` after one round, contradicting Lemma 5.11. The intent is evident: we let
+  `lead(1)` start view 1 at time 0.
+- Theorem 5.9 for `f = 0`: `T = O(nf)` is literally false (it is `n`), and so is `M = O(k²·f·n)`; the bounds hold
+  for `f ≥ 1`.
 - Peer IDs are `[1, k]` but `lead(v) = v mod k ∈ [0, k−1]`.
+
+### Typos
 - In §3 the letter `n` is both the number of peers and of bits, and Lemma 3.3 needs them equal.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 3.6 (Eq. (8) in the proof of Lemma 3.4)
+### 🔧 Theorem 3.6 (Eq. (8) in the proof of Lemma 3.4)
 Eq. (8) claims `p(R̂(Byz)) > (1 − e⁻¹)/2` *for every* Byzantine set `Byz`, which fails, e.g., when
 the defective peer `v(R)` always lies in `Byz`.
 
@@ -83,12 +78,12 @@ sets that depend on `R`.
 Byzantine peers that run the algorithm on the input with `ℓ` flipped, with failure probability
 `≥ (1 − e⁻¹)/4`.
 
-### 🛠️ Lemma 3.3 (maximizing `q(i)`)
+### 🔧 Lemma 3.3 (maximizing `q(i)`)
 The claim "q(i) is maximized when `p_v(i) = 1/n`" is not justified.
 
 **Impact.** Statement true; we use `1 − x ≤ e^{−x}` and pigeonhole instead (`lemma_3_3`).
 
-### 🛠️ Theorem 5.9 (query bound)
+### 🔧 Theorem 5.9 (query bound)
 The proof says each nonfaulty peer leads "at most `n/γk`" views, but the exact bound is
 `(n + k − 1)/(k − f) ≤ 2n/(γk)`.
 
@@ -137,8 +132,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Not formalized.**
 * The Byzantine randomized protocols (§2, §4), the asynchronous crash protocols (§6) and message sizes.
-* A proof of Algorithm 7 for `f ≤ 1`, and whether some protocol achieves Theorem 5.16's bounds for
-  `f ≥ 2`.
+* A proof of Algorithm 7 for `f ≤ 1`: for `f = 1`, exhaustive simulation (`k ≤ 4`, `n ≤ 4`) found no failure;
+  this is not a proof.
+* Whether some protocol achieves Theorem 5.16's bounds for `f ≥ 2`: the existential theorem may still hold
+  with a repaired protocol, which is not settled.
+* Lemmas 5.10–5.12 and 5.14 individually.
 
 **Trust.** No `sorry`. All listed theorems use only the axioms `propext`, `Classical.choice` and
 `Quot.sound`. The Algorithm 7 counterexample is checked by `decide +kernel` on a memoized execution

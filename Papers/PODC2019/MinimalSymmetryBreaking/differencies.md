@@ -1,7 +1,7 @@
 # Differences between the formalization and the paper
 
 Paper: Balliu, Hirvonen, Olivetti, Suomela, *Hardness of minimal symmetry breaking in distributed computing*,
-PODC 2019, arXiv 1811.01643v3. Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
+PODC 2019, arXiv 1811.01643v3.
 
 ## Model
 
@@ -47,7 +47,7 @@ PODC 2019, arXiv 1811.01643v3. Verdict rules: `.claude/skills/formalize-paper/ve
    - The paper's second step (Cole–Vishkin to 3 colours, then an MIS in a pseudoforest, O(log\* c) rounds) is
      replaced by a greedy MIS over the 2c colour classes of the subgraph of differently-coloured edges (2c rounds).
      Both are O(1) for constant c.
-   - Definition 1 is unsatisfiable for k = 0 and for graphs with isolated nodes, where the lemma is vacuous (R2).
+   - Definition 1 is unsatisfiable for k = 0 and for graphs with isolated nodes, where the lemma is vacuous.
 10. **Lemmas 7, 8, 14, 15.**
     - Proved as stated for general Δ = 2k (`lemma_14`, `lemma_15`). Δ = 4 gives Lemmas 7 and 8.
     - The exponents of c are Δ/(Δ+1) = 1 − 1/(Δ+1) and 1 − 1/Δ.
@@ -64,8 +64,7 @@ PODC 2019, arXiv 1811.01643v3. Verdict rules: `.claude/skills/formalize-paper/ve
     - The asymptotic part is proved with our own constants (`qT_mul_large`): for 2t + 2k + 15 ≤ log\* n, the local
       failure probability is large compared with the number of independent nodes.
     - The paper's exact statement ("(½log\* n − b − 3)-round algorithms fail with probability ≥ 1/log^{(2b)} n") is
-      not checked. Its proof uses "for large enough n", which the statement does not mention. Not checked, so it is
-      not part of the verdict.
+      not checked. Its proof uses "for large enough n", which the statement does not mention. Not checked.
 13. **Claim 10 / Lemma 9.**
     - We prove a variant (`succProb_le`). If every anonymous t-round algorithm with randomness Fin n × Ω fails
       locally with probability ≥ q, then some identifier assignment gives success probability
@@ -99,9 +98,9 @@ PODC 2019, arXiv 1811.01643v3. Verdict rules: `.claude/skills/formalize-paper/ve
 18. **Theorem 4.** `theorem4` combines Lemmas 17 and 18. The upper bound is in log_{Δ−1} n, the lower bound in
     log_Δ n; both are Θ(log n) for fixed Δ.
 
-## Proof repairs (decide the verdict 🛠️)
+## Proof repairs
 
-19. **Lemma 3's algorithm is incorrect** (Section 8.1).
+19. 🛠️ **Lemma 3's algorithm is incorrect** (Section 8.1).
     - Under "closest irregularity by distance": take a 4-cycle a < b < c < d of degree-4 nodes, a leaf x on b, and
       r = 2.
       - Ties going to the cycle: a outputs (p = b, d = 0) while b outputs (p = x, d = 1). Condition (3) fails at a.
@@ -114,11 +113,8 @@ PODC 2019, arXiv 1811.01643v3. Verdict rules: `.claude/skills/formalize-paper/ve
       C will have a cycle as their closest irregularity" is false.
     - Found by a brute-force search script (not included in the repository).
     - Repair: the mode-based algorithm described in the README, `pstarAlg`.
-    - **Borderline (R1/R5):** the algorithm appears only inside the proof of Lemma 3 and the lemma is existential,
-      so we count this as a proof repair (🛠️), not a false algorithm claim. A reader who counts the algorithm of
-      Section 8.1 as a "correctness claim about the paper's algorithm" would get ❌. Lemma 3 is not a headline
-      result, so it would not be 🚨.
-20. **Claim 10, independence.**
+    - The algorithm appears only inside the proof of Lemma 3, and the lemma is existential.
+20. 🔧 **Claim 10, independence.**
     - The paper takes nodes at pairwise distance ≥ 2t+1 and says their failure events are independent. A node's
       failure depends on its (t+1)-ball, so this needs distance ≥ 2t+3.
     - Repaired with disjoint (t+1)-balls. The resulting count differs from n^{1/(3(2t+1))}; see item 13.
@@ -128,7 +124,7 @@ PODC 2019, arXiv 1811.01643v3. Verdict rules: `.claude/skills/formalize-paper/ve
     - The step Pr[X|Y] ≤ Pr[X'|Y'] conditions on different events, and X' is not determined by B_k(v). We replace it
       by an averaging argument over identifiers that are i.i.d. on the central ball and conditioned to be injective,
       then extend them to a bijection (`exists_injOn_extend`, `exists_le_of_expect`).
-21. **Lemmas 7/8/14/15, threshold choice.**
+21. 🔧 **Lemmas 7/8/14/15, threshold choice.**
     - The paper sets f = p'/(5c) (resp. p'/(4c), p'/((Δ+1)c), p'/(Δc)), where p' is the failure probability of the
       algorithm built with threshold f. This is circular.
     - Repaired by choosing f = q/((Δ+1)c) for the target bound q and arguing by contradiction (`lemma_14`,
@@ -136,7 +132,7 @@ PODC 2019, arXiv 1811.01643v3. Verdict rules: `.claude/skills/formalize-paper/ve
       lower-bound chain.
     - Claim 11 only needs the lower-bound forms `nodeLB_succ_of_edgeLB` / `edgeLB_of_nodeLB`, which avoid this.
 
-## Minor imprecisions and typos (not affecting the verdict)
+## Minor imprecisions and typos
 
 22. In Claim 11 the recurrence for p̂_{t−1} uses ĉ_t; it should be ĉ_{t−1}. Claim 11's bound has exponent 5^{2t+1}
     after 2t steps; this is correct but not tight.

@@ -7,45 +7,47 @@ Applications to Consensus and Approximate Agreement.* PODC 2022. DOI
 Section 5.3); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** All the paper's results are proved, for any number of processes: the speedup
-theorem (Theorems 1 and 2), Lemma 1, Corollaries 1–3, Theorems 3 and 4, and Claims 1–6. The speedup
-theorems need two model properties that the paper uses without stating them (made explicit below), and
-the iteration in the proof of Theorem 4 skips a side condition, which we repaired. The
-abstract and conclusion overstate the binary-consensus result: read literally, the abstract's claim fails for
-`n = 2` (where consensus solves the task in one round), but the body states the qualifiers it needs. We also prove that the bounds of
-Corollary 3 are tight.
+**Verdict: ⚠️ Weakened.** All the paper's numbered results are proved, for any number of processes: the speedup
+theorem (Theorems 1 and 2), Lemma 1, Corollaries 1–3, Theorems 3 and 4, and Claims 1–6. But the claim that binary
+consensus does not help solve approximate agreement faster, half of the paper's main application, is supported only in
+a weaker form: inputs depending on id and round, and a bound one round below the IIS bound when
+`1/ε ≤ n ≤ 2^⌈log₂ 1/ε⌉`. The test&set half of that application stands for `n ≥ 3`.
 
 ## Mistakes in the paper
 
 ### ⚠️ Abstract, Section 1.2 and Conclusion (scope of the binary-consensus result)
 The abstract says binary consensus objects "are not more powerful as far as helping solving approximate agreement faster is concerned", but Theorem 4, the only supporting result, gives a bound one round below the IIS bound whenever `1/ε ≤ n ≤ 2^⌈log₂ 1/ε⌉` (for `n = 4`, `ε = 1/4`: 1 round versus 2).
 
-**Impact.** An overstatement of informal claims; no numbered statement is false, and Theorem 4 itself is
-correct as stated (`theorem4_log`).
+**Impact.** Only a weaker form of these informal claims is proved. No numbered statement is false, and Theorem 4
+itself is correct as stated (`theorem4_log`); the test&set half stands for `n ≥ 3` (`theorem3_log`).
 
-**Details.** The conclusion says binary consensus is not useful "at least when `n ≥ 1/ε`". Theorem 4 covers
-only algorithms whose consensus inputs depend on the process id and the round. Its bound
+**Details.** Read literally, the abstract's claim fails for `n = 2`, where consensus solves the task in one round; the
+body states the qualifiers it needs. The conclusion says binary consensus is not useful "at least when `n ≥ 1/ε`".
+Theorem 4 covers only algorithms whose consensus inputs depend on the process id and the round. Its bound
 `min(⌈log₂ n⌉ − 1, ⌈log₂ 1/ε⌉)` matches the IIS bound only for `n > 2^⌈log₂ 1/ε⌉` (e.g. `n ≥ 2/ε`).
 
-### ⚠️ Theorems 1 and 2 (implicit model assumptions)
-The speedup proofs use two model properties that the paper never states: a round of some processes extends to a round of all of them with the same views for the early ones (`P^(1)(τ') ⊆ P^(1)(τ)`), and a box called solo returns a value determined by the caller's input ("`b_i = B_t(a_i)`").
-
-**Impact.** Both properties hold in all the paper's models, so every application is correct. We make them
-explicit hypotheses (`Model.Extendable`, `Model.SoloDet`) and prove them for IIS, iterated snapshot,
-IIS + test&set and IIS + binary consensus.
-
-### Typos and slips
+### ✏️ Slips
+- Theorems 1 and 2: the speedup proofs use two model properties that the paper never states: a round of some processes
+  extends to a round of all of them with the same views for the early ones (`P^(1)(τ') ⊆ P^(1)(τ)`), and a box called
+  solo returns a value determined by the caller's input ("`b_i = B_t(a_i)`"). Both hold in all the paper's models, so
+  every application is correct. We make them explicit hypotheses (`Model.Extendable`, `Model.SoloDet`) and prove them
+  for IIS, iterated snapshot, IIS + test&set and IIS + binary consensus.
+- Section 2.2: solvability keeps the complex-based definition after the carrier-map requirement on `Δ` is dropped;
+  read literally with faces, the liberal task of Definition 4 would not be liberal. The proofs use exact participation
+  throughout (`Solves`).
 - The claims are applied to `3^k ε` and `2^k ε` beyond Definition 3's range `ε ≤ 1` (we prove them for every
   `ε ≥ 0`).
+
+### Typos
 - Claim 4's proof (and Corollary 2's) says `P^(1)(σ)` for the protocol complex `P^(1)(τ)` of the local task.
 - The proceedings version of Theorem 1's proof mixes `ρ'`/`ϱ'`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 4 (iteration of Claim 6)
+### 🔧 Theorem 4 (iteration of Claim 6)
 Claim 6 assumes `|S| ≥ 5`, and the proof of Theorem 4 applies it to every `S_k` but only checks `|S_{t−1}| ≥ 3`.
 
-**Impact.** Statement true; the missing inequality holds (`theorem4_aux`).
+**Impact.** The statement is true; the missing inequality holds (`theorem4_aux`).
 
 **Repair.** Claim 6 in fact needs no size hypothesis, and we iterate with the cleaner invariant
 "`|S| ≤ 2^(t+1)` or `1 ≤ 2^t ε`".
@@ -98,7 +100,7 @@ uniform one-round reductions (`solvable_succ_of_reduction`).
 
 **Not formalized.** The topological figures and the iterated *collect* model (the speedup theorem is
 proved for an abstract model; the paper's instances above are covered); the "essentially tight" remark
-on Theorem 4.
+on Theorem 4. We did not determine whether Theorem 2 can fail for boxes with nondeterministic solo answers.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity: all four models satisfy the hypotheses of the speedup theorem, and concrete

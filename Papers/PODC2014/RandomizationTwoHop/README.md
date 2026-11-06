@@ -5,26 +5,25 @@ Yuval Emek, Christoph Pfister, Jochen Seidel, Roger Wattenhofer. *Anonymous Netw
 Formalized version: the authors' 10-page copy from the ETH DISCO publication page (with proofs); there
 is no arXiv version.
 
-**Verdict: ⚠️ Minor statement issues.** Both main theorems hold: Theorem 1 (`Π ∈ GRAN` ⇒ `Πᶜ` is
-solvable by a deterministic anonymous algorithm) and Theorem 2 (the same in the infinity model). The
-graph-theoretic results also hold: Lemmas 2–4, Norris' Theorem 3 and Corollaries 1–2. The proof of
-Lemma 9, the correctness of the paper's algorithm `A*`, has an off-by-one in the view depth that port
-numbers make essential. So Lemma 9 is unestablished for `A*` as written. With one more level of view
-(at the same round cost) `A*` is correct, and that is how we prove Theorem 1.
+**Verdict: 🔧 Easy fix.** Both main theorems hold: Theorem 1 (`Π ∈ GRAN` ⇒ `Πᶜ` is solvable by a deterministic
+anonymous algorithm) and Theorem 2 (the same in the infinity model), and so do the graph-theoretic results (Lemmas 2–4,
+Norris' Theorem 3 and Corollaries 1–2). The proof of Lemma 9, the correctness of the paper's algorithm `A*`, has an
+off-by-one in the view depth that port numbers make essential, so Lemma 9 is unestablished for `A*` as written. With
+one more level of view (at the same round cost) `A*` is correct, and that is how we prove Theorem 1.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 9 (correctness of algorithm `A*`, §3.2)
-The proof uses that the first `k` rounds at `v` are determined by `L_k(v)` and the random bits, but
-with port numbers they need `L_{k+2}(v)` (`locality_gap`), while `A*` matches views `L_p` and simulates
-up to `p − 1` rounds.
+### 🔧 Lemma 9 (correctness of algorithm `A*`, §3.2)
+The proof says that "the first `k` rounds … are fully determined by `L_k(v, I)`" and the random bits, but they need
+`L_{k+1}(v)` even without ports and `L_{k+2}(v)` with port numbers (`locality_gap`), while `A*` matches views `L_p` and
+simulates up to `p − 1` rounds.
 
 **Impact.** Theorem 1 is not affected. Lemma 9, and with it the claim that the paper's `A*` (as
 written) solves `Πᶜ`, is neither proved nor refuted. If Update-Graph uses the view `L_{p+1}(v, I^p)`
 instead of `L_p(v, I^p)`, all lemmas of §3.2 go through and Theorem 1 follows (`theorem_1`). Computing
-`L_{p+1}` takes `p` rounds, which is the round count the paper states for this step. Graded ⚠️
-rather than 🛠️ because the repair changes the algorithm (one view level), not only the argument; it
-is a local fix that the paper's own round count points to.
+`L_{p+1}` takes `p` rounds, which is the round count the paper states for this step. The repair changes
+the algorithm (one view level), not only the argument; it is a local fix that the paper's own round
+count points to.
 
 **Details.** `L_1(v)` is the root alone, so `L_k(v)` has tree depth `k − 1`. Even without ports, `k` rounds depend
 on tree depth `k`, i.e. `L_{k+1}`. That alone does no harm here: the simulation of phase `p` lasts
@@ -46,17 +45,17 @@ an adversarial `A_R`, and an analysis of `A*`'s candidate selection over all sma
 **Repair.** `AStar.Lv` is `trunc p (relabel (bL p) W)`, the view of tree depth `p`, i.e. `L_{p+1}(v, I^p)`. With
 it, Lemma 9 is `AStar.outPhase_eq`, proved with the locality lemma `decided_local`.
 
-### Typos and slips
-- §3.2, Lemma 9's proof: "the first `k` rounds … are fully determined by `L_k(v, I)`". Even without
-  ports this should be `L_{k+1}` (see above).
-- §3.1: "node `v` computes `L_p(v, I^p)` (requires `p` rounds)". `p − 1` rounds suffice for `L_p`;
-  `p` rounds give `L_{p+1}`, the view the repaired algorithm uses.
+### ✏️ Slips
 - Corollary 3 is said to follow "from Corollary 1 as `|V̂*| ≤ p`". It follows from Fact 1 and Lemma 2
   (the finite view graph is a factor of the candidate).
 
+### Typos
+- §3.1: "node `v` computes `L_p(v, I^p)` (requires `p` rounds)". `p − 1` rounds suffice for `L_p`;
+  `p` rounds give `L_{p+1}`, the view the repaired algorithm uses.
+
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 3 (`G∞` is the unique prime factor)
+### 🔧 Lemma 3 (`G∞` is the unique prime factor)
 The proof shows that every prime factor of `G` is isomorphic to `G∞` but not that `G∞` itself is prime,
 which Lemma 7 later uses for `I*^p`.
 
@@ -64,17 +63,6 @@ which Lemma 7 later uses for `I*^p`.
 
 **Repair.** In `G∞` distinct nodes have distinct views (Fact 1). So every factorizing map out of
 `G∞` is injective, hence bijective.
-
-### 🛠️ Lemma 7 (`I*^p` is selected for `p ≥ 2n`)
-The proof compares views in two different graphs (`Ĝ'*` with `n' ≤ n` nodes and `I*^p` with `n`
-nodes), for which Theorem 3 (about two nodes of one graph) does not apply, and only sketches the
-argument via "the depth-`n'` truncating function is a factorizing map".
-
-**Impact.** Statement true; repaired (`AStar.eq_of_mem_Fam`).
-
-**Repair.** Colour refinement on the disjoint union (`teq_stable_two`): views of nodes of graphs with
-`m` and `n` nodes that agree to tree depth `m + n − 1` agree forever. With `p ≥ 2n ≥ n + n'`, the
-candidate's view graph has the same views as `I*^p`, so it is `I*^p`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -139,6 +127,13 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Probabilistic ⇒ combinatorial solvability | `SolvesAS.solves`, `GRAN_AS.gran` | `Measure.lean` |
 
 Lemma 1 holds by construction: `Ainf` makes its choices as functions of `V∞` only.
+
+Lemma 7 (`I*^p` is selected for `p ≥ 2n`) takes another route than the paper. The printed proof, which compares views
+in two different graphs (`Ĝ'*` with `n' ≤ n` nodes and `I*^p` with `n` nodes), is terse: it truncates subtrees of equal
+depth-`p` views and uses Corollary 1 inside each graph, via "the depth-`n'` truncating function is a factorizing map".
+We use colour refinement on the disjoint union (`teq_stable_two`): views of nodes of graphs with `m` and `n` nodes that
+agree to tree depth `m + n − 1` agree forever. With `p ≥ 2n ≥ n + n'`, the candidate's view graph has the same views as
+`I*^p`, so it is `I*^p` (`AStar.eq_of_mem_Fam`).
 
 **Not formalized.** Section 4 (fibrations), the introduction's remarks (2-hop colouring and MIS are
 in GRAN, `k`-hop colouring for `k > 2` is not), and computability of `A*`.

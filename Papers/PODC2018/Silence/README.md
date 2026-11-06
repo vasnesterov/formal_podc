@@ -6,31 +6,57 @@ Guy Goren, Yoram Moses. *Silence.* PODC 2018. DOI
 follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The Silent Choir Theorem, the lower bounds of Theorem 3 and the
-three matching AC protocols (STEALTH, D2, D1f1) hold, and so do the Appendix D bounds. The fixes:
-Lemma 2 and Corollary 2 are false when the receiver has itself crashed; Theorem 3 lacks the bound for
-`D = 1`, which "completely characterize" needs; the protocol proofs treat the consensus sub-protocol as
-a black box, which does not work. Under readings that the text allows, STEALTH and D2 are wrong; with
-the intended reading and a concrete consensus they are correct. Appendix D's 1-bit encoding of `huh?`
-does not say how it is decoded: one natural decoding breaks Agreement, and another works.
+**Verdict: 🛠️ Hard fix.** The Silent Choir Theorem, the lower bounds of Theorem 3 and the
+three matching AC protocols (STEALTH, D2, D1f1) hold, and so do the Appendix D bounds and protocol. The protocol proofs
+treat the consensus sub-protocol as a black box, which does not work: saving them took a concrete max-floodset
+consensus and a new argument across six lemmas. The rest needs local changes: Theorem 3 lacks the bound for `D = 1`,
+which "completely characterize" needs, and Appendix D's 1-bit encoding of `huh?` does not say how it is decoded.
 
 ## Mistakes in the paper
 
-### ⚠️ §4.2, STEALTH and D2 (self-messages under-specified)
-Under readings the text allows, STEALTH violates Commit Validity: if process 0 checks only "`n − 1` first-round messages", ignoring its own vote, then with `v₀ = 0` and no failures everyone commits (`Stealth.literal0_not_solvesAC`, `Stealth.literalErr_not_solvesAC`).
+### 🔧 §4.2, "completely characterize" (Theorem 3 for `D = 1`)
+§4.2 says the three protocols make the bounds of Theorem 3 tight, but for `f = 1` and `D = 1` Theorem 3 gives only `M ≥ n`, while D1f1 uses `n² − n`.
 
-**Impact.** Inconsistent or under-specified descriptions, not wrong protocols: the intended reading
-is "sent or received", as the D2 prose says, and we verify that reading (`Stealth.solvesAC`,
-`D2.solvesAC`).
+**Impact.** The claim is incomplete, and true after adding the missing bound: if all processes decide by time
+1, then `M ≥ n(n − 1)`. It follows from the Silent Choir Theorem (`theorem3_D1`).
 
-**Details.** Separately, suppose a choir member that sent `err` but received none still commits.
-With `n = 3`, `f = 1`, `v₂ = 0`, and process 0 crashing in round 3, process 1 commits. Both runs
-violate Commit Validity. Fig. 3 (D2) has the same self-message ambiguity.
+### ✏️ Slips
+- §4.2, STEALTH and D2: self-messages are under-specified. Under readings the text allows, STEALTH violates Commit
+  Validity: if process 0 checks only "`n − 1` first-round messages", ignoring its own vote, then with `v₀ = 0` and no
+  failures everyone commits (`Stealth.literal0_not_solvesAC`, `Stealth.literalErr_not_solvesAC`). Separately, suppose
+  a choir member that sent `err` but received none still commits. With `n = 3`, `f = 1`, `v₂ = 0`, and process 0
+  crashing in round 3, process 1 commits. Both runs violate Commit Validity. Fig. 3 (D2) has the same self-message
+  ambiguity. These are under-specified descriptions, not wrong protocols: the intended reading is "sent or received",
+  as the D2 prose says, and we verify that reading (`Stealth.solvesAC`, `D2.solvesAC`).
+- Lemma 2 and Corollary 2 fail when the receiver `i` has crashed by time `m`: a crashed `i` "receives nothing", but
+  its state is `⊥` and it knows nothing (`corollary2_literal_false`). Counterexample: `n = 3`, `f = 1`, `S = {1, 2}`,
+  `φ = (v₁ = 1 ∨ v₂ = 1)`. Process 0 crashes in round 1, and every value is `1`. We prove both results for an `i` that
+  is alive at time `m`; Lemma 1 is unaffected (`lemma2`, `corollary2`, `lemma1`).
+- The D1f1 prose (§4.2) says "`all[1]` message in the second round" where it means the third round.
+- Theorem 2's proof says "`k_y < ℓ − 1`" where it needs `k_y ≤ ℓ − 1`.
 
-### ⚠️ Appendix D, 1.5D (the 1-bit encoding of `huh?`)
+### Typos
+- Theorem 3(c)'s proof says "chain from `j`" where it means "from `i`".
+- Fig. 1 sends `all[1]` to `{0, …, f}` instead of `{1, …, f}`.
+
+## Proof gaps (statements true)
+
+### 🛠️ STEALTH, D2, 1.5D (consensus used as a black box; Lemmas 5, 8, 9, 11, 17, 18)
+The protocols call `B.1.Consensus(f − 1)`, which tolerates only `f − 1` crashes, but the Commit Validity proofs (Lemmas 5, 9, 17) need its Validity in runs where `f` crashes can happen during the consensus, and the Agreement proofs (Lemmas 8, 11, 18) never check the `f − 1` bound.
+
+**Impact.** Statements true; repaired with a concrete max-floodset consensus (`Stealth.solvesAC`,
+`D2.solvesAC`, `MidRound.OnePointFive.solvesACMid`).
+
+**Details.** The bad runs include e.g. `v_j = 0` with nothing failed earlier.
+
+**Repair.** With a concrete max-floodset everything works. Its validity holds for any number of
+crashes. When the inputs are mixed, a crash happened before the consensus, so its `f` rounds contain
+a round with no crash.
+
+### 🔧 Appendix D, 1.5D (the 1-bit encoding of `huh?`)
 The paper sends `huh?` as "quiet to `{i+1..i+f}`, `1` to the rest" but never says how a receiver decodes it, and the natural decoding that ignores silence from a predecessor breaks Agreement (`MidRound.OneBit.oneBit_not_solvesACMid`).
 
-**Impact.** Under-specified encoding: a decoding that also reads silence from a predecessor as
+**Impact.** The encoding is under-specified: a decoding that also reads silence from a predecessor as
 `huh?` makes the 1-bit protocol correct (`MidRound.OneBitFixed.solvesACMid`); with `huh?` as a
 separate message 1.5D is correct as well (`MidRound.OnePointFive.solvesACMid`). The appendices
 appear only in the arXiv version.
@@ -43,48 +69,19 @@ appear only in the arXiv version.
 - *Decoding that also reads "no `all[1]` from a predecessor" as `huh?`.* The 1-bit protocol is
   correct.
 
-### ⚠️ Lemma 2 and Corollary 2 (receiver crashed by time `m`)
-Lemma 2 and Corollary 2 fail when the receiver `i` has crashed by time `m`: a crashed `i` "receives nothing", but its state is `⊥` and it knows nothing (`corollary2_literal_false`).
-
-**Impact.** False only in this degenerate case. We prove both results for an `i` that is alive at
-time `m`; Lemma 1 is unaffected (`lemma2`, `corollary2`, `lemma1`).
-
-**Details.** Counterexample: `n = 3`, `f = 1`, `S = {1, 2}`, `φ = (v₁ = 1 ∨ v₂ = 1)`. Process 0
-crashes in round 1, and every value is `1`.
-
-### ⚠️ §4.2, "completely characterize" (Theorem 3 for `D = 1`)
-§4.2 says the three protocols make the bounds of Theorem 3 tight, but for `f = 1` and `D = 1` Theorem 3 gives only `M ≥ n`, while D1f1 uses `n² − n`.
-
-**Impact.** Incomplete claim, true after adding the missing bound: if all processes decide by time
-1, then `M ≥ n(n − 1)`. It follows from the Silent Choir Theorem (`theorem3_D1`).
-
-### Typos and slips
-- Theorem 2's proof says "`k_y < ℓ − 1`" where it needs `k_y ≤ ℓ − 1`.
-- Theorem 3(c)'s proof says "chain from `j`" where it means "from `i`".
-- Fig. 1 sends `all[1]` to `{0, …, f}` instead of `{1, …, f}`.
-- The D1f1 prose (§4.2) says "`all[1]` message in the second round" where it means the third round.
-
-## Proof gaps (statements true)
-
-### 🛠️ STEALTH, D2, 1.5D (consensus used as a black box; Lemmas 5, 8, 9, 11, 17, 18)
-The protocols call `B.1.Consensus(f − 1)`, which tolerates only `f − 1` crashes, but the Commit Validity proofs (Lemmas 5, 9, 17) need its Validity in runs where `f` crashes can happen during the consensus, and the Agreement proofs (Lemmas 8, 11, 18) never check the `f − 1` bound.
-
-**Impact.** Statements true; repaired with a concrete max-floodset consensus (`Stealth.solvesAC`,
-`D2.solvesAC`).
-
-**Details.** The bad runs include e.g. `v_j = 0` with nothing failed earlier.
-
-**Repair.** With a concrete max-floodset everything works. Its validity holds for any number of
-crashes. When the inputs are mixed, a crash happened before the consensus, so its `f` rounds contain
-a round with no crash.
-
-### 🛠️ Lemma 11 (D2 agreement)
+### 🔧 Lemma 11 (D2 agreement)
 The process `c_j` that received `j`'s vote need not "send `j`'s id to all": if it committed, it is silent in round 3.
 
 **Impact.** Statement true: agreement then follows from the biased-to-1 property instead
 (`D2.solvesAC`).
 
-### 🛠️ Theorem 2 (Silent Choir)
+### 🔧 Lemma 18 (1.5D agreement)
+"This correct process will start the consensus protocol with `v̂ = 1`" assumes that it takes part in the consensus, which is not shown.
+
+**Impact.** Statement true: any uncommitted process that later decides reaches everybody with its `huh?`
+(`MidRound.OnePointFive.solvesACMid`).
+
+### 🔧 Theorem 2 (Silent Choir)
 A process `h ∈ S_j^r(m−1)` may already have crashed in `r` before it is reached, and the paper's `r′` makes `h` crash later, so `h` behaves differently in `r′`.
 
 **Impact.** Statement true; fixed by keeping `h`'s earlier crash (`silent_choir`).

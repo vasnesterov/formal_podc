@@ -5,23 +5,25 @@ You Define Locally Checkable Labelings.* PODC 2026. DOI
 [10.1145/3796701.3815923](https://doi.org/10.1145/3796701.3815923). Formalized version: the full version
 arXiv:2602.18188v1 (40 pages).
 
-**Verdict: ❌ False claim.** Theorem 5.1, the graph-theoretic key of the reduction from LCLs to PN-checkable
-problems, is false as stated. So is Lemma 5.13. The hypothesis compares colours only inside an `r`-gball, but the
-conclusion is about a set of gadgeted diameter `2r`. Theorem 5.1 becomes true once edge-consistency is required for
-all pairs of vertices; we prove that repaired version in full, with the paper's proof strategy. Section 6 (PN-checkable
-→ RE formalism, Lemmas 6.2–6.6) is correct up to typos. The main Theorem 7.1 is not refuted, but as written it relies
-on the false Theorem 5.1, through Lemmas 5.4 and 5.8.
+**Verdict: ❌ Intent lost.** Theorem 5.1, the graph-theoretic key of the reduction from LCLs to PN-checkable problems, is
+false as stated, and the version we prove needs edge-consistency for all pairs of vertices, which a PN-view verifier cannot
+enforce. So the main Theorem 7.1, which relies on it through Lemmas 5.4 and 5.8, is unestablished, though not refuted: a
+local repair with a larger `r_D` is plausible but not proved. Section 6 (PN-checkable → RE formalism, Lemmas 6.2–6.6) is
+correct up to slips.
 
 ## Mistakes in the paper
 
-### ❌ Theorem 5.1 (graph-theoretic key of the reduction to PN-checkable problems)
+### ❌ Theorem 5.1 (graph-theoretic key of the reduction to PN-checkable problems; also Lemma 5.13 and Corollaries 5.11, 5.14, 5.16; used by Lemma 5.4, hence Lemma 5.8 and Theorem 7.1)
 The hypothesis compares colours only with the centre's colour inside an `r`-gball, but the conclusion claims all
 of `gball_r(v)` is injectively coloured, and two vertices of the gball at gadgeted distance up to `2r` can share
 a colour: in the gadgeted `K_{3,3}` with `r = 1`, two original vertices of the same side may (`theorem_5_1_false`).
 
-**Impact.** A numbered theorem, not the headline; but the headline Theorem 7.1 relies on it (next item). The
-theorem becomes true once edge-consistency is required for all pairs of vertices; we prove that repaired
-version in full, with the paper's proof strategy (`theorem_5_1_repaired`).
+**Impact.** Lemma 5.4 (soundness of the lift B → D) invokes the false theorem, so Lemma 5.8 and the main Theorem 7.1
+inherit the gap and are unestablished, though not refuted. Theorem 5.1 becomes true once edge-consistency is required for
+all pairs of vertices; we prove that repaired version in full, with the paper's proof strategy
+(`theorem_5_1_repaired`). But in the application (Lemma 5.4) consistency is only checked inside PN-views of radius `r_D`.
+We see no reason to doubt that these results hold with the repaired theorem and a larger `r_D`, but this part is not
+formalized.
 
 **Details.** Condition 2 ("edge-consistent in every `r`-gball") requires: for every edge `{v,u}` and every
 `v' ∈ gball_r(v)` with `χ(v') = χ(v)`, `v'` has a neighbour of colour `χ(u)`. The hypothesis never compares a
@@ -35,7 +37,15 @@ distance-`2r`, edge colouring), `r = 1`. Take an injective colouring and give th
 
 The paper's proof establishes only that the colour of the centre `v` and of its outer neighbours is unique in
 `gball_r(v)` (Corollary 5.14, Lemma 5.13). Corollary 5.16 then concludes uniqueness for *every* pair, which
-does not follow. Even those partial claims fail at the boundary of the gball (items below).
+does not follow. Even those partial claims fail at the boundary of the gball:
+- Lemma 5.13 is false as stated: in the gadgeted `K_{3,3}` with `r = 1`, the original vertex `1` may get the colour
+  of the outer vertex `v` of the expanded edge `{0,3}` next to `3` (`lemma_5_13_false`). The idea is the same: `1 ∈ gball_1(3)`,
+  but `1` and `v` are at gadgeted distance `3/2 > 1`, so the hypothesis never compares them. The lemma is a step of the
+  paper's proof of Theorem 5.1, whose repaired version we prove separately.
+- Corollary 5.14 fails too, by a SAT experiment that is not Lean-checked: in the gadgeted `K_4` with lengths `1, …, 6` and
+  `r = 1`, a SAT search found a colouring satisfying conditions 1 and 2 in which two *adjacent* original vertices get the
+  same colour. The proof of 5.14 applies Lemma 5.13 to a vertex `u'` that may lie outside `gball_r(v)`. Nothing here rests
+  on this experiment.
 
 **Repair.** If edge-consistency holds for all pairs of vertices, then every `gball_r(v)` is injectively
 coloured. This uses `x` as a distance-`2r` edge colouring with positive lengths; simplicity and 3-regularity
@@ -47,41 +57,19 @@ are not needed (`theorem_5_1_repaired`). The proof follows the paper's ideas, ma
   edge, read in opposite directions.
 - That is impossible: at the middle of the edge, two vertices at distance `≤ 2` would get the same colour.
 
-In the application (Lemma 5.4) consistency is only checked inside PN-views of radius `r_D`. So Problem D needs a
-view radius large enough to cover every pair the argument compares; see `differencies.md`.
+This does not save the local form of the theorem: Problem D would need a view radius large enough to cover every pair the
+argument compares; see `differencies.md`.
 
-### ❌ Theorem 7.1 and Lemmas 5.4, 5.8 (unestablished)
-Lemma 5.4 (soundness of the lift B → D) invokes the false Theorem 5.1, so Lemma 5.8 and the main Theorem 7.1
-inherit the gap and are unestablished, though not refuted.
-
-**Impact.** The headline is not refuted. We see no reason to doubt that these results hold with the repaired
-theorem and a larger `r_D`, but this part is not formalized.
-
-### ❌ Lemma 5.13
-The lemma is false as stated: in the gadgeted `K_{3,3}` with `r = 1`, the original vertex `1` may get the colour
-of the outer vertex `v` of the expanded edge `{0,3}` next to `3` (`lemma_5_13_false`).
-
-**Impact.** A false numbered lemma; it is a step of the paper's proof of Theorem 5.1, whose repaired version we prove separately.
-
-**Details.** Same idea as for Theorem 5.1: `1 ∈ gball_1(3)`, but `1` and `v` are at gadgeted distance
-`3/2 > 1`, so the hypothesis never compares them.
-
-### ❌ Corollary 5.14 (SAT experiment, not Lean-checked)
-In the gadgeted `K_4` with lengths `1, …, 6` and `r = 1`, a SAT search found a colouring satisfying conditions 1
-and 2 in which two *adjacent* original vertices get the same colour.
-
-**Impact.** A false numbered corollary on the way to Theorem 5.1, found by a SAT search only; we do not rely on
-it for the verdict.
-
-**Details.** The proof of 5.14 applies Lemma 5.13 to a vertex `u'` that may lie outside `gball_r(v)`.
-
-### Typos and slips
-- Proof of Lemma 6.4: `(T(v→u)) ≅ (T(v∖u))` should read `(T(u∖v))`.
+### ✏️ Slips
+- Gadgeting (Section 5.1): `x : E(G) → ℕ` allows length 0, which the gadget construction cannot handle; we require
+  positive lengths.
 - Lemma 6.2 silently needs every view of `C_D` to have a root with 3 children. This holds for PN-views of
   3-regular graphs.
+- Proof of Lemma 6.4: `(T(v→u)) ≅ (T(v∖u))` should read `(T(u∖v))`.
+
+### Typos
 - The remark "only original vertices are non-triangle vertices" is attributed to Lemma 5.2, but it holds by
   construction.
-- `x : E(G) → ℕ` allows length 0, which the gadget construction cannot handle; we require positive lengths.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -125,8 +113,12 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Not formalized.**
 - Sections 3–4: the general encoding/decoding framework, the simulations, the ladder gadgets and Lemmas 4.1–4.3, 4.6.
-- Problem D and Lemmas 5.3–5.5, 5.8.
+  We reviewed Section 4 without formalizing it. Open points: the decoded instance may be a multigraph with degree `3 > d`,
+  isolated vertices become cycles of length 2, and the "WLOG radius exactly `r_B`".
+- Problem D and Lemmas 5.3–5.5, 5.8. We reviewed Problem D without formalizing it. Open points: reconstructibility inside a
+  PN-view, read literally, fails at leaves, and the radius `r_D` and the bound `k` need adjusting for the repaired theorem.
 - Lemma 6.7 and Theorem 7.1: the complexity statements.
+- Lemma 5.12's proof by minimal counterexample is sketchy; we prove rigidity only under global consistency (`Base.rigid`).
 
 **Trust.** No `sorry`. All listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: the counterexamples are concrete. `theorem_5_1_repaired_nonvacuous` applies the repaired theorem to

@@ -6,43 +6,41 @@ matchings in constant time.* PODC 2010, pp. 281–282. DOI
 *Almost Stable Matchings in Constant Time*, arXiv [0812.4893](https://arxiv.org/abs/0812.4893) v1;
 numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** All three theorems hold with the paper's constants:
-truncated Gale–Shapley gives an `ε`-stable matching in `T ≤ 4 + 2Δ²/ε` rounds (also with ties), a
-`(2+ε)`-approximate maximum-weight matching in `T ≤ 4 + 2Δ/ε` rounds, and a constant-query
-estimator of the size of a stable matching. Lemmas 1–5 are true. Lemma 6 is false as stated in the
-degenerate case `Δ = 1`, `i = 1`; it needs `i ≥ 2`, as in Lemmas 4 and 5, which its proof uses.
+**Verdict: 🔧 Easy fix.** All three theorems hold with the paper's constants: truncated Gale–Shapley
+gives an `ε`-stable matching in `T ≤ 4 + 2Δ²/ε` rounds (also with ties), a `(2+ε)`-approximate
+maximum-weight matching in `T ≤ 4 + 2Δ/ε` rounds, and a constant-query estimator of the size of a
+stable matching. Lemmas 1–5 are true. Lemma 6 is false as stated for `Δ = 1`, `i = 1`, and the proofs
+of Theorems 1 and 2 inherit this; it needs `i ≥ 2`, as in Lemmas 4 and 5, which its proof uses, and
+this condition changes no constant.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 6 for `Δ = 1`
+### 🔧 Lemma 6 for `Δ = 1`, and its use in the proofs of Theorems 1 and 2
 Lemma 6 claims `f_i(R) ≤ γ w_i(B)` for all `γ > 0` and `i ≥ 1 + (Δ-1)/γ`, which for `Δ = 1`
 allows `i = 1`, where the bound fails already on a single edge `K₂` (`lemma_6_false_at_one`).
 
-**Impact.** Degenerate case with evident intent: the proof combines Lemmas 4 and 5, which are
-stated only for `i ≥ 2`, and with the extra hypothesis `i ≥ 2` the lemma holds
-(`Bicoloured.lemma_6`). No constant of Theorems 1–3 changes.
+**Impact.** The intent is evident: the proof combines Lemmas 4 and 5, which are stated only for
+`i ≥ 2`, and with the extra hypothesis `i ≥ 2` the lemma holds (`Bicoloured.lemma_6`). No constant of
+Theorems 1–3 changes.
 
 **Details.** After round 1 nothing is matched (`w_1(B) = 0`), while every red node has a pending
 proposal (`f_1(R) > 0`). `K₂` has maximum degree 1 and no isolated nodes. For `Δ ≥ 2` the
-hypothesis forces `i ≥ 2`.
+hypothesis forces `i ≥ 2`. The proofs of Theorems 1 and 2 inherit the mistake: for `Δ = 1` they allow
+`i = 1`, and `M_1 = ∅` is neither `ε`-stable nor an approximation.
 
-### Typos and slips
+**Repair.** Add `i ≥ 2` to Lemma 6. In Theorems 1 and 2, whose statements are true, choosing
+`i = max(2, ⌈…⌉)` keeps `T = 2i` within the claimed bounds (`theorem_1`, `theorem_2`).
+
+### ✏️ Slips
 - Proof of Lemma 5: "`w({r,b}) < w_j(b)`" should be `≤`. The weights respect the preferences only
   weakly, and with `w ≡ 1` equality holds. Only `≤` is needed.
+
+### Typos
 - §6.3 treats `Y` (the matched nodes among the first `N` red samples) as a binomial variable
   without saying that the analysis conditions on the sample containing `N` red nodes. The bound is
   correct. We prove it with a martingale (exponential-moment) argument over the sequential
   sampling. (`card_firstHits_abs_sub_ge_le` in
   `Podc/Probability/Finite/MultiplicativeChernoff.lean`)
-
-## Proof gaps (statements true)
-
-### 🛠️ Theorems 1 and 2 (choice of `i` for `Δ = 1`)
-The proofs of Theorems 1 and 2 inherit the slip of Lemma 6: for `Δ = 1` they allow `i = 1`, and
-`M_1 = ∅` is neither `ε`-stable nor an approximation.
-
-**Impact.** Statements true; choosing `i = max(2, ⌈…⌉)` keeps `T = 2i` within the claimed bounds
-(`theorem_1`, `theorem_2`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -103,7 +101,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Not formalized.** The informal interpretations of §2.1 (robustness, Boolean circuits). The
 cited impossibility results of §2.5 (Linial; Czygrinow et al.). Equality of the sizes of all stable
-matchings (rural hospitals theorem): Theorem 3 is stated for `M_∞`, which is what its proof uses.
+matchings (rural hospitals theorem): Theorem 3 is stated for `M_∞`, which is what its proof uses. For
+the query count of Theorem 3, the invariance of the run under order-preserving re-ranking is argued
+informally and not stated in Lean, and the oracle is not modelled interactively.
 
 **Trust.** No `sorry`; all listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. The distributed model is CSLib's `Cslib.PortNumbering`. Hypotheses are

@@ -1,11 +1,11 @@
 # Differences between the formalization and the paper
 
 Paper: Gilbert, Newport, Vaidya, Weaver. *Contention Resolution with Predictions.* PODC 2021,
-arXiv 2105.12706v1. Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
+arXiv 2105.12706v1.
 
 ## Statement-level issues
 
-1. **Theorems 3.3 and 3.5 are false if the advice may have variable length** (⚠️, R4, borderline ❌).
+1. **Theorems 3.3 and 3.5 are false if the advice may have variable length** (✏️).
    The definition of `b(n)`-non-interactive contention resolution says the advice "contains no more than
    `b(n)` bits", and Theorems 3.4/3.5 say `f` "returns at most `b(n)` bits". If strings of length `< b` are
    allowed there are `2^{b+1} − 1` advice values and:
@@ -16,12 +16,12 @@ arXiv 2105.12706v1. Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
    * Theorem 3.4 survives (its `/2` absorbs the extra bit; our `n ≤ |A| t` gives it for `|A| < 2 n^α`).
    Section 3.1 defines the advice function as `f_A : P(A) → {0,1}^b` (fixed length), and the proof of 3.3 counts
    `2^{b(n)}` strings; under that definition all three theorems are true (`theorem_3_3`, `theorem_3_4`,
-   `theorem_3_5`). We classify it as an implied assumption fixed by the paper's own model section (R4) rather than
-   ❌; it is borderline because the paper's own proof of 3.5 feeds variable-length strings (`f(P)` plus an
+   `theorem_3_5`). We classify it as an implied assumption fixed by the paper's own model section, although the
+   paper's own proof of 3.5 feeds variable-length strings (`f(P)` plus an
    `(r−1)`-bit history) into Theorem 3.3. With variable-length advice the correct bounds are
    `n ≤ 2^{b+1} − 1`, `n ≤ (2^{b+1} − 1)(2^t − 1)` (`theorem_3_3_card`, `card_le_mul_of_solvesIn_CD` with any
    alphabet).
-2. **Upper halves of the `Θ` claims of Theorems 3.6 and 3.7 (and Table 2) fail for long advice** (⚠️, R3).
+2. **Upper halves of the `Θ` claims of Theorems 3.6 and 3.7 (and Table 2) fail for long advice** (✏️).
    Every algorithm needs at least one round, but
    * Theorem 3.6 (`b(n) < log n`, claimed `t(n) = Θ(log n / 2^{b(n)})`): for `b(n) = ⌊log₂ n⌋ − 1`,
      `log n / 2^{b(n)} → 0` (`theorem_3_6_upper_false`);

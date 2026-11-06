@@ -5,15 +5,13 @@ PODC 2022. DOI [10.1145/3519270.3538432](https://doi.org/10.1145/3519270.3538432
 paper, with the proofs of the full version arXiv [2205.11148](https://arxiv.org/abs/2205.11148) v1. Numbering
 follows the PODC paper; arXiv numbers in brackets.
 
-**Verdict: ✅ Correct.** The simple-cycle simulator (Algorithm 1, Theorem 4, Lemma 5, [Theorem 6]) is proved
-correct: safety, liveness under fair scheduling, no starvation and quiescence. The two-party impossibility
-(Theorem 3) holds as stated. Robbins cycles exist exactly in the 2-edge-connected graphs.
-For the Robbins-cycle simulator (Algorithm 3, Theorem 6 [Theorems 10, 12]), safety and deadlock freedom
-are proved: single token holder, global consistency, consistent rotations, and the simulation of `π`. Its
-liveness under fairness is not formalized, nor are the distributed construction of the Robbins cycle
-(Section 5), the binary encoding and the complexity bounds; so the main Theorem 2 is only partly verified.
-We found no mistakes. The paper's proofs are informal, real-time inductions over epochs; the formal proofs need
-some invariants that the paper uses without stating them.
+**Verdict: ✅ Correct.** We found no mistakes, but the paper's main result (Theorem 2) is only partly verified. The
+simple-cycle simulator (Algorithm 1, Theorem 4, Lemma 5, [Theorem 6]) is proved correct (safety, liveness under fair
+scheduling, no starvation and quiescence), the two-party impossibility (Theorem 3) holds as stated, Robbins cycles
+exist exactly in the 2-edge-connected graphs, and for the Robbins-cycle simulator (Algorithm 3, Theorem 6
+[Theorems 10, 12]) safety and deadlock freedom are proved: single token holder, global consistency, consistent
+rotations, and the simulation of `π`. Its liveness under fairness is not formalized, nor are the distributed
+construction of the Robbins cycle (Section 5), the binary encoding and the complexity bounds.
 
 ## Mistakes in the paper
 
@@ -72,7 +70,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 All names are in the namespace `Podc.FullyDefective`.
 
-**Proof remarks.** Three points are only implicit in the paper and needed real work:
+**Proof remarks.** The paper's proofs are informal, real-time inductions over epochs; the formal proofs need some
+invariants that the paper uses without stating them. Three points are only implicit in the paper and needed real
+work:
 
 * **Why the token is caught (Lemma 5(1)).** The paper says the token travels "until it reaches a node `v` with a
   non-empty `Q_v`, which must exist". Two invariants make this precise. First, a request pulse of the current

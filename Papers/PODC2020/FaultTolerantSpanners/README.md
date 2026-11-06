@@ -5,35 +5,30 @@ DOI [10.1145/3382734.3405735](https://doi.org/10.1145/3382734.3405735). Formaliz
 [2002.10889](https://arxiv.org/abs/2002.10889) v2.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🛠️ Proof repaired.** The sequential part (Sections 2–4) holds as stated. The modified greedy
-algorithm, which uses the length-bounded-cut approximation (Algorithm 2), outputs an `f`-VFT
-`(2k−1)`-spanner with `O(k f^{1−1/k} n^{1+1/k})` edges, weighted and unweighted. We prove it with the
-explicit constant 32. We found only two minor slips: a wrong step (`p = 1`) in the proof of Lemma 3, and
-Lemma 7's hypothesis `f = o(n)`, which its proof's estimate strictly needs as `kf = o(n)`; the statement
-stays true (when `kf ≥ n` the claimed subgraph exists trivially), so only the proof needs repair.
+**Verdict: 🔧 Easy fix.** The sequential part (Sections 2–4) holds as stated: the modified greedy algorithm, which uses
+the length-bounded-cut approximation (Algorithm 2), outputs an `f`-VFT `(2k−1)`-spanner with `O(k f^{1−1/k} n^{1+1/k})`
+edges, weighted and unweighted, and we prove it with the explicit constant 32. Lemma 7's hypothesis `f = o(n)` is too
+weak for its proof's estimate, which needs `kf = o(n)`; the statement stays true (when `kf ≥ n` the claimed subgraph
+exists trivially), so only the proof needs repair, and the proof of Lemma 3 has a wrong step (`p = 1`). Running times
+and the distributed results were not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
+### ✏️ Slips
+- Lemma 3 (weighted, "if" direction, case `p = 1`): the paper writes `d_{H\F}(u, v) = w(u, v) = d_{G\F}(u, v)`, but `H`
+  need not contain the edge `uv`. What holds, and suffices, is `d_{H\F}(u, v) ≤ t·w(u, v)` by hypothesis. We prove the
+  full iff by a different argument: a non-tight edge has a strictly lighter walk made of strictly lighter edges, so
+  strong induction on the number of lighter edges applies; no shortest paths are needed
+  (`isWeightedVFTSpanner_iff`).
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 3 (weighted, "if" direction, case `p = 1`)
-The paper writes `d_{H\F}(u, v) = w(u, v) = d_{G\F}(u, v)`, but `H` need not contain the edge `uv`.
-
-**Impact.** Statement true; what holds, and suffices, is `d_{H\F}(u, v) ≤ t·w(u, v)` by hypothesis. We prove the
-full iff (`isWeightedVFTSpanner_iff`).
-
-**Repair.** We prove the full iff by a different argument. A non-tight edge has a strictly lighter walk made of
-strictly lighter edges, so strong induction on the number of lighter edges applies; no shortest paths are needed
-(`isWeightedVFTSpanner_iff`).
-
-### 🛠️ Lemma 7 (hypothesis `f = o(n)`)
+### 🔧 Lemma 7 (hypothesis `f = o(n)`)
 The lemma assumes `f = o(n)`, but the estimate `s(s−1)/(n(n−1)) ≥ (1−o(1))/(4((2k−1)f)²)` needs `kf = o(n)`, since
 `k` may grow with `n`.
 
-**Impact.** Harmless, because Theorem 8 is trivial when `kf = Ω(n)`; replaced by an exact form
-(`SimpleGraph.IsBlockingSet.exists_dense_subgraph`).
+**Impact.** Theorem 8 is not affected, because it is trivial when `kf = Ω(n)`, but its split on `f = Ω(n)` has to move
+there; Lemma 7 is replaced by an exact form (`SimpleGraph.IsBlockingSet.exists_dense_subgraph`).
 
 **Repair.** We replace the asymptotic lemma by exact counting over all `s`-subsets: if `|B| ≤ D·m` and `2Ds ≤ n`,
 some `s`-set carries a subgraph of girth `> 2k` with `m·s(s−1) ≤ 2n(n−1)·|E(H′)|`. A case split at

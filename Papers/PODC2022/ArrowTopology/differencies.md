@@ -5,7 +5,7 @@ Impossibility Theorem*, PODC 2022 ("PODC version"). Full version: *A Combinatori
 Arrow's Impossibility Theorem*, MPRA 120023 (2024) ("full version"). Numbering is the PODC numbering unless
 stated otherwise.
 
-**Overall verdict.** Arrow's theorem and its combinatorial-topology proof (Sections 2, 3, 5) are correct, up to
+**Overall.** Arrow's theorem and its combinatorial-topology proof (Sections 2, 3, 5) are correct, up to
 small gaps that we repaired (items 6, 9, 10). Section 4 of the PODC version (domain restrictions) contains
 a false theorem (item 13) and missing hypotheses (item 12). The full version corrects them, and we verified its corrected theorem (item 15).
 

@@ -5,24 +5,21 @@ DOI [10.1145/3382734.3405749](https://doi.org/10.1145/3382734.3405749). Formaliz
 arXiv:2006.10494v1, whose Appendix A contains the proofs.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The main theorem (every undoable CRDT is equivalent to a tuple of counters and modular
-counters), Propositions 1–3, Facts 1–6 and the Section 3 consequences hold under the paper's own definitions (the
-last up to one degenerate edge case). There are only typos, one point of reading that matters, and that edge case.
+**Verdict: ✏️ Slip.** The main theorem (every undoable CRDT is equivalent to a tuple of counters and modular
+counters), Propositions 1–3 and Facts 1–6 hold under the paper's own definitions. Only two Section 3
+consequences miss the degenerate case of operations that apply in no state. Beyond that there are only typos
+and one point of reading that matters (Axiom 1, below).
 
 ## Mistakes in the paper
 
-### ⚠️ Section 3 ("all operations are always valid")
-"All operations are always valid" fails for dead operations: a one-state CRDT with one primitive operation that
-applies in no state is undoable (`deadOp_not_valid`).
+### ✏️ Slips
+- Section 3: "All operations are always valid" fails for dead operations: a one-state CRDT with one primitive
+  operation that applies in no state is undoable (`deadOp_not_valid`). The same caveat applies to "negative
+  states always exist". The main theorem is unaffected, because the paper's equivalence only constrains
+  applicable operations, so dead operations can be mapped to the empty action. An action applying in *some*
+  state applies in *every* state (`all_operations_valid`); likewise for negative states (`negative_states`).
 
-**Impact.** Degenerate case; the main theorem is unaffected, because the paper's equivalence only constrains
-applicable operations, so dead operations can be mapped to the empty action. The same caveat applies to
-"negative states always exist".
-
-**Repair.** An action applying in *some* state applies in *every* state (`all_operations_valid`); likewise for
-negative states (`negative_states`).
-
-### Typos and slips
+### Typos
 - In the definition of equivalence (Section 2.2), `φ⁻¹(s') · ψ'(p)` should be `ψ'(p')`.
 - In the proof of Proposition 3, `s₀ · ψ(a) · ψ(p)` should be `s₀' · ψ(a) · ψ(p)`.
 - In Section 2.5, "by fact 5, s · a⁻¹ₛ ok": Fact 4 is the direct reference. This is not an error, since Fact 5

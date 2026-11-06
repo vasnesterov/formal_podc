@@ -44,20 +44,20 @@ hal-00787978v2, February 2013), whose numbering we follow.
 - `(Σ, Ω)` in `AMP` is the pair of histories (`SigmaOmegaFD`); an algorithm for `Σ` is run unchanged by
   ignoring the second component (`SolvableAMP.of_map`).
 
-## Statement-level issues (decided by `verdicts.md`)
+## Statement-level issues
 
 - **Theorem 4 / Lemma 6 false** (`lemma6_false`, `theorem4_false`), and hence **Theorem 5 false**
   (`theorem5_false`): `Tseen` is solvable in `AMP_{3,2}[Σ]` (and `AMP_{3,2}[Σ, Ω]`) but not in
-  `SMP_3[QUORUM]` (not even in `SMP_3[SOURCE, QUORUM]`). Headline (the abstract presents the SOURCE and
-  QUORUM characterizations as the contributions) → 🚨 (R5). The counterexample uses the paper's own
+  `SMP_3[QUORUM]` (not even in `SMP_3[SOURCE, QUORUM]`). ❌: the abstract presents the SOURCE and
+  QUORUM characterizations as the contributions. The counterexample uses the paper's own
   definitions: `SMP_n` processes are reliable and Section 2.4 lets only crashed processes lack an output.
-  *Borderline call (R4/R6).* One might argue that the intended notion of solving in `SMP_n` is "only
+  *The other reading of "solve".* One might argue that the intended notion of solving in `SMP_n` is "only
   strongly correct processes must output" (the proofs of Lemmas 2, 4, 6 behave as if it were). The paper
   never says so, and under that reading Lemmas 1, 3 and 5 lose their proofs. Figure 4 makes every non-leader
   weakly correct by design; Figures 2 and 6 can make correct asynchronous processes weakly correct (e.g. Σ
-  constantly `{ℓ}`). The theorems would then be unestablished (still ❌ by R5) rather than false. We keep 🚨
-  because it is the literal reading and no reading makes all six lemmas go through. (R4 does not excuse an
-  assumption the paper's own proofs contradict.)
+  constantly `{ℓ}`). The theorems would then be unestablished rather than false. We keep the literal
+  reading, and no reading makes all six lemmas go through. The paper's own proofs contradict the assumption
+  that only strongly correct processes must output, so it is not an implied assumption.
   *Legitimacy of the tasks.* Section 2.4 allows any set of input vectors and any relation `Δ`, with
   partial outputs valid iff they extend to some `O ∈ Δ(I)` (exactly `Task.Valid`); it imposes no
   colorlessness or other restriction. `Tseen` and `Tcons` are such tasks (inputs: all vectors; `p₃`'s
@@ -67,20 +67,20 @@ hal-00787978v2, February 2013), whose numbering we follow.
   history exist); ARW executions exist trivially (any schedule with a constant correct Ω leader).
 - **Lemma 2 / Theorem 2 false** (`lemma2_false`, built from `tcons_not_solvable` and
   `tcons_solvable_arw_omega`), and therefore **Corollary 1 false** (Theorem 6 holds, so Corollary 1 is
-  equivalent to Theorem 2). Same reading and same borderline remark as above. Headline → 🚨.
+  equivalent to Theorem 2). ❌. Same reading and same remark on the other reading as above.
 - **Figure 1 / Conclusion**: "SMP_n[adv: QUORUM] is stronger than SMP_n[adv: TOUR]" (explicit claim in
   the Conclusion, arrow in Figure 1), and the arrow SMP[SOURCE, QUORUM] → SMP[SOURCE, TOUR], are false
-  (`not_quorum_stronger_than_tour`, `not_source_quorum_stronger_than_source_tour`). Purely synchronous;
-  not a headline → ❌.
-- **Theorem 3**: unestablished (⚠️). Lemma 4's proof fails under the literal reading, and Lemma 3's under
+  (`not_quorum_stronger_than_tour`, `not_source_quorum_stronger_than_source_tour`). Purely synchronous.
+  ❌, as part of the same mistake.
+- **Theorem 3**: unestablished (❌, as part of the same mistake). Lemma 4's proof fails under the literal reading, and Lemma 3's under
   the "strongly correct only" reading. No counterexample known; `Tseen` and `Tcons` are not solvable in
   `AMP[Ω]` (partition argument), so ours do not apply.
-- **FAIR** in Theorem 3 and Lemma 6 is undefined; read as absent (R3, ⚠️; see Typos below).
+- **FAIR** in Theorem 3 and Lemma 6 is undefined; read as absent (✏️; see Typos below).
 - **Theorem 1**: true (`theorem1`), also under the weak reading on the synchronous side
   (`solvableSC_inf_iff_local`). The asynchronous side is modelled as `AMP_{n,n-1}[fd: ∅]` (at least one
   correct process).
-- **Theorem 6**: true (`theorem6`) for `n ≥ 2`; for `n = 1` the block length `2n − 3` is meaningless (R2,
-  degenerate). Stated with the strong solvability notion. The PAIRS schedule is the paper's
+- **Theorem 6**: true (`theorem6`) for `n ≥ 2`; for `n = 1` the block length `2n − 3` is meaningless
+  (degenerate; the statement is trivially true there). Stated with the strong solvability notion. The PAIRS schedule is the paper's
   `σ(r mod C(n,2))` (`paperPair`); the general statement only needs every block of `C` rounds to cover all
   pairs (`Covers`).
 - **Section 2.2 claims**: `↔∞` is an equivalence (`InfReach.refl/trans`); under TOUR there is a unique set
@@ -108,8 +108,8 @@ hal-00787978v2, February 2013), whose numbering we follow.
 
 - Theorem 3 is stated for `SMP_n[adv : SOURCE, FAIR]` and Lemma 6 for `SMP_n[adv : FAIR, QUORUM]`;
   FAIR is never defined. The section titles, Figure 1, the introduction, the conclusion, Lemmas 3–4
-  and Theorem 4 all use SOURCE (resp. QUORUM) alone; we read FAIR as a leftover of an earlier version
-  (rule R3). This changes nothing below: our counterexamples work for the adversaries without FAIR,
+  and Theorem 4 all use SOURCE (resp. QUORUM) alone; we read FAIR as a leftover of an earlier version.
+  This changes nothing below: our counterexamples work for the adversaries without FAIR,
   and for the statements with FAIR they would only need FAIR to be satisfied by our patterns, which we
   cannot check for an undefined property.
 - Figures 4 and 6, line 5: `r ← r_i + 1` should be `r_i ← r_i + 1`.

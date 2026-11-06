@@ -86,25 +86,23 @@ Gafni's adopt-commit objects) is a credit fix with no technical content.
   `min 1` cap on `2^k/(2n)`). The paper's estimates are `attemptProb_le_sum`, `one_sub_sum_le_prod`.
 - Expected total work: the explicit bound `7n` (paper: `O(n)`).
 
-## Statement-level remarks (no verdict impact)
+## Statement-level remarks
 
-- **Section 5.2, iteration count.** "the loop is never executed for more than `⌈lg n⌉ + 1` iterations": the write
+- ✏️ **Section 5.2, iteration count.** "the loop is never executed for more than `⌈lg n⌉ + 1` iterations": the write
   probability `2^k/(2n)` reaches `1` only at `k = ⌈lg n⌉ + 1`, so there can be `⌈lg n⌉ + 2` iterations
   (`k = 0, …, ⌈lg n⌉ + 1`). The paper's final bound `2⌈lg 2n⌉ + 3 = 2⌈lg n⌉ + 5` counts `⌈lg n⌉ + 2` iterations
-  and is correct. A slip in an intermediate sentence (R1/R3: not a statement; listed under "Typos and slips").
-  *Borderline call (R6).* The sentence is the paper's proof of Theorem 7's work bound ("The bounds on individual
-  work and total work have already been established"), so by R1 it is proof-internal, not a statement (else it
-  would be ⚠️ by R3). It is not counted as a proof repair (🛠️) because nothing needs repairing: the very next
+  and is correct. The sentence is the paper's proof of Theorem 7's work bound ("The bounds on individual
+  work and total work have already been established"). Nothing needs repairing: the very next
   formula `2⌈lg 2n⌉ + 3` is exactly `2·(⌈lg 2n⌉ + 1) + 1`, i.e. the proof already computes with the correct count
   `⌈lg 2n⌉ + 1`, and `⌈lg n⌉ + 1` is a typo for it (`lg n` for `lg 2n`).
 - **Theorem 10 for `m = 1`.** "`O(log m)` registers and `O(log m)` individual work" is literally `O(0)` for
-  `m = 1`, while every implementation needs at least one operation. Degenerate (R2); we state exact bounds
+  `m = 1`, while every implementation needs at least one operation. Degenerate; we state exact bounds
   `2⌈lg m⌉ + 1` registers and `2⌈lg m⌉ + 2` operations.
 - **Abstract: "`lg m + Θ(log log m)` space and individual work".** We prove the upper bound
   `k ≤ ⌈lg m⌉ + ⌈lg(2⌈lg m⌉ + 2)⌉` for the middle-layer construction (`exists_k_le`) and its optimality among
   all quorum systems with `|W_v| + |R_v| ≤ k` (`card_le_choose_of_quorums`, from Theorem 9). The matching lower
   bound `C(k,⌊k/2⌋) ≤ 2^k/√k`-type estimate behind the `Θ` is not formalized.
-- **Section 6.1 prose.** "This works as long as for every two distinct values `v` and `v'`, `R_{v'}` includes some
+- ✏️ **Section 6.1 prose.** "This works as long as for every two distinct values `v` and `v'`, `R_{v'}` includes some
   register written in `W_v` that is not written in `W_{v'}`" is a different (and, without `W_v ∩ R_v = ∅`,
   insufficient) condition than the hypothesis of Theorem 8; we follow Theorem 8.
 - **Theorem 9** is cited from Jukna; we prove it (`Cslib.SetPairs.sum_inv_choose_le_one`) together with the

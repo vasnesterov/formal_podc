@@ -41,15 +41,15 @@ Paper: D. Hendler, V. Khait. *Complexity Tradeoffs for Read and Update Operation
    is the `AW` of the top entry. Trivial events (reads, failed CAS, CAS with `new = old`) do not
    touch histories. This matches the intent ("information flow via shared memory") and the paper's
    arithmetic (Lemma 1 holds with the same factor 3).
-7. **Lemma 2 is false as stated (❌, rule R1; not excusable by R3/R4).** Two independent problems:
+7. **Lemma 2 is false as stated (🛠️).** Two independent problems:
    (a) it removes only the events of `q` that are aware of `p`, not all events of `q` from the
-   first such event on (the proof of Lemma 3 uses the latter; this alone would be an R3 typo);
+   first such event on (the proof of Lemma 3 uses the latter; this alone is a ✏️ slip);
    (b) with Definition 1, an overwritten write is invisible, and so is the trivial write that
    overwrites it. Counterexample `PaperDefs.lemma2_false`: in a single-writer max register
    (`toyImpl`), the writer `q` writes `5` twice, then the reader reads `5`; no event is aware of an
    event of `q` (even with a more generous transitive closure than Definition 2), yet removing `q`'s
    events leaves a sequence that is not an execution. Fixing it requires changing Definition 1, which
-   the paper's proofs rely on, so R3 does not apply: the proof of Lemma 1 schedules "read, trivial CAS
+   the paper's proofs rely on: the proof of Lemma 1 schedules "read, trivial CAS
    and trivial write events" in `σ₁` and asserts "No event in `σ₁` is visible", i.e. it uses exactly
    the clause that makes a trivial write invisible. (A definition under which a write is invisible
    only when overwritten before being accessed would not be refuted by this example, but it is not the
@@ -59,12 +59,12 @@ Paper: D. Hendler, V. Khait. *Complexity Tradeoffs for Read and Update Operation
    maximum in its own register `R_p`; `ReadMax` by `p` reads `R_{1−p}` once and returns the max with
    its own maximum), not formalized. Lemma 2 itself (Section 3) is stated for an arbitrary execution
    of an arbitrary implementation. Our sound replacement: `arun_erase`.
-8. **Claim 1 is false as stated (❌, rule R1).** Same execution: `{q}` is hidden after `E`
+8. **Claim 1 is false as stated (🛠️).** Same execution: `{q}` is hidden after `E`
    (Definition 5; also no object is familiar with `q`, no event is visible), but `E − {q}` is not an
    execution (`PaperDefs.claim1_false`). `toyImpl` is a genuine wait-free linearizable max register
    (`PaperDefsLin.lean`), so the counterexample lies in the paper's setting. Our sound replacement:
    `arun_filter_hidden` / `ess_erase`.
-9. **Definition 2's transitive clause** literally requires the aware event `e_p` to access the same
+9. **Definition 2's transitive clause (🔧)** literally requires the aware event `e_p` to access the same
    object `o` as `e_q`; chains through other objects are then impossible. Evidently unintended; our
    semantics propagates awareness through local state.
 
@@ -96,7 +96,7 @@ Paper: D. Hendler, V. Khait. *Complexity Tradeoffs for Read and Update Operation
     every process of `E ∪ H` invoked exactly one `WriteMax(val p)` and none returned, and that every
     essential process is still pending. "Hidden set" (Definition 5, second condition `|F(o) ∩ P| ≤ 1`)
     is automatic in our semantics and dropped.
-15. **Lemma 4: proof gap; proved for essential sets with the block invariant (⚠️ unestablished as
+15. **Lemma 4: proof gap; proved for essential sets with the block invariant (🛠️; unestablished as
     stated).** The paper's proof erases essential processes and then reasons with `F(o, E_i) \ K`
     as if erasing could only shrink familiarity sets. Erasing the last writer of an object
     *resurrects* the previous write, possibly by another essential process, which the next step then
@@ -108,11 +108,11 @@ Paper: D. Hendler, V. Khait. *Complexity Tradeoffs for Read and Update Operation
     of size `≥ k/3` by `exists_indep`, replacing Turán); in the high-contention case erase the block
     owner of `o` and classify after the erasure. The bound is `⌊√m⌋ ≤ 3(|E'| + 1)` for all `m`,
     which implies the paper's `|E'| ≥ √m/3 − 2` and needs no `m ≥ 81`. Whether Lemma 4 holds for
-    essential sets without the block invariant is left open (borderline call: neither proved nor
-    refuted → ⚠️ "unestablished", rule R5 note; it does not affect Theorem 3).
+    essential sets without the block invariant is left open (neither proved nor refuted; it does
+    not affect Theorem 3).
 16. **Lemma 5** is folded into the proof of Lemma 6 (the linearizability argument `read_lt` /
     `read_ge`).
-17. **Lemma 6: proof gap; proved for essential sets with the block invariant (⚠️ unestablished as
+17. **Lemma 6: proof gap; proved for essential sets with the block invariant (🛠️; unestablished as
     stated).** The paper erases, before each step of the reader, the completed hidden process the
     accessed object is familiar with; the same resurrection problem lets the reader see another
     completed process afterwards. Our proof (`lemma6`) compares two erasures instead: run the
@@ -128,7 +128,7 @@ Paper: D. Hendler, V. Khait. *Complexity Tradeoffs for Read and Update Operation
     are iterated `i` times and a threshold; we make them explicit (`gStep_ge_rpow`, `rpow_le_iterate`).
 19. **Theorem 4:** `theorem4` (generic, `m ≤ c · log |W|`) and `theorem4_fin` (paper's setting with
     processes `Fin N`, an `M`-bounded max register, writers `p₁…p_{M−1}`, reader `p₀`, `M ≤ N`,
-    `ReadMax ≤ c log M`). **Not covered: `M > N`.** The paper says Theorem 4 is "immediate from
+    `ReadMax ≤ c log M`). **Not covered: `M > N` (⚠️).** The paper says Theorem 4 is "immediate from
     Theorem 3", but with `K = min(N, M) = N` and `f(K) = log M`, Theorem 3 gives
     `Ω(log(log N / log log M))`, which is `Ω(log log N)` only if `log log M = O((log N)^{1−δ})`; e.g.
     for `M = 2^N` it gives nothing. So for very large `M` Theorem 4 is unestablished (proof gap; we
@@ -151,19 +151,12 @@ Paper: D. Hendler, V. Khait. *Complexity Tradeoffs for Read and Update Operation
     its leaf write is trivial, or it returns at line 16), so Definition 9 gives it no linearization
     point (`AlgA.not_counts`: `N = 2`, `WriteMax(3)` by `p₀` then `WriteMax(2)` by `p₁`). The proof of
     Invariant 1 confuses a trivial CAS with a failed one. Invariant 1 is stated inside the proof of
-    Lemma 9 (rule R1: not a statement); Observation 2 presupposes existence of the point. Repair:
+    Lemma 9; Observation 2 presupposes existence of the point. Repair:
     linearize `WriteMax(v)` at the first moment of its interval at which root `≥ v`
     (`AlgA.linearizable`).
-23. Line 5 typo `n ← node.parent` (should be `n.parent`); `T_L` has `N` (not `N − 1`) leaves for the
+23. ✏️ Line 5 typo `n ← node.parent` (should be `n.parent`); `T_L` has `N` (not `N − 1`) leaves for the
     values `v < N`; the "WLOG no process writes a smaller value" assumption is unnecessary and not
     used.
 24. **Theorem 6:** `AlgA.waitFree`, `readMax_steps_le` (≤ 1 access), `writeMax_steps_le`
     (`≤ 16⌊log₂ min(N, v+1)⌋ + 18` for `stdLayout`); `O(min(log N, log v))` read as
     `O(1 + min(log N, log v))`.
-
-## Verdict decision
-
-Worst label: ❌ — Lemma 2 and Claim 1 are numbered statements that are false with the paper's own
-definitions (items 7–8), not headline results (R5), and the fix changes a definition the proofs use
-(R3 does not apply). The headline tradeoffs (Theorems 1–4) and Algorithm A (Theorems 5–6) hold, with
-repaired proofs, except Theorem 4 for `M ≫ N` (not formalized, item 19).

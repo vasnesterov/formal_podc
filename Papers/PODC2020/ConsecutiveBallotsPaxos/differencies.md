@@ -15,21 +15,20 @@ Paper: E. Goldweber, N. Zhang, M. Kapritsos, *On the Significance of Consecutive
    - ballot 9: `A (3,x)`, `B ⊥`, `C ⊥` promise; `x` is proposed; `A, B, C` accept.
 
    `x` is CQ-chosen "in ballot 3" (`cex_chosen_3`), yet `y` is proposed and accepted in ballot 5.
-   **Rule R3 → ⚠️.** The intended version is recoverable: the proof of Lemma 4.3′ speaks of "the acceptor in
+   🔧 The intended version is recoverable: the proof of Lemma 4.3′ speaks of "the acceptor in
    `Qᵢ` that accepted `v` in ballot `i`" as a member of the CQ. The fix is local (`x_α = i`; our `CQChosen'`).
    Under it both lemmas are proved (`lemma_4_3'`, `lemma_4_2'`), and `x` is not chosen in ballot 3
    (`cex_not_chosen'_3`). The paper's proof reasons with the intended version, in fact with "`i` is the largest
-   CQ ballot". These are numbered lemmas, so the issue is statement-level (R1), not a proof repair. Under the
+   CQ ballot". These are numbered lemmas, so the issue is in the statements, not only in a proof. Under the
    literal definition, Lemmas 4.1–4.3, 4.1′ and Theorems 3.1/3.2 remain true. We prove them for the literal
    Definition 6, which is weaker than the intended one (`CQChosen'.cqChosen`).
-   Borderline note (reviewer): the TLA+ `AgreedConsecQ(v, b)` of Appendix B has the same looseness
+   The TLA+ `AgreedConsecQ(v, b)` of Appendix B has the same looseness
    (`∃ a ∈ Q : Sent2b(a, v, b)` is not tied to the ballots of `ConsecQ`), so the literal reading is
-   not a one-off slip of Definition 6. We still apply R3, because the paper's own proof of Lemma 4.3′
+   not a one-off slip of Definition 6. The paper's own proof of Lemma 4.3′
    reasons with the intended version (the ballot-`i` accept is a member's CQ accept), and the fix is
    local and does not change Theorems 3.1/3.2.
 
-2. **Missing case in the proof of Lemma 4.3′** (statement true for the intended definition; 🛠️ level, dominated
-   by item 1). The base case and the inductive step assume that the intersecting acceptor's CQ ballot is `≤ i`.
+2. **Missing case in the proof of Lemma 4.3′** (statement true for the intended definition; 🔧). The base case and the inductive step assume that the intersecting acceptor's CQ ballot is `≤ i`.
    They also assume implicitly that its promise for `j` came after its accept, so the promise reports a ballot
    `≥` its CQ ballot. Both fail when `i` is not the largest ballot of the CQ. Repair (`propose_eq_of_interval`):
    strong induction on `j ≥ lo`, where `[lo, hi]` is the CQ's ballot span. Ballots in `[lo, hi]` carry `v`
@@ -42,9 +41,9 @@ Paper: E. Goldweber, N. Zhang, M. Kapritsos, *On the Significance of Consecutive
    `NotIn(Q, r)` is a top-level conjunct, so `ConsecQ` is false for every nonempty `Q`. `AgreedConsecQ` is then
    never true, and `SafeValue` holds trivially. Also `∃ m ∈ msgs : (type = 2b ∧ acc = r) ⟹ …` is satisfied by
    any message that is not a 2b of `r`, so `∀` was presumably meant. Even with these fixes, `ConsecQ` (no
-   outside 2b ballot interleaves with all of `Q`'s) does not express Definition 5. **Not a verdict item.**
+   outside 2b ballot interleaves with all of `Q`'s) does not express Definition 5. 🔧
    Section 6.2 says "both in TLA+ and with Formal Verification we showed the correctness". This is a claim
-   about the authors' verification artifacts, not a mathematical statement (R1), and the correctness itself
+   about the authors' verification artifacts, not a mathematical statement, and the correctness itself
    holds (`theorem_3_2` with `cp = true`). The typeset appendix may differ from the file actually model-checked;
    we only judge the printed text. The IronFleet/Dafny proof was not inspected.
 

@@ -63,35 +63,34 @@ Network Throughput*, PODC 2026, arXiv 2605.04699v1.
     needs. In Lemma 1 the sign of the direction is chosen so that `∑ a·c` does not decrease. We use
     `∑ x² ≥ X²/n²` (Cauchy–Schwarz) as in the paper.
 
-## Errors and gaps in the paper (with the deciding rule)
+## Errors and gaps in the paper
 
-11. **Theorem 5, application of Theorem 4 (proof repair, 🛠️).** "`t = n + Y_i`" with
+11. **Theorem 5, application of Theorem 4 (🔧).** "`t = n + Y_i`" with
     `Y_i = ∑_j (1 − b'_ij)` treats `Y_i` as an integer number of constant variables of weight `1`,
     but `Y_i` is not an integer in general. Repair: `n` constant variables (`X ≡ 1`, `x = 1`) of
-    weight `1 − b'_ij` (`line_bad_prob_le`). This is a claim inside a proof (R1), not a statement.
+    weight `1 − b'_ij` (`line_bad_prob_le`). This is a claim inside a proof, not a statement.
 12. **Theorem 5, choice of `n_κ` (routine gap).** The conditions are imposed at `n_κ` only and used
     for all `n ≥ n_κ`. They do hold for all `n ≥ n_κ`: `2n e^{−cn}` is `> 1` up to its maximum at
     `1/c` and decreasing afterwards, for `c = 2ε²/3` small. Formalized via `eventually_large`.
-13. **Theorem 5, sign typo.** "`ε = κ − 5/8 > 0`" should be `ε = 5/8 − κ`. Also "`b_ij < (2n−1)κ a_ij`"
+13. **Theorem 5, sign typo (✏️).** "`ε = κ − 5/8 > 0`" should be `ε = 5/8 − κ`. Also "`b_ij < (2n−1)κ a_ij`"
     is only `≤` when `a_ij = 0`, and "`b_ij < min(a_ij, d_ij)`" should be `b_ij < d_ij`. These are
-    inside a proof, so R1 does not apply.
-14. **Proposition 1's proof.**
+    inside a proof.
+14. **Proposition 1's proof (🔧).**
     * The equation `5/6 − 5ε/12 − ε²/2 = 5/6 − 5ε/6 + ε − ε − ε²/2` is false. The final inequality is
       still true: `5/6 − 5ε/12 − ε²/2 < (5/6+ε)(1−ε)` iff `ε²/2 < 7ε/12`.
     * The bottom graphs are dismissed without a real argument ("since `1 − ε > 2/3`").
 
-    The statement is true (R1: proof repair).
-15. **Problem definition typo (⚠️, R3).** The box for Demand-Aware Weak Direct Throughput asks
+    The statement is true.
+15. **Problem definition typo (✏️).** The box for Demand-Aware Weak Direct Throughput asks
     whether "the direct throughput of `G` … is at least `κ`". Read literally, the problem is
     Demand-Aware Direct Throughput, and Theorem 6 (`κ ≤ (7n−4)/(8n−4)` ⇒ yes) would contradict
     Proposition 3 for `n ≥ 2`. The intended "weak direct throughput" is defined in §1.1 and is clear
     from the problem's name, Observation 4 and the proof of Theorem 6; the fix is one word. We
     formalize the intended problem (`DAWeakDirectThroughput`).
-16. **Proposition 3 typo (⚠️, R3).** The statement constructs `M_κ` but says "`(M, κ)` is a
+16. **Proposition 3 typo (✏️).** The statement constructs `M_κ` but says "`(M, κ)` is a
     no-instance" (checked on the rendered page; `M` carries no subscript). The intent `(M_κ, κ)` is
-    evident from the proof. Items 15 and 16 set the verdict to ⚠️. Borderline: both are pure
-    presentation typos, so one could argue for 🛠️ (through the proof repairs above); we keep ⚠️
-    because item 15 makes Theorem 6 false if read at the paper's word.
+    evident from the proof. Both items are pure presentation typos, but item 15 makes Theorem 6 false
+    if read at the paper's word.
 17. **§2 example (no error).** pdftotext renders the stacked fraction of "`(M₁, 8/9)` is a
     yes-instance of Demand-Aware Throughput" as "98"; the rendered page reads `8/9`, which we prove
     (`example_M1_throughput`, `example_M1_not_weakDirect`).

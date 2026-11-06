@@ -4,13 +4,13 @@ Paper: Juho Hirvonen, Jukka Suomela, *Distributed Maximal Matching: Greedy is Op
 DOI 10.1145/2332432.2332464. Formalized version: arXiv 1110.0367 v1 (the only arXiv version);
 numbering follows it.
 
-**Verdict.** No error affects the results. Lemma 1, Theorem 2, Corollary 3, Lemma 5, Theorem 6
+**Summary.** No error affects the results. Lemma 1, Theorem 2, Corollary 3, Lemma 5, Theorem 6
 and all intermediate lemmas (4, 7, 8, 10–16) are proved. The only gap is the passage from the
 paper's formal model (possibly infinite trees) to finite graphs. We close it.
 
 ## Gaps and imprecisions in the paper
 
-1. **Finite graphs (proof gap with true statement, minor).** Theorem 2 and Corollary 3 speak of
+1. **Finite graphs (🔧, proof gap with true statement).** Theorem 2 and Corollary 3 speak of
    "anonymous `k`-edge-coloured graphs", but the formal model of §2.3 only covers colour systems,
    i.e. edge-coloured *trees*, which may be infinite. All lower-bound instances are infinite: each
    realisation, and also the final `U` and `V`, is a `d`-regular tree with `d ≥ 2`. Read with the

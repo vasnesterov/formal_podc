@@ -5,10 +5,10 @@ Wait-Freedom.* PODC 2018. DOI [10.1145/3212734.3212739](https://doi.org/10.1145/
 Formalized version: HAL hal-02053248 v1 (no arXiv version); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ✅ Correct.** The impossibility half of the separation, Theorem 11, is proved in Lean with
-Lemmas 8 and 10 and Claim 9: no wait-free linearizable `n`-LLAA exists from `(n-1)`-window
-registers. Our version is stronger than the paper's. The lock-free algorithms (Theorems 4 and 7)
-are not formalized.
+**Verdict: ✅ Correct.** We found no mistakes. The impossibility half of the separation, Theorem 11, is proved in
+Lean with Lemmas 8 and 10 and Claim 9, in a form stronger than the paper's: no wait-free linearizable `n`-LLAA exists
+from `(n-1)`-window registers. The lock-free algorithms (Theorems 4 and 7) are not formalized, so the separation
+itself was only half checked.
 
 ## Mistakes in the paper
 

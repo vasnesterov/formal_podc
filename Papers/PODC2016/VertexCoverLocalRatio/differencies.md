@@ -3,7 +3,7 @@
 Paper: R. Bar-Yehuda, K. Censor-Hillel, G. Schwartzman, *A Distributed (2+ε)-Approximation for Vertex
 Cover in O(log Δ/ε log log Δ) Rounds*, PODC 2016, arXiv 1602.03713v2 (numbering follows it).
 
-No false statements were found. Items are classified as in the project conventions.
+No false statements were found.
 
 ## Statements
 

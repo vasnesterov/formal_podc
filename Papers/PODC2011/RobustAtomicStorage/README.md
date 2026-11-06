@@ -5,27 +5,28 @@ Atomic Storage.* PODC 2011. DOI [10.1145/1993806.1993816](https://doi.org/10.114
 Formalized version: the EPFL accepted version (infoscience record 208945, 10 pages, proofs included;
 no arXiv version); numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** Both lower bounds hold in the round model of [1] (see Model below):
+**Verdict: 🔧 Easy fix.** Both lower bounds hold in the round model of [1] (see Model below):
 two-round reads are impossible when `S ≤ 4t` and `R ≥ 4` (Proposition 1), and with three-round
 reads the write needs more than `min {R, k}` rounds when `S ≤ 3t + ⌊t/t_k⌋` (Lemma 1, Lemma 2,
 Proposition 2; `Ω(log t)` rounds at optimal resilience). The run constructions of Proposition 1 and
-Lemma 1 are correct. The step from Lemma 1 to Lemma 2 and Proposition 2 has a gap: scaling the
-blocks by `c = t/t_k` works only when `t_k` divides `t`.
+Lemma 1 are correct, and the one gap, in the step to Lemma 2 and Proposition 2, where scaling the
+blocks by `c = t/t_k` works only when `t_k` divides `t`, is closed by changing the block sizes. The
+matching upper bounds of §5, and so the optimality of four read rounds, were not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
-- §4, proof of Lemma 1: "the state of `{B_l, C_l}` at the end of `Δpr_1`" should be `Δpr_l`.
-- §3, general step of Proposition 1: the index expressions (`σ_{((j mod 4)/j)(k−i−1)}`, footnote 3)
-  are hard to parse; Fig. 1 gives the intended runs.
+### ✏️ Slips
 - Proof of Lemma 2: "solving for k" derives `t ≥ t_k ⇒ k ≤ ⌊log ⌈(3t+1)/2⌉⌋`, while the proof needs
   the converse; both directions hold (`tseq_le_iff`).
+- §4, proof of Lemma 1: "the state of `{B_l, C_l}` at the end of `Δpr_1`" should be `Δpr_l`.
+
+### Typos
+- §3, general step of Proposition 1: the index expressions (`σ_{((j mod 4)/j)(k−i−1)}`, footnote 3)
+  are hard to parse; Fig. 1 gives the intended runs.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Proposition 2 and Lemma 2 (scaling Lemma 1 to `t ≥ t_k`)
+### 🔧 Proposition 2 and Lemma 2 (scaling Lemma 1 to `t ≥ t_k`)
 "By carefully choosing `c = t/t_k`" (Proposition 2), and "this is valid even with `R ≥ k` readers and
 `t ≥ t_k` faults" (Lemma 2): multiplying the blocks of Lemma 1 by `c` needs an integer `c`, so the
 argument covers only `t_k ∣ t`.

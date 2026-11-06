@@ -1,11 +1,10 @@
 # Differences between the formalization and the paper
 
 Paper: W. Feng, Y. Yin, *On Local Distributed Sampling and Counting*, PODC 2018 (arXiv:1802.06686v1).
-Rules R1–R6 refer to the project's verdict scale.
 
 ## Errors in the paper (statement level)
 
-1. **Corollary 5.2 is false as stated (❌, R1/R5: a corollary, not a headline).**
+1. **Corollary 5.2 is false as stated (❌; the paper lists it under "Minor results").**
    *Claim.* A class of locally admissible, local Gibbs distributions has SSM with exponential decay
    at rate `α` in TV distance iff it has SSM with exponential decay at rate `α` in multiplicative
    error. Here `err(μ, μ̂) = max_x |ln μ(x) − ln μ̂(x)|`, eq. (2), with only `ln 0 − ln 0 = 0` as a
@@ -17,13 +16,13 @@ Rules R1–R6 refer to the project's verdict scale.
    to 1 (`σ`) and to 0 (`τ`). Then `D = {u}` is at distance 1, `μ^σ_v(1) = 0` and
    `μ^τ_v(1) > 0`, so `err = ∞`. Hence there is no multiplicative SSM with any real-valued rate
    (`hardcore_err_infinite`, `hardcore_not_mssm`, which hold for any graph with an edge; `corollary_5_2_false`).
-   *Why not ⚠️.* The counterexample satisfies every hypothesis of the paper and is not degenerate:
+   *Not degenerate.* The counterexample satisfies every hypothesis of the paper and is not degenerate:
    the class covers every even `n`, and the hardcore model is the paper's flagship application. The
    repair is not local. Restricting to distances `> ℓ` is not enough, because soft constraints with
    weights like `e^{e^n}` give finite but super-polynomial `err` at distance 1. The true statement
    must only constrain `err` where `poly(n)·α^d` is small, i.e. at distances `≳ log n`. That changes
    the definition of exponential decay the corollary is about.
-   *Second problem (proof gap).* Even at large distances, the paper's proof (Theorem 5.1 ⇐, then the
+   *Second problem (❌, the proof route).* Even at large distances, the paper's proof (Theorem 5.1 ⇐, then the
    boosting Lemma 4.1 with locality `2t + ℓ`, then Theorem 5.1 ⇒ for `err`) yields
    `err ≤ poly(n)·(√α)^d`, not `poly(n)·α^d`. A direct pinning argument, with the pinned shell
    placed close to `D` and lower bounds on the marginals obtained from SSM, should recover rate
@@ -34,24 +33,24 @@ Rules R1–R6 refer to the project's verdict scale.
    weak statement. The counterexample does not use this case: `hardcore_err_infinite` has `v` free in both
    pinnings, which differ only at a neighbour `u`. So it also refutes the natural readings "`v ∉ Λ`" and
    "`dist(v, D) ≥ 1`".
-   *Borderline (R6).* One could read Definition 5.1 for `err` as constraining only distances where
-   `poly(n)·α^d` is small, which would make the hardcore counterexample disappear. We do not excuse it under
-   R3/R4: the paper never states such a restriction, it says that the known multiplicative SSM results for
+   *Another reading.* One could read Definition 5.1 for `err` as constraining only distances where
+   `poly(n)·α^d` is small, which would make the hardcore counterexample disappear. We do not adopt this reading:
+   the paper never states such a restriction, it says that the known multiplicative SSM results for
    independent sets have exactly this form, and the needed repair changes the notion of exponential decay
-   itself (not a local fix). The corollary is listed by the paper under "Minor results", so ❌, not 🚨.
+   itself (not a local fix).
    *True part.* Multiplicative SSM ⇒ TV SSM with the same rate, since `d_TV ≤ err` for probability
    vectors (`tv_le_of_multClose`, `ssm_of_mssm`). This direction needs neither local admissibility
    nor locality.
 
 2. **Algorithm local-JVV and the statement of Lemma 4.8: acceptance and rejection swapped
-   (⚠️, R3).** §4.2.1: "`vᵢ` samples `F'_{vᵢ} = 1` with probability `q_{vᵢ}`" and "fails locally
+   (✏️).** §4.2.1: "`vᵢ` samples `F'_{vᵢ} = 1` with probability `q_{vᵢ}`" and "fails locally
    if `F'_{vᵢ} = 1`". Lemma 4.8: "fails with probability at most `∑ E[F'_{vᵢ}] = 1 − O(1/n)`". As
    written, with `q_{vᵢ} ≥ e^{−5/n²}`, the algorithm fails almost surely. The proof of Lemma 4.8
    uses `Pr[F'_{vᵢ} = 1 | Y = σ] = q_{vᵢ}(σ)` together with `Pr[success | Y = σ] = ∏ q_{vᵢ}(σ)`. The
    intent is therefore recoverable: accept with probability `q_{vᵢ}`, and fail with probability
    `≤ 1 − e^{−5/n} = O(1/n)`. The fix is local. We formalize the intended version.
 
-3. **Theorem 5.1 (⇒): `δ_n(t) = 2 min{δ | t(n, δ) ≤ t − 1}` (⚠️, R3).** The minimum need not be
+3. **Theorem 5.1 (⇒): `δ_n(t) = 2 min{δ | t(n, δ) ≤ t − 1}` (✏️).** The minimum need not be
    attained (`δ` ranges over the open set `δ > 0`), and for `t ≤ t(n, δ)` for all `δ` the set is
    empty, so `δ_n(t)` is undefined although Definition 5.1 requires `δ_n : ℕ → ℝ≥0`. Intended
    reading: infimum, with `inf ∅ = ∞`. We use `[0, ∞]`-valued rates in `SSM` and prove the
@@ -59,7 +58,7 @@ Rules R1–R6 refer to the project's verdict scale.
 
 ## Proof gaps and repairs
 
-4. **Lemma 4.1, Claim.** `μ_{Λᵢ∪{v}}(τᵢᶜ) = μ_{Λᵢ₋₁∪{v}}(τᵢ₋₁ᶜ) · μ^{τᵢ₋₁ᶜ}_{vᵢ}(cᵢ) ≥ μ^{τᵢ₋₁ᶜ}_{vᵢ}(cᵢ)`
+4. **Lemma 4.1, Claim (🔧).** `μ_{Λᵢ∪{v}}(τᵢᶜ) = μ_{Λᵢ₋₁∪{v}}(τᵢ₋₁ᶜ) · μ^{τᵢ₋₁ᶜ}_{vᵢ}(cᵢ) ≥ μ^{τᵢ₋₁ᶜ}_{vᵢ}(cᵢ)`
    is wrong (the first factor is `≤ 1`). Only positivity is needed. The first factor is positive by
    induction, and the second is `≥ 1/q − 3ε/(5nq) > 0` by (4) and (5). Our proof uses exactly this
    (`pinSeq_spec`). The quantitative bound (3) is correct as stated (`lemma_4_1_core`). The numeric

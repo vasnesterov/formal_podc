@@ -8,6 +8,9 @@ networks*, PODC 2019 (arXiv:1903.02637v2, the version formalized; numbering foll
 None found in the formalized part. All checked statements hold as written (see the README table).
 The only imprecisions are listed below; none of them changes a statement.
 
+Outside the formalized part, §1.2 (second paragraph) says "`X1 + X2 → W` (computing `w = x1 + x2`)"; this reaction
+computes `w = min(x1, x2)`, as the same sentence intends. ✏️
+
 ## Model and definitions
 
 1. **Inputs indexed by a finite type.** `ℕ^d` is `ι → ℕ` for any finite `ι` (`Fin d` in the paper).
@@ -90,16 +93,16 @@ The only imprecisions are listed below; none of them changes a statement.
     because each splice moves at least one `W` to the never-consumed `Y`, whose count is bounded by
     `f(x)`).
 
-## Verdict notes
+## Scope notes
 
-18. **Verdict ✅ (R6, checked statements only).** The checked statements are Observations 2.1, 2.2
+18. **Checked statements.** The checked statements are Observations 2.1, 2.2
     (in the generalized closure form), 5.3, 9.1, Lemmas 4.1, 6.1, 6.2, the `⇐` directions of Theorems
-    3.1, 5.2, 9.2, and the `⇒` directions of 3.1/9.2 modulo the cited Lemma 2.7. The headline
+    3.1, 5.2, 9.2, and the `⇒` directions of 3.1/9.2 modulo the cited Lemma 2.7. The main
     Theorem 5.2 is only half checked: the necessity of condition (ii) (Theorem 7.1, §7) is a
-    hypothesis, so nothing is claimed about it. Borderline point considered: Lemma 6.2 uses the
+    hypothesis, so nothing is claimed about it. Lemma 6.2 uses the
     multi-input form of Observation 2.2, which the paper only asserts in a remark ("more
     generally, …") without proof. The extension is routine (fan-out plus the same additivity
-    argument), so we count it as a routine detail rather than a proof repair.
+    argument), so we count it as a routine detail rather than a gap.
 19. **Hypotheses are the paper's own claims in the paper's model.** `StablyComputableImpliesSemilinear`
     and `Theorem71` are stated for our `FunCRN`, which, like the paper (`(R, P) ∈ ℕ^S × ℕ^S`), allows
     any reactions, including ones with no reactants. They are the paper's Lemma 2.7 ([10]) and

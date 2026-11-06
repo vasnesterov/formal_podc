@@ -84,7 +84,7 @@ Population Protocols*, PODC 2026 (arXiv:2605.18707v1).
     is a loser forever) and `tieShare_correct` (Theorem 4.2 for the sequential reading). The simultaneous
     reading is the less natural one ("follows the following rules" in order), so we classify this as a
     clarification.
-19c. **Output of winners.** `tieShare_correct` uses the output map `tsOut`: winners/winner spreaders output
+19c. **Output of winners (🔧).** `tieShare_correct` uses the output map `tsOut`: winners/winner spreaders output
     their own bra (= initial color), losers output `out`. If instead every agent outputs its `out` variable
     (Circles' "Output: return out", not redefined in Section 4.2), the claim "the output of every winner or
     winner_spreader is its initial color" is **false** even for the sequential reading:
@@ -99,9 +99,9 @@ Population Protocols*, PODC 2026 (arXiv:2605.18707v1).
     Interpretation: status ∈ {winner_spreader, winner, loser}; z ∈ [x,y]_k iff (z−x) mod k ≤ (y−x) mod k
     (so [i,i] = {i}); ⊆ is set inclusion plus the paper's extra condition x≠y' ∨ y≠x' (needed for Claim 2:
     otherwise ⟨a|a+1⟩ ⊆ ⟨a+1|a⟩ would mix sectors); winners output their own color, losers `out`.
-19a. Lemma 8.2 (r = 1) ignores tokens still alive after stabilization (they can demote majority agents or
+19a. 🛠️ Lemma 8.2 (r = 1) ignores tokens still alive after stabilization (they can demote majority agents or
     promote others); a separate token-extinction argument is needed (`extinction`).
-19b. Lemma 8.3's proof is a sketch: Claim 3 only holds once all agents of color μ_s have their final braket
+19b. 🛠️ Lemma 8.3's proof is a sketch: Claim 3 only holds once all agents of color μ_s have their final braket
     (`witness`); "token ascent until attached" is replaced by "tokens not on a top braket ⟨μ_s|μ_{s+1}⟩ die out"
     (`no_spurious`) and "the set of token holders is eventually constant" (`ws_const`); the induction needs
     a starting token from the last ket exchange (`tok_at_T0`). "Exactly one token per sector" is not
@@ -113,7 +113,7 @@ Population Protocols*, PODC 2026 (arXiv:2605.18707v1).
     token where it is. (If it were passed, e.g. always to the responder, an adversarial weakly fair
     scheduler could keep two tokens circulating among ≥3 agents with identical brakets forever; the
     output would still converge, but Lemma 8.4's "eventually only one holds the token" would fail.)
-21. The proof of Lemma 8.4 claims "the maximum weight is obtained in `f(G_q)` because `G_1 ⊇ … ⊇ G_q`";
+21. 🔧 The proof of Lemma 8.4 claims "the maximum weight is obtained in `f(G_q)` because `G_1 ⊇ … ⊇ G_q`";
     this is true but needs an argument (an arc of `G_p` lies inside an arc of `G_q`, strictly shorter if
     its start is not in `G_q`): `w_add_of_closest`, `exists_key_gt`. Also needed and not in the paper: if no
     ket exchange ever happens, the initial configuration is stable, so all agents have the same color.
@@ -136,7 +136,7 @@ Population Protocols*, PODC 2026 (arXiv:2605.18707v1).
     the symmetrized protocols (`Protocol.symm`: apply `δ` in both role assignments) are correct under
     unordered weak fairness: `orderingSymm_correct`, `ordCirclesSymm_correct`. The same orientation issue
     affects the proofs of Lemmas 8.5 and 8.12 and of Theorem 5.1 ("copy").
-25. **Proof gap in Lemma 8.11.** The lemma's statement (finitely many ordering-state changes) holds, but a
+25. **Proof gap in Lemma 8.11 (🛠️).** The lemma's statement (finitely many ordering-state changes) holds, but a
     step of its proof, "once a label is used by some leader it never becomes free again", is false: a
     label used only by leaders in state `I` left over from before leader stability can be freed (reachable
     for k = 3, colors 0,0,1,1; `tools/unordered/freed.py`). Finiteness of ordering-state changes still holds;

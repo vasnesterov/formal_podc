@@ -5,48 +5,44 @@ Machine Learning, MultiKrum and an Optimal Notion of Robustness.* PODC 2026. DOI
 [10.1145/3796701.3815914](https://doi.org/10.1145/3796701.3815914). Formalized version: arXiv
 [2602.03899](https://arxiv.org/abs/2602.03899) v1 (full version); numbering follows it.
 
-**Verdict: ⚠️ Minor statement issues.** All results hold: MultiKrum is robust with the stated upper
-bound (Theorems 1, 5, 6), and the lower bounds hold (Proposition 1, Theorems 3, 4, Proposition B.1), as
-does the asymptotics of the transition point (Theorem 2). The statement-level problems are a typo and
-a degenerate case. Display (1) of Theorem 1 prints `≥` for the upper bound. The lower bounds fail for
-`n = 1` under the paper's own convention `0/0 = −∞`. Two proofs needed repair: the bias computation
-in Proposition B.1 and the upper-bound step of Theorem 2.
+**Verdict: 🔧 Easy fix.** All bounds hold: MultiKrum is robust with the stated upper bound (Theorems 1, 5, 6), the
+lower bounds hold for `n ≥ 2` (Proposition 1, Theorems 3, 4, Proposition B.1), and so does the asymptotics of the
+transition point (Theorem 2). The proofs of Theorem 2 and Proposition B.1 and the score values in Theorem 4 need local
+changes only. Display (1) of Theorem 1 prints `≥` for the upper bound, and the lower bounds fail for `n = 1` under the
+paper's own convention `0/0 = −∞`; both are slips.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorem 1, display (1) (`≥` instead of `≤`)
-Display (1) reads `κ⋆_m ≥ (n−f)/(n−2f)·min((√2+1)², κ^>_2(m))`, which is false for `f = 0`, `m = n`
-(`theorem_1_as_written_false`), although the theorem is announced as an upper bound and its proof proves `≤`.
-
-**Impact.** A typo with evident intent; the intended upper bound holds. We prove it, together with "MultiKrum
-is robust" (`theorem_1`).
-
-**Details.** For `f = 0` and `m = n`, MultiKrum is the plain mean, so `κ⋆ ≤ 0`, while the right-hand side is
-`min((√2+1)², 1) = 1`.
-
-### ⚠️ Proposition 1, Theorem 3 (odd `n`), Theorem 4 for `n = 1`
-With the paper's own convention `0/0 = −∞`, Krum on a single input is robust with `κ⋆ = −∞`, so these lower
-bounds, which all equal 0 for `n = 1` (Proposition 1: `κ⋆ ≥ f/(n−2f)`), fail there
-(`kappaStar_eq_bot_of_n_eq_one`).
-
-**Impact.** Degenerate case only; the lower bounds hold for `n ≥ 2`.
-
-**Details.** Against Proposition 1, Krum is then a robust rule with `κ⋆ < 0 = f/(n−2f)`; Theorems 3 (odd `n`) and 4 give bounds equal to 0. Theorem 3 states no hypotheses; we prove it under Definition 2's standing assumption `f ≤ n/2`
-(for `n = 2f`, `κ⋆ = +∞`).
-
-### Typos and slips
-- Theorem 4 / B.1 give scores `f/(n−f)` and `(1−ε)(n−2f)/(n−f)` where the exact values are `f(1−ε)²/(n−f)`
-  and `(1−ε)²(n−2f)/(n−f)`. The ordering, which is all that matters, is right.
+### ✏️ Slips
+- Theorem 1, display (1) reads `κ⋆_m ≥ (n−f)/(n−2f)·min((√2+1)², κ^>_2(m))`, which is false for `f = 0`, `m = n`
+  (`theorem_1_as_written_false`): MultiKrum is then the plain mean, so `κ⋆ ≤ 0`, while the right-hand side is
+  `min((√2+1)², 1) = 1`. The theorem is announced as an upper bound and its proof proves `≤`. We prove that, together
+  with "MultiKrum is robust" (`theorem_1`).
+- Proposition 1, Theorem 3 (odd `n`), Theorem 4 for `n = 1`: with the paper's own convention `0/0 = −∞`, Krum on a
+  single input is robust with `κ⋆ = −∞`, so these lower bounds, which all equal 0 for `n = 1` (Proposition 1:
+  `κ⋆ ≥ f/(n−2f)`), fail there (`kappaStar_eq_bot_of_n_eq_one`). They hold for `n ≥ 2`.
+- Theorem 3 states no hypotheses. We prove it under Definition 2's standing assumption `f ≤ n/2` (for `n = 2f`,
+  `κ⋆ = +∞`, while the printed score `s(0)` is negative). At `n = 2` the paper's set `S` has zero variance and the bound
+  is 0. The construction works for `n ≥ 3`, `n > 2f` (`theorem_3_even`, `theorem_3_odd`).
+- Proposition B.1 at `f = 0`: the formula `R(n,f,m)` divides by `f`, although `n − 3f > 0` allows `f = 0`, and the
+  configuration has zero variance. The bound holds for `f ≥ 1` (`prop_B1`).
+- Table 1's `(n−f)`-MultiKrum entry omits the `min` of Theorem 1. Without it the entry exceeds Krum's bound when
+  `f/(n−f)` is near 1, e.g. `n = 19`, `f = 9` (6.54 > 5.83), against the claim that MultiKrum's bounds are never worse.
+  With the `min`, which is Theorem 1 itself, the claim holds.
 - The proof of Lemma 3 swaps `∪` and `∩`.
 - The proof of Theorem 2 writes `Cx⁴ = (A + f/x)²` for `Cx² = …`.
+- The proof of Lemma 2 says "averaging over the larger set `S`", but `S` has the same size `n−f` as `N(x_i)`.
+
+### Typos
 - "the κ^<_2 regime becomes active" should be `κ^>_2`.
-- Section 5 cites Theorem 3 for Theorem 1.
-- Table 1's `(n−f)`-MultiKrum entry omits the `min` of Theorem 1. Without it the entry exceeds Krum's bound
-  when `f/(n−f)` is near 1, e.g. `n = 19`, `f = 9`.
+- Section 2.1: `s^X : ℝⁿ → ℝ` should be `ℝ^d → ℝ`.
+- Section 3.2 calls the bounds of Appendix B `κ†_m` instead of `κ⋆_m`.
+- Section 5 cites Theorem 3 for Theorem 1, and says "upper bound" for the lower bound of Theorems 3 and 4 at `m = 1`.
+- The proof of Proposition B.1 writes `(1 + ϵ)e` for `(1 − ε)e`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Proposition B.1 (bias computation)
+### 🔧 Proposition B.1 (bias computation)
 The proof writes the bias as `(a·f/(n−f) + (m−a)(1−ε))/m`, scaling `f/(n−f)` by `a/m` instead of 1; the
 correct bias is `f/(n−f) + (m−a)(1−ε)/m`.
 
@@ -61,7 +57,7 @@ not the limit of the ratio. It is still a lower bound, because it is at most the
 **Repair.** We prove the corrected `R'` and derive both B.1 and Theorem 4 from it (`prop_B1_corrected`,
 `prop_B1`, `prop_B1_paper_lt_theorem_4`).
 
-### 🛠️ Theorem 2 (asymptotics of the transition point)
+### 🔧 Theorem 2 (asymptotics of the transition point)
 The proof's upper bound `m† ≤ (A² + √(A⁴ + 2Cf²))/C` (with `A = √(n−2f) + √(2f)`, `C = (√2+1)²`) reduces to
 `2n/C`, not to `n/C·(1+o(1))` as claimed: at `f = 0` it equals exactly `2n/C = 2m†`.
 
@@ -70,6 +66,12 @@ The proof's upper bound `m† ≤ (A² + √(A⁴ + 2Cf²))/C` (with `A = √(n�
 
 **Repair.** Solving the quadratic in `√m†` gives `m†·C/n = g(f/n)` for an explicit continuous `g` with
 `g(0) = 1` (`theorem_2`, `mDagger_mul_div`).
+
+### 🔧 Theorem 4 and Proposition B.1 (score values)
+The proofs give scores `f/(n−f)` and `(1−ε)(n−2f)/(n−f)` where the exact values are `f(1−ε)²/(n−f)` and
+`(1−ε)²(n−2f)/(n−f)`.
+
+**Impact.** The ordering, which is all that matters, is right (`theorem_4`, `prop_B1_instance`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

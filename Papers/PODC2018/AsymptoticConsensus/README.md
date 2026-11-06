@@ -6,11 +6,11 @@ Formalized version: arXiv [1705.02898](https://arxiv.org/abs/1705.02898) v2 (the
 not consulted).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The contraction-rate lower bounds (Theorems 1, 2, 3, 5, 6) and the
-approximate-consensus bounds (Theorems 8–11) are correct. Theorems 1 and 2 are tight (Algorithm 1 and the
-midpoint algorithm). **Theorem 4 (⇐) is false**: "valencies singleton or disconnected ⇒ exact consensus
-solvable" fails for two agents in `{H₀, H₁, H₂}`. It becomes true once the asymptotic algorithm is
-required to have a continuous consensus function.
+**Verdict: ⚠️ Weakened.** The contraction-rate lower bounds (Theorems 1, 2, 3, 5, 6) and the approximate-consensus
+bounds (Theorems 8–11) are correct, and Theorems 1 and 2 are tight (Algorithm 1 and the midpoint algorithm). **Theorem 4
+(⇐) is false**: "valencies singleton or disconnected ⇒ exact consensus solvable", the converse of the paper's topological
+characterization of exact consensus, fails for two agents in `{H₀, H₁, H₂}`. It becomes true once the asymptotic
+algorithm is required to have a continuous consensus function.
 
 ## Mistakes in the paper
 
@@ -41,21 +41,20 @@ this matters, since for `N' = ∅` the valency would be empty.
 **Repair.** With continuity, the full equivalence follows, conditional on the cited
 characterization of Coulouma et al. [12] (`theorem4_repaired`).
 
-### ⚠️ Definition 15 (α-relation)
-Definition 15 writes `In_S(G)` as a union of node sets, but [12, Def. 4.7] and every later use need
-the per-agent version `In_i(G) = In_i(H)` for all `i ∈ R(K)`; under the literal reading Lemma 20
-and Theorem 5 fail (`lemma20_literal_false`, `theorem5_literal_false`).
-
-**Impact.** A typo with evident intent: the remark `D = 2` for `{H₀,H₁,H₂}` and the proofs of
-Lemmas 20 and 24 use the per-agent version, under which Lemma 20 and Theorem 5 hold.
-
-**Details.** Under the literal reading the α-diameter of `{H₀,H₁,H₂}` would be 1. Lemma 20 would
-fail for Algorithm 1 from `(0, 1)`, since the valencies after `H₁` and `H₂` lie in `[0, 1/3]` and
-`[2/3, 1]`. Theorem 5 would claim rate `≥ 1/2` for Algorithm 1, whose rate is `1/3`.
-
-### Typos and slips
-- The proof of Theorem 11 writes `log₃` for `log_{D+1}` and `δ_N(C₀) ≤ Δ/n` for `≥ Δ/n`.
+### ✏️ Slips
+- Definition 15 (α-relation) writes `In_S(G)` as a union of node sets, but [12, Def. 4.7] and every later use need the
+  per-agent version `In_i(G) = In_i(H)` for all `i ∈ R(K)`; under the literal reading Lemma 20 and Theorem 5 fail
+  (`lemma20_literal_false`, `theorem5_literal_false`). The α-diameter of `{H₀,H₁,H₂}` would be 1. Lemma 20 would fail
+  for Algorithm 1 from `(0, 1)`, since the valencies after `H₁` and `H₂` lie in `[0, 1/3]` and `[2/3, 1]`. Theorem 5
+  would claim rate `≥ 1/2` for Algorithm 1, whose rate is `1/3`. The remark `D = 2` for `{H₀,H₁,H₂}` and the proofs of
+  Lemmas 20 and 24 use the per-agent version, under which Lemma 20 and Theorem 5 hold.
+- The proof of Theorem 11 writes `log₃` for `log_{D+1}`.
+- The proof of Theorem 11 writes `δ_N(C₀) ≤ Δ/n` for `≥ Δ/n`.
 - Lemma 24 swaps the endpoints of its chain relative to its own definition of `H_r`.
+
+### Typos
+- The cited Theorem 1 of [8] and the continuity theorem of Section 2.2 share their numbers with the main Theorems 1
+  and 2.
 
 ## Proof gaps (statements true)
 
@@ -63,10 +62,10 @@ fail for Algorithm 1 from `(0, 1)`, since the valencies after `H₁` and `H₂` 
 The proof builds `Ã` by restarting `A` with the decision values, but with a fixed `ε` this need not
 converge, so `Ã` is not an asymptotic consensus algorithm.
 
-**Impact.** Statement true; we prove Theorems 8–11 directly on finite-horizon decision sets
+**Impact.** The reduction to Theorem 5 fails; we prove Theorems 8–11 directly on finite-horizon decision sets
 (`theorem11`).
 
-### 🛠️ Theorem 3 (claim (8))
+### 🔧 Theorem 3 (claim (8))
 Claim (8) asserts the bound "for every initial snapshot", but Lemma 13 gives only one.
 
 **Impact.** One snapshot suffices for the theorem (`theorem3`).

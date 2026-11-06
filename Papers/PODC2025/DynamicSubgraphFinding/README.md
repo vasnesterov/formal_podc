@@ -5,14 +5,13 @@ Complexity Landscape of Dynamic Distributed Subgraph Finding.* PODC 2025.
 DOI [10.1145/3732772.3733522](https://doi.org/10.1145/3732772.3733522). Formalized version: arXiv
 [2411.11544](https://arxiv.org/abs/2411.11544) v3 (full version).
 
-**Verdict: ❌ False claim.** The two lower bounds hold: Theorem 1.3 (`Ω(log log n)` for one-round
-`MemDetect(K_s)` under edge insertions) and Theorem 1.6 (`Ω(log log log n)` for one-round
-`Detect(K_s)` under node and edge insertions), both on bounded-degree networks, with explicit
-constants. Theorem 1.3's proof needs two small repairs. The algorithm of Theorem 1.7 (`List(K₃)` under
-node and edge insertions) is incorrect: the rule by which a node infers a triangle is unsound once
-node insertions are allowed. So Theorem 1.7 and the upper half of Corollary 1.8 are not established.
-Theorem 1.4 (`O(Δ² log log n)` one-round `MemList(K₃)` under edge insertions) holds, once the
-periodic updates are also run on the edges of `G⁰`.
+**Verdict: ⚠️ Weakened.** The two lower bounds hold: Theorem 1.3 (`Ω(log log n)` for one-round `MemDetect(K_s)` under
+edge insertions) and Theorem 1.6 (`Ω(log log log n)` for one-round `Detect(K_s)` under node and edge insertions), both on
+bounded-degree networks, with explicit constants, and so does Theorem 1.4 (`O(Δ² log log n)` one-round `MemList(K₃)`
+under edge insertions), once the periodic updates are also run on the edges of `G⁰`. The algorithm of Theorem 1.7
+(`List(K₃)` under node and edge insertions) is incorrect, because the rule by which a node infers a triangle is unsound
+once node insertions are allowed, so Theorem 1.7 and the upper half of Corollary 1.8, the tightness of the
+`Ω(log log log n)` bound, are not established. The characterizations of Sections 6–8 were not checked.
 
 ## Mistakes in the paper
 
@@ -22,8 +21,7 @@ where round 2 inserts a node `x` with edges `{x, u}`, `{x, w}` and round 3 inser
 lists `{u, v, w}` although `u` and `w` are not adjacent (`Alg17.theorem_1_7_algorithm_unsound`).
 
 **Impact.** Theorem 1.7 (existence of some `O(Δ log log log n)` algorithm) and the upper half of
-Corollary 1.8 are not established, though they may still be true with a cheap fix; the lower bounds
-(Theorems 1.3, 1.6) and Theorem 1.4 are unaffected.
+Corollary 1.8 are not established; the lower bounds (Theorems 1.3, 1.6) and Theorem 1.4 are unaffected.
 
 **Details.** In the case `t_uv − t_uw ≤ d`, the proof lets `v` list `{u, v, w}` by reusing the
 argument for node `v` in Theorem 1.4. When `{u, v}` appears, `v` receives `R_edge(u) ∋ j` from `u`.
@@ -34,62 +32,56 @@ a new node `x` adjacent to both `u` and `w`. In the network above, in round 3, `
 every window `d ≥ 1`, every implementation of the remaining message parts (bit reports, periodic
 `1-DBList` updates) and every additional output rule.
 
-We also checked on paper, but not in Lean, that no other decision rule rescues these messages
-(for `T ≥ 2`). This needs a slightly different network: `{v, w}` is inserted in round 1 rather than
-being in `G⁰`. Otherwise `u` could list the triangle from its knowledge of `G⁰`. Then `{u, w}` is
-inserted in round 2 and `{u, v}` in round 3, which is exactly the paper's case
-`t_vw < t_uw < t_uv`, `t_uv − t_uw ≤ d`. With suitable identifiers, each of `u`, `v`, `w` sees the
-same messages as in some triangle-free network. For `v` it is the network above. For `u` it is a
-network where a node `z` adjacent to `v` and `w` is inserted in round 1 instead of `{v, w}`. For `w`
-it is a network where a node `x` adjacent to `u` and `v` is inserted in round 3 instead of
-`{u, v}`.
+### ✏️ Slips
+- The definitions of `List(H)` and `MemList(H)` in §1.2 do not say that only real copies may be listed; without that,
+  listing all triples solves `List(H)`, which would contradict Observation 1.1 together with Theorem 1.6. §5.3 shows
+  soundness is meant.
+- The proof of Theorem 1.4 orders the edges as `t_vw < t_uw < t_uv`, which ignores ties at time 0 (two edges of `G⁰`),
+  where no Signals exist; such edges are known from `G⁰`.
+- The last paragraph of the proof of Theorem 1.6 says "node `a`" for node `b`.
 
-**Repair.** A fix seems cheap: a freshly inserted node flags itself, and `u` reports its own
-insertion age. We have not formalized such a fix.
+## Proof gaps (statements true)
 
-### ⚠️ Theorem 1.4 (periodic updates for edges of `G⁰`)
+### 🔧 Theorem 1.4 (periodic updates for edges of `G⁰`)
 The algorithm never starts periodic updates for edges of `G⁰`, so with `{v, w} ∈ G⁰`, `{u, w}`
 inserted in round `t ≥ 1` and `{u, v}` more than `d` rounds later, read literally `v` never learns
 `{u, w}` (no Lean counterexample).
 
-**Impact.** A missing case with an evident fix: we start the updates in round 1, and Theorem 1.4
-then holds.
+**Impact.** We start the updates in round 1, and Theorem 1.4 then holds (`theorem_1_4`, `alg14_solves`).
 
 **Repair.** The paper also argues only that the true triangles are listed. We add explicit listing
 rules and prove that no node lists a non-triangle.
 
-### Typos and slips
-- For Theorem 1.6, the hard-instance paragraph says `o(log log n)` instead of `o(log log log n)`.
-- The last paragraph of the proof of Theorem 1.6 says "node `a`" for node `b`.
-- The same paragraph forgets the untouched cliques `K^j`, `j ≠ i`, as possible reporters; they see
-  the same in (S1) and (S4).
-
-## Proof gaps (statements true)
-
-### 🛠️ Theorem 1.3, proof of Lemma 4.2 (number of classes)
+### 🔧 Theorem 1.3, proof of Lemma 4.2 (number of classes)
 A class is a vector of message patterns over all `j ∈ [t]`, so there are `2^{O(Bt²)}` classes, not
 `t · 2^{O(Bt)}`.
 
 **Impact.** Statement true: this is still `n^{o(1)}`, so the argument survives (hypothesis `h2` of
 `Hard.not_solves_13`).
 
-### 🛠️ Theorem 1.3 (choice of `b` and `c`)
+### 🔧 Theorem 1.3 (choice of `b` and `c`)
 Lemma 4.1 only gives `b` *one* friend w.r.t. `(a, i)`, so `c = d` is possible, and `I*` may contain
 `b`.
 
-**Impact.** Statement true; repaired at the cost of a factor 2 in the count (`Hard.select13`).
+**Impact.** Statement true, at the cost of a factor 2 in the count (`Hard.select13`).
 
 **Details.** If `c = d`, then `d` is attached to both cliques in (S2), and `a` can learn about
 `K^{i*}` through `d`.
 
 **Repair.** We choose `b ∉ I*` with at least two friends besides itself.
 
-### 🛠️ Theorems 1.3 and 1.6 (`Ω(·)` proved as "not `o(·)`")
+### 🔧 Theorems 1.3 and 1.6 (`Ω(·)` proved as "not `o(·)`")
 Both lower-bound proofs only use `B = o(log log n)` (resp. `o(log log log n)`), so they show "not
 `o(·)`" rather than `Ω(·)`.
 
 **Impact.** Statements true: the counting works for `B ≤ c · log log n`, and we prove the `Ω` form
 with `c = 1/8` (resp. `c = 1/16`).
+
+### 🔧 Theorem 1.6 (possible reporters)
+The last paragraph of the proof considers only nodes of `K^i ∪ {a, b}` as possible reporters and forgets the untouched
+cliques `K^j`, `j ≠ i`.
+
+**Impact.** Statement true: those nodes see the same in (S1) and (S4) (`theorem_1_6`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -130,7 +122,21 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Not formalized.** Sections 2, 6–8 (membership listing, one-round detection/listing
 characterizations, `r`-round results), Appendix A (randomized), deletion models, and a repaired
-Theorem 1.7 algorithm. Corollaries 1.5/1.8 are not stated separately.
+Theorem 1.7 algorithm. Corollaries 1.5/1.8 are not stated separately. The remaining cases of the correctness proof of
+Theorem 1.7 (node insertion, `t_uv − t_uw > d`) were not checked.
+
+Open remarks on Theorem 1.7. A fix seems cheap: a freshly inserted node flags itself, and `u` reports its own insertion
+age. We have not formalized such a fix, so whether a repaired algorithm exists is open here.
+
+We also checked on paper, but not in Lean, that no other decision rule rescues these messages
+(for `T ≥ 2`). This needs a slightly different network: `{v, w}` is inserted in round 1 rather than
+being in `G⁰`. Otherwise `u` could list the triangle from its knowledge of `G⁰`. Then `{u, w}` is
+inserted in round 2 and `{u, v}` in round 3, which is exactly the paper's case
+`t_vw < t_uw < t_uv`, `t_uv − t_uw ≤ d`. With suitable identifiers, each of `u`, `v`, `w` sees the
+same messages as in some triangle-free network. For `v` it is the network of the counterexample above. For `u` it is a
+network where a node `z` adjacent to `v` and `w` is inserted in round 1 instead of `{v, w}`. For `w`
+it is a network where a node `x` adjacent to `u` and `v` is inserted in round 3 instead of
+`{u, v}`.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. The hard scenarios are checked to be valid networks of the respective model with

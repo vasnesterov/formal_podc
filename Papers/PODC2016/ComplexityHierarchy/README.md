@@ -5,31 +5,37 @@ Synchronization.* PODC 2016. DOI [10.1145/2933057.2933113](https://doi.org/10.11
 Formalized version: arXiv [1607.06139](https://arxiv.org/abs/1607.06139) v2 (2018).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** All formalized theorems hold as stated: the space lower bounds
-(`⌈(n−1)/ℓ⌉` ℓ-buffers, `⌈(n−1)/2ℓ⌉` locations with multiple assignment, one max-register / one
-read-write-FAI location insufficient, unboundedly many test-and-set locations) and the matching
-algorithms. But several proofs needed repair: Lemma 9.1 has a real gap, Lemma 7.1's proof is wrong
-(statement true), and Lemma 8.2 is false as stated, though never used in the false case.
+**Verdict: 🔧 Easy fix.** All formalized theorems hold: the space lower bounds (`⌈(n−1)/ℓ⌉` ℓ-buffers, `⌈(n−1)/2ℓ⌉`
+locations with multiple assignment, one max-register / one read-write-FAI location insufficient, unboundedly many
+test-and-set locations) and the matching algorithms. Several proofs needed only local repairs: Lemma 9.1 has a real
+gap, Lemma 7.1's proof is wrong (statement true), and Lemma 8.2 is false as stated, though never used in the false
+case. What is lost is minor: Theorem 8.8's `n − 1` swap/read protocol is proved only with process identifiers, not
+as anonymous.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 8.2 (swap/read algorithm, scans with `ℓ_v(S) = 1`)
-For a scan `S` with `ℓ_v(S) = 1`, Lemma 8.2 asks for an earlier scan `T` in which all laps are `0`, but no such `T`
-exists, since every scanner has lap `≥ 1` on its own input from line 1.
+### ⚠️ Theorem 8.8 ("anonymous", Section 8)
+The protocol is called anonymous, but every swap argument carries a process identifier, and without unique tags the
+double collect is not a linearizable scan.
 
-**Impact.** An unused edge case: the lemma is applied only with `ℓ_v(S) ≥ 2` (Lemma 8.4), where it holds.
-Theorem 8.8 is unaffected (invariant `SwapRead.AInv`).
+**Impact.** The `n − 1` location bound is proved, but only with identifiers (`theorem_8_8`), so the word "anonymous"
+is not saved. The space hierarchy depends only on the bound.
 
-### Typos and slips
+### ✏️ Slips
+- Lemma 8.2 (swap/read algorithm): for a scan `S` with `ℓ_v(S) = 1`, it asks for an earlier scan `T` in which all
+  laps are `0`, but no such `T` exists, since every scanner has lap `≥ 1` on its own input from line 1. This is an
+  unused edge case: the lemma is applied only with `ℓ_v(S) ≥ 2` (Lemma 8.4), where it holds, and Theorem 8.8 is
+  unaffected (invariant `SwapRead.AInv`).
 - The Section 7 introduction says `⌈n/2ℓ⌉` locations are necessary; Theorem 7.5 and the proof give `⌈(n−1)/2ℓ⌉`.
 - Lemma 7.3: "`Cζβ1β2`" should be "`Cξβ1β2`".
-- Lemma 7.4: "at mostwot two".
 - Theorem 4.2: "(r,x) ≺ (r′,x)" should be "(r,x) ≺ (r′,x′)".
-- "Anonymous" (Section 8) is inaccurate: the swapped values carry process ids.
+
+### Typos
+- Lemma 7.4: "at mostwot two".
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 9.1 (test-and-set)
+### 🔧 Lemma 9.1 (test-and-set)
 The proof runs `z`'s preliminary steps of `β` *after* `p_1`'s steps `ψ, ψ'`, which may set locations to 1, so `z`
 need not perform `β` at all, and the claims that "`β` sets `r` to 1" and that the two configurations are
 indistinguishable to `p_0` are unjustified.
@@ -44,7 +50,7 @@ may then return different values.
 **Repair.** Run `z`'s preliminary steps first (they change no memory), so that `z` is poised on `r`; its single
 remaining step commutes with any single step of `p_0`/`p_1`. This also removes the case analysis on `ψ'`.
 
-### 🛠️ Lemma 7.1 (re-packing along an Eulerian trail)
+### 🔧 Lemma 7.1 (re-packing along an Eulerian trail)
 The proof re-packs along *any* maximal Eulerian trail `r_1, …, r_t` from each `r_j` to `r_t`, which does nothing if
 the trail visits `r_t` earlier (`lemma71_trail_counterexample`).
 
@@ -53,29 +59,29 @@ the trail visits `r_t` earlier (`lemma71_trail_counterexample`).
 **Details.** Example: locations `A, B, C`, processes `p1, p2, p3`, 2-packings `g = (A, B, C)` and `h = (B, C, B)`.
 The unique maximal trail from `A` is `A→B→C→B`, and re-packing from `j = 2` leaves `B` unchanged.
 
-**Repair.** We prove Lemma 7.2 directly, by an augmenting-path argument (`fullyPacked_of_cov`).
+**Repair.** We prove Lemma 7.2, the only use of Lemma 7.1, directly, by an augmenting-path argument
+(`fullyPacked_of_cov`).
 
-### 🛠️ Lemmas 6.5 and 7.3 for `R = ∅` (used by Theorems 6.8 and 7.5)
+### 🔧 Lemmas 6.5 and 7.3 for `R = ∅` (used by Theorems 6.8 and 7.5)
 The proofs of Lemmas 6.5 / 7.3 start from a process `p ∈ R`, but Theorems 6.8 / 7.5 use them for `n = 2`, where
 `R = ∅`.
 
 **Impact.** Theorems true; the needed conclusion (at least one location) follows from a separate easy argument:
 with no locations, two processes cannot communicate (`no_locations`).
 
-### 🛠️ Implicit steps (Lemmas 3.2, 6.6, 8.6, Theorem 4.2, Section 8)
-Several proofs leave steps implicit, which we fill in.
+### 🔧 Lemma 3.2 (validity)
+Validity is not argued, and it needs every scan to see a nonzero component: otherwise the argmax of an all-zero
+vector could be an unproposed value, since decrements lower counts.
 
-**Impact.** Statements true; routine repairs.
+**Impact.** Statement true (`lemma_3_2`).
 
-**Details.**
-- Lemma 3.2: validity needs every scan to see a nonzero component. Otherwise the argmax of an all-zero vector
-  could be an unproposed value, since decrements lower counts.
-- Lemma 6.6: one must truncate `α` after its first decision, so that `U'` stays undecided.
-- Theorem 4.2 and Section 8: the step from linearizable double-collect scans to atomic-scan reasoning is left
-  implicit; we prove it (a ghost chain of observed pairs for Theorem 4.2, a step-by-step simulation for
-  Section 8).
-- Theorem 4.2: validity needs the observation that a process seeing `m1 = (0,0)` itself wrote `(0, input)`.
-- Lemma 8.6 proves only weak validity; standard validity also holds.
+**Repair.** One invariant (pending decrements + 1 ≤ total count) closes the step, with no change to the algorithm.
+
+### 🔧 Lemma 8.6 (validity)
+Section 8 announces validity, defined as "equal to the input of one of the processes", but Lemma 8.6 proves only
+weak validity: if all inputs are `x`, then only `x` is decided.
+
+**Impact.** Statement true; standard validity also holds (`theorem_8_8`, `SwapRead.AInv.valid`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -109,6 +115,13 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Lemma 7.2, Theorem 7.5 | `fullyPacked_of_cov`, `theorem_7_5`, `theorem_7_5_ceil` | `Packing.lean`, `BufferLB.lean` |
 | Theorem 8.8 (`n−1` swap/read locations) | `theorem_8_8` | `SwapAlgOF.lean` |
 | Lemma 9.1, Theorem 9.2 | `lemma_9_1`, `theorem_9_2`, `theorem_9_2_multivalued` | `TestAndSet.lean`, `NConsensus.lean` |
+
+**Steps left implicit in the paper (routine, filled in here).**
+* Lemma 6.6: one must truncate `α` after its first decision, so that `U'` stays undecided.
+* Theorem 4.2 and Section 8: the step from linearizable double-collect scans to atomic-scan reasoning is left
+  implicit; we prove it (a ghost chain of observed pairs for Theorem 4.2, a step-by-step simulation for
+  Section 8).
+* Theorem 4.2: validity needs the observation that a process seeing `m1 = (0,0)` itself wrote `(0, input)`.
 
 **Not formalized.** Lemma 5.2 / Theorem 5.3 (needs composition of consensus protocols), Theorems
 9.3–9.4, Table 1 entries cited from other papers, the remarks on heterogeneous capacities, and the

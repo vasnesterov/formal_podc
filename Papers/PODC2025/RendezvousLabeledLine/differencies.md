@@ -64,8 +64,8 @@ arXiv 2505.04564v2.
     * colours in `[17]`, proper on `G^{9R-1}[S]`;
     * commitment within `κ R log* ℓ(u)`, with `κ = 40001`.
 
-    The ruling-set property of the final `S` is the same as in the paper. Item (2) is weakened as
-    explained in the README: `u` knows the members of its own or lower levels.
+    The ruling-set property of the final `S` is the same as in the paper. Item (2) is stated for the
+    committed set, as explained in the README: `u` knows the members of its own or lower levels.
 17. **Lemma 2.1** (cited from Linial) is proved for the graphs used, with explicit constants. The
     graphs are `G^k[S]` for `S ⊆ ℤ` with labels `< n`, and the degree bound is supplied by packing.
     * Colouring: `log* n + 3` rounds of `G^k[S]` with Linial's reduction (CSLib), giving

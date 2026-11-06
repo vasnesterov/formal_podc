@@ -21,17 +21,16 @@ Theorems 4 and 5, Appendix B.
   the operation has at most `105 c + 46` steps. The theorem is stated on `Trace`s, which carry ghost
   variables; `exists_trace` shows that every finite execution of `alg` is a trace. The "same operation"
   hypothesis is phrased as "`p` is pending at `a` and does not return in `[min a n3, m)`".
-* No statement was found false. By rule R1, the issues below are proof-level only.
+* No statement was found false. The issues below are proof-level only.
 
 ## Proof-level
 
-* **Lemma B.2.14, inductive step (genuine gap; verdict 🛠️).** From `O_{n+1} = O_n` the proof concludes
+* **Lemma B.2.14, inductive step (genuine gap 🔧).** From `O_{n+1} = O_n` the proof concludes
   `o' = o_{3n+2} = o_{3n+3} = o_{3n+4}` for some `o' ∈ O_n`. This does not follow: the three operations
   may be distinct elements of `O_n`. Repair: by Proposition B.2.13, no operation is identified by four
   periods, so each operation of `S(o)` is identified by at most 3 periods; pigeonhole gives at most
   `3|S(o)|` periods.
-  *Borderline:* the repair is one line. We rate it 🛠️ rather than ✅ because the written argument is
-  logically invalid and a careful referee would flag it.
+  The repair is one line, but the written argument is logically invalid.
 * **Our counting argument differs from B.2.13/B.2.14.**
   * Instead of the operation "identified" by a useful period (Definition B.2.4), we use *rises*. A rise
     of `τ` is a step after which `τ` is done and `A.time ≠ τ` (`Trace.RE`).
@@ -45,7 +44,7 @@ Theorems 4 and 5, Appendix B.
     proof of Proposition B.2.13.
   * Periods are disjoint in time, so their rises are distinct; this gives at most `3|S(o)|` periods
     (`OpStart.periods`, `OpStart.it_le`).
-* **Proof of Theorem B.2.15, arithmetic slip.** At most `3c` disjoint periods allow up to `15c + 4`
+* **Proof of Theorem B.2.15, arithmetic error (🔧).** At most `3c` disjoint periods allow up to `15c + 4`
   complete non-terminal iterations after the first, not "`15|c|`". The total bound should be
   `15c + 6` iterations, not `15c + 2`. Linearity is unaffected. We prove at most `15|S(o)| + 5` complete
   iterations (`OpStart.it_le`). The step count of a pending operation is at most `9 + 7 · it`

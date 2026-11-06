@@ -4,47 +4,32 @@ Seth Gilbert, Calvin Newport, Nitin Vaidya, Alex Weaver. *Contention Resolution 
 DOI [10.1145/3465084.3467911](https://doi.org/10.1145/3465084.3467911). Formalized version: arXiv
 [2105.12706](https://arxiv.org/abs/2105.12706) v1; numbering follows it.
 
-**Verdict: ⚠️ Minor statement issues.** The entropy lower bound (Theorem 2.4) and the perfect-advice lower bounds
-(Theorems 3.3–3.7) hold, but several proofs need repair: Theorem 3.3 relies on a false "strongly selective" claim,
-Lemmas 2.5/2.7 and the proof of Theorem 3.7 contain invalid probabilistic or coding steps. Two statement-level slips:
-read literally ("at most `b` bits" of variable length), Theorems 3.3 and 3.5 are false, though they hold for the
-fixed-length `{0,1}^b` advice of the paper's model section; and the `Θ` upper bounds of Theorems 3.6/3.7 ignore that
-every algorithm needs at least one round.
+**Verdict: 🛠️ Hard fix.** The entropy lower bound without collision detection (Theorem 2.4) and the perfect-advice lower
+bounds (Theorems 3.3–3.7) hold, but the proofs of Theorems 3.3 and 3.7 are wrong and were replaced by new arguments. The
+collision-detection entropy bound (Theorem 2.8) and the upper bounds with predictions and randomization were not
+checked, and the randomized lower bounds assume Newport's bound [18], as the paper does.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorems 3.3 and 3.5 (advice of "at most `b` bits")
-Read literally, with advice of variable length `≤ b`, Theorems 3.3 and 3.5 are false: for `b = 1` the
-advice strings `ε, 0, 1` tell three players who transmits, and `n = 9` players are resolved in `t = 2` rounds
-with collision detection (`theorem_3_3_false_variable_length`, `theorem_3_5_false_variable_length`).
-
-**Impact.** Both theorems are true for the fixed-length advice `f_A : P(A) → {0,1}^b` of Section 3.1
-(`theorem_3_3`, `theorem_3_5`), which we treat as an implied assumption of the model section. The call is
-borderline: the proof of 3.5 itself feeds variable-length histories into 3.3.
-
-**Details.** The definitions say the advice has "no more than `b(n)` bits". With strings of length `≤ 1`
-(`ε, 0, 1`) three players can be told who transmits, although `1 < log₂ 3` (Theorem 3.3). With collision
-detection, the same three advice values select one of three groups of three players, and each group is
-resolved in two rounds (players 1, 2 of the group transmit; after silence player 3, after a collision
-player 1). So `n = 9`, `b = 1`, `t = 2 < log₂ 9 − 1` (Theorem 3.5). We read "at most `b` bits" as "a `b`-bit
-string".
-
-### ⚠️ Theorems 3.6 and 3.7 (upper halves of the `Θ` bounds)
-The `Θ` upper bounds of Theorems 3.6 and 3.7 are false for long advice, since every algorithm needs at
-least one round while the claimed bounds tend to `0` (`theorem_3_6_upper_false`, `theorem_3_7_upper_false`).
-
-**Impact.** A missing `1 +`: the correct forms are `Θ(1 + log n / 2^b)` and `Θ(1 + log log n − b)`, and the
-paper itself treats the `O(1)` regime only for `b ≥ log log n`. The lower halves are unaffected.
-
-**Details.** For `b(n) = ⌊log₂ n⌋ − 1 < log n`, `log n / 2^{b(n)} → 0` (3.6). For
-`b(n) = ⌈log₂ log₂ n⌉ − 1 < log log n` along `n = 2^{2^j+1}`, `log log n − b(n) → 0` (3.7). Table 2's
-`Θ(log n − b)` has the same issue.
-
-### Typos and slips
+### ✏️ Slips
+- Theorems 3.3 and 3.5 (advice of "at most `b` bits"): the definitions say the advice has "no more than `b(n)` bits", and
+  with strings of variable length `≤ b` both theorems are false (`theorem_3_3_false_variable_length`,
+  `theorem_3_5_false_variable_length`). For `b = 1` the strings `ε, 0, 1` tell three players who transmits, although
+  `1 < log₂ 3` (Theorem 3.3). With collision detection, the same three advice values select one of three groups of three
+  players, and each group is resolved in two rounds (players 1, 2 of the group transmit; after silence player 3, after a
+  collision player 1). So `n = 9`, `b = 1`, `t = 2 < log₂ 9 − 1` (Theorem 3.5). Both theorems are true for the
+  fixed-length advice `f_A : P(A) → {0,1}^b` of Section 3.1 (`theorem_3_3`, `theorem_3_5`), which we treat as an implied
+  assumption of the model section: we read "at most `b` bits" as "a `b`-bit string". The proof of 3.5 itself feeds
+  variable-length histories into 3.3; padding to `b + t` bits repairs that step.
+- Theorems 3.6 and 3.7 (upper halves of the `Θ` bounds): they are false for long advice, since every algorithm needs at
+  least one round while the claimed bounds tend to `0` (`theorem_3_6_upper_false`, `theorem_3_7_upper_false`). For
+  `b(n) = ⌊log₂ n⌋ − 1 < log n`, `log n / 2^{b(n)} → 0` (3.6). For `b(n) = ⌈log₂ log₂ n⌉ − 1 < log log n` along
+  `n = 2^{2^j+1}`, `log log n − b(n) → 0` (3.7). Table 2's `Θ(log n − b)` has the same issue. It is a missing `1 +`: the
+  correct forms are `Θ(1 + log n / 2^b)` and `Θ(1 + log log n − b)`, and the paper itself treats the `O(1)` regime only
+  for `b ≥ log log n`. The lower halves are unaffected.
 - RF-construction appends `2^j` where the range index `j` is meant.
 - The tightness text after 3.4 writes `n/q` for `n/2^q`.
 - The last display of 3.7 writes `O(log log n) − b(n)` for a lower bound.
-- Lemma 2.6's constants are loose (it holds as used).
 
 ## Proof gaps (statements true)
 
@@ -53,7 +38,8 @@ The proof claims that the first-round transmitter sets `V(s)` form an `(n, n)`-s
 which is false: for `n = 2`, `V(0) = {0}`, `V(1) = {0,1}` solve the problem but nothing isolates `1` in
 `{0,1}` (`not_stronglySelective_example`).
 
-**Impact.** Statement true; repaired (`theorem_3_3`, via `Cslib.card_le_of_forall_exists_card_inter_eq_one`).
+**Impact.** The theorem stands with an unchanged bound, on a new argument (`theorem_3_3`, via
+`Cslib.card_le_of_forall_exists_card_inter_eq_one`).
 
 **Details.** Correctness only says that *some* participant of each `P` is isolated, not every one. So
 Theorem 3.2 [5] does not apply.
@@ -66,8 +52,8 @@ The proof bounds the cost `E[2^T]` of simulating a collision-detection algorithm
 by `2^{E[T]}`, but Jensen gives `E[2^T] ≥ 2^{E[T]}`, so the step "if `t < log t'`, we get a no-CD algorithm
 faster than `t'`" does not follow.
 
-**Impact.** Statement true up to the constant: the claimed `Ω(log log n − b)` holds, with half the paper's
-leading constant (`theorem_3_7_lower`, `theorem_3_7_lower_bits`).
+**Impact.** The claimed `Ω(log log n − b)` stands, with half the paper's leading constant (`theorem_3_7_lower`,
+`theorem_3_7_lower_bits`).
 
 **Details.** Simulating a collision-detection algorithm that takes `T` rounds costs `2^T` rounds without
 collision detection. What the paper's argument gives is `E[2^T] ≥ c log n / 2^b` (`theorem_3_7_lower_exp`).
@@ -76,15 +62,15 @@ collision detection. What the paper's argument gives is `E[2^T] ≥ c log n / 2^
 `c log₂ n ≤ 2^b · 2^{2t+1}`, i.e. `t ≥ (log₂(c log₂ n) − b − 3)/2` (`theorem_3_7_lower`,
 `theorem_3_7_lower_bits`).
 
-### 🛠️ Lemma 2.5 (code not uniquely decodable)
+### 🔧 Lemma 2.5 (code not uniquely decodable)
 The proof applies the Source Coding Theorem to the code `x ↦ (r, d)`, which writes `r` in `log r` bits without
 a delimiter and so is not uniquely decodable.
 
-**Impact.** Statement true: a positive integer of mean `μ` has entropy at most `log(μ + 1) + log e`.
+**Impact.** The lemma's idea stands: a positive integer of mean `μ` has entropy at most `log(μ + 1) + log e`.
 
 **Repair.** A Gibbs inequality against a geometric distribution (`sum_negMulLog_le_of_card_fiber_le`).
 
-### 🛠️ Lemma 2.7, case 1 (mean is not median)
+### 🔧 Lemma 2.7, case 1 (mean is not median)
 The step "success within the first `μ_i` rounds with probability `< 1/2` contradicts expected time `μ_i`" is
 false (`T = 1` w.p. 0.49, `T = 2` w.p. 0.51).
 
@@ -133,6 +119,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Not formalized.** The collision-detection entropy bound (Theorem 2.8), the upper bounds with predicted
 distributions (Theorems 2.12, 2.16) and the randomized upper bounds (truncated decay, Willard's search with advice).
 Theorem 3.2 (from [5]) and the range-finding Lemmas 2.5 and 2.7 as stated are bypassed, and [18] is a hypothesis.
+Lemma 2.7 with its exact factor 2 is neither proved nor refuted: Lean bypasses RF-construction and our repair loses a
+constant. Lemma 2.6's constants are loose (it holds as used).
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. The
 counterexamples are checked by `decide`. The selective-family lemma is staged in

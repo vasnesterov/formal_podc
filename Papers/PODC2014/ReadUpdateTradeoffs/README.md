@@ -5,15 +5,29 @@ Danny Hendler, Vitaly Khait. *Complexity Tradeoffs for Read and Update Operation
 copy with complete proofs (no arXiv version); numbering follows it. Copy of the paper:
 [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** All main results hold: the counter/snapshot tradeoff (Theorems 1–2,
-Corollary 1), the max-register tradeoff (Theorems 3–4, the latter for `M ≤ N`) and the tree max
-register (Theorems 5–6). But the information-flow machinery they rest on is unsound as defined:
-**Lemma 2 and Claim 1 are false** with the paper's Definitions 1–5. Several proofs also have gaps,
-in Lemmas 4 and 6 and in the linearization points of Theorem 5. We repair all of them.
+**Verdict: 🛠️ Hard fix.** All the abstract's results hold: the counter/snapshot tradeoff (Theorems 1–2,
+Corollary 1), the max-register tradeoff (Theorems 3–4) and the tree max register (Theorems 5–6). But the
+information-flow machinery they rest on is unsound as defined (**Lemma 2 and Claim 1 are false** with
+the paper's Definitions 1–5), so it had to be redesigned, and the proofs of Lemmas 4 and 6 and the
+linearization points of Theorem 5 needed new arguments. Only Theorem 4 under its printed hypothesis for
+`M > N` stays unproved.
 
 ## Mistakes in the paper
 
-### ❌ Lemma 2 and Claim 1 (erasing processes nobody is aware of)
+### ⚠️ Theorem 4 for `M > N` ("immediate from Theorem 3")
+The paper calls Theorem 4 "immediate from Theorem 3", but with `K = min(N, M)` and `f = log M`, Theorem 3
+gives only `Ω(log(log N / log log M))`, which is not `Ω(log log N)` for huge `M`.
+
+**Impact.** We prove the theorem for `M ≤ N` (`theorem4_fin`), and for all `N, M` when ReadMax takes
+`O(log min(N, M))` steps: in particular for read-optimal implementations (the abstract's claim), the
+generic `theorem4` gives `Ω(log log min(N, M))`. Only ReadMax costs between `c log N` and `c log M`
+are affected.
+
+**Details.** The bound is `Ω(log log N)` only while `log log M` is small compared with `log N`; for
+`M = 2^N` it gives no bound. So the case of huge `M` is unestablished, and we neither prove nor refute
+it.
+
+### 🛠️ Lemma 2 and Claim 1 (erasing processes nobody is aware of)
 With Definitions 1–5 a writer can be hidden although a reader saw its value: if `q` writes `5` twice in a row and then `r` reads `5`, no event is aware of `q`, yet removing `q`'s events leaves no execution (`PaperDefs.lemma2_false`, `PaperDefs.claim1_false`).
 
 **Impact.** These are the paper's tools for erasing processes; all lower-bound proofs use them.
@@ -38,13 +52,6 @@ multi-writer max register built from per-process registers, give the same events
 mean trivial writes to be invisible: the proof of Lemma 1 schedules them first and asserts that
 none of them is visible.
 
-Lemma 2 has a second, minor slip. It removes only the events of `q` that are aware of `p`, but the
-proof of Lemma 3 removes all events of `q` from the first such event on.
-
-Definition 2 also never propagates awareness through a process's local state. Its transitive clause
-even requires every event in a chain to access the same object. The proof of Lemma 1, however,
-reasons with process-level awareness.
-
 **Repair.** We use a data-flow semantics (`Cslib.SharedMemory.Awareness`):
 - awareness sets grow by the familiarity set of each object read or CAS'ed;
 - every write and every value-changing CAS records the writer's awareness set as the object's new
@@ -56,7 +63,7 @@ On top of it:
 - `arun_filter_hidden` / `ess_erase` is the sound Claim 1;
 - `exists_round` is Lemma 1, with the paper's three-phase schedule.
 
-### ⚠️ Lemma 4 and Lemma 6 (unestablished as stated; proved under an extra invariant)
+### 🛠️ Lemma 4 and Lemma 6 (proved under an extra invariant)
 Both proofs assume that erasing hidden processes can only shrink familiarity sets, but erasing an object's last writer resurrects the previous write, possibly by another essential process.
 
 **Impact.** Theorem 3 still holds. We prove both lemmas for essential sets satisfying a *block
@@ -88,19 +95,29 @@ essential processes is written by a single process. We maintain it as follows:
 essential processes erased, notes the `≤ m` objects it reads, and keeps exactly the completed
 processes owning none of them.
 
-### Typos and slips
+### 🔧 Definition 2 (awareness)
+Definition 2 never propagates awareness through a process's local state, and its transitive clause
+even requires every event in a chain to access the same object, while the proof of Lemma 1 reasons
+with process-level awareness.
+
+**Impact.** Lemma 1 holds with awareness that flows along a process's own events and without the
+same-object requirement (`Cslib.SharedMemory.Awareness.exists_round`).
+
+### ✏️ Slips
+- Lemma 2 removes only the events of `q` that are aware of `p`, but the proof of Lemma 3 removes all
+  events of `q` from the first such event on.
+- Algorithm A, line 5: `n ← node.parent` should be `n ← n.parent`.
+- Algorithm A: `T_L` needs `N` leaves (one per value `v < N`), not `N − 1`.
+
+### Typos
 - Lemma 4's proof cites "Claim 4"; only Claim 1 exists.
-- Definition 2's transitive clause requires every event of an awareness chain to access the same
-  object; this is evidently unintended.
-- Algorithm A, line 5: `n ← node.parent` should be `n ← n.parent`. `T_L` needs `N` leaves (one per
-  value `v < N`), not `N − 1`.
 
 ## Proof gaps (statements true)
 
 ### 🛠️ Theorem 5 (linearization points of Algorithm A)
 Definition 9 linearizes a `WriteMax` when the root first "counts" it, but a completed `WriteMax` may never be counted (`AlgA.not_counts`: `N = 2`, `WriteMax(3)` by `p₀`, then `WriteMax(2)` by `p₁`).
 
-**Impact.** Statement true; repaired (`AlgA.linearizable`).
+**Impact.** The statement is true, with a new proof (`AlgA.linearizable`).
 
 **Details.** A `WriteMax` is never counted when all its CASes succeed trivially, when its leaf write
 is trivial, or when it returns early at line 16. The proof of Invariant 1 treats a trivial CAS as a
@@ -158,13 +175,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 iterates a hidden `Ω` constant `i` times. Lemma 5 is folded into `lemma6`.
 
 **Not formalized.**
-- **Theorem 4 for `M > N`.** The paper calls Theorem 4 "immediate from Theorem 3". With
-  `K = min(N, M)` and `f = log M`, however, Theorem 3 gives `Ω(log(log N / log log M))`. That is
-  `Ω(log log N)` only while `log log M` is small compared with `log N`; for `M = 2^N` it gives no
-  bound. So the case of huge `M` is unestablished, and we neither prove nor refute it. Only ReadMax
-  costs between `c log N` and `c log M` are affected: with ReadMax `O(log min(N, M))`, in particular
-  for read-optimal implementations (the abstract's claim), the generic `theorem4` gives
-  `Ω(log log min(N, M))` for all `N, M`.
+- **Theorem 4 for `M > N`** with ReadMax above `O(log min(N, M))`: see the mistake above.
 - **Lemmas 4 and 6 without the block invariant.**
 
 **Trust.** There is no `sorry`. All listed theorems use only the axioms `propext`,

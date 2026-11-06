@@ -1,7 +1,7 @@
 # Differences between the formalization and the paper
 
 Bushkov, Guerraoui, *Safety-Liveness Exclusion in Distributed Computing*, PODC 2015 (authors' full
-version, EPFL Infoscience 207929). Rules refer to `.claude/skills/formalize-paper/verdicts.md`.
+version, EPFL Infoscience 207929).
 
 ## Model (Section 2)
 
@@ -20,7 +20,7 @@ version, EPFL Infoscience 207929). Rules refer to `.claude/skills/formalize-pape
    - `inv_i` must be enabled at the crashed state, which contradicts "no action is enabled".
 
    We require it per execution: if a finite execution's history leaves `pᵢ` idle (not pending, not
-   crashed), every invocation of `pᵢ` is enabled at its last state. This is the evident intent (R3).
+   crashed), every invocation of `pᵢ` is enabled at its last state. This is the evident intent (✏️).
 4. **Initial states.** `Impl.Valid` requires an initial state. Without one, an implementation has no
    history at all and ensures every safety and liveness property, so nothing excludes anything and
    Corollaries 4.5, 4.6, 4.10, 4.11 fail. The paper implicitly assumes non-empty `init(A)`.
@@ -32,7 +32,7 @@ version, EPFL Infoscience 207929). Rules refer to `.claude/skills/formalize-pape
      `Lmax`.
    - If events after a crash counted as "histories", one could take `Lmax` = wait-freedom minus this
      history. Then `Lmax ∪ {it}` would be the strongest non-excluded property, a degenerate failure of
-     Theorem 4.9 (R2/R4). We consider our reading the intended one.
+     Theorem 4.9. We consider our reading the intended one.
 6. **Reactive implementations** (`Impl.Reactive`): no `step i` is enabled while `pᵢ` is idle. This is
    *not* part of the paper's formal model, and Theorem 4.9 needs it (item 13).
 7. **Histories** are finite lists or functions `ℕ → Ext` (`Hist`). The history of an infinite execution
@@ -53,8 +53,8 @@ version, EPFL Infoscience 207929). Rules refer to `.claude/skills/formalize-pape
     coincide. That is false for reactive implementations (`weaker_iff_subset_false`). For the general
     (non-reactive) class we did not settle it: with idle steps every well-formed history is fair for
     some implementation, so the easy counterexample disappears.
-    - *Decision (R3).* The intended order is the one used throughout; the false "it is easy to see"
-      remark is a ⚠️ item.
+    - *Label: 🔧.* The intended order is the one used throughout; the "it is easy to see" remark is
+      false.
 11. **Liveness properties, complements.** A liveness property is any `L ⊇ Lmax` of the history type,
     and "complement" is the complement in that type. The paper takes complements within the
     well-formed histories. For adversary sets (`F ⊆ S ⊆ U`) this makes no difference. The weakest
@@ -80,10 +80,10 @@ version, EPFL Infoscience 207929). Rules refer to `.claude/skills/formalize-pape
     - *Padding.* `A_B` of `Is` has a stuttering internal action, used only to build executions with
       blocks of three actions. Without it `Is` would also have finite fair executions, and they would
       have the same histories (`Y` or wait-free).
-    - *Verdict call (R4, borderline with 🚨).* Theorem 4.9 is a headline. In favour of 🚨: the paper's
+    - *Implied or new assumption (borderline; label ✏️).* Reactivity as a new assumption: the paper's
       formal model is explicit and allows process automata with internal actions at any time;
       heartbeat-style protocols are common; the proof's commutation claim is simply false without the
-      assumption. In favour of ⚠️: §2 says "when process `pᵢ` invokes `invᵢ` on `I`, it executes
+      assumption. Reactivity as an implied assumption: §2 says "when process `pᵢ` invokes `invᵢ` on `I`, it executes
       algorithm `Iᵢ` with `invᵢ` as an input", the standard shared-memory convention is that processes
       take steps only within operations, and every implementation in the paper is reactive.
     - *Why idle steps are essential.* In a reactive implementation, `p₀`'s steps read only `p₀`'s
@@ -95,7 +95,7 @@ version, EPFL Infoscience 207929). Rules refer to `.claude/skills/formalize-pape
     - *Robust to the order.* The counterexample does not depend on reading "stronger" as `⊆`
       (item 10). `Is` ensures `WaitFree ∪ Y` but not `WaitFree` (it has the fair history `h₀`), so
       the two properties are not even equivalent under the paper's semantic order.
-    - *Our call.* We judge reactivity to be an assumption a competent reader would make (⚠️). The
+    - *Our call.* We judge reactivity to be an assumption a competent reader would make (✏️). The
       counterexample is fully checked either way.
     - *Independent review.* Confirmed. The counterexample meets every formal definition of §2–3:
       general I/O automata with internal actions, crash actions in `ext(Tp)`, the fairness of §3.2,
@@ -103,13 +103,13 @@ version, EPFL Infoscience 207929). Rules refer to `.claude/skills/formalize-pape
       forbid idle steps, but it does not claim them either. "A general shared memory system" refers
       to the choice of base objects. The prose of §2 ("when `pᵢ` invokes `invᵢ` … it executes
       algorithm `Iᵢ` with `invᵢ` as an input; when executing `Iᵢ`, `pᵢ` performs steps") fixes the
-      reactive convention. Theorem 4.9 is a headline (the first of the two results in the
-      introduction), so without the R4 excuse the verdict would be 🚨.
-14. **Proof of Theorem 4.9** (🛠️ for the reactive statement):
+      reactive convention. Theorem 4.9 is the first of the two results in the introduction, so
+      everything rests on that reading.
+14. **Proof of Theorem 4.9** (🔧 for the reactive statement):
     - "Consider history `inv_l · res_l ∈ S`" is unjustified. The specific `res_l` comes from
       `h · res_l ∈ S`, and `S` need not contain `inv_l · res_l` (consensus validity).
     - The final paragraph needs a correct invoking process in `h`, and the all-crashed case is missing
-      (handled by item 5).
+      (✏️; handled by item 5).
     - "By Lemma 4.8, `Ls = Lmax ∪ fair(A_Is)`" also needs that `Ls` is strongest; this is routine.
     - The repaired proof uses the characterization `Setting.isStrongestNonExcl_iff`
       (`Ls = Lmax ∪ core`). It chooses the response from the paper's sequential assumption *before*
@@ -117,7 +117,7 @@ version, EPFL Infoscience 207929). Rules refer to `.claude/skills/formalize-pape
       holds only for reactive `I'`.
 15. **`Nonempty Inv`.** `theorem_4_9` assumes at least one invocation. With no invocations the empty
     history is fair for every reactive implementation, and an `Lmax` omitting it makes Theorem 4.9
-    fail. This is a degenerate case (R2).
+    fail. This is a degenerate case (✏️).
 16. **Corollaries 4.5, 4.6, 4.10, 4.11** are formalized as schemes. The concrete inputs are cited
     impossibility results and enter as hypotheses:
     - for 4.5–4.6, two disjoint adversary sets w.r.t. `Lmax`;
@@ -139,7 +139,7 @@ version, EPFL Infoscience 207929). Rules refer to `.claude/skills/formalize-pape
 
     The rest is order theory on `(l,k)` with `1 ≤ l ≤ k ≤ n` and `n ≥ 2`. For `n = 1` the property
     `(1,2)` does not exist (degenerate).
-19. **Progress for TM** (⚠️). "Good responses are those which do not abort transactions" (§5.1),
+19. **Progress for TM** (✏️). "Good responses are those which do not abort transactions" (§5.1),
     together with no exclusion of parasitic processes, makes the hypotheses of Theorem 5.3 false.
     - *Good = non-abort.* The TM that aborts every `tryC` and answers everything else is opaque and
       makes every correct process progress.
@@ -159,4 +159,4 @@ version, EPFL Infoscience 207929). Rules refer to `.claude/skills/formalize-pape
       routine point;
     - the same TM-progress caveat as item 19 applies.
 21. **§5.1 remark** "`LF_l ∪ OF_k` is the set of `(l,k)`-free executions" is false (`LK.lf_union_of_not_iff`):
-    only `(l,k)`-free ⊆ `LF_l ∪ OF_k` holds (`LK.lkFree_imp_lf_or_of`). The remark is unused (typo-level).
+    only `(l,k)`-free ⊆ `LF_l ∪ OF_k` holds (`LK.lkFree_imp_lf_or_of`). The remark is unused (🔧).

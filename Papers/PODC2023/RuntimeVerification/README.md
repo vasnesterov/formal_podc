@@ -6,45 +6,38 @@ Enforcement of Linearizability.* PODC 2023. DOI
 [2301.02638](https://arxiv.org/abs/2301.02638) v3 (Nov 2025, full version); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** All main results hold:
-* the impossibility of runtime verification (Theorem 5.1);
-* the impossibility of predictive runtime verification (Theorem A.1), under the black-box reading
-  of the model;
-* the predictive verifier for `DRV` and every `O ∈ GenLin` (Theorem 8.1);
-* self-enforced implementations (Theorem 8.2).
-
-Lemma 7.4 is false as stated: it fails for pending operations that no view has seen yet. The
-proofs of Lemmas 8.1/8.2 routinely meet such operations. Their statements are still true once the
-comparison is made with a prefix, and we prove them that way.
+**Verdict: 🔧 Easy fix.** All main results hold: the impossibility of runtime verification (Theorem 5.1), the
+impossibility of predictive runtime verification (Theorem A.1, under the black-box reading of the model), the
+predictive verifier for `DRV` and every `O ∈ GenLin` (Theorem 8.1) and self-enforced implementations (Theorem 8.2).
+Lemma 7.4 is false as stated: it fails for pending operations that no view has seen yet, and the proofs of Lemmas
+8.1/8.2 routinely meet such operations, but their statements are still true once the comparison is made with a
+prefix, and we prove them that way. The progress and step-complexity claims were not checked.
 
 ## Mistakes in the paper
 
-### ❌ Lemma 7.4 (tight execution vs. its sketch)
+### 🔧 Lemma 7.4 (tight execution vs. its sketch)
 Lemma 7.4 claims that every tight execution `E` is equivalent to its sketch `X(λ_E)`, but this fails when a pending operation has written to `N` and no view has seen it yet, i.e. its `N.Write` comes after every `N.Snapshot` (`lemma_7_4_false`).
 
-**Impact.** An edge case for the lemma itself, but the proofs of Lemmas 8.1 and 8.2 meet it routinely. The statements of Lemmas 8.1/8.2, and all main results, are true; we prove them with a prefix comparison.
+**Impact.** The proofs of Lemmas 8.1 and 8.2 meet such operations routinely. The statements of Lemmas 8.1/8.2, and all main results, are true; we prove them with a prefix comparison.
 
 **Details.** Such an operation is missing from `X(λ_E)`. Example: a process completes one operation, then invokes a second one and writes it to `N`. The proofs of Lemmas 8.1 and 8.2 apply Lemma 7.4 to executions in which such operations are normal: the execution `F` of Lemma 8.1, obtained by removing snapshot steps, and `T(E'|A*)` in Lemma 8.2.
 
 **Repair.** Compare with a prefix: truncate at the last relevant snapshot and use prefix closure. (`Exec.sketch_mem_of_tight`, `Exec.cut_mem_of_sketch`, `sketch_isAStarHist`)
 
-### ⚠️ Claim 7.2 (for all implementations)
+### 🔧 Claim 7.2 (for all implementations)
 Claim 7.2 is stated for all implementations, but it fails for abstract ones (sets of histories).
 
 **Impact.** It holds for `A*`, the only implementation it is used for.
 
-### ⚠️ Theorem 8.2 (2) (empty `O`)
-Theorem 8.2 (2) needs `O ≠ ∅`.
-
-**Impact.** Degenerate case.
-
-### Typos and slips
-- Typos in the proofs of Lemma 7.3 ("`E` and `T(E)` are equivalent") and Lemma 8.2 (`H` should be a prefix of `X(τ'')`).
+### ✏️ Slips
+- Theorem 8.2 (2) needs `O ≠ ∅`.
 - Theorem 8.2 (3) states the direction of similarity backwards.
+- Proof of Lemma 7.3: "`E` and `T(E)` are equivalent" should be `E'` and `T(E)`.
+- Proof of Lemma 8.2: `H` should be a prefix of `X(τ'')`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 8.1 (order equality)
+### 🔧 Lemma 8.1 (order equality)
 The proof of Lemma 8.1 claims `≺_{F'} = ≺_{T(E')}`, where only `⊆` holds.
 
 **Impact.** Statement true; only `⊆` is needed for similarity (`Exec.sketch_mem_of_tight`).

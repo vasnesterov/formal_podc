@@ -11,8 +11,8 @@ Paper: A. Balliu, S. Brandt, F. Kuhn, D. Olivetti, *Improved Distributed Lower B
      `1/2` each. Both are node configurations of `Π_1(1, 0)` (`M^1X^0` and `A^1X^0`). The algorithm
      fails only on `MM` or `AA`, i.e. with probability `1/2 < 1`.
    * *Where the proof breaks.* The last step `1/(3Δ)² ≥ 1/Δ⁸` needs `Δ ≥ 2`.
-   * *Rule.* R2: `Δ = 1` is a parameter corner that is never used and lies outside the interesting
-     range. Verdict ⚠️.
+   * *Label ✏️.* `Δ = 1` is a parameter corner that is never used and lies outside the interesting
+     range.
    * *What we prove.* `lemma_15` for `Δ ≥ 2`, with failure probability `≥ 1/(36Δ²) ≥ 1/Δ⁸`. The paper's
      argument assumes that the outputs are always node configurations ("there is at least one
      configuration that is used by all nodes with probability at least 1/3"). We count an invalid
@@ -21,12 +21,12 @@ Paper: A. Balliu, S. Brandt, F. Kuhn, D. Olivetti, *Improved Distributed Lower B
 
 ## Typos and implicit assumptions (no effect on any result)
 
-2. **§2.3, definition of `R̄`.** `Σ_{Π''}` is said to consist of the sets that appear in configurations of
+2. **§2.3, definition of `R̄` (✏️).** `Σ_{Π''}` is said to consist of the sets that appear in configurations of
    `E_{Π''}`, which is circular because `E_{Π''}` is defined via `Σ_{Π''}`. It should be `N_{Π''}`
    (`Problem.alphRbar`). Also the typo "`Σ_{Π''} =⊆ 2^{Σ_{Π'}}`".
 3. **Lemma 5** ("for all `a`") needs `k ≤ Δ`, so that `M^{Δ−k}X^k` exists. We assume `k ≤ Δ`, which is
-   implied by the family's range `0 ≤ a, x ≤ Δ` and by `k ≤ Δ^ε` (R4, not counted as an error).
-4. **Lemma 11** needs `x ≤ Δ` for the same reason (R4, family range).
+   implied by the family's range `0 ≤ a, x ≤ Δ` and by `k ≤ Δ^ε` (not counted as an error).
+4. **Lemma 11** needs `x ≤ Δ` for the same reason (family range).
 5. **Lemma 12** "`x ≤ Δ − 1`" is stated as `x < Δ`. This is the same thing for integers, but it rules
    out the truncated-subtraction case `Δ = 0` in Lean.
 6. **Lemma 8 proof.** "Each `Yᵢ` contains `B`" is derived after showing `Yᵢ ⊆ OUABPQ`, but this is not

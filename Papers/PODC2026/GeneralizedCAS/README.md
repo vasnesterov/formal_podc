@@ -5,29 +5,23 @@ Constructions for the Infinite-Arrival Model.* PODC 2026. DOI
 [10.1145/3796701.3815968](https://doi.org/10.1145/3796701.3815968). Formalized version: arXiv
 [2605.19237](https://arxiv.org/abs/2605.19237) v1 (full version with appendices); numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** Theorems 4 and 5 for Algorithm 1 hold. Algorithm 1 is a linearizable,
-wait-free universal construction for any (possibly infinite) set of processes. Its space is at most 4
-plus the number of processes that have participated. An operation takes `O(c)` steps, where `c` is the
-point contention when it obtains its timestamp. One step of the counting argument (the induction in
-Lemma B.2.14) is a non sequitur; a pigeonhole argument repairs it. Algorithm 2 (Theorem 6) is not
-formalized.
+**Verdict: 🔧 Easy fix.** Theorems 4 and 5 for Algorithm 1 hold: it is a linearizable, wait-free universal
+construction for any (possibly infinite) set of processes, its space is at most 4 plus the number of processes that
+have participated, and an operation takes `O(c)` steps, where `c` is the point contention when it obtains its
+timestamp. The flaws are local steps of the counting argument: a non sequitur in the induction of Lemma B.2.14,
+repaired by a pigeonhole argument, and an additive constant in the proof of Theorem B.2.15. Algorithm 2 (Theorem 6),
+the paper's second construction, was not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
-- Proof of Theorem B.2.15: at most `3c` disjoint periods allow up to `15c + 4` complete non-terminal
-  iterations after the first, not `15c`. The total is then `15c + 6` iterations, not `15c + 2`. Linearity is
-  unaffected. We prove that an operation completes at most `15|S(o)| + 5` iterations and takes at most
-  `105c + 44` memory steps.
+### ✏️ Slips
 - Lemma B.2.6 uses Proposition B.2.5 ("not pending ⇒ complete") also for `Noop`, which is not an operation
   execution. The case is easy: no process ever writes `Noop` into `A`. We treat it separately
   (`OpStart.old_out`).
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma B.2.14 (counting periods; inductive step)
+### 🔧 Lemma B.2.14 (counting periods; inductive step)
 The inductive step concludes "`o' = o_{3n+2} = o_{3n+3} = o_{3n+4}` for some `o' ∈ O_n`" from the set not
 growing, which is a non sequitur: the three new operations can be three different elements of `O_n`.
 
@@ -45,6 +39,13 @@ operation rises at most 3 times, because its owner writes it into `A` at most tw
 (`Trace.card_RE_le`). Every non-initial period contains a rise of an operation of `S(o)`, and disjoint
 periods give distinct rises (`OpStart.useful`, `OpStart.it_le`).
 
+### 🔧 Theorem B.2.15 (number of iterations)
+At most `3c` disjoint periods allow up to `15c + 4` complete non-terminal iterations after the first, not `15c`, so
+the total is `15c + 6` iterations, not `15c + 2`.
+
+**Impact.** Statement true: linearity is unaffected. We prove that an operation completes at most `15|S(o)| + 5`
+iterations and takes at most `105c + 44` memory steps (`step_bound`).
+
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
 ## The formalization
@@ -60,8 +61,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
   `(0, ⊥)`. Further cells are CAS objects with arbitrary initial contents, handed out by a memory
   manager in the order `0, 1, 2, …`. Since Algorithm 1 never frees cells, every allocation order has
   this form up to renaming.
-* The target type `T` is a deterministic sequential specification (CSLib `ObjSpec`). The paper allows
-  a nondeterministic `applyT`; the proof is the same.
+* The target type `T` is a deterministic sequential specification (CSLib `ObjSpec`).
 * Each line that accesses a shared object is one step, and local computation is merged into steps.
   Line 2 is a step only when the process allocates. Line 16 returns the response read on line 5.
 * Correctness notions are CSLib's `Linearizable` and `WaitFree`. The point contention is the number of
@@ -91,7 +91,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Observation B.1.8, Lemmas B.1.19, B.1.21, B.1.22, B.1.25 | `Trace.done_mono`, `done_of_completed`, `Trace.done_after_l7`, `Trace.done_of_S_change`, `Trace.S_ne_of_change` | `Trace.lean`, `Facts.lean` |
 
 **Not formalized.** Algorithm 2 (Section 4, Theorem 6, Appendix C: bounded concurrency and memory
-recycling). The claim that GCAS is cheap in hardware is not mathematical.
+recycling). The nondeterministic `applyT` the paper allows: we cover deterministic types only, though
+the proof looks the same. The claim that GCAS is cheap in hardware is not mathematical.
 
 **Trust.** No `sorry`. `theorem4`, `theorem5` and `linearizable` use only the axioms `propext`,
 `Classical.choice` and `Quot.sound`. The theorems are unconditional: there are no hypotheses on `T`,

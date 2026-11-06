@@ -8,7 +8,7 @@ did not use).
 ## Statement-level issues in the paper
 
 1. **Theorems 1–2 (RMR bound) are false under the paper's literal definition of a passage
-   (⚠️, R3).** The paper defines: "A passage of a process begins when it calls `Enter()` and ends
+   (🔧).** The paper defines: "A passage of a process begins when it calls `Enter()` and ends
    when the process crashes or when it finishes its following `Exit()` call", and claims that "in
    any execution in which `m` passages begin" the total number of RMRs is `O(m)`. Read literally,
    the steps of `Recover()` belong to no passage. A single process that calls `Enter()` once,
@@ -24,15 +24,15 @@ did not use).
    super-passages coincide only in the absence of crashes): every crash ends a passage and the
    recovery starts a new one. With this reading the bound holds; we prove `≤ 25·#Enter() + 76·#crashes`
    in the DSM model (`rmr_bound`), where `#crashes` counts only crashes outside the remainder
-   section (a crash in the remainder section has no effect and starts no passage). Decided by R3: the fix is local (the definition of a passage)
+   section (a crash in the remainder section has no effect and starts no passage). The fix is local (the definition of a passage)
    and recoverable from the paper.
-2. **Lemma 2.1 (19) (and Lemmas 2.4–2.6) omit the fairness hypothesis (⚠️, R4).** Lemma 2.1 is
+2. **Lemma 2.1 (19) (and Lemmas 2.4–2.6) omit the fairness hypothesis (✏️).** Lemma 2.1 is
    stated for "any run `E`", and (19) only assumes finitely many crashes. Without fairness it is
    false: two processes, no crash; process `false` obtains ticket 1 and grants it to itself
    (`W[false] = (1,true)`), then stops taking steps; process `true` takes ticket 2 and busy-waits
    forever; `Token` stays 0 (`Lemma2_1_19.lemma2_1_19_false`, `Lemma2_1_19.lean`). Lemmas 2.4–2.6
    have the same omission. All of them are used only inside the starvation-freedom proof, where
-   fairness holds, so this is a missing implied assumption (R4).
+   fairness holds, so this is a missing implied assumption.
 
 No other statement of the paper that we checked is false.
 

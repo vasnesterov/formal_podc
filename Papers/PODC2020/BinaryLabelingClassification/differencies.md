@@ -3,24 +3,20 @@
 Paper: Balliu, Brandt, Efron, Hirvonen, Maus, Olivetti, Suomela, *Classification of distributed binary labeling
 problems*, arXiv:1911.13294v3 (full version of the PODC 2020 brief announcement).
 
-## Verdict reasoning
+## Summary
 
 All formalized statements (Observation 3.2, Theorems 8.1–8.3, Lemmas 10.4, 10.8, 10.9) are true as stated.
-Two proofs need repairs:
-- Theorem 8.3: the orientation goes the wrong way.
-- Theorem 8.2: an intermediate claim is false for general trees.
-
-Both are claims inside proofs, so by R1 they are proof repairs, not statement errors. Verdict: 🛠️ (R6: worst label).
-Borderline: the Theorem 8.3 slip is a wrong direction ("towards" for "away from"). A referee would flag it, so we
-count it as a repair rather than a routine detail.
+Two proofs have claims that fail:
+- Theorem 8.3 (✏️): the orientation goes the wrong way ("towards" for "away from").
+- Theorem 8.2 (🔧): an intermediate claim is false for general trees.
 
 ## Proof gaps and errors
 
-1. **Theorem 8.3 proof.** "Choose a leaf as a root and orient all edges towards the leaf." With the paper's convention
+1. **Theorem 8.3 proof (✏️).** "Choose a leaf as a root and orient all edges towards the leaf." With the paper's convention
    (`X`-edges point black → white) the hardest VI.b problem `(010⁺, 0⁺10)` needs every relevant node to have
    indegree exactly 1. Orienting towards the root gives indegree `deg − 1`. The correct choice is away from the leaf
    (`viHard_exists`). The same slip appears in "always possible to orient a tree towards a root" for the 8.2 problem.
-2. **Theorem 8.2 proof.**
+2. **Theorem 8.2 proof (🔧).**
    - The paper claims that in any valid orientation at most one vertex has all its edges outgoing, so the problem
      equals the "oriented tree problem". This fails in general trees: only relevant nodes are constrained, and nodes
      of other degrees can have several incoming edges, so several sources can exist.
@@ -28,7 +24,7 @@ count it as a repair rather than a routine detail.
    - We run the paper's 4-node mirror argument directly on the caterpillar: path nodes are relevant, with leaves
      attached. Our version uses 3 nodes `w_c, w_k, w_e` and two mirrored instances.
    - We do not formalize the intermediate "almost oriented path" problem as a separate problem.
-3. **Theorem 8.1 upper bound proof.**
+3. **Theorem 8.1 upper bound proof (🔧).**
    - The paper argues only for `d`-regular subdivided trees, via a 2-colouring of the underlying tree. General
      bipartite trees (black nodes of degree `≠ 2`) are not covered.
    - We prove that every tree has a solution (`va_exists`). Root the tree at a node of degree `≤ 1`. An edge

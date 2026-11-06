@@ -1,7 +1,7 @@
 # Differences between the formalization and the paper
 
 Paper: Fischer, Gelles, *The Task Completion Problem and its Application to Crash-Resilient
-Computation*, PODC 2026, arXiv:2605.17961v1. Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
+Computation*, PODC 2026, arXiv:2605.17961v1.
 
 ## Errors and gaps in the paper's proofs (statements remain true)
 
@@ -10,7 +10,7 @@ Computation*, PODC 2026, arXiv:2605.17961v1. Verdict rules: `.claude/skills/form
    *larger* than `M < 0.04m`, so the inequality goes the wrong way. With the correct
    `δ ≈ 1 − 1/1.98` Chernoff only gives `Pr(M ≥ m) ≥ 1 − e^{−0.24m}`, which is `≈ 0.22 < 1/2` for
    `m = 1`. Repair: Markov's inequality on the number of bad sets (each set is bad with probability
-   `≤ 8k/(nB) ≤ 1/576` by Chebyshev), giving failure probability `≤ 1/288`. Inside a proof → proof repair (R1).
+   `≤ 8k/(nB) ≤ 1/576` by Chebyshev), giving failure probability `≤ 1/288`. → 🔧
 2. **Lemma 3.1, second part (union bound over the k-subsets).** The paper needs
    `C(2m,k) · e^{−(ε/2)²(1−ε/2)n/2} < 1/2` with `C(2m,k) ≤ 2^{2cn}` and `c = ε³/8`. This requires
    `2ε ln 2 < 1 − ε/2`, i.e. `ε < 0.53`. (The displayed line even drops the `/2` of the
@@ -18,13 +18,13 @@ Computation*, PODC 2026, arXiv:2605.17961v1. Verdict rules: `.claude/skills/form
    `ε ∈ (0,1)`, so the proof fails for large `ε`. Repair: independence of the "bad" events over
    the elements `j`, plus a union bound over the `t = ⌊εn⌋+1`-sets of bad elements:
    `C(n,t)·a^t ≤ (e a/ε)^t` with `a ≤ 2/(ε²B) ≤ ε/288` (Chebyshev), and `C(2m,k) ≤ 2^{2m} ≤ 2^t`. This works for all `ε` and
-   all `n`; it needs only second moments, no Chernoff bound. The statement is true → proof repair (R1).
+   all `n`; it needs only second moments, no Chernoff bound. The statement is true. → 🛠️
    The paper's own argument still covers the small `ε` Theorem 4.1 needs (we use `ε = (1−α)/8 < 1/8`).
 3. **Lemma 4.3 / Algorithm 1, termination condition.** The proof of Lemma 4.3 runs the loop
    "until `k_i < 1`". But `k_i = ⌈(1−ε)^{i−1}m⌉ ≥ 1` for every `i`, so this never happens (the
    test `1 ≤ k_i` in line 4 is also always true). Footnote 3 gives the right condition: once
    `k_i ≤ 2B`, `N_{i+1} = 0`. We run Algorithm 1 up to and including the first iteration with
-   `k_i ≤ 2B` (`numIter`). Proof slip with the intended fix in the paper (R3) → proof repair.
+   `k_i ≤ 2B` (`numIter`). Proof slip with the intended fix in the paper. → ✏️
 4. **Lemma 4.5, induction step.** "If `N_i > k_{i+1}`, the conditions of claim (b) hold" needs
    `N_i ≥ (1−ε)k_i`. This is true but unproved: `N_i ≥ k_{i+1} + 1 > (1−ε)k_i` by integrality
    (`one_sub_mul_ceil_lt`, the same estimate as Lemma A.2). Routine.
@@ -42,7 +42,7 @@ Computation*, PODC 2026, arXiv:2605.17961v1. Verdict rules: `.claude/skills/form
 ## Statement-level differences
 
 - **Theorem 4.1 and `log n`.** For `n = 1` the bound `O(R⌈M/n⌉ log n)` is `0`, which is impossible.
-  We state the theorem for `n ≥ 2` (degenerate case, R2; the paper does not count it as an
+  We state the theorem for `n ≥ 2` (degenerate case; the paper does not count it as an
   error and neither do we).
 - **Lemma 3.1.** We prove it as stated (`lemma_3_1`, "for sufficiently large `n`") and in a
   stronger form for **all** `n` (`lemma_3_1_all_n`).

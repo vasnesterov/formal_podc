@@ -5,7 +5,7 @@ PODC 2015, arXiv:1505.03469v1 (the version formalized; numbering follows it).
 
 ## Errors and gaps in the paper
 
-1. **Lemma 3 is false (statement-level, ❌ by R4/R5).** Algorithm 5 (ETOB from Ω) does not satisfy
+1. **🔧 Lemma 3 is false (statement-level).** Algorithm 5 (ETOB from Ω) does not satisfy
    ETOB-Stability in the paper's model, in which links are reliable but not FIFO (a step receives *a* message in
    transit, as in the CHT model the paper adopts). A process overwrites `d_i` with every promotion of its current
    leader, so an older, shorter promotion that is delivered after a newer one makes `d_i` shrink. With infinitely
@@ -13,9 +13,8 @@ PODC 2015, arXiv:1505.03469v1 (the version formalized; numbering follows it).
    processes from time 0 (`Alg5.lemma_3_false`: 2 processes, no crashes, broadcasts `0, 1, 2, …`, every odd block
    delivers promotion `b` and then the delayed promotion `b − 1`; all message delays are bounded by 16 time units).
    The proof's step "there exist `t₃ ≤ t₁`, `t₄ ≤ t₂` with `d_i(t₁) = promote_j(t₃)`, `d_i(t₂) = promote_j(t₄)`,
-   hence prefix" silently needs `t₃ ≤ t₄`, i.e. FIFO delivery. Not excused by R4: the paper never assumes FIFO links
-   and R4 explicitly lists "a channel property the proof silently needs and the paper never fixes". Not a headline
-   (the headline "Ω is the weakest failure detector for EC/ETOB" is established by Lemma 2 + Theorem 1, which hold).
+   hence prefix" silently needs `t₃ ≤ t₄`, i.e. FIFO delivery, a channel property the paper never fixes. The
+   sufficiency half of "Ω is the weakest failure detector for EC/ETOB" rests on Lemma 2 + Theorem 1, which hold.
    The paper's model (§2) has "a reliable link" between each pair of processes and configurations holding "the set
    of messages in transit", from which a step receives "a single message" (the CHT / Jayanti–Toueg message buffer);
    FIFO order is assumed nowhere in the paper, so the counterexample is within the paper's model. It is also within
@@ -24,12 +23,11 @@ PODC 2015, arXiv:1505.03469v1 (the version formalized; numbering follows it).
    everywhere from the beginning.
    The proof also uses "`Δc` = the longest communication delay between two correct processes in `r`", which need
    not exist in an asynchronous run (delays are finite but unbounded).
-2. **Lemma 2 — proof repaired (🛠️).** EC-Agreement ("no two processes return different values", uniform) is proved
+2. **🔧 Lemma 2: proof gap, repaired.** EC-Agreement ("no two processes return different values", uniform) is proved
    for `k` = first instance invoked after `τ_Ω`. But `Ω` constrains only correct processes: a faulty process still
    alive after `τ_Ω` may trust another leader and return a different value. Repair: choose `k` after `τ_Ω` *and*
    after every faulty process has crashed (finitely many processes) (`Alg4.agreement`).
-3. **Theorem 3 / Lemma 4 are false under the literal reading of EIC-Agreement (❌, not headline; borderline
-   ⚠️).** EIC-Agreement says "no two processes return infinitely different values", and the response of a process
+3. **🔧 Theorem 3 / Lemma 4 are false under the literal reading of EIC-Agreement.** EIC-Agreement says "no two processes return infinitely different values", and the response of a process
    at time `t` is its *last* response before `t`, so a crashed process keeps its last response forever. Under this
    (uniform) reading EIC cannot be implemented with `Ω` at all, already with 3 processes and at least one correct
    process (`EICImpossible.not_solvesEIC`): `a` (proposing `false`) and `b` (proposing `true`) run solo until they
@@ -38,20 +36,18 @@ PODC 2015, arXiv:1505.03469v1 (the version formalized; numbering follows it).
    equivalent. Algorithm 6 itself also violates uniform EIC-Agreement on an admissible run whose EC black box
    satisfies EC (`Alg6Counterexample.not_EICAgreement`: a faulty process decides `true` for instance `0` and
    crashes, the correct one decides `false` forever). With EIC-Agreement among **correct** processes, Lemma 4,
-   Lemma 5 and hence Theorem 3 hold (`Alg6.lemma4`, `Alg7.lemma5`). Borderline call: the correct-process
+   Lemma 5 and hence Theorem 3 hold (`Alg6.lemma4`, `Alg7.lemma5`). The correct-process
    reading is a plausible intent, but the paper uses the uniform wording for EC-Agreement too (where it matters
-   and holds), and the "last response" convention makes the uniform reading unambiguous, so we do not excuse it by
-   R3/R4. Appendix result, so not headline. The overall verdict (❌) does not depend on this call: Lemma 3 alone
-   decides it.
-4. **Algorithm 2 (`T_{ETOB→EC}`) violates the ETOB usage assumption (⚠️, local fix).** ETOB is only specified
+   and holds), and the "last response" convention makes the uniform reading unambiguous. Appendix result.
+4. **🔧 Algorithm 2 (`T_{ETOB→EC}`) violates the ETOB usage assumption (local fix).** ETOB is only specified
    "assuming that broadcast messages are distinct", but Algorithm 2 broadcasts `(ℓ, v)`, so two processes proposing
    the same `v` to instance `ℓ` broadcast the same message and the black box is unconstrained. Fix: broadcast
    `(p_i, ℓ, v)` and let `First(ℓ)` pick the first message of the form `(_, ℓ, _)` (`ETOBtoEC.tobHist_distinct`).
-5. **Theorem 1, direction ETOB → EC — proof repaired (🛠️).** The paper proves agreement only for two *correct*
+5. **🔧 Theorem 1, direction ETOB → EC: proof gap, repaired.** The paper proves agreement only for two *correct*
    processes (with `k` = first instance invoked after `τ`), but EC-Agreement is uniform. A faulty process still
    alive after `τ` is not constrained by ETOB-Stability/Total-order. Repair as in Lemma 2: `k` beyond every
    instance invoked before `τ` and before the crashes of all faulty processes (`ETOBtoEC.ecAgreement`).
-6. **Lemma 3, minor proof issue.** The proof uses "`Δc` = the longest communication delay" (see item 1). In the
+6. **🔧 Lemma 3, proof issue.** The proof uses "`Δc` = the longest communication delay" (see item 1). In the
    repaired algorithm (sequence numbers on promotions, below) we replace `τ_Ω + Δt + Δc` by the maximum over correct
    processes of the first adoption of a promotion of the final leader after `τ_Ω` (finite `P`).
 

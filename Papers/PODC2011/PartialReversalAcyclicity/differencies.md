@@ -3,23 +3,22 @@
 Paper: Radeva, Lynch, *Partial Reversal Acyclicity*, PODC 2011 brief announcement; formalized from the full
 version MIT-CSAIL-TR-2011-022.
 
-## Statement-level issues (decide the verdict)
+## Statement-level issues
 
-1. **Invariant 3.2, "exactly one of the following is true" — false for isolated nodes.** For a node with no
+1. **✏️ Invariant 3.2, "exactly one of the following is true" — false for isolated nodes.** For a node with no
    neighbours, both parts hold in every reachable state (`Counterexamples.inv_3_2_exactlyOne_false`). We prove
    "at least one" for every node and "exactly one" for every node with a neighbour (`PR.inv_3_2`,
    `PR.inv_3_2_exactlyOne`); in fact both parts hold iff `nbrsᵤ = ∅ ∧ list[u] = ∅` (`PR.part1_and_part2_iff`).
-   Rule: **R2** (degenerate: the isolated node is a one-vertex component; the paper never assumes `G` connected
-   but routing towards `D` makes connectivity natural; even for connected `G` it fails in the one-node graph
-   `V = {D}`, so R2 applies either way) → ⚠️. Borderline between ⚠️ and a mere slip: the
-   "exactly one" part is never used later, but it is part of a numbered statement, so ⚠️.
+   A degenerate case: the isolated node is a one-vertex component; the paper never assumes `G` connected but
+   routing towards `D` makes connectivity natural; even for connected `G` it fails in the one-node graph
+   `V = {D}`. The "exactly one" part is never used later, but it is part of a numbered statement.
 
 No other numbered statement is wrong; Theorems 4.3, 5.2, 5.4, 5.5, Lemmas 5.1, 5.3, Invariants 3.1, 4.1, 4.2,
 Corollaries 3.3, 3.4 are proved as stated (modulo the modelling choices below).
 
 ## Proof gaps (statements true)
 
-2. **Lemma 5.3 (b), Part 1, Cases 1/2.** "By Corollary 3.4, because `w` is a sink, `s.list[w] = out-nbrs_w`"
+2. **🔧 Lemma 5.3 (b), Part 1, Cases 1/2.** "By Corollary 3.4, because `w` is a sink, `s.list[w] = out-nbrs_w`"
    (even parity), resp. `= in-nbrs_w` (odd parity), does not follow: Corollary 3.4 plus `list ⊆ in-nbrs`
    (odd case) also allows `list = out-nbrs = ∅`. In that case the paper's prescription (one `reverse(w)` step
    whenever `list[w] ≠ nbrs_w`) is wrong: `NewPR` reverses `out-nbrs_w = ∅`, `OneStepPR` reverses `nbrs_w`.
@@ -31,9 +30,9 @@ Corollaries 3.3, 3.4 are proved as stated (modulo the modelling choices below).
    ≤ 6 nodes, every destination and `NewPR` counts ≤ 4 (`modelcheck/bf.py`) found failing related pairs only in
    disconnected graphs (a component without `D`). This counterexample is within the paper's stated model (connectivity
    is never assumed). For connected `G` the paper's inference is unjustified but not refuted. Either way it is a proof
-   gap, not a statement error (R1), so it does not affect the verdict.
+   gap, not a statement error.
 
-3. **"All neighbours in `T` are added to `list[u]`"** (proofs of Invariant 3.2 Case 2, Lemma 5.1 Part 2 Case 2,
+3. **✏️ "All neighbours in `T` are added to `list[u]`"** (proofs of Invariant 3.2 Case 2, Lemma 5.1 Part 2 Case 2,
    Lemma 5.3 Part 2 Case 2). Only stepping neighbours that actually reverse their edge to `u` are added (a sink
    `v` with `u ∈ list[v] ≠ nbrsᵥ` does not reverse `{u,v}`). Harmless: the other neighbours change neither
    `list[u]` nor `dir[u,·]`. Our proofs use `T = {y ∈ S | u ∈ revSet y}`.

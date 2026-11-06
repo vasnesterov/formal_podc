@@ -4,69 +4,52 @@ Ravi B. Boppana, Magnús M. Halldórsson, Dror Rawitz. *Brief Announcement: Simp
 Approximation.* PODC 2018. DOI [10.1145/3212734.3212793](https://doi.org/10.1145/3212734.3212793).
 Formalized version: arXiv [1803.00786](https://arxiv.org/abs/1803.00786) v1 (full version; numbering follows it).
 
-**Verdict: ❌ False claim.** The headline results hold: Boppana's algorithm / the Caro–Wei bound
-achieves a tight `(Δ+1)/2` ratio (Theorem 1), and no 1-round randomized algorithm does better
-(Theorem 4, after a repair of its proof). Theorems 3, 6 and 7 and Lemmas 2–4 also hold. **Theorem 2**
-(ratio `(d̄+2)/1.657` in terms of the average degree) is false as stated: the proof gives the constant
-`4(√2−1) = 1.65685…` and rounds it the wrong way. The paper's own extremal family refutes `1.657`, while
-`4(√2−1)` is correct. There are also small statement slips: Theorem 1 at `Δ = 0`, Lemma 5 lacks `Y > 0`,
-and Theorem 6 has `min_{x ≤ 1}`.
+**Verdict: 🔧 Easy fix.** Boppana's algorithm / the Caro–Wei bound achieves a tight `(Δ+1)/2` ratio (Theorem 1), and no
+1-round randomized algorithm does better (Theorem 4, whose proof needed a different pair of graphs). Theorems 3, 6 and 7
+and Lemmas 2–4 also hold, and everything else is a slip, such as the wrongly rounded constant of Theorem 2. Theorem 5
+was not checked.
 
 ## Mistakes in the paper
 
-### ❌ Theorem 2 (ratio `(d̄+2)/1.657`)
-Theorem 2 is false: `K_{24000,10000}` has `α = 24000` but `(d̄+2)/1.657·CaroWei ≈ 23999.2`, because
-the proof rounds its constant `4(√2−1) = 1.65685…` the wrong way (`theorem2_false`).
-
-**Impact.** A secondary result with a wrong constant: the statement with `4(√2−1)` in place of
-`1.657` holds (`theorem2_corrected`). This is a borderline call between ❌ and ⚠️; see
-differencies.md.
-
-**Details.** The theorem claims `α(G) ≤ (d̄+2)/1.657 · CaroWei(G)` for every graph. The proof ends
-with `(d̄+2)/(4(√2−1)) ≤ (d̄+2)/1.657`, but `4(√2−1) < 1.657`, so the inequality goes the wrong
-way. Because the bound is asymptotically tight on bipartite graphs with regular sides and
-`τ ≈ 1/√2` (the paper's own extremal family), the rounded constant really fails. The smallest
-complete bipartite counterexample is `K_{13721,5683}`.
-
-### ⚠️ Lemma 5 (lacks `Y > 0`)
-As stated (`a > b > 0`, `Z − Y ≥ X > 0`) Lemma 5 is false: `a=2, b=1, X=1, Y=−100, Z=−50` gives a
-smaller value at `t = 0` than at `t = 1` (`lemma5_false`).
-
-**Impact.** A missing hypothesis that holds at the only use, `Y = w(opt) > 0`; with it we prove the
-lemma (`lemma5`).
-
-### ⚠️ Theorem 1 at `Δ = 0`
-A ratio `(0+1)/2 < 1` is impossible on edgeless graphs (`theorem1_false_zero`).
-
-**Impact.** Degenerate: the theorem holds for every `Δ ≥ 1` (`theorem1`).
-
-### ⚠️ Theorem 6 (minimum over `x ≤ 1`)
-Theorem 6 takes the minimum over `x ≤ 1`, where the expression takes negative values
-(`theorem6_min_unbounded`).
-
-**Impact.** A typo with evident intent: the minimum should be over `0 ≤ x ≤ 1`, which we formalize.
-
-### Typos and slips
+### ✏️ Slips
+- Theorem 2 (ratio `(d̄+2)/1.657` in terms of the average degree) is false as printed: `K_{24000,10000}` has
+  `α = 24000` but `(d̄+2)/1.657·CaroWei ≈ 23999.2` (`theorem2_false`). The theorem claims
+  `α(G) ≤ (d̄+2)/1.657 · CaroWei(G)` for every graph. The proof ends with `(d̄+2)/(4(√2−1)) ≤ (d̄+2)/1.657`, but
+  `4(√2−1) = 1.65685… < 1.657`, so the inequality goes the wrong way. Because the bound is asymptotically tight on
+  bipartite graphs with regular sides and `τ ≈ 1/√2` (the paper's own extremal family), the rounded constant really
+  fails. The smallest complete bipartite counterexample is `K_{13721,5683}`. The statement with the proof's own
+  constant `4(√2−1)` in place of `1.657` holds (`theorem2_corrected`).
+- Lemma 5 lacks `Y > 0`: as stated (`a > b > 0`, `Z − Y ≥ X > 0`) it is false, since `a=2, b=1, X=1, Y=−100, Z=−50`
+  gives a smaller value at `t = 0` than at `t = 1` (`lemma5_false`). The hypothesis holds at the only use,
+  `Y = w(opt) > 0`; with it we prove the lemma (`lemma5`).
+- Theorem 1 at `Δ = 0`: a ratio `(0+1)/2 < 1` is impossible on edgeless graphs (`theorem1_false_zero`), and Theorem 3's
+  ratio is undefined there. The theorem holds for every `Δ ≥ 1` (`theorem1`).
+- Theorem 6 takes the minimum over `x ≤ 1`, where the expression takes negative values (`theorem6_min_unbounded`). The
+  minimum should be over `0 ≤ x ≤ 1`, which we formalize.
 - "For `Δ = 2`, … `ρ ∼ 1.657`" should be `≈ 1.686 = 1/0.593` (`rho_two_gt`).
-- The arXiv abstract says Boppana's algorithm is "only a `Δ`-approximation" on weighted graphs. The
-  correct ratio is `Δ+1`, as §3 and the PODC abstract state; it exceeds `Δ` on `K_{Δ,Δ}` with
-  weights `1, Q > Δ` (`boppana_weighted_not_Delta`).
+- The arXiv abstract says Boppana's algorithm is "only a `Δ`-approximation" on weighted graphs. The correct ratio is
+  `Δ+1`, as §3 and the PODC abstract state; it exceeds `Δ` on `K_{Δ,Δ}` with weights `1, Q > Δ`
+  (`boppana_weighted_not_Delta`).
 - §3 writes `E[w(B)] = Σ_{v∈B} …`, which should be `Σ_{v∈V}`.
 - Lemma 5 is applied with `t = W/X`, which is undefined when `V′ = ∅`.
 
+### Typos
+- Eqs. (8) and (11) write `w(Max)` for `E[w(Max)]`.
+
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 4 (1-round lower bound)
-The proof says no 1-round algorithm can distinguish `K_{Δ+1}` from a `Δ`-regular bipartite graph,
-but in the paper's model nodes know `n`, the two graphs have different sizes, and the view also
-contains the port number at the neighbour's end.
+### 🔧 Theorem 4 (1-round lower bound)
+The proof says no 1-round algorithm can distinguish `K_{Δ+1}` from a `Δ`-regular bipartite graph, but in the paper's
+model nodes know `n`, the two graphs have different sizes, and the view also contains the port number at the
+neighbour's end.
 
-**Impact.** The theorem is true; repaired (`theorem4`, `theorem4_ratio`).
+**Impact.** The theorem is true, and the paper's argument stays with another pair of graphs (`theorem4`,
+`theorem4_ratio`).
 
-**Repair.** We use `2k` copies of `K_{Δ+1}` versus `k` copies of `K_{Δ+1,Δ+1}` minus a perfect
-matching, on the same nodes, with matching port numbers at both ends of every edge. For each node
-`v`, a permutation fixing `v` maps its view in one graph to its view in the other, so averaging
-over labelings gives every node the same join probability in both graphs.
+**Repair.** We use `2k` copies of `K_{Δ+1}` versus `k` copies of `K_{Δ+1,Δ+1}` minus a perfect matching, on the same
+nodes, with matching port numbers at both ends of every edge. For each node `v`, a permutation fixing `v` maps its view
+in one graph to its view in the other, so averaging over labelings gives every node the same join probability in both
+graphs.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

@@ -4,9 +4,9 @@ Paper: Jayanti, Jayanti, Jayanti, *Brief Announcement: Efficient Recoverable Wri
 (the "BA"); proofs from the full version *Durable Algorithms for Writable LL/SC and CAS with Dynamic
 Joining*, arXiv:2302.00135v1 (the "FV").
 
-## Statement-level issues (decide the verdict)
+## Statement-level issues
 
-1. **Recovery discipline (Theorem 4.1(1), headline) — 🚨 (R4 not applicable, R5 headline).**
+1. **Recovery discipline (Theorem 4.1(1)) — 🔧.**
    The BA states the obligation of a crashed process per object: "when π subsequently restarts, it
    must execute `O.Recover()` before invoking any other operation on `O`". The DurEC handles (and
    their `Val`/`DetVal` fields) are shared by all objects of the type, as the BA requires ("whenever
@@ -15,15 +15,15 @@ Joining*, arXiv:2302.00135v1 (the "FV").
    then — legally under the BA's rule — invokes a `CAS` on `O₁` overwrites `h.Critical.Val` at
    line 7; a helper then forwards that value into `O₀`. `theorem_4_1_1_false` /
    `perObject_counterexample`: 2 processes, 2 objects, initial values 0; a `READ` of `O₀` returns 2,
-   which only an operation on `O₁` ever proposed. R4 does not excuse it: the paper explicitly states the
+   which only an operation on `O₁` ever proposed. The paper explicitly states the
    weaker discipline (and the FV's Appendix A.2/A.3 argue per object too: "W.RECOVER() or Z.RECOVER()
-   is executed before any other operation is executed on W or Z"). Borderline aspect, recorded here:
-   the FV's model section says "when p subsequently restarts, it is required to execute O.RECOVER()",
+   is executed before any other operation is executed on W or Z").
+   The FV's model section says "when p subsequently restarts, it is required to execute O.RECOVER()",
    which can be read as "immediately" (per-process); under that reading the theorem holds
    (`theorem_4_1_1`). Detectability fails under the per-object rule as well (a `DETECT` bracket of an
    operation then also covers the propagation of the earlier crashed install; found by the Python model
    checker, not formalized separately).
-   Reviewer's weighing (recorded because the call is borderline): for ⚠️ speak the cited model
+   For the per-process reading speak the cited model
    (the BA adopts recoverable linearizability "as adapted to the individual crash model by [2]",
    Attiya–Ben-Baruch–Hendler's nesting-safe model, which is per-process), the per-handle `DETECT`
    contract (a bracket "just before … just after" an operation presupposes that the process runs
@@ -33,20 +33,19 @@ Joining*, arXiv:2302.00135v1 (the "FV").
    uses exactly the per-object rule at the DurEC level (DuraCAS's `RECOVER` runs `W.RECOVER` before
    `Z.RECOVER`, so strict per-process recovery would not even hold for `W`, `Z`); the correct
    discipline ("recover before any other non-`RECOVER` operation with the same handle") is stated
-   nowhere. A user taking the BA at its word (lazy per-object recovery) gets another object's value
-   — substantive (R4 "misled substantively"; R3 "the proof reasons with the wrong version"). So 🚨.
+   nowhere. A user taking the BA at its word (lazy per-object recovery) gets another object's value.
 
-2. **Null dereference in `FORWARD` (Algorithm 1, lines 14 and 16) — ⚠️ (R3: missing case in
+2. **Null dereference in `FORWARD` (Algorithm 1, lines 14 and 16) — 🔧 (missing case in
    pseudocode, evident fix).** `X` is initialised to `(null, 0)`; `RECOVER` (hence `FORWARD`) is called
    on objects that never had an install (e.g. DuraCAS lines 22–25 always recover both `W` and `Z`), and
    then `x.hndl.DetVal` and `x.hndl.Val` dereference null. We model the evident fix "if `x.hndl = null`
    then return" (then `x.seq = 0` and line 18 does nothing anyway).
 
-3. **Lemma 4.4 / Lemma A.5(1) — ⚠️ (R3 typo).** "In the interval (t′, t), `X.hndl = h`, `h.Val = v`"
+3. **Lemma 4.4 / Lemma A.5(1) — ✏️ (typo).** "In the interval (t′, t), `X.hndl = h`, `h.Val = v`"
    should be `h′` (the installer's handle), not `h` (the mover's handle, which `FORWARD` ignores).
    As written it is false whenever another process moves.
 
-4. **Lemma A.10(2) — ⚠️ (R3).** "If `h.DetVal` is changed … then `X.hndl = h` and `h.pc ∈ {13,14,15}`" is
+4. **Lemma A.10(2) — 🛠️.** "If `h.DetVal` is changed … then `X.hndl = h` and `h.pc ∈ {13,14,15}`" is
    false as written: a helper can change `h.DetVal` while the installer is at line 11 (has installed,
    has not yet called `FORWARD`) or has crashed (its pc is lost / it is in `RECOVER`). The intended
    statement ("h's installing `ECSC` is not yet complete") is what the proof of A.10(3) uses. The
@@ -60,9 +59,8 @@ Joining*, arXiv:2302.00135v1 (the "FV").
    different invariant (`CInv.lean`; per-process uniqueness of pending installs replaces statement 4).
    In the paper's pseudocode there is also a crash-free counterexample (the installer sits at
    line 11, between its install and its call of `FORWARD`, while a hitchhiker's `FORWARD` executes
-   line 15); our model merges line 11 into line 10, so the Lean witness uses a crash. Borderline
-   ⚠️/❌ (a false numbered lemma of the FV whose repair adds the missing pc 11 and the crashed
-   state); it does not affect the verdict, which is decided by item 1.
+   line 15); our model merges line 11 into line 10, so the Lean witness uses a crash. The repair of the
+   lemma's statement adds the missing pc 11 and the crashed state.
 
 ## Proof gaps (statements true under the per-process discipline)
 
@@ -74,12 +72,12 @@ Joining*, arXiv:2302.00135v1 (the "FV").
    (`reach_aReach`, `Refinement.lean`). The A.3 proof must then also handle orphans (an orphan install,
    imprint or move behaves like the corresponding poised operation).
 
-6. **Linearization of hitchhiker `ECSC`s (Definition 4.6(2), main text) — typo.** "the earliest time t
+6. **Linearization of hitchhiker `ECSC`s (Definition 4.6(2), main text) — ✏️.** "the earliest time t
    such that a move occurs at t" must be "… with t > α[6]" (as in Definition A.8); otherwise an `ECSC`
    that reads `Y.seq = s` after a move that set `Y.seq = s` would be linearized as failing in a state
    where it should succeed.
 
-7. **Failing `CAS` and hitchhiking writes (Definitions A.42(3), A.43(2)).** "linearized at the earliest
+7. **Failing `CAS` and hitchhiking writes (Definitions A.42(3), A.43(2)) — ✏️.** "linearized at the earliest
    time when `Z.val ≠ old`" must be "the earliest such time in the operation's interval" (Lemma A.39
    provides one). Both linearization points are not determined forward in time (`Z.val` can go
    `old → x → old` during the first iteration while the `CAS` still succeeds in the second; a write

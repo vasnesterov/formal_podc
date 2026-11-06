@@ -6,24 +6,25 @@ Polylogarithmic Amortized Step Complexity.* PODC 2020. DOI
 version, HAL preprint hal-02860087v1 (June 2020, 19 pp., all proofs); numbering follows it. Copy of
 the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** Two numbered lemmas are false: Lemma 3.3 (the linearization given by
-rules 1–3 respects the max-array semantics) and Lemma 3.4 (counting the `MaxUpdate`s that start
-during a scan). The main results survive. Algorithm 1 (the unbounded 2-component max array) is
-linearizable, with a new proof. In bounded-increment executions it is wait-free, given a helping
-period `≥ 1`, which the pseudo-code's `⌊n/log² m⌋` is not for realistic `n`. The counting behind its
-`O(log² n)` amortized bound holds. Algorithm 2, the unlimited-use snapshot, is linearizable and
-wait-free, and its increments stay bounded (Lemmas 4.1, 4.2).
+**Verdict: 🛠️ Hard fix.** Lemma 3.3 (the linearization given by rules 1–3 respects the max-array semantics) and Lemma 3.4
+(counting the `MaxUpdate`s that start during a scan) are false, so the linearizability proof of the new max array
+collapses. Algorithm 1 (the unbounded 2-component max array) is still linearizable, by a new proof with certified views;
+in bounded-increment executions it is wait-free, given a helping period `≥ 1`, which the pseudo-code's `⌊n/log² m⌋` is not
+for realistic `n`; and Algorithm 2, the unlimited-use snapshot, is linearizable and wait-free, with bounded increments
+(Lemmas 4.1, 4.2). The polylogarithmic amortized bounds, the paper's main claim, were checked only in their counting
+cores, which hold; the black-box costs and the final summation were not checked.
 
 ## Mistakes in the paper
 
-### ❌ Lemma 3.3 (linearization rules 1–3, with Definition 3.2 and Claim 4)
+### 🛠️ Lemma 3.3 (linearization rules 1–3, with Definition 3.2 and Claim 4)
 The order of rules 1–3 can put a `MaxUpdate(right, 3)` before a `MaxScan` that returns right component
 `0`, in a `4`-bounded-increment execution with `n = 4` processes and `m = 16 = n²`
 (`Counterexample.lemma_3_3_false`).
 
-**Impact.** The linearizability proof of Theorem 3.7 is broken: Lemma 3.3 is false, and so are Claim 4
-and the "value of `O`" of Definition 3.2. Theorem 3.7's linearizability still holds; we prove it
-differently (`alg1_linearizable`). The history in the counterexample is itself linearizable.
+**Impact.** The linearizability proof of Theorem 3.7 rests on Lemma 3.3 and Claim 4 and is broken: Lemma 3.3 is false, and
+so are Claim 4 and the "value of `O`" of Definition 3.2. Theorem 3.7's linearizability still holds; we prove it
+differently (`alg1_linearizable`). It holds in every execution with atomic `MR` registers, with no bounded-increment
+hypothesis and for every `m`. The history in the counterexample is itself linearizable.
 
 **Details.** Process `A` writes `MR_left = 4, 8, 12`. Then:
 1. `Q` scans and reads `r₁ = 0`, `l = 12`.
@@ -44,7 +45,7 @@ are monotone in `t₁` (`cert_le`). Every completed operation has a certificate 
 direct view, or by Claim 1 a helper's view. The max-array criterion of the PODC 2012 formalization then
 gives a linearization (`exists_isLinearization_maxArr`). The invariant is `Inv` in `LinInv.lean`.
 
-### ❌ Lemma 3.4 (`MaxUpdate`s that start during a `CompScan`)
+### 🔧 Lemma 3.4 (`MaxUpdate`s that start during a `CompScan`)
 After `K = 3` unsuccessful iterations of a `CompScan`, only `3` `MaxUpdate`s have been invoked during it,
 not `⌈(K−2)m/b⌉ = 4`, with `n = 4`, `m = 16`, `b = 4` (`Counterexample34.lemma_3_4_false`).
 
@@ -58,55 +59,47 @@ may have invoked its `MaxUpdate` before `S` and write during `S`. In the counter
 - `MR_left = MR_right = 15` at that point;
 - the three pending writes plus three new `MaxUpdate`s of `C` (`24`, `28`, `32`) make three iterations of `S` fail.
 
-### ⚠️ Algorithm 1, lines 23–25 (helping period `⌊n/log² m⌋`)
-With `m = n²`, the period `⌊n/log² m⌋` is `0` for every `n < 256`, so line 25 computes `c mod 0`;
-line 25 also fires at `c = 0`, before `h₀` has been collected.
+**Repair.** Count `WriteMax` steps inside `I₂`. With `2n+1` of them, some process writes three times
+there. Both `CompScan`s between its writes then complete inside `I₂`, which gives Observation 5's
+"+2".
 
-**Impact.** Evident intent: the proof of Lemma 3.5 uses `⌈n/log² m⌉`, and the text says line 25 is
-"not the first collect". We model the intended version: a period `X ≥ 1`, with further collects at
-`c = 2X, 3X, …` (`afterFail`). With period `0` read as "never collect again", there is no helping. A
-scanner can then starve: a fast updater crosses a multiple of `m` during each of its iterations. We
-only sketch this starvation; it is not formalized.
-
-### Typos and slips
+### ✏️ Slips
+- Algorithm 1, lines 23 and 25 and the text of Section 3 (helping period `⌊n/log² m⌋`): with `m = n²`, the period is `0`
+  for every `n < 256`, so line 25 computes `c mod 0`. A floor is printed for a ceiling: the proof of Lemma 3.5 uses
+  `⌈n/log² m⌉`. We model the intended version: a period `X ≥ 1`, with further collects at `c = 2X, 3X, …` (`afterFail`,
+  `WaitFree.waitFreeOn_BIExec`). With period `0` read as "never collect again", there is no helping.
+- Algorithm 1, line 25 also fires at `c = 0`, before `h₀` has been collected. The text says line 25 is "not the first
+  collect", which is what we model.
 - Lemma 4.1: the induction takes `x` of height `h+1` but uses the bound `2^{h−1}`; this is an index
-  slip. Claim 5's `(L_u, R_u)` is undefined when no `MaxUpdate` of `I` touches `u.MA`; take `(0, 0)`.
+  slip (`Section4.lemma_4_1`).
+- Lemma 4.1, Claim 5: `(L_u, R_u)` is undefined when no `MaxUpdate` of `I` touches `u.MA`; take `(0, 0)`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 3.7 (linearizability of Algorithm 1)
-The proof rests on the false Lemma 3.3 and Claim 4.
+### 🔧 Lemma 3.5 (wait-freedom of Algorithm 1)
+The interval `I₁` in the proof is one iteration short, because the first collect happens in iteration `X + 1`; the proof
+also uses the false Lemma 3.4.
 
-**Impact.** Statement true; repaired (`alg1_linearizable`). It holds in every execution with atomic
-`MR` registers, with no bounded-increment hypothesis and for every `m`.
-
-### 🛠️ Lemma 3.5 (wait-freedom of Algorithm 1)
-The proof uses the false Lemma 3.4, and its interval `I₁` is one iteration short: the first collect
-happens in iteration `X + 1`.
-
-**Impact.** Statement true for a period `X ≥ 1`, with the paper's bound `K + 2X` iterations
+**Impact.** The statement stands for a period `X ≥ 1`, with the paper's bound `K + 2X` iterations
 (`WaitFree.iterations_le`, `WaitFree.steps_le`, `WaitFree.waitFreeOn_BIExec`). Here
 `⌈(K−2)m/ℓ⌉ ≥ 2n+1`, i.e. `2nℓ < (K−2)m`.
 
-**Repair.** Count `WriteMax` steps inside `I₂`. With `2n+1` of them, some process writes three times
-there. Both `CompScan`s between its writes then complete inside `I₂`, which gives Observation 5's
-"+2". The off-by-one in `I₁` is absorbed because `I₃` needs only `X − 1` iterations.
+**Repair.** The off-by-one in `I₁` is absorbed because `I₃` needs only `X − 1` iterations.
 
-### 🛠️ Section 3 (the bounded max arrays `MA_j` of [4])
+### 🔧 Section 3 (the bounded max arrays `MA_j` of [4])
 Algorithm 1 uses the `(m × m)`-bounded max arrays of Aspnes, Attiya, Censor-Hillel and Ellen [4]
 (the 2015 journal version) as linearizable black boxes, but as published that max array is not
 linearizable (its Theorem 3.4 is false, see
 [LimitedUseSnapshots](../../PODC2012/LimitedUseSnapshots/README.md)).
 
-**Impact.** Statement true with the authors' corrected max array (its erratum), which is linearizable.
-That correction makes `MaxUpdate₁` cost `O(log² m)`, which eq. (4) already charges per iteration. We
-did not check whether Algorithm 1 is also correct over the uncorrected max array.
+**Impact.** The statement stands with the authors' corrected max array (its erratum), which is linearizable.
+That correction makes `MaxUpdate₁` cost `O(log² m)`, which eq. (4) already charges per iteration.
 
-### 🛠️ Theorem 4.4 (Algorithm 2 is a linearizable snapshot)
+### 🔧 Theorem 4.4 (Algorithm 2 is a linearizable snapshot)
 The proof only says that the proof of Section 4.1 of [4] "holds also", but that proof's linearization
 points are wrong, as found in the PODC 2012 formalization.
 
-**Impact.** Statement true; repaired with the corrected linearization points of
+**Impact.** The statement stands with the corrected linearization points of
 `Snapshot.theorem_4_2` (`Section4.theorem_4_4_linearizable`). No bound on the number of `Update`s is
 needed (unlimited use).
 
@@ -158,7 +151,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 - Hence Lemma 3.6 and Lemma 4.3 are formalized only as their counting cores:
   - at most `|W|` unsuccessful iterations when `nℓ ≤ m`;
   - the per-operation weighted access bounds of Algorithm 2.
-- The starvation of the literal algorithm with period `0`.
+- The starvation of the literal algorithm with period `0`: a scanner can starve, because a fast updater crosses a multiple
+  of `m` during each of its iterations. We only sketch this.
+- The effect of the useless collect at `c = 0` on the amortized bound, under the literal reading of line 25: not analysed.
+- Whether Algorithm 1 is also correct over the uncorrected max array of [4]: not checked.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and
 `Quot.sound`.

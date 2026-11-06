@@ -1,7 +1,7 @@
 # Differences between the formalization and the paper
 
 Paper: Amores-Sesar, Cachin, Villacis, Zanolini, *DAG-based Consensus with Asymmetric Trust*, PODC 2025,
-arXiv:2505.17891v1. Rules R1–R6 refer to the verdict scale (`.claude/skills/formalize-paper/verdicts.md`).
+arXiv:2505.17891v1.
 
 ## Statement-level issues
 
@@ -9,9 +9,9 @@ arXiv:2505.17891v1. Rules R1–R6 refer to the verdict scale (`.claude/skills/fo
    `log_rounds_claim_false`: an 8-process `B³` system (`ex8`, canonical single quorums) and a fault-free run of
    the 2-round quorum-replacement gather in which all processes ag-deliver and no quorum's pairs are in all
    outputs. `log₂ 8 − 1 = 2` exactly. `ex8_three_rounds_core`: with 3 rounds there is a core.
-   *Rule:* R1 (explicit claim of a result in the main text/appendix), not excused by R2 (n = 8 is not
-   degenerate), R3 (the fix would change the bound, which is the claim), R4. Not a headline (R5) → ❌.
-   *Borderline (R6), recorded:* the claim is a remark, and the round count is not defined. We count
+   This is an explicit claim of a result in the appendix (❌): `n = 8` is not degenerate, and a fix would
+   change the bound, which is the claim.
+   The claim is a remark, and the round count is not defined. We count
    rounds as the paper does for Algorithm 2 ("the 3 rounds of Algorithm 2"; Algorithm 1 "consists of three
    rounds of broadcasting and collecting values"): one round = waiting for a quorum and sending on. Other
    readings: with `⌊log₂ n⌋ − 1`, the paper's own Figure 1 refutes the claim (`⌊log₂ 30⌋ − 1 = 3`,
@@ -24,9 +24,9 @@ arXiv:2505.17891v1. Rules R1–R6 refer to the verdict scale (`.claude/skills/fo
    logarithmic number of rounds" (§3.2). We do not count these as refuted: "require" reads as a lower bound,
    "logarithmic" is asymptotic, and `⌈log₂ n⌉` rounds is consistent with all our examples. (Under the floor
    reading `⌊log₂ 5⌋ = 2`, `ex5` refutes the §3 sentence too.) The paper's internal inconsistency (`log n` vs
-   `log n − 1`; "16 ↔ 3 rounds" vs "`2ⁿ` ↔ `n` rounds") does not make "`log n`" the evident intent under R3:
-   the "16 ↔ 3 rounds" sentence supports `log n − 1`, and R3 does not excuse changing a round bound that is
-   itself the claim. Reviewer check: the "Tusk" remark of §3.2 (Figure 1 also has no core after 2 rounds) is
+   `log n − 1`; "16 ↔ 3 rounds" vs "`2ⁿ` ↔ `n` rounds") does not make "`log n`" the evident intent:
+   the "16 ↔ 3 rounds" sentence supports `log n − 1`, and a round bound that is itself the claim cannot be
+   changed as a typo. Reviewer check: the "Tusk" remark of §3.2 (Figure 1 also has no core after 2 rounds) is
    consistent with the canonical run (checked numerically, not in Lean). Figure 1 does have a core after 4 rounds.
 2. **§3.2, "3 rounds suffice for fewer than 16 processes; `n` rounds for fewer than `2ⁿ`".** Not formalized
    as a theorem (neither proved nor refuted). The two sentences contradict each other (3 rounds ↔ 16 vs
@@ -36,11 +36,11 @@ arXiv:2505.17891v1. Rules R1–R6 refer to the verdict scale (`.claude/skills/fo
    Exhaustive SAT: no single-quorum fault-free counterexample to the 3-round claim with `n ≤ 7`.
 3. **Lemma 3.5, "the processes in one of the quorums `Qᵢ`".** True only for the *correct* members of `Qᵢ`
    (Byzantine members' "receiving before sending" is meaningless). We prove the correct-members version,
-   plus the consequence used later: every `DISTRIBUTET` set of a correct member contains `Sᵢ`. Evident intent
-   (R3) → no verdict impact.
+   plus the consequence used later: every `DISTRIBUTET` set of a correct member contains `Sᵢ`. Implied
+   assumption (✏️).
 4. **Definition 3.1 lacks termination.** As written it is satisfied by a protocol that never delivers. We add
    termination (`Gather3.termination`) to Lemma 3.8. Intent evident from Lemma 3.7 ("all processes in the
-   maximal guild will have …") (R4) → no verdict impact; the formal statement is stronger than the paper's.
+   maximal guild will have …") (🔧); the formal statement is stronger than the paper's.
 5. **Definition 3.1, "values ag-proposed by the processes of a quorum".** For Byzantine members "ag-proposed"
    is undefined. Our `ExecCommonCore` asks for a set `S` containing *some* pair `(s, v)` for every `s` of a
    quorum of a guild member, contained in all outputs of guild members (any time). Validity separately
@@ -53,10 +53,10 @@ arXiv:2505.17891v1. Rules R1–R6 refer to the verdict scale (`.claude/skills/fo
    member. Repaired: a quorum of a guild member contains a guild member
    (`IsGuild.exists_mem_guild_of_quorum`, by consistency against the actual faulty set with the member's
    quorum inside the guild). The same fact replaces "Lemma 7 of [3]" at the two other places (the `READY`
-   quorum). → 🛠️.
+   quorum). → 🔧.
 7. **Lemma 3.7's proof** uses an arbitrary process of `Qᵢ ∩ Qⱼ`, possibly Byzantine. Repaired: wise `pᵢ`, `pⱼ`
    both foresee `F`, so consistency gives a correct process in the intersection
-   (`IsQuorumSystem.exists_mem_inter_notMem`). → 🛠️.
+   (`IsQuorumSystem.exists_mem_inter_notMem`). → 🔧.
 8. **Lemma 3.3/3.6 liveness** silently need the totality of the reliable broadcast (a guild member can ACK
    `DISTRIBUTES S` and use `DISTRIBUTET T` only once it has arb-delivered all of `S`/`T`). The model also
    needs weak fairness for state-dependent messages. We prove that the arb-delivered and acknowledged
@@ -87,7 +87,7 @@ arXiv:2505.17891v1. Rules R1–R6 refer to the verdict scale (`.claude/skills/fo
     processed (`QualT`). We did not analyse the alternative reading, which counts raw receptions.
 15. **Guilds:** Lemmas 3.3–3.8 are proved for every nonempty guild `G` with `RBC` for `G`. The paper's
     maximal guild is a special case (`lemma_3_8_maxGuild`). The guild must be nonempty (Lemma 3.3 is false
-    for the empty guild, R2).
+    for the empty guild).
 16. **Algorithm 2's `r`-round generalization** (`RoundGather.protocol Qs r`; `r = 3` is Algorithm 2) is our
     reading of "modified to have `n` rounds" / "rounds of the type of communication used here".
 17. **Processes** are `Fin n`; the paper's process `i` is `i − 1`. Figure 1 = Listing 1, cross-checked

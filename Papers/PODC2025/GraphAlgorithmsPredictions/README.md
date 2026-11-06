@@ -6,10 +6,10 @@ announcement; the proof of Theorem 4.1 is taken from the full version, arXiv
 [2501.05267](https://arxiv.org/abs/2501.05267) (Lemmas 4 and 5 there).
 
 **Verdict: ✅ Correct.** Theorem 4.1 (every deterministic component-size bounded MIS algorithm needs `(n − 5)/2`
-rounds on an `n`-node line) holds, by the paper's own Ramsey proof. The 3-round pruning algorithm, the round bound
-`n` of the Distributed Greedy MIS Algorithm, consistency, and the `η + 3` round bound of "pruning, then greedy on
-every error component" all hold. The same Ramsey argument applied directly to MIS gives the slightly better bound
-`(n − 4)/2`.
+rounds on an `n`-node line) holds, by the paper's own Ramsey proof, and so do the 3-round pruning algorithm, the
+round bound `n` of the Distributed Greedy MIS Algorithm, consistency, and the `η + 3` round bound of "pruning, then
+greedy on every error component". The same Ramsey argument applied directly to MIS gives the slightly better bound
+`(n − 4)/2`. The framework's asymptotic definitions and the generic compositions of Section 5 were not checked.
 
 ## Mistakes in the paper
 
@@ -74,6 +74,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Not formalized.** The framework definitions (consistent/robust/smooth as asymptotic notions), the generic
 compositions of Section 5 with black-box algorithms (`2f(η)`-degrading composition with a clean-up algorithm,
 the fault-tolerant parallel composition), the coloring-based algorithms and the cited results ([2], [7], [8]).
+Of the generic compositions, only the round arithmetic was read.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity of Theorem 4.1: `exists_mis_algorithm` gives an `n`-round MIS algorithm for `n`-node lines (parity of

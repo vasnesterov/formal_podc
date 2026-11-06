@@ -9,23 +9,20 @@ Full version: arXiv 1311.6902v1, *Good, Better, Best! — Unbeatable Protocols f
    the PODC 2016 version (the five conditions are hypotheses 1–4 of `Lemma1HypPaper` in
    `Papers/PODC2016/UnbeatableSetConsensus`). Counterexample there: `n = 6`, `k = 2`, `t = 1`, `V = {0, 1, 2}`.
    The 2016 folder also proves Lemma 10 with the extra hypothesis "every process alive and low at `m − 1` crashes
-   in round `m`", which holds at every use, so Lemma 11 and Theorem 4 hold (`lemma11`, `theorem4`).
-   *Rule:* R1: a false numbered lemma is a statement, and the instance is not degenerate (R2). Not excused by
-   R3/R4: the fix adds a hypothesis that is not in the paper. This decides the verdict **❌** (not 🚨: Theorem 4 is
-   true, R5).
+   in round `m`", which holds at every use, so Lemma 11 and Theorem 4 hold (`lemma11`, `theorem4`). The instance is
+   not degenerate, and the fix adds a hypothesis that is not in the paper (🔧).
 2. **Lemma 6 is false when `d = t`** (`lemma6_literal_false`). Condition (b) holds vacuously for `t − d = 0`. With
    `n = 3`, `t = 1`, all inputs `1` and process `2` crashing silently in round 1, process `0` at time 1 satisfies
    (b) for `v = 0`, but `K_0 ∃correct(0)` fails. Proved version (`lemma6`): `K_i ∃correct(v)` iff `K_i ∃v` and
-   ((a) or (b)), for `i` alive at `m` and `t < n`. *Rule:* R3 (⚠️). The proof sketch ("the number of distinct
-   processes knowing `∃0`, including `i` itself") presupposes `K_i ∃v`, and the fix is local. The paper's
+   ((a) or (b)), for `i` alive at `m` and `t < n`. The proof sketch ("the number of distinct
+   processes knowing `∃0`, including `i` itself") presupposes `K_i ∃v`, and the fix is local (🔧). The paper's
    statement "at time `t + 1`, `K_i ∃v` holds exactly if (a) or (b)" has the same issue.
 3. **Corollary 1 (§3) needs `t ≥ 2`.** With `P0opt` read from the paper's description (item 12), `Opt0`
    strictly dominates `P0opt` when `t ≥ 2` and `n ≥ 4`, and when `2 ≤ n ≤ t + 1` (`corollary1`). For
    `n ≥ 3, t = 1`, and for `n ≥ 2, t = 0`, `P0opt` and `Opt0` make the same decisions (`p0opt_sameDecisions`), so
-   `P0opt` is unbeatable (`p0opt_unbeatable`). *Rule:* borderline. Read as a universal statement over `(n, t)`,
-   it is false for `t = 1`, which is not degenerate (R2). Read as the refutation of HMW's general claim, it is
-   true, and the paper's own example needs two failures. We count it as ⚠️ (implied `t ≥ 2`, recoverable from the
-   example, R3). It does not change the verdict, which item 1 decides.
+   `P0opt` is unbeatable (`p0opt_unbeatable`). Read as a universal statement over `(n, t)`, it is false for `t = 1`,
+   which is not degenerate. Read as the refutation of HMW's general claim, it is true, and the paper's own example
+   needs two failures, so one condition on `t` fixes it (🔧).
 4. **Lemma 15, proof.** (a) The inner induction measure `|C_i \ Z_i|` need not decrease: in Case II the paper
    notes `C_j ⊇ C_i`, and `j`, which does not see `⟨k, m⟩`, may know of fewer crashes, so `C_j ⊋ C_i` is possible.
    (b) The induction hypothesis is applied to `j ∈ Z_i` without checking its hypotheses: that `K_j ∃0` first holds
@@ -38,12 +35,12 @@ Full version: arXiv 1311.6902v1, *Good, Better, Best! — Unbeatable Protocols f
    `x ~_i x' ~_j x''`. In `x'`, `k` crashes in round `m + 1` reaching only `i`. `x''` is `x'` where `k` also
    receives `z`'s message. In `x''`, `Z_i` has grown by `k` and the hypothesis is applied to `i`. The paper's
    counting argument for Part 1 is not needed. Part 2 adds the case where `z` reached `⟨i, m + 1⟩` and the paper's
-   "`Z_i = {i}`" argument (`g15_succ`). *Rule:* R1: claims inside a proof; the lemma is true, so 🛠️.
+   "`Z_i = {i}`" argument (`g15_succ`). The lemma is true; its proof needs this new induction (🛠️).
 5. **Theorem 2, derivation.** "A precondition for deciding 1 is that no correct process ever decides 0" holds
    only for a correct decider. We make `i` correct in the run built from the hidden path
-   (`exists_run_of_hiddenPath`). 🛠️-level, minor.
+   (`exists_run_of_hiddenPath`) (🔧).
 6. **Lemma 2, proof.** "Since `Q` dominates `P0`, `i` must decide by time `m`" needs `P0` to decide at `m`. This
-   needs `m ≤ t + 1`, which holds because a value is first learnt by time `f + 1` (`first_le`). Minor gap.
+   needs `m ≤ t + 1`, which holds because a value is first learnt by time `f + 1` (`first_le`). A routine detail.
 7. **Typos.** Two different results are numbered "Corollary 1". In Lemma 15's last case, "j fails at `(r', m)`
    before sending any messages" must mean "`j`'s round-`m + 1` message reaches only `i`": `⟨j, m⟩` is seen by
    `⟨i, m + 1⟩`, as the construction of `r''` shows. In the same case, "the faulty processes in `r'` are those known

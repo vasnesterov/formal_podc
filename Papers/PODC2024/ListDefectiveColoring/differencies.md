@@ -22,7 +22,7 @@ algorithm, a gap in a proof's construction, and an error in a proof.
      * `isRun_ce`: a run exists, so the statement is not vacuous.
    * **Fix.** `d' := ⌈(d+1)/(7θ)⌉ − 1 = ⌊d/(7θ)⌋` (`Sec41.dPrime`). It is non-negative, as the paper intends,
      with `∑(d'+1) ≥ ∑(d+1)/(7θ)` and `7θ d' ≤ d`. Theorem 1.4 then holds (`Sec41.theorem_1_4`).
-2. **Lemma 4.5 (colour space reduction): gap in the proof's construction, trivial fix.**
+2. 🔧 **Lemma 4.5 (colour space reduction): gap in the proof's construction.**
    * **What the paper says.** The subspace-choice instance gives every node *all* `p` subspaces.
    * **Why it fails.** A node may choose a subspace `C_i` with `L_v ∩ C_i = ∅`, because `d_{v,i} = 0` is not
      violated when no neighbour chooses `i`. The node is then left with an empty list, and its sub-instance has
@@ -32,7 +32,7 @@ algorithm, a gap in a proof's construction, and an error in a proof.
    * **Fix.** Give a node only the subspaces that meet `L_v` (`lemma45`). The slack bound
      `∑_i (d_{v,i}+1) > σ deg(v)` survives because `L_v ≠ ∅`.
    * The lemma's round-time statement (17) is not refuted.
-3. **Lemma A.1: genuine error in the proof (existence of a colouring unaffected).**
+3. 🔧 **Lemma A.1: error in the proof (existence of a colouring unaffected).**
    * **What the paper says.** `H_i` is the set of nodes with `≤ Δ/2` coloured neighbours. The proof claims
      `∑_{L'}(d'+1) > deg(v) − deg~(v) ≥ Δ − Δ/2 ≥ µ deg_{G_i}(v)`.
    * **Why it fails.** The step `deg(v) − deg~(v) ≥ Δ − Δ/2` fails for nodes of degree `< Δ`.
@@ -47,7 +47,7 @@ algorithm, a gap in a proof's construction, and an error in a proof.
 
 ## Gaps in proofs (results correct; fixed in the formalization)
 
-* **Lemma 3.1, case `|L_v| > p`.**
+* 🔧 **Lemma 3.1, case `|L_v| > p`.**
   * **The flaw.** The final pigeonhole step bounds `|N_>(v)| + ∑_{x∈S_v} k_v(x)` by the average over all
     `p`-subsets and then by `∑_{x∈L_v}(d_v(x)+1)`. That does not give (4), whose right-hand side is
     `∑_{x∈S_v}(d_v(x)+1)`.
@@ -55,14 +55,14 @@ algorithm, a gap in a proof's construction, and an error in a proof.
     best subset is at least as good as the average (`IsBestSubset.mul_sum_le` with `sum_powersetCard_sum`).
     This also proves the Remark: the subset chosen by Algorithm 1 satisfies (4).
   * **What we prove.** Lemma 3.1 is true (`lemma_3_1`, `IsBestSubset.lemma_3_1`).
-* **Lemma 3.2.**
+* ✏️ **Lemma 3.2.**
   * The text "some colour `x_v` such that `r_v(x_v) + k_v(x_v) ≤ |N_>(v)| < d_v(x_v) + 1`" is garbled (and
     "`l'_v`" is a typo for `S_v`).
   * The correct step is a pigeonhole on sums: if every `x ∈ S_v` had `k + r ≥ d + 1`, summing would contradict
     (6) (`exists_phaseII_color`).
-* **Section 4.1, setup of Lemma 4.2.** The paper writes `deg~(v,i) ≤ ∑_x a_v(x,i)`. The proof needs the reverse
+* ✏️ **Section 4.1, setup of Lemma 4.2.** The paper writes `deg~(v,i) ≤ ∑_x a_v(x,i)`. The proof needs the reverse
   inequality, which is the true one: neighbours with colours outside `L_v` exist.
-* **Eq. (9) omits the factor `deg(v)`.** It must read `∑(d+1) > 21θ(⌈log Δ⌉+1)S·deg(v)`, as in Definition 1.1
+* ✏️ **Eq. (9) omits the factor `deg(v)`.** It must read `∑(d+1) > 21θ(⌈log Δ⌉+1)S·deg(v)`, as in Definition 1.1
   and in the theorem statement.
 * **Lemma 4.2's proof needs `d' ≥ 0`.** This holds only for the corrected `d'`. The pigeonhole over iterations
   can be replaced by summing the per-iteration bound `∑_{L_{v,i}}(d'+1) ≤ 2S deg(v)`.
@@ -81,7 +81,7 @@ algorithm, a gap in a proof's construction, and an error in a proof.
     `T(4) = O(log²C + log* q)`. That gives `O(log³C + log C · log* q)`, not the claimed `O(log³ C + log* q)`.
   * The reason is that the defective colouring of Lemma 3.4 depends on the current out-degrees and is recomputed
     at each of the `⌈log₄ C⌉` levels. We have not checked whether it can be shared across levels.
-  * Minor: for `C = 1`, `ε = 1/(3·0)` is undefined. Lemma 3.5 assumes "`≥`" while Theorem 1.1 gives "`>`"
+  * ✏️ For `C = 1`, `ε = 1/(3·0)` is undefined. Lemma 3.5 assumes "`≥`" while Theorem 1.1 gives "`>`"
     (harmless).
 * **Lemma A.1, round count (remark, not formalized).** As written, every phase recomputes Lemma 3.4. That
   would give `O(log Δ · log* q)` rather than `+O(log* q)`.
@@ -92,7 +92,7 @@ algorithm, a gap in a proof's construction, and an error in a proof.
 * **Conventions of Section 2.** The paper defines `Δ(G) = max(2, maxdeg)`, so `Δ ≥ 2` is a hypothesis of
   `Sec41.theorem_1_4`. For `Δ = 1`, `⌈log Δ⌉ = 0` and the bound `d ≤ 2d_0 = 0` would fail.
   * The paper also defines `β_v = max(1, outdeg)`, and we use this (`beta`).
-  * The statements of Theorems 1.1 and 1.2 say "`β_v` is the outdegree of `v`". This is inconsistent with
+  * ✏️ The statements of Theorems 1.1 and 1.2 say "`β_v` is the outdegree of `v`". This is inconsistent with
     Section 2.
   * With the literal outdegree, an isolated node with an empty list would satisfy the hypothesis of
     Theorem 1.2.

@@ -16,7 +16,7 @@ sketch has a gap, which we repaired. Lemma 2's broadcast is proved by a differen
    the vertex set is `P ∪ V(H)`, as in CSLib's `DilationLE`). The failure does not depend on that reading: on the
    path `0 – … – 4` rooted at `0`, `P = {4}`, `H = {01, 23}` has `b = 1` and the edge set `{01, 23}` itself is
    disconnected (`lemma_1_literal_false_edgeSet`). The paper explicitly allows such `H_i` (remark after Definition 5:
-   components without nodes of `P_i` "need not be counted"). Severity: degenerate / definitional; the repair (drop
+   components without nodes of `P_i` "need not be counted"). A degenerate, definitional case (✏️); the repair (drop
    the useless components) is immediate. We prove:
    - (a) `lemma_1`: any two nodes of `P_i` are joined in `G[P_i] + H_i` by a walk of length `≤ b(2D+1) − 1`. This
      is what the paper's proof shows and what Theorem 2 uses.

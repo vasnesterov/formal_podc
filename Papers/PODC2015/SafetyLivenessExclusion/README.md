@@ -5,28 +5,61 @@ DOI [10.1145/2767386.2767401](https://doi.org/10.1145/2767386.2767401). Formaliz
 full version with proofs (EPFL Infoscience record 207929, 19 pages); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** Theorem 4.4 (when a weakest excluded liveness property exists)
-and Lemma 4.8 are correct. Theorem 4.9 ("a strongest non-excluded liveness property must be `Lmax`")
-holds, with a repaired proof, if processes take steps only while they execute an operation. The
-paper's formal I/O-automaton model does not impose this, and there the theorem is false even with
-`Lmax` = wait-freedom. The `(l,k)`-freedom theorems of §5 follow from the cited (im)possibility results
-once "progress" for TM is read as the authors' earlier work defines it.
+**Verdict: 🔧 Easy fix.** Theorem 4.4 (when a weakest excluded liveness property exists) and Lemma 4.8 are
+correct, and Theorem 4.9 ("a strongest non-excluded liveness property must be `Lmax`") holds, with a locally
+repaired proof, if processes take steps only while they execute an operation. That is the convention of the paper's
+prose, but its formal I/O-automaton model does not impose it, and there the theorem is false even with `Lmax` =
+wait-freedom. The `(l,k)`-freedom theorems of §5 follow from the cited (im)possibility results once "progress" for
+TM is read as the authors' earlier work defines it; those cited results, the TM model and Lemma 5.4 were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorem 4.9 (the strongest non-excluded liveness property must be `Lmax`)
-In the paper's I/O-automaton model, which lets a process take steps while it executes no operation,
-Theorem 4.9 is false even for `Lmax` = wait-freedom: for two processes, a safety property `S` meeting all
-the paper's assumptions has a strongest non-excluded liveness property strictly weaker than
-wait-freedom (`theorem_4_9_false_waitFree`).
+### 🔧 §3.2 (the order on liveness properties)
+The claim "`L₁` is weaker than `L₂` iff `L₂ ⊆ L₁`" is false: for reactive implementations, wait-freedom
+and wait-freedom plus the never-fair history `inv₀` (with `p₁` idle forever) are ensured by exactly the
+same implementations (`weaker_iff_subset_false`).
 
-**Impact.** Implied assumption. §2 describes processes as running their algorithm when invoked, and every
-implementation in the paper does so. For such *reactive* implementations Theorem 4.9 holds
-(`theorem_4_9`), and Corollaries 4.10–4.11 follow from the cited impossibilities (`corollary_4_10`).
-This is a borderline call against 🚨; see [differencies.md](differencies.md).
+**Impact.** All proofs of the paper use `⊆`, and we formalize every result with `⊆`. With the paper's
+semantic definition, strongest and weakest properties are determined only up to equivalence: "it
+should be `Lmax`" in Theorem 4.9 then holds only up to equivalence.
 
-**Details.** `S` contains every well-formed history except those in which `p₀` receives a response after
-`p₁` crashed before `p₀`'s first invocation without ever having invoked. `S` is prefix- and
+### 🔧 §5.1 (the remark on `LF_l ∪ OF_k`, also "a union" in the Introduction)
+"`LF_l ∪ OF_k` is the set of all executions that ensure `(l,k)`-freedom" is false: only `⊆` holds
+(`lkFree_imp_lf_or_of`), because two correct processes, one of them stepping and progressing alone, give an
+execution that is 2-obstruction-free but not `(2,2)`-free (`lf_union_of_not_iff`).
+
+**Impact.** The remark is not used: all results rest on Definition 5.1.
+
+### ✏️ Slips
+- Theorem 4.9, implied assumption: in the paper's I/O-automaton model, which lets a process take steps while it
+  executes no operation, Theorem 4.9 is false even for `Lmax` = wait-freedom: for two processes, a safety property `S`
+  meeting all the paper's assumptions has a strongest non-excluded liveness property strictly weaker than
+  wait-freedom (`theorem_4_9_false_waitFree`). §2 describes processes as running their algorithm when invoked, and every
+  implementation in the paper does so. For such *reactive* implementations Theorem 4.9 holds (`theorem_4_9`), and
+  Corollaries 4.10–4.11 follow from the cited impossibilities (`corollary_4_10`). Whether this is an implied assumption
+  is a borderline call; see the details below and [differencies.md](differencies.md).
+- Theorem 4.9, proof: it ignores the case where every process crashed in `h`, in which there is no correct pending
+  process to answer. Such a history has no well-formed extension, so the assumption on `Lmax` puts it into `Lmax`
+  (`core_subset_Lmax`).
+- Theorem 4.9 with no invocations: the empty history is then fair for every reactive implementation, so an `Lmax`
+  omitting it makes the theorem fail. We assume `[Nonempty Inv]`.
+- Definition 5.1 and Theorem 5.3: read literally, Definition 5.1 makes Theorem 5.3 false. If "good" responses are those
+  that do not abort, a TM that aborts every commit request is opaque and `(n,n)`-free, and if they are commits, a correct
+  process that never invokes `tryC` makes every `(1,k)`-freedom unimplementable (argued, not formalized). The intent can
+  be recovered from §4 ("the set of 'good' events is restricted to commit events") and from the authors' [4], which
+  exempts parasitic processes. With that reading, the cited results give Theorem 5.3. We formalize it from those results,
+  taken as hypotheses (`theorem_5_3`).
+- §4.1, example before Corollary 4.5: some histories listed in `F₁` (e.g. `propose₁(v) · v₁ ·
+  propose₂(v')`) are never fair, because correct idle processes must keep invoking. For `n ≥ 3`, `F₁`
+  must also crash the other processes. The corollary is unaffected.
+- §5.3: the second requirement of `S` says the transactions "should be aborted in `h`". This is not
+  prefix-closed; "none of them commits" is meant.
+- §2: input-enabledness is stated for every state at which `pᵢ` is "not pending". Read literally, this
+  includes unreachable states and the crashed state, where nothing may be enabled. We require it along
+  executions (see [differencies.md](differencies.md)).
+
+**Details (Theorem 4.9 with idle steps).** `S` contains every well-formed history except those in which `p₀` receives
+a response after `p₁` crashed before `p₀`'s first invocation without ever having invoked. `S` is prefix- and
 limit-closed, every invocation can be answered sequentially, and every history of `S` is a history of
 an implementation ensuring `S`, namely `Is`.
 
@@ -53,54 +86,21 @@ response and `h'|pᵢ = invᵢ · resᵢ` is a history of `A_I'`". This needs th
 invocations and crashes to commute with `pᵢ`'s run. That fails as soon as `pᵢ` waits for an idle
 process. `Is` is valid but not reactive (`Is_not_reactive`).
 
-**Repair.** We assume that processes take no step while idle, and repair the proof (see Proof gaps).
+**Repair (Theorem 4.9).** We assume that processes take no step while idle, and repair the proof (see Proof gaps).
 `theorem_4_9` holds for every class of reactive valid implementations that contains the two trivial
 implementations of the paper's proof. One example is the reactive implementations from registers.
 The hypotheses can be met (`nonvacuous_4_9`).
 
-### ⚠️ §3.2 (the order on liveness properties)
-The claim "`L₁` is weaker than `L₂` iff `L₂ ⊆ L₁`" is false: for reactive implementations, wait-freedom
-and wait-freedom plus the never-fair history `inv₀` (with `p₁` idle forever) are ensured by exactly the
-same implementations (`weaker_iff_subset_false`).
-
-**Impact.** All proofs of the paper use `⊆`, and we formalize every result with `⊆`. With the paper's
-semantic definition, strongest and weakest properties are determined only up to equivalence: "it
-should be `Lmax`" in Theorem 4.9 then holds only up to equivalence.
-
-### ⚠️ Definition 5.1 and Theorem 5.3 (progress for transactional memory)
-Read literally, Definition 5.1 makes Theorem 5.3 false: if "good" responses are those that do not abort,
-a TM that aborts every commit request is opaque and `(n,n)`-free, and if they are commits, a correct
-process that never invokes `tryC` makes every `(1,k)`-freedom unimplementable (argued, not formalized).
-
-**Impact.** The intent can be recovered from §4 ("the set of 'good' events is restricted to commit
-events") and from the authors' [4], which exempts parasitic processes. With that reading, the cited
-results give Theorem 5.3. We formalize it from those results, taken as hypotheses (`theorem_5_3`).
-
-### Typos and slips
-- §5.1: "`LF_l ∪ OF_k` is the set of all executions that ensure `(l,k)`-freedom" is false. Only `⊆`
-  holds: two correct processes, one of them stepping and progressing alone, give an execution that is
-  2-obstruction-free but not `(2,2)`-free (`lf_union_of_not_iff`). The remark is not used.
-- §4.1, example before Corollary 4.5: some histories listed in `F₁` (e.g. `propose₁(v) · v₁ ·
-  propose₂(v')`) are never fair, because correct idle processes must keep invoking. For `n ≥ 3`, `F₁`
-  must also crash the other processes. The corollary is unaffected.
-- §5.3: the second requirement of `S` says the transactions "should be aborted in `h`". This is not
-  prefix-closed; "none of them commits" is meant.
-- §2: input-enabledness is stated for every state at which `pᵢ` is "not pending". Read literally, this
-  includes unreachable states and the crashed state, where nothing may be enabled. We require it along
-  executions (see [differencies.md](differencies.md)).
-
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 4.9 (proof, reactive implementations)
-The proof derives `invₗ · resₗ ∈ S` from `h · resₗ ∈ S`, which does not follow, and it ignores the case
-where every process crashed in `h`.
+### 🔧 Theorem 4.9 (proof, reactive implementations)
+The proof derives `invₗ · resₗ ∈ S` from `h · resₗ ∈ S`, which does not follow.
 
 **Impact.** Statement true for reactive implementations; repaired (`core_subset_Lmax`, `theorem_4_9`).
 
 **Details.** For consensus, `propose₂(1) · propose₁(0) · decide₁(1)` satisfies agreement and validity,
 but `propose₁(0) · decide₁(1)` violates validity. The paper's second and third steps pick the response
-`resₗ` in opposite orders. If every process crashed in `h`, there is no correct pending process to
-answer.
+`resₗ` in opposite orders.
 
 **Repair.** We use the characterization `Setting.isStrongestNonExcl_iff`: a strongest non-excluded
 property is `Lmax ∪ core`, where the core is the set of histories fair for every implementation

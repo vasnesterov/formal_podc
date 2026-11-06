@@ -5,23 +5,23 @@ Juho Hirvonen, Jukka Suomela. *Distributed Maximal Matching: Greedy is Optimal.*
 [1110.0367](https://arxiv.org/abs/1110.0367) v1 (the only version); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🛠️ Proof repaired.** On anonymous `k`-edge-coloured graphs, maximal matching needs exactly
-`k - 1` deterministic rounds; the greedy algorithm is optimal (Lemma 1, Theorem 2). For `k ≥ 3` the
-lower bound holds already on `(k-1)`-regular graphs (Theorem 6), which gives `Ω(Δ)` (Corollary 3).
-All of this is proved. The template / extension / critical-pair argument of §3 goes through as
-written. One step is missing: the paper's formal model uses infinite trees, and passing to finite
-simple graphs needs an extra construction, which we supply.
+**Verdict: 🔧 Easy fix.** On anonymous `k`-edge-coloured graphs, maximal matching needs exactly
+`k - 1` deterministic rounds, so the greedy algorithm is optimal (Lemma 1, Theorem 2), and for `k ≥ 3` the
+lower bound holds already on `(k-1)`-regular graphs (Theorem 6), which gives `Ω(Δ)` (Corollary 3). All of
+this is proved, and the template / extension / critical-pair argument of §3 goes through as written. One
+step is missing: the paper's formal model uses infinite trees, and passing to finite simple graphs needs
+an extra construction, which we supply.
 
 ## Mistakes in the paper
 
 No mistakes in the statements.
 
-### Typos and slips
+### Typos
 - The proof of Lemma 8 says "`w ∈ ȳY`"; it should be "`w ∈ ȳX`".
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 2, Theorem 6 and Corollary 3 (from infinite trees to finite graphs)
+### 🔧 Theorem 2, Theorem 6 and Corollary 3 (from infinite trees to finite graphs)
 The lower bounds are proved in the formal model of §2.3, whose instances are edge-coloured trees, all
 infinite in the proof, while Theorem 2 and Corollary 3 talk about `k`-edge-coloured *graphs*; the
 paper does not give the passage to finite graphs.

@@ -1,11 +1,11 @@
 # Differences between the formalization and the paper
 
 Attiya, Enea, Welch, *Blunting an Adversary Against Randomized Concurrent Programs with Linearizable
-Implementations*, PODC 2022 (arXiv 2106.15554v2). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
+Implementations*, PODC 2022 (arXiv 2106.15554v2).
 
 ## Errors in the paper
 
-1. **Lemma 4.3 is false (R1: numbered lemma → ❌).** The paper claims, for every adversary `A` against
+1. ⚠️ **Lemma 4.3 is false.** The paper claims, for every adversary `A` against
    `P(O^k)`, `Prob[(P(O^k)||A → B) | X] ≤ Prob[P(O^a) → B]`. Conditioning on `X` (all object random steps
    pick randomization-free iterations) biases the *program* coins: whether the iteration chosen later is
    overlapped by the second program random step can be arranged by the adversary depending on the first coin.
@@ -15,9 +15,9 @@ Implementations*, PODC 2022 (arXiv 2106.15554v2). Verdict rules: `.claude/skills
    only when `c1 = 0` gets `Pr[B ∧ X] = 1/2`, `Pr[X] = 3/4`, so `Pr[B | X] = 2/3` (`lemma_4_3_false`,
    `lemma_4_3_numbers`). All hypotheses of Theorem 4.2 hold (the object is even strongly
    linearizable; at most two random steps).
-2. **Lemma 4.4 is false (R1 → ❌).** Same instance, adversary overlapping only when `c1 = 1`:
+2. ⚠️ **Lemma 4.4 is false.** Same instance, adversary overlapping only when `c1 = 1`:
    `Pr[B | ¬X] = 1 > 1/2 ≥ Prob[P(O) → B]` (`lemma_4_4_false`; numbers in `lemma_4_4_numbers`).
-3. **Proof gap in Lemmas 4.3/4.4 beyond the conditioning: the simulating adversary `A_O` is not an adversary.**
+3. 🛠️ **Proof gap in Lemmas 4.3/4.4 beyond the conditioning: the simulating adversary `A_O` is not an adversary.**
    `A_O(v) = remRedundant(A(u))` picks the "best" object random value *after* seeing later program coins, and
    removing the unused iterations moves preamble steps relative to earlier program random steps, so the
    executions of `A_O` for two coin sequences with a common prefix need not agree up to the next random step
@@ -26,7 +26,7 @@ Implementations*, PODC 2022 (arXiv 2106.15554v2). Verdict rules: `.claude/skills
    seeing a later coin). Repair used here: the object random choices are independent of everything the
    adversary sees before they are made, so they can be sampled *in advance* (`Removal.opt_le_avg`); the
    simulating adversary against `P(O)` then knows them causally.
-4. **Theorem 4.2 (headline) is unestablished for `r ≥ 2`.** Its proof is the chain (1)–(2) built on Lemmas
+4. ⚠️ **Theorem 4.2 (main theorem) is unestablished for `r ≥ 2`.** Its proof is the chain (1)–(2) built on Lemmas
    4.3 and 4.4, both false. We prove (a) the theorem exactly as stated for `r = 1` (`theorem_4_2_r1`; this is
    the case used in Appendix A.3.1), and (b) for every `r` the weaker bound
    `Prob[O^k] ≤ Prob[O^a] + (1 − q)` together with `Prob[O^k] ≤ Prob[O]`, `q = (max{0,k−r}/k)^{n−1}`
@@ -34,12 +34,12 @@ Implementations*, PODC 2022 (arXiv 2106.15554v2). Verdict rules: `.claude/skills
    `Prob[O^a] + (1 − q)(Prob[O] − Prob[O^a])` for `r ≥ 2`. The natural repair of the paper's argument
    (induction over the random steps, mixing over the advance-sampled choices) breaks exactly where the
    adversary correlates which choices get spoiled at a later random step with the gap `Prob_O − Prob_{O^a}`
-   of the resulting configurations. Per R5 an unestablished headline is ❌.
-5. **Lemma 4.5 is true; its proof is imprecise.** "`Prob[X] = ∏ Prob[X_i]` since the random choices are
+   of the resulting configurations.
+5. 🛠️ **Lemma 4.5 is true; its proof is imprecise.** "`Prob[X] = ∏ Prob[X_i]` since the random choices are
    independent" ignores that which iterations are spoiled depends adaptively on earlier object choices and
    coins; the bound still holds (path-wise product argument). We prove it by a potential function
-   (`Clean.optNX_le`). 🛠️-level.
-6. **Theorem 3.1 is ill-typed as stated** (tail strong linearizability is defined for objects/sets of
+   (`Clean.optNX_le`).
+6. ✏️ **Theorem 3.1 is ill-typed as stated** (tail strong linearizability is defined for objects/sets of
    executions with control points, the theorem speaks of sets of *histories*). Not formalized; we model a set
    of objects as one combined object, so locality is not needed (see Modelling).
 
@@ -89,20 +89,19 @@ linearizable `O`); Theorem 3.1; the history-equivalence statement of Theorem 4.1
 `Prob[O^k] ≤ Prob[O]`); Section 5 (Theorem 5.1 and the snapshot / Vitányi–Awerbuch / Israeli–Li claims);
 Appendix A (ABD case study).
 
-## Verdict calibration
+## Scope of the counterexample
 
-- Worst label: ❌ (R1: Lemmas 4.3 and 4.4 are numbered lemmas and false; R5: the headline Theorem 4.2 is
-  only unestablished for `r ≥ 2`, not refuted, so not 🚨).
-- Borderline check (R2): the formalized counterexample uses `k = 2 = r`, where the bound of Theorem 4.2 is
+- Theorem 4.2 is only unestablished for `r ≥ 2`, not refuted.
+- The formalized counterexample uses `k = 2 = r`, where the bound of Theorem 4.2 is
   trivial. The lemmas are stated for every `k` and every adversary, and the instance is not degenerate
   (two processes, two coins). The same adversary works for every `k ≥ 1`: `Pr[X] = 1/2 + (k−1)/(2k)`,
   `Pr[B ∧ X] = 1/2`, so `Pr[B | X] = k/(2k−1) > 1/2` (computed by hand, only `k = 2` is in Lean).
-- Scope of the counterexample (checked in review). The adversary `σ b` reads only the client states and
+- Checked in review: the adversary `σ b` reads only the client states and
   the busy flags (no ghost fields) and depends only on the past coin `c₁`, so it is an adversary in the
   paper's sense (§2.4). The overlap is with `q`'s first preamble iteration, which starts at the call step;
   the paper counts the call transition as part of the preamble (§3, "empty" preamble = call transition
   only). The counterexample does not depend on this convention: with an `S`-read whose preamble makes two
   read-only accesses the same adversary works. The instance does not refute Theorem 4.2 itself: there
   `Prob[O] = Prob[O^a] = 1/2` and `Prob[O^k] ≤ 1/2` (B forces `c₁ = 1`), so the bound holds. Biasing the
-  coins only helps the adversary *within* `X` or `¬X`, not overall, which is why the headline is
+  coins only helps the adversary *within* `X` or `¬X`, not overall, which is why Theorem 4.2 is
   unestablished rather than refuted.

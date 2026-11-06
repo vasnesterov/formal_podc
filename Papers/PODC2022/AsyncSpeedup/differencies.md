@@ -79,8 +79,7 @@ Classification: **[F]** false statement, **[D]** false only in a degenerate case
     consensus inputs depend on ids and rounds. Its bound `⌈log₂ n⌉ − 1` is one round below the IIS bound
     `⌈log₂ 1/ε⌉` whenever `1/ε ≤ n ≤ 2^⌈log₂ 1/ε⌉` (e.g. `n = 4`, `ε = 1/4`: bound 1 versus 2); it
     reaches the IIS bound only for `n > 2^⌈log₂ 1/ε⌉` (e.g. `n ≥ 2/ε`). The claims
-    are informal, so we classify this as an overstatement, not a false theorem. Theorem 4 itself is
-    proved as stated.
+    are informal, and only this weaker form is proved (⚠️). Theorem 4 itself is proved as stated.
 15. **[T] Proof of Claim 4.** It says "the simplices of `P^(1)(σ)` considered in the proof of
     Corollary 2". They are simplices of `P^(1)(τ)`, the protocol complex of the local task (as in
     Corollary 2's own proof, which also writes `P^(1)(σ)` and `f : P^(1) → O`).

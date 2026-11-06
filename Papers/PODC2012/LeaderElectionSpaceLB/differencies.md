@@ -3,28 +3,24 @@
 Paper: G. Giakkoupis, P. Woelfel, *On the Time and Space Complexity of Randomized Test-And-Set*,
 PODC 2012 (authors' copy, HAL hal-00722947).
 
-## Statement-level issues (decide the verdict)
+## Statement-level issues
 
-1. **`GroupElect` definition (Section 2.1) / Lemma 2.2 — ⚠️ by R4 (implied assumption).** The
+1. ✏️ **`GroupElect` definition (Section 2.1) / Lemma 2.2 (implied assumption).** The
    definition says "If some processes call `elect()`, then at least one process must get elected".
    Unlike `LeaderElect`, it has no "if no process crashes", although the model of Section 1.1 has
    crashes. Read literally, Figure 1 is not a GroupElect object (`GroupElect.not_groupElectLiteral`,
-   2 processes, `ℓ = 1`). Excused as an implied assumption: the crash-free reading is the
+   2 processes, `ℓ = 1`). This is an implied assumption: the crash-free reading is the
    `LeaderElect` convention stated just before, and the only use (Section 2.1, "if no process
    crashes then some process wins") is crash-free. Proved under that reading:
-   `GroupElect.isGroupElection`. Borderline between ⚠️ and a mere slip. We chose ⚠️ because the
-   statement "Figure 1 implements a GroupElect object" is false as written in the paper's own model,
-   by a non-degenerate 2-process execution in which the returning process completes its call. Read as
-   a typo with evident intent (R3) it would be ⚠️ as well; only ignoring it would give 🛠️. GroupElect
-   is not itself a headline (it feeds Lemma 2.1 / Theorem 2.3), and the issue is excused, so R5 does
-   not apply.
-1a. **Claim 5.3 — degenerate (R2).** As a numbered claim it counts as a statement (R1). It fails only
-   for `Q = ∅` (hence `R = ∅`), where the `Q`-only `β` is empty (item 5). Degenerate, consistent
-   with ⚠️.
+   `GroupElect.isGroupElection`. The statement "Figure 1 implements a GroupElect object" is false as
+   written in the paper's own model, by a 2-process execution in which the returning process
+   completes its call. GroupElect feeds Lemma 2.1 / Theorem 2.3.
+1a. ✏️ **Claim 5.3 (degenerate).** It fails only for `Q = ∅` (hence `R = ∅`), where the `Q`-only `β`
+   is empty (item 5).
 
 ## Proof gaps of true statements
 
-2. **Theorem 5.1, "fix the random choices"** (Section 5.2 and the proof of Theorem 5.1). The paper
+2. 🔧 **Theorem 5.1, "fix the random choices"** (Section 5.2 and the proof of Theorem 5.1). The paper
    fixes the nondeterministic decisions by "an arbitrary (but fixed) one that guarantees that each
    process terminates within a bounded number of steps if it runs solo", so that "the algorithm
    becomes deterministic and obstruction free". No such fixing is shown to exist. A choice function
@@ -33,13 +29,13 @@ PODC 2012 (authors' copy, HAL hal-00722947).
    needed: we formalize the whole argument for nondeterministic executions (events `(p, l')` fix
    the choice), using nondeterministic solo-termination directly, as Claims 5.3 and Lemma 5.4
    already do.
-3. **Lemma 5.4(e) for `R = ∅`.** "The claim for `k' = k+1` follows immediately" does not cover (e),
+3. 🔧 **Lemma 5.4(e) for `R = ∅`.** "The claim for `k' = k+1` follows immediately" does not cover (e),
    which then needs `⌊m_k/(n−k)⌋ ≥ 1`. Repaired via `f(k) ≥ n − k` (`sub_le_f`) and
    `f(k+1) ≤ f(k)` (`f_succ_le`).
 
-## Slips inside proofs (no effect)
+## Small errors inside proofs (no effect)
 
-4. Claim 5.2's proof: "`C(E)` and `C(D)` are indistinguishable to all processes in `Q`" is false
+4. 🔧 Claim 5.2's proof: "`C(E)` and `C(D)` are indistinguishable to all processes in `Q`" is false
    under the paper's own definition of indistinguishability, which also compares all register
    values. What holds is our `AgreeOn`: same states of `Q`, and same value and writer on every
    register last written by `Q` or unwritten (`Alg.erase`).

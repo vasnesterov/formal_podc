@@ -5,27 +5,15 @@ PODC 2026. DOI [10.1145/3796701.3815934](https://doi.org/10.1145/3796701.3815934
 the 4-page proceedings brief announcement (we found no full version on arXiv); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The paper gives no proofs. We supplied them, and all the
-results hold in the generic runs-and-systems model: knowledge of preconditions (Thm 1.2), necessity
-of dynamic common knowledge (Thm 1.5, Cor 1.6) and sufficiency (Thm 1.7). One clause of Theorem 1.7
-("the nonfaulty processes decide `v` in `r` iff `r ⊨ θ_v`") is false in runs with no nonfaulty
-process. The informal converse remark after Theorem 1.7 needs nonfaulty processes to remember their
-decisions.
+**Verdict: 🔧 Easy fix.** The paper gives no proofs; we supplied them, and knowledge of preconditions
+(Thm 1.2), necessity of dynamic common knowledge (Thm 1.5, Cor 1.6) and sufficiency (Thm 1.7) all hold in the
+generic runs-and-systems model. One clause of Theorem 1.7 ("the nonfaulty processes decide `v` in `r` iff
+`r ⊨ θ_v`") is false only in runs with no nonfaulty process. The informal converse remark after Theorem 1.7
+needs one added condition: nonfaulty processes must remember their decisions.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorem 1.7 (the "iff" clause, runs with no nonfaulty process)
-"The nonfaulty processes decide `v` in `r` iff `r ⊨ θ_v`" fails in a run with `N(r) = ∅`, where
-`all_decide(v)` holds vacuously but `θ_v` need not (`theorem_1_7_iff_false_without_nonfaulty`).
-
-**Impact.** Degenerate: assuming `N(r) ≠ ∅`, which most models do (`f < n`), repairs it
-(`allDecide_newDec_iff`). The other claims of Theorem 1.7 hold unchanged.
-
-**Details.** Exclusivity even forbids `θ_v` for two different values, while `all_decide(v)` holds for
-all of them. Counterexample: one run, every process faulty, all `θ_v` false. All hypotheses of
-Theorem 1.7 hold trivially.
-
-### ⚠️ Converse remark after Theorem 1.7 (needs memory of decisions)
+### 🔧 Converse remark after Theorem 1.7 (needs memory of decisions)
 The remark "underlying the design of every AoN protocol is a set of facts Θ as described in
 Theorem 1.7" fails for a protocol whose nonfaulty processes forget their decisions
 (`no_theta_for_forgetful_protocol`).
@@ -33,7 +21,8 @@ Theorem 1.7" fails for a protocol whose nonfaulty processes forget their decisio
 **Impact.** An imprecise informal claim: it holds when nonfaulty processes remember their decisions
 (`exists_theta_of_AoN`).
 
-**Details.** We read Θ as facts that describe the protocol's decisions. Example without recall: one
+**Details.** We read Θ as facts that describe the protocol's decisions; read literally, all-false Θ makes the
+remark trivial. Example without recall: one
 failure-free process learns a bit `b` at time 1, decides `b` then, and forgets `b` afterwards. This
 protocol is AoN and satisfies Agreement, Validity and Decision. Yet no local, remembered profile makes
 `θ_v ↔ all_decide(v)` even dynamically *everyone*-known, let alone dynamic common knowledge.
@@ -41,6 +30,14 @@ protocol is AoN and satisfies Agreement, Validity and Decision. Yet no local, re
 
 **Repair.** With memory of decisions, take `θ_v` = "some nonfaulty process decides `v`" and the profile
 `𝛅(v)` (`exists_theta_of_AoN`).
+
+### ✏️ Slips
+- Theorem 1.7, the "iff" clause: "the nonfaulty processes decide `v` in `r` iff `r ⊨ θ_v`" fails in a run with
+  `N(r) = ∅`, where `all_decide(v)` holds vacuously but `θ_v` need not
+  (`theorem_1_7_iff_false_without_nonfaulty`). Exclusivity even forbids `θ_v` for two different values, while
+  `all_decide(v)` holds for all of them. Counterexample: one run, every process faulty, all `θ_v` false; all
+  hypotheses of Theorem 1.7 hold trivially. Assuming `N(r) ≠ ∅`, which most models do (`f < n`), repairs it
+  (`allDecide_newDec_iff`). The other claims of Theorem 1.7 hold unchanged.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

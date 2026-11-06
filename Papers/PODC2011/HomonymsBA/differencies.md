@@ -1,9 +1,8 @@
 # Differences between the formalization and the paper
 
 Paper: Delporte-Gallet, Fauconnier, Guerraoui, Kermarrec, Ruppert, Tran-The, *Byzantine Agreement with Homonyms*,
-PODC 2011 (HAL hal-00580133v1, with appendix). Verdict ⚠️ (reviewer decision): all theorems and the characterization
-of Table 1 are true; Prop. 26 is false only for α = 0 (R2) and Lemma 34 is unestablished (R3, see Proposition 18);
-several proofs needed repairs (R1: claims inside proofs are proof gaps).
+PODC 2011 (HAL hal-00580133v1, with appendix). All theorems and the characterization of Table 1 are true; Prop. 26
+is false only for α = 0 and Lemma 34 is unestablished (see Proposition 18); several proofs needed repairs.
 
 ## Model (Section 2)
 
@@ -38,8 +37,8 @@ several proofs needed repairs (R1: claims inside proofs are proof gaps).
 - **Thm. 19 necessity** is proved with the same cover (innumerate algorithm, restricted Byzantine processes sending
   one copy per identifier), not with the paper's simulation. The paper's proof has a gap (README, Proof gaps),
   repaired either by choosing the clone identifier among correct processes or by our cover argument. Typos in A.4:
-  ℓ < 3t (should be ≤), "If ℓ ≥ t" (should be ≤), "less than 3t" (at most 3t). Rule R3: typos with evident intent,
-  slips only.
+  ℓ < 3t (should be ≤), "If ℓ ≥ t" (should be ≤), "less than 3t" (at most 3t). These are typos with evident intent
+  (✏️).
 
 ## Proposition 2
 
@@ -69,14 +68,13 @@ several proofs needed repairs (R1: claims inside proofs are proof gaps).
 - Proper sets: rule 1 counts distinct identifiers in the current round. Rule 2 is read existentially ("some 2t+1
   received sets, no value in t+1 of them"). This is the literal reading of "received proper sets from 2t+1 different
   identifiers and no value appears in t+1 of them" and matches the paper's validity remark, so it is not counted
-  as a statement issue. Under the universal reading (all received sets) termination fails (README); even then R3
-  would apply (the paper's termination proof needs the existential rule; local fix), giving at most ⚠️. "All
-  values" = `Set.univ`.
+  as a mistake. Under the universal reading (all received sets) termination fails (README); the paper's termination
+  proof needs the existential rule, which would be a local fix. "All values" = `Set.univ`.
 - Decisions are latched; the leader decides only its own lock request.
 - Proof repairs: Lemma 12 Case 2 (README); Lemma 10's hypothesis weakened to what the proof uses; Lemma 11's tight
   timing (gst ≤ 8·ph₃+6); termination uses leader phases `Q = ℓ(gst+1) + id` of single-process correct
   identifiers. There are at least 2ℓ−n−t ≥ 2t+1 of these, by the strict `n < 2ℓ−3t`. The paper writes `n ≤ 2ℓ−3t`
-  and "superround 3" for the ack round (typos, R3).
+  and "superround 3" for the ack round (✏️).
 
 ## Proposition 16 (Section 5.1, Appendix A.2)
 
@@ -98,7 +96,7 @@ several proofs needed repairs (R1: claims inside proofs are proof gaps).
 - Proof repairs: relay holds in every later superround (needed by Lemma 36); Lemma 30 keeps `r ≤ r′` (needed by
   Lemma 35); Lemma 37 Case 2 splits on proper sets (as Lemma 12); proper rule 2 is existential; termination uses
   the deterministic choice on the common set of lock requests.
-- **Lemma 34 ("locks contain at most one pair at the end of each phase") is unestablished, not formalized.** Its
+- **Lemma 34 ("locks contain at most one pair at the end of each phase") is unestablished, not formalized (❌).** Its
   proof assumes that at lines 24–26 the process still has line 16's `n−t` witnesses. With per-superround witnesses
   (the paper's definition; Lemma 36 needs those of superround 4 at lines 24–26, our reading) this fails before T:
   the echoes of the last round can all be lost, so an older lock with another value survives. Reviewer's hand-built
@@ -108,13 +106,10 @@ several proofs needed repairs (R1: claims inside proofs are proof gaps).
   witnesses (all accepts so far, max multiplicity per identifier) the paper's proof of Lemma 34 is correct; Lemma 30
   (unforgeability bounds every accept) and Lemma 36 (relay) should survive it, but that variant is not formalized.
   Lemma 34 is not used: Prop. 39 only needs that some lock `(v₁, ∗)` is held (line 6 then excludes all other values),
-  `decAt_agree`. **Rule (reviewer decision):** a numbered lemma that is neither proved nor refuted is ⚠️
-  (readme-template; precedent RandomizationTwoHop Lemma 9), and the pseudocode admits a reading under which it holds
-  (R3), so not ❌. It does not decide the verdict alone: Prop. 26 already gives ⚠️.
+  `decAt_agree`. The lemma is neither proved nor refuted, and the pseudocode admits a reading under which it holds.
 - Prop. 26 is literally false for α = 0 (it demands an Accept when nobody broadcast; Figure 6 accepts only after
-  `n−t` echoes). It is a degenerate case (R2), never used with α = 0 (the paper's Lemma 24 itself separates α > 0):
-  a statement wrong as written in a degenerate case is ⚠️, which decides the verdict. We prove the witness form
-  `cc_le_witnesses` (summed over identifiers: correct broadcasters ≤ witnesses in round 2k+1 after GST); its proof
+  `n−t` echoes). It is a degenerate case (✏️), never used with α = 0 (the paper's Lemma 24 itself separates α > 0).
+  We prove the witness form `cc_le_witnesses` (summed over identifiers: correct broadcasters ≤ witnesses in round 2k+1 after GST); its proof
   gives the per-identifier bound `α ≤ α′` for every identifier.
 - Lemma 33's proof cites "Lemma 22" (means 32). Prop. 25 (unicity) holds by construction.
 

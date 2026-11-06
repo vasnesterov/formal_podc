@@ -5,76 +5,72 @@ Siddhartha Jayanti. *On Interplanetary and Relativistic Distributed Computing.* 
 version (no arXiv version exists); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The Central Theorem (Theorem 6.7) and the Equivalence Theorem
-(Theorem 6.8) hold when there are countably many processors. Theorem 6.8 holds with no assumption at
-all, once its three notions of linearizability are all read over finite executions (Def. A.3 already
-does this; see the under-specified definitions below). With uncountably many processors, Lemma 6.3
-(backward direction), Lemma 6.4 (second half), Corollary 6.5 and the implication (1) ⟹ (2) of
-Theorem 6.7 are false. The paper never restricts the set of processors, but this case is degenerate.
-The proof of Lemma 6.3 also has a gap for countably infinite executions, though the statement is true
-there.
+**Verdict: 🔧 Easy fix.** The Central Theorem (Theorem 6.7) and the Equivalence Theorem (Theorem 6.8) are saved by
+local changes: finite executions in two definitions, a rule for ties in frames, and a citation in place of one wrong
+step of Lemma 6.3. The only false case, uncountably many processors, is a corner the paper never uses. Theorem 6.7
+holds for countably many processors, and Theorem 6.8 holds with no assumption at all once its three notions of
+linearizability are all read over finite executions.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 6.3 (⇐), Lemma 6.4 (second half), Corollary 6.5, Theorem 6.7 (1) ⟹ (2) (uncountably many processors)
-With processors indexed by the "double arrow" `ℝ ×ₗ Bool`, each taking one step and sending no messages, the
-lexicographic order is a total ordering of the (empty-relation) computational execution that satisfies P1–P3 but
-does not embed into `(ℝ, <)`, so it is not classical (`lemma_6_3_false`, `lemma_6_4_false`, `corollary_6_5_false`,
-`theorem_6_7_false`, `theorem_6_7_false_frames`).
-
-**Impact.** False only in a degenerate case the paper never excludes: all four statements hold for executions with
-countably many steps, hence for every execution when `Π` is countable (`lemma_6_3_of_countable`, `lemma_6_4`,
-`theorem_6_7`) and for any countable class of executions, e.g. finite ones (`theorem_6_7_on`).
-
-**Details.** The order does not embed into `(ℝ, <)`: there would be a rational between the images of `(x, false)`
-and `(x, true)` for every real `x`, all distinct. Placing the steps at distinct points of the `t = 0` slice of
-Minkowski spacetime makes the same order a total ordering of a relativistic execution, which refutes Corollary 6.5.
-For the property "the order embeds into ℝ", statement (1) of Theorem 6.7 holds trivially and (2) fails. Statement (3)
-also fails if observers may perceive simultaneous steps in any order. Statement (3) holds if only frames without
-simultaneous steps count.
-
-**Repair.** We also proved that "classical ⟺ every observer in every relativistic execution, frames without ties"
-holds for any `Π` (`classical_iff_frames`).
-
-### ⚠️ Theorem 6.8 (linearizability over finite vs. all executions)
+### 🔧 Theorem 6.8 (linearizability over finite vs. all executions)
 Theorem 6.8 combines "linearizable" (Def. A.3), which quantifies over *finite* classical executions, with
 "relativistically/computationally linearizable" (Defs. 5.3, 6.1), which quantify over *all* executions.
 
-**Impact.** Under-specified definitions; with all three notions read over finite executions, Theorem 6.8 holds with
-no assumption on `Π` (`theorem_6_8`).
+**Impact.** The printed proof does not go through unchanged. With all three notions read over finite executions,
+Theorem 6.8 holds with no assumption on `Π` (`theorem_6_8`).
 
 **Details.** The proof instantiates Theorem 6.7 with no finiteness. Taken literally, (1) ⟹ (3) would need
 linearizability of infinite histories to follow from that of finite ones. This is delicate (cf. Guerraoui–Ruppert,
 "linearizability is not always a safety property"), and Def. A.3 does not pin down the infinite case.
 
-### ⚠️ Def. 5.3 and the Central Theorem ("the total ordering according to the local time of frame R")
+**Repair.** Add "finite" to the two other definitions, as Def. A.3 already has it, and restrict Theorem 6.7 to finite
+executions (`theorem_6_7_on`, `theorem_6_8`).
+
+### 🔧 Def. 5.3 and the Central Theorem ("the total ordering according to the local time of frame R")
 This order is not total when two steps are simultaneous in R, which happens in the paper's own §7 scenario
 (`e₁ =_A e₂`).
 
-**Impact.** Under-specified definition; we formalize both readings: all tie-breakings (`RelativisticallySatisfies`)
-and only frames without ties (`RelativisticallySatisfies'`). Both are equivalent to (1) and (2) for countable
-executions.
+**Impact.** One condition is missing. We formalize both readings: all tie-breakings (`RelativisticallySatisfies`) and
+only frames without ties (`RelativisticallySatisfies'`). Both are equivalent to (1) and (2) for countable executions.
 
-### ⚠️ Φ2 ("a step can occur at π only if its current state is σ")
-Φ2 presupposes that each processor's steps form a sequence, but a real-valued time map alone allows Zeno behaviour,
-e.g. steps at `1 − 1/n` followed by one at time 2.
+### ✏️ Slips
+- **Lemma 6.3 (⇐), Lemma 6.4 (second half), Corollary 6.5, Theorem 6.7 (1) ⟹ (2): uncountably many processors.**
+  With processors indexed by the "double arrow" `ℝ ×ₗ Bool`, each taking one step and sending no messages, the
+  lexicographic order is a total ordering of the (empty-relation) computational execution that satisfies P1–P3 but
+  does not embed into `(ℝ, <)`, so it is not classical (`lemma_6_3_false`, `lemma_6_4_false`, `corollary_6_5_false`,
+  `theorem_6_7_false`, `theorem_6_7_false_frames`). This case is degenerate, though the paper never excludes it: all
+  four statements hold for executions with countably many steps, hence for every execution when `Π` is countable
+  (`lemma_6_3_of_countable`, `lemma_6_4`, `theorem_6_7`) and for any countable class of executions, e.g. finite ones
+  (`theorem_6_7_on`).
+  - The order does not embed into `(ℝ, <)`: there would be a rational between the images of `(x, false)` and
+    `(x, true)` for every real `x`, all distinct.
+  - Placing the steps at distinct points of the `t = 0` slice of Minkowski spacetime makes the same order a total
+    ordering of a relativistic execution, which refutes Corollary 6.5.
+  - For the property "the order embeds into ℝ", statement (1) of Theorem 6.7 holds trivially and (2) fails. Statement
+    (3) also fails if observers may perceive simultaneous steps in any order, and holds if only frames without
+    simultaneous steps count.
+  - We also proved that "classical ⟺ every observer in every relativistic execution, frames without ties" holds for
+    any `Π` (`classical_iff_frames`).
+- **Φ2 ("a step can occur at π only if its current state is σ").** Φ2 presupposes that each processor's steps form a
+  sequence, but a real-valued time map alone allows Zeno behaviour, e.g. steps at `1 − 1/n` followed by one at time 2.
+  We make "the steps of each processor, in time order, form a rooted consecutively permissible sequence (order type
+  `≤ ω`)" part of Φ2. The paper's proofs of Lemmas 6.2 and 6.3 ("by CP1 / RP2 these steps can be ordered into a
+  sequence") rely on exactly this.
 
-**Impact.** Under-specified definition: we make "the steps of each processor, in time order, form a rooted
-consecutively permissible sequence (order type ≤ ω)" part of Φ2. The paper's proofs of Lemmas 6.2 and 6.3 ("by CP1 /
-RP2 these steps can be ordered into a sequence") rely on exactly this.
-
-### Typos and slips
+### Typos
 - "A predicate on classical executions" (Theorem 6.7) must really be a predicate on arbitrary totally ordered step
-  sets, since (2) and (3) apply it to orders that are not a priori classical.
+  sets, since (2) and (3) apply it to orders that are not a priori classical; the introduction has the right wording.
+- Def. 6.1, axiom A1: "the transitive closure of the relation satisfying the following axioms" is circular, since A2
+  refers to `◁_S`; the items (a), (b) of the proofs show the meaning.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 6.3 (⇐), used by Lemma 6.4: the map `t(sᵢ) = i` assumes order type `≤ ω`
+### 🔧 Lemma 6.3 (⇐), used by Lemma 6.4: the map `t(sᵢ) = i` assumes order type `≤ ω`
 Lemma 6.3 lists the steps as `s₁, s₂, …` in `<_S` order, but a total ordering of an infinite execution need not have
 order type `ω`, even with two processors (`omegaPlusOne_classical`, `omegaPlusOne_not_seq`).
 
-**Impact.** Statement true for countably many processors; Lemma 6.4 inherits the gap via Lemma 6.3. Repaired
-(`exists_real_embedding`).
+**Impact.** The statement is true for countably many processors, and Lemma 6.4 inherits the gap via Lemma 6.3.
 
 **Details.** Example: processor 0 takes infinitely many steps and processor 1 takes one step after all of them. This
 is a classical execution of order type `ω + 1`, with times `1 − 1/(n+1)` and `1`, and no indexing by `ℕ` exists

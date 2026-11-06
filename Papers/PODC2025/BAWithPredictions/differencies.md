@@ -18,7 +18,7 @@ paper's lower bounds).
 
 ## 1. Lower bounds (Section 10)
 
-1. **Theorem 13: the cited bound covers halting, not decision times (imprecision, statement true).**
+1. **Theorem 13: the cited bound covers halting, not decision times (⚠️, statement true).**
    - **What the proof does.** It simulates the predicted algorithm `A` by an algorithm `S'`
      without predictions on `n' = n − x` processes "at most `t'` of which may fail by
      crashing". Then it invokes [21] (Dolev–Reischuk–Strong): every algorithm has an execution

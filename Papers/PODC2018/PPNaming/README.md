@@ -6,30 +6,26 @@ the full version, LRI research report HAL [hal-01790517v3](https://inria.hal.sci
 ("Space-Optimal Naming in Population Protocols", 21 pp., also DISC 2019); the 2-page brief announcement has no
 proofs. Numbering follows the full version.
 
-**Verdict: ⚠️ Minor statement issues.** All formalized propositions hold as stated: the impossibilities
-(Propositions 1, 3, 4, Theorem 11), the sink property (Proposition 6), Lemma 2 and the protocols of
-Propositions 12, 13 and 14. The proof of Theorem 11, the subtlest result, has a real gap; we replace it with
-a different adversary argument. The summary in Table 1 and the introduction leaves out that without a
-leader, symmetric naming is impossible for `n = 2` agents whatever the number of states.
+**Verdict: 🛠️ Hard fix.** All formalized propositions hold, for `P ≥ 2`: the impossibilities (Propositions 1, 3, 4,
+Theorem 11), the sink property (Proposition 6), Lemma 2 and the protocols of Propositions 12, 13 and 14. The proof
+of Theorem 11, the subtlest result, has a real gap, and we replace it with a different adversary argument; the
+summary in Table 1 and the introduction leaves out that without a leader, symmetric naming is impossible for `n = 2`
+agents whatever the number of states. Propositions 16 and 17 and the with-leader cells of Proposition 12 were not
+checked, so the classification is checked only in part.
 
 ## Mistakes in the paper
 
-### ⚠️ Table 1 and §1 (no leader, global fairness, symmetric rules: "P + 1 states")
-The summary says naming without leader under global fairness is possible with `P + 1` states, but with
-`n = 2` agents no symmetric leaderless protocol, with any number of states, names them
-(`not_solvesGlobal_of_card_two`, `not_solvesWeak_of_card_two`).
-
-**Impact.** Only the summary is affected. Proposition 13 itself states the restriction `n > 2` and is
-correct (`prop13_solvesGlobal`). Since the model asks for one protocol that works for all `n ≤ P`, this
-table cell (and "the norm is `P + 1` states" in §1) holds only for populations of at least 3 agents.
-
-**Details.** From a uniform configuration of two agents, both orientations of the only pair apply
-`(s, s) → (s', s')`, so every reachable configuration is uniform. This holds under any fairness.
-
-### Typos and slips
+### ✏️ Slips
+- Table 1 and §1 (no leader, global fairness, symmetric rules: "P + 1 states"). The summary says naming without
+  leader under global fairness is possible with `P + 1` states, but with `n = 2` agents no symmetric leaderless
+  protocol, with any number of states, names them (`not_solvesGlobal_of_card_two`, `not_solvesWeak_of_card_two`).
+  From a uniform configuration of two agents, both orientations of the only pair apply `(s, s) → (s', s')`, so every
+  reachable configuration is uniform. This holds under any fairness. Only the summary is affected: Proposition 13
+  itself states the restriction `n > 2` and is correct (`prop13_solvesGlobal`). Since the model asks for one protocol
+  that works for all `n ≤ P`, this table cell (and "the norm is `P + 1` states" in §1) holds only for populations of
+  at least 3 agents.
 - Propositions 3, 4 and Theorem 11 are false for `P = 1` (one state, at most one mobile agent: naming is
   trivial). All our statements assume `P ≥ 2`.
-- Lemma 2 says "symmetric naming protocol", but symmetry is not needed (`lemma2_core`).
 
 ## Proof gaps (statements true)
 
@@ -38,7 +34,8 @@ The proof builds the execution `e` by alternating segments from the two indistin
 (Lemmas 8–10) but never shows that `e` is weakly fair, and then lets `e` end in a stable `C*` through a segment
 with an idle `s`-agent that the construction does not provide.
 
-**Impact.** Statement true; repaired with a cleaner adversary argument (`thm11`, `thm11_paper`).
+**Impact.** The theorem holds, but the paper's construction cannot be patched locally: it takes a different
+adversary argument (`thm11`, `thm11_paper`).
 
 **Details.** Lemmas 9/10 transfer segments in which the plus world's `s`-agent stays idle. Every segment the
 construction produces ends with that agent being reduced. A final segment reaching a named `C*` (which contains
@@ -55,6 +52,16 @@ the minus world drive. When the actual execution is the minus world, it first pe
 requires next; otherwise it follows the other world until the roles swap again. This execution is weakly fair and
 has two `m`-agents infinitely often, so it never names the agents (`thm11_core`, built with
 `exists_weaklyFair_of_phases`).
+
+### 🔧 Proposition 4 and Lemma 2 (stabilized configurations taken as terminal)
+Lemma 2 and Proposition 4 take for granted that a stabilized configuration is terminal, i.e. that no continuation
+can change a name, and under weak fairness stabilization of one execution does not give this.
+
+**Impact.** One added fact lets the paper's mirroring go through: correctness implies that a *closed* named
+configuration is reachable from every reachable configuration (`exists_stablyGood_of_weaklyFair`).
+
+**Repair.** Our proof of Proposition 4 mirrors the leader's interactions in a closed named configuration
+(`prop4_core`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -94,10 +101,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | `n > 2` is needed in Prop. 13 | `not_solvesGlobal_of_card_two`, `not_solvesWeak_of_card_two` | `Prop13.lean` |
 | Prop. 14 (initialized leader and mobiles, `P` states, weak and global) | `prop14_solvesWeak`, `prop14_solvesGlobal` | `Prop14.lean` |
 
-**Proof remarks.** Lemma 2 and Proposition 4 take for granted that a stabilized configuration is terminal,
-i.e. that no continuation can change a name. Under weak fairness this needs an argument: correctness implies that a
-*closed* named configuration is reachable from every reachable configuration (`exists_stablyGood_of_weaklyFair`).
-Our proof of Proposition 4 mirrors the leader's interactions in a closed named configuration.
+**Proof remarks.** Lemma 2 says "symmetric naming protocol", but symmetry is not needed (`lemma2_core`).
 
 **Not formalized.** Corollary 7 and Lemmas 8–10 are bypassed by the repaired proof of Theorem 11. Lemma 5 is
 proved only in the form that Proposition 6 uses (states of a stably named configuration of size `P - 1`).

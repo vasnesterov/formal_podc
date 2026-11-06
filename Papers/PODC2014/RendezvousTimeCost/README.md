@@ -5,18 +5,14 @@ PODC 2014. DOI [10.1145/2611462.2611473](https://doi.org/10.1145/2611462.2611473
 version: arXiv [1508.02471](https://arxiv.org/abs/1508.02471) v1 (the only version; same text as
 the proceedings copy we have). Numbering follows it.
 
-**Verdict: ❌ False claim.** Both main lower bounds hold:
-- Theorem 3.1: cost `E + o(E)` forces time `Ω(EL)`.
-- Theorem 3.2: time `O(E log L)` forces cost `Ω(E log L)`.
-
-Propositions 2.1 (Cheap) and 2.2 (Fast) hold as stated. The cost bound `2·w(L)·E` of
-Proposition 2.3 (FastWithRelabeling) is false. The correct bound is `(8w+6)E`, so Corollary 2.1
-(cost `O(E)`, time `O(L^{1/w}E)`) still holds. The proof of Theorem 3.2 relies on a false fact
-(Fact 3.11) and needed a repair; only constants change.
+**Verdict: 🔧 Easy fix.** Both main lower bounds hold (Theorem 3.1: cost `E + o(E)` forces time `Ω(EL)`; Theorem 3.2:
+time `O(E log L)` forces cost `Ω(E log L)`), and so do Propositions 2.1 (Cheap) and 2.2 (Fast) as stated. The cost
+bound of Proposition 2.3 (FastWithRelabeling) needs a new constant, `(8w+6)E`, which keeps Corollary 2.1 (cost `O(E)`,
+time `O(L^{1/w}E)`). The proof of Theorem 3.2 relies on the false Fact 3.11, and 10 sectors instead of 6 get around it.
 
 ## Mistakes in the paper
 
-### ❌ Proposition 2.3 (FastWithRelabeling, cost `2·w(L)·E`)
+### 🔧 Proposition 2.3 (FastWithRelabeling, cost `2·w(L)·E`)
 The cost bound `2·w(L)·E` is false: on the oriented 3-ring (`E = 2`) with `L = 2`, `w ≡ 1` and
 simultaneous start at nodes 0 and 1, the agents first meet at time 4 with cost `6 > 2wE = 4`
 (`prop_2_3_cost_false`).
@@ -36,22 +32,27 @@ simultaneous start gives worst-case cost `44 > 2wE` for `w = 2, 3` (`E = 4`).
 **Repair.** Each agent explores in at most `4w+3` segments, so the true bound is `(8w+6)E`
 (`prop_2_3_cost_repaired`, `cor_2_1`).
 
-### Typos and slips
-- Proposition 2.2's proof says "`i ∈ {2,…,m}`" for "`i ∈ {1,…,m}`" and mixes `τ ≥ 1` with
-  `0 ≤ τ ≤ E`.
-- In Fact 3.16 the count of `{-1,0,1}`-vectors forgets the factor `2^i` for signs (only constants
-  change).
+### ✏️ Slips
+- The abstract, Section 1.3 and Section 3 say that simultaneous-start Cheap has "cost exactly `E`". Agents may finish
+  earlier or meet before finishing, so it is "at most `E`", as Section 2 says (`Upper.cheapSim_bounds`).
+- Facts 3.6–3.8 (proof of Theorem 3.1) need `F > 3φ`, which the paper leaves implicit in `φ = o(E)`
+  (`thm_3_1_explicit`).
+- Fact 3.7's index range is off by one: it is stated for `i ≤ ⌊L/2⌋ - 1` but refers to `α_{i+1}` (`LBCost.step`).
+- Proposition 2.2's proof mixes `τ ≥ 1` with `0 ≤ τ ≤ E`, an off-by-one in the round numbering (`Upper.prop_2_2`).
+
+### Typos
+- Proposition 2.2's proof says "`i ∈ {2,…,m}`" for "`i ∈ {1,…,m}`".
 - Corollary 2.1 uses `t' = c L^{1/c}` as if it were an integer.
-- The abstract's "cost exactly `E`" for simultaneous-start Cheap means "at most `E`".
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 3.2 (Fact 3.11)
+### 🔧 Theorem 3.2 (Fact 3.11)
 Fact 3.11 is false: on the ring with `n = 12`, `x` moving `+1,+1,+1,-1` from node 0 and `y` moving
 `-1,-1,-1,+1` from node 6 have all partial surpluses `±1`, yet both are at node 3 after round 3
 (`Fact311.fact_3_11_false`).
 
-**Impact.** Statement true; the proof is repaired with different constants (`thm_3_2_core`, `thm_3_2`).
+**Impact.** Fact 3.15 is not established as written; the rest of the proof of Theorem 3.2 stands with different
+constants (`thm_3_2_core`, `thm_3_2`).
 
 **Details.** The proof cuts the ring into 6 sectors of size `n/6` and time into blocks of `n/6` rounds,
 and it tracks the sector of each agent only at block boundaries. Fact 3.11 claims that partial surpluses
@@ -59,21 +60,25 @@ of absolute value at most 1 keep `x` inside `P_{j-1} ∪ P_j ∪ P_{j+1}`. In mi
 the end of `P_{j+1}` can step into `P_{j+2}` and return. In the counterexample `Agg_x = (1,0)` and
 `Agg_y = (-1,0)`. The vectors come from a correct 2-label algorithm and survive trimming
 (`Fact311.V_correct`, `Fact311.mx_ge_four`). Fact 3.15 (distinct labels have distinct progress vectors)
-uses Fact 3.11 on every zero run, so it is not established as written.
+uses Fact 3.11 on every zero run.
 
 **Repair.** Blocks and sectors of size `⌊n/10⌋`. Two agents with equal progress vectors then stay within
 distance `< 5⌊n/10⌋ ≤ n/2` relative to their antipodal starts. This also removes the assumption `6 ∣ n`.
 The rest of the argument is the paper's, with different constants. (`thm_3_2_core`, `thm_3_2`)
 
-### 🛠️ Theorem 3.1 (small slips in the proof)
-Fact 3.1's shifted start `p'_B = p_A + forward(A) + 1 + back(B)` uses `B`'s solo extent instead of its
-extent during the execution, Facts 3.6–3.8 need an implicit `F > 3φ`, and Fact 3.7's index range is off
-by one.
+### 🔧 Theorem 3.2 (Fact 3.16, count of vectors)
+The count of `{-1,0,1}`-vectors with at most `k` non-zero entries forgets the factor `2^i` for signs.
 
-**Impact.** Statement true; minor repairs (`LBCost.back_le_phi`, `LBCost.step`).
+**Impact.** Only constants change (`thm_3_2_core`).
+
+### 🔧 Theorem 3.1 (Fact 3.1, witness)
+Fact 3.1's shifted start `p'_B = p_A + forward(A) + 1 + back(B)` uses `B`'s solo extent instead of its
+extent during the execution.
+
+**Impact.** The fact itself is true (`LBCost.back_le_phi`).
 
 **Details.** With `B`'s solo extent the segments can overlap around the ring; the extent within the
-execution works. The paper leaves `F > 3φ` implicit in `φ = o(E)`.
+execution works.
 
 Full list of differences (including modelling choices and minor imprecisions):
 [differencies.md](differencies.md).

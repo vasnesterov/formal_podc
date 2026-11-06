@@ -100,15 +100,15 @@ Newport, *Consensus with an abstract MAC layer*, PODC 2014 (arXiv 1405.1382 v1; 
 
 ## Section 4 — upper bounds
 
-25. **Theorem 4.1 is false for Algorithm 1 as written (pseudocode slip; the prose's rule is correct).** Line 23 looks for `⟨phase 2, *, decided(0)⟩` in `R2`
-    only, but a phase-2 message received during phase 1 is stored in `R1` (line 6), and line 20 then does not wait
+25. **Theorem 4.1 is false for Algorithm 1 as written (pseudocode slip; the prose's rule is correct).** Line 23 looks for `⟨phase 2, *, decided(0)⟩` in `R₂`
+    only, but a phase-2 message received during phase 1 is stored in `R₁` (line 6), and line 20 then does not wait
     for it again. Counterexample with two nodes (`twoPhaseLit_not_solvesConsensus`, schedule `cexSched`, timely with
     `F = 8`): `u` (id 0, input 0) completes phase 1 before hearing `x` (id 1, input 1) and becomes `decided(0)`; `x`,
-    still in phase 1, receives `⟨p2, 0, decided(0)⟩` into `R1` and becomes bivalent; `u` decides 0; `x`'s witnesses
-    are already covered by `R1 ∪ R2`, its `R2 = {⟨p2, 1, bivalent⟩}`, so it decides 1. The paper's proof ("it will
-    therefore see that `u` has a status of decided(0)") assumes the check sees `R1` too. **Repair:** look in
-    `R1 ∪ R2` (`TwoPhase.decRule`), which matches the prose ("if the set contains any message of the form decided"), line 20 (`R1 ∪ R2`) and
-    line 8 (which already expects phase-2 messages in `R1`), so the intent is evident;
+    still in phase 1, receives `⟨p2, 0, decided(0)⟩` into `R₁` and becomes bivalent; `u` decides 0; `x`'s witnesses
+    are already covered by `R₁ ∪ R₂`, its `R₂ = {⟨p2, 1, bivalent⟩}`, so it decides 1. The paper's proof ("it will
+    therefore see that `u` has a status of decided(0)") assumes the check sees `R₁` too. **Repair:** look in
+    `R₁ ∪ R₂` (`TwoPhase.decRule`), which matches the prose ("if the set contains any message of the form decided"), line 20 (`R₁ ∪ R₂`) and
+    line 8 (which already expects phase-2 messages in `R₁`), so the intent is evident;
     the repaired algorithm solves consensus (`theorem_4_1`) and every node decides by time `2 F_ack`
     (`theorem_4_1_time`, the paper's "small constant (i.e., 2)").
 26. Theorem 4.1 details: the state adds a program counter (phases 1–4) to the pseudocode's variables; after deciding

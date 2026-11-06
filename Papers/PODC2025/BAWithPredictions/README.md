@@ -5,38 +5,11 @@ PODC 2025. DOI [10.1145/3732772.3733518](https://doi.org/10.1145/3732772.3733518
 [2505.01793](https://arxiv.org/abs/2505.01793) v1; numbering follows it (Theorems 13/14 are the lower bounds).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** Every formal result holds. Both lower bounds are proved as stated:
-- `Ω(n + t²)` messages even with fully correct predictions (Theorem 14);
-- `min{f+2, t+1, ⌊B/(n−f)⌋+2, ⌊B/(n−t)⌋+1}` rounds (Theorem 13), for unauthenticated algorithms.
-
-The proof of Theorem 13 cites a crash-fault bound that holds for halting times but not for decision
-times. We prove the decision-time version by switching to Byzantine faults and proving the cited bound
-there. The conditional algorithms (Theorems 5 and 6) and the classification lemmas are correct. The wrapper is verified against the specifications of the cited
-sub-protocols. Lemma 23 and Theorem 14's choice of the faulty group have fixable proof gaps. The statement-level slips are minor:
-Theorem 6's per-process message bound fails only for `n = 1`, Algorithm 4 has a typo, and the arXiv v1 abstract's
-`Ω(n²)` stands for `Ω(n + t²)`.
+**Verdict: ⚠️ Weakened.** The `Ω(n + t²)` message bound even with fully correct predictions (Theorem 14), the conditional algorithms (Theorems 5 and 6) and the classification lemmas hold, and the wrapper is verified against the specifications of the cited sub-protocols. The proof of the round bound `min{f+2, t+1, ⌊B/(n−f)⌋+2, ⌊B/(n−t)⌋+1}` (Theorem 13) cites a crash-fault bound that holds for halting times but not for decision times; we prove the decision-time version by switching to Byzantine faults and proving the cited bound there, but only for unauthenticated algorithms. So the tightness of the time bound with signatures stands only in the halting-time reading of the paper's proof.
 
 ## Mistakes in the paper
 
-### ⚠️ Abstract and introduction of arXiv v1 (`Ω(n²)` messages)
-They claim an `Ω(n²)` message lower bound, but the theorem gives `Ω(n + t²)`, and read literally
-`Ω(n²)` is false for small `t`: for `t = 0`, "everyone sends to `p₁`, `p₁` broadcasts the
-minimum" uses `2(n−1)` messages.
-
-**Impact.** Loose shorthand: `Ω(n + t²)` is `Ω(n²)` when `t = Θ(n)` (the usual convention for
-Dolev–Reischuk), and the PODC abstract states `Ω(n + t²)`. Theorem 14 itself holds.
-
-### ⚠️ Theorem 6 (per-process message bound, `n = 1`)
-The per-process message bound of Theorem 6 fails for `n = 1`.
-
-**Impact.** Degenerate case; the round bound and the `O(nk²)` total hold.
-
-### ⚠️ Algorithm 4, line 4 (typo)
-Line 4 has `y ∈ L_y` where it should be `y ∈ T_i`.
-
-**Impact.** Typo with evident intent; Algorithms 3–4 and Theorem 5 hold with the intended reading.
-
-### ⚠️ Introduction of Section 7 (remark on too-small `k`)
+### ❌ Introduction of Section 7 (remark on too-small `k`)
 The remark that, when `k` is too small, "if any honest process decides, then they all decide" is
 false: with `k = 0`, two honest processes whose first-ranked process is a different faulty one can
 disagree on whether to decide (not formalized).
@@ -47,26 +20,15 @@ disagree on whether to decide (not formalized).
 one; one leader sends `v` everywhere, the other stays silent. The first process decides `v` at line
 12, the second never decides.
 
-### Typos and slips
-- Lemma 6 is stated ambiguously; we prove the union version used by Lemma 24.
-- Asymptotic statements omit `+1`s: `O(min{B/n, f})` should be `O(min{B/n, f} + 1)`, and `log(·)`
-  should be `log(· + 2)`.
-- Under-specified tie-breaking and defaults (Algorithm 3 line 14, empty `T_i ∩ L_i`, all-`⊥`
-  outputs).
-- The position formula for `c[i] = 0` has a typo.
-- Theorem 6 says "Algorithm 5" for Algorithm 7.
-- Algorithm 7 line 8 has `v_i` for `x_i`.
-
-## Proof gaps (statements true)
-
-### 🛠️ Theorem 13 (the cited crash-fault bound covers halting, not decision times)
+### ⚠️ Theorem 13 (the cited crash-fault bound covers halting, not decision times)
 The proof cites Dolev–Reischuk–Strong [21] for crash faults, whose bound `min{f'+2, t'+1}` holds
 for halting times (and uniform consensus) but not for the round in which the last honest process
-decides.
+decides, which is how the paper defines time complexity.
 
-**Impact.** Statement true (an imprecision); proved as stated, for decision times, for at least
-two values and `t < n − 1` (`theorem13`, `earlyDecidingLB_strong`), for *unauthenticated*
-algorithms (see the model section).
+**Impact.** For *unauthenticated* algorithms the statement is proved as stated, for decision times, for at
+least two values and `t < n − 1` (`theorem13`, `earlyDecidingLB_strong`; see the model section). For
+algorithms with signatures, the setting of Theorem 6 when `n/3 ≤ t < n/2`, only the halting-time reading
+stands.
 
 **Details.**
 - **The step.** The proof turns the predicted algorithm into an algorithm `S'` without predictions
@@ -89,28 +51,61 @@ bound `min{f'+2, t'+1}` ourselves. The usual chain argument gives `f'+1`; the ex
 from one more process that equivocates in the last round, which `f' < t'` allows. Reaching
 *exactly* `f` faults needs padding with Byzantine processes that behave honestly (`padScenario`).
 
-### 🛠️ Theorem 14 (choice of the faulty group)
+### ✏️ Slips
+- The abstract and the first paragraph of Section 10.2 of arXiv v1 claim an `Ω(n²)` message lower bound, but
+  the theorem gives `Ω(n + t²)`, and read literally `Ω(n²)` is false for small `t`: for `t = 0`, "everyone
+  sends to `p₁`, `p₁` broadcasts the minimum" uses `2(n−1)` messages. It is loose shorthand: `Ω(n + t²)` is
+  `Ω(n²)` when `t = Θ(n)` (the usual convention for Dolev–Reischuk), and the PODC abstract states
+  `Ω(n + t²)`. Theorem 14 itself holds.
+- The per-process message bound in the proof of Theorem 6 fails for `n = 1`; the round bound and the
+  `O(nk²)` total hold.
+- Algorithm 4, line 4 has `y ∈ L_y` where it should be `y ∈ T_i`; Algorithms 3–4 and Theorem 5 hold with the
+  intended reading.
+- Theorem 6 says "Algorithm 5" for Algorithm 7.
+- The position formula for `c[i] = 0` in Section 6 has a typo: `n − f + i − Σ_{j≤i} c[j]` should be
+  `Σ_j c[j] + i − Σ_{j≤i} c[j]`.
+- Asymptotic statements omit `+1`s: `O(min{B/n, f})` should be `O(min{B/n, f} + 1)`, and `log(·)`
+  should be `log(· + 2)`; the phase count `⌈log₂ t⌉ + 1` is undefined for `t = 0`.
+- The proof of Lemma 16 says "at the end of phase 2", but for `k = 0` there is only one phase.
+
+### Typos
+- The proof of Lemma 17 says "before phase `φ+1`" for "before the end of phase `φ+1`".
+- Lemma 6 is stated ambiguously; we prove the union version used by Lemma 24.
+- Algorithm 7 line 8 has `v_i` for `x_i`.
+- Algorithm 6 line 13 writes `x_m` for the value of the chain `m`.
+- The prose of Section 8.3 says `2k + 1 < n − t − k` where Lemma 24 and Theorem 6 use `≤`.
+- Under-specified tie-breaking and defaults (Algorithm 3 line 14, empty `T_i ∩ L_i`, all-`⊥`
+  outputs).
+
+## Proof gaps (statements true)
+
+### 🔧 Theorem 14 (choice of the faulty group)
 The proof assumes w.l.o.g. `|S₀| ≥ ⌈(n−1)/2⌉` for the processes `S₀` that "decide 0 for some
 prediction when they receive no messages", but a process receiving nothing need not decide at all,
 so `S₀ ∪ S₁` need not cover the processes.
 
-**Impact.** Statement true; repaired (`t_sq_om`), and proved directly for both agreement and
-broadcast (`message_lower_bound`, `message_lower_bound_bb`).
+**Impact.** Repaired (`t_sq_om`).
 
 **Details.** The proof picks the faulty group `B ⊆ S₀`. A process receiving nothing need not decide because such a run need not be
-admissible. Also, the paper proves Theorem 14 for broadcast and says it "implies the same bounds"
-for agreement; the reduction only transfers the `t²` term.
+admissible.
 
 **Repair.** Split the processes by whether their isolated run ever decides `v₁`, and give the
-honest processes the other value. Both cases contradict Agreement in `E_bad` (`t_sq_om`). We prove
-both problems directly, with `n + t² ≤ 8·#messages + 1`.
+honest processes the other value. Both cases contradict Agreement in `E_bad` (`t_sq_om`).
 
-### 🛠️ Lemma 23 (committee agreement)
+### 🔧 Theorem 14 (from broadcast to agreement)
+The paper proves Theorem 14 for broadcast and says it "implies the same bounds" for agreement, but the
+reduction only transfers the `t²` term.
+
+**Impact.** Proved directly for both agreement and broadcast (`message_lower_bound`,
+`message_lower_bound_bb`).
+
+**Repair.** We prove both problems directly, with `n + t² ≤ 8·#messages + 1`.
+
+### 🔧 Lemma 23 (committee agreement)
 The step "if `p_i` received a chain for `x` in the first `k` rounds, it broadcast one" ignores that
 `p_i` relays only values it *adds*, at most two.
 
-**Impact.** Statement true; repaired by arguing from the round in which `x` entered `X_i`
-(`lemma23`).
+**Impact.** Repaired by arguing from the round in which `x` entered `X_i` (`lemma23`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

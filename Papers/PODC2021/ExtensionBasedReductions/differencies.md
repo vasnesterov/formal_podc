@@ -1,7 +1,7 @@
 # Differences between the formalization and the paper
 
 Paper: K. Brusse, F. Ellen, *Reductions and Extension-Based Proofs*, PODC 2021 (proceedings version; no arXiv
-version). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
+version).
 
 ## Scope
 
@@ -10,8 +10,7 @@ version). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
    identity task `R₂` is a special case. The paper's general case composes `A₂` after `A ∘ A₁` with the NIS
    composition of Section 6 (estimate vectors). That composition and its correctness ("A complete proof
    appears in the full version") are not formalized, and neither is the general case of the prover's
-   assignment-query handling (see item 9). The verdict only concerns the checked statements (R1 of
-   `verdicts.md`).
+   assignment-query handling (see item 9).
 2. **Not formalized:**
    * Section 5 (no augmented EBP for `k`-set agreement); the paper only sketches its differences from
      [3] and defers the proof.
@@ -63,7 +62,7 @@ version). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
    * outputs of `S` are inputs of `R₂`.
 
    The paper assumes the analogous condition for protocols in §6 ("each output from `A₁` is a valid input
-   for `A₂`"). (R4: implied assumption.)
+   for `A₂`"). (Implied assumption.)
 7. **IS protocols.** `IsIS δ t` is the normal form "a process terminates exactly after its `t`-th scan",
    imposed on all states. The paper says "in every schedule ... every process terminates in round `t`";
    `exists_isIS_of_solves` produces protocols in normal form from any NIS protocol.
@@ -74,13 +73,15 @@ version). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
    argument gives a uniform round bound `N` for a wait-free protocol with finitely many inputs. A
    simulation protocol then runs until round `N + 1`, ignores processes that have already decided in the
    simulated protocol, and outputs the simulated decision.
-9. **Assignment queries (§7) for the general composition.** Not formalized. Two problems:
+9. **Assignment queries (§7) for the general composition (⚠️ for the first problem).** Not formalized. Two
+   problems:
    * The enumeration of "initial configurations `C₂` of `A₂` such that there is a `P'`-only schedule from
      `C₂` satisfying `f`" ignores the `A₂`-steps already taken during `γ`, including those of processes
      outside `P`. It can therefore drop the needed `g`. Enumerating all `g` repairs this (the later search
-     for `μ₂` is exact).
+     for `μ₂` is exact); this is proved only in the local case.
    * The claim that the schedules of `A₂` simulable from `C μ₁ μ'` "do not depend on the particular
-     schedule `μ'`" is not proved and is needed for completeness of the `None` answers.
+     schedule `μ'`" is not proved and is needed for completeness of the `None` answers. This is unchecked, not a mistake:
+     we neither proved nor refuted it.
 
    In the local case, which we formalize, `𝒫` enumerates the following, and both soundness and
    completeness are proved (`assign_sound`, `assign_complete`):
@@ -92,8 +93,8 @@ version). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
    `A`-schedule (`decompY`). It also needs extending the `A₁`-part so that all of `P` finishes
    (`exists_complete`). The candidate set is finite because IS schedules have bounded length
    (`candSet_finite`).
-10. **Choice of `D₀` (§7, "Responding to queries" and "Why the prover wins").** Proof repair; it decides
-    the 🛠️ verdict.
+10. **Choice of `D₀` (§7, "Responding to queries" and "Why the prover wins").** ⚠️: the repair is proved only
+    for `R₂` without communication.
     * The paper keeps `D₀` arbitrary on processes that have not finished `A₁`. It changes `D₀` only at
       the final step of `A₁` of a process, by a chain re-reaching `D₀'γ'`.
     * Then "if `D₀γ'` satisfies `S` then `C` satisfies `R₂∘S∘R₁`" fails for configurations `C` in which
@@ -132,7 +133,7 @@ version). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
     extension-based impossibility proof":** proved as stated (`hasAugEBProof_of_hasEBProof`). Each output
     query `(C, P, y)` becomes the assignment queries `(C, P, {p ↦ y})`, `p ∈ P`, preceded by one harmless
     query, needed when `P = ∅`.
-16. **Typos** (R3, no effect):
+16. **Typos** (no effect):
     * `R₂ ∘ S ∘ R₂` (§1) and `R₁ ∘ S ∘ R₂`, `R₂ ∘ S ∘ R₂` (§7) for `R₂ ∘ S ∘ R₁`;
     * `δ(sᵢ)` for `δ(s'ᵢ)` (§3, twice: "outputs `δ(sᵢ)`" and "if `δ(sᵢ) = ⊥`");
     * `α'(ϕ)` for `α'(φ)` (§7).

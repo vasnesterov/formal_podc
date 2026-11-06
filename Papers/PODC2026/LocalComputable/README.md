@@ -6,31 +6,42 @@ Jukka Suomela. *Brief Announcement: Is a LOCAL Algorithm Computable?* PODC 2026.
 version, arXiv [2602.21022](https://arxiv.org/abs/2602.21022) v2; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues — for Section 5 only.** **The headline result, the separation
-Theorem 4.1 (an LCL `Π` with complexity `O(log n)` in uncomputable-LOCAL but `Ω(√n)` in
-computable-LOCAL, i.e. classes I < II of Table 1), is *not* verified.** The LCL `Π` of Section 4 is
-not formalized, only the diagonalization core of Lemma 4.17 (on abstract hypotheses) and Lemma 4.18.
-The verdict covers the equivalence results of Section 5. They hold, in slightly greater generality,
-and are proved:
-* with a bound `n ≤ N` (or `n ≤ N ≤ f(n)`), uncomputable and computable LOCAL coincide (Theorem 5.3);
-* in uncomputable LOCAL the bound does not help (Theorem 5.4 / Corollary 5.6);
-* critical views are decidable (Lemma 5.2).
-
-The paper's central tool, "maximally `T`-safe neighbourhoods", is under-specified. Defined per
-node, it depends on the next, unseen radius, and an algorithm that stops only at such radii exceeds
-the time bound by one round. Lifted to views, it is not what the paper's proofs of Lemma 5.2 and
-Lemma 5.5 handle. We give a corrected notion ("critical" views) with which the proofs go through.
+**Verdict: 🛠️ Hard fix.** **The paper's main result, the separation Theorem 4.1 (an LCL `Π` with complexity `O(log n)` in
+uncomputable-LOCAL but `Ω(√n)` in computable-LOCAL, i.e. classes I < II of Table 1), was *not* checked:** the LCL `Π` of
+Section 4 is not formalized, only the diagonalization core of Lemma 4.17 (on abstract hypotheses) and Lemma 4.18. The
+equivalences of Section 5 hold, in slightly greater generality: with a bound `n ≤ N` (or `n ≤ N ≤ f(n)`) uncomputable and
+computable LOCAL coincide (Theorem 5.3), in uncomputable LOCAL the bound does not help (Theorem 5.4 / Corollary 5.6), and
+critical views are decidable (Lemma 5.2). Saving them took a redesign of the paper's central tool, "maximally `T`-safe
+neighbourhoods", as "critical" views.
 
 ## Mistakes in the paper
 
-### ⚠️ Definition 5.1 ("maximally `T`-safe"; used in Lemma 5.2 and Theorems 5.3–5.4)
+### ✏️ Slips
+- Definition 5.1: "maximal" vs. "safe with `t+1` unsafe" coincide only if safety is downward closed, which is not shown,
+  so "the" maximally safe neighbourhood of a node need not be unique. Our first critical radius settles it, and no
+  theorem depends on the difference.
+- Lemma 5.2, step 3 ("reject if ... `t < T(n)`") has the inequality reversed: it should be `T(n) < t`.
+- Theorem 5.3's proof does not say which class "safe" ranges over. If safety ranges over all graphs, the final
+  contradiction uses a network that need not satisfy the promise `n ≤ N ≤ f(n)` for the same `N`, and the uncomputable
+  algorithm owes nothing there. Definition 5.1 has a class parameter `𝒢`, and with the promise class the contradiction
+  works. We prove the theorem by a different argument: for fixed `N`, search over the finitely many finite tables
+  "(view, radius) ↦ output" for one that solves the problem on all legal networks. The uncomputable algorithm's table
+  shows that the search terminates (`exists_computable_of_promise`).
+- In Lemma 4.17, "do not see farther than the first `k−1` layers" must also avoid the constantly many special
+  layers near the bottom.
+- In Lemma 4.17, "the value computed by `T` will equal `k₀`" is not true in general, but any `k` with the property works
+  (`Model.exists_far_of_computable`).
+
+## Proof gaps (statements true)
+
+### 🛠️ Definition 5.1 ("maximally `T`-safe"; used in Lemma 5.2 and Theorems 5.3–5.4)
 Maximal safety of radius `t` depends on the unseen radius-`(t+1)` view, so the paper's algorithms that "grow
 the view until it is maximally `T`-safe", read literally, exceed the time bound by one round: in `C₃` with
 `T(n) = ⌊(n-1)/2⌋` they cannot stop within `T(3) = 1` (`maxSafe_rule_exceeds`).
 
-**Impact.** An under-specified definition and a proof gap; Theorems 5.3 and 5.4 are true and proved with a
-corrected notion ("critical" views). Under the view-level reading the algorithms stay within `T(n)`, but then
-the paper's proofs of Lemma 5.2 and Lemma 5.5 do not handle that notion.
+**Impact.** Theorems 5.3 and 5.4 are true and proved with a corrected notion ("critical" views). Under the view-level
+reading the algorithms stay within `T(n)`, but then the paper's proofs of Lemma 5.2 and Lemma 5.5 do not handle that
+notion.
 
 **Details.** `t` is maximally safe for `v` if `t` is safe and `t+1` is not, and safety of `t+1` is defined
 with radius-`(t+1)` neighbourhoods. A node that has seen only `N^t(v)` cannot evaluate this. Yet both
@@ -48,45 +59,41 @@ The paper's sentence "if `t` is maximally safe for `v`, then `N^t(v)` is maximal
 property of views: maximally safe for *some* node with this view. Under that reading the radius-1 view above
 is maximally safe, also in `C₅`, and the algorithms stay within `T(n)`. A view is then maximally safe iff it
 is safe and critical (below). The first such radius of a node is exactly its first critical radius, which is
-where our `B` stops. But then the paper's arguments do not establish what is needed. Lemma 5.2's procedure
-tests only safety of `t`, never criticality. Lemma 5.5 does not show that `A_N` stops within the view (next
-item). So in either reading this is a proof gap, not a false claim.
+where our `B` stops. But then the paper's arguments do not establish what is needed: Lemma 5.2's procedure
+tests only safety of `t`, never criticality, and Lemma 5.5 does not show that `A_N` stops within the view. So in either
+reading the statements are true and the gap is in the proofs.
 
 **Repair.** Call a radius-`t` view **critical** if it occurs in some network `G'` with `T(|V(G')|) ≤ t`.
 Every node meets a critical radius by `T(n)`, and any algorithm of locality `T` has already stopped there
-(`Model.Critical`, `out_of_critical`). Maximal safety implies criticality (`MaxSafe.critical`).
+(`Model.Critical`, `out_of_critical`). Maximal safety implies criticality (`MaxSafe.critical`). Section 5 is reworked on
+this notion (`Model.exists_boundFree`, `Model.sandwich_computable`).
 
-### Typos and slips
-- "Maximal" vs. "safe with `t+1` unsafe" (Definition 5.1) coincide only if safety is downward closed, which is
-  not shown.
-- Lemma 5.2's case "`t = T(N') = C`" should read "`T` bounded with supremum `C ≤ t`". Its step 3 ("reject if
-  ... `t < T(n)`") has the inequality reversed: it should be `T(n) < t`.
-- In Lemma 4.17, "do not see farther than the first `k−1` layers" must also avoid the constantly many special
-  layers near the bottom. "The value computed by `T` will equal `k₀`" is not true in general, but this is
-  immaterial.
+### 🔧 Lemma 5.2 (the procedure tests only safety)
+The procedure tests only safety of `t` and never that `t + 1` is unsafe, so it does not decide maximal safety in either
+reading of Definition 5.1.
 
-## Proof gaps (statements true)
+**Impact.** Decidability holds for critical views (`Model.critical_decidable`).
 
-### 🛠️ Lemma 5.5 (inside Theorem 5.4)
+**Repair.** Add the bounded search for a witness network with `T(n) ≤ t`.
+
+### 🔧 Lemma 5.2 (case split)
+The case "`t = T(N') = C`" misses `t > sup T`.
+
+**Impact.** The decidability claim stands (`Model.critical_decidable`).
+
+**Repair.** The case should read "`T` bounded with supremum `C ≤ t`", and step 1 should accept for `t ≥ C`.
+
+### 🔧 Lemma 5.5 (inside Theorem 5.4)
 The proof takes the neighbourhood `X_i` itself as a graph, which is not a network, and then only gets that
 `A_N` stops within `T(N_i)` rounds, while the sandbox needs `A_N` to stop within the radius of `X_i`.
 
-**Impact.** Statement true; taking `N_i` to be the size of a criticality witness repairs the argument
-(`exists_boundFree`).
+**Impact.** Statement true; the rest of the proof of Theorem 5.4 stays (`exists_boundFree`).
 
 **Details.** `X_i` is not a network: boundary degree labels count unseen edges.
 
-### 🛠️ Theorem 5.3 (class of "safe" unspecified)
-If safety ranges over all graphs, the final contradiction uses a network that need not satisfy the promise
-`n ≤ N ≤ f(n)` for the same `N`, and the uncomputable algorithm owes nothing there.
+**Repair.** Take `N_i` to be the size of a criticality witness (`exists_boundFree`).
 
-**Impact.** Statement true; proved by a different argument (`exists_computable_of_promise`).
-
-**Repair.** For fixed `N`, search over the finitely many finite tables "(view, radius) ↦ output" for one that
-solves the problem on all legal networks. The uncomputable algorithm's table shows that the search terminates
-(`exists_computable_of_promise`).
-
-### 🛠️ Definition 3.5 (why the locality `T` is non-decreasing)
+### 🔧 Definition 3.5 (why the locality `T` is non-decreasing)
 The paper's reason, "the set of graphs with `n₁` nodes is contained in the class of graphs with `n₂` nodes",
 is false.
 
@@ -141,8 +148,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 consensus layers; Lemmas 4.4–4.16, Corollary 4.14). Hence Theorem 4.1 and the strictness
 I < II are not verified. Only the diagonalization of Lemma 4.17 is formalized, for an abstract
 family `G_K(x)` whose two properties (validity forces the halting result; the node holding `x` does
-not see the bottom) are hypotheses. The equivalence of full-information views and Definition 3.1
-balls is not formalized.
+not see the bottom) are hypotheses; whether `Π` really forms such a family is open. The equivalence of full-information
+views and Definition 3.1 balls and the direct computable `O(log n)` algorithm with a bound `N` (end of Section 2.1) are not
+formalized.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity checks:

@@ -1,8 +1,7 @@
 # Differences between the formalization and the paper
 
 Golab, Li, López-Ortiz, Nishimura, *Computing k-Atomicity in Polynomial Time*, SIAM J. Comput. 47(2), 2018
-(journal version of the PODC 2015 paper *Computing Weak Consistency in Polynomial Time*). Rules refer to
-`.claude/skills/formalize-paper/verdicts.md`.
+(journal version of the PODC 2015 paper *Computing Weak Consistency in Polynomial Time*).
 
 ## Model (Section 3)
 
@@ -122,12 +121,11 @@ Golab, Li, López-Ortiz, Nishimura, *Computing k-Atomicity in Polynomial Time*, 
 27. The figure has no numeric times. We take the event ranks `1…18` read off Fig. 3.1 and check that they
     give exactly the drawn graphs `G_R`, `G_W` (`fig31_ER`, `fig31_EW`).
 
-## Verdict calibration
+## Remarks
 
-28. No statement-level issue was found. The `k ≥ 3` (abstract, Section 1: the new range beyond the known
+28. No mistake in a statement was found. The `k ≥ 3` (abstract, Section 1: the new range beyond the known
     `k ≤ 2` cases) vs `k ≥ 2` (Algorithms 2–3, Section 7) difference is between a weaker and a stronger
     true claim. The Lemma 5.10 edge bound fails only for `m = k = 1`, which is outside the lemma's own scope
-    (`G_C` is the graph built by Algorithm 3, whose input has `k ≥ 2`; see item 25), so R2 is not even
-    needed. The
+    (`G_C` is the graph built by Algorithm 3, whose input has `k ≥ 2`; see item 25). The
     `B[0]` index in `P(x)`-(c) is inside a proof and is vacuous. Every proof goes through with only
-    routine additions, so the verdict is ✅ (not 🛠️).
+    routine additions.

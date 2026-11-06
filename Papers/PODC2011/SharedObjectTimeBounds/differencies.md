@@ -17,7 +17,7 @@ D.1, D.2 of Chapter V) and the tables of Chapter VI, except the claims checked i
    so the lower bounds apply to all such automata. Zeno automata (timers accumulating at a finite time) have no
    complete run with an invocation at all; for them the thesis's correctness condition is vacuous and its
    Claim B.2 ("every finite admissible run has a complete admissible extension") is false. We exclude them by the
-   choice of the model (rule R4: the thesis evidently intends non-Zeno algorithms).
+   choice of the model (✏️: the thesis evidently intends non-Zeno algorithms).
 2. **Runs.** A run of a scenario (offsets, invocation times, delays as a function of sender, receiver and real
    send time) is the fixpoint of "invocations ∪ receipts of sent messages" (`IsRun`). It exists and is unique
    when delays are bounded below by some `γ > 0` (`exists_run`, `IsRun.unique`). Delays depending only on the send
@@ -52,7 +52,7 @@ D.1, D.2 of Chapter V) and the tables of Chapter VI, except the claims checked i
 
 10. **Definitions D.1, D.4 (mutator, pure accessor).** Literally no operation type is a pure accessor
     (`not_pureAccessor`), so Theorem E.1 would be vacuous. We use the intended notion `NonMutator` (for every
-    legal `ρ ∘ op`, `ρ ∘ op` is equivalent to `ρ`). Rule R3 (evident intent): ⚠️. Only the non-mutator part is used
+    legal `ρ ∘ op`, `ρ ∘ op` is equivalent to `ρ`). ✏️ (evident intent). Only the non-mutator part is used
     in Theorem E.1; the accessor part is dropped (the theorem is stated for every non-mutator `AOP`).
 11. "Immediately self-commuting" is the negation of Definition B.2 (as stated in the thesis's note).
 
@@ -75,8 +75,8 @@ D.1, D.2 of Chapter V) and the tables of Chapter VI, except the claims checked i
     than optimally. The statement only says "`ε`-bounded clocks". Without the hypothesis the bound is not
     established, and it is contradicted by the thesis's own Algorithm 1, whose pure mutators respond after
     `ε + X` with `X = 0` allowed (Chapter V, not formalized; its correctness proof does not seem to need the optimal
-    `ε`). Rule R4 (the assumption holds wherever the thesis uses the theorem and is stated in its proof): ⚠️. Borderline
-    (R6): the thesis treats `ε` as a free parameter in Theorems C.1 and E.1, but its Chapters IV–V consistently
+    `ε`). ✏️: the assumption holds wherever the thesis uses the theorem and is stated in its proof. The thesis
+    treats `ε` as a free parameter in Theorems C.1 and E.1, but its Chapters IV–V consistently
     take `ε` to be the optimal achievable skew (`ε ≥ (1 - 1/n) u` by Lundelius–Lynch), so a reader of the thesis
     would assume it; the refutation for smaller `ε` (Algorithm 1) is not formalized.
 16. **Proof gap, Step 1.1.** "There exists a legal permutation `π` of the `k` operations in `R₁` such that for
@@ -87,16 +87,15 @@ D.1, D.2 of Chapter V) and the tables of Chapter VI, except the claims checked i
     element is not `z`, for every `z` — which is no contradiction: for the test-and-reset register (`TR`,
     `Examples.lean`), whose writes satisfy the theorem's hypothesis (`tr_nonEquiv`), every query sequence has such
     answers (`tr_answers`). We prove the theorem under the stronger hypothesis `LastRevealing` (one fixed query
-    sequence whose answers determine the last operation), which holds for write/push/enqueue
-    (`write_lastRevealing`), and for `k = 2` under the thesis's own hypothesis (`theorem_D1_two`). Whether
+    sequence whose answers determine the last operation), which holds for writes
+    (`write_lastRevealing`) and, by the same argument (not formalized), for push and enqueue, and for `k = 2` under the thesis's own hypothesis (`theorem_D1_two`). Whether
     Theorem D.1 holds in its stated generality is open (we have neither a proof nor a counterexample algorithm).
     Precision: in `R₂^z` the real-time order puts `op_z` before `op_{z+1 mod k}`, and only that pair when
     `|OP| > (1 - 2/k) u`; for smaller `|OP|` the order of `R₂^z` is stricter and the runs do give a contradiction for
     `TR` (all writes ordered, last `= z + 1` for every `z`). So the gap concerns `|OP| ∈ ((1 - 2/k) u, (1 - 1/k) u)`;
     `tr_answers` only records "last ≠ z", which suffices because `TR`'s state after the writes depends only on the
-    last write. Label ❌ by rule R5: Theorem D.1 is one of the three results the abstract presents as main
-    contributions, and an unestablished headline is ❌ (not 🚨, since it is not refuted). Reviewer's note: the
-    paper agent first labelled this ⚠️; the template's "unestablished → ⚠️" applies to non-headline statements.
+    last write. ⚠️: Theorem D.1 is one of the three results the abstract presents as main contributions; it holds
+    only with the new hypothesis, and it is not refuted in general.
 17. Slip: the shift is written `x_i = [-(k-1)/2 + ((z-i) mod k)/k] u`; it must be `-(k-1)/(2k)` (Step 2.2 and the
     skew computation use `(k-1)/(2k)`).
 18. The thesis requires the `k` instances to be distinct; not needed. `ρ` executed by `p_0`, the queries `α` by
@@ -111,7 +110,7 @@ D.1, D.2 of Chapter V) and the tables of Chapter VI, except the claims checked i
     `C_j = t + 2d - 2m`, others `t + 2d - m`, extended with delay `d` on `j → i`; `R₂⁻` without `p_j`'s operations),
     with these changes: (a) **gap**: the proof gets "both `ρ ∘ op₁ ∘ op₂` and `ρ ∘ op₂ ∘ op₁` legal" from immediate
     self-commutativity, which needs `ρ ∘ op₁` and `ρ ∘ op₂` legal, while hypothesis C gives only one of them; repaired
-    by running each operation alone after `ρ` (correctness yields a legal return, determinism identifies it), 🛠️;
+    by running each operation alone after `ρ` (correctness yields a legal return, determinism identifies it), 🔧;
     (b) the accessors are invoked at fixed times `τ = t + B₁ + η`, `τ + m` (`η = (d + m - B₁ - B₂)/4`) instead of
     "at `t_max`" and the adaptive time `max{min{t_max, t+d-m}, t+|op''₁|}`; then the case analysis of Step 2.2a is
     unnecessary, and the strict real-time order holds; (c) `B₁, B₂ ≥ 0` are derived from runs. The second case of
@@ -126,8 +125,8 @@ D.1, D.2 of Chapter V) and the tables of Chapter VI, except the claims checked i
 24. **§IV.E: "The theorem can be applied to push and peek on a stack"** is false: with `peek` returning the top,
     hypotheses A and C of Theorem E.1 cannot hold together (`stack_push_peek_not_E1`), since `ρ ∘ op_1 ∘ aop_1` and
     `ρ ∘ op_2 ∘ op_1 ∘ aop_1` leave the same top. Hence the lower bound `d + min {ε, u, d/3}` for `|push| + |peek|`
-    in Table III (and "(|push| or |enqueue|) + |peek|" in Chapter VI) is not supported by Theorem E.1. Rule R1
-    (concrete claim that an object is in a class) and R5 (application, not a headline): ❌. Checked against the
+    in Table III (and "(|push| or |enqueue|) + |peek|" in Chapter VI) is not supported by Theorem E.1. ❌: a
+    concrete claim that an object is in a class is false, and nothing we proved gives the bound. Checked against the
     rendered thesis pages 47 and 76 (PDF pages 56, 85). The claim is in the thesis; the 2-page PODC brief
     announcement is not openly available, so whether it repeats the claim is unknown. The `|push| + |peek|` bound
     itself is neither proved nor refuted here (for the purposes of E.1 a peek after pushes behaves like a read after

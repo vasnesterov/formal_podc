@@ -5,29 +5,32 @@ consensus and set consensus.* PODC 2013, pp. 113–115. Formalized version: the 
 [1311.6902](https://arxiv.org/abs/1311.6902) v1, *Good, Better, Best! — Unbeatable Protocols for Consensus and
 Set Consensus*; numbering follows it.
 
-**Verdict: ❌ False claim.** The main results hold: `Opt0` is an unbeatable consensus protocol (Thm. 2), `OptMaj`
-is unbeatable for `t > 0` (Thm. 3), `Opt_min-k` is unbeatable (Thm. 4), and `U-Opt0` is an unbeatable uniform
-consensus protocol deciding by `f + 1` / `f + 2` (Thm. 5). But Lemma 10, the core of the `k`-set part, is false as
-stated (the same lemma as Lemma 1 of the authors' PODC 2016 paper). Lemma 6 is false when `i` knows of `t`
-failures, Corollary 1 (HMW's `P0opt` is beatable) needs `t ≥ 2`, and the proof of Lemma 15 needs a different
-inner induction.
+**Verdict: 🛠️ Hard fix.** The main results hold: `Opt0` is an unbeatable consensus protocol (Thm. 2), `OptMaj` is
+unbeatable for `t > 0` (Thm. 3), `Opt_min-k` is unbeatable (Thm. 4), and `U-Opt0` is an unbeatable uniform consensus
+protocol deciding by `f + 1` / `f + 2` (Thm. 5). Saving them takes a new inner induction for Lemma 15, the core of
+Theorem 5, and one added condition each for Lemma 10 (the core of the `k`-set part; the same lemma as Lemma 1 of the
+authors' PODC 2016 paper), Lemma 6 and Corollary 1 (HMW's `P0opt` is beatable, which needs `t ≥ 2`). The uniform
+`k`-set protocol `U-PROT_min-k` (Thm. 6) was not formalized, so this verdict does not cover it.
 
 ## Mistakes in the paper
 
-### ❌ Lemma 10 (the core of the `k`-set part)
+### 🔧 Lemma 10 (the core of the `k`-set part)
 Lemma 10 is false as stated: with `n = 6`, `k = 2`, `t = 1`, `V = {0, 1, 2}`, a 2-set consensus protocol in which
 low processes decide at once can make process `0` decide `2` at time 1 even though all five conditions hold for it
 with `v = 0` (`lemma10_false`).
 
-**Impact.** A false numbered lemma; Theorem 4 survives: the proof goes through with an extra hypothesis that holds
-wherever Lemma 10 is used (`theorem4`).
+**Impact.** Lemma 11 and Theorem 4 stand: the proof goes through with an extra hypothesis that holds wherever Lemma 10
+is used (`lemma11`, `theorem4`).
 
 **Details.** This is Lemma 1 of the authors' PODC 2016 paper, with the same five conditions. The "changes" in the
 proof suppress messages carrying `v` to `j_b`, which may need more than `t` crashes. The counterexample and the
 repair are in [`UnbeatableSetConsensus`](../../PODC2016/UnbeatableSetConsensus/README.md). (`lemma10_false`,
 `theorem4`)
 
-### ⚠️ Lemma 6 when `d = t` (missing hypothesis)
+**Repair.** Add the hypothesis "every process alive and low at `m − 1` crashes in round `m`".
+(`Podc.UnbeatableSetConsensus.lemma1`)
+
+### 🔧 Lemma 6 when `d = t` (missing hypothesis)
 Condition (b), "`K_i(K_j ∃v held at m − 1)` for at least `t − d` processes `j`", holds vacuously when `i` knows of
 `d = t` failures, even if `v` occurs nowhere, so Lemma 6 is false then (`lemma6_literal_false`).
 
@@ -36,20 +39,26 @@ it assumes `K_i ∃v`. We prove Lemma 6 with "`K_i ∃v` and ((a) or (b))" (`lem
 consistent with this version.
 
 **Details.** Example: `n = 3`, `t = 1`, all inputs `1`, process `2` crashes in round 1 sending nothing. At time 1,
-process `0` knows of one failure, so (b) holds for `v = 0`, but `K_0 ∃correct(0)` is false.
-(`lemma6_literal_false`; repaired: `lemma6`)
+process `0` knows of one failure, so (b) holds for `v = 0`, but `K_0 ∃correct(0)` is false. The remark on time `t + 1`
+after the lemma repeats the error. (`lemma6_literal_false`; repaired: `lemma6`)
 
-### ⚠️ Corollary 1 ("`P0opt` of [HMW] is not unbeatable") for `t ≤ 1`
-Corollary 1 holds only for `t ≥ 2` (or `t = n − 1`): for `t ≤ 1` (and `n ≥ 3`), `P0opt` makes exactly the same
+### 🔧 Corollary 1 ("`P0opt` of [HMW] is not unbeatable") for `t ≤ 1`
+Corollary 1 holds only for `t ≥ 2` (or `n ≤ t + 1`): for `t ≤ 1` (and `n ≥ 3`), `P0opt` makes exactly the same
 decisions as `Opt0`, so it is unbeatable by Theorem 2 (`p0opt_sameDecisions`, `p0opt_unbeatable`).
 
-**Impact.** Implied assumption: the paper's own example ("one failure seen in each of the first two rounds") needs
-`t ≥ 2`. As a refutation of HMW's general claim, the corollary is correct (`corollary1`).
+**Impact.** One condition on `t` saves it: the paper's own example ("one failure seen in each of the first two rounds")
+needs `t ≥ 2`. As a refutation of HMW's general claim, the corollary is correct (`corollary1`).
 
 **Details.** We read `P0opt` as the paper describes it: decide `0` on `K_i ∃0`; decide `1` after a round in which
 no new failure became known. (`corollary1`; for `t ≤ 1`: `p0opt_sameDecisions`, `p0opt_unbeatable`)
 
-### Typos and slips
+### ✏️ Slips
+- Lemma 15, last case: "`j` fails at `(r', m)` before sending any messages" must mean that `j`'s round-`m + 1` message
+  reaches only `i`, and "known by `⟨i, m⟩` to fail" should read `⟨i, m + 1⟩`.
+- Contribution 3 (§1) says "`P0opt`, which was claimed to be beatable is not unbeatable"; it should say "claimed to be
+  unbeatable".
+
+### Typos
 - Two different results are numbered "Corollary 1" (§3 and Appendix C).
 
 ## Proof gaps (statements true)
@@ -61,23 +70,22 @@ may consider more processes possibly alive, so `C_j` can be larger than `C_i`.
 **Impact.** Statement true; proved with a different induction (`lemma15_part1`, `lemma15_part2`).
 
 **Details.** The induction hypothesis is also applied to `j` without checking that `j` knows `∃0` for the first
-time at `m` and does not know `∃correct(0)` at `m`. The counting argument for Part 1 ("fewer Case II than Case I
-invocations") is not needed.
+time at `m` and does not know `∃correct(0)` at `m`. The base case needs `z ∈ C_i` argued. The counting argument for
+Part 1 ("fewer Case II than Case I invocations") is not needed.
 
 **Repair.** We prove Lemma 15 by an induction on `n − |Z_i|`. Case II followed by Case I becomes one step
 `x ~_i x' ~_j x''`: in `x''`, `k` has received `z`'s message, `Z_i` has grown by `k`, and the induction hypothesis
 is applied to `i` itself. The number of failures in these runs never exceeds `F⟨i, m+1⟩ + 1 ≤ t`. The base case
 becomes "`⟨z, m⟩` hidden" (Case C). (`lemma15_part1`, `lemma15_part2`, `ic`, `ic_caseII`)
 
-### 🛠️ Theorem 2 and Lemma 2 (small derivation gaps)
+### 🔧 Theorem 2 (derivation in §3)
 Theorem 2's proof says a process deciding `1` must know `never-known(∃0)`, but by Agreement this is only a
-precondition for *correct* deciders, and Lemma 2's proof needs `P0` to decide at the first time `K_i ∃0` holds.
+precondition for *correct* deciders.
 
-**Impact.** Statements true; minor fixes.
+**Impact.** Statement true (`theorem2`).
 
-**Details.**
-- Theorem 2: the proof works by making `i` correct in the run that contains the hidden path.
-- Lemma 2: `P0` decides at the first time `K_i ∃0` holds because first knowledge happens by time `f + 1 ≤ t + 1`.
+**Repair.** The proof works by making `i` correct in the run that contains the hidden path
+(`exists_run_of_hiddenPath`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -101,6 +109,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 Lemma 17, case `F⟨i, m⟩ = t`: it suffices that only `z` carries `0`. The paper makes every hidden process at
 `m − 1` carry it.
+
+Lemma 2: the proof needs `P0` to decide at the first time `K_i ∃0` holds, which is true because first knowledge
+happens by time `f + 1 ≤ t + 1`.
 
 **Main results in Lean.** Namespace `Podc.ParetoOptimalConsensus`.
 
@@ -135,8 +146,9 @@ Lemma 17, case `F⟨i, m⟩ = t`: it suffices that only `z` carries `0`. The pap
 | Theorem 5 (`U-Opt0` unbeatable, `f + 1` / `f + 2`) | `theorem5` | `Theorem5.lean` |
 
 **Not formalized.** Theorem 1 (KoP) in general; we use its instance for Validity. Also: the topological proof of
-Lemma 10 (B.1, B.2), `U-PROT_min-k` and Theorem 6, Theorem 7 and Lemma 19 (last-decider unbeatability), and
-Lemma 20 (`O(n log n)` bits).
+Lemma 10 (B.1, B.2), `U-PROT_min-k` and Theorem 6, the claim that it strictly dominates all known uniform `k`-set
+protocols, Theorem 7 and Lemma 19 (last-decider unbeatability), and Lemma 20 (`O(n log n)` bits). Lemma 10 as printed
+is false, but we did not locate the failure in its topological proof.
 
 **Trust.** No `sorry`. All theorems in the table use only the axioms `propext`, `Classical.choice` and
 `Quot.sound`. The protocols whose unbeatability is proved are proved to solve their problems (`optA_solves`,

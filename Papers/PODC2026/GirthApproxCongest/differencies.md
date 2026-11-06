@@ -4,15 +4,14 @@ Chechik, Lifshitz, Mukhtar, *Girth Approximations in the CONGEST Model*, PODC 20
 
 ## Errors and gaps in the paper
 
-1. **Claim 6.2(1) is false as stated (statement, ❌, harmless).** The claim is `girth(G) = 2q/ε · (1 + ε)` for intersecting
+1. **Claim 6.2(1) is false as stated (statement, 🔧).** The claim is `girth(G) = 2q/ε · (1 + ε)` for intersecting
    inputs. The proof counts `2q · 1` for the two pipes, but each pipe `r_1 → … → r_q` has `q − 1` edges. The directed
    Claim 6.1 counts this correctly as `2(q − 1) + 2`. The cycle through a shared edge weighs `2(q − 1) + 2q/ε`, so the girth
    is strictly smaller than the stated value (`claim_6_2_value_lt`). We prove `girth ≤ 2(q − 1) + 2·Win`
    (`uGraph_mwc_of_inter`), which is all the reduction uses.
-   *Rule.* R1: a numbered stand-alone claim is a statement. R3 does not excuse it, because the proof reasons with the wrong
-   count. It is not a headline (R5), so ❌. Borderline: the intended content (an upper bound) is clear and the theorem is
-   unaffected. The verdict reflects the letter of the rules.
-2. **Claim 6.2(2), proof gap (proof repair).** "Projecting C onto H yields a cycle in H" fails for undirected graphs: a cycle
+   It is not a mere typo, because the proof reasons with the wrong count. The intended content (an upper bound) is clear and
+   the theorem is unaffected.
+2. **Claim 6.2(2), proof gap (🔧).** "Projecting C onto H yields a cycle in H" fails for undirected graphs: a cycle
    can use two Alice edges at `l_1` and two Bob edges at `l_q`, so its projection visits `l` twice. The projection is a
    closed trail. Its edges are distinct because `E_A ∩ E_B = ∅`, and it is non-empty because a cycle cannot lie inside one
    pipe. Its length is still at least the girth of `H` (`egirth_le_card_of_stutter`, via Mathlib's
@@ -23,12 +22,12 @@ Chechik, Lifshitz, Mukhtar, *Girth Approximations in the CONGEST Model*, PODC 20
    `c ≥ t + 1`. Only one tree arc per level enters each shrinking set per round (`card_toA_le`, `card_toB_le`). All nodes
    are covered when `2T + 2 ≤ q` (`cover`). The resulting bound is `q ≤ 2T + 1` or `m ≤ 2T(d + 1)B + 2`, which is
    `Ω̃(min(q, m))`.
-4. **Quoted extremal bound (slip, ⚠️-level, not a result of the paper).** §6 states `ex(n, C_{<2k}) = O(n^{1+1/k})`
+4. **Quoted extremal bound (✏️, not a result of the paper).** §6 states `ex(n, C_{<2k}) = O(n^{1+1/k})`
    (attributed to [3]) and that this is conjecturally tight. For girth `≥ 2k` the exponent is `1 + 1/(k − 1)`. `k = 3` is a
    counterexample: girth-6 graphs with `Ω(n^{3/2})` edges exist (`ex_bound_misquoted`, from `denseHighGirth_three`). The
    paper's later uses (`z(n^{2/5}, C_{<6}) = Θ(n^{3/5})`, §6.2 `m = Θ(a^{1+1/(k−1)})`, "known for `k ∈ {3, 4, 6}`") all use
    the correct exponent.
-   *Rule.* R3 typo: the intent is recoverable from §6.0.1 and §6.2, the fix is local, and no proof uses the wrong version.
+   The intent is recoverable from §6.0.1 and §6.2, the fix is local, and no proof uses the wrong version.
 5. **Vertex count.** "`n^{2/5} · n^{3/5} = n`" ignores the `≈ 2q` tree vertices. Our parameter choice (`aOf`, `qOf`, `dOf`,
    `exists_equiv_vtx`) bounds the tree by `(d + 1)q` and pads with pendant vertices to exactly `n`.
 

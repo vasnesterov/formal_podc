@@ -1,38 +1,35 @@
 # Differences between the formalization and the paper
 
-Paper: Liang–Vaidya, PODC 2012, arXiv 1106.1845v3. Verdict rules from `verdicts.md`.
+Paper: Liang–Vaidya, PODC 2012, arXiv 1106.1845v3.
 
 ## Statement-level issues in the paper
 
-1. **Lemma 1 is false for small fields** (`lemma_1_false_small_field`). The bound
+1. **Lemma 1 is false for small fields** (✏️; `lemma_1_false_small_field`). The bound
    `(1 − (n−f−1)/2^{L/ρ_k})^{ρ_k}` exceeds 1 when `2^{L/ρ_k} < (n−f−1)/2` and `ρ_k` is even. It equals 1 at
    `n−f−1 = 4`, `ρ_k = 2`, `L = 2` (GF(2)), for `H = K_5` with capacities 2. The all-zero coding is singular. The
    proof multiplies inequalities with a possibly negative factor.
-   - Rule R4 (implied assumption), supported by R2 (parameter corner outside the interesting range). Classified
-     ⚠️. The paper fixes the large-`L` regime explicitly: "The algorithm is intended to be used for sufficiently
+   - Implied assumption, a parameter corner outside the interesting range. The paper fixes the large-`L` regime explicitly: "The algorithm is intended to be used for sufficiently
      large L" (Section 2); Theorem 1 adds "when L is large enough, 1 − 2^{−L/ρ_k}C(n,n−f)(n−f−1)ρ_k > 0"; (17)
      concludes "→ 1 as L → ∞". Lemma 1's only use (Appendix C.2: "invertible with non-zero probability") needs its
      bound to be positive, i.e. `2^{L/ρ_k} > n−f−1`, where the lemma is true. Outside the proved range
      (`2^{L/ρ_k} < n−f−1`) Theorem 1's bound is `≤ 0`, so no claim of the paper rests on the false range.
-   - Borderline: the lemma says "for any `ρ_k ≤ U_k/2`" with no condition on `L`, and `n = 7, f = 2` is not a
-     degenerate network (R2 alone would not excuse it). The excuse is the field size, which the paper takes large
-     throughout. The repaired statement assumes `n−f−1 ≤ |F|` (`TreePacking.lemma_1`).
-2. **Lemma 2 field size** (`lemma_2`). The paper draws the entries from `GF(2^{ρ_k})` and gives the bound
+   - The lemma says "for any `ρ_k ≤ U_k/2`" with no condition on `L`, and `n = 7, f = 2` is not a
+     degenerate network. The assumption is on the field size, which the paper takes large throughout. The repaired statement assumes `n−f−1 ≤ |F|` (`TreePacking.lemma_1`).
+2. **Lemma 2 field size** (✏️; `lemma_2`). The paper draws the entries from `GF(2^{ρ_k})` and gives the bound
    `1 − w/2^{ρ_k}`. The intended field `GF(2^{L/ρ_k})` is evident from its use in (16) and from the last sentence of
-   Appendix C.4, which concludes with the bound `1 − (n−f−1)/2^{L/ρ_k}` (checked on the rendered page). Rule R3 (typo, local fix):
-   ⚠️. We prove `1 − w/|F|` for any finite field.
+   Appendix C.4, which concludes with the bound `1 − (n−f−1)/2^{L/ρ_k}` (checked on the rendered page). We prove `1 − w/|F|` for any finite field.
 
 ## Proof-level issues (true statements)
 
-3. **Appendix C.3** (`c3_argument_insufficient`, `TreePacking.det_A_ne_zero`). The argument for `det A_q = ±1`
+3. **Appendix C.3** (🔧; `c3_argument_insufficient`, `TreePacking.det_A_ne_zero`). The argument for `det A_q = ±1`
    uses only properties that a singular cycle-incidence matrix also has. Repaired via connectivity: `D·A_q = 0`
    forces `D` to be constant on tree edges, hence 0. We prove `det A_q ≠ 0` over any field, which is all that is
-   needed. We do not prove `det = ±1`. Proof repair (🛠️).
+   needed. We do not prove `det = ±1`.
 4. **Appendix C.2** uses Lemma 1 to conclude that `det M_H` is a nonzero polynomial. That inference needs
    Lemma 1's bound to be positive, i.e. `|F| > n−f−1`. We instead evaluate at an explicit coding (`specialCoding`,
    block-diagonal `M̃_H`), which works for every field. We use plain Schwartz–Zippel (total degree) instead of
    Lemma 1 of [8]. Both give the same final bound. Routine.
-5. **Section 5.1 / eq. (6).** The proof sets `ρ_k = U_k/2` and `ρ* = U_1/2`, which can be non-integers, while
+5. **Section 5.1 / eq. (6) (✏️).** The proof sets `ρ_k = U_k/2` and `ρ* = U_1/2`, which can be non-integers, while
    Algorithm 1 needs an integer `ρ_k` dividing `L`. Fixed by rescaling the time unit, which the paper allows.
    Recorded only; the throughput argument is formalized at the level of the real-valued time bound.
 

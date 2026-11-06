@@ -7,11 +7,11 @@ brief announcement (author copy from NSF-PAR, retrieved via web.archive; no arXi
 proofs are condensed; numbering follows it. The gaps in Section 3 below are of the kind expected from such
 compression; the Lemma 4.2 gap is not (its one-line justification is false). Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🛠️ Proof repaired.** All results hold: Theorem 3.1 (`log₂ k` reads are needed), Theorem 3.2 and
+**Verdict: 🛠️ Hard fix.** All results hold: Theorem 3.1 (`log₂ k` reads are needed), Theorem 3.2 and
 Corollary 3.5 (a safe/regular simulation whose reads take `log₂ k` reads needs writes of `log₂ k` base writes),
 Lemmas 3.3/3.4, and Theorem 4.1 (no atomic simulation with two readers has reads of `log₂ k` steps; `k > 2`).
 The proof of Lemma 4.2, on which the paper's proof of Theorem 4.1 rests, has a genuine gap: it relies on a
-claim about decision trees that is false. We repair the proof of Theorem 4.1 with a case split.
+claim about decision trees that is false. We found no derivation of the lemma and prove Theorem 4.1 by a new case split.
 
 ## Mistakes in the paper
 
@@ -45,37 +45,39 @@ that `b`'s path in `T₂` reads `ρ` (with value 0, while `R₂` sees `ρ = 1`).
 main argument goes through with `ρ` read at any depth instead of at the root (`Sec4.caseB`). (`theorem_4_1`,
 `setting_false`)
 
-### 🛠️ Theorem 4.1 (main part of the proof)
-Two steps of the main argument need care: the first write of 1 to `x` may lie inside `W₁`, and Case 2 presumes
-that `R₁` reads `x`.
+### 🔧 Theorem 4.1, Case 1 (main part of the proof)
+The first write of 1 to `x` may lie inside `W₁`, and then the continuation of Case 1 (`R₂` sees `r = 1`) is not
+justified.
 
-**Impact.** Statement unaffected; both steps are fixed in the formal proof.
+**Impact.** Statement unaffected; the step is fixed in the formal proof (`Sec4.caseB`, Case 1a; `theorem_4_1`).
 
 **Details.**
 - (a) "The first write of 1 to `x` between the beginning of `W₁` and the end of `W₂`" may lie inside `W₁`. Then
   `R₁` returns `b` while only `a` and `z` have been written, which already violates regularity. We treat this as
   a separate case.
-- (b) In Case 2, "`R₁` cannot return `b`, since `R₁` read 0 in `x`" presumes that `R₁` reads `x`. The correct
-  argument: `R₁` must return `b` by regularity, so it follows `b`'s path, which reads `x` and needs `x = 1`; but
-  `x = 0` at that time.
+- (b) A smaller point: in Case 2, "`R₁` cannot return `b`, since `R₁` read 0 in `x`" presumes that `R₁` reads `x`.
+  The correct argument: `R₁` must return `b` by regularity, so it follows `b`'s path, which reads `x` and needs
+  `x = 1`; but `x = 0` at that time.
 - The cases "first write of 1 to `x` before / after the first write of 0 to `r`" are exhaustive because one step
   writes one register.
 
-### 🛠️ Lemma 3.3 and Theorem 3.2 (small gaps in Section 3)
-Lemma 3.3 bounds the depth of every path of `T_i`, although the step bound only constrains paths that occur in
-executions, and the last step of Theorem 3.2 forgets that the reader might write a register itself.
+### 🔧 Lemma 3.3 (depth of paths)
+Lemma 3.3's proof bounds the depth of *every* path of `T_i` by the step bound, but the bound only constrains paths
+that occur in executions, and the code may do anything on other branches.
 
-**Impact.** Statements unaffected; routine fixes, with a stronger form of Lemma 3.4.
+**Impact.** Statement unaffected (`lemma_3_3`, `SeqReads.complete`, `complete_of_prefixFree`).
 
-**Details.**
-- (a) Lemma 3.3 bounds the depth of *every* path of `T_i` by the step bound. But the bound only constrains paths
-  that occur in executions, and the code may do anything on other branches. The correct argument counts the `k`
-  paths realized by the executions `σ_v`: they form a prefix-free family of binary strings of length `≤ log₂ k`,
-  hence are exactly all strings of length `log₂ k`.
-- (b) Theorem 3.2 counts only *reads* of the simulated read, so the read may also write. The last step ("`WP`
-  writes 1 to each of the `log₂ k` registers read") forgets that the reader might have written such a register
-  itself. It cannot: the argument of Lemma 3.4 shows that every read accesses a register for the first time, so
-  it returns the value left by the write. We prove this stronger form of Lemma 3.4.
+**Repair.** Count the `k` paths realized by the executions `σ_v`: they form a prefix-free family of binary strings of
+length `≤ log₂ k`, hence are exactly all strings of length `log₂ k`.
+
+### 🔧 Theorem 3.2 (last step of the proof)
+Theorem 3.2 counts only *reads* of the simulated read, so the read may also write, and the last step ("`WP` writes 1
+to each of the `log₂ k` registers read") forgets that the reader might have written such a register itself.
+
+**Impact.** Statement unaffected, with a stronger form of Lemma 3.4 (`theorem_3_2`, `lemma_3_4`, `SeqReads.fresh`).
+
+**Repair.** The reader cannot have written it: the argument of Lemma 3.4 shows that every read accesses a register for
+the first time, so it returns the value left by the write. We prove this stronger form of Lemma 3.4.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -120,7 +122,7 @@ Supporting files: `Defs.lean` (model), `Kraft.lean` (prefix-free strings), `Read
 linearization, no new–old inversion).
 
 **Not formalized.** The tightness claims (algorithms of [4], [6], [5]) and the closing remark that one reader
-suffices if its first two reads start with the same register.
+suffices if its first two reads start with the same register, whose hypothesis is not precisely defined in the paper.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity (`Examples.lean`): for `k = 2` the trivial simulation (one base register, CSLib `atomicImpl`) is

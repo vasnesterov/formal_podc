@@ -4,9 +4,9 @@ Paper: H. Naderibeni, E. Ruppert, *A Wait-free Queue with Polylogarithmic Step C
 arXiv 2305.07229v1 (PODC paper + Appendix A with the deferred proofs + Appendix B). The proceedings
 version has the same pseudocode (Fig. 4).
 
-## Statement-level issues (verdict-relevant)
+## Statement-level issues
 
-1. **Fig. 4, line 13: `Append` does not set the `super` field of leaf blocks** (`Counterexample.lean`).
+1. 🔧 **Fig. 4, line 13: `Append` does not set the `super` field of leaf blocks** (`Counterexample.lean`).
    As printed, `leaf.head := leaf.head + 1` replaces `Advance`. The leaf block's `super` is set only if
    some `Refresh` of the parent runs `Advance(leaf, ·)` at line 29 between lines 12 and 13. In a solo
    run that never happens.
@@ -17,7 +17,7 @@ version has the same pseudocode (Fig. 4).
      Line 73 then picks root block 1 and line 76 computes rank 2. `FindResponse(1, 2)` returns `null`
      instead of `7`.
 
-   *Rule:* R3 (typo / evident intent) → ⚠️. The intended version can be recovered from the paper:
+   The intended version can be recovered from the paper:
    - the proof of Invariant 3 assumes that head fields change only at line 63;
    - Lemma 12's proof uses "the call to `Advance(v, b)` that writes `B.super`" for every block, leaves
      included (Lemma 13 applies Lemma 12 to the leaf);
@@ -26,48 +26,40 @@ version has the same pseudocode (Fig. 4).
    The repair is local: one pseudocode line, `Advance(leaf, h)` in place of line 13. The paper's
    proofs reason with the repaired version.
 
-   *Borderline call:* the headline Theorem 18 names this specific algorithm. Without the R3 excuse
-   this would be 🚨. We judge the missing `Advance` a slip in the pseudocode, not a design error,
-   because every proof in the paper treats leaves like internal nodes. An implementer following
-   Fig. 4 literally gets a non-linearizable queue, and the README says so prominently.
+   An implementer following Fig. 4 literally gets a non-linearizable queue.
 
    *Reviewer check.* Fig. 4 was rendered from both the arXiv v1 and the proceedings PDF. Both print
    line 13 as `leaf.head := leaf.head + 1`. arXiv has no later revision. `super` is written only at
    line 61. `Advance` is called only at lines 29 and 36, and line 36 never applies to a leaf. So
    nothing else sets a leaf block's `super`, and the counterexample is a solo sequential run, not a
    race.
-   - For 🚨 (R5): Theorem 18 is the headline and concerns this specific algorithm. The prose of
-     Section 3.4 ("the Append writes B there and increments head") does not mention `Advance`.
-   - For ⚠️ (R3): the proofs reason with the repaired version, not the printed one. Invariant 3
-     claims non-null `super` for every non-root node, leaves included. Its proof says head changes
-     "only" by the CAS at line 63, and Lemma 12's proof uses the `Advance` that writes `B.super`.
-     The fix is a missing call in the pseudocode.
-   - Precedents: CryptoConsensusNumber (a one-term slip in Fig. 4 breaks the headline liveness →
-     ⚠️), TimeOptimalSSLE (as printed the protocol never stabilizes → ⚠️), BindingCrusaderAgreement.
-
-   The reviewer endorses ⚠️.
-2. **Fig. 4, line 78: `v.blocks` should be `v.parent.left.blocks`**
+   - The prose of Section 3.4 ("the Append writes B there and increments head") does not mention
+     `Advance`.
+   - The proofs reason with the repaired version, not the printed one. Invariant 3 claims non-null
+     `super` for every non-root node, leaves included. Its proof says head changes "only" by the CAS
+     at line 63, and Lemma 12's proof uses the `Advance` that writes `B.super`.
+2. ✏️ **Fig. 4, line 78: `v.blocks` should be `v.parent.left.blocks`**
    (`line78_not_linearizable` for the variant `⟨true, false⟩`: only line 13 repaired).
 
-   *Rule:* R3 → ⚠️. The proof of Lemma 13 describes the intended computation ("the subblocks of B′ from
+   The proof of Lemma 13 describes the intended computation ("the subblocks of B′ from
    v's left sibling"), and the fix is one identifier.
 
    In the counterexample, the printed line 78 reads `leaf₃.blocks[2]`, which is still `null` (a null
    dereference if read literally). The model reads it as `B₀`, and truncated subtraction then gives
    rank `1`. Integer subtraction would give `0`, which violates `FindResponse`'s precondition. The
-   correct rank is `2`, so every reading fails. The verdict does not rest on this example: the
+   correct rank is `2`, so every reading fails. Apart from this example, the
    `endleft` indices plainly index the left sibling's array.
 
 ## Typos and slips in proofs (no effect on the statements)
 
-3. Proof of Proposition 19: "A Refresh does at most 5 CAS steps". It is 7: line 29 may call `Advance`
+3. ✏️ Proof of Proposition 19: "A Refresh does at most 5 CAS steps". It is 7: line 29 may call `Advance`
    for both children (2 CAS each), plus line 35 and the `Advance` of line 36. The `O(log p)` claim is
    unaffected; our step count per `Refresh` is 17 (`refPos` in `Progress.lean`).
 4. Proof of Lemma 10: "By Lemma 4, `v.blocks[h₂] = null` when `R₁` executes line 25" should cite
    Invariant 3, using `h₂ > h₁`.
-5. Proof of Invariant 7 (App. A): `E(v.left.blocks[0]) ⋯ E(v.left.blocks[B.endright])` should be
+5. ✏️ Proof of Invariant 7 (App. A): `E(v.left.blocks[0]) ⋯ E(v.left.blocks[B.endright])` should be
    `v.right`.
-6. Proof of Lemma 21: "the earliest termination `t` of any operation contained in `B`" need not
+6. 🔧 Proof of Lemma 21: "the earliest termination `t` of any operation contained in `B`" need not
    exist. We prove instead that, when `B` is installed, all its operations are pending: a completed
    operation is already in an earlier block of every node on its path, and Corollary 6 rules out a
    second block (`lemma_21`).
@@ -108,7 +100,7 @@ version has the same pseudocode (Fig. 4).
   used as `0`; this matters only for the printed algorithm.
 - **Tree.** Heap numbering of a complete binary tree of height `H ≥ 1` with `np ≤ 2^H` processes
   (unused leaves stay empty). The paper's `H = ⌈log₂ p⌉` is the case `np = p`. `p = 1` needs `H ≥ 1`
-  here; the paper's height-0 tree has no `leaf.parent` (degenerate).
+  here; the paper's height-0 tree has no `leaf.parent` (degenerate, ✏️).
 - **Searches.** `findFirst f x lo hi` is the least index in `[lo, hi]` with `x ≤ f(j)` (`hi` if none).
   It is the result of the doubling/binary searches; their cost is not modelled.
 - **Ghost state.** The invariant uses ghost variables (`Ghost`, `gstep`) computed from the run. The

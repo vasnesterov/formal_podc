@@ -4,27 +4,26 @@ Rafail Ostrovsky, Will Rosenbaum. *Fast Distributed Almost Stable Matchings.* PO
 [10.1145/2767386.2767424](https://doi.org/10.1145/2767386.2767424). Formalized version: arXiv
 [1408.2782](https://arxiv.org/abs/1408.2782) v2; numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🛠️ Proof repaired.** Theorem 4.1 is true with the paper's constants: for every maximal-matching
-subroutine, the deterministic algorithm ASM outputs a matching with at most `ε|E|` blocking pairs. Theorem 4.7
-(`O(ε⁻³ log⁵ n)` rounds given an `O(log⁴ n)`-round subroutine) is also true, as an explicit round count
-(no CONGEST message semantics). All lemmas of §§3–4 hold. The proof of
-Lemma 4.4 has a real gap: it overlooks men who become bad while inactive. We closed it with a different charging
-argument that gives the same bound.
+**Verdict: 🛠️ Hard fix.** Theorem 4.1 is true with the paper's constants: for every maximal-matching subroutine, the
+deterministic algorithm ASM outputs a matching with at most `ε|E|` blocking pairs, and all lemmas of §§3–4 hold. But the
+proof of Lemma 4.4, on which Theorem 4.1 rests, has a real gap: it overlooks men who become bad while inactive, and we
+closed it with a different charging argument that gives the same bound. Theorem 4.7 (`O(ε⁻³ log⁵ n)` rounds given an
+`O(log⁴ n)`-round subroutine) is also true, as an explicit round count (no CONGEST message semantics); the randomized
+variants were not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
 - Display (1) in Lemma 4.3 has the rank differences reversed (it should be
   `P^m(p(m)) − P^m(w) < 2deg(m)/k`).
+- Algorithm 3 has *every* processor test `|Q| ≥ 2^i`. Only the men can be meant, as §3.4 and §4.2 say: women and
+  inactive men must still react to proposals and rejections.
+- Theorem 2.7 states `log⁴ n` rounds, while [6] gives `O(log⁴ n)`, the form used in the proof of Theorem 4.7.
+
+### Typos
 - The proof of Lemma 4.2 ends with "ε-blocking" for "(2/k)-blocking".
 - In §3.1 the men's quantiles are described as sets of "men".
-- Under-specified details (we fixed natural readings):
-  - The rounding of the quantile sizes `deg v / k` is not given. We use `⌈k · rank / deg⌉`.
-  - Algorithm 3 has *every* processor test `|Q| ≥ 2^i`. Only the men can be meant: women and
-    inactive men must still react to proposals and rejections.
-  - `P^v(∅) = deg v + 1` in Definition 2.3 is introduced only inside the proof of Lemma 4.3.
+- `P^v(∅) = deg v + 1` in Definition 2.3 is introduced only inside the proof of Lemma 4.3.
 
 ## Proof gaps (statements true)
 
@@ -59,7 +58,7 @@ shows that inactive men gain nothing else. This gives `∑_{m bad} |Q^m| ≤ ∑
 Lemma 4.4's bound `4δ|E|` for every `δ > 0` (the paper needs `δ ≤ 1/2`).
 (`sum_bad_card_le`, `lemma_4_4`)
 
-### 🛠️ Lemma 4.5, proof (monotonicity of good active men)
+### 🔧 Lemma 4.5, proof (monotonicity of good active men)
 "The number of matched players can only increase, hence the number of good players can only
 increase" is applied to the *active* men, although individual active men can lose their partners.
 
@@ -81,7 +80,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 * `MaximalMatching` (Theorem 2.7) is a black box `MMOracle`: any function returning a maximal matching of every
   bipartite graph, with a round count. All results hold for every oracle, so for every deterministic subroutine.
 * The parameters are the paper's: `k = ⌈8/ε⌉`, `ℓ = ⌈2k/δ⌉` with `δ = ε/8`, and outer iterations
-  `0, …, ⌊log₂ n⌋`, where `n` bounds the degrees. A general version holds for any `k`, `ℓ`, `L`.
+  `0, …, ⌊log₂ n⌋`, where `n` bounds the degrees. A general version holds for any `k`, `ℓ`, `L`. The paper does not
+  give the rounding of the quantile sizes `deg v / k`; we use `⌈k · rank / deg⌉`.
 * Theorem 4.7 is proved for an explicit round count: ASM is run with a round counter that charges `3` one-bit
   rounds per `ProposalRound` plus the subroutine's `T` rounds (local steps are free). The counter ends at
   `(L+1) · ℓ · k · (3 + T)` (`stageC_asm`), which is `O(ε⁻³ log⁵ n)` for `T = O(log⁴ n)`. This is a cost

@@ -5,17 +5,17 @@ extended version arXiv 2605.19531v1 (numbering as there).
 
 ## Statement-level issues in the paper
 
-All checked statements hold as stated, so no statement-level rule (R2–R4) is needed. The verdict is 🛠️
-because of the proof repairs listed below. Under R1, wrong steps inside proofs count as proof repairs.
+All checked statements hold as stated, apart from the degenerate empty case of Commitment (see "GCA
+properties" below). The items here are wrong or missing steps inside proofs.
 
-1. **Lemma A.2 (Adoption), wrong step.** For the case `w_i = True` the proof says "since the snapshot is
+1. **Lemma A.2 (Adoption), wrong step (🔧).** For the case `w_i = True` the proof says "since the snapshot is
    linearizable, necessarily no flag `c_k` is set to False". This is false. Take inputs `a`, `b`, `c` with
    `b ≍ c` and `a` independent of both. `p₂` writes `b`, `p₃` writes `c`, and then `p₂` takes
    `A₂ = {a, b, c}` (here `p₁` wrote `a` and took its snapshot `{a}` earlier). `p₂`'s co-entries are
    `a`, `ε`, `ε`, so it writes `(a, False)`. Then `p₁` writes `(a, True)` and snapshots `B`. Its view
    holds a `False` flag, yet `w₁ = True`. The conclusion still holds: all entries seen by `p₁` equal its
    input. We reprove Adoption differently (`GCA.adoption_of_reach`; see its docstring).
-2. **Lemma A.3 (Commitment), wrong step.** "`B_{f(i)} = β`, therefore `f(i) ∈ P_β`" is false.
+2. **Lemma A.3 (Commitment), wrong step (🔧).** "`B_{f(i)} = β`, therefore `f(i) ∈ P_β`" is false.
    Counterexample (independent letters `a`, `c`; inputs `a`, `ε`, `c`):
    - `p₂` writes `A[2] = ε`.
    - `p₁` writes `A[1] = a`, snapshots `A = {a, ε}`, writes `B[1] = (a, True)`, snapshots `B = {(a, True)}`
@@ -27,12 +27,12 @@ because of the proof repairs listed below. Under R1, wrong steps inside proofs c
    `f`-chain by a maximality argument. Let `β₀` be the least candidate. Among the processes whose input is
    `≤ β₀` and whose `B`-view contains `β₀`, pick one with a ⊆-maximal `B`-view. It must commit, since a
    witness `k` against it would be such a process with a larger `B`-view (`GCA.commitment_of_reach`).
-3. **Algorithm 2: coherence is used silently.** "`A_i^co` contains only compatible traces", and Lemma
+3. **Algorithm 2: coherence is used silently (🔧).** "`A_i^co` contains only compatible traces", and Lemma
    A.4's step from incompatible LUBs to incompatible elements, both need *coherence*: a pairwise compatible
    finite set of traces has an upper bound. The paper never states this property. We prove it for traces
    of duplicate-free schedules (`NTrace.compat_of_pairwise`) and make it an axiom of the abstract domain
    (`GCADomain.compat_of_pairwise`).
-4. **Theorem 4.4, invariant (I).** The proof claims (I) for *every* round `r > r₀`, using "u_i contains
+4. **Theorem 4.4, invariant (I) (🔧).** The proof claims (I) for *every* round `r > r₀`, using "u_i contains
    only commands from pending operations". The claim is imprecise. Operations that complete between `τ`
    and `τ'` commit at rounds `> r₀`, and their commands may be outside the common prefix `t` of a round
    `r ≤` their commit round. Showing that such commands do not conflict with the others needs an extra
@@ -41,7 +41,7 @@ because of the proof repairs listed below. Under R1, wrong steps inside proofs c
    (`Setup.compat_round`). By Lemma A.1, completed operations committed at rounds `≤ B` (the registers no
    longer change), so their commands lie in the common prefix. The remaining commands belong to pending
    operations of distinct processes and do not conflict.
-5. **Proposition 3.4, second item (lock-freedom ⇒ weak conflict-freedom), incomplete proof (not
+5. **Proposition 3.4, second item (lock-freedom ⇒ weak conflict-freedom), incomplete proof (❌, not
    formalized).** The proof says "if Φ did not complete, there would exist a suffix in which Φ is pending
    and no other operation takes steps, contradicting lock-freedom". That suffix does not contradict
    lock-freedom as defined: a process with no pending operation is correct and vacuously "completes each of
@@ -100,7 +100,7 @@ because of the proof repairs listed below. Under R1, wrong steps inside proofs c
   prefix is stated as "every common lower bound of the inputs is below every output". This is equivalent
   to the paper's `⊓ s_j ≤ t_i`. Commitment additionally assumes that there is at least one participant.
   Taken literally, the paper's Commitment fails when nobody participates (`P = P_r = ∅`), which is a
-  degenerate case (R2).
+  degenerate case (✏️).
 - **`⊥` in line 9 of Algorithm 2.** The commit condition `∀ a_k : a_k ≤ β_i ⟹ b_k ≠ ⊥` is read over
   the non-`⊥` entries of `A_i`. The paper's `⊥` conventions (Appendix A.4) leave this case open. If
   `⊥` counted as `≤ β_i`, then a non-participant would block commitment forever. Elsewhere `⊓` is

@@ -7,41 +7,28 @@ version (IACR ePrint 2022/354, single version of 2022-03-18) has the same protoc
 the proof of Theorem 4.1 (Section 6.1).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** The impossibility result (Theorem 5.1: no AA protocol when `2tₛ + tₐ ≥ n`) is
-correct for `n ≥ 2`, even with signatures. The protocol side is broken. The Reliable Broadcast `Π_rBC` is
-not consistent in a synchronous network when `tₛ ≥ n/3` (Theorem 4.1 is false). As a result, the main
-protocol `Π_AA` is **not** a `tₛ`-secure AA protocol in the synchronous network (Theorem 3.1(1) is false).
-For `n = 3`, `tₛ = 1`, `tₐ = 0`, one Byzantine party keeps the two honest parties at `0` and `1` forever.
-The iteration analysis (Lemmas 3.2–3.7) is correct *if* the Overlap All-to-All Broadcast has the
-guarantees of Definition 2.2. So the headline tight characterization is only half established by the paper.
+**Verdict: ❌ Intent lost.** The protocol the paper is about fails: the Reliable Broadcast `Π_rBC` is not consistent
+in a synchronous network when `tₛ ≥ n/3`, the very range it was built for, so `Π_AA` is **not** a `tₛ`-secure AA
+protocol there (for `n = 3`, `tₛ = 1`, `tₐ = 0`, one Byzantine party keeps the two honest parties at `0` and `1`
+forever), and no repaired broadcast is proved. The impossibility result (Theorem 5.1: no AA protocol when
+`2tₛ + tₐ ≥ n`) is correct for `n ≥ 2`, even with signatures. The iteration analysis (Lemmas 3.2–3.7) is correct
+*if* the Overlap All-to-All Broadcast has the guarantees of Definition 2.2, so the tight characterization is only
+half established by the paper.
 
 ## Mistakes in the paper
 
-### 🚨 Theorem 3.1 (1) (`Π_AA` agreement in a synchronous network)
-`Π_AA` is not `tₛ`-secure in a synchronous network: for `n = 3`, `tₛ = 1`, `tₐ = 0`, a Byzantine party that
-runs the `Π_rBC` attack below keeps the two honest parties at outputs `0` and `1` (`AA.theorem_3_1_sync_false`).
-
-**Impact.** The protocol half of the headline tight characterization is not established: the range of honest
-values is not halved at all, and the attack can be repeated in every iteration. Validity and termination are not
-violated; agreement is. The characterization claimed in the abstract may still hold with a correct hybrid
-broadcast primitive, but the paper does not establish it; the impossibility half (Theorem 5.1) stands.
-
-**Details.** The proofs of Lemma 4.3 ("`Π_rBC` guarantees that `P′` has received each value reported by `P`")
-and of Lemma 4.4 (`tₛ`-Consistency of `Π_oBC`) rely on Theorem 4.1. So does Lemma 3.3 (`|V ∪ V′| ≤ n`). We ran
-the whole protocol in the setting above (`n = 3`, `tₛ = 1`, `tₐ = 0`, `ε = 1/2`, `δmax = 1`, hence `S = 1`
-iteration). Honest inputs are `0` and `1`. `C` performs the attack of the next item in its own `Π_rBC`
-instance. It then reports to each honest party exactly that party's set `O`, so `C` becomes a witness of both.
-Both honest parties terminate `Π_oBC` just after `4Δ`, with `O₀ = {0, 1, 0}` and `O₁ = {0, 1, 1}`. Discarding
-one value at each end gives the outputs `0` and `1`. If `C` instead withholds its reports, neither honest party
-ever terminates `Π_oBC`. This contradicts Lemma 4.3 too; we checked it by running the encoding, not by a proof.
-
-### ❌ Theorem 4.1 (`Π_rBC` synchronized consistency)
+### ❌ Theorem 4.1 (`Π_rBC` synchronized consistency) and Theorem 3.1 (1) (`Π_AA` agreement in a synchronous network)
 `Π_rBC` is not consistent in a synchronous network when `tₛ ≥ n/3`: for `n = 3`, `tₛ = 1`, a Byzantine sender
 whose conflicting proposals arrive late at `2Δ` makes the two honest parties output `0` and `1` at `3Δ`
-(`RBC.rbc_not_syncConsistent`, `RBC.rbc_attack`).
+(`RBC.rbc_not_syncConsistent`, `RBC.rbc_attack`), and a Byzantine party that runs this attack keeps the two honest
+parties of `Π_AA` at outputs `0` and `1` (`AA.theorem_3_1_sync_false`).
 
-**Impact.** False statement for every `tₛ` in the paper's range `n/3 ≤ tₛ < n/2` (only `n = 3` is formalized).
-It is the root cause of the failure of Theorem 3.1 (1) above.
+**Impact.** The protocol half of the tight characterization is not established: the range of honest values is not
+halved at all, and the attack can be repeated in every iteration. Validity and termination are not violated;
+agreement is. Theorem 4.1 is false for every `tₛ` in the paper's range `n/3 ≤ tₛ < n/2` (only `n = 3` is
+formalized), and it is the root cause of the failure of Theorem 3.1 (1). The characterization claimed in the
+abstract may still hold with a correct hybrid broadcast primitive, but the paper does not establish it and we
+prove no such primitive; the impossibility half (Theorem 5.1) stands.
 
 **Details.** Lines 2–4 detect a Byzantine sender's equivocation only for proposals that arrive by time `Δ`.
 Their forwards then reach everybody by `2Δ`, as the paragraph before the pseudocode argues. The failing step is
@@ -57,34 +44,31 @@ run is synchronous (every honest message arrives after exactly `Δ`), has one co
 signature. The same idea works whenever `n ≤ 3tₛ`: split the honest parties into two groups of size
 `≥ n − 2tₛ` each.
 
-### ⚠️ Theorem 5.1 for `n = 1` (impossibility)
-For `n = 1` (e.g. `tₛ = 0`, `tₐ = 1`, so `2tₛ + tₐ ≥ n`), "output your input" is a secure AA protocol
-(`theorem_5_1_false_n_eq_one`).
+The proofs of Lemma 4.3 ("`Π_rBC` guarantees that `P′` has received each value reported by `P`") and of Lemma 4.4
+(`tₛ`-Consistency of `Π_oBC`) rely on Theorem 4.1. So does Lemma 3.3 (`|V ∪ V′| ≤ n`). We ran the whole protocol in
+the setting above (`n = 3`, `tₛ = 1`, `tₐ = 0`, `ε = 1/2`, `δmax = 1`, hence `S = 1` iteration). Honest inputs are
+`0` and `1`. `C` performs the attack above in its own `Π_rBC` instance. It then reports to each honest party
+exactly that party's set `O`, so `C` becomes a witness of both. Both honest parties terminate `Π_oBC` just after
+`4Δ`, with `O₀ = {0, 1, 0}` and `O₁ = {0, 1, 1}`. Discarding one value at each end gives the outputs `0` and `1`.
+If `C` instead withholds its reports, neither honest party ever terminates `Π_oBC`. This contradicts Lemma 4.3 too;
+we checked it by running the encoding, not by a proof.
 
-**Impact.** False only in a degenerate case; Theorem 5.1 holds for `n ≥ 2`.
+### ✏️ Slips
+- Theorem 5.1 is false for `n = 1` (e.g. `tₛ = 0`, `tₐ = 1`, so `2tₛ + tₐ ≥ n`): "output your input" is a secure AA
+  protocol (`theorem_5_1_false_n_eq_one`). It holds for `n ≥ 2`.
+- Definition 2.1 does not require termination, while the impossibility proof uses it ("the honest parties output
+  +ε"). We include termination in the definition.
+- In the proofs of Lemmas 3.3 and 3.5, "`length(T ∪ T)`" should be `length(T ∪ T′)`.
+- In lines 9 and 15 of `Π_oBC`, "`(v′, P′)`" should be `(v, P′)`.
 
-### ⚠️ Definition 2.2 (asynchronous guarantees of the Overlap All-to-All Broadcast)
-Lemma 3.4 uses that "at most `tₐ` values are sent by corrupted parties", which needs the value attributed to an
-*honest* sender to be its actual input, and Definition 2.2 does not require this in the asynchronous case.
-
-**Impact.** Under-specified definition: a gap in the interface, not in the result. It holds for the concrete
-`Π_oBC`; we add it as the hypothesis `AsyncOBC.authentic`.
-
-### ⚠️ Definition 2.1 (termination)
-Definition 2.1 does not require termination, while the impossibility proof uses it ("the honest parties output
-+ε").
-
-**Impact.** Under-specified definition; we include termination in the definition.
-
-### Typos and slips
+### Typos
 - In Lemma 3.6, "`0 ≤ tₐ, c ≤ tₛ`" should read `0 ≤ tₐ ≤ tₛ` (`c` is not defined there).
 - In the proof of Lemma 3.6, "`i_v + m_V(u) − 1`" should be `i_u + …`.
-- In Lemmas 3.3 and 3.5, "`length(T ∪ T)`" should be `length(T ∪ T′)`.
-- In line 9 of `Π_oBC`, "`(v′, P′)`" should be `(v, P′)`.
+- In the proof of Lemma 3.5, "Let `P` and `P`" should be `P` and `P′`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 5.1 (reduction to `n = 2tₛ + tₐ`, and `tₛ = 0`)
+### 🔧 Theorem 5.1 (reduction to `n = 2tₛ + tₐ`, and `tₛ = 0`)
 The proof's "let `n = 2tₛ + tₐ`" is not always possible, and for `tₛ = 0` the groups `S±ε` are empty and the
 argument gives nothing.
 
@@ -96,6 +80,13 @@ argument gives nothing.
 **Repair.** Use groups of size *at most* `tₛ`/`tₐ`; for `tₛ = 0`, use groups of size `≤ max(tₛ, tₐ)`, with
 scenarios 1 and 2 read as asynchronous executions when needed (a synchronous execution is also an asynchronous
 one).
+
+### 🔧 Definition 2.2 (asynchronous guarantees of the Overlap All-to-All Broadcast)
+Lemma 3.4 uses that "at most `tₐ` values are sent by corrupted parties", which needs the value attributed to an
+*honest* sender to be its actual input, and Definition 2.2 does not require this in the asynchronous case.
+
+**Impact.** Under-specified definition: a gap in the interface, not in the result. It holds for the concrete
+`Π_oBC`; we add it as the hypothesis `AsyncOBC.authentic`, and Lemmas 3.4–3.5 go through (`theorem_3_1_async`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

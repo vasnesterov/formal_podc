@@ -3,19 +3,17 @@
 Paper: Chang, Mishra, Nguyen, Salim, *Round and Communication Efficient Graph Coloring*, PODC 2025,
 arXiv 2412.12589v2.
 
-## Statement-level issues (verdict rules from `verdicts.md`)
+## Statement-level issues
 
 1. **Lemma 5.3 is false for `Δ = 0`.** The lemma has no hypothesis `Δ ≥ 1`. With `Δ = 0` every vertex
    has degree 0, the degree-0 vertices are trivially independent, and no matching covers them: one
-   isolated vertex is a counterexample (`lemma_5_3_false_of_zero`). Rule **R2** (degenerate: a
-   parameter corner that Algorithm 2, with `Δ ≥ 8`, never uses) gives **⚠️**. This is the only
-   statement-level issue, so it alone sets the verdict. It is a borderline call: by R6 the worst label
-   wins, and R2 explicitly classifies a degenerate failure as ⚠️ rather than ✅. We prove `lemma_5_3`
+   isolated vertex is a counterexample (`lemma_5_3_false_of_zero`). This is a degenerate parameter
+   corner that Algorithm 2, with `Δ ≥ 8`, never uses (✏️). We prove `lemma_5_3`
    for `Δ ≥ 1` in a stronger form: only "maximum degree `≤ Δ`" is needed for an injective choice of
    neighbours (Hall). The independence hypothesis is used separately, to show the chosen edges are
    disjoint (`lemma_5_3_matching`, `Plan.M_unique`).
 
-## Proof-level remarks (no effect on the verdict)
+## Proof-level remarks
 
 2. **Theorem 3, deferral.** "Sequentially identifies edges connecting two vertices of degree `Δ`" must
    use the current degree in the remaining graph. Then the deferred edges form a maximal matching

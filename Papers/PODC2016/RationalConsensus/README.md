@@ -5,43 +5,39 @@ Joseph Y. Halpern, Xavier Vilaça. *Rational Consensus.* PODC 2016. DOI
 [2005.10141](https://arxiv.org/abs/2005.10141) v1 (full version with proofs and Algorithm 1); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** Theorem 1 (no fair consensus protocol is an `f`-Nash equilibrium,
-`f ≥ 1`) is correct for `n ≥ 2` and fully verified. Theorem 2 (`σ_cons` solves fair consensus whenever
-`f + 1 < n`) is verified for Algorithm 1 as written, but its proof has a gap (the first crash-free round
-need not seem clean), and the forwarding step of round `f + 1` is under-specified: under the prose reading
-("forward the shares *received*") the theorem fails for `n = f + 2` and for `f = 0`. Theorems 3 and 4
-(π-Nash and sequential equilibrium) were not formalized.
+**Verdict: 🛠️ Hard fix.** Theorem 1 (no fair consensus protocol is an `f`-Nash equilibrium, `f ≥ 1`) is correct
+for `n ≥ 2` and fully verified. Theorem 2 (`σ_cons` solves fair consensus whenever `f + 1 < n`) is verified for
+Algorithm 1 as written, but its agreement proof is wrong (the first crash-free round need not seem clean) and
+took a new counting argument. Theorems 3 and 4 (π-Nash and sequential equilibrium), the positive half of the
+paper's main point, were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Algorithm 1, line 20 / Theorem 2 (forwarding step of round `f + 1`)
-The forwarding step is under-specified, and under the prose reading ("forward the shares *received*") Theorem 2 is false for `n = f + 2` and for `f = 0`, because a nonfaulty agent holds only one point of a degree-1 polynomial and decides `⊥` (`Cons.theorem_2_receivedOnly_false`).
+### ✏️ Slips
+- The forwarding step of round `f + 1` (Algorithm 1, line 20) is under-specified: line 20 includes the agent's
+  own share, while the prose forwards the shares *received*. Under the prose reading Theorem 2 is false for
+  `n = f + 2` and for `f = 0`, because a nonfaulty agent holds only one point of a degree-1 polynomial and decides
+  `⊥` (`Cons.theorem_2_receivedOnly_false`). Line 20 as written (own share included) satisfies Theorem 2 for every
+  `f + 1 < n` (`Cons.theorem_2`), and the intended protocol is correct.
 
-**Impact.** An under-specified algorithm; the intended protocol is correct. Line 20 as written (own share included) satisfies Theorem 2 for every `f + 1 < n` (`Cons.theorem_2`).
+  Line 20 of Algorithm 1 has agent `i` send `j` the tuple `(y_li)_{l ≠ j}`. The index set includes `l = i`, so `i`
+  also sends its own share `y_ii = q_i(i)`. Elsewhere the pseudocode writes `l ≠ j, i` when it wants to exclude `i`
+  (lines 6, 28). But line 14 defines `y_ij` only for `j ≠ i`, and the prose says `i` forwards "the secret shares
+  `y_li` it received in round 1 from each agent `l`", which excludes the own share (though the next sentence,
+  "this enables `j` to compute the polynomials `q_i^t`", again needs it). The proof needs the own share: "since
+  there are at least `n − f ≥ 2` nonfaulty agents, `i` and `j` will be able to interpolate `q_l`" counts `l` itself
+  as a forwarder when `l` is nonfaulty. So does the hypothesis `f + 1 < n`.
 
-**Details.** Line 20 of Algorithm 1 has agent `i` send `j` the tuple `(y_li)_{l ≠ j}`. The index set includes
-`l = i`, so `i` also sends its own share `y_ii = q_i(i)`. Elsewhere the pseudocode writes `l ≠ j, i` when it
-wants to exclude `i` (lines 6, 28). But line 14 defines `y_ij` only for `j ≠ i`, and the prose says `i` forwards
-"the secret shares `y_li` it received in round 1 from each agent `l`", which excludes the own share (though the
-next sentence, "this enables `j` to compute the polynomials `q_i^t`", again needs it). The proof needs the own
-share: "since there are at least `n − f ≥ 2` nonfaulty agents, `i` and `j` will be able to interpolate `q_l`"
-counts `l` itself as a forwarder when `l` is nonfaulty. So does the hypothesis `f + 1 < n`.
+  Under the received-only reading, take `n = f + 2`, let agents `0` and `1` be nonfaulty, and let the other `f`
+  agents crash at the start of round 1 without sending anything. Agent `0` then holds a single point of agent
+  `1`'s degree-1 polynomial, cannot interpolate `x_1[t]` and decides `⊥`. The same holds for `f = 0` and any
+  `n ≥ 2`: round `f + 1 = 1` comes before any share is received. (`Cons.sigmaCons_receivedOnly_not_fair_3_1`)
 
-Under the received-only reading, take `n = f + 2`, let agents `0` and `1` be nonfaulty, and let the other `f`
-agents crash at the start of round 1 without sending anything. Agent `0` then holds a single point of agent
-`1`'s degree-1 polynomial, cannot interpolate `x_1[t]` and decides `⊥`. The same holds for `f = 0` and any
-`n ≥ 2`: round `f + 1 = 1` comes before any share is received. (`Cons.sigmaCons_receivedOnly_not_fair_3_1`)
-
-**Repair.** We formalize line 20 as written, with `y_ii = q_i(i)`, and prove Theorem 2 for every `f + 1 < n`
-(`Cons.theorem_2`). Under the received-only reading Theorem 2 holds only for `f ≥ 1`, `n ≥ f + 3`
-(`Cons.theorem_2_receivedOnly`).
-
-### ⚠️ Theorem 1 for `n = 1`
-Theorem 1 needs `n ≥ 2`: with a single agent, "decide your own preference" is fair consensus and an `f`-Nash equilibrium for every `f` (`theorem_1_false_of_card_eq_one`).
-
-**Impact.** Degenerate; Theorem 1 holds for every `n ≥ 2` (`theorem_1`).
-
-### Typos and slips
+  We formalize line 20 as written, with `y_ii = q_i(i)`, and prove Theorem 2 for every `f + 1 < n`
+  (`Cons.theorem_2`). Under the received-only reading Theorem 2 holds only for `f ≥ 1`, `n ≥ f + 3`
+  (`Cons.theorem_2_receivedOnly`).
+- Theorem 1 needs `n ≥ 2`: with a single agent, "decide your own preference" is fair consensus and an `f`-Nash
+  equilibrium for every `f` (`theorem_1_false_of_card_eq_one`). Theorem 1 holds for every `n ≥ 2` (`theorem_1`).
 - The secret sharing is under-specified: no field is given, and shares are evaluated at agent identifiers
   `0, …, n−1`, so agent `0` receives `q_i^t(0) = x_i[t]`, the secret itself. We use `𝔽_p` with a prime
   `p > n` and evaluation points `j + 1`.
@@ -49,6 +45,8 @@ Theorem 1 needs `n ≥ 2`: with a single agent, "decide your own preference" is 
   round, so the result depends on the order in which messages are processed: a later, larger report can
   overwrite a smaller one. We take the minimum, which is what the proof assumes.
 - Check 8 says "more than `f` crashes", then "(i.e., `f` or more agents …)".
+
+### Typos
 - In Theorem 1's proof, the step "there is a failure pattern `F²` where `i` fails after the decision"
   silently uses countable additivity: decisions happen at unbounded times, but with positive probability by a
   fixed time `T`.
@@ -113,7 +111,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Not formalized.** Lemma 1, Theorem 3 (π-Nash equilibrium under "supports reachability" and uniformity) and
 Theorem 4 (sequential equilibrium). They need conditional expectations over information sets, the full
-consistency-check machinery of `σ_cons`, and a case analysis over all deviations.
+consistency-check machinery of `σ_cons`, and a case analysis over all deviations. Consistency checks 1, 2, 3, 5,
+6, 7 and the random "signatures" `z`, which matter only for deviations. The naive protocol of §3.2.1 and its gain
+estimate.
 
 **Trust.** No `sorry`; all listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: `Cons.sigmaCons_fair_3_1` shows the hypotheses of Theorem 1 are satisfiable, and the `n = 1`

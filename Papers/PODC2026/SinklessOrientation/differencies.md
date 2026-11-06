@@ -4,26 +4,28 @@ Paper: Alexandre Nolin, *Brief Announcement: Sinkless Orientation Made Trivial*,
 pp. 333–336, DOI 10.1145/3796701.3815953 (4-page brief announcement; no full version found on arXiv
 or elsewhere). Proofs in the paper are sketches; the formalization fills them in.
 
-**Verdict.** No error affects the results. The deterministic algorithm (Theorem 2.1, Lemma 2.2,
-Lemma 2.3, Theorem 1.1) is correct as described, with the minor slips and remarks listed below.
+No error affects the results. The deterministic algorithm (Theorem 2.1, Lemma 2.2, Lemma 2.3,
+Theorem 1.1) is correct as described, with the slips and remarks listed below.
 
 ## Errors and imprecisions in the paper
 
-1. **Lemma 2.2, "in particular" part: typo.** The paper says the distance-`⌈log_{δ−1} n⌉`
+1. ✏️ **Lemma 2.2, "in particular" part.** The paper says the distance-`⌈log_{δ−1} n⌉`
    neighbourhood "contains a node of degree `δ` or a cycle". It should be "degree `< δ`"
    (`lemma_2_2_clog`); "degree `< δ`" is what the proof gives and what Algorithm 2 uses.
 2. **Lemma 2.2: the hypothesis `r ≥ 1` is redundant (harmless, not a slip).** For `r = 0` the
    bound `1 + δ((δ−1)^0 − 1)/(δ−2) = 1` holds trivially, so `lemma_2_2` omits it.
-3. **Section 3, "more balanced orientations": remark on the literal phrasing (not an error).** The
+3. ✏️ **Section 3, "more balanced orientations": literal phrasing.** The
    text asks for "every node `v` [to] have at least `max(ε deg(v), 1)` outgoing edges and
    `max(ε deg(v), 1)` incoming edges". The paper works with graphs of minimum degree `δ ≥ 3`
    (abstract), where this is meaningful; read literally for arbitrary graphs it would fail at
    degree-1 nodes (`no_orientation_in_and_out_single_edge`: a single edge has no such orientation).
    Corollary 1.2 itself uses `⌊ε deg(v)⌋`, and the "sinkless and sourceless" variant is restricted to
    nodes of degree `≥ δ`.
-4. **Theorem 2.1: "separated by a distance of at least `k`" vs. "cannot be within distance `k`".**
+4. ✏️ **Theorem 2.1: "separated by a distance of at least `k`" vs. "cannot be within distance `k`".**
    The definition of `k`-sinksparse (Section 1) says distance `≥ k`, while the proof of Theorem 2.1
-   gives distance `> k`. We formalize the stronger `> k` (`IsSinkSparse`). (With `k = 4c` the
+   gives distance `> k`. Only `> k` makes "the BFS trees of different nodes do not overlap" true: two
+   sinks at distance exactly `k` (`k` even) share a midpoint. We formalize the stronger `> k`
+   (`IsSinkSparse`). (With `k = 4c` the
    weaker `≥ k` would also suffice for Algorithm 1, since radius `c` already works.)
 5. **Constants.** Algorithm 1 uses `k = 4⌈log_{δ−1} n⌉`; only `k ≥ 2⌈log_{δ−1} n⌉` is needed
    (the balls of radius `k/2` must contain a low-degree node or a cycle, which Lemma 2.2 gives
@@ -92,6 +94,6 @@ any `T`-local orientation algorithm with `2T + 2 ≤ k` puts two sinks on some `
 
 * The randomized part of Theorem 1.1 (`O(log_δ log n)` rounds via the shattering argument of
   Ghaffari–Su [8]) and Corollary 1.2 (balanced orientations via the reductions of [7, 8]): they rely
-  on external results not available in Lean. Only the remark on the literal phrasing of item 3 is checked.
+  on external results not available in Lean. Only the literal phrasing of item 3 is checked.
 * The `Ω(log_δ n)` (deterministic) and `Ω(log_δ log n)` (randomized) lower bounds cited from earlier
   work.

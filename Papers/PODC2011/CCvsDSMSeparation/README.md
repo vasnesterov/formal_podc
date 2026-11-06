@@ -5,30 +5,16 @@ models.* PODC 2011. DOI [10.1145/1993806.1993822](https://doi.org/10.1145/199380
 Formalized version: arXiv [1109.5153](https://arxiv.org/abs/1109.5153) v1 (full version; numbering
 follows it).
 
-**Verdict: ⚠️ Minor statement issues.** The main result holds: the signaling problem has an
-`O(1)` RMR solution in the CC model (Section 5), but no deterministic terminating read/write
-solution with `O(1)` *amortized* RMR complexity in the DSM model (Theorem 6.2). We proved both,
-and the separation, in Lean. Corollary 6.14 is false as literally stated, because it drops the word
-"terminating"; its own proof assumes it. The proof of Lemma 6.10 has a genuine gap: the regularity
-invariant is not preserved. We repaired it with a weaker invariant.
+**Verdict: 🛠️ Hard fix.** The main result holds: the signaling problem has an `O(1)` RMR solution in the CC model
+(Section 5), but no deterministic terminating read/write solution with `O(1)` *amortized* RMR complexity in the DSM
+model (Theorem 6.2), and we proved both, and the separation, in Lean. The construction in the proof of Lemma 6.10
+does not preserve the regularity invariant, so saving the lower bound took a weaker invariant and changed rounds.
+Corollary 6.14 drops the word "terminating", which its own proof assumes, and its extension to CAS and LL/SC was
+not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Corollary 6.14 (omits "terminating")
-Corollary 6.14 claims the DSM lower bound for "any deterministic algorithm", but without
-termination it fails: an algorithm whose `Poll()` busy-waits forever on the caller's own module
-solves the problem with no RMRs at all (`corollary_6_14_needs_terminating`).
-
-**Impact.** Typo-level with evident intent: the corollary's own proof starts from "some
-deterministic *terminating* algorithm", and the fix is one word. Theorem 6.2 is unaffected.
-
-**Details.** The corollary covers "any deterministic algorithm" using reads, writes and CAS or
-LL/SC. In the counterexample `Poll()` busy-waits forever on a variable in the caller's own module
-and `Signal()` returns at once. Specification 4.1 only constrains calls that return, so this
-algorithm solves the problem, yet no execution has an RMR in the DSM model. The algorithm uses only
-reads, so it is also a "reads, writes, and CAS" algorithm.
-
-### ⚠️ Lemma 6.10 (regularity invariant, Definition 6.6 condition 3)
+### 🛠️ Lemma 6.10 (regularity invariant, Definition 6.6 condition 3)
 The construction in the proof of Lemma 6.10 does not preserve condition 3 of regularity (the last
 of several writers of a variable is finished), so Lemma 6.10 as stated is unestablished: neither
 proved nor refuted here.
@@ -52,39 +38,50 @@ construction. It gives out-degree ≤ 1 for the write conflicts (≤ 2 together 
 all that Lemma 6.13 and the roll-forward need: erasing active processes reverts every variable to a
 value written by a finished process (`SoleW.erase_writer_not_mem`, `Algorithm.round`).
 
-### Typos and slips
+### ✏️ Slips
+- Corollary 6.14 omits "terminating". It claims the DSM lower bound for "any deterministic algorithm", but without
+  termination it fails: an algorithm whose `Poll()` busy-waits forever on the caller's own module solves the problem
+  with no RMRs at all (`corollary_6_14_needs_terminating`). The corollary covers "any deterministic algorithm" using
+  reads, writes and CAS or LL/SC. In the counterexample `Poll()` busy-waits forever on a variable in the caller's own
+  module and `Signal()` returns at once. Specification 4.1 only constrains calls that return, so this algorithm solves
+  the problem, yet no execution has an RMR in the DSM model. The algorithm uses only reads, so it is also a "reads,
+  writes, and CAS" algorithm. The corollary's own proof starts from "some deterministic *terminating* algorithm", and
+  the fix is one word. Theorem 6.2 is unaffected.
 - Proof of Lemma 6.10: "`|Fin(H_{i+1})| ≤ |Fin(H_i)| + 1 ≤ i`" should end with `i + 1`.
 - Proof of Lemma 6.12: "erase all active processes except `⌊N^{1/3^c}/2⌋` unstable ones" should
   say *stable*.
-- Lemma 6.13: "at most `k` processes participate in `H`" should be `H′` (twice).
+- Lemma 6.13: "at most `k` processes participate in `H`" and "RMRs incurred in `H`" should say `H′`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 6.13 (termination and disjointness)
-Two steps lack a justification: termination is applied to histories that are not fair, and "`s`
-performs one such RMR for each stable process" needs an unstated disjointness.
+### 🔧 Lemma 6.13 and the roll-forward of Lemma 6.10 (termination in unfair histories)
+Stable processes "complete any pending call to `Poll()`", `s`'s `Signal()` "must eventually terminate" and the
+rolled-forward process completes its `Poll()`, but the histories in question are not fair, because the other active
+processes are stopped in mid-call, so termination does not apply directly.
 
-**Impact.** Statement true; repaired (`Algorithm.final_stable`).
-
-**Details.**
-- (a) Stable processes "complete any pending call to `Poll()`", and `s`'s `Signal()` "must
-  eventually terminate". The histories in question are not fair, because the other active
-  processes are stopped in mid-call, so termination does not apply directly.
-- (b) "`s` performs one such RMR for each stable process" needs the sets "`p`'s module ∪ variables
-  last written by `p`" to be pairwise disjoint over the stable processes `p`. This follows from
-  conditions 2 and 3 of regularity, but the paper does not say so. Also, `s` must be chosen outside
-  `Par(H)`, which the paper's choice "a process whose module is not written" does not guarantee.
+**Impact.** Erasing the other active processes first makes the solo runs legitimate (`Algorithm.final_stable`).
 
 **Repair.** Our proof runs `s` solo in the history where *all* stable processes are erased: there
 every other participant has terminated. It never needs the pending polls. We prove: for each stable
 `p`, `s`'s solo `Signal()` accesses `p`'s module or a variable last written by `p`. Otherwise `p`'s
 next `Poll()` would return `true` after a run without any signal (`Algorithm.final_stable`).
 
-### 🛠️ Theorem 6.2 (the constant `k`)
+### 🔧 Lemma 6.13 (one RMR per stable process)
+"`s` performs one such RMR for each stable process" needs the sets "`p`'s module ∪ variables last written by `p`" to
+be pairwise disjoint over the stable processes `p`, which the paper does not say.
+
+**Impact.** A missing step: the disjointness follows from conditions 2 and 3 of regularity (`Algorithm.final_stable`).
+
+### 🔧 Lemma 6.13 (choice of `s`)
+The paper's choice "a process whose module is not written" does not guarantee that `s` is outside `Par(H)`.
+
+**Impact.** One extra condition on `s`, available by the same count for `N` large (`Algorithm.final_stable`).
+
+### 🔧 Theorem 6.2 (the constant `k`)
 The theorem promises a *constant* `k`, but in the branch of the proof that goes through Lemma 6.11
 the paper's `k = c + ⌊N^{1/3^c}/2⌋` is not constant.
 
-**Impact.** Statement true; using only `c² + 1` unstable processes there gives `k ≤ c² + c + 1` in
+**Impact.** The theorem holds: using only `c² + 1` unstable processes there gives `k ≤ c² + c + 1` in
 every branch (`theorem_6_2`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).

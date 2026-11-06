@@ -3,17 +3,17 @@
 Paper: Cruciani, Das, Raevskaya, Suomela, *It does not matter how you define locally checkable labelings*,
 arXiv:2602.18188v1 (full version of the PODC 2026 brief announcement).
 
-## Statement-level issues (with the verdict rule that decides them)
+## Statement-level issues
 
-1. **Theorem 5.1 is false as stated** (`theorem_5_1_false`). Gadgeted `K_{3,3}`, lengths `1..9`, `r = 1`, colouring
+1. **Theorem 5.1 is false as stated (❌)** (`theorem_5_1_false`). Gadgeted `K_{3,3}`, lengths `1..9`, `r = 1`, colouring
    injective except `χ(0) = χ(1)` (two original vertices on the same side). The hypotheses of the paper hold
    literally: `K_{3,3}` is 3-regular and simple, and the injective colouring is a distance-`2r` edge colouring under
    any definition. Condition 1 holds since the vertices are at graph distance `≥ 3`. Condition 2 holds since they are
    at gadgeted distance `2 > r`. Yet `0, 1 ∈ gball_1(3)`.
-   - Rule: R1 (numbered theorem). Not R2: `r = 1`, `K_{3,3}` is not degenerate. Not R3/R4: the fix changes a
-     hypothesis of the theorem, its proof reasons with the stated version, and the proof also misses the pairs not
-     involving the centre (Corollary 5.16 does not follow from 5.13–5.15). Not R5: Theorem 5.1 is not the headline
-     (the abstract and title are about Theorem 7.1). So: ❌.
+   - `r = 1`, `K_{3,3}` is not degenerate. The fix changes a hypothesis of the theorem, its proof reasons with the
+     stated version, and the proof also misses the pairs not involving the centre (Corollary 5.16 does not follow
+     from 5.13–5.15). The abstract and title are about Theorem 7.1, not Theorem 5.1, but Theorem 7.1 depends on it
+     (item 4).
    - Reading checked on the rendered page (p. 26): condition 2 is spelled out as "for every vertex
      `v' ∈ gball_r(v)` such that `χ(v') = χ(v)` …". An alternative reading of the name "edge-consistent in every
      `r`-gball" is "for any two vertices of a common `r`-gball (of any vertex)". Under it, SAT checks on small
@@ -22,7 +22,7 @@ arXiv:2602.18188v1 (full version of the PODC 2026 brief announcement).
    - The colours are `χ : Vert → C` for an arbitrary type `C` (the paper: `χ : V(G) → ℕ`). The counterexample
      uses `C = Vert`, a finite type, so it transfers to `ℕ` by any injection.
 2. **Lemma 5.13 is false as stated** (`lemma_5_13_false`). Same instance; the original vertex `1` gets the colour of
-   the outer vertex of the expanded edge `{0,3}` at `3`. R1, ❌ (numbered lemma).
+   the outer vertex of the expanded edge `{0,3}` at `3`. Part of the ❌ of item 1.
 3. **Corollary 5.14 fails** (SAT experiment only, not Lean-checked). Gadgeted `K_4`, lengths `1..6`, `r = 1`: a
    colouring satisfying conditions 1 and 2 with two adjacent original vertices of the same colour exists. Its proof
    uses Lemma 5.13 for a vertex `u'` outside `gball_r(v)`. Lemmas 5.2 and 5.9 and Corollaries 5.10–5.11 were also
@@ -31,10 +31,10 @@ arXiv:2602.18188v1 (full version of the PODC 2026 brief announcement).
    - Lemma 5.9 is UNSAT on `K_4`.
    - Lemma 5.2 and Lemma 5.12 were inconclusive or UNSAT.
 
-   We do not rely on these for the verdict.
-4. **Theorem 7.1 (headline) is unestablished, not refuted.** Its proof goes A → B → D → E. The step B → D
+   These are experiments only; no finding here rests on them.
+4. **Theorem 7.1 (the main theorem) is unestablished, not refuted.** Its proof goes A → B → D → E. The step B → D
    (Lemmas 5.4, 5.8) uses Theorem 5.1. With our repaired Theorem 5.1 the step plausibly goes through, if Problem D
-   uses a large enough view radius (item 8). R5: an unestablished headline is ❌, the same label as item 1.
+   uses a large enough view radius (item 8), but this is not formalized. It is covered by the ❌ of item 1.
 
 ## Repaired Theorem 5.1 (`Base.theorem_5_1_repaired`)
 

@@ -5,10 +5,9 @@ Optimizations.* PODC 2019, extended version (61 pp., Appendices A–C). The pape
 protocol three times, and the three descriptions disagree: pseudocode (Figures 1–3), TLA+
 (Appendix B) and the refinement proof (Appendix C). We formalize the protocols the Appendix C proof
 talks about (Figures 1 and 2, with the mapping table of Appendix C). We repair them where needed,
-taking each repair from another of the paper's descriptions where possible. Verdict rules are
-those of `verdicts.md` (R1–R6).
+taking each repair from another of the paper's descriptions where possible.
 
-## Statement-level issues (decide the verdict)
+## Statement-level issues
 
 1. **TLA+ `theorem Invariance` of module MultiPaxos (B.1, line 177) is false** —
    `TLA.tla_invariance_false`. There are three acceptors and majority quorums. One leader runs
@@ -17,40 +16,38 @@ those of `verdicts.md` (R1–R6).
    all fail. The grey comment "⇒ v is safe at i, b" does not help: both values are `SafeAt` ballot
    1 because nothing was voted below it. Independently, two acceptors can become leaders of the
    same ballot, because 1b messages are not addressed (`TLA.tla_two_leaders_same_ballot`).
-   *Rule:* R1 (a stated theorem). R3 does not apply: the fix (record proposals, address 1b
-   messages) changes the protocol, it is not an index or symbol fix. R5: the TLA+ specs are
-   supporting material, not a headline. Hence **❌**.
+   **🔧.** The fix (record proposals, address 1b messages) changes the protocol, it is not an index
+   or symbol fix. The TLA+ specs are supporting material.
 2. **Figure 2 vote rule (lines 9–11)** compares the voter's entry *at the candidate's last index*
    with the candidate's last term. Raft* as printed then loses committed entries
    (`Raft.fig2_not_commitSafe`; isolated step: `Raft.fig2_voter_reports_higher_term`). So the
    printed Figure 2 refines no safe Paxos, and step 4.2 of Appendix C is false for it.
-   *Rule:* R3, **⚠️**. The fix is local (`s.log[lIndex]` → the voter's last entry), and the intent
+   **🔧.** The fix is local (`s.log[lIndex]` → the voter's last entry), and the intent
    is recoverable from TLA+ B.2 (`Phase1b` uses `raftlogs[a][lastIndex[a]]`) and from Raft. The
    Appendix C proof does not reason with the printed rule; it gives no argument at all for 4.2.
-   Borderline with 🚨, since Raft* (Figure 2) is the headline protocol and is unsafe as printed.
-   R3 applies because the intent is stated in the paper's own prose: Section 3 says "Raft* is
+   Raft* (Figure 2) is the paper's main protocol and is unsafe as printed. The intent is stated in
+   the paper's own prose: Section 3 says "Raft* is
    identical to Raft, except for two introduced differences" (extra entries in votes, the `bal`
    field), neither of which concerns the vote rule, so Raft's last-entry check is intended; TLA+ B.2
    `Phase1b` uses it too.
 3. **Figure 2 allows `AppendEntries` with `vals = []` (heartbeats)**. Then even Raft's own vote rule
    gives Raft's "Figure 8" loss of a committed entry (`Raft.heartbeat_not_commitSafe`). Section 3
    claims that re-stamping ballots replaces Raft's §5.4.2 commit rule, but that only works if every
-   append carries an entry of the current term. *Rule:* R3/R4, **⚠️**. TLA+ B.2's `ProposeEntries`
-   always appends exactly one value, which recovers the assumption. Borderline: Raft (which Raft*
+   append carries an entry of the current term. **🔧.** TLA+ B.2's `ProposeEntries`
+   always appends exactly one value, which recovers the assumption. Raft (which Raft*
    claims to equal "except two differences") does send empty `AppendEntries`, so a reader may be
    misled; but read the same way, Raft* would also keep Raft's §5.4.2 commit rule, which makes
    heartbeats safe. Either reading of the paper recovers a safe protocol; recorded here.
 4. **Raft*-PQL / Raft*-Mencius "guaranteed correct" (Sections 4.3–4.4, Appendix A)**:
-   *unestablished* (**⚠️**). The Section 4.3 argument needs a single-step refinement (`b_j ⇒ a_i`).
+   *unestablished* (**❌**). The Section 4.3 argument needs a single-step refinement (`b_j ⇒ a_i`).
    The Raft* → Paxos refinement is multi-step (Appendix C 2.4/2.5 map one step to "several Phase2a
    steps"). For multi-step refinements, the recipe of conjoining the added clauses at the end points
    is unsound in general (`Porting.naive_multistep_port_unsound`). The ported protocols themselves
-   are not formalized, so they are neither proved nor refuted. *Rule:* R5, **❌** (reviewer
-   correction; the author had ⚠️). The abstract presents porting "from Paxos to Raft with guaranteed
+   are not formalized, so they are neither proved nor refuted. The abstract presents porting "from Paxos to Raft with guaranteed
    correctness" as a primary contribution, and its proof for Raft* relies on `b_j ⇒ a_i`, which the
    paper's own Appendix C contradicts (one `AppendEntries` = several Paxos steps; "3. Q.E.D. … each
-   step of Raft* implies a step of Paxos" is false as stated). An *unestablished* headline is ❌,
-   not 🚨, since nothing is refuted for Raft*-PQL/Mencius. The verdict is ❌ either way (item 1).
+   step of Raft* implies a step of Paxos" is false as stated). Nothing is refuted for
+   Raft*-PQL/Mencius.
 
 ## Proof gaps of true statements (Appendix C)
 
@@ -86,7 +83,7 @@ those of `verdicts.md` (R1–R6).
   so Paxos `safeEntry` would pick the voter's value. Scenario: 5 servers; term 1 writes `x` to
   `C`; term 3 writes `u` to `V`; term 5 extends `C`'s log with prev = 0; `C` then wins term 6 with
   `V`'s vote. This is only in prose, not formalized, because our Raft* has no `bal` field (it is
-  behaviourally irrelevant). Recorded as a remark, not a verdict item.
+  behaviourally irrelevant). Recorded as a remark (✏️).
 - **Figure 1 (MultiPaxos) repairs** in `Paxos.lean`:
   - `Phase2a` must not propose a second value for the same instance and ballot. As printed it
     records nothing, the same flaw as TLA+ `Propose`.

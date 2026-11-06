@@ -5,54 +5,29 @@ Greg Bodwin, Shyamal Patel. *A Trivial Yet Optimal Solution to Vertex Fault Tole
 [1812.05778](https://arxiv.org/abs/1812.05778) v2.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** Theorem 1 (the FT greedy spanner has `O(f² · b(n/f, k+1))` edges) and
-Corollary 2 (`O(f^{1−1/k} n^{1+1/k})` edges for stretch `2k−1`) hold, with explicit constants, for both
-vertex and edge faults. There are only imprecisions. The literal fault test of Algorithm 1 lets the
-fault set contain the edge's own endpoints, and Theorem 1's bound degenerates to `0` when `f > n/2`.
+**Verdict: ✏️ Slip.** Theorem 1 (the FT greedy spanner has `O(f² · b(n/f, k+1))` edges) and Corollary 2
+(`O(f^{1−1/k} n^{1+1/k})` edges for stretch `2k−1`) hold, with explicit constants, for both vertex and edge faults.
+There are only imprecisions: the literal fault test of Algorithm 1 lets the fault set contain the edge's own endpoints,
+and Theorem 1's bound degenerates to `0` when `f > n/2`. The optimality claims rest on the lower bound of [BDPW18],
+which we did not check.
 
 ## Mistakes in the paper
 
-### ⚠️ Algorithm 1 (the fault test does not exclude the edge's endpoints)
-Read literally, the test lets the fault set be `F = {u}`, which makes the distance `∞`, so for `f ≥ 1` every edge
-is added and on `K_n` with `f = 1` and stretch 3 the output has `n(n−1)/2` edges, contradicting Corollary 2's
-`O(n^{3/2})` (`literal_violates_corollary2`).
+### ✏️ Slips
+- Algorithm 1 (the fault test does not exclude the edge's endpoints): the test asks for a set `F` of `≤ f` vertices with
+  `dist_{H\F}(u, v) > k·w(u, v)`, but does not require `u, v ∉ F`. Read literally, it lets the fault set be `F = {u}`,
+  which makes the distance `∞`, so for `f ≥ 1` every edge is added and on `K_n` with `f = 1` and stretch 3 the output has
+  `n(n−1)/2` edges, contradicting Corollary 2's `O(n^{3/2})` (`literal_violates_corollary2`). This assumes that the
+  distance to a deleted vertex is `∞`; if it is read as undefined, the literal test is merely ill-posed. The proof of
+  Lemma 3 clearly uses `F ⊆ V \ {u, v}`, so the intended algorithm is unambiguous, and we formalize that.
+- Theorem 1 for large `f`: once `n/f < 2`, `b(n/f, k+1) = 0`, so the stated bound is `0` even though `H` has edges. With
+  floor rounding this happens for `f > n/2`, with ceiling rounding for `f ≥ n`. The proof dismisses the regime
+  `f = Ω(n)` as "trivially `O(n²)`". We prove `|E(H)| ≤ 32 f² · max(b(⌊n/2f⌋, k+1), 1)` for all `n` and all `f, k ≥ 1`
+  (`ftGreedy_card_edges_le`).
 
-**Impact.** Low severity: the proof of Lemma 3 clearly uses `F ⊆ V \ {u, v}`, so the intended algorithm is
-unambiguous, and we formalize that.
-
-**Details.** The test asks for a set `F` of `≤ f` vertices with `dist_{H\F}(u, v) > k·w(u, v)`, but does not
-require `u, v ∉ F`. The counterexample assumes that the distance to a deleted vertex is `∞`; if it is read as
-undefined, the literal test is merely ill-posed.
-
-### ⚠️ Theorem 1 for large `f` (`f > n/2`)
-Once `n/f < 2`, `b(n/f, k+1) = 0`, so the stated bound is `0` even though `H` has edges.
-
-**Impact.** Cosmetic: the proof dismisses the regime `f = Ω(n)` as "trivially `O(n²)`". We prove
-`|E(H)| ≤ 32 f² · max(b(⌊n/2f⌋, k+1), 1)` for all `n` and all `f, k ≥ 1` (`ftGreedy_card_edges_le`).
-
-**Details.** With floor rounding this happens for `f > n/2`, with ceiling rounding for `f ≥ n`.
-
-### Typos and slips
+### Typos
 - The proof of Theorem 1 swaps `n` and `m` ("`n` edges and `m` nodes").
 - `f ≥ 1` is used but left implicit.
-
-## Proof gaps (statements true)
-
-### 🛠️ Lemma 4 (`(1 + o(1))` factors)
-Sampling `⌈n/2f⌉` vertices and writing the probabilities as `(1+o(1))/(4f²)` and `(1+o(1))/(8f³)` is only
-asymptotic, under the lemma's hypothesis `f = o(n)`, and hides slack.
-
-**Impact.** Statement true; we prove the exact, non-asymptotic counting version, sampling `s` vertices with
-`2fs ≤ n` (`SimpleGraph.IsBlockingSet.exists_dense_subgraph_of_le`).
-
-**Details.** For small `n/f` the edge probability can be well below `1/(4f²)` (e.g. `1/(2f(4f−1))` for `n = 4f`);
-the triple probability never exceeds `1/(8f³)`.
-
-### 🛠️ Edge faults (only asserted)
-The edge-fault case is only asserted to be "essentially identical".
-
-**Impact.** True; we prove it via a vertex blocking set (`ftGreedyEdge_exists_blockingSet`,
-`ftGreedyEdge_card_edges_le`), which also explains the closing remark that edge blocking sets give nothing more.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -83,6 +58,16 @@ The comparison runs both analyses through the same blocking-set lemmas. Dinitz�
 is larger by a factor `2k−1`, so their upper bound is about `2k` times weaker in the Moore form. This
 compares upper-bound constants only, not the algorithms' outputs; Dinitz–Robelle's advantage is
 polynomial running time.
+
+Lemma 4 is proved in an exact form. The paper's sampling of `⌈n/2f⌉` vertices, with probabilities
+`(1+o(1))/(4f²)` and `(1+o(1))/(8f³)`, is only asymptotic, under the lemma's hypothesis `f = o(n)`, and hides slack: for
+small `n/f` the edge probability can be well below `1/(4f²)` (e.g. `1/(2f(4f−1))` for `n = 4f`); the triple
+probability never exceeds `1/(8f³)`. We prove the exact, non-asymptotic counting version, sampling `s` vertices with
+`2fs ≤ n` (`SimpleGraph.IsBlockingSet.exists_dense_subgraph_of_le`).
+
+The paper only asserts that the edge-fault case is "essentially identical". We prove it via a vertex blocking set
+(`ftGreedyEdge_exists_blockingSet`, `ftGreedyEdge_card_edges_le`), which also explains the closing remark that edge
+blocking sets give nothing more.
 
 **Not formalized.** The optimality claims, which rest on the lower bound of [BDPW18], and the
 edge-fault lower-bound remark.

@@ -5,11 +5,10 @@ DOI [10.1145/3465084.3467944](https://doi.org/10.1145/3465084.3467944). Formaliz
 arXiv:2105.06737v2 (numbering follows it).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ✅ Correct.** Every formalized claim holds as stated:
-- Under the original Herlihy–Wing definition (2.2), linearizability is neither local nor nonblocking.
-- The amended definition (4.1) is both (Theorems 5.1, 5.2).
-- Linearization points are equivalent to 4.1 (Claim 1) but not to 2.2.
-- The inclusions of Figure 6 hold, and they are strict.
+**Verdict: ✅ Correct.** Every claim we formalized holds as stated. Under the original Herlihy–Wing definition (2.2),
+linearizability is neither local nor nonblocking, while the amended definition (4.1) is both (Theorems 5.1, 5.2).
+Linearization points are equivalent to 4.1 (Claim 1) but not to 2.2, and the inclusions of Figure 6 hold and are
+strict.
 
 ## Mistakes in the paper
 

@@ -5,8 +5,7 @@ Sketches.* PODC 2019 (brief announcement; we use the arXiv version 1902.10995v2,
 that of the PODC paper). The PODC version defers all proofs to "the full paper [24]"; the proofs we
 checked are those of the journal version (ACM TOPC 9(2), 2022, author copy
 `iditkeidar.com/wp-content/uploads/2021/12/ConcurrentSketches.pdf`): Section 6 (Lemmas 2–8,
-Invariants 1–3) and Section 7 (Claims 1–6, Lemmas 9–10). Rules R1–R6 refer to the project's verdict
-scale.
+Invariants 1–3) and Section 7 (Claims 1–6, Lemmas 9–10).
 
 ## Statement-level issues
 
@@ -20,17 +19,16 @@ scale.
    no linearization in `SeqSketch_{Nb}` (`parSketch_hint_one_not_relaxed`,
    `parSketch_hint_one_not_stronglyLinearizable`, `Counterexample.lean`). We prove Lemma 1 and
    Theorem 1 under the hypothesis `S.Safe hint₀ []` (filtering by `hint₀` is harmless on every
-   stream), which holds for `hint₀ = calcHint(empty sketch)` (`safe_init_hint`). **Rule: R3
-   (⚠️).** The intended reading ("the hint of the empty sketch") is recoverable from the paper (hints
+   stream), which holds for `hint₀ = calcHint(empty sketch)` (`safe_init_hint`). 🔧 The intended
+   reading ("the hint of the empty sketch") is recoverable from the paper (hints
    are otherwise always produced by `calcHint`; for the only instantiation, the Θ sketch, `Θ = 1`
    initially — `theta_calcHint_init`; the "trivial" implementation `shouldAdd ≡ true` does not care),
-   and the fix is local (an initial value). Borderline with R4: the full version explicitly claims
+   and the fix is local (an initial value). The full version explicitly claims
    the algorithm works for "any composable sketch adhering to the API" (arXiv v2 only calls the
    algorithm "generic" and states Lemma 1 / Theorem 1 for "`ParSketch` instantiated with" the
-   sketch). We judged it an evident slip in the initial value, not a gap in the design. R4's
-   generality clause does not apply: R4 is about an *extra assumption on the sketch* that would
-   cut down the claimed generality, while here the repair (initialise `hint_i`, `prop_i` with
-   `globalS.calcHint()` of the empty `globalS`) keeps the claim for every composable sketch. The
+   sketch). This is a wrong initial value, not a gap in the design: the repair (initialise `hint_i`,
+   `prop_i` with `globalS.calcHint()` of the empty `globalS`) keeps the claim for every composable
+   sketch, with no extra assumption on the sketch. The
    journal proof (Invariant 3, case `shouldAdd` false: "let `H` be the last hint returned to
    `t_i`") already reasons with hints produced by `calcHint`, i.e. with the intended version.
    Note that in `OptParSketch` the initial `prop_i = 1` is also copied into `hint_i` at the first
@@ -43,7 +41,7 @@ scale.
    estimate is `(k − 1)/Θ` (`thetaSketch_query_exact`, `thetaSketch_query_of_le`,
    `thetaSketch_not_exact_k`). If "init k 1's" is read as a multiset, the estimate is `(k−1)/Θ`
    from the first update on and never exact. A remark motivating eager propagation, off by one;
-   **R3 (⚠️), borderline**: the fix changes the number, but the intended meaning ("exact until the
+   🔧 The fix changes the number, but the intended meaning ("exact until the
    sample set is full", Section 3) is recoverable, it is an index-level slip caused by the sentinel
    `1` occupying a slot of Algorithm 1's sample set, and nothing in the paper depends on it. (For
    the library sketch of Section 7, whose exact mode is not tied to a sentinel, the sentence may well
@@ -62,7 +60,7 @@ scale.
    follow from the paper's proof: we prove the stronger property `SeqSketchRPast` (no query dropped;
    a query is preceded in the relaxed history only by operations that precede it in the
    linearization), `lemma1_pastOnly`, `theorem1_pastOnly`. Proof gap in the step from Section 5 to
-   Section 6, statements true → 🛠️ at most.
+   Section 6, statements true. 🔧
 
 ## Versions
 
@@ -78,8 +76,7 @@ announcement as "the full paper [24]"). Differences that matter for the checked 
 * The quantiles bound `ε_r = ε − rε/n + r/n` (Section 6.2) is from v2; v1 has a different
   quantiles analysis (its Lemma 3), which we did not check.
 * The phrase "any composable sketch adhering to the API" is only in the journal version.
-The verdict is based on Lemma 1 and Theorem 1 (common to all versions) and on the v2 claims listed
-above.
+Our findings concern Lemma 1 and Theorem 1 (common to all versions) and the v2 claims listed above.
 
 ## Proof-level issues (statements true)
 
@@ -89,7 +86,8 @@ above.
    holds, because such an update can only be pending while `counter_i < b`, i.e. while
    `|up_suff_i| ≤ b − 1`. In our model `shouldAdd(hint_i, a)` is evaluated at the invocation (it is a
    local computation on the thread's own variable), so the issue disappears; the count is
-   `Inv.allButAtMost` (from `TI.length_le`). 🛠️ (claim inside a proof of a true lemma).
+   `Inv.allButAtMost` (from `TI.length_le`). This is a claim inside a proof of a true lemma, in the
+   journal version only.
 5. **Theorem 1's proof (full version, Section 6.3)** simulates one `OptParSketch` thread by two
    `ParSketch` threads and appeals to "forward simulation ⇒ strong linearisability". The mapping
    does not preserve histories: the update that fills a buffer returns in `OptParSketch` right after
@@ -145,7 +143,7 @@ above.
   is read as `1 ≤ i ≤ N` (typo: `t₀` is the propagator).
 * **Hints and counters** are of arbitrary types (the paper declares `int hint_i`, `int atomic
   prop_i`, although the Θ sketch's hints are reals in `(0, 1]`).
-* **`b ≥ 1`** is assumed (with `b = 0` no thread ever propagates; degenerate, R2).
+* **`b ≥ 1`** is assumed (with `b = 0` no thread ever propagates; degenerate).
 * **Strong linearisability w.r.t. a set of histories** (Definition 1 with `SeqSketch_r` in place of
   `SeqSpec`) is `Impl.HStronglyLinearizable` (staged in
   `Podc/Computability/Distributed/SharedMemory/HistorySpecLin.lean`): a prefix-preserving map from

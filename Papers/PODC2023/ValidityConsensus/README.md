@@ -5,33 +5,28 @@ PODC 2023. DOI [10.1145/3583668.3594567](https://doi.org/10.1145/3583668.3594567
 version arXiv:2301.04920v3 (numbering follows it).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The classification of solvable validity properties is proved: trivial ones for
-`n ≤ 3t`, and those satisfying the similarity condition `C_S` for `n > 3t`. So is the `Ω(t²)` message lower bound.
-The sufficiency direction is unconditional, because we also verified a vector-consensus protocol for every
-`n > 3t`; this replaces the paper's black box. The only proof gap is in Lemma 3 for `n < 2t`, and it is easily
-repaired. Two statements need implicit assumptions: Theorem 1 fails in the degenerate case of no proposals and no
-decision values, and Theorem 3's "Turing-computable `Λ`" needs computable algorithms.
+**Verdict: 🔧 Easy fix.** The classification of solvable validity properties (trivial ones for `n ≤ 3t`, those
+satisfying the similarity condition `C_S` for `n > 3t`) and the `Ω(t²)` message lower bound are proved, after one
+local repair of Lemma 3 for `n < 2t`. The sufficiency direction is unconditional, because we also verified a
+vector-consensus protocol for every `n > 3t`, which replaces the paper's black box, in a model without clock drift
+or sleeping processes. The `O(n²)` message complexity of Universal was not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorem 3 ("Turing-computable `Λ`")
-Theorem 3 claims a Turing-computable `Λ`, but the model allows arbitrary deterministic state machines, so solvability only yields *some* function `Λ`, not a computable one (`similarityCondition_of_solvable`).
-
-**Impact.** Needs the implicit assumption that algorithms are computable; with it the computable version holds (`similarityCondition_computable`).
-
-**Repair.** We prove both versions: any `Λ` for arbitrary algorithms, and a computable `Λ` (in Mathlib's sense) when the algorithm's transition functions are computable. (`similarityCondition_of_solvable`, `similarityCondition_computable`)
-
-### ⚠️ Theorem 1 (empty proposal set)
-Theorem 1 fails when the proposal set is empty and `V_O = ∅`: then there are no executions and every algorithm vacuously solves consensus.
-
-**Impact.** Degenerate case; the proposal set must be nonempty, which we assume.
+### ✏️ Slips
+- Theorem 3 claims a Turing-computable `Λ`, but the model allows arbitrary deterministic state machines, so
+  solvability only yields *some* function `Λ`, not a computable one (`similarityCondition_of_solvable`). Computable
+  algorithms are implied throughout. We prove both versions: any `Λ` for arbitrary algorithms, and a computable `Λ`
+  (in Mathlib's sense) when the algorithm's transition functions are computable (`similarityCondition_computable`).
+- Theorem 1 fails when the proposal set is empty and `V_O = ∅`: then there are no executions and every algorithm
+  vacuously solves consensus. The proposal set must be nonempty, which we assume.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 3 (proof of Theorem 1), case `n < 2t`
+### 🔧 Lemma 3 (proof of Theorem 1), case `n < 2t`
 The proof builds a configuration in `I_{n−t}` from *all* `t` processes outside `π(base)` plus `n − 2t` processes of `π(base)`, which is impossible for `n < 2t` (smallest instance `n = 3`, `t = 2`, allowed by `0 < t < n ≤ 3t`).
 
-**Impact.** Statement true; easily repaired (`trivial_of_solvesConsensus_auth`).
+**Impact.** Statement true; repaired (`trivial_of_solvesConsensus_auth`).
 
 **Details.** For `n < 2t`, `t` processes do not fit into a configuration of size `n − t`, and `n − 2t < 0`.
 
@@ -82,7 +77,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
 - The paper's own vector-consensus protocols (Quad, DBFT with reliable broadcast) and their `O(n²)` message
   complexity. Our verified protocol is a different PBFT-style protocol in a round layer, with much higher message
   complexity.
-- Appendix C (external validity) and the randomized remark.
+- Sufficiency in the paper's model with clock drift and sleeping processes before GST (see **Effect on the results**).
+- Appendix B (communication complexity), Appendix C (external validity) and the randomized remark.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. The
 model, the round layer and the vector-consensus protocol are in CSLib,

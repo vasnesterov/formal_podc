@@ -3,10 +3,9 @@
 Paper: Wei, Huang, Lu, *Specification and Implementation of Replicated List: The Jupiter Protocol
 Revisited*, arXiv:1708.04754v4 (full version of the PODC 2018 brief announcement).
 
-## Statement-level issues (with the deciding rule of `verdicts.md`)
+## Statement-level issues
 
-1. **Out-of-range positions break CP1 (Section 2.3 + Section 2.4 + Figure A.1) — ⚠️ by R3,
-   borderline ❌.** Section 2.3 explicitly allows `Ins(a, p)` / `Del(p)` with `p` beyond the list
+1. 🔧 **Out-of-range positions break CP1 (Section 2.3 + Section 2.4 + Figure A.1).** Section 2.3 explicitly allows `Ins(a, p)` / `Del(p)` with `p` beyond the list
    size ("insertion/deletion at the end"). Section 2.4 says that Figure A.1 gives "OT functions
    satisfying CP1". The clients send the user operation unchanged (Alg. B.5 line 9, Alg. C.5).
    With such positions CP1 fails (`cp1_fails`). Jupiter and CJupiter then diverge, so Theorem 11,
@@ -20,20 +19,20 @@ Revisited*, arXiv:1708.04754v4 (full version of the PODC 2018 brief announcement
    when the operation is generated (`genOp`), i.e. one extra line in `Do`. The paper itself shows
    that this is intended: it requires transformed operations to "insert (resp. delete) the element
    `a`", and the OT functions it cites assume in-range positions. With the fix all statements hold.
-   Why ⚠️ rather than ❌: the paper's proofs only use CP1 abstractly, the fix is a missing case in
-   pseudocode, and the intended version can be recovered from the paper. Why borderline: the
-   out-of-range convention is stated explicitly, so R4 would not excuse it. R3 applies because the
+   The paper's proofs only use CP1 abstractly, the fix is a missing case in the `Do`
+   pseudocode, and the intended version can be recovered from the paper, although the
+   out-of-range convention is stated explicitly: the
    paper states the intended behaviour itself (Appendix A: a transformed `Ins(a, p)`/`Del(a, p)`
-   still inserts/deletes the element `a`, which presupposes in-range positions), the fix is a
-   missing case in the `Do` pseudocode, and no proof of the paper reasons with out-of-range
-   positions (CP1 is cited, not proved). A stricter reading (the convention is the paper's own
-   definition and the fix changes the protocol) would give 🚨, since Theorems 11/18 are headlines;
+   still inserts/deletes the element `a`, which presupposes in-range positions), and no proof of
+   the paper reasons with out-of-range
+   positions (CP1 is cited, not proved). The convention is the paper's own
+   definition and the fix changes the protocol, but
    we judge the normalisation too evident to be a protocol design change.
 
-## Proof-level issues (🛠️, statements true)
+## Proof-level issues (statements true)
 
-2. **Lemmas 22–25 / Theorem 26.** These are sketches: Lemma 23's inductive step; Lemma 24 Case 2.2
-   ("step ladder"); Lemma 22 ("parallel transitions"). The one-step claim in the proof of Lemma 25
+2. **Lemmas 22–25 / Theorem 26.** These are sketches: 🛠️ Lemma 23's inductive step; 🛠️ Lemma 24 Case 2.2
+   ("step ladder"); Lemma 22 ("parallel transitions"). 🔧 The one-step claim in the proof of Lemma 25
    requires that the operation "not correspond to any element of the list in `v`". This excludes
    deletions of common elements, which the induction needs. We replace Section 5's argument (see
    README):
@@ -44,7 +43,7 @@ Revisited*, arXiv:1708.04754v4 (full version of the PODC 2018 brief announcement
    - lists along a path preserve the relative order of surviving elements
      (`Sched.sublist_of_subset`, Lemma 25);
    - common elements of two lists were inserted in `V₁ ∩ V₂` (`Sched.mem_L`).
-3. **Remark after Definition 19.** "By definition, `lo` is transitive on `{a | a ∈ w}`" is false
+3. 🔧 **Remark after Definition 19.** "By definition, `lo` is transitive on `{a | a ∈ w}`" is false
    without pairwise compatibility. It follows from Theorem 26 (used in `Cfg.GI.weak`).
 4. **Proposition 9 / Lemma 5 / Propositions 14, 16.** These are proved by induction sketches; the
    hard case of Prop. 9 (Case 2, an operation in the middle of the client's sequence) is only
@@ -56,7 +55,7 @@ Revisited*, arXiv:1708.04754v4 (full version of the PODC 2018 brief announcement
 
    We do not prove the literal statements "CSS_s = ⋃ DSS_s^i" and "DSS_ci ⊆ CSS_ci" as equalities
    or inclusions of graphs. Our invariants imply what Theorems 12 and 18 need.
-5. **Footnote 8.** It defines the LCAs as an antichain of common ancestors and does not require
+5. ✏️ **Footnote 8.** It defines the LCAs as an antichain of common ancestors and does not require
    them to be lowest. Our proof does not need LCAs.
 
 ## Modelling choices

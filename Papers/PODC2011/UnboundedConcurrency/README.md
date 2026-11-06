@@ -4,22 +4,24 @@ Yehuda Afek, Adam Morrison, Guy Wertheim. *From Bounded to Unbounded Concurrency
 DOI [10.1145/1993806.1993823](https://doi.org/10.1145/1993806.1993823). Formalized version: the authors' copy of the
 PODC paper (11 pages, with proofs; no arXiv version); numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** All three results hold and are fully proved. Algorithm 1 is a wait-free
-linearizable unbounded-concurrency swap. `n`-consensus objects for all `n` (with registers) give no
-unbounded-concurrency consensus. The iterator stack has infinite consensus number but cannot solve
-unbounded-concurrency consensus. The proof of Lemma 15 (the core of the iterator-stack impossibility) does not
-work as written and needed a repaired construction; a few other proofs skip a case or a step.
+**Verdict: 🛠️ Hard fix.** All three results hold: Algorithm 1 is a wait-free linearizable unbounded-concurrency swap,
+`n`-consensus objects for all `n` (with registers) give no unbounded-concurrency consensus, and the iterator stack has
+infinite consensus number but cannot solve unbounded-concurrency consensus. The proof of Lemma 15, the core of the
+iterator-stack impossibility, does not work as written and needed a redesigned construction; a few other proofs skip a
+case or a step. The composed claim of swap "from 2-consensus objects" was not checked, because F&A and snapshot are
+atomic base objects here.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
 - §4 overview: process `P₀` "with depth 0" captures the root, but in Algorithm 1 `max_depth` starts at 1, so depths
-  start at 1 and the root is never captured (harmless).
+  start at 1 and the root is never captured. The pseudocode and the proofs do not depend on this.
 - §4.1 says Line 9 looks at accessed nodes "of depth ≤ depth_i"; the pseudocode (and the proofs) use all nodes of
   depth ≤ `maxdepth_i`.
 - Theorem 9's proof: "some `P_i` that returns before `P_j` starts is ordered *before* `P_j`" should read *after*.
+- Lemma 13's proof: "each step in `L₁` but the last keeps the system in a bivalent state" fails for an arbitrary
+  extension `L₁` reaching a `q`-valent state. It holds if `L₁` stops at its first `q`-valent state, and the proof does
+  not use the remark (`lemma_13`).
 - Lemma 14's proof: "In `e_P` (where `I[m+1]` is initially 1)" should be 2.
 - Lemma 15's proof: "`o_P = write(v_P)` and `o_P = write(v_Q)`": the second is `o_Q`.
 
@@ -50,7 +52,7 @@ iterators while no write is executed, so each unblocking phase ends (`unblock`, 
 Executing writes one at a time would not obviously work: an algorithm could alternate writes with reads of `R`'s
 iterator and keep `R` blocked forever.
 
-### 🛠️ Lemma 1 (Algorithm 1: no capture in the right subtree of an unrecorded node)
+### 🔧 Lemma 1 (Algorithm 1: no capture in the right subtree of an unrecorded node)
 The proof finds a node `u` with `v_l < u < v_r` that was accessed early and concludes that `u` lies in the right
 subtree of `v` or of `v_l`; it misses the case `u = v`.
 
@@ -61,7 +63,7 @@ starts blocking nodes, hence before `P_i` tries `v_r`. Also, the step "Lemma 1 i
 phase" leaves termination implicit. It holds because successive capture attempts at a fixed depth `d` move strictly
 right among the `2^d` nodes of that depth (`waitFree`).
 
-### 🛠️ Lemma 5 and Theorem 9 (Algorithm 1: the chain)
+### 🔧 Lemma 5 and Theorem 9 (Algorithm 1: the chain)
 Lemma 5's proof only shows that the input of the process with the largest captured node is not returned (not that
 it is the only one), and Theorem 9 asserts without argument that Lemmas 4–8 make `⇝` a chain.
 

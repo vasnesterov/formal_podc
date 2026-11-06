@@ -5,35 +5,31 @@ Content-Oblivious Leader Election on General Graphs.* PODC 2026. DOI
 [10.1145/3796701.3815949](https://doi.org/10.1145/3796701.3815949). Formalized version: the 4-page
 brief announcement (no arXiv version). Numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** The combinatorial core is correct. Any port pairing of a graph with
-all degrees even induces a unique circuit decomposition (Lemma 2). Re-pairing at a node merges
-distinct circuits into one (Lemma 4). The merging phases of Lemma 5 end, after at most `log₂ n`
-phases, in a single Eulerian circuit with a single leader, and the pulse arithmetic of Theorem 1
-gives `O(|E|·IDmax)`. Two steps of the Lemma 5 sketch need a repair: in a mutually selecting pair
-of circuits both merges must not be executed, and the OR protocol does not say how the leader's own
-input is used. The OR protocol (with the leader's input) is verified on an asynchronous
-content-oblivious ring. The other pulse-level parts (Lemma 3 with its ring-election black box, the
-max-ID protocol, the synchronisation of merges) are not formalized.
+**Verdict: 🔧 Easy fix.** The combinatorial core is correct: any port pairing of a graph with all degrees even induces a
+unique circuit decomposition (Lemma 2), re-pairing at a node merges distinct circuits into one (Lemma 4), the merging
+phases of Lemma 5 end, after at most `log₂ n` phases, in a single Eulerian circuit with a single leader, and the pulse
+arithmetic of Theorem 1 gives `O(|E|·IDmax)`. Two steps of the Lemma 5 sketch each need one added rule: in a mutually
+selecting pair of circuits both merges must not be executed, and the OR protocol, which we verify on an asynchronous
+content-oblivious ring, must say how the leader's own input is used. The election as a pulse-level algorithm was not
+checked: Lemma 3 with its ring-election black box, the max-ID protocol and the synchronisation of merges are not
+formalized.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
 - The intro says the "maximum-ID node on the merged circuit becomes its new leader". It is the
   maximum among the merged *leaders* (the root of the merge tree; `id_le_id_top_of_top_eq`).
   This need not be the maximum-ID node of the circuit: in Lemma 3 a node may only relay
   passively on a circuit and then does not take part in its election.
+- "Eulerian" is defined as all degrees even, but a disconnected graph cannot end with a single circuit, so Lemma 5 and
+  Theorem 1 need connectivity, which we assume (`lemma5`).
 - The max-ID step of Lemma 5 (bitwise ORs over "prefix-free" encodings) needs an
   *order-preserving* prefix-free code. Otherwise it returns the lexicographically largest code,
   not the largest ID. Not formalized.
-- Lemma 3's sketch relies on properties of the ring election black box that are not stated:
-  passive relays must recognise when an election has finished, and pulses must be bounded per
-  edge (`O(IDmax)` on every edge) so that relays do not multiply the cost. Not formalized.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 5, merging phases (mutually selecting circuits)
+### 🔧 Lemma 5, merging phases (mutually selecting circuits)
 The sketch lets *every* circuit merge into its adjacent circuit with the largest leader ID, so two circuits that select each other are merged twice, and the second re-pairing can split the merged circuit again (`DoubleMerge.double_merge_splits`).
 
 **Impact.** Statement true; repaired by letting the larger circuit of a mutually selecting pair not merge (`phaseStep_spec`, `lemma5`).
@@ -55,7 +51,7 @@ circuits at least halves per phase, so there are at most `log₂ n` phases. (The
 also tell `C` whether `C'` selected `C`; we do not formalize that.)
 (`DoubleMerge.double_merge_splits`; repaired: `phaseStep_spec`, `lemma5`)
 
-### 🛠️ Lemma 5, OR protocol (the leader's own input)
+### 🔧 Lemma 5, OR protocol (the leader's own input)
 The sketch does not say how the leader's own input enters the OR protocol, and if "the first node with input 1" excludes the initiating leader, the protocol outputs 0 when only the leader borders another circuit (`OrProtocol.literal_wrong`).
 
 **Impact.** Under-specified; the evident fix (the leader reflects if its own input is 1) is verified on every schedule (`OrProtocol.orProc_final`, `orProc_totalSent_le`).
@@ -118,7 +114,10 @@ Full list of differences (including modelling choices and minor imprecisions):
 **Not formalized.** Lemma 3, i.e. the activation of virtual nodes running the ring election of
 Chalopin et al. as a black box. The pulse-level implementation of Lemma 5: orientation agreement,
 max-ID computation, and synchronising merges between circuits. Theorem 1 as a statement about a
-content-oblivious algorithm on general graphs.
+content-oblivious algorithm on general graphs. Open remark: Lemma 3's sketch relies on properties of the ring election
+black box that are not stated, and we did not check them against Chalopin et al.: passive relays must recognise when an
+election has finished, and pulses must be bounded per edge (`O(IDmax)` on every edge) so that relays do not multiply the
+cost.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity checks:

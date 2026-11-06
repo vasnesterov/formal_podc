@@ -4,28 +4,35 @@ Christoph Lenzen, Julian Loss. *Optimal Clock Synchronization with Signatures.* 
 [10.1145/3519270.3538444](https://doi.org/10.1145/3519270.3538444). Formalized version: arXiv
 [2203.02553](https://arxiv.org/abs/2203.02553) v2; numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🛠️ Proof repaired.** We formalized Section 2.1: the synchronous approximate-agreement algorithm APA
-built on signature-based crusader broadcast. All checked statements are true as written: Lemma 7, Lemma 8,
-Theorem 9 (2 rounds, `(ℓ, ℓ/2, ⌈n/2⌉−1)`-secure) and Corollary 2 (`2⌈log₂(ℓ/ε)⌉` rounds). The induction step
-of Lemma 8 had to be repaired. The clock-synchronization results (Sections 3 and 4) are not formalized.
+**Verdict: 🔧 Easy fix.** We checked only Section 2.1, the synchronous approximate-agreement algorithm APA built on
+signature-based crusader broadcast; the clock-synchronization results (Sections 3 and 4), the paper's main point, are
+not formalized. Lemma 7, Lemma 8, Theorem 9 (2 rounds, `(ℓ, ℓ/2, ⌈n/2⌉−1)`-secure) and Corollary 2
+(`2⌈log₂(ℓ/ε)⌉` rounds) are all true, apart from a degenerate corner of Corollary 2. The one real error is the
+induction step of Lemma 8, which a few lines repair.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
-- Lemma 7's proof writes the lists with lengths `n − k` and `n − k + 1` instead of `n − b` and `n − b + 1`.
-  The upper indices are off by `b`: the retained maximum is the `(n − f)`-th smallest value in both lists, not
-  `r̃^{n−(f−(b−1))}` and `r^{n−(f−b)}`. The inequalities used are correct.
+### ✏️ Slips
+- Corollary 2 (round count): for `ℓ ≤ ε` the count `2⌈log(ℓ/ε)⌉` is zero or negative, and undefined for `ℓ = 0`. Zero
+  rounds suffice there (`corollary_2`).
+- Corollary 2 and Figure 4 (repetition of APA): repeating the algorithm needs signatures tied to the instance. Figure 4
+  signs only `b_v`, so without a session id an old signature of an honest dealer can be replayed, and CB validity
+  fails. The paper's "(an instance of) Algorithm CB" implies separate signing domains; our tokens carry the iteration
+  number (`corollary_2`).
+- Lemma 7's proof: the upper indices are off by `b`. The retained maximum is the `(n − f)`-th smallest value in both
+  lists, not `r̃^{n−(f−(b−1))}` and `r^{n−(f−b)}`. The inequalities used are correct.
 - Definition 6 and Algorithm CB (Figure 4) are stated for binary inputs `b_v ∈ {0, 1}`. APA uses them for
   real values. Signatures work for any message, and we formalize CB on reals directly.
 
+### Typos
+- Lemma 7's proof writes the lists with lengths `n − k` and `n − k + 1` instead of `n − b` and `n − b + 1`.
+
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 8 (induction step written backwards)
+### 🔧 Lemma 8 (induction step written backwards)
 The induction step concludes `x ∈ I_w ⊇ Ĩ_w`, where `Ĩ_w` is the interval *with* the extra `⊥`, but Lemma 7 gives the opposite inclusion, and the step goes from a `k`-execution to some `(k+1)`-execution instead of covering every one.
 
-**Impact.** Statement true; repaired induction (`lemma_8`).
+**Impact.** The step as written proves nothing, but the lemma holds with a repaired induction (`lemma_8`).
 
 **Details.** The induction is on the number `k` of `⊥` values received by honest nodes. The paper starts from
 a `k`-execution and replaces one value by `⊥`. Lemma 7 says that a `⊥` *enlarges* the interval, so the

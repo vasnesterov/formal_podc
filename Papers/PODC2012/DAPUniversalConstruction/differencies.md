@@ -3,21 +3,20 @@
 Paper: Ellen, Fatourou, Kosmas, Milani, Travers, *Universal Constructions that Ensure Disjoint-Access Parallelism
 and Wait-Freedom*, PODC 2012; full version HAL hal-00697198v2 (numbering as there).
 
-## Verdict calibration
+## Issues in the paper
 
-Verdict ✅ (Correct). The checked statements are Theorem 5 (with Lemma 4 and the claims of its proof), and the
-claims of Section 3 that `Append` is value oblivious and `Search` is not. All are true as written and the proof of
+The checked statements are Theorem 5 (with Lemma 4 and the claims of its proof), and the claims of Section 3 that
+`Append` is value oblivious and `Search` is not. With the implied assumptions below they are true and the proof of
 Theorem 5 goes through without repairs; we only had to make precise notions the paper leaves informal (below).
 
-Borderline calls:
-- Theorem 5 is stated as "No feebly disjoint-access parallel universal construction is wait-free", without
+- ✏️ Theorem 5 is stated as "No feebly disjoint-access parallel universal construction is wait-free", without
   "linearizable", "satisfying Assumption 3" or "with at least two processes". The text says the result is about
   linearizable universal constructions and that "the proof relies on" Assumption 3, and a one-process system is
-  degenerate. These are implied assumptions (R4, R2), not statement issues; `theorem_5` takes them as hypotheses.
-- The wording of Assumption 3 ("the sets of base objects … during any solo execution of a sequence of consecutive
+  degenerate. `theorem_5` takes them as hypotheses.
+- ✏️ The wording of Assumption 3 ("the sets of base objects … during any solo execution of a sequence of consecutive
   instances") can be read as the union over the whole sequence; the proof needs per-instance sets (`B(ℓ)` is the
   set written by one instance, and "only base objects in `∪{B(k) | j ≤ k ≤ i}` can differ in `Cᵢ` and `Cᵢʲ`" is
-  not justified if only the union is fixed). The intent is clear from the proof (R3); listed as a slip.
+  not justified if only the union is fixed). The intent is clear from the proof.
 
 ## Model and definitions
 

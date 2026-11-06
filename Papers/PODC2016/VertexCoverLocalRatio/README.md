@@ -10,7 +10,8 @@ Copy of the paper: [paper.pdf](paper.pdf).
 is a deterministic `(2+ε)`-approximation for minimum-weight vertex cover, and a vertex of degree `d`
 finishes in `O(1/ε)` rounds if `d ≤ 16` and in `O(log d/(ε log log d))` rounds otherwise, for
 `ε = O(1)`. The CONGEST variant (Section 4) also holds once its under-specified rounding rule is pinned
-down, with twice the constant. The arithmetic of Section 5 checks out.
+down, with twice the constant. The arithmetic of Section 5 checks out; that [KMW10] rests on nothing else, and
+so the claimed contradiction with its lower bound, was not checked.
 
 ## Mistakes in the paper
 

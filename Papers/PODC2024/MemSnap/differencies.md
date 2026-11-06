@@ -11,11 +11,9 @@ Shared-Memory*, PODC 2024 (proceedings version; no arXiv version).
    possibility that no linearization realizes (`Counterexample.not_tracked`), so `Q ⊄ P`. The
    counterexample satisfies all of the paper's hypotheses: one component, primitive `write`, two
    updaters, one scanner, 16 steps. With the condition added the lemma holds
-   (`lemma_7_2_fixed`). *Rule:* R3 (typo / evident intent). The intent is stated in the paper's
-   prose. The fix is one local conjunct. The proof is omitted, so no published argument uses the
-   wrong version. Theorem 7.3 is unaffected. Borderline aspect: Lemma 7.2 is a numbered lemma and
-   the printed set is wrong for a non-degenerate execution. We grade ⚠️ rather than ❌ only because
-   R3 applies.
+   (`lemma_7_2_fixed`). ✏️ Slip: the intent is stated in the paper's prose. The fix is one local
+   conjunct. The proof is omitted, so no published argument uses the wrong version. Theorem 7.3 is
+   unaffected. The printed set is wrong for a non-degenerate execution.
 
 ## Proofs
 

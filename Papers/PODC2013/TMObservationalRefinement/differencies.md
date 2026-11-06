@@ -5,11 +5,11 @@ Consistency*, PODC 2013 (author copy, 10 pp.). Numbering follows the PODC versio
 (JACM 2017, *Characterizing Transactional Memory Consistency Conditions Using Observational
 Refinement*) was used only to confirm intended definitions; its numbering is not used.
 
-## Statement-level issues (verdict rules from `verdicts.md`)
+## Statement-level issues
 
-1. **Theorem 24 / third implication of Theorem 16 is unestablished** (R5 → ❌: a headline whose
-   proof is broken and which is neither proved nor refuted; reviewer correction of an earlier 🚨).
-   It is false for Figure 2 as printed (R3 would excuse that alone). `H_C ⊑_state H_A ⟹ H_C|complete ⊑ H_A|complete` fails
+1. **Theorem 24 / third implication of Theorem 16 is unestablished** (⚠️: its
+   proof is broken and it is neither proved nor refuted for the intended semantics).
+   It is false for Figure 2 as printed. `H_C ⊑_state H_A ⟹ H_C|complete ⊑ H_A|complete` fails
    with the literal trace sets of Figure 2 (`Tr`) whenever all primitive commands are deterministic,
    e.g. for the minimal command set the paper requires (assignments and `assume`; instance
    `instLangMinCmd`, `minCmd_det`). Counterexample (`theorem_24_false`, `Theorem24.lean`):
@@ -19,7 +19,7 @@ Refinement*) was used only to confirm intended definitions; its numbering is not
    value `v` of its target variable (so the assignment `x := v` does not change the state) and, if
    the call ended its block, the transaction aborts at commit. Final states coincide, but no complete
    history of `H_A` has the per-thread projection of `H`.
-   *Why the literal failure is not a refutation (no 🚨)*: the counterexample depends on the Figure 2 slip of item 4. As printed, the
+   *Why the literal failure is not a refutation*: the counterexample depends on the Figure 2 mistake of item 4. As printed, the
    body of an atomic block runs on after an aborted call, and the block can finish with
    `x := aborted` only if the whole body trace ends in `aborted`. So with commands after the call
    (`r := atomic { y := o.f(1); z := 1 }`), an aborted call never completes the block, and the
@@ -27,8 +27,8 @@ Refinement*) was used only to confirm intended definitions; its numbering is not
    ("Once this happens, the execution of C terminates"; JACM Figure 4), the block ends with
    `r := aborted` and `z` unchanged, which no trace with a history in `H_A` can reproduce:
    `theorem_24_cex_fails_intended` (`Theorem24Intended.lean`, repaired trace sets `TrI`, minimal
-   language, one thread) proves `¬ (H_C ⊑_state H_A)` there. By R3 (intent recoverable from the
-   prose, local fix of Figure 2) the literal failure is excused, as for Proposition 13.
+   language, one thread) proves `¬ (H_C ⊑_state H_A)` there. The intent is recoverable from the
+   prose and Figure 2 has a local fix, so the literal failure does not refute the intended theorem.
    *Status for the intended semantics*: neither proved nor refuted. The proof sketch has a real gap
    there: `P_H` records return values in never-rewritten variables with "distinguished initial
    values"; if the aborted call is the last command of its block, "call aborted" and "call returned
@@ -36,10 +36,7 @@ Refinement*) was used only to confirm intended definitions; its numbering is not
    final state of an execution of P_H we can reconstruct the interaction of each thread" is false.
    Adding a marker assignment after each call (inside the block; local variables are not rolled
    back) separates the two cases, and the rest of the sketch (status variables, global flags for
-   the real-time order) then looks sound; not formalized. *Deciding rule*: R5, an unestablished
-   headline → ❌. *Borderline note*: if the marker repair were proved, the item would drop to a
-   proof repair and the verdict to ⚠️ (from the R3 slips, items 2–4); a proof of Theorem 24 false
-   for the intended semantics would make it 🚨. The journal
+   the real-time order) then looks sound; not formalized. The journal
    version drops state-based refinement and proves necessity only for trace-based notions.
    *Nondeterministic commands*: with `x := *` in `Pcomm` the counterexample does not apply even for
    Figure 2 as printed (evaluation sets of states would differ).
@@ -50,7 +47,7 @@ Refinement*) was used only to confirm intended definitions; its numbering is not
    `nontrans` record the real-time order. `trace_necessity` needs only that `H_C` consists of
    (repaired) well-formed histories, nothing about `H_A`.
 
-2. **Definition 2 omits `txcommit` from its third condition** (R3 → ⚠️). As printed, a `txcommit`
+2. **Definition 2 omits `txcommit` from its third condition** (✏️). As printed, a `txcommit`
    need not occur inside a transaction. The intent (txcommit is "issued when a transaction tries to
    commit upon exiting an atomic block"; JACM Definition 3.2(vi) lists it) is clear and the fix is
    local. Consequences of the printed version, all formalized:
@@ -63,22 +60,22 @@ Refinement*) was used only to confirm intended definitions; its numbering is not
    Formalization: `WellFormedLit` (as printed), `WellFormed` (repaired, used for all positive
    results); `wellFormed_iff_run` characterizes the repaired version by a per-thread automaton.
 
-3. **Definition 12, third condition, misses the projection `τ₁|t`** (R3 → ⚠️). As printed, a global
+3. **Definition 12, third condition, misses the projection `τ₁|t`** (✏️). As printed, a global
    command of thread `t` inside `t`'s transaction is allowed as soon as *any* thread has committed or
    aborted since `t`'s `txbegin`. Lemma 18 is then false (`lemma_18_false_literal`: two writes to the
    same global variable, one inside a transaction, swapped by `∼`). The repaired `WFTrace` uses `τ₁|t`
    (as JACM Definition 3.2(viii)). Program traces satisfy the repaired condition (`Tr.props`), so
    Corollary 19 is unaffected.
 
-4. **Proposition 13 is false** (R3 → ⚠️, borderline). Figure 2 lets the body of an atomic block
+4. **Proposition 13 is false** (🔧). Figure 2 lets the body of an atomic block
    continue after a method call in it was aborted (`A(C₁;C₂)` concatenates any trace of `C₁`, including
    one ending in `aborted`, with a trace of `C₂`), contradicting the prose "Once this happens, the
    execution of C terminates". Hence `A(P)` contains traces with ill-formed histories
    (`prop_13_false`: `txbegin OK call aborted call`). Conversely, an aborted call followed by more
    body commands cannot end the block with `x := aborted` unless the body trace also ends in
-   `aborted`; this is what `theorem_24_false` exploits (item 1). Borderline between ⚠️ and ❌: the intended
+   `aborted`; this is what `theorem_24_false` exploits (item 1). The intended
    semantics is stated in the prose and the fix is local (stop after `aborted`, or intersect `A(P)`
-   with well-formed traces as JACM does), so we apply R3. What the paper needs from Proposition 13 —
+   with well-formed traces as JACM does). What the paper needs from Proposition 13 —
    traces of `[[P]](s, H)` are well-formed when `H` contains well-formed histories — is proved
    (`wfTrace_of_inA`). With the repaired Definition 2, the continuation is harmless; with the printed
    Definition 2 it is what makes Theorem 21 fail (item 2).

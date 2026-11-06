@@ -5,17 +5,23 @@ graphs through hub labeling.* PODC 2019. DOI
 [10.1145/3293611.3331625](https://doi.org/10.1145/3293611.3331625). Formalized version: arXiv
 [1902.07055](https://arxiv.org/abs/1902.07055) v3; numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** The hub-labeling lower bound holds as stated. This covers Lemma 2.2
-for the weighted layered graph `H_{b,ℓ}`, the pass-through and distance part of Lemma 2.2 for the
-degree-3 graph `G_{b,ℓ}`, Theorem 2.1 (i)–(iii) and Theorem 1.1, all with explicit constants. One step
-of the proof of Lemma 2.2 is false: the claim that `G_{b,ℓ}` preserves all distances of `H_{b,ℓ}`
-between levels. Only the special case the theorem needs is true, and it needs a different argument.
+**Verdict: 🛠️ Hard fix.** The hub-labeling lower bound holds as stated: Lemma 2.2 for the weighted layered graph
+`H_{b,ℓ}`, the pass-through and distance part of Lemma 2.2 for the degree-3 graph `G_{b,ℓ}`, Theorem 2.1 (i)–(iii)
+and Theorem 1.1 are proved, all with explicit constants. One step of the proof of Lemma 2.2 is false: the claim that
+`G_{b,ℓ}` preserves all distances of `H_{b,ℓ}` between levels; only the special case the theorem needs is true, and it
+needs a new potential argument. The Sum-Index reduction and the Ruzsa–Szemerédi upper bound (Sections 3 and 4) were
+not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
+### ✏️ Slips
+- Theorem 2.1, inequality (1): `|S*_v| ≤ diam(G)·|S_v|` is off by one, since a single hub at distance `diam` gives a
+  subtree of `diam + 1` vertices. The factor should be `diam + 1`; the loose second inequality absorbs this
+  (`card_hubPathSet_le`).
+- Proof of Theorem 2.1 (iii), counting of triplets: it prints `z = 2x − y` and `x = 2z − y`; from `y = (x+z)/2` the
+  right formulas are `z = 2y − x` and `x = 2y − z` (`card_triples_le_sum`).
 
-### Typos and slips
+### Typos
 - "path of length `w(e) − 2b + −2`" should be `w(e) − 2b − 2`.
 - "`V = ⋃_{r=0}^{2ℓ} V_i`" has a mismatched index.
 
@@ -52,20 +58,6 @@ for all `u ∈ V_i`, `v ∈ V_j` with `i < j`. For `j = i + 1` it cites "the con
 * `V_ℓ` separates the bottom from the top. Summing the two bounds gives `Lopt + 2 Σ_k (j_k − m_k)²` for a walk
   through `v_{ℓ,j}`, with `m = (x+z)/2`.
 
-### 🛠️ Lemma 2.2 for `H_{b,ℓ}` (smaller gaps)
-The proof does not argue that a walk with exactly `2ℓ` edges climbs one level per edge, nor why minimizing
-`δ_i² + δ_{2ℓ+1−i}²` under a fixed sum has a unique solution that pins down every vertex of the path.
-
-**Impact.** Statement true; routine, and we fill them in (`lemma_2_2`).
-
-### 🛠️ Theorem 2.1 (bound (1) on `S*_v`)
-The proof bounds `|S*_v| ≤ diam(G_{b,ℓ})·|S_v|` with an unproved diameter estimate.
-
-**Impact.** Statement true; we avoid the bound.
-
-**Repair.** We instead count only hubs within distance `L = 8ℓ²s² ≥ Lopt` of `v`. These are the only hubs that can
-serve the counted pairs, so `|S*_v| ≤ (L+1)|S_v|` without any diameter bound.
-
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
 ## The formalization
@@ -92,6 +84,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Theorem 1.1 | `theorem_1_1` | `Main.lean` |
 | Claim "`dist_G = dist_H` between levels" in the proof of Lemma 2.2: **false** | `dist_claim_false` | `Counterexample.lean` |
 
+The proof of Lemma 2.2 for `H_{b,ℓ}` does not argue that a walk with exactly `2ℓ` edges climbs one level per edge,
+nor why minimizing `δ_i² + δ_{2ℓ+1−i}²` under a fixed sum has a unique solution that pins down every vertex of the
+path. These steps are routine, and we fill them in (`lemma_2_2`).
+
 Supporting facts: `edist_main_le_wlen` (`d_G ≤ d_H` between vertices of `H`), `pot` and
 `abs_pot_sub_le` (the potential), `refl_adj` (level reflection is a homomorphism),
 `exists_mem_support_midLevel` (the cut at level `ℓ`), `lopt_le_length_and` (in `Distances.lean`).
@@ -103,7 +99,10 @@ Supporting facts: `edist_main_le_wlen` (`d_G ≤ d_H` between vertices of `H`), 
 * Theorem 1.1 is proved for infinitely many `n`, the usual reading of such a lower bound.
 
 **Not formalized.** Uniqueness of the shortest `v_{0,x}`–`v_{2ℓ,z}` path *in `G`*, which the paper
-states and never uses; we prove the pass-through property and the distance. Not formalized either:
+states and never uses, and whose proof rests on the false distance claim; we prove the pass-through property and the
+distance. The diameter estimate `diam(G) ≤ (3ℓ+1)s²·4ℓ` of inequality (1) in Theorem 2.1, which the paper asserts
+without proof: we avoid it by counting only hubs within distance `L = 8ℓ²s² ≥ Lopt` of `v`. These are the only hubs
+that can serve the counted pairs, so `|S*_v| ≤ (L+1)|S_v|` without any diameter bound. Not formalized either:
 Section 3 (Theorem 1.6, the reduction from Sum-Index) and Section 4 (Theorems 4.1/1.4, the
 Ruzsa–Szemerédi upper bound).
 

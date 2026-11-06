@@ -5,21 +5,21 @@ DOI [10.1145/3583668.3594571](https://doi.org/10.1145/3583668.3594571). Formaliz
 [2204.02115](https://arxiv.org/abs/2204.02115) v2 (full version with appendices); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The main results hold. Theorem 1 says there are population protocols with
-`O(n)` states deciding `x ≥ k` for some `k ≥ 2^(2^n)`. Theorem 2 says they are almost self-stabilising.
-Theorem 3 (the succinct population program), Theorem 5 (programs to protocols), Lemma 4 and
-Propositions 14 and 16 are verified too. But **Lemma 11(c) is false**: `IncrPair` is not `i`-robust. The
-proof of Lemma 12(c) relies on it, and we re-proved 12(c) by another argument. Several other proof steps
-needed repairs.
+**Verdict: 🔧 Easy fix.** The main results hold: Theorem 1 says there are population protocols with
+`O(n)` states deciding `x ≥ k` for some `k ≥ 2^(2^n)`, Theorem 2 says they are almost self-stabilising, and
+Theorem 3 (the succinct population program), Theorem 5 (programs to protocols), Lemma 4 and Propositions 14 and
+16 are verified too. Lemma 11(c) is false: `IncrPair` is not `i`-robust, and the proof of Lemma 12(c) relies on
+it, but one short replacement step saves Lemma 12(c). The other proof steps that needed repairs, mostly in the
+constructions of Appendix B, take local changes.
 
 ## Mistakes in the paper
 
-### ❌ Lemma 11(c) (`IncrPair` is `j`-robust for all `j ≤ i`)
+### 🔧 Lemma 11(c) (`IncrPair` is `j`-robust for all `j ≤ i`)
 Lemma 11(c) is false for `j = i`: with one level (`n = i = 1`, `N₁ = 1`), `IncrPair(x̄₁, ȳ₁)` on the `1`-high
 configuration `x₁ = 0, x̄₁ = 1, y₁ = 1, ȳ₁ = 0` returns a `1`-proper configuration (`lemma_11c_false`).
 
-**Impact.** A false numbered lemma whose false case the proof of Lemma 12(c) uses; Lemma 12(c) is still true, for
-a different reason (`large_robust_mid`), and the headline results (Theorems 1, 2, 3, 5) are unaffected.
+**Impact.** The proof of Lemma 12(c) uses the false case; Lemma 12(c) is still true, for a different reason
+(`large_robust_mid`), and the main results (Theorems 1, 2, 3, 5) are unaffected.
 
 **Details.** The lemma claims `IncrPair(x, y)` is `j`-robust for all `j ≤ i`, that is: called on a `j`-high configuration, every return is `j`-high again. The example is
 `1`-high: it is not `1`-proper, and both pair sums are `1`. `IncrPair(x̄₁, ȳ₁)` increments the two-digit counter
@@ -28,30 +28,29 @@ The same happens at every level, starting one counter step before the proper val
 that lines 3 and 5–7 change the level-`i` registers. Lemma 12(c) ("`Large` is robust") needs exactly the false
 case: `Large` at level `i` calls `IncrPair` at level `i − 1` on `(i−1)`-high configurations.
 
-**Repair.** Only `j < i` holds, and we prove that. Lemma 12(c) holds because the walk of `Large` never changes the
+**Repair.** Only `j < i` holds, and we prove that (`incr_robust_lt`). Lemma 12(c) holds because the walk of `Large` never changes the
 pair sums of level `i − 1`. Once line 9 has passed, one of these sums exceeds `N_{i−1}`, so the configuration
 cannot become `(i−1)`-proper. We prove termination with the paper's own symmetry idea: one loop iteration can be
 undone by another. In Lean this is the explicit relation `Iter` and `iter_symm`. (`large_robust_mid`)
 
-### Typos and slips
-- In `IncrPair`, the "Effect" line says the counter "decreases by 1", but the procedure increments it (prose and
-  Lemma 11(a) say so).
+### ✏️ Slips
+- The proof of Theorem 3 says "`N_{i+1} = (N_i+1)²` and `N₁ = 1`, implying `k ≥ 2^(2^n)`" for
+  `k = 2 ∑ᵢ₌₁ⁿ Nᵢ`, which fails already for `n = 1, 2, 3` (`k = 2, 10, 60`; `S_lt_claim`). The bound in the
+  theorem's own statement, `k ≥ 2^(2^(n−1))`, is correct (`S_ge`), and so is Theorem 1 (apply Theorem 3 with
+  `n + 1` levels).
+- In `IncrPair`, the title says "Decrement" and the "Effect" line says the counter "decreases by 1", but the
+  procedure increments it (prose and Lemma 11(a) say so).
+- On p. 27, the last `⟨move⟩` rule should read `v ∈ 𝓕_{V_y}`.
+
+### Typos
 - Line 12 of `Large` calls `CheckProper(i − 2)`, which should be `AssertProper(i − 2)`.
 - In the proof of Theorem 3, "registers sum to `i`" should be "`m`", and the bound "`m − |C| ≤ 2N_j`" is too weak
   for the argument: the strict `< 2N_j` is needed (with equality the configuration would be `j`-proper, not
   `j`-low), and it does hold by the choice of `j`.
-- On p. 27, the last `⟨move⟩` rule should read `v ∈ 𝓕_{V_y}`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 3 (the bound `k ≥ 2^(2^n)` in the proof)
-The proof says "`N_{i+1} = (N_i+1)²` and `N₁ = 1`, implying `k ≥ 2^(2^n)`" for `k = 2 ∑ᵢ₌₁ⁿ Nᵢ`, which fails
-already for `n = 1, 2, 3` (`k = 2, 10, 60`; `S_lt_claim`).
-
-**Impact.** Statement true: the bound in the theorem's own statement, `k ≥ 2^(2^(n−1))`, is correct (`S_ge`), and
-so is Theorem 1 (apply Theorem 3 with `n + 1` levels).
-
-### 🛠️ Proposition 16 (the initial value of `OF` must be `false`)
+### 🔧 Proposition 16 (the initial value of `OF` must be `false`)
 The construction lets the leader election give `OF` an arbitrary initial value `v_OF`, and with `v_OF = true` the
 protocol can output `true` on inputs `x < i`, where `φ′(x)` is false.
 
@@ -60,7 +59,7 @@ protocol can output `true` on inputs `x < i`, where `φ′(x)` is false.
 **Details.** With fewer than `|F|` agents the election can create an `OF` agent but never an `IP` agent. With
 `v_OF = true`, that agent would broadcast `true`.
 
-### 🛠️ Lemma 15 / Proposition 16 (the elected agents' initial states)
+### 🔧 Lemma 15 / Proposition 16 (the elected agents' initial states)
 The proof says the agents are in their initial states `X^v_none` "at the moment this happens", which needs three
 new invariants of the election (prefix counts, empty levels, fresh agents).
 
@@ -69,14 +68,17 @@ new invariants of the election (prefix counts, empty levels, fresh agents).
 **Details.** The fairness argument also needs the elected configuration to be reachable from every *reachable*
 configuration, not only from the initial one.
 
-### 🛠️ Propositions 14 and 16 (smaller gaps in the constructions of Appendix B)
+### 🔧 Proposition 16 (Appendix B.3, `⟨elect⟩` and `Y = IP`)
+The wildcard in `⟨elect⟩` covers states of `Q_X` only, so map states have to count as agents of their pointer, and
+the transitions for `Y = IP` must be added, since the paper assumes `Y ≠ IP` "w.l.o.g.".
+
+**Impact.** Statement true; a local addition to the transition list (`proposition_16`).
+
+### 🔧 Proposition 14 (Appendix B.2, `restart` and `V_y := V_□`)
 In Proposition 14, the `restart` helper must skip moves between equal registers, and `V_y := V_□` needs a clamped
 map `f`.
 
-**Impact.** Statements true; local fixes (`proposition_14`, `proposition_16`).
-
-**Details.** In Proposition 16, the paper assumes `Y ≠ IP` "w.l.o.g.", so transitions for `Y = IP` must be added.
-Map states also have to count as agents of their pointer in `⟨elect⟩`.
+**Impact.** Statement true; local fixes (`proposition_14`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

@@ -3,9 +3,8 @@
 Afek, Morrison, Wertheim, *From Bounded to Unbounded Concurrency Objects and Back*, PODC 2011
 (author copy of the PODC version, 11 pages, proofs included).
 
-**Verdict 🛠️ (rule R1).** No checked statement is false; the proof of Lemma 15 is broken as written (repaired), and
-Lemmas 1, 5 and Theorem 9 have smaller gaps. Typos (Lemma 14/15 proofs, §4 overview/§4.1 prose, Theorem 9 proof)
-have evident intent and do not affect the verdict.
+No checked statement is false; the proof of Lemma 15 is broken as written (repaired), and Lemmas 1, 5 and Theorem 9
+have smaller gaps. Typos (Lemma 14/15 proofs, §4 overview/§4.1 prose, Theorem 9 proof) have evident intent.
 
 ## Common model (Sections 3, 5)
 
@@ -68,8 +67,8 @@ have evident intent and do not affect the verdict.
   `P`, `Q` (and of `R`) do differ. The register case is Herlihy's argument for any read/write-like object.
   The write/read-of-next-iterator case is `write_read_next_false`; typo: "In `e_P` (where `I[m+1]` is initially 1)"
   should be 2.
-- **Lemma 15** (`lemma_15`): statement as in the paper (typo: "`o_P = write(v_Q)`" should be `o_Q`). **Proof
-  repaired** (rule R1: a numbered lemma whose statement is true, proof broken ⇒ 🛠️):
+- **Lemma 15** (`lemma_15`): statement as in the paper (typo: "`o_P = write(v_Q)`" should be `o_Q`). The proof
+  is broken as written and needed a new construction (🛠️):
   1. the paper freezes every new process at its first read "using an iterator `i ∈ T`", even a read that cannot
      distinguish the executions (e.g. of an exhausted iterator). Then all new processes may be frozen forever
      without any write and without moving `R` — the claim "if only (1) occurs, then eventually all iterators in `T`
@@ -115,7 +114,7 @@ have evident intent and do not affect the verdict.
   start at 1 and the root is never used. Harmless (slip).
 - **Lemma 1** (`lemma1_paper`, as stated: whenever a process holds `cap = w` with `w` in the right subtree of `v`,
   `update(v)` has been executed; state form `lemma1`). Proof gap: the case `u = v` (resp. `cap_j = v`) is missing;
-  excluded because the capturer of `v` posts `v` before blocking. 🛠️ (R1: proof gap, statement true).
+  excluded because the capturer of `v` posts `v` before blocking (🔧: proof gap, statement true).
 - **Wait-freedom** (`waitFree : WaitFree (alg V) infArrival`): the paper's "Lemma 1 implies wait-freedom of the
   capturing phase" leaves termination implicit (captures at a fixed depth move strictly right among `2^d` nodes);
   proved with a lexicographic progress measure.
@@ -124,7 +123,7 @@ have evident intent and do not affect the verdict.
   processes) is `lemma3_tst`. No circularity with Lemma 1 (Lemma 1 uses only the trivial first half).
 - **Lemmas 4–6** assume a complete execution (as the paper says); Lemmas 4 and 5 also need at least one process
   (degenerate). **Lemma 5**: the paper proves only that `P_big`'s input is not returned; uniqueness follows from the
-  chain structure / counting (proof gap, 🛠️). **Lemma 8** is `¬ TransGen RetFrom p p`.
+  chain structure / counting (proof gap, 🔧). **Lemma 8** is `¬ TransGen RetFrom p p`.
 - **Theorem 9.** Linearizability is our definition `SwapLin` (one-shot swap with infinitely many processes: a
   duplicate-free list of processes of σ containing all completed ones, the `j`-th completed returns `⊥` for `j = 0`
   and the input of the `(j−1)`-th otherwise, real-time order respected); tied to CSLib's `swapObj` sequential

@@ -1,7 +1,7 @@
 # Differences between the formalization and the paper
 
 Paper: Alon, Emek, Feldman, Tennenholtz, *Bayesian Ignorance*, PODC 2010 (full version of May 9, 2010,
-17 pp., with appendix). Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
+17 pp., with appendix).
 
 ## Model
 
@@ -46,8 +46,8 @@ Paper: Alon, Emek, Feldman, Tennenholtz, *Bayesian Ignorance*, PODC 2010 (full v
     `Q(s) = ∑_t p(t) ∑_e c(e) H(|{i : e ∈ s_i(t_i)}|)` is a Bayesian potential. A deviation from a
     connecting to a non-connecting edge set changes the agent's cost by `∞` but `Q` by a finite amount,
     so the identity `C_i(s) − C_i(s') = Q(s) − Q(s')` fails. Worse, the global minimiser of this `Q` is
-    the all-empty profile (`Q = 0`), which is not an equilibrium. Rule **R4** (an implied restriction
-    to path-containing actions, standard in the NCS literature where strategies are paths): **⚠️**.
+    the all-empty profile (`Q = 0`), which is not an equilibrium. The intended restriction is to
+    path-containing actions, standard in the NCS literature where strategies are paths (🔧).
     Repair: the identity holds between *feasible* profiles (every agent connects whenever possible),
     and a minimiser of `Q` over feasible profiles is a Bayesian equilibrium (`isBayesEq_of_isMin`,
     `exists_isBayesEq`), via the per-state identity `payment_add_potential_update`.
@@ -78,8 +78,8 @@ Paper: Alon, Emek, Feldman, Tennenholtz, *Bayesian Ignorance*, PODC 2010 (full v
     - The paper never fixes `ε` (it appears only in Figure 1). The claimed equilibrium needs
       `ε < 1/(2i+1)` for the agent `i` joining `(x, z)`, i.e. `ε < 1/(2k−1)`; we assume
       `ε(2k−1) < 1` (`worstEqP_le`) and `ε > 0` (`half_hnum_le_bestEqC`). For larger `ε` the profile is
-      not an equilibrium. Proof gap (🛠️), together with the next point.
-    - "`s` is the *unique* Bayesian equilibrium" is false literally: agents may additionally buy
+      not an equilibrium. Proof gap (🔧).
+    - "`s` is the *unique* Bayesian equilibrium" is false literally (✏️): agents may additionally buy
       zero-cost edges `(z, y_j)`. All equilibria have the same social cost `1 + ε`, which is what we
       prove (and what the lemma needs). Same for "the unique Nash equilibrium" when agent `k` stays at
       `x`: unique up to zero-cost edges; we prove every Nash equilibrium there costs `≥ H(k−1)`.
@@ -89,7 +89,7 @@ Paper: Alon, Emek, Feldman, Tennenholtz, *Bayesian Ignorance*, PODC 2010 (full v
     - The claim of Section 3 / the introduction that in this game "the worst Bayesian equilibrium
       achieves the expected cost of the globally optimal outcome" and "`opt^C(G) = worst-eq^P(G) = O(1)`"
       is proved for `k ≥ 3` (`ignorance_is_bliss`: `worst-eq^P = opt^C = 1 + ε`). For `k = 2` it fails
-      (`opt^C = 1 + ε/2`), a degenerate case (R2) irrelevant to the asymptotic claim.
+      (`opt^C = 1 + ε/2`), a case irrelevant to the asymptotic claim.
 14. **Lemma 3.4** (`opt^P/opt^C = O(log n)` in undirected graphs, via FRT tree embeddings and Gupta's
     Steiner-point removal) is **not formalized** (FRT is not in Mathlib/CSLib).
 15. **Lemma 3.5**: only the paper's reduction is formalized (`Lemma35.lemma_3_5`): for every
@@ -104,7 +104,7 @@ Paper: Alon, Emek, Feldman, Tennenholtz, *Bayesian Ignorance*, PODC 2010 (full v
     `(k+1) · worst-eq^C ≤ 4 · worst-eq^P` with `0 < worst-eq^C`, `worst-eq^P ≠ ∞` (Ω(k)), resp.
     `(k+1) · worst-eq^P ≤ 4 · worst-eq^C` with `0 < worst-eq^P`, `worst-eq^C ≠ ∞` (O(1/k)), on the 3-vertex
     undirected triangle `G_worst`, with `k + 1` agents (`k ≥ 3`, resp. `k ≥ 2`; the paper states no range).
-    - **The appendix proofs are swapped** (🛠️, statements true): the "proof of Lemma 3.6" gives
+    - **The appendix proofs are swapped** (✏️, statements true): the "proof of Lemma 3.6" gives
       `worst-eq^P = 3/2 + ε` and `worst-eq^C ≥ (k+2)/2`, i.e. ratio `O(1/k)` = Lemma 3.7
       (`worstConstructionA`); the "proof of Lemma 3.7" gives `worst-eq^P ≥ k + 2` and
       `(1−1/k)(1+ε) ≤ worst-eq^C ≤ (1−1/k)(1+ε) + (k+3+ε)/k`, i.e. ratio `Ω(k)` = Lemma 3.6
@@ -118,7 +118,7 @@ Paper: Alon, Emek, Feldman, Tennenholtz, *Bayesian Ignorance*, PODC 2010 (full v
     - Directed variants ("a trivial modification") are not formalized.
 17. **Lemma 3.8** (`lemma_3_8`): proved as stated. The paper's proof minimises the potential over all
     strategy profiles, whose minimiser is the empty profile (item 10); we minimise over feasible profiles,
-    and handle unreachable destinations (then `opt^P = ∞`). Proof repair (🛠️), consequence of item 10.
+    and handle unreachable destinations (then `opt^P = ∞`). Proof repair (🔧), consequence of item 10.
 18. **Table 1** universal bounds derived from the lemmas: `table_upper_k` (`opt^P/opt^C`,
     `best-eq^P/best-eq^C`, `worst-eq^P/worst-eq^C` are `≤ k`), `bestEqC_le_hnum_mul_bestEqP`
     (`best-eq^P/best-eq^C ≥ 1/H(k)`, via the price of stability `H(k)` of Anshelevich et al., which we
@@ -133,7 +133,7 @@ Paper: Alon, Emek, Feldman, Tennenholtz, *Bayesian Ignorance*, PODC 2010 (full v
     `p ↦ p·v/⟨p,v⟩` of the simplex. The appendix proof assumes that `sup_p min_i ratio` is attained
     ("by definition, there exists some `p` such that for all `i` the ratio is `≥ r*`"), true by
     compactness but not argued; and "`r*` is the minimum real such that …" presupposes that the minimum
-    exists, which we prove (`exists_isLeast_eorBound`). Routine (✅-level) remarks. Nonempty index sets
+    exists, which we prove (`exists_isLeast_eorBound`). Routine remarks. Nonempty index sets
     (and at least one agent) are assumed explicitly. Only `v > 0` is needed for the equivalence; `M > 0`
     is used for the existence of the minimum.
 20. **`RoE(φ) = EoR(φ)`** (`CostTuple.roe_eq_eor`, `isRoE_iff_isEoR`): proved.
@@ -141,17 +141,3 @@ Paper: Alon, Emek, Feldman, Tennenholtz, *Bayesian Ignorance*, PODC 2010 (full v
     von Neumann's. The existence part only needs that the bound `r` holds, not that it is least. The
     remark that the conclusion also holds "in the limit" when some costs are 0 (with `0/0 = 1`) is not
     formalized.
-
-## Verdict
-
-**⚠️ Minor statement issues**, decided by item 10 (the explicit main-text claim that Rosenthal's `Q` is a
-Bayesian potential of Bayesian NCS games is false under the paper's `∞`-cost definitions; excused under
-**R4** because restricting to path-containing actions is the standard NCS convention). Borderline call recorded:
-the sentence ("Observation 2.1 implies that the function `Q` … is a Bayesian potential function for that
-Bayesian NCS game") is an explicit main-text claim of a result, not a step inside a proof, so it is a
-statement under **R1** (hence ⚠️ rather than 🛠️); it is not ❌ because the intended reading (actions
-restricted to connecting edge sets, as in the cited NCS literature) is the standard convention and no
-numbered result depends on the literal version (R4). All numbered
-statements checked (Observations 2.1–2.2, Lemmas 3.1, 3.2, 3.3, 3.5 (reduction), 3.6, 3.7, 3.8,
-Proposition 4.1, Lemma 4.2) are true; proof repairs (🛠️): Lemma 3.8 (item 17), Lemma 3.3 (item 13),
-Lemmas 3.6/3.7 swapped proofs (item 16); typo-level slips in the proofs of Lemmas 3.2 and 3.7.

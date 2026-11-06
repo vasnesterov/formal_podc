@@ -6,18 +6,18 @@ Actively Dynamic Networks.* PODC 2020. DOI
 [2003.03355](https://arxiv.org/abs/2003.03355) v1 (full version with Appendices A–D); numbering
 follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** **Lemma 3.1 is false for GraphToStar as printed**: on the 4-node
+**Verdict: ⚠️ Weakened.** **Lemma 3.1 is false for GraphToStar as printed**: on the 4-node
 line with increasing IDs a pulling committee jumps onto a committee that is merging away in the
-same phase. It then merges into a follower, the committees stop being stars, and the output is not
-a spanning star. So Theorem 3.8 is not established; GraphToStar is the first of the three distributed
-algorithms announced in the abstract. The basic subroutines (Propositions 2.1, 2.2)
-and the centralized lower bounds (Lemmas 6.1, 6.2) hold, up to a small slip in the bound
-`⌈log d⌉ ≤ log n`. We proved them. We also proved the matching centralized upper bound on the line
-(Theorem 6.3, line case). The distributed `Ω(n log n)` bound (Theorem 6.4) is not formalized.
+same phase, it then merges into a follower, the committees stop being stars, and the output is not
+a spanning star. So Theorem 3.8 for GraphToStar, the first of the three distributed algorithms announced in the
+abstract, is not established, and neither is the distributed `Ω(n log n)` bound (Theorem 6.4). The basic subroutines
+(Propositions 2.1, 2.2, up to a small slip in the bound `⌈log d⌉ ≤ log n`), the centralized lower bounds
+(Lemmas 6.1, 6.2) and the matching centralized upper bound on the line (Theorem 6.3, line case) hold and are proved,
+while the other two algorithms (Sections 4–5) were not checked.
 
 ## Mistakes in the paper
 
-### 🚨 Lemma 3.1 (GraphToStar solves Depth-1 Tree)
+### ❌ Lemma 3.1 (GraphToStar solves Depth-1 Tree), hence Theorem 3.8
 On the line `0 - 1 - 2 - 3` with IDs increasing along the line, a pulling committee jumps onto a committee that
 is merging away in the same phase, the committees stop being stars, and the output is not a spanning star
 (`GraphToStar.lemma_3_1_breaks`, `line4_terminates_wrong`).
@@ -48,34 +48,31 @@ through the former leader, so this costs one extra round). In simulation this re
 `≈ 2–3 log₂ n` phases on all tested inputs (lines, trees and random graphs, up to 256 nodes). We did not prove
 it, so Theorem 3.8 remains unproved.
 
-### ⚠️ Lemmas 3.2–3.7 (time analysis of GraphToStar)
+### ❌ Lemmas 3.2–3.7 (time analysis of GraphToStar)
 The time analysis is not a proof: it refers to the broken invariant above, and its formulas and indices are
 garbled.
 
-**Impact.** Unestablished; not formalized.
+**Impact.** Unestablished and not formalized, so the `O(log n)` time is not saved even for a repaired algorithm. Its
+status is unknown, not refuted.
 
 **Details.**
-- Lemma 3.2's size formula writes `S(C(u_{s+log i}))` and sums `2^{log(i-1)}` terms equal to `2^{k+i}`.
+- Lemma 3.2's size formula writes `S(C(u_{s+log i}))` and sums `2^{log(i-1)}` terms equal to `2^{k+i}`, which gives
+  about `j·2^k` rather than `2^{k+j}`.
 - Lemmas 3.4/3.5 have inconsistent indices (`2^{k+p-4}` vs `2^{k+p-3}`, "phase `p+1`" vs "`s+p+1`").
 - Lemma 3.7's "each phase has ≤ 2 rounds" ignores the communication a leader needs to learn its neighbouring
   committees' IDs and modes.
 
-### ⚠️ Theorem 6.4 / D.12 (distributed `Ω(n log n)` activations)
+### ❌ Theorem 6.4 / D.12 (distributed `Ω(n log n)` activations)
 The proof is a sketch: several notions are undefined or garbled, and its final sum evaluates to "`= Θ(log n)`".
 
-**Impact.** Unestablished; the symmetry argument is plausible but not formalized.
+**Impact.** Unestablished, so the "optimal" total of `O(n log n)` activations has no matching bound; the symmetry
+argument is plausible but not formalized, and the theorem is not refuted.
 
 **Details.** Undefined or garbled: "corresponding states" (Def. D.7), `i_min`/`i_max` in Lemma D.11, and the
-"previous proof" giving `k − log k` rounds. The bound concerns *comparison-based* algorithms on increasing-order
-rings (stated in §2.1, not in the theorem).
+"previous proof" giving `k − log k` rounds. Observation 2 has no proof. The bound concerns *comparison-based*
+algorithms on increasing-order rings (stated in §2.1, not in the theorem).
 
-### ⚠️ Proposition 2.1 ("`⌈log d⌉ ≤ log n` rounds")
-TreeToStar takes exactly `⌈log₂ d⌉` rounds (proved), and on the line with `n = 6` nodes, `d = 5`, it needs
-`3 > log₂ 6` rounds (`ceil_log_depth_le_log_false`, `line6_not_star_two`).
-
-**Impact.** A minor imprecision: `⌈log₂ d⌉` can exceed `log₂ n`, but the bound holds with `⌈log₂ n⌉`.
-
-### ⚠️ Observation 1 / Lemma D.2 (distance bound off by a factor 2)
+### 🔧 Observation 1 / Lemma D.2 (distance bound off by a factor 2)
 "Depth-`log n` tree ⇒ `PO_{u,v} ≤ log n`" should be `2 log n`: two leaves are at distance up to twice the depth.
 
 **Impact.** Bookkeeping only: the bounds of Lemmas 6.1 and 6.2 survive (`lemma_6_1`, `lemma_6_2_total`).
@@ -83,13 +80,24 @@ TreeToStar takes exactly `⌈log₂ d⌉` rounds (proved), and on the line with 
 **Details.** The argument mixes information propagation with distances, but the bounds survive with a cleaner
 proof: one round at most halves any distance, and each activated edge shortens a distance by at most one.
 
-### Typos and slips
+### ✏️ Slips
+- Proposition 2.1 ("`⌈log d⌉ ≤ log n` rounds"): TreeToStar takes exactly `⌈log₂ d⌉` rounds (proved), and on the line
+  with `n = 6` nodes, `d = 5`, it needs `3 > log₂ 6` rounds (`ceil_log_depth_le_log_false`, `line6_not_star_two`). So
+  `⌈log₂ d⌉` can exceed `log₂ n`, but the bound holds with `⌈log₂ n⌉`.
 - Proof of Prop. A.1: "`O(log n)` total edge activations" should be `O(n log n)`.
+
+### Typos
 - Prop. 2.2 states maximum degree 3, while its proof and §2.3 say "at most 4". In every snapshot the degree is
   `≤ 3` (proved). The value 4 only appears in the middle of a round, after the activations and before the
   deactivations.
-- CutInHalf (App. D.1) only activates edges, so its output is not a tree. It becomes one after the deactivations
-  we add.
+
+## Proof gaps (statements true)
+
+### 🔧 CutInHalf (App. D.1, Theorem 6.3 / D.5)
+CutInHalf only activates edges, so its output is not a tree, although the target is a Depth-`log n` tree.
+
+**Impact.** It becomes one after the deactivations we add, which are free; we prove this for the line
+(`CutInHalf.theorem_6_3_line`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -134,6 +142,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Not formalized.** The time analysis of GraphToStar (Lemmas 3.2–3.7, Theorem 3.8), §§4–5
 (GraphToWreath, GraphToThinWreath, Theorems 4.2, 5.1), Theorem 6.3 for general graphs (Euler tour
 of a spanning tree), and the distributed lower bound Theorem 6.4 / D.12.
+- §§4–5 were not examined. They use a different merging mode instead of pulling, and the abstract's second and third
+  algorithms rest on them.
+- Theorem 6.3 for general graphs: the Euler-tour line has up to `2n` nodes, so the depth would be `log(2n)`, not
+  `log n`. We only noted this in passing.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. The GraphToStar counterexample and its sanity check are evaluated by

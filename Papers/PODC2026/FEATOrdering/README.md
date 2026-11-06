@@ -4,23 +4,24 @@ Tien Tuan Anh Dinh, Dakai Kang, Mohammad Sadoghi. *FEAT: Fair and Efficient Adve
 PODC 2026. DOI [10.1145/3796701.3815905](https://doi.org/10.1145/3796701.3815905). Formalized version: the
 11-page PODC version (no arXiv version). Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** The protocol as defined does not achieve what Theorem 6.6 claims (FEAT
-achieves comparator-based γ-Batch-Order-Fairness), and Theorem 6.4 and Lemma 6.3 fail with it. The cause is the
-transaction score: the paper counts only **honest** replicas, and a 7-replica run with `f = 2` makes FEAT output
-`[z, m]` although `cmp_T(z, m) = False`. If the score counts **all** replicas, Lemma 6.3 and Theorems 6.4 and 6.6
-hold, and we prove them. Theorem 4.4 (ACC suffices) and the `Ω(|T| log |T|)` lower bound (Theorem 4.5, Corollary
-4.6) are correct, and we prove the lower bound in a stronger form. The fix is one word in a definition, so this
-verdict is borderline: if "honest" is read as a slip, the verdict would be ⚠️ (see [differencies.md](differencies.md)).
+**Verdict: 🔧 Easy fix.** FEAT as printed does not achieve what Theorem 6.6 claims (comparator-based
+γ-Batch-Order-Fairness), and Theorem 6.4 and Lemma 6.3 fail with it: the paper's score counts only **honest** replicas,
+and a 7-replica run with `f = 2` makes FEAT output `[z, m]` although `cmp_T(z, m) = False`. If the score counts **all**
+replicas, Lemma 6.3 and Theorems 6.4 and 6.6 hold, and we prove them; Theorem 4.4 (ACC suffices) and the
+`Ω(|T| log |T|)` lower bound (Theorem 4.5, Corollary 4.6) are correct, and we prove the lower bound in a stronger form.
+The matching `O(|T| log |T|)` upper bound (Theorem 6.7, Corollary 6.8) was not checked.
 
 ## Mistakes in the paper
 
-### 🚨 Lemma 6.3, Theorems 6.4 and 6.6 (score counts only honest replicas)
+### 🔧 Lemma 6.3, Theorems 6.4 and 6.6 (score counts only honest replicas)
 With `score(T)` counting only *honest* replicas (§5.1), a 7-replica run with `f = 2` makes FEAT output `[z, m]` although `cmp_T(z, m) = False`, so Lemma 6.3 and Theorems 6.4 and 6.6 (FEAT achieves comparator-based γ-Batch-Order-Fairness) are false (`lemma_6_3_false`, `theorem_6_4_false`, `theorem_6_6_false`).
 
-**Impact.** The headline fails for the protocol as defined, but the fix is one word: if the score counts *all* replicas, Lemma 6.3 and Theorems 6.4 and 6.6 hold (`Setup.lemma_6_3`, `Setup.theorem_6_4`, `Setup.theorem_6_6`). The verdict is borderline (see the Verdict).
+**Impact.** The output of the protocol as defined is not consistent with its own comparator. Counting all replicas in the
+score, a one-word change to the definition, restores all three statements.
 
 **Details.** §5.1 defines `score(T)` as the number of *honest* replicas whose committed local orderings
-include `T`. Case 2 of the proof of Lemma 6.3 reasons as follows: `z` is solid and `m` is blank, so
+include `T`, and replicas cannot know which replicas are honest, so this score cannot be computed by the protocol.
+Case 2 of the proof of Lemma 6.3 reasons as follows: `z` is solid and `m` is blank, so
 `W(z, m) > τ_dec = τ_shaded > W(m, z)`. The second inequality needs `W(m, z) ≤ score(m)`. But
 `W(m, z)` counts *all* committed orderings, including the Byzantine ones. Here is a counterexample
 with `n = 7`, `f = 2`, `γ = 1` (so `n > (2γ+1)f/(2γ−1) = 6`), `τ_dec = 5/2` and `τ_solid = 5`:
@@ -40,38 +41,25 @@ is consistent with FEAT's own comparator, and that claim is exactly what Theorem
 **Repair.** If the score counts all replicas, the proof goes through: `W(m, z) ≤ score(m) < τ_shaded`.
 On the same run, FEAT then inserts both transactions in round 1 and outputs `[m, z]`.
 (`lemma_6_3_false`, `theorem_6_4_false`, `theorem_6_6_false`; repaired: `Setup.lemma_6_3`,
-`Setup.theorem_6_4`, `Setup.theorem_6_6`, contrast run `cex_scoreAll_FO1`)
+`Setup.theorem_6_4`, `Setup.theorem_6_6`, contrast run `cex_scoreAll_FO1`) The repair uses the "loose" reading of `W`
+that the paper's proof uses; see **Not formalized** below.
 
-The repair needs the "loose" reading of `W`. In the proof of Lemma 6.3, `W(z, m)` counts orderings
-that contain `z` but not yet `m` ("committed `z` but not `m`"). We use this reading. Under the
-stricter reading (both transactions present, `z` first), Case 2 fails even with the all-replica
-score. An example: two honest replicas that have committed nothing yet later commit `[m, z]`. This
-is a sketch and is not formalized.
-
-### ⚠️ Algorithm 3 (merge drops a suffix)
-After the loop `while i ≤ |TailList| and j ≤ |RO_r|`, the tests `if i = |TailList|` and `else if j = |RO_r|` are both false (the exhausted index is one past the end), so the remaining suffix is never appended.
-
-**Impact.** The prose (steps (1) and (2)) is correct, and we model the prose (`List.merge`).
-
-### Typos and slips
-- Algorithm 1 inserts the transactions that are "newly solid" or "newly shaded". Read literally, a transaction
-  that turns from shaded to solid would be inserted twice. The prose says "newly non-blank".
-- Rule (4) of `pcmp` says "both weights exceed the threshold". It should be `≥`, as in rules (2) and (3).
-- Replicas cannot know which replicas are honest, so an honest-replica score cannot be computed by the protocol.
-- The bound `W(T_j, T_i) ≤ (1−γ)(n−f) + f` in Lemma 6.5 implicitly takes exactly `n − f` honest replicas. It
-  remains true with more honest replicas: `n − γ|H| ≤ n − γ(n − f)`.
-
-## Proof gaps (statements true)
-
-### 🛠️ Lemma 6.3, Case 1
+### 🔧 Lemma 6.3, Case 1
 Case 1 says that the head of `TailList_{r−1}` immediately followed `z` in `Merged_{r−1}`, which fails when round `r−1` finalized nothing (`ℓ = 0`): then `z` was finalized earlier.
 
 **Impact.** The (repaired) statement is true; an invariant over rounds closes the gap: `FO ++ TailList` satisfies ACC and the last finalized transaction is solid (`Setup.inv_step`).
 
-### 🛠️ Theorem 4.5 (positional comparison model)
-"Fix `cmp★`, then `A` sorts the random permutation" works only if the algorithm sees the transactions through their input positions.
+### ✏️ Slips
+- Algorithm 3: after the loop `while i ≤ |TailList| and j ≤ |RO_r|`, the tests `if i = |TailList|` and
+  `else if j = |RO_r|` are both false (the exhausted index is one past the end), so the remaining suffix is never
+  appended. The prose (steps (1) and (2)) is correct, and we model the prose (`List.merge`).
+- Algorithm 1 inserts the transactions that are "newly solid" or "newly shaded". Read literally, a transaction
+  that turns from shaded to solid would be inserted twice. The prose says "newly non-blank".
+- Rule (4) of `pcmp` says "both weights exceed the threshold". It should be `≥`, as in rules (2) and (3).
 
-**Impact.** The theorem itself holds more generally: if the algorithm also sees the transaction identities, averaging over the `|T|!` linear comparators gives the same bound (`theorem_4_5_of_linear`, `theorem_4_5_identityAware`).
+### Typos
+- The bound `W(T_j, T_i) ≤ (1−γ)(n−f) + f` in Lemma 6.5 implicitly takes exactly `n − f` honest replicas. It
+  remains true with more honest replicas: `n − γ|H| ≤ n − γ(n − f)`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -119,7 +107,19 @@ order. So the `Ω(|T| log |T|)` bound holds for every algorithm guaranteeing com
 "relying on ACC". (`corollary_4_6`)
 
 **Not formalized.** Theorem 6.7 and Corollary 6.8 (the per-round `O(|T| log |T|)` upper bound: AVL heights and
-retry counts), Theorem 6.9 (safety: replicas agree), and the query count in Figure 4.
+retry counts), Theorem 6.9 (safety: replicas agree), and the query count in Figure 4. Two open remarks:
+* The repair of the score needs the "loose" reading of `W`. In the proof of Lemma 6.3, `W(z, m)` counts orderings
+  that contain `z` but not yet `m` ("committed `z` but not `m`"). We use this reading. Under the
+  stricter reading (both transactions present, `z` first), Case 2 seems to fail even with the all-replica
+  score. An example: two honest replicas that have committed nothing yet later commit `[m, z]`. This
+  is a sketch and is not formalized.
+* The lazy `pcmp` implementation ("if the pair has not been decided before") may differ from the eager definition of
+  `cmp_T` when a pair is first queried late. We model the eager definition and did not analyse the difference.
+
+**Remark on Theorem 4.5.** "Fix `cmp★`, then `A` sorts the random permutation" works only if the algorithm sees the
+transactions through their input positions, which is the positional comparison model. The theorem itself holds more
+generally: if the algorithm also sees the transaction identities, averaging over the `|T|!` linear comparators gives the
+same bound (`theorem_4_5_of_linear`, `theorem_4_5_identityAware`).
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. The
 counterexample `cex` instantiates every field of `Setup` (the system-model assumptions), and `theorem_6_6_false`

@@ -3,9 +3,9 @@
 Paper: J. Chalopin, Y.-J. Chang, G. A. Di Luna, H. Zhou, *Efficient Counting and Simulation in
 Content-Oblivious Rings*, PODC 2026; full version arXiv 2603.28260v1 (numbering follows it).
 
-Classification: **[false]** false statement · **[degenerate]** false only in a degenerate or unused
-case · **[gap]** proof gap, statement true · **[under-spec]** under-specified definition ·
-**[typo]** typo / slip · **[model]** modelling choice of the formalization.
+Classification: the labels ❌ 🔧 ✏️ are those of the README · **[gap]** unproved step, not counted as a
+mistake · **[under-spec]** under-specified definition · **[typo]** typo · **[model]** modelling
+choice of the formalization.
 
 ## Model
 
@@ -28,7 +28,7 @@ case · **[gap]** proof gap, statement true · **[under-spec]** under-specified 
 
 ## Section 4–6 (composition, ComputeOR, bit sending, message exchange, simulation)
 
-- **[false] Lemma 16 / Theorem 17: CCWBitRelay with a relay *leader* does not have the
+- **❌ Lemma 16 / Theorem 17: CCWBitRelay with a relay *leader* does not have the
   composable ending property** (the paper explicitly covers this case: Lemma 16 "If the leader is
   a CCWBitRelay…", Algorithm 8 lines 2–3, 6). After forwarding the termination wave the relay leader keeps
   receiving on *any* port (Algorithm 8, line 5), i.e. it waits on the wave's port `d`, which
@@ -39,7 +39,7 @@ case · **[gap]** proof gap, statement true · **[under-spec]** under-specified 
   procedures composes correctly, and alternating CW/CCW rounds (as in MsgExchange) also happen to
   work with a relay leader. Theorem 14 assumes an active leader and is unaffected; Theorem 22 as
   stated (and §9.2, whose relays may include the leader) covers a relay leader, and its proof relies
-  on this false claim. Lean, composed outputs: `BitSending.relay_leader_composition_wrong` (n = 3,
+  on this false composability. Lean, composed outputs: `BitSending.relay_leader_composition_wrong` (n = 3,
   relay leader 0, active 1 and 2, two CCW rounds; a 16-step execution ends final and quiescent with
   process 2 holding `[0, ⊥]` instead of `[⊥, 0]`). Lean: `BitSending.not_composable_relay_leader` (`¬ proc.Composable (oriented 2) xRelay`:
   node 0 relay leader, node 1 active with `⊥`; the witness configuration `cRelay` is reached in
@@ -66,7 +66,7 @@ case · **[gap]** proof gap, statement true · **[under-spec]** under-specified 
 
 ## Section 5 (anonymous counting)
 
-- **[false] Distance formula (p. 9).** For processes counted in a completed phase
+- **🔧 Distance formula (p. 9).** For processes counted in a completed phase
   (`myPhase < i`) the paper's `d = myPhase(myPhase+1)/2 − k − 1` is off by one: the correct value is
   `myPhase(myPhase+1)/2 − k`. Also the original leader has `myPhase` undefined (it is never probed),
   so the formula does not apply to it (its distance is 0). Counterexample: `n = 2`, the non-leader
@@ -79,7 +79,7 @@ case · **[gap]** proof gap, statement true · **[under-spec]** under-specified 
 - **[model] Under-specified pseudo-code, fixed by choice:** SndCount sends the bits of `count`
   least significant first and nothing for `count = 0`; the leader terminates after SndCount (its
   "return n"); `myPhase` is `none` until written. The counting result does not depend on these.
-- **[gap] Lemma 10** calls items (4)–(5) "immediate corollaries", and its premise says `p₀` has
+- **✏️ Lemma 10** calls items (4)–(5) "immediate corollaries", and its premise says `p₀` has
   `counted = false` (it has `counted = true`; `p₁ … p_i` are the uncounted ones). The formalization
   proves the full per-phase structure for every reachable configuration (`reach_inv`) and reads
   off (4)–(5) at the end (`final_data`; `relayed` is one larger there because of the completion
@@ -88,13 +88,13 @@ case · **[gap]** proof gap, statement true · **[under-spec]** under-specified 
   `totalPulses n ≤ 6n⌊√(2n)⌋ + 8n ≤ 12n⌊√n⌋ + 14n` pulses (`totalPulses_le`, `totalPulses_le_sqrt`;
   exact values for `n = 1..9`: 6, 18, 34, 48, 70, 98, 104, 134, 170, `totalPulses_small`).
 - **[typo]** Theorem 4 / §5: `d ∈ [0, n]` should be `[0, n−1]`.
-- **[typo]** Lemmas 11–12 index the last phase as `⌈n^0.5⌉`; the number of phases is the `i` with
+- **✏️** Lemmas 11–12 index the last phase as `⌈n^0.5⌉`; the number of phases is the `i` with
   `i(i−1)/2 + 1 ≤ n < i(i+1)/2 + 1`, i.e. about `√(2n)` (e.g. `n = 40` has 9 phases, `⌈√40⌉ = 7`).
   The asymptotic bound is unaffected (`lastPhase_spec`, `lastPhase_forty`).
 
 ## Section 9.1 (minimum finding)
 
-- **[false → fixed] Algorithm 10, line 8:** the bit loop runs `while phase < len(bits)` with the
+- **✏️ Algorithm 10, line 8:** the bit loop runs `while phase < len(bits)` with the
   process's *own* length, so processes with longer inputs would call ComputeOR more often than the
   others and the calls would no longer match. The text says inputs are "represented as a bit string
   of equal length B"; we loop `while phase < B`.
@@ -106,11 +106,11 @@ case · **[gap]** proof gap, statement true · **[under-spec]** under-specified 
 
 ## Section 8 (aggregation, Theorem 1, Corollary 2)
 
-- **[false → fixed] λ-preprocessing (proof of Theorem 1).** With the input "identifier length is
+- **🔧 λ-preprocessing (proof of Theorem 1).** With the input "identifier length is
   at most i" and "stop at the first false outcome" the loop stops at `i = 1` unless some ID has one
   bit, and "the largest index with outcome true" then does not exist. We use
   `ComputeOR(size(ID) ≥ i)`, stop at the first false outcome, and set `λ = i − 1`.
-- **[under-spec] Self-decomposability.** "f(X₁ ⊎ X₂) = f(X₁) ⊕ f(X₂) for disjoint multisets",
+- **✏️ Self-decomposability.** "f(X₁ ⊎ X₂) = f(X₁) ⊕ f(X₂) for disjoint multisets",
   read literally, excludes counting (`{1}` and `{1}` are not disjoint); what is meant is disjoint
   sets of *processes*. We assume `f(X₁ + X₂) = f(X₁) ⊕ f(X₂)` for all nonempty multisets (this is
   what is used); neither associativity nor commutativity of `⊕` is needed.
@@ -139,7 +139,7 @@ case · **[gap]** proof gap, statement true · **[under-spec]** under-specified 
   direction-agnostic. The formalization avoids the mirror case anyway by choosing the sparse left
   edge among the `⌊n/2⌋` edges just clockwise after the leader and using clockwise intervals only.
   Constants: `n·⌊log₂ n⌋ ≤ 14·M + 4·n` (and `n·⌊log₂ n⌋ ≤ 28·M` for `n ≥ 2^10`).
-- **[gap, minor] Lemma 28's proof.** "Replay `O` verbatim" cannot be literal: `O` contains events of
+- **🔧 Lemma 28's proof.** "Replay `O` verbatim" cannot be literal: `O` contains events of
   `I₂ \ I₁` (absent from `R'`), and `I₁`'s own events must be rescheduled relative to the outside.
   Replaced by a rigorous crossing-sequence merge (`Cslib.ContentOblivious.splice`).
 - **[under-spec] Lemma 28, "same local history".** We prove equal final local states and pulse

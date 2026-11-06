@@ -36,7 +36,8 @@ Networks*, PODC 2024. Formalized from the full version
 4. **Lemmas 9, 10 — imprecise indexing.** `R(i)` (end of the `i`-th round) is undefined when the
    finite execution ends earlier. Harmless: a terminal configuration is legitimate. In Lean, the
    `Ext∞` form makes every index meaningful.
-5. **Theorem 4 — proof by reference only.** The paper cites [ACDD23]. We give a direct proof for
+5. **Theorem 4 — proof by reference only.** Not an error: the paper cites [ACDD23], and the cited proof was not
+   examined. We give a direct proof for
    arbitrary deterministic local algorithms with identifiers (`theorem4`). It is true for every
    period `K ≥ 2`; the hypothesis `K ≥ 2` is needed, since `K = 1` is trivially solvable.
 

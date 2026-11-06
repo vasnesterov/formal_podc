@@ -6,8 +6,8 @@ full version, 36 pages); numbering follows it.
 
 ## Errors and imprecisions in the paper
 
-1. **Lemma 7.4 is false as stated** (false in an edge case; proof gap in Lemmas 8.1/8.2, whose
-   statements are true). The lemma says that for every tight execution `E` of `A*`, `E` and
+1. **Lemma 7.4 is false as stated** (it fails for some pending operations; proof gap in Lemmas 8.1/8.2,
+   whose statements are true). The lemma says that for every tight execution `E` of `A*`, `E` and
    `X(λ_E)` are equivalent with `≺_E = ≺_{X(λ_E)}`. This fails for pending operations that no view
    has seen yet, i.e. whose `N.Write` comes after the last `N.Snapshot`: `X(λ_E)` lacks their
    invocations.

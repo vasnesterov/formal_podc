@@ -3,17 +3,14 @@
 Paper: P. Czerner, *Population Protocols Decide Double-exponential Thresholds*, arXiv 2204.02115 v2
 (full version of the PODC 2023 brief announcement). Numbering follows v2.
 
-## Verdict
-
-**❌ False claim.** Lemma 11(c) is a numbered lemma and it is false (R1). The fix "`j < i`" is not a typo
-with evident intent (R3): the paper's proof of Lemma 12(c) applies 11(c) exactly in the false case
-(`IncrPair` at level `i − 1` on `(i−1)`-high configurations). It is not a headline result (R5). All
-headline results (Theorems 1, 2, 3, 5) are true and verified. Several proofs needed repairs (🛠️-level
-items below).
+All main results (Theorems 1, 2, 3, 5) are true and verified. Lemma 11(c) is a numbered lemma and it is false.
+The fix "`j < i`" is not a typo with evident intent: the paper's proof of Lemma 12(c) applies 11(c) exactly in
+the false case (`IncrPair` at level `i − 1` on `(i−1)`-high configurations). Several proofs needed repairs (items
+below).
 
 ## False statements
 
-1. **Lemma 11(c)** ("`IncrPair(x, y)` is `j`-robust for `j ≤ i`") is false for `j = i`.
+1. 🔧 **Lemma 11(c)** ("`IncrPair(x, y)` is `j`-robust for `j ≤ i`") is false for `j = i`.
    Counterexample: `n = i = 1`, `x₁ = 0, x̄₁ = 1, y₁ = 1, ȳ₁ = 0` (1-high). `IncrPair(x̄₁, ȳ₁)` returns
    a 1-proper configuration (`lemma_11c_false`, `Lemma11c.lean`). We prove 11(c) for `j < i`
    (`incr_robust_lt`, field `LevelOK.incrR`). The proof of Lemma 12(c) for `j = i − 1` uses the false
@@ -24,25 +21,25 @@ items below).
 
 ## Proof gaps and wrong claims inside proofs (statements true)
 
-2. **Proof of Theorem 3**: "`N_{i+1} = (Nᵢ+1)²` and `N₁ = 1`, implying `k ≥ 2^(2^n)`" is false
+2. ✏️ **Proof of Theorem 3**: "`N_{i+1} = (Nᵢ+1)²` and `N₁ = 1`, implying `k ≥ 2^(2^n)`" is false
    (`k = 2, 10, 60` for `n = 1, 2, 3`; `S_lt_claim`). The statement's `k ≥ 2^(2^(n−1))` holds for
    `n ≥ 1` (`S_ge`, via `Nᵢ + 1 ≥ 2^(2^(i−1))`). Theorem 1's `2^(2^n)` follows with `n + 1` levels.
 3. **Proof of Theorem 3**: "distribute the remaining `m − |C| ≤ 2N_j` units" states a bound that is
    true but too weak for the argument: `< 2N_j` is needed (equality would give a `j`-proper
    configuration). The paper's choice of `j` gives `<`. Our construction is `exists_good`.
-4. **Proposition 16**: the initial value `v_OF` of the leader election must be `false`. The paper
+4. 🔧 **Proposition 16**: the initial value `v_OF` of the leader election must be `false`. The paper
    allows any value. With `v_OF = true` and fewer than `|F|` agents, an `OF` agent with value `true`
    can be created while no `IP` agent ever is, so the protocol would output `true` on `x < i`.
-5. **Lemma 15**: the claim that the elected agents are in their initial states "at the moment this
+5. 🔧 **Lemma 15**: the claim that the elected agents are in their initial states "at the moment this
    happens" needs new election invariants: prefix counts `InvJ`, empty levels `InvK`, fresh agents
    `InvFr` (`MachineToProtocolElect.lean`). The fairness argument for Proposition 16 needs an
    elected configuration to be reachable from every reachable configuration (`reach_good`), not only
    from the initial one.
-6. **Appendix B.3 construction**: the paper assumes `Y ≠ IP` w.l.o.g. in `X := f(Y)`, so transitions
+6. 🔧 **Appendix B.3 construction**: the paper assumes `Y ≠ IP` w.l.o.g. in `X := f(Y)`, so transitions
    for `Y = IP` are added. Map states `X^i_map` count as agents of `X` in the wildcard of `⟨elect⟩`.
    The stages of `V_□` are `{none, done}`. On p. 27 the last `⟨move⟩` rule should read
    `v ∈ 𝓕_{V_y}` (typo).
-7. **Appendix B.2 construction** (Proposition 14): the `restart` helper must skip the pair `(x, x)`
+7. 🔧 **Appendix B.2 construction** (Proposition 14): the `restart` helper must skip the pair `(x, x)`
    (moves between equal registers are not machine instructions). The pointer assignment `V_y := V_□`
    needs a clamped map `f : 𝓕_{V_□} → 𝓕_{V_y}`. Return-address pointers are created only for used
    procedures (`Main` and called ones). Each procedure block ends with a guard self-loop, because a
@@ -60,11 +57,11 @@ items below).
 - **Theorem 1** (`theorem_1`): explicit bounds `|Q| ≤ 116160 n + 151040`. There is a single input
   state, the protocol decides `x ≥ k` with `k = 2 ∑ᵢ₌₁ⁿ⁺¹ Nᵢ + i ≥ 2^(2^n)`, and Theorem 2 (almost
   self-stabilisation) is included.
-- **Theorem 3** (`theorem_3`): for `n ≥ 1` (for `n = 0`, `2^(2^(n−1))` is not meaningful: R2). The
+- **Theorem 3** (`theorem_3`): for `n ≥ 1` (for `n = 0`, `2^(2^(n−1))` is not meaningful). The
   program of Section 6 itself (`prog n`) is well formed, has `4n + 1` registers and size
   `≤ 363 n + 108`, and decides `x ≥ k` with `k = 2 ∑ᵢ₌₁ⁿ Nᵢ`. `prog_decides` holds for every `n`.
 - **Theorem 5** (`theorem_5`): `i ≤ 20 s + 20`, `|Q| ≤ 320 s + 320`, and a single input state, for
-  well-formed programs (Proposition 14's `WellFormed`) over a nonempty register set (R2).
+  well-formed programs (Proposition 14's `WellFormed`) over a nonempty register set.
 - **Proposition 14** (`proposition_14`): explicit size `≤ 20 λ + 20`. It adds that all pointer
   domains are nonempty and that every register configuration is the register part of an initial
   machine configuration.

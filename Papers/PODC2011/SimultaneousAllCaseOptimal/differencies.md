@@ -6,7 +6,7 @@ no arXiv version).
 
 ## Errors in the paper (statement level)
 
-1. **Lemma 5 is false for `t = n − 1`** (❌, rule R4: the paper explicitly assumes `t ≤ n − 1` in
+1. **Lemma 5 is false for `t = n − 1`** (⚠️: the paper explicitly assumes `t ≤ n − 1` in
    §2.1 and again at the start of §4, so the missing `t ≤ n − 2` is not an implied convention).
    For every `n ≥ 2`, `t = n − 1` and every complete input set: in the run `r⋆` where all processes
    but `p₀` crash in round 1 without sending, `W(r⋆) = t − 1`, so round 1 is premature, as it is in
@@ -17,7 +17,7 @@ no arXiv version).
    `k = 1 ≤ t`). Lemma 5 is cited from [DM90, MR08], which presumably assume `n ≥ t + 2`; the paper
    restates it with its own range of `t`.
 
-2. **Theorem 6 vs. Theorems 2/3 for `t = n − 1`** (❌; borderline 🚨, see "Verdict" below).
+2. **Theorem 6 vs. Theorems 2/3 for `t = n − 1`** (⚠️, same mistake as item 1; see "Status of the claims" below).
    `n = 3`, `t = 2`, binary consensus: `2` is a worst-case lower bound (`consensus_lb_two`),
    FloodSet solves consensus in 2 rounds (`floodSet_solvesWithin`), the inputs are complete
    (`theorem6_hypotheses`). In `r⋆` (two processes crash silently in round 1) `W = 1`, so
@@ -35,7 +35,7 @@ no arXiv version).
    otherwise ConCon(A) decides before `t + 1 − W`, and Theorem 2's "decides at time `t + 1 − W(F)`"
    and Theorem 3's "execution time `min{k̂, t + 1 − W}`" fail.
 
-3. **Corollary 9 is false for `k = 1`, `n = 3`, `t = 2`** (❌, application, R5). It claims
+3. **Corollary 9 is false for `k = 1`, `n = 3`, `t = 2`** (⚠️, application). It claims
    `Opt(sa, ⌊t/k⌋ + 1) = Opt(sa, 3)` is all-case optimal and halts at `min{3, 3 − W}`, i.e. at time 3
    in failure-free runs; `floodSet 2` decides at time 2 in every run, so no protocol has both
    properties (`corollary9_false`). This does not depend on ConCon. The cause: the paper quotes the
@@ -48,7 +48,7 @@ no arXiv version).
 
 ## Proof gaps (statements true, proofs repaired)
 
-4. **Simultaneous protocols and processes that crash later** (used in Lemma 1, Theorem 3, Lemma 4).
+4. **Simultaneous protocols and processes that crash later** (🔧; used in Lemma 1, Theorem 3, Lemma 4).
    The proofs use, without argument, that if a simultaneous protocol has some process decide at
    time `k`, every process *alive* at time `k` (possibly crashing later) decides at time `k` (Lemma 4:
    "Since the nonfaulty processes decide at time k in r and p has not failed, p must decide at time k"
@@ -59,7 +59,7 @@ no arXiv version).
    unchanged) and use completeness and simultaneity there (`SolvesSim.decides_of_alive`,
    `SolvesWithin.decides_of_alive`, `Run.trunc`).
 
-5. **Theorem 2, correctness.** "All processes … simulate the same run of A, and hence choose output
+5. **Theorem 2, correctness** (🔧). "All processes … simulate the same run of A, and hence choose output
    values consistent with the input values" gives outputs consistent with the *simulated* input
    vector, which differs from the real one on processes outside the core (and the paper does not say
    which inputs those get; for non-complete input sets they must be chosen so that the vector is
@@ -117,21 +117,19 @@ no arXiv version).
   `t ≤ n − 2`; the applications' cited bounds (Corollaries 10, 11: d-tight conditions, strong
   renaming with `log n`); the topological discussion (§6).
 
-## Verdict
+## Status of the claims
 
-❌ False claim (worst label). Lemma 5 (numbered lemma, cited but restated with `t ≤ n − 1`) is false
-for `t = n − 1`; Corollary 9 is false for `n = 3`, `t = 2`, `k = 1`; and for `t = n − 1` either
-Theorem 6 (headline) or the timing claims of Theorems 2/3 are false. Borderline 🚨: Theorem 6 is
-refuted for every ConCon satisfying the properties the paper lists in §2.3 (and such protocols
-exist), but not for the actual [MM08] protocol, whose behaviour for `t = n − 1` we do not formalize;
-if that protocol is maximal, it is Theorem 2's timing claim (not a headline per R5: it is not in the
-abstract) that fails. For `t ≤ n − 2`, all checked statements other than Corollary 9 hold given Lemma 5 / Lemma 7
+For `t ≤ n − 2`, all checked statements other than Corollary 9 hold given Lemma 5 / Lemma 7
 (Corollary 9 also needs [CHLT00]'s `n ≥ t + k + 1`).
 
-Reviewer's note on the borderline (R5): Theorem 6 is refuted only for ConCon protocols with property
-(ii). A maximal ConCon (iii) would put the lone survivor's value into the core at time 1 in `r⋆`;
-then `Opt(A, k̂)` may well be all-case optimal for `t = n − 1`, and the false claim is the timing in
-Theorems 2/3 (not in the abstract). So the headline is unestablished, not refuted: ❌. Lemma 5
-(numbered, restated in the paper's setting "fix … `t ≤ n − 1`" of §4, and used in the proof of
+Lemma 5 (numbered, restated in the paper's setting "fix … `t ≤ n − 1`" of §4, and used in the proof of
 Theorem 6) and Corollary 9 are false regardless of ConCon; `t = n − 1` with `n = 3` is not
-degenerate (R2), and the paper explicitly allows it twice (R4).
+degenerate, and the paper explicitly allows it twice.
+
+For `t = n − 1`, either Theorem 6 or the timing claims of Theorems 2/3 are false. Theorem 6 is
+refuted for every ConCon satisfying the properties the paper lists in §2.3 (accuracy, consistency,
+(i), (ii); such protocols exist), but not for the actual [MM08] protocol, whose behaviour for
+`t = n − 1` we do not formalize. A maximal ConCon (iii) would put the lone survivor's value into the
+core at time 1 in `r⋆`; then `Opt(A, k̂)` may well be all-case optimal for `t = n − 1`, and the false
+claim is the timing in Theorems 2/3 (not in the abstract). So for the actual protocol Theorem 6 at
+`t = n − 1` is unestablished, not refuted.

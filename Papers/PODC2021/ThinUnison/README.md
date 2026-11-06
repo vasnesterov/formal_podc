@@ -5,21 +5,21 @@ Biological Networks.* PODC 2021, pp. 93–102. DOI [10.1145/3465084.3467922](htt
 Formalized version: the full version, arXiv:2102.12787v2 (18 May 2021).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** Theorem 1.1 is correct and fully proved, with explicit constants. AlgAU with
-`k = 3D + 2` (`12D + 6` states) is a self-stabilizing asynchronous unison on graphs of diameter `≤ D`, and it
-stabilizes within `70(D+1)³` rounds. The analysis has several minor gaps, all repaired. **Corollary 1.2 (the
-synchronizer) is false for arbitrary tasks, as stated.** It holds for static tasks such as LE and MIS, which are the
-paper's applications.
+**Verdict: ⚠️ Weakened.** Theorem 1.1 is correct and fully proved, with explicit constants: AlgAU with `k = 3D + 2`
+(`12D + 6` states) is a self-stabilizing asynchronous unison on graphs of diameter `≤ D`, and it stabilizes within
+`70(D+1)³` rounds. Corollary 1.2 (the synchronizer) is false for arbitrary tasks, as stated; it holds for static tasks
+such as LE and MIS, which are the paper's applications, and we prove that for deterministic Π. The randomized LE and
+MIS results (Theorems 1.3, 1.4) were not checked.
 
 ## Mistakes in the paper
 
-### ❌ Corollary 1.2 (the synchronizer Π*, arbitrary tasks)
+### ⚠️ Corollary 1.2 (the synchronizer Π*, arbitrary tasks)
 Corollary 1.2 is false for tasks constrained at every time instant: with `D = 1`, the task "all nodes output the
 same bit at all times, and the outputs change infinitely often" is solvable synchronously but by no asynchronous
 stone-age algorithm, Π* included (`toggle_sync`, `no_async_alg_roundRobin`).
 
 **Impact.** Theorem 1.1 is unaffected. The construction is correct for *static* tasks (eventually fixed legal
-outputs), which covers the paper's applications LE and MIS; we prove that version with the bound `f + N(D) + D`
+outputs), which covers the paper's applications LE and MIS; we prove that version, for deterministic Π, with the bound `f + N(D) + D`
 rounds (`corollary_1_2`).
 
 **Details.** The synchronizer Π* does not make the nodes simulate one global synchronous execution. Each node shows
@@ -29,7 +29,7 @@ at every time instant therefore cannot be transferred.
 - On `K₂` under the fair round-robin schedule, no deterministic stone-age algorithm (Π* included) solves it. A
   node that is not activated keeps its output, so the first output change after agreement breaks agreement.
 
-### ⚠️ Lemma 2.19 (the constant `k(k−1)`)
+### 🔧 Lemma 2.19 (the constant `k(k−1)`)
 The proof of the bound `k(k−1)` charges one application of Lemma 2.13 per level, which does not cover all moves, so
 the constant is unestablished (`lemma_2_19` proves `4(k−1)²`).
 
@@ -44,21 +44,24 @@ itself holds.
 **Repair.** We prove `4(k−1)²` in two phases. The node first moves inwards until it is protected or at `±1`; then
 every neighbour reaches `∓1` or becomes protected. (`lemma_2_19`)
 
-### ⚠️ Lemma 2.13 for `|ℓ| = 1`
+### 🔧 Lemma 2.13 for `|ℓ| = 1`
 The proof needs the endpoint at level `ℓ` to make an AF move, but levels `±1` have no faulty turn, so for
 `|ℓ| = 1` the lemma is unestablished (`lemma_2_13_edge` is proved for `|ℓ| ≥ 2`).
 
-**Impact.** Harmless: the lemma is used only with `|ℓ| ≥ 2`, so we prove it under that hypothesis. Whether the
+**Impact.** The lemma is used only with `|ℓ| ≥ 2`, so we prove it under that hypothesis. Whether the
 `|ℓ| = 1` case is false is open.
 
 **Details.** A non-protected node at level `±1` is stuck.
 
-### Typos and slips
+### ✏️ Slips
 - Lemma 2.13's time bound has `t'` for `t`.
+- Obs 2.9 requires `|λ_v^s| < k − d` also for `s = t'`, and with that the application in Lemma 2.20 at `d = D` fails,
+  because `v` is at level exactly `k − D` at `t'`. Obs 2.9 needs the bound only for `s < t'`, and the paper's proof
+  only uses `s < t'`. (`AURun.obs29`, `lemma_2_20`)
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 2.22 (the potential argument)
+### 🔧 Lemma 2.22 (the potential argument)
 The potential argument re-chooses `x_t` at every time, so "the distance decreases or `v` becomes grounded" does not
 follow literally.
 
@@ -69,26 +72,11 @@ at the same distance.
 
 **Repair.** Fix the walk at the start of each phase and recurse on its length.
 
-### 🛠️ Obs 2.9 / Lemma 2.20 (off by one at `s = t'`)
-Obs 2.9 requires `|λ_v^s| < k − d` also for `s = t'`, and with that the application in Lemma 2.20 at `d = D` fails,
-because `v` is at level exactly `k − D` at `t'`.
+### 🔧 Obs 2.8 (window of `D + 1` levels)
+The proof omits a short extremal-point step: pairwise distances `≤ D` imply a window of `D + 1` levels only
+because `2k > 3D`.
 
-**Impact.** Repaired: Obs 2.9 needs the bound only for `s < t'`, and the paper's proof only uses `s < t'`.
-(`AURun.obs29`, `lemma_2_20`)
-
-**Details.** Lemma 2.20's conclusion for an arbitrary later `t'` also needs persistence of protection after `T₁`;
-the paper does supply this, via Lemmas 2.10 and 2.18.
-
-### 🛠️ Obs 2.8, Lemmas 2.11 and 2.14 (minor details)
-Obs 2.8 omits a short extremal-point step, and two other proofs need small formal adjustments.
-
-**Impact.** Statements true; routine fixes.
-
-**Details.**
-- Obs 2.8 omits a short extremal-point step. Pairwise distances `≤ D` imply a window of `D + 1` levels only
-  because `2k > 3D`.
-- Lemma 2.11 compares levels cyclically (presentation only).
-- Lemma 2.14's inner induction needs strong induction on the remaining distance.
+**Impact.** Statement true; replaced in Lean by an integer lifting along walks (`AURun.exists_offsets`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -120,8 +108,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Corollary 1.2, static tasks | `synchronizer_simulation`, `corollary_1_2` | `Synchronizer.lean` |
 | Corollary 1.2 false for arbitrary tasks | `toggle_sync`, `no_async_alg_roundRobin` | `Counterexample.lean` |
 
-**Not formalized.** Theorems 1.3/1.4 (randomized LE and MIS, w.h.p. analysis). Corollary 1.2 for randomized Π.
-The `|Q*|` count.
+**Proof remarks.**
+- Lemma 2.20's conclusion for an arbitrary later `t'` also needs persistence of protection after `T₁`; the paper does
+  supply this, via Lemmas 2.10 and 2.18.
+- Lemma 2.11 compares levels cyclically (presentation only).
+- Lemma 2.14's inner induction needs strong induction on the remaining distance.
+
+**Not formalized.** Theorems 1.3/1.4 (randomized LE and MIS, w.h.p. analysis), hence the end-to-end asynchronous LE
+and MIS results. Corollary 1.2 for randomized Π, including its expectation and w.h.p. bounds. The `|Q*|` count.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. For
 non-vacuity, `Main.lean` instantiates Theorem 1.1 on `K₃` under the synchronous schedule. The synchronous and

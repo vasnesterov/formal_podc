@@ -5,36 +5,28 @@ PODC 2012. DOI [10.1145/2332432.2332491](https://doi.org/10.1145/2332432.2332491
 10-page proceedings version (no arXiv version; the "full version" with the deferred proofs was not available).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The main results hold. These are the equivalence of `f`-tolerance and
-`(n−2f)`-disjointness (Theorem 2), the reduction behind co-NP-hardness (Theorem 1) and the tight bounds
-`Tₙ(h) = Θ(n³/h²)` (Theorems 3, 5, 7). The exact formula of Theorem 13 for `Uₙ(h)` lacks a ceiling and is wrong
-when `n − h` is odd. Theorem 2 fails only for `n = 0`. Several proofs are missing or need repair.
+**Verdict: 🛠️ Hard fix.** The equivalence of `f`-tolerance and `(n−2f)`-disjointness (Theorem 2), the reduction
+behind co-NP-hardness (Theorem 1) and the tight bounds `Tₙ(h) = Θ(n³/h²)` (Theorems 3, 5, 7) all hold. The proof
+of the upper bound relies on expanders that the cited theorem does not provide and had to be replaced by a
+counting argument, and the exact formula of Theorem 13 for `Uₙ(h)` lacks a ceiling. The link to Byzantine
+agreement itself, taken from earlier work, was not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorem 13 (exact value of `Uₙ(h)` when `n ≢ h (mod 2)`)
+### 🔧 Theorem 13 (exact value of `Uₙ(h)` when `n ≢ h (mod 2)`)
 The claimed `Uₙ(h) = C(n,3) − ((n−h)/2)·h² + 1` lacks a ceiling: for `n − h` odd the correct value is
 `C(n,3) − h²⌈(n−h)/2⌉ + 1`, `h²/2` lower; e.g. `U₄(1) = 3`, while the formula gives `3.5`
 (`theorem_13_false`, `U_four_one`).
 
-**Impact.** A missing rounding with evident intent: the extremal structure and every asymptotic
-consequence are unchanged, and we prove the corrected formula for all `h ≤ n/3` (`theorem_13`). This
-is a borderline call, see [differencies.md](differencies.md).
+**Impact.** The extremal structure and every asymptotic consequence are unchanged, and we prove the corrected
+formula for all `h ≤ n/3` (`theorem_13`).
 
 **Details.** The proof minimises `abc` over integers `a, b, c ≥ h` with `a + b + c ≥ (n+3h)/2`. It
 only treats `n ≡ h (mod 2)` and says the other case "is proved similarly". When `n − h` is odd, `c`
 must be at least `⌈(n−h)/2⌉`. For odd `h` the paper's formula is not even an integer. In the example,
 any three of the four triples on 4 vertices form a 1-disjoint hypergraph, two do not.
 
-### ⚠️ Theorem 2 (`n = 0`)
-Theorem 2 fails for `n = 0`, where `f`-tolerance holds vacuously but no hypergraph is
-`(−2f)`-disjoint (`theorem_2_card_zero`).
-
-**Impact.** Degenerate; we prove it for `n ≥ 1` (`theorem_2`).
-
-## Proof gaps (statements true)
-
-### 🛠️ Proposition 15 (inside the proof of Theorem 13)
+### 🔧 Proposition 15 (inside the proof of Theorem 13)
 Its second bullet calls `(n+h)²h/16` the minimum of `g(a,b) = ab((n+3h)/2 − a − b)` along each face
 of the triangle, but that value is the face *maximum*: `n = 4`, `h = 1`, `(a,b) = (1,1)` gives
 `g = 3/2 < 25/16` (`prop_15_face_false`).
@@ -46,6 +38,12 @@ by an integer inequality (`mul_mul_ge`).
 
 **Repair.** We replace the calculus by `abc ≥ h²(a+b+c−2h)` for `a, b, c ≥ h`, a two-line integer
 argument (`mul_mul_ge`).
+
+### ✏️ Slips
+- Theorem 2 fails for `n = 0`, where `f`-tolerance holds vacuously but no hypergraph is `(−2f)`-disjoint
+  (`theorem_2_card_zero`); we prove it for `n ≥ 1` (`theorem_2`).
+
+## Proof gaps (statements true)
 
 ### 🛠️ Theorem 7 (expanders that are not known to exist)
 The proof uses Ramanujan graphs of degree `d = Θ(n/h)` for every `n`, justified by Friedman's
@@ -61,18 +59,7 @@ theorem, which is about fixed `d` as `n → ∞`.
 (Lemmas 8, 9, Claim 10, all algebraically correct) is formalized with the expander mixing lemma as a
 hypothesis (`hDisjoint_lift`).
 
-### 🛠️ Theorem 2 and Lemma 4 (proofs deferred to the full version)
-The proofs of Theorem 2 and Lemma 4 are deferred to an unavailable full version; we supply them.
-
-**Impact.** Statements true (Theorem 2 for `n ≥ 1`) (`theorem_2`, `lemma_4`).
-
-**Details.**
-- Theorem 2: the (⇐) direction is the paper's Figure 1 and needs no hypothesis on `f`. The (⇒)
-  direction shrinks a valid colouring to sizes `p, q, c ≥ h` with `p + q + c = 2n − 3f` and pads it
-  with fresh faulty vertices. This is exactly where `f ≥ n/3` is needed. (`theorem_2`)
-- Lemma 4 also holds for odd `n`. (`lemma_4`)
-
-### 🛠️ Theorems 3 and 5 (divisibility and parity)
+### 🔧 Theorems 3 and 5 (divisibility and parity)
 The proof of Theorem 3 silently assumes `3 ∣ n`, and Theorem 5 applies Lemma 6 (which needs `n` even)
 with `|B| = (n−h)/2`, which need not be an integer.
 
@@ -120,9 +107,19 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Proposition 15, 2nd bullet (false) | `prop_15_face_false` | `Sufficiency.lean` |
 | Theorem 13 (corrected / as stated) | `theorem_13` / `theorem_13_false`, `U_four_one` | `Sufficiency.lean` |
 
+**Proofs supplied.** The proofs of Theorem 2 and Lemma 4 are deferred to an unavailable full version; we supply
+them (`theorem_2`, `lemma_4`).
+- Theorem 2: the (⇐) direction is the paper's Figure 1 and needs no hypothesis on `f`. The (⇒)
+  direction shrinks a valid colouring to sizes `p, q, c ≥ h` with `p + q + c = 2n − 3f` and pads it
+  with fresh faulty vertices. This is exactly where `f ≥ n/3` is needed. (`theorem_2`)
+- Lemma 4 also holds for odd `n`. (`lemma_4`)
+
 **Not formalized.** The expander mixing lemma and the existence of (near-)Ramanujan graphs (Lemmas 8, 9 and
-Claim 10 take the EML's conclusion `MixingBound` as a hypothesis); Theorem 11 (explicit construction); the link between `f`-tolerance and Byzantine agreement ([38], [9]);
-NP-completeness of BBIS, co-NP membership and polynomial running time; the comparison with `f(n,3)` in Section 2.1.
+Claim 10 take the EML's conclusion `MixingBound` as a hypothesis); Theorem 11 (explicit construction; the printed
+proof stops at the Cioabă–Murty theorem, which has fixed `d`, while degree `Θ(n/h(n))` is needed, and we did not
+investigate it further); the link between `f`-tolerance and Byzantine agreement ([38], [9]) and Section 1.2's
+applications to other models; NP-completeness of BBIS, co-NP membership and polynomial running time; the
+comparison with `f(n,3)` in Section 2.1.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: the complete hypergraph is `h`-disjoint for `h ≥ 1` (`hDisjoint_complete`), Theorem 13's

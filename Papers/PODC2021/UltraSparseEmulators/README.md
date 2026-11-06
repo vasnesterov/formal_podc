@@ -5,42 +5,40 @@ Michael Elkin, Shaked Matar. *Ultra-Sparse Near-Additive Emulators.* PODC 2021. 
 [2106.01036](https://arxiv.org/abs/2106.01036) v1; numbering follows it. Copy of the paper:
 [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The centralized result of Section 2 is correct: for every
-`ε ∈ (0,1)` and integer `κ ≥ 2`, Algorithm 1 builds a `(1+ε, 30(34 log κ/ε)^{log κ − 1})`-emulator with
-at most `n^{1+1/κ}` edges (leading constant 1), in every order of consideration. It is ultra-sparse
-(`n + o(n)` edges) for `κ ≈ log n · log log n`. The new charging argument (eqs. (2)–(4)) is correct as
-written. The minor issues: line 18 of Algorithm 1 has a typo that, read literally, breaks the
-algorithm; the inequality `⌈log((κ+1)/2)⌉ ≤ log κ` needs `κ` to be an integer, which is the paper's
-convention.
+**Verdict: 🔧 Easy fix.** The centralized result of Section 2 holds: for every `ε ∈ (0,1)` and integer `κ ≥ 2`,
+Algorithm 1, with the wrong variable of line 18 corrected, builds a `(1+ε, 30(34 log κ/ε)^{log κ − 1})`-emulator with
+at most `n^{1+1/κ}` edges (leading constant 1), in every order of consideration, and it is ultra-sparse (`n + o(n)`
+edges) for `κ ≈ log n · log log n`. The new charging argument (eqs. (2)–(4)) is correct as written, and the gaps in
+Lemma 2.10 and Corollary 2.15 need only local repairs. The CONGEST algorithm and the spanners were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Algorithm 1, line 18 (condition on the wrong variable)
-Line 18 moves to `N_i` all `r_{C''} ∈ S_i` "such that `d_G(r_C, r_{C'}) ≤ 2δ_i`", a condition that is always
-true, so every remaining center joins the new supercluster however far away it is.
+### ✏️ Slips
+- Algorithm 1, line 18 (condition on the wrong variable). Line 18 moves to `N_i` all `r_{C''} ∈ S_i` "such that
+  `d_G(r_C, r_{C'}) ≤ 2δ_i`". The condition mentions `r_{C'}`, the variable of the previous loop, not `r_{C''}`.
+  Read literally, it is always true, so every center still in `S_i` moves to `N_i` and later joins the new
+  supercluster however far away it is, which destroys the radius bound (Lemma 2.5). The prose of Section 2.1.1
+  (`δ_i < d_G(r_C, r_{C''}) ≤ 2δ_i`) gives the intended rule, which is what we formalize (`step`).
+- Section 2.2.4, `⌈log((κ+1)/2)⌉ ≤ log κ` "for all `κ ≥ 2`". The inequality fails for non-integer `κ`: for
+  `κ = 7/2` the left side is 2 and the right side is `log₂ 3.5 ≈ 1.81`, and with `ε = 1/2` the stated `β` bound
+  fails as well (`not_numPhases_le_logb`, `not_rescale_seven_halves`). The paper's convention is `κ = 1, 2, …`, and
+  for integers the claim holds (`numPhases_le_logb_natCast`). Corollary 2.15 plugs in `κ = f(n) log n`; rounding it
+  to an integer costs nothing.
+- Eq. (13) and the rescaled `β` of Section 2.2.4 use `=` where `≤` is meant.
+- Lemma 2.10, Case 2: if the first `U_i`-clustered vertex of a segment is its left endpoint, the predecessor `w₁`
+  does not exist; this case is trivial.
+- Eq. (8) uses laminarity (`r₁' ∈ C₁`), which is stronger than what Lemma 2.9 states; the sentence before the lemma
+  announces it, and the lemma's proof gives it.
 
-**Impact.** A typo with evident intent: read literally it destroys the radius bound (Lemma 2.5), but the prose of
-Section 2.1.1 (`δ_i < d_G(r_C, r_{C''}) ≤ 2δ_i`) gives the intended rule, which is what we formalize (`step`).
-
-**Details.** The condition mentions `r_{C'}`, the variable of the previous loop, not `r_{C''}`. Read literally,
-it is always true, so every center still in `S_i` moves to `N_i` and later joins the new supercluster.
-
-### ⚠️ Section 2.2.4 (`⌈log((κ+1)/2)⌉ ≤ log κ` "for all `κ ≥ 2`")
-The inequality fails for non-integer `κ`: for `κ = 7/2` the left side is 2 and the right side is
-`log₂ 3.5 ≈ 1.81`, and with `ε = 1/2` the stated `β` bound fails as well (`not_numPhases_le_logb`,
-`not_rescale_seven_halves`).
-
-**Impact.** An imprecision, not an error, under the paper's convention `κ = 1, 2, …`: for integers the claim holds
-(`numPhases_le_logb_natCast`). Corollary 2.15 plugs in `κ = f(n) log n`; rounding it to an integer costs nothing.
-
-### Typos and slips
+### Typos
 - `R_{i+1} = 2δ_i + R_i` is defined "for `i ∈ [1, ℓ]`", leaving `R_1` undefined.
 - The recursions for `α_i, β_i` say "for `i > 1`" (meant: `i ≥ 1`).
-- Eq. (13) and the rescaled `β` use `=` where `≤` is meant.
+- Eq. (12) includes the term `j = 0` with `(1/ε)^{-1}` (harmless: `R_0 = 0`).
+- The introduction of Section 2.2 announces the running-time and stretch sections in the opposite order.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Corollary 2.15 (choice of `f`)
+### 🔧 Corollary 2.15 (choice of `f`)
 The derivation sets `κ = f(n) log n` for an arbitrary `f = ω(1)`, but the claimed `β` holds only for a slowly
 growing `f`.
 
@@ -49,14 +47,13 @@ growing `f`.
 **Details.** Any `f = ω(1)` gives `n + o(n)` edges, but `β = (log log n/ε)^{(1+o(1)) log log n}` requires a slowly
 growing `f` (e.g. `f(n) = n` gives `β ≈ (log n/ε)^{log n}`).
 
-### 🛠️ Lemma 2.10 (induction on the minimal index)
+### 🔧 Lemma 2.10 (induction on the minimal index)
 The lemma is stated for the *minimal* index `i`, but the induction hypothesis is applied to subpaths whose minimal
 index may be smaller.
 
-**Impact.** Statement true; all gaps easily repaired (`Hierarchy.lemma_2_10`).
+**Impact.** The lemma holds; dropping "minimal" from the statement repairs the induction (`Hierarchy.lemma_2_10`).
 
-**Details.** If the first `U_i`-clustered vertex of a segment is its left endpoint, the predecessor `w₁` does not
-exist; this case is trivial. Eq. (8) uses laminarity (`r₁' ∈ C₁`), which is stronger than what Lemma 2.9 states.
+**Details.** As printed, the step needs monotonicity of `α_j, β_j`, which is true but not stated.
 
 **Repair.** We prove the lemma for every walk and every admissible `i`, with no shortest paths needed.
 

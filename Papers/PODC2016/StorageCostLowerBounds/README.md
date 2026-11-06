@@ -5,19 +5,17 @@ of Shared Memory Emulation.* PODC 2016. DOI
 [10.1145/2933057.2933118](https://doi.org/10.1145/2933057.2933118). Formalized version: arXiv
 [1605.06844](https://arxiv.org/abs/1605.06844) v2; numbering follows it.
 
-**Verdict: 🚨 Headline claim false.** With reliable FIFO channels, Theorems 4.1, 5.1, B.1 and Corollaries 4.2,
-5.2 and B.2 are false, and this holds in the paper's I/O-automaton reading as well. The Lean
-counterexample is the *streaming relay*. Each server step either receives a message and sends
-nothing, or sends at most one message, so a server keeps its pending outputs in its state. Every
-server has 36 states independently of `|V|`, and the emulation is still atomic, live and
-gossip-free. With `n = 5`, `f = 2` and `|V| = 2^16`, all six bounds fail. The value is kept in the
-reader's incoming channels. The proofs assume, without saying so, that servers never send messages
-to an idle reader. With that assumption added (`ReaderQuiet`), Theorem 4.1 and Corollary 4.2 hold,
-and so does the Singleton-type Theorem B.1 without gossip. Theorem 6.5 is not formalized.
+**Verdict: ❌ Intent lost.** The paper claims bounds that make "no assumption on the structure of the algorithm", but
+with reliable FIFO channels, also in the paper's I/O-automaton reading, a gossip-free, atomic, live *streaming relay*
+with 36 states per server, independently of `|V|`, keeps the value in the reader's incoming channels and refutes all
+six bounds (Theorems 4.1, 5.1, B.1 and Corollaries 4.2, 5.2, B.2). The proofs assume, without saying so, that servers
+never send messages to an idle reader; with that assumption added (`ReaderQuiet`), Theorem 4.1, Corollary 4.2 and the
+Singleton-type Theorem B.1 without gossip hold, and no bound with gossip is proved. Theorem 6.5 and non-FIFO channels
+were not checked.
 
 ## Mistakes in the paper
 
-### 🚨 Theorems 4.1, 5.1, B.1 and Corollaries 4.2, 5.2, B.2 (storage lower bounds, FIFO channels)
+### ❌ Theorems 4.1, 5.1, B.1 and Corollaries 4.2, 5.2, B.2 (storage lower bounds, FIFO channels)
 All six bounds are false with reliable FIFO channels: a gossip-free, atomic, live *relay* emulation keeps the value in the reader's incoming channels, so its servers need only constant state (1 state, or 36 in the I/O-automaton version), independently of `|V|` (`not_theorem41`, `not_theorem41_ioa`, `relay_counterexample`, `stream_counterexample`).
 
 **Impact.** The paper's main results fail as stated. They hold under the unstated assumption that servers never
@@ -59,49 +57,49 @@ step of a server sends nothing, a spontaneous step sends at most one message).
 - The reader reassembles `B`-bit blocks per server and keeps the newest complete one. It sends
   one outstanding query per server and re-queries after a stale answer.
 
-It is proved atomic, live (`2f < n`) and gossip-free. With `n = 5`, `f = 2`, `V = Fin 16 → Bool`, all six bounds
-fail for it. (`not_theorem41_ioa`, `not_corollary42_ioa`, `not_theorem51_ioa`, `not_corollary52_ioa`,
+It is proved atomic, live (`2f < n`) and gossip-free. With `n = 5`, `f = 2`, `V = Fin 16 → Bool` (`|V| = 2^16`), all
+six bounds fail for it. (`not_theorem41_ioa`, `not_corollary42_ioa`, `not_theorem51_ioa`, `not_corollary52_ioa`,
 `not_theoremB1_ioa`, `not_corollaryB2_ioa`; the algorithm: `stream_counterexample`)
 
 *Scope.* Both counterexamples need FIFO channels. The paper says only "reliable, asynchronous", and reliable FIFO
-is the standard channel of Lynch's I/O-automaton framework, which the proofs use. We have no counterexample for
-non-FIFO channels. There the adversary could hold back the forwarded messages while a valency read runs, so the
-bounds may well hold, although the written proofs still ignore server-to-reader messages. The counterexamples also
-use the theorems' *single* reader. They would extend to any fixed finite set of readers (forward to each; not
-formalized), but not to the "possibly infinite" set of read clients of Section 3. So multi-reader versions of the
-bounds are not refuted.
-
-*Theorem 5.1's proof has an additional gap (not formalized).* Definition 5.3 "delivers all messages" between
-servers. With gossip this need not terminate, because servers can keep sending. At `R₂` the servers other than
-`s, s'` also receive messages that `s, s'` send during delivery, so they need not be in the same state as at `R₁`.
-The statement is false anyway.
+is the standard channel of Lynch's I/O-automaton framework, which the proofs use. They also use the theorems'
+*single* reader. See **Not formalized.** below for the other channel and reader settings.
 
 **Repair.** Theorem 4.1 holds when servers do not push to an idle reader. We add `ReaderQuiet`: if the reader
 takes no step, no server has sent it anything. It follows from "servers send to the reader only when processing a
 reader message" (`readerQuiet_of_repliesOnly`), which ABD-style algorithms satisfy. With it, the paper's proof
 goes through. We prove `|V|(|V|−1) ≤ (∏_{𝒩}|S_i|)·∑_{𝒩}|S_i|` for every `𝒩` of at least `n − f` servers, which is
 slightly stronger than the paper's `∏·(N−f)·max`. We also prove the logarithmic form, Corollary 4.2, and the
-counting form `|V| ≤ ∏_{𝒩}|S_i|` of Theorem B.1 without gossip. (`theorem41_count`, `theorem41`, `corollary42`,
-`theoremB1_count`)
+counting form `|V| ≤ ∏_{𝒩}|S_i|` of the Singleton-type Theorem B.1 without gossip. (`theorem41_count`, `theorem41`,
+`corollary42`, `theoremB1_count`)
 
-### Typos and slips
+### ❌ Theorem 5.1, proof (Definition 5.3, Section 5.3.2)
+Definition 5.3 "delivers all messages" between servers, but with gossip this need not terminate, and at `R₂` the
+servers other than `s, s'` also receive messages that `s, s'` send during delivery, so they need not be in the same
+state as at `R₁`, and the claim that all channels are empty is unjustified (also in Appendix B.3).
+
+**Impact.** This step is broken independently of the reader issue, and no version with gossip is proved: our repair
+of Theorem B.1 needs `NoGossip` for the same reason. With FIFO channels the statement is false anyway. This gap is
+not formalized.
+
+### ✏️ Slips
+- Lemmas 4.4/4.6 (writer-crash step assumes lossy channels from crashed clients): after a critical point, the
+  valency executions delay the writer's messages "indefinitely", justified as "indistinguishable from a fair
+  execution where the write client fails before sending the messages", but those messages were already sent. With
+  channels reliable even from crashed processes, liveness does not guarantee the read terminates, so the step needs
+  channels from crashed processes to be lossy. Our model (CSLib `ChannelFailures`) does not require them to deliver,
+  which matches the paper's use (`exists_canon_ret`, `exists_crit`).
+- `N − f ≥ 1` is implicit (we assume `f < n`).
+- The definition of critical points (Lemmas 4.6, 5.6, Definitions 4.7, 5.7) ranges over `{0, 2, …, M−1}` instead of
+  `{0, 1, …, M−1}`.
+
+### Typos
 - The hypothesis `f ≥ 2` of Theorem 4.1 is never used. The counting argument works for every `f`, and
   Corollary 4.2's total-storage bound needs only `f ≥ 1` (we assume `1 ≤ f < n`).
-- `N − f ≥ 1` is implicit (we assume `f < n`).
 - In Theorem 4.1's proof, Case II says the read in `γ` "should return `v₂`" because `Q₂` is 2-valent. It
   actually follows from Lemma 4.5 together with `Q₂` not being 1-valent.
-- The definition of critical points ranges over `{0, 2, …, M−1}`, and `P₁ = P^{(v₁,v₁)}` in Section 4.3.2.
-
-## Proof gaps (statements true)
-
-### 🛠️ Lemmas 4.4/4.6 (writer-crash step assumes lossy channels from crashed clients)
-After a critical point, the valency executions delay the writer's messages "indefinitely", justified as "indistinguishable from a fair execution where the write client fails before sending the messages", but those messages were already sent.
-
-**Impact.** A modelling imprecision, not an error in the result: the step needs channels from crashed processes
-to be lossy, and our model (CSLib `ChannelFailures`) does not require them to deliver, which matches the paper's
-use.
-
-**Details.** With channels reliable even from crashed processes, liveness does not guarantee the read terminates.
+- `P₁ = P^{(v₁,v₁)}` in Section 4.3.2 should be `P^{(v₁,v₂)}`, and "Definition 6.8" in Case (II) of Theorem 5.1
+  should be Definition 5.3.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -146,8 +144,16 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Lemma 4.5 / 4.4, 4.6, 4.8 / Claim 4.9 | `read_value` / `exists_crit` / `agree_of_loc`, `readExt_of_agree` | `Theorem41.lean` |
 | sufficient condition for `ReaderQuiet` | `readerQuiet_of_repliesOnly` | `Theorem41.lean` |
 
-**Not formalized.** Section 6 (Theorem 6.5, multi-version bound under protocol assumptions) and a
-repaired Theorem 5.1 with gossip.
+**Not formalized.**
+* Section 6 (Theorem 6.5, multi-version bound under protocol assumptions). Whether the reader-channel flaw affects it
+  was not examined.
+* A repaired Theorem 5.1 with gossip.
+* Non-FIFO channels. We have no counterexample for them: there the adversary could hold back the forwarded messages
+  while a valency read runs, so the bounds may well hold, although the written proofs still ignore server-to-reader
+  messages.
+* Multi-reader versions. The counterexamples use the theorems' *single* reader. They would extend to any fixed finite
+  set of readers (forward to each; not formalized), but not to the "possibly infinite" set of read clients of
+  Section 3, so multi-reader versions of the bounds are not refuted.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. The counterexample's atomicity is proved with CSLib's SWSR reads-from criterion

@@ -3,31 +3,27 @@
 Paper: Wan, Xiang, Momose, Ren, Shi. *On the Amortized Communication Complexity of Byzantine Broadcast.*
 PODC 2023 (proceedings version).
 
-## Statement-level issues (with the deciding rule of `verdicts.md`)
+## Statement-level issues
 
 1. **Lemma 3 is false** (`Counterexample.not_lemma3`). It is a numbered lemma, false for every reading of
-   the skip condition, and not a typo: the proof reasons with the wrong step (R1, R3 not applicable).
-   This alone gives ❌.
+   the skip condition, and not a typo: the proof reasons with the wrong step. Label ❌.
 2. **Algorithm 4 violates Validity (Definition 2)** (`Counterexample.not_validity`), for the readings in
    which a committed node keeps answering queries. In the literal reading the protocol is worse:
    committed nodes never answer, so rounds 8–11 never deliver a commit-proof. Validity of Algorithm 4 is
-   the correctness claim of the headline protocol. The abstract says "We present a protocol that
+   the correctness claim of the paper's main protocol. The abstract says "We present a protocol that
    achieves optimal amortized linear complexity under an honest majority", i.e. it names the paper's
-   specific protocol (R5), hence **🚨**.
-   *Borderline (R6):* the contribution list states the result existentially ("we show how to achieve
-   `O(κn)` amortized communication"). Under that reading, and since we do not know whether a repaired
-   protocol exists, the result would be "unestablished" and the label ❌. We chose 🚨 because the abstract
-   names the presented protocol and its correctness is what fails. The fix is not local (R3): the querier
-   cannot know a same-round accusation, so the protocol needs another round or a different response rule.
-   Respond-1 condition 2 also conflicts with the Query-1 filter.
+   specific protocol. The contribution list states the result existentially ("we show how to achieve
+   `O(κn)` amortized communication"), and we do not know whether a repaired protocol exists. Label ❌.
+   The fix is not local: the querier cannot know a same-round accusation, so the protocol needs another
+   round or a different response rule. Respond-1 condition 2 also conflicts with the Query-1 filter
+   (a separate mistake, also ❌).
 3. **Lemma 4 and Lemma 5 (Algorithm 5.2) fail under the literal reading** of "`TrustCast(G_u, n, k)`"
    (`literal_validity_fails`, `literal_consistency_fails`, `literal_integrity_fails`). They hold when
    graph maintenance runs in every round and equivocation evidence of every slot is processed
-   (`Setup.validity`, `Setup.consistency`). Label ⚠️ (R3/R4). The proof of Lemma 5 uses transferability
+   (`Setup.validity`, `Setup.consistency`). Label 🔧. The proof of Lemma 5 uses transferability
    during the Dolev–Strong rounds, and the TrustCast properties are claimed "for any round `t`", so
    maintenance after round `n` is the evident intent. That equivocation evidence must outlive its slot
-   (`slotLocal_validity_fails`) is less evident; we record it here as the borderline part of this
-   ⚠️ call.
+   (`slotLocal_validity_fails`) is less evident.
 4. **Termination of Algorithm 4** is not formalized. Theorem 1 does not depend on it. The validity
    counterexample already shows the protocol is not a multi-shot BB.
 

@@ -12,8 +12,7 @@ Breadth-First Depth-Next*, PODC 2023 (BA), with proofs from the full version arX
    the analysis uses is FV Lemma 2 (per depth `d ≥ 1`, at most `k(min{log k, log Δ} + 2)` assignments to
    depth-`d` anchors). We prove it (`lemma_2`). The per-depth reading with `+1` (`D·k(m+1)` in total)
    is neither proved by the paper nor by us. All calls in the counterexamples return the root (depth 0), which is
-   not a move of any urn game, so the corollary is best read as an imprecise wording of the per-depth bound
-   (so Cor. 3.2 is a minor statement issue; Claim 1, item 3, sits inside a proof, so the folder's label is ⚠️); in
+   not a move of any urn game, so the corollary is best read as an imprecise wording of the per-depth bound; in
    that reading it is not refuted, only the `+1` constant is unproved.
 2. **Algorithm 1 (BA), line 14** `while not all robots are at the root` makes the robots stop as soon as
    they are all back at the root, possibly with unexplored edges (`algorithm_1_loop_stops_early`, one

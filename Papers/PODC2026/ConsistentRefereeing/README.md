@@ -6,23 +6,25 @@ Difficulty of Consistent Refereeing.* PODC 2026. DOI
 [2506.18401](https://arxiv.org/abs/2506.18401) v3 (same text as the proceedings version); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** All theorems we formalized hold: Theorems 1, 3, 4, 5, 25, 30,
-Proposition 11, Corollary 12, and Lemma 14 for counters, max registers and snapshots. The proof of
-**Theorem 30 has a gap** in its test&set case; we closed it with a different argument. Case 4c (stack,
-push/pop) of Theorem 5 is only sketched; our stack argument does not need it. The statement-level issues
-are minor: Lemma 29(2) fails in the degenerate case `w = 0`, and Lemma 17 needs `decide` to be pending.
+**Verdict: 🛠️ Hard fix.** All theorems we formalized hold: Theorems 1, 3, 4, 5, 25, 30, Proposition 11, Corollary 12, and
+Lemma 14 for counters, max registers and snapshots. The proof of Theorem 30 fails in its test&set case, and closing it
+took a new argument. The other mistakes are one local repair in Lemma 17 and slips.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 29(2) for `w = 0` (window objects)
-Lemma 29(2) fails in the degenerate case `w = 0`: the sequences it needs (`|γ| = w`, `γ = qλ`) do not exist.
+### ✏️ Slips
+- Lemma 29(2) fails in the degenerate case `w = 0`: the sequences it needs (`|γ| = w`, `γ = qλ`) do not exist. We use
+  window `max(w, 1)` (a 0-window object is also 1-window-like), and our proof of Theorem 30 does not need Lemma 29(2) at
+  all.
+- Lemma 17 needs `decide` to be pending. This implied assumption holds where the lemma is used, and the lemma is proved
+  with it (`lemma17`).
+- The last paragraph of Theorem 25 ("We have that αβp is closed. Otherwise…") is garbled; we
+  formalized the intended argument (`theorem25`).
+- Lemma 28's test&set case calls `αβq′` closed, but it is supervalent there; the case needs only `αβq` closed
+  (`lemma28`).
 
-**Impact.** Degenerate; we use window `max(w, 1)` (a 0-window object is also 1-window-like), and our proof of Theorem 30 does not need Lemma 29(2) at all.
-
-### ⚠️ Lemma 17 (missing hypothesis)
-Lemma 17 needs `decide` to be pending.
-
-**Impact.** An implied assumption that holds where the lemma is used; the lemma is proved with it.
+### Typos
+- Lemma 29's proof cites Lemma 21 instead of Lemma 27.
 
 ## Proof gaps (statements true)
 
@@ -41,34 +43,13 @@ changes nothing and commutes with every competitor step. By Lemma 17 the singlet
 is then the same for every competitors-only extension `u`. Taking `u` in which some competitor completes
 more operations than that value contradicts the specification. (`const_valency_contra`, `theorem30`)
 
-### 🛠️ Theorem 5, stack case 4c (one push, one pop)
-Case 4c is only sketched: it refers to case 4b, "conceiving the step of `p_i` as a push of `u_i`", but the two orders leave different stack shapes than in 4b (`u_j·T` vs `s₀·T`, where `s₀·T` is the stack in `C`), so the transfer is not immediate.
+### 🔧 Lemma 17 (counting `q`'s operations)
+`q`'s operations are counted in `αβ′` and then transferred to `α′β′σ`, but `α′` may contain a different number of
+operations of `q`, since indistinguishability compares only states.
 
-**Impact.** Statement true; our replacement argument covers 4b and 4c (`Crit.stack_push`, `lockstep`).
+**Impact.** Statement true (`lemma17`).
 
-**Details.** The "w.l.o.g. pushed values are distinct" step (footnote 3, stamping) is standard and
-sound, but our proof does not need it.
-
-**Repair.**
-- Run the canonical extension (a third competitor solo, then the referee) from `α·i·j` and from `α·j`
-  in lock-step. The stacks are `X₁ ++ S` and `X₂ ++ S` and differ only below a common top.
-- If no step pops into `X₁`/`X₂`, the referee returns the same value from a descendant of `α·i` and of
-  `α·j`.
-- Otherwise, at the first such pop by `q`, the configurations `α·i·j·β·q` and `α·j·β·q·i` are
-  identical.
-
-(`Crit.stack_push`, `lockstep`)
-
-### 🛠️ Section 5 (under-specified proof steps)
-In Lemma 17's proof the operations of `q` must be counted inside `β′`, and the case analyses of Lemmas 20, 23, 27, 28 and Theorems 25, 30 omit the referee's invocation and response steps.
-
-**Impact.** Statements true; routine completions in the formalization.
-
-### Typos and slips
-- The last paragraph of Theorem 25 ("We have that αβp is closed. Otherwise…") is garbled; we
-  formalized the intended argument.
-- Lemma 28's test&set case calls `αβq′` closed, but it is supervalent there.
-- Lemma 29's proof cites Lemma 21 instead of Lemma 27.
+**Repair.** Count the operations inside `β′`, which wait-freedom gives just the same.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -111,6 +92,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
   - read/write (every primitive is read-only or a blind write);
   - test&set-like (every primitive sets the object to a fixed state).
 
+**Proof remarks.** The case analyses of Lemmas 20, 23, 27, 28 and Theorems 25, 30 omit the referee's invocation and
+response steps; these are routine completions in the formalization.
+
 **Main results in Lean** (namespace `Cslib.SharedMemory.Referee`).
 
 | Paper | Lean | File |
@@ -130,7 +114,20 @@ Full list of differences (including modelling choices and minor imprecisions): [
 **Not formalized.**
 * Decisive linearizability, so Theorems 3 and 13 are not covered as decisive. Theorem 13 is not
   formalized at all; Theorem 3 is proved only as linearizable.
-* Lemma 14 for fetch&increment and fetch&add.
+* Lemma 14 for fetch&increment and fetch&add, and from strongly linearizable implementations.
+* The paper's own proof of Theorem 1, which we obtain through Corollary 12.
+* Theorem 5, stack case 4c (one push, one pop), as the paper argues it. It refers to case 4b, "conceiving the step of
+  `p_i` as a push of `u_i`", but the two orders leave different stack shapes than in 4b (`u_j·T` vs `s₀·T`, where `s₀·T` is
+  the stack in `C`), so the transfer is not immediate; we did not decide whether the case holds up as written. Theorem 5
+  itself is proved by a replacement argument covering 4b and 4c (`Crit.stack_push`, `lockstep`):
+  - Run the canonical extension (a third competitor solo, then the referee) from `α·i·j` and from `α·j`
+    in lock-step. The stacks are `X₁ ++ S` and `X₂ ++ S` and differ only below a common top.
+  - If no step pops into `X₁`/`X₂`, the referee returns the same value from a descendant of `α·i` and of
+    `α·j`.
+  - Otherwise, at the first such pop by `q`, the configurations `α·i·j·β·q` and `α·j·β·q·i` are
+    identical.
+  - The "w.l.o.g. pushed values are distinct" step (footnote 3, stamping) is standard and sound, but our proof does not
+    need it.
 * Corollaries 26 and 31: they need a general composition theorem for strongly linearizable
   implementations. For queues (Proposition 11) the composition is done concretely.
 

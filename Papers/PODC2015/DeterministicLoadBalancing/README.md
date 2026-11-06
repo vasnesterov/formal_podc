@@ -5,23 +5,21 @@ Petra Berenbrink, Ralf Klasing, Adrian Kosowski, Frederik Mallmann-Trenn, Przemy
 [10.1145/2767386.2767413](https://doi.org/10.1145/2767386.2767413). Formalized version: arXiv
 [1404.4344](https://arxiv.org/abs/1404.4344) v4 (same text and numbering as the proceedings PDF).
 
-**Verdict: ❌ False claim.** Observation 3.2 is false: `SEND([x/d⁺])` is a good `(d⁺ − 2d)`-balancer
-only when `d◦ = d + 1`; in general it is a good `s`-balancer exactly for `s ≤ ⌈d⁺/2⌉ − d`, about
-half the claimed value. That is still `Ω(d)` for `d⁺ ≥ 3d`, so the Table 1 entries built on it
-survive. Observations 3.6 and 3.8 as printed (`max` instead of `min`) are false; the intended `min`
-versions hold. All three lower bounds of Section 4 (Theorems 4.1–4.3) and Lemmas 3.5 and 3.7 are
-true. The proofs of Theorems 4.2 and 4.3 needed repairs. The spectral upper bounds (Theorems 2.3,
-3.3) were not formalized.
+**Verdict: 🔧 Easy fix.** The one false statement, the constant in Observation 3.2, is saved by changing
+that constant (`⌈d⁺/2⌉ − d` for `d⁺ − 2d`), and the `max` printed in Observations 3.6 and 3.8 is a
+typo for `min`. All three lower bounds of Section 4 (Theorems 4.1–4.3) and Lemmas 3.5 and 3.7 are
+true, and the proofs of the lower bounds needed only local repairs. The paper's main upper bounds
+(the spectral Theorems 2.3 and 3.3, and Table 1, which rests on them) were not checked.
 
 ## Mistakes in the paper
 
-### ❌ Observation 3.2 (`SEND([x/d⁺])` is a good `(d⁺ − 2d)`-balancer)
+### 🔧 Observation 3.2 (`SEND([x/d⁺])` is a good `(d⁺ − 2d)`-balancer)
 `SEND([x/d⁺])` is not a good `(d⁺ − 2d)`-balancer: for `d = 1`, `d◦ = 4`, `x = 3` only two
 self-loops get `⌈x/d⁺⌉`, where self-preference with `s = 3` needs three (`observation_3_2_false`).
 
 **Impact.** The correct value is about half the claimed one: it is a good `s`-balancer exactly for
 `1 ≤ s ≤ ⌈d⁺/2⌉ − d` (`sendRound_isGood_iff`). That is still `s ≥ 1` for `d⁺ > 2d` and `s = Ω(d)`
-for `d⁺ ≥ 3d`, so the uses in Table 1 survive.
+for `d⁺ ≥ 3d`, which is all that Table 1 uses (the table also rests on Theorem 3.3, not checked).
 
 **Details.** When `x/d⁺` is rounded up, the `d` original edges use up `d` of the `e = x mod d⁺`
 extra tokens. Only `e − d` self-loops then get `⌈x/d⁺⌉`, but self-preference asks for `min{s, e}`
@@ -32,33 +30,30 @@ every reading.
 
 **Repair.** We prove the exact characterisation: on a `d`-regular graph with `d < d◦`,
 `SEND([x/d⁺])` is a good `s`-balancer iff `1 ≤ s ≤ ⌈d⁺/2⌉ − d`. So, with halves rounded up, the
-paper's claim holds iff `d◦ = d + 1`. Because `⌈d⁺/2⌉ − d ≥ (d◦ − d)/2`, the uses in Table 1
-survive. (`sendRound_isGood_iff`)
+paper's claim holds iff `d◦ = d + 1`. Because `⌈d⁺/2⌉ − d ≥ (d◦ − d)/2`, this is enough for the uses
+in Table 1. (`sendRound_isGood_iff`)
 
-### ⚠️ Observations 3.6 and 3.8 (`max` instead of `min`)
-As printed, the bounds on the potential drop over `[t, t']`, `∑_{u∈U} max{s, x_t(u) − cd⁺}`
-(respectively `max{s, cd⁺ + s − x_t(u)}`), are false already on `K₂` (`observation_3_6_false`,
-`observation_3_8_false`).
+### ✏️ Slips
+- Observations 3.6 and 3.8 print `max` instead of `min`: the bounds on the potential drop over
+  `[t, t']`, `∑_{u∈U} max{s, x_t(u) − cd⁺}` (respectively `max{s, cd⁺ + s − x_t(u)}`), are false
+  already on `K₂` (`observation_3_6_false`, `observation_3_8_false`). Take `K₂` with two self-loops
+  per node and the good 2-balancer `SEND(⌊x/3⌋)`, `c = 1` and loads `(4, 0)`. Node 0 drops to load
+  `3 = cd⁺` and `φ(1)` drops by only 1, but the printed bound demands `max{2, 1} = 2`. 3.8 fails the
+  same way, with `c = 0` and loads `(1, 3)`. Appendix B.4 actually uses `min{s, ·}`, and we prove the
+  `min` versions (`observation_3_6`, `observation_3_8`). Observation 3.8 also prints `φ_t` instead of
+  `φ'_t` on the right-hand side.
+- Theorem 4.1 needs a connected graph (otherwise the diameter is infinite).
+- Theorem 4.2 needs `d < n`.
+- Proof of Theorem 4.2: the neighbour indices are written "mod `d`" where "mod `|C|`" is meant.
+- Proof of Theorem 4.2: the paper's offset set for the circulant graph contains `0`, i.e. a self-loop.
 
-**Impact.** A typo with evident intent: Appendix B.4 actually uses `min{s, ·}`, and the `min`
-versions hold (`observation_3_6`, `observation_3_8`).
-
-**Details.** Take `K₂` with two self-loops per node and the good 2-balancer `SEND(⌊x/3⌋)`. Take
-`c = 1` and loads `(4, 0)`. Node 0 drops to load `3 = cd⁺` and `φ(1)` drops by only 1, but the
-printed bound demands `max{2, 1} = 2`. 3.8 fails the same way, with `c = 0` and loads `(1, 3)`.
-
-**Repair.** We prove the `min` versions. (`observation_3_6`, `observation_3_8`)
-
-### Typos and slips
-- Theorem 4.1 needs a connected graph (otherwise the diameter is infinite), and Theorem 4.2 needs
-  `d < n`.
-- The paper's offset set for the circulant graph contains `0`, i.e. a self-loop.
+### Typos
 - The introduction says that removing self-loops yields `Ω(d · diam)` (Theorem 4.3). Theorem 4.3
   gives `Ω(d · ϕ)`, where `2ϕ + 1` is the odd girth. The two agree on odd cycles.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 4.3 (rotor-router lower bound, construction of Appendix C.3)
+### 🔧 Theorem 4.3 (rotor-router lower bound, construction of Appendix C.3)
 The flow `f₀` of the construction is not a rotor-router execution: a node in layer `ϕ − 1 ≥ 1`
 with a neighbour in layer `ϕ` sends `L ± 2` towards layer `ϕ − 2` and `L` towards layer `ϕ`, contradicting the claimed
 `|f_t(v, v₁) − f_t(v, v₂)| ≤ 1`.
@@ -75,20 +70,20 @@ rotor-router step produces this; for example, on the 5-cycle the neighbour of `u
 `u ⇝ v₁ → v₂ ⇝ u`" is only an odd closed walk; we prove that an odd closed walk contains an odd
 cycle that is no longer. And `u` can be any vertex. (`theorem_4_3`)
 
-### 🛠️ Theorem 4.2 (stateless lower bound, `d ≤ 3`)
+### 🔧 Theorem 4.2 (stateless lower bound, `d ≤ 3`)
 The paper's clique of `⌊d/2⌋` nodes with load `ℓ = |C| − 1` gives discrepancy `⌊d/2⌋ − 1`, which
 is `0` for `d ≤ 3`.
 
 **Impact.** Statement true; repaired with a larger clique (`theorem_4_2`).
 
-**Details.** The neighbour indices are written "mod `d`" where "mod `|C|`" is meant. The proof needs
-the stateless algorithm to be anonymous: every node uses the same `p◦, p₁, …, p_d`, and the
-adversary chooses the port numbering. We formalize the theorem in that model.
+**Details.** The proof needs the stateless algorithm to be anonymous: every node uses the same
+`p◦, p₁, …, p_d`, and the adversary chooses the port numbering. We formalize the theorem in that
+model.
 
 **Repair.** The clique `{0, …, ⌊d/2⌋}` is also present in the paper's circulant graph and gives
 discrepancy `⌊d/2⌋ ≥ d/3` for `d ≥ 2`. For `d = 1` a single token suffices. (`theorem_4_2`)
 
-### 🛠️ Theorem 4.1 (`K₂`)
+### 🔧 Theorem 4.1 (`K₂`)
 Theorem 4.1's construction gives discrepancy `0` on `K₂` (`d = diam = 1`).
 
 **Impact.** Statement true; that case needs a separate argument: one token on two nodes

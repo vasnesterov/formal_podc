@@ -7,16 +7,17 @@ version: the brief announcement (BA, arXiv:2211.11352) states the result. The pr
 arXiv:2211.10151v2. The lower bound is due to Zeiner, Schwarz and Schmid (DAM 2019) and appears as FV Figure 5.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🛠️ Proof repaired.** Both bounds of BA Theorem 3.1, `⌈(3n−1)/2⌉ − 2 ≤ t*(𝒯ₙ) ≤ ⌈(1+√2)n − 1⌉`, are proved
-for all `n`. There are no false statements. The BA's upper bound is one round sharper than what FV's proof gives, and needs a recount of FV's pigeonhole; FV's proofs also have small slips.
+**Verdict: 🔧 Easy fix.** Both bounds of BA Theorem 3.1, `⌈(3n−1)/2⌉ − 2 ≤ t*(𝒯ₙ) ≤ ⌈(1+√2)n − 1⌉`, are proved
+for all `n`, and there are no false statements. The BA's upper bound is one round sharper than what FV's proof gives,
+and a recount of FV's pigeonhole recovers that round. FV's proofs also have small slips.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
 - FV Lemma 3.3 is stated for `t₁ ≤ t₂` but used in Lemma 3.5 with `t₁ = t₂ + 1` (round 1). That extra case is
-  trivial.
+  trivial (`lemma_3_3`).
+
+### Typos
 - In FV Lemma 3.5, the in-degree formula has `x` where `r_t` is meant.
 - The final comparison in FV Lemma 3.5 is not the actual pigeonhole threshold, although the inequality used is
   still sufficient.
@@ -24,7 +25,7 @@ No mistakes in the statements.
 
 ## Proof gaps (statements true)
 
-### 🛠️ BA Theorem 3.1 (upper bound `⌈(1+√2)n − 1⌉`)
+### 🔧 BA Theorem 3.1 (upper bound `⌈(1+√2)n − 1⌉`)
 BA Theorem 3.1 (and FV's abstract) states `⌈(1+√2)n − 1⌉`, but FV Theorem 3.6 only proves the bound
 `⌈(1+√2)n⌉`, one round weaker.
 

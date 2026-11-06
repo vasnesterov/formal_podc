@@ -6,11 +6,12 @@ Simulation in Content-Oblivious Rings.* PODC 2026. DOI
 [2603.28260](https://arxiv.org/abs/2603.28260) v1 (full version; numbering follows it).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** Lemma 16 / Theorem 17 (bit sending has the composable ending
+**Verdict: ⚠️ Weakened.** Lemma 16 / Theorem 17 (bit sending has the composable ending
 property) is false when the leader is a relay, a case the paper explicitly covers: two rounds run
-back to back produce swapped outputs; the distance output of the §5 counting algorithm is also off
-by one. The headline results hold: Theorems 1, 4, 5, 13, 14, 22 (with an active leader), Corollary
-2, and the lower bound Theorem 3 (even per execution).
+back to back produce swapped outputs, so the simulator's logical rings are proved only with an active leader.
+The counting bounds and the rest hold: Theorems 1, 4, 5, 13, 14, 22 (with an active leader), Corollary
+2, and the lower bound Theorem 3 (even per execution), although the distance output of the §5 counting
+algorithm is off by one. Theorems 6 and 7 were not checked.
 
 ## Mistakes in the paper
 
@@ -26,7 +27,7 @@ already-returned clockwise neighbour sends in the next procedure. In the counter
 `⊥` then `0`, `2` sends `⊥` twice; an execution of 16 deliveries ends with the round-2 bit
 attributed to round 1.
 
-### ❌ Section 5, p. 9 (distance formula of the counting algorithm)
+### 🔧 Section 5, p. 9 (distance formula of the counting algorithm)
 For every process probed in a completed phase (`myPhase < i`, including the last leader) the formula `myPhase(myPhase+1)/2 − k − 1` gives its clockwise distance minus one, e.g. for `n = 2` the non-leader computes 0, the leader's own distance (`AnonCounting.paperResult_off_by_one`, `paperResult_wrong`, `paperResult_two`).
 
 **Impact.** The algorithm is correct with the corrected formula: it computes `n` and all distances (Theorem 4, `anonCount_final`).
@@ -35,31 +36,31 @@ For every process probed in a completed phase (`myPhase < i`, including the last
 
 **Repair.** The correct value is `myPhase(myPhase+1)/2 − k` (and 0 for the leader). (`anonCount_final`)
 
-### ⚠️ Theorem 1 (λ-preprocessing pseudo-code)
-With the input "ID length ≤ i" and "stop at the first false", the loop stops at `i = 1` (unless some ID has one bit) and "the largest index with outcome true" does not exist; the input must be "ID length ≥ i".
-
-**Impact.** Pseudo-code error with an easy fix; fixed in the formalization.
-
-### ⚠️ Algorithm 10 (loop bound)
-`while phase < len(bits)` loops over the process's own input length, so processes with longer inputs call ComputeOR more often than the others and the calls no longer match.
-
-**Impact.** Pseudo-code error with an easy fix: the loop bound must be the common minimum length `B` (as the text suggests). Fixed in the formalization (Theorem 5).
-
-### Typos and slips
+### ✏️ Slips
+- Algorithm 10: `while phase < len(bits)` loops over the process's own input length, so processes with longer inputs
+  call ComputeOR more often than the others and the calls no longer match. The loop bound must be the common minimum
+  length `B` (as the text suggests). Fixed in the formalization (Theorem 5).
 - "Self-decomposable for *disjoint* multisets" (Theorem 1) literally excludes counting (`{1} ⊎ {1}`);
   disjoint sets of processes are meant.
 - Lemmas 11–12 say the last phase is `⌈√n⌉`; there are about `√(2n)` phases (`n = 40` has 9).
 - Lemma 10's premise has `p₀` uncounted and calls the per-phase invariant "immediate".
-- Lemma 16 (relay segments behave like a link) is asserted without proof.
+
+### Typos
 - Theorem 4 writes `d ∈ [0, n]`.
 - Algorithm 5's comments say `phase > len` for `≥`.
+- Section 10: `I_t = (v, …, v+t)` has `t + 1` processes.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 3 (splicing in Lemma 28)
+### 🔧 Theorem 1 (λ-preprocessing pseudo-code)
+With the input "ID length ≤ i" and "stop at the first false", the loop stops at `i = 1` (unless some ID has one bit) and "the largest index with outcome true" does not exist; the input must be "ID length ≥ i".
+
+**Impact.** Theorem 1 holds with this one condition changed; fixed in the formalization (`Aggregation.theorem1_concrete`).
+
+### 🔧 Theorem 3 (splicing in Lemma 28)
 The splicing in Lemma 28 ("replay O verbatim") cannot be literal: events of the removed part must be dropped and the kept interval's events rescheduled.
 
-**Impact.** Minor; statement true. We use a precise crossing-sequence merge (`Cslib.ContentOblivious.splice`).
+**Impact.** The statement is true. We use a precise crossing-sequence merge (`Cslib.ContentOblivious.splice`).
 
 **Repair.** We prove more than stated: `n⌊log₂ n⌋ ≤ 14M + 4n` for *every* execution with `M` pulses
 in which the leader has counted. (`Counting.count_lower_bound`, `Counting.theorem3`,
@@ -106,8 +107,14 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Observation 27, Lemma 28 (splicing) | `Counting.observation27`, `Counting.lemma28` | `LowerBoundSplice.lean`, `Cslib/Computability/Distributed/ContentOblivious/Splice.lean` |
 | Theorem 3 (lower bound), per execution and in the paper's form | `Counting.count_lower_bound`, `Counting.theorem3` | `LowerBound.lean` |
 
-**Not formalized.** Theorem 6 (multiset computation), Theorem 7 and §7 (2-edge-connected
-networks: relies on results of Censor-Hillel et al. and Alon–Tarsi), Theorem 22 with a relay leader.
+**Not formalized.**
+- Theorem 6 (multiset computation) and §9.2, which run counting on a virtual ring that need not contain the
+  leader, although Theorem 14 needs an active leader.
+- Theorem 7 and §7 (2-edge-connected networks: relies on results of Censor-Hillel et al. and Alon–Tarsi).
+- Theorem 22 with a relay leader. Only its proof relies on the false Theorem 17; as a statement it may be true:
+  random testing of Algorithms 5–6 with a relay leader found no error.
+- Lemma 16's claim that a relay segment is equivalent to a link for non-leader relays. It is asserted without
+  proof; we bypass it and prove the outputs, termination and `6n` bound of Theorem 17 directly.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. All composite results are instantiated with the formalized Algorithms 7–9 (no

@@ -4,7 +4,7 @@ Paper: A. Mostéfaoui, M. Raynal, *Two-Bit Messages are Sufficient to Implement 
 Registers in Crash-prone Systems*, PODC 2016 (arXiv:1602.02695v1; the arXiv version has a single
 version, identical in content to the local copy). Numbering follows the arXiv version.
 
-**Verdict.** The main result is correct. The algorithm of Figure 1 implements an atomic
+**Summary.** The main result is correct. The algorithm of Figure 1 implements an atomic
 (linearizable) SWMR register in `CAMP_{n,t}[t < n/2]` with four message types, and every
 operation of a correct process terminates. **FIFO channels are not needed.** Screening asked
 whether the paper silently relies on FIFO channels. It does not. Channels are modelled as
@@ -13,7 +13,7 @@ handle reordering. The pairwise invariant behind this (our `InvW`, Lemma 5 in ex
 that at most two `WRITE` messages are unprocessed per channel, with different parities.
 
 The algorithm relies on an **implicit convention**: code between two `wait`s executes atomically
-(§1). This is the standard convention of Raynal's pseudo-code, not an error, but we record it
+(§1). This is the standard convention of Raynal's pseudo-code, an implied assumption (✏️), and we record it
 because the algorithm is incorrect without it. The other items are proof imprecisions or gaps that
 the formal proof closes, small slips, harmless generalizations and modelling choices.
 
@@ -101,7 +101,7 @@ The theorems in Lean prove correctness in general.
     `sent(i,j) = min(w_sync_i[i], w_sync_i[j] + 1)`;
   - there are at most two of them (`sent ≤ w_sync_j[i] + 2`).
 - **Lemma 5.** Holds.
-  - R1/R2 about the messages *actually sent*: `lemma5_sent` (`Messages.lean`). The number of
+  - `R1`/`R2` about the messages *actually sent*: `lemma5_sent` (`Messages.lean`). The number of
     `WRITE`s `p_i` has sent to `p_j`, counted on the ghost log `C.sent`, equals
     `sent C i j = min(w_sync_i[i], w_sync_i[j] + 1)`. Note that `sent` in `InvWrite.lean` and
     `lemma5` (`Safety.lean`) is this *formula* on local variables, not a count; `lemma5_sent`
@@ -110,10 +110,10 @@ The theorems in Lean prove correctness in general.
     numbers in `(w_sync_j[i], sent C i j]`, at most two, and only crashed senders' messages can be
     lost.
   - The paper states it for `i ∈ C`, but it holds for every process.
-  - **Gap in the paper's proof.** The case analysis considers only a `write` invocation by
+  - **Gap in the paper's proof** (🔧). The case analysis considers only a `write` invocation by
     `p_i` and the reception by `p_i` of a `WRITE` from `p_j`. It ignores the reception by `p_i`
     of a `WRITE` from a third process `p_k ≠ p_j`. Such a reception may increase `w_sync_i[i]`
-    (line 14) and send a `WRITE` to `p_j` (line 15), changing the premises of R1/R2 for the pair
+    (line 14) and send a `WRITE` to `p_j` (line 15), changing the premises of `R1`/`R2` for the pair
     `(i, j)`. The statement remains true. Our invariant proof handles this case: in
     `InvW.of_recv_adopt` every `ℓ` with `w_sync_i[ℓ] = wsn − 1` gets exactly one new message.
   - The paper's case analysis also needs, as an induction hypothesis, the property "at most two
@@ -155,8 +155,8 @@ The theorems in Lean prove correctness in general.
     - In the proof of Claim 2, "a quorum `Q_w` of at least `(n−t)` processes `p_i` such that
       `w_sync_w[j] = x`" mixes the indices `i` and `j`.
     - In the proof of Lemma 8, "`w_sync_i[i] ≥ w_sync_w[i] = wsn` at each correct process
-      `p_i`" has the indices swapped. What is needed (and true by Lemma 6) is
-      `w_sync_w[i] ≥ wsn`.
+      `p_i`" is awkward, though every part of it is true (Lemmas 2 and 6). What is needed (and true by
+      Lemma 6) is `w_sync_w[i] ≥ wsn`.
   - Our proof makes the ghost information explicit (`InvH` in `InvHist.lean`):
     - the snapshot of all `w_sync_j[j]` at the invocation of each read (`snap`);
     - the reads-from map (`rf`).

@@ -5,70 +5,71 @@ PODC 2012. DOI [10.1145/2332432.2332436](https://doi.org/10.1145/2332432.2332436
 version: the authors' copy of the PODC paper (HAL hal-00722947, 11 pages; no arXiv version);
 numbering follows it.
 
-**Verdict: ⚠️ Minor statement issues.** The headline space lower bound (Theorem 5.1: any leader
-election algorithm with nondeterministic solo-termination needs `Ω(log n)` registers, concretely
-`⌊log₂ n⌋ - 1`) is proved in Lean, together with Claims 5.2, 5.3, 5.5 and Lemma 5.4. The only
-statement-level issue is that the `GroupElect` definition omits "if no process crashes", so read
-literally Figure 1 does not satisfy it (Lemma 2.2). A few proof steps need small repairs. The
-probabilistic upper bounds are not formalized.
+**Verdict: 🔧 Easy fix.** The space lower bound (Theorem 5.1: any leader election algorithm with nondeterministic
+solo-termination needs `Ω(log n)` registers, concretely `⌊log₂ n⌋ - 1`) is proved in Lean, together with Claims 5.2,
+5.3, 5.5 and Lemma 5.4, and its proofs needed only local changes. The one issue in the definitions is that `GroupElect`
+omits "if no process crashes", so read literally Figure 1 does not satisfy it (Lemma 2.2). The paper's probabilistic
+upper bounds, its expected step complexities, are not formalized, so they were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Section 2.1, definition of `GroupElect` (used by Lemma 2.2)
-"If some processes call `elect()`, then at least one process must get elected" lacks the "if no
-process crashes" qualifier of `LeaderElect`, so in the paper's crash model Figure 1 violates it
-(`p` writes `flag` and crashes, `q` reads `flag = 1` and returns `False`;
-`GroupElect.not_groupElectLiteral`).
-
-**Impact.** Local. The intended crash-free reading is clear from the `LeaderElect` definition just
-before it and from its only use ("if no process crashes then some process wins … at least one of
-the processes that call `GE_i.elect()` gets elected"). Under that reading Figure 1 is a
-GroupElect object (`GroupElect.isGroupElection`).
-
-### Typos and slips
+### ✏️ Slips
+- Section 2.1, definition of `GroupElect` (used by Lemma 2.2): "If some processes call `elect()`, then at least one
+  process must get elected" lacks the "if no process crashes" qualifier of `LeaderElect`, so in the paper's crash model
+  Figure 1 violates it (`p` writes `flag` and crashes, `q` reads `flag = 1` and returns `False`;
+  `GroupElect.not_groupElectLiteral`). The intended crash-free reading is clear from the `LeaderElect` definition just
+  before it and from its only use ("if no process crashes then some process wins … at least one of the processes that
+  call `GE_i.elect()` gets elected"). Under that reading Figure 1 is a GroupElect object
+  (`GroupElect.isGroupElection`).
+- Claim 5.3 is false for `R = R' = ∅`, `Q = ∅`: then `β` must be empty. It is only applied with `R ≠ ∅`, which we
+  assume.
+- Lemma 5.4(e) relates `m_k` to `m_{k-1}` of a different witness. It only makes sense for the sequence the inductive
+  construction builds, and that is what we formalize: `m_k ≥ f(k)`.
 - Proof of Lemma 2.2, last line: "since `ℓ = ⌈log n⌉ ≤ log k`" should be `≥`. The estimate holds
   (`GroupElect.lemma_2_2_final_bound`; in fact `2 log k + 4`, `GroupElect.final_bound`).
-- Proof of Lemma 2.2, computation of `E[Y_j]`: for `i = ℓ − 1` the factor should be
-  `(1 − 2^{-(ℓ-1)})^{j-1}`, because `Pr(x = ℓ) = 2^{-(ℓ-1)}`. So "=" is really "≤", and the bound
-  is unaffected.
-- Proof of Claim 5.2: "`C(E)` and `C(D)` are indistinguishable to all processes in `Q`" is too
-  strong under the paper's definition of indistinguishability, which includes all register values.
-  Only the states of `Q` agree, together with the registers last written by `Q` (`erase`).
-- Claim 5.3 is false for `R = R' = ∅`, `Q = ∅`: then `β` must be empty (degenerate). It is only
-  applied with `R ≠ ∅`, which we assume.
-- Proof of Lemma 5.4: "every register in `R` is covered by exactly two processes" should read "at
-  least two" (it is `n − k ≥ 2`). "No process in `Q` covers a register in `R'`" should say "no
-  chosen representative": other members of `Q` may cover `R'`. Neither affects the argument.
-- Lemma 5.4(e) relates `m_k` to `m_{k-1}` of a different witness. It only makes sense for the
-  sequence the inductive construction builds, and that is what we formalize: `m_k ≥ f(k)`.
+- Proof of Lemma 2.2, computation of `E[Y_j]`: for `i = ℓ − 1` the factor should be `(1 − 2^{-(ℓ-1)})^{j-1}`, because
+  `Pr(x = ℓ) = 2^{-(ℓ-1)}`. So "=" is really "≤", and the bound is unaffected.
+- Proof of Lemma 5.4: "every register in `R` is covered by exactly two processes" should read "at least two" (it is
+  `n − k ≥ 2`). This does not affect the argument.
+- Proof of Lemma 5.4: "No process in `Q` covers a register in `R'`" should say "no chosen representative": other
+  members of `Q` may cover `R'`. This does not affect the argument.
+- Section 5.2: "Further, let for `k ≥ 1` `δ(k+1) = …`" should be `k ≥ 0`, because Claim 5.5 uses `δ(1)`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 5.1 (reduction to deterministic algorithms)
-The proof's claim that the random choices can be fixed so that "the algorithm becomes
-deterministic and obstruction free" (every process finishing solo "within a bounded number of
-steps") is not justified.
+### 🔧 Theorem 5.1 (reduction to deterministic algorithms)
+The proof's claim that the random choices can be fixed so that "the algorithm becomes deterministic and obstruction
+free" (every process finishing solo "within a bounded number of steps") is not justified.
 
-**Impact.** Statement true. The step is not needed: Section 5.2 works verbatim with
-nondeterministic executions, and we formalize it that way (`theorem_5_1`).
+**Impact.** The step is not needed: Section 5.2 works verbatim with nondeterministic executions, and we formalize it
+that way (`theorem_5_1`).
 
-**Details.** Nondeterministic solo-termination only says that from every reachable configuration
-some choice sequence lets the process finish solo. Choices that work from every configuration at
-once need not exist if they depend only on the local state. Example gadget: choose a bit `b`,
-announce it in `r₃`, read `r₂`, finish if `r₂ = b`, otherwise forget and retry. Another process
-writes `1 − r₃` into `r₂`. Put this gadget in front of any correct algorithm. Then every
-local-state-based fixing of `b` loops forever solo from a reachable configuration. The gadget does
-not refute the usual reading "fix each process's coin tape" (the `i`-th coin of `p`): a tape that
-is not eventually constant finishes it within two tries. The paper does not show that a tape with
-finite solo runs from every configuration reachable under it exists, and solo runs need not be
-bounded. So this is a missing justification of an unnecessary step, not a refuted one.
+**Details.** Nondeterministic solo-termination only says that from every reachable configuration some choice sequence
+lets the process finish solo. Choices that work from every configuration at once need not exist if they depend only on
+the local state. Example gadget: choose a bit `b`, announce it in `r₃`, read `r₂`, finish if `r₂ = b`, otherwise forget
+and retry. Another process writes `1 − r₃` into `r₂`. Put this gadget in front of any correct algorithm. Then every
+local-state-based fixing of `b` loops forever solo from a reachable configuration. The gadget does not refute the usual
+reading "fix each process's coin tape" (the `i`-th coin of `p`): a tape that is not eventually constant finishes it
+within two tries. The paper does not show that a tape with finite solo runs from every configuration reachable under
+it exists, and solo runs need not be bounded. So this is a missing justification of an unnecessary step, not a refuted
+one.
 
-### 🛠️ Lemma 5.4(e), case `R = ∅`
-When no register is covered by `n − k` representatives, the proof keeps the configuration and says
-the claim for `k + 1` "follows immediately", but (e) then needs `m_k ≥ n − k`, which is not shown.
+### 🔧 Lemma 5.4(e), case `R = ∅`
+When no register is covered by `n − k` representatives, the proof keeps the configuration and says the claim for
+`k + 1` "follows immediately", but (e) then needs `m_k ≥ n − k`, which is not shown.
 
-**Impact.** Statement true; repaired. `f(k) ≥ n − k` holds by induction (`sub_le_f`), so
-`f(k+1) ≤ f(k)` (`f_succ_le`) and `m_{k+1} = m_k ≥ f(k) ≥ f(k+1)`.
+**Impact.** A few lines of arithmetic close the case.
+
+**Repair.** `f(k) ≥ n − k` holds by induction (`sub_le_f`), so `f(k+1) ≤ f(k)` (`f_succ_le`) and
+`m_{k+1} = m_k ≥ f(k) ≥ f(k+1)`.
+
+### 🔧 Claim 5.2 (indistinguishability)
+"`C(E)` and `C(D)` are indistinguishable to all processes in `Q`" is too strong under the paper's definition of
+indistinguishability, which includes all register values.
+
+**Impact.** The erasure argument goes through with a weaker invariant (`Alg.claim_5_2_paper`).
+
+**Repair.** Only the states of `Q` agree, together with the registers last written by `Q` (`erase`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

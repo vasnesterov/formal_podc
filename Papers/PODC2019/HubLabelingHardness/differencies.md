@@ -5,7 +5,7 @@ labeling*, PODC 2019 (arXiv 1902.07055v3). Scope: Section 2 (Theorem 2.1, Lemma 
 
 ## Errors and gaps in the paper
 
-1. **False claim in the proof of Lemma 2.2** (inside a proof → R1: proof repair, 🛠️).
+1. **Wrong step in the proof of Lemma 2.2** (🛠️).
    * The paper says: "for any `u ∈ V_i` and `v ∈ V_j` with `i < j`, `dist_G(u,v) = dist_H(u,v)`",
      justified by "the construction" for `j = i + 1` and by vertex cuts for `j > i + 1`.
    * It is false. In `G` a walk may turn around inside an in-tree (leaf → root → other leaf) without
@@ -19,7 +19,7 @@ labeling*, PODC 2019 (arXiv 1902.07055v3). Scope: Section 2 (Theorem 2.1, Lemma 
      the level reflection (`refl`) and the cut at level `ℓ` (`exists_mem_support_midLevel`); see
      `Distances.lean`. The upper bound `d_G ≤ d_H` between vertices of `H` does hold
      (`edist_main_le_wlen`).
-2. **Lemma 2.2 for `H`: routine gaps** (🛠️ at most; the statement is true). The proof does not show:
+2. **Lemma 2.2 for `H`: routine gaps** (the statement is true). The proof does not show:
    * that a walk with exactly `2ℓ` edges is monotone in the level;
    * that `a² + b²` with `a + b` fixed and even has the unique minimizer `a = b`;
    * that this determines every vertex of the path;
@@ -27,13 +27,14 @@ labeling*, PODC 2019 (arXiv 1902.07055v3). Scope: Section 2 (Theorem 2.1, Lemma 
 
    All four are proved in `HLemma.lean`.
 3. **Inequality (1)** `|S*_v| ≤ diam(G)·|S_v| ≤ (3ℓ+1)s²·4ℓ·|S_v|`. The diameter bound is asserted
-   without proof (and `diam` should be `diam + 1`, counting vertices). We avoid it: only hubs `h` of
+   without proof (and `diam` should be `diam + 1`, counting vertices: ✏️). We avoid it: only hubs `h` of
    `v` with `d(v, h) ≤ L := 8ℓ²s²` can serve the counted pairs, and `L ≥ Lopt`. So
    `S*_v` := union of fixed shortest paths to those hubs has size `≤ (L + 1)|S_v|`
    (`SimpleGraph.hubPathSet`, `card_hubPathSet_le`). The paper also uses shortest-path *trees*; we
    use arbitrary fixed shortest paths, which suffice.
 4. **Typos.** "a path of length `w(e) − 2b + −2`" should be `w(e) − 2b − 2`. In
-   "`V = ⋃_{r=0}^{2ℓ} V_i`" the union index is mismatched.
+   "`V = ⋃_{r=0}^{2ℓ} V_i`" the union index is mismatched. The proof of Theorem 2.1 (iii) prints `z = 2x − y` and
+   `x = 2z − y` where `z = 2y − x` and `x = 2y − z` are meant (✏️).
 
 ## Statement-level choices (no error in the paper)
 

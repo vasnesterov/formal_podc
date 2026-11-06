@@ -5,26 +5,23 @@ Advice*, arXiv:2405.04519 v2 (full version of the PODC 2024 brief announcement *
 Decompression*). Formalized: Theorem 30 with Lemmas 31–34 (Appendix D), Theorem 5 (Section 4.1), and
 Lemma 1 (as a tool).
 
-## Statement-level issues (verdict-relevant)
+## Statement-level issues
 
 1. **Lemma 1 (LLL), condition `e·p·d ≤ 1`.** This is false for `d = 0`: take one event of
-   probability 1 (`lemma_1_as_stated_false`). Rule R2 (degenerate corner, never used) → ⚠️.
+   probability 1 (`lemma_1_as_stated_false`). A degenerate corner, never used (✏️).
    We prove and use the standard symmetric form `e·p·(d+1) ≤ 1`
    (`Cslib.Probability.exists_forall_not_of_symmetric`) and an asymmetric form. The paper's
-   application satisfies both. Borderline: Lemma 1 is a cited textbook lemma, but it is a numbered
-   statement of the paper, so it counts.
+   application satisfies both. Lemma 1 is a cited textbook lemma, but it is a numbered
+   statement of the paper.
 2. **Algorithm `A` (page 42), "smallest ID … that receive color 1".** Nodes of `C(u)` never have
    colour 1, so the description must read "bit 1". The overview ("the smallest-ID node in the
-   component") and the proof of Theorem 34 recover this. Rule R3 (typo, evident intent, local fix)
-   → ⚠️. We implement "bit 1" (`outW`, `zone`).
+   component") and the proof of Theorem 34 recover this. A typo with evident intent (✏️). We implement "bit 1" (`outW`, `zone`).
 3. **Theorem 5, proof.** The LOCAL model of Section 3.1 gives `n` to the nodes, but the proof treats
    `A` as `n`-independent. Running `A` on the padded graph `H` (with `N ≠ n` nodes, `N` chosen after
-   the Ramsey set) is then not covered. The statement is true (`theorem_5`), so this is a proof
-   repair (🛠️), not a statement issue. Repair: finite Ramsey for every size `M` on `{1,…,(R(M)+M)!}`
+   the Ramsey set) is then not covered. The statement is true (`theorem_5`), so this is a gap in the
+   proof (🛠️), not a statement issue. Repair: finite Ramsey for every size `M` on `{1,…,(R(M)+M)!}`
    against `A_{(R(M)+M)!}`, then pigeonhole over the finitely many behaviour types. Choosing
    `M ≥ n + s` gives `n | N` and room to pad balls.
-
-Final label: ⚠️ (worst of ⚠️ (items 1, 2) and 🛠️ (item 3); no false non-degenerate statement).
 
 ## Modelling choices (3-colouring part)
 

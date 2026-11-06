@@ -3,9 +3,9 @@
 Paper: Jayanti, Jayanti, Joshi, *A Recoverable Mutex Algorithm with Sub-logarithmic RMR on Both CC
 and DSM*, PODC 2019, arXiv 1904.02124v2.
 
-## Statement-level issues (verdict rules from `verdicts.md`)
+## Statement-level issues
 
-1. **Lemma 9 is false as stated (❌, rule R1).** It is a numbered lemma, and three conditions of
+1. **Lemma 9 is false as stated (🛠️).** Three conditions of
    its invariant fail in reachable configurations of crash-free runs with `k = 2`:
    - Condition 5, `qnode.CS_Signal = 0 ⇒ qnode.Pred ∈ {NIL, &Crash, &InCS}`: false after line 14
      (`PaperInv.cond5_csSignal_false`); also false at line 28 (`Pred = &Exit`, signal 0).
@@ -14,14 +14,13 @@ and DSM*, PODC 2019, arXiv 1904.02124v2.
    - Condition 4, third conjunct (`Pred` iterated at most `k` times reaches a distinguished value):
      false with two queued processes (`PaperInv.cond4_false`); `k + 1` would be needed.
    - Condition 18 uses `PC_π'` instead of `\hat{PC}_π'` (fails in the initial configuration);
-     this one alone would be a typo with evident intent (Condition 19(g) has the hat).
+     this one is a typo with evident intent (✏️; Condition 19(g) has the hat).
 
-   *Borderline call (R3).* The Condition 4 off-by-one and Condition 18 typo would be excusable,
+   The Condition 4 off-by-one and the Condition 18 typo look like local matters,
    but the two Condition 5 conjuncts have no evident local fix in the paper (adding all node values
    and `&Exit` to the right-hand side would make them nearly vacuous). The proof in Appendix E
-   claims the whole conjunction is inductive. We therefore classify Lemma 9 as ❌. It is not a
-   headline (R5): the headline correctness claims (Theorem 2's RME properties) are true and proved
-   here.
+   claims the whole conjunction is inductive. The correctness claims (Theorem 2's RME properties) are
+   true and proved here.
 
    *Reviewer check (rendered Figures 8–9).* Condition 5 is quantified over all `qnode ∈ 𝒩` with no
    PC guard and no restriction to a role; `𝒩` contains every node created at line 11, and
@@ -35,14 +34,14 @@ and DSM*, PODC 2019, arXiv 1904.02124v2.
    re-check Condition 5. For Condition 4 the proof does reason with the wrong bound (step of line 14:
    "`b1 + b2 ≤ k`", which forgets that a fragment's head may be `SpecialNode` or an exited node that
    is nobody's `node_π`); it is only used for acyclicity (Condition 23's proof), where any finite
-   bound suffices. So R3 does not excuse Condition 5, and R1 makes the false numbered Lemma 9 ❌
-   even though Lemmas 4–8 are true (same treatment as Lemma 2(c) of ConstantBarriersMutex, PODC 2013).
+   bound suffices. So Condition 5 is not a typo with evident intent, and Lemma 9 is false even though
+   Lemmas 4–8 are true.
    The paper's corrected invariant (Conditions 4, 5, 18 patched, all others as printed) was not
    checked; we prove our own invariant instead.
 2. **Lemmas 4 and 5: proofs not established (🛠️).** Both proofs cite conditions of the false
    invariant (Conditions 15, 19), and Lemma 5's case "the queue is broken" is an informal induction
    over fragments. Statements proved with a new invariant and liveness argument.
-3. **Theorem 2, RMR part (not formalized, not counted).** "O(1) for a process that does not crash
+3. **Theorem 2, RMR part (✏️, not formalized).** "O(1) for a process that does not crash
    during its passage" is literally false for a passage that starts with recovery (it runs `RLock`
    and scans all of `Node[]`); the intent is crash-free super-passages. "O(fk)" should be
    "O(1 + fk)".

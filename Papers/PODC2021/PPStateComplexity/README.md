@@ -7,23 +7,21 @@ it. v3 has the double-exponential bound for leaderless protocols (Ω(log log η)
 claims only a triple-exponential bound and proves it differently (rejection certificates). That proof is not
 formalized.
 
-**Verdict: ⚠️ Minor statement issues.** The leaderless main result holds: Theorem 5.9 is proved, so
-`η ≤ 2^((2n+2)!)` and `BB(n) ≤ 2^((2n+2)!)`. Theorem 4.5 (protocols with `ℓ` leaders, `η < F_{ℓ,ϑ}(n)`) is
-also proved, after repairing a gap in its proof. Definition 1 of `BB_L` forgets to bound the number of leaders:
-read literally, `BB_L(4)` does not exist, since 4 states and `η` leaders decide `x ≥ η` for **every** `η`. The
-intended reading — a fixed number `ℓ` of leaders, as in Theorem 4.5, in the cited O(log log η) construction of
-Blondin et al., and in the follow-up by Leroux (PODC 2022, "with a fixed number of leaders") — makes the
-abstract's claim about protocols with leaders true, and that is what Theorem 4.5 proves. Further gaps
-(Lemma 5.8, Corollary 5.7) are repaired without changing the final bounds.
+**Verdict: 🔧 Easy fix.** Both lower bounds stand: Theorem 5.9 gives `η ≤ 2^((2n+2)!)` and `BB(n) ≤ 2^((2n+2)!)` for
+leaderless protocols, and Theorem 4.5 gives `η < F_{ℓ,ϑ}(n)` for protocols with `ℓ` leaders. Local changes save them:
+`BB_L` must fix the number of leaders, Lemma 5.8's hypothesis must be strict, and the proofs of Theorem 4.5, §5.3 and
+Corollary 5.7 need repairs that leave the final bounds unchanged. That the bound with leaders is non-elementary was
+not checked: it rests on the cited Lemma 4.4 at level `F_ω`, and we prove only that some admissible `F` exists.
 
 ## Mistakes in the paper
 
-### ⚠️ Definition 1 (`BB_L` does not fix the number of leaders)
+### 🔧 Definition 1 (`BB_L` does not fix the number of leaders)
 Read literally, `BB_L(4)` does not exist: a 4-state protocol with `η` leaders decides `x ≥ η` for every `η`
 (`not_bddAbove_BBLSet`, `majority4_computesGe`).
 
 **Impact.** Evident intent: a fixed number `ℓ` of leaders, as in Theorem 4.5, whose bound `F_{ℓ,ϑ}(n)`
-depends on `ℓ`. With that reading the claims about protocols with leaders hold and follow from Theorem 4.5.
+depends on `ℓ`. With that reading the claims about protocols with leaders hold and follow from Theorem 4.5
+(`theorem_4_5_ctrlChainBound`).
 
 **Details.** Definition 1 defines `BB_L(n)` as the largest `η` such that some protocol with at most `n`
 states and *any* leader multiset computes `x ≥ η`. Take states `A, B, a, b` with `L = η·A` and input
@@ -35,28 +33,31 @@ intended reading (a fixed number of leaders, or leaders counted in the size) is 
 O(log log η) construction of Blondin et al. and of the follow-up by Leroux (PODC 2022, "with a fixed
 number of leaders").
 
-### ⚠️ Lemma 5.8 (concentration hypothesis must be strict)
+### 🔧 Lemma 5.8 (concentration hypothesis must be strict)
 Lemma 5.8's proof needs `ξ·C(Q\S) < i`, but its hypothesis "`C` is `1/ξ`-concentrated in `S`" only gives
-`ξ·C(Q\S) ≤ i`, so the lemma as stated is unestablished (`lemma_5_8` proves the strict version).
+`ξ·C(Q\S) ≤ i`, so the lemma as stated is unestablished, though not refuted (`lemma_5_8` proves the strict version).
 
 **Impact.** Theorem 5.9 is unaffected: there the configuration is in fact `1/(ξ3^n)`-concentrated, which
 gives the strict inequality.
 
-**Details.** With equality, the pigeonhole step "`|J| > C(S)`" fails. The proof also swaps `S` and `Q \ S`:
-it writes `C(S)` where it means `C(Q\S)`. The case "if `x ∉ S` take θ empty" should read "if `x ∈ S`, take `j = 1`, `θ = 0`,
-`C' = x`": an empty `θ` gives `j = 0`, which is useless for Lemma 5.2.
+**Details.** With equality, the pigeonhole step "`|J| > C(S)`" fails.
 
-### Typos and slips
+### ✏️ Slips
+- The proof of Lemma 5.8 swaps `S` and `Q \ S`: it writes `C(S)` where it means `C(Q\S)`. The case "if `x ∉ S` take θ
+  empty" should read "if `x ∈ S`, take `j = 1`, `θ = 0`, `C' = x`": an empty `θ` gives `j = 0`, which is useless for
+  Lemma 5.2.
 - `P'_k` in Example 2.1 has `k+2` states, not `k+1`.
 - Lemma 4.4 writes `v_{g(n)}` for `v_{i_{g(n)}}`.
+
+### Typos
 - Lemma 4.2's proof says "for every `2 ≤ i ≤ k`".
-- Theorem 4.5 states `η < F` but its proof ends with `η ≤ i_k ≤ F`.
-- In Theorem 4.5 the sequence starts at `C_2`, so Lemma 4.4 must be applied with either `δ = ℓ + 2` or a
-  chain two elements longer; we use `g = ϑ + 2`.
+- Theorem 4.5 states `η < F` but its proof ends with `η ≤ i_k ≤ F`; strictness is immediate from `k < ℓ`.
+- The outline in §1 still says that Section 5 gives a triple exponential upper bound, a leftover of the PODC version;
+  v3 proves a double exponential one.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 4.5 (condition 2 of Lemma 4.1 never established)
+### 🔧 Theorem 4.5 (condition 2 of Lemma 4.1 never established)
 The proof applies Lemma 4.1 with `D_b := C_ℓ − C_k`, but never shows its condition 2, `b·x →* D_b`.
 
 **Impact.** Statement true; repaired with a variant of Lemma 4.1 (`lemma_4_1'`, `theorem_4_5`).
@@ -68,7 +69,15 @@ reach `D_b`.
 **Repair.** A variant of Lemma 4.1 with condition 2 replaced by `B + D_a + b·x →* B + D_a + D_b`. Pumping
 still works, because `C_k + λ b·x →* C_k + λ D_b` by induction. (`lemma_4_1'`, `theorem_4_5`)
 
-### 🛠️ §5.3 (unstated assumption that every state is coverable)
+### 🔧 Theorem 4.5 (indices when applying Lemma 4.4)
+The sequence of Lemma 4.2 starts at `C_2` while Lemma 4.4 starts at `v_0`, so Lemma 4.4 cannot be applied with
+`(ℓ, ϑ)` as printed.
+
+**Impact.** One constant changes and the shape of the bound is untouched (`theorem_4_5`).
+
+**Repair.** Apply Lemma 4.4 with either `δ = ℓ + 2` or a chain two elements longer; we use `g = ϑ + 2`.
+
+### 🔧 §5.3 (unstated assumption that every state is coverable)
 The text says "Recall our assumption that for every state `q` there is an input `i_q` with
 `IC(i_q) →* C_q ∋ q`", but this assumption is never stated, and it is not WLOG for Lemma 5.1(ii) as used.
 
@@ -81,7 +90,7 @@ require saturation only on the pre-states of transitions in the support of `π`.
 pre-states are coverable, because `π` is the Parikh vector of a real execution. (`lemma_5_1_ii`,
 `lemma_5_3`, `lemma_5_4`)
 
-### 🛠️ Corollary 5.7 (the wrong linear system for Lemma 5.8)
+### 🔧 Corollary 5.7 (the wrong linear system for Lemma 5.8)
 Corollary 5.7 sets up "`|Q|−1` equations on `|T|` variables", but Lemma 5.8 needs to decompose `i` and `C`
 together with `π`.
 
@@ -149,7 +158,9 @@ Monotonicity of reachability (`MReach.add_right`, `MReach.add`, `MReach.nsmul`) 
 `Model.lean` are further CSLib candidates.
 
 **Not formalized.** The two remaining cited results are not formalized: the fast-growing-hierarchy part of
-Lemma 4.4 and Pottier's sharper constant. Also not formalized: the length bound `|σ| ≤ 3^n` in Lemma 5.4
+Lemma 4.4, on which the "non-elementary" shape of the bound rests, and Pottier's sharper constant. So Corollary 5.7
+with the paper's exact `ξ`, and the middle inequality `η ≤ ξnβ3^n` of Theorem 5.9 with it, are proved only with our
+larger `ξ`. Also not formalized: the length bound `|σ| ≤ 3^n` in Lemma 5.4
 (unused), Section 4.1 (discussion), Theorem 2.2 (cited lower bounds; we only derive `2^k ≤ BB(k+2)`), and the
 triple-exponential proof of the PODC version.
 

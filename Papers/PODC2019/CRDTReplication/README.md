@@ -5,23 +5,24 @@ without Logs.* PODC 2019 (brief announcement). DOI [10.1145/3293611.3331568](htt
 Formalized version: the full version, arXiv [1905.08733](https://arxiv.org/abs/1905.08733) v2; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** Algorithm 2 is **not linearizable**. Theorem 3 (Consistency), Lemma 3 and Theorem 4
-(Update Stability) are false: a five-process execution with majority quorums lets two queries learn the
-incomparable states `{u₁}` and `{u₂}`, although `u₁` completed before `u₂` was invoked. Lemmas 1, 2, 4,
-Corollary 1 and Theorems 1, 2, 5 hold, and so does the Section III-E reduction (Theorems 1–5 ⇒ linearizability).
-A one-line repair of the `VOTE` handler restores Theorems 1–5 and linearizability, which we prove.
+**Verdict: 🔧 Easy fix.** Algorithm 2 is **not linearizable** as printed, and Theorem 3 (Consistency), Lemma 3 and
+Theorem 4 (Update Stability) are false: a five-process execution with majority quorums lets two queries learn the
+incomparable states `{u₁}` and `{u₂}`, although `u₁` completed before `u₂` was invoked. A one-line repair of the
+`VOTE` handler restores Theorems 1–5 and linearizability at no cost to updates or message size, which we prove for
+CRDTs with the causal history the paper assumes. Lemmas 1, 2, 4, Corollary 1 and Theorems 1, 2, 5 hold, and so does
+the Section III-E reduction (Theorems 1–5 ⇒ linearizability); finite-writes termination was not checked.
 
 ## Mistakes in the paper
 
-### 🚨 Algorithm 2 (linearizability), Theorem 3, Theorem 4 and Lemma 3
+### 🔧 Algorithm 2 (linearizability), Theorem 3, Theorem 4 and Lemma 3
 Algorithm 2 is not linearizable, and Lemma 3, Theorem 3 (Consistency) and Theorem 4 (Update Stability)
 are false: with five processes and majority quorums, one query learns `{u₂}` by vote while another
 learns `{u₁}` by consistent quorum, although `u₁` completed before `u₂` was invoked
 (`Cex.not_linearizable`, `paper_false`).
 
-**Impact.** The headline claim fails, and the flaw is in the protocol (the `VOTE` handler), not only in
-the proofs. Lemmas 1, 2, 4, Corollary 1, Theorems 1, 2, 5 and the Section III-E reduction hold, and a
-one-line repair of the `VOTE` handler restores Theorems 1–5 and linearizability.
+**Impact.** The paper's main claim fails for the protocol as printed, and the flaw is in the protocol (the `VOTE`
+handler), not only in the proofs. Lemmas 1, 2, 4, Corollary 1, Theorems 1, 2, 5 and the Section III-E reduction hold,
+and a one-line repair of the `VOTE` handler restores Theorems 1–5 and linearizability.
 
 **Details.** Take five processes `p₀…p₄`, majority quorums, a G-set, and only incremental prepares; no
 message is lost, some are only late.
@@ -64,22 +65,13 @@ argument is no longer needed. Update stability follows because a quorum acquired
 existed. We prove Theorems 1–5 and linearizability for the repaired protocol. (`fixed_theorem3`,
 `fixed_theorem4`, `fixed_linearizable`)
 
-### Typos and slips
+### ✏️ Slips
 - Line 13 tests `sᵢ ≡ s'`, and the paper defines `≡` as query equivalence. The proof of Lemma 2(i) needs
   `s' ⊑ a.s`, i.e. equality, so we use equality.
 - The causal history `C(s)` is treated as a function of the state, which is not well defined for every
   CRDT. Also `u ∈ C(u(s))` is too weak for Theorem 1. We assume a causal-history map with `C(s₀) = ∅`,
   `C(u(s)) = C(s) ∪ {u}`, `C(s ⊔ t) = C(s) ∪ C(t)` and Shapiro et al.'s `C(s) = C(t) ⇒ s ≡ t`. The G-set
   has one.
-
-## Proof gaps (statements true)
-
-### 🛠️ Lemma 4
-The proof does not handle two attempts with the same round number, and it uses without proof that round
-numbers of accepted prepares strictly increase at each acceptor.
-
-**Impact.** Statement true; proved with the Paxos-style invariant "every `ACK` with a larger round number
-carries a state above an earlier `VOTED`" (`paper_lemma4`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -121,8 +113,15 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | Lemmas 6–8 (Theorems 1–5 ⇒ linearizable) | `linearizable_of_learnedHistory` | `Linearizability.lean` |
 | Main claim (linearizable SMR): **false**; true after repair | `Cex.not_linearizable`, `paper_false`; `fixed_linearizable` | `Counterexample.lean`, `Main.lean` |
 
-**Not formalized.** Liveness (Section III-F, finite-writes termination), the optimizations (Section III-G) and the
-experiments.
+**Not formalized.** Liveness (Section III-F, finite-writes termination), including whether the repaired `VOTE`
+handler preserves it, the optimizations (Section III-G) and the experiments. Line 13 with `≡` read as query equivalence
+(only equality is formalized). The repaired protocol on CRDTs that have no causal-history map on states, such as a
+G-counter whose state forgets update identities: `fixed_linearizable` takes `H : D.CausalHistory` as a hypothesis.
+
+**Notes on the proofs.** The paper's proof of Lemma 4 does not spell out two attempts with the same round number, or
+that round numbers of accepted prepares strictly increase at each acceptor; both follow from the code (lines 41–43).
+We prove the lemma with the Paxos-style invariant "every `ACK` with a larger round number carries a state above an
+earlier `VOTED`" (`paper_lemma4`).
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and `Quot.sound`.
 The counterexample execution is checked by evaluation (`rfl`), with no `native_decide`.

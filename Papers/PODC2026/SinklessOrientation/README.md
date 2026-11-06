@@ -5,27 +5,23 @@ Alexandre Nolin. *Brief Announcement: Sinkless Orientation Made Trivial.* PODC 2
 announcement (HAL `hal-05678283`); no full version was found.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues (deterministic part).** The paper's proofs are sketches; filled in, they hold. This covers
-the min-ID orientation (Theorem 2.1), the ball-growth Lemma 2.2, the repair procedure (Lemma 2.3) and the
-deterministic `O(log_δ n)` sinkless orientation of Theorem 1.1. We also prove the "obvious" tightness remark
-after Theorem 2.1. We found only typos and imprecisions; one is in a statement (the "in particular" clause of Lemma 2.2
-says "degree `δ`" for "degree `< δ`"). The randomized part relies on external reductions and is
-not formalized.
+**Verdict: ✏️ Slip.** Only slips were found: filled in, the paper's proof sketches hold, covering the min-ID orientation
+(Theorem 2.1), Lemmas 2.2 and 2.3, and the deterministic `O(log_δ n)` sinkless orientation of Theorem 1.1, counted in
+LOCAL rounds. The CONGEST implementation, the paper's main point, was checked only for Theorem 2.1, so the CONGEST bound
+of Theorem 1.1 is not verified. The randomized part relies on external reductions and was not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 2.2, "in particular" clause (degree `δ` for degree `< δ`)
-The clause says the ball of radius `⌈log_{δ−1} n⌉` contains "a node of degree `δ` or a cycle", but it should read
-"degree `< δ`" (`lemma_2_2_clog`).
-
-**Impact.** A typo with evident intent: "degree `< δ`" is what the main statement (item (i)) gives and what
-Algorithm 2 uses. No result is affected.
-
-**Details.** The paper gives no proof of Lemma 2.2 ("the argument is standard").
-
-### Typos and slips
-- The definition of `k`-sinksparse asks for sinks at distance `≥ k`, but the proof of Theorem 2.1 gives `> k`; we
-  use the stronger `> k`.
+### ✏️ Slips
+- Lemma 2.2, "in particular" clause: the ball of radius `⌈log_{δ−1} n⌉` is said to contain "a node of degree `δ` or a
+  cycle", but it should read "degree `< δ`" (`lemma_2_2_clog`). As printed it is false, e.g. on a path with `δ = 3`.
+  "Degree `< δ`" is what the main statement (item (i)) gives and what Algorithm 2 uses.
+- The definition of `k`-sinksparse asks for sinks at distance `≥ k`, but the proof of Theorem 2.1 gives `> k`, and only
+  that makes "the BFS trees of different nodes do not overlap" true: two sinks at distance exactly `k` (`k` even) share a
+  midpoint. We use the stronger `> k` (`lemma_2_3`).
+- Section 3: "every node `v`" with at least `max(ε deg(v), 1)` outgoing and incoming edges is meant for minimum degree
+  `δ ≥ 3`. Read literally for arbitrary graphs, it is impossible at degree-1 nodes: a single edge has no such orientation
+  (`no_orientation_in_and_out_single_edge`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -64,14 +60,13 @@ The tightness proof is the classical reflection argument. A `T`-local algorithm 
 
 **Remarks.**
 - The hypothesis `r ≥ 1` of Lemma 2.2 is redundant: for `r = 0` the bound is 1.
-- Section 3 phrasing (not an error): "at least `max(ε deg(v), 1)` outgoing and incoming edges" is meant for minimum
-  degree `δ ≥ 3`. Read literally for arbitrary graphs, it is impossible at degree-1 nodes: a single edge has no such
-  orientation (`no_orientation_in_and_out_single_edge`).
+- The paper's proofs are sketches. It gives no proof of Lemma 2.2 ("the argument is standard").
 - Constants: Algorithm 1's `k = 4⌈log_{δ−1} n⌉` is twice what is needed; we keep the paper's value. The tightness
   of Theorem 2.1 is only asserted ("obviously tight, even in LOCAL").
 
 **Not formalized.** The randomized part of Theorem 1.1 and Corollary 1.2 (they rely on the shattering and
-reduction results of Ghaffari–Su and Ghaffari et al.), the CONGEST implementation of Algorithm 2, and the cited
+reduction results of Ghaffari–Su and Ghaffari et al.), the CONGEST implementation of Algorithm 2 and Lemma 2.3 (only
+the LOCAL round complexity is formalized, so the CONGEST bound of Theorem 1.1 is not checked), and the cited
 `Ω(log_δ n)` / `Ω(log_δ log n)` lower bounds.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`. The

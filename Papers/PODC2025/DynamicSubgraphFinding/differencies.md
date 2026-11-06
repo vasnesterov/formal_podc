@@ -8,7 +8,7 @@ formalized.
 
 ## Errors in the paper
 
-1. **The algorithm of Theorem 1.7 is unsound (false claim, ❌).** In the case
+1. **The algorithm of Theorem 1.7 is unsound (❌).** In the case
    `t_uv − t_uw ≤ d` of the correctness proof (Section 5.3), node `v` lists `{u, v, w}` "by the same
    argument as for node `v` in the proof of Theorem 1.4": it gets `R_edge(u) ∋ j` from its new
    neighbour `u` and had received `(Signal)` from `w` `j` rounds earlier, and concludes that the
@@ -44,19 +44,18 @@ formalized.
    `(Signal)`, and let `u` report its own insertion age in `R_edge`), but we have not formalized it.
    Corollary 1.8 (`Θ(log log log n)` for `Detect(K₃)` under node and edge insertions) loses its upper
    half accordingly; its lower half is Theorem 1.6.
-   Rule R5/R1: the correctness claim of the paper's algorithm is a statement and it is false; the
-   theorem is existential and only unestablished, hence ❌ rather than 🚨. Borderline call: the
-   abstract presents the upper bounds as a main contribution ("we demonstrate new algorithms to show
-   that our lower bounds are tight"). This is a tightness claim, i.e. existential; it does not name
-   the specific algorithm. So R5 gives ❌.
+   The correctness claim of the paper's algorithm is false; the theorem is existential and only
+   unestablished. The abstract presents the upper bounds as a main contribution ("we demonstrate new
+   algorithms to show that our lower bounds are tight"). This is a tightness claim, i.e. existential;
+   it does not name the specific algorithm.
 
-2. **Proof of Theorem 1.3, Lemma 4.2: wrong count (proof repaired).** The classes are vectors over all
+2. **Proof of Theorem 1.3, Lemma 4.2: wrong count (🔧).** The classes are vectors over all
    `j ∈ [t]` of message patterns, so there are `(2^{O(Bt)})^t = 2^{O(Bt²)}` of them, not
    `t · 2^{O(Bt)}`. The conclusion survives (`2^{O(Bt²)} = n^{o(1)}` for `t = log^{0.1} n`,
    `B = o(log log n)`); Lean: the hypothesis `h2` of `Hard.not_solves_13` is the correct count.
 
 3. **Proof of Theorem 1.3: the friend `c` may coincide with `d`, and `b` may lie in `I*`
-   (proof repaired).** Lemma 4.1 only guarantees that `b` has *some* friend w.r.t. `(a, i)`; if `d` is
+   (🔧).** Lemma 4.1 only guarantees that `b` has *some* friend w.r.t. `(a, i)`; if `d` is
    its only friend, then `c = d` and (S2) degenerates (`d` is attached to both `K^i` and `K^{i*}`, and
    `a` may learn about `K^{i*}` through `d`). Also `I*` is chosen before `b` and may contain `b`, in
    which case `a` or `d` may equal `b`. Repair: choose `b ∉ I*` and require `b`'s class to have at
@@ -69,8 +68,6 @@ formalized.
    `c`, which is what we prove: `c = 1/8` for Theorem 1.3, `c = 1/16` for Theorem 1.6, for all `n ≥ N(s)`.
 
 5. Typos / small slips.
-   * Section 4.1, "Hard instances": for Theorem 1.6 "`A` is an `o(log log n)`-bandwidth ... algorithm"
-     should be `o(log log log n)`.
    * Proof of Theorem 1.6, last paragraph: "if node `b` is responsible ..., as node `a` cannot
      distinguish between (S1) and (S3)" — should be node `b`.
    * Proof of Theorem 1.6: only nodes of `K^i ∪ {a, b}` are considered as possible reporters in (S1);

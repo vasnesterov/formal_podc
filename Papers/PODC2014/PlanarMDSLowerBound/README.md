@@ -5,21 +5,23 @@ Set on Planar Graphs.* PODC 2014. DOI [10.1145/2611462.2611504](https://doi.org/
 Formalized version: arXiv [1402.2549](https://arxiv.org/abs/1402.2549) v1 (3 pages, complete proof); numbering
 follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ✅ Correct.** The main theorem holds as stated: no deterministic `T`-round LOCAL algorithm finds a
-`(7 − ε)`-approximation of a minimum dominating set on planar graphs. The Ramsey argument of Lemma 1 and the
-construction of Figure 1 work as described. The only imprecision is that the last step of the proof of Lemma 1
-needs internal areas of at least `3 × 3`, while the lemma says "for any `m`". The paper fixes `m ≫ T` just before,
-and the theorem takes `m` large anyway.
+**Verdict: ✏️ Slip.** The main theorem holds as stated: no deterministic `T`-round LOCAL algorithm finds a
+`(7 − ε)`-approximation of a minimum dominating set on planar graphs, and the Ramsey argument of Lemma 1 and the
+construction of Figure 1 work as described. The only flaw is that the last step of the proof of Lemma 1 needs internal
+areas of at least `3 × 3`, while the lemma says "for any `m`". The paper fixes `m ≫ T` just before, and the theorem
+takes `m` large anyway.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
+### ✏️ Slips
+- Lemma 1, last step: "the common output cannot be 0" needs an internal node whose whole closed neighbourhood is
+  internal, i.e. `m − 2T ≥ 3`, while the lemma says "for any `m`". The paper has already fixed `m ≫ T`, and we prove
+  Lemma 1 under `2T + 3 ≤ m` (`lemma_1`); see **Proof remarks**.
 
-### Typos and slips
+### Typos
 - The graph `G` and the set `D*` are given only by Figure 1. The paper says `D*` contains 1/7 of the
   *internal* nodes, but it must also dominate the border of the whole grid; the bound
   `|D*| ≤ (1/7 + ε′)n` is right once these `O(rm)` extra nodes are added.
-- `ℓ = o(r)` can be taken as a constant `N(K, m²)` that does not depend on `r`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -65,7 +67,9 @@ Full list of differences (including modelling choices and minor imprecisions): [
 In the explicit form we take `m = ⌈7(4T + 72)/ε⌉ + 2T + 3`, `ℓ = N((2T+1)², m²) + 1` and `r = (m + 1)ℓ`. Then
 `|A(G)| ≥ ℓm(m − 2T)²` and `7|D*| ≤ rm² + 35rm`, which gives `(7 − ε)|D*| < |A(G)|`.
 
-**Proof remarks.** *Lemma 1, last step, degenerate case.* "The common output cannot be 0; otherwise there
+**Proof remarks.** *`ℓ`.* `ℓ = o(r)` can be taken as a constant `N(K, m²)` that does not depend on `r`.
+
+*Lemma 1, last step.* "The common output cannot be 0; otherwise there
 would be nodes that are not dominated" needs an internal node whose whole closed neighbourhood is internal,
 i.e. `m' = m − 2T ≥ 3`. For `m' ∈ {1, 2}` (and `T ≥ 1`) this inference fails *in `G` alone*: the boundary
 rows can dominate the internal nodes. Whether Lemma 1 itself still holds there depends on the reading of
@@ -79,8 +83,8 @@ rows can dominate the internal nodes. Whether Lemma 1 itself still holds there d
   iff your view is exactly that of the middle node of a `(2T+1)`-high strip" dominates every planar graph,
   and it puts no internal node of `G` into the output.
 
-In either case the paper has already fixed `m ≫ T` ("Pick sufficiently large `m ≫ T`"), so this is a minor
-gap in a degenerate case. The theorem is unaffected. We prove Lemma 1 under `2T + 3 ≤ m` (`lemma_1`). Our
+In either case the paper has already fixed `m ≫ T` ("Pick sufficiently large `m ≫ T`"), so the assumption is
+implied. The theorem is unaffected. We prove Lemma 1 under `2T + 3 ≤ m` (`lemma_1`). Our
 `lemma_1` assumes correctness only on relabellings of `G`. Under that weaker hypothesis Lemma 1 fails for
 `m' ∈ {1, 2}` already in model (a), via "join iff a horizontal border is visible at distance `< T`".
 Neither argument is formalized.

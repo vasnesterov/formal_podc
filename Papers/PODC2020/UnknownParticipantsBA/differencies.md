@@ -108,9 +108,9 @@ full-version Section VII (Algorithm 3, Lemmas 8–11, Theorem 3).
    `O(f)`.
 
 5. **Minor.**
-   - *Typo-level slip.* The proof of BA Lemma 1 garbles the inequality chain ("`G > 2(f − f_v')/3`
-     or at least one"). What is needed is `n_v/3 − f_v'' ≥ (g − 2f_v')/3 > 0`, i.e. `g > 2f_v'`
-     (`lemma1_arith`).
+   - *Not an error.* The proof of BA Lemma 1 concludes "`G > 2(f − f_v')/3` or at least one". This
+     is correct: `(g − 2f_v')/3 > 2(f − f_v')/3 ≥ 0` from `g > 2f`. In Lean we use directly
+     `n_v/3 − f_v'' ≥ (g − 2f_v')/3 > 0`, i.e. `g > 2f_v'` (`lemma1_arith`).
    - *Under-specified; true while everyone runs.* BA Lemma 3 (relay) holds only while all correct
      nodes are still running. A terminated node no longer echoes. Our `relay` assumes all correct
      nodes are alive up to the later step.
