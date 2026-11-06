@@ -6,35 +6,33 @@ PODC 2017. DOI [10.1145/3087801.3087833](https://doi.org/10.1145/3087801.3087833
 version: arXiv [1702.05456](https://arxiv.org/abs/1702.05456) v2; numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The 3-colouring lower bound (Theorem 9) holds, with
-`n ≤ 8T + 8` for every odd `n`. So do its ingredients: Theorem 10 (`q`-sum coordination is
-global) and Lemmas 12–14 (the parity invariant `s`). Theorem 21 (no edge `2d`-colouring for odd
-`n`) and Lemma 24 (no `{1,3}`-orientation for odd `n`) hold too. One statement is wrong as
-written: the third case of Theorem 22 claims that "no solution exists for infinitely many `n`",
-but `{0,3,4}`-orientations exist for every `n ≥ 3`. The problem is still global (Theorem 25), so
-only the stated reason is wrong.
+**Verdict: ✏️ Slip.** In what we checked there are only slips: the 3-colouring lower bound (Theorem 9, with
+`n ≤ 8T + 8` for every odd `n`) holds, and so do its ingredients, Theorem 10 (`q`-sum coordination is global) and
+Lemmas 12–14 (the parity invariant `s`), as well as Theorem 21 (no edge `2d`-colouring for odd `n`) and Lemma 24 (no
+`{1,3}`-orientation for odd `n`). The third case of Theorem 22 gives the wrong reason for `{0,3,4}`-orientation, which
+stays global by the paper's unformalized Theorem 25. The paper's main results, the classification of complexities,
+undecidability and synthesis, were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorem 22, third case (`X`-orientations with no solution)
-The third case claims "no solution exists for infinitely many `n`", but `X = {0,3,4}` falls in it and every
-`n × n` torus with `n ≥ 3` has a `{0,3,4}`-orientation (`exists_orientation034`,
-`theorem22_third_bullet_false`).
+### ✏️ Slips
+- **Theorem 22, third case (`X`-orientations with no solution).** The third case claims "no solution exists for
+  infinitely many `n`", but `X = {0,3,4}` falls in it and every `n × n` torus with `n ≥ 3` has a `{0,3,4}`-orientation
+  (`exists_orientation034`, `theorem22_third_bullet_false`). Only the stated reason is wrong, not the complexity:
+  `{0,3,4}` is still global, as the paper proves separately (Theorem 25, via `q`-sum coordination), and the introduction
+  says "otherwise it is global". Theorem 22 classifies `X`-orientations: the third case is `2 ∉ X`, `{1,3,4} ⊄ X` and
+  `{0,1,3} ⊄ X`. The same counterexample works for `{0,1,4}`, by reversing all edges. The construction is invariant
+  under the diagonal shift `(x, y) ↦ (x+1, y+1)`. Diagonal `k` gets a value `t_k`: how many of the two edges between
+  diagonals `k` and `k+1` point to `k+1`. A node then has in-degree `2 − t_k + t_{k−1}`. The cyclic sequence
+  `t = 0,2,0,2,…,0,2` (even `n`) or `0,2,…,0,2,1` (odd `n`) only produces in-degrees 0, 3 and 4.
+- **Theorem 21, `n = 1`.** "Any `d`-dimensional grid `G_n` with `n` odd admits no edge `2d`-colouring" fails literally for
+  `n = 1`, where the grid has no edges. All odd `n ≥ 3` are proved (`not_edgeColouring_torus`).
 
-**Impact.** Only the stated reason is wrong, not the complexity: `{0,3,4}` is still global, as the paper proves
-separately (Theorem 25, via `q`-sum coordination), and the introduction says "otherwise it is global". An imprecise
-statement with evident intent.
-
-**Details.** Theorem 22 classifies `X`-orientations: the third case is `2 ∉ X`, `{1,3,4} ⊄ X` and `{0,1,3} ⊄ X`.
-The same counterexample works for `{0,1,4}`, by reversing all edges. The construction is invariant under the
-diagonal shift `(x, y) ↦ (x+1, y+1)`. Diagonal `k` gets a value `t_k`: how many of the two edges between diagonals
-`k` and `k+1` point to `k+1`. A node then has in-degree `2 − t_k + t_{k−1}`. The cyclic sequence
-`t = 0,2,0,2,…,0,2` (even `n`) or `0,2,…,0,2,1` (odd `n`) only produces in-degrees 0, 3 and 4.
-
-### Typos and slips
+### Typos
 - In the proof of Theorem 10, `d = A(F₁X₂F₂) − A(F₁X₂F₂)` should be `A(F₁X₂F₂) − A(F₁X₁F₂)`.
 - "The conditions in Section 10" means those of Theorem 10.
 - The proof of Lemma 14 swaps the coordinate names.
+- In the proof of Lemma 12, "southbound on `r` (`S_{r1}`)" means "on `r₁`".
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -55,9 +53,8 @@ Full list of differences (including modelling choices and minor imprecisions): [
   `8T < n`, any constant output sum `Q` on `n`-cycles must be a multiple of `n` (`sum_eq_mul`).
   Lemmas 12–14 are proved for every proper colouring by finite `3 × 3` block checks (`decide`) and
   flux counting, instead of a cycle decomposition of `H`.
-* **Remarks on the paper (not mistakes).** The greedy post-processing before the reduction is unnecessary, because
-  Lemmas 12–14 hold for every proper 3-colouring. Lemma 13's bound `T < n/4` ignores the `O(1)` extra radius
-  needed to read `ℓ`, as the paper's conventions allow; we prove it with `4(T+2) ≤ n`.
+* **Remark on the paper (not a mistake).** The greedy post-processing before the reduction is unnecessary, because
+  Lemmas 12–14 hold for every proper 3-colouring.
 
 **Main results in Lean.**
 
@@ -76,7 +73,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Not formalized.** The classification theorem and the speed-up to `O(log* n)` (Theorem 2), the
 undecidability result (Theorem 3), the normal form and synthesis, the upper bounds (Theorems 4
-and 15, Lemma 23), Theorem 25, and the `d`-dimensional 3-colouring lower bound.
+and 15, Lemma 23), Theorem 25, which carries the corrected third case of Theorem 22, and the `d`-dimensional 3-colouring
+lower bound. Lemma 13's literal bound `T < n/4`: it ignores the `O(1)` extra radius needed to read `ℓ`, as the paper's
+conventions allow; we prove the lemma with `4(T+2) ≤ n` and neither prove nor refute the literal bound. The identity
+between the paper's cycle-decomposition `s(G)` and the row sum of `ℓ`, which is routine.
 
 **Trust.** No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and
 `Quot.sound`. Non-vacuity checks:

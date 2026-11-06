@@ -36,7 +36,7 @@ Ludwig, Marcinkowski, Schmid. *Scheduling Loop-free Network Updates: It's Good t
   only moves nodes **from round 2** to round 1, which is correct; we prove this version for any schedule
   with ≥ 2 rounds (`lemma_1`) and the backward version (round 2 → round 3, `lemma_1_backward`). The FB part
   is true as stated (FB nodes are never in round 3, `solidFwd_of_mem_last`).
-  *Rule:* R3 (the intended version is the one the proof proves; local fix "updates in round 2") → ⚠️.
+  *Label:* ✏️ (the intended version is the one the proof proves; local fix "updates in round 2").
 * **Normal form** (§3.2.1, "the problem boils down to finding a distribution of the FF updates"): proved
   as `hasSLF_three_iff` (with our `ofType` sets).
 * **Theorem 2 is false** (`gadget_cycle`, `theorem_2_false`). We formalize the gadgets of §3.2.3 for one
@@ -56,7 +56,7 @@ Ludwig, Marcinkowski, Schmid. *Scheduling Loop-free Network Updates: It's Good t
   way back from there" overlooks that `x_l`'s dashed edge enters the exclusive gadget, whose `BB` edge
   `v₄ ⇢ x̄_l^H` leads to the false copy `x̄_l`, from which the implication `BB` edges lead backwards through
   all false copies.
-  *Rule:* numbered theorem, false without excuse (holds for every formula with at least one variable).
+  *Label:* ❌ (the failure holds for every formula with at least one variable).
 * **The reduction (end of §3.2.4) fails.** `not_hasSLF_three_of_realizes`: every instance containing these
   gadgets with the colours the paper requires (white = FF, black = BB, grey = B·) has no 3-round SLF
   schedule. The paper's instance for any satisfiable 3-CNF formula (e.g. `x ∨ y ∨ z`) contains them, by the
@@ -72,7 +72,7 @@ Ludwig, Marcinkowski, Schmid. *Scheduling Loop-free Network Updates: It's Good t
   back to the antecedent, so false copies are always traversable backwards); dropping the redundant
   assignment clauses does not help (for `(x̄ ∨ y) ∧ (ȳ ∨ x)` cross-variable rings appear for every
   satisfying assignment; checked by hand, not in Lean).
-  *Rule:* R5 — a headline result that is only unestablished → ❌.
+  *Label:* ❌ (NP-hardness is unestablished).
 * **Fig. 2 / §2.2 example** (`LowerBound.lean`): "a strong loop-free schedule needs to go through the backward
   edges one by one … `n − 1` rounds are required": proved exactly (`fig2_slf_lower`, `fig2_hasSLF`,
   `fig2_not_hasSLF`), with `n = |U| = l − 1`; the RLF 3-round schedule of §2.2 is `fig2_hasRLF`. "This is
@@ -92,8 +92,8 @@ Ludwig, Marcinkowski, Schmid. *Scheduling Loop-free Network Updates: It's Good t
   distance) is a merge sort, ties broken arbitrarily (`greedy`). Lemma 2 is proved for any selection with the
   greedy's properties (`GoodSelection`), so every tie-breaking is covered. Line 7 of Algorithm 1 iterates over
   all of `X`; it must range over the forward edges sorted in line 6 (a backward edge outside all chosen
-  intervals would otherwise be added and could create a loop). *Rule:* R3 (evident from line 6 and the
-  prose "updating a disjoint set of far-reaching forward edges") → ⚠️ at most; recorded as a slip.
+  intervals would otherwise be added and could create a loop). *Label:* ✏️ (evident from line 6 and the
+  prose "updating a disjoint set of far-reaching forward edges").
 * **Candidates include merged no-op nodes.** After merging, a node may have the same old and new successor in
   the merged line although it still has to be updated in the real network; it is a forward edge of distance
   1 and stays a candidate (the paper's `X = U ∖ U_{<t}` contains it too). Rounds cover all nodes but `d`
@@ -102,8 +102,8 @@ Ludwig, Marcinkowski, Schmid. *Scheduling Loop-free Network Updates: It's Good t
   `3 N′ + 1 ≤ 2 N` (`lemma2`, `reduce_length`), where `N′` counts the non-updated nodes on the s–d walk after
   the odd round, i.e. the path *after merging*. With the updated start nodes counted as path nodes the claim
   is false (old `0,1,2,3`, new `0,2,1,3`: the walk `0 → 2 → 3` keeps 3 of 4 nodes). The paper uses merging
-  throughout §4 and its Theorem 3 proof counts merged nodes, so we read Lemma 2 this way (R3/R4; no label
-  needed beyond ⚠️). The paper's covering argument ("loses at most twice the distance") is correct; it
+  throughout §4 and its Theorem 3 proof counts merged nodes, so we read Lemma 2 this way (✏️). The
+  paper's covering argument ("loses at most twice the distance") is correct; it
   even gives the slightly better `N − 1 ≤ Σ (3x_c − 2)`.
 * **Lemma 3** (`even_round`, `reduce`): as stated.
 * **Theorem 3** (`theorem3`): the explicit bound `#rounds ≤ 2 log_{3/2} n`, where `n` is the number of nodes

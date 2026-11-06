@@ -11,7 +11,7 @@ Paper: C. Lenzen, *Optimal Deterministic Routing and Sorting on the Congested Cl
    - (a) The claim "every message not inside `V₁` or `V₂` goes from `V₁∩V₃` to `V₂∩V₃` or vice
      versa" fails for `n = 3`: the message 2→2 is handled by nobody (`PaperGaps.coverClaim_false_three`).
      It fails only for `n = 3`: it holds whenever `2s² ≥ n`, i.e. for all `n ≠ 3`
-     (kernel-checked for `n ≤ 40` in `coverClaim_small`). *False only in a degenerate case.*
+     (kernel-checked for `n ≤ 40` in `coverClaim_small`). *Proof gap.*
    - (b) Corollary 3.4 needs `|W| ≤ √n`, but `|V₁∩V₃| = n − s²` can be up to `2s`; for `n = 8`,
      `|W| = 4 > √8` (`cor34_size_fails_eight` records only this arithmetic). *Proof gap*: the helper announcements need
      `|W|² ≤ 4n` slots, i.e. 4 numbers per message.
@@ -50,18 +50,20 @@ Paper: C. Lenzen, *Optimal Deterministic Routing and Sorting on the Congested Cl
    `4n`, `RoutingBox.lean`). Inside Algorithm 3 we use Corollary 3.3 with up to 6 keys per edge,
    since buckets have `< 6s²` keys for holdings `≤ 3s²`.
 5. **Theorem 4.5, non-square case**: only a sketch in the paper ("work with subsets of size
-   `⌊√n⌋`…"). We use the virtual-node simulation (`SortMain.theorem_4_5`, `out r = prim ⌊r/n⌋`).
-6. **Typos / slips.**
+   `⌊√n⌋`…"). We use the virtual-node simulation (`SortMain.theorem_4_5`, `out r = prim ⌊r/n⌋`). We did
+   not check whether the sketch itself works.
+6. **Lemma 3.6, Algorithm 2 Steps 2–3** (proof gap).
+   - Step 3 ("announce the number of messages they need to move to each set") must
+     announce the counts per destination group. Members cannot know their quota before knowing the
+     others' counts.
+   - The footnote's "deferred completion" of Step 2 is a transportation problem among group members
+     (`Matrix.exists_transport`, `Setup.q`).
+7. **Typos / slips.**
    - Problem 4.1: "indices `i(n−1)+1, …, in`" should be `(i−1)n+1, …, in`. We use 0-based ranks:
      node `v` gets the ranks in `[vn, (v+1)n)`.
    - Proof of Corollary 3.3: "node `i` receives exactly `f` messages … for node `j`" should be
      exactly one. Likewise "each node will receive exactly one message of each color in the first
      round": node `c` receives messages of colour `c` only. Cosmetic.
-   - Lemma 3.6, Step 3 ("announce the number of messages they need to move to each set") must
-     announce the counts per destination group. Members cannot know their quota before knowing the
-     others' counts.
-   - The footnote's "deferred completion" of Step 2 is a transportation problem among group members
-     (`Matrix.exists_transport`, `Setup.q`).
    - Corollaries 3.3/3.4 are stated for exactly `f|W|` messages but applied to fewer (e.g. the
      `|W|²` helper messages). We prove "at most" versions.
 

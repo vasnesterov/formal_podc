@@ -5,10 +5,10 @@ Paper: Camenisch, Drijvers, Hanke, Pignolet, Shoup, Williams. *Internet Computer
 lemmas of Section 4 but contains no proofs; those are in the full version (IACR ePrint 2021/632), which was not
 available to us. All proofs here were reconstructed from the protocol description.
 
-## Statement-level issues (decide the verdict)
+## Statement-level issues
 
 1. **Liveness lemma: "each honest party will have `Q`'s round-`k` block in its pool as a finalized block" is
-   false as written; the intended "committed" reading holds (R3, ⚠️; borderline with ✅).**
+   false as written; the intended "committed" reading holds (🔧).**
    "Finalized for `P`" is defined in Section 3.4 as "valid, and a finalization (combined `S_final` signature) is in
    `P`'s pool". Figure 2 only combines finalization shares of a round-`k` block when `k > kmax`. After the two
    synchronous instants of hypothesis (iv) the network is asynchronous, so the adversary may deliver the round-`k`
@@ -22,8 +22,8 @@ available to us. All proofs here were reconstructed from the protocol descriptio
    discussion after it ("each honest party will output this command in round `k`"). We prove the
    intended version (`liveness`): every honest party has `B_Q` valid with a full set of `n − t` finalization shares
    in its pool (so it can form the finalization), has `kmax ≥ k`, and has committed `B_Q` (the chain ending at
-   `B_Q` is a prefix of its output). Borderline: a reader who takes "finalized" loosely as "committed" would rate
-   the lemma ✅.
+   `B_Q` is a prefix of its output). A reader who takes "finalized" loosely as "committed" would see no error in
+   the lemma.
 
 No other statement problem was found. Lemma (Safety) and Lemma (Deadlock freeness) hold as stated, under the
 reading of "will have finished" described below. Their proofs are ours, since the paper gives none.

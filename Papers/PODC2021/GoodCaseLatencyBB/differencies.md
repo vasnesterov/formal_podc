@@ -3,16 +3,16 @@
 Paper: Abraham, Nayak, Ren, Xiang, *Good-case Latency of Byzantine Broadcast: a Complete Categorization*,
 PODC 2021 (arXiv:2102.07240v3; numbering follows it).
 
-Summary: every lower bound we formalized holds in its intended range. Several statements are false in degenerate
-cases (`n ≤ 3`), one proof (Theorem 19) gives more than it claims and does not cover `f = n − 1`, and the
+Summary: every lower bound we formalized holds in its intended range. Several statements are false for very small
+`n` (`n ≤ 3`), one proof (Theorem 19) gives more than it claims and does not cover `f = n − 1`, and the
 lower-bound executions need small changes to respect unforgeable signatures. The 2-round BRB protocol
 (Theorem 5) is verified. The other upper bounds (Figures 3, 5, 6, 9, 10) are not formalized, except the timing
 core of Lemma 1.
 
 ## 1. Errors and gaps in the paper
 
-1. **Theorem 10, read literally, is false for `n = 3`** (`f = 2, 3`). *(False only in a degenerate case,
-   outside the intended range.)* Table 1 and §5.4 use `n/3 < f < n/2`, which no integer `f` satisfies for
+1. **Theorem 10, read literally, is false for `n = 3`** (`f = 2, 3`). *(✏️ Outside the
+   intended range.)* Table 1 and §5.4 use `n/3 < f < n/2`, which no integer `f` satisfies for
    `n = 3`; the counterexample (`f ≥ n/2`) refutes only the literal hypothesis `f > n/3`. For three parties a
    simple protocol has good-case latency `Δ + δ < Δ + 1.5δ`, for every `f`. A non-broadcaster commits the
    proposal `Δ` after first learning it if it saw no conflicting proposal. A party that saw two proposals adopts
@@ -21,11 +21,11 @@ core of Lemma 1.
    (`three_latency_unsync`, any skew allowed by `UValid`). Lean: `ThreeParties.theorem_10_false_three`,
    `ThreeParties.theorem_10_n4_necessary`. The paper's proof needs five groups `g, h, A, B ∋ s, C` with `A ≠ ∅`,
    i.e. `n ≥ 4`; we prove Theorem 10 for `n ≥ 4` (`Thm10.theorem_10`).
-2. **Theorems 4, 8 and 9 are false for `n = 2`** (any `f ≥ 1`). *(False only in a degenerate case.)* With one
+2. **Theorems 4, 8 and 9 are false for `n = 2`** (any `f ≥ 1`). *(✏️ Outside the ranges of Table 1.)* With one
    non-broadcaster, "commit the first value received from the broadcaster" is BRB and commits after one message
    delay (one round, resp. `δ`). Lean: `theorem_4_false_two`, `theorem_8_false_two` (`SmallCases.lean`). The
    proofs need two non-empty groups besides the broadcaster; our theorems assume `n ≥ 3`.
-3. **Theorems 6 and 7 fail for `n = 1`** (latency 0). *(Out of range: `n = 1` forces `f ≥ n`, outside the
+3. **Theorems 6 and 7 fail for `n = 1`** (latency 0). *(✏️ Out of range: `n = 1` forces `f ≥ n`, outside the
    paper's implicit `f < n`.)* `theorem_7_false_one`. For `n = 2`
    and for `n = 3, f = 1` psync-BB is unsolvable, so Theorems 6 and 7 hold vacuously there (`PsyncSmall.lean`);
    the paper's own proof of Theorem 7 needs `f ≥ 2` and `n ≥ 3`.
@@ -33,8 +33,7 @@ core of Lemma 1.
    *(a) Not an error, the bound is just not what the proof gives.* The executions of the proof give
    `⌊n/(n−f)⌋·Δ`, one `Δ` more than the claimed `(⌊n/(n−f)⌋ − 1)Δ`, once the good-case proposal is delayed by
    `Δ` (allowed). For `f = n/2` the paper's bound `Δ` is weaker than Theorem 9 (`Δ + δ`); ours is `2Δ`. Lean:
-   `dishonestMajority_lower_bound`, and `theorem_19` for the paper's statement. *(b) Proof gap in a degenerate
-   case.* For `f = n − 1` the groups `G_i` with odd `i` have size `n − f − 1 = 0`. The executions then have a
+   `dishonestMajority_lower_bound`, and `theorem_19` for the paper's statement. *(b) ⚠️ Proof gap.* For `f = n − 1` the groups `G_i` with odd `i` have size `n − f − 1 = 0`. The executions then have a
    single honest party, and agreement gives nothing. The hypothesis `n − f ≥ 2` of our stronger bound is
    necessary. For `n = 3, f = 2`, the 3-party protocol of item 1 at `δ = Δ` commits by `2Δ < 3Δ`; this
    transfer to the synchronized-start `IsBRB` formulation is argued informally. The paper's `(n − 1)Δ` holds
@@ -42,7 +41,7 @@ core of Lemma 1.
    `⌊n/2⌋Δ` by monotonicity in `f` (`allButOne_lower_bound`), without showing it tight. *(c) Typo.* The broadcaster's split
    ("0 to `G_j` for `1 ≤ j ≤ (d+1)/2`, 1 to `G_j` for `(d+1)/2 ≤ j ≤ d+1`") gives both values to the middle
    group.
-5. **Unforgeability in the lower-bound executions.** *(Proof gaps, all fixable; the statements are unaffected.)*
+5. **Unforgeability in the lower-bound executions.** *(🔧 Proof gaps; the statements are unaffected.)*
    The paper assumes ideal signatures but never checks that Byzantine parties can send what the executions make
    them send.
    - **Theorem 10, Executions 2/3.** As written they are not valid executions. In Execution 1 the Byzantine `C`

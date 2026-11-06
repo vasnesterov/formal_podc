@@ -5,18 +5,21 @@ pp. 343–353. DOI [10.1145/3465084.3467924](https://doi.org/10.1145/3465084.346
 version arXiv:2102.12825v3 (numbering follows it).
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🛠️ Proof repaired.** The tight bound holds: for `1 ≤ t ≤ f`, an `f`-resilient `t`-two-step consensus protocol
+**Verdict: 🔧 Easy fix.** The tight bound holds: for `1 ≤ t ≤ f`, an `f`-resilient `t`-two-step consensus protocol
 exists iff `n ≥ 3f + 2t − 1` (`5f − 1` for `t = f`). We proved both directions in one formal model: the lower bound
 (Theorem 4.5), and the safety, liveness and two-step property of a concrete implementation of the protocol. The
 paper's safety proof has one gap, which we repaired with a harmless extra check.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
+### ✏️ Slips
+- Theorem 4.5 fails at `f = 1, t = 0`: then `3f + 2t − 2 = 1`, and with one process "decide your own input" is an
+  `f`-resilient `t`-two-step protocol (`theorem_4_5_fails_f1_t0`). §4.1 assumes `n ≥ 3f + 1`, and the lower bound
+  holds for every `2 ≤ n ≤ 3f + 2t − 2` (`no_fastConsensus_of_le`).
 
 ## Proof gaps (statements true)
 
-### 🛠️ Protocol safety (Sections 3.2–3.3, Appendix A: votes from "future" views)
+### 🔧 Protocol safety (Sections 3.2–3.3, Appendix A: votes from "future" views)
 The safety proof's induction on views breaks because nothing requires a valid vote sent to the leader of
 view `v` to carry a proposal (or commit certificate) from a view `u < v`, so the highest view `w` among the
 valid votes can be `≥ v`.
@@ -101,7 +104,8 @@ certificates `Cslib.Byzantine.Certified` (`Cslib/Computability/Distributed/Byzan
 
 **Not formalized.** Section 4.3 (suspect sets), Section 4.4 (disjoint proposers and acceptors, `3f + 2t + 1`),
 extended validity, and bounded certificate size. The reduction of the vanilla protocol (Theorem 3.6) to the
-generalized one with `t = f` is argued on paper, not formalized.
+generalized one with `t = f` is argued on paper, not formalized. Liveness with a view synchronizer under loosely
+synchronized clocks is open: liveness is proved only with perfectly synchronized clocks.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 `leaderEcho_fastConsensus` (`NonVacuity.lean`) shows that `FastConsensus` is satisfiable, and `Impl.algo_fastConsensus`

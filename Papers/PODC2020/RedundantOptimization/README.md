@@ -5,11 +5,12 @@ Redundancy.* PODC 2020. DOI [10.1145/3382734.3405748](https://doi.org/10.1145/33
 Formalized version: the proceedings version (there is no arXiv version). Copy of the paper:
 [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** Theorem 2 (linear convergence of gradient descent with the CGC
-filter under 2f-redundancy) is fully proved; its part (i) `ρ ≥ 0` fails only in the degenerate case
-`W* = ℝ^d`. Theorem 1 ("2f-redundancy is necessary") is under-specified. Read literally it is
-vacuous. Read as what its proof shows (indistinguishability), it is true and tight, provided exactly
-`f` agents are faulty and `n > 2f`; we prove this repaired form in both directions.
+**Verdict: ⚠️ Weakened.** Theorem 2 (linear convergence of gradient descent with the CGC filter under
+2f-redundancy) is fully proved; its part (i) `ρ ≥ 0` fails only when `W* = ℝ^d`. Theorem 1 ("2f-redundancy is
+necessary") is under-specified: read literally it is vacuous, and read as what its proof shows
+(indistinguishability) it is true and tight, provided exactly `f` agents are faulty, `n > 2f` and the honest costs
+share a minimum point; we prove this repaired form in both directions. So the necessity half of the paper holds
+only in this weaker, per-execution form.
 
 ## Mistakes in the paper
 
@@ -18,8 +19,9 @@ Definition 2 does not say on which inputs the algorithm must be correct, so Theo
 literally and true only when read as what its proof shows, indistinguishability (`theorem1`,
 `theorem1_indistinguishable`).
 
-**Impact.** The indistinguishability reading is true and tight, provided exactly `f` agents are faulty and
-`n > 2f` (see the next two items); we prove this repaired form in both directions.
+**Impact.** Necessity survives only per execution: the indistinguishability reading is true and tight, provided
+exactly `f` agents are faulty (see the next item), `n > 2f` and the honest costs share a minimum point; we prove
+this repaired form in both directions.
 
 **Details.** There are three readings.
 - *(a) Literal: vacuous.* The proof turns the faulty agents' functions into honest functions of a
@@ -49,41 +51,26 @@ Part II assumes exactly `f` faulty agents ("Then `|H| = n − f`"), and with few
 false: `n = 3`, `f = 1`, no faulty agent, costs `x², y², x² + y²` on `ℝ²`
 (`theorem1_indistinguishable_false_fewer_faults`).
 
-**Impact.** A false statement under reading (c); the repair is "exactly `f` faulty agents".
+**Impact.** Under reading (c) "up to `f`" is not saved; the repair is "exactly `f` faulty agents", the case the
+proof treats.
 
 **Details.** In the counterexample the execution is not 2f-redundant, yet every execution producing
 the same received vector has the origin as a solution.
 
-### ⚠️ Theorem 1 for `n ≤ 2f`
-Theorem 1 needs `n > 2f`, which the proof uses but the statement omits, and it is false for `n = f = 1`
-(`theorem1_false_n_eq_one`).
-
-**Impact.** False only in a degenerate case.
-
-**Details.** Definition 1 then includes the empty subset, so a single honest agent with cost `x²`
-violates 2f-redundancy, while "output a minimum point of the received function" is f-resilient.
-
-### ⚠️ Theorem 2 (i) when `W* = ℝ^d` (`ρ ∈ [0, 1)`)
-Theorem 2 (i) fails when `W* = ℝ^d` (e.g. all honest costs constant): with `n = 3`, `f = 1`, `μ = 1`,
-`λ = 30`, `η = 29/3 < η̄ = 58/3` we get `ρ = −840` (`theorem2_rho_nonneg_false`).
-
-**Impact.** False only in a degenerate case; part (ii) is trivially true there, and (i) holds under
-`W* ≠ ℝ^d` (`theorem2_rho_nonneg`).
-
-**Details.** Appendix B derives `λ ≤ μ` from a point outside `W*`. Without one, `λ` is unconstrained.
-
-### Typos and slips
+### ✏️ Slips
+- Theorem 1 needs `n > 2f`, which the proof uses but the statement omits, and it is false for `n = f = 1`
+  (`theorem1_false_n_eq_one`). Definition 1 then includes the empty subset, so a single honest agent with cost
+  `x²` violates 2f-redundancy, while "output a minimum point of the received function" is f-resilient.
+- "2f-redundancy implies `n > 2f`" (Appendix B) does not follow from Definition 1.
+- Theorem 2 (i), `ρ ∈ [0, 1)`, fails when `W* = ℝ^d` (e.g. all honest costs constant): with `n = 3`, `f = 1`,
+  `μ = 1`, `λ = 30`, `η = 29/3 < η̄ = 58/3` we get `ρ = −840` (`theorem2_rho_nonneg_false`). Appendix B derives
+  `λ ≤ μ` from a point outside `W*`; without one, `λ` is unconstrained. Part (ii) is trivially true there, and
+  (i) holds under `W* ≠ ℝ^d` (`theorem2_rho_nonneg`).
 - Existence of minimum points is assumed tacitly. Definition 2 and the projection in Assumption 4
   need `W* ≠ ∅`.
-- "2f-redundancy implies `n > 2f`" (Appendix B) does not follow from Definition 1.
-
-## Proof gaps (statements true)
-
-### 🛠️ Theorem 2, step (29) ⇒ (30) (case `f = 0`)
-The step (29) ⇒ (30) ("every honest gradient vanishes on `W*`") needs `f ≥ 1` and fails for `f = 0`.
-
-**Impact.** Statement true: Theorem 2 still holds for `f = 0` via the Lipschitz bound on the aggregate
-gradient (`Assumptions.key_estimates`).
+- Theorem 2, step (29) ⇒ (30) ("every honest gradient vanishes on `W*`") needs `f ≥ 1` and fails for `f = 0`.
+  Theorem 2 still holds for `f = 0` via the Lipschitz bound on the aggregate gradient
+  (`Assumptions.key_estimates`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -139,6 +126,7 @@ The hypothesis `α > 0` of Theorem 2 is implied by `0 < η < η̄`, so `theorem2
 * Section 5 (partial asynchrony; the paper gives no proof).
 * The applications in Section 1.2.
 * The `O(n(d + log n))` complexity of the filter.
+* Part III of the proof of Theorem 1 as written.
 
 **Trust.** No `sorry`; all listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity of Theorem 2: `example_assumptions` instantiates all hypotheses with one

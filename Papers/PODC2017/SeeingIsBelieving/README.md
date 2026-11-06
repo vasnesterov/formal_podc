@@ -5,22 +5,24 @@ Database Isolation.* PODC 2017. DOI [10.1145/3087801.3087802](https://doi.org/10
 Formalized version: the 10-page author copy (identical in content to the 11-page UT copy; the appendices and the
 technical report TR-17-06 with the deferred proofs were not available).
 
-**Verdict: ✅ Correct.** The state-based characterizations are equivalent to Adya's: serializability ⇔ PL-3
+**Verdict: ✏️ Slip.** The state-based characterizations are equivalent to Adya's: serializability ⇔ PL-3
 (Theorem 1), snapshot isolation ⇔ PL-SI (Theorem 2), read committed ⇔ PL-2 (Theorem 3), read uncommitted ⇔ PL-1
 (Theorem 4) and PSI ⇔ PL-2+ (the dependency-graph half of Theorem 10), once Adya's side is read, as the paper's
 proofs do, as "for *some* version order (and some start/commit timestamps)". The proof sketches of Theorems 1 and 2
-go through; the missing steps are routine.
+go through, the missing steps are routine, and the only labeled mistake is loose wording of the model. The comparisons
+of Theorems 5–9 and the PSI half of Theorem 10 were not checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
 - Section 3 says states hold values "produced by writes from aborted or committed transactions", but executions
   apply only the transactions of `𝒯`, which must be the committed ones (otherwise Theorem 1 ⇒ fails on aborted
   reads).
+
+### Typos
 - Phenomenon G1b (intermediate reads) is vacuous under the paper's assumption that a transaction writes a key at most
   once.
+- Theorems 1–4 and 10 do not say which history the phenomena refer to; see "What ≡ ¬G1 ∧ ¬G2 quantifies over" below.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -75,7 +77,8 @@ including states after its parent state, so the chosen snapshot must be capped a
 
 **Not formalized.** Theorems 5–9 and the PSI half of Theorem 10 (they compare with operational or timestamp-based
 specifications — Sovran et al.'s PSI, read atomic, Strong SI, ANSI SI/GSI, Strong Session SI/PC-SI — that the paper
-does not define formally), strict serializability, the strictness of Figure 4 beyond SER ⊋ SI, Section 5.3.
+does not define formally), strict serializability, the strictness of Figure 4 beyond SER ⊋ SI, Section 5.3. Theorems 5–9
+and the PSI half of Theorem 10 remain open for us: their proofs are in the technical report, which we did not have.
 
 **Trust.** No `sorry`; all listed theorems use only `propext`, `Classical.choice`, `Quot.sound`. The hypotheses are
 non-vacuous: `writeSkew` and `blindWrites` are well-formed instances. Shared code: the topological-sort lemma

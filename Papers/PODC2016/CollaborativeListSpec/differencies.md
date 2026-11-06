@@ -10,9 +10,9 @@ renumberings: PODC Lemma 3 = TCS Lemma 6; PODC appendix Lemmas 13–16 = TCS Lem
 Claims 6–9 = TCS Claims 10–13. PODC Theorem 5 claims the bound for "some replica"; TCS Theorem 9
 claims it for every replica `R₁`. We prove the stronger TCS form.
 
-## Statement-level issues (verdict-relevant)
+## Statement-level issues
 
-1. **RGA's insert counts tombstones (Section 4.2 + "Insert" of Section 4.1).** As written, RGA
+1. **RGA's insert counts tombstones (Section 4.2 + "Insert" of Section 4.1) (🔧).** As written, RGA
    violates condition (1c), so Theorem 1 is false for the protocol as stated.
    - Counterexample: `ins(x,0); ins(y,1); del(x); ins(b,1)` at one replica. The last response is
      `[b, y]`, while (1c) requires `b` at index 1.
@@ -20,21 +20,20 @@ claims it for every replica `R₁`. We prove the stronger TCS form.
      There is no abstract execution in `A_weak`, so none in `A_strong`.
    - Fix: take the parent in the visible list `s(N) \ T` (`RGA.parentFor`), as the original RGA
      does. With it, Theorem 1 is proved (`RGA.theorem1_strong`).
-   - Rule: R3. The intent is recoverable from the paper itself. Section 3 says that `ins(a,k)`
+   - The intent is recoverable from the paper itself. Section 3 says that `ins(a,k)`
      inserts at position `k` of the list returned to the user, and (1c) states this on the
      response. Insert's prose takes "the element to the left of the insertion position". Section
      4.1 states Insert for trees without tombstones, where `s(N)` *is* that list. The fix is local:
      the same state, messages and tree rule (the new node becomes the child of its left neighbour),
      with the index computed in `s(N) \ T` instead of `s(N)`. It is not a design change. The proof
      ("(1c) follows directly from the properties of the data structure") never reasons with the
-     tombstone-counting index. Hence ⚠️.
-   - Borderline (R6). The pseudocode explicitly writes `s(N)`. Without R3 this would be a false
-     claim about the paper's own algorithm `R_rga`. The abstract presents that claim as a
-     contribution ("a strong list specification, which we prove is implemented by an existing
-     protocol"). However, that abstract sentence remains true for the original RGA [24], which
-     indexes the visible list.
-2. **(TCS only; not verdict-relevant for PODC 2016, whose Theorem 1 does not claim eventual
-   visibility.) Definition 10 (eventual visibility) has no connectivity assumption.** As literally
+     tombstone-counting index.
+   - The pseudocode explicitly writes `s(N)`, so Theorem 1 is false for the paper's own algorithm
+     `R_rga` as printed. The abstract presents that claim as a contribution ("a strong list
+     specification, which we prove is implemented by an existing protocol"). However, that abstract
+     sentence remains true for the original RGA [24], which indexes the visible list.
+2. **(TCS only: Theorem 1 of PODC 2016 does not claim eventual visibility.) Definition 10
+   (eventual visibility) has no connectivity assumption (✏️).** As literally
    stated, the liveness part of TCS Theorem 1 fails: in `RGA.def10_needs_connectivity`, replica 0 inserts and never
    sends, and replica 1 reads forever. The intended hypothesis is recoverable from the paper:
    - the remark after Definition 10 ("a protocol would rely on the network being sufficiently
@@ -44,21 +43,21 @@ claims it for every replica `R₁`. We prove the stronger TCS form.
    - the analogous Definition 18, which includes it.
 
    We prove Theorem 1's liveness for infinite executions under Definition 1
-   (`RGA.theorem1_eventualVisibility`). Rule: R4. Taken literally, Definition 10 is violated by
+   (`RGA.theorem1_eventualVisibility`). Taken literally, Definition 10 is violated by
    *every* protocol that can buffer an update: no protocol can make an unsent update visible. So
    no reader would take it literally.
 
-The headline lower bound (TCS Theorems 8 and 9 = PODC Theorems 4 and 5) has no statement-level issue. Worst label (R6): ⚠️, decided by item 1.
+The lower bound (TCS Theorems 8 and 9 = PODC Theorems 4 and 5) has no statement-level issue.
 
 ## Proof gaps (no effect on the statements)
 
-3. **Claim 12 (adjacency).** The paper concludes `v = …[ᵢ₋₁ ]ᵢ₋₁…` "from the definition of the weak
+3. **Claim 12 (adjacency) (🔧).** The paper concludes `v = …[ᵢ₋₁ ]ᵢ₋₁…` "from the definition of the weak
    list specification". The specification only fixes the *set* of elements of `v`. Adjacency, which
    lets `R₂` insert `x` between the brackets, needs another argument. `lo` orders both `v` and
    `R₁`'s earlier response at `ins ]ᵢ₋₁`, which has the same elements, and `lo` is transitive on
    `v`. Hence `v` equals `R₁`'s list (`eq_of_pairwise`). That list is computed from the user's
    positions by induction (`rval_insert_phase`).
-4. **Which state is `σ_w`.** The paper takes `σ_w` at the end of `α_w`, *after* the final read. In
+4. **Which state is `σ_w` (🔧).** The paper takes `σ_w` at the end of `α_w`, *after* the final read. In
    the model of Section 2 a `do(read)` may change the state and the buffer. So `σ_w ≠ σ_{w'}` would
    not give distinct internal states `q`, which is what the metadata overhead measures. We take the
    state right after `send(m_{d+3})`. Its buffer is empty, and its content (the unique `w` with

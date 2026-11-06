@@ -68,7 +68,7 @@ true)**, **under-specified definition**, **typo**, **modelling choice**.
    This reading has a leader forward a foreign key while still in Phase One. But the proof of
    Theorem 4.9 says that "a leader issues hashkeys in Phase Two only after a contract has been
    published on every entering arc". Under that reading the attack disappears, so this is not
-   counted as a mistake. The repaired protocol implements the intended behaviour.
+   a mistake. The repaired protocol implements the intended behaviour.
 
 3. **Lemma 4.8's proof also omits an unforgeability step. Proof gap (statement true for the
    repaired protocol).** The case "`v` does not appear in `p`" needs that the *first* key `v`

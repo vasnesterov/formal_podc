@@ -5,17 +5,23 @@ network with o(m) communication.* PODC 2015. DOI
 [10.1145/2767386.2767405](https://doi.org/10.1145/2767386.2767405). Formalized version: arXiv
 [1502.03320](https://arxiv.org/abs/1502.03320) v1; numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The combinatorial core is sound: the cut-parity identity
-behind `TestOut`, Observation 1, the fingerprint test `HP-TestOut`, Lemma 4 (isolation by a
-pairwise independent hash), and the correctness of the `w`-ary search `FindMin` and of
-`FindAny`/`FindAny-C` (Lemma 5). Three procedures are wrong as written, each fixed by a local change:
-`HP-TestOut` uses unordered edge numbers and can never detect a leaving edge, `FindMin`'s first range
-misses its top weight, and `FindAny`'s hash range `r > ∑ deg` is too small for Lemma 4, which makes
-Lemma 5 false for some pairwise independent hash families.
+**Verdict: 🔧 Easy fix.** `HP-TestOut`, `FindMin` and `FindAny` are each wrong as printed and saved by a local
+change proved in Lean, and the one step we did not repair, the Markov bound for `FindMin-C`, changes only a
+constant. The combinatorial core is sound: the cut-parity identity behind `TestOut`, Observation 1, the fingerprint
+test `HP-TestOut`, Lemma 4 (isolation by a pairwise independent hash), and the correctness of the `w`-ary search
+`FindMin` and of `FindAny`/`FindAny-C` (Lemma 5). The paper's main point, the message bounds of `Build MST`,
+`Build ST` and the repair, was not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ `HP-TestOut` (Section 2.2, edge numbers)
+### ❌ Lemma 2, proof (`FindMin-C`, Markov step)
+The budget `(2c/q + 1)L` is only `2c + q` times the expected `L/q` trials, so Markov gives `1/(2c + q) ≈ 0.47` for
+`c = 1`, `q = 1/8`, not "less than 1/3 for `c ≥ 1`" (that needs `c ≥ 1.44`).
+
+**Impact.** This step of the proof is wrong and we did not repair it in Lean. The statement is still true, by
+concentration of sums of geometric variables or a larger budget, and only the constant `C` of Lemma 3 depends on it.
+
+### 🔧 `HP-TestOut` (Section 2.2, edge numbers)
 `HP-TestOut` as written always answers "no leaving edge", because the edge number of the *undirected* edge
 is used for the *ordered* pairs in `E↑(T)`, `E↓(T)`, so both fingerprints are equal for every `α`
 (`hpTestOut_symm_never`, `hpTestOut_edgeNumber_never`).
@@ -28,7 +34,7 @@ inequality (2): error `≤ (D−1)/p < ε` with `D = ∑_{y∈T} deg y` (`hpTest
 pairs, but the edge number concatenates the IDs smallest first. Then `(u, v)` and `(v, u)` get the same
 number, already `Local↑(y) = Local↓(y)` at every node, and the two fingerprints are equal whatever `T` is.
 
-### ⚠️ `FindMin` (Section 3.1, Lemma 2: the heaviest weight is missed)
+### 🔧 `FindMin` (Section 3.1, Lemma 2: the heaviest weight is missed)
 `FindMin` returns `∅` although an edge leaves `T_x` when the lightest leaving edge is also the heaviest edge
 at `T_x` and `w | maxWt − 1`, e.g. on the path `0 − 1 − 2` with weights `1, 3` and `T = {0}`
 (`run_none_of_max`, `p3_counterexample`).
@@ -42,7 +48,7 @@ at `T_x` and `w | maxWt − 1`, e.g. on the path `0 − 1 − 2` with weights `1
 answers 1 wrongly) never answers 1. In the example, a singleton fragment in `Build MST`'s first phase,
 `maxWt(T) = 1` and every subrange is empty.
 
-### ⚠️ Lemma 5 (Section 4.1, `FindAny`'s hash range)
+### 🔧 Lemma 5 (Section 4.1, `FindAny`'s hash range)
 Lemma 5 is false for some pairwise independent hash families: on the star `K_{1,3}` with `T = {center}`,
 `FindAny`'s range `r > ∑ deg` gives `r = 4`, too small for Lemma 4, and `FindAny-C` succeeds with probability
 `0` instead of `≥ 1/16` (`FindAnyCex.lemma5_findAnyC_false`, `FindAnyCex.findAny_eq_none`).
@@ -60,28 +66,32 @@ independent and uniform. With it, the number of leaving edges hashing into `[2]`
 `min = 2`, `w(T) = 10 ⊕ 11 ⊕ 12 = 13` is not the number of any edge, and every round fails. `FindAny`
 never finds an edge.
 
-### Typos and slips
+### ✏️ Slips
 - Inequality (2) needs `B` = the *sum of the degrees* in `T`, as in step 0, not "the number of edges
   incident to `T`". The fingerprints agree at the number of every dart inside `T`
   (`card_inter_le_card_hpTestOut_fail`).
+- Inequality (2) is stated unconditionally but holds only when `E↑(T) ≠ E↓(T)` (`hpTestOut_error_lt`).
+- `FindMin`'s step 6 is undefined when no subrange answers 1. We repeat the iteration in that case.
+- Lemma 2's "worst case `O(log n)` time and messages" should be `O(|T_x| log n)`.
+- Lemma 3's phase count adds up to `24c/C + 16c/C²`, not `40c/C`. Only constants change. Not formalized.
+- Claim 1 of Lemma 3: "`lg n / lg(C/2)`" has a negative logarithm, and the number of trees drops only by a factor
+  `1 − C/4`. This is still `O(log n)` phases. Not formalized.
 - `Insert` misses the case where `u` and `v` are in different trees (not formalized).
-- `FindMin`'s step 6 is undefined when no subrange answers 1.
-- Typos: `|X|`, `TestHigh`, `{u′, v}`, and "TestOut" in `FindAny`'s step 5.
+- Section 4.2's "(at most one) cycle": one cycle forms per merged component, possibly of length 2. Not formalized.
+- The odd hash of [33] is not `1/8`-odd for `w = 1` (`thorup_not_odd_one`), a parameter the paper does not use.
+
+### Typos
+- Lemma 4's chain of inequalities ends with "`= 1/16`" but in fact gives `> 1/8`.
+- `|X|`, `W \ {x}`, `TestHigh`, `{u′, v}`, "TestOut" in `FindAny`'s step 5, "an edge no leaving" in Lemma 5, and
+  `O(log n/ log n log n)` in the proof of Lemma 2.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemmas 4 and 5 (the `1/16` bound)
-The proof of Lemma 5 only derives `1/16 − 1/(2n^c)` for `FindAny-C`, not the stated `1/16`, and Lemma 4's
-chain of inequalities ends with "`= 1/16`" but in fact gives `> 1/8`.
+### 🔧 Lemma 5, proof (the `1/16` bound)
+The proof of Lemma 5 only derives `1/16 − 1/(2n^c)` for `FindAny-C`, not the stated `1/16`.
 
-**Impact.** Statements true: the exact bound in Lemma 4 is `≥ 3/16` (`lemma4_strong`), and the stated
-`1/16` for `FindAny-C` follows from it (`lemma5_findAnyC`).
-
-### 🛠️ Lemmas 2 and 3 (constants; not formalized, noted in [differencies.md](differencies.md))
-Lemma 2's Markov step gives `≈ 0.47`, not `< 1/3`, for `c = 1`, and Lemma 3's phase count adds up to
-`24c/C + 16c/C²`, not `40c/C`.
-
-**Impact.** Not formalized. Only constants change.
+**Impact.** Statement true, read with the fix of `r` above: the exact bound in Lemma 4 is `≥ 3/16` (`lemma4_strong`),
+and the stated `1/16` for `FindAny-C` follows from it (`lemma5_findAnyC`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -125,11 +135,11 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Not formalized.**
 * Lemma 1 and all message, time and memory bounds (Theorems 1.1 and 1.2, Lemmas 3 and 6).
-* The Chernoff/Markov parts of Lemma 2.
-* `Build MST` and `Build ST`.
+* The Chernoff/Markov parts of Lemmas 2, 3, 5 and 6.
+* `Build MST` and `Build ST`, apart from the arithmetic points listed under Slips.
 * The MST/ST repair correctness of Section 3.2.
 * Appendix A.
-* The general `1/8`-oddness of the hash of [33].
+* The general `1/8`-oddness of the hash of [33], for `w ≥ 4` (cited; `w = 2, 3` are proved in Lean).
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`.

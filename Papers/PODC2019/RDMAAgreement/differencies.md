@@ -8,7 +8,7 @@ Aligned Paxos (§5.2).
 
 ## Theorem 6.1 (`LowerBound/`)
 
-Verdict for this statement: true as formalized; the proof needed repair (🛠️).
+Status: true as formalized; the proof needed repair (🔧).
 
 **Definitions.**
 - *2-deciding.* §3 defines "k-deciding: in common-case executions, some process decides in k delays" (common case:
@@ -24,9 +24,8 @@ Verdict for this statement: true as formalized; the proof needed repair (🛠️
   a value w, it decides w at time 2. Then both run any consensus algorithm B for this model (e.g. Disk Paxos): p2
   with its input, p1 with w if it read w and with its own input otherwise. If p1 decided w, all inputs to B are w, so
   B decides w by validity. Termination comes from B. So the theorem is true only for the universal / read-first
-  notion. *Rule:* the definition is ambiguous; we formalize the reading under which the claim holds (R3/R4,
-  borderline). We record this rather than call it a false claim, because the paper never fixes how simultaneous
-  operations are ordered.
+  notion. The definition is ambiguous, and the paper never fixes how simultaneous operations are ordered; we formalize
+  the reading under which the claim holds.
 - *Hypotheses weaker than the paper's (so the theorem is stronger):*
   - termination is assumed only in synchronous runs with at most one process crashed from the start
     (`SyncTermination 1`), which partially synchronous termination implies (GST = 0);
@@ -34,7 +33,7 @@ Verdict for this statement: true as formalized; the proof needed repair (🛠️
     (FIFO);
   - processes may have any number of pending operations, even on the same register (the paper allows one per
     object/memory).
-- *Added hypotheses:* `2 ≤ |P|` and `|V| ≥ 2`. With one process, it decides its input at time 0 (R2, degenerate).
+- *Added hypotheses:* `2 ≤ |P|` and `|V| ≥ 2`. With one process, it decides its input at time 0 (✏️ slip, degenerate).
 - *Memory regions:* with static permissions every (process, register) pair has a fixed access right, modelled by
   `canRead`/`canWrite`; a region parameter on operations would add nothing.
 - *Process model:* deterministic automata. A step receives the oldest `k ≥ 0` undelivered responses and invokes a
@@ -44,7 +43,7 @@ Verdict for this statement: true as formalized; the proof needed repair (🛠️
   P1 publishes its decision, which P0 adopts when it is not fast) satisfies `Agreement`, `Validity` and
   `SyncTermination 1`.
 
-**Proof gaps (repaired):**
+**Proof gaps (🔧, repaired):**
 1. The proof starts from an arbitrary execution E in which p decides in 2 delays. It claims that E′ (p's reads
    return by t₀, the others start after t₀) is indistinguishable to p from E. This fails when p's reads in E
    returned values written by others in E. Repair: take E to be the read-first synchronous run. There, p's reads
@@ -62,9 +61,8 @@ Verdict for this statement: true as formalized; the proof needed repair (🛠️
 
 ## Algorithm 7, Theorems D.1, D.2, Lemma D.4 (`PMP/`)
 
-Verdict for this statement: Theorem D.2 is false for Algorithm 7 as written, with a Lean counterexample. With two
-local fixes whose intent is recoverable, the algorithm is safe (proved). Classified ⚠️ (R3/R4); see "Borderline"
-below.
+Status: Theorem D.2 is false for Algorithm 7 as written, with a Lean counterexample. With two
+local fixes whose intent is recoverable, the algorithm is safe (proved); see "Why the fixes are local" below.
 
 **Model choices** (module docstring of `PMP/Model.lean`):
 - *Asynchrony:* interleaving semantics with one thread per (process, memory). Every memory operation
@@ -76,10 +74,10 @@ below.
 - *Crashes and Ω:* crashes do not matter for safety. Ω is arbitrary: any process whose loop is idle may start a new
   attempt, including after it decided (the loop is `repeat forever`).
 - *Ballots:* globally unique, and increasing for each process. The paper only says "a higher value than any proposal
-  number seen before"; uniqueness is the standard Paxos convention (R4). p1's first attempt, which skips phase 1,
+  number seen before"; uniqueness is the standard Paxos convention. p1's first attempt, which skips phase 1,
   uses the smallest ballot (see bug 2).
 - *Lines 24–26* are ambiguous: "non-null value", and "highest propNr" of which field? We use the semantics that the
-  proof of D.2 and Algorithm 12 (p. 17) fix (R3). Abort if *any* slot has minProp > propNr; otherwise adopt the
+  proof of D.2 and Algorithm 12 (p. 17) fix (✏️ slip). Abort if *any* slot has minProp > propNr; otherwise adopt the
   value with the highest accProp among the slots that hold a value. Under the other readings, the line-21
   counterexample still works (no slot holds a value), or the leader adopts its own fresh slot `(propNr, ⊥, ⊥)` and
   decides ⊥.
@@ -88,7 +86,7 @@ below.
 - *Scope:* only safety is formalized: D.1, D.2, D.4, for any number of processes and memories and any schedule.
 
 **Bugs:**
-1. **Line 21 erases the process's own accepted value** (`theorem_D2_false`; n = 2, m = 1, no crashes, unique
+1. 🔧 **Line 21 erases the process's own accepted value** (`theorem_D2_false`; n = 2, m = 1, no crashes, unique
    ballots, p1's first ballot minimal). Line 21 writes `(propNr, ⊥, ⊥)`, and the loop repeats forever after
    deciding. The run:
    - p2 decides `true` at ballot 2;
@@ -109,7 +107,7 @@ below.
    *Zombie caveat for that fix:* in our zombie model, a pending line-21 write of an earlier attempt could still
    land later, but only on a memory outside the decided majority, because there is one outstanding operation per
    (process, memory).
-2. **p1's first ballot must be the smallest, even after the repair** (`first_ballot_not_minimal_false`; n = 2,
+2. 🔧 **p1's first ballot must be the smallest, even after the repair** (`first_ballot_not_minimal_false`; n = 2,
    m = 3). The run:
    - q decides c at ballot 5 on memories 2 and 3;
    - p1's first attempt uses ballot 100, which "higher than any seen" allows because p1 has seen nothing. It skips
@@ -120,7 +118,7 @@ below.
    The Lean run again lets the decided q start a new attempt (ballot 200). If deciding ends the loop, a third
    process r can run ballot 200 instead of q, with the same effect. So this issue does not depend on the halting
    question for n ≥ 3 (argued, not formalized). For n = 2 under the literal line 21, p1's own retry would erase
-   `(100, 100, a)`. The standard convention that only the lowest ballot may skip phase 1 excludes this (R4).
+   `(100, 100, a)`. The standard convention that only the lowest ballot may skip phase 1 excludes this.
 
 **Proof gaps (repaired):**
 - In both cases, the proof of D.2 assumes that p's slot on m still holds `(b_p, v_p)` when q reads it ("q must have
@@ -139,33 +137,25 @@ below.
 - D.1: the paper's argument is fine. Formally, every phase-2 value is an input, since only slots that hold a value
   are adopted.
 
-**Borderline (R3/R4, recorded per R6).** D.2 is a numbered theorem about the paper's specific algorithm, and it is
-false as written. We classify it ⚠️, not ❌, for three reasons:
+**Why the fixes are local.** D.2 is a numbered theorem about the paper's specific algorithm, and it is false as
+written.
 - The intended line 21 is recoverable from the paper: the prose, Algorithm 10, and the proof of D.2, which reasons
   as if accepted values persist.
-- The fix is one line.
-- Minimality of the phase-1-skipping ballot is the standard Paxos convention.
+- Two one-line fixes each remove bug 1. One keeps the accepted pair at line 21 (proved). The other ends the loop at
+  `decide`, which matches the paper's "terminates" wording. Neither changes the protocol's design or its two-delay
+  fast path: p1's first attempt never executes line 21.
+- The D.2 proof reasons with the intended behaviour, namely that the decider's phase-2 entries persist ("q must have
+  seen p's value"). It never uses the erasing line 21. The proof is incomplete (the gaps above), but not built on the
+  faulty line.
+- Algorithm 7 is the paper's crash-failure algorithm, which the abstract presents as a primary contribution. Theorem
+  5.1 is existential ("there exists a 2-deciding algorithm"), and a repaired protocol exists (safety proved here).
 
-A stricter reading would count the explicit `(propNr, ⊥, ⊥)` as a protocol design rather than a slip, and would
-give ❌. The independent review endorses ⚠️, for three reasons:
-- *R3, recoverable and local.* Two one-line fixes each restore safety. One keeps the accepted pair at line 21
-  (proved). The other ends the loop at `decide`, which matches the paper's "terminates" wording. Neither changes the
-  protocol's design or its two-delay fast path: p1's first attempt never executes line 21.
-- *R3, the proof uses the intended version.* The D.2 proof reasons with the intended behaviour, namely that the
-  decider's phase-2 entries persist ("q must have seen p's value"). It never uses the erasing line 21. So the R3
-  exclusion "the proof reasons with the wrong version" does not apply. The proof is incomplete (the gaps above),
-  but not built on the faulty line.
-- *R5, the ceiling if not excused.* Algorithm 7 is the paper's crash-failure algorithm, which the abstract presents
-  as a primary contribution. But the headline, Theorem 5.1, is existential ("there exists a 2-deciding
-  algorithm"), and a repaired protocol exists (safety proved here). So even the strict reading gives ❌, not 🚨.
-
-Bug 2 (the first ballot must be minimal) is the more delicate R4 call. The paper never fixes p1's first ballot, and
-D.2 case 2 silently needs it. We excuse it because it is the universal convention for a pre-established leader that
-skips phase 1 (Fast Paxos and Multi-Paxos use ballot 0 for it). A competent reader would assume it.
+Bug 2: the paper never fixes p1's first ballot, and D.2 case 2 silently needs it. Minimality is the universal
+convention for a pre-established leader that skips phase 1 (Fast Paxos and Multi-Paxos use ballot 0 for it).
 
 ## Lemma 4.1 and Algorithm 2 (`RB/`)
 
-Verdict for this statement: true; the pseudocode has typos and Observation 1 is false as stated (⚠️).
+Status: true; the pseudocode has typos and Observation 1 is false as stated (🔧).
 
 **Model choices** (`RB/Model.lean`):
 - *Registers:* SWMR **regular** registers, as in the lemma. A pending read of a correct process may return the value
@@ -185,10 +175,10 @@ Verdict for this statement: true; the pseudocode has typos and Observation 1 is 
 - *Non-vacuity:* `lemma_4_1_nonvacuous` gives a fair execution in which a correct broadcast is delivered by all
   correct processes.
 
-**Pseudocode fixes (R3, evident intent):**
-1. *Off by one:* `try_deliver` uses `k = last[q]` with `last[q] = 0` initially, while the first key is 1
+**Pseudocode fixes (evident intent):**
+1. ✏️ *Off by one:* `try_deliver` uses `k = last[q]` with `last[q] = 0` initially, while the first key is 1
    (Definition 1). Taken literally, nothing is ever delivered. We use `last[q] + 1`.
-2. *Wrong signer:* lines 38 and 47 check `sValid(p, val)`, the reader's own signature. Intended: val carries the
+2. ✏️ *Wrong signer:* lines 38 and 47 check `sValid(p, val)`, the reader's own signature. Intended: val carries the
    sender q's signature on (k, m), and in line 47 it is endorsed by the slot owner i.
 3. *Scoping:* `state` must be per sender (`state[q]`). Line 30 delivers `proof.msg`, but `proof` is local to
    `checkL2proof`; the delivered value `val` is meant.
@@ -199,7 +189,7 @@ Verdict for this statement: true; the pseudocode has typos and Observation 1 is 
 6. *Doubly signed echo:* line 38 must also accept the sender's own echo `sign_p(sign_p(k, m))`, because
    `Value[p,k,p]` is both the broadcast slot (line 12) and p's echo slot (line 40).
 
-**Observation 1 is false as stated** ("no slot that belongs to a correct p is written more than once"):
+🔧 **Observation 1 is false as stated** ("no slot that belongs to a correct p is written more than once"):
 - `Value[p,k,p]` is written at line 12 and again at line 40. With regular registers, the line-40 write may even
   complete before the line-12 write.
 - `L2Proof[p,k,q]` is written at line 64 and again at line 18, possibly with a different proof.
@@ -210,8 +200,8 @@ Nothing breaks. The proof needs, and we prove, weaker facts:
 - every write to a correct L2Proof slot is a valid L2 proof for that key;
 - L1Proof slots are written once.
 
-*Rule:* R3 (evident intent: "a correct slot is never overwritten with content supporting a different message";
-the overwrites are harmless). This is a borderline ⚠️: a false numbered observation would otherwise be ❌.
+🔧 The evident intent is "a correct slot is never overwritten with content supporting a different message"; the
+overwrites are harmless.
 
 **Proof gaps (repaired):**
 - *Property 2:* "r wrote (k,m) before r′ wrote (k,m′), so r′ later saw both" needs "wrote" to mean the write

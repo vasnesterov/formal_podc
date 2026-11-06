@@ -4,9 +4,9 @@ Paper: Abraham, Ben-David, Yandamuri, *Efficient and Adaptively Secure Asynchron
 Agreement via Binding Crusader Agreement*, PODC 2022 (11-page proceedings version, the only one used;
 the "full version" it refers to was not available to us).
 
-## Statement-level observations (with the deciding rule of `verdicts.md`)
+## Statement-level observations
 
-1. **Algorithm 5, line 9 (all `echo2` messages `⊥`).** Read literally, "if all of the messages contain
+1. ✏️ **Algorithm 5, line 9 (all `echo2` messages `⊥`).** Read literally, "if all of the messages contain
    the same value `v` then decide `v, 2`" also fires when all `n − t` messages carry `⊥`: line 10 treats `⊥`
    as "a value other than `v`", so "value" includes `⊥` in this pseudocode. Example: `n = 3`, `t = 1`, inputs
    `0, 1, 0`, no crash, every party first receives one `⟨val, 0⟩` and one `⟨val, 1⟩`. Everybody sends
@@ -15,16 +15,15 @@ the "full version" it refers to was not available to us).
    code, and Algorithm 2, line 7 ("if grade = 2 then commit val") would commit `⊥`. The prose just above the
    algorithm says that the party then decides `⊥`. We model that: all `⊥` gives `⊥` grade 0
    (`Alg5.decideG`), and prove Theorem 5.1 for this version.
-   *Rule:* R3 (typo with evident intent: recoverable from the prose, local fix: "non-`⊥`" in line 9).
-   This is the only statement-level issue and sets the verdict to ⚠️. **Borderline call (R6):** one could
-   read "`⊥` grade 2" as the `⊥` bucket and call this notation, which would give 🛠️. We follow the
-   precedent for literal pseudocode slips (⚠️), since the literal output also breaks Algorithm 2. The same
+   This is a typo with evident intent: it is recoverable from the prose, and the fix is "non-`⊥`" in line 9.
+   It is the only statement-level issue. One could read "`⊥` grade 2" as the `⊥` bucket and call this
+   notation, but the literal output also breaks Algorithm 2. The same
    phrase in Algorithm 3, line 6 is harmless (`⊥` is a valid BCA output).
 2. **"Terminates in at most 4 (6, 3, 2) communication rounds"** (Theorem 4.3 / Lemma 4.7, Theorem 5.3,
    Theorem 5.1, Theorem 4.1). Lemma 4.7's proof counts messages: "a party sends at most 4 messages". §3
    fixes the measure as broadcasts ("we measure broadcasts, i.e., the number of communication steps").
    We prove exactly this: every party broadcasts at most 4 (6, 3, 2) messages (`out_ncard_le_*`).
-   *Remark (not counted as an error):* this is not the asynchronous latency in the usual normalized-delay
+   *Open remark (unchecked):* this is not the asynchronous latency in the usual normalized-delay
    measure (each message delay ≤ 1). For Algorithm 4 with `n = 7`, `t = 2` there is a schedule in which
    every correct party sends 4 messages but decides only at time `5 − ε`. Inputs: `A1, A2 = 1`,
    `B1, B2, B3 = 0`. Both Byzantine parties send `⟨echo, 1⟩` only to `B2`, at time `2 − ε`. All other
@@ -35,18 +34,18 @@ the "full version" it refers to was not available to us).
    comparisons with [9, 11, 28] in Tables 1–2 are fair only if those papers count the same way.
 
 *Typo.* Algorithm 6, line 11 reads "if 1 then"; evidently "if (1) then" (as in Algorithm 4, line 11).
-Our liberal guards make the branch choice irrelevant. *Rule:* R3, harmless.
+Our liberal guards make the branch choice irrelevant.
 
 Apart from the pseudocode slip of item 1, no statement checked here is false.
 
 ## Proof-level differences (repairs)
 
-3. **Lemma 4.5 (validity), second part.** "In order to decide `1 − v`, a non-faulty party must have
+3. 🔧 **Lemma 4.5 (validity), second part.** "In order to decide `1 − v`, a non-faulty party must have
    `1 − v` in its `approvedVals` set (line 15)". Line 15 only requires `n − t` messages `⟨echo3, 1 − v⟩`, so the
    cited justification is wrong. Repair: some uncorrupted sender of `⟨echo3, 1 − v⟩` received
    `⟨echo2, 1 − v⟩` from `n − t` parties. One of those is uncorrupted, so it approved `1 − v`, which by the
    first part needs an uncorrupted party with input `1 − v` (`Alg4.validity`).
-4. **Lemma 4.9 (binding) against an adaptive adversary.** The proof picks "the `t + 1` messages from
+4. 🔧 **Lemma 4.9 (binding) against an adaptive adversary.** The proof picks "the `t + 1` messages from
    non-faulty parties". Who is non-faulty depends on the *extension*, while `b` must be fixed at time `τ`.
    Our proof (`Alg4.binding`) fixes `b` from the prefix. If some party has broadcast `⟨echo3, u⟩` with `u ≠ ⊥`,
    take `b = u` and use Lemma 4.8 in the extension. Otherwise the decider's `n − t` `echo3` messages include at

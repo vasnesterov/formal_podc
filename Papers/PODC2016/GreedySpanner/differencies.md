@@ -85,7 +85,8 @@ stated, **[cond]** = cited result taken as a hypothesis, **[omitted]** = not for
     edges of `G`. An edge of `G` that is not a shortest path needs the same (verbatim) argument. In
     Theorem 6, Observations 2 and 4 are used only to show that `M` and `M_H` have the same MST
     weight. We prove this directly (`mstWeight_inducedW`): `w ≤ w_{M_H}` everywhere, with equality
-    on the edges of `H`, and `H` contains an MST of `M` (Observation 2).
+    on the edges of `H`, and `H` contains an MST of `M` (Observation 2). Typo in the proof of Observation 4:
+    "at least `n + 1` edges" should be `n`, which already forces the cycle.
 18. **[model]** Theorem 6 (`theorem6`) assumes `1 ≤ t < 2`; the paper writes only `t < 2`. For `t < 1`
     no `t`-spanner of a metric with `n ≥ 2` exists, so that case is degenerate.
 19. **[cond]** Corollary 3 (`corollary3_of_forall_exists`) takes the cited Theorem 4 [Got15], and for the

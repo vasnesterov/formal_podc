@@ -4,7 +4,7 @@ Paper: J. M. Faleiro, S. Rajamani, K. Rajan, G. Ramalingam, K. Vaswani, *General
 PODC 2012 (10-page extended abstract). Symbols were checked on rendered pages (Algorithm 2's `Propose` guard
 is `proposedValue ⊔ bufferedValues ⊐ proposedValue`; `Learn` updates when `learntValue ⊏ value`).
 
-## Errors in the paper (statement level), with the deciding rule
+## Errors in the paper (statement level)
 
 1. **Theorem 5.15 is false** (`Cex515.theorem_5_15_false`, `Cex515b.theorem_5_15_false_reliable`,
    `Cex515c.theorem_5_15_false_singleton`, `LivenessCounterexample.lean`). All three executions use three processes playing all roles, with process 2
@@ -33,15 +33,15 @@ is `proposedValue ⊔ bufferedValues ⊐ proposedValue`; `Learn` updates when `l
      bridge is that its run is ours minus the two `ProcessNACK` steps, with those `NACK`s discarded. Under
      the strictest channel reading (only the last broadcast of a crashing process may be partially lost),
      Execution 2 applies instead.
-   * Rule: R5 → 🚨. The abstract presents the algorithm and its guarantee as a primary contribution ("We
+   * ❌. The abstract presents the algorithm and its guarantee as a primary contribution ("We
      present a wait-free algorithm for solving generalized lattice agreement. The algorithm guarantees
      that every value received by a correct process is learnt in O(N) message delays"). The claim is
-     about the paper's specific algorithm. R4 does not apply: the paper explicitly includes message loss
+     about the paper's specific algorithm. No implicit assumption rescues it: the paper explicitly includes message loss
      and mid-step crashes in its failure model and requires delivery only between correct processes.
-     Execution 2 needs neither. R3 does not apply: Execution 3 survives the only local pseudocode
+     Execution 2 needs neither. No local fix rescues it: Execution 3 survives the only local pseudocode
      fix in sight (`status = active` in `ProcessNACK`); the error is the proof's claim that a correct
-     learner receives the `ACK`s of a chosen value, and repairing it changes the protocol. R2 does
-     not apply: `N = 3` with one crash is the smallest non-trivial instance.
+     learner receives the `ACK`s of a chosen value, and repairing it changes the protocol. It is not a
+     degenerate case: `N = 3` with one crash is the smallest non-trivial instance.
    * Consequences, not formalized separately: the `O(N)`/`O(k)`/"3 message delays" bounds (abstract, §1,
      §5.3); Section 6's progress claims ("every update operation will eventually be reflected in all read
      operations"); and the termination of Algorithm 4's `ExecuteUpdate` (`waituntil cmd ∈ LearntValue()`)
@@ -50,25 +50,23 @@ is `proposedValue ⊔ bufferedValues ⊐ proposedValue`; `Learn` updates when `l
      learners' copies of the crashing acceptor's last broadcast.
 2. **Lemma 5.14 is false** (execution 2; `theorem_5_15_false_reliable` states that no proposal ever
    includes `{1,2}`). The proof assumes that a passive proposer receiving `u` initiates `u`. But a passive
-   proposer's `proposedValue` may already include `u` through a late `NACK`. Rule: R1, a numbered lemma
-   → ❌ (subsumed by item 1).
+   proposer's `proposedValue` may already include `u` through a late `NACK`. ❌
 3. **Algorithm 1 violates Consistency** (`Cex1.alg1_consistency_false`, failure-free, 21 steps). The
-   outputs are `{1,2}` and `{1,3}`. Rule: R3 → ⚠️, borderline. The intended rule is recoverable from the
+   outputs are `{1,2}` and `{1,3}`. 🔧 The intended rule is recoverable from the
    prose of Section 3: "whenever a proposed value gets a majority of acceptances … its proposed value is a
    chosen value"; "If all these responses are acceptances, the proposer is done … Otherwise, it refines".
    The fix is local: add the conjunct `nackCount = 0` to `Decide`'s guard. The paper's proofs (Lemma 5.9)
-   reason with the intended version ("`v₂` must be a chosen value"). A stricter reader could call this a
-   false headline algorithm (🚨). That does not change the overall verdict, which item 1 already fixes at
-   🚨. The repaired consistency is `consistency_of_clean`. Repaired validity: `theorem_5_1` (outputs are
+   reason with the intended version ("`v₂` must be a chosen value").
+   The repaired consistency is `consistency_of_clean`. Repaired validity: `theorem_5_1` (outputs are
    joins of initial values). That the output is above the proposer's own initial value is not formalized,
    but it is immediate: `proposedValue` only grows.
 4. **Lemma 5.9, "at most one `Decide` step in a round", is false** for the pseudocode as written
    (`Cex59.lemma_5_9_decide_false`; failure-free fair execution, 46 steps, all messages delivered). The
-   cause is the same as in item 3. Rule: R3 → ⚠️, with the same fix as item 3; it holds for clean
+   cause is the same as in item 3. 🔧, with the same fix as item 3; it holds for clean
    decisions (`lemma_5_9_decide_clean`).
 5. **Lemma 5.13 lacks the hypothesis "initiated by a correct proposer"** (`Cex513.lemma_5_13_false`). In
-   the counterexample the faulty proposer's messages are lost, which the failure model allows. Rule: R4 →
-   ⚠️: the hypothesis holds at its only use (Theorem 5.15 via Lemma 5.14 concerns values proposed by
+   the counterexample the faulty proposer's messages are lost, which the failure model allows. ✏️: the
+   hypothesis holds at its only use (Theorem 5.15 via Lemma 5.14 concerns values proposed by
    correct processes). Lemma 5.12 ("every round eventually terminates") is too vague to formalize. In the
    same execution, the round of the faulty proposer's step never completes.
 
@@ -77,15 +75,14 @@ is `proposedValue ⊔ bufferedValues ⊐ proposedValue`; `Learn` updates when `l
 6. **Lemma 5.9, `Propose` half.** The proof says "`v₂` must be a chosen value". With the pseudocode as
    written, the decided value need not be chosen. The repaired proof: between two `Propose` steps of `q`
    there is a `Decide` at some proposal number `m`, so a quorum acknowledged proposal `m` and `w_m` is
-   chosen. Then `u₁ ⊑ w_m ⊏ u₂`, so `w_m` separates the rounds (`lemma_5_9_propose`). Rule: proof repair
-   (🛠️).
+   chosen. Then `u₁ ⊑ w_m ⊏ u₂`, so `w_m` separates the rounds (`lemma_5_9_propose`). 🔧
 7. **Lemma 5.11.** The final step ("the strictly increasing sequence covered₁ ⊂ ⋯ ⊂ covered_k can have
    length at most `N_p + 1`") also needs a current-round value `u₀ ∈ covered₁`. If every initiated value
    below `w₁` were of an earlier round, the join of the chosen values above them would be a chosen value
    `c` with `w₁ ⊑ c` and `w₁ ⋢ c`; this uses that the chosen values form a chain. Then
    `Prev ∪ {u₀} ⊆ covered_j ⊆ Prev ∪ Curr` for `j ≥ 2`, and `|Curr| ≤ N_p` by Lemma 5.9. "Each proposed value
    is a join of values in All" is the invariant `InitInv` (`InitInv.lean`). It also needs that
-   proposals are never `⊥`, so that `covered₁ ≠ ∅`. Rule: 🛠️ (minor).
+   proposals are never `⊥`, so that `covered₁ ≠ ∅`. 🔧
 8. **Lemma 5.10** is proved in a stronger form: for every chosen `c` with `w₁ ⋢ c`, `c ⊑ w₂`. The
    paper's "`a` must have acknowledged `v_{r−1}` before responding to `w₁`" is replaced by a time-free
    invariant: all `ACK` and `NACK` values of one acceptor form a chain (`Inv.resp_chain`).
@@ -96,8 +93,7 @@ is `proposedValue ⊔ bufferedValues ⊐ proposedValue`; `Learn` updates when `l
    `Learn` runs on every `ACK`, so literally all values below any acknowledged proposal are "learnt", and
    Theorem 5.6 would fail at once (one `ACK` of `{1,2}` "learns" `{1}` and `{2}`). We formalize Theorem 5.6
    for the values of `learntValue` (the outputs, as in `LearntValue()`), and liveness as in the problem
-   definition: `v ⊑ learntValue`. Execution 2 refutes Theorem 5.15 also for the literal definition. Rule:
-   R3, typo with evident intent.
+   definition: `v ⊑ learntValue`. Execution 2 refutes Theorem 5.15 also for the literal definition. ✏️
 10. **"Proposed"** literally means "is the value of some proposal". Lemma 5.14 must mean "is below the
    value of some proposal". Execution 2 refutes both readings.
 11. **Rounds.** The paper indexes the chain of chosen values of a finite execution. We use the

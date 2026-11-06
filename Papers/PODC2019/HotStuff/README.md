@@ -7,20 +7,35 @@ Consensus with Linearity and Responsiveness.* PODC 2019. DOI
 titled "HotStuff: BFT Consensus in the Lens of Blockchain"); numbering follows it. The replica code of
 Algorithm 3 is the same in v4 (Apr 2019), v5 (Jun 2019) and v6.
 
-**Verdict: ❌ False claim.** Theorem 5 (safety of Chained HotStuff) is false for Algorithm 3 as
-written: with round-robin leaders, one Byzantine replica and a synchronous execution, a correct
-replica commits two conflicting nodes; adding the check `b*.height = curView` restores it. Basic
-HotStuff (Algorithm 2) is safe and live as claimed (Theorems 2 and 4, proved for a partially
-synchronous implementation), although the proof of Theorem 2 has a gap.
+**Verdict: ⚠️ Weakened.** Safety survives: Basic HotStuff is safe as claimed, with a new proof of Theorem 2, and
+Chained HotStuff is safe for every `n > 3f` once Algorithm 3, which as printed lets a correct replica commit two
+conflicting nodes, gets the check `b*.height = curView`. Progress under a correct leader and synchronized views
+(Theorem 4) holds, proved for a partially synchronous implementation, but liveness of the whole protocol is lost:
+the doubling pacemaker of §4.4 does not give `T_f` overlap, and we proved no working pacemaker. The linear
+authenticator complexity, the paper's other main claim, was not checked.
 
 ## Mistakes in the paper
 
-### ❌ Theorem 5 (Chained HotStuff safety, Algorithm 3)
+### ❌ §4.4 (pacemaker: "eventually at least `T_f` overlap")
+The claim that doubling the timeout intervals eventually gives all correct replicas `T_f` overlap
+is false: two replicas can share every view for exactly `α < T_f` time units forever
+(`HotStuff.Pacemaker.overlap_constant`).
+
+**Impact.** No liveness is established for the protocol as a whole: Theorem 4 is conditional and correct, but we
+proved no working pacemaker. This is the view-synchronization gap; Algorithm 5 later just *assumes* "synchronized leadership after GST".
+
+**Details.** Suppose a Byzantine leader sends `decide` only to replica `A` at time `α`. Then `A`
+enters view 2 with interval `α`, while `B` times out at the same moment with interval `2α`. From
+then on the two replicas share every view for exactly `α` time units, forever. With `α < T_f` and
+`n = 4` (one silent Byzantine), no later view decides. The Lean theorem covers the timer
+arithmetic only.
+
+### 🔧 Theorem 5 (Chained HotStuff safety, Algorithm 3)
 Algorithm 3 as written is unsafe: with `n = 4`, `f = 1`, round-robin leaders and a synchronous
 execution, a correct replica commits two conflicting nodes
 (`HotStuff.Chained.theorem5_false_roundRobin`).
 
-**Impact.** False for the pseudocode, but the intended protocol is safe: adding the check
+**Impact.** The printed pseudocode is unsafe, but the intended protocol is safe: adding the check
 `b*.height = curView` restores Theorem 5 for every `n > 3f`. Basic HotStuff (Theorems 2 and 4) is
 not affected.
 
@@ -59,28 +74,27 @@ first but not the second.
    (`HotStuff.Chained.monoLock_unsafe`) In this execution every proposal passes `safeNode`. So
    reading Lines 17–22 as nested under `if safeNode` does not save Algorithm 3 either.
 
-The paper's proof also has an unjustified step ("by minimality of `qc_s`,
-`m.node.justify.viewNumber ≤ v_{w''}`"; the justification can also be higher but extend `w`).
-
 **Repair.** Add the guard `b*.height = curView` (and check that `b*.justify` is valid and refers to
 a strict ancestor, which the paper says it "assumes"). With these checks Theorem 5 holds for every
 `n > 3f` (`HotStuff.Chained.theorem5_fixed`); the lock then becomes monotone by itself.
 
-### ❌ §4.4 (pacemaker: "eventually at least `T_f` overlap")
-The claim that doubling the timeout intervals eventually gives all correct replicas `T_f` overlap
-is false: two replicas can share every view for exactly `α < T_f` time units forever
-(`HotStuff.Pacemaker.overlap_constant`).
+### 🔧 Theorem 5, proof in Appendix A ("by minimality of `qc_s`")
+Even with the height check, the step "by minimality of `qc_s`, `m.node.justify.viewNumber ≤ v_{w''}`" is
+unjustified: the justification can have a higher view and extend `w`.
 
-**Impact.** Informal claim, unsupported; Theorem 4 itself is conditional and correct. This is the
-view-synchronization gap; Algorithm 5 later just *assumes* "synchronized leadership after GST".
+**Impact.** One step of the proof of the repaired theorem. The other wrong step, "the lock that `r` has on `w` is not
+changed", has the same root cause as the Algorithm 3 item above.
 
-**Details.** Suppose a Byzantine leader sends `decide` only to replica `A` at time `α`. Then `A`
-enters view 2 with interval `α`, while `B` times out at the same moment with interval `2α`. From
-then on the two replicas share every view for exactly `α` time units, forever. With `α < T_f` and
-`n = 4` (one silent Byzantine), no later view decides. The Lean theorem covers the timer
-arithmetic only.
+**Repair.** The missing case extends `w` and gives the same contradiction. Our Lean proof is organized as an inductive
+invariant (`HotStuff.Chained.theorem5_fixed`).
 
-### Typos and slips
+### ✏️ Slips
+- Lemma 3's proof cites the prepare votes (Line 10). What it needs are the pre-commit voters, who
+  stored the `prepareQC` (Lines 16–18) (`HotStuff.Basic.lemma_3`).
+- In Theorem 4's proof, the "highest lock among all replicas" must be among *correct* replicas
+  (`HotStuff.Basic.theorem_4`).
+
+### Typos
 - Algorithm 2 Line 32 ("wait for message m from leader") duplicates Line 33.
 - Theorem 5 leaves `n > 3f`, `|F| ≤ f` implicit.
 
@@ -90,7 +104,7 @@ arithmetic only.
 The proof's choice of `v_s`, the lowest view in `(v₁, v₂]` with a `prepareQC` *conflicting* with
 the committed `w`, does not establish that "the disjunct at Line 26/27 is false".
 
-**Impact.** Statement true; repaired with a different proof (`HotStuff.Basic.theorem_2`).
+**Impact.** The statement stands, but the proof had to be replaced (`HotStuff.Basic.theorem_2`).
 
 **Details.** View-minimality over conflicting QCs does not exclude two things:
 - the lock of `r` moving, in a view in `(v₁, v_s)`, to a QC on a strict ancestor of `w`, which a
@@ -104,20 +118,14 @@ moment** at which a bad QC becomes valid: before it, every correct replica that 
 replicas can still contribute to the commit QC on `w` once a bad QC exists. This is formalized as a
 state invariant. (`HotStuff.Basic.theorem_2`, `commitQC_safety`, invariant `SInv`)
 
-### 🛠️ Lemma 3 and Theorem 4 (imprecise proofs)
-The proofs cite the wrong voters and the wrong voting rule in places.
+### 🔧 Theorem 4 (Line 27 of Algorithm 1)
+The proof says Line 27 (liveness rule) makes every correct replica vote, but when `highQC` has the *same* view as the
+replica's lock, Line 27 fails (strict inequality).
 
-**Impact.** Statements true; fixed locally (`HotStuff.Basic.lemma_3`, `safeNode_of_correct_leader`,
-`theorem_4`).
+**Impact.** The statement stands (`HotStuff.Basic.theorem_4`).
 
-**Details.**
-- Lemma 3's proof cites the prepare votes (Line 10). What it needs are the pre-commit voters, who
-  stored the `prepareQC` (Lines 16–18).
-- Theorem 4's proof says Line 27 (liveness rule) makes every correct replica vote. When `highQC`
-  has the *same* view as the replica's lock, Line 27 fails (strict inequality). Line 26 applies
-  instead, because two valid QCs of one view are on the same node.
-- The "highest lock among all replicas" must be among *correct* replicas.
-- Messages for a future view must be buffered, which the "wait for" pseudocode leaves implicit.
+**Repair.** Line 26 applies instead, because two valid QCs of one view are on the same node
+(`safeNode_of_correct_leader`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -143,6 +151,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
     Byzantine replicas send arbitrary messages subject to unforgeability (`Run.AuthValid`).
   - Messages between correct replicas sent at `τ` are delivered by `max τ GST + δ`.
   - Replicas buffer all received messages and run the leader and replica handlers of Algorithm 2.
+    Messages for a future view must be buffered, which the "wait for" pseudocode leaves implicit.
     A QC carries its signer set (the partial-signature tokens).
   - The pacemaker (`nextView` interrupts) and the client commands are per-replica *inputs*; views
     increase by one.

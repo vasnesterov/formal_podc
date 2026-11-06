@@ -5,16 +5,15 @@ Joan Feigenbaum, Brighten Godfrey, Aurojit Panda, Michael Schapira, Scott Shenke
 [10.1145/2332432.2332478](https://doi.org/10.1145/2332432.2332478). Formalized version: arXiv
 [1207.3732](https://arxiv.org/abs/1207.3732) v2 (full version); numbering follows it.
 
-**Verdict: ❌ False claim.** Both theorems hold. Theorem 3.1 says every (connected) network
-has a 1-resilient forwarding pattern. Theorem 4.3 says some network has no perfectly resilient
-one; the Figure 3 network is indeed such a network. But both lemmas behind Theorem 4.3 are false
-as stated, and its proof applies Lemma 4.1 where it does not hold. The algorithm of §3.2 is too
-under-specified to verify. We prove Theorem 3.1 with a different construction and repair the
-proof of Theorem 4.3.
+**Verdict: ⚠️ Weakened.** Both theorems hold: Theorem 3.1 says every (connected) network has a 1-resilient forwarding
+pattern, and Theorem 4.3 says some network has no perfectly resilient one; the Figure 3 network is indeed such a
+network. But both lemmas behind Theorem 4.3 are false as stated, its proof applies Lemma 4.1 where it does not hold, and
+the algorithm of §3.2 is too under-specified to verify. We prove Theorem 3.1 with a different construction and repair
+the proof of Theorem 4.3, so extending arbitrary loop-free routing tables and the polynomial running time stay unproved.
 
 ## Mistakes in the paper
 
-### ❌ Lemma 4.2 (nodes route along a cyclic ordering)
+### ⚠️ Lemma 4.2 (nodes route along a cyclic ordering)
 Lemma 4.2 is false: on the path `d – 1 – 2 – 3` with no failures, the perfectly resilient pattern
 "forward to the neighbour closer to `d`" makes node 2 send packets from 1 and from 3 both to 1, so
 it routes along no cyclic ordering (`lemma_4_2_false`).
@@ -26,7 +25,7 @@ with all four of its links up permutes `{2,3,4,5}` in one 4-cycle (`Fig3.exists_
 its live links. The proof assumes that every neighbour of the node has its own route to `d`; dead
 ends and links to `d` break this.
 
-### ❌ Lemma 4.1 (do not send packets back)
+### ⚠️ Lemma 4.1 (do not send packets back)
 Lemma 4.1 is false as stated: on `d – 1` plus the triangle `1, 2, 3`, where every node forwards to
 1 and node 1 forwards to `d` (a perfectly resilient pattern), node 2 has the path `2, 3, 1, d`
 avoiding edge `21`, yet sends packets from 1 back to 1 (`lemma_4_1_false`).
@@ -46,8 +45,9 @@ needs a path that avoids the *node* `u`.
 The algorithm of §3.2.1 is not well defined and the proof of Theorem 3.1 is only a sketch, so the
 algorithm's correctness is unestablished (we did not formalize it).
 
-**Impact.** Theorem 3.1 itself is true; we prove it with a simple construction from a rooted
-spanning tree (see below) (`theorem_3_1`).
+**Impact.** The existence part of Theorem 3.1 is true; we prove it with a simple construction from a rooted spanning
+tree (see below) (`theorem_3_1`). That construction does not extend arbitrary loop-free routing tables, as the
+introduction claims, and polynomial time is not proved in Lean, so these parts of the claim stay unproved.
 
 **Details.** Some steps are ambiguous or wrong:
 - Step 1 makes the forwarding functions partial (`∅`), but the model requires total functions.
@@ -62,22 +62,15 @@ spanning tree (see below) (`theorem_3_1`).
 - Nodes connected to `d` only through bridges are never handled. Neither is condition (2)
   (no forwarding loops) in components cut off from `d`.
 
-### ⚠️ §2 (forwarding paths: the destination must be a sink)
-Taken literally, the definition of a forwarding path lets a path go on after reaching `d`, and then
-no pattern is even 0-resilient on any network where `d` has a link (`literal_K2`).
+### ✏️ Slips
+- §2 (forwarding paths: the destination must be a sink): taken literally, the definition lets a path go on after
+  reaching `d`, and then no pattern is even 0-resilient on any network where `d` has a link (`literal_K2`). The
+  definition constrains only nodes `i ∈ [n]`, so on the network `d – 1` with no failures, `d, 1, d, 1` is a forwarding
+  loop. We let paths stop at `d`.
+- Theorem 3.1 (disconnected networks): "For every network" fails if a component without `d` has a link: with no
+  failures, packets there bounce forever (`theorem_3_1_disconnected`). We assume the network is connected.
 
-**Impact.** Degenerate reading with evident intent; we let paths stop at `d`.
-
-**Details.** The definition constrains only nodes `i ∈ [n]`. On the network `d – 1` with no
-failures, `d, 1, d, 1` is then a forwarding loop.
-
-### ⚠️ Theorem 3.1 (disconnected networks)
-"For every network" in Theorem 3.1 fails if a component without `d` has a link: with no failures,
-packets there bounce forever (`theorem_3_1_disconnected`).
-
-**Impact.** Implied assumption; we assume the network is connected.
-
-### Typos and slips
+### Typos
 - Lemma 4.1's proof says "sends it back to `i`" (should be `v`).
 - Lemma 4.2 cites "figure ??", and Theorem 4.3 cites "figure (c)" (both mean Figure 3).
 - The Case II proof says "iteration `q₁` of Step 2" (should be Step 4) and uses "`i_1 <_D γ`"
@@ -156,7 +149,8 @@ at most one failure, *every* packet in `d`'s component is delivered, whatever it
 
 **Not formalized.** The algorithm of §3.2.1 and the polynomial running time in Theorem 3.1. Our
 construction (BFS tree, depths of lowest common ancestors, minimum exits) is clearly polynomial,
-but there is no complexity model.
+but there is no complexity model. Whether the paper's own algorithm can be made correct after
+fixing its definition is not decided here.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Finite checks on the 12-node network use `decide`. The counterexamples to the lemmas

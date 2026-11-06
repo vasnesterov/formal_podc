@@ -5,15 +5,16 @@ Sebastian Brandt. *An Automatic Speedup Theorem for Distributed Problems.* PODC 
 [1902.09958](https://arxiv.org/abs/1902.09958) v1 (the only version); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** The converse of Theorem 1 ("`Π_1` in `t − 1` rounds ⇒ `Π` in `t`
-rounds"), and with it Corollary 1 and the "reversible" / "exact complexities `T − 1, T − 2, …`" claims,
-is false. It fails for the natural class of input-free `Δ`-regular high-girth graphs with arbitrary port
-numbers. It holds once the endpoints of each edge can be told apart (edge symmetry breaking). The
-forward direction, Theorem 2, Lemmas 1–4 and the lower bounds (§4.4, Theorem 4) are unaffected.
+**Verdict: ⚠️ Weakened.** The forward direction of Theorem 1, Theorem 2, Lemmas 1–4 and the lower bounds (§4.4, Theorem
+4) stand, though Lemma 4 and Theorem 4 were checked only in the port-numbering model with input orientations, not in
+their LOCAL form. The converse of Theorem 1 ("`Π_1` in `t − 1` rounds ⇒ `Π` in `t` rounds"), and with it Corollary 1 and
+the "reversible" / "exact complexities `T − 1, T − 2, …`" claims, is false: it fails for the natural class of input-free
+`Δ`-regular high-girth graphs with arbitrary port numbers. It holds once the endpoints of each edge can be told apart
+(edge symmetry breaking).
 
 ## Mistakes in the paper
 
-### 🚨 Theorem 1, (2) ⇒ (1), and Corollary 1 (the converse of the speedup)
+### ❌ Theorem 1, (2) ⇒ (1), and Corollary 1 (the converse of the speedup)
 Without edge symmetry breaking, `Π_1` in `t − 1` rounds does not give `Π` in `t` rounds: for edge
 orientation `Π_1` is solvable in 0 rounds on every graph, but `Π` is unsolvable on the `t`-independent
 class `{K_2}` (`theorem_1_backward_false`).
@@ -41,14 +42,15 @@ no independence. Input orientations (Theorem 2, §4.4, Lemmas 3–4, Theorem 4),
 and unique IDs (Theorem 3) all provide such symmetry breaking. (`theorem_1_backward`, `theorem_1`,
 `corollary_1`)
 
-### Typos and slips
+### ✏️ Slips
 - In Theorem 4 the bound is `(log*Δ − 7)/5` once and `(log*Δ − 8)/5` later. With CSLib's `log*`,
   `5T + 7 ≤ log*Δ` suffices.
 - In the proof of Theorem 3 (not formalized), the new IDs should be spaced by `2Δ^t` *elements of `S`*
   (ranks), with room at both ends; the text asks for a difference of `2Δ^t + 1` in value.
 - In §5.1, the per-colour listing of the maximal `g'_{1/2}` configurations omits the swapped case
   `({⊸}, {→, ⊸, •})`. The trit description that is actually used handles it (`edgeAllMax_superweak`).
-- §4.4's `g_{1/2}` listing omits the configurations containing `∅` (harmless).
+- §4.4's `g_{1/2}` listing omits the configurations containing `∅`; the maximal configuration used afterwards is
+  unchanged.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 

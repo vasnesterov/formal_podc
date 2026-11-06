@@ -12,32 +12,34 @@ symmetric trees) and §7.3 (`coLCP(0) ⊆ LogLCP`) make the same claims as the j
 and 6.3, and §7.3, with the same proofs. The only differences are the identifier layout of the cycles `C(a,b)`
 (identifiers up to about `n² + 3n` instead of `n²`; both are polynomial) and an even shorter 6.1 step
 ("if `G₁`, `G₂` are not isomorphic, `G` must be asymmetric", with no argument). The journal's Theorem 7.1
-(properties closed under lifts, port-numbering verifiers) is **not** in the PODC version. We formalized it, but
-it does not count towards the verdict for the PODC paper.
+(properties closed under lifts, port-numbering verifiers) is **not** in the PODC version. We formalized it anyway;
+its slip below exists only in the journal version.
 
-**Verdict: ✅ Correct.** Every checked statement is true as written, and the paper's proofs go through. We
-formalized:
+**Verdict: ✏️ Slip.** The only mistakes are a typo in the gluing step of Theorem 5.1 and an imprecise honest proof
+in Theorem 7.1 of the journal version. Every formalized statement is true as written, and apart from these the
+paper's proofs go through. Theorem 6.4 (non-3-colourability), §4 and Theorem 7.2 were not checked.
 
+## Mistakes in the paper
+
+### ✏️ Slips
+- Theorem 5.1, gluing step: the text adds the edges `{b_{i-1}[1], a_i[1]}` "for each `i > 1`", which produces a
+  path, not a `kn`-cycle; the definition `b_0 = b_k` and Figure 1c show that every `i` is meant (`glued`,
+  `glue_accept`).
+- Theorem 7.1 (journal version only): the honest proof is described as `P(v) = (H, v)`, but the encoded graph must
+  have identifiers `{1, …, n(G)}`. One has to use a relabelled copy of `H`, which lies in `P` because isomorphisms
+  are coverings (`theorem_7_1`).
+
+Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
+
+## The formalization
+
+**Formalized.**
 * the `Ω(log n)` gluing lower bound (Theorem 5.1) for odd `n`, non-bipartiteness, leader election, spanning
   trees and maximum matchings on cycles, together with the matching `O(log n)` spanning-tree schemes of §5.1;
 * the `Θ(n²)` bound for symmetric graphs (Theorem 6.1) and the `Θ(n)` bound for trees with a fixed-point-free
   symmetry (Theorem 6.3);
 * `coLCP(0) ⊆ LogLCP` (§7.3) and the colouring upper bounds of §2;
 * Theorem 7.1 (properties closed under lifts) with its converse (journal version only).
-
-A few proof steps are only sketched and a few details are imprecise. None of them affects a statement.
-
-## Mistakes in the paper
-
-No mistakes in the statements.
-
-### Typos and slips
-- Theorem 5.1, gluing step: the text adds the edges `{b_{i-1}[1], a_i[1]}` "for each `i > 1`", which produces a
-  path, not a `kn`-cycle; the definition `b_0 = b_k` and Figure 1c show that every `i` is meant (`glued`).
-
-Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
-
-## The formalization
 
 **Model.**
 * Deterministic, synchronous LOCAL verification with unique identifiers. Nodes *are* their identifiers: an
@@ -101,12 +103,8 @@ confirmed in Lean, and none affects a statement.
   family of `G₁`: asymmetric graphs in which any two vertices have three common neighbours. In `G₁ ⊛ G₂` the
   degree-2 nodes are then exactly the path nodes. We prove that this family still has at least `2^{C(k,2)}/2`
   labelled members, replacing the citation of Erdős–Rényi. (`symmetric_lcp_lower_bound`, `exists_many_good`)
-* **Theorem 7.1.** The honest proof is described as `P(v) = (H, v)`, but the encoded graph must have
-  identifiers `{1, …, n(G)}`. One has to use a relabelled copy of `H`, which lies in `P` because isomorphisms are
-  coverings. Also left implicit: surjectivity of `ϕ` needs the encoded graph to be connected, which the check
+* **Theorem 7.1.** Left implicit: surjectivity of `ϕ` needs the encoded graph to be connected, which the check
   `G ∈ P ⊆ F` provides. (`theorem_7_1`)
-* Table 2 lists `Θ(log n)` for verifying a Hamiltonian cycle, but §5 gives no lower-bound argument for it. The
-  cycle gluing does not apply: the glued all-marked `2n`-cycle is a Hamiltonian cycle. Not formalized.
 * §5.1 certifies non-bipartiteness by a counter "along the odd cycle". It certifies only an odd closed walk,
   which also rules out a 2-colouring. Our scheme uses two BFS-like trees instead (`nonBipartite_logLCP`).
 
@@ -115,8 +113,9 @@ confirmed in Lean, and none affects a statement.
 * Theorem 6.4 (non-3-colourability `Ω(n²/log n)`). Its fooling-set step is elementary, but the 3-colouring
   gadgets are not formalized.
 * Theorem 7.2 (alternative characterizations of LogLCP); §7.4–7.5.
-* The `LCP(0)` membership claims; the `O(log n)` upper bound for maximum matching on cycles (Table 2);
-  the Hamiltonian-cycle entry of Table 2 (unchecked: no argument is given for its lower bound).
+* The `LCP(0)` membership claims; the `O(log n)` upper bound for maximum matching on cycles (Table 2).
+* The Hamiltonian-cycle entry of Table 2: it lists `Θ(log n)`, but §5 gives no lower-bound argument for it. The
+  cycle gluing does not apply: the glued all-marked `2n`-cycle is a Hamiltonian cycle. We did not look further.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 * Every lower-bound theorem is paired with a matching upper bound (`*_theta`), so its hypotheses are

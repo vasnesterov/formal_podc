@@ -7,7 +7,7 @@ third case of Theorem 22.
 
 ## Errors in the paper
 
-1. **Theorem 22, third case, is false as written (⚠️, R3).** Theorem 22 says that if `2 ∉ X`,
+1. **Theorem 22, third case, is false as written (✏️).** Theorem 22 says that if `2 ∉ X`,
    `{1,3,4} ⊄ X` and `{0,1,3} ⊄ X`, then "no solution exists for infinitely many `n`". The set
    `X = {0,3,4}` (and, by reversing all edges, `{0,1,4}`) is in this case, but a `{0,3,4}`-orientation of
    the `n × n` torus exists for **every** `n ≥ 3` (`exists_orientation034`,
@@ -17,15 +17,17 @@ third case of Theorem 22.
    in-degree is then `2 − t_k + t_{k−1}`. The cyclic sequence `t = 0,2,0,2,…` (even `n`), or
    `0,2,…,0,2,1` (odd `n`), gives in-degrees in `{0,3,4}`. A brute-force search also found
    solutions for `n = 3,…,7`.
-   *Severity.* The complexity claim is still right. `{0,3,4}`-orientation is global, as the paper
+   *Effect.* The complexity claim is still right. `{0,3,4}`-orientation is global, as the paper
    itself proves by a different argument (Theorem 25, via `q`-sum coordination), and the
    introduction states the classification correctly ("otherwise it is global"). Only the reason
    given in Theorem 22, non-existence of solutions, is wrong; it holds for the other sets of this
    case, e.g. `{1,3}` (Lemma 24). The intended statement can be recovered from the paper itself (the
-   introduction and Theorem 25) and the fix is local. So by R3 this is a minor statement issue,
-   not a false claim. Borderline with ❌: the bullet as written asserts a different complexity class (unsolvable) than the true one (global); we take R3 because the correct classification is stated in the introduction and proved in Theorem 25, which the proof of Theorem 22 itself invokes ("the following lemmas cover the remaining cases"), so a reader of the paper is not misled. We did not formalize Theorem 25 (Θ(n) for `{0,3,4}`).
+   introduction and Theorem 25) and the fix is local. The bullet as written asserts a different complexity class
+   (unsolvable) than the true one (global), but the correct classification is stated in the introduction and proved
+   in Theorem 25, which the proof of Theorem 22 itself invokes ("the following lemmas cover the remaining cases"), so
+   a reader of the paper is not misled. We did not formalize Theorem 25 (Θ(n) for `{0,3,4}`).
 
-2. **Typos and slips** (none affects a statement):
+2. **Typos** (none affects a statement):
    * Proof of Theorem 10: "let `d = A(F₁X₂F₂) − A(F₁X₂F₂)`" should read `A(F₁X₂F₂) − A(F₁X₁F₂)`.
    * Reduction to 3-colouring: "for some `q` satisfying the conditions in Section 10" means the
      conditions of Theorem 10.
@@ -83,7 +85,7 @@ third case of Theorem 22.
     block, so a row sum depends on the identifiers up to distance `T + 2`. The paper explicitly
     absorbs such `O(1)` terms in its "radius-1 LCL" convention (Section 3), and the lemma is only
     used with `T = o(n)`. We neither prove nor refute the literal bound `T < n/4`; this is a
-    constant-level imprecision, not a statement issue. The proof of Theorem 9 does not use
+    constant-level imprecision. The proof of Theorem 9 does not use
     Lemma 13. It needs only the special case of strip instances (`rowSum_far`): far from the strip
     these instances carry the same identifiers.
 11. **Theorem 10** is proved by a different and stronger argument (`QSum.lean`). If `8T < n` and
@@ -104,7 +106,7 @@ third case of Theorem 22.
     `n < n₀` is unnecessary in the per-`n` formulation.
 13. **Theorem 21** (`not_edgeColouring_torus`) is stated with Mathlib's line graph
     (`IsEmpty ((torusGraph d n).lineGraph.Coloring (Fin (2d)))`) and assumes `d ≥ 1` and `n ≥ 3`.
-    For `n = 1` the "grid" has no edges and the empty colouring exists (R2, degenerate). For
+    For `n = 1` the "grid" has no edges and the empty colouring exists (✏️, degenerate). For
     `n = 2` the grid is not `2d`-regular as a simple graph.
 14. **Lemma 24** (`not_exists_oneThreeOrientation_torus`) holds for every odd `n`, including
     `n = 1`, where there are no edges and every in-degree is 0. Orientations are CSLib's

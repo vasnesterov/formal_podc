@@ -1,28 +1,28 @@
 # Differences between the formalization and the paper
 
 Paper: Holzer–Wattenhofer, *Optimal Distributed All Pairs Shortest Paths and Applications*, PODC 2012, preliminary
-full version of 22.05.2012. Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
+full version of 22.05.2012.
 
-## Statement-level issues (decide the verdict)
+## Statement-level issues
 
-1. **Theorem 5 is false (❌, R1/R5).** "Algorithm 2 computes S-SP in time `O(|S| + D)`" fails: Algorithm 2 computes
+1. **Theorem 5 is false (❌).** "Algorithm 2 computes S-SP in time `O(|S| + D)`" fails: Algorithm 2 computes
    wrong distances (`Alg2.theorem5_false`, `Alg2.exB_wrong`, `Alg2.triangle_wrong`); running longer does not
    help, since a set `δ` never changes (`Alg2.not_eventuallyCorrect`); it fails also with the natural repaired
    tie rule (minimal `δ` among same-round receipts) and every neighbour numbering (`exB_wrong` quantifies over all
-   `Network 4` with the same graph). It is not excused by R3/R4: the fix (priority by distance, then ID) changes the
-   algorithm. *Headline?* Borderline, decided ❌ by R5. The title names APSP; the abstract's last sentence does say
+   `Network 4` with the same graph). The fix (priority by distance, then ID) changes the
+   algorithm. The title names APSP; the abstract's last sentence does say
    "At the heart of these approximation algorithms is the S-Shortest Paths problem which we solve in `O(|S| + D)`
    time", and the `(×, 1+ε)` diameter algorithm built on it is also announced there. But the abstract claims are
    existential (no specific algorithm is named), they are true (correct `O(|S| + D)` S-SP algorithms exist, e.g.
-   Lenzen–Peleg's source detection), so they are only unestablished, not refuted (R5 → ❌). The false statement
+   Lenzen–Peleg's source detection), so they are only unestablished, not refuted. The false statement
    that names Algorithm 2, Theorem 5, is not itself advertised in the abstract.
-2. Consequence (not separately labelled, not formalized): Theorem 6, Corollary 4 and Theorem 7 rely on Theorem 5 and
+2. Consequence (not formalized): Theorem 6, Corollary 4 and Theorem 7 rely on Theorem 5 and
    are unestablished in the paper (their bounds follow from a correct S-SP algorithm).
 3. The running-time part of Theorem 5 is also off for the stated loop bound `|S| + D'` (`Alg2.exC_late`), with the
    paper's tie rule; this example is not robust (it depends on the numbering), so it is reported as a secondary
    observation.
 
-## Proof gaps of true statements (🛠️)
+## Proof gaps of true statements (🔧)
 
 4. **Lemma 9**: the proof never shows `diam ≥ d` for disjoint inputs; repaired (`lemma9`, potential argument,
    needs `k(n) ≥ 1`, which holds since `n ≥ d + 6`).
@@ -30,7 +30,7 @@ full version of 22.05.2012. Verdict rules: `.claude/skills/formalize-paper/verdi
    (`d(l'_ν, l'_ν') = 2p + 2`); the needed bound `≤ d + 2` holds (`lemma8`, `claim2`).
 6. **Theorem 4**: fill-up to `n/2` nodes per side is impossible for odd `n`; we split `⌊r/2⌋ / ⌈r/2⌉`.
 
-## Typos and slips (not deciding)
+## Typos and slips
 
 7. Index formula `k(n)·(μ − k(n) + 1) + ν` (§5.2) out of range; Figure 1 and Figure 2 captions use other indexings.
    Lean indexes inputs by `Fin k × Fin k` (any bijection works).

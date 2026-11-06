@@ -3,7 +3,7 @@
 Paper: O'Hearn, Rinetzky, Vechev, Yahav, Yorsh, *Verifying Linearizability with Hindsight*, PODC 2010
 (10-page author copy).
 
-## Statement-level issues (verdict-relevant)
+## Statement-level issues
 
 1. **Lemma 5.4 (Backbone Lemma) is false as stated** (`Counterexample.lean`: `lemma_5_4_false`,
    `lemma_5_4_as_stated_false`). The claim `i₀ = j₀ < j₁ < … < j_k = i_k` fails on a shape-legal trace
@@ -11,20 +11,18 @@ Paper: O'Hearn, Rinetzky, Vechev, Yahav, Yorsh, *Verifying Linearizability with 
    states just before and just after the atomic section of `remove`). Each of `j_k = i_k` and the strict
    inequalities fails separately. Corrected and proved: `i₀ = j₀ ≤ j₁ ≤ … ≤ j_k` with
    `i₀ ≤ j_m ≤ i_m` (`backbone_lemma`).
-   *Rule:* R3 (typo / evident intent) → ⚠️. The intended version can be recovered from the paper: the
+   ✏️ The intended version can be recovered from the paper: the
    lemma's own clause `i₀ ≤ j_m ≤ i_m`; its proof "follows directly from Lemma 5.2", which only gives
    `i ≤ j ≤ k`; and the definition of `ι` for `contains` in Thm 7.5, which chooses "the last state at
    or before the last crossing state in which the last crossed link is a backbone link" and so presumes
    `j_k ≤ i_k`. The fix is local (inequality symbols), and no proof in the paper uses the wrong
    version.
-   *Borderline call:* `j_k = i_k` would say that the last crossed link is a backbone link when it is
-   crossed, which would make hindsight pointless. Since nothing in the paper relies on it, we treat it as
-   a slip and not as a substantive false claim (❌).
+   `j_k = i_k` would say that the last crossed link is a backbone link when it is crossed, which would
+   make hindsight pointless. Nothing in the paper relies on it.
 2. **Lemma 5.7 conclusion typo.** It is printed as `K_σ ∩ {u.k_σ, v.k_σ} = {u.k_σ, v.k_σ}`, which is
    true but trivial (`local_window_as_printed`). The intended interval version
    `K_σ ∩ {u.k_σ, …, v.k_σ} = {u.k_σ, v.k_σ}` is the one used in Thm 7.5 and is proved as
-   `local_window` (with `Set.Icc`). *Rule:* R3; the printed statement is not false, so it does not
-   affect the verdict.
+   `local_window` (with `Set.Icc`). The printed statement is not false.
 
 ## Proofs
 

@@ -12,23 +12,22 @@ Lemma 3 → Lemma 6, appendix Lemmas 13–16 → Lemmas 3, 4, 5, 7, Theorems 4�
 Claims 6–9 → Claims 10–13.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ⚠️ Minor statement issues.** The main result holds. Any push-based protocol with at
-least three replicas that satisfies the weak list specification has metadata overhead Ω(D)
-(PODC Theorems 4 and 5). We formalized the encoding/decoding proof completely and found only small
-gaps. Theorem 1 (RGA implements the strong list specification) fails for the protocol as literally
-written, because its insert procedure counts tombstones when it locates the insertion position. The
-fix is a local index change that the paper's own definition of `ins(a, k)` dictates; with it,
-Theorem 1 holds.
+**Verdict: 🔧 Easy fix.** Theorem 1 (RGA implements the strong list specification) fails for the protocol as literally
+written, because its insert procedure counts tombstones when it locates the insertion position, but a local index change
+that the paper's own definition of `ins(a, k)` dictates makes it hold. The main lower bound holds: any push-based
+protocol with at least three replicas that satisfies the weak list specification has metadata overhead Ω(D) (PODC
+Theorems 4 and 5), and we formalized the encoding/decoding proof completely, with two local repairs. The `O(D lg k)`
+upper bound for RGA was not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Theorem 1 (RGA of Section 4.2 implements the strong list specification)
+### 🔧 Theorem 1 (RGA of Section 4.2 implements the strong list specification)
 RGA as written violates condition (1c), because its insert locates the parent in `s(N)`, which still contains
 tombstones: at one replica, `ins(x,0); ins(y,1); del(x); ins(b,1)` returns `b y`, while (1c) requires `b` at
 position 1 (`RGA.literal_not_weak`, `RGA.literal_not_satisfies`).
 
 **Impact.** A local index fix that the paper's own definition of `ins(a, k)` dictates; with it Theorem 1 holds
-(`RGA.theorem1_strong`). Borderline: without R3 this would be a false claim about the paper's own algorithm.
+(`RGA.theorem1_strong`). State, messages and tree rule stay the same.
 
 **Details.** The RGA `do` transition builds the new node "as described in the Insert procedure of Section 4.1".
 That procedure takes the parent `p = a_{k−1}` of `s(N) = a₀ … a_{n−1}`, a list that still contains the deleted
@@ -39,28 +38,24 @@ abstract execution of this execution is in `A_weak`, let alone `A_strong`. The p
 directly from the properties of the TI data structure". The same counterexample works with any number of
 replicas.
 
-Why ⚠️: the fix is local, the same tree rule applied to the list the user sees. The intent is recoverable from the
-paper: Section 3 defines positions on the returned list, and Insert's prose says "the element to the left of the
-insertion position". The proof never reasons with the tombstone-counting index. So R3 applies.
+The intent is recoverable from the paper: Section 3 defines positions on the returned list, and Insert's prose says
+"the element to the left of the insertion position". The proof never reasons with the tombstone-counting index.
 
 **Repair.** Take the parent in the visible list, `p = w_{min(k,|w|)−1}` with `w = s(N) \ T`. This is what the
 original RGA does, and it is what the meaning of `ins(a, k)` in Section 3 requires. With this fix we proved
 Theorem 1 (`RGA.theorem1_strong`).
 
-### ⚠️ Definition 10, eventual visibility (TCS version only)
-Definition 10 lacks the network-connectivity assumption, so the TCS claim that RGA guarantees eventual visibility
-fails when replica 0 runs `ins(a,0)` and never sends its message while replica 1 reads forever
-(`RGA.def10_needs_connectivity`).
+### ✏️ Slips
+- Definition 10 (eventual visibility, TCS version only) lacks the network-connectivity assumption, so the TCS claim
+  that RGA guarantees eventual visibility fails when replica 0 runs `ins(a,0)` and never sends its message while
+  replica 1 reads forever (`RGA.def10_needs_connectivity`). Every read returns `[]`, so by (1a) the insertion is
+  visible to none of them, and no abstract execution in `A_weak` satisfies eventual visibility. Definition 10 asks
+  that *every* execution with causal broadcast comply with such an abstract execution, but no protocol can do better.
+  The assumption is evidently intended: the remark after Definition 10 says so, the proof of Theorem 1 relies on it,
+  and under Definition 1 the claim holds (`RGA.theorem1_eventualVisibility`). PODC 2016 does not claim eventual
+  visibility.
 
-**Impact.** Does not affect the verdict: PODC 2016 does not claim eventual visibility. An implied assumption (R4):
-no protocol can do better, and under Definition 1 the claim holds (`RGA.theorem1_eventualVisibility`).
-
-**Details.** Definition 10 asks that *every* execution with causal broadcast comply with an abstract execution
-satisfying eventual visibility. In the counterexample every read returns `[]`, so by (1a) the insertion is visible
-to none of them, and no abstract execution in `A_weak` satisfies eventual visibility. The connectivity assumption
-is evidently intended: the remark after Definition 10 says so, and the proof of Theorem 1 relies on it.
-
-### Typos and slips
+### Typos
 - Section 4.1 is inconsistent about how a node names its parent. PODC 2016 declares `p ∈ C ∪ {◦}` (the parent's
   timestamp, with `n′.p = n.t`, as in the node `(b, t_b, t_a)` in the proof of appendix Lemma 15). Fig. 2 and the
   Insert procedure (`p = a_{k−1}`) instead name the parent by its element. The TCS version switches the
@@ -68,26 +63,24 @@ is evidently intended: the remark after Definition 10 says so, and the proof of 
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 9 (PODC Theorem 5, the lower bound)
-The proof has three small gaps: Claim 12 (PODC Claim 8) asserts an adjacency the weak specification does not give,
-the choice of `σ_w` after the final read breaks the counting of internal states, and the constructed executions are
-not checked against the user assumptions.
+### 🔧 Theorem 9, Claim 12 (PODC Theorem 5, Claim 8): adjacency of the brackets
+Claim 12 (PODC Claim 8) says that `R₂`'s read returns `…[ᵢ₋₁ ]ᵢ₋₁…` with the two brackets *adjacent*, because
+`R₂` must be able to insert `x` "between" them, but the weak specification alone gives only the set of elements.
 
-**Impact.** Statement true; all three repaired (`recover_correct`, `alpha_ok`).
+**Impact.** A few lines fix it, with no new idea (`recover_correct`).
 
-**Details.**
-- Claim 12 (PODC Claim 8) says that `R₂`'s read returns `…[ᵢ₋₁ ]ᵢ₋₁…` with the two brackets *adjacent*, because
-  `R₂` must be able to insert `x` "between" them. The weak specification alone gives only the set of elements.
-  Adjacency follows because `lo` orders the read's response and also `R₁`'s response at `ins ]ᵢ₋₁`, which has the
-  same elements, and `lo` is transitive on the read's response. We prove the read returns exactly `R₁`'s list
-  (`recover_correct`, step `hv`).
-- In the general model a `read` may change the state, including the send buffer. The paper takes `σ_w` to be
-  `R₁`'s state *after* the final read. Distinct pairs `(q, m)` then need not have distinct internal states `q`. We
-  take `σ_w` *before* the read, right after `send(m_{d+3})`, so its buffer is empty and its user-visible content is
-  `[∗]`. The read only witnesses this content.
-- The proof does not check that the constructed executions obey the user assumptions, in particular that
-  deletions only delete visible elements. The protocol is only required to be correct on such executions. We
-  verify this by induction along `α_w` (`alpha_ok`).
+**Details.** Adjacency follows because `lo` orders the read's response and also `R₁`'s response at `ins ]ᵢ₋₁`, which
+has the same elements, and `lo` is transitive on the read's response. We prove the read returns exactly `R₁`'s list
+(`recover_correct`, step `hv`).
+
+### 🔧 Theorem 9 (PODC Theorem 5): the choice of `σ_w`
+The paper takes `σ_w` to be `R₁`'s state *after* the final read, but in the general model a `read` may change the
+state, including the send buffer, so distinct pairs `(q, m)` need not have distinct internal states `q`.
+
+**Impact.** Moving `σ_w` one step earlier repairs the counting (`theorem9`).
+
+**Repair.** We take `σ_w` *before* the read, right after `send(m_{d+3})`, so its buffer is empty and its user-visible
+content is `[∗]`. The read only witnesses this content.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -142,6 +135,10 @@ Full list of differences (including modelling choices and minor imprecisions): [
 | `A_strong ⊆ A_weak` | `Strong.weak` | `Spec.lean` |
 | Literal RGA violates (1c) | `RGA.literal_not_weak`, `RGA.literal_not_satisfies` | `RGALiteral.lean` |
 | Def. 10 without connectivity fails for RGA | `RGA.def10_needs_connectivity` | `RGALive.lean` |
+
+**Proof remark.** The proof of Theorem 9 does not check that the constructed executions obey the user assumptions, in
+particular that deletions only delete visible elements. The protocol is only required to be correct on such executions.
+We verify this by induction along `α_w` (`alpha_ok`).
 
 **Not formalized.** Theorem 2, the `O(D lg k)` upper bound for RGA, which is a size estimate.
 Section 6.1 (client/server simulation, Proposition 14, Corollary 15). Section 7 (Theorem 16:

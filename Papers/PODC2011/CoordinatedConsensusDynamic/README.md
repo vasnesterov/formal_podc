@@ -5,33 +5,23 @@ DOI [10.1145/1993806.1993808](https://doi.org/10.1145/1993806.1993808). Formaliz
 10-page proceedings version (no full version exists); numbering follows it.
 Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** The paper's core results hold, and we proved them:
-
-- Lemma 3.1, the knowledge test for "I have heard from everybody".
-- Theorem 5.1: nothing non-trivial is common knowledge before time `n − 1` (known `n`) or `n`
-  (unknown `n`). So simultaneous consensus needs exactly `n − 1`, resp. `n`, rounds.
-- Theorem 6.1, Lemmas 6.2–6.4, and Theorem 6.7 (the static-line lower bound
-  `n − O(Δ^{0.28} n^{0.72})`).
-
-Several statements need fixing:
-
-- Theorem 4.1 is false as stated (quantifier order); the per-`n` version holds.
-- Definition 3 (dynamic diameter) is vacuous as written.
-- The precise running-time claim for the dynamic-diameter protocol is false, although its final
-  bound `nD/(D+Δ) + Δ` holds.
-- Lemma 6.5 names the wrong node.
-- Theorem 6.8 is only a sketch that never specifies its graph `H`. We supply `H` and the walk,
-  and the bound `Ω(nD/Δ)` then holds.
+**Verdict: 🛠️ Hard fix.** All the bounds survive, and most hold as printed or after a local change: Lemma 3.1 (the
+knowledge test for "I have heard from everybody"), Theorem 5.1 (nothing non-trivial is common knowledge before time
+`n − 1` with known `n`, or `n` with unknown `n`, so simultaneous consensus needs exactly `n − 1`, resp. `n`, rounds),
+Theorem 6.1, Lemmas 6.2–6.4 and Theorem 6.7 (the static-line lower bound `n − O(Δ^{0.28} n^{0.72})`). The lower bound
+`Ω(nD/Δ)` of Theorem 6.8, one of the results the abstract closes on, is only a sketch that never specifies its graph
+`H`; we had to supply a new construction of `H` and the walk. Theorem 4.1, the running-time claim of the
+dynamic-diameter protocol (its final bound `nD/(D+Δ) + Δ` holds) and Lemma 6.5 are false as printed, each with a
+local fix.
 
 ## Mistakes in the paper
 
-### ❌ Theorem 4.1 (quantifier order)
+### 🔧 Theorem 4.1 (quantifier order)
 Theorem 4.1 claims one bit `i` such that, in *every* execution with all inputs `i` and the upper
 bound `2n`, no node decides before hearing from everybody, but the bound `2n` reveals `n`, so a
 correct algorithm may favour `0` for some sizes and `1` for others (`theorem_4_1_literal_false`).
 
-**Impact.** The statement is false as written; the per-`n` version ("for every `n` there is an
-`i`") and its proof are correct (`theorem_4_1`).
+**Impact.** No single bit works for all network sizes.
 
 **Details.** Counterexample: decide `b = [⌊N/2⌋ odd]` as soon as an input `b` is heard, else
 decide `¬b` at time `N − 1`. This is a correct comparison-based consensus algorithm for every
@@ -39,14 +29,16 @@ valid bound `N ≥ n`. It decides at time 0 in the all-`0` execution with `n = 2
 execution with `n = 3`. The stitching proof tacitly assumes that both bad executions have the same
 size.
 
-### ❌ Running time of the dynamic-diameter protocol (§6)
+**Repair.** The per-`n` version ("for every `n` there is an `i`") and its proof are correct
+(`theorem_4_1`).
+
+### 🔧 Running time of the dynamic-diameter protocol (§6)
 The paper says nodes can stop at `n − kmax·Δ − 1` once `kmax ≥ ⌊n/(D+Δ)⌋`, but level `k` fires
 only when `k(D+Δ) ≤ n − 1`; a counterexample is the static graph on 6 nodes with `D = 2`, `Δ = 1`
 (`diamProtocol_counterexample_strict`).
 
-**Impact.** A false intermediate claim; the final bound `t < nD/(D+Δ) + Δ` is still true
-(`diamProtocol_decides`, `diamProtocol_time`). The abstract's `min{O(nD/Δ), …}` drops this
-additive `Δ`, which matters when `Δ` is large.
+**Impact.** Only the intermediate claim fails; the final bound `t < nD/(D+Δ) + Δ` is still true
+(`diamProtocol_decides`, `diamProtocol_time`).
 
 **Details.** The paper's side condition `(k−1)D < n − kΔ − 1` is necessary but not sufficient.
 To know that the diameter was `≤ D` up to time `(k−1)D`, a node must hear every
@@ -61,28 +53,32 @@ condition: the rule says `(k−1)D ≤ n − kΔ − 1`, and the later remark sa
   cannot exclude an execution in which node 2 has not heard from node 5 by time 3
   (`diamProtocol_counterexample_strict`).
 
-### ⚠️ Definition 3 (dynamic diameter)
-The definition is vacuous: "`(u, max{0, t'−D}) ↝ (v, t')` for all `t' ≤ t`" fails at `t' = 0`, so
-no graph with two or more nodes has a dynamic diameter (`not_diamLit`).
+**Repair.** Use the condition `k(D+Δ) ≤ n − 1` and `kmax ≥ ⌊(n−1)/(D+Δ)⌋`.
 
-**Impact.** Under-specified definition with an evident fix: quantify only over `t' ≥ D`
-(`DiamUpTo`). Read literally, the dynamic-diameter protocol never decides early.
-
-### ⚠️ Lemma 6.5 (wrong node; case `s < 0`)
+### 🔧 Lemma 6.5 (wrong node)
 The node that cannot distinguish the cycle-prefix from the path-prefix execution is `u_{k+s+1}`
-(the start of `P_{k+s}`), not `u_{k+s−1}`, and for `s < 0` the hypothesis must be
-`a + b < n − |s|` (`lemma_6_5_paper_node_false`, `lemma_6_5_neg_false`).
+(the start of `P_{k+s}`), not `u_{k+s−1}` (`lemma_6_5_paper_node_false`).
 
-**Impact.** A typo in the node index, plus a false case that is never used: only `s ≥ 0` is used
-later. Repaired: `lemma_6_5`.
+**Impact.** The wrong index is repeated in the statement, the proof and Figure 2, but later uses need only some node.
 
 **Details.** In the instance `n = 6, k = 0, s = 2, a = 1, b = 2, t = 3`, `u_1` does distinguish.
 
-### Typos and slips
-- Theorem 6.7's proof writes `log₂ e` for `log₂ 3`.
-- Lemma 6.2's proof drops a factor `Δ`, and its two conditions on `Δ` differ.
+**Repair.** Corrected index: `lemma_6_5`.
+
+### ✏️ Slips
+- Lemma 6.5, case `s < 0`: the hypothesis must be `a + b < n − |s|` (`lemma_6_5_neg_false`). This case is never used:
+  only `s ≥ 0` is used later.
+- Definition 3 (dynamic diameter) is vacuous as written: "`(u, max{0, t'−D}) ↝ (v, t')` for all `t' ≤ t`" fails at
+  `t' = 0`, so no graph with two or more nodes has a dynamic diameter (`not_diamLit`). Read literally, the
+  dynamic-diameter protocol never decides early. The evident fix quantifies only over `t' ≥ D` (`DiamUpTo`).
+- The abstract's `min{O(nD/Δ), …}` drops the additive `Δ` of the bound `nD/(D+Δ) + Δ` printed in §6, which matters
+  when `Δ` is large: for `Δ ≥ n` the protocol never decides before `n − 1` (`diamProtocol_eq_none_of_le`).
 - Lemma 6.3 never states the level-0 rule.
 - Lemma 3.1 holds only for unknown `n` (implicit in the text).
+- Theorem 6.7's proof writes `log₂ e` for `log₂ 3`.
+
+### Typos
+- Lemma 6.2's proof drops a factor `Δ`, and its two conditions on `Δ` differ.
 
 ## Proof gaps (statements true)
 
@@ -97,11 +93,6 @@ everything left of `a`, and a star at `b = n/2 − 1` covering everything right 
 `b − a = D − 2`. The walk deletes the left and right stars alternately in staggered blocks of
 `D − 1` rounds, observed by the far ends of the path. It needs `D ≥ 2`, and `D = O(Δ)` is
 unnecessary.
-
-### 🛠️ Lemma 6.6 (base case)
-The proof omits its base case and needs `n ≥ 3`.
-
-**Impact.** Statement true in the paper's model, which assumes `|V| > 2` (`lemma_6_6`).
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -170,8 +161,13 @@ diameter `≤ D` such that no `Δ`-coordinated consensus protocol decides by any
 `t(D−1+Δ) + 4Δ(D−1) ≤ (D−1)(n/2−1)`, in any execution that follows `H` up to time `t`. This is
 `Ω(nD/Δ)` for `D ≤ Δ + 1`.
 
-**Not formalized.** The extension of Section 5 to facts about arbitrary times and the
-exact (non-approximate) `Δ`-ladder with nested `E^{@t}` operators are not formalized either.
+Lemma 6.6: the proof omits its base case and needs `n ≥ 3`, which is the paper's model, since it assumes `|V| > 2`
+(`lemma_6_6`).
+
+**Not formalized.** The extension of Section 5 to facts about arbitrary times, and the
+exact (non-approximate) `Δ`-ladder with nested `E^{@t}` operators. Theorem 6.8 outside what the Lean theorem covers:
+`D = 1` (the clique) is not reached by our `H`, `D > n/2 + 1` needs a monotonicity step, and the bound says nothing
+once `3Δ > n/2 − 1`.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`,
 `Quot.sound`. Non-vacuity:

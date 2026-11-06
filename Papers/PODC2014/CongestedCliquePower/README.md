@@ -4,24 +4,22 @@ Andrew Drucker, Fabian Kuhn, Rotem Oshman. *On the Power of the Congested Clique
 [10.1145/2611462.2611493](https://doi.org/10.1145/2611462.2611493). Formalized version: the 10-page author copy
 (no arXiv version; the "full version" cited for several proofs is not online).
 
-**Verdict: ⚠️ Minor statement issues.** The headline results hold: the circuit simulation (Theorem 2, after
-repairing a factor-2 counting error in its proof), the reduction from set disjointness (Lemma 13), and the lower
-bounds for cliques (Theorem 15) and cycles (Theorem 19). The degeneracy upper bound (Claim 6, Theorem 7) holds for
-connected `H`. The `K_{ℓ,m}` lower-bound gadget in the proof of Lemma 21 is wrong for every `ℓ ≠ m`, so Lemma 21
-and Theorem 22 are unestablished there. Lemma 21 only claims that *some* lower-bound graph exists, and that claim
-is not refuted (other gadgets exist in the smallest case), so this is a broken proof, not a false statement. The
-statements that are false hold only in degenerate cases: Theorem 22 for `ℓ = 1` (stars), and Lemma 18 for `ℓ = 5`,
-`N = 4`, where every graph on `N < ℓ` vertices is `C_ℓ`-free.
+**Verdict: ⚠️ Weakened.** The circuit simulation (Theorem 2, after repairing a counting error in its proof), the
+reduction from set disjointness (Lemma 13) and the lower bounds for cliques (Theorem 15) and cycles (Theorem 19) hold.
+One of the three lower-bound families is lost: the `K_{ℓ,m}` gadget of Lemma 21 is wrong for every `ℓ ≠ m`, and the
+case `ℓ = m` was not checked. The degeneracy upper bound (Claim 6, Theorem 7) is proved only for connected `H`, and the
+consequences for triangle detection (Sections 2.1 and 3.6) were not checked.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 21 and Theorem 22 for `ℓ ≠ m` (the `K_{ℓ,m}` lower-bound gadget)
+### ❌ Lemma 21 and Theorem 22 for `ℓ ≠ m` (the `K_{ℓ,m}` lower-bound gadget)
 The construction in the proof of Lemma 21 contains unintended copies of `K_{ℓ,m}` for every
 `ℓ ≠ m`, so Lemma 21 and Theorem 22 are unestablished there (`lemma_21_counterexample`).
 
 **Impact.** A broken proof, not a refuted statement: Lemma 21 only claims that *some* lower-bound
-graph exists, and in the smallest case other gadgets exist. The case `ℓ = m` and all other lower
-bounds (cliques, cycles) are unaffected.
+graph exists, and in the smallest case other gadgets exist. Nothing we proved replaces the step, so
+the `K_{ℓ,m}` lower bound stands without a proof for `ℓ ≠ m`. The lower bounds for cliques and cycles
+do not use it.
 
 **Details.** The proof claims that each side of a copy of `K_{ℓ,m}` contains at least two nodes of
 `V_A ∪ V_B`, "as `|W^L| = ℓ − 2` and `|W^R| = m − 2` (and no mixing between `W^L, W^R` is
@@ -40,67 +38,70 @@ not formalized). For `|ℓ − m| ≥ 2` there is even a copy of `K_{ℓ,m}` avo
 `F_B`, so every input looks "intersecting". We do not know whether a lower-bound graph exists for
 `ℓ ≠ m` in general. For the 2-edge `F` above, a brute-force search finds valid
 `(K_{2,3}, F)`-lower bound graphs on `2N + ℓ + m − 4 = 7` vertices, so that instance of the lemma is
-true. Brute force found no problem with the paper's construction for `ℓ = m`.
+true.
 (`lemma_21_counterexample`, `lemma21_fails_succ`, `lemma21_fails_succ'`, `lemma21_fails_free`)
 
 ### ⚠️ Claim 6 and Theorem 7 for disconnected `H`
-The proof of Claim 6 needs `H` connected, but the paper also applies Theorem 7 to forests.
+The proof of Claim 6 needs `H` connected, but the paper states Claim 6 and Theorem 7 for every graph and also applies
+Theorem 7 to forests.
 
-**Impact.** Proved for connected `H` with at least one edge, which covers cycles, cliques and
-complete bipartite graphs (`claim_6`, `theorem_7`). For disconnected `H` (including forests) the
-claim is unestablished: our brute force found no counterexample, and we have no proof.
+**Impact.** Proved only for connected `H` with at least one edge, which covers cycles, cliques, complete bipartite
+graphs and trees (`claim_6`, `claim_6_isDegenerate`, `theorem_7`). Disconnected forests are not covered.
 
 **Details.** The proof uses that `ex(n, H)` is non-decreasing in `n` and that
 `ex(2n, H) ≥ 2 ex(n, H)` (two disjoint copies of an extremal graph). Both fail for disconnected
 `H`, e.g. `H = K₂ ∪ K₁` has `ex(2, H) = 1 > ex(3, H) = 0` (`extremalNumber_edge_plus_point`). For
 forests the doubling step fails too: `ex(3, 2K₂) = 3` (a triangle) but `ex(6, 2K₂) = 5` (a star).
 
-### ⚠️ Theorem 22 for `ℓ = 1` (stars)
-Theorem 22 is stated "for any `ℓ, m ≥ 1`", but for `ℓ = 1` (and, symmetrically, `m = 1`) one round
-with one-bit messages suffices, not `Ω(√n/b)` (`theorem_22_false_of_l_eq_one`, `starAlg`).
-
-**Impact.** Degenerate: `K_{1,m}` is a star, and `G` contains it iff some node has degree `≥ m`.
-Lemma 21 assumes `ℓ, m ≥ 2`, so this is evidently a typo.
-
-### ⚠️ Lemma 18 for `ℓ = 5`, `N = 4` (lower-bound graphs for cycles)
+### 🔧 Lemma 18 for `ℓ = 5`, `N = 4` (lower-bound graphs for cycles)
 Lemma 18 claims an *extremal* `C_ℓ`-free `F` with a `(C_ℓ, F)`-lower bound graph for every even
 `N`; for `ℓ = 5`, `N = 4` none exists (`lemma_18_false`, `no_lowerBoundGraph_C5_K4`).
 
-**Impact.** Degenerate corner: for `N < ℓ` every graph on `N` vertices is `C_ℓ`-free, and
-Theorem 19 (asymptotic in `n`, `ℓ` fixed) never uses it. Theorem 19 is proved from a corrected
-Lemma 18.
+**Impact.** One condition changes and the construction stays. For `N < ℓ` every graph on `N` vertices is
+`C_ℓ`-free, and Theorem 19 (asymptotic in `n`, `ℓ` fixed) never uses this range. Theorem 19 is proved from a
+corrected Lemma 18.
 
 **Details.** For odd `ℓ` the proof takes `F = K_{N/2,N/2}` "since `ex(N, C_ℓ) = N²/4`". That holds
 only for large `N`. For `ℓ = 5`, `N = 4` the unique extremal `C₅`-free graph is `K₄`, and no
 `(C₅, K₄)`-lower bound graph exists on any number of vertices. The witness cycle for an edge
 `{u, v}` has a single vertex outside `V_A ∪ V_B`, so it contains a direct edge `A_x B_y` with
 `x, y ∈ {u, v}`. Two such edges for the disjoint edges `{0,1}` and `{2,3}` of `K₄` close a 5-cycle
-through three vertices of `V_A`, which violates condition II. Whether the lemma also fails for some
-`N ≥ ℓ` (where `ex(N, C_ℓ) > N²/4` can still hold for odd `ℓ`) is not checked.
+through three vertices of `V_A`, which violates condition II.
 (`not_lemma18Statement`)
 
 **Repair.** With "extremal" replaced by "`C_ℓ`-free, with all edges between the two halves when
 `ℓ` is odd" the construction is correct for all `N`; we prove this (including condition II for
 every cycle, which the paper does not argue) and derive Theorem 19 from it. (`lemma_18`)
 
-### Typos and slips
+### 🔧 Lemma 18 (proof), the bound for even `ℓ`
+The proof claims "`ex(N, C_ℓ) = Ω(N^{3/2})`" for every even `ℓ`; for `ℓ ≥ 6` this contradicts
+Bondy–Simonovits (`ex(N, C_{2k}) = O(N^{1+1/k})`).
+
+**Impact.** The claim is never used: deleting it saves everything, and the even case is proved without it
+(`lemma_18_even`).
+
+### ✏️ Slips
+- Theorem 22 is stated "for any `ℓ, m ≥ 1`", but for `ℓ = 1` (and, symmetrically, `m = 1`) one round with one-bit
+  messages suffices, not `Ω(√n/b)` (`theorem_22_false_of_l_eq_one`, `starAlg`): `K_{1,m}` is a star, and `G` contains
+  it iff some node has degree `≥ m`. Lemma 21 assumes `ℓ, m ≥ 2`, so this is evidently a typo.
+- Theorem 4 says "depth `c·R`" with `c > 1`; the simulation gives depth `R / c` (`theorem_4`).
+- After Theorem 7 the paper says that for a fixed tree or forest `ex(n, H) = O(1)`. It is `O(n)`,
+  which is what the stated running time `O(log(n)/b)` needs.
 - Lemma 14's construction connects `u_1, …, u_{ℓ−1}` to everything; it should be `u_{ℓ−4}`.
 - Lemma 18's index ranges for the path nodes `u_{i,j}` give `⌊ℓ/2⌋` (resp. `⌈ℓ/2⌉`) internal
   nodes; it should be `⌊ℓ/2⌋ − 2` (resp. `⌈ℓ/2⌉ − 2`), consistent with the stated path lengths and
   the `(ℓ−4)N/2` extra nodes.
-- Lemma 18 also claims "`ex(N, C_ℓ) = Ω(N^{3/2})`" for every even `ℓ`; for `ℓ ≥ 6` this contradicts
-  Bondy–Simonovits (`ex(N, C_{2k}) = O(N^{1+1/k})`), but it is never used.
+
+### Typos
 - Lemma 21's proof says "assume `n = 4N + ℓ + m − 4`"; it should be `2N`.
-- Theorem 4 says "depth `c·R`" with `c > 1`; the simulation gives depth `R / c`.
-- After Theorem 7 the paper says that for a fixed tree or forest `ex(n, H) = O(1)`. It is `O(n)`,
-  which is what the stated running time `O(log(n)/b)` needs.
+- Section 3.6 prints the bound as `Ω(n/(e^{O(√n)} b))`, while the introduction has `e^{O(√log n)}`.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Theorem 2 (circuit simulation)
+### 🔧 Theorem 2 (circuit simulation)
 The proof's count of heavy gates is off by a factor 2: the total weight is `2N`, not `≤ n² s`.
 
-**Impact.** Statement true; repaired with adjusted thresholds (`theorem_2`).
+**Impact.** Only the thresholds change, and the rest of the proof stands (`theorem_2`).
 
 **Details.** The proof calls `G` heavy if `w(G) = |in G| + |out G| ≥ ns` (`N = n² s` wires) and
 claims that "the number of heavy gates cannot exceed `n`". It also claims that the greedy
@@ -158,7 +159,12 @@ Full list of differences (including modelling choices and minor imprecisions): [
 
 **Not formalized.** Section 2.1 (matrix multiplication and triangles), Remark 3, the threshold/ACC consequences,
 Lemma 8 and Theorem 9 (sampling), Theorem 22 for `ℓ = m` (it needs `ex(N, C₄) = Ω(N^{3/2})`), and Section 3.6
-(triangles vs. 3-party NOF disjointness).
+(triangles vs. 3-party NOF disjointness). Open remarks:
+* Lemma 21 and Theorem 22 for `ℓ = m`: brute force found no problem with the paper's construction on small `F`.
+* Lemma 18 for odd `ℓ` and `N ≥ ℓ` (where `ex(N, C_ℓ) > N²/4` can still hold, e.g. `ℓ = 7`, `N = 8`): whether the
+  printed lemma also fails there was not checked.
+* Claim 6 and Theorem 7 for disconnected `H`: our brute force found no counterexample for `n ≤ 6`, and we have no
+  proof.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: `andCircuit_ucast` runs Theorem 2 on a concrete circuit. `theorem_7`'s algorithm satisfies the detection

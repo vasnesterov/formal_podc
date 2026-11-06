@@ -4,33 +4,30 @@ Yoann Dieudonné, Andrzej Pelc, Vincent Villain. *How to meet asynchronously at 
 [10.1145/2484239.2484245](https://doi.org/10.1145/2484239.2484245). Formalized version: arXiv
 [1301.7119](https://arxiv.org/abs/1301.7119) v2 (full version, 2015); numbering follows it.
 
-**Verdict: 🛠️ Proof repaired.** Lemma 2.1, Lemma 3.1, the synchronization Lemmas 3.2–3.6 and the main
-Theorem 3.1 are all true as stated, for the paper's fully adversarial continuous asynchronous model and any
-exploration procedure with a non-decreasing polynomial step count. Reingold's theorem (UXS) is a hypothesis. Two
-proof steps need repair. The case analysis of Lemma 3.3 misses a case. The length estimates that define the
-polynomial `Π` are wrong for slowly growing `P`. Neither changes a statement.
+**Verdict: 🔧 Easy fix.** Lemma 2.1, Lemma 3.1, the synchronization Lemmas 3.2–3.6 and the main Theorem 3.1 are
+all true as stated, for the paper's fully adversarial continuous asynchronous model and any exploration procedure
+with a non-decreasing polynomial step count, with Reingold's theorem (UXS) as a hypothesis. Two proof steps need
+local repair: the case analysis of Lemma 3.3 misses a case, and the length estimates that define the polynomial
+`Π` are wrong for slowly growing `P`. Neither changes a statement, and the applications of Section 4 were not
+checked.
 
 ## Mistakes in the paper
 
-No mistakes in the statements.
-
-### Typos and slips
+### ✏️ Slips
 - Definition 3.8: the pseudocode loop body should be "Follow trajectory `X(k, v)`", not `Ω(k, v)`.
+- §2: `|x| = ⌈log x⌉` should be `⌊log x⌋ + 1`, the length of the binary representation, which is what is used.
 - Lemma 3.6, Case 2, `µ = 1`: the contradiction comes from Lemma 3.3 (`a` has not completed the first atom
   `N` of piece `j+1` when `b` ends its fence), not from Lemma 3.4.
 - Proof of Lemma 3.3: `Ω_b(2(n+l))` contains `(4(n+l)−1)|K(2(n+l))|` copies of `X(2(n+l))`, not
-  `2(2(n+l)−1)|K(2(n+l))|`. This is harmless, since the latter is smaller.
-- §2: `|x| = ⌈log x⌉` should be `⌊log x⌋ + 1`, the length of the binary representation, which is what is used.
+  `2(2(n+l)−1)|K(2(n+l))|`, and the printed "at most" bound for `(2k−1)|K(k)|` fails at `k = 2(n+l)`. This is
+  harmless, since the printed count is smaller.
 - The proof of Theorem 3.1 says "since the polynomial `P(k)` is non-decreasing". Monotonicity of `P` (and
   `P ≥ 1`) is used already in the correctness proof (Lemmas 3.2–3.6 compare `|A(·)|`, `|B(·)|` at different
   parameters), but it is stated only there. It is harmless: the step count can always be padded.
-- Lemma 2.1: `H` must keep `G`'s port numbers on the copied trajectory edges. The proof never says why the
-  procedure follows the same trajectory in `H` (it sees the same degrees and entry ports). That a free port
-  exists also uses connectivity.
 
 ## Proof gaps (statements true)
 
-### 🛠️ Lemma 3.3 (missing case)
+### 🔧 Lemma 3.3 (missing case)
 The proof says "if during this time interval agent `a` has not started any fence, it would have to follow a
 trajectory included in a piece `T_a(k)`", overlooking that `a` may spend the whole fence `Ω_b(2(n+l))` of `b`
 inside one of its own fences, started before `b`'s.
@@ -45,7 +42,7 @@ start a fence during the interval, which is not shown.
 piece `j + 1`. Nor can `a` stay inside the single piece `j + 1` (counting); here `j + 1 ≤ 2(n+l)` because `b`
 finished first. (`lemma_3_3`)
 
-### 🛠️ Theorem 3.1 (length estimates defining `Π`)
+### 🔧 Theorem 3.1 (length estimates defining `Π`)
 The proof's bounds `|Y(k, v)| ≤ Y*_k = 2P(k)·Q*_k` and `|A(k, v)| ≤ A*_k = 2P(k)·Z*_k` are false, e.g. for
 `P ≡ 1`, `|Y(1)| = 10 > 6 = Y*_1` and `|A(1)| = 42 > 12 = A*_1` (`paper_Ystar_wrong`, `paper_Astar_wrong`), so
 the paper's `Π(n, m)` is not justified.
@@ -102,11 +99,16 @@ Full list of differences (including modelling choices and minor imprecisions): [
 Lemmas 3.2–3.6 are stated for any `N0 ≥ n` in place of `n + l`, and with the hypothesis "the agents have not met
 before" as `NoMeet` (no meeting at a time when neither agent has passed a given index). Segments are 0-indexed.
 `lemma_3_6` gives Properties 1–4 for the segment indices where both agents still have a border after segment `i`
-(`i + 1 < min(k, s)` for both); Properties 1 and 2 for the last segment of the agent with the shorter modified
-label are not stated (they are not used).
+(`i + 1 < min(k, s)` for both).
+
+Lemma 2.1: `H` must keep `G`'s port numbers on the copied trajectory edges. The proof never says why the
+procedure follows the same trajectory in `H` (it sees the same degrees and entry ports). That a free port
+exists also uses connectivity. These details are routine and proved in `lemma_2_1`.
 
 **Not formalized.** Theorem 2.1 (procedure ESST) and Section 4 (team size, leader election, renaming,
-gossiping via SGL). Reingold's theorem is a hypothesis.
+gossiping via SGL). Properties 1 and 2 of Lemma 3.6 for the last segment of the agent with the shorter modified
+label are not stated (Theorem 3.1 does not use them). Reingold's theorem, and the transformation of his procedure
+into one traversing all edges, are hypotheses.
 
 **Trust.** No `sorry`; the listed theorems use only the axioms `propext`, `Classical.choice`, `Quot.sound`.
 Non-vacuity: `k2Explorer` (an exploration family on `K₂`) and `idWalk` satisfy all hypotheses, and `k2_meet`

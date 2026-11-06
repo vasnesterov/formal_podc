@@ -6,25 +6,23 @@ Theorem 16 → 5.2, …). The JACM version was consulted; it has the same defini
 
 ## Statement-level issues
 
-1. **Definition 20 / Theorem 21 (typo, R3 → ⚠️).** Definition 20 defines
+1. **Definition 20 / Theorem 21 (typo, ✏️).** Definition 20 defines
    `HistPSI = {H | ∃VIS, CO. (H, VIS, CO) ∈ ExecSI}` — with `ExecSI`, not the `ExecPSI` defined on the line above
    (checked on the rendered page, p. 9 of the extended version; the JACM version, Definition 5.14, has the same
    typo). Read literally, `HistPSI = HistSI`, and Theorem 21 (`HistPSI` = histories of graphs in `GraphPSI`) is
    false: the long-fork history of Figure 2(c) has a dependency graph in `GraphPSI` but is not in `HistSI`
    (see `Examples.lean`). The intent is evident (the text, the name, Theorem 22 and the proof of Theorem 21 all use
-   `ExecPSI`), so we define `HistPSI` with `ExecPSI` and prove Theorem 21 for it (`theorem21`). Decided by R3
-   (typo with evident intent, local fix) → ⚠️. Theorem 21 is cited from the authors' DISC 2015 paper, but it is a
+   `ExecPSI`), so we define `HistPSI` with `ExecPSI` and prove Theorem 21 for it (`theorem21`). Theorem 21 is cited from the authors' DISC 2015 paper, but it is a
    numbered theorem of this paper and is used for Theorem 22's interpretation.
 
 ## Proof-level issues (statements true)
 
-2. **Lemma 26, transitivity of `WW_splice(G)`: missing case.** The proof first shows `T' —WW→ S''` and only then
+2. **Lemma 26, transitivity of `WW_splice(G)`: missing case (🔧).** The proof first shows `T' —WW→ S''` and only then
    `T ≉ S`. In the first part, case `V'' —WW→ V'`, it excludes `S'' —WW→ T'` by the cycle
    `T' —WW→ V' —SO⁻¹→ V'' —WW→ S'' —WW→ T'` of Figure 10(f), which is a cycle of `DCG(G)` only if `S'' ≉ T'`; the
    case `S'' ≈ T'` (i.e. `T ≈ S`) is not covered. Repair (used in Lean): prove `T ≉ S` first — the paper's own
-   second part does not use the first — after which the cycle is in `DCG(G)`. Routine; we do not count it as a
-   genuine repair (borderline ✅/🛠️; see the verdict in the README).
-3. **Lemmas 26 and 27: implicit distinctness.** Several anti-dependencies `S' —RW→ V'` are derived without checking
+   second part does not use the first — after which the cycle is in `DCG(G)`.
+3. **Lemmas 26 and 27: implicit distinctness (✏️).** Several anti-dependencies `S' —RW→ V'` are derived without checking
    `S' ≠ V'` (required by Definition 5), e.g. Figure 10(d). When `S' = V'` the configuration is itself a cycle
    `S'' —SO→ S' —WR→ S''` excluded by `G ∈ GraphSI`; the Lean proof handles these cases (`Hyp.no_ww_of_wr_wr`).
 4. **Theorem 10(i), construction of the total commit order.** The paper adds unrelated pairs one at a time and
@@ -82,7 +80,7 @@ Theorem 16 → 5.2, …). The JACM version was consulted; it has the same defini
   chopping criteria; the static robustness analyses of §6 beyond Theorems 19 and 22.
 - Most worked examples (Figures 4–6, 11–13); `Examples.lean` covers the anomalies of Figure 2 listed in the README.
 
-## Small slips (no effect)
+## Typos (no effect)
 
 - §6.1: "the dependency graph `G₄` of the long fork anomaly in Figure 4" should be Figure 2(c).
 - Proof of Theorem 10(i): "in Figure 3 the transactions `T'` and `T''` are unrelated" should be Figure 4.

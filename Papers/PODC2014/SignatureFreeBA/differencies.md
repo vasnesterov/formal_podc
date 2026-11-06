@@ -3,15 +3,15 @@
 Paper: Mostéfaoui, Moumen, Raynal, *Signature-Free Asynchronous Byzantine Consensus with t < n/3 and
 O(n²) Messages*, PODC 2014; full version IRISA PI-2016 (hal-00944019).
 
-## Statement-level issues (decide the verdict)
+## Statement-level issues
 
-1. **Lemma 5, Theorem 2 (BC-Termination), Theorem 3 are false** (`Attack.counterexample`,
+1. ❌ **Lemma 5, Theorem 2 (BC-Termination), Theorem 3 are false** (`Attack.counterexample`,
    `Attack.prob_termination_eq_zero`). For `n = 4`, `t = 1`, inputs `0, 0, 1` and one Byzantine
    process, an adversary of the paper's model prevents every decision, for every coin sequence.
    The proof's error is in the third case of the Claim: `v` (the value adopted at line 09) is
    chosen by the adversary after the coin `s` is known, so `P(s = v) = 1/2` does not hold.
-   *Rule.* R5. Theorem 2 and the abstract ("the expected number of rounds to decide is four")
-   are claims about the paper's specific algorithm, so this is a false headline (🚨). R4 does not
+   Theorem 2 and the abstract ("the expected number of rounds to decide is four")
+   are claims about the paper's specific algorithm. The model does not
    excuse it. The paper explicitly lets the Byzantine processes control the schedule and only
    asks that the coin cannot be computed *in advance* (Section 4.1, footnote 2). Our adversary
    uses the coin of round `r` only after two correct processes (and the Byzantine one) have
@@ -23,11 +23,11 @@ O(n²) Messages*, PODC 2014; full version IRISA PI-2016 (hal-00944019).
    by the Byzantine `p3`), so even an ideal coin oracle does not help; only a content-oblivious
    scheduler (footnote 2, which the paper sets aside) would. The problem was reported earlier by
    Tholoniat and Gramoli (arXiv:1909.07453, 2019).
-   *Why 🚨 and not ❌.* The title's existential claim (signature-free, `t < n/3`, `O(n²)` messages)
-   survives through the new algorithm of the J. ACM 2015 version, but Theorem 2 and the abstract's
-   "expected number of rounds to decide is four" name the paper's specific algorithm (Figure 2), so
-   R5 gives 🚨.
-   *Borderline check.* The counterexample is not an artefact of our liberal guards. In each round
+   *Journal version.* The title's existential claim (signature-free, `t < n/3`, `O(n²)` messages)
+   survives through the new algorithm of the J. ACM 2015 version, which we did not formalize, but
+   Theorem 2 and the abstract's "expected number of rounds to decide is four" name the paper's
+   specific algorithm (Figure 2).
+   *Not an artefact of the model.* The counterexample is not an artefact of our liberal guards. In each round
    every delivery happens when no correct process has a pending step (`Local.eager`). The
    `bin_values` used at line 04 is a singleton, and every admissible set of `n − t` `AUX` messages
    at line 05 yields the same `values` (`Local.forced`). At the end of a round no step of that

@@ -4,46 +4,44 @@ Peter W. O'Hearn, Noam Rinetzky, Martin T. Vechev, Eran Yahav, Greta Yorsh. *Ver
 with Hindsight.* PODC 2010. DOI [10.1145/1835698.1835722](https://doi.org/10.1145/1835698.1835722).
 Formalized version: the 10-page author copy (no arXiv version); numbering follows it.
 
-**Verdict: ⚠️ Minor statement issues.** The main results hold. The optimistic set algorithm of Fig. 1
-satisfies all the integrity invariants and is memory safe (Thm 4.1). `contains` is wait-free (Thm 6.4),
-and the algorithm is linearizable (Thm 7.5). The Hindsight Lemma (Lemma 5.2) and the Local Window Lemma
-(Lemma 5.7) are proved as intended. The Backbone Lemma (Lemma 5.4) is false as printed: the claimed
-`j₀ < j₁ < … < j_k = i_k` must be weakened to `j₀ ≤ j₁ ≤ … ≤ j_k ≤ i_k`. That weaker form is what its
-proof gives and what Thm 7.5 uses.
+**Verdict: ✏️ Slip.** The main results hold: the optimistic set algorithm of Fig. 1 satisfies all the
+integrity invariants and is memory safe (Thm 4.1), `contains` is wait-free (Thm 6.4), the algorithm is
+linearizable (Thm 7.5), and the Hindsight Lemma (Lemma 5.2) and the Local Window Lemma (Lemma 5.7) are
+proved as intended. The Backbone Lemma (Lemma 5.4) is false as printed: the claimed
+`j₀ < j₁ < … < j_k = i_k` must be weakened to `j₀ ≤ j₁ ≤ … ≤ j_k ≤ i_k`, which is what its proof gives
+and what Thm 7.5 uses. The only other correction is reading "its atomic section" in Thm 7.5 as the
+successful one, as the paper's proof does.
 
 ## Mistakes in the paper
 
-### ⚠️ Lemma 5.4 (Backbone Lemma)
-The lemma's indices `i₀ = j₀ < j₁ < … < j_k = i_k` do not exist in general: both `j_k = i_k` and
-the strict inequalities fail on a real execution of the algorithm, `add(5)` followed by `remove(5)`
-(`lemma_5_4_false`, `lemma_5_4_as_stated_false`).
+### ✏️ Slips
+- **Lemma 5.4 (Backbone Lemma).** The lemma's indices `i₀ = j₀ < j₁ < … < j_k = i_k` do not exist in
+  general: both `j_k = i_k` and the strict inequalities fail on a real execution of the algorithm,
+  `add(5)` followed by `remove(5)` (`lemma_5_4_false`, `lemma_5_4_as_stated_false`). The weak form
+  `i₀ = j₀ ≤ j₁ ≤ … ≤ j_k ≤ i_k` is what the lemma's proof gives and what Thm 7.5 uses; nothing
+  downstream is affected, and we prove it (`backbone_lemma`).
 
-**Impact.** A local fix with evident intent: the weak form `i₀ = j₀ ≤ j₁ ≤ … ≤ j_k ≤ i_k` is what
-the lemma's proof gives and what Thm 7.5 uses; nothing downstream is affected.
+  The lemma claims that for a temporal backbone `ζ` through `τ(i₀), …, τ(i_k)` there are indices
+  `i₀ = j₀ < j₁ < … < j_k = i_k` such that `ζ(m)` is a backbone link in `τ(j_m)`. Counterexample:
+  thread 0 runs `add(5)`, giving `H → a → T`, then thread 1 runs `remove(5)`. Let `i₀` be the state
+  just before the atomic section of `remove` and `i₁ = i₀ + 1` the state right after it. Then
+  `⟨H, a⟩, ⟨a, T⟩` is a temporal backbone through `τ(i₀), τ(i₁)`, since the removed node `a` keeps its
+  successor. But `⟨a, T⟩` is a backbone link only at `i₀`. So `j₁ = i₁` is impossible, and so is
+  `j₀ < j₁ ≤ i₁`. The trace is shape-legal by Thm 4.1, so every hypothesis of the lemma holds. The last
+  link of a temporal backbone need not be a backbone link when it is crossed; that is the whole point of
+  hindsight. The paper itself shows that the weak form is intended: the lemma's clause
+  `i₀ ≤ j_m ≤ i_m`, its one-line proof via Lemma 5.2, and the choice of `ι` for `contains` in Thm 7.5
+  ("the last state at or before the last crossing state in which the last crossed link is a backbone
+  link") all fit only the weak form.
+- In Thm 7.5, "the transition in which `t` executes its atomic section" must mean the *successful*
+  one. An `add`/`remove` may run its atomic section several times, restarting after failed
+  validations.
 
-**Details.** The lemma claims that for a temporal backbone `ζ` through `τ(i₀), …, τ(i_k)` there
-are indices `i₀ = j₀ < j₁ < … < j_k = i_k` such that `ζ(m)` is a backbone link in `τ(j_m)`.
-Counterexample: thread 0 runs `add(5)`, giving `H → a → T`, then thread 1 runs `remove(5)`. Let
-`i₀` be the state just before the atomic section of `remove` and `i₁ = i₀ + 1` the state right
-after it. Then `⟨H, a⟩, ⟨a, T⟩` is a temporal backbone through `τ(i₀), τ(i₁)`, since the removed
-node `a` keeps its successor. But `⟨a, T⟩` is a backbone link only at `i₀`. So `j₁ = i₁` is
-impossible, and so is `j₀ < j₁ ≤ i₁`. The trace is shape-legal by Thm 4.1, so every hypothesis of
-the lemma holds. The last link of a temporal backbone need not be a backbone link when it is
-crossed; that is the whole point of hindsight. The paper itself shows that the weak form is
-intended: the lemma's clause `i₀ ≤ j_m ≤ i_m`, its one-line proof via Lemma 5.2, and the choice of
-`ι` for `contains` in Thm 7.5 ("the last state at or before the last crossing state in which the
-last crossed link is a backbone link") all fit only the weak form.
-
-**Repair.** We prove the intended statement `i₀ = j₀ ≤ j₁ ≤ … ≤ j_k ≤ i_k` (`backbone_lemma`).
-
-### Typos and slips
+### Typos
 - Lemma 5.7's conclusion is printed as `K_σ ∩ {u.k_σ, v.k_σ} = {u.k_σ, v.k_σ}`. That only says both
   keys are backbone keys, which is trivially true (`local_window_as_printed`). The proof of Thm 7.5
   uses the interval form `K_σ ∩ {u.k_σ, …, v.k_σ} = {u.k_σ, v.k_σ}`, which we prove
   (`local_window`). The interval form needs only `φ_s` and the backbone being a single heap path.
-- In Thm 7.5, "the transition in which `t` executes its atomic section" must mean the *successful*
-  one. An `add`/`remove` may run its atomic section several times, restarting after failed
-  validations.
 - Def. 7.2 is sloppy: it mixes indices of `H` and of `π`, and "linearizable with respect to a
   sequential history". We use CSLib's standard (amended Herlihy–Wing) definition.
 

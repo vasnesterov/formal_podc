@@ -1,7 +1,6 @@
 # Differences between the formalization and the paper
 
 Paper: Dieudonné, Pelc, Villain, *How to meet asynchronously at polynomial cost*, arXiv:1301.7119v2.
-Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
 
 ## Model and modelling choices
 
@@ -24,7 +23,7 @@ Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
 4. **Assumptions on `P`.** We assume `P(k) ≥ 1` (field `Explorer.P_pos`) and `P` non-decreasing. The paper
    states monotonicity only at the very end of the proof of Theorem 3.1, but uses it in Lemmas 3.2–3.6 and in
    Theorem 3.1, which compare `|A(·)|`, `|B(·)|`, `|K(·)|` at different parameters. Both assumptions are
-   harmless (pad by back-and-forth moves). R4: holds throughout the paper's use.
+   harmless (pad by back-and-forth moves). They hold throughout the paper's use (✏️).
 5. **Route as a fixed sequence.** Before the meeting the agent learns nothing that depends on the other agent,
    so its route is a fixed node sequence determined by the graph, its start node and its label
    (`Explorer.route`). We do not formalize the agent as a Turing machine.
@@ -55,14 +54,14 @@ Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
 
 ## Proofs: gaps and repairs
 
-13. **Lemma 3.3 (gap, statement true; 🛠️ by R1).** The proof claims that if `a` starts no fence during `b`'s
+13. **Lemma 3.3 (gap, statement true; 🔧).** The proof claims that if `a` starts no fence during `b`'s
     fence, `a` stays inside a piece. It overlooks that `a` may be inside a fence started earlier. We give a
     different argument (`lemma_3_3`). Take `j` = the last `k ≤ 2N0` such that `a` completed piece `k` by the end
     of `b`'s fence. Then:
     - `a` cannot follow a whole atom of an iteration `≥ N0` during the fence (catching against `X(2N0, v_b)`);
     - `a` cannot stay inside a piece `T_a(k)`, `k ≤ 2N0` (counting);
     - `j + 1 ≤ 2N0` in the remaining case, because `b` completed first.
-14. **Length estimates in the proof of Theorem 3.1 (wrong claims inside a proof; 🛠️ by R1).**
+14. **Length estimates in the proof of Theorem 3.1 (wrong claims inside a proof; 🔧).**
     `|Y(k, v)| ≤ 2P(k)·Q*_k` and `|A(k, v)| ≤ 2P(k)·Z*_k` are false in general (`paper_Ystar_wrong`,
     `paper_Astar_wrong`: `10 > 6`, `42 > 12` for `P ≡ 1`; at `k = 1` the `Y` bound fails for every `P`, since
     `|Y(1)| = 4P(1)² + 6P(1) > 4P(1)² + 2P(1) = Y*_1`). With `P ≡ 1`, `n = 2`, labels `1` and `3`, the
@@ -70,7 +69,7 @@ Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
     its `(2(n+l)+1)`-th piece. So the paper's specific `Π` is not justified by its proof (computed by a script,
     not in Lean). The theorem only claims existence of a polynomial; we use exact lengths (`lenX` … `lenOm`,
     `piBound`).
-15. **Lemma 3.6, Case 2, `µ = 1` (wrong reference, ⚠️-level typo inside a proof).** The contradiction comes
+15. **Lemma 3.6, Case 2, `µ = 1` (wrong reference inside a proof; ✏️).** The contradiction comes
     from Lemma 3.3 (`a` has not completed the first atom `N` of piece `j+1` by the end of `b`'s fence), not
     from Lemma 3.4. Our proof uses Lemma 3.3's second component.
 16. **Lemma 3.6's induction.** The paper argues with a minimal failing index `µ` and four cases. We prove
@@ -100,7 +99,7 @@ Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
     say why the procedure behaves the same in `H` (same degrees and entry ports, and the exit ports used are
     occupied: `obsRun_H`). That a free port exists also needs connectivity. The port order at the new nodes
     `y_q` is arbitrary in our construction (the paper's "smallest unused port" is one choice).
-20. **Small slips.** Definition 3.8's pseudocode says "Follow trajectory `Ω(k, v)`" (should be `X(k, v)`).
+20. **Small slips (✏️).** Definition 3.8's pseudocode says "Follow trajectory `Ω(k, v)`" (should be `X(k, v)`).
     Lemma 3.3's proof counts `2(2(n+l)−1)|K|` copies of `X(2(n+l))` in `Ω(2(n+l))` instead of
     `(4(n+l)−1)|K|` (harmless). §2's `|x| = ⌈log x⌉` should be `⌊log x⌋ + 1`. Lemma 3.2's "without loss of
     generality `b` is first" is unnecessary (the argument works for both orders; `lemma_3_2` is for arbitrary
@@ -115,4 +114,4 @@ Verdict rules: `.claude/skills/formalize-paper/verdicts.md`.
 ## Statement-level summary
 
 All checked statements (Lemmas 2.1, 3.1–3.6, Theorem 3.1) are true as written under the paper's model with
-the implicit assumptions of item 4 (R4). Proof repairs: items 13, 14. Verdict: 🛠️ Proof repaired.
+the implicit assumptions of item 4. Proof repairs: items 13, 14.

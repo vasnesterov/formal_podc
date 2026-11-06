@@ -7,17 +7,15 @@ version, IRISA technical report PI-2016 (February 2014), HAL
 [hal-00944019](https://hal.science/hal-00944019) (file `RR-2016-Consensus-optimal-V5.pdf`, 13 pages;
 same algorithm, lemmas and numbering as the proceedings version). Copy of the paper: [paper.pdf](paper.pdf).
 
-**Verdict: 🚨 Headline claim false.** The algorithm of Figure 2 does **not** terminate with
-probability 1, so Theorem 2 (it solves randomized binary consensus), Lemma 5 and Theorem 3
-("expected decision time is four rounds", also in the abstract) are false. For `n = 4`, `t = 1`
-and inputs `0, 0, 1`, an adversary that controls the schedule and the Byzantine process, and
-learns each coin only after two correct processes have asked for it, prevents every decision
-forever, whatever the coin values. The safety part holds: BV-broadcast (Theorem 1), Lemmas 1–4,
-validity and agreement. So do the two deterministic steps of the termination proof.
+**Verdict: ❌ Intent lost.** The algorithm of Figure 2 does **not** terminate: in the paper's own model, an
+adversary that controls the schedule and the Byzantine process prevents every decision, for every coin sequence.
+So Theorem 2, Lemma 5 and the four expected rounds of Theorem 3 and the abstract fail, and we proved no repaired
+algorithm. BV-broadcast (Theorem 1), Lemmas 1–4, validity and agreement hold, and so do the two deterministic
+steps of the termination proof.
 
 ## Mistakes in the paper
 
-### 🚨 Theorem 2 (BC-Termination), Lemma 5 and Theorem 3 (termination, four expected rounds)
+### ❌ Theorem 2 (BC-Termination), Lemma 5 and Theorem 3 (termination, four expected rounds)
 The algorithm of Figure 2 does not terminate: for `n = 4`, `t = 1` and inputs `0, 0, 1`, an adversary
 that controls the schedule and the Byzantine process, and sees each coin only after two correct
 processes have called `random()`, prevents every decision forever, for every coin sequence
@@ -25,7 +23,7 @@ processes have called `random()`, prevents every decision forever, for every coi
 
 **Impact.** The probability of termination is 0, not 1, and the expected number of rounds is infinite,
 not 4. Theorem 2 claims Figure 2 solves randomized consensus, and the abstract claims it decides in 4
-expected rounds; the paper's own algorithm is wrong, so this is a false headline claim (rule R5). Safety
+expected rounds; the paper's own algorithm is wrong, and we proved no repair. Safety
 (Theorem 1, Lemmas 1–4, validity, agreement) is unaffected.
 
 **Details.** The proof of Lemma 5 has a "Claim": with probability 1 all correct processes eventually
@@ -69,7 +67,7 @@ according to them the authors confirmed it, and the journal version (J. ACM 2015
 scheduler and a perfect common coin are needed for this algorithm and gives a new algorithm. We did not
 check the journal version.
 
-### Typos and slips
+### Typos
 - In the proof of Lemma 2, "`p_x` sent `AUX[r](v)` to `p_i` and `AUX[r](w)` to `p_i`" should end with
   "to `p_j`".
 
@@ -121,7 +119,8 @@ round whose coin is `v` (`Exec.decide_of_unanimous`). In particular, with unanim
 terminates as soon as the coin shows the input (`Exec.decide_of_unanimous_inputs`).
 
 **Not formalized.** Message, bit and step complexities (the "Cost" paragraphs, `O(n²)` messages per
-round). Probability spaces: the positive termination results are deterministic statements about
+round). Theorem 3's expected-value computation (sum of two geometric phases): it is informal, and its
+conclusion is refuted anyway. Probability spaces: the positive termination results are deterministic statements about
 fair executions. The counterexample is for `n = 4`, `t = 1` only (one instance refutes the claim
 for all `n > 3t`).
 

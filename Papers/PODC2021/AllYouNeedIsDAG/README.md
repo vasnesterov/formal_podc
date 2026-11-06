@@ -5,11 +5,16 @@ PODC 2021. DOI [10.1145/3465084.3467905](https://doi.org/10.1145/3465084.3467905
 version: arXiv [2102.08325](https://arxiv.org/abs/2102.08325) v2. Copy of the paper:
 [paper.pdf](paper.pdf).
 
-**Verdict: ❌ False claim.** DAG-Rider satisfies Integrity, Total order, Agreement and Validity (the last two given infinitely many good waves, which occur with probability 1; robust Lemma 2 and the `≤ 3/2` expected-waves bound are proved). But Lemma 1 is false as stated (for indirectly committed leaders) and the total-order proof relies on it; chain quality holds only for round-major delivery orders; several proofs (Lemma 2 → Claim 6, Claim 2, Validity) have gaps, all closed here.
+**Verdict: 🛠️ Hard fix.** Integrity, total order, agreement, validity and the expected number of waves until a commit
+all hold (agreement and validity given infinitely many good waves, which occur with probability 1), but the probability
+argument of Claim 6 needs a new object, a robust core fixed before the coin is revealed. Lemma 1 is false for indirectly
+committed leaders, chain quality holds only for round-major delivery orders, and the proofs of Claim 2 and Validity have
+gaps; all of these are closed by local changes. The complexity claims and the link from executions to the coin game were
+not checked.
 
 ## Mistakes in the paper
 
-### ❌ Lemma 1 (strong paths to committed leaders)
+### 🔧 Lemma 1 and the proof of Proposition 2 (total order)
 Lemma 1 is false for indirectly committed leaders: with `n = 4`, `f = 1`, a process commits `v₁` and then `v₃`,
 while the later wave-2 leader `v₂` sits in its DAG with no strong path to `v₁`
 (`Lemma1Counterexample.lemma1_false`).
@@ -33,7 +38,7 @@ Total order still holds: Lemma 1 for *direct* commits is enough (`lemma1_direct`
 committed leader, and that chain depends only on the global DAG. (`lemma1_direct`, `orun_inv`,
 `delivered_prefix`, `total_order`)
 
-### ⚠️ Section 3 (chain quality)
+### 🔧 Section 3 (chain quality)
 Chain quality, stated without proof, fails if the unspecified "deterministic order" of `order_vertices` lists
 vertices by source first: with `n = 4` the prefix of size `2f + 1 = 3` has only one correct block
 (`ChainQualityCounterexample.chain_quality_false`).
@@ -46,14 +51,15 @@ correctly: wave 1 delivers the leader `(1,1)`; wave 2 then delivers `(1,0), (2,0
 (rounds non-decreasing, any order within a round, even Byzantine first), every prefix of the output has
 `≥ 2f + 1` vertices in each round below its top round, and at most `f` Byzantine vertices per round.
 
-### Typos and slips
+### ✏️ Slips
+- Claim 6's "`≤ 3/2 + ε`" is slightly off for `ε > 0`: `1/(2/3 − ε) > 3/2 + ε`.
 - Line 7 requires predecessors in `⋃_{k≥1} DAG[k]`, which excludes the genesis round, so literally no round-1
   vertex is ever added.
-- Algorithm 2 calls `wave_ready(0)` with `round(0,1) = −3` (harmless).
 - Line 25 does not check that strong edges point to round `r − 1`. The prose requires it, and without it a
   Byzantine leader could skip a committed leader and break total order (described in words only).
-- Claim 7's proof ignores the buffer conditions.
-- Claim 6's "`≤ 3/2 + ε`" is slightly off for `ε > 0`: `1/(2/3 − ε) > 3/2 + ε`.
+
+### Typos
+- Algorithm 2 calls `wave_ready(0)` with `round(0,1) = −3` (harmless).
 
 ## Proof gaps (statements true)
 
@@ -76,19 +82,19 @@ Then:
 (`core_card`, `sPath_of_mem_core`, `core_congr`, `lemma2`, `goodWave_of_core`,
 `Coin.dagRider_expected_waves`)
 
-### 🛠️ Claim 2 (induction on rounds)
+### 🔧 Claim 2 and the proof of Claim 7
 Claim 2's "induction on rounds" is unsound as written: line 25 checks only the strong edges, so a Byzantine
 vertex may have weak edges to vertices of the same or a higher round.
 
 **Impact.** Statement true; repaired (`claim2`).
 
 **Details.** The proof also assumes every correct process eventually reaches the vertex's round. That progress
-claim is never proved and itself needs Claim 2.
+claim is never proved and itself needs Claim 2. Claim 7's proof likewise ignores the buffer conditions.
 
 **Repair.** We prove progress and Claim 2 jointly: induction on rounds, with an inner induction on the time at
 which the vertex was added. (`round_liveness`, `claim2`, `claim7`)
 
-### 🛠️ Proposition 4 (Validity)
+### 🔧 Proposition 4 (Validity)
 The proof skips a step: weak edges only guarantee that vertices created *later by correct processes* reach `v`,
 but the committed leader may be Byzantine.
 
@@ -96,7 +102,8 @@ but the committed leader may be Byzantine.
 
 **Details.** Missing step: a vertex of a late enough round has `2f + 1` strong edges, so at least one of them
 goes to a correct vertex, which reaches `v`. The proof also needs RBC *authenticity*: a correct sender's message
-is delivered only if it was sent. This is standard, but absent from the paper's RBC specification.
+is delivered only if it was sent. The paper's list of RBC properties omits it, but Section 2 says it in prose, and we
+model it as `Run.Valid.auth`.
 
 Full list of differences (including modelling choices and minor imprecisions): [differencies.md](differencies.md).
 
@@ -148,6 +155,7 @@ Full list of differences (including modelling choices and minor imprecisions): [
 - Communication and time complexity (Section 6.2, Table 1), post-quantum safety, and the
   threshold-signature coin.
 - The measure-theoretic link between executions and the coin game.
+- Claim 6 for `ε > 0`: only the perfect-coin game (`ε = 0`) is proved.
 
 **Trust.**
 - No `sorry`. The listed theorems use only the axioms `propext`, `Classical.choice` and

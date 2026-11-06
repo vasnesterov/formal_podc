@@ -1,19 +1,16 @@
 # Differences between the formalization and the paper
 
-Rules R1–R6 refer to `.claude/skills/formalize-paper/verdicts.md`.
-
 ## Statement-level issues
 
-1. **Lemma 2 is false for `v = Lᵢ` when the leader withholds its secret** (R1: numbered lemma; classed ⚠️ by R3).
+1. **Lemma 2 is false for `v = Lᵢ` when the leader withholds its secret** (🔧).
    - Counterexample: `TwoCycle.lemma_2_false` (digraph `A ⇄ B`, leader `A`, Bob deviating, `p = 1`). Alice's net
      redemption-premium profit is `−1`. She escrowed one asset, and her key never appears on her leaving arc.
    - True versions: `lemma_2` for `v ≠ Lᵢ`, and `lemma_2_leader_released`.
-   - *Borderline call.* We class it ⚠️ (imprecise statement, intent recoverable), not ❌. The proof of Lemma 3
+   - The proof of Lemma 3
      explicitly pays the leader's own redemption premiums `R(Lᵢ)` out of the escrow premium `E(u, v) = R(Lᵢ)`, and
      only then applies Lemma 2 to the leader. So the paper's own accounting excludes the leader's own deposits from
-     "net redemption premium profit" in this case, and the fix is local. A stricter reader could call Lemma 2 a
-     false numbered lemma (❌). The hedging result (Lemma 6) is unaffected either way.
-2. **Lemma 3, in its split form, is false for leaders** (same reason, same R3 call).
+     "net redemption premium profit" in this case, and the fix is local. The hedging result (Lemma 6) is unaffected.
+2. **Lemma 3, in its split form, is false for leaders** (same reason, 🔧).
    - Counterexample: `TwoCycle.lemma_3_split_false`. The net escrow profit is `2`, the net redemption profit `−1`,
      against the claimed `≥ 1`. The total is `1`.
    - We prove the total form: escrow profit `≥ 0` and total premium profit `≥ p` per escrowed asset (`lemma_3`).
@@ -21,7 +18,7 @@ Rules R1–R6 refer to `.claude/skills/formalize-paper/verdicts.md`.
      here.
 3. **Equation (1).** For `v ∥ q` that is neither a path nor a cycle (`v` strictly inside `q`), the paper's
    recursion does not terminate. Such premiums do occur with ≥ 2 leaders. We set `R(q, v) = p` there. This is the
-   only value the protocol needs, since a conforming `v` does not extend `q`. Classed R3: the paper's
+   only value the protocol needs, since a conforming `v` does not extend `q` (🔧). The paper's
    well-definedness remark shows it intends recursion over paths only.
 4. **Lemma 1** says "if a swap completes successfully, then each `v` has all its premiums refunded". We prove it
    for executions where everybody conforms and every asset is escrowed (`lemma_1`, `lemma_1_net`).
@@ -33,13 +30,13 @@ Rules R1–R6 refer to `.claude/skills/formalize-paper/verdicts.md`.
      before "What can go wrong?", mirroring the liveness property of §5.2), so this is not counted as an error.
      The scenario also depends on our choice of premium deadlines, which the paper does not fix. It is not
      formalized. (The paper's sentence "In the following lemmas, `v` is a compliant party" precedes Lemma 1.)
-5. **Lemma 6's proof** says "a profit of at least `p` for that asset" for every escrowed asset. That holds only
+5. **Lemma 6's proof** (✏️) says "a profit of at least `p` for that asset" for every escrowed asset. That holds only
    for assets that are not redeemed (Definition 1). We prove `p · |unredeemed escrowed assets| ≤ net` (`lemma_6`),
    and `net ≥ 0` always (`net_nonneg`).
 6. **Lemma 7** needs at least one conforming bidder, which the paper leaves implicit. Without one it fails
-   (`Auction.lemma7_needs_compliant_bidder`). Classed R4: Lemma 8 only uses it for a conforming bidder.
+   (`Auction.lemma7_needs_compliant_bidder`). ✏️: Lemma 8 only uses it for a conforming bidder.
 
-## Protocol details we had to fix (under-specification, R4)
+## Protocol details we had to fix (under-specification)
 
 - **Timeouts (§7.1).** The paper says only "each step takes time at most `Δ` … each following step's timeout
   increases by `Δ`". We use the family `Swap`:
@@ -74,15 +71,15 @@ Rules R1–R6 refer to `.claude/skills/formalize-paper/verdicts.md`.
   - For keys, the analogous problem with simple-paths-and-cycles was found by the model checker of the companion
     `Papers/PODC2018/AtomicCrossChainSwaps`.
 - **Arc orientation.** §7 defines a path by arcs `(uᵢ₊₁, uᵢ)`. Figure 3b and all later uses need `(uᵢ, uᵢ₊₁)`.
-  We follow the figure (typo).
+  We follow the figure (typo, ✏️).
 - **One redemption premium per (key, arc).** The contract keeps the first one. The contract computes premium
   amounts from the path, so a deviator cannot under-deposit.
 - **Hashkeys may be presented on an arc whose asset was never escrowed**, so that redemption premiums can be
   refunded.
-- **§5.2 swap phase.** Compliant Alice redeems Bob's principal whenever he escrows it, even if her own escrow did
+- **§5.2 swap phase (🔧).** Compliant Alice redeems Bob's principal whenever he escrows it, even if her own escrow did
   not happen. Compliant Bob escrows only after both premiums are in and Alice escrowed. Under the alternative
   reading Alice can lose `pa + pb` (`TwoParty.alt_reading_alice_loses`).
-- **§9 timing.** A key with path `q` is accepted until `1 + |q|`, counted from the start of the declaration
+- **§9 timing (✏️).** A key with path `q` is accepted until `1 + |q|`, counted from the start of the declaration
   phase. Counted from time 0, Alice's key `(A)` would expire at the end of the bidding phase. The winner rule is a
   parameter (ties are unspecified). If there is no winner, a conforming Alice forfeits her `2p`
   (`Auction.no_winner_alice_pays`).
@@ -107,6 +104,7 @@ Rules R1–R6 refer to `.claude/skills/formalize-paper/verdicts.md`.
 
 ## Proof gaps in the paper
 
+- The proof of Lemma 2 writes `q = (v, w, …, Lᵢ)` for `q = (w, …, Lᵢ)` (typo).
 - The proofs of Lemmas 2–6 rely on unstated facts, which we prove.
   - The first premium (`not_mem_fp`) and the first key (`ky_fwd`) a conforming party observes do not contain it.
     This is the unforgeability argument.
