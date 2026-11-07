@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>NonEquivocation: PSL.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2020/">PODC 2020</a><span class="sep">›</span><a href="PODC2020/NonEquivocation/">NonEquivocation</a><span class="sep">›</span><a href="PODC2020/NonEquivocation/src/">Lean source</a><span class="sep">›</span><span aria-current="page">PSL</span></nav>
+        <h1>
+          <code>PSL.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2020/NonEquivocation/">Non-Equivocation in Synchronous Agreement — PODC 2020</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2020/NonEquivocation/PSL.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="PSL"><span id="L1"><span class="kw">import</span> Papers.PODC2020.NonEquivocation.Majority</span>
+<span id="L2"><span class="kw">import</span> Cslib.Foundations.Data.Finset.Quorum</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Algorithm 2 and Theorem 5.1: interactive consistency under weak non-equivocation, `n &gt; 2t`</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">Madsen–Debois, PODC 2020, Section 5.</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">`psl t S τ p q` is Algorithm 2 (`PSL(σ_p, n, t, p, q, P)`): process `p` with local view `τ`</span></span>
+<span id="L10"><span class="dc">(`τ w = σ(p|w)`) computes the entry of source `q`, among the active processes `S`:</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">1. lines 1–7: own entry: `p`'s private value (`⟨⊥⟩` if it is `⊥`);</span></span>
+<span id="L13"><span class="dc">2. lines 8–10: if `p` has a consistent `q`-majority (Definition 4.3) for a value `v`, return `v`;</span></span>
+<span id="L14"><span class="dc">3. lines 11–19: otherwise recursively compute an interactive-consistency vector of the instance</span></span>
+<span id="L15"><span class="dc">   `σ̂(p|w) = σ(p|w|q)` on `S \ {q}` with `t - 1` faults;</span></span>
+<span id="L16"><span class="dc">4. lines 20–24: return a value `v ≠ ⟨⊥⟩` that occurs at least `t` times in that vector, or `⟨⊥⟩`.</span></span>
+<span id="L17"></span>
+<span id="L18"><span class="dc">**Readings fixed here** (see `differencies.md`): the value `v` of line 8 is a genuine value (not</span></span>
+<span id="L19"><span class="dc">`⊥`; this is the type-consistent reading, since line 2 says `⊥ ∉ V`; a reading allowing `⊥`</span></span>
+<span id="L20"><span class="dc">breaks agreement, see `literal_line8_fails`); the choice in line 20 is</span></span>
+<span id="L21"><span class="dc">deterministic (any fixed choice function: `Classical.choose`); for `t = 0` without majority the</span></span>
+<span id="L22"><span class="dc">algorithm returns `⟨⊥⟩` (this never happens in admissible runs).</span></span>
+<span id="L23"></span>
+<span id="L24"><span class="dc">`theorem_5_1`: with `t + 1` rounds, `psl t` solves interactive consistency in the weak</span></span>
+<span id="L25"><span class="dc">non-equivocation fault model whenever `n &gt; 2t`.</span></span>
+<span id="L26"><span class="dc">-/</span></span>
+<span id="L27"></span>
+<span id="L28"><span class="kw">namespace</span> NonEquivocation</span>
+<span id="L29"></span>
+<span id="L30"><span class="kw">open</span> Classical</span>
+<span id="L31"></span>
+<span id="L32"><span class="kw">variable</span> {P V : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="11">OmitVal</span> V]</span>
+<span id="L33"></span>
+<span id="L34"><span class="kw">variable</span> [<span class="const token" data-verso-hover="117">DecidableEq</span> P]</span>
+<span id="L35"></span>
+<span id="L36"><span class="dc">/-- Lines 1–10 of Algorithm 2, with `fb` the result of lines 11–24. -/</span></span>
+<span id="L37"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="199">pickMaj</span> (t : <span class="const token" data-verso-hover="57">ℕ</span>) (S : <span class="const token" data-verso-hover="69">Finset</span> P) (τ : <span class="const token" data-verso-hover="97">List</span> P → <span class="const token" data-verso-hover="98">Option</span> V) (p q : P) (fb : V) : V :=</span>
+<span id="L38">  <span class="kw">if</span> p = q <span class="kw">then</span> <span class="const token" data-verso-hover="52">rep</span> (τ [])</span>
+<span id="L39">  <span class="kw">else</span> <span class="kw">if</span> h : ∃ v, ∃ Q ⊆ S, <span class="const token" data-verso-hover="184">Maj</span> t τ p q Q v <span class="kw">then</span> h.<span class="const token" data-verso-hover="56">choose</span> <span class="kw">else</span> fb</span>
+<span id="L40"></span>
+<span id="L41"><span class="dc">/-- Lines 20–24 of Algorithm 2: a value `≠ ⟨⊥⟩` with at least `t` votes in `vec` among `S`, else</span></span>
+<span id="L42"><span class="dc">`⟨⊥⟩`. -/</span></span>
+<span id="L43"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="200">vote</span> (t : <span class="const token" data-verso-hover="57">ℕ</span>) (S : <span class="const token" data-verso-hover="69">Finset</span> P) (vec : P → V) : V :=</span>
+<span id="L44">  <span class="kw">if</span> h : ∃ v, v ≠ <span class="const token" data-verso-hover="55">omitted</span> ∧ t ≤ S.<span class="const token" data-verso-hover="48">countEq</span> vec v <span class="kw">then</span> h.<span class="const token" data-verso-hover="56">choose</span> <span class="kw">else</span> <span class="const token" data-verso-hover="55">omitted</span></span>
+<span id="L45"></span>
+<span id="L46"><span class="dc">/-! ### Unfolding lemmas -/</span></span>
+<span id="L47"></span>
+<span id="L48"><span class="kw">lemma</span> <span class="const token" data-verso-hover="201">pickMaj_self</span> {t : <span class="const token" data-verso-hover="57">ℕ</span>} {S : <span class="const token" data-verso-hover="69">Finset</span> P} {τ : <span class="const token" data-verso-hover="97">List</span> P → <span class="const token" data-verso-hover="98">Option</span> V} {p : P} {fb : V} :</span>
+<span id="L49">    <span class="const token" data-verso-hover="199">pickMaj</span> t S τ p p fb = <span class="const token" data-verso-hover="52">rep</span> (τ []) := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="199">pickMaj</span>]</span>
+<span id="L50"></span>
+<span id="L51"><span class="kw">lemma</span> <span class="const token" data-verso-hover="202">pickMaj_of_maj</span> {t : <span class="const token" data-verso-hover="57">ℕ</span>} {S Q : <span class="const token" data-verso-hover="69">Finset</span> P} {τ : <span class="const token" data-verso-hover="97">List</span> P → <span class="const token" data-verso-hover="98">Option</span> V} {p q : P} {fb v : V}</span>
+<span id="L52">    (hpq : p ≠ q) (hQ : Q ⊆ S) (h : <span class="const token" data-verso-hover="184">Maj</span> t τ p q Q v) : <span class="const token" data-verso-hover="199">pickMaj</span> t S τ p q fb = v := <span class="kw">by</span></span>
+<span id="L53">  <span class="kw">have</span> hex : ∃ v, ∃ Q ⊆ S, <span class="const token" data-verso-hover="184">Maj</span> t τ p q Q v := ⟨v, Q, hQ, h⟩</span>
+<span id="L54">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="199">pickMaj</span>, hpq, ↓<span class="const token" data-verso-hover="75">reduceIte</span>, hex, ↓<span class="const token" data-verso-hover="78">reduceDIte</span>]</span>
+<span id="L55">  <span class="kw">obtain</span> ⟨Q', -, hQ'⟩ := hex.<span class="const token" data-verso-hover="79">choose_spec</span></span>
+<span id="L56">  <span class="kw">exact</span> <span class="const token" data-verso-hover="26">lemma_4_6</span> hpq hQ' h</span>
+<span id="L57"></span>
+<span id="L58"><span class="kw">lemma</span> <span class="const token" data-verso-hover="203">pickMaj_of_not</span> {t : <span class="const token" data-verso-hover="57">ℕ</span>} {S : <span class="const token" data-verso-hover="69">Finset</span> P} {τ : <span class="const token" data-verso-hover="97">List</span> P → <span class="const token" data-verso-hover="98">Option</span> V} {p q : P} {fb : V}</span>
+<span id="L59">    (hpq : p ≠ q) (h : ¬ ∃ v, ∃ Q ⊆ S, <span class="const token" data-verso-hover="184">Maj</span> t τ p q Q v) : <span class="const token" data-verso-hover="199">pickMaj</span> t S τ p q fb = fb := <span class="kw">by</span></span>
+<span id="L60">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="199">pickMaj</span>, hpq, ↓<span class="const token" data-verso-hover="75">reduceIte</span>, h, ↓<span class="const token" data-verso-hover="78">reduceDIte</span>]</span>
+<span id="L61"></span>
+<span id="L62"><span class="kw">omit</span> [<span class="const token" data-verso-hover="117">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L63"><span class="kw">lemma</span> <span class="const token" data-verso-hover="204">vote_congr</span> {t : <span class="const token" data-verso-hover="57">ℕ</span>} {S : <span class="const token" data-verso-hover="69">Finset</span> P} {f g : P → V} (h : ∀ r ∈ S, f r = g r) :</span>
+<span id="L64">    <span class="const token" data-verso-hover="200">vote</span> t S f = <span class="const token" data-verso-hover="200">vote</span> t S g := <span class="kw">by</span></span>
+<span id="L65">  <span class="kw">have</span> : ∀ v, S.<span class="const token" data-verso-hover="48">countEq</span> f v = S.<span class="const token" data-verso-hover="48">countEq</span> g v := <span class="const token" data-verso-hover="205">Finset.countEq_congr</span> h</span>
+<span id="L66">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="200">vote</span>, this]</span>
+<span id="L67"></span>
+<span id="L68"><span class="kw">omit</span> [<span class="const token" data-verso-hover="117">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L69"><span class="dc">/-- `vote` returns the unique value that qualifies, if any. -/</span></span>
+<span id="L70"><span class="kw">lemma</span> <span class="const token" data-verso-hover="206">vote_eq</span> {t : <span class="const token" data-verso-hover="57">ℕ</span>} {S : <span class="const token" data-verso-hover="69">Finset</span> P} {f : P → V} {v : V}</span>
+<span id="L71">    (huniq : ∀ u, u ≠ <span class="const token" data-verso-hover="55">omitted</span> → t ≤ S.<span class="const token" data-verso-hover="48">countEq</span> f u → u = v)</span>
+<span id="L72">    (hv : v ≠ <span class="const token" data-verso-hover="55">omitted</span> → t ≤ S.<span class="const token" data-verso-hover="48">countEq</span> f v) : <span class="const token" data-verso-hover="200">vote</span> t S f = v := <span class="kw">by</span></span>
+<span id="L73">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="200">vote</span></span>
+<span id="L74">  <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L75">  · <span class="kw">obtain</span> ⟨h1, h2⟩ := h.<span class="const token" data-verso-hover="79">choose_spec</span></span>
+<span id="L76">    <span class="kw">exact</span> huniq _ h1 h2</span>
+<span id="L77">  · <span class="kw">by_contra</span> hne</span>
+<span id="L78">    <span class="kw">by_cases</span> hvo : v = <span class="const token" data-verso-hover="55">omitted</span></span>
+<span id="L79">    · <span class="kw">exact</span> hne hvo.<span class="const token" data-verso-hover="67">symm</span></span>
+<span id="L80">    · <span class="kw">exact</span> h ⟨v, hvo, hv hvo⟩</span>
+<span id="L81"></span>
+<span id="L82"><span class="dc">/-- **Algorithm 2** (`PSL`). -/</span></span>
+<span id="L83"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="207">psl</span> : <span class="const token" data-verso-hover="57">ℕ</span> → <span class="const token" data-verso-hover="69">Finset</span> P → (<span class="const token" data-verso-hover="97">List</span> P → <span class="const token" data-verso-hover="98">Option</span> V) → P → P → V</span>
+<span id="L84">  | <span class="nu">0</span>, S, τ, p, q =&gt; <span class="const token" data-verso-hover="199">pickMaj</span> <span class="nu">0</span> S τ p q <span class="const token" data-verso-hover="55">omitted</span></span>
+<span id="L85">  | t + <span class="nu">1</span>, S, τ, p, q =&gt; <span class="const token" data-verso-hover="199">pickMaj</span> (t + <span class="nu">1</span>) S τ p q</span>
+<span id="L86">      (<span class="const token" data-verso-hover="200">vote</span> (t + <span class="nu">1</span>) (S.<span class="const token" data-verso-hover="208">erase</span> q) (<span class="kw">fun</span> r =&gt; <span class="const token" data-verso-hover="207">psl</span> t (S.<span class="const token" data-verso-hover="208">erase</span> q) (<span class="kw">fun</span> w =&gt; τ (w ++ [q])) p r))</span>
+<span id="L87"></span>
+<span id="L88"><span class="dc">/-- Algorithm 2 as an interactive-consistency algorithm on all processes. -/</span></span>
+<span id="L89"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="28">alg2</span> [<span class="const token" data-verso-hover="49">Fintype</span> P] (t : <span class="const token" data-verso-hover="57">ℕ</span>) : <span class="const token" data-verso-hover="51">Alg</span> P V := <span class="kw">fun</span> p τ q =&gt; <span class="const token" data-verso-hover="207">psl</span> t <span class="const token" data-verso-hover="109">Finset.univ</span> τ p q</span>
+<span id="L90"></span>
+<span id="L91"><span class="kw">lemma</span> <span class="const token" data-verso-hover="209">psl_eq_pickMaj</span> (t : <span class="const token" data-verso-hover="57">ℕ</span>) (S : <span class="const token" data-verso-hover="69">Finset</span> P) (τ : <span class="const token" data-verso-hover="97">List</span> P → <span class="const token" data-verso-hover="98">Option</span> V) (p q : P) :</span>
+<span id="L92">    ∃ fb, <span class="const token" data-verso-hover="207">psl</span> t S τ p q = <span class="const token" data-verso-hover="199">pickMaj</span> t S τ p q fb := <span class="kw">by</span></span>
+<span id="L93">  <span class="kw">cases</span> t &lt;;&gt; <span class="kw">exact</span> ⟨_, <span class="const token" data-verso-hover="95">rfl</span>⟩</span>
+<span id="L94"></span>
+<span id="L95"><span class="kw">lemma</span> <span class="const token" data-verso-hover="210">psl_self</span> (t : <span class="const token" data-verso-hover="57">ℕ</span>) (S : <span class="const token" data-verso-hover="69">Finset</span> P) (τ : <span class="const token" data-verso-hover="97">List</span> P → <span class="const token" data-verso-hover="98">Option</span> V) (p : P) :</span>
+<span id="L96">    <span class="const token" data-verso-hover="207">psl</span> t S τ p p = <span class="const token" data-verso-hover="52">rep</span> (τ []) := <span class="kw">by</span></span>
+<span id="L97">  <span class="kw">obtain</span> ⟨fb, h⟩ := <span class="const token" data-verso-hover="209">psl_eq_pickMaj</span> t S τ p p</span>
+<span id="L98">  <span class="kw">rw</span> [h, <span class="const token" data-verso-hover="201">pickMaj_self</span>]</span>
+<span id="L99"></span>
+<span id="L100"><span class="kw">lemma</span> <span class="const token" data-verso-hover="211">psl_of_maj</span> {t : <span class="const token" data-verso-hover="57">ℕ</span>} {S Q : <span class="const token" data-verso-hover="69">Finset</span> P} {τ : <span class="const token" data-verso-hover="97">List</span> P → <span class="const token" data-verso-hover="98">Option</span> V} {p q : P} {v : V}</span>
+<span id="L101">    (hpq : p ≠ q) (hQ : Q ⊆ S) (h : <span class="const token" data-verso-hover="184">Maj</span> t τ p q Q v) : <span class="const token" data-verso-hover="207">psl</span> t S τ p q = v := <span class="kw">by</span></span>
+<span id="L102">  <span class="kw">obtain</span> ⟨fb, e⟩ := <span class="const token" data-verso-hover="209">psl_eq_pickMaj</span> t S τ p q</span>
+<span id="L103">  <span class="kw">rw</span> [e, <span class="const token" data-verso-hover="202">pickMaj_of_maj</span> hpq hQ h]</span>
+<span id="L104"></span>
+<span id="L105"><span class="dc">/-! ### Only `t + 1` rounds are read -/</span></span>
+<span id="L106"></span>
+<span id="L107"><span class="kw">theorem</span> <span class="const token" data-verso-hover="212">psl_congr</span> : ∀ (t : <span class="const token" data-verso-hover="57">ℕ</span>) (S : <span class="const token" data-verso-hover="69">Finset</span> P) (τ τ' : <span class="const token" data-verso-hover="97">List</span> P → <span class="const token" data-verso-hover="98">Option</span> V) (p q : P),</span>
+<span id="L108">    (∀ w : <span class="const token" data-verso-hover="97">List</span> P, w.<span class="const token" data-verso-hover="118">length</span> ≤ t + <span class="nu">1</span> → τ w = τ' w) → <span class="const token" data-verso-hover="207">psl</span> t S τ p q = <span class="const token" data-verso-hover="207">psl</span> t S τ' p q := <span class="kw">by</span></span>
+<span id="L109">  <span class="kw">intro</span> t</span>
+<span id="L110">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L111">  | <span class="const token" data-verso-hover="213">zero</span> =&gt;</span>
+<span id="L112">    <span class="kw">intro</span> S τ τ' p q h</span>
+<span id="L113">    <span class="kw">have</span> hm : ∀ v Q, <span class="const token" data-verso-hover="184">Maj</span> <span class="nu">0</span> τ p q Q v ↔ <span class="const token" data-verso-hover="184">Maj</span> <span class="nu">0</span> τ' p q Q v := <span class="kw">fun</span> v Q =&gt; <span class="kw">by</span></span>
+<span id="L114">      <span class="kw">refine</span> <span class="const token" data-verso-hover="214">and_congr</span> <span class="const token" data-verso-hover="215">Iff.rfl</span> (<span class="const token" data-verso-hover="216">forall_congr'</span> <span class="kw">fun</span> w =&gt; ?_)</span>
+<span id="L115">      <span class="kw">refine</span> <span class="const token" data-verso-hover="217">imp_congr_right</span> <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="217">imp_congr_right</span> <span class="kw">fun</span> hw =&gt; <span class="const token" data-verso-hover="217">imp_congr_right</span> <span class="kw">fun</span> _ =&gt; ?_</span>
+<span id="L116">      <span class="kw">rw</span> [h _ (<span class="kw">by</span> <span class="kw">simp</span> only [<span class="const token" data-verso-hover="152">List.length_append</span>, <span class="const token" data-verso-hover="218">List.length_singleton</span>]; <span class="kw">omega</span>)]</span>
+<span id="L117">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="207">psl</span>, <span class="const token" data-verso-hover="199">pickMaj</span>, hm, h [] (<span class="kw">by</span> <span class="kw">simp</span>)]</span>
+<span id="L118">  | <span class="const token" data-verso-hover="219">succ</span> t ih =&gt;</span>
+<span id="L119">    <span class="kw">intro</span> S τ τ' p q h</span>
+<span id="L120">    <span class="kw">have</span> hm : ∀ v Q, <span class="const token" data-verso-hover="184">Maj</span> (t + <span class="nu">1</span>) τ p q Q v ↔ <span class="const token" data-verso-hover="184">Maj</span> (t + <span class="nu">1</span>) τ' p q Q v := <span class="kw">fun</span> v Q =&gt; <span class="kw">by</span></span>
+<span id="L121">      <span class="kw">refine</span> <span class="const token" data-verso-hover="214">and_congr</span> <span class="const token" data-verso-hover="215">Iff.rfl</span> (<span class="const token" data-verso-hover="216">forall_congr'</span> <span class="kw">fun</span> w =&gt; ?_)</span>
+<span id="L122">      <span class="kw">refine</span> <span class="const token" data-verso-hover="217">imp_congr_right</span> <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="217">imp_congr_right</span> <span class="kw">fun</span> hw =&gt; <span class="const token" data-verso-hover="217">imp_congr_right</span> <span class="kw">fun</span> _ =&gt; ?_</span>
+<span id="L123">      <span class="kw">rw</span> [h _ (<span class="kw">by</span> <span class="kw">simp</span> only [<span class="const token" data-verso-hover="152">List.length_append</span>, <span class="const token" data-verso-hover="218">List.length_singleton</span>]; <span class="kw">omega</span>)]</span>
+<span id="L124">    <span class="kw">have</span> hrec : ∀ r, <span class="const token" data-verso-hover="207">psl</span> t (S.<span class="const token" data-verso-hover="208">erase</span> q) (<span class="kw">fun</span> w =&gt; τ (w ++ [q])) p r =</span>
+<span id="L125">        <span class="const token" data-verso-hover="207">psl</span> t (S.<span class="const token" data-verso-hover="208">erase</span> q) (<span class="kw">fun</span> w =&gt; τ' (w ++ [q])) p r := <span class="kw">fun</span> r =&gt;</span>
+<span id="L126">      ih _ _ _ _ _ <span class="kw">fun</span> w hw =&gt; h _ (<span class="kw">by</span> <span class="kw">simp</span> only [<span class="const token" data-verso-hover="152">List.length_append</span>, <span class="const token" data-verso-hover="218">List.length_singleton</span>]; <span class="kw">omega</span>)</span>
+<span id="L127">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="207">psl</span>, <span class="const token" data-verso-hover="199">pickMaj</span>, hm, h [] (<span class="kw">by</span> <span class="kw">simp</span>), hrec]</span>
+<span id="L128"></span>
+<span id="L129"><span class="dc">/-! ### Correctness -/</span></span>
+<span id="L130"></span>
+<span id="L131"><span class="dc">/-- The recursive instance: remove the source `q`, `σ̂(x|w) = σ(x|w|q)`. -/</span></span>
+<span id="L132"><span class="kw">def</span> <span class="const token" data-verso-hover="220">sub</span> (σ : <span class="const token" data-verso-hover="91">MsgMap</span> P V) (q : P) : <span class="const token" data-verso-hover="91">MsgMap</span> P V := <span class="kw">fun</span> l =&gt; σ (l ++ [q])</span>
+<span id="L133"></span>
+<span id="L134"><span class="kw">omit</span> [<span class="const token" data-verso-hover="11">OmitVal</span> V] [<span class="const token" data-verso-hover="117">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L135"><span class="kw">lemma</span> <span class="const token" data-verso-hover="221">loc_sub</span> (σ : <span class="const token" data-verso-hover="91">MsgMap</span> P V) (p q : P) : <span class="const token" data-verso-hover="107">loc</span> (<span class="const token" data-verso-hover="220">sub</span> σ q) p = <span class="kw">fun</span> w =&gt; <span class="const token" data-verso-hover="107">loc</span> σ p (w ++ [q]) := <span class="const token" data-verso-hover="95">rfl</span></span>
+<span id="L136"></span>
+<span id="L137"><span class="kw">lemma</span> <span class="const token" data-verso-hover="222">mem_erase_of_list</span> {S : <span class="const token" data-verso-hover="69">Finset</span> P} {q : P} (hq : q ∈ S) {w : <span class="const token" data-verso-hover="97">List</span> P}</span>
+<span id="L138">    (hw : ∀ x ∈ w, x ∈ S.<span class="const token" data-verso-hover="208">erase</span> q) :</span>
+<span id="L139">    (∀ x ∈ w ++ [q], x ∈ S) ∧ ∀ x ∈ w.<span class="const token" data-verso-hover="197">getLast?</span>, x ≠ q := <span class="kw">by</span></span>
+<span id="L140">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> x hx =&gt; ?_, <span class="kw">fun</span> x hx =&gt; ?_⟩</span>
+<span id="L141">  · <span class="kw">rcases</span> <span class="const token" data-verso-hover="188">List.mem_append</span>.<span class="const token" data-verso-hover="62">1</span> hx <span class="kw">with</span> hx | hx</span>
+<span id="L142">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="223">Finset.mem_of_mem_erase</span> (hw x hx)</span>
+<span id="L143">    · <span class="kw">simp</span> <span class="kw">at</span> hx; <span class="kw">subst</span> hx; <span class="kw">exact</span> hq</span>
+<span id="L144">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="224">Finset.ne_of_mem_erase</span> (hw x (<span class="const token" data-verso-hover="225">List.mem_of_getLast?</span> hx))</span>
+<span id="L145"></span>
+<span id="L146"></span>
+<span id="L147"><span class="kw">lemma</span> <span class="const token" data-verso-hover="226">sub_nonFaulty</span> {k : <span class="const token" data-verso-hover="57">ℕ</span>} {S F : <span class="const token" data-verso-hover="69">Finset</span> P} {σ : <span class="const token" data-verso-hover="91">MsgMap</span> P V} (hσ : <span class="const token" data-verso-hover="18">NonFaulty</span> (k + <span class="nu">1</span>) S F σ)</span>
+<span id="L148">    {q : P} (hq : q ∈ S) : <span class="const token" data-verso-hover="18">NonFaulty</span> k (S.<span class="const token" data-verso-hover="208">erase</span> q) F (<span class="const token" data-verso-hover="220">sub</span> σ q) := <span class="kw">by</span></span>
+<span id="L149">  <span class="kw">intro</span> r hr hrF x hx w hw hs hk</span>
+<span id="L150">  <span class="kw">obtain</span> ⟨hwS, hlast⟩ := <span class="const token" data-verso-hover="222">mem_erase_of_list</span> hq hw</span>
+<span id="L151">  <span class="kw">have</span> hs' : <span class="const token" data-verso-hover="73">Seq</span> (x :: r :: (w ++ [q])) := <span class="kw">by</span></span>
+<span id="L152">    <span class="kw">have</span> : x :: r :: (w ++ [q]) = (x :: r :: w) ++ [q] := <span class="const token" data-verso-hover="95">rfl</span></span>
+<span id="L153">    <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="196">seq_append_singleton</span>]</span>
+<span id="L154">    <span class="kw">refine</span> ⟨hs, <span class="kw">fun</span> y hy =&gt; ?_⟩</span>
+<span id="L155">    <span class="kw">have</span> hy' : y ∈ x :: r :: w := <span class="const token" data-verso-hover="225">List.mem_of_getLast?</span> hy</span>
+<span id="L156">    <span class="kw">have</span> : y ∈ S.<span class="const token" data-verso-hover="208">erase</span> q := <span class="kw">by</span></span>
+<span id="L157">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="227">List.mem_cons</span>] <span class="kw">at</span> hy'</span>
+<span id="L158">      <span class="kw">rcases</span> hy' <span class="kw">with</span> <span class="kw">rfl</span> | <span class="kw">rfl</span> | hy'</span>
+<span id="L159">      · <span class="kw">exact</span> hx</span>
+<span id="L160">      · <span class="kw">exact</span> hr</span>
+<span id="L161">      · <span class="kw">exact</span> hw y hy'</span>
+<span id="L162">    <span class="kw">exact</span> <span class="const token" data-verso-hover="224">Finset.ne_of_mem_erase</span> this</span>
+<span id="L163">  <span class="kw">exact</span> hσ r (<span class="const token" data-verso-hover="223">Finset.mem_of_mem_erase</span> hr) hrF x (<span class="const token" data-verso-hover="223">Finset.mem_of_mem_erase</span> hx) (w ++ [q]) hwS hs'</span>
+<span id="L164">    (<span class="kw">by</span> <span class="kw">simp</span>; <span class="kw">omega</span>)</span>
+<span id="L165"></span>
+<span id="L166"><span class="kw">omit</span> [<span class="const token" data-verso-hover="11">OmitVal</span> V] <span class="kw">in</span></span>
+<span id="L167"><span class="kw">lemma</span> <span class="const token" data-verso-hover="228">sub_weakNE</span> {k : <span class="const token" data-verso-hover="57">ℕ</span>} {S : <span class="const token" data-verso-hover="69">Finset</span> P} {σ : <span class="const token" data-verso-hover="91">MsgMap</span> P V} (hσ : <span class="const token" data-verso-hover="20">WeakNE</span> (k + <span class="nu">1</span>) S σ)</span>
+<span id="L168">    {q : P} (hq : q ∈ S) : <span class="const token" data-verso-hover="20">WeakNE</span> k (S.<span class="const token" data-verso-hover="208">erase</span> q) (<span class="const token" data-verso-hover="220">sub</span> σ q) := <span class="kw">by</span></span>
+<span id="L169">  <span class="kw">intro</span> y hy r hr r' hr' w hw hs hs' hk h1 h2</span>
+<span id="L170">  <span class="kw">obtain</span> ⟨hwS, -⟩ := <span class="const token" data-verso-hover="222">mem_erase_of_list</span> hq hw</span>
+<span id="L171">  <span class="kw">have</span> key : ∀ z ∈ S.<span class="const token" data-verso-hover="208">erase</span> q, <span class="const token" data-verso-hover="73">Seq</span> (z :: y :: w) → <span class="const token" data-verso-hover="73">Seq</span> (z :: y :: (w ++ [q])) := <span class="kw">by</span></span>
+<span id="L172">    <span class="kw">intro</span> z hz hzs</span>
+<span id="L173">    <span class="kw">have</span> : z :: y :: (w ++ [q]) = (z :: y :: w) ++ [q] := <span class="const token" data-verso-hover="95">rfl</span></span>
+<span id="L174">    <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="196">seq_append_singleton</span>]</span>
+<span id="L175">    <span class="kw">refine</span> ⟨hzs, <span class="kw">fun</span> u hu =&gt; ?_⟩</span>
+<span id="L176">    <span class="kw">have</span> hu' : u ∈ z :: y :: w := <span class="const token" data-verso-hover="225">List.mem_of_getLast?</span> hu</span>
+<span id="L177">    <span class="kw">have</span> : u ∈ S.<span class="const token" data-verso-hover="208">erase</span> q := <span class="kw">by</span></span>
+<span id="L178">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="227">List.mem_cons</span>] <span class="kw">at</span> hu'</span>
+<span id="L179">      <span class="kw">rcases</span> hu' <span class="kw">with</span> <span class="kw">rfl</span> | <span class="kw">rfl</span> | hu'</span>
+<span id="L180">      · <span class="kw">exact</span> hz</span>
+<span id="L181">      · <span class="kw">exact</span> hy</span>
+<span id="L182">      · <span class="kw">exact</span> hw u hu'</span>
+<span id="L183">    <span class="kw">exact</span> <span class="const token" data-verso-hover="224">Finset.ne_of_mem_erase</span> this</span>
+<span id="L184">  <span class="kw">exact</span> hσ y (<span class="const token" data-verso-hover="223">Finset.mem_of_mem_erase</span> hy) r (<span class="const token" data-verso-hover="223">Finset.mem_of_mem_erase</span> hr) r'</span>
+<span id="L185">    (<span class="const token" data-verso-hover="223">Finset.mem_of_mem_erase</span> hr') (w ++ [q]) hwS (key r hr hs) (key r' hr' hs') (<span class="kw">by</span> <span class="kw">simp</span>; <span class="kw">omega</span>)</span>
+<span id="L186">    h1 h2</span>
+<span id="L187"></span>
+<span id="L188"><span class="kw">lemma</span> <span class="const token" data-verso-hover="229">card_inter_erase</span> {S F : <span class="const token" data-verso-hover="69">Finset</span> P} {q : P} (hqS : q ∈ S) (hqF : q ∈ F) :</span>
+<span id="L189">    ((S.<span class="const token" data-verso-hover="208">erase</span> q) ∩ F).<span class="const token" data-verso-hover="115">card</span> + <span class="nu">1</span> = (S ∩ F).<span class="const token" data-verso-hover="115">card</span> := <span class="kw">by</span></span>
+<span id="L190">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="230">Finset.erase_inter</span>]</span>
+<span id="L191">  <span class="kw">exact</span> <span class="const token" data-verso-hover="231">Finset.card_erase_add_one</span> (<span class="const token" data-verso-hover="232">Finset.mem_inter</span>.<span class="const token" data-verso-hover="65">2</span> ⟨hqS, hqF⟩)</span>
+<span id="L192"></span>
+<span id="L193"><span class="kw">lemma</span> <span class="const token" data-verso-hover="233">card_sdiff_ge</span> {t : <span class="const token" data-verso-hover="57">ℕ</span>} {S F : <span class="const token" data-verso-hover="69">Finset</span> P} (hS : <span class="nu">2</span> * t &lt; S.<span class="const token" data-verso-hover="115">card</span>) (hF : (S ∩ F).<span class="const token" data-verso-hover="115">card</span> ≤ t) :</span>
+<span id="L194">    t + <span class="nu">1</span> ≤ (S \ F).<span class="const token" data-verso-hover="115">card</span> := <span class="kw">by</span></span>
+<span id="L195">  <span class="kw">have</span> := <span class="const token" data-verso-hover="234">Finset.card_sdiff_add_card_inter</span> S F</span>
+<span id="L196">  <span class="kw">omega</span></span>
+<span id="L197"></span>
+<span id="L198"><span class="dc">/-- Validity of `psl t` (Lemma 4.4 + Lemma 4.6): the entry of a non-faulty source is its private</span></span>
+<span id="L199"><span class="dc">value. -/</span></span>
+<span id="L200"><span class="kw">theorem</span> <span class="const token" data-verso-hover="235">psl_valid</span> {t : <span class="const token" data-verso-hover="57">ℕ</span>} {S F : <span class="const token" data-verso-hover="69">Finset</span> P} {σ : <span class="const token" data-verso-hover="91">MsgMap</span> P V} (hS : <span class="nu">2</span> * t &lt; S.<span class="const token" data-verso-hover="115">card</span>)</span>
+<span id="L201">    (hF : (S ∩ F).<span class="const token" data-verso-hover="115">card</span> ≤ t) (hσ : <span class="const token" data-verso-hover="18">NonFaulty</span> (t + <span class="nu">1</span>) S F σ) {p q : P} (hp : p ∈ S) (hq : q ∈ S)</span>
+<span id="L202">    (hqF : q ∉ F) : <span class="const token" data-verso-hover="207">psl</span> t S (<span class="const token" data-verso-hover="107">loc</span> σ p) p q = <span class="const token" data-verso-hover="52">rep</span> (σ [q]) := <span class="kw">by</span></span>
+<span id="L203">  <span class="kw">by_cases</span> hpq : p = q</span>
+<span id="L204">  · <span class="kw">subst</span> hpq; <span class="kw">rw</span> [<span class="const token" data-verso-hover="210">psl_self</span>]; <span class="kw">rfl</span></span>
+<span id="L205">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="211">psl_of_maj</span> hpq <span class="const token" data-verso-hover="189">Finset.sdiff_subset</span> (<span class="const token" data-verso-hover="24">lemma_4_4</span> hσ hp hq hqF (<span class="const token" data-verso-hover="233">card_sdiff_ge</span> hS hF))</span>
+<span id="L206"></span>
+<span id="L207"><span class="dc">/-- Main induction behind Theorem 5.1: validity and agreement of `psl t` on an active set `S` with</span></span>
+<span id="L208"><span class="dc">`|S| &gt; 2t` and at most `t` faulty processes in `S`, given `t + 1` rounds. -/</span></span>
+<span id="L209"><span class="kw">theorem</span> <span class="const token" data-verso-hover="29">psl_correct</span> (t : <span class="const token" data-verso-hover="57">ℕ</span>) : ∀ (S F : <span class="const token" data-verso-hover="69">Finset</span> P) (σ : <span class="const token" data-verso-hover="91">MsgMap</span> P V), <span class="nu">2</span> * t &lt; S.<span class="const token" data-verso-hover="115">card</span> →</span>
+<span id="L210">    (S ∩ F).<span class="const token" data-verso-hover="115">card</span> ≤ t → <span class="const token" data-verso-hover="18">NonFaulty</span> (t + <span class="nu">1</span>) S F σ → <span class="const token" data-verso-hover="20">WeakNE</span> (t + <span class="nu">1</span>) S σ →</span>
+<span id="L211">    (∀ p ∈ S, p ∉ F → ∀ q ∈ S, q ∉ F → <span class="const token" data-verso-hover="207">psl</span> t S (<span class="const token" data-verso-hover="107">loc</span> σ p) p q = <span class="const token" data-verso-hover="52">rep</span> (σ [q])) ∧</span>
+<span id="L212">    (∀ p ∈ S, p ∉ F → ∀ p' ∈ S, p' ∉ F → ∀ q ∈ S,</span>
+<span id="L213">      <span class="const token" data-verso-hover="207">psl</span> t S (<span class="const token" data-verso-hover="107">loc</span> σ p) p q = <span class="const token" data-verso-hover="207">psl</span> t S (<span class="const token" data-verso-hover="107">loc</span> σ p') p' q) := <span class="kw">by</span></span>
+<span id="L214">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L215">  | <span class="const token" data-verso-hover="213">zero</span> =&gt;</span>
+<span id="L216">    <span class="kw">intro</span> S F σ hS hF hσ _</span>
+<span id="L217">    <span class="kw">refine</span> ⟨<span class="kw">fun</span> p hp _ q hq hqF =&gt; <span class="const token" data-verso-hover="235">psl_valid</span> hS hF hσ hp hq hqF, ?_⟩</span>
+<span id="L218">    <span class="kw">intro</span> p hp hpF p' hp' hp'F q hq</span>
+<span id="L219">    <span class="kw">by_cases</span> hqF : q ∈ F</span>
+<span id="L220">    · <span class="kw">exfalso</span></span>
+<span id="L221">      <span class="kw">have</span> : <span class="nu">0</span> &lt; (S ∩ F).<span class="const token" data-verso-hover="115">card</span> := <span class="const token" data-verso-hover="236">Finset.card_pos</span>.<span class="const token" data-verso-hover="65">2</span> ⟨q, <span class="const token" data-verso-hover="232">Finset.mem_inter</span>.<span class="const token" data-verso-hover="65">2</span> ⟨hq, hqF⟩⟩</span>
+<span id="L222">      <span class="kw">omega</span></span>
+<span id="L223">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="235">psl_valid</span> hS hF hσ hp hq hqF, <span class="const token" data-verso-hover="235">psl_valid</span> hS hF hσ hp' hq hqF]</span>
+<span id="L224">  | <span class="const token" data-verso-hover="219">succ</span> t ih =&gt;</span>
+<span id="L225">    <span class="kw">intro</span> S F σ hS hF hσ hw</span>
+<span id="L226">    <span class="kw">refine</span> ⟨<span class="kw">fun</span> p hp _ q hq hqF =&gt; <span class="const token" data-verso-hover="235">psl_valid</span> hS hF hσ hp hq hqF, ?_⟩</span>
+<span id="L227">    <span class="kw">intro</span> p hp hpF p' hp' hp'F q hq</span>
+<span id="L228">    <span class="kw">by_cases</span> hqF : q ∉ F</span>
+<span id="L229">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="235">psl_valid</span> hS hF hσ hp hq hqF, <span class="const token" data-verso-hover="235">psl_valid</span> hS hF hσ hp' hq hqF]</span>
+<span id="L230">    push <span class="const token" data-verso-hover="68">Not</span> <span class="kw">at</span> hqF</span>
+<span id="L231">    <span class="cm">--</span><span class="cm"> the recursive instance</span></span>
+<span id="L232">    <span class="kw">have</span> hcard := <span class="const token" data-verso-hover="229">card_inter_erase</span> hq hqF</span>
+<span id="L233">    <span class="kw">have</span> hS' : <span class="nu">2</span> * t &lt; (S.<span class="const token" data-verso-hover="208">erase</span> q).<span class="const token" data-verso-hover="115">card</span> := <span class="kw">by</span></span>
+<span id="L234">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="237">Finset.card_erase_of_mem</span> hq]; <span class="kw">omega</span></span>
+<span id="L235">    <span class="kw">have</span> hF' : ((S.<span class="const token" data-verso-hover="208">erase</span> q) ∩ F).<span class="const token" data-verso-hover="115">card</span> ≤ t := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L236">    <span class="kw">obtain</span> ⟨ihv, iha⟩ := ih (S.<span class="const token" data-verso-hover="208">erase</span> q) F (<span class="const token" data-verso-hover="220">sub</span> σ q) hS' hF' (<span class="const token" data-verso-hover="226">sub_nonFaulty</span> hσ hq)</span>
+<span id="L237">      (<span class="const token" data-verso-hover="228">sub_weakNE</span> hw hq)</span>
+<span id="L238">    <span class="kw">have</span> hne : ∀ x, x ∉ F → x ≠ q := <span class="kw">fun</span> x hx h =&gt; hx (h ▸ hqF)</span>
+<span id="L239">    <span class="kw">have</span> unf : ∀ x, <span class="const token" data-verso-hover="207">psl</span> (t + <span class="nu">1</span>) S (<span class="const token" data-verso-hover="107">loc</span> σ x) x q = <span class="const token" data-verso-hover="199">pickMaj</span> (t + <span class="nu">1</span>) S (<span class="const token" data-verso-hover="107">loc</span> σ x) x q</span>
+<span id="L240">        (<span class="const token" data-verso-hover="200">vote</span> (t + <span class="nu">1</span>) (S.<span class="const token" data-verso-hover="208">erase</span> q) (<span class="kw">fun</span> r =&gt; <span class="const token" data-verso-hover="207">psl</span> t (S.<span class="const token" data-verso-hover="208">erase</span> q) (<span class="const token" data-verso-hover="107">loc</span> (<span class="const token" data-verso-hover="220">sub</span> σ q) x) x r)) :=</span>
+<span id="L241">      <span class="kw">fun</span> x =&gt; <span class="const token" data-verso-hover="95">rfl</span></span>
+<span id="L242">    <span class="cm">--</span><span class="cm"> the case where exactly one of them has a consistent majority</span></span>
+<span id="L243">    <span class="kw">have</span> one_sided : ∀ x ∈ S, x ∉ F → ∀ y ∈ S, y ∉ F → ∀ (v : V) (Q : <span class="const token" data-verso-hover="69">Finset</span> P), Q ⊆ S →</span>
+<span id="L244">        <span class="const token" data-verso-hover="184">Maj</span> (t + <span class="nu">1</span>) (<span class="const token" data-verso-hover="107">loc</span> σ x) x q Q v → (¬ ∃ v, ∃ Q ⊆ S, <span class="const token" data-verso-hover="184">Maj</span> (t + <span class="nu">1</span>) (<span class="const token" data-verso-hover="107">loc</span> σ y) y q Q v) →</span>
+<span id="L245">        <span class="const token" data-verso-hover="207">psl</span> (t + <span class="nu">1</span>) S (<span class="const token" data-verso-hover="107">loc</span> σ y) y q = v := <span class="kw">by</span></span>
+<span id="L246">      <span class="kw">intro</span> x hx hxF y hy hyF v Q hQS hm hno</span>
+<span id="L247">      <span class="kw">have</span> hxq := hne x hxF</span>
+<span id="L248">      <span class="kw">have</span> hyq := hne y hyF</span>
+<span id="L249">      <span class="kw">rw</span> [unf, <span class="const token" data-verso-hover="203">pickMaj_of_not</span> hyq hno]</span>
+<span id="L250">      <span class="kw">have</span> hvx : σ [x, q] = <span class="const token" data-verso-hover="54">some</span> v := hm.<span class="const token" data-verso-hover="185">direct</span> hxq</span>
+<span id="L251">      <span class="kw">have</span> hvecx : ∀ r ∈ Q.<span class="const token" data-verso-hover="208">erase</span> q, <span class="const token" data-verso-hover="207">psl</span> t (S.<span class="const token" data-verso-hover="208">erase</span> q) (<span class="const token" data-verso-hover="107">loc</span> (<span class="const token" data-verso-hover="220">sub</span> σ q) x) x r = v := <span class="kw">by</span></span>
+<span id="L252">        <span class="kw">intro</span> r hr</span>
+<span id="L253">        <span class="kw">by_cases</span> hrx : x = r</span>
+<span id="L254">        · <span class="kw">subst</span> hrx; <span class="kw">rw</span> [<span class="const token" data-verso-hover="210">psl_self</span>]; <span class="kw">show</span> <span class="const token" data-verso-hover="52">rep</span> (σ [x, q]) = v; <span class="kw">rw</span> [hvx]; <span class="kw">rfl</span></span>
+<span id="L255">        · <span class="kw">refine</span> <span class="const token" data-verso-hover="211">psl_of_maj</span> hrx (<span class="const token" data-verso-hover="238">Finset.erase_subset_erase</span> q hQS) ⟨?_, ?_⟩</span>
+<span id="L256">          · <span class="kw">have</span> := <span class="const token" data-verso-hover="239">Finset.pred_card_le_card_erase</span> (s := Q) (a := q)</span>
+<span id="L257">            <span class="kw">have</span> := hm.<span class="const token" data-verso-hover="60">1</span></span>
+<span id="L258">            <span class="kw">omega</span></span>
+<span id="L259">          · <span class="kw">intro</span> w hw' hl hs</span>
+<span id="L260">            <span class="kw">have</span> hrq : r ≠ q := <span class="const token" data-verso-hover="224">Finset.ne_of_mem_erase</span> hr</span>
+<span id="L261">            <span class="kw">show</span> σ (x :: ((w ++ [r]) ++ [q])) = <span class="const token" data-verso-hover="54">some</span> v</span>
+<span id="L262">            <span class="kw">refine</span> hm.<span class="const token" data-verso-hover="72">2</span> (w ++ [r]) (<span class="kw">fun</span> z hz =&gt; ?_) (<span class="kw">by</span> <span class="kw">simp</span>; <span class="kw">omega</span>) ?_</span>
+<span id="L263">            · <span class="kw">rcases</span> <span class="const token" data-verso-hover="188">List.mem_append</span>.<span class="const token" data-verso-hover="62">1</span> hz <span class="kw">with</span> hz | hz</span>
+<span id="L264">              · <span class="kw">exact</span> <span class="const token" data-verso-hover="223">Finset.mem_of_mem_erase</span> (hw' z hz)</span>
+<span id="L265">              · <span class="kw">simp</span> <span class="kw">at</span> hz; <span class="kw">subst</span> hz; <span class="kw">exact</span> <span class="const token" data-verso-hover="223">Finset.mem_of_mem_erase</span> hr</span>
+<span id="L266">            · <span class="kw">rw</span> [<span class="kw">show</span> x :: ((w ++ [r]) ++ [q]) = (x :: (w ++ [r])) ++ [q] <span class="kw">from</span> <span class="const token" data-verso-hover="95">rfl</span>,</span>
+<span id="L267">                <span class="const token" data-verso-hover="196">seq_append_singleton</span>]</span>
+<span id="L268">              <span class="kw">refine</span> ⟨hs, <span class="kw">fun</span> z hz =&gt; ?_⟩</span>
+<span id="L269">              <span class="kw">rw</span> [<span class="kw">show</span> x :: (w ++ [r]) = (x :: w) ++ [r] <span class="kw">from</span> <span class="const token" data-verso-hover="95">rfl</span>, <span class="const token" data-verso-hover="240">List.getLast?_append</span>] <span class="kw">at</span> hz</span>
+<span id="L270">              <span class="kw">simp</span> <span class="kw">at</span> hz</span>
+<span id="L271">              <span class="kw">exact</span> hz ▸ hrq</span>
+<span id="L272">      <span class="kw">have</span> hxS' : x ∈ S.<span class="const token" data-verso-hover="208">erase</span> q := <span class="const token" data-verso-hover="241">Finset.mem_erase</span>.<span class="const token" data-verso-hover="65">2</span> ⟨hxq, hx⟩</span>
+<span id="L273">      <span class="kw">have</span> hyS' : y ∈ S.<span class="const token" data-verso-hover="208">erase</span> q := <span class="const token" data-verso-hover="241">Finset.mem_erase</span>.<span class="const token" data-verso-hover="65">2</span> ⟨hyq, hy⟩</span>
+<span id="L274">      <span class="kw">apply</span> <span class="const token" data-verso-hover="206">vote_eq</span></span>
+<span id="L275">      · <span class="kw">intro</span> u hu hcu</span>
+<span id="L276">        <span class="kw">obtain</span> ⟨r, hrS', hrF', hru⟩ :=</span>
+<span id="L277">          <span class="const token" data-verso-hover="242">Finset.exists_mem_notMem_of_card_lt_countEq</span> (F := S.<span class="const token" data-verso-hover="208">erase</span> q ∩ F) (hF'.<span class="const token" data-verso-hover="243">trans_lt</span> hcu)</span>
+<span id="L278">        <span class="kw">have</span> hrF : r ∉ F := <span class="kw">fun</span> h =&gt; hrF' (<span class="const token" data-verso-hover="232">Finset.mem_inter</span>.<span class="const token" data-verso-hover="65">2</span> ⟨hrS', h⟩)</span>
+<span id="L279">        <span class="kw">rw</span> [ihv y hyS' hyF r hrS' hrF] <span class="kw">at</span> hru</span>
+<span id="L280">        <span class="kw">have</span> hrq : r ≠ q := <span class="const token" data-verso-hover="224">Finset.ne_of_mem_erase</span> hrS'</span>
+<span id="L281">        <span class="kw">show</span> u = v</span>
+<span id="L282">        <span class="kw">change</span> <span class="const token" data-verso-hover="52">rep</span> (σ [r, q]) = u <span class="kw">at</span> hru</span>
+<span id="L283">        <span class="kw">cases</span> hrq' : σ [r, q] <span class="kw">with</span></span>
+<span id="L284">        | <span class="const token" data-verso-hover="10">none</span> =&gt; <span class="kw">rw</span> [hrq'] <span class="kw">at</span> hru; <span class="kw">exact</span> <span class="const token" data-verso-hover="150">absurd</span> hru.<span class="const token" data-verso-hover="67">symm</span> hu</span>
+<span id="L285">        | <span class="const token" data-verso-hover="54">some</span> a =&gt;</span>
+<span id="L286">          <span class="kw">rw</span> [hrq'] <span class="kw">at</span> hru</span>
+<span id="L287">          <span class="kw">simp</span> only [<span class="const token" data-verso-hover="77">rep_some</span>] <span class="kw">at</span> hru</span>
+<span id="L288">          <span class="kw">subst</span> hru</span>
+<span id="L289">          <span class="kw">have</span> := hw q hq x hx r (<span class="const token" data-verso-hover="223">Finset.mem_of_mem_erase</span> hrS') [] (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="const token" data-verso-hover="64">seq_pair</span>.<span class="const token" data-verso-hover="65">2</span> hxq)</span>
+<span id="L290">            (<span class="const token" data-verso-hover="64">seq_pair</span>.<span class="const token" data-verso-hover="65">2</span> hrq) (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">rw</span> [hvx]; <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">rw</span> [hrq']; <span class="kw">simp</span>)</span>
+<span id="L291">          <span class="kw">rw</span> [hvx, hrq'] <span class="kw">at</span> this</span>
+<span id="L292">          <span class="kw">exact</span> (<span class="const token" data-verso-hover="66">Option.some.inj</span> this).<span class="const token" data-verso-hover="67">symm</span></span>
+<span id="L293">      · <span class="kw">intro</span> _</span>
+<span id="L294">        <span class="kw">have</span> hsub : Q.<span class="const token" data-verso-hover="208">erase</span> q ⊆ (S.<span class="const token" data-verso-hover="208">erase</span> q).<span class="const token" data-verso-hover="244">filter</span></span>
+<span id="L295">            (<span class="kw">fun</span> r =&gt; <span class="const token" data-verso-hover="207">psl</span> t (S.<span class="const token" data-verso-hover="208">erase</span> q) (<span class="const token" data-verso-hover="107">loc</span> (<span class="const token" data-verso-hover="220">sub</span> σ q) y) y r = v) := <span class="kw">by</span></span>
+<span id="L296">          <span class="kw">intro</span> r hr</span>
+<span id="L297">          <span class="kw">have</span> hrS' : r ∈ S.<span class="const token" data-verso-hover="208">erase</span> q := <span class="const token" data-verso-hover="238">Finset.erase_subset_erase</span> q hQS hr</span>
+<span id="L298">          <span class="kw">refine</span> <span class="const token" data-verso-hover="245">Finset.mem_filter</span>.<span class="const token" data-verso-hover="65">2</span> ⟨hrS', ?_⟩</span>
+<span id="L299">          <span class="kw">rw</span> [iha y hyS' hyF x hxS' hxF r hrS', hvecx r hr]</span>
+<span id="L300">        <span class="kw">have</span> h1 : (Q.<span class="const token" data-verso-hover="208">erase</span> q).<span class="const token" data-verso-hover="115">card</span> ≤ (S.<span class="const token" data-verso-hover="208">erase</span> q).<span class="const token" data-verso-hover="48">countEq</span></span>
+<span id="L301">            (<span class="kw">fun</span> r =&gt; <span class="const token" data-verso-hover="207">psl</span> t (S.<span class="const token" data-verso-hover="208">erase</span> q) (<span class="const token" data-verso-hover="107">loc</span> (<span class="const token" data-verso-hover="220">sub</span> σ q) y) y r) v := <span class="const token" data-verso-hover="70">Finset.card_le_card</span> hsub</span>
+<span id="L302">        <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="239">Finset.pred_card_le_card_erase</span> (s := Q) (a := q)</span>
+<span id="L303">        <span class="kw">have</span> h3 := hm.<span class="const token" data-verso-hover="60">1</span></span>
+<span id="L304">        <span class="kw">omega</span></span>
+<span id="L305">    <span class="kw">have</span> hpq := hne p hpF</span>
+<span id="L306">    <span class="kw">have</span> hp'q := hne p' hp'F</span>
+<span id="L307">    <span class="kw">by_cases</span> h1 : ∃ v, ∃ Q ⊆ S, <span class="const token" data-verso-hover="184">Maj</span> (t + <span class="nu">1</span>) (<span class="const token" data-verso-hover="107">loc</span> σ p) p q Q v &lt;;&gt;</span>
+<span id="L308">      <span class="kw">by_cases</span> h2 : ∃ v, ∃ Q ⊆ S, <span class="const token" data-verso-hover="184">Maj</span> (t + <span class="nu">1</span>) (<span class="const token" data-verso-hover="107">loc</span> σ p') p' q Q v</span>
+<span id="L309">    · <span class="kw">obtain</span> ⟨v, Q, hQ, hm⟩ := h1</span>
+<span id="L310">      <span class="kw">obtain</span> ⟨v', Q', hQ', hm'⟩ := h2</span>
+<span id="L311">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="211">psl_of_maj</span> hpq hQ hm, <span class="const token" data-verso-hover="211">psl_of_maj</span> hp'q hQ' hm']</span>
+<span id="L312">      <span class="kw">exact</span> <span class="const token" data-verso-hover="6">lemma_4_8</span> (<span class="kw">by</span> <span class="kw">omega</span>) hw hp hp' hq hpq hp'q hm hm'</span>
+<span id="L313">    · <span class="kw">obtain</span> ⟨v, Q, hQ, hm⟩ := h1</span>
+<span id="L314">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="211">psl_of_maj</span> hpq hQ hm, one_sided p hp hpF p' hp' hp'F v Q hQ hm h2]</span>
+<span id="L315">    · <span class="kw">obtain</span> ⟨v, Q, hQ, hm⟩ := h2</span>
+<span id="L316">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="211">psl_of_maj</span> hp'q hQ hm, one_sided p' hp' hp'F p hp hpF v Q hQ hm h1]</span>
+<span id="L317">    · <span class="kw">rw</span> [unf, unf, <span class="const token" data-verso-hover="203">pickMaj_of_not</span> hpq h1, <span class="const token" data-verso-hover="203">pickMaj_of_not</span> hp'q h2]</span>
+<span id="L318">      <span class="kw">refine</span> <span class="const token" data-verso-hover="204">vote_congr</span> <span class="kw">fun</span> r hr =&gt; ?_</span>
+<span id="L319">      <span class="kw">exact</span> iha p (<span class="const token" data-verso-hover="241">Finset.mem_erase</span>.<span class="const token" data-verso-hover="65">2</span> ⟨hpq, hp⟩) hpF p' (<span class="const token" data-verso-hover="241">Finset.mem_erase</span>.<span class="const token" data-verso-hover="65">2</span> ⟨hp'q, hp'⟩) hp'F r hr</span>
+<span id="L320"></span>
+<span id="L321"><span class="kw">lemma</span> <span class="const token" data-verso-hover="246">alg2_eq</span> [<span class="const token" data-verso-hover="49">Fintype</span> P] (t : <span class="const token" data-verso-hover="57">ℕ</span>) (σ : <span class="const token" data-verso-hover="91">MsgMap</span> P V) (p q : P) :</span>
+<span id="L322">    <span class="const token" data-verso-hover="28">alg2</span> t p (<span class="const token" data-verso-hover="16">view</span> (t + <span class="nu">1</span>) σ p) q = <span class="const token" data-verso-hover="207">psl</span> t <span class="const token" data-verso-hover="109">Finset.univ</span> (<span class="const token" data-verso-hover="107">loc</span> σ p) p q :=</span>
+<span id="L323">  <span class="const token" data-verso-hover="212">psl_congr</span> _ _ _ _ _ _ <span class="kw">fun</span> _ hw =&gt; <span class="const token" data-verso-hover="74">view_of_le</span> hw</span>
+<span id="L324"></span>
+<span id="L325"><span class="dc">/-- **Theorem 5.1**: Algorithm 2 is correct — with `t + 1` rounds it solves interactive consistency</span></span>
+<span id="L326"><span class="dc">in the weak non-equivocation fault model whenever `n &gt; 2t`. -/</span></span>
+<span id="L327"><span class="kw">theorem</span> <span class="const token" data-verso-hover="7">theorem_5_1</span> [<span class="const token" data-verso-hover="49">Fintype</span> P] {t : <span class="const token" data-verso-hover="57">ℕ</span>} (h : <span class="nu">2</span> * t &lt; <span class="const token" data-verso-hover="183">Fintype.card</span> P) :</span>
+<span id="L328">    <span class="const token" data-verso-hover="58">SolvesIC</span> <span class="const token" data-verso-hover="59">wne</span> (t + <span class="nu">1</span>) t (<span class="const token" data-verso-hover="28">alg2</span> (P := P) (V := V) t) := <span class="kw">by</span></span>
+<span id="L329">  <span class="kw">intro</span> F σ hF hm hpriv</span>
+<span id="L330">  <span class="kw">obtain</span> ⟨hv, ha⟩ := <span class="const token" data-verso-hover="29">psl_correct</span> t <span class="const token" data-verso-hover="109">Finset.univ</span> F σ (<span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> h)</span>
+<span id="L331">    (<span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hF) hm.<span class="const token" data-verso-hover="60">1</span> hm.<span class="const token" data-verso-hover="72">2</span></span>
+<span id="L332">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> p q hp hq =&gt; ?_, <span class="kw">fun</span> p p' q hp hp' =&gt; ?_⟩</span>
+<span id="L333">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="246">alg2_eq</span>, hv p (<span class="const token" data-verso-hover="63">Finset.mem_univ</span> _) hp q (<span class="const token" data-verso-hover="63">Finset.mem_univ</span> _) hq]</span>
+<span id="L334">    <span class="kw">obtain</span> ⟨a, ha⟩ := <span class="const token" data-verso-hover="61">Option.ne_none_iff_exists'</span>.<span class="const token" data-verso-hover="62">1</span> (hpriv q hq)</span>
+<span id="L335">    <span class="kw">rw</span> [ha]; <span class="kw">rfl</span></span>
+<span id="L336">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="246">alg2_eq</span>, <span class="const token" data-verso-hover="246">alg2_eq</span>]</span>
+<span id="L337">    <span class="kw">exact</span> ha p (<span class="const token" data-verso-hover="63">Finset.mem_univ</span> _) hp p' (<span class="const token" data-verso-hover="63">Finset.mem_univ</span> _) hp' q (<span class="const token" data-verso-hover="63">Finset.mem_univ</span> _)</span>
+<span id="L338"></span>
+<span id="L339"><span class="kw">end</span> NonEquivocation</span>
+<span id="L340"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2020/NonEquivocation/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

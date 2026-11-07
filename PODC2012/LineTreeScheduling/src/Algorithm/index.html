@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>LineTreeScheduling: Algorithm.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2012/">PODC 2012</a><span class="sep">›</span><a href="PODC2012/LineTreeScheduling/">LineTreeScheduling</a><span class="sep">›</span><a href="PODC2012/LineTreeScheduling/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Algorithm</span></nav>
+        <h1>
+          <code>Algorithm.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2012/LineTreeScheduling/">Scheduling on Line and Tree Networks — PODC 2012</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2012/LineTreeScheduling/Algorithm.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Algorithm"><span id="L1"><span class="kw">import</span> Papers.PODC2012.LineTreeScheduling.Framework</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># The distributed algorithm of Section 5 (epochs, stages, steps) and Lemma 5.1</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">The first phase of the algorithm of Figure 7, generic in the raising rule (so that it covers the</span></span>
+<span id="L7"><span class="dc">unit-height algorithm of Section 5, the narrow-instance algorithm of Lemma 6.2 and the</span></span>
+<span id="L8"><span class="dc">line-network algorithms of Section 7). The demand instances are partitioned into groups</span></span>
+<span id="L9"><span class="dc">`grp d ∈ {0, …, ℓ-1}` (a layered decomposition; group `0` is the paper's `G₁`). The first phase</span></span>
+<span id="L10"><span class="dc">has `ℓ` epochs; epoch `k` has `b` stages; stage `j` (0-based, the paper's stage `j+1`) consists of</span></span>
+<span id="L11"><span class="dc">`K` steps. In step `t` of stage `j` of epoch `k`, let `U` be the set of instances of group `k` that</span></span>
+<span id="L12"><span class="dc">are `(1 - ξ^{j+1})`-unsatisfied; an arbitrary maximal independent set `I ⊆ U` (supplied by an</span></span>
+<span id="L13"><span class="dc">adversarial MIS oracle `mis`) is raised.</span></span>
+<span id="L14"></span>
+<span id="L15"><span class="dc">The paper runs each stage "until `U = ∅`"; its distributed implementation runs a fixed number of</span></span>
+<span id="L16"><span class="dc">iterations per stage. We run `K` steps per stage and prove (`lemma_5_1`, `stage_complete`) that</span></span>
+<span id="L17"><span class="dc">`U = ∅` after `K` steps as soon as `p_max &lt; 2^K p_min`, so the two versions coincide (once</span></span>
+<span id="L18"><span class="dc">`U = ∅` the remaining steps raise nothing).</span></span>
+<span id="L19"></span>
+<span id="L20"><span class="dc">Main results:</span></span>
+<span id="L21"><span class="dc">* `claim_5_2`: if `d₁ ∈ I` kills `d₂` (conflicting, `d₂` still unsatisfied after the step), then</span></span>
+<span id="L22"><span class="dc">  `p(d₂) &gt; 2 p(d₁)`.</span></span>
+<span id="L23"><span class="dc">* `lemma_5_1`: if `U` is nonempty at the `L`-th step of a stage then `2^L p_min ≤ p_max`.</span></span>
+<span id="L24"><span class="dc">* `alg_sat`: at the end of the first phase all dual constraints are `(1-ξ^b)`-satisfied.</span></span>
+<span id="L25"><span class="dc">* `alg_validRun`, `alg_interference`: the run is a valid run of the framework with the</span></span>
+<span id="L26"><span class="dc">  interference property, so Lemmas 3.1 / 6.1 apply.</span></span>
+<span id="L27"><span class="dc">-/</span></span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">set_option</span> <span class="const token" data-verso-hover="47">linter.unusedSectionVars</span> false</span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">namespace</span> Podc.LineTreeScheduling</span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">open</span> Finset</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">variable</span> {A D E : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="48">DecidableEq</span> A] [<span class="const token" data-verso-hover="48">DecidableEq</span> D] [<span class="const token" data-verso-hover="48">DecidableEq</span> E]</span>
+<span id="L36"></span>
+<span id="L37"><span class="kw">noncomputable</span> <span class="kw">section</span></span>
+<span id="L38"></span>
+<span id="L39"><span class="kw">namespace</span> Inst</span>
+<span id="L40"></span>
+<span id="L41"><span class="kw">variable</span> (I : <span class="const token" data-verso-hover="49">Inst</span> A D E)</span>
+<span id="L42"></span>
+<span id="L43"><span class="dc">/-- `J` is a maximal independent set contained in `U` (w.r.t. the conflict graph). -/</span></span>
+<span id="L44"><span class="kw">structure</span> <span class="const token" data-verso-hover="50">IsMIS</span> (U J : <span class="const token" data-verso-hover="51">Finset</span> D) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L45">  <span class="const token" data-verso-hover="52">subset</span> : J ⊆ U</span>
+<span id="L46">  <span class="const token" data-verso-hover="53">indep</span> : I.<span class="const token" data-verso-hover="54">IsIndep</span> J</span>
+<span id="L47">  <span class="const token" data-verso-hover="55">maximal</span> : ∀ d ∈ U, ∃ d' ∈ J, I.<span class="const token" data-verso-hover="56">Conflict</span> d d'</span>
+<span id="L48"></span>
+<span id="L49"><span class="dc">/-- Non-vacuity of the MIS oracle: every set of instances contains a maximal independent set. -/</span></span>
+<span id="L50"><span class="kw">lemma</span> <span class="const token" data-verso-hover="42">exists_isMIS</span> (U : <span class="const token" data-verso-hover="51">Finset</span> D) : ∃ J, I.<span class="const token" data-verso-hover="50">IsMIS</span> U J := <span class="kw">by</span></span>
+<span id="L51">  <span class="kw">classical</span></span>
+<span id="L52">  <span class="kw">obtain</span> ⟨J, hJ, hmax⟩ := (U.<span class="const token" data-verso-hover="57">powerset</span>.<span class="const token" data-verso-hover="58">filter</span> (<span class="kw">fun</span> J =&gt; I.<span class="const token" data-verso-hover="54">IsIndep</span> J)).<span class="const token" data-verso-hover="59">exists_maximal</span></span>
+<span id="L53">    ⟨∅, <span class="const token" data-verso-hover="60">Finset.mem_filter</span>.<span class="const token" data-verso-hover="61">2</span> ⟨<span class="const token" data-verso-hover="62">Finset.empty_mem_powerset</span> U, <span class="kw">fun</span> d h =&gt; <span class="kw">by</span> <span class="kw">simp</span> <span class="kw">at</span> h⟩⟩</span>
+<span id="L54">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="60">Finset.mem_filter</span>, <span class="const token" data-verso-hover="63">Finset.mem_powerset</span>] <span class="kw">at</span> hJ hmax</span>
+<span id="L55">  <span class="kw">refine</span> ⟨J, hJ.<span class="const token" data-verso-hover="64">1</span>, hJ.<span class="const token" data-verso-hover="65">2</span>, <span class="kw">fun</span> d hd =&gt; ?_⟩</span>
+<span id="L56">  <span class="kw">by_contra</span> hno</span>
+<span id="L57">  push <span class="const token" data-verso-hover="66">Not</span> <span class="kw">at</span> hno</span>
+<span id="L58">  <span class="kw">have</span> hdJ : d ∉ J := <span class="kw">fun</span> h =&gt; hno d h (I.<span class="const token" data-verso-hover="67">conflict_self</span> d)</span>
+<span id="L59">  <span class="kw">have</span> hind : I.<span class="const token" data-verso-hover="54">IsIndep</span> (<span class="const token" data-verso-hover="68">insert</span> d J) := <span class="kw">by</span></span>
+<span id="L60">    <span class="kw">intro</span> d₁ h₁ d₂ h₂ hne</span>
+<span id="L61">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="69">Finset.mem_insert</span>.<span class="const token" data-verso-hover="70">1</span> h₁ <span class="kw">with</span> e₁ | h₁' &lt;;&gt; <span class="kw">rcases</span> <span class="const token" data-verso-hover="69">Finset.mem_insert</span>.<span class="const token" data-verso-hover="70">1</span> h₂ <span class="kw">with</span> e₂ | h₂'</span>
+<span id="L62">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="71">absurd</span> (e₁.<span class="const token" data-verso-hover="72">trans</span> e₂.<span class="const token" data-verso-hover="73">symm</span>) hne</span>
+<span id="L63">    · <span class="kw">subst</span> e₁; <span class="kw">exact</span> hno d₂ h₂'</span>
+<span id="L64">    · <span class="kw">subst</span> e₂; <span class="kw">exact</span> <span class="kw">fun</span> hc =&gt; hno d₁ h₁' ((I.<span class="const token" data-verso-hover="74">conflict_comm</span>).<span class="const token" data-verso-hover="70">1</span> hc)</span>
+<span id="L65">    · <span class="kw">exact</span> hJ.<span class="const token" data-verso-hover="65">2</span> d₁ h₁' d₂ h₂' hne</span>
+<span id="L66">  <span class="kw">have</span> := hmax ⟨<span class="const token" data-verso-hover="75">Finset.insert_subset</span> hd hJ.<span class="const token" data-verso-hover="64">1</span>, hind⟩ (<span class="const token" data-verso-hover="76">Finset.subset_insert</span> d J)</span>
+<span id="L67">  <span class="kw">exact</span> hdJ (this (<span class="const token" data-verso-hover="77">Finset.mem_insert_self</span> d J))</span>
+<span id="L68"></span>
+<span id="L69"><span class="dc">/-- Non-vacuity: an MIS oracle (for every step and every candidate set) exists. -/</span></span>
+<span id="L70"><span class="kw">lemma</span> <span class="const token" data-verso-hover="43">exists_misOracle</span> : ∃ mis : <span class="const token" data-verso-hover="78">ℕ</span> → <span class="const token" data-verso-hover="51">Finset</span> D → <span class="const token" data-verso-hover="51">Finset</span> D, ∀ t U, I.<span class="const token" data-verso-hover="50">IsMIS</span> U (mis t U) :=</span>
+<span id="L71">  ⟨<span class="kw">fun</span> _ U =&gt; (I.<span class="const token" data-verso-hover="42">exists_isMIS</span> U).<span class="const token" data-verso-hover="79">choose</span>, <span class="kw">fun</span> _ U =&gt; (I.<span class="const token" data-verso-hover="42">exists_isMIS</span> U).<span class="const token" data-verso-hover="80">choose_spec</span>⟩</span>
+<span id="L72"></span>
+<span id="L73"><span class="dc">/-- The schedule parameters of the first phase: groups, number of stages per epoch, number of</span></span>
+<span id="L74"><span class="dc">steps per stage, and the progress factor `ξ`. -/</span></span>
+<span id="L75"><span class="kw">structure</span> <span class="const token" data-verso-hover="81">Sched</span> (D : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L76">  <span class="dc">/-- The group (layer) of a demand instance; group `k` is processed in epoch `k`. -/</span></span>
+<span id="L77">  <span class="const token" data-verso-hover="82">grp</span> : D → <span class="const token" data-verso-hover="78">ℕ</span></span>
+<span id="L78">  <span class="dc">/-- Number of stages per epoch. -/</span></span>
+<span id="L79">  <span class="const token" data-verso-hover="83">b</span> : <span class="const token" data-verso-hover="78">ℕ</span></span>
+<span id="L80">  <span class="dc">/-- Number of steps per stage. -/</span></span>
+<span id="L81">  <span class="const token" data-verso-hover="84">K</span> : <span class="const token" data-verso-hover="78">ℕ</span></span>
+<span id="L82">  <span class="dc">/-- The stage-progress factor (`14/15` in Section 5). -/</span></span>
+<span id="L83">  <span class="const token" data-verso-hover="85">ξ</span> : <span class="const token" data-verso-hover="86">ℝ</span></span>
+<span id="L84"></span>
+<span id="L85"><span class="kw">variable</span> (R : <span class="const token" data-verso-hover="87">Rule</span> D E) (P : <span class="const token" data-verso-hover="81">Sched</span> D) (mis : <span class="const token" data-verso-hover="78">ℕ</span> → <span class="const token" data-verso-hover="51">Finset</span> D → <span class="const token" data-verso-hover="51">Finset</span> D) [<span class="const token" data-verso-hover="88">Fintype</span> D]</span>
+<span id="L86"></span>
+<span id="L87"><span class="dc">/-- The epoch of step `t`. -/</span></span>
+<span id="L88"><span class="kw">def</span> <span class="const token" data-verso-hover="89">Sched.epoch</span> (P : <span class="const token" data-verso-hover="81">Sched</span> D) (t : <span class="const token" data-verso-hover="78">ℕ</span>) : <span class="const token" data-verso-hover="78">ℕ</span> := t / P.<span class="const token" data-verso-hover="84">K</span> / P.<span class="const token" data-verso-hover="83">b</span></span>
+<span id="L89"></span>
+<span id="L90"><span class="dc">/-- The (0-based) stage of step `t` within its epoch. -/</span></span>
+<span id="L91"><span class="kw">def</span> <span class="const token" data-verso-hover="90">Sched.stage</span> (P : <span class="const token" data-verso-hover="81">Sched</span> D) (t : <span class="const token" data-verso-hover="78">ℕ</span>) : <span class="const token" data-verso-hover="78">ℕ</span> := t / P.<span class="const token" data-verso-hover="84">K</span> % P.<span class="const token" data-verso-hover="83">b</span></span>
+<span id="L92"></span>
+<span id="L93"><span class="dc">/-- The set `U` of step `t`: instances of the current group that are</span></span>
+<span id="L94"><span class="dc">`(1 - ξ^{j+1})`-unsatisfied, `j` the current stage. -/</span></span>
+<span id="L95"><span class="kw">def</span> <span class="const token" data-verso-hover="91">cand</span> (t : <span class="const token" data-verso-hover="78">ℕ</span>) (y : <span class="const token" data-verso-hover="92">Duals</span> A E) : <span class="const token" data-verso-hover="51">Finset</span> D :=</span>
+<span id="L96">  <span class="const token" data-verso-hover="93">univ</span>.<span class="const token" data-verso-hover="58">filter</span> <span class="kw">fun</span> d =&gt; P.<span class="const token" data-verso-hover="82">grp</span> d = P.<span class="const token" data-verso-hover="89">epoch</span> t ∧</span>
+<span id="L97">    I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> y d &lt; (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span> ^ (P.<span class="const token" data-verso-hover="90">stage</span> t + <span class="nu">1</span>)) * I.<span class="const token" data-verso-hover="96">profit</span> d</span>
+<span id="L98"></span>
+<span id="L99"><span class="dc">/-- The dual assignment of the algorithm after `t` steps. -/</span></span>
+<span id="L100"><span class="kw">def</span> <span class="const token" data-verso-hover="97">algState</span> : <span class="const token" data-verso-hover="78">ℕ</span> → <span class="const token" data-verso-hover="92">Duals</span> A E</span>
+<span id="L101">  | <span class="nu">0</span> =&gt; <span class="nu">0</span></span>
+<span id="L102">  | t + <span class="nu">1</span> =&gt; I.<span class="const token" data-verso-hover="98">raise</span> R (<span class="const token" data-verso-hover="97">algState</span> t) (mis t (I.<span class="const token" data-verso-hover="91">cand</span> R P t (<span class="const token" data-verso-hover="97">algState</span> t)))</span>
+<span id="L103"></span>
+<span id="L104"><span class="dc">/-- The independent set raised at step `t`. -/</span></span>
+<span id="L105"><span class="kw">def</span> <span class="const token" data-verso-hover="99">algI</span> (t : <span class="const token" data-verso-hover="78">ℕ</span>) : <span class="const token" data-verso-hover="51">Finset</span> D := mis t (I.<span class="const token" data-verso-hover="91">cand</span> R P t (I.<span class="const token" data-verso-hover="97">algState</span> R P mis t))</span>
+<span id="L106"></span>
+<span id="L107"><span class="kw">lemma</span> <span class="const token" data-verso-hover="100">algState_eq_run</span> (t : <span class="const token" data-verso-hover="78">ℕ</span>) : I.<span class="const token" data-verso-hover="97">algState</span> R P mis t = I.<span class="const token" data-verso-hover="101">run</span> R (I.<span class="const token" data-verso-hover="99">algI</span> R P mis) t := <span class="kw">by</span></span>
+<span id="L108">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L109">  | <span class="const token" data-verso-hover="102">zero</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L110">  | <span class="const token" data-verso-hover="103">succ</span> t ih =&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="97">algState</span>, <span class="const token" data-verso-hover="104">run_succ</span>, <span class="const token" data-verso-hover="99">algI</span>, ih]</span>
+<span id="L111"></span>
+<span id="L112"><span class="kw">variable</span> {I R P mis}</span>
+<span id="L113"></span>
+<span id="L114"><span class="dc">/-- Hypotheses on the algorithm: the rule is well formed, profits are positive, `0 &lt; ξ &lt; 1`, and the</span></span>
+<span id="L115"><span class="dc">oracle returns maximal independent sets. -/</span></span>
+<span id="L116"><span class="kw">structure</span> <span class="const token" data-verso-hover="105">AlgHyp</span> (I : <span class="const token" data-verso-hover="49">Inst</span> A D E) (R : <span class="const token" data-verso-hover="87">Rule</span> D E) (P : <span class="const token" data-verso-hover="81">Sched</span> D)</span>
+<span id="L117">    (mis : <span class="const token" data-verso-hover="78">ℕ</span> → <span class="const token" data-verso-hover="51">Finset</span> D → <span class="const token" data-verso-hover="51">Finset</span> D) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L118">  <span class="const token" data-verso-hover="106">wf</span> : R.<span class="const token" data-verso-hover="107">WF</span> I</span>
+<span id="L119">  <span class="const token" data-verso-hover="108">profit_pos</span> : ∀ d, <span class="nu">0</span> &lt; I.<span class="const token" data-verso-hover="96">profit</span> d</span>
+<span id="L120">  <span class="const token" data-verso-hover="109">ξ_pos</span> : <span class="nu">0</span> &lt; P.<span class="const token" data-verso-hover="85">ξ</span></span>
+<span id="L121">  <span class="const token" data-verso-hover="110">ξ_lt_one</span> : P.<span class="const token" data-verso-hover="85">ξ</span> &lt; <span class="nu">1</span></span>
+<span id="L122">  <span class="const token" data-verso-hover="111">mis</span> : ∀ t U, I.<span class="const token" data-verso-hover="50">IsMIS</span> U (mis t U)</span>
+<span id="L123"></span>
+<span id="L124"><span class="kw">lemma</span> <span class="const token" data-verso-hover="112">mem_cand</span> {t : <span class="const token" data-verso-hover="78">ℕ</span>} {y : <span class="const token" data-verso-hover="92">Duals</span> A E} {d : D} :</span>
+<span id="L125">    d ∈ I.<span class="const token" data-verso-hover="91">cand</span> R P t y ↔ P.<span class="const token" data-verso-hover="82">grp</span> d = P.<span class="const token" data-verso-hover="89">epoch</span> t ∧</span>
+<span id="L126">      I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> y d &lt; (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span> ^ (P.<span class="const token" data-verso-hover="90">stage</span> t + <span class="nu">1</span>)) * I.<span class="const token" data-verso-hover="96">profit</span> d := <span class="kw">by</span></span>
+<span id="L127">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="91">cand</span>]</span>
+<span id="L128"></span>
+<span id="L129"><span class="kw">lemma</span> <span class="const token" data-verso-hover="113">algI_subset</span> (H : <span class="const token" data-verso-hover="105">AlgHyp</span> I R P mis) (t : <span class="const token" data-verso-hover="78">ℕ</span>) :</span>
+<span id="L130">    I.<span class="const token" data-verso-hover="99">algI</span> R P mis t ⊆ I.<span class="const token" data-verso-hover="91">cand</span> R P t (I.<span class="const token" data-verso-hover="97">algState</span> R P mis t) := (H.<span class="const token" data-verso-hover="111">mis</span> _ _).<span class="const token" data-verso-hover="52">subset</span></span>
+<span id="L131"></span>
+<span id="L132"><span class="dc">/-- The first phase of the algorithm is a valid run of the framework (for any horizon). -/</span></span>
+<span id="L133"><span class="kw">lemma</span> <span class="const token" data-verso-hover="44">alg_validRun</span> (H : <span class="const token" data-verso-hover="105">AlgHyp</span> I R P mis) (T : <span class="const token" data-verso-hover="78">ℕ</span>) : I.<span class="const token" data-verso-hover="114">ValidRun</span> R (I.<span class="const token" data-verso-hover="99">algI</span> R P mis) T := <span class="kw">by</span></span>
+<span id="L134">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> t _ =&gt; (H.<span class="const token" data-verso-hover="111">mis</span> _ _).<span class="const token" data-verso-hover="53">indep</span>, <span class="kw">fun</span> t _ d hd =&gt; ?_⟩</span>
+<span id="L135">  <span class="kw">have</span> h := (<span class="const token" data-verso-hover="112">mem_cand</span>.<span class="const token" data-verso-hover="70">1</span> (<span class="const token" data-verso-hover="113">algI_subset</span> H t hd)).<span class="const token" data-verso-hover="65">2</span></span>
+<span id="L136">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="100">algState_eq_run</span>]</span>
+<span id="L137">  <span class="kw">have</span> : <span class="nu">0</span> &lt; P.<span class="const token" data-verso-hover="85">ξ</span> ^ (P.<span class="const token" data-verso-hover="90">stage</span> t + <span class="nu">1</span>) * I.<span class="const token" data-verso-hover="96">profit</span> d := <span class="const token" data-verso-hover="115">mul_pos</span> (<span class="const token" data-verso-hover="116">pow_pos</span> H.<span class="const token" data-verso-hover="109">ξ_pos</span> _) (H.<span class="const token" data-verso-hover="108">profit_pos</span> d)</span>
+<span id="L138">  <span class="kw">nlinarith</span></span>
+<span id="L139"></span>
+<span id="L140"><span class="dc">/-- The run satisfies the interference property whenever the groups and critical sets form a</span></span>
+<span id="L141"><span class="dc">layered decomposition (instances of earlier-or-equal groups are raised earlier-or-equal). -/</span></span>
+<span id="L142"><span class="kw">lemma</span> <span class="const token" data-verso-hover="45">alg_interference</span> (H : <span class="const token" data-verso-hover="105">AlgHyp</span> I R P mis)</span>
+<span id="L143">    (hlay : ∀ d₁ d₂, P.<span class="const token" data-verso-hover="82">grp</span> d₁ ≤ P.<span class="const token" data-verso-hover="82">grp</span> d₂ → I.<span class="const token" data-verso-hover="117">Overlap</span> d₁ d₂ → (R.<span class="const token" data-verso-hover="118">crit</span> d₁ ∩ I.<span class="const token" data-verso-hover="119">path</span> d₂).<span class="const token" data-verso-hover="120">Nonempty</span>)</span>
+<span id="L144">    (T : <span class="const token" data-verso-hover="78">ℕ</span>) : I.<span class="const token" data-verso-hover="121">Interference</span> R (I.<span class="const token" data-verso-hover="99">algI</span> R P mis) T := <span class="kw">by</span></span>
+<span id="L145">  <span class="kw">intro</span> s t hst _ d₁ h₁ d₂ h₂ hov</span>
+<span id="L146">  <span class="kw">refine</span> hlay d₁ d₂ ?_ hov</span>
+<span id="L147">  <span class="kw">rw</span> [(<span class="const token" data-verso-hover="112">mem_cand</span>.<span class="const token" data-verso-hover="70">1</span> (<span class="const token" data-verso-hover="113">algI_subset</span> H s h₁)).<span class="const token" data-verso-hover="64">1</span>, (<span class="const token" data-verso-hover="112">mem_cand</span>.<span class="const token" data-verso-hover="70">1</span> (<span class="const token" data-verso-hover="113">algI_subset</span> H t h₂)).<span class="const token" data-verso-hover="64">1</span>]</span>
+<span id="L148">  <span class="kw">exact</span> <span class="const token" data-verso-hover="122">Nat.div_le_div_right</span> (<span class="const token" data-verso-hover="122">Nat.div_le_div_right</span> hst.<span class="const token" data-verso-hover="123">le</span>)</span>
+<span id="L149"></span>
+<span id="L150"><span class="kw">lemma</span> <span class="const token" data-verso-hover="124">lhs_nonneg_alg</span> (H : <span class="const token" data-verso-hover="105">AlgHyp</span> I R P mis) (t : <span class="const token" data-verso-hover="78">ℕ</span>) (d : D) :</span>
+<span id="L151">    <span class="nu">0</span> ≤ I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="97">algState</span> R P mis t) d := <span class="kw">by</span></span>
+<span id="L152">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="100">algState_eq_run</span>]</span>
+<span id="L153">  <span class="kw">have</span> hv := <span class="const token" data-verso-hover="44">alg_validRun</span> H t</span>
+<span id="L154">  <span class="kw">exact</span> <span class="const token" data-verso-hover="125">add_nonneg</span> (<span class="const token" data-verso-hover="126">run_α_nonneg</span> H.<span class="const token" data-verso-hover="106">wf</span> hv <span class="const token" data-verso-hover="127">le_rfl</span> _)</span>
+<span id="L155">    (<span class="const token" data-verso-hover="128">mul_nonneg</span> (H.<span class="const token" data-verso-hover="106">wf</span>.<span class="const token" data-verso-hover="129">h_nonneg</span> d) (<span class="const token" data-verso-hover="130">Finset.sum_nonneg</span> <span class="kw">fun</span> e _ =&gt; <span class="const token" data-verso-hover="131">run_β_nonneg</span> H.<span class="const token" data-verso-hover="106">wf</span> hv <span class="const token" data-verso-hover="127">le_rfl</span> e))</span>
+<span id="L156"></span>
+<span id="L157"><span class="kw">lemma</span> <span class="const token" data-verso-hover="132">lhs_mono_alg</span> (H : <span class="const token" data-verso-hover="105">AlgHyp</span> I R P mis) {s t : <span class="const token" data-verso-hover="78">ℕ</span>} (hst : s ≤ t) (d : D) :</span>
+<span id="L158">    I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="97">algState</span> R P mis s) d ≤ I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="97">algState</span> R P mis t) d := <span class="kw">by</span></span>
+<span id="L159">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="100">algState_eq_run</span>, <span class="const token" data-verso-hover="100">algState_eq_run</span>]</span>
+<span id="L160">  <span class="kw">exact</span> <span class="const token" data-verso-hover="133">lhs_mono</span> H.<span class="const token" data-verso-hover="106">wf</span> (<span class="const token" data-verso-hover="44">alg_validRun</span> H t) hst <span class="const token" data-verso-hover="127">le_rfl</span> d</span>
+<span id="L161"></span>
+<span id="L162"><span class="dc">/-- **Claim 5.2.** Let `d₁` be raised at step `t` (stage `j`, epoch `k`) and let `d₂` be an</span></span>
+<span id="L163"><span class="dc">instance of group `k` conflicting with `d₁` that is still `(1-ξ^{j+1})`-unsatisfied after the step</span></span>
+<span id="L164"><span class="dc">("`d₁` kills `d₂`"). Suppose all instances of group `k` were `(1-ξ^j)`-satisfied at the beginning</span></span>
+<span id="L165"><span class="dc">of the step, every raise of `d₁` contributes at least `κ δ(d₁)` to the constraint of a conflicting</span></span>
+<span id="L166"><span class="dc">instance of its group, all denominators are `≤ M`, and `2M(1-ξ) ≤ κξ`. Then `p(d₂) &gt; 2 p(d₁)`.</span></span>
+<span id="L167"><span class="dc">(Section 5: `κ = 1`, `M = Δ+1`, `ξ = 2(Δ+1)/(2(Δ+1)+1)`.) -/</span></span>
+<span id="L168"><span class="kw">theorem</span> <span class="const token" data-verso-hover="20">claim_5_2</span> (H : <span class="const token" data-verso-hover="105">AlgHyp</span> I R P mis) {κ M : <span class="const token" data-verso-hover="86">ℝ</span>} (hκ : <span class="nu">0</span> &lt; κ)</span>
+<span id="L169">    (hkill : ∀ d₁ d₂, P.<span class="const token" data-verso-hover="82">grp</span> d₁ = P.<span class="const token" data-verso-hover="82">grp</span> d₂ → I.<span class="const token" data-verso-hover="56">Conflict</span> d₁ d₂ → κ ≤ I.<span class="const token" data-verso-hover="134">weight</span> R d₁ d₂)</span>
+<span id="L170">    (hden : ∀ d, R.<span class="const token" data-verso-hover="135">denom</span> d ≤ M) (hratio : <span class="nu">2</span> * M * (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span>) ≤ κ * P.<span class="const token" data-verso-hover="85">ξ</span>) {t : <span class="const token" data-verso-hover="78">ℕ</span>}</span>
+<span id="L171">    (hpre : ∀ d, P.<span class="const token" data-verso-hover="82">grp</span> d = P.<span class="const token" data-verso-hover="89">epoch</span> t →</span>
+<span id="L172">      (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span> ^ P.<span class="const token" data-verso-hover="90">stage</span> t) * I.<span class="const token" data-verso-hover="96">profit</span> d ≤ I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="97">algState</span> R P mis t) d)</span>
+<span id="L173">    {d₁ d₂ : D} (h₁ : d₁ ∈ I.<span class="const token" data-verso-hover="99">algI</span> R P mis t) (hg₂ : P.<span class="const token" data-verso-hover="82">grp</span> d₂ = P.<span class="const token" data-verso-hover="89">epoch</span> t)</span>
+<span id="L174">    (hc : I.<span class="const token" data-verso-hover="56">Conflict</span> d₁ d₂)</span>
+<span id="L175">    (h₂ : I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="97">algState</span> R P mis (t + <span class="nu">1</span>)) d₂ &lt; (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span> ^ (P.<span class="const token" data-verso-hover="90">stage</span> t + <span class="nu">1</span>)) * I.<span class="const token" data-verso-hover="96">profit</span> d₂) :</span>
+<span id="L176">    <span class="nu">2</span> * I.<span class="const token" data-verso-hover="96">profit</span> d₁ &lt; I.<span class="const token" data-verso-hover="96">profit</span> d₂ := <span class="kw">by</span></span>
+<span id="L177">  <span class="kw">have</span> hR := H.<span class="const token" data-verso-hover="106">wf</span></span>
+<span id="L178">  <span class="kw">have</span> hv := <span class="const token" data-verso-hover="44">alg_validRun</span> H (t + <span class="nu">1</span>)</span>
+<span id="L179">  <span class="kw">set</span> y := I.<span class="const token" data-verso-hover="97">algState</span> R P mis t</span>
+<span id="L180">  <span class="kw">set</span> j := P.<span class="const token" data-verso-hover="90">stage</span> t</span>
+<span id="L181">  <span class="kw">obtain</span> ⟨hg₁, hu₁⟩ := <span class="const token" data-verso-hover="112">mem_cand</span>.<span class="const token" data-verso-hover="70">1</span> (<span class="const token" data-verso-hover="113">algI_subset</span> H t h₁)</span>
+<span id="L182">  <span class="kw">have</span> hw := hkill d₁ d₂ (hg₁.<span class="const token" data-verso-hover="72">trans</span> hg₂.<span class="const token" data-verso-hover="73">symm</span>) hc</span>
+<span id="L183">  <span class="cm">--</span><span class="cm"> the raise of `d₁`</span></span>
+<span id="L184">  <span class="kw">set</span> δ := I.<span class="const token" data-verso-hover="136">amt</span> R y d₁</span>
+<span id="L185">  <span class="kw">have</span> hδ : δ * R.<span class="const token" data-verso-hover="135">denom</span> d₁ = I.<span class="const token" data-verso-hover="96">profit</span> d₁ - I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> y d₁ := <span class="const token" data-verso-hover="137">amt_mul_denom</span> hR y d₁</span>
+<span id="L186">  <span class="kw">have</span> hδpos : <span class="nu">0</span> &lt; δ := <span class="kw">by</span></span>
+<span id="L187">    <span class="kw">have</span> := <span class="const token" data-verso-hover="138">amt_pos</span> hR hv (<span class="const token" data-verso-hover="139">Nat.lt_succ_self</span> t) h₁</span>
+<span id="L188">    <span class="kw">rwa</span> [← <span class="const token" data-verso-hover="100">algState_eq_run</span>] <span class="kw">at</span> this</span>
+<span id="L189">  <span class="kw">have</span> hξj : <span class="nu">0</span> &lt; P.<span class="const token" data-verso-hover="85">ξ</span> ^ j := <span class="const token" data-verso-hover="116">pow_pos</span> H.<span class="const token" data-verso-hover="109">ξ_pos</span> j</span>
+<span id="L190">  <span class="kw">have</span> hp₁ := H.<span class="const token" data-verso-hover="108">profit_pos</span> d₁</span>
+<span id="L191">  <span class="kw">have</span> hp₂ := H.<span class="const token" data-verso-hover="108">profit_pos</span> d₂</span>
+<span id="L192">  <span class="cm">--</span><span class="cm"> `δ(d₁) ≥ ξ^{j+1} p(d₁) / M`</span></span>
+<span id="L193">  <span class="kw">have</span> hδM : P.<span class="const token" data-verso-hover="85">ξ</span> ^ (j + <span class="nu">1</span>) * I.<span class="const token" data-verso-hover="96">profit</span> d₁ &lt; δ * M := <span class="kw">by</span></span>
+<span id="L194">    <span class="kw">have</span> hden1 := hden d₁</span>
+<span id="L195">    <span class="kw">have</span> : P.<span class="const token" data-verso-hover="85">ξ</span> ^ (j + <span class="nu">1</span>) * I.<span class="const token" data-verso-hover="96">profit</span> d₁ &lt; δ * R.<span class="const token" data-verso-hover="135">denom</span> d₁ := <span class="kw">by</span> <span class="kw">rw</span> [hδ]; <span class="kw">linarith</span></span>
+<span id="L196">    <span class="kw">nlinarith</span></span>
+<span id="L197">  <span class="cm">--</span><span class="cm"> the constraint of `d₂` grows by at least `κ δ(d₁)`</span></span>
+<span id="L198">  <span class="kw">have</span> hgrow : I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> y d₂ + δ * κ ≤ I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="97">algState</span> R P mis (t + <span class="nu">1</span>)) d₂ := <span class="kw">by</span></span>
+<span id="L199">    <span class="kw">show</span> _ ≤ I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="98">raise</span> R y (mis t (I.<span class="const token" data-verso-hover="91">cand</span> R P t y))) d₂</span>
+<span id="L200">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="140">lhs_raise</span>]</span>
+<span id="L201">    <span class="kw">have</span> hnn : ∀ d' ∈ mis t (I.<span class="const token" data-verso-hover="91">cand</span> R P t y), <span class="nu">0</span> ≤ I.<span class="const token" data-verso-hover="136">amt</span> R y d' * I.<span class="const token" data-verso-hover="134">weight</span> R d' d₂ := <span class="kw">by</span></span>
+<span id="L202">      <span class="kw">intro</span> d' hd'</span>
+<span id="L203">      <span class="kw">have</span> := <span class="const token" data-verso-hover="138">amt_pos</span> hR hv (<span class="const token" data-verso-hover="139">Nat.lt_succ_self</span> t) hd'</span>
+<span id="L204">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="100">algState_eq_run</span>] <span class="kw">at</span> this</span>
+<span id="L205">      <span class="kw">exact</span> <span class="const token" data-verso-hover="128">mul_nonneg</span> this.<span class="const token" data-verso-hover="123">le</span> (<span class="const token" data-verso-hover="141">weight_nonneg</span> hR d' d₂)</span>
+<span id="L206">    <span class="kw">have</span> := <span class="const token" data-verso-hover="142">Finset.single_le_sum</span> hnn h₁</span>
+<span id="L207">    <span class="kw">have</span> : δ * κ ≤ δ * I.<span class="const token" data-verso-hover="134">weight</span> R d₁ d₂ := <span class="const token" data-verso-hover="143">mul_le_mul_of_nonneg_left</span> hw hδpos.<span class="const token" data-verso-hover="123">le</span></span>
+<span id="L208">    <span class="kw">linarith</span></span>
+<span id="L209">  <span class="kw">have</span> hpre₂ := hpre d₂ hg₂</span>
+<span id="L210">  <span class="cm">--</span><span class="cm"> `κ δ(d₁) &lt; (ξ^j - ξ^{j+1}) p(d₂)`</span></span>
+<span id="L211">  <span class="kw">have</span> hgap : δ * κ &lt; P.<span class="const token" data-verso-hover="85">ξ</span> ^ j * (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span>) * I.<span class="const token" data-verso-hover="96">profit</span> d₂ := <span class="kw">by</span></span>
+<span id="L212">    <span class="kw">have</span> : P.<span class="const token" data-verso-hover="85">ξ</span> ^ (j + <span class="nu">1</span>) = P.<span class="const token" data-verso-hover="85">ξ</span> ^ j * P.<span class="const token" data-verso-hover="85">ξ</span> := <span class="const token" data-verso-hover="144">pow_succ</span> _ _</span>
+<span id="L213">    <span class="kw">nlinarith</span></span>
+<span id="L214">  <span class="kw">have</span> hM : <span class="nu">0</span> &lt; M := <span class="const token" data-verso-hover="145">lt_of_lt_of_le</span> (<span class="const token" data-verso-hover="146">denom_pos</span> hR d₁) (hden d₁)</span>
+<span id="L215">  <span class="cm">--</span><span class="cm"> combine: `κ ξ p(d₁) &lt; M (1-ξ) p(d₂)`</span></span>
+<span id="L216">  <span class="kw">have</span> hcomb : κ * P.<span class="const token" data-verso-hover="85">ξ</span> * I.<span class="const token" data-verso-hover="96">profit</span> d₁ &lt; M * (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span>) * I.<span class="const token" data-verso-hover="96">profit</span> d₂ := <span class="kw">by</span></span>
+<span id="L217">    <span class="kw">have</span> e1 : P.<span class="const token" data-verso-hover="85">ξ</span> ^ (j + <span class="nu">1</span>) = P.<span class="const token" data-verso-hover="85">ξ</span> ^ j * P.<span class="const token" data-verso-hover="85">ξ</span> := <span class="const token" data-verso-hover="144">pow_succ</span> _ _</span>
+<span id="L218">    <span class="kw">have</span> h3 : κ * (P.<span class="const token" data-verso-hover="85">ξ</span> ^ (j + <span class="nu">1</span>) * I.<span class="const token" data-verso-hover="96">profit</span> d₁) &lt; κ * (δ * M) := <span class="const token" data-verso-hover="147">mul_lt_mul_of_pos_left</span> hδM hκ</span>
+<span id="L219">    <span class="kw">have</span> h4 : M * (δ * κ) &lt; M * (P.<span class="const token" data-verso-hover="85">ξ</span> ^ j * (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span>) * I.<span class="const token" data-verso-hover="96">profit</span> d₂) :=</span>
+<span id="L220">      <span class="const token" data-verso-hover="147">mul_lt_mul_of_pos_left</span> hgap hM</span>
+<span id="L221">    <span class="kw">have</span> : P.<span class="const token" data-verso-hover="85">ξ</span> ^ j * (κ * P.<span class="const token" data-verso-hover="85">ξ</span> * I.<span class="const token" data-verso-hover="96">profit</span> d₁) &lt; P.<span class="const token" data-verso-hover="85">ξ</span> ^ j * (M * (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span>) * I.<span class="const token" data-verso-hover="96">profit</span> d₂) := <span class="kw">by</span></span>
+<span id="L222">      <span class="kw">rw</span> [e1] <span class="kw">at</span> h3; <span class="kw">nlinarith</span></span>
+<span id="L223">    <span class="kw">exact</span> <span class="const token" data-verso-hover="148">lt_of_mul_lt_mul_left</span> this hξj.<span class="const token" data-verso-hover="123">le</span></span>
+<span id="L224">  <span class="kw">have</span> h1ξ : <span class="nu">0</span> &lt; <span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span> := <span class="kw">by</span> <span class="kw">linarith</span> [H.<span class="const token" data-verso-hover="110">ξ_lt_one</span>]</span>
+<span id="L225">  <span class="kw">have</span> : <span class="nu">2</span> * M * (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span>) * I.<span class="const token" data-verso-hover="96">profit</span> d₁ &lt; M * (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span>) * I.<span class="const token" data-verso-hover="96">profit</span> d₂ := <span class="kw">by</span></span>
+<span id="L226">    <span class="kw">have</span> := <span class="const token" data-verso-hover="149">mul_le_mul_of_nonneg_right</span> hratio hp₁.<span class="const token" data-verso-hover="123">le</span></span>
+<span id="L227">    <span class="kw">linarith</span></span>
+<span id="L228">  <span class="kw">have</span> hMξ : <span class="nu">0</span> &lt; M * (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span>) := <span class="const token" data-verso-hover="115">mul_pos</span> hM h1ξ</span>
+<span id="L229">  <span class="kw">nlinarith</span></span>
+<span id="L230"></span>
+<span id="L231"><span class="dc">/-- Index arithmetic: steps `(k b + j) K + i` with `i &lt; K`, `j &lt; b` lie in epoch `k`, stage `j`. -/</span></span>
+<span id="L232"><span class="kw">lemma</span> <span class="const token" data-verso-hover="150">epoch_stage_eq</span> {k j i : <span class="const token" data-verso-hover="78">ℕ</span>} (hj : j &lt; P.<span class="const token" data-verso-hover="83">b</span>) (hi : i &lt; P.<span class="const token" data-verso-hover="84">K</span>) :</span>
+<span id="L233">    P.<span class="const token" data-verso-hover="89">epoch</span> ((k * P.<span class="const token" data-verso-hover="83">b</span> + j) * P.<span class="const token" data-verso-hover="84">K</span> + i) = k ∧ P.<span class="const token" data-verso-hover="90">stage</span> ((k * P.<span class="const token" data-verso-hover="83">b</span> + j) * P.<span class="const token" data-verso-hover="84">K</span> + i) = j := <span class="kw">by</span></span>
+<span id="L234">  <span class="kw">have</span> hK : <span class="nu">0</span> &lt; P.<span class="const token" data-verso-hover="84">K</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L235">  <span class="kw">have</span> hq : ((k * P.<span class="const token" data-verso-hover="83">b</span> + j) * P.<span class="const token" data-verso-hover="84">K</span> + i) / P.<span class="const token" data-verso-hover="84">K</span> = k * P.<span class="const token" data-verso-hover="83">b</span> + j := <span class="kw">by</span></span>
+<span id="L236">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="151">Nat.add_comm</span>, <span class="const token" data-verso-hover="152">Nat.add_mul_div_right</span> _ _ hK, <span class="const token" data-verso-hover="153">Nat.div_eq_of_lt</span> hi, <span class="const token" data-verso-hover="154">Nat.zero_add</span>]</span>
+<span id="L237">  <span class="kw">have</span> hb : <span class="nu">0</span> &lt; P.<span class="const token" data-verso-hover="83">b</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L238">  <span class="kw">refine</span> ⟨?_, ?_⟩</span>
+<span id="L239">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="89">Sched.epoch</span>, hq]</span>
+<span id="L240">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="151">Nat.add_comm</span>, <span class="const token" data-verso-hover="152">Nat.add_mul_div_right</span> _ _ hb, <span class="const token" data-verso-hover="153">Nat.div_eq_of_lt</span> hj, <span class="const token" data-verso-hover="154">Nat.zero_add</span>]</span>
+<span id="L241">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="90">Sched.stage</span>, hq]</span>
+<span id="L242">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="151">Nat.add_comm</span>, <span class="const token" data-verso-hover="155">Nat.add_mul_mod_self_right</span>, <span class="const token" data-verso-hover="156">Nat.mod_eq_of_lt</span> hj]</span>
+<span id="L243"></span>
+<span id="L244"><span class="dc">/-- **Lemma 5.1** (the step bound of a stage). Consider stage `j` of epoch `k` and suppose that at</span></span>
+<span id="L245"><span class="dc">its beginning all instances of group `k` are `(1-ξ^j)`-satisfied. If after `L ≤ K` steps of the</span></span>
+<span id="L246"><span class="dc">stage some instance of group `k` is still `(1-ξ^{j+1})`-unsatisfied, then</span></span>
+<span id="L247"><span class="dc">`2^L p_min ≤ p_max` (for any bounds `p_min ≤ p(d) ≤ p_max`). Equivalently, a stage has at most</span></span>
+<span id="L248"><span class="dc">`1 + log₂(p_max/p_min)` steps with `U ≠ ∅`. -/</span></span>
+<span id="L249"><span class="kw">theorem</span> <span class="const token" data-verso-hover="21">lemma_5_1</span> (H : <span class="const token" data-verso-hover="105">AlgHyp</span> I R P mis) {κ M : <span class="const token" data-verso-hover="86">ℝ</span>} (hκ : <span class="nu">0</span> &lt; κ)</span>
+<span id="L250">    (hkill : ∀ d₁ d₂, P.<span class="const token" data-verso-hover="82">grp</span> d₁ = P.<span class="const token" data-verso-hover="82">grp</span> d₂ → I.<span class="const token" data-verso-hover="56">Conflict</span> d₁ d₂ → κ ≤ I.<span class="const token" data-verso-hover="134">weight</span> R d₁ d₂)</span>
+<span id="L251">    (hden : ∀ d, R.<span class="const token" data-verso-hover="135">denom</span> d ≤ M) (hratio : <span class="nu">2</span> * M * (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span>) ≤ κ * P.<span class="const token" data-verso-hover="85">ξ</span>)</span>
+<span id="L252">    {pmin pmax : <span class="const token" data-verso-hover="86">ℝ</span>} (hpmin : ∀ d, pmin ≤ I.<span class="const token" data-verso-hover="96">profit</span> d) (hpmax : ∀ d, I.<span class="const token" data-verso-hover="96">profit</span> d ≤ pmax)</span>
+<span id="L253">    {k j : <span class="const token" data-verso-hover="78">ℕ</span>} (hj : j &lt; P.<span class="const token" data-verso-hover="83">b</span>)</span>
+<span id="L254">    (hstart : ∀ d, P.<span class="const token" data-verso-hover="82">grp</span> d = k →</span>
+<span id="L255">      (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span> ^ j) * I.<span class="const token" data-verso-hover="96">profit</span> d ≤ I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="97">algState</span> R P mis ((k * P.<span class="const token" data-verso-hover="83">b</span> + j) * P.<span class="const token" data-verso-hover="84">K</span>)) d)</span>
+<span id="L256">    {L : <span class="const token" data-verso-hover="78">ℕ</span>} (hL : L ≤ P.<span class="const token" data-verso-hover="84">K</span>) {d : D} (hd : P.<span class="const token" data-verso-hover="82">grp</span> d = k)</span>
+<span id="L257">    (hunsat : I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="97">algState</span> R P mis ((k * P.<span class="const token" data-verso-hover="83">b</span> + j) * P.<span class="const token" data-verso-hover="84">K</span> + L)) d &lt;</span>
+<span id="L258">      (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span> ^ (j + <span class="nu">1</span>)) * I.<span class="const token" data-verso-hover="96">profit</span> d) :</span>
+<span id="L259">    <span class="nu">2</span> ^ L * pmin ≤ pmax := <span class="kw">by</span></span>
+<span id="L260">  <span class="kw">obtain</span> ⟨t₀, ht₀⟩ : ∃ t₀, t₀ = (k * P.<span class="const token" data-verso-hover="83">b</span> + j) * P.<span class="const token" data-verso-hover="84">K</span> := ⟨_, <span class="const token" data-verso-hover="157">rfl</span>⟩</span>
+<span id="L261">  <span class="kw">rw</span> [← ht₀] <span class="kw">at</span> hstart hunsat</span>
+<span id="L262">  <span class="cm">--</span><span class="cm"> chain: an unsatisfied instance after `L` steps has profit `≥ 2^L` times some profit</span></span>
+<span id="L263">  <span class="kw">suffices</span> h : ∀ L ≤ P.<span class="const token" data-verso-hover="84">K</span>, ∀ d, P.<span class="const token" data-verso-hover="82">grp</span> d = k →</span>
+<span id="L264">      I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="97">algState</span> R P mis (t₀ + L)) d &lt; (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span> ^ (j + <span class="nu">1</span>)) * I.<span class="const token" data-verso-hover="96">profit</span> d →</span>
+<span id="L265">      ∃ d₀, <span class="nu">2</span> ^ L * I.<span class="const token" data-verso-hover="96">profit</span> d₀ ≤ I.<span class="const token" data-verso-hover="96">profit</span> d <span class="kw">by</span></span>
+<span id="L266">    <span class="kw">obtain</span> ⟨d₀, h₀⟩ := h L hL d hd hunsat</span>
+<span id="L267">    <span class="kw">have</span> := <span class="const token" data-verso-hover="143">mul_le_mul_of_nonneg_left</span> (hpmin d₀) (<span class="const token" data-verso-hover="158">pow_nonneg</span> (<span class="const token" data-verso-hover="159">zero_le_two</span> (α := <span class="const token" data-verso-hover="86">ℝ</span>)) L)</span>
+<span id="L268">    <span class="kw">linarith</span> [hpmax d]</span>
+<span id="L269">  <span class="kw">intro</span> L</span>
+<span id="L270">  <span class="kw">induction</span> L <span class="kw">with</span></span>
+<span id="L271">  | <span class="const token" data-verso-hover="102">zero</span> =&gt; <span class="kw">intro</span> _ d _ _; <span class="kw">exact</span> ⟨d, <span class="kw">by</span> <span class="kw">simp</span>⟩</span>
+<span id="L272">  | <span class="const token" data-verso-hover="103">succ</span> L ih =&gt;</span>
+<span id="L273">    <span class="kw">intro</span> hL d hd hu</span>
+<span id="L274">    <span class="kw">have</span> hLK : L &lt; P.<span class="const token" data-verso-hover="84">K</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L275">    <span class="kw">obtain</span> ⟨hep, hst⟩ := <span class="const token" data-verso-hover="150">epoch_stage_eq</span> (P := P) (k := k) hj hLK</span>
+<span id="L276">    <span class="kw">rw</span> [← ht₀] <span class="kw">at</span> hep hst</span>
+<span id="L277">    <span class="cm">--</span><span class="cm"> `d` is in `U` at step `t₀ + L`</span></span>
+<span id="L278">    <span class="kw">have</span> hu' : I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="97">algState</span> R P mis (t₀ + L)) d &lt; (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span> ^ (j + <span class="nu">1</span>)) * I.<span class="const token" data-verso-hover="96">profit</span> d :=</span>
+<span id="L279">      <span class="const token" data-verso-hover="160">lt_of_le_of_lt</span> (<span class="const token" data-verso-hover="132">lhs_mono_alg</span> H (<span class="kw">by</span> <span class="kw">omega</span>) d) hu</span>
+<span id="L280">    <span class="kw">have</span> hdU : d ∈ I.<span class="const token" data-verso-hover="91">cand</span> R P (t₀ + L) (I.<span class="const token" data-verso-hover="97">algState</span> R P mis (t₀ + L)) := <span class="kw">by</span></span>
+<span id="L281">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="112">mem_cand</span>, hep, hst]; <span class="kw">exact</span> ⟨hd, hu'⟩</span>
+<span id="L282">    <span class="kw">obtain</span> ⟨d₁, hd₁, hc⟩ := (H.<span class="const token" data-verso-hover="111">mis</span> (t₀ + L) _).<span class="const token" data-verso-hover="55">maximal</span> d hdU</span>
+<span id="L283">    <span class="kw">have</span> hd₁' : d₁ ∈ I.<span class="const token" data-verso-hover="99">algI</span> R P mis (t₀ + L) := hd₁</span>
+<span id="L284">    <span class="kw">obtain</span> ⟨hg₁, hu₁⟩ := <span class="const token" data-verso-hover="112">mem_cand</span>.<span class="const token" data-verso-hover="70">1</span> (<span class="const token" data-verso-hover="113">algI_subset</span> H _ hd₁')</span>
+<span id="L285">    <span class="kw">rw</span> [hep] <span class="kw">at</span> hg₁; <span class="kw">rw</span> [hst] <span class="kw">at</span> hu₁</span>
+<span id="L286">    <span class="cm">--</span><span class="cm"> Claim 5.2 for `d₁` killing `d`</span></span>
+<span id="L287">    <span class="kw">have</span> hpre : ∀ d', P.<span class="const token" data-verso-hover="82">grp</span> d' = P.<span class="const token" data-verso-hover="89">epoch</span> (t₀ + L) →</span>
+<span id="L288">        (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span> ^ P.<span class="const token" data-verso-hover="90">stage</span> (t₀ + L)) * I.<span class="const token" data-verso-hover="96">profit</span> d' ≤ I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="97">algState</span> R P mis (t₀ + L)) d' := <span class="kw">by</span></span>
+<span id="L289">      <span class="kw">intro</span> d' hd'</span>
+<span id="L290">      <span class="kw">rw</span> [hep] <span class="kw">at</span> hd'; <span class="kw">rw</span> [hst]</span>
+<span id="L291">      <span class="kw">exact</span> (hstart d' hd').<span class="const token" data-verso-hover="161">trans</span> (<span class="const token" data-verso-hover="132">lhs_mono_alg</span> H (<span class="kw">by</span> <span class="kw">omega</span>) d')</span>
+<span id="L292">    <span class="kw">have</span> hkl := <span class="const token" data-verso-hover="20">claim_5_2</span> H hκ hkill hden hratio hpre hd₁' (<span class="kw">by</span> <span class="kw">rw</span> [hep]; <span class="kw">exact</span> hd)</span>
+<span id="L293">      ((I.<span class="const token" data-verso-hover="74">conflict_comm</span>).<span class="const token" data-verso-hover="70">1</span> hc) (<span class="kw">by</span> <span class="kw">rw</span> [hst]; <span class="kw">exact</span> hu)</span>
+<span id="L294">    <span class="kw">obtain</span> ⟨d₀, h₀⟩ := ih (<span class="kw">by</span> <span class="kw">omega</span>) d₁ hg₁ hu₁</span>
+<span id="L295">    <span class="kw">refine</span> ⟨d₀, ?_⟩</span>
+<span id="L296">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="144">pow_succ</span>]</span>
+<span id="L297">    <span class="kw">linarith</span></span>
+<span id="L298"></span>
+<span id="L299"><span class="dc">/-- Each stage completes: if all instances of group `k` are `(1-ξ^j)`-satisfied at the beginning of</span></span>
+<span id="L300"><span class="dc">stage `j` and `p_max &lt; 2^K p_min`, they are all `(1-ξ^{j+1})`-satisfied at its end. -/</span></span>
+<span id="L301"><span class="kw">theorem</span> <span class="const token" data-verso-hover="22">stage_complete</span> (H : <span class="const token" data-verso-hover="105">AlgHyp</span> I R P mis) {κ M : <span class="const token" data-verso-hover="86">ℝ</span>} (hκ : <span class="nu">0</span> &lt; κ)</span>
+<span id="L302">    (hkill : ∀ d₁ d₂, P.<span class="const token" data-verso-hover="82">grp</span> d₁ = P.<span class="const token" data-verso-hover="82">grp</span> d₂ → I.<span class="const token" data-verso-hover="56">Conflict</span> d₁ d₂ → κ ≤ I.<span class="const token" data-verso-hover="134">weight</span> R d₁ d₂)</span>
+<span id="L303">    (hden : ∀ d, R.<span class="const token" data-verso-hover="135">denom</span> d ≤ M) (hratio : <span class="nu">2</span> * M * (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span>) ≤ κ * P.<span class="const token" data-verso-hover="85">ξ</span>)</span>
+<span id="L304">    {pmin pmax : <span class="const token" data-verso-hover="86">ℝ</span>} (hpmin : ∀ d, pmin ≤ I.<span class="const token" data-verso-hover="96">profit</span> d) (hpmax : ∀ d, I.<span class="const token" data-verso-hover="96">profit</span> d ≤ pmax)</span>
+<span id="L305">    (hK : pmax &lt; <span class="nu">2</span> ^ P.<span class="const token" data-verso-hover="84">K</span> * pmin) {k j : <span class="const token" data-verso-hover="78">ℕ</span>} (hj : j &lt; P.<span class="const token" data-verso-hover="83">b</span>)</span>
+<span id="L306">    (hstart : ∀ d, P.<span class="const token" data-verso-hover="82">grp</span> d = k →</span>
+<span id="L307">      (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span> ^ j) * I.<span class="const token" data-verso-hover="96">profit</span> d ≤ I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="97">algState</span> R P mis ((k * P.<span class="const token" data-verso-hover="83">b</span> + j) * P.<span class="const token" data-verso-hover="84">K</span>)) d)</span>
+<span id="L308">    (d : D) (hd : P.<span class="const token" data-verso-hover="82">grp</span> d = k) :</span>
+<span id="L309">    (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span> ^ (j + <span class="nu">1</span>)) * I.<span class="const token" data-verso-hover="96">profit</span> d ≤</span>
+<span id="L310">      I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="97">algState</span> R P mis ((k * P.<span class="const token" data-verso-hover="83">b</span> + (j + <span class="nu">1</span>)) * P.<span class="const token" data-verso-hover="84">K</span>)) d := <span class="kw">by</span></span>
+<span id="L311">  <span class="kw">by_contra</span> hc</span>
+<span id="L312">  push <span class="const token" data-verso-hover="66">Not</span> <span class="kw">at</span> hc</span>
+<span id="L313">  <span class="kw">have</span> := <span class="const token" data-verso-hover="21">lemma_5_1</span> H hκ hkill hden hratio hpmin hpmax hj hstart <span class="const token" data-verso-hover="127">le_rfl</span> hd</span>
+<span id="L314">    (<span class="kw">by</span> <span class="kw">rw</span> [<span class="kw">show</span> (k * P.<span class="const token" data-verso-hover="83">b</span> + j) * P.<span class="const token" data-verso-hover="84">K</span> + P.<span class="const token" data-verso-hover="84">K</span> = (k * P.<span class="const token" data-verso-hover="83">b</span> + (j + <span class="nu">1</span>)) * P.<span class="const token" data-verso-hover="84">K</span> <span class="kw">by</span> <span class="kw">ring</span>]; <span class="kw">exact</span> hc)</span>
+<span id="L315">  <span class="kw">linarith</span></span>
+<span id="L316"></span>
+<span id="L317"><span class="dc">/-- At the end of the first phase (`ℓ b K` steps, all groups `&lt; ℓ`) every dual constraint is</span></span>
+<span id="L318"><span class="dc">`(1-ξ^b)`-satisfied: the slackness parameter is `λ ≥ 1 - ξ^b`. -/</span></span>
+<span id="L319"><span class="kw">theorem</span> <span class="const token" data-verso-hover="23">alg_sat</span> (H : <span class="const token" data-verso-hover="105">AlgHyp</span> I R P mis) {κ M : <span class="const token" data-verso-hover="86">ℝ</span>} (hκ : <span class="nu">0</span> &lt; κ)</span>
+<span id="L320">    (hkill : ∀ d₁ d₂, P.<span class="const token" data-verso-hover="82">grp</span> d₁ = P.<span class="const token" data-verso-hover="82">grp</span> d₂ → I.<span class="const token" data-verso-hover="56">Conflict</span> d₁ d₂ → κ ≤ I.<span class="const token" data-verso-hover="134">weight</span> R d₁ d₂)</span>
+<span id="L321">    (hden : ∀ d, R.<span class="const token" data-verso-hover="135">denom</span> d ≤ M) (hratio : <span class="nu">2</span> * M * (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span>) ≤ κ * P.<span class="const token" data-verso-hover="85">ξ</span>)</span>
+<span id="L322">    {pmin pmax : <span class="const token" data-verso-hover="86">ℝ</span>} (hpmin : ∀ d, pmin ≤ I.<span class="const token" data-verso-hover="96">profit</span> d) (hpmax : ∀ d, I.<span class="const token" data-verso-hover="96">profit</span> d ≤ pmax)</span>
+<span id="L323">    (hK : pmax &lt; <span class="nu">2</span> ^ P.<span class="const token" data-verso-hover="84">K</span> * pmin) {ℓ : <span class="const token" data-verso-hover="78">ℕ</span>} (hℓ : ∀ d, P.<span class="const token" data-verso-hover="82">grp</span> d &lt; ℓ) (d : D) :</span>
+<span id="L324">    (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span> ^ P.<span class="const token" data-verso-hover="83">b</span>) * I.<span class="const token" data-verso-hover="96">profit</span> d ≤ I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="97">algState</span> R P mis (ℓ * P.<span class="const token" data-verso-hover="83">b</span> * P.<span class="const token" data-verso-hover="84">K</span>)) d := <span class="kw">by</span></span>
+<span id="L325">  <span class="kw">set</span> k := P.<span class="const token" data-verso-hover="82">grp</span> d</span>
+<span id="L326">  <span class="kw">have</span> hstages : ∀ j ≤ P.<span class="const token" data-verso-hover="83">b</span>, ∀ d', P.<span class="const token" data-verso-hover="82">grp</span> d' = k →</span>
+<span id="L327">      (<span class="nu">1</span> - P.<span class="const token" data-verso-hover="85">ξ</span> ^ j) * I.<span class="const token" data-verso-hover="96">profit</span> d' ≤ I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="97">algState</span> R P mis ((k * P.<span class="const token" data-verso-hover="83">b</span> + j) * P.<span class="const token" data-verso-hover="84">K</span>)) d' := <span class="kw">by</span></span>
+<span id="L328">    <span class="kw">intro</span> j</span>
+<span id="L329">    <span class="kw">induction</span> j <span class="kw">with</span></span>
+<span id="L330">    | <span class="const token" data-verso-hover="102">zero</span> =&gt; <span class="kw">intro</span> _ d' _; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="162">pow_zero</span>, <span class="const token" data-verso-hover="163">sub_self</span>, <span class="const token" data-verso-hover="164">zero_mul</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="124">lhs_nonneg_alg</span> H _ d'</span>
+<span id="L331">    | <span class="const token" data-verso-hover="103">succ</span> j ih =&gt;</span>
+<span id="L332">      <span class="kw">intro</span> hj d' hd'</span>
+<span id="L333">      <span class="kw">exact</span> <span class="const token" data-verso-hover="22">stage_complete</span> H hκ hkill hden hratio hpmin hpmax hK (<span class="kw">by</span> <span class="kw">omega</span>) (ih (<span class="kw">by</span> <span class="kw">omega</span>)) d' hd'</span>
+<span id="L334">  <span class="kw">refine</span> (hstages P.<span class="const token" data-verso-hover="83">b</span> <span class="const token" data-verso-hover="127">le_rfl</span> d <span class="const token" data-verso-hover="157">rfl</span>).<span class="const token" data-verso-hover="161">trans</span> (<span class="const token" data-verso-hover="132">lhs_mono_alg</span> H ?_ d)</span>
+<span id="L335">  <span class="kw">have</span> : k + <span class="nu">1</span> ≤ ℓ := hℓ d</span>
+<span id="L336">  <span class="kw">calc</span> (k * P.<span class="const token" data-verso-hover="83">b</span> + P.<span class="const token" data-verso-hover="83">b</span>) * P.<span class="const token" data-verso-hover="84">K</span> = (k + <span class="nu">1</span>) * P.<span class="const token" data-verso-hover="83">b</span> * P.<span class="const token" data-verso-hover="84">K</span> := <span class="kw">by</span> <span class="kw">ring</span></span>
+<span id="L337">    _ ≤ ℓ * P.<span class="const token" data-verso-hover="83">b</span> * P.<span class="const token" data-verso-hover="84">K</span> := <span class="const token" data-verso-hover="165">Nat.mul_le_mul_right</span> _ (<span class="const token" data-verso-hover="165">Nat.mul_le_mul_right</span> _ this)</span>
+<span id="L338"></span>
+<span id="L339"><span class="kw">end</span> Inst</span>
+<span id="L340"></span>
+<span id="L341"><span class="kw">end</span></span>
+<span id="L342"></span>
+<span id="L343"><span class="kw">end</span> Podc.LineTreeScheduling</span>
+<span id="L344"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2012/LineTreeScheduling/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

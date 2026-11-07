@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>NoBroadcastKSA: Derive.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2024/">PODC 2024</a><span class="sep">›</span><a href="PODC2024/NoBroadcastKSA/">NoBroadcastKSA</a><span class="sep">›</span><a href="PODC2024/NoBroadcastKSA/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Derive</span></nav>
+        <h1>
+          <code>Derive.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2024/NoBroadcastKSA/">No Broadcast Abstraction for k-Set Agreement — PODC 2024</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2024/NoBroadcastKSA/Derive.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Derive"><span id="L1"><span class="kw">import</span> Papers.PODC2024.NoBroadcastKSA.Sim</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Executions of `A` on top of `S` derived from executions of `B`</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">Let `α` be an admissible execution of the implementation `B` in `CAMP_n[k-SA]` whose upper layer</span></span>
+<span id="L7"><span class="dc">runs copies of the k-SA algorithm `A` (`Sim.lean`). Keep only</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">* the broadcast events of the messages of a set `Ms` (the messages of selected copies), and</span></span>
+<span id="L10"><span class="dc">* the internal steps of the upper layer of the *active* processes from time `ws p` on (the start</span></span>
+<span id="L11"><span class="dc">  of the selected copy of `p`), turned into the decisions and idle steps of `A`.</span></span>
+<span id="L12"></span>
+<span id="L13"><span class="dc">The result (`derive`) is an execution of `A` on top of the broadcast abstraction. Its</span></span>
+<span id="L14"><span class="dc">broadcast events are the restriction of those of `α` to `Ms`, so if `B` implements `S` and `S`</span></span>
+<span id="L15"><span class="dc">is compositional, it is admitted by `S`; under the hypotheses of `derive_admissible` (the</span></span>
+<span id="L16"><span class="dc">selected copy of each active process sees exactly the selected messages) it is an admissible</span></span>
+<span id="L17"><span class="dc">execution of `A`, and the local history of an active process is the view of its copy</span></span>
+<span id="L18"><span class="dc">(`derive_hist`).</span></span>
+<span id="L19"><span class="dc">-/</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="kw">namespace</span> Podc.NoBroadcastKSA.Camp</span>
+<span id="L22"></span>
+<span id="L23"><span class="kw">open</span> Classical</span>
+<span id="L24"></span>
+<span id="L25"><span class="kw">variable</span> {P C V X O W : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="30">DecidableEq</span> P] [<span class="const token" data-verso-hover="30">DecidableEq</span> C]</span>
+<span id="L26"></span>
+<span id="L27"><span class="dc">/-- The parameters of the copy of `A` run by the upper layer of each process. -/</span></span>
+<span id="L28"><span class="kw">structure</span> <span class="const token" data-verso-hover="122">CopyPar</span> (P C V O : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L29">  <span class="dc">/-- the proposal -/</span></span>
+<span id="L30">  <span class="const token" data-verso-hover="126">v</span> : P → V</span>
+<span id="L31">  <span class="dc">/-- the reset objects -/</span></span>
+<span id="L32">  <span class="const token" data-verso-hover="463">R</span> : P → <span class="const token" data-verso-hover="63">Set</span> O</span>
+<span id="L33">  <span class="dc">/-- the foreign filter -/</span></span>
+<span id="L34">  <span class="const token" data-verso-hover="464">F</span> : P → P → <span class="const token" data-verso-hover="33">Msg</span> C → <span class="kw">Prop</span></span>
+<span id="L35"></span>
+<span id="L36"><span class="kw">variable</span> (A : <span class="const token" data-verso-hover="31">Algo</span> P C V) (cp : <span class="const token" data-verso-hover="122">CopyPar</span> P C V O)</span>
+<span id="L37"></span>
+<span id="L38"><span class="dc">/-- The view of the copy of `p` at time `t` of `α`. -/</span></span>
+<span id="L39"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="125">copyView</span> (α : <span class="const token" data-verso-hover="46">CExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W) (p : P) (t : <span class="const token" data-verso-hover="47">ℕ</span>) :</span>
+<span id="L40">    <span class="const token" data-verso-hover="77">List</span> (<span class="const token" data-verso-hover="243">LEv</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) V) :=</span>
+<span id="L41">  <span class="const token" data-verso-hover="81">simView</span> A p (cp.<span class="const token" data-verso-hover="126">v</span> p) (cp.<span class="const token" data-verso-hover="463">R</span> p) (cp.<span class="const token" data-verso-hover="464">F</span> p) (<span class="const token" data-verso-hover="49">fhist</span> α p t)</span>
+<span id="L42"></span>
+<span id="L43"><span class="dc">/-- The execution of `A` derived from `α`. -/</span></span>
+<span id="L44"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="130">derive</span> (α : <span class="const token" data-verso-hover="46">CExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W) (Ms : <span class="const token" data-verso-hover="63">Set</span> (P × <span class="const token" data-verso-hover="33">Msg</span> C)) (act : <span class="const token" data-verso-hover="63">Set</span> P)</span>
+<span id="L45">    (ws : P → <span class="const token" data-verso-hover="47">ℕ</span>) (Cr : <span class="const token" data-verso-hover="63">Set</span> P) : <span class="const token" data-verso-hover="387">AExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) V <span class="kw">where</span></span>
+<span id="L46">  <span class="const token" data-verso-hover="131">st</span> t := <span class="kw">match</span> α t <span class="kw">with</span></span>
+<span id="L47">    | <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="39">.</span>inv p m) =&gt; <span class="kw">if</span> (p, m) ∈ Ms <span class="kw">then</span> <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="157">.</span>b (<span class="const token" data-verso-hover="158">.</span>bc p m)) <span class="kw">else</span> <span class="const token" data-verso-hover="142">none</span></span>
+<span id="L48">    | <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="44">.</span>act p (<span class="const token" data-verso-hover="43">.</span>ret m)) =&gt; <span class="kw">if</span> (p, m) ∈ Ms <span class="kw">then</span> <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="157">.</span>b (<span class="const token" data-verso-hover="193">.</span>ret p m)) <span class="kw">else</span> <span class="const token" data-verso-hover="142">none</span></span>
+<span id="L49">    | <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="44">.</span>act p (<span class="const token" data-verso-hover="169">.</span>deliver q m)) =&gt; <span class="kw">if</span> (q, m) ∈ Ms <span class="kw">then</span> <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="157">.</span>b (<span class="const token" data-verso-hover="194">.</span>dl p q m)) <span class="kw">else</span> <span class="const token" data-verso-hover="142">none</span></span>
+<span id="L50">    | <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="86">.</span>up p) =&gt;</span>
+<span id="L51">      <span class="kw">if</span> p ∈ act ∧ ws p ≤ t <span class="kw">then</span></span>
+<span id="L52">        <span class="kw">match</span> A.<span class="const token" data-verso-hover="78">act</span> p (cp.<span class="const token" data-verso-hover="126">v</span> p) (<span class="const token" data-verso-hover="125">copyView</span> A cp α p t) <span class="kw">with</span></span>
+<span id="L53">        | <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="160">.</span><span class="kw">decide</span> w) =&gt; <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="159">.</span>dec p w)</span>
+<span id="L54">        | <span class="const token" data-verso-hover="142">none</span> =&gt; <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="143">.</span>tick p)</span>
+<span id="L55">        | <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="84">.</span>bcast _) =&gt; <span class="const token" data-verso-hover="142">none</span></span>
+<span id="L56">      <span class="kw">else</span> <span class="const token" data-verso-hover="142">none</span></span>
+<span id="L57">    | _ =&gt; <span class="const token" data-verso-hover="142">none</span></span>
+<span id="L58">  <span class="const token" data-verso-hover="413">correct</span> := Cr</span>
+<span id="L59">  <span class="const token" data-verso-hover="389">inp</span> := cp.<span class="const token" data-verso-hover="126">v</span></span>
+<span id="L60"></span>
+<span id="L61"><span class="dc">/-- The hypotheses under which the selected copies see exactly the selected messages. -/</span></span>
+<span id="L62"><span class="kw">structure</span> <span class="const token" data-verso-hover="123">DeriveHyp</span> (α : <span class="const token" data-verso-hover="46">CExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W) (Ms : <span class="const token" data-verso-hover="63">Set</span> (P × <span class="const token" data-verso-hover="33">Msg</span> C)) (act : <span class="const token" data-verso-hover="63">Set</span> P)</span>
+<span id="L63">    (ws : P → <span class="const token" data-verso-hover="47">ℕ</span>) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L64">  <span class="dc">/-- the broadcast events of `α` satisfy the basic properties (e.g. `α` is admissible for an</span></span>
+<span id="L65"><span class="dc">  implementation of a broadcast abstraction) -/</span></span>
+<span id="L66">  <span class="const token" data-verso-hover="465">bc</span> : (<span class="const token" data-verso-hover="64">proj</span> α ∅).<span class="const token" data-verso-hover="65">IsBroadcast</span></span>
+<span id="L67">  <span class="dc">/-- inactive processes have no selected events -/</span></span>
+<span id="L68">  <span class="const token" data-verso-hover="466">inactive</span> : ∀ p ∉ act, ∀ t (m : <span class="const token" data-verso-hover="33">Msg</span> C), ((p, m) ∈ Ms → α t ≠ <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="39">.</span>inv p m)) ∧</span>
+<span id="L69">    ((p, m) ∈ Ms → α t ≠ <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="44">.</span>act p (<span class="const token" data-verso-hover="43">.</span>ret m))) ∧</span>
+<span id="L70">    ∀ q, (q, m) ∈ Ms → α t ≠ <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="44">.</span>act p (<span class="const token" data-verso-hover="169">.</span>deliver q m))</span>
+<span id="L71">  <span class="dc">/-- before `ws p`, an active process has no selected events -/</span></span>
+<span id="L72">  <span class="const token" data-verso-hover="467">before</span> : ∀ p ∈ act, ∀ t &lt; ws p, ∀ (m : <span class="const token" data-verso-hover="33">Msg</span> C), ((p, m) ∈ Ms → α t ≠ <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="39">.</span>inv p m)) ∧</span>
+<span id="L73">    ((p, m) ∈ Ms → α t ≠ <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="44">.</span>act p (<span class="const token" data-verso-hover="43">.</span>ret m))) ∧</span>
+<span id="L74">    ∀ q, (q, m) ∈ Ms → α t ≠ <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="44">.</span>act p (<span class="const token" data-verso-hover="169">.</span>deliver q m))</span>
+<span id="L75">  <span class="dc">/-- the copy starts at `ws p` with an empty view -/</span></span>
+<span id="L76">  <span class="const token" data-verso-hover="468">start</span> : ∀ p ∈ act, <span class="const token" data-verso-hover="125">copyView</span> A cp α p (ws p) = []</span>
+<span id="L77">  <span class="dc">/-- the copy is not discarded after `ws p` -/</span></span>
+<span id="L78">  <span class="const token" data-verso-hover="469">noReset</span> : ∀ p ∈ act, ∀ t ≥ ws p, ∀ o w, α t = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="44">.</span>act p (<span class="const token" data-verso-hover="165">.</span>propose o w)) →</span>
+<span id="L79">    ¬ (o ∈ cp.<span class="const token" data-verso-hover="463">R</span> p ∧ (<span class="const token" data-verso-hover="125">copyView</span> A cp α p t).<span class="const token" data-verso-hover="166">any</span> <span class="const token" data-verso-hover="167">isDecL</span> = <span class="const token" data-verso-hover="168">false</span>)</span>
+<span id="L80">  <span class="dc">/-- the selected messages of an active process are the ones its upper layer invokes from</span></span>
+<span id="L81"><span class="dc">  `ws p` on -/</span></span>
+<span id="L82">  <span class="const token" data-verso-hover="470">own</span> : ∀ p ∈ act, ∀ m, (p, m) ∈ Ms ↔ ∃ t ≥ ws p, α t = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="39">.</span>inv p m)</span>
+<span id="L83">  <span class="dc">/-- the copy sees exactly the selected foreign messages -/</span></span>
+<span id="L84">  <span class="const token" data-verso-hover="471">foreign</span> : ∀ p ∈ act, ∀ t ≥ ws p, ∀ q m, q ≠ p → α t = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="44">.</span>act p (<span class="const token" data-verso-hover="169">.</span>deliver q m)) →</span>
+<span id="L85">    ((q, m) ∈ Ms ↔ cp.<span class="const token" data-verso-hover="464">F</span> p q m)</span>
+<span id="L86">  <span class="dc">/-- the upper layer invokes `broadcast` as its copy wants -/</span></span>
+<span id="L87">  <span class="const token" data-verso-hover="472">invAct</span> : ∀ p ∈ act, ∀ t ≥ ws p, ∀ m, α t = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="39">.</span>inv p m) →</span>
+<span id="L88">    A.<span class="const token" data-verso-hover="78">act</span> p (cp.<span class="const token" data-verso-hover="126">v</span> p) (<span class="const token" data-verso-hover="125">copyView</span> A cp α p t) = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="84">.</span>bcast m.<span class="const token" data-verso-hover="88">2</span>)</span>
+<span id="L89"></span>
+<span id="L90"><span class="kw">section</span> Aux</span>
+<span id="L91"></span>
+<span id="L92"><span class="kw">variable</span> {M : <span class="kw">Type</span>}</span>
+<span id="L93"></span>
+<span id="L94"><span class="kw">omit</span> [<span class="const token" data-verso-hover="30">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L95"><span class="kw">lemma</span> <span class="const token" data-verso-hover="155">CStep.toB_eq_bc</span> {s : <span class="const token" data-verso-hover="35">CStep</span> P M X O W} {q : P} {m : M} :</span>
+<span id="L96">    s.<span class="const token" data-verso-hover="191">toB</span> = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="158">.</span>bc q m) ↔ s = <span class="const token" data-verso-hover="39">.</span>inv q m := <span class="kw">by</span></span>
+<span id="L97">  <span class="kw">rcases</span> s <span class="kw">with</span> ⟨_, (_ | _ | _ | _ | _)⟩ | _ | _ | _ | _ &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="191">CStep.toB</span>]</span>
+<span id="L98"></span>
+<span id="L99"><span class="kw">omit</span> [<span class="const token" data-verso-hover="30">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L100"><span class="kw">lemma</span> <span class="const token" data-verso-hover="138">CStep.toB_eq_ret</span> {s : <span class="const token" data-verso-hover="35">CStep</span> P M X O W} {q : P} {m : M} :</span>
+<span id="L101">    s.<span class="const token" data-verso-hover="191">toB</span> = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="193">.</span>ret q m) ↔ s = <span class="const token" data-verso-hover="44">.</span>act q (<span class="const token" data-verso-hover="43">.</span>ret m) := <span class="kw">by</span></span>
+<span id="L102">  <span class="kw">rcases</span> s <span class="kw">with</span> ⟨_, (_ | _ | _ | _ | _)⟩ | _ | _ | _ | _ &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="191">CStep.toB</span>]</span>
+<span id="L103"></span>
+<span id="L104"><span class="kw">omit</span> [<span class="const token" data-verso-hover="30">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L105"><span class="kw">lemma</span> <span class="const token" data-verso-hover="473">CStep.toB_eq_dl</span> {s : <span class="const token" data-verso-hover="35">CStep</span> P M X O W} {q r : P} {m : M} :</span>
+<span id="L106">    s.<span class="const token" data-verso-hover="191">toB</span> = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="194">.</span>dl q r m) ↔ s = <span class="const token" data-verso-hover="44">.</span>act q (<span class="const token" data-verso-hover="169">.</span>deliver r m) := <span class="kw">by</span></span>
+<span id="L107">  <span class="kw">rcases</span> s <span class="kw">with</span> ⟨_, (_ | _ | _ | _ | _)⟩ | _ | _ | _ | _ &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="191">CStep.toB</span>]</span>
+<span id="L108"></span>
+<span id="L109"><span class="kw">end</span> Aux</span>
+<span id="L110"></span>
+<span id="L111"><span class="kw">omit</span> [<span class="const token" data-verso-hover="30">DecidableEq</span> C] <span class="kw">in</span></span>
+<span id="L112"><span class="dc">/-- The broadcast events of the derived execution are those of `α` restricted to `Ms`. -/</span></span>
+<span id="L113"><span class="kw">theorem</span> <span class="const token" data-verso-hover="474">derive_proj</span> (α : <span class="const token" data-verso-hover="46">CExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W) (Ms : <span class="const token" data-verso-hover="63">Set</span> (P × <span class="const token" data-verso-hover="33">Msg</span> C)) (act : <span class="const token" data-verso-hover="63">Set</span> P)</span>
+<span id="L114">    (ws : P → <span class="const token" data-verso-hover="47">ℕ</span>) (Cr : <span class="const token" data-verso-hover="63">Set</span> P) :</span>
+<span id="L115">    (<span class="const token" data-verso-hover="130">derive</span> A cp α Ms act ws Cr).<span class="const token" data-verso-hover="410">proj</span> = (<span class="const token" data-verso-hover="64">proj</span> α Cr).<span class="const token" data-verso-hover="475">restrict</span> Ms := <span class="kw">by</span></span>
+<span id="L116">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="410">AExec.proj</span>, <span class="const token" data-verso-hover="475">BExec.restrict</span>, <span class="const token" data-verso-hover="64">proj</span>, <span class="const token" data-verso-hover="130">derive</span>]</span>
+<span id="L117">  <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L118">  <span class="kw">funext</span> t</span>
+<span id="L119">  <span class="kw">rcases</span> α t <span class="kw">with</span> _ | ⟨q, a⟩ | ⟨q, m⟩ | ⟨q, r, x, s⟩ | ⟨q, o, w⟩ | q</span>
+<span id="L120">  · <span class="kw">rfl</span></span>
+<span id="L121">  · <span class="kw">rcases</span> a <span class="kw">with</span> ⟨r, x⟩ | ⟨o, w⟩ | m | ⟨r, m⟩ | _ &lt;;&gt;</span>
+<span id="L122">      <span class="kw">simp</span> [<span class="const token" data-verso-hover="191">CStep.toB</span>, <span class="const token" data-verso-hover="439">BEv.msg</span>, <span class="const token" data-verso-hover="476">Step.toB</span>] &lt;;&gt; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp_all</span> [<span class="const token" data-verso-hover="476">Step.toB</span>]</span>
+<span id="L123">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="191">CStep.toB</span>, <span class="const token" data-verso-hover="439">BEv.msg</span>, <span class="const token" data-verso-hover="476">Step.toB</span>]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp_all</span> [<span class="const token" data-verso-hover="476">Step.toB</span>]</span>
+<span id="L124">  · <span class="kw">rfl</span></span>
+<span id="L125">  · <span class="kw">rfl</span></span>
+<span id="L126">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="191">CStep.toB</span>]</span>
+<span id="L127">    <span class="kw">split_ifs</span></span>
+<span id="L128">    · <span class="kw">split</span> &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L129">    · <span class="kw">rfl</span></span>
+<span id="L130"></span>
+<span id="L131"><span class="kw">omit</span> [<span class="const token" data-verso-hover="30">DecidableEq</span> C] <span class="kw">in</span></span>
+<span id="L132"><span class="kw">lemma</span> <span class="const token" data-verso-hover="477">derive_st_b</span> {α : <span class="const token" data-verso-hover="46">CExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W} {Ms : <span class="const token" data-verso-hover="63">Set</span> (P × <span class="const token" data-verso-hover="33">Msg</span> C)} {act : <span class="const token" data-verso-hover="63">Set</span> P}</span>
+<span id="L133">    {ws : P → <span class="const token" data-verso-hover="47">ℕ</span>} {Cr : <span class="const token" data-verso-hover="63">Set</span> P} {t : <span class="const token" data-verso-hover="47">ℕ</span>} {e : <span class="const token" data-verso-hover="192">BEv</span> P (<span class="const token" data-verso-hover="33">Msg</span> C)} :</span>
+<span id="L134">    (<span class="const token" data-verso-hover="130">derive</span> A cp α Ms act ws Cr).<span class="const token" data-verso-hover="131">st</span> t = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="157">.</span>b e) ↔</span>
+<span id="L135">      (∃ s, α t = <span class="const token" data-verso-hover="50">some</span> s ∧ s.<span class="const token" data-verso-hover="191">toB</span> = <span class="const token" data-verso-hover="50">some</span> e) ∧ e.<span class="const token" data-verso-hover="439">msg</span> ∈ Ms := <span class="kw">by</span></span>
+<span id="L136">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="405">AExec.proj_ev_eq_some</span>, <span class="const token" data-verso-hover="474">derive_proj</span>, <span class="const token" data-verso-hover="350">BExec.restrict_ev_eq_some</span>, <span class="const token" data-verso-hover="134">proj_ev_eq_some</span>]</span>
+<span id="L137"></span>
+<span id="L138"><span class="kw">omit</span> [<span class="const token" data-verso-hover="30">DecidableEq</span> C] <span class="kw">in</span></span>
+<span id="L139"><span class="kw">lemma</span> <span class="const token" data-verso-hover="149">derive_st_bc</span> {α : <span class="const token" data-verso-hover="46">CExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W} {Ms : <span class="const token" data-verso-hover="63">Set</span> (P × <span class="const token" data-verso-hover="33">Msg</span> C)} {act : <span class="const token" data-verso-hover="63">Set</span> P}</span>
+<span id="L140">    {ws : P → <span class="const token" data-verso-hover="47">ℕ</span>} {Cr : <span class="const token" data-verso-hover="63">Set</span> P} {t : <span class="const token" data-verso-hover="47">ℕ</span>} {q : P} {m : <span class="const token" data-verso-hover="33">Msg</span> C} :</span>
+<span id="L141">    (<span class="const token" data-verso-hover="130">derive</span> A cp α Ms act ws Cr).<span class="const token" data-verso-hover="131">st</span> t = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="157">.</span>b (<span class="const token" data-verso-hover="158">.</span>bc q m)) ↔</span>
+<span id="L142">      α t = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="39">.</span>inv q m) ∧ (q, m) ∈ Ms := <span class="kw">by</span></span>
+<span id="L143">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="477">derive_st_b</span>]; <span class="kw">simp</span> [<span class="const token" data-verso-hover="155">CStep.toB_eq_bc</span>, <span class="const token" data-verso-hover="439">BEv.msg</span>]</span>
+<span id="L144"></span>
+<span id="L145"><span class="kw">omit</span> [<span class="const token" data-verso-hover="30">DecidableEq</span> C] <span class="kw">in</span></span>
+<span id="L146"><span class="kw">lemma</span> <span class="const token" data-verso-hover="154">derive_st_ret</span> {α : <span class="const token" data-verso-hover="46">CExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W} {Ms : <span class="const token" data-verso-hover="63">Set</span> (P × <span class="const token" data-verso-hover="33">Msg</span> C)} {act : <span class="const token" data-verso-hover="63">Set</span> P}</span>
+<span id="L147">    {ws : P → <span class="const token" data-verso-hover="47">ℕ</span>} {Cr : <span class="const token" data-verso-hover="63">Set</span> P} {t : <span class="const token" data-verso-hover="47">ℕ</span>} {q : P} {m : <span class="const token" data-verso-hover="33">Msg</span> C} :</span>
+<span id="L148">    (<span class="const token" data-verso-hover="130">derive</span> A cp α Ms act ws Cr).<span class="const token" data-verso-hover="131">st</span> t = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="157">.</span>b (<span class="const token" data-verso-hover="193">.</span>ret q m)) ↔</span>
+<span id="L149">      α t = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="44">.</span>act q (<span class="const token" data-verso-hover="43">.</span>ret m)) ∧ (q, m) ∈ Ms := <span class="kw">by</span></span>
+<span id="L150">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="477">derive_st_b</span>]; <span class="kw">simp</span> [<span class="const token" data-verso-hover="138">CStep.toB_eq_ret</span>, <span class="const token" data-verso-hover="439">BEv.msg</span>]</span>
+<span id="L151"></span>
+<span id="L152"><span class="kw">omit</span> [<span class="const token" data-verso-hover="30">DecidableEq</span> C] <span class="kw">in</span></span>
+<span id="L153"><span class="kw">lemma</span> <span class="const token" data-verso-hover="478">derive_st_dl</span> {α : <span class="const token" data-verso-hover="46">CExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W} {Ms : <span class="const token" data-verso-hover="63">Set</span> (P × <span class="const token" data-verso-hover="33">Msg</span> C)} {act : <span class="const token" data-verso-hover="63">Set</span> P}</span>
+<span id="L154">    {ws : P → <span class="const token" data-verso-hover="47">ℕ</span>} {Cr : <span class="const token" data-verso-hover="63">Set</span> P} {t : <span class="const token" data-verso-hover="47">ℕ</span>} {q r : P} {m : <span class="const token" data-verso-hover="33">Msg</span> C} :</span>
+<span id="L155">    (<span class="const token" data-verso-hover="130">derive</span> A cp α Ms act ws Cr).<span class="const token" data-verso-hover="131">st</span> t = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="157">.</span>b (<span class="const token" data-verso-hover="194">.</span>dl q r m)) ↔</span>
+<span id="L156">      α t = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="44">.</span>act q (<span class="const token" data-verso-hover="169">.</span>deliver r m)) ∧ (r, m) ∈ Ms := <span class="kw">by</span></span>
+<span id="L157">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="477">derive_st_b</span>]; <span class="kw">simp</span> [<span class="const token" data-verso-hover="473">CStep.toB_eq_dl</span>, <span class="const token" data-verso-hover="439">BEv.msg</span>]</span>
+<span id="L158"></span>
+<span id="L159"><span class="kw">omit</span> [<span class="const token" data-verso-hover="30">DecidableEq</span> C] <span class="kw">in</span></span>
+<span id="L160"><span class="kw">lemma</span> <span class="const token" data-verso-hover="174">derive_st_dec</span> {α : <span class="const token" data-verso-hover="46">CExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W} {Ms : <span class="const token" data-verso-hover="63">Set</span> (P × <span class="const token" data-verso-hover="33">Msg</span> C)} {act : <span class="const token" data-verso-hover="63">Set</span> P}</span>
+<span id="L161">    {ws : P → <span class="const token" data-verso-hover="47">ℕ</span>} {Cr : <span class="const token" data-verso-hover="63">Set</span> P} {t : <span class="const token" data-verso-hover="47">ℕ</span>} {q : P} {w : V}</span>
+<span id="L162">    (hs : (<span class="const token" data-verso-hover="130">derive</span> A cp α Ms act ws Cr).<span class="const token" data-verso-hover="131">st</span> t = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="159">.</span>dec q w)) :</span>
+<span id="L163">    α t = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="86">.</span>up q) ∧ q ∈ act ∧ ws q ≤ t ∧</span>
+<span id="L164">      A.<span class="const token" data-verso-hover="78">act</span> q (cp.<span class="const token" data-verso-hover="126">v</span> q) (<span class="const token" data-verso-hover="125">copyView</span> A cp α q t) = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="160">.</span><span class="kw">decide</span> w) := <span class="kw">by</span></span>
+<span id="L165">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="130">derive</span>] <span class="kw">at</span> hs</span>
+<span id="L166">  <span class="kw">split</span> <span class="kw">at</span> hs</span>
+<span id="L167">  · <span class="kw">split_ifs</span> <span class="kw">at</span> hs; <span class="kw">simp</span> <span class="kw">at</span> hs</span>
+<span id="L168">  · <span class="kw">split_ifs</span> <span class="kw">at</span> hs; <span class="kw">simp</span> <span class="kw">at</span> hs</span>
+<span id="L169">  · <span class="kw">split_ifs</span> <span class="kw">at</span> hs; <span class="kw">simp</span> <span class="kw">at</span> hs</span>
+<span id="L170">  · <span class="kw">rename_i</span> r hα</span>
+<span id="L171">    <span class="kw">split_ifs</span> <span class="kw">at</span> hs <span class="kw">with</span> hr</span>
+<span id="L172">    <span class="kw">split</span> <span class="kw">at</span> hs</span>
+<span id="L173">    · <span class="kw">rename_i</span> w' hw</span>
+<span id="L174">      <span class="kw">cases</span> hs</span>
+<span id="L175">      <span class="kw">exact</span> ⟨hα, hr.<span class="const token" data-verso-hover="100">1</span>, hr.<span class="const token" data-verso-hover="101">2</span>, hw⟩</span>
+<span id="L176">    · <span class="kw">cases</span> hs</span>
+<span id="L177">    · <span class="kw">cases</span> hs</span>
+<span id="L178">  · <span class="kw">cases</span> hs</span>
+<span id="L179"></span>
+<span id="L180"><span class="kw">omit</span> [<span class="const token" data-verso-hover="30">DecidableEq</span> C] <span class="kw">in</span></span>
+<span id="L181"><span class="kw">lemma</span> <span class="const token" data-verso-hover="479">derive_st_tick</span> {α : <span class="const token" data-verso-hover="46">CExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W} {Ms : <span class="const token" data-verso-hover="63">Set</span> (P × <span class="const token" data-verso-hover="33">Msg</span> C)} {act : <span class="const token" data-verso-hover="63">Set</span> P}</span>
+<span id="L182">    {ws : P → <span class="const token" data-verso-hover="47">ℕ</span>} {Cr : <span class="const token" data-verso-hover="63">Set</span> P} {t : <span class="const token" data-verso-hover="47">ℕ</span>} {q : P}</span>
+<span id="L183">    (hs : (<span class="const token" data-verso-hover="130">derive</span> A cp α Ms act ws Cr).<span class="const token" data-verso-hover="131">st</span> t = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="143">.</span>tick q)) :</span>
+<span id="L184">    α t = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="86">.</span>up q) ∧ q ∈ act ∧ ws q ≤ t ∧</span>
+<span id="L185">      A.<span class="const token" data-verso-hover="78">act</span> q (cp.<span class="const token" data-verso-hover="126">v</span> q) (<span class="const token" data-verso-hover="125">copyView</span> A cp α q t) = <span class="const token" data-verso-hover="142">none</span> := <span class="kw">by</span></span>
+<span id="L186">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="130">derive</span>] <span class="kw">at</span> hs</span>
+<span id="L187">  <span class="kw">split</span> <span class="kw">at</span> hs</span>
+<span id="L188">  · <span class="kw">split_ifs</span> <span class="kw">at</span> hs; <span class="kw">simp</span> <span class="kw">at</span> hs</span>
+<span id="L189">  · <span class="kw">split_ifs</span> <span class="kw">at</span> hs; <span class="kw">simp</span> <span class="kw">at</span> hs</span>
+<span id="L190">  · <span class="kw">split_ifs</span> <span class="kw">at</span> hs; <span class="kw">simp</span> <span class="kw">at</span> hs</span>
+<span id="L191">  · <span class="kw">rename_i</span> r hα</span>
+<span id="L192">    <span class="kw">split_ifs</span> <span class="kw">at</span> hs <span class="kw">with</span> hr</span>
+<span id="L193">    <span class="kw">split</span> <span class="kw">at</span> hs</span>
+<span id="L194">    · <span class="kw">cases</span> hs</span>
+<span id="L195">    · <span class="kw">rename_i</span> hw</span>
+<span id="L196">      <span class="kw">cases</span> hs</span>
+<span id="L197">      <span class="kw">exact</span> ⟨hα, hr.<span class="const token" data-verso-hover="100">1</span>, hr.<span class="const token" data-verso-hover="101">2</span>, hw⟩</span>
+<span id="L198">    · <span class="kw">cases</span> hs</span>
+<span id="L199">  · <span class="kw">cases</span> hs</span>
+<span id="L200"></span>
+<span id="L201"><span class="kw">omit</span> [<span class="const token" data-verso-hover="30">DecidableEq</span> C] <span class="kw">in</span></span>
+<span id="L202"><span class="kw">lemma</span> <span class="const token" data-verso-hover="480">copyView_succ_none</span> {α : <span class="const token" data-verso-hover="46">CExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W} {p : P} {t : <span class="const token" data-verso-hover="47">ℕ</span>} (hα : α t = <span class="const token" data-verso-hover="142">none</span>) :</span>
+<span id="L203">    <span class="const token" data-verso-hover="125">copyView</span> A cp α p (t + <span class="nu">1</span>) = <span class="const token" data-verso-hover="125">copyView</span> A cp α p t := <span class="kw">by</span></span>
+<span id="L204">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="125">copyView</span>, <span class="const token" data-verso-hover="49">fhist</span>, hα]</span>
+<span id="L205"></span>
+<span id="L206"><span class="kw">omit</span> [<span class="const token" data-verso-hover="30">DecidableEq</span> C] <span class="kw">in</span></span>
+<span id="L207"><span class="kw">lemma</span> <span class="const token" data-verso-hover="481">copyView_succ_other</span> {α : <span class="const token" data-verso-hover="46">CExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W} {p : P} {t : <span class="const token" data-verso-hover="47">ℕ</span>}</span>
+<span id="L208">    {s : <span class="const token" data-verso-hover="35">CStep</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W} (hα : α t = <span class="const token" data-verso-hover="50">some</span> s) (hs : s.<span class="const token" data-verso-hover="51">proc</span> ≠ p) :</span>
+<span id="L209">    <span class="const token" data-verso-hover="125">copyView</span> A cp α p (t + <span class="nu">1</span>) = <span class="const token" data-verso-hover="125">copyView</span> A cp α p t := <span class="kw">by</span></span>
+<span id="L210">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="125">copyView</span>, <span class="const token" data-verso-hover="49">fhist</span>, hα, hs]</span>
+<span id="L211"></span>
+<span id="L212"><span class="kw">omit</span> [<span class="const token" data-verso-hover="30">DecidableEq</span> C] <span class="kw">in</span></span>
+<span id="L213"><span class="kw">lemma</span> <span class="const token" data-verso-hover="482">copyView_succ_self</span> {α : <span class="const token" data-verso-hover="46">CExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W} {p : P} {t : <span class="const token" data-verso-hover="47">ℕ</span>}</span>
+<span id="L214">    {s : <span class="const token" data-verso-hover="35">CStep</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W} (hα : α t = <span class="const token" data-verso-hover="50">some</span> s) (hs : s.<span class="const token" data-verso-hover="51">proc</span> = p) :</span>
+<span id="L215">    <span class="const token" data-verso-hover="125">copyView</span> A cp α p (t + <span class="nu">1</span>) =</span>
+<span id="L216">      <span class="const token" data-verso-hover="179">simStep</span> A p (cp.<span class="const token" data-verso-hover="126">v</span> p) (cp.<span class="const token" data-verso-hover="463">R</span> p) (cp.<span class="const token" data-verso-hover="464">F</span> p) (<span class="const token" data-verso-hover="125">copyView</span> A cp α p t) s.<span class="const token" data-verso-hover="36">floc</span> := <span class="kw">by</span></span>
+<span id="L217">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="125">copyView</span>, <span class="const token" data-verso-hover="49">fhist</span>, hα, <span class="const token" data-verso-hover="483">Option.bind_some</span>, hs, ↓<span class="const token" data-verso-hover="484">reduceIte</span>, <span class="const token" data-verso-hover="177">Option.toList_some</span>]</span>
+<span id="L218">  <span class="kw">exact</span> <span class="const token" data-verso-hover="178">simView_append</span> ..</span>
+<span id="L219"></span>
+<span id="L220"><span class="kw">omit</span> [<span class="const token" data-verso-hover="30">DecidableEq</span> C] <span class="kw">in</span></span>
+<span id="L221"><span class="dc">/-- The local history of an active process in the derived execution is the view of its</span></span>
+<span id="L222"><span class="dc">copy. -/</span></span>
+<span id="L223"><span class="kw">theorem</span> <span class="const token" data-verso-hover="151">derive_hist</span> {α : <span class="const token" data-verso-hover="46">CExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W} {Ms : <span class="const token" data-verso-hover="63">Set</span> (P × <span class="const token" data-verso-hover="33">Msg</span> C)} {act : <span class="const token" data-verso-hover="63">Set</span> P}</span>
+<span id="L224">    {ws : P → <span class="const token" data-verso-hover="47">ℕ</span>} {Cr : <span class="const token" data-verso-hover="63">Set</span> P} (h : <span class="const token" data-verso-hover="123">DeriveHyp</span> A cp α Ms act ws) {p : P} (hp : p ∈ act)</span>
+<span id="L225">    {t : <span class="const token" data-verso-hover="47">ℕ</span>} (ht : ws p ≤ t) :</span>
+<span id="L226">    (<span class="const token" data-verso-hover="130">derive</span> A cp α Ms act ws Cr).<span class="const token" data-verso-hover="147">hist</span> p t = <span class="const token" data-verso-hover="125">copyView</span> A cp α p t := <span class="kw">by</span></span>
+<span id="L227">  <span class="kw">have</span> hmem : ∀ t m, <span class="const token" data-verso-hover="146">LEv.bc</span> m ∈ (<span class="const token" data-verso-hover="130">derive</span> A cp α Ms act ws Cr).<span class="const token" data-verso-hover="147">hist</span> p t ↔</span>
+<span id="L228">      ∃ s &lt; t, α s = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="39">.</span>inv p m) ∧ (p, m) ∈ Ms := <span class="kw">by</span></span>
+<span id="L229">    <span class="kw">intro</span> t m</span>
+<span id="L230">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="148">AExec.mem_hist</span>]</span>
+<span id="L231">    <span class="kw">constructor</span></span>
+<span id="L232">    · <span class="kw">rintro</span> ⟨s, hs, he⟩</span>
+<span id="L233">      <span class="kw">obtain</span> ⟨st, hst, hl⟩ := <span class="const token" data-verso-hover="56">Option.bind_eq_some_iff</span>.<span class="const token" data-verso-hover="59">1</span> he</span>
+<span id="L234">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="153">AExec.loc_eq_some</span> hl <span class="kw">with</span> ⟨m', he', <span class="kw">rfl</span>⟩ | ⟨m', he', <span class="kw">rfl</span>⟩ | ⟨q, m', he', <span class="kw">rfl</span>⟩ |</span>
+<span id="L235">          ⟨v, he', <span class="kw">rfl</span>⟩ &lt;;&gt; <span class="kw">cases</span> he'</span>
+<span id="L236">      <span class="kw">exact</span> ⟨s, hs, (<span class="const token" data-verso-hover="149">derive_st_bc</span> A cp).<span class="const token" data-verso-hover="59">1</span> hst⟩</span>
+<span id="L237">    · <span class="kw">rintro</span> ⟨s, hs, h1, h2⟩</span>
+<span id="L238">      <span class="kw">exact</span> ⟨s, hs, <span class="kw">by</span> <span class="kw">rw</span> [(<span class="const token" data-verso-hover="149">derive_st_bc</span> A cp).<span class="const token" data-verso-hover="135">2</span> ⟨h1, h2⟩]; <span class="kw">simp</span> [<span class="const token" data-verso-hover="150">Step.loc</span>]⟩</span>
+<span id="L239">  <span class="kw">induction</span> t, ht <span class="kw">using</span> <span class="const token" data-verso-hover="248">Nat.le_induction</span> <span class="kw">with</span></span>
+<span id="L240">  | base =&gt;</span>
+<span id="L241">    <span class="kw">rw</span> [h.<span class="const token" data-verso-hover="468">start</span> p hp]</span>
+<span id="L242">    <span class="kw">refine</span> <span class="const token" data-verso-hover="485">List.eq_nil_iff_forall_not_mem</span>.<span class="const token" data-verso-hover="135">2</span> <span class="kw">fun</span> e he =&gt; ?_</span>
+<span id="L243">    <span class="kw">obtain</span> ⟨s, hs, he⟩ := <span class="const token" data-verso-hover="148">AExec.mem_hist</span>.<span class="const token" data-verso-hover="59">1</span> he</span>
+<span id="L244">    <span class="kw">obtain</span> ⟨st, hst, hl⟩ := <span class="const token" data-verso-hover="56">Option.bind_eq_some_iff</span>.<span class="const token" data-verso-hover="59">1</span> he</span>
+<span id="L245">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="153">AExec.loc_eq_some</span> hl <span class="kw">with</span> ⟨m, <span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ | ⟨m, <span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ | ⟨q, m, <span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ |</span>
+<span id="L246">        ⟨v, <span class="kw">rfl</span>, <span class="kw">rfl</span>⟩</span>
+<span id="L247">    · <span class="kw">obtain</span> ⟨h1, h2⟩ := (<span class="const token" data-verso-hover="149">derive_st_bc</span> A cp).<span class="const token" data-verso-hover="59">1</span> hst</span>
+<span id="L248">      <span class="kw">exact</span> (h.<span class="const token" data-verso-hover="467">before</span> p hp s hs m).<span class="const token" data-verso-hover="100">1</span> h2 h1</span>
+<span id="L249">    · <span class="kw">obtain</span> ⟨h1, h2⟩ := (<span class="const token" data-verso-hover="154">derive_st_ret</span> A cp).<span class="const token" data-verso-hover="59">1</span> hst</span>
+<span id="L250">      <span class="kw">exact</span> (h.<span class="const token" data-verso-hover="467">before</span> p hp s hs m).<span class="const token" data-verso-hover="101">2</span><span class="nu">.</span><span class="const token" data-verso-hover="100">1</span> h2 h1</span>
+<span id="L251">    · <span class="kw">obtain</span> ⟨h1, h2⟩ := (<span class="const token" data-verso-hover="478">derive_st_dl</span> A cp).<span class="const token" data-verso-hover="59">1</span> hst</span>
+<span id="L252">      <span class="kw">exact</span> (h.<span class="const token" data-verso-hover="467">before</span> p hp s hs m).<span class="const token" data-verso-hover="101">2</span><span class="nu">.</span><span class="const token" data-verso-hover="101">2</span> q h2 h1</span>
+<span id="L253">    · <span class="kw">have</span> := (<span class="const token" data-verso-hover="174">derive_st_dec</span> A cp hst).<span class="const token" data-verso-hover="101">2</span><span class="nu">.</span><span class="const token" data-verso-hover="101">2</span><span class="nu">.</span><span class="const token" data-verso-hover="100">1</span></span>
+<span id="L254">      <span class="kw">omega</span></span>
+<span id="L255">  | <span class="const token" data-verso-hover="53">succ</span> t ht ih =&gt;</span>
+<span id="L256">    <span class="kw">have</span> hown : ∀ m, (p, m) ∈ Ms → (∃ s &lt; t, α s = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="39">.</span>inv p m)) →</span>
+<span id="L257">        <span class="const token" data-verso-hover="146">LEv.bc</span> m ∈ <span class="const token" data-verso-hover="125">copyView</span> A cp α p t := <span class="kw">by</span></span>
+<span id="L258">      <span class="kw">rintro</span> m hm ⟨s, hs, h1⟩</span>
+<span id="L259">      <span class="kw">exact</span> ih ▸ (hmem t m).<span class="const token" data-verso-hover="135">2</span> ⟨s, hs, h1, hm⟩</span>
+<span id="L260">    <span class="kw">have</span> hown' : ∀ m, <span class="const token" data-verso-hover="146">LEv.bc</span> m ∈ <span class="const token" data-verso-hover="125">copyView</span> A cp α p t → (p, m) ∈ Ms := <span class="kw">by</span></span>
+<span id="L261">      <span class="kw">intro</span> m hm</span>
+<span id="L262">      <span class="kw">obtain</span> ⟨-, -, -, h2⟩ := (hmem t m).<span class="const token" data-verso-hover="59">1</span> (ih ▸ hm)</span>
+<span id="L263">      <span class="kw">exact</span> h2</span>
+<span id="L264">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="147">AExec.hist</span>, ih]</span>
+<span id="L265">    <span class="kw">rcases</span> hα : α t <span class="kw">with</span> _ | s</span>
+<span id="L266">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="480">copyView_succ_none</span> A cp hα]; <span class="kw">simp</span> [<span class="const token" data-verso-hover="130">derive</span>, hα]</span>
+<span id="L267">    <span class="kw">by_cases</span> hq : s.<span class="const token" data-verso-hover="51">proc</span> = p</span>
+<span id="L268">    swap</span>
+<span id="L269">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="481">copyView_succ_other</span> A cp hα hq]</span>
+<span id="L270">      <span class="kw">rcases</span> s <span class="kw">with</span> ⟨q, a⟩ | ⟨q, m⟩ | ⟨q, r, x, s⟩ | ⟨q, o, w⟩ | q &lt;;&gt;</span>
+<span id="L271">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="51">CStep.proc</span>] <span class="kw">at</span> hq</span>
+<span id="L272">      · <span class="kw">rcases</span> a <span class="kw">with</span> ⟨r, x⟩ | ⟨o, w⟩ | m | ⟨r, m⟩ | _ &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="130">derive</span>, hα, <span class="const token" data-verso-hover="150">Step.loc</span>, hq]</span>
+<span id="L273">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="130">derive</span>, hα]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="150">Step.loc</span>, hq]</span>
+<span id="L274">      · <span class="kw">simp</span> [<span class="const token" data-verso-hover="130">derive</span>, hα]</span>
+<span id="L275">      · <span class="kw">simp</span> [<span class="const token" data-verso-hover="130">derive</span>, hα]</span>
+<span id="L276">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="130">derive</span>, hα]; <span class="kw">split_ifs</span> &lt;;&gt; (<span class="kw">try</span> <span class="kw">split</span>) &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="150">Step.loc</span>, hq]</span>
+<span id="L277">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="482">copyView_succ_self</span> A cp hα hq]</span>
+<span id="L278">    <span class="kw">rcases</span> s <span class="kw">with</span> ⟨q, a⟩ | ⟨q, m⟩ | ⟨q, r, x, s⟩ | ⟨q, o, w⟩ | q &lt;;&gt;</span>
+<span id="L279">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="51">CStep.proc</span>] <span class="kw">at</span> hq &lt;;&gt; <span class="kw">subst</span> hq</span>
+<span id="L280">    · <span class="kw">have</span> hinv : ∀ m, (∃ t' &lt; t, (<span class="const token" data-verso-hover="64">proj</span> α ∅).<span class="const token" data-verso-hover="198">ev</span> t' = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="158">.</span>bc q m)) →</span>
+<span id="L281">          ∃ s &lt; t, α s = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="39">.</span>inv q m) := <span class="kw">by</span></span>
+<span id="L282">        <span class="kw">rintro</span> m ⟨t', ht', h1⟩</span>
+<span id="L283">        <span class="kw">obtain</span> ⟨st, h2, h3⟩ := <span class="const token" data-verso-hover="134">proj_ev_eq_some</span>.<span class="const token" data-verso-hover="59">1</span> h1</span>
+<span id="L284">        <span class="kw">exact</span> ⟨t', ht', <span class="const token" data-verso-hover="155">CStep.toB_eq_bc</span>.<span class="const token" data-verso-hover="59">1</span> h3 ▸ h2⟩</span>
+<span id="L285">      <span class="kw">rcases</span> a <span class="kw">with</span> ⟨r, x⟩ | ⟨o, w⟩ | m | ⟨r, m⟩ | _</span>
+<span id="L286">      · <span class="kw">simp</span> [<span class="const token" data-verso-hover="130">derive</span>, hα, <span class="const token" data-verso-hover="36">CStep.floc</span>, <span class="const token" data-verso-hover="40">CStep.bloc</span>, <span class="const token" data-verso-hover="179">simStep</span>]</span>
+<span id="L287">      · <span class="kw">have</span> := h.<span class="const token" data-verso-hover="469">noReset</span> q hp t ht o w hα</span>
+<span id="L288">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="130">derive</span>, hα, <span class="const token" data-verso-hover="36">CStep.floc</span>, <span class="const token" data-verso-hover="40">CStep.bloc</span>, <span class="const token" data-verso-hover="179">simStep</span>]</span>
+<span id="L289">        <span class="kw">split_ifs</span></span>
+<span id="L290">        <span class="kw">simp</span></span>
+<span id="L291">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="130">derive</span>, hα, <span class="const token" data-verso-hover="36">CStep.floc</span>, <span class="const token" data-verso-hover="40">CStep.bloc</span>, <span class="const token" data-verso-hover="179">simStep</span>]</span>
+<span id="L292">        <span class="kw">by_cases</span> hm : (q, m) ∈ Ms</span>
+<span id="L293">        · <span class="kw">have</span> hb : <span class="const token" data-verso-hover="146">LEv.bc</span> m ∈ <span class="const token" data-verso-hover="125">copyView</span> A cp α q t :=</span>
+<span id="L294">            hown m hm (hinv m (h.<span class="const token" data-verso-hover="465">bc</span>.<span class="const token" data-verso-hover="69">wf</span>.<span class="const token" data-verso-hover="70">ret_bc</span> t q m (<span class="const token" data-verso-hover="134">proj_ev_eq_some</span>.<span class="const token" data-verso-hover="135">2</span> ⟨_, hα, <span class="const token" data-verso-hover="57">rfl</span>⟩)))</span>
+<span id="L295">          <span class="kw">simp</span> [hm, hb, <span class="const token" data-verso-hover="150">Step.loc</span>]</span>
+<span id="L296">        · <span class="kw">have</span> hb : <span class="const token" data-verso-hover="146">LEv.bc</span> m ∉ <span class="const token" data-verso-hover="125">copyView</span> A cp α q t := <span class="kw">fun</span> hb =&gt; hm (hown' m hb)</span>
+<span id="L297">          <span class="kw">simp</span> [hm, hb]</span>
+<span id="L298">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="130">derive</span>, hα, <span class="const token" data-verso-hover="36">CStep.floc</span>, <span class="const token" data-verso-hover="40">CStep.bloc</span>, <span class="const token" data-verso-hover="179">simStep</span>]</span>
+<span id="L299">        <span class="kw">by_cases</span> hr : r = q</span>
+<span id="L300">        · <span class="kw">subst</span> hr</span>
+<span id="L301">          <span class="kw">by_cases</span> hm : (r, m) ∈ Ms</span>
+<span id="L302">          · <span class="kw">have</span> hb : <span class="const token" data-verso-hover="146">LEv.bc</span> m ∈ <span class="const token" data-verso-hover="125">copyView</span> A cp α r t :=</span>
+<span id="L303">              hown m hm (hinv m (h.<span class="const token" data-verso-hover="465">bc</span>.<span class="const token" data-verso-hover="66">validity</span> t r r m (<span class="const token" data-verso-hover="134">proj_ev_eq_some</span>.<span class="const token" data-verso-hover="135">2</span> ⟨_, hα, <span class="const token" data-verso-hover="57">rfl</span>⟩)))</span>
+<span id="L304">            <span class="kw">simp</span> [hm, hb, <span class="const token" data-verso-hover="150">Step.loc</span>]</span>
+<span id="L305">          · <span class="kw">have</span> hb : <span class="const token" data-verso-hover="146">LEv.bc</span> m ∉ <span class="const token" data-verso-hover="125">copyView</span> A cp α r t := <span class="kw">fun</span> hb =&gt; hm (hown' m hb)</span>
+<span id="L306">            <span class="kw">simp</span> [hm, hb]</span>
+<span id="L307">        · <span class="kw">have</span> hF := h.<span class="const token" data-verso-hover="471">foreign</span> q hp t ht r m hr hα</span>
+<span id="L308">          <span class="kw">by_cases</span> hm : (r, m) ∈ Ms</span>
+<span id="L309">          · <span class="kw">simp</span> [hm, hF.<span class="const token" data-verso-hover="59">1</span> hm, hr, <span class="const token" data-verso-hover="150">Step.loc</span>]</span>
+<span id="L310">          · <span class="kw">have</span> : ¬ cp.<span class="const token" data-verso-hover="464">F</span> q r m := <span class="kw">fun</span> h' =&gt; hm (hF.<span class="const token" data-verso-hover="135">2</span> h')</span>
+<span id="L311">            <span class="kw">simp</span> [hm, this, hr]</span>
+<span id="L312">      · <span class="kw">simp</span> [<span class="const token" data-verso-hover="130">derive</span>, hα, <span class="const token" data-verso-hover="36">CStep.floc</span>, <span class="const token" data-verso-hover="40">CStep.bloc</span>, <span class="const token" data-verso-hover="179">simStep</span>]</span>
+<span id="L313">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="130">derive</span>, hα, <span class="const token" data-verso-hover="36">CStep.floc</span>, <span class="const token" data-verso-hover="40">CStep.bloc</span>, <span class="const token" data-verso-hover="179">simStep</span>, (h.<span class="const token" data-verso-hover="470">own</span> q hp m).<span class="const token" data-verso-hover="135">2</span> ⟨t, ht, hα⟩,</span>
+<span id="L314">        <span class="const token" data-verso-hover="150">Step.loc</span>]</span>
+<span id="L315">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="130">derive</span>, hα, <span class="const token" data-verso-hover="36">CStep.floc</span>, <span class="const token" data-verso-hover="40">CStep.bloc</span>, <span class="const token" data-verso-hover="179">simStep</span>]</span>
+<span id="L316">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="130">derive</span>, hα, <span class="const token" data-verso-hover="36">CStep.floc</span>, <span class="const token" data-verso-hover="40">CStep.bloc</span>, <span class="const token" data-verso-hover="179">simStep</span>]</span>
+<span id="L317">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="130">derive</span>, hα, hp, ht, <span class="const token" data-verso-hover="486">and_self</span>, ↓<span class="const token" data-verso-hover="484">reduceIte</span>, <span class="const token" data-verso-hover="36">CStep.floc</span>, <span class="const token" data-verso-hover="179">simStep</span>]</span>
+<span id="L318">      <span class="kw">rcases</span> hA : A.<span class="const token" data-verso-hover="78">act</span> q (cp.<span class="const token" data-verso-hover="126">v</span> q) (<span class="const token" data-verso-hover="125">copyView</span> A cp α q t) <span class="kw">with</span> _ | (m | w) &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="150">Step.loc</span>]</span>
+<span id="L319"></span>
+<span id="L320"><span class="kw">omit</span> [<span class="const token" data-verso-hover="30">DecidableEq</span> C] <span class="kw">in</span></span>
+<span id="L321"><span class="dc">/-- A step of the derived execution at `p` comes from a step of `p` in `α`. -/</span></span>
+<span id="L322"><span class="kw">lemma</span> <span class="const token" data-verso-hover="487">derive_proc</span> {α : <span class="const token" data-verso-hover="46">CExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W} {Ms : <span class="const token" data-verso-hover="63">Set</span> (P × <span class="const token" data-verso-hover="33">Msg</span> C)} {act : <span class="const token" data-verso-hover="63">Set</span> P}</span>
+<span id="L323">    {ws : P → <span class="const token" data-verso-hover="47">ℕ</span>} {Cr : <span class="const token" data-verso-hover="63">Set</span> P} {t : <span class="const token" data-verso-hover="47">ℕ</span>} {s : <span class="const token" data-verso-hover="127">Step</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) V} {p : P}</span>
+<span id="L324">    (hs : (<span class="const token" data-verso-hover="130">derive</span> A cp α Ms act ws Cr).<span class="const token" data-verso-hover="131">st</span> t = <span class="const token" data-verso-hover="50">some</span> s) (hp : s.<span class="const token" data-verso-hover="132">aStep</span> p ≠ <span class="const token" data-verso-hover="142">none</span> ∨ s.<span class="const token" data-verso-hover="150">loc</span> p ≠ <span class="const token" data-verso-hover="142">none</span>) :</span>
+<span id="L325">    ∃ st, α t = <span class="const token" data-verso-hover="50">some</span> st ∧ st.<span class="const token" data-verso-hover="51">proc</span> = p := <span class="kw">by</span></span>
+<span id="L326">  <span class="kw">rcases</span> s <span class="kw">with</span> (⟨q, m⟩ | ⟨q, m⟩ | ⟨q, r, m⟩) | ⟨q, w⟩ | q</span>
+<span id="L327">  · <span class="kw">exact</span> ⟨_, ((<span class="const token" data-verso-hover="149">derive_st_bc</span> A cp).<span class="const token" data-verso-hover="59">1</span> hs).<span class="const token" data-verso-hover="100">1</span>, <span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="132">Step.aStep</span>, <span class="const token" data-verso-hover="150">Step.loc</span>, <span class="const token" data-verso-hover="51">CStep.proc</span>] <span class="kw">using</span> hp⟩</span>
+<span id="L328">  · <span class="kw">exact</span> ⟨_, ((<span class="const token" data-verso-hover="154">derive_st_ret</span> A cp).<span class="const token" data-verso-hover="59">1</span> hs).<span class="const token" data-verso-hover="100">1</span>, <span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="132">Step.aStep</span>, <span class="const token" data-verso-hover="150">Step.loc</span>, <span class="const token" data-verso-hover="51">CStep.proc</span>] <span class="kw">using</span> hp⟩</span>
+<span id="L329">  · <span class="kw">exact</span> ⟨_, ((<span class="const token" data-verso-hover="478">derive_st_dl</span> A cp).<span class="const token" data-verso-hover="59">1</span> hs).<span class="const token" data-verso-hover="100">1</span>, <span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="132">Step.aStep</span>, <span class="const token" data-verso-hover="150">Step.loc</span>, <span class="const token" data-verso-hover="51">CStep.proc</span>] <span class="kw">using</span> hp⟩</span>
+<span id="L330">  · <span class="kw">exact</span> ⟨_, (<span class="const token" data-verso-hover="174">derive_st_dec</span> A cp hs).<span class="const token" data-verso-hover="100">1</span>, <span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="132">Step.aStep</span>, <span class="const token" data-verso-hover="150">Step.loc</span>, <span class="const token" data-verso-hover="51">CStep.proc</span>] <span class="kw">using</span> hp⟩</span>
+<span id="L331">  · <span class="kw">exact</span> ⟨_, (<span class="const token" data-verso-hover="479">derive_st_tick</span> A cp hs).<span class="const token" data-verso-hover="100">1</span>, <span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="132">Step.aStep</span>, <span class="const token" data-verso-hover="150">Step.loc</span>, <span class="const token" data-verso-hover="51">CStep.proc</span>] <span class="kw">using</span> hp⟩</span>
+<span id="L332"></span>
+<span id="L333"><span class="kw">omit</span> [<span class="const token" data-verso-hover="30">DecidableEq</span> C] <span class="kw">in</span></span>
+<span id="L334"><span class="dc">/-- **The derived execution is an admissible execution of `A`.** -/</span></span>
+<span id="L335"><span class="kw">theorem</span> <span class="const token" data-verso-hover="28">derive_admissible</span> {k : <span class="const token" data-verso-hover="47">ℕ</span>} {B : <span class="const token" data-verso-hover="32">BAlgo</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W} {S : <span class="const token" data-verso-hover="63">Set</span> (<span class="const token" data-verso-hover="102">BExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C))}</span>
+<span id="L336">    (hS : <span class="const token" data-verso-hover="20">Compositional</span> S) (hB : <span class="const token" data-verso-hover="163">Implements</span> B k S) {Cr : <span class="const token" data-verso-hover="63">Set</span> P} {α : <span class="const token" data-verso-hover="46">CExec</span> P (<span class="const token" data-verso-hover="33">Msg</span> C) X O W}</span>
+<span id="L337">    (hα : <span class="const token" data-verso-hover="164">Adm</span> B k Cr α) {Ms : <span class="const token" data-verso-hover="63">Set</span> (P × <span class="const token" data-verso-hover="33">Msg</span> C)} {act : <span class="const token" data-verso-hover="63">Set</span> P} {ws : P → <span class="const token" data-verso-hover="47">ℕ</span>}</span>
+<span id="L338">    (h : <span class="const token" data-verso-hover="123">DeriveHyp</span> A cp α Ms act ws)</span>
+<span id="L339">    (hfair : ∀ p ∈ Cr, p ∈ act ∧ ∀ t, ∃ t' ≥ t, ∃ s o,</span>
+<span id="L340">      (<span class="const token" data-verso-hover="130">derive</span> A cp α Ms act ws Cr).<span class="const token" data-verso-hover="131">st</span> t' = <span class="const token" data-verso-hover="50">some</span> s ∧ s.<span class="const token" data-verso-hover="132">aStep</span> p = <span class="const token" data-verso-hover="50">some</span> o) :</span>
+<span id="L341">    <span class="const token" data-verso-hover="388">Admissible</span> A S (<span class="const token" data-verso-hover="130">derive</span> A cp α Ms act ws Cr) := <span class="kw">by</span></span>
+<span id="L342">  <span class="kw">refine</span> ⟨?_, ?_, ?_, ?_⟩</span>
+<span id="L343">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="474">derive_proj</span>]</span>
+<span id="L344">    <span class="kw">exact</span> hS _ (hB Cr α hα) Ms</span>
+<span id="L345">  · <span class="kw">intro</span> t p s o hs ho</span>
+<span id="L346">    <span class="kw">change</span> A.<span class="const token" data-verso-hover="78">act</span> p (cp.<span class="const token" data-verso-hover="126">v</span> p) _ = _</span>
+<span id="L347">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="414">AExec.aStep_eq_some</span> ho <span class="kw">with</span> ⟨m, <span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ | ⟨v, <span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ | ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩</span>
+<span id="L348">    · <span class="kw">obtain</span> ⟨h1, h2⟩ := (<span class="const token" data-verso-hover="149">derive_st_bc</span> A cp).<span class="const token" data-verso-hover="59">1</span> hs</span>
+<span id="L349">      <span class="kw">have</span> hp : p ∈ act := <span class="kw">by</span></span>
+<span id="L350">        <span class="kw">by_contra</span> hp</span>
+<span id="L351">        <span class="kw">exact</span> (h.<span class="const token" data-verso-hover="466">inactive</span> p hp t m).<span class="const token" data-verso-hover="100">1</span> h2 h1</span>
+<span id="L352">      <span class="kw">have</span> ht : ws p ≤ t := <span class="kw">by</span></span>
+<span id="L353">        <span class="kw">by_contra</span> ht</span>
+<span id="L354">        <span class="kw">exact</span> (h.<span class="const token" data-verso-hover="467">before</span> p hp t (<span class="kw">by</span> <span class="kw">omega</span>) m).<span class="const token" data-verso-hover="100">1</span> h2 h1</span>
+<span id="L355">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="151">derive_hist</span> A cp h hp ht, h.<span class="const token" data-verso-hover="472">invAct</span> p hp t ht m h1]</span>
+<span id="L356">      <span class="kw">rfl</span></span>
+<span id="L357">    · <span class="kw">obtain</span> ⟨-, hp, ht, hA⟩ := <span class="const token" data-verso-hover="174">derive_st_dec</span> A cp hs</span>
+<span id="L358">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="151">derive_hist</span> A cp h hp ht, hA]</span>
+<span id="L359">      <span class="kw">rfl</span></span>
+<span id="L360">    · <span class="kw">obtain</span> ⟨-, hp, ht, hA⟩ := <span class="const token" data-verso-hover="479">derive_st_tick</span> A cp hs</span>
+<span id="L361">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="151">derive_hist</span> A cp h hp ht, hA]</span>
+<span id="L362">      <span class="kw">rfl</span></span>
+<span id="L363">  · <span class="kw">intro</span> p hp t</span>
+<span id="L364">    <span class="kw">exact</span> (hfair p hp).<span class="const token" data-verso-hover="101">2</span> t</span>
+<span id="L365">  · <span class="kw">intro</span> p hp</span>
+<span id="L366">    <span class="kw">obtain</span> ⟨T, hT⟩ := hα.<span class="const token" data-verso-hover="202">crash</span> p hp</span>
+<span id="L367">    <span class="kw">refine</span> ⟨T, <span class="kw">fun</span> t ht s hs =&gt; ?_⟩</span>
+<span id="L368">    <span class="kw">by_contra</span> hc</span>
+<span id="L369">    <span class="kw">obtain</span> ⟨st, h1, h2⟩ := <span class="const token" data-verso-hover="487">derive_proc</span> A cp hs (<span class="const token" data-verso-hover="488">not_and_or</span>.<span class="const token" data-verso-hover="59">1</span> hc)</span>
+<span id="L370">    <span class="kw">exact</span> hT t ht st h1 h2</span>
+<span id="L371"></span>
+<span id="L372"><span class="kw">end</span> Podc.NoBroadcastKSA.Camp</span>
+<span id="L373"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2024/NoBroadcastKSA/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

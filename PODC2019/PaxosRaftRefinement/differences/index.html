@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>PaxosRaftRefinement (PODC 2019): Differences between the formalization and the paper · Formal PODC</title><base href="../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/PaxosRaftRefinement/">PaxosRaftRefinement</a><span class="sep">›</span><span aria-current="page">Differences</span></nav>
+        <h1>
+          Differences between the formalization and the paper</h1>
+        <div class="paper-links">
+          <p>
+            Rendered from <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/PaxosRaftRefinement/differencies.md"><code>differencies.md</code></a> of <a href="PODC2019/PaxosRaftRefinement/">Paxos vs. Raft, and porting optimizations — PODC 2019</a>.</p>
+          </div>
+        <p>
+          Paper: Wang, Zhao, Mu, Chen, Li. <em>On the Parallels between Paxos and Raft, and how to Port
+Optimizations.</em> PODC 2019, extended version (61 pp., Appendices A–C). The paper describes each
+protocol three times, and the three descriptions disagree: pseudocode (Figures 1–3), TLA+
+(Appendix B) and the refinement proof (Appendix C). We formalize the protocols the Appendix C proof
+talks about (Figures 1 and 2, with the mapping table of Appendix C). We repair them where needed,
+taking each repair from another of the paper's descriptions where possible.</p>
+        <section>
+          <h2 id="statement-level-issues">
+            Statement-level issues</h2>
+          <ol start="1">
+            <li>
+              <p>
+                <strong>TLA+ <code>theorem Invariance</code> of module MultiPaxos (B.1, line 177) is false</strong> —
+<code>TLA.tla_invariance_false</code>. There are three acceptors and majority quorums. One leader runs
+<code>Propose(a1, 0, TRUE)</code> and then <code>Propose(a1, 0, FALSE)</code>, since <code>Propose</code> records nothing. Two
+quorums then accept, and <code>OneValuePerBallot</code>, <code>Inv</code> and agreement (<code>chosen[0] = {TRUE, FALSE}</code>)
+all fail. The grey comment "⇒ v is safe at i, b" does not help: both values are <code>SafeAt</code> ballot
+1 because nothing was voted below it. Independently, two acceptors can become leaders of the
+same ballot, because 1b messages are not addressed (<code>TLA.tla_two_leaders_same_ballot</code>).
+<strong>🔧.</strong> The fix (record proposals, address 1b messages) changes the protocol, it is not an index
+or symbol fix. The TLA+ specs are supporting material.</p>
+              </li>
+            <li>
+              <p>
+                <strong>Figure 2 vote rule (lines 9–11)</strong> compares the voter's entry <em>at the candidate's last index</em>
+with the candidate's last term. Raft* as printed then loses committed entries
+(<code>Raft.fig2_not_commitSafe</code>; isolated step: <code>Raft.fig2_voter_reports_higher_term</code>). So the
+printed Figure 2 refines no safe Paxos, and step 4.2 of Appendix C is false for it.
+<strong>🔧.</strong> The fix is local (<code>s.log[lIndex]</code> → the voter's last entry), and the intent
+is recoverable from TLA+ B.2 (<code>Phase1b</code> uses <code>raftlogs[a][lastIndex[a]]</code>) and from Raft. The
+Appendix C proof does not reason with the printed rule; it gives no argument at all for 4.2.
+Raft* (Figure 2) is the paper's main protocol and is unsafe as printed. The intent is stated in
+the paper's own prose: Section 3 says "Raft* is
+identical to Raft, except for two introduced differences" (extra entries in votes, the <code>bal</code>
+field), neither of which concerns the vote rule, so Raft's last-entry check is intended; TLA+ B.2
+<code>Phase1b</code> uses it too.</p>
+              </li>
+            <li>
+              <p>
+                <strong>Figure 2 allows <code>AppendEntries</code> with <code>vals = []</code> (heartbeats)</strong>. Then even Raft's own vote rule
+gives Raft's "Figure 8" loss of a committed entry (<code>Raft.heartbeat_not_commitSafe</code>). Section 3
+claims that re-stamping ballots replaces Raft's §5.4.2 commit rule, but that only works if every
+append carries an entry of the current term. <strong>🔧.</strong> TLA+ B.2's <code>ProposeEntries</code>
+always appends exactly one value, which recovers the assumption. Raft (which Raft*
+claims to equal "except two differences") does send empty <code>AppendEntries</code>, so a reader may be
+misled; but read the same way, Raft* would also keep Raft's §5.4.2 commit rule, which makes
+heartbeats safe. Either reading of the paper recovers a safe protocol; recorded here.</p>
+              </li>
+            <li>
+              <p>
+                <em><em>Raft</em>-PQL / Raft</em>-Mencius "guaranteed correct" (Sections 4.3–4.4, Appendix A)<strong>:
+<em>unestablished</em> (</strong>❌**). The Section 4.3 argument needs a single-step refinement (<code>b_j ⇒ a_i</code>).
+The Raft* → Paxos refinement is multi-step (Appendix C 2.4/2.5 map one step to "several Phase2a
+steps"). For multi-step refinements, the recipe of conjoining the added clauses at the end points
+is unsound in general (<code>Porting.naive_multistep_port_unsound</code>). The ported protocols themselves
+are not formalized, so they are neither proved nor refuted. The abstract presents porting "from Paxos to Raft with guaranteed
+correctness" as a primary contribution, and its proof for Raft* relies on <code>b_j ⇒ a_i</code>, which the
+paper's own Appendix C contradicts (one <code>AppendEntries</code> = several Paxos steps; "3. Q.E.D. … each
+step of Raft* implies a step of Paxos" is false as stated). Nothing is refuted for
+Raft*-PQL/Mencius.</p>
+              </li>
+            </ol>
+          </section>
+        <section>
+          <h2 id="proof-gaps-of-true-statements-appendix-c">
+            Proof gaps of true statements (Appendix C)</h2>
+          <ol start="5">
+            <li>
+              <p>
+                <strong>Step 2.3 / 4.2</strong> ("<code>s.instances[0, s.lastIndex]</code> is already the safe entries") has no
+argument. For the repaired protocol it needs the invariant <code>Raft.Inv</code> (<a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/PaxosRaftRefinement/RaftInv.lean"><code>RaftInv.lean</code></a>):</p>
+              <ul>
+                <li>
+                  <p>
+                    log matching;</p>
+                  </li>
+                <li>
+                  <p>
+                    at most one candidate with a quorum of votes per term (<code>Inv.cand_unique</code>);</p>
+                  </li>
+                <li>
+                  <p>
+                    a candidate's log equals its own vote (<code>cand_log</code>);</p>
+                  </li>
+                <li>
+                  <p>
+                    every voter's last term is ≤ the candidate's (<code>rvok_vote</code>);</p>
+                  </li>
+                <li>
+                  <p>
+                    every entry is a proposal of its own term and of its log's last term (<code>entry_props</code>,
+<code>last_props</code>), and proposals of a term come from that term's leader (<code>props_leader</code>).</p>
+                  </li>
+                </ul>
+              </li>
+            <li>
+              <p>
+                <strong>Step 2.5 (<code>ReceiveAppend ⇒ Phase2b</code>)</strong> maps only the entries <code>prev+1 .. prev+|ents|</code>. Under
+the Appendix C mapping (accepted ballot = term of the last entry), the follower re-accepts its
+<em>whole</em> log in the leader's term. This is justified by log matching: the follower's prefix
+equals the leader's, so <code>Inv.receiveAppend_log</code> gives that the new log is the leader's log.
+The step ignores the follower's <code>commitIndex</code> update, which changes <code>chosenSet</code>. We map it to
+Paxos <code>Learn</code> steps. Showing that the already committed entries are not overwritten needs
+MultiPaxos safety itself (<code>PropSafe</code>, supplied by <code>Paxos.proposal_eq_of_chosenAt</code> inside the
+induction, <code>inv_and_reachable</code>).</p>
+              </li>
+            <li>
+              <p>
+                <strong>Truncation</strong> (screening question): Raft* never truncates (<code>s.lastIndex ≤ prev + length(ents)</code>).
+A replaced entry corresponds to a Paxos acceptance in a higher ballot, never to un-accepting a
+value. This holds in our model.</p>
+              </li>
+            <li>
+              <p>
+                <em><em>"Every Raft</em> step implies a Paxos step or a stutter"</em>* (Section 4.1 and step 3): it is a
+<em>finite sequence</em> of Paxos steps (<code>refinement_step</code>, batches in <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/PaxosRaftRefinement/PaxosBatch.lean"><code>PaxosBatch.lean</code></a>). The paper
+itself says so in 2.4/2.5 ("several Phase2a steps").</p>
+              </li>
+            </ol>
+          </section>
+        <section>
+          <h2 id="modelling-choices-and-repairs-not-mistakes-of-the-papers-results">
+            Modelling choices and repairs (not mistakes of the paper's results)</h2>
+          <ul>
+            <li>
+              <p>
+                <strong>Mapping.</strong> We use Appendix C's mapping <code>accBallot ↦ lastLogEntry.Term</code> for <em>every</em> entry.
+Figure 3 maps <code>instance.bal ↦ entry.bal</code> (the per-entry <code>bal</code> field of Figure 2). With that
+mapping the refinement fails even for repaired Raft*, although safety holds. A candidate keeps its
+entry at index 0 with <code>bal 1</code>, while a voter reports a different value at index 0 with <code>bal 3</code>,
+so Paxos <code>safeEntry</code> would pick the voter's value. Scenario: 5 servers; term 1 writes <code>x</code> to
+<code>C</code>; term 3 writes <code>u</code> to <code>V</code>; term 5 extends <code>C</code>'s log with prev = 0; <code>C</code> then wins term 6 with
+<code>V</code>'s vote. This is only in prose, not formalized, because our Raft* has no <code>bal</code> field (it is
+behaviourally irrelevant). Recorded as a remark (✏️).</p>
+              </li>
+            <li>
+              <p>
+                <strong>Figure 1 (MultiPaxos) repairs</strong> in <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/PaxosRaftRefinement/Paxos.lean"><code>Paxos.lean</code></a>:</p>
+              <ul>
+                <li>
+                  <p>
+                    <code>Phase2a</code> must not propose a second value for the same instance and ballot. As printed it
+records nothing, the same flaw as TLA+ <code>Propose</code>.</p>
+                  </li>
+                <li>
+                  <p>
+                    <code>Phase1a</code> resets <code>phase1Succeeded</code>. As printed a leader keeps leadership after raising its
+ballot; TLA+ <code>IncreaseHighestBallot</code> resets it.</p>
+                  </li>
+                <li>
+                  <p>
+                    <code>Phase1a</code> sends the proposer's own <code>prepareOK</code>, and <code>Phase1Succeed</code> requires it and is guarded
+by <code>¬phase1Succeeded</code>, as TLA+ <code>BecomeLeader</code>.</p>
+                  </li>
+                <li>
+                  <p>
+                    <code>Phase1Succeed</code> sets all instances (empty above the largest reported one). The <code>unchosen</code>
+optimisation is dropped, as Appendix C does.</p>
+                  </li>
+                <li>
+                  <p>
+                    <code>Learn</code> only adds to <code>chosenSet</code>; Figure 1 also overwrites the instance with <code>(b, v)</code>.
+<code>acceptOK</code> messages are readable by every learner, which is the paper's "notify other servers".</p>
+                  </li>
+                </ul>
+              </li>
+            <li>
+              <p>
+                <em><em>Figure 2 (Raft</em>) repairs</em>* in <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/PaxosRaftRefinement/RaftStar.lean"><code>RaftStar.lean</code></a>:</p>
+              <ul>
+                <li>
+                  <p>
+                    <code>RequestVote</code> resets <code>isLeader</code> and casts the candidate's own vote, which carries its log.</p>
+                  </li>
+                <li>
+                  <p>
+                    <code>BecomeLeader</code> needs the own vote among a quorum of votes and is guarded by <code>¬isLeader</code>,
+as TLA+ B.2. As printed it can re-run and <em>shrink</em> <code>lastIndex</code>.</p>
+                  </li>
+                <li>
+                  <p>
+                    Votes carry the whole log (Appendix C 3.5: "we can still assume Raft* includes the full log").</p>
+                  </li>
+                <li>
+                  <p>
+                    <code>append</code> messages carry the leader's log; the receiver uses only <code>prevLen</code>, <code>pTerm</code> and <code>ents</code>.</p>
+                  </li>
+                <li>
+                  <p>
+                    <code>safeEntry</code> among votes picks a vote with the largest <em>last term</em>, matching the mapping.</p>
+                  </li>
+                <li>
+                  <p>
+                    <code>LeaderLearn</code> commits any <code>k</code> at most the reported lengths. Figure 2 says exactly the minimum;
+allowing more nondeterminism only strengthens the safety result.</p>
+                  </li>
+                <li>
+                  <p>
+                    The vote rule is a parameter (<code>Rules.voteOK</code>). The theorem holds for every rule that never lets
+a voter vote for a candidate with a smaller last term (<code>VoteMono</code>). This covers Raft's/TLA+'s
+rule (<code>raftStar_commitSafe_raftVote</code>), the index-fixed Figure 2 rule
+(<code>raftStar_commitSafe_fig2Fixed</code>) and the most permissive rule "voter's last term ≤
+candidate's" (<code>refinement_repaired</code>).</p>
+                  </li>
+                <li>
+                  <p>
+                    <code>commitIndex</code> is stored as a length (<code>commit = commitIndex + 1</code>). Indices are 0-based, as in
+the paper.</p>
+                  </li>
+                </ul>
+              </li>
+            <li>
+              <p>
+                <strong>Ghost variables</strong> <code>props</code>/<code>acks</code> record the implied Paxos <code>accept</code>/<code>acceptOK</code> messages, like
+TLA+ <code>proposedValues</code>/<code>votes</code>.</p>
+              </li>
+            <li>
+              <p>
+                <strong>Network and failures</strong>: every message ever sent stays in a set, so loss, duplication and
+reordering are all possible; crash-stop is a server that takes no more steps; quorums are any
+intersecting family. These are the paper's assumptions (Section 2, TLA+).</p>
+              </li>
+            <li>
+              <p>
+                <strong>Not formalized</strong>:</p>
+              <ul>
+                <li>
+                  <p>
+                    the TLA+ module Raft* (B.2) — its <code>ProposeEntries</code> also records nothing in the leader's log, so
+its <code>Invariance</code> very likely fails the same way as B.1's; not checked;</p>
+                  </li>
+                <li>
+                  <p>
+                    PQL, Mencius and their Raft* ports (B.3–B.6, Appendix A);</p>
+                  </li>
+                <li>
+                  <p>
+                    Fig. 6's classification of Paxos variants;</p>
+                  </li>
+                <li>
+                  <p>
+                    the evaluation (Section 5).</p>
+                  </li>
+                </ul>
+              </li>
+            <li>
+              <p>
+                <strong>Section 4 formalization</strong> (<a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/PaxosRaftRefinement/Porting.lean"><code>Porting.lean</code></a>):</p>
+              <ul>
+                <li>
+                  <p>
+                    Subactions are relations on full states. A modified subaction conjoins an arbitrary clause, and
+an added subaction must leave the variables of <code>A</code> unchanged ("non-mutating").</p>
+                  </li>
+                <li>
+                  <p>
+                    The paper's syntactic "does not mutate <code>Var_A</code>" for the clauses of <em>modified</em> subactions is not
+needed: any conjunct only restricts behaviour.</p>
+                  </li>
+                <li>
+                  <p>
+                    Parameter mappings (<code>f_args</code>) are subsumed by letting clauses read the full pre/post states.</p>
+                  </li>
+                <li>
+                  <p>
+                    A stuttering <code>b_j</code> keeps the new variables, which the recipe leaves implicit.</p>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </section>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

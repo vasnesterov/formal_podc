@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>PaxosRaftRefinement: TLAMultiPaxos.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/PaxosRaftRefinement/">PaxosRaftRefinement</a><span class="sep">›</span><a href="PODC2019/PaxosRaftRefinement/src/">Lean source</a><span class="sep">›</span><span aria-current="page">TLAMultiPaxos</span></nav>
+        <h1>
+          <code>TLAMultiPaxos.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2019/PaxosRaftRefinement/">Paxos vs. Raft, and porting optimizations — PODC 2019</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/PaxosRaftRefinement/TLAMultiPaxos.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="TLAMultiPaxos"><span id="L1"><span class="kw">import</span> Papers.PODC2019.PaxosRaftRefinement.Paxos</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># The TLA+ module `MultiPaxos` of [paper] (Appendix B.1), transcribed, and its `Invariance` refuted</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">A line-by-line transcription of the TLA+ specification `MultiPaxos` printed in Appendix B.1 of</span></span>
+<span id="L7"><span class="dc">[paper] (pages 27–30 of the extended version); `Lnn` in docstrings refers to the line numbers of</span></span>
+<span id="L8"><span class="dc">the printed module.</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">Representation choices:</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">* constants: `Acceptor` is a type `A`, `Value` a type `V`, `Quorum` a `QuorumSystem A` (an</span></span>
+<span id="L13"><span class="dc">  intersecting family of finite sets of acceptors, which is `QuorumAssumption`, L28–29);</span></span>
+<span id="L14"><span class="dc">* `Ballot = Index = Nat` (L23–24); the "ballot" `-1` of empty log entries and of `logTail` is</span></span>
+<span id="L15"><span class="dc">  handled by using `ℤ` for those fields; `NoVal` (L25, a value outside `Value`) is `none`, so</span></span>
+<span id="L16"><span class="dc">  a log entry `⟨b, v⟩ ∈ (Ballot ∪ {-1}) × (Value ∪ {NoVal})` is a pair `ℤ × Option V`;</span></span>
+<span id="L17"><span class="dc">* `CHOOSE` (in `Max`, L7, and `GetHighestBallotEntry`, L64–67) is Hilbert's `Classical.epsilon`:</span></span>
+<span id="L18"><span class="dc">  deterministic, unspecified when nothing satisfies the predicate, as in TLA+;</span></span>
+<span id="L19"><span class="dc">* each action is a predicate on the pair (unprimed state `s`, primed state `s'`), listing every</span></span>
+<span id="L20"><span class="dc">  variable (the `UNCHANGED` clauses become equations); `TypeOK` (L136–145) holds by typing;</span></span>
+<span id="L21"><span class="dc">* `S ∈ SUBSET 1bmsgs` in `Next` (L162) ranges over finite subsets (`Finset`); `1bmsgs` is finite</span></span>
+<span id="L22"><span class="dc">  in every reachable state anyway.</span></span>
+<span id="L23"></span>
+<span id="L24"><span class="dc">In `Propose` (L118–123) the text "`⇒ v is safe at i, b`" after `logs[a][i][2] = NoVal` is a</span></span>
+<span id="L25"><span class="dc">grey comment, not part of the formula. So `Propose(a, i, v)` is enabled whenever `a` is a leader</span></span>
+<span id="L26"><span class="dc">and its log entry at `i` holds `v` or no value, and it records nothing in `logs`: a leader whose</span></span>
+<span id="L27"><span class="dc">entry is empty may propose *several different values* at the same index and ballot.</span></span>
+<span id="L28"></span>
+<span id="L29"><span class="dc">**Main result** (`tla_invariance_false`): with three acceptors, majority quorums and</span></span>
+<span id="L30"><span class="dc">`Value = Bool`, a state reachable from `Init` by `Next` steps violates `OneValuePerBallot`, and both</span></span>
+<span id="L31"><span class="dc">`true` and `false` are chosen at index `0`; hence `THEOREM Invariance` (L177) is false. The run:</span></span>
+<span id="L32"><span class="dc">`IncreaseHighestBallot(a0, 1)`, `Phase1a(a0)`, `Phase1b(a1, ·)`, `Phase1b(a2, ·)`,</span></span>
+<span id="L33"><span class="dc">`BecomeLeader(a1, {1b of a1, 1b of a2})`, `Propose(a1, 0, TRUE)`, `Propose(a1, 0, FALSE)`,</span></span>
+<span id="L34"><span class="dc">`Accept(a1, 0, 1, TRUE)`, `Accept(a2, 0, 1, TRUE)`, `Accept(a0, 0, 1, FALSE)`,</span></span>
+<span id="L35"><span class="dc">`Accept(a2, 0, 1, FALSE)`.</span></span>
+<span id="L36"></span>
+<span id="L37"><span class="dc">A second problem (`tla_two_leaders_same_ballot`): `1b` messages are not addressed to the</span></span>
+<span id="L38"><span class="dc">proposer that sent the `1a`, and `BecomeLeader(a, S)` only needs `a`'s own `1b` in `S`; so two</span></span>
+<span id="L39"><span class="dc">acceptors may become leaders of the same ballot from the same set of `1b` messages.</span></span>
+<span id="L40"><span class="dc">-/</span></span>
+<span id="L41"></span>
+<span id="L42"><span class="kw">namespace</span> Podc.PaxosRaftRefinement</span>
+<span id="L43"></span>
+<span id="L44"><span class="kw">namespace</span> TLA</span>
+<span id="L45"></span>
+<span id="L46"><span class="kw">open</span> Relation</span>
+<span id="L47"></span>
+<span id="L48"><span class="kw">variable</span> {A V : <span class="kw">Type</span>*}</span>
+<span id="L49"></span>
+<span id="L50"><span class="dc">/-- A `1a` message `[acc ↦ a, bal ↦ b]` (L97). -/</span></span>
+<span id="L51">@[<span class="kw">ext</span>]</span>
+<span id="L52"><span class="kw">structure</span> <span class="const token" data-verso-hover="390">Msg1a</span> (A : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L53">  <span class="dc">/-- The sender. -/</span></span>
+<span id="L54">  <span class="const token" data-verso-hover="391">acc</span> : A</span>
+<span id="L55">  <span class="dc">/-- Its ballot. -/</span></span>
+<span id="L56">  <span class="const token" data-verso-hover="392">bal</span> : <span class="const token" data-verso-hover="37">ℕ</span></span>
+<span id="L57"></span>
+<span id="L58"><span class="dc">/-- A `1b` message `[acc ↦ a, bal ↦ b, log ↦ logs[a], logTail ↦ logTail[a]]` (L105–106). -/</span></span>
+<span id="L59">@[<span class="kw">ext</span>]</span>
+<span id="L60"><span class="kw">structure</span> <span class="const token" data-verso-hover="393">Msg1b</span> (A V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L61">  <span class="dc">/-- The sender. -/</span></span>
+<span id="L62">  <span class="const token" data-verso-hover="394">acc</span> : A</span>
+<span id="L63">  <span class="dc">/-- The ballot of the `1a` message answered. -/</span></span>
+<span id="L64">  <span class="const token" data-verso-hover="395">bal</span> : <span class="const token" data-verso-hover="37">ℕ</span></span>
+<span id="L65">  <span class="dc">/-- The sender's whole log. -/</span></span>
+<span id="L66">  <span class="const token" data-verso-hover="396">log</span> : <span class="const token" data-verso-hover="37">ℕ</span> → <span class="const token" data-verso-hover="397">ℤ</span> × <span class="const token" data-verso-hover="102">Option</span> V</span>
+<span id="L67">  <span class="dc">/-- The sender's `logTail`. -/</span></span>
+<span id="L68">  <span class="const token" data-verso-hover="398">logTail</span> : <span class="const token" data-verso-hover="397">ℤ</span></span>
+<span id="L69"></span>
+<span id="L70"><span class="dc">/-- The variables of the module (L14–21). -/</span></span>
+<span id="L71">@[<span class="kw">ext</span>]</span>
+<span id="L72"><span class="kw">structure</span> <span class="const token" data-verso-hover="399">State</span> (A V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L73">  <span class="dc">/-- `highestBallot[a]`: the highest ballot number acceptor `a` has seen. -/</span></span>
+<span id="L74">  <span class="const token" data-verso-hover="400">highestBallot</span> : A → <span class="const token" data-verso-hover="37">ℕ</span></span>
+<span id="L75">  <span class="dc">/-- `isLeader[a]`: whether acceptor `a` is the leader and can propose values. -/</span></span>
+<span id="L76">  <span class="const token" data-verso-hover="22">isLeader</span> : A → <span class="const token" data-verso-hover="38">Bool</span></span>
+<span id="L77">  <span class="dc">/-- `logTail[a]`: pointer to the end of the log (`-1` for an empty log). -/</span></span>
+<span id="L78">  <span class="const token" data-verso-hover="401">logTail</span> : A → <span class="const token" data-verso-hover="397">ℤ</span></span>
+<span id="L79">  <span class="dc">/-- `votes[a][i]`: the set of votes `⟨b, v⟩` cast by acceptor `a` at index `i`. -/</span></span>
+<span id="L80">  <span class="const token" data-verso-hover="402">votes</span> : A → <span class="const token" data-verso-hover="37">ℕ</span> → <span class="const token" data-verso-hover="108">Set</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)</span>
+<span id="L81">  <span class="dc">/-- `proposedValues`: the proposals `⟨i, b, v⟩`. -/</span></span>
+<span id="L82">  <span class="const token" data-verso-hover="403">proposedValues</span> : <span class="const token" data-verso-hover="108">Set</span> (<span class="const token" data-verso-hover="37">ℕ</span> × <span class="const token" data-verso-hover="37">ℕ</span> × V)</span>
+<span id="L83">  <span class="dc">/-- `logs[a][i]`: the latest vote `⟨b, v⟩` cast by acceptor `a` at index `i`. -/</span></span>
+<span id="L84">  <span class="const token" data-verso-hover="404">logs</span> : A → <span class="const token" data-verso-hover="37">ℕ</span> → <span class="const token" data-verso-hover="397">ℤ</span> × <span class="const token" data-verso-hover="102">Option</span> V</span>
+<span id="L85">  <span class="dc">/-- `1amsgs`. -/</span></span>
+<span id="L86">  <span class="const token" data-verso-hover="405">msgs1a</span> : <span class="const token" data-verso-hover="108">Set</span> (<span class="const token" data-verso-hover="390">Msg1a</span> A)</span>
+<span id="L87">  <span class="dc">/-- `1bmsgs`. -/</span></span>
+<span id="L88">  <span class="const token" data-verso-hover="406">msgs1b</span> : <span class="const token" data-verso-hover="108">Set</span> (<span class="const token" data-verso-hover="393">Msg1b</span> A V)</span>
+<span id="L89"></span>
+<span id="L90"><span class="dc">/-- `Max(s) ≜ CHOOSE x ∈ s : ∀ y ∈ s : x ≥ y` (L7). -/</span></span>
+<span id="L91"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="407">tlaMax</span> (s : <span class="const token" data-verso-hover="108">Set</span> <span class="const token" data-verso-hover="397">ℤ</span>) : <span class="const token" data-verso-hover="397">ℤ</span> :=</span>
+<span id="L92">  <span class="const token" data-verso-hover="408">Classical.epsilon</span> <span class="kw">fun</span> x =&gt; x ∈ s ∧ ∀ y ∈ s, x ≥ y</span>
+<span id="L93"></span>
+<span id="L94"><span class="dc">/-- `VotedFor(a, i, b, v) ≜ ⟨b, v⟩ ∈ votes[a][i]` (L31). -/</span></span>
+<span id="L95"><span class="kw">def</span> <span class="const token" data-verso-hover="409">VotedFor</span> (s : <span class="const token" data-verso-hover="399">State</span> A V) (a : A) (i b : <span class="const token" data-verso-hover="37">ℕ</span>) (v : V) : <span class="kw">Prop</span> :=</span>
+<span id="L96">  (b, v) ∈ s.<span class="const token" data-verso-hover="402">votes</span> a i</span>
+<span id="L97"></span>
+<span id="L98"><span class="dc">/-- `ChosenAt(i, b, v) ≜ ∃ Q ∈ Quorum : ∀ a ∈ Q : VotedFor(a, i, b, v)` (L33–34). -/</span></span>
+<span id="L99"><span class="kw">def</span> <span class="const token" data-verso-hover="410">ChosenAt</span> (Q : <span class="const token" data-verso-hover="33">QuorumSystem</span> A) (s : <span class="const token" data-verso-hover="399">State</span> A V) (i b : <span class="const token" data-verso-hover="37">ℕ</span>) (v : V) : <span class="kw">Prop</span> :=</span>
+<span id="L100">  ∃ q, Q.<span class="const token" data-verso-hover="82">IsQuorum</span> q ∧ ∀ a ∈ q, <span class="const token" data-verso-hover="409">VotedFor</span> s a i b v</span>
+<span id="L101"></span>
+<span id="L102"><span class="dc">/-- `chosen ≜ [i ∈ Index ↦ {v ∈ Value : ∃ b ∈ Ballot : ChosenAt(i, b, v)}]` (L36). -/</span></span>
+<span id="L103"><span class="kw">def</span> <span class="const token" data-verso-hover="411">chosen</span> (Q : <span class="const token" data-verso-hover="33">QuorumSystem</span> A) (s : <span class="const token" data-verso-hover="399">State</span> A V) (i : <span class="const token" data-verso-hover="37">ℕ</span>) : <span class="const token" data-verso-hover="108">Set</span> V :=</span>
+<span id="L104">  {v | ∃ b, <span class="const token" data-verso-hover="410">ChosenAt</span> Q s i b v}</span>
+<span id="L105"></span>
+<span id="L106"><span class="dc">/-- `DidNotVoteAt(a, i, b) ≜ ∀ v ∈ Value : ¬VotedFor(a, i, b, v)` (L38). -/</span></span>
+<span id="L107"><span class="kw">def</span> <span class="const token" data-verso-hover="412">DidNotVoteAt</span> (s : <span class="const token" data-verso-hover="399">State</span> A V) (a : A) (i b : <span class="const token" data-verso-hover="37">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L108">  ∀ v, ¬ <span class="const token" data-verso-hover="409">VotedFor</span> s a i b v</span>
+<span id="L109"></span>
+<span id="L110"><span class="dc">/-- `CannotVoteAt(a, i, b) ≜ highestBallot[a] &gt; b ∧ DidNotVoteAt(a, i, b)` (L40–41). -/</span></span>
+<span id="L111"><span class="kw">def</span> <span class="const token" data-verso-hover="413">CannotVoteAt</span> (s : <span class="const token" data-verso-hover="399">State</span> A V) (a : A) (i b : <span class="const token" data-verso-hover="37">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L112">  s.<span class="const token" data-verso-hover="400">highestBallot</span> a &gt; b ∧ <span class="const token" data-verso-hover="412">DidNotVoteAt</span> s a i b</span>
+<span id="L113"></span>
+<span id="L114"><span class="dc">/-- `NoneOtherChoosableAt(i, b, v)` (L43–45). -/</span></span>
+<span id="L115"><span class="kw">def</span> <span class="const token" data-verso-hover="414">NoneOtherChoosableAt</span> (Q : <span class="const token" data-verso-hover="33">QuorumSystem</span> A) (s : <span class="const token" data-verso-hover="399">State</span> A V) (i b : <span class="const token" data-verso-hover="37">ℕ</span>) (v : V) : <span class="kw">Prop</span> :=</span>
+<span id="L116">  ∃ q, Q.<span class="const token" data-verso-hover="82">IsQuorum</span> q ∧ ∀ a ∈ q, <span class="const token" data-verso-hover="409">VotedFor</span> s a i b v ∨ <span class="const token" data-verso-hover="413">CannotVoteAt</span> s a i b</span>
+<span id="L117"></span>
+<span id="L118"><span class="dc">/-- `SafeAt(i, b, v) ≜ ∀ c ∈ 0 .. (b - 1) : NoneOtherChoosableAt(i, c, v)` (L47). -/</span></span>
+<span id="L119"><span class="kw">def</span> <span class="const token" data-verso-hover="415">SafeAt</span> (Q : <span class="const token" data-verso-hover="33">QuorumSystem</span> A) (s : <span class="const token" data-verso-hover="399">State</span> A V) (i b : <span class="const token" data-verso-hover="37">ℕ</span>) (v : V) : <span class="kw">Prop</span> :=</span>
+<span id="L120">  ∀ c &lt; b, <span class="const token" data-verso-hover="414">NoneOtherChoosableAt</span> Q s i c v</span>
+<span id="L121"></span>
+<span id="L122"><span class="dc">/-- `ShowsSafeAt(Q, i, b, v)` (L49–53); `c` ranges over `-1 .. (b - 1)`. -/</span></span>
+<span id="L123"><span class="kw">def</span> <span class="const token" data-verso-hover="416">ShowsSafeAt</span> (s : <span class="const token" data-verso-hover="399">State</span> A V) (q : <span class="const token" data-verso-hover="83">Finset</span> A) (i b : <span class="const token" data-verso-hover="37">ℕ</span>) (v : V) : <span class="kw">Prop</span> :=</span>
+<span id="L124">  (∀ a ∈ q, s.<span class="const token" data-verso-hover="400">highestBallot</span> a ≥ b) ∧</span>
+<span id="L125">  ∃ c : <span class="const token" data-verso-hover="397">ℤ</span>, -<span class="nu">1</span> ≤ c ∧ c ≤ (b : <span class="const token" data-verso-hover="397">ℤ</span>) - <span class="nu">1</span> ∧</span>
+<span id="L126">    (c ≠ -<span class="nu">1</span> → ∃ a ∈ q, <span class="const token" data-verso-hover="409">VotedFor</span> s a i c.<span class="const token" data-verso-hover="417">toNat</span> v) ∧</span>
+<span id="L127">    ∀ d : <span class="const token" data-verso-hover="37">ℕ</span>, c + <span class="nu">1</span> ≤ d → (d : <span class="const token" data-verso-hover="397">ℤ</span>) ≤ (b : <span class="const token" data-verso-hover="397">ℤ</span>) - <span class="nu">1</span> → ∀ a ∈ q, <span class="const token" data-verso-hover="412">DidNotVoteAt</span> s a i d</span>
+<span id="L128"></span>
+<span id="L129"><span class="dc">/-- `OneValuePerBallot` (L56–58). -/</span></span>
+<span id="L130"><span class="kw">def</span> <span class="const token" data-verso-hover="2">OneValuePerBallot</span> (s : <span class="const token" data-verso-hover="399">State</span> A V) : <span class="kw">Prop</span> :=</span>
+<span id="L131">  ∀ a1 a2 b v1 v2 i, <span class="const token" data-verso-hover="409">VotedFor</span> s a1 i b v1 ∧ <span class="const token" data-verso-hover="409">VotedFor</span> s a2 i b v2 → v1 = v2</span>
+<span id="L132"></span>
+<span id="L133"><span class="dc">/-- `LogsSafe` (L60–62). -/</span></span>
+<span id="L134"><span class="kw">def</span> <span class="const token" data-verso-hover="418">LogsSafe</span> (Q : <span class="const token" data-verso-hover="33">QuorumSystem</span> A) (s : <span class="const token" data-verso-hover="399">State</span> A V) : <span class="kw">Prop</span> :=</span>
+<span id="L135">  ∀ a (b : <span class="const token" data-verso-hover="37">ℕ</span>) i v, s.<span class="const token" data-verso-hover="404">logs</span> a i = ((b : <span class="const token" data-verso-hover="397">ℤ</span>), <span class="const token" data-verso-hover="116">some</span> v) → <span class="const token" data-verso-hover="415">SafeAt</span> Q s i b v</span>
+<span id="L136"></span>
+<span id="L137"><span class="dc">/-- `GetHighestBallotEntry(i, logsIn1b)` (L64–67): an entry at index `i` of one of the logs with</span></span>
+<span id="L138"><span class="dc">the highest ballot. -/</span></span>
+<span id="L139"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="419">GetHighestBallotEntry</span> (i : <span class="const token" data-verso-hover="37">ℕ</span>) (logsIn1b : <span class="const token" data-verso-hover="108">Set</span> (<span class="const token" data-verso-hover="37">ℕ</span> → <span class="const token" data-verso-hover="397">ℤ</span> × <span class="const token" data-verso-hover="102">Option</span> V)) :</span>
+<span id="L140">    <span class="const token" data-verso-hover="397">ℤ</span> × <span class="const token" data-verso-hover="102">Option</span> V :=</span>
+<span id="L141">  <span class="const token" data-verso-hover="408">Classical.epsilon</span> <span class="kw">fun</span> bv =&gt; (∃ log ∈ logsIn1b, bv = log i) ∧ ∀ log ∈ logsIn1b, bv.<span class="const token" data-verso-hover="234">1</span> ≥ (log i).<span class="const token" data-verso-hover="234">1</span></span>
+<span id="L142"></span>
+<span id="L143"><span class="kw">variable</span> [<span class="const token" data-verso-hover="86">DecidableEq</span> A]</span>
+<span id="L144"></span>
+<span id="L145"><span class="dc">/-- `UpdateLog(a, logsIn1b, i1, i2)` (L69, L81–87). -/</span></span>
+<span id="L146"><span class="kw">def</span> <span class="const token" data-verso-hover="420">UpdateLog</span> (a : A) (logsIn1b : <span class="const token" data-verso-hover="108">Set</span> (<span class="const token" data-verso-hover="37">ℕ</span> → <span class="const token" data-verso-hover="397">ℤ</span> × <span class="const token" data-verso-hover="102">Option</span> V)) (i1 i2 : <span class="const token" data-verso-hover="397">ℤ</span>) (s s' : <span class="const token" data-verso-hover="399">State</span> A V) :</span>
+<span id="L147">    <span class="kw">Prop</span> :=</span>
+<span id="L148">  (∀ i : <span class="const token" data-verso-hover="37">ℕ</span>, i1 ≤ i ∧ (i : <span class="const token" data-verso-hover="397">ℤ</span>) ≤ i2 → s'.<span class="const token" data-verso-hover="404">logs</span> a i = <span class="const token" data-verso-hover="419">GetHighestBallotEntry</span> i logsIn1b) ∧</span>
+<span id="L149">  (∀ x, x ≠ a → s'.<span class="const token" data-verso-hover="404">logs</span> x = s.<span class="const token" data-verso-hover="404">logs</span> x) ∧</span>
+<span id="L150">  (∀ i : <span class="const token" data-verso-hover="37">ℕ</span>, ¬ (i1 ≤ i ∧ (i : <span class="const token" data-verso-hover="397">ℤ</span>) ≤ i2) → s'.<span class="const token" data-verso-hover="404">logs</span> a i = s.<span class="const token" data-verso-hover="404">logs</span> a i) ∧</span>
+<span id="L151">  s'.<span class="const token" data-verso-hover="401">logTail</span> = <span class="kw">if</span> i2 &gt; s.<span class="const token" data-verso-hover="401">logTail</span> a <span class="kw">then</span> <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="401">logTail</span> a i2 <span class="kw">else</span> s.<span class="const token" data-verso-hover="401">logTail</span></span>
+<span id="L152"></span>
+<span id="L153"><span class="dc">/-- `IncreaseHighestBallot(a, b)` (L89–93). -/</span></span>
+<span id="L154"><span class="kw">def</span> <span class="const token" data-verso-hover="421">IncreaseHighestBallot</span> (a : A) (b : <span class="const token" data-verso-hover="37">ℕ</span>) (s s' : <span class="const token" data-verso-hover="399">State</span> A V) : <span class="kw">Prop</span> :=</span>
+<span id="L155">  s.<span class="const token" data-verso-hover="400">highestBallot</span> a &lt; b ∧</span>
+<span id="L156">  s'.<span class="const token" data-verso-hover="400">highestBallot</span> = <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="400">highestBallot</span> a b ∧</span>
+<span id="L157">  s'.<span class="const token" data-verso-hover="22">isLeader</span> = <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="22">isLeader</span> a <span class="const token" data-verso-hover="57">false</span> ∧</span>
+<span id="L158">  s'.<span class="const token" data-verso-hover="401">logTail</span> = s.<span class="const token" data-verso-hover="401">logTail</span> ∧ s'.<span class="const token" data-verso-hover="402">votes</span> = s.<span class="const token" data-verso-hover="402">votes</span> ∧ s'.<span class="const token" data-verso-hover="403">proposedValues</span> = s.<span class="const token" data-verso-hover="403">proposedValues</span> ∧</span>
+<span id="L159">  s'.<span class="const token" data-verso-hover="404">logs</span> = s.<span class="const token" data-verso-hover="404">logs</span> ∧ s'.<span class="const token" data-verso-hover="405">msgs1a</span> = s.<span class="const token" data-verso-hover="405">msgs1a</span> ∧ s'.<span class="const token" data-verso-hover="406">msgs1b</span> = s.<span class="const token" data-verso-hover="406">msgs1b</span></span>
+<span id="L160"></span>
+<span id="L161"><span class="dc">/-- `Phase1a(a)` (L95–99). -/</span></span>
+<span id="L162"><span class="kw">def</span> <span class="const token" data-verso-hover="9">Phase1a</span> (a : A) (s s' : <span class="const token" data-verso-hover="399">State</span> A V) : <span class="kw">Prop</span> :=</span>
+<span id="L163">  s.<span class="const token" data-verso-hover="22">isLeader</span> a = <span class="const token" data-verso-hover="57">false</span> ∧</span>
+<span id="L164">  s'.<span class="const token" data-verso-hover="405">msgs1a</span> = <span class="const token" data-verso-hover="120">insert</span> ⟨a, s.<span class="const token" data-verso-hover="400">highestBallot</span> a⟩ s.<span class="const token" data-verso-hover="405">msgs1a</span> ∧</span>
+<span id="L165">  s'.<span class="const token" data-verso-hover="400">highestBallot</span> = s.<span class="const token" data-verso-hover="400">highestBallot</span> ∧ s'.<span class="const token" data-verso-hover="22">isLeader</span> = s.<span class="const token" data-verso-hover="22">isLeader</span> ∧ s'.<span class="const token" data-verso-hover="401">logTail</span> = s.<span class="const token" data-verso-hover="401">logTail</span> ∧</span>
+<span id="L166">  s'.<span class="const token" data-verso-hover="402">votes</span> = s.<span class="const token" data-verso-hover="402">votes</span> ∧ s'.<span class="const token" data-verso-hover="403">proposedValues</span> = s.<span class="const token" data-verso-hover="403">proposedValues</span> ∧ s'.<span class="const token" data-verso-hover="404">logs</span> = s.<span class="const token" data-verso-hover="404">logs</span> ∧</span>
+<span id="L167">  s'.<span class="const token" data-verso-hover="406">msgs1b</span> = s.<span class="const token" data-verso-hover="406">msgs1b</span></span>
+<span id="L168"></span>
+<span id="L169"><span class="dc">/-- `Phase1b(a, 1amsg)` (L101–107). -/</span></span>
+<span id="L170"><span class="kw">def</span> <span class="const token" data-verso-hover="6">Phase1b</span> (a : A) (m : <span class="const token" data-verso-hover="390">Msg1a</span> A) (s s' : <span class="const token" data-verso-hover="399">State</span> A V) : <span class="kw">Prop</span> :=</span>
+<span id="L171">  m.<span class="const token" data-verso-hover="392">bal</span> &gt; s.<span class="const token" data-verso-hover="400">highestBallot</span> a ∧</span>
+<span id="L172">  s'.<span class="const token" data-verso-hover="400">highestBallot</span> = <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="400">highestBallot</span> a m.<span class="const token" data-verso-hover="392">bal</span> ∧</span>
+<span id="L173">  s'.<span class="const token" data-verso-hover="22">isLeader</span> = <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="22">isLeader</span> a <span class="const token" data-verso-hover="57">false</span> ∧</span>
+<span id="L174">  s'.<span class="const token" data-verso-hover="406">msgs1b</span> = <span class="const token" data-verso-hover="120">insert</span> ⟨a, m.<span class="const token" data-verso-hover="392">bal</span>, s.<span class="const token" data-verso-hover="404">logs</span> a, s.<span class="const token" data-verso-hover="401">logTail</span> a⟩ s.<span class="const token" data-verso-hover="406">msgs1b</span> ∧</span>
+<span id="L175">  s'.<span class="const token" data-verso-hover="401">logTail</span> = s.<span class="const token" data-verso-hover="401">logTail</span> ∧ s'.<span class="const token" data-verso-hover="402">votes</span> = s.<span class="const token" data-verso-hover="402">votes</span> ∧ s'.<span class="const token" data-verso-hover="403">proposedValues</span> = s.<span class="const token" data-verso-hover="403">proposedValues</span> ∧</span>
+<span id="L176">  s'.<span class="const token" data-verso-hover="404">logs</span> = s.<span class="const token" data-verso-hover="404">logs</span> ∧ s'.<span class="const token" data-verso-hover="405">msgs1a</span> = s.<span class="const token" data-verso-hover="405">msgs1a</span></span>
+<span id="L177"></span>
+<span id="L178"><span class="dc">/-- `BecomeLeader(a, S)` (L109–116). -/</span></span>
+<span id="L179"><span class="kw">def</span> <span class="const token" data-verso-hover="7">BecomeLeader</span> (Q : <span class="const token" data-verso-hover="33">QuorumSystem</span> A) (a : A) (S : <span class="const token" data-verso-hover="83">Finset</span> (<span class="const token" data-verso-hover="393">Msg1b</span> A V)) (s s' : <span class="const token" data-verso-hover="399">State</span> A V) :</span>
+<span id="L180">    <span class="kw">Prop</span> :=</span>
+<span id="L181">  s.<span class="const token" data-verso-hover="22">isLeader</span> a = <span class="const token" data-verso-hover="57">false</span> ∧</span>
+<span id="L182">  (∃ m ∈ S, m.<span class="const token" data-verso-hover="394">acc</span> = a) ∧</span>
+<span id="L183">  (∀ m ∈ S, m.<span class="const token" data-verso-hover="395">bal</span> = s.<span class="const token" data-verso-hover="400">highestBallot</span> a) ∧</span>
+<span id="L184">  Q.<span class="const token" data-verso-hover="82">IsQuorum</span> (S.<span class="const token" data-verso-hover="123">image</span> <span class="const token" data-verso-hover="394">Msg1b.acc</span>) ∧</span>
+<span id="L185">  <span class="const token" data-verso-hover="420">UpdateLog</span> a {l | ∃ m ∈ S, m.<span class="const token" data-verso-hover="396">log</span> = l} <span class="nu">0</span> (<span class="const token" data-verso-hover="407">tlaMax</span> {t | ∃ m ∈ S, m.<span class="const token" data-verso-hover="398">logTail</span> = t}) s s' ∧</span>
+<span id="L186">  s'.<span class="const token" data-verso-hover="22">isLeader</span> = <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="22">isLeader</span> a <span class="const token" data-verso-hover="56">true</span> ∧</span>
+<span id="L187">  s'.<span class="const token" data-verso-hover="400">highestBallot</span> = s.<span class="const token" data-verso-hover="400">highestBallot</span> ∧ s'.<span class="const token" data-verso-hover="402">votes</span> = s.<span class="const token" data-verso-hover="402">votes</span> ∧</span>
+<span id="L188">  s'.<span class="const token" data-verso-hover="403">proposedValues</span> = s.<span class="const token" data-verso-hover="403">proposedValues</span> ∧ s'.<span class="const token" data-verso-hover="405">msgs1a</span> = s.<span class="const token" data-verso-hover="405">msgs1a</span> ∧ s'.<span class="const token" data-verso-hover="406">msgs1b</span> = s.<span class="const token" data-verso-hover="406">msgs1b</span></span>
+<span id="L189"></span>
+<span id="L190"><span class="dc">/-- `Propose(a, i, v)` (L118–123). The grey "`⇒ v is safe at i, b`" on L121 is a comment. -/</span></span>
+<span id="L191"><span class="kw">def</span> <span class="const token" data-verso-hover="422">Propose</span> (a : A) (i : <span class="const token" data-verso-hover="37">ℕ</span>) (v : V) (s s' : <span class="const token" data-verso-hover="399">State</span> A V) : <span class="kw">Prop</span> :=</span>
+<span id="L192">  s.<span class="const token" data-verso-hover="22">isLeader</span> a = <span class="const token" data-verso-hover="56">true</span> ∧</span>
+<span id="L193">  ((s.<span class="const token" data-verso-hover="404">logs</span> a i).<span class="const token" data-verso-hover="75">2</span> = <span class="const token" data-verso-hover="116">some</span> v ∨ (s.<span class="const token" data-verso-hover="404">logs</span> a i).<span class="const token" data-verso-hover="75">2</span> = <span class="const token" data-verso-hover="114">none</span>) ∧</span>
+<span id="L194">  s'.<span class="const token" data-verso-hover="403">proposedValues</span> = <span class="const token" data-verso-hover="120">insert</span> (i, s.<span class="const token" data-verso-hover="400">highestBallot</span> a, v) s.<span class="const token" data-verso-hover="403">proposedValues</span> ∧</span>
+<span id="L195">  s'.<span class="const token" data-verso-hover="400">highestBallot</span> = s.<span class="const token" data-verso-hover="400">highestBallot</span> ∧ s'.<span class="const token" data-verso-hover="22">isLeader</span> = s.<span class="const token" data-verso-hover="22">isLeader</span> ∧ s'.<span class="const token" data-verso-hover="401">logTail</span> = s.<span class="const token" data-verso-hover="401">logTail</span> ∧</span>
+<span id="L196">  s'.<span class="const token" data-verso-hover="402">votes</span> = s.<span class="const token" data-verso-hover="402">votes</span> ∧ s'.<span class="const token" data-verso-hover="404">logs</span> = s.<span class="const token" data-verso-hover="404">logs</span> ∧ s'.<span class="const token" data-verso-hover="405">msgs1a</span> = s.<span class="const token" data-verso-hover="405">msgs1a</span> ∧ s'.<span class="const token" data-verso-hover="406">msgs1b</span> = s.<span class="const token" data-verso-hover="406">msgs1b</span></span>
+<span id="L197"></span>
+<span id="L198"><span class="dc">/-- `Accept(a, i, b, v)` (L125–134). -/</span></span>
+<span id="L199"><span class="kw">def</span> <span class="const token" data-verso-hover="423">Accept</span> (a : A) (i b : <span class="const token" data-verso-hover="37">ℕ</span>) (v : V) (s s' : <span class="const token" data-verso-hover="399">State</span> A V) : <span class="kw">Prop</span> :=</span>
+<span id="L200">  (i, b, v) ∈ s.<span class="const token" data-verso-hover="403">proposedValues</span> ∧</span>
+<span id="L201">  b ≥ s.<span class="const token" data-verso-hover="400">highestBallot</span> a ∧</span>
+<span id="L202">  s'.<span class="const token" data-verso-hover="400">highestBallot</span> = <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="400">highestBallot</span> a b ∧</span>
+<span id="L203">  s'.<span class="const token" data-verso-hover="402">votes</span> = <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="402">votes</span> a (<span class="const token" data-verso-hover="119">Function.update</span> (s.<span class="const token" data-verso-hover="402">votes</span> a) i (s.<span class="const token" data-verso-hover="402">votes</span> a i ∪ {(b, v)})) ∧</span>
+<span id="L204">  s'.<span class="const token" data-verso-hover="404">logs</span> = <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="404">logs</span> a (<span class="const token" data-verso-hover="119">Function.update</span> (s.<span class="const token" data-verso-hover="404">logs</span> a) i ((b : <span class="const token" data-verso-hover="397">ℤ</span>), <span class="const token" data-verso-hover="116">some</span> v)) ∧</span>
+<span id="L205">  s'.<span class="const token" data-verso-hover="401">logTail</span> = (<span class="kw">if</span> (i : <span class="const token" data-verso-hover="397">ℤ</span>) &gt; s.<span class="const token" data-verso-hover="401">logTail</span> a <span class="kw">then</span> <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="401">logTail</span> a i <span class="kw">else</span> s.<span class="const token" data-verso-hover="401">logTail</span>) ∧</span>
+<span id="L206">  s'.<span class="const token" data-verso-hover="22">isLeader</span> = (<span class="kw">if</span> b &gt; s.<span class="const token" data-verso-hover="400">highestBallot</span> a <span class="kw">then</span> <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="22">isLeader</span> a <span class="const token" data-verso-hover="57">false</span></span>
+<span id="L207">    <span class="kw">else</span> s.<span class="const token" data-verso-hover="22">isLeader</span>) ∧</span>
+<span id="L208">  s'.<span class="const token" data-verso-hover="403">proposedValues</span> = s.<span class="const token" data-verso-hover="403">proposedValues</span> ∧ s'.<span class="const token" data-verso-hover="405">msgs1a</span> = s.<span class="const token" data-verso-hover="405">msgs1a</span> ∧ s'.<span class="const token" data-verso-hover="406">msgs1b</span> = s.<span class="const token" data-verso-hover="406">msgs1b</span></span>
+<span id="L209"></span>
+<span id="L210"><span class="dc">/-- `Init` (L147–154). -/</span></span>
+<span id="L211"><span class="kw">def</span> <span class="const token" data-verso-hover="424">Init</span> (s : <span class="const token" data-verso-hover="399">State</span> A V) : <span class="kw">Prop</span> :=</span>
+<span id="L212">  s.<span class="const token" data-verso-hover="400">highestBallot</span> = (<span class="kw">fun</span> _ =&gt; <span class="nu">0</span>) ∧ s.<span class="const token" data-verso-hover="22">isLeader</span> = (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="57">false</span>) ∧ s.<span class="const token" data-verso-hover="401">logTail</span> = (<span class="kw">fun</span> _ =&gt; -<span class="nu">1</span>) ∧</span>
+<span id="L213">  s.<span class="const token" data-verso-hover="402">votes</span> = (<span class="kw">fun</span> _ _ =&gt; ∅) ∧ s.<span class="const token" data-verso-hover="404">logs</span> = (<span class="kw">fun</span> _ _ =&gt; (-<span class="nu">1</span>, <span class="const token" data-verso-hover="114">none</span>)) ∧ s.<span class="const token" data-verso-hover="403">proposedValues</span> = ∅ ∧</span>
+<span id="L214">  s.<span class="const token" data-verso-hover="405">msgs1a</span> = ∅ ∧ s.<span class="const token" data-verso-hover="406">msgs1b</span> = ∅</span>
+<span id="L215"></span>
+<span id="L216"><span class="dc">/-- `Next` (L156–167). -/</span></span>
+<span id="L217"><span class="kw">def</span> <span class="const token" data-verso-hover="425">Next</span> (Q : <span class="const token" data-verso-hover="33">QuorumSystem</span> A) (s s' : <span class="const token" data-verso-hover="399">State</span> A V) : <span class="kw">Prop</span> :=</span>
+<span id="L218">  (∃ a b, <span class="const token" data-verso-hover="421">IncreaseHighestBallot</span> a b s s') ∨</span>
+<span id="L219">  (∃ a, <span class="const token" data-verso-hover="9">Phase1a</span> a s s') ∨</span>
+<span id="L220">  (∃ a, ∃ m ∈ s.<span class="const token" data-verso-hover="405">msgs1a</span>, <span class="const token" data-verso-hover="6">Phase1b</span> a m s s') ∨</span>
+<span id="L221">  (∃ a, ∃ S : <span class="const token" data-verso-hover="83">Finset</span> (<span class="const token" data-verso-hover="393">Msg1b</span> A V), ↑S ⊆ s.<span class="const token" data-verso-hover="406">msgs1b</span> ∧ <span class="const token" data-verso-hover="7">BecomeLeader</span> Q a S s s') ∨</span>
+<span id="L222">  (∃ a i v, <span class="const token" data-verso-hover="422">Propose</span> a i v s s') ∨</span>
+<span id="L223">  (∃ a, ∃ pv ∈ s.<span class="const token" data-verso-hover="403">proposedValues</span>, <span class="const token" data-verso-hover="423">Accept</span> a pv.<span class="const token" data-verso-hover="234">1</span> pv.<span class="const token" data-verso-hover="75">2</span><span class="nu">.</span><span class="const token" data-verso-hover="234">1</span> pv.<span class="const token" data-verso-hover="75">2</span><span class="nu">.</span><span class="const token" data-verso-hover="75">2</span> s s')</span>
+<span id="L224"></span>
+<span id="L225"><span class="dc">/-- The states reachable in a behaviour of `Spec ≜ Init ∧ □[Next]_vars` (L172). -/</span></span>
+<span id="L226"><span class="kw">def</span> <span class="const token" data-verso-hover="426">Reachable</span> (Q : <span class="const token" data-verso-hover="33">QuorumSystem</span> A) (s : <span class="const token" data-verso-hover="399">State</span> A V) : <span class="kw">Prop</span> :=</span>
+<span id="L227">  ∃ s₀, <span class="const token" data-verso-hover="424">Init</span> s₀ ∧ <span class="const token" data-verso-hover="128">ReflTransGen</span> (<span class="const token" data-verso-hover="425">Next</span> Q) s₀ s</span>
+<span id="L228"></span>
+<span id="L229"><span class="dc">/-- `Inv ≜ TypeOK ∧ LogsSafe ∧ OneValuePerBallot` (L174); `TypeOK` holds by typing. -/</span></span>
+<span id="L230"><span class="kw">def</span> <span class="const token" data-verso-hover="427">Inv</span> (Q : <span class="const token" data-verso-hover="33">QuorumSystem</span> A) (s : <span class="const token" data-verso-hover="399">State</span> A V) : <span class="kw">Prop</span> :=</span>
+<span id="L231">  <span class="const token" data-verso-hover="418">LogsSafe</span> Q s ∧ <span class="const token" data-verso-hover="2">OneValuePerBallot</span> s</span>
+<span id="L232"></span>
+<span id="L233"><span class="dc">/-! ### Canonical successor states of the actions -/</span></span>
+<span id="L234"></span>
+<span id="L235"><span class="kw">section</span> Successors</span>
+<span id="L236"></span>
+<span id="L237"><span class="kw">variable</span> {Q : <span class="const token" data-verso-hover="33">QuorumSystem</span> A}</span>
+<span id="L238"></span>
+<span id="L239"><span class="kw">theorem</span> <span class="const token" data-verso-hover="428">tlaMax_eq</span> {t : <span class="const token" data-verso-hover="108">Set</span> <span class="const token" data-verso-hover="397">ℤ</span>} {x : <span class="const token" data-verso-hover="397">ℤ</span>} (hx : x ∈ t) (hmax : ∀ y ∈ t, x ≥ y) : <span class="const token" data-verso-hover="407">tlaMax</span> t = x := <span class="kw">by</span></span>
+<span id="L240">  <span class="kw">have</span> h := <span class="const token" data-verso-hover="429">Classical.epsilon_spec</span> (p := <span class="kw">fun</span> x =&gt; x ∈ t ∧ ∀ y ∈ t, x ≥ y) ⟨x, hx, hmax⟩</span>
+<span id="L241">  <span class="kw">exact</span> <span class="const token" data-verso-hover="430">le_antisymm</span> (hmax _ h.<span class="const token" data-verso-hover="199">1</span>) (h.<span class="const token" data-verso-hover="208">2</span> x hx)</span>
+<span id="L242"></span>
+<span id="L243"><span class="kw">theorem</span> <span class="const token" data-verso-hover="431">next_increaseHighestBallot</span> (s : <span class="const token" data-verso-hover="399">State</span> A V) (a : A) (b : <span class="const token" data-verso-hover="37">ℕ</span>) (h : s.<span class="const token" data-verso-hover="400">highestBallot</span> a &lt; b) :</span>
+<span id="L244">    <span class="const token" data-verso-hover="425">Next</span> Q s { s <span class="kw">with</span> <span class="const token" data-verso-hover="400">highestBallot</span> := <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="400">highestBallot</span> a b</span>
+<span id="L245">                      <span class="const token" data-verso-hover="22">isLeader</span> := <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="22">isLeader</span> a <span class="const token" data-verso-hover="57">false</span> } :=</span>
+<span id="L246">  <span class="const token" data-verso-hover="159">Or.inl</span> ⟨a, b, h, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>⟩</span>
+<span id="L247"></span>
+<span id="L248"><span class="kw">theorem</span> <span class="const token" data-verso-hover="432">next_phase1a</span> (s : <span class="const token" data-verso-hover="399">State</span> A V) (a : A) (h : s.<span class="const token" data-verso-hover="22">isLeader</span> a = <span class="const token" data-verso-hover="57">false</span>) :</span>
+<span id="L249">    <span class="const token" data-verso-hover="425">Next</span> Q s { s <span class="kw">with</span> <span class="const token" data-verso-hover="405">msgs1a</span> := <span class="const token" data-verso-hover="120">insert</span> ⟨a, s.<span class="const token" data-verso-hover="400">highestBallot</span> a⟩ s.<span class="const token" data-verso-hover="405">msgs1a</span> } :=</span>
+<span id="L250">  <span class="const token" data-verso-hover="135">Or.inr</span> &lt;| <span class="const token" data-verso-hover="159">Or.inl</span> ⟨a, h, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>⟩</span>
+<span id="L251"></span>
+<span id="L252"><span class="kw">theorem</span> <span class="const token" data-verso-hover="433">next_phase1b</span> (s : <span class="const token" data-verso-hover="399">State</span> A V) (a : A) (m : <span class="const token" data-verso-hover="390">Msg1a</span> A) (hm : m ∈ s.<span class="const token" data-verso-hover="405">msgs1a</span>)</span>
+<span id="L253">    (h : m.<span class="const token" data-verso-hover="392">bal</span> &gt; s.<span class="const token" data-verso-hover="400">highestBallot</span> a) :</span>
+<span id="L254">    <span class="const token" data-verso-hover="425">Next</span> Q s { s <span class="kw">with</span> <span class="const token" data-verso-hover="400">highestBallot</span> := <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="400">highestBallot</span> a m.<span class="const token" data-verso-hover="392">bal</span></span>
+<span id="L255">                      <span class="const token" data-verso-hover="22">isLeader</span> := <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="22">isLeader</span> a <span class="const token" data-verso-hover="57">false</span></span>
+<span id="L256">                      <span class="const token" data-verso-hover="406">msgs1b</span> := <span class="const token" data-verso-hover="120">insert</span> ⟨a, m.<span class="const token" data-verso-hover="392">bal</span>, s.<span class="const token" data-verso-hover="404">logs</span> a, s.<span class="const token" data-verso-hover="401">logTail</span> a⟩ s.<span class="const token" data-verso-hover="406">msgs1b</span> } :=</span>
+<span id="L257">  <span class="const token" data-verso-hover="135">Or.inr</span> &lt;| <span class="const token" data-verso-hover="135">Or.inr</span> &lt;| <span class="const token" data-verso-hover="159">Or.inl</span> ⟨a, m, hm, h, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>⟩</span>
+<span id="L258"></span>
+<span id="L259"><span class="dc">/-- `BecomeLeader(a, S)` when every `1b` message of `S` reports an empty log tail (`-1`): the</span></span>
+<span id="L260"><span class="dc">range `0 .. Max({m.logTail : m ∈ S}) = 0 .. -1` of `UpdateLog` is empty, so only `isLeader`</span></span>
+<span id="L261"><span class="dc">changes. -/</span></span>
+<span id="L262"><span class="kw">theorem</span> <span class="const token" data-verso-hover="434">next_becomeLeader_of_empty</span> (s : <span class="const token" data-verso-hover="399">State</span> A V) (a : A) (S : <span class="const token" data-verso-hover="83">Finset</span> (<span class="const token" data-verso-hover="393">Msg1b</span> A V))</span>
+<span id="L263">    (hsub : ↑S ⊆ s.<span class="const token" data-verso-hover="406">msgs1b</span>) (hl : s.<span class="const token" data-verso-hover="22">isLeader</span> a = <span class="const token" data-verso-hover="57">false</span>) (hown : ∃ m ∈ S, m.<span class="const token" data-verso-hover="394">acc</span> = a)</span>
+<span id="L264">    (hbal : ∀ m ∈ S, m.<span class="const token" data-verso-hover="395">bal</span> = s.<span class="const token" data-verso-hover="400">highestBallot</span> a) (hQ : Q.<span class="const token" data-verso-hover="82">IsQuorum</span> (S.<span class="const token" data-verso-hover="123">image</span> <span class="const token" data-verso-hover="394">Msg1b.acc</span>))</span>
+<span id="L265">    (htail : ∀ m ∈ S, m.<span class="const token" data-verso-hover="398">logTail</span> = -<span class="nu">1</span>) (hat : -<span class="nu">1</span> ≤ s.<span class="const token" data-verso-hover="401">logTail</span> a) :</span>
+<span id="L266">    <span class="const token" data-verso-hover="425">Next</span> Q s { s <span class="kw">with</span> <span class="const token" data-verso-hover="22">isLeader</span> := <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="22">isLeader</span> a <span class="const token" data-verso-hover="56">true</span> } := <span class="kw">by</span></span>
+<span id="L267">  <span class="kw">have</span> hM : <span class="const token" data-verso-hover="407">tlaMax</span> {t | ∃ m ∈ S, m.<span class="const token" data-verso-hover="398">logTail</span> = t} = -<span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L268">    <span class="kw">obtain</span> ⟨m, hm, -⟩ := hown</span>
+<span id="L269">    <span class="kw">refine</span> <span class="const token" data-verso-hover="428">tlaMax_eq</span> ⟨m, hm, htail m hm⟩ ?_</span>
+<span id="L270">    <span class="kw">rintro</span> y ⟨m', hm', <span class="kw">rfl</span>⟩</span>
+<span id="L271">    <span class="kw">rw</span> [htail m' hm']</span>
+<span id="L272">  <span class="kw">refine</span> <span class="const token" data-verso-hover="135">Or.inr</span> &lt;| <span class="const token" data-verso-hover="135">Or.inr</span> &lt;| <span class="const token" data-verso-hover="135">Or.inr</span> &lt;| <span class="const token" data-verso-hover="159">Or.inl</span> ⟨a, S, hsub, hl, hown, hbal, hQ,</span>
+<span id="L273">    ⟨?_, <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="146">rfl</span>, <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="146">rfl</span>, ?_⟩, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>⟩</span>
+<span id="L274">  · <span class="kw">intro</span> i hi</span>
+<span id="L275">    <span class="kw">rw</span> [hM] <span class="kw">at</span> hi</span>
+<span id="L276">    <span class="kw">omega</span></span>
+<span id="L277">  · <span class="kw">rw</span> [hM]</span>
+<span id="L278">    <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">first</span> | <span class="kw">rfl</span> | <span class="kw">omega</span></span>
+<span id="L279"></span>
+<span id="L280"><span class="kw">theorem</span> <span class="const token" data-verso-hover="435">next_propose</span> (s : <span class="const token" data-verso-hover="399">State</span> A V) (a : A) (i : <span class="const token" data-verso-hover="37">ℕ</span>) (v : V) (hl : s.<span class="const token" data-verso-hover="22">isLeader</span> a = <span class="const token" data-verso-hover="56">true</span>)</span>
+<span id="L281">    (hv : (s.<span class="const token" data-verso-hover="404">logs</span> a i).<span class="const token" data-verso-hover="75">2</span> = <span class="const token" data-verso-hover="116">some</span> v ∨ (s.<span class="const token" data-verso-hover="404">logs</span> a i).<span class="const token" data-verso-hover="75">2</span> = <span class="const token" data-verso-hover="114">none</span>) :</span>
+<span id="L282">    <span class="const token" data-verso-hover="425">Next</span> Q s { s <span class="kw">with</span> <span class="const token" data-verso-hover="403">proposedValues</span> := <span class="const token" data-verso-hover="120">insert</span> (i, s.<span class="const token" data-verso-hover="400">highestBallot</span> a, v) s.<span class="const token" data-verso-hover="403">proposedValues</span> } :=</span>
+<span id="L283">  <span class="const token" data-verso-hover="135">Or.inr</span> &lt;| <span class="const token" data-verso-hover="135">Or.inr</span> &lt;| <span class="const token" data-verso-hover="135">Or.inr</span> &lt;| <span class="const token" data-verso-hover="135">Or.inr</span> &lt;| <span class="const token" data-verso-hover="159">Or.inl</span></span>
+<span id="L284">    ⟨a, i, v, hl, hv, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>⟩</span>
+<span id="L285"></span>
+<span id="L286"><span class="kw">theorem</span> <span class="const token" data-verso-hover="436">next_accept</span> (s : <span class="const token" data-verso-hover="399">State</span> A V) (a : A) (i b : <span class="const token" data-verso-hover="37">ℕ</span>) (v : V)</span>
+<span id="L287">    (hp : (i, b, v) ∈ s.<span class="const token" data-verso-hover="403">proposedValues</span>) (hb : b ≥ s.<span class="const token" data-verso-hover="400">highestBallot</span> a) :</span>
+<span id="L288">    <span class="const token" data-verso-hover="425">Next</span> Q s { s <span class="kw">with</span></span>
+<span id="L289">      <span class="const token" data-verso-hover="400">highestBallot</span> := <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="400">highestBallot</span> a b</span>
+<span id="L290">      <span class="const token" data-verso-hover="402">votes</span> := <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="402">votes</span> a</span>
+<span id="L291">        (<span class="const token" data-verso-hover="119">Function.update</span> (s.<span class="const token" data-verso-hover="402">votes</span> a) i (s.<span class="const token" data-verso-hover="402">votes</span> a i ∪ {(b, v)}))</span>
+<span id="L292">      <span class="const token" data-verso-hover="404">logs</span> := <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="404">logs</span> a (<span class="const token" data-verso-hover="119">Function.update</span> (s.<span class="const token" data-verso-hover="404">logs</span> a) i ((b : <span class="const token" data-verso-hover="397">ℤ</span>), <span class="const token" data-verso-hover="116">some</span> v))</span>
+<span id="L293">      <span class="const token" data-verso-hover="401">logTail</span> := <span class="kw">if</span> (i : <span class="const token" data-verso-hover="397">ℤ</span>) &gt; s.<span class="const token" data-verso-hover="401">logTail</span> a <span class="kw">then</span> <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="401">logTail</span> a i <span class="kw">else</span> s.<span class="const token" data-verso-hover="401">logTail</span></span>
+<span id="L294">      <span class="const token" data-verso-hover="22">isLeader</span> := <span class="kw">if</span> b &gt; s.<span class="const token" data-verso-hover="400">highestBallot</span> a <span class="kw">then</span> <span class="const token" data-verso-hover="119">Function.update</span> s.<span class="const token" data-verso-hover="22">isLeader</span> a <span class="const token" data-verso-hover="57">false</span></span>
+<span id="L295">        <span class="kw">else</span> s.<span class="const token" data-verso-hover="22">isLeader</span> } :=</span>
+<span id="L296">  <span class="const token" data-verso-hover="135">Or.inr</span> &lt;| <span class="const token" data-verso-hover="135">Or.inr</span> &lt;| <span class="const token" data-verso-hover="135">Or.inr</span> &lt;| <span class="const token" data-verso-hover="135">Or.inr</span> &lt;| <span class="const token" data-verso-hover="135">Or.inr</span></span>
+<span id="L297">    ⟨a, (i, b, v), hp, hp, hb, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>⟩</span>
+<span id="L298"></span>
+<span id="L299"><span class="kw">end</span> Successors</span>
+<span id="L300"></span>
+<span id="L301"><span class="dc">/-! ### The counterexample -/</span></span>
+<span id="L302"></span>
+<span id="L303"><span class="dc">/-- The initial state. -/</span></span>
+<span id="L304"><span class="kw">def</span> <span class="const token" data-verso-hover="437">init</span> : <span class="const token" data-verso-hover="399">State</span> A V <span class="kw">where</span></span>
+<span id="L305">  <span class="const token" data-verso-hover="400">highestBallot</span> _ := <span class="nu">0</span></span>
+<span id="L306">  <span class="const token" data-verso-hover="22">isLeader</span> _ := <span class="const token" data-verso-hover="57">false</span></span>
+<span id="L307">  <span class="const token" data-verso-hover="401">logTail</span> _ := -<span class="nu">1</span></span>
+<span id="L308">  <span class="const token" data-verso-hover="402">votes</span> _ _ := ∅</span>
+<span id="L309">  <span class="const token" data-verso-hover="403">proposedValues</span> := ∅</span>
+<span id="L310">  <span class="const token" data-verso-hover="404">logs</span> _ _ := (-<span class="nu">1</span>, <span class="const token" data-verso-hover="114">none</span>)</span>
+<span id="L311">  <span class="const token" data-verso-hover="405">msgs1a</span> := ∅</span>
+<span id="L312">  <span class="const token" data-verso-hover="406">msgs1b</span> := ∅</span>
+<span id="L313"></span>
+<span id="L314"><span class="kw">omit</span> [<span class="const token" data-verso-hover="86">DecidableEq</span> A] <span class="kw">in</span></span>
+<span id="L315"><span class="kw">theorem</span> <span class="const token" data-verso-hover="438">init_Init</span> : <span class="const token" data-verso-hover="424">Init</span> (<span class="const token" data-verso-hover="437">init</span> : <span class="const token" data-verso-hover="399">State</span> A V) :=</span>
+<span id="L316">  ⟨<span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="const token" data-verso-hover="146">rfl</span>⟩</span>
+<span id="L317"></span>
+<span id="L318"><span class="dc">/-- Majority quorums of three acceptors: any two of them. -/</span></span>
+<span id="L319"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="439">Q3</span> : <span class="const token" data-verso-hover="33">QuorumSystem</span> (<span class="const token" data-verso-hover="34">Fin</span> <span class="nu">3</span>) := <span class="const token" data-verso-hover="21">QuorumSystem.majority</span> (<span class="const token" data-verso-hover="34">Fin</span> <span class="nu">3</span>)</span>
+<span id="L320"></span>
+<span id="L321"><span class="dc">/-- The two `1b` messages of the run (from `a1` and `a2`, ballot `1`, empty logs). -/</span></span>
+<span id="L322"><span class="kw">noncomputable</span> <span class="kw">abbrev</span> <span class="const token" data-verso-hover="440">S12</span> : <span class="const token" data-verso-hover="83">Finset</span> (<span class="const token" data-verso-hover="393">Msg1b</span> (<span class="const token" data-verso-hover="34">Fin</span> <span class="nu">3</span>) <span class="const token" data-verso-hover="38">Bool</span>) :=</span>
+<span id="L323">  <span class="kw">open</span> <span class="kw">scoped</span> Classical <span class="kw">in</span> {⟨<span class="nu">1</span>, <span class="nu">1</span>, <span class="kw">fun</span> _ =&gt; (-<span class="nu">1</span>, <span class="const token" data-verso-hover="114">none</span>), -<span class="nu">1</span>⟩, ⟨<span class="nu">2</span>, <span class="nu">1</span>, <span class="kw">fun</span> _ =&gt; (-<span class="nu">1</span>, <span class="const token" data-verso-hover="114">none</span>), -<span class="nu">1</span>⟩}</span>
+<span id="L324"></span>
+<span id="L325"><span class="dc">/-- **The TLA+ theorem `Invariance` (L177) of [paper], Appendix B.1, is false.** With three</span></span>
+<span id="L326"><span class="dc">acceptors, majority quorums and `Value = Bool`, a state reachable from `Init` by `Next` steps</span></span>
+<span id="L327"><span class="dc">violates `OneValuePerBallot` (hence `Inv`), and both values are chosen at index `0`. -/</span></span>
+<span id="L328"><span class="kw">theorem</span> <span class="const token" data-verso-hover="3">tla_invariance_false</span> : ∃ s : <span class="const token" data-verso-hover="399">State</span> (<span class="const token" data-verso-hover="34">Fin</span> <span class="nu">3</span>) <span class="const token" data-verso-hover="38">Bool</span>, <span class="const token" data-verso-hover="426">Reachable</span> <span class="const token" data-verso-hover="439">Q3</span> s ∧</span>
+<span id="L329">    ¬ <span class="const token" data-verso-hover="2">OneValuePerBallot</span> s ∧ ¬ <span class="const token" data-verso-hover="427">Inv</span> <span class="const token" data-verso-hover="439">Q3</span> s ∧ <span class="const token" data-verso-hover="411">chosen</span> <span class="const token" data-verso-hover="439">Q3</span> s <span class="nu">0</span> = <span class="const token" data-verso-hover="441">Set.univ</span> := <span class="kw">by</span></span>
+<span id="L330">  <span class="kw">have</span> h : <span class="const token" data-verso-hover="128">ReflTransGen</span> (<span class="const token" data-verso-hover="425">Next</span> <span class="const token" data-verso-hover="439">Q3</span>) <span class="const token" data-verso-hover="437">init</span> (<span class="const token" data-verso-hover="437">init</span> : <span class="const token" data-verso-hover="399">State</span> (<span class="const token" data-verso-hover="34">Fin</span> <span class="nu">3</span>) <span class="const token" data-verso-hover="38">Bool</span>) := <span class="const token" data-verso-hover="59">.</span>refl</span>
+<span id="L331">  <span class="cm">--</span><span class="cm"> IncreaseHighestBallot(a0, 1); Phase1a(a0); Phase1b(a1, ·); Phase1b(a2, ·)</span></span>
+<span id="L332">  replace h := h.<span class="const token" data-verso-hover="60">tail</span> (<span class="const token" data-verso-hover="431">next_increaseHighestBallot</span> _ <span class="nu">0</span> <span class="nu">1</span> (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]))</span>
+<span id="L333">  replace h := h.<span class="const token" data-verso-hover="60">tail</span> (<span class="const token" data-verso-hover="432">next_phase1a</span> _ <span class="nu">0</span> (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]))</span>
+<span id="L334">  replace h := h.<span class="const token" data-verso-hover="60">tail</span> (<span class="const token" data-verso-hover="433">next_phase1b</span> _ <span class="nu">1</span> ⟨<span class="nu">0</span>, <span class="nu">1</span>⟩ (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]))</span>
+<span id="L335">  replace h := h.<span class="const token" data-verso-hover="60">tail</span> (<span class="const token" data-verso-hover="433">next_phase1b</span> _ <span class="nu">2</span> ⟨<span class="nu">0</span>, <span class="nu">1</span>⟩ (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]))</span>
+<span id="L336">  <span class="cm">--</span><span class="cm"> BecomeLeader(a1, {1b of a1, 1b of a2})</span></span>
+<span id="L337">  replace h := h.<span class="const token" data-verso-hover="60">tail</span> (<span class="const token" data-verso-hover="434">next_becomeLeader_of_empty</span> _ <span class="nu">1</span> <span class="const token" data-verso-hover="440">S12</span></span>
+<span id="L338">    (<span class="kw">by</span> <span class="kw">intro</span> m; <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]; <span class="kw">tauto</span>) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]) (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>])</span>
+<span id="L339">    (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="21">QuorumSystem.majority</span>]) (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]))</span>
+<span id="L340">  <span class="cm">--</span><span class="cm"> Propose(a1, 0, TRUE); Propose(a1, 0, FALSE)</span></span>
+<span id="L341">  replace h := h.<span class="const token" data-verso-hover="60">tail</span> (<span class="const token" data-verso-hover="435">next_propose</span> _ <span class="nu">1</span> <span class="nu">0</span> <span class="const token" data-verso-hover="56">true</span> (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]))</span>
+<span id="L342">  replace h := h.<span class="const token" data-verso-hover="60">tail</span> (<span class="const token" data-verso-hover="435">next_propose</span> _ <span class="nu">1</span> <span class="nu">0</span> <span class="const token" data-verso-hover="57">false</span> (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]))</span>
+<span id="L343">  <span class="cm">--</span><span class="cm"> Accept(a1, 0, 1, TRUE); Accept(a2, 0, 1, TRUE); Accept(a0, 0, 1, FALSE); Accept(a2, 0, 1, FALSE)</span></span>
+<span id="L344">  replace h := h.<span class="const token" data-verso-hover="60">tail</span> (<span class="const token" data-verso-hover="436">next_accept</span> _ <span class="nu">1</span> <span class="nu">0</span> <span class="nu">1</span> <span class="const token" data-verso-hover="56">true</span> (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span>))</span>
+<span id="L345">  replace h := h.<span class="const token" data-verso-hover="60">tail</span> (<span class="const token" data-verso-hover="436">next_accept</span> _ <span class="nu">2</span> <span class="nu">0</span> <span class="nu">1</span> <span class="const token" data-verso-hover="56">true</span> (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span>))</span>
+<span id="L346">  replace h := h.<span class="const token" data-verso-hover="60">tail</span> (<span class="const token" data-verso-hover="436">next_accept</span> _ <span class="nu">0</span> <span class="nu">0</span> <span class="nu">1</span> <span class="const token" data-verso-hover="57">false</span> (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span>))</span>
+<span id="L347">  replace h := h.<span class="const token" data-verso-hover="60">tail</span> (<span class="const token" data-verso-hover="436">next_accept</span> _ <span class="nu">2</span> <span class="nu">0</span> <span class="nu">1</span> <span class="const token" data-verso-hover="57">false</span> (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span>))</span>
+<span id="L348">  <span class="kw">have</span> hov : ∀ t : <span class="const token" data-verso-hover="399">State</span> (<span class="const token" data-verso-hover="34">Fin</span> <span class="nu">3</span>) <span class="const token" data-verso-hover="38">Bool</span>, (<span class="nu">1</span>, <span class="const token" data-verso-hover="56">true</span>) ∈ t.<span class="const token" data-verso-hover="402">votes</span> <span class="nu">1</span> <span class="nu">0</span> → (<span class="nu">1</span>, <span class="const token" data-verso-hover="57">false</span>) ∈ t.<span class="const token" data-verso-hover="402">votes</span> <span class="nu">0</span> <span class="nu">0</span> →</span>
+<span id="L349">      ¬ <span class="const token" data-verso-hover="2">OneValuePerBallot</span> t := <span class="kw">fun</span> t h1 h2 hc =&gt;</span>
+<span id="L350">    <span class="const token" data-verso-hover="145">absurd</span> (hc <span class="nu">1</span> <span class="nu">0</span> <span class="nu">1</span> <span class="const token" data-verso-hover="56">true</span> <span class="const token" data-verso-hover="57">false</span> <span class="nu">0</span> ⟨h1, h2⟩) (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L351">  <span class="kw">refine</span> ⟨_, ⟨<span class="const token" data-verso-hover="437">init</span>, <span class="const token" data-verso-hover="438">init_Init</span>, h⟩, hov _ (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span>),</span>
+<span id="L352">    <span class="kw">fun</span> hi =&gt; hov _ (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span>) hi.<span class="const token" data-verso-hover="208">2</span>, ?_⟩</span>
+<span id="L353">  <span class="kw">clear</span> h hov</span>
+<span id="L354">  <span class="kw">ext</span> v</span>
+<span id="L355">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="442">Set.mem_univ</span>, <span class="const token" data-verso-hover="443">iff_true</span>]</span>
+<span id="L356">  <span class="kw">refine</span> ⟨<span class="nu">1</span>, ?_⟩</span>
+<span id="L357">  <span class="kw">cases</span> v</span>
+<span id="L358">  · <span class="kw">exact</span> ⟨{<span class="nu">0</span>, <span class="nu">2</span>}, <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="21">QuorumSystem.majority</span>], <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="409">VotedFor</span>, <span class="const token" data-verso-hover="437">init</span>]⟩</span>
+<span id="L359">  · <span class="kw">exact</span> ⟨{<span class="nu">1</span>, <span class="nu">2</span>}, <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="21">QuorumSystem.majority</span>], <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="409">VotedFor</span>, <span class="const token" data-verso-hover="437">init</span>]⟩</span>
+<span id="L360"></span>
+<span id="L361"><span class="dc">/-- Two acceptors can become leaders of the same ballot `1` from the same two `1b` messages:</span></span>
+<span id="L362"><span class="dc">`1b` messages are not addressed to the proposer of the `1a`, and `BecomeLeader(a, S)` only</span></span>
+<span id="L363"><span class="dc">needs `a`'s own `1b` message in `S`. -/</span></span>
+<span id="L364"><span class="kw">theorem</span> <span class="const token" data-verso-hover="8">tla_two_leaders_same_ballot</span> : ∃ s : <span class="const token" data-verso-hover="399">State</span> (<span class="const token" data-verso-hover="34">Fin</span> <span class="nu">3</span>) <span class="const token" data-verso-hover="38">Bool</span>, <span class="const token" data-verso-hover="426">Reachable</span> <span class="const token" data-verso-hover="439">Q3</span> s ∧</span>
+<span id="L365">    s.<span class="const token" data-verso-hover="22">isLeader</span> <span class="nu">1</span> = <span class="const token" data-verso-hover="56">true</span> ∧ s.<span class="const token" data-verso-hover="22">isLeader</span> <span class="nu">2</span> = <span class="const token" data-verso-hover="56">true</span> ∧ s.<span class="const token" data-verso-hover="400">highestBallot</span> <span class="nu">1</span> = <span class="nu">1</span> ∧</span>
+<span id="L366">    s.<span class="const token" data-verso-hover="400">highestBallot</span> <span class="nu">2</span> = <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L367">  <span class="kw">have</span> h : <span class="const token" data-verso-hover="128">ReflTransGen</span> (<span class="const token" data-verso-hover="425">Next</span> <span class="const token" data-verso-hover="439">Q3</span>) <span class="const token" data-verso-hover="437">init</span> (<span class="const token" data-verso-hover="437">init</span> : <span class="const token" data-verso-hover="399">State</span> (<span class="const token" data-verso-hover="34">Fin</span> <span class="nu">3</span>) <span class="const token" data-verso-hover="38">Bool</span>) := <span class="const token" data-verso-hover="59">.</span>refl</span>
+<span id="L368">  replace h := h.<span class="const token" data-verso-hover="60">tail</span> (<span class="const token" data-verso-hover="431">next_increaseHighestBallot</span> _ <span class="nu">0</span> <span class="nu">1</span> (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]))</span>
+<span id="L369">  replace h := h.<span class="const token" data-verso-hover="60">tail</span> (<span class="const token" data-verso-hover="432">next_phase1a</span> _ <span class="nu">0</span> (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]))</span>
+<span id="L370">  replace h := h.<span class="const token" data-verso-hover="60">tail</span> (<span class="const token" data-verso-hover="433">next_phase1b</span> _ <span class="nu">1</span> ⟨<span class="nu">0</span>, <span class="nu">1</span>⟩ (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]))</span>
+<span id="L371">  replace h := h.<span class="const token" data-verso-hover="60">tail</span> (<span class="const token" data-verso-hover="433">next_phase1b</span> _ <span class="nu">2</span> ⟨<span class="nu">0</span>, <span class="nu">1</span>⟩ (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]))</span>
+<span id="L372">  replace h := h.<span class="const token" data-verso-hover="60">tail</span> (<span class="const token" data-verso-hover="434">next_becomeLeader_of_empty</span> _ <span class="nu">1</span> <span class="const token" data-verso-hover="440">S12</span></span>
+<span id="L373">    (<span class="kw">by</span> <span class="kw">intro</span> m; <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]; <span class="kw">tauto</span>) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]) (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>])</span>
+<span id="L374">    (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="21">QuorumSystem.majority</span>]) (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]))</span>
+<span id="L375">  replace h := h.<span class="const token" data-verso-hover="60">tail</span> (<span class="const token" data-verso-hover="434">next_becomeLeader_of_empty</span> _ <span class="nu">2</span> <span class="const token" data-verso-hover="440">S12</span></span>
+<span id="L376">    (<span class="kw">by</span> <span class="kw">intro</span> m; <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]; <span class="kw">tauto</span>) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]) (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>])</span>
+<span id="L377">    (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="21">QuorumSystem.majority</span>]) (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="437">init</span>]))</span>
+<span id="L378">  <span class="kw">exact</span> ⟨_, ⟨<span class="const token" data-verso-hover="437">init</span>, <span class="const token" data-verso-hover="438">init_Init</span>, h⟩, <span class="kw">by</span> <span class="kw">simp</span>, <span class="kw">by</span> <span class="kw">simp</span>, <span class="kw">by</span> <span class="kw">simp</span>, <span class="kw">by</span> <span class="kw">simp</span>⟩</span>
+<span id="L379"></span>
+<span id="L380"><span class="kw">end</span> TLA</span>
+<span id="L381"></span>
+<span id="L382"><span class="kw">end</span> Podc.PaxosRaftRefinement</span>
+<span id="L383"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2019/PaxosRaftRefinement/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

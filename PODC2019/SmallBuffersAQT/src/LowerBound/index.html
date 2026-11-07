@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>SmallBuffersAQT: LowerBound.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/SmallBuffersAQT/">SmallBuffersAQT</a><span class="sep">›</span><a href="PODC2019/SmallBuffersAQT/src/">Lean source</a><span class="sep">›</span><span aria-current="page">LowerBound</span></nav>
+        <h1>
+          <code>LowerBound.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2019/SmallBuffersAQT/">Small Buffers on a Path (AQT) — PODC 2019</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/SmallBuffersAQT/LowerBound.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="LowerBound"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"><span class="kw">import</span> Podc.Computability.Distributed.AQT.Basic</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># The lower bound on buffer space (Theorem 5.1 of [MPR19])</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">[MPR19] A. Miller, B. Patt-Shamir, W. Rosenbaum, *With Great Speed Come Small Buffers:</span></span>
+<span id="L8"><span class="dc">Space-Bandwidth Tradeoffs for Routing*, PODC 2019 (arXiv 1902.08069).</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">Theorem 5.1: for every `ρ &gt; 1/(ℓ+1)` there is a `(ρ, 1)`-bounded adversary on a path with</span></span>
+<span id="L11"><span class="dc">`n ≈ (ℓ+1) m^ℓ` nodes such that *every* forwarding protocol needs buffers of size</span></span>
+<span id="L12"><span class="dc">`Ω(((ℓ+1)ρ - 1) m / (ℓ+1))`.</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">## Model</span></span>
+<span id="L15"></span>
+<span id="L16"><span class="dc">* The network is the directed path `0 → 1 → ⋯`. A `Packet` has an injection round, a source and a</span></span>
+<span id="L17"><span class="dc">  destination. A finite packet family `P : ι → Packet` is an (offline) injection pattern; its</span></span>
+<span id="L18"><span class="dc">  count function `counts P` is used to state `(ρ, σ)`-boundedness with `Cslib.AQT.IsBounded`.</span></span>
+<span id="L19"><span class="dc">* An `Execution P` is an arbitrary (offline, centralized, possibly clairvoyant) forwarding</span></span>
+<span id="L20"><span class="dc">  protocol: `pos t p` is the node holding `p` in round `t` (after injections, before forwarding);</span></span>
+<span id="L21"><span class="dc">  in each round a packet either stays or moves one hop towards its destination, and every edge</span></span>
+<span id="L22"><span class="dc">  carries at most one packet per round. A packet at its destination is delivered and occupies no</span></span>
+<span id="L23"><span class="dc">  buffer (`Execution.load`).</span></span>
+<span id="L24"></span>
+<span id="L25"><span class="dc">## The adversary (`lbAdv`)</span></span>
+<span id="L26"></span>
+<span id="L27"><span class="dc">Rounds are grouped into phases of `m` rounds; the phase of round `t` is `P = t / m`, whose</span></span>
+<span id="L28"><span class="dc">base-`m` digits are the paper's `t_ℓ … t_1` (`digit m P j = t_j`). The paper's sites are</span></span>
+<span id="L29"><span class="dc">`v_i = ∑_{j=i}^{ℓ} ((j+1) m^j - (t_j+1) j m^{j-1})` (`site`, with `term_eq`), and</span></span>
+<span id="L30"><span class="dc">`v_0 = (ℓ+1) m^ℓ` is the last node (the paper writes `n`; with `n = (ℓ+1) m^ℓ` nodes this is off</span></span>
+<span id="L31"><span class="dc">by one, so the path here has `(ℓ+1) m^ℓ + 1` nodes). In every round `t &lt; (m-1) m^ℓ` with</span></span>
+<span id="L32"><span class="dc">`⌊ρ (t+1)⌋ ≠ ⌊ρ t⌋` (`jump`), one packet of each type `r = 0, …, ℓ` is injected at `v_{r+1}` with</span></span>
+<span id="L33"><span class="dc">destination `v_r`; this makes precise the paper's informal "inject `ρm` packets per phase".</span></span>
+<span id="L34"><span class="dc">The adversary is `(ρ, 1)`-bounded (`lbAdv_isBounded`) since the `ℓ+1` routes of a round are</span></span>
+<span id="L35"><span class="dc">disjoint.</span></span>
+<span id="L36"></span>
+<span id="L37"><span class="dc">## Proof</span></span>
+<span id="L38"></span>
+<span id="L39"><span class="dc">`front ℓ m t = v_1(t/m)` is the paper's `F(t)`. A packet is *fresh* in round `t` if it is at a</span></span>
+<span id="L40"><span class="dc">node `≤ F(t)`. Claim 3 (`claim3`) and its consequence `site_one_lt` show Lemma 5.3</span></span>
+<span id="L41"><span class="dc">(`lemma_5_3`): a packet that has reached its destination is to the right of `F` (so fresh packets</span></span>
+<span id="L42"><span class="dc">are undelivered). Lemma 5.2/5.4 (`becomeStale_pos`, `card_becomeStale_le_one`,</span></span>
+<span id="L43"><span class="dc">`card_becomeStale_le_sum_load`): a packet that becomes stale at the end of round `t` lies in</span></span>
+<span id="L44"><span class="dc">`[F(t+1), F(t)]` in round `t`, and if `F` does not move, at most one packet becomes stale; the</span></span>
+<span id="L45"><span class="dc">paper's length of that interval, `F(t) - F(t+1) = ∑_{j=0}^{k} m^j`, is `lemma_5_4_drop` (not</span></span>
+<span id="L46"><span class="dc">needed below).</span></span>
+<span id="L47"></span>
+<span id="L48"><span class="dc">Instead of the dichotomy of Lemma 5.5 we use a global telescoping count</span></span>
+<span id="L49"><span class="dc">(`Execution.card_injected_le_real`): with `L` the maximal load, at most</span></span>
+<span id="L50"><span class="dc">`1 + 2 L (F(t) - F(t+1))` packets become stale at the end of round `t`, which sums to</span></span>
+<span id="L51"><span class="dc">`T + 2 L F(0)`; the fresh packets at the end are at most `(F(T)+1) L`. Comparing with the</span></span>
+<span id="L52"><span class="dc">`(ℓ+1) ⌊ρ T⌋` injected packets gives `exists_load_ge`, which implies the paper's bound</span></span>
+<span id="L53"><span class="dc">(`lower_bound`, `theorem_5_1`).</span></span>
+<span id="L54"><span class="dc">-/</span></span>
+<span id="L55"></span>
+<span id="L56"><span class="kw">namespace</span> Podc.SmallBuffersAQT.LowerBound</span>
+<span id="L57"></span>
+<span id="L58"><span class="kw">open</span> Finset</span>
+<span id="L59"></span>
+<span id="L60"><span class="dc">/-- A packet on the path: injection round, source node, destination node. -/</span></span>
+<span id="L61"><span class="kw">structure</span> <span class="const token" data-verso-hover="239">Packet</span> <span class="kw">where</span></span>
+<span id="L62">  <span class="dc">/-- injection round -/</span></span>
+<span id="L63">  <span class="const token" data-verso-hover="240">time</span> : <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L64">  <span class="dc">/-- source node -/</span></span>
+<span id="L65">  <span class="const token" data-verso-hover="241">src</span> : <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L66">  <span class="dc">/-- destination node -/</span></span>
+<span id="L67">  <span class="const token" data-verso-hover="242">dst</span> : <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L68">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="243">DecidableEq</span></span>
+<span id="L69"></span>
+<span id="L70"><span class="dc">/-- The count function of a finite packet family (number of packets injected in round `t` at</span></span>
+<span id="L71"><span class="dc">node `a` with destination `b`), to state `(ρ, σ)`-boundedness with `Cslib.AQT.IsBounded`. -/</span></span>
+<span id="L72"><span class="kw">def</span> <span class="const token" data-verso-hover="244">counts</span> {ι : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="245">Fintype</span> ι] (P : ι → <span class="const token" data-verso-hover="239">Packet</span>) : <span class="const token" data-verso-hover="44">ℕ</span> → <span class="const token" data-verso-hover="44">ℕ</span> → <span class="const token" data-verso-hover="44">ℕ</span> → <span class="const token" data-verso-hover="44">ℕ</span> :=</span>
+<span id="L73">  <span class="kw">fun</span> t a b =&gt; #{p | P p = ⟨t, a, b⟩}</span>
+<span id="L74"></span>
+<span id="L75"><span class="dc">/-- An execution of an arbitrary forwarding protocol on the path for the packet family `P`:</span></span>
+<span id="L76"><span class="dc">`pos t p` is the node holding `p` in round `t` (state after injection, before forwarding); it is</span></span>
+<span id="L77"><span class="dc">meaningful for `t ≥ (P p).time`. In each round a packet stays or moves one hop towards its</span></span>
+<span id="L78"><span class="dc">destination, and at most one packet is forwarded over each edge `(v, v+1)`. -/</span></span>
+<span id="L79"><span class="kw">structure</span> <span class="const token" data-verso-hover="19">Execution</span> {ι : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="245">Fintype</span> ι] (P : ι → <span class="const token" data-verso-hover="239">Packet</span>) <span class="kw">where</span></span>
+<span id="L80">  <span class="dc">/-- position of packet `p` in round `t` -/</span></span>
+<span id="L81">  <span class="const token" data-verso-hover="246">pos</span> : <span class="const token" data-verso-hover="44">ℕ</span> → ι → <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L82">  <span class="const token" data-verso-hover="247">pos_time</span> : ∀ p, <span class="const token" data-verso-hover="246">pos</span> (P p).<span class="const token" data-verso-hover="240">time</span> p = (P p).<span class="const token" data-verso-hover="241">src</span></span>
+<span id="L83">  <span class="const token" data-verso-hover="248">step</span> : ∀ p t, (P p).<span class="const token" data-verso-hover="240">time</span> ≤ t →</span>
+<span id="L84">    <span class="const token" data-verso-hover="246">pos</span> (t + <span class="nu">1</span>) p = <span class="const token" data-verso-hover="246">pos</span> t p ∨ (<span class="const token" data-verso-hover="246">pos</span> t p &lt; (P p).<span class="const token" data-verso-hover="242">dst</span> ∧ <span class="const token" data-verso-hover="246">pos</span> (t + <span class="nu">1</span>) p = <span class="const token" data-verso-hover="246">pos</span> t p + <span class="nu">1</span>)</span>
+<span id="L85">  <span class="const token" data-verso-hover="249">cap</span> : ∀ t v, #{p | (P p).<span class="const token" data-verso-hover="240">time</span> ≤ t ∧ <span class="const token" data-verso-hover="246">pos</span> t p = v ∧ <span class="const token" data-verso-hover="246">pos</span> (t + <span class="nu">1</span>) p = v + <span class="nu">1</span>} ≤ <span class="nu">1</span></span>
+<span id="L86"></span>
+<span id="L87"><span class="kw">variable</span> {ι : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="245">Fintype</span> ι] {P : ι → <span class="const token" data-verso-hover="239">Packet</span>}</span>
+<span id="L88"></span>
+<span id="L89"><span class="kw">namespace</span> Execution</span>
+<span id="L90"></span>
+<span id="L91"><span class="dc">/-- Buffer occupancy of node `v` in round `t` (delivered packets do not count). -/</span></span>
+<span id="L92"><span class="kw">def</span> <span class="const token" data-verso-hover="250">load</span> (E : <span class="const token" data-verso-hover="19">Execution</span> P) (t v : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="44">ℕ</span> :=</span>
+<span id="L93">  #{p | (P p).<span class="const token" data-verso-hover="240">time</span> ≤ t ∧ E.<span class="const token" data-verso-hover="246">pos</span> t p = v ∧ v &lt; (P p).<span class="const token" data-verso-hover="242">dst</span>}</span>
+<span id="L94"></span>
+<span id="L95"><span class="dc">/-- The idle protocol (never forward anything) is an execution: executions exist. -/</span></span>
+<span id="L96"><span class="kw">def</span> <span class="const token" data-verso-hover="42">idle</span> (P : ι → <span class="const token" data-verso-hover="239">Packet</span>) : <span class="const token" data-verso-hover="19">Execution</span> P <span class="kw">where</span></span>
+<span id="L97">  <span class="const token" data-verso-hover="246">pos</span> _ p := (P p).<span class="const token" data-verso-hover="241">src</span></span>
+<span id="L98">  <span class="const token" data-verso-hover="247">pos_time</span> _ := <span class="const token" data-verso-hover="55">rfl</span></span>
+<span id="L99">  <span class="const token" data-verso-hover="248">step</span> _ _ _ := <span class="const token" data-verso-hover="251">Or.inl</span> <span class="const token" data-verso-hover="55">rfl</span></span>
+<span id="L100">  <span class="const token" data-verso-hover="249">cap</span> t v := <span class="kw">by</span></span>
+<span id="L101">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="252">Nat.le_one_iff_eq_zero_or_eq_one</span>]; <span class="kw">left</span></span>
+<span id="L102">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="253">card_eq_zero</span>, <span class="const token" data-verso-hover="254">filter_eq_empty_iff</span>]</span>
+<span id="L103">    <span class="kw">rintro</span> p - ⟨-, h1, h2⟩</span>
+<span id="L104">    <span class="kw">omega</span></span>
+<span id="L105"></span>
+<span id="L106"><span class="kw">variable</span> (E : <span class="const token" data-verso-hover="19">Execution</span> P)</span>
+<span id="L107"></span>
+<span id="L108"><span class="kw">lemma</span> <span class="const token" data-verso-hover="255">pos_succ_le</span> {p : ι} {t : <span class="const token" data-verso-hover="44">ℕ</span>} (h : (P p).<span class="const token" data-verso-hover="240">time</span> ≤ t) : E.<span class="const token" data-verso-hover="246">pos</span> (t + <span class="nu">1</span>) p ≤ E.<span class="const token" data-verso-hover="246">pos</span> t p + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L109">  <span class="kw">rcases</span> E.<span class="const token" data-verso-hover="248">step</span> p t h <span class="kw">with</span> h' | ⟨_, h'⟩ &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L110"></span>
+<span id="L111"><span class="kw">lemma</span> <span class="const token" data-verso-hover="256">pos_le_src_add</span> (p : ι) : ∀ n, E.<span class="const token" data-verso-hover="246">pos</span> ((P p).<span class="const token" data-verso-hover="240">time</span> + n) p ≤ (P p).<span class="const token" data-verso-hover="241">src</span> + n</span>
+<span id="L112">  | <span class="nu">0</span> =&gt; <span class="kw">by</span> <span class="kw">simp</span> [E.<span class="const token" data-verso-hover="247">pos_time</span>]</span>
+<span id="L113">  | n + <span class="nu">1</span> =&gt; <span class="kw">by</span></span>
+<span id="L114">    <span class="kw">have</span> h1 := E.<span class="const token" data-verso-hover="255">pos_succ_le</span> (p := p) (t := (P p).<span class="const token" data-verso-hover="240">time</span> + n) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L115">    <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="256">pos_le_src_add</span> p n</span>
+<span id="L116">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="257">add_assoc</span>]</span>
+<span id="L117">    <span class="kw">omega</span></span>
+<span id="L118"></span>
+<span id="L119"><span class="dc">/-- A packet moves at most one hop per round. -/</span></span>
+<span id="L120"><span class="kw">lemma</span> <span class="const token" data-verso-hover="258">pos_le_src_add_of_le</span> {p : ι} {t : <span class="const token" data-verso-hover="44">ℕ</span>} (h : (P p).<span class="const token" data-verso-hover="240">time</span> ≤ t) :</span>
+<span id="L121">    E.<span class="const token" data-verso-hover="246">pos</span> t p ≤ (P p).<span class="const token" data-verso-hover="241">src</span> + (t - (P p).<span class="const token" data-verso-hover="240">time</span>) := <span class="kw">by</span></span>
+<span id="L122">  <span class="kw">obtain</span> ⟨n, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="192">Nat.exists_eq_add_of_le</span> h</span>
+<span id="L123">  <span class="kw">simpa</span> <span class="kw">using</span> E.<span class="const token" data-verso-hover="256">pos_le_src_add</span> p n</span>
+<span id="L124"></span>
+<span id="L125"><span class="kw">lemma</span> <span class="const token" data-verso-hover="259">pos_le_dst_aux</span> {p : ι} (hsd : (P p).<span class="const token" data-verso-hover="241">src</span> ≤ (P p).<span class="const token" data-verso-hover="242">dst</span>) :</span>
+<span id="L126">    ∀ n, E.<span class="const token" data-verso-hover="246">pos</span> ((P p).<span class="const token" data-verso-hover="240">time</span> + n) p ≤ (P p).<span class="const token" data-verso-hover="242">dst</span></span>
+<span id="L127">  | <span class="nu">0</span> =&gt; <span class="kw">by</span> <span class="kw">simp</span> [E.<span class="const token" data-verso-hover="247">pos_time</span>, hsd]</span>
+<span id="L128">  | n + <span class="nu">1</span> =&gt; <span class="kw">by</span></span>
+<span id="L129">    <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="259">pos_le_dst_aux</span> hsd n</span>
+<span id="L130">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="257">add_assoc</span>]</span>
+<span id="L131">    <span class="kw">rcases</span> E.<span class="const token" data-verso-hover="248">step</span> p ((P p).<span class="const token" data-verso-hover="240">time</span> + n) (<span class="kw">by</span> <span class="kw">omega</span>) <span class="kw">with</span> h' | ⟨h1, h'⟩ &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L132"></span>
+<span id="L133"><span class="dc">/-- A packet never overshoots its destination. -/</span></span>
+<span id="L134"><span class="kw">lemma</span> <span class="const token" data-verso-hover="260">pos_le_dst</span> {p : ι} {t : <span class="const token" data-verso-hover="44">ℕ</span>} (hsd : (P p).<span class="const token" data-verso-hover="241">src</span> ≤ (P p).<span class="const token" data-verso-hover="242">dst</span>) (h : (P p).<span class="const token" data-verso-hover="240">time</span> ≤ t) :</span>
+<span id="L135">    E.<span class="const token" data-verso-hover="246">pos</span> t p ≤ (P p).<span class="const token" data-verso-hover="242">dst</span> := <span class="kw">by</span></span>
+<span id="L136">  <span class="kw">obtain</span> ⟨n, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="192">Nat.exists_eq_add_of_le</span> h</span>
+<span id="L137">  <span class="kw">exact</span> E.<span class="const token" data-verso-hover="259">pos_le_dst_aux</span> hsd n</span>
+<span id="L138"></span>
+<span id="L139"><span class="dc">/-! ### Counting fresh and stale packets, for an arbitrary "front" `F` -/</span></span>
+<span id="L140"></span>
+<span id="L141"><span class="kw">variable</span> (F : <span class="const token" data-verso-hover="44">ℕ</span> → <span class="const token" data-verso-hover="44">ℕ</span>)</span>
+<span id="L142"></span>
+<span id="L143"><span class="dc">/-- Packets fresh in round `t`: injected and at a node `≤ F t`. -/</span></span>
+<span id="L144"><span class="kw">def</span> <span class="const token" data-verso-hover="261">fresh</span> (t : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="60">Finset</span> ι := {p | (P p).<span class="const token" data-verso-hover="240">time</span> ≤ t ∧ E.<span class="const token" data-verso-hover="246">pos</span> t p ≤ F t}</span>
+<span id="L145"></span>
+<span id="L146"><span class="dc">/-- Packets stale in round `t`: injected and at a node `&gt; F t`. -/</span></span>
+<span id="L147"><span class="kw">def</span> <span class="const token" data-verso-hover="262">stale</span> (t : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="60">Finset</span> ι := {p | (P p).<span class="const token" data-verso-hover="240">time</span> ≤ t ∧ F t &lt; E.<span class="const token" data-verso-hover="246">pos</span> t p}</span>
+<span id="L148"></span>
+<span id="L149"><span class="dc">/-- Packets that become stale at the end of round `t`. -/</span></span>
+<span id="L150"><span class="kw">def</span> <span class="const token" data-verso-hover="263">becomeStale</span> (t : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="60">Finset</span> ι :=</span>
+<span id="L151">  {p | (P p).<span class="const token" data-verso-hover="240">time</span> ≤ t ∧ E.<span class="const token" data-verso-hover="246">pos</span> t p ≤ F t ∧ F (t + <span class="nu">1</span>) &lt; E.<span class="const token" data-verso-hover="246">pos</span> (t + <span class="nu">1</span>) p}</span>
+<span id="L152"></span>
+<span id="L153"><span class="dc">/-- Undelivered packets of round `t` located in `I` are counted by the loads of the nodes of `I`. -/</span></span>
+<span id="L154"><span class="kw">lemma</span> <span class="const token" data-verso-hover="264">card_le_sum_load</span> {t : <span class="const token" data-verso-hover="44">ℕ</span>} {s : <span class="const token" data-verso-hover="60">Finset</span> ι} {I : <span class="const token" data-verso-hover="60">Finset</span> <span class="const token" data-verso-hover="44">ℕ</span>}</span>
+<span id="L155">    (h : ∀ p ∈ s, (P p).<span class="const token" data-verso-hover="240">time</span> ≤ t ∧ E.<span class="const token" data-verso-hover="246">pos</span> t p ∈ I ∧ E.<span class="const token" data-verso-hover="246">pos</span> t p &lt; (P p).<span class="const token" data-verso-hover="242">dst</span>) :</span>
+<span id="L156">    <span class="kw">#s</span> ≤ ∑ v ∈ I, E.<span class="const token" data-verso-hover="250">load</span> t v := <span class="kw">by</span></span>
+<span id="L157">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="265">card_eq_sum_card_fiberwise</span> (f := E.<span class="const token" data-verso-hover="246">pos</span> t) (<span class="kw">fun</span> p hp =&gt; (h p hp).<span class="const token" data-verso-hover="96">2</span><span class="nu">.</span><span class="const token" data-verso-hover="66">1</span>)]</span>
+<span id="L158">  <span class="kw">refine</span> <span class="const token" data-verso-hover="266">sum_le_sum</span> <span class="kw">fun</span> v _ =&gt; ?_</span>
+<span id="L159">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="250">load</span></span>
+<span id="L160">  <span class="kw">refine</span> <span class="const token" data-verso-hover="267">card_le_card</span> <span class="kw">fun</span> p hp =&gt; ?_</span>
+<span id="L161">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="268">mem_filter</span>, <span class="const token" data-verso-hover="269">mem_univ</span>, <span class="const token" data-verso-hover="270">true_and</span>] <span class="kw">at</span> hp ⊢</span>
+<span id="L162">  <span class="kw">obtain</span> ⟨hps, <span class="kw">rfl</span>⟩ := hp</span>
+<span id="L163">  <span class="kw">exact</span> ⟨(h p hps).<span class="const token" data-verso-hover="66">1</span>, <span class="const token" data-verso-hover="55">rfl</span>, (h p hps).<span class="const token" data-verso-hover="96">2</span><span class="nu">.</span><span class="const token" data-verso-hover="96">2</span>⟩</span>
+<span id="L164"></span>
+<span id="L165"><span class="dc">/-- Lemma 5.2 of [MPR19] (form used here): a packet that becomes stale at the end of round `t`</span></span>
+<span id="L166"><span class="dc">is in `[F(t+1), F(t)]` in round `t`. -/</span></span>
+<span id="L167"><span class="kw">lemma</span> <span class="const token" data-verso-hover="38">becomeStale_pos</span> {t : <span class="const token" data-verso-hover="44">ℕ</span>} {p : ι} (hp : p ∈ E.<span class="const token" data-verso-hover="263">becomeStale</span> F t) :</span>
+<span id="L168">    F (t + <span class="nu">1</span>) ≤ E.<span class="const token" data-verso-hover="246">pos</span> t p ∧ E.<span class="const token" data-verso-hover="246">pos</span> t p ≤ F t := <span class="kw">by</span></span>
+<span id="L169">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="263">becomeStale</span>, <span class="const token" data-verso-hover="268">mem_filter</span>, <span class="const token" data-verso-hover="269">mem_univ</span>, <span class="const token" data-verso-hover="270">true_and</span>] <span class="kw">at</span> hp</span>
+<span id="L170">  <span class="kw">have</span> := E.<span class="const token" data-verso-hover="255">pos_succ_le</span> hp.<span class="const token" data-verso-hover="66">1</span></span>
+<span id="L171">  <span class="kw">omega</span></span>
+<span id="L172"></span>
+<span id="L173"><span class="dc">/-- Lemma 5.2 (1) and Lemma 5.4 (α-stale packets) of [MPR19]: if `F` does not decrease in round</span></span>
+<span id="L174"><span class="dc">`t`, a packet becomes stale only by being forwarded from node `F t`, so at most one packet becomes</span></span>
+<span id="L175"><span class="dc">stale. -/</span></span>
+<span id="L176"><span class="kw">lemma</span> <span class="const token" data-verso-hover="39">card_becomeStale_le_one</span> {t : <span class="const token" data-verso-hover="44">ℕ</span>} (hF : F t ≤ F (t + <span class="nu">1</span>)) : #(E.<span class="const token" data-verso-hover="263">becomeStale</span> F t) ≤ <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L177">  <span class="kw">refine</span> (<span class="const token" data-verso-hover="267">card_le_card</span> ?_).<span class="const token" data-verso-hover="271">trans</span> (E.<span class="const token" data-verso-hover="249">cap</span> t (F t))</span>
+<span id="L178">  <span class="kw">intro</span> p hp</span>
+<span id="L179">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="263">becomeStale</span>, <span class="const token" data-verso-hover="268">mem_filter</span>, <span class="const token" data-verso-hover="269">mem_univ</span>, <span class="const token" data-verso-hover="270">true_and</span>] <span class="kw">at</span> hp ⊢</span>
+<span id="L180">  <span class="kw">have</span> := E.<span class="const token" data-verso-hover="255">pos_succ_le</span> hp.<span class="const token" data-verso-hover="66">1</span></span>
+<span id="L181">  <span class="kw">exact</span> ⟨hp.<span class="const token" data-verso-hover="66">1</span>, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L182"></span>
+<span id="L183"><span class="dc">/-- Lemma 5.4 (β-stale packets) of [MPR19], corrected: the packets that become stale at the end</span></span>
+<span id="L184"><span class="dc">of round `t` are counted by the loads of `[F(t+1), F(t)]` **in round `t`** (the paper uses round</span></span>
+<span id="L185"><span class="dc">`t+1`, where such a packet may already have been delivered). Needs that fresh packets are</span></span>
+<span id="L186"><span class="dc">undelivered (Lemma 5.3). -/</span></span>
+<span id="L187"><span class="kw">lemma</span> <span class="const token" data-verso-hover="7">card_becomeStale_le_sum_load</span> {t : <span class="const token" data-verso-hover="44">ℕ</span>}</span>
+<span id="L188">    (hund : ∀ p, (P p).<span class="const token" data-verso-hover="240">time</span> ≤ t → E.<span class="const token" data-verso-hover="246">pos</span> t p ≤ F t → E.<span class="const token" data-verso-hover="246">pos</span> t p &lt; (P p).<span class="const token" data-verso-hover="242">dst</span>) :</span>
+<span id="L189">    #(E.<span class="const token" data-verso-hover="263">becomeStale</span> F t) ≤ ∑ v ∈ <span class="const token" data-verso-hover="187">Icc</span> (F (t + <span class="nu">1</span>)) (F t), E.<span class="const token" data-verso-hover="250">load</span> t v := <span class="kw">by</span></span>
+<span id="L190">  <span class="kw">refine</span> E.<span class="const token" data-verso-hover="264">card_le_sum_load</span> <span class="kw">fun</span> p hp =&gt; ?_</span>
+<span id="L191">  <span class="kw">have</span> h2 := E.<span class="const token" data-verso-hover="38">becomeStale_pos</span> F hp</span>
+<span id="L192">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="263">becomeStale</span>, <span class="const token" data-verso-hover="268">mem_filter</span>, <span class="const token" data-verso-hover="269">mem_univ</span>, <span class="const token" data-verso-hover="270">true_and</span>] <span class="kw">at</span> hp</span>
+<span id="L193">  <span class="kw">exact</span> ⟨hp.<span class="const token" data-verso-hover="66">1</span>, <span class="const token" data-verso-hover="272">mem_Icc</span>.<span class="const token" data-verso-hover="89">2</span> h2, hund p hp.<span class="const token" data-verso-hover="66">1</span> hp.<span class="const token" data-verso-hover="96">2</span><span class="nu">.</span><span class="const token" data-verso-hover="66">1</span>⟩</span>
+<span id="L194"></span>
+<span id="L195"><span class="kw">lemma</span> <span class="const token" data-verso-hover="273">stale_succ_subset</span> [<span class="const token" data-verso-hover="243">DecidableEq</span> ι] (hinj : ∀ p, (P p).<span class="const token" data-verso-hover="241">src</span> ≤ F (P p).<span class="const token" data-verso-hover="240">time</span>) (t : <span class="const token" data-verso-hover="44">ℕ</span>) :</span>
+<span id="L196">    E.<span class="const token" data-verso-hover="262">stale</span> F (t + <span class="nu">1</span>) ⊆ E.<span class="const token" data-verso-hover="263">becomeStale</span> F t ∪ E.<span class="const token" data-verso-hover="262">stale</span> F t := <span class="kw">by</span></span>
+<span id="L197">  <span class="kw">intro</span> p hp</span>
+<span id="L198">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="262">stale</span>, <span class="const token" data-verso-hover="263">becomeStale</span>, <span class="const token" data-verso-hover="274">mem_union</span>, <span class="const token" data-verso-hover="268">mem_filter</span>, <span class="const token" data-verso-hover="269">mem_univ</span>, <span class="const token" data-verso-hover="270">true_and</span>] <span class="kw">at</span> hp ⊢</span>
+<span id="L199">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="133">Nat.lt_or_ge</span> t (P p).<span class="const token" data-verso-hover="240">time</span> <span class="kw">with</span> h | h</span>
+<span id="L200">  · <span class="kw">have</span> ht : (P p).<span class="const token" data-verso-hover="240">time</span> = t + <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L201">    <span class="kw">have</span> h1 := E.<span class="const token" data-verso-hover="247">pos_time</span> p</span>
+<span id="L202">    <span class="kw">have</span> h2 := hinj p</span>
+<span id="L203">    <span class="kw">rw</span> [ht] <span class="kw">at</span> h1 h2</span>
+<span id="L204">    <span class="kw">omega</span></span>
+<span id="L205">  · <span class="kw">by_cases</span> hf : E.<span class="const token" data-verso-hover="246">pos</span> t p ≤ F t</span>
+<span id="L206">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="251">Or.inl</span> ⟨h, hf, hp.<span class="const token" data-verso-hover="96">2</span>⟩</span>
+<span id="L207">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="275">Or.inr</span> ⟨h, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L208"></span>
+<span id="L209"><span class="kw">lemma</span> <span class="const token" data-verso-hover="276">card_stale_le</span> (hinj : ∀ p, (P p).<span class="const token" data-verso-hover="241">src</span> ≤ F (P p).<span class="const token" data-verso-hover="240">time</span>) :</span>
+<span id="L210">    ∀ T, #(E.<span class="const token" data-verso-hover="262">stale</span> F T) ≤ ∑ t ∈ <span class="const token" data-verso-hover="177">range</span> T, #(E.<span class="const token" data-verso-hover="263">becomeStale</span> F t)</span>
+<span id="L211">  | <span class="nu">0</span> =&gt; <span class="kw">by</span></span>
+<span id="L212">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="277">range_zero</span>, <span class="const token" data-verso-hover="278">sum_empty</span>, <span class="const token" data-verso-hover="279">Nat.le_zero</span>, <span class="const token" data-verso-hover="253">card_eq_zero</span>, <span class="const token" data-verso-hover="254">filter_eq_empty_iff</span>, <span class="const token" data-verso-hover="262">stale</span>,</span>
+<span id="L213">      <span class="const token" data-verso-hover="269">mem_univ</span>, <span class="const token" data-verso-hover="280">true_implies</span>, <span class="const token" data-verso-hover="125">not_and</span>, <span class="const token" data-verso-hover="225">not_lt</span>]</span>
+<span id="L214">    <span class="kw">intro</span> p hp</span>
+<span id="L215">    <span class="kw">have</span> h0 : (P p).<span class="const token" data-verso-hover="240">time</span> = <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L216">    <span class="kw">have</span> h1 := E.<span class="const token" data-verso-hover="247">pos_time</span> p</span>
+<span id="L217">    <span class="kw">have</span> h2 := hinj p</span>
+<span id="L218">    <span class="kw">rw</span> [h0] <span class="kw">at</span> h1 h2</span>
+<span id="L219">    <span class="kw">omega</span></span>
+<span id="L220">  | T + <span class="nu">1</span> =&gt; <span class="kw">by</span></span>
+<span id="L221">    <span class="kw">classical</span></span>
+<span id="L222">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="281">sum_range_succ</span>]</span>
+<span id="L223">    <span class="kw">have</span> := <span class="const token" data-verso-hover="276">card_stale_le</span> hinj T</span>
+<span id="L224">    <span class="kw">calc</span> #(E.<span class="const token" data-verso-hover="262">stale</span> F (T + <span class="nu">1</span>)) ≤ #(E.<span class="const token" data-verso-hover="263">becomeStale</span> F T ∪ E.<span class="const token" data-verso-hover="262">stale</span> F T) :=</span>
+<span id="L225">          <span class="const token" data-verso-hover="267">card_le_card</span> (E.<span class="const token" data-verso-hover="273">stale_succ_subset</span> F hinj T)</span>
+<span id="L226">      _ ≤ #(E.<span class="const token" data-verso-hover="263">becomeStale</span> F T) + #(E.<span class="const token" data-verso-hover="262">stale</span> F T) := <span class="const token" data-verso-hover="282">card_union_le</span> _ _</span>
+<span id="L227">      _ ≤ _ := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L228"></span>
+<span id="L229"><span class="dc">/-- Every injected packet is fresh or became stale in some earlier round. -/</span></span>
+<span id="L230"><span class="kw">lemma</span> <span class="const token" data-verso-hover="283">card_injected_le</span> (hinj : ∀ p, (P p).<span class="const token" data-verso-hover="241">src</span> ≤ F (P p).<span class="const token" data-verso-hover="240">time</span>) (T : <span class="const token" data-verso-hover="44">ℕ</span>) :</span>
+<span id="L231">    #{p | (P p).<span class="const token" data-verso-hover="240">time</span> ≤ T} ≤ #(E.<span class="const token" data-verso-hover="261">fresh</span> F T) + ∑ t ∈ <span class="const token" data-verso-hover="177">range</span> T, #(E.<span class="const token" data-verso-hover="263">becomeStale</span> F t) := <span class="kw">by</span></span>
+<span id="L232">  <span class="kw">classical</span></span>
+<span id="L233">  <span class="kw">have</span> h1 : #{p | (P p).<span class="const token" data-verso-hover="240">time</span> ≤ T} ≤ #(E.<span class="const token" data-verso-hover="261">fresh</span> F T ∪ E.<span class="const token" data-verso-hover="262">stale</span> F T) := <span class="kw">by</span></span>
+<span id="L234">    <span class="kw">refine</span> <span class="const token" data-verso-hover="267">card_le_card</span> <span class="kw">fun</span> p hp =&gt; ?_</span>
+<span id="L235">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="261">fresh</span>, <span class="const token" data-verso-hover="262">stale</span>, <span class="const token" data-verso-hover="274">mem_union</span>, <span class="const token" data-verso-hover="268">mem_filter</span>, <span class="const token" data-verso-hover="269">mem_univ</span>, <span class="const token" data-verso-hover="270">true_and</span>] <span class="kw">at</span> hp ⊢</span>
+<span id="L236">    <span class="kw">by_cases</span> h : E.<span class="const token" data-verso-hover="246">pos</span> T p ≤ F T</span>
+<span id="L237">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="251">Or.inl</span> ⟨hp, h⟩</span>
+<span id="L238">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="275">Or.inr</span> ⟨hp, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L239">  <span class="kw">have</span> := <span class="const token" data-verso-hover="282">card_union_le</span> (E.<span class="const token" data-verso-hover="261">fresh</span> F T) (E.<span class="const token" data-verso-hover="262">stale</span> F T)</span>
+<span id="L240">  <span class="kw">have</span> := E.<span class="const token" data-verso-hover="276">card_stale_le</span> F hinj T</span>
+<span id="L241">  <span class="kw">omega</span></span>
+<span id="L242"></span>
+<span id="L243"><span class="dc">/-- The counting core of the lower bound (replacing Lemma 5.5 of [MPR19] by a telescoping</span></span>
+<span id="L244"><span class="dc">argument). Assume every packet is fresh at injection, `F` is non-increasing up to round `T`,</span></span>
+<span id="L245"><span class="dc">fresh packets are undelivered (Lemma 5.3), and all loads up to round `T` are at most `L`. Then at</span></span>
+<span id="L246"><span class="dc">most `T + L (2 F(0) + 1)` packets are injected up to round `T`. -/</span></span>
+<span id="L247"><span class="kw">theorem</span> <span class="const token" data-verso-hover="284">card_injected_le_real</span> {T : <span class="const token" data-verso-hover="44">ℕ</span>} (hinj : ∀ p, (P p).<span class="const token" data-verso-hover="241">src</span> ≤ F (P p).<span class="const token" data-verso-hover="240">time</span>)</span>
+<span id="L248">    (hF : ∀ t &lt; T, F (t + <span class="nu">1</span>) ≤ F t)</span>
+<span id="L249">    (hund : ∀ t ≤ T, ∀ p, (P p).<span class="const token" data-verso-hover="240">time</span> ≤ t → E.<span class="const token" data-verso-hover="246">pos</span> t p ≤ F t → E.<span class="const token" data-verso-hover="246">pos</span> t p &lt; (P p).<span class="const token" data-verso-hover="242">dst</span>)</span>
+<span id="L250">    {L : <span class="const token" data-verso-hover="69">ℝ</span>} (hL : ∀ t ≤ T, ∀ v, (E.<span class="const token" data-verso-hover="250">load</span> t v : <span class="const token" data-verso-hover="69">ℝ</span>) ≤ L) :</span>
+<span id="L251">    (#{p | (P p).<span class="const token" data-verso-hover="240">time</span> ≤ T} : <span class="const token" data-verso-hover="69">ℝ</span>) ≤ T + L * (<span class="nu">2</span> * F <span class="nu">0</span> + <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L252">  <span class="kw">have</span> hL0 : <span class="nu">0</span> ≤ L := (<span class="const token" data-verso-hover="285">Nat.cast_nonneg</span> _).<span class="const token" data-verso-hover="271">trans</span> (hL <span class="nu">0</span> (<span class="const token" data-verso-hover="202">Nat.zero_le</span> _) <span class="nu">0</span>)</span>
+<span id="L253">  <span class="kw">have</span> h1 := E.<span class="const token" data-verso-hover="283">card_injected_le</span> F hinj T</span>
+<span id="L254">  <span class="kw">have</span> hfresh : (#(E.<span class="const token" data-verso-hover="261">fresh</span> F T) : <span class="const token" data-verso-hover="69">ℝ</span>) ≤ (F T + <span class="nu">1</span>) * L := <span class="kw">by</span></span>
+<span id="L255">    <span class="kw">have</span> h : #(E.<span class="const token" data-verso-hover="261">fresh</span> F T) ≤ ∑ v ∈ <span class="const token" data-verso-hover="177">range</span> (F T + <span class="nu">1</span>), E.<span class="const token" data-verso-hover="250">load</span> T v := <span class="kw">by</span></span>
+<span id="L256">      <span class="kw">refine</span> E.<span class="const token" data-verso-hover="264">card_le_sum_load</span> <span class="kw">fun</span> p hp =&gt; ?_</span>
+<span id="L257">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="261">fresh</span>, <span class="const token" data-verso-hover="268">mem_filter</span>, <span class="const token" data-verso-hover="269">mem_univ</span>, <span class="const token" data-verso-hover="270">true_and</span>] <span class="kw">at</span> hp</span>
+<span id="L258">      <span class="kw">exact</span> ⟨hp.<span class="const token" data-verso-hover="66">1</span>, <span class="const token" data-verso-hover="153">mem_range</span>.<span class="const token" data-verso-hover="89">2</span> (<span class="const token" data-verso-hover="286">Nat.lt_succ_of_le</span> hp.<span class="const token" data-verso-hover="96">2</span>), hund T <span class="const token" data-verso-hover="73">le_rfl</span> p hp.<span class="const token" data-verso-hover="66">1</span> hp.<span class="const token" data-verso-hover="96">2</span>⟩</span>
+<span id="L259">    <span class="kw">calc</span> (#(E.<span class="const token" data-verso-hover="261">fresh</span> F T) : <span class="const token" data-verso-hover="69">ℝ</span>) ≤ ∑ v ∈ <span class="const token" data-verso-hover="177">range</span> (F T + <span class="nu">1</span>), (E.<span class="const token" data-verso-hover="250">load</span> T v : <span class="const token" data-verso-hover="69">ℝ</span>) := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> h</span>
+<span id="L260">      _ ≤ ∑ v ∈ <span class="const token" data-verso-hover="177">range</span> (F T + <span class="nu">1</span>), L := <span class="const token" data-verso-hover="266">sum_le_sum</span> <span class="kw">fun</span> v _ =&gt; hL T <span class="const token" data-verso-hover="73">le_rfl</span> v</span>
+<span id="L261">      _ = _ := <span class="kw">by</span> <span class="kw">simp</span></span>
+<span id="L262">  <span class="kw">have</span> hstep : ∀ t ∈ <span class="const token" data-verso-hover="177">range</span> T,</span>
+<span id="L263">      (#(E.<span class="const token" data-verso-hover="263">becomeStale</span> F t) : <span class="const token" data-verso-hover="69">ℝ</span>) ≤ <span class="nu">1</span> + <span class="nu">2</span> * L * ((F t : <span class="const token" data-verso-hover="69">ℝ</span>) - F (t + <span class="nu">1</span>)) := <span class="kw">by</span></span>
+<span id="L264">    <span class="kw">intro</span> t ht</span>
+<span id="L265">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="153">mem_range</span>] <span class="kw">at</span> ht</span>
+<span id="L266">    <span class="kw">rcases</span> (hF t ht).<span class="const token" data-verso-hover="287">lt_or_eq</span> <span class="kw">with</span> hlt | heq</span>
+<span id="L267">    · <span class="kw">have</span> hs := E.<span class="const token" data-verso-hover="7">card_becomeStale_le_sum_load</span> F (t := t)</span>
+<span id="L268">        (<span class="kw">fun</span> p h1 h2 =&gt; hund t ht.<span class="const token" data-verso-hover="205">le</span> p h1 h2)</span>
+<span id="L269">      <span class="kw">have</span> h2 : (#(E.<span class="const token" data-verso-hover="263">becomeStale</span> F t) : <span class="const token" data-verso-hover="69">ℝ</span>) ≤ ((F t + <span class="nu">1</span> - F (t + <span class="nu">1</span>) : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="69">ℝ</span>) * L := <span class="kw">by</span></span>
+<span id="L270">        <span class="kw">calc</span> (#(E.<span class="const token" data-verso-hover="263">becomeStale</span> F t) : <span class="const token" data-verso-hover="69">ℝ</span>) ≤ ∑ v ∈ <span class="const token" data-verso-hover="187">Icc</span> (F (t + <span class="nu">1</span>)) (F t), (E.<span class="const token" data-verso-hover="250">load</span> t v : <span class="const token" data-verso-hover="69">ℝ</span>) := <span class="kw">by</span></span>
+<span id="L271">              <span class="kw">exact_mod_cast</span> hs</span>
+<span id="L272">          _ ≤ ∑ v ∈ <span class="const token" data-verso-hover="187">Icc</span> (F (t + <span class="nu">1</span>)) (F t), L := <span class="const token" data-verso-hover="266">sum_le_sum</span> <span class="kw">fun</span> v _ =&gt; hL t ht.<span class="const token" data-verso-hover="205">le</span> v</span>
+<span id="L273">          _ = _ := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="288">Nat.card_Icc</span>]</span>
+<span id="L274">      <span class="kw">have</span> hc : ((F t + <span class="nu">1</span> - F (t + <span class="nu">1</span>) : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="69">ℝ</span>) ≤ <span class="nu">2</span> * ((F t : <span class="const token" data-verso-hover="69">ℝ</span>) - F (t + <span class="nu">1</span>)) := <span class="kw">by</span></span>
+<span id="L275">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="289">Nat.cast_sub</span> (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L276">        <span class="kw">push_cast</span></span>
+<span id="L277">        <span class="kw">have</span> : (F (t + <span class="nu">1</span>) : <span class="const token" data-verso-hover="69">ℝ</span>) + <span class="nu">1</span> ≤ F t := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> hlt</span>
+<span id="L278">        <span class="kw">linarith</span></span>
+<span id="L279">      <span class="kw">nlinarith</span></span>
+<span id="L280">    · <span class="kw">have</span> := E.<span class="const token" data-verso-hover="39">card_becomeStale_le_one</span> F (t := t) heq.<span class="const token" data-verso-hover="290">ge</span></span>
+<span id="L281">      <span class="kw">rw</span> [heq, <span class="const token" data-verso-hover="291">sub_self</span>, <span class="const token" data-verso-hover="292">mul_zero</span>, <span class="const token" data-verso-hover="293">add_zero</span>]</span>
+<span id="L282">      <span class="kw">exact_mod_cast</span> this</span>
+<span id="L283">  <span class="kw">have</span> htel : ∑ t ∈ <span class="const token" data-verso-hover="177">range</span> T, ((F t : <span class="const token" data-verso-hover="69">ℝ</span>) - F (t + <span class="nu">1</span>)) = F <span class="nu">0</span> - F T :=</span>
+<span id="L284">    <span class="const token" data-verso-hover="294">sum_range_sub'</span> (<span class="kw">fun</span> t =&gt; (F t : <span class="const token" data-verso-hover="69">ℝ</span>)) T</span>
+<span id="L285">  <span class="kw">have</span> hsum : ∑ t ∈ <span class="const token" data-verso-hover="177">range</span> T, (<span class="nu">1</span> + <span class="nu">2</span> * L * ((F t : <span class="const token" data-verso-hover="69">ℝ</span>) - F (t + <span class="nu">1</span>))) = T + <span class="nu">2</span> * L * (F <span class="nu">0</span> - F T) := <span class="kw">by</span></span>
+<span id="L286">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="295">sum_add_distrib</span>, ← <span class="const token" data-verso-hover="296">mul_sum</span>, htel]</span>
+<span id="L287">    <span class="kw">simp</span></span>
+<span id="L288">  <span class="kw">have</span> hFT : (<span class="nu">0</span> : <span class="const token" data-verso-hover="69">ℝ</span>) ≤ L * F T := <span class="const token" data-verso-hover="297">mul_nonneg</span> hL0 (<span class="const token" data-verso-hover="285">Nat.cast_nonneg</span> _)</span>
+<span id="L289">  <span class="kw">calc</span> (#{p | (P p).<span class="const token" data-verso-hover="240">time</span> ≤ T} : <span class="const token" data-verso-hover="69">ℝ</span>)</span>
+<span id="L290">      ≤ #(E.<span class="const token" data-verso-hover="261">fresh</span> F T) + ∑ t ∈ <span class="const token" data-verso-hover="177">range</span> T, (#(E.<span class="const token" data-verso-hover="263">becomeStale</span> F t) : <span class="const token" data-verso-hover="69">ℝ</span>) := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> h1</span>
+<span id="L291">    _ ≤ (F T + <span class="nu">1</span>) * L + ∑ t ∈ <span class="const token" data-verso-hover="177">range</span> T, (<span class="nu">1</span> + <span class="nu">2</span> * L * ((F t : <span class="const token" data-verso-hover="69">ℝ</span>) - F (t + <span class="nu">1</span>))) :=</span>
+<span id="L292">        <span class="const token" data-verso-hover="298">add_le_add</span> hfresh (<span class="const token" data-verso-hover="266">sum_le_sum</span> hstep)</span>
+<span id="L293">    _ = (F T + <span class="nu">1</span>) * L + (T + <span class="nu">2</span> * L * (F <span class="nu">0</span> - F T)) := <span class="kw">by</span> <span class="kw">rw</span> [hsum]</span>
+<span id="L294">    _ ≤ T + L * (<span class="nu">2</span> * F <span class="nu">0</span> + <span class="nu">1</span>) := <span class="kw">by</span> <span class="kw">nlinarith</span></span>
+<span id="L295"></span>
+<span id="L296"><span class="kw">end</span> Execution</span>
+<span id="L297"></span>
+<span id="L298"><span class="dc">/-! ### The adversary -/</span></span>
+<span id="L299"></span>
+<span id="L300"><span class="kw">section</span> Adversary</span>
+<span id="L301"></span>
+<span id="L302"><span class="kw">variable</span> {ℓ m : <span class="const token" data-verso-hover="44">ℕ</span>}</span>
+<span id="L303"></span>
+<span id="L304"><span class="dc">/-- The paper's digit `t_j` (`j ≥ 1`) of a round in phase `P`: the base-`m` digit `j - 1` of the</span></span>
+<span id="L305"><span class="dc">phase number `P`. -/</span></span>
+<span id="L306"><span class="kw">def</span> <span class="const token" data-verso-hover="299">digit</span> (m P j : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="44">ℕ</span> := P / m ^ (j - <span class="nu">1</span>) % m</span>
+<span id="L307"></span>
+<span id="L308"><span class="dc">/-- The `j`-th summand of the sites; equal to the paper's `(j+1) m^j - (t_j + 1) j m^(j-1)`</span></span>
+<span id="L309"><span class="dc">(`term_eq`), written without truncated subtraction. -/</span></span>
+<span id="L310"><span class="kw">def</span> <span class="const token" data-verso-hover="300">term</span> (m P j : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="44">ℕ</span> := m ^ j + (m - <span class="nu">1</span> - <span class="const token" data-verso-hover="299">digit</span> m P j) * j * m ^ (j - <span class="nu">1</span>)</span>
+<span id="L311"></span>
+<span id="L312"><span class="dc">/-- The sites of phase `P`: `site ℓ m P i = v_i` for `1 ≤ i ≤ ℓ` (paper), `site ℓ m P (ℓ+1) = 0`,</span></span>
+<span id="L313"><span class="dc">and `site ℓ m P 0 = (ℓ+1) m^ℓ` is the last node of the path (the paper's destination `n`). -/</span></span>
+<span id="L314"><span class="kw">def</span> <span class="const token" data-verso-hover="301">site</span> (ℓ m P i : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="44">ℕ</span> := <span class="kw">if</span> i = <span class="nu">0</span> <span class="kw">then</span> (ℓ + <span class="nu">1</span>) * m ^ ℓ <span class="kw">else</span> ∑ j ∈ <span class="const token" data-verso-hover="302">Ico</span> i (ℓ + <span class="nu">1</span>), <span class="const token" data-verso-hover="300">term</span> m P j</span>
+<span id="L315"></span>
+<span id="L316"><span class="dc">/-- The paper's `F(t) = v_1(t_ℓ ⋯ t_1)`: the right-most injection site in round `t`. -/</span></span>
+<span id="L317"><span class="kw">def</span> <span class="const token" data-verso-hover="303">front</span> (ℓ m t : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="44">ℕ</span> := <span class="const token" data-verso-hover="301">site</span> ℓ m (t / m) <span class="nu">1</span></span>
+<span id="L318"></span>
+<span id="L319"><span class="dc">/-- Length of the injection period: `(m - 1) m^ℓ` rounds (phases `0, …, (m-1) m^(ℓ-1) - 1`, i.e.</span></span>
+<span id="L320"><span class="dc">the paper's `t_ℓ ∈ {0, …, m-2}`). -/</span></span>
+<span id="L321"><span class="kw">def</span> <span class="const token" data-verso-hover="304">horizon</span> (ℓ m : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="44">ℕ</span> := (m - <span class="nu">1</span>) * m ^ ℓ</span>
+<span id="L322"></span>
+<span id="L323"><span class="dc">/-- Round `t` is an injection round iff `⌊ρ (t+1)⌋ ≠ ⌊ρ t⌋`. -/</span></span>
+<span id="L324"><span class="kw">def</span> <span class="const token" data-verso-hover="305">jump</span> (ρ : <span class="const token" data-verso-hover="69">ℝ</span>) (t : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="kw">Prop</span> := ⌊ρ * ((t : <span class="const token" data-verso-hover="69">ℝ</span>) + <span class="nu">1</span>)⌋₊ ≠ ⌊ρ * t⌋₊</span>
+<span id="L325"></span>
+<span id="L326"><span class="kw">noncomputable</span> <span class="const token" data-verso-hover="306">instance</span> (ρ : <span class="const token" data-verso-hover="69">ℝ</span>) : <span class="const token" data-verso-hover="307">DecidablePred</span> (<span class="const token" data-verso-hover="305">jump</span> ρ) :=</span>
+<span id="L327">  <span class="kw">fun</span> _ =&gt; inferInstanceAs (<span class="const token" data-verso-hover="308">Decidable</span> (_ ≠ _))</span>
+<span id="L328"></span>
+<span id="L329"><span class="dc">/-- Packets of the adversary: a type `r ∈ {0, …, ℓ}` and an injection round `t &lt; horizon ℓ m`</span></span>
+<span id="L330"><span class="dc">with `jump ρ t`. -/</span></span>
+<span id="L331"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="309">LBIndex</span> (ℓ m : <span class="const token" data-verso-hover="44">ℕ</span>) (ρ : <span class="const token" data-verso-hover="69">ℝ</span>) := {x : <span class="const token" data-verso-hover="310">Fin</span> (ℓ + <span class="nu">1</span>) × <span class="const token" data-verso-hover="310">Fin</span> (<span class="const token" data-verso-hover="304">horizon</span> ℓ m) // <span class="const token" data-verso-hover="305">jump</span> ρ x.<span class="const token" data-verso-hover="166">2</span>}</span>
+<span id="L332"></span>
+<span id="L333"><span class="dc">/-- The adversary of Theorem 5.1 of [MPR19]: in every injection round `t`, a packet of each type</span></span>
+<span id="L334"><span class="dc">`r ∈ {0, …, ℓ}` is injected at `v_{r+1}(t/m)` with destination `v_r(t/m)` (type `r` here is the</span></span>
+<span id="L335"><span class="dc">paper's type `r + 1`; type `ℓ` is injected at node `0 = v_{ℓ+1}`). -/</span></span>
+<span id="L336"><span class="kw">def</span> <span class="const token" data-verso-hover="20">lbAdv</span> (ℓ m : <span class="const token" data-verso-hover="44">ℕ</span>) (ρ : <span class="const token" data-verso-hover="69">ℝ</span>) (x : <span class="const token" data-verso-hover="309">LBIndex</span> ℓ m ρ) : <span class="const token" data-verso-hover="239">Packet</span> :=</span>
+<span id="L337">  ⟨x.<span class="const token" data-verso-hover="311">1</span><span class="nu">.</span><span class="const token" data-verso-hover="166">2</span>, <span class="const token" data-verso-hover="301">site</span> ℓ m ((x.<span class="const token" data-verso-hover="311">1</span><span class="nu">.</span><span class="const token" data-verso-hover="166">2</span> : <span class="const token" data-verso-hover="44">ℕ</span>) / m) ((x.<span class="const token" data-verso-hover="311">1</span><span class="nu">.</span><span class="const token" data-verso-hover="181">1</span> : <span class="const token" data-verso-hover="44">ℕ</span>) + <span class="nu">1</span>), <span class="const token" data-verso-hover="301">site</span> ℓ m ((x.<span class="const token" data-verso-hover="311">1</span><span class="nu">.</span><span class="const token" data-verso-hover="166">2</span> : <span class="const token" data-verso-hover="44">ℕ</span>) / m) x.<span class="const token" data-verso-hover="311">1</span><span class="nu">.</span><span class="const token" data-verso-hover="181">1</span>⟩</span>
+<span id="L338"></span>
+<span id="L339"><span class="kw">lemma</span> <span class="const token" data-verso-hover="312">digit_lt</span> (hm : <span class="nu">0</span> &lt; m) (P j : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="299">digit</span> m P j &lt; m := <span class="const token" data-verso-hover="237">Nat.mod_lt</span> _ hm</span>
+<span id="L340"></span>
+<span id="L341"><span class="kw">lemma</span> <span class="const token" data-verso-hover="313">term_eq</span> (hm : <span class="nu">0</span> &lt; m) (P : <span class="const token" data-verso-hover="44">ℕ</span>) {j : <span class="const token" data-verso-hover="44">ℕ</span>} (hj : <span class="nu">1</span> ≤ j) :</span>
+<span id="L342">    (<span class="const token" data-verso-hover="300">term</span> m P j : <span class="const token" data-verso-hover="314">ℤ</span>) = (j + <span class="nu">1</span>) * m ^ j - (<span class="const token" data-verso-hover="299">digit</span> m P j + <span class="nu">1</span>) * j * m ^ (j - <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L343">  <span class="kw">obtain</span> ⟨j, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="192">Nat.exists_eq_add_of_le</span> hj</span>
+<span id="L344">  <span class="kw">have</span> hd := <span class="const token" data-verso-hover="312">digit_lt</span> hm P (<span class="nu">1</span> + j)</span>
+<span id="L345">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="300">term</span></span>
+<span id="L346">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="315">Nat.sub_sub</span>, <span class="const token" data-verso-hover="316">Nat.add_sub_cancel_left</span>]</span>
+<span id="L347">  <span class="kw">push_cast</span> [<span class="const token" data-verso-hover="289">Nat.cast_sub</span> (<span class="kw">show</span> <span class="nu">1</span> + <span class="const token" data-verso-hover="299">digit</span> m P (<span class="nu">1</span> + j) ≤ m <span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L348">  <span class="kw">ring</span></span>
+<span id="L349"></span>
+<span id="L350"><span class="kw">lemma</span> <span class="const token" data-verso-hover="317">pow_le_term</span> (m P j : <span class="const token" data-verso-hover="44">ℕ</span>) : m ^ j ≤ <span class="const token" data-verso-hover="300">term</span> m P j := <span class="const token" data-verso-hover="318">Nat.le_add_right</span> _ _</span>
+<span id="L351"></span>
+<span id="L352"><span class="kw">lemma</span> <span class="const token" data-verso-hover="319">term_le</span> (m P j : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="300">term</span> m P j ≤ m ^ j + (m - <span class="nu">1</span>) * j * m ^ (j - <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L353">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="300">term</span></span>
+<span id="L354">  <span class="kw">exact</span> <span class="const token" data-verso-hover="320">Nat.add_le_add_left</span> (<span class="const token" data-verso-hover="176">Nat.mul_le_mul_right</span> _ (<span class="const token" data-verso-hover="176">Nat.mul_le_mul_right</span> _ (<span class="const token" data-verso-hover="321">Nat.sub_le</span> _ _))) _</span>
+<span id="L355"></span>
+<span id="L356"><span class="dc">/-- `∑_{j=1}^{K} ((j+1) m^j - j m^(j-1)) = (K+1) m^K - 1`. -/</span></span>
+<span id="L357"><span class="kw">lemma</span> <span class="const token" data-verso-hover="322">sum_termMax</span> (hm : <span class="nu">0</span> &lt; m) (K : <span class="const token" data-verso-hover="44">ℕ</span>) :</span>
+<span id="L358">    ∑ j ∈ <span class="const token" data-verso-hover="302">Ico</span> <span class="nu">1</span> (K + <span class="nu">1</span>), (m ^ j + (m - <span class="nu">1</span>) * j * m ^ (j - <span class="nu">1</span>)) + <span class="nu">1</span> = (K + <span class="nu">1</span>) * m ^ K := <span class="kw">by</span></span>
+<span id="L359">  <span class="kw">induction</span> K <span class="kw">with</span></span>
+<span id="L360">  | <span class="const token" data-verso-hover="67">zero</span> =&gt; <span class="kw">simp</span></span>
+<span id="L361">  | <span class="const token" data-verso-hover="68">succ</span> K ih =&gt;</span>
+<span id="L362">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="323">sum_Ico_succ_top</span> (<span class="kw">by</span> <span class="kw">omega</span> : <span class="nu">1</span> ≤ K + <span class="nu">1</span>), <span class="const token" data-verso-hover="324">add_right_comm</span>, ih]</span>
+<span id="L363">    <span class="kw">obtain</span> ⟨m', <span class="kw">rfl</span>⟩ : ∃ m', m = m' + <span class="nu">1</span> := ⟨m - <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L364">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="325">Nat.add_sub_cancel</span>]</span>
+<span id="L365">    <span class="kw">ring</span></span>
+<span id="L366"></span>
+<span id="L367"><span class="kw">lemma</span> <span class="const token" data-verso-hover="326">site_zero</span> (P : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="301">site</span> ℓ m P <span class="nu">0</span> = (ℓ + <span class="nu">1</span>) * m ^ ℓ := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="301">site</span>]</span>
+<span id="L368"></span>
+<span id="L369"><span class="kw">lemma</span> <span class="const token" data-verso-hover="327">site_of_ne_zero</span> (P : <span class="const token" data-verso-hover="44">ℕ</span>) {i : <span class="const token" data-verso-hover="44">ℕ</span>} (hi : i ≠ <span class="nu">0</span>) :</span>
+<span id="L370">    <span class="const token" data-verso-hover="301">site</span> ℓ m P i = ∑ j ∈ <span class="const token" data-verso-hover="302">Ico</span> i (ℓ + <span class="nu">1</span>), <span class="const token" data-verso-hover="300">term</span> m P j := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="301">site</span>, hi]</span>
+<span id="L371"></span>
+<span id="L372"><span class="kw">lemma</span> <span class="const token" data-verso-hover="328">site_one_add_one_le</span> (hm : <span class="nu">0</span> &lt; m) (P : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="301">site</span> ℓ m P <span class="nu">1</span> + <span class="nu">1</span> ≤ (ℓ + <span class="nu">1</span>) * m ^ ℓ := <span class="kw">by</span></span>
+<span id="L373">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="327">site_of_ne_zero</span> P <span class="const token" data-verso-hover="329">one_ne_zero</span>, ← <span class="const token" data-verso-hover="322">sum_termMax</span> hm ℓ]</span>
+<span id="L374">  <span class="kw">have</span> := <span class="const token" data-verso-hover="266">sum_le_sum</span> (s := <span class="const token" data-verso-hover="302">Ico</span> <span class="nu">1</span> (ℓ + <span class="nu">1</span>)) <span class="kw">fun</span> j _ =&gt; <span class="const token" data-verso-hover="319">term_le</span> m P j</span>
+<span id="L375">  <span class="kw">omega</span></span>
+<span id="L376"></span>
+<span id="L377"><span class="kw">lemma</span> <span class="const token" data-verso-hover="330">site_succ</span> (P : <span class="const token" data-verso-hover="44">ℕ</span>) {i : <span class="const token" data-verso-hover="44">ℕ</span>} (hi : <span class="nu">1</span> ≤ i) (hiℓ : i ≤ ℓ) :</span>
+<span id="L378">    <span class="const token" data-verso-hover="301">site</span> ℓ m P i = <span class="const token" data-verso-hover="300">term</span> m P i + <span class="const token" data-verso-hover="301">site</span> ℓ m P (i + <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L379">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="327">site_of_ne_zero</span> P (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="327">site_of_ne_zero</span> P (<span class="kw">by</span> <span class="kw">omega</span>),</span>
+<span id="L380">    <span class="const token" data-verso-hover="331">sum_eq_sum_Ico_succ_bot</span> (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L381"></span>
+<span id="L382"><span class="dc">/-- The sites are non-increasing in the index. -/</span></span>
+<span id="L383"><span class="kw">lemma</span> <span class="const token" data-verso-hover="332">site_anti</span> (hm : <span class="nu">0</span> &lt; m) (P : <span class="const token" data-verso-hover="44">ℕ</span>) {i i' : <span class="const token" data-verso-hover="44">ℕ</span>} (h : i ≤ i') : <span class="const token" data-verso-hover="301">site</span> ℓ m P i' ≤ <span class="const token" data-verso-hover="301">site</span> ℓ m P i := <span class="kw">by</span></span>
+<span id="L384">  <span class="kw">have</span> hpos : ∀ {i i'}, <span class="nu">1</span> ≤ i → i ≤ i' → <span class="const token" data-verso-hover="301">site</span> ℓ m P i' ≤ <span class="const token" data-verso-hover="301">site</span> ℓ m P i := <span class="kw">by</span></span>
+<span id="L385">    <span class="kw">intro</span> i i' hi h</span>
+<span id="L386">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="327">site_of_ne_zero</span> P (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="327">site_of_ne_zero</span> P (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L387">    <span class="kw">exact</span> <span class="const token" data-verso-hover="333">sum_le_sum_of_subset</span> (<span class="const token" data-verso-hover="334">Ico_subset_Ico_left</span> h)</span>
+<span id="L388">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="335">Nat.eq_zero_or_pos</span> i <span class="kw">with</span> <span class="kw">rfl</span> | hi</span>
+<span id="L389">  · <span class="kw">rcases</span> <span class="const token" data-verso-hover="335">Nat.eq_zero_or_pos</span> i' <span class="kw">with</span> <span class="kw">rfl</span> | hi'</span>
+<span id="L390">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="73">le_rfl</span></span>
+<span id="L391">    · <span class="kw">have</span> h1 := hpos <span class="const token" data-verso-hover="73">le_rfl</span> hi'</span>
+<span id="L392">      <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="328">site_one_add_one_le</span> (ℓ := ℓ) hm P</span>
+<span id="L393">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="326">site_zero</span>]</span>
+<span id="L394">      <span class="kw">omega</span></span>
+<span id="L395">  · <span class="kw">exact</span> hpos hi h</span>
+<span id="L396"></span>
+<span id="L397"><span class="dc">/-- Routes are non-empty: `v_{r+1} &lt; v_r`. -/</span></span>
+<span id="L398"><span class="kw">lemma</span> <span class="const token" data-verso-hover="336">site_succ_lt</span> (hm : <span class="nu">0</span> &lt; m) (P : <span class="const token" data-verso-hover="44">ℕ</span>) {r : <span class="const token" data-verso-hover="44">ℕ</span>} (hr : r ≤ ℓ) :</span>
+<span id="L399">    <span class="const token" data-verso-hover="301">site</span> ℓ m P (r + <span class="nu">1</span>) &lt; <span class="const token" data-verso-hover="301">site</span> ℓ m P r := <span class="kw">by</span></span>
+<span id="L400">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="335">Nat.eq_zero_or_pos</span> r <span class="kw">with</span> <span class="kw">rfl</span> | hr0</span>
+<span id="L401">  · <span class="kw">have</span> := <span class="const token" data-verso-hover="328">site_one_add_one_le</span> (ℓ := ℓ) hm P</span>
+<span id="L402">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="326">site_zero</span>, <span class="const token" data-verso-hover="337">Nat.zero_add</span>]</span>
+<span id="L403">    <span class="kw">omega</span></span>
+<span id="L404">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="330">site_succ</span> P hr0 hr]</span>
+<span id="L405">    <span class="kw">have</span> := <span class="const token" data-verso-hover="317">pow_le_term</span> m P r</span>
+<span id="L406">    <span class="kw">have</span> := <span class="const token" data-verso-hover="144">pow_pos</span> hm r</span>
+<span id="L407">    <span class="kw">omega</span></span>
+<span id="L408"></span>
+<span id="L409"><span class="dc">/-- Claim 3 of [MPR19] (in terms of phases): if the phases `P` and `P'` agree in the digits</span></span>
+<span id="L410"><span class="dc">`t_ℓ, …, t_{k+1}` and `t'_k &gt; t_k`, then `F` in phase `P'` is left of `v_k` of phase `P`. -/</span></span>
+<span id="L411"><span class="kw">theorem</span> <span class="const token" data-verso-hover="36">claim3</span> (hm : <span class="nu">0</span> &lt; m) {k P P' : <span class="const token" data-verso-hover="44">ℕ</span>} (hk : <span class="nu">1</span> ≤ k) (hkℓ : k ≤ ℓ)</span>
+<span id="L412">    (hq : P' / m ^ k = P / m ^ k) (hd : <span class="const token" data-verso-hover="299">digit</span> m P k &lt; <span class="const token" data-verso-hover="299">digit</span> m P' k) :</span>
+<span id="L413">    <span class="const token" data-verso-hover="301">site</span> ℓ m P' <span class="nu">1</span> &lt; <span class="const token" data-verso-hover="301">site</span> ℓ m P k := <span class="kw">by</span></span>
+<span id="L414">  <span class="kw">have</span> hhi : ∑ j ∈ <span class="const token" data-verso-hover="302">Ico</span> (k + <span class="nu">1</span>) (ℓ + <span class="nu">1</span>), <span class="const token" data-verso-hover="300">term</span> m P' j = ∑ j ∈ <span class="const token" data-verso-hover="302">Ico</span> (k + <span class="nu">1</span>) (ℓ + <span class="nu">1</span>), <span class="const token" data-verso-hover="300">term</span> m P j := <span class="kw">by</span></span>
+<span id="L415">    <span class="kw">refine</span> <span class="const token" data-verso-hover="338">sum_congr</span> <span class="const token" data-verso-hover="55">rfl</span> <span class="kw">fun</span> j hj =&gt; ?_</span>
+<span id="L416">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="339">mem_Ico</span>] <span class="kw">at</span> hj</span>
+<span id="L417">    <span class="kw">have</span> : P' / m ^ (j - <span class="nu">1</span>) = P / m ^ (j - <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L418">      <span class="kw">have</span> e : m ^ (j - <span class="nu">1</span>) = m ^ k * m ^ (j - <span class="nu">1</span> - k) := <span class="kw">by</span> <span class="kw">rw</span> [← <span class="const token" data-verso-hover="193">pow_add</span>]; <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">omega</span></span>
+<span id="L419">      <span class="kw">rw</span> [e, ← <span class="const token" data-verso-hover="194">Nat.div_div_eq_div_mul</span>, ← <span class="const token" data-verso-hover="194">Nat.div_div_eq_div_mul</span>, hq]</span>
+<span id="L420">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="300">term</span>, <span class="const token" data-verso-hover="299">digit</span>, this]</span>
+<span id="L421">  <span class="kw">have</span> hlo : ∑ j ∈ <span class="const token" data-verso-hover="302">Ico</span> <span class="nu">1</span> k, <span class="const token" data-verso-hover="300">term</span> m P' j + <span class="nu">1</span> ≤ k * m ^ (k - <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L422">    <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="322">sum_termMax</span> hm (k - <span class="nu">1</span>)</span>
+<span id="L423">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="340">Nat.sub_add_cancel</span> hk] <span class="kw">at</span> h1</span>
+<span id="L424">    <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="266">sum_le_sum</span> (s := <span class="const token" data-verso-hover="302">Ico</span> <span class="nu">1</span> k) <span class="kw">fun</span> j _ =&gt; <span class="const token" data-verso-hover="319">term_le</span> m P' j</span>
+<span id="L425">    <span class="kw">omega</span></span>
+<span id="L426">  <span class="kw">have</span> hmid : <span class="const token" data-verso-hover="300">term</span> m P' k + k * m ^ (k - <span class="nu">1</span>) ≤ <span class="const token" data-verso-hover="300">term</span> m P k := <span class="kw">by</span></span>
+<span id="L427">    <span class="kw">have</span> hd' := <span class="const token" data-verso-hover="312">digit_lt</span> hm P' k</span>
+<span id="L428">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="300">term</span></span>
+<span id="L429">    <span class="kw">have</span> h3 : (m - <span class="nu">1</span> - <span class="const token" data-verso-hover="299">digit</span> m P' k + <span class="nu">1</span>) * (k * m ^ (k - <span class="nu">1</span>)) ≤</span>
+<span id="L430">        (m - <span class="nu">1</span> - <span class="const token" data-verso-hover="299">digit</span> m P k) * (k * m ^ (k - <span class="nu">1</span>)) := <span class="const token" data-verso-hover="176">Nat.mul_le_mul_right</span> _ (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L431">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="341">add_mul</span>, <span class="const token" data-verso-hover="342">one_mul</span>, ← <span class="const token" data-verso-hover="343">mul_assoc</span>, ← <span class="const token" data-verso-hover="343">mul_assoc</span>] <span class="kw">at</span> h3</span>
+<span id="L432">    <span class="kw">omega</span></span>
+<span id="L433">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="327">site_of_ne_zero</span> P' <span class="const token" data-verso-hover="329">one_ne_zero</span>, <span class="const token" data-verso-hover="327">site_of_ne_zero</span> P (<span class="kw">by</span> <span class="kw">omega</span>),</span>
+<span id="L434">    ← <span class="const token" data-verso-hover="344">sum_Ico_consecutive</span> _ hk (<span class="kw">by</span> <span class="kw">omega</span> : k ≤ ℓ + <span class="nu">1</span>),</span>
+<span id="L435">    <span class="const token" data-verso-hover="331">sum_eq_sum_Ico_succ_bot</span> (<span class="kw">by</span> <span class="kw">omega</span> : k &lt; ℓ + <span class="nu">1</span>),</span>
+<span id="L436">    <span class="const token" data-verso-hover="331">sum_eq_sum_Ico_succ_bot</span> (<span class="kw">by</span> <span class="kw">omega</span> : k &lt; ℓ + <span class="nu">1</span>), hhi]</span>
+<span id="L437">  <span class="kw">omega</span></span>
+<span id="L438"></span>
+<span id="L439"><span class="dc">/-- Consequence of Claim 3: if phase `P'` is at least `m^(r-1)` phases after `P` (and</span></span>
+<span id="L440"><span class="dc">`P' &lt; m^ℓ`), then `F` in phase `P'` is strictly left of `v_r` of phase `P`. -/</span></span>
+<span id="L441"><span class="kw">theorem</span> <span class="const token" data-verso-hover="345">site_one_lt</span> (hm : <span class="nu">0</span> &lt; m) {r P P' : <span class="const token" data-verso-hover="44">ℕ</span>} (hr : <span class="nu">1</span> ≤ r)</span>
+<span id="L442">    (hPP' : P + m ^ (r - <span class="nu">1</span>) ≤ P') (hP' : P' &lt; m ^ ℓ) : <span class="const token" data-verso-hover="301">site</span> ℓ m P' <span class="nu">1</span> &lt; <span class="const token" data-verso-hover="301">site</span> ℓ m P r := <span class="kw">by</span></span>
+<span id="L443">  <span class="kw">classical</span></span>
+<span id="L444">  <span class="kw">have</span> hpos : ∀ i, <span class="nu">0</span> &lt; m ^ i := <span class="kw">fun</span> i =&gt; <span class="const token" data-verso-hover="144">pow_pos</span> hm i</span>
+<span id="L445">  <span class="kw">have</span> hP : P &lt; m ^ ℓ := <span class="kw">by</span> <span class="kw">have</span> := hpos (r - <span class="nu">1</span>); <span class="kw">omega</span></span>
+<span id="L446">  <span class="kw">have</span> hex : ∃ k, P' / m ^ k = P / m ^ k :=</span>
+<span id="L447">    ⟨ℓ, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="199">Nat.div_eq_of_lt</span> hP', <span class="const token" data-verso-hover="199">Nat.div_eq_of_lt</span> hP]⟩</span>
+<span id="L448">  <span class="kw">have</span> hk : P' / m ^ <span class="const token" data-verso-hover="112">Nat.find</span> hex = P / m ^ <span class="const token" data-verso-hover="112">Nat.find</span> hex := <span class="const token" data-verso-hover="131">Nat.find_spec</span> hex</span>
+<span id="L449">  <span class="kw">have</span> hkℓ : <span class="const token" data-verso-hover="112">Nat.find</span> hex ≤ ℓ :=</span>
+<span id="L450">    <span class="const token" data-verso-hover="346">Nat.find_min'</span> hex (<span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="199">Nat.div_eq_of_lt</span> hP', <span class="const token" data-verso-hover="199">Nat.div_eq_of_lt</span> hP])</span>
+<span id="L451">  <span class="kw">have</span> hrk : r ≤ <span class="const token" data-verso-hover="112">Nat.find</span> hex := <span class="kw">by</span></span>
+<span id="L452">    <span class="kw">by_contra</span> hlt</span>
+<span id="L453">    <span class="kw">have</span> e : m ^ (r - <span class="nu">1</span>) = m ^ <span class="const token" data-verso-hover="112">Nat.find</span> hex * m ^ (r - <span class="nu">1</span> - <span class="const token" data-verso-hover="112">Nat.find</span> hex) := <span class="kw">by</span></span>
+<span id="L454">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="193">pow_add</span>]; <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">omega</span></span>
+<span id="L455">    <span class="kw">have</span> hq : P' / m ^ (r - <span class="nu">1</span>) = P / m ^ (r - <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L456">      <span class="kw">rw</span> [e, ← <span class="const token" data-verso-hover="194">Nat.div_div_eq_div_mul</span>, ← <span class="const token" data-verso-hover="194">Nat.div_div_eq_div_mul</span>, hk]</span>
+<span id="L457">    <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="212">Nat.lt_div_mul_add</span> (a := P') (hpos (r - <span class="nu">1</span>))</span>
+<span id="L458">    <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="213">Nat.div_mul_le_self</span> P (m ^ (r - <span class="nu">1</span>))</span>
+<span id="L459">    <span class="kw">rw</span> [hq] <span class="kw">at</span> h1</span>
+<span id="L460">    <span class="kw">omega</span></span>
+<span id="L461">  <span class="kw">set</span> k := <span class="const token" data-verso-hover="112">Nat.find</span> hex <span class="kw">with</span> hkdef</span>
+<span id="L462">  <span class="kw">have</span> hk1 : <span class="nu">1</span> ≤ k := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L463">  <span class="kw">have</span> hne : P' / m ^ (k - <span class="nu">1</span>) ≠ P / m ^ (k - <span class="nu">1</span>) := <span class="const token" data-verso-hover="134">Nat.find_min</span> hex (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L464">  <span class="kw">have</span> hdiv : ∀ Q, Q / m ^ (k - <span class="nu">1</span>) / m = Q / m ^ k := <span class="kw">fun</span> Q =&gt; <span class="kw">by</span></span>
+<span id="L465">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="194">Nat.div_div_eq_div_mul</span>, ← <span class="const token" data-verso-hover="217">pow_succ</span>, <span class="const token" data-verso-hover="340">Nat.sub_add_cancel</span> hk1]</span>
+<span id="L466">  <span class="kw">have</span> hle : P / m ^ (k - <span class="nu">1</span>) ≤ P' / m ^ (k - <span class="nu">1</span>) := <span class="const token" data-verso-hover="196">Nat.div_le_div_right</span> (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L467">  <span class="kw">have</span> hd : <span class="const token" data-verso-hover="299">digit</span> m P k &lt; <span class="const token" data-verso-hover="299">digit</span> m P' k := <span class="kw">by</span></span>
+<span id="L468">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="299">digit</span></span>
+<span id="L469">    <span class="kw">have</span> a1 := <span class="const token" data-verso-hover="238">Nat.div_add_mod</span> (P' / m ^ (k - <span class="nu">1</span>)) m</span>
+<span id="L470">    <span class="kw">have</span> a2 := <span class="const token" data-verso-hover="238">Nat.div_add_mod</span> (P / m ^ (k - <span class="nu">1</span>)) m</span>
+<span id="L471">    <span class="kw">rw</span> [hdiv] <span class="kw">at</span> a1 a2</span>
+<span id="L472">    <span class="kw">rw</span> [hk] <span class="kw">at</span> a1</span>
+<span id="L473">    <span class="kw">generalize</span> m * (P / m ^ k) = z <span class="kw">at</span> a1 a2</span>
+<span id="L474">    <span class="kw">omega</span></span>
+<span id="L475">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="36">claim3</span> hm hk1 hkℓ hk hd).<span class="const token" data-verso-hover="347">trans_le</span> (<span class="const token" data-verso-hover="332">site_anti</span> hm P hrk)</span>
+<span id="L476"></span>
+<span id="L477"><span class="kw">lemma</span> <span class="const token" data-verso-hover="348">mul_sub_one_mod</span> (hm : <span class="nu">0</span> &lt; m) {x : <span class="const token" data-verso-hover="44">ℕ</span>} (hx : <span class="nu">1</span> ≤ x) : (x * m - <span class="nu">1</span>) % m = m - <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L478">  <span class="kw">obtain</span> ⟨x, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="192">Nat.exists_eq_add_of_le</span> hx</span>
+<span id="L479">  <span class="kw">have</span> e : (<span class="nu">1</span> + x) * m - <span class="nu">1</span> = (m - <span class="nu">1</span>) + m * x := <span class="kw">by</span></span>
+<span id="L480">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="341">add_mul</span>, <span class="const token" data-verso-hover="342">one_mul</span>, <span class="const token" data-verso-hover="349">mul_comm</span> x m]</span>
+<span id="L481">    <span class="kw">omega</span></span>
+<span id="L482">  <span class="kw">rw</span> [e, <span class="const token" data-verso-hover="350">Nat.add_mul_mod_self_left</span>, <span class="const token" data-verso-hover="351">Nat.mod_eq_of_lt</span> (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L483"></span>
+<span id="L484"><span class="dc">/-- Lemma 5.4 of [MPR19], the length of the interval `[F(t+1)+1, F(t)]` (not needed for the</span></span>
+<span id="L485"><span class="dc">proof of `exists_load_ge`, verified for completeness): if the phase `P = q m^k + (m^k - 1)` has</span></span>
+<span id="L486"><span class="dc">its lowest `k` digits equal to `m - 1` and its digit `t_{k+1} = q mod m &lt; m - 1` (with</span></span>
+<span id="L487"><span class="dc">`k + 1 ≤ ℓ`), then at the transition to phase `P + 1` the front `F` drops by</span></span>
+<span id="L488"><span class="dc">`∑_{j=0}^{k} m^j = 1 + m (m^k - 1)/(m - 1)`. -/</span></span>
+<span id="L489"><span class="kw">theorem</span> <span class="const token" data-verso-hover="40">lemma_5_4_drop</span> (hm : <span class="nu">0</span> &lt; m) {k q : <span class="const token" data-verso-hover="44">ℕ</span>} (hk : k + <span class="nu">1</span> ≤ ℓ) (hq : q % m &lt; m - <span class="nu">1</span>) :</span>
+<span id="L490">    <span class="const token" data-verso-hover="301">site</span> ℓ m (q * m ^ k + (m ^ k - <span class="nu">1</span>)) <span class="nu">1</span> =</span>
+<span id="L491">      <span class="const token" data-verso-hover="301">site</span> ℓ m ((q + <span class="nu">1</span>) * m ^ k) <span class="nu">1</span> + ∑ j ∈ <span class="const token" data-verso-hover="177">range</span> (k + <span class="nu">1</span>), m ^ j := <span class="kw">by</span></span>
+<span id="L492">  <span class="kw">set</span> P := q * m ^ k + (m ^ k - <span class="nu">1</span>) <span class="kw">with</span> hPdef</span>
+<span id="L493">  <span class="kw">set</span> P1 := (q + <span class="nu">1</span>) * m ^ k <span class="kw">with</span> hP1def</span>
+<span id="L494">  <span class="kw">have</span> hpos : ∀ i, <span class="nu">0</span> &lt; m ^ i := <span class="kw">fun</span> i =&gt; <span class="const token" data-verso-hover="144">pow_pos</span> hm i</span>
+<span id="L495">  <span class="kw">have</span> hPk : P / m ^ k = q := <span class="kw">by</span></span>
+<span id="L496">    <span class="kw">rw</span> [hPdef, <span class="const token" data-verso-hover="352">add_comm</span>, <span class="const token" data-verso-hover="353">Nat.add_mul_div_right</span> _ _ (hpos k), <span class="const token" data-verso-hover="199">Nat.div_eq_of_lt</span> (<span class="kw">by</span></span>
+<span id="L497">      <span class="kw">have</span> := hpos k; <span class="kw">omega</span>), <span class="const token" data-verso-hover="61">zero_add</span>]</span>
+<span id="L498">  <span class="kw">have</span> hP1k : P1 / m ^ k = q + <span class="nu">1</span> := <span class="const token" data-verso-hover="218">Nat.mul_div_cancel</span> _ (hpos k)</span>
+<span id="L499">  <span class="kw">have</span> hq1 : (q + <span class="nu">1</span>) / m = q / m := <span class="kw">by</span></span>
+<span id="L500">    <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="238">Nat.div_add_mod</span> q m</span>
+<span id="L501">    <span class="kw">have</span> : q + <span class="nu">1</span> = (q % m + <span class="nu">1</span>) + m * (q / m) := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L502">    <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="354">Nat.add_mul_div_left</span> _ _ hm, <span class="const token" data-verso-hover="199">Nat.div_eq_of_lt</span> (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="61">zero_add</span>]</span>
+<span id="L503">  <span class="kw">have</span> hqa : ∀ a, <span class="nu">1</span> ≤ a → (q + <span class="nu">1</span>) / m ^ a = q / m ^ a := <span class="kw">by</span></span>
+<span id="L504">    <span class="kw">intro</span> a ha</span>
+<span id="L505">    <span class="kw">obtain</span> ⟨a, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="192">Nat.exists_eq_add_of_le</span> ha</span>
+<span id="L506">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="193">pow_add</span>, <span class="const token" data-verso-hover="355">pow_one</span>, ← <span class="const token" data-verso-hover="194">Nat.div_div_eq_div_mul</span>, ← <span class="const token" data-verso-hover="194">Nat.div_div_eq_div_mul</span>, hq1]</span>
+<span id="L507">  <span class="cm">--</span><span class="cm"> digits above `k + 1` agree</span></span>
+<span id="L508">  <span class="kw">have</span> hhigh : ∀ j ∈ <span class="const token" data-verso-hover="302">Ico</span> (k + <span class="nu">1</span> + <span class="nu">1</span>) (ℓ + <span class="nu">1</span>), <span class="const token" data-verso-hover="300">term</span> m P j = <span class="const token" data-verso-hover="300">term</span> m P1 j := <span class="kw">by</span></span>
+<span id="L509">    <span class="kw">intro</span> j hj</span>
+<span id="L510">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="339">mem_Ico</span>] <span class="kw">at</span> hj</span>
+<span id="L511">    <span class="kw">have</span> e : m ^ (j - <span class="nu">1</span>) = m ^ k * m ^ (j - <span class="nu">1</span> - k) := <span class="kw">by</span> <span class="kw">rw</span> [← <span class="const token" data-verso-hover="193">pow_add</span>]; <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">omega</span></span>
+<span id="L512">    <span class="kw">have</span> : P / m ^ (j - <span class="nu">1</span>) = P1 / m ^ (j - <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L513">      <span class="kw">rw</span> [e, ← <span class="const token" data-verso-hover="194">Nat.div_div_eq_div_mul</span>, ← <span class="const token" data-verso-hover="194">Nat.div_div_eq_div_mul</span>, hPk, hP1k, hqa _ (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L514">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="300">term</span>, <span class="const token" data-verso-hover="299">digit</span>, this]</span>
+<span id="L515">  <span class="cm">--</span><span class="cm"> digit `k + 1`</span></span>
+<span id="L516">  <span class="kw">have</span> hdk : <span class="const token" data-verso-hover="299">digit</span> m P (k + <span class="nu">1</span>) = q % m := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="299">digit</span>, hPk]</span>
+<span id="L517">  <span class="kw">have</span> hdk1 : <span class="const token" data-verso-hover="299">digit</span> m P1 (k + <span class="nu">1</span>) = q % m + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L518">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="299">digit</span>, <span class="const token" data-verso-hover="325">Nat.add_sub_cancel</span>, hP1k]</span>
+<span id="L519">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="356">Nat.add_mod</span>, <span class="const token" data-verso-hover="351">Nat.mod_eq_of_lt</span> (a := <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="351">Nat.mod_eq_of_lt</span> (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L520">  <span class="kw">have</span> hmidk : <span class="const token" data-verso-hover="300">term</span> m P (k + <span class="nu">1</span>) = <span class="const token" data-verso-hover="300">term</span> m P1 (k + <span class="nu">1</span>) + (k + <span class="nu">1</span>) * m ^ k := <span class="kw">by</span></span>
+<span id="L521">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="300">term</span></span>
+<span id="L522">    <span class="kw">rw</span> [hdk, hdk1, <span class="const token" data-verso-hover="325">Nat.add_sub_cancel</span>]</span>
+<span id="L523">    <span class="kw">have</span> : m - <span class="nu">1</span> - q % m = (m - <span class="nu">1</span> - (q % m + <span class="nu">1</span>)) + <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L524">    <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="341">add_mul</span>, <span class="const token" data-verso-hover="341">add_mul</span>, <span class="const token" data-verso-hover="342">one_mul</span>]</span>
+<span id="L525">    <span class="kw">ring</span></span>
+<span id="L526">  <span class="cm">--</span><span class="cm"> low digits</span></span>
+<span id="L527">  <span class="kw">have</span> hlow : ∀ j ∈ <span class="const token" data-verso-hover="302">Ico</span> <span class="nu">1</span> (k + <span class="nu">1</span>), <span class="const token" data-verso-hover="300">term</span> m P j = m ^ j ∧</span>
+<span id="L528">      <span class="const token" data-verso-hover="300">term</span> m P1 j = m ^ j + (m - <span class="nu">1</span>) * j * m ^ (j - <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L529">    <span class="kw">intro</span> j hj</span>
+<span id="L530">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="339">mem_Ico</span>] <span class="kw">at</span> hj</span>
+<span id="L531">    <span class="kw">have</span> e : m ^ k = m ^ (k - j) * m * m ^ (j - <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L532">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="217">pow_succ</span>, ← <span class="const token" data-verso-hover="193">pow_add</span>]; <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">omega</span></span>
+<span id="L533">    <span class="kw">have</span> hd1 : <span class="const token" data-verso-hover="299">digit</span> m P1 j = <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L534">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="299">digit</span>, hP1def, e, ← <span class="const token" data-verso-hover="343">mul_assoc</span>, <span class="const token" data-verso-hover="218">Nat.mul_div_cancel</span> _ (hpos (j - <span class="nu">1</span>))]</span>
+<span id="L535">      <span class="kw">exact</span> <span class="const token" data-verso-hover="357">Nat.mul_mod_left</span> _ _</span>
+<span id="L536">    <span class="kw">have</span> hd : <span class="const token" data-verso-hover="299">digit</span> m P j = m - <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L537">      <span class="kw">have</span> hPj : P / m ^ (j - <span class="nu">1</span>) = (q + <span class="nu">1</span>) * m ^ (k - j) * m - <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L538">        <span class="kw">have</span> h1 : P + <span class="nu">1</span> = ((q + <span class="nu">1</span>) * m ^ (k - j) * m) * m ^ (j - <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L539">          <span class="kw">rw</span> [hPdef, <span class="const token" data-verso-hover="343">mul_assoc</span>, <span class="const token" data-verso-hover="343">mul_assoc</span>, ← <span class="const token" data-verso-hover="343">mul_assoc</span> (m ^ (k - j)), ← e]</span>
+<span id="L540">          <span class="kw">have</span> := hpos k</span>
+<span id="L541">          <span class="kw">rw</span> [<span class="const token" data-verso-hover="341">add_mul</span>, <span class="const token" data-verso-hover="342">one_mul</span>]</span>
+<span id="L542">          <span class="kw">omega</span></span>
+<span id="L543">        <span class="kw">have</span> h2 : <span class="nu">0</span> &lt; (q + <span class="nu">1</span>) * m ^ (k - j) * m := <span class="kw">by</span></span>
+<span id="L544">          <span class="kw">have</span> := hpos (k - j); <span class="kw">positivity</span></span>
+<span id="L545">        <span class="kw">have</span> h3 : P = ((q + <span class="nu">1</span>) * m ^ (k - j) * m - <span class="nu">1</span>) * m ^ (j - <span class="nu">1</span>) + (m ^ (j - <span class="nu">1</span>) - <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L546">          <span class="kw">have</span> := hpos (j - <span class="nu">1</span>)</span>
+<span id="L547">          <span class="kw">rw</span> [<span class="const token" data-verso-hover="358">Nat.sub_mul</span>, <span class="const token" data-verso-hover="342">one_mul</span>, ← h1]</span>
+<span id="L548">          <span class="kw">have</span> : m ^ (j - <span class="nu">1</span>) ≤ P + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L549">            <span class="kw">rw</span> [h1]; <span class="kw">exact</span> <span class="const token" data-verso-hover="359">Nat.le_mul_of_pos_left</span> _ h2</span>
+<span id="L550">          <span class="kw">omega</span></span>
+<span id="L551">        <span class="kw">rw</span> [h3, <span class="const token" data-verso-hover="352">add_comm</span>, <span class="const token" data-verso-hover="353">Nat.add_mul_div_right</span> _ _ (hpos (j - <span class="nu">1</span>)),</span>
+<span id="L552">          <span class="const token" data-verso-hover="199">Nat.div_eq_of_lt</span> (<span class="kw">by</span> <span class="kw">have</span> := hpos (j - <span class="nu">1</span>); <span class="kw">omega</span>), <span class="const token" data-verso-hover="61">zero_add</span>]</span>
+<span id="L553">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="299">digit</span>]</span>
+<span id="L554">      <span class="kw">rw</span> [hPj]</span>
+<span id="L555">      <span class="kw">exact</span> <span class="const token" data-verso-hover="348">mul_sub_one_mod</span> hm (<span class="const token" data-verso-hover="360">Nat.mul_pos</span> (<span class="const token" data-verso-hover="361">Nat.succ_pos</span> q) (hpos _))</span>
+<span id="L556">    <span class="kw">refine</span> ⟨?_, ?_⟩</span>
+<span id="L557">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="300">term</span>, hd]</span>
+<span id="L558">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="300">term</span>, hd1]</span>
+<span id="L559">  <span class="kw">have</span> hsP : ∑ j ∈ <span class="const token" data-verso-hover="302">Ico</span> <span class="nu">1</span> (k + <span class="nu">1</span>), <span class="const token" data-verso-hover="300">term</span> m P j = ∑ j ∈ <span class="const token" data-verso-hover="302">Ico</span> <span class="nu">1</span> (k + <span class="nu">1</span>), m ^ j :=</span>
+<span id="L560">    <span class="const token" data-verso-hover="338">sum_congr</span> <span class="const token" data-verso-hover="55">rfl</span> <span class="kw">fun</span> j hj =&gt; (hlow j hj).<span class="const token" data-verso-hover="66">1</span></span>
+<span id="L561">  <span class="kw">have</span> hsP1 : ∑ j ∈ <span class="const token" data-verso-hover="302">Ico</span> <span class="nu">1</span> (k + <span class="nu">1</span>), <span class="const token" data-verso-hover="300">term</span> m P1 j + <span class="nu">1</span> = (k + <span class="nu">1</span>) * m ^ k := <span class="kw">by</span></span>
+<span id="L562">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="338">sum_congr</span> <span class="const token" data-verso-hover="55">rfl</span> <span class="kw">fun</span> j hj =&gt; (hlow j hj).<span class="const token" data-verso-hover="96">2</span>]</span>
+<span id="L563">    <span class="kw">exact</span> <span class="const token" data-verso-hover="322">sum_termMax</span> hm k</span>
+<span id="L564">  <span class="kw">have</span> hgeom : ∑ j ∈ <span class="const token" data-verso-hover="177">range</span> (k + <span class="nu">1</span>), m ^ j = <span class="nu">1</span> + ∑ j ∈ <span class="const token" data-verso-hover="302">Ico</span> <span class="nu">1</span> (k + <span class="nu">1</span>), m ^ j := <span class="kw">by</span></span>
+<span id="L565">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="362">range_eq_Ico</span>, <span class="const token" data-verso-hover="331">sum_eq_sum_Ico_succ_bot</span> (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="363">pow_zero</span>]</span>
+<span id="L566">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="327">site_of_ne_zero</span> _ <span class="const token" data-verso-hover="329">one_ne_zero</span>, <span class="const token" data-verso-hover="327">site_of_ne_zero</span> _ <span class="const token" data-verso-hover="329">one_ne_zero</span>,</span>
+<span id="L567">    ← <span class="const token" data-verso-hover="344">sum_Ico_consecutive</span> _ (<span class="kw">by</span> <span class="kw">omega</span> : <span class="nu">1</span> ≤ k + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span> : k + <span class="nu">1</span> ≤ ℓ + <span class="nu">1</span>),</span>
+<span id="L568">    ← <span class="const token" data-verso-hover="344">sum_Ico_consecutive</span> _ (<span class="kw">by</span> <span class="kw">omega</span> : <span class="nu">1</span> ≤ k + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span> : k + <span class="nu">1</span> ≤ ℓ + <span class="nu">1</span>),</span>
+<span id="L569">    <span class="const token" data-verso-hover="331">sum_eq_sum_Ico_succ_bot</span> (<span class="kw">by</span> <span class="kw">omega</span> : k + <span class="nu">1</span> &lt; ℓ + <span class="nu">1</span>),</span>
+<span id="L570">    <span class="const token" data-verso-hover="331">sum_eq_sum_Ico_succ_bot</span> (<span class="kw">by</span> <span class="kw">omega</span> : k + <span class="nu">1</span> &lt; ℓ + <span class="nu">1</span>), <span class="const token" data-verso-hover="338">sum_congr</span> <span class="const token" data-verso-hover="55">rfl</span> (<span class="kw">fun</span> j hj =&gt; hhigh j hj),</span>
+<span id="L571">    hgeom, hsP, hmidk]</span>
+<span id="L572">  <span class="kw">linarith</span></span>
+<span id="L573"></span>
+<span id="L574"><span class="kw">lemma</span> <span class="const token" data-verso-hover="364">front_add_one_le</span> (hm : <span class="nu">0</span> &lt; m) (t : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="303">front</span> ℓ m t + <span class="nu">1</span> ≤ (ℓ + <span class="nu">1</span>) * m ^ ℓ :=</span>
+<span id="L575">  <span class="const token" data-verso-hover="328">site_one_add_one_le</span> hm _</span>
+<span id="L576"></span>
+<span id="L577"><span class="kw">lemma</span> <span class="const token" data-verso-hover="365">div_lt_of_le_horizon</span> (hm : <span class="nu">0</span> &lt; m) {t : <span class="const token" data-verso-hover="44">ℕ</span>} (ht : t ≤ <span class="const token" data-verso-hover="304">horizon</span> ℓ m) : t / m &lt; m ^ ℓ := <span class="kw">by</span></span>
+<span id="L578">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="223">Nat.div_lt_iff_lt_mul</span> hm]</span>
+<span id="L579">  <span class="kw">have</span> := <span class="const token" data-verso-hover="144">pow_pos</span> hm ℓ</span>
+<span id="L580">  <span class="kw">calc</span> t ≤ (m - <span class="nu">1</span>) * m ^ ℓ := ht</span>
+<span id="L581">    _ &lt; m * m ^ ℓ := <span class="const token" data-verso-hover="366">Nat.mul_lt_mul_of_pos_right</span> (<span class="kw">by</span> <span class="kw">omega</span>) this</span>
+<span id="L582">    _ = m ^ ℓ * m := <span class="const token" data-verso-hover="349">mul_comm</span> _ _</span>
+<span id="L583"></span>
+<span id="L584"><span class="dc">/-- `F` is non-increasing (during the injection period). -/</span></span>
+<span id="L585"><span class="kw">lemma</span> <span class="const token" data-verso-hover="367">front_succ_le</span> (hm : <span class="nu">0</span> &lt; m) {t : <span class="const token" data-verso-hover="44">ℕ</span>} (ht : t + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="304">horizon</span> ℓ m) :</span>
+<span id="L586">    <span class="const token" data-verso-hover="303">front</span> ℓ m (t + <span class="nu">1</span>) ≤ <span class="const token" data-verso-hover="303">front</span> ℓ m t := <span class="kw">by</span></span>
+<span id="L587">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="303">front</span></span>
+<span id="L588">  <span class="kw">rcases</span> (<span class="const token" data-verso-hover="196">Nat.div_le_div_right</span> (<span class="const token" data-verso-hover="368">Nat.le_succ</span> t) : t / m ≤ (t + <span class="nu">1</span>) / m).<span class="const token" data-verso-hover="369">eq_or_lt</span> <span class="kw">with</span> h | h</span>
+<span id="L589">  · <span class="kw">rw</span> [h]</span>
+<span id="L590">  · <span class="kw">exact</span> (<span class="const token" data-verso-hover="345">site_one_lt</span> (r := <span class="nu">1</span>) hm <span class="const token" data-verso-hover="73">le_rfl</span> (<span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> h)</span>
+<span id="L591">      (<span class="const token" data-verso-hover="365">div_lt_of_le_horizon</span> hm ht)).<span class="const token" data-verso-hover="205">le</span></span>
+<span id="L592"></span>
+<span id="L593"><span class="kw">variable</span> {ρ : <span class="const token" data-verso-hover="69">ℝ</span>}</span>
+<span id="L594"></span>
+<span id="L595"><span class="kw">lemma</span> <span class="const token" data-verso-hover="370">lbAdv_src_le_front</span> (hm : <span class="nu">0</span> &lt; m) (x : <span class="const token" data-verso-hover="309">LBIndex</span> ℓ m ρ) :</span>
+<span id="L596">    (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ x).<span class="const token" data-verso-hover="241">src</span> ≤ <span class="const token" data-verso-hover="303">front</span> ℓ m (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ x).<span class="const token" data-verso-hover="240">time</span> :=</span>
+<span id="L597">  <span class="const token" data-verso-hover="332">site_anti</span> hm _ (<span class="const token" data-verso-hover="371">Nat.le_add_left</span> <span class="nu">1</span> _)</span>
+<span id="L598"></span>
+<span id="L599"><span class="kw">lemma</span> <span class="const token" data-verso-hover="372">lbAdv_src_lt_dst</span> (hm : <span class="nu">0</span> &lt; m) (x : <span class="const token" data-verso-hover="309">LBIndex</span> ℓ m ρ) :</span>
+<span id="L600">    (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ x).<span class="const token" data-verso-hover="241">src</span> &lt; (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ x).<span class="const token" data-verso-hover="242">dst</span> :=</span>
+<span id="L601">  <span class="const token" data-verso-hover="336">site_succ_lt</span> hm _ (<span class="const token" data-verso-hover="373">Nat.lt_succ_iff</span>.<span class="const token" data-verso-hover="91">1</span> x.<span class="const token" data-verso-hover="311">1</span><span class="nu">.</span><span class="const token" data-verso-hover="181">1</span><span class="nu">.</span><span class="const token" data-verso-hover="374">2</span>)</span>
+<span id="L602"></span>
+<span id="L603"><span class="kw">lemma</span> <span class="const token" data-verso-hover="375">lbAdv_dst_lt</span> (hm : <span class="nu">0</span> &lt; m) (x : <span class="const token" data-verso-hover="309">LBIndex</span> ℓ m ρ) :</span>
+<span id="L604">    (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ x).<span class="const token" data-verso-hover="242">dst</span> &lt; (ℓ + <span class="nu">1</span>) * m ^ ℓ + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L605">  <span class="kw">have</span> := <span class="const token" data-verso-hover="332">site_anti</span> (ℓ := ℓ) hm ((x.<span class="const token" data-verso-hover="311">1</span><span class="nu">.</span><span class="const token" data-verso-hover="166">2</span> : <span class="const token" data-verso-hover="44">ℕ</span>) / m) (<span class="const token" data-verso-hover="202">Nat.zero_le</span> x.<span class="const token" data-verso-hover="311">1</span><span class="nu">.</span><span class="const token" data-verso-hover="181">1</span>)</span>
+<span id="L606">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="326">site_zero</span>] <span class="kw">at</span> this</span>
+<span id="L607">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="20">lbAdv</span>]</span>
+<span id="L608">  <span class="kw">omega</span></span>
+<span id="L609"></span>
+<span id="L610"><span class="dc">/-- Lemma 5.3 of [MPR19]: a packet that has reached its destination in round `t` (within the</span></span>
+<span id="L611"><span class="dc">injection period) is stale in round `t`, i.e. its destination is right of `F(t)`. -/</span></span>
+<span id="L612"><span class="kw">theorem</span> <span class="const token" data-verso-hover="37">lemma_5_3</span> (hm : <span class="nu">0</span> &lt; m) (E : <span class="const token" data-verso-hover="19">Execution</span> (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ)) (p : <span class="const token" data-verso-hover="309">LBIndex</span> ℓ m ρ) {t : <span class="const token" data-verso-hover="44">ℕ</span>}</span>
+<span id="L613">    (ht : (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ p).<span class="const token" data-verso-hover="240">time</span> ≤ t) (htT : t ≤ <span class="const token" data-verso-hover="304">horizon</span> ℓ m)</span>
+<span id="L614">    (hdel : E.<span class="const token" data-verso-hover="246">pos</span> t p = (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ p).<span class="const token" data-verso-hover="242">dst</span>) : <span class="const token" data-verso-hover="303">front</span> ℓ m t &lt; (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ p).<span class="const token" data-verso-hover="242">dst</span> := <span class="kw">by</span></span>
+<span id="L615">  <span class="kw">have</span> hmove := E.<span class="const token" data-verso-hover="258">pos_le_src_add_of_le</span> ht</span>
+<span id="L616">  <span class="kw">obtain</span> ⟨⟨r, t0⟩, hj⟩ := p</span>
+<span id="L617">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="20">lbAdv</span>] <span class="kw">at</span> ht hdel hmove ⊢</span>
+<span id="L618">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="335">Nat.eq_zero_or_pos</span> (r : <span class="const token" data-verso-hover="44">ℕ</span>) <span class="kw">with</span> hr | hr</span>
+<span id="L619">  · <span class="kw">rw</span> [hr, <span class="const token" data-verso-hover="326">site_zero</span>]</span>
+<span id="L620">    <span class="kw">have</span> := <span class="const token" data-verso-hover="364">front_add_one_le</span> (ℓ := ℓ) hm t</span>
+<span id="L621">    <span class="kw">omega</span></span>
+<span id="L622">  · <span class="kw">have</span> hrℓ : (r : <span class="const token" data-verso-hover="44">ℕ</span>) ≤ ℓ := <span class="const token" data-verso-hover="373">Nat.lt_succ_iff</span>.<span class="const token" data-verso-hover="91">1</span> r.<span class="const token" data-verso-hover="374">2</span></span>
+<span id="L623">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="330">site_succ</span> _ hr hrℓ] <span class="kw">at</span> hdel</span>
+<span id="L624">    <span class="kw">have</span> hterm := <span class="const token" data-verso-hover="317">pow_le_term</span> m ((t0 : <span class="const token" data-verso-hover="44">ℕ</span>) / m) r</span>
+<span id="L625">    <span class="kw">have</span> h1 : (t0 : <span class="const token" data-verso-hover="44">ℕ</span>) + m ^ (r : <span class="const token" data-verso-hover="44">ℕ</span>) ≤ t := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L626">    <span class="kw">have</span> h2 : (t0 : <span class="const token" data-verso-hover="44">ℕ</span>) / m + m ^ ((r : <span class="const token" data-verso-hover="44">ℕ</span>) - <span class="nu">1</span>) ≤ t / m := <span class="kw">by</span></span>
+<span id="L627">      <span class="kw">have</span> e : m ^ (r : <span class="const token" data-verso-hover="44">ℕ</span>) = m ^ ((r : <span class="const token" data-verso-hover="44">ℕ</span>) - <span class="nu">1</span>) * m := <span class="kw">by</span> <span class="kw">rw</span> [← <span class="const token" data-verso-hover="217">pow_succ</span>, <span class="const token" data-verso-hover="340">Nat.sub_add_cancel</span> hr]</span>
+<span id="L628">      <span class="kw">rw</span> [e] <span class="kw">at</span> h1</span>
+<span id="L629">      <span class="kw">calc</span> (t0 : <span class="const token" data-verso-hover="44">ℕ</span>) / m + m ^ ((r : <span class="const token" data-verso-hover="44">ℕ</span>) - <span class="nu">1</span>) = ((t0 : <span class="const token" data-verso-hover="44">ℕ</span>) + m ^ ((r : <span class="const token" data-verso-hover="44">ℕ</span>) - <span class="nu">1</span>) * m) / m :=</span>
+<span id="L630">            (<span class="const token" data-verso-hover="353">Nat.add_mul_div_right</span> _ _ hm).<span class="const token" data-verso-hover="135">symm</span></span>
+<span id="L631">        _ ≤ t / m := <span class="const token" data-verso-hover="196">Nat.div_le_div_right</span> h1</span>
+<span id="L632">    <span class="kw">exact</span> <span class="const token" data-verso-hover="345">site_one_lt</span> hm hr h2 (<span class="const token" data-verso-hover="365">div_lt_of_le_horizon</span> hm htT)</span>
+<span id="L633"></span>
+<span id="L634"><span class="dc">/-- Fresh packets are not delivered (consequence of Lemma 5.3). -/</span></span>
+<span id="L635"><span class="kw">lemma</span> <span class="const token" data-verso-hover="376">lbAdv_undelivered</span> (hm : <span class="nu">0</span> &lt; m) (E : <span class="const token" data-verso-hover="19">Execution</span> (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ)) {t : <span class="const token" data-verso-hover="44">ℕ</span>}</span>
+<span id="L636">    (htT : t ≤ <span class="const token" data-verso-hover="304">horizon</span> ℓ m) (p : <span class="const token" data-verso-hover="309">LBIndex</span> ℓ m ρ) (ht : (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ p).<span class="const token" data-verso-hover="240">time</span> ≤ t)</span>
+<span id="L637">    (hf : E.<span class="const token" data-verso-hover="246">pos</span> t p ≤ <span class="const token" data-verso-hover="303">front</span> ℓ m t) : E.<span class="const token" data-verso-hover="246">pos</span> t p &lt; (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ p).<span class="const token" data-verso-hover="242">dst</span> := <span class="kw">by</span></span>
+<span id="L638">  <span class="kw">have</span> hle := E.<span class="const token" data-verso-hover="260">pos_le_dst</span> (<span class="const token" data-verso-hover="372">lbAdv_src_lt_dst</span> hm p).<span class="const token" data-verso-hover="205">le</span> ht</span>
+<span id="L639">  <span class="kw">rcases</span> hle.<span class="const token" data-verso-hover="287">lt_or_eq</span> <span class="kw">with</span> h | h</span>
+<span id="L640">  · <span class="kw">exact</span> h</span>
+<span id="L641">  · <span class="kw">have</span> := <span class="const token" data-verso-hover="37">lemma_5_3</span> hm E p ht htT h</span>
+<span id="L642">    <span class="kw">omega</span></span>
+<span id="L643"></span>
+<span id="L644"><span class="dc">/-! ### Counting injections and boundedness -/</span></span>
+<span id="L645"></span>
+<span id="L646"><span class="kw">lemma</span> <span class="const token" data-verso-hover="377">sum_jump</span> (hρ0 : <span class="nu">0</span> ≤ ρ) (hρ1 : ρ ≤ <span class="nu">1</span>) {s t : <span class="const token" data-verso-hover="44">ℕ</span>} (hst : s ≤ t) :</span>
+<span id="L647">    ∑ u ∈ <span class="const token" data-verso-hover="302">Ico</span> s t, (<span class="kw">if</span> <span class="const token" data-verso-hover="305">jump</span> ρ u <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>) + ⌊ρ * s⌋₊ = ⌊ρ * t⌋₊ := <span class="kw">by</span></span>
+<span id="L648">  <span class="kw">induction</span> t, hst <span class="kw">using</span> <span class="const token" data-verso-hover="378">Nat.le_induction</span> <span class="kw">with</span></span>
+<span id="L649">  | base =&gt; <span class="kw">simp</span></span>
+<span id="L650">  | <span class="const token" data-verso-hover="68">succ</span> t hst ih =&gt;</span>
+<span id="L651">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="323">sum_Ico_succ_top</span> hst, <span class="const token" data-verso-hover="324">add_right_comm</span>, ih]</span>
+<span id="L652">    <span class="kw">have</span> h1 : ⌊ρ * t⌋₊ ≤ ⌊ρ * ((t : <span class="const token" data-verso-hover="69">ℝ</span>) + <span class="nu">1</span>)⌋₊ := <span class="const token" data-verso-hover="379">Nat.floor_le_floor</span> (<span class="kw">by</span> <span class="kw">nlinarith</span>)</span>
+<span id="L653">    <span class="kw">have</span> h2 : ⌊ρ * ((t : <span class="const token" data-verso-hover="69">ℝ</span>) + <span class="nu">1</span>)⌋₊ ≤ ⌊ρ * t⌋₊ + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L654">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="380">Nat.floor_add_one</span> (<span class="kw">by</span> <span class="kw">positivity</span>)]</span>
+<span id="L655">      <span class="kw">exact</span> <span class="const token" data-verso-hover="379">Nat.floor_le_floor</span> (<span class="kw">by</span> <span class="kw">nlinarith</span>)</span>
+<span id="L656">    <span class="kw">push_cast</span></span>
+<span id="L657">    <span class="kw">by_cases</span> h : <span class="const token" data-verso-hover="305">jump</span> ρ t</span>
+<span id="L658">    · <span class="kw">simp</span> only [h, ↓<span class="const token" data-verso-hover="381">reduceIte</span>]</span>
+<span id="L659">      <span class="kw">unfold</span> <span class="const token" data-verso-hover="305">jump</span> <span class="kw">at</span> h</span>
+<span id="L660">      <span class="kw">omega</span></span>
+<span id="L661">    · <span class="kw">simp</span> only [h, ↓<span class="const token" data-verso-hover="381">reduceIte</span>]</span>
+<span id="L662">      <span class="kw">unfold</span> <span class="const token" data-verso-hover="305">jump</span> <span class="kw">at</span> h</span>
+<span id="L663">      <span class="kw">omega</span></span>
+<span id="L664"></span>
+<span id="L665"><span class="kw">lemma</span> <span class="const token" data-verso-hover="382">card_jump_le</span> (hρ0 : <span class="nu">0</span> ≤ ρ) (hρ1 : ρ ≤ <span class="nu">1</span>) {s t : <span class="const token" data-verso-hover="44">ℕ</span>} (hst : s ≤ t) :</span>
+<span id="L666">    ((∑ u ∈ <span class="const token" data-verso-hover="302">Ico</span> s t, (<span class="kw">if</span> <span class="const token" data-verso-hover="305">jump</span> ρ u <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>) : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="69">ℝ</span>) ≤ ρ * ((t : <span class="const token" data-verso-hover="69">ℝ</span>) - s) + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L667">  <span class="kw">have</span> h := <span class="const token" data-verso-hover="377">sum_jump</span> hρ0 hρ1 hst</span>
+<span id="L668">  <span class="kw">have</span> h1 : (⌊ρ * t⌋₊ : <span class="const token" data-verso-hover="69">ℝ</span>) ≤ ρ * t := <span class="const token" data-verso-hover="383">Nat.floor_le</span> (<span class="kw">by</span> <span class="kw">positivity</span>)</span>
+<span id="L669">  <span class="kw">have</span> h2 : ρ * s &lt; ⌊ρ * s⌋₊ + <span class="nu">1</span> := <span class="const token" data-verso-hover="384">Nat.lt_floor_add_one</span> _</span>
+<span id="L670">  <span class="kw">have</span> h3 : ((∑ u ∈ <span class="const token" data-verso-hover="302">Ico</span> s t, (<span class="kw">if</span> <span class="const token" data-verso-hover="305">jump</span> ρ u <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>) : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="69">ℝ</span>) = ⌊ρ * t⌋₊ - ⌊ρ * s⌋₊ := <span class="kw">by</span></span>
+<span id="L671">    <span class="kw">rw</span> [← h]</span>
+<span id="L672">    <span class="kw">push_cast</span></span>
+<span id="L673">    <span class="kw">ring</span></span>
+<span id="L674">  <span class="kw">linarith</span></span>
+<span id="L675"></span>
+<span id="L676"><span class="dc">/-- The adversary injects `(ℓ + 1) ⌊ρ (m-1) m^ℓ⌋` packets. -/</span></span>
+<span id="L677"><span class="kw">lemma</span> <span class="const token" data-verso-hover="385">card_lbIndex</span> (hρ0 : <span class="nu">0</span> ≤ ρ) (hρ1 : ρ ≤ <span class="nu">1</span>) :</span>
+<span id="L678">    <span class="const token" data-verso-hover="386">Fintype.card</span> (<span class="const token" data-verso-hover="309">LBIndex</span> ℓ m ρ) = (ℓ + <span class="nu">1</span>) * ⌊ρ * <span class="const token" data-verso-hover="304">horizon</span> ℓ m⌋₊ := <span class="kw">by</span></span>
+<span id="L679">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="387">Fintype.card_subtype</span>, ← <span class="const token" data-verso-hover="388">univ_product_univ</span>,</span>
+<span id="L680">    <span class="const token" data-verso-hover="389">filter_product_right</span> (<span class="kw">fun</span> y : <span class="const token" data-verso-hover="310">Fin</span> (<span class="const token" data-verso-hover="304">horizon</span> ℓ m) =&gt; <span class="const token" data-verso-hover="305">jump</span> ρ y), <span class="const token" data-verso-hover="390">card_product</span>, <span class="const token" data-verso-hover="391">card_univ</span>,</span>
+<span id="L681">    <span class="const token" data-verso-hover="392">Fintype.card_fin</span>, <span class="const token" data-verso-hover="393">card_filter</span>, <span class="const token" data-verso-hover="394">Fin.sum_univ_eq_sum_range</span> (<span class="kw">fun</span> u =&gt; <span class="kw">if</span> <span class="const token" data-verso-hover="305">jump</span> ρ u <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>),</span>
+<span id="L682">    <span class="const token" data-verso-hover="362">range_eq_Ico</span>, ← <span class="const token" data-verso-hover="377">sum_jump</span> hρ0 hρ1 (<span class="const token" data-verso-hover="202">Nat.zero_le</span> (<span class="const token" data-verso-hover="304">horizon</span> ℓ m))]</span>
+<span id="L683">  <span class="kw">simp</span></span>
+<span id="L684"></span>
+<span id="L685"><span class="kw">lemma</span> <span class="const token" data-verso-hover="395">sum_counts_eq</span> (P : ι → <span class="const token" data-verso-hover="239">Packet</span>) (u v n : <span class="const token" data-verso-hover="44">ℕ</span>) :</span>
+<span id="L686">    ∑ a ∈ <span class="const token" data-verso-hover="177">range</span> (v + <span class="nu">1</span>), ∑ b ∈ <span class="const token" data-verso-hover="396">Ioo</span> v n, <span class="const token" data-verso-hover="244">counts</span> P u a b =</span>
+<span id="L687">      #{p | (P p).<span class="const token" data-verso-hover="240">time</span> = u ∧ (P p).<span class="const token" data-verso-hover="241">src</span> ≤ v ∧ v &lt; (P p).<span class="const token" data-verso-hover="242">dst</span> ∧ (P p).<span class="const token" data-verso-hover="242">dst</span> &lt; n} := <span class="kw">by</span></span>
+<span id="L688">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="265">card_eq_sum_card_fiberwise</span> (f := <span class="kw">fun</span> p =&gt; ((P p).<span class="const token" data-verso-hover="241">src</span>, (P p).<span class="const token" data-verso-hover="242">dst</span>))</span>
+<span id="L689">    (t := <span class="const token" data-verso-hover="177">range</span> (v + <span class="nu">1</span>) ×ˢ <span class="const token" data-verso-hover="396">Ioo</span> v n), <span class="const token" data-verso-hover="397">sum_product</span>]</span>
+<span id="L690">  · <span class="kw">refine</span> <span class="const token" data-verso-hover="338">sum_congr</span> <span class="const token" data-verso-hover="55">rfl</span> <span class="kw">fun</span> a ha =&gt; <span class="const token" data-verso-hover="338">sum_congr</span> <span class="const token" data-verso-hover="55">rfl</span> <span class="kw">fun</span> b hb =&gt; ?_</span>
+<span id="L691">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="153">mem_range</span>, <span class="const token" data-verso-hover="398">mem_Ioo</span>] <span class="kw">at</span> ha hb</span>
+<span id="L692">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="244">counts</span></span>
+<span id="L693">    <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L694">    <span class="kw">ext</span> p</span>
+<span id="L695">    <span class="kw">rcases</span> hP : P p <span class="kw">with</span> ⟨t', a', b'⟩</span>
+<span id="L696">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="268">mem_filter</span>, <span class="const token" data-verso-hover="269">mem_univ</span>, <span class="const token" data-verso-hover="270">true_and</span>, hP, <span class="const token" data-verso-hover="399">Packet.mk.injEq</span>, <span class="const token" data-verso-hover="154">Prod.mk.injEq</span>]</span>
+<span id="L697">    <span class="kw">constructor</span></span>
+<span id="L698">    · <span class="kw">rintro</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>, <span class="kw">rfl</span>⟩</span>
+<span id="L699">      <span class="kw">exact</span> ⟨⟨<span class="const token" data-verso-hover="55">rfl</span>, <span class="kw">by</span> <span class="kw">omega</span>, hb.<span class="const token" data-verso-hover="66">1</span>, hb.<span class="const token" data-verso-hover="96">2</span>⟩, <span class="const token" data-verso-hover="55">rfl</span>, <span class="const token" data-verso-hover="55">rfl</span>⟩</span>
+<span id="L700">    · <span class="kw">rintro</span> ⟨⟨<span class="kw">rfl</span>, -⟩, <span class="kw">rfl</span>, <span class="kw">rfl</span>⟩</span>
+<span id="L701">      <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="55">rfl</span>, <span class="const token" data-verso-hover="55">rfl</span>, <span class="const token" data-verso-hover="55">rfl</span>⟩</span>
+<span id="L702">  · <span class="kw">intro</span> p hp</span>
+<span id="L703">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="400">coe_filter</span>, <span class="const token" data-verso-hover="269">mem_univ</span>, <span class="const token" data-verso-hover="270">true_and</span>, <span class="const token" data-verso-hover="401">Set.mem_ofPred_eq</span>] <span class="kw">at</span> hp</span>
+<span id="L704">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="402">coe_product</span>, <span class="const token" data-verso-hover="403">coe_range</span>, <span class="const token" data-verso-hover="404">coe_Ioo</span>, <span class="const token" data-verso-hover="405">Set.mem_prod</span>, <span class="const token" data-verso-hover="406">Set.mem_Iio</span>, <span class="const token" data-verso-hover="407">Set.mem_Ioo</span>]</span>
+<span id="L705">    <span class="kw">omega</span></span>
+<span id="L706"></span>
+<span id="L707"><span class="dc">/-- The `ℓ + 1` routes of one round are pairwise disjoint, so at most one packet injected in round</span></span>
+<span id="L708"><span class="dc">`u` crosses a given buffer, and none if `u` is not an injection round. -/</span></span>
+<span id="L709"><span class="kw">lemma</span> <span class="const token" data-verso-hover="408">card_route_le</span> (hm : <span class="nu">0</span> &lt; m) (u v n : <span class="const token" data-verso-hover="44">ℕ</span>) :</span>
+<span id="L710">    #{p : <span class="const token" data-verso-hover="309">LBIndex</span> ℓ m ρ | (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ p).<span class="const token" data-verso-hover="240">time</span> = u ∧ (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ p).<span class="const token" data-verso-hover="241">src</span> ≤ v ∧</span>
+<span id="L711">      v &lt; (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ p).<span class="const token" data-verso-hover="242">dst</span> ∧ (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ p).<span class="const token" data-verso-hover="242">dst</span> &lt; n} ≤ <span class="kw">if</span> <span class="const token" data-verso-hover="305">jump</span> ρ u <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L712">  <span class="kw">split_ifs</span> <span class="kw">with</span> hj</span>
+<span id="L713">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="409">card_le_one</span>]</span>
+<span id="L714">    <span class="kw">rintro</span> ⟨⟨r, t0⟩, h0⟩ hp ⟨⟨r', t0'⟩, h0'⟩ hq</span>
+<span id="L715">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="268">mem_filter</span>, <span class="const token" data-verso-hover="269">mem_univ</span>, <span class="const token" data-verso-hover="270">true_and</span>] <span class="kw">at</span> hp hq</span>
+<span id="L716">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="20">lbAdv</span>] <span class="kw">at</span> hp hq</span>
+<span id="L717">    <span class="kw">have</span> ht : t0 = t0' := <span class="const token" data-verso-hover="410">Fin.ext</span> (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L718">    <span class="kw">subst</span> ht</span>
+<span id="L719">    <span class="kw">have</span> hr : r = r' := <span class="kw">by</span></span>
+<span id="L720">      <span class="kw">apply</span> <span class="const token" data-verso-hover="410">Fin.ext</span></span>
+<span id="L721">      <span class="kw">by_contra</span> hne</span>
+<span id="L722">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="411">Nat.lt_or_gt_of_ne</span> hne <span class="kw">with</span> h | h</span>
+<span id="L723">      · <span class="kw">have</span> := <span class="const token" data-verso-hover="332">site_anti</span> (ℓ := ℓ) hm ((t0 : <span class="const token" data-verso-hover="44">ℕ</span>) / m) (<span class="kw">show</span> (r : <span class="const token" data-verso-hover="44">ℕ</span>) + <span class="nu">1</span> ≤ r' <span class="kw">from</span> h)</span>
+<span id="L724">        <span class="kw">omega</span></span>
+<span id="L725">      · <span class="kw">have</span> := <span class="const token" data-verso-hover="332">site_anti</span> (ℓ := ℓ) hm ((t0 : <span class="const token" data-verso-hover="44">ℕ</span>) / m) (<span class="kw">show</span> (r' : <span class="const token" data-verso-hover="44">ℕ</span>) + <span class="nu">1</span> ≤ r <span class="kw">from</span> h)</span>
+<span id="L726">        <span class="kw">omega</span></span>
+<span id="L727">    <span class="kw">subst</span> hr</span>
+<span id="L728">    <span class="kw">rfl</span></span>
+<span id="L729">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="279">Nat.le_zero</span>, <span class="const token" data-verso-hover="253">card_eq_zero</span>, <span class="const token" data-verso-hover="254">filter_eq_empty_iff</span>]</span>
+<span id="L730">    <span class="kw">rintro</span> ⟨⟨r, t0⟩, h0⟩ - ⟨h1, -⟩</span>
+<span id="L731">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="20">lbAdv</span>] <span class="kw">at</span> h1</span>
+<span id="L732">    <span class="kw">exact</span> hj (h1 ▸ h0)</span>
+<span id="L733"></span>
+<span id="L734"><span class="dc">/-- The adversary is `(ρ, 1)`-bounded (part of Theorem 5.1 of [MPR19]). -/</span></span>
+<span id="L735"><span class="kw">theorem</span> <span class="const token" data-verso-hover="43">lbAdv_isBounded</span> (hm : <span class="nu">0</span> &lt; m) (hρ0 : <span class="nu">0</span> &lt; ρ) (hρ1 : ρ ≤ <span class="nu">1</span>) :</span>
+<span id="L736">    <span class="const token" data-verso-hover="13">Cslib.AQT.IsBounded</span> (<span class="const token" data-verso-hover="244">counts</span> (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ)) ((ℓ + <span class="nu">1</span>) * m ^ ℓ + <span class="nu">1</span>) ρ <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L737">  <span class="kw">intro</span> v _ s t hst</span>
+<span id="L738">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="412">Cslib.AQT.cross</span></span>
+<span id="L739">  <span class="kw">have</span> h : ∑ u ∈ <span class="const token" data-verso-hover="302">Ico</span> s t, ∑ a ∈ <span class="const token" data-verso-hover="177">range</span> (v + <span class="nu">1</span>), ∑ b ∈ <span class="const token" data-verso-hover="396">Ioo</span> v ((ℓ + <span class="nu">1</span>) * m ^ ℓ + <span class="nu">1</span>),</span>
+<span id="L740">      <span class="const token" data-verso-hover="244">counts</span> (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ) u a b ≤ ∑ u ∈ <span class="const token" data-verso-hover="302">Ico</span> s t, <span class="kw">if</span> <span class="const token" data-verso-hover="305">jump</span> ρ u <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span> :=</span>
+<span id="L741">    <span class="const token" data-verso-hover="266">sum_le_sum</span> <span class="kw">fun</span> u _ =&gt; (<span class="const token" data-verso-hover="395">sum_counts_eq</span> _ u v _).<span class="const token" data-verso-hover="413">trans_le</span> (<span class="const token" data-verso-hover="408">card_route_le</span> hm u v _)</span>
+<span id="L742">  <span class="kw">calc</span> _ ≤ ((∑ u ∈ <span class="const token" data-verso-hover="302">Ico</span> s t, (<span class="kw">if</span> <span class="const token" data-verso-hover="305">jump</span> ρ u <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>) : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="69">ℝ</span>) := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> h</span>
+<span id="L743">    _ ≤ _ := <span class="const token" data-verso-hover="382">card_jump_le</span> hρ0.<span class="const token" data-verso-hover="205">le</span> hρ1 hst</span>
+<span id="L744"></span>
+<span id="L745"><span class="dc">/-! ### The lower bound -/</span></span>
+<span id="L746"></span>
+<span id="L747"><span class="dc">/-- Theorem 5.1 of [MPR19], sharp form: for every execution some buffer, in some round of the</span></span>
+<span id="L748"><span class="dc">injection period, has load `L` with `((ℓ+1)ρ - 1)(m-1) m^ℓ - (ℓ+1) ≤ 2 (ℓ+1) m^ℓ L`, i.e.</span></span>
+<span id="L749"><span class="dc">`L ≥ ((ℓ+1)ρ - 1)(m-1) / (2(ℓ+1)) - 1/(2 m^ℓ)` (the paper's bound in its second case). -/</span></span>
+<span id="L750"><span class="kw">theorem</span> <span class="const token" data-verso-hover="6">exists_load_ge</span> (hm : <span class="nu">2</span> ≤ m) (hρ0 : <span class="nu">0</span> &lt; ρ) (hρ1 : ρ ≤ <span class="nu">1</span>)</span>
+<span id="L751">    (E : <span class="const token" data-verso-hover="19">Execution</span> (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ)) :</span>
+<span id="L752">    ∃ t ≤ <span class="const token" data-verso-hover="304">horizon</span> ℓ m, ∃ v, (((ℓ + <span class="nu">1</span>) * ρ - <span class="nu">1</span>) * (m - <span class="nu">1</span>) * m ^ ℓ - (ℓ + <span class="nu">1</span>) : <span class="const token" data-verso-hover="69">ℝ</span>) ≤</span>
+<span id="L753">      <span class="nu">2</span> * (ℓ + <span class="nu">1</span>) * m ^ ℓ * E.<span class="const token" data-verso-hover="250">load</span> t v := <span class="kw">by</span></span>
+<span id="L754">  <span class="kw">have</span> hm0 : <span class="nu">0</span> &lt; m := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L755">  <span class="kw">set</span> T := <span class="const token" data-verso-hover="304">horizon</span> ℓ m <span class="kw">with</span> hTdef</span>
+<span id="L756">  <span class="kw">set</span> s : <span class="const token" data-verso-hover="60">Finset</span> (<span class="const token" data-verso-hover="44">ℕ</span> × <span class="const token" data-verso-hover="44">ℕ</span>) := <span class="const token" data-verso-hover="177">range</span> (T + <span class="nu">1</span>) ×ˢ <span class="const token" data-verso-hover="177">range</span> ((ℓ + <span class="nu">1</span>) * m ^ ℓ + <span class="nu">1</span>) <span class="kw">with</span> hs</span>
+<span id="L757">  <span class="kw">have</span> hne : s.<span class="const token" data-verso-hover="184">Nonempty</span> := ⟨(<span class="nu">0</span>, <span class="nu">0</span>), <span class="kw">by</span> <span class="kw">simp</span> [hs]⟩</span>
+<span id="L758">  <span class="kw">obtain</span> ⟨⟨t, v⟩, hmem, hmax⟩ := <span class="const token" data-verso-hover="414">exists_mem_eq_sup</span> s hne (<span class="kw">fun</span> x =&gt; E.<span class="const token" data-verso-hover="250">load</span> x.<span class="const token" data-verso-hover="181">1</span> x.<span class="const token" data-verso-hover="166">2</span>)</span>
+<span id="L759">  <span class="kw">set</span> L := s.<span class="const token" data-verso-hover="415">sup</span> (<span class="kw">fun</span> x =&gt; E.<span class="const token" data-verso-hover="250">load</span> x.<span class="const token" data-verso-hover="181">1</span> x.<span class="const token" data-verso-hover="166">2</span>) <span class="kw">with</span> hLdef</span>
+<span id="L760">  <span class="kw">have</span> hL : ∀ t' ≤ T, ∀ v', (E.<span class="const token" data-verso-hover="250">load</span> t' v' : <span class="const token" data-verso-hover="69">ℝ</span>) ≤ L := <span class="kw">by</span></span>
+<span id="L761">    <span class="kw">intro</span> t' ht' v'</span>
+<span id="L762">    <span class="kw">by_cases</span> hv : v' &lt; (ℓ + <span class="nu">1</span>) * m ^ ℓ + <span class="nu">1</span></span>
+<span id="L763">    · <span class="kw">exact_mod_cast</span> <span class="const token" data-verso-hover="416">le_sup</span> (f := <span class="kw">fun</span> x : <span class="const token" data-verso-hover="44">ℕ</span> × <span class="const token" data-verso-hover="44">ℕ</span> =&gt; E.<span class="const token" data-verso-hover="250">load</span> x.<span class="const token" data-verso-hover="181">1</span> x.<span class="const token" data-verso-hover="166">2</span>) (b := (t', v'))</span>
+<span id="L764">        (<span class="const token" data-verso-hover="152">mem_product</span>.<span class="const token" data-verso-hover="89">2</span> ⟨<span class="const token" data-verso-hover="153">mem_range</span>.<span class="const token" data-verso-hover="89">2</span> (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="153">mem_range</span>.<span class="const token" data-verso-hover="89">2</span> hv⟩)</span>
+<span id="L765">    · <span class="kw">have</span> : E.<span class="const token" data-verso-hover="250">load</span> t' v' = <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L766">        <span class="kw">unfold</span> <span class="const token" data-verso-hover="250">Execution.load</span></span>
+<span id="L767">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="253">card_eq_zero</span>, <span class="const token" data-verso-hover="254">filter_eq_empty_iff</span>]</span>
+<span id="L768">        <span class="kw">rintro</span> p - ⟨-, -, h⟩</span>
+<span id="L769">        <span class="kw">have</span> := <span class="const token" data-verso-hover="375">lbAdv_dst_lt</span> hm0 p</span>
+<span id="L770">        <span class="kw">omega</span></span>
+<span id="L771">      <span class="kw">rw</span> [this]</span>
+<span id="L772">      <span class="kw">exact_mod_cast</span> <span class="const token" data-verso-hover="202">Nat.zero_le</span> _</span>
+<span id="L773">  <span class="kw">have</span> key := E.<span class="const token" data-verso-hover="284">card_injected_le_real</span> (<span class="const token" data-verso-hover="303">front</span> ℓ m) (T := T) (<span class="const token" data-verso-hover="370">lbAdv_src_le_front</span> hm0)</span>
+<span id="L774">    (<span class="kw">fun</span> t ht =&gt; <span class="const token" data-verso-hover="367">front_succ_le</span> hm0 (<span class="kw">by</span> <span class="kw">omega</span>))</span>
+<span id="L775">    (<span class="kw">fun</span> t ht p h1 h2 =&gt; <span class="const token" data-verso-hover="376">lbAdv_undelivered</span> hm0 E ht p h1 h2) hL</span>
+<span id="L776">  <span class="kw">have</span> hall : #{p : <span class="const token" data-verso-hover="309">LBIndex</span> ℓ m ρ | (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ p).<span class="const token" data-verso-hover="240">time</span> ≤ T} = (ℓ + <span class="nu">1</span>) * ⌊ρ * T⌋₊ := <span class="kw">by</span></span>
+<span id="L777">    <span class="kw">have</span> hle : ∀ p ∈ (<span class="const token" data-verso-hover="417">univ</span> : <span class="const token" data-verso-hover="60">Finset</span> (<span class="const token" data-verso-hover="309">LBIndex</span> ℓ m ρ)), (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ p).<span class="const token" data-verso-hover="240">time</span> ≤ T :=</span>
+<span id="L778">      <span class="kw">fun</span> p _ =&gt; p.<span class="const token" data-verso-hover="311">1</span><span class="nu">.</span><span class="const token" data-verso-hover="166">2</span><span class="nu">.</span><span class="const token" data-verso-hover="374">2</span>.<span class="const token" data-verso-hover="205">le</span></span>
+<span id="L779">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="418">filter_true_of_mem</span> hle, <span class="const token" data-verso-hover="391">card_univ</span>, <span class="const token" data-verso-hover="385">card_lbIndex</span> hρ0.<span class="const token" data-verso-hover="205">le</span> hρ1]</span>
+<span id="L780">  <span class="kw">rw</span> [hall] <span class="kw">at</span> key</span>
+<span id="L781">  <span class="kw">push_cast</span> <span class="kw">at</span> key</span>
+<span id="L782">  <span class="kw">have</span> hfl : ρ * T - <span class="nu">1</span> &lt; ⌊ρ * T⌋₊ := <span class="kw">by</span> <span class="kw">have</span> := <span class="const token" data-verso-hover="384">Nat.lt_floor_add_one</span> (ρ * T); <span class="kw">linarith</span></span>
+<span id="L783">  <span class="kw">have</span> hF0 : (<span class="const token" data-verso-hover="303">front</span> ℓ m <span class="nu">0</span> : <span class="const token" data-verso-hover="69">ℝ</span>) + <span class="nu">1</span> ≤ (ℓ + <span class="nu">1</span>) * m ^ ℓ := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> <span class="const token" data-verso-hover="364">front_add_one_le</span> hm0 <span class="nu">0</span></span>
+<span id="L784">  <span class="kw">have</span> hT : (T : <span class="const token" data-verso-hover="69">ℝ</span>) = (m - <span class="nu">1</span>) * m ^ ℓ := <span class="kw">by</span></span>
+<span id="L785">    <span class="kw">rw</span> [hTdef, <span class="const token" data-verso-hover="304">horizon</span>, <span class="const token" data-verso-hover="419">Nat.cast_mul</span>, <span class="const token" data-verso-hover="289">Nat.cast_sub</span> (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L786">    <span class="kw">push_cast</span></span>
+<span id="L787">    <span class="kw">ring</span></span>
+<span id="L788">  <span class="kw">have</span> hL0 : (<span class="nu">0</span> : <span class="const token" data-verso-hover="69">ℝ</span>) ≤ L := <span class="const token" data-verso-hover="285">Nat.cast_nonneg</span> _</span>
+<span id="L789">  <span class="kw">have</span> hLF : (L : <span class="const token" data-verso-hover="69">ℝ</span>) * (<span class="nu">2</span> * <span class="const token" data-verso-hover="303">front</span> ℓ m <span class="nu">0</span> + <span class="nu">1</span>) ≤ L * (<span class="nu">2</span> * ((ℓ + <span class="nu">1</span>) * m ^ ℓ)) :=</span>
+<span id="L790">    <span class="const token" data-verso-hover="420">mul_le_mul_of_nonneg_left</span> (<span class="kw">by</span> <span class="kw">linarith</span>) hL0</span>
+<span id="L791">  <span class="kw">refine</span> ⟨t, ?_, v, ?_⟩</span>
+<span id="L792">  · <span class="kw">simp</span> only [hs, <span class="const token" data-verso-hover="152">mem_product</span>, <span class="const token" data-verso-hover="153">mem_range</span>] <span class="kw">at</span> hmem</span>
+<span id="L793">    <span class="kw">omega</span></span>
+<span id="L794">  · <span class="kw">have</span> hLv : (L : <span class="const token" data-verso-hover="69">ℝ</span>) = E.<span class="const token" data-verso-hover="250">load</span> t v := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> hmax</span>
+<span id="L795">    <span class="kw">rw</span> [← hLv]</span>
+<span id="L796">    <span class="kw">have</span> hℓ0 : (<span class="nu">0</span> : <span class="const token" data-verso-hover="69">ℝ</span>) ≤ ℓ + <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">positivity</span></span>
+<span id="L797">    <span class="kw">have</span> h5 : (ℓ + <span class="nu">1</span>) * (ρ * T - <span class="nu">1</span>) ≤ (ℓ + <span class="nu">1</span>) * (⌊ρ * T⌋₊ : <span class="const token" data-verso-hover="69">ℝ</span>) :=</span>
+<span id="L798">      <span class="const token" data-verso-hover="420">mul_le_mul_of_nonneg_left</span> hfl.<span class="const token" data-verso-hover="205">le</span> hℓ0</span>
+<span id="L799">    <span class="kw">rw</span> [hT] <span class="kw">at</span> h5 key</span>
+<span id="L800">    <span class="kw">linarith</span></span>
+<span id="L801"></span>
+<span id="L802"><span class="dc">/-- Theorem 5.1 of [MPR19], with explicit constants: for every execution of any forwarding</span></span>
+<span id="L803"><span class="dc">protocol against `lbAdv ℓ m ρ`, some buffer has load at least</span></span>
+<span id="L804"><span class="dc">`((ℓ+1)ρ - 1)(m-1) / (4(ℓ+1)) - 1`. -/</span></span>
+<span id="L805"><span class="kw">theorem</span> <span class="const token" data-verso-hover="421">lower_bound</span> (hm : <span class="nu">2</span> ≤ m) (hρ : <span class="nu">1</span> / ((ℓ : <span class="const token" data-verso-hover="69">ℝ</span>) + <span class="nu">1</span>) &lt; ρ) (hρ1 : ρ ≤ <span class="nu">1</span>)</span>
+<span id="L806">    (E : <span class="const token" data-verso-hover="19">Execution</span> (<span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ)) :</span>
+<span id="L807">    ∃ t v, ((ℓ + <span class="nu">1</span>) * ρ - <span class="nu">1</span>) * (m - <span class="nu">1</span>) / (<span class="nu">4</span> * (ℓ + <span class="nu">1</span>)) ≤ (E.<span class="const token" data-verso-hover="250">load</span> t v : <span class="const token" data-verso-hover="69">ℝ</span>) + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L808">  <span class="kw">have</span> hℓ0 : (<span class="nu">0</span> : <span class="const token" data-verso-hover="69">ℝ</span>) &lt; ℓ + <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">positivity</span></span>
+<span id="L809">  <span class="kw">have</span> hρ0 : <span class="nu">0</span> &lt; ρ := <span class="const token" data-verso-hover="422">lt_trans</span> (<span class="kw">by</span> <span class="kw">positivity</span>) hρ</span>
+<span id="L810">  <span class="kw">have</span> hc : <span class="nu">0</span> &lt; (ℓ + <span class="nu">1</span>) * ρ - <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L811">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="423">div_lt_iff₀</span> hℓ0] <span class="kw">at</span> hρ</span>
+<span id="L812">    <span class="kw">linarith</span></span>
+<span id="L813">  <span class="kw">obtain</span> ⟨t, -, v, h⟩ := <span class="const token" data-verso-hover="6">exists_load_ge</span> hm hρ0 hρ1 E</span>
+<span id="L814">  <span class="kw">refine</span> ⟨t, v, ?_⟩</span>
+<span id="L815">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="424">div_le_iff₀</span> (<span class="kw">by</span> <span class="kw">positivity</span>)]</span>
+<span id="L816">  <span class="kw">have</span> hmℓ : (<span class="nu">1</span> : <span class="const token" data-verso-hover="69">ℝ</span>) ≤ m ^ ℓ := <span class="const token" data-verso-hover="425">one_le_pow₀</span> (<span class="kw">by</span> <span class="kw">exact_mod_cast</span> (<span class="kw">by</span> <span class="kw">omega</span> : <span class="nu">1</span> ≤ m))</span>
+<span id="L817">  <span class="kw">have</span> hload : (<span class="nu">0</span> : <span class="const token" data-verso-hover="69">ℝ</span>) ≤ E.<span class="const token" data-verso-hover="250">load</span> t v := <span class="const token" data-verso-hover="285">Nat.cast_nonneg</span> _</span>
+<span id="L818">  <span class="kw">have</span> h2 : ((ℓ + <span class="nu">1</span>) * ρ - <span class="nu">1</span>) * (m - <span class="nu">1</span>) * m ^ ℓ ≤</span>
+<span id="L819">      (<span class="nu">2</span> * (ℓ + <span class="nu">1</span>) * E.<span class="const token" data-verso-hover="250">load</span> t v + (ℓ + <span class="nu">1</span>)) * m ^ ℓ := <span class="kw">by</span> <span class="kw">nlinarith</span></span>
+<span id="L820">  <span class="kw">have</span> h3 : ((ℓ + <span class="nu">1</span>) * ρ - <span class="nu">1</span>) * (m - <span class="nu">1</span>) ≤ <span class="nu">2</span> * (ℓ + <span class="nu">1</span>) * E.<span class="const token" data-verso-hover="250">load</span> t v + (ℓ + <span class="nu">1</span>) :=</span>
+<span id="L821">    <span class="const token" data-verso-hover="426">le_of_mul_le_mul_right</span> h2 (<span class="kw">by</span> <span class="kw">positivity</span>)</span>
+<span id="L822">  <span class="kw">nlinarith</span></span>
+<span id="L823"></span>
+<span id="L824"><span class="dc">/-- **Theorem 5.1 of [MPR19]** (packaged). For `m ≥ 2` and `1/(ℓ+1) &lt; ρ ≤ 1`, on the</span></span>
+<span id="L825"><span class="dc">path with `(ℓ+1) m^ℓ + 1` nodes there is a finite `(ρ, 1)`-bounded injection pattern such that</span></span>
+<span id="L826"><span class="dc">every forwarding protocol has, in some round, a buffer of load at least</span></span>
+<span id="L827"><span class="dc">`((ℓ+1)ρ - 1)(m-1) / (4(ℓ+1)) - 1`; with `n ≈ (ℓ+1) m^ℓ` this is</span></span>
+<span id="L828"><span class="dc">`Ω(((ℓ+1)ρ - 1) / (ℓ+1) · (n/(ℓ+1))^(1/ℓ))`. -/</span></span>
+<span id="L829"><span class="kw">theorem</span> <span class="const token" data-verso-hover="5">theorem_5_1</span> (ℓ m : <span class="const token" data-verso-hover="44">ℕ</span>) (ρ : <span class="const token" data-verso-hover="69">ℝ</span>) (hm : <span class="nu">2</span> ≤ m) (hρ : <span class="nu">1</span> / ((ℓ : <span class="const token" data-verso-hover="69">ℝ</span>) + <span class="nu">1</span>) &lt; ρ)</span>
+<span id="L830">    (hρ1 : ρ ≤ <span class="nu">1</span>) :</span>
+<span id="L831">    ∃ (ι : <span class="kw">Type</span>) (_ : <span class="const token" data-verso-hover="245">Fintype</span> ι) (P : ι → <span class="const token" data-verso-hover="239">Packet</span>),</span>
+<span id="L832">      (∀ p, (P p).<span class="const token" data-verso-hover="241">src</span> &lt; (P p).<span class="const token" data-verso-hover="242">dst</span> ∧ (P p).<span class="const token" data-verso-hover="242">dst</span> &lt; (ℓ + <span class="nu">1</span>) * m ^ ℓ + <span class="nu">1</span>) ∧</span>
+<span id="L833">      <span class="const token" data-verso-hover="13">Cslib.AQT.IsBounded</span> (<span class="const token" data-verso-hover="244">counts</span> P) ((ℓ + <span class="nu">1</span>) * m ^ ℓ + <span class="nu">1</span>) ρ <span class="nu">1</span> ∧</span>
+<span id="L834">      ∀ E : <span class="const token" data-verso-hover="19">Execution</span> P, ∃ t v,</span>
+<span id="L835">        ((ℓ + <span class="nu">1</span>) * ρ - <span class="nu">1</span>) * (m - <span class="nu">1</span>) / (<span class="nu">4</span> * (ℓ + <span class="nu">1</span>)) ≤ (E.<span class="const token" data-verso-hover="250">load</span> t v : <span class="const token" data-verso-hover="69">ℝ</span>) + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L836">  <span class="kw">have</span> hm0 : <span class="nu">0</span> &lt; m := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L837">  <span class="kw">have</span> hρ0 : <span class="nu">0</span> &lt; ρ := <span class="const token" data-verso-hover="422">lt_trans</span> (<span class="kw">by</span> <span class="kw">positivity</span>) hρ</span>
+<span id="L838">  <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="309">LBIndex</span> ℓ m ρ, <span class="const token" data-verso-hover="427">inferInstance</span>, <span class="const token" data-verso-hover="20">lbAdv</span> ℓ m ρ,</span>
+<span id="L839">    <span class="kw">fun</span> p =&gt; ⟨<span class="const token" data-verso-hover="372">lbAdv_src_lt_dst</span> hm0 p, <span class="const token" data-verso-hover="375">lbAdv_dst_lt</span> hm0 p⟩,</span>
+<span id="L840">    <span class="const token" data-verso-hover="43">lbAdv_isBounded</span> hm0 hρ0 hρ1, <span class="kw">fun</span> E =&gt; <span class="const token" data-verso-hover="421">lower_bound</span> hm hρ hρ1 E⟩</span>
+<span id="L841"></span>
+<span id="L842"><span class="kw">end</span> Adversary</span>
+<span id="L843"></span>
+<span id="L844"><span class="kw">end</span> Podc.SmallBuffersAQT.LowerBound</span>
+<span id="L845"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2019/SmallBuffersAQT/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

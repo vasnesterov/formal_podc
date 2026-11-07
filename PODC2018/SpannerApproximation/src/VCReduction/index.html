@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>SpannerApproximation: VCReduction.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2018/">PODC 2018</a><span class="sep">›</span><a href="PODC2018/SpannerApproximation/">SpannerApproximation</a><span class="sep">›</span><a href="PODC2018/SpannerApproximation/src/">Lean source</a><span class="sep">›</span><span aria-current="page">VCReduction</span></nav>
+        <h1>
+          <code>VCReduction.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2018/SpannerApproximation/">Distributed Spanner Approximation — PODC 2018</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2018/SpannerApproximation/VCReduction.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="VCReduction"><span id="L1"><span class="kw">import</span> Papers.PODC2018.SpannerApproximation.VertexCover</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.Congest.LowerBound</span>
+<span id="L3"><span class="kw">import</span> Mathlib.Logic.Equiv.Fin.Basic</span>
+<span id="L4"></span>
+<span id="L5"><span class="dc">/-!</span></span>
+<span id="L6"><span class="dc"># From distributed weighted 2-spanners to distributed vertex cover (Lemma 3.2 of [CD18])</span></span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">Model: CSLib's deterministic synchronous CONGEST model `Cslib.Congest.Algorithm V I σ B`</span></span>
+<span id="L9"><span class="dc">(vertex names are the IDs, `B`-bit messages per edge, direction and round, no failures).</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">* **Spanner algorithms** run on `G_S` (vertex type `V × Fin 3`). The input of node `a` is the list</span></span>
+<span id="L12"><span class="dc">  of its incident edges with their weights, `inpS G a : V × Fin 3 → Option ℕ`. The output is given</span></span>
+<span id="L13"><span class="dc">  by a selector `pick : V' → σ → V' → V' → Bool`: node `x` in state `s` outputs the edge `{a, b}`</span></span>
+<span id="L14"><span class="dc">  iff `pick x s a b` (either orientation; only incident edges count). The output spanner is the</span></span>
+<span id="L15"><span class="dc">  union of the nodes' outputs, `spannerOut`.</span></span>
+<span id="L16"><span class="dc">* **MVC algorithms** run on `G`; node input = its neighbourhood `V → Bool`; output</span></span>
+<span id="L17"><span class="dc">  `out v s = true` iff `v` is in the cover.</span></span>
+<span id="L18"></span>
+<span id="L19"><span class="dc">`mvcAlg A pick T` simulates `A` on `G_S`: node `v` of `G` simulates `v₁, v₂, v₃`; the (at most</span></span>
+<span id="L20"><span class="dc">three) `G_S`-messages that travel from copies of `v` to copies of a neighbour `u` in one round are</span></span>
+<span id="L21"><span class="dc">bundled into one message of `3B` bits. After `T` simulated rounds, one extra round tells every</span></span>
+<span id="L22"><span class="dc">neighbour `u` whether a copy of `v` picked the cross edge between `v` and `u`; then `v` decides</span></span>
+<span id="L23"><span class="dc">whether `v ∈ C_H` (Claim 3.1). The extra round is needed: whether the cross edge `{v₁, u₂}` is in</span></span>
+<span id="L24"><span class="dc">the union of the outputs may depend on the output of `u₂`, which `v` does not know</span></span>
+<span id="L25"><span class="dc">(see `localRule_counterexample`).</span></span>
+<span id="L26"></span>
+<span id="L27"><span class="dc">Main results:</span></span>
+<span id="L28"><span class="dc">* `lemma_3_2`: `A_MVC = mvcAlg A pick T` uses `3B`-bit messages and `T + 1` rounds;</span></span>
+<span id="L29"><span class="dc">* `lemma_3_2_congest`: `slow 3 (mvcAlg A pick T)` uses `B`-bit messages and `3(T + 1)` rounds</span></span>
+<span id="L30"><span class="dc">  (`slow k` is a generic CONGEST slowdown splitting `kB`-bit messages over `k` rounds);</span></span>
+<span id="L31"><span class="dc">* `localRule_counterexample`: `C_H` cannot be computed from the nodes' own outputs only.</span></span>
+<span id="L32"><span class="dc">-/</span></span>
+<span id="L33"></span>
+<span id="L34"><span class="kw">namespace</span> Podc.SpannerApproximation</span>
+<span id="L35"></span>
+<span id="L36"><span class="kw">open</span> Cslib.Congest</span>
+<span id="L37"></span>
+<span id="L38"><span class="kw">section</span> SpannerOutput</span>
+<span id="L39"></span>
+<span id="L40"><span class="kw">variable</span> {W σ : <span class="kw">Type</span>*}</span>
+<span id="L41"></span>
+<span id="L42"><span class="dc">/-- The spanner output by the nodes: the union of the edges output by the nodes, restricted to the</span></span>
+<span id="L43"><span class="dc">edges of `Gs`; node `x` (in state `st x`) outputs its incident edge `{x, y}` iff</span></span>
+<span id="L44"><span class="dc">`pick x (st x) x y` or `pick x (st x) y x`. -/</span></span>
+<span id="L45"><span class="kw">def</span> <span class="const token" data-verso-hover="282">spannerOut</span> (Gs : <span class="const token" data-verso-hover="247">SimpleGraph</span> W) (pick : W → σ → W → W → <span class="const token" data-verso-hover="59">Bool</span>) (st : W → σ) :</span>
+<span id="L46">    <span class="const token" data-verso-hover="247">SimpleGraph</span> W <span class="kw">where</span></span>
+<span id="L47">  <span class="const token" data-verso-hover="130">Adj</span> a b := Gs.<span class="const token" data-verso-hover="130">Adj</span> a b ∧ (pick a (st a) a b = <span class="const token" data-verso-hover="60">true</span> ∨ pick a (st a) b a = <span class="const token" data-verso-hover="60">true</span> ∨</span>
+<span id="L48">    pick b (st b) a b = <span class="const token" data-verso-hover="60">true</span> ∨ pick b (st b) b a = <span class="const token" data-verso-hover="60">true</span>)</span>
+<span id="L49">  <span class="const token" data-verso-hover="248">symm</span> := ⟨<span class="kw">fun</span> _ _ h =&gt; ⟨h.<span class="const token" data-verso-hover="80">1</span>.<span class="const token" data-verso-hover="283">symm</span>, <span class="kw">by</span> <span class="kw">tauto</span>⟩⟩</span>
+<span id="L50">  <span class="const token" data-verso-hover="251">loopless</span> := ⟨<span class="kw">fun</span> _ h =&gt; Gs.<span class="const token" data-verso-hover="284">irrefl</span> h.<span class="const token" data-verso-hover="80">1</span>⟩</span>
+<span id="L51"></span>
+<span id="L52"><span class="const token" data-verso-hover="285">instance</span> (Gs : <span class="const token" data-verso-hover="247">SimpleGraph</span> W) [<span class="const token" data-verso-hover="157">DecidableRel</span> Gs.<span class="const token" data-verso-hover="130">Adj</span>] (pick : W → σ → W → W → <span class="const token" data-verso-hover="59">Bool</span>) (st : W → σ) :</span>
+<span id="L53">    <span class="const token" data-verso-hover="157">DecidableRel</span> (<span class="const token" data-verso-hover="282">spannerOut</span> Gs pick st).<span class="const token" data-verso-hover="130">Adj</span> := <span class="kw">fun</span> _ _ =&gt; <span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="282">spannerOut</span>; <span class="kw">infer_instance</span></span>
+<span id="L54"></span>
+<span id="L55"><span class="kw">lemma</span> <span class="const token" data-verso-hover="286">spannerOut_le</span> (Gs : <span class="const token" data-verso-hover="247">SimpleGraph</span> W) (pick : W → σ → W → W → <span class="const token" data-verso-hover="59">Bool</span>) (st : W → σ) :</span>
+<span id="L56">    <span class="const token" data-verso-hover="282">spannerOut</span> Gs pick st ≤ Gs := <span class="kw">fun</span> _ _ h =&gt; h.<span class="const token" data-verso-hover="80">1</span></span>
+<span id="L57"></span>
+<span id="L58"><span class="kw">end</span> SpannerOutput</span>
+<span id="L59"></span>
+<span id="L60"><span class="kw">variable</span> {V : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="287">LinearOrder</span> V]</span>
+<span id="L61"></span>
+<span id="L62"><span class="dc">/-! ### Inputs -/</span></span>
+<span id="L63"></span>
+<span id="L64"><span class="dc">/-- Input of the MVC algorithm at `v`: its neighbourhood. -/</span></span>
+<span id="L65"><span class="kw">def</span> <span class="const token" data-verso-hover="288">nbrInput</span> (G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V) [<span class="const token" data-verso-hover="157">DecidableRel</span> G.<span class="const token" data-verso-hover="130">Adj</span>] (v : V) : V → <span class="const token" data-verso-hover="59">Bool</span> :=</span>
+<span id="L66">  <span class="kw">fun</span> u =&gt; <span class="const token" data-verso-hover="64">decide</span> (G.<span class="const token" data-verso-hover="130">Adj</span> v u)</span>
+<span id="L67"></span>
+<span id="L68"><span class="dc">/-- Input of the spanner algorithm at node `a` of `G_S`: its incident edges with their weights. -/</span></span>
+<span id="L69"><span class="kw">def</span> <span class="const token" data-verso-hover="289">inpS</span> (G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V) [<span class="const token" data-verso-hover="157">DecidableRel</span> G.<span class="const token" data-verso-hover="130">Adj</span>] (a : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="229">Option</span> <span class="const token" data-verso-hover="30">ℕ</span> :=</span>
+<span id="L70">  <span class="kw">fun</span> b =&gt; <span class="kw">if</span> (<span class="const token" data-verso-hover="290">GS</span> G).<span class="const token" data-verso-hover="130">Adj</span> a b <span class="kw">then</span> <span class="const token" data-verso-hover="230">some</span> (<span class="const token" data-verso-hover="291">wtPair</span> a b) <span class="kw">else</span> <span class="const token" data-verso-hover="231">none</span></span>
+<span id="L71"></span>
+<span id="L72"><span class="dc">/-- Node `v` computes the `G_S`-input of its copy `vᵢ` from its own neighbourhood `nb`. -/</span></span>
+<span id="L73"><span class="kw">def</span> <span class="const token" data-verso-hover="292">localInpS</span> (v : V) (nb : V → <span class="const token" data-verso-hover="59">Bool</span>) (i : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="229">Option</span> <span class="const token" data-verso-hover="30">ℕ</span> :=</span>
+<span id="L74">  <span class="kw">fun</span> b =&gt; <span class="kw">if</span> <span class="const token" data-verso-hover="293">SAdj</span> (<span class="kw">fun</span> _ y =&gt; nb y = <span class="const token" data-verso-hover="60">true</span>) (v, i) b <span class="kw">then</span> <span class="const token" data-verso-hover="230">some</span> (<span class="const token" data-verso-hover="291">wtPair</span> (v, i) b) <span class="kw">else</span> <span class="const token" data-verso-hover="231">none</span></span>
+<span id="L75"></span>
+<span id="L76"><span class="kw">lemma</span> <span class="const token" data-verso-hover="294">localInpS_eq</span> (G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V) [<span class="const token" data-verso-hover="157">DecidableRel</span> G.<span class="const token" data-verso-hover="130">Adj</span>] (v : V) (i : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) :</span>
+<span id="L77">    <span class="const token" data-verso-hover="292">localInpS</span> v (<span class="const token" data-verso-hover="288">nbrInput</span> G v) i = <span class="const token" data-verso-hover="289">inpS</span> G (v, i) := <span class="kw">by</span></span>
+<span id="L78">  <span class="kw">funext</span> b</span>
+<span id="L79">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="292">localInpS</span>, <span class="const token" data-verso-hover="289">inpS</span>, <span class="const token" data-verso-hover="295">GS_adj</span>, <span class="const token" data-verso-hover="293">SAdj</span>, <span class="const token" data-verso-hover="288">nbrInput</span>]</span>
+<span id="L80"></span>
+<span id="L81"><span class="dc">/-! ### The three `G_S`-edges of a `G`-edge -/</span></span>
+<span id="L82"></span>
+<span id="L83"><span class="dc">/-- The `k`-th `G_S`-edge between copies of `v` and copies of `u ≠ v`, as (copy of `v`, copy of</span></span>
+<span id="L84"><span class="dc">`u`): `{v₁,u₁}`, `{v₂,u₂}` and the cross edge. -/</span></span>
+<span id="L85"><span class="kw">def</span> <span class="const token" data-verso-hover="296">src</span> (v u : V) : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span></span>
+<span id="L86">  | <span class="nu">0</span> =&gt; (<span class="nu">0</span>, <span class="nu">0</span>)</span>
+<span id="L87">  | <span class="nu">1</span> =&gt; (<span class="nu">1</span>, <span class="nu">1</span>)</span>
+<span id="L88">  | <span class="nu">2</span> =&gt; <span class="kw">if</span> v &lt; u <span class="kw">then</span> (<span class="nu">0</span>, <span class="nu">1</span>) <span class="kw">else</span> (<span class="nu">1</span>, <span class="nu">0</span>)</span>
+<span id="L89"></span>
+<span id="L90"><span class="dc">/-- The index `k` of the `G_S`-edge `{wᵢ, uⱼ}` (if it is one of the three). -/</span></span>
+<span id="L91"><span class="kw">def</span> <span class="const token" data-verso-hover="297">idx</span> (w u : V) (i j : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) : <span class="const token" data-verso-hover="229">Option</span> (<span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) :=</span>
+<span id="L92">  <span class="kw">if</span> i = <span class="nu">0</span> ∧ j = <span class="nu">0</span> <span class="kw">then</span> <span class="const token" data-verso-hover="230">some</span> <span class="nu">0</span> <span class="kw">else</span> <span class="kw">if</span> i = <span class="nu">1</span> ∧ j = <span class="nu">1</span> <span class="kw">then</span> <span class="const token" data-verso-hover="230">some</span> <span class="nu">1</span></span>
+<span id="L93">  <span class="kw">else</span> <span class="kw">if</span> <span class="const token" data-verso-hover="296">src</span> w u <span class="nu">2</span> = (i, j) <span class="kw">then</span> <span class="const token" data-verso-hover="230">some</span> <span class="nu">2</span> <span class="kw">else</span> <span class="const token" data-verso-hover="231">none</span></span>
+<span id="L94"></span>
+<span id="L95"><span class="kw">lemma</span> <span class="const token" data-verso-hover="298">src_idx</span> {w u : V} {i j : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>} {k : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>} (h : <span class="const token" data-verso-hover="297">idx</span> w u i j = <span class="const token" data-verso-hover="230">some</span> k) :</span>
+<span id="L96">    <span class="const token" data-verso-hover="296">src</span> w u k = (i, j) := <span class="kw">by</span></span>
+<span id="L97">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="297">idx</span> <span class="kw">at</span> h</span>
+<span id="L98">  <span class="kw">split_ifs</span> <span class="kw">at</span> h <span class="kw">with</span> h1 h2 h3 &lt;;&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="299">Option.some.injEq</span>] <span class="kw">at</span> h &lt;;&gt; <span class="kw">subst</span> h</span>
+<span id="L99">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="296">src</span>, h1.<span class="const token" data-verso-hover="80">1</span>, h1.<span class="const token" data-verso-hover="96">2</span>]</span>
+<span id="L100">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="296">src</span>, h2.<span class="const token" data-verso-hover="80">1</span>, h2.<span class="const token" data-verso-hover="96">2</span>]</span>
+<span id="L101">  · <span class="kw">exact</span> h3</span>
+<span id="L102"></span>
+<span id="L103"><span class="kw">lemma</span> <span class="const token" data-verso-hover="300">GS_adj_iff_idx</span> {G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V} {w u : V} (h : w ≠ u) {i j : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>} :</span>
+<span id="L104">    (<span class="const token" data-verso-hover="290">GS</span> G).<span class="const token" data-verso-hover="130">Adj</span> (w, i) (u, j) ↔ G.<span class="const token" data-verso-hover="130">Adj</span> w u ∧ (<span class="const token" data-verso-hover="297">idx</span> w u i j).<span class="const token" data-verso-hover="301">isSome</span> := <span class="kw">by</span></span>
+<span id="L105">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="302">GS_adj_of_ne</span> h]</span>
+<span id="L106">  <span class="kw">refine</span> <span class="const token" data-verso-hover="303">and_congr_right</span> <span class="kw">fun</span> _ =&gt; ?_</span>
+<span id="L107">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="304">lt_or_gt_of_ne</span> h <span class="kw">with</span> hlt | hlt</span>
+<span id="L108">  · <span class="kw">have</span> : ¬ u &lt; w := <span class="const token" data-verso-hover="201">not_lt</span>.<span class="const token" data-verso-hover="121">mpr</span> hlt.<span class="const token" data-verso-hover="240">le</span></span>
+<span id="L109">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="297">idx</span>, <span class="const token" data-verso-hover="296">src</span>, hlt, this, <span class="const token" data-verso-hover="305">ite_true</span>, <span class="const token" data-verso-hover="306">false_and</span>, <span class="const token" data-verso-hover="307">or_false</span>, <span class="const token" data-verso-hover="79">true_and</span>]</span>
+<span id="L110">    <span class="kw">revert</span> i j; <span class="kw">decide</span></span>
+<span id="L111">  · <span class="kw">have</span> : ¬ w &lt; u := <span class="const token" data-verso-hover="201">not_lt</span>.<span class="const token" data-verso-hover="121">mpr</span> hlt.<span class="const token" data-verso-hover="240">le</span></span>
+<span id="L112">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="297">idx</span>, <span class="const token" data-verso-hover="296">src</span>, hlt, this, <span class="const token" data-verso-hover="308">ite_false</span>, <span class="const token" data-verso-hover="306">false_and</span>, <span class="const token" data-verso-hover="79">true_and</span>]</span>
+<span id="L113">    <span class="kw">revert</span> i j; <span class="kw">decide</span></span>
+<span id="L114"></span>
+<span id="L115"><span class="dc">/-! ### The simulation -/</span></span>
+<span id="L116"></span>
+<span id="L117"><span class="dc">/-- State of the MVC algorithm at `v`: round counter, own neighbourhood, simulated states of the</span></span>
+<span id="L118"><span class="dc">copies `v₁, v₂, v₃`, and the output bit. -/</span></span>
+<span id="L119"><span class="kw">structure</span> <span class="const token" data-verso-hover="309">SimState</span> (V σ : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L120">  <span class="dc">/-- Number of rounds done. -/</span></span>
+<span id="L121">  <span class="const token" data-verso-hover="310">round</span> : <span class="const token" data-verso-hover="30">ℕ</span></span>
+<span id="L122">  <span class="dc">/-- The neighbourhood of `v` (its input). -/</span></span>
+<span id="L123">  <span class="const token" data-verso-hover="311">nbr</span> : V → <span class="const token" data-verso-hover="59">Bool</span></span>
+<span id="L124">  <span class="dc">/-- Simulated states of `v₁, v₂, v₃`. -/</span></span>
+<span id="L125">  <span class="const token" data-verso-hover="312">sim</span> : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → σ</span>
+<span id="L126">  <span class="dc">/-- Output: `v ∈ C_H`. -/</span></span>
+<span id="L127">  <span class="const token" data-verso-hover="313">inC</span> : <span class="const token" data-verso-hover="59">Bool</span></span>
+<span id="L128"></span>
+<span id="L129"><span class="kw">variable</span> {σ : <span class="kw">Type</span>*} {B : <span class="const token" data-verso-hover="30">ℕ</span>}</span>
+<span id="L130"></span>
+<span id="L131"><span class="dc">/-- Node `x` in state `s` outputs the edge `{a, b}` (either orientation). -/</span></span>
+<span id="L132"><span class="kw">def</span> <span class="const token" data-verso-hover="314">picks</span> (pick : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → σ → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="59">Bool</span>) (x : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) (s : σ)</span>
+<span id="L133">    (a b : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) : <span class="const token" data-verso-hover="59">Bool</span> :=</span>
+<span id="L134">  pick x s a b || pick x s b a</span>
+<span id="L135"></span>
+<span id="L136"><span class="dc">/-- Whether the copy of `v` incident to the cross edge between `v` and `u` outputs it. -/</span></span>
+<span id="L137"><span class="kw">def</span> <span class="const token" data-verso-hover="315">crossPicked</span> (pick : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → σ → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="59">Bool</span>) (v u : V)</span>
+<span id="L138">    (sim : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → σ) : <span class="const token" data-verso-hover="59">Bool</span> :=</span>
+<span id="L139">  <span class="const token" data-verso-hover="314">picks</span> pick (v, (<span class="const token" data-verso-hover="296">src</span> v u <span class="nu">2</span>).<span class="const token" data-verso-hover="70">1</span>) (sim (<span class="const token" data-verso-hover="296">src</span> v u <span class="nu">2</span>).<span class="const token" data-verso-hover="70">1</span>) (v, (<span class="const token" data-verso-hover="296">src</span> v u <span class="nu">2</span>).<span class="const token" data-verso-hover="70">1</span>) (u, (<span class="const token" data-verso-hover="296">src</span> v u <span class="nu">2</span>).<span class="const token" data-verso-hover="71">2</span>)</span>
+<span id="L140"></span>
+<span id="L141"><span class="dc">/-- The bundled `3B`-bit message from `v` to `u`: the messages of the copies of `v` along the</span></span>
+<span id="L142"><span class="dc">three `G_S`-edges between `v` and `u`. -/</span></span>
+<span id="L143"><span class="kw">def</span> <span class="const token" data-verso-hover="316">bundle</span> (A : <span class="const token" data-verso-hover="3">Algorithm</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="229">Option</span> <span class="const token" data-verso-hover="30">ℕ</span>) σ B) (v u : V) (sim : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → σ) :</span>
+<span id="L144">    <span class="const token" data-verso-hover="317">Msg</span> (<span class="nu">3</span> * B) := <span class="kw">fun</span> n =&gt;</span>
+<span id="L145">  <span class="kw">let</span> p := <span class="const token" data-verso-hover="318">finProdFinEquiv</span>.<span class="const token" data-verso-hover="51">symm</span> n</span>
+<span id="L146">  A.<span class="const token" data-verso-hover="319">send</span> (v, (<span class="const token" data-verso-hover="296">src</span> v u p.<span class="const token" data-verso-hover="70">1</span>).<span class="const token" data-verso-hover="70">1</span>) (sim (<span class="const token" data-verso-hover="296">src</span> v u p.<span class="const token" data-verso-hover="70">1</span>).<span class="const token" data-verso-hover="70">1</span>) (u, (<span class="const token" data-verso-hover="296">src</span> v u p.<span class="const token" data-verso-hover="70">1</span>).<span class="const token" data-verso-hover="71">2</span>) p.<span class="const token" data-verso-hover="71">2</span></span>
+<span id="L147"></span>
+<span id="L148"><span class="dc">/-- The `k`-th `B`-bit chunk of a bundled message. -/</span></span>
+<span id="L149"><span class="kw">def</span> <span class="const token" data-verso-hover="320">chunk</span> (k : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) (m : <span class="const token" data-verso-hover="317">Msg</span> (<span class="nu">3</span> * B)) : <span class="const token" data-verso-hover="317">Msg</span> B := <span class="kw">fun</span> b =&gt; m (<span class="const token" data-verso-hover="318">finProdFinEquiv</span> (k, b))</span>
+<span id="L150"></span>
+<span id="L151"><span class="kw">lemma</span> <span class="const token" data-verso-hover="321">chunk_bundle</span> (A : <span class="const token" data-verso-hover="3">Algorithm</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="229">Option</span> <span class="const token" data-verso-hover="30">ℕ</span>) σ B) (v u : V)</span>
+<span id="L152">    (sim : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → σ) (k : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) :</span>
+<span id="L153">    <span class="const token" data-verso-hover="320">chunk</span> k (<span class="const token" data-verso-hover="316">bundle</span> A v u sim) =</span>
+<span id="L154">      A.<span class="const token" data-verso-hover="319">send</span> (v, (<span class="const token" data-verso-hover="296">src</span> v u k).<span class="const token" data-verso-hover="70">1</span>) (sim (<span class="const token" data-verso-hover="296">src</span> v u k).<span class="const token" data-verso-hover="70">1</span>) (u, (<span class="const token" data-verso-hover="296">src</span> v u k).<span class="const token" data-verso-hover="71">2</span>) := <span class="kw">by</span></span>
+<span id="L155">  <span class="kw">funext</span> b</span>
+<span id="L156">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="320">chunk</span>, <span class="const token" data-verso-hover="316">bundle</span>]</span>
+<span id="L157"></span>
+<span id="L158"><span class="dc">/-- The first bit of a message (`false` if `B = 0`). -/</span></span>
+<span id="L159"><span class="kw">def</span> <span class="const token" data-verso-hover="322">firstBit</span> (m : <span class="const token" data-verso-hover="317">Msg</span> (<span class="nu">3</span> * B)) : <span class="const token" data-verso-hover="59">Bool</span> := <span class="kw">if</span> h : <span class="nu">0</span> &lt; <span class="nu">3</span> * B <span class="kw">then</span> m ⟨<span class="nu">0</span>, h⟩ <span class="kw">else</span> <span class="const token" data-verso-hover="61">false</span></span>
+<span id="L160"></span>
+<span id="L161"><span class="dc">/-- The messages received by the simulated copy `vⱼ`, reconstructed by `v` from its own</span></span>
+<span id="L162"><span class="dc">simulated states (triangle edges) and the bundled messages received from its neighbours. -/</span></span>
+<span id="L163"><span class="kw">def</span> <span class="const token" data-verso-hover="323">simRecv</span> (A : <span class="const token" data-verso-hover="3">Algorithm</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="229">Option</span> <span class="const token" data-verso-hover="30">ℕ</span>) σ B) (v : V) (sim : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → σ)</span>
+<span id="L164">    (recv : V → <span class="const token" data-verso-hover="229">Option</span> (<span class="const token" data-verso-hover="317">Msg</span> (<span class="nu">3</span> * B))) (j : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="229">Option</span> (<span class="const token" data-verso-hover="317">Msg</span> B) := <span class="kw">fun</span> x =&gt;</span>
+<span id="L165">  <span class="kw">if</span> x.<span class="const token" data-verso-hover="70">1</span> = v <span class="kw">then</span> (<span class="kw">if</span> x.<span class="const token" data-verso-hover="71">2</span> ≠ j <span class="kw">then</span> <span class="const token" data-verso-hover="230">some</span> (A.<span class="const token" data-verso-hover="319">send</span> (v, x.<span class="const token" data-verso-hover="71">2</span>) (sim x.<span class="const token" data-verso-hover="71">2</span>) (v, j)) <span class="kw">else</span> <span class="const token" data-verso-hover="231">none</span>)</span>
+<span id="L166">  <span class="kw">else</span> (recv x.<span class="const token" data-verso-hover="70">1</span>).<span class="const token" data-verso-hover="324">bind</span> <span class="kw">fun</span> m =&gt; (<span class="const token" data-verso-hover="297">idx</span> x.<span class="const token" data-verso-hover="70">1</span> v x.<span class="const token" data-verso-hover="71">2</span> j).<span class="const token" data-verso-hover="325">map</span> <span class="kw">fun</span> k =&gt; <span class="const token" data-verso-hover="320">chunk</span> k m</span>
+<span id="L167"></span>
+<span id="L168"><span class="dc">/-- Bit sent by `v` to `u`: in the first `T` rounds the bundled `A`-messages, then whether a copy</span></span>
+<span id="L169"><span class="dc">of `v` output the cross edge between `v` and `u`. -/</span></span>
+<span id="L170"><span class="kw">def</span> <span class="const token" data-verso-hover="326">mvcSend</span> (A : <span class="const token" data-verso-hover="3">Algorithm</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="229">Option</span> <span class="const token" data-verso-hover="30">ℕ</span>) σ B)</span>
+<span id="L171">    (pick : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → σ → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="59">Bool</span>) (T : <span class="const token" data-verso-hover="30">ℕ</span>) (v : V) (st : <span class="const token" data-verso-hover="309">SimState</span> V σ)</span>
+<span id="L172">    (u : V) : <span class="const token" data-verso-hover="317">Msg</span> (<span class="nu">3</span> * B) :=</span>
+<span id="L173">  <span class="kw">if</span> st.<span class="const token" data-verso-hover="310">round</span> &lt; T <span class="kw">then</span> <span class="const token" data-verso-hover="316">bundle</span> A v u st.<span class="const token" data-verso-hover="312">sim</span> <span class="kw">else</span> <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="315">crossPicked</span> pick v u st.<span class="const token" data-verso-hover="312">sim</span></span>
+<span id="L174"></span>
+<span id="L175"><span class="dc">/-- The decision `v ∈ C_H` after the last round: `{v₁, v₂}` was output by `v₁` or `v₂`, or the</span></span>
+<span id="L176"><span class="dc">cross edge between `v` and some neighbour `u` was output by the copy of `v` or (as reported in</span></span>
+<span id="L177"><span class="dc">the last round) by the copy of `u`. -/</span></span>
+<span id="L178"><span class="kw">def</span> <span class="const token" data-verso-hover="327">decideC</span> [<span class="const token" data-verso-hover="49">Fintype</span> V] (pick : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → σ → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="59">Bool</span>) (v : V)</span>
+<span id="L179">    (st : <span class="const token" data-verso-hover="309">SimState</span> V σ) (recv : V → <span class="const token" data-verso-hover="229">Option</span> (<span class="const token" data-verso-hover="317">Msg</span> (<span class="nu">3</span> * B))) : <span class="const token" data-verso-hover="59">Bool</span> :=</span>
+<span id="L180">  <span class="const token" data-verso-hover="314">picks</span> pick (v, <span class="nu">0</span>) (st.<span class="const token" data-verso-hover="312">sim</span> <span class="nu">0</span>) (v, <span class="nu">0</span>) (v, <span class="nu">1</span>) || <span class="const token" data-verso-hover="314">picks</span> pick (v, <span class="nu">1</span>) (st.<span class="const token" data-verso-hover="312">sim</span> <span class="nu">1</span>) (v, <span class="nu">0</span>) (v, <span class="nu">1</span>) ||</span>
+<span id="L181">    <span class="const token" data-verso-hover="64">decide</span> (∃ u, st.<span class="const token" data-verso-hover="311">nbr</span> u = <span class="const token" data-verso-hover="60">true</span> ∧</span>
+<span id="L182">      (<span class="const token" data-verso-hover="315">crossPicked</span> pick v u st.<span class="const token" data-verso-hover="312">sim</span> || ((recv u).<span class="const token" data-verso-hover="325">map</span> <span class="const token" data-verso-hover="322">firstBit</span>).<span class="const token" data-verso-hover="328">getD</span> <span class="const token" data-verso-hover="61">false</span>) = <span class="const token" data-verso-hover="60">true</span>)</span>
+<span id="L183"></span>
+<span id="L184"><span class="dc">/-- State update of `A_MVC`. -/</span></span>
+<span id="L185"><span class="kw">def</span> <span class="const token" data-verso-hover="329">mvcStep</span> [<span class="const token" data-verso-hover="49">Fintype</span> V] (A : <span class="const token" data-verso-hover="3">Algorithm</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="229">Option</span> <span class="const token" data-verso-hover="30">ℕ</span>) σ B)</span>
+<span id="L186">    (pick : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → σ → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="59">Bool</span>) (T : <span class="const token" data-verso-hover="30">ℕ</span>) (v : V) (st : <span class="const token" data-verso-hover="309">SimState</span> V σ)</span>
+<span id="L187">    (recv : V → <span class="const token" data-verso-hover="229">Option</span> (<span class="const token" data-verso-hover="317">Msg</span> (<span class="nu">3</span> * B))) : <span class="const token" data-verso-hover="309">SimState</span> V σ :=</span>
+<span id="L188">  <span class="kw">if</span> st.<span class="const token" data-verso-hover="310">round</span> &lt; T <span class="kw">then</span></span>
+<span id="L189">    { st <span class="kw">with</span> <span class="const token" data-verso-hover="310">round</span> := st.<span class="const token" data-verso-hover="310">round</span> + <span class="nu">1</span>,</span>
+<span id="L190">              <span class="const token" data-verso-hover="312">sim</span> := <span class="kw">fun</span> j =&gt; A.<span class="const token" data-verso-hover="330">step</span> (v, j) (st.<span class="const token" data-verso-hover="312">sim</span> j) (<span class="const token" data-verso-hover="323">simRecv</span> A v st.<span class="const token" data-verso-hover="312">sim</span> recv j) }</span>
+<span id="L191">  <span class="kw">else</span> <span class="kw">if</span> st.<span class="const token" data-verso-hover="310">round</span> = T <span class="kw">then</span></span>
+<span id="L192">    { st <span class="kw">with</span> <span class="const token" data-verso-hover="310">round</span> := T + <span class="nu">1</span>, <span class="const token" data-verso-hover="313">inC</span> := <span class="const token" data-verso-hover="327">decideC</span> pick v st recv }</span>
+<span id="L193">  <span class="kw">else</span> st</span>
+<span id="L194"></span>
+<span id="L195"><span class="dc">/-- The MVC algorithm `A_MVC` of Lemma 3.2: `T` simulated rounds of `A` on `G_S`, then one round</span></span>
+<span id="L196"><span class="dc">in which `v` learns which cross edges at its copies were output by its neighbours, and computes</span></span>
+<span id="L197"><span class="dc">`v ∈ C_H`. -/</span></span>
+<span id="L198"><span class="kw">def</span> <span class="const token" data-verso-hover="331">mvcAlg</span> [<span class="const token" data-verso-hover="49">Fintype</span> V] (A : <span class="const token" data-verso-hover="3">Algorithm</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="229">Option</span> <span class="const token" data-verso-hover="30">ℕ</span>) σ B)</span>
+<span id="L199">    (pick : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → σ → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="59">Bool</span>) (T : <span class="const token" data-verso-hover="30">ℕ</span>) :</span>
+<span id="L200">    <span class="const token" data-verso-hover="3">Algorithm</span> V (V → <span class="const token" data-verso-hover="59">Bool</span>) (<span class="const token" data-verso-hover="309">SimState</span> V σ) (<span class="nu">3</span> * B) <span class="kw">where</span></span>
+<span id="L201">  <span class="const token" data-verso-hover="332">init</span> v nb := ⟨<span class="nu">0</span>, nb, <span class="kw">fun</span> i =&gt; A.<span class="const token" data-verso-hover="332">init</span> (v, i) (<span class="const token" data-verso-hover="292">localInpS</span> v nb i), <span class="const token" data-verso-hover="61">false</span>⟩</span>
+<span id="L202">  <span class="const token" data-verso-hover="319">send</span> := <span class="const token" data-verso-hover="326">mvcSend</span> A pick T</span>
+<span id="L203">  <span class="const token" data-verso-hover="330">step</span> := <span class="const token" data-verso-hover="329">mvcStep</span> A pick T</span>
+<span id="L204">  <span class="const token" data-verso-hover="333">out</span> _ st := st.<span class="const token" data-verso-hover="313">inC</span></span>
+<span id="L205"></span>
+<span id="L206"><span class="kw">lemma</span> <span class="const token" data-verso-hover="334">run_succ_eq</span> {W I τ : <span class="kw">Type</span>*} {b : <span class="const token" data-verso-hover="30">ℕ</span>} (A' : <span class="const token" data-verso-hover="3">Algorithm</span> W I τ b) (G' : <span class="const token" data-verso-hover="247">SimpleGraph</span> W)</span>
+<span id="L207">    [<span class="const token" data-verso-hover="157">DecidableRel</span> G'.<span class="const token" data-verso-hover="130">Adj</span>] (inp : W → I) (t : <span class="const token" data-verso-hover="30">ℕ</span>) (v : W) :</span>
+<span id="L208">    A'.<span class="const token" data-verso-hover="214">run</span> G' inp (t + <span class="nu">1</span>) v = A'.<span class="const token" data-verso-hover="330">step</span> v (A'.<span class="const token" data-verso-hover="214">run</span> G' inp t v)</span>
+<span id="L209">      (<span class="kw">fun</span> w =&gt; <span class="kw">if</span> G'.<span class="const token" data-verso-hover="130">Adj</span> w v <span class="kw">then</span> <span class="const token" data-verso-hover="230">some</span> (A'.<span class="const token" data-verso-hover="319">send</span> w (A'.<span class="const token" data-verso-hover="214">run</span> G' inp t w) v) <span class="kw">else</span> <span class="const token" data-verso-hover="231">none</span>) := <span class="const token" data-verso-hover="90">rfl</span></span>
+<span id="L210"></span>
+<span id="L211"><span class="kw">section</span></span>
+<span id="L212"><span class="kw">variable</span> [<span class="const token" data-verso-hover="49">Fintype</span> V] (A : <span class="const token" data-verso-hover="3">Algorithm</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="229">Option</span> <span class="const token" data-verso-hover="30">ℕ</span>) σ B)</span>
+<span id="L213">  (pick : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → σ → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="59">Bool</span>) (T : <span class="const token" data-verso-hover="30">ℕ</span>)</span>
+<span id="L214"></span>
+<span id="L215">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="335">mvcAlg_step</span> : (<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T).<span class="const token" data-verso-hover="330">step</span> = <span class="const token" data-verso-hover="329">mvcStep</span> A pick T := <span class="const token" data-verso-hover="90">rfl</span></span>
+<span id="L216">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="336">mvcAlg_send</span> : (<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T).<span class="const token" data-verso-hover="319">send</span> = <span class="const token" data-verso-hover="326">mvcSend</span> A pick T := <span class="const token" data-verso-hover="90">rfl</span></span>
+<span id="L217">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="337">mvcAlg_out</span> (v : V) (st : <span class="const token" data-verso-hover="309">SimState</span> V σ) : (<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T).<span class="const token" data-verso-hover="333">out</span> v st = st.<span class="const token" data-verso-hover="313">inC</span> := <span class="const token" data-verso-hover="90">rfl</span></span>
+<span id="L218">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="338">mvcAlg_init</span> (v : V) (nb : V → <span class="const token" data-verso-hover="59">Bool</span>) :</span>
+<span id="L219">    (<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T).<span class="const token" data-verso-hover="332">init</span> v nb = ⟨<span class="nu">0</span>, nb, <span class="kw">fun</span> i =&gt; A.<span class="const token" data-verso-hover="332">init</span> (v, i) (<span class="const token" data-verso-hover="292">localInpS</span> v nb i), <span class="const token" data-verso-hover="61">false</span>⟩ := <span class="const token" data-verso-hover="90">rfl</span></span>
+<span id="L220"></span>
+<span id="L221"><span class="kw">end</span></span>
+<span id="L222"></span>
+<span id="L223"><span class="kw">variable</span> [<span class="const token" data-verso-hover="49">Fintype</span> V] (A : <span class="const token" data-verso-hover="3">Algorithm</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="229">Option</span> <span class="const token" data-verso-hover="30">ℕ</span>) σ B)</span>
+<span id="L224">  (pick : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → σ → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="59">Bool</span>) (T : <span class="const token" data-verso-hover="30">ℕ</span>)</span>
+<span id="L225">  (G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V) [<span class="const token" data-verso-hover="157">DecidableRel</span> G.<span class="const token" data-verso-hover="130">Adj</span>]</span>
+<span id="L226"></span>
+<span id="L227"><span class="dc">/-- Simulation invariant: after `t ≤ T` rounds, `v` holds the states of `v₁, v₂, v₃` after `t`</span></span>
+<span id="L228"><span class="dc">rounds of `A` on `G_S`. -/</span></span>
+<span id="L229"><span class="kw">theorem</span> <span class="const token" data-verso-hover="339">mvcAlg_run_of_le</span> : ∀ t ≤ T, ∀ v,</span>
+<span id="L230">    ((<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T).<span class="const token" data-verso-hover="214">run</span> G (<span class="const token" data-verso-hover="288">nbrInput</span> G) t v).<span class="const token" data-verso-hover="310">round</span> = t ∧</span>
+<span id="L231">    ((<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T).<span class="const token" data-verso-hover="214">run</span> G (<span class="const token" data-verso-hover="288">nbrInput</span> G) t v).<span class="const token" data-verso-hover="311">nbr</span> = <span class="const token" data-verso-hover="288">nbrInput</span> G v ∧</span>
+<span id="L232">    ∀ i, ((<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T).<span class="const token" data-verso-hover="214">run</span> G (<span class="const token" data-verso-hover="288">nbrInput</span> G) t v).<span class="const token" data-verso-hover="312">sim</span> i = A.<span class="const token" data-verso-hover="214">run</span> (<span class="const token" data-verso-hover="290">GS</span> G) (<span class="const token" data-verso-hover="289">inpS</span> G) t (v, i)</span>
+<span id="L233">  | <span class="nu">0</span>, _, v =&gt; <span class="kw">by</span></span>
+<span id="L234">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="214">Algorithm.run</span>, <span class="const token" data-verso-hover="294">localInpS_eq</span>]</span>
+<span id="L235">  | t + <span class="nu">1</span>, ht, v =&gt; <span class="kw">by</span></span>
+<span id="L236">    <span class="kw">have</span> ih := <span class="const token" data-verso-hover="339">mvcAlg_run_of_le</span> t (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L237">    <span class="kw">obtain</span> ⟨h1, h2, h3⟩ := ih v</span>
+<span id="L238">    <span class="kw">have</span> hlt : ((<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T).<span class="const token" data-verso-hover="214">run</span> G (<span class="const token" data-verso-hover="288">nbrInput</span> G) t v).<span class="const token" data-verso-hover="310">round</span> &lt; T := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L239">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="334">run_succ_eq</span>, <span class="const token" data-verso-hover="335">mvcAlg_step</span>, <span class="const token" data-verso-hover="329">mvcStep</span>, <span class="const token" data-verso-hover="340">ite_eq_left</span> hlt]</span>
+<span id="L240">    <span class="kw">refine</span> ⟨<span class="kw">by</span> <span class="kw">rw</span> [h1], h2, <span class="kw">fun</span> j =&gt; ?_⟩</span>
+<span id="L241">    <span class="kw">simp</span> only [h3, <span class="const token" data-verso-hover="334">run_succ_eq</span>, <span class="const token" data-verso-hover="336">mvcAlg_send</span>]</span>
+<span id="L242">    <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L243">    <span class="kw">funext</span> ⟨w, i⟩</span>
+<span id="L244">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="323">simRecv</span>]</span>
+<span id="L245">    <span class="kw">by_cases</span> hw : w = v</span>
+<span id="L246">    · <span class="kw">subst</span> hw</span>
+<span id="L247">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="305">ite_true</span>, <span class="const token" data-verso-hover="341">GS_adj_same</span>, h3]</span>
+<span id="L248">    · <span class="kw">simp</span> only [hw, <span class="const token" data-verso-hover="308">ite_false</span>, <span class="const token" data-verso-hover="300">GS_adj_iff_idx</span> hw]</span>
+<span id="L249">      <span class="kw">by_cases</span> hG : G.<span class="const token" data-verso-hover="130">Adj</span> w v</span>
+<span id="L250">      · <span class="kw">have</span> hlt' : ((<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T).<span class="const token" data-verso-hover="214">run</span> G (<span class="const token" data-verso-hover="288">nbrInput</span> G) t w).<span class="const token" data-verso-hover="310">round</span> &lt; T := <span class="kw">by</span></span>
+<span id="L251">          <span class="kw">rw</span> [(ih w).<span class="const token" data-verso-hover="80">1</span>]; <span class="kw">omega</span></span>
+<span id="L252">        <span class="kw">simp</span> only [hG, <span class="const token" data-verso-hover="305">ite_true</span>, <span class="const token" data-verso-hover="342">Option.bind_some</span>, <span class="const token" data-verso-hover="79">true_and</span>]</span>
+<span id="L253">        <span class="kw">cases</span> hk : <span class="const token" data-verso-hover="297">idx</span> w v i j <span class="kw">with</span></span>
+<span id="L254">        | <span class="const token" data-verso-hover="231">none</span> =&gt; <span class="kw">simp</span></span>
+<span id="L255">        | <span class="const token" data-verso-hover="230">some</span> k =&gt;</span>
+<span id="L256">          <span class="kw">have</span> hs := <span class="const token" data-verso-hover="298">src_idx</span> hk</span>
+<span id="L257">          <span class="kw">simp</span> only [<span class="const token" data-verso-hover="343">Option.map_some</span>, <span class="const token" data-verso-hover="344">Option.isSome_some</span>, <span class="const token" data-verso-hover="305">ite_true</span>, <span class="const token" data-verso-hover="299">Option.some.injEq</span>]</span>
+<span id="L258">          <span class="kw">rw</span> [<span class="const token" data-verso-hover="326">mvcSend</span>, <span class="const token" data-verso-hover="340">ite_eq_left</span> hlt', <span class="const token" data-verso-hover="321">chunk_bundle</span>, hs, (ih w).<span class="const token" data-verso-hover="96">2</span><span class="nu">.</span><span class="const token" data-verso-hover="96">2</span>]</span>
+<span id="L259">      · <span class="kw">simp</span> [hG]</span>
+<span id="L260"></span>
+<span id="L261"><span class="kw">omit</span> [<span class="const token" data-verso-hover="49">Fintype</span> V] [<span class="const token" data-verso-hover="157">DecidableRel</span> G.<span class="const token" data-verso-hover="130">Adj</span>] <span class="kw">in</span></span>
+<span id="L262"><span class="dc">/-- Local characterisation of `C_H` for the union-of-outputs spanner `H`: `v ∈ C_H` iff one of</span></span>
+<span id="L263"><span class="dc">`v₁, v₂` output `{v₁, v₂}`, or for some neighbour `u` the cross edge between `v` and `u` was output</span></span>
+<span id="L264"><span class="dc">by the copy of `v` or by the copy of `u` on it. -/</span></span>
+<span id="L265"><span class="kw">lemma</span> <span class="const token" data-verso-hover="345">mem_CH_spannerOut_iff</span> (st : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → σ) (v : V) :</span>
+<span id="L266">    v ∈ <span class="const token" data-verso-hover="346">CH</span> (<span class="const token" data-verso-hover="282">spannerOut</span> (<span class="const token" data-verso-hover="290">GS</span> G) pick st) ↔</span>
+<span id="L267">      (<span class="const token" data-verso-hover="314">picks</span> pick (v, <span class="nu">0</span>) (st (v, <span class="nu">0</span>)) (v, <span class="nu">0</span>) (v, <span class="nu">1</span>) = <span class="const token" data-verso-hover="60">true</span> ∨</span>
+<span id="L268">        <span class="const token" data-verso-hover="314">picks</span> pick (v, <span class="nu">1</span>) (st (v, <span class="nu">1</span>)) (v, <span class="nu">0</span>) (v, <span class="nu">1</span>) = <span class="const token" data-verso-hover="60">true</span>) ∨</span>
+<span id="L269">      ∃ u, G.<span class="const token" data-verso-hover="130">Adj</span> v u ∧ (<span class="const token" data-verso-hover="315">crossPicked</span> pick v u (<span class="kw">fun</span> i =&gt; st (v, i)) = <span class="const token" data-verso-hover="60">true</span> ∨</span>
+<span id="L270">        <span class="const token" data-verso-hover="315">crossPicked</span> pick u v (<span class="kw">fun</span> i =&gt; st (u, i)) = <span class="const token" data-verso-hover="60">true</span>) := <span class="kw">by</span></span>
+<span id="L271">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="346">CH</span>, <span class="const token" data-verso-hover="347">Set.mem_ofPred_eq</span>, <span class="const token" data-verso-hover="282">spannerOut</span>, <span class="const token" data-verso-hover="314">picks</span>, <span class="const token" data-verso-hover="315">crossPicked</span>, <span class="const token" data-verso-hover="348">Bool.or_eq_true</span>]</span>
+<span id="L272">  <span class="kw">constructor</span></span>
+<span id="L273">  · <span class="kw">rintro</span> ⟨u, h | h⟩</span>
+<span id="L274">    · <span class="kw">by_cases</span> hu : u = v</span>
+<span id="L275">      · <span class="kw">subst</span> hu</span>
+<span id="L276">        <span class="kw">left</span>; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="341">GS_adj_same</span>] <span class="kw">at</span> h; <span class="kw">tauto</span></span>
+<span id="L277">      · <span class="kw">right</span></span>
+<span id="L278">        <span class="kw">have</span> hvu : v ≠ u := <span class="const token" data-verso-hover="249">Ne.symm</span> hu</span>
+<span id="L279">        <span class="kw">have</span> h1 := (<span class="const token" data-verso-hover="302">GS_adj_of_ne</span> hvu).<span class="const token" data-verso-hover="202">mp</span> h.<span class="const token" data-verso-hover="80">1</span></span>
+<span id="L280">        <span class="kw">have</span> hlt : v &lt; u := <span class="kw">by</span> <span class="kw">rcases</span> h1.<span class="const token" data-verso-hover="96">2</span> <span class="kw">with</span> h' | h' | h' | h' &lt;;&gt; (<span class="kw">simp</span> <span class="kw">at</span> h'; <span class="kw">try</span> <span class="kw">exact</span> h')</span>
+<span id="L281">        <span class="kw">refine</span> ⟨u, h1.<span class="const token" data-verso-hover="80">1</span>, ?_⟩</span>
+<span id="L282">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="296">src</span>, hlt, <span class="const token" data-verso-hover="305">ite_true</span>, <span class="const token" data-verso-hover="201">not_lt</span>.<span class="const token" data-verso-hover="121">mpr</span> hlt.<span class="const token" data-verso-hover="240">le</span>, <span class="const token" data-verso-hover="308">ite_false</span>]</span>
+<span id="L283">        <span class="kw">tauto</span></span>
+<span id="L284">    · <span class="kw">by_cases</span> hu : u = v</span>
+<span id="L285">      · <span class="kw">subst</span> hu</span>
+<span id="L286">        <span class="kw">left</span>; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="341">GS_adj_same</span>] <span class="kw">at</span> h; <span class="kw">tauto</span></span>
+<span id="L287">      · <span class="kw">right</span></span>
+<span id="L288">        <span class="kw">have</span> h1 := (<span class="const token" data-verso-hover="302">GS_adj_of_ne</span> hu).<span class="const token" data-verso-hover="202">mp</span> h.<span class="const token" data-verso-hover="80">1</span></span>
+<span id="L289">        <span class="kw">have</span> hlt : u &lt; v := <span class="kw">by</span> <span class="kw">rcases</span> h1.<span class="const token" data-verso-hover="96">2</span> <span class="kw">with</span> h' | h' | h' | h' &lt;;&gt; (<span class="kw">simp</span> <span class="kw">at</span> h'; <span class="kw">try</span> <span class="kw">exact</span> h')</span>
+<span id="L290">        <span class="kw">refine</span> ⟨u, h1.<span class="const token" data-verso-hover="80">1</span>.<span class="const token" data-verso-hover="283">symm</span>, ?_⟩</span>
+<span id="L291">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="296">src</span>, hlt, <span class="const token" data-verso-hover="305">ite_true</span>, <span class="const token" data-verso-hover="201">not_lt</span>.<span class="const token" data-verso-hover="121">mpr</span> hlt.<span class="const token" data-verso-hover="240">le</span>, <span class="const token" data-verso-hover="308">ite_false</span>]</span>
+<span id="L292">        <span class="kw">tauto</span></span>
+<span id="L293">  · <span class="kw">rintro</span> (h | ⟨u, hG, h⟩)</span>
+<span id="L294">    · <span class="kw">exact</span> ⟨v, <span class="const token" data-verso-hover="131">Or.inl</span> ⟨<span class="const token" data-verso-hover="341">GS_adj_same</span>.<span class="const token" data-verso-hover="121">mpr</span> (<span class="kw">by</span> <span class="kw">decide</span>), <span class="kw">by</span> <span class="kw">tauto</span>⟩⟩</span>
+<span id="L295">    · <span class="kw">have</span> hvu : v ≠ u := G.<span class="const token" data-verso-hover="349">ne_of_adj</span> hG</span>
+<span id="L296">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="304">lt_or_gt_of_ne</span> hvu <span class="kw">with</span> hlt | hlt</span>
+<span id="L297">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="296">src</span>, hlt, <span class="const token" data-verso-hover="305">ite_true</span>, <span class="const token" data-verso-hover="201">not_lt</span>.<span class="const token" data-verso-hover="121">mpr</span> hlt.<span class="const token" data-verso-hover="240">le</span>, <span class="const token" data-verso-hover="308">ite_false</span>] <span class="kw">at</span> h</span>
+<span id="L298">        <span class="kw">exact</span> ⟨u, <span class="const token" data-verso-hover="131">Or.inl</span> ⟨(<span class="const token" data-verso-hover="302">GS_adj_of_ne</span> hvu).<span class="const token" data-verso-hover="121">mpr</span> ⟨hG, <span class="kw">by</span> <span class="kw">simp</span> [hlt]⟩, <span class="kw">by</span> <span class="kw">tauto</span>⟩⟩</span>
+<span id="L299">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="296">src</span>, hlt, <span class="const token" data-verso-hover="305">ite_true</span>, <span class="const token" data-verso-hover="201">not_lt</span>.<span class="const token" data-verso-hover="121">mpr</span> hlt.<span class="const token" data-verso-hover="240">le</span>, <span class="const token" data-verso-hover="308">ite_false</span>] <span class="kw">at</span> h</span>
+<span id="L300">        <span class="kw">exact</span> ⟨u, <span class="const token" data-verso-hover="153">Or.inr</span> ⟨(<span class="const token" data-verso-hover="302">GS_adj_of_ne</span> (<span class="const token" data-verso-hover="249">Ne.symm</span> hvu)).<span class="const token" data-verso-hover="121">mpr</span> ⟨hG.<span class="const token" data-verso-hover="283">symm</span>, <span class="kw">by</span> <span class="kw">simp</span> [hlt]⟩, <span class="kw">by</span> <span class="kw">tauto</span>⟩⟩</span>
+<span id="L301"></span>
+<span id="L302"><span class="dc">/-- After `T + 1` rounds, `v` outputs `true` iff `v ∈ C_H`, where `H` is the spanner output by `A`</span></span>
+<span id="L303"><span class="dc">on `G_S` after `T` rounds. -/</span></span>
+<span id="L304"><span class="kw">theorem</span> <span class="const token" data-verso-hover="350">mvcAlg_inC</span> (hB : <span class="nu">0</span> &lt; B) (v : V) :</span>
+<span id="L305">    ((<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T).<span class="const token" data-verso-hover="214">run</span> G (<span class="const token" data-verso-hover="288">nbrInput</span> G) (T + <span class="nu">1</span>) v).<span class="const token" data-verso-hover="313">inC</span> = <span class="const token" data-verso-hover="60">true</span> ↔</span>
+<span id="L306">      v ∈ <span class="const token" data-verso-hover="346">CH</span> (<span class="const token" data-verso-hover="282">spannerOut</span> (<span class="const token" data-verso-hover="290">GS</span> G) pick (A.<span class="const token" data-verso-hover="214">run</span> (<span class="const token" data-verso-hover="290">GS</span> G) (<span class="const token" data-verso-hover="289">inpS</span> G) T)) := <span class="kw">by</span></span>
+<span id="L307">  <span class="kw">have</span> hrun := <span class="const token" data-verso-hover="339">mvcAlg_run_of_le</span> A pick T G T <span class="const token" data-verso-hover="351">le_rfl</span></span>
+<span id="L308">  <span class="kw">obtain</span> ⟨h1, h2, h3⟩ := hrun v</span>
+<span id="L309">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="334">run_succ_eq</span>, <span class="const token" data-verso-hover="335">mvcAlg_step</span>, <span class="const token" data-verso-hover="329">mvcStep</span>, <span class="const token" data-verso-hover="352">ite_eq_right</span> (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="340">ite_eq_left</span> h1]</span>
+<span id="L310">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="327">decideC</span>]</span>
+<span id="L311">  <span class="kw">have</span> hsim : ((<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T).<span class="const token" data-verso-hover="214">run</span> G (<span class="const token" data-verso-hover="288">nbrInput</span> G) T v).<span class="const token" data-verso-hover="312">sim</span> =</span>
+<span id="L312">      <span class="kw">fun</span> i =&gt; A.<span class="const token" data-verso-hover="214">run</span> (<span class="const token" data-verso-hover="290">GS</span> G) (<span class="const token" data-verso-hover="289">inpS</span> G) T (v, i) := <span class="const token" data-verso-hover="353">funext</span> h3</span>
+<span id="L313">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="348">Bool.or_eq_true</span>, <span class="const token" data-verso-hover="206">decide_eq_true_eq</span>, <span class="const token" data-verso-hover="345">mem_CH_spannerOut_iff</span>, h2, h3, hsim, <span class="const token" data-verso-hover="288">nbrInput</span>]</span>
+<span id="L314">  <span class="kw">refine</span> <span class="const token" data-verso-hover="354">or_congr</span> <span class="const token" data-verso-hover="355">Iff.rfl</span> (<span class="const token" data-verso-hover="356">exists_congr</span> <span class="kw">fun</span> u =&gt; <span class="const token" data-verso-hover="303">and_congr_right</span> <span class="kw">fun</span> hG =&gt; <span class="const token" data-verso-hover="357">or_congr_right</span> ?_)</span>
+<span id="L315">  <span class="kw">have</span> hu := hrun u</span>
+<span id="L316">  <span class="kw">have</span> hu' : ¬ ((<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T).<span class="const token" data-verso-hover="214">run</span> G (<span class="const token" data-verso-hover="288">nbrInput</span> G) T u).<span class="const token" data-verso-hover="310">round</span> &lt; T := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L317">  <span class="kw">have</span> h3B : <span class="nu">0</span> &lt; <span class="nu">3</span> * B := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L318">  <span class="kw">have</span> hsimu : ((<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T).<span class="const token" data-verso-hover="214">run</span> G (<span class="const token" data-verso-hover="288">nbrInput</span> G) T u).<span class="const token" data-verso-hover="312">sim</span> =</span>
+<span id="L319">      <span class="kw">fun</span> i =&gt; A.<span class="const token" data-verso-hover="214">run</span> (<span class="const token" data-verso-hover="290">GS</span> G) (<span class="const token" data-verso-hover="289">inpS</span> G) T (u, i) := <span class="const token" data-verso-hover="353">funext</span> hu.<span class="const token" data-verso-hover="96">2</span><span class="nu">.</span><span class="const token" data-verso-hover="96">2</span></span>
+<span id="L320">  <span class="kw">simp</span> only [G.<span class="const token" data-verso-hover="358">adj_symm</span> hG, <span class="const token" data-verso-hover="305">ite_true</span>, <span class="const token" data-verso-hover="336">mvcAlg_send</span>, <span class="const token" data-verso-hover="326">mvcSend</span>, hu', <span class="const token" data-verso-hover="308">ite_false</span>, <span class="const token" data-verso-hover="343">Option.map_some</span>,</span>
+<span id="L321">    <span class="const token" data-verso-hover="359">Option.getD_some</span>, <span class="const token" data-verso-hover="322">firstBit</span>, h3B, <span class="const token" data-verso-hover="360">dite_true</span>, hsimu]</span>
+<span id="L322"></span>
+<span id="L323"><span class="dc">/-- **Lemma 3.2 of [CD18]** (with `3B`-bit messages and `T + 1` rounds). Let `A` be a</span></span>
+<span id="L324"><span class="dc">deterministic CONGEST algorithm on `G_S` (vertex set `V × Fin 3`, `B`-bit messages, `B &gt; 0`)</span></span>
+<span id="L325"><span class="dc">which, for every graph `G` in the class `P`, outputs after `T` rounds an `α`-approximate</span></span>
+<span id="L326"><span class="dc">minimum-cost 2-spanner of `G_S` (as the union of the nodes' outputs). Then `A_MVC = mvcAlg A pick T`</span></span>
+<span id="L327"><span class="dc">is a CONGEST algorithm on `G` with `3B`-bit messages which, for every `G` in `P`, outputs after</span></span>
+<span id="L328"><span class="dc">`T + 1` rounds an `α`-approximate minimum vertex cover of `G`. -/</span></span>
+<span id="L329"><span class="kw">theorem</span> <span class="const token" data-verso-hover="1">lemma_3_2</span> (hB : <span class="nu">0</span> &lt; B) (α : <span class="const token" data-verso-hover="184">ℝ</span>) (P : <span class="const token" data-verso-hover="247">SimpleGraph</span> V → <span class="kw">Prop</span>)</span>
+<span id="L330">    (hA : ∀ (G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V) [<span class="const token" data-verso-hover="157">DecidableRel</span> G.<span class="const token" data-verso-hover="130">Adj</span>], P G →</span>
+<span id="L331">      <span class="const token" data-verso-hover="361">IsApproxMinSpanner</span> <span class="const token" data-verso-hover="362">wt</span> α (<span class="const token" data-verso-hover="290">GS</span> G) (<span class="const token" data-verso-hover="282">spannerOut</span> (<span class="const token" data-verso-hover="290">GS</span> G) pick (A.<span class="const token" data-verso-hover="214">run</span> (<span class="const token" data-verso-hover="290">GS</span> G) (<span class="const token" data-verso-hover="289">inpS</span> G) T)))</span>
+<span id="L332">    (hP : P G) :</span>
+<span id="L333">    <span class="const token" data-verso-hover="363">IsApproxMinVC</span> α G</span>
+<span id="L334">      {v | (<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T).<span class="const token" data-verso-hover="333">out</span> v ((<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T).<span class="const token" data-verso-hover="214">run</span> G (<span class="const token" data-verso-hover="288">nbrInput</span> G) (T + <span class="nu">1</span>) v) = <span class="const token" data-verso-hover="60">true</span>} := <span class="kw">by</span></span>
+<span id="L335">  <span class="kw">have</span> : {v | (<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T).<span class="const token" data-verso-hover="333">out</span> v ((<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T).<span class="const token" data-verso-hover="214">run</span> G (<span class="const token" data-verso-hover="288">nbrInput</span> G) (T + <span class="nu">1</span>) v) = <span class="const token" data-verso-hover="60">true</span>} =</span>
+<span id="L336">      <span class="const token" data-verso-hover="346">CH</span> (<span class="const token" data-verso-hover="282">spannerOut</span> (<span class="const token" data-verso-hover="290">GS</span> G) pick (A.<span class="const token" data-verso-hover="214">run</span> (<span class="const token" data-verso-hover="290">GS</span> G) (<span class="const token" data-verso-hover="289">inpS</span> G) T)) := <span class="kw">by</span></span>
+<span id="L337">    <span class="kw">ext</span> v</span>
+<span id="L338">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="350">mvcAlg_inC</span> A pick T G hB]</span>
+<span id="L339">  <span class="kw">rw</span> [this]</span>
+<span id="L340">  <span class="kw">exact</span> <span class="const token" data-verso-hover="25">approx_transfer</span> (hA G hP)</span>
+<span id="L341"></span>
+<span id="L342"><span class="dc">/-! ### Splitting `kB`-bit messages into `k` rounds of `B`-bit messages -/</span></span>
+<span id="L343"></span>
+<span id="L344"><span class="kw">section</span> Slow</span>
+<span id="L345"></span>
+<span id="L346"><span class="cm">--</span><span class="cm"> CSLib candidate: generic slowdown of a CONGEST algorithm (Cslib.Congest).</span></span>
+<span id="L347"></span>
+<span id="L348"><span class="kw">variable</span> {U I τ : <span class="kw">Type</span>*} {k b : <span class="const token" data-verso-hover="30">ℕ</span>}</span>
+<span id="L349"></span>
+<span id="L350"><span class="dc">/-- State of the slowed-down algorithm: the simulated state, the sub-round within the current</span></span>
+<span id="L351"><span class="dc">block of `k` rounds, and the `b`-bit chunks received so far in this block. -/</span></span>
+<span id="L352"><span class="kw">structure</span> <span class="const token" data-verso-hover="364">SlowState</span> (U τ : <span class="kw">Type</span>*) (k b : <span class="const token" data-verso-hover="30">ℕ</span>) <span class="kw">where</span></span>
+<span id="L353">  <span class="dc">/-- The simulated state. -/</span></span>
+<span id="L354">  <span class="const token" data-verso-hover="365">inner</span> : τ</span>
+<span id="L355">  <span class="dc">/-- Sub-round within the current block (`&lt; k`). -/</span></span>
+<span id="L356">  <span class="const token" data-verso-hover="366">phase</span> : <span class="const token" data-verso-hover="30">ℕ</span></span>
+<span id="L357">  <span class="dc">/-- Chunks received in the current block, per neighbour. -/</span></span>
+<span id="L358">  <span class="const token" data-verso-hover="367">buf</span> : U → <span class="const token" data-verso-hover="32">Fin</span> k → <span class="const token" data-verso-hover="317">Msg</span> b</span>
+<span id="L359"></span>
+<span id="L360"><span class="dc">/-- The `c`-th `b`-bit chunk of a `k·b`-bit message. -/</span></span>
+<span id="L361"><span class="kw">def</span> <span class="const token" data-verso-hover="368">chunkK</span> (c : <span class="const token" data-verso-hover="32">Fin</span> k) (m : <span class="const token" data-verso-hover="317">Msg</span> (k * b)) : <span class="const token" data-verso-hover="317">Msg</span> b := <span class="kw">fun</span> i =&gt; m (<span class="const token" data-verso-hover="318">finProdFinEquiv</span> (c, i))</span>
+<span id="L362"></span>
+<span id="L363"><span class="dc">/-- Sending in the slowed-down algorithm: the current chunk of the simulated message. -/</span></span>
+<span id="L364"><span class="kw">def</span> <span class="const token" data-verso-hover="369">slowSend</span> (k : <span class="const token" data-verso-hover="30">ℕ</span>) [<span class="const token" data-verso-hover="370">NeZero</span> k] (A' : <span class="const token" data-verso-hover="3">Algorithm</span> U I τ (k * b)) (v : U) (st : <span class="const token" data-verso-hover="364">SlowState</span> U τ k b)</span>
+<span id="L365">    (w : U) : <span class="const token" data-verso-hover="317">Msg</span> b :=</span>
+<span id="L366">  <span class="const token" data-verso-hover="368">chunkK</span> ⟨st.<span class="const token" data-verso-hover="366">phase</span> % k, <span class="const token" data-verso-hover="264">Nat.mod_lt</span> _ (<span class="const token" data-verso-hover="371">NeZero.pos</span> k)⟩ (A'.<span class="const token" data-verso-hover="319">send</span> v st.<span class="const token" data-verso-hover="365">inner</span> w)</span>
+<span id="L367"></span>
+<span id="L368"><span class="dc">/-- State update of the slowed-down algorithm: store the received chunk; at the end of a block,</span></span>
+<span id="L369"><span class="dc">reassemble the messages and take the simulated step. -/</span></span>
+<span id="L370"><span class="kw">def</span> <span class="const token" data-verso-hover="372">slowStep</span> (k : <span class="const token" data-verso-hover="30">ℕ</span>) (A' : <span class="const token" data-verso-hover="3">Algorithm</span> U I τ (k * b)) (v : U) (st : <span class="const token" data-verso-hover="364">SlowState</span> U τ k b)</span>
+<span id="L371">    (recv : U → <span class="const token" data-verso-hover="229">Option</span> (<span class="const token" data-verso-hover="317">Msg</span> b)) : <span class="const token" data-verso-hover="364">SlowState</span> U τ k b :=</span>
+<span id="L372">  <span class="kw">let</span> buf' : U → <span class="const token" data-verso-hover="32">Fin</span> k → <span class="const token" data-verso-hover="317">Msg</span> b := <span class="kw">fun</span> w c =&gt;</span>
+<span id="L373">    <span class="kw">if</span> c.<span class="const token" data-verso-hover="65">val</span> = st.<span class="const token" data-verso-hover="366">phase</span> <span class="kw">then</span> (recv w).<span class="const token" data-verso-hover="328">getD</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="61">false</span>) <span class="kw">else</span> st.<span class="const token" data-verso-hover="367">buf</span> w c</span>
+<span id="L374">  <span class="kw">if</span> st.<span class="const token" data-verso-hover="366">phase</span> + <span class="nu">1</span> &lt; k <span class="kw">then</span> ⟨st.<span class="const token" data-verso-hover="365">inner</span>, st.<span class="const token" data-verso-hover="366">phase</span> + <span class="nu">1</span>, buf'⟩</span>
+<span id="L375">  <span class="kw">else</span> ⟨A'.<span class="const token" data-verso-hover="330">step</span> v st.<span class="const token" data-verso-hover="365">inner</span></span>
+<span id="L376">      (<span class="kw">fun</span> w =&gt; (recv w).<span class="const token" data-verso-hover="325">map</span> <span class="kw">fun</span> _ =&gt; <span class="kw">fun</span> n =&gt; buf' w (<span class="const token" data-verso-hover="318">finProdFinEquiv</span>.<span class="const token" data-verso-hover="51">symm</span> n).<span class="const token" data-verso-hover="70">1</span></span>
+<span id="L377">        (<span class="const token" data-verso-hover="318">finProdFinEquiv</span>.<span class="const token" data-verso-hover="51">symm</span> n).<span class="const token" data-verso-hover="71">2</span>), <span class="nu">0</span>, <span class="kw">fun</span> _ _ _ =&gt; <span class="const token" data-verso-hover="61">false</span>⟩</span>
+<span id="L378"></span>
+<span id="L379"><span class="dc">/-- Simulate a CONGEST algorithm with `k·b`-bit messages by one with `b`-bit messages: every</span></span>
+<span id="L380"><span class="dc">round becomes a block of `k` rounds; in sub-round `c` the `c`-th chunk of each message is sent,</span></span>
+<span id="L381"><span class="dc">and at the end of the block the simulated step is taken. -/</span></span>
+<span id="L382"><span class="kw">def</span> <span class="const token" data-verso-hover="373">slow</span> (k : <span class="const token" data-verso-hover="30">ℕ</span>) [<span class="const token" data-verso-hover="370">NeZero</span> k] (A' : <span class="const token" data-verso-hover="3">Algorithm</span> U I τ (k * b)) :</span>
+<span id="L383">    <span class="const token" data-verso-hover="3">Algorithm</span> U I (<span class="const token" data-verso-hover="364">SlowState</span> U τ k b) b <span class="kw">where</span></span>
+<span id="L384">  <span class="const token" data-verso-hover="332">init</span> v i := ⟨A'.<span class="const token" data-verso-hover="332">init</span> v i, <span class="nu">0</span>, <span class="kw">fun</span> _ _ _ =&gt; <span class="const token" data-verso-hover="61">false</span>⟩</span>
+<span id="L385">  <span class="const token" data-verso-hover="319">send</span> := <span class="const token" data-verso-hover="369">slowSend</span> k A'</span>
+<span id="L386">  <span class="const token" data-verso-hover="330">step</span> := <span class="const token" data-verso-hover="372">slowStep</span> k A'</span>
+<span id="L387">  <span class="const token" data-verso-hover="333">out</span> v st := A'.<span class="const token" data-verso-hover="333">out</span> v st.<span class="const token" data-verso-hover="365">inner</span></span>
+<span id="L388"></span>
+<span id="L389"><span class="kw">section</span></span>
+<span id="L390"><span class="kw">variable</span> [<span class="const token" data-verso-hover="370">NeZero</span> k] (A' : <span class="const token" data-verso-hover="3">Algorithm</span> U I τ (k * b))</span>
+<span id="L391">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="374">slow_send</span> : (<span class="const token" data-verso-hover="373">slow</span> k A').<span class="const token" data-verso-hover="319">send</span> = <span class="const token" data-verso-hover="369">slowSend</span> k A' := <span class="const token" data-verso-hover="90">rfl</span></span>
+<span id="L392">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="375">slow_step</span> : (<span class="const token" data-verso-hover="373">slow</span> k A').<span class="const token" data-verso-hover="330">step</span> = <span class="const token" data-verso-hover="372">slowStep</span> k A' := <span class="const token" data-verso-hover="90">rfl</span></span>
+<span id="L393">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="376">slow_out'</span> (v : U) (st : <span class="const token" data-verso-hover="364">SlowState</span> U τ k b) : (<span class="const token" data-verso-hover="373">slow</span> k A').<span class="const token" data-verso-hover="333">out</span> v st = A'.<span class="const token" data-verso-hover="333">out</span> v st.<span class="const token" data-verso-hover="365">inner</span> :=</span>
+<span id="L394">  <span class="const token" data-verso-hover="90">rfl</span></span>
+<span id="L395">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="377">slow_init</span> (v : U) (i : I) :</span>
+<span id="L396">    (<span class="const token" data-verso-hover="373">slow</span> k A').<span class="const token" data-verso-hover="332">init</span> v i = ⟨A'.<span class="const token" data-verso-hover="332">init</span> v i, <span class="nu">0</span>, <span class="kw">fun</span> _ _ _ =&gt; <span class="const token" data-verso-hover="61">false</span>⟩ := <span class="const token" data-verso-hover="90">rfl</span></span>
+<span id="L397"><span class="kw">end</span></span>
+<span id="L398"></span>
+<span id="L399"><span class="kw">variable</span> [<span class="const token" data-verso-hover="370">NeZero</span> k] (A' : <span class="const token" data-verso-hover="3">Algorithm</span> U I τ (k * b)) (G' : <span class="const token" data-verso-hover="247">SimpleGraph</span> U) [<span class="const token" data-verso-hover="157">DecidableRel</span> G'.<span class="const token" data-verso-hover="130">Adj</span>]</span>
+<span id="L400">  (inp : U → I)</span>
+<span id="L401"></span>
+<span id="L402"><span class="dc">/-- Invariant of `slow` after `k·t + j` rounds (`j &lt; k`). -/</span></span>
+<span id="L403"><span class="kw">def</span> <span class="const token" data-verso-hover="378">SlowSpec</span> (t j : <span class="const token" data-verso-hover="30">ℕ</span>) (v : U) : <span class="kw">Prop</span> :=</span>
+<span id="L404">  ((<span class="const token" data-verso-hover="373">slow</span> k A').<span class="const token" data-verso-hover="214">run</span> G' inp (k * t + j) v).<span class="const token" data-verso-hover="365">inner</span> = A'.<span class="const token" data-verso-hover="214">run</span> G' inp t v ∧</span>
+<span id="L405">  ((<span class="const token" data-verso-hover="373">slow</span> k A').<span class="const token" data-verso-hover="214">run</span> G' inp (k * t + j) v).<span class="const token" data-verso-hover="366">phase</span> = j ∧</span>
+<span id="L406">  ∀ w, G'.<span class="const token" data-verso-hover="130">Adj</span> w v → ∀ c : <span class="const token" data-verso-hover="32">Fin</span> k, c.<span class="const token" data-verso-hover="65">val</span> &lt; j →</span>
+<span id="L407">    ((<span class="const token" data-verso-hover="373">slow</span> k A').<span class="const token" data-verso-hover="214">run</span> G' inp (k * t + j) v).<span class="const token" data-verso-hover="367">buf</span> w c = <span class="const token" data-verso-hover="368">chunkK</span> c (A'.<span class="const token" data-verso-hover="319">send</span> w (A'.<span class="const token" data-verso-hover="214">run</span> G' inp t w) v)</span>
+<span id="L408"></span>
+<span id="L409"><span class="kw">lemma</span> <span class="const token" data-verso-hover="379">slowSpec_succ</span> {t j : <span class="const token" data-verso-hover="30">ℕ</span>} (hj : j + <span class="nu">1</span> &lt; k) (h : ∀ v, <span class="const token" data-verso-hover="378">SlowSpec</span> A' G' inp t j v) (v : U) :</span>
+<span id="L410">    <span class="const token" data-verso-hover="378">SlowSpec</span> A' G' inp t (j + <span class="nu">1</span>) v := <span class="kw">by</span></span>
+<span id="L411">  <span class="kw">obtain</span> ⟨h1, h2, h3⟩ := h v</span>
+<span id="L412">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="378">SlowSpec</span></span>
+<span id="L413">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="380">Nat.add_assoc</span>, <span class="const token" data-verso-hover="334">run_succ_eq</span>, <span class="const token" data-verso-hover="375">slow_step</span>, <span class="const token" data-verso-hover="372">slowStep</span>]</span>
+<span id="L414">  <span class="kw">simp</span> only [h2, hj, <span class="const token" data-verso-hover="305">ite_true</span>]</span>
+<span id="L415">  <span class="kw">refine</span> ⟨h1, <span class="kw">by</span> <span class="kw">simp</span>, <span class="kw">fun</span> w hw c hc =&gt; ?_⟩</span>
+<span id="L416">  <span class="kw">simp</span> only [hw, <span class="const token" data-verso-hover="305">ite_true</span>, <span class="const token" data-verso-hover="359">Option.getD_some</span>, <span class="const token" data-verso-hover="374">slow_send</span>, <span class="const token" data-verso-hover="369">slowSend</span>]</span>
+<span id="L417">  <span class="kw">split_ifs</span> <span class="kw">with</span> hcj</span>
+<span id="L418">  · <span class="kw">obtain</span> ⟨hw1, hw2, -⟩ := h w</span>
+<span id="L419">    <span class="kw">have</span> : (⟨((<span class="const token" data-verso-hover="373">slow</span> k A').<span class="const token" data-verso-hover="214">run</span> G' inp (k * t + j) w).<span class="const token" data-verso-hover="366">phase</span> % k, <span class="const token" data-verso-hover="264">Nat.mod_lt</span> _ (<span class="const token" data-verso-hover="371">NeZero.pos</span> k)⟩ :</span>
+<span id="L420">        <span class="const token" data-verso-hover="32">Fin</span> k) = c := <span class="kw">by</span></span>
+<span id="L421">      <span class="kw">ext</span>; <span class="kw">simp</span> only [hw2, hcj, <span class="const token" data-verso-hover="381">Nat.mod_eq_of_lt</span> (<span class="kw">by</span> <span class="kw">omega</span> : j &lt; k)]</span>
+<span id="L422">    <span class="kw">rw</span> [this, hw1]</span>
+<span id="L423">  · <span class="kw">exact</span> h3 w hw c (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L424"></span>
+<span id="L425"><span class="kw">lemma</span> <span class="const token" data-verso-hover="382">slowSpec_block</span> {t : <span class="const token" data-verso-hover="30">ℕ</span>} (h : ∀ v, <span class="const token" data-verso-hover="378">SlowSpec</span> A' G' inp t (k - <span class="nu">1</span>) v) (v : U) :</span>
+<span id="L426">    <span class="const token" data-verso-hover="378">SlowSpec</span> A' G' inp (t + <span class="nu">1</span>) <span class="nu">0</span> v := <span class="kw">by</span></span>
+<span id="L427">  <span class="kw">have</span> hk := <span class="const token" data-verso-hover="371">NeZero.pos</span> k</span>
+<span id="L428">  <span class="kw">obtain</span> ⟨h1, h2, h3⟩ := h v</span>
+<span id="L429">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="378">SlowSpec</span></span>
+<span id="L430">  <span class="kw">have</span> he : k * (t + <span class="nu">1</span>) + <span class="nu">0</span> = k * t + (k - <span class="nu">1</span>) + <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="383">Nat.mul_succ</span>]; <span class="kw">omega</span></span>
+<span id="L431">  <span class="kw">rw</span> [he, <span class="const token" data-verso-hover="334">run_succ_eq</span>, <span class="const token" data-verso-hover="375">slow_step</span>, <span class="const token" data-verso-hover="372">slowStep</span>]</span>
+<span id="L432">  <span class="kw">simp</span> only [h2]</span>
+<span id="L433">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="352">ite_eq_right</span> (<span class="kw">show</span> ¬ (k - <span class="nu">1</span> + <span class="nu">1</span> &lt; k) <span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L434">  <span class="kw">refine</span> ⟨?_, <span class="const token" data-verso-hover="90">rfl</span>, <span class="kw">fun</span> w _ c hc =&gt; <span class="const token" data-verso-hover="384">absurd</span> hc (<span class="const token" data-verso-hover="385">Nat.not_lt_zero</span> _)⟩</span>
+<span id="L435">  <span class="kw">rw</span> [h1, <span class="const token" data-verso-hover="334">run_succ_eq</span>]</span>
+<span id="L436">  <span class="kw">dsimp</span> only</span>
+<span id="L437">  <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L438">  <span class="kw">funext</span> w</span>
+<span id="L439">  <span class="kw">by_cases</span> hw : G'.<span class="const token" data-verso-hover="130">Adj</span> w v</span>
+<span id="L440">  · <span class="kw">simp</span> only [hw, <span class="const token" data-verso-hover="305">ite_true</span>, <span class="const token" data-verso-hover="343">Option.map_some</span>, <span class="const token" data-verso-hover="359">Option.getD_some</span>, <span class="const token" data-verso-hover="299">Option.some.injEq</span>, <span class="const token" data-verso-hover="374">slow_send</span>,</span>
+<span id="L441">      <span class="const token" data-verso-hover="369">slowSend</span>]</span>
+<span id="L442">    <span class="kw">funext</span> n</span>
+<span id="L443">    <span class="kw">obtain</span> ⟨hw1, hw2, -⟩ := h w</span>
+<span id="L444">    <span class="kw">split_ifs</span> <span class="kw">with</span> hc</span>
+<span id="L445">    · <span class="kw">have</span> : (⟨((<span class="const token" data-verso-hover="373">slow</span> k A').<span class="const token" data-verso-hover="214">run</span> G' inp (k * t + (k - <span class="nu">1</span>)) w).<span class="const token" data-verso-hover="366">phase</span> % k,</span>
+<span id="L446">          <span class="const token" data-verso-hover="264">Nat.mod_lt</span> _ (<span class="const token" data-verso-hover="371">NeZero.pos</span> k)⟩ : <span class="const token" data-verso-hover="32">Fin</span> k) = (<span class="const token" data-verso-hover="318">finProdFinEquiv</span>.<span class="const token" data-verso-hover="51">symm</span> n).<span class="const token" data-verso-hover="70">1</span> := <span class="kw">by</span></span>
+<span id="L447">        <span class="kw">ext</span>; <span class="kw">simp</span> only [hw2, hc, <span class="const token" data-verso-hover="381">Nat.mod_eq_of_lt</span> (<span class="kw">by</span> <span class="kw">omega</span> : k - <span class="nu">1</span> &lt; k)]</span>
+<span id="L448">      <span class="kw">rw</span> [this, hw1, <span class="const token" data-verso-hover="368">chunkK</span>, <span class="const token" data-verso-hover="386">Prod.mk.eta</span>, <span class="const token" data-verso-hover="387">Equiv.apply_symm_apply</span>]</span>
+<span id="L449">    · <span class="kw">rw</span> [h3 w hw _ (<span class="kw">by</span> <span class="kw">have</span> := (<span class="const token" data-verso-hover="318">finProdFinEquiv</span>.<span class="const token" data-verso-hover="51">symm</span> n).<span class="const token" data-verso-hover="70">1</span>.<span class="const token" data-verso-hover="109">isLt</span>; <span class="kw">omega</span>), <span class="const token" data-verso-hover="368">chunkK</span>, <span class="const token" data-verso-hover="386">Prod.mk.eta</span>,</span>
+<span id="L450">        <span class="const token" data-verso-hover="387">Equiv.apply_symm_apply</span>]</span>
+<span id="L451">  · <span class="kw">simp</span> [hw]</span>
+<span id="L452"></span>
+<span id="L453"><span class="dc">/-- The slowed-down algorithm after `k·t` rounds holds the state of the original after `t`</span></span>
+<span id="L454"><span class="dc">rounds. -/</span></span>
+<span id="L455"><span class="kw">theorem</span> <span class="const token" data-verso-hover="27">slow_run</span> (t : <span class="const token" data-verso-hover="30">ℕ</span>) (v : U) :</span>
+<span id="L456">    ((<span class="const token" data-verso-hover="373">slow</span> k A').<span class="const token" data-verso-hover="214">run</span> G' inp (k * t) v).<span class="const token" data-verso-hover="365">inner</span> = A'.<span class="const token" data-verso-hover="214">run</span> G' inp t v := <span class="kw">by</span></span>
+<span id="L457">  <span class="kw">have</span> hk := <span class="const token" data-verso-hover="371">NeZero.pos</span> k</span>
+<span id="L458">  <span class="kw">have</span> key : ∀ t, ∀ v, <span class="const token" data-verso-hover="378">SlowSpec</span> A' G' inp t <span class="nu">0</span> v := <span class="kw">by</span></span>
+<span id="L459">    <span class="kw">intro</span> t</span>
+<span id="L460">    <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L461">    | <span class="const token" data-verso-hover="388">zero</span> =&gt; <span class="kw">intro</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="378">SlowSpec</span>, <span class="const token" data-verso-hover="214">Algorithm.run</span>]</span>
+<span id="L462">    | <span class="const token" data-verso-hover="389">succ</span> t ih =&gt;</span>
+<span id="L463">      <span class="kw">have</span> hall : ∀ j, j &lt; k → ∀ v, <span class="const token" data-verso-hover="378">SlowSpec</span> A' G' inp t j v := <span class="kw">by</span></span>
+<span id="L464">        <span class="kw">intro</span> j</span>
+<span id="L465">        <span class="kw">induction</span> j <span class="kw">with</span></span>
+<span id="L466">        | <span class="const token" data-verso-hover="388">zero</span> =&gt; <span class="kw">exact</span> <span class="kw">fun</span> _ =&gt; ih</span>
+<span id="L467">        | <span class="const token" data-verso-hover="389">succ</span> j ihj =&gt; <span class="kw">exact</span> <span class="kw">fun</span> hj =&gt; <span class="const token" data-verso-hover="379">slowSpec_succ</span> A' G' inp hj (ihj (<span class="kw">by</span> <span class="kw">omega</span>))</span>
+<span id="L468">      <span class="kw">exact</span> <span class="const token" data-verso-hover="382">slowSpec_block</span> A' G' inp (hall (k - <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>))</span>
+<span id="L469">  <span class="kw">exact</span> (key t v).<span class="const token" data-verso-hover="80">1</span></span>
+<span id="L470"></span>
+<span id="L471"><span class="dc">/-- Outputs of the slowed-down algorithm after `k·t` rounds. -/</span></span>
+<span id="L472"><span class="kw">theorem</span> <span class="const token" data-verso-hover="28">slow_out</span> (t : <span class="const token" data-verso-hover="30">ℕ</span>) (v : U) :</span>
+<span id="L473">    (<span class="const token" data-verso-hover="373">slow</span> k A').<span class="const token" data-verso-hover="333">out</span> v ((<span class="const token" data-verso-hover="373">slow</span> k A').<span class="const token" data-verso-hover="214">run</span> G' inp (k * t) v) = A'.<span class="const token" data-verso-hover="333">out</span> v (A'.<span class="const token" data-verso-hover="214">run</span> G' inp t v) := <span class="kw">by</span></span>
+<span id="L474">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="376">slow_out'</span>, <span class="const token" data-verso-hover="27">slow_run</span>]</span>
+<span id="L475"></span>
+<span id="L476"><span class="kw">end</span> Slow</span>
+<span id="L477"></span>
+<span id="L478"><span class="dc">/-- **Lemma 3.2 of [CD18]** (with `B`-bit messages and `3(T + 1)` rounds). Under the hypotheses</span></span>
+<span id="L479"><span class="dc">of `lemma_3_2`, the algorithm `slow 3 (mvcAlg A pick T)` with `B`-bit messages outputs, for every</span></span>
+<span id="L480"><span class="dc">`G` in `P`, an `α`-approximate minimum vertex cover of `G` after `3 (T + 1)` rounds. -/</span></span>
+<span id="L481"><span class="kw">theorem</span> <span class="const token" data-verso-hover="2">lemma_3_2_congest</span> (hB : <span class="nu">0</span> &lt; B) (α : <span class="const token" data-verso-hover="184">ℝ</span>) (P : <span class="const token" data-verso-hover="247">SimpleGraph</span> V → <span class="kw">Prop</span>)</span>
+<span id="L482">    (hA : ∀ (G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V) [<span class="const token" data-verso-hover="157">DecidableRel</span> G.<span class="const token" data-verso-hover="130">Adj</span>], P G →</span>
+<span id="L483">      <span class="const token" data-verso-hover="361">IsApproxMinSpanner</span> <span class="const token" data-verso-hover="362">wt</span> α (<span class="const token" data-verso-hover="290">GS</span> G) (<span class="const token" data-verso-hover="282">spannerOut</span> (<span class="const token" data-verso-hover="290">GS</span> G) pick (A.<span class="const token" data-verso-hover="214">run</span> (<span class="const token" data-verso-hover="290">GS</span> G) (<span class="const token" data-verso-hover="289">inpS</span> G) T)))</span>
+<span id="L484">    (hP : P G) :</span>
+<span id="L485">    <span class="const token" data-verso-hover="363">IsApproxMinVC</span> α G {v | (<span class="const token" data-verso-hover="373">slow</span> <span class="nu">3</span> (<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T)).<span class="const token" data-verso-hover="333">out</span> v</span>
+<span id="L486">      ((<span class="const token" data-verso-hover="373">slow</span> <span class="nu">3</span> (<span class="const token" data-verso-hover="331">mvcAlg</span> A pick T)).<span class="const token" data-verso-hover="214">run</span> G (<span class="const token" data-verso-hover="288">nbrInput</span> G) (<span class="nu">3</span> * (T + <span class="nu">1</span>)) v) = <span class="const token" data-verso-hover="60">true</span>} := <span class="kw">by</span></span>
+<span id="L487">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="28">slow_out</span>]</span>
+<span id="L488">  <span class="kw">exact</span> <span class="const token" data-verso-hover="1">lemma_3_2</span> A pick T G hB α P hA hP</span>
+<span id="L489"></span>
+<span id="L490"><span class="dc">/-! ### The extra round is needed</span></span>
+<span id="L491"></span>
+<span id="L492"><span class="dc">The paper says that, after the simulation, `C_H` is computed "without any communication". With</span></span>
+<span id="L493"><span class="dc">the output convention of the paper (every node outputs some of its incident edges, the spanner is</span></span>
+<span id="L494"><span class="dc">the union), node `v` does not know whether the cross edge `{v₁, u₂}` was output by `u₂`. The</span></span>
+<span id="L495"><span class="dc">natural communication-free variant — `v` evaluates the rule of `C_H` on the edges output by its</span></span>
+<span id="L496"><span class="dc">own copies (`ownCH`) — fails: on the triangle, the optimal 2-spanner `Hex` (all weight-0 edges and</span></span>
+<span id="L497"><span class="dc">the cross edge `{0₁, 2₂}`) can be output with the cross edge chosen by `0₁` (`pickA`) or by `2₂`</span></span>
+<span id="L498"><span class="dc">(`pickC`); `ownCH` is `{0}` resp. `{2}`, neither of which is a vertex cover. -/</span></span>
+<span id="L499"></span>
+<span id="L500"><span class="dc">/-- `C_H` evaluated by `v` on the edges output by its own copies only. -/</span></span>
+<span id="L501"><span class="kw">def</span> <span class="const token" data-verso-hover="390">ownCH</span> (G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V) (pick : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → σ → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="59">Bool</span>)</span>
+<span id="L502">    (st : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → σ) : <span class="const token" data-verso-hover="391">Set</span> V :=</span>
+<span id="L503">  {v | ∃ u, ((<span class="const token" data-verso-hover="290">GS</span> G).<span class="const token" data-verso-hover="130">Adj</span> (v, <span class="nu">0</span>) (u, <span class="nu">1</span>) ∧ <span class="const token" data-verso-hover="314">picks</span> pick (v, <span class="nu">0</span>) (st (v, <span class="nu">0</span>)) (v, <span class="nu">0</span>) (u, <span class="nu">1</span>) = <span class="const token" data-verso-hover="60">true</span>) ∨</span>
+<span id="L504">    ((<span class="const token" data-verso-hover="290">GS</span> G).<span class="const token" data-verso-hover="130">Adj</span> (u, <span class="nu">0</span>) (v, <span class="nu">1</span>) ∧ <span class="const token" data-verso-hover="314">picks</span> pick (v, <span class="nu">1</span>) (st (v, <span class="nu">1</span>)) (u, <span class="nu">0</span>) (v, <span class="nu">1</span>) = <span class="const token" data-verso-hover="60">true</span>)}</span>
+<span id="L505"></span>
+<span id="L506"><span class="dc">/-- The triangle. -/</span></span>
+<span id="L507"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="392">K3</span> : <span class="const token" data-verso-hover="247">SimpleGraph</span> (<span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) := ⊤</span>
+<span id="L508"></span>
+<span id="L509"><span class="dc">/-- An optimal 2-spanner of `G_S` for the triangle: all weight-0 edges and the cross edge</span></span>
+<span id="L510"><span class="dc">`{0₁, 2₂}`. -/</span></span>
+<span id="L511"><span class="kw">def</span> <span class="const token" data-verso-hover="393">Hex</span> : <span class="const token" data-verso-hover="247">SimpleGraph</span> (<span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) <span class="kw">where</span></span>
+<span id="L512">  <span class="const token" data-verso-hover="130">Adj</span> x y := (<span class="const token" data-verso-hover="290">GS</span> <span class="const token" data-verso-hover="392">K3</span>).<span class="const token" data-verso-hover="130">Adj</span> x y ∧ (<span class="const token" data-verso-hover="291">wtPair</span> x y = <span class="nu">0</span> ∨ s(x, y) = s(((<span class="nu">0</span> : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>), (<span class="nu">0</span> : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>)), (<span class="nu">2</span>, <span class="nu">1</span>)))</span>
+<span id="L513">  <span class="const token" data-verso-hover="248">symm</span> := ⟨<span class="kw">fun</span> x y h =&gt; ⟨h.<span class="const token" data-verso-hover="80">1</span>.<span class="const token" data-verso-hover="283">symm</span>, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="394">wtPair_comm</span>, <span class="const token" data-verso-hover="395">Sym2.eq_swap</span>]; <span class="kw">exact</span> h.<span class="const token" data-verso-hover="96">2</span>⟩⟩</span>
+<span id="L514">  <span class="const token" data-verso-hover="251">loopless</span> := ⟨<span class="kw">fun</span> x h =&gt; (<span class="const token" data-verso-hover="290">GS</span> <span class="const token" data-verso-hover="392">K3</span>).<span class="const token" data-verso-hover="284">irrefl</span> h.<span class="const token" data-verso-hover="80">1</span>⟩</span>
+<span id="L515"></span>
+<span id="L516"><span class="const token" data-verso-hover="396">instance</span> : <span class="const token" data-verso-hover="157">DecidableRel</span> <span class="const token" data-verso-hover="393">Hex</span>.<span class="const token" data-verso-hover="130">Adj</span> := <span class="kw">fun</span> x y =&gt; <span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="393">Hex</span>; <span class="kw">infer_instance</span></span>
+<span id="L517"></span>
+<span id="L518"><span class="dc">/-- Selector: every node outputs its weight-0 edges, `0₁` also outputs `{0₁, 2₂}`. -/</span></span>
+<span id="L519"><span class="kw">def</span> <span class="const token" data-verso-hover="397">pickA</span> : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="398">Unit</span> → <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="59">Bool</span> := <span class="kw">fun</span> x _ a b =&gt;</span>
+<span id="L520">  <span class="const token" data-verso-hover="64">decide</span> (x = a ∧ (<span class="const token" data-verso-hover="291">wtPair</span> a b = <span class="nu">0</span> ∨ (a = (<span class="nu">0</span>, <span class="nu">0</span>) ∧ b = (<span class="nu">2</span>, <span class="nu">1</span>))))</span>
+<span id="L521"></span>
+<span id="L522"><span class="dc">/-- Selector: every node outputs its weight-0 edges, `2₂` also outputs `{0₁, 2₂}`. -/</span></span>
+<span id="L523"><span class="kw">def</span> <span class="const token" data-verso-hover="399">pickC</span> : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="398">Unit</span> → <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="59">Bool</span> := <span class="kw">fun</span> x _ a b =&gt;</span>
+<span id="L524">  <span class="const token" data-verso-hover="64">decide</span> (x = a ∧ (<span class="const token" data-verso-hover="291">wtPair</span> a b = <span class="nu">0</span> ∨ (a = (<span class="nu">2</span>, <span class="nu">1</span>) ∧ b = (<span class="nu">0</span>, <span class="nu">0</span>))))</span>
+<span id="L525"></span>
+<span id="L526"><span class="kw">lemma</span> <span class="const token" data-verso-hover="400">cost_Hex</span> : <span class="const token" data-verso-hover="401">cost</span> <span class="const token" data-verso-hover="393">Hex</span> = <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L527">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="401">cost</span>, <span class="const token" data-verso-hover="402">wcost_eq</span>]</span>
+<span id="L528">  <span class="kw">decide</span> +<span class="const token" data-verso-hover="403">kernel</span></span>
+<span id="L529"></span>
+<span id="L530"><span class="kw">lemma</span> <span class="const token" data-verso-hover="404">isApproxMinSpanner_Hex</span> : <span class="const token" data-verso-hover="361">IsApproxMinSpanner</span> <span class="const token" data-verso-hover="362">wt</span> <span class="nu">1</span> (<span class="const token" data-verso-hover="290">GS</span> <span class="const token" data-verso-hover="392">K3</span>) <span class="const token" data-verso-hover="393">Hex</span> := <span class="kw">by</span></span>
+<span id="L531">  <span class="kw">have</span> hsp : <span class="const token" data-verso-hover="405">IsTwoSpanner</span> (<span class="const token" data-verso-hover="290">GS</span> <span class="const token" data-verso-hover="392">K3</span>) <span class="const token" data-verso-hover="393">Hex</span> := ⟨<span class="kw">fun</span> _ _ h =&gt; h.<span class="const token" data-verso-hover="80">1</span>, <span class="kw">by</span> <span class="kw">decide</span>⟩</span>
+<span id="L532">  <span class="kw">refine</span> ⟨hsp, <span class="kw">fun</span> H' hH' =&gt; ?_⟩</span>
+<span id="L533">  <span class="kw">have</span> h1 : <span class="const token" data-verso-hover="406">minSpannerCost</span> <span class="const token" data-verso-hover="392">K3</span> ≤ <span class="const token" data-verso-hover="401">cost</span> H' := <span class="const token" data-verso-hover="407">iInf₂_le</span> H' hH'</span>
+<span id="L534">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="20">claim_3_1</span>, <span class="const token" data-verso-hover="408">SimpleGraph.vertexCoverNum_top</span>] <span class="kw">at</span> h1</span>
+<span id="L535">  <span class="kw">have</span> h0 : <span class="const token" data-verso-hover="409">ENat.card</span> (<span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) - <span class="nu">1</span> = <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L536">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="410">ENat.card_eq_coe_fintype_card</span>, <span class="const token" data-verso-hover="56">Fintype.card_fin</span>]; <span class="kw">rfl</span></span>
+<span id="L537">  <span class="kw">rw</span> [h0] <span class="kw">at</span> h1</span>
+<span id="L538">  <span class="kw">have</span> h3 : <span class="nu">2</span> ≤ <span class="const token" data-verso-hover="401">cost</span> H' := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> h1</span>
+<span id="L539">  <span class="kw">show</span> (<span class="const token" data-verso-hover="401">cost</span> <span class="const token" data-verso-hover="393">Hex</span> : <span class="const token" data-verso-hover="184">ℝ</span>) ≤ <span class="nu">1</span> * <span class="const token" data-verso-hover="401">cost</span> H'</span>
+<span id="L540">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="400">cost_Hex</span>, <span class="const token" data-verso-hover="244">one_mul</span>]</span>
+<span id="L541">  <span class="kw">exact_mod_cast</span> h3</span>
+<span id="L542"></span>
+<span id="L543"><span class="dc">/-- Counterexample to computing `C_H` "without any communication" (see above). Both selectors</span></span>
+<span id="L544"><span class="dc">output the same optimal 2-spanner `Hex`, but the sets computed from the nodes' own outputs are</span></span>
+<span id="L545"><span class="dc">`{0}` and `{2}`, which are not vertex covers of the triangle. -/</span></span>
+<span id="L546"><span class="kw">theorem</span> <span class="const token" data-verso-hover="0">localRule_counterexample</span> :</span>
+<span id="L547">    <span class="const token" data-verso-hover="282">spannerOut</span> (<span class="const token" data-verso-hover="290">GS</span> <span class="const token" data-verso-hover="392">K3</span>) <span class="const token" data-verso-hover="397">pickA</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="411">(</span>)) = <span class="const token" data-verso-hover="393">Hex</span> ∧ <span class="const token" data-verso-hover="282">spannerOut</span> (<span class="const token" data-verso-hover="290">GS</span> <span class="const token" data-verso-hover="392">K3</span>) <span class="const token" data-verso-hover="399">pickC</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="411">(</span>)) = <span class="const token" data-verso-hover="393">Hex</span> ∧</span>
+<span id="L548">    <span class="const token" data-verso-hover="361">IsApproxMinSpanner</span> <span class="const token" data-verso-hover="362">wt</span> <span class="nu">1</span> (<span class="const token" data-verso-hover="290">GS</span> <span class="const token" data-verso-hover="392">K3</span>) <span class="const token" data-verso-hover="393">Hex</span> ∧</span>
+<span id="L549">    <span class="const token" data-verso-hover="390">ownCH</span> <span class="const token" data-verso-hover="392">K3</span> <span class="const token" data-verso-hover="397">pickA</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="411">(</span>)) = {<span class="nu">0</span>} ∧ <span class="const token" data-verso-hover="390">ownCH</span> <span class="const token" data-verso-hover="392">K3</span> <span class="const token" data-verso-hover="399">pickC</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="411">(</span>)) = {<span class="nu">2</span>} ∧</span>
+<span id="L550">    ¬ <span class="const token" data-verso-hover="392">K3</span>.<span class="const token" data-verso-hover="412">IsVertexCover</span> {<span class="nu">0</span>} ∧ ¬ <span class="const token" data-verso-hover="392">K3</span>.<span class="const token" data-verso-hover="412">IsVertexCover</span> {<span class="nu">2</span>} := <span class="kw">by</span></span>
+<span id="L551">  <span class="kw">refine</span> ⟨?_, ?_, <span class="const token" data-verso-hover="404">isApproxMinSpanner_Hex</span>, ?_, ?_, ?_, ?_⟩</span>
+<span id="L552">  · <span class="kw">ext</span> x y; <span class="kw">revert</span> x y; <span class="kw">decide</span></span>
+<span id="L553">  · <span class="kw">ext</span> x y; <span class="kw">revert</span> x y; <span class="kw">decide</span></span>
+<span id="L554">  · <span class="kw">ext</span> v; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="390">ownCH</span>, <span class="const token" data-verso-hover="347">Set.mem_ofPred_eq</span>, <span class="const token" data-verso-hover="413">Set.mem_singleton_iff</span>]; <span class="kw">revert</span> v; <span class="kw">decide</span></span>
+<span id="L555">  · <span class="kw">ext</span> v; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="390">ownCH</span>, <span class="const token" data-verso-hover="347">Set.mem_ofPred_eq</span>, <span class="const token" data-verso-hover="413">Set.mem_singleton_iff</span>]; <span class="kw">revert</span> v; <span class="kw">decide</span></span>
+<span id="L556">  · <span class="kw">intro</span> h; <span class="kw">have</span> := @h <span class="nu">1</span> <span class="nu">2</span> (<span class="kw">by</span> <span class="kw">decide</span>); <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L557">  · <span class="kw">intro</span> h; <span class="kw">have</span> := @h <span class="nu">0</span> <span class="nu">1</span> (<span class="kw">by</span> <span class="kw">decide</span>); <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L558"></span>
+<span id="L559"><span class="kw">end</span> Podc.SpannerApproximation</span>
+<span id="L560"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2018/SpannerApproximation/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

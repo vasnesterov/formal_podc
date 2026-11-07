@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ContentObliviousCounting: MinFindingGeneric.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2026/">PODC 2026</a><span class="sep">›</span><a href="PODC2026/ContentObliviousCounting/">ContentObliviousCounting</a><span class="sep">›</span><a href="PODC2026/ContentObliviousCounting/src/">Lean source</a><span class="sep">›</span><span aria-current="page">MinFindingGeneric</span></nav>
+        <h1>
+          <code>MinFindingGeneric.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2026/ContentObliviousCounting/">Efficient Counting and Simulation in Content-Oblivious Rings — PODC 2026</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2026/ContentObliviousCounting/MinFindingGeneric.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="MinFindingGeneric"><span id="L1"><span class="kw">import</span> Cslib.Computability.Distributed.ContentOblivious.Staged</span>
+<span id="L2"><span class="kw">import</span> Mathlib</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Minimum finding by repeated ComputeOR (Algorithm 10, Theorem 5), from an abstract ComputeOR</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">Chalopin, Chang, Di Luna, Zhou, *Efficient Counting and Simulation in Content-Oblivious Rings*,</span></span>
+<span id="L8"><span class="dc">PODC 2026 (arXiv 2603.28260), §9.1, Algorithm 10 (`MinFinding`) and Theorem 5.</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">Every node holds a bit string (MSB first) and an `active` flag (the participants). The algorithm</span></span>
+<span id="L11"><span class="dc">first finds the minimum length `m` of the participants' strings by calls</span></span>
+<span id="L12"><span class="dc">`ComputeOR(active ∧ B ≥ len)` for `B = 1, 2, …`, keeps active the participants of length `m`, and</span></span>
+<span id="L13"><span class="dc">then determines the minimum bit by bit: in phase `p` the call `ComputeOR(active ∧ bits[p] = 0)`</span></span>
+<span id="L14"><span class="dc">tells whether some remaining candidate has a `0`; if so the candidates with a `1` drop out.</span></span>
+<span id="L15"></span>
+<span id="L16"><span class="dc">**Pseudo-code fix.** Line 8 of Algorithm 10 loops `while phase &lt; len(bits)`, with the node's *own*</span></span>
+<span id="L17"><span class="dc">length: nodes whose strings are longer than `m` would call `ComputeOR` more often than the others,</span></span>
+<span id="L18"><span class="dc">so the calls would no longer match. The text says "we assume that every input is represented as a</span></span>
+<span id="L19"><span class="dc">bit string of equal length B"; we loop `while phase &lt; B` (the common value `m`).</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="dc">The ComputeOR procedure is abstract here (`ORSpec`); see `MinFinding.lean` for the instance.</span></span>
+<span id="L22"><span class="dc">-/</span></span>
+<span id="L23"></span>
+<span id="L24"><span class="kw">namespace</span> Podc.ContentOblivious.MinFinding</span>
+<span id="L25"></span>
+<span id="L26"><span class="kw">open</span> Cslib.ContentOblivious Finset</span>
+<span id="L27"></span>
+<span id="L28"><span class="dc">/-- Node input: leader flag, participation flag, bit string (MSB first, `false` = 0). -/</span></span>
+<span id="L29"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="1222">Input</span> := <span class="const token" data-verso-hover="33">Bool</span> × <span class="const token" data-verso-hover="33">Bool</span> × <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="33">Bool</span></span>
+<span id="L30"></span>
+<span id="L31"><span class="dc">/-- Local variables of Algorithm 10. `lenPhase`: still in the length-search loop (lines 1–4). -/</span></span>
+<span id="L32"><span class="kw">structure</span> <span class="const token" data-verso-hover="1223">St</span> <span class="kw">where</span></span>
+<span id="L33">  <span class="const token" data-verso-hover="1224">leader</span> : <span class="const token" data-verso-hover="33">Bool</span></span>
+<span id="L34">  <span class="const token" data-verso-hover="1225">active</span> : <span class="const token" data-verso-hover="33">Bool</span></span>
+<span id="L35">  <span class="const token" data-verso-hover="1226">bits</span> : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="33">Bool</span></span>
+<span id="L36">  <span class="const token" data-verso-hover="1227">B</span> : <span class="const token" data-verso-hover="30">ℕ</span></span>
+<span id="L37">  <span class="const token" data-verso-hover="1228">lenPhase</span> : <span class="const token" data-verso-hover="33">Bool</span></span>
+<span id="L38">  <span class="const token" data-verso-hover="1229">p</span> : <span class="const token" data-verso-hover="30">ℕ</span></span>
+<span id="L39">  <span class="const token" data-verso-hover="1230">minBits</span> : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="33">Bool</span></span>
+<span id="L40"></span>
+<span id="L41"><span class="dc">/-- Input of `ComputeOR` in bit phase `p`: `hasZero = active ∧ bits[p] = 0`. -/</span></span>
+<span id="L42"><span class="kw">def</span> <span class="const token" data-verso-hover="1231">hasZero</span> (a : <span class="const token" data-verso-hover="33">Bool</span>) (bits : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="33">Bool</span>) (p : <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="const token" data-verso-hover="33">Bool</span> := a &amp;&amp; (bits[p]? == <span class="const token" data-verso-hover="49">some</span> <span class="const token" data-verso-hover="239">false</span>)</span>
+<span id="L43"></span>
+<span id="L44"><span class="dc">/-- The driver of Algorithm 10 (with the fix `while phase &lt; B`). -/</span></span>
+<span id="L45"><span class="kw">def</span> <span class="const token" data-verso-hover="1232">driver</span> : <span class="const token" data-verso-hover="427">Driver</span> <span class="const token" data-verso-hover="1222">Input</span> (<span class="const token" data-verso-hover="33">Bool</span> × <span class="const token" data-verso-hover="33">Bool</span>) <span class="const token" data-verso-hover="33">Bool</span> <span class="const token" data-verso-hover="1223">St</span> <span class="kw">where</span></span>
+<span id="L46">  <span class="const token" data-verso-hover="428">start</span> i := (⟨i.<span class="const token" data-verso-hover="63">1</span>, i.<span class="const token" data-verso-hover="60">2</span><span class="nu">.</span><span class="const token" data-verso-hover="63">1</span>, i.<span class="const token" data-verso-hover="60">2</span><span class="nu">.</span><span class="const token" data-verso-hover="60">2</span>, <span class="nu">1</span>, <span class="const token" data-verso-hover="41">true</span>, <span class="nu">0</span>, []⟩,</span>
+<span id="L47">    <span class="const token" data-verso-hover="49">some</span> (i.<span class="const token" data-verso-hover="63">1</span>, i.<span class="const token" data-verso-hover="60">2</span><span class="nu">.</span><span class="const token" data-verso-hover="63">1</span> &amp;&amp; <span class="const token" data-verso-hover="117">decide</span> (i.<span class="const token" data-verso-hover="60">2</span><span class="nu">.</span><span class="const token" data-verso-hover="60">2</span>.<span class="const token" data-verso-hover="61">length</span> ≤ <span class="nu">1</span>)))</span>
+<span id="L48">  <span class="const token" data-verso-hover="429">next</span> d r :=</span>
+<span id="L49">    <span class="kw">if</span> d.<span class="const token" data-verso-hover="1228">lenPhase</span> <span class="kw">then</span></span>
+<span id="L50">      <span class="kw">if</span> r <span class="kw">then</span></span>
+<span id="L51">        <span class="kw">let</span> a := d.<span class="const token" data-verso-hover="1225">active</span> &amp;&amp; <span class="const token" data-verso-hover="117">decide</span> (d.<span class="const token" data-verso-hover="1226">bits</span>.<span class="const token" data-verso-hover="61">length</span> = d.<span class="const token" data-verso-hover="1227">B</span>)</span>
+<span id="L52">        (⟨d.<span class="const token" data-verso-hover="1224">leader</span>, a, d.<span class="const token" data-verso-hover="1226">bits</span>, d.<span class="const token" data-verso-hover="1227">B</span>, <span class="const token" data-verso-hover="239">false</span>, <span class="nu">0</span>, []⟩, <span class="const token" data-verso-hover="49">some</span> (d.<span class="const token" data-verso-hover="1224">leader</span>, <span class="const token" data-verso-hover="1231">hasZero</span> a d.<span class="const token" data-verso-hover="1226">bits</span> <span class="nu">0</span>))</span>
+<span id="L53">      <span class="kw">else</span></span>
+<span id="L54">        (⟨d.<span class="const token" data-verso-hover="1224">leader</span>, d.<span class="const token" data-verso-hover="1225">active</span>, d.<span class="const token" data-verso-hover="1226">bits</span>, d.<span class="const token" data-verso-hover="1227">B</span> + <span class="nu">1</span>, <span class="const token" data-verso-hover="41">true</span>, <span class="nu">0</span>, []⟩,</span>
+<span id="L55">          <span class="const token" data-verso-hover="49">some</span> (d.<span class="const token" data-verso-hover="1224">leader</span>, d.<span class="const token" data-verso-hover="1225">active</span> &amp;&amp; <span class="const token" data-verso-hover="117">decide</span> (d.<span class="const token" data-verso-hover="1226">bits</span>.<span class="const token" data-verso-hover="61">length</span> ≤ d.<span class="const token" data-verso-hover="1227">B</span> + <span class="nu">1</span>)))</span>
+<span id="L56">    <span class="kw">else</span></span>
+<span id="L57">      <span class="kw">let</span> a := <span class="kw">if</span> r <span class="kw">then</span> d.<span class="const token" data-verso-hover="1225">active</span> &amp;&amp; (d.<span class="const token" data-verso-hover="1226">bits</span>[d.<span class="const token" data-verso-hover="1229">p</span>]? != <span class="const token" data-verso-hover="49">some</span> <span class="const token" data-verso-hover="41">true</span>) <span class="kw">else</span> d.<span class="const token" data-verso-hover="1225">active</span></span>
+<span id="L58">      (⟨d.<span class="const token" data-verso-hover="1224">leader</span>, a, d.<span class="const token" data-verso-hover="1226">bits</span>, d.<span class="const token" data-verso-hover="1227">B</span>, <span class="const token" data-verso-hover="239">false</span>, d.<span class="const token" data-verso-hover="1229">p</span> + <span class="nu">1</span>, d.<span class="const token" data-verso-hover="1230">minBits</span> ++ [!r]⟩,</span>
+<span id="L59">        <span class="kw">if</span> d.<span class="const token" data-verso-hover="1229">p</span> + <span class="nu">1</span> &lt; d.<span class="const token" data-verso-hover="1227">B</span> <span class="kw">then</span> <span class="const token" data-verso-hover="49">some</span> (d.<span class="const token" data-verso-hover="1224">leader</span>, <span class="const token" data-verso-hover="1231">hasZero</span> a d.<span class="const token" data-verso-hover="1226">bits</span> (d.<span class="const token" data-verso-hover="1229">p</span> + <span class="nu">1</span>)) <span class="kw">else</span> <span class="const token" data-verso-hover="77">none</span>)</span>
+<span id="L60"></span>
+<span id="L61"><span class="dc">/-- The minimum-finding program. -/</span></span>
+<span id="L62"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="1233">prog</span> (OR : <span class="const token" data-verso-hover="32">Proc</span> (<span class="const token" data-verso-hover="33">Bool</span> × <span class="const token" data-verso-hover="33">Bool</span>) <span class="const token" data-verso-hover="33">Bool</span>) : <span class="const token" data-verso-hover="32">Proc</span> <span class="const token" data-verso-hover="1222">Input</span> <span class="const token" data-verso-hover="1223">St</span> := OR.<span class="const token" data-verso-hover="431">staged</span> <span class="const token" data-verso-hover="1232">driver</span></span>
+<span id="L63"></span>
+<span id="L64"><span class="kw">variable</span> {n : <span class="const token" data-verso-hover="30">ℕ</span>} [<span class="const token" data-verso-hover="31">NeZero</span> n]</span>
+<span id="L65"></span>
+<span id="L66"><span class="dc">/-- Hypotheses on the ComputeOR procedure (Theorem 21). -/</span></span>
+<span id="L67"><span class="kw">structure</span> <span class="const token" data-verso-hover="1234">ORSpec</span> (OR : <span class="const token" data-verso-hover="32">Proc</span> (<span class="const token" data-verso-hover="33">Bool</span> × <span class="const token" data-verso-hover="33">Bool</span>) <span class="const token" data-verso-hover="33">Bool</span>) (lead : <span class="const token" data-verso-hover="38">ZMod</span> n → <span class="const token" data-verso-hover="33">Bool</span>) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L68">  <span class="const token" data-verso-hover="1235">init</span> : ∀ a, OR.<span class="const token" data-verso-hover="82">result</span> (OR.<span class="const token" data-verso-hover="83">init</span> a).<span class="const token" data-verso-hover="63">1</span> = <span class="const token" data-verso-hover="77">none</span></span>
+<span id="L69">  <span class="const token" data-verso-hover="1236">comp</span> : ∀ b : <span class="const token" data-verso-hover="38">ZMod</span> n → <span class="const token" data-verso-hover="33">Bool</span>, OR.<span class="const token" data-verso-hover="11">Composable</span> (<span class="const token" data-verso-hover="99">oriented</span> n) (<span class="kw">fun</span> v =&gt; (lead v, b v))</span>
+<span id="L70">  <span class="const token" data-verso-hover="1237">ret</span> : ∀ b : <span class="const token" data-verso-hover="38">ZMod</span> n → <span class="const token" data-verso-hover="33">Bool</span>,</span>
+<span id="L71">    OR.<span class="const token" data-verso-hover="410">Returns</span> (<span class="const token" data-verso-hover="99">oriented</span> n) (<span class="kw">fun</span> v =&gt; (lead v, b v)) (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="117">decide</span> (∃ v, b v = <span class="const token" data-verso-hover="41">true</span>))</span>
+<span id="L72">  <span class="const token" data-verso-hover="1238">bound</span> : ∀ b : <span class="const token" data-verso-hover="38">ZMod</span> n → <span class="const token" data-verso-hover="33">Bool</span>, ∀ c, OR.<span class="const token" data-verso-hover="159">Reach</span> (<span class="const token" data-verso-hover="99">oriented</span> n) (<span class="kw">fun</span> v =&gt; (lead v, b v)) c →</span>
+<span id="L73">    <span class="const token" data-verso-hover="160">totalSent</span> c ≤ <span class="nu">3</span> * n</span>
+<span id="L74"></span>
+<span id="L75"><span class="kw">section</span> schedule</span>
+<span id="L76"></span>
+<span id="L77"><span class="kw">variable</span> (a0 : <span class="const token" data-verso-hover="38">ZMod</span> n → <span class="const token" data-verso-hover="33">Bool</span>) (bits : <span class="const token" data-verso-hover="38">ZMod</span> n → <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="33">Bool</span>)</span>
+<span id="L78"></span>
+<span id="L79"><span class="dc">/-- Value of a bit string, MSB first. -/</span></span>
+<span id="L80"><span class="kw">def</span> <span class="const token" data-verso-hover="1239">val</span> (l : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="33">Bool</span>) : <span class="const token" data-verso-hover="30">ℕ</span> := l.<span class="const token" data-verso-hover="1240">foldl</span> (<span class="kw">fun</span> acc b =&gt; <span class="nu">2</span> * acc + b.<span class="const token" data-verso-hover="206">toNat</span>) <span class="nu">0</span></span>
+<span id="L81"></span>
+<span id="L82"><span class="kw">lemma</span> <span class="const token" data-verso-hover="1241">val_append</span> (l : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="33">Bool</span>) (b : <span class="const token" data-verso-hover="33">Bool</span>) : <span class="const token" data-verso-hover="1239">val</span> (l ++ [b]) = <span class="nu">2</span> * <span class="const token" data-verso-hover="1239">val</span> l + b.<span class="const token" data-verso-hover="206">toNat</span> := <span class="kw">by</span></span>
+<span id="L83">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="1239">val</span>, <span class="const token" data-verso-hover="1242">List.foldl_append</span>]</span>
+<span id="L84"></span>
+<span id="L85"><span class="dc">/-- Existence of a participant: needed for the length search to stop. -/</span></span>
+<span id="L86"><span class="kw">lemma</span> <span class="const token" data-verso-hover="1243">exists_len</span> (h : ∃ v, a0 v = <span class="const token" data-verso-hover="41">true</span>) : ∃ B, ∃ v, a0 v = <span class="const token" data-verso-hover="41">true</span> ∧ (bits v).<span class="const token" data-verso-hover="61">length</span> ≤ B := <span class="kw">by</span></span>
+<span id="L87">  <span class="kw">obtain</span> ⟨v, hv⟩ := h</span>
+<span id="L88">  <span class="kw">exact</span> ⟨_, v, hv, <span class="const token" data-verso-hover="104">le_rfl</span>⟩</span>
+<span id="L89"></span>
+<span id="L90"><span class="kw">variable</span> (hex : ∃ v, a0 v = <span class="const token" data-verso-hover="41">true</span>)</span>
+<span id="L91"></span>
+<span id="L92"><span class="dc">/-- `m`: the minimum length of a participant's string. -/</span></span>
+<span id="L93"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="1244">minLen</span> : <span class="const token" data-verso-hover="30">ℕ</span> := <span class="kw">by</span></span>
+<span id="L94">  <span class="kw">classical</span> <span class="kw">exact</span> <span class="const token" data-verso-hover="300">Nat.find</span> (<span class="const token" data-verso-hover="1243">exists_len</span> a0 bits hex)</span>
+<span id="L95"></span>
+<span id="L96"><span class="dc">/-- Participants of minimum length (line 5). -/</span></span>
+<span id="L97"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="1245">a1</span> (v : <span class="const token" data-verso-hover="38">ZMod</span> n) : <span class="const token" data-verso-hover="33">Bool</span> := a0 v &amp;&amp; <span class="const token" data-verso-hover="117">decide</span> ((bits v).<span class="const token" data-verso-hover="61">length</span> = <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex)</span>
+<span id="L98"></span>
+<span id="L99"><span class="dc">/-- The prefix of the minimum after `p` bit phases. -/</span></span>
+<span id="L100"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="1246">mb</span> : <span class="const token" data-verso-hover="30">ℕ</span> → <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="33">Bool</span></span>
+<span id="L101">  | <span class="nu">0</span> =&gt; []</span>
+<span id="L102">  | p + <span class="nu">1</span> =&gt; <span class="const token" data-verso-hover="1246">mb</span> p ++ [!(<span class="const token" data-verso-hover="117">decide</span> (∃ v, <span class="const token" data-verso-hover="1231">hasZero</span> (<span class="const token" data-verso-hover="1245">a1</span> a0 bits hex v &amp;&amp;</span>
+<span id="L103">      <span class="const token" data-verso-hover="117">decide</span> ((bits v).<span class="const token" data-verso-hover="440">take</span> p = <span class="const token" data-verso-hover="1246">mb</span> p)) (bits v) p = <span class="const token" data-verso-hover="41">true</span>))]</span>
+<span id="L104"></span>
+<span id="L105"><span class="dc">/-- The candidates after `p` bit phases. -/</span></span>
+<span id="L106"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="1247">actP</span> (p : <span class="const token" data-verso-hover="30">ℕ</span>) (v : <span class="const token" data-verso-hover="38">ZMod</span> n) : <span class="const token" data-verso-hover="33">Bool</span> :=</span>
+<span id="L107">  <span class="const token" data-verso-hover="1245">a1</span> a0 bits hex v &amp;&amp; <span class="const token" data-verso-hover="117">decide</span> ((bits v).<span class="const token" data-verso-hover="440">take</span> p = <span class="const token" data-verso-hover="1246">mb</span> a0 bits hex p)</span>
+<span id="L108"></span>
+<span id="L109"><span class="dc">/-- Whether some candidate has a `0` at position `p` (the result of `ComputeOR` in phase `p`). -/</span></span>
+<span id="L110"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="1248">eP</span> (p : <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="const token" data-verso-hover="33">Bool</span> :=</span>
+<span id="L111">  <span class="const token" data-verso-hover="117">decide</span> (∃ v, <span class="const token" data-verso-hover="1231">hasZero</span> (<span class="const token" data-verso-hover="1247">actP</span> a0 bits hex p v) (bits v) p = <span class="const token" data-verso-hover="41">true</span>)</span>
+<span id="L112"></span>
+<span id="L113"><span class="kw">lemma</span> <span class="const token" data-verso-hover="1249">mb_succ</span> (p : <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="const token" data-verso-hover="1246">mb</span> a0 bits hex (p + <span class="nu">1</span>) = <span class="const token" data-verso-hover="1246">mb</span> a0 bits hex p ++ [!<span class="const token" data-verso-hover="1248">eP</span> a0 bits hex p] := <span class="const token" data-verso-hover="100">rfl</span></span>
+<span id="L114"></span>
+<span id="L115"><span class="kw">variable</span> {a0 bits hex}</span>
+<span id="L116"></span>
+<span id="L117"><span class="kw">lemma</span> <span class="const token" data-verso-hover="1250">mb_length</span> (p : <span class="const token" data-verso-hover="30">ℕ</span>) : (<span class="const token" data-verso-hover="1246">mb</span> a0 bits hex p).<span class="const token" data-verso-hover="61">length</span> = p := <span class="kw">by</span></span>
+<span id="L118">  <span class="kw">induction</span> p <span class="kw">with</span></span>
+<span id="L119">  | <span class="const token" data-verso-hover="78">zero</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L120">  | <span class="const token" data-verso-hover="79">succ</span> p ih =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="1249">mb_succ</span>]; <span class="kw">simp</span> [ih]</span>
+<span id="L121"></span>
+<span id="L122"><span class="kw">lemma</span> <span class="const token" data-verso-hover="1251">minLen_le_iff</span> (B : <span class="const token" data-verso-hover="30">ℕ</span>) :</span>
+<span id="L123">    <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex ≤ B ↔ ∃ v, a0 v = <span class="const token" data-verso-hover="41">true</span> ∧ (bits v).<span class="const token" data-verso-hover="61">length</span> ≤ B := <span class="kw">by</span></span>
+<span id="L124">  <span class="kw">classical</span></span>
+<span id="L125">  <span class="kw">constructor</span></span>
+<span id="L126">  · <span class="kw">intro</span> h</span>
+<span id="L127">    <span class="kw">obtain</span> ⟨v, hv, hl⟩ : ∃ v, a0 v = <span class="const token" data-verso-hover="41">true</span> ∧ (bits v).<span class="const token" data-verso-hover="61">length</span> ≤ <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex := <span class="kw">by</span></span>
+<span id="L128">      <span class="kw">unfold</span> <span class="const token" data-verso-hover="1244">minLen</span>; <span class="kw">exact</span> <span class="const token" data-verso-hover="330">Nat.find_spec</span> (<span class="const token" data-verso-hover="1243">exists_len</span> a0 bits hex)</span>
+<span id="L129">    <span class="kw">exact</span> ⟨v, hv, hl.<span class="const token" data-verso-hover="606">trans</span> h⟩</span>
+<span id="L130">  · <span class="kw">intro</span> h; <span class="kw">unfold</span> <span class="const token" data-verso-hover="1244">minLen</span>; <span class="kw">exact</span> <span class="const token" data-verso-hover="1252">Nat.find_min'</span> _ h</span>
+<span id="L131"></span>
+<span id="L132"><span class="kw">lemma</span> <span class="const token" data-verso-hover="1253">actP_succ</span> {p : <span class="const token" data-verso-hover="30">ℕ</span>} (hp : p &lt; <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex) (v : <span class="const token" data-verso-hover="38">ZMod</span> n) :</span>
+<span id="L133">    <span class="const token" data-verso-hover="1247">actP</span> a0 bits hex (p + <span class="nu">1</span>) v = <span class="kw">if</span> <span class="const token" data-verso-hover="1248">eP</span> a0 bits hex p <span class="kw">then</span></span>
+<span id="L134">      (<span class="const token" data-verso-hover="1247">actP</span> a0 bits hex p v &amp;&amp; ((bits v)[p]? != <span class="const token" data-verso-hover="49">some</span> <span class="const token" data-verso-hover="41">true</span>)) <span class="kw">else</span> <span class="const token" data-verso-hover="1247">actP</span> a0 bits hex p v := <span class="kw">by</span></span>
+<span id="L135">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="1247">actP</span></span>
+<span id="L136">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="1249">mb_succ</span>]</span>
+<span id="L137">  <span class="kw">by_cases</span> ha : <span class="const token" data-verso-hover="1245">a1</span> a0 bits hex v = <span class="const token" data-verso-hover="41">true</span></span>
+<span id="L138">  · <span class="kw">have</span> hlen : (bits v).<span class="const token" data-verso-hover="61">length</span> = <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex := <span class="kw">by</span></span>
+<span id="L139">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="1245">a1</span>, <span class="const token" data-verso-hover="356">Bool.and_eq_true</span>, <span class="const token" data-verso-hover="357">decide_eq_true_eq</span>] <span class="kw">at</span> ha; <span class="kw">exact</span> ha.<span class="const token" data-verso-hover="73">2</span></span>
+<span id="L140">    <span class="kw">have</span> hpl : p &lt; (bits v).<span class="const token" data-verso-hover="61">length</span> := hlen ▸ hp</span>
+<span id="L141">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="448">List.take_add_one</span>, <span class="const token" data-verso-hover="449">List.getElem?_eq_getElem</span> hpl]</span>
+<span id="L142">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="1254">Option.toList_some</span>, ha, <span class="const token" data-verso-hover="332">Bool.true_and</span>]</span>
+<span id="L143">    <span class="kw">have</span> _key : ((bits v).<span class="const token" data-verso-hover="440">take</span> p ++ [(bits v)[p]] = <span class="const token" data-verso-hover="1246">mb</span> a0 bits hex p ++ [!<span class="const token" data-verso-hover="1248">eP</span> a0 bits hex p]) ↔</span>
+<span id="L144">        ((bits v).<span class="const token" data-verso-hover="440">take</span> p = <span class="const token" data-verso-hover="1246">mb</span> a0 bits hex p ∧ (bits v)[p] = !<span class="const token" data-verso-hover="1248">eP</span> a0 bits hex p) := <span class="kw">by</span></span>
+<span id="L145">      <span class="kw">constructor</span></span>
+<span id="L146">      · <span class="kw">intro</span> h</span>
+<span id="L147">        <span class="kw">obtain</span> ⟨h1, h2⟩ := <span class="const token" data-verso-hover="1255">List.append_inj'</span> h <span class="const token" data-verso-hover="100">rfl</span></span>
+<span id="L148">        <span class="kw">exact</span> ⟨h1, <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> h2⟩</span>
+<span id="L149">      · <span class="kw">rintro</span> ⟨h1, h2⟩; <span class="kw">rw</span> [h1, h2]</span>
+<span id="L150">    <span class="kw">have</span> hne : ∀ b, (bits v).<span class="const token" data-verso-hover="440">take</span> p ≠ <span class="const token" data-verso-hover="1246">mb</span> a0 bits hex p →</span>
+<span id="L151">        ¬ ((bits v).<span class="const token" data-verso-hover="440">take</span> p ++ [b] = <span class="const token" data-verso-hover="1246">mb</span> a0 bits hex p ++ [!<span class="const token" data-verso-hover="1248">eP</span> a0 bits hex p]) :=</span>
+<span id="L152">      <span class="kw">fun</span> b ht h =&gt; ht (<span class="const token" data-verso-hover="1255">List.append_inj'</span> h <span class="const token" data-verso-hover="100">rfl</span>).<span class="const token" data-verso-hover="72">1</span></span>
+<span id="L153">    <span class="kw">by_cases</span> he : <span class="const token" data-verso-hover="1248">eP</span> a0 bits hex p = <span class="const token" data-verso-hover="41">true</span></span>
+<span id="L154">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="1256">ite_eq_left</span> he]</span>
+<span id="L155">      <span class="kw">by_cases</span> ht : (bits v).<span class="const token" data-verso-hover="440">take</span> p = <span class="const token" data-verso-hover="1246">mb</span> a0 bits hex p</span>
+<span id="L156">      · <span class="kw">by_cases</span> hb : (bits v)[p] = <span class="const token" data-verso-hover="41">true</span> &lt;;&gt; <span class="kw">simp</span> [ht, hb, he]</span>
+<span id="L157">      · <span class="kw">simp</span> [ht]</span>
+<span id="L158">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="448">List.take_add_one</span>, <span class="const token" data-verso-hover="449">List.getElem?_eq_getElem</span> hpl]; <span class="kw">exact</span> hne _ ht</span>
+<span id="L159">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="1257">ite_eq_right</span> he]</span>
+<span id="L160">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="273">Bool.not_eq_true</span>] <span class="kw">at</span> he</span>
+<span id="L161">      <span class="kw">by_cases</span> ht : (bits v).<span class="const token" data-verso-hover="440">take</span> p = <span class="const token" data-verso-hover="1246">mb</span> a0 bits hex p</span>
+<span id="L162">      · <span class="kw">have</span> hb : (bits v)[p] = <span class="const token" data-verso-hover="41">true</span> := <span class="kw">by</span></span>
+<span id="L163">          <span class="kw">by_contra</span> hb</span>
+<span id="L164">          <span class="kw">simp</span> only [<span class="const token" data-verso-hover="273">Bool.not_eq_true</span>] <span class="kw">at</span> hb</span>
+<span id="L165">          <span class="kw">have</span> : <span class="const token" data-verso-hover="1248">eP</span> a0 bits hex p = <span class="const token" data-verso-hover="41">true</span> := <span class="kw">by</span></span>
+<span id="L166">            <span class="kw">unfold</span> <span class="const token" data-verso-hover="1248">eP</span></span>
+<span id="L167">            <span class="kw">refine</span> <span class="const token" data-verso-hover="331">decide_eq_true</span> ⟨v, ?_⟩</span>
+<span id="L168">            <span class="kw">simp</span> [<span class="const token" data-verso-hover="1231">hasZero</span>, <span class="const token" data-verso-hover="1247">actP</span>, ha, ht, <span class="const token" data-verso-hover="449">List.getElem?_eq_getElem</span> hpl, hb]</span>
+<span id="L169">          <span class="kw">rw</span> [he] <span class="kw">at</span> this; <span class="kw">exact</span> <span class="const token" data-verso-hover="390">absurd</span> this (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L170">        <span class="kw">simp</span> [ht, hb, he]</span>
+<span id="L171">      · <span class="kw">simp</span> [ht]</span>
+<span id="L172">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="448">List.take_add_one</span>, <span class="const token" data-verso-hover="449">List.getElem?_eq_getElem</span> hpl]; <span class="kw">exact</span> hne _ ht</span>
+<span id="L173">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="273">Bool.not_eq_true</span>] <span class="kw">at</span> ha</span>
+<span id="L174">    <span class="kw">simp</span> [ha]</span>
+<span id="L175"></span>
+<span id="L176"><span class="kw">variable</span> (a0 bits hex) (lead : <span class="const token" data-verso-hover="38">ZMod</span> n → <span class="const token" data-verso-hover="33">Bool</span>)</span>
+<span id="L177"></span>
+<span id="L178"><span class="dc">/-- Scheduled local states. -/</span></span>
+<span id="L179"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="1258">dS</span> (k : <span class="const token" data-verso-hover="30">ℕ</span>) (v : <span class="const token" data-verso-hover="38">ZMod</span> n) : <span class="const token" data-verso-hover="1223">St</span> :=</span>
+<span id="L180">  <span class="kw">if</span> k &lt; <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex <span class="kw">then</span> ⟨lead v, a0 v, bits v, k + <span class="nu">1</span>, <span class="const token" data-verso-hover="41">true</span>, <span class="nu">0</span>, []⟩</span>
+<span id="L181">  <span class="kw">else</span> ⟨lead v, <span class="const token" data-verso-hover="1247">actP</span> a0 bits hex (k - <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex) v, bits v, <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex, <span class="const token" data-verso-hover="239">false</span>,</span>
+<span id="L182">    k - <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex, <span class="const token" data-verso-hover="1246">mb</span> a0 bits hex (k - <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex)⟩</span>
+<span id="L183"></span>
+<span id="L184"><span class="dc">/-- Scheduled `ComputeOR` inputs. -/</span></span>
+<span id="L185"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="1259">jS</span> (k : <span class="const token" data-verso-hover="30">ℕ</span>) (v : <span class="const token" data-verso-hover="38">ZMod</span> n) : <span class="const token" data-verso-hover="33">Bool</span> × <span class="const token" data-verso-hover="33">Bool</span> :=</span>
+<span id="L186">  <span class="kw">if</span> k &lt; <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex <span class="kw">then</span> (lead v, a0 v &amp;&amp; <span class="const token" data-verso-hover="117">decide</span> ((bits v).<span class="const token" data-verso-hover="61">length</span> ≤ k + <span class="nu">1</span>))</span>
+<span id="L187">  <span class="kw">else</span> (lead v, <span class="const token" data-verso-hover="1231">hasZero</span> (<span class="const token" data-verso-hover="1247">actP</span> a0 bits hex (k - <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex) v) (bits v)</span>
+<span id="L188">    (k - <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex))</span>
+<span id="L189"></span>
+<span id="L190"><span class="dc">/-- Scheduled `ComputeOR` results. -/</span></span>
+<span id="L191"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="1260">rS</span> (k : <span class="const token" data-verso-hover="30">ℕ</span>) (_v : <span class="const token" data-verso-hover="38">ZMod</span> n) : <span class="const token" data-verso-hover="33">Bool</span> :=</span>
+<span id="L192">  <span class="kw">if</span> k &lt; <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex <span class="kw">then</span> <span class="const token" data-verso-hover="117">decide</span> (<span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex ≤ k + <span class="nu">1</span>)</span>
+<span id="L193">  <span class="kw">else</span> <span class="const token" data-verso-hover="1248">eP</span> a0 bits hex (k - <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex)</span>
+<span id="L194"></span>
+<span id="L195"><span class="kw">variable</span> {a0 bits hex lead}</span>
+<span id="L196"></span>
+<span id="L197"><span class="kw">lemma</span> <span class="const token" data-verso-hover="1261">one_le_minLen</span> (hne : ∀ v, a0 v = <span class="const token" data-verso-hover="41">true</span> → bits v ≠ []) : <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex := <span class="kw">by</span></span>
+<span id="L198">  <span class="kw">by_contra</span> h</span>
+<span id="L199">  <span class="kw">have</span> h0 : <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex ≤ <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L200">  <span class="kw">obtain</span> ⟨v, hv, hl⟩ := (<span class="const token" data-verso-hover="1251">minLen_le_iff</span> <span class="nu">0</span>).<span class="const token" data-verso-hover="135">1</span> h0</span>
+<span id="L201">  <span class="kw">exact</span> hne v hv (<span class="const token" data-verso-hover="1262">List.eq_nil_of_length_eq_zero</span> (<span class="kw">by</span> <span class="kw">omega</span>))</span>
+<span id="L202"></span>
+<span id="L203"><span class="kw">lemma</span> <span class="const token" data-verso-hover="1263">schedule</span> {OR : <span class="const token" data-verso-hover="32">Proc</span> (<span class="const token" data-verso-hover="33">Bool</span> × <span class="const token" data-verso-hover="33">Bool</span>) <span class="const token" data-verso-hover="33">Bool</span>} (hOR : <span class="const token" data-verso-hover="1234">ORSpec</span> OR lead)</span>
+<span id="L204">    (hne : ∀ v, a0 v = <span class="const token" data-verso-hover="41">true</span> → bits v ≠ []) :</span>
+<span id="L205">    <span class="const token" data-verso-hover="98">Schedule</span> OR <span class="const token" data-verso-hover="1232">driver</span> (<span class="const token" data-verso-hover="99">oriented</span> n) (<span class="kw">fun</span> v =&gt; (lead v, a0 v, bits v)) (<span class="nu">2</span> * <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex)</span>
+<span id="L206">      (<span class="const token" data-verso-hover="1258">dS</span> a0 bits hex lead) (<span class="const token" data-verso-hover="1259">jS</span> a0 bits hex lead) (<span class="const token" data-verso-hover="1260">rS</span> a0 bits hex) := <span class="kw">by</span></span>
+<span id="L207">  <span class="kw">have</span> hm := <span class="const token" data-verso-hover="1261">one_le_minLen</span> (hex := hex) hne</span>
+<span id="L208">  <span class="kw">set</span> m := <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex <span class="kw">with</span> hm_def</span>
+<span id="L209">  <span class="kw">refine</span> ⟨hOR.<span class="const token" data-verso-hover="1235">init</span>, <span class="kw">fun</span> v =&gt; ?_, <span class="kw">fun</span> k hk v =&gt; ?_, <span class="kw">fun</span> k _ =&gt; ?_, <span class="kw">fun</span> k _ =&gt; ?_⟩</span>
+<span id="L210">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="1232">driver</span>, <span class="const token" data-verso-hover="1258">dS</span>, <span class="const token" data-verso-hover="1259">jS</span>, ← hm_def, <span class="kw">show</span> <span class="nu">0</span> &lt; m <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">show</span> <span class="nu">0</span> &lt; <span class="nu">2</span> * m <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L211">  · <span class="kw">by_cases</span> hkm : k &lt; m</span>
+<span id="L212">    · <span class="kw">by_cases</span> hk1 : k + <span class="nu">1</span> &lt; m</span>
+<span id="L213">      · <span class="kw">simp</span> [<span class="const token" data-verso-hover="1232">driver</span>, <span class="const token" data-verso-hover="1258">dS</span>, <span class="const token" data-verso-hover="1259">jS</span>, <span class="const token" data-verso-hover="1260">rS</span>, ← hm_def, hkm, hk1, <span class="kw">show</span> ¬ m ≤ k + <span class="nu">1</span> <span class="kw">by</span> <span class="kw">omega</span>,</span>
+<span id="L214">          <span class="kw">show</span> k + <span class="nu">1</span> &lt; <span class="nu">2</span> * m <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L215">      · <span class="kw">have</span> e : k + <span class="nu">1</span> - m = <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L216">        <span class="kw">have</span> hB : k + <span class="nu">1</span> = m := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L217">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="1260">rS</span>, <span class="const token" data-verso-hover="1258">dS</span>, <span class="const token" data-verso-hover="1259">jS</span>, ← hm_def, hkm, hk1, <span class="const token" data-verso-hover="141">ite_true</span>, <span class="const token" data-verso-hover="140">ite_false</span>, e, <span class="const token" data-verso-hover="1232">driver</span>,</span>
+<span id="L218">          <span class="kw">show</span> m ≤ k + <span class="nu">1</span> <span class="kw">by</span> <span class="kw">omega</span>, <span class="const token" data-verso-hover="1080">decide_true</span>, <span class="kw">show</span> k + <span class="nu">1</span> &lt; <span class="nu">2</span> * m <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L219">        <span class="kw">refine</span> <span class="const token" data-verso-hover="1177">Prod.ext</span> ?_ ?_</span>
+<span id="L220">        · <span class="kw">simp</span> [<span class="const token" data-verso-hover="1247">actP</span>, <span class="const token" data-verso-hover="1245">a1</span>, <span class="const token" data-verso-hover="1246">mb</span>, hB, ← hm_def]</span>
+<span id="L221">        · <span class="kw">simp</span> [<span class="const token" data-verso-hover="1247">actP</span>, <span class="const token" data-verso-hover="1245">a1</span>, <span class="const token" data-verso-hover="1246">mb</span>, hB, ← hm_def]</span>
+<span id="L222">    · <span class="kw">have</span> hp : k - m &lt; m := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L223">      <span class="kw">have</span> e : k + <span class="nu">1</span> - m = k - m + <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L224">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="1260">rS</span>, <span class="const token" data-verso-hover="1258">dS</span>, <span class="const token" data-verso-hover="1259">jS</span>, ← hm_def, hkm, <span class="const token" data-verso-hover="140">ite_false</span>, <span class="kw">show</span> ¬ k + <span class="nu">1</span> &lt; m <span class="kw">by</span> <span class="kw">omega</span>, e, <span class="const token" data-verso-hover="1232">driver</span>,</span>
+<span id="L225">        <span class="const token" data-verso-hover="240">Bool.false_eq_true</span>]</span>
+<span id="L226">      <span class="kw">refine</span> <span class="const token" data-verso-hover="1177">Prod.ext</span> ?_ ?_</span>
+<span id="L227">      · <span class="kw">simp</span> only</span>
+<span id="L228">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="1253">actP_succ</span> hp v, <span class="const token" data-verso-hover="1249">mb_succ</span>]</span>
+<span id="L229">      · <span class="kw">simp</span> only</span>
+<span id="L230">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="1253">actP_succ</span> hp v]</span>
+<span id="L231">        <span class="kw">by_cases</span> h : k - m + <span class="nu">1</span> &lt; m</span>
+<span id="L232">        · <span class="kw">simp</span> [h, <span class="kw">show</span> k + <span class="nu">1</span> &lt; <span class="nu">2</span> * m <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L233">        · <span class="kw">simp</span> [h, <span class="kw">show</span> ¬ k + <span class="nu">1</span> &lt; <span class="nu">2</span> * m <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L234">  · <span class="kw">have</span> e : <span class="const token" data-verso-hover="1259">jS</span> a0 bits hex lead k = <span class="kw">fun</span> v =&gt; (lead v, (<span class="const token" data-verso-hover="1259">jS</span> a0 bits hex lead k v).<span class="const token" data-verso-hover="60">2</span>) := <span class="kw">by</span></span>
+<span id="L235">      <span class="kw">funext</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="1259">jS</span>]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L236">    <span class="kw">rw</span> [e]; <span class="kw">exact</span> hOR.<span class="const token" data-verso-hover="1236">comp</span> _</span>
+<span id="L237">  · <span class="kw">have</span> e : <span class="const token" data-verso-hover="1259">jS</span> a0 bits hex lead k = <span class="kw">fun</span> v =&gt; (lead v, (<span class="const token" data-verso-hover="1259">jS</span> a0 bits hex lead k v).<span class="const token" data-verso-hover="60">2</span>) := <span class="kw">by</span></span>
+<span id="L238">      <span class="kw">funext</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="1259">jS</span>]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L239">    <span class="kw">have</span> er : <span class="const token" data-verso-hover="1260">rS</span> a0 bits hex k = <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="117">decide</span> (∃ v, (<span class="const token" data-verso-hover="1259">jS</span> a0 bits hex lead k v).<span class="const token" data-verso-hover="60">2</span> = <span class="const token" data-verso-hover="41">true</span>) := <span class="kw">by</span></span>
+<span id="L240">      <span class="kw">funext</span> v</span>
+<span id="L241">      <span class="kw">by_cases</span> hkm : k &lt; m</span>
+<span id="L242">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="1260">rS</span>, <span class="const token" data-verso-hover="1259">jS</span>, ← hm_def, hkm, <span class="const token" data-verso-hover="141">ite_true</span>, <span class="const token" data-verso-hover="356">Bool.and_eq_true</span>, <span class="const token" data-verso-hover="357">decide_eq_true_eq</span>]</span>
+<span id="L243">        <span class="kw">exact</span> <span class="const token" data-verso-hover="1264">decide_eq_decide</span>.<span class="const token" data-verso-hover="185">2</span> (<span class="const token" data-verso-hover="1251">minLen_le_iff</span> _)</span>
+<span id="L244">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="1260">rS</span>, <span class="const token" data-verso-hover="1259">jS</span>, ← hm_def, hkm, <span class="const token" data-verso-hover="140">ite_false</span>, <span class="const token" data-verso-hover="1248">eP</span>]</span>
+<span id="L245">    <span class="kw">rw</span> [e, er]; <span class="kw">exact</span> hOR.<span class="const token" data-verso-hover="1237">ret</span> _</span>
+<span id="L246"></span>
+<span id="L247"><span class="kw">lemma</span> <span class="const token" data-verso-hover="1265">minLen_le_len</span> {v : <span class="const token" data-verso-hover="38">ZMod</span> n} (hv : a0 v = <span class="const token" data-verso-hover="41">true</span>) : <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex ≤ (bits v).<span class="const token" data-verso-hover="61">length</span> :=</span>
+<span id="L248">  (<span class="const token" data-verso-hover="1251">minLen_le_iff</span> _).<span class="const token" data-verso-hover="185">2</span> ⟨v, hv, <span class="const token" data-verso-hover="104">le_rfl</span>⟩</span>
+<span id="L249"></span>
+<span id="L250"><span class="dc">/-- Invariant of the bit phases: some candidate is left, and every participant of minimum length</span></span>
+<span id="L251"><span class="dc">either matches the prefix found so far or has a strictly larger prefix. -/</span></span>
+<span id="L252"><span class="kw">lemma</span> <span class="const token" data-verso-hover="1266">mb_spec</span> {p : <span class="const token" data-verso-hover="30">ℕ</span>} (hp : p ≤ <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex) :</span>
+<span id="L253">    (∃ w, <span class="const token" data-verso-hover="1247">actP</span> a0 bits hex p w = <span class="const token" data-verso-hover="41">true</span>) ∧ ∀ v, <span class="const token" data-verso-hover="1245">a1</span> a0 bits hex v = <span class="const token" data-verso-hover="41">true</span> →</span>
+<span id="L254">      (bits v).<span class="const token" data-verso-hover="440">take</span> p = <span class="const token" data-verso-hover="1246">mb</span> a0 bits hex p ∨ <span class="const token" data-verso-hover="1239">val</span> (<span class="const token" data-verso-hover="1246">mb</span> a0 bits hex p) &lt; <span class="const token" data-verso-hover="1239">val</span> ((bits v).<span class="const token" data-verso-hover="440">take</span> p) := <span class="kw">by</span></span>
+<span id="L255">  <span class="kw">induction</span> p <span class="kw">with</span></span>
+<span id="L256">  | <span class="const token" data-verso-hover="78">zero</span> =&gt;</span>
+<span id="L257">    <span class="kw">refine</span> ⟨?_, <span class="kw">fun</span> v _ =&gt; <span class="const token" data-verso-hover="243">Or.inl</span> (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="1246">mb</span>])⟩</span>
+<span id="L258">    <span class="kw">obtain</span> ⟨w, hw, hl⟩ := (<span class="const token" data-verso-hover="1251">minLen_le_iff</span> (hex := hex) (<span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex)).<span class="const token" data-verso-hover="135">1</span> <span class="const token" data-verso-hover="104">le_rfl</span></span>
+<span id="L259">    <span class="kw">have</span> := <span class="const token" data-verso-hover="1265">minLen_le_len</span> (bits := bits) (hex := hex) hw</span>
+<span id="L260">    <span class="kw">exact</span> ⟨w, <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="1247">actP</span>, <span class="const token" data-verso-hover="1245">a1</span>, hw, <span class="const token" data-verso-hover="1246">mb</span>, <span class="kw">show</span> (bits w).<span class="const token" data-verso-hover="61">length</span> = <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex <span class="kw">by</span> <span class="kw">omega</span>]⟩</span>
+<span id="L261">  | <span class="const token" data-verso-hover="79">succ</span> p ih =&gt;</span>
+<span id="L262">    <span class="kw">have</span> hp' : p &lt; <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L263">    <span class="kw">obtain</span> ⟨⟨w, hw⟩, hord⟩ := ih (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L264">    <span class="kw">refine</span> ⟨?_, <span class="kw">fun</span> v hv =&gt; ?_⟩</span>
+<span id="L265">    · <span class="kw">by_cases</span> he : <span class="const token" data-verso-hover="1248">eP</span> a0 bits hex p = <span class="const token" data-verso-hover="41">true</span></span>
+<span id="L266">      · <span class="kw">obtain</span> ⟨u, hu⟩ := <span class="const token" data-verso-hover="1267">of_decide_eq_true</span> he</span>
+<span id="L267">        <span class="kw">refine</span> ⟨u, ?_⟩</span>
+<span id="L268">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="1253">actP_succ</span> hp', <span class="const token" data-verso-hover="1256">ite_eq_left</span> he]</span>
+<span id="L269">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="1231">hasZero</span>, <span class="const token" data-verso-hover="356">Bool.and_eq_true</span>, <span class="const token" data-verso-hover="1205">beq_iff_eq</span>] <span class="kw">at</span> hu</span>
+<span id="L270">        <span class="kw">simp</span> [hu.<span class="const token" data-verso-hover="72">1</span>, hu.<span class="const token" data-verso-hover="73">2</span>]</span>
+<span id="L271">      · <span class="kw">exact</span> ⟨w, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="1253">actP_succ</span> hp', <span class="const token" data-verso-hover="1257">ite_eq_right</span> he]; <span class="kw">exact</span> hw⟩</span>
+<span id="L272">    · <span class="kw">have</span> hlen : (bits v).<span class="const token" data-verso-hover="61">length</span> = <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex := <span class="kw">by</span></span>
+<span id="L273">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="1245">a1</span>, <span class="const token" data-verso-hover="356">Bool.and_eq_true</span>, <span class="const token" data-verso-hover="357">decide_eq_true_eq</span>] <span class="kw">at</span> hv; <span class="kw">exact</span> hv.<span class="const token" data-verso-hover="73">2</span></span>
+<span id="L274">      <span class="kw">have</span> hpl : p &lt; (bits v).<span class="const token" data-verso-hover="61">length</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L275">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="448">List.take_add_one</span>, <span class="const token" data-verso-hover="449">List.getElem?_eq_getElem</span> hpl, <span class="const token" data-verso-hover="1249">mb_succ</span>]</span>
+<span id="L276">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="1254">Option.toList_some</span>, <span class="const token" data-verso-hover="1241">val_append</span>]</span>
+<span id="L277">      <span class="kw">rcases</span> hord v hv <span class="kw">with</span> heq | hlt</span>
+<span id="L278">      · <span class="kw">rw</span> [heq]</span>
+<span id="L279">        <span class="kw">by_cases</span> hb : (bits v)[p] = !<span class="const token" data-verso-hover="1248">eP</span> a0 bits hex p</span>
+<span id="L280">        · <span class="kw">left</span>; <span class="kw">rw</span> [hb]</span>
+<span id="L281">        · <span class="kw">right</span></span>
+<span id="L282">          <span class="kw">by_cases</span> he : <span class="const token" data-verso-hover="1248">eP</span> a0 bits hex p = <span class="const token" data-verso-hover="41">true</span></span>
+<span id="L283">          · <span class="kw">have</span> : (bits v)[p] = <span class="const token" data-verso-hover="41">true</span> := <span class="kw">by</span> <span class="kw">rw</span> [he] <span class="kw">at</span> hb; <span class="kw">simpa</span> <span class="kw">using</span> hb</span>
+<span id="L284">            <span class="kw">rw</span> [he, this]; <span class="kw">simp</span></span>
+<span id="L285">          · <span class="kw">exfalso</span></span>
+<span id="L286">            <span class="kw">simp</span> only [<span class="const token" data-verso-hover="273">Bool.not_eq_true</span>] <span class="kw">at</span> he</span>
+<span id="L287">            <span class="kw">have</span> hb' : (bits v)[p] = <span class="const token" data-verso-hover="239">false</span> := <span class="kw">by</span> <span class="kw">rw</span> [he] <span class="kw">at</span> hb; <span class="kw">simpa</span> <span class="kw">using</span> hb</span>
+<span id="L288">            <span class="kw">have</span> : <span class="const token" data-verso-hover="1248">eP</span> a0 bits hex p = <span class="const token" data-verso-hover="41">true</span> := <span class="kw">by</span></span>
+<span id="L289">              <span class="kw">unfold</span> <span class="const token" data-verso-hover="1248">eP</span></span>
+<span id="L290">              <span class="kw">refine</span> <span class="const token" data-verso-hover="331">decide_eq_true</span> ⟨v, ?_⟩</span>
+<span id="L291">              <span class="kw">simp</span> [<span class="const token" data-verso-hover="1231">hasZero</span>, <span class="const token" data-verso-hover="1247">actP</span>, hv, heq, <span class="const token" data-verso-hover="449">List.getElem?_eq_getElem</span> hpl, hb']</span>
+<span id="L292">            <span class="kw">rw</span> [he] <span class="kw">at</span> this; <span class="kw">exact</span> <span class="const token" data-verso-hover="390">absurd</span> this (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L293">      · <span class="kw">right</span></span>
+<span id="L294">        <span class="kw">have</span> h1 : (!<span class="const token" data-verso-hover="1248">eP</span> a0 bits hex p).<span class="const token" data-verso-hover="206">toNat</span> ≤ <span class="nu">1</span> := <span class="const token" data-verso-hover="334">Bool.toNat_le</span> _</span>
+<span id="L295">        <span class="kw">omega</span></span>
+<span id="L296"></span>
+<span id="L297"><span class="dc">/-- The final prefix is the minimum of the participants' strings of minimum length. -/</span></span>
+<span id="L298"><span class="kw">lemma</span> <span class="const token" data-verso-hover="1268">mb_final</span> :</span>
+<span id="L299">    (∃ w, <span class="const token" data-verso-hover="1245">a1</span> a0 bits hex w = <span class="const token" data-verso-hover="41">true</span> ∧ bits w = <span class="const token" data-verso-hover="1246">mb</span> a0 bits hex (<span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex)) ∧</span>
+<span id="L300">    ∀ v, <span class="const token" data-verso-hover="1245">a1</span> a0 bits hex v = <span class="const token" data-verso-hover="41">true</span> → bits v = <span class="const token" data-verso-hover="1246">mb</span> a0 bits hex (<span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex) ∨</span>
+<span id="L301">      <span class="const token" data-verso-hover="1239">val</span> (<span class="const token" data-verso-hover="1246">mb</span> a0 bits hex (<span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex)) &lt; <span class="const token" data-verso-hover="1239">val</span> (bits v) := <span class="kw">by</span></span>
+<span id="L302">  <span class="kw">obtain</span> ⟨⟨w, hw⟩, hord⟩ := <span class="const token" data-verso-hover="1266">mb_spec</span> (hex := hex) (<span class="const token" data-verso-hover="835">le_refl</span> (<span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex))</span>
+<span id="L303">  <span class="kw">have</span> htake : ∀ v, <span class="const token" data-verso-hover="1245">a1</span> a0 bits hex v = <span class="const token" data-verso-hover="41">true</span> → (bits v).<span class="const token" data-verso-hover="440">take</span> (<span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex) = bits v := <span class="kw">by</span></span>
+<span id="L304">    <span class="kw">intro</span> v hv</span>
+<span id="L305">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="1245">a1</span>, <span class="const token" data-verso-hover="356">Bool.and_eq_true</span>, <span class="const token" data-verso-hover="357">decide_eq_true_eq</span>] <span class="kw">at</span> hv</span>
+<span id="L306">    <span class="kw">exact</span> <span class="const token" data-verso-hover="794">List.take_of_length_le</span> hv.<span class="const token" data-verso-hover="73">2</span>.<span class="const token" data-verso-hover="1269">le</span></span>
+<span id="L307">  <span class="kw">refine</span> ⟨?_, <span class="kw">fun</span> v hv =&gt; <span class="kw">by</span> <span class="kw">rw</span> [← htake v hv]; <span class="kw">exact</span> hord v hv⟩</span>
+<span id="L308">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="1247">actP</span>, <span class="const token" data-verso-hover="356">Bool.and_eq_true</span>, <span class="const token" data-verso-hover="357">decide_eq_true_eq</span>] <span class="kw">at</span> hw</span>
+<span id="L309">  <span class="kw">exact</span> ⟨w, hw.<span class="const token" data-verso-hover="72">1</span>, <span class="kw">by</span> <span class="kw">rw</span> [← htake w hw.<span class="const token" data-verso-hover="72">1</span>]; <span class="kw">exact</span> hw.<span class="const token" data-verso-hover="73">2</span>⟩</span>
+<span id="L310"></span>
+<span id="L311"><span class="dc">/-- **Theorem 5 (bit strings, abstract ComputeOR).** Algorithm 10 (with the loop bound fixed to the</span></span>
+<span id="L312"><span class="dc">common length) on an oriented ring with a leader, at least one participant and non-empty strings:</span></span>
+<span id="L313"><span class="dc">every final configuration is quiescent; every node outputs the same string `mb m`, which is the</span></span>
+<span id="L314"><span class="dc">minimum (as a binary number) among the participants' strings of minimum length `m`; a node stays</span></span>
+<span id="L315"><span class="dc">active iff it is a participant whose string is that minimum. At most `6·n·m` pulses are sent, and</span></span>
+<span id="L316"><span class="dc">the procedure is composable. -/</span></span>
+<span id="L317"><span class="kw">theorem</span> <span class="const token" data-verso-hover="1270">theorem_5_bits</span> {OR : <span class="const token" data-verso-hover="32">Proc</span> (<span class="const token" data-verso-hover="33">Bool</span> × <span class="const token" data-verso-hover="33">Bool</span>) <span class="const token" data-verso-hover="33">Bool</span>} (hOR : <span class="const token" data-verso-hover="1234">ORSpec</span> OR lead)</span>
+<span id="L318">    (hne : ∀ v, a0 v = <span class="const token" data-verso-hover="41">true</span> → bits v ≠ []) :</span>
+<span id="L319">    (∀ c, (<span class="const token" data-verso-hover="1233">prog</span> OR).<span class="const token" data-verso-hover="159">Reach</span> (<span class="const token" data-verso-hover="99">oriented</span> n) (<span class="kw">fun</span> v =&gt; (lead v, a0 v, bits v)) c →</span>
+<span id="L320">      (<span class="const token" data-verso-hover="1233">prog</span> OR).<span class="const token" data-verso-hover="176">Final</span> (<span class="const token" data-verso-hover="99">oriented</span> n) c → (<span class="const token" data-verso-hover="1233">prog</span> OR).<span class="const token" data-verso-hover="177">Quiescent</span> (<span class="const token" data-verso-hover="99">oriented</span> n) c ∧ ∀ v,</span>
+<span id="L321">        (c.<span class="const token" data-verso-hover="178">st</span> v).<span class="const token" data-verso-hover="60">2</span> = <span class="const token" data-verso-hover="77">none</span> ∧ (c.<span class="const token" data-verso-hover="178">st</span> v).<span class="const token" data-verso-hover="63">1</span>.<span class="const token" data-verso-hover="1230">minBits</span> = <span class="const token" data-verso-hover="1246">mb</span> a0 bits hex (<span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex) ∧</span>
+<span id="L322">        ((c.<span class="const token" data-verso-hover="178">st</span> v).<span class="const token" data-verso-hover="63">1</span>.<span class="const token" data-verso-hover="1225">active</span> = <span class="const token" data-verso-hover="41">true</span> ↔ a0 v = <span class="const token" data-verso-hover="41">true</span> ∧ bits v = <span class="const token" data-verso-hover="1246">mb</span> a0 bits hex (<span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex))) ∧</span>
+<span id="L323">    (∀ c, (<span class="const token" data-verso-hover="1233">prog</span> OR).<span class="const token" data-verso-hover="159">Reach</span> (<span class="const token" data-verso-hover="99">oriented</span> n) (<span class="kw">fun</span> v =&gt; (lead v, a0 v, bits v)) c →</span>
+<span id="L324">      <span class="const token" data-verso-hover="160">totalSent</span> c ≤ <span class="nu">6</span> * n * <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex) ∧</span>
+<span id="L325">    (<span class="const token" data-verso-hover="1233">prog</span> OR).<span class="const token" data-verso-hover="11">Composable</span> (<span class="const token" data-verso-hover="99">oriented</span> n) (<span class="kw">fun</span> v =&gt; (lead v, a0 v, bits v)) := <span class="kw">by</span></span>
+<span id="L326">  <span class="kw">have</span> hS := <span class="const token" data-verso-hover="1263">schedule</span> (hex := hex) hOR hne</span>
+<span id="L327">  <span class="kw">have</span> hm := <span class="const token" data-verso-hover="1261">one_le_minLen</span> (hex := hex) hne</span>
+<span id="L328">  <span class="kw">have</span> hB : ∀ k &lt; <span class="nu">2</span> * <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex, ∀ c, OR.<span class="const token" data-verso-hover="159">Reach</span> (<span class="const token" data-verso-hover="99">oriented</span> n) (<span class="const token" data-verso-hover="1259">jS</span> a0 bits hex lead k) c →</span>
+<span id="L329">      <span class="const token" data-verso-hover="160">totalSent</span> c ≤ <span class="nu">3</span> * n := <span class="kw">by</span></span>
+<span id="L330">    <span class="kw">intro</span> k _ c hc</span>
+<span id="L331">    <span class="kw">have</span> e : <span class="const token" data-verso-hover="1259">jS</span> a0 bits hex lead k = <span class="kw">fun</span> v =&gt; (lead v, (<span class="const token" data-verso-hover="1259">jS</span> a0 bits hex lead k v).<span class="const token" data-verso-hover="60">2</span>) := <span class="kw">by</span></span>
+<span id="L332">      <span class="kw">funext</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="1259">jS</span>]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L333">    <span class="kw">rw</span> [e] <span class="kw">at</span> hc; <span class="kw">exact</span> hOR.<span class="const token" data-verso-hover="1238">bound</span> _ c hc</span>
+<span id="L334">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> c hc hfin =&gt; ?_, <span class="kw">fun</span> c hc =&gt; ?_, hS.<span class="const token" data-verso-hover="187">composable</span> hB⟩</span>
+<span id="L335">  · <span class="kw">obtain</span> ⟨hq, hst⟩ := hS.<span class="const token" data-verso-hover="13">final</span> hc hfin</span>
+<span id="L336">    <span class="kw">refine</span> ⟨hq, <span class="kw">fun</span> v =&gt; ⟨<span class="kw">by</span> <span class="kw">rw</span> [hst v], ?_, ?_⟩⟩</span>
+<span id="L337">    · <span class="kw">rw</span> [hst v]; <span class="kw">simp</span> [<span class="const token" data-verso-hover="1258">dS</span>, <span class="kw">show</span> ¬ <span class="nu">2</span> * <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex &lt; <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex <span class="kw">by</span> <span class="kw">omega</span>,</span>
+<span id="L338">        <span class="kw">show</span> <span class="nu">2</span> * <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex - <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex = <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L339">    · <span class="kw">rw</span> [hst v]</span>
+<span id="L340">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="1258">dS</span>, <span class="kw">show</span> ¬ <span class="nu">2</span> * <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex &lt; <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex <span class="kw">by</span> <span class="kw">omega</span>, <span class="const token" data-verso-hover="140">ite_false</span>,</span>
+<span id="L341">        <span class="kw">show</span> <span class="nu">2</span> * <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex - <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex = <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex <span class="kw">by</span> <span class="kw">omega</span>, <span class="const token" data-verso-hover="1247">actP</span>, <span class="const token" data-verso-hover="1245">a1</span>,</span>
+<span id="L342">        <span class="const token" data-verso-hover="356">Bool.and_eq_true</span>, <span class="const token" data-verso-hover="357">decide_eq_true_eq</span>]</span>
+<span id="L343">      <span class="kw">constructor</span></span>
+<span id="L344">      · <span class="kw">rintro</span> ⟨⟨h1, h2⟩, h3⟩</span>
+<span id="L345">        <span class="kw">exact</span> ⟨h1, <span class="kw">by</span> <span class="kw">rw</span> [← h3]; <span class="kw">exact</span> (<span class="const token" data-verso-hover="794">List.take_of_length_le</span> h2.<span class="const token" data-verso-hover="1269">le</span>).<span class="const token" data-verso-hover="253">symm</span>⟩</span>
+<span id="L346">      · <span class="kw">rintro</span> ⟨h1, h2⟩</span>
+<span id="L347">        <span class="kw">have</span> hl : (bits v).<span class="const token" data-verso-hover="61">length</span> = <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex := <span class="kw">by</span></span>
+<span id="L348">          <span class="kw">rw</span> [h2, <span class="const token" data-verso-hover="1250">mb_length</span>]</span>
+<span id="L349">        <span class="kw">exact</span> ⟨⟨h1, hl⟩, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="794">List.take_of_length_le</span> hl.<span class="const token" data-verso-hover="1269">le</span>, h2]⟩</span>
+<span id="L350">  · <span class="kw">have</span> := hS.<span class="const token" data-verso-hover="190">totalSent_le</span> hB hc</span>
+<span id="L351">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="130">Finset.sum_const</span>, <span class="const token" data-verso-hover="131">Finset.card_range</span>, <span class="const token" data-verso-hover="132">smul_eq_mul</span>] <span class="kw">at</span> this</span>
+<span id="L352">    <span class="kw">calc</span> <span class="const token" data-verso-hover="160">totalSent</span> c ≤ <span class="nu">2</span> * <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex * (<span class="nu">3</span> * n) := this</span>
+<span id="L353">      _ = <span class="nu">6</span> * n * <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex := <span class="kw">by</span> <span class="kw">ring</span></span>
+<span id="L354"></span>
+<span id="L355"><span class="dc">/-! ## Natural-number inputs -/</span></span>
+<span id="L356"></span>
+<span id="L357"><span class="dc">/-- Binary representation of a natural number, MSB first (`enc 0 = [0]`); its length is the bit</span></span>
+<span id="L358"><span class="dc">length `|x| = ⌊log₂ x⌋ + 1`. -/</span></span>
+<span id="L359"><span class="kw">def</span> <span class="const token" data-verso-hover="1271">enc</span> (x : <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="33">Bool</span> :=</span>
+<span id="L360">  <span class="kw">if</span> x &lt; <span class="nu">2</span> <span class="kw">then</span> [<span class="const token" data-verso-hover="117">decide</span> (x = <span class="nu">1</span>)] <span class="kw">else</span> <span class="const token" data-verso-hover="1271">enc</span> (x / <span class="nu">2</span>) ++ [<span class="const token" data-verso-hover="117">decide</span> (x % <span class="nu">2</span> = <span class="nu">1</span>)]</span>
+<span id="L361"><span class="kw">termination_by</span> x</span>
+<span id="L362"><span class="kw">decreasing_by</span> <span class="kw">omega</span></span>
+<span id="L363"></span>
+<span id="L364"><span class="kw">lemma</span> <span class="const token" data-verso-hover="1272">val_enc</span> (x : <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="const token" data-verso-hover="1239">val</span> (<span class="const token" data-verso-hover="1271">enc</span> x) = x := <span class="kw">by</span></span>
+<span id="L365">  <span class="kw">induction</span> x <span class="kw">using</span> <span class="const token" data-verso-hover="339">Nat.strong_induction_on</span> <span class="kw">with</span></span>
+<span id="L366">  | _ x ih =&gt;</span>
+<span id="L367">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="1271">enc</span>]</span>
+<span id="L368">    <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L369">    · <span class="kw">interval_cases</span> x &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L370">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="1241">val_append</span>, ih _ (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L371">      <span class="kw">by_cases</span> h2 : x % <span class="nu">2</span> = <span class="nu">1</span> &lt;;&gt; <span class="kw">simp</span> [h2] &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L372"></span>
+<span id="L373"><span class="kw">lemma</span> <span class="const token" data-verso-hover="1273">length_enc</span> (x : <span class="const token" data-verso-hover="30">ℕ</span>) : (<span class="const token" data-verso-hover="1271">enc</span> x).<span class="const token" data-verso-hover="61">length</span> = <span class="const token" data-verso-hover="181">Nat.log</span> <span class="nu">2</span> x + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L374">  <span class="kw">induction</span> x <span class="kw">using</span> <span class="const token" data-verso-hover="339">Nat.strong_induction_on</span> <span class="kw">with</span></span>
+<span id="L375">  | _ x ih =&gt;</span>
+<span id="L376">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="1271">enc</span>]</span>
+<span id="L377">    <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L378">    · <span class="kw">interval_cases</span> x &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L379">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="1274">List.length_append</span>, ih _ (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="1275">List.length_singleton</span>, <span class="const token" data-verso-hover="1276">Nat.log_div_base</span>]</span>
+<span id="L380">      <span class="kw">have</span> : <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="181">Nat.log</span> <span class="nu">2</span> x := <span class="const token" data-verso-hover="1277">Nat.log_pos</span> (<span class="kw">by</span> <span class="kw">norm_num</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L381">      <span class="kw">omega</span></span>
+<span id="L382"></span>
+<span id="L383"><span class="kw">lemma</span> <span class="const token" data-verso-hover="1278">enc_ne_nil</span> (x : <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="const token" data-verso-hover="1271">enc</span> x ≠ [] := <span class="kw">by</span></span>
+<span id="L384">  <span class="kw">intro</span> h; <span class="kw">have</span> := <span class="const token" data-verso-hover="1273">length_enc</span> x; <span class="kw">rw</span> [h] <span class="kw">at</span> this; <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L385"></span>
+<span id="L386"><span class="kw">include</span> hex <span class="kw">in</span></span>
+<span id="L387"><span class="dc">/-- **Theorem 5.** On an oriented ring with a leader, if every process `v` holds `x v ∈ ℕ` and the</span></span>
+<span id="L388"><span class="dc">participants (`a0`, at least one) run Algorithm 10 (loop bound fixed) on the binary</span></span>
+<span id="L389"><span class="dc">representations, every final configuration is quiescent, every process outputs</span></span>
+<span id="L390"><span class="dc">`xmin = min {x v | a0 v}` (and stays active iff it is a participant holding `xmin`), and at most</span></span>
+<span id="L391"><span class="dc">`6·n·|xmin|` pulses are sent, `|xmin| = ⌊log₂ xmin⌋ + 1`. Anonymous: only the leader is</span></span>
+<span id="L392"><span class="dc">distinguished. -/</span></span>
+<span id="L393"><span class="kw">theorem</span> <span class="const token" data-verso-hover="1279">theorem_5</span> {OR : <span class="const token" data-verso-hover="32">Proc</span> (<span class="const token" data-verso-hover="33">Bool</span> × <span class="const token" data-verso-hover="33">Bool</span>) <span class="const token" data-verso-hover="33">Bool</span>} (hOR : <span class="const token" data-verso-hover="1234">ORSpec</span> OR lead) (x : <span class="const token" data-verso-hover="38">ZMod</span> n → <span class="const token" data-verso-hover="30">ℕ</span>) :</span>
+<span id="L394">    ∃ xmin, (∃ w, a0 w = <span class="const token" data-verso-hover="41">true</span> ∧ x w = xmin) ∧ (∀ v, a0 v = <span class="const token" data-verso-hover="41">true</span> → xmin ≤ x v) ∧</span>
+<span id="L395">    (∀ c, (<span class="const token" data-verso-hover="1233">prog</span> OR).<span class="const token" data-verso-hover="159">Reach</span> (<span class="const token" data-verso-hover="99">oriented</span> n) (<span class="kw">fun</span> v =&gt; (lead v, a0 v, <span class="const token" data-verso-hover="1271">enc</span> (x v))) c →</span>
+<span id="L396">      (<span class="const token" data-verso-hover="1233">prog</span> OR).<span class="const token" data-verso-hover="176">Final</span> (<span class="const token" data-verso-hover="99">oriented</span> n) c → (<span class="const token" data-verso-hover="1233">prog</span> OR).<span class="const token" data-verso-hover="177">Quiescent</span> (<span class="const token" data-verso-hover="99">oriented</span> n) c ∧ ∀ v,</span>
+<span id="L397">        (c.<span class="const token" data-verso-hover="178">st</span> v).<span class="const token" data-verso-hover="60">2</span> = <span class="const token" data-verso-hover="77">none</span> ∧ <span class="const token" data-verso-hover="1239">val</span> (c.<span class="const token" data-verso-hover="178">st</span> v).<span class="const token" data-verso-hover="63">1</span>.<span class="const token" data-verso-hover="1230">minBits</span> = xmin ∧</span>
+<span id="L398">        ((c.<span class="const token" data-verso-hover="178">st</span> v).<span class="const token" data-verso-hover="63">1</span>.<span class="const token" data-verso-hover="1225">active</span> = <span class="const token" data-verso-hover="41">true</span> ↔ a0 v = <span class="const token" data-verso-hover="41">true</span> ∧ x v = xmin)) ∧</span>
+<span id="L399">    (∀ c, (<span class="const token" data-verso-hover="1233">prog</span> OR).<span class="const token" data-verso-hover="159">Reach</span> (<span class="const token" data-verso-hover="99">oriented</span> n) (<span class="kw">fun</span> v =&gt; (lead v, a0 v, <span class="const token" data-verso-hover="1271">enc</span> (x v))) c →</span>
+<span id="L400">      <span class="const token" data-verso-hover="160">totalSent</span> c ≤ <span class="nu">6</span> * n * (<span class="const token" data-verso-hover="181">Nat.log</span> <span class="nu">2</span> xmin + <span class="nu">1</span>)) := <span class="kw">by</span></span>
+<span id="L401">  <span class="kw">set</span> bits : <span class="const token" data-verso-hover="38">ZMod</span> n → <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="33">Bool</span> := <span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="1271">enc</span> (x v)</span>
+<span id="L402">  <span class="kw">have</span> hne : ∀ v, a0 v = <span class="const token" data-verso-hover="41">true</span> → bits v ≠ [] := <span class="kw">fun</span> v _ =&gt; <span class="const token" data-verso-hover="1278">enc_ne_nil</span> _</span>
+<span id="L403">  <span class="kw">obtain</span> ⟨hfin, hbound, -⟩ := <span class="const token" data-verso-hover="1270">theorem_5_bits</span> (bits := bits) (hex := hex) hOR hne</span>
+<span id="L404">  <span class="kw">obtain</span> ⟨⟨w, hw, hwe⟩, hord⟩ := <span class="const token" data-verso-hover="1268">mb_final</span> (bits := bits) (hex := hex)</span>
+<span id="L405">  <span class="kw">set</span> M := <span class="const token" data-verso-hover="1246">mb</span> a0 bits hex (<span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex) <span class="kw">with</span> hM</span>
+<span id="L406">  <span class="kw">have</span> hw' : a0 w = <span class="const token" data-verso-hover="41">true</span> ∧ (bits w).<span class="const token" data-verso-hover="61">length</span> = <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex := <span class="kw">by</span></span>
+<span id="L407">    <span class="kw">simpa</span> [<span class="const token" data-verso-hover="1245">a1</span>] <span class="kw">using</span> hw</span>
+<span id="L408">  <span class="kw">have</span> hvalw : <span class="const token" data-verso-hover="1239">val</span> M = x w := <span class="kw">by</span> <span class="kw">rw</span> [← hwe]; <span class="kw">exact</span> <span class="const token" data-verso-hover="1272">val_enc</span> _</span>
+<span id="L409">  <span class="kw">have</span> hmin : ∀ v, a0 v = <span class="const token" data-verso-hover="41">true</span> → <span class="const token" data-verso-hover="1239">val</span> M ≤ x v := <span class="kw">by</span></span>
+<span id="L410">    <span class="kw">intro</span> v hv</span>
+<span id="L411">    <span class="kw">by_cases</span> hl : (bits v).<span class="const token" data-verso-hover="61">length</span> = <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex</span>
+<span id="L412">    · <span class="kw">rcases</span> hord v (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="1245">a1</span>, hv, hl]) <span class="kw">with</span> h | h</span>
+<span id="L413">      · <span class="kw">rw</span> [← <span class="const token" data-verso-hover="1272">val_enc</span> (x v)]; <span class="kw">exact</span> <span class="const token" data-verso-hover="1280">le_of_eq</span> (<span class="kw">by</span> <span class="kw">rw</span> [<span class="kw">show</span> <span class="const token" data-verso-hover="1271">enc</span> (x v) = bits v <span class="kw">from</span> <span class="const token" data-verso-hover="100">rfl</span>, h])</span>
+<span id="L414">      · <span class="kw">rw</span> [← <span class="const token" data-verso-hover="1272">val_enc</span> (x v)]; <span class="kw">exact</span> h.<span class="const token" data-verso-hover="112">le</span></span>
+<span id="L415">    · <span class="kw">by_contra</span> hlt</span>
+<span id="L416">      push <span class="const token" data-verso-hover="326">Not</span> <span class="kw">at</span> hlt</span>
+<span id="L417">      <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="1265">minLen_le_len</span> (bits := bits) (hex := hex) hv</span>
+<span id="L418">      <span class="kw">have</span> h2 : <span class="const token" data-verso-hover="181">Nat.log</span> <span class="nu">2</span> (x v) ≤ <span class="const token" data-verso-hover="181">Nat.log</span> <span class="nu">2</span> (x w) := <span class="const token" data-verso-hover="218">Nat.log_mono_right</span> (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L419">      <span class="kw">have</span> h3 := <span class="const token" data-verso-hover="1273">length_enc</span> (x v)</span>
+<span id="L420">      <span class="kw">have</span> h4 := <span class="const token" data-verso-hover="1273">length_enc</span> (x w)</span>
+<span id="L421">      <span class="kw">have</span> : (bits v).<span class="const token" data-verso-hover="61">length</span> ≤ (bits w).<span class="const token" data-verso-hover="61">length</span> := <span class="kw">by</span></span>
+<span id="L422">        <span class="kw">simp</span> only [bits]; <span class="kw">omega</span></span>
+<span id="L423">      <span class="kw">omega</span></span>
+<span id="L424">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="1239">val</span> M, ⟨w, hw'.<span class="const token" data-verso-hover="72">1</span>, hvalw.<span class="const token" data-verso-hover="253">symm</span>⟩, hmin, <span class="kw">fun</span> c hc hf =&gt; ?_, <span class="kw">fun</span> c hc =&gt; ?_⟩</span>
+<span id="L425">  · <span class="kw">obtain</span> ⟨hq, hst⟩ := hfin c hc hf</span>
+<span id="L426">    <span class="kw">refine</span> ⟨hq, <span class="kw">fun</span> v =&gt; ⟨(hst v).<span class="const token" data-verso-hover="72">1</span>, <span class="kw">by</span> <span class="kw">rw</span> [(hst v).<span class="const token" data-verso-hover="73">2</span><span class="nu">.</span><span class="const token" data-verso-hover="72">1</span>], ?_⟩⟩</span>
+<span id="L427">    <span class="kw">rw</span> [(hst v).<span class="const token" data-verso-hover="73">2</span><span class="nu">.</span><span class="const token" data-verso-hover="73">2</span>]</span>
+<span id="L428">    <span class="kw">constructor</span></span>
+<span id="L429">    · <span class="kw">rintro</span> ⟨h1, h2⟩; <span class="kw">exact</span> ⟨h1, <span class="kw">by</span> <span class="kw">rw</span> [← <span class="const token" data-verso-hover="1272">val_enc</span> (x v)]; <span class="kw">exact</span> <span class="const token" data-verso-hover="1042">congrArg</span> <span class="const token" data-verso-hover="1239">val</span> h2⟩</span>
+<span id="L430">    · <span class="kw">rintro</span> ⟨h1, h2⟩</span>
+<span id="L431">      <span class="kw">refine</span> ⟨h1, ?_⟩</span>
+<span id="L432">      <span class="cm">--</span><span class="cm"> equal values and equal minimal lengths give equal strings</span></span>
+<span id="L433">      <span class="kw">have</span> hl : (bits v).<span class="const token" data-verso-hover="61">length</span> = <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex := <span class="kw">by</span></span>
+<span id="L434">        <span class="kw">rw</span> [← hw'.<span class="const token" data-verso-hover="73">2</span>]; <span class="kw">show</span> (<span class="const token" data-verso-hover="1271">enc</span> (x v)).<span class="const token" data-verso-hover="61">length</span> = (<span class="const token" data-verso-hover="1271">enc</span> (x w)).<span class="const token" data-verso-hover="61">length</span>; <span class="kw">rw</span> [h2, hvalw]</span>
+<span id="L435">      <span class="kw">rcases</span> hord v (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="1245">a1</span>, h1, hl]) <span class="kw">with</span> h | h</span>
+<span id="L436">      · <span class="kw">exact</span> h</span>
+<span id="L437">      · <span class="kw">exfalso</span>; <span class="kw">rw</span> [<span class="kw">show</span> bits v = <span class="const token" data-verso-hover="1271">enc</span> (x v) <span class="kw">from</span> <span class="const token" data-verso-hover="100">rfl</span>, <span class="const token" data-verso-hover="1272">val_enc</span>] <span class="kw">at</span> h; <span class="kw">omega</span></span>
+<span id="L438">  · <span class="kw">have</span> := hbound c hc</span>
+<span id="L439">    <span class="kw">have</span> hm : <span class="const token" data-verso-hover="1244">minLen</span> a0 bits hex = <span class="const token" data-verso-hover="181">Nat.log</span> <span class="nu">2</span> (<span class="const token" data-verso-hover="1239">val</span> M) + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L440">      <span class="kw">rw</span> [hvalw, ← hw'.<span class="const token" data-verso-hover="73">2</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="1273">length_enc</span> _</span>
+<span id="L441">    <span class="kw">rwa</span> [hm] <span class="kw">at</span> this</span>
+<span id="L442"></span>
+<span id="L443"><span class="kw">end</span> schedule</span>
+<span id="L444"></span>
+<span id="L445"><span class="kw">end</span> Podc.ContentOblivious.MinFinding</span>
+<span id="L446"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2026/ContentObliviousCounting/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>WritableObjects: Defs.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2014/">PODC 2014</a><span class="sep">›</span><a href="PODC2014/WritableObjects/">WritableObjects</a><span class="sep">›</span><a href="PODC2014/WritableObjects/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Defs</span></nav>
+        <h1>
+          <code>Defs.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2014/WritableObjects/">Making Objects Writable — PODC 2014</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2014/WritableObjects/Defs.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Defs"><span id="L1"><span class="kw">import</span> Cslib.Computability.Distributed.SharedMemory.History</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Making objects writable: the template of Figure 4.4</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">Definitions for Aghazadeh, Golab, Woelfel, *Making Objects Writable*, PODC 2014, in the numbering</span></span>
+<span id="L7"><span class="dc">of Chapter 4 of Aghazadeh's PhD thesis (U. Calgary 2018), which contains the full proofs.</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">## Model</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">A *writable type* `T` (an `ObjSpec` from CSLib) has operations `wr v` that set the state to `v`</span></span>
+<span id="L12"><span class="dc">regardless of the current state (`Writable`). A *sequentially writable* object `SW` of type `T`</span></span>
+<span id="L13"><span class="dc">is an implementation whose histories are linearizable provided that no write overlaps any other</span></span>
+<span id="L14"><span class="dc">operation (`SeqWritable`). The paper turns an array `A` of such objects plus a register `Ptr`</span></span>
+<span id="L15"><span class="dc">into a linearizable object `WT` of type `T` (template of Figure 4.4):</span></span>
+<span id="L16"></span>
+<span id="L17"><span class="dc">* `Write(v)` by `p`: choose a write-index `f` owned by `p` that is not in use, call</span></span>
+<span id="L18"><span class="dc">  `A[f].SWrite(v)`, then write `f` to `Ptr`;</span></span>
+<span id="L19"><span class="dc">* `Exec(o)` by `q` (for a non-write operation `o`): determine an exec-index `i`, call</span></span>
+<span id="L20"><span class="dc">  `A[i].Oper(o)` and return its response.</span></span>
+<span id="L21"></span>
+<span id="L22"><span class="dc">We work with *transcripts*: lists of the events (`Ev`) relevant to the template, i.e. the</span></span>
+<span id="L23"><span class="dc">invocations and responses of the high-level operations on `WT`, the invocations and responses of</span></span>
+<span id="L24"><span class="dc">operations on the objects `A[i]`, and the writes to `Ptr`. All other steps (accesses of auxiliary</span></span>
+<span id="L25"><span class="dc">registers, internal steps of the `SW` objects) are omitted: they do not affect any of the notions</span></span>
+<span id="L26"><span class="dc">below. The high-level history `highH W α` and the history `lowH W i α` of the object `A[i]` are</span></span>
+<span id="L27"><span class="dc">CSLib histories (`List (Label P T)`), so CSLib's `IsLinearization` applies to both.</span></span>
+<span id="L28"></span>
+<span id="L29"><span class="dc">A *point* `t ≤ α.length` is the moment after the first `t` events of `α`; `ptrAt α t` is the value</span></span>
+<span id="L30"><span class="dc">of `Ptr` at point `t` (`none` = `⊥`, the initial value).</span></span>
+<span id="L31"></span>
+<span id="L32"><span class="dc">* `Template W owner α`: every process follows the template (a per-process control automaton</span></span>
+<span id="L33"><span class="dc">  `PStep`, witnessed by control states `σ p t`), only the owner of an index `f` performs</span></span>
+<span id="L34"><span class="dc">  `A[f].SWrite`, and `A[f]` is not in use when the `SWrite` is invoked.</span></span>
+<span id="L35"><span class="dc">* `CondC α`: condition (C) of Lemma 4.5.</span></span>
+<span id="L36"><span class="dc">-/</span></span>
+<span id="L37"></span>
+<span id="L38"><span class="kw">namespace</span> Podc.WritableObjects</span>
+<span id="L39"></span>
+<span id="L40"><span class="kw">open</span> Cslib.SharedMemory</span>
+<span id="L41"></span>
+<span id="L42"><span class="dc">/-- A *writable* type: `wr v` changes the state to `v` regardless of the current state (and its</span></span>
+<span id="L43"><span class="dc">response `wresp v` does not depend on the current state; in the paper `Write()` returns</span></span>
+<span id="L44"><span class="dc">nothing). -/</span></span>
+<span id="L45"><span class="kw">structure</span> <span class="const token" data-verso-hover="124">Writable</span> (T : <span class="const token" data-verso-hover="67">ObjSpec</span>) <span class="kw">where</span></span>
+<span id="L46">  <span class="dc">/-- The write operation `Write(v)`. -/</span></span>
+<span id="L47">  <span class="const token" data-verso-hover="151">wr</span> : T.<span class="const token" data-verso-hover="71">State</span> → T.<span class="const token" data-verso-hover="86">Op</span></span>
+<span id="L48">  <span class="dc">/-- The (state-independent) response of `Write(v)`. -/</span></span>
+<span id="L49">  <span class="const token" data-verso-hover="149">wresp</span> : T.<span class="const token" data-verso-hover="71">State</span> → T.<span class="const token" data-verso-hover="95">Resp</span></span>
+<span id="L50">  <span class="const token" data-verso-hover="401">δ_wr</span> : ∀ s v, T.<span class="const token" data-verso-hover="341">δ</span> s (<span class="const token" data-verso-hover="151">wr</span> v) = (v, <span class="const token" data-verso-hover="149">wresp</span> v)</span>
+<span id="L51"></span>
+<span id="L52"><span class="kw">variable</span> {P ι : <span class="kw">Type</span>} {T : <span class="const token" data-verso-hover="67">ObjSpec</span>}</span>
+<span id="L53"></span>
+<span id="L54"><span class="dc">/-- The events of a transcript of an implementation following the template of Figure 4.4. -/</span></span>
+<span id="L55"><span class="kw">inductive</span> <span class="const token" data-verso-hover="115">Ev</span> (P ι : <span class="kw">Type</span>) (T : <span class="const token" data-verso-hover="67">ObjSpec</span>) <span class="kw">where</span></span>
+<span id="L56">  <span class="dc">/-- `p` invokes `WT.Write(v)`. -/</span></span>
+<span id="L57">  | <span class="const token" data-verso-hover="126">winv</span> (p : P) (v : T.<span class="const token" data-verso-hover="71">State</span>)</span>
+<span id="L58">  <span class="dc">/-- `p` invokes `WT.Exec(o)`. -/</span></span>
+<span id="L59">  | <span class="const token" data-verso-hover="152">einv</span> (p : P) (o : T.<span class="const token" data-verso-hover="86">Op</span>)</span>
+<span id="L60">  <span class="dc">/-- `p` returns `r` from its pending operation on `WT`. -/</span></span>
+<span id="L61">  | <span class="const token" data-verso-hover="148">hret</span> (p : P) (r : T.<span class="const token" data-verso-hover="95">Resp</span>)</span>
+<span id="L62">  <span class="dc">/-- `p` invokes `A[i].SWrite(v)`. -/</span></span>
+<span id="L63">  | <span class="const token" data-verso-hover="133">swinv</span> (p : P) (i : ι) (v : T.<span class="const token" data-verso-hover="71">State</span>)</span>
+<span id="L64">  <span class="dc">/-- `p` invokes `A[i].Oper(o)`. -/</span></span>
+<span id="L65">  | <span class="const token" data-verso-hover="163">opinv</span> (p : P) (i : ι) (o : T.<span class="const token" data-verso-hover="86">Op</span>)</span>
+<span id="L66">  <span class="dc">/-- the pending operation of `p` on `A[i]` returns `r`. -/</span></span>
+<span id="L67">  | <span class="const token" data-verso-hover="135">aret</span> (p : P) (i : ι) (r : T.<span class="const token" data-verso-hover="95">Resp</span>)</span>
+<span id="L68">  <span class="dc">/-- `p` writes `i` to `Ptr`. -/</span></span>
+<span id="L69">  | <span class="const token" data-verso-hover="144">ptr</span> (p : P) (i : ι)</span>
+<span id="L70"></span>
+<span id="L71"><span class="kw">namespace</span> Ev</span>
+<span id="L72"></span>
+<span id="L73"><span class="dc">/-- The process executing an event. -/</span></span>
+<span id="L74"><span class="kw">def</span> <span class="const token" data-verso-hover="191">proc</span> : <span class="const token" data-verso-hover="115">Ev</span> P ι T → P</span>
+<span id="L75">  | <span class="const token" data-verso-hover="126">winv</span> p _ | <span class="const token" data-verso-hover="152">einv</span> p _ | <span class="const token" data-verso-hover="148">hret</span> p _ | <span class="const token" data-verso-hover="133">swinv</span> p _ _ | <span class="const token" data-verso-hover="163">opinv</span> p _ _ | <span class="const token" data-verso-hover="135">aret</span> p _ _ | <span class="const token" data-verso-hover="144">ptr</span> p _ =&gt; p</span>
+<span id="L76"></span>
+<span id="L77"><span class="dc">/-- The high-level label of an event (`Write(v)` is the operation `W.wr v` of `T`). -/</span></span>
+<span id="L78"><span class="kw">def</span> <span class="const token" data-verso-hover="182">toHigh</span> (W : <span class="const token" data-verso-hover="124">Writable</span> T) : <span class="const token" data-verso-hover="115">Ev</span> P ι T → <span class="const token" data-verso-hover="56">Option</span> (<span class="const token" data-verso-hover="340">Label</span> P T)</span>
+<span id="L79">  | <span class="const token" data-verso-hover="126">winv</span> p v =&gt; <span class="const token" data-verso-hover="61">some</span> (<span class="const token" data-verso-hover="178">.</span>inv p (W.<span class="const token" data-verso-hover="151">wr</span> v))</span>
+<span id="L80">  | <span class="const token" data-verso-hover="152">einv</span> p o =&gt; <span class="const token" data-verso-hover="61">some</span> (<span class="const token" data-verso-hover="178">.</span>inv p o)</span>
+<span id="L81">  | <span class="const token" data-verso-hover="148">hret</span> p r =&gt; <span class="const token" data-verso-hover="61">some</span> (<span class="const token" data-verso-hover="180">.</span>ret p r)</span>
+<span id="L82">  | _ =&gt; <span class="const token" data-verso-hover="63">none</span></span>
+<span id="L83"></span>
+<span id="L84"><span class="dc">/-- The label of an event in the history of the base object `A[i]`. -/</span></span>
+<span id="L85"><span class="kw">def</span> <span class="const token" data-verso-hover="177">toLow</span> [<span class="const token" data-verso-hover="176">DecidableEq</span> ι] (W : <span class="const token" data-verso-hover="124">Writable</span> T) (i : ι) : <span class="const token" data-verso-hover="115">Ev</span> P ι T → <span class="const token" data-verso-hover="56">Option</span> (<span class="const token" data-verso-hover="340">Label</span> P T)</span>
+<span id="L86">  | <span class="const token" data-verso-hover="133">swinv</span> p j v =&gt; <span class="kw">if</span> j = i <span class="kw">then</span> <span class="const token" data-verso-hover="61">some</span> (<span class="const token" data-verso-hover="178">.</span>inv p (W.<span class="const token" data-verso-hover="151">wr</span> v)) <span class="kw">else</span> <span class="const token" data-verso-hover="63">none</span></span>
+<span id="L87">  | <span class="const token" data-verso-hover="163">opinv</span> p j o =&gt; <span class="kw">if</span> j = i <span class="kw">then</span> <span class="const token" data-verso-hover="61">some</span> (<span class="const token" data-verso-hover="178">.</span>inv p o) <span class="kw">else</span> <span class="const token" data-verso-hover="63">none</span></span>
+<span id="L88">  | <span class="const token" data-verso-hover="135">aret</span> p j r =&gt; <span class="kw">if</span> j = i <span class="kw">then</span> <span class="const token" data-verso-hover="61">some</span> (<span class="const token" data-verso-hover="180">.</span>ret p r) <span class="kw">else</span> <span class="const token" data-verso-hover="63">none</span></span>
+<span id="L89">  | _ =&gt; <span class="const token" data-verso-hover="63">none</span></span>
+<span id="L90"></span>
+<span id="L91"><span class="dc">/-- The index written to `Ptr` by a `ptr` event. -/</span></span>
+<span id="L92"><span class="kw">def</span> <span class="const token" data-verso-hover="402">ptrVal</span> : <span class="const token" data-verso-hover="115">Ev</span> P ι T → <span class="const token" data-verso-hover="56">Option</span> ι</span>
+<span id="L93">  | <span class="const token" data-verso-hover="144">ptr</span> _ i =&gt; <span class="const token" data-verso-hover="61">some</span> i</span>
+<span id="L94">  | _ =&gt; <span class="const token" data-verso-hover="63">none</span></span>
+<span id="L95"></span>
+<span id="L96"><span class="kw">end</span> Ev</span>
+<span id="L97"></span>
+<span id="L98"><span class="dc">/-- The history of the implemented object `WT`. -/</span></span>
+<span id="L99"><span class="kw">def</span> <span class="const token" data-verso-hover="315">highH</span> (W : <span class="const token" data-verso-hover="124">Writable</span> T) (α : <span class="const token" data-verso-hover="55">List</span> (<span class="const token" data-verso-hover="115">Ev</span> P ι T)) : <span class="const token" data-verso-hover="55">List</span> (<span class="const token" data-verso-hover="340">Label</span> P T) :=</span>
+<span id="L100">  α.<span class="const token" data-verso-hover="301">filterMap</span> (<span class="const token" data-verso-hover="182">Ev.toHigh</span> W)</span>
+<span id="L101"></span>
+<span id="L102"><span class="dc">/-- The history of the base object `A[i]`. -/</span></span>
+<span id="L103"><span class="kw">def</span> <span class="const token" data-verso-hover="314">lowH</span> [<span class="const token" data-verso-hover="176">DecidableEq</span> ι] (W : <span class="const token" data-verso-hover="124">Writable</span> T) (i : ι) (α : <span class="const token" data-verso-hover="55">List</span> (<span class="const token" data-verso-hover="115">Ev</span> P ι T)) : <span class="const token" data-verso-hover="55">List</span> (<span class="const token" data-verso-hover="340">Label</span> P T) :=</span>
+<span id="L104">  α.<span class="const token" data-verso-hover="301">filterMap</span> (<span class="const token" data-verso-hover="177">Ev.toLow</span> W i)</span>
+<span id="L105"></span>
+<span id="L106"><span class="dc">/-- The value of `Ptr` at point `t` (after the first `t` events); `none` is the initial `⊥`. -/</span></span>
+<span id="L107"><span class="kw">def</span> <span class="const token" data-verso-hover="239">ptrAt</span> (α : <span class="const token" data-verso-hover="55">List</span> (<span class="const token" data-verso-hover="115">Ev</span> P ι T)) (t : <span class="const token" data-verso-hover="31">ℕ</span>) : <span class="const token" data-verso-hover="56">Option</span> ι :=</span>
+<span id="L108">  ((α.<span class="const token" data-verso-hover="300">take</span> t).<span class="const token" data-verso-hover="301">filterMap</span> <span class="const token" data-verso-hover="402">Ev.ptrVal</span>).<span class="const token" data-verso-hover="403">getLast?</span></span>
+<span id="L109"></span>
+<span id="L110"><span class="dc">/-! ## Sequential writability -/</span></span>
+<span id="L111"></span>
+<span id="L112"><span class="dc">/-- In the history `h` of a base object, no write operation (`W.wr v`) overlaps any other</span></span>
+<span id="L113"><span class="dc">operation: for every write instance `x` and every other invoked instance `y`, one of them</span></span>
+<span id="L114"><span class="dc">precedes the other in real time. -/</span></span>
+<span id="L115"><span class="kw">def</span> <span class="const token" data-verso-hover="404">WritesIsolated</span> [<span class="const token" data-verso-hover="176">DecidableEq</span> P] (W : <span class="const token" data-verso-hover="124">Writable</span> T) (h : <span class="const token" data-verso-hover="55">List</span> (<span class="const token" data-verso-hover="340">Label</span> P T)) : <span class="kw">Prop</span> :=</span>
+<span id="L116">  ∀ x y : <span class="const token" data-verso-hover="206">OpId</span> P, x ≠ y → (∃ v, <span class="const token" data-verso-hover="347">opOf</span> h x = <span class="const token" data-verso-hover="61">some</span> (W.<span class="const token" data-verso-hover="151">wr</span> v)) → <span class="const token" data-verso-hover="349">Invoked</span> h y →</span>
+<span id="L117">    <span class="const token" data-verso-hover="377">Precedes</span> h x y ∨ <span class="const token" data-verso-hover="377">Precedes</span> h y x</span>
+<span id="L118"></span>
+<span id="L119"><span class="dc">/-- The history `h` of a base object is admissible for a *sequentially writable* object: if no</span></span>
+<span id="L120"><span class="dc">write overlaps another operation, then `h` is linearizable (w.r.t. `T`). -/</span></span>
+<span id="L121"><span class="kw">def</span> <span class="const token" data-verso-hover="8">SeqWritable</span> [<span class="const token" data-verso-hover="176">DecidableEq</span> P] (W : <span class="const token" data-verso-hover="124">Writable</span> T) (h : <span class="const token" data-verso-hover="55">List</span> (<span class="const token" data-verso-hover="340">Label</span> P T)) : <span class="kw">Prop</span> :=</span>
+<span id="L122">  <span class="const token" data-verso-hover="404">WritesIsolated</span> W h → ∃ L, <span class="const token" data-verso-hover="7">IsLinearization</span> h L</span>
+<span id="L123"></span>
+<span id="L124"><span class="dc">/-! ## The template (Figure 4.4) -/</span></span>
+<span id="L125"></span>
+<span id="L126"><span class="dc">/-- Control states of a process following the template. -/</span></span>
+<span id="L127"><span class="kw">inductive</span> <span class="const token" data-verso-hover="174">PSt</span> (ι : <span class="kw">Type</span>) (T : <span class="const token" data-verso-hover="67">ObjSpec</span>) <span class="kw">where</span></span>
+<span id="L128">  <span class="dc">/-- no pending operation on `WT` -/</span></span>
+<span id="L129">  | <span class="const token" data-verso-hover="261">idle</span></span>
+<span id="L130">  <span class="dc">/-- in `Write(v)`, before `A[f].SWrite(v)` -/</span></span>
+<span id="L131">  | <span class="const token" data-verso-hover="290">wBeg</span> (v : T.<span class="const token" data-verso-hover="71">State</span>)</span>
+<span id="L132">  <span class="dc">/-- in `Write(v)`, `A[f].SWrite(v)` pending -/</span></span>
+<span id="L133">  | <span class="const token" data-verso-hover="190">wSW</span> (v : T.<span class="const token" data-verso-hover="71">State</span>) (f : ι)</span>
+<span id="L134">  <span class="dc">/-- in `Write(v)`, `A[f].SWrite(v)` returned, `Ptr` not yet written -/</span></span>
+<span id="L135">  | <span class="const token" data-verso-hover="193">wPtr</span> (v : T.<span class="const token" data-verso-hover="71">State</span>) (f : ι)</span>
+<span id="L136">  <span class="dc">/-- in `Write(v)`, after writing `Ptr` -/</span></span>
+<span id="L137">  | <span class="const token" data-verso-hover="198">wEnd</span> (v : T.<span class="const token" data-verso-hover="71">State</span>)</span>
+<span id="L138">  <span class="dc">/-- in `Exec(o)`, before `A[i].Oper(o)` -/</span></span>
+<span id="L139">  | <span class="const token" data-verso-hover="292">eBeg</span> (o : T.<span class="const token" data-verso-hover="86">Op</span>)</span>
+<span id="L140">  <span class="dc">/-- in `Exec`, `A[i].Oper` pending -/</span></span>
+<span id="L141">  | <span class="const token" data-verso-hover="201">eOp</span> (i : ι)</span>
+<span id="L142">  <span class="dc">/-- in `Exec`, `A[i].Oper` returned `r` -/</span></span>
+<span id="L143">  | <span class="const token" data-verso-hover="202">eEnd</span> (r : T.<span class="const token" data-verso-hover="95">Resp</span>)</span>
+<span id="L144"></span>
+<span id="L145"><span class="dc">/-- One event of process `p` in the template (Figure 4.4): `Write(v)` = choose a write-index `f`</span></span>
+<span id="L146"><span class="dc">owned by `p`, `A[f].SWrite(v)`, `Ptr.Write(f)`, return; `Exec(o)` (for a non-write operation</span></span>
+<span id="L147"><span class="dc">`o`) = `A[i].Oper(o)` for some exec-index `i`, return its response. Other steps (choosing the</span></span>
+<span id="L148"><span class="dc">indices, auxiliary registers) are not recorded. -/</span></span>
+<span id="L149"><span class="kw">inductive</span> <span class="const token" data-verso-hover="10">PStep</span> (W : <span class="const token" data-verso-hover="124">Writable</span> T) (owner : ι → P) (p : P) : <span class="const token" data-verso-hover="174">PSt</span> ι T → <span class="const token" data-verso-hover="115">Ev</span> P ι T → <span class="const token" data-verso-hover="174">PSt</span> ι T → <span class="kw">Prop</span></span>
+<span id="L150">  | <span class="const token" data-verso-hover="331">winv</span> (v : T.<span class="const token" data-verso-hover="71">State</span>) : <span class="const token" data-verso-hover="10">PStep</span> W owner p <span class="const token" data-verso-hover="261">.</span>idle (<span class="const token" data-verso-hover="126">.</span>winv p v) (<span class="const token" data-verso-hover="290">.</span>wBeg v)</span>
+<span id="L151">  | <span class="const token" data-verso-hover="294">einv</span> (o : T.<span class="const token" data-verso-hover="86">Op</span>) (ho : ∀ v, o ≠ W.<span class="const token" data-verso-hover="151">wr</span> v) : <span class="const token" data-verso-hover="10">PStep</span> W owner p <span class="const token" data-verso-hover="261">.</span>idle (<span class="const token" data-verso-hover="152">.</span>einv p o) (<span class="const token" data-verso-hover="292">.</span>eBeg o)</span>
+<span id="L152">  | <span class="const token" data-verso-hover="291">swinv</span> (v : T.<span class="const token" data-verso-hover="71">State</span>) (f : ι) (hf : owner f = p) :</span>
+<span id="L153">      <span class="const token" data-verso-hover="10">PStep</span> W owner p (<span class="const token" data-verso-hover="290">.</span>wBeg v) (<span class="const token" data-verso-hover="133">.</span>swinv p f v) (<span class="const token" data-verso-hover="190">.</span>wSW v f)</span>
+<span id="L154">  | <span class="const token" data-verso-hover="195">swret</span> (v : T.<span class="const token" data-verso-hover="71">State</span>) (f : ι) (r : T.<span class="const token" data-verso-hover="95">Resp</span>) : <span class="const token" data-verso-hover="10">PStep</span> W owner p (<span class="const token" data-verso-hover="190">.</span>wSW v f) (<span class="const token" data-verso-hover="135">.</span>aret p f r) (<span class="const token" data-verso-hover="193">.</span>wPtr v f)</span>
+<span id="L155">  | <span class="const token" data-verso-hover="199">ptr</span> (v : T.<span class="const token" data-verso-hover="71">State</span>) (f : ι) : <span class="const token" data-verso-hover="10">PStep</span> W owner p (<span class="const token" data-verso-hover="193">.</span>wPtr v f) (<span class="const token" data-verso-hover="144">.</span>ptr p f) (<span class="const token" data-verso-hover="198">.</span>wEnd v)</span>
+<span id="L156">  | <span class="const token" data-verso-hover="296">wret</span> (v : T.<span class="const token" data-verso-hover="71">State</span>) : <span class="const token" data-verso-hover="10">PStep</span> W owner p (<span class="const token" data-verso-hover="198">.</span>wEnd v) (<span class="const token" data-verso-hover="148">.</span>hret p (W.<span class="const token" data-verso-hover="149">wresp</span> v)) <span class="const token" data-verso-hover="261">.</span>idle</span>
+<span id="L157">  | <span class="const token" data-verso-hover="293">opinv</span> (o : T.<span class="const token" data-verso-hover="86">Op</span>) (i : ι) : <span class="const token" data-verso-hover="10">PStep</span> W owner p (<span class="const token" data-verso-hover="292">.</span>eBeg o) (<span class="const token" data-verso-hover="163">.</span>opinv p i o) (<span class="const token" data-verso-hover="201">.</span>eOp i)</span>
+<span id="L158">  | <span class="const token" data-verso-hover="203">opret</span> (i : ι) (r : T.<span class="const token" data-verso-hover="95">Resp</span>) : <span class="const token" data-verso-hover="10">PStep</span> W owner p (<span class="const token" data-verso-hover="201">.</span>eOp i) (<span class="const token" data-verso-hover="135">.</span>aret p i r) (<span class="const token" data-verso-hover="202">.</span>eEnd r)</span>
+<span id="L159">  | <span class="const token" data-verso-hover="297">eret</span> (r : T.<span class="const token" data-verso-hover="95">Resp</span>) : <span class="const token" data-verso-hover="10">PStep</span> W owner p (<span class="const token" data-verso-hover="202">.</span>eEnd r) (<span class="const token" data-verso-hover="148">.</span>hret p r) <span class="const token" data-verso-hover="261">.</span>idle</span>
+<span id="L160"></span>
+<span id="L161"><span class="dc">/-- The transcript `α` follows the template of Figure 4.4 (with ownership function `owner`):</span></span>
+<span id="L162"><span class="dc">* every process runs the control automaton `PStep` (witnessed by its control states `σ p t` at</span></span>
+<span id="L163"><span class="dc">  the points `t`), in particular only the owner of `f` invokes `A[f].SWrite` and only inside a</span></span>
+<span id="L164"><span class="dc">  `Write` that then writes `f` to `Ptr`;</span></span>
+<span id="L165"><span class="dc">* `A[f]` is not in use (`Ptr ≠ f`) when `A[f].SWrite` is invoked. (The paper asks this at the</span></span>
+<span id="L166"><span class="dc">  invocation of the enclosing `Write`, which implies it: `notInUse_of_atWriteInv`.) -/</span></span>
+<span id="L167"><span class="kw">structure</span> <span class="const token" data-verso-hover="9">Template</span> (W : <span class="const token" data-verso-hover="124">Writable</span> T) (owner : ι → P) (α : <span class="const token" data-verso-hover="55">List</span> (<span class="const token" data-verso-hover="115">Ev</span> P ι T)) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L168">  <span class="const token" data-verso-hover="405">ctrl</span> : ∃ σ : P → <span class="const token" data-verso-hover="31">ℕ</span> → <span class="const token" data-verso-hover="174">PSt</span> ι T, ∀ p, σ p <span class="nu">0</span> = <span class="const token" data-verso-hover="261">.</span>idle ∧</span>
+<span id="L169">    ∀ t (ht : t &lt; α.<span class="const token" data-verso-hover="142">length</span>),</span>
+<span id="L170">      (α[t].<span class="const token" data-verso-hover="191">proc</span> = p → <span class="const token" data-verso-hover="10">PStep</span> W owner p (σ p t) α[t] (σ p (t + <span class="nu">1</span>))) ∧</span>
+<span id="L171">      (α[t].<span class="const token" data-verso-hover="191">proc</span> ≠ p → σ p (t + <span class="nu">1</span>) = σ p t)</span>
+<span id="L172">  <span class="const token" data-verso-hover="406">notInUse</span> : ∀ t p f v, α[t]? = <span class="const token" data-verso-hover="61">some</span> (<span class="const token" data-verso-hover="133">.</span>swinv p f v) → <span class="const token" data-verso-hover="239">ptrAt</span> α t ≠ <span class="const token" data-verso-hover="61">some</span> f</span>
+<span id="L173"></span>
+<span id="L174"><span class="dc">/-- Condition (C) of Lemma 4.5: for each `Exec` call `E` of `q` (invoked at event `e`) that</span></span>
+<span id="L175"><span class="dc">invokes `Op = A[i].Oper(o)` (at event `t`) there is a point `ts` between the invocation of `E`</span></span>
+<span id="L176"><span class="dc">and the invocation of `Op` such that</span></span>
+<span id="L177"><span class="dc">* (C1) `A[i]` is in use at `ts` (`Ptr = i`), and</span></span>
+<span id="L178"><span class="dc">* (C2) no `A[i].SWrite` overlaps `[ts, Op's response]`: every `A[i].SWrite` (by `p`, invoked at</span></span>
+<span id="L179"><span class="dc">  event `a`) either has returned before `ts`, or is invoked after `Op` has returned. -/</span></span>
+<span id="L180"><span class="kw">def</span> <span class="const token" data-verso-hover="12">CondC</span> (α : <span class="const token" data-verso-hover="55">List</span> (<span class="const token" data-verso-hover="115">Ev</span> P ι T)) : <span class="kw">Prop</span> :=</span>
+<span id="L181">  ∀ e t q o o' i, e &lt; t → α[e]? = <span class="const token" data-verso-hover="61">some</span> (<span class="const token" data-verso-hover="152">.</span>einv q o') → α[t]? = <span class="const token" data-verso-hover="61">some</span> (<span class="const token" data-verso-hover="163">.</span>opinv q i o) →</span>
+<span id="L182">    (∀ k (hk : k &lt; α.<span class="const token" data-verso-hover="142">length</span>), e &lt; k → k &lt; t → α[k].<span class="const token" data-verso-hover="191">proc</span> ≠ q) →</span>
+<span id="L183">    ∃ ts, e &lt; ts ∧ ts ≤ t ∧ <span class="const token" data-verso-hover="239">ptrAt</span> α ts = <span class="const token" data-verso-hover="61">some</span> i ∧</span>
+<span id="L184">      ∀ a p v, α[a]? = <span class="const token" data-verso-hover="61">some</span> (<span class="const token" data-verso-hover="133">.</span>swinv p i v) →</span>
+<span id="L185">        (∃ b r, a &lt; b ∧ b &lt; ts ∧ α[b]? = <span class="const token" data-verso-hover="61">some</span> (<span class="const token" data-verso-hover="135">.</span>aret p i r)) ∨</span>
+<span id="L186">        (∃ c r, t &lt; c ∧ c &lt; a ∧ α[c]? = <span class="const token" data-verso-hover="61">some</span> (<span class="const token" data-verso-hover="135">.</span>aret q i r))</span>
+<span id="L187"></span>
+<span id="L188"><span class="kw">end</span> Podc.WritableObjects</span>
+<span id="L189"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2014/WritableObjects/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

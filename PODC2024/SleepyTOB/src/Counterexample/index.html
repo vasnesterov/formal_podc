@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>SleepyTOB: Counterexample.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2024/">PODC 2024</a><span class="sep">›</span><a href="PODC2024/SleepyTOB/">SleepyTOB</a><span class="sep">›</span><a href="PODC2024/SleepyTOB/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Counterexample</span></nav>
+        <h1>
+          <code>Counterexample.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2024/SleepyTOB/">Asynchrony-Resilient Sleepy TOB — PODC 2024</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2024/SleepyTOB/Counterexample.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Counterexample"><span id="L1"><span class="kw">import</span> Papers.PODC2024.SleepyTOB.Resilience</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Algorithm 1 as printed is unsafe; non-vacuity of Theorem 2</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">D'Amato, Losa, Zanolini, PODC 2024, Section 3.1, Algorithm 1, lines 6–7: "Start `GA_{v,1}` with a</span></span>
+<span id="L7"><span class="dc">log in the propose message with the largest valid `VRF(v)` *not conflicting with* `L_{v-1}`".</span></span>
+<span id="L8"><span class="dc">Safety needs the [MMR]-style lock rule (Algorithm 1 is said to recall [MMR]'s protocol): the</span></span>
+<span id="L9"><span class="dc">proposal must *extend* `L_{v-1}`, and otherwise the process inputs `L_{v-1}` itself (the printed</span></span>
+<span id="L10"><span class="dc">algorithm has no such fallback).</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">With the printed rule (`FollowsLiteral`) a Byzantine proposer that wins the VRF lottery can propose</span></span>
+<span id="L13"><span class="dc">a strict prefix of the decided log (e.g. the genesis log); all honest processes then input it, the</span></span>
+<span id="L14"><span class="dc">lock is lost, and a conflicting log is decided two views later — in a completely synchronous</span></span>
+<span id="L15"><span class="dc">execution with one Byzantine process out of four. This refutes Lemma 3, Theorem 1 (safety) and</span></span>
+<span id="L16"><span class="dc">Theorem 2 for the printed algorithm (`algorithm_1_literal_unsafe`).</span></span>
+<span id="L17"></span>
+<span id="L18"><span class="dc">The execution (`P = Fin 4`, process 3 Byzantine and silent, all processes always awake, all</span></span>
+<span id="L19"><span class="dc">messages delivered at once, `η = 2`, `ra = 3`, `π = 1`): every honest process votes</span></span>
+<span id="L20"><span class="dc">* `[1]` in rounds 1, 2: round 2 is the longest grade-1 output of round 1;</span></span>
+<span id="L21"><span class="dc">* `[]` in rounds 3, 4: in round 3 (view 2) the processes decide `[1]`, `L_1 = [1]`, and the</span></span>
+<span id="L22"><span class="dc">  winning proposal is the Byzantine `[]`, which does not conflict with `[1]`;</span></span>
+<span id="L23"><span class="dc">* `[2]` from round 5 on: in round 5 (view 3) `L_2 = []` and the winning proposal is an honest</span></span>
+<span id="L24"><span class="dc">  proposal `b || C_2 = [2]` (`C_2 = []` is the longest output of `GA_{2,1}`), which is then</span></span>
+<span id="L25"><span class="dc">  decided in round 7.</span></span>
+<span id="L26"></span>
+<span id="L27"><span class="dc">The same family of executions with constant votes satisfies all hypotheses of Theorem 2 together</span></span>
+<span id="L28"><span class="dc">with a decision (`theorem_2_hypotheses_satisfiable`).</span></span>
+<span id="L29"><span class="dc">-/</span></span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">namespace</span> Podc.SleepyTOB</span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">open</span> Finset</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">noncomputable</span> <span class="kw">section</span></span>
+<span id="L36"><span class="kw">open</span> Classical</span>
+<span id="L37"></span>
+<span id="L38"><span class="kw">variable</span> {P α : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="76">Fintype</span> P]</span>
+<span id="L39"></span>
+<span id="L40"><span class="dc">/-- Honest processes follow Algorithm 1 *as printed*: the input of `GA_{v,1}` is only required not</span></span>
+<span id="L41"><span class="dc">to conflict with the longest output `L_{v-1}` of `GA_{v-1,2}`. -/</span></span>
+<span id="L42"><span class="kw">structure</span> <span class="const token" data-verso-hover="77">Exec.FollowsLiteral</span> (E : <span class="const token" data-verso-hover="24">Exec</span> P α) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L43">  <span class="const token" data-verso-hover="78">odd</span> : ∀ r p, <span class="nu">3</span> ≤ r → <span class="const token" data-verso-hover="79">Odd</span> r → p ∈ E.<span class="const token" data-verso-hover="31">H</span> r → (∃ Λ, <span class="const token" data-verso-hover="80">Outputs</span> (E.<span class="const token" data-verso-hover="81">tally</span> p (r - <span class="nu">1</span>)) Λ) →</span>
+<span id="L44">    ∃ L, <span class="const token" data-verso-hover="82">IsLongest</span> (<span class="const token" data-verso-hover="80">Outputs</span> (E.<span class="const token" data-verso-hover="81">tally</span> p (r - <span class="nu">1</span>))) L ∧ ¬ <span class="const token" data-verso-hover="83">Conflict</span> L (E.<span class="const token" data-verso-hover="84">vote</span> r p)</span>
+<span id="L45">  <span class="const token" data-verso-hover="85">even</span> : ∀ r p, <span class="nu">2</span> ≤ r → <span class="const token" data-verso-hover="86">Even</span> r → p ∈ E.<span class="const token" data-verso-hover="31">H</span> r → (∃ Λ, <span class="const token" data-verso-hover="87">Grade1</span> (E.<span class="const token" data-verso-hover="81">tally</span> p (r - <span class="nu">1</span>)) Λ) →</span>
+<span id="L46">    <span class="const token" data-verso-hover="82">IsLongest</span> (<span class="const token" data-verso-hover="87">Grade1</span> (E.<span class="const token" data-verso-hover="81">tally</span> p (r - <span class="nu">1</span>))) (E.<span class="const token" data-verso-hover="84">vote</span> r p)</span>
+<span id="L47"></span>
+<span id="L48"><span class="dc">/-- The printed rule is weaker than [MMR]'s: every execution following [MMR]'s rule follows the</span></span>
+<span id="L49"><span class="dc">printed one. -/</span></span>
+<span id="L50"><span class="kw">theorem</span> <span class="const token" data-verso-hover="88">Exec.Follows.followsLiteral</span> {E : <span class="const token" data-verso-hover="24">Exec</span> P α} (h : E.<span class="const token" data-verso-hover="3">Follows</span>) : E.<span class="const token" data-verso-hover="77">FollowsLiteral</span> <span class="kw">where</span></span>
+<span id="L51">  <span class="const token" data-verso-hover="78">odd</span> r p h1 h2 h3 h4 := <span class="kw">by</span></span>
+<span id="L52">    <span class="kw">obtain</span> ⟨L, hL, hLv⟩ := h.<span class="const token" data-verso-hover="89">odd</span> r p h1 h2 h3 h4</span>
+<span id="L53">    <span class="kw">exact</span> ⟨L, hL, <span class="kw">fun</span> hc =&gt; hc (<span class="const token" data-verso-hover="41">Or.inl</span> hLv)⟩</span>
+<span id="L54">  <span class="const token" data-verso-hover="85">even</span> := h.<span class="const token" data-verso-hover="90">even</span></span>
+<span id="L55"></span>
+<span id="L56"><span class="dc">/-! ### Uniform executions -/</span></span>
+<span id="L57"></span>
+<span id="L58"><span class="dc">/-- All processes always awake, a fixed silent Byzantine set `Bz`, every honest process votes</span></span>
+<span id="L59"><span class="dc">`v r` in round `r`, and every message is delivered immediately. -/</span></span>
+<span id="L60"><span class="kw">def</span> <span class="const token" data-verso-hover="91">uniformExec</span> (Bz : <span class="const token" data-verso-hover="27">Finset</span> P) (v : <span class="const token" data-verso-hover="26">ℕ</span> → <span class="const token" data-verso-hover="92">List</span> α) (η ra π : <span class="const token" data-verso-hover="26">ℕ</span>) : <span class="const token" data-verso-hover="24">Exec</span> P α <span class="kw">where</span></span>
+<span id="L61">  <span class="const token" data-verso-hover="29">η</span> := η</span>
+<span id="L62">  <span class="const token" data-verso-hover="93">ra</span> := ra</span>
+<span id="L63">  <span class="const token" data-verso-hover="94">π</span> := π</span>
+<span id="L64">  <span class="const token" data-verso-hover="52">O</span> _ := <span class="const token" data-verso-hover="95">univ</span></span>
+<span id="L65">  <span class="const token" data-verso-hover="34">B</span> _ := Bz</span>
+<span id="L66">  <span class="const token" data-verso-hover="59">B_subset</span> _ := <span class="const token" data-verso-hover="96">subset_univ</span> _</span>
+<span id="L67">  <span class="const token" data-verso-hover="97">B_mono</span> _ := <span class="const token" data-verso-hover="98">subset_refl</span> _</span>
+<span id="L68">  <span class="const token" data-verso-hover="84">vote</span> r _ := v r</span>
+<span id="L69">  <span class="const token" data-verso-hover="99">byz</span> _ := ∅</span>
+<span id="L70">  <span class="const token" data-verso-hover="100">byz_sender</span> _ _ h := <span class="const token" data-verso-hover="44">absurd</span> h (<span class="const token" data-verso-hover="101">Set.notMem_empty</span> _)</span>
+<span id="L71">  <span class="const token" data-verso-hover="102">rcv</span> _ r := {m | ∃ t ≤ r, <span class="const token" data-verso-hover="103">SentIn</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="95">univ</span>) (<span class="kw">fun</span> _ =&gt; Bz) (<span class="kw">fun</span> r _ =&gt; v r) (<span class="kw">fun</span> _ =&gt; ∅) t m}</span>
+<span id="L72">  <span class="const token" data-verso-hover="104">rcv_mono</span> _ _ _ := <span class="kw">fun</span> ⟨t, ht, hs⟩ =&gt; ⟨t, <span class="kw">by</span> <span class="kw">omega</span>, hs⟩</span>
+<span id="L73">  <span class="const token" data-verso-hover="105">rcv_sent</span> _ _ _ h := h</span>
+<span id="L74">  <span class="const token" data-verso-hover="106">rcv_sync</span> _ _ _ _ t ht _ hm := ⟨t, ht, hm⟩</span>
+<span id="L75"></span>
+<span id="L76"><span class="dc">/-- The tally vote assignment of a uniform round: the honest processes vote `w`. -/</span></span>
+<span id="L77"><span class="kw">def</span> <span class="const token" data-verso-hover="107">uniformVotes</span> (Bz : <span class="const token" data-verso-hover="27">Finset</span> P) (w : <span class="const token" data-verso-hover="92">List</span> α) : <span class="const token" data-verso-hover="108">Votes</span> P α :=</span>
+<span id="L78">  <span class="kw">fun</span> q =&gt; <span class="kw">if</span> q ∈ Bz <span class="kw">then</span> <span class="const token" data-verso-hover="109">none</span> <span class="kw">else</span> <span class="const token" data-verso-hover="110">some</span> w</span>
+<span id="L79"></span>
+<span id="L80"><span class="kw">theorem</span> <span class="const token" data-verso-hover="111">uniformExec_tally</span> (Bz : <span class="const token" data-verso-hover="27">Finset</span> P) (v : <span class="const token" data-verso-hover="26">ℕ</span> → <span class="const token" data-verso-hover="92">List</span> α) (η ra π : <span class="const token" data-verso-hover="26">ℕ</span>) (p : P) {r : <span class="const token" data-verso-hover="26">ℕ</span>}</span>
+<span id="L81">    (hr : <span class="nu">1</span> ≤ r) : (<span class="const token" data-verso-hover="91">uniformExec</span> Bz v η ra π).<span class="const token" data-verso-hover="81">tally</span> p r = <span class="const token" data-verso-hover="107">uniformVotes</span> Bz (v r) := <span class="kw">by</span></span>
+<span id="L82">  <span class="kw">funext</span> q</span>
+<span id="L83">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="107">uniformVotes</span>]</span>
+<span id="L84">  <span class="kw">split_ifs</span> <span class="kw">with</span> hq</span>
+<span id="L85">  · <span class="kw">apply</span> <span class="const token" data-verso-hover="112">latest_eq_none_of_forall</span></span>
+<span id="L86">    <span class="kw">rintro</span> s l - ⟨t, -, hs⟩</span>
+<span id="L87">    <span class="kw">rcases</span> hs <span class="kw">with</span> ⟨-, hm, -⟩ | hm</span>
+<span id="L88">    · <span class="kw">exact</span> (<span class="const token" data-verso-hover="39">mem_sdiff</span>.<span class="const token" data-verso-hover="36">1</span> hm).<span class="const token" data-verso-hover="43">2</span> hq</span>
+<span id="L89">    · <span class="kw">exact</span> hm</span>
+<span id="L90">  · <span class="kw">obtain</span> ⟨s, hs, hW, -, heq⟩ := <span class="const token" data-verso-hover="113">latest_eq_of_functional</span> (S := (<span class="const token" data-verso-hover="91">uniformExec</span> Bz v η ra π).<span class="const token" data-verso-hover="102">rcv</span> p r)</span>
+<span id="L91">      (W := <span class="kw">fun</span> s =&gt; r - η ≤ s ∧ s ≤ r) (q := q) v r (<span class="kw">fun</span> s hs =&gt; hs.<span class="const token" data-verso-hover="43">2</span>)</span>
+<span id="L92">      (<span class="kw">by</span></span>
+<span id="L93">        <span class="kw">rintro</span> s l - ⟨t, -, hs⟩</span>
+<span id="L94">        <span class="kw">rcases</span> hs <span class="kw">with</span> ⟨-, -, hm⟩ | hm</span>
+<span id="L95">        · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="114">Prod.mk.injEq</span>] <span class="kw">at</span> hm; <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := hm; <span class="kw">rfl</span></span>
+<span id="L96">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="44">absurd</span> hm (<span class="const token" data-verso-hover="101">Set.notMem_empty</span> _))</span>
+<span id="L97">      (s₀ := r) ⟨<span class="const token" data-verso-hover="54">Nat.sub_le</span> r η, <span class="const token" data-verso-hover="55">le_rfl</span>⟩</span>
+<span id="L98">      ⟨r, <span class="const token" data-verso-hover="55">le_rfl</span>, <span class="const token" data-verso-hover="41">Or.inl</span> ⟨hr, <span class="const token" data-verso-hover="39">mem_sdiff</span>.<span class="const token" data-verso-hover="45">2</span> ⟨<span class="const token" data-verso-hover="115">mem_univ</span> q, hq⟩, <span class="const token" data-verso-hover="116">rfl</span>⟩⟩</span>
+<span id="L99">    <span class="kw">obtain</span> <span class="kw">rfl</span> : s = r := <span class="const token" data-verso-hover="117">le_antisymm</span> hW.<span class="const token" data-verso-hover="43">2</span> hs</span>
+<span id="L100">    <span class="kw">exact</span> heq</span>
+<span id="L101"></span>
+<span id="L102"><span class="kw">theorem</span> <span class="const token" data-verso-hover="118">uniformVotes_voters</span> (Bz : <span class="const token" data-verso-hover="27">Finset</span> P) (w : <span class="const token" data-verso-hover="92">List</span> α) :</span>
+<span id="L103">    <span class="const token" data-verso-hover="119">voters</span> (<span class="const token" data-verso-hover="107">uniformVotes</span> Bz w) = <span class="const token" data-verso-hover="95">univ</span> \ Bz := <span class="kw">by</span></span>
+<span id="L104">  <span class="kw">ext</span> q; <span class="kw">simp</span> [<span class="const token" data-verso-hover="119">voters</span>, <span class="const token" data-verso-hover="107">uniformVotes</span>]</span>
+<span id="L105"></span>
+<span id="L106"><span class="kw">theorem</span> <span class="const token" data-verso-hover="120">uniformVotes_votesFor</span> (Bz : <span class="const token" data-verso-hover="27">Finset</span> P) (w Λ : <span class="const token" data-verso-hover="92">List</span> α) :</span>
+<span id="L107">    <span class="const token" data-verso-hover="121">votesFor</span> (<span class="const token" data-verso-hover="107">uniformVotes</span> Bz w) Λ = <span class="kw">if</span> Λ &lt;+: w <span class="kw">then</span> <span class="const token" data-verso-hover="95">univ</span> \ Bz <span class="kw">else</span> ∅ := <span class="kw">by</span></span>
+<span id="L108">  <span class="kw">ext</span> q</span>
+<span id="L109">  <span class="kw">split_ifs</span> <span class="kw">with</span> h &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="121">votesFor</span>, <span class="const token" data-verso-hover="107">uniformVotes</span>, h]</span>
+<span id="L110"></span>
+<span id="L111"><span class="kw">theorem</span> <span class="const token" data-verso-hover="122">uniformVotes_grade1</span> {Bz : <span class="const token" data-verso-hover="27">Finset</span> P} (hBz : <span class="kw">#Bz</span> &lt; <span class="const token" data-verso-hover="123">Fintype.card</span> P) {w Λ : <span class="const token" data-verso-hover="92">List</span> α} :</span>
+<span id="L112">    <span class="const token" data-verso-hover="87">Grade1</span> (<span class="const token" data-verso-hover="107">uniformVotes</span> Bz w) Λ ↔ Λ &lt;+: w := <span class="kw">by</span></span>
+<span id="L113">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="87">Grade1</span></span>
+<span id="L114">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="118">uniformVotes_voters</span>, <span class="const token" data-verso-hover="120">uniformVotes_votesFor</span>, <span class="const token" data-verso-hover="124">card_univ_sdiff</span>]</span>
+<span id="L115">  <span class="kw">split_ifs</span> <span class="kw">with</span> h &lt;;&gt; <span class="kw">simp</span> [h, <span class="const token" data-verso-hover="124">card_univ_sdiff</span>]</span>
+<span id="L116">  <span class="kw">omega</span></span>
+<span id="L117"></span>
+<span id="L118"><span class="kw">theorem</span> <span class="const token" data-verso-hover="125">uniformVotes_outputs</span> {Bz : <span class="const token" data-verso-hover="27">Finset</span> P} (hBz : <span class="kw">#Bz</span> &lt; <span class="const token" data-verso-hover="123">Fintype.card</span> P) {w Λ : <span class="const token" data-verso-hover="92">List</span> α} :</span>
+<span id="L119">    <span class="const token" data-verso-hover="80">Outputs</span> (<span class="const token" data-verso-hover="107">uniformVotes</span> Bz w) Λ ↔ Λ &lt;+: w := <span class="kw">by</span></span>
+<span id="L120">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="80">Outputs</span></span>
+<span id="L121">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="118">uniformVotes_voters</span>, <span class="const token" data-verso-hover="120">uniformVotes_votesFor</span>, <span class="const token" data-verso-hover="124">card_univ_sdiff</span>]</span>
+<span id="L122">  <span class="kw">split_ifs</span> <span class="kw">with</span> h &lt;;&gt; <span class="kw">simp</span> [h, <span class="const token" data-verso-hover="124">card_univ_sdiff</span>]</span>
+<span id="L123">  <span class="kw">omega</span></span>
+<span id="L124"></span>
+<span id="L125"><span class="kw">theorem</span> <span class="const token" data-verso-hover="126">uniformVotes_isLongest_grade1</span> {Bz : <span class="const token" data-verso-hover="27">Finset</span> P} (hBz : <span class="kw">#Bz</span> &lt; <span class="const token" data-verso-hover="123">Fintype.card</span> P) {w L : <span class="const token" data-verso-hover="92">List</span> α} :</span>
+<span id="L126">    <span class="const token" data-verso-hover="82">IsLongest</span> (<span class="const token" data-verso-hover="87">Grade1</span> (<span class="const token" data-verso-hover="107">uniformVotes</span> Bz w)) L ↔ L = w := <span class="kw">by</span></span>
+<span id="L127">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="82">IsLongest</span>, <span class="const token" data-verso-hover="122">uniformVotes_grade1</span> hBz]</span>
+<span id="L128">  <span class="kw">constructor</span></span>
+<span id="L129">  · <span class="kw">rintro</span> ⟨h1, h2⟩</span>
+<span id="L130">    <span class="kw">exact</span> h1.<span class="const token" data-verso-hover="127">eq_of_length</span> (<span class="const token" data-verso-hover="117">le_antisymm</span> h1.<span class="const token" data-verso-hover="128">length_le</span> (h2 w (<span class="const token" data-verso-hover="129">List.prefix_refl</span> w)))</span>
+<span id="L131">  · <span class="kw">rintro</span> <span class="kw">rfl</span>; <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="129">List.prefix_refl</span> _, <span class="kw">fun</span> _ h =&gt; h.<span class="const token" data-verso-hover="128">length_le</span>⟩</span>
+<span id="L132"></span>
+<span id="L133"><span class="kw">theorem</span> <span class="const token" data-verso-hover="130">uniformVotes_isLongest_outputs</span> {Bz : <span class="const token" data-verso-hover="27">Finset</span> P} (hBz : <span class="kw">#Bz</span> &lt; <span class="const token" data-verso-hover="123">Fintype.card</span> P) {w L : <span class="const token" data-verso-hover="92">List</span> α} :</span>
+<span id="L134">    <span class="const token" data-verso-hover="82">IsLongest</span> (<span class="const token" data-verso-hover="80">Outputs</span> (<span class="const token" data-verso-hover="107">uniformVotes</span> Bz w)) L ↔ L = w := <span class="kw">by</span></span>
+<span id="L135">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="82">IsLongest</span>, <span class="const token" data-verso-hover="125">uniformVotes_outputs</span> hBz]</span>
+<span id="L136">  <span class="kw">constructor</span></span>
+<span id="L137">  · <span class="kw">rintro</span> ⟨h1, h2⟩</span>
+<span id="L138">    <span class="kw">exact</span> h1.<span class="const token" data-verso-hover="127">eq_of_length</span> (<span class="const token" data-verso-hover="117">le_antisymm</span> h1.<span class="const token" data-verso-hover="128">length_le</span> (h2 w (<span class="const token" data-verso-hover="129">List.prefix_refl</span> w)))</span>
+<span id="L139">  · <span class="kw">rintro</span> <span class="kw">rfl</span>; <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="129">List.prefix_refl</span> _, <span class="kw">fun</span> _ h =&gt; h.<span class="const token" data-verso-hover="128">length_le</span>⟩</span>
+<span id="L140"></span>
+<span id="L141"><span class="kw">theorem</span> <span class="const token" data-verso-hover="131">uniformExec_H</span> (Bz : <span class="const token" data-verso-hover="27">Finset</span> P) (v : <span class="const token" data-verso-hover="26">ℕ</span> → <span class="const token" data-verso-hover="92">List</span> α) (η ra π r : <span class="const token" data-verso-hover="26">ℕ</span>) :</span>
+<span id="L142">    (<span class="const token" data-verso-hover="91">uniformExec</span> Bz v η ra π).<span class="const token" data-verso-hover="31">H</span> r = <span class="const token" data-verso-hover="95">univ</span> \ Bz := <span class="const token" data-verso-hover="116">rfl</span></span>
+<span id="L143"></span>
+<span id="L144"><span class="kw">theorem</span> <span class="const token" data-verso-hover="132">uniformExec_Ow</span> (Bz : <span class="const token" data-verso-hover="27">Finset</span> P) (v : <span class="const token" data-verso-hover="26">ℕ</span> → <span class="const token" data-verso-hover="92">List</span> α) (η ra π a b : <span class="const token" data-verso-hover="26">ℕ</span>) (h : a ≤ b) :</span>
+<span id="L145">    (<span class="const token" data-verso-hover="91">uniformExec</span> Bz v η ra π).<span class="const token" data-verso-hover="33">Ow</span> a b = <span class="const token" data-verso-hover="95">univ</span> := <span class="kw">by</span></span>
+<span id="L146">  <span class="kw">apply</span> <span class="const token" data-verso-hover="133">eq_univ_of_forall</span></span>
+<span id="L147">  <span class="kw">intro</span> q</span>
+<span id="L148">  <span class="kw">exact</span> <span class="const token" data-verso-hover="35">mem_biUnion</span>.<span class="const token" data-verso-hover="45">2</span> ⟨a, <span class="const token" data-verso-hover="37">mem_Icc</span>.<span class="const token" data-verso-hover="45">2</span> ⟨<span class="const token" data-verso-hover="55">le_rfl</span>, h⟩, <span class="const token" data-verso-hover="115">mem_univ</span> q⟩</span>
+<span id="L149"></span>
+<span id="L150"><span class="kw">theorem</span> <span class="const token" data-verso-hover="134">uniformExec_sleepy</span> {Bz : <span class="const token" data-verso-hover="27">Finset</span> P} (v : <span class="const token" data-verso-hover="26">ℕ</span> → <span class="const token" data-verso-hover="92">List</span> α) (η ra π : <span class="const token" data-verso-hover="26">ℕ</span>)</span>
+<span id="L151">    (h : <span class="nu">2</span> * <span class="const token" data-verso-hover="123">Fintype.card</span> P &lt; <span class="nu">3</span> * (<span class="const token" data-verso-hover="123">Fintype.card</span> P - <span class="kw">#Bz</span>)) (r : <span class="const token" data-verso-hover="26">ℕ</span>) : (<span class="const token" data-verso-hover="91">uniformExec</span> Bz v η ra π).<span class="const token" data-verso-hover="135">Sleepy</span> r := <span class="kw">by</span></span>
+<span id="L152">  <span class="kw">show</span> <span class="nu">2</span> * #((<span class="const token" data-verso-hover="91">uniformExec</span> Bz v η ra π).<span class="const token" data-verso-hover="33">Ow</span> (r - η) r) &lt; <span class="nu">3</span> * #((<span class="const token" data-verso-hover="91">uniformExec</span> Bz v η ra π).<span class="const token" data-verso-hover="31">H</span> r)</span>
+<span id="L153">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="132">uniformExec_Ow</span> _ _ _ _ _ _ _ (<span class="const token" data-verso-hover="54">Nat.sub_le</span> r η), <span class="const token" data-verso-hover="131">uniformExec_H</span>, <span class="const token" data-verso-hover="136">card_univ</span>, <span class="const token" data-verso-hover="124">card_univ_sdiff</span>]</span>
+<span id="L154">  <span class="kw">exact</span> h</span>
+<span id="L155"></span>
+<span id="L156"><span class="kw">theorem</span> <span class="const token" data-verso-hover="137">uniformExec_eq4</span> {Bz : <span class="const token" data-verso-hover="27">Finset</span> P} (v : <span class="const token" data-verso-hover="26">ℕ</span> → <span class="const token" data-verso-hover="92">List</span> α) (η ra π : <span class="const token" data-verso-hover="26">ℕ</span>)</span>
+<span id="L157">    (h : <span class="nu">2</span> * <span class="const token" data-verso-hover="123">Fintype.card</span> P &lt; <span class="nu">3</span> * (<span class="const token" data-verso-hover="123">Fintype.card</span> P - <span class="kw">#Bz</span>)) : (<span class="const token" data-verso-hover="91">uniformExec</span> Bz v η ra π).<span class="const token" data-verso-hover="138">Eq4</span> := <span class="kw">by</span></span>
+<span id="L158">  <span class="kw">intro</span> r _ _</span>
+<span id="L159">  <span class="kw">show</span> <span class="nu">2</span> * #((<span class="const token" data-verso-hover="91">uniformExec</span> Bz v η ra π).<span class="const token" data-verso-hover="33">Ow</span> (r - η) r) &lt;</span>
+<span id="L160">    <span class="nu">3</span> * #((<span class="const token" data-verso-hover="91">uniformExec</span> Bz v η ra π).<span class="const token" data-verso-hover="31">H</span> ra \ Bz)</span>
+<span id="L161">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="131">uniformExec_H</span>, <span class="const token" data-verso-hover="139">Finset.sdiff_idem</span>, <span class="const token" data-verso-hover="132">uniformExec_Ow</span> _ _ _ _ _ _ _ (<span class="const token" data-verso-hover="54">Nat.sub_le</span> r η), <span class="const token" data-verso-hover="136">card_univ</span>,</span>
+<span id="L162">    <span class="const token" data-verso-hover="124">card_univ_sdiff</span>]</span>
+<span id="L163">  <span class="kw">exact</span> h</span>
+<span id="L164"></span>
+<span id="L165"><span class="kw">theorem</span> <span class="const token" data-verso-hover="140">uniformExec_eq5</span> (Bz : <span class="const token" data-verso-hover="27">Finset</span> P) (v : <span class="const token" data-verso-hover="26">ℕ</span> → <span class="const token" data-verso-hover="92">List</span> α) (η ra π : <span class="const token" data-verso-hover="26">ℕ</span>) :</span>
+<span id="L166">    (<span class="const token" data-verso-hover="91">uniformExec</span> Bz v η ra π).<span class="const token" data-verso-hover="141">Eq5</span> := <span class="const token" data-verso-hover="98">subset_refl</span> _</span>
+<span id="L167"></span>
+<span id="L168"><span class="dc">/-! ### The counterexample -/</span></span>
+<span id="L169"></span>
+<span id="L170"><span class="dc">/-- Honest votes of the counterexample: `[1]` in rounds `≤ 2`, `[]` in rounds 3–4, `[2]` later. -/</span></span>
+<span id="L171"><span class="kw">def</span> <span class="const token" data-verso-hover="142">cexVote</span> (r : <span class="const token" data-verso-hover="26">ℕ</span>) : <span class="const token" data-verso-hover="92">List</span> <span class="const token" data-verso-hover="26">ℕ</span> := <span class="kw">if</span> r ≤ <span class="nu">2</span> <span class="kw">then</span> [<span class="nu">1</span>] <span class="kw">else</span> <span class="kw">if</span> r ≤ <span class="nu">4</span> <span class="kw">then</span> [] <span class="kw">else</span> [<span class="nu">2</span>]</span>
+<span id="L172"></span>
+<span id="L173"><span class="dc">/-- The counterexample execution: `Fin 4`, process 3 Byzantine (silent), `η = 2`, `ra = 3`,</span></span>
+<span id="L174"><span class="dc">`π = 1`. -/</span></span>
+<span id="L175"><span class="kw">def</span> <span class="const token" data-verso-hover="143">cexExecP</span> (π : <span class="const token" data-verso-hover="26">ℕ</span>) : <span class="const token" data-verso-hover="24">Exec</span> (<span class="const token" data-verso-hover="144">Fin</span> <span class="nu">4</span>) <span class="const token" data-verso-hover="26">ℕ</span> := <span class="const token" data-verso-hover="91">uniformExec</span> {<span class="nu">3</span>} <span class="const token" data-verso-hover="142">cexVote</span> <span class="nu">2</span> <span class="nu">3</span> π</span>
+<span id="L176"></span>
+<span id="L177"><span class="dc">/-- The counterexample with `π = 1`. -/</span></span>
+<span id="L178"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="145">cexExec</span> : <span class="const token" data-verso-hover="24">Exec</span> (<span class="const token" data-verso-hover="144">Fin</span> <span class="nu">4</span>) <span class="const token" data-verso-hover="26">ℕ</span> := <span class="const token" data-verso-hover="143">cexExecP</span> <span class="nu">1</span></span>
+<span id="L179"></span>
+<span id="L180"><span class="kw">theorem</span> <span class="const token" data-verso-hover="146">cex_card</span> : #({<span class="nu">3</span>} : <span class="const token" data-verso-hover="27">Finset</span> (<span class="const token" data-verso-hover="144">Fin</span> <span class="nu">4</span>)) &lt; <span class="const token" data-verso-hover="123">Fintype.card</span> (<span class="const token" data-verso-hover="144">Fin</span> <span class="nu">4</span>) := <span class="kw">by</span> <span class="kw">simp</span></span>
+<span id="L181"></span>
+<span id="L182"><span class="kw">theorem</span> <span class="const token" data-verso-hover="147">cex_quorum</span> : <span class="nu">2</span> * <span class="const token" data-verso-hover="123">Fintype.card</span> (<span class="const token" data-verso-hover="144">Fin</span> <span class="nu">4</span>) &lt; <span class="nu">3</span> * (<span class="const token" data-verso-hover="123">Fintype.card</span> (<span class="const token" data-verso-hover="144">Fin</span> <span class="nu">4</span>) - #({<span class="nu">3</span>} : <span class="const token" data-verso-hover="27">Finset</span> (<span class="const token" data-verso-hover="144">Fin</span> <span class="nu">4</span>))) := <span class="kw">by</span></span>
+<span id="L183">  <span class="kw">simp</span></span>
+<span id="L184"></span>
+<span id="L185"><span class="kw">theorem</span> <span class="const token" data-verso-hover="148">cex_mem_H</span> (π r : <span class="const token" data-verso-hover="26">ℕ</span>) (v : <span class="const token" data-verso-hover="26">ℕ</span> → <span class="const token" data-verso-hover="92">List</span> <span class="const token" data-verso-hover="26">ℕ</span>) : (<span class="nu">0</span> : <span class="const token" data-verso-hover="144">Fin</span> <span class="nu">4</span>) ∈ (<span class="const token" data-verso-hover="91">uniformExec</span> {<span class="nu">3</span>} v <span class="nu">2</span> <span class="nu">3</span> π).<span class="const token" data-verso-hover="31">H</span> r := <span class="kw">by</span></span>
+<span id="L186">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="131">uniformExec_H</span>]; <span class="kw">simp</span></span>
+<span id="L187"></span>
+<span id="L188"><span class="kw">theorem</span> <span class="const token" data-verso-hover="149">cex_tally</span> {π : <span class="const token" data-verso-hover="26">ℕ</span>} (p : <span class="const token" data-verso-hover="144">Fin</span> <span class="nu">4</span>) {r : <span class="const token" data-verso-hover="26">ℕ</span>} (hr : <span class="nu">1</span> ≤ r) :</span>
+<span id="L189">    (<span class="const token" data-verso-hover="143">cexExecP</span> π).<span class="const token" data-verso-hover="81">tally</span> p r = <span class="const token" data-verso-hover="107">uniformVotes</span> {<span class="nu">3</span>} (<span class="const token" data-verso-hover="142">cexVote</span> r) :=</span>
+<span id="L190">  <span class="const token" data-verso-hover="111">uniformExec_tally</span> _ _ _ _ _ p hr</span>
+<span id="L191"></span>
+<span id="L192"><span class="kw">theorem</span> <span class="const token" data-verso-hover="150">cex_followsLiteral</span> (π : <span class="const token" data-verso-hover="26">ℕ</span>) : (<span class="const token" data-verso-hover="143">cexExecP</span> π).<span class="const token" data-verso-hover="77">FollowsLiteral</span> <span class="kw">where</span></span>
+<span id="L193">  <span class="const token" data-verso-hover="78">odd</span> r p h3 hodd _ _ := <span class="kw">by</span></span>
+<span id="L194">    <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="142">cexVote</span> (r - <span class="nu">1</span>), ?_, ?_⟩</span>
+<span id="L195">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="149">cex_tally</span> p (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="130">uniformVotes_isLongest_outputs</span> <span class="const token" data-verso-hover="146">cex_card</span>]</span>
+<span id="L196">    · <span class="kw">intro</span> hc; <span class="kw">apply</span> hc</span>
+<span id="L197">      <span class="kw">show</span> <span class="const token" data-verso-hover="151">Compatible</span> (<span class="const token" data-verso-hover="142">cexVote</span> (r - <span class="nu">1</span>)) (<span class="const token" data-verso-hover="142">cexVote</span> r)</span>
+<span id="L198">      <span class="kw">obtain</span> ⟨k, <span class="kw">rfl</span>⟩ := hodd</span>
+<span id="L199">      <span class="kw">unfold</span> <span class="const token" data-verso-hover="142">cexVote</span></span>
+<span id="L200">      <span class="kw">unfold</span> <span class="const token" data-verso-hover="151">Compatible</span></span>
+<span id="L201">      <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">first</span> | <span class="kw">omega</span> | <span class="kw">simp</span></span>
+<span id="L202">  <span class="const token" data-verso-hover="85">even</span> r p h2 heven _ _ := <span class="kw">by</span></span>
+<span id="L203">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="149">cex_tally</span> p (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="126">uniformVotes_isLongest_grade1</span> <span class="const token" data-verso-hover="146">cex_card</span>]</span>
+<span id="L204">    <span class="kw">show</span> <span class="const token" data-verso-hover="142">cexVote</span> r = <span class="const token" data-verso-hover="142">cexVote</span> (r - <span class="nu">1</span>)</span>
+<span id="L205">    <span class="kw">obtain</span> ⟨k, <span class="kw">rfl</span>⟩ := heven</span>
+<span id="L206">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="142">cexVote</span></span>
+<span id="L207">    <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">first</span> | <span class="kw">omega</span> | <span class="kw">rfl</span></span>
+<span id="L208"></span>
+<span id="L209"><span class="kw">theorem</span> <span class="const token" data-verso-hover="152">cex_decides_1</span> (π : <span class="const token" data-verso-hover="26">ℕ</span>) : (<span class="const token" data-verso-hover="143">cexExecP</span> π).<span class="const token" data-verso-hover="153">Decides</span> <span class="nu">0</span> <span class="nu">3</span> [<span class="nu">1</span>] := <span class="kw">by</span></span>
+<span id="L210">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="55">le_rfl</span>, ⟨<span class="nu">1</span>, <span class="const token" data-verso-hover="116">rfl</span>⟩, <span class="const token" data-verso-hover="148">cex_mem_H</span> π <span class="nu">3</span> <span class="const token" data-verso-hover="142">cexVote</span>, ?_⟩</span>
+<span id="L211">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="149">cex_tally</span> <span class="nu">0</span> (<span class="kw">by</span> <span class="kw">norm_num</span>), <span class="const token" data-verso-hover="122">uniformVotes_grade1</span> <span class="const token" data-verso-hover="146">cex_card</span>]</span>
+<span id="L212">  <span class="kw">decide</span></span>
+<span id="L213"></span>
+<span id="L214"><span class="kw">theorem</span> <span class="const token" data-verso-hover="154">cex_decides_2</span> (π : <span class="const token" data-verso-hover="26">ℕ</span>) : (<span class="const token" data-verso-hover="143">cexExecP</span> π).<span class="const token" data-verso-hover="153">Decides</span> <span class="nu">0</span> <span class="nu">7</span> [<span class="nu">2</span>] := <span class="kw">by</span></span>
+<span id="L215">  <span class="kw">refine</span> ⟨<span class="kw">by</span> <span class="kw">norm_num</span>, ⟨<span class="nu">3</span>, <span class="const token" data-verso-hover="116">rfl</span>⟩, <span class="const token" data-verso-hover="148">cex_mem_H</span> π <span class="nu">7</span> <span class="const token" data-verso-hover="142">cexVote</span>, ?_⟩</span>
+<span id="L216">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="149">cex_tally</span> <span class="nu">0</span> (<span class="kw">by</span> <span class="kw">norm_num</span>), <span class="const token" data-verso-hover="122">uniformVotes_grade1</span> <span class="const token" data-verso-hover="146">cex_card</span>]</span>
+<span id="L217">  <span class="kw">decide</span></span>
+<span id="L218"></span>
+<span id="L219"><span class="dc">/-- **Algorithm 1 as printed is unsafe.** There is an execution in which honest processes follow</span></span>
+<span id="L220"><span class="dc">the printed Algorithm 1 (input of `GA_{v,1}` "not conflicting with `L_{v-1}`"), every message is</span></span>
+<span id="L221"><span class="dc">delivered immediately (no asynchrony at all), all hypotheses of Theorem 2 hold (`π &lt; η`,</span></span>
+<span id="L222"><span class="dc">η-sleepiness in every round, Equations 4 and 5; one Byzantine process out of four), process 0</span></span>
+<span id="L223"><span class="dc">decides `[1]` in round 3 and `[2]` in round 7, and `[1]`, `[2]` conflict. In particular</span></span>
+<span id="L224"><span class="dc">* Lemma 3 fails: process 0 decides `[1]` in round 3 but votes `[]` in round 3;</span></span>
+<span id="L225"><span class="dc">* Theorem 2 fails: `[1] ∈ D_ra` (`ra = 3`) and `[2]` is decided in round `7 &gt; ra + π + 1`;</span></span>
+<span id="L226"><span class="dc">* Theorem 1 (safety) fails. -/</span></span>
+<span id="L227"><span class="kw">theorem</span> <span class="const token" data-verso-hover="0">algorithm_1_literal_unsafe</span> :</span>
+<span id="L228">    <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="77">FollowsLiteral</span> ∧</span>
+<span id="L229">    (∀ p r t m, t ≤ r → <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="155">Sent</span> t m → m ∈ <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="102">rcv</span> p r) ∧</span>
+<span id="L230">    <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="94">π</span> &lt; <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="29">η</span> ∧ (∀ r, <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="135">Sleepy</span> r) ∧ <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="138">Eq4</span> ∧ <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="141">Eq5</span> ∧</span>
+<span id="L231">    <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="153">Decides</span> <span class="nu">0</span> <span class="nu">3</span> [<span class="nu">1</span>] ∧ <span class="nu">3</span> ≤ <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="93">ra</span> ∧</span>
+<span id="L232">    <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="153">Decides</span> <span class="nu">0</span> <span class="nu">7</span> [<span class="nu">2</span>] ∧ <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="93">ra</span> + <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="94">π</span> + <span class="nu">1</span> &lt; <span class="nu">7</span> ∧ <span class="nu">0</span> ∈ <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="31">H</span> <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="93">ra</span> ∧</span>
+<span id="L233">    <span class="const token" data-verso-hover="83">Conflict</span> [<span class="nu">1</span>] [<span class="nu">2</span>] ∧</span>
+<span id="L234">    ¬ [<span class="nu">1</span>] &lt;+: <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="84">vote</span> <span class="nu">3</span> <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L235">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="150">cex_followsLiteral</span> <span class="nu">1</span>, <span class="kw">fun</span> _ _ t _ ht hm =&gt; ⟨t, ht, hm⟩, <span class="kw">by</span> <span class="kw">decide</span>,</span>
+<span id="L236">    <span class="const token" data-verso-hover="134">uniformExec_sleepy</span> _ _ _ _ <span class="const token" data-verso-hover="147">cex_quorum</span>, <span class="const token" data-verso-hover="137">uniformExec_eq4</span> _ _ _ _ <span class="const token" data-verso-hover="147">cex_quorum</span>,</span>
+<span id="L237">    <span class="const token" data-verso-hover="140">uniformExec_eq5</span> _ _ _ _ _, <span class="const token" data-verso-hover="152">cex_decides_1</span> <span class="nu">1</span>, <span class="const token" data-verso-hover="55">le_rfl</span>, <span class="const token" data-verso-hover="154">cex_decides_2</span> <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">decide</span>, <span class="const token" data-verso-hover="148">cex_mem_H</span> <span class="nu">1</span> <span class="nu">3</span> <span class="const token" data-verso-hover="142">cexVote</span>,</span>
+<span id="L238">    ?_, ?_⟩</span>
+<span id="L239">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="83">Conflict</span>, <span class="const token" data-verso-hover="151">Compatible</span>]</span>
+<span id="L240">  · <span class="kw">show</span> ¬ [<span class="nu">1</span>] &lt;+: <span class="const token" data-verso-hover="142">cexVote</span> <span class="nu">3</span></span>
+<span id="L241">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="142">cexVote</span>]</span>
+<span id="L242"></span>
+<span id="L243"><span class="dc">/-- Theorem 2 is false for the printed Algorithm 1: its conclusion fails in `cexExec`. -/</span></span>
+<span id="L244"><span class="kw">theorem</span> <span class="const token" data-verso-hover="2">theorem_2_false_for_literal_algorithm</span> :</span>
+<span id="L245">    ¬ (∀ q s Λ', <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="93">ra</span> + <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="94">π</span> + <span class="nu">1</span> &lt; s → <span class="const token" data-verso-hover="145">cexExec</span>.<span class="const token" data-verso-hover="153">Decides</span> q s Λ' → <span class="const token" data-verso-hover="151">Compatible</span> [<span class="nu">1</span>] Λ') :=</span>
+<span id="L246">  <span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="0">algorithm_1_literal_unsafe</span>.<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="49">1</span> (h <span class="nu">0</span> <span class="nu">7</span> [<span class="nu">2</span>] (<span class="kw">by</span> <span class="kw">decide</span>) (<span class="const token" data-verso-hover="154">cex_decides_2</span> <span class="nu">1</span>))</span>
+<span id="L247"></span>
+<span id="L248"><span class="dc">/-- Theorem 1 (safety) is false for the printed Algorithm 1, even without any asynchronous round</span></span>
+<span id="L249"><span class="dc">(`π = 0`) and with η-sleepiness in every round. Compare `Exec.theorem_1_safety`. -/</span></span>
+<span id="L250"><span class="kw">theorem</span> <span class="const token" data-verso-hover="1">theorem_1_false_for_literal_algorithm</span> :</span>
+<span id="L251">    (<span class="const token" data-verso-hover="143">cexExecP</span> <span class="nu">0</span>).<span class="const token" data-verso-hover="77">FollowsLiteral</span> ∧ (<span class="const token" data-verso-hover="143">cexExecP</span> <span class="nu">0</span>).<span class="const token" data-verso-hover="94">π</span> = <span class="nu">0</span> ∧ (∀ r, (<span class="const token" data-verso-hover="143">cexExecP</span> <span class="nu">0</span>).<span class="const token" data-verso-hover="135">Sleepy</span> r) ∧</span>
+<span id="L252">    (<span class="const token" data-verso-hover="143">cexExecP</span> <span class="nu">0</span>).<span class="const token" data-verso-hover="153">Decides</span> <span class="nu">0</span> <span class="nu">3</span> [<span class="nu">1</span>] ∧ (<span class="const token" data-verso-hover="143">cexExecP</span> <span class="nu">0</span>).<span class="const token" data-verso-hover="153">Decides</span> <span class="nu">0</span> <span class="nu">7</span> [<span class="nu">2</span>] ∧ <span class="const token" data-verso-hover="83">Conflict</span> [<span class="nu">1</span>] [<span class="nu">2</span>] :=</span>
+<span id="L253">  ⟨<span class="const token" data-verso-hover="150">cex_followsLiteral</span> <span class="nu">0</span>, <span class="const token" data-verso-hover="116">rfl</span>, <span class="const token" data-verso-hover="134">uniformExec_sleepy</span> _ _ _ _ <span class="const token" data-verso-hover="147">cex_quorum</span>, <span class="const token" data-verso-hover="152">cex_decides_1</span> <span class="nu">0</span>,</span>
+<span id="L254">    <span class="const token" data-verso-hover="154">cex_decides_2</span> <span class="nu">0</span>, <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="83">Conflict</span>, <span class="const token" data-verso-hover="151">Compatible</span>]⟩</span>
+<span id="L255"></span>
+<span id="L256"><span class="dc">/-! ### Non-vacuity of Theorem 2 -/</span></span>
+<span id="L257"></span>
+<span id="L258"><span class="dc">/-- Constant votes `[1]`: an execution following the modified Algorithm 1 (with [MMR]'s rule) that</span></span>
+<span id="L259"><span class="dc">satisfies all hypotheses of Theorem 2 and contains a decision before the asynchronous period. -/</span></span>
+<span id="L260"><span class="kw">def</span> <span class="const token" data-verso-hover="156">goodExec</span> : <span class="const token" data-verso-hover="24">Exec</span> (<span class="const token" data-verso-hover="144">Fin</span> <span class="nu">4</span>) <span class="const token" data-verso-hover="26">ℕ</span> := <span class="const token" data-verso-hover="91">uniformExec</span> {<span class="nu">3</span>} (<span class="kw">fun</span> _ =&gt; [<span class="nu">1</span>]) <span class="nu">2</span> <span class="nu">3</span> <span class="nu">1</span></span>
+<span id="L261"></span>
+<span id="L262"><span class="kw">theorem</span> <span class="const token" data-verso-hover="157">good_follows</span> : <span class="const token" data-verso-hover="156">goodExec</span>.<span class="const token" data-verso-hover="3">Follows</span> <span class="kw">where</span></span>
+<span id="L263">  <span class="const token" data-verso-hover="89">odd</span> r p h3 _ _ _ := <span class="kw">by</span></span>
+<span id="L264">    <span class="kw">refine</span> ⟨[<span class="nu">1</span>], ?_, <span class="const token" data-verso-hover="129">List.prefix_refl</span> _⟩</span>
+<span id="L265">    <span class="kw">rw</span> [<span class="kw">show</span> <span class="const token" data-verso-hover="156">goodExec</span>.<span class="const token" data-verso-hover="81">tally</span> p (r - <span class="nu">1</span>) = <span class="const token" data-verso-hover="107">uniformVotes</span> {<span class="nu">3</span>} [<span class="nu">1</span>] <span class="kw">from</span></span>
+<span id="L266">      <span class="const token" data-verso-hover="111">uniformExec_tally</span> _ _ _ _ _ p (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="130">uniformVotes_isLongest_outputs</span> <span class="const token" data-verso-hover="146">cex_card</span>]</span>
+<span id="L267">  <span class="const token" data-verso-hover="90">even</span> r p h2 _ _ _ := <span class="kw">by</span></span>
+<span id="L268">    <span class="kw">rw</span> [<span class="kw">show</span> <span class="const token" data-verso-hover="156">goodExec</span>.<span class="const token" data-verso-hover="81">tally</span> p (r - <span class="nu">1</span>) = <span class="const token" data-verso-hover="107">uniformVotes</span> {<span class="nu">3</span>} [<span class="nu">1</span>] <span class="kw">from</span></span>
+<span id="L269">      <span class="const token" data-verso-hover="111">uniformExec_tally</span> _ _ _ _ _ p (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="126">uniformVotes_isLongest_grade1</span> <span class="const token" data-verso-hover="146">cex_card</span>]</span>
+<span id="L270">    <span class="kw">rfl</span></span>
+<span id="L271"></span>
+<span id="L272"><span class="dc">/-- All hypotheses of Theorem 2 are simultaneously satisfiable, with a decision in a round</span></span>
+<span id="L273"><span class="dc">`≤ ra`. -/</span></span>
+<span id="L274"><span class="kw">theorem</span> <span class="const token" data-verso-hover="19">theorem_2_hypotheses_satisfiable</span> :</span>
+<span id="L275">    ∃ E : <span class="const token" data-verso-hover="24">Exec</span> (<span class="const token" data-verso-hover="144">Fin</span> <span class="nu">4</span>) <span class="const token" data-verso-hover="26">ℕ</span>, E.<span class="const token" data-verso-hover="3">Follows</span> ∧ E.<span class="const token" data-verso-hover="94">π</span> &lt; E.<span class="const token" data-verso-hover="29">η</span> ∧</span>
+<span id="L276">      (∀ r, r ≤ E.<span class="const token" data-verso-hover="93">ra</span> ∨ E.<span class="const token" data-verso-hover="93">ra</span> + E.<span class="const token" data-verso-hover="94">π</span> + <span class="nu">1</span> &lt; r → E.<span class="const token" data-verso-hover="135">Sleepy</span> r) ∧ E.<span class="const token" data-verso-hover="138">Eq4</span> ∧ E.<span class="const token" data-verso-hover="141">Eq5</span> ∧</span>
+<span id="L277">      ∃ p r Λ, E.<span class="const token" data-verso-hover="153">Decides</span> p r Λ ∧ r ≤ E.<span class="const token" data-verso-hover="93">ra</span> := <span class="kw">by</span></span>
+<span id="L278">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="156">goodExec</span>, <span class="const token" data-verso-hover="157">good_follows</span>, <span class="kw">by</span> <span class="kw">decide</span>, <span class="kw">fun</span> r _ =&gt; <span class="const token" data-verso-hover="134">uniformExec_sleepy</span> _ _ _ _ <span class="const token" data-verso-hover="147">cex_quorum</span> r,</span>
+<span id="L279">    <span class="const token" data-verso-hover="137">uniformExec_eq4</span> _ _ _ _ <span class="const token" data-verso-hover="147">cex_quorum</span>, <span class="const token" data-verso-hover="140">uniformExec_eq5</span> _ _ _ _ _, <span class="nu">0</span>, <span class="nu">3</span>, [<span class="nu">1</span>], ?_, <span class="const token" data-verso-hover="55">le_rfl</span>⟩</span>
+<span id="L280">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="55">le_rfl</span>, ⟨<span class="nu">1</span>, <span class="const token" data-verso-hover="116">rfl</span>⟩, <span class="const token" data-verso-hover="148">cex_mem_H</span> <span class="nu">1</span> <span class="nu">3</span> _, ?_⟩</span>
+<span id="L281">  <span class="kw">rw</span> [<span class="kw">show</span> <span class="const token" data-verso-hover="156">goodExec</span>.<span class="const token" data-verso-hover="81">tally</span> <span class="nu">0</span> (<span class="nu">3</span> - <span class="nu">1</span>) = <span class="const token" data-verso-hover="107">uniformVotes</span> {<span class="nu">3</span>} [<span class="nu">1</span>] <span class="kw">from</span></span>
+<span id="L282">    <span class="const token" data-verso-hover="111">uniformExec_tally</span> _ _ _ _ _ <span class="nu">0</span> (<span class="kw">by</span> <span class="kw">norm_num</span>), <span class="const token" data-verso-hover="122">uniformVotes_grade1</span> <span class="const token" data-verso-hover="146">cex_card</span>]</span>
+<span id="L283"></span>
+<span id="L284"><span class="kw">end</span></span>
+<span id="L285"></span>
+<span id="L286"><span class="kw">end</span> Podc.SleepyTOB</span>
+<span id="L287"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2024/SleepyTOB/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>AllYouNeedIsDAG: Safety.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2021/">PODC 2021</a><span class="sep">›</span><a href="PODC2021/AllYouNeedIsDAG/">AllYouNeedIsDAG</a><span class="sep">›</span><a href="PODC2021/AllYouNeedIsDAG/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Safety</span></nav>
+        <h1>
+          <code>Safety.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2021/AllYouNeedIsDAG/">All You Need is DAG (DAG-Rider) — PODC 2021</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2021/AllYouNeedIsDAG/Safety.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Safety"><span id="L1"><span class="kw">import</span> Papers.PODC2021.AllYouNeedIsDAG.Ordering</span>
+<span id="L2"><span class="kw">import</span> Cslib.Foundations.Data.Finset.Quorum</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># DAG-Rider: safety (Lemma 1, Claims 4–5, Propositions 1–2)</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">Keidar, Kokoris-Kogias, Naor, Spiegelman, *All You Need is DAG*, PODC 2021, Section 6.1.</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">All statements are about arbitrary *snapshot sequences* (the local DAGs at the `wave_ready`</span></span>
+<span id="L10"><span class="dc">events) that are closed (Claim 1) and valid (line 25) with respect to one global `Content`</span></span>
+<span id="L11"><span class="dc">(non-equivocation). No assumption relates the snapshots of different processes or of different</span></span>
+<span id="L12"><span class="dc">waves of the same process, so the theorems hold for every asynchronous schedule.</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">* `DCommit v d`: some correct process *directly* commits `v` in wave `d` (the commit rule of line 36</span></span>
+<span id="L15"><span class="dc">  holds in a closed valid local DAG).</span></span>
+<span id="L16"><span class="dc">* `lemma1_direct` (Lemma 1, for direct commits): every vertex of round `&gt; round(d, 4)` in any closed</span></span>
+<span id="L17"><span class="dc">  valid local DAG has a strong path to `v`. The quorum intersection only needs</span></span>
+<span id="L18"><span class="dc">  `2(2f + 1) &gt; n`, i.e. `n ≤ 4f + 1`.</span></span>
+<span id="L19"><span class="dc">* `orun_inv`: after any number of waves, the output of a process is the delivery sequence of the</span></span>
+<span id="L20"><span class="dc">  *full chain* of its last directly committed leader (`fullChain`), which is a function of the</span></span>
+<span id="L21"><span class="dc">  global DAG only.</span></span>
+<span id="L22"><span class="dc">* `delivered_prefix` (total order, strong form): the outputs of any two processes (after any</span></span>
+<span id="L23"><span class="dc">  numbers of waves) are prefix-comparable; `total_order` (Proposition 2) and `integrity`</span></span>
+<span id="L24"><span class="dc">  (Proposition 1) are the BAB properties of Definition 3.1.</span></span>
+<span id="L25"><span class="dc">-/</span></span>
+<span id="L26"></span>
+<span id="L27"><span class="kw">namespace</span> DagRider</span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">open</span> Finset</span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">variable</span> {P : <span class="kw">Type</span>*} {B : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="29">DecidableEq</span> P]</span>
+<span id="L32"></span>
+<span id="L33"><span class="dc">/-- The (potential) leader vertex of wave `w`. -/</span></span>
+<span id="L34"><span class="kw">def</span> <span class="const token" data-verso-hover="388">lv</span> (coin : <span class="const token" data-verso-hover="30">ℕ</span> → P) (w : <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="const token" data-verso-hover="33">Vtx</span> P := (<span class="const token" data-verso-hover="224">wround</span> w <span class="nu">1</span>, coin w)</span>
+<span id="L35"></span>
+<span id="L36"><span class="dc">/-- The leader `v` of wave `d ≥ 1` is directly committed by some process, i.e. the commit rule</span></span>
+<span id="L37"><span class="dc">holds in some closed valid local DAG. -/</span></span>
+<span id="L38"><span class="kw">def</span> <span class="const token" data-verso-hover="434">DCommit</span> (f : <span class="const token" data-verso-hover="30">ℕ</span>) (C : <span class="const token" data-verso-hover="31">Content</span> P B) (coin : <span class="const token" data-verso-hover="30">ℕ</span> → P) (v : <span class="const token" data-verso-hover="33">Vtx</span> P) (d : <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L39">  <span class="nu">1</span> ≤ d ∧ v = <span class="const token" data-verso-hover="388">lv</span> coin d ∧</span>
+<span id="L40">    ∃ D, <span class="const token" data-verso-hover="44">Closed</span> C D ∧ <span class="const token" data-verso-hover="45">Valid</span> f C D ∧ v ∈ D ∧ <span class="nu">2</span> * f + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="187">commitCount</span> C D v d</span>
+<span id="L41"></span>
+<span id="L42"><span class="kw">variable</span> {f : <span class="const token" data-verso-hover="30">ℕ</span>} {C : <span class="const token" data-verso-hover="31">Content</span> P B} {coin : <span class="const token" data-verso-hover="30">ℕ</span> → P}</span>
+<span id="L43"></span>
+<span id="L44"><span class="kw">lemma</span> <span class="const token" data-verso-hover="435">wround_one</span> (w : <span class="const token" data-verso-hover="30">ℕ</span>) (hw : <span class="nu">1</span> ≤ w) : <span class="const token" data-verso-hover="224">wround</span> w <span class="nu">1</span> = <span class="nu">4</span> * w - <span class="nu">3</span> := <span class="kw">by</span></span>
+<span id="L45">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="224">wround</span>; <span class="kw">omega</span></span>
+<span id="L46"></span>
+<span id="L47"><span class="kw">lemma</span> <span class="const token" data-verso-hover="436">wround_four</span> (w : <span class="const token" data-verso-hover="30">ℕ</span>) (hw : <span class="nu">1</span> ≤ w) : <span class="const token" data-verso-hover="224">wround</span> w <span class="nu">4</span> = <span class="nu">4</span> * w := <span class="kw">by</span></span>
+<span id="L48">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="224">wround</span>; <span class="kw">omega</span></span>
+<span id="L49"></span>
+<span id="L50"><span class="kw">omit</span> [<span class="const token" data-verso-hover="29">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L51"><span class="dc">/-- In a closed valid DAG, every vertex has a strong path to some vertex of every lower round</span></span>
+<span id="L52"><span class="dc">`≥ 1`. -/</span></span>
+<span id="L53"><span class="kw">lemma</span> <span class="const token" data-verso-hover="48">exists_sPath_down</span> {D : <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)} (hD : <span class="const token" data-verso-hover="44">Closed</span> C D) (hV : <span class="const token" data-verso-hover="45">Valid</span> f C D) :</span>
+<span id="L54">    ∀ n, ∀ u ∈ D, ∀ k, <span class="nu">1</span> ≤ k → k + n = u.<span class="const token" data-verso-hover="37">1</span> → ∃ x ∈ D, x.<span class="const token" data-verso-hover="37">1</span> = k ∧ <span class="const token" data-verso-hover="211">SPath</span> C u x := <span class="kw">by</span></span>
+<span id="L55">  <span class="kw">intro</span> n</span>
+<span id="L56">  <span class="kw">induction</span> n <span class="kw">with</span></span>
+<span id="L57">  | <span class="const token" data-verso-hover="98">zero</span> =&gt; <span class="kw">intro</span> u hu k _ hk; <span class="kw">exact</span> ⟨u, hu, <span class="kw">by</span> <span class="kw">omega</span>, <span class="const token" data-verso-hover="220">SPath.refl</span> u⟩</span>
+<span id="L58">  | <span class="const token" data-verso-hover="99">succ</span> n ih =&gt;</span>
+<span id="L59">    <span class="kw">intro</span> u hu k hk1 hk</span>
+<span id="L60">    <span class="kw">obtain</span> ⟨s, hs⟩ : (C.<span class="const token" data-verso-hover="55">strong</span> u).<span class="const token" data-verso-hover="120">Nonempty</span> := <span class="kw">by</span></span>
+<span id="L61">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="121">Finset.card_pos</span>]; <span class="kw">have</span> := hV u hu; <span class="kw">omega</span></span>
+<span id="L62">    <span class="kw">have</span> e : <span class="const token" data-verso-hover="61">SEdge</span> C u (u.<span class="const token" data-verso-hover="37">1</span> - <span class="nu">1</span>, s) := ⟨<span class="kw">by</span> <span class="kw">simp</span>; <span class="kw">omega</span>, hs, <span class="kw">by</span> <span class="kw">simp</span>; <span class="kw">omega</span>⟩</span>
+<span id="L63">    <span class="kw">have</span> hmem : (u.<span class="const token" data-verso-hover="37">1</span> - <span class="nu">1</span>, s) ∈ D := hD u hu _ e.<span class="const token" data-verso-hover="63">edge</span></span>
+<span id="L64">    <span class="kw">obtain</span> ⟨x, hx, hx1, hxp⟩ := ih _ hmem k hk1 (<span class="kw">by</span> <span class="kw">simp</span>; <span class="kw">omega</span>)</span>
+<span id="L65">    <span class="kw">exact</span> ⟨x, hx, hx1, <span class="const token" data-verso-hover="180">Relation.ReflTransGen.head</span> e hxp⟩</span>
+<span id="L66"></span>
+<span id="L67"><span class="dc">/-- **Lemma 1** (for direct commits). If the leader `v` of wave `d` is directly committed, then</span></span>
+<span id="L68"><span class="dc">every vertex `u` of a round `&gt; round(d, 4)` in any closed valid local DAG (in particular the</span></span>
+<span id="L69"><span class="dc">leader of any later wave, in the DAG of any process) has a strong path to `v`. -/</span></span>
+<span id="L70"><span class="kw">theorem</span> <span class="const token" data-verso-hover="1">lemma1_direct</span> [<span class="const token" data-verso-hover="201">Fintype</span> P] (hP : <span class="const token" data-verso-hover="202">Fintype.card</span> P ≤ <span class="nu">4</span> * f + <span class="nu">1</span>) {v : <span class="const token" data-verso-hover="33">Vtx</span> P} {d : <span class="const token" data-verso-hover="30">ℕ</span>}</span>
+<span id="L71">    (hc : <span class="const token" data-verso-hover="434">DCommit</span> f C coin v d) {D' : <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)} (hD' : <span class="const token" data-verso-hover="44">Closed</span> C D') (hV' : <span class="const token" data-verso-hover="45">Valid</span> f C D')</span>
+<span id="L72">    {u : <span class="const token" data-verso-hover="33">Vtx</span> P} (hu : u ∈ D') (hr : <span class="const token" data-verso-hover="224">wround</span> d <span class="nu">4</span> &lt; u.<span class="const token" data-verso-hover="37">1</span>) : <span class="const token" data-verso-hover="211">SPath</span> C u v := <span class="kw">by</span></span>
+<span id="L73">  <span class="kw">classical</span></span>
+<span id="L74">  <span class="kw">obtain</span> ⟨hd, -, D, -, -, -, hcnt⟩ := hc</span>
+<span id="L75">  <span class="kw">have</span> h4 := <span class="const token" data-verso-hover="436">wround_four</span> d hd</span>
+<span id="L76">  <span class="cm">--</span><span class="cm"> descend to round `4d + 1`</span></span>
+<span id="L77">  <span class="kw">obtain</span> ⟨x, hx, hx1, hux⟩ := <span class="const token" data-verso-hover="48">exists_sPath_down</span> hD' hV' (u.<span class="const token" data-verso-hover="37">1</span> - (<span class="nu">4</span> * d + <span class="nu">1</span>)) u hu (<span class="nu">4</span> * d + <span class="nu">1</span>)</span>
+<span id="L78">    (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L79">  <span class="kw">set</span> F := D.<span class="const token" data-verso-hover="41">filter</span> (<span class="kw">fun</span> u =&gt; u.<span class="const token" data-verso-hover="37">1</span> = <span class="const token" data-verso-hover="224">wround</span> d <span class="nu">4</span> ∧ <span class="const token" data-verso-hover="211">SPath</span> C u v) <span class="kw">with</span> hF</span>
+<span id="L80">  <span class="kw">have</span> hinj : <span class="const token" data-verso-hover="437">Set.InjOn</span> <span class="const token" data-verso-hover="111">Prod.snd</span> (F : <span class="const token" data-verso-hover="438">Set</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)) := <span class="kw">by</span></span>
+<span id="L81">    <span class="kw">intro</span> a ha b hb hab</span>
+<span id="L82">    <span class="kw">simp</span> only [hF, <span class="const token" data-verso-hover="366">Finset.coe_filter</span>, <span class="const token" data-verso-hover="367">Set.mem_ofPred_eq</span>] <span class="kw">at</span> ha hb</span>
+<span id="L83">    <span class="kw">exact</span> <span class="const token" data-verso-hover="215">Prod.ext</span> (<span class="kw">by</span> <span class="kw">rw</span> [ha.<span class="const token" data-verso-hover="51">2</span><span class="nu">.</span><span class="const token" data-verso-hover="49">1</span>, hb.<span class="const token" data-verso-hover="51">2</span><span class="nu">.</span><span class="const token" data-verso-hover="49">1</span>]) hab</span>
+<span id="L84">  <span class="kw">have</span> hQ : <span class="nu">2</span> * f + <span class="nu">1</span> ≤ (F.<span class="const token" data-verso-hover="56">image</span> <span class="const token" data-verso-hover="111">Prod.snd</span>).<span class="const token" data-verso-hover="42">card</span> := <span class="kw">by</span></span>
+<span id="L85">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="365">Finset.card_image_of_injOn</span> hinj]; <span class="kw">exact</span> hcnt</span>
+<span id="L86">  <span class="kw">obtain</span> ⟨s, hs⟩ := <span class="const token" data-verso-hover="439">Cslib.Quorum.inter_nonempty_of_card_le_four_mul_add_one</span> hP hQ (hV' x hx)</span>
+<span id="L87">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="244">Finset.mem_inter</span>, <span class="const token" data-verso-hover="60">Finset.mem_image</span>] <span class="kw">at</span> hs</span>
+<span id="L88">  <span class="kw">obtain</span> ⟨⟨y, hy, <span class="kw">rfl</span>⟩, hsx⟩ := hs</span>
+<span id="L89">  <span class="kw">simp</span> only [hF, <span class="const token" data-verso-hover="62">Finset.mem_filter</span>] <span class="kw">at</span> hy</span>
+<span id="L90">  <span class="kw">have</span> e : <span class="const token" data-verso-hover="61">SEdge</span> C x y := ⟨<span class="kw">by</span> <span class="kw">omega</span>, hsx, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L91">  <span class="kw">exact</span> hux.<span class="const token" data-verso-hover="245">trans</span> (<span class="const token" data-verso-hover="180">Relation.ReflTransGen.head</span> e hy.<span class="const token" data-verso-hover="51">2</span><span class="nu">.</span><span class="const token" data-verso-hover="51">2</span>)</span>
+<span id="L92"></span>
+<span id="L93"><span class="dc">/-! ### The greedy chain of leaders (lines 39–43), computed in the global DAG -/</span></span>
+<span id="L94"></span>
+<span id="L95"><span class="dc">/-- The loop of lines 39–43 evaluated on the global DAG. -/</span></span>
+<span id="L96"><span class="kw">def</span> <span class="const token" data-verso-hover="440">gchain</span> (C : <span class="const token" data-verso-hover="31">Content</span> P B) (coin : <span class="const token" data-verso-hover="30">ℕ</span> → P) : <span class="const token" data-verso-hover="33">Vtx</span> P → <span class="const token" data-verso-hover="34">List</span> <span class="const token" data-verso-hover="30">ℕ</span> → <span class="const token" data-verso-hover="34">List</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)</span>
+<span id="L97">  | _, [] =&gt; []</span>
+<span id="L98">  | cur, w :: ws =&gt;</span>
+<span id="L99">    <span class="kw">if</span> <span class="const token" data-verso-hover="211">SPath</span> C cur (<span class="const token" data-verso-hover="388">lv</span> coin w) <span class="kw">then</span> <span class="const token" data-verso-hover="388">lv</span> coin w :: <span class="const token" data-verso-hover="440">gchain</span> C coin (<span class="const token" data-verso-hover="388">lv</span> coin w) ws</span>
+<span id="L100">    <span class="kw">else</span> <span class="const token" data-verso-hover="440">gchain</span> C coin cur ws</span>
+<span id="L101"></span>
+<span id="L102"><span class="dc">/-- In a closed local DAG, the loop of lines 39–43 does not depend on the DAG. -/</span></span>
+<span id="L103"><span class="kw">lemma</span> <span class="const token" data-verso-hover="106">chain_eq_gchain</span> {D : <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)} (hD : <span class="const token" data-verso-hover="44">Closed</span> C D) :</span>
+<span id="L104">    ∀ ws cur, cur ∈ D → <span class="const token" data-verso-hover="101">chain</span> C coin D cur ws = <span class="const token" data-verso-hover="440">gchain</span> C coin cur ws := <span class="kw">by</span></span>
+<span id="L105">  <span class="kw">intro</span> ws</span>
+<span id="L106">  <span class="kw">induction</span> ws <span class="kw">with</span></span>
+<span id="L107">  | <span class="const token" data-verso-hover="88">nil</span> =&gt; <span class="kw">intro</span> cur _; <span class="kw">rfl</span></span>
+<span id="L108">  | <span class="const token" data-verso-hover="89">cons</span> w ws ih =&gt;</span>
+<span id="L109">    <span class="kw">intro</span> cur hcur</span>
+<span id="L110">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="101">chain</span>, <span class="const token" data-verso-hover="440">gchain</span>, <span class="const token" data-verso-hover="100">leader</span>]</span>
+<span id="L111">    <span class="kw">by_cases</span> hm : (<span class="const token" data-verso-hover="224">wround</span> w <span class="nu">1</span>, coin w) ∈ D</span>
+<span id="L112">    · <span class="kw">simp</span> only [hm, <span class="const token" data-verso-hover="441">ite_true</span>]</span>
+<span id="L113">      <span class="kw">by_cases</span> hp : <span class="const token" data-verso-hover="211">SPath</span> C cur (<span class="const token" data-verso-hover="388">lv</span> coin w)</span>
+<span id="L114">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="388">lv</span>] <span class="kw">at</span> hp ⊢</span>
+<span id="L115">        <span class="kw">simp</span> only [hp, <span class="const token" data-verso-hover="441">ite_true</span>, ih _ hm]</span>
+<span id="L116">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="388">lv</span>] <span class="kw">at</span> hp ⊢</span>
+<span id="L117">        <span class="kw">simp</span> only [hp, <span class="const token" data-verso-hover="311">ite_false</span>, ih _ hcur]</span>
+<span id="L118">    · <span class="kw">have</span> hp : ¬ <span class="const token" data-verso-hover="211">SPath</span> C cur (<span class="const token" data-verso-hover="388">lv</span> coin w) := <span class="kw">fun</span> h =&gt; hm (hD.<span class="const token" data-verso-hover="107">mem_of_sPath</span> hcur h)</span>
+<span id="L119">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="388">lv</span>] <span class="kw">at</span> hp ⊢</span>
+<span id="L120">      <span class="kw">simp</span> only [hm, hp, <span class="const token" data-verso-hover="311">ite_false</span>, ih _ hcur]</span>
+<span id="L121"></span>
+<span id="L122"><span class="kw">lemma</span> <span class="const token" data-verso-hover="108">mem_gchain</span> {ws : <span class="const token" data-verso-hover="34">List</span> <span class="const token" data-verso-hover="30">ℕ</span>} {cur x : <span class="const token" data-verso-hover="33">Vtx</span> P} (hx : x ∈ cur :: <span class="const token" data-verso-hover="440">gchain</span> C coin cur ws) :</span>
+<span id="L123">    <span class="const token" data-verso-hover="211">SPath</span> C cur x ∧ (x = cur ∨ ∃ w ∈ ws, x = <span class="const token" data-verso-hover="388">lv</span> coin w) := <span class="kw">by</span></span>
+<span id="L124">  <span class="kw">induction</span> ws generalizing cur <span class="kw">with</span></span>
+<span id="L125">  | <span class="const token" data-verso-hover="88">nil</span> =&gt;</span>
+<span id="L126">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="440">gchain</span>, <span class="const token" data-verso-hover="199">List.mem_singleton</span>] <span class="kw">at</span> hx</span>
+<span id="L127">    <span class="kw">exact</span> ⟨hx ▸ <span class="const token" data-verso-hover="220">SPath.refl</span> _, <span class="const token" data-verso-hover="80">Or.inl</span> hx⟩</span>
+<span id="L128">  | <span class="const token" data-verso-hover="89">cons</span> w ws ih =&gt;</span>
+<span id="L129">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="440">gchain</span>] <span class="kw">at</span> hx</span>
+<span id="L130">    <span class="kw">split_ifs</span> <span class="kw">at</span> hx <span class="kw">with</span> hp</span>
+<span id="L131">    · <span class="kw">rcases</span> <span class="const token" data-verso-hover="403">List.mem_cons</span>.<span class="const token" data-verso-hover="82">1</span> hx <span class="kw">with</span> <span class="kw">rfl</span> | hx</span>
+<span id="L132">      · <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="220">SPath.refl</span> _, <span class="const token" data-verso-hover="80">Or.inl</span> <span class="const token" data-verso-hover="65">rfl</span>⟩</span>
+<span id="L133">      · <span class="kw">obtain</span> ⟨h1, h2⟩ := ih hx</span>
+<span id="L134">        <span class="kw">refine</span> ⟨hp.<span class="const token" data-verso-hover="245">trans</span> h1, <span class="const token" data-verso-hover="95">Or.inr</span> ?_⟩</span>
+<span id="L135">        <span class="kw">rcases</span> h2 <span class="kw">with</span> <span class="kw">rfl</span> | ⟨w', hw', <span class="kw">rfl</span>⟩</span>
+<span id="L136">        · <span class="kw">exact</span> ⟨w, <span class="const token" data-verso-hover="92">List.mem_cons_self</span>, <span class="const token" data-verso-hover="65">rfl</span>⟩</span>
+<span id="L137">        · <span class="kw">exact</span> ⟨w', <span class="const token" data-verso-hover="91">List.mem_cons_of_mem</span> _ hw', <span class="const token" data-verso-hover="65">rfl</span>⟩</span>
+<span id="L138">    · <span class="kw">rcases</span> <span class="const token" data-verso-hover="403">List.mem_cons</span>.<span class="const token" data-verso-hover="82">1</span> hx <span class="kw">with</span> <span class="kw">rfl</span> | hx</span>
+<span id="L139">      · <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="220">SPath.refl</span> _, <span class="const token" data-verso-hover="80">Or.inl</span> <span class="const token" data-verso-hover="65">rfl</span>⟩</span>
+<span id="L140">      · <span class="kw">obtain</span> ⟨h1, h2⟩ := ih (<span class="const token" data-verso-hover="91">List.mem_cons_of_mem</span> _ hx)</span>
+<span id="L141">        <span class="kw">refine</span> ⟨h1, ?_⟩</span>
+<span id="L142">        <span class="kw">rcases</span> h2 <span class="kw">with</span> h | ⟨w', hw', <span class="kw">rfl</span>⟩</span>
+<span id="L143">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="80">Or.inl</span> h</span>
+<span id="L144">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="95">Or.inr</span> ⟨w', <span class="const token" data-verso-hover="91">List.mem_cons_of_mem</span> _ hw', <span class="const token" data-verso-hover="65">rfl</span>⟩</span>
+<span id="L145"></span>
+<span id="L146"><span class="kw">lemma</span> <span class="const token" data-verso-hover="442">gchain_append</span> (cur : <span class="const token" data-verso-hover="33">Vtx</span> P) (l₁ l₂ : <span class="const token" data-verso-hover="34">List</span> <span class="const token" data-verso-hover="30">ℕ</span>) :</span>
+<span id="L147">    <span class="const token" data-verso-hover="440">gchain</span> C coin cur (l₁ ++ l₂) =</span>
+<span id="L148">      <span class="const token" data-verso-hover="440">gchain</span> C coin cur l₁ ++ <span class="const token" data-verso-hover="440">gchain</span> C coin ((<span class="const token" data-verso-hover="440">gchain</span> C coin cur l₁).<span class="const token" data-verso-hover="443">getLast?</span>.<span class="const token" data-verso-hover="444">getD</span> cur) l₂ := <span class="kw">by</span></span>
+<span id="L149">  <span class="kw">induction</span> l₁ generalizing cur <span class="kw">with</span></span>
+<span id="L150">  | <span class="const token" data-verso-hover="88">nil</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="440">gchain</span>]</span>
+<span id="L151">  | <span class="const token" data-verso-hover="89">cons</span> w l₁ ih =&gt;</span>
+<span id="L152">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="445">List.cons_append</span>, <span class="const token" data-verso-hover="440">gchain</span>]</span>
+<span id="L153">    <span class="kw">split_ifs</span> <span class="kw">with</span> hp</span>
+<span id="L154">    · <span class="kw">rw</span> [ih, <span class="const token" data-verso-hover="446">List.getLast?_cons</span>]; <span class="kw">simp</span></span>
+<span id="L155">    · <span class="kw">rw</span> [ih]</span>
+<span id="L156"></span>
+<span id="L157"><span class="kw">omit</span> [<span class="const token" data-verso-hover="29">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L158"><span class="kw">lemma</span> <span class="const token" data-verso-hover="447">getLast_mem_cons</span> (cur : <span class="const token" data-verso-hover="33">Vtx</span> P) (l : <span class="const token" data-verso-hover="34">List</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)) : l.<span class="const token" data-verso-hover="443">getLast?</span>.<span class="const token" data-verso-hover="444">getD</span> cur ∈ cur :: l := <span class="kw">by</span></span>
+<span id="L159">  <span class="kw">cases</span> h : l.<span class="const token" data-verso-hover="443">getLast?</span> <span class="kw">with</span></span>
+<span id="L160">  | <span class="const token" data-verso-hover="432">none</span> =&gt; <span class="kw">simp</span></span>
+<span id="L161">  | <span class="const token" data-verso-hover="186">some</span> a =&gt; <span class="kw">simpa</span> <span class="kw">using</span> <span class="const token" data-verso-hover="91">List.mem_cons_of_mem</span> cur (<span class="const token" data-verso-hover="448">List.mem_of_getLast?</span> h)</span>
+<span id="L162"></span>
+<span id="L163"><span class="dc">/-- The waves `w - 1, …, d + 1`. -/</span></span>
+<span id="L164"><span class="kw">lemma</span> <span class="const token" data-verso-hover="449">mem_wavesDown</span> {w d x : <span class="const token" data-verso-hover="30">ℕ</span>} : x ∈ <span class="const token" data-verso-hover="102">wavesDown</span> w d ↔ d &lt; x ∧ x &lt; w := <span class="kw">by</span></span>
+<span id="L165">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="102">wavesDown</span>, <span class="const token" data-verso-hover="163">List.mem_map</span>, <span class="const token" data-verso-hover="169">List.mem_range</span>]</span>
+<span id="L166">  <span class="kw">constructor</span></span>
+<span id="L167">  · <span class="kw">rintro</span> ⟨k, hk, <span class="kw">rfl</span>⟩; <span class="kw">omega</span></span>
+<span id="L168">  · <span class="kw">intro</span> h; <span class="kw">exact</span> ⟨w - <span class="nu">1</span> - x, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L169"></span>
+<span id="L170"><span class="kw">lemma</span> <span class="const token" data-verso-hover="450">wavesDown_split</span> {w d : <span class="const token" data-verso-hover="30">ℕ</span>} (hd : <span class="nu">1</span> ≤ d) (hdw : d &lt; w) :</span>
+<span id="L171">    <span class="const token" data-verso-hover="102">wavesDown</span> w <span class="nu">0</span> = <span class="const token" data-verso-hover="102">wavesDown</span> w d ++ d :: <span class="const token" data-verso-hover="102">wavesDown</span> d <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L172">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="102">wavesDown</span></span>
+<span id="L173">  <span class="kw">have</span> : w - <span class="nu">1</span> - <span class="nu">0</span> = (w - <span class="nu">1</span> - d) + d := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L174">  <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="451">List.range_add</span>, <span class="const token" data-verso-hover="452">List.map_append</span>, <span class="const token" data-verso-hover="453">List.map_map</span>]</span>
+<span id="L175">  <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L176">  <span class="kw">obtain</span> ⟨e, <span class="kw">rfl</span>⟩ : ∃ e, d = e + <span class="nu">1</span> := ⟨d - <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L177">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="454">List.range_succ_eq_map</span>, <span class="const token" data-verso-hover="455">List.map_cons</span>, <span class="const token" data-verso-hover="453">List.map_map</span>]</span>
+<span id="L178">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="264">Nat.sub_zero</span>, <span class="const token" data-verso-hover="456">Function.comp_def</span>]</span>
+<span id="L179">  <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L180">  · <span class="kw">omega</span></span>
+<span id="L181">  · <span class="kw">apply</span> <span class="const token" data-verso-hover="457">List.map_congr_left</span></span>
+<span id="L182">    <span class="kw">intro</span> k hk</span>
+<span id="L183">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="169">List.mem_range</span>] <span class="kw">at</span> hk</span>
+<span id="L184">    <span class="kw">omega</span></span>
+<span id="L185"></span>
+<span id="L186"><span class="dc">/-- The full sequence of leaders committed together with (and before) `v`, the leader of wave `d`,</span></span>
+<span id="L187"><span class="dc">in increasing wave order. -/</span></span>
+<span id="L188"><span class="kw">def</span> <span class="const token" data-verso-hover="409">fullChain</span> (C : <span class="const token" data-verso-hover="31">Content</span> P B) (coin : <span class="const token" data-verso-hover="30">ℕ</span> → P) (v : <span class="const token" data-verso-hover="33">Vtx</span> P) (d : <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="const token" data-verso-hover="34">List</span> (<span class="const token" data-verso-hover="33">Vtx</span> P) :=</span>
+<span id="L189">  (<span class="const token" data-verso-hover="440">gchain</span> C coin v (<span class="const token" data-verso-hover="102">wavesDown</span> d <span class="nu">0</span>)).<span class="const token" data-verso-hover="104">reverse</span> ++ [v]</span>
+<span id="L190"></span>
+<span id="L191"><span class="dc">/-- Key step of total order: once `v₀` (wave `d`) is directly committed, the chain of every later</span></span>
+<span id="L192"><span class="dc">leader `v` passes through `v₀`. -/</span></span>
+<span id="L193"><span class="kw">theorem</span> <span class="const token" data-verso-hover="458">gchain_through</span> [<span class="const token" data-verso-hover="201">Fintype</span> P] (hP : <span class="const token" data-verso-hover="202">Fintype.card</span> P ≤ <span class="nu">4</span> * f + <span class="nu">1</span>) {v₀ v : <span class="const token" data-verso-hover="33">Vtx</span> P} {d w : <span class="const token" data-verso-hover="30">ℕ</span>}</span>
+<span id="L194">    (hc : <span class="const token" data-verso-hover="434">DCommit</span> f C coin v₀ d) (hdw : d &lt; w) (hv : v = <span class="const token" data-verso-hover="388">lv</span> coin w) {D : <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)}</span>
+<span id="L195">    (hD : <span class="const token" data-verso-hover="44">Closed</span> C D) (hV : <span class="const token" data-verso-hover="45">Valid</span> f C D) (hvD : v ∈ D) :</span>
+<span id="L196">    <span class="const token" data-verso-hover="440">gchain</span> C coin v (<span class="const token" data-verso-hover="102">wavesDown</span> w <span class="nu">0</span>) =</span>
+<span id="L197">      <span class="const token" data-verso-hover="440">gchain</span> C coin v (<span class="const token" data-verso-hover="102">wavesDown</span> w d) ++ v₀ :: <span class="const token" data-verso-hover="440">gchain</span> C coin v₀ (<span class="const token" data-verso-hover="102">wavesDown</span> d <span class="nu">0</span>) := <span class="kw">by</span></span>
+<span id="L198">  <span class="kw">have</span> hd := hc.<span class="const token" data-verso-hover="49">1</span></span>
+<span id="L199">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="450">wavesDown_split</span> hd hdw, <span class="const token" data-verso-hover="442">gchain_append</span>]</span>
+<span id="L200">  <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L201">  <span class="kw">obtain</span> ⟨hpc, hc'⟩ := <span class="const token" data-verso-hover="108">mem_gchain</span> (<span class="const token" data-verso-hover="447">getLast_mem_cons</span> v (<span class="const token" data-verso-hover="440">gchain</span> C coin v (<span class="const token" data-verso-hover="102">wavesDown</span> w d)))</span>
+<span id="L202">  <span class="kw">generalize</span> (<span class="const token" data-verso-hover="440">gchain</span> C coin v (<span class="const token" data-verso-hover="102">wavesDown</span> w d)).<span class="const token" data-verso-hover="443">getLast?</span>.<span class="const token" data-verso-hover="444">getD</span> v = c <span class="kw">at</span> hpc hc' ⊢</span>
+<span id="L203">  <span class="kw">have</span> hcD : c ∈ D := hD.<span class="const token" data-verso-hover="107">mem_of_sPath</span> hvD hpc</span>
+<span id="L204">  <span class="kw">have</span> hround : <span class="const token" data-verso-hover="224">wround</span> d <span class="nu">4</span> &lt; c.<span class="const token" data-verso-hover="37">1</span> := <span class="kw">by</span></span>
+<span id="L205">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="436">wround_four</span> d hd]</span>
+<span id="L206">    <span class="kw">rcases</span> hc' <span class="kw">with</span> h | ⟨w', hw', h⟩</span>
+<span id="L207">    · <span class="kw">rw</span> [h, hv]; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="388">lv</span>, <span class="const token" data-verso-hover="224">wround</span>]; <span class="kw">omega</span></span>
+<span id="L208">    · <span class="kw">rw</span> [h]; <span class="kw">rw</span> [<span class="const token" data-verso-hover="449">mem_wavesDown</span>] <span class="kw">at</span> hw'; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="388">lv</span>, <span class="const token" data-verso-hover="224">wround</span>]; <span class="kw">omega</span></span>
+<span id="L209">  <span class="kw">have</span> hp := <span class="const token" data-verso-hover="1">lemma1_direct</span> hP hc hD hV hcD hround</span>
+<span id="L210">  <span class="kw">obtain</span> ⟨-, hv0, -⟩ := hc</span>
+<span id="L211">  <span class="kw">subst</span> hv0</span>
+<span id="L212">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="440">gchain</span>, hp, ↓<span class="const token" data-verso-hover="192">reduceIte</span>]</span>
+<span id="L213"></span>
+<span id="L214"><span class="dc">/-! ### Delivery -/</span></span>
+<span id="L215"></span>
+<span id="L216"><span class="kw">variable</span> {sortV : <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P) → <span class="const token" data-verso-hover="34">List</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)}</span>
+<span id="L217"></span>
+<span id="L218"><span class="kw">omit</span> [<span class="const token" data-verso-hover="29">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L219"><span class="kw">lemma</span> <span class="const token" data-verso-hover="459">deliverAll_append</span> (D : <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)) (L : <span class="const token" data-verso-hover="34">List</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)) (l₁ l₂ : <span class="const token" data-verso-hover="34">List</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)) :</span>
+<span id="L220">    <span class="const token" data-verso-hover="87">deliverAll</span> C sortV D L (l₁ ++ l₂) = <span class="const token" data-verso-hover="87">deliverAll</span> C sortV D (<span class="const token" data-verso-hover="87">deliverAll</span> C sortV D L l₁) l₂ := <span class="kw">by</span></span>
+<span id="L221">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="87">deliverAll</span>, <span class="const token" data-verso-hover="460">List.foldl_append</span>]</span>
+<span id="L222"></span>
+<span id="L223"><span class="kw">omit</span> [<span class="const token" data-verso-hover="29">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L224"><span class="kw">lemma</span> <span class="const token" data-verso-hover="404">prefix_deliverAll</span> (D : <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)) (L : <span class="const token" data-verso-hover="34">List</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)) (l : <span class="const token" data-verso-hover="34">List</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)) :</span>
+<span id="L225">    L &lt;+: <span class="const token" data-verso-hover="87">deliverAll</span> C sortV D L l := <span class="kw">by</span></span>
+<span id="L226">  <span class="kw">induction</span> l generalizing L <span class="kw">with</span></span>
+<span id="L227">  | <span class="const token" data-verso-hover="88">nil</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="461">List.prefix_refl</span> L</span>
+<span id="L228">  | <span class="const token" data-verso-hover="89">cons</span> x l ih =&gt;</span>
+<span id="L229">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="87">deliverAll</span>, <span class="const token" data-verso-hover="90">List.foldl_cons</span>]</span>
+<span id="L230">    <span class="kw">exact</span> (<span class="const token" data-verso-hover="462">List.prefix_append</span> L _).<span class="const token" data-verso-hover="463">trans</span> (ih _)</span>
+<span id="L231"></span>
+<span id="L232"><span class="kw">omit</span> [<span class="const token" data-verso-hover="29">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L233"><span class="kw">lemma</span> <span class="const token" data-verso-hover="464">deliverAll_congr</span> {D D' : <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)} (L : <span class="const token" data-verso-hover="34">List</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)) (l : <span class="const token" data-verso-hover="34">List</span> (<span class="const token" data-verso-hover="33">Vtx</span> P))</span>
+<span id="L234">    (h : ∀ x ∈ l, <span class="const token" data-verso-hover="46">hist</span> C D x = <span class="const token" data-verso-hover="46">hist</span> C D' x) :</span>
+<span id="L235">    <span class="const token" data-verso-hover="87">deliverAll</span> C sortV D L l = <span class="const token" data-verso-hover="87">deliverAll</span> C sortV D' L l := <span class="kw">by</span></span>
+<span id="L236">  <span class="kw">induction</span> l generalizing L <span class="kw">with</span></span>
+<span id="L237">  | <span class="const token" data-verso-hover="88">nil</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L238">  | <span class="const token" data-verso-hover="89">cons</span> x l ih =&gt;</span>
+<span id="L239">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="87">deliverAll</span>, <span class="const token" data-verso-hover="90">List.foldl_cons</span>]</span>
+<span id="L240">    <span class="kw">have</span> : <span class="const token" data-verso-hover="68">deliverOne</span> C sortV D L x = <span class="const token" data-verso-hover="68">deliverOne</span> C sortV D' L x := <span class="kw">by</span></span>
+<span id="L241">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="68">deliverOne</span>, h x <span class="const token" data-verso-hover="92">List.mem_cons_self</span>]</span>
+<span id="L242">    <span class="kw">rw</span> [this]</span>
+<span id="L243">    <span class="kw">exact</span> ih _ (<span class="kw">fun</span> y hy =&gt; h y (<span class="const token" data-verso-hover="91">List.mem_cons_of_mem</span> _ hy))</span>
+<span id="L244"></span>
+<span id="L245"><span class="kw">lemma</span> <span class="const token" data-verso-hover="465">mem_fullChain</span> {v x : <span class="const token" data-verso-hover="33">Vtx</span> P} {d : <span class="const token" data-verso-hover="30">ℕ</span>} (hx : x ∈ <span class="const token" data-verso-hover="409">fullChain</span> C coin v d) : <span class="const token" data-verso-hover="211">SPath</span> C v x := <span class="kw">by</span></span>
+<span id="L246">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="409">fullChain</span>, <span class="const token" data-verso-hover="76">List.mem_append</span>, <span class="const token" data-verso-hover="105">List.mem_reverse</span>, <span class="const token" data-verso-hover="199">List.mem_singleton</span>] <span class="kw">at</span> hx</span>
+<span id="L247">  <span class="kw">rcases</span> hx <span class="kw">with</span> hx | <span class="kw">rfl</span></span>
+<span id="L248">  · <span class="kw">exact</span> (<span class="const token" data-verso-hover="108">mem_gchain</span> (<span class="const token" data-verso-hover="91">List.mem_cons_of_mem</span> v hx)).<span class="const token" data-verso-hover="49">1</span></span>
+<span id="L249">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="220">SPath.refl</span> _</span>
+<span id="L250"></span>
+<span id="L251"><span class="dc">/-- Delivering a full chain does not depend on the (closed) local DAG. -/</span></span>
+<span id="L252"><span class="kw">lemma</span> <span class="const token" data-verso-hover="466">deliverAll_fullChain_congr</span> {D D' : <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)} (hD : <span class="const token" data-verso-hover="44">Closed</span> C D) (hD' : <span class="const token" data-verso-hover="44">Closed</span> C D')</span>
+<span id="L253">    {v : <span class="const token" data-verso-hover="33">Vtx</span> P} (hv : v ∈ D) (hv' : v ∈ D') (d : <span class="const token" data-verso-hover="30">ℕ</span>) (L : <span class="const token" data-verso-hover="34">List</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)) :</span>
+<span id="L254">    <span class="const token" data-verso-hover="87">deliverAll</span> C sortV D L (<span class="const token" data-verso-hover="409">fullChain</span> C coin v d) = <span class="const token" data-verso-hover="87">deliverAll</span> C sortV D' L (<span class="const token" data-verso-hover="409">fullChain</span> C coin v d) :=</span>
+<span id="L255">  <span class="const token" data-verso-hover="464">deliverAll_congr</span> L _ <span class="kw">fun</span> _ hx =&gt;</span>
+<span id="L256">    <span class="const token" data-verso-hover="260">hist_eq_of_closed</span> hD hD' (hD.<span class="const token" data-verso-hover="107">mem_of_sPath</span> hv (<span class="const token" data-verso-hover="465">mem_fullChain</span> hx))</span>
+<span id="L257">      (hD'.<span class="const token" data-verso-hover="107">mem_of_sPath</span> hv' (<span class="const token" data-verso-hover="465">mem_fullChain</span> hx))</span>
+<span id="L258"></span>
+<span id="L259"><span class="dc">/-! ### The invariant of the ordering layer -/</span></span>
+<span id="L260"></span>
+<span id="L261"><span class="dc">/-- The state of a process is either initial, or determined by its last directly committed</span></span>
+<span id="L262"><span class="dc">leader `lv coin s.decided`: the output is the delivery of its full chain. -/</span></span>
+<span id="L263"><span class="kw">def</span> <span class="const token" data-verso-hover="408">OInv</span> (f : <span class="const token" data-verso-hover="30">ℕ</span>) (C : <span class="const token" data-verso-hover="31">Content</span> P B) (coin : <span class="const token" data-verso-hover="30">ℕ</span> → P) (sortV : <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P) → <span class="const token" data-verso-hover="34">List</span> (<span class="const token" data-verso-hover="33">Vtx</span> P))</span>
+<span id="L264">    (s : <span class="const token" data-verso-hover="407">OState</span> P) : <span class="kw">Prop</span> :=</span>
+<span id="L265">  (s.<span class="const token" data-verso-hover="103">decided</span> = <span class="nu">0</span> ∧ s.<span class="const token" data-verso-hover="97">delivered</span> = []) ∨</span>
+<span id="L266">    (<span class="const token" data-verso-hover="434">DCommit</span> f C coin (<span class="const token" data-verso-hover="388">lv</span> coin s.<span class="const token" data-verso-hover="103">decided</span>) s.<span class="const token" data-verso-hover="103">decided</span> ∧</span>
+<span id="L267">      ∃ D, <span class="const token" data-verso-hover="44">Closed</span> C D ∧ <span class="const token" data-verso-hover="45">Valid</span> f C D ∧ <span class="const token" data-verso-hover="388">lv</span> coin s.<span class="const token" data-verso-hover="103">decided</span> ∈ D ∧</span>
+<span id="L268">        s.<span class="const token" data-verso-hover="97">delivered</span> = <span class="const token" data-verso-hover="87">deliverAll</span> C sortV D [] (<span class="const token" data-verso-hover="409">fullChain</span> C coin (<span class="const token" data-verso-hover="388">lv</span> coin s.<span class="const token" data-verso-hover="103">decided</span>) s.<span class="const token" data-verso-hover="103">decided</span>))</span>
+<span id="L269"></span>
+<span id="L270"><span class="kw">lemma</span> <span class="const token" data-verso-hover="467">waveReady_inv</span> [<span class="const token" data-verso-hover="201">Fintype</span> P] (hP : <span class="const token" data-verso-hover="202">Fintype.card</span> P ≤ <span class="nu">4</span> * f + <span class="nu">1</span>) {D : <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)}</span>
+<span id="L271">    (hD : <span class="const token" data-verso-hover="44">Closed</span> C D) (hV : <span class="const token" data-verso-hover="45">Valid</span> f C D) {w : <span class="const token" data-verso-hover="30">ℕ</span>} (hw : <span class="nu">1</span> ≤ w) {s : <span class="const token" data-verso-hover="407">OState</span> P}</span>
+<span id="L272">    (hs : <span class="const token" data-verso-hover="408">OInv</span> f C coin sortV s) (hsw : s.<span class="const token" data-verso-hover="103">decided</span> &lt; w) :</span>
+<span id="L273">    <span class="const token" data-verso-hover="408">OInv</span> f C coin sortV (<span class="const token" data-verso-hover="19">waveReady</span> f C coin sortV D w s) ∧</span>
+<span id="L274">      (<span class="const token" data-verso-hover="19">waveReady</span> f C coin sortV D w s).<span class="const token" data-verso-hover="103">decided</span> ≤ w := <span class="kw">by</span></span>
+<span id="L275">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="19">waveReady</span></span>
+<span id="L276">  <span class="kw">cases</span> hl : <span class="const token" data-verso-hover="100">leader</span> coin D w <span class="kw">with</span></span>
+<span id="L277">  | <span class="const token" data-verso-hover="432">none</span> =&gt; <span class="kw">exact</span> ⟨hs, <span class="kw">show</span> s.<span class="const token" data-verso-hover="103">decided</span> ≤ w <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L278">  | <span class="const token" data-verso-hover="186">some</span> v =&gt;</span>
+<span id="L279">    <span class="kw">simp</span> only</span>
+<span id="L280">    <span class="kw">have</span> hvD : v ∈ D ∧ v = <span class="const token" data-verso-hover="388">lv</span> coin w := <span class="kw">by</span></span>
+<span id="L281">      <span class="kw">unfold</span> <span class="const token" data-verso-hover="100">leader</span> <span class="kw">at</span> hl; <span class="kw">split_ifs</span> <span class="kw">at</span> hl <span class="kw">with</span> h</span>
+<span id="L282">      · <span class="kw">cases</span> hl; <span class="kw">exact</span> ⟨h, <span class="const token" data-verso-hover="65">rfl</span>⟩</span>
+<span id="L283">    <span class="kw">split_ifs</span> <span class="kw">with</span> hcnt</span>
+<span id="L284">    swap</span>
+<span id="L285">    · <span class="kw">exact</span> ⟨hs, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L286">    <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="95">Or.inr</span> ?_, <span class="const token" data-verso-hover="256">le_rfl</span>⟩</span>
+<span id="L287">    <span class="kw">simp</span> only</span>
+<span id="L288">    <span class="kw">have</span> hcw : <span class="const token" data-verso-hover="434">DCommit</span> f C coin (<span class="const token" data-verso-hover="388">lv</span> coin w) w :=</span>
+<span id="L289">      ⟨hw, <span class="const token" data-verso-hover="65">rfl</span>, D, hD, hV, hvD.<span class="const token" data-verso-hover="51">2</span> ▸ hvD.<span class="const token" data-verso-hover="49">1</span>, hvD.<span class="const token" data-verso-hover="51">2</span> ▸ hcnt⟩</span>
+<span id="L290">    <span class="kw">refine</span> ⟨hcw, D, hD, hV, hvD.<span class="const token" data-verso-hover="51">2</span> ▸ hvD.<span class="const token" data-verso-hover="49">1</span>, ?_⟩</span>
+<span id="L291">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="106">chain_eq_gchain</span> hD _ _ hvD.<span class="const token" data-verso-hover="49">1</span>, <span class="const token" data-verso-hover="193">List.reverse_cons</span>]</span>
+<span id="L292">    <span class="kw">rw</span> [← hvD.<span class="const token" data-verso-hover="51">2</span>]</span>
+<span id="L293">    <span class="kw">rcases</span> hs <span class="kw">with</span> ⟨h0, h1⟩ | ⟨hc0, D₀, hD₀, -, hv₀, hdel⟩</span>
+<span id="L294">    · <span class="kw">rw</span> [h0, h1]; <span class="kw">rfl</span></span>
+<span id="L295">    · <span class="kw">have</span> hd := hc0.<span class="const token" data-verso-hover="49">1</span></span>
+<span id="L296">      <span class="kw">have</span> hv₀D : <span class="const token" data-verso-hover="388">lv</span> coin s.<span class="const token" data-verso-hover="103">decided</span> ∈ D :=</span>
+<span id="L297">        hD.<span class="const token" data-verso-hover="107">mem_of_sPath</span> hvD.<span class="const token" data-verso-hover="49">1</span> (<span class="const token" data-verso-hover="1">lemma1_direct</span> hP hc0 hD hV hvD.<span class="const token" data-verso-hover="49">1</span> (<span class="kw">by</span></span>
+<span id="L298">          <span class="kw">rw</span> [hvD.<span class="const token" data-verso-hover="51">2</span>, <span class="const token" data-verso-hover="436">wround_four</span> _ hd]; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="388">lv</span>, <span class="const token" data-verso-hover="224">wround</span>]; <span class="kw">omega</span>))</span>
+<span id="L299">      <span class="kw">rw</span> [hdel, <span class="const token" data-verso-hover="466">deliverAll_fullChain_congr</span> hD₀ hD hv₀ hv₀D, ← <span class="const token" data-verso-hover="459">deliverAll_append</span>]</span>
+<span id="L300">      <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L301">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="409">fullChain</span>]</span>
+<span id="L302">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="458">gchain_through</span> hP hc0 hsw hvD.<span class="const token" data-verso-hover="51">2</span> hD hV hvD.<span class="const token" data-verso-hover="49">1</span>]</span>
+<span id="L303">      <span class="kw">simp</span></span>
+<span id="L304"></span>
+<span id="L305"><span class="dc">/-- The invariant of the ordering layer after `W` waves. -/</span></span>
+<span id="L306"><span class="kw">theorem</span> <span class="const token" data-verso-hover="3">orun_inv</span> [<span class="const token" data-verso-hover="201">Fintype</span> P] (hP : <span class="const token" data-verso-hover="202">Fintype.card</span> P ≤ <span class="nu">4</span> * f + <span class="nu">1</span>) {D : <span class="const token" data-verso-hover="30">ℕ</span> → <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)}</span>
+<span id="L307">    (hD : ∀ w, <span class="const token" data-verso-hover="44">Closed</span> C (D w) ∧ <span class="const token" data-verso-hover="45">Valid</span> f C (D w)) (W : <span class="const token" data-verso-hover="30">ℕ</span>) :</span>
+<span id="L308">    <span class="const token" data-verso-hover="408">OInv</span> f C coin sortV (<span class="const token" data-verso-hover="20">orun</span> f C coin sortV D W) ∧ (<span class="const token" data-verso-hover="20">orun</span> f C coin sortV D W).<span class="const token" data-verso-hover="103">decided</span> ≤ W := <span class="kw">by</span></span>
+<span id="L309">  <span class="kw">induction</span> W <span class="kw">with</span></span>
+<span id="L310">  | <span class="const token" data-verso-hover="98">zero</span> =&gt; <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="80">Or.inl</span> ⟨<span class="const token" data-verso-hover="65">rfl</span>, <span class="const token" data-verso-hover="65">rfl</span>⟩, <span class="const token" data-verso-hover="256">le_rfl</span>⟩</span>
+<span id="L311">  | <span class="const token" data-verso-hover="99">succ</span> W ih =&gt;</span>
+<span id="L312">    <span class="kw">exact</span> <span class="const token" data-verso-hover="467">waveReady_inv</span> hP (hD (W + <span class="nu">1</span>)).<span class="const token" data-verso-hover="49">1</span> (hD (W + <span class="nu">1</span>)).<span class="const token" data-verso-hover="51">2</span> (<span class="kw">by</span> <span class="kw">omega</span>) ih.<span class="const token" data-verso-hover="49">1</span> (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L313"></span>
+<span id="L314"><span class="dc">/-- Two states satisfying the invariant have prefix-comparable outputs. -/</span></span>
+<span id="L315"><span class="kw">lemma</span> <span class="const token" data-verso-hover="410">prefix_of_inv</span> [<span class="const token" data-verso-hover="201">Fintype</span> P] (hP : <span class="const token" data-verso-hover="202">Fintype.card</span> P ≤ <span class="nu">4</span> * f + <span class="nu">1</span>) {s₁ s₂ : <span class="const token" data-verso-hover="407">OState</span> P}</span>
+<span id="L316">    (h₁ : <span class="const token" data-verso-hover="408">OInv</span> f C coin sortV s₁) (h₂ : <span class="const token" data-verso-hover="408">OInv</span> f C coin sortV s₂) (hle : s₁.<span class="const token" data-verso-hover="103">decided</span> ≤ s₂.<span class="const token" data-verso-hover="103">decided</span>) :</span>
+<span id="L317">    s₁.<span class="const token" data-verso-hover="97">delivered</span> &lt;+: s₂.<span class="const token" data-verso-hover="97">delivered</span> := <span class="kw">by</span></span>
+<span id="L318">  <span class="kw">rcases</span> h₁ <span class="kw">with</span> ⟨-, h⟩ | ⟨hc₁, D₁, hD₁, -, hv₁, hdel₁⟩</span>
+<span id="L319">  · <span class="kw">rw</span> [h]; <span class="kw">exact</span> <span class="const token" data-verso-hover="468">List.nil_prefix</span></span>
+<span id="L320">  <span class="kw">rcases</span> h₂ <span class="kw">with</span> ⟨h, -⟩ | ⟨hc₂, D₂, hD₂, hV₂, hv₂, hdel₂⟩</span>
+<span id="L321">  · <span class="kw">have</span> := hc₁.<span class="const token" data-verso-hover="49">1</span>; <span class="kw">omega</span></span>
+<span id="L322">  <span class="kw">rw</span> [hdel₁, hdel₂]</span>
+<span id="L323">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="469">Nat.eq_or_lt_of_le</span> hle <span class="kw">with</span> heq | hlt</span>
+<span id="L324">  · <span class="kw">rw</span> [heq] <span class="kw">at</span> hv₁ ⊢</span>
+<span id="L325">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="466">deliverAll_fullChain_congr</span> hD₁ hD₂ hv₁ hv₂]</span>
+<span id="L326">  · <span class="kw">have</span> hd₁ := hc₁.<span class="const token" data-verso-hover="49">1</span></span>
+<span id="L327">    <span class="kw">have</span> hv₁D₂ : <span class="const token" data-verso-hover="388">lv</span> coin s₁.<span class="const token" data-verso-hover="103">decided</span> ∈ D₂ :=</span>
+<span id="L328">      hD₂.<span class="const token" data-verso-hover="107">mem_of_sPath</span> hv₂ (<span class="const token" data-verso-hover="1">lemma1_direct</span> hP hc₁ hD₂ hV₂ hv₂ (<span class="kw">by</span></span>
+<span id="L329">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="436">wround_four</span> _ hd₁]; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="388">lv</span>, <span class="const token" data-verso-hover="224">wround</span>]; <span class="kw">omega</span>))</span>
+<span id="L330">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="466">deliverAll_fullChain_congr</span> hD₁ hD₂ hv₁ hv₁D₂]</span>
+<span id="L331">    <span class="kw">have</span> : <span class="const token" data-verso-hover="409">fullChain</span> C coin (<span class="const token" data-verso-hover="388">lv</span> coin s₂.<span class="const token" data-verso-hover="103">decided</span>) s₂.<span class="const token" data-verso-hover="103">decided</span> =</span>
+<span id="L332">        <span class="const token" data-verso-hover="409">fullChain</span> C coin (<span class="const token" data-verso-hover="388">lv</span> coin s₁.<span class="const token" data-verso-hover="103">decided</span>) s₁.<span class="const token" data-verso-hover="103">decided</span> ++</span>
+<span id="L333">          ((<span class="const token" data-verso-hover="440">gchain</span> C coin (<span class="const token" data-verso-hover="388">lv</span> coin s₂.<span class="const token" data-verso-hover="103">decided</span>) (<span class="const token" data-verso-hover="102">wavesDown</span> s₂.<span class="const token" data-verso-hover="103">decided</span> s₁.<span class="const token" data-verso-hover="103">decided</span>)).<span class="const token" data-verso-hover="104">reverse</span> ++</span>
+<span id="L334">            [<span class="const token" data-verso-hover="388">lv</span> coin s₂.<span class="const token" data-verso-hover="103">decided</span>]) := <span class="kw">by</span></span>
+<span id="L335">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="409">fullChain</span>]</span>
+<span id="L336">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="458">gchain_through</span> hP hc₁ hlt <span class="const token" data-verso-hover="65">rfl</span> hD₂ hV₂ hv₂]</span>
+<span id="L337">      <span class="kw">simp</span></span>
+<span id="L338">    <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="459">deliverAll_append</span>]</span>
+<span id="L339">    <span class="kw">exact</span> <span class="const token" data-verso-hover="404">prefix_deliverAll</span> _ _ _</span>
+<span id="L340"></span>
+<span id="L341"><span class="dc">/-- **Total order, strong form.** For any two processes (closed valid snapshot sequences w.r.t. the</span></span>
+<span id="L342"><span class="dc">same global contents and coin) and any numbers of completed waves, the two output sequences are</span></span>
+<span id="L343"><span class="dc">prefix-comparable. Only `n ≤ 4f + 1` is used (the paper has `n = 3f + 1`). -/</span></span>
+<span id="L344"><span class="kw">theorem</span> <span class="const token" data-verso-hover="4">delivered_prefix</span> [<span class="const token" data-verso-hover="201">Fintype</span> P] (hP : <span class="const token" data-verso-hover="202">Fintype.card</span> P ≤ <span class="nu">4</span> * f + <span class="nu">1</span>)</span>
+<span id="L345">    {D₁ D₂ : <span class="const token" data-verso-hover="30">ℕ</span> → <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)} (hD₁ : ∀ w, <span class="const token" data-verso-hover="44">Closed</span> C (D₁ w) ∧ <span class="const token" data-verso-hover="45">Valid</span> f C (D₁ w))</span>
+<span id="L346">    (hD₂ : ∀ w, <span class="const token" data-verso-hover="44">Closed</span> C (D₂ w) ∧ <span class="const token" data-verso-hover="45">Valid</span> f C (D₂ w)) (W₁ W₂ : <span class="const token" data-verso-hover="30">ℕ</span>) :</span>
+<span id="L347">    (<span class="const token" data-verso-hover="20">orun</span> f C coin sortV D₁ W₁).<span class="const token" data-verso-hover="97">delivered</span> &lt;+: (<span class="const token" data-verso-hover="20">orun</span> f C coin sortV D₂ W₂).<span class="const token" data-verso-hover="97">delivered</span> ∨</span>
+<span id="L348">      (<span class="const token" data-verso-hover="20">orun</span> f C coin sortV D₂ W₂).<span class="const token" data-verso-hover="97">delivered</span> &lt;+: (<span class="const token" data-verso-hover="20">orun</span> f C coin sortV D₁ W₁).<span class="const token" data-verso-hover="97">delivered</span> := <span class="kw">by</span></span>
+<span id="L349">  <span class="kw">have</span> h₁ := (<span class="const token" data-verso-hover="3">orun_inv</span> (coin := coin) (sortV := sortV) hP hD₁ W₁).<span class="const token" data-verso-hover="49">1</span></span>
+<span id="L350">  <span class="kw">have</span> h₂ := (<span class="const token" data-verso-hover="3">orun_inv</span> (coin := coin) (sortV := sortV) hP hD₂ W₂).<span class="const token" data-verso-hover="49">1</span></span>
+<span id="L351">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="470">le_total</span> (<span class="const token" data-verso-hover="20">orun</span> f C coin sortV D₁ W₁).<span class="const token" data-verso-hover="103">decided</span> (<span class="const token" data-verso-hover="20">orun</span> f C coin sortV D₂ W₂).<span class="const token" data-verso-hover="103">decided</span> <span class="kw">with</span></span>
+<span id="L352">    h | h</span>
+<span id="L353">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="80">Or.inl</span> (<span class="const token" data-verso-hover="410">prefix_of_inv</span> hP h₁ h₂ h)</span>
+<span id="L354">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="95">Or.inr</span> (<span class="const token" data-verso-hover="410">prefix_of_inv</span> hP h₂ h₁ h)</span>
+<span id="L355"></span>
+<span id="L356"><span class="dc">/-- Outputs only grow. -/</span></span>
+<span id="L357"><span class="kw">lemma</span> <span class="const token" data-verso-hover="471">orun_prefix_succ</span> (D : <span class="const token" data-verso-hover="30">ℕ</span> → <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)) (W : <span class="const token" data-verso-hover="30">ℕ</span>) :</span>
+<span id="L358">    (<span class="const token" data-verso-hover="20">orun</span> f C coin sortV D W).<span class="const token" data-verso-hover="97">delivered</span> &lt;+: (<span class="const token" data-verso-hover="20">orun</span> f C coin sortV D (W + <span class="nu">1</span>)).<span class="const token" data-verso-hover="97">delivered</span> := <span class="kw">by</span></span>
+<span id="L359">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="20">orun</span>, <span class="const token" data-verso-hover="19">waveReady</span>]</span>
+<span id="L360">  <span class="kw">split</span></span>
+<span id="L361">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="461">List.prefix_refl</span> _</span>
+<span id="L362">  · <span class="kw">split_ifs</span></span>
+<span id="L363">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="404">prefix_deliverAll</span> _ _ _</span>
+<span id="L364">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="461">List.prefix_refl</span> _</span>
+<span id="L365"></span>
+<span id="L366"><span class="kw">lemma</span> <span class="const token" data-verso-hover="393">orun_mono</span> (D : <span class="const token" data-verso-hover="30">ℕ</span> → <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)) {W W' : <span class="const token" data-verso-hover="30">ℕ</span>} (h : W ≤ W') :</span>
+<span id="L367">    (<span class="const token" data-verso-hover="20">orun</span> f C coin sortV D W).<span class="const token" data-verso-hover="97">delivered</span> &lt;+: (<span class="const token" data-verso-hover="20">orun</span> f C coin sortV D W').<span class="const token" data-verso-hover="97">delivered</span> := <span class="kw">by</span></span>
+<span id="L368">  <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L369">  | <span class="const token" data-verso-hover="396">refl</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="461">List.prefix_refl</span> _</span>
+<span id="L370">  | <span class="const token" data-verso-hover="397">step</span> _ ih =&gt; <span class="kw">exact</span> ih.<span class="const token" data-verso-hover="463">trans</span> (<span class="const token" data-verso-hover="471">orun_prefix_succ</span> D _)</span>
+<span id="L371"></span>
+<span id="L372"><span class="dc">/-! ### Integrity -/</span></span>
+<span id="L373"></span>
+<span id="L374"><span class="kw">omit</span> [<span class="const token" data-verso-hover="29">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L375"><span class="kw">lemma</span> <span class="const token" data-verso-hover="472">nodup_deliverAll</span> (hsort : <span class="const token" data-verso-hover="67">SortSpec</span> sortV) (D : <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)) {L : <span class="const token" data-verso-hover="34">List</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)}</span>
+<span id="L376">    (hL : L.<span class="const token" data-verso-hover="112">Nodup</span>) (l : <span class="const token" data-verso-hover="34">List</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)) : (<span class="const token" data-verso-hover="87">deliverAll</span> C sortV D L l).<span class="const token" data-verso-hover="112">Nodup</span> := <span class="kw">by</span></span>
+<span id="L377">  <span class="kw">classical</span></span>
+<span id="L378">  <span class="kw">induction</span> l generalizing L <span class="kw">with</span></span>
+<span id="L379">  | <span class="const token" data-verso-hover="88">nil</span> =&gt; <span class="kw">exact</span> hL</span>
+<span id="L380">  | <span class="const token" data-verso-hover="89">cons</span> x l ih =&gt;</span>
+<span id="L381">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="87">deliverAll</span>, <span class="const token" data-verso-hover="90">List.foldl_cons</span>]</span>
+<span id="L382">    <span class="kw">apply</span> ih</span>
+<span id="L383">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="68">deliverOne</span>]</span>
+<span id="L384">    <span class="kw">refine</span> <span class="const token" data-verso-hover="473">List.nodup_append</span>.<span class="const token" data-verso-hover="83">2</span> ⟨hL, (hsort _).<span class="const token" data-verso-hover="49">1</span>, ?_⟩</span>
+<span id="L385">    <span class="kw">intro</span> a ha b hb hab</span>
+<span id="L386">    <span class="kw">subst</span> hab</span>
+<span id="L387">    <span class="kw">rw</span> [(hsort _).<span class="const token" data-verso-hover="51">2</span>, <span class="const token" data-verso-hover="62">Finset.mem_filter</span>] <span class="kw">at</span> hb</span>
+<span id="L388">    <span class="kw">exact</span> hb.<span class="const token" data-verso-hover="51">2</span> ha</span>
+<span id="L389"></span>
+<span id="L390"><span class="dc">/-- **Proposition 1 (Integrity).** A process outputs every vertex `(r, k)` (i.e. a block with</span></span>
+<span id="L391"><span class="dc">round `r` and source `k`) at most once. -/</span></span>
+<span id="L392"><span class="kw">theorem</span> <span class="const token" data-verso-hover="22">integrity</span> (hsort : <span class="const token" data-verso-hover="67">SortSpec</span> sortV) (D : <span class="const token" data-verso-hover="30">ℕ</span> → <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)) (W : <span class="const token" data-verso-hover="30">ℕ</span>) :</span>
+<span id="L393">    (<span class="const token" data-verso-hover="20">orun</span> f C coin sortV D W).<span class="const token" data-verso-hover="97">delivered</span>.<span class="const token" data-verso-hover="112">Nodup</span> := <span class="kw">by</span></span>
+<span id="L394">  <span class="kw">induction</span> W <span class="kw">with</span></span>
+<span id="L395">  | <span class="const token" data-verso-hover="98">zero</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="474">List.nodup_nil</span></span>
+<span id="L396">  | <span class="const token" data-verso-hover="99">succ</span> W ih =&gt;</span>
+<span id="L397">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="20">orun</span>, <span class="const token" data-verso-hover="19">waveReady</span>]</span>
+<span id="L398">    <span class="kw">split</span></span>
+<span id="L399">    · <span class="kw">exact</span> ih</span>
+<span id="L400">    · <span class="kw">split_ifs</span></span>
+<span id="L401">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="472">nodup_deliverAll</span> hsort _ ih _</span>
+<span id="L402">      · <span class="kw">exact</span> ih</span>
+<span id="L403"></span>
+<span id="L404"><span class="dc">/-- **Proposition 2 (Total order, Definition 3.1).** If a process outputs `m` before `m'`, then</span></span>
+<span id="L405"><span class="dc">any process that outputs `m'` has output `m` before. -/</span></span>
+<span id="L406"><span class="kw">theorem</span> <span class="const token" data-verso-hover="2">total_order</span> [<span class="const token" data-verso-hover="201">Fintype</span> P] (hP : <span class="const token" data-verso-hover="202">Fintype.card</span> P ≤ <span class="nu">4</span> * f + <span class="nu">1</span>) (hsort : <span class="const token" data-verso-hover="67">SortSpec</span> sortV)</span>
+<span id="L407">    {D₁ D₂ : <span class="const token" data-verso-hover="30">ℕ</span> → <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="33">Vtx</span> P)} (hD₁ : ∀ w, <span class="const token" data-verso-hover="44">Closed</span> C (D₁ w) ∧ <span class="const token" data-verso-hover="45">Valid</span> f C (D₁ w))</span>
+<span id="L408">    (hD₂ : ∀ w, <span class="const token" data-verso-hover="44">Closed</span> C (D₂ w) ∧ <span class="const token" data-verso-hover="45">Valid</span> f C (D₂ w)) (W₁ W₂ : <span class="const token" data-verso-hover="30">ℕ</span>) {m m' : <span class="const token" data-verso-hover="33">Vtx</span> P}</span>
+<span id="L409">    (hbefore : <span class="const token" data-verso-hover="391">List.Sublist</span> [m, m'] (<span class="const token" data-verso-hover="20">orun</span> f C coin sortV D₁ W₁).<span class="const token" data-verso-hover="97">delivered</span>)</span>
+<span id="L410">    (hm' : m' ∈ (<span class="const token" data-verso-hover="20">orun</span> f C coin sortV D₂ W₂).<span class="const token" data-verso-hover="97">delivered</span>) :</span>
+<span id="L411">    <span class="const token" data-verso-hover="391">List.Sublist</span> [m, m'] (<span class="const token" data-verso-hover="20">orun</span> f C coin sortV D₂ W₂).<span class="const token" data-verso-hover="97">delivered</span> := <span class="kw">by</span></span>
+<span id="L412">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="4">delivered_prefix</span> (coin := coin) (sortV := sortV) hP hD₁ hD₂ W₁ W₂ <span class="kw">with</span> h | h</span>
+<span id="L413">  · <span class="kw">exact</span> hbefore.<span class="const token" data-verso-hover="475">trans</span> h.<span class="const token" data-verso-hover="476">sublist</span></span>
+<span id="L414">  · <span class="kw">obtain</span> ⟨X, hX⟩ := h</span>
+<span id="L415">    <span class="kw">have</span> hnd := <span class="const token" data-verso-hover="22">integrity</span> (f := f) (C := C) (coin := coin) hsort D₁ W₁</span>
+<span id="L416">    <span class="kw">rw</span> [← hX] <span class="kw">at</span> hbefore hnd</span>
+<span id="L417">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="473">List.nodup_append</span>] <span class="kw">at</span> hnd</span>
+<span id="L418">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="477">List.sublist_append_iff</span>] <span class="kw">at</span> hbefore</span>
+<span id="L419">    <span class="kw">obtain</span> ⟨l₁, l₂, heq, h₁, h₂⟩ := hbefore</span>
+<span id="L420">    <span class="kw">match</span> l₁, l₂, heq <span class="kw">with</span></span>
+<span id="L421">    | [], _, <span class="const token" data-verso-hover="65">rfl</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="213">absurd</span> <span class="const token" data-verso-hover="65">rfl</span> (hnd.<span class="const token" data-verso-hover="51">2</span><span class="nu">.</span><span class="const token" data-verso-hover="51">2</span> _ hm' _ (h₂.<span class="const token" data-verso-hover="478">subset</span> (<span class="kw">by</span> <span class="kw">simp</span>)))</span>
+<span id="L422">    | [_], _, heq =&gt;</span>
+<span id="L423">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="445">List.cons_append</span>, <span class="const token" data-verso-hover="195">List.nil_append</span>, <span class="const token" data-verso-hover="479">List.cons.injEq</span>] <span class="kw">at</span> heq</span>
+<span id="L424">      <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := heq</span>
+<span id="L425">      <span class="kw">exact</span> <span class="const token" data-verso-hover="213">absurd</span> <span class="const token" data-verso-hover="65">rfl</span> (hnd.<span class="const token" data-verso-hover="51">2</span><span class="nu">.</span><span class="const token" data-verso-hover="51">2</span> _ hm' _ (h₂.<span class="const token" data-verso-hover="478">subset</span> (<span class="kw">by</span> <span class="kw">simp</span>)))</span>
+<span id="L426">    | [_, _], _, heq =&gt;</span>
+<span id="L427">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="445">List.cons_append</span>, <span class="const token" data-verso-hover="195">List.nil_append</span>, <span class="const token" data-verso-hover="479">List.cons.injEq</span>] <span class="kw">at</span> heq</span>
+<span id="L428">      <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := heq</span>
+<span id="L429">      <span class="kw">exact</span> h₁</span>
+<span id="L430">    | _ :: _ :: _ :: _, _, heq =&gt; <span class="kw">simp</span> <span class="kw">at</span> heq</span>
+<span id="L431"></span>
+<span id="L432"><span class="kw">end</span> DagRider</span>
+<span id="L433"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2021/AllYouNeedIsDAG/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

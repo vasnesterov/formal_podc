@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>TreeAA: BlockGraph.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2026/">PODC 2026</a><span class="sep">›</span><a href="PODC2026/TreeAA/">TreeAA</a><span class="sep">›</span><a href="PODC2026/TreeAA/src/">Lean source</a><span class="sep">›</span><span aria-current="page">BlockGraph</span></nav>
+        <h1>
+          <code>BlockGraph.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2026/TreeAA/">Approximate Agreement on Trees and Block Graphs — PODC 2026</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2026/TreeAA/BlockGraph.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="BlockGraph"><span id="L1"><span class="kw">import</span> Papers.PODC2026.TreeAA.Protocol</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Block graphs (Section 5): `BlockGraphAA` and Theorem 8</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">* `IsMaxClique`, `IsBlockGraph` (distinct maximal cliques share at most one vertex),</span></span>
+<span id="L7"><span class="dc">  `IsCliqueTree G T bag` (a tree `T` whose nodes are exactly the maximal cliques `bag c` of `G`,</span></span>
+<span id="L8"><span class="dc">  adjacent cliques intersect, running intersection property).</span></span>
+<span id="L9"><span class="dc">* `subdiv T` — the subdivided clique tree `T_S` (one intermediate vertex `inr e` per edge `e`).</span></span>
+<span id="L10"><span class="dc">* `blockOut` — the output map of `BlockGraphAA` (lines 4–5).</span></span>
+<span id="L11"><span class="dc">* `sep_mem_support` / `sep_btw` — **Lemma 12** (clique-tree edge separator).</span></span>
+<span id="L12"><span class="dc">* `blockOut_spec` — **Lemmas 13 and 14** at spec level (model independent: also covers the</span></span>
+<span id="L13"><span class="dc">  asynchronous Corollary 6 at the level of the reduction).</span></span>
+<span id="L14"><span class="dc">* `blockGraphAA_solves` — **Theorem 8** (round complexity: that of the tree protocol on `T_S`).</span></span>
+<span id="L15"><span class="dc">* `subdiv_isTree`, `diam_subdiv_le` — `T_S` is a tree and `D(T_S) ≤ 2·D(T)`.</span></span>
+<span id="L16"><span class="dc">* `blockGraphAA_of_gc_realAA` — Theorem 8 instantiated with `TreeAA` (Theorem 5).</span></span>
+<span id="L17"></span>
+<span id="L18"><span class="dc">Auxiliary material: the lift `liftW` of `T`-walks to `T_S` and the description `btw_subdiv` of</span></span>
+<span id="L19"><span class="dc">paths of `T_S` between clique vertices; sides of a tree edge (`side_or`, `btw_cross`); and</span></span>
+<span id="L20"><span class="dc">`eq_of_mem_cross` (a vertex in cliques on both sides of `{c, c'}` is the separator `u`).</span></span>
+<span id="L21"></span>
+<span id="L22"><span class="dc">Proof notes. Lemma 12 is proved by induction along the walk with the invariant "the current vertex</span></span>
+<span id="L23"><span class="dc">is not `u` and all cliques containing it are on `c`'s side" (the appendix proof's step "`T_P`</span></span>
+<span id="L24"><span class="dc">meets both components, so some `v_i` lies in `bag c ∩ bag c'`" is made precise this way). In</span></span>
+<span id="L25"><span class="dc">Case 3 of Lemma 13 (`cout = c` a clique with `v_in ∉ bag c`) the paper claims the output is the</span></span>
+<span id="L26"><span class="dc">separator towards the honest clique `c_b`; in fact it is the separator `u''` towards the party's</span></span>
+<span id="L27"><span class="dc">*own* clique `cin p` (the vertex of `bag c` closest to `v_in`). The output is still valid: `c` lies</span></span>
+<span id="L28"><span class="dc">between `cin p` and one of the honest cliques `c_a, c_b` (tripod), and by Lemma 12 `u''` lies on</span></span>
+<span id="L29"><span class="dc">a shortest path from `v_in` to that party's input.</span></span>
+<span id="L30"><span class="dc">-/</span></span>
+<span id="L31"></span>
+<span id="L32"><span class="kw">namespace</span> TreeAA</span>
+<span id="L33"></span>
+<span id="L34"><span class="kw">open</span> Cslib.Byzantine.LockStep SimpleGraph</span>
+<span id="L35"></span>
+<span id="L36"><span class="kw">section</span> Defs</span>
+<span id="L37"></span>
+<span id="L38"><span class="kw">variable</span> {V C : <span class="kw">Type</span>*} (G : <span class="const token" data-verso-hover="16">SimpleGraph</span> V)</span>
+<span id="L39"></span>
+<span id="L40"><span class="dc">/-- A maximal clique of `G`. -/</span></span>
+<span id="L41"><span class="kw">def</span> <span class="const token" data-verso-hover="43">IsMaxClique</span> (K : <span class="const token" data-verso-hover="44">Finset</span> V) : <span class="kw">Prop</span> :=</span>
+<span id="L42">  G.<span class="const token" data-verso-hover="45">IsClique</span> (K : <span class="const token" data-verso-hover="46">Set</span> V) ∧ ∀ K' : <span class="const token" data-verso-hover="44">Finset</span> V, G.<span class="const token" data-verso-hover="45">IsClique</span> (K' : <span class="const token" data-verso-hover="46">Set</span> V) → K ⊆ K' → K' = K</span>
+<span id="L43"></span>
+<span id="L44"><span class="dc">/-- A *block graph*: any two distinct maximal cliques share at most one vertex. (The paper's</span></span>
+<span id="L45"><span class="dc">definition is "chordal, and maximal cliques pairwise share at most one vertex"; chordality is</span></span>
+<span id="L46"><span class="dc">provided by the clique tree `IsCliqueTree`.) -/</span></span>
+<span id="L47"><span class="kw">def</span> <span class="const token" data-verso-hover="47">IsBlockGraph</span> [<span class="const token" data-verso-hover="48">DecidableEq</span> V] : <span class="kw">Prop</span> :=</span>
+<span id="L48">  ∀ K K', <span class="const token" data-verso-hover="43">IsMaxClique</span> G K → <span class="const token" data-verso-hover="43">IsMaxClique</span> G K' → K ≠ K' → (K ∩ K').<span class="const token" data-verso-hover="49">card</span> ≤ <span class="nu">1</span></span>
+<span id="L49"></span>
+<span id="L50"><span class="dc">/-- `(T, bag)` is a *clique tree* of `G`: `T` is a tree whose nodes `c` are labelled injectively</span></span>
+<span id="L51"><span class="dc">by the maximal cliques `bag c` of `G` (all of them), adjacent nodes have intersecting cliques,</span></span>
+<span id="L52"><span class="dc">and the running intersection property holds: `bag c ∩ bag c'` is contained in every clique on</span></span>
+<span id="L53"><span class="dc">the path between `c` and `c'`. -/</span></span>
+<span id="L54"><span class="kw">structure</span> <span class="const token" data-verso-hover="18">IsCliqueTree</span> [<span class="const token" data-verso-hover="48">DecidableEq</span> V] (T : <span class="const token" data-verso-hover="16">SimpleGraph</span> C) (bag : C → <span class="const token" data-verso-hover="44">Finset</span> V) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L55">  <span class="const token" data-verso-hover="50">isTree</span> : T.<span class="const token" data-verso-hover="51">IsTree</span></span>
+<span id="L56">  <span class="const token" data-verso-hover="52">isMaxClique</span> : ∀ c, <span class="const token" data-verso-hover="43">IsMaxClique</span> G (bag c)</span>
+<span id="L57">  <span class="const token" data-verso-hover="53">injective</span> : <span class="const token" data-verso-hover="54">Function.Injective</span> bag</span>
+<span id="L58">  <span class="const token" data-verso-hover="55">surjective</span> : ∀ K, <span class="const token" data-verso-hover="43">IsMaxClique</span> G K → ∃ c, bag c = K</span>
+<span id="L59">  <span class="const token" data-verso-hover="56">adj_nonempty</span> : ∀ c c', T.<span class="const token" data-verso-hover="57">Adj</span> c c' → (bag c ∩ bag c').<span class="const token" data-verso-hover="58">Nonempty</span></span>
+<span id="L60">  <span class="const token" data-verso-hover="59">rip</span> : ∀ c c' d, <span class="const token" data-verso-hover="60">Btw</span> T c d c' → bag c ∩ bag c' ⊆ bag d</span>
+<span id="L61"></span>
+<span id="L62"><span class="dc">/-- The *subdivided clique tree* `T_S`: every edge `e = {c, c'}` of `T` is replaced by a path</span></span>
+<span id="L63"><span class="dc">`c — inr e — c'`. -/</span></span>
+<span id="L64"><span class="kw">def</span> <span class="const token" data-verso-hover="61">subdiv</span> (T : <span class="const token" data-verso-hover="16">SimpleGraph</span> C) : <span class="const token" data-verso-hover="16">SimpleGraph</span> (C ⊕ T.<span class="const token" data-verso-hover="62">edgeSet</span>) :=</span>
+<span id="L65">  <span class="const token" data-verso-hover="63">SimpleGraph.fromRel</span> <span class="kw">fun</span> a b =&gt; ∃ c e, a = <span class="const token" data-verso-hover="64">Sum.inl</span> c ∧ b = <span class="const token" data-verso-hover="65">Sum.inr</span> e ∧ c ∈ (e : <span class="const token" data-verso-hover="66">Sym2</span> C)</span>
+<span id="L66"></span>
+<span id="L67"><span class="kw">variable</span> [<span class="const token" data-verso-hover="48">DecidableEq</span> V] {T : <span class="const token" data-verso-hover="16">SimpleGraph</span> C} (bag : C → <span class="const token" data-verso-hover="44">Finset</span> V)</span>
+<span id="L68"></span>
+<span id="L69"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L70"><span class="dc">/-- The output map of `BlockGraphAA` (lines 4–5): for a clique vertex, the vertex of the clique</span></span>
+<span id="L71"><span class="dc">closest to the own input `v`; for an intermediate vertex of the edge `{c, c'}`, the vertex in</span></span>
+<span id="L72"><span class="dc">`bag c ∩ bag c'`. (The fallback `v` is never used for honest parties.) -/</span></span>
+<span id="L73"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="67">blockOut</span> (v : V) : C ⊕ T.<span class="const token" data-verso-hover="62">edgeSet</span> → V</span>
+<span id="L74">  | <span class="const token" data-verso-hover="64">.</span>inl c =&gt; <span class="kw">if</span> h : (bag c).<span class="const token" data-verso-hover="58">Nonempty</span> <span class="kw">then</span> ((bag c).<span class="const token" data-verso-hover="68">exists_min_image</span> (G.<span class="const token" data-verso-hover="69">dist</span> v) h).<span class="const token" data-verso-hover="70">choose</span> <span class="kw">else</span> v</span>
+<span id="L75">  | <span class="const token" data-verso-hover="65">.</span>inr e =&gt; <span class="kw">if</span> h : ∃ u, ∀ c ∈ (e : <span class="const token" data-verso-hover="66">Sym2</span> C), u ∈ bag c <span class="kw">then</span> h.<span class="const token" data-verso-hover="70">choose</span> <span class="kw">else</span> v</span>
+<span id="L76"></span>
+<span id="L77"><span class="dc">/-- **`BlockGraphAA`**: run a tree-AA protocol `treeAlg` on `T_S` with input a clique `cl p v`</span></span>
+<span id="L78"><span class="dc">containing the own input `v`, and map the output back with `blockOut`. -/</span></span>
+<span id="L79"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="71">blockGraphAA</span> {P M : <span class="kw">Type</span>*} (cl : P → V → C)</span>
+<span id="L80">    (treeAlg : <span class="const token" data-verso-hover="72">Protocol</span> P (C ⊕ T.<span class="const token" data-verso-hover="62">edgeSet</span>) M (C ⊕ T.<span class="const token" data-verso-hover="62">edgeSet</span>)) : <span class="const token" data-verso-hover="72">Protocol</span> P V M V :=</span>
+<span id="L81">  treeAlg.<span class="const token" data-verso-hover="73">wrap</span> (<span class="kw">fun</span> p v =&gt; <span class="const token" data-verso-hover="64">Sum.inl</span> (cl p v)) (<span class="kw">fun</span> _ v c =&gt; <span class="const token" data-verso-hover="67">blockOut</span> G bag v c)</span>
+<span id="L82"></span>
+<span id="L83"><span class="kw">end</span> Defs</span>
+<span id="L84"></span>
+<span id="L85"><span class="dc">/-! ### The subdivided tree -/</span></span>
+<span id="L86"></span>
+<span id="L87"><span class="kw">section</span> Subdiv</span>
+<span id="L88"></span>
+<span id="L89"><span class="kw">variable</span> {C : <span class="kw">Type</span>*} {T : <span class="const token" data-verso-hover="16">SimpleGraph</span> C}</span>
+<span id="L90"></span>
+<span id="L91">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="74">subdiv_adj_inl_inr</span> {c : C} {e : T.<span class="const token" data-verso-hover="62">edgeSet</span>} :</span>
+<span id="L92">    (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="57">Adj</span> (<span class="const token" data-verso-hover="64">Sum.inl</span> c) (<span class="const token" data-verso-hover="65">Sum.inr</span> e) ↔ c ∈ (e : <span class="const token" data-verso-hover="66">Sym2</span> C) := <span class="kw">by</span></span>
+<span id="L93">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="61">subdiv</span>, <span class="const token" data-verso-hover="75">SimpleGraph.fromRel_adj</span>]</span>
+<span id="L94"></span>
+<span id="L95">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="76">subdiv_adj_inr_inl</span> {c : C} {e : T.<span class="const token" data-verso-hover="62">edgeSet</span>} :</span>
+<span id="L96">    (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="57">Adj</span> (<span class="const token" data-verso-hover="65">Sum.inr</span> e) (<span class="const token" data-verso-hover="64">Sum.inl</span> c) ↔ c ∈ (e : <span class="const token" data-verso-hover="66">Sym2</span> C) := <span class="kw">by</span></span>
+<span id="L97">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="77">adj_comm</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="74">subdiv_adj_inl_inr</span></span>
+<span id="L98"></span>
+<span id="L99">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="78">subdiv_not_adj_inl_inl</span> {c c' : C} : ¬ (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="57">Adj</span> (<span class="const token" data-verso-hover="64">Sum.inl</span> c) (<span class="const token" data-verso-hover="64">Sum.inl</span> c') := <span class="kw">by</span></span>
+<span id="L100">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="61">subdiv</span>]</span>
+<span id="L101"></span>
+<span id="L102">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="79">subdiv_not_adj_inr_inr</span> {e e' : T.<span class="const token" data-verso-hover="62">edgeSet</span>} :</span>
+<span id="L103">    ¬ (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="57">Adj</span> (<span class="const token" data-verso-hover="65">Sum.inr</span> e) (<span class="const token" data-verso-hover="65">Sum.inr</span> e') := <span class="kw">by</span></span>
+<span id="L104">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="61">subdiv</span>]</span>
+<span id="L105"></span>
+<span id="L106"><span class="kw">lemma</span> <span class="const token" data-verso-hover="80">exists_eq_edge</span> (e : T.<span class="const token" data-verso-hover="62">edgeSet</span>) : ∃ c c', T.<span class="const token" data-verso-hover="57">Adj</span> c c' ∧ (e : <span class="const token" data-verso-hover="66">Sym2</span> C) = s(c, c') := <span class="kw">by</span></span>
+<span id="L107">  <span class="kw">obtain</span> ⟨e, he⟩ := e</span>
+<span id="L108">  <span class="kw">induction</span> e <span class="kw">using</span> <span class="const token" data-verso-hover="81">Sym2.ind</span> <span class="kw">with</span></span>
+<span id="L109">  | h c c' =&gt; <span class="kw">exact</span> ⟨c, c', he, <span class="const token" data-verso-hover="82">rfl</span>⟩</span>
+<span id="L110"></span>
+<span id="L111"><span class="dc">/-- The edge `s(a, b)` of `T` as an element of `T.edgeSet`. -/</span></span>
+<span id="L112"><span class="kw">def</span> <span class="const token" data-verso-hover="83">edgeOf</span> {a b : C} (h : T.<span class="const token" data-verso-hover="57">Adj</span> a b) : T.<span class="const token" data-verso-hover="62">edgeSet</span> := ⟨s(a, b), h⟩</span>
+<span id="L113"></span>
+<span id="L114"><span class="dc">/-- The lift of a walk of `T` to the subdivided tree `T_S`. -/</span></span>
+<span id="L115"><span class="kw">def</span> <span class="const token" data-verso-hover="84">liftW</span> : ∀ {a b : C}, T.<span class="const token" data-verso-hover="85">Walk</span> a b → (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="85">Walk</span> (<span class="const token" data-verso-hover="64">Sum.inl</span> a) (<span class="const token" data-verso-hover="64">Sum.inl</span> b)</span>
+<span id="L116">  | _, _, <span class="const token" data-verso-hover="86">.</span>nil =&gt; <span class="const token" data-verso-hover="86">.</span>nil</span>
+<span id="L117">  | a, _, <span class="const token" data-verso-hover="87">.</span>cons (v := b) h p =&gt;</span>
+<span id="L118">    <span class="const token" data-verso-hover="87">.</span>cons (<span class="const token" data-verso-hover="74">subdiv_adj_inl_inr</span>.<span class="const token" data-verso-hover="88">2</span> (<span class="const token" data-verso-hover="89">Sym2.mem_mk_left</span> a b) :</span>
+<span id="L119">        (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="57">Adj</span> (<span class="const token" data-verso-hover="64">Sum.inl</span> a) (<span class="const token" data-verso-hover="65">Sum.inr</span> (<span class="const token" data-verso-hover="83">edgeOf</span> h)))</span>
+<span id="L120">      (<span class="const token" data-verso-hover="87">.</span>cons (<span class="const token" data-verso-hover="76">subdiv_adj_inr_inl</span>.<span class="const token" data-verso-hover="88">2</span> (<span class="const token" data-verso-hover="90">Sym2.mem_mk_right</span> a b)) (<span class="const token" data-verso-hover="84">liftW</span> p))</span>
+<span id="L121"></span>
+<span id="L122"><span class="kw">lemma</span> <span class="const token" data-verso-hover="91">length_liftW</span> {a b : C} (p : T.<span class="const token" data-verso-hover="85">Walk</span> a b) : (<span class="const token" data-verso-hover="84">liftW</span> p).<span class="const token" data-verso-hover="92">length</span> = <span class="nu">2</span> * p.<span class="const token" data-verso-hover="92">length</span> := <span class="kw">by</span></span>
+<span id="L123">  <span class="kw">induction</span> p <span class="kw">with</span></span>
+<span id="L124">  | <span class="const token" data-verso-hover="86">nil</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L125">  | <span class="const token" data-verso-hover="87">cons</span> h p ih =&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="84">liftW</span>, <span class="const token" data-verso-hover="93">Walk.length_cons</span>, ih]; <span class="kw">ring</span></span>
+<span id="L126"></span>
+<span id="L127"><span class="kw">lemma</span> <span class="const token" data-verso-hover="94">mem_support_liftW</span> {a b : C} (p : T.<span class="const token" data-verso-hover="85">Walk</span> a b) (z : C ⊕ T.<span class="const token" data-verso-hover="62">edgeSet</span>) :</span>
+<span id="L128">    z ∈ (<span class="const token" data-verso-hover="84">liftW</span> p).<span class="const token" data-verso-hover="95">support</span> ↔</span>
+<span id="L129">      (∃ c ∈ p.<span class="const token" data-verso-hover="95">support</span>, z = <span class="const token" data-verso-hover="64">Sum.inl</span> c) ∨</span>
+<span id="L130">        (∃ e : T.<span class="const token" data-verso-hover="62">edgeSet</span>, (e : <span class="const token" data-verso-hover="66">Sym2</span> C) ∈ p.<span class="const token" data-verso-hover="96">edges</span> ∧ z = <span class="const token" data-verso-hover="65">Sum.inr</span> e) := <span class="kw">by</span></span>
+<span id="L131">  <span class="kw">induction</span> p <span class="kw">with</span></span>
+<span id="L132">  | <span class="const token" data-verso-hover="86">nil</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="84">liftW</span>]</span>
+<span id="L133">  | <span class="const token" data-verso-hover="87">cons</span> h p ih =&gt;</span>
+<span id="L134">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="84">liftW</span>, <span class="const token" data-verso-hover="97">Walk.support_cons</span>, <span class="const token" data-verso-hover="98">List.mem_cons</span>, ih, <span class="const token" data-verso-hover="99">Walk.edges_cons</span>]</span>
+<span id="L135">    <span class="kw">constructor</span></span>
+<span id="L136">    · <span class="kw">rintro</span> (<span class="kw">rfl</span> | <span class="kw">rfl</span> | (⟨c, hc, <span class="kw">rfl</span>⟩ | ⟨e, he, <span class="kw">rfl</span>⟩))</span>
+<span id="L137">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="100">Or.inl</span> ⟨_, <span class="const token" data-verso-hover="100">Or.inl</span> <span class="const token" data-verso-hover="82">rfl</span>, <span class="const token" data-verso-hover="82">rfl</span>⟩</span>
+<span id="L138">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="101">Or.inr</span> ⟨_, <span class="const token" data-verso-hover="100">Or.inl</span> <span class="const token" data-verso-hover="82">rfl</span>, <span class="const token" data-verso-hover="82">rfl</span>⟩</span>
+<span id="L139">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="100">Or.inl</span> ⟨c, <span class="const token" data-verso-hover="101">Or.inr</span> hc, <span class="const token" data-verso-hover="82">rfl</span>⟩</span>
+<span id="L140">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="101">Or.inr</span> ⟨e, <span class="const token" data-verso-hover="101">Or.inr</span> he, <span class="const token" data-verso-hover="82">rfl</span>⟩</span>
+<span id="L141">    · <span class="kw">rintro</span> (⟨c, hc, <span class="kw">rfl</span>⟩ | ⟨e, he, <span class="kw">rfl</span>⟩)</span>
+<span id="L142">      · <span class="kw">rcases</span> hc <span class="kw">with</span> <span class="kw">rfl</span> | hc</span>
+<span id="L143">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="100">Or.inl</span> <span class="const token" data-verso-hover="82">rfl</span></span>
+<span id="L144">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="101">Or.inr</span> (<span class="const token" data-verso-hover="101">Or.inr</span> (<span class="const token" data-verso-hover="100">Or.inl</span> ⟨c, hc, <span class="const token" data-verso-hover="82">rfl</span>⟩))</span>
+<span id="L145">      · <span class="kw">rcases</span> he <span class="kw">with</span> he | he</span>
+<span id="L146">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="101">Or.inr</span> (<span class="const token" data-verso-hover="100">Or.inl</span> (<span class="kw">by</span> <span class="kw">rw</span> [<span class="kw">show</span> e = <span class="const token" data-verso-hover="83">edgeOf</span> h <span class="kw">from</span> <span class="const token" data-verso-hover="102">Subtype.ext</span> he]))</span>
+<span id="L147">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="101">Or.inr</span> (<span class="const token" data-verso-hover="101">Or.inr</span> (<span class="const token" data-verso-hover="101">Or.inr</span> ⟨e, he, <span class="const token" data-verso-hover="82">rfl</span>⟩))</span>
+<span id="L148"></span>
+<span id="L149"><span class="kw">lemma</span> <span class="const token" data-verso-hover="103">liftW_isPath</span> {a b : C} {p : T.<span class="const token" data-verso-hover="85">Walk</span> a b} (hp : p.<span class="const token" data-verso-hover="104">IsPath</span>) : (<span class="const token" data-verso-hover="84">liftW</span> p).<span class="const token" data-verso-hover="104">IsPath</span> := <span class="kw">by</span></span>
+<span id="L150">  <span class="kw">induction</span> p <span class="kw">with</span></span>
+<span id="L151">  | <span class="const token" data-verso-hover="86">nil</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="84">liftW</span>]</span>
+<span id="L152">  | <span class="const token" data-verso-hover="87">cons</span> h p ih =&gt;</span>
+<span id="L153">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="105">Walk.cons_isPath_iff</span>] <span class="kw">at</span> hp</span>
+<span id="L154">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="84">liftW</span>, <span class="const token" data-verso-hover="105">Walk.cons_isPath_iff</span>, <span class="const token" data-verso-hover="97">Walk.support_cons</span>, <span class="const token" data-verso-hover="98">List.mem_cons</span>, <span class="const token" data-verso-hover="94">mem_support_liftW</span>]</span>
+<span id="L155">    <span class="kw">refine</span> ⟨⟨ih hp.<span class="const token" data-verso-hover="106">1</span>, ?_⟩, ?_⟩</span>
+<span id="L156">    · <span class="kw">rintro</span> (⟨c, -, hc⟩ | ⟨e, he, hee⟩)</span>
+<span id="L157">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="107">Sum.inr_ne_inl</span> hc</span>
+<span id="L158">      · <span class="kw">cases</span> hee</span>
+<span id="L159">        <span class="kw">exact</span> hp.<span class="const token" data-verso-hover="108">2</span> (p.<span class="const token" data-verso-hover="109">fst_mem_support_of_mem_edges</span> he)</span>
+<span id="L160">    · <span class="kw">rintro</span> (hc | ⟨c, hc', hc⟩ | ⟨e, -, hc⟩)</span>
+<span id="L161">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="110">Sum.inl_ne_inr</span> hc</span>
+<span id="L162">      · <span class="kw">obtain</span> <span class="kw">rfl</span> := <span class="const token" data-verso-hover="111">Sum.inl.inj</span> hc; <span class="kw">exact</span> hp.<span class="const token" data-verso-hover="108">2</span> hc'</span>
+<span id="L163">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="110">Sum.inl_ne_inr</span> hc</span>
+<span id="L164"></span>
+<span id="L165"><span class="kw">lemma</span> <span class="const token" data-verso-hover="112">subdiv_connected</span> (hT : T.<span class="const token" data-verso-hover="113">Connected</span>) : (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="113">Connected</span> := <span class="kw">by</span></span>
+<span id="L166">  <span class="kw">have</span> hne := hT.<span class="const token" data-verso-hover="114">nonempty</span></span>
+<span id="L167">  <span class="kw">have</span> hinl : ∀ a b : C, (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="115">Reachable</span> (<span class="const token" data-verso-hover="64">Sum.inl</span> a) (<span class="const token" data-verso-hover="64">Sum.inl</span> b) := <span class="kw">fun</span> a b =&gt;</span>
+<span id="L168">    ⟨<span class="const token" data-verso-hover="84">liftW</span> (hT.<span class="const token" data-verso-hover="116">preconnected</span> a b).<span class="const token" data-verso-hover="117">some</span>⟩</span>
+<span id="L169">  <span class="kw">have</span> hto : ∀ z : C ⊕ T.<span class="const token" data-verso-hover="62">edgeSet</span>, ∃ c, (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="115">Reachable</span> z (<span class="const token" data-verso-hover="64">Sum.inl</span> c) := <span class="kw">by</span></span>
+<span id="L170">    <span class="kw">rintro</span> (c | e)</span>
+<span id="L171">    · <span class="kw">exact</span> ⟨c, <span class="const token" data-verso-hover="118">Reachable.refl</span> _⟩</span>
+<span id="L172">    · <span class="kw">obtain</span> ⟨c, c', -, he⟩ := <span class="const token" data-verso-hover="80">exists_eq_edge</span> e</span>
+<span id="L173">      <span class="kw">exact</span> ⟨c, (<span class="const token" data-verso-hover="76">subdiv_adj_inr_inl</span>.<span class="const token" data-verso-hover="88">2</span> (<span class="kw">by</span> <span class="kw">rw</span> [he]; <span class="kw">exact</span> <span class="const token" data-verso-hover="89">Sym2.mem_mk_left</span> c c')).<span class="const token" data-verso-hover="119">reachable</span>⟩</span>
+<span id="L174">  <span class="kw">have</span> : <span class="const token" data-verso-hover="120">Nonempty</span> (C ⊕ T.<span class="const token" data-verso-hover="62">edgeSet</span>) := ⟨<span class="const token" data-verso-hover="64">Sum.inl</span> hne.<span class="const token" data-verso-hover="117">some</span>⟩</span>
+<span id="L175">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> z z' =&gt; ?_⟩</span>
+<span id="L176">  <span class="kw">obtain</span> ⟨c, hc⟩ := hto z</span>
+<span id="L177">  <span class="kw">obtain</span> ⟨c', hc'⟩ := hto z'</span>
+<span id="L178">  <span class="kw">exact</span> hc.<span class="const token" data-verso-hover="121">trans</span> ((hinl c c').<span class="const token" data-verso-hover="121">trans</span> hc'.<span class="const token" data-verso-hover="122">symm</span>)</span>
+<span id="L179"></span>
+<span id="L180"><span class="dc">/-- Edges of `T_S` correspond to darts of `T`, hence `|E(T_S)| = 2 |E(T)|`. -/</span></span>
+<span id="L181"><span class="kw">lemma</span> <span class="const token" data-verso-hover="123">card_edgeSet_subdiv</span> [<span class="const token" data-verso-hover="124">Finite</span> C] : <span class="const token" data-verso-hover="125">Nat.card</span> (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="62">edgeSet</span> = <span class="nu">2</span> * <span class="const token" data-verso-hover="125">Nat.card</span> T.<span class="const token" data-verso-hover="62">edgeSet</span> := <span class="kw">by</span></span>
+<span id="L182">  <span class="kw">classical</span></span>
+<span id="L183">  <span class="kw">have</span> := <span class="const token" data-verso-hover="126">Fintype.ofFinite</span> C</span>
+<span id="L184">  <span class="kw">let</span> f : T.<span class="const token" data-verso-hover="127">Dart</span> → (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="62">edgeSet</span> := <span class="kw">fun</span> d =&gt;</span>
+<span id="L185">    ⟨s(<span class="const token" data-verso-hover="64">Sum.inl</span> d.<span class="const token" data-verso-hover="128">fst</span>, <span class="const token" data-verso-hover="65">Sum.inr</span> (<span class="const token" data-verso-hover="83">edgeOf</span> d.<span class="const token" data-verso-hover="129">adj</span>)), <span class="const token" data-verso-hover="74">subdiv_adj_inl_inr</span>.<span class="const token" data-verso-hover="88">2</span> (<span class="const token" data-verso-hover="89">Sym2.mem_mk_left</span> _ _)⟩</span>
+<span id="L186">  <span class="kw">have</span> hf : <span class="const token" data-verso-hover="130">Function.Bijective</span> f := <span class="kw">by</span></span>
+<span id="L187">    <span class="kw">constructor</span></span>
+<span id="L188">    · <span class="kw">rintro</span> ⟨⟨a, b⟩, hab⟩ ⟨⟨a', b'⟩, hab'⟩ h</span>
+<span id="L189">      <span class="kw">simp</span> only [f, <span class="const token" data-verso-hover="83">edgeOf</span>, <span class="const token" data-verso-hover="131">Subtype.mk.injEq</span>, <span class="const token" data-verso-hover="132">Sym2.eq_iff</span>, <span class="const token" data-verso-hover="133">Sum.inl.injEq</span>, <span class="const token" data-verso-hover="134">reduceCtorEq</span>,</span>
+<span id="L190">        <span class="const token" data-verso-hover="135">false_and</span>, <span class="const token" data-verso-hover="136">or_false</span>] <span class="kw">at</span> h</span>
+<span id="L191">      <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, h⟩ := h</span>
+<span id="L192">      <span class="kw">obtain</span> <span class="kw">rfl</span> := <span class="const token" data-verso-hover="137">Sym2.congr_right</span>.<span class="const token" data-verso-hover="138">1</span> (<span class="const token" data-verso-hover="139">congrArg</span> <span class="const token" data-verso-hover="140">Subtype.val</span> (<span class="const token" data-verso-hover="141">Sum.inr.inj</span> h))</span>
+<span id="L193">      <span class="kw">rfl</span></span>
+<span id="L194">    · <span class="kw">rintro</span> ⟨z, hz⟩</span>
+<span id="L195">      <span class="kw">revert</span> hz</span>
+<span id="L196">      <span class="kw">induction</span> z <span class="kw">using</span> <span class="const token" data-verso-hover="81">Sym2.ind</span> <span class="kw">with</span></span>
+<span id="L197">      | h x y =&gt;</span>
+<span id="L198">        <span class="kw">intro</span> hz</span>
+<span id="L199">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="142">mem_edgeSet</span>] <span class="kw">at</span> hz</span>
+<span id="L200">        <span class="kw">rcases</span> x <span class="kw">with</span> c | e &lt;;&gt; <span class="kw">rcases</span> y <span class="kw">with</span> c' | e'</span>
+<span id="L201">        · <span class="kw">simp</span> <span class="kw">at</span> hz</span>
+<span id="L202">        · <span class="kw">have</span> hc : c ∈ (e' : <span class="const token" data-verso-hover="66">Sym2</span> C) := <span class="const token" data-verso-hover="74">subdiv_adj_inl_inr</span>.<span class="const token" data-verso-hover="138">1</span> hz</span>
+<span id="L203">          <span class="kw">refine</span> ⟨⟨(c, <span class="const token" data-verso-hover="143">Sym2.Mem.other</span> hc), <span class="kw">by</span></span>
+<span id="L204">            <span class="kw">rw</span> [← <span class="const token" data-verso-hover="142">mem_edgeSet</span>, <span class="const token" data-verso-hover="144">Sym2.other_spec</span>]; <span class="kw">exact</span> e'.<span class="const token" data-verso-hover="145">2</span>⟩, ?_⟩</span>
+<span id="L205">          <span class="kw">simp</span> only [f, <span class="const token" data-verso-hover="83">edgeOf</span>, <span class="const token" data-verso-hover="131">Subtype.mk.injEq</span>]</span>
+<span id="L206">          <span class="kw">congr</span> <span class="nu">2</span></span>
+<span id="L207">          <span class="kw">exact</span> <span class="const token" data-verso-hover="102">Subtype.ext</span> (<span class="const token" data-verso-hover="144">Sym2.other_spec</span> hc)</span>
+<span id="L208">        · <span class="kw">have</span> hc : c' ∈ (e : <span class="const token" data-verso-hover="66">Sym2</span> C) := <span class="const token" data-verso-hover="76">subdiv_adj_inr_inl</span>.<span class="const token" data-verso-hover="138">1</span> hz</span>
+<span id="L209">          <span class="kw">refine</span> ⟨⟨(c', <span class="const token" data-verso-hover="143">Sym2.Mem.other</span> hc), <span class="kw">by</span></span>
+<span id="L210">            <span class="kw">rw</span> [← <span class="const token" data-verso-hover="142">mem_edgeSet</span>, <span class="const token" data-verso-hover="144">Sym2.other_spec</span>]; <span class="kw">exact</span> e.<span class="const token" data-verso-hover="145">2</span>⟩, ?_⟩</span>
+<span id="L211">          <span class="kw">simp</span> only [f, <span class="const token" data-verso-hover="83">edgeOf</span>, <span class="const token" data-verso-hover="131">Subtype.mk.injEq</span>]</span>
+<span id="L212">          <span class="kw">rw</span> [<span class="const token" data-verso-hover="146">Sym2.eq_swap</span>]</span>
+<span id="L213">          <span class="kw">congr</span> <span class="nu">2</span></span>
+<span id="L214">          <span class="kw">exact</span> <span class="const token" data-verso-hover="102">Subtype.ext</span> (<span class="const token" data-verso-hover="144">Sym2.other_spec</span> hc)</span>
+<span id="L215">        · <span class="kw">simp</span> <span class="kw">at</span> hz</span>
+<span id="L216">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="147">Nat.card_eq_of_bijective</span> f hf, <span class="const token" data-verso-hover="148">Nat.card_eq_fintype_card</span>, <span class="const token" data-verso-hover="149">dart_card_eq_twice_card_edges</span>,</span>
+<span id="L217">    <span class="const token" data-verso-hover="150">edgeFinset_card</span>, <span class="const token" data-verso-hover="148">Nat.card_eq_fintype_card</span>]</span>
+<span id="L218"></span>
+<span id="L219"><span class="kw">end</span> Subdiv</span>
+<span id="L220"></span>
+<span id="L221"><span class="kw">section</span> Proofs</span>
+<span id="L222"></span>
+<span id="L223"><span class="kw">variable</span> {V C : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="48">DecidableEq</span> V] {G : <span class="const token" data-verso-hover="16">SimpleGraph</span> V} {T : <span class="const token" data-verso-hover="16">SimpleGraph</span> C}</span>
+<span id="L224">  {bag : C → <span class="const token" data-verso-hover="44">Finset</span> V}</span>
+<span id="L225"></span>
+<span id="L226"><span class="dc">/-- The subdivided tree of a tree is a tree. -/</span></span>
+<span id="L227"><span class="kw">theorem</span> <span class="const token" data-verso-hover="34">subdiv_isTree</span> [<span class="const token" data-verso-hover="124">Finite</span> C] (hT : T.<span class="const token" data-verso-hover="51">IsTree</span>) : (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="51">IsTree</span> := <span class="kw">by</span></span>
+<span id="L228">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="151">isTree_iff_connected_and_card</span>] <span class="kw">at</span> hT ⊢</span>
+<span id="L229">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="112">subdiv_connected</span> hT.<span class="const token" data-verso-hover="106">1</span>, ?_⟩</span>
+<span id="L230">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="123">card_edgeSet_subdiv</span>, <span class="const token" data-verso-hover="152">Nat.card_sum</span>, ← hT.<span class="const token" data-verso-hover="108">2</span>]</span>
+<span id="L231">  <span class="kw">ring</span></span>
+<span id="L232"></span>
+<span id="L233"><span class="dc">/-- The path of `T_S` between two clique vertices `inl a`, `inl b` is the lift of the path of `T`</span></span>
+<span id="L234"><span class="dc">between `a` and `b`: its vertices are the `inl c` with `c` between `a` and `b`, and the `inr e`</span></span>
+<span id="L235"><span class="dc">for the edges `e = {c, c'}` of that path, where `c` is on `a`'s side and `c'` on `b`'s side. -/</span></span>
+<span id="L236"><span class="kw">lemma</span> <span class="const token" data-verso-hover="153">btw_subdiv</span> [<span class="const token" data-verso-hover="124">Finite</span> C] (hT : T.<span class="const token" data-verso-hover="51">IsTree</span>) {a b : C} {z : C ⊕ T.<span class="const token" data-verso-hover="62">edgeSet</span>}</span>
+<span id="L237">    (h : <span class="const token" data-verso-hover="60">Btw</span> (<span class="const token" data-verso-hover="61">subdiv</span> T) (<span class="const token" data-verso-hover="64">Sum.inl</span> a) z (<span class="const token" data-verso-hover="64">Sum.inl</span> b)) :</span>
+<span id="L238">    (∃ c, z = <span class="const token" data-verso-hover="64">Sum.inl</span> c ∧ <span class="const token" data-verso-hover="60">Btw</span> T a c b) ∨</span>
+<span id="L239">      (∃ e c c', z = <span class="const token" data-verso-hover="65">Sum.inr</span> e ∧ (e : <span class="const token" data-verso-hover="66">Sym2</span> C) = s(c, c') ∧ T.<span class="const token" data-verso-hover="57">Adj</span> c c' ∧ <span class="const token" data-verso-hover="60">Btw</span> T a c c' ∧</span>
+<span id="L240">        <span class="const token" data-verso-hover="60">Btw</span> T b c' c) := <span class="kw">by</span></span>
+<span id="L241">  <span class="kw">classical</span></span>
+<span id="L242">  <span class="kw">have</span> hTS := <span class="const token" data-verso-hover="34">subdiv_isTree</span> hT</span>
+<span id="L243">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="154">mem_tpath_iff</span> hTS, ← <span class="const token" data-verso-hover="155">eq_tpath</span> hTS _ (<span class="const token" data-verso-hover="103">liftW_isPath</span> (<span class="const token" data-verso-hover="156">tpath_isPath</span> hT a b)),</span>
+<span id="L244">    <span class="const token" data-verso-hover="94">mem_support_liftW</span>] <span class="kw">at</span> h</span>
+<span id="L245">  <span class="kw">rcases</span> h <span class="kw">with</span> ⟨c, hc, <span class="kw">rfl</span>⟩ | ⟨e, he, <span class="kw">rfl</span>⟩</span>
+<span id="L246">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="100">Or.inl</span> ⟨c, <span class="const token" data-verso-hover="82">rfl</span>, (<span class="const token" data-verso-hover="154">mem_tpath_iff</span> hT).<span class="const token" data-verso-hover="138">1</span> hc⟩</span>
+<span id="L247">  · <span class="kw">right</span></span>
+<span id="L248">    <span class="kw">obtain</span> ⟨c, c', hcc', hee⟩ := <span class="const token" data-verso-hover="80">exists_eq_edge</span> e</span>
+<span id="L249">    <span class="kw">rw</span> [hee] <span class="kw">at</span> he</span>
+<span id="L250">    <span class="kw">have</span> h1 := (<span class="const token" data-verso-hover="154">mem_tpath_iff</span> hT).<span class="const token" data-verso-hover="138">1</span> ((<span class="const token" data-verso-hover="157">tpath</span> hT a b).<span class="const token" data-verso-hover="109">fst_mem_support_of_mem_edges</span> he)</span>
+<span id="L251">    <span class="kw">have</span> h2 := (<span class="const token" data-verso-hover="154">mem_tpath_iff</span> hT).<span class="const token" data-verso-hover="138">1</span> ((<span class="const token" data-verso-hover="157">tpath</span> hT a b).<span class="const token" data-verso-hover="158">snd_mem_support_of_mem_edges</span> he)</span>
+<span id="L252">    <span class="kw">have</span> d1 : T.<span class="const token" data-verso-hover="69">dist</span> c c' = <span class="nu">1</span> := <span class="const token" data-verso-hover="159">dist_eq_one_iff_adj</span>.<span class="const token" data-verso-hover="88">2</span> hcc'</span>
+<span id="L253">    <span class="kw">have</span> d2 : T.<span class="const token" data-verso-hover="69">dist</span> c' c = <span class="nu">1</span> := <span class="const token" data-verso-hover="159">dist_eq_one_iff_adj</span>.<span class="const token" data-verso-hover="88">2</span> hcc'.<span class="const token" data-verso-hover="160">symm</span></span>
+<span id="L254">    <span class="kw">have</span> d3 : T.<span class="const token" data-verso-hover="69">dist</span> b c = T.<span class="const token" data-verso-hover="69">dist</span> c b := <span class="const token" data-verso-hover="161">dist_comm</span></span>
+<span id="L255">    <span class="kw">have</span> d4 : T.<span class="const token" data-verso-hover="69">dist</span> b c' = T.<span class="const token" data-verso-hover="69">dist</span> c' b := <span class="const token" data-verso-hover="161">dist_comm</span></span>
+<span id="L256">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="60">Btw</span> <span class="kw">at</span> h1 h2</span>
+<span id="L257">    <span class="kw">rcases</span> hT.<span class="const token" data-verso-hover="162">dist_eq_dist_add_one_of_adj</span> a hcc' <span class="kw">with</span> hd | hd</span>
+<span id="L258">    · <span class="kw">refine</span> ⟨e, c', c, <span class="const token" data-verso-hover="82">rfl</span>, <span class="kw">by</span> <span class="kw">rw</span> [hee, <span class="const token" data-verso-hover="146">Sym2.eq_swap</span>], hcc'.<span class="const token" data-verso-hover="160">symm</span>, ?_, ?_⟩ &lt;;&gt; <span class="kw">unfold</span> <span class="const token" data-verso-hover="60">Btw</span> &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L259">    · <span class="kw">refine</span> ⟨e, c, c', <span class="const token" data-verso-hover="82">rfl</span>, hee, hcc', ?_, ?_⟩ &lt;;&gt; <span class="kw">unfold</span> <span class="const token" data-verso-hover="60">Btw</span> &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L260"></span>
+<span id="L261"><span class="dc">/-- `D(T_S) ≤ 2 · D(T)`. -/</span></span>
+<span id="L262"><span class="kw">theorem</span> <span class="const token" data-verso-hover="35">diam_subdiv_le</span> [<span class="const token" data-verso-hover="124">Finite</span> C] (hT : T.<span class="const token" data-verso-hover="51">IsTree</span>) : (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="163">diam</span> ≤ <span class="nu">2</span> * T.<span class="const token" data-verso-hover="163">diam</span> := <span class="kw">by</span></span>
+<span id="L263">  <span class="kw">have</span> hTS := <span class="const token" data-verso-hover="34">subdiv_isTree</span> hT</span>
+<span id="L264">  <span class="kw">have</span> : <span class="const token" data-verso-hover="120">Nonempty</span> C := hT.<span class="const token" data-verso-hover="164">connected</span>.<span class="const token" data-verso-hover="114">nonempty</span></span>
+<span id="L265">  <span class="kw">have</span> hD : ∀ a b : C, T.<span class="const token" data-verso-hover="69">dist</span> a b ≤ T.<span class="const token" data-verso-hover="163">diam</span> := <span class="kw">fun</span> a b =&gt;</span>
+<span id="L266">    <span class="const token" data-verso-hover="165">dist_le_diam</span> (<span class="const token" data-verso-hover="166">connected_iff_ediam_ne_top</span>.<span class="const token" data-verso-hover="138">1</span> hT.<span class="const token" data-verso-hover="164">connected</span>)</span>
+<span id="L267">  <span class="kw">have</span> hll : ∀ a b : C, (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="69">dist</span> (<span class="const token" data-verso-hover="64">Sum.inl</span> a) (<span class="const token" data-verso-hover="64">Sum.inl</span> b) ≤ <span class="nu">2</span> * T.<span class="const token" data-verso-hover="69">dist</span> a b := <span class="kw">by</span></span>
+<span id="L268">    <span class="kw">intro</span> a b</span>
+<span id="L269">    <span class="kw">obtain</span> ⟨p, hp⟩ := hT.<span class="const token" data-verso-hover="164">connected</span>.<span class="const token" data-verso-hover="167">exists_walk_length_eq_dist</span> a b</span>
+<span id="L270">    <span class="kw">calc</span> _ ≤ (<span class="const token" data-verso-hover="84">liftW</span> p).<span class="const token" data-verso-hover="92">length</span> := <span class="const token" data-verso-hover="168">dist_le</span> _</span>
+<span id="L271">      _ = _ := <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="91">length_liftW</span>, hp]</span>
+<span id="L272">  <span class="kw">have</span> hrl : ∀ (e : T.<span class="const token" data-verso-hover="62">edgeSet</span>) (b : C),</span>
+<span id="L273">      (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="69">dist</span> (<span class="const token" data-verso-hover="65">Sum.inr</span> e) (<span class="const token" data-verso-hover="64">Sum.inl</span> b) + <span class="nu">1</span> ≤ <span class="nu">2</span> * T.<span class="const token" data-verso-hover="163">diam</span> := <span class="kw">by</span></span>
+<span id="L274">    <span class="kw">intro</span> e b</span>
+<span id="L275">    <span class="kw">obtain</span> ⟨c, c', hcc', hee⟩ := <span class="const token" data-verso-hover="80">exists_eq_edge</span> e</span>
+<span id="L276">    <span class="kw">have</span> key : ∀ x y : C, x ∈ (e : <span class="const token" data-verso-hover="66">Sym2</span> C) → T.<span class="const token" data-verso-hover="69">dist</span> b x &lt; T.<span class="const token" data-verso-hover="69">dist</span> b y →</span>
+<span id="L277">        (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="69">dist</span> (<span class="const token" data-verso-hover="65">Sum.inr</span> e) (<span class="const token" data-verso-hover="64">Sum.inl</span> b) + <span class="nu">1</span> ≤ <span class="nu">2</span> * T.<span class="const token" data-verso-hover="163">diam</span> := <span class="kw">by</span></span>
+<span id="L278">      <span class="kw">intro</span> x y hx hxy</span>
+<span id="L279">      <span class="kw">have</span> h1 := hTS.<span class="const token" data-verso-hover="164">connected</span>.<span class="const token" data-verso-hover="169">dist_triangle</span> (u := <span class="const token" data-verso-hover="65">Sum.inr</span> e) (v := <span class="const token" data-verso-hover="64">Sum.inl</span> x) (w := <span class="const token" data-verso-hover="64">Sum.inl</span> b)</span>
+<span id="L280">      <span class="kw">have</span> h2 : (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="69">dist</span> (<span class="const token" data-verso-hover="65">Sum.inr</span> e) (<span class="const token" data-verso-hover="64">Sum.inl</span> x) = <span class="nu">1</span> :=</span>
+<span id="L281">        <span class="const token" data-verso-hover="159">dist_eq_one_iff_adj</span>.<span class="const token" data-verso-hover="88">2</span> (<span class="const token" data-verso-hover="76">subdiv_adj_inr_inl</span>.<span class="const token" data-verso-hover="88">2</span> hx)</span>
+<span id="L282">      <span class="kw">have</span> h3 := hll x b</span>
+<span id="L283">      <span class="kw">have</span> h4 := hD b y</span>
+<span id="L284">      <span class="kw">have</span> h5 : T.<span class="const token" data-verso-hover="69">dist</span> x b = T.<span class="const token" data-verso-hover="69">dist</span> b x := <span class="const token" data-verso-hover="161">dist_comm</span></span>
+<span id="L285">      <span class="kw">omega</span></span>
+<span id="L286">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="170">lt_or_gt_of_ne</span> (hT.<span class="const token" data-verso-hover="171">dist_ne_of_adj</span> b hcc') <span class="kw">with</span> h | h</span>
+<span id="L287">    · <span class="kw">exact</span> key c c' (<span class="kw">by</span> <span class="kw">rw</span> [hee]; <span class="kw">exact</span> <span class="const token" data-verso-hover="89">Sym2.mem_mk_left</span> _ _) h</span>
+<span id="L288">    · <span class="kw">exact</span> key c' c (<span class="kw">by</span> <span class="kw">rw</span> [hee]; <span class="kw">exact</span> <span class="const token" data-verso-hover="90">Sym2.mem_mk_right</span> _ _) h</span>
+<span id="L289">  <span class="kw">obtain</span> ⟨u, v, huv⟩ := (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="172">exists_dist_eq_diam</span></span>
+<span id="L290">  <span class="kw">rw</span> [← huv]</span>
+<span id="L291">  <span class="kw">rcases</span> u <span class="kw">with</span> a | e &lt;;&gt; <span class="kw">rcases</span> v <span class="kw">with</span> b | e'</span>
+<span id="L292">  · <span class="kw">exact</span> (hll a b).<span class="const token" data-verso-hover="173">trans</span> (<span class="const token" data-verso-hover="174">Nat.mul_le_mul_left</span> <span class="nu">2</span> (hD a b))</span>
+<span id="L293">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="161">dist_comm</span>]; <span class="kw">have</span> := hrl e' a; <span class="kw">omega</span></span>
+<span id="L294">  · <span class="kw">have</span> := hrl e b; <span class="kw">omega</span></span>
+<span id="L295">  · <span class="kw">obtain</span> ⟨c, c', -, hee⟩ := <span class="const token" data-verso-hover="80">exists_eq_edge</span> e'</span>
+<span id="L296">    <span class="kw">have</span> h1 := hTS.<span class="const token" data-verso-hover="164">connected</span>.<span class="const token" data-verso-hover="169">dist_triangle</span> (u := <span class="const token" data-verso-hover="65">Sum.inr</span> e) (v := <span class="const token" data-verso-hover="64">Sum.inl</span> c) (w := <span class="const token" data-verso-hover="65">Sum.inr</span> e')</span>
+<span id="L297">    <span class="kw">have</span> h2 : (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="69">dist</span> (<span class="const token" data-verso-hover="64">Sum.inl</span> c) (<span class="const token" data-verso-hover="65">Sum.inr</span> e') = <span class="nu">1</span> :=</span>
+<span id="L298">      <span class="const token" data-verso-hover="159">dist_eq_one_iff_adj</span>.<span class="const token" data-verso-hover="88">2</span> (<span class="const token" data-verso-hover="74">subdiv_adj_inl_inr</span>.<span class="const token" data-verso-hover="88">2</span> (<span class="kw">by</span> <span class="kw">rw</span> [hee]; <span class="kw">exact</span> <span class="const token" data-verso-hover="89">Sym2.mem_mk_left</span> _ _))</span>
+<span id="L299">    <span class="kw">have</span> := hrl e c</span>
+<span id="L300">    <span class="kw">omega</span></span>
+<span id="L301"></span>
+<span id="L302"><span class="dc">/-! #### Sides of a tree edge -/</span></span>
+<span id="L303"></span>
+<span id="L304"><span class="dc">/-- In a tree, every vertex `d` is on one side of an edge `{c, c'}`. -/</span></span>
+<span id="L305"><span class="kw">lemma</span> <span class="const token" data-verso-hover="175">side_or</span> (hT : T.<span class="const token" data-verso-hover="51">IsTree</span>) {c c' : C} (h : T.<span class="const token" data-verso-hover="57">Adj</span> c c') (d : C) :</span>
+<span id="L306">    <span class="const token" data-verso-hover="60">Btw</span> T d c c' ∨ <span class="const token" data-verso-hover="60">Btw</span> T d c' c := <span class="kw">by</span></span>
+<span id="L307">  <span class="kw">have</span> h1 : T.<span class="const token" data-verso-hover="69">dist</span> c c' = <span class="nu">1</span> := <span class="const token" data-verso-hover="159">dist_eq_one_iff_adj</span>.<span class="const token" data-verso-hover="88">2</span> h</span>
+<span id="L308">  <span class="kw">have</span> h2 : T.<span class="const token" data-verso-hover="69">dist</span> c' c = <span class="nu">1</span> := <span class="const token" data-verso-hover="159">dist_eq_one_iff_adj</span>.<span class="const token" data-verso-hover="88">2</span> h.<span class="const token" data-verso-hover="160">symm</span></span>
+<span id="L309">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="60">Btw</span></span>
+<span id="L310">  <span class="kw">rcases</span> hT.<span class="const token" data-verso-hover="162">dist_eq_dist_add_one_of_adj</span> d h <span class="kw">with</span> hd | hd &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L311"></span>
+<span id="L312"><span class="kw">lemma</span> <span class="const token" data-verso-hover="176">not_side_and</span> {c c' : C} (h : T.<span class="const token" data-verso-hover="57">Adj</span> c c') {d : C} (h1 : <span class="const token" data-verso-hover="60">Btw</span> T d c c') (h2 : <span class="const token" data-verso-hover="60">Btw</span> T d c' c) :</span>
+<span id="L313">    <span class="const token" data-verso-hover="177">False</span> := <span class="kw">by</span></span>
+<span id="L314">  <span class="kw">have</span> := <span class="const token" data-verso-hover="159">dist_eq_one_iff_adj</span>.<span class="const token" data-verso-hover="88">2</span> h</span>
+<span id="L315">  <span class="kw">have</span> := <span class="const token" data-verso-hover="159">dist_eq_one_iff_adj</span>.<span class="const token" data-verso-hover="88">2</span> h.<span class="const token" data-verso-hover="160">symm</span></span>
+<span id="L316">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="60">Btw</span> <span class="kw">at</span> *</span>
+<span id="L317">  <span class="kw">omega</span></span>
+<span id="L318"></span>
+<span id="L319"><span class="dc">/-- **Crossing lemma**: if `f` is on `c`'s side and `e` on `c'`'s side of the edge `{c, c'}`,</span></span>
+<span id="L320"><span class="dc">then both `c` and `c'` lie on the path between `f` and `e`. -/</span></span>
+<span id="L321"><span class="kw">lemma</span> <span class="const token" data-verso-hover="178">btw_cross</span> (hT : T.<span class="const token" data-verso-hover="51">IsTree</span>) {c c' f e : C} (h : T.<span class="const token" data-verso-hover="57">Adj</span> c c') (hf : <span class="const token" data-verso-hover="60">Btw</span> T f c c')</span>
+<span id="L322">    (he : <span class="const token" data-verso-hover="60">Btw</span> T e c' c) : <span class="const token" data-verso-hover="60">Btw</span> T f c e ∧ <span class="const token" data-verso-hover="60">Btw</span> T f c' e := <span class="kw">by</span></span>
+<span id="L323">  <span class="kw">classical</span></span>
+<span id="L324">  <span class="kw">have</span> := <span class="const token" data-verso-hover="159">dist_eq_one_iff_adj</span>.<span class="const token" data-verso-hover="88">2</span> h</span>
+<span id="L325">  <span class="kw">have</span> := <span class="const token" data-verso-hover="159">dist_eq_one_iff_adj</span>.<span class="const token" data-verso-hover="88">2</span> h.<span class="const token" data-verso-hover="160">symm</span></span>
+<span id="L326">  <span class="kw">constructor</span></span>
+<span id="L327">  · <span class="kw">rcases</span> <span class="const token" data-verso-hover="179">btw_or</span> hT hf e <span class="kw">with</span> h' | h'</span>
+<span id="L328">    · <span class="kw">exact</span> h'</span>
+<span id="L329">    · <span class="kw">exfalso</span>; <span class="kw">unfold</span> <span class="const token" data-verso-hover="60">Btw</span> <span class="kw">at</span> *; <span class="kw">omega</span></span>
+<span id="L330">  · <span class="kw">rcases</span> <span class="const token" data-verso-hover="179">btw_or</span> hT he f <span class="kw">with</span> h' | h'</span>
+<span id="L331">    · <span class="kw">exact</span> h'.<span class="const token" data-verso-hover="180">symm</span></span>
+<span id="L332">    · <span class="kw">exfalso</span>; <span class="kw">unfold</span> <span class="const token" data-verso-hover="60">Btw</span> <span class="kw">at</span> *; <span class="kw">omega</span></span>
+<span id="L333"></span>
+<span id="L334"><span class="dc">/-! #### Bags -/</span></span>
+<span id="L335"></span>
+<span id="L336"><span class="dc">/-- A vertex lying in a clique on each side of the clique-tree edge `{c, c'}` is the unique</span></span>
+<span id="L337"><span class="dc">vertex `u` of `bag c ∩ bag c'` (running intersection property + block property). -/</span></span>
+<span id="L338"><span class="kw">lemma</span> <span class="const token" data-verso-hover="181">eq_of_mem_cross</span> (hB : <span class="const token" data-verso-hover="47">IsBlockGraph</span> G) (hCT : <span class="const token" data-verso-hover="18">IsCliqueTree</span> G T bag) {c c' : C}</span>
+<span id="L339">    (h : T.<span class="const token" data-verso-hover="57">Adj</span> c c') {u : V} (hu : u ∈ bag c) (hu' : u ∈ bag c') {f e : C} (hf : <span class="const token" data-verso-hover="60">Btw</span> T f c c')</span>
+<span id="L340">    (he : <span class="const token" data-verso-hover="60">Btw</span> T e c' c) {y : V} (hyf : y ∈ bag f) (hye : y ∈ bag e) : y = u := <span class="kw">by</span></span>
+<span id="L341">  <span class="kw">obtain</span> ⟨h1, h2⟩ := <span class="const token" data-verso-hover="178">btw_cross</span> hCT.<span class="const token" data-verso-hover="50">isTree</span> h hf he</span>
+<span id="L342">  <span class="kw">have</span> hy : y ∈ bag c ∩ bag c' := <span class="const token" data-verso-hover="182">Finset.mem_inter</span>.<span class="const token" data-verso-hover="88">2</span></span>
+<span id="L343">    ⟨hCT.<span class="const token" data-verso-hover="59">rip</span> f e c h1 (<span class="const token" data-verso-hover="182">Finset.mem_inter</span>.<span class="const token" data-verso-hover="88">2</span> ⟨hyf, hye⟩),</span>
+<span id="L344">      hCT.<span class="const token" data-verso-hover="59">rip</span> f e c' h2 (<span class="const token" data-verso-hover="182">Finset.mem_inter</span>.<span class="const token" data-verso-hover="88">2</span> ⟨hyf, hye⟩)⟩</span>
+<span id="L345">  <span class="kw">have</span> hcard := hB _ _ (hCT.<span class="const token" data-verso-hover="52">isMaxClique</span> c) (hCT.<span class="const token" data-verso-hover="52">isMaxClique</span> c') (hCT.<span class="const token" data-verso-hover="53">injective</span>.<span class="const token" data-verso-hover="183">ne</span> h.<span class="const token" data-verso-hover="184">ne</span>)</span>
+<span id="L346">  <span class="kw">exact</span> <span class="const token" data-verso-hover="185">Finset.card_le_one</span>.<span class="const token" data-verso-hover="138">1</span> hcard _ hy _ (<span class="const token" data-verso-hover="182">Finset.mem_inter</span>.<span class="const token" data-verso-hover="88">2</span> ⟨hu, hu'⟩)</span>
+<span id="L347"></span>
+<span id="L348"><span class="dc">/-- Every edge of `G` lies in some bag (it extends to a maximal clique). -/</span></span>
+<span id="L349"><span class="kw">lemma</span> <span class="const token" data-verso-hover="186">exists_bag_of_adj</span> [<span class="const token" data-verso-hover="124">Finite</span> V] (hCT : <span class="const token" data-verso-hover="18">IsCliqueTree</span> G T bag) {a b : V} (h : G.<span class="const token" data-verso-hover="57">Adj</span> a b) :</span>
+<span id="L350">    ∃ c, a ∈ bag c ∧ b ∈ bag c := <span class="kw">by</span></span>
+<span id="L351">  <span class="kw">classical</span></span>
+<span id="L352">  <span class="kw">have</span> := <span class="const token" data-verso-hover="126">Fintype.ofFinite</span> V</span>
+<span id="L353">  <span class="kw">let</span> S := <span class="const token" data-verso-hover="187">Finset.univ</span>.<span class="const token" data-verso-hover="188">filter</span> (<span class="kw">fun</span> K : <span class="const token" data-verso-hover="44">Finset</span> V =&gt; G.<span class="const token" data-verso-hover="45">IsClique</span> (K : <span class="const token" data-verso-hover="46">Set</span> V) ∧ {a, b} ⊆ K)</span>
+<span id="L354">  <span class="kw">have</span> hS : ({a, b} : <span class="const token" data-verso-hover="44">Finset</span> V) ∈ S := <span class="kw">by</span></span>
+<span id="L355">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="189">Finset.mem_filter</span>, <span class="const token" data-verso-hover="190">Finset.coe_pair</span>, <span class="const token" data-verso-hover="191">isClique_pair</span>]</span>
+<span id="L356">    <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="192">Finset.mem_univ</span> _, <span class="kw">fun</span> _ =&gt; h, <span class="const token" data-verso-hover="193">subset_rfl</span>⟩</span>
+<span id="L357">  <span class="kw">obtain</span> ⟨K, hK, hmax⟩ := S.<span class="const token" data-verso-hover="194">exists_max_image</span> <span class="const token" data-verso-hover="49">Finset.card</span> ⟨_, hS⟩</span>
+<span id="L358">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="189">Finset.mem_filter</span>] <span class="kw">at</span> hK</span>
+<span id="L359">  <span class="kw">have</span> hKmax : <span class="const token" data-verso-hover="43">IsMaxClique</span> G K := ⟨hK.<span class="const token" data-verso-hover="108">2</span><span class="nu">.</span><span class="const token" data-verso-hover="106">1</span>, <span class="kw">fun</span> K' hK' hsub =&gt;</span>
+<span id="L360">    (<span class="const token" data-verso-hover="195">Finset.eq_of_subset_of_card_le</span> hsub (hmax K' (<span class="const token" data-verso-hover="189">Finset.mem_filter</span>.<span class="const token" data-verso-hover="88">2</span></span>
+<span id="L361">      ⟨<span class="const token" data-verso-hover="192">Finset.mem_univ</span> _, hK', hK.<span class="const token" data-verso-hover="108">2</span><span class="nu">.</span><span class="const token" data-verso-hover="108">2</span>.<span class="const token" data-verso-hover="173">trans</span> hsub⟩))).<span class="const token" data-verso-hover="196">symm</span>⟩</span>
+<span id="L362">  <span class="kw">obtain</span> ⟨c, hc⟩ := hCT.<span class="const token" data-verso-hover="55">surjective</span> K hKmax</span>
+<span id="L363">  <span class="kw">refine</span> ⟨c, ?_, ?_⟩ &lt;;&gt; <span class="kw">rw</span> [hc] &lt;;&gt; <span class="kw">apply</span> hK.<span class="const token" data-verso-hover="108">2</span><span class="nu">.</span><span class="const token" data-verso-hover="108">2</span> &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L364"></span>
+<span id="L365"><span class="kw">omit</span> [<span class="const token" data-verso-hover="48">DecidableEq</span> V] <span class="kw">in</span></span>
+<span id="L366"><span class="dc">/-- Maximal cliques are nonempty (when there is a vertex). -/</span></span>
+<span id="L367"><span class="kw">lemma</span> <span class="const token" data-verso-hover="197">IsMaxClique.nonempty</span> [<span class="const token" data-verso-hover="120">Nonempty</span> V] {K : <span class="const token" data-verso-hover="44">Finset</span> V} (hK : <span class="const token" data-verso-hover="43">IsMaxClique</span> G K) : K.<span class="const token" data-verso-hover="58">Nonempty</span> := <span class="kw">by</span></span>
+<span id="L368">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="198">Finset.nonempty_iff_ne_empty</span>]</span>
+<span id="L369">  <span class="kw">rintro</span> <span class="kw">rfl</span></span>
+<span id="L370">  <span class="kw">obtain</span> ⟨v⟩ := ‹<span class="const token" data-verso-hover="120">Nonempty</span> V›</span>
+<span id="L371">  <span class="kw">have</span> := hK.<span class="const token" data-verso-hover="108">2</span> {v} (<span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="199">Finset.coe_singleton</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="200">isClique_singleton</span> v)</span>
+<span id="L372">    (<span class="const token" data-verso-hover="201">Finset.empty_subset</span> _)</span>
+<span id="L373">  <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L374"></span>
+<span id="L375"><span class="dc">/-- **Lemma 12** (clique-tree edge separator). Let `{c, c'}` be an edge of the clique tree and</span></span>
+<span id="L376"><span class="dc">`u ∈ bag c ∩ bag c'`. If `d` is on `c`'s side (the path from `d` to `c'` passes `c`), `d'` on</span></span>
+<span id="L377"><span class="dc">`c'`'s side, `v ∈ bag d`, `w ∈ bag d'` and `v, w ≠ u`, then every walk from `v` to `w` passes</span></span>
+<span id="L378"><span class="dc">through `u`. (The hypothesis `w ≠ u` is not needed.) -/</span></span>
+<span id="L379"><span class="kw">theorem</span> <span class="const token" data-verso-hover="4">sep_mem_support</span> [<span class="const token" data-verso-hover="124">Finite</span> V] (hB : <span class="const token" data-verso-hover="47">IsBlockGraph</span> G) (hCT : <span class="const token" data-verso-hover="18">IsCliqueTree</span> G T bag)</span>
+<span id="L380">    {c c' : C} (hcc' : T.<span class="const token" data-verso-hover="57">Adj</span> c c') {u : V} (hu : u ∈ bag c) (hu' : u ∈ bag c')</span>
+<span id="L381">    {d d' : C} (hd : <span class="const token" data-verso-hover="60">Btw</span> T d c c') (hd' : <span class="const token" data-verso-hover="60">Btw</span> T d' c' c) {v w : V} (hv : v ∈ bag d)</span>
+<span id="L382">    (hw : w ∈ bag d') (hvu : v ≠ u) (_hwu : w ≠ u) (q : G.<span class="const token" data-verso-hover="85">Walk</span> v w) : u ∈ q.<span class="const token" data-verso-hover="95">support</span> := <span class="kw">by</span></span>
+<span id="L383">  <span class="kw">have</span> hT := hCT.<span class="const token" data-verso-hover="50">isTree</span></span>
+<span id="L384">  <span class="cm">--</span><span class="cm"> the invariant: all cliques containing the current vertex are on `c`'s side</span></span>
+<span id="L385">  <span class="kw">have</span> side : ∀ {y : V} {f : C}, y ≠ u → <span class="const token" data-verso-hover="60">Btw</span> T f c c' → y ∈ bag f → ∀ e, y ∈ bag e →</span>
+<span id="L386">      <span class="const token" data-verso-hover="60">Btw</span> T e c c' := <span class="kw">by</span></span>
+<span id="L387">    <span class="kw">intro</span> y f hyu hf hyf e hye</span>
+<span id="L388">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="175">side_or</span> hT hcc' e <span class="kw">with</span> h | h</span>
+<span id="L389">    · <span class="kw">exact</span> h</span>
+<span id="L390">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="202">absurd</span> (<span class="const token" data-verso-hover="181">eq_of_mem_cross</span> hB hCT hcc' hu hu' hf h hyf hye) hyu</span>
+<span id="L391">  <span class="kw">have</span> main : ∀ {y w' : V} (q : G.<span class="const token" data-verso-hover="85">Walk</span> y w'), w' ∈ bag d' → y ≠ u →</span>
+<span id="L392">      (∀ e, y ∈ bag e → <span class="const token" data-verso-hover="60">Btw</span> T e c c') → u ∈ q.<span class="const token" data-verso-hover="95">support</span> := <span class="kw">by</span></span>
+<span id="L393">    <span class="kw">intro</span> y w' q</span>
+<span id="L394">    <span class="kw">induction</span> q <span class="kw">with</span></span>
+<span id="L395">    | <span class="const token" data-verso-hover="86">nil</span> =&gt; <span class="kw">intro</span> hw' _ hy; <span class="kw">exact</span> (<span class="const token" data-verso-hover="176">not_side_and</span> hcc' (hy d' hw') hd').<span class="const token" data-verso-hover="203">elim</span></span>
+<span id="L396">    | @<span class="const token" data-verso-hover="87">cons</span> y z _ h q ih =&gt;</span>
+<span id="L397">      <span class="kw">intro</span> hw' hyu hy</span>
+<span id="L398">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="97">Walk.support_cons</span>, <span class="const token" data-verso-hover="98">List.mem_cons</span>]</span>
+<span id="L399">      <span class="kw">by_cases</span> hzu : z = u</span>
+<span id="L400">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="101">Or.inr</span> (hzu ▸ q.<span class="const token" data-verso-hover="204">start_mem_support</span>)</span>
+<span id="L401">      · <span class="kw">obtain</span> ⟨f, hyf, hzf⟩ := <span class="const token" data-verso-hover="186">exists_bag_of_adj</span> hCT h</span>
+<span id="L402">        <span class="kw">exact</span> <span class="const token" data-verso-hover="101">Or.inr</span> (ih hw' hzu (side hzu (hy f hyf) hzf))</span>
+<span id="L403">  <span class="kw">exact</span> main q hw hvu (side hvu hd hv)</span>
+<span id="L404"></span>
+<span id="L405"><span class="dc">/-- **Lemma 12**, metric form: `u` lies on a shortest path between `v` and `w`. -/</span></span>
+<span id="L406"><span class="kw">theorem</span> <span class="const token" data-verso-hover="5">sep_btw</span> [<span class="const token" data-verso-hover="124">Finite</span> V] (hG : G.<span class="const token" data-verso-hover="113">Connected</span>) (hB : <span class="const token" data-verso-hover="47">IsBlockGraph</span> G) (hCT : <span class="const token" data-verso-hover="18">IsCliqueTree</span> G T bag)</span>
+<span id="L407">    {c c' : C} (hcc' : T.<span class="const token" data-verso-hover="57">Adj</span> c c') {u : V} (hu : u ∈ bag c) (hu' : u ∈ bag c')</span>
+<span id="L408">    {d d' : C} (hd : <span class="const token" data-verso-hover="60">Btw</span> T d c c') (hd' : <span class="const token" data-verso-hover="60">Btw</span> T d' c' c) {v w : V} (hv : v ∈ bag d)</span>
+<span id="L409">    (hw : w ∈ bag d') : <span class="const token" data-verso-hover="60">Btw</span> G v u w := <span class="kw">by</span></span>
+<span id="L410">  <span class="kw">classical</span></span>
+<span id="L411">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="60">Btw</span></span>
+<span id="L412">  <span class="kw">apply</span> <span class="const token" data-verso-hover="205">le_antisymm</span> _ hG.<span class="const token" data-verso-hover="169">dist_triangle</span></span>
+<span id="L413">  <span class="kw">by_cases</span> hvu : v = u</span>
+<span id="L414">  · <span class="kw">subst</span> hvu; <span class="kw">simp</span></span>
+<span id="L415">  <span class="kw">by_cases</span> hwu : w = u</span>
+<span id="L416">  · <span class="kw">subst</span> hwu; <span class="kw">simp</span></span>
+<span id="L417">  <span class="kw">obtain</span> ⟨q, hq⟩ := hG.<span class="const token" data-verso-hover="167">exists_walk_length_eq_dist</span> v w</span>
+<span id="L418">  <span class="kw">have</span> hmem := <span class="const token" data-verso-hover="4">sep_mem_support</span> hB hCT hcc' hu hu' hd hd' hv hw hvu hwu q</span>
+<span id="L419">  <span class="kw">have</span> := <span class="const token" data-verso-hover="139">congrArg</span> <span class="const token" data-verso-hover="92">Walk.length</span> (q.<span class="const token" data-verso-hover="206">take_spec</span> hmem)</span>
+<span id="L420">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="207">Walk.length_append</span>] <span class="kw">at</span> this</span>
+<span id="L421">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="168">dist_le</span> (q.<span class="const token" data-verso-hover="208">takeUntil</span> u hmem)</span>
+<span id="L422">  <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="168">dist_le</span> (q.<span class="const token" data-verso-hover="209">dropUntil</span> u hmem)</span>
+<span id="L423">  <span class="kw">omega</span></span>
+<span id="L424"></span>
+<span id="L425"><span class="dc">/-- `blockOut` at a clique vertex `inl c`: a vertex of `bag c` closest to the input. -/</span></span>
+<span id="L426"><span class="kw">lemma</span> <span class="const token" data-verso-hover="210">blockOut_inl</span> [<span class="const token" data-verso-hover="120">Nonempty</span> V] (hCT : <span class="const token" data-verso-hover="18">IsCliqueTree</span> G T bag) (v : V) (c : C) :</span>
+<span id="L427">    <span class="const token" data-verso-hover="67">blockOut</span> G bag v (<span class="const token" data-verso-hover="64">Sum.inl</span> c : C ⊕ T.<span class="const token" data-verso-hover="62">edgeSet</span>) ∈ bag c ∧</span>
+<span id="L428">      ∀ w ∈ bag c, G.<span class="const token" data-verso-hover="69">dist</span> v (<span class="const token" data-verso-hover="67">blockOut</span> G bag v (<span class="const token" data-verso-hover="64">Sum.inl</span> c : C ⊕ T.<span class="const token" data-verso-hover="62">edgeSet</span>)) ≤ G.<span class="const token" data-verso-hover="69">dist</span> v w := <span class="kw">by</span></span>
+<span id="L429">  <span class="kw">have</span> hne := (hCT.<span class="const token" data-verso-hover="52">isMaxClique</span> c).<span class="const token" data-verso-hover="197">nonempty</span></span>
+<span id="L430">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="67">blockOut</span>, hne, ↓<span class="const token" data-verso-hover="211">reduceDIte</span>]</span>
+<span id="L431">  <span class="kw">exact</span> ((bag c).<span class="const token" data-verso-hover="68">exists_min_image</span> (G.<span class="const token" data-verso-hover="69">dist</span> v) hne).<span class="const token" data-verso-hover="212">choose_spec</span></span>
+<span id="L432"></span>
+<span id="L433"><span class="dc">/-- `blockOut` at an intermediate vertex `inr e`: the vertex of `bag c ∩ bag c'`, `e = {c, c'}`. -/</span></span>
+<span id="L434"><span class="kw">lemma</span> <span class="const token" data-verso-hover="213">blockOut_inr</span> (hCT : <span class="const token" data-verso-hover="18">IsCliqueTree</span> G T bag) (v : V) (e : T.<span class="const token" data-verso-hover="62">edgeSet</span>) :</span>
+<span id="L435">    ∀ c ∈ (e : <span class="const token" data-verso-hover="66">Sym2</span> C), <span class="const token" data-verso-hover="67">blockOut</span> G bag v (<span class="const token" data-verso-hover="65">Sum.inr</span> e) ∈ bag c := <span class="kw">by</span></span>
+<span id="L436">  <span class="kw">obtain</span> ⟨c, c', hcc', hee⟩ := <span class="const token" data-verso-hover="80">exists_eq_edge</span> e</span>
+<span id="L437">  <span class="kw">obtain</span> ⟨u, hu⟩ := hCT.<span class="const token" data-verso-hover="56">adj_nonempty</span> c c' hcc'</span>
+<span id="L438">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="182">Finset.mem_inter</span>] <span class="kw">at</span> hu</span>
+<span id="L439">  <span class="kw">have</span> h : ∃ u, ∀ c ∈ (e : <span class="const token" data-verso-hover="66">Sym2</span> C), u ∈ bag c := ⟨u, <span class="kw">fun</span> d hd =&gt; <span class="kw">by</span></span>
+<span id="L440">    <span class="kw">rw</span> [hee, <span class="const token" data-verso-hover="214">Sym2.mem_iff</span>] <span class="kw">at</span> hd</span>
+<span id="L441">    <span class="kw">rcases</span> hd <span class="kw">with</span> <span class="kw">rfl</span> | <span class="kw">rfl</span></span>
+<span id="L442">    · <span class="kw">exact</span> hu.<span class="const token" data-verso-hover="106">1</span></span>
+<span id="L443">    · <span class="kw">exact</span> hu.<span class="const token" data-verso-hover="108">2</span>⟩</span>
+<span id="L444">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="67">blockOut</span>, h, ↓<span class="const token" data-verso-hover="211">reduceDIte</span>]</span>
+<span id="L445">  <span class="kw">exact</span> h.<span class="const token" data-verso-hover="212">choose_spec</span></span>
+<span id="L446"></span>
+<span id="L447"><span class="dc">/-- Two vertices of a clique are at distance at most one. -/</span></span>
+<span id="L448"><span class="kw">lemma</span> <span class="const token" data-verso-hover="215">dist_le_one_of_mem</span> (hCT : <span class="const token" data-verso-hover="18">IsCliqueTree</span> G T bag) {c : C} {v w : V} (hv : v ∈ bag c)</span>
+<span id="L449">    (hw : w ∈ bag c) : G.<span class="const token" data-verso-hover="69">dist</span> v w ≤ <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L450">  <span class="kw">by_cases</span> hvw : v = w</span>
+<span id="L451">  · <span class="kw">simp</span> [hvw]</span>
+<span id="L452">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="159">dist_eq_one_iff_adj</span>.<span class="const token" data-verso-hover="88">2</span> ((hCT.<span class="const token" data-verso-hover="52">isMaxClique</span> c).<span class="const token" data-verso-hover="106">1</span> hv hw hvw)]</span>
+<span id="L453"></span>
+<span id="L454"><span class="dc">/-- **Lemmas 13 and 14** (spec level; Case 3 of Lemma 13 with the corrected argument, see the</span></span>
+<span id="L455"><span class="dc">module docstring). If the honest outputs `cout` of the tree protocol on `T_S`</span></span>
+<span id="L456"><span class="dc">(run with clique inputs `cin p ∋ x p`) are in the hull of the honest clique inputs and pairwise</span></span>
+<span id="L457"><span class="dc">at distance `≤ 1` in `T_S`, then the mapped outputs `blockOut` are in the hull of the honest</span></span>
+<span id="L458"><span class="dc">inputs in `G` and pairwise at distance `≤ 1` in `G`. -/</span></span>
+<span id="L459"><span class="kw">theorem</span> <span class="const token" data-verso-hover="3">blockOut_spec</span> [<span class="const token" data-verso-hover="124">Finite</span> V] [<span class="const token" data-verso-hover="124">Finite</span> C] (hG : G.<span class="const token" data-verso-hover="113">Connected</span>) (hB : <span class="const token" data-verso-hover="47">IsBlockGraph</span> G)</span>
+<span id="L460">    (hCT : <span class="const token" data-verso-hover="18">IsCliqueTree</span> G T bag) {P : <span class="kw">Type</span>*} {H : <span class="const token" data-verso-hover="46">Set</span> P} (x : P → V) (cin : P → C)</span>
+<span id="L461">    (hcin : ∀ p ∈ H, x p ∈ bag (cin p)) (cout : P → C ⊕ T.<span class="const token" data-verso-hover="62">edgeSet</span>)</span>
+<span id="L462">    (hval : ∀ p ∈ H, cout p ∈ <span class="const token" data-verso-hover="17">hull</span> (<span class="const token" data-verso-hover="61">subdiv</span> T) ((<span class="kw">fun</span> p =&gt; <span class="const token" data-verso-hover="64">Sum.inl</span> (cin p)) '' H))</span>
+<span id="L463">    (hagr : ∀ p ∈ H, ∀ q ∈ H, (<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="69">dist</span> (cout p) (cout q) ≤ <span class="nu">1</span>) :</span>
+<span id="L464">    (∀ p ∈ H, <span class="const token" data-verso-hover="67">blockOut</span> G bag (x p) (cout p) ∈ <span class="const token" data-verso-hover="17">hull</span> G (x '' H)) ∧</span>
+<span id="L465">    (∀ p ∈ H, ∀ q ∈ H,</span>
+<span id="L466">      G.<span class="const token" data-verso-hover="69">dist</span> (<span class="const token" data-verso-hover="67">blockOut</span> G bag (x p) (cout p)) (<span class="const token" data-verso-hover="67">blockOut</span> G bag (x q) (cout q)) ≤ <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L467">  <span class="kw">have</span> hT := hCT.<span class="const token" data-verso-hover="50">isTree</span></span>
+<span id="L468">  <span class="kw">have</span> hTS := <span class="const token" data-verso-hover="34">subdiv_isTree</span> hT</span>
+<span id="L469">  <span class="kw">constructor</span></span>
+<span id="L470">  · <span class="cm">--</span><span class="cm"> **Lemma 13** (validity)</span></span>
+<span id="L471">    <span class="kw">intro</span> p hp</span>
+<span id="L472">    <span class="kw">have</span> : <span class="const token" data-verso-hover="120">Nonempty</span> V := ⟨x p⟩</span>
+<span id="L473">    <span class="kw">obtain</span> ⟨_, ⟨a, ha, <span class="kw">rfl</span>⟩, _, ⟨b, hb, <span class="kw">rfl</span>⟩, hab⟩ := hval p hp</span>
+<span id="L474">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="153">btw_subdiv</span> hT hab <span class="kw">with</span> ⟨c, hc, hacb⟩ | ⟨e, c, c', he, hee, hcc', hac, hbc⟩</span>
+<span id="L475">    · <span class="kw">rw</span> [hc]</span>
+<span id="L476">      <span class="kw">obtain</span> ⟨hgc, hmin⟩ := <span class="const token" data-verso-hover="210">blockOut_inl</span> hCT (x p) c</span>
+<span id="L477">      <span class="kw">set</span> g := <span class="const token" data-verso-hover="67">blockOut</span> G bag (x p) (<span class="const token" data-verso-hover="64">Sum.inl</span> c)</span>
+<span id="L478">      <span class="kw">by_cases</span> hxp : x p ∈ bag c</span>
+<span id="L479">      · <span class="cm">--</span><span class="cm"> the own input is in the clique: it is the output</span></span>
+<span id="L480">        <span class="kw">have</span> h0 := hmin _ hxp</span>
+<span id="L481">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="216">dist_self</span>] <span class="kw">at</span> h0</span>
+<span id="L482">        <span class="kw">have</span> : x p = g := hG.<span class="const token" data-verso-hover="217">dist_eq_zero_iff</span>.<span class="const token" data-verso-hover="138">1</span> (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L483">        <span class="kw">rw</span> [← this]</span>
+<span id="L484">        <span class="kw">exact</span> <span class="const token" data-verso-hover="218">subset_hull</span> _ ⟨p, hp, <span class="const token" data-verso-hover="82">rfl</span>⟩</span>
+<span id="L485">      · <span class="cm">--</span><span class="cm"> Case 3 (corrected): the output is the separator `u` towards the own clique `cin p`</span></span>
+<span id="L486">        <span class="kw">classical</span></span>
+<span id="L487">        <span class="kw">have</span> hpc : cin p ≠ c := <span class="kw">fun</span> h =&gt; hxp (h ▸ hcin p hp)</span>
+<span id="L488">        <span class="kw">obtain</span> ⟨q, hq, hqc⟩ : ∃ q ∈ H, <span class="const token" data-verso-hover="60">Btw</span> T (cin q) c (cin p) := <span class="kw">by</span></span>
+<span id="L489">          <span class="kw">rcases</span> <span class="const token" data-verso-hover="179">btw_or</span> hT hacb (cin p) <span class="kw">with</span> h | h</span>
+<span id="L490">          · <span class="kw">exact</span> ⟨a, ha, h⟩</span>
+<span id="L491">          · <span class="kw">exact</span> ⟨b, hb, h.<span class="const token" data-verso-hover="180">symm</span>⟩</span>
+<span id="L492">        <span class="cm">--</span><span class="cm"> the neighbour `c''` of `c` towards `cin p`</span></span>
+<span id="L493">        <span class="kw">have</span> hnil : ¬ (<span class="const token" data-verso-hover="157">tpath</span> hT c (cin p)).<span class="const token" data-verso-hover="219">Nil</span> := <span class="const token" data-verso-hover="220">Walk.not_nil_of_ne</span> hpc.<span class="const token" data-verso-hover="221">symm</span></span>
+<span id="L494">        <span class="kw">set</span> c'' := (<span class="const token" data-verso-hover="157">tpath</span> hT c (cin p)).<span class="const token" data-verso-hover="222">snd</span></span>
+<span id="L495">        <span class="kw">have</span> hcc'' : T.<span class="const token" data-verso-hover="57">Adj</span> c c'' := <span class="const token" data-verso-hover="223">Walk.adj_snd</span> hnil</span>
+<span id="L496">        <span class="kw">have</span> hc'' : <span class="const token" data-verso-hover="60">Btw</span> T c c'' (cin p) :=</span>
+<span id="L497">          (<span class="const token" data-verso-hover="154">mem_tpath_iff</span> hT).<span class="const token" data-verso-hover="138">1</span> ((<span class="const token" data-verso-hover="157">tpath</span> hT c (cin p)).<span class="const token" data-verso-hover="224">getVert_mem_support</span> <span class="nu">1</span>)</span>
+<span id="L498">        <span class="kw">have</span> hpside : <span class="const token" data-verso-hover="60">Btw</span> T (cin p) c'' c := <span class="kw">by</span></span>
+<span id="L499">          <span class="kw">have</span> := <span class="const token" data-verso-hover="159">dist_eq_one_iff_adj</span>.<span class="const token" data-verso-hover="88">2</span> hcc''</span>
+<span id="L500">          <span class="kw">have</span> := <span class="const token" data-verso-hover="159">dist_eq_one_iff_adj</span>.<span class="const token" data-verso-hover="88">2</span> hcc''.<span class="const token" data-verso-hover="160">symm</span></span>
+<span id="L501">          <span class="kw">have</span> e1 : T.<span class="const token" data-verso-hover="69">dist</span> (cin p) c'' = T.<span class="const token" data-verso-hover="69">dist</span> c'' (cin p) := <span class="const token" data-verso-hover="161">dist_comm</span></span>
+<span id="L502">          <span class="kw">have</span> e2 : T.<span class="const token" data-verso-hover="69">dist</span> (cin p) c = T.<span class="const token" data-verso-hover="69">dist</span> c (cin p) := <span class="const token" data-verso-hover="161">dist_comm</span></span>
+<span id="L503">          <span class="kw">unfold</span> <span class="const token" data-verso-hover="60">Btw</span> <span class="kw">at</span> hc'' ⊢</span>
+<span id="L504">          <span class="kw">omega</span></span>
+<span id="L505">        <span class="kw">have</span> hqside : <span class="const token" data-verso-hover="60">Btw</span> T (cin q) c c'' := hqc.<span class="const token" data-verso-hover="225">left_of_trans'</span> hT.<span class="const token" data-verso-hover="164">connected</span> hc''</span>
+<span id="L506">        <span class="kw">obtain</span> ⟨u, hu⟩ := hCT.<span class="const token" data-verso-hover="56">adj_nonempty</span> c c'' hcc''</span>
+<span id="L507">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="182">Finset.mem_inter</span>] <span class="kw">at</span> hu</span>
+<span id="L508">        <span class="cm">--</span><span class="cm"> every other vertex of `bag c` is farther from `x p` than `u`</span></span>
+<span id="L509">        <span class="kw">have</span> hfar : ∀ w ∈ bag c, w ≠ u → G.<span class="const token" data-verso-hover="69">dist</span> (x p) w = G.<span class="const token" data-verso-hover="69">dist</span> (x p) u + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L510">          <span class="kw">intro</span> w hw hwu</span>
+<span id="L511">          <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="5">sep_btw</span> hG hB hCT hcc''.<span class="const token" data-verso-hover="160">symm</span> hu.<span class="const token" data-verso-hover="108">2</span> hu.<span class="const token" data-verso-hover="106">1</span> hpside (<span class="const token" data-verso-hover="226">btw_left</span> c c'') (hcin p hp) hw</span>
+<span id="L512">          <span class="kw">have</span> h2 : G.<span class="const token" data-verso-hover="69">dist</span> u w = <span class="nu">1</span> :=</span>
+<span id="L513">            <span class="const token" data-verso-hover="159">dist_eq_one_iff_adj</span>.<span class="const token" data-verso-hover="88">2</span> ((hCT.<span class="const token" data-verso-hover="52">isMaxClique</span> c).<span class="const token" data-verso-hover="106">1</span> hu.<span class="const token" data-verso-hover="106">1</span> hw (<span class="const token" data-verso-hover="221">Ne.symm</span> hwu))</span>
+<span id="L514">          <span class="kw">unfold</span> <span class="const token" data-verso-hover="60">Btw</span> <span class="kw">at</span> h1</span>
+<span id="L515">          <span class="kw">omega</span></span>
+<span id="L516">        <span class="kw">have</span> hgu : g = u := <span class="kw">by</span></span>
+<span id="L517">          <span class="kw">by_contra</span> hne</span>
+<span id="L518">          <span class="kw">have</span> := hfar g hgc hne</span>
+<span id="L519">          <span class="kw">have</span> := hmin u hu.<span class="const token" data-verso-hover="106">1</span></span>
+<span id="L520">          <span class="kw">omega</span></span>
+<span id="L521">        <span class="kw">rw</span> [hgu]</span>
+<span id="L522">        <span class="kw">exact</span> ⟨x p, ⟨p, hp, <span class="const token" data-verso-hover="82">rfl</span>⟩, x q, ⟨q, hq, <span class="const token" data-verso-hover="82">rfl</span>⟩,</span>
+<span id="L523">          <span class="const token" data-verso-hover="5">sep_btw</span> hG hB hCT hcc''.<span class="const token" data-verso-hover="160">symm</span> hu.<span class="const token" data-verso-hover="108">2</span> hu.<span class="const token" data-verso-hover="106">1</span> hpside hqside (hcin p hp) (hcin q hq)⟩</span>
+<span id="L524">    · <span class="cm">--</span><span class="cm"> intermediate vertex of an edge `{c, c'}` of the path: the separator `u`</span></span>
+<span id="L525">      <span class="kw">rw</span> [he]</span>
+<span id="L526">      <span class="kw">have</span> hmem := <span class="const token" data-verso-hover="213">blockOut_inr</span> hCT (x p) e</span>
+<span id="L527">      <span class="kw">have</span> hu : <span class="const token" data-verso-hover="67">blockOut</span> G bag (x p) (<span class="const token" data-verso-hover="65">Sum.inr</span> e) ∈ bag c :=</span>
+<span id="L528">        hmem c (<span class="kw">by</span> <span class="kw">rw</span> [hee]; <span class="kw">exact</span> <span class="const token" data-verso-hover="89">Sym2.mem_mk_left</span> _ _)</span>
+<span id="L529">      <span class="kw">have</span> hu' : <span class="const token" data-verso-hover="67">blockOut</span> G bag (x p) (<span class="const token" data-verso-hover="65">Sum.inr</span> e) ∈ bag c' :=</span>
+<span id="L530">        hmem c' (<span class="kw">by</span> <span class="kw">rw</span> [hee]; <span class="kw">exact</span> <span class="const token" data-verso-hover="90">Sym2.mem_mk_right</span> _ _)</span>
+<span id="L531">      <span class="kw">exact</span> ⟨x a, ⟨a, ha, <span class="const token" data-verso-hover="82">rfl</span>⟩, x b, ⟨b, hb, <span class="const token" data-verso-hover="82">rfl</span>⟩,</span>
+<span id="L532">        <span class="const token" data-verso-hover="5">sep_btw</span> hG hB hCT hcc' hu hu' hac hbc (hcin a ha) (hcin b hb)⟩</span>
+<span id="L533">  · <span class="cm">--</span><span class="cm"> **Lemma 14** (agreement): both outputs lie in a common clique</span></span>
+<span id="L534">    <span class="kw">intro</span> p hp q hq</span>
+<span id="L535">    <span class="kw">have</span> : <span class="const token" data-verso-hover="120">Nonempty</span> V := ⟨x p⟩</span>
+<span id="L536">    <span class="kw">have</span> hmemb : ∀ (v : V) (z : C ⊕ T.<span class="const token" data-verso-hover="62">edgeSet</span>) (c : C),</span>
+<span id="L537">        (z = <span class="const token" data-verso-hover="64">Sum.inl</span> c ∨ ∃ e : T.<span class="const token" data-verso-hover="62">edgeSet</span>, z = <span class="const token" data-verso-hover="65">Sum.inr</span> e ∧ c ∈ (e : <span class="const token" data-verso-hover="66">Sym2</span> C)) →</span>
+<span id="L538">          <span class="const token" data-verso-hover="67">blockOut</span> G bag v z ∈ bag c := <span class="kw">by</span></span>
+<span id="L539">      <span class="kw">rintro</span> v z c (<span class="kw">rfl</span> | ⟨e, <span class="kw">rfl</span>, hc⟩)</span>
+<span id="L540">      · <span class="kw">exact</span> (<span class="const token" data-verso-hover="210">blockOut_inl</span> hCT v c).<span class="const token" data-verso-hover="106">1</span></span>
+<span id="L541">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="213">blockOut_inr</span> hCT v e c hc</span>
+<span id="L542">    <span class="kw">obtain</span> ⟨c, hpc, hqc⟩ : ∃ c : C,</span>
+<span id="L543">        (cout p = <span class="const token" data-verso-hover="64">Sum.inl</span> c ∨ ∃ e : T.<span class="const token" data-verso-hover="62">edgeSet</span>, cout p = <span class="const token" data-verso-hover="65">Sum.inr</span> e ∧ c ∈ (e : <span class="const token" data-verso-hover="66">Sym2</span> C)) ∧</span>
+<span id="L544">        (cout q = <span class="const token" data-verso-hover="64">Sum.inl</span> c ∨ ∃ e : T.<span class="const token" data-verso-hover="62">edgeSet</span>, cout q = <span class="const token" data-verso-hover="65">Sum.inr</span> e ∧ c ∈ (e : <span class="const token" data-verso-hover="66">Sym2</span> C)) := <span class="kw">by</span></span>
+<span id="L545">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="227">Nat.le_one_iff_eq_zero_or_eq_one</span>.<span class="const token" data-verso-hover="138">1</span> (hagr p hp q hq) <span class="kw">with</span> h0 | h1</span>
+<span id="L546">      · <span class="kw">rw</span> [← hTS.<span class="const token" data-verso-hover="164">connected</span>.<span class="const token" data-verso-hover="217">dist_eq_zero_iff</span>.<span class="const token" data-verso-hover="138">1</span> h0]</span>
+<span id="L547">        <span class="kw">rcases</span> cout p <span class="kw">with</span> c | e</span>
+<span id="L548">        · <span class="kw">exact</span> ⟨c, <span class="const token" data-verso-hover="100">Or.inl</span> <span class="const token" data-verso-hover="82">rfl</span>, <span class="const token" data-verso-hover="100">Or.inl</span> <span class="const token" data-verso-hover="82">rfl</span>⟩</span>
+<span id="L549">        · <span class="kw">obtain</span> ⟨c, c', -, hee⟩ := <span class="const token" data-verso-hover="80">exists_eq_edge</span> e</span>
+<span id="L550">          <span class="kw">have</span> hc : c ∈ (e : <span class="const token" data-verso-hover="66">Sym2</span> C) := <span class="kw">by</span> <span class="kw">rw</span> [hee]; <span class="kw">exact</span> <span class="const token" data-verso-hover="89">Sym2.mem_mk_left</span> _ _</span>
+<span id="L551">          <span class="kw">exact</span> ⟨c, <span class="const token" data-verso-hover="101">Or.inr</span> ⟨e, <span class="const token" data-verso-hover="82">rfl</span>, hc⟩, <span class="const token" data-verso-hover="101">Or.inr</span> ⟨e, <span class="const token" data-verso-hover="82">rfl</span>, hc⟩⟩</span>
+<span id="L552">      · <span class="kw">have</span> hadj := <span class="const token" data-verso-hover="159">dist_eq_one_iff_adj</span>.<span class="const token" data-verso-hover="138">1</span> h1</span>
+<span id="L553">        <span class="kw">rcases</span> hz : cout p <span class="kw">with</span> c | e &lt;;&gt; <span class="kw">rcases</span> hz' : cout q <span class="kw">with</span> c' | e' &lt;;&gt;</span>
+<span id="L554">          <span class="kw">rw</span> [hz, hz'] <span class="kw">at</span> hadj</span>
+<span id="L555">        · <span class="kw">simp</span> <span class="kw">at</span> hadj</span>
+<span id="L556">        · <span class="kw">exact</span> ⟨c, <span class="const token" data-verso-hover="100">Or.inl</span> <span class="const token" data-verso-hover="82">rfl</span>, <span class="const token" data-verso-hover="101">Or.inr</span> ⟨e', <span class="const token" data-verso-hover="82">rfl</span>, <span class="const token" data-verso-hover="74">subdiv_adj_inl_inr</span>.<span class="const token" data-verso-hover="138">1</span> hadj⟩⟩</span>
+<span id="L557">        · <span class="kw">exact</span> ⟨c', <span class="const token" data-verso-hover="101">Or.inr</span> ⟨e, <span class="const token" data-verso-hover="82">rfl</span>, <span class="const token" data-verso-hover="76">subdiv_adj_inr_inl</span>.<span class="const token" data-verso-hover="138">1</span> hadj⟩, <span class="const token" data-verso-hover="100">Or.inl</span> <span class="const token" data-verso-hover="82">rfl</span>⟩</span>
+<span id="L558">        · <span class="kw">simp</span> <span class="kw">at</span> hadj</span>
+<span id="L559">    <span class="kw">exact</span> <span class="const token" data-verso-hover="215">dist_le_one_of_mem</span> hCT (hmemb _ _ c hpc) (hmemb _ _ c hqc)</span>
+<span id="L560"></span>
+<span id="L561"><span class="dc">/-- **Theorem 8.** If `treeAlg` achieves AA on the subdivided clique tree `T_S` within `R` rounds</span></span>
+<span id="L562"><span class="dc">(against an adversary structure `Z`), then `BlockGraphAA` achieves AA on the connected block</span></span>
+<span id="L563"><span class="dc">graph `G` within `R` rounds. -/</span></span>
+<span id="L564"><span class="kw">theorem</span> <span class="const token" data-verso-hover="2">blockGraphAA_solves</span> [<span class="const token" data-verso-hover="124">Finite</span> V] [<span class="const token" data-verso-hover="124">Finite</span> C] {P M S : <span class="kw">Type</span>*} (hG : G.<span class="const token" data-verso-hover="113">Connected</span>)</span>
+<span id="L565">    (hB : <span class="const token" data-verso-hover="47">IsBlockGraph</span> G) (hCT : <span class="const token" data-verso-hover="18">IsCliqueTree</span> G T bag) (cl : P → V → C)</span>
+<span id="L566">    (hcl : ∀ p v, v ∈ bag (cl p v)) (A : <span class="const token" data-verso-hover="9">Auth</span> P M S)</span>
+<span id="L567">    (treeAlg : <span class="const token" data-verso-hover="72">Protocol</span> P (C ⊕ T.<span class="const token" data-verso-hover="62">edgeSet</span>) M (C ⊕ T.<span class="const token" data-verso-hover="62">edgeSet</span>)) (Z : <span class="const token" data-verso-hover="228">AdvStructure</span> P) (R : <span class="const token" data-verso-hover="229">ℕ</span>)</span>
+<span id="L568">    (hU : treeAlg.<span class="const token" data-verso-hover="230">Unforging</span> A)</span>
+<span id="L569">    (htree : <span class="const token" data-verso-hover="231">SolvesAuthWithin</span> ⊤ treeAlg A Z <span class="const token" data-verso-hover="232">noPre</span> (<span class="const token" data-verso-hover="233">GraphAA</span> (<span class="const token" data-verso-hover="61">subdiv</span> T)) R) :</span>
+<span id="L570">    (<span class="const token" data-verso-hover="71">blockGraphAA</span> G bag cl treeAlg).<span class="const token" data-verso-hover="230">Unforging</span> A ∧</span>
+<span id="L571">      <span class="const token" data-verso-hover="231">SolvesAuthWithin</span> ⊤ (<span class="const token" data-verso-hover="71">blockGraphAA</span> G bag cl treeAlg) A Z <span class="const token" data-verso-hover="232">noPre</span> (<span class="const token" data-verso-hover="233">GraphAA</span> G) R := <span class="kw">by</span></span>
+<span id="L572">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="234">Protocol.Unforging.wrap</span> _ _ _ hU, ?_⟩</span>
+<span id="L573">  <span class="kw">intro</span> s hZ hrel hV _</span>
+<span id="L574">  <span class="kw">set</span> fi : P → V → C ⊕ T.<span class="const token" data-verso-hover="62">edgeSet</span> := <span class="kw">fun</span> p v =&gt; <span class="const token" data-verso-hover="64">Sum.inl</span> (cl p v)</span>
+<span id="L575">  <span class="kw">have</span> hV' : (s.<span class="const token" data-verso-hover="235">wrapIn</span> fi).<span class="const token" data-verso-hover="236">AuthValid</span> ⊤ treeAlg A :=</span>
+<span id="L576">    (<span class="const token" data-verso-hover="237">Scenario.authValid_wrap</span> _ _ _ _ _ _).<span class="const token" data-verso-hover="138">1</span> hV</span>
+<span id="L577">  <span class="kw">obtain</span> ⟨⟨hTerm, hVal, hAgr⟩, hTermBy⟩ := htree (s.<span class="const token" data-verso-hover="235">wrapIn</span> fi) hZ (hrel.<span class="const token" data-verso-hover="238">wrapIn</span> fi) hV' <span class="const token" data-verso-hover="239">trivial</span></span>
+<span id="L578">  <span class="kw">have</span> hex : ∀ p, ∃ o, p ∈ s.<span class="const token" data-verso-hover="240">honest</span> → <span class="const token" data-verso-hover="241">Decides</span> ⊤ treeAlg (s.<span class="const token" data-verso-hover="235">wrapIn</span> fi) p o := <span class="kw">by</span></span>
+<span id="L579">    <span class="kw">intro</span> p</span>
+<span id="L580">    <span class="kw">by_cases</span> hp : p ∈ s.<span class="const token" data-verso-hover="240">honest</span></span>
+<span id="L581">    · <span class="kw">obtain</span> ⟨o, ho⟩ := hTerm p hp; <span class="kw">exact</span> ⟨o, <span class="kw">fun</span> _ =&gt; ho⟩</span>
+<span id="L582">    · <span class="kw">exact</span> ⟨fi p (s.<span class="const token" data-verso-hover="242">input</span> p), <span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="202">absurd</span> h hp⟩</span>
+<span id="L583">  <span class="kw">choose</span> cout hcout <span class="kw">using</span> hex</span>
+<span id="L584">  <span class="kw">have</span> hdec : ∀ p ∈ s.<span class="const token" data-verso-hover="240">honest</span>, ∀ o, <span class="const token" data-verso-hover="241">Decides</span> ⊤ (<span class="const token" data-verso-hover="71">blockGraphAA</span> G bag cl treeAlg) s p o ↔</span>
+<span id="L585">      o = <span class="const token" data-verso-hover="67">blockOut</span> G bag (s.<span class="const token" data-verso-hover="242">input</span> p) (cout p) := <span class="kw">by</span></span>
+<span id="L586">    <span class="kw">intro</span> p hp o</span>
+<span id="L587">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="71">blockGraphAA</span>, <span class="const token" data-verso-hover="243">decides_wrap_iff</span>]</span>
+<span id="L588">    <span class="kw">constructor</span></span>
+<span id="L589">    · <span class="kw">rintro</span> ⟨o', ho', <span class="kw">rfl</span>⟩</span>
+<span id="L590">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="244">Decides.unique</span> _ _ ho' (hcout p hp)]</span>
+<span id="L591">    · <span class="kw">rintro</span> <span class="kw">rfl</span></span>
+<span id="L592">      <span class="kw">exact</span> ⟨cout p, hcout p hp, <span class="const token" data-verso-hover="82">rfl</span>⟩</span>
+<span id="L593">  <span class="kw">obtain</span> ⟨hvalid, hagree⟩ := <span class="const token" data-verso-hover="3">blockOut_spec</span> hG hB hCT (H := s.<span class="const token" data-verso-hover="240">honest</span>) s.<span class="const token" data-verso-hover="242">input</span></span>
+<span id="L594">    (<span class="kw">fun</span> p =&gt; cl p (s.<span class="const token" data-verso-hover="242">input</span> p)) (<span class="kw">fun</span> p _ =&gt; hcl p (s.<span class="const token" data-verso-hover="242">input</span> p)) cout</span>
+<span id="L595">    (<span class="kw">fun</span> p hp =&gt; hVal p hp _ (hcout p hp))</span>
+<span id="L596">    (<span class="kw">fun</span> p hp q hq =&gt; hAgr p hp q hq _ _ (hcout p hp) (hcout q hq))</span>
+<span id="L597">  <span class="kw">refine</span> ⟨⟨<span class="kw">fun</span> p hp =&gt; ⟨_, (hdec p hp _).<span class="const token" data-verso-hover="88">2</span> <span class="const token" data-verso-hover="82">rfl</span>⟩, <span class="kw">fun</span> p hp o ho =&gt; ?_,</span>
+<span id="L598">    <span class="kw">fun</span> p hp q hq o o' ho ho' =&gt; ?_⟩, <span class="const token" data-verso-hover="245">terminatesBy_wrap</span> _ _ _ _ _ _ hTermBy⟩</span>
+<span id="L599">  · <span class="kw">rw</span> [(hdec p hp o).<span class="const token" data-verso-hover="138">1</span> ho]; <span class="kw">exact</span> hvalid p hp</span>
+<span id="L600">  · <span class="kw">rw</span> [(hdec p hp o).<span class="const token" data-verso-hover="138">1</span> ho, (hdec q hq o').<span class="const token" data-verso-hover="138">1</span> ho']; <span class="kw">exact</span> hagree p hp q hq</span>
+<span id="L601"></span>
+<span id="L602"><span class="dc">/-- **Theorem 8 with Theorem 5** (Corollaries 4/5 modulo the instantiation of the black boxes):</span></span>
+<span id="L603"><span class="dc">`BlockGraphAA` on top of `TreeAA(T_S)` (rooted at a clique vertex), with gradecast and RealAA as</span></span>
+<span id="L604"><span class="dc">black boxes, achieves AA on the block graph `G` within `R_GC + R_RealAA` rounds, where RealAA</span></span>
+<span id="L605"><span class="dc">only needs to handle `2·D(T)`-close inputs. -/</span></span>
+<span id="L606"><span class="kw">theorem</span> <span class="const token" data-verso-hover="36">blockGraphAA_of_gc_realAA</span> {P : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="246">Fintype</span> P] [<span class="const token" data-verso-hover="48">DecidableEq</span> P] {V C : <span class="kw">Type</span>}</span>
+<span id="L607">    [<span class="const token" data-verso-hover="246">Fintype</span> V] [<span class="const token" data-verso-hover="48">DecidableEq</span> V] [<span class="const token" data-verso-hover="246">Fintype</span> C] [<span class="const token" data-verso-hover="48">DecidableEq</span> C] {G : <span class="const token" data-verso-hover="16">SimpleGraph</span> V}</span>
+<span id="L608">    {T : <span class="const token" data-verso-hover="16">SimpleGraph</span> C} [<span class="const token" data-verso-hover="247">DecidableRel</span> T.<span class="const token" data-verso-hover="57">Adj</span>] {bag : C → <span class="const token" data-verso-hover="44">Finset</span> V}</span>
+<span id="L609">    (hG : G.<span class="const token" data-verso-hover="113">Connected</span>) (hB : <span class="const token" data-verso-hover="47">IsBlockGraph</span> G) (hCT : <span class="const token" data-verso-hover="18">IsCliqueTree</span> G T bag)</span>
+<span id="L610">    (cl : P → V → C) (hcl : ∀ p v, v ∈ bag (cl p v)) (c₀ : C)</span>
+<span id="L611">    {M₁ S₁ M₂ S₂ : <span class="kw">Type</span>} {t Rgc Rreal : <span class="const token" data-verso-hover="229">ℕ</span>} (ht : <span class="nu">2</span> * t &lt; <span class="const token" data-verso-hover="248">Fintype.card</span> P)</span>
+<span id="L612">    (A₁ : <span class="const token" data-verso-hover="9">Auth</span> P M₁ S₁)</span>
+<span id="L613">    (gc : P → <span class="const token" data-verso-hover="72">Protocol</span> P (<span class="const token" data-verso-hover="249">List</span> (C ⊕ T.<span class="const token" data-verso-hover="62">edgeSet</span>)) M₁ (<span class="const token" data-verso-hover="249">List</span> (C ⊕ T.<span class="const token" data-verso-hover="62">edgeSet</span>) × <span class="const token" data-verso-hover="250">Fin</span> <span class="nu">3</span>))</span>
+<span id="L614">    (hgcU : ∀ s, (gc s).<span class="const token" data-verso-hover="230">Unforging</span> A₁)</span>
+<span id="L615">    (hgc : ∀ s, <span class="const token" data-verso-hover="231">SolvesAuthWithin</span> ⊤ (gc s) A₁ (<span class="const token" data-verso-hover="251">atMost</span> t) <span class="const token" data-verso-hover="232">noPre</span> (<span class="const token" data-verso-hover="252">Gradecast</span> s) Rgc)</span>
+<span id="L616">    (A₂ : <span class="const token" data-verso-hover="9">Auth</span> P M₂ S₂) (realAA : <span class="const token" data-verso-hover="72">Protocol</span> P <span class="const token" data-verso-hover="253">ℝ</span> M₂ <span class="const token" data-verso-hover="253">ℝ</span>) (hrU : realAA.<span class="const token" data-verso-hover="230">Unforging</span> A₂)</span>
+<span id="L617">    (hreal : <span class="const token" data-verso-hover="231">SolvesAuthWithin</span> ⊤ realAA A₂ (<span class="const token" data-verso-hover="251">atMost</span> t) (<span class="const token" data-verso-hover="254">Close</span> (<span class="nu">2</span> * T.<span class="const token" data-verso-hover="163">diam</span> : <span class="const token" data-verso-hover="253">ℝ</span>)) (<span class="const token" data-verso-hover="255">RealAA</span> <span class="nu">1</span>) Rreal) :</span>
+<span id="L618">    (<span class="const token" data-verso-hover="71">blockGraphAA</span> G bag cl (<span class="const token" data-verso-hover="256">treeAA</span> (<span class="const token" data-verso-hover="34">subdiv_isTree</span> hCT.<span class="const token" data-verso-hover="50">isTree</span>) (<span class="const token" data-verso-hover="64">Sum.inl</span> c₀) t Rgc gc realAA)).<span class="const token" data-verso-hover="230">Unforging</span></span>
+<span id="L619">        (<span class="const token" data-verso-hover="257">treeAuth</span> A₁ A₂) ∧</span>
+<span id="L620">      <span class="const token" data-verso-hover="231">SolvesAuthWithin</span> ⊤</span>
+<span id="L621">        (<span class="const token" data-verso-hover="71">blockGraphAA</span> G bag cl (<span class="const token" data-verso-hover="256">treeAA</span> (<span class="const token" data-verso-hover="34">subdiv_isTree</span> hCT.<span class="const token" data-verso-hover="50">isTree</span>) (<span class="const token" data-verso-hover="64">Sum.inl</span> c₀) t Rgc gc realAA))</span>
+<span id="L622">        (<span class="const token" data-verso-hover="257">treeAuth</span> A₁ A₂) (<span class="const token" data-verso-hover="251">atMost</span> t) <span class="const token" data-verso-hover="232">noPre</span> (<span class="const token" data-verso-hover="233">GraphAA</span> G) (Rgc + Rreal) := <span class="kw">by</span></span>
+<span id="L623">  <span class="kw">have</span> hT := hCT.<span class="const token" data-verso-hover="50">isTree</span></span>
+<span id="L624">  <span class="kw">have</span> hD : ((<span class="const token" data-verso-hover="61">subdiv</span> T).<span class="const token" data-verso-hover="163">diam</span> : <span class="const token" data-verso-hover="253">ℝ</span>) ≤ <span class="nu">2</span> * T.<span class="const token" data-verso-hover="163">diam</span> := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> <span class="const token" data-verso-hover="35">diam_subdiv_le</span> hT</span>
+<span id="L625">  <span class="kw">obtain</span> ⟨hU, hsol⟩ := <span class="const token" data-verso-hover="25">treeAA_solves</span> (<span class="const token" data-verso-hover="34">subdiv_isTree</span> hT) (<span class="const token" data-verso-hover="64">Sum.inl</span> c₀) ht A₁ gc hgcU hgc A₂ realAA</span>
+<span id="L626">    hrU <span class="kw">fun</span> s hZ hrel hV hpre =&gt;</span>
+<span id="L627">      hreal s hZ hrel hV <span class="kw">fun</span> p hp q hq =&gt; (hpre p hp q hq).<span class="const token" data-verso-hover="173">trans</span> hD</span>
+<span id="L628">  <span class="kw">exact</span> <span class="const token" data-verso-hover="2">blockGraphAA_solves</span> hG hB hCT cl hcl _ _ _ _ hU hsol</span>
+<span id="L629"></span>
+<span id="L630"><span class="kw">end</span> Proofs</span>
+<span id="L631"></span>
+<span id="L632"><span class="kw">end</span> TreeAA</span>
+<span id="L633"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2026/TreeAA/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

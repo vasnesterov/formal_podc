@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>RegisterEmulationSpace: Algorithm2.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2017/">PODC 2017</a><span class="sep">›</span><a href="PODC2017/RegisterEmulationSpace/">RegisterEmulationSpace</a><span class="sep">›</span><a href="PODC2017/RegisterEmulationSpace/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Algorithm2</span></nav>
+        <h1>
+          <code>Algorithm2.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2017/RegisterEmulationSpace/">Space Complexity of Fault-Tolerant Register Emulations — PODC 2017</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2017/RegisterEmulationSpace/Algorithm2.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Algorithm2"><span id="L1"><span class="kw">import</span> Papers.PODC2017.RegisterEmulationSpace.Runs</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Algorithm 2 (Section 3.3, Appendix D): the upper bound</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">Base registers store pairs `(timestamp, value)`, initially `(0, v₀)`. Every client `c` has a *write</span></span>
+<span id="L7"><span class="dc">set* `R c` of registers (the paper's `R_j`, `j = ⌊i/z⌋`; `R c = ∅` for clients that never write).</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">* `collect()`: trigger a read on every register (in parallel — the paper scans the registers of a</span></span>
+<span id="L10"><span class="dc">  server sequentially, which only delays responses) and wait until every register of some `n - f`</span></span>
+<span id="L11"><span class="dc">  servers has responded; the result is the pair with the highest timestamp read.</span></span>
+<span id="L12"><span class="dc">* `write(v)`: collect, take `ts := max + 1`; registers of `R c` that still have a pending write of</span></span>
+<span id="L13"><span class="dc">  `c` (from earlier writes) form `coverSet`; trigger `write(ts, v)` on all other registers of `R c`</span></span>
+<span id="L14"><span class="dc">  and wait until `|wrSet| ≥ |R c| - f`. When a pending write on a register `b ∈ coverSet` responds,</span></span>
+<span id="L15"><span class="dc">  `b` is removed from `coverSet` and rewritten with the *current* `(ts, v)` (lines 29–34), also</span></span>
+<span id="L16"><span class="dc">  after the write has returned.</span></span>
+<span id="L17"><span class="dc">* `read()`: collect and return the value of the highest timestamp.</span></span>
+<span id="L18"></span>
+<span id="L19"><span class="dc">Local state (`Loc`): `ts, val` (`tsVal`); `pw` = registers with a pending write of the client</span></span>
+<span id="L20"><span class="dc">(a ghost-free mirror of the pending low-level writes); `cov` (`coverSet`); `wr` (`wrSet`); `q` =</span></span>
+<span id="L21"><span class="dc">registers to be (re)written with the current `tsVal` (a write is triggered only in a step, so the</span></span>
+<span id="L22"><span class="dc">re-trigger of line 32 and the triggers of line 10 are queued here); the mode; and the state of the</span></span>
+<span id="L23"><span class="dc">current collect (`rq` = registers not yet read, `got` = registers that responded, `best` = maximum</span></span>
+<span id="L24"><span class="dc">read so far).</span></span>
+<span id="L25"><span class="dc">-/</span></span>
+<span id="L26"></span>
+<span id="L27"><span class="kw">set_option</span> <span class="const token" data-verso-hover="47">linter.unusedSectionVars</span> false</span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">namespace</span> Podc.RegisterEmulationSpace.Alg2</span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">open</span> Finset</span>
+<span id="L32"></span>
+<span id="L33"><span class="dc">/-- Modes of a client. -/</span></span>
+<span id="L34"><span class="kw">inductive</span> <span class="const token" data-verso-hover="48">Mode</span> (V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L35">  <span class="dc">/-- no pending high-level operation -/</span></span>
+<span id="L36">  | <span class="const token" data-verso-hover="49">idle</span></span>
+<span id="L37">  <span class="dc">/-- collecting for a read -/</span></span>
+<span id="L38">  | <span class="const token" data-verso-hover="50">rd</span></span>
+<span id="L39">  <span class="dc">/-- collecting for a write of `v` -/</span></span>
+<span id="L40">  | <span class="const token" data-verso-hover="51">wc</span> (v : V)</span>
+<span id="L41">  <span class="dc">/-- writing phase of a write (lines 6–11) -/</span></span>
+<span id="L42">  | <span class="const token" data-verso-hover="52">wp</span></span>
+<span id="L43"></span>
+<span id="L44"><span class="dc">/-- Local state of a client. -/</span></span>
+<span id="L45"><span class="kw">structure</span> <span class="const token" data-verso-hover="53">Loc</span> (B V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L46">  <span class="dc">/-- `tsVal.ts` -/</span></span>
+<span id="L47">  <span class="const token" data-verso-hover="54">ts</span> : <span class="const token" data-verso-hover="55">ℕ</span></span>
+<span id="L48">  <span class="dc">/-- `tsVal.val` -/</span></span>
+<span id="L49">  <span class="const token" data-verso-hover="56">val</span> : V</span>
+<span id="L50">  <span class="dc">/-- registers with a pending low-level write of this client -/</span></span>
+<span id="L51">  <span class="const token" data-verso-hover="57">pw</span> : <span class="const token" data-verso-hover="58">Finset</span> B</span>
+<span id="L52">  <span class="dc">/-- `coverSet` -/</span></span>
+<span id="L53">  <span class="const token" data-verso-hover="59">cov</span> : <span class="const token" data-verso-hover="58">Finset</span> B</span>
+<span id="L54">  <span class="dc">/-- `wrSet` -/</span></span>
+<span id="L55">  <span class="const token" data-verso-hover="60">wr</span> : <span class="const token" data-verso-hover="58">Finset</span> B</span>
+<span id="L56">  <span class="dc">/-- registers to be (re)written with `tsVal` -/</span></span>
+<span id="L57">  <span class="const token" data-verso-hover="61">q</span> : <span class="const token" data-verso-hover="58">Finset</span> B</span>
+<span id="L58">  <span class="dc">/-- current phase -/</span></span>
+<span id="L59">  <span class="const token" data-verso-hover="62">mode</span> : <span class="const token" data-verso-hover="48">Mode</span> V</span>
+<span id="L60">  <span class="dc">/-- registers not yet read in the current collect -/</span></span>
+<span id="L61">  <span class="const token" data-verso-hover="63">rq</span> : <span class="const token" data-verso-hover="58">Finset</span> B</span>
+<span id="L62">  <span class="dc">/-- registers that responded in the current collect -/</span></span>
+<span id="L63">  <span class="const token" data-verso-hover="64">got</span> : <span class="const token" data-verso-hover="58">Finset</span> B</span>
+<span id="L64">  <span class="dc">/-- maximum `(ts, val)` read in the current collect -/</span></span>
+<span id="L65">  <span class="const token" data-verso-hover="65">best</span> : <span class="const token" data-verso-hover="55">ℕ</span> × V</span>
+<span id="L66"></span>
+<span id="L67"><span class="kw">variable</span> {C B S V : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="66">DecidableEq</span> C] [<span class="const token" data-verso-hover="67">LinearOrder</span> B] [<span class="const token" data-verso-hover="68">Fintype</span> B] [<span class="const token" data-verso-hover="68">Fintype</span> S] [<span class="const token" data-verso-hover="66">DecidableEq</span> S]</span>
+<span id="L68"></span>
+<span id="L69"><span class="dc">/-- The smallest element of a finite set, if any. -/</span></span>
+<span id="L70"><span class="kw">def</span> <span class="const token" data-verso-hover="69">pick</span> (s : <span class="const token" data-verso-hover="58">Finset</span> B) : <span class="const token" data-verso-hover="70">Option</span> B := <span class="kw">if</span> h : s.<span class="const token" data-verso-hover="71">Nonempty</span> <span class="kw">then</span> <span class="const token" data-verso-hover="72">some</span> (s.<span class="const token" data-verso-hover="73">min'</span> h) <span class="kw">else</span> <span class="const token" data-verso-hover="74">none</span></span>
+<span id="L71"></span>
+<span id="L72"><span class="kw">lemma</span> <span class="const token" data-verso-hover="75">pick_mem</span> {s : <span class="const token" data-verso-hover="58">Finset</span> B} {b : B} (h : <span class="const token" data-verso-hover="69">pick</span> s = <span class="const token" data-verso-hover="72">some</span> b) : b ∈ s := <span class="kw">by</span></span>
+<span id="L73">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="69">pick</span> <span class="kw">at</span> h; <span class="kw">split</span> <span class="kw">at</span> h</span>
+<span id="L74">  · <span class="kw">cases</span> h; <span class="kw">exact</span> <span class="const token" data-verso-hover="76">min'_mem</span> _ _</span>
+<span id="L75">  · <span class="kw">cases</span> h</span>
+<span id="L76"></span>
+<span id="L77"><span class="kw">lemma</span> <span class="const token" data-verso-hover="77">pick_eq_none</span> {s : <span class="const token" data-verso-hover="58">Finset</span> B} (h : <span class="const token" data-verso-hover="69">pick</span> s = <span class="const token" data-verso-hover="74">none</span>) : s = ∅ := <span class="kw">by</span></span>
+<span id="L78">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="69">pick</span> <span class="kw">at</span> h; <span class="kw">split</span> <span class="kw">at</span> h</span>
+<span id="L79">  · <span class="kw">cases</span> h</span>
+<span id="L80">  · <span class="kw">rename_i</span> h'; <span class="kw">exact</span> <span class="const token" data-verso-hover="78">not_nonempty_iff_eq_empty</span>.<span class="const token" data-verso-hover="79">1</span> h'</span>
+<span id="L81"></span>
+<span id="L82"><span class="kw">lemma</span> <span class="const token" data-verso-hover="80">pick_eq_none_iff</span> {s : <span class="const token" data-verso-hover="58">Finset</span> B} : <span class="const token" data-verso-hover="69">pick</span> s = <span class="const token" data-verso-hover="74">none</span> ↔ s = ∅ := <span class="kw">by</span></span>
+<span id="L83">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="77">pick_eq_none</span>, ?_⟩</span>
+<span id="L84">  <span class="kw">rintro</span> <span class="kw">rfl</span>; <span class="kw">simp</span> [<span class="const token" data-verso-hover="69">pick</span>]</span>
+<span id="L85"></span>
+<span id="L86"><span class="dc">/-- The collect is complete: every register of at least `n - f` servers responded. -/</span></span>
+<span id="L87"><span class="kw">def</span> <span class="const token" data-verso-hover="81">Done</span> (δ : B → S) (f : <span class="const token" data-verso-hover="55">ℕ</span>) (got : <span class="const token" data-verso-hover="58">Finset</span> B) : <span class="kw">Prop</span> :=</span>
+<span id="L88">  <span class="const token" data-verso-hover="82">Fintype.card</span> S - f ≤ #(<span class="const token" data-verso-hover="83">univ</span>.<span class="const token" data-verso-hover="84">filter</span> <span class="kw">fun</span> s =&gt; ∀ b, δ b = s → b ∈ got)</span>
+<span id="L89"></span>
+<span id="L90"><span class="const token" data-verso-hover="85">instance</span> (δ : B → S) (f : <span class="const token" data-verso-hover="55">ℕ</span>) (got : <span class="const token" data-verso-hover="58">Finset</span> B) : <span class="const token" data-verso-hover="86">Decidable</span> (<span class="const token" data-verso-hover="81">Done</span> δ f got) := <span class="kw">by</span></span>
+<span id="L91">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="81">Done</span>; <span class="kw">infer_instance</span></span>
+<span id="L92"></span>
+<span id="L93"><span class="dc">/-- The local state after a step that triggers nothing. -/</span></span>
+<span id="L94"><span class="kw">def</span> <span class="const token" data-verso-hover="87">afterQ</span> (δ : B → S) (f : <span class="const token" data-verso-hover="55">ℕ</span>) (R : <span class="const token" data-verso-hover="58">Finset</span> B) (l : <span class="const token" data-verso-hover="53">Loc</span> B V) : <span class="const token" data-verso-hover="88">Act</span> B (<span class="const token" data-verso-hover="55">ℕ</span> × V) V × <span class="const token" data-verso-hover="53">Loc</span> B V :=</span>
+<span id="L95">  <span class="kw">match</span> l.<span class="const token" data-verso-hover="62">mode</span> <span class="kw">with</span></span>
+<span id="L96">  | <span class="const token" data-verso-hover="49">.</span>idle =&gt; (<span class="const token" data-verso-hover="89">.</span>skip, l)</span>
+<span id="L97">  | <span class="const token" data-verso-hover="50">.</span>rd =&gt;</span>
+<span id="L98">    <span class="kw">match</span> <span class="const token" data-verso-hover="69">pick</span> l.<span class="const token" data-verso-hover="63">rq</span> <span class="kw">with</span></span>
+<span id="L99">    | <span class="const token" data-verso-hover="72">some</span> b =&gt; (<span class="const token" data-verso-hover="90">.</span>trig b <span class="const token" data-verso-hover="91">.</span>read, { l <span class="kw">with</span> <span class="const token" data-verso-hover="63">rq</span> := l.<span class="const token" data-verso-hover="63">rq</span>.<span class="const token" data-verso-hover="92">erase</span> b })</span>
+<span id="L100">    | <span class="const token" data-verso-hover="74">none</span> =&gt; <span class="kw">if</span> <span class="const token" data-verso-hover="81">Done</span> δ f l.<span class="const token" data-verso-hover="64">got</span> <span class="kw">then</span> (<span class="const token" data-verso-hover="93">.</span>ret l.<span class="const token" data-verso-hover="65">best</span>.<span class="const token" data-verso-hover="94">2</span>, { l <span class="kw">with</span> <span class="const token" data-verso-hover="62">mode</span> := <span class="const token" data-verso-hover="49">.</span>idle }) <span class="kw">else</span> (<span class="const token" data-verso-hover="89">.</span>skip, l)</span>
+<span id="L101">  | <span class="const token" data-verso-hover="51">.</span>wc v =&gt;</span>
+<span id="L102">    <span class="kw">match</span> <span class="const token" data-verso-hover="69">pick</span> l.<span class="const token" data-verso-hover="63">rq</span> <span class="kw">with</span></span>
+<span id="L103">    | <span class="const token" data-verso-hover="72">some</span> b =&gt; (<span class="const token" data-verso-hover="90">.</span>trig b <span class="const token" data-verso-hover="91">.</span>read, { l <span class="kw">with</span> <span class="const token" data-verso-hover="63">rq</span> := l.<span class="const token" data-verso-hover="63">rq</span>.<span class="const token" data-verso-hover="92">erase</span> b })</span>
+<span id="L104">    | <span class="const token" data-verso-hover="74">none</span> =&gt;</span>
+<span id="L105">      <span class="kw">if</span> <span class="const token" data-verso-hover="81">Done</span> δ f l.<span class="const token" data-verso-hover="64">got</span> <span class="kw">then</span></span>
+<span id="L106">        (<span class="const token" data-verso-hover="89">.</span>skip, { l <span class="kw">with</span> <span class="const token" data-verso-hover="54">ts</span> := l.<span class="const token" data-verso-hover="65">best</span>.<span class="const token" data-verso-hover="95">1</span> + <span class="nu">1</span>, <span class="const token" data-verso-hover="56">val</span> := v, <span class="const token" data-verso-hover="59">cov</span> := l.<span class="const token" data-verso-hover="57">pw</span>, <span class="const token" data-verso-hover="60">wr</span> := ∅, <span class="const token" data-verso-hover="61">q</span> := R \ l.<span class="const token" data-verso-hover="57">pw</span>,</span>
+<span id="L107">                         <span class="const token" data-verso-hover="62">mode</span> := <span class="const token" data-verso-hover="52">.</span>wp })</span>
+<span id="L108">      <span class="kw">else</span> (<span class="const token" data-verso-hover="89">.</span>skip, l)</span>
+<span id="L109">  | <span class="const token" data-verso-hover="52">.</span>wp =&gt; <span class="kw">if</span> <span class="kw">#R</span> ≤ <span class="kw">#l</span>.<span class="const token" data-verso-hover="60">wr</span> + f <span class="kw">then</span> (<span class="const token" data-verso-hover="93">.</span>ret l.<span class="const token" data-verso-hover="56">val</span>, { l <span class="kw">with</span> <span class="const token" data-verso-hover="62">mode</span> := <span class="const token" data-verso-hover="49">.</span>idle }) <span class="kw">else</span> (<span class="const token" data-verso-hover="89">.</span>skip, l)</span>
+<span id="L110"></span>
+<span id="L111"><span class="dc">/-- Start a collect. -/</span></span>
+<span id="L112"><span class="kw">def</span> <span class="const token" data-verso-hover="96">startCollect</span> (v₀ : V) (m : <span class="const token" data-verso-hover="48">Mode</span> V) (l : <span class="const token" data-verso-hover="53">Loc</span> B V) : <span class="const token" data-verso-hover="53">Loc</span> B V :=</span>
+<span id="L113">  { l <span class="kw">with</span> <span class="const token" data-verso-hover="62">mode</span> := m, <span class="const token" data-verso-hover="63">rq</span> := <span class="const token" data-verso-hover="83">univ</span>, <span class="const token" data-verso-hover="64">got</span> := ∅, <span class="const token" data-verso-hover="65">best</span> := (<span class="nu">0</span>, v₀) }</span>
+<span id="L114"></span>
+<span id="L115"><span class="dc">/-- The mode is a collect (for a read or for a write). -/</span></span>
+<span id="L116"><span class="kw">def</span> <span class="const token" data-verso-hover="97">Mode.isColl</span> {V : <span class="kw">Type</span>*} : <span class="const token" data-verso-hover="48">Mode</span> V → <span class="const token" data-verso-hover="98">Bool</span></span>
+<span id="L117">  | <span class="const token" data-verso-hover="50">.</span>rd =&gt; <span class="const token" data-verso-hover="99">true</span></span>
+<span id="L118">  | <span class="const token" data-verso-hover="51">.</span>wc _ =&gt; <span class="const token" data-verso-hover="99">true</span></span>
+<span id="L119">  | _ =&gt; <span class="const token" data-verso-hover="100">false</span></span>
+<span id="L120"></span>
+<span id="L121">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="101">Mode.isColl_rd</span> : (<span class="const token" data-verso-hover="50">Mode.rd</span> : <span class="const token" data-verso-hover="48">Mode</span> V).<span class="const token" data-verso-hover="97">isColl</span> = <span class="const token" data-verso-hover="99">true</span> := <span class="const token" data-verso-hover="102">rfl</span></span>
+<span id="L122">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="103">Mode.isColl_wc</span> (v : V) : (<span class="const token" data-verso-hover="51">Mode.wc</span> v).<span class="const token" data-verso-hover="97">isColl</span> = <span class="const token" data-verso-hover="99">true</span> := <span class="const token" data-verso-hover="102">rfl</span></span>
+<span id="L123">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="104">Mode.isColl_idle</span> : (<span class="const token" data-verso-hover="49">Mode.idle</span> : <span class="const token" data-verso-hover="48">Mode</span> V).<span class="const token" data-verso-hover="97">isColl</span> = <span class="const token" data-verso-hover="100">false</span> := <span class="const token" data-verso-hover="102">rfl</span></span>
+<span id="L124">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="105">Mode.isColl_wp</span> : (<span class="const token" data-verso-hover="52">Mode.wp</span> : <span class="const token" data-verso-hover="48">Mode</span> V).<span class="const token" data-verso-hover="97">isColl</span> = <span class="const token" data-verso-hover="100">false</span> := <span class="const token" data-verso-hover="102">rfl</span></span>
+<span id="L125"></span>
+<span id="L126"><span class="dc">/-- Response to a low-level read with value `w`. -/</span></span>
+<span id="L127"><span class="kw">def</span> <span class="const token" data-verso-hover="106">recvRead</span> (l : <span class="const token" data-verso-hover="53">Loc</span> B V) (b : B) (w : <span class="const token" data-verso-hover="55">ℕ</span> × V) : <span class="const token" data-verso-hover="53">Loc</span> B V :=</span>
+<span id="L128">  <span class="kw">if</span> l.<span class="const token" data-verso-hover="62">mode</span>.<span class="const token" data-verso-hover="97">isColl</span> <span class="kw">then</span></span>
+<span id="L129">    { l <span class="kw">with</span> <span class="const token" data-verso-hover="64">got</span> := <span class="const token" data-verso-hover="107">insert</span> b l.<span class="const token" data-verso-hover="64">got</span>, <span class="const token" data-verso-hover="65">best</span> := <span class="kw">if</span> l.<span class="const token" data-verso-hover="65">best</span>.<span class="const token" data-verso-hover="95">1</span> &lt; w.<span class="const token" data-verso-hover="95">1</span> <span class="kw">then</span> w <span class="kw">else</span> l.<span class="const token" data-verso-hover="65">best</span> }</span>
+<span id="L130">  <span class="kw">else</span> l</span>
+<span id="L131"></span>
+<span id="L132"><span class="dc">/-- Response to a low-level write on `b` (lines 29–34). -/</span></span>
+<span id="L133"><span class="kw">def</span> <span class="const token" data-verso-hover="108">recvWrite</span> (l : <span class="const token" data-verso-hover="53">Loc</span> B V) (b : B) : <span class="const token" data-verso-hover="53">Loc</span> B V :=</span>
+<span id="L134">  <span class="kw">if</span> b ∈ l.<span class="const token" data-verso-hover="59">cov</span> <span class="kw">then</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="57">pw</span> := l.<span class="const token" data-verso-hover="57">pw</span>.<span class="const token" data-verso-hover="92">erase</span> b, <span class="const token" data-verso-hover="59">cov</span> := l.<span class="const token" data-verso-hover="59">cov</span>.<span class="const token" data-verso-hover="92">erase</span> b, <span class="const token" data-verso-hover="61">q</span> := <span class="const token" data-verso-hover="107">insert</span> b l.<span class="const token" data-verso-hover="61">q</span> }</span>
+<span id="L135">  <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="57">pw</span> := l.<span class="const token" data-verso-hover="57">pw</span>.<span class="const token" data-verso-hover="92">erase</span> b, <span class="const token" data-verso-hover="60">wr</span> := <span class="const token" data-verso-hover="107">insert</span> b l.<span class="const token" data-verso-hover="60">wr</span> }</span>
+<span id="L136"></span>
+<span id="L137"><span class="dc">/-- **Algorithm 2** of the paper, for the write sets `R` (servers `δ`, failure threshold `f`,</span></span>
+<span id="L138"><span class="dc">initial value `v₀`). -/</span></span>
+<span id="L139"><span class="kw">def</span> <span class="const token" data-verso-hover="109">alg</span> (δ : B → S) (f : <span class="const token" data-verso-hover="55">ℕ</span>) (R : C → <span class="const token" data-verso-hover="58">Finset</span> B) (v₀ : V) : <span class="const token" data-verso-hover="110">Alg</span> C B V (<span class="const token" data-verso-hover="55">ℕ</span> × V) (<span class="const token" data-verso-hover="53">Loc</span> B V) <span class="kw">where</span></span>
+<span id="L140">  <span class="const token" data-verso-hover="111">init</span> c := { <span class="const token" data-verso-hover="54">ts</span> := <span class="nu">0</span>, <span class="const token" data-verso-hover="56">val</span> := v₀, <span class="const token" data-verso-hover="57">pw</span> := ∅, <span class="const token" data-verso-hover="59">cov</span> := ∅, <span class="const token" data-verso-hover="60">wr</span> := R c, <span class="const token" data-verso-hover="61">q</span> := ∅, <span class="const token" data-verso-hover="62">mode</span> := <span class="const token" data-verso-hover="49">.</span>idle, <span class="const token" data-verso-hover="63">rq</span> := ∅,</span>
+<span id="L141">              <span class="const token" data-verso-hover="64">got</span> := ∅, <span class="const token" data-verso-hover="65">best</span> := (<span class="nu">0</span>, v₀) }</span>
+<span id="L142">  <span class="const token" data-verso-hover="112">winit</span> _ := (<span class="nu">0</span>, v₀)</span>
+<span id="L143">  <span class="const token" data-verso-hover="113">invoke</span> _ o l :=</span>
+<span id="L144">    <span class="kw">match</span> l.<span class="const token" data-verso-hover="62">mode</span> <span class="kw">with</span></span>
+<span id="L145">    | <span class="const token" data-verso-hover="49">.</span>idle =&gt;</span>
+<span id="L146">      <span class="kw">match</span> o <span class="kw">with</span></span>
+<span id="L147">      | <span class="const token" data-verso-hover="114">.</span>read =&gt; <span class="const token" data-verso-hover="96">startCollect</span> v₀ <span class="const token" data-verso-hover="50">.</span>rd l</span>
+<span id="L148">      | <span class="const token" data-verso-hover="115">.</span>write v =&gt; <span class="const token" data-verso-hover="96">startCollect</span> v₀ (<span class="const token" data-verso-hover="51">.</span>wc v) l</span>
+<span id="L149">    | _ =&gt; l</span>
+<span id="L150">  <span class="const token" data-verso-hover="116">act</span> c l :=</span>
+<span id="L151">    <span class="kw">match</span> <span class="const token" data-verso-hover="69">pick</span> l.<span class="const token" data-verso-hover="61">q</span> <span class="kw">with</span></span>
+<span id="L152">    | <span class="const token" data-verso-hover="72">some</span> b =&gt; (<span class="const token" data-verso-hover="90">.</span>trig b (<span class="const token" data-verso-hover="117">.</span>write (l.<span class="const token" data-verso-hover="54">ts</span>, l.<span class="const token" data-verso-hover="56">val</span>)), { l <span class="kw">with</span> <span class="const token" data-verso-hover="61">q</span> := l.<span class="const token" data-verso-hover="61">q</span>.<span class="const token" data-verso-hover="92">erase</span> b, <span class="const token" data-verso-hover="57">pw</span> := <span class="const token" data-verso-hover="107">insert</span> b l.<span class="const token" data-verso-hover="57">pw</span> })</span>
+<span id="L153">    | <span class="const token" data-verso-hover="74">none</span> =&gt; <span class="const token" data-verso-hover="87">afterQ</span> δ f (R c) l</span>
+<span id="L154">  <span class="const token" data-verso-hover="118">recv</span> _ l p r :=</span>
+<span id="L155">    <span class="kw">match</span> p.<span class="const token" data-verso-hover="119">op</span> <span class="kw">with</span></span>
+<span id="L156">    | <span class="const token" data-verso-hover="91">.</span>read =&gt; <span class="const token" data-verso-hover="106">recvRead</span> l p.<span class="const token" data-verso-hover="120">reg</span> (r.<span class="const token" data-verso-hover="121">getD</span> (<span class="nu">0</span>, v₀))</span>
+<span id="L157">    | <span class="const token" data-verso-hover="117">.</span>write _ =&gt; <span class="const token" data-verso-hover="108">recvWrite</span> l p.<span class="const token" data-verso-hover="120">reg</span></span>
+<span id="L158"></span>
+<span id="L159"><span class="kw">end</span> Podc.RegisterEmulationSpace.Alg2</span>
+<span id="L160"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2017/RegisterEmulationSpace/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

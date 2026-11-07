@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>LocalComputable: Separation.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2026/">PODC 2026</a><span class="sep">›</span><a href="PODC2026/LocalComputable/">LocalComputable</a><span class="sep">›</span><a href="PODC2026/LocalComputable/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Separation</span></nav>
+        <h1>
+          <code>Separation.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2026/LocalComputable/">Is a LOCAL Algorithm Computable? — PODC 2026</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2026/LocalComputable/Separation.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Separation"><span id="L1"><span class="kw">import</span> Papers.PODC2026.LocalComputable.ComputableEquiv</span>
+<span id="L2"><span class="kw">import</span> Mathlib.Computability.PartrecCode</span>
+<span id="L3"><span class="kw">import</span> Mathlib.Analysis.Asymptotics.Defs</span>
+<span id="L4"><span class="kw">import</span> Mathlib.Analysis.SpecialFunctions.Pow.Real</span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">/-!</span></span>
+<span id="L7"><span class="dc"># The logical core of the separation (Lemmas 4.17, 4.18)</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">Section 4 constructs an LCL `Π = Π_tree ⊗ Π_row ⊗ Π_grid ⊗ Π_Turing ⊗ Π_consensus` on</span></span>
+<span id="L10"><span class="dc">"growing grids" and shows that computable-LOCAL needs locality `Ω(√n)` for it, while</span></span>
+<span id="L11"><span class="dc">uncomputable-LOCAL solves it in `O(log n)` rounds. We do **not** formalize the LCL (trees, rows,</span></span>
+<span id="L12"><span class="dc">grids, the Turing machine encoding). We formalize the diagonalization argument of Lemma 4.17</span></span>
+<span id="L13"><span class="dc">for an abstract *separation family*: instances `G_K(x)` (program `x`, `K` layers) with a node in</span></span>
+<span id="L14"><span class="dc">the layer holding `x`, such that</span></span>
+<span id="L15"></span>
+<span id="L16"><span class="dc">* (`forced`) if `x` halts with result `r`, then for all large `K` every valid labelling of</span></span>
+<span id="L17"><span class="dc">  `G_K(x)` outputs the bit `r ≠ 0` at the node (the halting configuration lies in the grid and the</span></span>
+<span id="L18"><span class="dc">  consensus constraints propagate it);</span></span>
+<span id="L19"><span class="dc">* (`stable`) the radius-`r` view of the node is the same in `G_K(x)` and `G_{K'}(x)` once</span></span>
+<span id="L20"><span class="dc">  `K, K' ≥ depth x r` (the node does not see the bottom of the grid);</span></span>
+<span id="L21"></span>
+<span id="L22"><span class="dc">with `inst`, `node`, `depth` computable. Programs are Mathlib's `Nat.Partrec.Code`, run on input</span></span>
+<span id="L23"><span class="dc">`0` (the universal machine `U` of the paper is `Code.eval`).</span></span>
+<span id="L24"></span>
+<span id="L25"><span class="dc">* `diagonalizer` (**Lemma 4.18**): for every computable total predictor `h` there is a program</span></span>
+<span id="L26"><span class="dc">  that halts with the opposite bit (Kleene's recursion theorem plays the role of the quine).</span></span>
+<span id="L27"><span class="dc">* `exists_far_of_computable` (**Lemma 4.17**, abstract): a computable algorithm that solves the</span></span>
+<span id="L28"><span class="dc">  problem must, on some `x`, stop beyond `depth` for every `K`.</span></span>
+<span id="L29"><span class="dc">* `not_littleO_sqrt`: with the size bound `|G_K(x)| ≤ C (K+1)²` and `depth x r ≤ r + D x`, its</span></span>
+<span id="L30"><span class="dc">  locality is not `o(√n)`.</span></span>
+<span id="L31"><span class="dc">-/</span></span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">namespace</span> LocalComputable</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">open</span> Computable</span>
+<span id="L36"><span class="kw">open</span> Nat.Partrec (<span class="const token" data-verso-hover="449">Code</span>)</span>
+<span id="L37"></span>
+<span id="L38"><span class="dc">/-- **Lemma 4.18** (diagonalizer). For every computable predictor `h` of the output bit of</span></span>
+<span id="L39"><span class="dc">programs, there is a program `c` that halts on input `0` with output `0` if `h c` predicts</span></span>
+<span id="L40"><span class="dc">"accept" (`true`) and `1` otherwise. -/</span></span>
+<span id="L41"><span class="kw">theorem</span> <span class="const token" data-verso-hover="27">diagonalizer</span> {h : <span class="const token" data-verso-hover="449">Code</span> → <span class="const token" data-verso-hover="107">Bool</span>} (hh : <span class="const token" data-verso-hover="16">Computable</span> h) :</span>
+<span id="L42">    ∃ c : <span class="const token" data-verso-hover="449">Code</span>, <span class="const token" data-verso-hover="450">Code.eval</span> c <span class="nu">0</span> = <span class="const token" data-verso-hover="169">Part.some</span> (<span class="kw">if</span> h c <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L43">  <span class="kw">have</span> hf : <span class="const token" data-verso-hover="101">Computable₂</span> <span class="kw">fun</span> (c : <span class="const token" data-verso-hover="449">Code</span>) (_ : <span class="const token" data-verso-hover="36">ℕ</span>) =&gt; bif h c <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> <span class="nu">1</span> :=</span>
+<span id="L44">    ((<span class="const token" data-verso-hover="451">cond</span> hh (<span class="const token" data-verso-hover="167">const</span> <span class="nu">0</span>) (<span class="const token" data-verso-hover="167">const</span> <span class="nu">1</span>)).<span class="const token" data-verso-hover="104">comp</span> <span class="const token" data-verso-hover="103">fst</span>).<span class="const token" data-verso-hover="157">to₂</span></span>
+<span id="L45">  <span class="kw">obtain</span> ⟨c, hc⟩ := <span class="const token" data-verso-hover="452">Code.fixed_point₂</span> hf.<span class="const token" data-verso-hover="170">partrec₂</span></span>
+<span id="L46">  <span class="kw">refine</span> ⟨c, ?_⟩</span>
+<span id="L47">  <span class="kw">rw</span> [hc]</span>
+<span id="L48">  <span class="kw">cases</span> h c &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L49"></span>
+<span id="L50"><span class="kw">variable</span> {Net View Out : <span class="kw">Type</span>*}</span>
+<span id="L51"></span>
+<span id="L52"><span class="kw">namespace</span> Model</span>
+<span id="L53"></span>
+<span id="L54"><span class="kw">variable</span> {M : <span class="const token" data-verso-hover="34">Model</span> Net View}</span>
+<span id="L55"></span>
+<span id="L56"><span class="kw">theorem</span> <span class="const token" data-verso-hover="453">out_isSome_of</span> {A : <span class="const token" data-verso-hover="39">Alg</span> View Out} {G : Net} {v r : <span class="const token" data-verso-hover="36">ℕ</span>} {b : Out}</span>
+<span id="L57">    (h : A (M.<span class="const token" data-verso-hover="37">view</span> G v r) r = <span class="const token" data-verso-hover="47">some</span> b) : (M.<span class="const token" data-verso-hover="41">out</span> A G v r).<span class="const token" data-verso-hover="71">isSome</span> := <span class="kw">by</span></span>
+<span id="L58">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="41">out</span></span>
+<span id="L59">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="93">Option.isSome_iff_exists</span>]</span>
+<span id="L60">  <span class="kw">by_contra</span> hc</span>
+<span id="L61">  push <span class="const token" data-verso-hover="403">Not</span> <span class="kw">at</span> hc</span>
+<span id="L62">  <span class="kw">have</span> : (<span class="const token" data-verso-hover="42">List.range</span> (r + <span class="nu">1</span>)).<span class="const token" data-verso-hover="43">findSome?</span> (<span class="kw">fun</span> t =&gt; A (M.<span class="const token" data-verso-hover="37">view</span> G v t) t) = <span class="const token" data-verso-hover="14">none</span> := <span class="kw">by</span></span>
+<span id="L63">    <span class="kw">cases</span> e : (<span class="const token" data-verso-hover="42">List.range</span> (r + <span class="nu">1</span>)).<span class="const token" data-verso-hover="43">findSome?</span> (<span class="kw">fun</span> t =&gt; A (M.<span class="const token" data-verso-hover="37">view</span> G v t) t) <span class="kw">with</span></span>
+<span id="L64">    | <span class="const token" data-verso-hover="14">none</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L65">    | <span class="const token" data-verso-hover="47">some</span> a =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="386">absurd</span> e (hc a)</span>
+<span id="L66">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="65">List.findSome?_eq_none_iff</span>] <span class="kw">at</span> this</span>
+<span id="L67">  <span class="kw">have</span> := this r (<span class="const token" data-verso-hover="59">List.mem_range</span>.<span class="const token" data-verso-hover="90">mpr</span> (<span class="const token" data-verso-hover="444">Nat.lt_succ_self</span> r))</span>
+<span id="L68">  <span class="kw">rw</span> [h] <span class="kw">at</span> this</span>
+<span id="L69">  <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L70"></span>
+<span id="L71"><span class="kw">theorem</span> <span class="const token" data-verso-hover="454">out_unique</span> {A : <span class="const token" data-verso-hover="39">Alg</span> View Out} {G : Net} {v r r' : <span class="const token" data-verso-hover="36">ℕ</span>} {a b : Out}</span>
+<span id="L72">    (h : M.<span class="const token" data-verso-hover="41">out</span> A G v r = <span class="const token" data-verso-hover="47">some</span> a) (h' : M.<span class="const token" data-verso-hover="41">out</span> A G v r' = <span class="const token" data-verso-hover="47">some</span> b) : a = b := <span class="kw">by</span></span>
+<span id="L73">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="455">le_total</span> r r' <span class="kw">with</span> hr | hr</span>
+<span id="L74">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="60">out_mono</span> A h hr] <span class="kw">at</span> h'; <span class="kw">exact</span> <span class="const token" data-verso-hover="456">Option.some_injective</span> _ h'</span>
+<span id="L75">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="60">out_mono</span> A h' hr] <span class="kw">at</span> h; <span class="kw">exact</span> (<span class="const token" data-verso-hover="456">Option.some_injective</span> _ h).<span class="const token" data-verso-hover="96">symm</span></span>
+<span id="L76"></span>
+<span id="L77"><span class="kw">variable</span> (M)</span>
+<span id="L78"></span>
+<span id="L79"><span class="dc">/-- An abstract *separation family* for the problem `P` (see the module docstring). -/</span></span>
+<span id="L80"><span class="kw">structure</span> <span class="const token" data-verso-hover="457">SepFamily</span> (P : M.<span class="const token" data-verso-hover="44">Problem</span> Out) <span class="kw">where</span></span>
+<span id="L81">  <span class="dc">/-- the instance `G_K(x)` -/</span></span>
+<span id="L82">  <span class="const token" data-verso-hover="458">inst</span> : <span class="const token" data-verso-hover="449">Code</span> → <span class="const token" data-verso-hover="36">ℕ</span> → Net</span>
+<span id="L83">  <span class="dc">/-- a node in the layer holding the input `x` -/</span></span>
+<span id="L84">  <span class="const token" data-verso-hover="459">node</span> : <span class="const token" data-verso-hover="449">Code</span> → <span class="const token" data-verso-hover="36">ℕ</span> → <span class="const token" data-verso-hover="36">ℕ</span></span>
+<span id="L85">  <span class="const token" data-verso-hover="460">node_lt</span> : ∀ x K, <span class="const token" data-verso-hover="459">node</span> x K &lt; M.<span class="const token" data-verso-hover="35">size</span> (<span class="const token" data-verso-hover="458">inst</span> x K)</span>
+<span id="L86">  <span class="dc">/-- the output bit encoded by a label -/</span></span>
+<span id="L87">  <span class="const token" data-verso-hover="461">bit</span> : Out → <span class="const token" data-verso-hover="107">Bool</span></span>
+<span id="L88">  <span class="dc">/-- `K ≥ depth x r` layers suffice for the radius-`r` view of the node to be stable -/</span></span>
+<span id="L89">  <span class="const token" data-verso-hover="462">depth</span> : <span class="const token" data-verso-hover="449">Code</span> → <span class="const token" data-verso-hover="36">ℕ</span> → <span class="const token" data-verso-hover="36">ℕ</span></span>
+<span id="L90">  <span class="const token" data-verso-hover="463">le_depth</span> : ∀ x r, r ≤ <span class="const token" data-verso-hover="462">depth</span> x r</span>
+<span id="L91">  <span class="const token" data-verso-hover="464">depth_mono</span> : ∀ x, <span class="const token" data-verso-hover="399">Monotone</span> (<span class="const token" data-verso-hover="462">depth</span> x)</span>
+<span id="L92">  <span class="dc">/-- validity forces the result of a halting program -/</span></span>
+<span id="L93">  <span class="const token" data-verso-hover="465">forced</span> : ∀ x r, <span class="const token" data-verso-hover="450">Code.eval</span> x <span class="nu">0</span> = <span class="const token" data-verso-hover="169">Part.some</span> r → ∃ K₀, ∀ K ≥ K₀,</span>
+<span id="L94">    ∀ lab, P (<span class="const token" data-verso-hover="458">inst</span> x K) lab → <span class="const token" data-verso-hover="461">bit</span> (lab ⟨<span class="const token" data-verso-hover="459">node</span> x K, <span class="const token" data-verso-hover="460">node_lt</span> x K⟩) = (r != <span class="nu">0</span>)</span>
+<span id="L95">  <span class="dc">/-- the node cannot see the bottom of the grid -/</span></span>
+<span id="L96">  <span class="const token" data-verso-hover="466">stable</span> : ∀ x r K K', <span class="const token" data-verso-hover="462">depth</span> x r ≤ K → K ≤ K' →</span>
+<span id="L97">    M.<span class="const token" data-verso-hover="37">view</span> (<span class="const token" data-verso-hover="458">inst</span> x K) (<span class="const token" data-verso-hover="459">node</span> x K) r = M.<span class="const token" data-verso-hover="37">view</span> (<span class="const token" data-verso-hover="458">inst</span> x K') (<span class="const token" data-verso-hover="459">node</span> x K') r</span>
+<span id="L98"></span>
+<span id="L99"><span class="kw">variable</span> [<span class="const token" data-verso-hover="17">Primcodable</span> Net] [<span class="const token" data-verso-hover="17">Primcodable</span> View] [<span class="const token" data-verso-hover="17">Primcodable</span> Out]</span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- Outputs of a computable algorithm are computable. -/</span></span>
+<span id="L102"><span class="kw">theorem</span> <span class="const token" data-verso-hover="467">out_computable</span> (hview : <span class="const token" data-verso-hover="16">Computable</span> <span class="kw">fun</span> p : Net × <span class="const token" data-verso-hover="36">ℕ</span> × <span class="const token" data-verso-hover="36">ℕ</span> =&gt; M.<span class="const token" data-verso-hover="37">view</span> p.<span class="const token" data-verso-hover="98">1</span> p.<span class="const token" data-verso-hover="99">2</span><span class="nu">.</span><span class="const token" data-verso-hover="98">1</span> p.<span class="const token" data-verso-hover="99">2</span><span class="nu">.</span><span class="const token" data-verso-hover="99">2</span>)</span>
+<span id="L103">    {A : <span class="const token" data-verso-hover="39">Alg</span> View Out} (hA : <span class="const token" data-verso-hover="101">Computable₂</span> A) :</span>
+<span id="L104">    <span class="const token" data-verso-hover="16">Computable</span> <span class="kw">fun</span> q : Net × <span class="const token" data-verso-hover="36">ℕ</span> × <span class="const token" data-verso-hover="36">ℕ</span> =&gt; M.<span class="const token" data-verso-hover="41">out</span> A q.<span class="const token" data-verso-hover="98">1</span> q.<span class="const token" data-verso-hover="99">2</span><span class="nu">.</span><span class="const token" data-verso-hover="98">1</span> q.<span class="const token" data-verso-hover="99">2</span><span class="nu">.</span><span class="const token" data-verso-hover="99">2</span> := <span class="kw">by</span></span>
+<span id="L105">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="41">out</span></span>
+<span id="L106">  <span class="kw">refine</span> <span class="const token" data-verso-hover="150">Computable.list_findSome?</span> (<span class="const token" data-verso-hover="151">Primrec.list_range</span>.<span class="const token" data-verso-hover="152">to_comp</span>.<span class="const token" data-verso-hover="104">comp</span> (<span class="const token" data-verso-hover="153">succ</span>.<span class="const token" data-verso-hover="104">comp</span> (<span class="const token" data-verso-hover="105">snd</span>.<span class="const token" data-verso-hover="104">comp</span> <span class="const token" data-verso-hover="105">snd</span>))) ?_</span>
+<span id="L107">  <span class="kw">exact</span> (hA.<span class="const token" data-verso-hover="102">comp</span> (hview.<span class="const token" data-verso-hover="104">comp</span> (<span class="const token" data-verso-hover="156">pair</span> (<span class="const token" data-verso-hover="103">fst</span>.<span class="const token" data-verso-hover="104">comp</span> <span class="const token" data-verso-hover="103">fst</span>) (<span class="const token" data-verso-hover="156">pair</span> (<span class="const token" data-verso-hover="103">fst</span>.<span class="const token" data-verso-hover="104">comp</span> (<span class="const token" data-verso-hover="105">snd</span>.<span class="const token" data-verso-hover="104">comp</span> <span class="const token" data-verso-hover="103">fst</span>)) <span class="const token" data-verso-hover="105">snd</span>))) <span class="const token" data-verso-hover="105">snd</span>).<span class="const token" data-verso-hover="157">to₂</span></span>
+<span id="L108"></span>
+<span id="L109"><span class="dc">/-- **Lemma 4.17** (abstract form). If a *computable* algorithm `A` solves `P` with locality `T`,</span></span>
+<span id="L110"><span class="dc">then for some program `x` and every `K`, the node of `G_K(x)` may look beyond depth `K`, i.e.</span></span>
+<span id="L111"><span class="dc">`K &lt; depth x (T |G_K(x)|)`. (Otherwise one could compute, for every `x`, the bit that `A`</span></span>
+<span id="L112"><span class="dc">outputs at the node of a deep enough instance, and the diagonalizer defeats it.) -/</span></span>
+<span id="L113"><span class="kw">theorem</span> <span class="const token" data-verso-hover="1">exists_far_of_computable</span> {P : M.<span class="const token" data-verso-hover="44">Problem</span> Out} (F : M.<span class="const token" data-verso-hover="457">SepFamily</span> P)</span>
+<span id="L114">    (hview : <span class="const token" data-verso-hover="16">Computable</span> <span class="kw">fun</span> p : Net × <span class="const token" data-verso-hover="36">ℕ</span> × <span class="const token" data-verso-hover="36">ℕ</span> =&gt; M.<span class="const token" data-verso-hover="37">view</span> p.<span class="const token" data-verso-hover="98">1</span> p.<span class="const token" data-verso-hover="99">2</span><span class="nu">.</span><span class="const token" data-verso-hover="98">1</span> p.<span class="const token" data-verso-hover="99">2</span><span class="nu">.</span><span class="const token" data-verso-hover="99">2</span>)</span>
+<span id="L115">    (hinst : <span class="const token" data-verso-hover="101">Computable₂</span> F.<span class="const token" data-verso-hover="458">inst</span>) (hnode : <span class="const token" data-verso-hover="101">Computable₂</span> F.<span class="const token" data-verso-hover="459">node</span>) (hdepth : <span class="const token" data-verso-hover="101">Computable₂</span> F.<span class="const token" data-verso-hover="462">depth</span>)</span>
+<span id="L116">    (hbit : <span class="const token" data-verso-hover="16">Computable</span> F.<span class="const token" data-verso-hover="461">bit</span>)</span>
+<span id="L117">    {T : <span class="const token" data-verso-hover="36">ℕ</span> → <span class="const token" data-verso-hover="36">ℕ</span>} {A : <span class="const token" data-verso-hover="39">Alg</span> View Out} (hA : <span class="const token" data-verso-hover="101">Computable₂</span> A) (hsol : M.<span class="const token" data-verso-hover="48">Solves</span> P A T) :</span>
+<span id="L118">    ∃ x, ∀ K, K &lt; F.<span class="const token" data-verso-hover="462">depth</span> x (T (M.<span class="const token" data-verso-hover="35">size</span> (F.<span class="const token" data-verso-hover="458">inst</span> x K))) := <span class="kw">by</span></span>
+<span id="L119">  <span class="kw">classical</span></span>
+<span id="L120">  <span class="kw">by_contra</span> hcon</span>
+<span id="L121">  push <span class="const token" data-verso-hover="403">Not</span> <span class="kw">at</span> hcon</span>
+<span id="L122">  <span class="cm">--</span><span class="cm"> `goodK x K`: some radius `r` with `depth x r ≤ K` already has a non-`⊥` value</span></span>
+<span id="L123">  <span class="kw">let</span> goodK : <span class="const token" data-verso-hover="449">Code</span> → <span class="const token" data-verso-hover="36">ℕ</span> → <span class="const token" data-verso-hover="107">Bool</span> := <span class="kw">fun</span> x K =&gt; (<span class="const token" data-verso-hover="42">List.range</span> (K + <span class="nu">1</span>)).<span class="const token" data-verso-hover="240">any</span> <span class="kw">fun</span> r =&gt;</span>
+<span id="L124">    <span class="const token" data-verso-hover="179">decide</span> (F.<span class="const token" data-verso-hover="462">depth</span> x r ≤ K) &amp;&amp; (A (M.<span class="const token" data-verso-hover="37">view</span> (F.<span class="const token" data-verso-hover="458">inst</span> x K) (F.<span class="const token" data-verso-hover="459">node</span> x K) r) r).<span class="const token" data-verso-hover="71">isSome</span></span>
+<span id="L125">  <span class="kw">have</span> hex : ∀ x, ∃ K, goodK x K = <span class="const token" data-verso-hover="109">true</span> := <span class="kw">by</span></span>
+<span id="L126">    <span class="kw">intro</span> x</span>
+<span id="L127">    <span class="kw">obtain</span> ⟨K, hK⟩ := hcon x</span>
+<span id="L128">    <span class="kw">obtain</span> ⟨lab, hlab, -⟩ := hsol (F.<span class="const token" data-verso-hover="458">inst</span> x K)</span>
+<span id="L129">    <span class="kw">have</span> hs := hlab ⟨F.<span class="const token" data-verso-hover="459">node</span> x K, F.<span class="const token" data-verso-hover="460">node_lt</span> x K⟩</span>
+<span id="L130">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="41">out</span> <span class="kw">at</span> hs</span>
+<span id="L131">    <span class="kw">obtain</span> ⟨r, hr, hrs⟩ := <span class="const token" data-verso-hover="468">List.exists_of_findSome?_eq_some</span> hs</span>
+<span id="L132">    <span class="kw">have</span> hr' : r ≤ T (M.<span class="const token" data-verso-hover="35">size</span> (F.<span class="const token" data-verso-hover="458">inst</span> x K)) := <span class="const token" data-verso-hover="57">Nat.lt_succ_iff</span>.<span class="const token" data-verso-hover="58">mp</span> (<span class="const token" data-verso-hover="59">List.mem_range</span>.<span class="const token" data-verso-hover="58">mp</span> hr)</span>
+<span id="L133">    <span class="kw">have</span> hdr : F.<span class="const token" data-verso-hover="462">depth</span> x r ≤ K := (F.<span class="const token" data-verso-hover="464">depth_mono</span> x hr').<span class="const token" data-verso-hover="401">trans</span> hK</span>
+<span id="L134">    <span class="kw">refine</span> ⟨K, <span class="const token" data-verso-hover="303">List.any_eq_true</span>.<span class="const token" data-verso-hover="90">mpr</span> ⟨r, <span class="const token" data-verso-hover="59">List.mem_range</span>.<span class="const token" data-verso-hover="90">mpr</span> ?_, ?_⟩⟩</span>
+<span id="L135">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="372">Nat.lt_succ_of_le</span> ((F.<span class="const token" data-verso-hover="463">le_depth</span> x r).<span class="const token" data-verso-hover="401">trans</span> hdr)</span>
+<span id="L136">    · <span class="kw">simp</span> [hdr, hrs]</span>
+<span id="L137">  <span class="kw">have</span> hgoodK : <span class="const token" data-verso-hover="101">Computable₂</span> goodK := <span class="kw">by</span></span>
+<span id="L138">    <span class="kw">refine</span> <span class="const token" data-verso-hover="404">Computable₂.mk</span> ((<span class="const token" data-verso-hover="405">Computable.list_any</span> (f := <span class="kw">fun</span> a : <span class="const token" data-verso-hover="449">Code</span> × <span class="const token" data-verso-hover="36">ℕ</span> =&gt; <span class="const token" data-verso-hover="42">List.range</span> (a.<span class="const token" data-verso-hover="99">2</span> + <span class="nu">1</span>))</span>
+<span id="L139">      (p := <span class="kw">fun</span> a r =&gt; <span class="const token" data-verso-hover="179">decide</span> (F.<span class="const token" data-verso-hover="462">depth</span> a.<span class="const token" data-verso-hover="98">1</span> r ≤ a.<span class="const token" data-verso-hover="99">2</span>) &amp;&amp;</span>
+<span id="L140">        (A (M.<span class="const token" data-verso-hover="37">view</span> (F.<span class="const token" data-verso-hover="458">inst</span> a.<span class="const token" data-verso-hover="98">1</span> a.<span class="const token" data-verso-hover="99">2</span>) (F.<span class="const token" data-verso-hover="459">node</span> a.<span class="const token" data-verso-hover="98">1</span> a.<span class="const token" data-verso-hover="99">2</span>) r) r).<span class="const token" data-verso-hover="71">isSome</span>)</span>
+<span id="L141">      (<span class="const token" data-verso-hover="151">Primrec.list_range</span>.<span class="const token" data-verso-hover="152">to_comp</span>.<span class="const token" data-verso-hover="104">comp</span> (<span class="const token" data-verso-hover="153">succ</span>.<span class="const token" data-verso-hover="104">comp</span> <span class="const token" data-verso-hover="105">snd</span>)) ?_).<span class="const token" data-verso-hover="163">of_eq</span> <span class="kw">fun</span> a =&gt; <span class="const token" data-verso-hover="69">rfl</span>)</span>
+<span id="L142">    <span class="kw">have</span> h1 : <span class="const token" data-verso-hover="16">Computable</span> <span class="kw">fun</span> c : (<span class="const token" data-verso-hover="449">Code</span> × <span class="const token" data-verso-hover="36">ℕ</span>) × <span class="const token" data-verso-hover="36">ℕ</span> =&gt; <span class="const token" data-verso-hover="179">decide</span> (F.<span class="const token" data-verso-hover="462">depth</span> c.<span class="const token" data-verso-hover="98">1</span><span class="nu">.</span><span class="const token" data-verso-hover="98">1</span> c.<span class="const token" data-verso-hover="99">2</span> ≤ c.<span class="const token" data-verso-hover="98">1</span><span class="nu">.</span><span class="const token" data-verso-hover="99">2</span>) :=</span>
+<span id="L143">      <span class="const token" data-verso-hover="180">Primrec.nat_le</span>.<span class="const token" data-verso-hover="181">decide</span>.<span class="const token" data-verso-hover="155">to_comp</span>.<span class="const token" data-verso-hover="102">comp</span> (hdepth.<span class="const token" data-verso-hover="102">comp</span> (<span class="const token" data-verso-hover="103">fst</span>.<span class="const token" data-verso-hover="104">comp</span> <span class="const token" data-verso-hover="103">fst</span>) <span class="const token" data-verso-hover="105">snd</span>) (<span class="const token" data-verso-hover="105">snd</span>.<span class="const token" data-verso-hover="104">comp</span> <span class="const token" data-verso-hover="103">fst</span>)</span>
+<span id="L144">    <span class="kw">have</span> hv : <span class="const token" data-verso-hover="16">Computable</span> <span class="kw">fun</span> c : (<span class="const token" data-verso-hover="449">Code</span> × <span class="const token" data-verso-hover="36">ℕ</span>) × <span class="const token" data-verso-hover="36">ℕ</span> =&gt;</span>
+<span id="L145">        M.<span class="const token" data-verso-hover="37">view</span> (F.<span class="const token" data-verso-hover="458">inst</span> c.<span class="const token" data-verso-hover="98">1</span><span class="nu">.</span><span class="const token" data-verso-hover="98">1</span> c.<span class="const token" data-verso-hover="98">1</span><span class="nu">.</span><span class="const token" data-verso-hover="99">2</span>) (F.<span class="const token" data-verso-hover="459">node</span> c.<span class="const token" data-verso-hover="98">1</span><span class="nu">.</span><span class="const token" data-verso-hover="98">1</span> c.<span class="const token" data-verso-hover="98">1</span><span class="nu">.</span><span class="const token" data-verso-hover="99">2</span>) c.<span class="const token" data-verso-hover="99">2</span> :=</span>
+<span id="L146">      hview.<span class="const token" data-verso-hover="104">comp</span> (<span class="const token" data-verso-hover="156">pair</span> (hinst.<span class="const token" data-verso-hover="102">comp</span> (<span class="const token" data-verso-hover="103">fst</span>.<span class="const token" data-verso-hover="104">comp</span> <span class="const token" data-verso-hover="103">fst</span>) (<span class="const token" data-verso-hover="105">snd</span>.<span class="const token" data-verso-hover="104">comp</span> <span class="const token" data-verso-hover="103">fst</span>))</span>
+<span id="L147">        (<span class="const token" data-verso-hover="156">pair</span> (hnode.<span class="const token" data-verso-hover="102">comp</span> (<span class="const token" data-verso-hover="103">fst</span>.<span class="const token" data-verso-hover="104">comp</span> <span class="const token" data-verso-hover="103">fst</span>) (<span class="const token" data-verso-hover="105">snd</span>.<span class="const token" data-verso-hover="104">comp</span> <span class="const token" data-verso-hover="103">fst</span>)) <span class="const token" data-verso-hover="105">snd</span>))</span>
+<span id="L148">    <span class="kw">have</span> h2 : <span class="const token" data-verso-hover="16">Computable</span> <span class="kw">fun</span> c : (<span class="const token" data-verso-hover="449">Code</span> × <span class="const token" data-verso-hover="36">ℕ</span>) × <span class="const token" data-verso-hover="36">ℕ</span> =&gt;</span>
+<span id="L149">        (A (M.<span class="const token" data-verso-hover="37">view</span> (F.<span class="const token" data-verso-hover="458">inst</span> c.<span class="const token" data-verso-hover="98">1</span><span class="nu">.</span><span class="const token" data-verso-hover="98">1</span> c.<span class="const token" data-verso-hover="98">1</span><span class="nu">.</span><span class="const token" data-verso-hover="99">2</span>) (F.<span class="const token" data-verso-hover="459">node</span> c.<span class="const token" data-verso-hover="98">1</span><span class="nu">.</span><span class="const token" data-verso-hover="98">1</span> c.<span class="const token" data-verso-hover="98">1</span><span class="nu">.</span><span class="const token" data-verso-hover="99">2</span>) c.<span class="const token" data-verso-hover="99">2</span>) c.<span class="const token" data-verso-hover="99">2</span>).<span class="const token" data-verso-hover="71">isSome</span> :=</span>
+<span id="L150">      <span class="const token" data-verso-hover="161">Primrec.option_isSome</span>.<span class="const token" data-verso-hover="152">to_comp</span>.<span class="const token" data-verso-hover="104">comp</span> (hA.<span class="const token" data-verso-hover="102">comp</span> hv <span class="const token" data-verso-hover="105">snd</span>)</span>
+<span id="L151">    <span class="kw">exact</span> (<span class="const token" data-verso-hover="159">Primrec.and</span>.<span class="const token" data-verso-hover="155">to_comp</span>.<span class="const token" data-verso-hover="102">comp</span> h1 h2).<span class="const token" data-verso-hover="157">to₂</span></span>
+<span id="L152">  <span class="kw">let</span> Kx : <span class="const token" data-verso-hover="449">Code</span> → <span class="const token" data-verso-hover="36">ℕ</span> := <span class="kw">fun</span> x =&gt; <span class="const token" data-verso-hover="88">Nat.find</span> (hex x)</span>
+<span id="L153">  <span class="kw">have</span> hKx : <span class="const token" data-verso-hover="16">Computable</span> Kx := <span class="const token" data-verso-hover="32">Computable.nat_find</span> hgoodK hex</span>
+<span id="L154">  <span class="cm">--</span><span class="cm"> the predictor: the bit output by `A` at the node of `G_{Kx x}(x)`</span></span>
+<span id="L155">  <span class="kw">let</span> h : <span class="const token" data-verso-hover="449">Code</span> → <span class="const token" data-verso-hover="107">Bool</span> := <span class="kw">fun</span> x =&gt;</span>
+<span id="L156">    ((M.<span class="const token" data-verso-hover="41">out</span> A (F.<span class="const token" data-verso-hover="458">inst</span> x (Kx x)) (F.<span class="const token" data-verso-hover="459">node</span> x (Kx x)) (Kx x)).<span class="const token" data-verso-hover="136">map</span> F.<span class="const token" data-verso-hover="461">bit</span>).<span class="const token" data-verso-hover="144">getD</span> <span class="const token" data-verso-hover="140">false</span></span>
+<span id="L157">  <span class="kw">have</span> hh : <span class="const token" data-verso-hover="16">Computable</span> h := <span class="kw">by</span></span>
+<span id="L158">    <span class="kw">refine</span> <span class="const token" data-verso-hover="164">option_getD</span> (<span class="const token" data-verso-hover="165">option_map</span> ((<span class="const token" data-verso-hover="467">out_computable</span> M hview hA).<span class="const token" data-verso-hover="104">comp</span></span>
+<span id="L159">      (<span class="const token" data-verso-hover="156">pair</span> (hinst.<span class="const token" data-verso-hover="102">comp</span> <span class="const token" data-verso-hover="400">.</span>id hKx) (<span class="const token" data-verso-hover="156">pair</span> (hnode.<span class="const token" data-verso-hover="102">comp</span> <span class="const token" data-verso-hover="400">.</span>id hKx) hKx))) (hbit.<span class="const token" data-verso-hover="104">comp</span> <span class="const token" data-verso-hover="105">snd</span>).<span class="const token" data-verso-hover="157">to₂</span>)</span>
+<span id="L160">      (<span class="const token" data-verso-hover="167">const</span> <span class="const token" data-verso-hover="140">false</span>)</span>
+<span id="L161">  <span class="kw">obtain</span> ⟨c, hc⟩ := <span class="const token" data-verso-hover="27">diagonalizer</span> hh</span>
+<span id="L162">  <span class="kw">obtain</span> ⟨K₀, hK₀⟩ := F.<span class="const token" data-verso-hover="465">forced</span> c _ hc</span>
+<span id="L163">  <span class="cm">--</span><span class="cm"> the good radius for `c`</span></span>
+<span id="L164">  <span class="kw">have</span> hg : goodK c (Kx c) = <span class="const token" data-verso-hover="109">true</span> := <span class="const token" data-verso-hover="91">Nat.find_spec</span> (hex c)</span>
+<span id="L165">  <span class="kw">simp</span> only [goodK, <span class="const token" data-verso-hover="303">List.any_eq_true</span>, <span class="const token" data-verso-hover="59">List.mem_range</span>, <span class="const token" data-verso-hover="131">Bool.and_eq_true</span>, <span class="const token" data-verso-hover="302">decide_eq_true_eq</span>] <span class="kw">at</span> hg</span>
+<span id="L166">  <span class="kw">obtain</span> ⟨r, -, hdr, hrs⟩ := hg</span>
+<span id="L167">  <span class="kw">obtain</span> ⟨b, hb⟩ := <span class="const token" data-verso-hover="93">Option.isSome_iff_exists</span>.<span class="const token" data-verso-hover="58">mp</span> hrs</span>
+<span id="L168">  <span class="kw">obtain</span> ⟨a, ha⟩ := <span class="const token" data-verso-hover="93">Option.isSome_iff_exists</span>.<span class="const token" data-verso-hover="58">mp</span> (<span class="const token" data-verso-hover="453">out_isSome_of</span> (M := M) hb)</span>
+<span id="L169">  <span class="kw">have</span> hhc : h c = F.<span class="const token" data-verso-hover="461">bit</span> a := <span class="kw">by</span></span>
+<span id="L170">    <span class="kw">simp</span> only [h, <span class="const token" data-verso-hover="60">out_mono</span> A ha ((F.<span class="const token" data-verso-hover="463">le_depth</span> c r).<span class="const token" data-verso-hover="401">trans</span> hdr), <span class="const token" data-verso-hover="139">Option.map_some</span>, <span class="const token" data-verso-hover="148">Option.getD_some</span>]</span>
+<span id="L171">  <span class="cm">--</span><span class="cm"> a deep instance</span></span>
+<span id="L172">  <span class="kw">let</span> K := <span class="const token" data-verso-hover="335">max</span> K₀ (Kx c)</span>
+<span id="L173">  <span class="kw">have</span> hview' := F.<span class="const token" data-verso-hover="466">stable</span> c r (Kx c) K hdr (<span class="const token" data-verso-hover="469">le_max_right</span> _ _)</span>
+<span id="L174">  <span class="kw">have</span> haK : M.<span class="const token" data-verso-hover="41">out</span> A (F.<span class="const token" data-verso-hover="458">inst</span> c K) (F.<span class="const token" data-verso-hover="459">node</span> c K) r = <span class="const token" data-verso-hover="47">some</span> a := <span class="kw">by</span></span>
+<span id="L175">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="52">out_congr</span> A hview']; <span class="kw">exact</span> ha</span>
+<span id="L176">  <span class="kw">obtain</span> ⟨lab, hlab, hP⟩ := hsol (F.<span class="const token" data-verso-hover="458">inst</span> c K)</span>
+<span id="L177">  <span class="kw">have</span> hlabv := hlab ⟨F.<span class="const token" data-verso-hover="459">node</span> c K, F.<span class="const token" data-verso-hover="460">node_lt</span> c K⟩</span>
+<span id="L178">  <span class="kw">have</span> hla : a = lab ⟨F.<span class="const token" data-verso-hover="459">node</span> c K, F.<span class="const token" data-verso-hover="460">node_lt</span> c K⟩ := <span class="const token" data-verso-hover="454">out_unique</span> haK hlabv</span>
+<span id="L179">  <span class="kw">have</span> hforced := hK₀ K (<span class="const token" data-verso-hover="470">le_max_left</span> _ _) lab hP</span>
+<span id="L180">  <span class="kw">rw</span> [← hla] <span class="kw">at</span> hforced</span>
+<span id="L181">  <span class="kw">rw</span> [← hhc] <span class="kw">at</span> hforced</span>
+<span id="L182">  <span class="kw">cases</span> hhcv : h c &lt;;&gt; <span class="kw">simp</span> [hhcv] <span class="kw">at</span> hforced</span>
+<span id="L183"></span>
+<span id="L184"><span class="dc">/-- **Lemma 4.17** (`Ω(√n)` form). If moreover `|G_K(x)| ≤ C (K+1)²` and</span></span>
+<span id="L185"><span class="dc">`depth x r ≤ r + D x`, then no computable algorithm with locality `T(n) = o(√n)` solves `P`. -/</span></span>
+<span id="L186"><span class="kw">theorem</span> <span class="const token" data-verso-hover="28">not_littleO_sqrt</span> {P : M.<span class="const token" data-verso-hover="44">Problem</span> Out} (F : M.<span class="const token" data-verso-hover="457">SepFamily</span> P)</span>
+<span id="L187">    (hview : <span class="const token" data-verso-hover="16">Computable</span> <span class="kw">fun</span> p : Net × <span class="const token" data-verso-hover="36">ℕ</span> × <span class="const token" data-verso-hover="36">ℕ</span> =&gt; M.<span class="const token" data-verso-hover="37">view</span> p.<span class="const token" data-verso-hover="98">1</span> p.<span class="const token" data-verso-hover="99">2</span><span class="nu">.</span><span class="const token" data-verso-hover="98">1</span> p.<span class="const token" data-verso-hover="99">2</span><span class="nu">.</span><span class="const token" data-verso-hover="99">2</span>)</span>
+<span id="L188">    (hinst : <span class="const token" data-verso-hover="101">Computable₂</span> F.<span class="const token" data-verso-hover="458">inst</span>) (hnode : <span class="const token" data-verso-hover="101">Computable₂</span> F.<span class="const token" data-verso-hover="459">node</span>) (hdepth : <span class="const token" data-verso-hover="101">Computable₂</span> F.<span class="const token" data-verso-hover="462">depth</span>)</span>
+<span id="L189">    (hbit : <span class="const token" data-verso-hover="16">Computable</span> F.<span class="const token" data-verso-hover="461">bit</span>) (C : <span class="const token" data-verso-hover="36">ℕ</span>) (D : <span class="const token" data-verso-hover="449">Code</span> → <span class="const token" data-verso-hover="36">ℕ</span>)</span>
+<span id="L190">    (hsize : ∀ x K, M.<span class="const token" data-verso-hover="35">size</span> (F.<span class="const token" data-verso-hover="458">inst</span> x K) ≤ C * (K + <span class="nu">1</span>) ^ <span class="nu">2</span>)</span>
+<span id="L191">    (hD : ∀ x r, F.<span class="const token" data-verso-hover="462">depth</span> x r ≤ r + D x)</span>
+<span id="L192">    {T : <span class="const token" data-verso-hover="36">ℕ</span> → <span class="const token" data-verso-hover="36">ℕ</span>} (hT : (<span class="kw">fun</span> n =&gt; (T n : <span class="const token" data-verso-hover="471">ℝ</span>)) =o[<span class="const token" data-verso-hover="472">Filter.atTop</span>] <span class="kw">fun</span> n =&gt; <span class="const token" data-verso-hover="473">Real.sqrt</span> n)</span>
+<span id="L193">    {A : <span class="const token" data-verso-hover="39">Alg</span> View Out} (hA : <span class="const token" data-verso-hover="101">Computable₂</span> A) : ¬ M.<span class="const token" data-verso-hover="48">Solves</span> P A T := <span class="kw">by</span></span>
+<span id="L194">  <span class="kw">intro</span> hsol</span>
+<span id="L195">  <span class="kw">obtain</span> ⟨x, hx⟩ := M.<span class="const token" data-verso-hover="1">exists_far_of_computable</span> F hview hinst hnode hdepth hbit hA hsol</span>
+<span id="L196">  <span class="cm">--</span><span class="cm"> eventually `T n ≤ √n / (2 (C+1))`</span></span>
+<span id="L197">  <span class="kw">have</span> hε : (<span class="nu">0</span> : <span class="const token" data-verso-hover="471">ℝ</span>) &lt; <span class="nu">1</span> / (<span class="nu">2</span> * (C + <span class="nu">1</span>)) := <span class="kw">by</span> <span class="kw">positivity</span></span>
+<span id="L198">  <span class="kw">obtain</span> ⟨n₀, hn₀⟩ := <span class="const token" data-verso-hover="474">Filter.eventually_atTop</span>.<span class="const token" data-verso-hover="58">mp</span> (hT.<span class="const token" data-verso-hover="475">bound</span> hε)</span>
+<span id="L199">  <span class="cm">--</span><span class="cm"> a bound for small `n`</span></span>
+<span id="L200">  <span class="kw">let</span> M₀ := ((<span class="const token" data-verso-hover="227">Finset.range</span> n₀).<span class="const token" data-verso-hover="228">image</span> T).<span class="const token" data-verso-hover="476">sup</span> <span class="const token" data-verso-hover="477">id</span></span>
+<span id="L201">  <span class="kw">have</span> hsmall : ∀ n &lt; n₀, T n ≤ M₀ := <span class="kw">fun</span> n hn =&gt;</span>
+<span id="L202">    <span class="const token" data-verso-hover="478">Finset.le_sup</span> (f := <span class="const token" data-verso-hover="477">id</span>) (<span class="const token" data-verso-hover="231">Finset.mem_image_of_mem</span> T (<span class="const token" data-verso-hover="232">Finset.mem_range</span>.<span class="const token" data-verso-hover="90">mpr</span> hn))</span>
+<span id="L203">  <span class="cm">--</span><span class="cm"> choose `K` large</span></span>
+<span id="L204">  <span class="kw">let</span> K := <span class="nu">2</span> * (M₀ + D x) + <span class="nu">1</span></span>
+<span id="L205">  <span class="kw">have</span> hK := hx K</span>
+<span id="L206">  <span class="kw">have</span> hTK : T (M.<span class="const token" data-verso-hover="35">size</span> (F.<span class="const token" data-verso-hover="458">inst</span> x K)) + D x ≤ K := <span class="kw">by</span></span>
+<span id="L207">    <span class="kw">by_cases</span> hn : M.<span class="const token" data-verso-hover="35">size</span> (F.<span class="const token" data-verso-hover="458">inst</span> x K) &lt; n₀</span>
+<span id="L208">    · <span class="kw">have</span> := hsmall _ hn; <span class="kw">omega</span></span>
+<span id="L209">    · push <span class="const token" data-verso-hover="403">Not</span> <span class="kw">at</span> hn</span>
+<span id="L210">      <span class="kw">have</span> h1 := hn₀ _ hn</span>
+<span id="L211">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="479">Real.norm_eq_abs</span>, <span class="const token" data-verso-hover="480">abs_of_nonneg</span> (<span class="const token" data-verso-hover="481">Real.sqrt_nonneg</span> _), <span class="const token" data-verso-hover="482">Nat.abs_cast</span>] <span class="kw">at</span> h1</span>
+<span id="L212">      <span class="kw">have</span> hs : (M.<span class="const token" data-verso-hover="35">size</span> (F.<span class="const token" data-verso-hover="458">inst</span> x K) : <span class="const token" data-verso-hover="471">ℝ</span>) ≤ C * ((K : <span class="const token" data-verso-hover="471">ℝ</span>) + <span class="nu">1</span>) ^ <span class="nu">2</span> := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> hsize x K</span>
+<span id="L213">      <span class="kw">have</span> hsq : <span class="const token" data-verso-hover="473">Real.sqrt</span> (M.<span class="const token" data-verso-hover="35">size</span> (F.<span class="const token" data-verso-hover="458">inst</span> x K)) ≤ (C + <span class="nu">1</span>) * ((K : <span class="const token" data-verso-hover="471">ℝ</span>) + <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L214">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="483">Real.sqrt_le_left</span> (<span class="kw">by</span> <span class="kw">positivity</span>)]</span>
+<span id="L215">        <span class="kw">calc</span> (M.<span class="const token" data-verso-hover="35">size</span> (F.<span class="const token" data-verso-hover="458">inst</span> x K) : <span class="const token" data-verso-hover="471">ℝ</span>) ≤ C * ((K : <span class="const token" data-verso-hover="471">ℝ</span>) + <span class="nu">1</span>) ^ <span class="nu">2</span> := hs</span>
+<span id="L216">          _ ≤ ((C + <span class="nu">1</span>) * ((K : <span class="const token" data-verso-hover="471">ℝ</span>) + <span class="nu">1</span>)) ^ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L217">            <span class="kw">have</span> : (C : <span class="const token" data-verso-hover="471">ℝ</span>) ≤ ((C : <span class="const token" data-verso-hover="471">ℝ</span>) + <span class="nu">1</span>) ^ <span class="nu">2</span> := <span class="kw">by</span> <span class="kw">nlinarith</span></span>
+<span id="L218">            <span class="kw">nlinarith</span> [<span class="const token" data-verso-hover="484">sq_nonneg</span> ((K : <span class="const token" data-verso-hover="471">ℝ</span>) + <span class="nu">1</span>)]</span>
+<span id="L219">      <span class="kw">have</span> h2 : (T (M.<span class="const token" data-verso-hover="35">size</span> (F.<span class="const token" data-verso-hover="458">inst</span> x K)) : <span class="const token" data-verso-hover="471">ℝ</span>) ≤ ((K : <span class="const token" data-verso-hover="471">ℝ</span>) + <span class="nu">1</span>) / <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L220">        <span class="kw">calc</span> (T (M.<span class="const token" data-verso-hover="35">size</span> (F.<span class="const token" data-verso-hover="458">inst</span> x K)) : <span class="const token" data-verso-hover="471">ℝ</span>) ≤ <span class="nu">1</span> / (<span class="nu">2</span> * (C + <span class="nu">1</span>)) *</span>
+<span id="L221">              <span class="const token" data-verso-hover="473">Real.sqrt</span> (M.<span class="const token" data-verso-hover="35">size</span> (F.<span class="const token" data-verso-hover="458">inst</span> x K)) := h1</span>
+<span id="L222">          _ ≤ <span class="nu">1</span> / (<span class="nu">2</span> * (C + <span class="nu">1</span>)) * ((C + <span class="nu">1</span>) * ((K : <span class="const token" data-verso-hover="471">ℝ</span>) + <span class="nu">1</span>)) := <span class="kw">by</span> <span class="kw">gcongr</span></span>
+<span id="L223">          _ = ((K : <span class="const token" data-verso-hover="471">ℝ</span>) + <span class="nu">1</span>) / <span class="nu">2</span> := <span class="kw">by</span> <span class="kw">field_simp</span></span>
+<span id="L224">      <span class="kw">have</span> h3 : <span class="nu">2</span> * T (M.<span class="const token" data-verso-hover="35">size</span> (F.<span class="const token" data-verso-hover="458">inst</span> x K)) ≤ K + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L225">        <span class="kw">have</span> : (<span class="nu">2</span> * T (M.<span class="const token" data-verso-hover="35">size</span> (F.<span class="const token" data-verso-hover="458">inst</span> x K)) : <span class="const token" data-verso-hover="471">ℝ</span>) ≤ K + <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">linarith</span></span>
+<span id="L226">        <span class="kw">exact_mod_cast</span> this</span>
+<span id="L227">      <span class="kw">omega</span></span>
+<span id="L228">  <span class="kw">have</span> := hD x (T (M.<span class="const token" data-verso-hover="35">size</span> (F.<span class="const token" data-verso-hover="458">inst</span> x K)))</span>
+<span id="L229">  <span class="kw">omega</span></span>
+<span id="L230"></span>
+<span id="L231"><span class="kw">end</span> Model</span>
+<span id="L232"></span>
+<span id="L233"><span class="kw">end</span> LocalComputable</span>
+<span id="L234"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2026/LocalComputable/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

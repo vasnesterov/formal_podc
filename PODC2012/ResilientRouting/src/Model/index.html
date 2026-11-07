@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ResilientRouting: Model.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2012/">PODC 2012</a><span class="sep">›</span><a href="PODC2012/ResilientRouting/">ResilientRouting</a><span class="sep">›</span><a href="PODC2012/ResilientRouting/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Model</span></nav>
+        <h1>
+          <code>Model.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2012/ResilientRouting/">On the Resilience of Routing Tables — PODC 2012</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2012/ResilientRouting/Model.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Model"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"></span>
+<span id="L3"><span class="cm">--</span><span class="cm"> CSLib candidate: static fast-failover forwarding model (`Pattern`, `FwdPath`, `Good`,</span></span>
+<span id="L4"><span class="cm">--</span><span class="cm"> `IsResilient`, trajectory semantics `good_of` / `not_good_of_trap`).</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">/-!</span></span>
+<span id="L7"><span class="dc"># Resilient routing tables: the model</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">Feigenbaum, Godfrey, Panda, Schapira, Shenker, Singla, *Brief announcement: On the resilience of</span></span>
+<span id="L10"><span class="dc">routing tables*, PODC 2012 (full version arXiv:1207.3732v2), Section 2.</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">The network is a simple graph `G` with a destination `d`. A *forwarding pattern* gives every node</span></span>
+<span id="L13"><span class="dc">`i` a function that maps the link on which a packet arrived (represented by the neighbour `u` it</span></span>
+<span id="L14"><span class="dc">came from) and the set of live incident links (represented by the set `A` of neighbours over live</span></span>
+<span id="L15"><span class="dc">links) to an outgoing incident link (represented by a neighbour of `i`). If the chosen link is down</span></span>
+<span id="L16"><span class="dc">the packet is lost.</span></span>
+<span id="L17"></span>
+<span id="L18"><span class="dc">For a failure set `F` (a set of edges), a *forwarding path* is a walk `x₀ x₁ … x_k` (`k ≥ 1`) in</span></span>
+<span id="L19"><span class="dc">`G \ F` such that every interior vertex `x_j` (`0 &lt; j &lt; k`) is not the destination and forwards</span></span>
+<span id="L20"><span class="dc">`x_{j-1} → x_j` to `x_{j+1}`. The first hop is not constrained (the paper does not model the</span></span>
+<span id="L21"><span class="dc">source's choice). The destination is a sink: a packet is not forwarded any further once it reaches</span></span>
+<span id="L22"><span class="dc">`d` (the paper puts no constraint at `d`, which makes every pattern loop; see `literal_K2`).</span></span>
+<span id="L23"></span>
+<span id="L24"><span class="dc">A pattern is *good* for `F` if (1) every node connected to `d` in `G \ F` has a forwarding path</span></span>
+<span id="L25"><span class="dc">to `d`, and (2) no forwarding path repeats a directed edge (the paper's notion of a forwarding</span></span>
+<span id="L26"><span class="dc">loop, Section 4). It is *t-resilient* if it is good for every `F ⊆ E` with `|F| ≤ t`, and</span></span>
+<span id="L27"><span class="dc">*perfectly resilient* if it is good for every `F ⊆ E`.</span></span>
+<span id="L28"></span>
+<span id="L29"><span class="dc">Besides the definitions, this file contains the trajectory semantics used in the proofs:</span></span>
+<span id="L30"><span class="dc">a forwarding path is the beginning of the deterministic trajectory `δ, nxt δ, nxt² δ, …` of</span></span>
+<span id="L31"><span class="dc">its first dart, so loop-freedom follows from termination of trajectories (`good_of`), and a</span></span>
+<span id="L32"><span class="dc">"trap" (a set of darts closed under forwarding and avoiding `d`) refutes condition (1)</span></span>
+<span id="L33"><span class="dc">(`not_reach_of_trap`).</span></span>
+<span id="L34"><span class="dc">-/</span></span>
+<span id="L35"></span>
+<span id="L36"><span class="kw">namespace</span> Podc.ResilientRouting</span>
+<span id="L37"></span>
+<span id="L38"><span class="kw">open</span> SimpleGraph</span>
+<span id="L39"></span>
+<span id="L40"><span class="kw">variable</span> {V : <span class="kw">Type</span>*}</span>
+<span id="L41"></span>
+<span id="L42"><span class="dc">/-- A forwarding pattern on `G` (the paper's `f^d = (f^d_1, …, f^d_n)`): `next i A u` is the</span></span>
+<span id="L43"><span class="dc">neighbour to which node `i` sends a packet that arrived from `u`, when `A` is the set of</span></span>
+<span id="L44"><span class="dc">neighbours of `i` over live links. As in the paper (`f^d_i : E_i × 2^{E_i} → E_i`), the output is</span></span>
+<span id="L45"><span class="dc">an incident link (it may be a failed one: then the packet is lost). The function at `d` is never</span></span>
+<span id="L46"><span class="dc">used. -/</span></span>
+<span id="L47"><span class="kw">structure</span> <span class="const token" data-verso-hover="45">Pattern</span> (G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V) <span class="kw">where</span></span>
+<span id="L48">  <span class="dc">/-- The forwarding function of node `i`. -/</span></span>
+<span id="L49">  <span class="const token" data-verso-hover="11">next</span> : V → <span class="const token" data-verso-hover="47">Set</span> V → V → V</span>
+<span id="L50">  <span class="dc">/-- The output is an incident link. -/</span></span>
+<span id="L51">  <span class="const token" data-verso-hover="10">adj_next</span> : ∀ i A u, G.<span class="const token" data-verso-hover="32">Adj</span> i u → G.<span class="const token" data-verso-hover="32">Adj</span> i (<span class="const token" data-verso-hover="11">next</span> i A u)</span>
+<span id="L52"></span>
+<span id="L53"><span class="dc">/-- The link `uv` exists and has not failed. -/</span></span>
+<span id="L54"><span class="kw">def</span> <span class="const token" data-verso-hover="58">Live</span> (G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V) (F : <span class="const token" data-verso-hover="47">Set</span> (<span class="const token" data-verso-hover="48">Sym2</span> V)) (u v : V) : <span class="kw">Prop</span> := G.<span class="const token" data-verso-hover="32">Adj</span> u v ∧ s(u, v) ∉ F</span>
+<span id="L55"></span>
+<span id="L56"><span class="dc">/-- The local view of node `i` in failure scenario `F`: its neighbours over live links. -/</span></span>
+<span id="L57"><span class="kw">def</span> <span class="const token" data-verso-hover="66">view</span> (G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V) (F : <span class="const token" data-verso-hover="47">Set</span> (<span class="const token" data-verso-hover="48">Sym2</span> V)) (i : V) : <span class="const token" data-verso-hover="47">Set</span> V := {u | <span class="const token" data-verso-hover="58">Live</span> G F i u}</span>
+<span id="L58"></span>
+<span id="L59"><span class="dc">/-- Forwarding paths in failure scenario `F`, as lists of vertices `[x₀, x₁, …, x_k]`, `k ≥ 1`. -/</span></span>
+<span id="L60"><span class="kw">inductive</span> <span class="const token" data-verso-hover="131">FwdPath</span> (G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V) (d : V) (f : <span class="const token" data-verso-hover="45">Pattern</span> G) (F : <span class="const token" data-verso-hover="47">Set</span> (<span class="const token" data-verso-hover="48">Sym2</span> V)) : <span class="const token" data-verso-hover="22">List</span> V → <span class="kw">Prop</span></span>
+<span id="L61">  | <span class="const token" data-verso-hover="82">single</span> {u v : V} : <span class="const token" data-verso-hover="58">Live</span> G F u v → <span class="const token" data-verso-hover="131">FwdPath</span> G d f F [u, v]</span>
+<span id="L62">  | <span class="const token" data-verso-hover="81">cons</span> {u v w : V} {l : <span class="const token" data-verso-hover="22">List</span> V} : <span class="const token" data-verso-hover="58">Live</span> G F u v → v ≠ d → f.<span class="const token" data-verso-hover="11">next</span> v (<span class="const token" data-verso-hover="66">view</span> G F v) u = w →</span>
+<span id="L63">      <span class="const token" data-verso-hover="131">FwdPath</span> G d f F (v :: w :: l) → <span class="const token" data-verso-hover="131">FwdPath</span> G d f F (u :: v :: w :: l)</span>
+<span id="L64"></span>
+<span id="L65"><span class="dc">/-- The pattern `f` behaves well in failure scenario `F`: (1) every node `i ≠ d` that is connected</span></span>
+<span id="L66"><span class="dc">to `d` in `G \ F` has a forwarding path to `d`, and (2) no forwarding path repeats a directed</span></span>
+<span id="L67"><span class="dc">edge. -/</span></span>
+<span id="L68"><span class="kw">def</span> <span class="const token" data-verso-hover="116">Good</span> (G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V) (d : V) (f : <span class="const token" data-verso-hover="45">Pattern</span> G) (F : <span class="const token" data-verso-hover="47">Set</span> (<span class="const token" data-verso-hover="48">Sym2</span> V)) : <span class="kw">Prop</span> :=</span>
+<span id="L69">  (∀ i, i ≠ d → (G.<span class="const token" data-verso-hover="56">deleteEdges</span> F).<span class="const token" data-verso-hover="57">Reachable</span> i d →</span>
+<span id="L70">      ∃ l : <span class="const token" data-verso-hover="22">List</span> V, <span class="const token" data-verso-hover="131">FwdPath</span> G d f F (i :: l) ∧ (i :: l).<span class="const token" data-verso-hover="132">getLast</span> (<span class="const token" data-verso-hover="133">List.cons_ne_nil</span> _ _) = d) ∧</span>
+<span id="L71">  ∀ l : <span class="const token" data-verso-hover="22">List</span> V, <span class="const token" data-verso-hover="131">FwdPath</span> G d f F l → (l.<span class="const token" data-verso-hover="87">zip</span> l.<span class="const token" data-verso-hover="134">tail</span>).<span class="const token" data-verso-hover="88">Nodup</span></span>
+<span id="L72"></span>
+<span id="L73"><span class="dc">/-- `f` is `t`-resilient: good for every failure set `F ⊆ E` with `|F| ≤ t`. -/</span></span>
+<span id="L74"><span class="kw">def</span> <span class="const token" data-verso-hover="12">IsResilient</span> (G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V) (d : V) (f : <span class="const token" data-verso-hover="45">Pattern</span> G) (t : <span class="const token" data-verso-hover="135">ℕ</span>∞) : <span class="kw">Prop</span> :=</span>
+<span id="L75">  ∀ F : <span class="const token" data-verso-hover="47">Set</span> (<span class="const token" data-verso-hover="48">Sym2</span> V), F ⊆ G.<span class="const token" data-verso-hover="75">edgeSet</span> → F.<span class="const token" data-verso-hover="136">encard</span> ≤ t → <span class="const token" data-verso-hover="116">Good</span> G d f F</span>
+<span id="L76"></span>
+<span id="L77"><span class="dc">/-- `f` is perfectly resilient: good for every failure set `F ⊆ E`. -/</span></span>
+<span id="L78"><span class="kw">def</span> <span class="const token" data-verso-hover="54">PerfectlyResilient</span> (G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V) (d : V) (f : <span class="const token" data-verso-hover="45">Pattern</span> G) : <span class="kw">Prop</span> :=</span>
+<span id="L79">  ∀ F : <span class="const token" data-verso-hover="47">Set</span> (<span class="const token" data-verso-hover="48">Sym2</span> V), F ⊆ G.<span class="const token" data-verso-hover="75">edgeSet</span> → <span class="const token" data-verso-hover="116">Good</span> G d f F</span>
+<span id="L80"></span>
+<span id="L81"><span class="kw">theorem</span> <span class="const token" data-verso-hover="137">PerfectlyResilient.isResilient</span> {G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V} {d : V} {f : <span class="const token" data-verso-hover="45">Pattern</span> G}</span>
+<span id="L82">    (h : <span class="const token" data-verso-hover="54">PerfectlyResilient</span> G d f) (t : <span class="const token" data-verso-hover="135">ℕ</span>∞) : <span class="const token" data-verso-hover="12">IsResilient</span> G d f t :=</span>
+<span id="L83">  <span class="kw">fun</span> F hF _ =&gt; h F hF</span>
+<span id="L84"></span>
+<span id="L85"><span class="kw">theorem</span> <span class="const token" data-verso-hover="138">Live.symm</span> {G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V} {F : <span class="const token" data-verso-hover="47">Set</span> (<span class="const token" data-verso-hover="48">Sym2</span> V)} {u v : V} (h : <span class="const token" data-verso-hover="58">Live</span> G F u v) :</span>
+<span id="L86">    <span class="const token" data-verso-hover="58">Live</span> G F v u :=</span>
+<span id="L87">  ⟨h.<span class="const token" data-verso-hover="35">1</span>.<span class="const token" data-verso-hover="139">symm</span>, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="127">Sym2.eq_swap</span>]; <span class="kw">exact</span> h.<span class="const token" data-verso-hover="37">2</span>⟩</span>
+<span id="L88"></span>
+<span id="L89"><span class="dc">/-- A set of vertices closed under live links that contains `i` but not `d`: `i` is cut off. -/</span></span>
+<span id="L90"><span class="kw">theorem</span> <span class="const token" data-verso-hover="140">not_reachable_of_closed</span> {G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V} {F : <span class="const token" data-verso-hover="47">Set</span> (<span class="const token" data-verso-hover="48">Sym2</span> V)} (S : <span class="const token" data-verso-hover="47">Set</span> V) {i d : V}</span>
+<span id="L91">    (hi : i ∈ S) (hd : d ∉ S) (hS : ∀ x y, x ∈ S → <span class="const token" data-verso-hover="58">Live</span> G F x y → y ∈ S) :</span>
+<span id="L92">    ¬ (G.<span class="const token" data-verso-hover="56">deleteEdges</span> F).<span class="const token" data-verso-hover="57">Reachable</span> i d := <span class="kw">by</span></span>
+<span id="L93">  <span class="kw">rintro</span> ⟨p⟩</span>
+<span id="L94">  <span class="kw">have</span> key : ∀ {x y : V} (p : (G.<span class="const token" data-verso-hover="56">deleteEdges</span> F).<span class="const token" data-verso-hover="64">Walk</span> x y), x ∈ S → y ∈ S := <span class="kw">by</span></span>
+<span id="L95">    <span class="kw">intro</span> x y p</span>
+<span id="L96">    <span class="kw">induction</span> p <span class="kw">with</span></span>
+<span id="L97">    | <span class="const token" data-verso-hover="68">nil</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="141">id</span></span>
+<span id="L98">    | <span class="const token" data-verso-hover="67">cons</span> h _ ih =&gt; <span class="kw">exact</span> <span class="kw">fun</span> hx =&gt; ih (hS _ _ hx (<span class="const token" data-verso-hover="107">deleteEdges_adj</span>.<span class="const token" data-verso-hover="126">1</span> h))</span>
+<span id="L99">  <span class="kw">exact</span> hd (key p hi)</span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-! ### Trajectory semantics -/</span></span>
+<span id="L102"></span>
+<span id="L103"><span class="kw">section</span> Traj</span>
+<span id="L104"></span>
+<span id="L105"><span class="kw">variable</span> (G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V) (d : V) (f : <span class="const token" data-verso-hover="45">Pattern</span> G) (F : <span class="const token" data-verso-hover="47">Set</span> (<span class="const token" data-verso-hover="48">Sym2</span> V))</span>
+<span id="L106"></span>
+<span id="L107"><span class="dc">/-- The dart following the dart `δ = (u, v)` (a packet at `v` that came from `u`). -/</span></span>
+<span id="L108"><span class="kw">def</span> <span class="const token" data-verso-hover="119">nxt</span> (δ : V × V) : V × V := (δ.<span class="const token" data-verso-hover="27">2</span>, f.<span class="const token" data-verso-hover="11">next</span> δ.<span class="const token" data-verso-hover="27">2</span> (<span class="const token" data-verso-hover="66">view</span> G F δ.<span class="const token" data-verso-hover="27">2</span>) δ.<span class="const token" data-verso-hover="26">1</span>)</span>
+<span id="L109"></span>
+<span id="L110"><span class="dc">/-- The trajectory of `δ` stops after `δ`: the packet is delivered, or forwarded on a dead link. -/</span></span>
+<span id="L111"><span class="kw">def</span> <span class="const token" data-verso-hover="142">Stops</span> (δ : V × V) : <span class="kw">Prop</span> := δ.<span class="const token" data-verso-hover="27">2</span> = d ∨ ¬ <span class="const token" data-verso-hover="58">Live</span> G F (<span class="const token" data-verso-hover="119">nxt</span> G f F δ).<span class="const token" data-verso-hover="26">1</span> (<span class="const token" data-verso-hover="119">nxt</span> G f F δ).<span class="const token" data-verso-hover="27">2</span></span>
+<span id="L112"></span>
+<span id="L113"><span class="dc">/-- The trajectory of `δ` reaches the destination. -/</span></span>
+<span id="L114"><span class="kw">inductive</span> <span class="const token" data-verso-hover="60">Delivers</span> : V × V → <span class="kw">Prop</span></span>
+<span id="L115">  | <span class="const token" data-verso-hover="62">base</span> {δ : V × V} : δ.<span class="const token" data-verso-hover="27">2</span> = d → <span class="const token" data-verso-hover="60">Delivers</span> δ</span>
+<span id="L116">  | <span class="const token" data-verso-hover="143">step</span> {δ : V × V} : ¬ <span class="const token" data-verso-hover="142">Stops</span> G d f F δ → <span class="const token" data-verso-hover="60">Delivers</span> (<span class="const token" data-verso-hover="119">nxt</span> G f F δ) → <span class="const token" data-verso-hover="60">Delivers</span> δ</span>
+<span id="L117"></span>
+<span id="L118"><span class="dc">/-- The trajectory of `δ` stops. -/</span></span>
+<span id="L119"><span class="kw">inductive</span> <span class="const token" data-verso-hover="49">Terminates</span> : V × V → <span class="kw">Prop</span></span>
+<span id="L120">  | <span class="const token" data-verso-hover="50">base</span> {δ : V × V} : <span class="const token" data-verso-hover="142">Stops</span> G d f F δ → <span class="const token" data-verso-hover="49">Terminates</span> δ</span>
+<span id="L121">  | <span class="const token" data-verso-hover="52">step</span> {δ : V × V} : <span class="const token" data-verso-hover="49">Terminates</span> (<span class="const token" data-verso-hover="119">nxt</span> G f F δ) → <span class="const token" data-verso-hover="49">Terminates</span> δ</span>
+<span id="L122"></span>
+<span id="L123"><span class="dc">/-- The vertex list of the first `n + 1` darts of the trajectory of `δ`. -/</span></span>
+<span id="L124"><span class="kw">def</span> <span class="const token" data-verso-hover="144">walkOf</span> : V × V → <span class="const token" data-verso-hover="21">ℕ</span> → <span class="const token" data-verso-hover="22">List</span> V</span>
+<span id="L125">  | δ, <span class="nu">0</span> =&gt; [δ.<span class="const token" data-verso-hover="26">1</span>, δ.<span class="const token" data-verso-hover="27">2</span>]</span>
+<span id="L126">  | δ, n + <span class="nu">1</span> =&gt; δ.<span class="const token" data-verso-hover="26">1</span> :: <span class="const token" data-verso-hover="144">walkOf</span> (<span class="const token" data-verso-hover="119">nxt</span> G f F δ) n</span>
+<span id="L127"></span>
+<span id="L128"><span class="kw">variable</span> {G d f F}</span>
+<span id="L129"></span>
+<span id="L130"><span class="kw">theorem</span> <span class="const token" data-verso-hover="61">Delivers.of_next</span> {x v y : V} (hv : v ≠ d) (hn : f.<span class="const token" data-verso-hover="11">next</span> v (<span class="const token" data-verso-hover="66">view</span> G F v) x = y)</span>
+<span id="L131">    (hl : <span class="const token" data-verso-hover="58">Live</span> G F v y) (h : <span class="const token" data-verso-hover="60">Delivers</span> G d f F (v, y)) : <span class="const token" data-verso-hover="60">Delivers</span> G d f F (x, v) := <span class="kw">by</span></span>
+<span id="L132">  <span class="kw">refine</span> <span class="const token" data-verso-hover="143">.</span>step ?_ ?_</span>
+<span id="L133">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="142">Stops</span>, <span class="const token" data-verso-hover="119">nxt</span>, hn, <span class="const token" data-verso-hover="124">not_or</span>, <span class="const token" data-verso-hover="102">not_not</span>]; <span class="kw">exact</span> ⟨hv, hl⟩</span>
+<span id="L134">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="119">nxt</span>, hn]; <span class="kw">exact</span> h</span>
+<span id="L135"></span>
+<span id="L136"><span class="dc">/-- Cut-off criterion with an explicit list `D` of dead links (for concrete networks). -/</span></span>
+<span id="L137"><span class="kw">theorem</span> <span class="const token" data-verso-hover="59">not_reachable_of_dead</span> (S : <span class="const token" data-verso-hover="55">Finset</span> V) (D : <span class="const token" data-verso-hover="22">List</span> (V × V))</span>
+<span id="L138">    (hD : ∀ p ∈ D, ¬ <span class="const token" data-verso-hover="58">Live</span> G F p.<span class="const token" data-verso-hover="26">1</span> p.<span class="const token" data-verso-hover="27">2</span>) (hcl : ∀ x ∈ S, ∀ y, G.<span class="const token" data-verso-hover="32">Adj</span> x y → y ∈ S ∨ (x, y) ∈ D)</span>
+<span id="L139">    {i : V} (hi : i ∈ S) (hd : d ∉ S) : ¬ (G.<span class="const token" data-verso-hover="56">deleteEdges</span> F).<span class="const token" data-verso-hover="57">Reachable</span> i d := <span class="kw">by</span></span>
+<span id="L140">  <span class="kw">refine</span> <span class="const token" data-verso-hover="140">not_reachable_of_closed</span> (S : <span class="const token" data-verso-hover="47">Set</span> V) hi (<span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hd) <span class="kw">fun</span> x y hx hl =&gt; ?_</span>
+<span id="L141">  <span class="kw">rcases</span> hcl x hx y hl.<span class="const token" data-verso-hover="35">1</span> <span class="kw">with</span> h | h</span>
+<span id="L142">  · <span class="kw">exact</span> h</span>
+<span id="L143">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="63">absurd</span> hl (hD _ h)</span>
+<span id="L144"></span>
+<span id="L145"><span class="kw">theorem</span> <span class="const token" data-verso-hover="145">Delivers.terminates</span> {δ : V × V} (h : <span class="const token" data-verso-hover="60">Delivers</span> G d f F δ) : <span class="const token" data-verso-hover="49">Terminates</span> G d f F δ := <span class="kw">by</span></span>
+<span id="L146">  <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L147">  | <span class="const token" data-verso-hover="62">base</span> h =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="50">.</span>base (<span class="const token" data-verso-hover="51">Or.inl</span> h)</span>
+<span id="L148">  | <span class="const token" data-verso-hover="143">step</span> _ _ ih =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="52">.</span>step ih</span>
+<span id="L149"></span>
+<span id="L150"><span class="kw">theorem</span> <span class="const token" data-verso-hover="146">nxt_fst</span> (δ : V × V) : (<span class="const token" data-verso-hover="119">nxt</span> G f F δ).<span class="const token" data-verso-hover="26">1</span> = δ.<span class="const token" data-verso-hover="27">2</span> := <span class="const token" data-verso-hover="39">rfl</span></span>
+<span id="L151"></span>
+<span id="L152"><span class="kw">theorem</span> <span class="const token" data-verso-hover="147">walkOf_head</span> (δ : V × V) (n : <span class="const token" data-verso-hover="21">ℕ</span>) : ∃ l, <span class="const token" data-verso-hover="144">walkOf</span> G f F δ n = δ.<span class="const token" data-verso-hover="26">1</span> :: δ.<span class="const token" data-verso-hover="27">2</span> :: l := <span class="kw">by</span></span>
+<span id="L153">  <span class="kw">cases</span> n <span class="kw">with</span></span>
+<span id="L154">  | <span class="const token" data-verso-hover="148">zero</span> =&gt; <span class="kw">exact</span> ⟨[], <span class="const token" data-verso-hover="39">rfl</span>⟩</span>
+<span id="L155">  | <span class="const token" data-verso-hover="149">succ</span> n =&gt;</span>
+<span id="L156">    <span class="kw">obtain</span> ⟨l, hl⟩ := <span class="const token" data-verso-hover="147">walkOf_head</span> (<span class="const token" data-verso-hover="119">nxt</span> G f F δ) n</span>
+<span id="L157">    <span class="kw">exact</span> ⟨_, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="144">walkOf</span>, hl]; <span class="kw">rfl</span>⟩</span>
+<span id="L158"></span>
+<span id="L159"><span class="kw">theorem</span> <span class="const token" data-verso-hover="150">walkOf_getLast</span> (δ : V × V) (n : <span class="const token" data-verso-hover="21">ℕ</span>) (h) :</span>
+<span id="L160">    (<span class="const token" data-verso-hover="144">walkOf</span> G f F δ n).<span class="const token" data-verso-hover="132">getLast</span> h = ((<span class="const token" data-verso-hover="119">nxt</span> G f F)^[n] δ).<span class="const token" data-verso-hover="27">2</span> := <span class="kw">by</span></span>
+<span id="L161">  <span class="kw">induction</span> n generalizing δ <span class="kw">with</span></span>
+<span id="L162">  | <span class="const token" data-verso-hover="148">zero</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L163">  | <span class="const token" data-verso-hover="149">succ</span> n ih =&gt;</span>
+<span id="L164">    <span class="kw">obtain</span> ⟨l, hl⟩ := <span class="const token" data-verso-hover="147">walkOf_head</span> (G := G) (f := f) (F := F) (<span class="const token" data-verso-hover="119">nxt</span> G f F δ) n</span>
+<span id="L165">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="144">walkOf</span>]</span>
+<span id="L166">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="151">List.getLast_cons</span> (<span class="kw">by</span> <span class="kw">simp</span> [hl]), ih, <span class="const token" data-verso-hover="152">Function.iterate_succ_apply</span>]</span>
+<span id="L167"></span>
+<span id="L168"><span class="kw">theorem</span> <span class="const token" data-verso-hover="153">walkOf_darts</span> (δ : V × V) (n : <span class="const token" data-verso-hover="21">ℕ</span>) :</span>
+<span id="L169">    (<span class="const token" data-verso-hover="144">walkOf</span> G f F δ n).<span class="const token" data-verso-hover="87">zip</span> (<span class="const token" data-verso-hover="144">walkOf</span> G f F δ n).<span class="const token" data-verso-hover="134">tail</span> =</span>
+<span id="L170">      (<span class="const token" data-verso-hover="154">List.range</span> (n + <span class="nu">1</span>)).<span class="const token" data-verso-hover="155">map</span> (<span class="kw">fun</span> k =&gt; (<span class="const token" data-verso-hover="119">nxt</span> G f F)^[k] δ) := <span class="kw">by</span></span>
+<span id="L171">  <span class="kw">induction</span> n generalizing δ <span class="kw">with</span></span>
+<span id="L172">  | <span class="const token" data-verso-hover="148">zero</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L173">  | <span class="const token" data-verso-hover="149">succ</span> n ih =&gt;</span>
+<span id="L174">    <span class="kw">obtain</span> ⟨l, hl⟩ := <span class="const token" data-verso-hover="147">walkOf_head</span> (G := G) (f := f) (F := F) (<span class="const token" data-verso-hover="119">nxt</span> G f F δ) n</span>
+<span id="L175">    <span class="kw">have</span> ih' := ih (<span class="const token" data-verso-hover="119">nxt</span> G f F δ)</span>
+<span id="L176">    <span class="kw">rw</span> [hl] <span class="kw">at</span> ih'</span>
+<span id="L177">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="156">List.tail_cons</span>] <span class="kw">at</span> ih'</span>
+<span id="L178">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="144">walkOf</span>]</span>
+<span id="L179">    <span class="kw">rw</span> [hl, <span class="const token" data-verso-hover="156">List.tail_cons</span>, <span class="const token" data-verso-hover="157">List.zip_cons_cons</span>, ih', <span class="const token" data-verso-hover="158">List.range_succ_eq_map</span> (n := n + <span class="nu">1</span>), <span class="const token" data-verso-hover="159">List.map_cons</span>,</span>
+<span id="L180">      <span class="const token" data-verso-hover="160">List.map_map</span>]</span>
+<span id="L181">    <span class="kw">rfl</span></span>
+<span id="L182"></span>
+<span id="L183"><span class="dc">/-- Every forwarding path is the beginning of a trajectory. -/</span></span>
+<span id="L184"><span class="kw">theorem</span> <span class="const token" data-verso-hover="161">FwdPath.exists_walkOf</span> {l : <span class="const token" data-verso-hover="22">List</span> V} (h : <span class="const token" data-verso-hover="131">FwdPath</span> G d f F l) :</span>
+<span id="L185">    ∃ δ n, l = <span class="const token" data-verso-hover="144">walkOf</span> G f F δ n ∧ (∀ k ≤ n, <span class="const token" data-verso-hover="58">Live</span> G F ((<span class="const token" data-verso-hover="119">nxt</span> G f F)^[k] δ).<span class="const token" data-verso-hover="26">1</span> ((<span class="const token" data-verso-hover="119">nxt</span> G f F)^[k] δ).<span class="const token" data-verso-hover="27">2</span>) ∧</span>
+<span id="L186">      ∀ k &lt; n, ((<span class="const token" data-verso-hover="119">nxt</span> G f F)^[k] δ).<span class="const token" data-verso-hover="27">2</span> ≠ d := <span class="kw">by</span></span>
+<span id="L187">  <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L188">  | @<span class="const token" data-verso-hover="82">single</span> u v h =&gt; <span class="kw">exact</span> ⟨(u, v), <span class="nu">0</span>, <span class="const token" data-verso-hover="39">rfl</span>, <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> h, <span class="kw">by</span> <span class="kw">simp</span>⟩</span>
+<span id="L189">  | @<span class="const token" data-verso-hover="81">cons</span> u v w l hl hv hw _ ih =&gt;</span>
+<span id="L190">    <span class="kw">obtain</span> ⟨δ, n, he, hlive, hne⟩ := ih</span>
+<span id="L191">    <span class="kw">have</span> hδ : δ = <span class="const token" data-verso-hover="119">nxt</span> G f F (u, v) := <span class="kw">by</span></span>
+<span id="L192">      <span class="kw">obtain</span> ⟨l', hl'⟩ := <span class="const token" data-verso-hover="147">walkOf_head</span> (G := G) (f := f) (F := F) δ n</span>
+<span id="L193">      <span class="kw">rw</span> [hl'] <span class="kw">at</span> he</span>
+<span id="L194">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="162">List.cons.injEq</span>] <span class="kw">at</span> he</span>
+<span id="L195">      <span class="kw">obtain</span> ⟨h1, h2, -⟩ := he</span>
+<span id="L196">      <span class="kw">ext</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="119">nxt</span>, ← h1, ← h2, hw]</span>
+<span id="L197">    <span class="kw">refine</span> ⟨(u, v), n + <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="144">walkOf</span>, ← hδ, ← he], <span class="kw">fun</span> k hk =&gt; ?_, <span class="kw">fun</span> k hk =&gt; ?_⟩</span>
+<span id="L198">    · <span class="kw">cases</span> k <span class="kw">with</span></span>
+<span id="L199">      | <span class="const token" data-verso-hover="148">zero</span> =&gt; <span class="kw">exact</span> hl</span>
+<span id="L200">      | <span class="const token" data-verso-hover="149">succ</span> k =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="152">Function.iterate_succ_apply</span>, ← hδ]; <span class="kw">exact</span> hlive k (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L201">    · <span class="kw">cases</span> k <span class="kw">with</span></span>
+<span id="L202">      | <span class="const token" data-verso-hover="148">zero</span> =&gt; <span class="kw">exact</span> hv</span>
+<span id="L203">      | <span class="const token" data-verso-hover="149">succ</span> k =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="152">Function.iterate_succ_apply</span>, ← hδ]; <span class="kw">exact</span> hne k (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L204"></span>
+<span id="L205"><span class="dc">/-- A trajectory that stays live is a forwarding path. -/</span></span>
+<span id="L206"><span class="kw">theorem</span> <span class="const token" data-verso-hover="163">fwdPath_walkOf</span> (δ : V × V) (n : <span class="const token" data-verso-hover="21">ℕ</span>)</span>
+<span id="L207">    (hlive : ∀ k ≤ n, <span class="const token" data-verso-hover="58">Live</span> G F ((<span class="const token" data-verso-hover="119">nxt</span> G f F)^[k] δ).<span class="const token" data-verso-hover="26">1</span> ((<span class="const token" data-verso-hover="119">nxt</span> G f F)^[k] δ).<span class="const token" data-verso-hover="27">2</span>)</span>
+<span id="L208">    (hne : ∀ k &lt; n, ((<span class="const token" data-verso-hover="119">nxt</span> G f F)^[k] δ).<span class="const token" data-verso-hover="27">2</span> ≠ d) : <span class="const token" data-verso-hover="131">FwdPath</span> G d f F (<span class="const token" data-verso-hover="144">walkOf</span> G f F δ n) := <span class="kw">by</span></span>
+<span id="L209">  <span class="kw">induction</span> n generalizing δ <span class="kw">with</span></span>
+<span id="L210">  | <span class="const token" data-verso-hover="148">zero</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="82">.</span>single (<span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hlive <span class="nu">0</span> <span class="const token" data-verso-hover="164">le_rfl</span>)</span>
+<span id="L211">  | <span class="const token" data-verso-hover="149">succ</span> n ih =&gt;</span>
+<span id="L212">    <span class="kw">have</span> h := ih (<span class="const token" data-verso-hover="119">nxt</span> G f F δ) (<span class="kw">fun</span> k hk =&gt; hlive (k + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>))</span>
+<span id="L213">      (<span class="kw">fun</span> k hk =&gt; hne (k + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>))</span>
+<span id="L214">    <span class="kw">obtain</span> ⟨l, hl⟩ := <span class="const token" data-verso-hover="147">walkOf_head</span> (G := G) (f := f) (F := F) (<span class="const token" data-verso-hover="119">nxt</span> G f F δ) n</span>
+<span id="L215">    <span class="kw">rw</span> [hl] <span class="kw">at</span> h</span>
+<span id="L216">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="144">walkOf</span>, hl]</span>
+<span id="L217">    <span class="kw">exact</span> <span class="const token" data-verso-hover="81">.</span>cons (hlive <span class="nu">0</span> (<span class="kw">by</span> <span class="kw">omega</span>)) (hne <span class="nu">0</span> (<span class="kw">by</span> <span class="kw">omega</span>)) <span class="const token" data-verso-hover="39">rfl</span> h</span>
+<span id="L218"></span>
+<span id="L219"><span class="kw">theorem</span> <span class="const token" data-verso-hover="165">Delivers.exists_fwdPath</span> {δ : V × V} (h : <span class="const token" data-verso-hover="60">Delivers</span> G d f F δ) (hδ : <span class="const token" data-verso-hover="58">Live</span> G F δ.<span class="const token" data-verso-hover="26">1</span> δ.<span class="const token" data-verso-hover="27">2</span>) :</span>
+<span id="L220">    ∃ l, <span class="const token" data-verso-hover="131">FwdPath</span> G d f F (δ.<span class="const token" data-verso-hover="26">1</span> :: l) ∧ (δ.<span class="const token" data-verso-hover="26">1</span> :: l).<span class="const token" data-verso-hover="132">getLast</span> (<span class="const token" data-verso-hover="133">List.cons_ne_nil</span> _ _) = d := <span class="kw">by</span></span>
+<span id="L221">  <span class="cm">--</span><span class="cm"> extract the delivery time</span></span>
+<span id="L222">  <span class="kw">have</span> key : ∃ n, (∀ k &lt; n, ¬ <span class="const token" data-verso-hover="142">Stops</span> G d f F ((<span class="const token" data-verso-hover="119">nxt</span> G f F)^[k] δ)) ∧ ((<span class="const token" data-verso-hover="119">nxt</span> G f F)^[n] δ).<span class="const token" data-verso-hover="27">2</span> = d := <span class="kw">by</span></span>
+<span id="L223">    <span class="kw">clear</span> hδ</span>
+<span id="L224">    <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L225">    | <span class="const token" data-verso-hover="62">base</span> h =&gt; <span class="kw">exact</span> ⟨<span class="nu">0</span>, <span class="kw">by</span> <span class="kw">simp</span>, h⟩</span>
+<span id="L226">    | @<span class="const token" data-verso-hover="143">step</span> δ hs _ ih =&gt;</span>
+<span id="L227">      <span class="kw">obtain</span> ⟨n, h1, h2⟩ := ih</span>
+<span id="L228">      <span class="kw">refine</span> ⟨n + <span class="nu">1</span>, <span class="kw">fun</span> k hk =&gt; ?_, <span class="kw">by</span> <span class="kw">rwa</span> [<span class="const token" data-verso-hover="152">Function.iterate_succ_apply</span>]⟩</span>
+<span id="L229">      <span class="kw">cases</span> k <span class="kw">with</span></span>
+<span id="L230">      | <span class="const token" data-verso-hover="148">zero</span> =&gt; <span class="kw">exact</span> hs</span>
+<span id="L231">      | <span class="const token" data-verso-hover="149">succ</span> k =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="152">Function.iterate_succ_apply</span>]; <span class="kw">exact</span> h1 k (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L232">  <span class="kw">obtain</span> ⟨n, h1, h2⟩ := key</span>
+<span id="L233">  <span class="kw">have</span> hlive : ∀ k ≤ n, <span class="const token" data-verso-hover="58">Live</span> G F ((<span class="const token" data-verso-hover="119">nxt</span> G f F)^[k] δ).<span class="const token" data-verso-hover="26">1</span> ((<span class="const token" data-verso-hover="119">nxt</span> G f F)^[k] δ).<span class="const token" data-verso-hover="27">2</span> := <span class="kw">by</span></span>
+<span id="L234">    <span class="kw">intro</span> k hk</span>
+<span id="L235">    <span class="kw">induction</span> k <span class="kw">with</span></span>
+<span id="L236">    | <span class="const token" data-verso-hover="148">zero</span> =&gt; <span class="kw">exact</span> hδ</span>
+<span id="L237">    | <span class="const token" data-verso-hover="149">succ</span> k ih =&gt;</span>
+<span id="L238">      <span class="kw">have</span> := h1 k (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L239">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="142">Stops</span>, <span class="const token" data-verso-hover="124">not_or</span>, <span class="const token" data-verso-hover="102">not_not</span>] <span class="kw">at</span> this</span>
+<span id="L240">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="166">Function.iterate_succ_apply'</span>]</span>
+<span id="L241">      <span class="kw">exact</span> this.<span class="const token" data-verso-hover="37">2</span></span>
+<span id="L242">  <span class="kw">have</span> hne : ∀ k &lt; n, ((<span class="const token" data-verso-hover="119">nxt</span> G f F)^[k] δ).<span class="const token" data-verso-hover="27">2</span> ≠ d := <span class="kw">fun</span> k hk =&gt; <span class="kw">by</span></span>
+<span id="L243">    <span class="kw">have</span> := h1 k hk</span>
+<span id="L244">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="142">Stops</span>, <span class="const token" data-verso-hover="124">not_or</span>] <span class="kw">at</span> this</span>
+<span id="L245">    <span class="kw">exact</span> this.<span class="const token" data-verso-hover="35">1</span></span>
+<span id="L246">  <span class="kw">obtain</span> ⟨l, hl⟩ := <span class="const token" data-verso-hover="147">walkOf_head</span> (G := G) (f := f) (F := F) δ n</span>
+<span id="L247">  <span class="kw">refine</span> ⟨δ.<span class="const token" data-verso-hover="27">2</span> :: l, ?_, ?_⟩</span>
+<span id="L248">  · <span class="kw">rw</span> [← hl]; <span class="kw">exact</span> <span class="const token" data-verso-hover="163">fwdPath_walkOf</span> δ n hlive hne</span>
+<span id="L249">  · <span class="kw">have</span> := <span class="const token" data-verso-hover="150">walkOf_getLast</span> (G := G) (f := f) (F := F) δ n (<span class="kw">by</span> <span class="kw">simp</span> [hl])</span>
+<span id="L250">    <span class="kw">simp</span> only [hl] <span class="kw">at</span> this</span>
+<span id="L251">    <span class="kw">rw</span> [this, h2]</span>
+<span id="L252"></span>
+<span id="L253"><span class="dc">/-- If all trajectories terminate, no forwarding path repeats a dart. -/</span></span>
+<span id="L254"><span class="kw">theorem</span> <span class="const token" data-verso-hover="167">FwdPath.nodup_of_terminates</span> (hT : ∀ δ, <span class="const token" data-verso-hover="49">Terminates</span> G d f F δ) {l : <span class="const token" data-verso-hover="22">List</span> V}</span>
+<span id="L255">    (h : <span class="const token" data-verso-hover="131">FwdPath</span> G d f F l) : (l.<span class="const token" data-verso-hover="87">zip</span> l.<span class="const token" data-verso-hover="134">tail</span>).<span class="const token" data-verso-hover="88">Nodup</span> := <span class="kw">by</span></span>
+<span id="L256">  <span class="kw">obtain</span> ⟨δ, n, <span class="kw">rfl</span>, hlive, hne⟩ := h.<span class="const token" data-verso-hover="161">exists_walkOf</span></span>
+<span id="L257">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="153">walkOf_darts</span>]</span>
+<span id="L258">  <span class="kw">refine</span> (<span class="const token" data-verso-hover="168">List.nodup_range</span>).<span class="const token" data-verso-hover="169">map_on</span> <span class="kw">fun</span> i hi j hj hij =&gt; ?_</span>
+<span id="L259">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="170">List.mem_range</span>] <span class="kw">at</span> hi hj</span>
+<span id="L260">  <span class="kw">by_contra</span> hne'</span>
+<span id="L261">  <span class="cm">--</span><span class="cm"> wlog i &lt; j</span></span>
+<span id="L262">  <span class="kw">have</span> main : ∀ i j, i &lt; j → j ≤ n → (<span class="const token" data-verso-hover="119">nxt</span> G f F)^[i] δ = (<span class="const token" data-verso-hover="119">nxt</span> G f F)^[j] δ → <span class="const token" data-verso-hover="171">False</span> := <span class="kw">by</span></span>
+<span id="L263">    <span class="kw">intro</span> i j hij hjn heq</span>
+<span id="L264">    <span class="cm">--</span><span class="cm"> no stop at any time</span></span>
+<span id="L265">    <span class="kw">have</span> back : ∀ m, ∃ m' &lt; j, (<span class="const token" data-verso-hover="119">nxt</span> G f F)^[m] δ = (<span class="const token" data-verso-hover="119">nxt</span> G f F)^[m'] δ := <span class="kw">by</span></span>
+<span id="L266">      <span class="kw">intro</span> m</span>
+<span id="L267">      <span class="kw">induction</span> m <span class="kw">using</span> <span class="const token" data-verso-hover="172">Nat.strong_induction_on</span> <span class="kw">with</span></span>
+<span id="L268">      | _ m ih =&gt;</span>
+<span id="L269">        <span class="kw">by_cases</span> hm : m &lt; j</span>
+<span id="L270">        · <span class="kw">exact</span> ⟨m, hm, <span class="const token" data-verso-hover="39">rfl</span>⟩</span>
+<span id="L271">        · <span class="kw">obtain</span> ⟨m', hm', he⟩ := ih (m - j + i) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L272">          <span class="kw">refine</span> ⟨m', hm', ?_⟩</span>
+<span id="L273">          <span class="kw">rw</span> [← he]</span>
+<span id="L274">          conv_lhs =&gt; <span class="kw">rw</span> [<span class="kw">show</span> m = (m - j) + j <span class="kw">by</span> <span class="kw">omega</span>, <span class="const token" data-verso-hover="173">Function.iterate_add_apply</span>, ← heq,</span>
+<span id="L275">            ← <span class="const token" data-verso-hover="173">Function.iterate_add_apply</span>]</span>
+<span id="L276">    <span class="kw">have</span> nostop : ∀ m, ¬ <span class="const token" data-verso-hover="142">Stops</span> G d f F ((<span class="const token" data-verso-hover="119">nxt</span> G f F)^[m] δ) := <span class="kw">by</span></span>
+<span id="L277">      <span class="kw">intro</span> m</span>
+<span id="L278">      <span class="kw">obtain</span> ⟨m, hm, he⟩ := back m</span>
+<span id="L279">      <span class="kw">rw</span> [he]</span>
+<span id="L280">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="142">Stops</span>, <span class="const token" data-verso-hover="124">not_or</span>, <span class="const token" data-verso-hover="102">not_not</span>]</span>
+<span id="L281">      <span class="kw">refine</span> ⟨hne m (<span class="kw">by</span> <span class="kw">omega</span>), ?_⟩</span>
+<span id="L282">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="166">Function.iterate_succ_apply'</span> (<span class="const token" data-verso-hover="119">nxt</span> G f F)]</span>
+<span id="L283">      <span class="kw">exact</span> hlive (m + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L284">    <span class="cm">--</span><span class="cm"> but the trajectory terminates</span></span>
+<span id="L285">    <span class="kw">have</span> ht := hT δ</span>
+<span id="L286">    <span class="kw">have</span> : ∀ δ', <span class="const token" data-verso-hover="49">Terminates</span> G d f F δ' → ∀ m, δ' = (<span class="const token" data-verso-hover="119">nxt</span> G f F)^[m] δ → <span class="const token" data-verso-hover="171">False</span> := <span class="kw">by</span></span>
+<span id="L287">      <span class="kw">intro</span> δ' ht'</span>
+<span id="L288">      <span class="kw">induction</span> ht' <span class="kw">with</span></span>
+<span id="L289">      | <span class="const token" data-verso-hover="50">base</span> hs =&gt; <span class="kw">intro</span> m hm; <span class="kw">exact</span> nostop m (hm ▸ hs)</span>
+<span id="L290">      | <span class="const token" data-verso-hover="52">step</span> _ ih =&gt; <span class="kw">intro</span> m hm; <span class="kw">exact</span> ih (m + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">rw</span> [hm, <span class="const token" data-verso-hover="166">Function.iterate_succ_apply'</span>])</span>
+<span id="L291">    <span class="kw">exact</span> this δ ht <span class="nu">0</span> <span class="const token" data-verso-hover="39">rfl</span></span>
+<span id="L292">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="174">Nat.lt_or_gt_of_ne</span> hne' <span class="kw">with</span> h' | h'</span>
+<span id="L293">  · <span class="kw">exact</span> main i j h' (<span class="kw">by</span> <span class="kw">omega</span>) hij</span>
+<span id="L294">  · <span class="kw">exact</span> main j i h' (<span class="kw">by</span> <span class="kw">omega</span>) hij.<span class="const token" data-verso-hover="175">symm</span></span>
+<span id="L295"></span>
+<span id="L296"><span class="dc">/-- Reduction: a scenario is good if all trajectories terminate and every node connected to `d`</span></span>
+<span id="L297"><span class="dc">has a live first hop whose trajectory is delivered. -/</span></span>
+<span id="L298"><span class="kw">theorem</span> <span class="const token" data-verso-hover="13">good_of</span> (hT : ∀ δ, <span class="const token" data-verso-hover="49">Terminates</span> G d f F δ)</span>
+<span id="L299">    (hD : ∀ i, i ≠ d → (G.<span class="const token" data-verso-hover="56">deleteEdges</span> F).<span class="const token" data-verso-hover="57">Reachable</span> i d →</span>
+<span id="L300">      ∃ y, <span class="const token" data-verso-hover="58">Live</span> G F i y ∧ <span class="const token" data-verso-hover="60">Delivers</span> G d f F (i, y)) : <span class="const token" data-verso-hover="116">Good</span> G d f F := <span class="kw">by</span></span>
+<span id="L301">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> i hi hr =&gt; ?_, <span class="kw">fun</span> l hl =&gt; hl.<span class="const token" data-verso-hover="167">nodup_of_terminates</span> hT⟩</span>
+<span id="L302">  <span class="kw">obtain</span> ⟨y, hy, hdel⟩ := hD i hi hr</span>
+<span id="L303">  <span class="kw">exact</span> hdel.<span class="const token" data-verso-hover="165">exists_fwdPath</span> hy</span>
+<span id="L304"></span>
+<span id="L305"><span class="dc">/-- A *trap*: a set of darts avoiding `d` and closed under live forwarding. No forwarding path that</span></span>
+<span id="L306"><span class="dc">starts in a trap reaches `d`. -/</span></span>
+<span id="L307"><span class="kw">theorem</span> <span class="const token" data-verso-hover="176">not_reach_of_trap</span> (S : <span class="const token" data-verso-hover="47">Set</span> (V × V))</span>
+<span id="L308">    (hS : ∀ δ ∈ S, <span class="const token" data-verso-hover="58">Live</span> G F δ.<span class="const token" data-verso-hover="26">1</span> δ.<span class="const token" data-verso-hover="27">2</span> → δ.<span class="const token" data-verso-hover="27">2</span> ≠ d ∧</span>
+<span id="L309">      (<span class="const token" data-verso-hover="58">Live</span> G F (<span class="const token" data-verso-hover="119">nxt</span> G f F δ).<span class="const token" data-verso-hover="26">1</span> (<span class="const token" data-verso-hover="119">nxt</span> G f F δ).<span class="const token" data-verso-hover="27">2</span> → <span class="const token" data-verso-hover="119">nxt</span> G f F δ ∈ S))</span>
+<span id="L310">    {u v : V} {l : <span class="const token" data-verso-hover="22">List</span> V} (h : <span class="const token" data-verso-hover="131">FwdPath</span> G d f F (u :: v :: l)) (huv : (u, v) ∈ S) :</span>
+<span id="L311">    (u :: v :: l).<span class="const token" data-verso-hover="132">getLast</span> (<span class="const token" data-verso-hover="133">List.cons_ne_nil</span> _ _) ≠ d := <span class="kw">by</span></span>
+<span id="L312">  <span class="kw">obtain</span> ⟨δ, n, he, hlive, -⟩ := h.<span class="const token" data-verso-hover="161">exists_walkOf</span></span>
+<span id="L313">  <span class="kw">have</span> hδ : δ = (u, v) := <span class="kw">by</span></span>
+<span id="L314">    <span class="kw">obtain</span> ⟨l', hl'⟩ := <span class="const token" data-verso-hover="147">walkOf_head</span> (G := G) (f := f) (F := F) δ n</span>
+<span id="L315">    <span class="kw">rw</span> [hl'] <span class="kw">at</span> he</span>
+<span id="L316">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="162">List.cons.injEq</span>] <span class="kw">at</span> he</span>
+<span id="L317">    <span class="kw">ext</span> &lt;;&gt; <span class="kw">simp</span> [he.<span class="const token" data-verso-hover="35">1</span>, he.<span class="const token" data-verso-hover="37">2</span><span class="nu">.</span><span class="const token" data-verso-hover="35">1</span>]</span>
+<span id="L318">  <span class="kw">subst</span> hδ</span>
+<span id="L319">  <span class="kw">have</span> mem : ∀ k ≤ n, (<span class="const token" data-verso-hover="119">nxt</span> G f F)^[k] (u, v) ∈ S := <span class="kw">by</span></span>
+<span id="L320">    <span class="kw">intro</span> k hk</span>
+<span id="L321">    <span class="kw">induction</span> k <span class="kw">with</span></span>
+<span id="L322">    | <span class="const token" data-verso-hover="148">zero</span> =&gt; <span class="kw">exact</span> huv</span>
+<span id="L323">    | <span class="const token" data-verso-hover="149">succ</span> k ih =&gt;</span>
+<span id="L324">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="166">Function.iterate_succ_apply'</span>]</span>
+<span id="L325">      <span class="kw">exact</span> (hS _ (ih (<span class="kw">by</span> <span class="kw">omega</span>)) (hlive k (<span class="kw">by</span> <span class="kw">omega</span>))).<span class="const token" data-verso-hover="37">2</span></span>
+<span id="L326">        (<span class="kw">by</span> <span class="kw">rw</span> [← <span class="const token" data-verso-hover="166">Function.iterate_succ_apply'</span> (<span class="const token" data-verso-hover="119">nxt</span> G f F)]; <span class="kw">exact</span> hlive (k + <span class="nu">1</span>) hk)</span>
+<span id="L327">  <span class="kw">have</span> := <span class="const token" data-verso-hover="150">walkOf_getLast</span> (G := G) (f := f) (F := F) (u, v) n (<span class="kw">by</span> <span class="kw">simp</span> [← he])</span>
+<span id="L328">  <span class="kw">simp</span> only [← he] <span class="kw">at</span> this</span>
+<span id="L329">  <span class="kw">rw</span> [this]</span>
+<span id="L330">  <span class="kw">exact</span> (hS _ (mem n <span class="const token" data-verso-hover="164">le_rfl</span>) (hlive n <span class="const token" data-verso-hover="164">le_rfl</span>)).<span class="const token" data-verso-hover="35">1</span></span>
+<span id="L331"></span>
+<span id="L332"><span class="dc">/-- Condition (1) refuted by a trap: if `i ≠ d` is connected to `d`, but every live first hop of</span></span>
+<span id="L333"><span class="dc">`i` lies in a trap, then the scenario is not good. -/</span></span>
+<span id="L334"><span class="kw">theorem</span> <span class="const token" data-verso-hover="14">not_good_of_trap</span> (S : <span class="const token" data-verso-hover="47">Set</span> (V × V))</span>
+<span id="L335">    (hS : ∀ δ ∈ S, <span class="const token" data-verso-hover="58">Live</span> G F δ.<span class="const token" data-verso-hover="26">1</span> δ.<span class="const token" data-verso-hover="27">2</span> → δ.<span class="const token" data-verso-hover="27">2</span> ≠ d ∧</span>
+<span id="L336">      (<span class="const token" data-verso-hover="58">Live</span> G F (<span class="const token" data-verso-hover="119">nxt</span> G f F δ).<span class="const token" data-verso-hover="26">1</span> (<span class="const token" data-verso-hover="119">nxt</span> G f F δ).<span class="const token" data-verso-hover="27">2</span> → <span class="const token" data-verso-hover="119">nxt</span> G f F δ ∈ S))</span>
+<span id="L337">    {i : V} (hi : i ≠ d) (hr : (G.<span class="const token" data-verso-hover="56">deleteEdges</span> F).<span class="const token" data-verso-hover="57">Reachable</span> i d)</span>
+<span id="L338">    (hfirst : ∀ y, <span class="const token" data-verso-hover="58">Live</span> G F i y → (i, y) ∈ S) : ¬ <span class="const token" data-verso-hover="116">Good</span> G d f F := <span class="kw">by</span></span>
+<span id="L339">  <span class="kw">rintro</span> ⟨h1, -⟩</span>
+<span id="L340">  <span class="kw">obtain</span> ⟨l, hl, hlast⟩ := h1 i hi hr</span>
+<span id="L341">  <span class="kw">cases</span> hl <span class="kw">with</span></span>
+<span id="L342">  | <span class="const token" data-verso-hover="82">single</span> h =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="176">not_reach_of_trap</span> S hS (<span class="const token" data-verso-hover="82">.</span>single h) (hfirst _ h) hlast</span>
+<span id="L343">  | <span class="const token" data-verso-hover="81">cons</span> h hv hw hp =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="176">not_reach_of_trap</span> S hS (<span class="const token" data-verso-hover="81">.</span>cons h hv hw hp) (hfirst _ h) hlast</span>
+<span id="L344"></span>
+<span id="L345"><span class="kw">end</span> Traj</span>
+<span id="L346"></span>
+<span id="L347"><span class="kw">end</span> Podc.ResilientRouting</span>
+<span id="L348"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2012/ResilientRouting/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

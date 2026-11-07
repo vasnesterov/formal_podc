@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ListDefectiveColoring: Distributed.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2024/">PODC 2024</a><span class="sep">›</span><a href="PODC2024/ListDefectiveColoring/">ListDefectiveColoring</a><span class="sep">›</span><a href="PODC2024/ListDefectiveColoring/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Distributed</span></nav>
+        <h1>
+          <code>Distributed.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2024/ListDefectiveColoring/">List defective colouring — PODC 2024</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2024/ListDefectiveColoring/Distributed.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Distributed"><span id="L1"><span class="kw">import</span> Papers.PODC2024.ListDefectiveColoring.TwoSweep</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.Local.Identifiers</span>
+<span id="L3"><span class="kw">import</span> Cslib.Computability.Distributed.Local.OnlineLocalLocality</span>
+<span id="L4"></span>
+<span id="L5"><span class="dc">/-!</span></span>
+<span id="L6"><span class="dc"># The Two-Sweep algorithm as a synchronous distributed algorithm (Lemma 3.3 of [FK24])</span></span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">We implement Algorithm 1 of [FK24] in the synchronous round model of CSLib</span></span>
+<span id="L9"><span class="dc">(`Cslib.LocallyIterative.Algorithm`): in round `t` every node replaces its state by a function of</span></span>
+<span id="L10"><span class="dc">the round number, its own state and the **set** of its neighbours' states. A node's state</span></span>
+<span id="L11"><span class="dc">(`NodeState`) contains its identifier, its initial colour, its out-neighbourhood (as a set of</span></span>
+<span id="L12"><span class="dc">identifiers), its list and defect function (the local input), and the two outputs `S_v` and</span></span>
+<span id="L13"><span class="dc">`x_v` (initially `none`). Identifiers are only used to recognise out-neighbours; the step function</span></span>
+<span id="L14"><span class="dc">does not depend on the graph.</span></span>
+<span id="L15"></span>
+<span id="L16"><span class="dc">Model: synchronous, deterministic, fault-free LOCAL rounds; all nodes start at round `0` and know</span></span>
+<span id="L17"><span class="dc">`p` and `q`. Every node broadcasts its whole state each round, which is LOCAL; the paper's message</span></span>
+<span id="L18"><span class="dc">size claim (Lemma 3.3: "the nodes exchange a list of `p` colours"; in Phase I the only new</span></span>
+<span id="L19"><span class="dc">information is `S_v`, in Phase II only `x_v`) is not formalized.</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="dc">* Rounds `0, …, q-1` (Phase I): in round `t` the nodes with initial colour `t` choose `S_v`</span></span>
+<span id="L22"><span class="dc">  (a best `min(p, |L_v|)`-subset for the score `d_v(x) − k_v(x)`).</span></span>
+<span id="L23"><span class="dc">* Rounds `q, …, 2q-1` (Phase II): in round `2q-1-c` the nodes with initial colour `c` choose</span></span>
+<span id="L24"><span class="dc">  `x_v ∈ S_v` with `k_v(x_v) + r_v(x_v) ≤ d_v(x_v)`.</span></span>
+<span id="L25"></span>
+<span id="L26"><span class="dc">## Main results</span></span>
+<span id="L27"></span>
+<span id="L28"><span class="dc">* `twoSweep_correct` (**Lemma 3.3**, and **Theorem 1.1** for `ε = 0`): from a proper</span></span>
+<span id="L29"><span class="dc">  `q`-colouring, after `2q` rounds every node has output a colour and the outputs form an oriented</span></span>
+<span id="L30"><span class="dc">  list defective colouring, provided the slack condition (2) holds.</span></span>
+<span id="L31"><span class="dc">* `twoSweep_listColoring`: the corollary for list colouring with lists of size `≥ β² + β + 1`</span></span>
+<span id="L32"><span class="dc">  (Section 1.1, "List coloring with bounded outdegree", `p = β + 1`, all defects `0`).</span></span>
+<span id="L33"><span class="dc">* `twoSweep_threeColoring`: list `d`-defective colouring with lists of size `3` whenever</span></span>
+<span id="L34"><span class="dc">  `d &gt; (2Δ − 3)/3` (Section 1.1, generalizing [BHL+19]), using `out v = N(v)`.</span></span>
+<span id="L35"><span class="dc">-/</span></span>
+<span id="L36"></span>
+<span id="L37"><span class="kw">open</span> Finset Cslib.LocallyIterative</span>
+<span id="L38"></span>
+<span id="L39"><span class="kw">namespace</span> FK24</span>
+<span id="L40"></span>
+<span id="L41"><span class="kw">variable</span> {V α : <span class="kw">Type</span>*}</span>
+<span id="L42"></span>
+<span id="L43"><span class="dc">/-- The local state of a node in the Two-Sweep algorithm. -/</span></span>
+<span id="L44"><span class="kw">structure</span> <span class="const token" data-verso-hover="113">NodeState</span> (V α : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L45">  <span class="dc">/-- The node's identifier. -/</span></span>
+<span id="L46">  <span class="const token" data-verso-hover="114">id</span> : V</span>
+<span id="L47">  <span class="dc">/-- The initial colour (from the proper `q`-colouring). -/</span></span>
+<span id="L48">  <span class="const token" data-verso-hover="115">c</span> : <span class="const token" data-verso-hover="28">ℕ</span></span>
+<span id="L49">  <span class="dc">/-- The identifiers of the out-neighbours. -/</span></span>
+<span id="L50">  <span class="const token" data-verso-hover="116">out</span> : <span class="const token" data-verso-hover="26">Finset</span> V</span>
+<span id="L51">  <span class="dc">/-- The colour list `L_v`. -/</span></span>
+<span id="L52">  <span class="const token" data-verso-hover="117">L</span> : <span class="const token" data-verso-hover="26">Finset</span> α</span>
+<span id="L53">  <span class="dc">/-- The defect function `d_v`. -/</span></span>
+<span id="L54">  <span class="const token" data-verso-hover="118">d</span> : α → <span class="const token" data-verso-hover="28">ℕ</span></span>
+<span id="L55">  <span class="dc">/-- The sublist `S_v` chosen in Phase I. -/</span></span>
+<span id="L56">  <span class="const token" data-verso-hover="119">S</span> : <span class="const token" data-verso-hover="120">Option</span> (<span class="const token" data-verso-hover="26">Finset</span> α)</span>
+<span id="L57">  <span class="dc">/-- The final colour `x_v` chosen in Phase II. -/</span></span>
+<span id="L58">  <span class="const token" data-verso-hover="121">col</span> : <span class="const token" data-verso-hover="120">Option</span> α</span>
+<span id="L59"></span>
+<span id="L60"><span class="kw">namespace</span> TwoSweepAlg</span>
+<span id="L61"></span>
+<span id="L62"><span class="dc">/-- A best `m`-subset of `L` for the score `g` (any fixed choice; Algorithm 1 sorts `L` by `g`). -/</span></span>
+<span id="L63"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="122">bestSubset</span> (L : <span class="const token" data-verso-hover="26">Finset</span> α) (m : <span class="const token" data-verso-hover="28">ℕ</span>) (g : α → <span class="const token" data-verso-hover="123">ℤ</span>) : <span class="const token" data-verso-hover="26">Finset</span> α :=</span>
+<span id="L64">  <span class="kw">if</span> h : m ≤ L.<span class="const token" data-verso-hover="32">card</span> <span class="kw">then</span> <span class="const token" data-verso-hover="124">Classical.choose</span> (<span class="const token" data-verso-hover="125">exists_isBestSubset</span> L h g) <span class="kw">else</span> ∅</span>
+<span id="L65"></span>
+<span id="L66"><span class="kw">theorem</span> <span class="const token" data-verso-hover="126">bestSubset_spec</span> (L : <span class="const token" data-verso-hover="26">Finset</span> α) {m : <span class="const token" data-verso-hover="28">ℕ</span>} (g : α → <span class="const token" data-verso-hover="123">ℤ</span>) (h : m ≤ L.<span class="const token" data-verso-hover="32">card</span>) :</span>
+<span id="L67">    <span class="const token" data-verso-hover="127">IsBestSubset</span> L m g (<span class="const token" data-verso-hover="122">bestSubset</span> L m g) := <span class="kw">by</span></span>
+<span id="L68">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="122">bestSubset</span>; <span class="kw">simp</span> only [h, ↓<span class="const token" data-verso-hover="128">reduceDIte</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="129">Classical.choose_spec</span> (<span class="const token" data-verso-hover="125">exists_isBestSubset</span> L h g)</span>
+<span id="L69"></span>
+<span id="L70"><span class="dc">/-- `k_v(x)` as computed by the node with state `s` from the set `N` of its neighbours' states. -/</span></span>
+<span id="L71"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="130">kOf</span> (s : <span class="const token" data-verso-hover="113">NodeState</span> V α) (N : <span class="const token" data-verso-hover="131">Set</span> (<span class="const token" data-verso-hover="113">NodeState</span> V α)) (x : α) : <span class="const token" data-verso-hover="28">ℕ</span> :=</span>
+<span id="L72">  <span class="const token" data-verso-hover="132">Set.ncard</span> {s' ∈ N | s'.<span class="const token" data-verso-hover="114">id</span> ∈ s.<span class="const token" data-verso-hover="116">out</span> ∧ s'.<span class="const token" data-verso-hover="115">c</span> &lt; s.<span class="const token" data-verso-hover="115">c</span> ∧ x ∈ s'.<span class="const token" data-verso-hover="119">S</span>.<span class="const token" data-verso-hover="133">getD</span> ∅}</span>
+<span id="L73"></span>
+<span id="L74"><span class="dc">/-- `r_v(x)` as computed by the node with state `s` from the set `N` of its neighbours' states. -/</span></span>
+<span id="L75"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="134">rOf</span> (s : <span class="const token" data-verso-hover="113">NodeState</span> V α) (N : <span class="const token" data-verso-hover="131">Set</span> (<span class="const token" data-verso-hover="113">NodeState</span> V α)) (x : α) : <span class="const token" data-verso-hover="28">ℕ</span> :=</span>
+<span id="L76">  <span class="const token" data-verso-hover="132">Set.ncard</span> {s' ∈ N | s'.<span class="const token" data-verso-hover="114">id</span> ∈ s.<span class="const token" data-verso-hover="116">out</span> ∧ s.<span class="const token" data-verso-hover="115">c</span> &lt; s'.<span class="const token" data-verso-hover="115">c</span> ∧ s'.<span class="const token" data-verso-hover="121">col</span> = <span class="const token" data-verso-hover="135">some</span> x}</span>
+<span id="L77"></span>
+<span id="L78"><span class="dc">/-- Phase I action: choose `S_v` (line 4 of Algorithm 1). -/</span></span>
+<span id="L79"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="136">phaseI</span> (p : <span class="const token" data-verso-hover="28">ℕ</span>) (s : <span class="const token" data-verso-hover="113">NodeState</span> V α) (N : <span class="const token" data-verso-hover="131">Set</span> (<span class="const token" data-verso-hover="113">NodeState</span> V α)) :</span>
+<span id="L80">    <span class="const token" data-verso-hover="113">NodeState</span> V α :=</span>
+<span id="L81">  { s <span class="kw">with</span> <span class="const token" data-verso-hover="119">S</span> := <span class="const token" data-verso-hover="135">some</span> (<span class="const token" data-verso-hover="122">bestSubset</span> s.<span class="const token" data-verso-hover="117">L</span> (<span class="const token" data-verso-hover="137">min</span> p s.<span class="const token" data-verso-hover="117">L</span>.<span class="const token" data-verso-hover="32">card</span>) (<span class="kw">fun</span> x =&gt; (s.<span class="const token" data-verso-hover="118">d</span> x : <span class="const token" data-verso-hover="123">ℤ</span>) - <span class="const token" data-verso-hover="130">kOf</span> s N x)) }</span>
+<span id="L82"></span>
+<span id="L83"><span class="dc">/-- Phase II action: choose `x_v ∈ S_v` with `k_v(x_v) + r_v(x_v) ≤ d_v(x_v)` (line 9). -/</span></span>
+<span id="L84"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="138">phaseII</span> (s : <span class="const token" data-verso-hover="113">NodeState</span> V α) (N : <span class="const token" data-verso-hover="131">Set</span> (<span class="const token" data-verso-hover="113">NodeState</span> V α)) : <span class="const token" data-verso-hover="113">NodeState</span> V α :=</span>
+<span id="L85">  <span class="kw">if</span> h : ∃ x, x ∈ s.<span class="const token" data-verso-hover="119">S</span>.<span class="const token" data-verso-hover="133">getD</span> ∅ ∧ <span class="const token" data-verso-hover="130">kOf</span> s N x + <span class="const token" data-verso-hover="134">rOf</span> s N x ≤ s.<span class="const token" data-verso-hover="118">d</span> x <span class="kw">then</span></span>
+<span id="L86">    { s <span class="kw">with</span> <span class="const token" data-verso-hover="121">col</span> := <span class="const token" data-verso-hover="135">some</span> (<span class="const token" data-verso-hover="124">Classical.choose</span> h) }</span>
+<span id="L87">  <span class="kw">else</span> s</span>
+<span id="L88"></span>
+<span id="L89"><span class="dc">/-- The round function of Algorithm 1. -/</span></span>
+<span id="L90"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="139">step</span> (p q : <span class="const token" data-verso-hover="28">ℕ</span>) (t : <span class="const token" data-verso-hover="28">ℕ</span>) (s : <span class="const token" data-verso-hover="113">NodeState</span> V α) (N : <span class="const token" data-verso-hover="131">Set</span> (<span class="const token" data-verso-hover="113">NodeState</span> V α)) :</span>
+<span id="L91">    <span class="const token" data-verso-hover="113">NodeState</span> V α :=</span>
+<span id="L92">  <span class="kw">if</span> t &lt; q <span class="kw">then</span> (<span class="kw">if</span> s.<span class="const token" data-verso-hover="115">c</span> = t <span class="kw">then</span> <span class="const token" data-verso-hover="136">phaseI</span> p s N <span class="kw">else</span> s)</span>
+<span id="L93">  <span class="kw">else</span> <span class="kw">if</span> s.<span class="const token" data-verso-hover="115">c</span> + t + <span class="nu">1</span> = <span class="nu">2</span> * q <span class="kw">then</span> <span class="const token" data-verso-hover="138">phaseII</span> s N <span class="kw">else</span> s</span>
+<span id="L94"></span>
+<span id="L95"><span class="kw">variable</span> {p q t : <span class="const token" data-verso-hover="28">ℕ</span>} {s : <span class="const token" data-verso-hover="113">NodeState</span> V α} {N : <span class="const token" data-verso-hover="131">Set</span> (<span class="const token" data-verso-hover="113">NodeState</span> V α)}</span>
+<span id="L96"></span>
+<span id="L97"><span class="kw">theorem</span> <span class="const token" data-verso-hover="140">step_id</span> : (<span class="const token" data-verso-hover="139">step</span> p q t s N).<span class="const token" data-verso-hover="114">id</span> = s.<span class="const token" data-verso-hover="114">id</span> := <span class="kw">by</span></span>
+<span id="L98">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="139">step</span> <span class="const token" data-verso-hover="136">phaseI</span> <span class="const token" data-verso-hover="138">phaseII</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L99"><span class="kw">theorem</span> <span class="const token" data-verso-hover="141">step_c</span> : (<span class="const token" data-verso-hover="139">step</span> p q t s N).<span class="const token" data-verso-hover="115">c</span> = s.<span class="const token" data-verso-hover="115">c</span> := <span class="kw">by</span></span>
+<span id="L100">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="139">step</span> <span class="const token" data-verso-hover="136">phaseI</span> <span class="const token" data-verso-hover="138">phaseII</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L101"><span class="kw">theorem</span> <span class="const token" data-verso-hover="142">step_out</span> : (<span class="const token" data-verso-hover="139">step</span> p q t s N).<span class="const token" data-verso-hover="116">out</span> = s.<span class="const token" data-verso-hover="116">out</span> := <span class="kw">by</span></span>
+<span id="L102">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="139">step</span> <span class="const token" data-verso-hover="136">phaseI</span> <span class="const token" data-verso-hover="138">phaseII</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L103"><span class="kw">theorem</span> <span class="const token" data-verso-hover="143">step_L</span> : (<span class="const token" data-verso-hover="139">step</span> p q t s N).<span class="const token" data-verso-hover="117">L</span> = s.<span class="const token" data-verso-hover="117">L</span> := <span class="kw">by</span></span>
+<span id="L104">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="139">step</span> <span class="const token" data-verso-hover="136">phaseI</span> <span class="const token" data-verso-hover="138">phaseII</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L105"><span class="kw">theorem</span> <span class="const token" data-verso-hover="144">step_d</span> : (<span class="const token" data-verso-hover="139">step</span> p q t s N).<span class="const token" data-verso-hover="118">d</span> = s.<span class="const token" data-verso-hover="118">d</span> := <span class="kw">by</span></span>
+<span id="L106">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="139">step</span> <span class="const token" data-verso-hover="136">phaseI</span> <span class="const token" data-verso-hover="138">phaseII</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L107"></span>
+<span id="L108"><span class="kw">theorem</span> <span class="const token" data-verso-hover="145">step_S_of_not</span> (h : ¬ (t &lt; q ∧ s.<span class="const token" data-verso-hover="115">c</span> = t)) : (<span class="const token" data-verso-hover="139">step</span> p q t s N).<span class="const token" data-verso-hover="119">S</span> = s.<span class="const token" data-verso-hover="119">S</span> := <span class="kw">by</span></span>
+<span id="L109">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="139">step</span> <span class="const token" data-verso-hover="136">phaseI</span> <span class="const token" data-verso-hover="138">phaseII</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp_all</span></span>
+<span id="L110"></span>
+<span id="L111"><span class="kw">theorem</span> <span class="const token" data-verso-hover="146">step_S_of_eq</span> (h1 : t &lt; q) (h2 : s.<span class="const token" data-verso-hover="115">c</span> = t) :</span>
+<span id="L112">    (<span class="const token" data-verso-hover="139">step</span> p q t s N).<span class="const token" data-verso-hover="119">S</span> =</span>
+<span id="L113">      <span class="const token" data-verso-hover="135">some</span> (<span class="const token" data-verso-hover="122">bestSubset</span> s.<span class="const token" data-verso-hover="117">L</span> (<span class="const token" data-verso-hover="137">min</span> p s.<span class="const token" data-verso-hover="117">L</span>.<span class="const token" data-verso-hover="32">card</span>) (<span class="kw">fun</span> x =&gt; (s.<span class="const token" data-verso-hover="118">d</span> x : <span class="const token" data-verso-hover="123">ℤ</span>) - <span class="const token" data-verso-hover="130">kOf</span> s N x)) := <span class="kw">by</span></span>
+<span id="L114">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="139">step</span> <span class="const token" data-verso-hover="136">phaseI</span>; <span class="kw">simp</span> [h1, h2]</span>
+<span id="L115"></span>
+<span id="L116"><span class="kw">theorem</span> <span class="const token" data-verso-hover="147">step_col_of_not</span> (h : ¬ (q ≤ t ∧ s.<span class="const token" data-verso-hover="115">c</span> + t + <span class="nu">1</span> = <span class="nu">2</span> * q)) : (<span class="const token" data-verso-hover="139">step</span> p q t s N).<span class="const token" data-verso-hover="121">col</span> = s.<span class="const token" data-verso-hover="121">col</span> := <span class="kw">by</span></span>
+<span id="L117">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="139">step</span> <span class="const token" data-verso-hover="136">phaseI</span> <span class="const token" data-verso-hover="138">phaseII</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">first</span> | <span class="kw">rfl</span> | <span class="kw">omega</span></span>
+<span id="L118"></span>
+<span id="L119"><span class="kw">theorem</span> <span class="const token" data-verso-hover="148">step_col_of_eq</span> (h1 : q ≤ t) (h2 : s.<span class="const token" data-verso-hover="115">c</span> + t + <span class="nu">1</span> = <span class="nu">2</span> * q) :</span>
+<span id="L120">    (<span class="const token" data-verso-hover="139">step</span> p q t s N).<span class="const token" data-verso-hover="121">col</span> = (<span class="const token" data-verso-hover="138">phaseII</span> s N).<span class="const token" data-verso-hover="121">col</span> := <span class="kw">by</span></span>
+<span id="L121">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="139">step</span>; <span class="kw">simp</span> [<span class="kw">show</span> ¬ t &lt; q <span class="kw">by</span> <span class="kw">omega</span>, h2]</span>
+<span id="L122"></span>
+<span id="L123"><span class="kw">end</span> TwoSweepAlg</span>
+<span id="L124"></span>
+<span id="L125"><span class="kw">open</span> TwoSweepAlg</span>
+<span id="L126"></span>
+<span id="L127"><span class="dc">/-- Algorithm 1 of [FK24] (Two-Sweep-Algorithm(q, p)) as a synchronous round algorithm. -/</span></span>
+<span id="L128"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="149">twoSweep</span> (p q : <span class="const token" data-verso-hover="28">ℕ</span>) : <span class="const token" data-verso-hover="9">Algorithm</span> (<span class="const token" data-verso-hover="113">NodeState</span> V α) := ⟨<span class="const token" data-verso-hover="139">step</span> p q⟩</span>
+<span id="L129"></span>
+<span id="L130"><span class="dc">/-- The initial state of node `v`: identifier, initial colour, out-neighbourhood, list and defect</span></span>
+<span id="L131"><span class="dc">function; no outputs yet. -/</span></span>
+<span id="L132"><span class="kw">def</span> <span class="const token" data-verso-hover="150">initState</span> (out : V → <span class="const token" data-verso-hover="26">Finset</span> V) (c : V → <span class="const token" data-verso-hover="28">ℕ</span>) (I : <span class="const token" data-verso-hover="24">ListInstance</span> V α) (v : V) : <span class="const token" data-verso-hover="113">NodeState</span> V α :=</span>
+<span id="L133">  ⟨v, c v, out v, I.<span class="const token" data-verso-hover="25">L</span> v, I.<span class="const token" data-verso-hover="27">d</span> v, <span class="const token" data-verso-hover="151">none</span>, <span class="const token" data-verso-hover="151">none</span>⟩</span>
+<span id="L134"></span>
+<span id="L135"><span class="kw">section</span> Run</span>
+<span id="L136"></span>
+<span id="L137"><span class="kw">variable</span> (G : <span class="const token" data-verso-hover="39">SimpleGraph</span> V) (out : V → <span class="const token" data-verso-hover="26">Finset</span> V) (c : V → <span class="const token" data-verso-hover="28">ℕ</span>) (I : <span class="const token" data-verso-hover="24">ListInstance</span> V α) (p q : <span class="const token" data-verso-hover="28">ℕ</span>)</span>
+<span id="L138"></span>
+<span id="L139"><span class="dc">/-- The state of node `v` after `t` rounds of the Two-Sweep algorithm. -/</span></span>
+<span id="L140"><span class="kw">noncomputable</span> <span class="kw">abbrev</span> <span class="const token" data-verso-hover="152">st</span> (t : <span class="const token" data-verso-hover="28">ℕ</span>) (v : V) : <span class="const token" data-verso-hover="113">NodeState</span> V α :=</span>
+<span id="L141">  (<span class="const token" data-verso-hover="149">twoSweep</span> p q).<span class="const token" data-verso-hover="153">run</span> G (<span class="const token" data-verso-hover="150">initState</span> out c I) t v</span>
+<span id="L142"></span>
+<span id="L143"><span class="kw">variable</span> {G out c I p q}</span>
+<span id="L144"></span>
+<span id="L145"><span class="kw">theorem</span> <span class="const token" data-verso-hover="154">st_succ</span> (t : <span class="const token" data-verso-hover="28">ℕ</span>) (v : V) :</span>
+<span id="L146">    <span class="const token" data-verso-hover="152">st</span> G out c I p q (t + <span class="nu">1</span>) v =</span>
+<span id="L147">      <span class="const token" data-verso-hover="139">step</span> p q t (<span class="const token" data-verso-hover="152">st</span> G out c I p q t v) (<span class="const token" data-verso-hover="155">nbrColors</span> G (<span class="const token" data-verso-hover="152">st</span> G out c I p q t) v) :=</span>
+<span id="L148">  <span class="const token" data-verso-hover="156">Algorithm.run_succ_apply</span> _ _ _ _</span>
+<span id="L149"></span>
+<span id="L150"><span class="kw">theorem</span> <span class="const token" data-verso-hover="157">st_fields</span> (t : <span class="const token" data-verso-hover="28">ℕ</span>) (v : V) :</span>
+<span id="L151">    (<span class="const token" data-verso-hover="152">st</span> G out c I p q t v).<span class="const token" data-verso-hover="114">id</span> = v ∧ (<span class="const token" data-verso-hover="152">st</span> G out c I p q t v).<span class="const token" data-verso-hover="115">c</span> = c v ∧</span>
+<span id="L152">      (<span class="const token" data-verso-hover="152">st</span> G out c I p q t v).<span class="const token" data-verso-hover="116">out</span> = out v ∧ (<span class="const token" data-verso-hover="152">st</span> G out c I p q t v).<span class="const token" data-verso-hover="117">L</span> = I.<span class="const token" data-verso-hover="25">L</span> v ∧</span>
+<span id="L153">      (<span class="const token" data-verso-hover="152">st</span> G out c I p q t v).<span class="const token" data-verso-hover="118">d</span> = I.<span class="const token" data-verso-hover="27">d</span> v := <span class="kw">by</span></span>
+<span id="L154">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L155">  | <span class="const token" data-verso-hover="158">zero</span> =&gt; <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="56">rfl</span>, <span class="const token" data-verso-hover="56">rfl</span>, <span class="const token" data-verso-hover="56">rfl</span>, <span class="const token" data-verso-hover="56">rfl</span>, <span class="const token" data-verso-hover="56">rfl</span>⟩</span>
+<span id="L156">  | <span class="const token" data-verso-hover="159">succ</span> t ih =&gt;</span>
+<span id="L157">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="154">st_succ</span>, <span class="const token" data-verso-hover="140">step_id</span>, <span class="const token" data-verso-hover="141">step_c</span>, <span class="const token" data-verso-hover="142">step_out</span>, <span class="const token" data-verso-hover="143">step_L</span>, <span class="const token" data-verso-hover="144">step_d</span>]</span>
+<span id="L158">    <span class="kw">exact</span> ih</span>
+<span id="L159"></span>
+<span id="L160"><span class="kw">theorem</span> <span class="const token" data-verso-hover="160">st_S_of_le</span> {t : <span class="const token" data-verso-hover="28">ℕ</span>} {v : V} (h : t ≤ c v) : (<span class="const token" data-verso-hover="152">st</span> G out c I p q t v).<span class="const token" data-verso-hover="119">S</span> = <span class="const token" data-verso-hover="151">none</span> := <span class="kw">by</span></span>
+<span id="L161">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L162">  | <span class="const token" data-verso-hover="158">zero</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L163">  | <span class="const token" data-verso-hover="159">succ</span> t ih =&gt;</span>
+<span id="L164">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="154">st_succ</span>, <span class="const token" data-verso-hover="145">step_S_of_not</span>, ih (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L165">    <span class="kw">rw</span> [(<span class="const token" data-verso-hover="157">st_fields</span> t v).<span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="50">1</span>]; <span class="kw">omega</span></span>
+<span id="L166"></span>
+<span id="L167"><span class="kw">theorem</span> <span class="const token" data-verso-hover="161">st_S_of_lt</span> {t : <span class="const token" data-verso-hover="28">ℕ</span>} {v : V} (h : c v &lt; t) :</span>
+<span id="L168">    (<span class="const token" data-verso-hover="152">st</span> G out c I p q t v).<span class="const token" data-verso-hover="119">S</span> = (<span class="const token" data-verso-hover="152">st</span> G out c I p q (c v + <span class="nu">1</span>) v).<span class="const token" data-verso-hover="119">S</span> := <span class="kw">by</span></span>
+<span id="L169">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L170">  | <span class="const token" data-verso-hover="158">zero</span> =&gt; <span class="kw">omega</span></span>
+<span id="L171">  | <span class="const token" data-verso-hover="159">succ</span> t ih =&gt;</span>
+<span id="L172">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="162">Nat.lt_or_ge</span> (c v) t <span class="kw">with</span> h' | h'</span>
+<span id="L173">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="154">st_succ</span>, <span class="const token" data-verso-hover="145">step_S_of_not</span>, ih h']</span>
+<span id="L174">      <span class="kw">rw</span> [(<span class="const token" data-verso-hover="157">st_fields</span> t v).<span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="50">1</span>]; <span class="kw">omega</span></span>
+<span id="L175">    · <span class="kw">have</span> : t = c v := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L176">      <span class="kw">subst</span> this; <span class="kw">rfl</span></span>
+<span id="L177"></span>
+<span id="L178"><span class="kw">theorem</span> <span class="const token" data-verso-hover="163">st_col_of_le</span> {t : <span class="const token" data-verso-hover="28">ℕ</span>} {v : V} (h : t + c v + <span class="nu">1</span> ≤ <span class="nu">2</span> * q) :</span>
+<span id="L179">    (<span class="const token" data-verso-hover="152">st</span> G out c I p q t v).<span class="const token" data-verso-hover="121">col</span> = <span class="const token" data-verso-hover="151">none</span> := <span class="kw">by</span></span>
+<span id="L180">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L181">  | <span class="const token" data-verso-hover="158">zero</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L182">  | <span class="const token" data-verso-hover="159">succ</span> t ih =&gt;</span>
+<span id="L183">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="154">st_succ</span>, <span class="const token" data-verso-hover="147">step_col_of_not</span>, ih (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L184">    <span class="kw">rw</span> [(<span class="const token" data-verso-hover="157">st_fields</span> t v).<span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="50">1</span>]; <span class="kw">omega</span></span>
+<span id="L185"></span>
+<span id="L186"><span class="kw">theorem</span> <span class="const token" data-verso-hover="164">st_col_of_lt</span> {t : <span class="const token" data-verso-hover="28">ℕ</span>} {v : V} (hcv : c v &lt; q) (h : <span class="nu">2</span> * q &lt; t + c v + <span class="nu">1</span>) :</span>
+<span id="L187">    (<span class="const token" data-verso-hover="152">st</span> G out c I p q t v).<span class="const token" data-verso-hover="121">col</span> = (<span class="const token" data-verso-hover="152">st</span> G out c I p q (<span class="nu">2</span> * q - c v) v).<span class="const token" data-verso-hover="121">col</span> := <span class="kw">by</span></span>
+<span id="L188">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L189">  | <span class="const token" data-verso-hover="158">zero</span> =&gt; <span class="kw">omega</span></span>
+<span id="L190">  | <span class="const token" data-verso-hover="159">succ</span> t ih =&gt;</span>
+<span id="L191">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="162">Nat.lt_or_ge</span> (<span class="nu">2</span> * q) (t + c v + <span class="nu">1</span>) <span class="kw">with</span> h' | h'</span>
+<span id="L192">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="154">st_succ</span>, <span class="const token" data-verso-hover="147">step_col_of_not</span>, ih h']</span>
+<span id="L193">      <span class="kw">rw</span> [(<span class="const token" data-verso-hover="157">st_fields</span> t v).<span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="50">1</span>]; <span class="kw">omega</span></span>
+<span id="L194">    · <span class="kw">have</span> : t + <span class="nu">1</span> = <span class="nu">2</span> * q - c v := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L195">      <span class="kw">rw</span> [this]</span>
+<span id="L196"></span>
+<span id="L197"><span class="dc">/-- The sublist chosen by `v` in Phase I. -/</span></span>
+<span id="L198"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="165">Sfin</span> (G : <span class="const token" data-verso-hover="39">SimpleGraph</span> V) (out : V → <span class="const token" data-verso-hover="26">Finset</span> V) (c : V → <span class="const token" data-verso-hover="28">ℕ</span>) (I : <span class="const token" data-verso-hover="24">ListInstance</span> V α)</span>
+<span id="L199">    (p q : <span class="const token" data-verso-hover="28">ℕ</span>) (v : V) : <span class="const token" data-verso-hover="26">Finset</span> α :=</span>
+<span id="L200">  ((<span class="const token" data-verso-hover="152">st</span> G out c I p q (c v + <span class="nu">1</span>) v).<span class="const token" data-verso-hover="119">S</span>).<span class="const token" data-verso-hover="133">getD</span> ∅</span>
+<span id="L201"></span>
+<span id="L202"><span class="dc">/-- The (optional) colour chosen by `v` in Phase II. -/</span></span>
+<span id="L203"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="166">colOpt</span> (G : <span class="const token" data-verso-hover="39">SimpleGraph</span> V) (out : V → <span class="const token" data-verso-hover="26">Finset</span> V) (c : V → <span class="const token" data-verso-hover="28">ℕ</span>)</span>
+<span id="L204">    (I : <span class="const token" data-verso-hover="24">ListInstance</span> V α) (p q : <span class="const token" data-verso-hover="28">ℕ</span>) (v : V) : <span class="const token" data-verso-hover="120">Option</span> α :=</span>
+<span id="L205">  (<span class="const token" data-verso-hover="152">st</span> G out c I p q (<span class="nu">2</span> * q - c v) v).<span class="const token" data-verso-hover="121">col</span></span>
+<span id="L206"></span>
+<span id="L207"><span class="kw">theorem</span> <span class="const token" data-verso-hover="167">st_S_eq_Sfin</span> {t : <span class="const token" data-verso-hover="28">ℕ</span>} {v : V} (h : c v &lt; t) :</span>
+<span id="L208">    (<span class="const token" data-verso-hover="152">st</span> G out c I p q t v).<span class="const token" data-verso-hover="119">S</span>.<span class="const token" data-verso-hover="133">getD</span> ∅ = <span class="const token" data-verso-hover="165">Sfin</span> G out c I p q v := <span class="kw">by</span></span>
+<span id="L209">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="161">st_S_of_lt</span> h]; <span class="kw">rfl</span></span>
+<span id="L210"></span>
+<span id="L211"><span class="kw">variable</span> [<span class="const token" data-verso-hover="38">DecidableEq</span> α] (hout : ∀ v, ∀ u ∈ out v, G.<span class="const token" data-verso-hover="44">Adj</span> v u) (hcq : ∀ v, c v &lt; q)</span>
+<span id="L212"><span class="kw">include</span> hout hcq</span>
+<span id="L213"></span>
+<span id="L214"></span>
+<span id="L215"><span class="kw">omit</span> hcq <span class="kw">in</span></span>
+<span id="L216"><span class="kw">theorem</span> <span class="const token" data-verso-hover="168">kOf_eq</span> (t : <span class="const token" data-verso-hover="28">ℕ</span>) (v : V) (hct : c v ≤ t) (x : α) :</span>
+<span id="L217">    <span class="const token" data-verso-hover="130">kOf</span> (<span class="const token" data-verso-hover="152">st</span> G out c I p q t v) (<span class="const token" data-verso-hover="155">nbrColors</span> G (<span class="const token" data-verso-hover="152">st</span> G out c I p q t) v) x =</span>
+<span id="L218">      <span class="const token" data-verso-hover="169">kCount</span> out c (<span class="const token" data-verso-hover="165">Sfin</span> G out c I p q) v x := <span class="kw">by</span></span>
+<span id="L219">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="130">kOf</span> <span class="const token" data-verso-hover="169">kCount</span></span>
+<span id="L220">  <span class="kw">rw</span> [(<span class="const token" data-verso-hover="157">st_fields</span> t v).<span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="50">1</span>, (<span class="const token" data-verso-hover="157">st_fields</span> t v).<span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="50">1</span>]</span>
+<span id="L221">  <span class="kw">have</span> := <span class="const token" data-verso-hover="170">ncard_nbrColors_filter</span> (G := G) (c := <span class="const token" data-verso-hover="152">st</span> G out c I p q t) (v := v) <span class="const token" data-verso-hover="114">NodeState.id</span></span>
+<span id="L222">    (<span class="kw">fun</span> u =&gt; (<span class="const token" data-verso-hover="157">st_fields</span> t u).<span class="const token" data-verso-hover="50">1</span>)</span>
+<span id="L223">    (out v) (hout v) (<span class="kw">fun</span> s' =&gt; s'.<span class="const token" data-verso-hover="115">c</span> &lt; c v ∧ x ∈ s'.<span class="const token" data-verso-hover="119">S</span>.<span class="const token" data-verso-hover="133">getD</span> ∅)</span>
+<span id="L224">  <span class="kw">rw</span> [this]</span>
+<span id="L225">  <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L226">  <span class="kw">ext</span> u</span>
+<span id="L227">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="83">Finset.mem_filter</span>]</span>
+<span id="L228">  <span class="kw">rw</span> [(<span class="const token" data-verso-hover="157">st_fields</span> t u).<span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="50">1</span>]</span>
+<span id="L229">  <span class="kw">constructor</span></span>
+<span id="L230">  · <span class="kw">rintro</span> ⟨hu, h1, h2⟩; <span class="kw">exact</span> ⟨hu, h1, <span class="kw">by</span> <span class="kw">rwa</span> [<span class="const token" data-verso-hover="167">st_S_eq_Sfin</span> (<span class="kw">by</span> <span class="kw">omega</span>)] <span class="kw">at</span> h2⟩</span>
+<span id="L231">  · <span class="kw">rintro</span> ⟨hu, h1, h2⟩; <span class="kw">exact</span> ⟨hu, h1, <span class="kw">by</span> <span class="kw">rwa</span> [<span class="const token" data-verso-hover="167">st_S_eq_Sfin</span> (<span class="kw">by</span> <span class="kw">omega</span>)]⟩</span>
+<span id="L232"></span>
+<span id="L233"><span class="kw">theorem</span> <span class="const token" data-verso-hover="171">Sfin_eq</span> (v : V) :</span>
+<span id="L234">    <span class="const token" data-verso-hover="165">Sfin</span> G out c I p q v = <span class="const token" data-verso-hover="122">bestSubset</span> (I.<span class="const token" data-verso-hover="25">L</span> v) (<span class="const token" data-verso-hover="137">min</span> p (I.<span class="const token" data-verso-hover="25">L</span> v).<span class="const token" data-verso-hover="32">card</span>)</span>
+<span id="L235">      (<span class="kw">fun</span> x =&gt; (I.<span class="const token" data-verso-hover="27">d</span> v x : <span class="const token" data-verso-hover="123">ℤ</span>) - <span class="const token" data-verso-hover="169">kCount</span> out c (<span class="const token" data-verso-hover="165">Sfin</span> G out c I p q) v x) := <span class="kw">by</span></span>
+<span id="L236">  <span class="kw">show</span> ((<span class="const token" data-verso-hover="152">st</span> G out c I p q (c v + <span class="nu">1</span>) v).<span class="const token" data-verso-hover="119">S</span>).<span class="const token" data-verso-hover="133">getD</span> ∅ = _</span>
+<span id="L237">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="154">st_succ</span>, <span class="const token" data-verso-hover="146">step_S_of_eq</span> (hcq v) (<span class="const token" data-verso-hover="157">st_fields</span> (c v) v).<span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="50">1</span>, <span class="const token" data-verso-hover="172">Option.getD_some</span>]</span>
+<span id="L238">  <span class="kw">rw</span> [(<span class="const token" data-verso-hover="157">st_fields</span> (c v) v).<span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="50">1</span>, (<span class="const token" data-verso-hover="157">st_fields</span> (c v) v).<span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="52">2</span>]</span>
+<span id="L239">  <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L240">  <span class="kw">funext</span> x</span>
+<span id="L241">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="168">kOf_eq</span> hout (c v) v <span class="const token" data-verso-hover="173">le_rfl</span> x]</span>
+<span id="L242"></span>
+<span id="L243"><span class="dc">/-- The outputs of Phase I satisfy the Phase I specification. -/</span></span>
+<span id="L244"><span class="kw">theorem</span> <span class="const token" data-verso-hover="174">isPhaseI_Sfin</span> : <span class="const token" data-verso-hover="175">IsPhaseI</span> I out c p (<span class="const token" data-verso-hover="165">Sfin</span> G out c I p q) := <span class="kw">by</span></span>
+<span id="L245">  <span class="kw">intro</span> v</span>
+<span id="L246">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="171">Sfin_eq</span> hout hcq v]</span>
+<span id="L247">  <span class="kw">exact</span> <span class="const token" data-verso-hover="126">bestSubset_spec</span> _ _ (<span class="const token" data-verso-hover="176">min_le_right</span> _ _)</span>
+<span id="L248"></span>
+<span id="L249"><span class="kw">theorem</span> <span class="const token" data-verso-hover="177">rOf_eq</span> (v : V) (x : α) :</span>
+<span id="L250">    <span class="const token" data-verso-hover="134">rOf</span> (<span class="const token" data-verso-hover="152">st</span> G out c I p q (<span class="nu">2</span> * q - c v - <span class="nu">1</span>) v) (<span class="const token" data-verso-hover="155">nbrColors</span> G (<span class="const token" data-verso-hover="152">st</span> G out c I p q (<span class="nu">2</span> * q - c v - <span class="nu">1</span>)) v) x</span>
+<span id="L251">      = #{u ∈ out v | c v &lt; c u ∧ <span class="const token" data-verso-hover="166">colOpt</span> G out c I p q u = <span class="const token" data-verso-hover="135">some</span> x} := <span class="kw">by</span></span>
+<span id="L252">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="134">rOf</span></span>
+<span id="L253">  <span class="kw">set</span> t := <span class="nu">2</span> * q - c v - <span class="nu">1</span></span>
+<span id="L254">  <span class="kw">rw</span> [(<span class="const token" data-verso-hover="157">st_fields</span> t v).<span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="50">1</span>, (<span class="const token" data-verso-hover="157">st_fields</span> t v).<span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="50">1</span>]</span>
+<span id="L255">  <span class="kw">have</span> := <span class="const token" data-verso-hover="170">ncard_nbrColors_filter</span> (G := G) (c := <span class="const token" data-verso-hover="152">st</span> G out c I p q t) (v := v) <span class="const token" data-verso-hover="114">NodeState.id</span></span>
+<span id="L256">    (<span class="kw">fun</span> u =&gt; (<span class="const token" data-verso-hover="157">st_fields</span> t u).<span class="const token" data-verso-hover="50">1</span>)</span>
+<span id="L257">    (out v) (hout v) (<span class="kw">fun</span> s' =&gt; c v &lt; s'.<span class="const token" data-verso-hover="115">c</span> ∧ s'.<span class="const token" data-verso-hover="121">col</span> = <span class="const token" data-verso-hover="135">some</span> x)</span>
+<span id="L258">  <span class="kw">rw</span> [this]</span>
+<span id="L259">  <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L260">  <span class="kw">ext</span> u</span>
+<span id="L261">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="83">Finset.mem_filter</span>]</span>
+<span id="L262">  <span class="kw">rw</span> [(<span class="const token" data-verso-hover="157">st_fields</span> t u).<span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="50">1</span>]</span>
+<span id="L263">  <span class="kw">constructor</span></span>
+<span id="L264">  · <span class="kw">rintro</span> ⟨hu, h1, h2⟩</span>
+<span id="L265">    <span class="kw">refine</span> ⟨hu, h1, ?_⟩</span>
+<span id="L266">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="166">colOpt</span>; <span class="kw">rwa</span> [<span class="const token" data-verso-hover="164">st_col_of_lt</span> (hcq u) (<span class="kw">by</span> <span class="kw">have</span> := hcq v; <span class="kw">omega</span>)] <span class="kw">at</span> h2</span>
+<span id="L267">  · <span class="kw">rintro</span> ⟨hu, h1, h2⟩</span>
+<span id="L268">    <span class="kw">refine</span> ⟨hu, h1, ?_⟩</span>
+<span id="L269">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="166">colOpt</span> <span class="kw">at</span> h2; <span class="kw">rwa</span> [<span class="const token" data-verso-hover="164">st_col_of_lt</span> (hcq u) (<span class="kw">by</span> <span class="kw">have</span> := hcq v; <span class="kw">omega</span>)]</span>
+<span id="L270"></span>
+<span id="L271"><span class="kw">theorem</span> <span class="const token" data-verso-hover="178">colOpt_spec</span> (hp : <span class="nu">1</span> ≤ p)</span>
+<span id="L272">    (hc : ∀ v, ∀ u ∈ out v, c u ≠ c v)</span>
+<span id="L273">    (hslack : ∀ v, <span class="const token" data-verso-hover="31">max</span> (p ^ <span class="nu">2</span>) (I.<span class="const token" data-verso-hover="25">L</span> v).<span class="const token" data-verso-hover="32">card</span> * <span class="const token" data-verso-hover="30">beta</span> out v &lt; p * I.<span class="const token" data-verso-hover="29">weight</span> v) (v : V) :</span>
+<span id="L274">    ∃ y, <span class="const token" data-verso-hover="166">colOpt</span> G out c I p q v = <span class="const token" data-verso-hover="135">some</span> y ∧ y ∈ <span class="const token" data-verso-hover="165">Sfin</span> G out c I p q v ∧</span>
+<span id="L275">      <span class="const token" data-verso-hover="169">kCount</span> out c (<span class="const token" data-verso-hover="165">Sfin</span> G out c I p q) v y +</span>
+<span id="L276">        #{u ∈ out v | c v &lt; c u ∧ <span class="const token" data-verso-hover="166">colOpt</span> G out c I p q u = <span class="const token" data-verso-hover="135">some</span> y} ≤ I.<span class="const token" data-verso-hover="27">d</span> v y := <span class="kw">by</span></span>
+<span id="L277">  <span class="kw">have</span> hq := hcq v</span>
+<span id="L278">  <span class="kw">set</span> t := <span class="nu">2</span> * q - c v - <span class="nu">1</span></span>
+<span id="L279">  <span class="kw">have</span> ht1 : <span class="nu">2</span> * q - c v = t + <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L280">  <span class="cm">--</span><span class="cm"> existence of a good colour</span></span>
+<span id="L281">  <span class="kw">have</span> h34 := (<span class="const token" data-verso-hover="174">isPhaseI_Sfin</span> hout hcq (I := I) (p := p)).<span class="const token" data-verso-hover="179">eq3_eq4</span> hp hc v (hslack v)</span>
+<span id="L282">  <span class="kw">set</span> S := <span class="const token" data-verso-hover="165">Sfin</span> G out c I p q</span>
+<span id="L283">  <span class="kw">have</span> hr : ∑ y ∈ S v, #{u ∈ out v | c v &lt; c u ∧ <span class="const token" data-verso-hover="166">colOpt</span> G out c I p q u = <span class="const token" data-verso-hover="135">some</span> y} ≤</span>
+<span id="L284">      #{u ∈ out v | c v &lt; c u} := <span class="kw">by</span></span>
+<span id="L285">    <span class="kw">have</span> := <span class="const token" data-verso-hover="180">sum_card_filter_mem_le</span> (S v) {u ∈ out v | c v &lt; c u}</span>
+<span id="L286">      (<span class="kw">fun</span> u =&gt; (<span class="const token" data-verso-hover="166">colOpt</span> G out c I p q u).<span class="const token" data-verso-hover="181">toFinset</span>)</span>
+<span id="L287">    <span class="kw">refine</span> <span class="const token" data-verso-hover="105">le_trans</span> (<span class="const token" data-verso-hover="106">le_of_eq</span> ?_) (this.<span class="const token" data-verso-hover="103">trans</span> ?_)</span>
+<span id="L288">    · <span class="kw">refine</span> <span class="const token" data-verso-hover="182">Finset.sum_congr</span> <span class="const token" data-verso-hover="56">rfl</span> <span class="kw">fun</span> y _ =&gt; ?_</span>
+<span id="L289">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="183">Finset.filter_filter</span>]</span>
+<span id="L290">      <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L291">      <span class="kw">refine</span> <span class="const token" data-verso-hover="184">Finset.filter_congr</span> <span class="kw">fun</span> u _ =&gt; ?_</span>
+<span id="L292">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="185">Option.mem_toFinset</span>, <span class="const token" data-verso-hover="186">Option.mem_def</span>]</span>
+<span id="L293">    · <span class="kw">refine</span> (<span class="const token" data-verso-hover="187">Finset.sum_le_sum</span> <span class="kw">fun</span> u _ =&gt; ?_).<span class="const token" data-verso-hover="103">trans</span> (<span class="const token" data-verso-hover="106">le_of_eq</span> (<span class="const token" data-verso-hover="188">Finset.card_eq_sum_ones</span> _).<span class="const token" data-verso-hover="53">symm</span>)</span>
+<span id="L294">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="189">Option.card_toFinset</span>]; <span class="kw">cases</span> <span class="const token" data-verso-hover="166">colOpt</span> G out c I p q u &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L295">  <span class="kw">have</span> hex : ∃ y, y ∈ S v ∧ <span class="const token" data-verso-hover="169">kCount</span> out c S v y +</span>
+<span id="L296">      #{u ∈ out v | c v &lt; c u ∧ <span class="const token" data-verso-hover="166">colOpt</span> G out c I p q u = <span class="const token" data-verso-hover="135">some</span> y} ≤ I.<span class="const token" data-verso-hover="27">d</span> v y := <span class="kw">by</span></span>
+<span id="L297">    <span class="kw">by_contra</span> hne</span>
+<span id="L298">    push <span class="const token" data-verso-hover="190">Not</span> <span class="kw">at</span> hne</span>
+<span id="L299">    <span class="kw">have</span> hsum : ∑ y ∈ S v, (I.<span class="const token" data-verso-hover="27">d</span> v y + <span class="nu">1</span>) ≤ ∑ y ∈ S v, (<span class="const token" data-verso-hover="169">kCount</span> out c S v y +</span>
+<span id="L300">        #{u ∈ out v | c v &lt; c u ∧ <span class="const token" data-verso-hover="166">colOpt</span> G out c I p q u = <span class="const token" data-verso-hover="135">some</span> y}) :=</span>
+<span id="L301">      <span class="const token" data-verso-hover="187">Finset.sum_le_sum</span> <span class="kw">fun</span> y hy =&gt; hne y hy</span>
+<span id="L302">    <span class="kw">have</span> hsum2 : ∑ y ∈ S v, (<span class="const token" data-verso-hover="169">kCount</span> out c S v y +</span>
+<span id="L303">        #{u ∈ out v | c v &lt; c u ∧ <span class="const token" data-verso-hover="166">colOpt</span> G out c I p q u = <span class="const token" data-verso-hover="135">some</span> y}) =</span>
+<span id="L304">        ∑ y ∈ S v, <span class="const token" data-verso-hover="169">kCount</span> out c S v y +</span>
+<span id="L305">          ∑ y ∈ S v, #{u ∈ out v | c v &lt; c u ∧ <span class="const token" data-verso-hover="166">colOpt</span> G out c I p q u = <span class="const token" data-verso-hover="135">some</span> y} :=</span>
+<span id="L306">      <span class="const token" data-verso-hover="191">Finset.sum_add_distrib</span></span>
+<span id="L307">    <span class="kw">omega</span></span>
+<span id="L308">  <span class="cm">--</span><span class="cm"> the step at round t</span></span>
+<span id="L309">  <span class="kw">have</span> hstate : (<span class="const token" data-verso-hover="152">st</span> G out c I p q t v).<span class="const token" data-verso-hover="119">S</span>.<span class="const token" data-verso-hover="133">getD</span> ∅ = S v := <span class="const token" data-verso-hover="167">st_S_eq_Sfin</span> (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L310">  <span class="kw">have</span> hcond : ∃ y, y ∈ (<span class="const token" data-verso-hover="152">st</span> G out c I p q t v).<span class="const token" data-verso-hover="119">S</span>.<span class="const token" data-verso-hover="133">getD</span> ∅ ∧</span>
+<span id="L311">      <span class="const token" data-verso-hover="130">kOf</span> (<span class="const token" data-verso-hover="152">st</span> G out c I p q t v) (<span class="const token" data-verso-hover="155">nbrColors</span> G (<span class="const token" data-verso-hover="152">st</span> G out c I p q t) v) y +</span>
+<span id="L312">        <span class="const token" data-verso-hover="134">rOf</span> (<span class="const token" data-verso-hover="152">st</span> G out c I p q t v) (<span class="const token" data-verso-hover="155">nbrColors</span> G (<span class="const token" data-verso-hover="152">st</span> G out c I p q t) v) y ≤</span>
+<span id="L313">          (<span class="const token" data-verso-hover="152">st</span> G out c I p q t v).<span class="const token" data-verso-hover="118">d</span> y := <span class="kw">by</span></span>
+<span id="L314">    <span class="kw">obtain</span> ⟨y, hy, hle⟩ := hex</span>
+<span id="L315">    <span class="kw">refine</span> ⟨y, <span class="kw">by</span> <span class="kw">rw</span> [hstate]; <span class="kw">exact</span> hy, ?_⟩</span>
+<span id="L316">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="168">kOf_eq</span> hout t v (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="177">rOf_eq</span> hout hcq v, (<span class="const token" data-verso-hover="157">st_fields</span> t v).<span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="52">2</span>]</span>
+<span id="L317">    <span class="kw">exact</span> hle</span>
+<span id="L318">  <span class="kw">have</span> hcol : <span class="const token" data-verso-hover="166">colOpt</span> G out c I p q v = <span class="const token" data-verso-hover="135">some</span> (<span class="const token" data-verso-hover="124">Classical.choose</span> hcond) := <span class="kw">by</span></span>
+<span id="L319">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="166">colOpt</span></span>
+<span id="L320">    <span class="kw">rw</span> [ht1, <span class="const token" data-verso-hover="154">st_succ</span>, <span class="const token" data-verso-hover="148">step_col_of_eq</span> (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">rw</span> [(<span class="const token" data-verso-hover="157">st_fields</span> t v).<span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="50">1</span>]; <span class="kw">omega</span>)]</span>
+<span id="L321">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="138">phaseII</span></span>
+<span id="L322">    <span class="kw">simp</span> only [hcond, ↓<span class="const token" data-verso-hover="128">reduceDIte</span>]</span>
+<span id="L323">  <span class="kw">have</span> hspec := <span class="const token" data-verso-hover="129">Classical.choose_spec</span> hcond</span>
+<span id="L324">  <span class="kw">generalize</span> <span class="const token" data-verso-hover="124">Classical.choose</span> hcond = y <span class="kw">at</span> hcol hspec</span>
+<span id="L325">  <span class="kw">refine</span> ⟨y, hcol, ?_, ?_⟩</span>
+<span id="L326">  · <span class="kw">rw</span> [← hstate]; <span class="kw">exact</span> hspec.<span class="const token" data-verso-hover="50">1</span></span>
+<span id="L327">  · <span class="kw">have</span> := hspec.<span class="const token" data-verso-hover="52">2</span></span>
+<span id="L328">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="168">kOf_eq</span> hout t v (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="177">rOf_eq</span> hout hcq v,</span>
+<span id="L329">      (<span class="const token" data-verso-hover="157">st_fields</span> t v).<span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="52">2</span><span class="nu">.</span><span class="const token" data-verso-hover="52">2</span>] <span class="kw">at</span> this</span>
+<span id="L330">    <span class="kw">exact</span> this</span>
+<span id="L331"></span>
+<span id="L332"><span class="kw">end</span> Run</span>
+<span id="L333"></span>
+<span id="L334"><span class="kw">variable</span> [<span class="const token" data-verso-hover="38">DecidableEq</span> α]</span>
+<span id="L335"></span>
+<span id="L336"><span class="kw">omit</span> [<span class="const token" data-verso-hover="38">DecidableEq</span> α] <span class="kw">in</span></span>
+<span id="L337"><span class="dc">/-- The Two-Sweep algorithm is a `2q`-round LOCAL algorithm: the state of a node after `2q`</span></span>
+<span id="L338"><span class="dc">rounds (in particular its output colour) only depends on the graph and the initial states</span></span>
+<span id="L339"><span class="dc">(identifiers, initial colours, out-neighbourhoods, lists and defects) within distance `2q`. -/</span></span>
+<span id="L340"><span class="kw">theorem</span> <span class="const token" data-verso-hover="10">twoSweep_isLocal</span> (p q : <span class="const token" data-verso-hover="28">ℕ</span>) :</span>
+<span id="L341">    <span class="const token" data-verso-hover="192">Cslib.Local.IsLocal</span> (<span class="nu">2</span> * q) <span class="kw">fun</span> G (s₀ : V → <span class="const token" data-verso-hover="113">NodeState</span> V α) v =&gt;</span>
+<span id="L342">      (<span class="const token" data-verso-hover="149">twoSweep</span> p q).<span class="const token" data-verso-hover="153">run</span> G s₀ (<span class="nu">2</span> * q) v :=</span>
+<span id="L343">  <span class="const token" data-verso-hover="193">Algorithm.run_isLocal</span> _ _</span>
+<span id="L344"></span>
+<span id="L345"><span class="dc">/-- **Lemma 3.3** of [FK24] (Algorithm 1 is correct and takes `2q` rounds), which is also</span></span>
+<span id="L346"><span class="dc">**Theorem 1.1** for `ε = 0`. Let the out-neighbours of every node be neighbours in the</span></span>
+<span id="L347"><span class="dc">communication graph `G`, let `c` be an initial colouring with values `&lt; q` that is proper along</span></span>
+<span id="L348"><span class="dc">out-edges (e.g. a proper `q`-colouring of `G`), let `p ≥ 1`, and assume the slack condition (2):</span></span>
+<span id="L349"><span class="dc">`∑_{x ∈ L_v} (d_v(x) + 1) &gt; max(p, |L_v|/p) · β_v` for all `v`. Then after `2q` rounds of the</span></span>
+<span id="L350"><span class="dc">Two-Sweep algorithm every node `v` has output a colour `col v`, and `col` is an oriented list</span></span>
+<span id="L351"><span class="dc">defective colouring. -/</span></span>
+<span id="L352"><span class="kw">theorem</span> <span class="const token" data-verso-hover="11">twoSweep_correct</span> (G : <span class="const token" data-verso-hover="39">SimpleGraph</span> V) (out : V → <span class="const token" data-verso-hover="26">Finset</span> V)</span>
+<span id="L353">    (hout : ∀ v, ∀ u ∈ out v, G.<span class="const token" data-verso-hover="44">Adj</span> v u) (c : V → <span class="const token" data-verso-hover="28">ℕ</span>) (q : <span class="const token" data-verso-hover="28">ℕ</span>) (hcq : ∀ v, c v &lt; q)</span>
+<span id="L354">    (hc : ∀ v, ∀ u ∈ out v, c u ≠ c v) (I : <span class="const token" data-verso-hover="24">ListInstance</span> V α) (p : <span class="const token" data-verso-hover="28">ℕ</span>) (hp : <span class="nu">1</span> ≤ p)</span>
+<span id="L355">    (hslack : ∀ v, <span class="const token" data-verso-hover="31">max</span> (p : <span class="const token" data-verso-hover="46">ℝ</span>) ((I.<span class="const token" data-verso-hover="25">L</span> v).<span class="const token" data-verso-hover="32">card</span> / p) * <span class="const token" data-verso-hover="30">beta</span> out v &lt; I.<span class="const token" data-verso-hover="29">weight</span> v) :</span>
+<span id="L356">    ∃ col : V → α, (∀ v, ((<span class="const token" data-verso-hover="149">twoSweep</span> p q).<span class="const token" data-verso-hover="153">run</span> G (<span class="const token" data-verso-hover="150">initState</span> out c I) (<span class="nu">2</span> * q) v).<span class="const token" data-verso-hover="121">col</span> = <span class="const token" data-verso-hover="135">some</span> (col v))</span>
+<span id="L357">      ∧ <span class="const token" data-verso-hover="37">IsOLDC</span> I out col := <span class="kw">by</span></span>
+<span id="L358">  <span class="kw">have</span> hslack' : ∀ v, <span class="const token" data-verso-hover="31">max</span> (p ^ <span class="nu">2</span>) (I.<span class="const token" data-verso-hover="25">L</span> v).<span class="const token" data-verso-hover="32">card</span> * <span class="const token" data-verso-hover="30">beta</span> out v &lt; p * I.<span class="const token" data-verso-hover="29">weight</span> v :=</span>
+<span id="L359">    <span class="kw">fun</span> v =&gt; (<span class="const token" data-verso-hover="194">slack_iff_nat</span> hp _ _ _).<span class="const token" data-verso-hover="80">1</span> (hslack v)</span>
+<span id="L360">  <span class="kw">have</span> hspec := <span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="178">colOpt_spec</span> (G := G) hout hcq hp hc hslack' v</span>
+<span id="L361">  <span class="kw">choose</span> col hcol hmem hle <span class="kw">using</span> hspec</span>
+<span id="L362">  <span class="kw">refine</span> ⟨col, <span class="kw">fun</span> v =&gt; ?_, ?_⟩</span>
+<span id="L363">  · <span class="kw">have</span> := hcq v</span>
+<span id="L364">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="164">st_col_of_lt</span> this (<span class="kw">by</span> <span class="kw">omega</span>)]; <span class="kw">exact</span> hcol v</span>
+<span id="L365">  · <span class="kw">refine</span> <span class="const token" data-verso-hover="195">IsPhaseII.isOLDC</span> (<span class="const token" data-verso-hover="174">isPhaseI_Sfin</span> hout hcq) (<span class="kw">fun</span> v =&gt; ⟨hmem v, ?_⟩) hc</span>
+<span id="L366">    <span class="kw">refine</span> <span class="const token" data-verso-hover="105">le_trans</span> (<span class="const token" data-verso-hover="106">le_of_eq</span> ?_) (hle v)</span>
+<span id="L367">    <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L368">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="196">rCount</span></span>
+<span id="L369">    <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L370">    <span class="kw">refine</span> <span class="const token" data-verso-hover="184">Finset.filter_congr</span> <span class="kw">fun</span> u _ =&gt; ?_</span>
+<span id="L371">    <span class="kw">rw</span> [hcol u, <span class="const token" data-verso-hover="197">Option.some_inj</span>]</span>
+<span id="L372"></span>
+<span id="L373"><span class="dc">/-- **Lemma 3.3** / **Theorem 1.1** (`ε = 0`) for a proper `q`-colouring of `G` and an orientation</span></span>
+<span id="L374"><span class="dc">of (some of) the edges of `G`. -/</span></span>
+<span id="L375"><span class="kw">theorem</span> <span class="const token" data-verso-hover="12">twoSweep_correct_of_isProper</span> (G : <span class="const token" data-verso-hover="39">SimpleGraph</span> V) (out : V → <span class="const token" data-verso-hover="26">Finset</span> V)</span>
+<span id="L376">    (hout : ∀ v, ∀ u ∈ out v, G.<span class="const token" data-verso-hover="44">Adj</span> v u) (c : V → <span class="const token" data-verso-hover="28">ℕ</span>) (q : <span class="const token" data-verso-hover="28">ℕ</span>) (hcq : ∀ v, c v &lt; q)</span>
+<span id="L377">    (hc : <span class="const token" data-verso-hover="198">IsProper</span> G c) (I : <span class="const token" data-verso-hover="24">ListInstance</span> V α) (p : <span class="const token" data-verso-hover="28">ℕ</span>) (hp : <span class="nu">1</span> ≤ p)</span>
+<span id="L378">    (hslack : ∀ v, <span class="const token" data-verso-hover="31">max</span> (p : <span class="const token" data-verso-hover="46">ℝ</span>) ((I.<span class="const token" data-verso-hover="25">L</span> v).<span class="const token" data-verso-hover="32">card</span> / p) * <span class="const token" data-verso-hover="30">beta</span> out v &lt; I.<span class="const token" data-verso-hover="29">weight</span> v) :</span>
+<span id="L379">    ∃ col : V → α, (∀ v, ((<span class="const token" data-verso-hover="149">twoSweep</span> p q).<span class="const token" data-verso-hover="153">run</span> G (<span class="const token" data-verso-hover="150">initState</span> out c I) (<span class="nu">2</span> * q) v).<span class="const token" data-verso-hover="121">col</span> = <span class="const token" data-verso-hover="135">some</span> (col v))</span>
+<span id="L380">      ∧ <span class="const token" data-verso-hover="37">IsOLDC</span> I out col :=</span>
+<span id="L381">  <span class="const token" data-verso-hover="11">twoSweep_correct</span> G out hout c q hcq (<span class="kw">fun</span> v u hu =&gt; (hc (hout v u hu)).<span class="const token" data-verso-hover="199">symm</span>) I p hp hslack</span>
+<span id="L382"></span>
+<span id="L383"><span class="dc">/-- Section 1.1 of [FK24], "List coloring with bounded outdegree": with `p = β + 1` and all</span></span>
+<span id="L384"><span class="dc">defects `0`, the Two-Sweep algorithm properly list-colours an oriented graph with out-degrees</span></span>
+<span id="L385"><span class="dc">`≤ β` from lists of size `≥ β² + β + 1`, in `2q` rounds from a proper `q`-colouring (combined with</span></span>
+<span id="L386"><span class="dc">an `O(β²)`-colouring of Linial, this gives `O(β² + log* n)` rounds). -/</span></span>
+<span id="L387"><span class="kw">theorem</span> <span class="const token" data-verso-hover="14">twoSweep_listColoring</span> (G : <span class="const token" data-verso-hover="39">SimpleGraph</span> V) (out : V → <span class="const token" data-verso-hover="26">Finset</span> V)</span>
+<span id="L388">    (hout : ∀ v, ∀ u ∈ out v, G.<span class="const token" data-verso-hover="44">Adj</span> v u) (c : V → <span class="const token" data-verso-hover="28">ℕ</span>) (q : <span class="const token" data-verso-hover="28">ℕ</span>) (hcq : ∀ v, c v &lt; q)</span>
+<span id="L389">    (hc : <span class="const token" data-verso-hover="198">IsProper</span> G c) (L : V → <span class="const token" data-verso-hover="26">Finset</span> α) (β : <span class="const token" data-verso-hover="28">ℕ</span>) (hβ1 : <span class="nu">1</span> ≤ β) (hβ : ∀ v, (out v).<span class="const token" data-verso-hover="32">card</span> ≤ β)</span>
+<span id="L390">    (hL : ∀ v, β ^ <span class="nu">2</span> + β + <span class="nu">1</span> ≤ (L v).<span class="const token" data-verso-hover="32">card</span>) :</span>
+<span id="L391">    ∃ col : V → α, (∀ v, ((<span class="const token" data-verso-hover="149">twoSweep</span> (β + <span class="nu">1</span>) q).<span class="const token" data-verso-hover="153">run</span> G (<span class="const token" data-verso-hover="150">initState</span> out c ⟨L, <span class="kw">fun</span> _ _ =&gt; <span class="nu">0</span>⟩)</span>
+<span id="L392">        (<span class="nu">2</span> * q) v).<span class="const token" data-verso-hover="121">col</span> = <span class="const token" data-verso-hover="135">some</span> (col v)) ∧</span>
+<span id="L393">      ∀ v, col v ∈ L v ∧ ∀ u ∈ out v, col u ≠ col v := <span class="kw">by</span></span>
+<span id="L394">  <span class="kw">obtain</span> ⟨col, hrun, hcol⟩ := <span class="const token" data-verso-hover="12">twoSweep_correct_of_isProper</span> G out hout c q hcq hc</span>
+<span id="L395">    ⟨L, <span class="kw">fun</span> _ _ =&gt; <span class="nu">0</span>⟩ (β + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="kw">by</span></span>
+<span id="L396">      <span class="kw">intro</span> v</span>
+<span id="L397">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="194">slack_iff_nat</span> (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L398">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="29">ListInstance.weight</span>, <span class="const token" data-verso-hover="200">zero_add</span>, <span class="const token" data-verso-hover="201">Finset.sum_const</span>, <span class="const token" data-verso-hover="202">smul_eq_mul</span>, <span class="const token" data-verso-hover="97">mul_one</span>]</span>
+<span id="L399">      <span class="kw">have</span> hb : <span class="const token" data-verso-hover="30">beta</span> out v ≤ β := <span class="const token" data-verso-hover="203">max_le</span> hβ1 (hβ v)</span>
+<span id="L400">      <span class="kw">have</span> hL' := hL v</span>
+<span id="L401">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="204">le_total</span> ((β + <span class="nu">1</span>) ^ <span class="nu">2</span>) (L v).<span class="const token" data-verso-hover="32">card</span> <span class="kw">with</span> h | h</span>
+<span id="L402">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="205">max_eq_right</span> h]</span>
+<span id="L403">        <span class="kw">nlinarith</span></span>
+<span id="L404">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="206">max_eq_left</span> h]</span>
+<span id="L405">        <span class="kw">nlinarith</span>)</span>
+<span id="L406">  <span class="kw">refine</span> ⟨col, hrun, <span class="kw">fun</span> v =&gt; ⟨(hcol v).<span class="const token" data-verso-hover="50">1</span>, <span class="kw">fun</span> u hu he =&gt; ?_⟩⟩</span>
+<span id="L407">  <span class="kw">have</span> h2 : #{u ∈ out v | col u = col v} ≤ <span class="nu">0</span> := (hcol v).<span class="const token" data-verso-hover="52">2</span></span>
+<span id="L408">  <span class="kw">have</span> : <span class="nu">0</span> &lt; #{u ∈ out v | col u = col v} :=</span>
+<span id="L409">    <span class="const token" data-verso-hover="207">Finset.card_pos</span>.<span class="const token" data-verso-hover="84">2</span> ⟨u, <span class="const token" data-verso-hover="83">Finset.mem_filter</span>.<span class="const token" data-verso-hover="84">2</span> ⟨hu, he⟩⟩</span>
+<span id="L410">  <span class="kw">omega</span></span>
+<span id="L411"></span>
+<span id="L412"><span class="dc">/-- Section 1.1 of [FK24] (generalizing [BHL+19]): list `d`-defective colouring with lists of</span></span>
+<span id="L413"><span class="dc">size `3` from a proper `q`-colouring in `2q` rounds (with `p = 2`), whenever `d &gt; (2Δ − 3)/3`,</span></span>
+<span id="L414"><span class="dc">i.e. `2Δ &lt; 3(d + 1)`. Here the "orientation" is `out v = N(v)` (every edge in both directions),</span></span>
+<span id="L415"><span class="dc">so the output is a list defective colouring of `G`. With an initial `O(Δ)`-colouring this is the</span></span>
+<span id="L416"><span class="dc">paper's `O(Δ + log* n)`-round claim. -/</span></span>
+<span id="L417"><span class="kw">theorem</span> <span class="const token" data-verso-hover="15">twoSweep_threeColoring</span> (G : <span class="const token" data-verso-hover="39">SimpleGraph</span> V) [G.<span class="const token" data-verso-hover="40">LocallyFinite</span>] (c : V → <span class="const token" data-verso-hover="28">ℕ</span>) (q : <span class="const token" data-verso-hover="28">ℕ</span>)</span>
+<span id="L418">    (hcq : ∀ v, c v &lt; q) (hc : <span class="const token" data-verso-hover="198">IsProper</span> G c) (L : V → <span class="const token" data-verso-hover="26">Finset</span> α) (d Δ : <span class="const token" data-verso-hover="28">ℕ</span>)</span>
+<span id="L419">    (hΔ : ∀ v, G.<span class="const token" data-verso-hover="47">degree</span> v ≤ Δ) (hL : ∀ v, (L v).<span class="const token" data-verso-hover="32">card</span> = <span class="nu">3</span>) (hd : <span class="nu">2</span> * Δ &lt; <span class="nu">3</span> * (d + <span class="nu">1</span>)) :</span>
+<span id="L420">    ∃ col : V → α, (∀ v, ((<span class="const token" data-verso-hover="149">twoSweep</span> <span class="nu">2</span> q).<span class="const token" data-verso-hover="153">run</span> G</span>
+<span id="L421">        (<span class="const token" data-verso-hover="150">initState</span> (<span class="kw">fun</span> v =&gt; G.<span class="const token" data-verso-hover="42">neighborFinset</span> v) c ⟨L, <span class="kw">fun</span> _ _ =&gt; d⟩) (<span class="nu">2</span> * q) v).<span class="const token" data-verso-hover="121">col</span> =</span>
+<span id="L422">          <span class="const token" data-verso-hover="135">some</span> (col v)) ∧</span>
+<span id="L423">      <span class="const token" data-verso-hover="41">IsListDefective</span> G ⟨L, <span class="kw">fun</span> _ _ =&gt; d⟩ col := <span class="kw">by</span></span>
+<span id="L424">  <span class="kw">obtain</span> ⟨col, hrun, hcol⟩ := <span class="const token" data-verso-hover="12">twoSweep_correct_of_isProper</span> G (<span class="kw">fun</span> v =&gt; G.<span class="const token" data-verso-hover="42">neighborFinset</span> v)</span>
+<span id="L425">    (<span class="kw">fun</span> v u hu =&gt; (G.<span class="const token" data-verso-hover="107">mem_neighborFinset</span> v u).<span class="const token" data-verso-hover="80">1</span> hu) c q hcq hc ⟨L, <span class="kw">fun</span> _ _ =&gt; d⟩ <span class="nu">2</span> (<span class="kw">by</span> <span class="kw">norm_num</span>) (<span class="kw">by</span></span>
+<span id="L426">      <span class="kw">intro</span> v</span>
+<span id="L427">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="194">slack_iff_nat</span> (p := <span class="nu">2</span>) (<span class="kw">by</span> <span class="kw">norm_num</span>)]</span>
+<span id="L428">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="29">ListInstance.weight</span>, <span class="const token" data-verso-hover="201">Finset.sum_const</span>, <span class="const token" data-verso-hover="202">smul_eq_mul</span>, hL v]</span>
+<span id="L429">      <span class="kw">have</span> hb : <span class="const token" data-verso-hover="30">beta</span> (<span class="kw">fun</span> v =&gt; G.<span class="const token" data-verso-hover="42">neighborFinset</span> v) v ≤ <span class="const token" data-verso-hover="31">max</span> <span class="nu">1</span> Δ :=</span>
+<span id="L430">        <span class="const token" data-verso-hover="208">max_le_max</span> <span class="const token" data-verso-hover="173">le_rfl</span> (<span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="66">SimpleGraph.card_neighborFinset_eq_degree</span>]; <span class="kw">exact</span> hΔ v)</span>
+<span id="L431">      <span class="kw">have</span> : <span class="const token" data-verso-hover="31">max</span> (<span class="nu">2</span> ^ <span class="nu">2</span>) <span class="nu">3</span> = <span class="nu">4</span> := <span class="const token" data-verso-hover="56">rfl</span></span>
+<span id="L432">      <span class="kw">rw</span> [this]</span>
+<span id="L433">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="209">Nat.eq_zero_or_pos</span> Δ <span class="kw">with</span> h0 | h0</span>
+<span id="L434">      · <span class="kw">subst</span> h0</span>
+<span id="L435">        <span class="kw">have</span> : <span class="const token" data-verso-hover="30">beta</span> (<span class="kw">fun</span> v =&gt; G.<span class="const token" data-verso-hover="42">neighborFinset</span> v) v ≤ <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hb</span>
+<span id="L436">        <span class="kw">omega</span></span>
+<span id="L437">      · <span class="kw">have</span> : <span class="const token" data-verso-hover="30">beta</span> (<span class="kw">fun</span> v =&gt; G.<span class="const token" data-verso-hover="42">neighborFinset</span> v) v ≤ Δ := hb.<span class="const token" data-verso-hover="103">trans</span> (<span class="const token" data-verso-hover="203">max_le</span> h0 <span class="const token" data-verso-hover="173">le_rfl</span>)</span>
+<span id="L438">        <span class="kw">omega</span>)</span>
+<span id="L439">  <span class="kw">exact</span> ⟨col, hrun, hcol⟩</span>
+<span id="L440"></span>
+<span id="L441"><span class="kw">end</span> FK24</span>
+<span id="L442"></span>
+<span id="L443"><span class="kw">namespace</span> FK24</span>
+<span id="L444"></span>
+<span id="L445"><span class="kw">variable</span> {V α : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="38">DecidableEq</span> α]</span>
+<span id="L446"></span>
+<span id="L447"><span class="dc">/-- The form of Theorem 1.1 stated in the abstract of [FK24]: if all lists have size `p²` and</span></span>
+<span id="L448"><span class="dc">`∑_{x ∈ L_v} (d_v(x) + 1) &gt; p · β_v`, then two sweeps (`2q` rounds from a proper `q`-colouring)</span></span>
+<span id="L449"><span class="dc">compute an oriented list defective colouring. -/</span></span>
+<span id="L450"><span class="kw">theorem</span> <span class="const token" data-verso-hover="210">twoSweep_correct_sq</span> (G : <span class="const token" data-verso-hover="39">SimpleGraph</span> V) (out : V → <span class="const token" data-verso-hover="26">Finset</span> V)</span>
+<span id="L451">    (hout : ∀ v, ∀ u ∈ out v, G.<span class="const token" data-verso-hover="44">Adj</span> v u) (c : V → <span class="const token" data-verso-hover="28">ℕ</span>) (q : <span class="const token" data-verso-hover="28">ℕ</span>) (hcq : ∀ v, c v &lt; q)</span>
+<span id="L452">    (hc : ∀ v, ∀ u ∈ out v, c u ≠ c v) (I : <span class="const token" data-verso-hover="24">ListInstance</span> V α) (p : <span class="const token" data-verso-hover="28">ℕ</span>) (hp : <span class="nu">1</span> ≤ p)</span>
+<span id="L453">    (hL : ∀ v, (I.<span class="const token" data-verso-hover="25">L</span> v).<span class="const token" data-verso-hover="32">card</span> = p ^ <span class="nu">2</span>) (hslack : ∀ v, p * <span class="const token" data-verso-hover="30">beta</span> out v &lt; I.<span class="const token" data-verso-hover="29">weight</span> v) :</span>
+<span id="L454">    ∃ col : V → α, (∀ v, ((<span class="const token" data-verso-hover="149">twoSweep</span> p q).<span class="const token" data-verso-hover="153">run</span> G (<span class="const token" data-verso-hover="150">initState</span> out c I) (<span class="nu">2</span> * q) v).<span class="const token" data-verso-hover="121">col</span> = <span class="const token" data-verso-hover="135">some</span> (col v))</span>
+<span id="L455">      ∧ <span class="const token" data-verso-hover="37">IsOLDC</span> I out col := <span class="kw">by</span></span>
+<span id="L456">  <span class="kw">refine</span> <span class="const token" data-verso-hover="11">twoSweep_correct</span> G out hout c q hcq hc I p hp <span class="kw">fun</span> v =&gt; ?_</span>
+<span id="L457">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="194">slack_iff_nat</span> hp, hL v, <span class="const token" data-verso-hover="211">max_self</span>, <span class="const token" data-verso-hover="212">sq</span>, <span class="const token" data-verso-hover="213">mul_assoc</span>]</span>
+<span id="L458">  <span class="kw">exact</span> <span class="const token" data-verso-hover="214">Nat.mul_lt_mul_of_pos_left</span> (hslack v) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L459"></span>
+<span id="L460"><span class="kw">end</span> FK24</span>
+<span id="L461"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2024/ListDefectiveColoring/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

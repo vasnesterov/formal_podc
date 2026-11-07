@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>AtMostOnceEffectiveness: Model.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2011/">PODC 2011</a><span class="sep">›</span><a href="PODC2011/AtMostOnceEffectiveness/">AtMostOnceEffectiveness</a><span class="sep">›</span><a href="PODC2011/AtMostOnceEffectiveness/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Model</span></nav>
+        <h1>
+          <code>Model.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2011/AtMostOnceEffectiveness/">At-Most-Once with Nearly Optimal Effectiveness — PODC 2011</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2011/AtMostOnceEffectiveness/Model.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Model"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># The at-most-once problem: model</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">Sotirios Kentros, Aggelos Kiayias. *Solving the At-Most-Once Problem with Nearly Optimal</span></span>
+<span id="L7"><span class="dc">Effectiveness.* PODC 2011 (full version: arXiv 1107.2990v2, TCS 2013), Section 2.</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">`m` asynchronous crash-prone processes (`Fin m`) communicate through atomic read/write registers</span></span>
+<span id="L10"><span class="dc">(`R`, values in `V`) and perform jobs `1, …, n` (action `do_{p,j}`). Every process runs a</span></span>
+<span id="L11"><span class="dc">*deterministic* program: in local state `l` it either reads a register, writes a register, performs</span></span>
+<span id="L12"><span class="dc">a job, takes an internal step, or has terminated (`Step.halt`: no locally controlled action is</span></span>
+<span id="L13"><span class="dc">enabled). This covers the I/O-automaton formalisation of the paper for deterministic algorithms</span></span>
+<span id="L14"><span class="dc">(each process has exactly one enabled locally controlled action in every state).</span></span>
+<span id="L15"></span>
+<span id="L16"><span class="dc">* A configuration records the local states, the memory and a ghost `log` of all `do` actions.</span></span>
+<span id="L17"><span class="dc">* Finite executions are lists of process identifiers (`runFrom`); `Reachable` is the inductive</span></span>
+<span id="L18"><span class="dc">  version.</span></span>
+<span id="L19"><span class="dc">* Infinite executions (`Run`) may *stutter* (`ev k = none`), so finite executions followed by</span></span>
+<span id="L20"><span class="dc">  stuttering are runs too; a run is `Fair F` (the processes of `F` crash) if every process outside</span></span>
+<span id="L21"><span class="dc">  `F` takes a step at infinitely many times or terminates. Crashes are therefore fairness exemptions</span></span>
+<span id="L22"><span class="dc">  rather than events: a crashed process simply stops being scheduled (the paper's `stop_p`).</span></span>
+<span id="L23"><span class="dc">* `Run.Do n` is the number of jobs in `{1, …, n}` performed in the run (Definition 2.1),</span></span>
+<span id="L24"><span class="dc">  `Alg.AtMostOnce n` is Definition 2.2, `Alg.effectiveness n f` is Definition 2.4</span></span>
+<span id="L25"><span class="dc">  (the infimum of `Do` over the fair runs with at most `f` crashes).</span></span>
+<span id="L26"><span class="dc">-/</span></span>
+<span id="L27"></span>
+<span id="L28"><span class="kw">set_option</span> <span class="const token" data-verso-hover="27">linter.unusedSectionVars</span> false</span>
+<span id="L29"></span>
+<span id="L30"><span class="cm">--</span><span class="cm"> CSLib candidate: the generic at-most-once / task-allocation model (deterministic read/write</span></span>
+<span id="L31"><span class="cm">--</span><span class="cm"> processes with `do` actions, stuttering runs, crashes as fairness exemptions, effectiveness).</span></span>
+<span id="L32"><span class="kw">namespace</span> Podc.AtMostOnceEffectiveness</span>
+<span id="L33"></span>
+<span id="L34"><span class="dc">/-- What a process does next (its unique enabled locally controlled action). -/</span></span>
+<span id="L35"><span class="kw">inductive</span> <span class="const token" data-verso-hover="240">Step</span> (R V L : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L36">  <span class="dc">/-- Read register `r` and continue in local state `k v` (`v` = the value read). -/</span></span>
+<span id="L37">  | <span class="const token" data-verso-hover="243">read</span> (r : R) (k : V → L)</span>
+<span id="L38">  <span class="dc">/-- Write `v` to register `r` and continue in local state `l`. -/</span></span>
+<span id="L39">  | <span class="const token" data-verso-hover="242">write</span> (r : R) (v : V) (l : L)</span>
+<span id="L40">  <span class="dc">/-- Perform job `j` (action `do_{p,j}`) and continue in local state `l`. -/</span></span>
+<span id="L41">  | <span class="const token" data-verso-hover="245">perform</span> (j : <span class="const token" data-verso-hover="28">ℕ</span>) (l : L)</span>
+<span id="L42">  <span class="dc">/-- Internal step to local state `l`. -/</span></span>
+<span id="L43">  | <span class="const token" data-verso-hover="241">internal</span> (l : L)</span>
+<span id="L44">  <span class="dc">/-- The process has terminated: no locally controlled action is enabled. -/</span></span>
+<span id="L45">  | <span class="const token" data-verso-hover="246">halt</span></span>
+<span id="L46"></span>
+<span id="L47"><span class="dc">/-- A deterministic algorithm for `m` processes with registers `R` holding values in `V` and</span></span>
+<span id="L48"><span class="dc">local states `L`. -/</span></span>
+<span id="L49"><span class="kw">structure</span> <span class="const token" data-verso-hover="30">Alg</span> (m : <span class="const token" data-verso-hover="28">ℕ</span>) (R V L : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L50">  <span class="dc">/-- Initial values of the registers. -/</span></span>
+<span id="L51">  <span class="const token" data-verso-hover="247">memInit</span> : R → V</span>
+<span id="L52">  <span class="dc">/-- Initial local states. -/</span></span>
+<span id="L53">  <span class="const token" data-verso-hover="248">locInit</span> : <span class="const token" data-verso-hover="31">Fin</span> m → L</span>
+<span id="L54">  <span class="dc">/-- The next action of process `p` in local state `l`. -/</span></span>
+<span id="L55">  <span class="const token" data-verso-hover="249">next</span> : <span class="const token" data-verso-hover="31">Fin</span> m → L → <span class="const token" data-verso-hover="240">Step</span> R V L</span>
+<span id="L56"></span>
+<span id="L57"><span class="dc">/-- A configuration: local states, memory and the (ghost) log of performed `do` actions, in</span></span>
+<span id="L58"><span class="dc">order. -/</span></span>
+<span id="L59"><span class="kw">structure</span> <span class="const token" data-verso-hover="33">Config</span> (m : <span class="const token" data-verso-hover="28">ℕ</span>) (R V L : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L60">  <span class="dc">/-- Local states. -/</span></span>
+<span id="L61">  <span class="const token" data-verso-hover="111">loc</span> : <span class="const token" data-verso-hover="31">Fin</span> m → L</span>
+<span id="L62">  <span class="dc">/-- Register values. -/</span></span>
+<span id="L63">  <span class="const token" data-verso-hover="114">mem</span> : R → V</span>
+<span id="L64">  <span class="dc">/-- All `do_{p,j}` actions performed so far, oldest first. -/</span></span>
+<span id="L65">  <span class="const token" data-verso-hover="109">log</span> : <span class="const token" data-verso-hover="316">List</span> (<span class="const token" data-verso-hover="31">Fin</span> m × <span class="const token" data-verso-hover="28">ℕ</span>)</span>
+<span id="L66"></span>
+<span id="L67"><span class="kw">namespace</span> Alg</span>
+<span id="L68"></span>
+<span id="L69"><span class="kw">variable</span> {m : <span class="const token" data-verso-hover="28">ℕ</span>} {R V L : <span class="kw">Type</span>} (A : <span class="const token" data-verso-hover="30">Alg</span> m R V L)</span>
+<span id="L70"></span>
+<span id="L71"><span class="dc">/-- The initial configuration. -/</span></span>
+<span id="L72"><span class="kw">def</span> <span class="const token" data-verso-hover="34">init</span> : <span class="const token" data-verso-hover="33">Config</span> m R V L := ⟨A.<span class="const token" data-verso-hover="248">locInit</span>, A.<span class="const token" data-verso-hover="247">memInit</span>, []⟩</span>
+<span id="L73"></span>
+<span id="L74"><span class="dc">/-- Process `p` has terminated in `C`. -/</span></span>
+<span id="L75"><span class="kw">def</span> <span class="const token" data-verso-hover="35">Halted</span> (C : <span class="const token" data-verso-hover="33">Config</span> m R V L) (p : <span class="const token" data-verso-hover="31">Fin</span> m) : <span class="kw">Prop</span> := A.<span class="const token" data-verso-hover="249">next</span> p (C.<span class="const token" data-verso-hover="111">loc</span> p) = <span class="const token" data-verso-hover="246">.</span>halt</span>
+<span id="L76"></span>
+<span id="L77"><span class="kw">variable</span> [<span class="const token" data-verso-hover="29">DecidableEq</span> R]</span>
+<span id="L78"></span>
+<span id="L79"><span class="dc">/-- One step of process `p` (`none` if `p` has terminated). -/</span></span>
+<span id="L80"><span class="kw">def</span> <span class="const token" data-verso-hover="36">step</span> (C : <span class="const token" data-verso-hover="33">Config</span> m R V L) (p : <span class="const token" data-verso-hover="31">Fin</span> m) : <span class="const token" data-verso-hover="317">Option</span> (<span class="const token" data-verso-hover="33">Config</span> m R V L) :=</span>
+<span id="L81">  <span class="kw">match</span> A.<span class="const token" data-verso-hover="249">next</span> p (C.<span class="const token" data-verso-hover="111">loc</span> p) <span class="kw">with</span></span>
+<span id="L82">  | <span class="const token" data-verso-hover="243">.</span>read r k =&gt; <span class="const token" data-verso-hover="43">some</span> { C <span class="kw">with</span> <span class="const token" data-verso-hover="111">loc</span> := <span class="const token" data-verso-hover="244">Function.update</span> C.<span class="const token" data-verso-hover="111">loc</span> p (k (C.<span class="const token" data-verso-hover="114">mem</span> r)) }</span>
+<span id="L83">  | <span class="const token" data-verso-hover="242">.</span>write r v l =&gt; <span class="const token" data-verso-hover="43">some</span> { C <span class="kw">with</span> <span class="const token" data-verso-hover="114">mem</span> := <span class="const token" data-verso-hover="244">Function.update</span> C.<span class="const token" data-verso-hover="114">mem</span> r v,</span>
+<span id="L84">                                  <span class="const token" data-verso-hover="111">loc</span> := <span class="const token" data-verso-hover="244">Function.update</span> C.<span class="const token" data-verso-hover="111">loc</span> p l }</span>
+<span id="L85">  | <span class="const token" data-verso-hover="245">.</span>perform j l =&gt; <span class="const token" data-verso-hover="43">some</span> { C <span class="kw">with</span> <span class="const token" data-verso-hover="111">loc</span> := <span class="const token" data-verso-hover="244">Function.update</span> C.<span class="const token" data-verso-hover="111">loc</span> p l, <span class="const token" data-verso-hover="109">log</span> := C.<span class="const token" data-verso-hover="109">log</span> ++ [(p, j)] }</span>
+<span id="L86">  | <span class="const token" data-verso-hover="241">.</span>internal l =&gt; <span class="const token" data-verso-hover="43">some</span> { C <span class="kw">with</span> <span class="const token" data-verso-hover="111">loc</span> := <span class="const token" data-verso-hover="244">Function.update</span> C.<span class="const token" data-verso-hover="111">loc</span> p l }</span>
+<span id="L87">  | <span class="const token" data-verso-hover="246">.</span>halt =&gt; <span class="const token" data-verso-hover="42">none</span></span>
+<span id="L88"></span>
+<span id="L89"><span class="dc">/-- A step or a stutter (`none`). -/</span></span>
+<span id="L90"><span class="kw">def</span> <span class="const token" data-verso-hover="49">stepO</span> (C : <span class="const token" data-verso-hover="33">Config</span> m R V L) : <span class="const token" data-verso-hover="317">Option</span> (<span class="const token" data-verso-hover="31">Fin</span> m) → <span class="const token" data-verso-hover="317">Option</span> (<span class="const token" data-verso-hover="33">Config</span> m R V L)</span>
+<span id="L91">  | <span class="const token" data-verso-hover="42">none</span> =&gt; <span class="const token" data-verso-hover="43">some</span> C</span>
+<span id="L92">  | <span class="const token" data-verso-hover="43">some</span> p =&gt; A.<span class="const token" data-verso-hover="36">step</span> C p</span>
+<span id="L93"></span>
+<span id="L94"><span class="dc">/-- Run a finite schedule from `C`. -/</span></span>
+<span id="L95"><span class="kw">def</span> <span class="const token" data-verso-hover="318">runFrom</span> (C : <span class="const token" data-verso-hover="33">Config</span> m R V L) : <span class="const token" data-verso-hover="316">List</span> (<span class="const token" data-verso-hover="31">Fin</span> m) → <span class="const token" data-verso-hover="317">Option</span> (<span class="const token" data-verso-hover="33">Config</span> m R V L)</span>
+<span id="L96">  | [] =&gt; <span class="const token" data-verso-hover="43">some</span> C</span>
+<span id="L97">  | p :: α =&gt; (A.<span class="const token" data-verso-hover="36">step</span> C p).<span class="const token" data-verso-hover="319">bind</span> (<span class="kw">fun</span> C' =&gt; <span class="const token" data-verso-hover="318">runFrom</span> C' α)</span>
+<span id="L98"></span>
+<span id="L99"><span class="dc">/-- Reachable configurations (final configurations of finite executions). -/</span></span>
+<span id="L100"><span class="kw">inductive</span> <span class="const token" data-verso-hover="252">Reachable</span> : <span class="const token" data-verso-hover="33">Config</span> m R V L → <span class="kw">Prop</span></span>
+<span id="L101">  | <span class="const token" data-verso-hover="257">init</span> : <span class="const token" data-verso-hover="252">Reachable</span> A.<span class="const token" data-verso-hover="34">init</span></span>
+<span id="L102">  | <span class="const token" data-verso-hover="258">step</span> {C C' : <span class="const token" data-verso-hover="33">Config</span> m R V L} {p : <span class="const token" data-verso-hover="31">Fin</span> m} : <span class="const token" data-verso-hover="252">Reachable</span> C → A.<span class="const token" data-verso-hover="36">step</span> C p = <span class="const token" data-verso-hover="43">some</span> C' →</span>
+<span id="L103">      <span class="const token" data-verso-hover="252">Reachable</span> C'</span>
+<span id="L104"></span>
+<span id="L105"><span class="dc">/-- An infinite execution, possibly stuttering (`ev k = none`): finite executions followed by</span></span>
+<span id="L106"><span class="dc">stuttering are runs as well. -/</span></span>
+<span id="L107"><span class="kw">structure</span> <span class="const token" data-verso-hover="39">Run</span> <span class="kw">where</span></span>
+<span id="L108">  <span class="dc">/-- The configuration at time `k`. -/</span></span>
+<span id="L109">  <span class="const token" data-verso-hover="40">cfg</span> : <span class="const token" data-verso-hover="28">ℕ</span> → <span class="const token" data-verso-hover="33">Config</span> m R V L</span>
+<span id="L110">  <span class="dc">/-- The process taking the step at time `k` (`none` = no step). -/</span></span>
+<span id="L111">  <span class="const token" data-verso-hover="41">ev</span> : <span class="const token" data-verso-hover="28">ℕ</span> → <span class="const token" data-verso-hover="317">Option</span> (<span class="const token" data-verso-hover="31">Fin</span> m)</span>
+<span id="L112">  <span class="const token" data-verso-hover="44">cfg_zero</span> : <span class="const token" data-verso-hover="40">cfg</span> <span class="nu">0</span> = A.<span class="const token" data-verso-hover="34">init</span></span>
+<span id="L113">  <span class="const token" data-verso-hover="46">cfg_succ</span> : ∀ k, A.<span class="const token" data-verso-hover="49">stepO</span> (<span class="const token" data-verso-hover="40">cfg</span> k) (<span class="const token" data-verso-hover="41">ev</span> k) = <span class="const token" data-verso-hover="43">some</span> (<span class="const token" data-verso-hover="40">cfg</span> (k + <span class="nu">1</span>))</span>
+<span id="L114"></span>
+<span id="L115"><span class="dc">/-- Weak fairness with crash set `F`: every process outside `F` takes a step at infinitely many</span></span>
+<span id="L116"><span class="dc">times, or terminates. -/</span></span>
+<span id="L117"><span class="kw">def</span> <span class="const token" data-verso-hover="219">Run.Fair</span> {A : <span class="const token" data-verso-hover="30">Alg</span> m R V L} (r : A.<span class="const token" data-verso-hover="39">Run</span>) (F : <span class="const token" data-verso-hover="55">Finset</span> (<span class="const token" data-verso-hover="31">Fin</span> m)) : <span class="kw">Prop</span> :=</span>
+<span id="L118">  ∀ p, p ∉ F → ∀ k, ∃ k' ≥ k, r.<span class="const token" data-verso-hover="41">ev</span> k' = <span class="const token" data-verso-hover="43">some</span> p ∨ A.<span class="const token" data-verso-hover="35">Halted</span> (r.<span class="const token" data-verso-hover="40">cfg</span> k') p</span>
+<span id="L119"></span>
+<span id="L120"><span class="dc">/-- The jobs of `{1, …, n}` performed in `C` (`J_α` of Definition 2.1). -/</span></span>
+<span id="L121"><span class="kw">def</span> <span class="const token" data-verso-hover="199">jobs</span> (n : <span class="const token" data-verso-hover="28">ℕ</span>) (C : <span class="const token" data-verso-hover="33">Config</span> m R V L) : <span class="const token" data-verso-hover="55">Finset</span> <span class="const token" data-verso-hover="28">ℕ</span> :=</span>
+<span id="L122">  (<span class="const token" data-verso-hover="67">Finset.Icc</span> <span class="nu">1</span> n).<span class="const token" data-verso-hover="94">filter</span> (<span class="kw">fun</span> j =&gt; j ∈ C.<span class="const token" data-verso-hover="109">log</span>.<span class="const token" data-verso-hover="149">map</span> <span class="const token" data-verso-hover="150">Prod.snd</span>)</span>
+<span id="L123"></span>
+<span id="L124"><span class="dc">/-- The number of jobs performed in `C` (`Do(α)`, Definition 2.1). -/</span></span>
+<span id="L125"><span class="kw">def</span> <span class="const token" data-verso-hover="198">Do</span> (n : <span class="const token" data-verso-hover="28">ℕ</span>) (C : <span class="const token" data-verso-hover="33">Config</span> m R V L) : <span class="const token" data-verso-hover="28">ℕ</span> := (<span class="const token" data-verso-hover="199">jobs</span> n C).<span class="const token" data-verso-hover="77">card</span></span>
+<span id="L126"></span>
+<span id="L127"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L128"><span class="dc">/-- The jobs of `{1, …, n}` performed in a run. -/</span></span>
+<span id="L129"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="320">Run.jobs</span> {A : <span class="const token" data-verso-hover="30">Alg</span> m R V L} (r : A.<span class="const token" data-verso-hover="39">Run</span>) (n : <span class="const token" data-verso-hover="28">ℕ</span>) : <span class="const token" data-verso-hover="55">Finset</span> <span class="const token" data-verso-hover="28">ℕ</span> :=</span>
+<span id="L130">  (<span class="const token" data-verso-hover="67">Finset.Icc</span> <span class="nu">1</span> n).<span class="const token" data-verso-hover="94">filter</span> (<span class="kw">fun</span> j =&gt; ∃ k, j ∈ (r.<span class="const token" data-verso-hover="40">cfg</span> k).<span class="const token" data-verso-hover="109">log</span>.<span class="const token" data-verso-hover="149">map</span> <span class="const token" data-verso-hover="150">Prod.snd</span>)</span>
+<span id="L131"></span>
+<span id="L132"><span class="dc">/-- The number of jobs performed in a run (`Do(α)`, Definition 2.1). -/</span></span>
+<span id="L133"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="15">Run.Do</span> {A : <span class="const token" data-verso-hover="30">Alg</span> m R V L} (r : A.<span class="const token" data-verso-hover="39">Run</span>) (n : <span class="const token" data-verso-hover="28">ℕ</span>) : <span class="const token" data-verso-hover="28">ℕ</span> := (r.<span class="const token" data-verso-hover="320">jobs</span> n).<span class="const token" data-verso-hover="77">card</span></span>
+<span id="L134"></span>
+<span id="L135"><span class="dc">/-- Definition 2.2: the algorithm solves the at-most-once problem for the jobs `1, …, n`: in every</span></span>
+<span id="L136"><span class="dc">execution, every job is performed at most once (by all processes together). -/</span></span>
+<span id="L137"><span class="kw">def</span> <span class="const token" data-verso-hover="16">AtMostOnce</span> (n : <span class="const token" data-verso-hover="28">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L138">  ∀ C, A.<span class="const token" data-verso-hover="252">Reachable</span> C → ∀ j ∈ <span class="const token" data-verso-hover="67">Finset.Icc</span> <span class="nu">1</span> n, (C.<span class="const token" data-verso-hover="109">log</span>.<span class="const token" data-verso-hover="149">map</span> <span class="const token" data-verso-hover="150">Prod.snd</span>).<span class="const token" data-verso-hover="321">count</span> j ≤ <span class="nu">1</span></span>
+<span id="L139"></span>
+<span id="L140"><span class="dc">/-- Definition 2.4: the effectiveness `E_A(n, m, f)`, the minimum of `Do(α)` over all fair</span></span>
+<span id="L141"><span class="dc">executions with at most `f` crashes. -/</span></span>
+<span id="L142"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="17">effectiveness</span> (n f : <span class="const token" data-verso-hover="28">ℕ</span>) : <span class="const token" data-verso-hover="28">ℕ</span> :=</span>
+<span id="L143">  <span class="const token" data-verso-hover="322">sInf</span> {d | ∃ (F : <span class="const token" data-verso-hover="55">Finset</span> (<span class="const token" data-verso-hover="31">Fin</span> m)) (r : A.<span class="const token" data-verso-hover="39">Run</span>), F.<span class="const token" data-verso-hover="77">card</span> ≤ f ∧ r.<span class="const token" data-verso-hover="219">Fair</span> F ∧ r.<span class="const token" data-verso-hover="15">Do</span> n = d}</span>
+<span id="L144"></span>
+<span id="L145"><span class="dc">/-! ## Basic lemmas -/</span></span>
+<span id="L146"></span>
+<span id="L147"><span class="kw">variable</span> {A}</span>
+<span id="L148"></span>
+<span id="L149"><span class="kw">lemma</span> <span class="const token" data-verso-hover="323">step_loc_ne</span> {C C' : <span class="const token" data-verso-hover="33">Config</span> m R V L} {p q : <span class="const token" data-verso-hover="31">Fin</span> m} (h : A.<span class="const token" data-verso-hover="36">step</span> C p = <span class="const token" data-verso-hover="43">some</span> C')</span>
+<span id="L150">    (hq : q ≠ p) : C'.<span class="const token" data-verso-hover="111">loc</span> q = C.<span class="const token" data-verso-hover="111">loc</span> q := <span class="kw">by</span></span>
+<span id="L151">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="36">step</span> <span class="kw">at</span> h</span>
+<span id="L152">  <span class="kw">split</span> <span class="kw">at</span> h &lt;;&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="214">Option.some.injEq</span>, <span class="const token" data-verso-hover="324">reduceCtorEq</span>] <span class="kw">at</span> h &lt;;&gt; <span class="kw">subst</span> h &lt;;&gt;</span>
+<span id="L153">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="131">Function.update_of_ne</span> hq]</span>
+<span id="L154"></span>
+<span id="L155"><span class="kw">lemma</span> <span class="const token" data-verso-hover="259">step_log</span> {C C' : <span class="const token" data-verso-hover="33">Config</span> m R V L} {p : <span class="const token" data-verso-hover="31">Fin</span> m} (h : A.<span class="const token" data-verso-hover="36">step</span> C p = <span class="const token" data-verso-hover="43">some</span> C') :</span>
+<span id="L156">    ∃ l, C'.<span class="const token" data-verso-hover="109">log</span> = C.<span class="const token" data-verso-hover="109">log</span> ++ l := <span class="kw">by</span></span>
+<span id="L157">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="36">step</span> <span class="kw">at</span> h</span>
+<span id="L158">  <span class="kw">split</span> <span class="kw">at</span> h &lt;;&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="214">Option.some.injEq</span>, <span class="const token" data-verso-hover="324">reduceCtorEq</span>] <span class="kw">at</span> h &lt;;&gt; <span class="kw">subst</span> h &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L159"></span>
+<span id="L160"><span class="kw">lemma</span> <span class="const token" data-verso-hover="325">step_ne_none_iff</span> {C : <span class="const token" data-verso-hover="33">Config</span> m R V L} {p : <span class="const token" data-verso-hover="31">Fin</span> m} : A.<span class="const token" data-verso-hover="36">step</span> C p ≠ <span class="const token" data-verso-hover="42">none</span> ↔ ¬ A.<span class="const token" data-verso-hover="35">Halted</span> C p := <span class="kw">by</span></span>
+<span id="L161">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="36">step</span> <span class="const token" data-verso-hover="35">Halted</span></span>
+<span id="L162">  <span class="kw">split</span> &lt;;&gt; <span class="kw">simp_all</span></span>
+<span id="L163"></span>
+<span id="L164"><span class="kw">lemma</span> <span class="const token" data-verso-hover="48">step_isSome_of_not_halted</span> {C : <span class="const token" data-verso-hover="33">Config</span> m R V L} {p : <span class="const token" data-verso-hover="31">Fin</span> m} (h : ¬ A.<span class="const token" data-verso-hover="35">Halted</span> C p) :</span>
+<span id="L165">    ∃ C', A.<span class="const token" data-verso-hover="36">step</span> C p = <span class="const token" data-verso-hover="43">some</span> C' := <span class="kw">by</span></span>
+<span id="L166">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="325">step_ne_none_iff</span>] <span class="kw">at</span> h</span>
+<span id="L167">  <span class="kw">exact</span> <span class="const token" data-verso-hover="326">Option.ne_none_iff_exists'</span>.<span class="const token" data-verso-hover="256">mp</span> h</span>
+<span id="L168"></span>
+<span id="L169"><span class="kw">lemma</span> <span class="const token" data-verso-hover="327">not_halted_of_step</span> {C C' : <span class="const token" data-verso-hover="33">Config</span> m R V L} {p : <span class="const token" data-verso-hover="31">Fin</span> m} (h : A.<span class="const token" data-verso-hover="36">step</span> C p = <span class="const token" data-verso-hover="43">some</span> C') :</span>
+<span id="L170">    ¬ A.<span class="const token" data-verso-hover="35">Halted</span> C p := <span class="kw">by</span></span>
+<span id="L171">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="325">step_ne_none_iff</span>, h]; <span class="kw">simp</span></span>
+<span id="L172"></span>
+<span id="L173"><span class="kw">lemma</span> <span class="const token" data-verso-hover="328">jobs_mono</span> {n : <span class="const token" data-verso-hover="28">ℕ</span>} {C C' : <span class="const token" data-verso-hover="33">Config</span> m R V L} (h : ∃ l, C'.<span class="const token" data-verso-hover="109">log</span> = C.<span class="const token" data-verso-hover="109">log</span> ++ l) :</span>
+<span id="L174">    <span class="const token" data-verso-hover="199">jobs</span> n C ⊆ <span class="const token" data-verso-hover="199">jobs</span> n C' := <span class="kw">by</span></span>
+<span id="L175">  <span class="kw">obtain</span> ⟨l, hl⟩ := h</span>
+<span id="L176">  <span class="kw">intro</span> j hj</span>
+<span id="L177">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="199">jobs</span>, <span class="const token" data-verso-hover="201">Finset.mem_filter</span>, hl, <span class="const token" data-verso-hover="186">List.map_append</span>, <span class="const token" data-verso-hover="187">List.mem_append</span>] <span class="kw">at</span> hj ⊢</span>
+<span id="L178">  <span class="kw">exact</span> ⟨hj.<span class="const token" data-verso-hover="92">1</span>, <span class="const token" data-verso-hover="184">Or.inl</span> hj.<span class="const token" data-verso-hover="156">2</span>⟩</span>
+<span id="L179"></span>
+<span id="L180"><span class="kw">namespace</span> Run</span>
+<span id="L181"></span>
+<span id="L182"><span class="kw">variable</span> {r : A.<span class="const token" data-verso-hover="39">Run</span>}</span>
+<span id="L183"></span>
+<span id="L184"><span class="kw">lemma</span> <span class="const token" data-verso-hover="230">reachable</span> (r : A.<span class="const token" data-verso-hover="39">Run</span>) (k : <span class="const token" data-verso-hover="28">ℕ</span>) : A.<span class="const token" data-verso-hover="252">Reachable</span> (r.<span class="const token" data-verso-hover="40">cfg</span> k) := <span class="kw">by</span></span>
+<span id="L185">  <span class="kw">induction</span> k <span class="kw">with</span></span>
+<span id="L186">  | <span class="const token" data-verso-hover="208">zero</span> =&gt; <span class="kw">rw</span> [r.<span class="const token" data-verso-hover="44">cfg_zero</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="257">.</span>init</span>
+<span id="L187">  | <span class="const token" data-verso-hover="209">succ</span> k ih =&gt;</span>
+<span id="L188">    <span class="kw">have</span> h := r.<span class="const token" data-verso-hover="46">cfg_succ</span> k</span>
+<span id="L189">    <span class="kw">cases</span> hk : r.<span class="const token" data-verso-hover="41">ev</span> k <span class="kw">with</span></span>
+<span id="L190">    | <span class="const token" data-verso-hover="42">none</span> =&gt; <span class="kw">rw</span> [hk] <span class="kw">at</span> h; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="49">stepO</span>, <span class="const token" data-verso-hover="214">Option.some.injEq</span>] <span class="kw">at</span> h; <span class="kw">rw</span> [← h]; <span class="kw">exact</span> ih</span>
+<span id="L191">    | <span class="const token" data-verso-hover="43">some</span> p =&gt; <span class="kw">rw</span> [hk] <span class="kw">at</span> h; <span class="kw">exact</span> <span class="const token" data-verso-hover="258">.</span>step ih h</span>
+<span id="L192"></span>
+<span id="L193"><span class="kw">lemma</span> <span class="const token" data-verso-hover="329">log_mono</span> (r : A.<span class="const token" data-verso-hover="39">Run</span>) {k k' : <span class="const token" data-verso-hover="28">ℕ</span>} (h : k ≤ k') :</span>
+<span id="L194">    ∃ l, (r.<span class="const token" data-verso-hover="40">cfg</span> k').<span class="const token" data-verso-hover="109">log</span> = (r.<span class="const token" data-verso-hover="40">cfg</span> k).<span class="const token" data-verso-hover="109">log</span> ++ l := <span class="kw">by</span></span>
+<span id="L195">  <span class="kw">induction</span> k', h <span class="kw">using</span> <span class="const token" data-verso-hover="330">Nat.le_induction</span> <span class="kw">with</span></span>
+<span id="L196">  | base =&gt; <span class="kw">exact</span> ⟨[], <span class="kw">by</span> <span class="kw">simp</span>⟩</span>
+<span id="L197">  | <span class="const token" data-verso-hover="209">succ</span> k' _ ih =&gt;</span>
+<span id="L198">    <span class="kw">obtain</span> ⟨l, hl⟩ := ih</span>
+<span id="L199">    <span class="kw">have</span> h := r.<span class="const token" data-verso-hover="46">cfg_succ</span> k'</span>
+<span id="L200">    <span class="kw">cases</span> hk : r.<span class="const token" data-verso-hover="41">ev</span> k' <span class="kw">with</span></span>
+<span id="L201">    | <span class="const token" data-verso-hover="42">none</span> =&gt;</span>
+<span id="L202">      <span class="kw">rw</span> [hk] <span class="kw">at</span> h; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="49">stepO</span>, <span class="const token" data-verso-hover="214">Option.some.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L203">      <span class="kw">exact</span> ⟨l, <span class="kw">by</span> <span class="kw">rw</span> [← h, hl]⟩</span>
+<span id="L204">    | <span class="const token" data-verso-hover="43">some</span> p =&gt;</span>
+<span id="L205">      <span class="kw">rw</span> [hk] <span class="kw">at</span> h</span>
+<span id="L206">      <span class="kw">obtain</span> ⟨l', hl'⟩ := <span class="const token" data-verso-hover="259">step_log</span> h</span>
+<span id="L207">      <span class="kw">exact</span> ⟨l ++ l', <span class="kw">by</span> <span class="kw">rw</span> [hl', hl, <span class="const token" data-verso-hover="331">List.append_assoc</span>]⟩</span>
+<span id="L208"></span>
+<span id="L209"><span class="kw">lemma</span> <span class="const token" data-verso-hover="332">jobs_mono'</span> (r : A.<span class="const token" data-verso-hover="39">Run</span>) (n : <span class="const token" data-verso-hover="28">ℕ</span>) {k k' : <span class="const token" data-verso-hover="28">ℕ</span>} (h : k ≤ k') :</span>
+<span id="L210">    <span class="const token" data-verso-hover="199">Alg.jobs</span> n (r.<span class="const token" data-verso-hover="40">cfg</span> k) ⊆ <span class="const token" data-verso-hover="199">Alg.jobs</span> n (r.<span class="const token" data-verso-hover="40">cfg</span> k') := <span class="const token" data-verso-hover="328">jobs_mono</span> (r.<span class="const token" data-verso-hover="329">log_mono</span> h)</span>
+<span id="L211"></span>
+<span id="L212"><span class="kw">lemma</span> <span class="const token" data-verso-hover="333">jobs_cfg_subset</span> (r : A.<span class="const token" data-verso-hover="39">Run</span>) (n k : <span class="const token" data-verso-hover="28">ℕ</span>) : <span class="const token" data-verso-hover="199">Alg.jobs</span> n (r.<span class="const token" data-verso-hover="40">cfg</span> k) ⊆ r.<span class="const token" data-verso-hover="320">jobs</span> n := <span class="kw">by</span></span>
+<span id="L213">  <span class="kw">intro</span> j hj</span>
+<span id="L214">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="199">Alg.jobs</span>, <span class="const token" data-verso-hover="201">Finset.mem_filter</span>] <span class="kw">at</span> hj</span>
+<span id="L215">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="320">Run.jobs</span>, <span class="const token" data-verso-hover="201">Finset.mem_filter</span>]</span>
+<span id="L216">  <span class="kw">exact</span> ⟨hj.<span class="const token" data-verso-hover="92">1</span>, k, hj.<span class="const token" data-verso-hover="156">2</span>⟩</span>
+<span id="L217"></span>
+<span id="L218"><span class="kw">lemma</span> <span class="const token" data-verso-hover="232">do_cfg_le</span> (r : A.<span class="const token" data-verso-hover="39">Run</span>) (n k : <span class="const token" data-verso-hover="28">ℕ</span>) : <span class="const token" data-verso-hover="198">Alg.Do</span> n (r.<span class="const token" data-verso-hover="40">cfg</span> k) ≤ r.<span class="const token" data-verso-hover="15">Do</span> n :=</span>
+<span id="L219">  <span class="const token" data-verso-hover="204">Finset.card_le_card</span> (r.<span class="const token" data-verso-hover="333">jobs_cfg_subset</span> n k)</span>
+<span id="L220"></span>
+<span id="L221"><span class="dc">/-- The jobs of a run are the jobs of one of its configurations. -/</span></span>
+<span id="L222"><span class="kw">lemma</span> <span class="const token" data-verso-hover="334">exists_jobs_eq</span> (r : A.<span class="const token" data-verso-hover="39">Run</span>) (n : <span class="const token" data-verso-hover="28">ℕ</span>) : ∃ k, r.<span class="const token" data-verso-hover="320">jobs</span> n = <span class="const token" data-verso-hover="199">Alg.jobs</span> n (r.<span class="const token" data-verso-hover="40">cfg</span> k) := <span class="kw">by</span></span>
+<span id="L223">  <span class="kw">classical</span></span>
+<span id="L224">  <span class="kw">have</span> : ∀ j ∈ r.<span class="const token" data-verso-hover="320">jobs</span> n, ∃ k, j ∈ <span class="const token" data-verso-hover="199">Alg.jobs</span> n (r.<span class="const token" data-verso-hover="40">cfg</span> k) := <span class="kw">by</span></span>
+<span id="L225">    <span class="kw">intro</span> j hj</span>
+<span id="L226">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="320">Run.jobs</span>, <span class="const token" data-verso-hover="201">Finset.mem_filter</span>] <span class="kw">at</span> hj</span>
+<span id="L227">    <span class="kw">obtain</span> ⟨hj, k, hk⟩ := hj</span>
+<span id="L228">    <span class="kw">exact</span> ⟨k, <span class="const token" data-verso-hover="201">Finset.mem_filter</span>.<span class="const token" data-verso-hover="91">mpr</span> ⟨hj, hk⟩⟩</span>
+<span id="L229">  choose! t ht <span class="kw">using</span> this</span>
+<span id="L230">  <span class="kw">refine</span> ⟨(r.<span class="const token" data-verso-hover="320">jobs</span> n).<span class="const token" data-verso-hover="335">sup</span> t, ?_⟩</span>
+<span id="L231">  <span class="kw">apply</span> <span class="const token" data-verso-hover="336">Finset.Subset.antisymm</span></span>
+<span id="L232">  · <span class="kw">intro</span> j hj</span>
+<span id="L233">    <span class="kw">exact</span> r.<span class="const token" data-verso-hover="332">jobs_mono'</span> n (<span class="const token" data-verso-hover="337">Finset.le_sup</span> hj) (ht j hj)</span>
+<span id="L234">  · <span class="kw">exact</span> r.<span class="const token" data-verso-hover="333">jobs_cfg_subset</span> n _</span>
+<span id="L235"></span>
+<span id="L236"><span class="kw">lemma</span> <span class="const token" data-verso-hover="228">do_le_of_forall</span> (r : A.<span class="const token" data-verso-hover="39">Run</span>) (n b : <span class="const token" data-verso-hover="28">ℕ</span>) (h : ∀ k, <span class="const token" data-verso-hover="198">Alg.Do</span> n (r.<span class="const token" data-verso-hover="40">cfg</span> k) ≤ b) : r.<span class="const token" data-verso-hover="15">Do</span> n ≤ b := <span class="kw">by</span></span>
+<span id="L237">  <span class="kw">obtain</span> ⟨k, hk⟩ := r.<span class="const token" data-verso-hover="334">exists_jobs_eq</span> n</span>
+<span id="L238">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="15">Run.Do</span>; <span class="kw">rw</span> [hk]; <span class="kw">exact</span> h k</span>
+<span id="L239"></span>
+<span id="L240"><span class="dc">/-- After the last step, the configuration does not change. -/</span></span>
+<span id="L241"><span class="kw">lemma</span> <span class="const token" data-verso-hover="276">cfg_eq_of_stutter</span> (r : A.<span class="const token" data-verso-hover="39">Run</span>) {K : <span class="const token" data-verso-hover="28">ℕ</span>} (h : ∀ k ≥ K, r.<span class="const token" data-verso-hover="41">ev</span> k = <span class="const token" data-verso-hover="42">none</span>) :</span>
+<span id="L242">    ∀ k ≥ K, r.<span class="const token" data-verso-hover="40">cfg</span> k = r.<span class="const token" data-verso-hover="40">cfg</span> K := <span class="kw">by</span></span>
+<span id="L243">  <span class="kw">intro</span> k hk</span>
+<span id="L244">  <span class="kw">induction</span> k, hk <span class="kw">using</span> <span class="const token" data-verso-hover="330">Nat.le_induction</span> <span class="kw">with</span></span>
+<span id="L245">  | base =&gt; <span class="kw">rfl</span></span>
+<span id="L246">  | <span class="const token" data-verso-hover="209">succ</span> k hle ih =&gt;</span>
+<span id="L247">    <span class="kw">have</span> hs := r.<span class="const token" data-verso-hover="46">cfg_succ</span> k</span>
+<span id="L248">    <span class="kw">rw</span> [h k hle] <span class="kw">at</span> hs</span>
+<span id="L249">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="49">stepO</span>, <span class="const token" data-verso-hover="214">Option.some.injEq</span>] <span class="kw">at</span> hs</span>
+<span id="L250">    <span class="kw">rw</span> [← hs, ih]</span>
+<span id="L251"></span>
+<span id="L252"><span class="kw">lemma</span> <span class="const token" data-verso-hover="313">do_eq_of_stutter</span> (r : A.<span class="const token" data-verso-hover="39">Run</span>) (n : <span class="const token" data-verso-hover="28">ℕ</span>) {K : <span class="const token" data-verso-hover="28">ℕ</span>} (h : ∀ k ≥ K, r.<span class="const token" data-verso-hover="41">ev</span> k = <span class="const token" data-verso-hover="42">none</span>) :</span>
+<span id="L253">    r.<span class="const token" data-verso-hover="15">Do</span> n = <span class="const token" data-verso-hover="198">Alg.Do</span> n (r.<span class="const token" data-verso-hover="40">cfg</span> K) := <span class="kw">by</span></span>
+<span id="L254">  <span class="kw">apply</span> <span class="const token" data-verso-hover="288">le_antisymm</span></span>
+<span id="L255">  · <span class="kw">apply</span> r.<span class="const token" data-verso-hover="228">do_le_of_forall</span></span>
+<span id="L256">    <span class="kw">intro</span> k</span>
+<span id="L257">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="338">le_total</span> k K <span class="kw">with</span> hk | hk</span>
+<span id="L258">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="204">Finset.card_le_card</span> (r.<span class="const token" data-verso-hover="332">jobs_mono'</span> n hk)</span>
+<span id="L259">    · <span class="kw">rw</span> [r.<span class="const token" data-verso-hover="276">cfg_eq_of_stutter</span> h k hk]</span>
+<span id="L260">  · <span class="kw">exact</span> r.<span class="const token" data-verso-hover="232">do_cfg_le</span> n K</span>
+<span id="L261"></span>
+<span id="L262"><span class="kw">end</span> Run</span>
+<span id="L263"></span>
+<span id="L264"><span class="kw">end</span> Alg</span>
+<span id="L265"></span>
+<span id="L266"><span class="kw">end</span> Podc.AtMostOnceEffectiveness</span>
+<span id="L267"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2011/AtMostOnceEffectiveness/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

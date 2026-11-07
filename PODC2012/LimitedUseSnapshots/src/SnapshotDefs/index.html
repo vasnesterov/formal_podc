@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>LimitedUseSnapshots: SnapshotDefs.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2012/">PODC 2012</a><span class="sep">›</span><a href="PODC2012/LimitedUseSnapshots/">LimitedUseSnapshots</a><span class="sep">›</span><a href="PODC2012/LimitedUseSnapshots/src/">Lean source</a><span class="sep">›</span><span aria-current="page">SnapshotDefs</span></nav>
+        <h1>
+          <code>SnapshotDefs.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2012/LimitedUseSnapshots/">Limited-Use Atomic Snapshots — PODC 2012</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2012/LimitedUseSnapshots/SnapshotDefs.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="SnapshotDefs"><span id="L1"><span class="kw">import</span> Papers.PODC2012.LimitedUseSnapshots.Spec</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.SharedMemory.LinPoints</span>
+<span id="L3"><span class="kw">import</span> Cslib.Computability.Distributed.SharedMemory.StrongLin</span>
+<span id="L4"><span class="kw">import</span> Mathlib.Algebra.BigOperators.Group.List.Basic</span>
+<span id="L5"><span class="kw">import</span> Mathlib.Algebra.Order.Pi</span>
+<span id="L6"><span class="kw">import</span> Mathlib.Algebra.Group.Pi.Basic</span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">/-!</span></span>
+<span id="L9"><span class="dc"># Section 4 of Aspnes–Attiya–Censor-Hillel–Ellen: single-writer snapshots from max arrays</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">Aspnes, Attiya, Censor-Hillel, Ellen, *Limited-Use Atomic Snapshots with Polylogarithmic Step</span></span>
+<span id="L12"><span class="dc">Complexity* (PODC 2012 / J. ACM 62(1), 2015), Section 4, **Algorithm 3**: a single-writer snapshot</span></span>
+<span id="L13"><span class="dc">object built from 2-component max arrays (one per internal node of a binary tree whose leaves are</span></span>
+<span id="L14"><span class="dc">the processes), registers (the `view` arrays) and a max register at the root.</span></span>
+<span id="L15"></span>
+<span id="L16"><span class="dc">## Model</span></span>
+<span id="L17"></span>
+<span id="L18"><span class="dc">* Asynchronous shared memory, deterministic processes, no failures needed for safety (the model</span></span>
+<span id="L19"><span class="dc">  of CSLib, `Cslib.SharedMemory.Impl`; crashed processes are processes that stop taking steps).</span></span>
+<span id="L20"><span class="dc">* **Base objects are atomic**: the paper uses `MaxArray` as a black box (its linearizable</span></span>
+<span id="L21"><span class="dc">  implementation is Section 3), so every max array `u.ma` is one atomic `maxArrObj` (with</span></span>
+<span id="L22"><span class="dc">  unbounded components), `root.mr` is one atomic `maxRegObj` and every entry `u.view[k]` is one</span></span>
+<span id="L23"><span class="dc">  atomic register. The arrays are unbounded families indexed by `ℕ`; the bound `b` of the paper</span></span>
+<span id="L24"><span class="dc">  is recovered by `Snapshot.indices_le_updates` (all indices are at most the number of invoked</span></span>
+<span id="L25"><span class="dc">  `Update`s).</span></span>
+<span id="L26"><span class="dc">* The tree is an arbitrary binary tree `T : BTree P` whose leaves are exactly the processes</span></span>
+<span id="L27"><span class="dc">  (each once). Nodes are addressed by *reversed* paths `a : List Bool` (`[]` = root, `b :: a` =</span></span>
+<span id="L28"><span class="dc">  child `b` of node `a`, `false` = left). The paper's strict balanced tree is one instance</span></span>
+<span id="L29"><span class="dc">  (depth `⌈log₂ n⌉`, see `SnapshotCost.lean`).</span></span>
+<span id="L30"><span class="dc">* A partial snapshot (the content of `u.view[k]`) is represented by a full vector `P → V`, of which</span></span>
+<span id="L31"><span class="dc">  only the components of the leaves below `u` are meaningful; concatenation `lview · rview` is</span></span>
+<span id="L32"><span class="dc">  "take the components of left leaves from `lview`, the others from `rview`" (`concat`). A leaf</span></span>
+<span id="L33"><span class="dc">  stores the value `v` as the constant vector `fun _ =&gt; v`. All view registers initially hold the</span></span>
+<span id="L34"><span class="dc">  initial vector `v₀`, so `u.view[0]` is the concatenation of the initial values.</span></span>
+<span id="L35"><span class="dc">* `count_i` is the persistent local counter of the paper. The local assignment</span></span>
+<span id="L36"><span class="dc">  `count_i ← count_i + 1` (Line 2) is performed together with the leaf write (Line 5) instead of</span></span>
+<span id="L37"><span class="dc">  at invocation; since `count_i` is local, this is invisible to other processes.</span></span>
+<span id="L38"><span class="dc">* The single-writer discipline (`Update(s, i, v)` only by process `i`) is `Impl.allowed`.</span></span>
+<span id="L39"><span class="dc">-/</span></span>
+<span id="L40"></span>
+<span id="L41"><span class="kw">namespace</span> Podc.LimitedUseSnapshots.Snapshot</span>
+<span id="L42"></span>
+<span id="L43"><span class="kw">open</span> Cslib.SharedMemory</span>
+<span id="L44"></span>
+<span id="L45"><span class="dc">/-! ### Binary trees with processes at the leaves -/</span></span>
+<span id="L46"></span>
+<span id="L47"><span class="dc">/-- A binary tree with processes at the leaves. -/</span></span>
+<span id="L48"><span class="kw">inductive</span> <span class="const token" data-verso-hover="559">BTree</span> (P : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L49">  | <span class="const token" data-verso-hover="659">leaf</span> (p : P)</span>
+<span id="L50">  | <span class="const token" data-verso-hover="619">node</span> (l r : <span class="const token" data-verso-hover="559">BTree</span> P)</span>
+<span id="L51">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="35">DecidableEq</span></span>
+<span id="L52"></span>
+<span id="L53"><span class="kw">namespace</span> BTree</span>
+<span id="L54"></span>
+<span id="L55"><span class="kw">variable</span> {P : <span class="kw">Type</span>}</span>
+<span id="L56"></span>
+<span id="L57"><span class="dc">/-- The leaves of a tree, from left to right. -/</span></span>
+<span id="L58"><span class="kw">def</span> <span class="const token" data-verso-hover="567">leaves</span> : <span class="const token" data-verso-hover="559">BTree</span> P → <span class="const token" data-verso-hover="32">List</span> P</span>
+<span id="L59">  | <span class="const token" data-verso-hover="659">leaf</span> p =&gt; [p]</span>
+<span id="L60">  | <span class="const token" data-verso-hover="619">node</span> l r =&gt; l.<span class="const token" data-verso-hover="567">leaves</span> ++ r.<span class="const token" data-verso-hover="567">leaves</span></span>
+<span id="L61"></span>
+<span id="L62"><span class="dc">/-- Child `b` of a node (`false` = left). -/</span></span>
+<span id="L63"><span class="kw">def</span> <span class="const token" data-verso-hover="626">child</span> : <span class="const token" data-verso-hover="559">BTree</span> P → <span class="const token" data-verso-hover="33">Bool</span> → <span class="const token" data-verso-hover="53">Option</span> (<span class="const token" data-verso-hover="559">BTree</span> P)</span>
+<span id="L64">  | <span class="const token" data-verso-hover="659">leaf</span> _, _ =&gt; <span class="const token" data-verso-hover="54">none</span></span>
+<span id="L65">  | <span class="const token" data-verso-hover="619">node</span> l _, <span class="const token" data-verso-hover="69">false</span> =&gt; <span class="const token" data-verso-hover="55">some</span> l</span>
+<span id="L66">  | <span class="const token" data-verso-hover="619">node</span> _ r, <span class="const token" data-verso-hover="62">true</span> =&gt; <span class="const token" data-verso-hover="55">some</span> r</span>
+<span id="L67"></span>
+<span id="L68"><span class="dc">/-- The subtree at the reversed address `a` (`[]` = the tree itself, `b :: a` = child `b` of the</span></span>
+<span id="L69"><span class="dc">subtree at `a`). -/</span></span>
+<span id="L70"><span class="kw">def</span> <span class="const token" data-verso-hover="606">sub</span> (t : <span class="const token" data-verso-hover="559">BTree</span> P) : <span class="const token" data-verso-hover="32">List</span> <span class="const token" data-verso-hover="33">Bool</span> → <span class="const token" data-verso-hover="53">Option</span> (<span class="const token" data-verso-hover="559">BTree</span> P)</span>
+<span id="L71">  | [] =&gt; <span class="const token" data-verso-hover="55">some</span> t</span>
+<span id="L72">  | b :: a =&gt; (t.<span class="const token" data-verso-hover="606">sub</span> a).<span class="const token" data-verso-hover="705">bind</span> (<span class="kw">fun</span> u =&gt; u.<span class="const token" data-verso-hover="626">child</span> b)</span>
+<span id="L73"></span>
+<span id="L74"><span class="dc">/-- The (reversed) address of the leaf of process `j`. -/</span></span>
+<span id="L75"><span class="kw">def</span> <span class="const token" data-verso-hover="650">path</span> [<span class="const token" data-verso-hover="35">DecidableEq</span> P] : <span class="const token" data-verso-hover="559">BTree</span> P → P → <span class="const token" data-verso-hover="32">List</span> <span class="const token" data-verso-hover="33">Bool</span></span>
+<span id="L76">  | <span class="const token" data-verso-hover="659">leaf</span> _, _ =&gt; []</span>
+<span id="L77">  | <span class="const token" data-verso-hover="619">node</span> l r, j =&gt; <span class="kw">if</span> j ∈ l.<span class="const token" data-verso-hover="567">leaves</span> <span class="kw">then</span> l.<span class="const token" data-verso-hover="650">path</span> j ++ [<span class="const token" data-verso-hover="69">false</span>] <span class="kw">else</span> r.<span class="const token" data-verso-hover="650">path</span> j ++ [<span class="const token" data-verso-hover="62">true</span>]</span>
+<span id="L78"></span>
+<span id="L79"><span class="dc">/-- The depth of a tree. -/</span></span>
+<span id="L80"><span class="kw">def</span> <span class="const token" data-verso-hover="657">depth</span> : <span class="const token" data-verso-hover="559">BTree</span> P → <span class="const token" data-verso-hover="43">ℕ</span></span>
+<span id="L81">  | <span class="const token" data-verso-hover="659">leaf</span> _ =&gt; <span class="nu">0</span></span>
+<span id="L82">  | <span class="const token" data-verso-hover="619">node</span> l r =&gt; <span class="const token" data-verso-hover="367">max</span> l.<span class="const token" data-verso-hover="657">depth</span> r.<span class="const token" data-verso-hover="657">depth</span> + <span class="nu">1</span></span>
+<span id="L83"></span>
+<span id="L84"><span class="dc">/-- Well-formed trees for the process set `P`: every process is exactly one leaf. -/</span></span>
+<span id="L85"><span class="kw">structure</span> <span class="const token" data-verso-hover="594">WF</span> (t : <span class="const token" data-verso-hover="559">BTree</span> P) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L86">  <span class="const token" data-verso-hover="610">nodup</span> : t.<span class="const token" data-verso-hover="567">leaves</span>.<span class="const token" data-verso-hover="119">Nodup</span></span>
+<span id="L87">  <span class="const token" data-verso-hover="631">mem</span> : ∀ p, p ∈ t.<span class="const token" data-verso-hover="567">leaves</span></span>
+<span id="L88"></span>
+<span id="L89"><span class="dc">/-- The leaves below the node at address `a` (`[]` if there is no such node). -/</span></span>
+<span id="L90"><span class="kw">def</span> <span class="const token" data-verso-hover="706">leavesAt</span> (t : <span class="const token" data-verso-hover="559">BTree</span> P) (a : <span class="const token" data-verso-hover="32">List</span> <span class="const token" data-verso-hover="33">Bool</span>) : <span class="const token" data-verso-hover="32">List</span> P := ((t.<span class="const token" data-verso-hover="606">sub</span> a).<span class="const token" data-verso-hover="251">map</span> <span class="const token" data-verso-hover="567">leaves</span>).<span class="const token" data-verso-hover="158">getD</span> []</span>
+<span id="L91"></span>
+<span id="L92"><span class="kw">end</span> BTree</span>
+<span id="L93"></span>
+<span id="L94"><span class="dc">/-! ### The implemented object: a single-writer snapshot over arbitrary values -/</span></span>
+<span id="L95"></span>
+<span id="L96"><span class="dc">/-- Operations of a single-writer snapshot: `update i v` (only by process `i`) and `scan`. -/</span></span>
+<span id="L97"><span class="kw">inductive</span> <span class="const token" data-verso-hover="561">SOp</span> (P V : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L98">  | <span class="const token" data-verso-hover="562">update</span> (i : P) (v : V)</span>
+<span id="L99">  | <span class="const token" data-verso-hover="563">scan</span></span>
+<span id="L100">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="35">DecidableEq</span></span>
+<span id="L101"></span>
+<span id="L102"><span class="dc">/-- Sequential specification of a snapshot object with one component per process `P`, values `V`</span></span>
+<span id="L103"><span class="dc">and initial vector `v₀`. `update` returns `none` (an acknowledgement), `scan` returns `some` of</span></span>
+<span id="L104"><span class="dc">the current vector. -/</span></span>
+<span id="L105"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="565">swSnap</span> (P V : <span class="kw">Type</span>) [<span class="const token" data-verso-hover="35">DecidableEq</span> P] (v₀ : P → V) : <span class="const token" data-verso-hover="37">ObjSpec</span> <span class="kw">where</span></span>
+<span id="L106">  <span class="const token" data-verso-hover="247">State</span> := P → V</span>
+<span id="L107">  <span class="const token" data-verso-hover="248">Op</span> := <span class="const token" data-verso-hover="561">SOp</span> P V</span>
+<span id="L108">  <span class="const token" data-verso-hover="578">Resp</span> := <span class="const token" data-verso-hover="53">Option</span> (P → V)</span>
+<span id="L109">  <span class="const token" data-verso-hover="113">init</span> := v₀</span>
+<span id="L110">  <span class="const token" data-verso-hover="181">δ</span> q</span>
+<span id="L111">    | <span class="const token" data-verso-hover="562">.</span>update i v =&gt; (<span class="const token" data-verso-hover="379">Function.update</span> q i v, <span class="const token" data-verso-hover="54">none</span>)</span>
+<span id="L112">    | <span class="const token" data-verso-hover="563">.</span>scan =&gt; (q, <span class="const token" data-verso-hover="55">some</span> q)</span>
+<span id="L113"></span>
+<span id="L114"><span class="dc">/-! ### Base objects -/</span></span>
+<span id="L115"></span>
+<span id="L116"><span class="dc">/-- Base objects of Algorithm 3: the max array `ma` of the node at address `a`, the max register</span></span>
+<span id="L117"><span class="dc">`root.mr`, and the register `view[k]` of the node at address `a`. -/</span></span>
+<span id="L118"><span class="kw">inductive</span> <span class="const token" data-verso-hover="576">Obj</span> <span class="kw">where</span></span>
+<span id="L119">  | <span class="const token" data-verso-hover="620">ma</span> (a : <span class="const token" data-verso-hover="32">List</span> <span class="const token" data-verso-hover="33">Bool</span>)</span>
+<span id="L120">  | <span class="const token" data-verso-hover="618">mr</span></span>
+<span id="L121">  | <span class="const token" data-verso-hover="647">view</span> (a : <span class="const token" data-verso-hover="32">List</span> <span class="const token" data-verso-hover="33">Bool</span>) (k : <span class="const token" data-verso-hover="43">ℕ</span>)</span>
+<span id="L122">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="35">DecidableEq</span></span>
+<span id="L123"></span>
+<span id="L124"><span class="dc">/-- Specifications of the base objects. -/</span></span>
+<span id="L125"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="577">objSpec</span> (P V : <span class="kw">Type</span>) (v₀ : P → V) : <span class="const token" data-verso-hover="576">Obj</span> → <span class="const token" data-verso-hover="37">ObjSpec</span></span>
+<span id="L126">  | <span class="const token" data-verso-hover="620">.</span>ma _ =&gt; <span class="const token" data-verso-hover="58">maxArrObj</span></span>
+<span id="L127">  | <span class="const token" data-verso-hover="618">.</span>mr =&gt; <span class="const token" data-verso-hover="39">maxRegObj</span></span>
+<span id="L128">  | <span class="const token" data-verso-hover="647">.</span>view _ _ =&gt; <span class="const token" data-verso-hover="707">register</span> (P → V) v₀</span>
+<span id="L129"></span>
+<span id="L130"><span class="dc">/-! ### Local states -/</span></span>
+<span id="L131"></span>
+<span id="L132"><span class="dc">/-- Program counters of Algorithm 3 (local variables included). Every program counter performs</span></span>
+<span id="L133"><span class="dc">exactly one base-object access or returns.</span></span>
+<span id="L134"></span>
+<span id="L135"><span class="dc">* `lw v`: Line 5, write `v` into `leaf_i.view[count_i + 1]` (and increment `count_i`, Line 2);</span></span>
+<span id="L136"><span class="dc">* `up a ptr`: Lines 7–10, `MaxUpdate_b(u.parent.ma, ptr)` where `u` is the node at address</span></span>
+<span id="L137"><span class="dc">  `a = b :: p` (so `p` is the parent);</span></span>
+<span id="L138"><span class="dc">* `sc p`: Line 12, `MaxScan(ma)` at the node `p`;</span></span>
+<span id="L139"><span class="dc">* `rl p x y`, `rr p x y lv`: Lines 13–14, read the children's views;</span></span>
+<span id="L140"><span class="dc">* `wv p k val`: Line 16, write `val` into `view[k]` of node `p`;</span></span>
+<span id="L141"><span class="dc">* `wm d`: Line 18, `WriteMax(root.mr, d)`;</span></span>
+<span id="L142"><span class="dc">* `ackU`: return of `Update`;</span></span>
+<span id="L143"><span class="dc">* `s0`, `s1 c`, `retS val`: Lines 20–21 of `Scan`. -/</span></span>
+<span id="L144"><span class="kw">inductive</span> <span class="const token" data-verso-hover="683">PC</span> (P V : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L145">  | <span class="const token" data-verso-hover="583">idle</span></span>
+<span id="L146">  | <span class="const token" data-verso-hover="572">lw</span> (v : V)</span>
+<span id="L147">  | <span class="const token" data-verso-hover="581">up</span> (a : <span class="const token" data-verso-hover="32">List</span> <span class="const token" data-verso-hover="33">Bool</span>) (ptr : <span class="const token" data-verso-hover="43">ℕ</span>)</span>
+<span id="L148">  | <span class="const token" data-verso-hover="586">sc</span> (p : <span class="const token" data-verso-hover="32">List</span> <span class="const token" data-verso-hover="33">Bool</span>)</span>
+<span id="L149">  | <span class="const token" data-verso-hover="587">rl</span> (p : <span class="const token" data-verso-hover="32">List</span> <span class="const token" data-verso-hover="33">Bool</span>) (x y : <span class="const token" data-verso-hover="43">ℕ</span>)</span>
+<span id="L150">  | <span class="const token" data-verso-hover="588">rr</span> (p : <span class="const token" data-verso-hover="32">List</span> <span class="const token" data-verso-hover="33">Bool</span>) (x y : <span class="const token" data-verso-hover="43">ℕ</span>) (lv : P → V)</span>
+<span id="L151">  | <span class="const token" data-verso-hover="582">wv</span> (p : <span class="const token" data-verso-hover="32">List</span> <span class="const token" data-verso-hover="33">Bool</span>) (k : <span class="const token" data-verso-hover="43">ℕ</span>) (val : P → V)</span>
+<span id="L152">  | <span class="const token" data-verso-hover="589">wm</span> (d : <span class="const token" data-verso-hover="43">ℕ</span>)</span>
+<span id="L153">  | <span class="const token" data-verso-hover="584">ackU</span></span>
+<span id="L154">  | <span class="const token" data-verso-hover="590">s0</span></span>
+<span id="L155">  | <span class="const token" data-verso-hover="591">s1</span> (c : <span class="const token" data-verso-hover="43">ℕ</span>)</span>
+<span id="L156">  | <span class="const token" data-verso-hover="585">retS</span> (val : P → V)</span>
+<span id="L157"></span>
+<span id="L158"><span class="dc">/-- Local state: the persistent counter `count_i` and the program counter. -/</span></span>
+<span id="L159"><span class="kw">structure</span> <span class="const token" data-verso-hover="570">Loc</span> (P V : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L160">  <span class="const token" data-verso-hover="580">cnt</span> : <span class="const token" data-verso-hover="43">ℕ</span></span>
+<span id="L161">  <span class="const token" data-verso-hover="571">pc</span> : <span class="const token" data-verso-hover="683">PC</span> P V</span>
+<span id="L162"></span>
+<span id="L163"><span class="kw">variable</span> {P V : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="35">DecidableEq</span> P]</span>
+<span id="L164"></span>
+<span id="L165"><span class="dc">/-- After writing `view[k]` of the node `a`: go up (`a ≠ root`) or write the root max register. -/</span></span>
+<span id="L166"><span class="kw">def</span> <span class="const token" data-verso-hover="574">cont</span> (a : <span class="const token" data-verso-hover="32">List</span> <span class="const token" data-verso-hover="33">Bool</span>) (k : <span class="const token" data-verso-hover="43">ℕ</span>) : <span class="const token" data-verso-hover="683">PC</span> P V := <span class="kw">if</span> a = [] <span class="kw">then</span> <span class="const token" data-verso-hover="589">.</span>wm k <span class="kw">else</span> <span class="const token" data-verso-hover="581">.</span>up a k</span>
+<span id="L167"></span>
+<span id="L168"><span class="dc">/-- Concatenation of the partial snapshots of the two children of the node `p` (Line 16). -/</span></span>
+<span id="L169"><span class="kw">def</span> <span class="const token" data-verso-hover="708">concat</span> (T : <span class="const token" data-verso-hover="559">BTree</span> P) (p : <span class="const token" data-verso-hover="32">List</span> <span class="const token" data-verso-hover="33">Bool</span>) (lv rv : P → V) : P → V :=</span>
+<span id="L170">  <span class="kw">fun</span> j =&gt; <span class="kw">if</span> j ∈ T.<span class="const token" data-verso-hover="706">leavesAt</span> (<span class="const token" data-verso-hover="69">false</span> :: p) <span class="kw">then</span> lv j <span class="kw">else</span> rv j</span>
+<span id="L171"></span>
+<span id="L172"><span class="dc">/-- The next action of process `i` (Algorithm 3). -/</span></span>
+<span id="L173"><span class="kw">def</span> <span class="const token" data-verso-hover="579">act</span> (T : <span class="const token" data-verso-hover="559">BTree</span> P) (v₀ : P → V) (i : P) (l : <span class="const token" data-verso-hover="570">Loc</span> P V) :</span>
+<span id="L174">    <span class="const token" data-verso-hover="57">Action</span> (<span class="const token" data-verso-hover="565">swSnap</span> P V v₀) (<span class="const token" data-verso-hover="577">objSpec</span> P V v₀) (<span class="const token" data-verso-hover="570">Loc</span> P V) :=</span>
+<span id="L175">  <span class="kw">match</span> l.<span class="const token" data-verso-hover="571">pc</span> <span class="kw">with</span></span>
+<span id="L176">  | <span class="const token" data-verso-hover="583">.</span>idle =&gt; <span class="const token" data-verso-hover="59">.</span>ret <span class="const token" data-verso-hover="54">none</span> l</span>
+<span id="L177">  | <span class="const token" data-verso-hover="572">.</span>lw v =&gt; <span class="const token" data-verso-hover="60">.</span>access (<span class="const token" data-verso-hover="647">.</span>view (T.<span class="const token" data-verso-hover="650">path</span> i) (l.<span class="const token" data-verso-hover="580">cnt</span> + <span class="nu">1</span>)) (<span class="const token" data-verso-hover="61">RWOp.write</span> (<span class="kw">fun</span> _ =&gt; v))</span>
+<span id="L178">      (<span class="kw">fun</span> _ =&gt; ⟨l.<span class="const token" data-verso-hover="580">cnt</span> + <span class="nu">1</span>, <span class="const token" data-verso-hover="574">cont</span> (T.<span class="const token" data-verso-hover="650">path</span> i) (l.<span class="const token" data-verso-hover="580">cnt</span> + <span class="nu">1</span>)⟩)</span>
+<span id="L179">  | <span class="const token" data-verso-hover="581">.</span>up [] ptr =&gt; <span class="const token" data-verso-hover="60">.</span>access <span class="const token" data-verso-hover="618">.</span>mr (<span class="const token" data-verso-hover="73">MaxOp.writeMax</span> ptr) (<span class="kw">fun</span> _ =&gt; ⟨l.<span class="const token" data-verso-hover="580">cnt</span>, <span class="const token" data-verso-hover="584">.</span>ackU⟩)</span>
+<span id="L180">  | <span class="const token" data-verso-hover="581">.</span>up (b :: p) ptr =&gt; <span class="const token" data-verso-hover="60">.</span>access (<span class="const token" data-verso-hover="620">.</span>ma p) (<span class="kw">if</span> b <span class="kw">then</span> <span class="const token" data-verso-hover="78">MAOp.upd1</span> ptr <span class="kw">else</span> <span class="const token" data-verso-hover="77">MAOp.upd0</span> ptr)</span>
+<span id="L181">      (<span class="kw">fun</span> _ =&gt; ⟨l.<span class="const token" data-verso-hover="580">cnt</span>, <span class="const token" data-verso-hover="586">.</span>sc p⟩)</span>
+<span id="L182">  | <span class="const token" data-verso-hover="586">.</span>sc p =&gt; <span class="const token" data-verso-hover="60">.</span>access (<span class="const token" data-verso-hover="620">.</span>ma p) <span class="const token" data-verso-hover="79">MAOp.scan</span> (<span class="kw">fun</span> r =&gt; ⟨l.<span class="const token" data-verso-hover="580">cnt</span>, <span class="const token" data-verso-hover="587">.</span>rl p r.<span class="const token" data-verso-hover="88">1</span> r.<span class="const token" data-verso-hover="96">2</span>⟩)</span>
+<span id="L183">  | <span class="const token" data-verso-hover="587">.</span>rl p x y =&gt; <span class="const token" data-verso-hover="60">.</span>access (<span class="const token" data-verso-hover="647">.</span>view (<span class="const token" data-verso-hover="69">false</span> :: p) x) <span class="const token" data-verso-hover="68">RWOp.read</span> (<span class="kw">fun</span> lv =&gt; ⟨l.<span class="const token" data-verso-hover="580">cnt</span>, <span class="const token" data-verso-hover="588">.</span>rr p x y lv⟩)</span>
+<span id="L184">  | <span class="const token" data-verso-hover="588">.</span>rr p x y lv =&gt; <span class="const token" data-verso-hover="60">.</span>access (<span class="const token" data-verso-hover="647">.</span>view (<span class="const token" data-verso-hover="62">true</span> :: p) y) <span class="const token" data-verso-hover="68">RWOp.read</span></span>
+<span id="L185">      (<span class="kw">fun</span> rv =&gt; ⟨l.<span class="const token" data-verso-hover="580">cnt</span>, <span class="const token" data-verso-hover="582">.</span>wv p (x + y) (<span class="const token" data-verso-hover="708">concat</span> T p lv rv)⟩)</span>
+<span id="L186">  | <span class="const token" data-verso-hover="582">.</span>wv p k val =&gt; <span class="const token" data-verso-hover="60">.</span>access (<span class="const token" data-verso-hover="647">.</span>view p k) (<span class="const token" data-verso-hover="61">RWOp.write</span> val) (<span class="kw">fun</span> _ =&gt; ⟨l.<span class="const token" data-verso-hover="580">cnt</span>, <span class="const token" data-verso-hover="574">cont</span> p k⟩)</span>
+<span id="L187">  | <span class="const token" data-verso-hover="589">.</span>wm d =&gt; <span class="const token" data-verso-hover="60">.</span>access <span class="const token" data-verso-hover="618">.</span>mr (<span class="const token" data-verso-hover="73">MaxOp.writeMax</span> d) (<span class="kw">fun</span> _ =&gt; ⟨l.<span class="const token" data-verso-hover="580">cnt</span>, <span class="const token" data-verso-hover="584">.</span>ackU⟩)</span>
+<span id="L188">  | <span class="const token" data-verso-hover="584">.</span>ackU =&gt; <span class="const token" data-verso-hover="59">.</span>ret <span class="const token" data-verso-hover="54">none</span> ⟨l.<span class="const token" data-verso-hover="580">cnt</span>, <span class="const token" data-verso-hover="583">.</span>idle⟩</span>
+<span id="L189">  | <span class="const token" data-verso-hover="590">.</span>s0 =&gt; <span class="const token" data-verso-hover="60">.</span>access <span class="const token" data-verso-hover="618">.</span>mr <span class="const token" data-verso-hover="74">MaxOp.readMax</span> (<span class="kw">fun</span> c =&gt; ⟨l.<span class="const token" data-verso-hover="580">cnt</span>, <span class="const token" data-verso-hover="591">.</span>s1 c⟩)</span>
+<span id="L190">  | <span class="const token" data-verso-hover="591">.</span>s1 c =&gt; <span class="const token" data-verso-hover="60">.</span>access (<span class="const token" data-verso-hover="647">.</span>view [] c) <span class="const token" data-verso-hover="68">RWOp.read</span> (<span class="kw">fun</span> v =&gt; ⟨l.<span class="const token" data-verso-hover="580">cnt</span>, <span class="const token" data-verso-hover="585">.</span>retS v⟩)</span>
+<span id="L191">  | <span class="const token" data-verso-hover="585">.</span>retS v =&gt; <span class="const token" data-verso-hover="59">.</span>ret (<span class="const token" data-verso-hover="55">some</span> v) ⟨l.<span class="const token" data-verso-hover="580">cnt</span>, <span class="const token" data-verso-hover="583">.</span>idle⟩</span>
+<span id="L192"></span>
+<span id="L193"><span class="dc">/-- Initial memory: max arrays `(0, 0)`, `root.mr = 0`, every view register holds `v₀`. -/</span></span>
+<span id="L194"><span class="kw">def</span> <span class="const token" data-verso-hover="709">memInit</span> (v₀ : P → V) : (o : <span class="const token" data-verso-hover="576">Obj</span>) → (<span class="const token" data-verso-hover="577">objSpec</span> P V v₀ o).<span class="const token" data-verso-hover="247">State</span></span>
+<span id="L195">  | <span class="const token" data-verso-hover="620">.</span>ma _ =&gt; ((<span class="nu">0</span>, <span class="nu">0</span>) : <span class="const token" data-verso-hover="43">ℕ</span> × <span class="const token" data-verso-hover="43">ℕ</span>)</span>
+<span id="L196">  | <span class="const token" data-verso-hover="618">.</span>mr =&gt; (<span class="nu">0</span> : <span class="const token" data-verso-hover="43">ℕ</span>)</span>
+<span id="L197">  | <span class="const token" data-verso-hover="647">.</span>view _ _ =&gt; v₀</span>
+<span id="L198"></span>
+<span id="L199"><span class="dc">/-- Single-writer discipline: process `i` may only update component `i`. -/</span></span>
+<span id="L200"><span class="kw">def</span> <span class="const token" data-verso-hover="710">allowed</span> (i : P) : <span class="const token" data-verso-hover="561">SOp</span> P V → <span class="kw">Prop</span></span>
+<span id="L201">  | <span class="const token" data-verso-hover="562">.</span>update j _ =&gt; j = i</span>
+<span id="L202">  | <span class="const token" data-verso-hover="563">.</span>scan =&gt; <span class="const token" data-verso-hover="86">True</span></span>
+<span id="L203"></span>
+<span id="L204"><span class="const token" data-verso-hover="711">instance</span> (i : P) (o : <span class="const token" data-verso-hover="561">SOp</span> P V) : <span class="const token" data-verso-hover="131">Decidable</span> (<span class="const token" data-verso-hover="710">allowed</span> i o) := <span class="kw">by</span></span>
+<span id="L205">  <span class="kw">cases</span> o &lt;;&gt; <span class="kw">unfold</span> <span class="const token" data-verso-hover="710">allowed</span> &lt;;&gt; <span class="kw">infer_instance</span></span>
+<span id="L206"></span>
+<span id="L207"><span class="dc">/-- **Algorithm 3** of the paper, for the tree `T` and initial vector `v₀`. -/</span></span>
+<span id="L208"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="596">alg3</span> (T : <span class="const token" data-verso-hover="559">BTree</span> P) (v₀ : P → V) : <span class="const token" data-verso-hover="11">Impl</span> (<span class="const token" data-verso-hover="565">swSnap</span> P V v₀) (<span class="const token" data-verso-hover="577">objSpec</span> P V v₀) P (<span class="const token" data-verso-hover="570">Loc</span> P V) <span class="kw">where</span></span>
+<span id="L209">  <span class="const token" data-verso-hover="81">memInit</span> := <span class="const token" data-verso-hover="709">memInit</span> v₀</span>
+<span id="L210">  <span class="const token" data-verso-hover="82">locInit</span> _ := ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="583">.</span>idle⟩</span>
+<span id="L211">  <span class="const token" data-verso-hover="83">invoke</span> _ l o := <span class="kw">match</span> o <span class="kw">with</span></span>
+<span id="L212">    | <span class="const token" data-verso-hover="562">.</span>update _ v =&gt; ⟨l.<span class="const token" data-verso-hover="580">cnt</span>, <span class="const token" data-verso-hover="572">.</span>lw v⟩</span>
+<span id="L213">    | <span class="const token" data-verso-hover="563">.</span>scan =&gt; ⟨l.<span class="const token" data-verso-hover="580">cnt</span>, <span class="const token" data-verso-hover="590">.</span>s0⟩</span>
+<span id="L214">  <span class="const token" data-verso-hover="84">act</span> := <span class="const token" data-verso-hover="579">act</span> T v₀</span>
+<span id="L215">  <span class="const token" data-verso-hover="85">allowed</span> := <span class="const token" data-verso-hover="710">allowed</span></span>
+<span id="L216"></span>
+<span id="L217"><span class="kw">end</span> Podc.LimitedUseSnapshots.Snapshot</span>
+<span id="L218"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2012/LimitedUseSnapshots/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

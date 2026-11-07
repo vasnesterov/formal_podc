@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ByzantineVectorConsensus: Iterative.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2013/">PODC 2013</a><span class="sep">›</span><a href="PODC2013/ByzantineVectorConsensus/">ByzantineVectorConsensus</a><span class="sep">›</span><a href="PODC2013/ByzantineVectorConsensus/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Iterative</span></nav>
+        <h1>
+          <code>Iterative.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2013/ByzantineVectorConsensus/">Byzantine Vector Consensus in Complete Graphs — PODC 2013</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2013/ByzantineVectorConsensus/Iterative.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Iterative"><span id="L1"><span class="kw">import</span> Papers.PODC2013.ByzantineVectorConsensus.Spec</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.ApproxConsensus.Contraction</span>
+<span id="L3"><span class="kw">import</span> Cslib.Foundations.Algebra.Order.BigOperators.Average</span>
+<span id="L4"><span class="kw">import</span> Cslib.Foundations.Data.Finset.Quorum</span>
+<span id="L5"><span class="kw">import</span> Cslib.Foundations.Data.Real.Logb</span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">/-!</span></span>
+<span id="L8"><span class="dc"># The iterative approximate BVC algorithm (Section 3.2, Theorem 5; Section 4, Theorem 6)</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">The paper's asynchronous algorithm runs in asynchronous rounds. In round `r + 1`, every correct</span></span>
+<span id="L11"><span class="dc">process `i` obtains (by Component #1 of the Abraham–Amit–Dolev algorithm, used as a black box) a</span></span>
+<span id="L12"><span class="dc">set `B_i[r+1]` of tuples `(p_k, w_k)` with at most one tuple per process (Property 2), with</span></span>
+<span id="L13"><span class="dc">`w_k = v_k[r]` for correct `p_k` (Property 3), such that any two correct processes share at least</span></span>
+<span id="L14"><span class="dc">`n - f` identical tuples (Property 1). It then sets `v_i[r+1]` to the average of one</span></span>
+<span id="L15"><span class="dc">deterministically chosen point of `Γ(Φ(C))` for every `C ⊆ B_i[r+1]` with `|C| = n - f`.</span></span>
+<span id="L16"></span>
+<span id="L17"><span class="dc">We formalize the algorithm on the level of these round exchanges, exactly as the paper's proof</span></span>
+<span id="L18"><span class="dc">does: a `RoundExec` records the adversary's choices (faulty set, inputs, the sets `B`, and the values</span></span>
+<span id="L19"><span class="dc">in the tuples of faulty processes, which may differ between receivers); the states are computed</span></span>
+<span id="L20"><span class="dc">(`RoundExec.state`). Property 2 is built into the representation (`B` is a set of processes and</span></span>
+<span id="L21"><span class="dc">the tuple values are a function of the sender), Property 3 into `recvWith` (tuples of correct</span></span>
+<span id="L22"><span class="dc">senders carry their current state), and Properties 1 and "`|B_i| ≥ n - f`" are the hypotheses</span></span>
+<span id="L23"><span class="dc">`RoundExec.Valid f s` with subset size `s`. **The implementation of Component #1 (reliable</span></span>
+<span id="L24"><span class="dc">broadcast + witnesses, [AAD04]) is not formalized**: Theorem 5 is proved for every execution in</span></span>
+<span id="L25"><span class="dc">which Component #1 delivers sets with Properties 1–3, as in the paper.</span></span>
+<span id="L26"></span>
+<span id="L27"><span class="dc">The subset size `s` is a parameter: `s = n - f` is the paper's Section 3.2 algorithm; the restricted</span></span>
+<span id="L28"><span class="dc">round structures of Section 4 are the instances `s = n - f` (synchronous, `B_i` = all processes)</span></span>
+<span id="L29"><span class="dc">and `s = n - 3f` (asynchronous, `B_i` = the first `n - f` round messages); see</span></span>
+<span id="L30"><span class="dc">`theorem_6_sync`, `theorem_6_async`.</span></span>
+<span id="L31"></span>
+<span id="L32"><span class="dc">Main results:</span></span>
+<span id="L33"><span class="dc">* `RoundExec.state_mem_convexHull` — validity (Part I and Part III of the proof of Theorem 5);</span></span>
+<span id="L34"><span class="dc">* `RoundExec.contraction` — inequality (12) (Part II and Appendix E), with</span></span>
+<span id="L35"><span class="dc">  `γ = 1 / (n · C(n, s))` (equation (11) for `s = n - f`);</span></span>
+<span id="L36"><span class="dc">* `RoundExec.agreement_bound`, `RoundExec.approx_agreement` and `theorem_5`.</span></span>
+<span id="L37"><span class="dc">-/</span></span>
+<span id="L38"></span>
+<span id="L39"><span class="kw">open</span> Finset Module Cslib.ApproxConsensus</span>
+<span id="L40"></span>
+<span id="L41"><span class="kw">namespace</span> ByzantineVectorConsensus</span>
+<span id="L42"></span>
+<span id="L43"><span class="kw">set_option</span> <span class="const token" data-verso-hover="38">linter.unusedSectionVars</span> false</span>
+<span id="L44"></span>
+<span id="L45"><span class="kw">variable</span> {P : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="39">Fintype</span> P] [<span class="const token" data-verso-hover="40">DecidableEq</span> P] {d : <span class="const token" data-verso-hover="41">ℕ</span>}</span>
+<span id="L46"></span>
+<span id="L47"><span class="dc">/-! ### Auxiliary real-arithmetic lemmas -/</span></span>
+<span id="L48"></span>
+<span id="L49"><span class="dc">/-- If a point is a convex combination of the points of `F` (at most `n` of them), all with</span></span>
+<span id="L50"><span class="dc">`l`-th coordinate in `[a, b]`, then some point `u ∈ F` has weight `≥ 1 / n`; hence the</span></span>
+<span id="L51"><span class="dc">`l`-th coordinate of the point is at most `b - (b - u_l) / n` and at least `a + (u_l - a) / n`.</span></span>
+<span id="L52"><span class="dc">(The "weight `≥ 1/m`" observation after Definition 1 of the paper.) -/</span></span>
+<span id="L53"><span class="kw">theorem</span> <span class="const token" data-verso-hover="159">exists_heavy</span> {F : <span class="const token" data-verso-hover="64">Finset</span> (<span class="const token" data-verso-hover="43">Vec</span> d)} {z : <span class="const token" data-verso-hover="43">Vec</span> d} (hz : z ∈ <span class="const token" data-verso-hover="67">convexHull</span> <span class="const token" data-verso-hover="63">ℝ</span> (F : <span class="const token" data-verso-hover="65">Set</span> (<span class="const token" data-verso-hover="43">Vec</span> d)))</span>
+<span id="L54">    {n : <span class="const token" data-verso-hover="41">ℕ</span>} (hn : F.<span class="const token" data-verso-hover="50">card</span> ≤ n) (l : <span class="const token" data-verso-hover="105">Fin</span> d) {a b : <span class="const token" data-verso-hover="63">ℝ</span>} (hab : ∀ u ∈ F, a ≤ u l ∧ u l ≤ b) :</span>
+<span id="L55">    ∃ u ∈ F, z l ≤ b - (b - u l) / n ∧ a + (u l - a) / n ≤ z l := <span class="kw">by</span></span>
+<span id="L56">  <span class="kw">obtain</span> ⟨w, hw0, hw1, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="160">Finset.mem_convexHull'</span>.<span class="const token" data-verso-hover="59">1</span> hz</span>
+<span id="L57">  <span class="kw">have</span> hne : F.<span class="const token" data-verso-hover="161">Nonempty</span> := <span class="kw">by</span></span>
+<span id="L58">    <span class="kw">by_contra</span> h</span>
+<span id="L59">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="162">Finset.not_nonempty_iff_eq_empty</span>] <span class="kw">at</span> h</span>
+<span id="L60">    <span class="kw">simp</span> [h] <span class="kw">at</span> hw1</span>
+<span id="L61">  <span class="kw">have</span> hcard : (<span class="nu">0</span> : <span class="const token" data-verso-hover="63">ℝ</span>) &lt; F.<span class="const token" data-verso-hover="50">card</span> := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> hne.<span class="const token" data-verso-hover="163">card_pos</span></span>
+<span id="L62">  <span class="kw">obtain</span> ⟨u, huF, hu⟩ := <span class="const token" data-verso-hover="164">Finset.exists_le_of_sum_le</span> hne</span>
+<span id="L63">    (f := <span class="kw">fun</span> _ =&gt; (<span class="nu">1</span> : <span class="const token" data-verso-hover="63">ℝ</span>) / F.<span class="const token" data-verso-hover="50">card</span>) (g := w) (<span class="kw">by</span></span>
+<span id="L64">      <span class="kw">rw</span> [hw1, <span class="const token" data-verso-hover="117">Finset.sum_const</span>, <span class="const token" data-verso-hover="165">nsmul_eq_mul</span>]; <span class="kw">field_simp</span>; <span class="kw">rfl</span>)</span>
+<span id="L65">  <span class="kw">have</span> hun : (<span class="nu">1</span> : <span class="const token" data-verso-hover="63">ℝ</span>) / n ≤ w u := <span class="kw">by</span></span>
+<span id="L66">    <span class="kw">refine</span> <span class="const token" data-verso-hover="166">le_trans</span> ?_ hu</span>
+<span id="L67">    <span class="kw">exact</span> <span class="const token" data-verso-hover="167">one_div_le_one_div_of_le</span> hcard (<span class="kw">by</span> <span class="kw">exact_mod_cast</span> hn)</span>
+<span id="L68">  <span class="kw">have</span> hzl : (∑ y ∈ F, w y • y) l = ∑ y ∈ F, w y * y l := <span class="kw">by</span></span>
+<span id="L69">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="168">Finset.sum_apply</span>, <span class="const token" data-verso-hover="169">smul_eq_mul</span>]</span>
+<span id="L70">  <span class="kw">refine</span> ⟨u, huF, ?_, ?_⟩</span>
+<span id="L71">  · <span class="kw">have</span> h3 : (b - u l) / n ≤ w u * (b - u l) := <span class="kw">by</span></span>
+<span id="L72">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="170">div_eq_mul_one_div</span>, <span class="const token" data-verso-hover="136">mul_comm</span>]</span>
+<span id="L73">      <span class="kw">exact</span> <span class="const token" data-verso-hover="171">mul_le_mul_of_nonneg_right</span> hun (<span class="kw">by</span> <span class="kw">linarith</span> [(hab u huF).<span class="const token" data-verso-hover="87">2</span>])</span>
+<span id="L74">    <span class="kw">rw</span> [hzl]</span>
+<span id="L75">    <span class="kw">linarith</span> [<span class="const token" data-verso-hover="172">Finset.sum_mul_le_sub_mul_sub</span> hw0 hw1 (<span class="kw">fun</span> y hy =&gt; (hab y hy).<span class="const token" data-verso-hover="87">2</span>) huF]</span>
+<span id="L76">  · <span class="kw">have</span> h3 : (u l - a) / n ≤ w u * (u l - a) := <span class="kw">by</span></span>
+<span id="L77">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="170">div_eq_mul_one_div</span>, <span class="const token" data-verso-hover="136">mul_comm</span>]</span>
+<span id="L78">      <span class="kw">exact</span> <span class="const token" data-verso-hover="171">mul_le_mul_of_nonneg_right</span> hun (<span class="kw">by</span> <span class="kw">linarith</span> [(hab u huF).<span class="const token" data-verso-hover="86">1</span>])</span>
+<span id="L79">    <span class="kw">rw</span> [hzl]</span>
+<span id="L80">    <span class="kw">linarith</span> [<span class="const token" data-verso-hover="173">Finset.add_mul_sub_le_sum_mul</span> hw0 hw1 (<span class="kw">fun</span> y hy =&gt; (hab y hy).<span class="const token" data-verso-hover="86">1</span>) huF]</span>
+<span id="L81"></span>
+<span id="L82"><span class="dc">/-- Averaging: if all `x_i ≤ b` and `x_{i₀} ≤ b - δ₀`, the average is `≤ b - δ₀ / |S|`. -/</span></span>
+<span id="L83"><span class="kw">theorem</span> <span class="const token" data-verso-hover="174">avg_le</span> {ι : <span class="kw">Type</span>*} {S : <span class="const token" data-verso-hover="64">Finset</span> ι} {x : ι → <span class="const token" data-verso-hover="63">ℝ</span>} {b δ₀ : <span class="const token" data-verso-hover="63">ℝ</span>} {i₀ : ι} (hi₀ : i₀ ∈ S)</span>
+<span id="L84">    (hx : ∀ i ∈ S, x i ≤ b) (h0 : x i₀ ≤ b - δ₀) :</span>
+<span id="L85">    ((S.<span class="const token" data-verso-hover="50">card</span> : <span class="const token" data-verso-hover="63">ℝ</span>))⁻¹ * ∑ i ∈ S, x i ≤ b - δ₀ / S.<span class="const token" data-verso-hover="50">card</span> := <span class="kw">by</span></span>
+<span id="L86">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="175">inv_mul_eq_div</span>]</span>
+<span id="L87">  <span class="kw">refine</span> (<span class="const token" data-verso-hover="176">Finset.sum_div_card_le_sub_div</span> hx hi₀ <span class="const token" data-verso-hover="177">le_rfl</span>).<span class="const token" data-verso-hover="76">trans</span> ?_</span>
+<span id="L88">  <span class="kw">gcongr</span></span>
+<span id="L89">  <span class="kw">linarith</span></span>
+<span id="L90"></span>
+<span id="L91"><span class="dc">/-- Averaging, lower bound version. -/</span></span>
+<span id="L92"><span class="kw">theorem</span> <span class="const token" data-verso-hover="178">le_avg</span> {ι : <span class="kw">Type</span>*} {S : <span class="const token" data-verso-hover="64">Finset</span> ι} {x : ι → <span class="const token" data-verso-hover="63">ℝ</span>} {a δ₀ : <span class="const token" data-verso-hover="63">ℝ</span>} {i₀ : ι} (hi₀ : i₀ ∈ S)</span>
+<span id="L93">    (hx : ∀ i ∈ S, a ≤ x i) (h0 : a + δ₀ ≤ x i₀) :</span>
+<span id="L94">    a + δ₀ / S.<span class="const token" data-verso-hover="50">card</span> ≤ ((S.<span class="const token" data-verso-hover="50">card</span> : <span class="const token" data-verso-hover="63">ℝ</span>))⁻¹ * ∑ i ∈ S, x i := <span class="kw">by</span></span>
+<span id="L95">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="175">inv_mul_eq_div</span>]</span>
+<span id="L96">  <span class="kw">refine</span> <span class="const token" data-verso-hover="166">le_trans</span> ?_ (<span class="const token" data-verso-hover="179">Finset.add_div_le_sum_div_card</span> hx hi₀ <span class="const token" data-verso-hover="177">le_rfl</span>)</span>
+<span id="L97">  <span class="kw">gcongr</span></span>
+<span id="L98">  <span class="kw">linarith</span></span>
+<span id="L99"></span>
+<span id="L100"><span class="dc">/-- The number of rounds after which the paper's algorithm terminates:</span></span>
+<span id="L101"><span class="dc">`1 + ⌈log_{1/q} (D / ε)⌉` with `q = 1 - γ` and `D = U - ν`, is enough: `q^R · D &lt; ε`. -/</span></span>
+<span id="L102"><span class="kw">theorem</span> <span class="const token" data-verso-hover="4">rounds_spec</span> {q D ε : <span class="const token" data-verso-hover="63">ℝ</span>} (hq0 : <span class="nu">0</span> ≤ q) (hq1 : q &lt; <span class="nu">1</span>) (hε : <span class="nu">0</span> &lt; ε) :</span>
+<span id="L103">    q ^ (<span class="nu">1</span> + ⌈<span class="const token" data-verso-hover="180">Real.logb</span> (<span class="nu">1</span> / q) (D / ε)⌉₊) * D &lt; ε := <span class="kw">by</span></span>
+<span id="L104">  <span class="kw">set</span> R := <span class="nu">1</span> + ⌈<span class="const token" data-verso-hover="180">Real.logb</span> (<span class="nu">1</span> / q) (D / ε)⌉₊</span>
+<span id="L105">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="181">le_or_gt</span> D <span class="nu">0</span> <span class="kw">with</span> hD | hD</span>
+<span id="L106">  · <span class="kw">nlinarith</span> [<span class="const token" data-verso-hover="182">pow_nonneg</span> hq0 R]</span>
+<span id="L107">  <span class="kw">rcases</span> hq0.<span class="const token" data-verso-hover="183">eq_or_lt</span> <span class="kw">with</span> hq | hq</span>
+<span id="L108">  · <span class="kw">subst</span> hq; <span class="kw">simp</span> [R, hε]</span>
+<span id="L109">  <span class="kw">have</span> h := <span class="const token" data-verso-hover="184">Real.pow_natCeil_logb_inv_div_mul_le</span> hq hq1 D hε</span>
+<span id="L110">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="185">one_div</span>] <span class="kw">at</span> h</span>
+<span id="L111">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="186">pow_add</span>, <span class="const token" data-verso-hover="187">pow_one</span>, <span class="const token" data-verso-hover="188">mul_assoc</span>]</span>
+<span id="L112">  <span class="kw">nlinarith</span></span>
+<span id="L113"></span>
+<span id="L114"><span class="dc">/-! ### Executions of the round-based algorithm -/</span></span>
+<span id="L115"></span>
+<span id="L116"><span class="dc">/-- The adversary's choices in an execution of the round-based algorithm. -/</span></span>
+<span id="L117"><span class="kw">structure</span> <span class="const token" data-verso-hover="10">RoundExec</span> (P : <span class="kw">Type</span>*) (d : <span class="const token" data-verso-hover="41">ℕ</span>) <span class="kw">where</span></span>
+<span id="L118">  <span class="dc">/-- The faulty processes. -/</span></span>
+<span id="L119">  <span class="const token" data-verso-hover="189">faulty</span> : <span class="const token" data-verso-hover="64">Finset</span> P</span>
+<span id="L120">  <span class="dc">/-- The inputs. -/</span></span>
+<span id="L121">  <span class="const token" data-verso-hover="190">inp</span> : P → <span class="const token" data-verso-hover="43">Vec</span> d</span>
+<span id="L122">  <span class="dc">/-- `B r i`: the processes whose tuples correct process `i` obtained in round `r + 1`. -/</span></span>
+<span id="L123">  <span class="const token" data-verso-hover="191">B</span> : <span class="const token" data-verso-hover="41">ℕ</span> → P → <span class="const token" data-verso-hover="64">Finset</span> P</span>
+<span id="L124">  <span class="dc">/-- `byz r i k`: the value in the tuple of the faulty process `k` obtained by `i` in round</span></span>
+<span id="L125"><span class="dc">  `r + 1` (may differ between receivers). -/</span></span>
+<span id="L126">  <span class="const token" data-verso-hover="192">byz</span> : <span class="const token" data-verso-hover="41">ℕ</span> → P → P → <span class="const token" data-verso-hover="43">Vec</span> d</span>
+<span id="L127"></span>
+<span id="L128"><span class="kw">namespace</span> RoundExec</span>
+<span id="L129"></span>
+<span id="L130"><span class="kw">variable</span> (f s : <span class="const token" data-verso-hover="41">ℕ</span>) (E : <span class="const token" data-verso-hover="10">RoundExec</span> P d)</span>
+<span id="L131"></span>
+<span id="L132"><span class="dc">/-- The correct processes. -/</span></span>
+<span id="L133"><span class="kw">def</span> <span class="const token" data-verso-hover="193">correct</span> : <span class="const token" data-verso-hover="64">Finset</span> P := <span class="const token" data-verso-hover="45">univ</span>.<span class="const token" data-verso-hover="118">filter</span> <span class="kw">fun</span> k =&gt; k ∉ E.<span class="const token" data-verso-hover="189">faulty</span></span>
+<span id="L134"></span>
+<span id="L135"><span class="dc">/-- The values in the tuples obtained by `i` in round `r + 1`, given the states `v` at the end of</span></span>
+<span id="L136"><span class="dc">round `r`: correct senders carry their state (Property 3). -/</span></span>
+<span id="L137"><span class="kw">def</span> <span class="const token" data-verso-hover="194">recvWith</span> (v : P → <span class="const token" data-verso-hover="43">Vec</span> d) (r : <span class="const token" data-verso-hover="41">ℕ</span>) (i k : P) : <span class="const token" data-verso-hover="43">Vec</span> d :=</span>
+<span id="L138">  <span class="kw">if</span> k ∈ E.<span class="const token" data-verso-hover="189">faulty</span> <span class="kw">then</span> E.<span class="const token" data-verso-hover="192">byz</span> r i k <span class="kw">else</span> v k</span>
+<span id="L139"></span>
+<span id="L140"><span class="dc">/-- Step 2 of the algorithm: the average, over all `C ⊆ B` with `|C| = s`, of the chosen point</span></span>
+<span id="L141"><span class="dc">of `Γ(Φ(C))` (equation (9)). -/</span></span>
+<span id="L142"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="195">update</span> (B : <span class="const token" data-verso-hover="64">Finset</span> P) (w : P → <span class="const token" data-verso-hover="43">Vec</span> d) : <span class="const token" data-verso-hover="43">Vec</span> d :=</span>
+<span id="L143">  (((B.<span class="const token" data-verso-hover="66">powersetCard</span> s).<span class="const token" data-verso-hover="50">card</span> : <span class="const token" data-verso-hover="63">ℝ</span>))⁻¹ • ∑ C ∈ B.<span class="const token" data-verso-hover="66">powersetCard</span> s, <span class="const token" data-verso-hover="44">gammaPt</span> f C w</span>
+<span id="L144"></span>
+<span id="L145"><span class="dc">/-- The state `v_i[r]` of every process at the end of round `r` (meaningful for correct `i`). -/</span></span>
+<span id="L146"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="196">state</span> : <span class="const token" data-verso-hover="41">ℕ</span> → P → <span class="const token" data-verso-hover="43">Vec</span> d</span>
+<span id="L147">  | <span class="nu">0</span> =&gt; E.<span class="const token" data-verso-hover="190">inp</span></span>
+<span id="L148">  | r + <span class="nu">1</span> =&gt; <span class="kw">fun</span> i =&gt; <span class="const token" data-verso-hover="195">update</span> f s (E.<span class="const token" data-verso-hover="191">B</span> r i) (E.<span class="const token" data-verso-hover="194">recvWith</span> (<span class="const token" data-verso-hover="196">state</span> r) r i)</span>
+<span id="L149"></span>
+<span id="L150"><span class="dc">/-- The hypotheses on the round exchange (Properties 1–3 of AAD Component #1, Property 2 and 3 being</span></span>
+<span id="L151"><span class="dc">built into the representation), with subset size `s`. -/</span></span>
+<span id="L152"><span class="kw">structure</span> <span class="const token" data-verso-hover="11">Valid</span> : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L153">  <span class="const token" data-verso-hover="197">card_faulty</span> : E.<span class="const token" data-verso-hover="189">faulty</span>.<span class="const token" data-verso-hover="50">card</span> ≤ f</span>
+<span id="L154">  <span class="dc">/-- every correct process obtains at least `s` tuples -/</span></span>
+<span id="L155">  <span class="const token" data-verso-hover="198">card_B</span> : ∀ r, ∀ i ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, s ≤ (E.<span class="const token" data-verso-hover="191">B</span> r i).<span class="const token" data-verso-hover="50">card</span></span>
+<span id="L156">  <span class="dc">/-- Property 1: any two correct processes share `s` identical tuples -/</span></span>
+<span id="L157">  <span class="const token" data-verso-hover="199">common</span> : ∀ r, ∀ i ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, ∀ j ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, ∃ C ⊆ E.<span class="const token" data-verso-hover="191">B</span> r i ∩ E.<span class="const token" data-verso-hover="191">B</span> r j, C.<span class="const token" data-verso-hover="50">card</span> = s ∧</span>
+<span id="L158">    ∀ k ∈ C, k ∈ E.<span class="const token" data-verso-hover="189">faulty</span> → E.<span class="const token" data-verso-hover="192">byz</span> r i k = E.<span class="const token" data-verso-hover="192">byz</span> r j k</span>
+<span id="L159"></span>
+<span id="L160"><span class="kw">variable</span> {f s E}</span>
+<span id="L161"></span>
+<span id="L162"><span class="kw">theorem</span> <span class="const token" data-verso-hover="200">mem_correct</span> {k : P} : k ∈ E.<span class="const token" data-verso-hover="193">correct</span> ↔ k ∉ E.<span class="const token" data-verso-hover="189">faulty</span> := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="193">correct</span>]</span>
+<span id="L163"></span>
+<span id="L164"><span class="kw">theorem</span> <span class="const token" data-verso-hover="201">card_correct</span> (hV : E.<span class="const token" data-verso-hover="11">Valid</span> f s) : <span class="const token" data-verso-hover="47">Fintype.card</span> P - f ≤ E.<span class="const token" data-verso-hover="193">correct</span>.<span class="const token" data-verso-hover="50">card</span> :=</span>
+<span id="L165">  <span class="const token" data-verso-hover="202">card_sub_le_card_filter_notMem</span> hV.<span class="const token" data-verso-hover="197">card_faulty</span></span>
+<span id="L166"></span>
+<span id="L167"><span class="dc">/-- **Part I**: every point added to `Z_i` is *valid*, i.e. in the hull of the round-`r` states</span></span>
+<span id="L168"><span class="dc">of the correct processes. -/</span></span>
+<span id="L169"><span class="kw">theorem</span> <span class="const token" data-verso-hover="203">gammaPt_mem_hull</span> (hV : E.<span class="const token" data-verso-hover="11">Valid</span> f s) (hs : (d + <span class="nu">1</span>) * f &lt; s) (r : <span class="const token" data-verso-hover="41">ℕ</span>) (i : P) {C : <span class="const token" data-verso-hover="64">Finset</span> P}</span>
+<span id="L170">    (hC : C.<span class="const token" data-verso-hover="50">card</span> = s) :</span>
+<span id="L171">    <span class="const token" data-verso-hover="44">gammaPt</span> f C (E.<span class="const token" data-verso-hover="194">recvWith</span> (E.<span class="const token" data-verso-hover="196">state</span> f s r) r i) ∈</span>
+<span id="L172">      <span class="const token" data-verso-hover="67">convexHull</span> <span class="const token" data-verso-hover="63">ℝ</span> (E.<span class="const token" data-verso-hover="196">state</span> f s r '' (E.<span class="const token" data-verso-hover="193">correct</span> : <span class="const token" data-verso-hover="65">Set</span> P)) := <span class="kw">by</span></span>
+<span id="L173">  <span class="kw">have</span> hmem := <span class="const token" data-verso-hover="51">gammaPt_mem</span> (f := f) (C := C) (E.<span class="const token" data-verso-hover="194">recvWith</span> (E.<span class="const token" data-verso-hover="196">state</span> f s r) r i)</span>
+<span id="L174">    (<span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="52">finrank_fin_fun</span>, hC]; <span class="kw">exact</span> hs)</span>
+<span id="L175">  <span class="kw">set</span> T := C.<span class="const token" data-verso-hover="118">filter</span> <span class="kw">fun</span> k =&gt; k ∉ E.<span class="const token" data-verso-hover="189">faulty</span></span>
+<span id="L176">  <span class="kw">have</span> hT : C.<span class="const token" data-verso-hover="50">card</span> - f ≤ T.<span class="const token" data-verso-hover="50">card</span> := <span class="kw">by</span></span>
+<span id="L177">    <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="151">card_filter_add_card_filter_not</span> (s := C) (<span class="kw">fun</span> q =&gt; q ∉ E.<span class="const token" data-verso-hover="189">faulty</span>)</span>
+<span id="L178">    <span class="kw">have</span> h2 : (C.<span class="const token" data-verso-hover="118">filter</span> <span class="kw">fun</span> q =&gt; ¬ q ∉ E.<span class="const token" data-verso-hover="189">faulty</span>).<span class="const token" data-verso-hover="50">card</span> ≤ f := <span class="kw">by</span></span>
+<span id="L179">      <span class="kw">refine</span> <span class="const token" data-verso-hover="166">le_trans</span> (<span class="const token" data-verso-hover="91">card_le_card</span> <span class="kw">fun</span> k hk =&gt; ?_) hV.<span class="const token" data-verso-hover="197">card_faulty</span></span>
+<span id="L180">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="141">mem_filter</span>, <span class="const token" data-verso-hover="204">not_not</span>] <span class="kw">at</span> hk; <span class="kw">exact</span> hk.<span class="const token" data-verso-hover="87">2</span></span>
+<span id="L181">    <span class="kw">simp</span> only [T]; <span class="kw">omega</span></span>
+<span id="L182">  <span class="kw">have</span> := <span class="const token" data-verso-hover="54">GammaOn_subset_convexHull</span> (<span class="const token" data-verso-hover="205">filter_subset</span> _ C) hT hmem</span>
+<span id="L183">  <span class="kw">refine</span> <span class="const token" data-verso-hover="56">convexHull_mono</span> ?_ this</span>
+<span id="L184">  <span class="kw">rintro</span> _ ⟨k, hk, <span class="kw">rfl</span>⟩</span>
+<span id="L185">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="154">coe_filter</span>, <span class="const token" data-verso-hover="113">Set.mem_ofPred_eq</span>] <span class="kw">at</span> hk</span>
+<span id="L186">  <span class="kw">refine</span> ⟨k, <span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="200">mem_correct</span>] <span class="kw">using</span> hk.<span class="const token" data-verso-hover="87">2</span>, ?_⟩</span>
+<span id="L187">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="194">recvWith</span>, hk.<span class="const token" data-verso-hover="87">2</span>]</span>
+<span id="L188"></span>
+<span id="L189"><span class="kw">theorem</span> <span class="const token" data-verso-hover="206">powersetCard_nonempty'</span> (hV : E.<span class="const token" data-verso-hover="11">Valid</span> f s) (r : <span class="const token" data-verso-hover="41">ℕ</span>) {i : P} (hi : i ∉ E.<span class="const token" data-verso-hover="189">faulty</span>) :</span>
+<span id="L190">    (E.<span class="const token" data-verso-hover="191">B</span> r i |&gt;.<span class="const token" data-verso-hover="66">powersetCard</span> s).<span class="const token" data-verso-hover="161">Nonempty</span> :=</span>
+<span id="L191">  <span class="const token" data-verso-hover="207">powersetCard_nonempty</span>.<span class="const token" data-verso-hover="93">2</span> (hV.<span class="const token" data-verso-hover="198">card_B</span> r i hi)</span>
+<span id="L192"></span>
+<span id="L193"><span class="dc">/-- Observation 3 (first half): the new state of a correct process is valid. -/</span></span>
+<span id="L194"><span class="kw">theorem</span> <span class="const token" data-verso-hover="208">state_succ_mem_hull</span> (hV : E.<span class="const token" data-verso-hover="11">Valid</span> f s) (hs : (d + <span class="nu">1</span>) * f &lt; s) (r : <span class="const token" data-verso-hover="41">ℕ</span>) {i : P}</span>
+<span id="L195">    (hi : i ∉ E.<span class="const token" data-verso-hover="189">faulty</span>) :</span>
+<span id="L196">    E.<span class="const token" data-verso-hover="196">state</span> f s (r + <span class="nu">1</span>) i ∈ <span class="const token" data-verso-hover="67">convexHull</span> <span class="const token" data-verso-hover="63">ℝ</span> (E.<span class="const token" data-verso-hover="196">state</span> f s r '' (E.<span class="const token" data-verso-hover="193">correct</span> : <span class="const token" data-verso-hover="65">Set</span> P)) := <span class="kw">by</span></span>
+<span id="L197">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="196">state</span>, <span class="const token" data-verso-hover="195">update</span>]</span>
+<span id="L198">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="209">Finset.smul_sum</span>]</span>
+<span id="L199">  <span class="kw">refine</span> (<span class="const token" data-verso-hover="81">convex_convexHull</span> <span class="const token" data-verso-hover="63">ℝ</span> _).<span class="const token" data-verso-hover="210">sum_mem</span> (<span class="kw">fun</span> _ _ =&gt; <span class="kw">by</span> <span class="kw">positivity</span>) ?_</span>
+<span id="L200">    <span class="kw">fun</span> C hC =&gt; <span class="const token" data-verso-hover="203">gammaPt_mem_hull</span> hV hs r i (<span class="const token" data-verso-hover="69">mem_powersetCard</span>.<span class="const token" data-verso-hover="59">1</span> hC).<span class="const token" data-verso-hover="87">2</span></span>
+<span id="L201">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="117">Finset.sum_const</span>, <span class="const token" data-verso-hover="165">nsmul_eq_mul</span>]</span>
+<span id="L202">  <span class="kw">have</span> : (<span class="nu">0</span> : <span class="const token" data-verso-hover="63">ℝ</span>) &lt; ((E.<span class="const token" data-verso-hover="191">B</span> r i).<span class="const token" data-verso-hover="66">powersetCard</span> s).<span class="const token" data-verso-hover="50">card</span> := <span class="kw">by</span></span>
+<span id="L203">    <span class="kw">exact_mod_cast</span> (<span class="const token" data-verso-hover="206">powersetCard_nonempty'</span> hV r hi).<span class="const token" data-verso-hover="163">card_pos</span></span>
+<span id="L204">  <span class="kw">field_simp</span></span>
+<span id="L205"></span>
+<span id="L206"><span class="dc">/-- **Validity** (Part III of the proof of Theorem 5): the state of every correct process is</span></span>
+<span id="L207"><span class="dc">always in the convex hull of the inputs of the correct processes. -/</span></span>
+<span id="L208"><span class="kw">theorem</span> <span class="const token" data-verso-hover="25">state_mem_convexHull</span> (hV : E.<span class="const token" data-verso-hover="11">Valid</span> f s) (hs : (d + <span class="nu">1</span>) * f &lt; s) (r : <span class="const token" data-verso-hover="41">ℕ</span>) {i : P}</span>
+<span id="L209">    (hi : i ∉ E.<span class="const token" data-verso-hover="189">faulty</span>) :</span>
+<span id="L210">    E.<span class="const token" data-verso-hover="196">state</span> f s r i ∈ <span class="const token" data-verso-hover="67">convexHull</span> <span class="const token" data-verso-hover="63">ℝ</span> (E.<span class="const token" data-verso-hover="190">inp</span> '' (E.<span class="const token" data-verso-hover="193">correct</span> : <span class="const token" data-verso-hover="65">Set</span> P)) := <span class="kw">by</span></span>
+<span id="L211">  <span class="kw">have</span> key : ∀ r, <span class="const token" data-verso-hover="67">convexHull</span> <span class="const token" data-verso-hover="63">ℝ</span> (E.<span class="const token" data-verso-hover="196">state</span> f s r '' (E.<span class="const token" data-verso-hover="193">correct</span> : <span class="const token" data-verso-hover="65">Set</span> P)) ⊆</span>
+<span id="L212">      <span class="const token" data-verso-hover="67">convexHull</span> <span class="const token" data-verso-hover="63">ℝ</span> (E.<span class="const token" data-verso-hover="190">inp</span> '' (E.<span class="const token" data-verso-hover="193">correct</span> : <span class="const token" data-verso-hover="65">Set</span> P)) := <span class="kw">by</span></span>
+<span id="L213">    <span class="kw">intro</span> r</span>
+<span id="L214">    <span class="kw">induction</span> r <span class="kw">with</span></span>
+<span id="L215">    | <span class="const token" data-verso-hover="211">zero</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="177">le_rfl</span></span>
+<span id="L216">    | <span class="const token" data-verso-hover="212">succ</span> r ih =&gt;</span>
+<span id="L217">      <span class="kw">refine</span> <span class="const token" data-verso-hover="111">convexHull_min</span> ?_ (<span class="const token" data-verso-hover="81">convex_convexHull</span> <span class="const token" data-verso-hover="63">ℝ</span> _)</span>
+<span id="L218">      <span class="kw">rintro</span> _ ⟨k, hk, <span class="kw">rfl</span>⟩</span>
+<span id="L219">      <span class="kw">exact</span> ih (<span class="const token" data-verso-hover="208">state_succ_mem_hull</span> hV hs r (<span class="const token" data-verso-hover="200">mem_correct</span>.<span class="const token" data-verso-hover="59">1</span> hk))</span>
+<span id="L220">  <span class="kw">exact</span> key r (<span class="const token" data-verso-hover="94">subset_convexHull</span> <span class="const token" data-verso-hover="63">ℝ</span> _ ⟨i, <span class="const token" data-verso-hover="200">mem_correct</span>.<span class="const token" data-verso-hover="93">2</span> hi, <span class="const token" data-verso-hover="95">rfl</span>⟩)</span>
+<span id="L221"></span>
+<span id="L222"><span class="dc">/-- Points of the hull of a set whose `l`-th coordinates lie in `[a, b]` have their `l`-th</span></span>
+<span id="L223"><span class="dc">coordinate in `[a, b]`. -/</span></span>
+<span id="L224"><span class="kw">theorem</span> <span class="const token" data-verso-hover="213">coord_mem_of_mem_hull</span> {X : <span class="const token" data-verso-hover="65">Set</span> (<span class="const token" data-verso-hover="43">Vec</span> d)} {z : <span class="const token" data-verso-hover="43">Vec</span> d} (hz : z ∈ <span class="const token" data-verso-hover="67">convexHull</span> <span class="const token" data-verso-hover="63">ℝ</span> X) (l : <span class="const token" data-verso-hover="105">Fin</span> d)</span>
+<span id="L225">    {a b : <span class="const token" data-verso-hover="63">ℝ</span>} (hX : ∀ u ∈ X, a ≤ u l ∧ u l ≤ b) : a ≤ z l ∧ z l ≤ b := <span class="kw">by</span></span>
+<span id="L226">  <span class="kw">have</span> hconv : <span class="const token" data-verso-hover="109">Convex</span> <span class="const token" data-verso-hover="63">ℝ</span> {w : <span class="const token" data-verso-hover="43">Vec</span> d | a ≤ w l ∧ w l ≤ b} :=</span>
+<span id="L227">    (<span class="const token" data-verso-hover="214">convex_Icc</span> a b).<span class="const token" data-verso-hover="215">linear_preimage</span> (<span class="const token" data-verso-hover="216">LinearMap.proj</span> (R := <span class="const token" data-verso-hover="63">ℝ</span>) (φ := <span class="kw">fun</span> _ : <span class="const token" data-verso-hover="105">Fin</span> d =&gt; <span class="const token" data-verso-hover="63">ℝ</span>) l)</span>
+<span id="L228">  <span class="kw">exact</span> <span class="const token" data-verso-hover="111">convexHull_min</span> (<span class="kw">fun</span> u hu =&gt; hX u hu) hconv hz</span>
+<span id="L229"></span>
+<span id="L230"><span class="dc">/-- The contraction factor `γ = 1 / (n · C(n, s))` (equation (11) for `s = n - f`). -/</span></span>
+<span id="L231"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="217">gam</span> (n s : <span class="const token" data-verso-hover="41">ℕ</span>) : <span class="const token" data-verso-hover="63">ℝ</span> := <span class="nu">1</span> / ((n : <span class="const token" data-verso-hover="63">ℝ</span>) * (n.<span class="const token" data-verso-hover="218">choose</span> s))</span>
+<span id="L232"></span>
+<span id="L233"><span class="dc">/-- **Inequality (12)** (Part II of the proof of Theorem 5 and Appendix E): if the round-`r`</span></span>
+<span id="L234"><span class="dc">states of the correct processes have `l`-th coordinates in `[a, b]`, then after round `r + 1` any</span></span>
+<span id="L235"><span class="dc">two correct processes differ by at most `(1 - γ)(b - a)` in coordinate `l`. -/</span></span>
+<span id="L236"><span class="kw">theorem</span> <span class="const token" data-verso-hover="26">contraction</span> (hV : E.<span class="const token" data-verso-hover="11">Valid</span> f s) (hs : (d + <span class="nu">1</span>) * f &lt; s) (r : <span class="const token" data-verso-hover="41">ℕ</span>) (l : <span class="const token" data-verso-hover="105">Fin</span> d) {a b : <span class="const token" data-verso-hover="63">ℝ</span>}</span>
+<span id="L237">    (hab : ∀ k ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, a ≤ E.<span class="const token" data-verso-hover="196">state</span> f s r k l ∧ E.<span class="const token" data-verso-hover="196">state</span> f s r k l ≤ b) {i j : P}</span>
+<span id="L238">    (hi : i ∉ E.<span class="const token" data-verso-hover="189">faulty</span>) (hj : j ∉ E.<span class="const token" data-verso-hover="189">faulty</span>) :</span>
+<span id="L239">    E.<span class="const token" data-verso-hover="196">state</span> f s (r + <span class="nu">1</span>) i l - E.<span class="const token" data-verso-hover="196">state</span> f s (r + <span class="nu">1</span>) j l ≤</span>
+<span id="L240">      (<span class="nu">1</span> - <span class="const token" data-verso-hover="217">gam</span> (<span class="const token" data-verso-hover="47">Fintype.card</span> P) s) * (b - a) := <span class="kw">by</span></span>
+<span id="L241">  <span class="kw">set</span> n := <span class="const token" data-verso-hover="47">Fintype.card</span> P</span>
+<span id="L242">  <span class="kw">set</span> F := E.<span class="const token" data-verso-hover="193">correct</span>.<span class="const token" data-verso-hover="219">image</span> (E.<span class="const token" data-verso-hover="196">state</span> f s r)</span>
+<span id="L243">  <span class="kw">have</span> hFn : F.<span class="const token" data-verso-hover="50">card</span> ≤ n := <span class="const token" data-verso-hover="220">card_image_le</span>.<span class="const token" data-verso-hover="76">trans</span> (<span class="const token" data-verso-hover="221">card_le_univ</span> _)</span>
+<span id="L244">  <span class="kw">have</span> hF : ∀ u ∈ F, a ≤ u l ∧ u l ≤ b := <span class="kw">by</span></span>
+<span id="L245">    <span class="kw">intro</span> u hu</span>
+<span id="L246">    <span class="kw">obtain</span> ⟨k, hk, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="222">mem_image</span>.<span class="const token" data-verso-hover="59">1</span> hu</span>
+<span id="L247">    <span class="kw">exact</span> hab k (<span class="const token" data-verso-hover="200">mem_correct</span>.<span class="const token" data-verso-hover="59">1</span> hk)</span>
+<span id="L248">  <span class="kw">have</span> hFset : (F : <span class="const token" data-verso-hover="65">Set</span> (<span class="const token" data-verso-hover="43">Vec</span> d)) = E.<span class="const token" data-verso-hover="196">state</span> f s r '' (E.<span class="const token" data-verso-hover="193">correct</span> : <span class="const token" data-verso-hover="65">Set</span> P) := <span class="kw">by</span> <span class="kw">simp</span> [F]</span>
+<span id="L249">  <span class="cm">--</span><span class="cm"> the common point `z_ij`</span></span>
+<span id="L250">  <span class="kw">obtain</span> ⟨C₀, hC₀, hC₀card, hC₀byz⟩ := hV.<span class="const token" data-verso-hover="199">common</span> r i hi j hj</span>
+<span id="L251">  <span class="kw">have</span> hz : <span class="const token" data-verso-hover="44">gammaPt</span> f C₀ (E.<span class="const token" data-verso-hover="194">recvWith</span> (E.<span class="const token" data-verso-hover="196">state</span> f s r) r i) =</span>
+<span id="L252">      <span class="const token" data-verso-hover="44">gammaPt</span> f C₀ (E.<span class="const token" data-verso-hover="194">recvWith</span> (E.<span class="const token" data-verso-hover="196">state</span> f s r) r j) :=</span>
+<span id="L253">    <span class="const token" data-verso-hover="103">gammaPt_congr</span> <span class="kw">fun</span> k hk =&gt; <span class="kw">by</span></span>
+<span id="L254">      <span class="kw">by_cases</span> hkf : k ∈ E.<span class="const token" data-verso-hover="189">faulty</span></span>
+<span id="L255">      · <span class="kw">simp</span> [<span class="const token" data-verso-hover="194">recvWith</span>, hkf, hC₀byz k hk hkf]</span>
+<span id="L256">      · <span class="kw">simp</span> [<span class="const token" data-verso-hover="194">recvWith</span>, hkf]</span>
+<span id="L257">  <span class="kw">set</span> z := <span class="const token" data-verso-hover="44">gammaPt</span> f C₀ (E.<span class="const token" data-verso-hover="194">recvWith</span> (E.<span class="const token" data-verso-hover="196">state</span> f s r) r i)</span>
+<span id="L258">  <span class="kw">have</span> hzmem : z ∈ <span class="const token" data-verso-hover="67">convexHull</span> <span class="const token" data-verso-hover="63">ℝ</span> (F : <span class="const token" data-verso-hover="65">Set</span> (<span class="const token" data-verso-hover="43">Vec</span> d)) := <span class="kw">by</span></span>
+<span id="L259">    <span class="kw">rw</span> [hFset]; <span class="kw">exact</span> <span class="const token" data-verso-hover="203">gammaPt_mem_hull</span> hV hs r i hC₀card</span>
+<span id="L260">  <span class="kw">obtain</span> ⟨u, huF, hzu1, hzu2⟩ := <span class="const token" data-verso-hover="159">exists_heavy</span> hzmem hFn l hF</span>
+<span id="L261">  <span class="kw">have</span> hu := hF u huF</span>
+<span id="L262">  <span class="cm">--</span><span class="cm"> the sizes of `Z_i`, `Z_j`</span></span>
+<span id="L263">  <span class="kw">have</span> hn0 : (<span class="nu">0</span> : <span class="const token" data-verso-hover="63">ℝ</span>) &lt; n := <span class="kw">by</span></span>
+<span id="L264">    <span class="kw">have</span> := hV.<span class="const token" data-verso-hover="198">card_B</span> r i hi</span>
+<span id="L265">    <span class="kw">have</span> := <span class="const token" data-verso-hover="221">card_le_univ</span> (E.<span class="const token" data-verso-hover="191">B</span> r i)</span>
+<span id="L266">    <span class="kw">have</span> : <span class="nu">0</span> &lt; s := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L267">    <span class="kw">exact_mod_cast</span> (<span class="kw">show</span> <span class="nu">0</span> &lt; n <span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L268">  <span class="kw">have</span> hγ : ∀ k ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, <span class="const token" data-verso-hover="217">gam</span> n s ≤ <span class="nu">1</span> / (n * ((E.<span class="const token" data-verso-hover="191">B</span> r k).<span class="const token" data-verso-hover="66">powersetCard</span> s).<span class="const token" data-verso-hover="50">card</span>) := <span class="kw">by</span></span>
+<span id="L269">    <span class="kw">intro</span> k hk</span>
+<span id="L270">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="223">card_powersetCard</span>]</span>
+<span id="L271">    <span class="kw">have</span> h1 : (<span class="nu">0</span> : <span class="const token" data-verso-hover="63">ℝ</span>) &lt; (E.<span class="const token" data-verso-hover="191">B</span> r k).<span class="const token" data-verso-hover="50">card</span>.<span class="const token" data-verso-hover="218">choose</span> s := <span class="kw">by</span></span>
+<span id="L272">      <span class="kw">exact_mod_cast</span> <span class="const token" data-verso-hover="224">Nat.choose_pos</span> (hV.<span class="const token" data-verso-hover="198">card_B</span> r k hk)</span>
+<span id="L273">    <span class="kw">have</span> h2 : ((E.<span class="const token" data-verso-hover="191">B</span> r k).<span class="const token" data-verso-hover="50">card</span>.<span class="const token" data-verso-hover="218">choose</span> s : <span class="const token" data-verso-hover="63">ℝ</span>) ≤ n.<span class="const token" data-verso-hover="218">choose</span> s := <span class="kw">by</span></span>
+<span id="L274">      <span class="kw">exact_mod_cast</span> <span class="const token" data-verso-hover="225">Nat.choose_le_choose</span> s (<span class="const token" data-verso-hover="221">card_le_univ</span> _)</span>
+<span id="L275">    <span class="kw">exact</span> <span class="const token" data-verso-hover="167">one_div_le_one_div_of_le</span> (<span class="kw">by</span> <span class="kw">positivity</span>) (<span class="kw">by</span> <span class="kw">gcongr</span>)</span>
+<span id="L276">  <span class="kw">have</span> hcoord : ∀ k, (E.<span class="const token" data-verso-hover="196">state</span> f s (r + <span class="nu">1</span>) k) l = (((E.<span class="const token" data-verso-hover="191">B</span> r k).<span class="const token" data-verso-hover="66">powersetCard</span> s).<span class="const token" data-verso-hover="50">card</span> : <span class="const token" data-verso-hover="63">ℝ</span>)⁻¹ *</span>
+<span id="L277">      ∑ C ∈ (E.<span class="const token" data-verso-hover="191">B</span> r k).<span class="const token" data-verso-hover="66">powersetCard</span> s, (<span class="const token" data-verso-hover="44">gammaPt</span> f C (E.<span class="const token" data-verso-hover="194">recvWith</span> (E.<span class="const token" data-verso-hover="196">state</span> f s r) r k)) l := <span class="kw">by</span></span>
+<span id="L278">    <span class="kw">intro</span> k</span>
+<span id="L279">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="196">state</span>, <span class="const token" data-verso-hover="195">update</span>, <span class="const token" data-verso-hover="168">Finset.sum_apply</span>, <span class="const token" data-verso-hover="169">smul_eq_mul</span>]</span>
+<span id="L280">  <span class="kw">have</span> hall : ∀ k ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, ∀ C ∈ (E.<span class="const token" data-verso-hover="191">B</span> r k).<span class="const token" data-verso-hover="66">powersetCard</span> s,</span>
+<span id="L281">      a ≤ (<span class="const token" data-verso-hover="44">gammaPt</span> f C (E.<span class="const token" data-verso-hover="194">recvWith</span> (E.<span class="const token" data-verso-hover="196">state</span> f s r) r k)) l ∧</span>
+<span id="L282">        (<span class="const token" data-verso-hover="44">gammaPt</span> f C (E.<span class="const token" data-verso-hover="194">recvWith</span> (E.<span class="const token" data-verso-hover="196">state</span> f s r) r k)) l ≤ b := <span class="kw">by</span></span>
+<span id="L283">    <span class="kw">intro</span> k _ C hC</span>
+<span id="L284">    <span class="kw">refine</span> <span class="const token" data-verso-hover="213">coord_mem_of_mem_hull</span> (<span class="const token" data-verso-hover="203">gammaPt_mem_hull</span> hV hs r k (<span class="const token" data-verso-hover="69">mem_powersetCard</span>.<span class="const token" data-verso-hover="59">1</span> hC).<span class="const token" data-verso-hover="87">2</span>) l ?_</span>
+<span id="L285">    <span class="kw">rintro</span> _ ⟨m, hm, <span class="kw">rfl</span>⟩</span>
+<span id="L286">    <span class="kw">exact</span> hab m (<span class="const token" data-verso-hover="200">mem_correct</span>.<span class="const token" data-verso-hover="59">1</span> hm)</span>
+<span id="L287">  <span class="kw">have</span> hC₀i : C₀ ∈ (E.<span class="const token" data-verso-hover="191">B</span> r i).<span class="const token" data-verso-hover="66">powersetCard</span> s :=</span>
+<span id="L288">    <span class="const token" data-verso-hover="69">mem_powersetCard</span>.<span class="const token" data-verso-hover="93">2</span> ⟨hC₀.<span class="const token" data-verso-hover="76">trans</span> <span class="const token" data-verso-hover="226">inter_subset_left</span>, hC₀card⟩</span>
+<span id="L289">  <span class="kw">have</span> hC₀j : C₀ ∈ (E.<span class="const token" data-verso-hover="191">B</span> r j).<span class="const token" data-verso-hover="66">powersetCard</span> s :=</span>
+<span id="L290">    <span class="const token" data-verso-hover="69">mem_powersetCard</span>.<span class="const token" data-verso-hover="93">2</span> ⟨hC₀.<span class="const token" data-verso-hover="76">trans</span> <span class="const token" data-verso-hover="227">inter_subset_right</span>, hC₀card⟩</span>
+<span id="L291">  <span class="cm">--</span><span class="cm"> upper bound for `i`, lower bound for `j`</span></span>
+<span id="L292">  <span class="kw">set</span> Ni := ((E.<span class="const token" data-verso-hover="191">B</span> r i).<span class="const token" data-verso-hover="66">powersetCard</span> s).<span class="const token" data-verso-hover="50">card</span></span>
+<span id="L293">  <span class="kw">set</span> Nj := ((E.<span class="const token" data-verso-hover="191">B</span> r j).<span class="const token" data-verso-hover="66">powersetCard</span> s).<span class="const token" data-verso-hover="50">card</span></span>
+<span id="L294">  <span class="kw">have</span> hNi : (<span class="nu">0</span> : <span class="const token" data-verso-hover="63">ℝ</span>) &lt; Ni := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> (<span class="const token" data-verso-hover="206">powersetCard_nonempty'</span> hV r hi).<span class="const token" data-verso-hover="163">card_pos</span></span>
+<span id="L295">  <span class="kw">have</span> hNj : (<span class="nu">0</span> : <span class="const token" data-verso-hover="63">ℝ</span>) &lt; Nj := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> (<span class="const token" data-verso-hover="206">powersetCard_nonempty'</span> hV r hj).<span class="const token" data-verso-hover="163">card_pos</span></span>
+<span id="L296">  <span class="kw">have</span> hi' : E.<span class="const token" data-verso-hover="196">state</span> f s (r + <span class="nu">1</span>) i l ≤ b - <span class="const token" data-verso-hover="217">gam</span> n s * (b - u l) := <span class="kw">by</span></span>
+<span id="L297">    <span class="kw">rw</span> [hcoord]</span>
+<span id="L298">    <span class="kw">refine</span> (<span class="const token" data-verso-hover="174">avg_le</span> hC₀i (<span class="kw">fun</span> C hC =&gt; (hall i hi C hC).<span class="const token" data-verso-hover="87">2</span>) hzu1).<span class="const token" data-verso-hover="76">trans</span> ?_</span>
+<span id="L299">    <span class="kw">have</span> := hγ i hi</span>
+<span id="L300">    <span class="kw">have</span> h1 : (b - u l) / n / Ni = <span class="nu">1</span> / (n * Ni) * (b - u l) := <span class="kw">by</span> <span class="kw">field_simp</span></span>
+<span id="L301">    <span class="kw">rw</span> [h1]</span>
+<span id="L302">    <span class="kw">nlinarith</span> [hu.<span class="const token" data-verso-hover="87">2</span>]</span>
+<span id="L303">  <span class="kw">have</span> hj' : a + <span class="const token" data-verso-hover="217">gam</span> n s * (u l - a) ≤ E.<span class="const token" data-verso-hover="196">state</span> f s (r + <span class="nu">1</span>) j l := <span class="kw">by</span></span>
+<span id="L304">    <span class="kw">rw</span> [hcoord]</span>
+<span id="L305">    <span class="kw">refine</span> <span class="const token" data-verso-hover="166">le_trans</span> ?_ (<span class="const token" data-verso-hover="178">le_avg</span> hC₀j (<span class="kw">fun</span> C hC =&gt; (hall j hj C hC).<span class="const token" data-verso-hover="86">1</span>) (<span class="kw">by</span> <span class="kw">rw</span> [← hz]; <span class="kw">exact</span> hzu2))</span>
+<span id="L306">    <span class="kw">have</span> := hγ j hj</span>
+<span id="L307">    <span class="kw">have</span> h1 : (u l - a) / n / Nj = <span class="nu">1</span> / (n * Nj) * (u l - a) := <span class="kw">by</span> <span class="kw">field_simp</span></span>
+<span id="L308">    <span class="kw">rw</span> [h1]</span>
+<span id="L309">    <span class="kw">nlinarith</span> [hu.<span class="const token" data-verso-hover="86">1</span>]</span>
+<span id="L310">  <span class="kw">nlinarith</span></span>
+<span id="L311"></span>
+<span id="L312"><span class="kw">theorem</span> <span class="const token" data-verso-hover="228">gam_nonneg</span> (n s : <span class="const token" data-verso-hover="41">ℕ</span>) : <span class="nu">0</span> ≤ <span class="const token" data-verso-hover="217">gam</span> n s := <span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="217">gam</span>; <span class="kw">positivity</span></span>
+<span id="L313"></span>
+<span id="L314"><span class="kw">theorem</span> <span class="const token" data-verso-hover="229">gam_le_one</span> {n s : <span class="const token" data-verso-hover="41">ℕ</span>} (hs : s ≤ n) (hs0 : <span class="nu">0</span> &lt; s) : <span class="const token" data-verso-hover="217">gam</span> n s ≤ <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L315">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="217">gam</span></span>
+<span id="L316">  <span class="kw">have</span> h1 : (<span class="nu">1</span> : <span class="const token" data-verso-hover="63">ℝ</span>) ≤ n := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> (<span class="kw">show</span> <span class="nu">1</span> ≤ n <span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L317">  <span class="kw">have</span> h2 : (<span class="nu">1</span> : <span class="const token" data-verso-hover="63">ℝ</span>) ≤ n.<span class="const token" data-verso-hover="218">choose</span> s := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> <span class="const token" data-verso-hover="224">Nat.choose_pos</span> hs</span>
+<span id="L318">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="230">div_le_one</span> (<span class="kw">by</span> <span class="kw">positivity</span>)]</span>
+<span id="L319">  <span class="kw">nlinarith</span></span>
+<span id="L320"></span>
+<span id="L321"><span class="dc">/-- **Inequality (13)**: the spread of coordinate `l` among correct processes after `r` rounds is</span></span>
+<span id="L322"><span class="dc">at most `(1 - γ)^r (U - ν)`, if all correct inputs lie in the box `[ν, U]^d`. -/</span></span>
+<span id="L323"><span class="kw">theorem</span> <span class="const token" data-verso-hover="27">spread</span> (hV : E.<span class="const token" data-verso-hover="11">Valid</span> f s) (hs : (d + <span class="nu">1</span>) * f &lt; s) (hsn : s ≤ <span class="const token" data-verso-hover="47">Fintype.card</span> P) {ν U : <span class="const token" data-verso-hover="63">ℝ</span>}</span>
+<span id="L324">    (hin : ∀ k ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, ∀ l, ν ≤ E.<span class="const token" data-verso-hover="190">inp</span> k l ∧ E.<span class="const token" data-verso-hover="190">inp</span> k l ≤ U) (l : <span class="const token" data-verso-hover="105">Fin</span> d) (r : <span class="const token" data-verso-hover="41">ℕ</span>) :</span>
+<span id="L325">    ∃ a b, b - a ≤ (<span class="nu">1</span> - <span class="const token" data-verso-hover="217">gam</span> (<span class="const token" data-verso-hover="47">Fintype.card</span> P) s) ^ r * (U - ν) ∧</span>
+<span id="L326">      ∀ k ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, a ≤ E.<span class="const token" data-verso-hover="196">state</span> f s r k l ∧ E.<span class="const token" data-verso-hover="196">state</span> f s r k l ≤ b := <span class="kw">by</span></span>
+<span id="L327">  <span class="kw">have</span> hγ1 : <span class="nu">0</span> ≤ <span class="nu">1</span> - <span class="const token" data-verso-hover="217">gam</span> (<span class="const token" data-verso-hover="47">Fintype.card</span> P) s := <span class="kw">by</span></span>
+<span id="L328">    <span class="kw">linarith</span> [<span class="const token" data-verso-hover="229">gam_le_one</span> hsn (<span class="kw">by</span> <span class="kw">omega</span> : <span class="nu">0</span> &lt; s)]</span>
+<span id="L329">  <span class="kw">obtain</span> ⟨a, b, hk, hab⟩ := <span class="const token" data-verso-hover="231">exists_sub_le_pow_mul_of_step</span></span>
+<span id="L330">    (P := <span class="kw">fun</span> r a b =&gt; ∀ k ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, a ≤ E.<span class="const token" data-verso-hover="196">state</span> f s r k l ∧ E.<span class="const token" data-verso-hover="196">state</span> f s r k l ≤ b) hγ1</span>
+<span id="L331">    (<span class="kw">fun</span> k hk =&gt; hin k hk l) (<span class="kw">fun</span> r a b hk =&gt; <span class="kw">by</span></span>
+<span id="L332">      <span class="kw">obtain</span> ⟨a', b', hab', hk'⟩ := <span class="const token" data-verso-hover="232">exists_Icc_of_forall_sub_le_of_finite</span></span>
+<span id="L333">        (s := {k | k ∉ E.<span class="const token" data-verso-hover="189">faulty</span>}) (<span class="const token" data-verso-hover="233">Set.toFinite</span> _) (y := <span class="kw">fun</span> k =&gt; E.<span class="const token" data-verso-hover="196">state</span> f s (r + <span class="nu">1</span>) k l)</span>
+<span id="L334">        <span class="kw">fun</span> i hi j hj =&gt; <span class="const token" data-verso-hover="26">contraction</span> hV hs r l hk hi hj</span>
+<span id="L335">      <span class="kw">exact</span> ⟨a', b', hk', hab'⟩) r</span>
+<span id="L336">  <span class="kw">exact</span> ⟨a, b, hab, hk⟩</span>
+<span id="L337"></span>
+<span id="L338"><span class="dc">/-- `ε`-agreement after `r` rounds, coordinate by coordinate. -/</span></span>
+<span id="L339"><span class="kw">theorem</span> <span class="const token" data-verso-hover="234">agreement_bound</span> (hV : E.<span class="const token" data-verso-hover="11">Valid</span> f s) (hs : (d + <span class="nu">1</span>) * f &lt; s) (hsn : s ≤ <span class="const token" data-verso-hover="47">Fintype.card</span> P)</span>
+<span id="L340">    {ν U : <span class="const token" data-verso-hover="63">ℝ</span>} (hin : ∀ k ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, ∀ l, ν ≤ E.<span class="const token" data-verso-hover="190">inp</span> k l ∧ E.<span class="const token" data-verso-hover="190">inp</span> k l ≤ U) (r : <span class="const token" data-verso-hover="41">ℕ</span>) {i j : P}</span>
+<span id="L341">    (hi : i ∉ E.<span class="const token" data-verso-hover="189">faulty</span>) (hj : j ∉ E.<span class="const token" data-verso-hover="189">faulty</span>) (l : <span class="const token" data-verso-hover="105">Fin</span> d) :</span>
+<span id="L342">    |E.<span class="const token" data-verso-hover="196">state</span> f s r i l - E.<span class="const token" data-verso-hover="196">state</span> f s r j l| ≤ (<span class="nu">1</span> - <span class="const token" data-verso-hover="217">gam</span> (<span class="const token" data-verso-hover="47">Fintype.card</span> P) s) ^ r * (U - ν) := <span class="kw">by</span></span>
+<span id="L343">  <span class="kw">obtain</span> ⟨a, b, hab, hk⟩ := <span class="const token" data-verso-hover="27">spread</span> hV hs hsn hin l r</span>
+<span id="L344">  <span class="kw">have</span> := hk i hi</span>
+<span id="L345">  <span class="kw">have</span> := hk j hj</span>
+<span id="L346">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="235">abs_le</span>]; <span class="kw">constructor</span> &lt;;&gt; <span class="kw">linarith</span></span>
+<span id="L347"></span>
+<span id="L348"><span class="dc">/-- The number of rounds of Step 3 of the algorithm: `1 + ⌈log_{1/(1-γ)} ((U - ν)/ε)⌉`. -/</span></span>
+<span id="L349"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="236">rounds</span> (n s : <span class="const token" data-verso-hover="41">ℕ</span>) (ν U ε : <span class="const token" data-verso-hover="63">ℝ</span>) : <span class="const token" data-verso-hover="41">ℕ</span> :=</span>
+<span id="L350">  <span class="nu">1</span> + ⌈<span class="const token" data-verso-hover="180">Real.logb</span> (<span class="nu">1</span> / (<span class="nu">1</span> - <span class="const token" data-verso-hover="217">gam</span> n s)) ((U - ν) / ε)⌉₊</span>
+<span id="L351"></span>
+<span id="L352"><span class="dc">/-- After `rounds` rounds, correct processes agree up to `&lt; ε` in every coordinate. -/</span></span>
+<span id="L353"><span class="kw">theorem</span> <span class="const token" data-verso-hover="237">approx_agreement</span> (hV : E.<span class="const token" data-verso-hover="11">Valid</span> f s) (hs : (d + <span class="nu">1</span>) * f &lt; s) (hsn : s ≤ <span class="const token" data-verso-hover="47">Fintype.card</span> P)</span>
+<span id="L354">    {ν U ε : <span class="const token" data-verso-hover="63">ℝ</span>} (hε : <span class="nu">0</span> &lt; ε) (hin : ∀ k ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, ∀ l, ν ≤ E.<span class="const token" data-verso-hover="190">inp</span> k l ∧ E.<span class="const token" data-verso-hover="190">inp</span> k l ≤ U)</span>
+<span id="L355">    {i j : P} (hi : i ∉ E.<span class="const token" data-verso-hover="189">faulty</span>) (hj : j ∉ E.<span class="const token" data-verso-hover="189">faulty</span>) (l : <span class="const token" data-verso-hover="105">Fin</span> d) :</span>
+<span id="L356">    |E.<span class="const token" data-verso-hover="196">state</span> f s (<span class="const token" data-verso-hover="236">rounds</span> (<span class="const token" data-verso-hover="47">Fintype.card</span> P) s ν U ε) i l -</span>
+<span id="L357">      E.<span class="const token" data-verso-hover="196">state</span> f s (<span class="const token" data-verso-hover="236">rounds</span> (<span class="const token" data-verso-hover="47">Fintype.card</span> P) s ν U ε) j l| &lt; ε := <span class="kw">by</span></span>
+<span id="L358">  <span class="kw">refine</span> (<span class="const token" data-verso-hover="234">agreement_bound</span> hV hs hsn hin _ hi hj l).<span class="const token" data-verso-hover="238">trans_lt</span> ?_</span>
+<span id="L359">  <span class="kw">have</span> hs0 : <span class="nu">0</span> &lt; s := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L360">  <span class="kw">have</span> hn : <span class="nu">0</span> &lt; <span class="const token" data-verso-hover="47">Fintype.card</span> P := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L361">  <span class="kw">refine</span> <span class="const token" data-verso-hover="4">rounds_spec</span> (<span class="kw">by</span> <span class="kw">linarith</span> [<span class="const token" data-verso-hover="229">gam_le_one</span> hsn hs0]) ?_ hε</span>
+<span id="L362">  <span class="kw">have</span> : <span class="nu">0</span> &lt; <span class="const token" data-verso-hover="217">gam</span> (<span class="const token" data-verso-hover="47">Fintype.card</span> P) s := <span class="kw">by</span></span>
+<span id="L363">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="217">gam</span></span>
+<span id="L364">    <span class="kw">have</span> := <span class="const token" data-verso-hover="224">Nat.choose_pos</span> hsn</span>
+<span id="L365">    <span class="kw">positivity</span></span>
+<span id="L366">  <span class="kw">linarith</span></span>
+<span id="L367"></span>
+<span id="L368"><span class="kw">end</span> RoundExec</span>
+<span id="L369"></span>
+<span id="L370"><span class="dc">/-- Correctness of the round-based algorithm with subset size `s`: if `(d + 1) f &lt; s ≤ n` and the</span></span>
+<span id="L371"><span class="dc">round exchanges are `Valid f s`, then after `rounds n s ν U ε` rounds the correct states are valid</span></span>
+<span id="L372"><span class="dc">and pairwise `ε`-close in every coordinate. -/</span></span>
+<span id="L373"><span class="kw">theorem</span> <span class="const token" data-verso-hover="239">RoundExec.correct_of_valid</span> {f s : <span class="const token" data-verso-hover="41">ℕ</span>} {E : <span class="const token" data-verso-hover="10">RoundExec</span> P d} (hV : E.<span class="const token" data-verso-hover="11">Valid</span> f s)</span>
+<span id="L374">    (hs : (d + <span class="nu">1</span>) * f &lt; s) (hsn : s ≤ <span class="const token" data-verso-hover="47">Fintype.card</span> P) {ν U ε : <span class="const token" data-verso-hover="63">ℝ</span>} (hε : <span class="nu">0</span> &lt; ε)</span>
+<span id="L375">    (hin : ∀ k ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, ∀ l, ν ≤ E.<span class="const token" data-verso-hover="190">inp</span> k l ∧ E.<span class="const token" data-verso-hover="190">inp</span> k l ≤ U) :</span>
+<span id="L376">    <span class="kw">let</span> R := <span class="const token" data-verso-hover="236">RoundExec.rounds</span> (<span class="const token" data-verso-hover="47">Fintype.card</span> P) s ν U ε</span>
+<span id="L377">    ∀ i ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, ∀ j ∉ E.<span class="const token" data-verso-hover="189">faulty</span>,</span>
+<span id="L378">      E.<span class="const token" data-verso-hover="196">state</span> f s R i ∈ <span class="const token" data-verso-hover="67">convexHull</span> <span class="const token" data-verso-hover="63">ℝ</span> (E.<span class="const token" data-verso-hover="190">inp</span> '' (E.<span class="const token" data-verso-hover="193">correct</span> : <span class="const token" data-verso-hover="65">Set</span> P)) ∧</span>
+<span id="L379">      ∀ l, |E.<span class="const token" data-verso-hover="196">state</span> f s R i l - E.<span class="const token" data-verso-hover="196">state</span> f s R j l| &lt; ε :=</span>
+<span id="L380">  <span class="kw">fun</span> _ hi _ hj =&gt; ⟨<span class="const token" data-verso-hover="25">RoundExec.state_mem_convexHull</span> hV hs _ hi,</span>
+<span id="L381">    <span class="kw">fun</span> l =&gt; <span class="const token" data-verso-hover="237">RoundExec.approx_agreement</span> hV hs hsn hε hin hi hj l⟩</span>
+<span id="L382"></span>
+<span id="L383"><span class="dc">/-- **Theorem 5** of the paper (sufficiency of `n ≥ (d + 2) f + 1` for approximate BVC in</span></span>
+<span id="L384"><span class="dc">asynchronous systems), for the algorithm of Section 3.2 on top of AAD Component #1: in every</span></span>
+<span id="L385"><span class="dc">execution in which the round exchanges satisfy Properties 1–3 (`RoundExec.Valid f (n - f)`) and the</span></span>
+<span id="L386"><span class="dc">correct inputs lie in `[ν, U]^d`, after `rounds n (n - f) ν U ε` rounds the states of the correct</span></span>
+<span id="L387"><span class="dc">processes are in the convex hull of the correct inputs (validity) and pairwise `ε`-close in</span></span>
+<span id="L388"><span class="dc">every coordinate (`ε`-agreement). -/</span></span>
+<span id="L389"><span class="kw">theorem</span> <span class="const token" data-verso-hover="24">theorem_5</span> {f : <span class="const token" data-verso-hover="41">ℕ</span>} (hn : (d + <span class="nu">2</span>) * f &lt; <span class="const token" data-verso-hover="47">Fintype.card</span> P) {E : <span class="const token" data-verso-hover="10">RoundExec</span> P d}</span>
+<span id="L390">    (hV : E.<span class="const token" data-verso-hover="11">Valid</span> f (<span class="const token" data-verso-hover="47">Fintype.card</span> P - f)) {ν U ε : <span class="const token" data-verso-hover="63">ℝ</span>} (hε : <span class="nu">0</span> &lt; ε)</span>
+<span id="L391">    (hin : ∀ k ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, ∀ l, ν ≤ E.<span class="const token" data-verso-hover="190">inp</span> k l ∧ E.<span class="const token" data-verso-hover="190">inp</span> k l ≤ U) :</span>
+<span id="L392">    <span class="kw">let</span> R := <span class="const token" data-verso-hover="236">RoundExec.rounds</span> (<span class="const token" data-verso-hover="47">Fintype.card</span> P) (<span class="const token" data-verso-hover="47">Fintype.card</span> P - f) ν U ε</span>
+<span id="L393">    ∀ i ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, ∀ j ∉ E.<span class="const token" data-verso-hover="189">faulty</span>,</span>
+<span id="L394">      E.<span class="const token" data-verso-hover="196">state</span> f (<span class="const token" data-verso-hover="47">Fintype.card</span> P - f) R i ∈ <span class="const token" data-verso-hover="67">convexHull</span> <span class="const token" data-verso-hover="63">ℝ</span> (E.<span class="const token" data-verso-hover="190">inp</span> '' (E.<span class="const token" data-verso-hover="193">correct</span> : <span class="const token" data-verso-hover="65">Set</span> P)) ∧</span>
+<span id="L395">      ∀ l, |E.<span class="const token" data-verso-hover="196">state</span> f (<span class="const token" data-verso-hover="47">Fintype.card</span> P - f) R i l - E.<span class="const token" data-verso-hover="196">state</span> f (<span class="const token" data-verso-hover="47">Fintype.card</span> P - f) R j l| &lt; ε := <span class="kw">by</span></span>
+<span id="L396">  <span class="kw">intro</span> R i hi j hj</span>
+<span id="L397">  <span class="kw">have</span> hs : (d + <span class="nu">1</span>) * f &lt; <span class="const token" data-verso-hover="47">Fintype.card</span> P - f := <span class="kw">by</span></span>
+<span id="L398">    <span class="kw">have</span> : (d + <span class="nu">2</span>) * f = (d + <span class="nu">1</span>) * f + f := <span class="kw">by</span> <span class="kw">ring</span></span>
+<span id="L399">    <span class="kw">omega</span></span>
+<span id="L400">  <span class="kw">exact</span> <span class="const token" data-verso-hover="239">RoundExec.correct_of_valid</span> hV hs (<span class="const token" data-verso-hover="240">Nat.sub_le</span> _ _) hε hin i hi j hj</span>
+<span id="L401"></span>
+<span id="L402"><span class="dc">/-! ### Section 4: restricted round structures (sufficiency part of Theorem 6) -/</span></span>
+<span id="L403"></span>
+<span id="L404"><span class="dc">/-- **Theorem 6, synchronous case, sufficiency.** In the restricted synchronous round structure</span></span>
+<span id="L405"><span class="dc">every correct process receives a value from every process in every round (`B_i = P`; faulty</span></span>
+<span id="L406"><span class="dc">processes may send different values to different processes, a missing message is replaced by a</span></span>
+<span id="L407"><span class="dc">default value, i.e. some value). With Step 2 of Section 3.2 (subsets of size `n - f`), approximate</span></span>
+<span id="L408"><span class="dc">BVC is achieved if `n ≥ (d + 2) f + 1`. -/</span></span>
+<span id="L409"><span class="kw">theorem</span> <span class="const token" data-verso-hover="28">theorem_6_sync</span> {f : <span class="const token" data-verso-hover="41">ℕ</span>} (hn : (d + <span class="nu">2</span>) * f &lt; <span class="const token" data-verso-hover="47">Fintype.card</span> P) {E : <span class="const token" data-verso-hover="10">RoundExec</span> P d}</span>
+<span id="L410">    (hB : ∀ r i, E.<span class="const token" data-verso-hover="191">B</span> r i = <span class="const token" data-verso-hover="45">univ</span>) (hf : E.<span class="const token" data-verso-hover="189">faulty</span>.<span class="const token" data-verso-hover="50">card</span> ≤ f) {ν U ε : <span class="const token" data-verso-hover="63">ℝ</span>} (hε : <span class="nu">0</span> &lt; ε)</span>
+<span id="L411">    (hin : ∀ k ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, ∀ l, ν ≤ E.<span class="const token" data-verso-hover="190">inp</span> k l ∧ E.<span class="const token" data-verso-hover="190">inp</span> k l ≤ U) :</span>
+<span id="L412">    <span class="kw">let</span> R := <span class="const token" data-verso-hover="236">RoundExec.rounds</span> (<span class="const token" data-verso-hover="47">Fintype.card</span> P) (<span class="const token" data-verso-hover="47">Fintype.card</span> P - f) ν U ε</span>
+<span id="L413">    ∀ i ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, ∀ j ∉ E.<span class="const token" data-verso-hover="189">faulty</span>,</span>
+<span id="L414">      E.<span class="const token" data-verso-hover="196">state</span> f (<span class="const token" data-verso-hover="47">Fintype.card</span> P - f) R i ∈ <span class="const token" data-verso-hover="67">convexHull</span> <span class="const token" data-verso-hover="63">ℝ</span> (E.<span class="const token" data-verso-hover="190">inp</span> '' (E.<span class="const token" data-verso-hover="193">correct</span> : <span class="const token" data-verso-hover="65">Set</span> P)) ∧</span>
+<span id="L415">      ∀ l, |E.<span class="const token" data-verso-hover="196">state</span> f (<span class="const token" data-verso-hover="47">Fintype.card</span> P - f) R i l - E.<span class="const token" data-verso-hover="196">state</span> f (<span class="const token" data-verso-hover="47">Fintype.card</span> P - f) R j l| &lt; ε := <span class="kw">by</span></span>
+<span id="L416">  <span class="kw">have</span> hs : (d + <span class="nu">1</span>) * f &lt; <span class="const token" data-verso-hover="47">Fintype.card</span> P - f := <span class="kw">by</span></span>
+<span id="L417">    <span class="kw">have</span> : (d + <span class="nu">2</span>) * f = (d + <span class="nu">1</span>) * f + f := <span class="kw">by</span> <span class="kw">ring</span></span>
+<span id="L418">    <span class="kw">omega</span></span>
+<span id="L419">  <span class="kw">have</span> hcorr : <span class="const token" data-verso-hover="47">Fintype.card</span> P - f ≤ E.<span class="const token" data-verso-hover="193">correct</span>.<span class="const token" data-verso-hover="50">card</span> := <span class="kw">by</span></span>
+<span id="L420">    <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="151">card_filter_add_card_filter_not</span> (s := (<span class="const token" data-verso-hover="45">univ</span> : <span class="const token" data-verso-hover="64">Finset</span> P)) (<span class="kw">fun</span> q =&gt; q ∈ E.<span class="const token" data-verso-hover="189">faulty</span>)</span>
+<span id="L421">    <span class="kw">have</span> h2 : (<span class="const token" data-verso-hover="45">univ</span>.<span class="const token" data-verso-hover="118">filter</span> <span class="kw">fun</span> q =&gt; q ∈ E.<span class="const token" data-verso-hover="189">faulty</span>) = E.<span class="const token" data-verso-hover="189">faulty</span> := <span class="kw">by</span> <span class="kw">ext</span>; <span class="kw">simp</span></span>
+<span id="L422">    <span class="kw">rw</span> [h2, <span class="const token" data-verso-hover="53">card_univ</span>] <span class="kw">at</span> h1</span>
+<span id="L423">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="193">RoundExec.correct</span>]</span>
+<span id="L424">    <span class="kw">omega</span></span>
+<span id="L425">  <span class="kw">refine</span> <span class="const token" data-verso-hover="239">RoundExec.correct_of_valid</span> ⟨hf, <span class="kw">fun</span> r i _ =&gt; <span class="kw">by</span> <span class="kw">simp</span> [hB], <span class="kw">fun</span> r i _ j _ =&gt; ?_⟩ hs</span>
+<span id="L426">    (<span class="const token" data-verso-hover="240">Nat.sub_le</span> _ _) hε hin</span>
+<span id="L427">  <span class="kw">obtain</span> ⟨C, hC, hCcard⟩ := <span class="const token" data-verso-hover="74">exists_subset_card_eq</span> hcorr</span>
+<span id="L428">  <span class="kw">refine</span> ⟨C, <span class="kw">by</span> <span class="kw">simp</span> [hB], hCcard, <span class="kw">fun</span> k hk hkf =&gt; ?_⟩</span>
+<span id="L429">  <span class="kw">exact</span> <span class="const token" data-verso-hover="90">absurd</span> hkf (<span class="const token" data-verso-hover="200">RoundExec.mem_correct</span>.<span class="const token" data-verso-hover="59">1</span> (hC hk))</span>
+<span id="L430"></span>
+<span id="L431"><span class="dc">/-- **Theorem 6, asynchronous case, sufficiency.** In the restricted asynchronous round structure</span></span>
+<span id="L432"><span class="dc">every correct process waits for round-`r` messages from `n - f` processes (itself included), so</span></span>
+<span id="L433"><span class="dc">`|B_i| ≥ n - f`, and any two correct processes share the (identical) values of at least `n - 3f`</span></span>
+<span id="L434"><span class="dc">correct processes. The paper says that Step 2 is "analogous to Section 3.2"; with subsets of</span></span>
+<span id="L435"><span class="dc">size `n - f` the paper's argument does not go through (`B_i` itself has only `n - f` elements, so</span></span>
+<span id="L436"><span class="dc">`Z_i` is a single point and `Z_i ∩ Z_j` may be empty). With subsets of size `n - 3f` (any size `s`</span></span>
+<span id="L437"><span class="dc">with `(d + 1) f &lt; s ≤ n - 3f` works) the algorithm achieves approximate BVC if</span></span>
+<span id="L438"><span class="dc">`n ≥ (d + 4) f + 1`. -/</span></span>
+<span id="L439"><span class="kw">theorem</span> <span class="const token" data-verso-hover="5">theorem_6_async</span> {f : <span class="const token" data-verso-hover="41">ℕ</span>} (hn : (d + <span class="nu">4</span>) * f &lt; <span class="const token" data-verso-hover="47">Fintype.card</span> P) {E : <span class="const token" data-verso-hover="10">RoundExec</span> P d}</span>
+<span id="L440">    (hB : ∀ r, ∀ i ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, <span class="const token" data-verso-hover="47">Fintype.card</span> P - f ≤ (E.<span class="const token" data-verso-hover="191">B</span> r i).<span class="const token" data-verso-hover="50">card</span>) (hf : E.<span class="const token" data-verso-hover="189">faulty</span>.<span class="const token" data-verso-hover="50">card</span> ≤ f)</span>
+<span id="L441">    {ν U ε : <span class="const token" data-verso-hover="63">ℝ</span>} (hε : <span class="nu">0</span> &lt; ε) (hin : ∀ k ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, ∀ l, ν ≤ E.<span class="const token" data-verso-hover="190">inp</span> k l ∧ E.<span class="const token" data-verso-hover="190">inp</span> k l ≤ U) :</span>
+<span id="L442">    <span class="kw">let</span> R := <span class="const token" data-verso-hover="236">RoundExec.rounds</span> (<span class="const token" data-verso-hover="47">Fintype.card</span> P) (<span class="const token" data-verso-hover="47">Fintype.card</span> P - <span class="nu">3</span> * f) ν U ε</span>
+<span id="L443">    ∀ i ∉ E.<span class="const token" data-verso-hover="189">faulty</span>, ∀ j ∉ E.<span class="const token" data-verso-hover="189">faulty</span>,</span>
+<span id="L444">      E.<span class="const token" data-verso-hover="196">state</span> f (<span class="const token" data-verso-hover="47">Fintype.card</span> P - <span class="nu">3</span> * f) R i ∈ <span class="const token" data-verso-hover="67">convexHull</span> <span class="const token" data-verso-hover="63">ℝ</span> (E.<span class="const token" data-verso-hover="190">inp</span> '' (E.<span class="const token" data-verso-hover="193">correct</span> : <span class="const token" data-verso-hover="65">Set</span> P)) ∧</span>
+<span id="L445">      ∀ l, |E.<span class="const token" data-verso-hover="196">state</span> f (<span class="const token" data-verso-hover="47">Fintype.card</span> P - <span class="nu">3</span> * f) R i l -</span>
+<span id="L446">        E.<span class="const token" data-verso-hover="196">state</span> f (<span class="const token" data-verso-hover="47">Fintype.card</span> P - <span class="nu">3</span> * f) R j l| &lt; ε := <span class="kw">by</span></span>
+<span id="L447">  <span class="kw">have</span> hs : (d + <span class="nu">1</span>) * f &lt; <span class="const token" data-verso-hover="47">Fintype.card</span> P - <span class="nu">3</span> * f := <span class="kw">by</span></span>
+<span id="L448">    <span class="kw">have</span> : (d + <span class="nu">4</span>) * f = (d + <span class="nu">1</span>) * f + <span class="nu">3</span> * f := <span class="kw">by</span> <span class="kw">ring</span></span>
+<span id="L449">    <span class="kw">omega</span></span>
+<span id="L450">  <span class="kw">refine</span> <span class="const token" data-verso-hover="239">RoundExec.correct_of_valid</span> ⟨hf, <span class="kw">fun</span> r i hi =&gt; (<span class="const token" data-verso-hover="241">Nat.sub_le_sub_left</span> (<span class="kw">by</span> <span class="kw">omega</span>) _).<span class="const token" data-verso-hover="76">trans</span></span>
+<span id="L451">    (hB r i hi), <span class="kw">fun</span> r i hi j hj =&gt; ?_⟩ hs (<span class="const token" data-verso-hover="240">Nat.sub_le</span> _ _) hε hin</span>
+<span id="L452">  <span class="kw">set</span> I := (E.<span class="const token" data-verso-hover="191">B</span> r i ∩ E.<span class="const token" data-verso-hover="191">B</span> r j).<span class="const token" data-verso-hover="118">filter</span> <span class="kw">fun</span> k =&gt; k ∉ E.<span class="const token" data-verso-hover="189">faulty</span></span>
+<span id="L453">  <span class="kw">have</span> hI : <span class="const token" data-verso-hover="47">Fintype.card</span> P - <span class="nu">3</span> * f ≤ I.<span class="const token" data-verso-hover="50">card</span> := <span class="kw">by</span></span>
+<span id="L454">    <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="242">card_union_add_card_inter</span> (E.<span class="const token" data-verso-hover="191">B</span> r i) (E.<span class="const token" data-verso-hover="191">B</span> r j)</span>
+<span id="L455">    <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="221">card_le_univ</span> (E.<span class="const token" data-verso-hover="191">B</span> r i ∪ E.<span class="const token" data-verso-hover="191">B</span> r j)</span>
+<span id="L456">    <span class="kw">have</span> h3 := <span class="const token" data-verso-hover="151">card_filter_add_card_filter_not</span> (s := E.<span class="const token" data-verso-hover="191">B</span> r i ∩ E.<span class="const token" data-verso-hover="191">B</span> r j) (<span class="kw">fun</span> q =&gt; q ∉ E.<span class="const token" data-verso-hover="189">faulty</span>)</span>
+<span id="L457">    <span class="kw">have</span> h4 : ((E.<span class="const token" data-verso-hover="191">B</span> r i ∩ E.<span class="const token" data-verso-hover="191">B</span> r j).<span class="const token" data-verso-hover="118">filter</span> <span class="kw">fun</span> q =&gt; ¬ q ∉ E.<span class="const token" data-verso-hover="189">faulty</span>).<span class="const token" data-verso-hover="50">card</span> ≤ f := <span class="kw">by</span></span>
+<span id="L458">      <span class="kw">refine</span> <span class="const token" data-verso-hover="166">le_trans</span> (<span class="const token" data-verso-hover="91">card_le_card</span> <span class="kw">fun</span> k hk =&gt; ?_) hf</span>
+<span id="L459">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="141">mem_filter</span>, <span class="const token" data-verso-hover="204">not_not</span>] <span class="kw">at</span> hk; <span class="kw">exact</span> hk.<span class="const token" data-verso-hover="87">2</span></span>
+<span id="L460">    <span class="kw">have</span> := hB r i hi</span>
+<span id="L461">    <span class="kw">have</span> := hB r j hj</span>
+<span id="L462">    <span class="kw">simp</span> only [I]</span>
+<span id="L463">    <span class="kw">omega</span></span>
+<span id="L464">  <span class="kw">obtain</span> ⟨C, hC, hCcard⟩ := <span class="const token" data-verso-hover="74">exists_subset_card_eq</span> hI</span>
+<span id="L465">  <span class="kw">refine</span> ⟨C, hC.<span class="const token" data-verso-hover="76">trans</span> (<span class="const token" data-verso-hover="205">filter_subset</span> _ _), hCcard, <span class="kw">fun</span> k hk hkf =&gt; ?_⟩</span>
+<span id="L466">  <span class="kw">exact</span> <span class="const token" data-verso-hover="90">absurd</span> hkf (<span class="const token" data-verso-hover="141">mem_filter</span>.<span class="const token" data-verso-hover="59">1</span> (hC hk)).<span class="const token" data-verso-hover="87">2</span></span>
+<span id="L467"></span>
+<span id="L468"><span class="kw">end</span> ByzantineVectorConsensus</span>
+<span id="L469"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2013/ByzantineVectorConsensus/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

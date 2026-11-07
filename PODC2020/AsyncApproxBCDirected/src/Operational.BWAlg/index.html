@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>AsyncApproxBCDirected: Operational/BWAlg.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2020/">PODC 2020</a><span class="sep">›</span><a href="PODC2020/AsyncApproxBCDirected/">AsyncApproxBCDirected</a><span class="sep">›</span><a href="PODC2020/AsyncApproxBCDirected/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Operational.BWAlg</span></nav>
+        <h1>
+          <code>Operational/BWAlg.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2020/AsyncApproxBCDirected/">Asynchronous Byzantine Approximate Consensus in Directed Networks — PODC 2020</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2020/AsyncApproxBCDirected/Operational/BWAlg.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Operational.BWAlg"><span id="L1"><span class="kw">import</span> Papers.PODC2020.AsyncApproxBCDirected.Operational.HistAlg</span>
+<span id="L2"><span class="kw">import</span> Papers.PODC2020.AsyncApproxBCDirected.Round</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Algorithm BW + Filter-and-Average as an operational algorithm</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">The algorithm of Section 4 as a full-information `HistSpec` in the asynchronous model of</span></span>
+<span id="L8"><span class="dc">`AsyncModel.lean`, run for `N` asynchronous rounds (round `r &lt; N` computes `x_v[r+1]`; the output</span></span>
+<span id="L9"><span class="dc">is `x_v[N]`).</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">* Messages (`BMsg`): `val r x p` (RedundantFlood of the value `x` of round `r` along path `p`) and</span></span>
+<span id="L12"><span class="dc">  `comp r c M^c F' k p` (FIFO-Flood of `COMPLETE(F')` with content `M^c`, initiator `c`,</span></span>
+<span id="L13"><span class="dc">  FIFO counter `k`, along the simple path `p`). Paths end at the sender; the receiver checks it.</span></span>
+<span id="L14"><span class="dc">* RedundantFlood (Appendix E): a node forwards the *first* `val` message received on a path `p`</span></span>
+<span id="L15"><span class="dc">  to every out-neighbour `w` such that `p ‖ v ‖ w` is redundant.</span></span>
+<span id="L16"><span class="dc">* FIFO-Flood / FIFO-Receive (Appendix F): `COMPLETE` messages carry the counter `k` of their</span></span>
+<span id="L17"><span class="dc">  initiator (number of earlier `COMPLETE`s of that round) and are forwarded along simple paths;</span></span>
+<span id="L18"><span class="dc">  a message is FIFO-received along a path once all smaller counters were received along it.</span></span>
+<span id="L19"><span class="dc">* The protocol logic (Maximal-Consistency, FIFO-Receive-All, Verify, Filter-and-Average) is the</span></span>
+<span id="L20"><span class="dc">  same as in `RoundModel.lean`, evaluated on the history (all conditions are re-evaluated after</span></span>
+<span id="L21"><span class="dc">  every reception; "for the first time" = first prefix of the history).</span></span>
+<span id="L22"><span class="dc">-/</span></span>
+<span id="L23"></span>
+<span id="L24"><span class="kw">open</span> Finset</span>
+<span id="L25"></span>
+<span id="L26"><span class="kw">set_option</span> <span class="const token" data-verso-hover="55">linter.unusedSectionVars</span> false</span>
+<span id="L27"></span>
+<span id="L28"><span class="kw">namespace</span> AsyncApproxBCDirected</span>
+<span id="L29"></span>
+<span id="L30"><span class="kw">open</span> Cslib.ApproxConsensus Cslib.ApproxConsensus.Async</span>
+<span id="L31"></span>
+<span id="L32"><span class="dc">/-- Messages of the operational algorithm. -/</span></span>
+<span id="L33"><span class="kw">inductive</span> <span class="const token" data-verso-hover="429">BMsg</span> (V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L34">  | <span class="const token" data-verso-hover="430">val</span> (r : <span class="const token" data-verso-hover="58">ℕ</span>) (x : <span class="const token" data-verso-hover="129">ℝ</span>) (p : <span class="const token" data-verso-hover="60">List</span> V)</span>
+<span id="L35">  | <span class="const token" data-verso-hover="431">comp</span> (r : <span class="const token" data-verso-hover="58">ℕ</span>) (c : V) (Mc : <span class="const token" data-verso-hover="66">Finset</span> (<span class="const token" data-verso-hover="177">Msg</span> V)) (F' : <span class="const token" data-verso-hover="66">Finset</span> V) (k : <span class="const token" data-verso-hover="58">ℕ</span>) (p : <span class="const token" data-verso-hover="60">List</span> V)</span>
+<span id="L36"></span>
+<span id="L37"><span class="kw">namespace</span> BWOp</span>
+<span id="L38"></span>
+<span id="L39"><span class="kw">variable</span> {V : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="56">Fintype</span> V] [<span class="const token" data-verso-hover="57">DecidableEq</span> V]</span>
+<span id="L40"></span>
+<span id="L41"><span class="dc">/-- Histories of received messages `(sender, message)`. -/</span></span>
+<span id="L42"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="432">Hist</span> (V : <span class="kw">Type</span>*) := <span class="const token" data-verso-hover="60">List</span> (V × <span class="const token" data-verso-hover="429">BMsg</span> V)</span>
+<span id="L43"></span>
+<span id="L44"><span class="dc">/-! ## First index -/</span></span>
+<span id="L45"></span>
+<span id="L46"><span class="dc">/-- The first `k ≤ n` with `P k`. -/</span></span>
+<span id="L47"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="433">firstIdx</span> (P : <span class="const token" data-verso-hover="58">ℕ</span> → <span class="kw">Prop</span>) (n : <span class="const token" data-verso-hover="58">ℕ</span>) : <span class="const token" data-verso-hover="434">Option</span> <span class="const token" data-verso-hover="58">ℕ</span> := <span class="kw">by</span></span>
+<span id="L48">  <span class="kw">classical</span></span>
+<span id="L49">  <span class="kw">exact</span> <span class="kw">if</span> h : ∃ k, k ≤ n ∧ P k <span class="kw">then</span> <span class="const token" data-verso-hover="62">some</span> (<span class="const token" data-verso-hover="195">Nat.find</span> (⟨h.<span class="const token" data-verso-hover="435">choose</span>, h.<span class="const token" data-verso-hover="436">choose_spec</span>.<span class="const token" data-verso-hover="77">2</span>⟩ : ∃ k, P k))</span>
+<span id="L50">    <span class="kw">else</span> <span class="const token" data-verso-hover="437">none</span></span>
+<span id="L51"></span>
+<span id="L52"><span class="kw">theorem</span> <span class="const token" data-verso-hover="438">firstIdx_eq_some</span> {P : <span class="const token" data-verso-hover="58">ℕ</span> → <span class="kw">Prop</span>} {n k : <span class="const token" data-verso-hover="58">ℕ</span>} :</span>
+<span id="L53">    <span class="const token" data-verso-hover="433">firstIdx</span> P n = <span class="const token" data-verso-hover="62">some</span> k ↔ k ≤ n ∧ P k ∧ ∀ j &lt; k, ¬ P j := <span class="kw">by</span></span>
+<span id="L54">  <span class="kw">classical</span></span>
+<span id="L55">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="433">firstIdx</span></span>
+<span id="L56">  <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L57">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="93">Option.some.injEq</span>]</span>
+<span id="L58">    <span class="kw">constructor</span></span>
+<span id="L59">    · <span class="kw">rintro</span> <span class="kw">rfl</span></span>
+<span id="L60">      <span class="kw">refine</span> ⟨(<span class="const token" data-verso-hover="269">Nat.find_min'</span> _ h.<span class="const token" data-verso-hover="436">choose_spec</span>.<span class="const token" data-verso-hover="77">2</span>).<span class="const token" data-verso-hover="323">trans</span> h.<span class="const token" data-verso-hover="436">choose_spec</span>.<span class="const token" data-verso-hover="76">1</span>, <span class="const token" data-verso-hover="194">Nat.find_spec</span> _,</span>
+<span id="L61">        <span class="kw">fun</span> j hj =&gt; <span class="const token" data-verso-hover="196">Nat.find_min</span> _ hj⟩</span>
+<span id="L62">    · <span class="kw">rintro</span> ⟨-, hk, hmin⟩</span>
+<span id="L63">      <span class="kw">exact</span> <span class="const token" data-verso-hover="439">le_antisymm</span> (<span class="const token" data-verso-hover="269">Nat.find_min'</span> _ hk) (<span class="const token" data-verso-hover="440">not_lt</span>.<span class="const token" data-verso-hover="69">mp</span> <span class="kw">fun</span> hlt =&gt; hmin _ hlt (<span class="const token" data-verso-hover="194">Nat.find_spec</span> _))</span>
+<span id="L64">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="441">false_iff</span>]</span>
+<span id="L65">    <span class="kw">rintro</span> ⟨hk, hP, -⟩; <span class="kw">exact</span> h ⟨k, hk, hP⟩</span>
+<span id="L66"></span>
+<span id="L67"><span class="kw">theorem</span> <span class="const token" data-verso-hover="442">firstIdx_eq_none</span> {P : <span class="const token" data-verso-hover="58">ℕ</span> → <span class="kw">Prop</span>} {n : <span class="const token" data-verso-hover="58">ℕ</span>} :</span>
+<span id="L68">    <span class="const token" data-verso-hover="433">firstIdx</span> P n = <span class="const token" data-verso-hover="437">none</span> ↔ ∀ k ≤ n, ¬ P k := <span class="kw">by</span></span>
+<span id="L69">  <span class="kw">classical</span></span>
+<span id="L70">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="433">firstIdx</span></span>
+<span id="L71">  <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L72">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="441">false_iff</span>, <span class="const token" data-verso-hover="443">not_forall</span>, <span class="const token" data-verso-hover="444">not_not</span>]</span>
+<span id="L73">    <span class="kw">exact</span> ⟨h.<span class="const token" data-verso-hover="435">choose</span>, h.<span class="const token" data-verso-hover="436">choose_spec</span>.<span class="const token" data-verso-hover="76">1</span>, h.<span class="const token" data-verso-hover="436">choose_spec</span>.<span class="const token" data-verso-hover="77">2</span>⟩</span>
+<span id="L74">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="445">true_iff</span>]; <span class="kw">intro</span> k hk hP; <span class="kw">exact</span> h ⟨k, hk, hP⟩</span>
+<span id="L75"></span>
+<span id="L76"><span class="kw">theorem</span> <span class="const token" data-verso-hover="446">firstIdx_mono</span> {P : <span class="const token" data-verso-hover="58">ℕ</span> → <span class="kw">Prop</span>} {n n' k : <span class="const token" data-verso-hover="58">ℕ</span>} (h : <span class="const token" data-verso-hover="433">firstIdx</span> P n = <span class="const token" data-verso-hover="62">some</span> k) (hn : n ≤ n') :</span>
+<span id="L77">    <span class="const token" data-verso-hover="433">firstIdx</span> P n' = <span class="const token" data-verso-hover="62">some</span> k := <span class="kw">by</span></span>
+<span id="L78">  <span class="kw">obtain</span> ⟨h1, h2, h3⟩ := <span class="const token" data-verso-hover="438">firstIdx_eq_some</span>.<span class="const token" data-verso-hover="69">mp</span> h</span>
+<span id="L79">  <span class="kw">exact</span> <span class="const token" data-verso-hover="438">firstIdx_eq_some</span>.<span class="const token" data-verso-hover="159">mpr</span> ⟨h1.<span class="const token" data-verso-hover="323">trans</span> hn, h2, h3⟩</span>
+<span id="L80"></span>
+<span id="L81"><span class="dc">/-! ## Received messages -/</span></span>
+<span id="L82"></span>
+<span id="L83"><span class="dc">/-- A valid `val` message of round `r` received by `v`: path extended by `v`. -/</span></span>
+<span id="L84"><span class="kw">def</span> <span class="const token" data-verso-hover="447">valOf</span> (v : V) (r : <span class="const token" data-verso-hover="58">ℕ</span>) : V × <span class="const token" data-verso-hover="429">BMsg</span> V → <span class="const token" data-verso-hover="434">Option</span> (<span class="const token" data-verso-hover="177">Msg</span> V)</span>
+<span id="L85">  | (u, <span class="const token" data-verso-hover="430">.</span>val r' x p) =&gt; <span class="kw">if</span> r' = r ∧ p.<span class="const token" data-verso-hover="61">getLast?</span> = <span class="const token" data-verso-hover="62">some</span> u <span class="kw">then</span> <span class="const token" data-verso-hover="62">some</span> (x, p ++ [v]) <span class="kw">else</span> <span class="const token" data-verso-hover="437">none</span></span>
+<span id="L86">  | _ =&gt; <span class="const token" data-verso-hover="437">none</span></span>
+<span id="L87"></span>
+<span id="L88"><span class="dc">/-- A valid `comp` message of round `r` received by `v`: `(c, p ‖ v, M^c, F', k)`. -/</span></span>
+<span id="L89"><span class="kw">def</span> <span class="const token" data-verso-hover="448">compOf</span> (v : V) (r : <span class="const token" data-verso-hover="58">ℕ</span>) :</span>
+<span id="L90">    V × <span class="const token" data-verso-hover="429">BMsg</span> V → <span class="const token" data-verso-hover="434">Option</span> (V × <span class="const token" data-verso-hover="60">List</span> V × <span class="const token" data-verso-hover="66">Finset</span> (<span class="const token" data-verso-hover="177">Msg</span> V) × <span class="const token" data-verso-hover="66">Finset</span> V × <span class="const token" data-verso-hover="58">ℕ</span>)</span>
+<span id="L91">  | (u, <span class="const token" data-verso-hover="431">.</span>comp r' c Mc F' k p) =&gt;</span>
+<span id="L92">    <span class="kw">if</span> r' = r ∧ p.<span class="const token" data-verso-hover="61">getLast?</span> = <span class="const token" data-verso-hover="62">some</span> u <span class="kw">then</span> <span class="const token" data-verso-hover="62">some</span> (c, p ++ [v], Mc, F', k) <span class="kw">else</span> <span class="const token" data-verso-hover="437">none</span></span>
+<span id="L93">  | _ =&gt; <span class="const token" data-verso-hover="437">none</span></span>
+<span id="L94"></span>
+<span id="L95"><span class="dc">/-- The own value, if the round has started. -/</span></span>
+<span id="L96"><span class="kw">def</span> <span class="const token" data-verso-hover="449">ownSet</span> (v : V) : <span class="const token" data-verso-hover="434">Option</span> <span class="const token" data-verso-hover="129">ℝ</span> → <span class="const token" data-verso-hover="66">Finset</span> (<span class="const token" data-verso-hover="177">Msg</span> V)</span>
+<span id="L97">  | <span class="const token" data-verso-hover="62">some</span> x =&gt; {(x, [v])}</span>
+<span id="L98">  | <span class="const token" data-verso-hover="437">none</span> =&gt; ∅</span>
+<span id="L99"></span>
+<span id="L100"><span class="dc">/-- `M_v` of round `r`: received values plus the own value. -/</span></span>
+<span id="L101"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="450">recvM</span> (v : V) (r : <span class="const token" data-verso-hover="58">ℕ</span>) (own : <span class="const token" data-verso-hover="434">Option</span> <span class="const token" data-verso-hover="129">ℝ</span>) (h : <span class="const token" data-verso-hover="432">Hist</span> V) : <span class="const token" data-verso-hover="66">Finset</span> (<span class="const token" data-verso-hover="177">Msg</span> V) := <span class="kw">by</span></span>
+<span id="L102">  <span class="kw">classical</span> <span class="kw">exact</span> (h.<span class="const token" data-verso-hover="451">filterMap</span> (<span class="const token" data-verso-hover="447">valOf</span> v r)).<span class="const token" data-verso-hover="271">toFinset</span> ∪ <span class="const token" data-verso-hover="449">ownSet</span> v own</span>
+<span id="L103"></span>
+<span id="L104"><span class="kw">variable</span> (G : <span class="const token" data-verso-hover="15">Digraph</span> V) (f N : <span class="const token" data-verso-hover="58">ℕ</span>)</span>
+<span id="L105"></span>
+<span id="L106"><span class="dc">/-- Maximal-Consistency (line 10). -/</span></span>
+<span id="L107"><span class="kw">def</span> <span class="const token" data-verso-hover="452">MCop</span> (v : V) (r : <span class="const token" data-verso-hover="58">ℕ</span>) (own : <span class="const token" data-verso-hover="434">Option</span> <span class="const token" data-verso-hover="129">ℝ</span>) (h : <span class="const token" data-verso-hover="432">Hist</span> V) (F' : <span class="const token" data-verso-hover="66">Finset</span> V) : <span class="kw">Prop</span> :=</span>
+<span id="L108">  <span class="const token" data-verso-hover="342">Consistent</span> (<span class="const token" data-verso-hover="453">excl</span> (<span class="const token" data-verso-hover="450">recvM</span> v r own h) F') ∧ <span class="const token" data-verso-hover="454">Full</span> G (<span class="const token" data-verso-hover="453">excl</span> (<span class="const token" data-verso-hover="450">recvM</span> v r own h) F') F' v</span>
+<span id="L109"></span>
+<span id="L110"><span class="dc">/-- Threads of `v`. -/</span></span>
+<span id="L111"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="455">threadL</span> (v : V) : <span class="const token" data-verso-hover="60">List</span> (<span class="const token" data-verso-hover="66">Finset</span> V) := <span class="kw">by</span></span>
+<span id="L112">  <span class="kw">classical</span> <span class="kw">exact</span> (<span class="const token" data-verso-hover="210">univ</span>.<span class="const token" data-verso-hover="211">filter</span> <span class="kw">fun</span> F' : <span class="const token" data-verso-hover="66">Finset</span> V =&gt; v ∉ F' ∧ F'.<span class="const token" data-verso-hover="167">card</span> ≤ f).<span class="const token" data-verso-hover="240">toList</span></span>
+<span id="L113"></span>
+<span id="L114"><span class="dc">/-- Out-neighbours of `v`. -/</span></span>
+<span id="L115"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="456">outL</span> [<span class="const token" data-verso-hover="208">DecidableRel</span> G.<span class="const token" data-verso-hover="98">Adj</span>] (v : V) : <span class="const token" data-verso-hover="60">List</span> V :=</span>
+<span id="L116">  (<span class="const token" data-verso-hover="210">univ</span>.<span class="const token" data-verso-hover="211">filter</span> <span class="kw">fun</span> w =&gt; G.<span class="const token" data-verso-hover="98">Adj</span> v w ∧ v ≠ w).<span class="const token" data-verso-hover="240">toList</span></span>
+<span id="L117"></span>
+<span id="L118"><span class="kw">section</span> Round</span>
+<span id="L119"></span>
+<span id="L120"><span class="kw">variable</span> (v : V) (r : <span class="const token" data-verso-hover="58">ℕ</span>) (own : <span class="const token" data-verso-hover="432">Hist</span> V → <span class="const token" data-verso-hover="434">Option</span> <span class="const token" data-verso-hover="129">ℝ</span>)</span>
+<span id="L121"></span>
+<span id="L122"><span class="dc">/-- The first prefix length at which Maximal-Consistency holds for thread `F'`. -/</span></span>
+<span id="L123"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="457">mcK</span> (h : <span class="const token" data-verso-hover="432">Hist</span> V) (F' : <span class="const token" data-verso-hover="66">Finset</span> V) : <span class="const token" data-verso-hover="434">Option</span> <span class="const token" data-verso-hover="58">ℕ</span> :=</span>
+<span id="L124">  <span class="const token" data-verso-hover="433">firstIdx</span> (<span class="kw">fun</span> k =&gt; <span class="const token" data-verso-hover="452">MCop</span> G v r (own (h.<span class="const token" data-verso-hover="236">take</span> k)) (h.<span class="const token" data-verso-hover="236">take</span> k) F') h.<span class="const token" data-verso-hover="118">length</span></span>
+<span id="L125"></span>
+<span id="L126"><span class="dc">/-- The content of `COMPLETE(F')`. -/</span></span>
+<span id="L127"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="458">mcContent</span> (h : <span class="const token" data-verso-hover="432">Hist</span> V) (F' : <span class="const token" data-verso-hover="66">Finset</span> V) : <span class="const token" data-verso-hover="66">Finset</span> (<span class="const token" data-verso-hover="177">Msg</span> V) :=</span>
+<span id="L128">  <span class="kw">match</span> <span class="const token" data-verso-hover="457">mcK</span> G v r own h F' <span class="kw">with</span></span>
+<span id="L129">  | <span class="const token" data-verso-hover="62">some</span> k =&gt; <span class="const token" data-verso-hover="453">excl</span> (<span class="const token" data-verso-hover="450">recvM</span> v r (own (h.<span class="const token" data-verso-hover="236">take</span> k)) (h.<span class="const token" data-verso-hover="236">take</span> k)) F'</span>
+<span id="L130">  | <span class="const token" data-verso-hover="437">none</span> =&gt; ∅</span>
+<span id="L131"></span>
+<span id="L132"><span class="dc">/-- The `COMPLETE` messages of `v` in round `r`, in sending order. -/</span></span>
+<span id="L133"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="459">compSeq</span> (h : <span class="const token" data-verso-hover="432">Hist</span> V) : <span class="const token" data-verso-hover="60">List</span> (<span class="const token" data-verso-hover="66">Finset</span> V) := <span class="kw">by</span></span>
+<span id="L134">  <span class="kw">classical</span></span>
+<span id="L135">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="460">List.range</span> (h.<span class="const token" data-verso-hover="118">length</span> + <span class="nu">1</span>)).<span class="const token" data-verso-hover="461">flatMap</span> <span class="kw">fun</span> k =&gt;</span>
+<span id="L136">    (<span class="const token" data-verso-hover="455">threadL</span> f v).<span class="const token" data-verso-hover="462">filter</span> <span class="kw">fun</span> F' =&gt; <span class="const token" data-verso-hover="457">mcK</span> G v r own h F' = <span class="const token" data-verso-hover="62">some</span> k</span>
+<span id="L137"></span>
+<span id="L138"><span class="dc">/-- The FIFO counter of `COMPLETE(F')`. -/</span></span>
+<span id="L139"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="463">counter</span> (h : <span class="const token" data-verso-hover="432">Hist</span> V) (F' : <span class="const token" data-verso-hover="66">Finset</span> V) : <span class="const token" data-verso-hover="58">ℕ</span> := <span class="kw">by</span></span>
+<span id="L140">  <span class="kw">classical</span> <span class="kw">exact</span> (<span class="const token" data-verso-hover="459">compSeq</span> G f v r own h).<span class="const token" data-verso-hover="464">idxOf</span> F'</span>
+<span id="L141"></span>
+<span id="L142"><span class="dc">/-- `v`'s own `COMPLETE` messages (received by itself along the path `[v]`). -/</span></span>
+<span id="L143"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="465">ownCR</span> (h : <span class="const token" data-verso-hover="432">Hist</span> V) : <span class="const token" data-verso-hover="66">Finset</span> (V × <span class="const token" data-verso-hover="60">List</span> V × <span class="const token" data-verso-hover="66">Finset</span> (<span class="const token" data-verso-hover="177">Msg</span> V) × <span class="const token" data-verso-hover="66">Finset</span> V) := <span class="kw">by</span></span>
+<span id="L144">  <span class="kw">classical</span></span>
+<span id="L145">  <span class="kw">exact</span> ((<span class="const token" data-verso-hover="455">threadL</span> f v).<span class="const token" data-verso-hover="462">filter</span> <span class="kw">fun</span> F' =&gt; (<span class="const token" data-verso-hover="457">mcK</span> G v r own h F').<span class="const token" data-verso-hover="466">isSome</span>).<span class="const token" data-verso-hover="271">toFinset</span>.<span class="const token" data-verso-hover="405">image</span></span>
+<span id="L146">    <span class="kw">fun</span> F' =&gt; (v, [v], <span class="const token" data-verso-hover="458">mcContent</span> G v r own h F', F')</span>
+<span id="L147"></span>
+<span id="L148"><span class="dc">/-- FIFO-received `COMPLETE` messages: all smaller counters received along the same path. -/</span></span>
+<span id="L149"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="7">fifoCR</span> (h : <span class="const token" data-verso-hover="432">Hist</span> V) : <span class="const token" data-verso-hover="66">Finset</span> (V × <span class="const token" data-verso-hover="60">List</span> V × <span class="const token" data-verso-hover="66">Finset</span> (<span class="const token" data-verso-hover="177">Msg</span> V) × <span class="const token" data-verso-hover="66">Finset</span> V) := <span class="kw">by</span></span>
+<span id="L150">  <span class="kw">classical</span></span>
+<span id="L151">  <span class="kw">exact</span> ((h.<span class="const token" data-verso-hover="451">filterMap</span> (<span class="const token" data-verso-hover="448">compOf</span> v r)).<span class="const token" data-verso-hover="462">filter</span> <span class="kw">fun</span> e =&gt; ∀ j &lt; e.<span class="const token" data-verso-hover="158">2</span><span class="nu">.</span><span class="const token" data-verso-hover="158">2</span><span class="nu">.</span><span class="const token" data-verso-hover="158">2</span><span class="nu">.</span><span class="const token" data-verso-hover="158">2</span>,</span>
+<span id="L152">    ∃ e' ∈ h.<span class="const token" data-verso-hover="451">filterMap</span> (<span class="const token" data-verso-hover="448">compOf</span> v r), e'.<span class="const token" data-verso-hover="179">1</span> = e.<span class="const token" data-verso-hover="179">1</span> ∧ e'.<span class="const token" data-verso-hover="158">2</span><span class="nu">.</span><span class="const token" data-verso-hover="179">1</span> = e.<span class="const token" data-verso-hover="158">2</span><span class="nu">.</span><span class="const token" data-verso-hover="179">1</span> ∧ e'.<span class="const token" data-verso-hover="158">2</span><span class="nu">.</span><span class="const token" data-verso-hover="158">2</span><span class="nu">.</span><span class="const token" data-verso-hover="158">2</span><span class="nu">.</span><span class="const token" data-verso-hover="158">2</span> = j).<span class="const token" data-verso-hover="271">toFinset</span>.<span class="const token" data-verso-hover="405">image</span></span>
+<span id="L153">      <span class="kw">fun</span> e =&gt; (e.<span class="const token" data-verso-hover="179">1</span>, e.<span class="const token" data-verso-hover="158">2</span><span class="nu">.</span><span class="const token" data-verso-hover="179">1</span>, e.<span class="const token" data-verso-hover="158">2</span><span class="nu">.</span><span class="const token" data-verso-hover="158">2</span><span class="nu">.</span><span class="const token" data-verso-hover="179">1</span>, e.<span class="const token" data-verso-hover="158">2</span><span class="nu">.</span><span class="const token" data-verso-hover="158">2</span><span class="nu">.</span><span class="const token" data-verso-hover="158">2</span><span class="nu">.</span><span class="const token" data-verso-hover="179">1</span>)</span>
+<span id="L154"></span>
+<span id="L155"><span class="dc">/-- All `COMPLETE` messages FIFO-received by `v` in round `r`. -/</span></span>
+<span id="L156"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="467">CRop</span> (h : <span class="const token" data-verso-hover="432">Hist</span> V) : <span class="const token" data-verso-hover="66">Finset</span> (V × <span class="const token" data-verso-hover="60">List</span> V × <span class="const token" data-verso-hover="66">Finset</span> (<span class="const token" data-verso-hover="177">Msg</span> V) × <span class="const token" data-verso-hover="66">Finset</span> V) := <span class="kw">by</span></span>
+<span id="L157">  <span class="kw">classical</span> <span class="kw">exact</span> <span class="const token" data-verso-hover="7">fifoCR</span> v r h ∪ <span class="const token" data-verso-hover="465">ownCR</span> G f v r own h</span>
+<span id="L158"></span>
+<span id="L159"><span class="dc">/-- FIFO-Receive-All (line 12). -/</span></span>
+<span id="L160"><span class="kw">def</span> <span class="const token" data-verso-hover="468">FIFORecAllOp</span> (h : <span class="const token" data-verso-hover="432">Hist</span> V) (Fv : <span class="const token" data-verso-hover="66">Finset</span> V) : <span class="kw">Prop</span> :=</span>
+<span id="L161">  ∀ c, ∃ Mc, ∀ p, <span class="const token" data-verso-hover="79">IsSimplePath</span> G p c v → (∀ y ∈ p, <span class="const token" data-verso-hover="54">Reaches</span> G Fv y v) →</span>
+<span id="L162">    (c, p, Mc, Fv) ∈ <span class="const token" data-verso-hover="467">CRop</span> G f v r own h</span>
+<span id="L163"></span>
+<span id="L164"><span class="dc">/-- `Verify` (lines 20–26). -/</span></span>
+<span id="L165"><span class="kw">def</span> <span class="const token" data-verso-hover="469">VerifyOp</span> (h : <span class="const token" data-verso-hover="432">Hist</span> V) (Fv : <span class="const token" data-verso-hover="66">Finset</span> V) : <span class="kw">Prop</span> :=</span>
+<span id="L166">  (∃ k ≤ h.<span class="const token" data-verso-hover="118">length</span>, <span class="const token" data-verso-hover="468">FIFORecAllOp</span> G f v r own (h.<span class="const token" data-verso-hover="236">take</span> k) Fv) ∧</span>
+<span id="L167">  ∀ c p Mc Fu, (c, p, Mc, Fu) ∈ <span class="const token" data-verso-hover="467">CRop</span> G f v r own h → (∀ y ∈ p, <span class="const token" data-verso-hover="54">Reaches</span> G Fv y v) →</span>
+<span id="L168">    <span class="const token" data-verso-hover="342">Consistent</span> Mc → <span class="const token" data-verso-hover="2">Completeness</span> G f v (<span class="const token" data-verso-hover="450">recvM</span> v r (own h) h) Mc Fu</span>
+<span id="L169"></span>
+<span id="L170"><span class="dc">/-- The first prefix length at which some thread verifies (Filter-and-Average, line 17). -/</span></span>
+<span id="L171"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="470">faK</span> (h : <span class="const token" data-verso-hover="432">Hist</span> V) : <span class="const token" data-verso-hover="434">Option</span> <span class="const token" data-verso-hover="58">ℕ</span> :=</span>
+<span id="L172">  <span class="const token" data-verso-hover="433">firstIdx</span> (<span class="kw">fun</span> k =&gt; ∃ Fv : <span class="const token" data-verso-hover="66">Finset</span> V, v ∉ Fv ∧ Fv.<span class="const token" data-verso-hover="167">card</span> ≤ f ∧ <span class="const token" data-verso-hover="469">VerifyOp</span> G f v r own (h.<span class="const token" data-verso-hover="236">take</span> k) Fv)</span>
+<span id="L173">    h.<span class="const token" data-verso-hover="118">length</span></span>
+<span id="L174"></span>
+<span id="L175"><span class="kw">end</span> Round</span>
+<span id="L176"></span>
+<span id="L177"><span class="dc">/-- A deterministic choice of the output of Filter-and-Average. -/</span></span>
+<span id="L178"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="471">faOut</span> (v : V) (Mv : <span class="const token" data-verso-hover="66">Finset</span> (<span class="const token" data-verso-hover="177">Msg</span> V)) : <span class="const token" data-verso-hover="129">ℝ</span> := <span class="kw">by</span></span>
+<span id="L179">  <span class="kw">classical</span> <span class="kw">exact</span> <span class="kw">if</span> hx : ∃ y, <span class="const token" data-verso-hover="238">IsFA</span> f v Mv y <span class="kw">then</span> <span class="const token" data-verso-hover="425">Classical.choose</span> hx <span class="kw">else</span> <span class="nu">0</span></span>
+<span id="L180"></span>
+<span id="L181"><span class="dc">/-- `x_v[r]` as a function of the history (`none` if round `r` has not started). -/</span></span>
+<span id="L182"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="472">xv</span> (v : V) (x : <span class="const token" data-verso-hover="129">ℝ</span>) : <span class="const token" data-verso-hover="58">ℕ</span> → <span class="const token" data-verso-hover="432">Hist</span> V → <span class="const token" data-verso-hover="434">Option</span> <span class="const token" data-verso-hover="129">ℝ</span></span>
+<span id="L183">  | <span class="nu">0</span> =&gt; <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="62">some</span> x</span>
+<span id="L184">  | r + <span class="nu">1</span> =&gt; <span class="kw">fun</span> h =&gt;</span>
+<span id="L185">    <span class="kw">if</span> r &lt; N <span class="kw">then</span></span>
+<span id="L186">      <span class="kw">match</span> <span class="const token" data-verso-hover="470">faK</span> G f v r (<span class="const token" data-verso-hover="472">xv</span> v x r) h <span class="kw">with</span></span>
+<span id="L187">      | <span class="const token" data-verso-hover="62">some</span> k =&gt; <span class="const token" data-verso-hover="62">some</span> (<span class="const token" data-verso-hover="471">faOut</span> f v (<span class="const token" data-verso-hover="450">recvM</span> v r (<span class="const token" data-verso-hover="472">xv</span> v x r (h.<span class="const token" data-verso-hover="236">take</span> k)) (h.<span class="const token" data-verso-hover="236">take</span> k)))</span>
+<span id="L188">      | <span class="const token" data-verso-hover="437">none</span> =&gt; <span class="const token" data-verso-hover="437">none</span></span>
+<span id="L189">    <span class="kw">else</span> <span class="const token" data-verso-hover="437">none</span></span>
+<span id="L190"></span>
+<span id="L191"><span class="dc">/-! ## Sends -/</span></span>
+<span id="L192"></span>
+<span id="L193"><span class="kw">section</span> Sends</span>
+<span id="L194"></span>
+<span id="L195"><span class="kw">variable</span> [<span class="const token" data-verso-hover="208">DecidableRel</span> G.<span class="const token" data-verso-hover="98">Adj</span>]</span>
+<span id="L196"></span>
+<span id="L197"><span class="dc">/-- Relaying of the last received message. -/</span></span>
+<span id="L198"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="473">relay</span> (v : V) (h : <span class="const token" data-verso-hover="432">Hist</span> V) : <span class="const token" data-verso-hover="60">List</span> (V × <span class="const token" data-verso-hover="429">BMsg</span> V) := <span class="kw">by</span></span>
+<span id="L199">  <span class="kw">classical</span></span>
+<span id="L200">  <span class="kw">exact</span> <span class="kw">match</span> h.<span class="const token" data-verso-hover="61">getLast?</span> <span class="kw">with</span></span>
+<span id="L201">  | <span class="const token" data-verso-hover="62">some</span> (u, <span class="const token" data-verso-hover="430">.</span>val r y p) =&gt;</span>
+<span id="L202">    <span class="kw">if</span> r &lt; N ∧ p.<span class="const token" data-verso-hover="61">getLast?</span> = <span class="const token" data-verso-hover="62">some</span> u ∧ ∀ e' ∈ h.<span class="const token" data-verso-hover="474">dropLast</span>, ∀ m ∈ <span class="const token" data-verso-hover="447">valOf</span> v r e', m.<span class="const token" data-verso-hover="158">2</span> ≠ p ++ [v] <span class="kw">then</span></span>
+<span id="L203">      (<span class="const token" data-verso-hover="456">outL</span> G v).<span class="const token" data-verso-hover="451">filterMap</span> <span class="kw">fun</span> w =&gt;</span>
+<span id="L204">        <span class="kw">if</span> <span class="const token" data-verso-hover="83">IsRedundant</span> G (p ++ [v, w]) <span class="kw">then</span> <span class="const token" data-verso-hover="62">some</span> (w, <span class="const token" data-verso-hover="430">.</span>val r y (p ++ [v])) <span class="kw">else</span> <span class="const token" data-verso-hover="437">none</span></span>
+<span id="L205">    <span class="kw">else</span> []</span>
+<span id="L206">  | <span class="const token" data-verso-hover="62">some</span> (u, <span class="const token" data-verso-hover="431">.</span>comp r c Mc F' k p) =&gt;</span>
+<span id="L207">    <span class="kw">if</span> r &lt; N ∧ p.<span class="const token" data-verso-hover="61">getLast?</span> = <span class="const token" data-verso-hover="62">some</span> u ∧ (p ++ [v]).<span class="const token" data-verso-hover="104">Nodup</span> <span class="kw">then</span></span>
+<span id="L208">      (<span class="const token" data-verso-hover="456">outL</span> G v).<span class="const token" data-verso-hover="451">filterMap</span> <span class="kw">fun</span> w =&gt;</span>
+<span id="L209">        <span class="kw">if</span> (p ++ [v, w]).<span class="const token" data-verso-hover="104">Nodup</span> <span class="kw">then</span> <span class="const token" data-verso-hover="62">some</span> (w, <span class="const token" data-verso-hover="431">.</span>comp r c Mc F' k (p ++ [v])) <span class="kw">else</span> <span class="const token" data-verso-hover="437">none</span></span>
+<span id="L210">    <span class="kw">else</span> []</span>
+<span id="L211">  | <span class="const token" data-verso-hover="437">none</span> =&gt; []</span>
+<span id="L212"></span>
+<span id="L213"><span class="dc">/-- Flooding of the own value of every round that starts now. -/</span></span>
+<span id="L214"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="475">newVals</span> (v : V) (x : <span class="const token" data-verso-hover="129">ℝ</span>) (h : <span class="const token" data-verso-hover="432">Hist</span> V) : <span class="const token" data-verso-hover="60">List</span> (V × <span class="const token" data-verso-hover="429">BMsg</span> V) := <span class="kw">by</span></span>
+<span id="L215">  <span class="kw">classical</span></span>
+<span id="L216">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="460">List.range</span> N).<span class="const token" data-verso-hover="461">flatMap</span> <span class="kw">fun</span> r =&gt;</span>
+<span id="L217">    <span class="kw">match</span> <span class="const token" data-verso-hover="472">xv</span> G f N v x r h <span class="kw">with</span></span>
+<span id="L218">    | <span class="const token" data-verso-hover="62">some</span> y =&gt;</span>
+<span id="L219">      <span class="kw">if</span> h = [] ∨ <span class="const token" data-verso-hover="472">xv</span> G f N v x r h.<span class="const token" data-verso-hover="474">dropLast</span> = <span class="const token" data-verso-hover="437">none</span> <span class="kw">then</span> (<span class="const token" data-verso-hover="456">outL</span> G v).<span class="const token" data-verso-hover="270">map</span> <span class="kw">fun</span> w =&gt; (w, <span class="const token" data-verso-hover="430">.</span>val r y [v])</span>
+<span id="L220">      <span class="kw">else</span> []</span>
+<span id="L221">    | <span class="const token" data-verso-hover="437">none</span> =&gt; []</span>
+<span id="L222"></span>
+<span id="L223"><span class="dc">/-- Flooding of the `COMPLETE` messages of every thread whose Maximal-Consistency holds now for</span></span>
+<span id="L224"><span class="dc">the first time. -/</span></span>
+<span id="L225"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="476">newComps</span> (v : V) (x : <span class="const token" data-verso-hover="129">ℝ</span>) (h : <span class="const token" data-verso-hover="432">Hist</span> V) : <span class="const token" data-verso-hover="60">List</span> (V × <span class="const token" data-verso-hover="429">BMsg</span> V) := <span class="kw">by</span></span>
+<span id="L226">  <span class="kw">classical</span></span>
+<span id="L227">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="460">List.range</span> N).<span class="const token" data-verso-hover="461">flatMap</span> <span class="kw">fun</span> r =&gt;</span>
+<span id="L228">    (<span class="const token" data-verso-hover="455">threadL</span> f v).<span class="const token" data-verso-hover="461">flatMap</span> <span class="kw">fun</span> F' =&gt;</span>
+<span id="L229">      <span class="kw">if</span> <span class="const token" data-verso-hover="457">mcK</span> G v r (<span class="const token" data-verso-hover="472">xv</span> G f N v x r) h F' = <span class="const token" data-verso-hover="62">some</span> h.<span class="const token" data-verso-hover="118">length</span> <span class="kw">then</span></span>
+<span id="L230">        (<span class="const token" data-verso-hover="456">outL</span> G v).<span class="const token" data-verso-hover="270">map</span> <span class="kw">fun</span> w =&gt; (w, <span class="const token" data-verso-hover="431">.</span>comp r v (<span class="const token" data-verso-hover="458">mcContent</span> G v r (<span class="const token" data-verso-hover="472">xv</span> G f N v x r) h F') F'</span>
+<span id="L231">          (<span class="const token" data-verso-hover="463">counter</span> G f v r (<span class="const token" data-verso-hover="472">xv</span> G f N v x r) h F') [v])</span>
+<span id="L232">      <span class="kw">else</span> []</span>
+<span id="L233"></span>
+<span id="L234"><span class="dc">/-- The operational Algorithm BW + Filter-and-Average with `N` rounds. -/</span></span>
+<span id="L235"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="477">spec</span> : <span class="const token" data-verso-hover="478">HistSpec</span> V (<span class="const token" data-verso-hover="429">BMsg</span> V) <span class="kw">where</span></span>
+<span id="L236">  <span class="const token" data-verso-hover="479">react</span> v x h := <span class="const token" data-verso-hover="473">relay</span> G N v h ++ <span class="const token" data-verso-hover="475">newVals</span> G f N v x h ++ <span class="const token" data-verso-hover="476">newComps</span> G f N v x h</span>
+<span id="L237">  <span class="const token" data-verso-hover="480">out</span> v x h := <span class="const token" data-verso-hover="472">xv</span> G f N v x N h</span>
+<span id="L238"></span>
+<span id="L239"><span class="dc">/-- The algorithm. -/</span></span>
+<span id="L240"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="481">alg</span> : <span class="const token" data-verso-hover="49">Algorithm</span> V (<span class="const token" data-verso-hover="429">BMsg</span> V) (<span class="const token" data-verso-hover="129">ℝ</span> × <span class="const token" data-verso-hover="432">Hist</span> V) := (<span class="const token" data-verso-hover="477">spec</span> G f N).<span class="const token" data-verso-hover="482">toAlg</span></span>
+<span id="L241"></span>
+<span id="L242"><span class="kw">end</span> Sends</span>
+<span id="L243"></span>
+<span id="L244"><span class="kw">end</span> BWOp</span>
+<span id="L245"></span>
+<span id="L246"><span class="kw">end</span> AsyncApproxBCDirected</span>
+<span id="L247"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2020/AsyncApproxBCDirected/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

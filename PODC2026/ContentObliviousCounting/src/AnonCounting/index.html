@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ContentObliviousCounting: AnonCounting.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2026/">PODC 2026</a><span class="sep">›</span><a href="PODC2026/ContentObliviousCounting/">ContentObliviousCounting</a><span class="sep">›</span><a href="PODC2026/ContentObliviousCounting/src/">Lean source</a><span class="sep">›</span><span aria-current="page">AnonCounting</span></nav>
+        <h1>
+          <code>AnonCounting.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2026/ContentObliviousCounting/">Efficient Counting and Simulation in Content-Oblivious Rings — PODC 2026</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2026/ContentObliviousCounting/AnonCounting.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="AnonCounting"><span id="L1"><span class="kw">import</span> Cslib.Computability.Distributed.ContentOblivious.Compose</span>
+<span id="L2"><span class="kw">import</span> Mathlib</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Counting in an anonymous oriented ring with a leader (Section 5, Algorithms 1–4)</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">Chalopin, Chang, Di Luna, Zhou, *Efficient Counting and Simulation in Content-Oblivious Rings*,</span></span>
+<span id="L8"><span class="dc">PODC 2026 (arXiv 2603.28260), Section 5.</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">## Model</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">Oriented ring `Cslib.ContentOblivious.oriented n` on `ZMod n` (`n ≥ 1`, including the self-loop</span></span>
+<span id="L13"><span class="dc">`n = 1` and the double link `n = 2`); `Port1 = true` is the clockwise port, linked to `Port0 = false`</span></span>
+<span id="L14"><span class="dc">of the clockwise neighbour. Asynchronous, fully defective (content-oblivious) channels, adversarial</span></span>
+<span id="L15"><span class="dc">scheduler, no failures, deterministic anonymous nodes. The only input is the leader flag (`true` at</span></span>
+<span id="L16"><span class="dc">exactly one node). See `Cslib/Computability/Distributed/ContentOblivious/Model.lean`.</span></span>
+<span id="L17"></span>
+<span id="L18"><span class="dc">## Encoding of the pseudo-code</span></span>
+<span id="L19"></span>
+<span id="L20"><span class="dc">Each blocking `receive` of Algorithms 1–4 is a program counter (`PC`); a port-specific receive is</span></span>
+<span id="L21"><span class="dc">`ready` only on that port, "receive a message on port `q`" is ready on both ports. Each reception</span></span>
+<span id="L22"><span class="dc">executes the code up to the next `receive`. The local variables `phase`, `counted`, `relayed` of</span></span>
+<span id="L23"><span class="dc">`NonLeader`, the global variable `myPhase` (`none` = never written, e.g. at the original leader),</span></span>
+<span id="L24"><span class="dc">`count` of `Leader`, and the list `L` of `RcvCount` (field `bits`; `SndCount` keeps there the bits</span></span>
+<span id="L25"><span class="dc">still to be sent) are record fields.</span></span>
+<span id="L26"></span>
+<span id="L27"><span class="dc">Ambiguities of the pseudo-code, fixed here:</span></span>
+<span id="L28"><span class="dc">* `SndCount` sends the binary digits of `count` least significant first (`Nat.digits 2`), so</span></span>
+<span id="L29"><span class="dc">  `count = 0` sends no data bits; `RcvCount` returns `Nat.ofDigits 2 L`.</span></span>
+<span id="L30"><span class="dc">* `SndCount`'s `return n`: the last leader terminates after `SndCount` (state `doneL`), with output</span></span>
+<span id="L31"><span class="dc">  `n = i(i-1)/2 + count + 1`, where `i` is its phase.</span></span>
+<span id="L32"><span class="dc">* A reception by a `NonLeader` at line 2 with `q = 1` executes lines 13–14 and then either becomes the</span></span>
+<span id="L33"><span class="dc">  new leader (lines 15–16) or waits at line 20.</span></span>
+<span id="L34"><span class="dc">* The leader's initial record has `counted = true`, `relayed = 0` (unused by `Leader`; `NonLeader`</span></span>
+<span id="L35"><span class="dc">  re-initialises them when the leader steps down, line 17 of Algorithm 2).</span></span>
+<span id="L36"><span class="dc">-/</span></span>
+<span id="L37"></span>
+<span id="L38"><span class="kw">namespace</span> Podc.ContentOblivious.AnonCounting</span>
+<span id="L39"></span>
+<span id="L40"><span class="kw">open</span> Cslib.ContentOblivious</span>
+<span id="L41"></span>
+<span id="L42"><span class="dc">/-- Program counters: one per blocking `receive` of Algorithms 1–4 (plus the two final states). -/</span></span>
+<span id="L43"><span class="kw">inductive</span> <span class="const token" data-verso-hover="454">PC</span> <span class="kw">where</span></span>
+<span id="L44">  <span class="dc">/-- Algorithm 1, line 2: `receive a message on port q` (main loop of `NonLeader`). -/</span></span>
+<span id="L45">  | <span class="const token" data-verso-hover="455">main</span></span>
+<span id="L46">  <span class="dc">/-- Algorithm 1, line 10: `receive a message on port 1` (relaying a probe back). -/</span></span>
+<span id="L47">  | <span class="const token" data-verso-hover="456">relay</span></span>
+<span id="L48">  <span class="dc">/-- Algorithm 1, line 16: `receive a message on port 0` (new leader awaiting confirmation). -/</span></span>
+<span id="L49">  | <span class="const token" data-verso-hover="457">newLeader</span></span>
+<span id="L50">  <span class="dc">/-- Algorithm 1, line 20: `receive a message on port q` (after relaying a CCW pulse). -/</span></span>
+<span id="L51">  | <span class="const token" data-verso-hover="458">wait2</span></span>
+<span id="L52">  <span class="dc">/-- Algorithm 2, line 4: `receive a message on port q` (awaiting the probe's return). -/</span></span>
+<span id="L53">  | <span class="const token" data-verso-hover="459">probe</span></span>
+<span id="L54">  <span class="dc">/-- Algorithm 2, line 9: `receive three messages on port 1`; `k` received so far. -/</span></span>
+<span id="L55">  | <span class="const token" data-verso-hover="460">fin</span> (k : <span class="const token" data-verso-hover="30">ℕ</span>)</span>
+<span id="L56">  <span class="dc">/-- Algorithm 2, line 13: `receive a message on port 1` (transfer pulse). -/</span></span>
+<span id="L57">  | <span class="const token" data-verso-hover="461">tr1</span></span>
+<span id="L58">  <span class="dc">/-- Algorithm 2, line 14: `receive a message on port 0` (confirmation pulse). -/</span></span>
+<span id="L59">  | <span class="const token" data-verso-hover="462">tr2</span></span>
+<span id="L60">  <span class="dc">/-- Algorithm 3, line 4 or 7: receive two messages for the current bit; `got` received so far. -/</span></span>
+<span id="L61">  | <span class="const token" data-verso-hover="463">sndBit</span> (got : <span class="const token" data-verso-hover="30">ℕ</span>)</span>
+<span id="L62">  <span class="dc">/-- Algorithm 3, line 9: `receive a message on port 0`. -/</span></span>
+<span id="L63">  | <span class="const token" data-verso-hover="464">sndEnd1</span></span>
+<span id="L64">  <span class="dc">/-- Algorithm 3, line 11: `receive a message on port 1`. -/</span></span>
+<span id="L65">  | <span class="const token" data-verso-hover="465">sndEnd2</span></span>
+<span id="L66">  <span class="dc">/-- Algorithm 4, line 3: `receive a message on port q`. -/</span></span>
+<span id="L67">  | <span class="const token" data-verso-hover="466">rcvQ</span></span>
+<span id="L68">  <span class="dc">/-- Algorithm 4, line 5: `receive a message on port u`, after receiving on port `q`. -/</span></span>
+<span id="L69">  | <span class="const token" data-verso-hover="467">rcvU</span> (q : <span class="const token" data-verso-hover="33">Bool</span>)</span>
+<span id="L70">  <span class="dc">/-- The (last) leader has returned from `SndCount`. -/</span></span>
+<span id="L71">  | <span class="const token" data-verso-hover="468">doneL</span></span>
+<span id="L72">  <span class="dc">/-- A non-leader has returned from `RcvCount`. -/</span></span>
+<span id="L73">  | <span class="const token" data-verso-hover="469">doneN</span></span>
+<span id="L74">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="229">DecidableEq</span></span>
+<span id="L75"></span>
+<span id="L76"><span class="dc">/-- Local state of a node. -/</span></span>
+<span id="L77"><span class="kw">structure</span> <span class="const token" data-verso-hover="470">St</span> <span class="kw">where</span></span>
+<span id="L78">  <span class="const token" data-verso-hover="471">pc</span> : <span class="const token" data-verso-hover="454">PC</span></span>
+<span id="L79">  <span class="dc">/-- `phase` (argument of `NonLeader` / `Leader`). -/</span></span>
+<span id="L80">  <span class="const token" data-verso-hover="472">phase</span> : <span class="const token" data-verso-hover="30">ℕ</span></span>
+<span id="L81">  <span class="dc">/-- `counted` (argument of `NonLeader`). -/</span></span>
+<span id="L82">  <span class="const token" data-verso-hover="473">counted</span> : <span class="const token" data-verso-hover="33">Bool</span></span>
+<span id="L83">  <span class="dc">/-- `relayed` (argument of `NonLeader`). -/</span></span>
+<span id="L84">  <span class="const token" data-verso-hover="474">relayed</span> : <span class="const token" data-verso-hover="30">ℕ</span></span>
+<span id="L85">  <span class="dc">/-- The global variable `myPhase`; `none` while undefined. -/</span></span>
+<span id="L86">  <span class="const token" data-verso-hover="6">myPhase</span> : <span class="const token" data-verso-hover="34">Option</span> <span class="const token" data-verso-hover="30">ℕ</span></span>
+<span id="L87">  <span class="dc">/-- `count` (local variable of `Leader`). -/</span></span>
+<span id="L88">  <span class="const token" data-verso-hover="475">count</span> : <span class="const token" data-verso-hover="30">ℕ</span></span>
+<span id="L89">  <span class="dc">/-- `RcvCount`: the list `L` received so far; `SndCount`: the bits still to be sent. -/</span></span>
+<span id="L90">  <span class="const token" data-verso-hover="476">bits</span> : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="30">ℕ</span></span>
+<span id="L91">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="229">DecidableEq</span></span>
+<span id="L92"></span>
+<span id="L93"><span class="dc">/-- Pulses sent: `a` on `Port0` (`false`) and `b` on `Port1` (`true`). -/</span></span>
+<span id="L94"><span class="kw">def</span> <span class="const token" data-verso-hover="477">out</span> (a b : <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="const token" data-verso-hover="33">Bool</span> → <span class="const token" data-verso-hover="30">ℕ</span> := <span class="kw">fun</span> p =&gt; <span class="kw">if</span> p <span class="kw">then</span> b <span class="kw">else</span> a</span>
+<span id="L95"></span>
+<span id="L96">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="478">out_false</span> (a b : <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="const token" data-verso-hover="477">out</span> a b <span class="const token" data-verso-hover="239">false</span> = a := <span class="const token" data-verso-hover="100">rfl</span></span>
+<span id="L97">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="479">out_true</span> (a b : <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="const token" data-verso-hover="477">out</span> a b <span class="const token" data-verso-hover="41">true</span> = b := <span class="const token" data-verso-hover="100">rfl</span></span>
+<span id="L98"></span>
+<span id="L99"><span class="dc">/-- Start sending the bits `l` (Algorithm 3, line 1 / next iteration, or lines 8 when `l = []`). -/</span></span>
+<span id="L100"><span class="kw">def</span> <span class="const token" data-verso-hover="480">sndStart</span> (s : <span class="const token" data-verso-hover="470">St</span>) (l : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="const token" data-verso-hover="470">St</span> × (<span class="const token" data-verso-hover="33">Bool</span> → <span class="const token" data-verso-hover="30">ℕ</span>) :=</span>
+<span id="L101">  <span class="kw">match</span> l <span class="kw">with</span></span>
+<span id="L102">  | [] =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="464">.</span>sndEnd1, <span class="const token" data-verso-hover="476">bits</span> := [] }, <span class="const token" data-verso-hover="477">out</span> <span class="nu">0</span> <span class="nu">1</span>)</span>
+<span id="L103">  | b :: r =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="463">.</span>sndBit <span class="nu">0</span>, <span class="const token" data-verso-hover="476">bits</span> := b :: r }, <span class="kw">if</span> b = <span class="nu">0</span> <span class="kw">then</span> <span class="const token" data-verso-hover="477">out</span> <span class="nu">2</span> <span class="nu">0</span> <span class="kw">else</span> <span class="const token" data-verso-hover="477">out</span> <span class="nu">0</span> <span class="nu">2</span>)</span>
+<span id="L104"></span>
+<span id="L105"><span class="dc">/-- Reaction to the reception of a pulse on port `q`. -/</span></span>
+<span id="L106"><span class="kw">def</span> <span class="const token" data-verso-hover="481">recv</span> (s : <span class="const token" data-verso-hover="470">St</span>) (q : <span class="const token" data-verso-hover="33">Bool</span>) : <span class="const token" data-verso-hover="470">St</span> × (<span class="const token" data-verso-hover="33">Bool</span> → <span class="const token" data-verso-hover="30">ℕ</span>) :=</span>
+<span id="L107">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="471">pc</span> <span class="kw">with</span></span>
+<span id="L108">  | <span class="const token" data-verso-hover="455">.</span>main =&gt;</span>
+<span id="L109">    <span class="kw">if</span> q = <span class="const token" data-verso-hover="239">false</span> <span class="kw">then</span></span>
+<span id="L110">      <span class="kw">if</span> s.<span class="const token" data-verso-hover="473">counted</span> = <span class="const token" data-verso-hover="239">false</span> <span class="kw">then</span></span>
+<span id="L111">        <span class="cm">--</span><span class="cm"> lines 3–6: first time counted, pong back</span></span>
+<span id="L112">        ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="473">counted</span> := <span class="const token" data-verso-hover="41">true</span>, <span class="const token" data-verso-hover="6">myPhase</span> := <span class="const token" data-verso-hover="49">some</span> s.<span class="const token" data-verso-hover="472">phase</span> }, <span class="const token" data-verso-hover="477">out</span> <span class="nu">1</span> <span class="nu">0</span>)</span>
+<span id="L113">      <span class="kw">else</span></span>
+<span id="L114">        <span class="cm">--</span><span class="cm"> lines 7–9</span></span>
+<span id="L115">        ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="474">relayed</span> := s.<span class="const token" data-verso-hover="474">relayed</span> + <span class="nu">1</span>, <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="456">.</span>relay }, <span class="const token" data-verso-hover="477">out</span> <span class="nu">0</span> <span class="nu">1</span>)</span>
+<span id="L116">    <span class="kw">else</span></span>
+<span id="L117">      <span class="cm">--</span><span class="cm"> lines 12–14</span></span>
+<span id="L118">      <span class="kw">if</span> s.<span class="const token" data-verso-hover="6">myPhase</span> = <span class="const token" data-verso-hover="49">some</span> s.<span class="const token" data-verso-hover="472">phase</span> ∧ s.<span class="const token" data-verso-hover="474">relayed</span> = <span class="nu">0</span> <span class="kw">then</span></span>
+<span id="L119">        ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="457">.</span>newLeader }, <span class="const token" data-verso-hover="477">out</span> <span class="nu">1</span> <span class="nu">1</span>)  <span class="cm">--</span><span class="cm"> line 15</span></span>
+<span id="L120">      <span class="kw">else</span> ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="458">.</span>wait2 }, <span class="const token" data-verso-hover="477">out</span> <span class="nu">1</span> <span class="nu">0</span>)</span>
+<span id="L121">  | <span class="const token" data-verso-hover="456">.</span>relay =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="455">.</span>main }, <span class="const token" data-verso-hover="477">out</span> <span class="nu">1</span> <span class="nu">0</span>)  <span class="cm">--</span><span class="cm"> line 11</span></span>
+<span id="L122">  | <span class="const token" data-verso-hover="457">.</span>newLeader =&gt;</span>
+<span id="L123">    <span class="cm">--</span><span class="cm"> lines 17–18, then Algorithm 2 lines 1–3</span></span>
+<span id="L124">    ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="459">.</span>probe, <span class="const token" data-verso-hover="472">phase</span> := s.<span class="const token" data-verso-hover="472">phase</span> + <span class="nu">1</span>, <span class="const token" data-verso-hover="475">count</span> := <span class="nu">0</span> }, <span class="const token" data-verso-hover="477">out</span> <span class="nu">0</span> <span class="nu">1</span>)</span>
+<span id="L125">  | <span class="const token" data-verso-hover="458">.</span>wait2 =&gt;</span>
+<span id="L126">    <span class="kw">if</span> q = <span class="const token" data-verso-hover="239">false</span> <span class="kw">then</span> ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="455">.</span>main, <span class="const token" data-verso-hover="472">phase</span> := s.<span class="const token" data-verso-hover="472">phase</span> + <span class="nu">1</span> }, <span class="const token" data-verso-hover="477">out</span> <span class="nu">0</span> <span class="nu">1</span>)  <span class="cm">--</span><span class="cm"> lines 21–24</span></span>
+<span id="L127">    <span class="kw">else</span> ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="466">.</span>rcvQ, <span class="const token" data-verso-hover="476">bits</span> := [] }, <span class="const token" data-verso-hover="477">out</span> <span class="nu">1</span> <span class="nu">0</span>)  <span class="cm">--</span><span class="cm"> lines 25–27</span></span>
+<span id="L128">  | <span class="const token" data-verso-hover="459">.</span>probe =&gt;</span>
+<span id="L129">    <span class="kw">if</span> q <span class="kw">then</span></span>
+<span id="L130">      <span class="cm">--</span><span class="cm"> lines 5–6 and 11, then line 3 or line 12</span></span>
+<span id="L131">      <span class="kw">if</span> s.<span class="const token" data-verso-hover="475">count</span> + <span class="nu">1</span> = s.<span class="const token" data-verso-hover="472">phase</span> <span class="kw">then</span> ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="475">count</span> := s.<span class="const token" data-verso-hover="475">count</span> + <span class="nu">1</span>, <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="461">.</span>tr1 }, <span class="const token" data-verso-hover="477">out</span> <span class="nu">1</span> <span class="nu">0</span>)</span>
+<span id="L132">      <span class="kw">else</span> ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="475">count</span> := s.<span class="const token" data-verso-hover="475">count</span> + <span class="nu">1</span> }, <span class="const token" data-verso-hover="477">out</span> <span class="nu">0</span> <span class="nu">1</span>)</span>
+<span id="L133">    <span class="kw">else</span> ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="460">.</span>fin <span class="nu">0</span> }, <span class="const token" data-verso-hover="477">out</span> <span class="nu">3</span> <span class="nu">0</span>)  <span class="cm">--</span><span class="cm"> line 8</span></span>
+<span id="L134">  | <span class="const token" data-verso-hover="460">.</span>fin k =&gt;</span>
+<span id="L135">    <span class="kw">if</span> k + <span class="nu">1</span> &lt; <span class="nu">3</span> <span class="kw">then</span> ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="460">.</span>fin (k + <span class="nu">1</span>) }, <span class="const token" data-verso-hover="477">out</span> <span class="nu">0</span> <span class="nu">0</span>)</span>
+<span id="L136">    <span class="kw">else</span> <span class="const token" data-verso-hover="480">sndStart</span> s (<span class="const token" data-verso-hover="202">Nat.digits</span> <span class="nu">2</span> s.<span class="const token" data-verso-hover="475">count</span>)  <span class="cm">--</span><span class="cm"> line 10</span></span>
+<span id="L137">  | <span class="const token" data-verso-hover="461">.</span>tr1 =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="462">.</span>tr2 }, <span class="const token" data-verso-hover="477">out</span> <span class="nu">0</span> <span class="nu">0</span>)</span>
+<span id="L138">  | <span class="const token" data-verso-hover="462">.</span>tr2 =&gt;</span>
+<span id="L139">    <span class="cm">--</span><span class="cm"> lines 15–17: NonLeader(phase + 1, true, 0)</span></span>
+<span id="L140">    ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="455">.</span>main, <span class="const token" data-verso-hover="472">phase</span> := s.<span class="const token" data-verso-hover="472">phase</span> + <span class="nu">1</span>, <span class="const token" data-verso-hover="473">counted</span> := <span class="const token" data-verso-hover="41">true</span>, <span class="const token" data-verso-hover="474">relayed</span> := <span class="nu">0</span>, <span class="const token" data-verso-hover="475">count</span> := <span class="nu">0</span> },</span>
+<span id="L141">      <span class="const token" data-verso-hover="477">out</span> <span class="nu">0</span> <span class="nu">1</span>)</span>
+<span id="L142">  | <span class="const token" data-verso-hover="463">.</span>sndBit got =&gt;</span>
+<span id="L143">    <span class="kw">if</span> got = <span class="nu">0</span> <span class="kw">then</span> ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="463">.</span>sndBit <span class="nu">1</span> }, <span class="const token" data-verso-hover="477">out</span> <span class="nu">0</span> <span class="nu">0</span>) <span class="kw">else</span> <span class="const token" data-verso-hover="480">sndStart</span> s s.<span class="const token" data-verso-hover="476">bits</span>.<span class="const token" data-verso-hover="303">tail</span></span>
+<span id="L144">  | <span class="const token" data-verso-hover="464">.</span>sndEnd1 =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="465">.</span>sndEnd2 }, <span class="const token" data-verso-hover="477">out</span> <span class="nu">1</span> <span class="nu">0</span>)  <span class="cm">--</span><span class="cm"> line 10</span></span>
+<span id="L145">  | <span class="const token" data-verso-hover="465">.</span>sndEnd2 =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="468">.</span>doneL }, <span class="const token" data-verso-hover="477">out</span> <span class="nu">0</span> <span class="nu">0</span>)  <span class="cm">--</span><span class="cm"> line 12</span></span>
+<span id="L146">  | <span class="const token" data-verso-hover="466">.</span>rcvQ =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="467">.</span>rcvU q }, <span class="kw">if</span> q <span class="kw">then</span> <span class="const token" data-verso-hover="477">out</span> <span class="nu">1</span> <span class="nu">0</span> <span class="kw">else</span> <span class="const token" data-verso-hover="477">out</span> <span class="nu">0</span> <span class="nu">1</span>)  <span class="cm">--</span><span class="cm"> line 4</span></span>
+<span id="L147">  | <span class="const token" data-verso-hover="467">.</span>rcvU q₀ =&gt;</span>
+<span id="L148">    <span class="kw">let</span> o := <span class="kw">if</span> q <span class="kw">then</span> <span class="const token" data-verso-hover="477">out</span> <span class="nu">1</span> <span class="nu">0</span> <span class="kw">else</span> <span class="const token" data-verso-hover="477">out</span> <span class="nu">0</span> <span class="nu">1</span>  <span class="cm">--</span><span class="cm"> line 6</span></span>
+<span id="L149">    <span class="kw">match</span> q₀, q <span class="kw">with</span></span>
+<span id="L150">    | <span class="const token" data-verso-hover="41">true</span>, <span class="const token" data-verso-hover="41">true</span> =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="466">.</span>rcvQ, <span class="const token" data-verso-hover="476">bits</span> := s.<span class="const token" data-verso-hover="476">bits</span> ++ [<span class="nu">0</span>] }, o)</span>
+<span id="L151">    | <span class="const token" data-verso-hover="239">false</span>, <span class="const token" data-verso-hover="239">false</span> =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="466">.</span>rcvQ, <span class="const token" data-verso-hover="476">bits</span> := s.<span class="const token" data-verso-hover="476">bits</span> ++ [<span class="nu">1</span>] }, o)</span>
+<span id="L152">    | <span class="const token" data-verso-hover="239">false</span>, <span class="const token" data-verso-hover="41">true</span> =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="469">.</span>doneN }, o)</span>
+<span id="L153">    | <span class="const token" data-verso-hover="41">true</span>, <span class="const token" data-verso-hover="239">false</span> =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="471">pc</span> := <span class="const token" data-verso-hover="466">.</span>rcvQ }, o)</span>
+<span id="L154">  | <span class="const token" data-verso-hover="468">.</span>doneL =&gt; (s, <span class="const token" data-verso-hover="477">out</span> <span class="nu">0</span> <span class="nu">0</span>)</span>
+<span id="L155">  | <span class="const token" data-verso-hover="469">.</span>doneN =&gt; (s, <span class="const token" data-verso-hover="477">out</span> <span class="nu">0</span> <span class="nu">0</span>)</span>
+<span id="L156"></span>
+<span id="L157"><span class="dc">/-- Ports on which a node is willing to read. -/</span></span>
+<span id="L158"><span class="kw">def</span> <span class="const token" data-verso-hover="482">ready</span> (s : <span class="const token" data-verso-hover="470">St</span>) (q : <span class="const token" data-verso-hover="33">Bool</span>) : <span class="const token" data-verso-hover="33">Bool</span> :=</span>
+<span id="L159">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="471">pc</span> <span class="kw">with</span></span>
+<span id="L160">  | <span class="const token" data-verso-hover="455">.</span>main | <span class="const token" data-verso-hover="458">.</span>wait2 | <span class="const token" data-verso-hover="459">.</span>probe | <span class="const token" data-verso-hover="466">.</span>rcvQ | <span class="const token" data-verso-hover="467">.</span>rcvU _ =&gt; <span class="const token" data-verso-hover="41">true</span></span>
+<span id="L161">  | <span class="const token" data-verso-hover="456">.</span>relay | <span class="const token" data-verso-hover="460">.</span>fin _ | <span class="const token" data-verso-hover="461">.</span>tr1 | <span class="const token" data-verso-hover="465">.</span>sndEnd2 =&gt; q</span>
+<span id="L162">  | <span class="const token" data-verso-hover="457">.</span>newLeader | <span class="const token" data-verso-hover="462">.</span>tr2 | <span class="const token" data-verso-hover="464">.</span>sndEnd1 =&gt; !q</span>
+<span id="L163">  | <span class="const token" data-verso-hover="463">.</span>sndBit _ =&gt; <span class="kw">if</span> s.<span class="const token" data-verso-hover="476">bits</span>.<span class="const token" data-verso-hover="483">head?</span> = <span class="const token" data-verso-hover="49">some</span> <span class="nu">0</span> <span class="kw">then</span> q <span class="kw">else</span> !q</span>
+<span id="L164">  | <span class="const token" data-verso-hover="468">.</span>doneL | <span class="const token" data-verso-hover="469">.</span>doneN =&gt; <span class="const token" data-verso-hover="239">false</span></span>
+<span id="L165"></span>
+<span id="L166"><span class="dc">/-- Terminated states. -/</span></span>
+<span id="L167"><span class="kw">def</span> <span class="const token" data-verso-hover="484">terminated</span> (s : <span class="const token" data-verso-hover="470">St</span>) : <span class="const token" data-verso-hover="33">Bool</span> :=</span>
+<span id="L168">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="471">pc</span> <span class="kw">with</span></span>
+<span id="L169">  | <span class="const token" data-verso-hover="468">.</span>doneL | <span class="const token" data-verso-hover="469">.</span>doneN =&gt; <span class="const token" data-verso-hover="41">true</span></span>
+<span id="L170">  | _ =&gt; <span class="const token" data-verso-hover="239">false</span></span>
+<span id="L171"></span>
+<span id="L172"><span class="dc">/-- Initial state of the leader: `Leader(phase = 1)` has sent its first probe (line 3). -/</span></span>
+<span id="L173"><span class="kw">def</span> <span class="const token" data-verso-hover="485">leaderInit</span> : <span class="const token" data-verso-hover="470">St</span> := ⟨<span class="const token" data-verso-hover="459">.</span>probe, <span class="nu">1</span>, <span class="const token" data-verso-hover="41">true</span>, <span class="nu">0</span>, <span class="const token" data-verso-hover="77">none</span>, <span class="nu">0</span>, []⟩</span>
+<span id="L174"></span>
+<span id="L175"><span class="dc">/-- Initial state of a non-leader: `NonLeader(phase = 1, counted = false, relayed = 0)`. -/</span></span>
+<span id="L176"><span class="kw">def</span> <span class="const token" data-verso-hover="486">nonLeaderInit</span> : <span class="const token" data-verso-hover="470">St</span> := ⟨<span class="const token" data-verso-hover="455">.</span>main, <span class="nu">1</span>, <span class="const token" data-verso-hover="239">false</span>, <span class="nu">0</span>, <span class="const token" data-verso-hover="77">none</span>, <span class="nu">0</span>, []⟩</span>
+<span id="L177"></span>
+<span id="L178"><span class="dc">/-- The paper's `i(i-1)/2`: number of nodes probed in phases `1, …, i - 1`. -/</span></span>
+<span id="L179"><span class="kw">def</span> <span class="const token" data-verso-hover="487">tri</span> : <span class="const token" data-verso-hover="30">ℕ</span> → <span class="const token" data-verso-hover="30">ℕ</span></span>
+<span id="L180">  | <span class="nu">0</span> =&gt; <span class="nu">0</span></span>
+<span id="L181">  | j + <span class="nu">1</span> =&gt; <span class="const token" data-verso-hover="487">tri</span> j + j</span>
+<span id="L182"></span>
+<span id="L183"><span class="dc">/-- The ring size computed by a node in phase `i` with `count` (paper, "Ring size"). -/</span></span>
+<span id="L184"><span class="kw">def</span> <span class="const token" data-verso-hover="488">ringSize</span> (i count : <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="const token" data-verso-hover="30">ℕ</span> := i * (i - <span class="nu">1</span>) / <span class="nu">2</span> + count + <span class="nu">1</span></span>
+<span id="L185"></span>
+<span id="L186"><span class="dc">/-- The **corrected** distance formula. `i` = final phase, `N` = ring size, `mp` = `myPhase`,</span></span>
+<span id="L187"><span class="dc">`k` = `relayed - 1` (non-leaders) or `relayed` (the last leader). -/</span></span>
+<span id="L188"><span class="kw">def</span> <span class="const token" data-verso-hover="489">corrDist</span> (i N : <span class="const token" data-verso-hover="30">ℕ</span>) (mp : <span class="const token" data-verso-hover="34">Option</span> <span class="const token" data-verso-hover="30">ℕ</span>) (k : <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="const token" data-verso-hover="30">ℕ</span> :=</span>
+<span id="L189">  <span class="kw">match</span> mp <span class="kw">with</span></span>
+<span id="L190">  | <span class="const token" data-verso-hover="77">none</span> =&gt; <span class="nu">0</span></span>
+<span id="L191">  | <span class="const token" data-verso-hover="49">some</span> m =&gt; <span class="kw">if</span> m &lt; i <span class="kw">then</span> m * (m + <span class="nu">1</span>) / <span class="nu">2</span> - k <span class="kw">else</span> N - k - <span class="nu">1</span></span>
+<span id="L192"></span>
+<span id="L193"><span class="dc">/-- The distance formula **as stated in the paper** (p. 9); undefined (`none`) if `myPhase` is. -/</span></span>
+<span id="L194"><span class="kw">def</span> <span class="const token" data-verso-hover="490">paperDist</span> (i N : <span class="const token" data-verso-hover="30">ℕ</span>) (mp : <span class="const token" data-verso-hover="34">Option</span> <span class="const token" data-verso-hover="30">ℕ</span>) (k : <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="const token" data-verso-hover="34">Option</span> <span class="const token" data-verso-hover="30">ℕ</span> :=</span>
+<span id="L195">  <span class="kw">match</span> mp <span class="kw">with</span></span>
+<span id="L196">  | <span class="const token" data-verso-hover="77">none</span> =&gt; <span class="const token" data-verso-hover="77">none</span></span>
+<span id="L197">  | <span class="const token" data-verso-hover="49">some</span> m =&gt; <span class="const token" data-verso-hover="49">some</span> (<span class="kw">if</span> m &lt; i <span class="kw">then</span> m * (m + <span class="nu">1</span>) / <span class="nu">2</span> - k - <span class="nu">1</span> <span class="kw">else</span> N - k - <span class="nu">1</span>)</span>
+<span id="L198"></span>
+<span id="L199"><span class="dc">/-- The `k` of the paper's distance formula: `relayed` for the last leader, `relayed - 1` for every</span></span>
+<span id="L200"><span class="dc">other process. -/</span></span>
+<span id="L201"><span class="kw">def</span> <span class="const token" data-verso-hover="491">kOf</span> (s : <span class="const token" data-verso-hover="470">St</span>) : <span class="const token" data-verso-hover="30">ℕ</span> := <span class="kw">if</span> s.<span class="const token" data-verso-hover="471">pc</span> = <span class="const token" data-verso-hover="468">.</span>doneL <span class="kw">then</span> s.<span class="const token" data-verso-hover="474">relayed</span> <span class="kw">else</span> s.<span class="const token" data-verso-hover="474">relayed</span> - <span class="nu">1</span></span>
+<span id="L202"></span>
+<span id="L203"><span class="dc">/-- The `count` known to a terminated node: its own (last leader) or the received one. -/</span></span>
+<span id="L204"><span class="kw">def</span> <span class="const token" data-verso-hover="492">countOf</span> (s : <span class="const token" data-verso-hover="470">St</span>) : <span class="const token" data-verso-hover="30">ℕ</span> := <span class="kw">if</span> s.<span class="const token" data-verso-hover="471">pc</span> = <span class="const token" data-verso-hover="468">.</span>doneL <span class="kw">then</span> s.<span class="const token" data-verso-hover="475">count</span> <span class="kw">else</span> <span class="const token" data-verso-hover="205">Nat.ofDigits</span> <span class="nu">2</span> s.<span class="const token" data-verso-hover="476">bits</span></span>
+<span id="L205"></span>
+<span id="L206"><span class="dc">/-- Output of a terminated node: (ring size, clockwise distance from the leader). -/</span></span>
+<span id="L207"><span class="kw">def</span> <span class="const token" data-verso-hover="493">result</span> (s : <span class="const token" data-verso-hover="470">St</span>) : <span class="const token" data-verso-hover="34">Option</span> (<span class="const token" data-verso-hover="30">ℕ</span> × <span class="const token" data-verso-hover="30">ℕ</span>) :=</span>
+<span id="L208">  <span class="kw">if</span> <span class="const token" data-verso-hover="484">terminated</span> s <span class="kw">then</span></span>
+<span id="L209">    <span class="kw">let</span> N := <span class="const token" data-verso-hover="488">ringSize</span> s.<span class="const token" data-verso-hover="472">phase</span> (<span class="const token" data-verso-hover="492">countOf</span> s)</span>
+<span id="L210">    <span class="const token" data-verso-hover="49">some</span> (N, <span class="const token" data-verso-hover="489">corrDist</span> s.<span class="const token" data-verso-hover="472">phase</span> N s.<span class="const token" data-verso-hover="6">myPhase</span> (<span class="const token" data-verso-hover="491">kOf</span> s))</span>
+<span id="L211">  <span class="kw">else</span> <span class="const token" data-verso-hover="77">none</span></span>
+<span id="L212"></span>
+<span id="L213"><span class="dc">/-- The paper's distance output of a terminated node. -/</span></span>
+<span id="L214"><span class="kw">def</span> <span class="const token" data-verso-hover="494">paperResult</span> (s : <span class="const token" data-verso-hover="470">St</span>) : <span class="const token" data-verso-hover="34">Option</span> <span class="const token" data-verso-hover="30">ℕ</span> :=</span>
+<span id="L215">  <span class="kw">if</span> <span class="const token" data-verso-hover="484">terminated</span> s <span class="kw">then</span> <span class="const token" data-verso-hover="490">paperDist</span> s.<span class="const token" data-verso-hover="472">phase</span> (<span class="const token" data-verso-hover="488">ringSize</span> s.<span class="const token" data-verso-hover="472">phase</span> (<span class="const token" data-verso-hover="492">countOf</span> s)) s.<span class="const token" data-verso-hover="6">myPhase</span> (<span class="const token" data-verso-hover="491">kOf</span> s)</span>
+<span id="L216">  <span class="kw">else</span> <span class="const token" data-verso-hover="77">none</span></span>
+<span id="L217"></span>
+<span id="L218"><span class="dc">/-- **The counting algorithm of Section 5** (Algorithms 1–4) as a procedure with input "is the</span></span>
+<span id="L219"><span class="dc">leader" and result (ring size, clockwise distance from the leader). -/</span></span>
+<span id="L220"><span class="kw">def</span> <span class="const token" data-verso-hover="495">anonCount</span> : <span class="const token" data-verso-hover="32">Proc</span> <span class="const token" data-verso-hover="33">Bool</span> (<span class="const token" data-verso-hover="30">ℕ</span> × <span class="const token" data-verso-hover="30">ℕ</span>) <span class="kw">where</span></span>
+<span id="L221">  <span class="const token" data-verso-hover="197">State</span> := <span class="const token" data-verso-hover="470">St</span></span>
+<span id="L222">  <span class="const token" data-verso-hover="83">init</span> b := <span class="kw">if</span> b <span class="kw">then</span> (<span class="const token" data-verso-hover="485">leaderInit</span>, <span class="const token" data-verso-hover="477">out</span> <span class="nu">0</span> <span class="nu">1</span>) <span class="kw">else</span> (<span class="const token" data-verso-hover="486">nonLeaderInit</span>, <span class="const token" data-verso-hover="477">out</span> <span class="nu">0</span> <span class="nu">0</span>)</span>
+<span id="L223">  <span class="const token" data-verso-hover="393">recv</span> := <span class="const token" data-verso-hover="481">recv</span></span>
+<span id="L224">  <span class="const token" data-verso-hover="394">ready</span> := <span class="const token" data-verso-hover="482">ready</span></span>
+<span id="L225">  <span class="const token" data-verso-hover="395">terminated</span> := <span class="const token" data-verso-hover="484">terminated</span></span>
+<span id="L226">  <span class="const token" data-verso-hover="82">result</span> := <span class="const token" data-verso-hover="493">result</span></span>
+<span id="L227">  <span class="const token" data-verso-hover="396">terminated_eq</span> s := <span class="kw">by</span></span>
+<span id="L228">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="493">result</span>; <span class="kw">split</span> &lt;;&gt; <span class="kw">simp_all</span></span>
+<span id="L229"></span>
+<span id="L230"><span class="dc">/-- Input assignment: the leader flag, `true` exactly at `ℓ`. -/</span></span>
+<span id="L231"><span class="kw">def</span> <span class="const token" data-verso-hover="496">leaderInput</span> {n : <span class="const token" data-verso-hover="30">ℕ</span>} (ℓ : <span class="const token" data-verso-hover="38">ZMod</span> n) : <span class="const token" data-verso-hover="38">ZMod</span> n → <span class="const token" data-verso-hover="33">Bool</span> := <span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="117">decide</span> (v = ℓ)</span>
+<span id="L232"></span>
+<span id="L233"><span class="kw">end</span> Podc.ContentOblivious.AnonCounting</span>
+<span id="L234"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2026/ContentObliviousCounting/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

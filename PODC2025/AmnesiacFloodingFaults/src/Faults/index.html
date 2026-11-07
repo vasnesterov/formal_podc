@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>AmnesiacFloodingFaults: Faults.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2025/">PODC 2025</a><span class="sep">›</span><a href="PODC2025/AmnesiacFloodingFaults/">AmnesiacFloodingFaults</a><span class="sep">›</span><a href="PODC2025/AmnesiacFloodingFaults/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Faults</span></nav>
+        <h1>
+          <code>Faults.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2025/AmnesiacFloodingFaults/">Amnesiac Flooding: Easy to Break, Difficult to Escape — PODC 2025</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2025/AmnesiacFloodingFaults/Faults.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Faults"><span id="L1"><span class="kw">import</span> Papers.PODC2025.AmnesiacFloodingFaults.Theorem51</span>
+<span id="L2"><span class="kw">import</span> Papers.PODC2025.AmnesiacFloodingFaults.OneMessage</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Fault sensitivity (Section 5.2.2, Appendix D): Theorems 5.6, 5.7, 5.8</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">Fault models (Section 5.2.2), with the natural indexing: faults may act from the very first</span></span>
+<span id="L8"><span class="dc">round on (see `differencies.md` for the paper's literal indexing).</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">* **Message dropping** — the fault-free single-source run `srcRun G s t = A_∅^t(A_{{s}}(∅))`</span></span>
+<span id="L11"><span class="dc">  loses the message `m` of round `k`; the run continues from `srcRun G s k \ {m}`.</span></span>
+<span id="L12"><span class="dc">* **Uni-directional link failure** — `uniRun G I X`: every round, the messages in the set `X`</span></span>
+<span id="L13"><span class="dc">  of failed directed links are lost.</span></span>
+<span id="L14"><span class="dc">* **Weak-Byzantine nodes** — `byzRun G I J k B`: until round `k` the nodes of `J` send the</span></span>
+<span id="L15"><span class="dc">  messages `B t` of the adversary's choice (along edges); the other nodes follow the protocol;</span></span>
+<span id="L16"><span class="dc">  from round `k` on everybody follows the protocol.</span></span>
+<span id="L17"></span>
+<span id="L18"><span class="dc">Main results:</span></span>
+<span id="L19"><span class="dc">* `theorem_5_6_nonterm` — dropping a message on a non-bridge, or on the path of a faux-even cycle,</span></span>
+<span id="L20"><span class="dc">  makes single-source amnesiac flooding non-terminating (Theorem 5.6, first part).</span></span>
+<span id="L21"><span class="dc">* `fails_of_failed_link` — if the link `a → b` fails but `b → a` works, flooding initiated at `a`</span></span>
+<span id="L22"><span class="dc">  fails to broadcast or fails to terminate. Corollaries: `theorem_5_7_singleton` (first claim of</span></span>
+<span id="L23"><span class="dc">  Theorem 5.7 for a single initiator; false for larger initiator sets, see</span></span>
+<span id="L24"><span class="dc">  `theorem_5_7_multi_false`) and `theorem_5_7_second` (second claim).</span></span>
+<span id="L25"><span class="dc">* `theorem_5_8_nonterm` — a weak-Byzantine set `J` can force non-termination iff some member of</span></span>
+<span id="L26"><span class="dc">  `J` lies on a cycle or on a path between two odd cycles (Theorem 5.8, second part).</span></span>
+<span id="L27"><span class="dc">-/</span></span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">namespace</span> AmnesiacFloodingFaults</span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">open</span> SimpleGraph Finset</span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">variable</span> {V : <span class="kw">Type</span>*} {G : <span class="const token" data-verso-hover="49">SimpleGraph</span> V}</span>
+<span id="L34"></span>
+<span id="L35"><span class="dc">/-! ### Single message drop (Theorem 5.6) -/</span></span>
+<span id="L36"></span>
+<span id="L37"><span class="kw">variable</span> (G) <span class="kw">in</span></span>
+<span id="L38"><span class="dc">/-- The fault-free run of single-source amnesiac flooding: `srcRun G s t` is the set of messages</span></span>
+<span id="L39"><span class="dc">sent in round `t + 1`. -/</span></span>
+<span id="L40"><span class="kw">def</span> <span class="const token" data-verso-hover="11">srcRun</span> (s : V) (t : <span class="const token" data-verso-hover="50">ℕ</span>) : <span class="const token" data-verso-hover="52">Config</span> V := (<span class="const token" data-verso-hover="188">af</span> G)^[t] (<span class="const token" data-verso-hover="187">step</span> G {s} ∅)</span>
+<span id="L41"></span>
+<span id="L42"><span class="kw">lemma</span> <span class="const token" data-verso-hover="305">srcRun_reachable</span> (s : V) (t : <span class="const token" data-verso-hover="50">ℕ</span>) : <span class="const token" data-verso-hover="10">Reachable</span> G (<span class="const token" data-verso-hover="11">srcRun</span> G s t) := <span class="kw">by</span></span>
+<span id="L43">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L44">  | <span class="const token" data-verso-hover="110">zero</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="197">reachable_empty</span>.<span class="const token" data-verso-hover="198">step</span> {s}</span>
+<span id="L45">  | <span class="const token" data-verso-hover="111">succ</span> t ih =&gt;</span>
+<span id="L46">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="11">srcRun</span>, <span class="const token" data-verso-hover="204">Function.iterate_succ_apply'</span>]</span>
+<span id="L47">    <span class="kw">exact</span> ih.<span class="const token" data-verso-hover="198">step</span> ∅</span>
+<span id="L48"></span>
+<span id="L49"><span class="dc">/-- **Theorem 5.6** (single message failure, non-termination). If single-source amnesiac</span></span>
+<span id="L50"><span class="dc">flooding loses the message `(u, v)` in some round, and `uv` is not a bridge or `uv` lies on a</span></span>
+<span id="L51"><span class="dc">path between two odd cycles (the path of a faux-even cycle), then flooding does not terminate. -/</span></span>
+<span id="L52"><span class="kw">theorem</span> <span class="const token" data-verso-hover="36">theorem_5_6_nonterm</span> [<span class="const token" data-verso-hover="190">Fintype</span> V] {s u v : V} {k : <span class="const token" data-verso-hover="50">ℕ</span>} (hm : (u, v) ∈ <span class="const token" data-verso-hover="11">srcRun</span> G s k)</span>
+<span id="L53">    (h : ¬ G.<span class="const token" data-verso-hover="304">IsBridge</span> s(u, v) ∨ ∃ F : <span class="const token" data-verso-hover="360">FEC</span> G, s(u, v) ∈ F.<span class="const token" data-verso-hover="364">p</span>.<span class="const token" data-verso-hover="310">edges</span>) :</span>
+<span id="L54">    ¬ <span class="const token" data-verso-hover="228">Terminates</span> G (<span class="const token" data-verso-hover="11">srcRun</span> G s k \ {(u, v)}) := <span class="kw">by</span></span>
+<span id="L55">  <span class="kw">intro</span> ht</span>
+<span id="L56">  <span class="kw">have</span> hS := (<span class="const token" data-verso-hover="305">srcRun_reachable</span> (G := G) s k).<span class="const token" data-verso-hover="226">balancedAll</span></span>
+<span id="L57">  <span class="kw">have</span> hadj : G.<span class="const token" data-verso-hover="162">Adj</span> u v := (<span class="const token" data-verso-hover="305">srcRun_reachable</span> (G := G) s k).<span class="const token" data-verso-hover="259">isConfig</span> u v hm</span>
+<span id="L58">  <span class="kw">exact</span> <span class="const token" data-verso-hover="380">not_balancedAll_sdiff</span> hS hm hadj h ht.<span class="const token" data-verso-hover="27">balancedAll</span></span>
+<span id="L59"></span>
+<span id="L60"><span class="dc">/-! ### Uni-directional link failures (Theorem 5.7) -/</span></span>
+<span id="L61"></span>
+<span id="L62"><span class="kw">variable</span> (G) <span class="kw">in</span></span>
+<span id="L63"><span class="dc">/-- Amnesiac flooding from the initiators `I` when the directed links in `X` have failed:</span></span>
+<span id="L64"><span class="dc">`uniRun G I X t` is the set of messages delivered in round `t + 1`. -/</span></span>
+<span id="L65"><span class="kw">def</span> <span class="const token" data-verso-hover="18">uniRun</span> (I : <span class="const token" data-verso-hover="178">Set</span> V) (X : <span class="const token" data-verso-hover="178">Set</span> (V × V)) : <span class="const token" data-verso-hover="50">ℕ</span> → <span class="const token" data-verso-hover="52">Config</span> V</span>
+<span id="L66">  | <span class="nu">0</span> =&gt; <span class="const token" data-verso-hover="187">step</span> G I ∅ \ X</span>
+<span id="L67">  | t + <span class="nu">1</span> =&gt; <span class="const token" data-verso-hover="188">af</span> G (<span class="const token" data-verso-hover="18">uniRun</span> I X t) \ X</span>
+<span id="L68"></span>
+<span id="L69"><span class="kw">variable</span> (G) <span class="kw">in</span></span>
+<span id="L70"><span class="dc">/-- Flooding from `I` with failed links `X` fails to terminate or fails to broadcast (some</span></span>
+<span id="L71"><span class="dc">non-initiator never receives the message). -/</span></span>
+<span id="L72"><span class="kw">def</span> <span class="const token" data-verso-hover="347">UniFails</span> (I : <span class="const token" data-verso-hover="178">Set</span> V) (X : <span class="const token" data-verso-hover="178">Set</span> (V × V)) : <span class="kw">Prop</span> :=</span>
+<span id="L73">  (∀ t, <span class="const token" data-verso-hover="18">uniRun</span> G I X t ≠ ∅) ∨ ∃ v, v ∉ I ∧ ∀ t, ¬ <span class="const token" data-verso-hover="185">Active</span> (<span class="const token" data-verso-hover="18">uniRun</span> G I X t) v</span>
+<span id="L74"></span>
+<span id="L75"><span class="kw">lemma</span> <span class="const token" data-verso-hover="381">exists_walk_of_reflTransGen</span> {X : <span class="const token" data-verso-hover="178">Set</span> (V × V)} {a b : V}</span>
+<span id="L76">    (h : <span class="const token" data-verso-hover="382">Relation.ReflTransGen</span> (<span class="kw">fun</span> x y =&gt; G.<span class="const token" data-verso-hover="162">Adj</span> x y ∧ (x, y) ∉ X) a b) :</span>
+<span id="L77">    ∃ p : G.<span class="const token" data-verso-hover="135">Walk</span> a b, ∀ d ∈ p.<span class="const token" data-verso-hover="383">darts</span>, d.<span class="const token" data-verso-hover="247">toProd</span> ∉ X := <span class="kw">by</span></span>
+<span id="L78">  <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L79">  | <span class="const token" data-verso-hover="384">refl</span> =&gt; <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="145">Walk.nil</span>, <span class="kw">by</span> <span class="kw">simp</span>⟩</span>
+<span id="L80">  | <span class="const token" data-verso-hover="385">tail</span> _ hyz ih =&gt;</span>
+<span id="L81">    <span class="kw">obtain</span> ⟨p, hp⟩ := ih</span>
+<span id="L82">    <span class="kw">refine</span> ⟨p.<span class="const token" data-verso-hover="163">concat</span> hyz.<span class="const token" data-verso-hover="133">1</span>, <span class="kw">fun</span> d hd =&gt; ?_⟩</span>
+<span id="L83">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="386">Walk.darts_concat</span>, <span class="const token" data-verso-hover="387">List.concat_eq_append</span>, <span class="const token" data-verso-hover="388">List.mem_append</span>] <span class="kw">at</span> hd</span>
+<span id="L84">    <span class="kw">rcases</span> hd <span class="kw">with</span> hd | hd</span>
+<span id="L85">    · <span class="kw">exact</span> hp d hd</span>
+<span id="L86">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="389">List.mem_singleton</span>] <span class="kw">at</span> hd; <span class="kw">subst</span> hd; <span class="kw">exact</span> hyz.<span class="const token" data-verso-hover="181">2</span></span>
+<span id="L87"></span>
+<span id="L88"><span class="kw">lemma</span> <span class="const token" data-verso-hover="390">getVert_pair_notMem</span> {X : <span class="const token" data-verso-hover="178">Set</span> (V × V)} {x y : V} (p : G.<span class="const token" data-verso-hover="135">Walk</span> x y)</span>
+<span id="L89">    (hp : ∀ d ∈ p.<span class="const token" data-verso-hover="383">darts</span>, d.<span class="const token" data-verso-hover="247">toProd</span> ∉ X) {i : <span class="const token" data-verso-hover="50">ℕ</span>} (hi : i &lt; p.<span class="const token" data-verso-hover="136">length</span>) :</span>
+<span id="L90">    (p.<span class="const token" data-verso-hover="137">getVert</span> i, p.<span class="const token" data-verso-hover="137">getVert</span> (i + <span class="nu">1</span>)) ∉ X := <span class="kw">by</span></span>
+<span id="L91">  <span class="kw">induction</span> p generalizing i <span class="kw">with</span></span>
+<span id="L92">  | <span class="const token" data-verso-hover="145">nil</span> =&gt; <span class="kw">simp</span> <span class="kw">at</span> hi</span>
+<span id="L93">  | <span class="const token" data-verso-hover="146">cons</span> h q ih =&gt;</span>
+<span id="L94">    <span class="kw">cases</span> i <span class="kw">with</span></span>
+<span id="L95">    | <span class="const token" data-verso-hover="110">zero</span> =&gt;</span>
+<span id="L96">      <span class="kw">simpa</span> [<span class="const token" data-verso-hover="149">Walk.getVert_cons_succ</span>] <span class="kw">using</span> hp _ (<span class="const token" data-verso-hover="391">List.mem_cons_self</span> ..)</span>
+<span id="L97">    | <span class="const token" data-verso-hover="111">succ</span> i =&gt;</span>
+<span id="L98">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="149">Walk.getVert_cons_succ</span>, <span class="const token" data-verso-hover="149">Walk.getVert_cons_succ</span>]</span>
+<span id="L99">      <span class="kw">exact</span> ih (<span class="kw">fun</span> d hd =&gt; hp d (<span class="const token" data-verso-hover="392">List.mem_cons_of_mem</span> _ hd)) (<span class="kw">by</span> <span class="kw">simp</span> <span class="kw">at</span> hi; <span class="kw">omega</span>)</span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- Flow is non-decreasing under a round with link failures, along a closed walk all of whose</span></span>
+<span id="L102"><span class="dc">clockwise links work. -/</span></span>
+<span id="L103"><span class="kw">lemma</span> <span class="const token" data-verso-hover="393">flowSum_le_of_failures</span> [<span class="const token" data-verso-hover="58">NeZero</span> L'] {w : <span class="const token" data-verso-hover="60">ZMod</span> L' → V} (hw : <span class="const token" data-verso-hover="139">IsClosedWalk</span> G w)</span>
+<span id="L104">    (S : <span class="const token" data-verso-hover="52">Config</span> V) (X : <span class="const token" data-verso-hover="178">Set</span> (V × V)) (hX : ∀ k, (w k, w (k + <span class="nu">1</span>)) ∉ X) :</span>
+<span id="L105">    <span class="const token" data-verso-hover="59">flowSum</span> S w ≤ <span class="const token" data-verso-hover="59">flowSum</span> (<span class="const token" data-verso-hover="188">af</span> G S \ X) w := <span class="kw">by</span></span>
+<span id="L106">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="87">sum_cw_sub_ccw</span>, ← <span class="const token" data-verso-hover="87">sum_cw_sub_ccw</span>]</span>
+<span id="L107">  <span class="kw">have</span> hshift : ∑ k, (<span class="const token" data-verso-hover="54">ind</span> (<span class="const token" data-verso-hover="88">cw</span> S w (k - <span class="nu">1</span>)) - <span class="const token" data-verso-hover="54">ind</span> (<span class="const token" data-verso-hover="89">ccw</span> S w (k + <span class="nu">1</span>))) =</span>
+<span id="L108">      ∑ k, (<span class="const token" data-verso-hover="54">ind</span> (<span class="const token" data-verso-hover="88">cw</span> S w k) - <span class="const token" data-verso-hover="54">ind</span> (<span class="const token" data-verso-hover="89">ccw</span> S w k)) := <span class="kw">by</span></span>
+<span id="L109">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="90">Finset.sum_sub_distrib</span>, <span class="const token" data-verso-hover="90">Finset.sum_sub_distrib</span>]</span>
+<span id="L110">    <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L111">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="91">Equiv.sum_comp</span> (<span class="const token" data-verso-hover="394">Equiv.subRight</span> (<span class="nu">1</span> : <span class="const token" data-verso-hover="60">ZMod</span> L')) (<span class="kw">fun</span> k =&gt; <span class="const token" data-verso-hover="54">ind</span> (<span class="const token" data-verso-hover="88">cw</span> S w k))</span>
+<span id="L112">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="91">Equiv.sum_comp</span> (<span class="const token" data-verso-hover="92">Equiv.addRight</span> (<span class="nu">1</span> : <span class="const token" data-verso-hover="60">ZMod</span> L')) (<span class="kw">fun</span> k =&gt; <span class="const token" data-verso-hover="54">ind</span> (<span class="const token" data-verso-hover="89">ccw</span> S w k))</span>
+<span id="L113">  <span class="kw">rw</span> [← hshift]</span>
+<span id="L114">  <span class="kw">apply</span> <span class="const token" data-verso-hover="395">Finset.sum_le_sum</span></span>
+<span id="L115">  <span class="kw">intro</span> k _</span>
+<span id="L116">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="396">ind_cw_step_sub</span> hw ∅ S k]</span>
+<span id="L117">  <span class="kw">have</span> h1 : <span class="const token" data-verso-hover="54">ind</span> (<span class="const token" data-verso-hover="88">cw</span> (<span class="const token" data-verso-hover="188">af</span> G S \ X) w k) = <span class="const token" data-verso-hover="54">ind</span> (<span class="const token" data-verso-hover="88">cw</span> (<span class="const token" data-verso-hover="188">af</span> G S) w k) :=</span>
+<span id="L118">    <span class="const token" data-verso-hover="397">ind_congr</span> ⟨<span class="kw">fun</span> h =&gt; h.<span class="const token" data-verso-hover="133">1</span>, <span class="kw">fun</span> h =&gt; ⟨h, hX k⟩⟩</span>
+<span id="L119">  <span class="kw">have</span> h2 : <span class="const token" data-verso-hover="54">ind</span> (<span class="const token" data-verso-hover="89">ccw</span> (<span class="const token" data-verso-hover="188">af</span> G S \ X) w k) ≤ <span class="const token" data-verso-hover="54">ind</span> (<span class="const token" data-verso-hover="89">ccw</span> (<span class="const token" data-verso-hover="188">af</span> G S) w k) := <span class="kw">by</span></span>
+<span id="L120">    <span class="kw">by_cases</span> h : <span class="const token" data-verso-hover="89">ccw</span> (<span class="const token" data-verso-hover="188">af</span> G S \ X) w k</span>
+<span id="L121">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="398">ind_of</span> h, <span class="const token" data-verso-hover="398">ind_of</span> (<span class="kw">show</span> <span class="const token" data-verso-hover="89">ccw</span> (<span class="const token" data-verso-hover="188">af</span> G S) w k <span class="kw">from</span> h.<span class="const token" data-verso-hover="133">1</span>)]</span>
+<span id="L122">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="399">ind_of_not</span> h]; <span class="kw">exact</span> <span class="const token" data-verso-hover="400">ind_nonneg</span> _</span>
+<span id="L123">  <span class="kw">rw</span> [h1]; <span class="kw">linarith</span></span>
+<span id="L124"></span>
+<span id="L125"><span class="kw">lemma</span> <span class="const token" data-verso-hover="401">walkFlow_gS_eq_zero_of_notMem</span> {S : <span class="const token" data-verso-hover="52">Config</span> V} {a : V} (hS : ∀ e ∈ S, e.<span class="const token" data-verso-hover="202">1</span> = a)</span>
+<span id="L126">    {x y : V} (p : G.<span class="const token" data-verso-hover="135">Walk</span> x y) (hp : a ∉ p.<span class="const token" data-verso-hover="280">support</span>) : <span class="const token" data-verso-hover="144">walkFlow</span> (<span class="const token" data-verso-hover="51">gS</span> S) p = <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L127">  <span class="kw">induction</span> p <span class="kw">with</span></span>
+<span id="L128">  | <span class="const token" data-verso-hover="145">nil</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L129">  | @<span class="const token" data-verso-hover="146">cons</span> x' y' z' h p ih =&gt;</span>
+<span id="L130">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="402">Walk.support_cons</span>, <span class="const token" data-verso-hover="403">List.mem_cons</span>, <span class="const token" data-verso-hover="404">not_or</span>] <span class="kw">at</span> hp</span>
+<span id="L131">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="144">walkFlow</span>, ih hp.<span class="const token" data-verso-hover="181">2</span>]</span>
+<span id="L132">    <span class="kw">have</span> h1 : (x', y') ∉ S := <span class="kw">fun</span> hm =&gt; hp.<span class="const token" data-verso-hover="133">1</span> (hS _ hm).<span class="const token" data-verso-hover="128">symm</span></span>
+<span id="L133">    <span class="kw">have</span> h2 : (y', x') ∉ S := <span class="kw">fun</span> hm =&gt; hp.<span class="const token" data-verso-hover="181">2</span> (<span class="kw">by</span></span>
+<span id="L134">      <span class="kw">have</span> := hS _ hm; <span class="kw">simp</span> only <span class="kw">at</span> this; <span class="kw">subst</span> this; <span class="kw">exact</span> p.<span class="const token" data-verso-hover="316">start_mem_support</span>)</span>
+<span id="L135">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="51">gS</span>, <span class="const token" data-verso-hover="399">ind_of_not</span> h1, <span class="const token" data-verso-hover="399">ind_of_not</span> h2]</span>
+<span id="L136"></span>
+<span id="L137"><span class="dc">/-- **Lemma D.3 / proof of Theorem 5.7.** If the directed link `a → b` has failed while `b → a`</span></span>
+<span id="L138"><span class="dc">works, amnesiac flooding initiated at `a` fails to broadcast or fails to terminate. Either `b` is</span></span>
+<span id="L139"><span class="dc">unreachable from `a` along working links (then `b` never receives the message), or there is a</span></span>
+<span id="L140"><span class="dc">cycle `a ⇝ b → a` all of whose links work in the cycle direction; initially exactly one message</span></span>
+<span id="L141"><span class="dc">travels in that direction around it, and the number of messages travelling with the cycle minus</span></span>
+<span id="L142"><span class="dc">those travelling against it never decreases. -/</span></span>
+<span id="L143"><span class="kw">theorem</span> <span class="const token" data-verso-hover="38">fails_of_failed_link</span> [<span class="const token" data-verso-hover="190">Fintype</span> V] {X : <span class="const token" data-verso-hover="178">Set</span> (V × V)} {a b : V} (hab : G.<span class="const token" data-verso-hover="162">Adj</span> a b)</span>
+<span id="L144">    (hX : (a, b) ∈ X) (hba : (b, a) ∉ X) : <span class="const token" data-verso-hover="347">UniFails</span> G {a} X := <span class="kw">by</span></span>
+<span id="L145">  <span class="kw">classical</span></span>
+<span id="L146">  <span class="kw">set</span> D : V → V → <span class="kw">Prop</span> := <span class="kw">fun</span> x y =&gt; G.<span class="const token" data-verso-hover="162">Adj</span> x y ∧ (x, y) ∉ X</span>
+<span id="L147">  <span class="kw">by_cases</span> hR : <span class="const token" data-verso-hover="382">Relation.ReflTransGen</span> D a b</span>
+<span id="L148">  · <span class="kw">left</span></span>
+<span id="L149">    <span class="kw">obtain</span> ⟨p₀, hp₀⟩ := <span class="const token" data-verso-hover="381">exists_walk_of_reflTransGen</span> hR</span>
+<span id="L150">    <span class="kw">set</span> p := p₀.<span class="const token" data-verso-hover="405">bypass</span></span>
+<span id="L151">    <span class="kw">have</span> hpath : p.<span class="const token" data-verso-hover="406">IsPath</span> := p₀.<span class="const token" data-verso-hover="407">bypass_isPath</span></span>
+<span id="L152">    <span class="kw">have</span> hpd : ∀ d ∈ p.<span class="const token" data-verso-hover="383">darts</span>, d.<span class="const token" data-verso-hover="247">toProd</span> ∉ X := <span class="kw">fun</span> d hd =&gt;</span>
+<span id="L153">      hp₀ d (p₀.<span class="const token" data-verso-hover="408">darts_bypass_subset_darts</span> hd)</span>
+<span id="L154">    <span class="cm">--</span><span class="cm"> the path is nonempty since `a ≠ b`</span></span>
+<span id="L155">    <span class="kw">cases</span> hcase : p <span class="kw">with</span></span>
+<span id="L156">    | <span class="const token" data-verso-hover="145">nil</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="131">absurd</span> <span class="const token" data-verso-hover="123">rfl</span> hab.<span class="const token" data-verso-hover="409">ne</span></span>
+<span id="L157">    | @<span class="const token" data-verso-hover="146">cons</span> _ y _ hay q =&gt;</span>
+<span id="L158">      <span class="kw">rw</span> [hcase] <span class="kw">at</span> hpath hpd</span>
+<span id="L159">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="410">Walk.cons_isPath_iff</span>] <span class="kw">at</span> hpath</span>
+<span id="L160">      <span class="kw">have</span> hay' : (a, y) ∉ X := hpd ⟨(a, y), hay⟩ (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L161">      <span class="kw">let</span> c : G.<span class="const token" data-verso-hover="135">Walk</span> a a := (<span class="const token" data-verso-hover="146">Walk.cons</span> hay q).<span class="const token" data-verso-hover="163">concat</span> hab.<span class="const token" data-verso-hover="180">symm</span></span>
+<span id="L162">      <span class="kw">have</span> hclen : <span class="nu">0</span> &lt; c.<span class="const token" data-verso-hover="136">length</span> := <span class="kw">by</span> <span class="kw">simp</span> [c]</span>
+<span id="L163">      <span class="kw">have</span> : <span class="const token" data-verso-hover="58">NeZero</span> c.<span class="const token" data-verso-hover="136">length</span> := ⟨hclen.<span class="const token" data-verso-hover="411">ne'</span>⟩</span>
+<span id="L164">      <span class="kw">set</span> w := <span class="const token" data-verso-hover="134">toFun</span> c</span>
+<span id="L165">      <span class="kw">have</span> hw : <span class="const token" data-verso-hover="139">IsClosedWalk</span> G w := <span class="const token" data-verso-hover="138">isClosedWalk_toFun</span> c hclen</span>
+<span id="L166">      <span class="cm">--</span><span class="cm"> all clockwise links of `c` work</span></span>
+<span id="L167">      <span class="kw">have</span> hcd : ∀ d ∈ c.<span class="const token" data-verso-hover="383">darts</span>, d.<span class="const token" data-verso-hover="247">toProd</span> ∉ X := <span class="kw">by</span></span>
+<span id="L168">        <span class="kw">intro</span> d hd</span>
+<span id="L169">        <span class="kw">simp</span> only [c, <span class="const token" data-verso-hover="386">Walk.darts_concat</span>, <span class="const token" data-verso-hover="387">List.concat_eq_append</span>, <span class="const token" data-verso-hover="388">List.mem_append</span>,</span>
+<span id="L170">          <span class="const token" data-verso-hover="389">List.mem_singleton</span>] <span class="kw">at</span> hd</span>
+<span id="L171">        <span class="kw">rcases</span> hd <span class="kw">with</span> hd | <span class="kw">rfl</span></span>
+<span id="L172">        · <span class="kw">exact</span> hpd d hd</span>
+<span id="L173">        · <span class="kw">exact</span> hba</span>
+<span id="L174">      <span class="kw">have</span> hXw : ∀ k, (w k, w (k + <span class="nu">1</span>)) ∉ X := <span class="kw">by</span></span>
+<span id="L175">        <span class="kw">intro</span> k</span>
+<span id="L176">        <span class="kw">have</span> hk := <span class="const token" data-verso-hover="73">ZMod.val_lt</span> k</span>
+<span id="L177">        <span class="kw">have</span> e1 : w (k + <span class="nu">1</span>) = c.<span class="const token" data-verso-hover="137">getVert</span> (k.<span class="const token" data-verso-hover="62">val</span> + <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L178">          <span class="kw">simp</span> only [w, <span class="const token" data-verso-hover="134">toFun</span>]</span>
+<span id="L179">          <span class="kw">rw</span> [← <span class="const token" data-verso-hover="155">getVert_succ_toFun</span> c hk, <span class="const token" data-verso-hover="74">ZMod.natCast_zmod_val</span>]</span>
+<span id="L180">        <span class="kw">rw</span> [e1]</span>
+<span id="L181">        <span class="kw">exact</span> <span class="const token" data-verso-hover="390">getVert_pair_notMem</span> c hcd hk</span>
+<span id="L182">      <span class="cm">--</span><span class="cm"> initial flow is `1`</span></span>
+<span id="L183">      <span class="kw">have</span> hU0 : ∀ e ∈ <span class="const token" data-verso-hover="18">uniRun</span> G {a} X <span class="nu">0</span>, e.<span class="const token" data-verso-hover="202">1</span> = a := <span class="kw">by</span></span>
+<span id="L184">        <span class="kw">rintro</span> ⟨x, z⟩ ⟨⟨-, -, hx⟩, -⟩</span>
+<span id="L185">        <span class="kw">simpa</span> [<span class="const token" data-verso-hover="185">Active</span>] <span class="kw">using</span> hx</span>
+<span id="L186">      <span class="kw">have</span> hflow0 : <span class="const token" data-verso-hover="59">flowSum</span> (<span class="const token" data-verso-hover="18">uniRun</span> G {a} X <span class="nu">0</span>) w = <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L187">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="156">flowSum_toFun</span>, <span class="const token" data-verso-hover="161">walkFlow_concat_aux</span>, <span class="const token" data-verso-hover="144">walkFlow</span>,</span>
+<span id="L188">          <span class="const token" data-verso-hover="401">walkFlow_gS_eq_zero_of_notMem</span> hU0 q hpath.<span class="const token" data-verso-hover="181">2</span>]</span>
+<span id="L189">        <span class="kw">have</span> h1 : (a, y) ∈ <span class="const token" data-verso-hover="18">uniRun</span> G {a} X <span class="nu">0</span> := ⟨⟨hay, <span class="kw">by</span> <span class="kw">simp</span>, <span class="kw">by</span> <span class="kw">simp</span>⟩, hay'⟩</span>
+<span id="L190">        <span class="kw">have</span> h2 : (y, a) ∉ <span class="const token" data-verso-hover="18">uniRun</span> G {a} X <span class="nu">0</span> := <span class="kw">fun</span> h =&gt; hay.<span class="const token" data-verso-hover="409">ne</span> (hU0 _ h).<span class="const token" data-verso-hover="128">symm</span></span>
+<span id="L191">        <span class="kw">have</span> h3 : (b, a) ∉ <span class="const token" data-verso-hover="18">uniRun</span> G {a} X <span class="nu">0</span> := <span class="kw">fun</span> h =&gt; hab.<span class="const token" data-verso-hover="409">ne</span> (hU0 _ h).<span class="const token" data-verso-hover="128">symm</span></span>
+<span id="L192">        <span class="kw">have</span> h4 : (a, b) ∉ <span class="const token" data-verso-hover="18">uniRun</span> G {a} X <span class="nu">0</span> := <span class="kw">fun</span> h =&gt; h.<span class="const token" data-verso-hover="181">2</span> hX</span>
+<span id="L193">        <span class="kw">simp</span> [<span class="const token" data-verso-hover="51">gS</span>, <span class="const token" data-verso-hover="398">ind_of</span> h1, <span class="const token" data-verso-hover="399">ind_of_not</span> h2, <span class="const token" data-verso-hover="399">ind_of_not</span> h3, <span class="const token" data-verso-hover="399">ind_of_not</span> h4]</span>
+<span id="L194">      <span class="kw">have</span> hmono : ∀ t, <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="59">flowSum</span> (<span class="const token" data-verso-hover="18">uniRun</span> G {a} X t) w := <span class="kw">by</span></span>
+<span id="L195">        <span class="kw">intro</span> t</span>
+<span id="L196">        <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L197">        | <span class="const token" data-verso-hover="110">zero</span> =&gt; <span class="kw">rw</span> [hflow0]</span>
+<span id="L198">        | <span class="const token" data-verso-hover="111">succ</span> t ih =&gt; <span class="kw">exact</span> ih.<span class="const token" data-verso-hover="255">trans</span> (<span class="const token" data-verso-hover="393">flowSum_le_of_failures</span> hw _ X hXw)</span>
+<span id="L199">      <span class="kw">intro</span> t ht</span>
+<span id="L200">      <span class="kw">have</span> := hmono t</span>
+<span id="L201">      <span class="kw">rw</span> [ht] <span class="kw">at</span> this</span>
+<span id="L202">      <span class="kw">simp</span> [<span class="const token" data-verso-hover="59">flowSum</span>, <span class="const token" data-verso-hover="51">gS</span>, <span class="const token" data-verso-hover="399">ind_of_not</span>] <span class="kw">at</span> this</span>
+<span id="L203">  · <span class="kw">right</span></span>
+<span id="L204">    <span class="kw">refine</span> ⟨b, <span class="kw">fun</span> h =&gt; hab.<span class="const token" data-verso-hover="409">ne</span> (h.<span class="const token" data-verso-hover="128">symm</span>), <span class="kw">fun</span> t =&gt; ?_⟩</span>
+<span id="L205">    <span class="kw">have</span> key : ∀ t, ∀ x z, (x, z) ∈ <span class="const token" data-verso-hover="18">uniRun</span> G {a} X t → <span class="const token" data-verso-hover="382">Relation.ReflTransGen</span> D a z := <span class="kw">by</span></span>
+<span id="L206">      <span class="kw">intro</span> t</span>
+<span id="L207">      <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L208">      | <span class="const token" data-verso-hover="110">zero</span> =&gt;</span>
+<span id="L209">        <span class="kw">rintro</span> x z ⟨⟨hxz, -, hx⟩, hX'⟩</span>
+<span id="L210">        <span class="kw">have</span> : x = a := <span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="185">Active</span>] <span class="kw">using</span> hx</span>
+<span id="L211">        <span class="kw">subst</span> this</span>
+<span id="L212">        <span class="kw">exact</span> <span class="const token" data-verso-hover="412">Relation.ReflTransGen.single</span> ⟨hxz, hX'⟩</span>
+<span id="L213">      | <span class="const token" data-verso-hover="111">succ</span> t ih =&gt;</span>
+<span id="L214">        <span class="kw">rintro</span> x z ⟨⟨hxz, -, hx⟩, hX'⟩</span>
+<span id="L215">        <span class="kw">obtain</span> ⟨y, hy⟩ := hx.<span class="const token" data-verso-hover="194">resolve_left</span> (<span class="const token" data-verso-hover="195">Set.notMem_empty</span> _)</span>
+<span id="L216">        <span class="kw">exact</span> (ih y x hy).<span class="const token" data-verso-hover="385">tail</span> ⟨hxz, hX'⟩</span>
+<span id="L217">    <span class="kw">rintro</span> ⟨x, hx⟩</span>
+<span id="L218">    <span class="kw">exact</span> hR (key t x b hx)</span>
+<span id="L219"></span>
+<span id="L220"><span class="dc">/-- **Theorem 5.7, first claim, for a single initiator.** For every node `s` with a neighbour there</span></span>
+<span id="L221"><span class="dc">is a uni-directional link failure (of a link at `s`) making amnesiac flooding from `s` fail to</span></span>
+<span id="L222"><span class="dc">broadcast or fail to terminate. (The paper states this for every initiator set `I ⊊ V`; that is</span></span>
+<span id="L223"><span class="dc">false, see `theorem_5_7_multi_false`.) -/</span></span>
+<span id="L224"><span class="kw">theorem</span> <span class="const token" data-verso-hover="3">theorem_5_7_singleton</span> [<span class="const token" data-verso-hover="190">Fintype</span> V] {s b : V} (hsb : G.<span class="const token" data-verso-hover="162">Adj</span> s b) :</span>
+<span id="L225">    ∃ e : V × V, G.<span class="const token" data-verso-hover="162">Adj</span> e.<span class="const token" data-verso-hover="202">1</span> e.<span class="const token" data-verso-hover="231">2</span> ∧ <span class="const token" data-verso-hover="347">UniFails</span> G {s} {e} :=</span>
+<span id="L226">  ⟨(s, b), hsb, <span class="const token" data-verso-hover="38">fails_of_failed_link</span> hsb <span class="const token" data-verso-hover="123">rfl</span> (<span class="kw">fun</span> h =&gt; hsb.<span class="const token" data-verso-hover="409">ne</span> (<span class="const token" data-verso-hover="72">congrArg</span> <span class="const token" data-verso-hover="202">Prod.fst</span> h).<span class="const token" data-verso-hover="128">symm</span>)⟩</span>
+<span id="L227"></span>
+<span id="L228"><span class="dc">/-- **Theorem 5.7, second claim.** For every non-empty set `X` of uni-directional link failures</span></span>
+<span id="L229"><span class="dc">(no link fails in both directions) there is a node `v` such that amnesiac flooding initiated at</span></span>
+<span id="L230"><span class="dc">`v` fails to broadcast or fails to terminate. -/</span></span>
+<span id="L231"><span class="kw">theorem</span> <span class="const token" data-verso-hover="4">theorem_5_7_second</span> [<span class="const token" data-verso-hover="190">Fintype</span> V] {X : <span class="const token" data-verso-hover="178">Set</span> (V × V)} (hXE : ∀ e ∈ X, G.<span class="const token" data-verso-hover="162">Adj</span> e.<span class="const token" data-verso-hover="202">1</span> e.<span class="const token" data-verso-hover="231">2</span>)</span>
+<span id="L232">    (huni : ∀ u v, (u, v) ∈ X → (v, u) ∉ X) (hne : X.<span class="const token" data-verso-hover="413">Nonempty</span>) :</span>
+<span id="L233">    ∃ v, <span class="const token" data-verso-hover="347">UniFails</span> G {v} X := <span class="kw">by</span></span>
+<span id="L234">  <span class="kw">obtain</span> ⟨⟨a, b⟩, hX⟩ := hne</span>
+<span id="L235">  <span class="kw">exact</span> ⟨a, <span class="const token" data-verso-hover="38">fails_of_failed_link</span> (hXE _ hX) hX (huni a b hX)⟩</span>
+<span id="L236"></span>
+<span id="L237"><span class="dc">/-! ### Weak-Byzantine nodes (Theorem 5.8) -/</span></span>
+<span id="L238"></span>
+<span id="L239"><span class="kw">variable</span> (G) <span class="kw">in</span></span>
+<span id="L240"><span class="dc">/-- One round under a weak-Byzantine adversary controlling `J` until round `k`: the honest</span></span>
+<span id="L241"><span class="dc">messages of `X`, together with the messages `B` of the adversary sent from `J` along edges. -/</span></span>
+<span id="L242"><span class="kw">def</span> <span class="const token" data-verso-hover="189">byzMix</span> (J : <span class="const token" data-verso-hover="178">Set</span> V) (k t : <span class="const token" data-verso-hover="50">ℕ</span>) (B : <span class="const token" data-verso-hover="52">Config</span> V) (X : <span class="const token" data-verso-hover="52">Config</span> V) : <span class="const token" data-verso-hover="52">Config</span> V :=</span>
+<span id="L243">  <span class="kw">if</span> t &lt; k <span class="kw">then</span> {e ∈ X | e.<span class="const token" data-verso-hover="202">1</span> ∉ J} ∪ {e ∈ B | e.<span class="const token" data-verso-hover="202">1</span> ∈ J ∧ G.<span class="const token" data-verso-hover="162">Adj</span> e.<span class="const token" data-verso-hover="202">1</span> e.<span class="const token" data-verso-hover="231">2</span>} <span class="kw">else</span> X</span>
+<span id="L244"></span>
+<span id="L245"><span class="kw">variable</span> (G) <span class="kw">in</span></span>
+<span id="L246"><span class="dc">/-- Amnesiac flooding from `I` under a weak-Byzantine adversary controlling `J` until round `k`</span></span>
+<span id="L247"><span class="dc">and sending `B t` in round `t + 1`. -/</span></span>
+<span id="L248"><span class="kw">def</span> <span class="const token" data-verso-hover="19">byzRun</span> (I J : <span class="const token" data-verso-hover="178">Set</span> V) (k : <span class="const token" data-verso-hover="50">ℕ</span>) (B : <span class="const token" data-verso-hover="50">ℕ</span> → <span class="const token" data-verso-hover="52">Config</span> V) : <span class="const token" data-verso-hover="50">ℕ</span> → <span class="const token" data-verso-hover="52">Config</span> V</span>
+<span id="L249">  | <span class="nu">0</span> =&gt; <span class="const token" data-verso-hover="189">byzMix</span> G J k <span class="nu">0</span> (B <span class="nu">0</span>) (<span class="const token" data-verso-hover="187">step</span> G I ∅)</span>
+<span id="L250">  | t + <span class="nu">1</span> =&gt; <span class="const token" data-verso-hover="189">byzMix</span> G J k (t + <span class="nu">1</span>) (B (t + <span class="nu">1</span>)) (<span class="const token" data-verso-hover="188">af</span> G (<span class="const token" data-verso-hover="19">byzRun</span> I J k B t))</span>
+<span id="L251"></span>
+<span id="L252"><span class="kw">lemma</span> <span class="const token" data-verso-hover="414">byzRun_isConfig</span> (I J : <span class="const token" data-verso-hover="178">Set</span> V) (k : <span class="const token" data-verso-hover="50">ℕ</span>) (B : <span class="const token" data-verso-hover="50">ℕ</span> → <span class="const token" data-verso-hover="52">Config</span> V) (t : <span class="const token" data-verso-hover="50">ℕ</span>) :</span>
+<span id="L253">    <span class="const token" data-verso-hover="9">IsConfig</span> G (<span class="const token" data-verso-hover="19">byzRun</span> G I J k B t) := <span class="kw">by</span></span>
+<span id="L254">  <span class="kw">have</span> hmix : ∀ t' B' X, <span class="const token" data-verso-hover="9">IsConfig</span> G X → <span class="const token" data-verso-hover="9">IsConfig</span> G (<span class="const token" data-verso-hover="189">byzMix</span> G J k t' B' X) := <span class="kw">by</span></span>
+<span id="L255">    <span class="kw">intro</span> t' B' X hX u v h</span>
+<span id="L256">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="189">byzMix</span> <span class="kw">at</span> h</span>
+<span id="L257">    <span class="kw">split_ifs</span> <span class="kw">at</span> h</span>
+<span id="L258">    · <span class="kw">rcases</span> h <span class="kw">with</span> h | h</span>
+<span id="L259">      · <span class="kw">exact</span> hX u v h.<span class="const token" data-verso-hover="133">1</span></span>
+<span id="L260">      · <span class="kw">exact</span> h.<span class="const token" data-verso-hover="181">2</span><span class="nu">.</span><span class="const token" data-verso-hover="181">2</span></span>
+<span id="L261">    · <span class="kw">exact</span> hX u v h</span>
+<span id="L262">  <span class="kw">cases</span> t <span class="kw">with</span></span>
+<span id="L263">  | <span class="const token" data-verso-hover="110">zero</span> =&gt; <span class="kw">exact</span> hmix _ _ _ (<span class="const token" data-verso-hover="415">isConfig_step</span> _ _)</span>
+<span id="L264">  | <span class="const token" data-verso-hover="111">succ</span> t =&gt; <span class="kw">exact</span> hmix _ _ _ (<span class="const token" data-verso-hover="415">isConfig_step</span> _ _)</span>
+<span id="L265"></span>
+<span id="L266"><span class="kw">lemma</span> <span class="const token" data-verso-hover="416">byzRun_add</span> (I J : <span class="const token" data-verso-hover="178">Set</span> V) (k : <span class="const token" data-verso-hover="50">ℕ</span>) (B : <span class="const token" data-verso-hover="50">ℕ</span> → <span class="const token" data-verso-hover="52">Config</span> V) (t : <span class="const token" data-verso-hover="50">ℕ</span>) :</span>
+<span id="L267">    <span class="const token" data-verso-hover="19">byzRun</span> G I J k B (k + t + <span class="nu">1</span>) = <span class="const token" data-verso-hover="188">af</span> G (<span class="const token" data-verso-hover="19">byzRun</span> G I J k B (k + t)) := <span class="kw">by</span></span>
+<span id="L268">  <span class="kw">rw</span> [<span class="kw">show</span> k + t + <span class="nu">1</span> = (k + t) + <span class="nu">1</span> <span class="kw">from</span> <span class="const token" data-verso-hover="123">rfl</span>, <span class="const token" data-verso-hover="19">byzRun</span>, <span class="const token" data-verso-hover="189">byzMix</span>, <span class="const token" data-verso-hover="212">ite_eq_right</span> (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L269"></span>
+<span id="L270"><span class="kw">lemma</span> <span class="const token" data-verso-hover="211">byzRun_eventually</span> (I J : <span class="const token" data-verso-hover="178">Set</span> V) (k : <span class="const token" data-verso-hover="50">ℕ</span>) (B : <span class="const token" data-verso-hover="50">ℕ</span> → <span class="const token" data-verso-hover="52">Config</span> V) (t : <span class="const token" data-verso-hover="50">ℕ</span>) :</span>
+<span id="L271">    <span class="const token" data-verso-hover="19">byzRun</span> G I J k B (k + t) = (<span class="const token" data-verso-hover="188">af</span> G)^[t] (<span class="const token" data-verso-hover="19">byzRun</span> G I J k B k) := <span class="kw">by</span></span>
+<span id="L272">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L273">  | <span class="const token" data-verso-hover="110">zero</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L274">  | <span class="const token" data-verso-hover="111">succ</span> t ih =&gt; <span class="kw">rw</span> [← <span class="const token" data-verso-hover="253">add_assoc</span>, <span class="const token" data-verso-hover="416">byzRun_add</span>, ih, <span class="const token" data-verso-hover="204">Function.iterate_succ_apply'</span>]</span>
+<span id="L275"></span>
+<span id="L276"><span class="dc">/-- The adversary run eventually stops sending messages. -/</span></span>
+<span id="L277"><span class="kw">def</span> <span class="const token" data-verso-hover="417">EventuallyQuiet</span> (R : <span class="const token" data-verso-hover="50">ℕ</span> → <span class="const token" data-verso-hover="52">Config</span> V) : <span class="kw">Prop</span> := ∃ T, ∀ t ≥ T, R t = ∅</span>
+<span id="L278"></span>
+<span id="L279"><span class="kw">lemma</span> <span class="const token" data-verso-hover="418">eventuallyQuiet_byzRun_iff</span> (I J : <span class="const token" data-verso-hover="178">Set</span> V) (k : <span class="const token" data-verso-hover="50">ℕ</span>) (B : <span class="const token" data-verso-hover="50">ℕ</span> → <span class="const token" data-verso-hover="52">Config</span> V) :</span>
+<span id="L280">    <span class="const token" data-verso-hover="417">EventuallyQuiet</span> (<span class="const token" data-verso-hover="19">byzRun</span> G I J k B) ↔ <span class="const token" data-verso-hover="228">Terminates</span> G (<span class="const token" data-verso-hover="19">byzRun</span> G I J k B k) := <span class="kw">by</span></span>
+<span id="L281">  <span class="kw">constructor</span></span>
+<span id="L282">  · <span class="kw">rintro</span> ⟨T, hT⟩</span>
+<span id="L283">    <span class="kw">refine</span> ⟨T, ?_⟩</span>
+<span id="L284">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="211">byzRun_eventually</span>]; <span class="kw">exact</span> hT _ (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L285">  · <span class="kw">rintro</span> ⟨m, hm⟩</span>
+<span id="L286">    <span class="kw">refine</span> ⟨k + m, <span class="kw">fun</span> t ht =&gt; ?_⟩</span>
+<span id="L287">    <span class="kw">obtain</span> ⟨r, <span class="kw">rfl</span>⟩ : ∃ r, t = k + m + r := ⟨t - (k + m), <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L288">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="253">add_assoc</span>, <span class="const token" data-verso-hover="211">byzRun_eventually</span>, <span class="const token" data-verso-hover="199">add_comm</span> m r, <span class="const token" data-verso-hover="200">Function.iterate_add_apply</span>, hm,</span>
+<span id="L289">      <span class="const token" data-verso-hover="201">iterate_af_empty</span>]</span>
+<span id="L290"></span>
+<span id="L291"><span class="kw">variable</span> (G) <span class="kw">in</span></span>
+<span id="L292"><span class="dc">/-- `j` lies on a cycle, or on a path between two odd cycles (the path of a faux-even cycle). -/</span></span>
+<span id="L293"><span class="kw">def</span> <span class="const token" data-verso-hover="419">OnCycleOrOddPath</span> (j : V) : <span class="kw">Prop</span> :=</span>
+<span id="L294">  (∃ (u : V) (c : G.<span class="const token" data-verso-hover="135">Walk</span> u u), c.<span class="const token" data-verso-hover="279">IsCycle</span> ∧ j ∈ c.<span class="const token" data-verso-hover="280">support</span>) ∨ ∃ F : <span class="const token" data-verso-hover="360">FEC</span> G, j ∈ F.<span class="const token" data-verso-hover="364">p</span>.<span class="const token" data-verso-hover="280">support</span></span>
+<span id="L295"></span>
+<span id="L296"><span class="kw">lemma</span> <span class="const token" data-verso-hover="420">mem_support_of_length_zero</span> {x y j : V} (p : G.<span class="const token" data-verso-hover="135">Walk</span> x y) (h0 : p.<span class="const token" data-verso-hover="136">length</span> = <span class="nu">0</span>)</span>
+<span id="L297">    (hj : j ∈ p.<span class="const token" data-verso-hover="280">support</span>) : j = x := <span class="kw">by</span></span>
+<span id="L298">  <span class="kw">cases</span> p <span class="kw">with</span></span>
+<span id="L299">  | <span class="const token" data-verso-hover="145">nil</span> =&gt; <span class="kw">simpa</span> <span class="kw">using</span> hj</span>
+<span id="L300">  | <span class="const token" data-verso-hover="146">cons</span> _ _ =&gt; <span class="kw">simp</span> <span class="kw">at</span> h0</span>
+<span id="L301"></span>
+<span id="L302"><span class="kw">lemma</span> <span class="const token" data-verso-hover="421">exists_edge_of_mem_support</span> {x y j : V} (p : G.<span class="const token" data-verso-hover="135">Walk</span> x y) (hp : <span class="nu">0</span> &lt; p.<span class="const token" data-verso-hover="136">length</span>)</span>
+<span id="L303">    (hj : j ∈ p.<span class="const token" data-verso-hover="280">support</span>) : ∃ z, s(j, z) ∈ p.<span class="const token" data-verso-hover="310">edges</span> := <span class="kw">by</span></span>
+<span id="L304">  <span class="kw">induction</span> p <span class="kw">with</span></span>
+<span id="L305">  | <span class="const token" data-verso-hover="145">nil</span> =&gt; <span class="kw">simp</span> <span class="kw">at</span> hp</span>
+<span id="L306">  | @<span class="const token" data-verso-hover="146">cons</span> a b c h q ih =&gt;</span>
+<span id="L307">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="402">Walk.support_cons</span>, <span class="const token" data-verso-hover="403">List.mem_cons</span>] <span class="kw">at</span> hj</span>
+<span id="L308">    <span class="kw">rcases</span> hj <span class="kw">with</span> <span class="kw">rfl</span> | hj</span>
+<span id="L309">    · <span class="kw">exact</span> ⟨b, <span class="kw">by</span> <span class="kw">simp</span>⟩</span>
+<span id="L310">    · <span class="kw">cases</span> q <span class="kw">with</span></span>
+<span id="L311">      | <span class="const token" data-verso-hover="145">nil</span> =&gt;</span>
+<span id="L312">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="422">Walk.support_nil</span>, <span class="const token" data-verso-hover="389">List.mem_singleton</span>] <span class="kw">at</span> hj</span>
+<span id="L313">        <span class="kw">subst</span> hj; <span class="kw">exact</span> ⟨a, <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="423">Sym2.eq_swap</span>]⟩</span>
+<span id="L314">      | <span class="const token" data-verso-hover="146">cons</span> h' q' =&gt;</span>
+<span id="L315">        <span class="kw">obtain</span> ⟨z, hz⟩ := ih (<span class="kw">by</span> <span class="kw">simp</span>) hj</span>
+<span id="L316">        <span class="kw">exact</span> ⟨z, <span class="kw">by</span> <span class="kw">simp</span> only [<span class="const token" data-verso-hover="424">Walk.edges_cons</span>, <span class="const token" data-verso-hover="403">List.mem_cons</span>] <span class="kw">at</span> hz ⊢; <span class="kw">tauto</span>⟩</span>
+<span id="L317"></span>
+<span id="L318"><span class="dc">/-- A node on a cycle or on the path of a faux-even cycle has an incident edge that is not a</span></span>
+<span id="L319"><span class="dc">bridge or lies on the path of a faux-even cycle. -/</span></span>
+<span id="L320"><span class="kw">lemma</span> <span class="const token" data-verso-hover="425">exists_bad_edge</span> {j : V} (h : <span class="const token" data-verso-hover="419">OnCycleOrOddPath</span> G j) :</span>
+<span id="L321">    ∃ z, G.<span class="const token" data-verso-hover="162">Adj</span> j z ∧ (¬ G.<span class="const token" data-verso-hover="304">IsBridge</span> s(j, z) ∨ ∃ F : <span class="const token" data-verso-hover="360">FEC</span> G, s(j, z) ∈ F.<span class="const token" data-verso-hover="364">p</span>.<span class="const token" data-verso-hover="310">edges</span>) := <span class="kw">by</span></span>
+<span id="L322">  <span class="kw">classical</span></span>
+<span id="L323">  <span class="kw">have</span> hcyc : ∀ (u : V) (c : G.<span class="const token" data-verso-hover="135">Walk</span> u u), c.<span class="const token" data-verso-hover="279">IsCycle</span> → j ∈ c.<span class="const token" data-verso-hover="280">support</span> →</span>
+<span id="L324">      ∃ z, G.<span class="const token" data-verso-hover="162">Adj</span> j z ∧ ¬ G.<span class="const token" data-verso-hover="304">IsBridge</span> s(j, z) := <span class="kw">by</span></span>
+<span id="L325">    <span class="kw">intro</span> u c hc hj</span>
+<span id="L326">    <span class="kw">have</span> hlen : <span class="nu">0</span> &lt; c.<span class="const token" data-verso-hover="136">length</span> := <span class="kw">by</span> <span class="kw">have</span> := hc.<span class="const token" data-verso-hover="426">three_le_length</span>; <span class="kw">omega</span></span>
+<span id="L327">    <span class="kw">obtain</span> ⟨z, hz⟩ := <span class="const token" data-verso-hover="421">exists_edge_of_mem_support</span> c hlen hj</span>
+<span id="L328">    <span class="kw">have</span> hadj := c.<span class="const token" data-verso-hover="427">adj_of_mem_edges</span> hz</span>
+<span id="L329">    <span class="kw">refine</span> ⟨z, hadj, <span class="kw">fun</span> hb =&gt; ?_⟩</span>
+<span id="L330">    <span class="kw">exact</span> hb.<span class="const token" data-verso-hover="314">notMem_edges_of_isCycle</span> hc hz</span>
+<span id="L331">  <span class="kw">rcases</span> h <span class="kw">with</span> ⟨u, c, hc, hj⟩ | ⟨F, hF⟩</span>
+<span id="L332">  · <span class="kw">obtain</span> ⟨z, hz, hb⟩ := hcyc u c hc hj</span>
+<span id="L333">    <span class="kw">exact</span> ⟨z, hz, <span class="const token" data-verso-hover="192">Or.inl</span> hb⟩</span>
+<span id="L334">  · <span class="kw">rcases</span> <span class="const token" data-verso-hover="331">Nat.eq_zero_or_pos</span> F.<span class="const token" data-verso-hover="364">p</span>.<span class="const token" data-verso-hover="136">length</span> <span class="kw">with</span> h0 | hpos</span>
+<span id="L335">    · <span class="cm">--</span><span class="cm"> the path is trivial, so `j` is the junction vertex, on the first cycle</span></span>
+<span id="L336">      <span class="kw">have</span> : j = F.<span class="const token" data-verso-hover="361">u</span> := <span class="const token" data-verso-hover="420">mem_support_of_length_zero</span> F.<span class="const token" data-verso-hover="364">p</span> h0 hF</span>
+<span id="L337">      <span class="kw">obtain</span> ⟨z, hz, hb⟩ := hcyc _ F.<span class="const token" data-verso-hover="363">c₁</span> F.<span class="const token" data-verso-hover="366">isCycle₁</span> (this ▸ F.<span class="const token" data-verso-hover="363">c₁</span>.<span class="const token" data-verso-hover="316">start_mem_support</span>)</span>
+<span id="L338">      <span class="kw">exact</span> ⟨z, hz, <span class="const token" data-verso-hover="192">Or.inl</span> hb⟩</span>
+<span id="L339">    · <span class="kw">obtain</span> ⟨z, hz⟩ := <span class="const token" data-verso-hover="421">exists_edge_of_mem_support</span> F.<span class="const token" data-verso-hover="364">p</span> hpos hF</span>
+<span id="L340">      <span class="kw">exact</span> ⟨z, F.<span class="const token" data-verso-hover="364">p</span>.<span class="const token" data-verso-hover="427">adj_of_mem_edges</span> hz, <span class="const token" data-verso-hover="193">Or.inr</span> ⟨F, hz⟩⟩</span>
+<span id="L341"></span>
+<span id="L342"><span class="kw">lemma</span> <span class="const token" data-verso-hover="428">balancedOn_congr</span> {S S' : <span class="const token" data-verso-hover="52">Config</span> V} {L' : <span class="const token" data-verso-hover="50">ℕ</span>} {w : <span class="const token" data-verso-hover="60">ZMod</span> L' → V}</span>
+<span id="L343">    (h : ∀ k, (w k, w (k + <span class="nu">1</span>)) ∈ S ↔ (w k, w (k + <span class="nu">1</span>)) ∈ S')</span>
+<span id="L344">    (h' : ∀ k, (w k, w (k - <span class="nu">1</span>)) ∈ S ↔ (w k, w (k - <span class="nu">1</span>)) ∈ S') :</span>
+<span id="L345">    <span class="const token" data-verso-hover="15">BalancedOn</span> S w ↔ <span class="const token" data-verso-hover="15">BalancedOn</span> S' w := <span class="kw">by</span></span>
+<span id="L346">  <span class="kw">have</span> : ∀ k₀, <span class="const token" data-verso-hover="102">classSum</span> S w k₀ = <span class="const token" data-verso-hover="102">classSum</span> S' w k₀ := <span class="kw">by</span></span>
+<span id="L347">    <span class="kw">intro</span> k₀; <span class="kw">unfold</span> <span class="const token" data-verso-hover="102">classSum</span></span>
+<span id="L348">    <span class="kw">apply</span> <span class="const token" data-verso-hover="122">Finset.sum_congr</span> <span class="const token" data-verso-hover="123">rfl</span>; <span class="kw">intro</span> i _</span>
+<span id="L349">    <span class="kw">exact</span> <span class="const token" data-verso-hover="429">congrArg₂</span> (· - ·) (<span class="const token" data-verso-hover="397">ind_congr</span> (h _)) (<span class="const token" data-verso-hover="397">ind_congr</span> (h' _))</span>
+<span id="L350">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="15">BalancedOn</span>, this]</span>
+<span id="L351"></span>
+<span id="L352"><span class="dc">/-- Along a closed walk avoiding `J`, the adversary cannot change the balance. -/</span></span>
+<span id="L353"><span class="kw">lemma</span> <span class="const token" data-verso-hover="430">balancedOn_byzRun</span> {I J : <span class="const token" data-verso-hover="178">Set</span> V} {k : <span class="const token" data-verso-hover="50">ℕ</span>} {B : <span class="const token" data-verso-hover="50">ℕ</span> → <span class="const token" data-verso-hover="52">Config</span> V} {L' : <span class="const token" data-verso-hover="50">ℕ</span>} [<span class="const token" data-verso-hover="58">NeZero</span> L']</span>
+<span id="L354">    {w : <span class="const token" data-verso-hover="60">ZMod</span> L' → V} (hw : <span class="const token" data-verso-hover="139">IsClosedWalk</span> G w) (hJ : ∀ k, w k ∉ J) (t : <span class="const token" data-verso-hover="50">ℕ</span>) :</span>
+<span id="L355">    <span class="const token" data-verso-hover="15">BalancedOn</span> (<span class="const token" data-verso-hover="19">byzRun</span> G I J k B t) w := <span class="kw">by</span></span>
+<span id="L356">  <span class="kw">have</span> hmix : ∀ t' B' X, <span class="const token" data-verso-hover="15">BalancedOn</span> (<span class="const token" data-verso-hover="189">byzMix</span> G J k t' B' X) w ↔ <span class="const token" data-verso-hover="15">BalancedOn</span> X w := <span class="kw">by</span></span>
+<span id="L357">    <span class="kw">intro</span> t' B' X</span>
+<span id="L358">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="189">byzMix</span></span>
+<span id="L359">    <span class="kw">split_ifs</span></span>
+<span id="L360">    · <span class="kw">apply</span> <span class="const token" data-verso-hover="428">balancedOn_congr</span> &lt;;&gt; <span class="kw">intro</span> i &lt;;&gt; <span class="kw">simp</span> [hJ i]</span>
+<span id="L361">    · <span class="kw">rfl</span></span>
+<span id="L362">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L363">  | <span class="const token" data-verso-hover="110">zero</span> =&gt;</span>
+<span id="L364">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="19">byzRun</span>, hmix, <span class="const token" data-verso-hover="26">balancedOn_step_iff</span> hw]; <span class="kw">exact</span> <span class="const token" data-verso-hover="219">balancedOn_empty</span> w</span>
+<span id="L365">  | <span class="const token" data-verso-hover="111">succ</span> t ih =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="19">byzRun</span>, hmix, <span class="const token" data-verso-hover="26">balancedOn_step_iff</span> hw]; <span class="kw">exact</span> ih</span>
+<span id="L366"></span>
+<span id="L367"><span class="dc">/-- **Theorem 5.8** (weak-Byzantine failure, non-termination). Let the initiators `I` and the</span></span>
+<span id="L368"><span class="dc">weak-Byzantine set `J` be disjoint, and let the adversary control `J` until a round `k ≥ k₀` of its</span></span>
+<span id="L369"><span class="dc">choice (in the paper `k₀` is twice the diameter). The adversary can force non-termination iff</span></span>
+<span id="L370"><span class="dc">some member of `J` lies on a cycle or on a path between two odd cycles. -/</span></span>
+<span id="L371"><span class="kw">theorem</span> <span class="const token" data-verso-hover="39">theorem_5_8_nonterm</span> [<span class="const token" data-verso-hover="190">Fintype</span> V] {I J : <span class="const token" data-verso-hover="178">Set</span> V} (hIJ : <span class="const token" data-verso-hover="431">Disjoint</span> I J) (k₀ : <span class="const token" data-verso-hover="50">ℕ</span>) :</span>
+<span id="L372">    (∃ k ≥ k₀, ∃ B, ¬ <span class="const token" data-verso-hover="417">EventuallyQuiet</span> (<span class="const token" data-verso-hover="19">byzRun</span> G I J k B)) ↔ ∃ j ∈ J, <span class="const token" data-verso-hover="419">OnCycleOrOddPath</span> G j := <span class="kw">by</span></span>
+<span id="L373">  <span class="kw">classical</span></span>
+<span id="L374">  <span class="kw">constructor</span></span>
+<span id="L375">  · <span class="kw">rintro</span> ⟨k, -, B, hB⟩</span>
+<span id="L376">    <span class="kw">by_contra</span> hno</span>
+<span id="L377">    push <span class="const token" data-verso-hover="432">Not</span> <span class="kw">at</span> hno</span>
+<span id="L378">    <span class="kw">apply</span> hB</span>
+<span id="L379">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="418">eventuallyQuiet_byzRun_iff</span>]</span>
+<span id="L380">    <span class="kw">apply</span> (<span class="const token" data-verso-hover="22">terminates_iff_balancedAll</span> (<span class="const token" data-verso-hover="414">byzRun_isConfig</span> I J k B k)).<span class="const token" data-verso-hover="116">2</span></span>
+<span id="L381">    <span class="kw">apply</span> <span class="const token" data-verso-hover="433">Balanced.balancedAll</span></span>
+<span id="L382">    <span class="kw">have</span> avoid : ∀ (u : V) (p : G.<span class="const token" data-verso-hover="135">Walk</span> u u), (∀ x ∈ p.<span class="const token" data-verso-hover="280">support</span>, x ∉ J) → <span class="nu">0</span> &lt; p.<span class="const token" data-verso-hover="136">length</span> →</span>
+<span id="L383">        <span class="const token" data-verso-hover="15">BalancedOn</span> (<span class="const token" data-verso-hover="19">byzRun</span> G I J k B k) (<span class="const token" data-verso-hover="134">toFun</span> p) := <span class="kw">by</span></span>
+<span id="L384">      <span class="kw">intro</span> u p hp hpos</span>
+<span id="L385">      <span class="kw">have</span> : <span class="const token" data-verso-hover="58">NeZero</span> p.<span class="const token" data-verso-hover="136">length</span> := ⟨hpos.<span class="const token" data-verso-hover="411">ne'</span>⟩</span>
+<span id="L386">      <span class="kw">exact</span> <span class="const token" data-verso-hover="430">balancedOn_byzRun</span> (<span class="const token" data-verso-hover="138">isClosedWalk_toFun</span> p hpos)</span>
+<span id="L387">        (<span class="kw">fun</span> i =&gt; hp _ (p.<span class="const token" data-verso-hover="434">getVert_mem_support</span> _)) k</span>
+<span id="L388">    <span class="kw">refine</span> ⟨<span class="kw">fun</span> u c hc =&gt; avoid u c (<span class="kw">fun</span> x hx hxJ =&gt; hno x hxJ (<span class="const token" data-verso-hover="192">Or.inl</span> ⟨u, c, hc, hx⟩))</span>
+<span id="L389">      (<span class="kw">by</span> <span class="kw">have</span> := hc.<span class="const token" data-verso-hover="426">three_le_length</span>; <span class="kw">omega</span>), <span class="kw">fun</span> F =&gt; avoid _ F.<span class="const token" data-verso-hover="20">walk</span> ?_ F.<span class="const token" data-verso-hover="435">walk_length_pos</span>⟩</span>
+<span id="L390">    <span class="kw">intro</span> x hx hxJ</span>
+<span id="L391">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="20">FEC.walk</span>, <span class="const token" data-verso-hover="284">Walk.mem_support_append_iff</span>, <span class="const token" data-verso-hover="327">Walk.support_reverse</span>,</span>
+<span id="L392">      <span class="const token" data-verso-hover="328">List.mem_reverse</span>] <span class="kw">at</span> hx</span>
+<span id="L393">    <span class="kw">rcases</span> hx <span class="kw">with</span> hx | hx | hx | hx</span>
+<span id="L394">    · <span class="kw">exact</span> hno x hxJ (<span class="const token" data-verso-hover="192">Or.inl</span> ⟨_, _, F.<span class="const token" data-verso-hover="366">isCycle₁</span>, hx⟩)</span>
+<span id="L395">    · <span class="kw">exact</span> hno x hxJ (<span class="const token" data-verso-hover="193">Or.inr</span> ⟨F, hx⟩)</span>
+<span id="L396">    · <span class="kw">exact</span> hno x hxJ (<span class="const token" data-verso-hover="192">Or.inl</span> ⟨_, _, F.<span class="const token" data-verso-hover="369">isCycle₂</span>, hx⟩)</span>
+<span id="L397">    · <span class="kw">exact</span> hno x hxJ (<span class="const token" data-verso-hover="193">Or.inr</span> ⟨F, hx⟩)</span>
+<span id="L398">  · <span class="kw">rintro</span> ⟨j, hjJ, hj⟩</span>
+<span id="L399">    <span class="kw">obtain</span> ⟨z, hjz, hbad⟩ := <span class="const token" data-verso-hover="425">exists_bad_edge</span> hj</span>
+<span id="L400">    <span class="kw">set</span> Z₀ : <span class="const token" data-verso-hover="52">Config</span> V := <span class="const token" data-verso-hover="187">step</span> G I ∅ ∪ {(j, z)}</span>
+<span id="L401">    <span class="kw">refine</span> ⟨k₀ + <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">fun</span> t =&gt; (<span class="const token" data-verso-hover="188">af</span> G)^[t] Z₀, ?_⟩</span>
+<span id="L402">    <span class="kw">have</span> hjI : j ∉ I := <span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="436">Set.disjoint_left</span>.<span class="const token" data-verso-hover="85">1</span> hIJ h hjJ</span>
+<span id="L403">    <span class="kw">have</span> hZ0J : ∀ e ∈ <span class="const token" data-verso-hover="187">step</span> G I ∅, e.<span class="const token" data-verso-hover="202">1</span> ∉ J := <span class="kw">by</span></span>
+<span id="L404">      <span class="kw">rintro</span> ⟨x, y⟩ ⟨-, -, hx⟩ hxJ</span>
+<span id="L405">      <span class="kw">rcases</span> hx <span class="kw">with</span> hx | ⟨w, hw⟩</span>
+<span id="L406">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="436">Set.disjoint_left</span>.<span class="const token" data-verso-hover="85">1</span> hIJ hx hxJ</span>
+<span id="L407">      · <span class="kw">exact</span> hw</span>
+<span id="L408">    <span class="kw">have</span> hZc : <span class="const token" data-verso-hover="9">IsConfig</span> G Z₀ := <span class="kw">by</span></span>
+<span id="L409">      <span class="kw">rintro</span> x y (h | h)</span>
+<span id="L410">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="415">isConfig_step</span> _ _ x y h</span>
+<span id="L411">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="268">Set.mem_singleton_iff</span>, <span class="const token" data-verso-hover="297">Prod.mk.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L412">        <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := h; <span class="kw">exact</span> hjz</span>
+<span id="L413">    <span class="kw">have</span> mix_eq : ∀ t (X Y : <span class="const token" data-verso-hover="52">Config</span> V), t &lt; k₀ + <span class="nu">1</span> → <span class="const token" data-verso-hover="9">IsConfig</span> G Y →</span>
+<span id="L414">        (∀ e : V × V, e.<span class="const token" data-verso-hover="202">1</span> ∉ J → (e ∈ X ↔ e ∈ Y)) → <span class="const token" data-verso-hover="189">byzMix</span> G J (k₀ + <span class="nu">1</span>) t Y X = Y := <span class="kw">by</span></span>
+<span id="L415">      <span class="kw">intro</span> t X Y ht hY hXY</span>
+<span id="L416">      <span class="kw">unfold</span> <span class="const token" data-verso-hover="189">byzMix</span></span>
+<span id="L417">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="203">ite_eq_left</span> ht]</span>
+<span id="L418">      <span class="kw">ext</span> e</span>
+<span id="L419">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="437">Set.mem_union</span>, <span class="const token" data-verso-hover="438">Set.mem_sep_iff</span>]</span>
+<span id="L420">      <span class="kw">by_cases</span> he : e.<span class="const token" data-verso-hover="202">1</span> ∈ J</span>
+<span id="L421">      · <span class="kw">exact</span> ⟨<span class="kw">fun</span> h =&gt; h.<span class="const token" data-verso-hover="439">elim</span> (<span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="131">absurd</span> he h.<span class="const token" data-verso-hover="181">2</span>) (<span class="kw">fun</span> h =&gt; h.<span class="const token" data-verso-hover="133">1</span>),</span>
+<span id="L422">          <span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="193">Or.inr</span> ⟨h, he, hY _ _ h⟩⟩</span>
+<span id="L423">      · <span class="kw">exact</span> ⟨<span class="kw">fun</span> h =&gt; h.<span class="const token" data-verso-hover="439">elim</span> (<span class="kw">fun</span> h =&gt; (hXY e he).<span class="const token" data-verso-hover="85">1</span> h.<span class="const token" data-verso-hover="133">1</span>) (<span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="131">absurd</span> h.<span class="const token" data-verso-hover="181">2</span><span class="nu">.</span><span class="const token" data-verso-hover="133">1</span> he),</span>
+<span id="L424">          <span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="192">Or.inl</span> ⟨(hXY e he).<span class="const token" data-verso-hover="116">2</span> h, he⟩⟩</span>
+<span id="L425">    <span class="kw">have</span> hrun : ∀ t, <span class="const token" data-verso-hover="19">byzRun</span> G I J (k₀ + <span class="nu">1</span>) (<span class="kw">fun</span> t =&gt; (<span class="const token" data-verso-hover="188">af</span> G)^[t] Z₀) t = (<span class="const token" data-verso-hover="188">af</span> G)^[t] Z₀ := <span class="kw">by</span></span>
+<span id="L426">      <span class="kw">intro</span> t</span>
+<span id="L427">      <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L428">      | <span class="const token" data-verso-hover="110">zero</span> =&gt;</span>
+<span id="L429">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="19">byzRun</span>]</span>
+<span id="L430">        <span class="kw">apply</span> mix_eq <span class="nu">0</span> _ _ (<span class="kw">by</span> <span class="kw">omega</span>) hZc</span>
+<span id="L431">        <span class="kw">intro</span> e he</span>
+<span id="L432">        <span class="kw">constructor</span></span>
+<span id="L433">        · <span class="kw">intro</span> h; <span class="kw">exact</span> <span class="const token" data-verso-hover="192">Or.inl</span> h</span>
+<span id="L434">        · <span class="kw">rintro</span> (h | h)</span>
+<span id="L435">          · <span class="kw">exact</span> h</span>
+<span id="L436">          · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="268">Set.mem_singleton_iff</span>] <span class="kw">at</span> h; <span class="kw">subst</span> h; <span class="kw">exact</span> <span class="const token" data-verso-hover="131">absurd</span> hjJ he</span>
+<span id="L437">      | <span class="const token" data-verso-hover="111">succ</span> t ih =&gt;</span>
+<span id="L438">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="19">byzRun</span>, ih, ← <span class="const token" data-verso-hover="204">Function.iterate_succ_apply'</span> (<span class="const token" data-verso-hover="188">af</span> G)]</span>
+<span id="L439">        <span class="kw">by_cases</span> ht : t + <span class="nu">1</span> &lt; k₀ + <span class="nu">1</span></span>
+<span id="L440">        · <span class="kw">exact</span> mix_eq _ _ _ ht (<span class="const token" data-verso-hover="240">isConfig_iterate</span> hZc _) (<span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="440">Iff.rfl</span>)</span>
+<span id="L441">        · <span class="kw">unfold</span> <span class="const token" data-verso-hover="189">byzMix</span>; <span class="kw">rw</span> [<span class="const token" data-verso-hover="212">ite_eq_right</span> ht]</span>
+<span id="L442">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="418">eventuallyQuiet_byzRun_iff</span>, hrun, <span class="const token" data-verso-hover="441">terminates_iterate_iff</span>]</span>
+<span id="L443">    <span class="kw">have</span> hZ : <span class="const token" data-verso-hover="10">Reachable</span> G (<span class="const token" data-verso-hover="187">step</span> G I ∅) := <span class="const token" data-verso-hover="197">reachable_empty</span>.<span class="const token" data-verso-hover="198">step</span> I</span>
+<span id="L444">    <span class="kw">have</span> hnot : (j, z) ∉ <span class="const token" data-verso-hover="187">step</span> G I ∅ := <span class="kw">fun</span> h =&gt; hZ0J _ h hjJ</span>
+<span id="L445">    <span class="kw">exact</span> <span class="kw">fun</span> ht =&gt; <span class="const token" data-verso-hover="442">not_balancedAll_union</span> hZ.<span class="const token" data-verso-hover="226">balancedAll</span> hnot hjz hbad ht.<span class="const token" data-verso-hover="27">balancedAll</span></span>
+<span id="L446"></span>
+<span id="L447"><span class="kw">end</span> AmnesiacFloodingFaults</span>
+<span id="L448"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2025/AmnesiacFloodingFaults/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

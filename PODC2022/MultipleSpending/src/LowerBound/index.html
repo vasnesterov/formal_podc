@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>MultipleSpending: LowerBound.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2022/">PODC 2022</a><span class="sep">›</span><a href="PODC2022/MultipleSpending/">MultipleSpending</a><span class="sep">›</span><a href="PODC2022/MultipleSpending/src/">Lean source</a><span class="sep">›</span><span aria-current="page">LowerBound</span></nav>
+        <h1>
+          <code>LowerBound.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2022/MultipleSpending/">How to Tame Multiple Spending in Decentralized Cryptocurrencies — PODC 2022</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2022/MultipleSpending/LowerBound.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="LowerBound"><span id="L1"><span class="kw">import</span> Papers.PODC2022.MultipleSpending.Broadcast</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># The lower bound of Theorem 5.1, repaired (§5.1)</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">The paper's gluing argument, made precise in the asynchronous Byzantine broadcast model</span></span>
+<span id="L7"><span class="dc">`Cslib.Byzantine.AsyncBroadcast`.</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">* `exists_exec_of_reachable`: every reachable state lies on an infinite execution that stutters</span></span>
+<span id="L10"><span class="dc">  in it forever.</span></span>
+<span id="L11"><span class="dc">* `Mirror R γ₀ τ γ` and `Mirror.reach` (**replay lemma**): a run `τ₀ →* τ` without corruption of</span></span>
+<span id="L12"><span class="dc">  the members of `R` can be replayed, restricted to the processes of `R`, on top of any state `γ₀`</span></span>
+<span id="L13"><span class="dc">  in which those processes have not acted yet and are uncorrupted, provided every process outside</span></span>
+<span id="L14"><span class="dc">  `R` from which a member of `R` receives a message is corrupted in `γ₀`: sends and decisions of</span></span>
+<span id="L15"><span class="dc">  members of `R` are replayed as such, receptions from members of `R` as deliveries and</span></span>
+<span id="L16"><span class="dc">  receptions from outside `R` as Byzantine injections; all other steps are dropped.</span></span>
+<span id="L17"><span class="dc">* `IsKCB.dec_eq_of_reachable`: in a failure-free run with source value `m`, every decision is `m`</span></span>
+<span id="L18"><span class="dc">  (Integrity, applied to the stuttering execution; needs `∅ ∈ F`).</span></span>
+<span id="L19"><span class="dc">* `lower_bound`: if the source lies in `F ∈ F` and `C` is independent in `G_{F,S}`, then</span></span>
+<span id="L20"><span class="dc">  `|C| ≤ k` for every `k`-CB algorithm with (per-value) Local Progress.</span></span>
+<span id="L21"><span class="dc">* `srcInconsistencyNumber_le`: `λ_s ≤ k` (the repaired Theorem 5.1).</span></span>
+<span id="L22"><span class="dc">* `lower_bound_needs_empty_mem`: the hypothesis `∅ ∈ F` (a consequence of the paper's standing</span></span>
+<span id="L23"><span class="dc">  assumption that `F` is inclusion-closed) cannot be dropped.</span></span>
+<span id="L24"><span class="dc">-/</span></span>
+<span id="L25"></span>
+<span id="L26"><span class="kw">namespace</span> Podc.MultipleSpending</span>
+<span id="L27"></span>
+<span id="L28"><span class="kw">open</span> Cslib.Byzantine.AsyncBroadcast Finset</span>
+<span id="L29"></span>
+<span id="L30"><span class="dc">/-! ### Replaying a run on a subset of processes -/</span></span>
+<span id="L31"></span>
+<span id="L32"><span class="kw">section</span> Replay</span>
+<span id="L33"></span>
+<span id="L34"><span class="kw">variable</span> {P M I O : <span class="kw">Type</span>*} {A : <span class="const token" data-verso-hover="47">Protocol</span> P M I O} {x x' : P → I} {k : <span class="const token" data-verso-hover="52">FaultKind</span>} {t t' : <span class="const token" data-verso-hover="53">ℕ</span>}</span>
+<span id="L35"></span>
+<span id="L36"><span class="cm">--</span><span class="cm"> CSLib candidate</span></span>
+<span id="L37"><span class="dc">/-- `γ` mirrors `τ` on the processes of `R`: their receptions, broadcasts and decisions are those</span></span>
+<span id="L38"><span class="dc">of `τ`; the receptions, broadcasts and decisions of the other processes, and the corrupted set,</span></span>
+<span id="L39"><span class="dc">are those of `γ₀`. -/</span></span>
+<span id="L40"><span class="kw">structure</span> <span class="const token" data-verso-hover="388">Mirror</span> (R : <span class="const token" data-verso-hover="59">Set</span> P) (γ₀ τ γ : <span class="const token" data-verso-hover="75">State</span> P M O) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L41">  <span class="const token" data-verso-hover="389">bad</span> : γ.<span class="const token" data-verso-hover="80">bad</span> = γ₀.<span class="const token" data-verso-hover="80">bad</span></span>
+<span id="L42">  <span class="const token" data-verso-hover="390">rcv_in</span> : ∀ q ∈ R, ∀ r m, (q, r, m) ∈ γ.<span class="const token" data-verso-hover="77">rcv</span> ↔ (q, r, m) ∈ τ.<span class="const token" data-verso-hover="77">rcv</span></span>
+<span id="L43">  <span class="const token" data-verso-hover="391">sent_in</span> : ∀ q ∈ R, ∀ m, (q, m) ∈ γ.<span class="const token" data-verso-hover="76">sent</span> ↔ (q, m) ∈ τ.<span class="const token" data-verso-hover="76">sent</span></span>
+<span id="L44">  <span class="const token" data-verso-hover="392">dec_in</span> : ∀ q ∈ R, γ.<span class="const token" data-verso-hover="61">dec</span> q = τ.<span class="const token" data-verso-hover="61">dec</span> q</span>
+<span id="L45">  <span class="const token" data-verso-hover="393">rcv_out</span> : ∀ q ∉ R, ∀ r m, (q, r, m) ∈ γ.<span class="const token" data-verso-hover="77">rcv</span> ↔ (q, r, m) ∈ γ₀.<span class="const token" data-verso-hover="77">rcv</span></span>
+<span id="L46">  <span class="const token" data-verso-hover="394">sent_out</span> : ∀ q ∉ R, ∀ m, (q, m) ∈ γ.<span class="const token" data-verso-hover="76">sent</span> ↔ (q, m) ∈ γ₀.<span class="const token" data-verso-hover="76">sent</span></span>
+<span id="L47">  <span class="const token" data-verso-hover="395">dec_out</span> : ∀ q ∉ R, γ.<span class="const token" data-verso-hover="61">dec</span> q = γ₀.<span class="const token" data-verso-hover="61">dec</span> q</span>
+<span id="L48"></span>
+<span id="L49"><span class="kw">namespace</span> Mirror</span>
+<span id="L50"></span>
+<span id="L51"><span class="kw">variable</span> {R : <span class="const token" data-verso-hover="59">Set</span> P} {γ₀ τ γ : <span class="const token" data-verso-hover="75">State</span> P M O}</span>
+<span id="L52"></span>
+<span id="L53"><span class="kw">theorem</span> <span class="const token" data-verso-hover="396">inbox_eq</span> (h : <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ τ γ) {q : P} (hq : q ∈ R) : γ.<span class="const token" data-verso-hover="128">inbox</span> q = τ.<span class="const token" data-verso-hover="128">inbox</span> q := <span class="kw">by</span></span>
+<span id="L54">  <span class="kw">funext</span> r; <span class="kw">ext</span> m; <span class="kw">exact</span> h.<span class="const token" data-verso-hover="390">rcv_in</span> q hq r m</span>
+<span id="L55"></span>
+<span id="L56"><span class="kw">theorem</span> <span class="const token" data-verso-hover="397">out_eq</span> (h : <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ τ γ) {q : P} (hq : q ∈ R) : γ.<span class="const token" data-verso-hover="194">out</span> q = τ.<span class="const token" data-verso-hover="194">out</span> q := <span class="kw">by</span></span>
+<span id="L57">  <span class="kw">ext</span> m; <span class="kw">exact</span> h.<span class="const token" data-verso-hover="391">sent_in</span> q hq m</span>
+<span id="L58"></span>
+<span id="L59"><span class="kw">theorem</span> <span class="const token" data-verso-hover="398">insert_rcv</span> (h : <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ τ γ) {q r : P} {m : M} (hq : q ∈ R) :</span>
+<span id="L60">    <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ { τ <span class="kw">with</span> <span class="const token" data-verso-hover="77">rcv</span> := <span class="const token" data-verso-hover="81">insert</span> (q, r, m) τ.<span class="const token" data-verso-hover="77">rcv</span> }</span>
+<span id="L61">      { γ <span class="kw">with</span> <span class="const token" data-verso-hover="77">rcv</span> := <span class="const token" data-verso-hover="81">insert</span> (q, r, m) γ.<span class="const token" data-verso-hover="77">rcv</span> } <span class="kw">where</span></span>
+<span id="L62">  <span class="const token" data-verso-hover="389">bad</span> := h.<span class="const token" data-verso-hover="389">bad</span></span>
+<span id="L63">  <span class="const token" data-verso-hover="390">rcv_in</span> q' hq' r' m' := <span class="kw">by</span> <span class="kw">simp</span> only [<span class="const token" data-verso-hover="131">Set.mem_insert_iff</span>, h.<span class="const token" data-verso-hover="390">rcv_in</span> q' hq' r' m']</span>
+<span id="L64">  <span class="const token" data-verso-hover="391">sent_in</span> := h.<span class="const token" data-verso-hover="391">sent_in</span></span>
+<span id="L65">  <span class="const token" data-verso-hover="392">dec_in</span> := h.<span class="const token" data-verso-hover="392">dec_in</span></span>
+<span id="L66">  <span class="const token" data-verso-hover="393">rcv_out</span> q' hq' r' m' := <span class="kw">by</span></span>
+<span id="L67">    <span class="kw">have</span> : q' ≠ q := <span class="kw">fun</span> e =&gt; hq' (e ▸ hq)</span>
+<span id="L68">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="131">Set.mem_insert_iff</span>, this, h.<span class="const token" data-verso-hover="393">rcv_out</span> q' hq' r' m']</span>
+<span id="L69">  <span class="const token" data-verso-hover="394">sent_out</span> := h.<span class="const token" data-verso-hover="394">sent_out</span></span>
+<span id="L70">  <span class="const token" data-verso-hover="395">dec_out</span> := h.<span class="const token" data-verso-hover="395">dec_out</span></span>
+<span id="L71"></span>
+<span id="L72"><span class="kw">theorem</span> <span class="const token" data-verso-hover="399">insert_rcv_skip</span> (h : <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ τ γ) {q r : P} {m : M} (hq : q ∉ R) :</span>
+<span id="L73">    <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ { τ <span class="kw">with</span> <span class="const token" data-verso-hover="77">rcv</span> := <span class="const token" data-verso-hover="81">insert</span> (q, r, m) τ.<span class="const token" data-verso-hover="77">rcv</span> } γ <span class="kw">where</span></span>
+<span id="L74">  <span class="const token" data-verso-hover="389">bad</span> := h.<span class="const token" data-verso-hover="389">bad</span></span>
+<span id="L75">  <span class="const token" data-verso-hover="390">rcv_in</span> q' hq' r' m' := <span class="kw">by</span></span>
+<span id="L76">    <span class="kw">have</span> : q' ≠ q := <span class="kw">fun</span> e =&gt; hq (e ▸ hq')</span>
+<span id="L77">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="131">Set.mem_insert_iff</span>, this, h.<span class="const token" data-verso-hover="390">rcv_in</span> q' hq' r' m']</span>
+<span id="L78">  <span class="const token" data-verso-hover="391">sent_in</span> := h.<span class="const token" data-verso-hover="391">sent_in</span></span>
+<span id="L79">  <span class="const token" data-verso-hover="392">dec_in</span> := h.<span class="const token" data-verso-hover="392">dec_in</span></span>
+<span id="L80">  <span class="const token" data-verso-hover="393">rcv_out</span> := h.<span class="const token" data-verso-hover="393">rcv_out</span></span>
+<span id="L81">  <span class="const token" data-verso-hover="394">sent_out</span> := h.<span class="const token" data-verso-hover="394">sent_out</span></span>
+<span id="L82">  <span class="const token" data-verso-hover="395">dec_out</span> := h.<span class="const token" data-verso-hover="395">dec_out</span></span>
+<span id="L83"></span>
+<span id="L84"><span class="kw">theorem</span> <span class="const token" data-verso-hover="400">insert_sent</span> (h : <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ τ γ) {p : P} {m : M} (hp : p ∈ R) :</span>
+<span id="L85">    <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ { τ <span class="kw">with</span> <span class="const token" data-verso-hover="76">sent</span> := <span class="const token" data-verso-hover="81">insert</span> (p, m) τ.<span class="const token" data-verso-hover="76">sent</span> }</span>
+<span id="L86">      { γ <span class="kw">with</span> <span class="const token" data-verso-hover="76">sent</span> := <span class="const token" data-verso-hover="81">insert</span> (p, m) γ.<span class="const token" data-verso-hover="76">sent</span> } <span class="kw">where</span></span>
+<span id="L87">  <span class="const token" data-verso-hover="389">bad</span> := h.<span class="const token" data-verso-hover="389">bad</span></span>
+<span id="L88">  <span class="const token" data-verso-hover="390">rcv_in</span> := h.<span class="const token" data-verso-hover="390">rcv_in</span></span>
+<span id="L89">  <span class="const token" data-verso-hover="391">sent_in</span> q' hq' m' := <span class="kw">by</span> <span class="kw">simp</span> only [<span class="const token" data-verso-hover="131">Set.mem_insert_iff</span>, h.<span class="const token" data-verso-hover="391">sent_in</span> q' hq' m']</span>
+<span id="L90">  <span class="const token" data-verso-hover="392">dec_in</span> := h.<span class="const token" data-verso-hover="392">dec_in</span></span>
+<span id="L91">  <span class="const token" data-verso-hover="393">rcv_out</span> := h.<span class="const token" data-verso-hover="393">rcv_out</span></span>
+<span id="L92">  <span class="const token" data-verso-hover="394">sent_out</span> q' hq' m' := <span class="kw">by</span></span>
+<span id="L93">    <span class="kw">have</span> : q' ≠ p := <span class="kw">fun</span> e =&gt; hq' (e ▸ hp)</span>
+<span id="L94">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="131">Set.mem_insert_iff</span>, this, h.<span class="const token" data-verso-hover="394">sent_out</span> q' hq' m']</span>
+<span id="L95">  <span class="const token" data-verso-hover="395">dec_out</span> := h.<span class="const token" data-verso-hover="395">dec_out</span></span>
+<span id="L96"></span>
+<span id="L97"><span class="kw">theorem</span> <span class="const token" data-verso-hover="401">insert_sent_skip</span> (h : <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ τ γ) {p : P} {m : M} (hp : p ∉ R) :</span>
+<span id="L98">    <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ { τ <span class="kw">with</span> <span class="const token" data-verso-hover="76">sent</span> := <span class="const token" data-verso-hover="81">insert</span> (p, m) τ.<span class="const token" data-verso-hover="76">sent</span> } γ <span class="kw">where</span></span>
+<span id="L99">  <span class="const token" data-verso-hover="389">bad</span> := h.<span class="const token" data-verso-hover="389">bad</span></span>
+<span id="L100">  <span class="const token" data-verso-hover="390">rcv_in</span> := h.<span class="const token" data-verso-hover="390">rcv_in</span></span>
+<span id="L101">  <span class="const token" data-verso-hover="391">sent_in</span> q' hq' m' := <span class="kw">by</span></span>
+<span id="L102">    <span class="kw">have</span> : q' ≠ p := <span class="kw">fun</span> e =&gt; hp (e ▸ hq')</span>
+<span id="L103">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="131">Set.mem_insert_iff</span>, this, h.<span class="const token" data-verso-hover="391">sent_in</span> q' hq' m']</span>
+<span id="L104">  <span class="const token" data-verso-hover="392">dec_in</span> := h.<span class="const token" data-verso-hover="392">dec_in</span></span>
+<span id="L105">  <span class="const token" data-verso-hover="393">rcv_out</span> := h.<span class="const token" data-verso-hover="393">rcv_out</span></span>
+<span id="L106">  <span class="const token" data-verso-hover="394">sent_out</span> := h.<span class="const token" data-verso-hover="394">sent_out</span></span>
+<span id="L107">  <span class="const token" data-verso-hover="395">dec_out</span> := h.<span class="const token" data-verso-hover="395">dec_out</span></span>
+<span id="L108"></span>
+<span id="L109"><span class="kw">theorem</span> <span class="const token" data-verso-hover="402">set_bad</span> (h : <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ τ γ) (B : <span class="const token" data-verso-hover="59">Set</span> P) : <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ { τ <span class="kw">with</span> <span class="const token" data-verso-hover="80">bad</span> := B } γ <span class="kw">where</span></span>
+<span id="L110">  <span class="const token" data-verso-hover="389">bad</span> := h.<span class="const token" data-verso-hover="389">bad</span></span>
+<span id="L111">  <span class="const token" data-verso-hover="390">rcv_in</span> := h.<span class="const token" data-verso-hover="390">rcv_in</span></span>
+<span id="L112">  <span class="const token" data-verso-hover="391">sent_in</span> := h.<span class="const token" data-verso-hover="391">sent_in</span></span>
+<span id="L113">  <span class="const token" data-verso-hover="392">dec_in</span> := h.<span class="const token" data-verso-hover="392">dec_in</span></span>
+<span id="L114">  <span class="const token" data-verso-hover="393">rcv_out</span> := h.<span class="const token" data-verso-hover="393">rcv_out</span></span>
+<span id="L115">  <span class="const token" data-verso-hover="394">sent_out</span> := h.<span class="const token" data-verso-hover="394">sent_out</span></span>
+<span id="L116">  <span class="const token" data-verso-hover="395">dec_out</span> := h.<span class="const token" data-verso-hover="395">dec_out</span></span>
+<span id="L117"></span>
+<span id="L118"><span class="kw">end</span> Mirror</span>
+<span id="L119"></span>
+<span id="L120"><span class="kw">variable</span> [<span class="const token" data-verso-hover="42">DecidableEq</span> P]</span>
+<span id="L121"></span>
+<span id="L122"><span class="cm">--</span><span class="cm"> CSLib candidate</span></span>
+<span id="L123"><span class="dc">/-- Every reachable state lies on an execution that stutters in it forever. -/</span></span>
+<span id="L124"><span class="kw">theorem</span> <span class="const token" data-verso-hover="403">exists_exec_of_reachable</span> {σ : <span class="const token" data-verso-hover="75">State</span> P M O} (h : <span class="const token" data-verso-hover="79">Reachable</span> A x k t σ) :</span>
+<span id="L125">    ∃ E : <span class="const token" data-verso-hover="48">Exec</span> A x k t, ∃ N, ∀ i, N ≤ i → E.<span class="const token" data-verso-hover="60">σ</span> i = σ := <span class="kw">by</span></span>
+<span id="L126">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="79">Reachable</span> <span class="kw">at</span> h</span>
+<span id="L127">  <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L128">  | <span class="const token" data-verso-hover="129">refl</span> =&gt; <span class="kw">exact</span> ⟨⟨<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="122">State.init</span>, <span class="const token" data-verso-hover="157">rfl</span>, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="115">Or.inr</span> <span class="const token" data-verso-hover="157">rfl</span>⟩, <span class="nu">0</span>, <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="157">rfl</span>⟩</span>
+<span id="L129">  | @<span class="const token" data-verso-hover="130">tail</span> σ₁ σ₂ _ hst ih =&gt;</span>
+<span id="L130">    <span class="kw">obtain</span> ⟨E, N, hE⟩ := ih</span>
+<span id="L131">    <span class="kw">refine</span> ⟨⟨<span class="kw">fun</span> i =&gt; <span class="kw">if</span> i ≤ N <span class="kw">then</span> E.<span class="const token" data-verso-hover="60">σ</span> i <span class="kw">else</span> σ₂, <span class="kw">by</span> <span class="kw">simp</span> [E.<span class="const token" data-verso-hover="404">zero</span>], <span class="kw">fun</span> i =&gt; ?_⟩, N + <span class="nu">1</span>,</span>
+<span id="L132">      <span class="kw">fun</span> i hi =&gt; ?_⟩</span>
+<span id="L133">    · <span class="kw">rcases</span> <span class="const token" data-verso-hover="405">lt_trichotomy</span> i N <span class="kw">with</span> hi | <span class="kw">rfl</span> | hi</span>
+<span id="L134">      · <span class="kw">simp</span> only [<span class="kw">show</span> i ≤ N <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">show</span> i + <span class="nu">1</span> ≤ N <span class="kw">by</span> <span class="kw">omega</span>, ↓<span class="const token" data-verso-hover="371">reduceIte</span>]</span>
+<span id="L135">        <span class="kw">exact</span> E.<span class="const token" data-verso-hover="406">step</span> i</span>
+<span id="L136">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="407">le_refl</span>, <span class="kw">show</span> ¬ (i + <span class="nu">1</span> ≤ i) <span class="kw">by</span> <span class="kw">omega</span>, ↓<span class="const token" data-verso-hover="371">reduceIte</span>]</span>
+<span id="L137">        <span class="kw">left</span>; <span class="kw">rw</span> [hE i <span class="const token" data-verso-hover="143">le_rfl</span>]; <span class="kw">exact</span> hst</span>
+<span id="L138">      · <span class="kw">right</span>; <span class="kw">simp</span> [<span class="kw">show</span> ¬ i ≤ N <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">show</span> ¬ (i + <span class="nu">1</span> ≤ N) <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L139">    · <span class="kw">simp</span> only [<span class="kw">show</span> ¬ i ≤ N <span class="kw">by</span> <span class="kw">omega</span>, ↓<span class="const token" data-verso-hover="371">reduceIte</span>]</span>
+<span id="L140"></span>
+<span id="L141"><span class="cm">--</span><span class="cm"> CSLib candidate</span></span>
+<span id="L142"><span class="dc">/-- In an execution that eventually stutters in `σ`, the correct processes are those not</span></span>
+<span id="L143"><span class="dc">corrupted in `σ`. -/</span></span>
+<span id="L144"><span class="kw">theorem</span> <span class="const token" data-verso-hover="408">correct_iff_of_stutter</span> {E : <span class="const token" data-verso-hover="48">Exec</span> A x k t} {σ : <span class="const token" data-verso-hover="75">State</span> P M O} {N : <span class="const token" data-verso-hover="53">ℕ</span>}</span>
+<span id="L145">    (hE : ∀ i, N ≤ i → E.<span class="const token" data-verso-hover="60">σ</span> i = σ) (p : P) : E.<span class="const token" data-verso-hover="57">Correct</span> p ↔ p ∉ σ.<span class="const token" data-verso-hover="80">bad</span> := <span class="kw">by</span></span>
+<span id="L146">  <span class="kw">constructor</span></span>
+<span id="L147">  · <span class="kw">intro</span> h; <span class="kw">rw</span> [← hE N <span class="const token" data-verso-hover="143">le_rfl</span>]; <span class="kw">exact</span> h N</span>
+<span id="L148">  · <span class="kw">intro</span> h i hi</span>
+<span id="L149">    <span class="kw">exact</span> h (<span class="kw">by</span> <span class="kw">rw</span> [← hE (i + N) (<span class="kw">by</span> <span class="kw">omega</span>)]; <span class="kw">exact</span> E.<span class="const token" data-verso-hover="409">bad_mono</span> (<span class="kw">by</span> <span class="kw">omega</span>) hi)</span>
+<span id="L150"></span>
+<span id="L151"><span class="kw">namespace</span> Mirror</span>
+<span id="L152"></span>
+<span id="L153"><span class="kw">variable</span> {R : <span class="const token" data-verso-hover="59">Set</span> P} {γ₀ τ γ : <span class="const token" data-verso-hover="75">State</span> P M O}</span>
+<span id="L154"></span>
+<span id="L155"><span class="kw">theorem</span> <span class="const token" data-verso-hover="410">update_dec</span> (h : <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ τ γ) {p : P} {o : O} (hp : p ∈ R) :</span>
+<span id="L156">    <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ { τ <span class="kw">with</span> <span class="const token" data-verso-hover="61">dec</span> := <span class="const token" data-verso-hover="123">Function.update</span> τ.<span class="const token" data-verso-hover="61">dec</span> p (<span class="const token" data-verso-hover="62">some</span> o) }</span>
+<span id="L157">      { γ <span class="kw">with</span> <span class="const token" data-verso-hover="61">dec</span> := <span class="const token" data-verso-hover="123">Function.update</span> γ.<span class="const token" data-verso-hover="61">dec</span> p (<span class="const token" data-verso-hover="62">some</span> o) } <span class="kw">where</span></span>
+<span id="L158">  <span class="const token" data-verso-hover="389">bad</span> := h.<span class="const token" data-verso-hover="389">bad</span></span>
+<span id="L159">  <span class="const token" data-verso-hover="390">rcv_in</span> := h.<span class="const token" data-verso-hover="390">rcv_in</span></span>
+<span id="L160">  <span class="const token" data-verso-hover="391">sent_in</span> := h.<span class="const token" data-verso-hover="391">sent_in</span></span>
+<span id="L161">  <span class="const token" data-verso-hover="392">dec_in</span> q' hq' := <span class="kw">by</span></span>
+<span id="L162">    <span class="kw">by_cases</span> e : q' = p</span>
+<span id="L163">    · <span class="kw">subst</span> e; <span class="kw">simp</span></span>
+<span id="L164">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="138">Function.update_of_ne</span> e, h.<span class="const token" data-verso-hover="392">dec_in</span> q' hq']</span>
+<span id="L165">  <span class="const token" data-verso-hover="393">rcv_out</span> := h.<span class="const token" data-verso-hover="393">rcv_out</span></span>
+<span id="L166">  <span class="const token" data-verso-hover="394">sent_out</span> := h.<span class="const token" data-verso-hover="394">sent_out</span></span>
+<span id="L167">  <span class="const token" data-verso-hover="395">dec_out</span> q' hq' := <span class="kw">by</span></span>
+<span id="L168">    <span class="kw">have</span> : q' ≠ p := <span class="kw">fun</span> e =&gt; hq' (e ▸ hp)</span>
+<span id="L169">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="138">Function.update_of_ne</span> this, h.<span class="const token" data-verso-hover="395">dec_out</span> q' hq']</span>
+<span id="L170"></span>
+<span id="L171"><span class="kw">theorem</span> <span class="const token" data-verso-hover="411">update_dec_skip</span> (h : <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ τ γ) {p : P} {o : O} (hp : p ∉ R) :</span>
+<span id="L172">    <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ { τ <span class="kw">with</span> <span class="const token" data-verso-hover="61">dec</span> := <span class="const token" data-verso-hover="123">Function.update</span> τ.<span class="const token" data-verso-hover="61">dec</span> p (<span class="const token" data-verso-hover="62">some</span> o) } γ <span class="kw">where</span></span>
+<span id="L173">  <span class="const token" data-verso-hover="389">bad</span> := h.<span class="const token" data-verso-hover="389">bad</span></span>
+<span id="L174">  <span class="const token" data-verso-hover="390">rcv_in</span> := h.<span class="const token" data-verso-hover="390">rcv_in</span></span>
+<span id="L175">  <span class="const token" data-verso-hover="391">sent_in</span> := h.<span class="const token" data-verso-hover="391">sent_in</span></span>
+<span id="L176">  <span class="const token" data-verso-hover="392">dec_in</span> q' hq' := <span class="kw">by</span></span>
+<span id="L177">    <span class="kw">have</span> : q' ≠ p := <span class="kw">fun</span> e =&gt; hp (e ▸ hq')</span>
+<span id="L178">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="138">Function.update_of_ne</span> this, h.<span class="const token" data-verso-hover="392">dec_in</span> q' hq']</span>
+<span id="L179">  <span class="const token" data-verso-hover="393">rcv_out</span> := h.<span class="const token" data-verso-hover="393">rcv_out</span></span>
+<span id="L180">  <span class="const token" data-verso-hover="394">sent_out</span> := h.<span class="const token" data-verso-hover="394">sent_out</span></span>
+<span id="L181">  <span class="const token" data-verso-hover="395">dec_out</span> := h.<span class="const token" data-verso-hover="395">dec_out</span></span>
+<span id="L182"></span>
+<span id="L183"><span class="dc">/-- One step of `τ` can be mirrored by at most one (Byzantine) step of `γ`. -/</span></span>
+<span id="L184"><span class="kw">theorem</span> <span class="const token" data-verso-hover="412">step</span> (h : <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ τ γ) {τ' : <span class="const token" data-verso-hover="75">State</span> P M O} (hst : <span class="const token" data-verso-hover="124">Step</span> A x k t τ τ')</span>
+<span id="L185">    (hR : ∀ q ∈ R, q ∉ γ₀.<span class="const token" data-verso-hover="80">bad</span>) (hx : ∀ q ∈ R, x' q = x q) (hgood : ∀ q ∈ R, q ∉ τ'.<span class="const token" data-verso-hover="80">bad</span>)</span>
+<span id="L186">    (hsrc : ∀ q ∈ R, ∀ r m, (q, r, m) ∈ τ'.<span class="const token" data-verso-hover="77">rcv</span> → r ∉ R → r ∈ γ₀.<span class="const token" data-verso-hover="80">bad</span>) :</span>
+<span id="L187">    ∃ γ', <span class="const token" data-verso-hover="189">Reach</span> A x' <span class="const token" data-verso-hover="49">.</span>byzantine t' γ γ' ∧ <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ τ' γ' := <span class="kw">by</span></span>
+<span id="L188">  <span class="kw">cases</span> hst <span class="kw">with</span></span>
+<span id="L189">  | <span class="const token" data-verso-hover="125">send</span> p m _ hg =&gt;</span>
+<span id="L190">    <span class="kw">by_cases</span> hpR : p ∈ R</span>
+<span id="L191">    · <span class="kw">refine</span> ⟨_, <span class="const token" data-verso-hover="207">Relation.ReflTransGen.single</span> (<span class="const token" data-verso-hover="125">Step.send</span> γ p m ?_ ?_), h.<span class="const token" data-verso-hover="400">insert_sent</span> hpR⟩</span>
+<span id="L192">      · <span class="kw">rw</span> [h.<span class="const token" data-verso-hover="389">bad</span>]; <span class="kw">exact</span> hR p hpR</span>
+<span id="L193">      · <span class="kw">rw</span> [hx p hpR, h.<span class="const token" data-verso-hover="396">inbox_eq</span> hpR, h.<span class="const token" data-verso-hover="397">out_eq</span> hpR]; <span class="kw">exact</span> hg</span>
+<span id="L194">    · <span class="kw">exact</span> ⟨γ, <span class="const token" data-verso-hover="129">.</span>refl, h.<span class="const token" data-verso-hover="401">insert_sent_skip</span> hpR⟩</span>
+<span id="L195">  | <span class="const token" data-verso-hover="126">deliver</span> q r m hs =&gt;</span>
+<span id="L196">    <span class="kw">by_cases</span> hqR : q ∈ R</span>
+<span id="L197">    · <span class="kw">refine</span> ⟨_, <span class="const token" data-verso-hover="207">Relation.ReflTransGen.single</span> ?_, h.<span class="const token" data-verso-hover="398">insert_rcv</span> hqR⟩</span>
+<span id="L198">      <span class="kw">by_cases</span> hrR : r ∈ R</span>
+<span id="L199">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="126">Step.deliver</span> γ q r m ((h.<span class="const token" data-verso-hover="391">sent_in</span> r hrR m).<span class="const token" data-verso-hover="145">2</span> hs)</span>
+<span id="L200">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="413">Step.inject</span> γ q r m <span class="const token" data-verso-hover="157">rfl</span></span>
+<span id="L201">          (<span class="kw">by</span> <span class="kw">rw</span> [h.<span class="const token" data-verso-hover="389">bad</span>]; <span class="kw">exact</span> hsrc q hqR r m (<span class="const token" data-verso-hover="192">Set.mem_insert</span> _ _) hrR)</span>
+<span id="L202">    · <span class="kw">exact</span> ⟨γ, <span class="const token" data-verso-hover="129">.</span>refl, h.<span class="const token" data-verso-hover="399">insert_rcv_skip</span> hqR⟩</span>
+<span id="L203">  | <span class="const token" data-verso-hover="413">inject</span> q r m _ hb =&gt;</span>
+<span id="L204">    <span class="kw">by_cases</span> hqR : q ∈ R</span>
+<span id="L205">    · <span class="kw">refine</span> ⟨_, <span class="const token" data-verso-hover="207">Relation.ReflTransGen.single</span> ?_, h.<span class="const token" data-verso-hover="398">insert_rcv</span> hqR⟩</span>
+<span id="L206">      <span class="kw">by_cases</span> hrR : r ∈ R</span>
+<span id="L207">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="200">absurd</span> hb (hgood r hrR)</span>
+<span id="L208">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="413">Step.inject</span> γ q r m <span class="const token" data-verso-hover="157">rfl</span></span>
+<span id="L209">          (<span class="kw">by</span> <span class="kw">rw</span> [h.<span class="const token" data-verso-hover="389">bad</span>]; <span class="kw">exact</span> hsrc q hqR r m (<span class="const token" data-verso-hover="192">Set.mem_insert</span> _ _) hrR)</span>
+<span id="L210">    · <span class="kw">exact</span> ⟨γ, <span class="const token" data-verso-hover="129">.</span>refl, h.<span class="const token" data-verso-hover="399">insert_rcv_skip</span> hqR⟩</span>
+<span id="L211">  | <span class="const token" data-verso-hover="127">decide</span> p o _ hd hg =&gt;</span>
+<span id="L212">    <span class="kw">by_cases</span> hpR : p ∈ R</span>
+<span id="L213">    · <span class="kw">refine</span> ⟨_, <span class="const token" data-verso-hover="207">Relation.ReflTransGen.single</span> (<span class="const token" data-verso-hover="127">Step.decide</span> γ p o ?_ ?_ ?_), h.<span class="const token" data-verso-hover="410">update_dec</span> hpR⟩</span>
+<span id="L214">      · <span class="kw">rw</span> [h.<span class="const token" data-verso-hover="389">bad</span>]; <span class="kw">exact</span> hR p hpR</span>
+<span id="L215">      · <span class="kw">rw</span> [h.<span class="const token" data-verso-hover="392">dec_in</span> p hpR]; <span class="kw">exact</span> hd</span>
+<span id="L216">      · <span class="kw">rw</span> [hx p hpR, h.<span class="const token" data-verso-hover="396">inbox_eq</span> hpR, h.<span class="const token" data-verso-hover="397">out_eq</span> hpR]; <span class="kw">exact</span> hg</span>
+<span id="L217">    · <span class="kw">exact</span> ⟨γ, <span class="const token" data-verso-hover="129">.</span>refl, h.<span class="const token" data-verso-hover="411">update_dec_skip</span> hpR⟩</span>
+<span id="L218">  | <span class="const token" data-verso-hover="414">corrupt</span> p _ =&gt; <span class="kw">exact</span> ⟨γ, <span class="const token" data-verso-hover="129">.</span>refl, h.<span class="const token" data-verso-hover="402">set_bad</span> _⟩</span>
+<span id="L219"></span>
+<span id="L220"><span class="cm">--</span><span class="cm"> CSLib candidate</span></span>
+<span id="L221"><span class="dc">/-- **Replay lemma.** A run `τ₀ →* τ` in which no member of `R` is corrupted can be replayed on</span></span>
+<span id="L222"><span class="dc">the members of `R` on top of `γ₀` (where they are uncorrupted and have the same inputs), provided</span></span>
+<span id="L223"><span class="dc">every process outside `R` from which a member of `R` receives a message in `τ` is corrupted in</span></span>
+<span id="L224"><span class="dc">`γ₀`: receptions from such processes become Byzantine injections. -/</span></span>
+<span id="L225"><span class="kw">theorem</span> <span class="const token" data-verso-hover="415">reach</span> {τ₀ : <span class="const token" data-verso-hover="75">State</span> P M O} (h : <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ τ₀ γ) {τ : <span class="const token" data-verso-hover="75">State</span> P M O}</span>
+<span id="L226">    (hτ : <span class="const token" data-verso-hover="189">Reach</span> A x k t τ₀ τ) (hR : ∀ q ∈ R, q ∉ γ₀.<span class="const token" data-verso-hover="80">bad</span>) (hx : ∀ q ∈ R, x' q = x q)</span>
+<span id="L227">    (hgood : ∀ q ∈ R, q ∉ τ.<span class="const token" data-verso-hover="80">bad</span>)</span>
+<span id="L228">    (hsrc : ∀ q ∈ R, ∀ r m, (q, r, m) ∈ τ.<span class="const token" data-verso-hover="77">rcv</span> → r ∉ R → r ∈ γ₀.<span class="const token" data-verso-hover="80">bad</span>) :</span>
+<span id="L229">    ∃ γ', <span class="const token" data-verso-hover="189">Reach</span> A x' <span class="const token" data-verso-hover="49">.</span>byzantine t' γ γ' ∧ <span class="const token" data-verso-hover="388">Mirror</span> R γ₀ τ γ' := <span class="kw">by</span></span>
+<span id="L230">  <span class="kw">induction</span> hτ <span class="kw">with</span></span>
+<span id="L231">  | <span class="const token" data-verso-hover="129">refl</span> =&gt; <span class="kw">exact</span> ⟨γ, <span class="const token" data-verso-hover="129">.</span>refl, h⟩</span>
+<span id="L232">  | @<span class="const token" data-verso-hover="130">tail</span> τ₁ τ₂ _ hst ih =&gt;</span>
+<span id="L233">    <span class="kw">obtain</span> ⟨γ₁, h₁, hm₁⟩ := ih (<span class="kw">fun</span> q hq hb =&gt; hgood q hq (hst.<span class="const token" data-verso-hover="416">bad_subset</span> hb))</span>
+<span id="L234">      (<span class="kw">fun</span> q hq r m hm =&gt; hsrc q hq r m (hst.<span class="const token" data-verso-hover="417">rcv_subset</span> hm))</span>
+<span id="L235">    <span class="kw">obtain</span> ⟨γ₂, h₂, hm₂⟩ := hm₁.<span class="const token" data-verso-hover="412">step</span> hst hR hx hgood hsrc</span>
+<span id="L236">    <span class="kw">exact</span> ⟨γ₂, h₁.<span class="const token" data-verso-hover="208">trans</span> h₂, hm₂⟩</span>
+<span id="L237"></span>
+<span id="L238"><span class="kw">end</span> Mirror</span>
+<span id="L239"></span>
+<span id="L240"><span class="kw">end</span> Replay</span>
+<span id="L241"></span>
+<span id="L242"><span class="dc">/-! ### The lower bound -/</span></span>
+<span id="L243"></span>
+<span id="L244"><span class="kw">section</span> LowerBound</span>
+<span id="L245"></span>
+<span id="L246"><span class="kw">variable</span> {P M V : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="41">Fintype</span> P] [<span class="const token" data-verso-hover="42">DecidableEq</span> P]</span>
+<span id="L247"></span>
+<span id="L248"><span class="dc">/-- The state in which exactly the processes of `F` are corrupted and nothing else happened. -/</span></span>
+<span id="L249"><span class="kw">def</span> <span class="const token" data-verso-hover="418">corrupted</span> (F : <span class="const token" data-verso-hover="54">Finset</span> P) : <span class="const token" data-verso-hover="75">State</span> P M V := ⟨∅, ∅, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="45">none</span>, ↑F⟩</span>
+<span id="L250"></span>
+<span id="L251"><span class="kw">theorem</span> <span class="const token" data-verso-hover="419">reach_corrupted</span> {I : <span class="kw">Type</span>*} {A : <span class="const token" data-verso-hover="47">Protocol</span> P M I V} {x : P → I} {k : <span class="const token" data-verso-hover="52">FaultKind</span>}</span>
+<span id="L252">    (F : <span class="const token" data-verso-hover="54">Finset</span> P) : <span class="const token" data-verso-hover="189">Reach</span> A x k (<span class="const token" data-verso-hover="50">Fintype.card</span> P) <span class="const token" data-verso-hover="122">State.init</span> (<span class="const token" data-verso-hover="418">corrupted</span> F) := <span class="kw">by</span></span>
+<span id="L253">  <span class="kw">induction</span> F <span class="kw">using</span> <span class="const token" data-verso-hover="195">Finset.induction_on</span> <span class="kw">with</span></span>
+<span id="L254">  | <span class="const token" data-verso-hover="196">empty</span> =&gt;</span>
+<span id="L255">    <span class="kw">show</span> <span class="const token" data-verso-hover="189">Reach</span> A x k _ <span class="const token" data-verso-hover="122">State.init</span> ⟨∅, ∅, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="45">none</span>, ((∅ : <span class="const token" data-verso-hover="54">Finset</span> P) : <span class="const token" data-verso-hover="59">Set</span> P)⟩</span>
+<span id="L256">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="420">Finset.coe_empty</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="129">.</span>refl</span>
+<span id="L257">  | insert a F _ ih =&gt;</span>
+<span id="L258">    <span class="kw">have</span> e : (<span class="const token" data-verso-hover="418">corrupted</span> (<span class="const token" data-verso-hover="81">insert</span> a F) : <span class="const token" data-verso-hover="75">State</span> P M V) =</span>
+<span id="L259">        { (<span class="const token" data-verso-hover="418">corrupted</span> F : <span class="const token" data-verso-hover="75">State</span> P M V) <span class="kw">with</span> <span class="const token" data-verso-hover="80">bad</span> := <span class="const token" data-verso-hover="81">insert</span> a (<span class="const token" data-verso-hover="418">corrupted</span> F : <span class="const token" data-verso-hover="75">State</span> P M V).<span class="const token" data-verso-hover="80">bad</span> } := <span class="kw">by</span></span>
+<span id="L260">      <span class="kw">simp</span> [<span class="const token" data-verso-hover="418">corrupted</span>]</span>
+<span id="L261">    <span class="kw">rw</span> [e]</span>
+<span id="L262">    <span class="kw">refine</span> ih.<span class="const token" data-verso-hover="130">tail</span> (<span class="const token" data-verso-hover="414">Step.corrupt</span> _ a ?_)</span>
+<span id="L263">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="421">Nat.card_eq_fintype_card</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="422">Set.ncard_le_card</span> _</span>
+<span id="L264"></span>
+<span id="L265"><span class="kw">variable</span> {T : <span class="const token" data-verso-hover="64">TrustModel</span> P} {s : P} {k : <span class="const token" data-verso-hover="53">ℕ</span>} {A : <span class="const token" data-verso-hover="47">Protocol</span> P M (<span class="const token" data-verso-hover="44">Option</span> V) V}</span>
+<span id="L266"></span>
+<span id="L267"><span class="dc">/-- In a failure-free run in which the source broadcasts `m`, a `k`-CB algorithm only delivers</span></span>
+<span id="L268"><span class="dc">`m` (Integrity, applied to the execution stuttering in the final state; this execution complies</span></span>
+<span id="L269"><span class="dc">with the fault model iff `∅ ∈ F`). -/</span></span>
+<span id="L270"><span class="kw">theorem</span> <span class="const token" data-verso-hover="423">IsKCB.dec_eq_of_reachable</span> (hA : <span class="const token" data-verso-hover="63">IsKCB</span> T s k A) (h0 : ∅ ∈ T.<span class="const token" data-verso-hover="67">F</span>) {m : V}</span>
+<span id="L271">    {σ : <span class="const token" data-verso-hover="75">State</span> P M V} (hσ : <span class="const token" data-verso-hover="79">Reachable</span> A (<span class="const token" data-verso-hover="43">srcInput</span> s (<span class="const token" data-verso-hover="62">some</span> m)) <span class="const token" data-verso-hover="49">.</span>byzantine (<span class="const token" data-verso-hover="50">Fintype.card</span> P) σ)</span>
+<span id="L272">    (hb : σ.<span class="const token" data-verso-hover="80">bad</span> = ∅) {p : P} (hp : σ.<span class="const token" data-verso-hover="61">dec</span> p ≠ <span class="const token" data-verso-hover="45">none</span>) : σ.<span class="const token" data-verso-hover="61">dec</span> p = <span class="const token" data-verso-hover="62">some</span> m := <span class="kw">by</span></span>
+<span id="L273">  <span class="kw">obtain</span> ⟨v, hv⟩ := <span class="const token" data-verso-hover="117">Option.ne_none_iff_exists'</span>.<span class="const token" data-verso-hover="118">mp</span> hp</span>
+<span id="L274">  <span class="kw">obtain</span> ⟨E, N, hE⟩ := <span class="const token" data-verso-hover="403">exists_exec_of_reachable</span> hσ</span>
+<span id="L275">  <span class="kw">have</span> hc : ∀ q, E.<span class="const token" data-verso-hover="57">Correct</span> q := <span class="kw">fun</span> q =&gt;</span>
+<span id="L276">    (<span class="const token" data-verso-hover="408">correct_iff_of_stutter</span> hE q).<span class="const token" data-verso-hover="145">2</span> (<span class="kw">by</span> <span class="kw">rw</span> [hb]; <span class="kw">exact</span> <span class="const token" data-verso-hover="424">Set.notMem_empty</span> q)</span>
+<span id="L277">  <span class="kw">have</span> hfs : <span class="const token" data-verso-hover="51">faultySet</span> E = ∅ := <span class="kw">by</span> <span class="kw">ext</span> q; <span class="kw">simp</span> [<span class="const token" data-verso-hover="51">faultySet</span>, hc q]</span>
+<span id="L278">  <span class="kw">have</span> := hA.<span class="const token" data-verso-hover="71">integrity</span> (<span class="const token" data-verso-hover="62">some</span> m) E (<span class="kw">by</span> <span class="kw">rw</span> [hfs]; <span class="kw">exact</span> h0) (hc s) p N v (hc p)</span>
+<span id="L279">    (<span class="kw">by</span> <span class="kw">rw</span> [hE N <span class="const token" data-verso-hover="143">le_rfl</span>]; <span class="kw">exact</span> hv)</span>
+<span id="L280">  <span class="kw">rw</span> [hv, this]</span>
+<span id="L281"></span>
+<span id="L282"><span class="dc">/-- **Lower bound of Theorem 5.1** (repaired). Let `F ∈ F` contain the source `s` and let `C` be</span></span>
+<span id="L283"><span class="dc">an independent set of `G_{F,S}`. Then every algorithm implementing `k`-CB with (per-value) Local</span></span>
+<span id="L284"><span class="dc">Progress has `|C| ≤ k`: replaying, for each `p ∈ C`, the Local Progress run of `p` with value</span></span>
+<span id="L285"><span class="dc">`val p` on the correct members of `S p` (pairwise disjoint by independence), with the members of</span></span>
+<span id="L286"><span class="dc">`F` (including the source) Byzantine, yields an execution complying with `F` in which the members</span></span>
+<span id="L287"><span class="dc">of `C` deliver `|C|` distinct values. The fault model must contain `∅` (failure-free executions</span></span>
+<span id="L288"><span class="dc">comply with it), which follows from the paper's standing assumption that `F` is</span></span>
+<span id="L289"><span class="dc">inclusion-closed. -/</span></span>
+<span id="L290"><span class="kw">theorem</span> <span class="const token" data-verso-hover="6">lower_bound</span> (hA : <span class="const token" data-verso-hover="63">IsKCB</span> T s k A) (hLP : <span class="const token" data-verso-hover="82">LocalProgressAll</span> T s A) (h0 : ∅ ∈ T.<span class="const token" data-verso-hover="67">F</span>)</span>
+<span id="L291">    {F : <span class="const token" data-verso-hover="54">Finset</span> P} (hF : F ∈ T.<span class="const token" data-verso-hover="67">F</span>) (hsF : s ∈ F) {S : P → <span class="const token" data-verso-hover="54">Finset</span> P} (hS : S ∈ T.<span class="const token" data-verso-hover="225">QuorumMaps</span>)</span>
+<span id="L292">    {C : <span class="const token" data-verso-hover="54">Finset</span> P} (hC : <span class="const token" data-verso-hover="235">IsIndep</span> F S C) (val : P → V) (hval : <span class="const token" data-verso-hover="169">Set.InjOn</span> val C) :</span>
+<span id="L293">    C.<span class="const token" data-verso-hover="103">card</span> ≤ k := <span class="kw">by</span></span>
+<span id="L294">  <span class="cm">--</span><span class="cm"> the Local Progress runs</span></span>
+<span id="L295">  <span class="kw">choose</span> σ hreach hbad hdec honly <span class="kw">using</span> <span class="kw">fun</span> p =&gt; hLP p (S p) (hS p) (val p)</span>
+<span id="L296">  <span class="kw">have</span> hdecv : ∀ p, (σ p).<span class="const token" data-verso-hover="61">dec</span> p = <span class="const token" data-verso-hover="62">some</span> (val p) := <span class="kw">fun</span> p =&gt;</span>
+<span id="L297">    hA.<span class="const token" data-verso-hover="423">dec_eq_of_reachable</span> h0 (hreach p) (hbad p) (hdec p)</span>
+<span id="L298">  <span class="kw">have</span> hCF : ∀ p ∈ C, p ∉ F := <span class="kw">fun</span> p hp =&gt; <span class="const token" data-verso-hover="177">Finset.disjoint_left</span>.<span class="const token" data-verso-hover="118">mp</span> hC.<span class="const token" data-verso-hover="135">1</span> hp</span>
+<span id="L299">  <span class="cm">--</span><span class="cm"> the correct members of the quorums</span></span>
+<span id="L300">  <span class="kw">let</span> R : P → <span class="const token" data-verso-hover="59">Set</span> P := <span class="kw">fun</span> p =&gt; {q | q ∈ S p ∧ q ∉ F}</span>
+<span id="L301">  <span class="kw">have</span> hpR : ∀ p ∈ C, p ∈ R p := <span class="kw">by</span></span>
+<span id="L302">    <span class="kw">intro</span> p hp</span>
+<span id="L303">    <span class="kw">have</span> h1 := (honly p).<span class="const token" data-verso-hover="158">2</span><span class="nu">.</span><span class="const token" data-verso-hover="158">2</span> p (hdec p)</span>
+<span id="L304">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="202">Finset.mem_insert</span>.<span class="const token" data-verso-hover="118">mp</span> h1 <span class="kw">with</span> h1 | h1</span>
+<span id="L305">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="200">absurd</span> (h1 ▸ hsF) (hCF p hp)</span>
+<span id="L306">    · <span class="kw">exact</span> ⟨h1, hCF p hp⟩</span>
+<span id="L307">  <span class="kw">have</span> hdisj : ∀ p ∈ C, ∀ p' ∈ C, p ≠ p' → ∀ q ∈ R p, q ∉ R p' := <span class="kw">by</span></span>
+<span id="L308">    <span class="kw">rintro</span> p hp p' hp' hne q ⟨hq1, hq2⟩ ⟨hq1', -⟩</span>
+<span id="L309">    <span class="kw">exact</span> hq2 (hC.<span class="const token" data-verso-hover="158">2</span> p hp p' hp' hne (<span class="const token" data-verso-hover="178">Finset.mem_inter</span>.<span class="const token" data-verso-hover="145">mpr</span> ⟨hq1, hq1'⟩))</span>
+<span id="L310">  <span class="cm">--</span><span class="cm"> gluing the runs, one member of `C` after the other</span></span>
+<span id="L311">  <span class="kw">have</span> key : ∀ D ⊆ C, ∃ γ, <span class="const token" data-verso-hover="189">Reach</span> A (<span class="const token" data-verso-hover="43">srcInput</span> s <span class="const token" data-verso-hover="45">none</span>) <span class="const token" data-verso-hover="49">.</span>byzantine (<span class="const token" data-verso-hover="50">Fintype.card</span> P) (<span class="const token" data-verso-hover="418">corrupted</span> F) γ ∧</span>
+<span id="L312">      γ.<span class="const token" data-verso-hover="80">bad</span> = ↑F ∧ (∀ p ∈ D, γ.<span class="const token" data-verso-hover="61">dec</span> p = <span class="const token" data-verso-hover="62">some</span> (val p)) ∧</span>
+<span id="L313">      ∀ q, (∀ p ∈ D, q ∉ R p) →</span>
+<span id="L314">        (∀ r m, (q, r, m) ∉ γ.<span class="const token" data-verso-hover="77">rcv</span>) ∧ (∀ m, (q, m) ∉ γ.<span class="const token" data-verso-hover="76">sent</span>) ∧ γ.<span class="const token" data-verso-hover="61">dec</span> q = <span class="const token" data-verso-hover="45">none</span> := <span class="kw">by</span></span>
+<span id="L315">    <span class="kw">intro</span> D</span>
+<span id="L316">    <span class="kw">induction</span> D <span class="kw">using</span> <span class="const token" data-verso-hover="195">Finset.induction_on</span> <span class="kw">with</span></span>
+<span id="L317">    | <span class="const token" data-verso-hover="196">empty</span> =&gt;</span>
+<span id="L318">      <span class="kw">intro</span> _</span>
+<span id="L319">      <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="418">corrupted</span> F, <span class="const token" data-verso-hover="129">.</span>refl, <span class="const token" data-verso-hover="157">rfl</span>, <span class="kw">by</span> <span class="kw">simp</span>,</span>
+<span id="L320">        <span class="kw">fun</span> q _ =&gt; ⟨<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="418">corrupted</span>], <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="418">corrupted</span>], <span class="const token" data-verso-hover="157">rfl</span>⟩⟩</span>
+<span id="L321">    | insert a D ha ih =&gt;</span>
+<span id="L322">      <span class="kw">intro</span> hD</span>
+<span id="L323">      <span class="kw">have</span> haC : a ∈ C := hD (<span class="const token" data-verso-hover="136">Finset.mem_insert_self</span> a D)</span>
+<span id="L324">      <span class="kw">have</span> hDC : D ⊆ C := (<span class="const token" data-verso-hover="425">Finset.subset_insert</span> a D).<span class="const token" data-verso-hover="120">trans</span> hD</span>
+<span id="L325">      <span class="kw">obtain</span> ⟨γ, hγ, hγbad, hγdec, hγfr⟩ := ih hDC</span>
+<span id="L326">      <span class="kw">have</span> hfra : ∀ q ∈ R a, (∀ r m, (q, r, m) ∉ γ.<span class="const token" data-verso-hover="77">rcv</span>) ∧ (∀ m, (q, m) ∉ γ.<span class="const token" data-verso-hover="76">sent</span>) ∧</span>
+<span id="L327">          γ.<span class="const token" data-verso-hover="61">dec</span> q = <span class="const token" data-verso-hover="45">none</span> := <span class="kw">fun</span> q hq =&gt;</span>
+<span id="L328">        hγfr q <span class="kw">fun</span> p hp =&gt; hdisj a haC p (hDC hp) (<span class="kw">fun</span> e =&gt; ha (e ▸ hp)) q hq</span>
+<span id="L329">      <span class="kw">have</span> hm0 : <span class="const token" data-verso-hover="388">Mirror</span> (R a) γ <span class="const token" data-verso-hover="122">State.init</span> γ :=</span>
+<span id="L330">        { <span class="const token" data-verso-hover="389">bad</span> := <span class="const token" data-verso-hover="157">rfl</span></span>
+<span id="L331">          <span class="const token" data-verso-hover="390">rcv_in</span> := <span class="kw">fun</span> q hq r m =&gt; <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="122">State.init</span>, (hfra q hq).<span class="const token" data-verso-hover="135">1</span> r m]</span>
+<span id="L332">          <span class="const token" data-verso-hover="391">sent_in</span> := <span class="kw">fun</span> q hq m =&gt; <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="122">State.init</span>, (hfra q hq).<span class="const token" data-verso-hover="158">2</span><span class="nu">.</span><span class="const token" data-verso-hover="135">1</span> m]</span>
+<span id="L333">          <span class="const token" data-verso-hover="392">dec_in</span> := <span class="kw">fun</span> q hq =&gt; (hfra q hq).<span class="const token" data-verso-hover="158">2</span><span class="nu">.</span><span class="const token" data-verso-hover="158">2</span></span>
+<span id="L334">          <span class="const token" data-verso-hover="393">rcv_out</span> := <span class="kw">fun</span> _ _ _ _ =&gt; <span class="const token" data-verso-hover="426">Iff.rfl</span></span>
+<span id="L335">          <span class="const token" data-verso-hover="394">sent_out</span> := <span class="kw">fun</span> _ _ _ =&gt; <span class="const token" data-verso-hover="426">Iff.rfl</span></span>
+<span id="L336">          <span class="const token" data-verso-hover="395">dec_out</span> := <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="157">rfl</span> }</span>
+<span id="L337">      <span class="kw">obtain</span> ⟨γ', hγ', hm⟩ := hm0.<span class="const token" data-verso-hover="415">reach</span> (x' := <span class="const token" data-verso-hover="43">srcInput</span> s <span class="const token" data-verso-hover="45">none</span>) (t' := <span class="const token" data-verso-hover="50">Fintype.card</span> P) (hreach a)</span>
+<span id="L338">        (<span class="kw">fun</span> q hq =&gt; <span class="kw">by</span> <span class="kw">rw</span> [hγbad]; <span class="kw">exact</span> hq.<span class="const token" data-verso-hover="158">2</span>)</span>
+<span id="L339">        (<span class="kw">fun</span> q hq =&gt; <span class="kw">by</span></span>
+<span id="L340">          <span class="kw">have</span> : q ≠ s := <span class="kw">fun</span> e =&gt; hq.<span class="const token" data-verso-hover="158">2</span> (e ▸ hsF)</span>
+<span id="L341">          <span class="kw">simp</span> [<span class="const token" data-verso-hover="43">srcInput</span>, this])</span>
+<span id="L342">        (<span class="kw">fun</span> q _ =&gt; <span class="kw">by</span> <span class="kw">rw</span> [hbad a]; <span class="kw">exact</span> <span class="const token" data-verso-hover="424">Set.notMem_empty</span> q)</span>
+<span id="L343">        (<span class="kw">fun</span> q _ r m hm hr =&gt; <span class="kw">by</span></span>
+<span id="L344">          <span class="kw">rw</span> [hγbad]</span>
+<span id="L345">          <span class="kw">rcases</span> (hreach a).<span class="const token" data-verso-hover="427">rcv_origin</span> hm <span class="kw">with</span> h1 | ⟨-, h1⟩</span>
+<span id="L346">          · <span class="kw">rcases</span> <span class="const token" data-verso-hover="202">Finset.mem_insert</span>.<span class="const token" data-verso-hover="118">mp</span> ((honly a).<span class="const token" data-verso-hover="135">1</span> r m h1) <span class="kw">with</span> h2 | h2</span>
+<span id="L347">            · <span class="kw">rw</span> [h2]; <span class="kw">exact</span> hsF</span>
+<span id="L348">            · <span class="kw">by_contra</span> h3; <span class="kw">exact</span> hr ⟨h2, h3⟩</span>
+<span id="L349">          · <span class="kw">rw</span> [hbad a] <span class="kw">at</span> h1; <span class="kw">exact</span> <span class="const token" data-verso-hover="200">absurd</span> h1 (<span class="const token" data-verso-hover="424">Set.notMem_empty</span> r))</span>
+<span id="L350">      <span class="kw">refine</span> ⟨γ', hγ.<span class="const token" data-verso-hover="208">trans</span> hγ', hm.<span class="const token" data-verso-hover="389">bad</span>.<span class="const token" data-verso-hover="386">trans</span> hγbad, ?_, ?_⟩</span>
+<span id="L351">      · <span class="kw">intro</span> p hp</span>
+<span id="L352">        <span class="kw">rcases</span> <span class="const token" data-verso-hover="202">Finset.mem_insert</span>.<span class="const token" data-verso-hover="118">mp</span> hp <span class="kw">with</span> <span class="kw">rfl</span> | hp</span>
+<span id="L353">        · <span class="kw">rw</span> [hm.<span class="const token" data-verso-hover="392">dec_in</span> p (hpR p haC)]; <span class="kw">exact</span> hdecv p</span>
+<span id="L354">        · <span class="kw">have</span> hpa : p ∉ R a :=</span>
+<span id="L355">            hdisj p (hDC hp) a haC (<span class="kw">fun</span> e =&gt; ha (e ▸ hp)) p (hpR p (hDC hp))</span>
+<span id="L356">          <span class="kw">rw</span> [hm.<span class="const token" data-verso-hover="395">dec_out</span> p hpa]; <span class="kw">exact</span> hγdec p hp</span>
+<span id="L357">      · <span class="kw">intro</span> q hq</span>
+<span id="L358">        <span class="kw">have</span> hqa : q ∉ R a := hq a (<span class="const token" data-verso-hover="136">Finset.mem_insert_self</span> a D)</span>
+<span id="L359">        <span class="kw">obtain</span> ⟨h1, h2, h3⟩ := hγfr q <span class="kw">fun</span> p hp =&gt; hq p (<span class="const token" data-verso-hover="137">Finset.mem_insert_of_mem</span> hp)</span>
+<span id="L360">        <span class="kw">exact</span> ⟨<span class="kw">fun</span> r m =&gt; <span class="kw">by</span> <span class="kw">rw</span> [hm.<span class="const token" data-verso-hover="393">rcv_out</span> q hqa r m]; <span class="kw">exact</span> h1 r m,</span>
+<span id="L361">          <span class="kw">fun</span> m =&gt; <span class="kw">by</span> <span class="kw">rw</span> [hm.<span class="const token" data-verso-hover="394">sent_out</span> q hqa m]; <span class="kw">exact</span> h2 m, <span class="kw">by</span> <span class="kw">rw</span> [hm.<span class="const token" data-verso-hover="395">dec_out</span> q hqa]; <span class="kw">exact</span> h3⟩</span>
+<span id="L362">  <span class="kw">obtain</span> ⟨γ, hγ, hγbad, hγdec, -⟩ := key C <span class="const token" data-verso-hover="428">subset_rfl</span></span>
+<span id="L363">  <span class="cm">--</span><span class="cm"> the glued execution</span></span>
+<span id="L364">  <span class="kw">obtain</span> ⟨E, N, hE⟩ := <span class="const token" data-verso-hover="403">exists_exec_of_reachable</span> (<span class="const token" data-verso-hover="419">reach_corrupted</span> F |&gt;.<span class="const token" data-verso-hover="208">trans</span> hγ)</span>
+<span id="L365">  <span class="kw">have</span> hcorr : ∀ p, E.<span class="const token" data-verso-hover="57">Correct</span> p ↔ p ∉ F := <span class="kw">fun</span> p =&gt; <span class="kw">by</span></span>
+<span id="L366">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="408">correct_iff_of_stutter</span> hE, hγbad]; <span class="kw">rfl</span></span>
+<span id="L367">  <span class="kw">have</span> hfs : <span class="const token" data-verso-hover="51">faultySet</span> E = F := <span class="kw">by</span> <span class="kw">ext</span> p; <span class="kw">simp</span> [<span class="const token" data-verso-hover="51">faultySet</span>, hcorr p]</span>
+<span id="L368">  <span class="kw">have</span> hsub : val '' ↑C ⊆ <span class="const token" data-verso-hover="58">delivered</span> E := <span class="kw">by</span></span>
+<span id="L369">    <span class="kw">rintro</span> _ ⟨p, hp, <span class="kw">rfl</span>⟩</span>
+<span id="L370">    <span class="kw">exact</span> ⟨p, N, (hcorr p).<span class="const token" data-verso-hover="145">2</span> (hCF p hp), <span class="kw">by</span> <span class="kw">rw</span> [hE N <span class="const token" data-verso-hover="143">le_rfl</span>]; <span class="kw">exact</span> hγdec p hp⟩</span>
+<span id="L371">  <span class="kw">have</span> := (<span class="const token" data-verso-hover="429">Set.encard_le_encard</span> hsub).<span class="const token" data-verso-hover="120">trans</span> (hA.<span class="const token" data-verso-hover="69">consistency</span> <span class="const token" data-verso-hover="45">none</span> E (hfs ▸ hF))</span>
+<span id="L372">  <span class="kw">rw</span> [hval.<span class="const token" data-verso-hover="430">encard_image</span>, <span class="const token" data-verso-hover="109">Set.encard_coe_eq_coe_finsetCard</span>] <span class="kw">at</span> this</span>
+<span id="L373">  <span class="kw">exact_mod_cast</span> this</span>
+<span id="L374"></span>
+<span id="L375"><span class="dc">/-- **Theorem 5.1** (repaired): an algorithm implementing `k`-CB with source `s` and per-value</span></span>
+<span id="L376"><span class="dc">Local Progress has `k ≥ λ_s`, the largest independence number of a graph `G_{F,S}` with `s ∈ F`.</span></span>
+<span id="L377"><span class="dc">(The value set must be large enough to give the members of an independent set distinct values;</span></span>
+<span id="L378"><span class="dc">`∅ ∈ F` follows from the paper's standing assumption that `F` is inclusion-closed.) -/</span></span>
+<span id="L379"><span class="kw">theorem</span> <span class="const token" data-verso-hover="7">srcInconsistencyNumber_le</span> [<span class="const token" data-verso-hover="431">Infinite</span> V] (h0 : ∅ ∈ T.<span class="const token" data-verso-hover="67">F</span>) (hA : <span class="const token" data-verso-hover="63">IsKCB</span> T s k A)</span>
+<span id="L380">    (hLP : <span class="const token" data-verso-hover="82">LocalProgressAll</span> T s A) : <span class="const token" data-verso-hover="72">srcInconsistencyNumber</span> T s ≤ k := <span class="kw">by</span></span>
+<span id="L381">  <span class="kw">let</span> e : P ↪ V := (<span class="const token" data-verso-hover="432">Fintype.equivFin</span> P).<span class="const token" data-verso-hover="433">toEmbedding</span>.<span class="const token" data-verso-hover="434">trans</span></span>
+<span id="L382">    (<span class="const token" data-verso-hover="435">Fin.valEmbedding</span>.<span class="const token" data-verso-hover="434">trans</span> (<span class="const token" data-verso-hover="436">Infinite.natEmbedding</span> V))</span>
+<span id="L383">  <span class="kw">apply</span> <span class="const token" data-verso-hover="224">TrustModel.inconsistencyNumber_le</span></span>
+<span id="L384">  <span class="kw">rintro</span> F ⟨hF, hsF⟩ S hS C hC</span>
+<span id="L385">  <span class="kw">exact</span> <span class="const token" data-verso-hover="6">lower_bound</span> hA hLP h0 hF hsF hS hC e e.<span class="const token" data-verso-hover="437">injective</span>.<span class="const token" data-verso-hover="438">injOn</span></span>
+<span id="L386"></span>
+<span id="L387"><span class="dc">/-! ### The hypothesis `∅ ∈ F` is needed -/</span></span>
+<span id="L388"></span>
+<span id="L389"><span class="dc">/-- The algorithm in which every process delivers `v₀` at once and nobody sends anything. -/</span></span>
+<span id="L390"><span class="kw">def</span> <span class="const token" data-verso-hover="439">constAlg</span> (v₀ : V) : <span class="const token" data-verso-hover="47">Protocol</span> P M (<span class="const token" data-verso-hover="44">Option</span> V) V <span class="kw">where</span></span>
+<span id="L391">  <span class="const token" data-verso-hover="87">send</span> _ _ _ _ _ := <span class="const token" data-verso-hover="440">False</span></span>
+<span id="L392">  <span class="const token" data-verso-hover="88">decide</span> _ _ _ _ o := o = v₀</span>
+<span id="L393"></span>
+<span id="L394"><span class="kw">omit</span> [<span class="const token" data-verso-hover="41">Fintype</span> P] <span class="kw">in</span></span>
+<span id="L395"><span class="kw">theorem</span> <span class="const token" data-verso-hover="441">constAlg_dec</span> {v₀ : V} {x : P → <span class="const token" data-verso-hover="44">Option</span> V} {k : <span class="const token" data-verso-hover="52">FaultKind</span>} {t : <span class="const token" data-verso-hover="53">ℕ</span>} {σ : <span class="const token" data-verso-hover="75">State</span> P M V}</span>
+<span id="L396">    (h : <span class="const token" data-verso-hover="79">Reachable</span> (<span class="const token" data-verso-hover="439">constAlg</span> v₀) x k t σ) {p : P} {v : V} (hv : σ.<span class="const token" data-verso-hover="61">dec</span> p = <span class="const token" data-verso-hover="62">some</span> v) : v = v₀ :=</span>
+<span id="L397">  h.<span class="const token" data-verso-hover="92">dec_just</span> (J := <span class="kw">fun</span> _ o _ _ =&gt; o = v₀) (<span class="kw">fun</span> _ _ _ _ _ _ _ _ h =&gt; h) (<span class="kw">fun</span> _ _ _ _ h =&gt; h) hv</span>
+<span id="L398"></span>
+<span id="L399"><span class="dc">/-- **The hypothesis `∅ ∈ F` of `lower_bound` cannot be dropped.** Three processes, the only</span></span>
+<span id="L400"><span class="dc">quorum of each process is itself, and the only admissible faulty set is `{0}` (so `F` is not</span></span>
+<span id="L401"><span class="dc">inclusion-closed). The source `0` is never correct in a compliant execution, so the algorithm in</span></span>
+<span id="L402"><span class="dc">which everybody delivers `0` at once is a `1`-CB with per-value Local Progress, although</span></span>
+<span id="L403"><span class="dc">`{1, 2}` is independent in `G_{{0},S}` and `0 ∈ {0}`. -/</span></span>
+<span id="L404"><span class="kw">theorem</span> <span class="const token" data-verso-hover="442">lower_bound_needs_empty_mem</span> :</span>
+<span id="L405">    <span class="kw">let</span> T : <span class="const token" data-verso-hover="64">TrustModel</span> (<span class="const token" data-verso-hover="140">Fin</span> <span class="nu">3</span>) := ⟨<span class="kw">fun</span> p =&gt; {{p}}, {{<span class="nu">0</span>}}⟩</span>
+<span id="L406">    T.<span class="const token" data-verso-hover="20">SelfMem</span> ∧ <span class="const token" data-verso-hover="63">IsKCB</span> (M := <span class="const token" data-verso-hover="443">Unit</span>) T <span class="nu">0</span> <span class="nu">1</span> (<span class="const token" data-verso-hover="439">constAlg</span> (<span class="nu">0</span> : <span class="const token" data-verso-hover="53">ℕ</span>)) ∧</span>
+<span id="L407">      <span class="const token" data-verso-hover="82">LocalProgressAll</span> (M := <span class="const token" data-verso-hover="443">Unit</span>) T <span class="nu">0</span> (<span class="const token" data-verso-hover="439">constAlg</span> (<span class="nu">0</span> : <span class="const token" data-verso-hover="53">ℕ</span>)) ∧</span>
+<span id="L408">      ({<span class="nu">0</span>} : <span class="const token" data-verso-hover="54">Finset</span> (<span class="const token" data-verso-hover="140">Fin</span> <span class="nu">3</span>)) ∈ T.<span class="const token" data-verso-hover="67">F</span> ∧ (<span class="kw">fun</span> p =&gt; ({p} : <span class="const token" data-verso-hover="54">Finset</span> (<span class="const token" data-verso-hover="140">Fin</span> <span class="nu">3</span>))) ∈ T.<span class="const token" data-verso-hover="225">QuorumMaps</span> ∧</span>
+<span id="L409">      <span class="const token" data-verso-hover="235">IsIndep</span> {<span class="nu">0</span>} (<span class="kw">fun</span> p =&gt; ({p} : <span class="const token" data-verso-hover="54">Finset</span> (<span class="const token" data-verso-hover="140">Fin</span> <span class="nu">3</span>))) {<span class="nu">1</span>, <span class="nu">2</span>} ∧</span>
+<span id="L410">      ¬ (({<span class="nu">1</span>, <span class="nu">2</span>} : <span class="const token" data-verso-hover="54">Finset</span> (<span class="const token" data-verso-hover="140">Fin</span> <span class="nu">3</span>)).<span class="const token" data-verso-hover="103">card</span> ≤ <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L411">  <span class="kw">intro</span> T</span>
+<span id="L412">  <span class="kw">have</span> hsrc : ∀ mo (E : <span class="const token" data-verso-hover="46">BExec</span> (<span class="const token" data-verso-hover="439">constAlg</span> (M := <span class="const token" data-verso-hover="443">Unit</span>) (<span class="nu">0</span> : <span class="const token" data-verso-hover="53">ℕ</span>)) (<span class="nu">0</span> : <span class="const token" data-verso-hover="140">Fin</span> <span class="nu">3</span>) mo), <span class="const token" data-verso-hover="51">faultySet</span> E ∈ T.<span class="const token" data-verso-hover="67">F</span> →</span>
+<span id="L413">      ¬ E.<span class="const token" data-verso-hover="57">Correct</span> <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L414">    <span class="kw">intro</span> mo E hF hs</span>
+<span id="L415">    <span class="kw">have</span> h1 : <span class="const token" data-verso-hover="51">faultySet</span> E = {<span class="nu">0</span>} := hF</span>
+<span id="L416">    <span class="kw">have</span> h2 : (<span class="nu">0</span> : <span class="const token" data-verso-hover="140">Fin</span> <span class="nu">3</span>) ∈ <span class="const token" data-verso-hover="51">faultySet</span> E := <span class="kw">by</span> <span class="kw">rw</span> [h1]; <span class="kw">exact</span> <span class="const token" data-verso-hover="444">Finset.mem_singleton_self</span> <span class="nu">0</span></span>
+<span id="L417">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="51">faultySet</span>] <span class="kw">at</span> h2</span>
+<span id="L418">    <span class="kw">exact</span> h2 hs</span>
+<span id="L419">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> p Q hQ =&gt; ?_, ⟨<span class="kw">fun</span> m E _ hF hs =&gt; <span class="const token" data-verso-hover="200">absurd</span> hs (hsrc _ E hF), <span class="kw">fun</span> mo E _ =&gt; ?_,</span>
+<span id="L420">    <span class="kw">fun</span> mo E hF hs =&gt; <span class="const token" data-verso-hover="200">absurd</span> hs (hsrc _ E hF)⟩, <span class="kw">fun</span> p Q hQ m =&gt; ?_, <span class="const token" data-verso-hover="157">rfl</span>, <span class="kw">fun</span> p =&gt; <span class="const token" data-verso-hover="157">rfl</span>, ?_,</span>
+<span id="L421">    <span class="kw">by</span> <span class="kw">decide</span>⟩</span>
+<span id="L422">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="209">Set.mem_singleton_iff</span>.<span class="const token" data-verso-hover="118">mp</span> hQ]; <span class="kw">exact</span> <span class="const token" data-verso-hover="444">Finset.mem_singleton_self</span> p</span>
+<span id="L423">  · <span class="kw">have</span> hsub : <span class="const token" data-verso-hover="58">delivered</span> E ⊆ {<span class="nu">0</span>} := <span class="kw">by</span></span>
+<span id="L424">      <span class="kw">rintro</span> v ⟨p, i, -, hv⟩</span>
+<span id="L425">      <span class="kw">exact</span> <span class="const token" data-verso-hover="441">constAlg_dec</span> (E.<span class="const token" data-verso-hover="96">reachable</span> i) hv</span>
+<span id="L426">    <span class="kw">exact</span> (<span class="const token" data-verso-hover="429">Set.encard_le_encard</span> hsub).<span class="const token" data-verso-hover="120">trans</span> (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L427">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="209">Set.mem_singleton_iff</span>.<span class="const token" data-verso-hover="118">mp</span> hQ]</span>
+<span id="L428">    <span class="kw">let</span> σ : <span class="const token" data-verso-hover="75">State</span> (<span class="const token" data-verso-hover="140">Fin</span> <span class="nu">3</span>) <span class="const token" data-verso-hover="443">Unit</span> <span class="const token" data-verso-hover="53">ℕ</span> :=</span>
+<span id="L429">      { (<span class="const token" data-verso-hover="122">State.init</span> : <span class="const token" data-verso-hover="75">State</span> (<span class="const token" data-verso-hover="140">Fin</span> <span class="nu">3</span>) <span class="const token" data-verso-hover="443">Unit</span> <span class="const token" data-verso-hover="53">ℕ</span>) <span class="kw">with</span></span>
+<span id="L430">        <span class="const token" data-verso-hover="61">dec</span> := <span class="const token" data-verso-hover="123">Function.update</span> (<span class="const token" data-verso-hover="122">State.init</span> : <span class="const token" data-verso-hover="75">State</span> (<span class="const token" data-verso-hover="140">Fin</span> <span class="nu">3</span>) <span class="const token" data-verso-hover="443">Unit</span> <span class="const token" data-verso-hover="53">ℕ</span>).<span class="const token" data-verso-hover="61">dec</span> p (<span class="const token" data-verso-hover="62">some</span> <span class="nu">0</span>) }</span>
+<span id="L431">    <span class="kw">have</span> hst : <span class="const token" data-verso-hover="124">Step</span> (<span class="const token" data-verso-hover="439">constAlg</span> (<span class="nu">0</span> : <span class="const token" data-verso-hover="53">ℕ</span>)) (<span class="const token" data-verso-hover="43">srcInput</span> <span class="nu">0</span> (<span class="const token" data-verso-hover="62">some</span> m)) <span class="const token" data-verso-hover="49">.</span>byzantine (<span class="const token" data-verso-hover="50">Fintype.card</span> (<span class="const token" data-verso-hover="140">Fin</span> <span class="nu">3</span>))</span>
+<span id="L432">        <span class="const token" data-verso-hover="122">State.init</span> σ :=</span>
+<span id="L433">      <span class="const token" data-verso-hover="127">Step.decide</span> _ p <span class="nu">0</span> (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="122">State.init</span>]) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="122">State.init</span>]) <span class="const token" data-verso-hover="157">rfl</span></span>
+<span id="L434">    <span class="kw">refine</span> ⟨σ, <span class="const token" data-verso-hover="207">Relation.ReflTransGen.single</span> hst, <span class="const token" data-verso-hover="157">rfl</span>, <span class="kw">by</span> <span class="kw">simp</span> [σ], ?_, ?_, ?_⟩</span>
+<span id="L435">    · <span class="kw">intro</span> q m' hq; <span class="kw">simp</span> [σ, <span class="const token" data-verso-hover="122">State.init</span>] <span class="kw">at</span> hq</span>
+<span id="L436">    · <span class="kw">intro</span> q r m' hq; <span class="kw">simp</span> [σ, <span class="const token" data-verso-hover="122">State.init</span>] <span class="kw">at</span> hq</span>
+<span id="L437">    · <span class="kw">intro</span> q hq</span>
+<span id="L438">      <span class="kw">by_cases</span> e : q = p</span>
+<span id="L439">      · <span class="kw">rw</span> [e]; <span class="kw">simp</span></span>
+<span id="L440">      · <span class="kw">simp</span> [σ, <span class="const token" data-verso-hover="122">State.init</span>, <span class="const token" data-verso-hover="138">Function.update_of_ne</span> e] <span class="kw">at</span> hq</span>
+<span id="L441">  · <span class="kw">unfold</span> <span class="const token" data-verso-hover="235">IsIndep</span>; <span class="kw">decide</span></span>
+<span id="L442"></span>
+<span id="L443"><span class="kw">end</span> LowerBound</span>
+<span id="L444"></span>
+<span id="L445"><span class="kw">end</span> Podc.MultipleSpending</span>
+<span id="L446"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2022/MultipleSpending/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

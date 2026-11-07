@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>RendezvousTimeCost: Segments.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2014/">PODC 2014</a><span class="sep">›</span><a href="PODC2014/RendezvousTimeCost/">RendezvousTimeCost</a><span class="sep">›</span><a href="PODC2014/RendezvousTimeCost/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Segments</span></nav>
+        <h1>
+          <code>Segments.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2014/RendezvousTimeCost/">Time vs. Cost of Deterministic Rendezvous — PODC 2014</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2014/RendezvousTimeCost/Segments.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Segments"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Segment schedules: the model of Section 2 of Miller–Pelc (upper bounds)</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">All three algorithms of Section 2 of [Miller, Pelc, *Time versus cost tradeoffs for deterministic</span></span>
+<span id="L7"><span class="dc">rendezvous in networks*, PODC 2014] (Cheap, Fast, FastWithRelabeling) have the same shape: the</span></span>
+<span id="L8"><span class="dc">agent's time is cut into *segments* of `E` rounds, and in segment `i` the agent either executes</span></span>
+<span id="L9"><span class="dc">the procedure EXPLORE (which visits every node of the graph within `E` rounds, from any start) or</span></span>
+<span id="L10"><span class="dc">waits `E` rounds. Such an algorithm is a bit list (`true` = explore), the *segment schedule*; after</span></span>
+<span id="L11"><span class="dc">the list is exhausted the agent stays where it is.</span></span>
+<span id="L12"></span>
+<span id="L13"><span class="dc">**Model.** For the upper bounds of Section 2 no graph structure is needed: the network is an</span></span>
+<span id="L14"><span class="dc">arbitrary type `V` of nodes and EXPLORE is abstracted by `Explore V E`, a family of walks</span></span>
+<span id="L15"><span class="dc">`walk v t` (position after `t` rounds of EXPLORE started at `v`) visiting every node within `E`</span></span>
+<span id="L16"><span class="dc">rounds. EXPLORE always takes exactly `E` rounds (it waits at the end), so its position after `t`</span></span>
+<span id="L17"><span class="dc">rounds is `walk v (min t E)`. Executions are synchronous and deterministic. The adversary wakes</span></span>
+<span id="L18"><span class="dc">agent `A` at time `δA` and agent `B` at time `δB`, with `δA = 0 ∨ δB = 0` (time is counted from</span></span>
+<span id="L19"><span class="dc">the wake-up of the earlier agent). A sleeping agent sits at its starting node, where it can be</span></span>
+<span id="L20"><span class="dc">found. Both agents stop upon meeting.</span></span>
+<span id="L21"></span>
+<span id="L22"><span class="dc">* `pos X a r` : position of agent `a` at time `r` (after `r` rounds);</span></span>
+<span id="L23"><span class="dc">* `MeetsAt X A B r` : both agents are at the same node at time `r`;</span></span>
+<span id="L24"><span class="dc">* `meetTime X A B` : the first such time (rendezvous time, counted from the earlier wake-up);</span></span>
+<span id="L25"><span class="dc">* `cost X A B` : the number of rounds before the first meeting in which `A` changes its position,</span></span>
+<span id="L26"><span class="dc">  plus the same for `B` (the edge traversals of both agents before rendezvous).</span></span>
+<span id="L27"><span class="dc">-/</span></span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">namespace</span> Podc.RendezvousTimeCost.Upper</span>
+<span id="L30"></span>
+<span id="L31"><span class="dc">/-- `omega` after expanding products `(a + b) * E` into multiples of the atoms `x * E`. -/</span></span>
+<span id="L32"><span class="kw">macro</span> <span class="st">"rtc_omega"</span> : <span class="const token" data-verso-hover="487">tactic</span> =&gt;</span>
+<span id="L33">  `(tactic| ((<span class="kw">try</span> <span class="kw">simp</span> only [add_mul, mul_assoc, one_mul] <span class="kw">at</span> *) &lt;;&gt; <span class="kw">omega</span>))</span>
+<span id="L34"></span>
+<span id="L35"><span class="dc">/-- An exploration procedure with time bound `E` on a network with node set `V`: `walk v t` is</span></span>
+<span id="L36"><span class="dc">the position after `t` rounds of EXPLORE started at `v`, and every node is visited within `E`</span></span>
+<span id="L37"><span class="dc">rounds. (No graph structure is needed for the upper bounds of Section 2.) -/</span></span>
+<span id="L38"><span class="kw">structure</span> <span class="const token" data-verso-hover="38">Explore</span> (V : <span class="kw">Type</span>*) (E : <span class="const token" data-verso-hover="23">ℕ</span>) <span class="kw">where</span></span>
+<span id="L39">  <span class="dc">/-- Position after `t` rounds of EXPLORE started at `v`. -/</span></span>
+<span id="L40">  <span class="const token" data-verso-hover="196">walk</span> : V → <span class="const token" data-verso-hover="23">ℕ</span> → V</span>
+<span id="L41">  <span class="const token" data-verso-hover="197">walk_zero</span> : ∀ v, <span class="const token" data-verso-hover="196">walk</span> v <span class="nu">0</span> = v</span>
+<span id="L42">  <span class="const token" data-verso-hover="198">covers</span> : ∀ v u, ∃ t ≤ E, <span class="const token" data-verso-hover="196">walk</span> v t = u</span>
+<span id="L43"></span>
+<span id="L44"><span class="kw">variable</span> {V : <span class="kw">Type</span>*} {E : <span class="const token" data-verso-hover="23">ℕ</span>}</span>
+<span id="L45"></span>
+<span id="L46"><span class="dc">/-- Position after `s ≤ E` rounds of a segment started at `w`: EXPLORE if `b`, waiting otherwise. -/</span></span>
+<span id="L47"><span class="kw">def</span> <span class="const token" data-verso-hover="488">segStep</span> (X : <span class="const token" data-verso-hover="38">Explore</span> V E) (b : <span class="const token" data-verso-hover="36">Bool</span>) (w : V) (s : <span class="const token" data-verso-hover="23">ℕ</span>) : V := <span class="kw">if</span> b <span class="kw">then</span> X.<span class="const token" data-verso-hover="196">walk</span> w s <span class="kw">else</span> w</span>
+<span id="L48"></span>
+<span id="L49"><span class="dc">/-- The solo trajectory of an agent following the segment schedule `bits` from node `v`:</span></span>
+<span id="L50"><span class="dc">position after `t` rounds of its own clock. After the schedule ends the agent stays. -/</span></span>
+<span id="L51"><span class="kw">def</span> <span class="const token" data-verso-hover="51">segTraj</span> (X : <span class="const token" data-verso-hover="38">Explore</span> V E) : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="36">Bool</span> → V → <span class="const token" data-verso-hover="23">ℕ</span> → V</span>
+<span id="L52">  | [], v, _ =&gt; v</span>
+<span id="L53">  | b :: bs, v, t =&gt;</span>
+<span id="L54">    <span class="kw">if</span> t &lt; E <span class="kw">then</span> <span class="const token" data-verso-hover="488">segStep</span> X b v t <span class="kw">else</span> <span class="const token" data-verso-hover="51">segTraj</span> X bs (<span class="const token" data-verso-hover="488">segStep</span> X b v E) (t - E)</span>
+<span id="L55"></span>
+<span id="L56"><span class="dc">/-- An agent: its segment schedule, its starting node and its wake-up delay. -/</span></span>
+<span id="L57"><span class="kw">structure</span> <span class="const token" data-verso-hover="42">Agent</span> (V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L58">  <span class="dc">/-- The segment schedule (`true` = explore). -/</span></span>
+<span id="L59">  <span class="const token" data-verso-hover="52">bits</span> : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="36">Bool</span></span>
+<span id="L60">  <span class="dc">/-- The starting node. -/</span></span>
+<span id="L61">  <span class="const token" data-verso-hover="53">start</span> : V</span>
+<span id="L62">  <span class="dc">/-- The wake-up time (rounds after time `0`). -/</span></span>
+<span id="L63">  <span class="const token" data-verso-hover="489">delay</span> : <span class="const token" data-verso-hover="23">ℕ</span></span>
+<span id="L64"></span>
+<span id="L65"><span class="dc">/-- Position of agent `a` at (global) time `r`. -/</span></span>
+<span id="L66"><span class="kw">def</span> <span class="const token" data-verso-hover="41">pos</span> (X : <span class="const token" data-verso-hover="38">Explore</span> V E) (a : <span class="const token" data-verso-hover="42">Agent</span> V) (r : <span class="const token" data-verso-hover="23">ℕ</span>) : V := <span class="const token" data-verso-hover="51">segTraj</span> X a.<span class="const token" data-verso-hover="52">bits</span> a.<span class="const token" data-verso-hover="53">start</span> (r - a.<span class="const token" data-verso-hover="489">delay</span>)</span>
+<span id="L67"></span>
+<span id="L68"><span class="dc">/-- The agents are at the same node at time `r`. -/</span></span>
+<span id="L69"><span class="kw">def</span> <span class="const token" data-verso-hover="39">MeetsAt</span> (X : <span class="const token" data-verso-hover="38">Explore</span> V E) (A B : <span class="const token" data-verso-hover="42">Agent</span> V) (r : <span class="const token" data-verso-hover="23">ℕ</span>) : <span class="kw">Prop</span> := <span class="const token" data-verso-hover="41">pos</span> X A r = <span class="const token" data-verso-hover="41">pos</span> X B r</span>
+<span id="L70"></span>
+<span id="L71"><span class="dc">/-- Rendezvous time: the first time at which the agents meet. -/</span></span>
+<span id="L72"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="62">meetTime</span> (X : <span class="const token" data-verso-hover="38">Explore</span> V E) (A B : <span class="const token" data-verso-hover="42">Agent</span> V) : <span class="const token" data-verso-hover="23">ℕ</span> := <span class="const token" data-verso-hover="177">sInf</span> {r | <span class="const token" data-verso-hover="39">MeetsAt</span> X A B r}</span>
+<span id="L73"></span>
+<span id="L74"><span class="dc">/-- Number of rounds among the first `n` in which the position `f` changes. -/</span></span>
+<span id="L75"><span class="kw">def</span> <span class="const token" data-verso-hover="40">moveCount</span> [<span class="const token" data-verso-hover="22">DecidableEq</span> V] (f : <span class="const token" data-verso-hover="23">ℕ</span> → V) : <span class="const token" data-verso-hover="23">ℕ</span> → <span class="const token" data-verso-hover="23">ℕ</span></span>
+<span id="L76">  | <span class="nu">0</span> =&gt; <span class="nu">0</span></span>
+<span id="L77">  | n + <span class="nu">1</span> =&gt; <span class="const token" data-verso-hover="40">moveCount</span> f n + <span class="kw">if</span> f (n + <span class="nu">1</span>) = f n <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> <span class="nu">1</span></span>
+<span id="L78"></span>
+<span id="L79"><span class="dc">/-- Cost of rendezvous: edge traversals of both agents before the first meeting. -/</span></span>
+<span id="L80"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="64">cost</span> [<span class="const token" data-verso-hover="22">DecidableEq</span> V] (X : <span class="const token" data-verso-hover="38">Explore</span> V E) (A B : <span class="const token" data-verso-hover="42">Agent</span> V) : <span class="const token" data-verso-hover="23">ℕ</span> :=</span>
+<span id="L81">  <span class="const token" data-verso-hover="40">moveCount</span> (<span class="const token" data-verso-hover="41">pos</span> X A) (<span class="const token" data-verso-hover="62">meetTime</span> X A B) + <span class="const token" data-verso-hover="40">moveCount</span> (<span class="const token" data-verso-hover="41">pos</span> X B) (<span class="const token" data-verso-hover="62">meetTime</span> X A B)</span>
+<span id="L82"></span>
+<span id="L83"><span class="dc">/-! ### Trajectories -/</span></span>
+<span id="L84"></span>
+<span id="L85"><span class="kw">section</span> Traj</span>
+<span id="L86"></span>
+<span id="L87"><span class="kw">variable</span> (X : <span class="const token" data-verso-hover="38">Explore</span> V E)</span>
+<span id="L88"></span>
+<span id="L89">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="490">segStep_zero</span> (b : <span class="const token" data-verso-hover="36">Bool</span>) (w : V) : <span class="const token" data-verso-hover="488">segStep</span> X b w <span class="nu">0</span> = w := <span class="kw">by</span></span>
+<span id="L90">  <span class="kw">cases</span> b &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="488">segStep</span>, X.<span class="const token" data-verso-hover="197">walk_zero</span>]</span>
+<span id="L91"></span>
+<span id="L92">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="491">segStep_false</span> (w : V) (s : <span class="const token" data-verso-hover="23">ℕ</span>) : <span class="const token" data-verso-hover="488">segStep</span> X <span class="const token" data-verso-hover="26">false</span> w s = w := <span class="const token" data-verso-hover="114">rfl</span></span>
+<span id="L93"></span>
+<span id="L94">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="492">segTraj_zero</span> (bits : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="36">Bool</span>) (v : V) : <span class="const token" data-verso-hover="51">segTraj</span> X bits v <span class="nu">0</span> = v := <span class="kw">by</span></span>
+<span id="L95">  <span class="kw">induction</span> bits generalizing v <span class="kw">with</span></span>
+<span id="L96">  | <span class="const token" data-verso-hover="118">nil</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L97">  | <span class="const token" data-verso-hover="119">cons</span> b bs ih =&gt;</span>
+<span id="L98">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="51">segTraj</span>]</span>
+<span id="L99">    <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L100">    · <span class="kw">simp</span></span>
+<span id="L101">    · <span class="kw">have</span> : E = <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L102">      <span class="kw">subst</span> this</span>
+<span id="L103">      <span class="kw">simp</span> [ih]</span>
+<span id="L104"></span>
+<span id="L105"><span class="kw">lemma</span> <span class="const token" data-verso-hover="493">segTraj_cons_of_le</span> (b : <span class="const token" data-verso-hover="36">Bool</span>) (bs : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="36">Bool</span>) (v : V) {t : <span class="const token" data-verso-hover="23">ℕ</span>} (ht : t ≤ E) :</span>
+<span id="L106">    <span class="const token" data-verso-hover="51">segTraj</span> X (b :: bs) v t = <span class="const token" data-verso-hover="488">segStep</span> X b v t := <span class="kw">by</span></span>
+<span id="L107">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="51">segTraj</span>]</span>
+<span id="L108">  <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L109">  · <span class="kw">rfl</span></span>
+<span id="L110">  · <span class="kw">have</span> : t = E := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L111">    <span class="kw">subst</span> this</span>
+<span id="L112">    <span class="kw">simp</span></span>
+<span id="L113"></span>
+<span id="L114"><span class="kw">lemma</span> <span class="const token" data-verso-hover="494">segTraj_cons_add</span> (b : <span class="const token" data-verso-hover="36">Bool</span>) (bs : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="36">Bool</span>) (v : V) (t : <span class="const token" data-verso-hover="23">ℕ</span>) :</span>
+<span id="L115">    <span class="const token" data-verso-hover="51">segTraj</span> X (b :: bs) v (E + t) = <span class="const token" data-verso-hover="51">segTraj</span> X bs (<span class="const token" data-verso-hover="488">segStep</span> X b v E) t := <span class="kw">by</span></span>
+<span id="L116">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="51">segTraj</span>]</span>
+<span id="L117">  <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L118">  · <span class="kw">omega</span></span>
+<span id="L119">  · <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">omega</span></span>
+<span id="L120"></span>
+<span id="L121"><span class="dc">/-- Position inside segment `i`: `s ≤ E` rounds after the start of segment `i`. -/</span></span>
+<span id="L122"><span class="kw">lemma</span> <span class="const token" data-verso-hover="495">segTraj_seg</span> (bits : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="36">Bool</span>) (v : V) (i : <span class="const token" data-verso-hover="23">ℕ</span>) {s : <span class="const token" data-verso-hover="23">ℕ</span>} (hs : s ≤ E) :</span>
+<span id="L123">    <span class="const token" data-verso-hover="51">segTraj</span> X bits v (i * E + s) =</span>
+<span id="L124">      <span class="const token" data-verso-hover="488">segStep</span> X (bits.<span class="const token" data-verso-hover="28">getD</span> i <span class="const token" data-verso-hover="26">false</span>) (<span class="const token" data-verso-hover="51">segTraj</span> X bits v (i * E)) s := <span class="kw">by</span></span>
+<span id="L125">  <span class="kw">induction</span> bits generalizing v i <span class="kw">with</span></span>
+<span id="L126">  | <span class="const token" data-verso-hover="118">nil</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="51">segTraj</span>]</span>
+<span id="L127">  | <span class="const token" data-verso-hover="119">cons</span> b bs ih =&gt;</span>
+<span id="L128">    <span class="kw">cases</span> i <span class="kw">with</span></span>
+<span id="L129">    | <span class="const token" data-verso-hover="30">zero</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="493">segTraj_cons_of_le</span> X b bs v hs]</span>
+<span id="L130">    | <span class="const token" data-verso-hover="31">succ</span> i =&gt;</span>
+<span id="L131">      <span class="kw">have</span> h1 : (i + <span class="nu">1</span>) * E + s = E + (i * E + s) := <span class="kw">by</span> <span class="kw">ring</span></span>
+<span id="L132">      <span class="kw">have</span> h2 : (i + <span class="nu">1</span>) * E = E + i * E := <span class="kw">by</span> <span class="kw">ring</span></span>
+<span id="L133">      <span class="kw">rw</span> [h1, h2, <span class="const token" data-verso-hover="494">segTraj_cons_add</span>, <span class="const token" data-verso-hover="494">segTraj_cons_add</span>, ih]</span>
+<span id="L134">      <span class="kw">simp</span></span>
+<span id="L135"></span>
+<span id="L136"><span class="dc">/-- In an idle segment the agent does not move. -/</span></span>
+<span id="L137"><span class="kw">lemma</span> <span class="const token" data-verso-hover="496">segTraj_idle</span> (bits : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="36">Bool</span>) (v : V) {i : <span class="const token" data-verso-hover="23">ℕ</span>} (hi : bits.<span class="const token" data-verso-hover="28">getD</span> i <span class="const token" data-verso-hover="26">false</span> = <span class="const token" data-verso-hover="26">false</span>)</span>
+<span id="L138">    {s : <span class="const token" data-verso-hover="23">ℕ</span>} (hs : s ≤ E) : <span class="const token" data-verso-hover="51">segTraj</span> X bits v (i * E + s) = <span class="const token" data-verso-hover="51">segTraj</span> X bits v (i * E) := <span class="kw">by</span></span>
+<span id="L139">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="495">segTraj_seg</span> X bits v i hs, hi, <span class="const token" data-verso-hover="491">segStep_false</span>]</span>
+<span id="L140"></span>
+<span id="L141"><span class="dc">/-- In an exploration segment the agent visits every node. -/</span></span>
+<span id="L142"><span class="kw">lemma</span> <span class="const token" data-verso-hover="497">segTraj_explore</span> (bits : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="36">Bool</span>) (v : V) {i : <span class="const token" data-verso-hover="23">ℕ</span>} (hi : bits.<span class="const token" data-verso-hover="28">getD</span> i <span class="const token" data-verso-hover="26">false</span> = <span class="const token" data-verso-hover="27">true</span>)</span>
+<span id="L143">    (u : V) : ∃ s ≤ E, <span class="const token" data-verso-hover="51">segTraj</span> X bits v (i * E + s) = u := <span class="kw">by</span></span>
+<span id="L144">  <span class="kw">obtain</span> ⟨s, hs, h⟩ := X.<span class="const token" data-verso-hover="198">covers</span> (<span class="const token" data-verso-hover="51">segTraj</span> X bits v (i * E)) u</span>
+<span id="L145">  <span class="kw">exact</span> ⟨s, hs, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="495">segTraj_seg</span> X bits v i hs, hi]; <span class="kw">exact</span> h⟩</span>
+<span id="L146"></span>
+<span id="L147"><span class="dc">/-- Over a run of idle segments `a, …, b-1` the agent does not move. -/</span></span>
+<span id="L148"><span class="kw">lemma</span> <span class="const token" data-verso-hover="498">segTraj_idle_range</span> (bits : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="36">Bool</span>) (v : V) {a b : <span class="const token" data-verso-hover="23">ℕ</span>} (hab : a ≤ b)</span>
+<span id="L149">    (hi : ∀ i, a ≤ i → i &lt; b → bits.<span class="const token" data-verso-hover="28">getD</span> i <span class="const token" data-verso-hover="26">false</span> = <span class="const token" data-verso-hover="26">false</span>) {t : <span class="const token" data-verso-hover="23">ℕ</span>} (h1 : a * E ≤ t)</span>
+<span id="L150">    (h2 : t ≤ b * E) : <span class="const token" data-verso-hover="51">segTraj</span> X bits v t = <span class="const token" data-verso-hover="51">segTraj</span> X bits v (a * E) := <span class="kw">by</span></span>
+<span id="L151">  <span class="kw">induction</span> b, hab <span class="kw">using</span> <span class="const token" data-verso-hover="179">Nat.le_induction</span> generalizing t <span class="kw">with</span></span>
+<span id="L152">  | base =&gt; <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">exact</span> <span class="const token" data-verso-hover="202">le_antisymm</span> h2 h1</span>
+<span id="L153">  | <span class="const token" data-verso-hover="31">succ</span> b hab ih =&gt;</span>
+<span id="L154">    <span class="kw">by_cases</span> ht : t ≤ b * E</span>
+<span id="L155">    · <span class="kw">exact</span> ih (<span class="kw">fun</span> i h1 h2 =&gt; hi i h1 (<span class="kw">by</span> <span class="kw">omega</span>)) h1 ht</span>
+<span id="L156">    · <span class="kw">obtain</span> ⟨s, <span class="kw">rfl</span>⟩ : ∃ s, t = b * E + s := ⟨t - b * E, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L157">      <span class="kw">have</span> hs : s ≤ E := <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="46">Nat.succ_mul</span>] <span class="kw">at</span> h2; <span class="kw">omega</span></span>
+<span id="L158">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="496">segTraj_idle</span> X bits v (hi b hab (<span class="kw">by</span> <span class="kw">omega</span>)) hs]</span>
+<span id="L159">      <span class="kw">exact</span> ih (<span class="kw">fun</span> i h1 h2 =&gt; hi i h1 (<span class="kw">by</span> <span class="kw">omega</span>)) (<span class="const token" data-verso-hover="49">Nat.mul_le_mul_right</span> _ hab) <span class="const token" data-verso-hover="86">le_rfl</span></span>
+<span id="L160"></span>
+<span id="L161"><span class="dc">/-- The trajectory up to time `k * E` only depends on the first `k` segments. -/</span></span>
+<span id="L162"><span class="kw">lemma</span> <span class="const token" data-verso-hover="499">segTraj_take</span> (bits : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="36">Bool</span>) (v : V) {k t : <span class="const token" data-verso-hover="23">ℕ</span>} (ht : t ≤ k * E) :</span>
+<span id="L163">    <span class="const token" data-verso-hover="51">segTraj</span> X bits v t = <span class="const token" data-verso-hover="51">segTraj</span> X (bits.<span class="const token" data-verso-hover="79">take</span> k) v t := <span class="kw">by</span></span>
+<span id="L164">  <span class="kw">induction</span> bits generalizing k v t <span class="kw">with</span></span>
+<span id="L165">  | <span class="const token" data-verso-hover="118">nil</span> =&gt; <span class="kw">simp</span></span>
+<span id="L166">  | <span class="const token" data-verso-hover="119">cons</span> b bs ih =&gt;</span>
+<span id="L167">    <span class="kw">cases</span> k <span class="kw">with</span></span>
+<span id="L168">    | <span class="const token" data-verso-hover="30">zero</span> =&gt; <span class="kw">simp</span> <span class="kw">at</span> ht; <span class="kw">simp</span> [ht]</span>
+<span id="L169">    | <span class="const token" data-verso-hover="31">succ</span> k =&gt;</span>
+<span id="L170">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="500">List.take_succ_cons</span>]</span>
+<span id="L171">      <span class="kw">by_cases</span> htE : t ≤ E</span>
+<span id="L172">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="493">segTraj_cons_of_le</span> X _ _ _ htE, <span class="const token" data-verso-hover="493">segTraj_cons_of_le</span> X _ _ _ htE]</span>
+<span id="L173">      · <span class="kw">obtain</span> ⟨s, <span class="kw">rfl</span>⟩ : ∃ s, t = E + s := ⟨t - E, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L174">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="494">segTraj_cons_add</span>, <span class="const token" data-verso-hover="494">segTraj_cons_add</span>, ih]</span>
+<span id="L175">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="46">Nat.succ_mul</span>] <span class="kw">at</span> ht; <span class="kw">omega</span></span>
+<span id="L176"></span>
+<span id="L177"><span class="kw">end</span> Traj</span>
+<span id="L178"></span>
+<span id="L179"><span class="dc">/-! ### Agents -/</span></span>
+<span id="L180"></span>
+<span id="L181"><span class="kw">section</span> Agents</span>
+<span id="L182"></span>
+<span id="L183"><span class="kw">variable</span> (X : <span class="const token" data-verso-hover="38">Explore</span> V E)</span>
+<span id="L184"></span>
+<span id="L185">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="501">pos_delay_add</span> (a : <span class="const token" data-verso-hover="42">Agent</span> V) (t : <span class="const token" data-verso-hover="23">ℕ</span>) :</span>
+<span id="L186">    <span class="const token" data-verso-hover="41">pos</span> X a (a.<span class="const token" data-verso-hover="489">delay</span> + t) = <span class="const token" data-verso-hover="51">segTraj</span> X a.<span class="const token" data-verso-hover="52">bits</span> a.<span class="const token" data-verso-hover="53">start</span> t := <span class="kw">by</span></span>
+<span id="L187">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="41">pos</span>]</span>
+<span id="L188"></span>
+<span id="L189"><span class="kw">lemma</span> <span class="const token" data-verso-hover="84">pos_of_le_delay</span> (a : <span class="const token" data-verso-hover="42">Agent</span> V) {r : <span class="const token" data-verso-hover="23">ℕ</span>} (hr : r ≤ a.<span class="const token" data-verso-hover="489">delay</span>) : <span class="const token" data-verso-hover="41">pos</span> X a r = a.<span class="const token" data-verso-hover="53">start</span> := <span class="kw">by</span></span>
+<span id="L190">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="41">pos</span>, <span class="const token" data-verso-hover="502">Nat.sub_eq_zero_of_le</span> hr]</span>
+<span id="L191"></span>
+<span id="L192"><span class="dc">/-- An agent idle (in its own time) on the segments `i, …, j-1` stays at one node during the</span></span>
+<span id="L193"><span class="dc">global time window `[δ + iE, δ + jE]`. -/</span></span>
+<span id="L194"><span class="kw">lemma</span> <span class="const token" data-verso-hover="43">pos_idle_range</span> (a : <span class="const token" data-verso-hover="42">Agent</span> V) {i j : <span class="const token" data-verso-hover="23">ℕ</span>} (hij : i ≤ j)</span>
+<span id="L195">    (hi : ∀ k, i ≤ k → k &lt; j → a.<span class="const token" data-verso-hover="52">bits</span>.<span class="const token" data-verso-hover="28">getD</span> k <span class="const token" data-verso-hover="26">false</span> = <span class="const token" data-verso-hover="26">false</span>) :</span>
+<span id="L196">    ∀ r, a.<span class="const token" data-verso-hover="489">delay</span> + i * E ≤ r → r ≤ a.<span class="const token" data-verso-hover="489">delay</span> + j * E →</span>
+<span id="L197">      <span class="const token" data-verso-hover="41">pos</span> X a r = <span class="const token" data-verso-hover="51">segTraj</span> X a.<span class="const token" data-verso-hover="52">bits</span> a.<span class="const token" data-verso-hover="53">start</span> (i * E) := <span class="kw">by</span></span>
+<span id="L198">  <span class="kw">intro</span> r h1 h2</span>
+<span id="L199">  <span class="kw">obtain</span> ⟨t, <span class="kw">rfl</span>⟩ : ∃ t, r = a.<span class="const token" data-verso-hover="489">delay</span> + t := ⟨r - a.<span class="const token" data-verso-hover="489">delay</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L200">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="501">pos_delay_add</span>]</span>
+<span id="L201">  <span class="kw">exact</span> <span class="const token" data-verso-hover="498">segTraj_idle_range</span> X _ _ hij hi (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L202"></span>
+<span id="L203"><span class="dc">/-- An agent exploring in its segment `i` visits every node in the window</span></span>
+<span id="L204"><span class="dc">`[δ + iE, δ + (i+1)E]`. -/</span></span>
+<span id="L205"><span class="kw">lemma</span> <span class="const token" data-verso-hover="45">pos_explore</span> (a : <span class="const token" data-verso-hover="42">Agent</span> V) {i : <span class="const token" data-verso-hover="23">ℕ</span>} (hi : a.<span class="const token" data-verso-hover="52">bits</span>.<span class="const token" data-verso-hover="28">getD</span> i <span class="const token" data-verso-hover="26">false</span> = <span class="const token" data-verso-hover="27">true</span>) (u : V) :</span>
+<span id="L206">    ∃ s ≤ E, <span class="const token" data-verso-hover="41">pos</span> X a (a.<span class="const token" data-verso-hover="489">delay</span> + i * E + s) = u := <span class="kw">by</span></span>
+<span id="L207">  <span class="kw">obtain</span> ⟨s, hs, h⟩ := <span class="const token" data-verso-hover="497">segTraj_explore</span> X a.<span class="const token" data-verso-hover="52">bits</span> a.<span class="const token" data-verso-hover="53">start</span> hi u</span>
+<span id="L208">  <span class="kw">exact</span> ⟨s, hs, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="180">add_assoc</span>, <span class="const token" data-verso-hover="501">pos_delay_add</span>, h]⟩</span>
+<span id="L209"></span>
+<span id="L210"><span class="dc">/-- If one agent stays at a node `c` during the window `[lo, hi]` and the other one visits every</span></span>
+<span id="L211"><span class="dc">node during the window `[b, b + E] ⊆ [lo, hi]`, they meet within `[b, b + E]`. -/</span></span>
+<span id="L212"><span class="kw">lemma</span> <span class="const token" data-verso-hover="50">meet_of_window</span> {p q : <span class="const token" data-verso-hover="23">ℕ</span> → V} (c : V) {lo hi b : <span class="const token" data-verso-hover="23">ℕ</span>}</span>
+<span id="L213">    (hp : ∀ r, lo ≤ r → r ≤ hi → p r = c) (hq : ∀ u, ∃ s ≤ E, q (b + s) = u)</span>
+<span id="L214">    (h1 : lo ≤ b) (h2 : b + E ≤ hi) : ∃ r, b ≤ r ∧ r ≤ b + E ∧ p r = q r := <span class="kw">by</span></span>
+<span id="L215">  <span class="kw">obtain</span> ⟨s, hs, h⟩ := hq c</span>
+<span id="L216">  <span class="kw">exact</span> ⟨b + s, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">by</span> <span class="kw">rw</span> [h, hp _ (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">omega</span>)]⟩</span>
+<span id="L217"></span>
+<span id="L218"><span class="kw">lemma</span> <span class="const token" data-verso-hover="154">meetsAt_comm</span> (A B : <span class="const token" data-verso-hover="42">Agent</span> V) (r : <span class="const token" data-verso-hover="23">ℕ</span>) : <span class="const token" data-verso-hover="39">MeetsAt</span> X A B r ↔ <span class="const token" data-verso-hover="39">MeetsAt</span> X B A r := <span class="const token" data-verso-hover="453">eq_comm</span></span>
+<span id="L219"></span>
+<span id="L220"><span class="kw">lemma</span> <span class="const token" data-verso-hover="503">meetTime_comm</span> (A B : <span class="const token" data-verso-hover="42">Agent</span> V) : <span class="const token" data-verso-hover="62">meetTime</span> X A B = <span class="const token" data-verso-hover="62">meetTime</span> X B A := <span class="kw">by</span></span>
+<span id="L221">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="62">meetTime</span>, <span class="const token" data-verso-hover="154">meetsAt_comm</span> X A B]</span>
+<span id="L222"></span>
+<span id="L223"><span class="kw">lemma</span> <span class="const token" data-verso-hover="155">meetTime_le</span> {A B : <span class="const token" data-verso-hover="42">Agent</span> V} {r : <span class="const token" data-verso-hover="23">ℕ</span>} (h : <span class="const token" data-verso-hover="39">MeetsAt</span> X A B r) : <span class="const token" data-verso-hover="62">meetTime</span> X A B ≤ r :=</span>
+<span id="L224">  <span class="const token" data-verso-hover="184">Nat.sInf_le</span> h</span>
+<span id="L225"></span>
+<span id="L226"><span class="kw">end</span> Agents</span>
+<span id="L227"></span>
+<span id="L228"><span class="dc">/-! ### Counting moves -/</span></span>
+<span id="L229"></span>
+<span id="L230"><span class="kw">section</span> Moves</span>
+<span id="L231"></span>
+<span id="L232"><span class="kw">variable</span> [<span class="const token" data-verso-hover="22">DecidableEq</span> V]</span>
+<span id="L233"></span>
+<span id="L234">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="504">moveCount_zero</span> (f : <span class="const token" data-verso-hover="23">ℕ</span> → V) : <span class="const token" data-verso-hover="40">moveCount</span> f <span class="nu">0</span> = <span class="nu">0</span> := <span class="const token" data-verso-hover="114">rfl</span></span>
+<span id="L235"></span>
+<span id="L236"><span class="kw">lemma</span> <span class="const token" data-verso-hover="505">moveCount_succ</span> (f : <span class="const token" data-verso-hover="23">ℕ</span> → V) (n : <span class="const token" data-verso-hover="23">ℕ</span>) :</span>
+<span id="L237">    <span class="const token" data-verso-hover="40">moveCount</span> f (n + <span class="nu">1</span>) = <span class="const token" data-verso-hover="40">moveCount</span> f n + <span class="kw">if</span> f (n + <span class="nu">1</span>) = f n <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> <span class="nu">1</span> := <span class="const token" data-verso-hover="114">rfl</span></span>
+<span id="L238"></span>
+<span id="L239"><span class="kw">lemma</span> <span class="const token" data-verso-hover="506">moveCount_mono</span> (f : <span class="const token" data-verso-hover="23">ℕ</span> → V) {m n : <span class="const token" data-verso-hover="23">ℕ</span>} (h : m ≤ n) : <span class="const token" data-verso-hover="40">moveCount</span> f m ≤ <span class="const token" data-verso-hover="40">moveCount</span> f n := <span class="kw">by</span></span>
+<span id="L240">  <span class="kw">induction</span> n, h <span class="kw">using</span> <span class="const token" data-verso-hover="179">Nat.le_induction</span> <span class="kw">with</span></span>
+<span id="L241">  | base =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="86">le_rfl</span></span>
+<span id="L242">  | <span class="const token" data-verso-hover="31">succ</span> n _ ih =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="505">moveCount_succ</span>]; <span class="kw">omega</span></span>
+<span id="L243"></span>
+<span id="L244"><span class="kw">lemma</span> <span class="const token" data-verso-hover="87">moveCount_le_self</span> (f : <span class="const token" data-verso-hover="23">ℕ</span> → V) (n : <span class="const token" data-verso-hover="23">ℕ</span>) : <span class="const token" data-verso-hover="40">moveCount</span> f n ≤ n := <span class="kw">by</span></span>
+<span id="L245">  <span class="kw">induction</span> n <span class="kw">with</span></span>
+<span id="L246">  | <span class="const token" data-verso-hover="30">zero</span> =&gt; <span class="kw">simp</span></span>
+<span id="L247">  | <span class="const token" data-verso-hover="31">succ</span> n ih =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="505">moveCount_succ</span>]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L248"></span>
+<span id="L249"><span class="kw">lemma</span> <span class="const token" data-verso-hover="507">moveCount_congr</span> {f g : <span class="const token" data-verso-hover="23">ℕ</span> → V} {n : <span class="const token" data-verso-hover="23">ℕ</span>} (h : ∀ t ≤ n, f t = g t) :</span>
+<span id="L250">    <span class="const token" data-verso-hover="40">moveCount</span> f n = <span class="const token" data-verso-hover="40">moveCount</span> g n := <span class="kw">by</span></span>
+<span id="L251">  <span class="kw">induction</span> n <span class="kw">with</span></span>
+<span id="L252">  | <span class="const token" data-verso-hover="30">zero</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L253">  | <span class="const token" data-verso-hover="31">succ</span> n ih =&gt;</span>
+<span id="L254">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="505">moveCount_succ</span>, <span class="const token" data-verso-hover="505">moveCount_succ</span>, ih (<span class="kw">fun</span> t ht =&gt; h t (<span class="kw">by</span> <span class="kw">omega</span>)), h n (<span class="kw">by</span> <span class="kw">omega</span>),</span>
+<span id="L255">      h (n + <span class="nu">1</span>) <span class="const token" data-verso-hover="86">le_rfl</span>]</span>
+<span id="L256"></span>
+<span id="L257"><span class="kw">lemma</span> <span class="const token" data-verso-hover="60">moveCount_const</span> {f : <span class="const token" data-verso-hover="23">ℕ</span> → V} {n : <span class="const token" data-verso-hover="23">ℕ</span>} (c : V) (h : ∀ t ≤ n, f t = c) :</span>
+<span id="L258">    <span class="const token" data-verso-hover="40">moveCount</span> f n = <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L259">  <span class="kw">induction</span> n <span class="kw">with</span></span>
+<span id="L260">  | <span class="const token" data-verso-hover="30">zero</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L261">  | <span class="const token" data-verso-hover="31">succ</span> n ih =&gt;</span>
+<span id="L262">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="505">moveCount_succ</span>, ih (<span class="kw">fun</span> t ht =&gt; h t (<span class="kw">by</span> <span class="kw">omega</span>)), h n (<span class="kw">by</span> <span class="kw">omega</span>), h (n + <span class="nu">1</span>) <span class="const token" data-verso-hover="86">le_rfl</span>]</span>
+<span id="L263">    <span class="kw">simp</span></span>
+<span id="L264"></span>
+<span id="L265"><span class="kw">lemma</span> <span class="const token" data-verso-hover="508">moveCount_add</span> (f : <span class="const token" data-verso-hover="23">ℕ</span> → V) (m n : <span class="const token" data-verso-hover="23">ℕ</span>) :</span>
+<span id="L266">    <span class="const token" data-verso-hover="40">moveCount</span> f (m + n) = <span class="const token" data-verso-hover="40">moveCount</span> f m + <span class="const token" data-verso-hover="40">moveCount</span> (<span class="kw">fun</span> t =&gt; f (m + t)) n := <span class="kw">by</span></span>
+<span id="L267">  <span class="kw">induction</span> n <span class="kw">with</span></span>
+<span id="L268">  | <span class="const token" data-verso-hover="30">zero</span> =&gt; <span class="kw">simp</span></span>
+<span id="L269">  | <span class="const token" data-verso-hover="31">succ</span> n ih =&gt; <span class="kw">rw</span> [← <span class="const token" data-verso-hover="180">add_assoc</span>, <span class="const token" data-verso-hover="505">moveCount_succ</span>, ih, <span class="const token" data-verso-hover="505">moveCount_succ</span>]; <span class="kw">simp</span> [<span class="const token" data-verso-hover="180">add_assoc</span>]</span>
+<span id="L270"></span>
+<span id="L271"><span class="dc">/-- Moves of a delayed agent are the moves of its solo trajectory. -/</span></span>
+<span id="L272"><span class="kw">lemma</span> <span class="const token" data-verso-hover="509">moveCount_shift</span> (f : <span class="const token" data-verso-hover="23">ℕ</span> → V) (δ n : <span class="const token" data-verso-hover="23">ℕ</span>) :</span>
+<span id="L273">    <span class="const token" data-verso-hover="40">moveCount</span> (<span class="kw">fun</span> r =&gt; f (r - δ)) n = <span class="const token" data-verso-hover="40">moveCount</span> f (n - δ) := <span class="kw">by</span></span>
+<span id="L274">  <span class="kw">induction</span> n <span class="kw">with</span></span>
+<span id="L275">  | <span class="const token" data-verso-hover="30">zero</span> =&gt; <span class="kw">simp</span></span>
+<span id="L276">  | <span class="const token" data-verso-hover="31">succ</span> n ih =&gt;</span>
+<span id="L277">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="505">moveCount_succ</span>, ih]</span>
+<span id="L278">    <span class="kw">by_cases</span> h : n &lt; δ</span>
+<span id="L279">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="502">Nat.sub_eq_zero_of_le</span> (<span class="kw">show</span> n + <span class="nu">1</span> ≤ δ <span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="502">Nat.sub_eq_zero_of_le</span> h.<span class="const token" data-verso-hover="68">le</span>]; <span class="kw">simp</span></span>
+<span id="L280">    · <span class="kw">rw</span> [<span class="kw">show</span> n + <span class="nu">1</span> - δ = n - δ + <span class="nu">1</span> <span class="kw">by</span> <span class="kw">omega</span>, <span class="const token" data-verso-hover="505">moveCount_succ</span>]</span>
+<span id="L281"></span>
+<span id="L282"><span class="kw">variable</span> (X : <span class="const token" data-verso-hover="38">Explore</span> V E)</span>
+<span id="L283"></span>
+<span id="L284"><span class="kw">lemma</span> <span class="const token" data-verso-hover="56">moveCount_pos</span> (a : <span class="const token" data-verso-hover="42">Agent</span> V) (n : <span class="const token" data-verso-hover="23">ℕ</span>) :</span>
+<span id="L285">    <span class="const token" data-verso-hover="40">moveCount</span> (<span class="const token" data-verso-hover="41">pos</span> X a) n = <span class="const token" data-verso-hover="40">moveCount</span> (<span class="const token" data-verso-hover="51">segTraj</span> X a.<span class="const token" data-verso-hover="52">bits</span> a.<span class="const token" data-verso-hover="53">start</span>) (n - a.<span class="const token" data-verso-hover="489">delay</span>) :=</span>
+<span id="L286">  <span class="const token" data-verso-hover="509">moveCount_shift</span> _ _ _</span>
+<span id="L287"></span>
+<span id="L288"><span class="kw">lemma</span> <span class="const token" data-verso-hover="510">moveCount_segTraj_cons</span> (b : <span class="const token" data-verso-hover="36">Bool</span>) (bs : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="36">Bool</span>) (v : V) (n : <span class="const token" data-verso-hover="23">ℕ</span>) :</span>
+<span id="L289">    <span class="const token" data-verso-hover="40">moveCount</span> (<span class="const token" data-verso-hover="51">segTraj</span> X (b :: bs) v) n ≤</span>
+<span id="L290">      (<span class="kw">if</span> b <span class="kw">then</span> E <span class="kw">else</span> <span class="nu">0</span>) + <span class="const token" data-verso-hover="40">moveCount</span> (<span class="const token" data-verso-hover="51">segTraj</span> X bs (<span class="const token" data-verso-hover="488">segStep</span> X b v E)) (n - E) := <span class="kw">by</span></span>
+<span id="L291">  <span class="kw">have</span> hfirst : <span class="const token" data-verso-hover="40">moveCount</span> (<span class="const token" data-verso-hover="51">segTraj</span> X (b :: bs) v) (<span class="const token" data-verso-hover="63">min</span> n E) ≤ <span class="kw">if</span> b <span class="kw">then</span> E <span class="kw">else</span> <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L292">    <span class="kw">cases</span> b</span>
+<span id="L293">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="60">moveCount_const</span> v]; · <span class="kw">simp</span></span>
+<span id="L294">      <span class="kw">intro</span> t ht; <span class="kw">rw</span> [<span class="const token" data-verso-hover="493">segTraj_cons_of_le</span> X _ _ _ (<span class="kw">by</span> <span class="kw">omega</span>)]; <span class="kw">rfl</span></span>
+<span id="L295">    · <span class="kw">exact</span> (<span class="const token" data-verso-hover="87">moveCount_le_self</span> _ _).<span class="const token" data-verso-hover="58">trans</span> (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L296">  <span class="kw">by_cases</span> h : n ≤ E</span>
+<span id="L297">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="67">min_eq_left</span> h] <span class="kw">at</span> hfirst; <span class="kw">omega</span></span>
+<span id="L298">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="72">min_eq_right</span> (<span class="kw">by</span> <span class="kw">omega</span>)] <span class="kw">at</span> hfirst</span>
+<span id="L299">    <span class="kw">obtain</span> ⟨s, <span class="kw">rfl</span>⟩ : ∃ s, n = E + s := ⟨n - E, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L300">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="508">moveCount_add</span>]</span>
+<span id="L301">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="494">segTraj_cons_add</span>, <span class="const token" data-verso-hover="511">Nat.add_sub_cancel_left</span>]</span>
+<span id="L302">    <span class="kw">exact</span> <span class="const token" data-verso-hover="512">Nat.add_le_add</span> hfirst <span class="const token" data-verso-hover="86">le_rfl</span></span>
+<span id="L303"></span>
+<span id="L304"><span class="dc">/-- Moves during the first `k` segments: at most `E` per exploration segment. -/</span></span>
+<span id="L305"><span class="kw">lemma</span> <span class="const token" data-verso-hover="89">moveCount_segTraj_take</span> (bits : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="36">Bool</span>) (v : V) {k n : <span class="const token" data-verso-hover="23">ℕ</span>} (hn : n ≤ k * E) :</span>
+<span id="L306">    <span class="const token" data-verso-hover="40">moveCount</span> (<span class="const token" data-verso-hover="51">segTraj</span> X bits v) n ≤ E * (bits.<span class="const token" data-verso-hover="79">take</span> k).<span class="const token" data-verso-hover="77">count</span> <span class="const token" data-verso-hover="27">true</span> := <span class="kw">by</span></span>
+<span id="L307">  <span class="kw">induction</span> bits generalizing k v n <span class="kw">with</span></span>
+<span id="L308">  | <span class="const token" data-verso-hover="118">nil</span> =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="60">moveCount_const</span> (f := <span class="const token" data-verso-hover="51">segTraj</span> X [] v) v (<span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="114">rfl</span>)]; <span class="kw">simp</span></span>
+<span id="L309">  | <span class="const token" data-verso-hover="119">cons</span> b bs ih =&gt;</span>
+<span id="L310">    <span class="kw">cases</span> k <span class="kw">with</span></span>
+<span id="L311">    | <span class="const token" data-verso-hover="30">zero</span> =&gt; <span class="kw">simp</span> <span class="kw">at</span> hn; <span class="kw">simp</span> [hn]</span>
+<span id="L312">    | <span class="const token" data-verso-hover="31">succ</span> k =&gt;</span>
+<span id="L313">      <span class="kw">refine</span> (<span class="const token" data-verso-hover="510">moveCount_segTraj_cons</span> X b bs v n).<span class="const token" data-verso-hover="58">trans</span> ?_</span>
+<span id="L314">      <span class="kw">have</span> := ih (<span class="const token" data-verso-hover="488">segStep</span> X b v E) (k := k) (n := n - E) (<span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="46">Nat.succ_mul</span>] <span class="kw">at</span> hn; <span class="kw">omega</span>)</span>
+<span id="L315">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="500">List.take_succ_cons</span>, <span class="const token" data-verso-hover="121">List.count_cons</span>]</span>
+<span id="L316">      <span class="kw">cases</span> b &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="513">mul_add</span>] <span class="kw">at</span> this ⊢ &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L317"></span>
+<span id="L318"><span class="dc">/-- Total moves: at most `E` per exploration segment. -/</span></span>
+<span id="L319"><span class="kw">lemma</span> <span class="const token" data-verso-hover="57">moveCount_segTraj</span> (bits : <span class="const token" data-verso-hover="35">List</span> <span class="const token" data-verso-hover="36">Bool</span>) (v : V) (n : <span class="const token" data-verso-hover="23">ℕ</span>) :</span>
+<span id="L320">    <span class="const token" data-verso-hover="40">moveCount</span> (<span class="const token" data-verso-hover="51">segTraj</span> X bits v) n ≤ E * bits.<span class="const token" data-verso-hover="77">count</span> <span class="const token" data-verso-hover="27">true</span> := <span class="kw">by</span></span>
+<span id="L321">  <span class="kw">induction</span> bits generalizing v n <span class="kw">with</span></span>
+<span id="L322">  | <span class="const token" data-verso-hover="118">nil</span> =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="60">moveCount_const</span> (f := <span class="const token" data-verso-hover="51">segTraj</span> X [] v) v (<span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="114">rfl</span>)]; <span class="kw">simp</span></span>
+<span id="L323">  | <span class="const token" data-verso-hover="119">cons</span> b bs ih =&gt;</span>
+<span id="L324">    <span class="kw">refine</span> (<span class="const token" data-verso-hover="510">moveCount_segTraj_cons</span> X b bs v n).<span class="const token" data-verso-hover="58">trans</span> ?_</span>
+<span id="L325">    <span class="kw">have</span> := ih (<span class="const token" data-verso-hover="488">segStep</span> X b v E) (n - E)</span>
+<span id="L326">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="121">List.count_cons</span>]</span>
+<span id="L327">    <span class="kw">cases</span> b &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="513">mul_add</span>] <span class="kw">at</span> this ⊢ &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L328"></span>
+<span id="L329"><span class="dc">/-- To bound rendezvous time and cost it suffices to exhibit one meeting time `r ≤ T` with at</span></span>
+<span id="L330"><span class="dc">most `C` moves of both agents up to `r`. -/</span></span>
+<span id="L331"><span class="kw">lemma</span> <span class="const token" data-verso-hover="66">bounds_of_meet</span> {A B : <span class="const token" data-verso-hover="42">Agent</span> V} {T C : <span class="const token" data-verso-hover="23">ℕ</span>}</span>
+<span id="L332">    (h : ∃ r ≤ T, <span class="const token" data-verso-hover="39">MeetsAt</span> X A B r ∧ <span class="const token" data-verso-hover="40">moveCount</span> (<span class="const token" data-verso-hover="41">pos</span> X A) r + <span class="const token" data-verso-hover="40">moveCount</span> (<span class="const token" data-verso-hover="41">pos</span> X B) r ≤ C) :</span>
+<span id="L333">    (∃ r, <span class="const token" data-verso-hover="39">MeetsAt</span> X A B r) ∧ <span class="const token" data-verso-hover="62">meetTime</span> X A B ≤ T ∧ <span class="const token" data-verso-hover="64">cost</span> X A B ≤ C := <span class="kw">by</span></span>
+<span id="L334">  <span class="kw">obtain</span> ⟨r, hrT, hm, hc⟩ := h</span>
+<span id="L335">  <span class="kw">have</span> hle := <span class="const token" data-verso-hover="155">meetTime_le</span> X hm</span>
+<span id="L336">  <span class="kw">refine</span> ⟨⟨r, hm⟩, hle.<span class="const token" data-verso-hover="58">trans</span> hrT, ?_⟩</span>
+<span id="L337">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="514">add_le_add</span> (<span class="const token" data-verso-hover="506">moveCount_mono</span> _ hle) (<span class="const token" data-verso-hover="506">moveCount_mono</span> _ hle)).<span class="const token" data-verso-hover="58">trans</span> hc</span>
+<span id="L338"></span>
+<span id="L339"><span class="kw">lemma</span> <span class="const token" data-verso-hover="71">exists_meet_swap</span> {A B : <span class="const token" data-verso-hover="42">Agent</span> V} {T C : <span class="const token" data-verso-hover="23">ℕ</span>}</span>
+<span id="L340">    (h : ∃ r ≤ T, <span class="const token" data-verso-hover="39">MeetsAt</span> X B A r ∧ <span class="const token" data-verso-hover="40">moveCount</span> (<span class="const token" data-verso-hover="41">pos</span> X B) r + <span class="const token" data-verso-hover="40">moveCount</span> (<span class="const token" data-verso-hover="41">pos</span> X A) r ≤ C) :</span>
+<span id="L341">    ∃ r ≤ T, <span class="const token" data-verso-hover="39">MeetsAt</span> X A B r ∧ <span class="const token" data-verso-hover="40">moveCount</span> (<span class="const token" data-verso-hover="41">pos</span> X A) r + <span class="const token" data-verso-hover="40">moveCount</span> (<span class="const token" data-verso-hover="41">pos</span> X B) r ≤ C := <span class="kw">by</span></span>
+<span id="L342">  <span class="kw">obtain</span> ⟨r, h1, h2, h3⟩ := h</span>
+<span id="L343">  <span class="kw">exact</span> ⟨r, h1, (<span class="const token" data-verso-hover="154">meetsAt_comm</span> X _ _ _).<span class="const token" data-verso-hover="137">1</span> h2, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L344"></span>
+<span id="L345"><span class="dc">/-- Cost is at most twice the rendezvous time (at most one move per agent per round). -/</span></span>
+<span id="L346"><span class="kw">lemma</span> <span class="const token" data-verso-hover="159">cost_le_two_mul_meetTime</span> (A B : <span class="const token" data-verso-hover="42">Agent</span> V) : <span class="const token" data-verso-hover="64">cost</span> X A B ≤ <span class="nu">2</span> * <span class="const token" data-verso-hover="62">meetTime</span> X A B := <span class="kw">by</span></span>
+<span id="L347">  <span class="kw">have</span> := <span class="const token" data-verso-hover="87">moveCount_le_self</span> (<span class="const token" data-verso-hover="41">pos</span> X A) (<span class="const token" data-verso-hover="62">meetTime</span> X A B)</span>
+<span id="L348">  <span class="kw">have</span> := <span class="const token" data-verso-hover="87">moveCount_le_self</span> (<span class="const token" data-verso-hover="41">pos</span> X B) (<span class="const token" data-verso-hover="62">meetTime</span> X A B)</span>
+<span id="L349">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="64">cost</span>; <span class="kw">omega</span></span>
+<span id="L350"></span>
+<span id="L351"><span class="kw">end</span> Moves</span>
+<span id="L352"></span>
+<span id="L353"><span class="kw">end</span> Podc.RendezvousTimeCost.Upper</span>
+<span id="L354"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2014/RendezvousTimeCost/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

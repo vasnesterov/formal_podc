@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>BAWithPredictions: RoundLowerBound.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2025/">PODC 2025</a><span class="sep">›</span><a href="PODC2025/BAWithPredictions/">BAWithPredictions</a><span class="sep">›</span><a href="PODC2025/BAWithPredictions/src/">Lean source</a><span class="sep">›</span><span aria-current="page">RoundLowerBound</span></nav>
+        <h1>
+          <code>RoundLowerBound.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2025/BAWithPredictions/">Byzantine Agreement with Predictions — PODC 2025</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2025/BAWithPredictions/RoundLowerBound.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="RoundLowerBound"><span id="L1"><span class="kw">import</span> Papers.PODC2025.BAWithPredictions.Defs</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.Byzantine.LockStep.Agreement</span>
+<span id="L3"><span class="kw">import</span> Cslib.Computability.Distributed.Byzantine.LockStep.Parallel</span>
+<span id="L4"><span class="kw">import</span> Cslib.Foundations.Data.Finset.Quorum</span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">/-!</span></span>
+<span id="L7"><span class="dc"># Byzantine Agreement with Predictions — round-complexity lower bound (Theorem 13)</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">Ben-David, Dzulfikar, Ellen, Gilbert, *Byzantine Agreement with Predictions*, PODC 2025</span></span>
+<span id="L10"><span class="dc">(arXiv:2505.01793), Section 10.1.</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">Model: CSLib's synchronous lock-step model (`Cslib.Byzantine.LockStep`) on the complete graph,</span></span>
+<span id="L13"><span class="dc">deterministic history-based protocols, static Byzantine adversary, reliable channels. A process'</span></span>
+<span id="L14"><span class="dc">input is a pair `(v, a)` of a value `v : V` and a classification prediction `a : P → Bool`</span></span>
+<span id="L15"><span class="dc">(`a j = true`: "`p_j` is predicted honest").</span></span>
+<span id="L16"></span>
+<span id="L17"><span class="dc">The paper reduces Theorem 13 to the early-deciding lower bound of Dolev–Reischuk–Strong for</span></span>
+<span id="L18"><span class="dc">algorithms *without* predictions, which it cites. We state that bound as an explicit hypothesis</span></span>
+<span id="L19"><span class="dc">(`EarlyDecidingLB`) — in the **Byzantine** model, see the docstring — and prove the reduction:</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="dc">* `simProtocol X alg`: the prediction-free algorithm `S'` on the processes outside `X`, which run</span></span>
+<span id="L22"><span class="dc">  `alg` with the prediction "`X` is faulty, everyone else is honest"; the processes of `X` are</span></span>
+<span id="L23"><span class="dc">  silent Byzantine (`liftScenario`, `status_liftScenario`, `solves_simProtocol`).</span></span>
+<span id="L24"><span class="dc">* `padScenario` (shared, `Cslib/Computability/Distributed/Byzantine/LockStep/Basic.lean`): Byzantine</span></span>
+<span id="L25"><span class="dc">  processes that behave exactly as honest ones (used to reach exactly `f` faults).</span></span>
+<span id="L26"><span class="dc">* `roundLowerBound`: Theorem 13 conditional on `EarlyDecidingLB`, with the sharper bound</span></span>
+<span id="L27"><span class="dc">  `min (f' + 2) (t - f + f' + 1)` for `f' = min f ⌊B/(n-f)⌋`;</span></span>
+<span id="L28"><span class="dc">  `roundLowerBound_paper`: the paper's four-term bound.</span></span>
+<span id="L29"><span class="dc">-/</span></span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">namespace</span> BAWithPredictions</span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">open</span> Cslib.Byzantine.LockStep Finset</span>
+<span id="L34"></span>
+<span id="L35"><span class="dc">/-- **Byzantine agreement with predictions**: Byzantine agreement (termination, strong unanimity,</span></span>
+<span id="L36"><span class="dc">agreement) on the value component of the inputs; the prediction component is advice only. -/</span></span>
+<span id="L37"><span class="kw">def</span> <span class="const token" data-verso-hover="556">BAP</span> {P V : <span class="kw">Type</span>*} : <span class="const token" data-verso-hover="557">Spec</span> P (V × (P → <span class="const token" data-verso-hover="152">Bool</span>)) V := <span class="kw">fun</span> x H dec =&gt; <span class="const token" data-verso-hover="558">BA</span> (<span class="kw">fun</span> p =&gt; (x p).<span class="const token" data-verso-hover="80">1</span>) H dec</span>
+<span id="L38"></span>
+<span id="L39"><span class="dc">/-! ### Simulating an algorithm with predictions on the processes outside `X` -/</span></span>
+<span id="L40"></span>
+<span id="L41"><span class="kw">section</span> Sim</span>
+<span id="L42"></span>
+<span id="L43"><span class="kw">variable</span> {P V M : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="70">DecidableEq</span> P] (X : <span class="const token" data-verso-hover="77">Finset</span> P)</span>
+<span id="L44"></span>
+<span id="L45"><span class="dc">/-- Extend an inbox of the processes outside `X` by "nothing from `X`". -/</span></span>
+<span id="L46"><span class="kw">def</span> <span class="const token" data-verso-hover="559">liftInbox</span> (i : <span class="const token" data-verso-hover="560">Inbox</span> {p // p ∉ X} M) : <span class="const token" data-verso-hover="560">Inbox</span> P M :=</span>
+<span id="L47">  <span class="kw">fun</span> p =&gt; <span class="kw">if</span> hp : p ∈ X <span class="kw">then</span> <span class="const token" data-verso-hover="142">none</span> <span class="kw">else</span> i ⟨p, hp⟩</span>
+<span id="L48"></span>
+<span id="L49"><span class="dc">/-- Extend a history of the processes outside `X` by "nothing from `X`". -/</span></span>
+<span id="L50"><span class="kw">def</span> <span class="const token" data-verso-hover="561">liftHist</span> (h : <span class="const token" data-verso-hover="562">History</span> {p // p ∉ X} M) : <span class="const token" data-verso-hover="562">History</span> P M := h.<span class="const token" data-verso-hover="79">map</span> (<span class="const token" data-verso-hover="559">liftInbox</span> X)</span>
+<span id="L51"></span>
+<span id="L52"><span class="dc">/-- The paper's algorithm `S'` (proof of Theorem 13): process `q ∉ X` runs `alg` as `q`, with the</span></span>
+<span id="L53"><span class="dc">prediction that exactly the processes of `X` are faulty, treating the processes of `X` as silent. -/</span></span>
+<span id="L54"><span class="kw">def</span> <span class="const token" data-verso-hover="13">simProtocol</span> (alg : <span class="const token" data-verso-hover="563">Protocol</span> P (V × (P → <span class="const token" data-verso-hover="152">Bool</span>)) M V) : <span class="const token" data-verso-hover="563">Protocol</span> {p // p ∉ X} V M V <span class="kw">where</span></span>
+<span id="L55">  <span class="const token" data-verso-hover="564">send</span> q v h q' := alg.<span class="const token" data-verso-hover="564">send</span> q.<span class="const token" data-verso-hover="565">1</span> (v, <span class="const token" data-verso-hover="378">correctPred</span> X) (<span class="const token" data-verso-hover="561">liftHist</span> X h) q'.<span class="const token" data-verso-hover="565">1</span></span>
+<span id="L56">  <span class="const token" data-verso-hover="566">decide</span> q v h := alg.<span class="const token" data-verso-hover="566">decide</span> q.<span class="const token" data-verso-hover="565">1</span> (v, <span class="const token" data-verso-hover="378">correctPred</span> X) (<span class="const token" data-verso-hover="561">liftHist</span> X h)</span>
+<span id="L57"></span>
+<span id="L58"><span class="dc">/-- The run of `alg` corresponding to a run `s` of `simProtocol X alg`: the processes of `X` are</span></span>
+<span id="L59"><span class="dc">silent Byzantine, the others behave as in `s` and get the prediction `correctPred X`. The values</span></span>
+<span id="L60"><span class="dc">`x0` are the (irrelevant) inputs of the processes of `X`. -/</span></span>
+<span id="L61"><span class="kw">def</span> <span class="const token" data-verso-hover="567">liftScenario</span> (s : <span class="const token" data-verso-hover="568">Scenario</span> {p // p ∉ X} V M) (x0 : P → V) : <span class="const token" data-verso-hover="568">Scenario</span> P (V × (P → <span class="const token" data-verso-hover="152">Bool</span>)) M <span class="kw">where</span></span>
+<span id="L62">  <span class="const token" data-verso-hover="569">byz</span> := <span class="const token" data-verso-hover="565">Subtype.val</span> '' s.<span class="const token" data-verso-hover="569">byz</span> ∪ ↑X</span>
+<span id="L63">  <span class="const token" data-verso-hover="570">input</span> p := (<span class="kw">if</span> hp : p ∈ X <span class="kw">then</span> x0 p <span class="kw">else</span> s.<span class="const token" data-verso-hover="570">input</span> ⟨p, hp⟩, <span class="const token" data-verso-hover="378">correctPred</span> X)</span>
+<span id="L64">  <span class="const token" data-verso-hover="571">adv</span> r p q := <span class="kw">if</span> h : p ∉ X ∧ q ∉ X <span class="kw">then</span> s.<span class="const token" data-verso-hover="571">adv</span> r ⟨p, h.<span class="const token" data-verso-hover="103">1</span>⟩ ⟨q, h.<span class="const token" data-verso-hover="120">2</span>⟩ <span class="kw">else</span> <span class="const token" data-verso-hover="142">none</span></span>
+<span id="L65">  <span class="const token" data-verso-hover="572">drop</span> r p q := ∃ h : p ∉ X ∧ q ∉ X, s.<span class="const token" data-verso-hover="572">drop</span> r ⟨p, h.<span class="const token" data-verso-hover="103">1</span>⟩ ⟨q, h.<span class="const token" data-verso-hover="120">2</span>⟩</span>
+<span id="L66"></span>
+<span id="L67"><span class="kw">variable</span> {X}</span>
+<span id="L68"></span>
+<span id="L69"><span class="kw">theorem</span> <span class="const token" data-verso-hover="573">val_mem_byz_liftScenario</span> {s : <span class="const token" data-verso-hover="568">Scenario</span> {p // p ∉ X} V M} {x0 : P → V} {q : {p // p ∉ X}} :</span>
+<span id="L70">    q.<span class="const token" data-verso-hover="565">1</span> ∈ (<span class="const token" data-verso-hover="567">liftScenario</span> X s x0).<span class="const token" data-verso-hover="569">byz</span> ↔ q ∈ s.<span class="const token" data-verso-hover="569">byz</span> := <span class="kw">by</span></span>
+<span id="L71">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="567">liftScenario</span>, q.<span class="const token" data-verso-hover="574">2</span>]</span>
+<span id="L72"></span>
+<span id="L73"><span class="kw">theorem</span> <span class="const token" data-verso-hover="575">mem_byz_liftScenario_of_mem</span> {s : <span class="const token" data-verso-hover="568">Scenario</span> {p // p ∉ X} V M} {x0 : P → V} {p : P}</span>
+<span id="L74">    (hp : p ∈ X) : p ∈ (<span class="const token" data-verso-hover="567">liftScenario</span> X s x0).<span class="const token" data-verso-hover="569">byz</span> := <span class="kw">by</span></span>
+<span id="L75">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="567">liftScenario</span>, hp]</span>
+<span id="L76"></span>
+<span id="L77"><span class="kw">theorem</span> <span class="const token" data-verso-hover="576">input_liftScenario</span> {s : <span class="const token" data-verso-hover="568">Scenario</span> {p // p ∉ X} V M} {x0 : P → V} (q : {p // p ∉ X}) :</span>
+<span id="L78">    (<span class="const token" data-verso-hover="567">liftScenario</span> X s x0).<span class="const token" data-verso-hover="570">input</span> q.<span class="const token" data-verso-hover="565">1</span> = (s.<span class="const token" data-verso-hover="570">input</span> q, <span class="const token" data-verso-hover="378">correctPred</span> X) := <span class="kw">by</span></span>
+<span id="L79">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="567">liftScenario</span>, q.<span class="const token" data-verso-hover="574">2</span>]</span>
+<span id="L80"></span>
+<span id="L81"><span class="dc">/-- Histories correspond: the history of `q` in the lifted run of `alg` is its history in the run</span></span>
+<span id="L82"><span class="dc">of `simProtocol X alg`, with empty messages from `X`. -/</span></span>
+<span id="L83"><span class="kw">theorem</span> <span class="const token" data-verso-hover="577">hist_liftScenario</span> (alg : <span class="const token" data-verso-hover="563">Protocol</span> P (V × (P → <span class="const token" data-verso-hover="152">Bool</span>)) M V)</span>
+<span id="L84">    (s : <span class="const token" data-verso-hover="568">Scenario</span> {p // p ∉ X} V M) (x0 : P → V) :</span>
+<span id="L85">    ∀ r (q : {p // p ∉ X}),</span>
+<span id="L86">      <span class="const token" data-verso-hover="578">hist</span> ⊤ alg (<span class="const token" data-verso-hover="567">liftScenario</span> X s x0) r q.<span class="const token" data-verso-hover="565">1</span> = <span class="const token" data-verso-hover="561">liftHist</span> X (<span class="const token" data-verso-hover="578">hist</span> ⊤ (<span class="const token" data-verso-hover="13">simProtocol</span> X alg) s r q) := <span class="kw">by</span></span>
+<span id="L87">  <span class="kw">intro</span> r</span>
+<span id="L88">  <span class="kw">induction</span> r <span class="kw">with</span></span>
+<span id="L89">  | <span class="const token" data-verso-hover="187">zero</span> =&gt; <span class="kw">intro</span> q; <span class="kw">rfl</span></span>
+<span id="L90">  | <span class="const token" data-verso-hover="188">succ</span> r ih =&gt;</span>
+<span id="L91">    <span class="kw">intro</span> q</span>
+<span id="L92">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="579">hist_succ</span>, <span class="const token" data-verso-hover="579">hist_succ</span>, ih, <span class="const token" data-verso-hover="561">liftHist</span>, <span class="const token" data-verso-hover="561">liftHist</span>, <span class="const token" data-verso-hover="291">List.map_append</span>]</span>
+<span id="L93">    <span class="kw">congr</span> <span class="nu">2</span></span>
+<span id="L94">    <span class="kw">funext</span> p</span>
+<span id="L95">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="559">liftInbox</span> <span class="const token" data-verso-hover="580">deliver</span></span>
+<span id="L96">    <span class="kw">by_cases</span> hp : p ∈ X</span>
+<span id="L97">    · <span class="kw">have</span> hne : p ≠ q.<span class="const token" data-verso-hover="565">1</span> := <span class="kw">fun</span> h =&gt; q.<span class="const token" data-verso-hover="574">2</span> (h ▸ hp)</span>
+<span id="L98">      <span class="kw">simp</span> [hp, hne, <span class="const token" data-verso-hover="567">liftScenario</span>, q.<span class="const token" data-verso-hover="574">2</span>]</span>
+<span id="L99">    · <span class="kw">have</span> hq := q.<span class="const token" data-verso-hover="574">2</span></span>
+<span id="L100">      <span class="kw">by_cases</span> hpq : p = q.<span class="const token" data-verso-hover="565">1</span></span>
+<span id="L101">      · <span class="kw">subst</span> hpq; <span class="kw">simp</span></span>
+<span id="L102">      · <span class="kw">have</span> hne : (⟨p, hp⟩ : {p // p ∉ X}) ≠ q := <span class="kw">fun</span> h =&gt; hpq (<span class="const token" data-verso-hover="290">congrArg</span> <span class="const token" data-verso-hover="565">Subtype.val</span> h)</span>
+<span id="L103">        <span class="kw">have</span> hadv : (<span class="const token" data-verso-hover="567">liftScenario</span> X s x0).<span class="const token" data-verso-hover="571">adv</span> r p q.<span class="const token" data-verso-hover="565">1</span> = s.<span class="const token" data-verso-hover="571">adv</span> r ⟨p, hp⟩ q := <span class="kw">by</span></span>
+<span id="L104">          <span class="kw">simp</span> [<span class="const token" data-verso-hover="567">liftScenario</span>, hp, hq]</span>
+<span id="L105">        <span class="kw">have</span> hdrop : (<span class="const token" data-verso-hover="567">liftScenario</span> X s x0).<span class="const token" data-verso-hover="572">drop</span> r p q.<span class="const token" data-verso-hover="565">1</span> ↔ s.<span class="const token" data-verso-hover="572">drop</span> r ⟨p, hp⟩ q := <span class="kw">by</span></span>
+<span id="L106">          <span class="kw">simp</span> [<span class="const token" data-verso-hover="567">liftScenario</span>, hp, hq]</span>
+<span id="L107">        <span class="kw">have</span> hin := <span class="const token" data-verso-hover="576">input_liftScenario</span> (s := s) (x0 := x0) ⟨p, hp⟩</span>
+<span id="L108">        <span class="kw">have</span> hh := ih ⟨p, hp⟩</span>
+<span id="L109">        <span class="kw">by_cases</span> hb : (⟨p, hp⟩ : {p // p ∉ X}) ∈ s.<span class="const token" data-verso-hover="569">byz</span></span>
+<span id="L110">        · <span class="kw">have</span> hb' : p ∈ (<span class="const token" data-verso-hover="567">liftScenario</span> X s x0).<span class="const token" data-verso-hover="569">byz</span> := <span class="const token" data-verso-hover="573">val_mem_byz_liftScenario</span>.<span class="const token" data-verso-hover="123">2</span> hb</span>
+<span id="L111">          <span class="kw">simp</span> [hpq, hne, hb, hb', hadv, hp]</span>
+<span id="L112">        · <span class="kw">have</span> hb' : p ∉ (<span class="const token" data-verso-hover="567">liftScenario</span> X s x0).<span class="const token" data-verso-hover="569">byz</span> := <span class="kw">fun</span> h =&gt; hb (<span class="const token" data-verso-hover="573">val_mem_byz_liftScenario</span>.<span class="const token" data-verso-hover="112">1</span> h)</span>
+<span id="L113">          <span class="kw">by_cases</span> hd : s.<span class="const token" data-verso-hover="572">drop</span> r ⟨p, hp⟩ q</span>
+<span id="L114">          · <span class="kw">simp</span> [hpq, hne, hb, hb', hdrop, hd]</span>
+<span id="L115">          · <span class="kw">simp</span> only <span class="kw">at</span> hin hh</span>
+<span id="L116">            <span class="kw">simp</span> [hpq, hne, hb, hb', hdrop, hd, hin, hh, <span class="const token" data-verso-hover="13">simProtocol</span>, hp]</span>
+<span id="L117"></span>
+<span id="L118"><span class="kw">theorem</span> <span class="const token" data-verso-hover="581">status_liftScenario</span> (alg : <span class="const token" data-verso-hover="563">Protocol</span> P (V × (P → <span class="const token" data-verso-hover="152">Bool</span>)) M V)</span>
+<span id="L119">    (s : <span class="const token" data-verso-hover="568">Scenario</span> {p // p ∉ X} V M) (x0 : P → V) (r : <span class="const token" data-verso-hover="92">ℕ</span>) (q : {p // p ∉ X}) :</span>
+<span id="L120">    <span class="const token" data-verso-hover="582">status</span> ⊤ alg (<span class="const token" data-verso-hover="567">liftScenario</span> X s x0) r q.<span class="const token" data-verso-hover="565">1</span> = <span class="const token" data-verso-hover="582">status</span> ⊤ (<span class="const token" data-verso-hover="13">simProtocol</span> X alg) s r q := <span class="kw">by</span></span>
+<span id="L121">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="582">status</span>, <span class="const token" data-verso-hover="576">input_liftScenario</span>, <span class="const token" data-verso-hover="577">hist_liftScenario</span>]</span>
+<span id="L122">  <span class="kw">rfl</span></span>
+<span id="L123"></span>
+<span id="L124"><span class="kw">theorem</span> <span class="const token" data-verso-hover="583">decides_liftScenario</span> (alg : <span class="const token" data-verso-hover="563">Protocol</span> P (V × (P → <span class="const token" data-verso-hover="152">Bool</span>)) M V)</span>
+<span id="L125">    (s : <span class="const token" data-verso-hover="568">Scenario</span> {p // p ∉ X} V M) (x0 : P → V) (q : {p // p ∉ X}) (v : V) :</span>
+<span id="L126">    <span class="const token" data-verso-hover="584">Decides</span> ⊤ alg (<span class="const token" data-verso-hover="567">liftScenario</span> X s x0) q.<span class="const token" data-verso-hover="565">1</span> v ↔ <span class="const token" data-verso-hover="584">Decides</span> ⊤ (<span class="const token" data-verso-hover="13">simProtocol</span> X alg) s q v := <span class="kw">by</span></span>
+<span id="L127">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="584">Decides</span>, <span class="const token" data-verso-hover="581">status_liftScenario</span>]</span>
+<span id="L128"></span>
+<span id="L129"><span class="kw">theorem</span> <span class="const token" data-verso-hover="585">ncard_byz_liftScenario</span> [<span class="const token" data-verso-hover="130">Fintype</span> P] (s : <span class="const token" data-verso-hover="568">Scenario</span> {p // p ∉ X} V M) (x0 : P → V) :</span>
+<span id="L130">    (<span class="const token" data-verso-hover="567">liftScenario</span> X s x0).<span class="const token" data-verso-hover="569">byz</span>.<span class="const token" data-verso-hover="586">ncard</span> ≤ s.<span class="const token" data-verso-hover="569">byz</span>.<span class="const token" data-verso-hover="586">ncard</span> + X.<span class="const token" data-verso-hover="97">card</span> := <span class="kw">by</span></span>
+<span id="L131">  <span class="kw">calc</span> (<span class="const token" data-verso-hover="567">liftScenario</span> X s x0).<span class="const token" data-verso-hover="569">byz</span>.<span class="const token" data-verso-hover="586">ncard</span> ≤ (<span class="const token" data-verso-hover="565">Subtype.val</span> '' s.<span class="const token" data-verso-hover="569">byz</span>).<span class="const token" data-verso-hover="586">ncard</span> + (X : <span class="const token" data-verso-hover="82">Set</span> P).<span class="const token" data-verso-hover="586">ncard</span> :=</span>
+<span id="L132">        <span class="const token" data-verso-hover="587">Set.ncard_union_le</span> _ _</span>
+<span id="L133">    _ ≤ s.<span class="const token" data-verso-hover="569">byz</span>.<span class="const token" data-verso-hover="586">ncard</span> + X.<span class="const token" data-verso-hover="97">card</span> := <span class="kw">by</span></span>
+<span id="L134">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="588">Set.ncard_coe_finset</span>]</span>
+<span id="L135">        <span class="kw">exact</span> <span class="const token" data-verso-hover="425">Nat.add_le_add_right</span> (<span class="const token" data-verso-hover="589">Set.ncard_image_le</span> (<span class="const token" data-verso-hover="590">Set.toFinite</span> _)) _</span>
+<span id="L136"></span>
+<span id="L137"><span class="dc">/-- **Correctness of the simulation** (proof of Theorem 13): if `alg` solves Byzantine agreement</span></span>
+<span id="L138"><span class="dc">with predictions against `t` Byzantine faults, then the prediction-free algorithm `S'` on the</span></span>
+<span id="L139"><span class="dc">processes outside `X` solves Byzantine agreement against `t - |X|` Byzantine faults. -/</span></span>
+<span id="L140"><span class="kw">theorem</span> <span class="const token" data-verso-hover="14">solves_simProtocol</span> [<span class="const token" data-verso-hover="130">Fintype</span> P] {alg : <span class="const token" data-verso-hover="563">Protocol</span> P (V × (P → <span class="const token" data-verso-hover="152">Bool</span>)) M V} {t : <span class="const token" data-verso-hover="92">ℕ</span>}</span>
+<span id="L141">    (hA : <span class="const token" data-verso-hover="9">Solves</span> ⊤ alg {S | S.<span class="const token" data-verso-hover="586">ncard</span> ≤ t} <span class="const token" data-verso-hover="556">BAP</span>) (hX : X.<span class="const token" data-verso-hover="97">card</span> ≤ t) :</span>
+<span id="L142">    <span class="const token" data-verso-hover="9">Solves</span> ⊤ (<span class="const token" data-verso-hover="13">simProtocol</span> X alg) {S | S.<span class="const token" data-verso-hover="586">ncard</span> ≤ t - X.<span class="const token" data-verso-hover="97">card</span>} <span class="const token" data-verso-hover="558">BA</span> := <span class="kw">by</span></span>
+<span id="L143">  <span class="kw">intro</span> s hs hrel</span>
+<span id="L144">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="591">isEmpty_or_nonempty</span> {p // p ∉ X} <span class="kw">with</span> hQ | ⟨⟨q0⟩⟩</span>
+<span id="L145">  · <span class="kw">exact</span> ⟨<span class="kw">fun</span> p =&gt; (hQ.<span class="const token" data-verso-hover="592">false</span> p).<span class="const token" data-verso-hover="593">elim</span>, <span class="kw">fun</span> _ _ p =&gt; (hQ.<span class="const token" data-verso-hover="592">false</span> p).<span class="const token" data-verso-hover="593">elim</span>,</span>
+<span id="L146">      <span class="kw">fun</span> p =&gt; (hQ.<span class="const token" data-verso-hover="592">false</span> p).<span class="const token" data-verso-hover="593">elim</span>⟩</span>
+<span id="L147">  <span class="kw">obtain</span> ⟨x0⟩ : <span class="const token" data-verso-hover="377">Nonempty</span> (P → V) := ⟨<span class="kw">fun</span> _ =&gt; s.<span class="const token" data-verso-hover="570">input</span> q0⟩</span>
+<span id="L148">  <span class="kw">have</span> hbyz : (<span class="const token" data-verso-hover="567">liftScenario</span> X s x0).<span class="const token" data-verso-hover="569">byz</span> ∈ {S : <span class="const token" data-verso-hover="82">Set</span> P | S.<span class="const token" data-verso-hover="586">ncard</span> ≤ t} := <span class="kw">by</span></span>
+<span id="L149">    <span class="kw">have</span> := <span class="const token" data-verso-hover="585">ncard_byz_liftScenario</span> s x0</span>
+<span id="L150">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="594">Set.mem_ofPred_eq</span>] <span class="kw">at</span> hs ⊢</span>
+<span id="L151">    <span class="kw">omega</span></span>
+<span id="L152">  <span class="kw">have</span> hrelA : (<span class="const token" data-verso-hover="567">liftScenario</span> X s x0).<span class="const token" data-verso-hover="595">Reliable</span> := <span class="kw">fun</span> r p q ⟨_, hd⟩ =&gt; hrel _ _ _ hd</span>
+<span id="L153">  <span class="kw">obtain</span> ⟨h1, h2, h3⟩ := hA (<span class="const token" data-verso-hover="567">liftScenario</span> X s x0) hbyz hrelA</span>
+<span id="L154">  <span class="kw">have</span> hon : ∀ q : {p // p ∉ X}, q ∈ s.<span class="const token" data-verso-hover="596">honest</span> ↔ q.<span class="const token" data-verso-hover="565">1</span> ∈ (<span class="const token" data-verso-hover="567">liftScenario</span> X s x0).<span class="const token" data-verso-hover="596">honest</span> := <span class="kw">fun</span> q =&gt;</span>
+<span id="L155">    <span class="const token" data-verso-hover="597">not_congr</span> <span class="const token" data-verso-hover="573">val_mem_byz_liftScenario</span>.<span class="const token" data-verso-hover="598">symm</span></span>
+<span id="L156">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> q hq =&gt; ?_, <span class="kw">fun</span> v hv q hq =&gt; ?_, <span class="kw">fun</span> q hq q' hq' v w hv hw =&gt; ?_⟩</span>
+<span id="L157">  · <span class="kw">obtain</span> ⟨v, hv⟩ := h1 q.<span class="const token" data-verso-hover="565">1</span> ((hon q).<span class="const token" data-verso-hover="112">1</span> hq)</span>
+<span id="L158">    <span class="kw">exact</span> ⟨v, (<span class="const token" data-verso-hover="583">decides_liftScenario</span> alg s x0 q v).<span class="const token" data-verso-hover="112">1</span> hv⟩</span>
+<span id="L159">  · <span class="kw">refine</span> (<span class="const token" data-verso-hover="583">decides_liftScenario</span> alg s x0 q v).<span class="const token" data-verso-hover="112">1</span> (h2 v (<span class="kw">fun</span> p hp =&gt; ?_) q.<span class="const token" data-verso-hover="565">1</span> ((hon q).<span class="const token" data-verso-hover="112">1</span> hq))</span>
+<span id="L160">    <span class="kw">have</span> hpX : p ∉ X := <span class="kw">fun</span> h =&gt; hp (<span class="const token" data-verso-hover="575">mem_byz_liftScenario_of_mem</span> h)</span>
+<span id="L161">    <span class="kw">have</span> := <span class="const token" data-verso-hover="576">input_liftScenario</span> (s := s) (x0 := x0) ⟨p, hpX⟩</span>
+<span id="L162">    <span class="kw">simp</span> only <span class="kw">at</span> this ⊢</span>
+<span id="L163">    <span class="kw">rw</span> [this]</span>
+<span id="L164">    <span class="kw">exact</span> hv ⟨p, hpX⟩ ((hon ⟨p, hpX⟩).<span class="const token" data-verso-hover="123">2</span> hp)</span>
+<span id="L165">  · <span class="kw">exact</span> h3 q.<span class="const token" data-verso-hover="565">1</span> ((hon q).<span class="const token" data-verso-hover="112">1</span> hq) q'.<span class="const token" data-verso-hover="565">1</span> ((hon q').<span class="const token" data-verso-hover="112">1</span> hq') v w</span>
+<span id="L166">      ((<span class="const token" data-verso-hover="583">decides_liftScenario</span> alg s x0 q v).<span class="const token" data-verso-hover="123">2</span> hv) ((<span class="const token" data-verso-hover="583">decides_liftScenario</span> alg s x0 q' w).<span class="const token" data-verso-hover="123">2</span> hw)</span>
+<span id="L167"></span>
+<span id="L168"><span class="kw">end</span> Sim</span>
+<span id="L169"></span>
+<span id="L170"><span class="dc">/-! ### Wrong bits of the simulated predictions -/</span></span>
+<span id="L171"></span>
+<span id="L172"><span class="dc">/-- If every honest process gets the prediction "exactly `X` is faulty" and the actual faulty set</span></span>
+<span id="L173"><span class="dc">is `F ⊇ X`, each honest process has `|F \ X|` wrong bits. -/</span></span>
+<span id="L174"><span class="kw">theorem</span> <span class="const token" data-verso-hover="599">wrongBits_correctPred_of_subset</span> {P : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="130">Fintype</span> P] [<span class="const token" data-verso-hover="70">DecidableEq</span> P] {X F : <span class="const token" data-verso-hover="77">Finset</span> P}</span>
+<span id="L175">    (hXF : X ⊆ F) :</span>
+<span id="L176">    <span class="const token" data-verso-hover="8">wrongBits</span> F (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="378">correctPred</span> X) = (<span class="const token" data-verso-hover="206">Fintype.card</span> P - F.<span class="const token" data-verso-hover="97">card</span>) * (F \ X).<span class="const token" data-verso-hover="97">card</span> := <span class="kw">by</span></span>
+<span id="L177">  <span class="kw">have</span> h1 : <span class="const token" data-verso-hover="446">wrongBitsOf</span> F (<span class="const token" data-verso-hover="378">correctPred</span> X) = (F \ X).<span class="const token" data-verso-hover="97">card</span> := <span class="kw">by</span></span>
+<span id="L178">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="446">wrongBitsOf</span></span>
+<span id="L179">    <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L180">    <span class="kw">ext</span> j</span>
+<span id="L181">    <span class="kw">by_cases</span> hj : j ∈ X</span>
+<span id="L182">    · <span class="kw">simp</span> [hj, hXF hj]</span>
+<span id="L183">    · <span class="kw">by_cases</span> hjF : j ∈ F &lt;;&gt; <span class="kw">simp</span> [hj, hjF]</span>
+<span id="L184">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="8">wrongBits</span>, h1, <span class="const token" data-verso-hover="371">sum_const</span>, <span class="const token" data-verso-hover="372">smul_eq_mul</span>, <span class="const token" data-verso-hover="221">card_filter_notMem_univ</span>]</span>
+<span id="L185"></span>
+<span id="L186"><span class="dc">/-! ### The cited lower bound and Theorem 13 -/</span></span>
+<span id="L187"></span>
+<span id="L188"><span class="dc">/-- A lower bound `bound f' t'` on the decision round of Byzantine agreement *without predictions*</span></span>
+<span id="L189"><span class="dc">on the processes `Q`: every deterministic algorithm that solves Byzantine agreement against `t'`</span></span>
+<span id="L190"><span class="dc">Byzantine faults has, for every `f' ≤ t'`, a reliable execution with at most `f'` Byzantine</span></span>
+<span id="L191"><span class="dc">processes in which some honest process has not decided before round `bound f' t'`. -/</span></span>
+<span id="L192"><span class="kw">def</span> <span class="const token" data-verso-hover="600">EarlyDecidingLBWith</span> (bound : <span class="const token" data-verso-hover="92">ℕ</span> → <span class="const token" data-verso-hover="92">ℕ</span> → <span class="const token" data-verso-hover="92">ℕ</span>) (Q V : <span class="kw">Type</span>*) (t' : <span class="const token" data-verso-hover="92">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L193">  ∀ (M : <span class="kw">Type</span>) (alg' : <span class="const token" data-verso-hover="563">Protocol</span> Q V M V), <span class="const token" data-verso-hover="9">Solves</span> ⊤ alg' {S | S.<span class="const token" data-verso-hover="586">ncard</span> ≤ t'} <span class="const token" data-verso-hover="558">BA</span> →</span>
+<span id="L194">    ∀ f' ≤ t', ∃ s : <span class="const token" data-verso-hover="568">Scenario</span> Q V M, s.<span class="const token" data-verso-hover="595">Reliable</span> ∧ s.<span class="const token" data-verso-hover="569">byz</span>.<span class="const token" data-verso-hover="586">ncard</span> ≤ f' ∧</span>
+<span id="L195">      ∃ q ∉ s.<span class="const token" data-verso-hover="569">byz</span>, ∀ r &lt; bound f' t', <span class="const token" data-verso-hover="582">status</span> ⊤ alg' s r q = <span class="const token" data-verso-hover="142">none</span></span>
+<span id="L196"></span>
+<span id="L197"><span class="dc">/-- **The early-deciding lower bound cited by the paper** ([DRS90]: Dolev, Reischuk, Strong,</span></span>
+<span id="L198"><span class="dc">*Early stopping in Byzantine agreement*, J. ACM 37(4), 1990), stated for the **Byzantine** model:</span></span>
+<span id="L199"><span class="dc">every deterministic Byzantine agreement algorithm (without predictions) for the processes `Q` that</span></span>
+<span id="L200"><span class="dc">tolerates `t'` Byzantine faults has, for every `f' ≤ t'`, a (reliable) execution with at most `f'`</span></span>
+<span id="L201"><span class="dc">Byzantine processes in which some honest process has not decided before round</span></span>
+<span id="L202"><span class="dc">`min (f' + 2) (t' + 1)`.</span></span>
+<span id="L203"></span>
+<span id="L204"><span class="dc">Stated here as a hypothesis; it is proved for `Nontrivial V` in `RoundLowerBoundStrong.lean`</span></span>
+<span id="L205"><span class="dc">(`earlyDecidingLB_strong`, `drsBound`; `earlyDecidingLB_weak` is the `f' + 1` part). It is</span></span>
+<span id="L206"><span class="dc">needs `Nontrivial V` (for a subsingleton `V`, deciding at round 0 is correct); we prove it for</span></span>
+<span id="L207"><span class="dc">`t' + 2 ≤ |Q|`. The paper invokes it for algorithms tolerating *crash* faults, where it is false for</span></span>
+<span id="L208"><span class="dc">decision times (see `differencies.md`); our reduction produces a Byzantine-tolerant algorithm, for</span></span>
+<span id="L209"><span class="dc">which the cited bound is the Byzantine early-deciding bound of [DRS90]. -/</span></span>
+<span id="L210"><span class="kw">def</span> <span class="const token" data-verso-hover="601">EarlyDecidingLB</span> (Q V : <span class="kw">Type</span>*) (t' : <span class="const token" data-verso-hover="92">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L211">  <span class="const token" data-verso-hover="600">EarlyDecidingLBWith</span> (<span class="kw">fun</span> f' t' =&gt; <span class="const token" data-verso-hover="602">min</span> (f' + <span class="nu">2</span>) (t' + <span class="nu">1</span>)) Q V t'</span>
+<span id="L212"></span>
+<span id="L213"><span class="dc">/-- The cited bound for all finite process sets with `t' + 2 ≤ n'` (Byzantine model). -/</span></span>
+<span id="L214"><span class="kw">def</span> <span class="const token" data-verso-hover="603">DRSBound</span> (V : <span class="kw">Type</span>*) : <span class="kw">Prop</span> :=</span>
+<span id="L215">  ∀ (Q : <span class="kw">Type</span>) [<span class="const token" data-verso-hover="130">Fintype</span> Q] (t' : <span class="const token" data-verso-hover="92">ℕ</span>), t' + <span class="nu">2</span> ≤ <span class="const token" data-verso-hover="206">Fintype.card</span> Q → <span class="const token" data-verso-hover="601">EarlyDecidingLB</span> Q V t'</span>
+<span id="L216"></span>
+<span id="L217"><span class="dc">/-- **Theorem 13 of [BDEG25]**, the reduction (proof of Theorem 13), for any lower bound</span></span>
+<span id="L218"><span class="dc">`bound f' t'` on algorithms without predictions. Let `alg` solve Byzantine agreement with</span></span>
+<span id="L219"><span class="dc">classification predictions against `t` Byzantine faults (for *all* predictions), `f ≤ t`,</span></span>
+<span id="L220"><span class="dc">`t + 2 ≤ n`, and `Bd` a bound on the number of wrong prediction bits. If `bound` is a lower bound</span></span>
+<span id="L221"><span class="dc">for the prediction-free algorithms on `n - x` processes tolerating `t - x` faults (`x ≤ f`), there</span></span>
+<span id="L222"><span class="dc">is a reliable execution with exactly `f` Byzantine processes (the set `F`), at most `Bd` wrong</span></span>
+<span id="L223"><span class="dc">prediction bits given to honest processes, and an honest process that has not decided before round</span></span>
+<span id="L224"><span class="dc">`bound f' (t - f + f')`, where `f' = min f ⌊Bd / (n - f)⌋`. -/</span></span>
+<span id="L225"><span class="kw">theorem</span> <span class="const token" data-verso-hover="15">roundLowerBoundWith</span> (bound : <span class="const token" data-verso-hover="92">ℕ</span> → <span class="const token" data-verso-hover="92">ℕ</span> → <span class="const token" data-verso-hover="92">ℕ</span>) {P V : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="130">Fintype</span> P] [<span class="const token" data-verso-hover="70">DecidableEq</span> P]</span>
+<span id="L226">    {M : <span class="kw">Type</span>} {alg : <span class="const token" data-verso-hover="563">Protocol</span> P (V × (P → <span class="const token" data-verso-hover="152">Bool</span>)) M V} {t f : <span class="const token" data-verso-hover="92">ℕ</span>}</span>
+<span id="L227">    (hA : <span class="const token" data-verso-hover="9">Solves</span> ⊤ alg {S | S.<span class="const token" data-verso-hover="586">ncard</span> ≤ t} <span class="const token" data-verso-hover="556">BAP</span>) (hft : f ≤ t) (htn : t + <span class="nu">2</span> ≤ <span class="const token" data-verso-hover="206">Fintype.card</span> P)</span>
+<span id="L228">    (Bd : <span class="const token" data-verso-hover="92">ℕ</span>)</span>
+<span id="L229">    (hLB : ∀ X : <span class="const token" data-verso-hover="77">Finset</span> P, X.<span class="const token" data-verso-hover="97">card</span> ≤ f → <span class="const token" data-verso-hover="600">EarlyDecidingLBWith</span> bound {p // p ∉ X} V (t - X.<span class="const token" data-verso-hover="97">card</span>)) :</span>
+<span id="L230">    ∃ (s : <span class="const token" data-verso-hover="568">Scenario</span> P (V × (P → <span class="const token" data-verso-hover="152">Bool</span>)) M) (F : <span class="const token" data-verso-hover="77">Finset</span> P),</span>
+<span id="L231">      s.<span class="const token" data-verso-hover="595">Reliable</span> ∧ s.<span class="const token" data-verso-hover="569">byz</span> = ↑F ∧ F.<span class="const token" data-verso-hover="97">card</span> = f ∧ <span class="const token" data-verso-hover="8">wrongBits</span> F (<span class="kw">fun</span> i =&gt; (s.<span class="const token" data-verso-hover="570">input</span> i).<span class="const token" data-verso-hover="83">2</span>) ≤ Bd ∧</span>
+<span id="L232">      ∃ p ∉ F, ∀ r &lt; bound (<span class="const token" data-verso-hover="602">min</span> f (Bd / (<span class="const token" data-verso-hover="206">Fintype.card</span> P - f)))</span>
+<span id="L233">          (t - f + <span class="const token" data-verso-hover="602">min</span> f (Bd / (<span class="const token" data-verso-hover="206">Fintype.card</span> P - f))), <span class="const token" data-verso-hover="582">status</span> ⊤ alg s r p = <span class="const token" data-verso-hover="142">none</span> := <span class="kw">by</span></span>
+<span id="L234">  <span class="kw">classical</span></span>
+<span id="L235">  <span class="kw">obtain</span> ⟨n, hn⟩ : ∃ n, n = <span class="const token" data-verso-hover="206">Fintype.card</span> P := ⟨_, <span class="const token" data-verso-hover="145">rfl</span>⟩</span>
+<span id="L236">  <span class="kw">rw</span> [← hn] <span class="kw">at</span> htn ⊢</span>
+<span id="L237">  <span class="kw">obtain</span> ⟨f', hf'⟩ : ∃ f', f' = <span class="const token" data-verso-hover="602">min</span> f (Bd / (n - f)) := ⟨_, <span class="const token" data-verso-hover="145">rfl</span>⟩</span>
+<span id="L238">  <span class="kw">rw</span> [← hf']</span>
+<span id="L239">  <span class="kw">have</span> hf'f : f' ≤ f := hf' ▸ <span class="const token" data-verso-hover="604">min_le_left</span> _ _</span>
+<span id="L240">  <span class="kw">have</span> hf'B : f' ≤ Bd / (n - f) := hf' ▸ <span class="const token" data-verso-hover="605">min_le_right</span> _ _</span>
+<span id="L241">  <span class="kw">obtain</span> ⟨X, -, hXc⟩ := <span class="const token" data-verso-hover="475">exists_subset_card_eq</span> (s := (<span class="const token" data-verso-hover="134">univ</span> : <span class="const token" data-verso-hover="77">Finset</span> P)) (n := f - f')</span>
+<span id="L242">    (<span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="407">card_univ</span>, ← hn]; <span class="kw">omega</span>)</span>
+<span id="L243">  <span class="kw">have</span> hS := <span class="const token" data-verso-hover="14">solves_simProtocol</span> (X := X) hA (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L244">  <span class="kw">obtain</span> ⟨s', hrel, hcard, q, hq, hslow⟩ :=</span>
+<span id="L245">    hLB X (<span class="kw">by</span> <span class="kw">omega</span>) M (<span class="const token" data-verso-hover="13">simProtocol</span> X alg) hS f' (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L246">  <span class="kw">have</span> hQ : <span class="const token" data-verso-hover="206">Fintype.card</span> {p // p ∉ X} = n - X.<span class="const token" data-verso-hover="97">card</span> := <span class="kw">by</span></span>
+<span id="L247">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="606">Fintype.card_subtype_compl</span>, <span class="const token" data-verso-hover="607">Fintype.card_coe</span>, hn]</span>
+<span id="L248">  <span class="cm">--</span><span class="cm"> extend the Byzantine set of `s'` to exactly `f'` processes, avoiding `q`</span></span>
+<span id="L249">  <span class="kw">obtain</span> ⟨Z, hBZ, hZq, hZc⟩ := <span class="const token" data-verso-hover="608">exists_subsuperset_card_eq</span> (s := s'.<span class="const token" data-verso-hover="569">byz</span>.<span class="const token" data-verso-hover="609">toFinset</span>)</span>
+<span id="L250">    (t := <span class="const token" data-verso-hover="134">univ</span>.<span class="const token" data-verso-hover="482">erase</span> q) (n := f')</span>
+<span id="L251">    (<span class="kw">fun</span> a ha =&gt; <span class="const token" data-verso-hover="486">mem_erase</span>.<span class="const token" data-verso-hover="123">2</span> ⟨<span class="kw">fun</span> h =&gt; hq (h ▸ <span class="const token" data-verso-hover="610">Set.mem_toFinset</span>.<span class="const token" data-verso-hover="112">1</span> ha), <span class="const token" data-verso-hover="140">mem_univ</span> _⟩)</span>
+<span id="L252">    (<span class="kw">by</span> <span class="kw">rw</span> [← <span class="const token" data-verso-hover="611">Set.ncard_eq_toFinset_card'</span>]; <span class="kw">exact</span> hcard)</span>
+<span id="L253">    (<span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="485">card_erase_of_mem</span> (<span class="const token" data-verso-hover="140">mem_univ</span> _), <span class="const token" data-verso-hover="407">card_univ</span>, hQ]; <span class="kw">omega</span>)</span>
+<span id="L254">  <span class="kw">set</span> sA := <span class="const token" data-verso-hover="567">liftScenario</span> X s' (<span class="kw">fun</span> _ =&gt; s'.<span class="const token" data-verso-hover="570">input</span> q) <span class="kw">with</span> hsA</span>
+<span id="L255">  <span class="kw">set</span> sF := <span class="const token" data-verso-hover="2">padScenario</span> ⊤ alg sA (<span class="const token" data-verso-hover="565">Subtype.val</span> '' (Z : <span class="const token" data-verso-hover="82">Set</span> {p // p ∉ X})) <span class="kw">with</span> hsF</span>
+<span id="L256">  <span class="kw">set</span> F := X ∪ Z.<span class="const token" data-verso-hover="612">map</span> (<span class="const token" data-verso-hover="613">Function.Embedding.subtype</span> _) <span class="kw">with</span> hF</span>
+<span id="L257">  <span class="kw">have</span> hdisj : <span class="const token" data-verso-hover="614">Disjoint</span> X (Z.<span class="const token" data-verso-hover="612">map</span> (<span class="const token" data-verso-hover="613">Function.Embedding.subtype</span> _)) := <span class="kw">by</span></span>
+<span id="L258">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="418">disjoint_left</span>]</span>
+<span id="L259">    <span class="kw">intro</span> p hpX hpZ</span>
+<span id="L260">    <span class="kw">obtain</span> ⟨z, -, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="615">mem_map</span>.<span class="const token" data-verso-hover="112">1</span> hpZ</span>
+<span id="L261">    <span class="kw">exact</span> z.<span class="const token" data-verso-hover="574">2</span> hpX</span>
+<span id="L262">  <span class="kw">have</span> hFX : F \ X = Z.<span class="const token" data-verso-hover="612">map</span> (<span class="const token" data-verso-hover="613">Function.Embedding.subtype</span> _) := <span class="kw">by</span></span>
+<span id="L263">    <span class="kw">rw</span> [hF, <span class="const token" data-verso-hover="616">union_sdiff_left</span>, <span class="const token" data-verso-hover="617">sdiff_eq_self_of_disjoint</span> hdisj.<span class="const token" data-verso-hover="618">symm</span>]</span>
+<span id="L264">  <span class="kw">refine</span> ⟨sF, F, ?_, ?_, ?_, ?_, q.<span class="const token" data-verso-hover="565">1</span>, ?_, ?_⟩</span>
+<span id="L265">  · <span class="kw">intro</span> r p p' hd</span>
+<span id="L266">    <span class="kw">exact</span> hrel _ _ _ hd.<span class="const token" data-verso-hover="103">1</span><span class="nu">.2</span></span>
+<span id="L267">  · <span class="kw">ext</span> p</span>
+<span id="L268">    <span class="kw">simp</span> only [hsF, <span class="const token" data-verso-hover="2">padScenario</span>, hsA, <span class="const token" data-verso-hover="567">liftScenario</span>, hF, <span class="const token" data-verso-hover="619">Set.mem_union</span>, <span class="const token" data-verso-hover="620">Set.mem_image</span>,</span>
+<span id="L269">      <span class="const token" data-verso-hover="621">coe_union</span>, <span class="const token" data-verso-hover="622">coe_map</span>, <span class="const token" data-verso-hover="623">Function.Embedding.coe_subtype</span>, <span class="const token" data-verso-hover="624">mem_coe</span>]</span>
+<span id="L270">    <span class="kw">constructor</span></span>
+<span id="L271">    · <span class="kw">rintro</span> ((⟨z, hz, <span class="kw">rfl</span>⟩ | hp) | ⟨z, hz, <span class="kw">rfl</span>⟩)</span>
+<span id="L272">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="121">Or.inr</span> ⟨z, hBZ (<span class="const token" data-verso-hover="610">Set.mem_toFinset</span>.<span class="const token" data-verso-hover="123">2</span> hz), <span class="const token" data-verso-hover="145">rfl</span>⟩</span>
+<span id="L273">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="122">Or.inl</span> hp</span>
+<span id="L274">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="121">Or.inr</span> ⟨z, hz, <span class="const token" data-verso-hover="145">rfl</span>⟩</span>
+<span id="L275">    · <span class="kw">rintro</span> (hp | ⟨z, hz, <span class="kw">rfl</span>⟩)</span>
+<span id="L276">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="122">Or.inl</span> (<span class="const token" data-verso-hover="121">Or.inr</span> hp)</span>
+<span id="L277">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="121">Or.inr</span> ⟨z, hz, <span class="const token" data-verso-hover="145">rfl</span>⟩</span>
+<span id="L278">  · <span class="kw">rw</span> [hF, <span class="const token" data-verso-hover="417">card_union_of_disjoint</span> hdisj, <span class="const token" data-verso-hover="625">card_map</span>, hXc, hZc]</span>
+<span id="L279">    <span class="kw">omega</span></span>
+<span id="L280">  · <span class="kw">have</span> hin : (<span class="kw">fun</span> i =&gt; (sF.<span class="const token" data-verso-hover="570">input</span> i).<span class="const token" data-verso-hover="83">2</span>) = <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="378">correctPred</span> X := <span class="const token" data-verso-hover="145">rfl</span></span>
+<span id="L281">    <span class="kw">rw</span> [hin, <span class="const token" data-verso-hover="599">wrongBits_correctPred_of_subset</span> <span class="const token" data-verso-hover="114">subset_union_left</span>, hFX, <span class="const token" data-verso-hover="625">card_map</span>, hZc]</span>
+<span id="L282">    <span class="kw">have</span> hFc : F.<span class="const token" data-verso-hover="97">card</span> = f := <span class="kw">by</span> <span class="kw">rw</span> [hF, <span class="const token" data-verso-hover="417">card_union_of_disjoint</span> hdisj, <span class="const token" data-verso-hover="625">card_map</span>, hXc, hZc]; <span class="kw">omega</span></span>
+<span id="L283">    <span class="kw">rw</span> [hFc, <span class="const token" data-verso-hover="367">mul_comm</span>, ← hn]</span>
+<span id="L284">    <span class="kw">calc</span> f' * (n - f) ≤ Bd / (n - f) * (n - f) := <span class="const token" data-verso-hover="426">Nat.mul_le_mul_right</span> _ hf'B</span>
+<span id="L285">      _ ≤ Bd := <span class="const token" data-verso-hover="429">Nat.div_mul_le_self</span> _ _</span>
+<span id="L286">  · <span class="kw">simp</span> only [hF, <span class="const token" data-verso-hover="126">mem_union</span>, <span class="const token" data-verso-hover="615">mem_map</span>, <span class="const token" data-verso-hover="623">Function.Embedding.coe_subtype</span>, <span class="const token" data-verso-hover="487">not_or</span>, <span class="const token" data-verso-hover="232">not_exists</span>,</span>
+<span id="L287">      <span class="const token" data-verso-hover="233">not_and</span>]</span>
+<span id="L288">    <span class="kw">refine</span> ⟨q.<span class="const token" data-verso-hover="574">2</span>, <span class="kw">fun</span> z hz hzq =&gt; ?_⟩</span>
+<span id="L289">    <span class="kw">have</span> := hZq hz</span>
+<span id="L290">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="626">Subtype.ext</span> hzq] <span class="kw">at</span> this</span>
+<span id="L291">    <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L292">  · <span class="kw">intro</span> r hr</span>
+<span id="L293">    <span class="kw">rw</span> [hsF, <span class="const token" data-verso-hover="627">status_padScenario</span>, hsA, <span class="const token" data-verso-hover="581">status_liftScenario</span>]</span>
+<span id="L294">    <span class="kw">apply</span> hslow</span>
+<span id="L295">    <span class="kw">rw</span> [hXc]</span>
+<span id="L296">    <span class="kw">have</span> : t - (f - f') = t - f + f' := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L297">    <span class="kw">rw</span> [this]</span>
+<span id="L298">    <span class="kw">exact</span> hr</span>
+<span id="L299"></span>
+<span id="L300"><span class="dc">/-- **Theorem 13 of [BDEG25]**, conditional on the cited early-deciding lower bound</span></span>
+<span id="L301"><span class="dc">(`EarlyDecidingLB`), with the sharper bound of the paper's proof: some honest process has not</span></span>
+<span id="L302"><span class="dc">decided before round `min (f' + 2) (t - f + f' + 1)`, `f' = min f ⌊Bd / (n - f)⌋`, in a reliable</span></span>
+<span id="L303"><span class="dc">execution with exactly `f` Byzantine processes and at most `Bd` wrong prediction bits. -/</span></span>
+<span id="L304"><span class="kw">theorem</span> <span class="const token" data-verso-hover="628">roundLowerBound</span> {P V : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="130">Fintype</span> P] [<span class="const token" data-verso-hover="70">DecidableEq</span> P] {M : <span class="kw">Type</span>}</span>
+<span id="L305">    {alg : <span class="const token" data-verso-hover="563">Protocol</span> P (V × (P → <span class="const token" data-verso-hover="152">Bool</span>)) M V} {t f : <span class="const token" data-verso-hover="92">ℕ</span>}</span>
+<span id="L306">    (hA : <span class="const token" data-verso-hover="9">Solves</span> ⊤ alg {S | S.<span class="const token" data-verso-hover="586">ncard</span> ≤ t} <span class="const token" data-verso-hover="556">BAP</span>) (hft : f ≤ t) (htn : t + <span class="nu">2</span> ≤ <span class="const token" data-verso-hover="206">Fintype.card</span> P)</span>
+<span id="L307">    (Bd : <span class="const token" data-verso-hover="92">ℕ</span>) (hLB : ∀ X : <span class="const token" data-verso-hover="77">Finset</span> P, X.<span class="const token" data-verso-hover="97">card</span> ≤ f → <span class="const token" data-verso-hover="601">EarlyDecidingLB</span> {p // p ∉ X} V (t - X.<span class="const token" data-verso-hover="97">card</span>)) :</span>
+<span id="L308">    ∃ (s : <span class="const token" data-verso-hover="568">Scenario</span> P (V × (P → <span class="const token" data-verso-hover="152">Bool</span>)) M) (F : <span class="const token" data-verso-hover="77">Finset</span> P),</span>
+<span id="L309">      s.<span class="const token" data-verso-hover="595">Reliable</span> ∧ s.<span class="const token" data-verso-hover="569">byz</span> = ↑F ∧ F.<span class="const token" data-verso-hover="97">card</span> = f ∧ <span class="const token" data-verso-hover="8">wrongBits</span> F (<span class="kw">fun</span> i =&gt; (s.<span class="const token" data-verso-hover="570">input</span> i).<span class="const token" data-verso-hover="83">2</span>) ≤ Bd ∧</span>
+<span id="L310">      ∃ p ∉ F, ∀ r &lt; <span class="const token" data-verso-hover="602">min</span> (<span class="const token" data-verso-hover="602">min</span> f (Bd / (<span class="const token" data-verso-hover="206">Fintype.card</span> P - f)) + <span class="nu">2</span>)</span>
+<span id="L311">          (t - f + <span class="const token" data-verso-hover="602">min</span> f (Bd / (<span class="const token" data-verso-hover="206">Fintype.card</span> P - f)) + <span class="nu">1</span>), <span class="const token" data-verso-hover="582">status</span> ⊤ alg s r p = <span class="const token" data-verso-hover="142">none</span> :=</span>
+<span id="L312">  <span class="const token" data-verso-hover="15">roundLowerBoundWith</span> _ hA hft htn Bd hLB</span>
+<span id="L313"></span>
+<span id="L314"><span class="dc">/-- **Theorem 13 of [BDEG25]** (the paper's statement), conditional on the cited early-deciding lower</span></span>
+<span id="L315"><span class="dc">bound: for `f ≤ t &lt; n - 1` there is a reliable execution with exactly `f` Byzantine processes and at</span></span>
+<span id="L316"><span class="dc">most `Bd` wrong prediction bits in which some honest process has not decided before round</span></span>
+<span id="L317"><span class="dc">`min {f + 2, t + 1, ⌊Bd/(n - f)⌋ + 2, ⌊Bd/(n - t)⌋ + 1}`. -/</span></span>
+<span id="L318"><span class="kw">theorem</span> <span class="const token" data-verso-hover="629">roundLowerBound_paper</span> {P V : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="130">Fintype</span> P] [<span class="const token" data-verso-hover="70">DecidableEq</span> P] {M : <span class="kw">Type</span>}</span>
+<span id="L319">    {alg : <span class="const token" data-verso-hover="563">Protocol</span> P (V × (P → <span class="const token" data-verso-hover="152">Bool</span>)) M V} {t f : <span class="const token" data-verso-hover="92">ℕ</span>}</span>
+<span id="L320">    (hA : <span class="const token" data-verso-hover="9">Solves</span> ⊤ alg {S | S.<span class="const token" data-verso-hover="586">ncard</span> ≤ t} <span class="const token" data-verso-hover="556">BAP</span>) (hft : f ≤ t) (htn : t + <span class="nu">2</span> ≤ <span class="const token" data-verso-hover="206">Fintype.card</span> P)</span>
+<span id="L321">    (Bd : <span class="const token" data-verso-hover="92">ℕ</span>) (hLB : ∀ X : <span class="const token" data-verso-hover="77">Finset</span> P, X.<span class="const token" data-verso-hover="97">card</span> ≤ f → <span class="const token" data-verso-hover="601">EarlyDecidingLB</span> {p // p ∉ X} V (t - X.<span class="const token" data-verso-hover="97">card</span>)) :</span>
+<span id="L322">    ∃ (s : <span class="const token" data-verso-hover="568">Scenario</span> P (V × (P → <span class="const token" data-verso-hover="152">Bool</span>)) M) (F : <span class="const token" data-verso-hover="77">Finset</span> P),</span>
+<span id="L323">      s.<span class="const token" data-verso-hover="595">Reliable</span> ∧ s.<span class="const token" data-verso-hover="569">byz</span> = ↑F ∧ F.<span class="const token" data-verso-hover="97">card</span> = f ∧ <span class="const token" data-verso-hover="8">wrongBits</span> F (<span class="kw">fun</span> i =&gt; (s.<span class="const token" data-verso-hover="570">input</span> i).<span class="const token" data-verso-hover="83">2</span>) ≤ Bd ∧</span>
+<span id="L324">      ∃ p ∉ F, ∀ r &lt; <span class="const token" data-verso-hover="602">min</span> (<span class="const token" data-verso-hover="602">min</span> (f + <span class="nu">2</span>) (t + <span class="nu">1</span>))</span>
+<span id="L325">          (<span class="const token" data-verso-hover="602">min</span> (Bd / (<span class="const token" data-verso-hover="206">Fintype.card</span> P - f) + <span class="nu">2</span>) (Bd / (<span class="const token" data-verso-hover="206">Fintype.card</span> P - t) + <span class="nu">1</span>)),</span>
+<span id="L326">        <span class="const token" data-verso-hover="582">status</span> ⊤ alg s r p = <span class="const token" data-verso-hover="142">none</span> := <span class="kw">by</span></span>
+<span id="L327">  <span class="kw">obtain</span> ⟨s, F, h1, h2, h3, h4, p, hp, hslow⟩ := <span class="const token" data-verso-hover="628">roundLowerBound</span> hA hft htn Bd hLB</span>
+<span id="L328">  <span class="kw">refine</span> ⟨s, F, h1, h2, h3, h4, p, hp, <span class="kw">fun</span> r hr =&gt; hslow r (<span class="const token" data-verso-hover="630">lt_of_lt_of_le</span> hr ?_)⟩</span>
+<span id="L329">  <span class="kw">clear</span> hslow hr</span>
+<span id="L330">  <span class="kw">rcases</span> hft.<span class="const token" data-verso-hover="631">lt_or_eq</span> <span class="kw">with</span> hlt | <span class="kw">rfl</span></span>
+<span id="L331">  · <span class="kw">generalize</span> Bd / (<span class="const token" data-verso-hover="206">Fintype.card</span> P - f) = a</span>
+<span id="L332">    <span class="kw">generalize</span> Bd / (<span class="const token" data-verso-hover="206">Fintype.card</span> P - t) = b</span>
+<span id="L333">    <span class="kw">omega</span></span>
+<span id="L334">  · <span class="kw">generalize</span> Bd / (<span class="const token" data-verso-hover="206">Fintype.card</span> P - f) = a</span>
+<span id="L335">    <span class="kw">omega</span></span>
+<span id="L336"></span>
+<span id="L337"><span class="dc">/-- **Theorem 13 of [BDEG25]**, with the cited bound assumed in the form `DRSBound V` (for all process</span></span>
+<span id="L338"><span class="dc">sets). -/</span></span>
+<span id="L339"><span class="kw">theorem</span> <span class="const token" data-verso-hover="632">roundLowerBound_of_DRS</span> {P V : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="130">Fintype</span> P] [<span class="const token" data-verso-hover="70">DecidableEq</span> P] {M : <span class="kw">Type</span>}</span>
+<span id="L340">    {alg : <span class="const token" data-verso-hover="563">Protocol</span> P (V × (P → <span class="const token" data-verso-hover="152">Bool</span>)) M V} {t f : <span class="const token" data-verso-hover="92">ℕ</span>}</span>
+<span id="L341">    (hA : <span class="const token" data-verso-hover="9">Solves</span> ⊤ alg {S | S.<span class="const token" data-verso-hover="586">ncard</span> ≤ t} <span class="const token" data-verso-hover="556">BAP</span>) (hft : f ≤ t) (htn : t + <span class="nu">2</span> ≤ <span class="const token" data-verso-hover="206">Fintype.card</span> P)</span>
+<span id="L342">    (Bd : <span class="const token" data-verso-hover="92">ℕ</span>) (hDRS : <span class="const token" data-verso-hover="603">DRSBound</span> V) :</span>
+<span id="L343">    ∃ (s : <span class="const token" data-verso-hover="568">Scenario</span> P (V × (P → <span class="const token" data-verso-hover="152">Bool</span>)) M) (F : <span class="const token" data-verso-hover="77">Finset</span> P),</span>
+<span id="L344">      s.<span class="const token" data-verso-hover="595">Reliable</span> ∧ s.<span class="const token" data-verso-hover="569">byz</span> = ↑F ∧ F.<span class="const token" data-verso-hover="97">card</span> = f ∧ <span class="const token" data-verso-hover="8">wrongBits</span> F (<span class="kw">fun</span> i =&gt; (s.<span class="const token" data-verso-hover="570">input</span> i).<span class="const token" data-verso-hover="83">2</span>) ≤ Bd ∧</span>
+<span id="L345">      ∃ p ∉ F, ∀ r &lt; <span class="const token" data-verso-hover="602">min</span> (<span class="const token" data-verso-hover="602">min</span> (f + <span class="nu">2</span>) (t + <span class="nu">1</span>))</span>
+<span id="L346">          (<span class="const token" data-verso-hover="602">min</span> (Bd / (<span class="const token" data-verso-hover="206">Fintype.card</span> P - f) + <span class="nu">2</span>) (Bd / (<span class="const token" data-verso-hover="206">Fintype.card</span> P - t) + <span class="nu">1</span>)),</span>
+<span id="L347">        <span class="const token" data-verso-hover="582">status</span> ⊤ alg s r p = <span class="const token" data-verso-hover="142">none</span> := <span class="kw">by</span></span>
+<span id="L348">  <span class="kw">refine</span> <span class="const token" data-verso-hover="629">roundLowerBound_paper</span> hA hft htn Bd <span class="kw">fun</span> X hX =&gt; hDRS _ _ ?_</span>
+<span id="L349">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="606">Fintype.card_subtype_compl</span>, <span class="const token" data-verso-hover="607">Fintype.card_coe</span>]</span>
+<span id="L350">  <span class="kw">omega</span></span>
+<span id="L351"></span>
+<span id="L352"><span class="kw">end</span> BAWithPredictions</span>
+<span id="L353"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2025/BAWithPredictions/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

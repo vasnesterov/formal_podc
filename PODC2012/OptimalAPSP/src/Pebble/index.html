@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>OptimalAPSP: Pebble.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2012/">PODC 2012</a><span class="sep">›</span><a href="PODC2012/OptimalAPSP/">OptimalAPSP</a><span class="sep">›</span><a href="PODC2012/OptimalAPSP/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Pebble</span></nav>
+        <h1>
+          <code>Pebble.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2012/OptimalAPSP/">Optimal Distributed APSP — PODC 2012</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2012/OptimalAPSP/Pebble.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Pebble"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># The pebble traversal of Algorithm 1 and Lemma 1 of [HW12]</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">Holzer–Wattenhofer, *Optimal Distributed All Pairs Shortest Paths and Applications*, PODC 2012</span></span>
+<span id="L7"><span class="dc">([HW12]). Algorithm 1 sends a pebble `P` along a depth-first traversal of a BFS tree `T₁`; when</span></span>
+<span id="L8"><span class="dc">`P` enters a node `v` for the first time it waits one time slot and then starts `BFS_v`.</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">This file analyses the pebble *globally* (the distributed implementation in `Algorithm1.lean`</span></span>
+<span id="L11"><span class="dc">is shown to follow it step by step):</span></span>
+<span id="L12"></span>
+<span id="L13"><span class="dc">* `RTree V`: a rooted tree given by a parent function and a depth function.</span></span>
+<span id="L14"><span class="dc">* `PState`, `PState.step`: the global state of the pebble (position, waiting/ready, the set of</span></span>
+<span id="L15"><span class="dc">  entered nodes, and for every node the set of children not yet visited) and one time slot.</span></span>
+<span id="L16"><span class="dc">* `PState.done_all_entered`: after `3n - 1` slots the traversal is over and every node has been</span></span>
+<span id="L17"><span class="dc">  entered (Remark 3: the tree is traversed in `O(n)` time, here with the waiting slots counted).</span></span>
+<span id="L18"><span class="dc">* `firstVisit`, `firstVisit_le`: the slot in which the pebble enters `v`, at most `3n - 1`.</span></span>
+<span id="L19"><span class="dc">* `lemma1_sep`: if `u` is entered before `v` then `firstVisit u + 1 + d(u, v) ≤ firstVisit v`</span></span>
+<span id="L20"><span class="dc">  (the pebble walks along edges of `G` and waits one slot at `u`), and **Lemma 1**</span></span>
+<span id="L21"><span class="dc">  (`lemma1`): for `u ≠ v` and every node `w`, `firstVisit u + d(u, w) ≠ firstVisit v + d(v, w)`,</span></span>
+<span id="L22"><span class="dc">  i.e. `w` is never reached by the waves of `BFS_u` and `BFS_v` in the same slot.</span></span>
+<span id="L23"><span class="dc">-/</span></span>
+<span id="L24"></span>
+<span id="L25"><span class="cm">--</span><span class="cm"> CSLib candidate: `RTree`, `PState` (generic depth-first token traversal of a rooted tree).</span></span>
+<span id="L26"></span>
+<span id="L27"><span class="kw">namespace</span> Podc.OptimalAPSP</span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">open</span> Finset</span>
+<span id="L30"></span>
+<span id="L31"><span class="dc">/-- A rooted tree on `V`: parent function with `par root = root` and a depth function decreasing</span></span>
+<span id="L32"><span class="dc">by one along parent edges. -/</span></span>
+<span id="L33"><span class="kw">structure</span> <span class="const token" data-verso-hover="162">RTree</span> (V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L34">  <span class="dc">/-- The root. -/</span></span>
+<span id="L35">  <span class="const token" data-verso-hover="163">root</span> : V</span>
+<span id="L36">  <span class="dc">/-- The parent function. -/</span></span>
+<span id="L37">  <span class="const token" data-verso-hover="164">par</span> : V → V</span>
+<span id="L38">  <span class="dc">/-- The depth function. -/</span></span>
+<span id="L39">  <span class="const token" data-verso-hover="165">dep</span> : V → <span class="const token" data-verso-hover="58">ℕ</span></span>
+<span id="L40">  <span class="const token" data-verso-hover="166">par_root</span> : <span class="const token" data-verso-hover="164">par</span> <span class="const token" data-verso-hover="163">root</span> = <span class="const token" data-verso-hover="163">root</span></span>
+<span id="L41">  <span class="const token" data-verso-hover="167">dep_par</span> : ∀ v, v ≠ <span class="const token" data-verso-hover="163">root</span> → <span class="const token" data-verso-hover="165">dep</span> (<span class="const token" data-verso-hover="164">par</span> v) + <span class="nu">1</span> = <span class="const token" data-verso-hover="165">dep</span> v</span>
+<span id="L42"></span>
+<span id="L43"><span class="kw">namespace</span> RTree</span>
+<span id="L44"></span>
+<span id="L45"><span class="kw">variable</span> {V : <span class="kw">Type</span>*} (T : <span class="const token" data-verso-hover="162">RTree</span> V)</span>
+<span id="L46"></span>
+<span id="L47"><span class="dc">/-- `x` is an ancestor of `y` (or `y` itself). -/</span></span>
+<span id="L48"><span class="kw">def</span> <span class="const token" data-verso-hover="688">IsAnc</span> (x y : V) : <span class="kw">Prop</span> := ∃ k, T.<span class="const token" data-verso-hover="164">par</span>^[k] y = x</span>
+<span id="L49"></span>
+<span id="L50"><span class="kw">lemma</span> <span class="const token" data-verso-hover="689">isAnc_refl</span> (x : V) : T.<span class="const token" data-verso-hover="688">IsAnc</span> x x := ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="175">rfl</span>⟩</span>
+<span id="L51"></span>
+<span id="L52"><span class="kw">lemma</span> <span class="const token" data-verso-hover="690">dep_iterate_le</span> (y : V) : ∀ k, T.<span class="const token" data-verso-hover="165">dep</span> (T.<span class="const token" data-verso-hover="164">par</span>^[k] y) ≤ T.<span class="const token" data-verso-hover="165">dep</span> y</span>
+<span id="L53">  | <span class="nu">0</span> =&gt; <span class="const token" data-verso-hover="281">le_rfl</span></span>
+<span id="L54">  | k + <span class="nu">1</span> =&gt; <span class="kw">by</span></span>
+<span id="L55">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="691">Function.iterate_succ_apply'</span>]</span>
+<span id="L56">      <span class="kw">by_cases</span> h : T.<span class="const token" data-verso-hover="164">par</span>^[k] y = T.<span class="const token" data-verso-hover="163">root</span></span>
+<span id="L57">      · <span class="kw">rw</span> [h, T.<span class="const token" data-verso-hover="166">par_root</span>]; <span class="kw">rw</span> [← h]; <span class="kw">exact</span> <span class="const token" data-verso-hover="690">dep_iterate_le</span> y k</span>
+<span id="L58">      · <span class="kw">have</span> := T.<span class="const token" data-verso-hover="167">dep_par</span> _ h; <span class="kw">have</span> := <span class="const token" data-verso-hover="690">dep_iterate_le</span> y k; <span class="kw">omega</span></span>
+<span id="L59"></span>
+<span id="L60"><span class="kw">lemma</span> <span class="const token" data-verso-hover="692">dep_le_of_isAnc</span> {x y : V} (h : T.<span class="const token" data-verso-hover="688">IsAnc</span> x y) : T.<span class="const token" data-verso-hover="165">dep</span> x ≤ T.<span class="const token" data-verso-hover="165">dep</span> y := <span class="kw">by</span></span>
+<span id="L61">  <span class="kw">obtain</span> ⟨k, <span class="kw">rfl</span>⟩ := h; <span class="kw">exact</span> T.<span class="const token" data-verso-hover="690">dep_iterate_le</span> y k</span>
+<span id="L62"></span>
+<span id="L63"><span class="kw">lemma</span> <span class="const token" data-verso-hover="693">iterate_dep_eq_root</span> (y : V) : T.<span class="const token" data-verso-hover="164">par</span>^[T.<span class="const token" data-verso-hover="165">dep</span> y] y = T.<span class="const token" data-verso-hover="163">root</span> := <span class="kw">by</span></span>
+<span id="L64">  <span class="kw">suffices</span> ∀ d y, T.<span class="const token" data-verso-hover="165">dep</span> y = d → T.<span class="const token" data-verso-hover="164">par</span>^[d] y = T.<span class="const token" data-verso-hover="163">root</span> <span class="kw">from</span> this _ y <span class="const token" data-verso-hover="175">rfl</span></span>
+<span id="L65">  <span class="kw">intro</span> d</span>
+<span id="L66">  <span class="kw">induction</span> d <span class="kw">with</span></span>
+<span id="L67">  | <span class="const token" data-verso-hover="615">zero</span> =&gt;</span>
+<span id="L68">    <span class="kw">intro</span> y hy</span>
+<span id="L69">    <span class="kw">by_contra</span> h</span>
+<span id="L70">    <span class="kw">have</span> := T.<span class="const token" data-verso-hover="167">dep_par</span> y h; <span class="kw">omega</span></span>
+<span id="L71">  | <span class="const token" data-verso-hover="616">succ</span> d ih =&gt;</span>
+<span id="L72">    <span class="kw">intro</span> y hy</span>
+<span id="L73">    <span class="kw">by_cases</span> h : y = T.<span class="const token" data-verso-hover="163">root</span></span>
+<span id="L74">    · <span class="kw">subst</span> h; <span class="kw">exact</span> <span class="const token" data-verso-hover="694">Function.iterate_fixed</span> T.<span class="const token" data-verso-hover="166">par_root</span> _</span>
+<span id="L75">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="695">Function.iterate_succ_apply</span>]</span>
+<span id="L76">      <span class="kw">exact</span> ih _ (<span class="kw">by</span> <span class="kw">have</span> := T.<span class="const token" data-verso-hover="167">dep_par</span> y h; <span class="kw">omega</span>)</span>
+<span id="L77"></span>
+<span id="L78"><span class="kw">lemma</span> <span class="const token" data-verso-hover="696">isAnc_root</span> (y : V) : T.<span class="const token" data-verso-hover="688">IsAnc</span> T.<span class="const token" data-verso-hover="163">root</span> y := ⟨_, T.<span class="const token" data-verso-hover="693">iterate_dep_eq_root</span> y⟩</span>
+<span id="L79"></span>
+<span id="L80"><span class="dc">/-- The children of `x`. -/</span></span>
+<span id="L81"><span class="kw">def</span> <span class="const token" data-verso-hover="210">IsKid</span> (x c : V) : <span class="kw">Prop</span> := c ≠ T.<span class="const token" data-verso-hover="163">root</span> ∧ T.<span class="const token" data-verso-hover="164">par</span> c = x</span>
+<span id="L82"></span>
+<span id="L83"><span class="kw">lemma</span> <span class="const token" data-verso-hover="697">isAnc_par</span> {y : V} (hy : y ≠ T.<span class="const token" data-verso-hover="163">root</span>) {x : V} (h : T.<span class="const token" data-verso-hover="688">IsAnc</span> x (T.<span class="const token" data-verso-hover="164">par</span> y)) : T.<span class="const token" data-verso-hover="688">IsAnc</span> x y := <span class="kw">by</span></span>
+<span id="L84">  <span class="kw">obtain</span> ⟨k, hk⟩ := h; <span class="kw">exact</span> ⟨k + <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="695">Function.iterate_succ_apply</span>]; <span class="kw">exact</span> hk⟩</span>
+<span id="L85"></span>
+<span id="L86"><span class="kw">lemma</span> <span class="const token" data-verso-hover="698">isAnc_of_isKid</span> {x c y : V} (hc : T.<span class="const token" data-verso-hover="210">IsKid</span> x c) (h : T.<span class="const token" data-verso-hover="688">IsAnc</span> y x) : T.<span class="const token" data-verso-hover="688">IsAnc</span> y c := <span class="kw">by</span></span>
+<span id="L87">  <span class="kw">apply</span> T.<span class="const token" data-verso-hover="697">isAnc_par</span> hc.<span class="const token" data-verso-hover="189">1</span>; <span class="kw">rw</span> [hc.<span class="const token" data-verso-hover="169">2</span>]; <span class="kw">exact</span> h</span>
+<span id="L88"></span>
+<span id="L89"><span class="dc">/-- Ancestors of `c` (a child of `x`) are `c` and the ancestors of `x`. -/</span></span>
+<span id="L90"><span class="kw">lemma</span> <span class="const token" data-verso-hover="699">isAnc_kid_iff</span> {x c y : V} (hc : T.<span class="const token" data-verso-hover="210">IsKid</span> x c) : T.<span class="const token" data-verso-hover="688">IsAnc</span> y c ↔ y = c ∨ T.<span class="const token" data-verso-hover="688">IsAnc</span> y x := <span class="kw">by</span></span>
+<span id="L91">  <span class="kw">constructor</span></span>
+<span id="L92">  · <span class="kw">rintro</span> ⟨k, hk⟩</span>
+<span id="L93">    <span class="kw">cases</span> k <span class="kw">with</span></span>
+<span id="L94">    | <span class="const token" data-verso-hover="615">zero</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="181">Or.inl</span> hk.<span class="const token" data-verso-hover="230">symm</span></span>
+<span id="L95">    | <span class="const token" data-verso-hover="616">succ</span> k =&gt; <span class="kw">right</span>; <span class="kw">refine</span> ⟨k, ?_⟩; <span class="kw">rw</span> [<span class="const token" data-verso-hover="695">Function.iterate_succ_apply</span>, hc.<span class="const token" data-verso-hover="169">2</span>] <span class="kw">at</span> hk; <span class="kw">exact</span> hk</span>
+<span id="L96">  · <span class="kw">rintro</span> (<span class="kw">rfl</span> | h)</span>
+<span id="L97">    · <span class="kw">exact</span> T.<span class="const token" data-verso-hover="689">isAnc_refl</span> _</span>
+<span id="L98">    · <span class="kw">exact</span> T.<span class="const token" data-verso-hover="698">isAnc_of_isKid</span> hc h</span>
+<span id="L99"></span>
+<span id="L100"><span class="kw">lemma</span> <span class="const token" data-verso-hover="700">not_isAnc_kid</span> {x c : V} (hc : T.<span class="const token" data-verso-hover="210">IsKid</span> x c) : ¬ T.<span class="const token" data-verso-hover="688">IsAnc</span> c x := <span class="kw">by</span></span>
+<span id="L101">  <span class="kw">intro</span> h</span>
+<span id="L102">  <span class="kw">have</span> h1 := T.<span class="const token" data-verso-hover="692">dep_le_of_isAnc</span> h</span>
+<span id="L103">  <span class="kw">have</span> h2 := T.<span class="const token" data-verso-hover="167">dep_par</span> c hc.<span class="const token" data-verso-hover="189">1</span></span>
+<span id="L104">  <span class="kw">rw</span> [hc.<span class="const token" data-verso-hover="169">2</span>] <span class="kw">at</span> h2; <span class="kw">omega</span></span>
+<span id="L105"></span>
+<span id="L106"><span class="kw">lemma</span> <span class="const token" data-verso-hover="701">not_isAnc_par</span> {y : V} (hy : y ≠ T.<span class="const token" data-verso-hover="163">root</span>) : ¬ T.<span class="const token" data-verso-hover="688">IsAnc</span> y (T.<span class="const token" data-verso-hover="164">par</span> y) :=</span>
+<span id="L107">  T.<span class="const token" data-verso-hover="700">not_isAnc_kid</span> ⟨hy, <span class="const token" data-verso-hover="175">rfl</span>⟩</span>
+<span id="L108"></span>
+<span id="L109"><span class="dc">/-- A proper descendant `y` of `x` lies below some child of `x`. -/</span></span>
+<span id="L110"><span class="kw">lemma</span> <span class="const token" data-verso-hover="702">exists_kid_of_isAnc</span> {x y : V} (h : T.<span class="const token" data-verso-hover="688">IsAnc</span> x y) (hne : y ≠ x) :</span>
+<span id="L111">    ∃ c, T.<span class="const token" data-verso-hover="210">IsKid</span> x c ∧ T.<span class="const token" data-verso-hover="688">IsAnc</span> c y := <span class="kw">by</span></span>
+<span id="L112">  <span class="kw">classical</span></span>
+<span id="L113">  <span class="kw">have</span> hex : ∃ k, T.<span class="const token" data-verso-hover="164">par</span>^[k] y = x := h</span>
+<span id="L114">  <span class="kw">let</span> k := <span class="const token" data-verso-hover="115">Nat.find</span> hex</span>
+<span id="L115">  <span class="kw">have</span> hk : T.<span class="const token" data-verso-hover="164">par</span>^[k] y = x := <span class="const token" data-verso-hover="268">Nat.find_spec</span> hex</span>
+<span id="L116">  <span class="kw">have</span> hk0 : k ≠ <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L117">    <span class="kw">intro</span> h0; <span class="kw">rw</span> [h0] <span class="kw">at</span> hk; <span class="kw">exact</span> hne hk</span>
+<span id="L118">  <span class="kw">obtain</span> ⟨j, hj⟩ := <span class="const token" data-verso-hover="703">Nat.exists_eq_succ_of_ne_zero</span> hk0</span>
+<span id="L119">  <span class="kw">refine</span> ⟨T.<span class="const token" data-verso-hover="164">par</span>^[j] y, ⟨?_, ?_⟩, ⟨j, <span class="const token" data-verso-hover="175">rfl</span>⟩⟩</span>
+<span id="L120">  · <span class="kw">intro</span> hr</span>
+<span id="L121">    <span class="kw">have</span> : T.<span class="const token" data-verso-hover="164">par</span>^[j] y = x := <span class="kw">by</span></span>
+<span id="L122">      <span class="kw">rw</span> [hj, <span class="const token" data-verso-hover="691">Function.iterate_succ_apply'</span>, hr, T.<span class="const token" data-verso-hover="166">par_root</span>] <span class="kw">at</span> hk; <span class="kw">rw</span> [hr, hk]</span>
+<span id="L123">    <span class="kw">have</span> := <span class="const token" data-verso-hover="704">Nat.find_min</span> hex (<span class="kw">show</span> j &lt; k <span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L124">    <span class="kw">exact</span> this ‹_›</span>
+<span id="L125">  · <span class="kw">rw</span> [← <span class="const token" data-verso-hover="691">Function.iterate_succ_apply'</span> T.<span class="const token" data-verso-hover="164">par</span> j y, ← hj, hk]</span>
+<span id="L126"></span>
+<span id="L127"><span class="kw">end</span> RTree</span>
+<span id="L128"></span>
+<span id="L129"><span class="kw">variable</span> {V : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="11">Fintype</span> V] [<span class="const token" data-verso-hover="56">LinearOrder</span> V]</span>
+<span id="L130"></span>
+<span id="L131"><span class="dc">/-- The next target of a ready pebble at `v` with unvisited children `pend`: the smallest</span></span>
+<span id="L132"><span class="dc">unvisited child, else the parent (none at the root: the traversal is over). -/</span></span>
+<span id="L133"><span class="kw">def</span> <span class="const token" data-verso-hover="222">target</span> (T : <span class="const token" data-verso-hover="162">RTree</span> V) (pend : <span class="const token" data-verso-hover="72">Finset</span> V) (v : V) : <span class="const token" data-verso-hover="60">Option</span> V :=</span>
+<span id="L134">  <span class="kw">if</span> h : pend.<span class="const token" data-verso-hover="89">Nonempty</span> <span class="kw">then</span> <span class="const token" data-verso-hover="90">some</span> (pend.<span class="const token" data-verso-hover="91">min'</span> h) <span class="kw">else</span> <span class="kw">if</span> v = T.<span class="const token" data-verso-hover="163">root</span> <span class="kw">then</span> <span class="const token" data-verso-hover="84">none</span> <span class="kw">else</span> <span class="const token" data-verso-hover="90">some</span> (T.<span class="const token" data-verso-hover="164">par</span> v)</span>
+<span id="L135"></span>
+<span id="L136"><span class="dc">/-- Global state of the pebble. `ready = false`: the pebble has just entered `pos` for the first</span></span>
+<span id="L137"><span class="dc">time and waits one slot. -/</span></span>
+<span id="L138"><span class="kw">structure</span> <span class="const token" data-verso-hover="47">PState</span> (V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L139">  <span class="dc">/-- Current position. -/</span></span>
+<span id="L140">  <span class="const token" data-verso-hover="226">pos</span> : V</span>
+<span id="L141">  <span class="dc">/-- `false` while waiting at a newly entered node. -/</span></span>
+<span id="L142">  <span class="const token" data-verso-hover="232">ready</span> : <span class="const token" data-verso-hover="62">Bool</span></span>
+<span id="L143">  <span class="dc">/-- The nodes entered so far. -/</span></span>
+<span id="L144">  <span class="const token" data-verso-hover="231">ent</span> : <span class="const token" data-verso-hover="72">Finset</span> V</span>
+<span id="L145">  <span class="dc">/-- Children of each node that the pebble has not yet been sent to. -/</span></span>
+<span id="L146">  <span class="const token" data-verso-hover="225">pend</span> : V → <span class="const token" data-verso-hover="72">Finset</span> V</span>
+<span id="L147"></span>
+<span id="L148"><span class="kw">namespace</span> PState</span>
+<span id="L149"></span>
+<span id="L150"><span class="kw">variable</span> (T : <span class="const token" data-verso-hover="162">RTree</span> V)</span>
+<span id="L151"></span>
+<span id="L152"><span class="dc">/-- The children of `x` as a finset. -/</span></span>
+<span id="L153"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="208">kids</span> (x : V) : <span class="const token" data-verso-hover="72">Finset</span> V := <span class="kw">by</span></span>
+<span id="L154">  <span class="kw">classical</span> <span class="kw">exact</span> <span class="const token" data-verso-hover="99">univ</span>.<span class="const token" data-verso-hover="106">filter</span> <span class="kw">fun</span> c =&gt; T.<span class="const token" data-verso-hover="210">IsKid</span> x c</span>
+<span id="L155"></span>
+<span id="L156"><span class="kw">lemma</span> <span class="const token" data-verso-hover="209">mem_kids</span> {x c : V} : c ∈ <span class="const token" data-verso-hover="208">kids</span> T x ↔ T.<span class="const token" data-verso-hover="210">IsKid</span> x c := <span class="kw">by</span></span>
+<span id="L157">  <span class="kw">classical</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="208">kids</span>]</span>
+<span id="L158"></span>
+<span id="L159"><span class="dc">/-- Initial state: the pebble has just entered the root. -/</span></span>
+<span id="L160"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="237">init</span> : <span class="const token" data-verso-hover="47">PState</span> V <span class="kw">where</span></span>
+<span id="L161">  <span class="const token" data-verso-hover="226">pos</span> := T.<span class="const token" data-verso-hover="163">root</span></span>
+<span id="L162">  <span class="const token" data-verso-hover="232">ready</span> := <span class="const token" data-verso-hover="85">false</span></span>
+<span id="L163">  <span class="const token" data-verso-hover="231">ent</span> := {T.<span class="const token" data-verso-hover="163">root</span>}</span>
+<span id="L164">  <span class="const token" data-verso-hover="225">pend</span> := <span class="const token" data-verso-hover="208">kids</span> T</span>
+<span id="L165"></span>
+<span id="L166"><span class="dc">/-- The ready pebble at `g.pos` is sent to `x`. -/</span></span>
+<span id="L167"><span class="kw">def</span> <span class="const token" data-verso-hover="247">move</span> (g : <span class="const token" data-verso-hover="47">PState</span> V) (x : V) : <span class="const token" data-verso-hover="47">PState</span> V <span class="kw">where</span></span>
+<span id="L168">  <span class="const token" data-verso-hover="226">pos</span> := x</span>
+<span id="L169">  <span class="const token" data-verso-hover="232">ready</span> := <span class="const token" data-verso-hover="93">decide</span> (x ∈ g.<span class="const token" data-verso-hover="231">ent</span>)</span>
+<span id="L170">  <span class="const token" data-verso-hover="231">ent</span> := <span class="const token" data-verso-hover="705">insert</span> x g.<span class="const token" data-verso-hover="231">ent</span></span>
+<span id="L171">  <span class="const token" data-verso-hover="225">pend</span> := <span class="const token" data-verso-hover="339">Function.update</span> g.<span class="const token" data-verso-hover="225">pend</span> g.<span class="const token" data-verso-hover="226">pos</span> ((g.<span class="const token" data-verso-hover="225">pend</span> g.<span class="const token" data-verso-hover="226">pos</span>).<span class="const token" data-verso-hover="104">erase</span> x)</span>
+<span id="L172"></span>
+<span id="L173">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="250">move_pos</span> (g : <span class="const token" data-verso-hover="47">PState</span> V) (x : V) : (g.<span class="const token" data-verso-hover="247">move</span> x).<span class="const token" data-verso-hover="226">pos</span> = x := <span class="const token" data-verso-hover="175">rfl</span></span>
+<span id="L174">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="251">move_ready</span> (g : <span class="const token" data-verso-hover="47">PState</span> V) (x : V) : (g.<span class="const token" data-verso-hover="247">move</span> x).<span class="const token" data-verso-hover="232">ready</span> = <span class="const token" data-verso-hover="93">decide</span> (x ∈ g.<span class="const token" data-verso-hover="231">ent</span>) := <span class="const token" data-verso-hover="175">rfl</span></span>
+<span id="L175">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="248">move_ent</span> (g : <span class="const token" data-verso-hover="47">PState</span> V) (x : V) : (g.<span class="const token" data-verso-hover="247">move</span> x).<span class="const token" data-verso-hover="231">ent</span> = <span class="const token" data-verso-hover="705">insert</span> x g.<span class="const token" data-verso-hover="231">ent</span> := <span class="const token" data-verso-hover="175">rfl</span></span>
+<span id="L176">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="252">move_pend</span> (g : <span class="const token" data-verso-hover="47">PState</span> V) (x : V) :</span>
+<span id="L177">    (g.<span class="const token" data-verso-hover="247">move</span> x).<span class="const token" data-verso-hover="225">pend</span> = <span class="const token" data-verso-hover="339">Function.update</span> g.<span class="const token" data-verso-hover="225">pend</span> g.<span class="const token" data-verso-hover="226">pos</span> ((g.<span class="const token" data-verso-hover="225">pend</span> g.<span class="const token" data-verso-hover="226">pos</span>).<span class="const token" data-verso-hover="104">erase</span> x) := <span class="const token" data-verso-hover="175">rfl</span></span>
+<span id="L178"></span>
+<span id="L179"><span class="dc">/-- One time slot. -/</span></span>
+<span id="L180"><span class="kw">def</span> <span class="const token" data-verso-hover="242">step</span> (g : <span class="const token" data-verso-hover="47">PState</span> V) : <span class="const token" data-verso-hover="47">PState</span> V :=</span>
+<span id="L181">  <span class="kw">if</span> !g.<span class="const token" data-verso-hover="232">ready</span> <span class="kw">then</span> { g <span class="kw">with</span> <span class="const token" data-verso-hover="232">ready</span> := <span class="const token" data-verso-hover="94">true</span> }</span>
+<span id="L182">  <span class="kw">else</span> <span class="kw">match</span> <span class="const token" data-verso-hover="222">target</span> T (g.<span class="const token" data-verso-hover="225">pend</span> g.<span class="const token" data-verso-hover="226">pos</span>) g.<span class="const token" data-verso-hover="226">pos</span> <span class="kw">with</span></span>
+<span id="L183">    | <span class="const token" data-verso-hover="84">none</span> =&gt; g</span>
+<span id="L184">    | <span class="const token" data-verso-hover="90">some</span> x =&gt; g.<span class="const token" data-verso-hover="247">move</span> x</span>
+<span id="L185"></span>
+<span id="L186"><span class="dc">/-- The traversal is over: the pebble is ready at the root with nothing left to visit. -/</span></span>
+<span id="L187"><span class="kw">def</span> <span class="const token" data-verso-hover="706">Done</span> (g : <span class="const token" data-verso-hover="47">PState</span> V) : <span class="kw">Prop</span> := g.<span class="const token" data-verso-hover="232">ready</span> = <span class="const token" data-verso-hover="94">true</span> ∧ <span class="const token" data-verso-hover="222">target</span> T (g.<span class="const token" data-verso-hover="225">pend</span> g.<span class="const token" data-verso-hover="226">pos</span>) g.<span class="const token" data-verso-hover="226">pos</span> = <span class="const token" data-verso-hover="84">none</span></span>
+<span id="L188"></span>
+<span id="L189"><span class="kw">lemma</span> <span class="const token" data-verso-hover="707">step_of_done</span> {g : <span class="const token" data-verso-hover="47">PState</span> V} (h : <span class="const token" data-verso-hover="706">Done</span> T g) : <span class="const token" data-verso-hover="242">step</span> T g = g := <span class="kw">by</span></span>
+<span id="L190">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="242">step</span>, h.<span class="const token" data-verso-hover="189">1</span>, h.<span class="const token" data-verso-hover="169">2</span>]</span>
+<span id="L191"></span>
+<span id="L192"><span class="dc">/-- The invariant of the traversal. -/</span></span>
+<span id="L193"><span class="kw">structure</span> <span class="const token" data-verso-hover="708">Inv</span> (g : <span class="const token" data-verso-hover="47">PState</span> V) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L194">  <span class="const token" data-verso-hover="709">pos_ent</span> : g.<span class="const token" data-verso-hover="226">pos</span> ∈ g.<span class="const token" data-verso-hover="231">ent</span></span>
+<span id="L195">  <span class="const token" data-verso-hover="228">pend_kid</span> : ∀ x c, c ∈ g.<span class="const token" data-verso-hover="225">pend</span> x → T.<span class="const token" data-verso-hover="210">IsKid</span> x c ∧ c ∉ g.<span class="const token" data-verso-hover="231">ent</span></span>
+<span id="L196">  <span class="const token" data-verso-hover="710">pend_new</span> : ∀ x, x ∉ g.<span class="const token" data-verso-hover="231">ent</span> → g.<span class="const token" data-verso-hover="225">pend</span> x = <span class="const token" data-verso-hover="208">kids</span> T x</span>
+<span id="L197">  <span class="const token" data-verso-hover="711">kid_cov</span> : ∀ x ∈ g.<span class="const token" data-verso-hover="231">ent</span>, ∀ c, T.<span class="const token" data-verso-hover="210">IsKid</span> x c → c ∈ g.<span class="const token" data-verso-hover="225">pend</span> x ∨ c ∈ g.<span class="const token" data-verso-hover="231">ent</span></span>
+<span id="L198">  <span class="const token" data-verso-hover="712">finished</span> : ∀ x ∈ g.<span class="const token" data-verso-hover="231">ent</span>, ¬ T.<span class="const token" data-verso-hover="688">IsAnc</span> x g.<span class="const token" data-verso-hover="226">pos</span> → ∀ y, T.<span class="const token" data-verso-hover="688">IsAnc</span> x y → y ∈ g.<span class="const token" data-verso-hover="231">ent</span></span>
+<span id="L199">  <span class="const token" data-verso-hover="713">anc_ent</span> : ∀ x, T.<span class="const token" data-verso-hover="688">IsAnc</span> x g.<span class="const token" data-verso-hover="226">pos</span> → x ∈ g.<span class="const token" data-verso-hover="231">ent</span></span>
+<span id="L200"></span>
+<span id="L201"><span class="kw">lemma</span> <span class="const token" data-verso-hover="714">inv_init</span> : <span class="const token" data-verso-hover="708">Inv</span> T (<span class="const token" data-verso-hover="237">init</span> T) <span class="kw">where</span></span>
+<span id="L202">  <span class="const token" data-verso-hover="709">pos_ent</span> := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="237">init</span>]</span>
+<span id="L203">  <span class="const token" data-verso-hover="228">pend_kid</span> x c h := <span class="kw">by</span></span>
+<span id="L204">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="237">init</span>, <span class="const token" data-verso-hover="209">mem_kids</span>] <span class="kw">at</span> h</span>
+<span id="L205">    <span class="kw">exact</span> ⟨h, <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="237">init</span>, h.<span class="const token" data-verso-hover="189">1</span>]⟩</span>
+<span id="L206">  <span class="const token" data-verso-hover="710">pend_new</span> x _ := <span class="const token" data-verso-hover="175">rfl</span></span>
+<span id="L207">  <span class="const token" data-verso-hover="711">kid_cov</span> x hx c hc := <span class="const token" data-verso-hover="181">Or.inl</span> ((<span class="const token" data-verso-hover="209">mem_kids</span> T).<span class="const token" data-verso-hover="151">2</span> hc)</span>
+<span id="L208">  <span class="const token" data-verso-hover="712">finished</span> x hx h := <span class="kw">by</span></span>
+<span id="L209">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="237">init</span>, <span class="const token" data-verso-hover="239">mem_singleton</span>] <span class="kw">at</span> hx; <span class="kw">subst</span> hx; <span class="kw">exact</span> <span class="const token" data-verso-hover="203">absurd</span> (T.<span class="const token" data-verso-hover="689">isAnc_refl</span> _) h</span>
+<span id="L210">  <span class="const token" data-verso-hover="713">anc_ent</span> x h := <span class="kw">by</span></span>
+<span id="L211">    <span class="kw">obtain</span> ⟨k, hk⟩ := h</span>
+<span id="L212">    <span class="kw">have</span> : T.<span class="const token" data-verso-hover="164">par</span>^[k] T.<span class="const token" data-verso-hover="163">root</span> = T.<span class="const token" data-verso-hover="163">root</span> := <span class="const token" data-verso-hover="694">Function.iterate_fixed</span> T.<span class="const token" data-verso-hover="166">par_root</span> k</span>
+<span id="L213">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="237">init</span>, ← hk, this]</span>
+<span id="L214"></span>
+<span id="L215"><span class="dc">/-- Potential: increases by exactly one in every slot before the end. -/</span></span>
+<span id="L216"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="715">pot</span> (g : <span class="const token" data-verso-hover="47">PState</span> V) : <span class="const token" data-verso-hover="58">ℕ</span> := <span class="kw">by</span></span>
+<span id="L217">  <span class="kw">classical</span></span>
+<span id="L218">  <span class="kw">exact</span> <span class="nu">2</span> * g.<span class="const token" data-verso-hover="231">ent</span>.<span class="const token" data-verso-hover="351">card</span> + (g.<span class="const token" data-verso-hover="231">ent</span>.<span class="const token" data-verso-hover="106">filter</span> <span class="kw">fun</span> x =&gt; ¬ T.<span class="const token" data-verso-hover="688">IsAnc</span> x g.<span class="const token" data-verso-hover="226">pos</span>).<span class="const token" data-verso-hover="351">card</span> + (<span class="kw">if</span> g.<span class="const token" data-verso-hover="232">ready</span> <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>)</span>
+<span id="L219"></span>
+<span id="L220"><span class="kw">lemma</span> <span class="const token" data-verso-hover="716">pot_init</span> : <span class="const token" data-verso-hover="715">pot</span> T (<span class="const token" data-verso-hover="237">init</span> T) = <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L221">  <span class="kw">classical</span></span>
+<span id="L222">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="715">pot</span> <span class="const token" data-verso-hover="237">init</span>; <span class="kw">simp</span>; <span class="kw">exact</span> ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="175">rfl</span>⟩</span>
+<span id="L223"></span>
+<span id="L224"><span class="kw">lemma</span> <span class="const token" data-verso-hover="717">pot_le</span> (g : <span class="const token" data-verso-hover="47">PState</span> V) (hg : <span class="const token" data-verso-hover="708">Inv</span> T g) : <span class="const token" data-verso-hover="715">pot</span> T g ≤ <span class="nu">3</span> * <span class="const token" data-verso-hover="81">Fintype.card</span> V := <span class="kw">by</span></span>
+<span id="L225">  <span class="kw">classical</span></span>
+<span id="L226">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="715">pot</span></span>
+<span id="L227">  <span class="kw">have</span> h1 : g.<span class="const token" data-verso-hover="231">ent</span>.<span class="const token" data-verso-hover="351">card</span> ≤ <span class="const token" data-verso-hover="81">Fintype.card</span> V := <span class="const token" data-verso-hover="718">card_le_univ</span> _</span>
+<span id="L228">  <span class="kw">have</span> h2 : (g.<span class="const token" data-verso-hover="231">ent</span>.<span class="const token" data-verso-hover="106">filter</span> <span class="kw">fun</span> x =&gt; ¬ T.<span class="const token" data-verso-hover="688">IsAnc</span> x g.<span class="const token" data-verso-hover="226">pos</span>).<span class="const token" data-verso-hover="351">card</span> ≤ <span class="const token" data-verso-hover="81">Fintype.card</span> V - <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L229">    <span class="kw">have</span> : (g.<span class="const token" data-verso-hover="231">ent</span>.<span class="const token" data-verso-hover="106">filter</span> <span class="kw">fun</span> x =&gt; ¬ T.<span class="const token" data-verso-hover="688">IsAnc</span> x g.<span class="const token" data-verso-hover="226">pos</span>) ⊆ <span class="const token" data-verso-hover="99">univ</span>.<span class="const token" data-verso-hover="104">erase</span> g.<span class="const token" data-verso-hover="226">pos</span> := <span class="kw">by</span></span>
+<span id="L230">      <span class="kw">intro</span> x hx</span>
+<span id="L231">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="186">mem_filter</span>] <span class="kw">at</span> hx</span>
+<span id="L232">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="719">mem_erase</span>, <span class="const token" data-verso-hover="187">mem_univ</span>, <span class="const token" data-verso-hover="720">and_true</span>]</span>
+<span id="L233">      <span class="kw">rintro</span> <span class="kw">rfl</span>; <span class="kw">exact</span> hx.<span class="const token" data-verso-hover="169">2</span> (T.<span class="const token" data-verso-hover="689">isAnc_refl</span> _)</span>
+<span id="L234">    <span class="kw">have</span> := <span class="const token" data-verso-hover="678">card_le_card</span> this</span>
+<span id="L235">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="721">card_erase_of_mem</span> (<span class="const token" data-verso-hover="187">mem_univ</span> _), <span class="const token" data-verso-hover="521">card_univ</span>] <span class="kw">at</span> this</span>
+<span id="L236">    <span class="kw">exact</span> this</span>
+<span id="L237">  <span class="kw">have</span> h3 : <span class="nu">0</span> &lt; <span class="const token" data-verso-hover="81">Fintype.card</span> V := <span class="const token" data-verso-hover="233">Fintype.card_pos_iff</span>.<span class="const token" data-verso-hover="151">2</span> ⟨g.<span class="const token" data-verso-hover="226">pos</span>⟩</span>
+<span id="L238">  <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L239"></span>
+<span id="L240"><span class="dc">/-- The main step lemma: before the end, the invariant is preserved and the potential grows by</span></span>
+<span id="L241"><span class="dc">one. -/</span></span>
+<span id="L242"><span class="kw">lemma</span> <span class="const token" data-verso-hover="722">step_spec</span> (g : <span class="const token" data-verso-hover="47">PState</span> V) (hg : <span class="const token" data-verso-hover="708">Inv</span> T g) (hd : ¬ <span class="const token" data-verso-hover="706">Done</span> T g) :</span>
+<span id="L243">    <span class="const token" data-verso-hover="708">Inv</span> T (<span class="const token" data-verso-hover="242">step</span> T g) ∧ <span class="const token" data-verso-hover="715">pot</span> T (<span class="const token" data-verso-hover="242">step</span> T g) = <span class="const token" data-verso-hover="715">pot</span> T g + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L244">  <span class="kw">classical</span></span>
+<span id="L245">  <span class="kw">cases</span> hr : g.<span class="const token" data-verso-hover="232">ready</span> <span class="kw">with</span></span>
+<span id="L246">  | <span class="const token" data-verso-hover="85">false</span> =&gt;</span>
+<span id="L247">    <span class="kw">have</span> hs : <span class="const token" data-verso-hover="242">step</span> T g = { g <span class="kw">with</span> <span class="const token" data-verso-hover="232">ready</span> := <span class="const token" data-verso-hover="94">true</span> } := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="242">step</span>, hr]</span>
+<span id="L248">    <span class="kw">rw</span> [hs]</span>
+<span id="L249">    <span class="kw">refine</span> ⟨⟨hg.<span class="const token" data-verso-hover="709">pos_ent</span>, hg.<span class="const token" data-verso-hover="228">pend_kid</span>, hg.<span class="const token" data-verso-hover="710">pend_new</span>, hg.<span class="const token" data-verso-hover="711">kid_cov</span>, hg.<span class="const token" data-verso-hover="712">finished</span>, hg.<span class="const token" data-verso-hover="713">anc_ent</span>⟩, ?_⟩</span>
+<span id="L250">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="715">pot</span>, hr]</span>
+<span id="L251">  | <span class="const token" data-verso-hover="94">true</span> =&gt;</span>
+<span id="L252">    <span class="kw">have</span> hrt : g.<span class="const token" data-verso-hover="232">ready</span> = <span class="const token" data-verso-hover="94">true</span> := hr</span>
+<span id="L253">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="706">Done</span> <span class="kw">at</span> hd</span>
+<span id="L254">    <span class="kw">rw</span> [hr] <span class="kw">at</span> hd</span>
+<span id="L255">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="188">true_and</span>] <span class="kw">at</span> hd</span>
+<span id="L256">    <span class="kw">obtain</span> ⟨x, hx⟩ := <span class="const token" data-verso-hover="723">Option.ne_none_iff_exists'</span>.<span class="const token" data-verso-hover="155">1</span> hd</span>
+<span id="L257">    <span class="kw">have</span> hs : <span class="const token" data-verso-hover="242">step</span> T g = g.<span class="const token" data-verso-hover="247">move</span> x := <span class="kw">by</span></span>
+<span id="L258">      <span class="kw">unfold</span> <span class="const token" data-verso-hover="242">step</span>; <span class="kw">simp</span> only [hr, <span class="const token" data-verso-hover="724">Bool.not_true</span>, <span class="const token" data-verso-hover="198">Bool.false_eq_true</span>, ↓<span class="const token" data-verso-hover="192">reduceIte</span>, hx]</span>
+<span id="L259">    <span class="kw">rw</span> [hs]</span>
+<span id="L260">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="222">target</span> <span class="kw">at</span> hx</span>
+<span id="L261">    <span class="kw">split_ifs</span> <span class="kw">at</span> hx <span class="kw">with</span> hne hroot</span>
+<span id="L262">    · <span class="cm">--</span><span class="cm"> descend to the smallest unvisited child `x`</span></span>
+<span id="L263">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="201">Option.some.injEq</span>] <span class="kw">at</span> hx</span>
+<span id="L264">      <span class="kw">have</span> hxm : x ∈ g.<span class="const token" data-verso-hover="225">pend</span> g.<span class="const token" data-verso-hover="226">pos</span> := hx ▸ <span class="const token" data-verso-hover="156">min'_mem</span> _ _</span>
+<span id="L265">      <span class="kw">obtain</span> ⟨hkid, hxe⟩ := hg.<span class="const token" data-verso-hover="228">pend_kid</span> _ _ hxm</span>
+<span id="L266">      <span class="kw">have</span> hxpos : x ≠ g.<span class="const token" data-verso-hover="226">pos</span> := <span class="kw">fun</span> h =&gt; hxe (h ▸ hg.<span class="const token" data-verso-hover="709">pos_ent</span>)</span>
+<span id="L267">      <span class="kw">have</span> hanc : ∀ y, T.<span class="const token" data-verso-hover="688">IsAnc</span> y x ↔ y = x ∨ T.<span class="const token" data-verso-hover="688">IsAnc</span> y g.<span class="const token" data-verso-hover="226">pos</span> := <span class="kw">fun</span> y =&gt; T.<span class="const token" data-verso-hover="699">isAnc_kid_iff</span> hkid</span>
+<span id="L268">      <span class="kw">refine</span> ⟨⟨<span class="kw">by</span> <span class="kw">simp</span>, ?_, ?_, ?_, ?_, ?_⟩, ?_⟩</span>
+<span id="L269">      <span class="kw">all_goals</span> <span class="kw">try</span> <span class="kw">simp</span> only [<span class="const token" data-verso-hover="250">move_pos</span>, <span class="const token" data-verso-hover="251">move_ready</span>, <span class="const token" data-verso-hover="248">move_ent</span>, <span class="const token" data-verso-hover="252">move_pend</span>]</span>
+<span id="L270">      · <span class="kw">intro</span> y c hc</span>
+<span id="L271">        <span class="kw">by_cases</span> hy : y = g.<span class="const token" data-verso-hover="226">pos</span></span>
+<span id="L272">        · <span class="kw">subst</span> hy</span>
+<span id="L273">          <span class="kw">rw</span> [<span class="const token" data-verso-hover="725">Function.update_self</span>, <span class="const token" data-verso-hover="719">mem_erase</span>] <span class="kw">at</span> hc</span>
+<span id="L274">          <span class="kw">obtain</span> ⟨h1, h2⟩ := hg.<span class="const token" data-verso-hover="228">pend_kid</span> _ _ hc.<span class="const token" data-verso-hover="169">2</span></span>
+<span id="L275">          <span class="kw">exact</span> ⟨h1, <span class="kw">by</span> <span class="kw">simp</span> [hc.<span class="const token" data-verso-hover="189">1</span>, h2]⟩</span>
+<span id="L276">        · <span class="kw">rw</span> [<span class="const token" data-verso-hover="253">Function.update_of_ne</span> hy] <span class="kw">at</span> hc</span>
+<span id="L277">          <span class="kw">obtain</span> ⟨h1, h2⟩ := hg.<span class="const token" data-verso-hover="228">pend_kid</span> _ _ hc</span>
+<span id="L278">          <span class="kw">refine</span> ⟨h1, ?_⟩</span>
+<span id="L279">          <span class="kw">simp</span> only [<span class="const token" data-verso-hover="726">mem_insert</span>, <span class="const token" data-verso-hover="727">not_or</span>]</span>
+<span id="L280">          <span class="kw">refine</span> ⟨?_, h2⟩</span>
+<span id="L281">          <span class="kw">rintro</span> <span class="kw">rfl</span>; <span class="kw">exact</span> hy (h1.<span class="const token" data-verso-hover="169">2</span>.<span class="const token" data-verso-hover="230">symm</span>.<span class="const token" data-verso-hover="728">trans</span> hkid.<span class="const token" data-verso-hover="169">2</span>)</span>
+<span id="L282">      · <span class="kw">intro</span> y hy</span>
+<span id="L283">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="726">mem_insert</span>, <span class="const token" data-verso-hover="727">not_or</span>] <span class="kw">at</span> hy</span>
+<span id="L284">        <span class="kw">have</span> : y ≠ g.<span class="const token" data-verso-hover="226">pos</span> := <span class="kw">fun</span> h =&gt; hy.<span class="const token" data-verso-hover="169">2</span> (h ▸ hg.<span class="const token" data-verso-hover="709">pos_ent</span>)</span>
+<span id="L285">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="253">Function.update_of_ne</span> this]; <span class="kw">exact</span> hg.<span class="const token" data-verso-hover="710">pend_new</span> y hy.<span class="const token" data-verso-hover="169">2</span></span>
+<span id="L286">      · <span class="kw">intro</span> y hy c hc</span>
+<span id="L287">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="726">mem_insert</span>] <span class="kw">at</span> hy ⊢</span>
+<span id="L288">        <span class="kw">rcases</span> hy <span class="kw">with</span> <span class="kw">rfl</span> | hy</span>
+<span id="L289">        · <span class="kw">left</span></span>
+<span id="L290">          <span class="kw">rw</span> [<span class="const token" data-verso-hover="253">Function.update_of_ne</span> hxpos, hg.<span class="const token" data-verso-hover="710">pend_new</span> _ hxe]; <span class="kw">exact</span> (<span class="const token" data-verso-hover="209">mem_kids</span> T).<span class="const token" data-verso-hover="151">2</span> hc</span>
+<span id="L291">        · <span class="kw">rcases</span> hg.<span class="const token" data-verso-hover="711">kid_cov</span> y hy c hc <span class="kw">with</span> h | h</span>
+<span id="L292">          · <span class="kw">by_cases</span> hyp : y = g.<span class="const token" data-verso-hover="226">pos</span></span>
+<span id="L293">            · <span class="kw">subst</span> hyp</span>
+<span id="L294">              <span class="kw">by_cases</span> hcx : c = x</span>
+<span id="L295">              · <span class="kw">right</span>; <span class="kw">left</span>; <span class="kw">exact</span> hcx</span>
+<span id="L296">              · <span class="kw">left</span>; <span class="kw">rw</span> [<span class="const token" data-verso-hover="725">Function.update_self</span>, <span class="const token" data-verso-hover="719">mem_erase</span>]; <span class="kw">exact</span> ⟨hcx, h⟩</span>
+<span id="L297">            · <span class="kw">left</span>; <span class="kw">rw</span> [<span class="const token" data-verso-hover="253">Function.update_of_ne</span> hyp]; <span class="kw">exact</span> h</span>
+<span id="L298">          · <span class="kw">right</span>; <span class="kw">right</span>; <span class="kw">exact</span> h</span>
+<span id="L299">      · <span class="kw">intro</span> y hy hna z hz</span>
+<span id="L300">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="726">mem_insert</span>] <span class="kw">at</span> hy ⊢</span>
+<span id="L301">        <span class="kw">rw</span> [hanc] <span class="kw">at</span> hna</span>
+<span id="L302">        <span class="kw">push_neg</span> <span class="kw">at</span> hna</span>
+<span id="L303">        <span class="kw">rcases</span> hy <span class="kw">with</span> <span class="kw">rfl</span> | hy</span>
+<span id="L304">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="203">absurd</span> <span class="const token" data-verso-hover="175">rfl</span> hna.<span class="const token" data-verso-hover="189">1</span></span>
+<span id="L305">        · <span class="kw">right</span>; <span class="kw">exact</span> hg.<span class="const token" data-verso-hover="712">finished</span> y hy hna.<span class="const token" data-verso-hover="169">2</span> z hz</span>
+<span id="L306">      · <span class="kw">intro</span> y hy</span>
+<span id="L307">        <span class="kw">rw</span> [hanc] <span class="kw">at</span> hy</span>
+<span id="L308">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="726">mem_insert</span>]</span>
+<span id="L309">        <span class="kw">rcases</span> hy <span class="kw">with</span> <span class="kw">rfl</span> | hy</span>
+<span id="L310">        · <span class="kw">left</span>; <span class="kw">rfl</span></span>
+<span id="L311">        · <span class="kw">right</span>; <span class="kw">exact</span> hg.<span class="const token" data-verso-hover="713">anc_ent</span> y hy</span>
+<span id="L312">      · <span class="kw">have</span> hp : <span class="const token" data-verso-hover="715">pot</span> T (g.<span class="const token" data-verso-hover="247">move</span> x) = <span class="nu">2</span> * (<span class="const token" data-verso-hover="705">insert</span> x g.<span class="const token" data-verso-hover="231">ent</span>).<span class="const token" data-verso-hover="351">card</span> +</span>
+<span id="L313">            ((<span class="const token" data-verso-hover="705">insert</span> x g.<span class="const token" data-verso-hover="231">ent</span>).<span class="const token" data-verso-hover="106">filter</span> (<span class="kw">fun</span> y =&gt; ¬ T.<span class="const token" data-verso-hover="688">IsAnc</span> y x)).<span class="const token" data-verso-hover="351">card</span> := <span class="kw">by</span></span>
+<span id="L314">          <span class="kw">unfold</span> <span class="const token" data-verso-hover="715">pot</span>; <span class="kw">simp</span> [hxe]; <span class="kw">congr</span></span>
+<span id="L315">        <span class="kw">have</span> hp' : <span class="const token" data-verso-hover="715">pot</span> T g = <span class="nu">2</span> * g.<span class="const token" data-verso-hover="231">ent</span>.<span class="const token" data-verso-hover="351">card</span> + (g.<span class="const token" data-verso-hover="231">ent</span>.<span class="const token" data-verso-hover="106">filter</span> (<span class="kw">fun</span> y =&gt; ¬ T.<span class="const token" data-verso-hover="688">IsAnc</span> y g.<span class="const token" data-verso-hover="226">pos</span>)).<span class="const token" data-verso-hover="351">card</span> + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L316">          <span class="kw">unfold</span> <span class="const token" data-verso-hover="715">pot</span>; <span class="kw">simp</span> [hrt]</span>
+<span id="L317">        <span class="kw">rw</span> [hp, hp', <span class="const token" data-verso-hover="729">card_insert_of_notMem</span> hxe]</span>
+<span id="L318">        <span class="kw">have</span> : (<span class="const token" data-verso-hover="705">insert</span> x g.<span class="const token" data-verso-hover="231">ent</span>).<span class="const token" data-verso-hover="106">filter</span> (<span class="kw">fun</span> y =&gt; ¬ T.<span class="const token" data-verso-hover="688">IsAnc</span> y x) =</span>
+<span id="L319">            g.<span class="const token" data-verso-hover="231">ent</span>.<span class="const token" data-verso-hover="106">filter</span> (<span class="kw">fun</span> y =&gt; ¬ T.<span class="const token" data-verso-hover="688">IsAnc</span> y g.<span class="const token" data-verso-hover="226">pos</span>) := <span class="kw">by</span></span>
+<span id="L320">          <span class="kw">ext</span> y</span>
+<span id="L321">          <span class="kw">simp</span> only [<span class="const token" data-verso-hover="186">mem_filter</span>, <span class="const token" data-verso-hover="726">mem_insert</span>, hanc, <span class="const token" data-verso-hover="727">not_or</span>]</span>
+<span id="L322">          <span class="kw">constructor</span></span>
+<span id="L323">          · <span class="kw">rintro</span> ⟨<span class="kw">rfl</span> | h1, h2, h3⟩</span>
+<span id="L324">            · <span class="kw">exact</span> <span class="const token" data-verso-hover="203">absurd</span> <span class="const token" data-verso-hover="175">rfl</span> h2</span>
+<span id="L325">            · <span class="kw">exact</span> ⟨h1, h3⟩</span>
+<span id="L326">          · <span class="kw">rintro</span> ⟨h1, h3⟩</span>
+<span id="L327">            <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="199">Or.inr</span> h1, <span class="kw">fun</span> h =&gt; hxe (h ▸ h1), h3⟩</span>
+<span id="L328">        <span class="kw">rw</span> [this]; <span class="kw">ring</span></span>
+<span id="L329">    · <span class="cm">--</span><span class="cm"> ascend to the parent</span></span>
+<span id="L330">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="201">Option.some.injEq</span>] <span class="kw">at</span> hx</span>
+<span id="L331">      <span class="kw">subst</span> hx</span>
+<span id="L332">      <span class="kw">have</span> hpe : T.<span class="const token" data-verso-hover="164">par</span> g.<span class="const token" data-verso-hover="226">pos</span> ∈ g.<span class="const token" data-verso-hover="231">ent</span> := hg.<span class="const token" data-verso-hover="713">anc_ent</span> _ ⟨<span class="nu">1</span>, <span class="const token" data-verso-hover="175">rfl</span>⟩</span>
+<span id="L333">      <span class="kw">have</span> hemp : g.<span class="const token" data-verso-hover="225">pend</span> g.<span class="const token" data-verso-hover="226">pos</span> = ∅ := <span class="const token" data-verso-hover="730">not_nonempty_iff_eq_empty</span>.<span class="const token" data-verso-hover="155">1</span> hne</span>
+<span id="L334">      <span class="kw">have</span> hpend : <span class="const token" data-verso-hover="339">Function.update</span> g.<span class="const token" data-verso-hover="225">pend</span> g.<span class="const token" data-verso-hover="226">pos</span> ((g.<span class="const token" data-verso-hover="225">pend</span> g.<span class="const token" data-verso-hover="226">pos</span>).<span class="const token" data-verso-hover="104">erase</span> (T.<span class="const token" data-verso-hover="164">par</span> g.<span class="const token" data-verso-hover="226">pos</span>)) = g.<span class="const token" data-verso-hover="225">pend</span> := <span class="kw">by</span></span>
+<span id="L335">        <span class="kw">rw</span> [hemp, <span class="const token" data-verso-hover="731">Finset.erase_empty</span>, ← hemp, <span class="const token" data-verso-hover="732">Function.update_eq_self</span>]</span>
+<span id="L336">      <span class="kw">have</span> hins : <span class="const token" data-verso-hover="705">insert</span> (T.<span class="const token" data-verso-hover="164">par</span> g.<span class="const token" data-verso-hover="226">pos</span>) g.<span class="const token" data-verso-hover="231">ent</span> = g.<span class="const token" data-verso-hover="231">ent</span> := <span class="const token" data-verso-hover="733">insert_eq_of_mem</span> hpe</span>
+<span id="L337">      <span class="kw">have</span> hmv : g.<span class="const token" data-verso-hover="247">move</span> (T.<span class="const token" data-verso-hover="164">par</span> g.<span class="const token" data-verso-hover="226">pos</span>) = { g <span class="kw">with</span> <span class="const token" data-verso-hover="226">pos</span> := T.<span class="const token" data-verso-hover="164">par</span> g.<span class="const token" data-verso-hover="226">pos</span>, <span class="const token" data-verso-hover="232">ready</span> := <span class="const token" data-verso-hover="94">true</span> } := <span class="kw">by</span></span>
+<span id="L338">        <span class="kw">unfold</span> <span class="const token" data-verso-hover="247">move</span>; <span class="kw">rw</span> [hpend, hins]; <span class="kw">simp</span> [hpe]</span>
+<span id="L339">      <span class="kw">rw</span> [hmv]</span>
+<span id="L340">      <span class="kw">have</span> hanc : ∀ y, T.<span class="const token" data-verso-hover="688">IsAnc</span> y g.<span class="const token" data-verso-hover="226">pos</span> ↔ y = g.<span class="const token" data-verso-hover="226">pos</span> ∨ T.<span class="const token" data-verso-hover="688">IsAnc</span> y (T.<span class="const token" data-verso-hover="164">par</span> g.<span class="const token" data-verso-hover="226">pos</span>) :=</span>
+<span id="L341">        <span class="kw">fun</span> y =&gt; T.<span class="const token" data-verso-hover="699">isAnc_kid_iff</span> ⟨hroot, <span class="const token" data-verso-hover="175">rfl</span>⟩</span>
+<span id="L342">      <span class="kw">refine</span> ⟨⟨hpe, hg.<span class="const token" data-verso-hover="228">pend_kid</span>, hg.<span class="const token" data-verso-hover="710">pend_new</span>, hg.<span class="const token" data-verso-hover="711">kid_cov</span>, ?_, ?_⟩, ?_⟩</span>
+<span id="L343">      · <span class="kw">intro</span> y hy hna z hz</span>
+<span id="L344">        <span class="kw">by_cases</span> hyp : y = g.<span class="const token" data-verso-hover="226">pos</span></span>
+<span id="L345">        · <span class="kw">subst</span> hyp</span>
+<span id="L346">          <span class="cm">--</span><span class="cm"> the subtree of `pos` is finished</span></span>
+<span id="L347">          <span class="kw">by_cases</span> hzp : z = g.<span class="const token" data-verso-hover="226">pos</span></span>
+<span id="L348">          · <span class="kw">rw</span> [hzp]; <span class="kw">exact</span> hg.<span class="const token" data-verso-hover="709">pos_ent</span></span>
+<span id="L349">          · <span class="kw">obtain</span> ⟨c, hc, hcz⟩ := T.<span class="const token" data-verso-hover="702">exists_kid_of_isAnc</span> hz hzp</span>
+<span id="L350">            <span class="kw">have</span> hce : c ∈ g.<span class="const token" data-verso-hover="231">ent</span> := <span class="kw">by</span></span>
+<span id="L351">              <span class="kw">rcases</span> hg.<span class="const token" data-verso-hover="711">kid_cov</span> _ hg.<span class="const token" data-verso-hover="709">pos_ent</span> c hc <span class="kw">with</span> h | h</span>
+<span id="L352">              · <span class="kw">rw</span> [hemp] <span class="kw">at</span> h; <span class="kw">simp</span> <span class="kw">at</span> h</span>
+<span id="L353">              · <span class="kw">exact</span> h</span>
+<span id="L354">            <span class="kw">exact</span> hg.<span class="const token" data-verso-hover="712">finished</span> c hce (T.<span class="const token" data-verso-hover="700">not_isAnc_kid</span> hc) z hcz</span>
+<span id="L355">        · <span class="kw">exact</span> hg.<span class="const token" data-verso-hover="712">finished</span> y hy (<span class="kw">by</span> <span class="kw">rw</span> [hanc]; <span class="kw">push_neg</span>; <span class="kw">exact</span> ⟨hyp, hna⟩) z hz</span>
+<span id="L356">      · <span class="kw">intro</span> y hy; <span class="kw">exact</span> hg.<span class="const token" data-verso-hover="713">anc_ent</span> y (T.<span class="const token" data-verso-hover="697">isAnc_par</span> hroot hy)</span>
+<span id="L357">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="715">pot</span>, hrt, hpe, <span class="const token" data-verso-hover="190">decide_true</span>, ↓<span class="const token" data-verso-hover="192">reduceIte</span>]</span>
+<span id="L358">        <span class="kw">have</span> : g.<span class="const token" data-verso-hover="231">ent</span>.<span class="const token" data-verso-hover="106">filter</span> (<span class="kw">fun</span> y =&gt; ¬ T.<span class="const token" data-verso-hover="688">IsAnc</span> y (T.<span class="const token" data-verso-hover="164">par</span> g.<span class="const token" data-verso-hover="226">pos</span>)) =</span>
+<span id="L359">            <span class="const token" data-verso-hover="705">insert</span> g.<span class="const token" data-verso-hover="226">pos</span> (g.<span class="const token" data-verso-hover="231">ent</span>.<span class="const token" data-verso-hover="106">filter</span> (<span class="kw">fun</span> y =&gt; ¬ T.<span class="const token" data-verso-hover="688">IsAnc</span> y g.<span class="const token" data-verso-hover="226">pos</span>)) := <span class="kw">by</span></span>
+<span id="L360">          <span class="kw">ext</span> y</span>
+<span id="L361">          <span class="kw">simp</span> only [<span class="const token" data-verso-hover="186">mem_filter</span>, <span class="const token" data-verso-hover="726">mem_insert</span>, hanc, <span class="const token" data-verso-hover="727">not_or</span>]</span>
+<span id="L362">          <span class="kw">constructor</span></span>
+<span id="L363">          · <span class="kw">rintro</span> ⟨h1, h2⟩</span>
+<span id="L364">            <span class="kw">by_cases</span> hyp : y = g.<span class="const token" data-verso-hover="226">pos</span></span>
+<span id="L365">            · <span class="kw">left</span>; <span class="kw">exact</span> hyp</span>
+<span id="L366">            · <span class="kw">right</span>; <span class="kw">exact</span> ⟨h1, hyp, h2⟩</span>
+<span id="L367">          · <span class="kw">rintro</span> (<span class="kw">rfl</span> | ⟨h1, _, h3⟩)</span>
+<span id="L368">            · <span class="kw">exact</span> ⟨hg.<span class="const token" data-verso-hover="709">pos_ent</span>, T.<span class="const token" data-verso-hover="701">not_isAnc_par</span> hroot⟩</span>
+<span id="L369">            · <span class="kw">exact</span> ⟨h1, h3⟩</span>
+<span id="L370">        <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="729">card_insert_of_notMem</span> (<span class="kw">by</span> <span class="kw">simp</span> [T.<span class="const token" data-verso-hover="689">isAnc_refl</span>])]; <span class="kw">ring</span></span>
+<span id="L371"></span>
+<span id="L372"><span class="dc">/-- At the end of the traversal every node has been entered. -/</span></span>
+<span id="L373"><span class="kw">lemma</span> <span class="const token" data-verso-hover="734">done_all_entered</span> (g : <span class="const token" data-verso-hover="47">PState</span> V) (hg : <span class="const token" data-verso-hover="708">Inv</span> T g) (hd : <span class="const token" data-verso-hover="706">Done</span> T g) (v : V) : v ∈ g.<span class="const token" data-verso-hover="231">ent</span> := <span class="kw">by</span></span>
+<span id="L374">  <span class="kw">obtain</span> ⟨-, ht⟩ := hd</span>
+<span id="L375">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="222">target</span> <span class="kw">at</span> ht</span>
+<span id="L376">  <span class="kw">split_ifs</span> <span class="kw">at</span> ht <span class="kw">with</span> hne hroot</span>
+<span id="L377">  <span class="kw">have</span> hemp : g.<span class="const token" data-verso-hover="225">pend</span> g.<span class="const token" data-verso-hover="226">pos</span> = ∅ := <span class="const token" data-verso-hover="730">not_nonempty_iff_eq_empty</span>.<span class="const token" data-verso-hover="155">1</span> hne</span>
+<span id="L378">  <span class="kw">by_cases</span> hv : v = g.<span class="const token" data-verso-hover="226">pos</span></span>
+<span id="L379">  · <span class="kw">rw</span> [hv]; <span class="kw">exact</span> hg.<span class="const token" data-verso-hover="709">pos_ent</span></span>
+<span id="L380">  · <span class="kw">have</span> : T.<span class="const token" data-verso-hover="688">IsAnc</span> g.<span class="const token" data-verso-hover="226">pos</span> v := hroot ▸ T.<span class="const token" data-verso-hover="696">isAnc_root</span> v</span>
+<span id="L381">    <span class="kw">obtain</span> ⟨c, hc, hcv⟩ := T.<span class="const token" data-verso-hover="702">exists_kid_of_isAnc</span> this hv</span>
+<span id="L382">    <span class="kw">have</span> hce : c ∈ g.<span class="const token" data-verso-hover="231">ent</span> := <span class="kw">by</span></span>
+<span id="L383">      <span class="kw">rcases</span> hg.<span class="const token" data-verso-hover="711">kid_cov</span> _ hg.<span class="const token" data-verso-hover="709">pos_ent</span> c hc <span class="kw">with</span> h | h</span>
+<span id="L384">      · <span class="kw">rw</span> [hemp] <span class="kw">at</span> h; <span class="kw">simp</span> <span class="kw">at</span> h</span>
+<span id="L385">      · <span class="kw">exact</span> h</span>
+<span id="L386">    <span class="kw">refine</span> hg.<span class="const token" data-verso-hover="712">finished</span> c hce ?_ v hcv</span>
+<span id="L387">    <span class="kw">intro</span> h</span>
+<span id="L388">    <span class="kw">obtain</span> ⟨k, hk⟩ := h</span>
+<span id="L389">    <span class="kw">rw</span> [hroot, <span class="const token" data-verso-hover="694">Function.iterate_fixed</span> T.<span class="const token" data-verso-hover="166">par_root</span>] <span class="kw">at</span> hk</span>
+<span id="L390">    <span class="kw">exact</span> hc.<span class="const token" data-verso-hover="189">1</span> hk.<span class="const token" data-verso-hover="230">symm</span></span>
+<span id="L391"></span>
+<span id="L392"><span class="dc">/-- The state after `s` slots. -/</span></span>
+<span id="L393"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="224">iter</span> (s : <span class="const token" data-verso-hover="58">ℕ</span>) : <span class="const token" data-verso-hover="47">PState</span> V := (<span class="const token" data-verso-hover="242">step</span> T)^[s] (<span class="const token" data-verso-hover="237">init</span> T)</span>
+<span id="L394"></span>
+<span id="L395"><span class="kw">lemma</span> <span class="const token" data-verso-hover="243">iter_succ</span> (s : <span class="const token" data-verso-hover="58">ℕ</span>) : <span class="const token" data-verso-hover="224">iter</span> T (s + <span class="nu">1</span>) = <span class="const token" data-verso-hover="242">step</span> T (<span class="const token" data-verso-hover="224">iter</span> T s) :=</span>
+<span id="L396">  <span class="const token" data-verso-hover="691">Function.iterate_succ_apply'</span> _ _ _</span>
+<span id="L397"></span>
+<span id="L398"><span class="kw">lemma</span> <span class="const token" data-verso-hover="735">iter_inv_pot</span> (s : <span class="const token" data-verso-hover="58">ℕ</span>) : <span class="const token" data-verso-hover="708">Inv</span> T (<span class="const token" data-verso-hover="224">iter</span> T s) ∧ (<span class="const token" data-verso-hover="706">Done</span> T (<span class="const token" data-verso-hover="224">iter</span> T s) ∨ <span class="const token" data-verso-hover="715">pot</span> T (<span class="const token" data-verso-hover="224">iter</span> T s) = s + <span class="nu">2</span>) := <span class="kw">by</span></span>
+<span id="L399">  <span class="kw">induction</span> s <span class="kw">with</span></span>
+<span id="L400">  | <span class="const token" data-verso-hover="615">zero</span> =&gt; <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="714">inv_init</span> T, <span class="const token" data-verso-hover="199">Or.inr</span> (<span class="const token" data-verso-hover="716">pot_init</span> T)⟩</span>
+<span id="L401">  | <span class="const token" data-verso-hover="616">succ</span> s ih =&gt;</span>
+<span id="L402">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="243">iter_succ</span>]</span>
+<span id="L403">    <span class="kw">by_cases</span> hd : <span class="const token" data-verso-hover="706">Done</span> T (<span class="const token" data-verso-hover="224">iter</span> T s)</span>
+<span id="L404">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="707">step_of_done</span> T hd]; <span class="kw">exact</span> ⟨ih.<span class="const token" data-verso-hover="189">1</span>, <span class="const token" data-verso-hover="181">Or.inl</span> hd⟩</span>
+<span id="L405">    · <span class="kw">obtain</span> ⟨h1, h2⟩ := <span class="const token" data-verso-hover="722">step_spec</span> T _ ih.<span class="const token" data-verso-hover="189">1</span> hd</span>
+<span id="L406">      <span class="kw">refine</span> ⟨h1, <span class="const token" data-verso-hover="199">Or.inr</span> ?_⟩</span>
+<span id="L407">      <span class="kw">rcases</span> ih.<span class="const token" data-verso-hover="169">2</span> <span class="kw">with</span> h | h</span>
+<span id="L408">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="203">absurd</span> h hd</span>
+<span id="L409">      · <span class="kw">omega</span></span>
+<span id="L410"></span>
+<span id="L411"><span class="kw">lemma</span> <span class="const token" data-verso-hover="227">iter_inv</span> (s : <span class="const token" data-verso-hover="58">ℕ</span>) : <span class="const token" data-verso-hover="708">Inv</span> T (<span class="const token" data-verso-hover="224">iter</span> T s) := (<span class="const token" data-verso-hover="735">iter_inv_pot</span> T s).<span class="const token" data-verso-hover="189">1</span></span>
+<span id="L412"></span>
+<span id="L413"><span class="dc">/-- **Remark 3**: the traversal ends within `3n - 1` slots (`n - 1` descents, `n - 1` ascents</span></span>
+<span id="L414"><span class="dc">and `n` waiting slots). -/</span></span>
+<span id="L415"><span class="kw">lemma</span> <span class="const token" data-verso-hover="19">iter_done</span> : <span class="const token" data-verso-hover="706">Done</span> T (<span class="const token" data-verso-hover="224">iter</span> T (<span class="nu">3</span> * <span class="const token" data-verso-hover="81">Fintype.card</span> V - <span class="nu">1</span>)) := <span class="kw">by</span></span>
+<span id="L416">  <span class="kw">rcases</span> (<span class="const token" data-verso-hover="735">iter_inv_pot</span> T (<span class="nu">3</span> * <span class="const token" data-verso-hover="81">Fintype.card</span> V - <span class="nu">1</span>)).<span class="const token" data-verso-hover="169">2</span> <span class="kw">with</span> h | h</span>
+<span id="L417">  · <span class="kw">exact</span> h</span>
+<span id="L418">  · <span class="kw">have</span> := <span class="const token" data-verso-hover="717">pot_le</span> T (<span class="const token" data-verso-hover="224">iter</span> T (<span class="nu">3</span> * <span class="const token" data-verso-hover="81">Fintype.card</span> V - <span class="nu">1</span>)) (<span class="const token" data-verso-hover="227">iter_inv</span> T _)</span>
+<span id="L419">    <span class="kw">have</span> : <span class="nu">0</span> &lt; <span class="const token" data-verso-hover="81">Fintype.card</span> V := <span class="const token" data-verso-hover="233">Fintype.card_pos_iff</span>.<span class="const token" data-verso-hover="151">2</span> ⟨T.<span class="const token" data-verso-hover="163">root</span>⟩</span>
+<span id="L420">    <span class="kw">omega</span></span>
+<span id="L421"></span>
+<span id="L422"><span class="kw">lemma</span> <span class="const token" data-verso-hover="736">ent_mono_succ</span> (s : <span class="const token" data-verso-hover="58">ℕ</span>) : (<span class="const token" data-verso-hover="224">iter</span> T s).<span class="const token" data-verso-hover="231">ent</span> ⊆ (<span class="const token" data-verso-hover="224">iter</span> T (s + <span class="nu">1</span>)).<span class="const token" data-verso-hover="231">ent</span> := <span class="kw">by</span></span>
+<span id="L423">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="243">iter_succ</span>]</span>
+<span id="L424">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="242">step</span></span>
+<span id="L425">  <span class="kw">split</span></span>
+<span id="L426">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="737">subset_rfl</span></span>
+<span id="L427">  · <span class="kw">split</span></span>
+<span id="L428">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="737">subset_rfl</span></span>
+<span id="L429">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="738">subset_insert</span> _ _</span>
+<span id="L430"></span>
+<span id="L431"><span class="kw">lemma</span> <span class="const token" data-verso-hover="739">ent_mono</span> {s s' : <span class="const token" data-verso-hover="58">ℕ</span>} (h : s ≤ s') : (<span class="const token" data-verso-hover="224">iter</span> T s).<span class="const token" data-verso-hover="231">ent</span> ⊆ (<span class="const token" data-verso-hover="224">iter</span> T s').<span class="const token" data-verso-hover="231">ent</span> := <span class="kw">by</span></span>
+<span id="L432">  <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L433">  | <span class="const token" data-verso-hover="374">refl</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="737">subset_rfl</span></span>
+<span id="L434">  | <span class="const token" data-verso-hover="375">step</span> _ ih =&gt; <span class="kw">exact</span> ih.<span class="const token" data-verso-hover="139">trans</span> (<span class="const token" data-verso-hover="736">ent_mono_succ</span> T _)</span>
+<span id="L435"></span>
+<span id="L436"><span class="kw">lemma</span> <span class="const token" data-verso-hover="740">all_entered</span> (v : V) : v ∈ (<span class="const token" data-verso-hover="224">iter</span> T (<span class="nu">3</span> * <span class="const token" data-verso-hover="81">Fintype.card</span> V - <span class="nu">1</span>)).<span class="const token" data-verso-hover="231">ent</span> :=</span>
+<span id="L437">  <span class="const token" data-verso-hover="734">done_all_entered</span> T _ (<span class="const token" data-verso-hover="227">iter_inv</span> T _) (<span class="const token" data-verso-hover="19">iter_done</span> T) v</span>
+<span id="L438"></span>
+<span id="L439"><span class="dc">/-- When a node is entered, the pebble is there and waits. -/</span></span>
+<span id="L440"><span class="kw">lemma</span> <span class="const token" data-verso-hover="741">step_cases</span> (g : <span class="const token" data-verso-hover="47">PState</span> V) :</span>
+<span id="L441">    (g.<span class="const token" data-verso-hover="232">ready</span> = <span class="const token" data-verso-hover="85">false</span> ∧ <span class="const token" data-verso-hover="242">step</span> T g = { g <span class="kw">with</span> <span class="const token" data-verso-hover="232">ready</span> := <span class="const token" data-verso-hover="94">true</span> }) ∨ <span class="const token" data-verso-hover="242">step</span> T g = g ∨</span>
+<span id="L442">      ∃ x, <span class="const token" data-verso-hover="242">step</span> T g = g.<span class="const token" data-verso-hover="247">move</span> x := <span class="kw">by</span></span>
+<span id="L443">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="242">step</span></span>
+<span id="L444">  <span class="kw">cases</span> h : g.<span class="const token" data-verso-hover="232">ready</span></span>
+<span id="L445">  · <span class="kw">left</span>; <span class="kw">simp</span></span>
+<span id="L446">  · <span class="kw">right</span></span>
+<span id="L447">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="724">Bool.not_true</span>, <span class="const token" data-verso-hover="198">Bool.false_eq_true</span>, ↓<span class="const token" data-verso-hover="192">reduceIte</span>]</span>
+<span id="L448">    <span class="kw">split</span></span>
+<span id="L449">    · <span class="kw">left</span>; <span class="kw">rfl</span></span>
+<span id="L450">    · <span class="kw">right</span>; <span class="kw">exact</span> ⟨_, <span class="const token" data-verso-hover="175">rfl</span>⟩</span>
+<span id="L451"></span>
+<span id="L452"><span class="kw">lemma</span> <span class="const token" data-verso-hover="742">enter_spec</span> {s : <span class="const token" data-verso-hover="58">ℕ</span>} {v : V} (h1 : v ∉ (<span class="const token" data-verso-hover="224">iter</span> T s).<span class="const token" data-verso-hover="231">ent</span>) (h2 : v ∈ (<span class="const token" data-verso-hover="224">iter</span> T (s + <span class="nu">1</span>)).<span class="const token" data-verso-hover="231">ent</span>) :</span>
+<span id="L453">    (<span class="const token" data-verso-hover="224">iter</span> T (s + <span class="nu">1</span>)).<span class="const token" data-verso-hover="226">pos</span> = v ∧ (<span class="const token" data-verso-hover="224">iter</span> T (s + <span class="nu">1</span>)).<span class="const token" data-verso-hover="232">ready</span> = <span class="const token" data-verso-hover="85">false</span> := <span class="kw">by</span></span>
+<span id="L454">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="243">iter_succ</span>] <span class="kw">at</span> h2 ⊢</span>
+<span id="L455">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="741">step_cases</span> T (<span class="const token" data-verso-hover="224">iter</span> T s) <span class="kw">with</span> ⟨-, h⟩ | h | ⟨x, h⟩ &lt;;&gt; <span class="kw">rw</span> [h] <span class="kw">at</span> h2 ⊢</span>
+<span id="L456">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="203">absurd</span> h2 h1</span>
+<span id="L457">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="203">absurd</span> h2 h1</span>
+<span id="L458">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="248">move_ent</span>, <span class="const token" data-verso-hover="726">mem_insert</span>] <span class="kw">at</span> h2</span>
+<span id="L459">    <span class="kw">rcases</span> h2 <span class="kw">with</span> <span class="kw">rfl</span> | h2</span>
+<span id="L460">    · <span class="kw">simp</span> [h1]</span>
+<span id="L461">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="203">absurd</span> h2 h1</span>
+<span id="L462"></span>
+<span id="L463"><span class="kw">lemma</span> <span class="const token" data-verso-hover="743">wait_spec</span> {s : <span class="const token" data-verso-hover="58">ℕ</span>} (h : (<span class="const token" data-verso-hover="224">iter</span> T s).<span class="const token" data-verso-hover="232">ready</span> = <span class="const token" data-verso-hover="85">false</span>) : (<span class="const token" data-verso-hover="224">iter</span> T (s + <span class="nu">1</span>)).<span class="const token" data-verso-hover="226">pos</span> = (<span class="const token" data-verso-hover="224">iter</span> T s).<span class="const token" data-verso-hover="226">pos</span> := <span class="kw">by</span></span>
+<span id="L464">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="243">iter_succ</span>]; <span class="kw">simp</span> [<span class="const token" data-verso-hover="242">step</span>, h]</span>
+<span id="L465"></span>
+<span id="L466"><span class="dc">/-- The pebble moves along tree edges. -/</span></span>
+<span id="L467"><span class="kw">lemma</span> <span class="const token" data-verso-hover="744">move_spec</span> (s : <span class="const token" data-verso-hover="58">ℕ</span>) :</span>
+<span id="L468">    (<span class="const token" data-verso-hover="224">iter</span> T (s + <span class="nu">1</span>)).<span class="const token" data-verso-hover="226">pos</span> = (<span class="const token" data-verso-hover="224">iter</span> T s).<span class="const token" data-verso-hover="226">pos</span> ∨ T.<span class="const token" data-verso-hover="210">IsKid</span> (<span class="const token" data-verso-hover="224">iter</span> T s).<span class="const token" data-verso-hover="226">pos</span> (<span class="const token" data-verso-hover="224">iter</span> T (s + <span class="nu">1</span>)).<span class="const token" data-verso-hover="226">pos</span> ∨</span>
+<span id="L469">      ((<span class="const token" data-verso-hover="224">iter</span> T s).<span class="const token" data-verso-hover="226">pos</span> ≠ T.<span class="const token" data-verso-hover="163">root</span> ∧ T.<span class="const token" data-verso-hover="164">par</span> (<span class="const token" data-verso-hover="224">iter</span> T s).<span class="const token" data-verso-hover="226">pos</span> = (<span class="const token" data-verso-hover="224">iter</span> T (s + <span class="nu">1</span>)).<span class="const token" data-verso-hover="226">pos</span>) := <span class="kw">by</span></span>
+<span id="L470">  <span class="kw">have</span> hinv := <span class="const token" data-verso-hover="227">iter_inv</span> T s</span>
+<span id="L471">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="243">iter_succ</span>]</span>
+<span id="L472">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="242">step</span></span>
+<span id="L473">  <span class="kw">split</span></span>
+<span id="L474">  · <span class="kw">left</span>; <span class="kw">rfl</span></span>
+<span id="L475">  · <span class="kw">split</span></span>
+<span id="L476">    · <span class="kw">left</span>; <span class="kw">rfl</span></span>
+<span id="L477">    · <span class="kw">rename_i</span> x hx</span>
+<span id="L478">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="247">move</span>]</span>
+<span id="L479">      <span class="kw">unfold</span> <span class="const token" data-verso-hover="222">target</span> <span class="kw">at</span> hx</span>
+<span id="L480">      <span class="kw">split_ifs</span> <span class="kw">at</span> hx <span class="kw">with</span> hne hroot</span>
+<span id="L481">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="201">Option.some.injEq</span>] <span class="kw">at</span> hx</span>
+<span id="L482">        <span class="kw">right</span>; <span class="kw">left</span></span>
+<span id="L483">        <span class="kw">exact</span> (hinv.<span class="const token" data-verso-hover="228">pend_kid</span> _ _ (hx ▸ <span class="const token" data-verso-hover="156">min'_mem</span> _ _)).<span class="const token" data-verso-hover="189">1</span></span>
+<span id="L484">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="201">Option.some.injEq</span>] <span class="kw">at</span> hx</span>
+<span id="L485">        <span class="kw">right</span>; <span class="kw">right</span>; <span class="kw">exact</span> ⟨hroot, hx⟩</span>
+<span id="L486"></span>
+<span id="L487"><span class="dc">/-- The slot in which the pebble enters `v` (`0` for the root). -/</span></span>
+<span id="L488"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="255">firstVisit</span> (v : V) : <span class="const token" data-verso-hover="58">ℕ</span> := <span class="kw">by</span></span>
+<span id="L489">  <span class="kw">classical</span> <span class="kw">exact</span> <span class="const token" data-verso-hover="115">Nat.find</span> (⟨_, <span class="const token" data-verso-hover="740">all_entered</span> T v⟩ : ∃ s, v ∈ (<span class="const token" data-verso-hover="224">iter</span> T s).<span class="const token" data-verso-hover="231">ent</span>)</span>
+<span id="L490"></span>
+<span id="L491"><span class="kw">lemma</span> <span class="const token" data-verso-hover="745">firstVisit_spec</span> (v : V) : v ∈ (<span class="const token" data-verso-hover="224">iter</span> T (<span class="const token" data-verso-hover="255">firstVisit</span> T v)).<span class="const token" data-verso-hover="231">ent</span> := <span class="kw">by</span></span>
+<span id="L492">  <span class="kw">classical</span> <span class="kw">exact</span> <span class="const token" data-verso-hover="268">Nat.find_spec</span> (⟨_, <span class="const token" data-verso-hover="740">all_entered</span> T v⟩ : ∃ s, v ∈ (<span class="const token" data-verso-hover="224">iter</span> T s).<span class="const token" data-verso-hover="231">ent</span>)</span>
+<span id="L493"></span>
+<span id="L494"><span class="kw">lemma</span> <span class="const token" data-verso-hover="746">not_mem_of_lt_firstVisit</span> {v : V} {s : <span class="const token" data-verso-hover="58">ℕ</span>} (h : s &lt; <span class="const token" data-verso-hover="255">firstVisit</span> T v) : v ∉ (<span class="const token" data-verso-hover="224">iter</span> T s).<span class="const token" data-verso-hover="231">ent</span> := <span class="kw">by</span></span>
+<span id="L495">  <span class="kw">classical</span> <span class="kw">exact</span> <span class="const token" data-verso-hover="704">Nat.find_min</span> (⟨_, <span class="const token" data-verso-hover="740">all_entered</span> T v⟩ : ∃ s, v ∈ (<span class="const token" data-verso-hover="224">iter</span> T s).<span class="const token" data-verso-hover="231">ent</span>) h</span>
+<span id="L496"></span>
+<span id="L497"><span class="kw">lemma</span> <span class="const token" data-verso-hover="264">mem_iff_firstVisit_le</span> {v : V} {s : <span class="const token" data-verso-hover="58">ℕ</span>} : v ∈ (<span class="const token" data-verso-hover="224">iter</span> T s).<span class="const token" data-verso-hover="231">ent</span> ↔ <span class="const token" data-verso-hover="255">firstVisit</span> T v ≤ s := <span class="kw">by</span></span>
+<span id="L498">  <span class="kw">constructor</span></span>
+<span id="L499">  · <span class="kw">intro</span> h; <span class="kw">by_contra</span> h'; <span class="kw">exact</span> <span class="const token" data-verso-hover="746">not_mem_of_lt_firstVisit</span> T (<span class="const token" data-verso-hover="301">not_le</span>.<span class="const token" data-verso-hover="155">1</span> h') h</span>
+<span id="L500">  · <span class="kw">intro</span> h; <span class="kw">exact</span> <span class="const token" data-verso-hover="739">ent_mono</span> T h (<span class="const token" data-verso-hover="745">firstVisit_spec</span> T v)</span>
+<span id="L501"></span>
+<span id="L502"><span class="dc">/-- **Remark 3** (with waiting slots): every node is entered within `3n - 1` slots. -/</span></span>
+<span id="L503"><span class="kw">lemma</span> <span class="const token" data-verso-hover="14">firstVisit_le</span> (v : V) : <span class="const token" data-verso-hover="255">firstVisit</span> T v ≤ <span class="nu">3</span> * <span class="const token" data-verso-hover="81">Fintype.card</span> V - <span class="nu">1</span> :=</span>
+<span id="L504">  (<span class="const token" data-verso-hover="264">mem_iff_firstVisit_le</span> T).<span class="const token" data-verso-hover="155">1</span> (<span class="const token" data-verso-hover="740">all_entered</span> T v)</span>
+<span id="L505"></span>
+<span id="L506"><span class="kw">lemma</span> <span class="const token" data-verso-hover="260">firstVisit_root</span> : <span class="const token" data-verso-hover="255">firstVisit</span> T T.<span class="const token" data-verso-hover="163">root</span> = <span class="nu">0</span> :=</span>
+<span id="L507">  <span class="const token" data-verso-hover="747">Nat.eq_zero_of_le_zero</span> ((<span class="const token" data-verso-hover="264">mem_iff_firstVisit_le</span> T).<span class="const token" data-verso-hover="155">1</span> (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="224">iter</span>, <span class="const token" data-verso-hover="237">init</span>]))</span>
+<span id="L508"></span>
+<span id="L509"><span class="dc">/-- In slot `firstVisit v` the pebble is at `v`, and it is still there one slot later. -/</span></span>
+<span id="L510"><span class="kw">lemma</span> <span class="const token" data-verso-hover="748">pos_firstVisit</span> (v : V) :</span>
+<span id="L511">    (<span class="const token" data-verso-hover="224">iter</span> T (<span class="const token" data-verso-hover="255">firstVisit</span> T v)).<span class="const token" data-verso-hover="226">pos</span> = v ∧ (<span class="const token" data-verso-hover="224">iter</span> T (<span class="const token" data-verso-hover="255">firstVisit</span> T v + <span class="nu">1</span>)).<span class="const token" data-verso-hover="226">pos</span> = v := <span class="kw">by</span></span>
+<span id="L512">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="749">Nat.eq_zero_or_pos</span> (<span class="const token" data-verso-hover="255">firstVisit</span> T v) <span class="kw">with</span> h | h</span>
+<span id="L513">  · <span class="kw">have</span> hv : v ∈ (<span class="const token" data-verso-hover="224">iter</span> T <span class="nu">0</span>).<span class="const token" data-verso-hover="231">ent</span> := h ▸ <span class="const token" data-verso-hover="745">firstVisit_spec</span> T v</span>
+<span id="L514">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="224">iter</span>, <span class="const token" data-verso-hover="750">Function.iterate_zero</span>, <span class="const token" data-verso-hover="751">id</span>, <span class="const token" data-verso-hover="237">init</span>, <span class="const token" data-verso-hover="239">mem_singleton</span>] <span class="kw">at</span> hv</span>
+<span id="L515">    <span class="kw">subst</span> hv</span>
+<span id="L516">    <span class="kw">rw</span> [h]</span>
+<span id="L517">    <span class="kw">have</span> h0 : (<span class="const token" data-verso-hover="224">iter</span> T <span class="nu">0</span>).<span class="const token" data-verso-hover="226">pos</span> = T.<span class="const token" data-verso-hover="163">root</span> := <span class="const token" data-verso-hover="175">rfl</span></span>
+<span id="L518">    <span class="kw">exact</span> ⟨h0, (<span class="const token" data-verso-hover="743">wait_spec</span> T <span class="const token" data-verso-hover="175">rfl</span>).<span class="const token" data-verso-hover="728">trans</span> h0⟩</span>
+<span id="L519">  · <span class="kw">obtain</span> ⟨k, hk⟩ : ∃ k, <span class="const token" data-verso-hover="255">firstVisit</span> T v = k + <span class="nu">1</span> := ⟨<span class="const token" data-verso-hover="255">firstVisit</span> T v - <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L520">    <span class="kw">have</span> h1 : v ∉ (<span class="const token" data-verso-hover="224">iter</span> T k).<span class="const token" data-verso-hover="231">ent</span> := <span class="const token" data-verso-hover="746">not_mem_of_lt_firstVisit</span> T (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L521">    <span class="kw">have</span> h2 : v ∈ (<span class="const token" data-verso-hover="224">iter</span> T (k + <span class="nu">1</span>)).<span class="const token" data-verso-hover="231">ent</span> := <span class="kw">by</span></span>
+<span id="L522">      <span class="kw">rw</span> [← hk]; <span class="kw">exact</span> <span class="const token" data-verso-hover="745">firstVisit_spec</span> T v</span>
+<span id="L523">    <span class="kw">obtain</span> ⟨hp, hw⟩ := <span class="const token" data-verso-hover="742">enter_spec</span> T h1 h2</span>
+<span id="L524">    <span class="kw">rw</span> [hk]</span>
+<span id="L525">    <span class="kw">exact</span> ⟨hp, (<span class="const token" data-verso-hover="743">wait_spec</span> T hw).<span class="const token" data-verso-hover="728">trans</span> hp⟩</span>
+<span id="L526"></span>
+<span id="L527"><span class="kw">lemma</span> <span class="const token" data-verso-hover="261">firstVisit_injective</span> : <span class="const token" data-verso-hover="127">Function.Injective</span> (<span class="const token" data-verso-hover="255">firstVisit</span> T) := <span class="kw">by</span></span>
+<span id="L528">  <span class="kw">intro</span> u v h</span>
+<span id="L529">  <span class="kw">rw</span> [← (<span class="const token" data-verso-hover="748">pos_firstVisit</span> T u).<span class="const token" data-verso-hover="189">1</span>, ← (<span class="const token" data-verso-hover="748">pos_firstVisit</span> T v).<span class="const token" data-verso-hover="189">1</span>, h]</span>
+<span id="L530"></span>
+<span id="L531"><span class="kw">variable</span> {T}</span>
+<span id="L532"></span>
+<span id="L533"><span class="dc">/-- The positions of the pebble form a walk in any graph containing the tree edges. -/</span></span>
+<span id="L534"><span class="kw">lemma</span> <span class="const token" data-verso-hover="48">dist_pos_le</span> (G : <span class="const token" data-verso-hover="141">SimpleGraph</span> V) (hG : ∀ v, v ≠ T.<span class="const token" data-verso-hover="163">root</span> → G.<span class="const token" data-verso-hover="143">Adj</span> v (T.<span class="const token" data-verso-hover="164">par</span> v)) (s : <span class="const token" data-verso-hover="58">ℕ</span>) :</span>
+<span id="L535">    ∀ j, G.<span class="const token" data-verso-hover="145">dist</span> (<span class="const token" data-verso-hover="224">iter</span> T s).<span class="const token" data-verso-hover="226">pos</span> (<span class="const token" data-verso-hover="224">iter</span> T (s + j)).<span class="const token" data-verso-hover="226">pos</span> ≤ j ∧</span>
+<span id="L536">      G.<span class="const token" data-verso-hover="401">Reachable</span> (<span class="const token" data-verso-hover="224">iter</span> T s).<span class="const token" data-verso-hover="226">pos</span> (<span class="const token" data-verso-hover="224">iter</span> T (s + j)).<span class="const token" data-verso-hover="226">pos</span></span>
+<span id="L537">  | <span class="nu">0</span> =&gt; <span class="kw">by</span> <span class="kw">simp</span></span>
+<span id="L538">  | j + <span class="nu">1</span> =&gt; <span class="kw">by</span></span>
+<span id="L539">      <span class="kw">obtain</span> ⟨ih1, ih2⟩ := <span class="const token" data-verso-hover="48">dist_pos_le</span> G hG s j</span>
+<span id="L540">      <span class="kw">have</span> hstep : (<span class="const token" data-verso-hover="224">iter</span> T (s + j + <span class="nu">1</span>)).<span class="const token" data-verso-hover="226">pos</span> = (<span class="const token" data-verso-hover="224">iter</span> T (s + j)).<span class="const token" data-verso-hover="226">pos</span> ∨</span>
+<span id="L541">          G.<span class="const token" data-verso-hover="143">Adj</span> (<span class="const token" data-verso-hover="224">iter</span> T (s + j)).<span class="const token" data-verso-hover="226">pos</span> (<span class="const token" data-verso-hover="224">iter</span> T (s + j + <span class="nu">1</span>)).<span class="const token" data-verso-hover="226">pos</span> := <span class="kw">by</span></span>
+<span id="L542">        <span class="kw">rcases</span> <span class="const token" data-verso-hover="744">move_spec</span> T (s + j) <span class="kw">with</span> h | h | h</span>
+<span id="L543">        · <span class="kw">left</span>; <span class="kw">exact</span> h</span>
+<span id="L544">        · <span class="kw">right</span>; <span class="kw">have</span> := hG _ h.<span class="const token" data-verso-hover="189">1</span>; <span class="kw">rw</span> [h.<span class="const token" data-verso-hover="169">2</span>] <span class="kw">at</span> this; <span class="kw">exact</span> this.<span class="const token" data-verso-hover="152">symm</span></span>
+<span id="L545">        · <span class="kw">right</span>; <span class="kw">rw</span> [← h.<span class="const token" data-verso-hover="169">2</span>]; <span class="kw">exact</span> hG _ h.<span class="const token" data-verso-hover="189">1</span></span>
+<span id="L546">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="262">add_assoc</span>]</span>
+<span id="L547">      <span class="kw">rcases</span> hstep <span class="kw">with</span> h | h</span>
+<span id="L548">      · <span class="kw">rw</span> [h]; <span class="kw">exact</span> ⟨<span class="kw">by</span> <span class="kw">omega</span>, ih2⟩</span>
+<span id="L549">      · <span class="kw">obtain</span> ⟨p, hp⟩ := ih2.<span class="const token" data-verso-hover="752">exists_walk_length_eq_dist</span></span>
+<span id="L550">        <span class="kw">refine</span> ⟨?_, ih2.<span class="const token" data-verso-hover="403">trans</span> h.<span class="const token" data-verso-hover="402">reachable</span>⟩</span>
+<span id="L551">        <span class="kw">calc</span> G.<span class="const token" data-verso-hover="145">dist</span> _ _ ≤ (p.<span class="const token" data-verso-hover="389">concat</span> h).<span class="const token" data-verso-hover="567">length</span> := <span class="const token" data-verso-hover="400">SimpleGraph.dist_le</span> _</span>
+<span id="L552">          _ = G.<span class="const token" data-verso-hover="145">dist</span> (<span class="const token" data-verso-hover="224">iter</span> T s).<span class="const token" data-verso-hover="226">pos</span> (<span class="const token" data-verso-hover="224">iter</span> T (s + j)).<span class="const token" data-verso-hover="226">pos</span> + <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">simp</span> [hp]</span>
+<span id="L553">          _ ≤ j + <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L554"></span>
+<span id="L555"><span class="dc">/-- The separation property behind Lemma 1: if the pebble enters `u` before `v`, then it waited</span></span>
+<span id="L556"><span class="dc">one slot at `u` and walked at least `d(u, v)` steps. -/</span></span>
+<span id="L557"><span class="kw">lemma</span> <span class="const token" data-verso-hover="753">lemma1_sep</span> (G : <span class="const token" data-verso-hover="141">SimpleGraph</span> V) (hG : ∀ v, v ≠ T.<span class="const token" data-verso-hover="163">root</span> → G.<span class="const token" data-verso-hover="143">Adj</span> v (T.<span class="const token" data-verso-hover="164">par</span> v)) {u v : V}</span>
+<span id="L558">    (h : <span class="const token" data-verso-hover="255">firstVisit</span> T u &lt; <span class="const token" data-verso-hover="255">firstVisit</span> T v) :</span>
+<span id="L559">    <span class="const token" data-verso-hover="255">firstVisit</span> T u + <span class="nu">1</span> + G.<span class="const token" data-verso-hover="145">dist</span> u v ≤ <span class="const token" data-verso-hover="255">firstVisit</span> T v ∧ G.<span class="const token" data-verso-hover="401">Reachable</span> u v := <span class="kw">by</span></span>
+<span id="L560">  <span class="kw">obtain</span> ⟨-, hu⟩ := <span class="const token" data-verso-hover="748">pos_firstVisit</span> T u</span>
+<span id="L561">  <span class="kw">obtain</span> ⟨hv, -⟩ := <span class="const token" data-verso-hover="748">pos_firstVisit</span> T v</span>
+<span id="L562">  <span class="kw">have</span> := <span class="const token" data-verso-hover="48">dist_pos_le</span> G hG (<span class="const token" data-verso-hover="255">firstVisit</span> T u + <span class="nu">1</span>) (<span class="const token" data-verso-hover="255">firstVisit</span> T v - (<span class="const token" data-verso-hover="255">firstVisit</span> T u + <span class="nu">1</span>))</span>
+<span id="L563">  <span class="kw">rw</span> [<span class="kw">show</span> <span class="const token" data-verso-hover="255">firstVisit</span> T u + <span class="nu">1</span> + (<span class="const token" data-verso-hover="255">firstVisit</span> T v - (<span class="const token" data-verso-hover="255">firstVisit</span> T u + <span class="nu">1</span>)) = <span class="const token" data-verso-hover="255">firstVisit</span> T v <span class="kw">by</span> <span class="kw">omega</span>,</span>
+<span id="L564">    hu, hv] <span class="kw">at</span> this</span>
+<span id="L565">  <span class="kw">exact</span> ⟨<span class="kw">by</span> <span class="kw">omega</span>, this.<span class="const token" data-verso-hover="169">2</span>⟩</span>
+<span id="L566"></span>
+<span id="L567"><span class="dc">/-- **Lemma 1 of [HW12].** In Algorithm 1, no node `w` is reached by the waves of two different</span></span>
+<span id="L568"><span class="dc">breadth-first searches in the same time slot: `BFS_u` (started when the pebble enters `u`)</span></span>
+<span id="L569"><span class="dc">reaches `w` in slot `firstVisit u + d(u, w)`, and these slots are pairwise distinct. -/</span></span>
+<span id="L570"><span class="kw">theorem</span> <span class="const token" data-verso-hover="20">lemma1</span> (G : <span class="const token" data-verso-hover="141">SimpleGraph</span> V) (hconn : G.<span class="const token" data-verso-hover="149">Connected</span>)</span>
+<span id="L571">    (hG : ∀ v, v ≠ T.<span class="const token" data-verso-hover="163">root</span> → G.<span class="const token" data-verso-hover="143">Adj</span> v (T.<span class="const token" data-verso-hover="164">par</span> v)) {u v : V} (huv : u ≠ v) (w : V) :</span>
+<span id="L572">    <span class="const token" data-verso-hover="255">firstVisit</span> T u + G.<span class="const token" data-verso-hover="145">dist</span> u w ≠ <span class="const token" data-verso-hover="255">firstVisit</span> T v + G.<span class="const token" data-verso-hover="145">dist</span> v w := <span class="kw">by</span></span>
+<span id="L573">  <span class="kw">have</span> key : ∀ u v, <span class="const token" data-verso-hover="255">firstVisit</span> T u &lt; <span class="const token" data-verso-hover="255">firstVisit</span> T v →</span>
+<span id="L574">      <span class="const token" data-verso-hover="255">firstVisit</span> T u + G.<span class="const token" data-verso-hover="145">dist</span> u w &lt; <span class="const token" data-verso-hover="255">firstVisit</span> T v + G.<span class="const token" data-verso-hover="145">dist</span> v w := <span class="kw">by</span></span>
+<span id="L575">    <span class="kw">intro</span> u v h</span>
+<span id="L576">    <span class="kw">have</span> h1 := (<span class="const token" data-verso-hover="753">lemma1_sep</span> G hG h).<span class="const token" data-verso-hover="189">1</span></span>
+<span id="L577">    <span class="kw">have</span> h2 := hconn.<span class="const token" data-verso-hover="178">dist_triangle</span> (u := u) (v := v) (w := w)</span>
+<span id="L578">    <span class="kw">omega</span></span>
+<span id="L579">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="259">lt_trichotomy</span> (<span class="const token" data-verso-hover="255">firstVisit</span> T u) (<span class="const token" data-verso-hover="255">firstVisit</span> T v) <span class="kw">with</span> h | h | h</span>
+<span id="L580">  · <span class="kw">exact</span> (key u v h).<span class="const token" data-verso-hover="754">ne</span></span>
+<span id="L581">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="203">absurd</span> (<span class="const token" data-verso-hover="261">firstVisit_injective</span> T h) huv</span>
+<span id="L582">  · <span class="kw">exact</span> (key v u h).<span class="const token" data-verso-hover="755">ne'</span></span>
+<span id="L583"></span>
+<span id="L584"><span class="kw">end</span> PState</span>
+<span id="L585"></span>
+<span id="L586"><span class="kw">end</span> Podc.OptimalAPSP</span>
+<span id="L587"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2012/OptimalAPSP/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

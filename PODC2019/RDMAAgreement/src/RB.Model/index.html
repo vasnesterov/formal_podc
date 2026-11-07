@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>RDMAAgreement: RB/Model.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/RDMAAgreement/">RDMAAgreement</a><span class="sep">›</span><a href="PODC2019/RDMAAgreement/src/">Lean source</a><span class="sep">›</span><span aria-current="page">RB.Model</span></nav>
+        <h1>
+          <code>RB/Model.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2019/RDMAAgreement/">The Impact of RDMA on Agreement — PODC 2019</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/RDMAAgreement/RB/Model.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="RB.Model"><span id="L1"><span class="kw">import</span> Mathlib.Data.Fintype.Card</span>
+<span id="L2"><span class="kw">import</span> Mathlib.Data.Finset.Image</span>
+<span id="L3"><span class="kw">import</span> Mathlib.Data.Set.Insert</span>
+<span id="L4"></span>
+<span id="L5"><span class="dc">/-!</span></span>
+<span id="L6"><span class="dc"># Algorithm 2 (Reliable Broadcast) of "The Impact of RDMA on Agreement" — the model</span></span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">Aguilera, Ben-David, Guerraoui, Marathe, Zablotchi, PODC 2019 (arXiv:1905.12143v2), §4.1.1 and</span></span>
+<span id="L9"><span class="dc">Appendix A. This file fixes the model; `Safety.lean` and `Liveness.lean` prove the four properties</span></span>
+<span id="L10"><span class="dc">of Definition 1 (Lemma 4.1).</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">## Model</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">* **Processes** `P` (a `Fintype`, `n = |P|`), Byzantine set `F : Finset P`; the thresholds of the</span></span>
+<span id="L15"><span class="dc">  algorithm ("majority") are `f + 1`. The resilience hypotheses `|F| ≤ f`, `2f + 1 ≤ n` are</span></span>
+<span id="L16"><span class="dc">  assumptions of the theorems, not of the model.</span></span>
+<span id="L17"><span class="dc">* **Asynchronous shared memory** of SWMR registers `Value[p,k,q]`, `L1Proof[p,k,q]`,</span></span>
+<span id="L18"><span class="dc">  `L2Proof[p,k,q]` (`Reg`), all holding a `Val` (`⊥`, a signed copy, an L1 proof or an L2 proof;</span></span>
+<span id="L19"><span class="dc">  a value of the wrong shape is ignored by every reader, exactly like an ill-formed bit string).</span></span>
+<span id="L20"><span class="dc">* **Regular registers.** A read or write by a correct process has an invocation and a response.</span></span>
+<span id="L21"><span class="dc">  A pending read of `r` keeps a *candidate set* (`St.cand`): at invocation it is the current value</span></span>
+<span id="L22"><span class="dc">  of `r` together with the values of all pending writes to `r`; every write to `r` invoked while</span></span>
+<span id="L23"><span class="dc">  the read is pending is added; at the response the adversary returns *any* candidate. This is</span></span>
+<span id="L24"><span class="dc">  exactly Lamport's regular register ("the last value written before the read started, or the</span></span>
+<span id="L25"><span class="dc">  value of a write overlapping the read"); it also covers two overlapping writes of the same owner</span></span>
+<span id="L26"><span class="dc">  to the same register, which happens in Algorithm 2 (see `differencies`). A write updates the</span></span>
+<span id="L27"><span class="dc">  current value at its response.</span></span>
+<span id="L28"><span class="dc">* **Granularity.** Each step of a correct thread completes its pending memory operation, performs</span></span>
+<span id="L29"><span class="dc">  local computation, and invokes the next operation of that thread. (Invoking the next operation</span></span>
+<span id="L30"><span class="dc">  as early as possible only enlarges candidate sets, so it is no restriction on the adversary.)</span></span>
+<span id="L31"><span class="dc">* **Correct processes** run Algorithm 2: one *broadcast thread* (`broadcast(k,m)` with</span></span>
+<span id="L32"><span class="dc">  consecutive keys `k = 1, 2, …`, the next one only after the previous returned) and, for every</span></span>
+<span id="L33"><span class="dc">  sender `q`, one *delivery thread* `(p,q)` looping `try_deliver(q)`. The loops `for i ∈ Π` read</span></span>
+<span id="L34"><span class="dc">  the slots one by one in an arbitrary (adversarial) order.</span></span>
+<span id="L35"><span class="dc">* **Byzantine processes** (`p ∈ F`) write anything, at any time, any number of times, but only to</span></span>
+<span id="L36"><span class="dc">  their own registers (atomically). Their written values must respect unforgeability.</span></span>
+<span id="L37"><span class="dc">* **Signatures** are unforgeable and transferable, modelled abstractly: a term is a structured</span></span>
+<span id="L38"><span class="dc">  value whose signatures are listed by `Val.sigs`; the ghost set `St.signed` contains the</span></span>
+<span id="L39"><span class="dc">  signatures correct processes actually produced. A Byzantine write must not contain a signature</span></span>
+<span id="L40"><span class="dc">  of a correct process outside `St.signed` (`SigOK`); Byzantine processes may sign anything.</span></span>
+<span id="L41"><span class="dc">  A process's signature on its own broadcast `(k,m)` also serves as its endorsement (counter-</span></span>
+<span id="L42"><span class="dc">  signature) of that copy, so that `Value[p,k,p]` holds a valid echo of `p` after line 12 as well</span></span>
+<span id="L43"><span class="dc">  as after line 40.</span></span>
+<span id="L44"><span class="dc">* **Fairness** (for liveness only, `Exec.Fair`): every delivery thread of a correct process takes</span></span>
+<span id="L45"><span class="dc">  infinitely many steps and every pending broadcast write of a correct process completes.</span></span>
+<span id="L46"></span>
+<span id="L47"><span class="dc">## Charitable reading of the pseudocode (see `notes.md` / `differencies.md`)</span></span>
+<span id="L48"></span>
+<span id="L49"><span class="dc">* `try_deliver(q)` works on key `k = last[q] + 1` (the paper uses `k = last[q]` with</span></span>
+<span id="L50"><span class="dc">  `last[q] = 0` initially and first key `1`, so nothing would ever be delivered);</span></span>
+<span id="L51"><span class="dc">* `state` is per sender; line 30 delivers the message of the proof found at line 16;</span></span>
+<span id="L52"><span class="dc">* line 38 accepts a value carrying `q`'s signature on `(k, m)`; line 40 writes `p`'s</span></span>
+<span id="L53"><span class="dc">  endorsement of that signed pair; line 47 accepts from slot `i` an endorsement by `i` of a pair</span></span>
+<span id="L54"><span class="dc">  signed by `q` with key `k`;</span></span>
+<span id="L55"><span class="dc">* "majority" means `f + 1`; an L1 proof is valid for `(q,k,m)` if it has `≥ f+1` endorsements of</span></span>
+<span id="L56"><span class="dc">  `q`'s signed `(k,m)` (distinct, hence by distinct endorsers), an L2 proof if it has valid L1</span></span>
+<span id="L57"><span class="dc">  proofs for one `(q,k,m)` by `≥ f+1` distinct authors; at line 62 the process signs any such</span></span>
+<span id="L58"><span class="dc">  subset of the L1 proofs it collected.</span></span>
+<span id="L59"><span class="dc">-/</span></span>
+<span id="L60"></span>
+<span id="L61"><span class="kw">namespace</span> Podc.RDMAAgreement.RB</span>
+<span id="L62"></span>
+<span id="L63"><span class="dc">/-! ### Terms -/</span></span>
+<span id="L64"></span>
+<span id="L65"><span class="dc">/-- `q`'s signature on the pair `(k, m)`: the signed message broadcast at line 12. -/</span></span>
+<span id="L66"><span class="kw">structure</span> <span class="const token" data-verso-hover="606">Base</span> (P M : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L67">  <span class="const token" data-verso-hover="753">sender</span> : P</span>
+<span id="L68">  <span class="const token" data-verso-hover="587">key</span> : <span class="const token" data-verso-hover="47">ℕ</span></span>
+<span id="L69">  <span class="const token" data-verso-hover="795">msg</span> : M</span>
+<span id="L70"><span class="kw">deriving</span> <span class="const token" data-verso-hover="23">DecidableEq</span></span>
+<span id="L71"></span>
+<span id="L72"><span class="dc">/-- An endorsement (signed copy) by `signer` of the signed pair `base` (lines 12 and 40). -/</span></span>
+<span id="L73"><span class="kw">structure</span> <span class="const token" data-verso-hover="601">Copy</span> (P M : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L74">  <span class="const token" data-verso-hover="803">signer</span> : P</span>
+<span id="L75">  <span class="const token" data-verso-hover="624">base</span> : <span class="const token" data-verso-hover="606">Base</span> P M</span>
+<span id="L76"><span class="kw">deriving</span> <span class="const token" data-verso-hover="23">DecidableEq</span></span>
+<span id="L77"></span>
+<span id="L78"><span class="dc">/-- An L1 proof: a set of copies, signed by `author` (line 51). -/</span></span>
+<span id="L79"><span class="kw">structure</span> <span class="const token" data-verso-hover="760">L1</span> (P M : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L80">  <span class="const token" data-verso-hover="804">author</span> : P</span>
+<span id="L81">  <span class="const token" data-verso-hover="805">copies</span> : <span class="const token" data-verso-hover="60">Finset</span> (<span class="const token" data-verso-hover="601">Copy</span> P M)</span>
+<span id="L82"><span class="kw">deriving</span> <span class="const token" data-verso-hover="23">DecidableEq</span></span>
+<span id="L83"></span>
+<span id="L84"><span class="dc">/-- An L2 proof: a set of L1 proofs, signed by `author` (line 63). -/</span></span>
+<span id="L85"><span class="kw">structure</span> <span class="const token" data-verso-hover="743">L2</span> (P M : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L86">  <span class="const token" data-verso-hover="806">author</span> : P</span>
+<span id="L87">  <span class="const token" data-verso-hover="807">proofs</span> : <span class="const token" data-verso-hover="60">Finset</span> (<span class="const token" data-verso-hover="760">L1</span> P M)</span>
+<span id="L88"><span class="kw">deriving</span> <span class="const token" data-verso-hover="23">DecidableEq</span></span>
+<span id="L89"></span>
+<span id="L90"><span class="dc">/-- Register contents. -/</span></span>
+<span id="L91"><span class="kw">inductive</span> <span class="const token" data-verso-hover="576">Val</span> (P M : <span class="kw">Type</span>)</span>
+<span id="L92">  | <span class="const token" data-verso-hover="604">bot</span></span>
+<span id="L93">  | <span class="const token" data-verso-hover="588">cp</span> (c : <span class="const token" data-verso-hover="601">Copy</span> P M)</span>
+<span id="L94">  | <span class="const token" data-verso-hover="761">p1</span> (π : <span class="const token" data-verso-hover="760">L1</span> P M)</span>
+<span id="L95">  | <span class="const token" data-verso-hover="719">p2</span> (ρ : <span class="const token" data-verso-hover="743">L2</span> P M)</span>
+<span id="L96"></span>
+<span id="L97"><span class="dc">/-- What a signature signs. -/</span></span>
+<span id="L98"><span class="kw">inductive</span> <span class="const token" data-verso-hover="579">Sig</span> (P M : <span class="kw">Type</span>)</span>
+<span id="L99">  | <span class="const token" data-verso-hover="808">base</span> (b : <span class="const token" data-verso-hover="606">Base</span> P M)</span>
+<span id="L100">  | <span class="const token" data-verso-hover="809">endorse</span> (b : <span class="const token" data-verso-hover="606">Base</span> P M)</span>
+<span id="L101">  | <span class="const token" data-verso-hover="810">l1</span> (π : <span class="const token" data-verso-hover="760">L1</span> P M)</span>
+<span id="L102">  | <span class="const token" data-verso-hover="811">l2</span> (ρ : <span class="const token" data-verso-hover="743">L2</span> P M)</span>
+<span id="L103"></span>
+<span id="L104"><span class="dc">/-- Signatures contained in a copy. -/</span></span>
+<span id="L105"><span class="kw">def</span> <span class="const token" data-verso-hover="812">Copy.sigs</span> {P M : <span class="kw">Type</span>} (c : <span class="const token" data-verso-hover="601">Copy</span> P M) : <span class="const token" data-verso-hover="386">Set</span> (P × <span class="const token" data-verso-hover="579">Sig</span> P M) :=</span>
+<span id="L106">  {(c.<span class="const token" data-verso-hover="624">base</span>.<span class="const token" data-verso-hover="753">sender</span>, <span class="const token" data-verso-hover="808">.</span>base c.<span class="const token" data-verso-hover="624">base</span>), (c.<span class="const token" data-verso-hover="803">signer</span>, <span class="const token" data-verso-hover="809">.</span>endorse c.<span class="const token" data-verso-hover="624">base</span>)}</span>
+<span id="L107"></span>
+<span id="L108"><span class="dc">/-- Signatures contained in an L1 proof. -/</span></span>
+<span id="L109"><span class="kw">def</span> <span class="const token" data-verso-hover="813">L1.sigs</span> {P M : <span class="kw">Type</span>} (π : <span class="const token" data-verso-hover="760">L1</span> P M) : <span class="const token" data-verso-hover="386">Set</span> (P × <span class="const token" data-verso-hover="579">Sig</span> P M) :=</span>
+<span id="L110">  {x | x = (π.<span class="const token" data-verso-hover="804">author</span>, <span class="const token" data-verso-hover="810">.</span>l1 π) ∨ ∃ c ∈ π.<span class="const token" data-verso-hover="805">copies</span>, x ∈ c.<span class="const token" data-verso-hover="812">sigs</span>}</span>
+<span id="L111"></span>
+<span id="L112"><span class="dc">/-- Signatures contained in an L2 proof. -/</span></span>
+<span id="L113"><span class="kw">def</span> <span class="const token" data-verso-hover="814">L2.sigs</span> {P M : <span class="kw">Type</span>} (ρ : <span class="const token" data-verso-hover="743">L2</span> P M) : <span class="const token" data-verso-hover="386">Set</span> (P × <span class="const token" data-verso-hover="579">Sig</span> P M) :=</span>
+<span id="L114">  {x | x = (ρ.<span class="const token" data-verso-hover="806">author</span>, <span class="const token" data-verso-hover="811">.</span>l2 ρ) ∨ ∃ π ∈ ρ.<span class="const token" data-verso-hover="807">proofs</span>, x ∈ π.<span class="const token" data-verso-hover="813">sigs</span>}</span>
+<span id="L115"></span>
+<span id="L116"><span class="dc">/-- Signatures contained in a register value. -/</span></span>
+<span id="L117"><span class="kw">def</span> <span class="const token" data-verso-hover="815">Val.sigs</span> {P M : <span class="kw">Type</span>} : <span class="const token" data-verso-hover="576">Val</span> P M → <span class="const token" data-verso-hover="386">Set</span> (P × <span class="const token" data-verso-hover="579">Sig</span> P M)</span>
+<span id="L118">  | <span class="const token" data-verso-hover="604">.</span>bot =&gt; ∅</span>
+<span id="L119">  | <span class="const token" data-verso-hover="588">.</span>cp c =&gt; c.<span class="const token" data-verso-hover="812">sigs</span></span>
+<span id="L120">  | <span class="const token" data-verso-hover="761">.</span>p1 π =&gt; π.<span class="const token" data-verso-hover="813">sigs</span></span>
+<span id="L121">  | <span class="const token" data-verso-hover="719">.</span>p2 ρ =&gt; ρ.<span class="const token" data-verso-hover="814">sigs</span></span>
+<span id="L122"></span>
+<span id="L123"><span class="dc">/-- Unforgeability: every signature of a correct process in `v` was produced by it. -/</span></span>
+<span id="L124"><span class="kw">def</span> <span class="const token" data-verso-hover="816">SigOK</span> {P M : <span class="kw">Type</span>} (F : <span class="const token" data-verso-hover="60">Finset</span> P) (signed : <span class="const token" data-verso-hover="386">Set</span> (P × <span class="const token" data-verso-hover="579">Sig</span> P M)) (v : <span class="const token" data-verso-hover="576">Val</span> P M) : <span class="kw">Prop</span> :=</span>
+<span id="L125">  ∀ x ∈ v.<span class="const token" data-verso-hover="815">sigs</span>, x.<span class="const token" data-verso-hover="52">1</span> ∉ F → x ∈ signed</span>
+<span id="L126"></span>
+<span id="L127"><span class="dc">/-- A valid L1 proof for `(q, k, m)` ("majority" = `f + 1`). Copies with the same base are</span></span>
+<span id="L128"><span class="dc">distinct iff their endorsers are, so the endorsers are distinct. -/</span></span>
+<span id="L129"><span class="kw">def</span> <span class="const token" data-verso-hover="817">L1Valid</span> {P M : <span class="kw">Type</span>} (f : <span class="const token" data-verso-hover="47">ℕ</span>) (q : P) (k : <span class="const token" data-verso-hover="47">ℕ</span>) (m : M) (π : <span class="const token" data-verso-hover="760">L1</span> P M) : <span class="kw">Prop</span> :=</span>
+<span id="L130">  f + <span class="nu">1</span> ≤ π.<span class="const token" data-verso-hover="805">copies</span>.<span class="const token" data-verso-hover="76">card</span> ∧ ∀ c ∈ π.<span class="const token" data-verso-hover="805">copies</span>, c.<span class="const token" data-verso-hover="624">base</span> = ⟨q, k, m⟩</span>
+<span id="L131"></span>
+<span id="L132"><span class="dc">/-- A valid L2 proof for `(q, k, m)`: valid L1 proofs for `(q,k,m)` by `≥ f+1` distinct authors. -/</span></span>
+<span id="L133"><span class="kw">def</span> <span class="const token" data-verso-hover="720">L2Valid</span> {P M : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="23">DecidableEq</span> P] (f : <span class="const token" data-verso-hover="47">ℕ</span>) (q : P) (k : <span class="const token" data-verso-hover="47">ℕ</span>) (m : M) (ρ : <span class="const token" data-verso-hover="743">L2</span> P M) : <span class="kw">Prop</span> :=</span>
+<span id="L134">  f + <span class="nu">1</span> ≤ (ρ.<span class="const token" data-verso-hover="807">proofs</span>.<span class="const token" data-verso-hover="818">image</span> <span class="const token" data-verso-hover="804">L1.author</span>).<span class="const token" data-verso-hover="76">card</span> ∧ ∀ π ∈ ρ.<span class="const token" data-verso-hover="807">proofs</span>, <span class="const token" data-verso-hover="817">L1Valid</span> f q k m π</span>
+<span id="L135"></span>
+<span id="L136"><span class="dc">/-! ### Registers and program counters -/</span></span>
+<span id="L137"></span>
+<span id="L138"><span class="kw">inductive</span> <span class="const token" data-verso-hover="730">Kind</span></span>
+<span id="L139">  | <span class="const token" data-verso-hover="586">val</span> | <span class="const token" data-verso-hover="699">l1</span> | <span class="const token" data-verso-hover="697">l2</span></span>
+<span id="L140"><span class="kw">deriving</span> <span class="const token" data-verso-hover="23">DecidableEq</span></span>
+<span id="L141"></span>
+<span id="L142"><span class="dc">/-- Register `X[owner, key, sender]`, `X ∈ {Value, L1Proof, L2Proof}`. -/</span></span>
+<span id="L143"><span class="kw">structure</span> <span class="const token" data-verso-hover="575">Reg</span> (P : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L144">  <span class="const token" data-verso-hover="779">kind</span> : <span class="const token" data-verso-hover="730">Kind</span></span>
+<span id="L145">  <span class="const token" data-verso-hover="654">owner</span> : P</span>
+<span id="L146">  <span class="const token" data-verso-hover="781">key</span> : <span class="const token" data-verso-hover="47">ℕ</span></span>
+<span id="L147">  <span class="const token" data-verso-hover="780">sender</span> : P</span>
+<span id="L148"><span class="kw">deriving</span> <span class="const token" data-verso-hover="23">DecidableEq</span></span>
+<span id="L149"></span>
+<span id="L150"><span class="dc">/-- Per-sender state of Algorithm 2 (line 9). -/</span></span>
+<span id="L151"><span class="kw">inductive</span> <span class="const token" data-verso-hover="522">Phase</span></span>
+<span id="L152">  | <span class="const token" data-verso-hover="524">wfs</span> | <span class="const token" data-verso-hover="527">wfl1</span> | <span class="const token" data-verso-hover="530">wfl2</span></span>
+<span id="L153"><span class="kw">deriving</span> <span class="const token" data-verso-hover="23">DecidableEq</span></span>
+<span id="L154"></span>
+<span id="L155"><span class="dc">/-- Program counter of a delivery thread `(p, q)`; it always designates the pending memory</span></span>
+<span id="L156"><span class="dc">operation. `todo` is the set of slots still to be read in the current loop `for i ∈ Π`,</span></span>
+<span id="L157"><span class="dc">`acc` the set collected so far (`checkedVals` / `checkedL1Proofs`). -/</span></span>
+<span id="L158"><span class="kw">inductive</span> <span class="const token" data-verso-hover="521">PC</span> (P M : <span class="kw">Type</span>)</span>
+<span id="L159">  <span class="dc">/-- line 16: reading `L2Proof[i,k,q]` -/</span></span>
+<span id="L160">  | <span class="const token" data-verso-hover="744">rdL2</span> (i : P) (todo : <span class="const token" data-verso-hover="60">Finset</span> P)</span>
+<span id="L161">  <span class="dc">/-- line 18: writing the valid L2 proof `ρ` for message `m` to `L2Proof[p,k,q]` -/</span></span>
+<span id="L162">  | <span class="const token" data-verso-hover="745">wrCopy</span> (ρ : <span class="const token" data-verso-hover="743">L2</span> P M) (m : M)</span>
+<span id="L163">  <span class="dc">/-- line 37: reading `Value[q,k,q]` -/</span></span>
+<span id="L164">  | <span class="const token" data-verso-hover="523">rdSnd</span></span>
+<span id="L165">  <span class="dc">/-- line 40: writing the endorsement of `b` to `Value[p,k,q]` -/</span></span>
+<span id="L166">  | <span class="const token" data-verso-hover="525">wrEcho</span> (b : <span class="const token" data-verso-hover="606">Base</span> P M)</span>
+<span id="L167">  <span class="dc">/-- line 46: reading `Value[i,k,q]` -/</span></span>
+<span id="L168">  | <span class="const token" data-verso-hover="526">rdVal</span> (i : P) (todo : <span class="const token" data-verso-hover="60">Finset</span> P) (acc : <span class="const token" data-verso-hover="60">Finset</span> (<span class="const token" data-verso-hover="601">Copy</span> P M))</span>
+<span id="L169">  <span class="dc">/-- line 52: writing the L1 proof `π` to `L1Proof[p,k,q]` -/</span></span>
+<span id="L170">  | <span class="const token" data-verso-hover="528">wrL1</span> (π : <span class="const token" data-verso-hover="760">L1</span> P M)</span>
+<span id="L171">  <span class="dc">/-- line 58: reading `L1Proof[i,k,q]` -/</span></span>
+<span id="L172">  | <span class="const token" data-verso-hover="529">rdL1</span> (i : P) (todo : <span class="const token" data-verso-hover="60">Finset</span> P) (acc : <span class="const token" data-verso-hover="60">Finset</span> (<span class="const token" data-verso-hover="760">L1</span> P M))</span>
+<span id="L173">  <span class="dc">/-- line 64: writing the L2 proof `ρ` to `L2Proof[p,k,q]` -/</span></span>
+<span id="L174">  | <span class="const token" data-verso-hover="531">wrL2</span> (ρ : <span class="const token" data-verso-hover="743">L2</span> P M)</span>
+<span id="L175"></span>
+<span id="L176"><span class="kw">section</span> Defs</span>
+<span id="L177"></span>
+<span id="L178"><span class="kw">variable</span> {P M : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="65">Fintype</span> P] [<span class="const token" data-verso-hover="23">DecidableEq</span> P] [<span class="const token" data-verso-hover="23">DecidableEq</span> M]</span>
+<span id="L179"></span>
+<span id="L180"><span class="dc">/-- The register read by a pending read of thread `(p,q)` working on key `k`. -/</span></span>
+<span id="L181"><span class="kw">def</span> <span class="const token" data-verso-hover="593">PC.rd</span> (q : P) (k : <span class="const token" data-verso-hover="47">ℕ</span>) : <span class="const token" data-verso-hover="521">PC</span> P M → <span class="const token" data-verso-hover="38">Option</span> (<span class="const token" data-verso-hover="575">Reg</span> P)</span>
+<span id="L182">  | <span class="const token" data-verso-hover="744">.</span>rdL2 i _ =&gt; <span class="const token" data-verso-hover="62">some</span> ⟨<span class="const token" data-verso-hover="697">.</span>l2, i, k, q⟩</span>
+<span id="L183">  | <span class="const token" data-verso-hover="523">.</span>rdSnd =&gt; <span class="const token" data-verso-hover="62">some</span> ⟨<span class="const token" data-verso-hover="586">.</span>val, q, k, q⟩</span>
+<span id="L184">  | <span class="const token" data-verso-hover="526">.</span>rdVal i _ _ =&gt; <span class="const token" data-verso-hover="62">some</span> ⟨<span class="const token" data-verso-hover="586">.</span>val, i, k, q⟩</span>
+<span id="L185">  | <span class="const token" data-verso-hover="529">.</span>rdL1 i _ _ =&gt; <span class="const token" data-verso-hover="62">some</span> ⟨<span class="const token" data-verso-hover="699">.</span>l1, i, k, q⟩</span>
+<span id="L186">  | _ =&gt; <span class="const token" data-verso-hover="94">none</span></span>
+<span id="L187"></span>
+<span id="L188"><span class="dc">/-- The register and value of a pending write of thread `(p,q)` working on key `k`. -/</span></span>
+<span id="L189"><span class="kw">def</span> <span class="const token" data-verso-hover="585">PC.wr</span> (p q : P) (k : <span class="const token" data-verso-hover="47">ℕ</span>) : <span class="const token" data-verso-hover="521">PC</span> P M → <span class="const token" data-verso-hover="38">Option</span> (<span class="const token" data-verso-hover="575">Reg</span> P × <span class="const token" data-verso-hover="576">Val</span> P M)</span>
+<span id="L190">  | <span class="const token" data-verso-hover="745">.</span>wrCopy ρ _ =&gt; <span class="const token" data-verso-hover="62">some</span> (⟨<span class="const token" data-verso-hover="697">.</span>l2, p, k, q⟩, <span class="const token" data-verso-hover="719">.</span>p2 ρ)</span>
+<span id="L191">  | <span class="const token" data-verso-hover="525">.</span>wrEcho b =&gt; <span class="const token" data-verso-hover="62">some</span> (⟨<span class="const token" data-verso-hover="586">.</span>val, p, k, q⟩, <span class="const token" data-verso-hover="588">.</span>cp ⟨p, b⟩)</span>
+<span id="L192">  | <span class="const token" data-verso-hover="528">.</span>wrL1 π =&gt; <span class="const token" data-verso-hover="62">some</span> (⟨<span class="const token" data-verso-hover="699">.</span>l1, p, k, q⟩, <span class="const token" data-verso-hover="761">.</span>p1 π)</span>
+<span id="L193">  | <span class="const token" data-verso-hover="531">.</span>wrL2 ρ =&gt; <span class="const token" data-verso-hover="62">some</span> (⟨<span class="const token" data-verso-hover="697">.</span>l2, p, k, q⟩, <span class="const token" data-verso-hover="719">.</span>p2 ρ)</span>
+<span id="L194">  | _ =&gt; <span class="const token" data-verso-hover="94">none</span></span>
+<span id="L195"></span>
+<span id="L196"><span class="dc">/-- Start of `try_deliver`: first read of the loop of `checkL2proof`, at slot `j`. -/</span></span>
+<span id="L197"><span class="kw">def</span> <span class="const token" data-verso-hover="613">PC.start</span> (j : P) : <span class="const token" data-verso-hover="521">PC</span> P M := <span class="const token" data-verso-hover="744">.</span>rdL2 j (<span class="const token" data-verso-hover="67">Finset.univ</span>.<span class="const token" data-verso-hover="747">erase</span> j)</span>
+<span id="L198"></span>
+<span id="L199"><span class="dc">/-- Line 47 (charitable): add the value read from `Value[i,k,q]` to `checkedVals` if it is an</span></span>
+<span id="L200"><span class="dc">endorsement by `i` of a pair signed by `q` with key `k`. -/</span></span>
+<span id="L201"><span class="kw">def</span> <span class="const token" data-verso-hover="623">addVal</span> (i q : P) (k : <span class="const token" data-verso-hover="47">ℕ</span>) : <span class="const token" data-verso-hover="576">Val</span> P M → <span class="const token" data-verso-hover="60">Finset</span> (<span class="const token" data-verso-hover="601">Copy</span> P M) → <span class="const token" data-verso-hover="60">Finset</span> (<span class="const token" data-verso-hover="601">Copy</span> P M)</span>
+<span id="L202">  | <span class="const token" data-verso-hover="588">.</span>cp c, acc =&gt; <span class="kw">if</span> c.<span class="const token" data-verso-hover="803">signer</span> = i ∧ c.<span class="const token" data-verso-hover="624">base</span>.<span class="const token" data-verso-hover="753">sender</span> = q ∧ c.<span class="const token" data-verso-hover="624">base</span>.<span class="const token" data-verso-hover="587">key</span> = k <span class="kw">then</span> <span class="const token" data-verso-hover="290">insert</span> c acc <span class="kw">else</span> acc</span>
+<span id="L203">  | _, acc =&gt; acc</span>
+<span id="L204"></span>
+<span id="L205"><span class="dc">/-- Lines 59–60: collect the L1 proofs read (validity is checked when the L2 proof is formed). -/</span></span>
+<span id="L206"><span class="kw">def</span> <span class="const token" data-verso-hover="763">addL1</span> : <span class="const token" data-verso-hover="576">Val</span> P M → <span class="const token" data-verso-hover="60">Finset</span> (<span class="const token" data-verso-hover="760">L1</span> P M) → <span class="const token" data-verso-hover="60">Finset</span> (<span class="const token" data-verso-hover="760">L1</span> P M)</span>
+<span id="L207">  | <span class="const token" data-verso-hover="761">.</span>p1 π, acc =&gt; <span class="const token" data-verso-hover="290">insert</span> π acc</span>
+<span id="L208">  | _, acc =&gt; acc</span>
+<span id="L209"></span>
+<span id="L210"><span class="kw">end</span> Defs</span>
+<span id="L211"></span>
+<span id="L212"><span class="dc">/-- Global state: shared memory, local states of correct processes, and ghost variables. -/</span></span>
+<span id="L213"><span class="kw">structure</span> <span class="const token" data-verso-hover="540">St</span> (P M : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L214">  <span class="dc">/-- global clock (ghost): number of steps taken so far -/</span></span>
+<span id="L215">  <span class="const token" data-verso-hover="543">now</span> : <span class="const token" data-verso-hover="47">ℕ</span></span>
+<span id="L216">  <span class="dc">/-- current value of every register -/</span></span>
+<span id="L217">  <span class="const token" data-verso-hover="545">mem</span> : <span class="const token" data-verso-hover="575">Reg</span> P → <span class="const token" data-verso-hover="576">Val</span> P M</span>
+<span id="L218">  <span class="dc">/-- program counter of delivery thread `(p, q)` -/</span></span>
+<span id="L219">  <span class="const token" data-verso-hover="547">pc</span> : P → P → <span class="const token" data-verso-hover="521">PC</span> P M</span>
+<span id="L220">  <span class="dc">/-- `last[q]` of process `p` -/</span></span>
+<span id="L221">  <span class="const token" data-verso-hover="549">last</span> : P → P → <span class="const token" data-verso-hover="47">ℕ</span></span>
+<span id="L222">  <span class="dc">/-- `state[q]` of process `p` -/</span></span>
+<span id="L223">  <span class="const token" data-verso-hover="551">phase</span> : P → P → <span class="const token" data-verso-hover="522">Phase</span></span>
+<span id="L224">  <span class="dc">/-- candidate set of the pending read of thread `(p,q)` (regular-register semantics) -/</span></span>
+<span id="L225">  <span class="const token" data-verso-hover="592">cand</span> : P → P → <span class="const token" data-verso-hover="386">Set</span> (<span class="const token" data-verso-hover="576">Val</span> P M)</span>
+<span id="L226">  <span class="dc">/-- (ghost) time at which the current L1 scan of thread `(p,q)` started -/</span></span>
+<span id="L227">  <span class="const token" data-verso-hover="553">scanT</span> : P → P → <span class="const token" data-verso-hover="47">ℕ</span></span>
+<span id="L228">  <span class="dc">/-- key of the last broadcast of `p` -/</span></span>
+<span id="L229">  <span class="const token" data-verso-hover="555">bnext</span> : P → <span class="const token" data-verso-hover="47">ℕ</span></span>
+<span id="L230">  <span class="dc">/-- pending broadcast write of `p` (line 12) -/</span></span>
+<span id="L231">  <span class="const token" data-verso-hover="557">bpend</span> : P → <span class="const token" data-verso-hover="38">Option</span> (<span class="const token" data-verso-hover="606">Base</span> P M)</span>
+<span id="L232">  <span class="dc">/-- (ghost) signatures produced by correct processes -/</span></span>
+<span id="L233">  <span class="const token" data-verso-hover="559">signed</span> : <span class="const token" data-verso-hover="386">Set</span> (P × <span class="const token" data-verso-hover="579">Sig</span> P M)</span>
+<span id="L234">  <span class="dc">/-- (ghost) `bc p k = some m` iff `p` broadcast `(k, m)` -/</span></span>
+<span id="L235">  <span class="const token" data-verso-hover="561">bc</span> : P → <span class="const token" data-verso-hover="47">ℕ</span> → <span class="const token" data-verso-hover="38">Option</span> M</span>
+<span id="L236">  <span class="dc">/-- (ghost) `dlv p q k = some m` iff `p` delivered `(k, m)` from `q` -/</span></span>
+<span id="L237">  <span class="const token" data-verso-hover="563">dlv</span> : P → P → <span class="const token" data-verso-hover="47">ℕ</span> → <span class="const token" data-verso-hover="38">Option</span> M</span>
+<span id="L238">  <span class="dc">/-- (ghost) the signed pair echoed by `p` for `(q,k)` (line 40) -/</span></span>
+<span id="L239">  <span class="const token" data-verso-hover="565">echo</span> : P → P → <span class="const token" data-verso-hover="47">ℕ</span> → <span class="const token" data-verso-hover="38">Option</span> (<span class="const token" data-verso-hover="606">Base</span> P M)</span>
+<span id="L240">  <span class="dc">/-- (ghost) time at which the echo write of `p` for `(q,k)` completed -/</span></span>
+<span id="L241">  <span class="const token" data-verso-hover="567">echoT</span> : P → P → <span class="const token" data-verso-hover="47">ℕ</span> → <span class="const token" data-verso-hover="38">Option</span> <span class="const token" data-verso-hover="47">ℕ</span></span>
+<span id="L242">  <span class="dc">/-- (ghost) the pair supported by the L1 proof of `p` for `(q,k)` and the start time of the</span></span>
+<span id="L243"><span class="dc">  scan it was built from -/</span></span>
+<span id="L244">  <span class="const token" data-verso-hover="569">l1</span> : P → P → <span class="const token" data-verso-hover="47">ℕ</span> → <span class="const token" data-verso-hover="38">Option</span> (<span class="const token" data-verso-hover="606">Base</span> P M × <span class="const token" data-verso-hover="47">ℕ</span>)</span>
+<span id="L245"></span>
+<span id="L246"><span class="kw">namespace</span> St</span>
+<span id="L247"></span>
+<span id="L248"><span class="kw">variable</span> {P M : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="65">Fintype</span> P] [<span class="const token" data-verso-hover="23">DecidableEq</span> P] [<span class="const token" data-verso-hover="23">DecidableEq</span> M]</span>
+<span id="L249"></span>
+<span id="L250"><span class="dc">/-- Two-argument function update. -/</span></span>
+<span id="L251"><span class="kw">def</span> <span class="const token" data-verso-hover="533">upd2</span> {X : <span class="kw">Type</span>} (g : P → P → X) (p q : P) (x : X) : P → P → X :=</span>
+<span id="L252">  <span class="const token" data-verso-hover="50">Function.update</span> g p (<span class="const token" data-verso-hover="50">Function.update</span> (g p) q x)</span>
+<span id="L253"></span>
+<span id="L254"><span class="dc">/-- Three-argument function update. -/</span></span>
+<span id="L255"><span class="kw">def</span> <span class="const token" data-verso-hover="535">upd3</span> {X : <span class="kw">Type</span>} (g : P → P → <span class="const token" data-verso-hover="47">ℕ</span> → X) (p q : P) (k : <span class="const token" data-verso-hover="47">ℕ</span>) (x : X) : P → P → <span class="const token" data-verso-hover="47">ℕ</span> → X :=</span>
+<span id="L256">  <span class="const token" data-verso-hover="50">Function.update</span> g p (<span class="const token" data-verso-hover="50">Function.update</span> (g p) q (<span class="const token" data-verso-hover="50">Function.update</span> (g p q) k x))</span>
+<span id="L257"></span>
+<span id="L258"><span class="kw">variable</span> (s : <span class="const token" data-verso-hover="540">St</span> P M)</span>
+<span id="L259"></span>
+<span id="L260"><span class="dc">/-- The key thread `(p,q)` currently works on (charitable: `last[q] + 1`). -/</span></span>
+<span id="L261"><span class="kw">def</span> <span class="const token" data-verso-hover="571">key</span> (p q : P) : <span class="const token" data-verso-hover="47">ℕ</span> := s.<span class="const token" data-verso-hover="549">last</span> p q + <span class="nu">1</span></span>
+<span id="L262"></span>
+<span id="L263"><span class="dc">/-- Values of the pending writes to `r`. -/</span></span>
+<span id="L264"><span class="kw">def</span> <span class="const token" data-verso-hover="584">pendW</span> (r : <span class="const token" data-verso-hover="575">Reg</span> P) : <span class="const token" data-verso-hover="386">Set</span> (<span class="const token" data-verso-hover="576">Val</span> P M) :=</span>
+<span id="L265">  {v | (∃ p q, (s.<span class="const token" data-verso-hover="547">pc</span> p q).<span class="const token" data-verso-hover="585">wr</span> p q (s.<span class="const token" data-verso-hover="571">key</span> p q) = <span class="const token" data-verso-hover="62">some</span> (r, v)) ∨</span>
+<span id="L266">       ∃ p b, s.<span class="const token" data-verso-hover="557">bpend</span> p = <span class="const token" data-verso-hover="62">some</span> b ∧ r = ⟨<span class="const token" data-verso-hover="586">.</span>val, p, b.<span class="const token" data-verso-hover="587">key</span>, p⟩ ∧ v = <span class="const token" data-verso-hover="588">.</span>cp ⟨p, b⟩}</span>
+<span id="L267"></span>
+<span id="L268"><span class="dc">/-- A write of `v` to `r` is invoked: `v` becomes a candidate of every pending read of `r`. -/</span></span>
+<span id="L269"><span class="kw">def</span> <span class="const token" data-verso-hover="591">addCand</span> (r : <span class="const token" data-verso-hover="575">Reg</span> P) (v : <span class="const token" data-verso-hover="576">Val</span> P M) : P → P → <span class="const token" data-verso-hover="386">Set</span> (<span class="const token" data-verso-hover="576">Val</span> P M) :=</span>
+<span id="L270">  <span class="kw">fun</span> p q =&gt; <span class="kw">if</span> (s.<span class="const token" data-verso-hover="547">pc</span> p q).<span class="const token" data-verso-hover="593">rd</span> q (s.<span class="const token" data-verso-hover="571">key</span> p q) = <span class="const token" data-verso-hover="62">some</span> r <span class="kw">then</span> <span class="const token" data-verso-hover="290">insert</span> v (s.<span class="const token" data-verso-hover="592">cand</span> p q) <span class="kw">else</span> s.<span class="const token" data-verso-hover="592">cand</span> p q</span>
+<span id="L271"></span>
+<span id="L272"><span class="dc">/-- Thread `(p,q)` moves to program counter `c` and invokes the corresponding operation. -/</span></span>
+<span id="L273"><span class="kw">def</span> <span class="const token" data-verso-hover="542">go</span> (p q : P) (c : <span class="const token" data-verso-hover="521">PC</span> P M) : <span class="const token" data-verso-hover="540">St</span> P M :=</span>
+<span id="L274">  <span class="kw">let</span> s1 : <span class="const token" data-verso-hover="540">St</span> P M := { s <span class="kw">with</span> <span class="const token" data-verso-hover="547">pc</span> := <span class="const token" data-verso-hover="533">upd2</span> s.<span class="const token" data-verso-hover="547">pc</span> p q c }</span>
+<span id="L275">  <span class="kw">match</span> c.<span class="const token" data-verso-hover="593">rd</span> q (s.<span class="const token" data-verso-hover="571">key</span> p q), c.<span class="const token" data-verso-hover="585">wr</span> p q (s.<span class="const token" data-verso-hover="571">key</span> p q) <span class="kw">with</span></span>
+<span id="L276">  | <span class="const token" data-verso-hover="62">some</span> r, _ =&gt; { s1 <span class="kw">with</span> <span class="const token" data-verso-hover="592">cand</span> := <span class="const token" data-verso-hover="533">upd2</span> s1.<span class="const token" data-verso-hover="592">cand</span> p q (<span class="const token" data-verso-hover="290">insert</span> (s1.<span class="const token" data-verso-hover="545">mem</span> r) (s1.<span class="const token" data-verso-hover="584">pendW</span> r)) }</span>
+<span id="L277">  | <span class="const token" data-verso-hover="94">none</span>, <span class="const token" data-verso-hover="62">some</span> (r, v) =&gt; { s1 <span class="kw">with</span> <span class="const token" data-verso-hover="592">cand</span> := s1.<span class="const token" data-verso-hover="591">addCand</span> r v }</span>
+<span id="L278">  | <span class="const token" data-verso-hover="94">none</span>, <span class="const token" data-verso-hover="94">none</span> =&gt; s1</span>
+<span id="L279"></span>
+<span id="L280"><span class="dc">/-- A write to `r` responds: the current value becomes `v`. -/</span></span>
+<span id="L281"><span class="kw">def</span> <span class="const token" data-verso-hover="577">write</span> (r : <span class="const token" data-verso-hover="575">Reg</span> P) (v : <span class="const token" data-verso-hover="576">Val</span> P M) : <span class="const token" data-verso-hover="540">St</span> P M := { s <span class="kw">with</span> <span class="const token" data-verso-hover="545">mem</span> := <span class="const token" data-verso-hover="50">Function.update</span> s.<span class="const token" data-verso-hover="545">mem</span> r v }</span>
+<span id="L282"></span>
+<span id="L283"><span class="dc">/-- A correct process signs. -/</span></span>
+<span id="L284"><span class="kw">def</span> <span class="const token" data-verso-hover="580">sign</span> (x : P × <span class="const token" data-verso-hover="579">Sig</span> P M) : <span class="const token" data-verso-hover="540">St</span> P M := { s <span class="kw">with</span> <span class="const token" data-verso-hover="559">signed</span> := <span class="const token" data-verso-hover="290">insert</span> x s.<span class="const token" data-verso-hover="559">signed</span> }</span>
+<span id="L285"></span>
+<span id="L286"><span class="dc">/-- Lines 30–32: deliver `(k, m)` from `q`, increment `last[q]`, reset `state[q]`. -/</span></span>
+<span id="L287"><span class="kw">def</span> <span class="const token" data-verso-hover="619">deliver</span> (p q : P) (m : M) : <span class="const token" data-verso-hover="540">St</span> P M :=</span>
+<span id="L288">  { s <span class="kw">with</span> <span class="const token" data-verso-hover="563">dlv</span> := <span class="const token" data-verso-hover="535">upd3</span> s.<span class="const token" data-verso-hover="563">dlv</span> p q (s.<span class="const token" data-verso-hover="571">key</span> p q) (<span class="const token" data-verso-hover="62">some</span> m), <span class="const token" data-verso-hover="549">last</span> := <span class="const token" data-verso-hover="533">upd2</span> s.<span class="const token" data-verso-hover="549">last</span> p q (s.<span class="const token" data-verso-hover="549">last</span> p q + <span class="nu">1</span>),</span>
+<span id="L289">           <span class="const token" data-verso-hover="551">phase</span> := <span class="const token" data-verso-hover="533">upd2</span> s.<span class="const token" data-verso-hover="551">phase</span> p q <span class="const token" data-verso-hover="524">.</span>wfs }</span>
+<span id="L290"></span>
+<span id="L291"><span class="dc">/-- Set `state[q]` of `p`. -/</span></span>
+<span id="L292"><span class="kw">def</span> <span class="const token" data-verso-hover="582">setPhase</span> (p q : P) (ph : <span class="const token" data-verso-hover="522">Phase</span>) : <span class="const token" data-verso-hover="540">St</span> P M := { s <span class="kw">with</span> <span class="const token" data-verso-hover="551">phase</span> := <span class="const token" data-verso-hover="533">upd2</span> s.<span class="const token" data-verso-hover="551">phase</span> p q ph }</span>
+<span id="L293"></span>
+<span id="L294"><span class="dc">/-- Line 12: `p` signs `(k, m)` (`k` = next key) and invokes the write of `Value[p,k,p]`. -/</span></span>
+<span id="L295"><span class="kw">def</span> <span class="const token" data-verso-hover="620">doBcast</span> (p : P) (m : M) : <span class="const token" data-verso-hover="540">St</span> P M :=</span>
+<span id="L296">  <span class="kw">let</span> b : <span class="const token" data-verso-hover="606">Base</span> P M := ⟨p, s.<span class="const token" data-verso-hover="555">bnext</span> p + <span class="nu">1</span>, m⟩</span>
+<span id="L297">  { s <span class="kw">with</span> <span class="const token" data-verso-hover="555">bnext</span> := <span class="const token" data-verso-hover="50">Function.update</span> s.<span class="const token" data-verso-hover="555">bnext</span> p (s.<span class="const token" data-verso-hover="555">bnext</span> p + <span class="nu">1</span>),</span>
+<span id="L298">           <span class="const token" data-verso-hover="561">bc</span> := <span class="const token" data-verso-hover="50">Function.update</span> s.<span class="const token" data-verso-hover="561">bc</span> p (<span class="const token" data-verso-hover="50">Function.update</span> (s.<span class="const token" data-verso-hover="561">bc</span> p) (s.<span class="const token" data-verso-hover="555">bnext</span> p + <span class="nu">1</span>) (<span class="const token" data-verso-hover="62">some</span> m)),</span>
+<span id="L299">           <span class="const token" data-verso-hover="559">signed</span> := <span class="const token" data-verso-hover="290">insert</span> (p, <span class="const token" data-verso-hover="808">.</span>base b) (<span class="const token" data-verso-hover="290">insert</span> (p, <span class="const token" data-verso-hover="809">.</span>endorse b) s.<span class="const token" data-verso-hover="559">signed</span>),</span>
+<span id="L300">           <span class="const token" data-verso-hover="557">bpend</span> := <span class="const token" data-verso-hover="50">Function.update</span> s.<span class="const token" data-verso-hover="557">bpend</span> p (<span class="const token" data-verso-hover="62">some</span> b),</span>
+<span id="L301">           <span class="const token" data-verso-hover="592">cand</span> := s.<span class="const token" data-verso-hover="591">addCand</span> ⟨<span class="const token" data-verso-hover="586">.</span>val, p, s.<span class="const token" data-verso-hover="555">bnext</span> p + <span class="nu">1</span>, p⟩ (<span class="const token" data-verso-hover="588">.</span>cp ⟨p, b⟩) }</span>
+<span id="L302"></span>
+<span id="L303"><span class="dc">/-- Advance the clock. -/</span></span>
+<span id="L304"><span class="kw">def</span> <span class="const token" data-verso-hover="573">tick</span> : <span class="const token" data-verso-hover="540">St</span> P M := { s <span class="kw">with</span> <span class="const token" data-verso-hover="543">now</span> := s.<span class="const token" data-verso-hover="543">now</span> + <span class="nu">1</span> }</span>
+<span id="L305"></span>
+<span id="L306"><span class="dc">/-- Initial state: every delivery thread starts `try_deliver` on key `1`. -/</span></span>
+<span id="L307"><span class="kw">def</span> <span class="const token" data-verso-hover="612">init</span> [<span class="const token" data-verso-hover="611">Inhabited</span> P] : <span class="const token" data-verso-hover="540">St</span> P M <span class="kw">where</span></span>
+<span id="L308">  <span class="const token" data-verso-hover="543">now</span> := <span class="nu">0</span></span>
+<span id="L309">  <span class="const token" data-verso-hover="545">mem</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="604">.</span>bot</span>
+<span id="L310">  <span class="const token" data-verso-hover="547">pc</span> := <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="613">PC.start</span> <span class="const token" data-verso-hover="819">default</span></span>
+<span id="L311">  <span class="const token" data-verso-hover="549">last</span> := <span class="kw">fun</span> _ _ =&gt; <span class="nu">0</span></span>
+<span id="L312">  <span class="const token" data-verso-hover="551">phase</span> := <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="524">.</span>wfs</span>
+<span id="L313">  <span class="const token" data-verso-hover="592">cand</span> := <span class="kw">fun</span> _ _ =&gt; {<span class="const token" data-verso-hover="604">.</span>bot}</span>
+<span id="L314">  <span class="const token" data-verso-hover="553">scanT</span> := <span class="kw">fun</span> _ _ =&gt; <span class="nu">0</span></span>
+<span id="L315">  <span class="const token" data-verso-hover="555">bnext</span> := <span class="kw">fun</span> _ =&gt; <span class="nu">0</span></span>
+<span id="L316">  <span class="const token" data-verso-hover="557">bpend</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="94">none</span></span>
+<span id="L317">  <span class="const token" data-verso-hover="559">signed</span> := ∅</span>
+<span id="L318">  <span class="const token" data-verso-hover="561">bc</span> := <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="94">none</span></span>
+<span id="L319">  <span class="const token" data-verso-hover="563">dlv</span> := <span class="kw">fun</span> _ _ _ =&gt; <span class="const token" data-verso-hover="94">none</span></span>
+<span id="L320">  <span class="const token" data-verso-hover="565">echo</span> := <span class="kw">fun</span> _ _ _ =&gt; <span class="const token" data-verso-hover="94">none</span></span>
+<span id="L321">  <span class="const token" data-verso-hover="567">echoT</span> := <span class="kw">fun</span> _ _ _ =&gt; <span class="const token" data-verso-hover="94">none</span></span>
+<span id="L322">  <span class="const token" data-verso-hover="569">l1</span> := <span class="kw">fun</span> _ _ _ =&gt; <span class="const token" data-verso-hover="94">none</span></span>
+<span id="L323"></span>
+<span id="L324"><span class="kw">end</span> St</span>
+<span id="L325"></span>
+<span id="L326"><span class="dc">/-- Step labels: a step of delivery thread `(p,q)`, a broadcast invocation / response of `p`,</span></span>
+<span id="L327"><span class="dc">or a write of a Byzantine process. -/</span></span>
+<span id="L328"><span class="kw">inductive</span> <span class="const token" data-verso-hover="615">Label</span> (P M : <span class="kw">Type</span>)</span>
+<span id="L329">  | <span class="const token" data-verso-hover="622">thr</span> (p q : P)</span>
+<span id="L330">  | <span class="const token" data-verso-hover="704">bcast</span> (p : P) (m : M)</span>
+<span id="L331">  | <span class="const token" data-verso-hover="820">bret</span> (p : P)</span>
+<span id="L332">  | <span class="const token" data-verso-hover="705">byz</span> (p : P) (r : <span class="const token" data-verso-hover="575">Reg</span> P) (v : <span class="const token" data-verso-hover="576">Val</span> P M)</span>
+<span id="L333"></span>
+<span id="L334"><span class="kw">section</span> Step</span>
+<span id="L335"></span>
+<span id="L336"><span class="kw">variable</span> {P M : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="65">Fintype</span> P] [<span class="const token" data-verso-hover="23">DecidableEq</span> P] [<span class="const token" data-verso-hover="23">DecidableEq</span> M]</span>
+<span id="L337"><span class="kw">variable</span> (F : <span class="const token" data-verso-hover="60">Finset</span> P) (f : <span class="const token" data-verso-hover="47">ℕ</span>)</span>
+<span id="L338"></span>
+<span id="L339"><span class="kw">open</span> St</span>
+<span id="L340"></span>
+<span id="L341"><span class="dc">/-- One step of the system (Algorithm 2 for correct processes, arbitrary own-register writes</span></span>
+<span id="L342"><span class="dc">respecting unforgeability for Byzantine ones). -/</span></span>
+<span id="L343"><span class="kw">inductive</span> <span class="const token" data-verso-hover="616">Step</span> : <span class="const token" data-verso-hover="540">St</span> P M → <span class="const token" data-verso-hover="615">Label</span> P M → <span class="const token" data-verso-hover="540">St</span> P M → <span class="kw">Prop</span></span>
+<span id="L344">  <span class="dc">/-- lines 16–18: a valid L2 proof is read; write it to the own slot -/</span></span>
+<span id="L345">  | <span class="const token" data-verso-hover="768">l2Found</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p q i : P} {todo v ρ m} (hp : p ∉ F) (hpc : s.<span class="const token" data-verso-hover="547">pc</span> p q = <span class="const token" data-verso-hover="744">.</span>rdL2 i todo)</span>
+<span id="L346">      (hv : v ∈ s.<span class="const token" data-verso-hover="592">cand</span> p q) (hρ : v = <span class="const token" data-verso-hover="719">.</span>p2 ρ) (hval : <span class="const token" data-verso-hover="720">L2Valid</span> f q (s.<span class="const token" data-verso-hover="571">key</span> p q) m ρ) :</span>
+<span id="L347">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="622">.</span>thr p q) ((s.<span class="const token" data-verso-hover="542">go</span> p q (<span class="const token" data-verso-hover="745">.</span>wrCopy ρ m)).<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L348">  <span class="dc">/-- line 15: the slot read holds no valid L2 proof; read the next slot -/</span></span>
+<span id="L349">  | <span class="const token" data-verso-hover="769">l2Next</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p q i j : P} {todo v} (hp : p ∉ F) (hpc : s.<span class="const token" data-verso-hover="547">pc</span> p q = <span class="const token" data-verso-hover="744">.</span>rdL2 i todo)</span>
+<span id="L350">      (hv : v ∈ s.<span class="const token" data-verso-hover="592">cand</span> p q) (hnv : ¬ ∃ ρ m, v = <span class="const token" data-verso-hover="719">.</span>p2 ρ ∧ <span class="const token" data-verso-hover="720">L2Valid</span> f q (s.<span class="const token" data-verso-hover="571">key</span> p q) m ρ)</span>
+<span id="L351">      (hj : j ∈ todo) :</span>
+<span id="L352">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="622">.</span>thr p q) ((s.<span class="const token" data-verso-hover="542">go</span> p q (<span class="const token" data-verso-hover="744">.</span>rdL2 j (todo.<span class="const token" data-verso-hover="747">erase</span> j))).<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L353">  <span class="dc">/-- line 20, `state = WaitForSender`: read `Value[q,k,q]` (line 37) -/</span></span>
+<span id="L354">  | <span class="const token" data-verso-hover="770">l2EndS</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p q i : P} {v} (hp : p ∉ F) (hpc : s.<span class="const token" data-verso-hover="547">pc</span> p q = <span class="const token" data-verso-hover="744">.</span>rdL2 i ∅)</span>
+<span id="L355">      (hv : v ∈ s.<span class="const token" data-verso-hover="592">cand</span> p q) (hnv : ¬ ∃ ρ m, v = <span class="const token" data-verso-hover="719">.</span>p2 ρ ∧ <span class="const token" data-verso-hover="720">L2Valid</span> f q (s.<span class="const token" data-verso-hover="571">key</span> p q) m ρ)</span>
+<span id="L356">      (hph : s.<span class="const token" data-verso-hover="551">phase</span> p q = <span class="const token" data-verso-hover="524">.</span>wfs) :</span>
+<span id="L357">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="622">.</span>thr p q) ((s.<span class="const token" data-verso-hover="542">go</span> p q <span class="const token" data-verso-hover="523">.</span>rdSnd).<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L358">  <span class="dc">/-- line 20, `state = WaitForL1Proof`: start the scan of the `Value` slots (line 45) -/</span></span>
+<span id="L359">  | <span class="const token" data-verso-hover="671">l2EndV</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p q i j : P} {v} (hp : p ∉ F) (hpc : s.<span class="const token" data-verso-hover="547">pc</span> p q = <span class="const token" data-verso-hover="744">.</span>rdL2 i ∅)</span>
+<span id="L360">      (hv : v ∈ s.<span class="const token" data-verso-hover="592">cand</span> p q) (hnv : ¬ ∃ ρ m, v = <span class="const token" data-verso-hover="719">.</span>p2 ρ ∧ <span class="const token" data-verso-hover="720">L2Valid</span> f q (s.<span class="const token" data-verso-hover="571">key</span> p q) m ρ)</span>
+<span id="L361">      (hph : s.<span class="const token" data-verso-hover="551">phase</span> p q = <span class="const token" data-verso-hover="527">.</span>wfl1) :</span>
+<span id="L362">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="622">.</span>thr p q)</span>
+<span id="L363">        ({ s.<span class="const token" data-verso-hover="542">go</span> p q (<span class="const token" data-verso-hover="526">.</span>rdVal j (<span class="const token" data-verso-hover="67">Finset.univ</span>.<span class="const token" data-verso-hover="747">erase</span> j) ∅) <span class="kw">with</span></span>
+<span id="L364">            <span class="const token" data-verso-hover="553">scanT</span> := <span class="const token" data-verso-hover="533">upd2</span> s.<span class="const token" data-verso-hover="553">scanT</span> p q s.<span class="const token" data-verso-hover="543">now</span> }.<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L365">  <span class="dc">/-- line 20, `state = WaitForL2Proof`: start the scan of the `L1Proof` slots (line 57) -/</span></span>
+<span id="L366">  | <span class="const token" data-verso-hover="771">l2EndL</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p q i j : P} {v} (hp : p ∉ F) (hpc : s.<span class="const token" data-verso-hover="547">pc</span> p q = <span class="const token" data-verso-hover="744">.</span>rdL2 i ∅)</span>
+<span id="L367">      (hv : v ∈ s.<span class="const token" data-verso-hover="592">cand</span> p q) (hnv : ¬ ∃ ρ m, v = <span class="const token" data-verso-hover="719">.</span>p2 ρ ∧ <span class="const token" data-verso-hover="720">L2Valid</span> f q (s.<span class="const token" data-verso-hover="571">key</span> p q) m ρ)</span>
+<span id="L368">      (hph : s.<span class="const token" data-verso-hover="551">phase</span> p q = <span class="const token" data-verso-hover="530">.</span>wfl2) :</span>
+<span id="L369">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="622">.</span>thr p q) ((s.<span class="const token" data-verso-hover="542">go</span> p q (<span class="const token" data-verso-hover="529">.</span>rdL1 j (<span class="const token" data-verso-hover="67">Finset.univ</span>.<span class="const token" data-verso-hover="747">erase</span> j) ∅)).<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L370">  <span class="dc">/-- line 18 completes; lines 30–33: deliver and start the next `try_deliver` -/</span></span>
+<span id="L371">  | <span class="const token" data-verso-hover="696">copyDone</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p q j : P} {ρ m} (hp : p ∉ F) (hpc : s.<span class="const token" data-verso-hover="547">pc</span> p q = <span class="const token" data-verso-hover="745">.</span>wrCopy ρ m) :</span>
+<span id="L372">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="622">.</span>thr p q)</span>
+<span id="L373">        ((((s.<span class="const token" data-verso-hover="577">write</span> ⟨<span class="const token" data-verso-hover="697">.</span>l2, p, s.<span class="const token" data-verso-hover="571">key</span> p q, q⟩ (<span class="const token" data-verso-hover="719">.</span>p2 ρ)).<span class="const token" data-verso-hover="619">deliver</span> p q m).<span class="const token" data-verso-hover="542">go</span> p q (<span class="const token" data-verso-hover="613">PC.start</span> j)).<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L374">  <span class="dc">/-- lines 37–40: a valid signed pair is read; sign it and write it to the own slot -/</span></span>
+<span id="L375">  | <span class="const token" data-verso-hover="772">sndOk</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p q : P} {v c} (hp : p ∉ F) (hpc : s.<span class="const token" data-verso-hover="547">pc</span> p q = <span class="const token" data-verso-hover="523">.</span>rdSnd)</span>
+<span id="L376">      (hv : v ∈ s.<span class="const token" data-verso-hover="592">cand</span> p q) (hc : v = <span class="const token" data-verso-hover="588">.</span>cp c) (hs : c.<span class="const token" data-verso-hover="624">base</span>.<span class="const token" data-verso-hover="753">sender</span> = q)</span>
+<span id="L377">      (hk : c.<span class="const token" data-verso-hover="624">base</span>.<span class="const token" data-verso-hover="587">key</span> = s.<span class="const token" data-verso-hover="571">key</span> p q) :</span>
+<span id="L378">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="622">.</span>thr p q)</span>
+<span id="L379">        ((({ s <span class="kw">with</span> <span class="const token" data-verso-hover="565">echo</span> := <span class="const token" data-verso-hover="535">upd3</span> s.<span class="const token" data-verso-hover="565">echo</span> p q (s.<span class="const token" data-verso-hover="571">key</span> p q) (<span class="const token" data-verso-hover="62">some</span> c.<span class="const token" data-verso-hover="624">base</span>) }.<span class="const token" data-verso-hover="580">sign</span></span>
+<span id="L380">            (p, <span class="const token" data-verso-hover="809">.</span>endorse c.<span class="const token" data-verso-hover="624">base</span>)).<span class="const token" data-verso-hover="542">go</span> p q (<span class="const token" data-verso-hover="525">.</span>wrEcho c.<span class="const token" data-verso-hover="624">base</span>)).<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L381">  <span class="dc">/-- lines 38–39: nothing valid read; return -/</span></span>
+<span id="L382">  | <span class="const token" data-verso-hover="773">sndBad</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p q j : P} {v} (hp : p ∉ F) (hpc : s.<span class="const token" data-verso-hover="547">pc</span> p q = <span class="const token" data-verso-hover="523">.</span>rdSnd)</span>
+<span id="L383">      (hv : v ∈ s.<span class="const token" data-verso-hover="592">cand</span> p q)</span>
+<span id="L384">      (hbad : ¬ ∃ c, v = <span class="const token" data-verso-hover="588">.</span>cp c ∧ c.<span class="const token" data-verso-hover="624">base</span>.<span class="const token" data-verso-hover="753">sender</span> = q ∧ c.<span class="const token" data-verso-hover="624">base</span>.<span class="const token" data-verso-hover="587">key</span> = s.<span class="const token" data-verso-hover="571">key</span> p q) :</span>
+<span id="L385">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="622">.</span>thr p q) ((s.<span class="const token" data-verso-hover="542">go</span> p q (<span class="const token" data-verso-hover="613">PC.start</span> j)).<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L386">  <span class="dc">/-- line 40 completes; line 41 -/</span></span>
+<span id="L387">  | <span class="const token" data-verso-hover="617">echoDone</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p q j : P} {b} (hp : p ∉ F) (hpc : s.<span class="const token" data-verso-hover="547">pc</span> p q = <span class="const token" data-verso-hover="525">.</span>wrEcho b) :</span>
+<span id="L388">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="622">.</span>thr p q)</span>
+<span id="L389">        (((({ s.<span class="const token" data-verso-hover="577">write</span> ⟨<span class="const token" data-verso-hover="586">.</span>val, p, s.<span class="const token" data-verso-hover="571">key</span> p q, q⟩ (<span class="const token" data-verso-hover="588">.</span>cp ⟨p, b⟩) <span class="kw">with</span></span>
+<span id="L390">              <span class="const token" data-verso-hover="567">echoT</span> := <span class="const token" data-verso-hover="535">upd3</span> s.<span class="const token" data-verso-hover="567">echoT</span> p q (s.<span class="const token" data-verso-hover="571">key</span> p q) (<span class="const token" data-verso-hover="62">some</span> s.<span class="const token" data-verso-hover="543">now</span>) }).<span class="const token" data-verso-hover="582">setPhase</span> p q <span class="const token" data-verso-hover="527">.</span>wfl1).<span class="const token" data-verso-hover="542">go</span> p q</span>
+<span id="L391">            (<span class="const token" data-verso-hover="613">PC.start</span> j)).<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L392">  <span class="dc">/-- lines 46–48, not the last slot -/</span></span>
+<span id="L393">  | <span class="const token" data-verso-hover="666">valNext</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p q i j : P} {todo acc v} (hp : p ∉ F)</span>
+<span id="L394">      (hpc : s.<span class="const token" data-verso-hover="547">pc</span> p q = <span class="const token" data-verso-hover="526">.</span>rdVal i todo acc) (hv : v ∈ s.<span class="const token" data-verso-hover="592">cand</span> p q) (hj : j ∈ todo) :</span>
+<span id="L395">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="622">.</span>thr p q)</span>
+<span id="L396">        ((s.<span class="const token" data-verso-hover="542">go</span> p q (<span class="const token" data-verso-hover="526">.</span>rdVal j (todo.<span class="const token" data-verso-hover="747">erase</span> j) (<span class="const token" data-verso-hover="623">addVal</span> i q (s.<span class="const token" data-verso-hover="571">key</span> p q) v acc))).<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L397">  <span class="dc">/-- lines 46–52, last slot, the check of line 50 succeeds: sign and write the L1 proof -/</span></span>
+<span id="L398">  | <span class="const token" data-verso-hover="625">valOk</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p q i : P} {acc v b} (hp : p ∉ F) (hpc : s.<span class="const token" data-verso-hover="547">pc</span> p q = <span class="const token" data-verso-hover="526">.</span>rdVal i ∅ acc)</span>
+<span id="L399">      (hv : v ∈ s.<span class="const token" data-verso-hover="592">cand</span> p q) (hcard : f + <span class="nu">1</span> ≤ (<span class="const token" data-verso-hover="623">addVal</span> i q (s.<span class="const token" data-verso-hover="571">key</span> p q) v acc).<span class="const token" data-verso-hover="76">card</span>)</span>
+<span id="L400">      (hb : ∀ c ∈ <span class="const token" data-verso-hover="623">addVal</span> i q (s.<span class="const token" data-verso-hover="571">key</span> p q) v acc, c.<span class="const token" data-verso-hover="624">base</span> = b) :</span>
+<span id="L401">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="622">.</span>thr p q)</span>
+<span id="L402">        ((({ s <span class="kw">with</span> <span class="const token" data-verso-hover="569">l1</span> := <span class="const token" data-verso-hover="535">upd3</span> s.<span class="const token" data-verso-hover="569">l1</span> p q (s.<span class="const token" data-verso-hover="571">key</span> p q) (<span class="const token" data-verso-hover="62">some</span> (b, s.<span class="const token" data-verso-hover="553">scanT</span> p q)) }.<span class="const token" data-verso-hover="580">sign</span></span>
+<span id="L403">            (p, <span class="const token" data-verso-hover="810">.</span>l1 ⟨p, <span class="const token" data-verso-hover="623">addVal</span> i q (s.<span class="const token" data-verso-hover="571">key</span> p q) v acc⟩)).<span class="const token" data-verso-hover="542">go</span> p q</span>
+<span id="L404">            (<span class="const token" data-verso-hover="528">.</span>wrL1 ⟨p, <span class="const token" data-verso-hover="623">addVal</span> i q (s.<span class="const token" data-verso-hover="571">key</span> p q) v acc⟩)).<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L405">  <span class="dc">/-- lines 46–50, last slot, the check of line 50 fails: return -/</span></span>
+<span id="L406">  | <span class="const token" data-verso-hover="774">valBad</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p q i j : P} {acc v} (hp : p ∉ F) (hpc : s.<span class="const token" data-verso-hover="547">pc</span> p q = <span class="const token" data-verso-hover="526">.</span>rdVal i ∅ acc)</span>
+<span id="L407">      (hv : v ∈ s.<span class="const token" data-verso-hover="592">cand</span> p q)</span>
+<span id="L408">      (hbad : ¬ (f + <span class="nu">1</span> ≤ (<span class="const token" data-verso-hover="623">addVal</span> i q (s.<span class="const token" data-verso-hover="571">key</span> p q) v acc).<span class="const token" data-verso-hover="76">card</span> ∧</span>
+<span id="L409">                ∃ b, ∀ c ∈ <span class="const token" data-verso-hover="623">addVal</span> i q (s.<span class="const token" data-verso-hover="571">key</span> p q) v acc, c.<span class="const token" data-verso-hover="624">base</span> = b)) :</span>
+<span id="L410">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="622">.</span>thr p q) ((s.<span class="const token" data-verso-hover="542">go</span> p q (<span class="const token" data-verso-hover="613">PC.start</span> j)).<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L411">  <span class="dc">/-- line 52 completes; line 53 -/</span></span>
+<span id="L412">  | <span class="const token" data-verso-hover="698">l1Done</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p q j : P} {π} (hp : p ∉ F) (hpc : s.<span class="const token" data-verso-hover="547">pc</span> p q = <span class="const token" data-verso-hover="528">.</span>wrL1 π) :</span>
+<span id="L413">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="622">.</span>thr p q)</span>
+<span id="L414">        ((((s.<span class="const token" data-verso-hover="577">write</span> ⟨<span class="const token" data-verso-hover="699">.</span>l1, p, s.<span class="const token" data-verso-hover="571">key</span> p q, q⟩ (<span class="const token" data-verso-hover="761">.</span>p1 π)).<span class="const token" data-verso-hover="582">setPhase</span> p q <span class="const token" data-verso-hover="530">.</span>wfl2).<span class="const token" data-verso-hover="542">go</span> p q</span>
+<span id="L415">            (<span class="const token" data-verso-hover="613">PC.start</span> j)).<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L416">  <span class="dc">/-- lines 58–60, not the last slot -/</span></span>
+<span id="L417">  | <span class="const token" data-verso-hover="639">l1Next</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p q i j : P} {todo acc v} (hp : p ∉ F)</span>
+<span id="L418">      (hpc : s.<span class="const token" data-verso-hover="547">pc</span> p q = <span class="const token" data-verso-hover="529">.</span>rdL1 i todo acc) (hv : v ∈ s.<span class="const token" data-verso-hover="592">cand</span> p q) (hj : j ∈ todo) :</span>
+<span id="L419">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="622">.</span>thr p q) ((s.<span class="const token" data-verso-hover="542">go</span> p q (<span class="const token" data-verso-hover="529">.</span>rdL1 j (todo.<span class="const token" data-verso-hover="747">erase</span> j) (<span class="const token" data-verso-hover="763">addL1</span> v acc))).<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L420">  <span class="dc">/-- lines 58–64, last slot, `f+1` valid L1 proofs for one value: sign and write an L2 proof -/</span></span>
+<span id="L421">  | <span class="const token" data-verso-hover="706">l1Ok</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p q i : P} {acc v S m} (hp : p ∉ F) (hpc : s.<span class="const token" data-verso-hover="547">pc</span> p q = <span class="const token" data-verso-hover="529">.</span>rdL1 i ∅ acc)</span>
+<span id="L422">      (hv : v ∈ s.<span class="const token" data-verso-hover="592">cand</span> p q) (hS : S ⊆ <span class="const token" data-verso-hover="763">addL1</span> v acc) (hval : <span class="const token" data-verso-hover="720">L2Valid</span> f q (s.<span class="const token" data-verso-hover="571">key</span> p q) m ⟨p, S⟩) :</span>
+<span id="L423">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="622">.</span>thr p q) (((s.<span class="const token" data-verso-hover="580">sign</span> (p, <span class="const token" data-verso-hover="811">.</span>l2 ⟨p, S⟩)).<span class="const token" data-verso-hover="542">go</span> p q (<span class="const token" data-verso-hover="531">.</span>wrL2 ⟨p, S⟩)).<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L424">  <span class="dc">/-- lines 58–62, last slot, not enough valid L1 proofs: return -/</span></span>
+<span id="L425">  | <span class="const token" data-verso-hover="775">l1Bad</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p q i j : P} {acc v} (hp : p ∉ F) (hpc : s.<span class="const token" data-verso-hover="547">pc</span> p q = <span class="const token" data-verso-hover="529">.</span>rdL1 i ∅ acc)</span>
+<span id="L426">      (hv : v ∈ s.<span class="const token" data-verso-hover="592">cand</span> p q)</span>
+<span id="L427">      (hbad : ¬ ∃ S m, S ⊆ <span class="const token" data-verso-hover="763">addL1</span> v acc ∧ <span class="const token" data-verso-hover="720">L2Valid</span> f q (s.<span class="const token" data-verso-hover="571">key</span> p q) m ⟨p, S⟩) :</span>
+<span id="L428">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="622">.</span>thr p q) ((s.<span class="const token" data-verso-hover="542">go</span> p q (<span class="const token" data-verso-hover="613">PC.start</span> j)).<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L429">  <span class="dc">/-- line 64 completes: return -/</span></span>
+<span id="L430">  | <span class="const token" data-verso-hover="660">l2Done</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p q j : P} {ρ} (hp : p ∉ F) (hpc : s.<span class="const token" data-verso-hover="547">pc</span> p q = <span class="const token" data-verso-hover="531">.</span>wrL2 ρ) :</span>
+<span id="L431">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="622">.</span>thr p q) (((s.<span class="const token" data-verso-hover="577">write</span> ⟨<span class="const token" data-verso-hover="697">.</span>l2, p, s.<span class="const token" data-verso-hover="571">key</span> p q, q⟩ (<span class="const token" data-verso-hover="719">.</span>p2 ρ)).<span class="const token" data-verso-hover="542">go</span> p q (<span class="const token" data-verso-hover="613">PC.start</span> j)).<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L432">  <span class="dc">/-- line 11–12: `broadcast(k, m)` is invoked (`k` = previous key + 1) -/</span></span>
+<span id="L433">  | <span class="const token" data-verso-hover="618">bcast</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p : P} {m : M} (hp : p ∉ F) (hidle : s.<span class="const token" data-verso-hover="557">bpend</span> p = <span class="const token" data-verso-hover="94">none</span>) :</span>
+<span id="L434">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="704">.</span>bcast p m) ((s.<span class="const token" data-verso-hover="620">doBcast</span> p m).<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L435">  <span class="dc">/-- the write of line 12 completes; `broadcast` returns -/</span></span>
+<span id="L436">  | <span class="const token" data-verso-hover="635">bret</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p : P} {b} (hp : p ∉ F) (hb : s.<span class="const token" data-verso-hover="557">bpend</span> p = <span class="const token" data-verso-hover="62">some</span> b) :</span>
+<span id="L437">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="820">.</span>bret p)</span>
+<span id="L438">        ({ s.<span class="const token" data-verso-hover="577">write</span> ⟨<span class="const token" data-verso-hover="586">.</span>val, p, b.<span class="const token" data-verso-hover="587">key</span>, p⟩ (<span class="const token" data-verso-hover="588">.</span>cp ⟨p, b⟩) <span class="kw">with</span></span>
+<span id="L439">            <span class="const token" data-verso-hover="557">bpend</span> := <span class="const token" data-verso-hover="50">Function.update</span> s.<span class="const token" data-verso-hover="557">bpend</span> p <span class="const token" data-verso-hover="94">none</span> }.<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L440">  <span class="dc">/-- no broadcast pending: no-op -/</span></span>
+<span id="L441">  | <span class="const token" data-verso-hover="659">bretIdle</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p : P} (hp : p ∉ F) (hidle : s.<span class="const token" data-verso-hover="557">bpend</span> p = <span class="const token" data-verso-hover="94">none</span>) :</span>
+<span id="L442">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="820">.</span>bret p) s.<span class="const token" data-verso-hover="573">tick</span></span>
+<span id="L443">  <span class="dc">/-- a Byzantine process writes (atomically) any unforgeable value to one of its registers -/</span></span>
+<span id="L444">  | <span class="const token" data-verso-hover="658">byz</span> {s : <span class="const token" data-verso-hover="540">St</span> P M} {p : P} {r : <span class="const token" data-verso-hover="575">Reg</span> P} {v : <span class="const token" data-verso-hover="576">Val</span> P M} (hp : p ∈ F) (hr : r.<span class="const token" data-verso-hover="654">owner</span> = p)</span>
+<span id="L445">      (hv : <span class="const token" data-verso-hover="816">SigOK</span> F s.<span class="const token" data-verso-hover="559">signed</span> v) :</span>
+<span id="L446">      <span class="const token" data-verso-hover="616">Step</span> s (<span class="const token" data-verso-hover="705">.</span>byz p r v) ({ s.<span class="const token" data-verso-hover="577">write</span> r v <span class="kw">with</span> <span class="const token" data-verso-hover="592">cand</span> := s.<span class="const token" data-verso-hover="591">addCand</span> r v }.<span class="const token" data-verso-hover="573">tick</span>)</span>
+<span id="L447"></span>
+<span id="L448"><span class="dc">/-- Reachable states. -/</span></span>
+<span id="L449"><span class="kw">inductive</span> <span class="const token" data-verso-hover="681">Reachable</span> [<span class="const token" data-verso-hover="611">Inhabited</span> P] : <span class="const token" data-verso-hover="540">St</span> P M → <span class="kw">Prop</span></span>
+<span id="L450">  | <span class="const token" data-verso-hover="682">init</span> : <span class="const token" data-verso-hover="681">Reachable</span> <span class="const token" data-verso-hover="612">St.init</span></span>
+<span id="L451">  | <span class="const token" data-verso-hover="683">step</span> {s s' : <span class="const token" data-verso-hover="540">St</span> P M} {ℓ : <span class="const token" data-verso-hover="615">Label</span> P M} : <span class="const token" data-verso-hover="681">Reachable</span> s → <span class="const token" data-verso-hover="616">Step</span> F f s ℓ s' → <span class="const token" data-verso-hover="681">Reachable</span> s'</span>
+<span id="L452"></span>
+<span id="L453"><span class="dc">/-- An infinite execution. -/</span></span>
+<span id="L454"><span class="kw">structure</span> <span class="const token" data-verso-hover="707">Exec</span> [<span class="const token" data-verso-hover="611">Inhabited</span> P] <span class="kw">where</span></span>
+<span id="L455">  <span class="const token" data-verso-hover="714">s</span> : <span class="const token" data-verso-hover="47">ℕ</span> → <span class="const token" data-verso-hover="540">St</span> P M</span>
+<span id="L456">  <span class="const token" data-verso-hover="709">ℓ</span> : <span class="const token" data-verso-hover="47">ℕ</span> → <span class="const token" data-verso-hover="615">Label</span> P M</span>
+<span id="L457">  <span class="const token" data-verso-hover="821">init</span> : <span class="const token" data-verso-hover="714">s</span> <span class="nu">0</span> = <span class="const token" data-verso-hover="612">St.init</span></span>
+<span id="L458">  <span class="const token" data-verso-hover="717">step</span> : ∀ t, <span class="const token" data-verso-hover="616">Step</span> F f (<span class="const token" data-verso-hover="714">s</span> t) (<span class="const token" data-verso-hover="709">ℓ</span> t) (<span class="const token" data-verso-hover="714">s</span> (t + <span class="nu">1</span>))</span>
+<span id="L459"></span>
+<span id="L460"><span class="dc">/-- Fairness: every delivery thread of a correct process takes infinitely many steps, and every</span></span>
+<span id="L461"><span class="dc">correct process takes infinitely many broadcast-response steps (so every pending broadcast write</span></span>
+<span id="L462"><span class="dc">of a correct process completes). -/</span></span>
+<span id="L463"><span class="kw">def</span> <span class="const token" data-verso-hover="708">Exec.Fair</span> [<span class="const token" data-verso-hover="611">Inhabited</span> P] (e : <span class="const token" data-verso-hover="707">Exec</span> (M := M) F f) : <span class="kw">Prop</span> :=</span>
+<span id="L464">  (∀ p ∉ F, ∀ q : P, ∀ t, ∃ t' ≥ t, e.<span class="const token" data-verso-hover="709">ℓ</span> t' = <span class="const token" data-verso-hover="622">.</span>thr p q) ∧</span>
+<span id="L465">  (∀ p ∉ F, ∀ t, ∃ t' ≥ t, e.<span class="const token" data-verso-hover="709">ℓ</span> t' = <span class="const token" data-verso-hover="820">.</span>bret p)</span>
+<span id="L466"></span>
+<span id="L467"><span class="kw">end</span> Step</span>
+<span id="L468"></span>
+<span id="L469"><span class="kw">end</span> Podc.RDMAAgreement.RB</span>
+<span id="L470"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2019/RDMAAgreement/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

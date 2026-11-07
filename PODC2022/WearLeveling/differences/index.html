@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>WearLeveling (PODC 2022): Differences between the formalization and the paper · Formal PODC</title><base href="../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2022/">PODC 2022</a><span class="sep">›</span><a href="PODC2022/WearLeveling/">WearLeveling</a><span class="sep">›</span><span aria-current="page">Differences</span></nav>
+        <h1>
+          Differences between the formalization and the paper</h1>
+        <div class="paper-links">
+          <p>
+            Rendered from <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2022/WearLeveling/differencies.md"><code>differencies.md</code></a> of <a href="PODC2022/WearLeveling/">Wear Leveling in Persistent Data Structures — PODC 2022</a>.</p>
+          </div>
+        <p>
+          Paper: X. Liu, W. Golab, <em>Brief Announcement: Towards a Theory of Wear Leveling in Persistent Data Structures</em>,
+PODC 2022 (proceedings version, 4 pages; proofs are sketches).</p>
+        <section>
+          <h2 id="errors-in-the-paper-statement-level">
+            Errors in the paper (statement level)</h2>
+          <div class="loose">
+            <ol start="1">
+              <li>
+                <p>
+                  ⚠️ <strong>Theorem 4.4 is false as stated</strong> (the paper explicitly claims generality, "any implemented
+object", and test-and-set is a standard object). The
+abstract's primary contributions are the problem formalization and the FAI implementation, and the
+introduction only claims optimality <em>of the counter</em>, which holds.
+<em>Counterexample</em> (<a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2022/WearLeveling/Tas.lean"><code>Tas.lean</code></a>): <code>tasAlg</code> = <code>CAS(A[0], false, true); Flush(A[0]); return ¬success</code>, with <code>k = 1</code>
+word. <code>tas_strictLin</code> shows it is strictly linearizable in every wear model with <code>T ≥ 1</code>. The invariant <code>TInv</code>
+says the word is written back at most once (<code>wear 0 = if pm 0 then 1 else 0</code>). <code>tas_lockFree</code> gives
+lock-freedom. Hence <code>tas_guarantees : GuaranteesUpTo tasAlg P 1 ⊤</code> (all executions, any number of updates),
+and <code>theorem_4_4_false : ¬ Theorem44Statement P</code>. <code>Theorem44Statement</code> is the paper's claim for
+implementations in our model: <code>¬ GuaranteesUpTo A P T (k·T + 1)</code> for every object, <code>k</code>, word type, algorithm
+and <code>T</code>.
+The paper's own counter also contradicts the statement, by one (<code>theorem_4_4_false_counter</code>, from
+<code>guarantees_kT_succ</code>; see item 2).
+<em>Where the proof breaks</em>: "each update operation on the implemented object must update at least one base
+object" is false for objects whose updates do not change the state (TAS after the first operation, max
+registers, consensus, …).
+<em>Scope</em>: the intended scope (the counter / FAI) is recoverable from the sentence before the
+theorem ("the endurance bound stated in Theorem 4.3 is optimal"), but the statement explicitly claims "any
+implemented object" and the proof argues with the general, false step. The objects that violate it are exactly those whose sequential update sequences have a
+bounded number of distinguishable state changes (TAS, consensus, sticky bits, one-shot objects); for objects
+with unboundedly many (FAI, registers with alternating writes, max registers), the <code>pm_ne</code> argument of
+<a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2022/WearLeveling/Optimality.lean"><code>Optimality.lean</code></a> adapts.
+<em>Robustness w.r.t. the wear model</em>: the TAS never performs a second write-back, so the refutation holds
+for every failure mode of worn-out words (wrong values, non-responsiveness). In the model where wear counts every update operation applied to a base
+object (Definition 2.1 literally applied to the base CAS words), the refutation by our TAS does not apply. But
+then Theorem 4.3 fails: every FAI starts with <code>CAS(A[0], …)</code> (lines 3–5), so <code>T + 1</code> sequential FAIs
+already apply <code>T + 1</code> updates to <code>A[0]</code>. This is not formalized (it is immediate from the pseudocode). Either
+way, Theorems 4.3 and 4.4 cannot both hold in one wear model.
+<em>Repaired version</em> (formalized): <code>theorem_4_4_fai</code> — for every implementation <code>A : Alg faiObj k V</code> of
+fetch-and-increment that is strictly linearizable and obstruction-free in the ideal model, and every <code>T</code>,
+there is a sequential, crash-free schedule of one thread with <code>k·T + 1</code> FAI invocations after which some word
+has been written back at least <code>T + 1</code> times. This is what the paper's proof sketch argues. The proof needs a
+real argument the paper omits: why "each update must update a base object" holds for FAI. Persistent memory
+must change during every FAI, otherwise crashing right after FAI <code>j</code> and right after FAI <code>j + 1</code> gives
+configurations that agree up to wear counters and operation identifiers (<code>Alg.Rel</code>, <code>pm_ne</code>). One more FAI
+then returns the same value in both, but strict linearizability forces <code>j</code> resp. <code>j + 1</code>
+(<code>resp_after_crash</code>). Non-vacuity: <code>counter_exceeds</code>.</p>
+                </li>
+              <li>
+                <p>
+                  <strong>Theorem 4.3: exact endurance depends on how worn-out words fail</strong> (not counted as a mistake). The paper never fixes the failure mode of a worn-out word;
+Definition 2.1 says it loses "safety and liveness". If a worn-out word may stop responding (the <code>Flush</code> that
+performs its <code>(T+1)</code>-st write-back never completes; a non-responsive failure in the sense of
+Jayanti–Chandra–Toueg, the paper's reference [4]), FAI <code>k·T + 1</code> of a sequential run never returns and the
+counter's endurance is exactly <code>k·T</code>, as the paper states; the paper's comparison "hardware FAI + Flush
+provides endurance <code>T</code>" uses the same reading. Non-responsive wear is not formalized (our <code>Wear</code> only has
+wrong values). In the formalized safety-only wear model, the exact value is <code>k·T + 1</code>, as follows.
+The paper's intended content, "<code>k·T</code> FAIs can be invoked before any element is updated more than <code>T</code>
+times", is true and formalized (<code>theorem_4_3</code>, <code>wear_le</code>, <code>exec_eq_ideal</code>). The exactness clause of
+Definition 2.1 ("but not in some execution where <code>T+1</code> updates are invoked") fails for <code>k·T</code>.
+<code>guarantees_kT_succ</code>: with <code>k·T + 1</code> FAIs the history is <em>equal</em> to the ideal-model history, whatever
+worn-out words store (<code>hist_eq_ideal_succ</code>, simulation <code>Diverged</code>). When the first worn-out write-back
+happens, all <code>k·T + 1</code> operations have done their successful CAS (<code>diverged_of_worn</code>: <code>|L| + 1 ≤ cnt</code> for
+any thread before its CAS), and afterwards threads only flush and return. <code>not_safeUpTo_kT_add_two</code>: with
+stuck-at words, <code>k·T + 1</code> sequential FAIs, a crash and one more FAI give two FAIs returning <code>k·T</code>
+(<code>hist_failSched</code>, <code>strictLin_res_inj</code>). Together: <code>hasEndurance_counter : HasEndurance (counter k) P T (k·T + 1)</code> and <code>not_hasEndurance_kT</code>.
+<em>Why this is not a mistake</em>: the off-by-one stems from the convention (the counter has no read operation, so the
+damage of the <code>(k·T+1)</code>-st FAI is unobservable without one more FAI). The paper's own proof makes the intended
+meaning clear ("FAI <code>k×T+1</code> … exceeds its endurance limit, and this <em>may</em> cause the implemented object to
+lose correctness"). The same convention applied to a hardware FAI word ("provides endurance <code>T</code>") has the same
+off-by-one in the safety-only model. Since the paper's definitions also admit non-responsive wear, under which
+<code>k·T</code> is exact, this is a modelling-dependent remark rather than an error; if one insists on reading Theorem
+4.3 as "for <em>every</em> base object of endurance <code>T</code>" (including safety-only ones), the failure mode is an unstated
+assumption.</p>
+                </li>
+              </ol>
+            </div>
+          </section>
+        <section>
+          <h2 id="proof-gaps-and-typos-true-statements">
+            Proof gaps and typos (true statements)</h2>
+          <ol start="3">
+            <li>
+              <p>
+                ✏️ Proof of Theorem 4.1, crucial claim: <code>iter = ⌊ℓ/2^k⌋</code>, <code>index = ℓ mod 2^k</code> should be <code>⌊ℓ/k⌋</code>, <code>ℓ mod k</code>
+(positions <code>ℓ</code> counted from 0; rendered page checked, not a <code>pdftotext</code> artefact). In Lean: <code>CInv.step_cas_succ</code>
+proves that a successful CAS with <code>iter, index</code> happens exactly when <code>|L| = iter·k + index</code> and all earlier CASes
+are persistent.</p>
+              </li>
+            <li>
+              <p>
+                Proof of Theorem 4.1: the claim "the ℓ'th FAI in the candidate linearization is the one that executes the
+ℓ'th CAS that succeeds and whose updates are subsequently flushed" is made precise by the invariant: at most one
+successful CAS is not persistent (the last one), and its cache line is the only dirty one (<code>GInv.dirty_iff</code>).
+At a crash only that last operation is dropped from the linearization (<code>CInv.step_crash</code>). The paper's sketch
+argues order preservation with "the helping mechanism at line 9 / lines 2 and 13". Our local invariant makes
+this explicit (<code>LocInv</code>: a thread at line 5 with <code>iter, index</code> knows <code>iter·k + index ≤ m</code> persisted
+increments).</p>
+              </li>
+            <li>
+              <p>
+                ✏️ Proof of Theorem 4.2: "read a value <code>v</code> from <code>A[k−1]</code> at line 13" — line 12. "after performing <code>k</code> additional
+iterations" — <code>k − 1</code>. The proof also needs finitely many threads (an implied assumption, ✏️; <code>[Finite P]</code> in
+<code>theorem_4_2</code>): it uses a suffix without successful CAS, which exists because, without responses, each thread
+performs at most one successful CAS. Our proof (potential argument, <code>phi_step</code>, <code>done_step</code>) follows the
+paper's idea.</p>
+              </li>
+            <li>
+              <p>
+                ✏️ Proof of Theorem 4.3: "element <code>A[0]</code> is accessed <code>T+1</code> times" — it is <em>written back</em> <code>T + 1</code> times. Every FAI
+accesses <code>A[0]</code> (line 5).</p>
+              </li>
+            </ol>
+          </section>
+        <section>
+          <h2 id="modelling-choices">
+            Modelling choices</h2>
+          <ol start="7">
+            <li>
+              <p>
+                <strong>Words are unbounded naturals</strong> (<code>b = ∞</code>). The paper's Theorem 4.1 is about a <code>b</code>-bit counter with values
+computed modulo <code>2^b</code>, under the assumption that "the implemented counter does not overflow during any one
+execution of the FAI operation". Not formalized. Informal reduction: under that assumption, at every CAS of
+line 5 the unbounded run has <code>0 ≤ A[index] − iter &lt; 2^b</code>. Indeed <code>iter ≤ A[index]</code> by the invariant, and
+<code>A[index] − iter ≤ ⌈(k − 1 + D)/k⌉ &lt; 2^b</code>, where <code>D &lt; 2^b</code> is the number of increments since the
+invocation (for <code>k ≥ 2</code>, <code>b ≥ 1</code>). So the comparison modulo <code>2^b</code> gives the same result, and the <code>b</code>-bit run is
+the unbounded run modulo <code>2^b</code>. It returns <code>(index + iter·k) mod 2^b = ℓ mod 2^b</code>, matching footnote 2. The
+assumption <code>b ≥ ⌈log₂ k⌉</code> is not needed for this.</p>
+              </li>
+            <li>
+              <p>
+                <strong>Persistence model</strong> (✏️: Definition 2.1 counts updates invoked on an object, while the proof of Theorem 4.3
+counts write-backs): the assumptions (1)–(3) of the proof of Theorem 4.3 and "a failed CAS does not dirty the
+line" are built into the model and used for <em>all</em> theorems. One word per cache line. Write-backs happen only by
+<code>Flush</code> or spontaneous eviction (<code>Ev.evict</code>, at any time). A crash reloads the whole cache from persistent memory
+and abandons all running operations; there is no recovery code, and threads may invoke new operations after a
+crash. The cache is coherent and sequentially consistent (a single cached value per word). Memory barriers are
+ignored, as in the paper.</p>
+              </li>
+            <li>
+              <p>
+                <strong>Granularity</strong>: each line of Figure 1 with a shared-memory access is one atomic step. Lines 3, 10, 11 (local) are
+merged into the preceding/following step. Lines 12–13 are the same program states as lines 1–2 (<code>CL.rd</code>,
+<code>CL.fl</code>), since <code>index = 0</code> afterwards in both cases.</p>
+              </li>
+            <li>
+              <p>
+                <strong>Strict linearizability</strong>: formalized at the history level (<code>IsStrictLin</code>). An operation <em>ends</em> at its
+response or at the first crash after its invocation, and the linearization respects "ends before invoked".
+Operations pending at the end of the history may be included or not. Op ids are assigned at invocation;
+histories also record crashes.</p>
+              </li>
+            <li>
+              <p>
+                <strong>Lock-freedom</strong>: every infinite schedule with finitely many crashes, in which threads with a pending operation
+take infinitely many steps, has infinitely many responses (<code>LockFreeOn</code>). It holds for every wear model
+(<code>theorem_4_2 W</code>), since the argument never reads persistent memory.</p>
+              </li>
+            <li>
+              <p>
+                <strong>Wear-out model</strong>: a word survives <code>T</code> write-backs (<code>Wear.T</code>); each later write-back stores
+<code>junk i w old new</code>, adversarially chosen. The cache is not affected. Wear counts write-backs of dirty lines
+only (the proof's model). "Endurance" of the implemented object follows Definition 2.1 with updates =
+invocations (FAI and TAS have only update operations): <code>HasEndurance A T N := GuaranteesUpTo A T N ∧ ¬ GuaranteesUpTo A T (N+1)</code>. <code>GuaranteesUpTo</code> quantifies over all <code>junk</code> (the paper: "maintains its safety
+and liveness"), and its negation exhibits one <code>junk</code> (<code>stuck</code>: worn-out words keep their old value).</p>
+              </li>
+            <li>
+              <p>
+                <strong>Theorem 4.4 statement</strong>: formalized for implementations in our model (<code>Alg O k V</code>, any sequential object
+<code>O</code>, any word type <code>V</code>), with "endurance at most <code>k·T</code>" read as "not guaranteed for all executions with
+<code>k·T + 1</code> updates" (<code>Theorem44Statement</code>).</p>
+              </li>
+            <li>
+              <p>
+                The FAI object is <code>faiObj</code> (operation <code>Unit</code>, response = old value, unbounded); the TAS object is CSLib's
+<code>tasObj</code>.</p>
+              </li>
+            </ol>
+          </section>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+
