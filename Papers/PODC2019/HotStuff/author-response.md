@@ -1,3 +1,0 @@
-*From:* Vasilii
-
-Overall disagree
