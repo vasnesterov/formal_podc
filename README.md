@@ -28,7 +28,7 @@ the reasoning is recorded in each `differencies.md`.
 ## Responses from the authors
 
 If you are an author of a paper here, you can respond to our findings: open the paper's page on the
-[website](https://vasnesterov.github.io/formal_podc/) and follow the link under "Response from the authors", or add a file
+[website](https://vasnesterov.github.io/formal_podc/) and follow the link under "Authors' response", or add a file
 `author-response.md` to the paper's folder in a pull request. Plain Markdown; we show it on the paper's page as written,
 with a 💬 mark on the list of papers. You can also [open an issue](https://github.com/vasnesterov/formal_podc/issues).
 
