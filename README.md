@@ -58,7 +58,7 @@ Each paper has one label: how hard it is to save what the paper set out to conve
 The label covers only what was checked. The rules are in [mistakes-labeling.md](mistakes-labeling.md) (each mistake) and
 [paper-labeling.md](paper-labeling.md) (the paper).
 
-Counts: ✅ 8, ✏️ 24, 🔧 128, 🛠️ 64, ⚠️ 73, ❌ 20 (317 papers).
+Counts: ✅ 8, ✏️ 24, 🔧 128, 🛠️ 65, ⚠️ 73, ❌ 20 (318 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -308,6 +308,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2023 | 2 | Czerner — *Brief Announcement: Population Protocols Decide Double-exponential Thresholds* | [PPDoubleExpThresholds](Papers/PODC2023/PPDoubleExpThresholds) | 🔧 **Easy fix.** All main theorems hold; Lemma 11(c) is false for j = i, repaired by a short replacement step in Lemma 12(c), and Appendix B needs local fixes. |
 | 2020 | 2 | Rinberg, Keidar — *Brief Announcement: Intermediate Value Linearizability: A Quantitative Correctness Criterion* | [IntermediateValueLin](Papers/PODC2020/IntermediateValueLin) | 🔧 **Easy fix.** All results hold (Omega(n) bound relative to the cited Israeli-Shirazi bound); the locality proof, Example 2's witness and two proof descriptions needed short local repairs. |
 | 2014 | 2 | Hendler, Khait — *Complexity Tradeoffs for Read and Update Operations* | [ReadUpdateTradeoffs](Papers/PODC2014/ReadUpdateTradeoffs) | 🛠️ **Hard fix.** Lemma 2 and Claim 1 are false as defined and Lemmas 4, 6 and Theorem 5's proof break; all tradeoffs survive a redesign, except Theorem 4 for huge M with slow ReadMax. |
+| 2012 | 2 | Taubenfeld — *A Closer Look at Fault Tolerance* | [CloserLookFT](Papers/PODC2012/CloserLookFT) | 🛠️ **Hard fix.** Almost-wait-free election with ⌈log n⌉+2 registers and Lemma 6.1 with Theorems 6.2–6.3 hold, but election safety needed a new credit invariant. The test-and-set bit has two winners as printed, fixed by one condition. Renaming, Common2 and TAS liveness not checked. |
 | 2026 | 1 | Breitkopf, Dallot, El-Hayek, Schmid — *Ranking Opinions with Few States in Population Protocols* | [RankingOpinions](Papers/PODC2026/RankingOpinions) | 🛠️ **Hard fix.** Circles (k^3) holds. The ranking and TieReport protocols are wrong as printed but fixed by small rule changes; the TieSharing and Lemma 8.11 proofs needed new arguments. |
 | 2026 | 1 | Lenzen, Loss, Shi, Wagner — *Byzantine Consensus in the Partially Authenticated Setting* | [PartialAuthBC](Papers/PODC2026/PartialAuthBC) | 🔧 **Easy fix.** Deterministic characterization and protocols hold; Theorem 4.1 omits 'unregistered sender' and fails for n = 2, Figure 1 is ambiguous, two proof steps need short fixes. Randomized bounds unchecked. |
 | 2026 | 1 | Chalopin, Chang, Di Luna, Zhou — *Efficient Counting and Simulation in Content-Oblivious Rings* | [ContentObliviousCounting](Papers/PODC2026/ContentObliviousCounting) | ⚠️ **Weakened.** Bit sending with a relay leader is not composable, so Theorem 22 is proved only with an active leader; counting bounds, lower bound and aggregation hold. Theorems 6, 7 unchecked. |
