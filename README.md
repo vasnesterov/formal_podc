@@ -58,7 +58,7 @@ Each paper has one label: how hard it is to save what the paper set out to conve
 The label covers only what was checked. The rules are in [mistakes-labeling.md](mistakes-labeling.md) (each mistake) and
 [paper-labeling.md](paper-labeling.md) (the paper).
 
-Counts: ✅ 8, ✏️ 22, 🔧 128, 🛠️ 64, ⚠️ 73, ❌ 20 (315 papers).
+Counts: ✅ 8, ✏️ 23, 🔧 128, 🛠️ 64, ⚠️ 73, ❌ 20 (316 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -84,6 +84,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2012 | 84 | Clement, Junqueira, Kate, Rodrigues — *On the (Limited) Power of Non-Equivocation* | [NonEquivocationLimits](Papers/PODC2012/NonEquivocationLimits) | ⚠️ **Weakened.** The n > 3f lower bounds hold for n ≥ 3. The generic crash-to-Byzantine translation is unsound: a Byzantine process can replay messages addressed to others, and no repaired compiler is proved. |
 | 2019 | 81 | Guerraoui, Kuznetsov, Monti, Pavlovič, Seredinschi — *The Consensus Number of a Cryptocurrency* | [CryptoConsensusNumber](Papers/PODC2019/CryptoConsensusNumber) | 🛠️ **Hard fix.** Consensus numbers 1 and k hold, but Lemma 2's wait-freedom needed a new proof; Figure 1 needs a local fix and Figure 4 a one-term fix. Message-passing safety was not checked. |
 | 2010 | 81 | O'Hearn, Rinetzky, Vechev, Yahav, Yorsh — *Verifying Linearizability with Hindsight* | [HindsightLinearizability](Papers/PODC2010/HindsightLinearizability) | ✏️ **Slip.** Linearizability, memory safety and the Hindsight Lemma all hold; the Backbone Lemma as printed is false, but the weak chain that its proof gives and Theorem 7.5 uses is what was meant. |
+| 2013 | 81 | Lenzen, Peleg — *Efficient distributed source detection with limited bandwidth* | [SourceDetectionCongest](Papers/PODC2013/SourceDetectionCongest) | ✏️ **Slip.** Pipelined Bellman–Ford solves (S, h, σ)-detection in σ + h − 1 rounds with one pair per message, with Lemmas 4.3–4.6, Corollaries 4.7 and 4.10 and the β-pairs remark; only Corollary 4.4's equality part fails when fewer than k sources are within h hops. |
 | 2018 | 79 | Barenboim, Elkin, Goldenberg — *Locally-Iterative Distributed (Δ+1)-Coloring below Szegedy–Vishwanathan Barrier* | [LocallyIterativeColoring](Papers/PODC2018/LocallyIterativeColoring) | 🔧 **Easy fix.** Core O(Δ) + log* n algorithm holds. The intro's 2p + 1 bound fails, fixed by Section 3's larger q. Side variant 3AG never terminates on K₂ (unsaved). Applications not checked. |
 | 2015 | 78 | Ludwig, Marcinkowski, Schmid — *Scheduling Loop-free Network Updates: It's Good to Relax!* | [LoopFreeUpdates](Papers/PODC2015/LoopFreeUpdates) | ⚠️ **Weakened.** Theorem 2's reduction is false, so NP-completeness for 3 rounds is unproved and we neither prove nor refute it; the Ω(n) lower bound and Peacock's O(log n) relaxed schedules hold. |
 | 2015 | 78 | Attiya, Ellen, Morrison — *Limitations of Highly-Available Eventually-Consistent Data Stores* | [EventualConsistencyLimits](Papers/PODC2015/EventualConsistencyLimits) | ⚠️ **Weakened.** Theorem 12's unbounded-message bound holds with a new decoding argument; the OCC limit, Theorem 6, is unestablished because two proof steps fail, though it is not refuted. |
