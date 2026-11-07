@@ -58,7 +58,7 @@ Each paper has one label: how hard it is to save what the paper set out to conve
 The label covers only what was checked. The rules are in [mistakes-labeling.md](mistakes-labeling.md) (each mistake) and
 [paper-labeling.md](paper-labeling.md) (the paper).
 
-Counts: ✅ 8, ✏️ 24, 🔧 128, 🛠️ 65, ⚠️ 73, ❌ 20 (318 papers).
+Counts: ✅ 8, ✏️ 24, 🔧 128, 🛠️ 66, ⚠️ 73, ❌ 20 (319 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -77,6 +77,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2021 | 137 | Abraham, Nayak, Ren, Xiang — *Good-case Latency of Byzantine Broadcast: a Complete Categorization* | [GoodCaseLatencyBB](Papers/PODC2021/GoodCaseLatencyBB) | 🔧 **Easy fix.** All lower bounds hold; Theorem 10's executions needed a small repair, and for f = n − 1 the bound is only ⌊n/2⌋Δ, still Θ(n). Upper bounds mostly not checked. |
 | 2011 | 125 | Kuhn, Moses, Oshman — *Coordinated Consensus in Dynamic Networks* | [CoordinatedConsensusDynamic](Papers/PODC2011/CoordinatedConsensusDynamic) | 🛠️ **Hard fix.** All bounds survive: Theorem 6.8's sketch needed a new graph and walk, while Theorem 4.1, the diameter protocol's running time and Lemma 6.5 are false as printed but fixed locally. |
 | 2015 | 122 | Alistarh, Gelashvili, Vojnović — *Fast and Exact Majority in Population Protocols* | [ExactMajorityAVC](Papers/PODC2015/ExactMajorityAVC) | ⚠️ **Weakened.** AVC is exact after a one-symbol fix; the four-state lower bound is proved only for unordered interactions; the convergence-time bounds, the main claim, were not checked. |
+| 2010 | 117 | Perelman, Fan, Keidar — *On Maintaining Multiple Versions in STM* | [MultiVersionSTM](Papers/PODC2010/MultiVersionSTM) | 🛠️ **Hard fix.** Theorems 1 and 2 hold with repaired proofs; Theorem 3 is false for Definition 4 as printed but holds for Section 7's potential-reader UP GC. The UP-MV algorithm was not checked. |
 | 2011 | 108 | Dinitz, Krauthgamer — *Fault-Tolerant Spanners: Better and Simpler* | [FaultTolerantSpanners](Papers/PODC2011/FaultTolerantSpanners) | 🔧 **Easy fix.** The conversion theorem and O(log n) rounding hold up to slips; Lemma 3.8 is false as printed and fixed by one clause. The O(log Δ) bound and distributed theorems were not checked. |
 | 2012 | 105 | Feinerman, Korman, Lotker, Sereni — *Collaborative Search on the Plane without Communication* | [CollaborativeSearchPlane](Papers/PODC2012/CollaborativeSearchPlane) | 🔧 **Easy fix.** All bounds hold: uniform O(log^{1+ε} k) search, no O(log k), advice bound, harmonic algorithm. Proofs of Theorems 3.3, 4.1, 5.1 need local patches; degenerate formulas and Theorem 5.1's wording are slips. |
 | 2013 | 100 | Vaidya, Garg — *Byzantine Vector Consensus in Complete Graphs* | [ByzantineVectorConsensus](Papers/PODC2013/ByzantineVectorConsensus) | ⚠️ **Weakened.** Theorems 1–5 hold, but tightness for restricted algorithms is lost: Theorem 6's synchronous necessity has a counterexample at n = 4, d = 2, f = 1; only its sufficiency survives, with one constant fixed. |
