@@ -58,7 +58,7 @@ Each paper has one label: how hard it is to save what the paper set out to conve
 The label covers only what was checked. The rules are in [mistakes-labeling.md](mistakes-labeling.md) (each mistake) and
 [paper-labeling.md](paper-labeling.md) (the paper).
 
-Counts: ✅ 8, ✏️ 23, 🔧 128, 🛠️ 64, ⚠️ 73, ❌ 20 (316 papers).
+Counts: ✅ 8, ✏️ 24, 🔧 128, 🛠️ 64, ⚠️ 73, ❌ 20 (317 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -100,6 +100,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2015 | 63 | Censor-Hillel, Kaski, Korhonen, Lenzen, Paz, Suomela — *Algebraic Methods in the Congested Clique* | [AlgebraicCongestedClique](Papers/PODC2015/AlgebraicCongestedClique) | 🔧 **Easy fix.** 4-cycle detection and semiring multiplication hold after a short repair of Lemma 12's proof and two slips; fast ring multiplication and its applications, the main point, were not checked. |
 | 2016 | 62 | Attiya, Burckhardt, Gotsman, Morrison, Yang, Zawirski — *Specification and Complexity of Collaborative Text Editing* | [CollaborativeListSpec](Papers/PODC2016/CollaborativeListSpec) | 🔧 **Easy fix.** RGA as printed violates even the weak list specification, but a one-line index fix proves Theorem 1; the Ω(D) metadata lower bound holds after two local proof repairs. |
 | 2010 | 60 | Kuhn, Lynch, Newport, Oshman, Richa — *Broadcasting in Unreliable Radio Networks* | [BroadcastUnreliableRadio](Papers/PODC2010/BroadcastUnreliableRadio) | 🔧 **Easy fix.** Theorems 2, 4, 10, 12 hold: Ω(n log n) and Ω(n) lower bounds and strong select. Proofs of Theorems 4, 10, 12 need local repairs; randomized O(n log² n) algorithm not checked. |
+| 2016 | 57 | Shibata, Mega, Ooshita, Kakugawa, Masuzawa — *Uniform Deployment of Mobile Agents in Asynchronous Rings* | [UniformDeploymentRings](Papers/PODC2016/UniformDeploymentRings) | ✏️ **Slip.** Algorithm 1 (knowledge of k, Theorem 3), the impossibility without knowledge of k or n (Theorem 5), the Ω(kn) move bound and Lemmas 2–4 hold; Algorithm 2's loop guard and Algorithm 6's array bounds are slips. Theorems 4 and 6 (Algorithms 2–6) are only simulated, not proved. |
 | 2020 | 55 | Gupta, Vaidya — *Fault-Tolerance in Distributed Optimization: The Case of Redundancy* | [RedundantOptimization](Papers/PODC2020/RedundantOptimization) | ⚠️ **Weakened.** Theorem 2 (CGC convergence) holds; Theorem 1 is vacuous literally, so '2f-redundancy is necessary' survives only as per-execution indistinguishability with exactly f faults and a common minimum point. |
 | 2021 | 55 | Liu, Gupta, Vaidya — *Approximate Byzantine Fault-Tolerance in Distributed Optimization* | [ApproxByzantineOptimization](Papers/PODC2021/ApproxByzantineOptimization) | 🛠️ **Hard fix.** Sufficiency holds after a local repair; necessity is false or vacuous as stated and holds on redundant inputs by a new proof, placing resilience in [eps', 2 eps']; gradient-descent results unchecked. |
 | 2018 | 53 | Kol, Oshman, Saxena — *Interactive Distributed Proofs* | [InteractiveDistributedProofs](Papers/PODC2018/InteractiveDistributedProofs) | ⚠️ **Weakened.** Upper bounds hold after local fixes. Lemma 3.11 is false; the Ω(log log n) lower bound is repaired only for bounded challenges, so the claim with unbounded shared randomness stays unproved. |

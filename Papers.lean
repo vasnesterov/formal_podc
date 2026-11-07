@@ -2624,3 +2624,10 @@ import Papers.PODC2020.WhyExtensionBased.NonVacuity
 import Papers.PODC2013.SourceDetectionCongest.Counterexamples
 import Papers.PODC2013.SourceDetectionCongest.Trees
 import Papers.PODC2013.SourceDetectionCongest.Congest
+import Papers.PODC2016.UniformDeploymentRings.Defs
+import Papers.PODC2016.UniformDeploymentRings.Model
+import Papers.PODC2016.UniformDeploymentRings.Words
+import Papers.PODC2016.UniformDeploymentRings.Alg1Targets
+import Papers.PODC2016.UniformDeploymentRings.Alg1
+import Papers.PODC2016.UniformDeploymentRings.Impossibility
+import Papers.PODC2016.UniformDeploymentRings.LowerBound
