@@ -2621,3 +2621,6 @@ import Papers.PODC2020.WhyExtensionBased.Phase2
 import Papers.PODC2020.WhyExtensionBased.Chain
 import Papers.PODC2020.WhyExtensionBased.Main
 import Papers.PODC2020.WhyExtensionBased.NonVacuity
+import Papers.PODC2013.SourceDetectionCongest.Counterexamples
+import Papers.PODC2013.SourceDetectionCongest.Trees
+import Papers.PODC2013.SourceDetectionCongest.Congest
