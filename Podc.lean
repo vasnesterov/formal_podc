@@ -133,3 +133,4 @@ import Podc.Computability.Distributed.MessagePassing.FailureDetectors.Sigma
 import Podc.Computability.Distributed.NIS.Subdivision
 import Podc.Computability.Distributed.NIS.Views
 import Podc.Computability.Distributed.NIS.Layers
+import Podc.Computability.Distributed.SharedMemory.Resilience

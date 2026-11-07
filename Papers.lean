@@ -2631,3 +2631,14 @@ import Papers.PODC2016.UniformDeploymentRings.Alg1Targets
 import Papers.PODC2016.UniformDeploymentRings.Alg1
 import Papers.PODC2016.UniformDeploymentRings.Impossibility
 import Papers.PODC2016.UniformDeploymentRings.LowerBound
+import Papers.PODC2012.CloserLookFT.ElectionCore
+import Papers.PODC2012.CloserLookFT.ElectionSafety
+import Papers.PODC2012.CloserLookFT.Election
+import Papers.PODC2012.CloserLookFT.ElectionLiveness
+import Papers.PODC2012.CloserLookFT.RenamingFacts
+import Papers.PODC2012.CloserLookFT.NonVacuity
+import Papers.PODC2012.CloserLookFT.Colorless
+import Papers.PODC2012.CloserLookFT.ColorlessLiveness
+import Papers.PODC2012.CloserLookFT.Section6
+import Papers.PODC2012.CloserLookFT.TestAndSet
+import Papers.PODC2012.CloserLookFT.TestAndSetFix
