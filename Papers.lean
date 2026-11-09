@@ -2766,3 +2766,15 @@ import Papers.PODC2016.WeakCrashFailures.Fig1Live
 import Papers.PODC2016.WeakCrashFailures.Fig1Main
 import Papers.PODC2016.WeakCrashFailures.Fig2
 import Papers.PODC2016.WeakCrashFailures.Impossibility
+import Papers.PODC2010.GroupMutexLogRMR.Model
+import Papers.PODC2010.GroupMutexLogRMR.Deadlock
+import Papers.PODC2010.GroupMutexLogRMR.RMR
+import Papers.PODC2010.GroupMutexLogRMR.Inv
+import Papers.PODC2010.GroupMutexLogRMR.InvLemmas
+import Papers.PODC2010.GroupMutexLogRMR.Frame
+import Papers.PODC2010.GroupMutexLogRMR.StepDoor
+import Papers.PODC2010.GroupMutexLogRMR.StepLocal
+import Papers.PODC2010.GroupMutexLogRMR.StepWrite
+import Papers.PODC2010.GroupMutexLogRMR.StepSwitch
+import Papers.PODC2010.GroupMutexLogRMR.Safety
+import Papers.PODC2010.GroupMutexLogRMR.BoundedExit
