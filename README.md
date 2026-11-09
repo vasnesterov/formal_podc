@@ -58,7 +58,7 @@ Each paper has one label: how hard it is to save what the paper set out to conve
 The label covers only what was checked. The rules are in [mistakes-labeling.md](mistakes-labeling.md) (each mistake) and
 [paper-labeling.md](paper-labeling.md) (the paper).
 
-Counts: ✅ 8, ✏️ 25, 🔧 130, 🛠️ 67, ⚠️ 74, ❌ 21 (325 papers).
+Counts: ✅ 8, ✏️ 25, 🔧 131, 🛠️ 67, ⚠️ 74, ❌ 21 (326 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -215,6 +215,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2021 | 10 | Gilbert, Newport, Vaidya, Weaver — *Contention Resolution with Predictions* | [ContentionPredictions](Papers/PODC2021/ContentionPredictions) | 🛠️ **Hard fix.** The entropy and perfect-advice lower bounds hold, but the proofs of Theorems 3.3 and 3.7 are wrong and were replaced by new arguments. Collision-detection entropy bound and randomized upper bounds unchecked. |
 | 2010 | 10 | Alon, Emek, Feldman, Tennenholtz — *Bayesian Ignorance* | [BayesianIgnorance](Papers/PODC2010/BayesianIgnorance) | 🔧 **Easy fix.** The checked bounds and "ignorance is bliss" hold. Rosenthal's potential fails with infinite costs but works on connecting profiles; several proofs need local repairs. Lemma 3.4 and the online bound behind Lemma 3.5 unchecked. |
 | 2010 | 10 | Aspnes — *A Modular Approach to Shared-Memory Consensus, with Applications to the Probabilistic-Write Model* | [ModularConsensus](Papers/PODC2010/ModularConsensus) | ✏️ **Slip.** Two slips only; the composition, adopt-commit and conciliator results hold, but the end-to-end consensus bound was checked only conditionally on a per-stage failure hypothesis. |
+| 2019 | 10 | Bravo, Gotsman — *Reconfigurable Atomic Transaction Commit* | [ReconfigurableCommit](Papers/PODC2019/ReconfigurableCommit) | 🔧 **Easy fix.** Safety (Theorem 4.1) fails because conditions (3)–(5) do not force fₛ({ε}, l) = commit; with that one condition the protocol of Figure 1 is proved safe; liveness and the RDMA variant not checked. |
 | 2022 | 9 | El-Hayek, Henzinger, Schmid — *Broadcasting Time in Dynamic Rooted Trees is Linear* | [DynamicRootedTrees](Papers/PODC2022/DynamicRootedTrees) | 🔧 **Easy fix.** The first linear upper bound holds as stated; the printed proof is one round short, and a recount of the same pigeonhole closes it. |
 | 2021 | 9 | Bodwin, Parter — *Restorable Shortest Path Tiebreaking for Edge-Faulty Graphs* | [RestorableTiebreaking](Papers/PODC2021/RestorableTiebreaking) | 🔧 **Easy fix.** Restorable tiebreaking exists as claimed; Corollary 22's count and Theorem 23's proof need local repairs, and application sizes for f ≥ 1 and all running-time and CONGEST claims were not checked. |
 | 2018 | 9 | Goren, Moses — *Silence* | [Silence](Papers/PODC2018/Silence) | 🛠️ **Hard fix.** Silent Choir, the lower bounds and STEALTH, D2, 1.5D hold, but the protocol proofs' black-box consensus fails and needed a concrete floodset and a new argument; the tradeoff needed a D = 1 bound. |
