@@ -2800,3 +2800,12 @@ import Papers.PODC2016.OhRAMAtomicMemory.Main
 import Papers.PODC2017.ObjectOrientedConsensus.Template
 import Papers.PODC2017.ObjectOrientedConsensus.PhaseKing
 import Papers.PODC2017.ObjectOrientedConsensus.BenOr
+import Papers.PODC2018.BeepingLeaderElection.Words
+import Papers.PODC2018.BeepingLeaderElection.Balanced
+import Papers.PODC2018.BeepingLeaderElection.Algorithm
+import Papers.PODC2018.BeepingLeaderElection.Counterexample
+import Papers.PODC2018.BeepingLeaderElection.Forms
+import Papers.PODC2018.BeepingLeaderElection.Rules
+import Papers.PODC2018.BeepingLeaderElection.Lemma1
+import Papers.PODC2018.BeepingLeaderElection.Theorem2
+import Papers.PODC2018.BeepingLeaderElection.Beeping
