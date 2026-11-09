@@ -2664,3 +2664,8 @@ import Papers.PODC2014.LinialLowerBoundEasy.ColouringFunctions
 import Papers.PODC2014.LinialLowerBoundEasy.LogStar
 import Papers.PODC2014.LinialLowerBoundEasy.Cycle
 import Papers.PODC2020.SelfStabHighDynamics.Main
+import Papers.PODC2026.LockFreeLinearProbing.Lemma4
+import Papers.PODC2026.LockFreeLinearProbing.Lookup
+import Papers.PODC2026.LockFreeLinearProbing.CounterexampleCAS
+import Papers.PODC2026.LockFreeLinearProbing.Prop2
+import Papers.PODC2026.LockFreeLinearProbing.LockFreeMain
