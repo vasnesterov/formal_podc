@@ -58,7 +58,7 @@ Each paper has one label: how hard it is to save what the paper set out to conve
 The label covers only what was checked. The rules are in [mistakes-labeling.md](mistakes-labeling.md) (each mistake) and
 [paper-labeling.md](paper-labeling.md) (the paper).
 
-Counts: ✅ 8, ✏️ 25, 🔧 132, 🛠️ 68, ⚠️ 74, ❌ 22 (329 papers).
+Counts: ✅ 8, ✏️ 25, 🔧 133, 🛠️ 68, ⚠️ 74, ❌ 22 (330 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -187,6 +187,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2016 | 15 | Spiegelman, Cassuto, Chockler, Keidar — *Space Bounds for Reliable Storage: Fundamental Limits of Coding* | [ReliableStorageSpace](Papers/PODC2016/ReliableStorageSpace) | ⚠️ **Weakened.** Theorem 1 is false, so the f + 1 lower bound holds only for algorithms not coding across writes. Algorithm 2 needs a local fix; the adaptive algorithm is unchecked. |
 | 2014 | 15 | Michail, Spirakis — *Simple and Efficient Local Codes for Distributed Stable Network Construction* | [NetworkConstructors](Papers/PODC2014/NetworkConstructors) | 🛠️ **Hard fix.** Global-Ring (Theorem 10) is false for n = 6; 2RC still gives the ring, the other checked protocols hold, kRC needs a new proof; running times and universality unchecked. |
 | 2016 | 15 | Bonomi, Del Pozzo, Potop-Butucaru, Tixeuil — *Optimal Mobile Byzantine Fault Tolerant Distributed Storage* | [MobileByzantineStorage](Papers/PODC2016/MobileByzantineStorage) | ❌ **Intent lost.** Both regular-register protocols (CAM, CUM) fail at the paper's own parameters and no repair is proved; only lower bounds 3 and 5 are re-proved, in a restricted model, so optimality is lost. |
+| 2015 | 15 | Di Luna, Baldoni — *Investigating the Cost of Anonymity on Dynamic Networks* | [AnonymousDynamicCounting](Papers/PODC2015/AnonymousDynamicCounting) | 🔧 **Easy fix.** The Ω(log n) counting lower bound on G(PD)₂ and the D + Ω(log n) bound for constant dynamic diameter hold for all algorithms. Lemmas 4 and 5 are each printed off by one, and the proofs of Lemma 2 and Corollary 1 have local gaps, which we closed. |
 | 2010 | 14 | Suomela — *Distributed Algorithms for Edge Dominating Sets* | [EdgeDominatingSets](Papers/PODC2010/EdgeDominatingSets) | ✏️ **Slip.** All algorithms and matching lower bounds hold as stated; the only flaw is a division by zero on edgeless graphs in the ratio computation of Section 7.8. |
 | 2015 | 14 | Ostrovsky, Rosenbaum — *Fast Distributed Almost Stable Matchings* | [AlmostStableMatchings](Papers/PODC2015/AlmostStableMatchings) | 🛠️ **Hard fix.** Deterministic ASM and its O(log^5 n) round count hold; the proof of Lemma 4.4 misses men who turn bad while inactive and needs a new charging argument; randomized variants unchecked. |
 | 2012 | 14 | Hella, Järvisalo, Kuusisto, Laurinharju, Lempiäinen, Luosto, Suomela, Virtema — *Weak Models of Distributed Computing, with Connections to Modal Logic* | [WeakModelsModalLogic](Papers/PODC2012/WeakModelsModalLogic) | 🔧 **Easy fix.** Both linear orders hold; the simulations of Theorems 4, 8 and 9 overlook stopped neighbours and are fixed locally with the claimed times; the modal-logic characterisation is unchecked. |

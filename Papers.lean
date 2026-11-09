@@ -2722,3 +2722,6 @@ import Papers.PODC2010.MobileDataSearch.Tight
 import Papers.PODC2010.MobileDataSearch.Lemma4
 import Papers.PODC2010.MobileDataSearch.Optimal
 import Papers.PODC2010.MobileDataSearch.Typical
+import Papers.PODC2015.AnonymousDynamicCounting.Kernel
+import Papers.PODC2015.AnonymousDynamicCounting.Multigraph
+import Papers.PODC2015.AnonymousDynamicCounting.Network
