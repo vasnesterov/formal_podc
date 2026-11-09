@@ -58,7 +58,7 @@ Each paper has one label: how hard it is to save what the paper set out to conve
 The label covers only what was checked. The rules are in [mistakes-labeling.md](mistakes-labeling.md) (each mistake) and
 [paper-labeling.md](paper-labeling.md) (the paper).
 
-Counts: ✅ 8, ✏️ 25, 🔧 129, 🛠️ 67, ⚠️ 74, ❌ 20 (323 papers).
+Counts: ✅ 8, ✏️ 25, 🔧 130, 🛠️ 67, ⚠️ 74, ❌ 20 (324 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -174,6 +174,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2020 | 18 | Chen, Chen — *Self-Stabilizing Leader Election in Regular Graphs* | [SSLERegular](Papers/PODC2020/SSLERegular) | ⚠️ **Weakened.** SS-Tree, the O(k^12) protocol, is refuted: all-root configurations keep every node a leader forever. SS-EulerCycle fails as printed but a one-line repair works, proved for even degree assuming the ring protocol. |
 | 2018 | 18 | Feng, Yin — *On Local Distributed Sampling and Counting* | [LocalSamplingCounting](Papers/PODC2018/LocalSamplingCounting) | 🔧 **Easy fix.** Corollary 5.2 is false: TV strong spatial mixing does not imply multiplicative mixing, a minor by-product. The cores of the main reductions and of Theorem 5.1 hold; their composition and round counts are unchecked. |
 | 2015 | 18 | Berenbrink, Klasing, Kosowski, Mallmann-Trenn, Uznański — *Improved Analysis of Deterministic Load-Balancing Schemes* | [DeterministicLoadBalancing](Papers/PODC2015/DeterministicLoadBalancing) | 🔧 **Easy fix.** Observation 3.2's constant is about twice too large; the lower bounds of Theorems 4.1-4.3 hold after local proof repairs. The upper bounds (Theorems 2.3, 3.3, Table 1) were not checked. |
+| 2016 | 18 | Montealegre, Todinca — *Brief Announcement: Deterministic Graph Connectivity in the Broadcast Congested Clique* | [BCCConnectivitySketches](Papers/PODC2016/BCCConnectivitySketches) | 🔧 **Easy fix.** The deterministic sparse sketch, one-round O(d log n) pruning and both connectivity protocols are proved; the proof of the ⌈1/ε⌉-round bound stops one round late and needs a sharper count, and Proposition 2's "girth at least 2r" must read "greater than 2r". |
 | 2015 | 17 | Bouzid, Mostéfaoui, Raynal — *Minimal Synchrony for Byzantine Consensus* | [MinimalSynchronyBC](Papers/PODC2015/MinimalSynchronyBC) | ❌ **Intent lost.** Figure 3 can block forever, so EA-Termination and consensus termination are false, and the proof of Lemma 3 fails; whether a repair works is open. Safety, CB-broadcast and adopt-commit hold. |
 | 2016 | 17 | Cadambe, Wang, Lynch — *Information-Theoretic Lower Bounds on the Storage Cost of Shared Memory Emulation* | [StorageCostLowerBounds](Papers/PODC2016/StorageCostLowerBounds) | ❌ **Intent lost.** With FIFO channels a constant-state relay refutes the bounds of Theorems 4.1, 5.1, B.1. The no-gossip bounds hold with a new assumption, ReaderQuiet. Theorem 6.5 and non-FIFO channels unchecked. |
 | 2017 | 17 | Censor-Hillel, Haeupler, Hershkowitz, Zuzic — *Broadcasting in Noisy Radio Networks* | [NoisyRadioBroadcast](Papers/PODC2017/NoisyRadioBroadcast) | 🛠️ **Hard fix.** All checked results hold, but the routing lower bound of Lemma 15 needed a new proof. The broadcast algorithms, the worst-case gap and Lemma 26 (noticed gap, undecided) were not checked. |
