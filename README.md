@@ -58,7 +58,7 @@ Each paper has one label: how hard it is to save what the paper set out to conve
 The label covers only what was checked. The rules are in [mistakes-labeling.md](mistakes-labeling.md) (each mistake) and
 [paper-labeling.md](paper-labeling.md) (the paper).
 
-Counts: ✅ 8, ✏️ 25, 🔧 129, 🛠️ 66, ⚠️ 74, ❌ 20 (322 papers).
+Counts: ✅ 8, ✏️ 25, 🔧 129, 🛠️ 67, ⚠️ 74, ❌ 20 (323 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -267,6 +267,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2012 | 5 | Aspnes, Attiya, Censor-Hillel, Ellen — *Faster than Optimal Snapshots (for a While)* | [LimitedUseSnapshots](Papers/PODC2012/LimitedUseSnapshots) | 🛠️ **Hard fix.** Algorithm 2's max array is not linearizable as published. The erratum's fix works, with a new proof; Theorem 4.2's linearization points are repaired, and the snapshot bounds stand. Section 6 is unchecked. |
 | 2023 | 5 | Naderibeni, Ruppert — *A Wait-free Queue with Polylogarithmic Step Complexity* | [WaitFreeQueuePolylog](Papers/PODC2023/WaitFreeQueuePolylog) | 🔧 **Easy fix.** Lines 13 and 78 of Fig. 4 break linearizability as printed; one-line repairs restore Theorem 18 and wait-freedom. The dequeue bound is checked only in parts, the bounded-space version not at all. |
 | 2020 | 5 | Baïg, Hendler, Milani, Travers — *Long-Lived Snapshots with Polylogarithmic Amortized Step Complexity* | [LongLivedSnapshotsPolylog](Papers/PODC2020/LongLivedSnapshotsPolylog) | 🛠️ **Hard fix.** Lemmas 3.3 and 3.4 are false. Linearizability of the max array needed a new proof; wait-freedom and the snapshot hold after local repairs. The amortized bounds are checked only in their counting cores. |
+| 2024 | 5 | Ramseyer, Goel — *Brief Announcement: Fair Ordering via Streaming Social Choice Theory* | [FairOrderingSocialChoice](Papers/PODC2024/FairOrderingSocialChoice) | 🛠️ **Hard fix.** Ranked Pairs is (γ, f/n)-minimally-batch-order-fair for every γ, and the streaming Algorithm 3 is monotonic and consistent with it once its always-empty output rule is fixed; Lemma 3.4 needed a new proof, and Lemma 3.6 (recovering batches) is false. Liveness (Section 6) not checked. |
 | 2025 | 4 | Constantinescu, Dufay, Ghinea, Wattenhofer — *Byzantine Stable Matching* | [ByzantineStableMatching](Papers/PODC2025/ByzantineStableMatching) | 🔧 **Easy fix.** All characterizations hold for k ≥ 2 but fail for the degenerate k = 1; two necessity proofs are repaired locally. Sufficiency assumes Theorems 8, 9 and the cited broadcast protocols. |
 | 2024 | 4 | Attiya, Bender, Farach-Colton, Oshman, Schiller — *History-Independent Concurrent Objects* | [HistoryIndependent](Papers/PODC2024/HistoryIndependent) | 🛠️ **Hard fix.** All impossibilities and algorithms hold for at least two processes; the broken proof of the universal construction (Theorem 32) needed a new proof, done for one fixed interleaving of its parallel blocks. |
 | 2021 | 4 | Ovens — *The Space Complexity of Scannable Binary Objects* | [ScannableBinaryObjects](Papers/PODC2021/ScannableBinaryObjects) | 🔧 **Easy fix.** Lower bounds and the lock-free upper bound hold; two proof steps need local changes, the abstract drops the body's conditions on k and n, and Observation 3 fails only from configurations never used. |
