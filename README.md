@@ -58,7 +58,7 @@ Each paper has one label: how hard it is to save what the paper set out to conve
 The label covers only what was checked. The rules are in [mistakes-labeling.md](mistakes-labeling.md) (each mistake) and
 [paper-labeling.md](paper-labeling.md) (the paper).
 
-Counts: ✅ 8, ✏️ 25, 🔧 129, 🛠️ 66, ⚠️ 73, ❌ 20 (321 papers).
+Counts: ✅ 8, ✏️ 25, 🔧 129, 🛠️ 66, ⚠️ 74, ❌ 20 (322 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -385,6 +385,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2014 | 0 | Raynal, Stainer, Taubenfeld — *Brief Announcement: Distributed Universality: Contention-Awareness; Wait-Freedom; Object Progress, and Other Properties* | [DistributedUniversality](Papers/PODC2014/DistributedUniversality) | ⚠️ **Weakened.** Figure 2 is not contention-aware, a property in the title, and no repair is proved; linearizability, wait-freedom, progress of l objects and the necessity and sufficiency of (k,l)-SC hold, some with new proofs. |
 | 2012 | 0 | Raynal, Stainer — *Brief Announcement: Increasing the Power of the Iterated Immediate Snapshot Model with Failure Detectors* | [IteratedSnapshotFD](Papers/PODC2012/IteratedSnapshotFD) | ⚠️ **Weakened.** The generic simulation of Figure 3 fails for Sigma, with no repair proved; the simulations for Omega_k and ◇P and the consensus algorithm hold; Theorem 1, the converse simulation, was not checked. |
 | 2020 | 0 | Altisen, Devismes, Durand, Johnen, Petit — *Brief Announcement: Self-stabilizing Systems in Spite of High Dynamics* | [SelfStabHighDynamics](Papers/PODC2020/SelfStabHighDynamics) | 🔧 **Easy fix.** All results hold: the impossibilities on closure, knowledge of n and unbounded stabilization time, and the three leader election algorithms with their 3Δ, 2Δ and Δ+1 bounds. Lemmas 6 and 11 needed short local repairs; Corollary 1 and Theorem 6 have only slips. |
+| 2026 | 0 | Attiya, Oshman, Schiller — *Brief Announcement: A Space-Efficient Lock-Free Linear-Probing Hash Table* | [LockFreeLinearProbing](Papers/PODC2026/LockFreeLinearProbing) | ⚠️ **Weakened.** The CAS version of Theorem 1 is not linearizable (2 processes, 2 cells). For the main LL/SC version, lock-freedom, wait-free lookups, Lemma 4 and Propositions 2–3 hold; its linearizability was only model-checked, not proved. |
 
 ## Papers with critical mistakes
 
