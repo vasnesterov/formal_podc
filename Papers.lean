@@ -2669,3 +2669,10 @@ import Papers.PODC2026.LockFreeLinearProbing.Lookup
 import Papers.PODC2026.LockFreeLinearProbing.CounterexampleCAS
 import Papers.PODC2026.LockFreeLinearProbing.Prop2
 import Papers.PODC2026.LockFreeLinearProbing.LockFreeMain
+import Papers.PODC2024.FairOrderingSocialChoice.Defs
+import Papers.PODC2024.FairOrderingSocialChoice.RankedPairs
+import Papers.PODC2024.FairOrderingSocialChoice.Theorem41
+import Papers.PODC2024.FairOrderingSocialChoice.Impossibility
+import Papers.PODC2024.FairOrderingSocialChoice.Batches
+import Papers.PODC2024.FairOrderingSocialChoice.Themis
+import Papers.PODC2024.FairOrderingSocialChoice.Streaming
