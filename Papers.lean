@@ -2694,3 +2694,9 @@ import Papers.PODC2014.GracefulKSetAgreement.MajInf
 import Papers.PODC2014.GracefulKSetAgreement.Decide
 import Papers.PODC2014.GracefulKSetAgreement.Concrete
 import Papers.PODC2014.GracefulKSetAgreement.Theorem11
+import Papers.PODC2019.ReconfigurableCommit.Spec
+import Papers.PODC2019.ReconfigurableCommit.LemmaA3
+import Papers.PODC2019.ReconfigurableCommit.Protocol
+import Papers.PODC2019.ReconfigurableCommit.Counterexample
+import Papers.PODC2019.ReconfigurableCommit.Main
+import Papers.PODC2019.ReconfigurableCommit.NonVacuity
