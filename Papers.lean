@@ -2778,3 +2778,7 @@ import Papers.PODC2010.GroupMutexLogRMR.StepWrite
 import Papers.PODC2010.GroupMutexLogRMR.StepSwitch
 import Papers.PODC2010.GroupMutexLogRMR.Safety
 import Papers.PODC2010.GroupMutexLogRMR.BoundedExit
+import Papers.PODC2017.FenceInsertionChain.Basic
+import Papers.PODC2017.FenceInsertionChain.Program
+import Papers.PODC2017.FenceInsertionChain.MultiCut
+import Papers.PODC2017.FenceInsertionChain.Greedy
