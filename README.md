@@ -58,7 +58,7 @@ Each paper has one label: how hard it is to save what the paper set out to conve
 The label covers only what was checked. The rules are in [mistakes-labeling.md](mistakes-labeling.md) (each mistake) and
 [paper-labeling.md](paper-labeling.md) (the paper).
 
-Counts: ✅ 8, ✏️ 25, 🔧 132, 🛠️ 67, ⚠️ 74, ❌ 22 (328 papers).
+Counts: ✅ 8, ✏️ 25, 🔧 132, 🛠️ 68, ⚠️ 74, ❌ 22 (329 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -345,6 +345,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2011 | 1 | Kentros, Kiayias — *Solving the At-Most-Once Problem with Nearly Optimal Effectiveness* | [AtMostOnceEffectiveness](Papers/PODC2011/AtMostOnceEffectiveness) | 🔧 **Easy fix.** KKβ is safe, wait-free and has effectiveness n - 2m + 2; Theorem 4.4's equality holds only at f = m - 1, a local correction. Work complexity, IterativeKK and Write-All unchecked. |
 | 2020 | 1 | Attiya, Kumari, Somani, Welch — *Brief Announcement: Collect in the Presence of Continuous Churn with Application to Snapshots and Lattice Agreement* | [StoreCollectChurn](Papers/PODC2020/StoreCollectChurn) | ❌ **Intent lost.** CCC is not regular: a 5-node run without churn or crashes refutes Theorem 6 and Corollary 7, and no repair is proved. The snapshot over any regular store-collect and the churn arithmetic hold. |
 | 2023 | 1 | Jayanti, Jayanti, Jayanti — *Brief Announcement: Efficient Recoverable Writable-CAS* | [DuraCAS](Papers/PODC2023/DuraCAS) | 🛠️ **Hard fix.** Durable linearizability, detectability and constant time hold under a per-process recovery rule, not the stated per-object one; the proof needed a new invariant and a refinement. Space bound not formalized. |
+| 2010 | 1 | Bar-Noy, Cheilaris, Feng, Levin — *Finding mobile data under delay constraints with searching costs* | [MobileDataSearch](Papers/PODC2010/MobileDataSearch) | 🛠️ **Hard fix.** FRO's tight 8/7 (arbitrary tokens) and (4+√7)/6 (typical tokens) two-round ratios hold for every N, but the paper's proof via the reduction to N = 3, 4 (Lemma 4) has a false step and Lemmas 5–6 are omitted; we re-proved both theorems by a direct bracketing argument. |
 | 2026 | 0 | Attiya, Flam, Welch — *Why Canonical-Round Algorithms Fail for Optimal Byzantine Resilience* | [CanonicalRoundByzantine](Papers/PODC2026/CanonicalRoundByzantine) | 🛠️ **Hard fix.** Lower bounds and gather results stand. Corollary 10's broadcast proof covers only n > 4f and needed a new direct argument; the abstract's n > 5f boundary must exclude broadcast. |
 | 2026 | 0 | D'Archivio, AlMahmoud, Natale, Mallmann-Trenn — *Order Statistics in Population Protocols via Simple Dynamics* | [OrderStatisticsPP](Papers/PODC2026/OrderStatisticsPP) | ⚠️ **Weakened.** All closed-form fixation laws stand, Proposition 6 with new proofs and Theorem 7 with a repaired definition. Theorem 1's O(log n) convergence time rests on an invalid proof and stays unproved. |
 | 2026 | 0 | Nolin — *Sinkless Orientation Made Trivial* | [SinklessOrientation](Papers/PODC2026/SinklessOrientation) | ✏️ **Slip.** Only slips. The deterministic algorithm is correct in O(log_δ n) LOCAL rounds; the CONGEST implementation of the repair step, the randomized bound and the cited lower bounds were not checked. |

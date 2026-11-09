@@ -2715,3 +2715,10 @@ import Papers.PODC2015.StabilizingByzStorage.RegularSafety
 import Papers.PODC2015.StabilizingByzStorage.RegularLiveness
 import Papers.PODC2015.StabilizingByzStorage.Theorem1
 import Papers.PODC2015.StabilizingByzStorage.Robust
+import Papers.PODC2010.MobileDataSearch.Basic
+import Papers.PODC2010.MobileDataSearch.Ineq
+import Papers.PODC2010.MobileDataSearch.TwoRounds
+import Papers.PODC2010.MobileDataSearch.Tight
+import Papers.PODC2010.MobileDataSearch.Lemma4
+import Papers.PODC2010.MobileDataSearch.Optimal
+import Papers.PODC2010.MobileDataSearch.Typical
