@@ -137,3 +137,6 @@ import Podc.Computability.Distributed.SharedMemory.Resilience
 import Podc.Foundations.GameTheory.NeverBestResponse
 import Podc.Computability.Distributed.Beeping.Basic
 import Podc.Computability.Languages.SubwordClosed
+import Podc.Computability.Distributed.MessagePassing.Causality.Basic
+import Podc.Computability.Distributed.MessagePassing.Causality.MergeAlg
+import Podc.Computability.Distributed.MessagePassing.Causality.VectorClock
