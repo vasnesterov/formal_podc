@@ -2700,3 +2700,11 @@ import Papers.PODC2019.ReconfigurableCommit.Protocol
 import Papers.PODC2019.ReconfigurableCommit.Counterexample
 import Papers.PODC2019.ReconfigurableCommit.Main
 import Papers.PODC2019.ReconfigurableCommit.NonVacuity
+import Papers.PODC2011.CompactPolicyRouting.Tree
+import Papers.PODC2011.CompactPolicyRouting.Product
+import Papers.PODC2011.CompactPolicyRouting.Algebra
+import Papers.PODC2011.CompactPolicyRouting.Paths
+import Papers.PODC2011.CompactPolicyRouting.Routing
+import Papers.PODC2011.CompactPolicyRouting.NoStretch
+import Papers.PODC2011.CompactPolicyRouting.Compressibility
+import Papers.PODC2011.CompactPolicyRouting.Cowen
