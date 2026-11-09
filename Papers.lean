@@ -2676,3 +2676,9 @@ import Papers.PODC2024.FairOrderingSocialChoice.Impossibility
 import Papers.PODC2024.FairOrderingSocialChoice.Batches
 import Papers.PODC2024.FairOrderingSocialChoice.Themis
 import Papers.PODC2024.FairOrderingSocialChoice.Streaming
+import Papers.PODC2016.BCCConnectivitySketches.Model
+import Papers.PODC2016.BCCConnectivitySketches.Sketch
+import Papers.PODC2016.BCCConnectivitySketches.Pruning
+import Papers.PODC2016.BCCConnectivitySketches.Supernodes
+import Papers.PODC2016.BCCConnectivitySketches.Cycles
+import Papers.PODC2016.BCCConnectivitySketches.Connectivity
