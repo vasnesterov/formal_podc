@@ -2731,3 +2731,11 @@ import Papers.PODC2011.BestResponseMechanisms.CostSharing
 import Papers.PODC2011.BestResponseMechanisms.Applications
 import Papers.PODC2011.BestResponseMechanisms.BGP
 import Papers.PODC2011.BestResponseMechanisms.StableRoommates
+import Papers.PODC2012.OptimismConcurrency.Serializability
+import Papers.PODC2012.OptimismConcurrency.Composition
+import Papers.PODC2012.OptimismConcurrency.IRMReject
+import Papers.PODC2012.OptimismConcurrency.LLCorrect
+import Papers.PODC2012.OptimismConcurrency.HistLemmas
+import Papers.PODC2012.OptimismConcurrency.Lookahead
+import Papers.PODC2012.OptimismConcurrency.Theorem7
+import Papers.PODC2012.OptimismConcurrency.Corollary4
