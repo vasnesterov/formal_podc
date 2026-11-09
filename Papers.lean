@@ -2797,3 +2797,6 @@ import Papers.PODC2016.OhRAMAtomicMemory.SafetyInv
 import Papers.PODC2016.OhRAMAtomicMemory.SafetyRecv
 import Papers.PODC2016.OhRAMAtomicMemory.Safety
 import Papers.PODC2016.OhRAMAtomicMemory.Main
+import Papers.PODC2017.ObjectOrientedConsensus.Template
+import Papers.PODC2017.ObjectOrientedConsensus.PhaseKing
+import Papers.PODC2017.ObjectOrientedConsensus.BenOr
