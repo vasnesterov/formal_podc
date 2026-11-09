@@ -58,7 +58,7 @@ Each paper has one label: how hard it is to save what the paper set out to conve
 The label covers only what was checked. The rules are in [mistakes-labeling.md](mistakes-labeling.md) (each mistake) and
 [paper-labeling.md](paper-labeling.md) (the paper).
 
-Counts: ✅ 8, ✏️ 27, 🔧 135, 🛠️ 68, ⚠️ 74, ❌ 24 (336 papers).
+Counts: ✅ 8, ✏️ 27, 🔧 136, 🛠️ 68, ⚠️ 74, ❌ 24 (337 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -296,6 +296,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2019 | 4 | Jayanti, Jayanti — *Constant Amortized RMR Abortable Mutex for CC and DSM* | [AbortableMutexAmortized](Papers/PODC2019/AbortableMutexAmortized) | 🔧 **Easy fix.** Algorithm 1 and all its bounds hold; AFCFS as defined is unsatisfiable and needs one added case, f lacks a value at line 11, and the invariant of Theorem 4.1 needs one conjunct. |
 | 2020 | 4 | Alistarh, Aspnes, Ellen, Gelashvili, Zhu — *Brief Announcement: Why Extension-Based Proofs Fail* | [WhyExtensionBased](Papers/PODC2020/WhyExtensionBased) | 🛠️ **Hard fix.** The limitation result stands, but the adversary needs a new output-query rule and Lemma 4.13 a new proof; provers interleaving an infinite chain with others are not covered in Lean. |
 | 2011 | 4 | Rétvári, Gulyás, Heszberger, Csernai, Bíró — *Compact policy routing* | [CompactPolicyRouting](Papers/PODC2011/CompactPolicyRouting) | 🔧 **Easy fix.** Checked on the thesis version. The algebraic compressibility results hold modulo slips. The generalized Cowen scheme's non-strict balls can give linear tables, and a strict tie-breaking key fixes it with stretch 3 proved. The no-stretch-k lower bound needed a corrected graph family. |
+| 2016 | 4 | Hadjistasi, Nicolaou, Schwarzmann — *Brief Announcement: Oh-RAM! One and a Half Round Read/Write Atomic Memory* | [OhRAMAtomicMemory](Papers/PODC2016/OhRAMAtomicMemory) | 🔧 **Easy fix.** OhSam, OhMam, OhSam' and OhMam' are atomic and terminate with fewer than half of the servers crashed; only Table 1's read message complexity is false, because stale relays re-trigger readAcks, and nesting one line restores it. |
 | 2024 | 3 | Chang, Mishra, Nguyen, Yang, Yeh — *A Tight Lower Bound for 3-Coloring Grids in the Online-LOCAL Model* | [OnlineLocalGrids](Papers/PODC2024/OnlineLocalGrids) | ✏️ **Slip.** Theorems 1.1 and 1.3 are proved with explicit constants; Theorem 1.3 omits that √n must be odd, as its proof assumes. The k-partite results were not checked. |
 | 2023 | 3 | Bashari, Jamadi, Woelfel — *Efficient Bounded Timestamping from Standard Synchronization Primitives* | [BoundedTimestamping](Papers/PODC2023/BoundedTimestamping) | ❌ **Intent lost.** Figures 1–2 are not linearizable (Lean counterexample, 3 processes) and a separate-link repair is unproved; Observation 13 is also false. The constant step bound and Section 6 hold. |
 | 2022 | 3 | Dory, Ghaffari, Ilchi — *Near-Optimal Distributed Dominating Set in Bounded Arboricity Graphs* | [DominatingSetArboricity](Papers/PODC2022/DominatingSetArboricity) | 🔧 **Easy fix.** Main approximation theorems hold; Theorem 1.3's arithmetic, Observation A.1 on K₂ and Lemma 4.7 need local repairs. The lower bound is checked only as a combinatorial reduction. |
