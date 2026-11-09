@@ -2725,3 +2725,9 @@ import Papers.PODC2010.MobileDataSearch.Typical
 import Papers.PODC2015.AnonymousDynamicCounting.Kernel
 import Papers.PODC2015.AnonymousDynamicCounting.Multigraph
 import Papers.PODC2015.AnonymousDynamicCounting.Network
+import Papers.PODC2011.BestResponseMechanisms.Mechanism
+import Papers.PODC2011.BestResponseMechanisms.Counterexamples
+import Papers.PODC2011.BestResponseMechanisms.CostSharing
+import Papers.PODC2011.BestResponseMechanisms.Applications
+import Papers.PODC2011.BestResponseMechanisms.BGP
+import Papers.PODC2011.BestResponseMechanisms.StableRoommates
