@@ -58,7 +58,7 @@ Each paper has one label: how hard it is to save what the paper set out to conve
 The label covers only what was checked. The rules are in [mistakes-labeling.md](mistakes-labeling.md) (each mistake) and
 [paper-labeling.md](paper-labeling.md) (the paper).
 
-Counts: ✅ 8, ✏️ 24, 🔧 128, 🛠️ 66, ⚠️ 73, ❌ 20 (319 papers).
+Counts: ✅ 8, ✏️ 25, 🔧 128, 🛠️ 66, ⚠️ 73, ❌ 20 (320 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -158,6 +158,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2016 | 23 | Halpern, Vilaça — *Rational Consensus* | [RationalConsensus](Papers/PODC2016/RationalConsensus) | 🛠️ **Hard fix.** Theorem 1 and Theorem 2 hold, the latter after a new counting argument replaces its wrong agreement proof; the rest are slips in Algorithm 1. The equilibrium results, Theorems 3 and 4, are unchecked. |
 | 2015 | 23 | Baruch, Fraigniaud, Patt-Shamir — *Randomized Proof-Labeling Schemes* | [RandomizedPLS](Papers/PODC2015/RandomizedPLS) | 🔧 **Easy fix.** Compiler and universal bound hold. The crossing lower bounds fail for an illegal G but hold for a legal G, which every application has. MST bounds and upper bounds of Theorems 5.2-5.3 are unchecked. |
 | 2010 | 23 | Serafini, Dobre, Majuntke, Bokor, Suri — *Eventually Linearizable Shared Objects* | [EventualLinearizability](Papers/PODC2010/EventualLinearizability) | ❌ **Intent lost.** Algorithm 1 is not weakly consistent, so Eventual Consensus is not shown sufficient; nonblocking and Lemma 5 are false. Locality and Theorem 2 hold; Theorem 4 and Aurora are unchecked. |
+| 2014 | 23 | Laurinharju, Suomela — *Brief Announcement: Linial's Lower Bound Made Easy* | [LinialLowerBoundEasy](Papers/PODC2014/LinialLowerBoundEasy) | ✏️ **Slip.** Linial's bound T ≥ log*(n)/2 − 1, the reduction to colouring functions and Lemmas 1–2 hold for every n; Lemma 2 is stated for every k but fails in the unused case k = 1. |
 | 2023 | 22 | Civit, Gilbert, Guerraoui, Komatovic, Vidigueira — *On the Validity of Consensus* | [ValidityConsensus](Papers/PODC2023/ValidityConsensus) | 🔧 **Easy fix.** Classification and the Ω(t²) bound hold; Lemma 3's proof needs a local repair for n < 2t. Universal's O(n²) messages, and sufficiency with clock drift and sleeping processes, are unchecked. |
 | 2019 | 22 | Aghazadeh, Imbs, Raynal, Taubenfeld, Woelfel — *Optimal Memory-Anonymous Symmetric Deadlock-Free Mutual Exclusion* | [AnonymousMutex](Papers/PODC2019/AnonymousMutex) | ⚠️ **Weakened.** Algorithm 1 livelocks at n = 4, m = 5, so the read/write characterization has only its necessity half. The read/modify/write characterization holds, with a new proof of Theorem 4. |
 | 2012 | 22 | Hirvonen, Suomela — *Distributed Maximal Matching: Greedy is Optimal* | [MaximalMatching](Papers/PODC2012/MaximalMatching) | 🔧 **Easy fix.** The k - 1 lower bound and Ω(Δ) hold; the proof omits the passage from infinite colour systems to finite graphs, closed by a short 2^k-copies construction. |

@@ -2660,3 +2660,6 @@ import Papers.PODC2010.MultiVersionSTM.Scenario3
 import Papers.PODC2010.MultiVersionSTM.Theorem3
 import Papers.PODC2010.MultiVersionSTM.SmallSnapshot
 import Papers.PODC2010.MultiVersionSTM.Theorem3False
+import Papers.PODC2014.LinialLowerBoundEasy.ColouringFunctions
+import Papers.PODC2014.LinialLowerBoundEasy.LogStar
+import Papers.PODC2014.LinialLowerBoundEasy.Cycle
