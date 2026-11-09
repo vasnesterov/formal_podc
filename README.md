@@ -58,7 +58,7 @@ Each paper has one label: how hard it is to save what the paper set out to conve
 The label covers only what was checked. The rules are in [mistakes-labeling.md](mistakes-labeling.md) (each mistake) and
 [paper-labeling.md](paper-labeling.md) (the paper).
 
-Counts: ✅ 8, ✏️ 27, 🔧 136, 🛠️ 68, ⚠️ 75, ❌ 24 (338 papers).
+Counts: ✅ 8, ✏️ 27, 🔧 137, 🛠️ 68, ⚠️ 75, ❌ 24 (339 papers).
 
 Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar counts, October 2026).
 
@@ -308,6 +308,7 @@ Sorted by citation count (the maximum of the OpenAlex and Semantic Scholar count
 | 2021 | 3 | Dani, Gupta, Hayes, Pettie — *Brief Announcement: Wake Up and Join Me! An Energy Efficient Algorithm for Maximal Matching in Radio Networks* | [WakeUpMatching](Papers/PODC2021/WakeUpMatching) | 🛠️ **Hard fix.** Maximal matching w.h.p. holds; Theorem 6.3 needed a new proof, Theorem 6.5 has load k + 1 and a repaired coverage proof; the energy bound for Delta >= 2 was not checked. |
 | 2020 | 3 | Shimi, Castañeda — *K-set agreement bounds in round-based models through combinatorial topology* | [RoundBasedKSetTopology](Papers/PODC2020/RoundBasedKSetTopology) | ❌ **Intent lost.** General lower bounds (Theorems 5.4, 6.11) are false on a single star and the tight bound for stars loses its proof; all upper bounds and the single-graph lower bounds hold. |
 | 2018 | 3 | Xiang, Vaidya — *Brief Announcement: Partially Replicated Causally Consistent Shared Memory* | [PartialReplicationCausal](Papers/PODC2018/PartialReplicationCausal) | 🛠️ **Hard fix.** Theorems 1 and 3 (necessary and sufficient timestamp condition) hold with new proofs; Lemma 4 and footnote 2 are false; the timestamp-size lower bound was not checked. |
+| 2018 | 3 | Dufoulon, Burman, Beauquier — *Brief Announcement: Beeping a Time-Optimal Leader Election* | [BeepingLeaderElection](Papers/PODC2018/BeepingLeaderElection) | 🔧 **Easy fix.** Lemma 1 fails for Algorithm 1 as printed (rule 1 before rule 2); with [5]'s largest-deletion rule, Lemma 1, Theorem 2 and the O(D + log n) beeping eventual election are proved. The headline terminating election (Theorem 6) is unchecked. |
 | 2025 | 2 | Jayanti — *On Interplanetary and Relativistic Distributed Computing* | [RelativisticComputing](Papers/PODC2025/RelativisticComputing) | 🔧 **Easy fix.** The Central Theorem fails only for uncountably many processors; Lemma 6.3's proof wrongly assumes order type ω and two definitions need local fixes, after which Theorems 6.7 and 6.8 hold. |
 | 2025 | 2 | Castañeda, Rodríguez — *Asynchronous Fault-Tolerant Language Decidability for Runtime Verification of Distributed Systems* | [LanguageDecidability](Papers/PODC2025/LanguageDecidability) | ⚠️ **Weakened.** Theorem 5.2 and the impossibilities hold, but WEC_COUNT is not in WD as defined, SD ⊊ WD needs a changed language, and the proof of PSD ⊂ PWD (Lemma 6.4) is broken and unsaved. |
 | 2024 | 2 | Ovens — *Determining Recoverable Consensus Numbers* | [RecoverableConsensus](Papers/PODC2024/RecoverableConsensus) | 🔧 **Easy fix.** Robustness and the T_{n,n′} separation both hold: false steps in the proofs of Lemmas 15 and 16 have local repairs, and Observation 5 needs an implied hypothesis. |
