@@ -2809,3 +2809,12 @@ import Papers.PODC2018.BeepingLeaderElection.Rules
 import Papers.PODC2018.BeepingLeaderElection.Lemma1
 import Papers.PODC2018.BeepingLeaderElection.Theorem2
 import Papers.PODC2018.BeepingLeaderElection.Beeping
+import Papers.PODC2012.TVGWaitingExpressivity.Basic
+import Papers.PODC2012.TVGWaitingExpressivity.Encoding
+import Papers.PODC2012.TVGWaitingExpressivity.NoWait
+import Papers.PODC2012.TVGWaitingExpressivity.BoundedWait
+import Papers.PODC2012.TVGWaitingExpressivity.FromDFA
+import Papers.PODC2012.TVGWaitingExpressivity.Wait
+import Papers.PODC2012.TVGWaitingExpressivity.Rado
+import Papers.PODC2012.TVGWaitingExpressivity.ExampleG1
+import Papers.PODC2012.TVGWaitingExpressivity.Computable
