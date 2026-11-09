@@ -2756,3 +2756,13 @@ import Papers.PODC2026.RandomizedWaitFreeLocks.Alg2Model
 import Papers.PODC2026.RandomizedWaitFreeLocks.Alg2Inv
 import Papers.PODC2026.RandomizedWaitFreeLocks.Alg2
 import Papers.PODC2026.RandomizedWaitFreeLocks.Alg3
+import Papers.PODC2016.WeakCrashFailures.Failures
+import Papers.PODC2016.WeakCrashFailures.Fig1Model
+import Papers.PODC2016.WeakCrashFailures.Fig1Inv
+import Papers.PODC2016.WeakCrashFailures.Fig1Step
+import Papers.PODC2016.WeakCrashFailures.Fig1Safety
+import Papers.PODC2016.WeakCrashFailures.Fig1Ranks
+import Papers.PODC2016.WeakCrashFailures.Fig1Live
+import Papers.PODC2016.WeakCrashFailures.Fig1Main
+import Papers.PODC2016.WeakCrashFailures.Fig2
+import Papers.PODC2016.WeakCrashFailures.Impossibility
