@@ -2663,3 +2663,4 @@ import Papers.PODC2010.MultiVersionSTM.Theorem3False
 import Papers.PODC2014.LinialLowerBoundEasy.ColouringFunctions
 import Papers.PODC2014.LinialLowerBoundEasy.LogStar
 import Papers.PODC2014.LinialLowerBoundEasy.Cycle
+import Papers.PODC2020.SelfStabHighDynamics.Main
